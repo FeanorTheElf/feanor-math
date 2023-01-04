@@ -119,6 +119,19 @@ pub trait RingBase {
     }
 }
 
+macro_rules! delegate {
+    (fn $name:ident (&self, $($pname:ident: $ptype:ty),*) -> $rtype:ty) => {
+        fn $name (&self, $($pname: $ptype),*) -> $rtype {
+            self.get_ring().$name($($pname),*)
+        }
+    };
+    (fn $name:ident (&self) -> $rtype:ty) => {
+        fn $name (&self) -> $rtype {
+            self.get_ring().$name()
+        }
+    };
+}
+
 ///
 /// Basic trait for objects that store (in some sense) a ring. This can
 /// be a ring-by-value, a reference to a ring, or a box to a ring. Note
@@ -147,6 +160,20 @@ pub trait RingWrapper {
     {
         self.get_ring().map_out(to.get_ring(), el)
     }
+
+    fn sum<I>(&self, els: I) -> El<Self> 
+        where I: Iterator<Item = El<Self>>
+    {
+        els.fold(self.zero(), |a, b| self.add(a, b))
+    }
+
+    delegate!{fn add_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
+    delegate!{fn sub_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
+    delegate!{fn add_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
+    delegate!{fn zero(&self) -> El<Self> }
+    delegate!{fn add(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
+    delegate!{fn mul_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{fn add_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
 
     fn base_ring<'a>(&'a self) -> &'a <Self::Type as RingExtension>::BaseRing
         where Self::Type: RingExtension
@@ -233,6 +260,12 @@ pub type El<R> = <<R as RingWrapper>::Type as RingBase>::Element;
 #[derive(Copy, Clone)]
 pub struct RingValue<R: RingBase> {
     ring: R
+}
+
+impl<R: RingBase> RingValue<R> {
+    pub const fn new(value: R) -> Self {
+        RingValue { ring: value }
+    }
 }
 
 impl<R: RingBase> RingWrapper for RingValue<R> {
