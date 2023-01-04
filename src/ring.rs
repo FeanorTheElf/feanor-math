@@ -167,13 +167,36 @@ pub trait RingWrapper {
         els.fold(self.zero(), |a, b| self.add(a, b))
     }
 
-    delegate!{fn add_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
-    delegate!{fn sub_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
-    delegate!{fn add_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
-    delegate!{fn zero(&self) -> El<Self> }
-    delegate!{fn add(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
-    delegate!{fn mul_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
-    delegate!{fn add_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ fn add_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
+    delegate!{ fn add_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
+    delegate!{ fn sub_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
+    delegate!{ fn negate_inplace(&self, lhs: &mut El<Self>) -> () }
+    delegate!{ fn mul_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
+    delegate!{ fn mul_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
+    delegate!{ fn zero(&self) -> El<Self> }
+    delegate!{ fn one(&self) -> El<Self> }
+    delegate!{ fn neg_one(&self) -> El<Self> }
+    delegate!{ fn from_z(&self, value: i32) -> El<Self> }
+    delegate!{ fn eq(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
+    delegate!{ fn is_zero(&self, value: &El<Self>) -> bool }
+    delegate!{ fn is_one(&self, value: &El<Self>) -> bool }
+    delegate!{ fn is_neg_one(&self, value: &El<Self>) -> bool }
+    delegate!{ fn is_commutative(&self) -> bool }
+    delegate!{ fn is_noetherian(&self) -> bool }
+    delegate!{ fn negate(&self, value: El<Self>) -> El<Self> }
+    delegate!{ fn sub_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
+    delegate!{ fn add_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ fn add_ref_fst(&self, lhs: &El<Self>, rhs: El<Self>) -> El<Self> }
+    delegate!{ fn add_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ fn add(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
+    delegate!{ fn sub_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ fn sub_ref_fst(&self, lhs: &El<Self>, rhs: El<Self>) -> El<Self> }
+    delegate!{ fn sub_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ fn sub(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
+    delegate!{ fn mul_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ fn mul_ref_fst(&self, lhs: &El<Self>, rhs: El<Self>) -> El<Self> }
+    delegate!{ fn mul_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ fn mul(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
 
     fn base_ring<'a>(&'a self) -> &'a <Self::Type as RingExtension>::BaseRing
         where Self::Type: RingExtension
