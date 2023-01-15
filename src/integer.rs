@@ -1,9 +1,9 @@
+use crate::primitive::StaticRingBase;
 use crate::ring::*;
+use crate::euclidean::*;
+use crate::ordered::*;
 
-pub trait IntegerRing: RingBase {
-
-    fn to_i128(&self, value: &Self::Element) -> Result<i128, ()>;
-    fn from_i128(&self, value: i128) -> Result<Self::Element, ()>;
+pub trait IntegerRing: EuclideanRing + CanonicalIso<StaticRingBase<i128>> + OrderedRing {
 
     fn abs_is_bit_set(&self, value: &Self::Element, i: usize) -> bool;
     fn abs_highest_set_bit(&self, value: &Self::Element) -> Option<usize>;

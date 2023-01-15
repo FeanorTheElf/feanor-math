@@ -21,8 +21,11 @@ pub fn generic_abs_square_and_multiply<T, F, G, I>(base: &T, power: &El<I>, int_
     return result;
 }
 
+#[cfg(test)]
+use crate::primitive::*;
+
 #[test]
 fn test_pow() {
-    assert_eq!(3 * 3, abs_square_and_multiply(&3, &2, StaticRing::<i64>::RING, |a, b| a * b, |a, b| *a * *b, 1));
-    assert_eq!(3 * 3 * 3 * 3 * 3, abs_square_and_multiply(&3, &5, StaticRing::<i64>::RING, |a, b| a * b, |a, b| *a * *b, 1));
+    assert_eq!(3 * 3, generic_abs_square_and_multiply(&3, &2, StaticRing::<i64>::RING, |a, b| a * b, |a, b| *a * *b, 1));
+    assert_eq!(3 * 3 * 3 * 3 * 3, generic_abs_square_and_multiply(&3, &5, StaticRing::<i64>::RING, |a, b| a * b, |a, b| *a * *b, 1));
 }

@@ -1,8 +1,9 @@
-use std::{ops::{AddAssign, SubAssign, MulAssign, Neg}, marker::PhantomData};
-use crate::ring::*;
+use std::{ops::{AddAssign, SubAssign, MulAssign, Neg, Div, Rem}, marker::PhantomData};
+use crate::{ring::*, euclidean::EuclideanRing, divisibility::DivisibilityRing, ordered::OrderedRing};
 use crate::integer::*;
+use crate::algorithms::multiply::KaratsubaHint;
 
-pub trait PrimitiveInt: AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Eq + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy {}
+pub trait PrimitiveInt: AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Eq + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy + Div<Self, Output = Self> + Rem<Self, Output = Self> {}
 
 impl PrimitiveInt for i8 {}
 impl PrimitiveInt for i16 {}
@@ -10,25 +11,71 @@ impl PrimitiveInt for i32 {}
 impl PrimitiveInt for i64 {}
 impl PrimitiveInt for i128 {}
 
-impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
-    
-    fn to_i128(&self, value: &Self::Element) -> Result<i128, ()> {
-        Ok((*value).into())
+impl<T: PrimitiveInt, S: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for StaticRingBase<S> {
+
+    fn has_canonical_hom(&self, _: &StaticRingBase<T>) -> bool {
+        true
     }
 
-    fn from_i128(&self, value: i128) -> Result<Self::Element, ()> {
-        T::try_from(value).map_err(|_| ())
+    fn map_in(&self, _: &StaticRingBase<T>, el: T) -> S {
+        S::try_from(el.into()).map_err(|_| ()).unwrap()
     }
+}
+
+impl<T: PrimitiveInt, S: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for StaticRingBase<S> {
+    
+    fn has_canonical_iso(&self, _: &StaticRingBase<T>) -> bool {
+        true
+    }
+
+    fn map_out(&self, _: &StaticRingBase<T>, el: S) -> T {
+        T::try_from(el.into()).map_err(|_| ()).unwrap()
+    }
+}
+
+impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
+    
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        let (div, rem) = self.euclidean_div_rem(*lhs, rhs);
+        if self.is_zero(&rem) {
+            return Some(div);
+        } else {
+            return None;
+        }
+    }
+}
+
+impl<T: PrimitiveInt> EuclideanRing for StaticRingBase<T> {
+    
+    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+        (lhs / *rhs, lhs % *rhs)
+    }
+
+    fn euclidean_deg(&self, val: &Self::Element) -> usize {
+        self.map_out(StaticRing::<i128>::RING.get_ring(), *val).abs() as usize
+    }
+}
+
+impl<T: PrimitiveInt> OrderedRing for StaticRingBase<T> {
+    
+    fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
+        self.map_out(StaticRing::<i128>::RING.get_ring(), *lhs).cmp(
+            &self.map_out(StaticRing::<i128>::RING.get_ring(), *rhs)
+        )
+    }
+}
+
+impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
 
     fn abs_is_bit_set(&self, value: &Self::Element, i: usize) -> bool {
-        match self.to_i128(value).unwrap() {
+        match self.map_out(StaticRing::<i128>::RING.get_ring(), *value) {
             i128::MIN => i == i128::BITS as usize - 1,
             x => (x.abs() >> i) & 1 == 1
         }
     }
 
     fn abs_highest_set_bit(&self, value: &Self::Element) -> Option<usize> {
-        match self.to_i128(value).unwrap() {
+        match self.map_out(StaticRing::<i128>::RING.get_ring(), *value) {
             0 => None,
             i128::MIN => Some(i128::BITS as usize - 1),
             x => Some(i128::BITS as usize - x.abs().leading_zeros() as usize - 1)
@@ -77,6 +124,10 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
+}
+
+impl<T: PrimitiveInt> KaratsubaHint for StaticRingBase<T> {
+    
 }
 
 pub type StaticRing<T> = RingValue<StaticRingBase<T>>;
