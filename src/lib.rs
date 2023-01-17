@@ -12,5 +12,6 @@ pub mod euclidean;
 pub mod ordered;
 pub mod primitive;
 pub mod integer;
+pub mod vector;
 pub mod algorithms;
 pub mod rings;
