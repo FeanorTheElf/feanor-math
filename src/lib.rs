@@ -7,6 +7,8 @@ extern crate test;
 
 #[macro_use]
 pub mod ring;
+pub mod vector;
+pub mod vectors;
 pub mod divisibility;
 pub mod euclidean;
 pub mod ordered;
