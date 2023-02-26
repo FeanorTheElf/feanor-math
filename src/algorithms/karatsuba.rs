@@ -124,7 +124,9 @@ karatsuba_impl!{
     (16, karatsuba_impl_16, karatsuba_impl_15)
 }
 
-pub fn karatsuba<R: RingWrapper + Copy>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: &[El<R>], rhs: &[El<R>], ring: R) {
+pub fn karatsuba<R, V1, V2>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: V1, rhs: V2, ring: R) 
+    where R: RingWrapper + Copy, V1: SelfSubvectorView<El<R>> + Copy, V2: SelfSubvectorView<El<R>> + Copy
+{
     if lhs.len() == 0 || rhs.len() == 0 {
         return;
     }
@@ -143,8 +145,8 @@ pub fn karatsuba<R: RingWrapper + Copy>(threshold_size_log2: usize, dst: &mut [E
                 block_size_log2, 
                 threshold_size_log2,
                 &mut dst[(i + j)..(i + j + 2 * n)], 
-                &lhs[i..(i + n)], 
-                &rhs[j..(j + n)], 
+                lhs.subvector(i..(i + n)), 
+                rhs.subvector(j..(j + n)), 
                 &mut memory[..], 
                 ring
             );
@@ -164,8 +166,8 @@ pub fn karatsuba<R: RingWrapper + Copy>(threshold_size_log2: usize, dst: &mut [E
                     block_size_log2, 
                     threshold_size_log2,
                     &mut dst[(lhs_rem + j)..(lhs_rem + j + 2 * n)], 
-                    &lhs[lhs_rem..(lhs_rem + n)], 
-                    &rhs[j..(j + n)], 
+                    lhs.subvector(lhs_rem..(lhs_rem + n)), 
+                    rhs.subvector(j..(j + n)), 
                     &mut memory[..], 
                     ring
                 );
@@ -178,8 +180,8 @@ pub fn karatsuba<R: RingWrapper + Copy>(threshold_size_log2: usize, dst: &mut [E
                     rem_block_size_log2 as usize,
                     threshold_size_log2, 
                     &mut dst[(rhs_rem + i)..(rhs_rem + i + 2 * n)], 
-                    &lhs[i..(i + n)], 
-                    &rhs[rhs_rem..(rhs_rem + n)], 
+                    lhs.subvector(i..(i + n)), 
+                    rhs.subvector(rhs_rem..(rhs_rem + n)), 
                     &mut memory[..], 
                     ring
                 );
@@ -214,7 +216,7 @@ fn test_karatsuba_impl() {
 #[test]
 fn test_karatsuba_mul() {
     let mut c = vec![0, 0, 0, 0];
-    karatsuba(0, &mut c[..], &[-1, 0], &[1, 0], StaticRing::<i64>::RING);
+    karatsuba(0, &mut c[..], &[-1, 0][..], &[1, 0][..], StaticRing::<i64>::RING);
     assert_eq!(vec![-1, 0, 0, 0], c);
 
     let a = vec![1, 0, 1, 0, 1, 2, 3];

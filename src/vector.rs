@@ -93,6 +93,24 @@ impl<T> VectorViewMut<T> for [T] {
     }
 }
 
+impl<T, const N: usize> VectorView<T> for [T; N] {
+    
+    fn len(&self) -> usize {
+        N
+    }
+
+    fn at(&self, i: usize) -> &T {
+        &(*self)[i]
+    }
+}
+
+impl<T, const N: usize> VectorViewMut<T> for [T; N] {
+    
+    fn at_mut(&mut self, i: usize) -> &mut T {
+        &mut (*self)[i]
+    }
+}
+
 impl<'a, T, V: ?Sized> VectorView<T> for &'a V 
     where V: VectorView<T>
 {

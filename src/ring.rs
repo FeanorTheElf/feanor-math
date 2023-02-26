@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use crate::{algorithms, primitive::StaticRing};
+
 ///
 /// Basic trait for objects that have a ring structure.
 /// 
@@ -214,6 +216,18 @@ pub trait RingWrapper {
         where Self::Type: RingExtension
     {
         self.get_ring().from_ref(x)
+    }
+
+    fn pow(&self, x: &El<Self>, power: usize) -> El<Self> {
+        algorithms::sqr_mul::generic_abs_square_and_multiply(
+            x, 
+            &(power as i64), 
+            StaticRing::<i64>::RING, 
+            |a, 
+            b| self.mul(a, b), 
+            |a, b| self.mul_ref(a, b), 
+            self.one()
+        )
     }
 }
 
