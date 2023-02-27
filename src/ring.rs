@@ -147,7 +147,7 @@ macro_rules! delegate {
 /// 
 pub trait RingWrapper {
     
-    type Type: RingBase;
+    type Type: RingBase + CanonicalIso<Self::Type>;
 
     fn get_ring<'a>(&'a self) -> &'a Self::Type;
     
@@ -245,6 +245,37 @@ pub trait CanonicalIso<S> : CanonicalHom<S>
     fn map_out(&self, from: &S, el: Self::Element) -> S::Element;
 }
 
+macro_rules! impl_trivial_self_iso {
+    ($ring:ty where $($args:tt)*) => {
+
+        impl<$($args)*> CanonicalHom<$ring> for $ring {
+
+            fn has_canonical_hom(&self, from: &Self) -> bool { true }
+            fn map_in(&self, from: &Self, el: Self::Element) -> Self::Element { el }
+        }
+
+        impl<$($args)*> CanonicalIso<$ring> for $ring {
+
+            fn has_canonical_iso(&self, from: &Self) -> bool { true }
+            fn map_out(&self, from: &Self, el: Self::Element) -> Self::Element { el }
+        }
+    };
+    ($ring:ty) => {
+
+        impl CanonicalHom<$ring> for $ring {
+
+            fn has_canonical_hom(&self, from: &Self) -> bool { true }
+            fn map_in(&self, from: &Self, el: Self::Element) -> Self::Element { el }
+        }
+
+        impl CanonicalIso<$ring> for $ring {
+
+            fn has_canonical_iso(&self, from: &Self) -> bool { true }
+            fn map_out(&self, from: &Self, el: Self::Element) -> Self::Element { el }
+        }
+    };
+}
+
 pub trait RingExtension: RingBase {
     type BaseRing: RingWrapper;
 
@@ -305,7 +336,7 @@ impl<R: RingBase> RingValue<R> {
     }
 }
 
-impl<R: RingBase> RingWrapper for RingValue<R> {
+impl<R: RingBase + CanonicalIso<R>> RingWrapper for RingValue<R> {
 
     type Type = R;
     
@@ -403,6 +434,8 @@ fn test_internal_wrappings_dont_matter() {
         }
     }
 
+    impl_trivial_self_iso!{ABase}
+
     impl<R: RingWrapper> RingBase for BBase<R> {
         type Element = i32;
 
@@ -453,6 +486,17 @@ fn test_internal_wrappings_dont_matter() {
         }
 
         fn map_in(&self, _: &BBase<S>, el: <BBase<S> as RingBase>::Element) -> Self::Element {
+            el
+        }
+    }
+
+    impl<R: RingWrapper> CanonicalIso<BBase<R>> for BBase<R> {
+
+        fn has_canonical_iso(&self, from: &BBase<R>) -> bool {
+            true
+        }
+
+        fn map_out(&self, _: &BBase<R>, el: <BBase<R> as RingBase>::Element) -> Self::Element {
             el
         }
     }

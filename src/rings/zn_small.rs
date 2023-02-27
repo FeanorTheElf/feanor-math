@@ -62,6 +62,22 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD>
 
 }
 
+impl<const N: u64, const IS_FIELD: bool> CanonicalHom<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD>  
+    where [(); N as i64 as usize]: Exists
+{
+    fn has_canonical_hom(&self, _: &Self) -> bool { true }
+    fn map_in(&self, _: &Self, el: Self::Element) -> Self::Element { el }
+}
+
+
+impl<const N: u64, const IS_FIELD: bool> CanonicalIso<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD>  
+    where [(); N as i64 as usize]: Exists
+{
+
+    fn has_canonical_iso(&self, _: &Self) -> bool { true }
+    fn map_out(&self, _: &Self, el: Self::Element) -> Self::Element { el }
+}
+
 impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnBase<N, IS_FIELD> 
     where [(); N as i64 as usize]: Exists
 {
