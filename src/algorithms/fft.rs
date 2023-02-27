@@ -1,3 +1,5 @@
+use crate::divisibility::DivisibilityRingWrapper;
+use crate::vector::SwappableVectorViewMut;
 use crate::{ring::*, vector::VectorViewMut};
 
 pub struct FFTTableCooleyTuckey<R> 
@@ -16,16 +18,21 @@ pub fn bitreverse(index: usize, bits: usize) -> usize {
 impl<R> FFTTableCooleyTuckey<R>
     where R: RingWrapper
 {
-    pub fn bitreverse_fft_inplace<V, S>(&self, mut values: V, ring: S)
-        where V: VectorViewMut<El<S>>, S: RingWrapper, S::Type: CanonicalHom<R::Type>, El<S>: std::fmt::Display
+    fn bitreverse_fft_inplace_base<V, S, const INV: bool>(&self, mut values: V, ring: S)
+        where V: VectorViewMut<El<S>>, S: RingWrapper, S::Type: CanonicalHom<R::Type>
     {
         assert!(values.len() == 1 << self.log2_n);
         for s in (0..self.log2_n).rev() {
             let m = 1 << s;
             let log2_group_size = self.log2_n - s;
-            let m_th_root = ring.map_in(&self.ring, self.ring.pow(&self.inv_root_of_unity, m));
-            println!("{}", m_th_root);
+            let twiddle_root = if INV {
+                ring.map_in(&self.ring, self.ring.pow(&self.root_of_unity, m))
+            } else {
+                ring.map_in(&self.ring, self.ring.pow(&self.inv_root_of_unity, m))
+            };
+            
             for k in 0..(1 << s) {
+                let mut current_twiddle = ring.one();
                 // 
                 // we want to compute a bitreverse_fft_inplace for v_k, v_(k + m), v_(k + 2m), ..., v_(k + n - m);
                 // call this sequence a
@@ -34,27 +41,52 @@ impl<R> FFTTableCooleyTuckey<R>
                 // and v_(k + m), v_(k + 3m), v_(k + 5m), ..., v_(k + n - m) in the corresponding entries;
                 // call these sequences a1 and a2
                 //
-                // i goes through 0, ..., group_size/2 - 1
-                // j := bitrev(i, group_size)
-                //
-                for j in (0..(1 << log2_group_size)).step_by(2) {
+                for i in 0..(1 << (log2_group_size - 1)) {
+                    let j = bitreverse(i, log2_group_size);
                     //
-                    // we want to compute (a[i], a[i + group_size/2]) = (a1[i] + z a2[i], a1[i] - z a2[i])
+                    // we want to compute (a[i], a[i + group_size/2]) = (a1[i] + z a2[i], a1[i] - z^i a2[i])
                     //
                     // in bitreverse order, have
                     // local_index1 = bitrev(i, group_size) = 2 bitrev(i, group_size/2)
                     // local_index2 = bitrev(i + group_size/2, group_size) = 2 bitrev(i, group_size/2) + 1
+                    //
                     let local_index1 = j;
                     let local_index2 = j + 1;
                     let global_index1 = local_index1 * m + k;
                     let global_index2 = local_index2 * m + k;
-                    println!("{}, {}", global_index1, global_index2);
-                    let twiddled_entry = ring.mul_ref(values.at(global_index2), &m_th_root);
+                    let twiddled_entry = ring.mul_ref(values.at(global_index2), &current_twiddle);
                     *values.at_mut(global_index2) = ring.sub_ref(values.at(global_index1), &twiddled_entry);
                     ring.add_assign(values.at_mut(global_index1), twiddled_entry);
+                    ring.mul_assign_ref(&mut current_twiddle, &twiddle_root);
                 }
             }
-            println!("{}, {}, {}, {}", values.at(0), values.at(1), values.at(2), values.at(3));
+        }
+    }
+
+    pub fn bitreverse_permute_inplace<V>(&self, mut values: V) 
+        where V: SwappableVectorViewMut<El<R>>
+    {
+        assert!(values.len() == 1 << self.log2_n);
+        for i in 0..(1 << self.log2_n) {
+            if bitreverse(i, self.log2_n) < i {
+                values.swap(i, bitreverse(i, self.log2_n));
+            }
+        }
+    }
+    
+    pub fn bitreverse_fft_inplace<V>(&self, values: V)
+        where V: VectorViewMut<El<R>>
+    {
+        self.bitreverse_fft_inplace_base::<V, &R, false>(values, &self.ring);
+    }
+
+    pub fn bitreverse_inv_fft_inplace<V>(&self, mut values: V)
+        where V: VectorViewMut<El<R>>, R: DivisibilityRingWrapper
+    {
+        self.bitreverse_fft_inplace_base::<&mut V, &R, true>(&mut values, &self.ring);
+        let scale = self.ring.checked_div(&self.ring.one(), &self.ring.from_z(1 << self.log2_n)).unwrap();
+        for i in 0..values.len() {
+            self.ring.mul_assign_ref(values.at_mut(i), &scale);
         }
     }
 }
@@ -65,23 +97,23 @@ use crate::rings::zn_small::Zn;
 use crate::field::*;
 
 #[test]
-fn test_bitreverse_fft_inplace_small() {
+fn test_bitreverse_fft_inplace_base() {
     let ring = Zn::<5>::RING;
     let z = ring.from_z(2);
     let fft = FFTTableCooleyTuckey {
         ring: ring,
         log2_n: 2,
-        root_of_unity: z,
-        inv_root_of_unity: ring.div(&1, &z)
+        root_of_unity: ring.div(&1, &z),
+        inv_root_of_unity: z
     };
     let mut values = [1, 0, 0, 1];
-    let expected = [2, 4, 0, 4];
+    let expected = [2, 4, 0, 3];
     let mut bitreverse_expected = [0; 4];
     for i in 0..4 {
         bitreverse_expected[i] = expected[bitreverse(i, 2)];
     }
 
-    fft.bitreverse_fft_inplace(&mut values, ring);
+    fft.bitreverse_fft_inplace_base::<_, _, false>(&mut values, ring);
     assert_eq!(values, bitreverse_expected);
 }
 
@@ -102,6 +134,6 @@ fn test_bitreverse_fft_inplace() {
         bitreverse_expected[i] = expected[bitreverse(i, 4)];
     }
 
-    fft.bitreverse_fft_inplace(&mut values, ring);
+    fft.bitreverse_fft_inplace(&mut values);
     assert_eq!(values, bitreverse_expected);
 }

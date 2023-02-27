@@ -32,6 +32,7 @@ impl<T, V> VectorView<T> for Subvector<T, V>
     }
 
     fn at(&self, i: usize) -> &T {
+        debug_assert!(i < self.len());
         self.base.at(i + self.from)
     }
 }
@@ -40,7 +41,18 @@ impl<T, V> VectorViewMut<T> for Subvector<T, V>
     where V: VectorViewMut<T>
 {
     fn at_mut(&mut self, i: usize) -> &mut T {
+        debug_assert!(i < self.len());
         self.base.at_mut(i + self.from)
+    }
+}
+
+impl<T, V> SwappableVectorViewMut<T> for Subvector<T, V>
+    where V: SwappableVectorViewMut<T>
+{
+    fn swap(&mut self, i: usize, j: usize) {
+        debug_assert!(i < self.len());
+        debug_assert!(j < self.len());
+        self.base.swap(i + self.from, j + self.from);
     }
 }
 

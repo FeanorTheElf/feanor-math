@@ -28,6 +28,11 @@ pub trait VectorViewMut<T>: VectorView<T> {
     fn at_mut(&mut self, i: usize) -> &mut T;
 }
 
+pub trait SwappableVectorViewMut<T>: VectorViewMut<T> {
+
+    fn swap(&mut self, i: usize, j: usize);
+}
+
 ///
 /// A trait for objects that have the structure of a one-dimensional array,
 /// and can produce objects at each entry.
@@ -75,6 +80,13 @@ impl<T> VectorViewMut<T> for Vec<T> {
     }
 }
 
+impl<T> SwappableVectorViewMut<T> for Vec<T> {
+    
+    fn swap(&mut self, i: usize, j: usize) {
+        <[T]>::swap(&mut self[..], i, j);
+    }
+}
+
 impl<T> VectorView<T> for [T] {
     
     fn len(&self) -> usize {
@@ -93,6 +105,14 @@ impl<T> VectorViewMut<T> for [T] {
     }
 }
 
+impl<T> SwappableVectorViewMut<T> for [T] {
+    
+    fn swap(&mut self, i: usize, j: usize) {
+        <[T]>::swap(self, i, j);
+    }
+}
+
+
 impl<T, const N: usize> VectorView<T> for [T; N] {
     
     fn len(&self) -> usize {
@@ -108,6 +128,13 @@ impl<T, const N: usize> VectorViewMut<T> for [T; N] {
     
     fn at_mut(&mut self, i: usize) -> &mut T {
         &mut (*self)[i]
+    }
+}
+
+impl<T, const N: usize> SwappableVectorViewMut<T> for [T; N] {
+    
+    fn swap(&mut self, i: usize, j: usize) {
+        <[T]>::swap(&mut self[..], i, j);
     }
 }
 
@@ -140,6 +167,14 @@ impl<'a, T, V: ?Sized> VectorViewMut<T> for &'a mut V
 {
     fn at_mut(&mut self, i: usize) -> &mut T {
         V::at_mut(*self, i)
+    }
+}
+
+impl<'a, T, V: ?Sized> SwappableVectorViewMut<T> for &'a mut V 
+    where V: SwappableVectorViewMut<T>
+{
+    fn swap(&mut self, i: usize, j: usize) {
+        V::swap(*self, i, j);
     }
 }
 
