@@ -2,6 +2,7 @@
 #![feature(test)]
 #![feature(specialization)]
 #![feature(generic_const_exprs)]
+#![feature(allocator_api)]
 #![feature(associated_type_bounds)]
 
 extern crate test;
