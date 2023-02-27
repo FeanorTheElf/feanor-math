@@ -11,5 +11,5 @@ pub trait DivisibilityRingWrapper: RingWrapper<Type: DivisibilityRing> {
 }
 
 impl<R> DivisibilityRingWrapper for R
-    where R: RingWrapper<Type: DivisibilityRing>
+    where R: RingWrapper, R::Type: DivisibilityRing
 {}

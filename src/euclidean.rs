@@ -15,10 +15,14 @@ pub trait EuclideanRing: DivisibilityRing {
     }
 }
 
-pub trait EuclideanRingWrapper: RingWrapper<Type: EuclideanRing> {
+pub trait EuclideanRingWrapper: RingWrapper<Type: EuclideanRing> + DivisibilityRingWrapper {
 
     delegate!{ fn euclidean_div_rem(&self, lhs: El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>) }
     delegate!{ fn euclidean_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
     delegate!{ fn euclidean_rem(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
     delegate!{ fn euclidean_deg(&self, val: &El<Self>) -> usize }
 }
+
+impl<R> EuclideanRingWrapper for R
+    where R: RingWrapper, R::Type: EuclideanRing
+{}
