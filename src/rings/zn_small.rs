@@ -1,7 +1,7 @@
 use crate::algorithms::eea::*;
 use crate::euclidean::EuclideanRing;
 use crate::field::Field;
-use crate::{divisibility::*, Exists};
+use crate::{divisibility::*, Exists, Expr};
 use crate::primitive::StaticRing;
 use crate::ring::*;
 
@@ -21,9 +21,8 @@ pub const fn is_prime(n: u64) -> bool {
 }
 
 impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD> 
-    where [(); N as i64 as usize]: Exists
+    where Expr<{N as i64 as usize}>: Exists
 {
-    
     type Element = u64;
 
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
@@ -62,24 +61,24 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD>
 
 }
 
-impl<const N: u64, const IS_FIELD: bool> CanonicalHom<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD>  
-    where [(); N as i64 as usize]: Exists
+impl<const N: u64, const IS_FIELD: bool> CanonicalHom<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD>
+    where Expr<{N as i64 as usize}>: Exists
 {
     fn has_canonical_hom(&self, _: &Self) -> bool { true }
     fn map_in(&self, _: &Self, el: Self::Element) -> Self::Element { el }
 }
 
 
-impl<const N: u64, const IS_FIELD: bool> CanonicalIso<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD>  
-    where [(); N as i64 as usize]: Exists
+impl<const N: u64, const IS_FIELD: bool> CanonicalIso<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD>
+    where Expr<{N as i64 as usize}>: Exists
 {
 
     fn has_canonical_iso(&self, _: &Self) -> bool { true }
     fn map_out(&self, _: &Self, el: Self::Element) -> Self::Element { el }
 }
 
-impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnBase<N, IS_FIELD> 
-    where [(); N as i64 as usize]: Exists
+impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnBase<N, IS_FIELD>
+    where Expr<{N as i64 as usize}>: Exists
 {
     fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let (s, _, d) = signed_eea(*rhs as i64, N as i64, StaticRing::<i64>::RING);
@@ -95,8 +94,8 @@ impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnBase<N, IS_FIELD
     }
 }
 
-impl<const N: u64> EuclideanRing for ZnBase<N, true> 
-    where [(); N as i64 as usize]: Exists
+impl<const N: u64> EuclideanRing for ZnBase<N, true>
+    where Expr<{N as i64 as usize}>: Exists
 {
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
@@ -112,12 +111,12 @@ impl<const N: u64> EuclideanRing for ZnBase<N, true>
     }
 }
 
-impl<const N: u64> Field for ZnBase<N, true> 
-    where [(); N as i64 as usize]: Exists
+impl<const N: u64> Field for ZnBase<N, true>
+    where Expr<{N as i64 as usize}>: Exists
 {}
 
-impl<const N: u64, const IS_FIELD: bool> RingValue<ZnBase<N, IS_FIELD>> 
-    where [(); N as i64 as usize]: Exists
+impl<const N: u64, const IS_FIELD: bool> RingValue<ZnBase<N, IS_FIELD>>
+    where Expr<{N as i64 as usize}>: Exists
 {
     pub const RING: Self = Self::new(ZnBase);
 }

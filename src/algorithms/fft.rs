@@ -18,6 +18,13 @@ pub fn bitreverse(index: usize, bits: usize) -> usize {
 impl<R> FFTTableCooleyTuckey<R>
     where R: RingWrapper
 {
+    pub fn new(ring: R, root_of_unity: El<R>, log2_n: usize) -> Self {
+        assert!(log2_n > 0);
+        assert!(ring.is_neg_one(&ring.pow(&root_of_unity, 1 << (log2_n - 1))));
+        let inv_root_of_unity = ring.pow(&root_of_unity, (1 << log2_n) - 1);
+        FFTTableCooleyTuckey { ring, root_of_unity, inv_root_of_unity, log2_n }
+    }
+
     fn bitreverse_fft_inplace_base<V, S, const INV: bool>(&self, mut values: V, ring: S)
         where V: VectorViewMut<El<S>>, S: RingWrapper, S::Type: CanonicalHom<R::Type>
     {

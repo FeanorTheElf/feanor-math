@@ -7,6 +7,7 @@
 extern crate test;
 
 // used to represent that a const generic computation works
+pub struct Expr<const VALUE: usize>;
 pub trait Exists {}
 impl<T: ?Sized> Exists for T {}
 
