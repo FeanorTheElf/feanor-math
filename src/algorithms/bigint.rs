@@ -139,6 +139,47 @@ pub fn bigint_sub_self<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt
 	}
 }
 
+pub fn bigint_lshift<A: Allocator>(lhs: &mut Vec<BlockInt, A>, power: usize) {
+	if let Some(high) = highest_set_block(&lhs) {
+		let mut buffer: BlockInt = 0;
+		let mut i = 0;
+		let in_block = (power % BlockInt::BITS as usize) as u32;
+		if in_block != 0 {
+			while i <= high || buffer != 0 {
+				expand(lhs, i + 1);
+				let tmp = lhs[i].overflowing_shr(BlockInt::BITS - in_block).0;
+				lhs[i] = (lhs[i] << in_block) | buffer;
+				buffer = tmp;
+				i += 1;
+			}
+		}
+		lhs.reverse();
+		lhs.extend((0..(power / BlockInt::BITS as usize)).map(|_| 0));
+		lhs.reverse();
+	}
+}
+
+pub fn bigint_rshift(lhs: &mut [BlockInt], power: usize) {
+	if let Some(high) = highest_set_block(lhs) {
+		let mut buffer: BlockInt = 0;
+		let in_block = (power % BlockInt::BITS as usize) as u32;
+		let mut i = high as isize;
+		if in_block != 0 {
+			while i >= 0 {
+				let tmp = lhs[i as usize].overflowing_shl(BlockInt::BITS - in_block).0;
+				lhs[i as usize] = (lhs[i as usize] >> in_block) | buffer;
+				buffer = tmp;
+				i -= 1;
+			}
+		}
+		let blocks = power / BlockInt::BITS as usize;
+		for i in blocks..=high {
+			lhs[i - blocks] = lhs[i];
+			lhs[i] = 0;
+		}
+	}
+}
+
 pub fn bigint_mul<A: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt], mut out: Vec<BlockInt, A>) -> Vec<BlockInt, A> {
 	out.clear();
 	out.resize(

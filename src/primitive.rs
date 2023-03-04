@@ -81,6 +81,14 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
             x => Some(i128::BITS as usize - x.abs().leading_zeros() as usize - 1)
         }
     }
+
+    fn euclidean_div_pow_2(&self, value: &mut Self::Element, power: usize) {
+        *value = self.map_in(&StaticRing::<i128>::RING.get_ring(), self.map_out(&StaticRing::<i128>::RING.get_ring(), *value) >> power);
+    }
+
+    fn mul_pow_2(&self, value: &mut Self::Element, power: usize) {
+        *value = self.map_in(&StaticRing::<i128>::RING.get_ring(), self.map_out(&StaticRing::<i128>::RING.get_ring(), *value) << power);
+    }
 }
 
 pub struct StaticRingBase<T> {
