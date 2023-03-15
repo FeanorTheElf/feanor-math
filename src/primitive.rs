@@ -1,9 +1,9 @@
-use std::{ops::{AddAssign, SubAssign, MulAssign, Neg, Div, Rem}, marker::PhantomData};
+use std::{ops::{AddAssign, SubAssign, MulAssign, Neg, Div, Rem}, marker::PhantomData, fmt::Display};
 use crate::{ring::*, euclidean::EuclideanRing, divisibility::DivisibilityRing, ordered::OrderedRing};
 use crate::integer::*;
 use crate::algorithms::multiply::KaratsubaHint;
 
-pub trait PrimitiveInt: AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Eq + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy + Div<Self, Output = Self> + Rem<Self, Output = Self> {}
+pub trait PrimitiveInt: AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Eq + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy + Div<Self, Output = Self> + Rem<Self, Output = Self> + Display {}
 
 impl PrimitiveInt for i8 {}
 impl PrimitiveInt for i16 {}
@@ -132,6 +132,10 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
+    
+    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        write!(out, "{}", *value)
+    }
 }
 
 impl<T: PrimitiveInt> KaratsubaHint for StaticRingBase<T> {

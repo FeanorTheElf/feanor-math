@@ -39,6 +39,7 @@ pub trait RingBase {
     fn is_neg_one(&self, value: &Self::Element) -> bool { self.eq(value, &self.neg_one()) }
     fn is_commutative(&self) -> bool;
     fn is_noetherian(&self) -> bool;
+    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
 
     fn negate(&self, mut value: Self::Element) -> Self::Element {
         self.negate_inplace(&mut value);
@@ -229,6 +230,26 @@ pub trait RingWrapper {
             self.one()
         )
     }
+
+    fn format<'a>(&'a self, value: &'a El<Self>) -> RingElementDisplayWrapper<'a, Self> {
+        RingElementDisplayWrapper { ring: self, element: value }
+    }
+
+    fn println(&self, value: &El<Self>) {
+        println!("{}", self.format(value));
+    }
+}
+
+pub struct RingElementDisplayWrapper<'a, R: RingWrapper + ?Sized> {
+    ring: &'a R,
+    element: &'a El<R>
+}
+
+impl<'a, R: RingWrapper + ?Sized> std::fmt::Display for RingElementDisplayWrapper<'a, R> {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.ring.get_ring().dbg(self.element, f)
+    }
 }
 
 pub trait CanonicalHom<S> : RingBase
@@ -401,6 +422,10 @@ fn test_internal_wrappings_dont_matter() {
         fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
             *lhs *= rhs;
         }
+
+        fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+            Ok(())
+        }
     }
 
     impl CanonicalHom<ABase> for ABase {
@@ -453,6 +478,10 @@ fn test_internal_wrappings_dont_matter() {
 
         fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
             *lhs *= rhs;
+        }
+
+        fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+            Ok(())
         }
     }
 

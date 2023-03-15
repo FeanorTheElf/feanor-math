@@ -59,6 +59,9 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD>
 
     fn is_noetherian(&self) -> bool { true }
 
+    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        write!(out, "{}", *value)
+    }
 }
 
 impl<const N: u64, const IS_FIELD: bool> CanonicalHom<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD>

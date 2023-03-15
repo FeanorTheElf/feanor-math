@@ -25,6 +25,7 @@ impl DefaultBigInt {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct DefaultBigIntRing;
 
 impl DefaultBigIntRing {
@@ -120,6 +121,38 @@ impl RingBase for DefaultBigIntRing {
 
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
+    
+    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        ///
+        /// 10 to this power fits still in a u64
+        /// 
+        const BIG_POWER_TEN_ZEROS: usize = 19;
+        const BIG_POWER_TEN: u64 = 10u64.pow(BIG_POWER_TEN_ZEROS as u32);
+
+        if value.0 {
+            write!(out, "-")?;
+        }
+        let mut copy = value.clone();
+        let mut remainders: Vec<u64> = Vec::with_capacity(
+            (algorithms::bigint::highest_set_block(&value.1).unwrap_or(0) + 1) * u64::BITS as usize / 3
+        );
+        while !self.is_zero(&copy) {
+            let rem = algorithms::bigint::bigint_div_small(&mut copy.1, BIG_POWER_TEN);
+            remainders.push(rem);
+        }
+        remainders.reverse();
+        let mut it = remainders.into_iter();
+        if let Some(fst) = it.next() {
+            write!(out, "{}", fst)?;
+            for rem in it {
+                write!(out, "{:0>width$}", rem, width = BIG_POWER_TEN_ZEROS)?;
+            }
+        } else {
+            write!(out, "0")?;
+        }
+        return Ok(());
+    }
+
 }
 
 impl CanonicalHom<DefaultBigIntRing> for DefaultBigIntRing {
@@ -140,8 +173,8 @@ impl OrderedRing for DefaultBigIntRing {
 
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
         match (lhs.0, rhs.0) {
-            (true, true) => algorithms::bigint::bigint_cmp(&lhs.1, &rhs.1),
-            (false, false) => algorithms::bigint::bigint_cmp(&rhs.1, &lhs.1),
+            (true, true) => algorithms::bigint::bigint_cmp(&rhs.1, &lhs.1),
+            (false, false) => algorithms::bigint::bigint_cmp(&lhs.1, &rhs.1),
             (_, _) if self.is_zero(lhs) && self.is_zero(rhs) => std::cmp::Ordering::Equal,
             (true, false) => std::cmp::Ordering::Less,
             (false, true) => std::cmp::Ordering::Greater
@@ -164,13 +197,10 @@ impl DivisibilityRing for DefaultBigIntRing {
 impl EuclideanRing for DefaultBigIntRing {
 
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+        assert!(!self.is_zero(rhs));
         let mut quo = DefaultBigInt(false, algorithms::bigint::bigint_div(&mut lhs.1, &rhs.1, Vec::new()));
-        if self.is_neg(rhs) {
+        if rhs.0 ^ lhs.0 {// if result of division is zero, `.is_neg(&lhs)` does not work as expected
             self.negate_inplace(&mut quo);
-        }
-        if self.is_neg(&lhs) {
-            self.negate_inplace(&mut quo);
-            self.negate_inplace(&mut lhs);
         }
         return (quo, lhs);
     }
@@ -182,9 +212,9 @@ impl EuclideanRing for DefaultBigIntRing {
 
 impl CanonicalHom<StaticRingBase<i128>> for DefaultBigIntRing {
     
-    fn has_canonical_hom(&self, from: &StaticRingBase<i128>) -> bool { true }
+    fn has_canonical_hom(&self, _: &StaticRingBase<i128>) -> bool { true }
 
-    fn map_in(&self, from: &StaticRingBase<i128>, el: i128) -> Self::Element {
+    fn map_in(&self, _: &StaticRingBase<i128>, el: i128) -> Self::Element {
         let negative = el < 0;
         let value = el.checked_abs().map(|x| x as u128).unwrap_or(1 << (u128::BITS - 1));
         DefaultBigInt(negative, vec![(value >> u64::BITS) as u64, (value & ((1 << u64::BITS) - 1)) as u64])
@@ -193,22 +223,22 @@ impl CanonicalHom<StaticRingBase<i128>> for DefaultBigIntRing {
 
 impl CanonicalIso<StaticRingBase<i128>> for DefaultBigIntRing {
     
-    fn has_canonical_iso(&self, from: &StaticRingBase<i128>) -> bool { true }
+    fn has_canonical_iso(&self, _: &StaticRingBase<i128>) -> bool { true }
 
-    fn map_out(&self, from: &StaticRingBase<i128>, el: Self::Element) -> i128 {
+    fn map_out(&self, _: &StaticRingBase<i128>, el: Self::Element) -> i128 {
         match algorithms::bigint::highest_set_block(&el.1) {
             None => 0,
             Some(0) if el.0 => -(el.1[0] as i128),
             Some(0) if !el.0 => el.1[0] as i128,
             Some(1) if el.0 => {
-                let value = el.1[0] as u128 + (el.1[1] as u128) << u64::BITS;
+                let value = el.1[0] as u128 + ((el.1[1] as u128) << u64::BITS);
                 if value == 1 << (u128::BITS - 1) {
                     i128::MIN
                 } else {
-                    -(value as i128)
+                    -i128::try_from(value).unwrap()
                 }
             },
-            Some(1) if !el.0 => (el.1[0] as u128 + (el.1[1] as u128) << u64::BITS) as i128,
+            Some(1) if !el.0 => i128::try_from(el.1[0] as u128 + ((el.1[1] as u128) << u64::BITS)).unwrap(),
             Some(_) => panic!("overflow")
         }
     }
@@ -297,6 +327,8 @@ fn test_shift_right() {
     let mut x = DefaultBigInt::parse("9843a756781b34567f81394", 16).unwrap();
     let z = DefaultBigInt::parse("9843a756781b34567", 16).unwrap();
     DefaultBigIntRing::RING.euclidean_div_pow_2(&mut x, 24);
+    DefaultBigIntRing::RING.println(&x);
+    DefaultBigIntRing::RING.println(&z);
     assert!(DefaultBigIntRing::RING.eq(&z, &x));
 
     let mut x = DefaultBigInt::parse("-9843a756781b34567f81394", 16).unwrap();
@@ -345,14 +377,19 @@ fn test_axioms() {
     for i in 0..l {
         for j in 0..l {
             if !DefaultBigIntRing::RING.is_zero(&ns[j]) {
+                let (quo, rem) = DefaultBigIntRing::RING.euclidean_div_rem(ns[i].clone(), &ns[j]);
+                
+                DefaultBigIntRing::RING.println(&ns[i]);
+                DefaultBigIntRing::RING.println(&ns[j]);
+                DefaultBigIntRing::RING.println(&quo);
+                DefaultBigIntRing::RING.println(&rem);
                 assert!(DefaultBigIntRing::RING.eq(&ns[i], &DefaultBigIntRing::RING.add(
                     DefaultBigIntRing::RING.mul_ref(
-                        &DefaultBigIntRing::RING.euclidean_div(ns[i].clone(), &ns[j]), 
+                        &quo, 
                         &ns[j]
-                    ), 
-                        DefaultBigIntRing::RING.euclidean_rem(ns[i].clone(), &ns[j])
-                    )
-                ));
+                    ),
+                    rem
+                )));
             }
             assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRing::RING.add(ns[i].clone(), ns[j].clone()), &DefaultBigIntRing::RING.add(ns[j].clone(), ns[i].clone())));
             assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRing::RING.mul_ref(&ns[i], &ns[j]), &DefaultBigIntRing::RING.mul_ref(&ns[j], &ns[i])));

@@ -115,28 +115,28 @@ pub fn bigint_sub(lhs: &mut [BlockInt], rhs: &[BlockInt], block_offset: usize) {
 ///
 /// Calculate lhs = rhs - lhs
 /// 
-/// This will panic if the subtraction would result in a negative number
+/// This will panic or give a wrong result if the subtraction would result in a negative number
 /// 
 pub fn bigint_sub_self<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt]) {
-	assert!(bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Greater);
+	debug_assert!(bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Greater);
 
-	if let Some(rhs_high) = highest_set_block(rhs.as_ref()) {
-		expand(lhs, rhs_high + 1);
-		let mut buffer: bool = false;
-		let mut i = rhs_high as isize;
-		while i >= 0 {
-			let (difference, overflow) = rhs[i as usize].overflowing_sub(lhs[i as usize]);
-			if buffer {
-				let (carry_difference, carry_overflow) = difference.overflowing_sub(1);
-				lhs[i as usize] = carry_difference;
-				buffer = overflow || carry_overflow;
-			} else {
-				lhs[i as usize] = difference;
-				buffer = overflow;
-			}
-			i += 1;
+	let rhs_high = highest_set_block(rhs.as_ref()).expect("rhs must be larger than lhs");
+	expand(lhs, rhs_high + 1);
+	let mut buffer: bool = false;
+	let mut i = 0;
+	while i <= rhs_high {
+		let (difference, overflow) = rhs[i as usize].overflowing_sub(lhs[i as usize]);
+		if buffer {
+			let (carry_difference, carry_overflow) = difference.overflowing_sub(1);
+			lhs[i] = carry_difference;
+			buffer = overflow || carry_overflow;
+		} else {
+			lhs[i] = difference;
+			buffer = overflow;
 		}
+		i += 1;
 	}
+	assert!(!buffer);
 }
 
 pub fn bigint_lshift<A: Allocator>(lhs: &mut Vec<BlockInt, A>, power: usize) {
@@ -173,9 +173,11 @@ pub fn bigint_rshift(lhs: &mut [BlockInt], power: usize) {
 			}
 		}
 		let blocks = power / BlockInt::BITS as usize;
-		for i in blocks..=high {
-			lhs[i - blocks] = lhs[i];
-			lhs[i] = 0;
+			if blocks != 0 {
+			for i in blocks..=high {
+				lhs[i - blocks] = lhs[i];
+				lhs[i] = 0;
+			}
 		}
 	}
 }
