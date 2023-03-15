@@ -99,7 +99,7 @@ impl<R> FFTTableCooleyTuckey<R>
 }
 
 #[cfg(test)]
-use crate::rings::zn_small::Zn;
+use crate::rings::zn_static::Zn;
 #[cfg(test)]
 use crate::field::*;
 

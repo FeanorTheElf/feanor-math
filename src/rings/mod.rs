@@ -1,2 +1,2 @@
-pub mod zn_small;
+pub mod zn_static;
 pub mod bigint;
