@@ -83,7 +83,7 @@ impl<const N: u64, const IS_FIELD: bool> CanonicalIso<ZnBase<N, IS_FIELD>> for Z
 impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnBase<N, IS_FIELD>
     where Expr<{N as i64 as usize}>: Exists
 {
-    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let (s, _, d) = signed_eea(*rhs as i64, N as i64, StaticRing::<i64>::RING);
         let mut rhs_inv = ((s % (N as i64)) + (N as i64)) as u64;
         if rhs_inv >= N {
@@ -102,14 +102,14 @@ impl<const N: u64> EuclideanRing for ZnBase<N, true>
 {
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
-        (self.checked_div(&lhs, rhs).unwrap(), self.zero())
+        (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
     }
 
-    fn euclidean_deg(&self, val: &Self::Element) -> usize {
+    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
         if self.is_zero(val) {
-            0
+            Some(0)
         } else {
-            1
+            Some(1)
         }
     }
 }

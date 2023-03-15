@@ -533,3 +533,70 @@ fn test_internal_wrappings_dont_matter() {
     (&b2).map_in(&b3, 0);
     (&b2).map_in(&&&b3, 0);
 }
+
+#[cfg(test)]
+pub fn test_ring_axioms<R: RingWrapper, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
+    let elements = edge_case_elements.collect::<Vec<_>>();
+    let zero = ring.zero();
+    let one = ring.one();
+
+    // check self-subtraction
+    for a in &elements {
+        assert!(ring.eq(&zero, &ring.sub(a.clone(), a.clone())));
+    }
+
+    // check identity elements
+    for a in &elements {
+        assert!(ring.eq(&a, &ring.add(a.clone(), zero.clone())));
+        assert!(ring.eq(&a, &ring.mul(a.clone(), one.clone())));
+    }
+
+    // check commutativity
+    for a in &elements {
+        for b in &elements {
+            assert!(ring.eq(
+                &ring.add(a.clone(), b.clone()), 
+                &ring.add(b.clone(), a.clone())
+            ));
+                
+            if ring.is_commutative() {
+                assert!(ring.eq(
+                    &ring.mul(a.clone(), b.clone()), 
+                    &ring.mul(b.clone(), a.clone())
+                ));
+            }
+        }
+    }
+
+    // check associativity
+    for a in &elements {
+        for b in &elements {
+            for c in &elements {
+                assert!(ring.eq(
+                    &ring.add(a.clone(), ring.add(b.clone(), c.clone())), 
+                    &ring.add(ring.add(a.clone(), b.clone()), c.clone())
+                ));
+                assert!(ring.eq(
+                    &ring.mul(a.clone(), ring.mul(b.clone(), c.clone())), 
+                    &ring.mul(ring.mul(a.clone(), b.clone()), c.clone())
+                ));
+            }
+        }
+    }
+    
+    // check distributivity
+    for a in &elements {
+        for b in &elements {
+            for c in &elements {
+                assert!(ring.eq(
+                    &ring.mul(a.clone(), ring.add(b.clone(), c.clone())), 
+                    &ring.add(ring.mul(a.clone(), b.clone()), ring.mul(a.clone(), c.clone()))
+                ));
+                assert!(ring.eq(
+                    &ring.mul(ring.add(a.clone(), b.clone()), c.clone()), 
+                    &ring.add(ring.mul(a.clone(), c.clone()), ring.mul(b.clone(), c.clone()))
+                ));
+            }
+        }
+    }
+}

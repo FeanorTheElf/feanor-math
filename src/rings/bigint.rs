@@ -31,6 +31,24 @@ pub struct DefaultBigIntRing;
 impl DefaultBigIntRing {
 
     pub const RING: RingValue<DefaultBigIntRing> = RingValue::new(DefaultBigIntRing);
+
+    pub fn map_i128(&self, val: &<Self as RingBase>::Element) -> Option<i128> {
+        match algorithms::bigint::highest_set_block(&val.1) {
+            None => Some(0),
+            Some(0) if val.0 => Some(-(val.1[0] as i128)),
+            Some(0) if !val.0 => Some(val.1[0] as i128),
+            Some(1) if val.0 => {
+                let value = val.1[0] as u128 + ((val.1[1] as u128) << u64::BITS);
+                if value == 1 << (u128::BITS - 1) {
+                    Some(i128::MIN)
+                } else {
+                    i128::try_from(value).ok().map(|x| -x)
+                }
+            },
+            Some(1) if !val.0 => i128::try_from(val.1[0] as u128 + ((val.1[1] as u128) << u64::BITS)).ok(),
+            Some(_) => None
+        }
+    }
 }
 
 impl RingBase for DefaultBigIntRing {
@@ -184,7 +202,12 @@ impl OrderedRing for DefaultBigIntRing {
 
 impl DivisibilityRing for DefaultBigIntRing {
     
-    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        if self.is_zero(rhs) && self.is_zero(lhs) {
+            return Some(self.zero());
+        } else if self.is_zero(rhs) {
+            return None;
+        }
         let (quo, rem) = self.euclidean_div_rem(lhs.clone(), rhs);
         if self.is_zero(&rem) {
             Some(quo)
@@ -205,8 +228,8 @@ impl EuclideanRing for DefaultBigIntRing {
         return (quo, lhs);
     }
 
-    fn euclidean_deg(&self, val: &Self::Element) -> usize {
-        val.1[0] as usize
+    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
+        self.map_i128(val).and_then(|x| x.checked_abs()).and_then(|x| usize::try_from(x).ok())
     }
 }
 
@@ -226,21 +249,7 @@ impl CanonicalIso<StaticRingBase<i128>> for DefaultBigIntRing {
     fn has_canonical_iso(&self, _: &StaticRingBase<i128>) -> bool { true }
 
     fn map_out(&self, _: &StaticRingBase<i128>, el: Self::Element) -> i128 {
-        match algorithms::bigint::highest_set_block(&el.1) {
-            None => 0,
-            Some(0) if el.0 => -(el.1[0] as i128),
-            Some(0) if !el.0 => el.1[0] as i128,
-            Some(1) if el.0 => {
-                let value = el.1[0] as u128 + ((el.1[1] as u128) << u64::BITS);
-                if value == 1 << (u128::BITS - 1) {
-                    i128::MIN
-                } else {
-                    -i128::try_from(value).unwrap()
-                }
-            },
-            Some(1) if !el.0 => i128::try_from(el.1[0] as u128 + ((el.1[1] as u128) << u64::BITS)).unwrap(),
-            Some(_) => panic!("overflow")
-        }
+        self.map_i128(&el).unwrap()
     }
 }
 
@@ -270,12 +279,14 @@ impl IntegerRing for DefaultBigIntRing {
 
 #[cfg(test)]
 use crate::primitive::*;
+#[cfg(test)]
+use crate::divisibility::test_divisibility_axioms;
 
-// #[test]
-// fn test_print_power_2() {
-//     let x = DefaultBigInt(false, vec![0, 0, 1]);
-//     assert_eq!("340282366920938463463374607431768211456", DefaultBigIntRing::RING);
-// }
+#[test]
+fn test_print_power_2() {
+    let x = DefaultBigInt(false, vec![0, 0, 1]);
+    assert_eq!("340282366920938463463374607431768211456", format!("{}", DefaultBigIntRing::RING.format(&x)));
+}
 
 #[test]
 fn test_from() {
@@ -299,19 +310,6 @@ fn test_to_i128() {
     assert_eq!(i64::MAX as i128 + 1, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigInt(false, vec![i64::MAX as u64 + 1])));
     assert_eq!(u64::MAX as i128, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigInt(false, vec![u64::MAX])));
 }
-
-// #[test]
-// fn test_from_str_radix() {
-//     let x = DefaultBigInt::parse("fa3032c0ae8202135", 16).unwrap();
-//     assert_eq!("288447441784111374645", format!("{}", x));
-
-//     let y = DefaultBigInt::parse("1738495302390560118908327", 10).unwrap();
-//     assert_eq!("1738495302390560118908327", format!("{}", y));
-
-//     let u = DefaultBigInt::parse("87112285931760246650091887388390057836920", 10).unwrap();
-//     let v = DefaultBigInt::parse("10000000000000000BC0000000000000178", 16).unwrap();
-//     assert!(DefaultBigIntRing::RING.eq(&u, &v));
-// }
 
 #[test]
 fn test_sub_assign() {
@@ -350,8 +348,9 @@ fn test_assumptions_integer_division() {
     assert_eq!(1, 3 % 2);
 }
 
-#[test]
-fn test_axioms() {
+#[cfg(test)]
+fn numbers_iter() -> impl Iterator<Item = DefaultBigInt> {
+    
     const NUMBERS: [&'static str; 10] = [
         "5444517870735015415413993718908291383295", // power of two - 1
         "5444517870735015415413993718908291383296", // power of two
@@ -364,55 +363,28 @@ fn test_axioms() {
         "-231780567812394562346324763251741827457123654871236548715623487612384752328164",
         "+1278367182354612381234568509783420989356938472561078564732895634928563482349872698723465"
     ];
-    let ns = NUMBERS.iter().cloned().map(|s| DefaultBigInt::parse(s, 10)).map(Result::unwrap).collect::<Vec<_>>();
-    let l = ns.len();
-    for i in 0..l {
-        assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRing::RING.zero(), &DefaultBigIntRing::RING.sub(ns[i].clone(), ns[i].clone())));
-        if !DefaultBigIntRing::RING.is_zero(&ns[i]) {
-            assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRing::RING.one(), &DefaultBigIntRing::RING.euclidean_div(ns[i].clone(), &ns[i])));
-        }
-        assert!(DefaultBigIntRing::RING.eq(&ns[i], &DefaultBigIntRing::RING.add_ref(&DefaultBigIntRing::RING.zero(), &ns[i])));
-        assert!(DefaultBigIntRing::RING.eq(&ns[i], &DefaultBigIntRing::RING.mul_ref(&ns[i], &DefaultBigIntRing::RING.one())));
-    }
-    for i in 0..l {
-        for j in 0..l {
-            if !DefaultBigIntRing::RING.is_zero(&ns[j]) {
-                let (quo, rem) = DefaultBigIntRing::RING.euclidean_div_rem(ns[i].clone(), &ns[j]);
-                
-                DefaultBigIntRing::RING.println(&ns[i]);
-                DefaultBigIntRing::RING.println(&ns[j]);
-                DefaultBigIntRing::RING.println(&quo);
-                DefaultBigIntRing::RING.println(&rem);
-                assert!(DefaultBigIntRing::RING.eq(&ns[i], &DefaultBigIntRing::RING.add(
-                    DefaultBigIntRing::RING.mul_ref(
-                        &quo, 
-                        &ns[j]
-                    ),
-                    rem
-                )));
-            }
-            assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRing::RING.add(ns[i].clone(), ns[j].clone()), &DefaultBigIntRing::RING.add(ns[j].clone(), ns[i].clone())));
-            assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRing::RING.mul_ref(&ns[i], &ns[j]), &DefaultBigIntRing::RING.mul_ref(&ns[j], &ns[i])));
-        }
-    }
-    for i in 0..l {
-        for j in 0..l {
-            for k in 0..l {
-                assert!(DefaultBigIntRing::RING.eq(
-                    &DefaultBigIntRing::RING.mul_ref(&ns[k], &DefaultBigIntRing::RING.add_ref(&ns[i], &ns[j])), 
-                    &DefaultBigIntRing::RING.add(DefaultBigIntRing::RING.mul_ref(&ns[k], &ns[j]), DefaultBigIntRing::RING.mul_ref(&ns[k], &ns[i]))
-                ));
-                assert!(DefaultBigIntRing::RING.eq(
-                    &DefaultBigIntRing::RING.mul_ref(&DefaultBigIntRing::RING.mul_ref(&ns[i], &ns[j]), &ns[k]), 
-                    &DefaultBigIntRing::RING.mul_ref(&DefaultBigIntRing::RING.mul_ref(&ns[k], &ns[i]), &ns[j])
-                ));
-                assert!(DefaultBigIntRing::RING.eq(
-                    &DefaultBigIntRing::RING.add_ref(&DefaultBigIntRing::RING.add_ref(&ns[i], &ns[j]), &ns[k]), 
-                    &DefaultBigIntRing::RING.add_ref(&DefaultBigIntRing::RING.add_ref(&ns[k], &ns[i]), &ns[j])
-                ));
-            }
-        }
-    }
+
+    NUMBERS.iter().cloned().map(|s| DefaultBigInt::parse(s, 10)).map(Result::unwrap)
+}
+
+#[test]
+fn test_bigint_ring_axioms() {
+    test_ring_axioms(DefaultBigIntRing::RING, numbers_iter())
+}
+
+#[test]
+fn test_bigint_divisibility_ring_axioms() {
+    test_divisibility_axioms(DefaultBigIntRing::RING, numbers_iter())
+}
+
+#[test]
+fn test_bigint_euclidean_ring_axioms() {
+    test_euclidean_axioms(DefaultBigIntRing::RING, numbers_iter())
+}
+
+#[test]
+fn test_bigint_integer_ring_axioms() {
+    test_integer_axioms(DefaultBigIntRing::RING, numbers_iter())
 }
 
 #[bench]

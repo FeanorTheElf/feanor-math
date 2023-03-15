@@ -35,7 +35,7 @@ impl<T: PrimitiveInt, S: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for Stati
 
 impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
     
-    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let (div, rem) = self.euclidean_div_rem(*lhs, rhs);
         if self.is_zero(&rem) {
             return Some(div);
@@ -51,8 +51,8 @@ impl<T: PrimitiveInt> EuclideanRing for StaticRingBase<T> {
         (lhs / *rhs, lhs % *rhs)
     }
 
-    fn euclidean_deg(&self, val: &Self::Element) -> usize {
-        self.map_out(StaticRing::<i128>::RING.get_ring(), *val).abs() as usize
+    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
+        self.map_out(StaticRing::<i128>::RING.get_ring(), *val).checked_abs().and_then(|x| usize::try_from(x).ok())
     }
 }
 

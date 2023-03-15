@@ -173,7 +173,10 @@ pub fn bigint_rshift(lhs: &mut [BlockInt], power: usize) {
 			}
 		}
 		let blocks = power / BlockInt::BITS as usize;
-			if blocks != 0 {
+		if blocks != 0 {
+			for i in 0..blocks {
+				lhs[i] = 0;
+			}
 			for i in blocks..=high {
 				lhs[i - blocks] = lhs[i];
 				lhs[i] = 0;

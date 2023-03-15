@@ -23,3 +23,30 @@ pub trait IntegerRingWrapper: RingWrapper<Type: IntegerRing> {
 impl<R> IntegerRingWrapper for R
     where R: RingWrapper<Type: IntegerRing>
 {}
+
+#[cfg(test)]
+pub fn test_integer_axioms<R: IntegerRingWrapper, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
+    let elements = edge_case_elements.collect::<Vec<_>>();
+    for a in &elements {
+        let mut ceil_pow_2 = ring.from_z(2);
+        ring.mul_pow_2(&mut ceil_pow_2, ring.abs_highest_set_bit(a).unwrap_or(0));
+        assert!(ring.is_lt(a, &ceil_pow_2));
+        assert!(ring.is_lt(&ring.negate(a.clone()), &ceil_pow_2));
+        
+        for i in 0..ring.abs_highest_set_bit(a).unwrap_or(0) {
+            let mut pow_2 = ring.one();
+            ring.mul_pow_2(&mut pow_2, i);
+            let mut b = a.clone();
+            ring.mul_pow_2(&mut b, i);
+            assert!(ring.eq(&b, &ring.mul(a.clone(), pow_2.clone())));
+            ring.euclidean_div_pow_2(&mut b, i);
+            assert!(ring.eq(&b, a));
+            ring.euclidean_div_pow_2(&mut b, i);
+            ring.println(&b);
+            ring.println(&a);
+            ring.println(&pow_2);
+            println!("{}", i);
+            assert!(ring.eq(&b, &ring.euclidean_div(a.clone(), &pow_2)));
+        }
+    }
+}
