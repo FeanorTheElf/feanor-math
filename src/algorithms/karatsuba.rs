@@ -201,7 +201,7 @@ fn karatsuba_mem_size(block_size_log2: usize, threshold_size_log2: usize) -> usi
 }
 
 #[cfg(test)]
-use crate::primitive::*;
+use crate::primitive_int::*;
 
 #[test]
 fn test_karatsuba_impl() {

@@ -2,7 +2,7 @@ use crate::algorithms::eea::*;
 use crate::euclidean::EuclideanRing;
 use crate::field::Field;
 use crate::{divisibility::*, Exists, Expr};
-use crate::primitive::StaticRing;
+use crate::primitive_int::StaticRing;
 use crate::ring::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -22,7 +22,7 @@ pub fn generic_abs_square_and_multiply<T, F, G, I>(base: &T, power: &El<I>, int_
 }
 
 #[cfg(test)]
-use crate::primitive::*;
+use crate::primitive_int::*;
 
 #[test]
 fn test_pow() {

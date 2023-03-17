@@ -21,7 +21,7 @@ pub mod divisibility;
 pub mod field;
 pub mod euclidean;
 pub mod ordered;
-pub mod primitive;
+pub mod primitive_int;
 pub mod integer;
 pub mod algorithms;
 pub mod rings;

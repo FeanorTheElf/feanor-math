@@ -1,5 +1,12 @@
 use crate::ring::*;
 
+///
+/// Trait to simplify implementing newtype-pattern for rings.
+/// When you want to create a ring that just wraps another ring,
+/// possibly adding some functionality, you can implement `DelegateRing`
+/// instead of `RingBase`, and just provide how to map elements in the new
+/// ring to the wrapped ring and vice versa.
+/// 
 pub trait DelegateRing {
 
     type Base: RingBase;

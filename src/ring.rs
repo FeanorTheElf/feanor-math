@@ -1,6 +1,6 @@
 use std::{rc::Rc};
 
-use crate::{algorithms, primitive::StaticRing};
+use crate::{algorithms, primitive_int::StaticRing};
 
 ///
 /// Basic trait for objects that have a ring structure.
@@ -343,6 +343,7 @@ pub struct RingValue<R: RingBase> {
 }
 
 impl<R: RingBase> RingValue<R> {
+
     pub const fn new(value: R) -> Self {
         RingValue { ring: value }
     }
@@ -354,6 +355,48 @@ impl<R: RingBase + CanonicalIso<R>> RingWrapper for RingValue<R> {
     
     fn get_ring(&self) -> &R {
         &self.ring
+    }
+}
+
+///
+/// The second most basic [`crate::ring::RingWrapper`]. Similarly to 
+/// [`crate::ring::RingValue`] it is just a no-op container.
+/// 
+/// # Why do we need this in addition to [`crate::ring::RingValue`]?
+/// 
+/// The role of `RingRef` is much more niche than the role of [`crate::ring::RingValue`].
+/// However, it might happen that we want to implement [`crate::ring::RingBase`]-functions (or traits on the
+/// same level, e.g. [`crate::ring::CanonicalHom`], [`crate::divisibility::DivisibilityRing`]),
+/// and use more high-level techniques for that (e.g. complex algorithms, for example [`crate::algorithms::eea`]
+/// or [`crate::algorithms::sqr_mul`]). In this case, we only have a reference to a [`crate::ring::RingBase`]
+/// object, but require a [`crate::ring::RingWrapper`] object to use the algorithm.
+/// 
+pub struct RingRef<'a, R: RingBase> {
+    ring: &'a R
+}
+
+impl<'a, R: RingBase> Clone for RingRef<'a, R> {
+
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'a, R: RingBase> Copy for RingRef<'a, R> {}
+
+impl<'a, R: RingBase> RingRef<'a, R> {
+
+    pub const fn new(value: &'a R) -> Self {
+        RingRef { ring: value }
+    }
+}
+
+impl<'a, R: RingBase + CanonicalIso<R>> RingWrapper for RingRef<'a, R> {
+
+    type Type = R;
+    
+    fn get_ring(&self) -> &R {
+        self.ring
     }
 }
 

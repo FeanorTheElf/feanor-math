@@ -1,9 +1,9 @@
-use crate::primitive::StaticRingBase;
 use crate::ring::*;
 use crate::euclidean::*;
 use crate::ordered::*;
+use crate::algorithms;
 
-pub trait IntegerRing: EuclideanRing + CanonicalIso<StaticRingBase<i128>> + OrderedRing {
+pub trait IntegerRing: EuclideanRing + OrderedRing {
 
     fn abs_is_bit_set(&self, value: &Self::Element, i: usize) -> bool;
     fn abs_highest_set_bit(&self, value: &Self::Element) -> Option<usize>;
@@ -12,6 +12,21 @@ pub trait IntegerRing: EuclideanRing + CanonicalIso<StaticRingBase<i128>> + Orde
     fn mul_pow_2(&self, value: &mut Self::Element, power: usize);
     fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, rng: G) -> Self::Element;
 }
+
+impl<I: IntegerRing + CanonicalIso<I>, J: IntegerRing> CanonicalHom<I> for J {
+    
+    default fn has_canonical_hom(&self, _: &I) -> bool { true }
+
+    default fn map_in(&self, from: &I, el: I::Element) -> Self::Element {
+        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(&self.one(), &el, RingRef::new(from), |a, b| self.add(a, b), |a, b| self.add_ref(a, b), self.zero());
+        if from.is_neg(&el) {
+            return self.negate(result);
+        } else {
+            return result;
+        }
+    }
+}
+
 
 pub trait IntegerRingWrapper: RingWrapper<Type: IntegerRing> {
 

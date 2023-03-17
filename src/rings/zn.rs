@@ -1,7 +1,11 @@
 use crate::delegate::DelegateRing;
 use crate::divisibility::DivisibilityRing;
 use crate::divisibility::DivisibilityRingWrapper;
+use crate::euclidean::EuclideanRing;
 use crate::euclidean::EuclideanRingWrapper;
+use crate::field::Field;
+use crate::integer::IntegerRing;
+use crate::integer::IntegerRingWrapper;
 use crate::ordered::OrderedRingWrapper;
 use crate::ring::*;
 use crate::algorithms;
@@ -83,6 +87,16 @@ impl<I: IntegerRingWrapper> Zn<I> {
 
     pub fn integer_ring(&self) -> &I {
         &self.integer_ring
+    }
+
+    pub fn is_field(self) -> Result<Fp<I>, Zn<I>> 
+        where I: HashableElRingWrapper
+    {
+        if algorithms::miller_rabin::is_prime(self.integer_ring(), &self.modulus, 6) {
+            Ok(Fp { base: self })
+        } else {
+            Err(self)
+        }
     }
 }
 
@@ -206,6 +220,19 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<Zn<J>> for Zn<I>
     }
 }
 
+impl<I: IntegerRingWrapper, J: IntegerRing> CanonicalHom<J> for Zn<I> 
+    where I::Type: CanonicalHom<J>
+{
+    fn has_canonical_hom(&self, from: &J) -> bool {
+        self.integer_ring().get_ring().has_canonical_hom(from)
+    }
+
+    fn map_in(&self, from: &J, el: J::Element) -> Self::Element {
+        debug_assert!(self.has_canonical_hom(from));
+        self.project(self.integer_ring().get_ring().map_in(from, el))
+    }
+}
+
 #[derive(Clone)]
 pub struct Fp<I: IntegerRingWrapper> {
     base: Zn<I>
@@ -226,7 +253,7 @@ impl<I: IntegerRingWrapper> Copy for FpEl<I>
 
 impl<I: IntegerRingWrapper> Fp<I> {
 
-    fn get_base(&self) -> &Zn<I> {
+    pub fn get_base(&self) -> &Zn<I> {
         &self.base
     }
 }
@@ -309,7 +336,57 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<Zn<J>> for Fp<I>
     }
 }
 
-use crate::integer::IntegerRingWrapper;
+impl<I: IntegerRingWrapper, J: IntegerRing> CanonicalHom<J> for Fp<I> 
+    where I::Type: CanonicalHom<J>
+{
+    fn has_canonical_hom(&self, from: &J) -> bool {
+        self.get_base().has_canonical_hom(from)
+    }
+
+    fn map_in(&self, from: &J, el: J::Element) -> Self::Element {
+        debug_assert!(self.has_canonical_hom(from));
+        FpEl(self.get_base().map_in(from, el))
+    }
+}
+
+impl<I: IntegerRingWrapper> DivisibilityRing for Fp<I> {
+
+    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        if self.is_zero(rhs) {
+            None
+        } else {
+            Some(self.mul_ref_fst(
+                lhs, 
+                FpEl(self.get_base().project(
+                    self.get_base().invert(rhs.0.clone().0).ok().unwrap()
+                ))
+            ))
+        }
+    }
+}
+
+impl<I: IntegerRingWrapper> EuclideanRing for Fp<I> {
+
+    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+        assert!(!self.is_zero(rhs));
+        (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
+    }
+
+    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
+        if self.is_zero(val) {
+            Some(0)
+        } else {
+            Some(1)
+        }
+    }
+
+    fn euclidean_rem(&self, _: Self::Element, rhs: &Self::Element) -> Self::Element {
+        assert!(!self.is_zero(rhs));
+        self.zero()
+    }
+}
+
+impl<I: IntegerRingWrapper> Field for Fp<I> {}
 
 #[cfg(test)]
 use crate::rings::bigint::*;

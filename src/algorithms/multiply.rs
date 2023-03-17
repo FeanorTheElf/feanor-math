@@ -21,7 +21,7 @@ pub fn add_assign_convoluted_mul<R: RingWrapper + Copy>(dst: &mut [El<R>], lhs: 
 #[cfg(test)]
 use test;
 #[cfg(test)]
-use crate::primitive::*;
+use crate::primitive_int::*;
 
 #[bench]
 fn bench_naive_mul(bencher: &mut test::Bencher) {

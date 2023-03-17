@@ -50,7 +50,7 @@ pub fn eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
 /// In particular, have 
 /// ```
 /// # use feanor_math::algorithms::eea::signed_gcd;
-/// # use feanor_math::primitive::*;
+/// # use feanor_math::primitive_int::*;
 /// assert_eq!(2, signed_gcd(6, 8, &StaticRing::<i64>::RING));
 /// assert_eq!(0, signed_gcd(0, 0, &StaticRing::<i64>::RING)); 
 /// assert_eq!(5, signed_gcd(0, -5, &StaticRing::<i64>::RING));
@@ -138,7 +138,7 @@ pub fn lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
 }
 
 #[cfg(test)]
-use crate::primitive::*;
+use crate::primitive_int::*;
 
 #[test]
 fn test_gcd() {

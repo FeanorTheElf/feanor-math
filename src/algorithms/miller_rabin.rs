@@ -59,7 +59,7 @@ pub fn is_prime<I>(ring: I, n: &El<I>, k: usize) -> bool
 }
 
 #[cfg(test)]
-use crate::primitive::*;
+use crate::primitive_int::*;
 
 #[test]
 pub fn test_is_prime() {

@@ -2,9 +2,10 @@ use crate::divisibility::DivisibilityRing;
 use crate::euclidean::*;
 use crate::integer::*;
 use crate::ordered::*;
-use crate::primitive::StaticRingBase;
+use crate::primitive_int::StaticRingBase;
 use crate::{ring::*};
 use crate::algorithms;
+use crate::primitive_int::*;
 use std::cmp::Ordering::*;
 
 #[derive(Clone, Debug)]
@@ -233,23 +234,23 @@ impl EuclideanRing for DefaultBigIntRing {
     }
 }
 
-impl CanonicalHom<StaticRingBase<i128>> for DefaultBigIntRing {
+impl<T: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for DefaultBigIntRing {
     
-    fn has_canonical_hom(&self, _: &StaticRingBase<i128>) -> bool { true }
+    fn has_canonical_hom(&self, _: &StaticRingBase<T>) -> bool { true }
 
-    fn map_in(&self, _: &StaticRingBase<i128>, el: i128) -> Self::Element {
-        let negative = el < 0;
-        let value = el.checked_abs().map(|x| x as u128).unwrap_or(1 << (u128::BITS - 1));
+    fn map_in(&self, _: &StaticRingBase<T>, el: T) -> Self::Element {
+        let negative = el.into() < 0;
+        let value = el.into().checked_abs().map(|x| x as u128).unwrap_or(1 << (u128::BITS - 1));
         DefaultBigIntRingEl(negative, vec![(value >> u64::BITS) as u64, (value & ((1 << u64::BITS) - 1)) as u64])
     }
 }
 
-impl CanonicalIso<StaticRingBase<i128>> for DefaultBigIntRing {
+impl<T: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for DefaultBigIntRing {
     
-    fn has_canonical_iso(&self, _: &StaticRingBase<i128>) -> bool { true }
+    fn has_canonical_iso(&self, _: &StaticRingBase<T>) -> bool { true }
 
-    fn map_out(&self, _: &StaticRingBase<i128>, el: Self::Element) -> i128 {
-        self.map_i128(&el).unwrap()
+    fn map_out(&self, _: &StaticRingBase<T>, el: Self::Element) -> T {
+        T::try_from(self.map_i128(&el).unwrap()).ok().unwrap()
     }
 }
 
@@ -300,8 +301,6 @@ impl IntegerRing for DefaultBigIntRing {
     }
 }
 
-#[cfg(test)]
-use crate::primitive::*;
 #[cfg(test)]
 use crate::divisibility::test_divisibility_axioms;
 
