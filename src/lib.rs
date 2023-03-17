@@ -14,6 +14,7 @@ impl<T: ?Sized> Exists for T {}
 
 #[macro_use]
 pub mod ring;
+pub mod delegate;
 pub mod vector;
 pub mod vectors;
 pub mod divisibility;

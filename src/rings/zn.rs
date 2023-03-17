@@ -1,3 +1,4 @@
+use crate::delegate::DelegateRing;
 use crate::divisibility::DivisibilityRing;
 use crate::divisibility::DivisibilityRingWrapper;
 use crate::euclidean::EuclideanRingWrapper;
@@ -5,7 +6,6 @@ use crate::ordered::OrderedRingWrapper;
 use crate::ring::*;
 use crate::algorithms;
 
-use std::cell::Cell;
 use std::cmp::Ordering;
 
 #[derive(Clone)]
@@ -14,7 +14,6 @@ pub struct Zn<I: IntegerRingWrapper> {
     modulus: El<I>,
     inverse_modulus: El<I>,
     inverse_modulus_bitshift: usize,
-    integral: Cell<Option<bool>>
 }
 
 impl<I: IntegerRingWrapper> Zn<I> {
@@ -33,8 +32,7 @@ impl<I: IntegerRingWrapper> Zn<I> {
             integer_ring: integer_ring,
             modulus: modulus,
             inverse_modulus: inverse_modulus,
-            inverse_modulus_bitshift: k,
-            integral: Cell::from(None)
+            inverse_modulus_bitshift: k
         };
     }
 
@@ -67,7 +65,7 @@ impl<I: IntegerRingWrapper> Zn<I> {
             red_n = self.integer_ring.sub_ref_fst(&self.modulus, red_n);
         }
         debug_assert!(self.integer_ring.is_lt(&red_n, &self.modulus));
-        return FactorRingZEl(red_n);
+        return ZnEl(red_n);
     }
 
     ///
@@ -88,18 +86,22 @@ impl<I: IntegerRingWrapper> Zn<I> {
     }
 }
 
-pub struct FactorRingZEl<I: IntegerRingWrapper>(El<I>);
+pub struct ZnEl<I: IntegerRingWrapper>(El<I>);
 
-impl<I: IntegerRingWrapper> Clone for FactorRingZEl<I> {
+impl<I: IntegerRingWrapper> Clone for ZnEl<I> {
 
     fn clone(&self) -> Self {
-        FactorRingZEl(self.0.clone())
+        ZnEl(self.0.clone())
     }
 }
 
+impl<I: IntegerRingWrapper> Copy for ZnEl<I> 
+    where El<I>: Copy
+{}
+
 impl<I: IntegerRingWrapper> RingBase for Zn<I> {
 
-    type Element = FactorRingZEl<I>;
+    type Element = ZnEl<I>;
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         self.integer_ring.add_assign_ref(&mut lhs.0, &rhs.0);
@@ -186,7 +188,7 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<Zn<J>> for Zn<I>
 
     fn map_in(&self, from: &Zn<J>, el: <Zn<J> as RingBase>::Element) -> Self::Element {
         debug_assert!(self.has_canonical_hom(from));
-        FactorRingZEl(self.integer_ring.map_in(&from.integer_ring, el.0))
+        ZnEl(self.integer_ring.map_in(&from.integer_ring, el.0))
     }
 }
 
@@ -200,7 +202,110 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<Zn<J>> for Zn<I>
 
     fn map_out(&self, from: &Zn<J>, el: Self::Element) -> <Zn<J> as RingBase>::Element {
         debug_assert!(self.has_canonical_iso(from));
-        FactorRingZEl(self.integer_ring.map_out(&from.integer_ring, el.0))
+        ZnEl(self.integer_ring.map_out(&from.integer_ring, el.0))
+    }
+}
+
+#[derive(Clone)]
+pub struct Fp<I: IntegerRingWrapper> {
+    base: Zn<I>
+}
+
+pub struct FpEl<I: IntegerRingWrapper>(ZnEl<I>);
+
+impl<I: IntegerRingWrapper> Clone for FpEl<I> {
+
+    fn clone(&self) -> Self {
+        FpEl(self.0.clone())
+    }
+}
+
+impl<I: IntegerRingWrapper> Copy for FpEl<I> 
+    where El<I>: Copy
+{}
+
+impl<I: IntegerRingWrapper> Fp<I> {
+
+    fn get_base(&self) -> &Zn<I> {
+        &self.base
+    }
+}
+
+impl<I: IntegerRingWrapper> DelegateRing for Fp<I> {
+
+    type Element = FpEl<I>;
+    type Base = Zn<I>;
+
+    fn get_delegate(&self) -> &Self::Base {
+        &self.base
+    }
+
+    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element {
+        el.0
+    }
+
+    fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element {
+        &mut el.0
+    }
+
+    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element {
+        &el.0
+    }
+
+    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element {
+        FpEl(el)
+    }
+}
+
+impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<Fp<J>> for Fp<I> 
+    where I::Type: CanonicalHom<J::Type>
+{
+    fn has_canonical_hom(&self, from: &Fp<J>) -> bool {
+        self.get_base().has_canonical_hom(from.get_base())
+    }
+
+    fn map_in(&self, from: &Fp<J>, el: FpEl<J>) -> Self::Element {
+        debug_assert!(self.has_canonical_hom(from));
+        FpEl(self.get_base().map_in(from.get_base(), el.0))
+    }
+}
+
+impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<Fp<J>> for Fp<I> 
+    where I::Type: CanonicalIso<J::Type>
+{
+    fn has_canonical_iso(&self, from: &Fp<J>) -> bool {
+        self.get_base().has_canonical_iso(from.get_base())
+    }
+
+    fn map_out(&self, from: &Fp<J>, el: Self::Element) -> FpEl<J> {
+        debug_assert!(self.has_canonical_iso(from));
+        FpEl(self.get_base().map_out(from.get_base(), el.0))
+    }
+}
+
+impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<Zn<J>> for Fp<I> 
+    where I::Type: CanonicalHom<J::Type>
+{
+    fn has_canonical_hom(&self, from: &Zn<J>) -> bool {
+        self.get_base().has_canonical_hom(from)
+    }
+
+    fn map_in(&self, from: &Zn<J>, el: ZnEl<J>) -> Self::Element {
+        debug_assert!(self.has_canonical_hom(from));
+        FpEl(self.get_base().map_in(from, el))
+    }
+}
+
+impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<Zn<J>> for Fp<I> 
+    where I::Type: CanonicalIso<J::Type>
+{
+    fn has_canonical_iso(&self, from: &Zn<J>) -> bool {
+        self.get_base().has_canonical_iso(from)
+    }
+
+    fn map_out(&self, from: &Zn<J>, el: Self::Element) -> <Zn<J> as RingBase>::Element {
+        debug_assert!(self.has_canonical_iso(from));
+        self.get_base().map_out(from, el.0)
     }
 }
 

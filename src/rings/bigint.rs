@@ -8,11 +8,11 @@ use crate::algorithms;
 use std::cmp::Ordering::*;
 
 #[derive(Clone, Debug)]
-pub struct DefaultBigInt(bool, Vec<u64>);
+pub struct DefaultBigIntRingEl(bool, Vec<u64>);
 
-impl DefaultBigInt {
+impl DefaultBigIntRingEl {
     
-    pub fn parse(string: &str, base: u32) -> Result<DefaultBigInt, ()> {
+    pub fn parse(string: &str, base: u32) -> Result<DefaultBigIntRingEl, ()> {
         let result = Vec::new();
         let (negative, rest) = if string.chars().next() == Some('-') {
             (true, string.split_at(1).1)
@@ -21,7 +21,7 @@ impl DefaultBigInt {
         } else {
             (false, string)
         };
-        Ok(DefaultBigInt(negative, algorithms::bigint::from_str_radix(rest, base, result)?))
+        Ok(DefaultBigIntRingEl(negative, algorithms::bigint::from_str_radix(rest, base, result)?))
     }
 }
 
@@ -53,15 +53,15 @@ impl DefaultBigIntRing {
 
 impl RingBase for DefaultBigIntRing {
     
-    type Element = DefaultBigInt;
+    type Element = DefaultBigIntRingEl;
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         match (lhs, rhs) {
-            (DefaultBigInt(false, lhs_val), DefaultBigInt(false, rhs_val)) |
-            (DefaultBigInt(true, lhs_val), DefaultBigInt(true, rhs_val)) => {
+            (DefaultBigIntRingEl(false, lhs_val), DefaultBigIntRingEl(false, rhs_val)) |
+            (DefaultBigIntRingEl(true, lhs_val), DefaultBigIntRingEl(true, rhs_val)) => {
                 algorithms::bigint::bigint_add(lhs_val, rhs_val, 0);
             },
-            (DefaultBigInt(lhs_sgn, lhs_val), DefaultBigInt(_, rhs_val)) => {
+            (DefaultBigIntRingEl(lhs_sgn, lhs_val), DefaultBigIntRingEl(_, rhs_val)) => {
                 match algorithms::bigint::bigint_cmp(lhs_val, rhs_val) {
                     Less => {
                         algorithms::bigint::bigint_sub_self(lhs_val, rhs_val);
@@ -98,15 +98,15 @@ impl RingBase for DefaultBigIntRing {
 
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         let result = algorithms::bigint::bigint_mul(&lhs.1, &rhs.1, Vec::new());
-        *lhs = DefaultBigInt(lhs.0 ^ rhs.0, result);
+        *lhs = DefaultBigIntRingEl(lhs.0 ^ rhs.0, result);
     }
 
     fn zero(&self) -> Self::Element {
-        DefaultBigInt(false, Vec::new())
+        DefaultBigIntRingEl(false, Vec::new())
     }
 
     fn one(&self) -> Self::Element {
-        DefaultBigInt(false, vec![1])
+        DefaultBigIntRingEl(false, vec![1])
     }
 
     fn neg_one(&self) -> Self::Element {
@@ -114,7 +114,7 @@ impl RingBase for DefaultBigIntRing {
     }
 
     fn from_z(&self, value: i32) -> Self::Element {
-        DefaultBigInt(value < 0, vec![(value as i64).abs() as u64])
+        DefaultBigIntRingEl(value < 0, vec![(value as i64).abs() as u64])
     }
 
     fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -177,14 +177,14 @@ impl CanonicalHom<DefaultBigIntRing> for DefaultBigIntRing {
     
     fn has_canonical_hom(&self, _: &DefaultBigIntRing) -> bool { true }
 
-    fn map_in(&self, _: &DefaultBigIntRing, el: DefaultBigInt) -> Self::Element { el }
+    fn map_in(&self, _: &DefaultBigIntRing, el: DefaultBigIntRingEl) -> Self::Element { el }
 }
 
 impl CanonicalIso<DefaultBigIntRing> for DefaultBigIntRing {
     
     fn has_canonical_iso(&self, _: &DefaultBigIntRing) -> bool { true }
 
-    fn map_out(&self, _: &DefaultBigIntRing, el: DefaultBigInt) -> Self::Element { el }
+    fn map_out(&self, _: &DefaultBigIntRing, el: DefaultBigIntRingEl) -> Self::Element { el }
 }
 
 impl OrderedRing for DefaultBigIntRing {
@@ -221,7 +221,7 @@ impl EuclideanRing for DefaultBigIntRing {
 
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
-        let mut quo = DefaultBigInt(false, algorithms::bigint::bigint_div(&mut lhs.1, &rhs.1, Vec::new()));
+        let mut quo = DefaultBigIntRingEl(false, algorithms::bigint::bigint_div(&mut lhs.1, &rhs.1, Vec::new()));
         if rhs.0 ^ lhs.0 {// if result of division is zero, `.is_neg(&lhs)` does not work as expected
             self.negate_inplace(&mut quo);
         }
@@ -240,7 +240,7 @@ impl CanonicalHom<StaticRingBase<i128>> for DefaultBigIntRing {
     fn map_in(&self, _: &StaticRingBase<i128>, el: i128) -> Self::Element {
         let negative = el < 0;
         let value = el.checked_abs().map(|x| x as u128).unwrap_or(1 << (u128::BITS - 1));
-        DefaultBigInt(negative, vec![(value >> u64::BITS) as u64, (value & ((1 << u64::BITS) - 1)) as u64])
+        DefaultBigIntRingEl(negative, vec![(value >> u64::BITS) as u64, (value & ((1 << u64::BITS) - 1)) as u64])
     }
 }
 
@@ -292,10 +292,10 @@ impl IntegerRing for DefaultBigIntRing {
         let blocks = log2_bound_exclusive / u64::BITS as usize;
         let in_block = log2_bound_exclusive % u64::BITS as usize;
         if in_block == 0 {
-            DefaultBigInt(false, (0..blocks).map(|_| rng()).collect())
+            DefaultBigIntRingEl(false, (0..blocks).map(|_| rng()).collect())
         } else {
             let last = rng() & 1u64.overflowing_shl(in_block as u32).0.overflowing_sub(1).0;
-            DefaultBigInt(false, (0..blocks).map(|_| rng()).chain(std::iter::once(last)).collect())
+            DefaultBigIntRingEl(false, (0..blocks).map(|_| rng()).chain(std::iter::once(last)).collect())
         }
     }
 }
@@ -307,53 +307,53 @@ use crate::divisibility::test_divisibility_axioms;
 
 #[test]
 fn test_print_power_2() {
-    let x = DefaultBigInt(false, vec![0, 0, 1]);
+    let x = DefaultBigIntRingEl(false, vec![0, 0, 1]);
     assert_eq!("340282366920938463463374607431768211456", format!("{}", DefaultBigIntRing::RING.format(&x)));
 }
 
 #[test]
 fn test_from() {
-    assert!(DefaultBigIntRing::RING.eq(&DefaultBigInt(false, vec![]), &DefaultBigIntRing::RING.from_z(0)));
-    assert!(DefaultBigIntRing::RING.eq(&DefaultBigInt(false, vec![2138479]), &DefaultBigIntRing::RING.from_z(2138479)));
-    assert!(DefaultBigIntRing::RING.eq(&DefaultBigInt(true, vec![2138479]), &DefaultBigIntRing::RING.from_z(-2138479)));
+    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRingEl(false, vec![]), &DefaultBigIntRing::RING.from_z(0)));
+    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRingEl(false, vec![2138479]), &DefaultBigIntRing::RING.from_z(2138479)));
+    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRingEl(true, vec![2138479]), &DefaultBigIntRing::RING.from_z(-2138479)));
     // assert!(DefaultBigIntRing::RING.eq(&DefaultBigInt(false, vec![0x38691a350bf12fca, 0x1]), &DefaultBigIntRing::RING.from_z_gen(0x138691a350bf12fca, &i128::RING)));
 }
 
 #[test]
 fn test_to_i128() {
-    assert_eq!(0, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigInt(false, vec![])));
-    assert_eq!(2138479, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigInt(false, vec![2138479])));
-    assert_eq!(-2138479, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigInt(true, vec![2138479])));
-    assert_eq!(0x138691a350bf12fca, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigInt(false, vec![0x38691a350bf12fca, 0x1])));
+    assert_eq!(0, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![])));
+    assert_eq!(2138479, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![2138479])));
+    assert_eq!(-2138479, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(true, vec![2138479])));
+    assert_eq!(0x138691a350bf12fca, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![0x38691a350bf12fca, 0x1])));
     // assert_eq!(Err(()), DefaultBigInt(false, vec![0x38691a350bf12fca, 0x38691a350bf12fca, 0x1]).to_i128());
-    assert_eq!(i128::MAX, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigInt(false, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
-    assert_eq!(i128::MIN + 1, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigInt(true, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
+    assert_eq!(i128::MAX, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
+    assert_eq!(i128::MIN + 1, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(true, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
     // this is the possibly surprising, exceptional case
     // assert_eq!(Err(()), DefaultBigInt(true, vec![0, (i128::MAX >> 64) as u64 + 1]).to_i128());
-    assert_eq!(i64::MAX as i128 + 1, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigInt(false, vec![i64::MAX as u64 + 1])));
-    assert_eq!(u64::MAX as i128, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigInt(false, vec![u64::MAX])));
+    assert_eq!(i64::MAX as i128 + 1, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![i64::MAX as u64 + 1])));
+    assert_eq!(u64::MAX as i128, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![u64::MAX])));
 }
 
 #[test]
 fn test_sub_assign() {
-    let mut x = DefaultBigInt::parse("4294836225", 10).unwrap();
-    let y =     DefaultBigInt::parse("4294967297", 10).unwrap();
-    let z =     DefaultBigInt::parse("-131072", 10).unwrap();
+    let mut x = DefaultBigIntRingEl::parse("4294836225", 10).unwrap();
+    let y =     DefaultBigIntRingEl::parse("4294967297", 10).unwrap();
+    let z =     DefaultBigIntRingEl::parse("-131072", 10).unwrap();
     x = DefaultBigIntRing::RING.sub_ref_fst(&x, y);
     assert!(DefaultBigIntRing::RING.eq(&z, &x));
 }
 
 #[test]
 fn test_shift_right() {
-    let mut x = DefaultBigInt::parse("9843a756781b34567f81394", 16).unwrap();
-    let z = DefaultBigInt::parse("9843a756781b34567", 16).unwrap();
+    let mut x = DefaultBigIntRingEl::parse("9843a756781b34567f81394", 16).unwrap();
+    let z = DefaultBigIntRingEl::parse("9843a756781b34567", 16).unwrap();
     DefaultBigIntRing::RING.euclidean_div_pow_2(&mut x, 24);
     DefaultBigIntRing::RING.println(&x);
     DefaultBigIntRing::RING.println(&z);
     assert!(DefaultBigIntRing::RING.eq(&z, &x));
 
-    let mut x = DefaultBigInt::parse("-9843a756781b34567f81394", 16).unwrap();
-    let z = DefaultBigInt::parse("-9843a756781b34567", 16).unwrap();
+    let mut x = DefaultBigIntRingEl::parse("-9843a756781b34567f81394", 16).unwrap();
+    let z = DefaultBigIntRingEl::parse("-9843a756781b34567", 16).unwrap();
     DefaultBigIntRing::RING.euclidean_div_pow_2(&mut x, 24);
     assert!(DefaultBigIntRing::RING.eq(&z, &x));
 }
@@ -372,7 +372,7 @@ fn test_assumptions_integer_division() {
 }
 
 #[cfg(test)]
-fn numbers_iter() -> impl Iterator<Item = DefaultBigInt> {
+fn numbers_iter() -> impl Iterator<Item = DefaultBigIntRingEl> {
     
     const NUMBERS: [&'static str; 10] = [
         "5444517870735015415413993718908291383295", // power of two - 1
@@ -387,7 +387,7 @@ fn numbers_iter() -> impl Iterator<Item = DefaultBigInt> {
         "+1278367182354612381234568509783420989356938472561078564732895634928563482349872698723465"
     ];
 
-    NUMBERS.iter().cloned().map(|s| DefaultBigInt::parse(s, 10)).map(Result::unwrap)
+    NUMBERS.iter().cloned().map(|s| DefaultBigIntRingEl::parse(s, 10)).map(Result::unwrap)
 }
 
 #[test]
@@ -412,9 +412,9 @@ fn test_bigint_integer_ring_axioms() {
 
 #[bench]
 fn bench_mul(bencher: &mut test::Bencher) {
-    let x = DefaultBigInt::parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
-    let y = DefaultBigInt::parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
-    let z = DefaultBigInt::parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap();
+    let x = DefaultBigIntRingEl::parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
+    let y = DefaultBigIntRingEl::parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
+    let z = DefaultBigIntRingEl::parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap();
     bencher.iter(|| {
         let p = DefaultBigIntRing::RING.mul_ref(&x, &y);
         assert!(DefaultBigIntRing::RING.eq(&z, &p));
@@ -431,9 +431,9 @@ fn bench_mul(bencher: &mut test::Bencher) {
 
 #[bench]
 fn bench_div(bencher: &mut test::Bencher) {
-    let x = DefaultBigInt::parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
-    let y = DefaultBigInt::parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
-    let z = DefaultBigInt::parse("48682207850683149082203680872586784064678018", 10).unwrap();
+    let x = DefaultBigIntRingEl::parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
+    let y = DefaultBigIntRingEl::parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
+    let z = DefaultBigIntRingEl::parse("48682207850683149082203680872586784064678018", 10).unwrap();
     bencher.iter(|| {
         let q = DefaultBigIntRing::RING.euclidean_div(x.clone(), &y);
         assert!(DefaultBigIntRing::RING.eq(&z, &q));
@@ -525,8 +525,8 @@ fn test_get_uniformly_random() {
     test_integer_uniformly_random(DefaultBigIntRing::RING);
 
     let ring = DefaultBigIntRing::RING;
-    let bound = DefaultBigInt::parse("11000000000000000", 16).unwrap();
-    let block_bound = DefaultBigInt::parse("10000000000000000", 16).unwrap();
+    let bound = DefaultBigIntRingEl::parse("11000000000000000", 16).unwrap();
+    let block_bound = DefaultBigIntRingEl::parse("10000000000000000", 16).unwrap();
     let mut rng = oorandom::Rand64::new(0);
     let elements: Vec<_> = (0..1000).map(|_| ring.get_uniformly_random(&bound, || rng.rand_u64())).collect();
     assert!(elements.iter().any(|x| ring.is_lt(x, &block_bound)));

@@ -151,24 +151,6 @@ pub trait RingWrapper {
     type Type: RingBase + CanonicalIso<Self::Type>;
 
     fn get_ring<'a>(&'a self) -> &'a Self::Type;
-    
-    fn map_in<S>(&self, from: &S, el: El<S>) -> El<Self>
-        where S: RingWrapper, Self::Type: CanonicalHom<S::Type> 
-    {
-        self.get_ring().map_in(from.get_ring(), el)
-    }
-
-    fn map_out<S>(&self, to: &S, el: El<Self>) -> El<S>
-        where S: RingWrapper, Self::Type: CanonicalIso<S::Type> 
-    {
-        self.get_ring().map_out(to.get_ring(), el)
-    }
-
-    fn sum<I>(&self, els: I) -> El<Self> 
-        where I: Iterator<Item = El<Self>>
-    {
-        els.fold(self.zero(), |a, b| self.add(a, b))
-    }
 
     delegate!{ fn add_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
     delegate!{ fn add_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
@@ -200,6 +182,24 @@ pub trait RingWrapper {
     delegate!{ fn mul_ref_fst(&self, lhs: &El<Self>, rhs: El<Self>) -> El<Self> }
     delegate!{ fn mul_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
     delegate!{ fn mul(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
+    
+    fn map_in<S>(&self, from: &S, el: El<S>) -> El<Self>
+        where S: RingWrapper, Self::Type: CanonicalHom<S::Type> 
+    {
+        self.get_ring().map_in(from.get_ring(), el)
+    }
+
+    fn map_out<S>(&self, to: &S, el: El<Self>) -> El<S>
+        where S: RingWrapper, Self::Type: CanonicalIso<S::Type> 
+    {
+        self.get_ring().map_out(to.get_ring(), el)
+    }
+
+    fn sum<I>(&self, els: I) -> El<Self> 
+        where I: Iterator<Item = El<Self>>
+    {
+        els.fold(self.zero(), |a, b| self.add(a, b))
+    }
 
     fn base_ring<'a>(&'a self) -> &'a <Self::Type as RingExtension>::BaseRing
         where Self::Type: RingExtension
