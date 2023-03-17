@@ -57,3 +57,24 @@ pub fn is_prime<I>(ring: I, n: &El<I>, k: usize) -> bool
     }
     return true;
 }
+
+#[cfg(test)]
+use crate::primitive::*;
+
+#[test]
+pub fn test_is_prime() {
+    assert!(is_prime(StaticRing::<i128>::RING, &2, 5));
+    assert!(is_prime(StaticRing::<i128>::RING, &3, 5));
+    assert!(is_prime(StaticRing::<i128>::RING, &5, 5));
+    assert!(is_prime(StaticRing::<i128>::RING, &7, 5));
+    assert!(is_prime(StaticRing::<i128>::RING, &22531, 5));
+    assert!(is_prime(StaticRing::<i128>::RING, &417581, 5));
+
+    assert!(!is_prime(StaticRing::<i128>::RING, &4, 5));
+    assert!(!is_prime(StaticRing::<i128>::RING, &6, 5));
+    assert!(!is_prime(StaticRing::<i128>::RING, &8, 5));
+    assert!(!is_prime(StaticRing::<i128>::RING, &9, 5));
+    assert!(!is_prime(StaticRing::<i128>::RING, &10, 5));
+    assert!(!is_prime(StaticRing::<i128>::RING, &22532, 5));
+    assert!(!is_prime(StaticRing::<i128>::RING, &347584, 5));
+}

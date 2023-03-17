@@ -124,6 +124,13 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
     }
 }
 
+impl<T: PrimitiveInt> HashableElRing for StaticRingBase<T> {
+
+    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
+        h.write_i128(self.map_out(StaticRing::<i128>::RING.get_ring(), *el))
+    }
+}
+
 pub struct StaticRingBase<T> {
     element: PhantomData<T>
 }
@@ -171,9 +178,7 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     }
 }
 
-impl<T: PrimitiveInt> KaratsubaHint for StaticRingBase<T> {
-    
-}
+impl<T: PrimitiveInt> KaratsubaHint for StaticRingBase<T> {}
 
 pub type StaticRing<T> = RingValue<StaticRingBase<T>>;
 
