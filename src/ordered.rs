@@ -50,6 +50,6 @@ pub trait OrderedRingWrapper: RingWrapper<Type: OrderedRing> {
     delegate!{ fn abs(&self, value: El<Self>) -> El<Self> }
 }
 
-impl<R> OrderedRingWrapper for R
+impl<R: ?Sized> OrderedRingWrapper for R
     where R: RingWrapper<Type: OrderedRing>
 {}

@@ -255,6 +255,18 @@ impl CanonicalIso<StaticRingBase<i128>> for DefaultBigIntRing {
 
 impl IntegerRing for DefaultBigIntRing {
 
+    fn abs_lowest_set_bit(&self, value: &Self::Element) -> Option<usize> {
+        if self.is_zero(value) {
+            return None;
+        }
+        for i in 0..value.1.len() {
+            if value.1[i] != 0 {
+                return Some(i * u64::BITS as usize + value.1[i].trailing_zeros() as usize)
+            }
+        }
+        unreachable!()
+    }
+
     fn abs_is_bit_set(&self, value: &Self::Element, i: usize) -> bool {
         if i / u64::BITS as usize >= value.1.len() {
             false
@@ -274,6 +286,17 @@ impl IntegerRing for DefaultBigIntRing {
 
     fn mul_pow_2(&self, value: &mut Self::Element, power: usize) {
         algorithms::bigint::bigint_lshift(&mut value.1, power)
+    }
+
+    fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, mut rng: G) -> Self::Element {
+        let blocks = log2_bound_exclusive / u64::BITS as usize;
+        let in_block = log2_bound_exclusive % u64::BITS as usize;
+        if in_block == 0 {
+            DefaultBigInt(false, (0..blocks).map(|_| rng()).collect())
+        } else {
+            let last = rng() & 1u64.overflowing_shl(in_block as u32).0.overflowing_sub(1).0;
+            DefaultBigInt(false, (0..blocks).map(|_| rng()).chain(std::iter::once(last)).collect())
+        }
     }
 }
 
@@ -496,3 +519,17 @@ fn test_mul_pow_2() {
 //     assert!(DefaultBigIntRing::RING.eq(DefaultBigInt(true, vec![0, 1 << 63]), DefaultBigIntRing::RING.from_z_gen(i128::MIN, &i128::RING)));
 //     assert_eq!(format!("{}", i128::MIN), format!("{}", DefaultBigIntRing::RING.from_z_gen(i128::MIN, &i128::RING)));
 // }
+
+#[test]
+fn test_get_uniformly_random() {
+    test_integer_uniformly_random(DefaultBigIntRing::RING);
+
+    let ring = DefaultBigIntRing::RING;
+    let bound = DefaultBigInt::parse("11000000000000000", 16).unwrap();
+    let block_bound = DefaultBigInt::parse("10000000000000000", 16).unwrap();
+    let mut rng = oorandom::Rand64::new(0);
+    let elements: Vec<_> = (0..1000).map(|_| ring.get_uniformly_random(&bound, || rng.rand_u64())).collect();
+    assert!(elements.iter().any(|x| ring.is_lt(x, &block_bound)));
+    assert!(elements.iter().any(|x| ring.is_gt(x, &block_bound)));
+    assert!(elements.iter().all(|x| ring.is_lt(x, &bound)));
+}

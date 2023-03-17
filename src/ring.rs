@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc};
 
 use crate::{algorithms, primitive::StaticRing};
 
@@ -277,6 +277,28 @@ pub trait RingExtension: RingBase {
     }
 }
 
+pub trait HashableElRing: RingBase {
+
+    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H);
+}
+
+pub trait HashableElRingWrapper: RingWrapper<Type: HashableElRing> {
+
+    fn hash<H: std::hash::Hasher>(&self, el: &El<Self>, h: &mut H) {
+        self.get_ring().hash(el, h)
+    }
+
+    fn default_hash(&self, el: &El<Self>) -> u64 {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        self.hash(el, &mut hasher);
+        return <std::collections::hash_map::DefaultHasher as std::hash::Hasher>::finish(&hasher);
+    }
+}
+
+impl<R> HashableElRingWrapper for R
+    where R: RingWrapper<Type: HashableElRing>
+{}
+
 pub type El<R> = <<R as RingWrapper>::Type as RingBase>::Element;
 
 ///
@@ -423,7 +445,7 @@ fn test_internal_wrappings_dont_matter() {
             *lhs *= rhs;
         }
 
-        fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        fn dbg<'a>(&self, _: &Self::Element, _: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
             Ok(())
         }
     }
@@ -480,7 +502,7 @@ fn test_internal_wrappings_dont_matter() {
             *lhs *= rhs;
         }
 
-        fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        fn dbg<'a>(&self, _: &Self::Element, _: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
             Ok(())
         }
     }
