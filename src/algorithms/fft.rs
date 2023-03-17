@@ -1,4 +1,6 @@
 use crate::divisibility::DivisibilityRingWrapper;
+use crate::integer::IntegerRingWrapper;
+use crate::rings::zn::ZnRingWrapper;
 use crate::vector::SwappableVectorViewMut;
 use crate::{ring::*, vector::VectorViewMut};
 
@@ -23,6 +25,34 @@ impl<R> FFTTableCooleyTuckey<R>
         assert!(ring.is_neg_one(&ring.pow(&root_of_unity, 1 << (log2_n - 1))));
         let inv_root_of_unity = ring.pow(&root_of_unity, (1 << log2_n) - 1);
         FFTTableCooleyTuckey { ring, root_of_unity, inv_root_of_unity, log2_n }
+    }
+
+    #[allow(non_snake_case)]
+    pub fn for_zn(ring: R, log2_n: usize) -> Self
+        where R: ZnRingWrapper
+    {
+        assert!(log2_n > 0);
+        assert!(ring.is_field());
+        let ZZ = ring.integer_ring();
+        let mut n = ZZ.one();
+        ZZ.mul_pow_2(&mut n, log2_n);
+        let order = ZZ.sub_ref_fst(ring.modulus(), ZZ.one());
+        let power = ZZ.checked_div(&order, &n).unwrap();
+        
+        let pow_n_half = |mut x: El<R>| {
+            for _ in 1..log2_n {
+                let x_copy = x.clone();
+                ring.mul_assign(&mut x, x_copy);
+            }
+            return x;
+        };
+
+        let mut rng = oorandom::Rand64::new(ZZ.default_hash(ring.modulus()) as u128);
+        let mut current = ring.pow_gen(&ring.random_element(|| rng.rand_u64()), &power, ZZ);
+        while !ring.is_neg_one(&pow_n_half(current.clone())) {
+            current = ring.pow_gen(&ring.random_element(|| rng.rand_u64()), &power, ZZ);
+        }
+        return Self::new(ring, current, log2_n);
     }
 
     fn bitreverse_fft_inplace_base<V, S, const INV: bool>(&self, mut values: V, ring: S)
@@ -143,4 +173,17 @@ fn test_bitreverse_fft_inplace() {
 
     fft.bitreverse_fft_inplace(&mut values);
     assert_eq!(values, bitreverse_expected);
+}
+
+#[test]
+fn test_for_zn() {
+    let ring = Zn::<17>::RING;
+    let fft = FFTTableCooleyTuckey::for_zn(ring, 4);
+    assert!(ring.is_neg_one(&ring.pow(&fft.root_of_unity, 8)));
+    assert!(ring.is_neg_one(&ring.pow(&fft.inv_root_of_unity, 8)));
+
+    let ring = Zn::<97>::RING;
+    let fft = FFTTableCooleyTuckey::for_zn(ring, 4);
+    assert!(ring.is_neg_one(&ring.pow(&fft.root_of_unity, 8)));
+    assert!(ring.is_neg_one(&ring.pow(&fft.inv_root_of_unity, 8)));
 }

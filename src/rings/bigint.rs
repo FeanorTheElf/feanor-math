@@ -254,6 +254,18 @@ impl<T: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for DefaultBigIntRing {
     }
 }
 
+impl HashableElRing for DefaultBigIntRing {
+
+    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
+        let block = algorithms::bigint::highest_set_block(&el.1);
+        if let Some(b) = block {
+            for i in 0..=b {
+                h.write_u64(el.1[i])
+            }
+        }
+    }
+}
+
 impl IntegerRing for DefaultBigIntRing {
 
     fn abs_lowest_set_bit(&self, value: &Self::Element) -> Option<usize> {

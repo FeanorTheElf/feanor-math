@@ -45,12 +45,7 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD>
     }
 
     fn from_z(&self, value: i32) -> Self::Element {
-        let result = ((value as i64 % (N as i64)) + (N as i64)) as u64;
-        if result >= N {
-            result - N
-        } else {
-            result
-        }
+        self.map_in(StaticRing::<i64>::RING.get_ring(), value as i64)
     }
 
     fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -66,13 +61,28 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD>
     }
 }
 
+impl<const N: u64, const IS_FIELD: bool> CanonicalHom<StaticRingBase<i64>> for ZnBase<N, IS_FIELD>
+    where Expr<{N as i64 as usize}>: Exists
+{
+    fn has_canonical_hom(&self, _: &StaticRingBase<i64>) -> bool { true }
+
+    fn map_in(&self, _: &StaticRingBase<i64>, el: i64) -> Self::Element {
+        let result = ((el % (N as i64)) + (N as i64)) as u64;
+        if result >= N {
+            result - N
+        } else {
+            result
+        }
+    }
+}
+
+
 impl<const N: u64, const IS_FIELD: bool> CanonicalHom<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD>
     where Expr<{N as i64 as usize}>: Exists
 {
     fn has_canonical_hom(&self, _: &Self) -> bool { true }
     fn map_in(&self, _: &Self, el: Self::Element) -> Self::Element { el }
 }
-
 
 impl<const N: u64, const IS_FIELD: bool> CanonicalIso<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD>
     where Expr<{N as i64 as usize}>: Exists

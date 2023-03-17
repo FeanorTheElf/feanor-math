@@ -1,6 +1,6 @@
 use std::{rc::Rc};
 
-use crate::{algorithms, primitive_int::StaticRing};
+use crate::{algorithms, primitive_int::StaticRing, integer::IntegerRingWrapper};
 
 ///
 /// Basic trait for objects that have a ring structure.
@@ -224,6 +224,18 @@ pub trait RingWrapper {
             x, 
             &(power as i64), 
             StaticRing::<i64>::RING, 
+            |a, 
+            b| self.mul(a, b), 
+            |a, b| self.mul_ref(a, b), 
+            self.one()
+        )
+    }
+
+    fn pow_gen<R: IntegerRingWrapper>(&self, x: &El<Self>, power: &El<R>, integers: R) -> El<Self> {
+        algorithms::sqr_mul::generic_abs_square_and_multiply(
+            x, 
+            power, 
+            integers, 
             |a, 
             b| self.mul(a, b), 
             |a, b| self.mul_ref(a, b), 

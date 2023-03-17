@@ -3,7 +3,7 @@ use crate::euclidean::*;
 use crate::ordered::*;
 use crate::algorithms;
 
-pub trait IntegerRing: EuclideanRing + OrderedRing {
+pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing {
 
     fn abs_is_bit_set(&self, value: &Self::Element, i: usize) -> bool;
     fn abs_highest_set_bit(&self, value: &Self::Element) -> Option<usize>;
