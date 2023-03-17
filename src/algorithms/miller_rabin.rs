@@ -38,10 +38,13 @@ pub fn is_prime<I>(ring: I, n: &El<I>, k: usize) -> bool
     let s = ring.abs_lowest_set_bit(&n_minus_one).unwrap();
     ring.euclidean_div_pow_2(&mut n_minus_one, s as usize);
     let d = n_minus_one;
-    let Zn = Zn::new(&ring, n.clone());
+    let Zn = RingValue::new(Zn::new(&ring, n.clone()));
 
     for _i in 0..k {
-        let a = Zn.project(ring.add(ring.get_uniformly_random(n, || rng.rand_u64()), ring.one()));
+        let a = Zn.get_ring().project(ring.add(ring.get_uniformly_random(n, || rng.rand_u64()), ring.one()));
+        if Zn.is_zero(&a) {
+            continue;
+        }
         let mut current = algorithms::sqr_mul::generic_abs_square_and_multiply(&a, &d, &ring, |a, b| Zn.mul(a, b), |a, b| Zn.mul_ref(a, b), Zn.one());
         let mut miller_rabin_condition = Zn.is_one(&current);
         for _r in 0..s {
@@ -67,6 +70,7 @@ pub fn test_is_prime() {
     assert!(is_prime(StaticRing::<i128>::RING, &3, 5));
     assert!(is_prime(StaticRing::<i128>::RING, &5, 5));
     assert!(is_prime(StaticRing::<i128>::RING, &7, 5));
+    assert!(is_prime(StaticRing::<i128>::RING, &11, 5));
     assert!(is_prime(StaticRing::<i128>::RING, &22531, 5));
     assert!(is_prime(StaticRing::<i128>::RING, &417581, 5));
 

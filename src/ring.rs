@@ -201,6 +201,12 @@ pub trait RingWrapper {
         els.fold(self.zero(), |a, b| self.add(a, b))
     }
 
+    fn prod<I>(&self, els: I) -> El<Self> 
+        where I: Iterator<Item = El<Self>>
+    {
+        els.fold(self.one(), |a, b| self.mul(a, b))
+    }
+
     fn base_ring<'a>(&'a self) -> &'a <Self::Type as RingExtension>::BaseRing
         where Self::Type: RingExtension
     {

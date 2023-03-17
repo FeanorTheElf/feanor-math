@@ -8,6 +8,7 @@ use crate::integer::IntegerRing;
 use crate::integer::IntegerRingWrapper;
 use crate::ordered::OrderedRingWrapper;
 use crate::ring::*;
+use crate::rings::zn::*;
 use crate::algorithms;
 
 use std::cmp::Ordering;
@@ -188,44 +189,48 @@ impl<I: IntegerRingWrapper> DivisibilityRing for Zn<I> {
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<Zn<J>> for Zn<I> 
-    where I::Type: CanonicalHom<J::Type>
-{
+impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<Zn<J>> for Zn<I> {
+
     fn has_canonical_hom(&self, from: &Zn<J>) -> bool {
-        self.integer_ring.get_ring().has_canonical_hom(from.integer_ring.get_ring()) && 
-            self.integer_ring.eq(&self.modulus, &self.integer_ring.map_in(&from.integer_ring, from.modulus.clone()))
+        <I::Type as CanonicalHom<J::Type>>::has_canonical_hom(self.integer_ring.get_ring(), from.integer_ring.get_ring()) && 
+            self.integer_ring.eq(
+                &self.modulus, 
+                &<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), from.modulus.clone())
+            )
     }
 
     fn map_in(&self, from: &Zn<J>, el: <Zn<J> as RingBase>::Element) -> Self::Element {
         debug_assert!(self.has_canonical_hom(from));
-        ZnEl(self.integer_ring.map_in(&from.integer_ring, el.0))
+        ZnEl(<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), el.0))
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<Zn<J>> for Zn<I> 
-    where I::Type: CanonicalIso<J::Type>
-{
+impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<Zn<J>> for Zn<I> {
+
     fn has_canonical_iso(&self, from: &Zn<J>) -> bool {
-        self.integer_ring.get_ring().has_canonical_iso(from.integer_ring.get_ring()) && 
-            self.integer_ring.eq(&self.modulus, &self.integer_ring.map_in(&from.integer_ring, from.modulus.clone()))
+        <I::Type as CanonicalIso<J::Type>>::has_canonical_iso(self.integer_ring.get_ring(), from.integer_ring.get_ring()) && 
+            self.integer_ring.eq(
+                &self.modulus, 
+                &<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), from.modulus.clone())
+            )
     }
 
     fn map_out(&self, from: &Zn<J>, el: Self::Element) -> <Zn<J> as RingBase>::Element {
         debug_assert!(self.has_canonical_iso(from));
-        ZnEl(self.integer_ring.map_out(&from.integer_ring, el.0))
+        ZnEl(<I::Type as CanonicalIso<J::Type>>::map_out(self.integer_ring.get_ring(), from.integer_ring.get_ring(), el.0))
     }
 }
 
 impl<I: IntegerRingWrapper, J: IntegerRing> CanonicalHom<J> for Zn<I> 
-    where I::Type: CanonicalHom<J>
+    where J: CanonicalIso<J>
 {
     fn has_canonical_hom(&self, from: &J) -> bool {
-        self.integer_ring().get_ring().has_canonical_hom(from)
+        <I::Type as CanonicalHom<J>>::has_canonical_hom(self.integer_ring().get_ring(), from)
     }
 
     fn map_in(&self, from: &J, el: J::Element) -> Self::Element {
         debug_assert!(self.has_canonical_hom(from));
-        self.project(self.integer_ring().get_ring().map_in(from, el))
+        self.project(<I::Type as CanonicalHom<J>>::map_in(self.integer_ring().get_ring(), from, el))
     }
 }
 
@@ -298,9 +303,8 @@ impl<I: IntegerRingWrapper> DelegateRing for Fp<I> {
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<Fp<J>> for Fp<I> 
-    where I::Type: CanonicalHom<J::Type>
-{
+impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<Fp<J>> for Fp<I> {
+    
     fn has_canonical_hom(&self, from: &Fp<J>) -> bool {
         self.get_base().has_canonical_hom(from.get_base())
     }
@@ -311,9 +315,8 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<Fp<J>> for Fp<I>
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<Fp<J>> for Fp<I> 
-    where I::Type: CanonicalIso<J::Type>
-{
+impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<Fp<J>> for Fp<I> {
+
     fn has_canonical_iso(&self, from: &Fp<J>) -> bool {
         self.get_base().has_canonical_iso(from.get_base())
     }
@@ -324,9 +327,8 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<Fp<J>> for Fp<I>
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<Zn<J>> for Fp<I> 
-    where I::Type: CanonicalHom<J::Type>
-{
+impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<Zn<J>> for Fp<I> {
+
     fn has_canonical_hom(&self, from: &Zn<J>) -> bool {
         self.get_base().has_canonical_hom(from)
     }
@@ -337,9 +339,8 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<Zn<J>> for Fp<I>
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<Zn<J>> for Fp<I> 
-    where I::Type: CanonicalIso<J::Type>
-{
+impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<Zn<J>> for Fp<I> {
+
     fn has_canonical_iso(&self, from: &Zn<J>) -> bool {
         self.get_base().has_canonical_iso(from)
     }
@@ -351,7 +352,7 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<Zn<J>> for Fp<I>
 }
 
 impl<I: IntegerRingWrapper, J: IntegerRing> CanonicalHom<J> for Fp<I> 
-    where I::Type: CanonicalHom<J>
+    where J: CanonicalIso<J>
 {
     fn has_canonical_hom(&self, from: &J) -> bool {
         self.get_base().has_canonical_hom(from)
@@ -420,11 +421,10 @@ impl<I: IntegerRingWrapper> ZnRing for Fp<I> {
     }
 }
 
-
+#[cfg(test)]
+use crate::primitive_int::*;
 #[cfg(test)]
 use crate::rings::bigint::*;
-
-use super::ZnRing;
 
 #[test]
 fn test_mul() {
@@ -432,4 +432,10 @@ fn test_mul() {
     let z257 = Zn::new(ZZ, ZZ.from_z(257));
     let x = z257.project(ZZ.from_z(256));
     assert!(z257.eq(&z257.one(), &z257.mul_ref(&x, &x)));
+}
+
+#[test]
+fn test_zn_ring_axioms() {
+    let ring = Zn::new(StaticRing::<i64>::RING, 63);
+    test_ring_axioms(RingValue::new(ring.clone()), [0, 1, 3, 7, 9, 62, 8, 10, 11, 12].iter().cloned().map(|x| ring.from_z(x)))
 }

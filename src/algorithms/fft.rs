@@ -21,6 +21,7 @@ impl<R> FFTTableCooleyTuckey<R>
     where R: RingWrapper
 {
     pub fn new(ring: R, root_of_unity: El<R>, log2_n: usize) -> Self {
+        assert!(ring.is_commutative());
         assert!(log2_n > 0);
         assert!(ring.is_neg_one(&ring.pow(&root_of_unity, 1 << (log2_n - 1))));
         let inv_root_of_unity = ring.pow(&root_of_unity, (1 << log2_n) - 1);
@@ -125,6 +126,20 @@ impl<R> FFTTableCooleyTuckey<R>
         for i in 0..values.len() {
             self.ring.mul_assign_ref(values.at_mut(i), &scale);
         }
+    }
+
+    pub fn fft_inplace<V>(&self, mut values: V)
+        where V: SwappableVectorViewMut<El<R>>
+    {
+        self.bitreverse_fft_inplace(&mut values);
+        self.bitreverse_permute_inplace(&mut values);
+    }
+
+    pub fn inv_fft_inplace<V>(&self, mut values: V)
+        where V: SwappableVectorViewMut<El<R>>, R: DivisibilityRingWrapper
+    {
+        self.bitreverse_permute_inplace(&mut values);
+        self.bitreverse_fft_inplace(&mut values);
     }
 }
 

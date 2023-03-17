@@ -2,6 +2,7 @@ use crate::{divisibility::DivisibilityRing, integer::{IntegerRing, IntegerRingWr
 
 pub mod zn_dyn;
 pub mod zn_static;
+pub mod zn_rns;
 
 pub trait ZnRing: DivisibilityRing + CanonicalHom<Self::IntegerRingBase> {
 
