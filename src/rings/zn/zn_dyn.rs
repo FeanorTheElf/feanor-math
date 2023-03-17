@@ -85,10 +85,6 @@ impl<I: IntegerRingWrapper> Zn<I> {
         }
     }
 
-    pub fn integer_ring(&self) -> &I {
-        &self.integer_ring
-    }
-
     pub fn is_field(self) -> Result<Fp<I>, Zn<I>> 
         where I: HashableElRingWrapper
     {
@@ -230,6 +226,24 @@ impl<I: IntegerRingWrapper, J: IntegerRing> CanonicalHom<J> for Zn<I>
     fn map_in(&self, from: &J, el: J::Element) -> Self::Element {
         debug_assert!(self.has_canonical_hom(from));
         self.project(self.integer_ring().get_ring().map_in(from, el))
+    }
+}
+
+impl<I: IntegerRingWrapper> ZnRing for Zn<I> {
+    
+    type IntegerRingBase = I::Type;
+    type Integers = I;
+
+    fn integer_ring(&self) -> &Self::Integers {
+        &self.integer_ring
+    }
+
+    fn modulus(&self) -> &El<Self::Integers> {
+        &self.modulus
+    }
+
+    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
+        el.0
     }
 }
 
@@ -388,8 +402,29 @@ impl<I: IntegerRingWrapper> EuclideanRing for Fp<I> {
 
 impl<I: IntegerRingWrapper> Field for Fp<I> {}
 
+impl<I: IntegerRingWrapper> ZnRing for Fp<I> {
+    
+    type IntegerRingBase = I::Type;
+    type Integers = I;
+
+    fn integer_ring(&self) -> &Self::Integers {
+        self.get_base().integer_ring()
+    }
+
+    fn modulus(&self) -> &El<Self::Integers> {
+        self.get_base().modulus()
+    }
+
+    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
+        self.get_base().smallest_positive_lift(el.0)
+    }
+}
+
+
 #[cfg(test)]
 use crate::rings::bigint::*;
+
+use super::ZnRing;
 
 #[test]
 fn test_mul() {

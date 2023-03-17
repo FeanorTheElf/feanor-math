@@ -2,7 +2,7 @@ use crate::ordered::OrderedRingWrapper;
 use crate::ring::*;
 use crate::integer::*;
 use crate::algorithms;
-use crate::rings::zn::Zn;
+use crate::rings::zn::zn_dyn::*;
 
 use oorandom;
 

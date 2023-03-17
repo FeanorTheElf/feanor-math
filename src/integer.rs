@@ -27,6 +27,19 @@ impl<I: IntegerRing + CanonicalIso<I>, J: IntegerRing> CanonicalHom<I> for J {
     }
 }
 
+impl<I: IntegerRing + CanonicalIso<I>, J: IntegerRing + CanonicalIso<J>> CanonicalIso<I> for J {
+    
+    default fn has_canonical_iso(&self, _: &I) -> bool { true }
+
+    default fn map_out(&self, from: &I, el: Self::Element) -> I::Element {
+        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(&from.one(), &el, RingRef::new(self), |a, b| from.add(a, b), |a, b| from.add_ref(a, b), from.zero());
+        if self.is_neg(&el) {
+            return from.negate(result);
+        } else {
+            return result;
+        }
+    }
+}
 
 pub trait IntegerRingWrapper: RingWrapper<Type: IntegerRing> {
 

@@ -108,11 +108,11 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
     }
 
     fn euclidean_div_pow_2(&self, value: &mut Self::Element, power: usize) {
-        *value = self.map_in(StaticRing::<i128>::RING.get_ring(), self.map_out(&StaticRing::<i128>::RING.get_ring(), *value) >> power);
+        *value = self.map_in(StaticRing::<i128>::RING.get_ring(), self.map_out(StaticRing::<i128>::RING.get_ring(), *value) >> power);
     }
 
     fn mul_pow_2(&self, value: &mut Self::Element, power: usize) {
-        *value = self.map_in(StaticRing::<i128>::RING.get_ring(), self.map_out(&StaticRing::<i128>::RING.get_ring(), *value) << power);
+        *value = self.map_in(StaticRing::<i128>::RING.get_ring(), self.map_out(StaticRing::<i128>::RING.get_ring(), *value) << power);
     }
 
     fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, mut rng: G) -> Self::Element {

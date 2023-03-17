@@ -2,8 +2,10 @@ use crate::algorithms::eea::*;
 use crate::euclidean::EuclideanRing;
 use crate::field::Field;
 use crate::{divisibility::*, Exists, Expr};
-use crate::primitive_int::StaticRing;
+use crate::primitive_int::{StaticRing, StaticRingBase};
 use crate::ring::*;
+
+use super::ZnRing;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ZnBase<const N: u64, const IS_FIELD: bool>;
@@ -111,6 +113,25 @@ impl<const N: u64> EuclideanRing for ZnBase<N, true>
         } else {
             Some(1)
         }
+    }
+}
+
+impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD> 
+    where Expr<{N as i64 as usize}>: Exists
+{
+    type IntegerRingBase = StaticRingBase<i64>;
+    type Integers = RingValue<StaticRingBase<i64>>;
+
+    fn integer_ring(&self) -> &Self::Integers {
+        &StaticRing::<i64>::RING
+    }
+
+    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
+        el as i64
+    }
+
+    fn modulus(&self) -> &El<Self::Integers> {
+        &(N as i64)
     }
 }
 
