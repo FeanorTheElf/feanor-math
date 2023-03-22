@@ -5,3 +5,5 @@ pub mod fft;
 pub mod eea;
 pub mod bigint;
 pub mod miller_rabin;
+pub mod ec_factor;
+pub mod primes;

@@ -268,6 +268,29 @@ impl HashableElRing for DefaultBigIntRing {
 
 impl IntegerRing for DefaultBigIntRing {
 
+    fn to_float_approx(&self, value: &Self::Element) -> f64 {
+        let sign = if value.0 { -1. } else { 1. };
+        match algorithms::bigint::highest_set_block(&value.1) {
+            None => 0.,
+            Some(0) => value.1[0] as f64 * sign,
+            Some(d) => (value.1[d] as f64 * 2f64.powi(d as i32 * u64::BITS as i32) + value.1[d - 1] as f64 * 2f64.powi((d - 1) as i32 * u64::BITS as i32)) * sign
+        }
+    }
+
+    fn from_float_approx(&self, mut value: f64) -> Option<Self::Element> {
+        if value.round() == 0. {
+            return Some(self.zero());
+        }
+        let sign = value < 0.;
+        value = value.abs();
+        let scale = value.log2().floor() as i32;
+        let significant_digits = std::cmp::min(scale, u64::BITS as i32);
+        let most_significant_bits = (value / 2f64.powi(scale - significant_digits)) as u64;
+        let mut result = DefaultBigIntRingEl(sign, vec![most_significant_bits]);
+        self.mul_pow_2(&mut result, (scale - significant_digits) as usize);
+        return Some(result);
+    }
+
     fn abs_lowest_set_bit(&self, value: &Self::Element) -> Option<usize> {
         if self.is_zero(value) {
             return None;

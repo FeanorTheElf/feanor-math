@@ -41,6 +41,10 @@ pub trait RingBase {
     fn is_noetherian(&self) -> bool;
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
 
+    fn square(&self, value: Self::Element) -> Self::Element {
+        self.mul(value.clone(), value)
+    }
+
     fn negate(&self, mut value: Self::Element) -> Self::Element {
         self.negate_inplace(&mut value);
         return value;
@@ -182,6 +186,7 @@ pub trait RingWrapper {
     delegate!{ fn mul_ref_fst(&self, lhs: &El<Self>, rhs: El<Self>) -> El<Self> }
     delegate!{ fn mul_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
     delegate!{ fn mul(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
+    delegate!{ fn square(&self, value: El<Self>) -> El<Self> }
     
     fn map_in<S>(&self, from: &S, el: El<S>) -> El<Self>
         where S: RingWrapper, Self::Type: CanonicalHom<S::Type> 

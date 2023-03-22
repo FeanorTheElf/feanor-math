@@ -5,13 +5,15 @@ use crate::rings::zn::*;
 use super::zn_dyn::{Fp, FpEl};
 
 #[derive(Clone)]
-pub struct Zn<I: IntegerRingWrapper, J: IntegerRingWrapper> {
-    components: Vec<RingValue<Fp<I>>>,
-    total_ring: RingValue<zn_dyn::Zn<J>>,
-    unit_vectors: Vec<zn_dyn::ZnEl<J>>
+pub struct ZnBase<I: IntegerRingWrapper, J: IntegerRingWrapper> {
+    components: Vec<Fp<I>>,
+    total_ring: zn_dyn::Zn<J>,
+    unit_vectors: Vec<El<zn_dyn::Zn<J>>>
 }
 
-impl<I: IntegerRingWrapper + Clone, J: IntegerRingWrapper> Zn<I, J> {
+pub type Zn<I, J> = RingValue<ZnBase<I, J>>;
+
+impl<I: IntegerRingWrapper + Clone, J: IntegerRingWrapper> ZnBase<I, J> {
 
     #[allow(non_snake_case)]
     pub fn new(ring: I, large_ring: J, primes: Vec<El<I>>) -> Self {
@@ -22,10 +24,10 @@ impl<I: IntegerRingWrapper + Clone, J: IntegerRingWrapper> Zn<I, J> {
         let total_modulus = large_ring.prod(
             primes.iter().map(|p| large_ring.map_in::<I>(&ring, p.clone()))
         );
-        let total_ring = RingValue::new(zn_dyn::Zn::new(large_ring, total_modulus));
+        let total_ring = RingValue::new(zn_dyn::ZnBase::new(large_ring, total_modulus));
         let ZZ = total_ring.integer_ring();
         let components: Vec<_> = primes.into_iter()
-            .map(|p| zn_dyn::Zn::new(ring.clone(), p))
+            .map(|p| zn_dyn::ZnBase::new(ring.clone(), p))
             .map(|r| r.is_field().ok().unwrap())
             .map(|r| RingValue::new(r))
             .collect();
@@ -36,7 +38,7 @@ impl<I: IntegerRingWrapper + Clone, J: IntegerRingWrapper> Zn<I, J> {
             .enumerate()
             .map(|(i, n)| total_ring.pow_gen(&n, &ring.sub_ref_fst(components[i].modulus(), ring.one()), &ring))
             .collect();
-        Zn { components, total_ring, unit_vectors }
+        ZnBase { components, total_ring, unit_vectors }
     }
 }
 
@@ -49,7 +51,7 @@ impl<I: IntegerRingWrapper> Clone for ZnEl<I> {
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper> RingBase for Zn<I, J> {
+impl<I: IntegerRingWrapper, J: IntegerRingWrapper> RingBase for ZnBase<I, J> {
 
     type Element = ZnEl<I>;
 
@@ -117,16 +119,16 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> RingBase for Zn<I, J> {
     }
 }
 
-impl<I1: IntegerRingWrapper, J1: IntegerRingWrapper, I2: IntegerRingWrapper, J2: IntegerRingWrapper> CanonicalHom<Zn<I2, J2>> for Zn<I1, J1> {
+impl<I1: IntegerRingWrapper, J1: IntegerRingWrapper, I2: IntegerRingWrapper, J2: IntegerRingWrapper> CanonicalHom<ZnBase<I2, J2>> for ZnBase<I1, J1> {
 
-    fn has_canonical_hom(&self, from: &Zn<I2, J2>) -> bool {
+    fn has_canonical_hom(&self, from: &ZnBase<I2, J2>) -> bool {
         self.components.len() == from.components.len() && 
             self.components.iter()
                 .zip(from.components.iter())
                 .all(|(s, f)| s.get_ring().has_canonical_hom(f.get_ring()))
     }
 
-    fn map_in(&self, from: &Zn<I2, J2>, el: ZnEl<I2>) -> Self::Element {
+    fn map_in(&self, from: &ZnBase<I2, J2>, el: ZnEl<I2>) -> Self::Element {
         debug_assert!(self.has_canonical_hom(from));
         ZnEl(
             self.components.iter()
@@ -138,16 +140,16 @@ impl<I1: IntegerRingWrapper, J1: IntegerRingWrapper, I2: IntegerRingWrapper, J2:
     }
 }
 
-impl<I1: IntegerRingWrapper, J1: IntegerRingWrapper, I2: IntegerRingWrapper, J2: IntegerRingWrapper> CanonicalIso<Zn<I2, J2>> for Zn<I1, J1> {
+impl<I1: IntegerRingWrapper, J1: IntegerRingWrapper, I2: IntegerRingWrapper, J2: IntegerRingWrapper> CanonicalIso<ZnBase<I2, J2>> for ZnBase<I1, J1> {
 
-    fn has_canonical_iso(&self, from: &Zn<I2, J2>) -> bool {
+    fn has_canonical_iso(&self, from: &ZnBase<I2, J2>) -> bool {
         self.components.len() == from.components.len() && 
             self.components.iter()
                 .zip(from.components.iter())
                 .all(|(s, f)| s.get_ring().has_canonical_iso(f.get_ring()))
     }
 
-    fn map_out(&self, from: &Zn<I2, J2>, el: Self::Element) -> ZnEl<I2> {
+    fn map_out(&self, from: &ZnBase<I2, J2>, el: Self::Element) -> ZnEl<I2> {
         debug_assert!(self.has_canonical_iso(from));
         ZnEl(
             self.components.iter()
@@ -159,13 +161,13 @@ impl<I1: IntegerRingWrapper, J1: IntegerRingWrapper, I2: IntegerRingWrapper, J2:
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper, K: IntegerRingWrapper> CanonicalHom<zn_dyn::Zn<K>> for Zn<I, J> {
+impl<I: IntegerRingWrapper, J: IntegerRingWrapper, K: IntegerRingWrapper> CanonicalHom<zn_dyn::ZnBase<K>> for ZnBase<I, J> {
 
-    fn has_canonical_hom(&self, from: &zn_dyn::Zn<K>) -> bool {
+    fn has_canonical_hom(&self, from: &zn_dyn::ZnBase<K>) -> bool {
         self.total_ring.get_ring().has_canonical_hom(from)
     }
 
-    fn map_in(&self, from: &zn_dyn::Zn<K>, el: zn_dyn::ZnEl<K>) -> ZnEl<I> {
+    fn map_in(&self, from: &zn_dyn::ZnBase<K>, el: zn_dyn::ZnEl<K>) -> ZnEl<I> {
         debug_assert!(self.has_canonical_hom(from));
         ZnEl(
             self.components.iter()
@@ -175,13 +177,13 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper, K: IntegerRingWrapper> Canoni
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper, K: IntegerRingWrapper> CanonicalIso<zn_dyn::Zn<K>> for Zn<I, J> {
+impl<I: IntegerRingWrapper, J: IntegerRingWrapper, K: IntegerRingWrapper> CanonicalIso<zn_dyn::ZnBase<K>> for ZnBase<I, J> {
 
-    fn has_canonical_iso(&self, from: &zn_dyn::Zn<K>) -> bool {
+    fn has_canonical_iso(&self, from: &zn_dyn::ZnBase<K>) -> bool {
         self.total_ring.get_ring().has_canonical_iso(from)
     }
 
-    fn map_out(&self, from: &zn_dyn::Zn<K>, el: Self::Element) -> zn_dyn::ZnEl<K> {
+    fn map_out(&self, from: &zn_dyn::ZnBase<K>, el: Self::Element) -> zn_dyn::ZnEl<K> {
         debug_assert!(self.has_canonical_iso(from));
         RingRef::new(from).sum(
             self.components.iter().zip(el.0.into_iter())
@@ -195,8 +197,7 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper, K: IntegerRingWrapper> Canoni
     }
 }
 
-
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper, K: IntegerRing> CanonicalHom<K> for Zn<I, J> 
+impl<I: IntegerRingWrapper, J: IntegerRingWrapper, K: IntegerRing> CanonicalHom<K> for ZnBase<I, J> 
     where K: CanonicalIso<K>
 {
 
@@ -219,14 +220,14 @@ use crate::primitive_int::StaticRing;
 
 #[test]
 fn test_zn_ring_axioms() {
-    let ring = Zn::new(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]);
+    let ring = ZnBase::new(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]);
     test_ring_axioms(RingValue::new(ring.clone()), [0, 1, 7, 9, 62, 8, 10, 11, 12].iter().cloned().map(|x| ring.from_z(x)))
 }
 
 #[test]
 fn test_map_in_map_out() {
-    let ring1 = Zn::new(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11, 17]);
-    let ring2 = zn_dyn::Zn::new(StaticRing::<i32>::RING, 1309);
+    let ring1 = ZnBase::new(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11, 17]);
+    let ring2 = zn_dyn::ZnBase::new(StaticRing::<i32>::RING, 1309);
     for x in [0, 1, 7, 8, 9, 10, 11, 17, 7 * 17, 11 * 8, 11 * 17, 7 * 11 * 17 - 1] {
         let value = ring2.from_z(x);
         assert!(ring2.eq(&value, &ring1.map_out(&ring2, ring1.map_in(&ring2, value.clone()))));

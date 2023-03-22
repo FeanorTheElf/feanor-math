@@ -5,6 +5,8 @@ use crate::algorithms;
 
 pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing {
 
+    fn to_float_approx(&self, value: &Self::Element) -> f64;
+    fn from_float_approx(&self, value: f64) -> Option<Self::Element>;
     fn abs_is_bit_set(&self, value: &Self::Element, i: usize) -> bool;
     fn abs_highest_set_bit(&self, value: &Self::Element) -> Option<usize>;
     fn abs_lowest_set_bit(&self, value: &Self::Element) -> Option<usize>;
@@ -43,6 +45,8 @@ impl<I: IntegerRing + CanonicalIso<I>, J: IntegerRing + CanonicalIso<J>> Canonic
 
 pub trait IntegerRingWrapper: RingWrapper<Type: IntegerRing> {
 
+    delegate!{ fn to_float_approx(&self, value: &El<Self>) -> f64 }
+    delegate!{ fn from_float_approx(&self, value: f64) -> Option<El<Self>> }
     delegate!{ fn abs_is_bit_set(&self, value: &El<Self>, i: usize) -> bool }
     delegate!{ fn abs_highest_set_bit(&self, value: &El<Self>) -> Option<usize> }
     delegate!{ fn abs_lowest_set_bit(&self, value: &El<Self>) -> Option<usize> }

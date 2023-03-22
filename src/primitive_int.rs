@@ -84,6 +84,14 @@ impl<T: PrimitiveInt> OrderedRing for StaticRingBase<T> {
 
 impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
 
+    fn to_float_approx(&self, value: &Self::Element) -> f64 { 
+        self.map_out(StaticRing::<i128>::RING.get_ring(), *value) as f64
+    }
+
+    fn from_float_approx(&self, value: f64) -> Option<Self::Element> {
+        Some(self.map_in(StaticRing::<i128>::RING.get_ring(), value as i128))
+    }
+
     fn abs_is_bit_set(&self, value: &Self::Element, i: usize) -> bool {
         match self.map_out(StaticRing::<i128>::RING.get_ring(), *value) {
             i128::MIN => i == i128::BITS as usize - 1,
