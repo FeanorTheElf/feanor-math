@@ -1,68 +1,129 @@
 use crate::algorithms;
-use crate::divisibility::DivisibilityRingWrapper;
 use crate::ordered::OrderedRingWrapper;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::integer::*;
-use crate::rings::bigint::DefaultBigIntRing;
 use crate::rings::zn::ZnRingWrapper;
 use crate::rings::zn::zn_dyn::Zn;
 use crate::rings::zn::zn_dyn::ZnBase;
 
+#[allow(type_alias_bounds)]
+type Point<I: IntegerRingWrapper> = (El<Zn<I>>, El<Zn<I>>, El<Zn<I>>);
+
 #[allow(non_snake_case)]
-fn ec_group_action<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: Option<(El<Zn<I>>, El<Zn<I>>)>, Q: Option<(El<Zn<I>>, El<Zn<I>>)>) -> Result<Option<(El<Zn<I>>, El<Zn<I>>)>, El<I>>
+fn ec_group_action_proj<I>(Zn: &Zn<I>, _A: &El<Zn<I>>, _B: &El<Zn<I>>, P: Point<I>, Q: &Point<I>) -> Point<I> 
     where I: IntegerRingWrapper
 {
-    let half = Zn.get_ring().invert(Zn.from_z(2)).ok().unwrap();
-    match (P, Q) {
-        (None, Q) => Ok(Q),
-        (P, None) => Ok(P),
-        (Some((P_x, P_y)), Some((Q_x, Q_y))) => {
-            if Zn.eq(&P_x, &Q_x) && Zn.eq(&P_y, &Zn.negate(Q_y.clone())) {
-                Ok(None)
-            } else if Zn.eq(&P_x, &Q_x) {
-                let s = Zn.mul(
-                    Zn.add_ref_snd(
-                        Zn.mul(Zn.from_z(3), Zn.mul_ref(&P_x, &P_x)), 
-                        A
-                    ),
-                    Zn.mul_ref_fst(&half, Zn.get_ring().invert(P_y)?)
-                );
-                let R_x = Zn.sub(
-                    Zn.mul_ref(&s, &s),
-                    Zn.mul_ref_snd(Zn.from_z(2), &P_x)
-                );
-                let R_y = Zn.add(Q_y, Zn.mul(s, Zn.sub_ref_fst(&R_x, P_x)));
-                Ok(Some((R_x, R_y)))
-            } else {
-                let s = Zn.mul(
-                    Zn.sub_ref_fst(&P_y, Q_y),
-                    Zn.get_ring().invert(Zn.sub_ref_fst(&P_x, Q_x))?
-                );
-                let R_x = Zn.sub(
-                    Zn.mul_ref(&s, &s),
-                    Zn.mul_ref_snd(Zn.from_z(2), &P_x)
-                );
-                let R_y = Zn.add(P_y, Zn.mul(s, Zn.sub_ref_fst(&R_x, P_x)));
-                Ok(Some((R_x, R_y)))
-            }
-        }
+    if Zn.is_zero(&Q.2) {
+        return P;
+    } else if Zn.is_zero(&P.2) {
+        return Q.clone();
     }
+
+    let (P_x, P_y, P_z) = P;
+    let (Q_x, Q_y, Q_z) = Q;
+
+    let u = Zn.sub(Zn.mul_ref(&P_y, &Q_z), Zn.mul_ref(&Q_y, &P_z));
+    let w = Zn.sub(Zn.mul_ref(&P_x, &Q_z), Zn.mul_ref(&Q_x, &P_z));
+    let w_sqr = Zn.mul_ref(&w, &w);
+    let w_cbe = Zn.mul_ref(&w_sqr, &w);
+
+    let R_x_div_w = Zn.sub(
+        Zn.mul(Zn.mul_ref(&P_z, &Q_z), Zn.mul_ref(&u, &u)),
+        Zn.mul_ref_snd(
+            Zn.add(Zn.mul_ref(&P_x, &Q_z), Zn.mul_ref(&P_z, &Q_x)),
+            &w_sqr, 
+        )
+    );
+    return (
+        Zn.mul_ref(&w, &R_x_div_w),
+        Zn.add(
+            Zn.mul(P_y, Zn.mul_ref(&Q_z, &w_cbe)),
+            Zn.mul(u, Zn.sub(
+                R_x_div_w, Zn.mul(P_x, Zn.mul_ref_fst(&Q_z, w_sqr))
+            ))
+        ),
+        Zn.mul(P_z, w_cbe)
+    );
 }
 
 #[allow(non_snake_case)]
-fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &(El<Zn<I>>, El<Zn<I>>)) -> bool
+fn ec_group_double_proj<I>(Zn: &Zn<I>, A: &El<Zn<I>>, _B: &El<Zn<I>>, P: &Point<I>) -> Point<I>
     where I: IntegerRingWrapper
 {
-    let (x, y) = &P;
+    let (x, y, z) = P;
+
+    if Zn.is_zero(&z) {
+        return (Zn.zero(), Zn.one(), Zn.zero());
+    }
+    
+    let x_sqr = Zn.mul_ref(&x, &x);
+    let x_sqr_3 = Zn.add(Zn.add_ref(&x_sqr, &x_sqr), x_sqr);
+    let u = Zn.add(x_sqr_3, Zn.mul_ref_fst(&A, Zn.mul_ref(&z, &z)));
+    let w = Zn.mul_ref(&y, &z);
+    let w_sqr = Zn.mul_ref(&w, &w);
+    let w_cbe = Zn.mul_ref(&w_sqr, &w);
+
+    let x_w_sqr = Zn.mul_ref(&x, &w_sqr);
+    let R_x_div_w = Zn.sub(
+        Zn.mul_ref_fst(&z, Zn.mul_ref(&u, &u)),
+        Zn.add_ref(&x_w_sqr, &x_w_sqr)
+    );
+
+    return (
+        Zn.mul_ref(&w, &R_x_div_w),
+        Zn.add(
+            Zn.mul_ref(y, &w_cbe),
+            Zn.mul(u, Zn.sub(R_x_div_w, x_w_sqr))
+        ),
+        Zn.mul_ref_fst(z, w_cbe)
+    );
+}
+
+#[allow(non_snake_case)]
+pub fn ec_mul_abort<I>(base: &Point<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, power: &El<I>, ZZ: &I, Zn: &Zn<I>) -> Point<I>
+    where I: IntegerRingWrapper
+{
+    if ZZ.is_zero(&power) {
+        return (Zn.zero(), Zn.one(), Zn.zero());
+    } else if ZZ.is_one(&power) {
+        return base.clone();
+    }
+
+    let mut result = (Zn.zero(), Zn.one(), Zn.zero());
+    for i in (0..=ZZ.abs_highest_set_bit(power).unwrap()).rev() {
+        let double_result = ec_group_double_proj(Zn, A, B, &result);
+        let new = if ZZ.abs_is_bit_set(power, i) {
+            ec_group_action_proj(Zn, A, B, double_result, &base)
+        } else {
+            double_result
+        };
+        if Zn.is_zero(&new.2) {
+            return result;
+        }
+        result = new;
+    }
+    return result;
+}
+
+#[allow(non_snake_case)]
+fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &Point<I>) -> bool
+    where I: IntegerRingWrapper
+{
+    let (x, y, z) = &P;
     Zn.eq(
-        &Zn.mul_ref(y, y),
-        &Zn.add(Zn.pow(x, 3), Zn.add_ref_snd(Zn.mul_ref(A, x), B))
+        &Zn.mul_ref_snd(Zn.mul_ref(y, y), &z),
+        &Zn.add(
+            Zn.pow(x, 3), Zn.mul(
+                Zn.add(Zn.mul_ref(A, x), Zn.mul_ref(B, &z)),
+                Zn.mul_ref(&z, &z)
+            )
+        )
     )
 }
 
 ///
-/// Runtime L_N(1/2, 1) = exp((1 + o(1)) ln(N)^1/2 lnln(N)^1/2)
+/// Runtime `L_N(1/2, 1) = exp((1 + o(1)) ln(N)^1/2 lnln(N)^1/2)`
 /// 
 #[allow(non_snake_case)]
 pub fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
@@ -82,40 +143,39 @@ pub fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
     let Zn = Zn::new(ZnBase::new(&ZZ, N.clone()));
     let mut rng = oorandom::Rand64::new(ZZ.default_hash(N) as u128);
     loop {
-        let P = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()));
+        let P = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()), Zn.one());
         let A = Zn.random_element(|| rng.rand_u64());
         let B = Zn.sub(Zn.mul_ref(&P.1, &P.1), Zn.add(Zn.pow(&P.0, 3), Zn.mul_ref(&A, &P.0)));
-        assert!(is_on_curve(&Zn, &A, &B, &P));
-        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(
-            &Ok(Some(P)),
-            &k,
-            &ZZ,
-            |a, b| a.and_then(|a| b.and_then(|b| ec_group_action(&Zn, &A, &B, a, b))),
-            |a, b| a.clone().and_then(|a| b.clone().and_then(|b| ec_group_action(&Zn, &A, &B, a, b))),
-            Ok(None),
-        );
-        if let Err(factor) = result {
+        debug_assert!(is_on_curve(&Zn, &A, &B, &P));
+        let result = ec_mul_abort(&P, &A, &B, &k, &&ZZ, &Zn);
+        if let Err(factor) = Zn.get_ring().invert(result.2) {
             return factor;
-        } 
+        }
     }
 }
 
+#[cfg(test)]
+use crate::divisibility::DivisibilityRingWrapper;
+#[cfg(test)]
+use crate::rings::bigint::DefaultBigIntRing;
+
 #[test]
 fn test_ec_factor() {
-    assert_eq!(11, lenstra_ec_factor(StaticRing::<i64>::RING, &121));
-
-    let actual = lenstra_ec_factor(StaticRing::<i64>::RING, &(11 * 17));
-    assert!(actual == 11 || actual == 17);
+    let n = 11 * 17;
+    let actual = lenstra_ec_factor(StaticRing::<i64>::RING, &n);
+    assert!(actual != 1 && actual != n && n % actual == 0);
     
-    let actual = lenstra_ec_factor(StaticRing::<i128>::RING, &(23 * 59 * 113));
-    assert!(actual == 23 || actual == 59 || actual == 113);
+    let n = 23 * 59 * 113;
+    let actual = lenstra_ec_factor(StaticRing::<i128>::RING, &n);
+    assert!(actual != 1 && actual != n && n % actual == 0);
 }
 
+#[allow(non_snake_case)]
 #[bench]
 fn bench_ec_factor(bencher: &mut test::Bencher) {
     let ZZ = DefaultBigIntRing::RING;
     let mut n = ZZ.one();
-    ZZ.mul_pow_2(&mut n, 48);
+    ZZ.mul_pow_2(&mut n, 100);
     ZZ.add_assign(&mut n, ZZ.one());
     bencher.iter(|| {
         let p = lenstra_ec_factor(ZZ, &n);
