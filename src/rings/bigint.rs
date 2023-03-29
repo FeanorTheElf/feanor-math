@@ -241,7 +241,7 @@ impl<T: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for DefaultBigIntRing {
     fn map_in(&self, _: &StaticRingBase<T>, el: T) -> Self::Element {
         let negative = el.into() < 0;
         let value = el.into().checked_abs().map(|x| x as u128).unwrap_or(1 << (u128::BITS - 1));
-        DefaultBigIntRingEl(negative, vec![(value >> u64::BITS) as u64, (value & ((1 << u64::BITS) - 1)) as u64])
+        DefaultBigIntRingEl(negative, vec![(value & ((1 << u64::BITS) - 1)) as u64, (value >> u64::BITS) as u64])
     }
 }
 
@@ -283,7 +283,7 @@ impl IntegerRing for DefaultBigIntRing {
         }
         let sign = value < 0.;
         value = value.abs();
-        let scale = value.log2().floor() as i32;
+        let scale = value.log2().ceil() as i32;
         let significant_digits = std::cmp::min(scale, u64::BITS as i32);
         let most_significant_bits = (value / 2f64.powi(scale - significant_digits)) as u64;
         let mut result = DefaultBigIntRingEl(sign, vec![most_significant_bits]);
@@ -382,8 +382,6 @@ fn test_shift_right() {
     let mut x = DefaultBigIntRingEl::parse("9843a756781b34567f81394", 16).unwrap();
     let z = DefaultBigIntRingEl::parse("9843a756781b34567", 16).unwrap();
     DefaultBigIntRing::RING.euclidean_div_pow_2(&mut x, 24);
-    DefaultBigIntRing::RING.println(&x);
-    DefaultBigIntRing::RING.println(&z);
     assert!(DefaultBigIntRing::RING.eq(&z, &x));
 
     let mut x = DefaultBigIntRingEl::parse("-9843a756781b34567f81394", 16).unwrap();
@@ -455,13 +453,13 @@ fn bench_mul(bencher: &mut test::Bencher) {
     })
 }
 
-// #[test]
-// fn from_to_float_approx() {
-//     let x: f64 = 83465209236517892563478156042389675783219532497861237985328563.;
-//     let y = DefaultBigIntRing::RING.to_float_approx(&DefaultBigIntRing::RING.from_float_approx(x).unwrap());
-//     assert!(x * 0.99 < y);
-//     assert!(y < x * 1.01);
-// }
+#[test]
+fn from_to_float_approx() {
+    let x: f64 = 83465209236517892563478156042389675783219532497861237985328563.;
+    let y = DefaultBigIntRing::RING.to_float_approx(&DefaultBigIntRing::RING.from_float_approx(x).unwrap());
+    assert!(x * 0.99 < y);
+    assert!(y < x * 1.01);
+}
 
 #[bench]
 fn bench_div(bencher: &mut test::Bencher) {
@@ -537,22 +535,6 @@ fn test_mul_pow_2() {
     DefaultBigIntRing::RING.mul_pow_2(&mut z, 64);
     assert!(DefaultBigIntRing::RING.eq(&x, &z));
 }
-
-// #[test]
-// fn test_get_uniformly_random() {
-//     let end_exclusive = DefaultBigIntRing::RING.from_z(3);
-//     let mut rng = Rand32::new(0);
-//     let data: Vec<BigInt> = (0..100).map(|_| DefaultBigIntRing::RING.get_uniformly_random(|| rng.rand_u32(), &end_exclusive)).collect();
-//     assert!(data.iter().any(|x| *x == 0));
-//     assert!(data.iter().any(|x| *x == 1));
-//     assert!(data.iter().any(|x| *x == 2));
-// }
-
-// #[test]
-// fn test_from_overflow() {
-//     assert!(DefaultBigIntRing::RING.eq(DefaultBigInt(true, vec![0, 1 << 63]), DefaultBigIntRing::RING.from_z_gen(i128::MIN, &i128::RING)));
-//     assert_eq!(format!("{}", i128::MIN), format!("{}", DefaultBigIntRing::RING.from_z_gen(i128::MIN, &i128::RING)));
-// }
 
 #[test]
 fn test_get_uniformly_random() {

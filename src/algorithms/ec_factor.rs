@@ -1,8 +1,10 @@
 use crate::algorithms;
+use crate::divisibility::DivisibilityRingWrapper;
 use crate::ordered::OrderedRingWrapper;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::integer::*;
+use crate::rings::bigint::DefaultBigIntRing;
 use crate::rings::zn::ZnRingWrapper;
 use crate::rings::zn::zn_dyn::Zn;
 use crate::rings::zn::zn_dyn::ZnBase;
@@ -48,13 +50,25 @@ fn ec_group_action<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: Option<(El<Zn
     }
 }
 
+#[allow(non_snake_case)]
+fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &(El<Zn<I>>, El<Zn<I>>)) -> bool
+    where I: IntegerRingWrapper
+{
+    let (x, y) = &P;
+    Zn.eq(
+        &Zn.mul_ref(y, y),
+        &Zn.add(Zn.pow(x, 3), Zn.add_ref_snd(Zn.mul_ref(A, x), B))
+    )
+}
+
 ///
 /// Runtime L_N(1/2, 1) = exp((1 + o(1)) ln(N)^1/2 lnln(N)^1/2)
 /// 
 #[allow(non_snake_case)]
-fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
+pub fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
     where I: IntegerRingWrapper
 {
+    assert!(algorithms::miller_rabin::is_prime(&ZZ, N, 6) == false);
     assert!(ZZ.is_geq(N, &ZZ.from_z(100)));
     let Nf = ZZ.to_float_approx(N);
     // smoothness bound, choose L_N(1/2, 1/2)
@@ -63,7 +77,7 @@ fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
     let k = ZZ.prod(
         primes.iter()
             .map(|p| (Nf.log2() / ZZ.to_float_approx(&p).log2(), p))
-            .map(|(e, p)| ZZ.pow(p, e as usize))
+            .map(|(e, p)| ZZ.pow(p, e as usize + 1))
     );
     let Zn = Zn::new(ZnBase::new(&ZZ, N.clone()));
     let mut rng = oorandom::Rand64::new(ZZ.default_hash(N) as u128);
@@ -71,6 +85,7 @@ fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
         let P = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()));
         let A = Zn.random_element(|| rng.rand_u64());
         let B = Zn.sub(Zn.mul_ref(&P.1, &P.1), Zn.add(Zn.pow(&P.0, 3), Zn.mul_ref(&A, &P.0)));
+        assert!(is_on_curve(&Zn, &A, &B, &P));
         let result = algorithms::sqr_mul::generic_abs_square_and_multiply(
             &Ok(Some(P)),
             &k,
@@ -81,6 +96,29 @@ fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
         );
         if let Err(factor) = result {
             return factor;
-        }
+        } 
     }
+}
+
+#[test]
+fn test_ec_factor() {
+    assert_eq!(11, lenstra_ec_factor(StaticRing::<i64>::RING, &121));
+
+    let actual = lenstra_ec_factor(StaticRing::<i64>::RING, &(11 * 17));
+    assert!(actual == 11 || actual == 17);
+    
+    let actual = lenstra_ec_factor(StaticRing::<i128>::RING, &(23 * 59 * 113));
+    assert!(actual == 23 || actual == 59 || actual == 113);
+}
+
+#[bench]
+fn bench_ec_factor(bencher: &mut test::Bencher) {
+    let ZZ = DefaultBigIntRing::RING;
+    let mut n = ZZ.one();
+    ZZ.mul_pow_2(&mut n, 48);
+    ZZ.add_assign(&mut n, ZZ.one());
+    bencher.iter(|| {
+        let p = lenstra_ec_factor(ZZ, &n);
+        assert!(ZZ.checked_div(&n, &p).is_some());
+    });
 }
