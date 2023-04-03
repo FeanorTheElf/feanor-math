@@ -509,6 +509,9 @@ impl<'a, S: Deref<Target: RingStore>> RingStore for S {
     }
 }
 
+#[cfg(test)]
+use std::rc::Rc;
+
 #[test]
 fn test_ring_rc_lifetimes() {
     let ring = Rc::new(StaticRing::<i32>::RING);
