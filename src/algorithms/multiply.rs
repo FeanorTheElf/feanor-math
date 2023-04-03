@@ -13,7 +13,7 @@ impl<R: RingBase> KaratsubaHint for R {
     }
 }
 
-pub fn add_assign_convoluted_mul<R: RingWrapper + Copy>(dst: &mut [El<R>], lhs: &[El<R>], rhs: &[El<R>], ring: R) {
+pub fn add_assign_convoluted_mul<R: RingStore + Copy>(dst: &mut [El<R>], lhs: &[El<R>], rhs: &[El<R>], ring: R) {
     // checks are done by karatsuba()
     karatsuba(ring.get_ring().karatsuba_threshold(), dst, lhs, rhs, ring);
 }

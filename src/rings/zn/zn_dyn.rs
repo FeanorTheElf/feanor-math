@@ -1,12 +1,12 @@
 use crate::delegate::DelegateRing;
 use crate::divisibility::DivisibilityRing;
-use crate::divisibility::DivisibilityRingWrapper;
+use crate::divisibility::DivisibilityRingStore;
 use crate::euclidean::EuclideanRing;
-use crate::euclidean::EuclideanRingWrapper;
+use crate::euclidean::EuclideanRingStore;
 use crate::field::Field;
 use crate::integer::IntegerRing;
-use crate::integer::IntegerRingWrapper;
-use crate::ordered::OrderedRingWrapper;
+use crate::integer::IntegerRingStore;
+use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 use crate::rings::zn::*;
 use crate::algorithms;
@@ -14,7 +14,7 @@ use crate::algorithms;
 use std::cmp::Ordering;
 
 #[derive(Clone)]
-pub struct ZnBase<I: IntegerRingWrapper> {
+pub struct ZnBase<I: IntegerRingStore> {
     integer_ring: I,
     modulus: El<I>,
     inverse_modulus: El<I>,
@@ -23,7 +23,7 @@ pub struct ZnBase<I: IntegerRingWrapper> {
 
 pub type Zn<I> = RingValue<ZnBase<I>>;
 
-impl<I: IntegerRingWrapper> ZnBase<I> {
+impl<I: IntegerRingStore> ZnBase<I> {
 
     pub fn new(integer_ring: I, modulus: El<I>) -> Self {
         assert!(integer_ring.is_geq(&modulus, &integer_ring.from_z(2)));
@@ -89,7 +89,7 @@ impl<I: IntegerRingWrapper> ZnBase<I> {
     }
 
     pub fn is_field(self) -> Result<FpBase<I>, ZnBase<I>> 
-        where I: HashableElRingWrapper
+        where I: HashableElRingStore
     {
         if algorithms::miller_rabin::is_prime(self.integer_ring(), &self.modulus, 6) {
             Ok(FpBase { base: self })
@@ -99,20 +99,20 @@ impl<I: IntegerRingWrapper> ZnBase<I> {
     }
 }
 
-pub struct ZnEl<I: IntegerRingWrapper>(El<I>);
+pub struct ZnEl<I: IntegerRingStore>(El<I>);
 
-impl<I: IntegerRingWrapper> Clone for ZnEl<I> {
+impl<I: IntegerRingStore> Clone for ZnEl<I> {
 
     fn clone(&self) -> Self {
         ZnEl(self.0.clone())
     }
 }
 
-impl<I: IntegerRingWrapper> Copy for ZnEl<I> 
+impl<I: IntegerRingStore> Copy for ZnEl<I> 
     where El<I>: Copy
 {}
 
-impl<I: IntegerRingWrapper> RingBase for ZnBase<I> {
+impl<I: IntegerRingStore> RingBase for ZnBase<I> {
 
     type Element = ZnEl<I>;
 
@@ -179,7 +179,7 @@ impl<I: IntegerRingWrapper> RingBase for ZnBase<I> {
 
 }
 
-impl<I: IntegerRingWrapper> DivisibilityRing for ZnBase<I> {
+impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I> {
     
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let d = algorithms::eea::gcd(lhs.0.clone(), rhs.0.clone(), &self.integer_ring);
@@ -191,7 +191,7 @@ impl<I: IntegerRingWrapper> DivisibilityRing for ZnBase<I> {
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<ZnBase<J>> for ZnBase<I> {
+impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalHom<ZnBase<J>> for ZnBase<I> {
 
     fn has_canonical_hom(&self, from: &ZnBase<J>) -> bool {
         <I::Type as CanonicalHom<J::Type>>::has_canonical_hom(self.integer_ring.get_ring(), from.integer_ring.get_ring()) && 
@@ -207,7 +207,7 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<ZnBase<J>> for Z
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<ZnBase<J>> for ZnBase<I> {
+impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for ZnBase<I> {
 
     fn has_canonical_iso(&self, from: &ZnBase<J>) -> bool {
         <I::Type as CanonicalIso<J::Type>>::has_canonical_iso(self.integer_ring.get_ring(), from.integer_ring.get_ring()) && 
@@ -223,7 +223,7 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<ZnBase<J>> for Z
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRing> CanonicalHom<J> for ZnBase<I> 
+impl<I: IntegerRingStore, J: IntegerRing> CanonicalHom<J> for ZnBase<I> 
     where J: CanonicalIso<J>
 {
     fn has_canonical_hom(&self, from: &J) -> bool {
@@ -236,7 +236,7 @@ impl<I: IntegerRingWrapper, J: IntegerRing> CanonicalHom<J> for ZnBase<I>
     }
 }
 
-impl<I: IntegerRingWrapper> ZnRing for ZnBase<I> {
+impl<I: IntegerRingStore> ZnRing for ZnBase<I> {
     
     type IntegerRingBase = I::Type;
     type Integers = I;
@@ -255,33 +255,33 @@ impl<I: IntegerRingWrapper> ZnRing for ZnBase<I> {
 }
 
 #[derive(Clone)]
-pub struct FpBase<I: IntegerRingWrapper> {
+pub struct FpBase<I: IntegerRingStore> {
     base: ZnBase<I>
 }
 
 pub type Fp<I> = RingValue<FpBase<I>>;
 
-pub struct FpEl<I: IntegerRingWrapper>(ZnEl<I>);
+pub struct FpEl<I: IntegerRingStore>(ZnEl<I>);
 
-impl<I: IntegerRingWrapper> Clone for FpEl<I> {
+impl<I: IntegerRingStore> Clone for FpEl<I> {
 
     fn clone(&self) -> Self {
         FpEl(self.0.clone())
     }
 }
 
-impl<I: IntegerRingWrapper> Copy for FpEl<I> 
+impl<I: IntegerRingStore> Copy for FpEl<I> 
     where El<I>: Copy
 {}
 
-impl<I: IntegerRingWrapper> FpBase<I> {
+impl<I: IntegerRingStore> FpBase<I> {
 
     pub fn get_base(&self) -> &ZnBase<I> {
         &self.base
     }
 }
 
-impl<I: IntegerRingWrapper> DelegateRing for FpBase<I> {
+impl<I: IntegerRingStore> DelegateRing for FpBase<I> {
 
     type Element = FpEl<I>;
     type Base = ZnBase<I>;
@@ -307,7 +307,7 @@ impl<I: IntegerRingWrapper> DelegateRing for FpBase<I> {
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<FpBase<J>> for FpBase<I> {
+impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalHom<FpBase<J>> for FpBase<I> {
     
     fn has_canonical_hom(&self, from: &FpBase<J>) -> bool {
         self.get_base().has_canonical_hom(from.get_base())
@@ -319,7 +319,7 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<FpBase<J>> for F
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<FpBase<J>> for FpBase<I> {
+impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<FpBase<J>> for FpBase<I> {
 
     fn has_canonical_iso(&self, from: &FpBase<J>) -> bool {
         self.get_base().has_canonical_iso(from.get_base())
@@ -331,7 +331,7 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<FpBase<J>> for F
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<ZnBase<J>> for FpBase<I> {
+impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalHom<ZnBase<J>> for FpBase<I> {
 
     fn has_canonical_hom(&self, from: &ZnBase<J>) -> bool {
         self.get_base().has_canonical_hom(from)
@@ -343,7 +343,7 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalHom<ZnBase<J>> for F
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<ZnBase<J>> for FpBase<I> {
+impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for FpBase<I> {
 
     fn has_canonical_iso(&self, from: &ZnBase<J>) -> bool {
         self.get_base().has_canonical_iso(from)
@@ -355,7 +355,7 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> CanonicalIso<ZnBase<J>> for F
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRing> CanonicalHom<J> for FpBase<I> 
+impl<I: IntegerRingStore, J: IntegerRing> CanonicalHom<J> for FpBase<I> 
     where J: CanonicalIso<J>
 {
     fn has_canonical_hom(&self, from: &J) -> bool {
@@ -368,7 +368,7 @@ impl<I: IntegerRingWrapper, J: IntegerRing> CanonicalHom<J> for FpBase<I>
     }
 }
 
-impl<I: IntegerRingWrapper> DivisibilityRing for FpBase<I> {
+impl<I: IntegerRingStore> DivisibilityRing for FpBase<I> {
 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(rhs) {
@@ -382,7 +382,7 @@ impl<I: IntegerRingWrapper> DivisibilityRing for FpBase<I> {
     }
 }
 
-impl<I: IntegerRingWrapper> EuclideanRing for FpBase<I> {
+impl<I: IntegerRingStore> EuclideanRing for FpBase<I> {
 
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
@@ -403,9 +403,9 @@ impl<I: IntegerRingWrapper> EuclideanRing for FpBase<I> {
     }
 }
 
-impl<I: IntegerRingWrapper> Field for FpBase<I> {}
+impl<I: IntegerRingStore> Field for FpBase<I> {}
 
-impl<I: IntegerRingWrapper> ZnRing for FpBase<I> {
+impl<I: IntegerRingStore> ZnRing for FpBase<I> {
     
     type IntegerRingBase = I::Type;
     type Integers = I;

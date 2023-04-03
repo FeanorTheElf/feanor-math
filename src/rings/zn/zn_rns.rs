@@ -1,11 +1,11 @@
-use crate::{integer::IntegerRingWrapper, divisibility::DivisibilityRingWrapper};
-use crate::ordered::OrderedRingWrapper;
+use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
+use crate::ordered::OrderedRingStore;
 use crate::rings::zn::*;
 
 use super::zn_dyn::{Fp, FpEl};
 
 #[derive(Clone)]
-pub struct ZnBase<I: IntegerRingWrapper, J: IntegerRingWrapper> {
+pub struct ZnBase<I: IntegerRingStore, J: IntegerRingStore> {
     components: Vec<Fp<I>>,
     total_ring: zn_dyn::Zn<J>,
     unit_vectors: Vec<El<zn_dyn::Zn<J>>>
@@ -13,7 +13,7 @@ pub struct ZnBase<I: IntegerRingWrapper, J: IntegerRingWrapper> {
 
 pub type Zn<I, J> = RingValue<ZnBase<I, J>>;
 
-impl<I: IntegerRingWrapper + Clone, J: IntegerRingWrapper> ZnBase<I, J> {
+impl<I: IntegerRingStore + Clone, J: IntegerRingStore> ZnBase<I, J> {
 
     #[allow(non_snake_case)]
     pub fn new(ring: I, large_ring: J, primes: Vec<El<I>>) -> Self {
@@ -42,16 +42,16 @@ impl<I: IntegerRingWrapper + Clone, J: IntegerRingWrapper> ZnBase<I, J> {
     }
 }
 
-pub struct ZnEl<I: IntegerRingWrapper>(Vec<FpEl<I>>);
+pub struct ZnEl<I: IntegerRingStore>(Vec<FpEl<I>>);
 
-impl<I: IntegerRingWrapper> Clone for ZnEl<I> {
+impl<I: IntegerRingStore> Clone for ZnEl<I> {
 
     fn clone(&self) -> Self {
         ZnEl(self.0.clone())
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper> RingBase for ZnBase<I, J> {
+impl<I: IntegerRingStore, J: IntegerRingStore> RingBase for ZnBase<I, J> {
 
     type Element = ZnEl<I>;
 
@@ -119,7 +119,7 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper> RingBase for ZnBase<I, J> {
     }
 }
 
-impl<I1: IntegerRingWrapper, J1: IntegerRingWrapper, I2: IntegerRingWrapper, J2: IntegerRingWrapper> CanonicalHom<ZnBase<I2, J2>> for ZnBase<I1, J1> {
+impl<I1: IntegerRingStore, J1: IntegerRingStore, I2: IntegerRingStore, J2: IntegerRingStore> CanonicalHom<ZnBase<I2, J2>> for ZnBase<I1, J1> {
 
     fn has_canonical_hom(&self, from: &ZnBase<I2, J2>) -> bool {
         self.components.len() == from.components.len() && 
@@ -140,7 +140,7 @@ impl<I1: IntegerRingWrapper, J1: IntegerRingWrapper, I2: IntegerRingWrapper, J2:
     }
 }
 
-impl<I1: IntegerRingWrapper, J1: IntegerRingWrapper, I2: IntegerRingWrapper, J2: IntegerRingWrapper> CanonicalIso<ZnBase<I2, J2>> for ZnBase<I1, J1> {
+impl<I1: IntegerRingStore, J1: IntegerRingStore, I2: IntegerRingStore, J2: IntegerRingStore> CanonicalIso<ZnBase<I2, J2>> for ZnBase<I1, J1> {
 
     fn has_canonical_iso(&self, from: &ZnBase<I2, J2>) -> bool {
         self.components.len() == from.components.len() && 
@@ -161,7 +161,7 @@ impl<I1: IntegerRingWrapper, J1: IntegerRingWrapper, I2: IntegerRingWrapper, J2:
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper, K: IntegerRingWrapper> CanonicalHom<zn_dyn::ZnBase<K>> for ZnBase<I, J> {
+impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalHom<zn_dyn::ZnBase<K>> for ZnBase<I, J> {
 
     fn has_canonical_hom(&self, from: &zn_dyn::ZnBase<K>) -> bool {
         self.total_ring.get_ring().has_canonical_hom(from)
@@ -177,7 +177,7 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper, K: IntegerRingWrapper> Canoni
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper, K: IntegerRingWrapper> CanonicalIso<zn_dyn::ZnBase<K>> for ZnBase<I, J> {
+impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalIso<zn_dyn::ZnBase<K>> for ZnBase<I, J> {
 
     fn has_canonical_iso(&self, from: &zn_dyn::ZnBase<K>) -> bool {
         self.total_ring.get_ring().has_canonical_iso(from)
@@ -197,7 +197,7 @@ impl<I: IntegerRingWrapper, J: IntegerRingWrapper, K: IntegerRingWrapper> Canoni
     }
 }
 
-impl<I: IntegerRingWrapper, J: IntegerRingWrapper, K: IntegerRing> CanonicalHom<K> for ZnBase<I, J> 
+impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRing> CanonicalHom<K> for ZnBase<I, J> 
     where K: CanonicalIso<K>
 {
 

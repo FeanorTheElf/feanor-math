@@ -15,7 +15,7 @@ pub trait EuclideanRing: DivisibilityRing {
     }
 }
 
-pub trait EuclideanRingWrapper: RingWrapper<Type: EuclideanRing> + DivisibilityRingWrapper {
+pub trait EuclideanRingStore: RingStore<Type: EuclideanRing> + DivisibilityRingStore {
 
     delegate!{ fn euclidean_div_rem(&self, lhs: El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>) }
     delegate!{ fn euclidean_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
@@ -23,12 +23,12 @@ pub trait EuclideanRingWrapper: RingWrapper<Type: EuclideanRing> + DivisibilityR
     delegate!{ fn euclidean_deg(&self, val: &El<Self>) -> Option<usize> }
 }
 
-impl<R> EuclideanRingWrapper for R
-    where R: RingWrapper, R::Type: EuclideanRing
+impl<R> EuclideanRingStore for R
+    where R: RingStore, R::Type: EuclideanRing
 {}
 
 #[cfg(test)]
-pub fn test_euclidean_axioms<R: EuclideanRingWrapper, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
+pub fn test_euclidean_axioms<R: EuclideanRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
     assert!(ring.is_commutative());
     assert!(ring.is_noetherian());
     let elements = edge_case_elements.collect::<Vec<_>>();

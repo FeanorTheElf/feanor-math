@@ -1,4 +1,4 @@
-use crate::ordered::OrderedRingWrapper;
+use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 use crate::integer::*;
 use crate::algorithms;
@@ -27,7 +27,7 @@ use oorandom;
 /// 
 #[allow(non_snake_case)]
 pub fn is_prime<I>(ring: I, n: &El<I>, k: usize) -> bool 
-    where I: IntegerRingWrapper + HashableElRingWrapper
+    where I: IntegerRingStore + HashableElRingStore
 {
     if ring.is_leq(n, &ring.from_z(2)) {
         return ring.eq(n, &ring.from_z(2));

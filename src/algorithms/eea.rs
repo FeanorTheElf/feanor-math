@@ -1,5 +1,5 @@
-use crate::euclidean::EuclideanRingWrapper;
-use crate::ordered::OrderedRingWrapper;
+use crate::euclidean::EuclideanRingStore;
+use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 
 use std::mem::swap;
@@ -15,7 +15,7 @@ use std::cmp::Ordering;
 /// The given ring must be euclidean
 /// 
 pub fn eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>) 
-    where R: EuclideanRingWrapper
+    where R: EuclideanRingStore
 {
     let (mut a, mut b) = (fst, snd);
     let (mut sa, mut ta) = (ring.one(), ring.zero());
@@ -64,7 +64,7 @@ pub fn eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
 /// `signed_eea(0, 0) == (0, 0, 0)`
 /// 
 pub fn signed_eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
-    where R: EuclideanRingWrapper + OrderedRingWrapper
+    where R: EuclideanRingStore + OrderedRingStore
 {
     if ring.is_zero(&fst) {
         return match ring.cmp(&snd, &ring.zero()) {
@@ -99,7 +99,7 @@ pub fn signed_eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
 /// The given ring must be euclidean
 /// 
 pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
-    where R: EuclideanRingWrapper
+    where R: EuclideanRingStore
 {
     let (_, _, d) = eea(a, b, ring);
     return d;
@@ -119,20 +119,20 @@ pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
 /// ```
 /// 
 pub fn signed_gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
-    where R: EuclideanRingWrapper + OrderedRingWrapper
+    where R: EuclideanRingStore + OrderedRingStore
 {
     let (_, _, d) = signed_eea(a, b, ring);
     return d;
 }
 
 pub fn signed_lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
-    where R: EuclideanRingWrapper + OrderedRingWrapper
+    where R: EuclideanRingStore + OrderedRingStore
 {
     ring.mul(ring.euclidean_div(fst.clone(), &signed_gcd(fst, snd.clone(), &ring)), snd)
 }
 
 pub fn lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
-    where R: EuclideanRingWrapper
+    where R: EuclideanRingStore
 {
     ring.euclidean_div(ring.mul_ref(&fst, &snd), &gcd(fst, snd, &ring))
 }

@@ -38,7 +38,7 @@ pub trait OrderedRing: RingBase {
     }
 }
 
-pub trait OrderedRingWrapper: RingWrapper<Type: OrderedRing> {
+pub trait OrderedRingStore: RingStore<Type: OrderedRing> {
 
     delegate!{ fn cmp(&self, lhs: &El<Self>, rhs: &El<Self>) -> Ordering }
     delegate!{ fn is_leq(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
@@ -50,6 +50,6 @@ pub trait OrderedRingWrapper: RingWrapper<Type: OrderedRing> {
     delegate!{ fn abs(&self, value: El<Self>) -> El<Self> }
 }
 
-impl<R: ?Sized> OrderedRingWrapper for R
-    where R: RingWrapper<Type: OrderedRing>
+impl<R: ?Sized> OrderedRingStore for R
+    where R: RingStore<Type: OrderedRing>
 {}

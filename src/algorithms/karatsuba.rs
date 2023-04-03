@@ -3,7 +3,7 @@ use crate::{ring::*, vector::*};
 use std::cmp::{ max, min };
 
 pub fn naive_assign_mul<R, V1, V2, V3, const ADD_ASSIGN: bool>(mut dst: V1, lhs: V2, rhs: V3, ring: R) 
-    where R: RingWrapper, V1: VectorViewMut<El<R>>, V2: VectorView<El<R>>, V3: VectorView<El<R>>
+    where R: RingStore, V1: VectorViewMut<El<R>>, V2: VectorView<El<R>>, V3: VectorView<El<R>>
 {
     let n = lhs.len();
     assert_eq!(n, rhs.len());
@@ -23,7 +23,7 @@ pub fn naive_assign_mul<R, V1, V2, V3, const ADD_ASSIGN: bool>(mut dst: V1, lhs:
 }
 
 fn slice_add_assign<R, V1, V2>(mut dst: V1, src: V2, ring: R) 
-    where R: RingWrapper, V1: VectorViewMut<El<R>>, V2: VectorView<El<R>> 
+    where R: RingStore, V1: VectorViewMut<El<R>>, V2: VectorView<El<R>> 
 {
     assert_eq!(dst.len(), src.len());
     for i in 0..dst.len() {
@@ -32,7 +32,7 @@ fn slice_add_assign<R, V1, V2>(mut dst: V1, src: V2, ring: R)
 }
 
 fn slice_sub_assign<R, V1, V2>(mut dst: V1, src: V2, ring: R) 
-    where R: RingWrapper, V1: VectorViewMut<El<R>>, V2: VectorView<El<R>>
+    where R: RingStore, V1: VectorViewMut<El<R>>, V2: VectorView<El<R>>
 {
     assert_eq!(dst.len(), src.len());
     for i in 0..dst.len() {
@@ -44,11 +44,11 @@ macro_rules! karatsuba_impl {
         fn dispatch_karatsuba_impl<R, V2, V3, const ADD_ASSIGN: bool>(
             block_size_log2: usize, threshold_size_log2: usize, dst: &mut [El<R>], lhs: V2, rhs: V3, mem: &mut [El<R>], ring: R
         )
-            where R: RingWrapper + Copy, V2: SelfSubvectorView<El<R>> + Copy, V3: SelfSubvectorView<El<R>> + Copy
+            where R: RingStore + Copy, V2: SelfSubvectorView<El<R>> + Copy, V3: SelfSubvectorView<El<R>> + Copy
         {
             $(
                 fn $fun<R, V1, V2, V3, const ADD_ASSIGN: bool>(block_size_log2: usize, dst: &mut [El<R>], lhs: V2, rhs: V3, mem: &mut [El<R>], ring: R) 
-                    where R: RingWrapper + Copy, V2: SelfSubvectorView<El<R>> + Copy, V3: SelfSubvectorView<El<R>> + Copy
+                    where R: RingStore + Copy, V2: SelfSubvectorView<El<R>> + Copy, V3: SelfSubvectorView<El<R>> + Copy
                 {
                     const STEPS_LEFT: usize = $num;
                     let block_size: usize = 1 << block_size_log2;
@@ -125,7 +125,7 @@ karatsuba_impl!{
 }
 
 pub fn karatsuba<R, V1, V2>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: V1, rhs: V2, ring: R) 
-    where R: RingWrapper + Copy, V1: SelfSubvectorView<El<R>> + Copy, V2: SelfSubvectorView<El<R>> + Copy
+    where R: RingStore + Copy, V1: SelfSubvectorView<El<R>> + Copy, V2: SelfSubvectorView<El<R>> + Copy
 {
     if lhs.len() == 0 || rhs.len() == 0 {
         return;

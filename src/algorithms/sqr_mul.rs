@@ -2,7 +2,7 @@ use crate::ring::*;
 use crate::integer::*;
 
 pub fn generic_abs_square_and_multiply<T, F, G, I>(base: &T, power: &El<I>, int_ring: I, mut multiply: F, mut multiply_ref: G, identity: T) -> T
-    where I: IntegerRingWrapper, F: FnMut(T, T) -> T, G: FnMut(&T, &T) -> T, T: Clone
+    where I: IntegerRingStore, F: FnMut(T, T) -> T, G: FnMut(&T, &T) -> T, T: Clone
 {
     if int_ring.is_zero(&power) {
         return identity;

@@ -43,7 +43,7 @@ impl<I: IntegerRing + CanonicalIso<I>, J: IntegerRing + CanonicalIso<J>> Canonic
     }
 }
 
-pub trait IntegerRingWrapper: RingWrapper<Type: IntegerRing> {
+pub trait IntegerRingStore: RingStore<Type: IntegerRing> {
 
     delegate!{ fn to_float_approx(&self, value: &El<Self>) -> f64 }
     delegate!{ fn from_float_approx(&self, value: f64) -> Option<El<Self>> }
@@ -64,12 +64,12 @@ pub trait IntegerRingWrapper: RingWrapper<Type: IntegerRing> {
     }
 }
 
-impl<R> IntegerRingWrapper for R
-    where R: RingWrapper<Type: IntegerRing>
+impl<R> IntegerRingStore for R
+    where R: RingStore<Type: IntegerRing>
 {}
 
 #[cfg(test)]
-pub fn test_integer_uniformly_random<R: IntegerRingWrapper>(ring: R) {
+pub fn test_integer_uniformly_random<R: IntegerRingStore>(ring: R) {
     for b in [15, 16] {
         let bound = ring.from_z(b);
         let mut rng = oorandom::Rand64::new(0);
@@ -84,7 +84,7 @@ pub fn test_integer_uniformly_random<R: IntegerRingWrapper>(ring: R) {
 }
 
 #[cfg(test)]
-pub fn test_integer_axioms<R: IntegerRingWrapper, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
+pub fn test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
     let elements = edge_case_elements.collect::<Vec<_>>();
     for a in &elements {
         let mut ceil_pow_2 = ring.from_z(2);

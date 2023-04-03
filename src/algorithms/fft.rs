@@ -1,11 +1,11 @@
-use crate::divisibility::DivisibilityRingWrapper;
-use crate::integer::IntegerRingWrapper;
-use crate::rings::zn::ZnRingWrapper;
+use crate::divisibility::DivisibilityRingStore;
+use crate::integer::IntegerRingStore;
+use crate::rings::zn::ZnRingStore;
 use crate::vector::SwappableVectorViewMut;
 use crate::{ring::*, vector::VectorViewMut};
 
 pub struct FFTTableCooleyTuckey<R> 
-    where R: RingWrapper
+    where R: RingStore
 {
     ring: R,
     root_of_unity: El<R>,
@@ -18,7 +18,7 @@ pub fn bitreverse(index: usize, bits: usize) -> usize {
 }
 
 impl<R> FFTTableCooleyTuckey<R>
-    where R: RingWrapper
+    where R: RingStore
 {
     pub fn new(ring: R, root_of_unity: El<R>, log2_n: usize) -> Self {
         assert!(ring.is_commutative());
@@ -30,7 +30,7 @@ impl<R> FFTTableCooleyTuckey<R>
 
     #[allow(non_snake_case)]
     pub fn for_zn(ring: R, log2_n: usize) -> Self
-        where R: ZnRingWrapper
+        where R: ZnRingStore
     {
         assert!(log2_n > 0);
         assert!(ring.is_field());
@@ -57,7 +57,7 @@ impl<R> FFTTableCooleyTuckey<R>
     }
 
     fn bitreverse_fft_inplace_base<V, S, const INV: bool>(&self, mut values: V, ring: S)
-        where V: VectorViewMut<El<S>>, S: RingWrapper, S::Type: CanonicalHom<R::Type>
+        where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
     {
         assert!(values.len() == 1 << self.log2_n);
         for s in (0..self.log2_n).rev() {
@@ -119,7 +119,7 @@ impl<R> FFTTableCooleyTuckey<R>
     }
 
     pub fn bitreverse_inv_fft_inplace<V>(&self, mut values: V)
-        where V: VectorViewMut<El<R>>, R: DivisibilityRingWrapper
+        where V: VectorViewMut<El<R>>, R: DivisibilityRingStore
     {
         self.bitreverse_fft_inplace_base::<&mut V, &R, true>(&mut values, &self.ring);
         let scale = self.ring.checked_div(&self.ring.one(), &self.ring.from_z(1 << self.log2_n)).unwrap();
@@ -136,7 +136,7 @@ impl<R> FFTTableCooleyTuckey<R>
     }
 
     pub fn inv_fft_inplace<V>(&self, mut values: V)
-        where V: SwappableVectorViewMut<El<R>>, R: DivisibilityRingWrapper
+        where V: SwappableVectorViewMut<El<R>>, R: DivisibilityRingStore
     {
         self.bitreverse_permute_inplace(&mut values);
         self.bitreverse_fft_inplace(&mut values);

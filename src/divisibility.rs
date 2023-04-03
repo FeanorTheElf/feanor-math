@@ -15,7 +15,7 @@ pub trait DivisibilityRing: RingBase {
     }
 }
 
-pub trait DivisibilityRingWrapper: RingWrapper<Type: DivisibilityRing> {
+pub trait DivisibilityRingStore: RingStore<Type: DivisibilityRing> {
 
     delegate!{ fn checked_left_div(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> }
     delegate!{ fn is_unit(&self, x: &El<Self>) -> bool }
@@ -26,12 +26,12 @@ pub trait DivisibilityRingWrapper: RingWrapper<Type: DivisibilityRing> {
     }
 }
 
-impl<R> DivisibilityRingWrapper for R
-    where R: RingWrapper, R::Type: DivisibilityRing
+impl<R> DivisibilityRingStore for R
+    where R: RingStore, R::Type: DivisibilityRing
 {}
 
 #[cfg(test)]
-pub fn test_divisibility_axioms<R: DivisibilityRingWrapper, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
+pub fn test_divisibility_axioms<R: DivisibilityRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
     let elements = edge_case_elements.collect::<Vec<_>>();
     for a in &elements {
         for b in &elements {

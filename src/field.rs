@@ -3,7 +3,7 @@ use crate::euclidean::*;
 
 pub trait Field: EuclideanRing {}
 
-pub trait FieldWrapper: RingWrapper<Type: Field> + EuclideanRingWrapper {
+pub trait FieldWrapper: RingStore<Type: Field> + EuclideanRingStore {
 
     fn div(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> {
         assert!(!self.is_zero(rhs));
@@ -12,5 +12,5 @@ pub trait FieldWrapper: RingWrapper<Type: Field> + EuclideanRingWrapper {
 }
 
 impl<R> FieldWrapper for R
-    where R: RingWrapper, R::Type: Field
+    where R: RingStore, R::Type: Field
 {}

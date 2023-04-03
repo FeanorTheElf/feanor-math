@@ -1,18 +1,18 @@
 use crate::algorithms;
-use crate::ordered::OrderedRingWrapper;
+use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::integer::*;
-use crate::rings::zn::ZnRingWrapper;
+use crate::rings::zn::ZnRingStore;
 use crate::rings::zn::zn_dyn::Zn;
 use crate::rings::zn::zn_dyn::ZnBase;
 
 #[allow(type_alias_bounds)]
-type Point<I: IntegerRingWrapper> = (El<Zn<I>>, El<Zn<I>>, El<Zn<I>>);
+type Point<I: IntegerRingStore> = (El<Zn<I>>, El<Zn<I>>, El<Zn<I>>);
 
 #[allow(non_snake_case)]
 fn ec_group_action_proj<I>(Zn: &Zn<I>, _A: &El<Zn<I>>, _B: &El<Zn<I>>, P: Point<I>, Q: &Point<I>) -> Point<I> 
-    where I: IntegerRingWrapper
+    where I: IntegerRingStore
 {
     if Zn.is_zero(&Q.2) {
         return P;
@@ -49,7 +49,7 @@ fn ec_group_action_proj<I>(Zn: &Zn<I>, _A: &El<Zn<I>>, _B: &El<Zn<I>>, P: Point<
 
 #[allow(non_snake_case)]
 fn ec_group_double_proj<I>(Zn: &Zn<I>, A: &El<Zn<I>>, _B: &El<Zn<I>>, P: &Point<I>) -> Point<I>
-    where I: IntegerRingWrapper
+    where I: IntegerRingStore
 {
     let (x, y, z) = P;
 
@@ -82,7 +82,7 @@ fn ec_group_double_proj<I>(Zn: &Zn<I>, A: &El<Zn<I>>, _B: &El<Zn<I>>, P: &Point<
 
 #[allow(non_snake_case)]
 pub fn ec_mul_abort<I>(base: &Point<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, power: &El<I>, ZZ: &I, Zn: &Zn<I>) -> Point<I>
-    where I: IntegerRingWrapper
+    where I: IntegerRingStore
 {
     if ZZ.is_zero(&power) {
         return (Zn.zero(), Zn.one(), Zn.zero());
@@ -108,7 +108,7 @@ pub fn ec_mul_abort<I>(base: &Point<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, power: &El
 
 #[allow(non_snake_case)]
 fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &Point<I>) -> bool
-    where I: IntegerRingWrapper
+    where I: IntegerRingStore
 {
     let (x, y, z) = &P;
     Zn.eq(
@@ -127,7 +127,7 @@ fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &Point<I>) -> boo
 /// 
 #[allow(non_snake_case)]
 pub fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
-    where I: IntegerRingWrapper
+    where I: IntegerRingStore
 {
     assert!(algorithms::miller_rabin::is_prime(&ZZ, N, 6) == false);
     assert!(ZZ.is_geq(N, &ZZ.from_z(100)));
@@ -155,7 +155,7 @@ pub fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
 }
 
 #[cfg(test)]
-use crate::divisibility::DivisibilityRingWrapper;
+use crate::divisibility::DivisibilityRingStore;
 #[cfg(test)]
 use crate::rings::bigint::DefaultBigIntRing;
 
@@ -175,7 +175,7 @@ fn test_ec_factor() {
 fn bench_ec_factor(bencher: &mut test::Bencher) {
     let ZZ = DefaultBigIntRing::RING;
     let mut n = ZZ.one();
-    ZZ.mul_pow_2(&mut n, 100);
+    ZZ.mul_pow_2(&mut n, 48);
     ZZ.add_assign(&mut n, ZZ.one());
     bencher.iter(|| {
         let p = lenstra_ec_factor(ZZ, &n);
