@@ -1,4 +1,4 @@
-use std::{rc::Rc};
+use std::ops::Deref;
 
 use crate::{algorithms, primitive_int::{StaticRing}, integer::IntegerRingStore};
 
@@ -500,47 +500,11 @@ impl<'a, R: RingBase + CanonicalIso<R>> RingStore for RingRef<'a, R> {
     }
 }
 
-impl<'a, R: RingStore> RingStore for &'a R {
+impl<'a, S: Deref<Target: RingStore>> RingStore for S {
     
-    type Type = <R as RingStore>::Type;
+    type Type = <<S as Deref>::Target as RingStore>::Type;
     
-    fn get_ring(&self) -> &Self::Type {
-        (**self).get_ring()
-    }
-}
-
-impl<'a, R: RingStore> RingStore for &'a mut R {
-    
-    type Type = <R as RingStore>::Type;
-    
-    fn get_ring(&self) -> &Self::Type {
-        (**self).get_ring()
-    }
-}
-
-impl<'a, R: RingStore> RingStore for Box<R> {
-    
-    type Type = <R as RingStore>::Type;
-    
-    fn get_ring(&self) -> &Self::Type {
-        (**self).get_ring()
-    }
-}
-
-impl<'a, R: RingStore> RingStore for Rc<R> {
-    
-    type Type = <R as RingStore>::Type;
-    
-    fn get_ring(&self) -> &Self::Type {
-        (**self).get_ring()
-    }
-}
-
-impl<'a, R: RingStore> RingStore for std::sync::Arc<R> {
-    
-    type Type = <R as RingStore>::Type;
-    
-    fn get_ring(&self) -> &Self::Type {
+    fn get_ring<'b>(&'b self) -> &'b Self::Type {
         (**self).get_ring()
     }
 }
