@@ -7,3 +7,5 @@ pub mod bigint;
 pub mod miller_rabin;
 pub mod ec_factor;
 pub mod primes;
+// pub mod int_factor;
+// pub mod discrete_log;
