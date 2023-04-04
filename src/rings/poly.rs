@@ -46,6 +46,10 @@ impl<'a, R: ?Sized + PolyRing> Iterator for PolyRingCoefficientIterator<'a, R> {
     }
 }
 
+///
+/// Trait for all rings that represent the polynomial ring `R[X]` with
+/// any base ring R.
+/// 
 pub trait PolyRing: RingExtension + CanonicalIso<Self> {
 
     type IteratorState;
@@ -92,5 +96,64 @@ pub trait PolyRingStore: RingStore<Type: PolyRing> {
         El<<Self::Type as RingExtension>::BaseRing>: 'a
     {
         self.get_ring().from_terms(iter)
+    }
+}
+
+impl<R: RingStore<Type: PolyRing>> PolyRingStore for R {}
+
+#[cfg(test)]
+fn test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R::Type as RingExtension>::BaseRing>>>(ring: R, interesting_base_ring_elements: I) {
+    
+    let elements = interesting_base_ring_elements.collect::<Vec<_>>();
+    
+    // test linear independence of X
+    let x = ring.indeterminate();
+    for a in &elements {
+        for b in &elements {
+            for c in &elements {
+                for d in &elements {
+                    let a_bx = ring.add(ring.from_ref(a), ring.mul_ref_snd(ring.from_ref(b), &x));
+                    let c_dx = ring.add(ring.from_ref(c), ring.mul_ref_snd(ring.from_ref(d), &x));
+                    assert!(ring.eq(&a_bx, &c_dx) == (ring.base_ring().eq(a, b) && ring.base_ring().eq(c, d)));
+                }
+            }
+        }
+    }
+    
+    // elementwise addition follows trivially from the ring axioms
+
+    // technically, convoluted multiplication follows from the ring axioms too, but test it anyway
+    for a in &elements {
+        for b in &elements {
+            for c in &elements {
+                for d in &elements {
+                    let a_bx = ring.add(ring.from_ref(a), ring.mul_ref_snd(ring.from_ref(b), &x));
+                    let c_dx = ring.add(ring.from_ref(c), ring.mul_ref_snd(ring.from_ref(d), &x));
+                    let result = ring.sum([
+                        ring.mul(ring.from_ref(a), ring.from_ref(c)),
+                        ring.mul(ring.from_ref(a), ring.mul_ref_snd(ring.from_ref(d), &x)),
+                        ring.mul(ring.from_ref(b), ring.mul_ref_snd(ring.from_ref(c), &x)),
+                        ring.mul(ring.from_ref(b), ring.mul(ring.from_ref(c), ring.pow(&x, 2)))
+                    ].into_iter());
+                    assert!(ring.eq(&result, &ring.mul(a_bx, c_dx)));
+                }
+            }
+        }
+    }
+
+    // test terms(), from_terms()
+    for a in &elements {
+        for b in &elements {
+            for c in &elements {
+                let f = ring.sum([
+                    ring.from_ref(a),
+                    ring.mul_ref_snd(ring.from_ref(b), &x),
+                    ring.mul(ring.from_ref(c), ring.pow(&x, 3))
+                ].into_iter());
+                let actual = ring.from_terms([(a, 0), (c, 3), (b, 1)].into_iter());
+                assert!(ring.eq(&f, &actual));
+                assert!(ring.eq(&f, &ring.from_terms(ring.terms(&f))));
+            }
+        }
     }
 }
