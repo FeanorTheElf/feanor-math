@@ -11,14 +11,17 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::IntegerRingStore};
 /// reference instead of by value, the default-implemented functions for
 /// ring operations on references should be overwritten.
 /// 
-/// Note that usually, this trait will not be used directly, but always
-/// through a [`crate::ring::RingStore`]. In more detail, while this trait
-/// defines the functionality, [`crate::ring::RingStore`] allows abstracting
-/// the storage - everything that allows access to a ring then is a 
-/// [`crate::ring::RingStore`]. For example, references or shared pointers
-/// to rings. If you want to use rings directly by value, some technical
-/// details make it necessary to use the no-op container [`crate::ring::RingValue`].
+/// # Relationship with [`RingStore`]
 /// 
+/// Note that usually, this trait will not be used directly, but always
+/// through a [`RingStore`]. In more detail, while this trait
+/// defines the functionality, [`RingStore`] allows abstracting
+/// the storage - everything that allows access to a ring then is a 
+/// [`RingStore`], as for example, references or shared pointers
+/// to rings. If you want to use rings directly by value, some technical
+/// details make it necessary to use the no-op container [`RingStore`].
+/// For more detail, see the documentation of [`RingStore`].
+///  
 /// # Example
 /// 
 /// An example implementation of a new, very useless ring type that represents
@@ -31,25 +34,15 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::IntegerRingStore};
 ///     
 ///     type Element = Box<i32>;
 ///
-///     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-///         **lhs += *rhs;
-///     }
+///     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { **lhs += *rhs; }
 /// 
-///     fn negate_inplace(&self, lhs: &mut Self::Element) {
-///         **lhs = -**lhs;
-///     }
+///     fn negate_inplace(&self, lhs: &mut Self::Element) { **lhs = -**lhs; }
 /// 
-///     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-///         **lhs *= *rhs;
-///     }
+///     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { **lhs *= *rhs; }
 /// 
-///     fn from_z(&self, value: i32) -> Self::Element {
-///         Box::new(value)
-///     }
+///     fn from_z(&self, value: i32) -> Self::Element { Box::new(value) }
 /// 
-///     fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-///         **lhs == **rhs
-///     }
+///     fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { **lhs == **rhs }
 /// 
 ///     fn is_commutative(&self) -> bool { true }
 /// 
@@ -60,27 +53,28 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::IntegerRingStore};
 ///     }
 /// }
 /// 
+/// // To use the ring through a RingStore, it is also required to implement CanonicalHom<Self>
+/// // and CanonicalIso<Self>.
+/// 
 /// impl CanonicalHom<MyRingBase> for MyRingBase {
 /// 
-///     fn has_canonical_hom(&self, _from: &MyRingBase) -> bool {
-///         true
-///     }
+///     type Homomorphism = ();
 /// 
-///     fn map_in(&self, _from: &MyRingBase, el: Self::Element) -> Self::Element {
-///         el
-///     }
+///     fn has_canonical_hom(&self, _from: &MyRingBase) -> Option<()> { Some(()) }
+/// 
+///     fn map_in(&self, _from: &MyRingBase, el: Self::Element, _: &()) -> Self::Element { el }
 /// }
 /// 
 /// impl CanonicalIso<MyRingBase> for MyRingBase {
 /// 
-///     fn has_canonical_iso(&self, _from: &MyRingBase) -> bool {
-///         true
-///     }
+///     type Isomorphism = ();
 /// 
-///     fn map_out(&self, _from: &MyRingBase, el: Self::Element) -> Self::Element {
-///         el
-///     }
+///     fn has_canonical_iso(&self, _from: &MyRingBase) -> Option<()> { Some(()) }
+/// 
+///     fn map_out(&self, _from: &MyRingBase, el: Self::Element, _: &()) -> Self::Element { el }
 /// }
+/// 
+/// // A type alias for the simple, by-value RingStore.
 /// 
 /// pub type MyRing = RingValue<MyRingBase>;
 /// 
@@ -218,14 +212,49 @@ macro_rules! delegate {
 
 ///
 /// Basic trait for objects that store (in some sense) a ring. This can
-/// be a ring-by-value, a reference to a ring, or a box to a ring. Note
-/// that this trait is also designed to allow chaining, with the exception
-/// of [`crate::ring::RingValue`].
+/// be a ring-by-value, a reference to a ring, or really any object that
+/// provides access to a [`RingBase`] object.
 /// 
-/// As opposed to [`crate::ring::RingBase`], which is responsible for the
+/// As opposed to [`RingBase`], which is responsible for the
 /// functionality and ring operations, this trait is solely responsible for
-/// the storage. Note however, that storage can be quite difficult once we
-/// build rings onto other rings and so on.
+/// the storage. The two basic implementors are [`RingValue`] and [`RingRef`],
+/// which just wrap a value resp. reference to a [`RingBase`] object.
+/// Building on that, every object that wraps a [`RingStore`] object can implement
+/// again [`RingStore`]. This applies in particular to implementors of
+/// `Deref<Target: RingStore>`, for whom there is a blanket implementation.
+/// 
+/// # Example
+/// 
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// fn add_in_ring<R: RingStore>(ring: R, a: El<R>, b: El<R>) -> El<R> {
+///     ring.add(a, b)
+/// }
+/// 
+/// let ring: RingValue<StaticRingBase<i64>> = StaticRing::<i64>::RING;
+/// assert!(ring.eq(&7, &add_in_ring(ring, 3, 4)));
+/// ```
+/// 
+/// # What does this do?
+/// 
+/// We need a framework that allows nesting rings, e.g. to provide a polynomial ring
+/// over a finite field - say `PolyRing<FiniteField>`. However, the simplest
+/// implementation
+/// ```ignore
+/// struct PolyRing<BaseRing: Ring> { /* omitted */ }
+/// ```
+/// would have the effect that `PolyRing<FiniteField>` and `PolyRing<&FiniteField>`
+/// are entirely different types. While implementing relationships between them
+/// is possible, the approach does not scale well when we consider many rings and
+/// multiple layers of nesting.
+/// 
+/// # Note for implementors
+/// 
+/// Generally speaking it is not recommended to overwrite any of the default-implementations
+/// of ring functionality, as this is against the spirit of this trait. Instead,
+/// just provide an implementation of `get_ring()` and put ring functionality in
+/// a custom implementation of [`RingBase`].
 /// 
 pub trait RingStore {
     
@@ -265,16 +294,16 @@ pub trait RingStore {
     delegate!{ fn mul(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
     delegate!{ fn square(&self, value: El<Self>) -> El<Self> }
     
-    fn map_in<S>(&self, from: &S, el: El<S>) -> El<Self>
+    fn coerce<S>(&self, from: &S, el: El<S>) -> El<Self>
         where S: RingStore, Self::Type: CanonicalHom<S::Type> 
     {
-        self.get_ring().map_in(from.get_ring(), el)
+        self.get_ring().map_in(from.get_ring(), el, &self.get_ring().has_canonical_hom(from.get_ring()).unwrap())
     }
 
-    fn map_out<S>(&self, to: &S, el: El<Self>) -> El<S>
+    fn cast<S>(&self, to: &S, el: El<Self>) -> El<S>
         where S: RingStore, Self::Type: CanonicalIso<S::Type> 
     {
-        self.get_ring().map_out(to.get_ring(), el)
+        self.get_ring().map_out(to.get_ring(), el, &self.get_ring().has_canonical_iso(to.get_ring()).unwrap())
     }
 
     fn sum<I>(&self, els: I) -> El<Self> 
@@ -352,18 +381,84 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
     }
 }
 
+///
+/// Trait for rings R that have a canonical homomorphism `S -> R`.
+/// 
+/// Which homomorphisms are considered canonical is up to implementors,
+/// as long as any diagram of canonical homomorphisms commutes. In
+/// other words, if there are rings `R, S` and "intermediate rings"
+/// `R1, ..., Rn` resp. `R1', ..., Rm'` such that there are canonical
+/// homomorphisms
+/// ```text
+/// S -> R1 -> R2 -> ... -> Rn -> R
+/// ```
+/// and
+/// ```text
+/// S -> R1' -> R2' -> ... -> Rm' -> R
+/// ```
+/// then both homomorphism chains should yield same results on same
+/// inputs.
+/// 
+/// If the canonical homomorphism might be an isomorphism, consider also
+/// implementing [`CanonicalIso`].
+/// 
+/// # Example
+/// 
+/// All integer rings support canonical homomorphisms between them.
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::bigint::*;
+/// let r = StaticRing::<i64>::RING;
+/// let s = DefaultBigIntRing::RING;
+/// // on RingBase level
+/// let hom = r.get_ring().has_canonical_hom(s.get_ring()).unwrap();
+/// assert_eq!(8, r.get_ring().map_in(s.get_ring(), s.from_z(8), &hom));
+/// // on RingStore level
+/// assert_eq!(8, r.coerce(&s, s.from_z(8)));
+/// ```
+/// 
 pub trait CanonicalHom<S> : RingBase
     where S: RingBase
 {
-    fn has_canonical_hom(&self, from: &S) -> bool;
-    fn map_in(&self, from: &S, el: S::Element) -> Self::Element;
+    type Homomorphism;
+
+    fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism>;
+    fn map_in(&self, from: &S, el: S::Element, hom: &Self::Homomorphism) -> Self::Element;
 }
 
+///
+/// Trait for rings R that have a canonical isomorphism `S -> R`.
+/// 
+/// As for [`CanonicalHom`], it is up to implementors to decide which
+/// isomorphisms are canonical, as long as each diagram that contains
+/// only canonical homomorphisms, canonical isomorphisms and their inverses
+/// commutes.
+/// In other words, if there are rings `R, S` and "intermediate rings"
+/// `R1, ..., Rn` resp. `R1', ..., Rm'` such that there are canonical
+/// homomorphisms `->` or isomorphisms `<~>` connecting them - e.g. like
+/// ```text
+/// S -> R1 -> R2 <~> R3 <~> R4 -> ... -> Rn -> R
+/// ```
+/// and
+/// ```text
+/// S <~> R1' -> R2' -> ... -> Rm' -> R
+/// ```
+/// then both chains should yield same results on same inputs.
+/// 
+/// Hence, it would be natural if the trait were symmetrical, i.e.
+///  for any implementation `R: CanonicalIso<S>` there is also an
+/// implementation `S: CanonicalIso<R>`. However, because of the trait
+/// impl constraints of Rust, this is unpracticable and so we only
+/// require the implementation `R: CanonicalHom<S>`.
+/// 
 pub trait CanonicalIso<S> : CanonicalHom<S>
     where S: RingBase
 {
-    fn has_canonical_iso(&self, from: &S) -> bool;
-    fn map_out(&self, from: &S, el: Self::Element) -> S::Element;
+    type Isomorphism;
+
+    fn has_canonical_iso(&self, from: &S) -> Option<Self::Isomorphism>;
+    fn map_out(&self, from: &S, el: Self::Element, iso: &Self::Isomorphism) -> S::Element;
 }
 
 pub trait RingExtension: RingBase {
@@ -573,23 +668,27 @@ fn test_internal_wrappings_dont_matter() {
     }
 
     impl CanonicalHom<ABase> for ABase {
+
+        type Homomorphism = ();
         
-        fn has_canonical_hom(&self, _: &ABase) -> bool {
-            true
+        fn has_canonical_hom(&self, _: &ABase) -> Option<()> {
+            Some(())
         }
 
-        fn map_in(&self, _: &ABase, el: <ABase as RingBase>::Element) -> Self::Element {
+        fn map_in(&self, _: &ABase, el: <ABase as RingBase>::Element, _: &()) -> Self::Element {
             el
         }
     }
 
     impl CanonicalIso<ABase> for ABase {
         
-        fn has_canonical_iso(&self, _: &ABase) -> bool {
-            true
+        type Isomorphism = ();
+
+        fn has_canonical_iso(&self, _: &ABase) -> Option<()> {
+            Some(())
         }
 
-        fn map_out(&self, _: &ABase, el: <ABase as RingBase>::Element) -> Self::Element {
+        fn map_out(&self, _: &ABase, el: <ABase as RingBase>::Element, _: &()) -> Self::Element {
             el
         }
     }
@@ -631,11 +730,13 @@ fn test_internal_wrappings_dont_matter() {
 
     impl<R: RingStore> CanonicalHom<ABase> for BBase<R> {
 
-        fn has_canonical_hom(&self, _: &ABase) -> bool {
-            true
+        type Homomorphism = ();
+
+        fn has_canonical_hom(&self, _: &ABase) -> Option<()> {
+            Some(())
         }
 
-        fn map_in(&self, _: &ABase, el: <ABase as RingBase>::Element) -> Self::Element {
+        fn map_in(&self, _: &ABase, el: <ABase as RingBase>::Element, _: &()) -> Self::Element {
             el
         }
     }
@@ -643,22 +744,26 @@ fn test_internal_wrappings_dont_matter() {
     impl<R: RingStore, S: RingStore> CanonicalHom<BBase<S>> for BBase<R> 
         where R::Type: CanonicalHom<S::Type>
     {
-        fn has_canonical_hom(&self, _: &BBase<S>) -> bool {
-            true
+        type Homomorphism = ();
+
+        fn has_canonical_hom(&self, _: &BBase<S>) -> Option<()> {
+            Some(())
         }
 
-        fn map_in(&self, _: &BBase<S>, el: <BBase<S> as RingBase>::Element) -> Self::Element {
+        fn map_in(&self, _: &BBase<S>, el: <BBase<S> as RingBase>::Element, _: &()) -> Self::Element {
             el
         }
     }
 
     impl<R: RingStore> CanonicalIso<BBase<R>> for BBase<R> {
 
-        fn has_canonical_iso(&self, _: &BBase<R>) -> bool {
-            true
+        type Isomorphism = ();
+
+        fn has_canonical_iso(&self, _: &BBase<R>) -> Option<()> {
+            Some(())
         }
 
-        fn map_out(&self, _: &BBase<R>, el: <BBase<R> as RingBase>::Element) -> Self::Element {
+        fn map_out(&self, _: &BBase<R>, el: <BBase<R> as RingBase>::Element, _: &()) -> Self::Element {
             el
         }
     }
@@ -670,12 +775,12 @@ fn test_internal_wrappings_dont_matter() {
     let b1: B<A> = RingValue { ring: BBase { base: a } };
     let b2: B<&B<A>> = RingValue { ring: BBase { base: &b1 } };
     let b3: B<&A> = RingValue { ring: BBase { base: &a } };
-    b1.map_in(&a, 0);
-    b2.map_in(&a, 0);
-    b2.map_in(&b1, 0);
-    b2.map_in(&b3, 0);
-    (&b2).map_in(&b3, 0);
-    (&b2).map_in(&&&b3, 0);
+    b1.coerce(&a, 0);
+    b2.coerce(&a, 0);
+    b2.coerce(&b1, 0);
+    b2.coerce(&b3, 0);
+    (&b2).coerce(&b3, 0);
+    (&b2).coerce(&&&b3, 0);
 }
 
 #[cfg(test)]

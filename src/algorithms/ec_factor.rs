@@ -134,7 +134,7 @@ pub fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
     let Nf = ZZ.to_float_approx(N);
     // smoothness bound, choose L_N(1/2, 1/2)
     let B = (0.5 * Nf.ln().sqrt() * Nf.ln().ln().sqrt()).exp() as usize;
-    let primes = algorithms::primes::enumerate_primes(&ZZ, &ZZ.map_in::<StaticRing<i128>>(&StaticRing::<i128>::RING, B as i128));
+    let primes = algorithms::primes::enumerate_primes(&ZZ, &ZZ.coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, B as i128));
     let k = ZZ.prod(
         primes.iter()
             .map(|p| (Nf.log2() / ZZ.to_float_approx(&p).log2(), p))

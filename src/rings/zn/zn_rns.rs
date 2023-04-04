@@ -2,7 +2,7 @@ use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
 use crate::ordered::OrderedRingStore;
 use crate::rings::zn::*;
 
-use super::zn_dyn::{Fp, FpEl};
+use super::zn_dyn::{Fp, FpEl, FpBase};
 
 #[derive(Clone)]
 pub struct ZnBase<I: IntegerRingStore, J: IntegerRingStore> {
@@ -22,7 +22,7 @@ impl<I: IntegerRingStore + Clone, J: IntegerRingStore> ZnBase<I, J> {
             assert!(ring.is_gt(&primes[i], &primes[i - 1]));
         }
         let total_modulus = large_ring.prod(
-            primes.iter().map(|p| large_ring.map_in::<I>(&ring, p.clone()))
+            primes.iter().map(|p| large_ring.coerce::<I>(&ring, p.clone()))
         );
         let total_ring = RingValue::new(zn_dyn::ZnBase::new(large_ring, total_modulus));
         let ZZ = total_ring.integer_ring();
@@ -32,9 +32,9 @@ impl<I: IntegerRingStore + Clone, J: IntegerRingStore> ZnBase<I, J> {
             .map(|r| RingValue::new(r))
             .collect();
         let unit_vectors = (0..components.len())
-            .map(|i| ZZ.checked_div(total_ring.modulus(), &ZZ.map_in::<I>(&ring, components[i].modulus().clone())))
+            .map(|i| ZZ.checked_div(total_ring.modulus(), &ZZ.coerce::<I>(&ring, components[i].modulus().clone())))
             .map(|n| n.unwrap())
-            .map(|n| total_ring.map_in(&ZZ, n))
+            .map(|n| total_ring.coerce(&ZZ, n))
             .enumerate()
             .map(|(i, n)| total_ring.pow_gen(&n, &ring.sub_ref_fst(components[i].modulus(), ring.one()), &ring))
             .collect();
@@ -115,26 +115,35 @@ impl<I: IntegerRingStore, J: IntegerRingStore> RingBase for ZnBase<I, J> {
     fn is_noetherian(&self) -> bool { true }
 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        self.total_ring.get_ring().dbg(&self.map_out(self.total_ring.get_ring(), value.clone()), out)
+        self.total_ring.get_ring().dbg(&RingRef::new(self).cast(&self.total_ring, value.clone()), out)
     }
 }
 
 impl<I1: IntegerRingStore, J1: IntegerRingStore, I2: IntegerRingStore, J2: IntegerRingStore> CanonicalHom<ZnBase<I2, J2>> for ZnBase<I1, J1> {
 
-    fn has_canonical_hom(&self, from: &ZnBase<I2, J2>) -> bool {
-        self.components.len() == from.components.len() && 
+    type Homomorphism = Vec<<FpBase<I1> as CanonicalHom<FpBase<I2>>>::Homomorphism>;
+
+    fn has_canonical_hom(&self, from: &ZnBase<I2, J2>) -> Option<Self::Homomorphism> {
+        if self.components.len() == from.components.len() {
             self.components.iter()
                 .zip(from.components.iter())
-                .all(|(s, f)| s.get_ring().has_canonical_hom(f.get_ring()))
+                .map(|(s, f): (&Fp<I1>, &Fp<I2>)| s.get_ring().has_canonical_hom(f.get_ring()).ok_or(()))
+                .collect::<Result<Self::Homomorphism, ()>>()
+                .ok()
+        } else {
+            None
+        }
     }
 
-    fn map_in(&self, from: &ZnBase<I2, J2>, el: ZnEl<I2>) -> Self::Element {
-        debug_assert!(self.has_canonical_hom(from));
+    fn map_in(&self, from: &ZnBase<I2, J2>, el: ZnEl<I2>, hom: &Self::Homomorphism) -> Self::Element {
         ZnEl(
             self.components.iter()
                 .zip(from.components.iter())
+                .map(|(s, f)| (s.get_ring(), f.get_ring()))
                 .zip(el.0.into_iter())
-                .map(|((s, f), x)| s.map_in(f, x))
+                .zip(hom.iter())
+                .map(|(((s, f), x), hom)| (s, f, x, hom))
+                .map(|(s, f, x, hom)| s.map_in(f, x, hom))
                 .collect()
         )
     }
@@ -142,20 +151,29 @@ impl<I1: IntegerRingStore, J1: IntegerRingStore, I2: IntegerRingStore, J2: Integ
 
 impl<I1: IntegerRingStore, J1: IntegerRingStore, I2: IntegerRingStore, J2: IntegerRingStore> CanonicalIso<ZnBase<I2, J2>> for ZnBase<I1, J1> {
 
-    fn has_canonical_iso(&self, from: &ZnBase<I2, J2>) -> bool {
-        self.components.len() == from.components.len() && 
+    type Isomorphism = Vec<<FpBase<I1> as CanonicalIso<FpBase<I2>>>::Isomorphism>;
+
+    fn has_canonical_iso(&self, from: &ZnBase<I2, J2>) -> Option<Self::Isomorphism> {
+        if self.components.len() == from.components.len() {
             self.components.iter()
                 .zip(from.components.iter())
-                .all(|(s, f)| s.get_ring().has_canonical_iso(f.get_ring()))
+                .map(|(s, f): (&Fp<I1>, &Fp<I2>)| s.get_ring().has_canonical_iso(f.get_ring()).ok_or(()))
+                .collect::<Result<Self::Homomorphism, ()>>()
+                .ok()
+        } else {
+            None
+        }
     }
 
-    fn map_out(&self, from: &ZnBase<I2, J2>, el: Self::Element) -> ZnEl<I2> {
-        debug_assert!(self.has_canonical_iso(from));
+    fn map_out(&self, from: &ZnBase<I2, J2>, el: Self::Element, iso: &Self::Isomorphism) -> ZnEl<I2> {
         ZnEl(
             self.components.iter()
                 .zip(from.components.iter())
+                .map(|(s, f)| (s.get_ring(), f.get_ring()))
                 .zip(el.0.into_iter())
-                .map(|((s, f), x)| s.map_out(f, x))
+                .zip(iso.iter())
+                .map(|(((s, f), x), hom)| (s, f, x, hom))
+                .map(|(s, f, x, hom)| s.map_out(f, x, hom))
                 .collect()
         )
     }
@@ -163,15 +181,26 @@ impl<I1: IntegerRingStore, J1: IntegerRingStore, I2: IntegerRingStore, J2: Integ
 
 impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalHom<zn_dyn::ZnBase<K>> for ZnBase<I, J> {
 
-    fn has_canonical_hom(&self, from: &zn_dyn::ZnBase<K>) -> bool {
-        self.total_ring.get_ring().has_canonical_hom(from)
+    type Homomorphism = Vec<<zn_dyn::ZnBase<J> as CanonicalHom<K::Type>>::Homomorphism>;
+
+    fn has_canonical_hom(&self, from: &zn_dyn::ZnBase<K>) -> Option<Self::Homomorphism> {
+        if self.total_ring.get_ring().has_canonical_hom(from).is_some() {
+            self.components.iter()
+                .map(|s| s.get_ring())
+                .map(|s| s.has_canonical_hom(from.integer_ring().get_ring()).ok_or(()))
+                .collect::<Result<Self::Homomorphism, ()>>()
+                .ok()
+        } else {
+            None
+        }
     }
 
-    fn map_in(&self, from: &zn_dyn::ZnBase<K>, el: zn_dyn::ZnEl<K>) -> ZnEl<I> {
-        debug_assert!(self.has_canonical_hom(from));
+    fn map_in(&self, from: &zn_dyn::ZnBase<K>, el: zn_dyn::ZnEl<K>, hom: &Self::Homomorphism) -> ZnEl<I> {
         ZnEl(
             self.components.iter()
-                .map(|r| r.map_in(from.integer_ring(), from.smallest_positive_lift(el.clone())))
+                .map(|s| s.get_ring())
+                .zip(hom.iter())
+                .map(|(r, hom)| r.map_in(from.integer_ring().get_ring(), from.smallest_positive_lift(el.clone()), hom))
                 .collect()
         )
     }
@@ -179,37 +208,54 @@ impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalHom
 
 impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalIso<zn_dyn::ZnBase<K>> for ZnBase<I, J> {
 
-    fn has_canonical_iso(&self, from: &zn_dyn::ZnBase<K>) -> bool {
-        self.total_ring.get_ring().has_canonical_iso(from)
+    type Isomorphism = (
+        <zn_dyn::ZnBase<J> as CanonicalIso<zn_dyn::ZnBase<K>>>::Isomorphism, 
+        Vec<<zn_dyn::ZnBase<J> as CanonicalHom<I::Type>>::Homomorphism>
+    );
+
+    fn has_canonical_iso(&self, from: &zn_dyn::ZnBase<K>) -> Option<Self::Isomorphism> {
+        Some((
+            <zn_dyn::ZnBase<J> as CanonicalIso<zn_dyn::ZnBase<K>>>::has_canonical_iso(self.total_ring.get_ring(), from)?,
+            self.components.iter()
+                .map(|s| s.integer_ring().get_ring())
+                .map(|s| self.total_ring.get_ring().has_canonical_hom(s).unwrap())
+                .collect()
+        ))
     }
 
-    fn map_out(&self, from: &zn_dyn::ZnBase<K>, el: Self::Element) -> zn_dyn::ZnEl<K> {
-        debug_assert!(self.has_canonical_iso(from));
-        RingRef::new(from).sum(
-            self.components.iter().zip(el.0.into_iter())
-                .map(|(fp, x)| (fp.integer_ring(), fp.smallest_positive_lift(x)))
+    fn map_out(&self, from: &zn_dyn::ZnBase<K>, el: Self::Element, (final_iso, homs): &Self::Isomorphism) -> zn_dyn::ZnEl<K> {
+        let result = self.total_ring.sum(
+            self.components.iter()
+                .zip(el.0.into_iter())
+                .map(|(fp, x)| (fp.integer_ring().get_ring(), fp.smallest_positive_lift(x)))
                 .zip(self.unit_vectors.iter())
-                .map(|((z, x), u)| from.mul(
-                    from.map_in(self.total_ring.get_ring(), u.clone()), 
-                    from.map_in(z.get_ring(), x)
-                ))
-        )
+                .zip(homs.iter())
+                .map(|(((integers, x), u), hom)| (integers, x, u, hom))
+                .map(|(integers, x, u, hom)| 
+                    self.total_ring.mul(<zn_dyn::ZnBase<J> as CanonicalHom<I::Type>>::map_in(self.total_ring.get_ring(), integers, x, hom), u.clone())
+                )
+        );
+        return <zn_dyn::ZnBase<J> as CanonicalIso<zn_dyn::ZnBase<K>>>::map_out(self.total_ring.get_ring(), from, result, final_iso);
     }
 }
 
 impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRing> CanonicalHom<K> for ZnBase<I, J> 
     where K: CanonicalIso<K>
 {
+    type Homomorphism = Vec<<I::Type as CanonicalHom<K>>::Homomorphism>;
 
-    fn has_canonical_hom(&self, from: &K) -> bool {
-        self.components.iter().all(|r| r.get_ring().has_canonical_hom(from))
+    fn has_canonical_hom(&self, from: &K) -> Option<Self::Homomorphism> {
+        self.components.iter()
+            .map(|r| r.get_ring().has_canonical_hom(from).ok_or(()))
+            .collect::<Result<Self::Homomorphism, ()>>()
+            .ok()
     }
 
-    fn map_in(&self, from: &K, el: K::Element) -> Self::Element {
-        debug_assert!(self.has_canonical_hom(from));
+    fn map_in(&self, from: &K, el: K::Element, hom: &Self::Homomorphism) -> Self::Element {
         ZnEl(
             self.components.iter()
-                .map(|r| r.get_ring().map_in(from, el.clone()))
+                .zip(hom)
+                .map(|(r, hom)| r.get_ring().map_in(from, el.clone(), hom))
                 .collect()
         )
     }
@@ -226,10 +272,10 @@ fn test_zn_ring_axioms() {
 
 #[test]
 fn test_map_in_map_out() {
-    let ring1 = ZnBase::new(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11, 17]);
-    let ring2 = zn_dyn::ZnBase::new(StaticRing::<i32>::RING, 1309);
+    let ring1 = RingValue::new(ZnBase::new(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11, 17]));
+    let ring2 = RingValue::new(zn_dyn::ZnBase::new(StaticRing::<i32>::RING, 7 * 11 * 17));
     for x in [0, 1, 7, 8, 9, 10, 11, 17, 7 * 17, 11 * 8, 11 * 17, 7 * 11 * 17 - 1] {
         let value = ring2.from_z(x);
-        assert!(ring2.eq(&value, &ring1.map_out(&ring2, ring1.map_in(&ring2, value.clone()))));
+        assert!(ring2.eq(&value, &ring1.cast(&ring2, ring1.coerce(&ring2, value.clone()))));
     }
 }

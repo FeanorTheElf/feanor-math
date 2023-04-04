@@ -193,46 +193,57 @@ impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I> {
 
 impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalHom<ZnBase<J>> for ZnBase<I> {
 
-    fn has_canonical_hom(&self, from: &ZnBase<J>) -> bool {
-        <I::Type as CanonicalHom<J::Type>>::has_canonical_hom(self.integer_ring.get_ring(), from.integer_ring.get_ring()) && 
-            self.integer_ring.eq(
-                &self.modulus, 
-                &<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), from.modulus.clone())
-            )
+    type Homomorphism =  <I::Type as CanonicalHom<J::Type>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &ZnBase<J>) -> Option<Self::Homomorphism> {
+        let base_hom = <I::Type as CanonicalHom<J::Type>>::has_canonical_hom(self.integer_ring.get_ring(), from.integer_ring.get_ring())?;
+        if self.integer_ring.eq(
+            &self.modulus, 
+            &<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), from.modulus.clone(), &base_hom)
+        ) {
+            Some(base_hom)
+        } else {
+            None
+        }
     }
 
-    fn map_in(&self, from: &ZnBase<J>, el: <ZnBase<J> as RingBase>::Element) -> Self::Element {
-        debug_assert!(self.has_canonical_hom(from));
-        ZnEl(<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), el.0))
+    fn map_in(&self, from: &ZnBase<J>, el: <ZnBase<J> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        ZnEl(<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), el.0, hom))
     }
 }
 
 impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for ZnBase<I> {
 
-    fn has_canonical_iso(&self, from: &ZnBase<J>) -> bool {
-        <I::Type as CanonicalIso<J::Type>>::has_canonical_iso(self.integer_ring.get_ring(), from.integer_ring.get_ring()) && 
-            self.integer_ring.eq(
-                &self.modulus, 
-                &<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), from.modulus.clone())
-            )
+    type Isomorphism = <I::Type as CanonicalIso<J::Type>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &ZnBase<J>) -> Option<Self::Isomorphism> {
+        let base_iso = <I::Type as CanonicalIso<J::Type>>::has_canonical_iso(self.integer_ring.get_ring(), from.integer_ring.get_ring())?;
+        if self.integer_ring.eq(
+             &self.modulus, 
+            &<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), from.modulus.clone(), &base_iso)
+        ) {
+            Some(base_iso)
+        } else {
+            None
+        }
     }
 
-    fn map_out(&self, from: &ZnBase<J>, el: Self::Element) -> <ZnBase<J> as RingBase>::Element {
-        debug_assert!(self.has_canonical_iso(from));
-        ZnEl(<I::Type as CanonicalIso<J::Type>>::map_out(self.integer_ring.get_ring(), from.integer_ring.get_ring(), el.0))
+    fn map_out(&self, from: &ZnBase<J>, el: Self::Element, iso: &Self::Isomorphism) -> <ZnBase<J> as RingBase>::Element {
+        ZnEl(<I::Type as CanonicalIso<J::Type>>::map_out(self.integer_ring.get_ring(), from.integer_ring.get_ring(), el.0, iso))
     }
 }
 
 impl<I: IntegerRingStore, J: IntegerRing> CanonicalHom<J> for ZnBase<I> 
     where J: CanonicalIso<J>
 {
-    fn has_canonical_hom(&self, from: &J) -> bool {
+    type Homomorphism = <I::Type as CanonicalHom<J>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &J) -> Option<Self::Homomorphism> {
         <I::Type as CanonicalHom<J>>::has_canonical_hom(self.integer_ring().get_ring(), from)
     }
 
-    fn map_in(&self, from: &J, el: J::Element) -> Self::Element {
-        debug_assert!(self.has_canonical_hom(from));
-        self.project(<I::Type as CanonicalHom<J>>::map_in(self.integer_ring().get_ring(), from, el))
+    fn map_in(&self, from: &J, el: J::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.project(<I::Type as CanonicalHom<J>>::map_in(self.integer_ring().get_ring(), from, el, hom))
     }
 }
 
@@ -309,62 +320,67 @@ impl<I: IntegerRingStore> DelegateRing for FpBase<I> {
 
 impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalHom<FpBase<J>> for FpBase<I> {
     
-    fn has_canonical_hom(&self, from: &FpBase<J>) -> bool {
+    type Homomorphism = <ZnBase<I> as CanonicalHom<ZnBase<J>>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &FpBase<J>) -> Option<Self::Homomorphism> {
         self.get_base().has_canonical_hom(from.get_base())
     }
 
-    fn map_in(&self, from: &FpBase<J>, el: FpEl<J>) -> Self::Element {
-        debug_assert!(self.has_canonical_hom(from));
-        FpEl(self.get_base().map_in(from.get_base(), el.0))
+    fn map_in(&self, from: &FpBase<J>, el: FpEl<J>, hom: &Self::Homomorphism) -> Self::Element {
+        FpEl(<ZnBase<I> as CanonicalHom<ZnBase<J>>>::map_in(self.get_base(), from.get_base(), el.0, hom))
     }
 }
 
 impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<FpBase<J>> for FpBase<I> {
 
-    fn has_canonical_iso(&self, from: &FpBase<J>) -> bool {
-        self.get_base().has_canonical_iso(from.get_base())
+    type Isomorphism = <ZnBase<I> as CanonicalIso<ZnBase<J>>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &FpBase<J>) -> Option<Self::Isomorphism> {
+        <ZnBase<I> as CanonicalIso<ZnBase<J>>>::has_canonical_iso(self.get_base(), from.get_base())
     }
 
-    fn map_out(&self, from: &FpBase<J>, el: Self::Element) -> FpEl<J> {
-        debug_assert!(self.has_canonical_iso(from));
-        FpEl(self.get_base().map_out(from.get_base(), el.0))
+    fn map_out(&self, from: &FpBase<J>, el: Self::Element, iso: &Self::Isomorphism) -> FpEl<J> {
+        FpEl(<ZnBase<I> as CanonicalIso<ZnBase<J>>>::map_out(self.get_base(), from.get_base(), el.0, iso))
     }
 }
 
 impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalHom<ZnBase<J>> for FpBase<I> {
 
-    fn has_canonical_hom(&self, from: &ZnBase<J>) -> bool {
+    type Homomorphism = <ZnBase<I> as CanonicalHom<ZnBase<J>>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &ZnBase<J>) -> Option<Self::Homomorphism> {
         self.get_base().has_canonical_hom(from)
     }
 
-    fn map_in(&self, from: &ZnBase<J>, el: ZnEl<J>) -> Self::Element {
-        debug_assert!(self.has_canonical_hom(from));
-        FpEl(self.get_base().map_in(from, el))
+    fn map_in(&self, from: &ZnBase<J>, el: ZnEl<J>, hom: &Self::Homomorphism) -> Self::Element {
+        FpEl(<ZnBase<I> as CanonicalHom<ZnBase<J>>>::map_in(self.get_base(), from, el, hom))
     }
 }
 
 impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for FpBase<I> {
 
-    fn has_canonical_iso(&self, from: &ZnBase<J>) -> bool {
-        self.get_base().has_canonical_iso(from)
+    type Isomorphism = <ZnBase<I> as CanonicalIso<ZnBase<J>>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &ZnBase<J>) -> Option<Self::Isomorphism> {
+        <ZnBase<I> as CanonicalIso<ZnBase<J>>>::has_canonical_iso(self.get_base(), from)
     }
 
-    fn map_out(&self, from: &ZnBase<J>, el: Self::Element) -> <ZnBase<J> as RingBase>::Element {
-        debug_assert!(self.has_canonical_iso(from));
-        self.get_base().map_out(from, el.0)
+    fn map_out(&self, from: &ZnBase<J>, el: Self::Element, iso: &Self::Isomorphism) -> <ZnBase<J> as RingBase>::Element {
+        <ZnBase<I> as CanonicalIso<ZnBase<J>>>::map_out(self.get_base(), from, el.0, iso)
     }
 }
 
 impl<I: IntegerRingStore, J: IntegerRing> CanonicalHom<J> for FpBase<I> 
     where J: CanonicalIso<J>
 {
-    fn has_canonical_hom(&self, from: &J) -> bool {
+    type Homomorphism = <ZnBase<I> as CanonicalHom<J>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &J) -> Option<Self::Homomorphism> {
         self.get_base().has_canonical_hom(from)
     }
 
-    fn map_in(&self, from: &J, el: J::Element) -> Self::Element {
-        debug_assert!(self.has_canonical_hom(from));
-        FpEl(self.get_base().map_in(from, el))
+    fn map_in(&self, from: &J, el: J::Element, hom: &Self::Homomorphism) -> Self::Element {
+        FpEl(<ZnBase<I> as CanonicalHom<J>>::map_in(self.get_base(), from, el, hom))
     }
 }
 

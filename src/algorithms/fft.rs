@@ -64,9 +64,9 @@ impl<R> FFTTableCooleyTuckey<R>
             let m = 1 << s;
             let log2_group_size = self.log2_n - s;
             let twiddle_root = if INV {
-                ring.map_in(&self.ring, self.ring.pow(&self.root_of_unity, m))
+                ring.coerce(&self.ring, self.ring.pow(&self.root_of_unity, m))
             } else {
-                ring.map_in(&self.ring, self.ring.pow(&self.inv_root_of_unity, m))
+                ring.coerce(&self.ring, self.ring.pow(&self.inv_root_of_unity, m))
             };
             
             for k in 0..(1 << s) {

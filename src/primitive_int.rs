@@ -30,22 +30,22 @@ impl PrimitiveInt for i128 {
 
 impl<T: PrimitiveInt, S: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for StaticRingBase<S> {
 
-    fn has_canonical_hom(&self, _: &StaticRingBase<T>) -> bool {
-        true
+    fn has_canonical_hom(&self, _: &StaticRingBase<T>) -> Option<()> {
+        Some(())
     }
 
-    fn map_in(&self, _: &StaticRingBase<T>, el: T) -> S {
+    fn map_in(&self, _: &StaticRingBase<T>, el: T, _: &()) -> S {
         S::try_from(el.into()).map_err(|_| ()).unwrap()
     }
 }
 
 impl<T: PrimitiveInt, S: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for StaticRingBase<S> {
     
-    fn has_canonical_iso(&self, _: &StaticRingBase<T>) -> bool {
-        true
+    fn has_canonical_iso(&self, _: &StaticRingBase<T>) -> Option<()> {
+        Some(())
     }
 
-    fn map_out(&self, _: &StaticRingBase<T>, el: S) -> T {
+    fn map_out(&self, _: &StaticRingBase<T>, el: S, _: &()) -> T {
         T::try_from(el.into()).map_err(|_| ()).unwrap()
     }
 }
@@ -69,15 +69,15 @@ impl<T: PrimitiveInt> EuclideanRing for StaticRingBase<T> {
     }
 
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
-        self.map_out(StaticRing::<i128>::RING.get_ring(), *val).checked_abs().and_then(|x| usize::try_from(x).ok())
+        RingRef::new(self).cast(&StaticRing::<i128>::RING, *val).checked_abs().and_then(|x| usize::try_from(x).ok())
     }
 }
 
 impl<T: PrimitiveInt> OrderedRing for StaticRingBase<T> {
     
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
-        self.map_out(StaticRing::<i128>::RING.get_ring(), *lhs).cmp(
-            &self.map_out(StaticRing::<i128>::RING.get_ring(), *rhs)
+        RingRef::new(self).cast(&StaticRing::<i128>::RING, *lhs).cmp(
+            &RingRef::new(self).cast(&StaticRing::<i128>::RING, *rhs)
         )
     }
 }
@@ -85,22 +85,22 @@ impl<T: PrimitiveInt> OrderedRing for StaticRingBase<T> {
 impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
 
     fn to_float_approx(&self, value: &Self::Element) -> f64 { 
-        self.map_out(StaticRing::<i128>::RING.get_ring(), *value) as f64
+        RingRef::new(self).cast(&StaticRing::<i128>::RING, *value) as f64
     }
 
     fn from_float_approx(&self, value: f64) -> Option<Self::Element> {
-        Some(self.map_in(StaticRing::<i128>::RING.get_ring(), value as i128))
+        Some(RingRef::new(self).coerce(&StaticRing::<i128>::RING, value as i128))
     }
 
     fn abs_is_bit_set(&self, value: &Self::Element, i: usize) -> bool {
-        match self.map_out(StaticRing::<i128>::RING.get_ring(), *value) {
+        match RingRef::new(self).cast(&StaticRing::<i128>::RING, *value) {
             i128::MIN => i == i128::BITS as usize - 1,
             x => (x.abs() >> i) & 1 == 1
         }
     }
 
     fn abs_highest_set_bit(&self, value: &Self::Element) -> Option<usize> {
-        match self.map_out(StaticRing::<i128>::RING.get_ring(), *value) {
+        match RingRef::new(self).cast(&StaticRing::<i128>::RING, *value) {
             0 => None,
             i128::MIN => Some(i128::BITS as usize - 1),
             x => Some(i128::BITS as usize - x.abs().leading_zeros() as usize - 1)
@@ -108,7 +108,7 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
     }
 
     fn abs_lowest_set_bit(&self, value: &Self::Element) -> Option<usize> {
-        match self.map_out(StaticRing::<i128>::RING.get_ring(), *value) {
+        match RingRef::new(self).cast(&StaticRing::<i128>::RING, *value) {
             0 => None,
             i128::MIN => Some(0),
             x => Some(x.abs().trailing_zeros() as usize)
@@ -116,17 +116,19 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
     }
 
     fn euclidean_div_pow_2(&self, value: &mut Self::Element, power: usize) {
-        *value = self.map_in(StaticRing::<i128>::RING.get_ring(), self.map_out(StaticRing::<i128>::RING.get_ring(), *value) >> power);
+        *value = RingRef::new(self).coerce(&StaticRing::<i128>::RING, 
+            RingRef::new(self).cast(&StaticRing::<i128>::RING, *value) >> power);
     }
 
     fn mul_pow_2(&self, value: &mut Self::Element, power: usize) {
-        *value = self.map_in(StaticRing::<i128>::RING.get_ring(), self.map_out(StaticRing::<i128>::RING.get_ring(), *value) << power);
+        *value = RingRef::new(self).coerce(&StaticRing::<i128>::RING, 
+            RingRef::new(self).cast(&StaticRing::<i128>::RING, *value) << power);
     }
 
     fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, mut rng: G) -> Self::Element {
         assert!(log2_bound_exclusive <= T::bits() - 1);
-        self.map_in(
-            StaticRing::<i128>::RING.get_ring(), 
+        RingRef::new(self).coerce(
+            &StaticRing::<i128>::RING, 
             ((((rng() as u128) << u64::BITS as u32) | (rng() as u128)) & ((1 << log2_bound_exclusive) - 1)) as i128
         )
     }
@@ -135,7 +137,7 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
 impl<T: PrimitiveInt> HashableElRing for StaticRingBase<T> {
 
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
-        h.write_i128(self.map_out(StaticRing::<i128>::RING.get_ring(), *el))
+        h.write_i128(RingRef::new(self).cast(&StaticRing::<i128>::RING, *el))
     }
 }
 

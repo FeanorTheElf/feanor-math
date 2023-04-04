@@ -176,16 +176,16 @@ impl RingBase for DefaultBigIntRing {
 
 impl CanonicalHom<DefaultBigIntRing> for DefaultBigIntRing {
     
-    fn has_canonical_hom(&self, _: &DefaultBigIntRing) -> bool { true }
+    fn has_canonical_hom(&self, _: &DefaultBigIntRing) -> Option<()> { Some(()) }
 
-    fn map_in(&self, _: &DefaultBigIntRing, el: DefaultBigIntRingEl) -> Self::Element { el }
+    fn map_in(&self, _: &DefaultBigIntRing, el: DefaultBigIntRingEl, _: &()) -> Self::Element { el }
 }
 
 impl CanonicalIso<DefaultBigIntRing> for DefaultBigIntRing {
     
-    fn has_canonical_iso(&self, _: &DefaultBigIntRing) -> bool { true }
+    fn has_canonical_iso(&self, _: &DefaultBigIntRing) -> Option<()> { Some(()) }
 
-    fn map_out(&self, _: &DefaultBigIntRing, el: DefaultBigIntRingEl) -> Self::Element { el }
+    fn map_out(&self, _: &DefaultBigIntRing, el: DefaultBigIntRingEl, _: &()) -> Self::Element { el }
 }
 
 impl OrderedRing for DefaultBigIntRing {
@@ -236,9 +236,9 @@ impl EuclideanRing for DefaultBigIntRing {
 
 impl<T: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for DefaultBigIntRing {
     
-    fn has_canonical_hom(&self, _: &StaticRingBase<T>) -> bool { true }
+    fn has_canonical_hom(&self, _: &StaticRingBase<T>) -> Option<()> { Some(()) }
 
-    fn map_in(&self, _: &StaticRingBase<T>, el: T) -> Self::Element {
+    fn map_in(&self, _: &StaticRingBase<T>, el: T, _: &()) -> Self::Element {
         let negative = el.into() < 0;
         let value = el.into().checked_abs().map(|x| x as u128).unwrap_or(1 << (u128::BITS - 1));
         DefaultBigIntRingEl(negative, vec![(value & ((1 << u64::BITS) - 1)) as u64, (value >> u64::BITS) as u64])
@@ -247,9 +247,9 @@ impl<T: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for DefaultBigIntRing {
 
 impl<T: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for DefaultBigIntRing {
     
-    fn has_canonical_iso(&self, _: &StaticRingBase<T>) -> bool { true }
+    fn has_canonical_iso(&self, _: &StaticRingBase<T>) -> Option<()> { Some(()) }
 
-    fn map_out(&self, _: &StaticRingBase<T>, el: Self::Element) -> T {
+    fn map_out(&self, _: &StaticRingBase<T>, el: Self::Element, _: &()) -> T {
         T::try_from(self.map_i128(&el).unwrap()).ok().unwrap()
     }
 }
@@ -355,17 +355,17 @@ fn test_from() {
 
 #[test]
 fn test_to_i128() {
-    assert_eq!(0, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![])));
-    assert_eq!(2138479, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![2138479])));
-    assert_eq!(-2138479, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(true, vec![2138479])));
-    assert_eq!(0x138691a350bf12fca, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![0x38691a350bf12fca, 0x1])));
+    assert_eq!(0, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![])));
+    assert_eq!(2138479, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![2138479])));
+    assert_eq!(-2138479, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(true, vec![2138479])));
+    assert_eq!(0x138691a350bf12fca, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![0x38691a350bf12fca, 0x1])));
     // assert_eq!(Err(()), DefaultBigInt(false, vec![0x38691a350bf12fca, 0x38691a350bf12fca, 0x1]).to_i128());
-    assert_eq!(i128::MAX, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
-    assert_eq!(i128::MIN + 1, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(true, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
+    assert_eq!(i128::MAX, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
+    assert_eq!(i128::MIN + 1, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(true, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
     // this is the possibly surprising, exceptional case
     // assert_eq!(Err(()), DefaultBigInt(true, vec![0, (i128::MAX >> 64) as u64 + 1]).to_i128());
-    assert_eq!(i64::MAX as i128 + 1, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![i64::MAX as u64 + 1])));
-    assert_eq!(u64::MAX as i128, DefaultBigIntRing::RING.map_out(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![u64::MAX])));
+    assert_eq!(i64::MAX as i128 + 1, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![i64::MAX as u64 + 1])));
+    assert_eq!(u64::MAX as i128, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![u64::MAX])));
 }
 
 #[test]

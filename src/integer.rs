@@ -16,10 +16,12 @@ pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing {
 }
 
 impl<I: IntegerRing + CanonicalIso<I>, J: IntegerRing> CanonicalHom<I> for J {
-    
-    default fn has_canonical_hom(&self, _: &I) -> bool { true }
 
-    default fn map_in(&self, from: &I, el: I::Element) -> Self::Element {
+    type Homomorphism = ();
+    
+    default fn has_canonical_hom(&self, _: &I) -> Option<()> { Some(()) }
+
+    default fn map_in(&self, from: &I, el: I::Element, _: &()) -> Self::Element {
         let result = algorithms::sqr_mul::generic_abs_square_and_multiply(&self.one(), &el, RingRef::new(from), |a, b| self.add(a, b), |a, b| self.add_ref(a, b), self.zero());
         if from.is_neg(&el) {
             return self.negate(result);
@@ -30,10 +32,12 @@ impl<I: IntegerRing + CanonicalIso<I>, J: IntegerRing> CanonicalHom<I> for J {
 }
 
 impl<I: IntegerRing + CanonicalIso<I>, J: IntegerRing + CanonicalIso<J>> CanonicalIso<I> for J {
-    
-    default fn has_canonical_iso(&self, _: &I) -> bool { true }
 
-    default fn map_out(&self, from: &I, el: Self::Element) -> I::Element {
+    type Isomorphism = ();
+    
+    default fn has_canonical_iso(&self, _: &I) -> Option<()> { Some(()) }
+
+    default fn map_out(&self, from: &I, el: Self::Element, _: &()) -> I::Element {
         let result = algorithms::sqr_mul::generic_abs_square_and_multiply(&from.one(), &el, RingRef::new(self), |a, b| from.add(a, b), |a, b| from.add_ref(a, b), from.zero());
         if self.is_neg(&el) {
             return from.negate(result);

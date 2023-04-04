@@ -28,7 +28,7 @@ pub trait ZnRingStore: RingStore<Type: ZnRing> {
     delegate!{ fn is_field(&self) -> bool }
 
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> El<Self> {
-        self.map_in(self.integer_ring(), self.integer_ring().get_uniformly_random(self.modulus(), rng))
+        self.coerce(self.integer_ring(), self.integer_ring().get_uniformly_random(self.modulus(), rng))
     }
 }
 
