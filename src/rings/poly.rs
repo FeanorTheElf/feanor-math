@@ -104,10 +104,10 @@ impl<R: RingStore<Type: PolyRing>> PolyRingStore for R {}
 #[cfg(test)]
 fn test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R::Type as RingExtension>::BaseRing>>>(ring: R, interesting_base_ring_elements: I) {
     
+    let x = ring.indeterminate();
     let elements = interesting_base_ring_elements.collect::<Vec<_>>();
     
     // test linear independence of X
-    let x = ring.indeterminate();
     for a in &elements {
         for b in &elements {
             for c in &elements {

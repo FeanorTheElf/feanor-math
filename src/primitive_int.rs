@@ -1,7 +1,7 @@
 use std::{ops::{AddAssign, SubAssign, MulAssign, Neg, Div, Rem}, marker::PhantomData, fmt::Display};
 use crate::{ring::*, euclidean::EuclideanRing, divisibility::DivisibilityRing, ordered::OrderedRing};
 use crate::integer::*;
-use crate::algorithms::multiply::KaratsubaHint;
+use crate::algorithms::conv_mul::KaratsubaHint;
 
 pub trait PrimitiveInt: AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Eq + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy + Div<Self, Output = Self> + Rem<Self, Output = Self> + Display {
 
