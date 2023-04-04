@@ -1,6 +1,26 @@
 use crate::ring::*;
 use crate::divisibility::*;
 
+///
+/// Trait for rings that support euclidean division.
+/// 
+/// In other words, there is a degree function d(.) 
+/// returning positive integers such that for every `x, y` 
+/// with `y != 0` there are `q, r` with `x = qy + r` and 
+/// `d(r) < d(y)`. Note that `q, r` do not have to be unique, 
+/// and implementations are free to use any choice.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::euclidean::*;
+/// # use feanor_math::primitive_int::*;
+/// let ring = StaticRing::<i64>::RING;
+/// let (q, r) = ring.euclidean_div_rem(14, &6);
+/// assert!(ring.eq(&14, &ring.add(ring.mul(q, 6), r)));
+/// assert!(ring.euclidean_deg(&r) < ring.euclidean_deg(&6));
+/// ```
+/// 
 pub trait EuclideanRing: DivisibilityRing {
 
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element);

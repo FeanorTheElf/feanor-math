@@ -1,5 +1,9 @@
 use crate::ring::*;
 
+///
+/// Trait for rings that support checking divisibility, i.e.
+/// whether for `x, y` there is `k` such that `x = ky`.
+/// 
 pub trait DivisibilityRing: RingBase {
 
     ///

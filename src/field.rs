@@ -1,6 +1,12 @@
 use crate::ring::*;
 use crate::euclidean::*;
 
+///
+/// Trait for rings that are fields, i.e. where every
+/// nonzero element has an inverse.
+/// 
+/// Note that fields must be commutative.
+/// 
 pub trait Field: EuclideanRing {}
 
 pub trait FieldWrapper: RingStore<Type: Field> + EuclideanRingStore {

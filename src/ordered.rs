@@ -1,6 +1,11 @@
 use crate::ring::*;
 use std::cmp::*;
 
+///
+/// Trait for rings that have a total ordering on their elements.
+/// The ordering must be compatible with addition and multiplication
+/// in the usual sense.
+/// 
 pub trait OrderedRing: RingBase {
 
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> Ordering;

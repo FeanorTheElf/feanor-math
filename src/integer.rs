@@ -3,6 +3,13 @@ use crate::euclidean::*;
 use crate::ordered::*;
 use crate::algorithms;
 
+///
+/// Trait for rings that are isomorphic to the ring of integers `ZZ = { ..., -2, -1, 0, 1, 2, ... }`.
+/// 
+/// Some of the functionality in this trait refers to the binary expansion of
+/// a positive integer. While this is not really general, it is often required
+/// for fast operations with integers.
+/// 
 pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing {
 
     fn to_float_approx(&self, value: &Self::Element) -> f64;
