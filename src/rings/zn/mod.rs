@@ -8,7 +8,7 @@ pub trait ZnRing: DivisibilityRing + CanonicalHom<Self::IntegerRingBase> {
 
     // there seems to be a problem with associated type bounds, hence we cannot use `Integers: IntegerRingStore`
     // or `Integers: RingStore<Type: IntegerRing>`
-    type IntegerRingBase: IntegerRing;
+    type IntegerRingBase: IntegerRing + ?Sized;
     type Integers: RingStore<Type = Self::IntegerRingBase>;
 
     fn integer_ring(&self) -> &Self::Integers;

@@ -258,7 +258,7 @@ macro_rules! delegate {
 /// 
 pub trait RingStore {
     
-    type Type: RingBase + CanonicalIso<Self::Type>;
+    type Type: RingBase + CanonicalIso<Self::Type> + ?Sized;
 
     fn get_ring<'a>(&'a self) -> &'a Self::Type;
 
@@ -418,8 +418,8 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// assert_eq!(8, r.coerce(&s, s.from_z(8)));
 /// ```
 /// 
-pub trait CanonicalHom<S> : RingBase
-    where S: RingBase
+pub trait CanonicalHom<S>: RingBase
+    where S: RingBase + ?Sized
 {
     type Homomorphism;
 
@@ -452,8 +452,8 @@ pub trait CanonicalHom<S> : RingBase
 /// impl constraints of Rust, this is unpracticable and so we only
 /// require the implementation `R: CanonicalHom<S>`.
 /// 
-pub trait CanonicalIso<S> : CanonicalHom<S>
-    where S: RingBase
+pub trait CanonicalIso<S>: CanonicalHom<S>
+    where S: RingBase + ?Sized
 {
     type Isomorphism;
 
@@ -566,27 +566,27 @@ impl<R: RingBase + CanonicalIso<R>> RingStore for RingValue<R> {
 /// or [`crate::algorithms::sqr_mul`]). In this case, we only have a reference to a [`crate::ring::RingBase`]
 /// object, but require a [`crate::ring::RingStore`] object to use the algorithm.
 /// 
-pub struct RingRef<'a, R: RingBase> {
+pub struct RingRef<'a, R: RingBase + ?Sized> {
     ring: &'a R
 }
 
-impl<'a, R: RingBase> Clone for RingRef<'a, R> {
+impl<'a, R: RingBase + ?Sized> Clone for RingRef<'a, R> {
 
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<'a, R: RingBase> Copy for RingRef<'a, R> {}
+impl<'a, R: RingBase + ?Sized> Copy for RingRef<'a, R> {}
 
-impl<'a, R: RingBase> RingRef<'a, R> {
+impl<'a, R: RingBase + ?Sized> RingRef<'a, R> {
 
     pub const fn new(value: &'a R) -> Self {
         RingRef { ring: value }
     }
 }
 
-impl<'a, R: RingBase + CanonicalIso<R>> RingStore for RingRef<'a, R> {
+impl<'a, R: RingBase + CanonicalIso<R> + ?Sized> RingStore for RingRef<'a, R> {
 
     type Type = R;
     

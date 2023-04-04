@@ -6,7 +6,7 @@ pub trait KaratsubaHint: RingBase {
     fn karatsuba_threshold(&self) -> usize;
 }
 
-impl<R: RingBase> KaratsubaHint for R {
+impl<R: RingBase + ?Sized> KaratsubaHint for R {
 
     default fn karatsuba_threshold(&self) -> usize {
         0

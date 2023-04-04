@@ -22,7 +22,7 @@ pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing {
     fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, rng: G) -> Self::Element;
 }
 
-impl<I: IntegerRing + CanonicalIso<I>, J: IntegerRing> CanonicalHom<I> for J {
+impl<I: IntegerRing + CanonicalIso<I> + ?Sized, J: IntegerRing + ?Sized> CanonicalHom<I> for J {
 
     type Homomorphism = ();
     
@@ -38,7 +38,7 @@ impl<I: IntegerRing + CanonicalIso<I>, J: IntegerRing> CanonicalHom<I> for J {
     }
 }
 
-impl<I: IntegerRing + CanonicalIso<I>, J: IntegerRing + CanonicalIso<J>> CanonicalIso<I> for J {
+impl<I: IntegerRing + CanonicalIso<I> + ?Sized, J: IntegerRing + CanonicalIso<J> + ?Sized> CanonicalIso<I> for J {
 
     type Isomorphism = ();
     

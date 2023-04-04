@@ -5,6 +5,8 @@
 #![feature(allocator_api)]
 #![feature(associated_type_bounds)]
 
+use std::marker::PhantomData;
+
 extern crate test;
 
 // used to represent that a const generic computation works

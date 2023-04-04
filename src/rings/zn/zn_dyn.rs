@@ -233,7 +233,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for ZnBas
     }
 }
 
-impl<I: IntegerRingStore, J: IntegerRing> CanonicalHom<J> for ZnBase<I> 
+impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanonicalHom<J> for ZnBase<I> 
     where J: CanonicalIso<J>
 {
     type Homomorphism = <I::Type as CanonicalHom<J>>::Homomorphism;
@@ -370,7 +370,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for FpBas
     }
 }
 
-impl<I: IntegerRingStore, J: IntegerRing> CanonicalHom<J> for FpBase<I> 
+impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanonicalHom<J> for FpBase<I> 
     where J: CanonicalIso<J>
 {
     type Homomorphism = <ZnBase<I> as CanonicalHom<J>>::Homomorphism;
