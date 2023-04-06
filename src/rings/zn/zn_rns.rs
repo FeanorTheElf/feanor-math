@@ -13,6 +13,13 @@ pub struct ZnBase<I: IntegerRingStore, J: IntegerRingStore> {
 
 pub type Zn<I, J> = RingValue<ZnBase<I, J>>;
 
+impl<I: IntegerRingStore + Clone, J: IntegerRingStore> Zn<I, J> {
+    
+    pub fn new(ring: I, large_ring: J, primes: Vec<El<I>>) -> Self {
+        Self::from(ZnBase::new(ring, large_ring, primes))
+    }
+}
+
 impl<I: IntegerRingStore + Clone, J: IntegerRingStore> ZnBase<I, J> {
 
     #[allow(non_snake_case)]
@@ -24,12 +31,12 @@ impl<I: IntegerRingStore + Clone, J: IntegerRingStore> ZnBase<I, J> {
         let total_modulus = large_ring.prod(
             primes.iter().map(|p| large_ring.coerce::<I>(&ring, p.clone()))
         );
-        let total_ring = RingValue::new(zn_dyn::ZnBase::new(large_ring, total_modulus));
+        let total_ring = zn_dyn::Zn::new(large_ring, total_modulus);
         let ZZ = total_ring.integer_ring();
         let components: Vec<_> = primes.into_iter()
             .map(|p| zn_dyn::ZnBase::new(ring.clone(), p))
             .map(|r| r.is_field().ok().unwrap())
-            .map(|r| RingValue::new(r))
+            .map(|r| RingValue::from(r))
             .collect();
         let unit_vectors = (0..components.len())
             .map(|i| ZZ.checked_div(total_ring.modulus(), &ZZ.coerce::<I>(&ring, components[i].modulus().clone())))
@@ -266,14 +273,14 @@ use crate::primitive_int::StaticRing;
 
 #[test]
 fn test_zn_ring_axioms() {
-    let ring = ZnBase::new(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]);
-    test_ring_axioms(RingValue::new(ring.clone()), [0, 1, 7, 9, 62, 8, 10, 11, 12].iter().cloned().map(|x| ring.from_z(x)))
+    let ring = Zn::new(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]);
+    test_ring_axioms(&ring, [0, 1, 7, 9, 62, 8, 10, 11, 12].iter().cloned().map(|x| ring.from_z(x)))
 }
 
 #[test]
 fn test_map_in_map_out() {
-    let ring1 = RingValue::new(ZnBase::new(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11, 17]));
-    let ring2 = RingValue::new(zn_dyn::ZnBase::new(StaticRing::<i32>::RING, 7 * 11 * 17));
+    let ring1 = Zn::new(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11, 17]);
+    let ring2 = zn_dyn::Zn::new(StaticRing::<i32>::RING, 7 * 11 * 17);
     for x in [0, 1, 7, 8, 9, 10, 11, 17, 7 * 17, 11 * 8, 11 * 17, 7 * 11 * 17 - 1] {
         let value = ring2.from_z(x);
         assert!(ring2.eq(&value, &ring1.cast(&ring2, ring1.coerce(&ring2, value.clone()))));

@@ -146,7 +146,7 @@ pub struct StaticRingBase<T> {
 }
 
 impl<T: PrimitiveInt> RingValue<StaticRingBase<T>> {
-    pub const RING: StaticRing<T> = RingValue::new(StaticRingBase { element: PhantomData });
+    pub const RING: StaticRing<T> = RingValue::from(StaticRingBase { element: PhantomData });
 }
 
 impl<T> Copy for StaticRingBase<T> {}

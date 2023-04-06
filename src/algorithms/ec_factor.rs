@@ -5,7 +5,6 @@ use crate::ring::*;
 use crate::integer::*;
 use crate::rings::zn::ZnRingStore;
 use crate::rings::zn::zn_dyn::Zn;
-use crate::rings::zn::zn_dyn::ZnBase;
 
 #[allow(type_alias_bounds)]
 type Point<I: IntegerRingStore> = (El<Zn<I>>, El<Zn<I>>, El<Zn<I>>);
@@ -140,7 +139,7 @@ pub fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
             .map(|p| (Nf.log2() / ZZ.to_float_approx(&p).log2(), p))
             .map(|(e, p)| ZZ.pow(p, e as usize + 1))
     );
-    let Zn = Zn::new(ZnBase::new(&ZZ, N.clone()));
+    let Zn = Zn::new(&ZZ, N.clone());
     let mut rng = oorandom::Rand64::new(ZZ.default_hash(N) as u128);
     loop {
         let P = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()), Zn.one());

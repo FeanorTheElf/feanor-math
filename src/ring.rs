@@ -80,7 +80,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::IntegerRingStore};
 /// 
 /// impl MyRingBase {
 /// 
-///     pub const RING: MyRing = RingValue::new(MyRingBase);
+///     pub const RING: MyRing = RingValue::from(MyRingBase);
 /// }
 /// 
 /// let ring = MyRingBase::RING;
@@ -89,6 +89,87 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::IntegerRingStore};
 ///     &ring.mul(ring.from_z(3), ring.from_z(2))
 /// ));
 /// ```
+/// And here is the example from the Readme, for the finite binary field F2
+/// ```
+/// use feanor_math::ring::*;
+/// 
+/// struct F2Base;
+/// 
+/// impl RingBase for F2Base {
+///    
+///     type Element = u8;
+/// 
+///     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
+///         *lhs = (*lhs + rhs) % 2;
+///     }
+///     
+///     fn negate_inplace(&self, lhs: &mut Self::Element) {
+///         *lhs = (2 - *lhs) % 2;
+///     }
+/// 
+///     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
+///         *lhs = (*lhs * rhs) % 2;
+///     }
+///     
+///     fn from_z(&self, value: i32) -> Self::Element {
+///         // make sure that we handle negative numbers correctly
+///         (((value % 2) + 2) % 2) as u8
+///     }
+/// 
+///     fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+///         // elements are always represented by 0 or 1
+///         *lhs == *rhs
+///     }
+///     
+///     fn is_commutative(&self) -> bool { true }
+///     fn is_noetherian(&self) -> bool { true }
+/// 
+///     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+///         write!(out, "{}", *value)
+///     }
+/// }
+/// 
+/// // To properly use a ring, in addition to RingBase we have to implement CanonicalHom<Self> and
+/// // CanonicalIso<Self>. This ensures that the ring works well with the canonical ring mapping
+/// // framework, that later allows us to use functions like `cast()` or `coerce()`.
+/// // In practice, we might also want to add implementations like `CanonicalHom<I> where I: IntegerRing`
+/// // or CanonicalIso<feanor_math::rings::zn::zn_static::ZnBase<2, true>>.
+/// 
+/// impl CanonicalHom<F2Base> for F2Base {
+///     
+///     type Homomorphism = ();
+/// 
+///     fn has_canonical_hom(&self, from: &Self) -> Option<Self::Homomorphism> {
+///         // a canonical homomorphism F -> F exists for all rings F of type F2Base, as
+///         // there is only one possible instance of F2Base
+///         Some(())
+///     }
+/// 
+///     fn map_in(&self, from: &Self, el: Self::Element, hom: &Self::Homomorphism) -> Self::Element {
+///         el
+///     }
+/// }
+/// 
+/// impl CanonicalIso<F2Base> for F2Base {
+///     
+///     type Isomorphism = ();
+/// 
+///     fn has_canonical_iso(&self, from: &Self) -> Option<Self::Isomorphism> {
+///         // a canonical isomorphism F -> F exists for all rings F of type F2Base, as
+///         // there is only one possible instance of F2Base
+///         Some(())
+///     }
+/// 
+///     fn map_out(&self, from: &Self, el: Self::Element, hom: &Self::Homomorphism) -> Self::Element {
+///         el
+///     }
+/// }
+/// 
+/// pub const F2: RingValue<F2Base> = RingValue::from(F2Base);
+/// 
+/// assert!(F2.eq(&F2.from_z(1), &F2.add(F2.one(), F2.zero())));
+/// ```
+/// 
 /// 
 pub trait RingBase {
 
@@ -250,6 +331,80 @@ macro_rules! delegate {
 /// 
 /// let ring: RingValue<StaticRingBase<i64>> = StaticRing::<i64>::RING;
 /// assert!(ring.eq(&7, &add_in_ring(ring, 3, 4)));
+/// ```
+/// The next example is the one from the Readme
+/// ```
+/// use feanor_math::ring::*;
+/// use feanor_math::primitive_int::*;
+/// use feanor_math::rings::zn::zn_dyn::*;
+/// use feanor_math::rings::zn::*;
+/// use feanor_math::algorithms;
+///
+/// use oorandom;
+///
+/// fn fermat_is_prime(n: i64) -> bool {
+///     // the Fermat primality test is based on the observation that a^n == a mod n if n
+///     // is a prime; On the other hand, if n is not prime, we hope that there are many
+///     // a such that this is not the case. 
+///     // Note that this is not always the case, and so more advanced primality tests should 
+///     // be used in practice. This is just a proof of concept.
+/// 
+///     let ZZ = StaticRing::<i64>::RING;
+///     let Zn = Zn::new(ZZ, n); // the ring Z/nZ
+/// 
+///     // check for 6 random a whether a^n == a mod n
+///     let mut rng = oorandom::Rand64::new(0);
+///     for _ in 0..6 {
+///         let a = Zn.random_element(|| rng.rand_u64());
+///         let a_n = Zn.pow(&a, n as usize);
+///         if !Zn.eq(&a, &a_n) {
+///             return false;
+///         }
+///     }
+///     return true;
+/// }
+/// 
+/// assert!(algorithms::miller_rabin::is_prime(StaticRing::<i64>::RING, &91, 6) == fermat_is_prime(91));
+/// ```
+/// And here the generic version
+/// ```
+/// use feanor_math::ring::*;
+/// use feanor_math::integer::*;
+/// use feanor_math::rings::bigint::*;
+/// use feanor_math::rings::zn::zn_dyn::*;
+/// use feanor_math::rings::zn::*;
+/// use feanor_math::algorithms;
+/// 
+/// use oorandom;
+/// 
+/// fn fermat_is_prime<R: IntegerRingStore>(ZZ: R, n: El<R>) -> bool {
+///     // the Fermat primality test is based on the observation that a^n == a mod n if n
+///     // is a prime; On the other hand, if n is not prime, we hope that there are many
+///     // a such that this is not the case. 
+///     // Note that this is not always the case, and so more advanced primality tests should 
+///     // be used in practice. This is just a proof of concept.
+/// 
+///     // ZZ is not guaranteed to be Copy anymore, so use reference instead
+///     let Zn = Zn::new(&ZZ, n.clone()); // the ring Z/nZ
+/// 
+///     // check for 6 random a whether a^n == a mod n
+///     let mut rng = oorandom::Rand64::new(0);
+///     for _ in 0..6 {
+///         let a = Zn.random_element(|| rng.rand_u64());
+///         // use a generic square-and-multiply powering function that works with any implementation
+///         // of integers
+///         let a_n = Zn.pow_gen(&a, &n, &ZZ);
+///         if !Zn.eq(&a, &a_n) {
+///             return false;
+///         }
+///     }
+///     return true;
+/// }
+/// 
+/// // the miller-rabin primality test is implemented in feanor_math::algorithms, so we can
+/// // check our implementation
+/// let n = DefaultBigIntRing::RING.from_z(91);
+/// assert!(algorithms::miller_rabin::is_prime(DefaultBigIntRing::RING, &n, 6) == fermat_is_prime(DefaultBigIntRing::RING, n));
 /// ```
 /// 
 /// # What does this do?
@@ -557,7 +712,7 @@ pub struct RingValue<R: RingBase> {
 
 impl<R: RingBase> RingValue<R> {
 
-    pub const fn new(value: R) -> Self {
+    pub const fn from(value: R) -> Self {
         RingValue { ring: value }
     }
 }

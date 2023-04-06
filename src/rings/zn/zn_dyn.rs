@@ -23,6 +23,13 @@ pub struct ZnBase<I: IntegerRingStore> {
 
 pub type Zn<I> = RingValue<ZnBase<I>>;
 
+impl<I: IntegerRingStore> Zn<I> {
+
+    pub fn new(integer_ring: I, modulus: El<I>) -> Self {
+        RingValue::from(ZnBase::new(integer_ring, modulus))
+    }
+}
+
 impl<I: IntegerRingStore> ZnBase<I> {
 
     pub fn new(integer_ring: I, modulus: El<I>) -> Self {
@@ -454,6 +461,6 @@ fn test_mul() {
 
 #[test]
 fn test_zn_ring_axioms() {
-    let ring = ZnBase::new(StaticRing::<i64>::RING, 63);
-    test_ring_axioms(RingValue::new(ring.clone()), [0, 1, 3, 7, 9, 62, 8, 10, 11, 12].iter().cloned().map(|x| ring.from_z(x)))
+    let ring = Zn::new(StaticRing::<i64>::RING, 63);
+    test_ring_axioms(&ring, [0, 1, 3, 7, 9, 62, 8, 10, 11, 12].iter().cloned().map(|x| ring.from_z(x)))
 }

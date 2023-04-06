@@ -38,7 +38,7 @@ pub fn is_prime<I>(ring: I, n: &El<I>, k: usize) -> bool
     let s = ring.abs_lowest_set_bit(&n_minus_one).unwrap();
     ring.euclidean_div_pow_2(&mut n_minus_one, s as usize);
     let d = n_minus_one;
-    let Zn = RingValue::new(ZnBase::new(&ring, n.clone()));
+    let Zn = Zn::new(&ring, n.clone());
 
     for _i in 0..k {
         let a = Zn.get_ring().project(ring.add(ring.get_uniformly_random(n, || rng.rand_u64()), ring.one()));

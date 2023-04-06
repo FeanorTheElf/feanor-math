@@ -155,7 +155,7 @@ impl<const N: u64> Field for ZnBase<N, true>
 impl<const N: u64, const IS_FIELD: bool> RingValue<ZnBase<N, IS_FIELD>>
     where Expr<{N as i64 as usize}>: Exists
 {
-    pub const RING: Self = Self::new(ZnBase);
+    pub const RING: Self = Self::from(ZnBase);
 }
 
 pub type Zn<const N: u64> = RingValue<ZnBase<N, {is_prime(N)}>>;

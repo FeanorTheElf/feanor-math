@@ -24,7 +24,9 @@ impl<R> FFTTableBluestein<R>
     where R: DivisibilityRingStore
 {
     pub fn new(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize) -> Self {
+        // checks on m and root_of_unity_m are done by the FFTTableCooleyTuckey
         assert!((1 << log2_m) >= 2 * n + 1);
+
         let m = 1 << log2_m;
         let mut b = (0..m).map(|_| ring.zero()).collect::<Vec<_>>();
         b[0] = ring.one();
@@ -60,6 +62,8 @@ impl<R> FFTTableBluestein<R>
         assert!(values.len() == self.n);
         assert!(buffer.len() == self.m_fft_table.len());
 
+        let base_ring = self.m_fft_table.ring();
+
         // set buffer to the zero-padded sequence values_i * z^(-i^2/2)
         for i in 0..self.n {
             let value = if INV {
@@ -69,7 +73,7 @@ impl<R> FFTTableBluestein<R>
             };
             *buffer.at_mut(i) = ring.mul_ref_fst(
                 value,
-                ring.coerce(self.m_fft_table.ring(), self.m_fft_table.ring().pow(&self.inv_root_of_unity, i * i))
+                ring.coerce(base_ring, base_ring.pow(&self.inv_root_of_unity, i * i))
             );
         }
         for i in self.n..self.m_fft_table.len() {
@@ -79,18 +83,18 @@ impl<R> FFTTableBluestein<R>
         // perform convoluted product with b using a power-of-two fft
         self.m_fft_table.bitreverse_fft_inplace_base(&mut buffer, &ring);
         for i in 0..self.m_fft_table.len() {
-            ring.mul_assign(buffer.at_mut(i), ring.coerce(self.m_fft_table.ring(), self.b_bitreverse_fft[i].clone()));
+            ring.mul_assign(buffer.at_mut(i), ring.coerce(base_ring, self.b_bitreverse_fft[i].clone()));
         }
         self.m_fft_table.bitreverse_inv_fft_inplace_base(&mut buffer, &ring);
 
         // write values back, and multiply them with a twiddle factor
         for i in 0..self.n {
-            *values.at_mut(i) = ring.mul_ref_fst(buffer.at(i), ring.coerce(self.m_fft_table.ring(), self.m_fft_table.ring().pow(&self.inv_root_of_unity, i * i)));
+            *values.at_mut(i) = ring.mul_ref_fst(buffer.at(i), ring.coerce(base_ring, base_ring.pow(&self.inv_root_of_unity, i * i)));
         }
 
         if INV {
             // finally, scale by 1/n
-            let scale = ring.coerce(&self.m_fft_table.ring(), self.m_fft_table.ring().checked_div(&self.m_fft_table.ring().one(), &self.m_fft_table.ring().from_z(self.n as i32)).unwrap());
+            let scale = ring.coerce(&base_ring, base_ring.checked_div(&base_ring.one(), &base_ring.from_z(self.n as i32)).unwrap());
             for i in 0..values.len() {
                 ring.mul_assign_ref(values.at_mut(i), &scale);
             }

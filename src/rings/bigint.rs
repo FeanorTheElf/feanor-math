@@ -31,7 +31,7 @@ pub struct DefaultBigIntRing;
 
 impl DefaultBigIntRing {
 
-    pub const RING: RingValue<DefaultBigIntRing> = RingValue::new(DefaultBigIntRing);
+    pub const RING: RingValue<DefaultBigIntRing> = RingValue::from(DefaultBigIntRing);
 
     pub fn map_i128(&self, val: &<Self as RingBase>::Element) -> Option<i128> {
         match algorithms::bigint::highest_set_block(&val.1) {
