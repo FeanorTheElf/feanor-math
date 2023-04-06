@@ -1,8 +1,4 @@
-use std::fmt::Debug;
-
 use crate::divisibility::DivisibilityRingStore;
-use crate::integer::IntegerRingStore;
-use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::algorithms;
 use crate::vector::VectorViewMut;
