@@ -21,7 +21,7 @@ The reasons for this separation are explained further down this page.
 ## Using rings
 
 As simple example of how to use the library, we implement Fermat primality test here
-```
+```rust
 use feanor_math::ring::*;
 use feanor_math::primitive_int::*;
 use feanor_math::rings::zn::zn_dyn::*;
@@ -59,7 +59,7 @@ assert!(algorithms::miller_rabin::is_prime(StaticRing::<i64>::RING, &91, 6) == f
 If we want to support arbitrary rings of integers - e.g. `DefaultBigIntRing::RING`, which is a simple
 implementation of arbitrary-precision integers - we could make the function generic as
 
-```
+```rust
 use feanor_math::ring::*;
 use feanor_math::integer::*;
 use feanor_math::rings::bigint::*;
@@ -104,7 +104,7 @@ This function now works with any ring that implements `IntegerRing`, a subtrait 
 
 To implement a custom ring, just create a struct and add an `impl RingBase` and an `impl CanonicalIso<Self>` - that's it!
 Assuming we want to provide our own implementation of the finite binary field F2, we could do it as follows.
-```
+```rust
 use feanor_math::ring::*;
 
 struct F2Base;
