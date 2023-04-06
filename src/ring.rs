@@ -126,6 +126,22 @@ pub trait RingBase {
         self.add_assign(lhs, rhs);
     }
 
+    ///
+    /// Computes `lhs = rhs - lhs`
+    /// 
+    fn sub_self_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
+        self.negate_inplace(lhs);
+        self.add_assign(lhs, rhs);
+    }
+
+    ///
+    /// Computes `lhs = rhs - lhs`
+    /// 
+    fn sub_self_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
+        self.negate_inplace(lhs);
+        self.add_assign_ref(lhs, rhs);
+    }
+
     fn add_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         let mut result = lhs.clone();
         self.add_assign_ref(&mut result, rhs);
@@ -265,6 +281,8 @@ pub trait RingStore {
     delegate!{ fn add_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
     delegate!{ fn add_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
     delegate!{ fn sub_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
+    delegate!{ fn sub_self_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
+    delegate!{ fn sub_self_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
     delegate!{ fn negate_inplace(&self, lhs: &mut El<Self>) -> () }
     delegate!{ fn mul_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
     delegate!{ fn mul_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }

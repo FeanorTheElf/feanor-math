@@ -56,18 +56,28 @@ impl<R> FFTTableCooleyTuckey<R>
         return Self::new(ring, current, log2_n);
     }
 
-    fn bitreverse_fft_inplace_base<V, S, const INV: bool>(&self, mut values: V, ring: S)
+    ///
+    /// Computes the bitreverse FFT of the given values, using the Cooley-Tuckey FFT algorithm.
+    /// 
+    /// This supports any given ring, as long as the precomputed values stored in the table are
+    /// also contained in the new ring. The result is wrong however if the canonical homomorphism
+    /// `R -> S` does not map the N-th root of unity to a primitive N-th root of unity.
+    /// 
+    /// Note that the FFT of a sequence `a[0], ..., a[N - 1]` is defined as `Fa[k] = sum_i a[i] z^(-ik)`
+    /// where `z` is an N-th root of unity. Since this is a bitreverse FFT, the output are not the `Fa[k]`
+    /// but instead the numbers `Fa[bitrev(k)]`, i.e. the same values in another order.
+    /// 
+    fn bitreverse_fft_inplace_base<V, S>(&self, mut values: V, ring: S)
         where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
     {
         assert!(values.len() == 1 << self.log2_n);
+        // check if the canonical hom `R -> S` maps `self.root_of_unity` to a primitive N-th root of unity
+        debug_assert!(ring.is_neg_one(&ring.pow(&ring.coerce(&self.ring, self.root_of_unity.clone()), 1 << (self.log2_n - 1))));
+
         for s in (0..self.log2_n).rev() {
             let m = 1 << s;
             let log2_group_size = self.log2_n - s;
-            let twiddle_root = if INV {
-                ring.coerce(&self.ring, self.ring.pow(&self.root_of_unity, m))
-            } else {
-                ring.coerce(&self.ring, self.ring.pow(&self.inv_root_of_unity, m))
-            };
+            let twiddle_root = ring.coerce(&self.ring, self.ring.pow(&self.inv_root_of_unity, m));
             
             for k in 0..(1 << s) {
                 let mut current_twiddle = ring.one();
@@ -79,10 +89,13 @@ impl<R> FFTTableCooleyTuckey<R>
                 // and v_(k + m), v_(k + 3m), v_(k + 5m), ..., v_(k + n - m) in the corresponding entries;
                 // call these sequences a1 and a2
                 //
+                // Note that a1[i] is stored in (k + 2m * bitrev(i, n/m)) and a2[i] in (k + m + 2m * bitrev(i, n/m));
+                // We want to store a[i] in (k + m + m * bitrev(i, 2n/m))
+                //
                 for i in 0..(1 << (log2_group_size - 1)) {
                     let j = bitreverse(i, log2_group_size);
                     //
-                    // we want to compute (a[i], a[i + group_size/2]) = (a1[i] + z a2[i], a1[i] - z^i a2[i])
+                    // we want to compute (a[i], a[i + group_size/2]) = (a1[i] + z^i a2[i], a1[i] - z^i a2[i])
                     //
                     // in bitreverse order, have
                     // local_index1 = bitrev(i, group_size) = 2 bitrev(i, group_size/2)
@@ -92,9 +105,51 @@ impl<R> FFTTableCooleyTuckey<R>
                     let local_index2 = j + 1;
                     let global_index1 = local_index1 * m + k;
                     let global_index2 = local_index2 * m + k;
-                    let twiddled_entry = ring.mul_ref(values.at(global_index2), &current_twiddle);
-                    *values.at_mut(global_index2) = ring.sub_ref(values.at(global_index1), &twiddled_entry);
-                    ring.add_assign(values.at_mut(global_index1), twiddled_entry);
+
+                    // (values[i1], values[i2]) = (values[i1] + twiddle * values[i2], values[i1] - twiddle * values[i2])
+                    ring.mul_assign_ref(values.at_mut(global_index2), &current_twiddle);
+                    let new_a = ring.add_ref(values.at(global_index1), values.at(global_index2));
+                    let a = std::mem::replace(values.at_mut(global_index1), new_a);
+                    ring.sub_self_assign(values.at_mut(global_index2), a);
+
+                    ring.mul_assign_ref(&mut current_twiddle, &twiddle_root);
+                }
+            }
+        }
+    }
+
+    ///
+    /// this is exactly `bitreverse_fft_inplace_base()` with all operations reversed
+    /// 
+    fn bitreverse_inv_fft_inplace_base<V, S>(&self, mut values: V, ring: S)
+        where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
+    {
+        assert!(values.len() == 1 << self.log2_n);
+        // check if the canonical hom `R -> S` maps `self.root_of_unity` to a primitive N-th root of unity
+        debug_assert!(ring.is_neg_one(&ring.pow(&ring.coerce(&self.ring, self.root_of_unity.clone()), 1 << (self.log2_n - 1))));
+
+        for s in 0..self.log2_n {
+            let m = 1 << s;
+            let log2_group_size = self.log2_n - s;
+            let twiddle_root = ring.coerce(&self.ring, self.ring.pow(&self.root_of_unity, m));
+            
+            // do not reverse this, as all executions are independent
+            for k in 0..(1 << s) {
+                let mut current_twiddle = ring.one();
+
+                for i in 0..(1 << (log2_group_size - 1)) {
+                    let j = bitreverse(i, log2_group_size);
+                    let local_index1 = j;
+                    let local_index2 = j + 1;
+                    let global_index1 = local_index1 * m + k;
+                    let global_index2 = local_index2 * m + k;
+
+                    // (values[i1], values[i2]) = (values[i1] + values[i2], twiddle * (values[i1] - values[i2]))
+                    let mut new_b = ring.sub_ref(values.at(global_index1), values.at(global_index2));
+                    ring.mul_assign_ref(&mut new_b, &current_twiddle);
+                    let b = std::mem::replace(values.at_mut(global_index2), new_b);
+                    ring.add_assign(values.at_mut(global_index1), b);
+
                     ring.mul_assign_ref(&mut current_twiddle, &twiddle_root);
                 }
             }
@@ -115,13 +170,13 @@ impl<R> FFTTableCooleyTuckey<R>
     pub fn bitreverse_fft_inplace<V>(&self, values: V)
         where V: VectorViewMut<El<R>>
     {
-        self.bitreverse_fft_inplace_base::<V, &R, false>(values, &self.ring);
+        self.bitreverse_fft_inplace_base::<V, &R>(values, &self.ring);
     }
 
     pub fn bitreverse_inv_fft_inplace<V>(&self, mut values: V)
         where V: VectorViewMut<El<R>>, R: DivisibilityRingStore
     {
-        self.bitreverse_fft_inplace_base::<&mut V, &R, true>(&mut values, &self.ring);
+        self.bitreverse_inv_fft_inplace_base::<&mut V, &R>(&mut values, &self.ring);
         let scale = self.ring.checked_div(&self.ring.one(), &self.ring.from_z(1 << self.log2_n)).unwrap();
         for i in 0..values.len() {
             self.ring.mul_assign_ref(values.at_mut(i), &scale);
@@ -165,7 +220,7 @@ fn test_bitreverse_fft_inplace_base() {
         bitreverse_expected[i] = expected[bitreverse(i, 2)];
     }
 
-    fft.bitreverse_fft_inplace_base::<_, _, false>(&mut values, ring);
+    fft.bitreverse_fft_inplace_base(&mut values, ring);
     assert_eq!(values, bitreverse_expected);
 }
 
@@ -188,6 +243,17 @@ fn test_bitreverse_fft_inplace() {
 
     fft.bitreverse_fft_inplace(&mut values);
     assert_eq!(values, bitreverse_expected);
+}
+
+#[test]
+fn test_bitreverse_inv_fft_inplace() {
+    let ring = Zn::<17>::RING;
+    let fft = FFTTableCooleyTuckey::for_zn(&ring, 4);
+    let values: [u64; 16] = [1, 2, 3, 2, 1, 0, 17 - 1, 17 - 2, 17 - 1, 0, 1, 2, 3, 4, 5, 6];
+    let mut work = values;
+    fft.bitreverse_fft_inplace(&mut work);
+    fft.bitreverse_inv_fft_inplace(&mut work);
+    assert_eq!(&work, &values);
 }
 
 #[test]

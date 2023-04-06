@@ -35,6 +35,14 @@ impl<R: DelegateRing> RingBase for R {
         self.get_delegate().sub_assign_ref(self.delegate_mut(lhs), self.delegate_ref(rhs))
     }
 
+    default fn sub_self_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
+        self.get_delegate().sub_self_assign(self.delegate_mut(lhs), self.delegate(rhs))
+    }
+
+    default fn sub_self_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
+        self.get_delegate().sub_self_assign_ref(self.delegate_mut(lhs), self.delegate_ref(rhs))
+    }
+
     default fn negate_inplace(&self, lhs: &mut Self::Element) {
         self.get_delegate().negate_inplace(self.delegate_mut(lhs))
     }
