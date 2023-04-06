@@ -18,7 +18,7 @@ pub fn bitreverse(index: usize, bits: usize) -> usize {
 }
 
 impl<R> FFTTableCooleyTuckey<R>
-    where R: RingStore
+    where R: DivisibilityRingStore
 {
     pub fn new(ring: R, root_of_unity: El<R>, log2_n: usize) -> Self {
         assert!(ring.is_commutative());
@@ -130,7 +130,7 @@ impl<R> FFTTableCooleyTuckey<R>
     /// this is exactly `bitreverse_fft_inplace_base()` with all operations reversed
     /// 
     pub fn bitreverse_inv_fft_inplace_base<V, S>(&self, mut values: V, ring: S)
-        where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>, R: DivisibilityRingStore
+        where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
     {
         assert!(values.len() == 1 << self.log2_n);
         // check if the canonical hom `R -> S` maps `self.root_of_unity` to a primitive N-th root of unity
@@ -189,7 +189,7 @@ impl<R> FFTTableCooleyTuckey<R>
     }
 
     pub fn bitreverse_inv_fft_inplace<V>(&self, mut values: V)
-        where V: VectorViewMut<El<R>>, R: DivisibilityRingStore
+        where V: VectorViewMut<El<R>>
     {
         self.bitreverse_inv_fft_inplace_base::<&mut V, &R>(&mut values, &self.ring);
     }
@@ -202,7 +202,7 @@ impl<R> FFTTableCooleyTuckey<R>
     }
 
     pub fn inv_fft_inplace<V>(&self, mut values: V)
-        where V: SwappableVectorViewMut<El<R>>, R: DivisibilityRingStore
+        where V: SwappableVectorViewMut<El<R>>
     {
         self.bitreverse_permute_inplace(&mut values);
         self.bitreverse_fft_inplace(&mut values);

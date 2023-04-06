@@ -21,7 +21,7 @@ pub struct FFTTableBluestein<R>
 }
 
 impl<R> FFTTableBluestein<R> 
-    where R: RingStore
+    where R: DivisibilityRingStore
 {
     pub fn new(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize) -> Self {
         assert!((1 << log2_m) >= 2 * n + 1);
@@ -54,16 +54,21 @@ impl<R> FFTTableBluestein<R>
     /// and compute the convolution efficiently using a power-of-two FFT (e.g. with the Cooley-Tuckey 
     /// algorithm).
     /// 
-    pub fn fft_base<V, W, S>(&self, mut values: V, ring: S, mut buffer: W)
-        where V: VectorViewMut<El<S>>, W: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>, R: DivisibilityRingStore
+    pub fn fft_base<V, W, S, const INV: bool>(&self, mut values: V, ring: S, mut buffer: W)
+        where V: VectorViewMut<El<S>>, W: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
     {
         assert!(values.len() == self.n);
         assert!(buffer.len() == self.m_fft_table.len());
 
         // set buffer to the zero-padded sequence values_i * z^(-i^2/2)
         for i in 0..self.n {
+            let value = if INV {
+                values.at((self.n - i) % self.n)
+            } else {
+                values.at(i)
+            };
             *buffer.at_mut(i) = ring.mul_ref_fst(
-                values.at(i),
+                value,
                 ring.coerce(self.m_fft_table.ring(), self.m_fft_table.ring().pow(&self.inv_root_of_unity, i * i))
             );
         }
@@ -82,6 +87,28 @@ impl<R> FFTTableBluestein<R>
         for i in 0..self.n {
             *values.at_mut(i) = ring.mul_ref_fst(buffer.at(i), ring.coerce(self.m_fft_table.ring(), self.m_fft_table.ring().pow(&self.inv_root_of_unity, i * i)));
         }
+
+        if INV {
+            // finally, scale by 1/n
+            let scale = ring.coerce(&self.m_fft_table.ring(), self.m_fft_table.ring().checked_div(&self.m_fft_table.ring().one(), &self.m_fft_table.ring().from_z(self.n as i32)).unwrap());
+            for i in 0..values.len() {
+                ring.mul_assign_ref(values.at_mut(i), &scale);
+            }
+        }
+    }
+
+    pub fn fft<V>(&self, values: V) 
+        where V: VectorViewMut<El<R>>
+    {
+        let buffer = (0..self.m_fft_table.len()).map(|_| self.m_fft_table.ring().zero()).collect::<Vec<_>>();
+        self.fft_base::<_, _, _, false>(values, self.m_fft_table.ring(), buffer);
+    }
+
+    pub fn inv_fft<V>(&self, values: V) 
+        where V: VectorViewMut<El<R>>
+    {
+        let buffer = (0..self.m_fft_table.len()).map(|_| self.m_fft_table.ring().zero()).collect::<Vec<_>>();
+        self.fft_base::<_, _, _, true>(values, self.m_fft_table.ring(), buffer);
     }
 }
 
@@ -95,7 +122,20 @@ fn test_fft_base() {
     let fft = FFTTableBluestein::new(ring, ring.from_z(36), ring.from_z(111), 5, 4);
     let mut values = [1, 3, 2, 0, 7];
     let mut buffer = [0; 16];
-    fft.fft_base(&mut values, ring, &mut buffer);
+    fft.fft_base::<_, _, _, false>(&mut values, ring, &mut buffer);
     let expected = [13, 137, 202, 206, 170];
     assert_eq!(expected, values);
+}
+
+#[test]
+fn test_inv_fft_base() {
+    let ring = Zn::<241>::RING;
+    // a 5-th root of unity is 91 
+    let fft = FFTTableBluestein::new(ring, ring.from_z(36), ring.from_z(111), 5, 4);
+    let values = [1, 3, 2, 0, 7];
+    let mut work = values;
+    let mut buffer = [0; 16];
+    fft.fft_base::<_, _, _, false>(&mut work, ring, &mut buffer);
+    fft.fft_base::<_, _, _, true>(&mut work, ring, &mut buffer);
+    assert_eq!(values, work);
 }
