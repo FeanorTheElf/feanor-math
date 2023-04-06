@@ -38,7 +38,7 @@ impl<R> FFTTableCooleyTuckey<R>
         let mut n = ZZ.one();
         ZZ.mul_pow_2(&mut n, log2_n);
         let order = ZZ.sub_ref_fst(ring.modulus(), ZZ.one());
-        let power = ZZ.checked_div(&order, &n).unwrap();
+        let power = ZZ.checked_div(&order, &n).expect("ring must have a n-th root of unity");
         
         let pow_n_half = |mut x: El<R>| {
             for _ in 1..log2_n {
