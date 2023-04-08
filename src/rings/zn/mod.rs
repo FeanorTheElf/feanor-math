@@ -56,9 +56,9 @@ use crate::primitive_int::*;
 
 #[cfg(test)]
 pub fn test_zn_ring_axioms<R: ZnRingStore>(R: R) 
+    // necessary to prevent typechecking overflow
     where <<R as RingStore>::Type as ZnRing>::IntegerRingBase: CanonicalIso<<<R as RingStore>::Type as ZnRing>::IntegerRingBase>
 {
-
     let ZZ = R.integer_ring();
     let n = R.modulus();
 

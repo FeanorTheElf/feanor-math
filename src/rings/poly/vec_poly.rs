@@ -9,6 +9,17 @@ pub struct VecPolyRingBase<R: RingStore> {
     zero: El<R>
 }
 
+impl<R: RingStore + Clone> Clone for VecPolyRingBase<R> {
+    
+    fn clone(&self) -> Self {
+        VecPolyRingBase {
+            base_ring: self.base_ring.clone(), 
+            unknown_name: self.unknown_name, 
+            zero: self.zero.clone() 
+        }
+    }
+}
+
 #[allow(type_alias_bounds)]
 pub type VecPolyRing<R: RingStore> = RingValue<VecPolyRingBase<R>>;
 
@@ -119,6 +130,8 @@ impl<R: RingStore> RingBase for VecPolyRingBase<R> {
         if let Some((c, i)) = terms.next() {
             self.base_ring.get_ring().dbg(c, out)?;
             print_unknown(i, out)?;
+        } else {
+            write!(out, "0")?;
         }
         while let Some((c, i)) = terms.next() {
             write!(out, " + ")?;
@@ -134,8 +147,8 @@ impl<R: RingStore> RingBase for VecPolyRingBase<R> {
 
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         let mut result = Vec::new();
-        let lhs_len = self.degree(lhs).unwrap_or(0) + 1;
-        let rhs_len = self.degree(rhs).unwrap_or(0) + 1;
+        let lhs_len = self.degree(lhs).map(|i| i + 1).unwrap_or(0);
+        let rhs_len = self.degree(rhs).map(|i| i + 1).unwrap_or(0);
         self.grow(&mut result, lhs_len + rhs_len);
         algorithms::conv_mul::add_assign_convoluted_mul(
             &mut result[..], 
@@ -268,10 +281,27 @@ impl<R> PolyRing for VecPolyRingBase<R>
 }
 
 #[cfg(test)]
+use crate::rings::zn::*;
+#[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
 
-// #[test]
-// fn test_poly_ring_ring_axioms() {
-//     let poly_ring = VecPolyRing::new(Zn::<7>::RING, "X");
-//     test_ring_axioms(poly_ring, unimplemented!())
-// }
+#[test]
+fn test_ring_axioms_vec_poly_ring() {
+    let poly_ring = VecPolyRing::new(Zn::<7>::RING, "X");
+    test_ring_axioms(poly_ring.clone(), vec![ 
+        poly_ring.from_terms([].into_iter()),
+        poly_ring.from_terms([(1, 0)].into_iter()),
+        poly_ring.from_terms([(1, 1)].into_iter()),
+        poly_ring.from_terms([(1, 0), (1, 1)].into_iter()),
+        poly_ring.from_terms([(6, 0)].into_iter()),
+        poly_ring.from_terms([(6, 1)].into_iter()),
+        poly_ring.from_terms([(6, 0), (1, 1)].into_iter()),
+        poly_ring.from_terms([(1, 0), (6, 1)].into_iter())
+    ].into_iter());
+}
+
+#[test]
+fn test_poly_ring_axioms_vec_poly_ring() {
+    let poly_ring = VecPolyRing::new(Zn::<7>::RING, "X");
+    test_poly_ring_axioms(poly_ring, Zn::<7>::RING.elements());
+}

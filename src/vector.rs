@@ -5,6 +5,7 @@ use std::ops::{RangeBounds, Index, IndexMut};
 /// array of objects.
 /// 
 /// # Related traits
+/// 
 /// If the entries are not owned by the object, but e.g. produced on the fly,
 /// or just "associated" in a more general sense, the trait [crate::vector::VectorFn]
 /// can be used.
@@ -21,6 +22,7 @@ pub trait VectorView<T> {
 /// array of objects.
 /// 
 /// # Related traits
+/// 
 /// If only immutable access is provided, use [crate::vector::VectorViewMut].
 /// 
 pub trait VectorViewMut<T>: VectorView<T> {
@@ -38,10 +40,12 @@ pub trait SwappableVectorViewMut<T>: VectorViewMut<T> {
 /// and can produce objects at each entry.
 /// 
 /// # Related traits
+/// 
 /// If the entries are owned by the object, consider using the trait [crate::vector::VectorView].
 /// Instead of returning entries by value, it returns entries by reference.
 /// 
 /// # Blanket implementations
+/// 
 /// There are many kinds of blanket implementations thinkable, e.g.
 /// ```ignore
 /// impl<T: Clone, V> VectorFn<T> for VectorView<T> { ... }
