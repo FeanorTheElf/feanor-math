@@ -268,6 +268,58 @@ impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRing> CanonicalHom<K> f
     }
 }
 
+impl<I: IntegerRingStore, J: IntegerRingStore> DivisibilityRing for ZnBase<I, J> {
+    
+    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        unimplemented!()
+    }
+}
+
+impl<I: IntegerRingStore, J: IntegerRingStore> ZnRing for ZnBase<I, J> 
+    where ZnBase<I, J>: CanonicalHom<J::Type>
+{
+    type IntegerRingBase = J::Type;
+    type Integers = J;
+    type IteratorState = Vec<<FpBase<I> as ZnRing>::IteratorState>;
+
+    fn integer_ring(&self) -> &Self::Integers {
+        self.total_ring.integer_ring()
+    }
+
+    fn modulus(&self) -> &El<Self::Integers> {
+        self.total_ring.modulus()
+    }
+
+    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
+        self.total_ring.smallest_positive_lift(
+            <Self as CanonicalIso<zn_dyn::ZnBase<J>>>::map_out(
+                self, 
+                self.total_ring.get_ring(), 
+                el, 
+                &<Self as CanonicalIso<zn_dyn::ZnBase<J>>>::has_canonical_iso(self, self.total_ring.get_ring()).unwrap()
+            )
+        )
+    }
+
+    fn elements<'a>(&'a self) -> ZnElementsIterator<'a, Self> {
+        unimplemented!()
+    }
+
+    fn elements_iterator_next<'a>(iter: &mut ZnElementsIterator<'a, Self>) -> Option<Self::Element> {
+        unimplemented!()
+    }
+
+    fn is_field(&self) -> bool {
+        self.components.len() == 1
+    }
+
+    fn random_element<G: FnMut() -> u64>(&self, mut rng: G) -> ZnEl<I> {
+        ZnEl::<I>(self.components.iter()
+            .map(|r| r.random_element(rng))
+            .collect::<Vec<_>>())
+    }
+}
+
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 

@@ -2,52 +2,6 @@ use crate::ring::*;
 
 pub mod vec_poly;
 
-pub struct PolyRingCoefficientIterator<'a, R: ?Sized + PolyRing> {
-    ring: &'a R,
-    element: &'a R::Element,
-    state: R::IteratorState
-}
-
-impl<'a, R: ?Sized + PolyRing> Clone for PolyRingCoefficientIterator<'a, R>
-    where R::IteratorState: Clone
-{
-    fn clone(&self) -> Self {
-        Self::new(self.ring, self.element, self.state.clone())
-    }
-}
-
-impl<'a, R: ?Sized + PolyRing> Copy for PolyRingCoefficientIterator<'a, R>
-    where R::IteratorState: Copy
-{}
-
-impl<'a, R: ?Sized + PolyRing> PolyRingCoefficientIterator<'a, R> {
-
-    pub fn new(ring: &'a R, element: &'a R::Element, state: R::IteratorState) -> Self {
-        PolyRingCoefficientIterator { ring: ring, element: element, state: state }
-    }
-
-    pub fn ring(&self) -> &R {
-        self.ring
-    }
-
-    pub fn element(&self) -> &R::Element {
-        self.element
-    }
-
-    pub fn state(&mut self) -> &mut R::IteratorState {
-        &mut self.state
-    }
-}
-
-impl<'a, R: ?Sized + PolyRing> Iterator for PolyRingCoefficientIterator<'a, R> {
-
-    type Item = (&'a El<R::BaseRing>, usize);
-
-    fn next(&mut self) -> Option<(&'a El<R::BaseRing>, usize)> {
-        R::coefficient_iterator_next(self)
-    }
-}
-
 ///
 /// Trait for all rings that represent the polynomial ring `R[X]` with
 /// any base ring R.
@@ -104,6 +58,52 @@ pub trait PolyRingStore: RingStore<Type: PolyRing> {
 }
 
 impl<R: RingStore<Type: PolyRing>> PolyRingStore for R {}
+
+pub struct PolyRingCoefficientIterator<'a, R: ?Sized + PolyRing> {
+    ring: &'a R,
+    element: &'a R::Element,
+    state: R::IteratorState
+}
+
+impl<'a, R: ?Sized + PolyRing> Clone for PolyRingCoefficientIterator<'a, R>
+    where R::IteratorState: Clone
+{
+    fn clone(&self) -> Self {
+        Self::new(self.ring, self.element, self.state.clone())
+    }
+}
+
+impl<'a, R: ?Sized + PolyRing> Copy for PolyRingCoefficientIterator<'a, R>
+    where R::IteratorState: Copy
+{}
+
+impl<'a, R: ?Sized + PolyRing> PolyRingCoefficientIterator<'a, R> {
+
+    pub fn new(ring: &'a R, element: &'a R::Element, state: R::IteratorState) -> Self {
+        PolyRingCoefficientIterator { ring: ring, element: element, state: state }
+    }
+
+    pub fn ring(&self) -> &R {
+        self.ring
+    }
+
+    pub fn element(&self) -> &R::Element {
+        self.element
+    }
+
+    pub fn state(&mut self) -> &mut R::IteratorState {
+        &mut self.state
+    }
+}
+
+impl<'a, R: ?Sized + PolyRing> Iterator for PolyRingCoefficientIterator<'a, R> {
+
+    type Item = (&'a El<R::BaseRing>, usize);
+
+    fn next(&mut self) -> Option<(&'a El<R::BaseRing>, usize)> {
+        R::coefficient_iterator_next(self)
+    }
+}
 
 #[cfg(test)]
 pub fn test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R::Type as RingExtension>::BaseRing>>>(ring: R, interesting_base_ring_elements: I) {

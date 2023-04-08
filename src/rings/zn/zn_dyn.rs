@@ -258,6 +258,7 @@ impl<I: IntegerRingStore> ZnRing for ZnBase<I> {
     
     type IntegerRingBase = I::Type;
     type Integers = I;
+    type IteratorState = El<I>;
 
     fn integer_ring(&self) -> &Self::Integers {
         &self.integer_ring
@@ -269,6 +270,21 @@ impl<I: IntegerRingStore> ZnRing for ZnBase<I> {
 
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
         el.0
+    }
+
+    fn elements<'a>(&'a self) -> ZnElementsIterator<'a, Self> {
+        ZnElementsIterator::new(self, self.integer_ring.zero())
+    }
+
+    fn elements_iterator_next<'a>(iter: &mut ZnElementsIterator<'a, Self>) -> Option<Self::Element> {
+        if iter.ring.integer_ring.is_lt(&iter.state, &iter.ring.modulus) {
+            let result = iter.state.clone();
+            iter.ring.integer_ring().add_assign(&mut iter.state, iter.ring.integer_ring().one());
+            let integer_ring = iter.ring.integer_ring().get_ring();
+            return Some(iter.ring.map_in(integer_ring, result, &iter.ring.has_canonical_hom(integer_ring).unwrap()));
+        } else {
+            return None;
+        }
     }
 }
 
@@ -432,6 +448,7 @@ impl<I: IntegerRingStore> ZnRing for FpBase<I> {
     
     type IntegerRingBase = I::Type;
     type Integers = I;
+    type IteratorState = El<I>;
 
     fn integer_ring(&self) -> &Self::Integers {
         self.get_base().integer_ring()
@@ -443,6 +460,21 @@ impl<I: IntegerRingStore> ZnRing for FpBase<I> {
 
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
         self.get_base().smallest_positive_lift(el.0)
+    }
+
+    fn elements<'a>(&'a self) -> ZnElementsIterator<'a, Self> {
+        ZnElementsIterator::new(self, self.get_base().integer_ring().zero())
+    }
+
+    fn elements_iterator_next<'a>(iter: &mut ZnElementsIterator<'a, Self>) -> Option<Self::Element> {
+        if iter.ring.get_base().integer_ring().is_lt(&iter.state, iter.ring.get_base().modulus()) {
+            let result = iter.state.clone();
+            iter.ring.integer_ring().add_assign(&mut iter.state, iter.ring.integer_ring().one());
+            let integer_ring = iter.ring.get_base().integer_ring().get_ring();
+            return Some(iter.ring.map_in(integer_ring, result, &iter.ring.has_canonical_hom(integer_ring).unwrap()));
+        } else {
+            return None;
+        }
     }
 }
 

@@ -5,7 +5,7 @@ use crate::{divisibility::*, Exists, Expr};
 use crate::primitive_int::{StaticRing, StaticRingBase};
 use crate::ring::*;
 
-use super::ZnRing;
+use super::{ZnRing, ZnElementsIterator};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ZnBase<const N: u64, const IS_FIELD: bool>;
@@ -134,6 +134,7 @@ impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD>
 {
     type IntegerRingBase = StaticRingBase<i64>;
     type Integers = RingValue<StaticRingBase<i64>>;
+    type IteratorState = u64;
 
     fn integer_ring(&self) -> &Self::Integers {
         &StaticRing::<i64>::RING
@@ -145,6 +146,19 @@ impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD>
 
     fn modulus(&self) -> &El<Self::Integers> {
         &(N as i64)
+    }
+    
+    fn elements<'a>(&'a self) -> ZnElementsIterator<'a, Self> {
+        ZnElementsIterator::new(self, 0)
+    }
+
+    fn elements_iterator_next<'a>(iter: &mut ZnElementsIterator<'a, Self>) -> Option<Self::Element> {
+        if iter.state < N {
+            iter.state += 1;
+            return Some(iter.state - 1);
+        } else {
+            return None;
+        }
     }
 }
 
