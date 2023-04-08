@@ -188,31 +188,56 @@ impl<R: RingStore> RingExtension for VecPolyRingBase<R> {
     }
 }
 
+pub struct TermIterator<'a, R>
+    where R: RingStore
+{
+    iter: std::iter::Enumerate<std::slice::Iter<'a, El<R>>>,
+    ring: &'a R
+}
+
+impl<'a, R> Clone for TermIterator<'a, R>
+    where R: RingStore
+{
+    fn clone(&self) -> Self {
+        TermIterator {
+            iter: self.iter.clone(),
+            ring: self.ring
+        }
+    }
+}
+
+impl<'a, R> Iterator for TermIterator<'a, R>
+    where R: RingStore
+{
+    type Item = (&'a El<R>, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some((i, c)) = self.iter.next() {
+            if !self.ring.is_zero(c) {
+                return Some((c, i));
+            }
+        }
+        return None;
+    }
+}
+
 impl<R> PolyRing for VecPolyRingBase<R> 
     where R: RingStore, R::Type: CanonicalIso<R::Type>
 {
-    type IteratorState = usize;
+    type TermsIterator<'a> = TermIterator<'a, R>
+        where Self: 'a;
 
     fn indeterminate(&self) -> Self::Element {
         vec![ self.base_ring().zero(), self.base_ring().one() ]
     }
 
-    fn terms<'a>(&'a self, f: &'a Self::Element) -> PolyRingCoefficientIterator<'a, Self> {
-        PolyRingCoefficientIterator::new(self, f, 0)
+    fn terms<'a>(&'a self, f: &'a Self::Element) -> TermIterator<'a, R> {
+        TermIterator {
+            iter: f.iter().enumerate(), 
+            ring: self.base_ring()
+        }
     }
 
-    fn coefficient_iterator_next<'a>(iter: &mut PolyRingCoefficientIterator<'a, Self>) -> Option<(&'a El<Self::BaseRing>, usize)> {
-        while iter.ring.base_ring().is_zero(&iter.element[iter.state]) && iter.state < iter.element.len() {
-            iter.state += 1;
-        }
-        if iter.state == iter.element.len() {
-            return None;
-        } else {
-            iter.state += 1;
-            return Some((&iter.element[iter.state - 1], iter.state - 1));
-        }
-    }
-    
     fn from_terms<I>(&self, iter: I) -> Self::Element
         where I: Iterator<Item = (El<Self::BaseRing>, usize)>
     {

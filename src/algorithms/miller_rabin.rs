@@ -25,7 +25,6 @@ use oorandom;
 /// PRNG would be random, then the probability of a wrong output is at 
 /// most 4^(-k).
 /// 
-#[allow(non_snake_case)]
 pub fn is_prime<I>(ring: I, n: &El<I>, k: usize) -> bool 
     where I: IntegerRingStore + HashableElRingStore
 {

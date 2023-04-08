@@ -2,7 +2,7 @@ use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
 use crate::ordered::OrderedRingStore;
 use crate::rings::zn::*;
 
-use super::zn_dyn::{Fp, FpEl, FpBase};
+use super::zn_dyn::{Fp, FpEl, FpBase, FpBaseElementsIter};
 
 #[derive(Clone)]
 pub struct ZnBase<I: IntegerRingStore, J: IntegerRingStore> {
@@ -22,7 +22,6 @@ impl<I: IntegerRingStore + Clone, J: IntegerRingStore> Zn<I, J> {
 
 impl<I: IntegerRingStore + Clone, J: IntegerRingStore> ZnBase<I, J> {
 
-    #[allow(non_snake_case)]
     pub fn new(ring: I, large_ring: J, primes: Vec<El<I>>) -> Self {
         assert!(primes.len() > 0);
         for i in 1..primes.len() {
@@ -271,7 +270,47 @@ impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRing> CanonicalHom<K> f
 impl<I: IntegerRingStore, J: IntegerRingStore> DivisibilityRing for ZnBase<I, J> {
     
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        unimplemented!()
+        Some(ZnEl(self.components.iter()
+            .zip(lhs.0.iter())
+            .zip(rhs.0.iter())
+            .map(|((r, x), y)| (r, x, y))
+            .map(|(r, x, y)| r.checked_left_div(x, y).ok_or(()))
+            .collect::<Result<Vec<FpEl<I>>, ()>>().ok()?))
+    }
+}
+
+pub struct ZnBaseElementsIterator<'a, I, J>
+    where I: IntegerRingStore, J: IntegerRingStore
+{
+    ring: &'a ZnBase<I, J>,
+    part_iters: Option<Vec<std::iter::Peekable<FpBaseElementsIter<'a, I>>>>
+}
+
+impl<'a, I, J> Iterator for ZnBaseElementsIterator<'a, I, J>
+    where I: IntegerRingStore, J: IntegerRingStore
+{
+    type Item = ZnEl<I>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(part_iters) = &mut self.part_iters {
+            while part_iters.len() < self.ring.components.len() {
+                part_iters.push(self.ring.components[part_iters.len()].elements().peekable());
+            }
+            let result = part_iters.iter_mut().map(|it| it.peek().unwrap().clone()).collect::<Vec<_>>();
+            part_iters.last_mut().unwrap().next();
+            while part_iters.last_mut().unwrap().peek().is_none() {
+                part_iters.pop();
+                if part_iters.len() > 0 {
+                    part_iters.last_mut().unwrap().next();
+                } else {
+                    self.part_iters = None;
+                    return Some(ZnEl(result));
+                }
+            }
+            return Some(ZnEl(result));
+        } else {
+            return None;
+        }
     }
 }
 
@@ -279,7 +318,8 @@ impl<I: IntegerRingStore, J: IntegerRingStore> ZnRing for ZnBase<I, J> {
     
     type IntegerRingBase = J::Type;
     type Integers = J;
-    type IteratorState = Vec<<FpBase<I> as ZnRing>::IteratorState>;
+    type ElementsIter<'a> = ZnBaseElementsIterator<'a, I, J>
+        where Self: 'a;
 
     fn integer_ring(&self) -> &Self::Integers {
         self.total_ring.integer_ring()
@@ -300,12 +340,11 @@ impl<I: IntegerRingStore, J: IntegerRingStore> ZnRing for ZnBase<I, J> {
         )
     }
 
-    fn elements<'a>(&'a self) -> ZnElementsIterator<'a, Self> {
-        unimplemented!()
-    }
-
-    fn elements_iterator_next<'a>(iter: &mut ZnElementsIterator<'a, Self>) -> Option<Self::Element> {
-        unimplemented!()
+    fn elements<'a>(&'a self) -> ZnBaseElementsIterator<'a, I, J> {
+        ZnBaseElementsIterator {
+            ring: self,
+            part_iters: Some(Vec::new())
+        }
     }
 
     fn is_field(&self) -> bool {
@@ -323,7 +362,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> ZnRing for ZnBase<I, J> {
 use crate::primitive_int::StaticRing;
 
 #[test]
-fn test_zn_ring_axioms() {
+fn test_ring_axioms_znbase() {
     let ring = Zn::new(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]);
     test_ring_axioms(&ring, [0, 1, 7, 9, 62, 8, 10, 11, 12].iter().cloned().map(|x| ring.from_z(x)))
 }
@@ -336,4 +375,9 @@ fn test_map_in_map_out() {
         let value = ring2.from_z(x);
         assert!(ring2.eq(&value, &ring1.cast(&ring2, ring1.coerce(&ring2, value.clone()))));
     }
+}
+
+#[test]
+fn test_zn_ring_axioms_znbase() {
+    test_zn_ring_axioms(Zn::new(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]));
 }

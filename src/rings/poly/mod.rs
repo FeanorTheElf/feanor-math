@@ -8,19 +8,12 @@ pub mod vec_poly;
 /// 
 pub trait PolyRing: RingExtension + CanonicalIso<Self> {
 
-    type IteratorState;
+    type TermsIterator<'a>: Iterator<Item = (&'a El<Self::BaseRing>, usize)>
+        where Self: 'a;
 
     fn indeterminate(&self) -> Self::Element;
 
-    fn terms<'a>(&'a self, f: &'a Self::Element) -> PolyRingCoefficientIterator<'a, Self>;
-
-    ///
-    /// This is a workaround that enables us to "return" an iterator depending
-    /// on the lifetimes of self; You should never have to call these functions.
-    /// The drawback of this method is that the iterator state cannot depend on the
-    /// element or self.
-    /// 
-    fn coefficient_iterator_next<'a>(iter: &mut PolyRingCoefficientIterator<'a, Self>) -> Option<(&'a El<Self::BaseRing>, usize)>;
+    fn terms<'a>(&'a self, f: &'a Self::Element) -> Self::TermsIterator<'a>;
     
     fn from_terms<I>(&self, iter: I) -> Self::Element
         where I: Iterator<Item = (El<Self::BaseRing>, usize)>
@@ -46,7 +39,7 @@ pub trait PolyRingStore: RingStore<Type: PolyRing> {
         self.get_ring().coefficient_at(f, i)
     }
 
-    fn terms<'a>(&'a self, f: &'a El<Self>) -> PolyRingCoefficientIterator<'a, Self::Type> {
+    fn terms<'a>(&'a self, f: &'a El<Self>) -> <Self::Type as PolyRing>::TermsIterator<'a> {
         self.get_ring().terms(f)
     }
 
@@ -58,52 +51,6 @@ pub trait PolyRingStore: RingStore<Type: PolyRing> {
 }
 
 impl<R: RingStore<Type: PolyRing>> PolyRingStore for R {}
-
-pub struct PolyRingCoefficientIterator<'a, R: ?Sized + PolyRing> {
-    ring: &'a R,
-    element: &'a R::Element,
-    state: R::IteratorState
-}
-
-impl<'a, R: ?Sized + PolyRing> Clone for PolyRingCoefficientIterator<'a, R>
-    where R::IteratorState: Clone
-{
-    fn clone(&self) -> Self {
-        Self::new(self.ring, self.element, self.state.clone())
-    }
-}
-
-impl<'a, R: ?Sized + PolyRing> Copy for PolyRingCoefficientIterator<'a, R>
-    where R::IteratorState: Copy
-{}
-
-impl<'a, R: ?Sized + PolyRing> PolyRingCoefficientIterator<'a, R> {
-
-    pub fn new(ring: &'a R, element: &'a R::Element, state: R::IteratorState) -> Self {
-        PolyRingCoefficientIterator { ring: ring, element: element, state: state }
-    }
-
-    pub fn ring(&self) -> &R {
-        self.ring
-    }
-
-    pub fn element(&self) -> &R::Element {
-        self.element
-    }
-
-    pub fn state(&mut self) -> &mut R::IteratorState {
-        &mut self.state
-    }
-}
-
-impl<'a, R: ?Sized + PolyRing> Iterator for PolyRingCoefficientIterator<'a, R> {
-
-    type Item = (&'a El<R::BaseRing>, usize);
-
-    fn next(&mut self) -> Option<(&'a El<R::BaseRing>, usize)> {
-        R::coefficient_iterator_next(self)
-    }
-}
 
 #[cfg(test)]
 pub fn test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R::Type as RingExtension>::BaseRing>>>(ring: R, interesting_base_ring_elements: I) {

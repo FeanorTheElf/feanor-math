@@ -254,11 +254,35 @@ impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanonicalHom<J> for ZnBase<I>
     }
 }
 
+pub struct ZnBaseElementsIter<'a, I>
+    where I: IntegerRingStore
+{
+    ring: &'a ZnBase<I>,
+    current: El<I>
+}
+
+impl<'a, I> Iterator for ZnBaseElementsIter<'a, I>
+    where I: IntegerRingStore
+{
+    type Item = ZnEl<I>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.ring.integer_ring().is_lt(&self.current, self.ring.modulus()) {
+            let result = self.current.clone();
+            self.ring.integer_ring().add_assign(&mut self.current, self.ring.integer_ring().one());
+            return Some(ZnEl(result));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl<I: IntegerRingStore> ZnRing for ZnBase<I> {
     
     type IntegerRingBase = I::Type;
     type Integers = I;
-    type IteratorState = El<I>;
+    type ElementsIter<'a> = ZnBaseElementsIter<'a, I>
+        where Self: 'a;
 
     fn integer_ring(&self) -> &Self::Integers {
         &self.integer_ring
@@ -272,20 +296,13 @@ impl<I: IntegerRingStore> ZnRing for ZnBase<I> {
         el.0
     }
 
-    fn elements<'a>(&'a self) -> ZnElementsIterator<'a, Self> {
-        ZnElementsIterator::new(self, self.integer_ring.zero())
-    }
-
-    fn elements_iterator_next<'a>(iter: &mut ZnElementsIterator<'a, Self>) -> Option<Self::Element> {
-        if iter.ring.integer_ring.is_lt(&iter.state, &iter.ring.modulus) {
-            let result = iter.state.clone();
-            iter.ring.integer_ring().add_assign(&mut iter.state, iter.ring.integer_ring().one());
-            let integer_ring = iter.ring.integer_ring().get_ring();
-            return Some(iter.ring.map_in(integer_ring, result, &iter.ring.has_canonical_hom(integer_ring).unwrap()));
-        } else {
-            return None;
+    fn elements<'a>(&'a self) -> ZnBaseElementsIter<'a, I> {
+        ZnBaseElementsIter {
+            ring: self,
+            current: self.integer_ring().zero()
         }
     }
+
 }
 
 #[derive(Clone)]
@@ -444,11 +461,28 @@ impl<I: IntegerRingStore> EuclideanRing for FpBase<I> {
 
 impl<I: IntegerRingStore> Field for FpBase<I> {}
 
+pub struct FpBaseElementsIter<'a, I>
+    where I: IntegerRingStore
+{
+    iter: ZnBaseElementsIter<'a, I>
+}
+
+impl<'a, I> Iterator for FpBaseElementsIter<'a, I>
+    where I: IntegerRingStore
+{
+    type Item = FpEl<I>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(FpEl)
+    }
+}
+
 impl<I: IntegerRingStore> ZnRing for FpBase<I> {
     
     type IntegerRingBase = I::Type;
     type Integers = I;
-    type IteratorState = El<I>;
+    type ElementsIter<'a> = FpBaseElementsIter<'a, I>
+        where Self: 'a;
 
     fn integer_ring(&self) -> &Self::Integers {
         self.get_base().integer_ring()
@@ -462,18 +496,9 @@ impl<I: IntegerRingStore> ZnRing for FpBase<I> {
         self.get_base().smallest_positive_lift(el.0)
     }
 
-    fn elements<'a>(&'a self) -> ZnElementsIterator<'a, Self> {
-        ZnElementsIterator::new(self, self.get_base().integer_ring().zero())
-    }
-
-    fn elements_iterator_next<'a>(iter: &mut ZnElementsIterator<'a, Self>) -> Option<Self::Element> {
-        if iter.ring.get_base().integer_ring().is_lt(&iter.state, iter.ring.get_base().modulus()) {
-            let result = iter.state.clone();
-            iter.ring.integer_ring().add_assign(&mut iter.state, iter.ring.integer_ring().one());
-            let integer_ring = iter.ring.get_base().integer_ring().get_ring();
-            return Some(iter.ring.map_in(integer_ring, result, &iter.ring.has_canonical_hom(integer_ring).unwrap()));
-        } else {
-            return None;
+    fn elements<'a>(&'a self) -> FpBaseElementsIter<'a, I> {
+        FpBaseElementsIter {
+            iter: self.get_base().elements()
         }
     }
 }
@@ -492,7 +517,13 @@ fn test_mul() {
 }
 
 #[test]
-fn test_zn_ring_axioms() {
+fn test_ring_axioms_znbase() {
     let ring = Zn::new(StaticRing::<i64>::RING, 63);
     test_ring_axioms(&ring, [0, 1, 3, 7, 9, 62, 8, 10, 11, 12].iter().cloned().map(|x| ring.from_z(x)))
+}
+
+#[test]
+fn test_zn_ring_axioms_znbase() {
+    test_zn_ring_axioms(Zn::new(StaticRing::<i64>::RING, 17));
+    test_zn_ring_axioms(Zn::new(StaticRing::<i64>::RING, 63));
 }

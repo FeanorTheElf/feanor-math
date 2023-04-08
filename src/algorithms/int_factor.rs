@@ -18,7 +18,6 @@ fn is_prime_power<I: IntegerRingStore>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize
     unimplemented!()
 }
 
-#[allow(non_snake_case)]
 pub fn factor<I: IntegerRingStore>(ZZ: I, n: &El<I>) -> Vec<(El<I>, usize)> {
     let mut result = Vec::new();
     let mut current = n.clone();

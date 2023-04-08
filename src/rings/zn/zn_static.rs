@@ -4,8 +4,7 @@ use crate::field::Field;
 use crate::{divisibility::*, Exists, Expr};
 use crate::primitive_int::{StaticRing, StaticRingBase};
 use crate::ring::*;
-
-use super::{ZnRing, ZnElementsIterator};
+use crate::rings::zn::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ZnBase<const N: u64, const IS_FIELD: bool>;
@@ -128,13 +127,31 @@ impl<const N: u64> EuclideanRing for ZnBase<N, true>
         }
     }
 }
+pub struct ZnBaseElementsIter<const N: u64> {
+    current: u64
+}
+
+impl<const N: u64> Iterator for ZnBaseElementsIter<N> {
+
+    type Item = u64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current < N {
+            self.current += 1;
+            return Some(self.current - 1);
+        } else {
+            return None;
+        }
+    }
+}
+
 
 impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD> 
     where Expr<{N as i64 as usize}>: Exists
 {
     type IntegerRingBase = StaticRingBase<i64>;
     type Integers = RingValue<StaticRingBase<i64>>;
-    type IteratorState = u64;
+    type ElementsIter<'a> = ZnBaseElementsIter<N>;
 
     fn integer_ring(&self) -> &Self::Integers {
         &StaticRing::<i64>::RING
@@ -148,17 +165,8 @@ impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD>
         &(N as i64)
     }
     
-    fn elements<'a>(&'a self) -> ZnElementsIterator<'a, Self> {
-        ZnElementsIterator::new(self, 0)
-    }
-
-    fn elements_iterator_next<'a>(iter: &mut ZnElementsIterator<'a, Self>) -> Option<Self::Element> {
-        if iter.state < N {
-            iter.state += 1;
-            return Some(iter.state - 1);
-        } else {
-            return None;
-        }
+    fn elements<'a>(&'a self) -> ZnBaseElementsIter<N> {
+        ZnBaseElementsIter { current: 0 }
     }
 }
 
@@ -215,4 +223,10 @@ fn fn_test_div_impossible() {
     let _a = Zn::<22>::RING.from_z(4);
     // the following line should give a compiler error
     // Zn::<22>::RING.div(_a, _a);
+}
+
+#[test]
+fn test_zn_ring_axioms_znbase() {
+    test_zn_ring_axioms(Zn::<17>::RING);
+    test_zn_ring_axioms(Zn::<63>::RING);
 }

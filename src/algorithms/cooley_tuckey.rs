@@ -36,7 +36,6 @@ impl<R> FFTTableCooleyTuckey<R>
         &self.ring
     }
 
-    #[allow(non_snake_case)]
     pub fn for_zn(ring: R, log2_n: usize) -> Self
         where R: ZnRingStore
     {

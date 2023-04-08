@@ -9,7 +9,6 @@ use crate::rings::zn::zn_dyn::Zn;
 #[allow(type_alias_bounds)]
 type Point<I: IntegerRingStore> = (El<Zn<I>>, El<Zn<I>>, El<Zn<I>>);
 
-#[allow(non_snake_case)]
 fn ec_group_action_proj<I>(Zn: &Zn<I>, _A: &El<Zn<I>>, _B: &El<Zn<I>>, P: Point<I>, Q: &Point<I>) -> Point<I> 
     where I: IntegerRingStore
 {
@@ -46,7 +45,6 @@ fn ec_group_action_proj<I>(Zn: &Zn<I>, _A: &El<Zn<I>>, _B: &El<Zn<I>>, P: Point<
     );
 }
 
-#[allow(non_snake_case)]
 fn ec_group_double_proj<I>(Zn: &Zn<I>, A: &El<Zn<I>>, _B: &El<Zn<I>>, P: &Point<I>) -> Point<I>
     where I: IntegerRingStore
 {
@@ -79,7 +77,6 @@ fn ec_group_double_proj<I>(Zn: &Zn<I>, A: &El<Zn<I>>, _B: &El<Zn<I>>, P: &Point<
     );
 }
 
-#[allow(non_snake_case)]
 pub fn ec_mul_abort<I>(base: &Point<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, power: &El<I>, ZZ: &I, Zn: &Zn<I>) -> Point<I>
     where I: IntegerRingStore
 {
@@ -105,7 +102,6 @@ pub fn ec_mul_abort<I>(base: &Point<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, power: &El
     return result;
 }
 
-#[allow(non_snake_case)]
 fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &Point<I>) -> bool
     where I: IntegerRingStore
 {
@@ -124,7 +120,6 @@ fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &Point<I>) -> boo
 ///
 /// Runtime `L_N(1/2, 1) = exp((1 + o(1)) ln(N)^1/2 lnln(N)^1/2)`
 /// 
-#[allow(non_snake_case)]
 pub fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
     where I: IntegerRingStore
 {
@@ -169,7 +164,6 @@ fn test_ec_factor() {
     assert!(actual != 1 && actual != n && n % actual == 0);
 }
 
-#[allow(non_snake_case)]
 #[bench]
 fn bench_ec_factor(bencher: &mut test::Bencher) {
     let ZZ = DefaultBigIntRing::RING;

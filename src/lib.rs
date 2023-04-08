@@ -1,4 +1,5 @@
 #![allow(soft_unstable)]
+#![allow(non_snake_case)]
 #![feature(test)]
 #![feature(specialization)]
 #![feature(generic_const_exprs)]
