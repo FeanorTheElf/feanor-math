@@ -635,6 +635,7 @@ pub trait CanonicalIso<S>: CanonicalHom<S>
 }
 
 pub trait RingExtension: RingBase {
+    
     type BaseRing: RingStore;
 
     fn base_ring<'a>(&'a self) -> &'a Self::BaseRing;

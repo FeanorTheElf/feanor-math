@@ -1,5 +1,7 @@
 use crate::ring::*;
 
+pub mod vec_poly;
+
 pub struct PolyRingCoefficientIterator<'a, R: ?Sized + PolyRing> {
     ring: &'a R,
     element: &'a R::Element,
@@ -66,17 +68,17 @@ pub trait PolyRing: RingExtension + CanonicalIso<Self> {
     /// 
     fn coefficient_iterator_next<'a>(iter: &mut PolyRingCoefficientIterator<'a, Self>) -> Option<(&'a El<Self::BaseRing>, usize)>;
     
-    fn from_terms<'a, I>(&self, iter: I) -> Self::Element
-        where I: Iterator<Item = (&'a El<Self::BaseRing>, usize)>, El<Self::BaseRing>: 'a
+    fn from_terms<I>(&self, iter: I) -> Self::Element
+        where I: Iterator<Item = (El<Self::BaseRing>, usize)>
     {
         let x = self.indeterminate();
         let self_ring = RingRef::new(self);
         self_ring.sum(
-            iter.map(|(c, i)| self.mul(self.from_ref(c), self_ring.pow(&x, i)))
+            iter.map(|(c, i)| self.mul(self.from(c), self_ring.pow(&x, i)))
         )
     }
 
-    fn coefficient_at(&self, f: &Self::Element, i: usize) -> &El<Self::BaseRing>;
+    fn coefficient_at<'a>(&'a self, f: &'a Self::Element, i: usize) -> &'a El<Self::BaseRing>;
 
     fn degree(&self, f: &Self::Element) -> Option<usize>;
 }
@@ -84,16 +86,18 @@ pub trait PolyRing: RingExtension + CanonicalIso<Self> {
 pub trait PolyRingStore: RingStore<Type: PolyRing> {
 
     delegate!{ fn indeterminate(&self) -> El<Self> }
-    delegate!{ fn coefficient_at(&self, f: &El<Self>, i: usize) -> &El<<Self::Type as RingExtension>::BaseRing> }
     delegate!{ fn degree(&self, f: &El<Self>) -> Option<usize> }
+
+    fn coefficient_at<'a>(&'a self, f: &'a El<Self>, i: usize) -> &'a El<<Self::Type as RingExtension>::BaseRing> {
+        self.get_ring().coefficient_at(f, i)
+    }
 
     fn terms<'a>(&'a self, f: &'a El<Self>) -> PolyRingCoefficientIterator<'a, Self::Type> {
         self.get_ring().terms(f)
     }
 
-    fn from_terms<'a, I>(&self, iter: I) -> El<Self>
-        where I: Iterator<Item = (&'a El<<Self::Type as RingExtension>::BaseRing>, usize)>, 
-        El<<Self::Type as RingExtension>::BaseRing>: 'a
+    fn from_terms<I>(&self, iter: I) -> El<Self>
+        where I: Iterator<Item = (El<<Self::Type as RingExtension>::BaseRing>, usize)>,
     {
         self.get_ring().from_terms(iter)
     }
@@ -150,9 +154,9 @@ pub fn test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R::Type as
                     ring.mul_ref_snd(ring.from_ref(b), &x),
                     ring.mul(ring.from_ref(c), ring.pow(&x, 3))
                 ].into_iter());
-                let actual = ring.from_terms([(a, 0), (c, 3), (b, 1)].into_iter());
+                let actual = ring.from_terms([(a.clone(), 0), (c.clone(), 3), (b.clone(), 1)].into_iter());
                 assert!(ring.eq(&f, &actual));
-                assert!(ring.eq(&f, &ring.from_terms(ring.terms(&f))));
+                assert!(ring.eq(&f, &ring.from_terms(ring.terms(&f).map(|(c, i)| (c.clone(), i)))));
             }
         }
     }
