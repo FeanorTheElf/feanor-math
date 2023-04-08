@@ -247,7 +247,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalIso
 }
 
 impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRing> CanonicalHom<K> for ZnBase<I, J> 
-    where K: CanonicalIso<K>
+    where K: CanonicalIso<K> + ?Sized
 {
     type Homomorphism = Vec<<I::Type as CanonicalHom<K>>::Homomorphism>;
 
@@ -275,9 +275,8 @@ impl<I: IntegerRingStore, J: IntegerRingStore> DivisibilityRing for ZnBase<I, J>
     }
 }
 
-impl<I: IntegerRingStore, J: IntegerRingStore> ZnRing for ZnBase<I, J> 
-    where ZnBase<I, J>: CanonicalHom<J::Type>
-{
+impl<I: IntegerRingStore, J: IntegerRingStore> ZnRing for ZnBase<I, J> {
+    
     type IntegerRingBase = J::Type;
     type Integers = J;
     type IteratorState = Vec<<FpBase<I> as ZnRing>::IteratorState>;
@@ -315,7 +314,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> ZnRing for ZnBase<I, J>
 
     fn random_element<G: FnMut() -> u64>(&self, mut rng: G) -> ZnEl<I> {
         ZnEl::<I>(self.components.iter()
-            .map(|r| r.random_element(rng))
+            .map(|r| r.random_element(&mut rng))
             .collect::<Vec<_>>())
     }
 }
