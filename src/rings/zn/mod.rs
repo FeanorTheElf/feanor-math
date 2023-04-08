@@ -18,6 +18,14 @@ pub trait ZnRing: DivisibilityRing + CanonicalHom<Self::IntegerRingBase> {
     fn is_field(&self) -> bool {
         algorithms::miller_rabin::is_prime(self.integer_ring(), self.modulus(), 6)
     }
+
+    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> Self::Element {
+        self.map_in(
+            self.integer_ring().get_ring(), 
+            self.integer_ring().get_uniformly_random(self.modulus(), rng), 
+            &self.has_canonical_hom(self.integer_ring().get_ring()).unwrap()
+        )
+    }
 }
 
 pub trait ZnRingStore: RingStore<Type: ZnRing> {
@@ -28,7 +36,7 @@ pub trait ZnRingStore: RingStore<Type: ZnRing> {
     delegate!{ fn is_field(&self) -> bool }
 
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> El<Self> {
-        self.coerce(self.integer_ring(), self.integer_ring().get_uniformly_random(self.modulus(), rng))
+        self.get_ring().random_element(rng)
     }
 }
 

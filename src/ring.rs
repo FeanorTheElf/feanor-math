@@ -591,6 +591,21 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// assert_eq!(8, r.coerce(&s, s.from_z(8)));
 /// ```
 /// 
+/// # Limitations
+/// 
+/// The rust constraints regarding conflicting impl make it, in some cases,
+/// impossible to implement all the canonical homomorphisms that we would like.
+/// This is true in particular, if the rings are highly generic, and build
+/// on base rings. In this case, it should always be preferred to implement
+/// `CanonicalIso` for rings that are "the same", and on the other hand not
+/// to implement classical homomorphisms, like `ZZ -> R` which exists for any
+/// ring R. In applicable cases, consider also implementing [`RingExtension`].
+/// 
+/// Because of this reason, implementing [`RingExtension`] also does not require
+/// an implementation of `CanonicalHom<Self::BaseRing>`. Hence, if you as a user
+/// miss a certain implementation of `CanonicalHom`, check whether there maybe
+/// is a corresponding implementation of [`RingExtension`], or a member function.
+/// 
 pub trait CanonicalHom<S>: RingBase
     where S: RingBase + ?Sized
 {
@@ -603,7 +618,7 @@ pub trait CanonicalHom<S>: RingBase
 ///
 /// Trait for rings R that have a canonical isomorphism `S -> R`.
 /// 
-/// As for [`CanonicalHom`], it is up to implementors to decide which
+/// Same as for [`CanonicalHom`], it is up to implementors to decide which
 /// isomorphisms are canonical, as long as each diagram that contains
 /// only canonical homomorphisms, canonical isomorphisms and their inverses
 /// commutes.

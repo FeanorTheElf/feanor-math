@@ -3,13 +3,28 @@ use crate::rings::poly::*;
 
 use std::cmp::min;
 
-pub struct VecPolyRing<R: RingStore> {
+pub struct VecPolyRingBase<R: RingStore> {
     base_ring: R,
     unknown_name: &'static str,
     zero: El<R>
 }
 
+#[allow(type_alias_bounds)]
+pub type VecPolyRing<R: RingStore> = RingValue<VecPolyRingBase<R>>;
+
 impl<R: RingStore> VecPolyRing<R> {
+
+    pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
+        Self::from(VecPolyRingBase::new(base_ring, unknown_name))
+    }
+}
+
+impl<R: RingStore> VecPolyRingBase<R> {
+
+    pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
+        let zero = base_ring.zero();
+        VecPolyRingBase { base_ring, unknown_name, zero }
+    }
 
     fn grow(&self, vector: &mut Vec<El<R>>, size: usize) {
         if vector.len() < size {
@@ -18,7 +33,7 @@ impl<R: RingStore> VecPolyRing<R> {
     }
 }
 
-impl<R: RingStore> RingBase for VecPolyRing<R> {
+impl<R: RingStore> RingBase for VecPolyRingBase<R> {
     
     type Element = Vec<El<R>>;
 
@@ -132,7 +147,7 @@ impl<R: RingStore> RingBase for VecPolyRing<R> {
     }
 }
 
-impl<R, P> CanonicalHom<P> for VecPolyRing<R> 
+impl<R, P> CanonicalHom<P> for VecPolyRingBase<R> 
     where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: PolyRing
 {
     type Homomorphism = <R::Type as CanonicalHom<<P::BaseRing as RingStore>::Type>>::Homomorphism;
@@ -146,7 +161,7 @@ impl<R, P> CanonicalHom<P> for VecPolyRing<R>
     }
 }
 
-impl<R, P> CanonicalIso<P> for VecPolyRing<R> 
+impl<R, P> CanonicalIso<P> for VecPolyRingBase<R> 
     where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: PolyRing
 {
     type Isomorphism = <R::Type as CanonicalIso<<P::BaseRing as RingStore>::Type>>::Isomorphism;
@@ -160,7 +175,7 @@ impl<R, P> CanonicalIso<P> for VecPolyRing<R>
     }
 }
 
-impl<R: RingStore> RingExtension for VecPolyRing<R> {
+impl<R: RingStore> RingExtension for VecPolyRingBase<R> {
     
     type BaseRing = R;
 
@@ -173,7 +188,7 @@ impl<R: RingStore> RingExtension for VecPolyRing<R> {
     }
 }
 
-impl<R> PolyRing for VecPolyRing<R> 
+impl<R> PolyRing for VecPolyRingBase<R> 
     where R: RingStore, R::Type: CanonicalIso<R::Type>
 {
     type IteratorState = usize;
@@ -226,3 +241,12 @@ impl<R> PolyRing for VecPolyRing<R>
         return None;
     }
 }
+
+#[cfg(test)]
+use crate::rings::zn::zn_static::Zn;
+
+// #[test]
+// fn test_poly_ring_ring_axioms() {
+//     let poly_ring = VecPolyRing::new(Zn::<7>::RING, "X");
+//     test_ring_axioms(poly_ring, unimplemented!())
+// }
