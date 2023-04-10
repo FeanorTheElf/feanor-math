@@ -49,6 +49,7 @@ pub trait ZnRingStore: RingStore<Type: ZnRing> {
     delegate!{ fn integer_ring(&self) -> &<Self::Type as ZnRing>::Integers }
     delegate!{ fn modulus(&self) -> &El<<Self::Type as ZnRing>::Integers> }
     delegate!{ fn smallest_positive_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::Integers> }
+    delegate!{ fn smallest_lift(&self, el: El<Self>) -> <Self::Type as ZnRing>::Integers }
     delegate!{ fn is_field(&self) -> bool }
 
     fn elements<'a>(&'a self) -> <Self::Type as ZnRing>::ElementsIter<'a> {
