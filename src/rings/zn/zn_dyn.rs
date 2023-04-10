@@ -332,6 +332,20 @@ impl<I: IntegerRingStore> FpBase<I> {
     }
 }
 
+impl<I: IntegerRingStore> Fp<I> {
+
+    pub fn new(integer_ring: I, prime: El<I>) -> Self {
+        Self::from(FpBase::new(integer_ring, prime))
+    }
+}
+
+impl<I: IntegerRingStore> FpBase<I> {
+
+    pub fn new(integer_ring: I, prime: El<I>) -> Self {
+        ZnBase::new(integer_ring, prime).is_field().ok().expect("not a prime")
+    }
+}
+
 impl<I: IntegerRingStore> DelegateRing for FpBase<I> {
 
     type Element = FpEl<I>;

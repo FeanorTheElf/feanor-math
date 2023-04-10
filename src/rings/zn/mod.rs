@@ -64,8 +64,6 @@ pub trait ZnRingStore: RingStore<Type: ZnRing> {
 impl<R: RingStore<Type: ZnRing>> ZnRingStore for R {}
 
 #[cfg(test)]
-use crate::ordered::*;
-#[cfg(test)]
 use crate::primitive_int::*;
 
 #[cfg(test)]
