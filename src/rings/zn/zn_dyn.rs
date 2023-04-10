@@ -553,6 +553,11 @@ fn test_mul() {
 }
 
 #[test]
+fn test_project() {
+    // 17, -34
+}
+
+#[test]
 fn test_ring_axioms_znbase() {
     let ring = Zn::new(StaticRing::<i64>::RING, 63);
     test_ring_axioms(&ring, [0, 1, 3, 7, 9, 62, 8, 10, 11, 12].iter().cloned().map(|x| ring.from_z(x)))
