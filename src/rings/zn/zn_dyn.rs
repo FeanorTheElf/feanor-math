@@ -75,11 +75,13 @@ impl<I: IntegerRingStore> ZnBase<I> {
         } else {
             red_n = self.integer_ring.euclidean_rem(red_n, &self.modulus);
         };
-        if negated {
-            red_n = self.integer_ring.sub_ref_fst(&self.modulus, red_n);
-        }
         debug_assert!(self.integer_ring.is_lt(&red_n, &self.modulus));
-        return ZnEl(red_n);
+        let result = ZnEl(red_n);
+        if negated {
+            return self.negate(result);
+        } else {
+            return result;
+        }
     }
 
     ///
@@ -547,20 +549,24 @@ use crate::rings::bigint::*;
 #[test]
 fn test_mul() {
     const ZZ: RingValue<DefaultBigIntRing> = DefaultBigIntRing::RING;
-    let z257 = ZnBase::new(ZZ, ZZ.from_z(257));
-    let x = z257.project(ZZ.from_z(256));
-    assert!(z257.eq(&z257.one(), &z257.mul_ref(&x, &x)));
+    let Z257 = ZnBase::new(ZZ, ZZ.from_z(257));
+    let x = Z257.project(ZZ.from_z(256));
+    assert!(Z257.eq(&Z257.one(), &Z257.mul_ref(&x, &x)));
 }
 
 #[test]
 fn test_project() {
-    // 17, -34
+    const ZZ: StaticRing<i64> = StaticRing::RING;
+    let Z17 = Zn::new(ZZ, 17);
+    for k in 0..289 {
+        assert!(Z17.eq(&Z17.from_z((289 - k) % 17), &Z17.get_ring().project(-k as i64)));
+    }
 }
 
 #[test]
 fn test_ring_axioms_znbase() {
-    let ring = Zn::new(StaticRing::<i64>::RING, 63);
-    test_ring_axioms(&ring, [0, 1, 3, 7, 9, 62, 8, 10, 11, 12].iter().cloned().map(|x| ring.from_z(x)))
+    let ZZ = Zn::new(StaticRing::<i64>::RING, 63);
+    test_ring_axioms(&ZZ, [0, 1, 3, 7, 9, 62, 8, 10, 11, 12].iter().cloned().map(|x| ZZ.from_z(x)))
 }
 
 #[test]
