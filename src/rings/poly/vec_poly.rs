@@ -141,8 +141,8 @@ impl<R: RingStore> RingBase for VecPolyRingBase<R> {
         return Ok(());
     }
 
-    fn square(&self, value: Self::Element) -> Self::Element {
-        self.mul_ref(&value, &value)
+    fn square(&self, value: &mut Self::Element) {
+        *value = self.mul_ref(&value, &value);
     }
 
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {

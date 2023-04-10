@@ -1,3 +1,5 @@
+use crate::algorithms::cooley_tuckey::FFTTableCooleyTuckey;
+use crate::vector::VectorViewMut;
 use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
 use crate::ordered::OrderedRingStore;
 use crate::rings::zn::*;
@@ -17,6 +19,21 @@ impl<I: IntegerRingStore + Clone, J: IntegerRingStore> Zn<I, J> {
     
     pub fn new(ring: I, large_ring: J, primes: Vec<El<I>>) -> Self {
         Self::from(ZnBase::new(ring, large_ring, primes))
+    }
+}
+
+impl<I: IntegerRingStore, J: IntegerRingStore> ZnBase<I, J> {
+    
+    pub fn prime_component(&self, index: usize) -> &Fp<I> {
+        &self.components[index]
+    }
+
+    pub(super) fn mod_prime_component<'a>(&self, index: usize, el: &'a ZnEl<I>) -> &'a FpEl<I> {
+        &el.0[index]
+    }
+
+    pub fn prime_component_count(&self) -> usize {
+        self.components.len()
     }
 }
 
@@ -202,11 +219,16 @@ impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalHom
     }
 
     fn map_in(&self, from: &zn_dyn::ZnBase<K>, el: zn_dyn::ZnEl<K>, hom: &Self::Homomorphism) -> ZnEl<I> {
+        self.map_in_ref(from, &el, hom)
+    }
+
+    fn map_in_ref(&self, from: &zn_dyn::ZnBase<K>, el: &zn_dyn::ZnEl<K>, hom: &Self::Homomorphism) -> ZnEl<I> {
+        let lift = from.smallest_positive_lift(el.clone());
         ZnEl(
             self.components.iter()
                 .map(|s| s.get_ring())
                 .zip(hom.iter())
-                .map(|(r, hom)| r.map_in(from.integer_ring().get_ring(), from.smallest_positive_lift(el.clone()), hom))
+                .map(|(r, hom)| r.map_in_ref(from.integer_ring().get_ring(), &lift, hom))
                 .collect()
         )
     }
@@ -238,7 +260,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalIso
                 .zip(homs.iter())
                 .map(|(((integers, x), u), hom)| (integers, x, u, hom))
                 .map(|(integers, x, u, hom)| 
-                    self.total_ring.mul(<zn_dyn::ZnBase<J> as CanonicalHom<I::Type>>::map_in(self.total_ring.get_ring(), integers, x, hom), u.clone())
+                    self.total_ring.mul_ref_snd(<zn_dyn::ZnBase<J> as CanonicalHom<I::Type>>::map_in(self.total_ring.get_ring(), integers, x, hom), u)
                 )
         );
         return <zn_dyn::ZnBase<J> as CanonicalIso<zn_dyn::ZnBase<K>>>::map_out(self.total_ring.get_ring(), from, result, final_iso);
@@ -258,10 +280,14 @@ impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRing> CanonicalHom<K> f
     }
 
     fn map_in(&self, from: &K, el: K::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in_ref(from, &el, hom)
+    }
+
+    fn map_in_ref(&self, from: &K, el: &K::Element, hom: &Self::Homomorphism) -> Self::Element {
         ZnEl(
             self.components.iter()
-                .zip(hom)
-                .map(|(r, hom)| r.get_ring().map_in(from, el.clone(), hom))
+                .zip(hom.iter())
+                .map(|(r, hom)| r.get_ring().map_in_ref(from, el, hom))
                 .collect()
         )
     }
@@ -355,6 +381,37 @@ impl<I: IntegerRingStore, J: IntegerRingStore> ZnRing for ZnBase<I, J> {
         ZnEl::<I>(self.components.iter()
             .map(|r| r.random_element(&mut rng))
             .collect::<Vec<_>>())
+    }
+}
+
+pub struct RNSFFTTable<'a, I: IntegerRingStore> {
+    part_tables: Vec<FFTTableCooleyTuckey<&'a Fp<I>>>
+}
+
+impl<'a, I: IntegerRingStore> RNSFFTTable<'a, I> {
+
+    pub fn new<J: IntegerRingStore>(ring: &'a ZnBase<I, J>, log2_n: usize) -> Option<Self> {
+        Some(RNSFFTTable {
+            part_tables: ring.components.iter()
+                .map(|r| FFTTableCooleyTuckey::for_zn(r, log2_n).ok_or(()))
+                .collect::<Result<Vec<_>, ()>>()
+                .ok()?
+        })
+    }
+}
+
+impl<'a, I: IntegerRingStore> RNSFFTTable<'a, I> {
+
+    pub fn bitreverse_fft_inplace<V: VectorViewMut<ZnEl<I>>>(&self, mut values: V) {
+        for i in 0..self.part_tables.len() {
+            self.part_tables[i].bitreverse_fft_inplace((&mut values).map_mut(|x| &x.0[i], |x| &mut x.0[i]));
+        }
+    }
+
+    pub fn bitreverse_inv_fft_inplace<V: VectorViewMut<ZnEl<I>>>(&self, mut values: V) {
+        for i in 0..self.part_tables.len() {
+            self.part_tables[i].bitreverse_inv_fft_inplace((&mut values).map_mut(|x| &x.0[i], |x| &mut x.0[i]));
+        }
     }
 }
 

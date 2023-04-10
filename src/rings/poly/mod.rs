@@ -86,7 +86,6 @@ pub fn test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R::Type as
                         ring.mul(ring.from_ref(b), ring.mul_ref_snd(ring.from_ref(c), &x)),
                         ring.mul(ring.from_ref(b), ring.mul(ring.from_ref(d), ring.pow(&x, 2)))
                     ].into_iter());
-                    ring.println(&ring.from_ref(c));
                     assert!(ring.eq(&result, &ring.mul(a_bx, c_dx)));
                 }
             }

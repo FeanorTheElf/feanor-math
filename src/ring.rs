@@ -193,8 +193,8 @@ pub trait RingBase {
     fn is_noetherian(&self) -> bool;
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
 
-    fn square(&self, value: Self::Element) -> Self::Element {
-        self.mul(value.clone(), value)
+    fn square(&self, value: &mut Self::Element) {
+        self.mul_assign(value, value.clone());
     }
 
     fn negate(&self, mut value: Self::Element) -> Self::Element {
@@ -465,7 +465,7 @@ pub trait RingStore {
     delegate!{ fn mul_ref_fst(&self, lhs: &El<Self>, rhs: El<Self>) -> El<Self> }
     delegate!{ fn mul_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
     delegate!{ fn mul(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
-    delegate!{ fn square(&self, value: El<Self>) -> El<Self> }
+    delegate!{ fn square(&self, value: &mut El<Self>) -> () }
     
     fn coerce<S>(&self, from: &S, el: El<S>) -> El<Self>
         where S: RingStore, Self::Type: CanonicalHom<S::Type> 
@@ -556,6 +556,7 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 
 ///
 /// Trait for rings R that have a canonical homomorphism `S -> R`.
+/// A ring homomorphism is expected to be unital.
 /// 
 /// Which homomorphisms are considered canonical is up to implementors,
 /// as long as any diagram of canonical homomorphisms commutes. In
@@ -613,10 +614,15 @@ pub trait CanonicalHom<S>: RingBase
 
     fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism>;
     fn map_in(&self, from: &S, el: S::Element, hom: &Self::Homomorphism) -> Self::Element;
+
+    fn map_in_ref(&self, from: &S, el: &S::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in(from, el.clone(), hom)
+    }
 }
 
 ///
 /// Trait for rings R that have a canonical isomorphism `S -> R`.
+/// A ring homomorphism is expected to be unital.
 /// 
 /// Same as for [`CanonicalHom`], it is up to implementors to decide which
 /// isomorphisms are canonical, as long as each diagram that contains
