@@ -1,4 +1,6 @@
-use crate::{divisibility::DivisibilityRing, integer::{IntegerRing, IntegerRingStore}, ring::*, algorithms};
+use crate::{divisibility::DivisibilityRing, ring::*, algorithms};
+use crate::integer::*;
+use crate::ordered::*;
 
 pub mod zn_dyn;
 pub mod zn_static;
@@ -17,6 +19,17 @@ pub trait ZnRing: DivisibilityRing + CanonicalHom<Self::IntegerRingBase> {
     fn modulus(&self) -> &El<Self::Integers>;
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers>;
     fn elements<'a>(&'a self) -> Self::ElementsIter<'a>;
+
+    fn smallest_lift(&self, el: Self::Element) -> El<Self::Integers> {
+        let result = self.smallest_positive_lift(el);
+        let mut mod_half = self.modulus().clone();
+        self.integer_ring().euclidean_div_pow_2(&mut mod_half, 1);
+        if self.integer_ring().is_gt(&result, &mod_half) {
+            return self.integer_ring().sub_ref_snd(result, self.modulus());
+        } else {
+            return result;
+        }
+    }
 
     fn is_field(&self) -> bool {
         algorithms::miller_rabin::is_prime(self.integer_ring(), self.modulus(), 6)
