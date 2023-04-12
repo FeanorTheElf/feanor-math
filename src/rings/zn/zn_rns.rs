@@ -28,6 +28,12 @@ impl<I: IntegerRingStore, J: IntegerRingStore> ZnBase<I, J> {
         &self.components[index]
     }
 
+    pub fn from_congruences<'a, It>(&self, values: It) -> ZnEl<I>
+        where It: 'a + Iterator<Item = (&'a Fp<I>, El<Fp<I>>)>, I: 'a
+    {
+        ZnEl(values.enumerate().map(|(i, (ring, x))| self.components[i].coerce(ring, x)).collect())
+    }
+
     pub(super) fn mod_prime_component<'a>(&self, index: usize, el: &'a ZnEl<I>) -> &'a FpEl<I> {
         &el.0[index]
     }
