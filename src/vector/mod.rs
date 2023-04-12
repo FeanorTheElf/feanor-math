@@ -1,4 +1,5 @@
 pub mod map;
+pub mod stride;
 
 use std::ops::{RangeBounds, Bound, Index, IndexMut};
 use std::marker::PhantomData;
