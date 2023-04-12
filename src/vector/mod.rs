@@ -5,6 +5,7 @@ use std::ops::{RangeBounds, Bound, Index, IndexMut};
 use std::marker::PhantomData;
 
 use self::map::{Map, MapMut};
+use self::stride::Stride;
 
 ///
 /// A trait for objects that provides read access to a 1-dimensional
@@ -26,6 +27,12 @@ pub trait VectorView<T> {
         where Self: Sized
     {
         Map::new(self, f)
+    }
+
+    fn stride(self, stride: usize) -> Stride<T, Self>
+        where Self: Sized
+    {
+        Stride::new(self, stride)
     }
 }
 
