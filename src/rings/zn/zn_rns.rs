@@ -24,8 +24,8 @@ impl<I: IntegerRingStore + Clone, J: IntegerRingStore> Zn<I, J> {
 
 impl<I: IntegerRingStore, J: IntegerRingStore> ZnBase<I, J> {
     
-    pub fn prime_component(&self, index: usize) -> &Fp<I> {
-        &self.components[index]
+    pub fn summands(&self) -> &[Fp<I>] {
+        &self.components[..]
     }
 
     pub fn from_congruences<'a, It>(&self, values: It) -> ZnEl<I>
@@ -36,10 +36,6 @@ impl<I: IntegerRingStore, J: IntegerRingStore> ZnBase<I, J> {
 
     pub(super) fn mod_prime_component<'a>(&self, index: usize, el: &'a ZnEl<I>) -> &'a FpEl<I> {
         &el.0[index]
-    }
-
-    pub fn prime_component_count(&self) -> usize {
-        self.components.len()
     }
 }
 
