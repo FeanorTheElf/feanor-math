@@ -42,7 +42,11 @@ impl<T, V> VectorView<T> for Stride<T, V>
     }
 
     fn len(&self) -> usize {
-        self.base_view.len() / self.stride
+        if self.base_view.len() == 0 {
+            0
+        } else {
+            (self.base_view.len() - 1) / self.stride + 1
+        }
     }
 }
 
@@ -60,4 +64,16 @@ impl<T, V> SwappableVectorViewMut<T> for Stride<T, V>
     fn swap(&mut self, i: usize, j: usize) {
         self.base_view.swap(i * self.stride, j * self.stride)
     }
+}
+
+#[test]
+fn test_stride() {
+    let vec = [0, 1, 2, 3, 4, 5, 6, 7];
+    let zero: [i32; 0] = [];
+    assert_eq!(0, zero.stride(1).len());
+    assert_eq!(4, vec.stride(2).len());
+    assert_eq!(3, vec.stride(3).len());
+    assert_eq!(6, *vec.stride(2).at(3));
+    assert_eq!(0, *vec.stride(3).at(0));
+    assert_eq!(3, *vec.stride(3).at(1));
 }
