@@ -1,7 +1,6 @@
 use crate::algorithms::cooley_tuckey::FFTTableCooleyTuckey;
 use crate::vector::VectorViewMut;
 use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
-use crate::ordered::OrderedRingStore;
 use crate::rings::zn::*;
 
 use super::zn_dyn::{Fp, FpEl, FpBase, FpBaseElementsIter};
@@ -47,9 +46,6 @@ impl<I: IntegerRingStore + Clone, J: IntegerRingStore> ZnBase<I, J> {
 
     pub fn new(ring: I, large_ring: J, primes: Vec<El<I>>) -> Self {
         assert!(primes.len() > 0);
-        for i in 1..primes.len() {
-            assert!(ring.is_gt(&primes[i], &primes[i - 1]));
-        }
         let total_modulus = large_ring.prod(
             primes.iter().map(|p| large_ring.coerce::<I>(&ring, p.clone()))
         );
