@@ -445,8 +445,8 @@ impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalHom
     type Homomorphism = (usize, <FpBase<I> as CanonicalHom<FpBase<J>>>::Homomorphism);
 
     fn has_canonical_hom(&self, from: &zn_rns::ZnBase<J, K>) -> Option<Self::Homomorphism> {
-        for i in 0..from.prime_component_count() {
-            if let Some(hom) = self.has_canonical_hom(from.prime_component(i).get_ring()) {
+        for i in 0..from.summands().len() {
+            if let Some(hom) = self.has_canonical_hom(from.summands()[i].get_ring()) {
                 return Some((i, hom));
             }
         }
@@ -454,11 +454,11 @@ impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalHom
     }
 
     fn map_in(&self, from: &zn_rns::ZnBase<J, K>, el: zn_rns::ZnEl<J>, (index, hom): &Self::Homomorphism) -> Self::Element {
-        <Self as CanonicalHom<FpBase<J>>>::map_in(self, from.prime_component(*index).get_ring(), from.mod_prime_component(*index, &el).clone(), hom)
+        <Self as CanonicalHom<FpBase<J>>>::map_in(self, from.summands()[*index].get_ring(), from.mod_prime_component(*index, &el).clone(), hom)
     }
 
     fn map_in_ref(&self, from: &zn_rns::ZnBase<J, K>, el: &zn_rns::ZnEl<J>, (index, hom): &Self::Homomorphism) -> Self::Element {
-        <Self as CanonicalHom<FpBase<J>>>::map_in(self, from.prime_component(*index).get_ring(), from.mod_prime_component(*index, el).clone(), hom)
+        <Self as CanonicalHom<FpBase<J>>>::map_in(self, from.summands()[*index].get_ring(), from.mod_prime_component(*index, el).clone(), hom)
     }
 }
 
