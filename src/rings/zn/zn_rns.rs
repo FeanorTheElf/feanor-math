@@ -1,10 +1,35 @@
+use std::ops::Index;
+
 use crate::algorithms::cooley_tuckey::FFTTableCooleyTuckey;
-use crate::vector::VectorViewMut;
+use crate::vector::{VectorViewMut, VectorView};
 use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
 use crate::rings::zn::*;
 
 use super::zn_dyn::Fp;
 
+///
+/// A ring representing `Z/nZ` for composite n by storing the
+/// values modulo `m1, ..., mr` for `n = m1 * ... * mr`.
+/// Generally, the advantage is improved performance in cases
+/// where `m1`, ..., `mr` are sufficiently small, and can e.g.
+/// by implemented without large integers.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_rns::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::bigint::*;
+/// 
+/// let R = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![17, 19]);
+/// let x = R.get_ring().from_congruence([R.get_ring()[0].from_z(1), R.get_ring()[1].from_z(16)]);
+/// assert_eq!(35, R.smallest_lift(x.clone()));
+/// let y = R.mul_ref(&x, &x);
+/// let z = R.get_ring().from_congruence([R.get_ring()[0].from_z(1), R.get_ring()[1].from_z(9)]);
+/// assert!(R.eq(&z, &y));
+/// ```
+/// 
 #[derive(Clone)]
 pub struct ZnBase<C: ZnRingStore, J: IntegerRingStore> 
     where C::Type: CanonicalHom<J::Type>,
@@ -77,6 +102,30 @@ impl<C: ZnRingStore, J: IntegerRingStore> ZnBase<C, J>
 
     fn ZZ(&self) -> &J {
         self.total_ring.integer_ring()
+    }
+
+    pub fn from_congruence<V: VectorView<El<C>>>(&self, el: V) -> ZnEl<C> {
+        assert_eq!(self.components.len(), el.len());
+        ZnEl((0..el.len()).map(|i| el.at(i).clone()).collect())
+    }
+
+    pub fn get_congruence<'a>(&self, el: &'a ZnEl<C>, prime_component_index: usize) -> &'a El<C> {
+        &el.0[prime_component_index]
+    }
+
+    pub fn len(&self) -> usize {
+        self.components.len()
+    }
+}
+
+impl<C: ZnRingStore, J: IntegerRingStore> Index<usize> for ZnBase<C, J>
+    where C::Type: CanonicalHom<J::Type>,
+        <C::Type as ZnRing>::IntegerRingBase: SelfIso
+{
+    type Output = C;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.components[index]
     }
 }
 
