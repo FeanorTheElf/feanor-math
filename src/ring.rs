@@ -655,6 +655,10 @@ pub trait CanonicalIso<S>: CanonicalHom<S>
     fn map_out(&self, from: &S, el: Self::Element, iso: &Self::Isomorphism) -> S::Element;
 }
 
+pub trait SelfIso: CanonicalIso<Self> {}
+
+impl<R: ?Sized + CanonicalIso<R>> SelfIso for R {}
+
 pub trait RingExtension: RingBase {
     
     type BaseRing: RingStore;

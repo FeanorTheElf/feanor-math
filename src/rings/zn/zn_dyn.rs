@@ -440,28 +440,6 @@ impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanonicalHom<J> for FpBase<I>
     }
 }
 
-impl<I: IntegerRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalHom<zn_rns::ZnBase<J, K>> for FpBase<I> {
-    
-    type Homomorphism = (usize, <FpBase<I> as CanonicalHom<FpBase<J>>>::Homomorphism);
-
-    fn has_canonical_hom(&self, from: &zn_rns::ZnBase<J, K>) -> Option<Self::Homomorphism> {
-        for i in 0..from.summands().len() {
-            if let Some(hom) = self.has_canonical_hom(from.summands()[i].get_ring()) {
-                return Some((i, hom));
-            }
-        }
-        return None;
-    }
-
-    fn map_in(&self, from: &zn_rns::ZnBase<J, K>, el: zn_rns::ZnEl<J>, (index, hom): &Self::Homomorphism) -> Self::Element {
-        <Self as CanonicalHom<FpBase<J>>>::map_in(self, from.summands()[*index].get_ring(), from.mod_prime_component(*index, &el).clone(), hom)
-    }
-
-    fn map_in_ref(&self, from: &zn_rns::ZnBase<J, K>, el: &zn_rns::ZnEl<J>, (index, hom): &Self::Homomorphism) -> Self::Element {
-        <Self as CanonicalHom<FpBase<J>>>::map_in(self, from.summands()[*index].get_ring(), from.mod_prime_component(*index, el).clone(), hom)
-    }
-}
-
 impl<I: IntegerRingStore> DivisibilityRing for FpBase<I> {
 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
