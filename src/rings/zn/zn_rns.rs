@@ -26,7 +26,7 @@ use super::zn_dyn::Fp;
 /// let x = R.get_ring().from_congruence([R.get_ring()[0].from_z(1), R.get_ring()[1].from_z(16)]);
 /// assert_eq!(35, R.smallest_lift(x.clone()));
 /// let y = R.mul_ref(&x, &x);
-/// let z = R.get_ring().from_congruence([R.get_ring()[0].from_z(1), R.get_ring()[1].from_z(9)]);
+/// let z = R.get_ring().from_congruence([R.get_ring()[0].from_z(1 * 1), R.get_ring()[1].from_z(16 * 16)]);
 /// assert!(R.eq(&z, &y));
 /// ```
 /// 
