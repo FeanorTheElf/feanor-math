@@ -50,6 +50,18 @@ impl DefaultBigIntRing {
             Some(_) => None
         }
     }
+
+    pub fn map_u128(&self, val: &<Self as RingBase>::Element) -> Option<u128> {
+        if val.0 {
+            return None;
+        }
+        match algorithms::bigint::highest_set_block(&val.1) {
+            None => Some(0),
+            Some(0) => Some(val.1[0] as u128),
+            Some(1) => Some(((val.1[1] as u128) << u64::BITS) | val.1[0] as u128),
+            Some(_) => None
+        }
+    }
 }
 
 impl RingBase for DefaultBigIntRing {

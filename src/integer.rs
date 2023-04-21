@@ -20,6 +20,12 @@ pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing {
     fn euclidean_div_pow_2(&self, value: &mut Self::Element, power: usize);
     fn mul_pow_2(&self, value: &mut Self::Element, power: usize);
     fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, rng: G) -> Self::Element;
+
+    fn power_of_two(&self, power: usize) -> Self::Element {
+        let mut result = self.one();
+        self.mul_pow_2(&mut result, power);
+        return result;
+    }
 }
 
 impl<I: IntegerRing + CanonicalIso<I> + ?Sized, J: IntegerRing + ?Sized> CanonicalHom<I> for J {
@@ -63,6 +69,7 @@ pub trait IntegerRingStore: RingStore<Type: IntegerRing> {
     delegate!{ fn abs_lowest_set_bit(&self, value: &El<Self>) -> Option<usize> }
     delegate!{ fn euclidean_div_pow_2(&self, value: &mut El<Self>, power: usize) -> () }
     delegate!{ fn mul_pow_2(&self, value: &mut El<Self>, power: usize) -> () }
+    delegate!{ fn power_of_two(&self, power: usize) -> El<Self> }
 
     fn get_uniformly_random<G: FnMut() -> u64>(&self, bound_exclusive: &El<Self>, mut rng: G) -> El<Self> {
         assert!(self.is_gt(bound_exclusive, &self.zero()));
