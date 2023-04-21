@@ -73,6 +73,15 @@ pub trait IntegerRingStore: RingStore<Type: IntegerRing> {
         }
         return result;
     }
+
+    fn abs_log2_ceil(&self, value: &El<Self>) -> Option<usize> {
+        let highest_bit = self.abs_highest_set_bit(value)?;
+        if self.abs_lowest_set_bit(value).unwrap() == highest_bit {
+            return Some(highest_bit);
+        } else {
+            return Some(highest_bit + 1);
+        }
+    }
 }
 
 impl<R> IntegerRingStore for R

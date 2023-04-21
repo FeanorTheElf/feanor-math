@@ -13,6 +13,32 @@ use crate::algorithms;
 
 use std::cmp::Ordering;
 
+///
+/// Ring representing `Z/nZ`, computing the modular reductions
+/// via a Barett-reduction algorithm. This is a fast general-purpose
+/// method, but note that it is required that `n^4` fits into the
+/// supplied integer type.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_barett::*;
+/// # use feanor_math::primitive_int::*;
+/// let R = Zn::new(StaticRing::<i64>::RING, 257);
+/// let a = R.from_z(16);
+/// assert!(R.eq(&R.from_z(-1), &R.mul_ref(&a, &a)));
+/// assert!(R.is_one(&R.pow(&a, 4)));
+/// ```
+/// However, this will panic as `257^4 > i32::MAX`.
+/// ```should_panic
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_barett::*;
+/// # use feanor_math::primitive_int::*;
+/// let R = Zn::new(StaticRing::<i32>::RING, 257);
+/// ```
+/// 
 #[derive(Clone)]
 pub struct ZnBase<I: IntegerRingStore> {
     integer_ring: I,
@@ -34,14 +60,18 @@ impl<I: IntegerRingStore> ZnBase<I> {
 
     pub fn new(integer_ring: I, modulus: El<I>) -> Self {
         assert!(integer_ring.is_geq(&modulus, &integer_ring.from_z(2)));
-        // have k such that 2^k > modulus^2
-        // then (2^k / modulus) * x >> k differs at most 1 from floor(x / modulus)
-        // if x < n^2, which is the case after multiplication
-        let k = integer_ring.abs_highest_set_bit(&modulus).unwrap() * 2 + 2;
-        let inverse_modulus = integer_ring.euclidean_div(
-            integer_ring.pow(&integer_ring.from_z(2), k as usize), 
-            &modulus
-        );
+
+        // have k such that `2^k >= modulus^2`
+        // then `floor(2^k / modulus) * x >> k` differs at most 1 from `floor(x / modulus)`
+        // if `x < 2^k`, which is the case after multiplication
+        let k = integer_ring.abs_log2_ceil(&modulus).unwrap() * 2;
+        let mut mod_square_bound = integer_ring.one();
+        integer_ring.mul_pow_2(&mut mod_square_bound, k);
+
+        // check that this expression does not overflow
+        integer_ring.mul_ref_snd(integer_ring.pow(&modulus, 2), &mod_square_bound);
+
+        let inverse_modulus = integer_ring.euclidean_div(mod_square_bound, &modulus);
         return ZnBase {
             integer_ring: integer_ring,
             modulus: modulus,

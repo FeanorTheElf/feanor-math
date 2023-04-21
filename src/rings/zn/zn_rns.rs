@@ -523,7 +523,7 @@ fn test_ring_axioms_znbase() {
 #[test]
 fn test_map_in_map_out() {
     let ring1 = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11, 17]);
-    let ring2 = zn_barett::Zn::new(StaticRing::<i32>::RING, 7 * 11 * 17);
+    let ring2 = zn_barett::Zn::new(StaticRing::<i64>::RING, 7 * 11 * 17);
     for x in [0, 1, 7, 8, 9, 10, 11, 17, 7 * 17, 11 * 8, 11 * 17, 7 * 11 * 17 - 1] {
         let value = ring2.from_z(x);
         assert!(ring2.eq(&value, &ring1.cast(&ring2, ring1.coerce(&ring2, value.clone()))));
