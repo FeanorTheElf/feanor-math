@@ -2,7 +2,7 @@ use crate::{divisibility::DivisibilityRing, ring::*, algorithms};
 use crate::integer::*;
 use crate::ordered::*;
 
-pub mod zn_dyn;
+pub mod zn_barett;
 pub mod zn_static;
 pub mod zn_rns;
 

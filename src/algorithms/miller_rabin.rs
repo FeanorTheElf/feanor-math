@@ -2,7 +2,7 @@ use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 use crate::integer::*;
 use crate::algorithms;
-use crate::rings::zn::zn_dyn::*;
+use crate::rings::zn::zn_barett::*;
 
 use oorandom;
 
