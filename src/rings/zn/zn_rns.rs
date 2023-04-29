@@ -534,3 +534,8 @@ fn test_map_in_map_out() {
 fn test_zn_ring_axioms_znbase() {
     test_zn_ring_axioms(Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]));
 }
+
+#[test]
+fn test_zn_map_in_large_int_znbase() {
+    test_map_in_large_int(Zn::from_primes(StaticRing::<i64>::RING, DefaultBigIntRing::RING, vec![7, 11]));
+}

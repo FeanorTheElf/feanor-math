@@ -93,24 +93,30 @@ impl<I: IntegerRingStore> ZnBase<I> {
     }
 
     pub fn project(&self, n: El<I>) -> <Self as RingBase>::Element {
+        self.project_gen(n, &self.integer_ring)
+    }
+
+    pub fn project_gen<J: IntegerRingStore>(&self, n: El<J>, ZZ: &J) -> <Self as RingBase>::Element {
         let mut red_n = n;
-        let negated = self.integer_ring.is_neg(&red_n);
+        let negated = ZZ.is_neg(&red_n);
         if negated {
-            self.integer_ring.negate_inplace(&mut red_n);
+            ZZ.negate_inplace(&mut red_n);
         }
-        if self.integer_ring.is_lt(&red_n, &self.modulus) {
-            // already in the interval [0, self.modulus[
-        } else if self.integer_ring.abs_highest_set_bit(&red_n).unwrap_or(0) + 1 < self.integer_ring.abs_highest_set_bit(&self.modulus).unwrap() * 2 {
-            self.project_leq_n_square(&mut red_n);
+        let result = if ZZ.abs_highest_set_bit(&red_n).unwrap_or(0) + 1 < self.integer_ring.abs_highest_set_bit(&self.modulus).unwrap() * 2 {
+            let mut result = self.integer_ring.coerce::<J>(ZZ, red_n); 
+            if !self.integer_ring.is_lt(&result, &self.modulus) {
+                self.project_leq_n_square(&mut result);
+            }
+            result
         } else {
-            red_n = self.integer_ring.euclidean_rem(red_n, &self.modulus);
+            let modulus = ZZ.coerce::<I>(&self.integer_ring, self.modulus.clone());
+            red_n = ZZ.euclidean_rem(red_n, &modulus);
+            self.integer_ring.coerce::<J>(ZZ, red_n)
         };
-        debug_assert!(self.integer_ring.is_lt(&red_n, &self.modulus));
-        let result = ZnEl(red_n);
         if negated {
-            return self.negate(result);
+            return self.negate(ZnEl(result));
         } else {
-            return result;
+            return ZnEl(result);
         }
     }
 
@@ -275,14 +281,14 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for ZnBas
 impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanonicalHom<J> for ZnBase<I> 
     where J: CanonicalIso<J>
 {
-    type Homomorphism = <I::Type as CanonicalHom<J>>::Homomorphism;
+    type Homomorphism = ();
 
-    fn has_canonical_hom(&self, from: &J) -> Option<Self::Homomorphism> {
-        <I::Type as CanonicalHom<J>>::has_canonical_hom(self.integer_ring().get_ring(), from)
+    fn has_canonical_hom(&self, _: &J) -> Option<Self::Homomorphism> {
+        Some(())
     }
 
-    fn map_in(&self, from: &J, el: J::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.project(<I::Type as CanonicalHom<J>>::map_in(self.integer_ring().get_ring(), from, el, hom))
+    fn map_in(&self, from: &J, el: J::Element, _hom: &Self::Homomorphism) -> Self::Element {
+        self.project_gen(el, &RingRef::new(from))
     }
 }
 
@@ -581,4 +587,9 @@ fn test_ring_axioms_znbase() {
 fn test_zn_ring_axioms_znbase() {
     test_zn_ring_axioms(Zn::new(StaticRing::<i64>::RING, 17));
     test_zn_ring_axioms(Zn::new(StaticRing::<i64>::RING, 63));
+}
+
+#[test]
+fn test_zn_map_in_large_int_znbase() {
+    test_map_in_large_int(Zn::new(StaticRing::<i64>::RING, 63));
 }
