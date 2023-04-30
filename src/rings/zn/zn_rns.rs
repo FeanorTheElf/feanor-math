@@ -5,8 +5,6 @@ use crate::vector::{VectorViewMut, VectorView};
 use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
 use crate::rings::zn::*;
 
-use super::zn_barett::Fp;
-
 ///
 /// A ring representing `Z/nZ` for composite n by storing the
 /// values modulo `m1, ..., mr` for `n = m1 * ... * mr`.
@@ -76,18 +74,18 @@ impl<C: ZnRingStore + Clone, J: IntegerRingStore> Zn<C, J>
     }
 }
 
-impl<I: IntegerRingStore + Clone, J: IntegerRingStore> Zn<Fp<I>, J> {
+impl<I: IntegerRingStore + Clone, J: IntegerRingStore> Zn<zn_barett::Zn<I>, J> {
 
     pub fn from_primes(integers: I, large_integers: J, primes: Vec<El<I>>) -> Self {
         Self::from(ZnBase::from_primes(integers, large_integers, primes))
     }
 }
 
-impl<I: IntegerRingStore + Clone, J: IntegerRingStore> ZnBase<Fp<I>, J> {
+impl<I: IntegerRingStore + Clone, J: IntegerRingStore> ZnBase<zn_barett::Zn<I>, J> {
 
     pub fn from_primes(integers: I, large_integers: J, primes: Vec<El<I>>) -> Self {
         Self::new(
-            primes.into_iter().map(|n| Fp::new(integers.clone(), n)).collect(),
+            primes.into_iter().map(|n| zn_barett::Zn::new(integers.clone(), n)).collect(),
             large_integers
         )
     }

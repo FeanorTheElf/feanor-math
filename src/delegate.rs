@@ -9,7 +9,7 @@ use crate::ring::*;
 /// 
 pub trait DelegateRing {
 
-    type Base: RingBase;
+    type Base: ?Sized + RingBase;
     type Element: Clone;
 
     fn get_delegate(&self) -> &Self::Base;

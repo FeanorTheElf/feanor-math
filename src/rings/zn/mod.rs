@@ -6,6 +6,7 @@ pub mod zn_barett;
 pub mod zn_63bit;
 pub mod zn_static;
 pub mod zn_rns;
+pub mod fp;
 
 pub trait ZnRing: DivisibilityRing + CanonicalHom<Self::IntegerRingBase> {
 

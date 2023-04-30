@@ -1,9 +1,6 @@
-use crate::delegate::DelegateRing;
 use crate::divisibility::DivisibilityRing;
 use crate::divisibility::DivisibilityRingStore;
-use crate::euclidean::EuclideanRing;
 use crate::euclidean::EuclideanRingStore;
-use crate::field::Field;
 use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
 use crate::ordered::OrderedRingStore;
@@ -38,6 +35,19 @@ use std::cmp::Ordering;
 /// # use feanor_math::rings::zn::zn_barett::*;
 /// # use feanor_math::primitive_int::*;
 /// let R = Zn::new(StaticRing::<i32>::RING, 257);
+/// ```
+/// 
+/// # Canonical mappings
+/// This ring has a canonical homomorphism from any integer ring
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_barett::*;
+/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::primitive_int::*;
+/// let R = Zn::new(StaticRing::<i16>::RING, 7);
+/// let S = DefaultBigIntRing::RING;
+/// assert!(R.eq(&R.from_z(120493), &R.coerce(&S, S.from_z(120493))));
 /// ```
 /// 
 #[derive(Clone)]
@@ -132,16 +142,6 @@ impl<I: IntegerRingStore> ZnBase<I> {
             Ok(self.project(s))
         } else {
             Err(d)
-        }
-    }
-
-    pub fn is_field(self) -> Result<FpBase<I>, ZnBase<I>> 
-        where I: HashableElRingStore
-    {
-        if algorithms::miller_rabin::is_prime(self.integer_ring(), &self.modulus, 6) {
-            Ok(FpBase { base: self })
-        } else {
-            Err(self)
         }
     }
 }
@@ -345,220 +345,6 @@ impl<I: IntegerRingStore> ZnRing for ZnBase<I> {
 
 }
 
-#[derive(Clone)]
-pub struct FpBase<I: IntegerRingStore> {
-    base: ZnBase<I>
-}
-
-pub type Fp<I> = RingValue<FpBase<I>>;
-
-pub struct FpEl<I: IntegerRingStore>(ZnEl<I>);
-
-impl<I: IntegerRingStore> Clone for FpEl<I> {
-
-    fn clone(&self) -> Self {
-        FpEl(self.0.clone())
-    }
-}
-
-impl<I: IntegerRingStore> Copy for FpEl<I> 
-    where El<I>: Copy
-{}
-
-impl<I: IntegerRingStore> FpBase<I> {
-
-    pub fn get_base(&self) -> &ZnBase<I> {
-        &self.base
-    }
-}
-
-impl<I: IntegerRingStore> Fp<I> {
-
-    pub fn new(integer_ring: I, prime: El<I>) -> Self {
-        Self::from(FpBase::new(integer_ring, prime))
-    }
-}
-
-impl<I: IntegerRingStore> FpBase<I> {
-
-    pub fn new(integer_ring: I, prime: El<I>) -> Self {
-        ZnBase::new(integer_ring, prime).is_field().ok().expect("not a prime")
-    }
-}
-
-impl<I: IntegerRingStore> DelegateRing for FpBase<I> {
-
-    type Element = FpEl<I>;
-    type Base = ZnBase<I>;
-
-    fn get_delegate(&self) -> &Self::Base {
-        &self.base
-    }
-
-    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element {
-        el.0
-    }
-
-    fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element {
-        &mut el.0
-    }
-
-    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element {
-        &el.0
-    }
-
-    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element {
-        FpEl(el)
-    }
-}
-
-impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalHom<FpBase<J>> for FpBase<I> {
-    
-    type Homomorphism = <ZnBase<I> as CanonicalHom<ZnBase<J>>>::Homomorphism;
-
-    fn has_canonical_hom(&self, from: &FpBase<J>) -> Option<Self::Homomorphism> {
-        self.get_base().has_canonical_hom(from.get_base())
-    }
-
-    fn map_in(&self, from: &FpBase<J>, el: FpEl<J>, hom: &Self::Homomorphism) -> Self::Element {
-        FpEl(<ZnBase<I> as CanonicalHom<ZnBase<J>>>::map_in(self.get_base(), from.get_base(), el.0, hom))
-    }
-}
-
-impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<FpBase<J>> for FpBase<I> {
-
-    type Isomorphism = <ZnBase<I> as CanonicalIso<ZnBase<J>>>::Isomorphism;
-
-    fn has_canonical_iso(&self, from: &FpBase<J>) -> Option<Self::Isomorphism> {
-        <ZnBase<I> as CanonicalIso<ZnBase<J>>>::has_canonical_iso(self.get_base(), from.get_base())
-    }
-
-    fn map_out(&self, from: &FpBase<J>, el: Self::Element, iso: &Self::Isomorphism) -> FpEl<J> {
-        FpEl(<ZnBase<I> as CanonicalIso<ZnBase<J>>>::map_out(self.get_base(), from.get_base(), el.0, iso))
-    }
-}
-
-impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalHom<ZnBase<J>> for FpBase<I> {
-
-    type Homomorphism = <ZnBase<I> as CanonicalHom<ZnBase<J>>>::Homomorphism;
-
-    fn has_canonical_hom(&self, from: &ZnBase<J>) -> Option<Self::Homomorphism> {
-        self.get_base().has_canonical_hom(from)
-    }
-
-    fn map_in(&self, from: &ZnBase<J>, el: ZnEl<J>, hom: &Self::Homomorphism) -> Self::Element {
-        FpEl(<ZnBase<I> as CanonicalHom<ZnBase<J>>>::map_in(self.get_base(), from, el, hom))
-    }
-}
-
-impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for FpBase<I> {
-
-    type Isomorphism = <ZnBase<I> as CanonicalIso<ZnBase<J>>>::Isomorphism;
-
-    fn has_canonical_iso(&self, from: &ZnBase<J>) -> Option<Self::Isomorphism> {
-        <ZnBase<I> as CanonicalIso<ZnBase<J>>>::has_canonical_iso(self.get_base(), from)
-    }
-
-    fn map_out(&self, from: &ZnBase<J>, el: Self::Element, iso: &Self::Isomorphism) -> <ZnBase<J> as RingBase>::Element {
-        <ZnBase<I> as CanonicalIso<ZnBase<J>>>::map_out(self.get_base(), from, el.0, iso)
-    }
-}
-
-impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanonicalHom<J> for FpBase<I> 
-    where J: CanonicalIso<J>
-{
-    type Homomorphism = <ZnBase<I> as CanonicalHom<J>>::Homomorphism;
-
-    fn has_canonical_hom(&self, from: &J) -> Option<Self::Homomorphism> {
-        self.get_base().has_canonical_hom(from)
-    }
-
-    fn map_in(&self, from: &J, el: J::Element, hom: &Self::Homomorphism) -> Self::Element {
-        FpEl(<ZnBase<I> as CanonicalHom<J>>::map_in(self.get_base(), from, el, hom))
-    }
-}
-
-impl<I: IntegerRingStore> DivisibilityRing for FpBase<I> {
-
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        if self.is_zero(rhs) {
-            None
-        } else {
-            Some(self.mul_ref_fst(
-                lhs, 
-                FpEl(self.get_base().invert(rhs.0.clone()).ok().unwrap())
-            ))
-        }
-    }
-}
-
-impl<I: IntegerRingStore> EuclideanRing for FpBase<I> {
-
-    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
-        assert!(!self.is_zero(rhs));
-        (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
-    }
-
-    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
-        if self.is_zero(val) {
-            Some(0)
-        } else {
-            Some(1)
-        }
-    }
-
-    fn euclidean_rem(&self, _: Self::Element, rhs: &Self::Element) -> Self::Element {
-        assert!(!self.is_zero(rhs));
-        self.zero()
-    }
-}
-
-impl<I: IntegerRingStore> Field for FpBase<I> {}
-
-pub struct FpBaseElementsIter<'a, I>
-    where I: IntegerRingStore
-{
-    iter: ZnBaseElementsIter<'a, I>
-}
-
-impl<'a, I> Iterator for FpBaseElementsIter<'a, I>
-    where I: IntegerRingStore
-{
-    type Item = FpEl<I>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(FpEl)
-    }
-}
-
-impl<I: IntegerRingStore> ZnRing for FpBase<I> {
-    
-    type IntegerRingBase = I::Type;
-    type Integers = I;
-    type ElementsIter<'a> = FpBaseElementsIter<'a, I>
-        where Self: 'a;
-
-    fn integer_ring(&self) -> &Self::Integers {
-        self.get_base().integer_ring()
-    }
-
-    fn modulus(&self) -> &El<Self::Integers> {
-        self.get_base().modulus()
-    }
-
-    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
-        self.get_base().smallest_positive_lift(el.0)
-    }
-
-    fn elements<'a>(&'a self) -> FpBaseElementsIter<'a, I> {
-        FpBaseElementsIter {
-            iter: self.get_base().elements()
-        }
-    }
-}
-
-#[cfg(test)]
-use crate::primitive_int::*;
 #[cfg(test)]
 use crate::rings::bigint::*;
 
