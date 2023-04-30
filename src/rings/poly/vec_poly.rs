@@ -288,7 +288,7 @@ use crate::rings::zn::zn_static::Zn;
 #[test]
 fn test_ring_axioms_vec_poly_ring() {
     let poly_ring = VecPolyRing::new(Zn::<7>::RING, "X");
-    test_ring_axioms(poly_ring.clone(), vec![ 
+    generic_test_ring_axioms(poly_ring.clone(), vec![ 
         poly_ring.from_terms([].into_iter()),
         poly_ring.from_terms([(1, 0)].into_iter()),
         poly_ring.from_terms([(1, 1)].into_iter()),
@@ -303,5 +303,5 @@ fn test_ring_axioms_vec_poly_ring() {
 #[test]
 fn test_poly_ring_axioms_vec_poly_ring() {
     let poly_ring = VecPolyRing::new(Zn::<7>::RING, "X");
-    test_poly_ring_axioms(poly_ring, Zn::<7>::RING.elements());
+    generic_test_poly_ring_axioms(poly_ring, Zn::<7>::RING.elements());
 }

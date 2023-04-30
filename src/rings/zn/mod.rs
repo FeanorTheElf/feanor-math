@@ -70,7 +70,7 @@ use crate::primitive_int::*;
 use super::bigint::DefaultBigIntRing;
 
 #[cfg(test)]
-pub fn test_zn_ring_axioms<R: ZnRingStore>(R: R) 
+pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R) 
     // necessary to prevent typechecking overflow
     where <<R as RingStore>::Type as ZnRing>::IntegerRingBase: SelfIso
 {
@@ -96,7 +96,7 @@ pub fn test_zn_ring_axioms<R: ZnRingStore>(R: R)
 }
 
 #[cfg(test)]
-pub fn test_map_in_large_int<R: ZnRingStore>(R: R)
+pub fn generic_test_map_in_large_int<R: ZnRingStore>(R: R)
     // necessary to prevent typechecking overflow
     where <<R as RingStore>::Type as ZnRing>::IntegerRingBase: SelfIso, <R as RingStore>::Type: CanonicalHom<DefaultBigIntRing>
 {

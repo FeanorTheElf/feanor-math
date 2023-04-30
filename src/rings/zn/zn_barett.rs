@@ -577,19 +577,37 @@ fn test_project() {
     }
 }
 
+#[cfg(test)]
+const EDGE_CASE_ELEMENTS: [i32; 10] = [0, 1, 3, 7, 9, 62, 8, 10, 11, 12];
+
 #[test]
 fn test_ring_axioms_znbase() {
     let ZZ = Zn::new(StaticRing::<i64>::RING, 63);
-    test_ring_axioms(&ZZ, [0, 1, 3, 7, 9, 62, 8, 10, 11, 12].iter().cloned().map(|x| ZZ.from_z(x)))
+    generic_test_ring_axioms(&ZZ, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ZZ.from_z(x)))
+}
+
+#[test]
+fn test_canonical_iso_axioms_zn_barett() {
+    let from = Zn::new(StaticRing::<i128>::RING, 7 * 11);
+    let to = Zn::new(DefaultBigIntRing::RING, DefaultBigIntRing::RING.from_z(7 * 11));
+    generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_z(x)));
+    generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_z(x)));
+}
+
+#[test]
+fn test_canonical_hom_axioms_static_int() {
+    let from = StaticRing::<i32>::RING;
+    let to = Zn::new(StaticRing::<i128>::RING, 7 * 11);
+    generic_test_canonical_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_z(x)));
 }
 
 #[test]
 fn test_zn_ring_axioms_znbase() {
-    test_zn_ring_axioms(Zn::new(StaticRing::<i64>::RING, 17));
-    test_zn_ring_axioms(Zn::new(StaticRing::<i64>::RING, 63));
+    generic_test_zn_ring_axioms(Zn::new(StaticRing::<i64>::RING, 17));
+    generic_test_zn_ring_axioms(Zn::new(StaticRing::<i64>::RING, 63));
 }
 
 #[test]
 fn test_zn_map_in_large_int_znbase() {
-    test_map_in_large_int(Zn::new(StaticRing::<i64>::RING, 63));
+    generic_test_map_in_large_int(Zn::new(StaticRing::<i64>::RING, 63));
 }

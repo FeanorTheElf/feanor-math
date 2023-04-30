@@ -514,10 +514,13 @@ impl<'a, C: ZnRingStore> RNSFFTTable<'a, C> {
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 
+#[cfg(test)]
+const EDGE_CASE_ELEMENTS: [i32; 9] = [0, 1, 7, 9, 62, 8, 10, 11, 12];
+
 #[test]
-fn test_ring_axioms_znbase() {
+fn test_ring_axioms() {
     let ring = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]);
-    test_ring_axioms(&ring, [0, 1, 7, 9, 62, 8, 10, 11, 12].iter().cloned().map(|x| ring.from_z(x)))
+    generic_test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.from_z(x)))
 }
 
 #[test]
@@ -531,11 +534,28 @@ fn test_map_in_map_out() {
 }
 
 #[test]
-fn test_zn_ring_axioms_znbase() {
-    test_zn_ring_axioms(Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]));
+fn test_canonical_iso_axioms_zn_barett() {
+    let from = zn_barett::Zn::new(StaticRing::<i128>::RING, 7 * 11);
+    let to = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]);
+    generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_z(x)));
+    generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_z(x)));
 }
 
 #[test]
-fn test_zn_map_in_large_int_znbase() {
-    test_map_in_large_int(Zn::from_primes(StaticRing::<i64>::RING, DefaultBigIntRing::RING, vec![7, 11]));
+fn test_canonical_hom_axioms_static_int() {
+    let from = StaticRing::<i32>::RING;
+    let to = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]);
+    generic_test_canonical_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_z(x)));
+}
+
+#[test]
+fn test_zn_ring_axioms() {
+    let ring = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]);
+    generic_test_zn_ring_axioms(ring);
+}
+
+#[test]
+fn test_zn_map_in_large_int() {
+    let ring = Zn::from_primes(StaticRing::<i64>::RING, DefaultBigIntRing::RING, vec![7, 11]);
+    generic_test_map_in_large_int(ring);
 }

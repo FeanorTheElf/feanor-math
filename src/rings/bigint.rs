@@ -337,7 +337,7 @@ impl IntegerRing for DefaultBigIntRing {
 }
 
 #[cfg(test)]
-use crate::divisibility::test_divisibility_axioms;
+use crate::divisibility::generic_test_divisibility_axioms;
 
 #[test]
 fn test_print_power_2() {
@@ -424,22 +424,22 @@ fn numbers_iter() -> impl Iterator<Item = DefaultBigIntRingEl> {
 
 #[test]
 fn test_bigint_ring_axioms() {
-    test_ring_axioms(DefaultBigIntRing::RING, numbers_iter())
+    generic_test_ring_axioms(DefaultBigIntRing::RING, numbers_iter())
 }
 
 #[test]
 fn test_bigint_divisibility_ring_axioms() {
-    test_divisibility_axioms(DefaultBigIntRing::RING, numbers_iter())
+    generic_test_divisibility_axioms(DefaultBigIntRing::RING, numbers_iter())
 }
 
 #[test]
 fn test_bigint_euclidean_ring_axioms() {
-    test_euclidean_axioms(DefaultBigIntRing::RING, numbers_iter())
+    generic_test_euclidean_axioms(DefaultBigIntRing::RING, numbers_iter())
 }
 
 #[test]
 fn test_bigint_integer_ring_axioms() {
-    test_integer_axioms(DefaultBigIntRing::RING, numbers_iter())
+    generic_test_integer_axioms(DefaultBigIntRing::RING, numbers_iter())
 }
 
 #[bench]
@@ -472,26 +472,6 @@ fn bench_div(bencher: &mut test::Bencher) {
     })
 }
 
-// #[test]
-// fn test_eq() {
-//     fn calculate_hash<T: Hash>(t: &T) -> u64 {
-//         let mut s = std::collections::hash_map::DefaultHasher::new();
-//         t.hash(&mut s);
-//         s.finish()
-//     }
-
-//     let a = DefaultBigInt(false, vec![98711]);
-//     let b = DefaultBigInt(false, vec![98711, 0]);
-//     assert!(a == 98711);
-//     assert!(a == b);
-//     assert!(b == a);
-//     assert!(a != DefaultBigIntRing::RING.neg(a.clone()));
-//     assert!(calculate_hash(&a) == calculate_hash(&b));
-//     assert!(a != DefaultBigIntRing::RING.one());
-//     // the next line could theoretically fail, but it is very improbable and we definitly should test hash inequality
-//     assert!(calculate_hash(&a) != calculate_hash(&DefaultBigIntRing::RING.one()));
-// }
-
 #[test]
 fn test_is_zero() {
     let zero = DefaultBigIntRing::RING.zero();
@@ -502,11 +482,6 @@ fn test_is_zero() {
     assert!(!DefaultBigIntRing::RING.is_zero(&nonzero));
     assert!(!DefaultBigIntRing::RING.is_zero(&DefaultBigIntRing::RING.negate(nonzero)));
 }
-
-// #[test]
-// fn test_cmp_small() {
-//     assert!(DefaultBigInt::parse("-23678", 10).unwrap() < 0);
-// }
 
 #[test]
 fn test_cmp() {
@@ -538,7 +513,7 @@ fn test_mul_pow_2() {
 
 #[test]
 fn test_get_uniformly_random() {
-    test_integer_uniformly_random(DefaultBigIntRing::RING);
+    generic_test_integer_uniformly_random(DefaultBigIntRing::RING);
 
     let ring = DefaultBigIntRing::RING;
     let bound = DefaultBigIntRingEl::parse("11000000000000000", 16).unwrap();
@@ -548,4 +523,11 @@ fn test_get_uniformly_random() {
     assert!(elements.iter().any(|x| ring.is_lt(x, &block_bound)));
     assert!(elements.iter().any(|x| ring.is_gt(x, &block_bound)));
     assert!(elements.iter().all(|x| ring.is_lt(x, &bound)));
+}
+
+#[test]
+fn test_canonical_iso_static_int() {
+    // for the hom test, we have to be able to multiply elements in `StaticRing::<i128>::RING`, so we cannot test `i128::MAX` or `i128::MIN`
+    generic_test_canonical_hom_axioms(StaticRing::<i128>::RING, DefaultBigIntRing::RING, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128].iter().copied());
+    generic_test_canonical_iso_axioms(StaticRing::<i128>::RING, DefaultBigIntRing::RING, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128, i128::MAX, i128::MIN].iter().copied());
 }

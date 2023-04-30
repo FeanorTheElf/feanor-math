@@ -990,7 +990,43 @@ fn test_internal_wrappings_dont_matter() {
 }
 
 #[cfg(test)]
-pub fn test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
+pub fn generic_test_canonical_hom_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
+    where S::Type: CanonicalHom<R::Type>
+{
+    let hom = to.get_ring().has_canonical_hom(from.get_ring()).unwrap();
+    let elements = edge_case_elements.collect::<Vec<_>>();
+
+    for a in &elements {
+        for b in &elements {
+            assert!(to.eq(
+                &to.add(to.get_ring().map_in_ref(from.get_ring(), a, &hom), to.get_ring().map_in_ref(from.get_ring(), b, &hom)),
+                &to.get_ring().map_in(from.get_ring(), from.add_ref(a, b), &hom)
+            ));
+            assert!(to.eq(
+                &to.mul(to.get_ring().map_in_ref(from.get_ring(), a, &hom), to.get_ring().map_in_ref(from.get_ring(), b, &hom)),
+                &to.get_ring().map_in(from.get_ring(), from.mul_ref(a, b), &hom)
+            ));
+        }
+    }
+}
+
+#[cfg(test)]
+pub fn generic_test_canonical_iso_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
+    where S::Type: CanonicalIso<R::Type>
+{
+    let hom = to.get_ring().has_canonical_hom(from.get_ring()).unwrap();
+    let iso = to.get_ring().has_canonical_iso(from.get_ring()).unwrap();
+    let elements = edge_case_elements.collect::<Vec<_>>();
+
+    for a in &elements {
+        assert!(
+            from.eq(a, &to.get_ring().map_out(from.get_ring(), to.get_ring().map_in_ref(from.get_ring(), a, &hom), &iso))
+        )
+    }
+}
+
+#[cfg(test)]
+pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
     let elements = edge_case_elements.collect::<Vec<_>>();
     let zero = ring.zero();
     let one = ring.one();

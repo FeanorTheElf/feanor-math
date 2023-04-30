@@ -48,7 +48,7 @@ impl<R> EuclideanRingStore for R
 {}
 
 #[cfg(test)]
-pub fn test_euclidean_axioms<R: EuclideanRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
+pub fn generic_test_euclidean_axioms<R: EuclideanRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
     assert!(ring.is_commutative());
     assert!(ring.is_noetherian());
     let elements = edge_case_elements.collect::<Vec<_>>();

@@ -212,9 +212,9 @@ fn test_ixx_bit_op() {
 
 #[test]
 fn test_get_uniformly_random() {
-    test_integer_uniformly_random(StaticRing::<i8>::RING);
-    test_integer_uniformly_random(StaticRing::<i16>::RING);
-    test_integer_uniformly_random(StaticRing::<i32>::RING);
-    test_integer_uniformly_random(StaticRing::<i64>::RING);
-    test_integer_uniformly_random(StaticRing::<i128>::RING);
+    generic_test_integer_uniformly_random(StaticRing::<i8>::RING);
+    generic_test_integer_uniformly_random(StaticRing::<i16>::RING);
+    generic_test_integer_uniformly_random(StaticRing::<i32>::RING);
+    generic_test_integer_uniformly_random(StaticRing::<i64>::RING);
+    generic_test_integer_uniformly_random(StaticRing::<i128>::RING);
 }
