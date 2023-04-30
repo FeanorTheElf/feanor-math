@@ -30,6 +30,31 @@ use super::zn_barett::Fp;
 /// assert!(R.eq(&z, &y));
 /// ```
 /// 
+/// # Canonical mappings
+/// This ring has a canonical isomorphism to Barett-reduction based Zn
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_rns::*;
+/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::primitive_int::*;
+/// let R = Zn::from_primes(StaticRing::<i64>::RING, DefaultBigIntRing::RING, vec![17, 19]);
+/// let S = zn_barett::Zn::new(StaticRing::<i64>::RING, 17 * 19);
+/// assert!(R.eq(&R.from_z(12), &R.coerce(&S, S.from_z(12))));
+/// assert!(S.eq(&S.from_z(12), &R.cast(&S, R.from_z(12))));
+/// ```
+/// and a canonical homomorphism from any integer ring
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_rns::*;
+/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::primitive_int::*;
+/// let R = Zn::from_primes(StaticRing::<i16>::RING, DefaultBigIntRing::RING, vec![3, 5, 7]);
+/// let S = DefaultBigIntRing::RING;
+/// assert!(R.eq(&R.from_z(120493), &R.coerce(&S, S.from_z(120493))));
+/// ```
+/// 
 #[derive(Clone)]
 pub struct ZnBase<C: ZnRingStore, J: IntegerRingStore> 
     where C::Type: CanonicalHom<J::Type>,
@@ -558,4 +583,8 @@ fn test_zn_ring_axioms() {
 fn test_zn_map_in_large_int() {
     let ring = Zn::from_primes(StaticRing::<i64>::RING, DefaultBigIntRing::RING, vec![7, 11]);
     generic_test_map_in_large_int(ring);
+
+    let R = Zn::from_primes(StaticRing::<i16>::RING, DefaultBigIntRing::RING, vec![3, 5, 7]);
+    let S = DefaultBigIntRing::RING;
+    assert!(R.eq(&R.from_z(120493), &R.coerce(&S, S.from_z(120493))));
 }

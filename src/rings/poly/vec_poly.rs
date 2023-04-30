@@ -285,10 +285,9 @@ use crate::rings::zn::*;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
 
-#[test]
-fn test_ring_axioms_vec_poly_ring() {
-    let poly_ring = VecPolyRing::new(Zn::<7>::RING, "X");
-    generic_test_ring_axioms(poly_ring.clone(), vec![ 
+#[cfg(test)]
+fn edge_case_elements(poly_ring: &VecPolyRing<Zn<7>>) -> impl Iterator<Item = El<VecPolyRing<Zn<7>>>> {
+    vec![ 
         poly_ring.from_terms([].into_iter()),
         poly_ring.from_terms([(1, 0)].into_iter()),
         poly_ring.from_terms([(1, 1)].into_iter()),
@@ -297,11 +296,17 @@ fn test_ring_axioms_vec_poly_ring() {
         poly_ring.from_terms([(6, 1)].into_iter()),
         poly_ring.from_terms([(6, 0), (1, 1)].into_iter()),
         poly_ring.from_terms([(1, 0), (6, 1)].into_iter())
-    ].into_iter());
+    ].into_iter()
 }
 
 #[test]
-fn test_poly_ring_axioms_vec_poly_ring() {
+fn test_ring_axioms() {
+    let poly_ring = VecPolyRing::new(Zn::<7>::RING, "X");
+    generic_test_ring_axioms(poly_ring.clone(), edge_case_elements(&poly_ring));
+}
+
+#[test]
+fn test_poly_ring_axioms() {
     let poly_ring = VecPolyRing::new(Zn::<7>::RING, "X");
     generic_test_poly_ring_axioms(poly_ring, Zn::<7>::RING.elements());
 }

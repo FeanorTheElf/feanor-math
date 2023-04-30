@@ -10,6 +10,7 @@ use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 use crate::rings::zn::*;
 use crate::algorithms;
+use crate::primitive_int::*;
 
 use std::cmp::Ordering;
 
@@ -69,6 +70,7 @@ impl<I: IntegerRingStore> ZnBase<I> {
         integer_ring.mul_pow_2(&mut mod_square_bound, k);
 
         // check that this expression does not overflow
+        integer_ring.println(&modulus);
         integer_ring.mul_ref_snd(integer_ring.pow(&modulus, 2), &mod_square_bound);
 
         let inverse_modulus = integer_ring.euclidean_div(mod_square_bound, &modulus);
@@ -200,7 +202,7 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I> {
     }
 
     fn from_z(&self, value: i32) -> Self::Element {
-        self.project(self.integer_ring.from_z(value))
+        self.project_gen(value, &StaticRing::<i32>::RING)
     }
 
     fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
