@@ -38,6 +38,10 @@ impl<R: ZnRingStore> FpBase<R> {
         assert!(algorithms::miller_rabin::is_prime(base.integer_ring(), base.modulus(), 10));
         Self { base }
     }
+
+    pub fn unwrap_element(&self, el: <Self as RingBase>::Element) -> El<R> {
+        el.0
+    }
 }
 
 impl<R: ZnRingStore> DelegateRing for FpBase<R> {

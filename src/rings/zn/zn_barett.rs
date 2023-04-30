@@ -8,6 +8,7 @@ use crate::ring::*;
 use crate::rings::zn::*;
 use crate::algorithms;
 use crate::primitive_int::*;
+use crate::rings::zn::fp::FpBase;
 
 use std::cmp::Ordering;
 
@@ -141,6 +142,14 @@ impl<I: IntegerRingStore> ZnBase<I> {
             Ok(self.project(s))
         } else {
             Err(d)
+        }
+    }
+
+    pub fn as_field(self) -> Result<FpBase<RingValue<Self>>, Self> {
+        if algorithms::miller_rabin::is_prime(self.integer_ring(), self.modulus(), 10) {
+            Ok(FpBase::new(RingValue::from(self)))
+        } else {
+            Err(self)
         }
     }
 }
@@ -280,7 +289,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for ZnBas
 }
 
 impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanonicalHom<J> for ZnBase<I> 
-    where J: CanonicalIso<J>
+    where J: SelfIso
 {
     type Homomorphism = ();
 
@@ -341,7 +350,32 @@ impl<I: IntegerRingStore> ZnRing for ZnBase<I> {
             current: self.integer_ring().zero()
         }
     }
+}
 
+impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalHom<ZnBase<I>> for FpBase<R> {
+
+    type Homomorphism = <ZnBase<I> as CanonicalHom<ZnBase<I>>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &ZnBase<I>) -> Option<Self::Homomorphism> {
+        <ZnBase<I> as CanonicalHom<ZnBase<I>>>::has_canonical_hom(self.base_ring().get_ring(), from)
+    }
+
+    fn map_in(&self, from: &ZnBase<I>, el: <ZnBase<I> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.from(<ZnBase<I> as CanonicalHom<ZnBase<I>>>::map_in(self.base_ring().get_ring(), from, el, hom))
+    }
+}
+
+impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalIso<ZnBase<I>> for FpBase<R> {
+
+    type Isomorphism = <ZnBase<I> as CanonicalIso<ZnBase<I>>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &ZnBase<I>) -> Option<Self::Isomorphism> {
+        <ZnBase<I> as CanonicalIso<ZnBase<I>>>::has_canonical_iso(self.base_ring().get_ring(), from)
+    }
+
+    fn map_out(&self, from: &ZnBase<I>, el: <FpBase<R> as RingBase>::Element, iso: &Self::Isomorphism) -> <ZnBase<I> as RingBase>::Element {
+        <ZnBase<I> as CanonicalIso<ZnBase<I>>>::map_out(self.base_ring().get_ring(), from, self.unwrap_element(el), iso)
+    }
 }
 
 #[cfg(test)]

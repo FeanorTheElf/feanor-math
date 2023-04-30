@@ -46,6 +46,31 @@ pub trait ZnRing: DivisibilityRing + CanonicalHom<Self::IntegerRingBase> {
     }
 }
 
+pub mod generic_maps {
+    use crate::{ring::*, divisibility::DivisibilityRingStore};
+    use super::ZnRing;
+
+    #[allow(type_alias_bounds)]
+    pub type GenericHomomorphism<R: ZnRing, S: ZnRing> = (<S as CanonicalHom<S::IntegerRingBase>>::Homomorphism, <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::Homomorphism);
+
+    pub fn generic_has_canonical_hom<R: ZnRing, S: ZnRing>(from: &R, to: &S) -> Option<GenericHomomorphism<R, S>> 
+        where R::IntegerRingBase: SelfIso, S::IntegerRingBase: SelfIso
+    {
+        let hom = <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::has_canonical_hom(to.integer_ring().get_ring(), from.integer_ring().get_ring())?;
+        if to.integer_ring().checked_div(&<S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::map_in_ref(&to.integer_ring().get_ring(), from.integer_ring().get_ring(), from.modulus(), &hom), &to.modulus()).is_some() {
+            Some((to.has_canonical_hom(to.integer_ring().get_ring()).unwrap(), hom))
+        } else {
+            None
+        }
+    }
+
+    pub fn generic_map_in<R: ZnRing, S: ZnRing>(from: &R, to: &S, el: R::Element, hom: &GenericHomomorphism<R, S>) -> S::Element 
+        where R::IntegerRingBase: SelfIso, S::IntegerRingBase: SelfIso
+    {
+        to.map_in(to.integer_ring().get_ring(), <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::map_in(to.integer_ring().get_ring(), from.integer_ring().get_ring(), from.smallest_positive_lift(el), &hom.1), &hom.0)
+    }
+}
+
 pub trait ZnRingStore: RingStore<Type: ZnRing> {
     
     delegate!{ fn integer_ring(&self) -> &<Self::Type as ZnRing>::Integers }
