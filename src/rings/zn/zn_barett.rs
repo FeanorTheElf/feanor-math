@@ -80,7 +80,6 @@ impl<I: IntegerRingStore> ZnBase<I> {
         integer_ring.mul_pow_2(&mut mod_square_bound, k);
 
         // check that this expression does not overflow
-        integer_ring.println(&modulus);
         integer_ring.mul_ref_snd(integer_ring.pow(&modulus, 2), &mod_square_bound);
 
         let inverse_modulus = integer_ring.euclidean_div(mod_square_bound, &modulus);

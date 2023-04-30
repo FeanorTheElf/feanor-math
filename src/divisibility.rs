@@ -45,8 +45,8 @@ pub fn generic_test_divisibility_axioms<R: DivisibilityRingStore, I: Iterator<It
             assert!(ring.eq(&ab, &ring.mul(a.clone(), c.unwrap())));
 
             if !ring.is_unit(b) {
-                assert!(ring.checked_left_div(&ring.add(ab.clone(), ring.one()), &a).is_none());
-                assert!(ring.checked_left_div(&ring.sub(ab.clone(), ring.one()), &a).is_none());
+                assert!(ring.checked_left_div(&ring.add(ab.clone(), ring.one()), &b).is_none());
+                assert!(ring.checked_left_div(&ring.sub(ab.clone(), ring.one()), &b).is_none());
             }
         }
     }

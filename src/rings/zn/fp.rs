@@ -206,3 +206,20 @@ impl<R: ZnRingStore> ZnRing for FpBase<R>
         }
     }
 }
+
+#[cfg(test)]
+use crate::divisibility::generic_test_divisibility_axioms;
+#[cfg(test)]
+use crate::rings::zn::zn_barett::Zn;
+
+#[test]
+fn test_canonical_hom_axioms_static_int() {
+    let R = Fp::new(Zn::new(StaticRing::<i64>::RING, 17));
+    generic_test_canonical_hom_axioms(StaticRing::<i64>::RING, &R, 0..17);
+}
+
+#[test]
+fn test_divisibility_axioms() {
+    let R = Fp::new(Zn::new(StaticRing::<i64>::RING, 17));
+    generic_test_divisibility_axioms(&R, R.elements());
+}

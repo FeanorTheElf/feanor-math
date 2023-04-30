@@ -128,10 +128,6 @@ pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>
             ring.euclidean_div_pow_2(&mut b, i);
             assert!(ring.eq(&b, a));
             ring.euclidean_div_pow_2(&mut b, i);
-            ring.println(&b);
-            ring.println(&a);
-            ring.println(&pow_2);
-            println!("{}", i);
             assert!(ring.eq(&b, &ring.euclidean_div(a.clone(), &pow_2)));
         }
     }
