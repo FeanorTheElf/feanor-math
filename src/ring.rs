@@ -336,7 +336,7 @@ macro_rules! delegate {
 /// ```
 /// use feanor_math::ring::*;
 /// use feanor_math::primitive_int::*;
-/// use feanor_math::rings::zn::zn_dyn::*;
+/// use feanor_math::rings::zn::zn_barett::*;
 /// use feanor_math::rings::zn::*;
 /// use feanor_math::algorithms;
 ///
@@ -371,7 +371,7 @@ macro_rules! delegate {
 /// use feanor_math::ring::*;
 /// use feanor_math::integer::*;
 /// use feanor_math::rings::bigint::*;
-/// use feanor_math::rings::zn::zn_dyn::*;
+/// use feanor_math::rings::zn::zn_barett::*;
 /// use feanor_math::rings::zn::*;
 /// use feanor_math::algorithms;
 /// 
@@ -510,6 +510,13 @@ pub trait RingStore {
     }
 
     fn pow(&self, x: &El<Self>, power: usize) -> El<Self> {
+        if power == 1 {
+            return x.clone();
+        } else if power == 2 {
+            let mut result = x.clone();
+            self.square(&mut result);
+            return result;
+        }
         algorithms::sqr_mul::generic_abs_square_and_multiply(
             x, 
             &(power as i64), 

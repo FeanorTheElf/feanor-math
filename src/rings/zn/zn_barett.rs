@@ -13,6 +13,32 @@ use crate::algorithms;
 
 use std::cmp::Ordering;
 
+///
+/// Ring representing `Z/nZ`, computing the modular reductions
+/// via a Barett-reduction algorithm. This is a fast general-purpose
+/// method, but note that it is required that `n^4` fits into the
+/// supplied integer type.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_barett::*;
+/// # use feanor_math::primitive_int::*;
+/// let R = Zn::new(StaticRing::<i64>::RING, 257);
+/// let a = R.from_z(16);
+/// assert!(R.eq(&R.from_z(-1), &R.mul_ref(&a, &a)));
+/// assert!(R.is_one(&R.pow(&a, 4)));
+/// ```
+/// However, this will panic as `257^4 > i32::MAX`.
+/// ```should_panic
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_barett::*;
+/// # use feanor_math::primitive_int::*;
+/// let R = Zn::new(StaticRing::<i32>::RING, 257);
+/// ```
+/// 
 #[derive(Clone)]
 pub struct ZnBase<I: IntegerRingStore> {
     integer_ring: I,
@@ -34,14 +60,18 @@ impl<I: IntegerRingStore> ZnBase<I> {
 
     pub fn new(integer_ring: I, modulus: El<I>) -> Self {
         assert!(integer_ring.is_geq(&modulus, &integer_ring.from_z(2)));
-        // have k such that 2^k > modulus^2
-        // then (2^k / modulus) * x >> k differs at most 1 from floor(x / modulus)
-        // if x < n^2, which is the case after multiplication
-        let k = integer_ring.abs_highest_set_bit(&modulus).unwrap() * 2 + 2;
-        let inverse_modulus = integer_ring.euclidean_div(
-            integer_ring.pow(&integer_ring.from_z(2), k as usize), 
-            &modulus
-        );
+
+        // have k such that `2^k >= modulus^2`
+        // then `floor(2^k / modulus) * x >> k` differs at most 1 from `floor(x / modulus)`
+        // if `x < 2^k`, which is the case after multiplication
+        let k = integer_ring.abs_log2_ceil(&modulus).unwrap() * 2;
+        let mut mod_square_bound = integer_ring.one();
+        integer_ring.mul_pow_2(&mut mod_square_bound, k);
+
+        // check that this expression does not overflow
+        integer_ring.mul_ref_snd(integer_ring.pow(&modulus, 2), &mod_square_bound);
+
+        let inverse_modulus = integer_ring.euclidean_div(mod_square_bound, &modulus);
         return ZnBase {
             integer_ring: integer_ring,
             modulus: modulus,
@@ -63,24 +93,30 @@ impl<I: IntegerRingStore> ZnBase<I> {
     }
 
     pub fn project(&self, n: El<I>) -> <Self as RingBase>::Element {
+        self.project_gen(n, &self.integer_ring)
+    }
+
+    pub fn project_gen<J: IntegerRingStore>(&self, n: El<J>, ZZ: &J) -> <Self as RingBase>::Element {
         let mut red_n = n;
-        let negated = self.integer_ring.is_neg(&red_n);
+        let negated = ZZ.is_neg(&red_n);
         if negated {
-            self.integer_ring.negate_inplace(&mut red_n);
+            ZZ.negate_inplace(&mut red_n);
         }
-        if self.integer_ring.is_lt(&red_n, &self.modulus) {
-            // already in the interval [0, self.modulus[
-        } else if self.integer_ring.abs_highest_set_bit(&red_n).unwrap_or(0) + 1 < self.integer_ring.abs_highest_set_bit(&self.modulus).unwrap() * 2 {
-            self.project_leq_n_square(&mut red_n);
+        let result = if ZZ.abs_highest_set_bit(&red_n).unwrap_or(0) + 1 < self.integer_ring.abs_highest_set_bit(&self.modulus).unwrap() * 2 {
+            let mut result = self.integer_ring.coerce::<J>(ZZ, red_n); 
+            if !self.integer_ring.is_lt(&result, &self.modulus) {
+                self.project_leq_n_square(&mut result);
+            }
+            result
         } else {
-            red_n = self.integer_ring.euclidean_rem(red_n, &self.modulus);
+            let modulus = ZZ.coerce::<I>(&self.integer_ring, self.modulus.clone());
+            red_n = ZZ.euclidean_rem(red_n, &modulus);
+            self.integer_ring.coerce::<J>(ZZ, red_n)
         };
-        debug_assert!(self.integer_ring.is_lt(&red_n, &self.modulus));
-        let result = ZnEl(red_n);
         if negated {
-            return self.negate(result);
+            return self.negate(ZnEl(result));
         } else {
-            return result;
+            return ZnEl(result);
         }
     }
 
@@ -245,14 +281,14 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for ZnBas
 impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanonicalHom<J> for ZnBase<I> 
     where J: CanonicalIso<J>
 {
-    type Homomorphism = <I::Type as CanonicalHom<J>>::Homomorphism;
+    type Homomorphism = ();
 
-    fn has_canonical_hom(&self, from: &J) -> Option<Self::Homomorphism> {
-        <I::Type as CanonicalHom<J>>::has_canonical_hom(self.integer_ring().get_ring(), from)
+    fn has_canonical_hom(&self, _: &J) -> Option<Self::Homomorphism> {
+        Some(())
     }
 
-    fn map_in(&self, from: &J, el: J::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.project(<I::Type as CanonicalHom<J>>::map_in(self.integer_ring().get_ring(), from, el, hom))
+    fn map_in(&self, from: &J, el: J::Element, _hom: &Self::Homomorphism) -> Self::Element {
+        self.project_gen(el, &RingRef::new(from))
     }
 }
 
@@ -551,4 +587,9 @@ fn test_ring_axioms_znbase() {
 fn test_zn_ring_axioms_znbase() {
     test_zn_ring_axioms(Zn::new(StaticRing::<i64>::RING, 17));
     test_zn_ring_axioms(Zn::new(StaticRing::<i64>::RING, 63));
+}
+
+#[test]
+fn test_zn_map_in_large_int_znbase() {
+    test_map_in_large_int(Zn::new(StaticRing::<i64>::RING, 63));
 }

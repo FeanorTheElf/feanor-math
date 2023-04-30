@@ -4,7 +4,7 @@ use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::integer::*;
 use crate::rings::zn::ZnRingStore;
-use crate::rings::zn::zn_dyn::Zn;
+use crate::rings::zn::zn_barett::Zn;
 
 #[allow(type_alias_bounds)]
 type Point<I: IntegerRingStore> = (El<Zn<I>>, El<Zn<I>>, El<Zn<I>>);

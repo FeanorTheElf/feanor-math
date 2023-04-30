@@ -5,7 +5,7 @@ use crate::vector::{VectorViewMut, VectorView};
 use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
 use crate::rings::zn::*;
 
-use super::zn_dyn::Fp;
+use super::zn_barett::Fp;
 
 ///
 /// A ring representing `Z/nZ` for composite n by storing the
@@ -36,8 +36,8 @@ pub struct ZnBase<C: ZnRingStore, J: IntegerRingStore>
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
     components: Vec<C>,
-    total_ring: zn_dyn::Zn<J>,
-    unit_vectors: Vec<El<zn_dyn::Zn<J>>>
+    total_ring: zn_barett::Zn<J>,
+    unit_vectors: Vec<El<zn_barett::Zn<J>>>
 }
 
 pub type Zn<C, J> = RingValue<ZnBase<C, J>>;
@@ -77,7 +77,7 @@ impl<C: ZnRingStore, J: IntegerRingStore> ZnBase<C, J>
         let total_modulus = large_integers.prod(
             component_rings.iter().map(|R| large_integers.coerce::<<C::Type as ZnRing>::Integers>(R.integer_ring(), R.modulus().clone()))
         );
-        let total_ring = zn_dyn::Zn::new(large_integers, total_modulus);
+        let total_ring = zn_barett::Zn::new(large_integers, total_modulus);
         let ZZ = total_ring.integer_ring();
         for R in &component_rings {
             let R_modulus = ZZ.coerce::<<C::Type as ZnRing>::Integers>(R.integer_ring(), R.modulus().clone());
@@ -278,13 +278,13 @@ impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStor
     }
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalHom<zn_dyn::ZnBase<K>> for ZnBase<C, J> 
+impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalHom<zn_barett::ZnBase<K>> for ZnBase<C, J> 
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
     type Homomorphism = (<J::Type as CanonicalHom<K::Type>>::Homomorphism, Vec<<C::Type as CanonicalHom<J::Type>>::Homomorphism>);
 
-    fn has_canonical_hom(&self, from: &zn_dyn::ZnBase<K>) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &zn_barett::ZnBase<K>) -> Option<Self::Homomorphism> {
         if self.total_ring.get_ring().has_canonical_hom(from).is_some() {
             Some((
                 self.total_ring.get_ring().has_canonical_hom(from)?,
@@ -299,7 +299,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalHom<zn_d
         }
     }
 
-    fn map_in(&self, from: &zn_dyn::ZnBase<K>, el: zn_dyn::ZnEl<K>, hom: &Self::Homomorphism) -> ZnEl<C> {
+    fn map_in(&self, from: &zn_barett::ZnBase<K>, el: zn_barett::ZnEl<K>, hom: &Self::Homomorphism) -> ZnEl<C> {
         let lift = from.smallest_positive_lift(el);
         let mapped_lift = <J::Type as CanonicalHom<K::Type>>::map_in(
             self.ZZ().get_ring(), 
@@ -317,18 +317,18 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalHom<zn_d
     }
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalIso<zn_dyn::ZnBase<K>> for ZnBase<C, J> 
+impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalIso<zn_barett::ZnBase<K>> for ZnBase<C, J> 
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
     type Isomorphism = (
-        <zn_dyn::ZnBase<J> as CanonicalIso<zn_dyn::ZnBase<K>>>::Isomorphism, 
+        <zn_barett::ZnBase<J> as CanonicalIso<zn_barett::ZnBase<K>>>::Isomorphism, 
         Vec<<J::Type as CanonicalHom<<C::Type as ZnRing>::IntegerRingBase>>::Homomorphism>
     );
 
-    fn has_canonical_iso(&self, from: &zn_dyn::ZnBase<K>) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, from: &zn_barett::ZnBase<K>) -> Option<Self::Isomorphism> {
         Some((
-            <zn_dyn::ZnBase<J> as CanonicalIso<zn_dyn::ZnBase<K>>>::has_canonical_iso(self.total_ring.get_ring(), from)?,
+            <zn_barett::ZnBase<J> as CanonicalIso<zn_barett::ZnBase<K>>>::has_canonical_iso(self.total_ring.get_ring(), from)?,
             self.components.iter()
                 .map(|s| s.integer_ring().get_ring())
                 .map(|s| self.total_ring.get_ring().has_canonical_hom(s).unwrap())
@@ -336,7 +336,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalIso<zn_d
         ))
     }
 
-    fn map_out(&self, from: &zn_dyn::ZnBase<K>, el: Self::Element, (final_iso, homs): &Self::Isomorphism) -> zn_dyn::ZnEl<K> {
+    fn map_out(&self, from: &zn_barett::ZnBase<K>, el: Self::Element, (final_iso, homs): &Self::Isomorphism) -> zn_barett::ZnEl<K> {
         let result = <_ as RingStore>::sum(&self.total_ring,
             self.components.iter()
                 .zip(el.0.into_iter())
@@ -345,10 +345,10 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalIso<zn_d
                 .zip(homs.iter())
                 .map(|(((integers, x), u), hom)| (integers, x, u, hom))
                 .map(|(integers, x, u, hom)| 
-                    self.total_ring.mul_ref_snd(<zn_dyn::ZnBase<J> as CanonicalHom<_>>::map_in(self.total_ring.get_ring(), integers, x, hom), u)
+                    self.total_ring.mul_ref_snd(<zn_barett::ZnBase<J> as CanonicalHom<_>>::map_in(self.total_ring.get_ring(), integers, x, hom), u)
                 )
         );
-        return <zn_dyn::ZnBase<J> as CanonicalIso<zn_dyn::ZnBase<K>>>::map_out(self.total_ring.get_ring(), from, result, final_iso);
+        return <zn_barett::ZnBase<J> as CanonicalIso<zn_barett::ZnBase<K>>>::map_out(self.total_ring.get_ring(), from, result, final_iso);
     }
 }
 
@@ -450,11 +450,11 @@ impl<C: ZnRingStore, J: IntegerRingStore> ZnRing for ZnBase<C, J>
 
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
         self.total_ring.smallest_positive_lift(
-            <Self as CanonicalIso<zn_dyn::ZnBase<J>>>::map_out(
+            <Self as CanonicalIso<zn_barett::ZnBase<J>>>::map_out(
                 self, 
                 self.total_ring.get_ring(), 
                 el, 
-                &<Self as CanonicalIso<zn_dyn::ZnBase<J>>>::has_canonical_iso(self, self.total_ring.get_ring()).unwrap()
+                &<Self as CanonicalIso<zn_barett::ZnBase<J>>>::has_canonical_iso(self, self.total_ring.get_ring()).unwrap()
             )
         )
     }
@@ -523,7 +523,7 @@ fn test_ring_axioms_znbase() {
 #[test]
 fn test_map_in_map_out() {
     let ring1 = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11, 17]);
-    let ring2 = zn_dyn::Zn::new(StaticRing::<i32>::RING, 7 * 11 * 17);
+    let ring2 = zn_barett::Zn::new(StaticRing::<i64>::RING, 7 * 11 * 17);
     for x in [0, 1, 7, 8, 9, 10, 11, 17, 7 * 17, 11 * 8, 11 * 17, 7 * 11 * 17 - 1] {
         let value = ring2.from_z(x);
         assert!(ring2.eq(&value, &ring1.cast(&ring2, ring1.coerce(&ring2, value.clone()))));
@@ -533,4 +533,9 @@ fn test_map_in_map_out() {
 #[test]
 fn test_zn_ring_axioms_znbase() {
     test_zn_ring_axioms(Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]));
+}
+
+#[test]
+fn test_zn_map_in_large_int_znbase() {
+    test_map_in_large_int(Zn::from_primes(StaticRing::<i64>::RING, DefaultBigIntRing::RING, vec![7, 11]));
 }

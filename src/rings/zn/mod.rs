@@ -2,7 +2,8 @@ use crate::{divisibility::DivisibilityRing, ring::*, algorithms};
 use crate::integer::*;
 use crate::ordered::*;
 
-pub mod zn_dyn;
+pub mod zn_barett;
+pub mod zn_63bit;
 pub mod zn_static;
 pub mod zn_rns;
 
@@ -65,11 +66,13 @@ impl<R: RingStore<Type: ZnRing>> ZnRingStore for R {}
 
 #[cfg(test)]
 use crate::primitive_int::*;
+#[cfg(test)]
+use super::bigint::DefaultBigIntRing;
 
 #[cfg(test)]
 pub fn test_zn_ring_axioms<R: ZnRingStore>(R: R) 
     // necessary to prevent typechecking overflow
-    where <<R as RingStore>::Type as ZnRing>::IntegerRingBase: CanonicalIso<<<R as RingStore>::Type as ZnRing>::IntegerRingBase>
+    where <<R as RingStore>::Type as ZnRing>::IntegerRingBase: SelfIso
 {
     let ZZ = R.integer_ring();
     let n = R.modulus();
@@ -90,4 +93,15 @@ pub fn test_zn_ring_axioms<R: ZnRingStore>(R: R)
             assert!(i == j || !R.eq(x, y));
         }
     }
+}
+
+#[cfg(test)]
+pub fn test_map_in_large_int<R: ZnRingStore>(R: R)
+    // necessary to prevent typechecking overflow
+    where <<R as RingStore>::Type as ZnRing>::IntegerRingBase: SelfIso, <R as RingStore>::Type: CanonicalHom<DefaultBigIntRing>
+{
+    let ZZ_big = DefaultBigIntRing::RING;
+    let n = ZZ_big.power_of_two(1000);
+    let x = R.coerce(&ZZ_big, n);
+    assert!(R.eq(&R.pow(&R.from_z(2), 1000), &x));
 }
