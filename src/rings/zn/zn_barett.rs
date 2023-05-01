@@ -5,10 +5,10 @@ use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
 use crate::ordered::OrderedRingStore;
 use crate::ring::*;
+use crate::rings::field::AssumeFieldDivision;
 use crate::rings::zn::*;
 use crate::algorithms;
 use crate::primitive_int::*;
-use crate::rings::zn::fp::FpBase;
 
 use std::cmp::Ordering;
 
@@ -17,7 +17,7 @@ use std::cmp::Ordering;
 /// via a Barett-reduction algorithm. This is a fast general-purpose
 /// method, but note that it is required that `n^4` fits into the
 /// supplied integer type.
-/// 
+///
 /// # Example
 /// ```
 /// # use feanor_math::ring::*;
@@ -37,7 +37,7 @@ use std::cmp::Ordering;
 /// # use feanor_math::primitive_int::*;
 /// let R = Zn::new(StaticRing::<i32>::RING, 257);
 /// ```
-/// 
+///
 /// # Canonical mappings
 /// This ring has a canonical homomorphism from any integer ring
 /// ```
@@ -50,7 +50,7 @@ use std::cmp::Ordering;
 /// let S = DefaultBigIntRing::RING;
 /// assert!(R.eq(&R.from_z(120493), &R.coerce(&S, S.from_z(120493))));
 /// ```
-/// 
+///
 #[derive(Clone)]
 pub struct ZnBase<I: IntegerRingStore> {
     integer_ring: I,
@@ -115,7 +115,7 @@ impl<I: IntegerRingStore> ZnBase<I> {
             ZZ.negate_inplace(&mut red_n);
         }
         let result = if ZZ.abs_highest_set_bit(&red_n).unwrap_or(0) + 1 < self.integer_ring.abs_highest_set_bit(&self.modulus).unwrap() * 2 {
-            let mut result = self.integer_ring.coerce::<J>(ZZ, red_n); 
+            let mut result = self.integer_ring.coerce::<J>(ZZ, red_n);
             if !self.integer_ring.is_lt(&result, &self.modulus) {
                 self.project_leq_n_square(&mut result);
             }
@@ -133,23 +133,15 @@ impl<I: IntegerRingStore> ZnBase<I> {
     }
 
     ///
-    /// Returns either the inverse of x (as Ok()) or a nontrivial 
+    /// Returns either the inverse of x (as Ok()) or a nontrivial
     /// factor of the modulus (as Err())
-    /// 
+    ///
     pub fn invert(&self, x: ZnEl<I>) -> Result<ZnEl<I>, El<I>> {
         let (s, _, d) = algorithms::eea::eea(x.0.clone(), self.modulus.clone(), &self.integer_ring);
         if self.integer_ring.is_neg_one(&d) || self.integer_ring.is_one(&d) {
             Ok(self.project(s))
         } else {
             Err(d)
-        }
-    }
-
-    pub fn as_field(self) -> Result<FpBase<RingValue<Self>>, Self> {
-        if algorithms::miller_rabin::is_prime(self.integer_ring(), self.modulus(), 10) {
-            Ok(FpBase::new(RingValue::from(self)))
-        } else {
-            Err(self)
         }
     }
 }
@@ -163,7 +155,7 @@ impl<I: IntegerRingStore> Clone for ZnEl<I> {
     }
 }
 
-impl<I: IntegerRingStore> Copy for ZnEl<I> 
+impl<I: IntegerRingStore> Copy for ZnEl<I>
     where El<I>: Copy
 {}
 
@@ -224,7 +216,7 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I> {
     fn is_one(&self, value: &Self::Element) -> bool {
         self.integer_ring.is_one(&value.0)
     }
-    
+
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
 
@@ -235,14 +227,24 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I> {
 }
 
 impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I> {
-    
+
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let d = algorithms::eea::gcd(lhs.0.clone(), rhs.0.clone(), &self.integer_ring);
-        if let Ok(inv) = self.invert(self.project(self.integer_ring.checked_div(&rhs.0, &d).unwrap())) {
+        if self.integer_ring.is_zero(&d) {
+            return Some(self.zero());
+        } else if let Ok(inv) = self.invert(self.project(self.integer_ring.checked_div(&rhs.0, &d).unwrap())) {
             return Some(self.mul(inv, self.project(self.integer_ring.checked_div(&lhs.0, &d).unwrap())));
         } else {
             return None;
         }
+    }
+}
+
+impl<I: IntegerRingStore> AssumeFieldDivision for ZnBase<I> {
+
+    fn assume_field_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+        assert!(!self.is_zero(rhs));
+        return self.mul_ref_fst(lhs, self.invert(rhs.clone()).ok().unwrap());
     }
 }
 
@@ -253,7 +255,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalHom<ZnBase<J>> for ZnBas
     fn has_canonical_hom(&self, from: &ZnBase<J>) -> Option<Self::Homomorphism> {
         let base_hom = <I::Type as CanonicalHom<J::Type>>::has_canonical_hom(self.integer_ring.get_ring(), from.integer_ring.get_ring())?;
         if self.integer_ring.eq(
-            &self.modulus, 
+            &self.modulus,
             &<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), from.modulus.clone(), &base_hom)
         ) {
             Some(base_hom)
@@ -274,7 +276,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for ZnBas
     fn has_canonical_iso(&self, from: &ZnBase<J>) -> Option<Self::Isomorphism> {
         let base_iso = <I::Type as CanonicalIso<J::Type>>::has_canonical_iso(self.integer_ring.get_ring(), from.integer_ring.get_ring())?;
         if self.integer_ring.eq(
-             &self.modulus, 
+             &self.modulus,
             &<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), from.modulus.clone(), &base_iso)
         ) {
             Some(base_iso)
@@ -288,7 +290,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for ZnBas
     }
 }
 
-impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanonicalHom<J> for ZnBase<I> 
+impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanonicalHom<J> for ZnBase<I>
     where J: SelfIso
 {
     type Homomorphism = ();
@@ -326,7 +328,7 @@ impl<'a, I> Iterator for ZnBaseElementsIter<'a, I>
 }
 
 impl<I: IntegerRingStore> ZnRing for ZnBase<I> {
-    
+
     type IntegerRingBase = I::Type;
     type Integers = I;
     type ElementsIter<'a> = ZnBaseElementsIter<'a, I>
@@ -352,7 +354,7 @@ impl<I: IntegerRingStore> ZnRing for ZnBase<I> {
     }
 }
 
-impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalHom<ZnBase<I>> for FpBase<R> {
+impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalHom<ZnBase<I>> for AsFieldBase<R> {
 
     type Homomorphism = <ZnBase<I> as CanonicalHom<ZnBase<I>>>::Homomorphism;
 
@@ -365,7 +367,7 @@ impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalHom<ZnBase<
     }
 }
 
-impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalIso<ZnBase<I>> for FpBase<R> {
+impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalIso<ZnBase<I>> for AsFieldBase<R> {
 
     type Isomorphism = <ZnBase<I> as CanonicalIso<ZnBase<I>>>::Isomorphism;
 
@@ -373,13 +375,15 @@ impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalIso<ZnBase<
         <ZnBase<I> as CanonicalIso<ZnBase<I>>>::has_canonical_iso(self.base_ring().get_ring(), from)
     }
 
-    fn map_out(&self, from: &ZnBase<I>, el: <FpBase<R> as RingBase>::Element, iso: &Self::Isomorphism) -> <ZnBase<I> as RingBase>::Element {
+    fn map_out(&self, from: &ZnBase<I>, el: <AsFieldBase<R> as RingBase>::Element, iso: &Self::Isomorphism) -> <ZnBase<I> as RingBase>::Element {
         <ZnBase<I> as CanonicalIso<ZnBase<I>>>::map_out(self.base_ring().get_ring(), from, self.unwrap_element(el), iso)
     }
 }
 
 #[cfg(test)]
 use crate::rings::bigint::*;
+#[cfg(test)]
+use crate::divisibility::generic_test_divisibility_axioms;
 
 #[test]
 fn test_mul() {
@@ -431,4 +435,10 @@ fn test_zn_ring_axioms_znbase() {
 #[test]
 fn test_zn_map_in_large_int_znbase() {
     generic_test_map_in_large_int(Zn::new(StaticRing::<i64>::RING, 63));
+}
+
+#[test]
+fn test_divisibility_axioms() {
+    let R = Zn::new(StaticRing::<i64>::RING, 17);
+    generic_test_divisibility_axioms(&R, R.elements());
 }

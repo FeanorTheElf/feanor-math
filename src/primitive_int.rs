@@ -53,6 +53,11 @@ impl<T: PrimitiveInt, S: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for Stati
 impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
     
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        if self.is_zero(lhs) && self.is_zero(rhs) {
+            return Some(self.zero());
+        } else if self.is_zero(rhs) {
+            return None;
+        }
         let (div, rem) = self.euclidean_div_rem(*lhs, rhs);
         if self.is_zero(&rem) {
             return Some(div);

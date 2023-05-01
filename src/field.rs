@@ -7,14 +7,17 @@ use crate::euclidean::*;
 /// 
 /// Note that fields must be commutative.
 /// 
-pub trait Field: EuclideanRing {}
+pub trait Field: EuclideanRing {
+
+    fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+        assert!(!self.is_zero(rhs));
+        return self.checked_left_div(lhs, rhs).unwrap();
+    }
+}
 
 pub trait FieldWrapper: RingStore<Type: Field> + EuclideanRingStore {
 
-    fn div(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> {
-        assert!(!self.is_zero(rhs));
-        self.checked_div(lhs, rhs).unwrap()
-    }
+    delegate!{ fn div(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
 }
 
 impl<R> FieldWrapper for R

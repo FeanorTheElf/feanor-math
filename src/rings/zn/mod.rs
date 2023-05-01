@@ -6,7 +6,6 @@ pub mod zn_barett;
 pub mod zn_63bit;
 pub mod zn_static;
 pub mod zn_rns;
-pub mod fp;
 
 pub trait ZnRing: DivisibilityRing + CanonicalHom<Self::IntegerRingBase> {
 
@@ -86,6 +85,16 @@ pub trait ZnRingStore: RingStore<Type: ZnRing> {
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> El<Self> {
         self.get_ring().random_element(rng)
     }
+    
+    fn as_field(self) -> Result<RingValue<AsFieldBase<Self>>, Self> 
+        where Self: Sized
+    {
+        if algorithms::miller_rabin::is_prime(self.integer_ring(), self.modulus(), 10) {
+            Ok(RingValue::from(unsafe { AsFieldBase::unsafe_create(self) }))
+        } else {
+            Err(self)
+        }
+    }
 }
 
 impl<R: RingStore<Type: ZnRing>> ZnRingStore for R {}
@@ -94,6 +103,7 @@ impl<R: RingStore<Type: ZnRing>> ZnRingStore for R {}
 use crate::primitive_int::*;
 #[cfg(test)]
 use super::bigint::DefaultBigIntRing;
+use super::field::AsFieldBase;
 
 #[cfg(test)]
 pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R) 

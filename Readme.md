@@ -199,3 +199,49 @@ The main power of this separation becomes apparent when we start nesting rings.
 Say we have a ring type that builds on an underlying ring type, for example a polynomial ring `PolyRing<R>` over a base ring `R`.
 In this case, `PolyRing` implements `RingBase`, but the underlying ring `R` is constrained to be `RingStore`.
 As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` can all be used equivalently, which provides a lot of flexibility, but still works both with expensive-to-clone rings and zero-sized rings.
+
+# Design decisions
+
+Here I document - mainly for myself - some of the more important design decisions.
+
+## `RingStore`
+
+Already talked about this.
+Mainly, this is the result of the headache I got in the first version of this crate, when trying to map elements from `RingWrapper<Zn<IntRing>>` to `RingWrapper<Zn<&IntRing>>` or similar.
+
+## Elements referencing the ring
+
+It seems to be a reasonably common requirement that elements of a ring may contain references to the ring.
+For example, this is the case if the element uses memory that is managed by a memory pool of the ring.
+In other words, we would define `RingBase` as
+```
+trait RingBase {
+
+    type Element<'a> where Self: 'a;
+
+    ...
+}
+```
+However, this conflicts with another design decision:
+We want to be able to nest rings, and allow the nested rings to be owned (not just borrowed).
+If we allow ring-referential elements, this now prevents us from defining rings that store the nested ring and some of its elements.
+For example, an implementation of Z/qZ might look like
+```rust
+struct Zn<I: IntegerRingStore> {
+    integer_ring: I,
+    modulus: El<I>
+}
+```
+If `El<I>` may contain a reference to `I`, then this struct is self-referential, causing untold trouble.
+
+Now it seems somewhat more natural to forbid owning nested rings instead of ring-referential elements, but this then severly limits which rings can be returned from functions.
+For example we might want a function to produce Fq with a mempool-based big integer implementation like
+```rust
+fn galois_field(q: i64, exponent: usize) -> RingExtension<ZnBarett<MempoolBigIntRing>> {
+    ...
+}
+```
+This would be impossible, as well as many other use cases.
+On the other hand, it is simpler to perform runtime checks in case of static lifetime analysis if we want to have ring-referential elements.
+This is maybe slightly unnatural, but very usable.
+And really, if elements need a reference to the ring, they won't be small and the arithmetic cost will greatly exceed the runtime management cost.
