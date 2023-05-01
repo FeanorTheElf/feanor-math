@@ -27,7 +27,7 @@ use std::cmp::Ordering;
 /// let R = Zn::new(StaticRing::<i64>::RING, 257);
 /// let a = R.from_z(16);
 /// assert!(R.eq(&R.from_z(-1), &R.mul_ref(&a, &a)));
-/// assert!(R.is_one(&R.pow(&a, 4)));
+/// assert!(R.is_one(&R.pow(a, 4)));
 /// ```
 /// However, this will panic as `257^4 > i32::MAX`.
 /// ```should_panic
