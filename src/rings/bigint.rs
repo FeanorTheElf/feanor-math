@@ -56,6 +56,10 @@ impl RingBase for DefaultBigIntRing {
     
     type Element = DefaultBigIntRingEl;
 
+    fn clone(&self, val: &Self::Element) -> Self::Element {
+        val.clone()
+    }
+
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         match (lhs, rhs) {
             (DefaultBigIntRingEl(false, lhs_val), DefaultBigIntRingEl(false, rhs_val)) |

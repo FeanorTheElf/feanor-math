@@ -26,6 +26,10 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD>
 {
     type Element = u64;
 
+    fn clone(&self, val: &Self::Element) -> Self::Element {
+        *val
+    }
+
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         *lhs += rhs;
         if *lhs >= N {

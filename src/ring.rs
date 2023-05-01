@@ -173,14 +173,15 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::IntegerRingStore};
 /// 
 pub trait RingBase {
 
-    type Element: Clone;
+    type Element;
 
-    fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.add_assign(lhs, rhs.clone()) }
+    fn clone(&self, val: &Self::Element) -> Self::Element;
+    fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.add_assign(lhs, self.clone(rhs)) }
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element);
-    fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.sub_assign(lhs, rhs.clone()) }
+    fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.sub_assign(lhs, self.clone(rhs)) }
     fn negate_inplace(&self, lhs: &mut Self::Element);
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element);
-    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.mul_assign(lhs, rhs.clone()) }
+    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.mul_assign(lhs, self.clone(rhs)) }
     fn zero(&self) -> Self::Element { self.from_z(0) }
     fn one(&self) -> Self::Element { self.from_z(1) }
     fn neg_one(&self) -> Self::Element { self.from_z(-1) }
@@ -194,7 +195,7 @@ pub trait RingBase {
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
 
     fn square(&self, value: &mut Self::Element) {
-        self.mul_assign(value, value.clone());
+        self.mul_assign(value, self.clone(value));
     }
 
     fn negate(&self, mut value: Self::Element) -> Self::Element {
@@ -224,7 +225,7 @@ pub trait RingBase {
     }
 
     fn add_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        let mut result = lhs.clone();
+        let mut result = self.clone(lhs);
         self.add_assign_ref(&mut result, rhs);
         return result;
     }
@@ -245,7 +246,7 @@ pub trait RingBase {
     }
 
     fn sub_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        let mut result = lhs.clone();
+        let mut result = self.clone(lhs);
         self.sub_assign_ref(&mut result, rhs);
         return result;
     }
@@ -267,7 +268,7 @@ pub trait RingBase {
     }
 
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        let mut result = lhs.clone();
+        let mut result = self.clone(lhs);
         self.mul_assign_ref(&mut result, rhs);
         return result;
     }
@@ -277,7 +278,7 @@ pub trait RingBase {
             self.mul_assign_ref(&mut rhs, lhs);
             return rhs;
         } else {
-            let mut result = lhs.clone();
+            let mut result = self.clone(lhs);
             self.mul_assign(&mut result, rhs);
             return result;
         }
@@ -433,6 +434,7 @@ pub trait RingStore {
 
     fn get_ring<'a>(&'a self) -> &'a Self::Type;
 
+    delegate!{ fn clone(&self, val: &El<Self>) -> El<Self> }
     delegate!{ fn add_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
     delegate!{ fn add_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
     delegate!{ fn sub_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
@@ -509,11 +511,11 @@ pub trait RingStore {
         self.get_ring().from_ref(x)
     }
 
-    fn pow(&self, x: &El<Self>, power: usize) -> El<Self> {
+    fn pow(&self, x: El<Self>, power: usize) -> El<Self> {
         if power == 1 {
-            return x.clone();
+            return x;
         } else if power == 2 {
-            let mut result = x.clone();
+            let mut result = x;
             self.square(&mut result);
             return result;
         }
@@ -528,7 +530,7 @@ pub trait RingStore {
         )
     }
 
-    fn pow_gen<R: IntegerRingStore>(&self, x: &El<Self>, power: &El<R>, integers: R) -> El<Self> {
+    fn pow_gen<R: IntegerRingStore>(&self, x: El<Self>, power: &El<R>, integers: R) -> El<Self> {
         algorithms::sqr_mul::generic_abs_square_and_multiply(
             x, 
             power, 
@@ -623,7 +625,7 @@ pub trait CanonicalHom<S>: RingBase
     fn map_in(&self, from: &S, el: S::Element, hom: &Self::Homomorphism) -> Self::Element;
 
     fn map_in_ref(&self, from: &S, el: &S::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in(from, el.clone(), hom)
+        self.map_in(from, from.clone(el), hom)
     }
 }
 
@@ -674,7 +676,7 @@ pub trait RingExtension: RingBase {
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element;
     
     fn from_ref(&self, x: &El<Self::BaseRing>) -> Self::Element {
-        self.from(x.clone())
+        self.from(self.base_ring().get_ring().clone(x))
     }
 }
 

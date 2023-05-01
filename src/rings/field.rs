@@ -16,8 +16,9 @@ pub type AsField<R: DivisibilityRingStore> = RingValue<AsFieldBase<R>>;
 
 pub struct FieldEl<R: DivisibilityRingStore>(El<R>);
 
-impl<R: DivisibilityRingStore> Clone for FieldEl<R> {
-
+impl<R: DivisibilityRingStore> Clone for FieldEl<R> 
+    where El<R>: Clone
+{
     fn clone(&self) -> Self {
         FieldEl(self.0.clone())
     }

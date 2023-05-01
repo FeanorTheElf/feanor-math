@@ -10,7 +10,7 @@ use crate::ring::*;
 pub trait DelegateRing {
 
     type Base: ?Sized + RingBase;
-    type Element: Clone;
+    type Element;
 
     fn get_delegate(&self) -> &Self::Base;
     fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element;
@@ -22,6 +22,10 @@ pub trait DelegateRing {
 impl<R: DelegateRing> RingBase for R {
 
     type Element = <Self as DelegateRing>::Element;
+
+    default fn clone(&self, val: &Self::Element) -> Self::Element {
+        self.rev_delegate(self.get_delegate().clone(self.delegate_ref(val)))
+    }
     
     default fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         self.get_delegate().add_assign_ref(self.delegate_mut(lhs), self.delegate_ref(rhs))

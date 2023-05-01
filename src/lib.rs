@@ -5,6 +5,7 @@
 #![feature(generic_const_exprs)]
 #![feature(allocator_api)]
 #![feature(associated_type_bounds)]
+#![feature(new_uninit)] 
 
 extern crate test;
 
@@ -13,6 +14,7 @@ pub struct Expr<const VALUE: usize>;
 pub trait Exists {}
 impl<T: ?Sized> Exists for T {}
 
+pub mod mempool;
 #[macro_use]
 pub mod ring;
 pub mod delegate;

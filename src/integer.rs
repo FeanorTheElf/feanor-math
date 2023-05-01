@@ -35,7 +35,7 @@ impl<I: IntegerRing + CanonicalIso<I> + ?Sized, J: IntegerRing + ?Sized> Canonic
     default fn has_canonical_hom(&self, _: &I) -> Option<()> { Some(()) }
 
     default fn map_in(&self, from: &I, el: I::Element, _: &()) -> Self::Element {
-        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(&self.one(), &el, RingRef::new(from), |a, b| self.add(a, b), |a, b| self.add_ref(a, b), self.zero());
+        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(self.one(), &el, RingRef::new(from), |a, b| self.add(a, b), |a, b| self.add_ref(a, b), self.zero());
         if from.is_neg(&el) {
             return self.negate(result);
         } else {
@@ -51,7 +51,7 @@ impl<I: IntegerRing + CanonicalIso<I> + ?Sized, J: IntegerRing + CanonicalIso<J>
     default fn has_canonical_iso(&self, _: &I) -> Option<()> { Some(()) }
 
     default fn map_out(&self, from: &I, el: Self::Element, _: &()) -> I::Element {
-        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(&from.one(), &el, RingRef::new(self), |a, b| from.add(a, b), |a, b| from.add_ref(a, b), from.zero());
+        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(from.one(), &el, RingRef::new(self), |a, b| from.add(a, b), |a, b| from.add_ref(a, b), from.zero());
         if self.is_neg(&el) {
             return from.negate(result);
         } else {

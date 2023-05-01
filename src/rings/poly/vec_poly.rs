@@ -1,40 +1,43 @@
+use crate::mempool::{MemoryProvider, AllocatingMemoryProvider};
 use crate::{ring::*, algorithms};
 use crate::rings::poly::*;
 
 use std::cmp::min;
 
-pub struct VecPolyRingBase<R: RingStore> {
+pub struct DensePolyRingBase<R: RingStore, M: MemoryProvider<El<R>> = AllocatingMemoryProvider> {
     base_ring: R,
     unknown_name: &'static str,
-    zero: El<R>
+    zero: El<R>,
+    memory_provider: M
 }
 
-impl<R: RingStore + Clone> Clone for VecPolyRingBase<R> {
+impl<R: RingStore + Clone, M: MemoryProvider<El<R>> + Clone> Clone for DensePolyRingBase<R, M> {
     
     fn clone(&self) -> Self {
-        VecPolyRingBase {
+        DensePolyRingBase {
             base_ring: self.base_ring.clone(), 
             unknown_name: self.unknown_name, 
-            zero: self.zero.clone() 
+            zero: self.zero.clone() ,
+            memory_provider: self.memory_provider.clone()
         }
     }
 }
 
 #[allow(type_alias_bounds)]
-pub type VecPolyRing<R: RingStore> = RingValue<VecPolyRingBase<R>>;
+pub type VecPolyRing<R: RingStore, M: MemoryProvider<El<R>>> = RingValue<DensePolyRingBase<R, M>>;
 
-impl<R: RingStore> VecPolyRing<R> {
+impl<R: RingStore, M: MemoryProvider<El<R>> + Default> VecPolyRing<R, M> {
 
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        Self::from(VecPolyRingBase::new(base_ring, unknown_name))
+        Self::from(DensePolyRingBase::new(base_ring, unknown_name, M::default()))
     }
 }
 
-impl<R: RingStore> VecPolyRingBase<R> {
+impl<R: RingStore, M: MemoryProvider<El<R>>> DensePolyRingBase<R, M> {
 
-    pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
+    pub fn new(base_ring: R, unknown_name: &'static str, memory_provider: M) -> Self {
         let zero = base_ring.zero();
-        VecPolyRingBase { base_ring, unknown_name, zero }
+        DensePolyRingBase { base_ring, unknown_name, zero, memory_provider }
     }
 
     fn grow(&self, vector: &mut Vec<El<R>>, size: usize) {
@@ -44,9 +47,9 @@ impl<R: RingStore> VecPolyRingBase<R> {
     }
 }
 
-impl<R: RingStore> RingBase for VecPolyRingBase<R> {
+impl<R: RingStore, M: MemoryProvider<El<R>>> RingBase for DensePolyRingBase<R, M> {
     
-    type Element = Vec<El<R>>;
+    type Element = M::Object;
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         self.grow(lhs, rhs.len());
@@ -160,7 +163,7 @@ impl<R: RingStore> RingBase for VecPolyRingBase<R> {
     }
 }
 
-impl<R, P> CanonicalHom<P> for VecPolyRingBase<R> 
+impl<R, P> CanonicalHom<P> for DensePolyRingBase<R> 
     where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: PolyRing
 {
     type Homomorphism = <R::Type as CanonicalHom<<P::BaseRing as RingStore>::Type>>::Homomorphism;
@@ -174,7 +177,7 @@ impl<R, P> CanonicalHom<P> for VecPolyRingBase<R>
     }
 }
 
-impl<R, P> CanonicalIso<P> for VecPolyRingBase<R> 
+impl<R, P> CanonicalIso<P> for DensePolyRingBase<R> 
     where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: PolyRing
 {
     type Isomorphism = <R::Type as CanonicalIso<<P::BaseRing as RingStore>::Type>>::Isomorphism;
@@ -188,7 +191,7 @@ impl<R, P> CanonicalIso<P> for VecPolyRingBase<R>
     }
 }
 
-impl<R: RingStore> RingExtension for VecPolyRingBase<R> {
+impl<R: RingStore> RingExtension for DensePolyRingBase<R> {
     
     type BaseRing = R;
 
@@ -234,7 +237,7 @@ impl<'a, R> Iterator for TermIterator<'a, R>
     }
 }
 
-impl<R> PolyRing for VecPolyRingBase<R> 
+impl<R> PolyRing for DensePolyRingBase<R> 
     where R: RingStore, R::Type: CanonicalIso<R::Type>
 {
     type TermsIterator<'a> = TermIterator<'a, R>

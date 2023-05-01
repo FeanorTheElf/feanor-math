@@ -15,7 +15,7 @@ fn ec_group_action_proj<I>(Zn: &Zn<I>, _A: &El<Zn<I>>, _B: &El<Zn<I>>, P: Point<
     if Zn.is_zero(&Q.2) {
         return P;
     } else if Zn.is_zero(&P.2) {
-        return Q.clone();
+        return (Zn.clone(&P.0), Zn.clone(&P.1), Zn.clone(&P.2));
     }
 
     let (P_x, P_y, P_z) = P;
@@ -83,7 +83,7 @@ pub fn ec_mul_abort<I>(base: &Point<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, power: &El
     if ZZ.is_zero(&power) {
         return (Zn.zero(), Zn.one(), Zn.zero());
     } else if ZZ.is_one(&power) {
-        return base.clone();
+        return (Zn.clone(&base.0), Zn.clone(&base.1), Zn.clone(&base.2));
     }
 
     let mut result = (Zn.zero(), Zn.one(), Zn.zero());
@@ -109,7 +109,7 @@ fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &Point<I>) -> boo
     Zn.eq(
         &Zn.mul_ref_snd(Zn.mul_ref(y, y), &z),
         &Zn.add(
-            Zn.pow(x, 3), Zn.mul(
+            Zn.pow(Zn.clone(x), 3), Zn.mul(
                 Zn.add(Zn.mul_ref(A, x), Zn.mul_ref(B, &z)),
                 Zn.mul_ref(&z, &z)
             )
@@ -132,14 +132,14 @@ pub fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
     let k = ZZ.prod(
         primes.iter()
             .map(|p| (Nf.log2() / ZZ.to_float_approx(&p).log2(), p))
-            .map(|(e, p)| ZZ.pow(p, e as usize + 1))
+            .map(|(e, p)| ZZ.pow(ZZ.clone(p), e as usize + 1))
     );
-    let Zn = Zn::new(&ZZ, N.clone());
+    let Zn = Zn::new(&ZZ, ZZ.clone(&N));
     let mut rng = oorandom::Rand64::new(ZZ.default_hash(N) as u128);
     loop {
         let P = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()), Zn.one());
         let A = Zn.random_element(|| rng.rand_u64());
-        let B = Zn.sub(Zn.mul_ref(&P.1, &P.1), Zn.add(Zn.pow(&P.0, 3), Zn.mul_ref(&A, &P.0)));
+        let B = Zn.sub(Zn.mul_ref(&P.1, &P.1), Zn.add(Zn.pow(P.0, 3), Zn.mul_ref(&A, &P.0)));
         debug_assert!(is_on_curve(&Zn, &A, &B, &P));
         let result = ec_mul_abort(&P, &A, &B, &k, &&ZZ, &Zn);
         if let Err(factor) = Zn.get_ring().invert(result.2) {

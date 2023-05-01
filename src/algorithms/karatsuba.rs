@@ -68,7 +68,7 @@ macro_rules! karatsuba_impl {
                             slice_add_assign(dst.subvector(..(2 * n)), &lower, ring);
                         } else {
                             for i in 0..(2 * n) {
-                                *dst.at_mut(i) = lower.at(i).clone();
+                                *dst.at_mut(i) = <R as RingStore>::clone(&ring, lower.at(i));
                             }
                             for i in (2 * n)..(4 * n) {
                                 *dst.at_mut(i) = ring.zero();
@@ -138,7 +138,7 @@ pub fn karatsuba<R, V1, V2>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: 
     assert!(lhs.len() < 2 * n || rhs.len() < 2 * n);
 
     let mut memory = Vec::new();
-    memory.resize(karatsuba_mem_size(block_size_log2, threshold_size_log2), ring.zero());
+    memory.resize_with(karatsuba_mem_size(block_size_log2, threshold_size_log2), || ring.zero());
     for i in (0..=(lhs.len() - n)).step_by(n) {
         for j in (0..=(rhs.len() - n)).step_by(n) {
             dispatch_karatsuba_impl::<R, _, _, true>(

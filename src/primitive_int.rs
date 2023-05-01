@@ -167,6 +167,10 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     
     type Element = T;
 
+    fn clone(&self, val: &Self::Element) -> Self::Element {
+        *val
+    }
+
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         *lhs += rhs;
     }

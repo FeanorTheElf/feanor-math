@@ -53,7 +53,6 @@ use crate::rings::zn::*;
 /// assert!(R.eq(&R.from_z(120493), &R.coerce(&S, S.from_z(120493))));
 /// ```
 /// 
-#[derive(Clone)]
 pub struct ZnBase<C: ZnRingStore, J: IntegerRingStore> 
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
@@ -85,7 +84,7 @@ impl<I: IntegerRingStore + Clone, J: IntegerRingStore> ZnBase<zn_barett::Zn<I>, 
 
     pub fn from_primes(integers: I, large_integers: J, primes: Vec<El<I>>) -> Self {
         Self::new(
-            primes.into_iter().map(|n| zn_barett::Zn::new(integers.clone(), n)).collect(),
+            primes.into_iter().map(|n| zn_barett::Zn::new(<I as Clone>::clone(&integers), n)).collect(),
             large_integers
         )
     }
@@ -98,23 +97,23 @@ impl<C: ZnRingStore, J: IntegerRingStore> ZnBase<C, J>
     pub fn new(component_rings: Vec<C>, large_integers: J) -> Self {
         assert!(component_rings.len() > 0);
         let total_modulus = large_integers.prod(
-            component_rings.iter().map(|R| large_integers.coerce::<<C::Type as ZnRing>::Integers>(R.integer_ring(), R.modulus().clone()))
+            component_rings.iter().map(|R| large_integers.coerce::<<C::Type as ZnRing>::Integers>(R.integer_ring(), R.integer_ring().clone(R.modulus())))
         );
         let total_ring = zn_barett::Zn::new(large_integers, total_modulus);
         let ZZ = total_ring.integer_ring();
         for R in &component_rings {
-            let R_modulus = ZZ.coerce::<<C::Type as ZnRing>::Integers>(R.integer_ring(), R.modulus().clone());
+            let R_modulus = ZZ.coerce::<<C::Type as ZnRing>::Integers>(R.integer_ring(), R.integer_ring().clone(R.modulus()));
             assert!(
                 ZZ.is_one(&algorithms::eea::signed_gcd(ZZ.checked_div(total_ring.modulus(), &R_modulus).unwrap(), R_modulus, ZZ)),
                 "all moduli must be coprime"
             );
         }
         let unit_vectors = component_rings.iter()
-            .map(|R| ZZ.checked_div(total_ring.modulus(), &ZZ.coerce::<<C::Type as ZnRing>::Integers>(R.integer_ring(), R.modulus().clone())))
+            .map(|R| ZZ.checked_div(total_ring.modulus(), &ZZ.coerce::<<C::Type as ZnRing>::Integers>(R.integer_ring(), R.integer_ring().clone(R.modulus()))))
             .map(Option::unwrap)
             .map(|n| total_ring.coerce(&ZZ, n))
             .zip(component_rings.iter())
-            .map(|(n, R)| total_ring.pow_gen(&n, &R.integer_ring().sub_ref_fst(R.modulus(), R.integer_ring().one()), R.integer_ring()))
+            .map(|(n, R)| total_ring.pow_gen(n, &R.integer_ring().sub_ref_fst(R.modulus(), R.integer_ring().one()), R.integer_ring()))
             .collect();
         ZnBase {
             components: component_rings,
@@ -129,7 +128,7 @@ impl<C: ZnRingStore, J: IntegerRingStore> ZnBase<C, J>
 
     pub fn from_congruence<V: VectorView<El<C>>>(&self, el: V) -> ZnEl<C> {
         assert_eq!(self.components.len(), el.len());
-        ZnEl((0..el.len()).map(|i| el.at(i).clone()).collect())
+        ZnEl((0..el.len()).map(|i| self[i].clone(el.at(i))).collect())
     }
 
     pub fn get_congruence<'a>(&self, el: &'a ZnEl<C>, prime_component_index: usize) -> &'a El<C> {
@@ -154,18 +153,15 @@ impl<C: ZnRingStore, J: IntegerRingStore> Index<usize> for ZnBase<C, J>
 
 pub struct ZnEl<C: ZnRingStore>(Vec<El<C>>);
 
-impl<C: ZnRingStore> Clone for ZnEl<C> {
-
-    fn clone(&self) -> Self {
-        ZnEl(self.0.clone())
-    }
-}
-
 impl<C: ZnRingStore, J: IntegerRingStore> RingBase for ZnBase<C, J> 
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
     type Element = ZnEl<C>;
+
+    fn clone(&self, val: &Self::Element) -> Self::Element {
+        ZnEl(val.0.iter().enumerate().map(|(i, x)| self[i].clone(x)).collect())
+    }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         for i in 0..self.components.len() {
@@ -227,7 +223,7 @@ impl<C: ZnRingStore, J: IntegerRingStore> RingBase for ZnBase<C, J>
     fn is_noetherian(&self) -> bool { true }
 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        self.total_ring.get_ring().dbg(&RingRef::new(self).cast(&self.total_ring, value.clone()), out)
+        self.total_ring.get_ring().dbg(&RingRef::new(self).cast(&self.total_ring, self.clone(value)), out)
     }
 }
 
@@ -436,7 +432,7 @@ impl<'a, C: ZnRingStore, J: IntegerRingStore> Iterator for ZnBaseElementsIterato
             while part_iters.len() < self.ring.components.len() {
                 part_iters.push(self.ring.components[part_iters.len()].elements().peekable());
             }
-            let result = part_iters.iter_mut().map(|it| it.peek().unwrap().clone()).collect::<Vec<_>>();
+            let result = part_iters.iter_mut().enumerate().map(|(i, it)| self.ring[i].clone(it.peek().unwrap())).collect::<Vec<_>>();
             part_iters.last_mut().unwrap().next();
             while part_iters.last_mut().unwrap().peek().is_none() {
                 part_iters.pop();
