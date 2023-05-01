@@ -57,15 +57,33 @@ pub trait MemoryProvider<T> {
 
     unsafe fn get_new<F: FnOnce(&mut [MaybeUninit<T>])>(&self, size: usize, initializer: F) -> Self::Object;
 
-    fn get_new_init<F: Fn() -> T>(&self, size: usize, initializer: F) -> Self::Object {
+    fn get_new_init<F: FnMut(usize) -> T>(&self, size: usize, mut initializer: F) -> Self::Object {
         unsafe {
             self.get_new(size, |mem| {
                 for i in 0..mem.len() {
-                    mem[i] = MaybeUninit::new(initializer())
+                    mem[i] = MaybeUninit::new(initializer(i))
                 }
             })
         }
     }
+}
+
+pub trait GrowableMemoryProvider<T>: MemoryProvider<T> {
+
+    unsafe fn grow<F: FnOnce(&mut [MaybeUninit<T>])>(&self, el: &mut Self::Object, new_size: usize, initializer: F);
+
+    fn grow_init<F: FnMut(usize) -> T>(&self, el: &mut Self::Object, new_size: usize, mut initializer: F) {
+        assert!(new_size > el.len());
+        let old_len = el.len();
+        unsafe {
+            self.grow(el, new_size, |mem| {
+                for i in 0..mem.len() {
+                    mem[i] = MaybeUninit::new(initializer(old_len + i))
+                }
+            })
+        }
+    }
+
 }
 
 impl<T, M: ?Sized> MemoryProvider<T> for Rc<M>
@@ -88,12 +106,30 @@ pub struct AllocatingMemoryProvider;
 
 impl<T> MemoryProvider<T> for AllocatingMemoryProvider {
     
-    type Object = Box<[T]>;
+    type Object = Vec<T>;
 
     unsafe fn get_new<F: FnOnce(&mut [MaybeUninit<T>])>(&self, size: usize, initializer: F) -> Self::Object {
         let mut result = Box::new_uninit_slice(size);
         initializer(&mut *result);
-        return result.assume_init();
+        return result.assume_init().into_vec();
+    }
+}
+
+impl<T> GrowableMemoryProvider<T> for AllocatingMemoryProvider {
+    
+    unsafe fn grow<F: FnOnce(&mut [MaybeUninit<T>])>(&self, el: &mut Vec<T>, new_size: usize, initializer: F) {
+        assert!(new_size > el.len());
+        let old_len = el.len();
+        el.reserve(new_size - old_len);
+        initializer(&mut el.spare_capacity_mut()[..(new_size - old_len)]);
+        el.set_len(new_size);
+    }
+}
+
+impl Default for AllocatingMemoryProvider {
+
+    fn default() -> Self {
+        AllocatingMemoryProvider
     }
 }
 
@@ -110,10 +146,21 @@ impl LoggingMemoryProvider {
 
 impl<T> MemoryProvider<T> for LoggingMemoryProvider {
     
-    type Object = Box<[T]>;
+    type Object = Vec<T>;
 
     unsafe fn get_new<F: FnOnce(&mut [MaybeUninit<T>])>(&self, size: usize, initializer: F) -> Self::Object {
         println!("[{}]: Allocating {} entries", self.description, size);
         AllocatingMemoryProvider.get_new(size, initializer)
+    }
+}
+
+impl<T> GrowableMemoryProvider<T> for LoggingMemoryProvider {
+    
+    unsafe fn grow<F: FnOnce(&mut [MaybeUninit<T>])>(&self, el: &mut Vec<T>, new_size: usize, initializer: F) {
+        assert!(new_size > el.len());
+        let old_len = el.len();
+        el.reserve(new_size - old_len);
+        initializer(&mut el.spare_capacity_mut()[..(new_size - old_len)]);
+        el.set_len(new_size);
     }
 }

@@ -1,55 +1,59 @@
-use crate::mempool::{MemoryProvider, AllocatingMemoryProvider};
+use crate::mempool::{AllocatingMemoryProvider, GrowableMemoryProvider};
 use crate::{ring::*, algorithms};
 use crate::rings::poly::*;
 
 use std::cmp::min;
 
-pub struct DensePolyRingBase<R: RingStore, M: MemoryProvider<El<R>> = AllocatingMemoryProvider> {
+pub struct DensePolyRingBase<R: RingStore, M: GrowableMemoryProvider<El<R>> = AllocatingMemoryProvider> {
     base_ring: R,
     unknown_name: &'static str,
     zero: El<R>,
     memory_provider: M
 }
 
-impl<R: RingStore + Clone, M: MemoryProvider<El<R>> + Clone> Clone for DensePolyRingBase<R, M> {
+impl<R: RingStore + Clone, M: GrowableMemoryProvider<El<R>> + Clone> Clone for DensePolyRingBase<R, M> {
     
     fn clone(&self) -> Self {
         DensePolyRingBase {
-            base_ring: self.base_ring.clone(), 
+            base_ring: <R as Clone>::clone(&self.base_ring), 
             unknown_name: self.unknown_name, 
-            zero: self.zero.clone() ,
+            zero: self.base_ring.zero() ,
             memory_provider: self.memory_provider.clone()
         }
     }
 }
 
 #[allow(type_alias_bounds)]
-pub type VecPolyRing<R: RingStore, M: MemoryProvider<El<R>>> = RingValue<DensePolyRingBase<R, M>>;
+pub type DensePolyRing<R: RingStore, M: GrowableMemoryProvider<El<R>> = AllocatingMemoryProvider> = RingValue<DensePolyRingBase<R, M>>;
 
-impl<R: RingStore, M: MemoryProvider<El<R>> + Default> VecPolyRing<R, M> {
+impl<R: RingStore> DensePolyRing<R> {
 
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        Self::from(DensePolyRingBase::new(base_ring, unknown_name, M::default()))
+        Self::from(DensePolyRingBase::new(base_ring, unknown_name, AllocatingMemoryProvider::default()))
     }
 }
 
-impl<R: RingStore, M: MemoryProvider<El<R>>> DensePolyRingBase<R, M> {
+impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> DensePolyRingBase<R, M> {
 
     pub fn new(base_ring: R, unknown_name: &'static str, memory_provider: M) -> Self {
         let zero = base_ring.zero();
         DensePolyRingBase { base_ring, unknown_name, zero, memory_provider }
     }
 
-    fn grow(&self, vector: &mut Vec<El<R>>, size: usize) {
+    fn grow(&self, vector: &mut M::Object, size: usize) {
         if vector.len() < size {
-            vector.resize(size, self.base_ring.zero());
+           self.memory_provider.grow_init(vector, size, |_| self.base_ring.zero());
         }
     }
 }
 
-impl<R: RingStore, M: MemoryProvider<El<R>>> RingBase for DensePolyRingBase<R, M> {
+impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingBase<R, M> {
     
     type Element = M::Object;
+
+    fn clone(&self, val: &Self::Element) -> Self::Element {
+        self.memory_provider.get_new_init(self.degree(val).map(|d| d + 1).unwrap_or(0), |i| self.base_ring.clone(&val[i]))
+    }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         self.grow(lhs, rhs.len());
@@ -61,7 +65,7 @@ impl<R: RingStore, M: MemoryProvider<El<R>>> RingBase for DensePolyRingBase<R, M
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         self.grow(lhs, rhs.len());
         for (i, x) in rhs.into_iter().enumerate() {
-            self.base_ring.add_assign(&mut lhs[i], x)
+            self.base_ring.add_assign_ref(&mut lhs[i], x)
         }
     }
 
@@ -87,11 +91,11 @@ impl<R: RingStore, M: MemoryProvider<El<R>>> RingBase for DensePolyRingBase<R, M
     }
 
     fn zero(&self) -> Self::Element {
-        vec![]
+        self.memory_provider.get_new_init(0, |_| self.base_ring.zero())
     }
     
     fn from_z(&self, value: i32) -> Self::Element {
-        vec![ self.base_ring.from_z(value) ]
+        self.memory_provider.get_new_init(1, |_| self.base_ring.from_z(value))
     }
 
     fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -149,10 +153,9 @@ impl<R: RingStore, M: MemoryProvider<El<R>>> RingBase for DensePolyRingBase<R, M
     }
 
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        let mut result = Vec::new();
         let lhs_len = self.degree(lhs).map(|i| i + 1).unwrap_or(0);
         let rhs_len = self.degree(rhs).map(|i| i + 1).unwrap_or(0);
-        self.grow(&mut result, lhs_len + rhs_len);
+        let mut result = self.memory_provider.get_new_init(lhs_len + rhs_len, |_| self.base_ring.zero());
         algorithms::conv_mul::add_assign_convoluted_mul(
             &mut result[..], 
             &lhs[0..lhs_len], 
@@ -163,8 +166,8 @@ impl<R: RingStore, M: MemoryProvider<El<R>>> RingBase for DensePolyRingBase<R, M
     }
 }
 
-impl<R, P> CanonicalHom<P> for DensePolyRingBase<R> 
-    where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: PolyRing
+impl<R, P, M> CanonicalHom<P> for DensePolyRingBase<R, M> 
+    where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: PolyRing, M: GrowableMemoryProvider<El<R>>
 {
     type Homomorphism = <R::Type as CanonicalHom<<P::BaseRing as RingStore>::Type>>::Homomorphism;
 
@@ -173,12 +176,12 @@ impl<R, P> CanonicalHom<P> for DensePolyRingBase<R>
     }
 
     fn map_in(&self, from: &P, el: P::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.from_terms(from.terms(&el).map(|(c, i)| (self.base_ring().get_ring().map_in(from.base_ring().get_ring(), c.clone(), hom), i)))
+        self.from_terms(from.terms(&el).map(|(c, i)| (self.base_ring().get_ring().map_in(from.base_ring().get_ring(), from.base_ring().clone(c), hom), i)))
     }
 }
 
-impl<R, P> CanonicalIso<P> for DensePolyRingBase<R> 
-    where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: PolyRing
+impl<R, P, M> CanonicalIso<P> for DensePolyRingBase<R, M> 
+    where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: PolyRing, M: GrowableMemoryProvider<El<R>>
 {
     type Isomorphism = <R::Type as CanonicalIso<<P::BaseRing as RingStore>::Type>>::Isomorphism;
 
@@ -187,11 +190,11 @@ impl<R, P> CanonicalIso<P> for DensePolyRingBase<R>
     }
 
     fn map_out(&self, from: &P, el: Self::Element, hom: &Self::Isomorphism) -> P::Element {
-        from.from_terms(self.terms(&el).map(|(c, i)| (self.base_ring().get_ring().map_out(from.base_ring().get_ring(), c.clone(), hom), i)))
+        from.from_terms(self.terms(&el).map(|(c, i)| (self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone(c), hom), i)))
     }
 }
 
-impl<R: RingStore> RingExtension for DensePolyRingBase<R> {
+impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingExtension for DensePolyRingBase<R, M> {
     
     type BaseRing = R;
 
@@ -200,7 +203,8 @@ impl<R: RingStore> RingExtension for DensePolyRingBase<R> {
     }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
-        vec![ x ]
+        let mut value = Some(x);
+        self.memory_provider.get_new_init(1, |_| std::mem::replace(&mut value, None).unwrap())
     }
 }
 
@@ -237,14 +241,14 @@ impl<'a, R> Iterator for TermIterator<'a, R>
     }
 }
 
-impl<R> PolyRing for DensePolyRingBase<R> 
+impl<R, M: GrowableMemoryProvider<El<R>>> PolyRing for DensePolyRingBase<R, M> 
     where R: RingStore, R::Type: CanonicalIso<R::Type>
 {
     type TermsIterator<'a> = TermIterator<'a, R>
         where Self: 'a;
 
     fn indeterminate(&self) -> Self::Element {
-        vec![ self.base_ring().zero(), self.base_ring().one() ]
+        self.memory_provider.get_new_init(2, |i| if i == 0 { self.base_ring().zero() } else { self.base_ring().one() })
     }
 
     fn terms<'a>(&'a self, f: &'a Self::Element) -> TermIterator<'a, R> {
@@ -257,7 +261,7 @@ impl<R> PolyRing for DensePolyRingBase<R>
     fn from_terms<I>(&self, iter: I) -> Self::Element
         where I: Iterator<Item = (El<Self::BaseRing>, usize)>
     {
-        let mut result = Vec::new();
+        let mut result = self.memory_provider.get_new_init(iter.size_hint().0, |_| self.base_ring.zero());
         for (c, i) in iter {
             self.grow(&mut result, i + 1);
             result[i] = c;
@@ -289,7 +293,7 @@ use crate::rings::zn::*;
 use crate::rings::zn::zn_static::Zn;
 
 #[cfg(test)]
-fn edge_case_elements(poly_ring: &VecPolyRing<Zn<7>>) -> impl Iterator<Item = El<VecPolyRing<Zn<7>>>> {
+fn edge_case_elements(poly_ring: &DensePolyRing<Zn<7>>) -> impl Iterator<Item = El<DensePolyRing<Zn<7>>>> {
     vec![ 
         poly_ring.from_terms([].into_iter()),
         poly_ring.from_terms([(1, 0)].into_iter()),
@@ -304,12 +308,12 @@ fn edge_case_elements(poly_ring: &VecPolyRing<Zn<7>>) -> impl Iterator<Item = El
 
 #[test]
 fn test_ring_axioms() {
-    let poly_ring = VecPolyRing::new(Zn::<7>::RING, "X");
-    generic_test_ring_axioms(poly_ring.clone(), edge_case_elements(&poly_ring));
+    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    generic_test_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_poly_ring_axioms() {
-    let poly_ring = VecPolyRing::new(Zn::<7>::RING, "X");
+    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
     generic_test_poly_ring_axioms(poly_ring, Zn::<7>::RING.elements());
 }

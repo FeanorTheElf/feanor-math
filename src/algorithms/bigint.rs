@@ -356,7 +356,7 @@ fn division_step<A: Allocator>(
 }
 
 ///
-// Calculates abs(self) = abs(self) % abs(rhs) and returns the quotient
+/// Calculates abs(self) = abs(self) % abs(rhs) and returns the quotient
 /// of the division abs(self) / abs(rhs). The sign bit of self is ignored
 /// and left unchanged.
 /// 

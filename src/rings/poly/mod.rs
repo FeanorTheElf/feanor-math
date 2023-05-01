@@ -1,5 +1,5 @@
 use crate::ring::*;
-// pub mod vec_poly;
+pub mod dense_poly;
 
 ///
 /// Trait for all rings that represent the polynomial ring `R[X]` with
