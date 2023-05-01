@@ -77,7 +77,7 @@ fn fermat_is_prime<R: IntegerRingStore>(ZZ: R, n: El<R>) -> bool {
     // be used in practice. This is just a proof of concept.
 
     // ZZ is not guaranteed to be Copy anymore, so use reference instead
-    let Zn = Zn::new(&ZZ, n.clone());
+    let Zn = Zn::new(&ZZ, ZZ.clone(&n)); // the ring Z/nZ
 
     // check for 6 random a whether a^n == a mod n
     let mut rng = oorandom::Rand64::new(0);
@@ -85,7 +85,7 @@ fn fermat_is_prime<R: IntegerRingStore>(ZZ: R, n: El<R>) -> bool {
         let a = Zn.random_element(|| rng.rand_u64());
         // use a generic square-and-multiply powering function that works with any implementation
         // of integers
-        let a_n = Zn.pow_gen(&a, &n, &ZZ);
+        let a_n = Zn.pow_gen(Zn.clone(&a), &n, &ZZ);
         if !Zn.eq(&a, &a_n) {
             return false;
         }
@@ -112,6 +112,10 @@ struct F2Base;
 impl RingBase for F2Base {
    
     type Element = u8;
+
+    fn clone(&self, val: &Self::Element) -> Self::Element {
+        *val
+    }
 
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         *lhs = (*lhs + rhs) % 2;
