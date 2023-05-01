@@ -270,11 +270,11 @@ fn test_bitreverse_inv_fft_inplace() {
 fn test_for_zn() {
     let ring = Zn::<17>::RING;
     let fft = FFTTableCooleyTuckey::for_zn(ring, 4).unwrap();
-    assert!(ring.is_neg_one(&ring.pow(&fft.root_of_unity, 8)));
-    assert!(ring.is_neg_one(&ring.pow(&fft.inv_root_of_unity, 8)));
+    assert!(ring.is_neg_one(&ring.pow(fft.root_of_unity, 8)));
+    assert!(ring.is_neg_one(&ring.pow(fft.inv_root_of_unity, 8)));
 
     let ring = Zn::<97>::RING;
     let fft = FFTTableCooleyTuckey::for_zn(ring, 4).unwrap();
-    assert!(ring.is_neg_one(&ring.pow(&fft.root_of_unity, 8)));
-    assert!(ring.is_neg_one(&ring.pow(&fft.inv_root_of_unity, 8)));
+    assert!(ring.is_neg_one(&ring.pow(fft.root_of_unity, 8)));
+    assert!(ring.is_neg_one(&ring.pow(fft.inv_root_of_unity, 8)));
 }

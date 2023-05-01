@@ -386,7 +386,7 @@ macro_rules! delegate {
 ///     // be used in practice. This is just a proof of concept.
 /// 
 ///     // ZZ is not guaranteed to be Copy anymore, so use reference instead
-///     let Zn = Zn::new(&ZZ, n.clone()); // the ring Z/nZ
+///     let Zn = Zn::new(&ZZ, ring.clone(n)); // the ring Z/nZ
 /// 
 ///     // check for 6 random a whether a^n == a mod n
 ///     let mut rng = oorandom::Rand64::new(0);
@@ -842,6 +842,10 @@ fn test_internal_wrappings_dont_matter() {
     impl RingBase for ABase {
         type Element = i32;
 
+        fn clone(&self, val: &Self::Element) -> Self::Element {
+            *val
+        }
+
         fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
             *lhs += rhs;
         }
@@ -903,6 +907,10 @@ fn test_internal_wrappings_dont_matter() {
 
     impl<R: RingStore> RingBase for BBase<R> {
         type Element = i32;
+
+        fn clone(&self, val: &Self::Element) -> Self::Element {
+            *val
+        }
 
         fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
             *lhs += rhs;
@@ -1035,27 +1043,27 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
 
     // check self-subtraction
     for a in &elements {
-        assert!(ring.eq(&zero, &ring.sub(a.clone(), a.clone())));
+        assert!(ring.eq(&zero, &ring.sub(ring.clone(a), ring.clone(a))));
     }
 
     // check identity elements
     for a in &elements {
-        assert!(ring.eq(&a, &ring.add(a.clone(), zero.clone())));
-        assert!(ring.eq(&a, &ring.mul(a.clone(), one.clone())));
+        assert!(ring.eq(&a, &ring.add(ring.clone(a), ring.clone(&zero))));
+        assert!(ring.eq(&a, &ring.mul(ring.clone(a), ring.clone(&one))));
     }
 
     // check commutativity
     for a in &elements {
         for b in &elements {
             assert!(ring.eq(
-                &ring.add(a.clone(), b.clone()), 
-                &ring.add(b.clone(), a.clone())
+                &ring.add(ring.clone(a), ring.clone(b)), 
+                &ring.add(ring.clone(b), ring.clone(a))
             ));
                 
             if ring.is_commutative() {
                 assert!(ring.eq(
-                    &ring.mul(a.clone(), b.clone()), 
-                    &ring.mul(b.clone(), a.clone())
+                    &ring.mul(ring.clone(a), ring.clone(b)), 
+                    &ring.mul(ring.clone(b), ring.clone(a))
                 ));
             }
         }
@@ -1066,12 +1074,12 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
         for b in &elements {
             for c in &elements {
                 assert!(ring.eq(
-                    &ring.add(a.clone(), ring.add(b.clone(), c.clone())), 
-                    &ring.add(ring.add(a.clone(), b.clone()), c.clone())
+                    &ring.add(ring.clone(a), ring.add(ring.clone(b), ring.clone(c))), 
+                    &ring.add(ring.add(ring.clone(a), ring.clone(b)), ring.clone(c))
                 ));
                 assert!(ring.eq(
-                    &ring.mul(a.clone(), ring.mul(b.clone(), c.clone())), 
-                    &ring.mul(ring.mul(a.clone(), b.clone()), c.clone())
+                    &ring.mul(ring.clone(a), ring.mul(ring.clone(b), ring.clone(c))), 
+                    &ring.mul(ring.mul(ring.clone(a), ring.clone(b)), ring.clone(c))
                 ));
             }
         }
@@ -1082,12 +1090,12 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
         for b in &elements {
             for c in &elements {
                 assert!(ring.eq(
-                    &ring.mul(a.clone(), ring.add(b.clone(), c.clone())), 
-                    &ring.add(ring.mul(a.clone(), b.clone()), ring.mul(a.clone(), c.clone()))
+                    &ring.mul(ring.clone(a), ring.add(ring.clone(b), ring.clone(c))), 
+                    &ring.add(ring.mul(ring.clone(a), ring.clone(b)), ring.mul(ring.clone(a), ring.clone(c)))
                 ));
                 assert!(ring.eq(
-                    &ring.mul(ring.add(a.clone(), b.clone()), c.clone()), 
-                    &ring.add(ring.mul(a.clone(), c.clone()), ring.mul(b.clone(), c.clone()))
+                    &ring.mul(ring.add(ring.clone(a), ring.clone(b)), ring.clone(c)), 
+                    &ring.add(ring.mul(ring.clone(a), ring.clone(c)), ring.mul(ring.clone(b), ring.clone(c)))
                 ));
             }
         }

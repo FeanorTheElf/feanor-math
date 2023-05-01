@@ -117,18 +117,18 @@ pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>
         let mut ceil_pow_2 = ring.from_z(2);
         ring.mul_pow_2(&mut ceil_pow_2, ring.abs_highest_set_bit(a).unwrap_or(0));
         assert!(ring.is_lt(a, &ceil_pow_2));
-        assert!(ring.is_lt(&ring.negate(a.clone()), &ceil_pow_2));
+        assert!(ring.is_lt(&ring.negate(ring.clone(a)), &ceil_pow_2));
         
         for i in 0..ring.abs_highest_set_bit(a).unwrap_or(0) {
             let mut pow_2 = ring.one();
             ring.mul_pow_2(&mut pow_2, i);
-            let mut b = a.clone();
+            let mut b = ring.clone(a);
             ring.mul_pow_2(&mut b, i);
-            assert!(ring.eq(&b, &ring.mul(a.clone(), pow_2.clone())));
+            assert!(ring.eq(&b, &ring.mul(ring.clone(a), ring.clone(&pow_2))));
             ring.euclidean_div_pow_2(&mut b, i);
             assert!(ring.eq(&b, a));
             ring.euclidean_div_pow_2(&mut b, i);
-            assert!(ring.eq(&b, &ring.euclidean_div(a.clone(), &pow_2)));
+            assert!(ring.eq(&b, &ring.euclidean_div(ring.clone(a), &pow_2)));
         }
     }
 }

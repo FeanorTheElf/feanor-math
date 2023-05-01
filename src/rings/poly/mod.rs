@@ -1,6 +1,5 @@
 use crate::ring::*;
-
-pub mod vec_poly;
+// pub mod vec_poly;
 
 ///
 /// Trait for all rings that represent the polynomial ring `R[X]` with
@@ -18,10 +17,9 @@ pub trait PolyRing: RingExtension + CanonicalIso<Self> {
     fn from_terms<I>(&self, iter: I) -> Self::Element
         where I: Iterator<Item = (El<Self::BaseRing>, usize)>
     {
-        let x = self.indeterminate();
         let self_ring = RingRef::new(self);
         self_ring.sum(
-            iter.map(|(c, i)| self.mul(self.from(c), self_ring.pow(&x, i)))
+            iter.map(|(c, i)| self.mul(self.from(c), self_ring.pow(self.indeterminate(), i)))
         )
     }
 
@@ -84,7 +82,7 @@ pub fn generic_test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R:
                         ring.mul(ring.from_ref(a), ring.from_ref(c)),
                         ring.mul(ring.from_ref(a), ring.mul_ref_snd(ring.from_ref(d), &x)),
                         ring.mul(ring.from_ref(b), ring.mul_ref_snd(ring.from_ref(c), &x)),
-                        ring.mul(ring.from_ref(b), ring.mul(ring.from_ref(d), ring.pow(&x, 2)))
+                        ring.mul(ring.from_ref(b), ring.mul(ring.from_ref(d), ring.pow(ring.clone(&x), 2)))
                     ].into_iter());
                     assert!(ring.eq(&result, &ring.mul(a_bx, c_dx)));
                 }
@@ -99,11 +97,11 @@ pub fn generic_test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R:
                 let f = ring.sum([
                     ring.from_ref(a),
                     ring.mul_ref_snd(ring.from_ref(b), &x),
-                    ring.mul(ring.from_ref(c), ring.pow(&x, 3))
+                    ring.mul(ring.from_ref(c), ring.pow(ring.clone(&x), 3))
                 ].into_iter());
-                let actual = ring.from_terms([(a.clone(), 0), (c.clone(), 3), (b.clone(), 1)].into_iter());
+                let actual = ring.from_terms([(ring.base_ring().clone(a), 0), (ring.base_ring().clone(c), 3), (ring.base_ring().clone(b), 1)].into_iter());
                 assert!(ring.eq(&f, &actual));
-                assert!(ring.eq(&f, &ring.from_terms(ring.terms(&f).map(|(c, i)| (c.clone(), i)))));
+                assert!(ring.eq(&f, &ring.from_terms(ring.terms(&f).map(|(c, i)| (ring.base_ring().clone(c), i)))));
             }
         }
     }

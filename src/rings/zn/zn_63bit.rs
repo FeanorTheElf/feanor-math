@@ -47,6 +47,10 @@ impl ZnBase {
 impl RingBase for ZnBase {
 
     type Element = ZnEl;
+
+    fn clone(&self, val: &Self::Element) -> Self::Element {
+        *val
+    }
     
     fn add_assign(&self, ZnEl(lhs): &mut Self::Element, ZnEl(rhs): Self::Element) {
         *lhs += rhs;

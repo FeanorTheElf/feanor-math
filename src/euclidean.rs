@@ -57,9 +57,9 @@ pub fn generic_test_euclidean_axioms<R: EuclideanRingStore, I: Iterator<Item = E
             if ring.is_zero(b) {
                 continue;
             }
-            let (q, r) = ring.euclidean_div_rem(a.clone(), b);
+            let (q, r) = ring.euclidean_div_rem(ring.clone(a), b);
             assert!(ring.euclidean_deg(b).is_none() || ring.euclidean_deg(&r).unwrap_or(usize::MAX) < ring.euclidean_deg(b).unwrap());
-            assert!(ring.eq(a, &ring.add(ring.mul(q, b.clone()), r)));
+            assert!(ring.eq(a, &ring.add(ring.mul(q, ring.clone(b)), r)));
         }
     }
 }

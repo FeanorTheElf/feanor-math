@@ -25,33 +25,33 @@ use oorandom;
 /// PRNG would be random, then the probability of a wrong output is at 
 /// most 4^(-k).
 /// 
-pub fn is_prime<I>(ring: I, n: &El<I>, k: usize) -> bool 
+pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool 
     where I: IntegerRingStore + HashableElRingStore
 {
-    if ring.is_leq(n, &ring.from_z(2)) {
-        return ring.eq(n, &ring.from_z(2));
+    if ZZ.is_leq(n, &ZZ.from_z(2)) {
+        return ZZ.eq(n, &ZZ.from_z(2));
     }
 
-    let mut rng = oorandom::Rand64::new(ring.default_hash(n) as u128);
-    let mut n_minus_one = ring.sub_ref_fst(n, ring.one());
-    let s = ring.abs_lowest_set_bit(&n_minus_one).unwrap();
-    ring.euclidean_div_pow_2(&mut n_minus_one, s as usize);
+    let mut rng = oorandom::Rand64::new(ZZ.default_hash(n) as u128);
+    let mut n_minus_one = ZZ.sub_ref_fst(n, ZZ.one());
+    let s = ZZ.abs_lowest_set_bit(&n_minus_one).unwrap();
+    ZZ.euclidean_div_pow_2(&mut n_minus_one, s as usize);
     let d = n_minus_one;
-    let Zn = Zn::new(&ring, n.clone());
+    let Zn = Zn::new(&ZZ, ZZ.clone(n));
 
     for _i in 0..k {
-        let a = Zn.get_ring().project(ring.add(ring.get_uniformly_random(n, || rng.rand_u64()), ring.one()));
+        let a = Zn.get_ring().project(ZZ.add(ZZ.get_uniformly_random(n, || rng.rand_u64()), ZZ.one()));
         if Zn.is_zero(&a) {
             continue;
         }
-        let mut current = algorithms::sqr_mul::generic_abs_square_and_multiply(&a, &d, &ring, |a, b| Zn.mul(a, b), |a, b| Zn.mul_ref(a, b), Zn.one());
+        let mut current = algorithms::sqr_mul::generic_abs_square_and_multiply(a, &d, &ZZ, |a, b| Zn.mul(a, b), |a, b| Zn.mul_ref(a, b), Zn.one());
         let mut miller_rabin_condition = Zn.is_one(&current);
         for _r in 0..s {
             miller_rabin_condition |= Zn.is_neg_one(&current);
             if miller_rabin_condition {
                 break;
             }
-            current = Zn.mul(current.clone(), current);
+            Zn.square(&mut current);
         }
         if Zn.is_zero(&current) || !miller_rabin_condition {
             return false;

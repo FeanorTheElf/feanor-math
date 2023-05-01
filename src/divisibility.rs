@@ -39,14 +39,14 @@ pub fn generic_test_divisibility_axioms<R: DivisibilityRingStore, I: Iterator<It
     let elements = edge_case_elements.collect::<Vec<_>>();
     for a in &elements {
         for b in &elements {
-            let ab = ring.mul(a.clone(), b.clone());
+            let ab = ring.mul(ring.clone(a), ring.clone(b));
             let c = ring.checked_left_div(&ab, &a);
             assert!(c.is_some());
-            assert!(ring.eq(&ab, &ring.mul(a.clone(), c.unwrap())));
+            assert!(ring.eq(&ab, &ring.mul(ring.clone(a), c.unwrap())));
 
             if !ring.is_unit(b) {
-                assert!(ring.checked_left_div(&ring.add(ab.clone(), ring.one()), &b).is_none());
-                assert!(ring.checked_left_div(&ring.sub(ab.clone(), ring.one()), &b).is_none());
+                assert!(ring.checked_left_div(&ring.add(ring.clone(&ab), ring.one()), &b).is_none());
+                assert!(ring.checked_left_div(&ring.sub(ring.clone(&ab), ring.one()), &b).is_none());
             }
         }
     }
