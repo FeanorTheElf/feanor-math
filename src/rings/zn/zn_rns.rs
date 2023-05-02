@@ -22,7 +22,7 @@ use crate::rings::zn::*;
 /// 
 /// let R = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![17, 19]);
 /// let x = R.get_ring().from_congruence([R.get_ring()[0].from_z(1), R.get_ring()[1].from_z(16)]);
-/// assert_eq!(35, R.smallest_lift(R.clone(&x)));
+/// assert_eq!(35, R.smallest_lift(<_ as RingStore>::clone(&R, &x)));
 /// let y = R.mul_ref(&x, &x);
 /// let z = R.get_ring().from_congruence([R.get_ring()[0].from_z(1 * 1), R.get_ring()[1].from_z(16 * 16)]);
 /// assert!(R.eq(&z, &y));
@@ -52,7 +52,7 @@ use crate::rings::zn::*;
 /// let S = DefaultBigIntRing::RING;
 /// assert!(R.eq(&R.from_z(120493), &R.coerce(&S, S.from_z(120493))));
 /// ```
-/// 
+///
 pub struct ZnBase<C: ZnRingStore, J: IntegerRingStore> 
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
@@ -224,6 +224,21 @@ impl<C: ZnRingStore, J: IntegerRingStore> RingBase for ZnBase<C, J>
 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         self.total_ring.get_ring().dbg(&RingRef::new(self).cast(&self.total_ring, self.clone(value)), out)
+    }
+}
+
+impl<C: ZnRingStore, J: IntegerRingStore> Clone for ZnBase<C, J> 
+    where C::Type: CanonicalHom<J::Type>,
+        <C::Type as ZnRing>::IntegerRingBase: SelfIso,
+        C: Clone,
+        J: Clone
+{
+    fn clone(&self) -> Self {
+        ZnBase {
+            components: <_ as Clone>::clone(&self.components),
+            total_ring: <_ as Clone>::clone(&self.total_ring),
+            unit_vectors: self.unit_vectors.iter().map(|e| <_ as RingStore>::clone(&self.total_ring, e)).collect()
+        }
     }
 }
 

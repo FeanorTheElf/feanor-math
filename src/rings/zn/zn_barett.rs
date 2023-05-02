@@ -227,7 +227,19 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I> {
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         self.integer_ring.get_ring().dbg(&value.0, out)
     }
+}
 
+impl<I: IntegerRingStore> Clone for ZnBase<I> 
+    where I: Clone
+{
+    fn clone(&self) -> Self {
+        ZnBase {
+            integer_ring: <_ as Clone>::clone(&self.integer_ring),
+            modulus: <_ as RingStore>::clone(&self.integer_ring, &self.modulus),
+            inverse_modulus: <_ as RingStore>::clone(&self.integer_ring, &self.inverse_modulus),
+            inverse_modulus_bitshift: self.inverse_modulus_bitshift
+        }
+    }
 }
 
 impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I> {

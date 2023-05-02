@@ -363,7 +363,7 @@ macro_rules! delegate {
 ///     let mut rng = oorandom::Rand64::new(0);
 ///     for _ in 0..6 {
 ///         let a = Zn.random_element(|| rng.rand_u64());
-///         let a_n = Zn.pow(Zn.clone(&a), n as usize);
+///         let a_n = Zn.pow(<_ as RingStore>::clone(&Zn, &a), n as usize);
 ///         if !Zn.eq(&a, &a_n) {
 ///             return false;
 ///         }
@@ -400,7 +400,7 @@ macro_rules! delegate {
 ///         let a = Zn.random_element(|| rng.rand_u64());
 ///         // use a generic square-and-multiply powering function that works with any implementation
 ///         // of integers
-///         let a_n = Zn.pow_gen(Zn.clone(&a), &n, &ZZ);
+///         let a_n = Zn.pow_gen(<_ as RingStore>::clone(&Zn, &a), &n, &ZZ);
 ///         if !Zn.eq(&a, &a_n) {
 ///             return false;
 ///         }
