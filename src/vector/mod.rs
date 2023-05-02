@@ -91,6 +91,84 @@ pub trait VectorFn<T> {
     fn at(&self, i: usize) -> T;
 }
 
+impl<T> VectorView<T> for (T, T) {
+    
+    fn len(&self) -> usize {
+        2
+    }
+
+    fn at(&self, i: usize) -> &T {
+        match i {
+            0 => &self.0,
+            1 => &self.1,
+            _ => panic!("out of range")
+        }
+    }
+}
+
+impl<T> VectorViewMut<T> for (T, T) {
+
+    fn at_mut(&mut self, i: usize) -> &mut T {
+        match i {
+            0 => &mut self.0,
+            1 => &mut self.1,
+            _ => panic!("out of range")
+        }
+    }
+}
+
+impl<T> SwappableVectorViewMut<T> for (T, T) {
+
+    fn swap(&mut self, i: usize, j: usize) {
+        match (i, j) {
+            (0, 1) | (1, 0) => { std::mem::swap(&mut self.0, &mut self.1) },
+            (0, 0) | (1, 1) => {},
+            _ => panic!("out of range")
+        }
+    }
+}
+
+impl<T> VectorView<T> for (T, T, T) {
+    
+    fn len(&self) -> usize {
+        3
+    }
+
+    fn at(&self, i: usize) -> &T {
+        match i {
+            0 => &self.0,
+            1 => &self.1,
+            2 => &self.2,
+            _ => panic!("out of range")
+        }
+    }
+}
+
+impl<T> VectorViewMut<T> for (T, T, T) {
+
+    fn at_mut(&mut self, i: usize) -> &mut T {
+        match i {
+            0 => &mut self.0,
+            1 => &mut self.1,
+            2 => &mut self.2,
+            _ => panic!("out of range")
+        }
+    }
+}
+
+impl<T> SwappableVectorViewMut<T> for (T, T, T) {
+
+    fn swap(&mut self, i: usize, j: usize) {
+        match (i, j) {
+            (0, 1) | (1, 0) => { std::mem::swap(&mut self.0, &mut self.1) },
+            (0, 2) | (2, 0) => { std::mem::swap(&mut self.0, &mut self.2) },
+            (2, 1) | (1, 2) => { std::mem::swap(&mut self.2, &mut self.1) },
+            (0, 0) | (1, 1) | (2, 2) => {},
+            _ => panic!("out of range")
+        }
+    }
+}
+
 impl<T> VectorView<T> for Vec<T> {
     
     fn len(&self) -> usize {
