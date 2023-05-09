@@ -1,9 +1,11 @@
 pub mod map;
 pub mod stride;
+pub mod chain;
 
 use std::ops::{RangeBounds, Bound, Index, IndexMut};
 use std::marker::PhantomData;
 
+use self::chain::Chain;
 use self::map::{Map, MapMut};
 use self::stride::Stride;
 
@@ -33,6 +35,12 @@ pub trait VectorView<T> {
         where Self: Sized
     {
         Stride::new(self, stride)
+    }
+
+    fn chain<V>(self, rhs: V) -> Chain<Self, V, T> 
+        where Self: Sized, V: VectorView<T>
+    {
+        Chain::new(self, rhs)
     }
 }
 
