@@ -1,4 +1,5 @@
 use crate::mempool::{AllocatingMemoryProvider, GrowableMemoryProvider};
+use crate::vector::VectorViewMut;
 use crate::{ring::*, algorithms};
 use crate::rings::poly::*;
 
@@ -94,8 +95,8 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
         self.memory_provider.get_new_init(0, |_| self.base_ring.zero())
     }
     
-    fn from_z(&self, value: i32) -> Self::Element {
-        self.memory_provider.get_new_init(1, |_| self.base_ring.from_z(value))
+    fn from_int(&self, value: i32) -> Self::Element {
+        self.memory_provider.get_new_init(1, |_| self.base_ring.from_int(value))
     }
 
     fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -163,6 +164,12 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
             &self.base_ring
         );
         return result;
+    }
+
+    fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
+        for i in 0..lhs.len() {
+            self.base_ring().mul_assign_int(lhs.at_mut(i), rhs);
+        }
     }
 }
 

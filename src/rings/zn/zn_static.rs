@@ -47,7 +47,7 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD>
         *lhs = ((*lhs as u128 * rhs as u128) % (N as u128)) as u64
     }
 
-    fn from_z(&self, value: i32) -> Self::Element {
+    fn from_int(&self, value: i32) -> Self::Element {
         RingRef::new(self).coerce(&StaticRing::<i64>::RING, value as i64)
     }
 
@@ -196,35 +196,35 @@ pub const Z17: Zn<17> = Zn::<17>::RING;
 
 #[test]
 fn test_zn_el_add() {
-    let a = Z17.from_z(6);
-    let b = Z17.from_z(12);
-    assert_eq!(Z17.from_z(1), Z17.add(a, b));
+    let a = Z17.from_int(6);
+    let b = Z17.from_int(12);
+    assert_eq!(Z17.from_int(1), Z17.add(a, b));
 }
 
 #[test]
 fn test_zn_el_sub() {
-    let a = Z17.from_z(6);
-    let b = Z17.from_z(12);
-    assert_eq!(Z17.from_z(11), Z17.sub(a, b));
+    let a = Z17.from_int(6);
+    let b = Z17.from_int(12);
+    assert_eq!(Z17.from_int(11), Z17.sub(a, b));
 }
 
 #[test]
 fn test_zn_el_mul() {
-    let a = Z17.from_z(6);
-    let b = Z17.from_z(12);
-    assert_eq!(Z17.from_z(4), Z17.mul(a, b));
+    let a = Z17.from_int(6);
+    let b = Z17.from_int(12);
+    assert_eq!(Z17.from_int(4), Z17.mul(a, b));
 }
 
 #[test]
 fn test_zn_el_div() {
-    let a = Z17.from_z(6);
-    let b = Z17.from_z(12);
-    assert_eq!(Z17.from_z(9), Z17.checked_div(&a, &b).unwrap());
+    let a = Z17.from_int(6);
+    let b = Z17.from_int(12);
+    assert_eq!(Z17.from_int(9), Z17.checked_div(&a, &b).unwrap());
 }
 
 #[test]
 fn fn_test_div_impossible() {
-    let _a = Zn::<22>::RING.from_z(4);
+    let _a = Zn::<22>::RING.from_int(4);
     // the following line should give a compiler error
     // Zn::<22>::RING.div(_a, _a);
 }

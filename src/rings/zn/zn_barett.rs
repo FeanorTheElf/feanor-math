@@ -25,8 +25,8 @@ use std::cmp::Ordering;
 /// # use feanor_math::rings::zn::zn_barett::*;
 /// # use feanor_math::primitive_int::*;
 /// let R = Zn::new(StaticRing::<i64>::RING, 257);
-/// let a = R.from_z(16);
-/// assert!(R.eq(&R.from_z(-1), &R.mul_ref(&a, &a)));
+/// let a = R.from_int(16);
+/// assert!(R.eq(&R.from_int(-1), &R.mul_ref(&a, &a)));
 /// assert!(R.is_one(&R.pow(a, 4)));
 /// ```
 /// However, this will panic as `257^4 > i32::MAX`.
@@ -48,7 +48,7 @@ use std::cmp::Ordering;
 /// # use feanor_math::primitive_int::*;
 /// let R = Zn::new(StaticRing::<i16>::RING, 7);
 /// let S = DefaultBigIntRing::RING;
-/// assert!(R.eq(&R.from_z(120493), &R.coerce(&S, S.from_z(120493))));
+/// assert!(R.eq(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
 /// ```
 ///
 pub struct ZnBase<I: IntegerRingStore> {
@@ -70,7 +70,7 @@ impl<I: IntegerRingStore> Zn<I> {
 impl<I: IntegerRingStore> ZnBase<I> {
 
     pub fn new(integer_ring: I, modulus: El<I>) -> Self {
-        assert!(integer_ring.is_geq(&modulus, &integer_ring.from_z(2)));
+        assert!(integer_ring.is_geq(&modulus, &integer_ring.from_int(2)));
 
         // have k such that `2^k >= modulus^2`
         // then `floor(2^k / modulus) * x >> k` differs at most 1 from `floor(x / modulus)`
@@ -205,7 +205,7 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I> {
         self.project_leq_n_square(&mut lhs.0);
     }
 
-    fn from_z(&self, value: i32) -> Self::Element {
+    fn from_int(&self, value: i32) -> Self::Element {
         self.project_gen(value, &StaticRing::<i32>::RING)
     }
 
@@ -404,8 +404,8 @@ use crate::divisibility::generic_test_divisibility_axioms;
 #[test]
 fn test_mul() {
     const ZZ: RingValue<DefaultBigIntRing> = DefaultBigIntRing::RING;
-    let Z257 = ZnBase::new(ZZ, ZZ.from_z(257));
-    let x = Z257.project(ZZ.from_z(256));
+    let Z257 = ZnBase::new(ZZ, ZZ.from_int(257));
+    let x = Z257.project(ZZ.from_int(256));
     assert!(Z257.eq(&Z257.one(), &Z257.mul_ref(&x, &x)));
 }
 
@@ -414,7 +414,7 @@ fn test_project() {
     const ZZ: StaticRing<i64> = StaticRing::RING;
     let Z17 = Zn::new(ZZ, 17);
     for k in 0..289 {
-        assert!(Z17.eq(&Z17.from_z((289 - k) % 17), &Z17.get_ring().project(-k as i64)));
+        assert!(Z17.eq(&Z17.from_int((289 - k) % 17), &Z17.get_ring().project(-k as i64)));
     }
 }
 
@@ -424,22 +424,22 @@ const EDGE_CASE_ELEMENTS: [i32; 10] = [0, 1, 3, 7, 9, 62, 8, 10, 11, 12];
 #[test]
 fn test_ring_axioms_znbase() {
     let ZZ = Zn::new(StaticRing::<i64>::RING, 63);
-    generic_test_ring_axioms(&ZZ, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ZZ.from_z(x)))
+    generic_test_ring_axioms(&ZZ, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ZZ.from_int(x)))
 }
 
 #[test]
 fn test_canonical_iso_axioms_zn_barett() {
     let from = Zn::new(StaticRing::<i128>::RING, 7 * 11);
-    let to = Zn::new(DefaultBigIntRing::RING, DefaultBigIntRing::RING.from_z(7 * 11));
-    generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_z(x)));
-    generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_z(x)));
+    let to = Zn::new(DefaultBigIntRing::RING, DefaultBigIntRing::RING.from_int(7 * 11));
+    generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
 }
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {
     let from = StaticRing::<i32>::RING;
     let to = Zn::new(StaticRing::<i128>::RING, 7 * 11);
-    generic_test_canonical_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_z(x)));
+    generic_test_canonical_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
 }
 
 #[test]

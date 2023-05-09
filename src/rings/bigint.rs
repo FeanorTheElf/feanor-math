@@ -118,7 +118,7 @@ impl RingBase for DefaultBigIntRing {
         self.negate(self.one())
     }
 
-    fn from_z(&self, value: i32) -> Self::Element {
+    fn from_int(&self, value: i32) -> Self::Element {
         DefaultBigIntRingEl(value < 0, vec![(value as i64).abs() as u64])
     }
 
@@ -351,9 +351,9 @@ fn test_print_power_2() {
 
 #[test]
 fn test_from() {
-    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRingEl(false, vec![]), &DefaultBigIntRing::RING.from_z(0)));
-    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRingEl(false, vec![2138479]), &DefaultBigIntRing::RING.from_z(2138479)));
-    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRingEl(true, vec![2138479]), &DefaultBigIntRing::RING.from_z(-2138479)));
+    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRingEl(false, vec![]), &DefaultBigIntRing::RING.from_int(0)));
+    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRingEl(false, vec![2138479]), &DefaultBigIntRing::RING.from_int(2138479)));
+    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRingEl(true, vec![2138479]), &DefaultBigIntRing::RING.from_int(-2138479)));
     // assert!(DefaultBigIntRing::RING.eq(&DefaultBigInt(false, vec![0x38691a350bf12fca, 0x1]), &DefaultBigIntRing::RING.from_z_gen(0x138691a350bf12fca, &i128::RING)));
 }
 
@@ -489,28 +489,28 @@ fn test_is_zero() {
 
 #[test]
 fn test_cmp() {
-    assert_eq!(true, DefaultBigIntRing::RING.is_lt(&DefaultBigIntRing::RING.from_z(-1), &DefaultBigIntRing::RING.from_z(2)));
-    assert_eq!(true, DefaultBigIntRing::RING.is_lt(&DefaultBigIntRing::RING.from_z(1), &DefaultBigIntRing::RING.from_z(2)));
-    assert_eq!(false, DefaultBigIntRing::RING.is_lt(&DefaultBigIntRing::RING.from_z(2), &DefaultBigIntRing::RING.from_z(2)));
-    assert_eq!(false, DefaultBigIntRing::RING.is_lt(&DefaultBigIntRing::RING.from_z(3), &DefaultBigIntRing::RING.from_z(2)));
-    assert_eq!(true, DefaultBigIntRing::RING.is_gt(&DefaultBigIntRing::RING.from_z(-1), &DefaultBigIntRing::RING.from_z(-2)));
+    assert_eq!(true, DefaultBigIntRing::RING.is_lt(&DefaultBigIntRing::RING.from_int(-1), &DefaultBigIntRing::RING.from_int(2)));
+    assert_eq!(true, DefaultBigIntRing::RING.is_lt(&DefaultBigIntRing::RING.from_int(1), &DefaultBigIntRing::RING.from_int(2)));
+    assert_eq!(false, DefaultBigIntRing::RING.is_lt(&DefaultBigIntRing::RING.from_int(2), &DefaultBigIntRing::RING.from_int(2)));
+    assert_eq!(false, DefaultBigIntRing::RING.is_lt(&DefaultBigIntRing::RING.from_int(3), &DefaultBigIntRing::RING.from_int(2)));
+    assert_eq!(true, DefaultBigIntRing::RING.is_gt(&DefaultBigIntRing::RING.from_int(-1), &DefaultBigIntRing::RING.from_int(-2)));
 }
 
 #[test]
 fn test_mul_pow_2() {
-    let mut x = DefaultBigIntRing::RING.from_z(2);
+    let mut x = DefaultBigIntRing::RING.from_int(2);
     DefaultBigIntRing::RING.mul_pow_2(&mut x, 0);
-    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRing::RING.from_z(2), &x));
+    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRing::RING.from_int(2), &x));
 
-    let mut x = DefaultBigIntRing::RING.from_z(4829192);
+    let mut x = DefaultBigIntRing::RING.from_int(4829192);
     DefaultBigIntRing::RING.mul_pow_2(&mut x, 3);
-    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRing::RING.from_z(4829192 * 8), &x));
+    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRing::RING.from_int(4829192 * 8), &x));
 
     let mut x = DefaultBigIntRing::RING.one();
     DefaultBigIntRing::RING.mul_pow_2(&mut x, 64);
-    DefaultBigIntRing::RING.mul_assign(&mut x, DefaultBigIntRing::RING.from_z(4829192));
+    DefaultBigIntRing::RING.mul_assign(&mut x, DefaultBigIntRing::RING.from_int(4829192));
 
-    let mut z = DefaultBigIntRing::RING.from_z(4829192);
+    let mut z = DefaultBigIntRing::RING.from_int(4829192);
     DefaultBigIntRing::RING.mul_pow_2(&mut z, 64);
     assert!(DefaultBigIntRing::RING.eq(&x, &z));
 }

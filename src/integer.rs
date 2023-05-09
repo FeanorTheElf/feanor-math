@@ -98,11 +98,11 @@ impl<R> IntegerRingStore for R
 #[cfg(test)]
 pub fn generic_test_integer_uniformly_random<R: IntegerRingStore>(ring: R) {
     for b in [15, 16] {
-        let bound = ring.from_z(b);
+        let bound = ring.from_int(b);
         let mut rng = oorandom::Rand64::new(0);
         let elements: Vec<El<R>> = (0..1000).map(|_| ring.get_uniformly_random(&bound, || rng.rand_u64())).collect();
         for i in 0..b {
-            assert!(elements.iter().any(|x| ring.eq(x, &ring.from_z(i))))
+            assert!(elements.iter().any(|x| ring.eq(x, &ring.from_int(i))))
         }
         for x in &elements {
             assert!(ring.is_lt(x, &bound));
@@ -114,7 +114,7 @@ pub fn generic_test_integer_uniformly_random<R: IntegerRingStore>(ring: R) {
 pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
     let elements = edge_case_elements.collect::<Vec<_>>();
     for a in &elements {
-        let mut ceil_pow_2 = ring.from_z(2);
+        let mut ceil_pow_2 = ring.from_int(2);
         ring.mul_pow_2(&mut ceil_pow_2, ring.abs_highest_set_bit(a).unwrap_or(0));
         assert!(ring.is_lt(a, &ceil_pow_2));
         assert!(ring.is_lt(&ring.negate(ring.clone(a)), &ceil_pow_2));

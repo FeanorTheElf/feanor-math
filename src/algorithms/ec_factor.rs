@@ -124,7 +124,7 @@ pub fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
     where I: IntegerRingStore
 {
     assert!(algorithms::miller_rabin::is_prime(&ZZ, N, 6) == false);
-    assert!(ZZ.is_geq(N, &ZZ.from_z(100)));
+    assert!(ZZ.is_geq(N, &ZZ.from_int(100)));
     let Nf = ZZ.to_float_approx(N);
     // smoothness bound, choose L_N(1/2, 1/2)
     let B = (0.5 * Nf.ln().sqrt() * Nf.ln().ln().sqrt()).exp() as usize;

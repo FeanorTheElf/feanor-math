@@ -164,7 +164,7 @@ impl<R> FFTTableCooleyTuckey<R>
         }
 
         // finally, scale by 1/n
-        let scale = ring.coerce(&self.ring, self.ring.checked_div(&self.ring.one(), &self.ring.from_z(1 << self.log2_n)).unwrap());
+        let scale = ring.coerce(&self.ring, self.ring.checked_div(&self.ring.one(), &self.ring.from_int(1 << self.log2_n)).unwrap());
         for i in 0..values.len() {
             ring.mul_assign_ref(values.at_mut(i), &scale);
         }
@@ -216,7 +216,7 @@ use crate::field::*;
 #[test]
 fn test_bitreverse_fft_inplace_base() {
     let ring = Zn::<5>::RING;
-    let z = ring.from_z(2);
+    let z = ring.from_int(2);
     let fft = FFTTableCooleyTuckey {
         ring: ring,
         log2_n: 2,
@@ -237,7 +237,7 @@ fn test_bitreverse_fft_inplace_base() {
 #[test]
 fn test_bitreverse_fft_inplace() {
     let ring = Zn::<17>::RING;
-    let z = ring.from_z(3);
+    let z = ring.from_int(3);
     let fft = FFTTableCooleyTuckey {
         ring: ring,
         log2_n: 4,

@@ -95,7 +95,7 @@ fn fermat_is_prime<R: IntegerRingStore>(ZZ: R, n: El<R>) -> bool {
 
 // the miller-rabin primality test is implemented in feanor_math::algorithms, so we can
 // check our implementation
-let n = DefaultBigIntRing::RING.from_z(91);
+let n = DefaultBigIntRing::RING.from_int(91);
 assert!(algorithms::miller_rabin::is_prime(DefaultBigIntRing::RING, &n, 6) == fermat_is_prime(DefaultBigIntRing::RING, n));
 ```
 This function now works with any ring that implements `IntegerRing`, a subtrait of `RingBase`.
@@ -129,7 +129,7 @@ impl RingBase for F2Base {
         *lhs = (*lhs * rhs) % 2;
     }
     
-    fn from_z(&self, value: i32) -> Self::Element {
+    fn from_int(&self, value: i32) -> Self::Element {
         // make sure that we handle negative numbers correctly
         (((value % 2) + 2) % 2) as u8
     }
@@ -185,7 +185,7 @@ impl CanonicalIso<F2Base> for F2Base {
 
 pub const F2: RingValue<F2Base> = RingValue::from(F2Base);
 
-assert!(F2.eq(&F2.from_z(1), &F2.add(F2.one(), F2.zero())));
+assert!(F2.eq(&F2.from_int(1), &F2.add(F2.one(), F2.zero())));
 ```
 
 ## `RingBase` vs `RingStore`

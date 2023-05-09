@@ -94,7 +94,7 @@ impl<R> FFTTableBluestein<R>
 
         if INV {
             // finally, scale by 1/n
-            let scale = ring.coerce(&base_ring, base_ring.checked_div(&base_ring.one(), &base_ring.from_z(self.n as i32)).unwrap());
+            let scale = ring.coerce(&base_ring, base_ring.checked_div(&base_ring.one(), &base_ring.from_int(self.n as i32)).unwrap());
             for i in 0..values.len() {
                 ring.mul_assign_ref(values.at_mut(i), &scale);
             }
@@ -123,7 +123,7 @@ use crate::rings::zn::zn_static::*;
 fn test_fft_base() {
     let ring = Zn::<241>::RING;
     // a 5-th root of unity is 91 
-    let fft = FFTTableBluestein::new(ring, ring.from_z(36), ring.from_z(111), 5, 4);
+    let fft = FFTTableBluestein::new(ring, ring.from_int(36), ring.from_int(111), 5, 4);
     let mut values = [1, 3, 2, 0, 7];
     let mut buffer = [0; 16];
     fft.fft_base::<_, _, _, false>(&mut values, ring, &mut buffer);
@@ -135,7 +135,7 @@ fn test_fft_base() {
 fn test_inv_fft_base() {
     let ring = Zn::<241>::RING;
     // a 5-th root of unity is 91 
-    let fft = FFTTableBluestein::new(ring, ring.from_z(36), ring.from_z(111), 5, 4);
+    let fft = FFTTableBluestein::new(ring, ring.from_int(36), ring.from_int(111), 5, 4);
     let values = [1, 3, 2, 0, 7];
     let mut work = values;
     let mut buffer = [0; 16];

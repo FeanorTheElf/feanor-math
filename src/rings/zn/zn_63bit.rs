@@ -76,7 +76,7 @@ impl RingBase for ZnBase {
         }
     }
 
-    fn from_z(&self, value: i32) -> Self::Element {
+    fn from_int(&self, value: i32) -> Self::Element {
         debug_assert!(self.modulus > i32::MAX as u64);
         if value < 0 {
             return ZnEl(self.modulus - (-value as u64));

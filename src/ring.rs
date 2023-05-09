@@ -42,7 +42,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::IntegerRingStore};
 /// 
 ///     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { **lhs *= *rhs; }
 /// 
-///     fn from_z(&self, value: i32) -> Self::Element { Box::new(value) }
+///     fn from_int(&self, value: i32) -> Self::Element { Box::new(value) }
 /// 
 ///     fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { **lhs == **rhs }
 /// 
@@ -87,8 +87,8 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::IntegerRingStore};
 /// 
 /// let ring = MyRingBase::RING;
 /// assert!(ring.eq(
-///     &ring.from_z(6), 
-///     &ring.mul(ring.from_z(3), ring.from_z(2))
+///     &ring.from_int(6), 
+///     &ring.mul(ring.from_int(3), ring.from_int(2))
 /// ));
 /// ```
 /// And here is the example from the Readme, for the finite binary field F2
@@ -117,7 +117,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::IntegerRingStore};
 ///         *lhs = (*lhs * rhs) % 2;
 ///     }
 ///     
-///     fn from_z(&self, value: i32) -> Self::Element {
+///     fn from_int(&self, value: i32) -> Self::Element {
 ///         // make sure that we handle negative numbers correctly
 ///         (((value % 2) + 2) % 2) as u8
 ///     }
@@ -173,7 +173,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::IntegerRingStore};
 /// 
 /// pub const F2: RingValue<F2Base> = RingValue::from(F2Base);
 /// 
-/// assert!(F2.eq(&F2.from_z(1), &F2.add(F2.one(), F2.zero())));
+/// assert!(F2.eq(&F2.from_int(1), &F2.add(F2.one(), F2.zero())));
 /// ```
 /// 
 /// 
@@ -188,10 +188,10 @@ pub trait RingBase {
     fn negate_inplace(&self, lhs: &mut Self::Element);
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element);
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.mul_assign(lhs, self.clone(rhs)) }
-    fn zero(&self) -> Self::Element { self.from_z(0) }
-    fn one(&self) -> Self::Element { self.from_z(1) }
-    fn neg_one(&self) -> Self::Element { self.from_z(-1) }
-    fn from_z(&self, value: i32) -> Self::Element;
+    fn zero(&self) -> Self::Element { self.from_int(0) }
+    fn one(&self) -> Self::Element { self.from_int(1) }
+    fn neg_one(&self) -> Self::Element { self.from_int(-1) }
+    fn from_int(&self, value: i32) -> Self::Element;
     fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool;
     fn is_zero(&self, value: &Self::Element) -> bool { self.eq(value, &self.zero()) }
     fn is_one(&self, value: &Self::Element) -> bool { self.eq(value, &self.one()) }
@@ -212,6 +212,15 @@ pub trait RingBase {
     fn sub_assign(&self, lhs: &mut Self::Element, mut rhs: Self::Element) {
         self.negate_inplace(&mut rhs);
         self.add_assign(lhs, rhs);
+    }
+
+    fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
+        self.mul_assign(lhs, self.from_int(rhs));
+    }
+
+    fn mul_int(&self, mut lhs: Self::Element, rhs: i32) -> Self::Element {
+        self.mul_assign_int(&mut lhs, rhs);
+        return lhs;
     }
 
     ///
@@ -410,7 +419,7 @@ macro_rules! delegate {
 /// 
 /// // the miller-rabin primality test is implemented in feanor_math::algorithms, so we can
 /// // check our implementation
-/// let n = DefaultBigIntRing::RING.from_z(91);
+/// let n = DefaultBigIntRing::RING.from_int(91);
 /// assert!(algorithms::miller_rabin::is_prime(DefaultBigIntRing::RING, &n, 6) == fermat_is_prime(DefaultBigIntRing::RING, n));
 /// ```
 /// 
@@ -452,7 +461,7 @@ pub trait RingStore {
     delegate!{ fn zero(&self) -> El<Self> }
     delegate!{ fn one(&self) -> El<Self> }
     delegate!{ fn neg_one(&self) -> El<Self> }
-    delegate!{ fn from_z(&self, value: i32) -> El<Self> }
+    delegate!{ fn from_int(&self, value: i32) -> El<Self> }
     delegate!{ fn eq(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
     delegate!{ fn is_zero(&self, value: &El<Self>) -> bool }
     delegate!{ fn is_one(&self, value: &El<Self>) -> bool }
@@ -474,6 +483,8 @@ pub trait RingStore {
     delegate!{ fn mul_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
     delegate!{ fn mul(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
     delegate!{ fn square(&self, value: &mut El<Self>) -> () }
+    delegate!{ fn mul_assign_int(&self, lhs: &mut El<Self>, rhs: i32) -> () }
+    delegate!{ fn mul_int(&self, lhs: El<Self>, rhs: i32) -> El<Self> }
     
     fn coerce<S>(&self, from: &S, el: El<S>) -> El<Self>
         where S: RingStore, Self::Type: CanonicalHom<S::Type> 
@@ -602,9 +613,9 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// let s = DefaultBigIntRing::RING;
 /// // on RingBase level
 /// let hom = r.get_ring().has_canonical_hom(s.get_ring()).unwrap();
-/// assert_eq!(8, r.get_ring().map_in(s.get_ring(), s.from_z(8), &hom));
+/// assert_eq!(8, r.get_ring().map_in(s.get_ring(), s.from_int(8), &hom));
 /// // on RingStore level
-/// assert_eq!(8, r.coerce(&s, s.from_z(8)));
+/// assert_eq!(8, r.coerce(&s, s.from_int(8)));
 /// ```
 /// 
 /// # Limitations
@@ -872,7 +883,7 @@ fn test_internal_wrappings_dont_matter() {
             true
         }
 
-        fn from_z(&self, value: i32) -> Self::Element {
+        fn from_int(&self, value: i32) -> Self::Element {
             value
         }
 
@@ -937,7 +948,7 @@ fn test_internal_wrappings_dont_matter() {
             true
         }
 
-        fn from_z(&self, value: i32) -> Self::Element {
+        fn from_int(&self, value: i32) -> Self::Element {
             value
         }
 

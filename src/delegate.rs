@@ -71,8 +71,8 @@ impl<R: DelegateRing> RingBase for R {
         self.rev_delegate(self.get_delegate().neg_one())
     }
 
-    default fn from_z(&self, value: i32) -> Self::Element {
-        self.rev_delegate(self.get_delegate().from_z(value))
+    default fn from_int(&self, value: i32) -> Self::Element {
+        self.rev_delegate(self.get_delegate().from_int(value))
     }
 
     default fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {

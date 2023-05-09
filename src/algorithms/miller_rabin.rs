@@ -28,8 +28,8 @@ use oorandom;
 pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool 
     where I: IntegerRingStore + HashableElRingStore
 {
-    if ZZ.is_leq(n, &ZZ.from_z(2)) {
-        return ZZ.eq(n, &ZZ.from_z(2));
+    if ZZ.is_leq(n, &ZZ.from_int(2)) {
+        return ZZ.eq(n, &ZZ.from_int(2));
     }
 
     let mut rng = oorandom::Rand64::new(ZZ.default_hash(n) as u128);

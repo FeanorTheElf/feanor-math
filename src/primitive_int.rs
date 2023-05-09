@@ -183,7 +183,7 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
         *lhs *= rhs;
     }
 
-    fn from_z(&self, value: i32) -> Self::Element { T::try_from(value).map_err(|_| ()).unwrap() }
+    fn from_int(&self, value: i32) -> Self::Element { T::try_from(value).map_err(|_| ()).unwrap() }
 
     fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         *lhs == *rhs

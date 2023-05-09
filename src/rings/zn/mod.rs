@@ -139,5 +139,5 @@ pub fn generic_test_map_in_large_int<R: ZnRingStore>(R: R)
     let ZZ_big = DefaultBigIntRing::RING;
     let n = ZZ_big.power_of_two(1000);
     let x = R.coerce(&ZZ_big, n);
-    assert!(R.eq(&R.pow(R.from_z(2), 1000), &x));
+    assert!(R.eq(&R.pow(R.from_int(2), 1000), &x));
 }
