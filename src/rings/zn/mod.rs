@@ -52,9 +52,7 @@ pub mod generic_maps {
     #[allow(type_alias_bounds)]
     pub type GenericHomomorphism<R: ZnRing, S: ZnRing> = (<S as CanonicalHom<S::IntegerRingBase>>::Homomorphism, <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::Homomorphism);
 
-    pub fn generic_has_canonical_hom<R: ZnRing, S: ZnRing>(from: &R, to: &S) -> Option<GenericHomomorphism<R, S>> 
-        where R::IntegerRingBase: SelfIso, S::IntegerRingBase: SelfIso
-    {
+    pub fn generic_has_canonical_hom<R: ZnRing, S: ZnRing>(from: &R, to: &S) -> Option<GenericHomomorphism<R, S>> {
         let hom = <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::has_canonical_hom(to.integer_ring().get_ring(), from.integer_ring().get_ring())?;
         if to.integer_ring().checked_div(&<S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::map_in_ref(&to.integer_ring().get_ring(), from.integer_ring().get_ring(), from.modulus(), &hom), &to.modulus()).is_some() {
             Some((to.has_canonical_hom(to.integer_ring().get_ring()).unwrap(), hom))
@@ -63,9 +61,7 @@ pub mod generic_maps {
         }
     }
 
-    pub fn generic_map_in<R: ZnRing, S: ZnRing>(from: &R, to: &S, el: R::Element, hom: &GenericHomomorphism<R, S>) -> S::Element 
-        where R::IntegerRingBase: SelfIso, S::IntegerRingBase: SelfIso
-    {
+    pub fn generic_map_in<R: ZnRing, S: ZnRing>(from: &R, to: &S, el: R::Element, hom: &GenericHomomorphism<R, S>) -> S::Element {
         to.map_in(to.integer_ring().get_ring(), <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::map_in(to.integer_ring().get_ring(), from.integer_ring().get_ring(), from.smallest_positive_lift(el), &hom.1), &hom.0)
     }
 }
@@ -106,10 +102,7 @@ use super::bigint::DefaultBigIntRing;
 use super::field::AsFieldBase;
 
 #[cfg(test)]
-pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R) 
-    // necessary to prevent typechecking overflow
-    where <<R as RingStore>::Type as ZnRing>::IntegerRingBase: SelfIso
-{
+pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R) {
     let ZZ = R.integer_ring();
     let n = R.modulus();
 
@@ -133,8 +126,7 @@ pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R)
 
 #[cfg(test)]
 pub fn generic_test_map_in_large_int<R: ZnRingStore>(R: R)
-    // necessary to prevent typechecking overflow
-    where <<R as RingStore>::Type as ZnRing>::IntegerRingBase: SelfIso, <R as RingStore>::Type: CanonicalHom<DefaultBigIntRing>
+    where <R as RingStore>::Type: CanonicalHom<DefaultBigIntRing>
 {
     let ZZ_big = DefaultBigIntRing::RING;
     let n = ZZ_big.power_of_two(1000);

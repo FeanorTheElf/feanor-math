@@ -10,7 +10,7 @@ use crate::algorithms;
 /// a positive integer. While this is not really general, it is often required
 /// for fast operations with integers.
 /// 
-pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing {
+pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + SelfIso {
 
     fn to_float_approx(&self, value: &Self::Element) -> f64;
     fn from_float_approx(&self, value: f64) -> Option<Self::Element>;

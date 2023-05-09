@@ -112,7 +112,7 @@ impl<R: DivisibilityRingStore> RingExtension for AsFieldBase<R> {
 }
 
 impl<R: DivisibilityRingStore, S: IntegerRing + ?Sized> CanonicalHom<S> for AsFieldBase<R> 
-    where S: SelfIso, R::Type: CanonicalHom<S>
+    where R::Type: CanonicalHom<S>
 {
     type Homomorphism = <R::Type as CanonicalHom<S>>::Homomorphism;
 
@@ -190,7 +190,7 @@ impl<'a, R> Iterator for FpBaseElementsIter<'a, R>
 }
 
 impl<R: ZnRingStore> ZnRing for AsFieldBase<R>
-    where R::Type: CanonicalHom<<R::Type as ZnRing>::IntegerRingBase>, <R::Type as ZnRing>::IntegerRingBase: SelfIso
+    where R::Type: CanonicalHom<<R::Type as ZnRing>::IntegerRingBase>
 {
     type IntegerRingBase = <R::Type as ZnRing>::IntegerRingBase;
     type Integers = <R::Type as ZnRing>::Integers;
