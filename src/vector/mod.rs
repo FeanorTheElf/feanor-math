@@ -42,6 +42,12 @@ pub trait VectorView<T> {
     {
         Chain::new(self, rhs)
     }
+
+    fn clone_to_vec(&self) -> Vec<T>
+        where T: Clone
+    {
+        (0..self.len()).map(|i| self.at(i).clone()).collect()
+    }
 }
 
 ///
