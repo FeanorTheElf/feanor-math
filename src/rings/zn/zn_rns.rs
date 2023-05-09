@@ -1,5 +1,3 @@
-use std::ops::Index;
-
 use crate::algorithms::cooley_tuckey::FFTTableCooleyTuckey;
 use crate::vector::{VectorViewMut, VectorView};
 use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
@@ -19,12 +17,13 @@ use crate::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_rns::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::vector::*;
 /// 
 /// let R = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![17, 19]);
-/// let x = R.get_ring().from_congruence([R.get_ring()[0].from_z(1), R.get_ring()[1].from_z(16)]);
+/// let x = R.get_ring().from_congruence([R.get_ring().at(0).from_z(1), R.get_ring().at(1).from_z(16)]);
 /// assert_eq!(35, R.smallest_lift(<_ as RingStore>::clone(&R, &x)));
 /// let y = R.mul_ref(&x, &x);
-/// let z = R.get_ring().from_congruence([R.get_ring()[0].from_z(1 * 1), R.get_ring()[1].from_z(16 * 16)]);
+/// let z = R.get_ring().from_congruence([R.get_ring().at(0).from_z(1 * 1), R.get_ring().at(1).from_z(16 * 16)]);
 /// assert!(R.eq(&z, &y));
 /// ```
 /// 
@@ -128,25 +127,24 @@ impl<C: ZnRingStore, J: IntegerRingStore> ZnBase<C, J>
 
     pub fn from_congruence<V: VectorView<El<C>>>(&self, el: V) -> ZnEl<C> {
         assert_eq!(self.components.len(), el.len());
-        ZnEl((0..el.len()).map(|i| self[i].clone(el.at(i))).collect())
+        ZnEl((0..el.len()).map(|i| self.at(i).clone(el.at(i))).collect())
     }
 
     pub fn get_congruence<'a>(&self, el: &'a ZnEl<C>) -> impl 'a + VectorView<El<C>> {
         &el.0
     }
 
-    pub fn len(&self) -> usize {
-        self.components.len()
-    }
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore> Index<usize> for ZnBase<C, J>
+impl<C: ZnRingStore, J: IntegerRingStore> VectorView<C> for ZnBase<C, J>
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
-    type Output = C;
+    fn len(&self) -> usize {
+        self.components.len()
+    }
 
-    fn index(&self, index: usize) -> &Self::Output {
+    fn at(&self, index: usize) -> &C {
         &self.components[index]
     }
 }
@@ -160,7 +158,7 @@ impl<C: ZnRingStore, J: IntegerRingStore> RingBase for ZnBase<C, J>
     type Element = ZnEl<C>;
 
     fn clone(&self, val: &Self::Element) -> Self::Element {
-        ZnEl(val.0.iter().enumerate().map(|(i, x)| self[i].clone(x)).collect())
+        ZnEl(val.0.iter().enumerate().map(|(i, x)| self.at(i).clone(x)).collect())
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -447,7 +445,7 @@ impl<'a, C: ZnRingStore, J: IntegerRingStore> Iterator for ZnBaseElementsIterato
             while part_iters.len() < self.ring.components.len() {
                 part_iters.push(self.ring.components[part_iters.len()].elements().peekable());
             }
-            let result = part_iters.iter_mut().enumerate().map(|(i, it)| self.ring[i].clone(it.peek().unwrap())).collect::<Vec<_>>();
+            let result = part_iters.iter_mut().enumerate().map(|(i, it)| self.ring.at(i).clone(it.peek().unwrap())).collect::<Vec<_>>();
             part_iters.last_mut().unwrap().next();
             while part_iters.last_mut().unwrap().peek().is_none() {
                 part_iters.pop();
