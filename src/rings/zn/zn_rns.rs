@@ -131,8 +131,8 @@ impl<C: ZnRingStore, J: IntegerRingStore> ZnBase<C, J>
         ZnEl((0..el.len()).map(|i| self[i].clone(el.at(i))).collect())
     }
 
-    pub fn get_congruence<'a>(&self, el: &'a ZnEl<C>, prime_component_index: usize) -> &'a El<C> {
-        &el.0[prime_component_index]
+    pub fn get_congruence<'a>(&self, el: &'a ZnEl<C>) -> impl 'a + VectorView<El<C>> {
+        &el.0
     }
 
     pub fn len(&self) -> usize {
