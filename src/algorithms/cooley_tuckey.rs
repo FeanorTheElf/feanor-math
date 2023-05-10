@@ -211,6 +211,10 @@ impl<R> FFTTableCooleyTuckey<R>
 #[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
 #[cfg(test)]
+use crate::rings::zn::zn_barett;
+#[cfg(test)]
+use crate::primitive_int::*;
+#[cfg(test)]
 use crate::field::*;
 
 #[test]
@@ -277,4 +281,19 @@ fn test_for_zn() {
     let fft = FFTTableCooleyTuckey::for_zn(ring, 4).unwrap();
     assert!(ring.is_neg_one(&ring.pow(fft.root_of_unity, 8)));
     assert!(ring.is_neg_one(&ring.pow(fft.inv_root_of_unity, 8)));
+}
+
+#[bench]
+fn bench_fft(bencher: &mut test::Bencher) {
+    let ring = zn_barett::Zn::new(StaticRing::<i128>::RING, 65537);
+    let fft = FFTTableCooleyTuckey::for_zn(&ring, 15).unwrap();
+    let data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+    let mut copy = Vec::with_capacity(1 << 15);
+    bencher.iter(|| {
+        copy.clear();
+        copy.extend(data.iter().cloned());
+        fft.bitreverse_fft_inplace(&mut copy[..]);
+        fft.bitreverse_inv_fft_inplace(&mut copy[..]);
+        assert!(ring.eq(&copy[0], &data[0]));
+    });
 }
