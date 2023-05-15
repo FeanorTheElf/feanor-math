@@ -1,4 +1,5 @@
 use crate::algorithms::cooley_tuckey::FFTTableCooleyTuckey;
+use crate::mempool::{MemoryProvider, AllocatingMemoryProvider};
 use crate::vector::{VectorViewMut, VectorView};
 use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
 use crate::rings::zn::*;
@@ -51,14 +52,15 @@ use crate::rings::zn::*;
 /// let S = DefaultBigIntRing::RING;
 /// assert!(R.eq(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
 /// ```
-///
-pub struct ZnBase<C: ZnRingStore, J: IntegerRingStore> 
+/// 
+pub struct ZnBase<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>> = AllocatingMemoryProvider> 
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
     components: Vec<C>,
     total_ring: zn_barett::Zn<J>,
-    unit_vectors: Vec<El<zn_barett::Zn<J>>>
+    unit_vectors: Vec<El<zn_barett::Zn<J>>>,
+    memory_provider: M
 }
 
 pub type Zn<C, J> = RingValue<ZnBase<C, J>>;
@@ -68,7 +70,7 @@ impl<C: ZnRingStore + Clone, J: IntegerRingStore> Zn<C, J>
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
     pub fn new(component_rings: Vec<C>, large_integers: J) -> Self {
-        Self::from(ZnBase::new(component_rings, large_integers))
+        Self::from(ZnBase::new(component_rings, large_integers, AllocatingMemoryProvider))
     }
 }
 
@@ -84,16 +86,17 @@ impl<I: IntegerRingStore + Clone, J: IntegerRingStore> ZnBase<zn_barett::Zn<I>, 
     pub fn from_primes(integers: I, large_integers: J, primes: Vec<El<I>>) -> Self {
         Self::new(
             primes.into_iter().map(|n| zn_barett::Zn::new(<I as Clone>::clone(&integers), n)).collect(),
-            large_integers
+            large_integers,
+            AllocatingMemoryProvider
         )
     }
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore> ZnBase<C, J> 
+impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnBase<C, J, M> 
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
-    pub fn new(component_rings: Vec<C>, large_integers: J) -> Self {
+    pub fn new(component_rings: Vec<C>, large_integers: J, memory_provider: M) -> Self {
         assert!(component_rings.len() > 0);
         let total_modulus = large_integers.prod(
             component_rings.iter().map(|R| large_integers.coerce::<<C::Type as ZnRing>::Integers>(R.integer_ring(), R.integer_ring().clone(R.modulus())))
@@ -117,7 +120,8 @@ impl<C: ZnRingStore, J: IntegerRingStore> ZnBase<C, J>
         ZnBase {
             components: component_rings,
             total_ring: total_ring,
-            unit_vectors: unit_vectors
+            unit_vectors: unit_vectors,
+            memory_provider: memory_provider
         }
     }
 
@@ -125,18 +129,17 @@ impl<C: ZnRingStore, J: IntegerRingStore> ZnBase<C, J>
         self.total_ring.integer_ring()
     }
 
-    pub fn from_congruence<V: VectorView<El<C>>>(&self, el: V) -> ZnEl<C> {
+    pub fn from_congruence<V: VectorView<El<C>>>(&self, el: V) -> ZnEl<C, M> {
         assert_eq!(self.components.len(), el.len());
-        ZnEl((0..el.len()).map(|i| self.at(i).clone(el.at(i))).collect())
+        ZnEl(self.memory_provider.get_new_init(self.len(), |i| self.at(i).clone(el.at(i))))
     }
 
-    pub fn get_congruence<'a>(&self, el: &'a ZnEl<C>) -> impl 'a + VectorView<El<C>> {
-        &el.0
+    pub fn get_congruence<'a>(&self, el: &'a ZnEl<C, M>) -> impl 'a + VectorView<El<C>> {
+        &el.0 as &[El<C>]
     }
-
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore> VectorView<C> for ZnBase<C, J>
+impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> VectorView<C> for ZnBase<C, J, M>
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
@@ -149,16 +152,16 @@ impl<C: ZnRingStore, J: IntegerRingStore> VectorView<C> for ZnBase<C, J>
     }
 }
 
-pub struct ZnEl<C: ZnRingStore>(Vec<El<C>>);
+pub struct ZnEl<C: ZnRingStore, M: MemoryProvider<El<C>>>(M::Object);
 
-impl<C: ZnRingStore, J: IntegerRingStore> RingBase for ZnBase<C, J> 
+impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> RingBase for ZnBase<C, J, M> 
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
-    type Element = ZnEl<C>;
+    type Element = ZnEl<C, M>;
 
     fn clone(&self, val: &Self::Element) -> Self::Element {
-        ZnEl(val.0.iter().enumerate().map(|(i, x)| self.at(i).clone(x)).collect())
+        ZnEl(self.memory_provider.get_new_init(self.len(), |i| self.at(i).clone(val.0.at(i))))
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -169,7 +172,7 @@ impl<C: ZnRingStore, J: IntegerRingStore> RingBase for ZnBase<C, J>
 
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         for (i, el) in (0..self.components.len()).zip(rhs.0.into_iter()) {
-            self.components[i].add_assign(&mut lhs.0[i], el)
+            self.components[i].add_assign_ref(&mut lhs.0[i], el)
         }
     }
 
@@ -187,7 +190,7 @@ impl<C: ZnRingStore, J: IntegerRingStore> RingBase for ZnBase<C, J>
 
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         for (i, el) in (0..self.components.len()).zip(rhs.0.into_iter()) {
-            self.components[i].mul_assign(&mut lhs.0[i], el)
+            self.components[i].mul_assign_ref(&mut lhs.0[i], el)
         }
     }
 
@@ -198,13 +201,14 @@ impl<C: ZnRingStore, J: IntegerRingStore> RingBase for ZnBase<C, J>
     }
     
     fn from_int(&self, value: i32) -> Self::Element {
-        ZnEl((0..self.components.len()).map(|i| self.components[i].from_int(value)).collect())
+        ZnEl(self.memory_provider.get_new_init(self.len(), |i| self.components[i].from_int(value)))
     }
     
     fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
         for i in 0..self.components.len() {
             self.components[i].mul_assign_int(&mut lhs.0[i], rhs)
         }
+
     }
 
     fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -227,26 +231,28 @@ impl<C: ZnRingStore, J: IntegerRingStore> RingBase for ZnBase<C, J>
     fn is_noetherian(&self) -> bool { true }
 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        self.total_ring.get_ring().dbg(&RingRef::new(self).cast(&self.total_ring, self.clone(value)), out)
+        self.total_ring.get_ring().dbg(&RingRef::new(self).cast::<zn_barett::Zn<_>>(&self.total_ring, self.clone(value)), out)
     }
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore> Clone for ZnBase<C, J> 
+impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clone for ZnBase<C, J, M> 
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso,
         C: Clone,
-        J: Clone
+        J: Clone,
+        M: Clone
 {
     fn clone(&self) -> Self {
         ZnBase {
             components: <_ as Clone>::clone(&self.components),
             total_ring: <_ as Clone>::clone(&self.total_ring),
-            unit_vectors: self.unit_vectors.iter().map(|e| <_ as RingStore>::clone(&self.total_ring, e)).collect()
+            unit_vectors: self.unit_vectors.iter().map(|e| <_ as RingStore>::clone(&self.total_ring, e)).collect(),
+            memory_provider: self.memory_provider.clone()
         }
     }
 }
 
-impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStore> CanonicalHom<ZnBase<C2, J2>> for ZnBase<C1, J1> 
+impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStore, M1: MemoryProvider<El<C1>>, M2: MemoryProvider<El<C2>>> CanonicalHom<ZnBase<C2, J2, M2>> for ZnBase<C1, J1, M1> 
     where C1::Type: CanonicalHom<C2::Type>,
         C1::Type: CanonicalHom<J1::Type>,
         <C1::Type as ZnRing>::IntegerRingBase: SelfIso,
@@ -255,7 +261,7 @@ impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStor
 {
     type Homomorphism = Vec<<C1::Type as CanonicalHom<C2::Type>>::Homomorphism>;
 
-    fn has_canonical_hom(&self, from: &ZnBase<C2, J2>) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &ZnBase<C2, J2, M2>) -> Option<Self::Homomorphism> {
         if self.components.len() == from.components.len() {
             self.components.iter()
                 .zip(from.components.iter())
@@ -267,21 +273,19 @@ impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStor
         }
     }
 
-    fn map_in(&self, from: &ZnBase<C2, J2>, el: ZnEl<C2>, hom: &Self::Homomorphism) -> Self::Element {
-        ZnEl(
-            self.components.iter()
-                .zip(from.components.iter())
-                .map(|(s, f)| (s.get_ring(), f.get_ring()))
-                .zip(el.0.into_iter())
-                .zip(hom.iter())
-                .map(|(((s, f), x), hom)| (s, f, x, hom))
-                .map(|(s, f, x, hom)| s.map_in(f, x, hom))
-                .collect()
-        )
+    fn map_in_ref(&self, from: &ZnBase<C2, J2, M2>, el: &ZnEl<C2, M2>, hom: &Self::Homomorphism) -> Self::Element {
+        ZnEl(self.memory_provider.get_new_init(
+            self.len(), 
+            |i| self.at(i).get_ring().map_in_ref(from.at(i).get_ring(), el.0.at(i), &hom[i])
+        ))
+    }
+
+    fn map_in(&self, from: &ZnBase<C2, J2, M2>, el: ZnEl<C2, M2>, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in_ref(from, &el, hom)
     }
 }
 
-impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStore> CanonicalIso<ZnBase<C2, J2>> for ZnBase<C1, J1> 
+impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStore, M1: MemoryProvider<El<C1>>, M2: MemoryProvider<El<C2>>> CanonicalIso<ZnBase<C2, J2, M2>> for ZnBase<C1, J1, M1> 
     where C1::Type: CanonicalIso<C2::Type>,
         C1::Type: CanonicalHom<J1::Type>,
         <C1::Type as ZnRing>::IntegerRingBase: SelfIso,
@@ -290,7 +294,7 @@ impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStor
 {
     type Isomorphism = Vec<<C1::Type as CanonicalIso<C2::Type>>::Isomorphism>;
 
-    fn has_canonical_iso(&self, from: &ZnBase<C2, J2>) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, from: &ZnBase<C2, J2, M2>) -> Option<Self::Isomorphism> {
         if self.components.len() == from.components.len() {
             self.components.iter()
                 .zip(from.components.iter())
@@ -302,21 +306,15 @@ impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStor
         }
     }
 
-    fn map_out(&self, from: &ZnBase<C2, J2>, el: Self::Element, iso: &Self::Isomorphism) -> ZnEl<C2> {
-        ZnEl(
-            self.components.iter()
-                .zip(from.components.iter())
-                .map(|(s, f)| (s.get_ring(), f.get_ring()))
-                .zip(el.0.into_iter())
-                .zip(iso.iter())
-                .map(|(((s, f), x), hom)| (s, f, x, hom))
-                .map(|(s, f, x, hom)| s.map_out(f, x, hom))
-                .collect()
-        )
+    fn map_out(&self, from: &ZnBase<C2, J2, M2>, el: ZnEl<C1, M1>, iso: &Self::Isomorphism) -> ZnEl<C2, M2> {
+        ZnEl(from.memory_provider.get_new_init(
+            self.len(), 
+            |i| self.at(i).get_ring().map_out(from.at(i).get_ring(), self.at(i).clone(el.0.at(i)), &iso[i])
+        ))
     }
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalHom<zn_barett::ZnBase<K>> for ZnBase<C, J> 
+impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider<El<C>>> CanonicalHom<zn_barett::ZnBase<K>> for ZnBase<C, J, M> 
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
@@ -337,7 +335,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalHom<zn_b
         }
     }
 
-    fn map_in(&self, from: &zn_barett::ZnBase<K>, el: zn_barett::ZnEl<K>, hom: &Self::Homomorphism) -> ZnEl<C> {
+    fn map_in(&self, from: &zn_barett::ZnBase<K>, el: zn_barett::ZnEl<K>, hom: &Self::Homomorphism) -> ZnEl<C, M> {
         let lift = from.smallest_positive_lift(el);
         let mapped_lift = <J::Type as CanonicalHom<K::Type>>::map_in(
             self.ZZ().get_ring(), 
@@ -345,13 +343,10 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalHom<zn_b
             lift, 
             &hom.0
         );
-        ZnEl(
-            self.components.iter()
-                .map(|R| R.get_ring())
-                .zip(hom.1.iter())
-                .map(|(R, hom)| R.map_in_ref(self.ZZ().get_ring(), &mapped_lift, hom))
-                .collect()
-        )
+        ZnEl(self.memory_provider.get_new_init(
+            self.len(),
+            |i| self.at(i).get_ring().map_in_ref(self.ZZ().get_ring(), &mapped_lift, &hom.1[i])
+        ))
     }
 }
 
@@ -390,7 +385,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalIso<zn_b
     }
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRing> CanonicalHom<K> for ZnBase<C, J> 
+impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRing, M: MemoryProvider<El<C>>> CanonicalHom<K> for ZnBase<C, J, M> 
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso,
         K: ?Sized + SelfIso
@@ -409,49 +404,46 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRing> CanonicalHom<K> for Zn
 
     fn map_in(&self, from: &K, el: K::Element, hom: &Self::Homomorphism) -> Self::Element {
         let mapped_el = <J::Type as CanonicalHom<K>>::map_in(self.ZZ().get_ring(), from, el, &hom.0);
-        ZnEl(
-            self.components.iter()
-                .zip(hom.1.iter())
-                .map(|(R, hom)| <C::Type as CanonicalHom<J::Type>>::map_in_ref(R.get_ring(), self.ZZ().get_ring(), &mapped_el, hom))
-                .collect()
-        )
+        ZnEl(self.memory_provider.get_new_init(
+            self.len(),
+            |i| <C::Type as CanonicalHom<J::Type>>::map_in_ref(self.at(i).get_ring(), self.ZZ().get_ring(), &mapped_el, &hom.1[i])
+        ))
     }
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore> DivisibilityRing for ZnBase<C, J> 
+impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> DivisibilityRing for ZnBase<C, J, M> 
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        Some(ZnEl(self.components.iter()
-            .zip(lhs.0.iter())
-            .zip(rhs.0.iter())
-            .map(|((r, x), y)| (r, x, y))
-            .map(|(r, x, y)| r.checked_left_div(x, y).ok_or(()))
-            .collect::<Result<Vec<El<C>>, ()>>().ok()?))
+        Some(ZnEl(self.memory_provider.try_get_new_init(self.len(), |i| self.at(i).checked_div(lhs.0.at(i), rhs.0.at(i)).ok_or(())).ok()?))
     }
 }
 
-pub struct ZnBaseElementsIterator<'a, C: ZnRingStore, J: IntegerRingStore>
+pub struct ZnBaseElementsIterator<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>>
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
-    ring: &'a ZnBase<C, J>,
+    ring: &'a ZnBase<C, J, M>,
     part_iters: Option<Vec<std::iter::Peekable<<C::Type as ZnRing>::ElementsIter<'a>>>>
 }
 
-impl<'a, C: ZnRingStore, J: IntegerRingStore> Iterator for ZnBaseElementsIterator<'a, C, J>
+impl<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Iterator for ZnBaseElementsIterator<'a, C, J, M>
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
-    type Item = ZnEl<C>;
+    type Item = ZnEl<C, M>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(part_iters) = &mut self.part_iters {
             while part_iters.len() < self.ring.components.len() {
                 part_iters.push(self.ring.components[part_iters.len()].elements().peekable());
             }
-            let result = part_iters.iter_mut().enumerate().map(|(i, it)| self.ring.at(i).clone(it.peek().unwrap())).collect::<Vec<_>>();
+
+            let result = self.ring.memory_provider.get_new_init(
+                self.ring.len(),
+                |i| self.ring.at(i).clone(part_iters[i].peek().unwrap())
+            );
             part_iters.last_mut().unwrap().next();
             while part_iters.last_mut().unwrap().peek().is_none() {
                 part_iters.pop();
@@ -469,13 +461,13 @@ impl<'a, C: ZnRingStore, J: IntegerRingStore> Iterator for ZnBaseElementsIterato
     }
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore> ZnRing for ZnBase<C, J> 
+impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnRing for ZnBase<C, J, M> 
     where C::Type: CanonicalHom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: SelfIso
 {
     type IntegerRingBase = J::Type;
     type Integers = J;
-    type ElementsIter<'a> = ZnBaseElementsIterator<'a, C, J>
+    type ElementsIter<'a> = ZnBaseElementsIterator<'a, C, J, M>
         where Self: 'a;
 
     fn integer_ring(&self) -> &Self::Integers {
@@ -497,7 +489,7 @@ impl<C: ZnRingStore, J: IntegerRingStore> ZnRing for ZnBase<C, J>
         )
     }
 
-    fn elements<'a>(&'a self) -> ZnBaseElementsIterator<'a, C, J> {
+    fn elements<'a>(&'a self) -> ZnBaseElementsIterator<'a, C, J, M> {
         ZnBaseElementsIterator {
             ring: self,
             part_iters: Some(Vec::new())
@@ -508,10 +500,8 @@ impl<C: ZnRingStore, J: IntegerRingStore> ZnRing for ZnBase<C, J>
         self.components.len() == 1
     }
 
-    fn random_element<G: FnMut() -> u64>(&self, mut rng: G) -> ZnEl<C> {
-        ZnEl(self.components.iter()
-            .map(|r| r.random_element(&mut rng))
-            .collect::<Vec<_>>())
+    fn random_element<G: FnMut() -> u64>(&self, mut rng: G) -> ZnEl<C, M> {
+        ZnEl(self.memory_provider.get_new_init(self.len(), |i| self.at(i).random_element(&mut rng)))
     }
 }
 
@@ -536,13 +526,13 @@ impl<'a, C: ZnRingStore> RNSFFTTable<'a, C> {
 
 impl<'a, C: ZnRingStore> RNSFFTTable<'a, C> {
 
-    pub fn bitreverse_fft_inplace<V: VectorViewMut<ZnEl<C>>>(&self, mut values: V) {
+    pub fn bitreverse_fft_inplace<M: MemoryProvider<El<C>>, V: VectorViewMut<ZnEl<C, M>>>(&self, mut values: V) {
         for i in 0..self.part_tables.len() {
             self.part_tables[i].bitreverse_fft_inplace((&mut values).map_mut(|x| &x.0[i], |x| &mut x.0[i]));
         }
     }
 
-    pub fn bitreverse_inv_fft_inplace<V: VectorViewMut<ZnEl<C>>>(&self, mut values: V) {
+    pub fn bitreverse_inv_fft_inplace<M: MemoryProvider<El<C>>, V: VectorViewMut<ZnEl<C, M>>>(&self, mut values: V) {
         for i in 0..self.part_tables.len() {
             self.part_tables[i].bitreverse_inv_fft_inplace((&mut values).map_mut(|x| &x.0[i], |x| &mut x.0[i]));
         }

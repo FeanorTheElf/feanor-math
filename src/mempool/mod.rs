@@ -45,7 +45,7 @@ pub trait MemoryProviderBase<T> {
 
     type Data;
 
-    fn access<'a>(&'a self, data: &'a Self::Data) -> &'a mut [T];
+    fn access<'a>(&'a self, data: &'a Self::Data) -> &'a [T];
     fn access_mut<'a>(&'a self, data: &'a mut Self::Data) -> &'a mut [T];
     fn put_back(&self, data: Self::Data);
     unsafe fn get_new<F: FnOnce(&mut [MaybeUninit<T>])>(&self, size: usize, initializer: F) -> Self::Data;
@@ -64,6 +64,38 @@ pub trait MemoryProvider<T> {
                     mem[i] = MaybeUninit::new(initializer(i))
                 }
             })
+        }
+    }
+
+    fn try_get_new_init<E, F: FnMut(usize) -> Result<T, E>>(&self, size: usize, mut initializer: F) -> Result<Self::Object, E> {
+        unsafe {
+            let mut aborted = None;
+            let result = self.get_new(size, |mem| {
+                let mut i = 0;
+                while i < mem.len() {
+                    // note that this will leak memory if initializer(i) panics
+                    match initializer(i) {
+                        Ok(val) => {
+                            mem[i] = MaybeUninit::new(val);
+                            i += 1;
+                        },
+                        Err(err) => {
+                            aborted = Some(err);
+                            // drop the previously initialized memory
+                            // note that this does not prevent a memory leak in the panic case
+                            for j in 0..i {
+                                mem[j].assume_init_drop();
+                            }
+                            break;
+                        }
+                    };
+                }
+            });
+            if let Some(err) = aborted {
+                Err(err)
+            } else {
+                Ok(result)
+            }
         }
     }
 }
