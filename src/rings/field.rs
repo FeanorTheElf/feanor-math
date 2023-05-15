@@ -7,17 +7,21 @@ use crate::ring::*;
 use crate::rings::zn::{ZnRingStore, ZnRing};
 
 #[derive(Clone, Copy)]
-pub struct AsFieldBase<R: DivisibilityRingStore> {
+pub struct AsFieldBase<R: DivisibilityRingStore> 
+    where R::Type: DivisibilityRing
+{
     base: R
 }
 
 #[allow(type_alias_bounds)]
 pub type AsField<R: DivisibilityRingStore> = RingValue<AsFieldBase<R>>;
 
-pub struct FieldEl<R: DivisibilityRingStore>(El<R>);
+pub struct FieldEl<R: DivisibilityRingStore>(El<R>)
+    where R::Type: DivisibilityRing;
 
 impl<R: DivisibilityRingStore> Clone for FieldEl<R> 
-    where El<R>: Clone
+    where El<R>: Clone,
+        R::Type: DivisibilityRing
 {
     fn clone(&self) -> Self {
         FieldEl(self.0.clone())
@@ -25,11 +29,13 @@ impl<R: DivisibilityRingStore> Clone for FieldEl<R>
 }
 
 impl<R: DivisibilityRingStore> Copy for FieldEl<R> 
-    where El<R>: Copy
+    where El<R>: Copy,
+        R::Type: DivisibilityRing
 {}
 
-impl<R: DivisibilityRingStore> AsFieldBase<R> {
-
+impl<R: DivisibilityRingStore> AsFieldBase<R> 
+    where R::Type: DivisibilityRing
+{
     ///
     /// This function is not really unsafe, but users should be careful to only use
     /// it with rings that are fields. This cannot be checked in here, so must be checked
@@ -44,8 +50,9 @@ impl<R: DivisibilityRingStore> AsFieldBase<R> {
     }
 }
 
-impl<R: DivisibilityRingStore> DelegateRing for AsFieldBase<R> {
-
+impl<R: DivisibilityRingStore> DelegateRing for AsFieldBase<R> 
+    where R::Type: DivisibilityRing
+{
     type Element = FieldEl<R>;
     type Base = R::Type;
 
@@ -71,7 +78,8 @@ impl<R: DivisibilityRingStore> DelegateRing for AsFieldBase<R> {
 }
 
 impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanonicalHom<AsFieldBase<S>> for AsFieldBase<R> 
-    where R::Type: CanonicalHom<S::Type>
+    where R::Type: DivisibilityRing + CanonicalHom<S::Type>,
+        S::Type: DivisibilityRing
 {
     type Homomorphism = <R::Type as CanonicalHom<S::Type>>::Homomorphism;
 
@@ -85,7 +93,8 @@ impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanonicalHom<AsFieldBas
 }
 
 impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanonicalIso<AsFieldBase<S>> for AsFieldBase<R> 
-    where R::Type: CanonicalIso<S::Type>
+    where R::Type: DivisibilityRing + CanonicalIso<S::Type>,
+        S::Type: DivisibilityRing
 {
     type Isomorphism = <R::Type as CanonicalIso<S::Type>>::Isomorphism;
 
@@ -98,8 +107,9 @@ impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanonicalIso<AsFieldBas
     }
 }
 
-impl<R: DivisibilityRingStore> RingExtension for AsFieldBase<R> {
-
+impl<R: DivisibilityRingStore> RingExtension for AsFieldBase<R> 
+    where R::Type: DivisibilityRing
+{
     type BaseRing = R;
 
     fn base_ring<'a>(&'a self) -> &'a Self::BaseRing {
@@ -112,7 +122,7 @@ impl<R: DivisibilityRingStore> RingExtension for AsFieldBase<R> {
 }
 
 impl<R: DivisibilityRingStore, S: IntegerRing + ?Sized> CanonicalHom<S> for AsFieldBase<R> 
-    where R::Type: CanonicalHom<S>
+    where R::Type: DivisibilityRing + CanonicalHom<S>
 {
     type Homomorphism = <R::Type as CanonicalHom<S>>::Homomorphism;
 
@@ -130,23 +140,25 @@ pub trait AssumeFieldDivision: RingBase {
     fn assume_field_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element;
 }
 
-impl<R: ?Sized + DivisibilityRing> AssumeFieldDivision for R {
+// impl<R: ?Sized + DivisibilityRing> AssumeFieldDivision for R {
     
-    default fn assume_field_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        assert!(!self.is_zero(rhs));
-        return self.checked_left_div(lhs, rhs).unwrap();
-    }
-}
+//     default fn assume_field_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+//         assert!(!self.is_zero(rhs));
+//         return self.checked_left_div(lhs, rhs).unwrap();
+//     }
+// }
 
-impl<R: DivisibilityRingStore> DivisibilityRing for AsFieldBase<R> {
-
+impl<R: DivisibilityRingStore> DivisibilityRing for AsFieldBase<R> 
+    where R::Type: DivisibilityRing
+{
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         self.base_ring().checked_left_div(&lhs.0, &rhs.0).map(FieldEl)
     }
 }
 
-impl<R: DivisibilityRingStore> EuclideanRing for AsFieldBase<R> {
-
+impl<R: DivisibilityRingStore> EuclideanRing for AsFieldBase<R> 
+    where R::Type: DivisibilityRing
+{
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
         (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
@@ -166,21 +178,22 @@ impl<R: DivisibilityRingStore> EuclideanRing for AsFieldBase<R> {
     }
 }
 
-impl<R: DivisibilityRingStore> Field for AsFieldBase<R> {
-
+impl<R: DivisibilityRingStore> Field for AsFieldBase<R>
+    where R::Type: DivisibilityRing
+{
     fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        FieldEl(self.base_ring().get_ring().assume_field_div(&lhs.0, &rhs.0))
+        FieldEl(self.base_ring().get_ring().checked_left_div(&lhs.0, &rhs.0).unwrap())
     }
 }
 
 pub struct FpBaseElementsIter<'a, R>
-    where R: ZnRingStore, R::Type: 'a
+    where R: ZnRingStore, R::Type: 'a + ZnRing
 {
     iter: <R::Type as ZnRing>::ElementsIter<'a>
 }
 
 impl<'a, R> Iterator for FpBaseElementsIter<'a, R>
-    where R: ZnRingStore, R::Type: 'a
+    where R: ZnRingStore, R::Type: 'a + ZnRing
 {
     type Item = FieldEl<R>;
 
@@ -190,7 +203,7 @@ impl<'a, R> Iterator for FpBaseElementsIter<'a, R>
 }
 
 impl<R: ZnRingStore> ZnRing for AsFieldBase<R>
-    where R::Type: CanonicalHom<<R::Type as ZnRing>::IntegerRingBase>
+    where R::Type: ZnRing + CanonicalHom<<R::Type as ZnRing>::IntegerRingBase>
 {
     type IntegerRingBase = <R::Type as ZnRing>::IntegerRingBase;
     type Integers = <R::Type as ZnRing>::Integers;

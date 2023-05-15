@@ -1,3 +1,4 @@
+use crate::divisibility::DivisibilityRing;
 use crate::divisibility::DivisibilityRingStore;
 use crate::ring::*;
 use crate::algorithms;
@@ -21,7 +22,8 @@ pub struct FFTTableBluestein<R>
 }
 
 impl<R> FFTTableBluestein<R> 
-    where R: DivisibilityRingStore
+    where R: DivisibilityRingStore,
+        R::Type: DivisibilityRing
 {
     pub fn new(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize) -> Self {
         // checks on m and root_of_unity_m are done by the FFTTableCooleyTuckey

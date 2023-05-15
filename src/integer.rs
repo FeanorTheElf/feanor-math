@@ -60,7 +60,9 @@ impl<I: IntegerRing + CanonicalIso<I> + ?Sized, J: IntegerRing + CanonicalIso<J>
     }
 }
 
-pub trait IntegerRingStore: RingStore<Type: IntegerRing> {
+pub trait IntegerRingStore: RingStore
+    where Self::Type: IntegerRing
+{
 
     delegate!{ fn to_float_approx(&self, value: &El<Self>) -> f64 }
     delegate!{ fn from_float_approx(&self, value: f64) -> Option<El<Self>> }
@@ -92,11 +94,14 @@ pub trait IntegerRingStore: RingStore<Type: IntegerRing> {
 }
 
 impl<R> IntegerRingStore for R
-    where R: RingStore<Type: IntegerRing>
+    where R: RingStore,
+        R::Type: IntegerRing
 {}
 
 #[cfg(test)]
-pub fn generic_test_integer_uniformly_random<R: IntegerRingStore>(ring: R) {
+pub fn generic_test_integer_uniformly_random<R: IntegerRingStore>(ring: R) 
+    where R::Type: IntegerRing
+{
     for b in [15, 16] {
         let bound = ring.from_int(b);
         let mut rng = oorandom::Rand64::new(0);
@@ -111,7 +116,9 @@ pub fn generic_test_integer_uniformly_random<R: IntegerRingStore>(ring: R) {
 }
 
 #[cfg(test)]
-pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
+pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) 
+    where R::Type: IntegerRing
+{
     let elements = edge_case_elements.collect::<Vec<_>>();
     for a in &elements {
         let mut ceil_pow_2 = ring.from_int(2);

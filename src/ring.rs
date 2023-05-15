@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{algorithms, primitive_int::{StaticRing}, integer::IntegerRingStore};
+use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore, IntegerRing}};
 
 ///
 /// Basic trait for objects that have a ring structure.
@@ -547,7 +547,9 @@ pub trait RingStore {
         )
     }
 
-    fn pow_gen<R: IntegerRingStore>(&self, x: El<Self>, power: &El<R>, integers: R) -> El<Self> {
+    fn pow_gen<R: IntegerRingStore>(&self, x: El<Self>, power: &El<R>, integers: R) -> El<Self> 
+        where R::Type: IntegerRing
+    {
         algorithms::sqr_mul::generic_abs_square_and_multiply(
             x, 
             power, 
@@ -702,8 +704,9 @@ pub trait HashableElRing: RingBase {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H);
 }
 
-pub trait HashableElRingStore: RingStore<Type: HashableElRing> {
-
+pub trait HashableElRingStore: RingStore
+    where Self::Type: HashableElRing
+{
     fn hash<H: std::hash::Hasher>(&self, el: &El<Self>, h: &mut H) {
         self.get_ring().hash(el, h)
     }
@@ -716,7 +719,8 @@ pub trait HashableElRingStore: RingStore<Type: HashableElRing> {
 }
 
 impl<R> HashableElRingStore for R
-    where R: RingStore<Type: HashableElRing>
+    where R: RingStore,
+        R::Type: HashableElRing
 {}
 
 pub type El<R> = <<R as RingStore>::Type as RingBase>::Element;
@@ -820,8 +824,9 @@ impl<'a, R: RingBase + CanonicalIso<R> + ?Sized> RingStore for RingRef<'a, R> {
     }
 }
 
-impl<'a, S: Deref<Target: RingStore>> RingStore for S {
-    
+impl<'a, S: Deref> RingStore for S
+    where S::Target: RingStore
+{    
     type Type = <<S as Deref>::Target as RingStore>::Type;
     
     fn get_ring<'b>(&'b self) -> &'b Self::Type {

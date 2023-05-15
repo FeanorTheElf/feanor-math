@@ -66,8 +66,9 @@ pub mod generic_maps {
     }
 }
 
-pub trait ZnRingStore: RingStore<Type: ZnRing> {
-    
+pub trait ZnRingStore: RingStore
+    where Self::Type: ZnRing
+{    
     delegate!{ fn integer_ring(&self) -> &<Self::Type as ZnRing>::Integers }
     delegate!{ fn modulus(&self) -> &El<<Self::Type as ZnRing>::Integers> }
     delegate!{ fn smallest_positive_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::Integers> }
@@ -93,7 +94,9 @@ pub trait ZnRingStore: RingStore<Type: ZnRing> {
     }
 }
 
-impl<R: RingStore<Type: ZnRing>> ZnRingStore for R {}
+impl<R: RingStore> ZnRingStore for R
+    where R::Type: ZnRing
+{}
 
 #[cfg(test)]
 use crate::primitive_int::*;
@@ -102,7 +105,9 @@ use super::bigint::DefaultBigIntRing;
 use super::field::AsFieldBase;
 
 #[cfg(test)]
-pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R) {
+pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R)
+    where R::Type: ZnRing
+{
     let ZZ = R.integer_ring();
     let n = R.modulus();
 
@@ -126,7 +131,7 @@ pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R) {
 
 #[cfg(test)]
 pub fn generic_test_map_in_large_int<R: ZnRingStore>(R: R)
-    where <R as RingStore>::Type: CanonicalHom<DefaultBigIntRing>
+    where <R as RingStore>::Type: ZnRing + CanonicalHom<DefaultBigIntRing>
 {
     let ZZ_big = DefaultBigIntRing::RING;
     let n = ZZ_big.power_of_two(1000);

@@ -28,8 +28,9 @@ pub trait PolyRing: RingExtension + CanonicalIso<Self> {
     fn degree(&self, f: &Self::Element) -> Option<usize>;
 }
 
-pub trait PolyRingStore: RingStore<Type: PolyRing> {
-
+pub trait PolyRingStore: RingStore
+    where Self::Type: PolyRing
+{
     delegate!{ fn indeterminate(&self) -> El<Self> }
     delegate!{ fn degree(&self, f: &El<Self>) -> Option<usize> }
 
@@ -48,11 +49,14 @@ pub trait PolyRingStore: RingStore<Type: PolyRing> {
     }
 }
 
-impl<R: RingStore<Type: PolyRing>> PolyRingStore for R {}
+impl<R: RingStore> PolyRingStore for R
+    where R::Type: PolyRing
+{}
 
 #[cfg(test)]
-pub fn generic_test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R::Type as RingExtension>::BaseRing>>>(ring: R, interesting_base_ring_elements: I) {
-    
+pub fn generic_test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R::Type as RingExtension>::BaseRing>>>(ring: R, interesting_base_ring_elements: I)
+    where R::Type: PolyRing
+{    
     let x = ring.indeterminate();
     let elements = interesting_base_ring_elements.collect::<Vec<_>>();
     

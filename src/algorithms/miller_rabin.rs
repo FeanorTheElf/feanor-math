@@ -26,7 +26,8 @@ use oorandom;
 /// most 4^(-k).
 /// 
 pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool 
-    where I: IntegerRingStore + HashableElRingStore
+    where I: IntegerRingStore + HashableElRingStore,
+        I::Type: IntegerRing
 {
     if ZZ.is_leq(n, &ZZ.from_int(2)) {
         return ZZ.eq(n, &ZZ.from_int(2));

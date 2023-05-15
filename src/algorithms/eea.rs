@@ -1,5 +1,5 @@
-use crate::euclidean::EuclideanRingStore;
-use crate::ordered::OrderedRingStore;
+use crate::euclidean::{EuclideanRingStore, EuclideanRing};
+use crate::ordered::{OrderedRingStore, OrderedRing};
 use crate::ring::*;
 
 use std::mem::swap;
@@ -15,7 +15,8 @@ use std::cmp::Ordering;
 /// The given ring must be euclidean
 /// 
 pub fn eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>) 
-    where R: EuclideanRingStore
+    where R: EuclideanRingStore,
+        R::Type: EuclideanRing
 {
     let (mut a, mut b) = (fst, snd);
     let (mut sa, mut ta) = (ring.one(), ring.zero());
@@ -64,7 +65,8 @@ pub fn eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
 /// `signed_eea(0, 0) == (0, 0, 0)`
 /// 
 pub fn signed_eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
-    where R: EuclideanRingStore + OrderedRingStore
+    where R: EuclideanRingStore + OrderedRingStore,
+        R::Type: EuclideanRing + OrderedRing
 {
     if ring.is_zero(&fst) {
         return match ring.cmp(&snd, &ring.zero()) {
@@ -99,7 +101,8 @@ pub fn signed_eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
 /// The given ring must be euclidean
 /// 
 pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
-    where R: EuclideanRingStore
+    where R: EuclideanRingStore,
+        R::Type: EuclideanRing
 {
     let (_, _, d) = eea(a, b, ring);
     return d;
@@ -119,20 +122,23 @@ pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
 /// ```
 /// 
 pub fn signed_gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
-    where R: EuclideanRingStore + OrderedRingStore
+    where R: EuclideanRingStore + OrderedRingStore,
+        R::Type: EuclideanRing + OrderedRing
 {
     let (_, _, d) = signed_eea(a, b, ring);
     return d;
 }
 
 pub fn signed_lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
-    where R: EuclideanRingStore + OrderedRingStore
+    where R: EuclideanRingStore + OrderedRingStore,
+        R::Type: EuclideanRing + OrderedRing
 {
     ring.mul(ring.euclidean_div(ring.clone(&fst), &signed_gcd(fst, ring.clone(&snd), &ring)), snd)
 }
 
 pub fn lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
-    where R: EuclideanRingStore
+    where R: EuclideanRingStore,
+        R::Type: EuclideanRing
 {
     ring.euclidean_div(ring.mul_ref(&fst, &snd), &gcd(fst, snd, &ring))
 }

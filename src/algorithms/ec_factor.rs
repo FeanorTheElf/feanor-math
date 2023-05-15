@@ -10,7 +10,8 @@ use crate::rings::zn::zn_barett::Zn;
 type Point<I: IntegerRingStore> = (El<Zn<I>>, El<Zn<I>>, El<Zn<I>>);
 
 fn ec_group_action_proj<I>(Zn: &Zn<I>, _A: &El<Zn<I>>, _B: &El<Zn<I>>, P: Point<I>, Q: &Point<I>) -> Point<I> 
-    where I: IntegerRingStore
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
 {
     if Zn.is_zero(&Q.2) {
         return P;
@@ -46,7 +47,8 @@ fn ec_group_action_proj<I>(Zn: &Zn<I>, _A: &El<Zn<I>>, _B: &El<Zn<I>>, P: Point<
 }
 
 fn ec_group_double_proj<I>(Zn: &Zn<I>, A: &El<Zn<I>>, _B: &El<Zn<I>>, P: &Point<I>) -> Point<I>
-    where I: IntegerRingStore
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
 {
     let (x, y, z) = P;
 
@@ -78,7 +80,8 @@ fn ec_group_double_proj<I>(Zn: &Zn<I>, A: &El<Zn<I>>, _B: &El<Zn<I>>, P: &Point<
 }
 
 pub fn ec_mul_abort<I>(base: &Point<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, power: &El<I>, ZZ: &I, Zn: &Zn<I>) -> Point<I>
-    where I: IntegerRingStore
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
 {
     if ZZ.is_zero(&power) {
         return (Zn.zero(), Zn.one(), Zn.zero());
@@ -103,7 +106,8 @@ pub fn ec_mul_abort<I>(base: &Point<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, power: &El
 }
 
 fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &Point<I>) -> bool
-    where I: IntegerRingStore
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
 {
     let (x, y, z) = &P;
     Zn.eq(
@@ -121,7 +125,8 @@ fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &Point<I>) -> boo
 /// Runtime `L_N(1/2, 1) = exp((1 + o(1)) ln(N)^1/2 lnln(N)^1/2)`
 /// 
 pub fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
-    where I: IntegerRingStore
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
 {
     assert!(algorithms::miller_rabin::is_prime(&ZZ, N, 6) == false);
     assert!(ZZ.is_geq(N, &ZZ.from_int(100)));

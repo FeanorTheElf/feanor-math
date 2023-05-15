@@ -1,6 +1,6 @@
-use crate::divisibility::DivisibilityRingStore;
+use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::integer::IntegerRingStore;
-use crate::rings::zn::ZnRingStore;
+use crate::rings::zn::{ZnRingStore, ZnRing};
 use crate::vector::SwappableVectorViewMut;
 use crate::{ring::*, vector::VectorViewMut};
 
@@ -18,7 +18,8 @@ pub fn bitreverse(index: usize, bits: usize) -> usize {
 }
 
 impl<R> FFTTableCooleyTuckey<R>
-    where R: DivisibilityRingStore
+    where R: DivisibilityRingStore, 
+        R::Type: DivisibilityRing
 {
     pub fn new(ring: R, root_of_unity: El<R>, log2_n: usize) -> Self {
         assert!(ring.is_commutative());
@@ -37,7 +38,8 @@ impl<R> FFTTableCooleyTuckey<R>
     }
 
     pub fn for_zn(ring: R, log2_n: usize) -> Option<Self>
-        where R: ZnRingStore
+        where R: ZnRingStore,
+            R::Type: ZnRing
     {
         assert!(log2_n > 0);
         assert!(ring.is_field());
