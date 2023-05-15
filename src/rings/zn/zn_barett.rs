@@ -10,8 +10,6 @@ use crate::rings::zn::*;
 use crate::algorithms;
 use crate::primitive_int::*;
 
-use std::cmp::Ordering;
-
 ///
 /// Ring representing `Z/nZ`, computing the modular reductions
 /// via a Barett-reduction algorithm. This is a fast general-purpose
@@ -84,7 +82,7 @@ impl<I: IntegerRingStore> ZnBase<I>
         integer_ring.mul_pow_2(&mut mod_square_bound, k);
 
         // check that this expression does not overflow
-        integer_ring.mul_ref_snd(integer_ring.pow(integer_ring.clone(&modulus), 2), &mod_square_bound);
+        integer_ring.mul_ref_snd(integer_ring.pow(integer_ring.clone_el(&modulus), 2), &mod_square_bound);
 
         let inverse_modulus = integer_ring.euclidean_div(mod_square_bound, &modulus);
         return ZnBase {
@@ -96,7 +94,7 @@ impl<I: IntegerRingStore> ZnBase<I>
     }
 
     fn project_leq_n_square(&self, n: &mut El<I>) {
-        assert!(self.integer_ring.cmp(&n, &self.integer_ring.zero()) != Ordering::Less);
+        assert!(!self.integer_ring.is_neg(&n));
         let mut subtract = self.integer_ring.mul_ref(&n, &self.inverse_modulus);
         self.integer_ring.euclidean_div_pow_2(&mut subtract, self.inverse_modulus_bitshift);
         self.integer_ring.mul_assign_ref(&mut subtract, &self.modulus);
@@ -126,7 +124,7 @@ impl<I: IntegerRingStore> ZnBase<I>
             }
             result
         } else {
-            let modulus = self.integer_ring.cast::<J>(ZZ, self.integer_ring().clone(&self.modulus));
+            let modulus = self.integer_ring.cast::<J>(ZZ, self.integer_ring().clone_el(&self.modulus));
             red_n = ZZ.euclidean_rem(red_n, &modulus);
             self.integer_ring.coerce::<J>(ZZ, red_n)
         };
@@ -142,7 +140,7 @@ impl<I: IntegerRingStore> ZnBase<I>
     /// factor of the modulus (as Err())
     ///
     pub fn invert(&self, x: ZnEl<I>) -> Result<ZnEl<I>, El<I>> {
-        let (s, _, d) = algorithms::eea::eea(self.integer_ring().clone(&x.0), self.integer_ring().clone(self.modulus()), &self.integer_ring);
+        let (s, _, d) = algorithms::eea::eea(self.integer_ring().clone_el(&x.0), self.integer_ring().clone_el(self.modulus()), &self.integer_ring);
         if self.integer_ring.is_neg_one(&d) || self.integer_ring.is_one(&d) {
             Ok(self.project(s))
         } else {
@@ -173,8 +171,8 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
 {
     type Element = ZnEl<I>;
 
-    fn clone(&self, val: &Self::Element) -> Self::Element {
-        ZnEl(self.integer_ring().clone(&val.0))
+    fn clone_el(&self, val: &Self::Element) -> Self::Element {
+        ZnEl(self.integer_ring().clone_el(&val.0))
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -245,9 +243,9 @@ impl<I: IntegerRingStore> Clone for ZnBase<I>
 {
     fn clone(&self) -> Self {
         ZnBase {
-            integer_ring: <_ as Clone>::clone(&self.integer_ring),
-            modulus: <_ as RingStore>::clone(&self.integer_ring, &self.modulus),
-            inverse_modulus: <_ as RingStore>::clone(&self.integer_ring, &self.inverse_modulus),
+            integer_ring: self.integer_ring.clone(),
+            modulus: self.integer_ring.clone_el(&self.modulus),
+            inverse_modulus: self.integer_ring.clone_el(&self.inverse_modulus),
             inverse_modulus_bitshift: self.inverse_modulus_bitshift
         }
     }
@@ -257,7 +255,7 @@ impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I>
     where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        let d = algorithms::eea::gcd(self.integer_ring().clone(&lhs.0), self.integer_ring().clone(&rhs.0), &self.integer_ring);
+        let d = algorithms::eea::gcd(self.integer_ring().clone_el(&lhs.0), self.integer_ring().clone_el(&rhs.0), &self.integer_ring);
         if self.integer_ring.is_zero(&d) {
             return Some(self.zero());
         } else if let Ok(inv) = self.invert(self.project(self.integer_ring.checked_div(&rhs.0, &d).unwrap())) {
@@ -273,7 +271,7 @@ impl<I: IntegerRingStore> AssumeFieldDivision for ZnBase<I>
 {
     fn assume_field_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         assert!(!self.is_zero(rhs));
-        return self.mul_ref_fst(lhs, self.invert(self.clone(rhs)).ok().unwrap());
+        return self.mul_ref_fst(lhs, self.invert(self.clone_el(rhs)).ok().unwrap());
     }
 }
 
@@ -287,7 +285,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalHom<ZnBase<J>> for ZnBas
         let base_hom = <I::Type as CanonicalHom<J::Type>>::has_canonical_hom(self.integer_ring.get_ring(), from.integer_ring.get_ring())?;
         if self.integer_ring.eq(
             &self.modulus,
-            &<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), from.integer_ring().clone(&from.modulus), &base_hom)
+            &<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), from.integer_ring().clone_el(&from.modulus), &base_hom)
         ) {
             Some(base_hom)
         } else {
@@ -310,7 +308,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for ZnBas
         let base_iso = <I::Type as CanonicalIso<J::Type>>::has_canonical_iso(self.integer_ring.get_ring(), from.integer_ring.get_ring())?;
         if from.integer_ring().eq(
             from.modulus(),
-            &<I::Type as CanonicalIso<J::Type>>::map_out(self.integer_ring.get_ring(), from.integer_ring.get_ring(), self.integer_ring().clone(self.modulus()), &base_iso)
+            &<I::Type as CanonicalIso<J::Type>>::map_out(self.integer_ring.get_ring(), from.integer_ring.get_ring(), self.integer_ring().clone_el(self.modulus()), &base_iso)
         ) {
             Some(base_iso)
         } else {
@@ -353,7 +351,7 @@ impl<'a, I> Iterator for ZnBaseElementsIter<'a, I>
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.ring.integer_ring().is_lt(&self.current, self.ring.modulus()) {
-            let result = self.ring.integer_ring().clone(&self.current);
+            let result = self.ring.integer_ring().clone_el(&self.current);
             self.ring.integer_ring().add_assign(&mut self.current, self.ring.integer_ring().one());
             return Some(ZnEl(result));
         } else {

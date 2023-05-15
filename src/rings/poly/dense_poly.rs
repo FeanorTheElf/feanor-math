@@ -52,8 +52,8 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
     
     type Element = M::Object;
 
-    fn clone(&self, val: &Self::Element) -> Self::Element {
-        self.memory_provider.get_new_init(self.degree(val).map(|d| d + 1).unwrap_or(0), |i| self.base_ring.clone(&val[i]))
+    fn clone_el(&self, val: &Self::Element) -> Self::Element {
+        self.memory_provider.get_new_init(self.degree(val).map(|d| d + 1).unwrap_or(0), |i| self.base_ring.clone_el(&val[i]))
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -183,7 +183,7 @@ impl<R, P, M> CanonicalHom<P> for DensePolyRingBase<R, M>
     }
 
     fn map_in(&self, from: &P, el: P::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.from_terms(from.terms(&el).map(|(c, i)| (self.base_ring().get_ring().map_in(from.base_ring().get_ring(), from.base_ring().clone(c), hom), i)))
+        self.from_terms(from.terms(&el).map(|(c, i)| (self.base_ring().get_ring().map_in(from.base_ring().get_ring(), from.base_ring().clone_el(c), hom), i)))
     }
 }
 
@@ -197,7 +197,7 @@ impl<R, P, M> CanonicalIso<P> for DensePolyRingBase<R, M>
     }
 
     fn map_out(&self, from: &P, el: Self::Element, hom: &Self::Isomorphism) -> P::Element {
-        from.from_terms(self.terms(&el).map(|(c, i)| (self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone(c), hom), i)))
+        from.from_terms(self.terms(&el).map(|(c, i)| (self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(c), hom), i)))
     }
 }
 

@@ -26,7 +26,7 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD>
 {
     type Element = u64;
 
-    fn clone(&self, val: &Self::Element) -> Self::Element {
+    fn clone_el(&self, val: &Self::Element) -> Self::Element {
         *val
     }
 

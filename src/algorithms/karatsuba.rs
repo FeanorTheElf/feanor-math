@@ -68,7 +68,7 @@ macro_rules! karatsuba_impl {
                             slice_add_assign(dst.subvector(..(2 * n)), &lower, ring);
                         } else {
                             for i in 0..(2 * n) {
-                                *dst.at_mut(i) = <R as RingStore>::clone(&ring, lower.at(i));
+                                *dst.at_mut(i) = ring.clone_el(lower.at(i));
                             }
                             for i in (2 * n)..(4 * n) {
                                 *dst.at_mut(i) = ring.zero();

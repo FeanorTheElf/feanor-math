@@ -3,7 +3,6 @@ use crate::mempool::{MemoryProvider, AllocatingMemoryProvider};
 use crate::vector::{VectorViewMut, VectorView};
 use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
 use crate::rings::zn::*;
-use crate::primitive_int::*;
 
 ///
 /// A ring representing `Z/nZ` for composite n by storing the
@@ -23,7 +22,7 @@ use crate::primitive_int::*;
 /// 
 /// let R = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![17, 19]);
 /// let x = R.get_ring().from_congruence([R.get_ring().at(0).from_int(1), R.get_ring().at(1).from_int(16)]);
-/// assert_eq!(35, R.smallest_lift(<_ as RingStore>::clone(&R, &x)));
+/// assert_eq!(35, R.smallest_lift(R.clone_el(&x)));
 /// let y = R.mul_ref(&x, &x);
 /// let z = R.get_ring().from_congruence([R.get_ring().at(0).from_int(1 * 1), R.get_ring().at(1).from_int(16 * 16)]);
 /// assert!(R.eq(&z, &y));
@@ -107,19 +106,19 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnBase<C, J,
     pub fn new(component_rings: Vec<C>, large_integers: J, memory_provider: M) -> Self {
         assert!(component_rings.len() > 0);
         let total_modulus = large_integers.prod(
-            component_rings.iter().map(|R| R.integer_ring().cast::<J>(&large_integers, R.integer_ring().clone(R.modulus())))
+            component_rings.iter().map(|R| R.integer_ring().cast::<J>(&large_integers, R.integer_ring().clone_el(R.modulus())))
         );
         let total_ring = zn_barett::Zn::new(large_integers, total_modulus);
         let ZZ = total_ring.integer_ring();
         for R in &component_rings {
-            let R_modulus = R.integer_ring().cast::<J>(ZZ, R.integer_ring().clone(R.modulus()));
+            let R_modulus = R.integer_ring().cast::<J>(ZZ, R.integer_ring().clone_el(R.modulus()));
             assert!(
                 ZZ.is_one(&algorithms::eea::signed_gcd(ZZ.checked_div(total_ring.modulus(), &R_modulus).unwrap(), R_modulus, ZZ)),
                 "all moduli must be coprime"
             );
         }
         let unit_vectors = component_rings.iter()
-            .map(|R| ZZ.checked_div(total_ring.modulus(), &R.integer_ring().cast::<J>(ZZ, R.integer_ring().clone(R.modulus()))))
+            .map(|R| ZZ.checked_div(total_ring.modulus(), &R.integer_ring().cast::<J>(ZZ, R.integer_ring().clone_el(R.modulus()))))
             .map(Option::unwrap)
             .map(|n| total_ring.coerce(&ZZ, n))
             .zip(component_rings.iter())
@@ -139,7 +138,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnBase<C, J,
 
     pub fn from_congruence<V: VectorView<El<C>>>(&self, el: V) -> ZnEl<C, M> {
         assert_eq!(self.components.len(), el.len());
-        ZnEl(self.memory_provider.get_new_init(self.len(), |i| self.at(i).clone(el.at(i))))
+        ZnEl(self.memory_provider.get_new_init(self.len(), |i| self.at(i).clone_el(el.at(i))))
     }
 
     pub fn get_congruence<'a>(&self, el: &'a ZnEl<C, M>) -> impl 'a + VectorView<El<C>> {
@@ -171,8 +170,8 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> RingBase for
 {
     type Element = ZnEl<C, M>;
 
-    fn clone(&self, val: &Self::Element) -> Self::Element {
-        ZnEl(self.memory_provider.get_new_init(self.len(), |i| self.at(i).clone(val.0.at(i))))
+    fn clone_el(&self, val: &Self::Element) -> Self::Element {
+        ZnEl(self.memory_provider.get_new_init(self.len(), |i| self.at(i).clone_el(val.0.at(i))))
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -242,7 +241,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> RingBase for
     fn is_noetherian(&self) -> bool { true }
 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        self.total_ring.get_ring().dbg(&RingRef::new(self).cast::<zn_barett::Zn<_>>(&self.total_ring, self.clone(value)), out)
+        self.total_ring.get_ring().dbg(&RingRef::new(self).cast::<zn_barett::Zn<_>>(&self.total_ring, self.clone_el(value)), out)
     }
 }
 
@@ -258,7 +257,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clone for Zn
         ZnBase {
             components: <_ as Clone>::clone(&self.components),
             total_ring: <_ as Clone>::clone(&self.total_ring),
-            unit_vectors: self.unit_vectors.iter().map(|e| <_ as RingStore>::clone(&self.total_ring, e)).collect(),
+            unit_vectors: self.unit_vectors.iter().map(|e| self.total_ring.clone_el(e)).collect(),
             memory_provider: self.memory_provider.clone()
         }
     }
@@ -323,7 +322,7 @@ impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStor
     fn map_out(&self, from: &ZnBase<C2, J2, M2>, el: ZnEl<C1, M1>, iso: &Self::Isomorphism) -> ZnEl<C2, M2> {
         ZnEl(from.memory_provider.get_new_init(
             self.len(), 
-            |i| self.at(i).get_ring().map_out(from.at(i).get_ring(), self.at(i).clone(el.0.at(i)), &iso[i])
+            |i| self.at(i).get_ring().map_out(from.at(i).get_ring(), self.at(i).clone_el(el.0.at(i)), &iso[i])
         ))
     }
 }
@@ -393,7 +392,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider
         let result = <_ as RingStore>::sum(&self.total_ring,
             self.components.iter()
                 .zip(el.0.into_iter())
-                .map(|(fp, x)| (fp.integer_ring().get_ring(), fp.smallest_positive_lift(fp.clone(x))))
+                .map(|(fp, x)| (fp.integer_ring().get_ring(), fp.smallest_positive_lift(fp.clone_el(x))))
                 .zip(self.unit_vectors.iter())
                 .zip(homs.iter())
                 .map(|(((integers, x), u), hom)| (integers, x, u, hom))
@@ -470,7 +469,7 @@ impl<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Iterator
 
             let result = self.ring.memory_provider.get_new_init(
                 self.ring.len(),
-                |i| self.ring.at(i).clone(part_iters[i].peek().unwrap())
+                |i: usize| self.ring.at(i).clone_el(part_iters[i].peek().unwrap())
             );
             part_iters.last_mut().unwrap().next();
             while part_iters.last_mut().unwrap().peek().is_none() {

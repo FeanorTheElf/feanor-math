@@ -23,7 +23,7 @@ pub trait ZnRing: DivisibilityRing + CanonicalHom<Self::IntegerRingBase> {
 
     fn smallest_lift(&self, el: Self::Element) -> El<Self::Integers> {
         let result = self.smallest_positive_lift(el);
-        let mut mod_half = self.integer_ring().clone(self.modulus());
+        let mut mod_half = self.integer_ring().clone_el(self.modulus());
         self.integer_ring().euclidean_div_pow_2(&mut mod_half, 1);
         if self.integer_ring().is_gt(&result, &mod_half) {
             return self.integer_ring().sub_ref_snd(result, self.modulus());
@@ -116,17 +116,17 @@ pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R)
     let ZZ = R.integer_ring();
     let n = R.modulus();
 
-    assert!(R.is_zero(&R.coerce(ZZ, ZZ.clone(n))));
+    assert!(R.is_zero(&R.coerce(ZZ, ZZ.clone_el(n))));
     assert!(R.is_field() == algorithms::miller_rabin::is_prime(ZZ, n, 10));
 
     let mut k = ZZ.one();
     while ZZ.is_lt(&k, &n) {
-        assert!(!R.is_zero(&R.coerce(ZZ, ZZ.clone(&k))));
+        assert!(!R.is_zero(&R.coerce(ZZ, ZZ.clone_el(&k))));
         ZZ.add_assign(&mut k, ZZ.one());
     }
 
     let all_elements = R.elements().collect::<Vec<_>>();
-    assert_eq!(ZZ.cast::<StaticRing<i64>>(&StaticRing::<i64>::RING, ZZ.clone(n)) as usize, all_elements.len());
+    assert_eq!(ZZ.cast::<StaticRing<i64>>(&StaticRing::<i64>::RING, ZZ.clone_el(n)) as usize, all_elements.len());
     for (i, x) in all_elements.iter().enumerate() {
         for (j, y) in all_elements.iter().enumerate() {
             assert!(i == j || !R.eq(x, y));

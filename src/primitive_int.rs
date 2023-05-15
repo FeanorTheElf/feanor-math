@@ -62,8 +62,8 @@ impl<T: PrimitiveInt> CanonicalHom<DefaultBigIntRing> for StaticRingBase<T> {
         Some(())
     }
 
-    fn map_in(&self, _: &DefaultBigIntRing, el: DefaultBigIntRingEl, _: &()) -> T {
-        unimplemented!()
+    fn map_in(&self, from: &DefaultBigIntRing, el: DefaultBigIntRingEl, _: &()) -> T {
+        from.map_out(self, el, &())
     }
 }
 
@@ -75,8 +75,8 @@ impl<T: PrimitiveInt> CanonicalIso<DefaultBigIntRing> for StaticRingBase<T> {
         Some(())
     }
 
-    fn map_out(&self, _: &DefaultBigIntRing, el: T, _: &()) -> DefaultBigIntRingEl {
-        unimplemented!()
+    fn map_out(&self, from: &DefaultBigIntRing, el: T, _: &()) -> DefaultBigIntRingEl {
+        from.map_in(self, el, &())
     }
 }
 
@@ -197,7 +197,7 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     
     type Element = T;
 
-    fn clone(&self, val: &Self::Element) -> Self::Element {
+    fn clone_el(&self, val: &Self::Element) -> Self::Element {
         *val
     }
 

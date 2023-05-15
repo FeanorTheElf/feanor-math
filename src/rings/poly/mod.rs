@@ -86,7 +86,7 @@ pub fn generic_test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R:
                         ring.mul(ring.from_ref(a), ring.from_ref(c)),
                         ring.mul(ring.from_ref(a), ring.mul_ref_snd(ring.from_ref(d), &x)),
                         ring.mul(ring.from_ref(b), ring.mul_ref_snd(ring.from_ref(c), &x)),
-                        ring.mul(ring.from_ref(b), ring.mul(ring.from_ref(d), ring.pow(ring.clone(&x), 2)))
+                        ring.mul(ring.from_ref(b), ring.mul(ring.from_ref(d), ring.pow(ring.clone_el(&x), 2)))
                     ].into_iter());
                     assert!(ring.eq(&result, &ring.mul(a_bx, c_dx)));
                 }
@@ -101,11 +101,11 @@ pub fn generic_test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R:
                 let f = ring.sum([
                     ring.from_ref(a),
                     ring.mul_ref_snd(ring.from_ref(b), &x),
-                    ring.mul(ring.from_ref(c), ring.pow(ring.clone(&x), 3))
+                    ring.mul(ring.from_ref(c), ring.pow(ring.clone_el(&x), 3))
                 ].into_iter());
-                let actual = ring.from_terms([(ring.base_ring().clone(a), 0), (ring.base_ring().clone(c), 3), (ring.base_ring().clone(b), 1)].into_iter());
+                let actual = ring.from_terms([(ring.base_ring().clone_el(a), 0), (ring.base_ring().clone_el(c), 3), (ring.base_ring().clone_el(b), 1)].into_iter());
                 assert!(ring.eq(&f, &actual));
-                assert!(ring.eq(&f, &ring.from_terms(ring.terms(&f).map(|(c, i)| (ring.base_ring().clone(c), i)))));
+                assert!(ring.eq(&f, &ring.from_terms(ring.terms(&f).map(|(c, i)| (ring.base_ring().clone_el(c), i)))));
             }
         }
     }

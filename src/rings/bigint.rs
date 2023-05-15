@@ -56,7 +56,7 @@ impl RingBase for DefaultBigIntRing {
     
     type Element = DefaultBigIntRingEl;
 
-    fn clone(&self, val: &Self::Element) -> Self::Element {
+    fn clone_el(&self, val: &Self::Element) -> Self::Element {
         val.clone()
     }
 

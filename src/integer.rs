@@ -2,7 +2,6 @@ use crate::ring::*;
 use crate::euclidean::*;
 use crate::ordered::*;
 use crate::primitive_int::*;
-use crate::algorithms;
 
 ///
 /// Trait for rings that are isomorphic to the ring of integers `ZZ = { ..., -2, -1, 0, 1, 2, ... }`.
@@ -29,37 +28,19 @@ pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + SelfIso + 
     }
 }
 
-// impl<I: IntegerRing + CanonicalIso<I> + ?Sized, J: IntegerRing + ?Sized> CanonicalHom<I> for J {
+pub mod generic_maps {
+    use crate::{algorithms, ring::{RingRef, RingBase}};
+    use super::IntegerRing;
 
-//     type Homomorphism = ();
-    
-//     default fn has_canonical_hom(&self, _: &I) -> Option<()> { Some(()) }
-
-//     default fn map_in(&self, from: &I, el: I::Element, _: &()) -> Self::Element {
-//         let result = algorithms::sqr_mul::generic_abs_square_and_multiply(self.one(), &el, RingRef::new(from), |a, b| self.add(a, b), |a, b| self.add_ref(a, b), self.zero());
-//         if from.is_neg(&el) {
-//             return self.negate(result);
-//         } else {
-//             return result;
-//         }
-//     }
-// }
-
-// impl<I: IntegerRing + CanonicalIso<I> + ?Sized, J: IntegerRing + CanonicalIso<J> + ?Sized> CanonicalIso<I> for J {
-
-//     type Isomorphism = ();
-    
-//     default fn has_canonical_iso(&self, _: &I) -> Option<()> { Some(()) }
-
-//     default fn map_out(&self, from: &I, el: Self::Element, _: &()) -> I::Element {
-//         let result = algorithms::sqr_mul::generic_abs_square_and_multiply(from.one(), &el, RingRef::new(self), |a, b| from.add(a, b), |a, b| from.add_ref(a, b), from.zero());
-//         if self.is_neg(&el) {
-//             return from.negate(result);
-//         } else {
-//             return result;
-//         }
-//     }
-// }
+    pub fn generic_map_in<R: IntegerRing, S: RingBase>(from: &R, to: &S, el: R::Element) -> S::Element {
+        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(to.one(), &el, RingRef::new(from), |a, b| to.add(a, b), |a, b| to.add_ref(a, b), to.zero());
+        if from.is_neg(&el) {
+            return to.negate(result);
+        } else {
+            return result;
+        }
+    }
+}
 
 pub trait IntegerRingStore: RingStore
     where Self::Type: IntegerRing
@@ -124,18 +105,18 @@ pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>
         let mut ceil_pow_2 = ring.from_int(2);
         ring.mul_pow_2(&mut ceil_pow_2, ring.abs_highest_set_bit(a).unwrap_or(0));
         assert!(ring.is_lt(a, &ceil_pow_2));
-        assert!(ring.is_lt(&ring.negate(ring.clone(a)), &ceil_pow_2));
+        assert!(ring.is_lt(&ring.negate(ring.clone_el(a)), &ceil_pow_2));
         
         for i in 0..ring.abs_highest_set_bit(a).unwrap_or(0) {
             let mut pow_2 = ring.one();
             ring.mul_pow_2(&mut pow_2, i);
-            let mut b = ring.clone(a);
+            let mut b = ring.clone_el(a);
             ring.mul_pow_2(&mut b, i);
-            assert!(ring.eq(&b, &ring.mul(ring.clone(a), ring.clone(&pow_2))));
+            assert!(ring.eq(&b, &ring.mul(ring.clone_el(a), ring.clone_el(&pow_2))));
             ring.euclidean_div_pow_2(&mut b, i);
             assert!(ring.eq(&b, a));
             ring.euclidean_div_pow_2(&mut b, i);
-            assert!(ring.eq(&b, &ring.euclidean_div(ring.clone(a), &pow_2)));
+            assert!(ring.eq(&b, &ring.euclidean_div(ring.clone_el(a), &pow_2)));
         }
     }
 }

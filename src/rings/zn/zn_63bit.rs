@@ -48,7 +48,7 @@ impl RingBase for ZnBase {
 
     type Element = ZnEl;
 
-    fn clone(&self, val: &Self::Element) -> Self::Element {
+    fn clone_el(&self, val: &Self::Element) -> Self::Element {
         *val
     }
     

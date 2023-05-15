@@ -23,8 +23,8 @@ impl<R: DelegateRing> RingBase for R {
 
     type Element = <Self as DelegateRing>::Element;
 
-    default fn clone(&self, val: &Self::Element) -> Self::Element {
-        self.rev_delegate(self.get_delegate().clone(self.delegate_ref(val)))
+    default fn clone_el(&self, val: &Self::Element) -> Self::Element {
+        self.rev_delegate(self.get_delegate().clone_el(self.delegate_ref(val)))
     }
     
     default fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {

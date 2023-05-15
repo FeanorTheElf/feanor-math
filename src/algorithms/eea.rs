@@ -133,7 +133,7 @@ pub fn signed_lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
     where R: EuclideanRingStore + OrderedRingStore,
         R::Type: EuclideanRing + OrderedRing
 {
-    ring.mul(ring.euclidean_div(ring.clone(&fst), &signed_gcd(fst, ring.clone(&snd), &ring)), snd)
+    ring.mul(ring.euclidean_div(ring.clone_el(&fst), &signed_gcd(fst, ring.clone_el(&snd), &ring)), snd)
 }
 
 pub fn lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>

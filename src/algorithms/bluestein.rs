@@ -33,10 +33,10 @@ impl<R> FFTTableBluestein<R>
         let mut b = (0..m).map(|_| ring.zero()).collect::<Vec<_>>();
         b[0] = ring.one();
         for i in 1..n {
-            b[i] = ring.pow(ring.clone(&root_of_unity_2n), i * i);
-            b[m - i] = ring.clone(&b[i]);
+            b[i] = ring.pow(ring.clone_el(&root_of_unity_2n), i * i);
+            b[m - i] = ring.clone_el(&b[i]);
         }
-        let inv_root_of_unity = ring.pow(ring.clone(&root_of_unity_2n), 2 * n - 1);
+        let inv_root_of_unity = ring.pow(ring.clone_el(&root_of_unity_2n), 2 * n - 1);
         let m_fft_table = algorithms::cooley_tuckey::FFTTableCooleyTuckey::new(ring, root_of_unity_m, log2_m);
         m_fft_table.bitreverse_fft_inplace(&mut b);
         return FFTTableBluestein { 
@@ -75,7 +75,7 @@ impl<R> FFTTableBluestein<R>
             };
             *buffer.at_mut(i) = ring.mul_ref_fst(
                 value,
-                ring.coerce(base_ring, base_ring.pow(base_ring.clone(&self.inv_root_of_unity), i * i))
+                ring.coerce(base_ring, base_ring.pow(base_ring.clone_el(&self.inv_root_of_unity), i * i))
             );
         }
         for i in self.n..self.m_fft_table.len() {
@@ -85,13 +85,13 @@ impl<R> FFTTableBluestein<R>
         // perform convoluted product with b using a power-of-two fft
         self.m_fft_table.bitreverse_fft_inplace_base(&mut buffer, &ring);
         for i in 0..self.m_fft_table.len() {
-            ring.mul_assign(buffer.at_mut(i), ring.coerce(base_ring, base_ring.clone(&self.b_bitreverse_fft[i])));
+            ring.mul_assign(buffer.at_mut(i), ring.coerce(base_ring, base_ring.clone_el(&self.b_bitreverse_fft[i])));
         }
         self.m_fft_table.bitreverse_inv_fft_inplace_base(&mut buffer, &ring);
 
         // write values back, and multiply them with a twiddle factor
         for i in 0..self.n {
-            *values.at_mut(i) = ring.mul_ref_fst(buffer.at(i), ring.coerce(base_ring, base_ring.pow(base_ring.clone(&self.inv_root_of_unity), i * i)));
+            *values.at_mut(i) = ring.mul_ref_fst(buffer.at(i), ring.coerce(base_ring, base_ring.pow(base_ring.clone_el(&self.inv_root_of_unity), i * i)));
         }
 
         if INV {

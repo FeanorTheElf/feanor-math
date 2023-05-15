@@ -24,8 +24,8 @@ impl<R> FFTTableCooleyTuckey<R>
     pub fn new(ring: R, root_of_unity: El<R>, log2_n: usize) -> Self {
         assert!(ring.is_commutative());
         assert!(log2_n > 0);
-        assert!(ring.is_neg_one(&ring.pow(ring.clone(&root_of_unity), 1 << (log2_n - 1))));
-        let inv_root_of_unity = ring.pow(ring.clone(&root_of_unity), (1 << log2_n) - 1);
+        assert!(ring.is_neg_one(&ring.pow(ring.clone_el(&root_of_unity), 1 << (log2_n - 1))));
+        let inv_root_of_unity = ring.pow(ring.clone_el(&root_of_unity), (1 << log2_n) - 1);
         FFTTableCooleyTuckey { ring, root_of_unity, inv_root_of_unity, log2_n }
     }
 
@@ -51,7 +51,7 @@ impl<R> FFTTableCooleyTuckey<R>
         
         let pow_n_half = |mut x: El<R>| {
             for _ in 1..log2_n {
-                let x_copy = ring.clone(&x);
+                let x_copy = ring.clone_el(&x);
                 ring.mul_assign(&mut x, x_copy);
             }
             return x;
@@ -59,7 +59,7 @@ impl<R> FFTTableCooleyTuckey<R>
 
         let mut rng = oorandom::Rand64::new(ZZ.default_hash(ring.modulus()) as u128);
         let mut current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZ);
-        while !ring.is_neg_one(&pow_n_half(ring.clone(&current))) {
+        while !ring.is_neg_one(&pow_n_half(ring.clone_el(&current))) {
             current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZ);
         }
         return Some(Self::new(ring, current, log2_n));
@@ -81,12 +81,12 @@ impl<R> FFTTableCooleyTuckey<R>
     {
         assert!(values.len() == 1 << self.log2_n);
         // check if the canonical hom `R -> S` maps `self.root_of_unity` to a primitive N-th root of unity
-        debug_assert!(ring.is_neg_one(&ring.pow(ring.coerce(&self.ring, self.ring.clone(&self.root_of_unity)), 1 << (self.log2_n - 1))));
+        debug_assert!(ring.is_neg_one(&ring.pow(ring.coerce(&self.ring, self.ring.clone_el(&self.root_of_unity)), 1 << (self.log2_n - 1))));
 
         for s in (0..self.log2_n).rev() {
             let m = 1 << s;
             let log2_group_size = self.log2_n - s;
-            let twiddle_root = ring.coerce(&self.ring, self.ring.pow(self.ring.clone(&self.inv_root_of_unity), m));
+            let twiddle_root = ring.coerce(&self.ring, self.ring.pow(self.ring.clone_el(&self.inv_root_of_unity), m));
             
             for k in 0..(1 << s) {
                 let mut current_twiddle = ring.one();
@@ -135,9 +135,9 @@ impl<R> FFTTableCooleyTuckey<R>
     {
         assert!(values.len() == 1 << self.log2_n);
         // check if the canonical hom `R -> S` maps `self.root_of_unity` to a primitive N-th root of unity
-        debug_assert!(ring.is_neg_one(&ring.pow(ring.coerce(&self.ring, self.ring.clone(&self.root_of_unity)), 1 << (self.log2_n - 1))));
+        debug_assert!(ring.is_neg_one(&ring.pow(ring.coerce(&self.ring, self.ring.clone_el(&self.root_of_unity)), 1 << (self.log2_n - 1))));
 
-        let mut twiddle_root = ring.coerce(&self.ring, self.ring.clone(&self.root_of_unity));
+        let mut twiddle_root = ring.coerce(&self.ring, self.ring.clone_el(&self.root_of_unity));
         for s in 0..self.log2_n {
             let m = 1 << s;
             let log2_group_size = self.log2_n - s;

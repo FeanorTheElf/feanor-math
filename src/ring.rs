@@ -34,7 +34,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore,
 ///     
 ///     type Element = Box<i32>;
 /// 
-///     fn clone(&self, val: &Self::Element) -> Self::Element { val.clone() }
+///     fn clone_el(&self, val: &Self::Element) -> Self::Element { val.clone() }
 ///
 ///     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { **lhs += *rhs; }
 /// 
@@ -101,7 +101,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore,
 ///    
 ///     type Element = u8;
 /// 
-///     fn clone(&self, val: &Self::Element) -> Self::Element {
+///     fn clone_el(&self, val: &Self::Element) -> Self::Element {
 ///         *val
 ///     }
 /// 
@@ -181,13 +181,13 @@ pub trait RingBase {
 
     type Element;
 
-    fn clone(&self, val: &Self::Element) -> Self::Element;
-    fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.add_assign(lhs, self.clone(rhs)) }
+    fn clone_el(&self, val: &Self::Element) -> Self::Element;
+    fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.add_assign(lhs, self.clone_el(rhs)) }
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element);
-    fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.sub_assign(lhs, self.clone(rhs)) }
+    fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.sub_assign(lhs, self.clone_el(rhs)) }
     fn negate_inplace(&self, lhs: &mut Self::Element);
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element);
-    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.mul_assign(lhs, self.clone(rhs)) }
+    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.mul_assign(lhs, self.clone_el(rhs)) }
     fn zero(&self) -> Self::Element { self.from_int(0) }
     fn one(&self) -> Self::Element { self.from_int(1) }
     fn neg_one(&self) -> Self::Element { self.from_int(-1) }
@@ -201,7 +201,7 @@ pub trait RingBase {
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
 
     fn square(&self, value: &mut Self::Element) {
-        self.mul_assign(value, self.clone(value));
+        self.mul_assign(value, self.clone_el(value));
     }
 
     fn negate(&self, mut value: Self::Element) -> Self::Element {
@@ -240,7 +240,7 @@ pub trait RingBase {
     }
 
     fn add_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        let mut result = self.clone(lhs);
+        let mut result = self.clone_el(lhs);
         self.add_assign_ref(&mut result, rhs);
         return result;
     }
@@ -261,7 +261,7 @@ pub trait RingBase {
     }
 
     fn sub_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        let mut result = self.clone(lhs);
+        let mut result = self.clone_el(lhs);
         self.sub_assign_ref(&mut result, rhs);
         return result;
     }
@@ -283,7 +283,7 @@ pub trait RingBase {
     }
 
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        let mut result = self.clone(lhs);
+        let mut result = self.clone_el(lhs);
         self.mul_assign_ref(&mut result, rhs);
         return result;
     }
@@ -293,7 +293,7 @@ pub trait RingBase {
             self.mul_assign_ref(&mut rhs, lhs);
             return rhs;
         } else {
-            let mut result = self.clone(lhs);
+            let mut result = self.clone_el(lhs);
             self.mul_assign(&mut result, rhs);
             return result;
         }
@@ -372,7 +372,7 @@ macro_rules! delegate {
 ///     let mut rng = oorandom::Rand64::new(0);
 ///     for _ in 0..6 {
 ///         let a = Zn.random_element(|| rng.rand_u64());
-///         let a_n = Zn.pow(<_ as RingStore>::clone(&Zn, &a), n as usize);
+///         let a_n = Zn.pow(Zn.clone_el(&a), n as usize);
 ///         if !Zn.eq(&a, &a_n) {
 ///             return false;
 ///         }
@@ -393,7 +393,9 @@ macro_rules! delegate {
 /// 
 /// use oorandom;
 /// 
-/// fn fermat_is_prime<R: IntegerRingStore>(ZZ: R, n: El<R>) -> bool {
+/// fn fermat_is_prime<R>(ZZ: R, n: El<R>) -> bool 
+///     where R: RingStore, R::Type: IntegerRing
+/// {
 ///     // the Fermat primality test is based on the observation that a^n == a mod n if n
 ///     // is a prime; On the other hand, if n is not prime, we hope that there are many
 ///     // a such that this is not the case. 
@@ -401,7 +403,7 @@ macro_rules! delegate {
 ///     // be used in practice. This is just a proof of concept.
 /// 
 ///     // ZZ is not guaranteed to be Copy anymore, so use reference instead
-///     let Zn = Zn::new(&ZZ, ZZ.clone(&n)); // the ring Z/nZ
+///     let Zn = Zn::new(&ZZ, ZZ.clone_el(&n)); // the ring Z/nZ
 /// 
 ///     // check for 6 random a whether a^n == a mod n
 ///     let mut rng = oorandom::Rand64::new(0);
@@ -409,7 +411,7 @@ macro_rules! delegate {
 ///         let a = Zn.random_element(|| rng.rand_u64());
 ///         // use a generic square-and-multiply powering function that works with any implementation
 ///         // of integers
-///         let a_n = Zn.pow_gen(<_ as RingStore>::clone(&Zn, &a), &n, &ZZ);
+///         let a_n = Zn.pow_gen(Zn.clone_el(&a), &n, &ZZ);
 ///         if !Zn.eq(&a, &a_n) {
 ///             return false;
 ///         }
@@ -449,7 +451,7 @@ pub trait RingStore {
 
     fn get_ring<'a>(&'a self) -> &'a Self::Type;
 
-    delegate!{ fn clone(&self, val: &El<Self>) -> El<Self> }
+    delegate!{ fn clone_el(&self, val: &El<Self>) -> El<Self> }
     delegate!{ fn add_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
     delegate!{ fn add_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
     delegate!{ fn sub_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
@@ -644,7 +646,7 @@ pub trait CanonicalHom<S>: RingBase
     fn map_in(&self, from: &S, el: S::Element, hom: &Self::Homomorphism) -> Self::Element;
 
     fn map_in_ref(&self, from: &S, el: &S::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in(from, from.clone(el), hom)
+        self.map_in(from, from.clone_el(el), hom)
     }
 }
 
@@ -695,7 +697,7 @@ pub trait RingExtension: RingBase {
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element;
     
     fn from_ref(&self, x: &El<Self::BaseRing>) -> Self::Element {
-        self.from(self.base_ring().get_ring().clone(x))
+        self.from(self.base_ring().get_ring().clone_el(x))
     }
 }
 
@@ -864,7 +866,7 @@ fn test_internal_wrappings_dont_matter() {
     impl RingBase for ABase {
         type Element = i32;
 
-        fn clone(&self, val: &Self::Element) -> Self::Element {
+        fn clone_el(&self, val: &Self::Element) -> Self::Element {
             *val
         }
 
@@ -930,7 +932,7 @@ fn test_internal_wrappings_dont_matter() {
     impl<R: RingStore> RingBase for BBase<R> {
         type Element = i32;
 
-        fn clone(&self, val: &Self::Element) -> Self::Element {
+        fn clone_el(&self, val: &Self::Element) -> Self::Element {
             *val
         }
 
@@ -1065,27 +1067,27 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
 
     // check self-subtraction
     for a in &elements {
-        assert!(ring.eq(&zero, &ring.sub(ring.clone(a), ring.clone(a))));
+        assert!(ring.eq(&zero, &ring.sub(ring.clone_el(a), ring.clone_el(a))));
     }
 
     // check identity elements
     for a in &elements {
-        assert!(ring.eq(&a, &ring.add(ring.clone(a), ring.clone(&zero))));
-        assert!(ring.eq(&a, &ring.mul(ring.clone(a), ring.clone(&one))));
+        assert!(ring.eq(&a, &ring.add(ring.clone_el(a), ring.clone_el(&zero))));
+        assert!(ring.eq(&a, &ring.mul(ring.clone_el(a), ring.clone_el(&one))));
     }
 
     // check commutativity
     for a in &elements {
         for b in &elements {
             assert!(ring.eq(
-                &ring.add(ring.clone(a), ring.clone(b)), 
-                &ring.add(ring.clone(b), ring.clone(a))
+                &ring.add(ring.clone_el(a), ring.clone_el(b)), 
+                &ring.add(ring.clone_el(b), ring.clone_el(a))
             ));
                 
             if ring.is_commutative() {
                 assert!(ring.eq(
-                    &ring.mul(ring.clone(a), ring.clone(b)), 
-                    &ring.mul(ring.clone(b), ring.clone(a))
+                    &ring.mul(ring.clone_el(a), ring.clone_el(b)), 
+                    &ring.mul(ring.clone_el(b), ring.clone_el(a))
                 ));
             }
         }
@@ -1096,12 +1098,12 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
         for b in &elements {
             for c in &elements {
                 assert!(ring.eq(
-                    &ring.add(ring.clone(a), ring.add(ring.clone(b), ring.clone(c))), 
-                    &ring.add(ring.add(ring.clone(a), ring.clone(b)), ring.clone(c))
+                    &ring.add(ring.clone_el(a), ring.add(ring.clone_el(b), ring.clone_el(c))), 
+                    &ring.add(ring.add(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c))
                 ));
                 assert!(ring.eq(
-                    &ring.mul(ring.clone(a), ring.mul(ring.clone(b), ring.clone(c))), 
-                    &ring.mul(ring.mul(ring.clone(a), ring.clone(b)), ring.clone(c))
+                    &ring.mul(ring.clone_el(a), ring.mul(ring.clone_el(b), ring.clone_el(c))), 
+                    &ring.mul(ring.mul(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c))
                 ));
             }
         }
@@ -1112,12 +1114,12 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
         for b in &elements {
             for c in &elements {
                 assert!(ring.eq(
-                    &ring.mul(ring.clone(a), ring.add(ring.clone(b), ring.clone(c))), 
-                    &ring.add(ring.mul(ring.clone(a), ring.clone(b)), ring.mul(ring.clone(a), ring.clone(c)))
+                    &ring.mul(ring.clone_el(a), ring.add(ring.clone_el(b), ring.clone_el(c))), 
+                    &ring.add(ring.mul(ring.clone_el(a), ring.clone_el(b)), ring.mul(ring.clone_el(a), ring.clone_el(c)))
                 ));
                 assert!(ring.eq(
-                    &ring.mul(ring.add(ring.clone(a), ring.clone(b)), ring.clone(c)), 
-                    &ring.add(ring.mul(ring.clone(a), ring.clone(c)), ring.mul(ring.clone(b), ring.clone(c)))
+                    &ring.mul(ring.add(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c)), 
+                    &ring.add(ring.mul(ring.clone_el(a), ring.clone_el(c)), ring.mul(ring.clone_el(b), ring.clone_el(c)))
                 ));
             }
         }

@@ -39,7 +39,7 @@ pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
     let s = ZZ.abs_lowest_set_bit(&n_minus_one).unwrap();
     ZZ.euclidean_div_pow_2(&mut n_minus_one, s as usize);
     let d = n_minus_one;
-    let Zn = Zn::new(&ZZ, ZZ.clone(n));
+    let Zn = Zn::new(&ZZ, ZZ.clone_el(n));
 
     for _i in 0..k {
         let a = Zn.get_ring().project(ZZ.add(ZZ.get_uniformly_random(n, || rng.rand_u64()), ZZ.one()));
@@ -61,9 +61,6 @@ pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
     }
     return true;
 }
-
-#[cfg(test)]
-use crate::primitive_int::*;
 
 #[test]
 pub fn test_is_prime() {
