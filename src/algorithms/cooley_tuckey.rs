@@ -296,6 +296,6 @@ fn bench_fft(bencher: &mut test::Bencher) {
         copy.extend(data.iter().cloned());
         fft.bitreverse_fft_inplace(&mut copy[..]);
         fft.bitreverse_inv_fft_inplace(&mut copy[..]);
-        assert!(ring.eq(&copy[0], &data[0]));
+        assert!(ring.eq_el(&copy[0], &data[0]));
     });
 }

@@ -24,7 +24,7 @@ use crate::primitive_int::*;
 /// # use feanor_math::primitive_int::*;
 /// let R = Zn::new(StaticRing::<i64>::RING, 257);
 /// let a = R.from_int(16);
-/// assert!(R.eq(&R.from_int(-1), &R.mul_ref(&a, &a)));
+/// assert!(R.eq_el(&R.from_int(-1), &R.mul_ref(&a, &a)));
 /// assert!(R.is_one(&R.pow(a, 4)));
 /// ```
 /// However, this will panic as `257^4 > i32::MAX`.
@@ -46,7 +46,7 @@ use crate::primitive_int::*;
 /// # use feanor_math::primitive_int::*;
 /// let R = Zn::new(StaticRing::<i16>::RING, 7);
 /// let S = DefaultBigIntRing::RING;
-/// assert!(R.eq(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
+/// assert!(R.eq_el(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
 /// ```
 ///
 pub struct ZnBase<I: IntegerRingStore> 
@@ -217,8 +217,8 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
         self.project_gen(value, &StaticRing::<i32>::RING)
     }
 
-    fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-        self.integer_ring.eq(&lhs.0, &rhs.0)
+    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+        self.integer_ring.eq_el(&lhs.0, &rhs.0)
     }
 
     fn is_zero(&self, value: &Self::Element) -> bool {
@@ -283,7 +283,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalHom<ZnBase<J>> for ZnBas
 
     fn has_canonical_hom(&self, from: &ZnBase<J>) -> Option<Self::Homomorphism> {
         let base_hom = <I::Type as CanonicalHom<J::Type>>::has_canonical_hom(self.integer_ring.get_ring(), from.integer_ring.get_ring())?;
-        if self.integer_ring.eq(
+        if self.integer_ring.eq_el(
             &self.modulus,
             &<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), from.integer_ring().clone_el(&from.modulus), &base_hom)
         ) {
@@ -306,7 +306,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for ZnBas
 
     fn has_canonical_iso(&self, from: &ZnBase<J>) -> Option<Self::Isomorphism> {
         let base_iso = <I::Type as CanonicalIso<J::Type>>::has_canonical_iso(self.integer_ring.get_ring(), from.integer_ring.get_ring())?;
-        if from.integer_ring().eq(
+        if from.integer_ring().eq_el(
             from.modulus(),
             &<I::Type as CanonicalIso<J::Type>>::map_out(self.integer_ring.get_ring(), from.integer_ring.get_ring(), self.integer_ring().clone_el(self.modulus()), &base_iso)
         ) {
@@ -426,7 +426,7 @@ fn test_mul() {
     const ZZ: RingValue<DefaultBigIntRing> = DefaultBigIntRing::RING;
     let Z257 = ZnBase::new(ZZ, ZZ.from_int(257));
     let x = Z257.project(ZZ.from_int(256));
-    assert!(Z257.eq(&Z257.one(), &Z257.mul_ref(&x, &x)));
+    assert!(Z257.eq_el(&Z257.one(), &Z257.mul_ref(&x, &x)));
 }
 
 #[test]
@@ -434,7 +434,7 @@ fn test_project() {
     const ZZ: StaticRing<i64> = StaticRing::RING;
     let Z17 = Zn::new(ZZ, 17);
     for k in 0..289 {
-        assert!(Z17.eq(&Z17.from_int((289 - k) % 17), &Z17.get_ring().project(-k as i64)));
+        assert!(Z17.eq_el(&Z17.from_int((289 - k) % 17), &Z17.get_ring().project(-k as i64)));
     }
 }
 

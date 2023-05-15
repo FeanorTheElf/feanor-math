@@ -25,7 +25,7 @@ use crate::rings::zn::*;
 /// assert_eq!(35, R.smallest_lift(R.clone_el(&x)));
 /// let y = R.mul_ref(&x, &x);
 /// let z = R.get_ring().from_congruence([R.get_ring().at(0).from_int(1 * 1), R.get_ring().at(1).from_int(16 * 16)]);
-/// assert!(R.eq(&z, &y));
+/// assert!(R.eq_el(&z, &y));
 /// ```
 /// 
 /// # Canonical mappings
@@ -38,8 +38,8 @@ use crate::rings::zn::*;
 /// # use feanor_math::primitive_int::*;
 /// let R = Zn::from_primes(StaticRing::<i64>::RING, DefaultBigIntRing::RING, vec![17, 19]);
 /// let S = zn_barett::Zn::new(StaticRing::<i64>::RING, 17 * 19);
-/// assert!(R.eq(&R.from_int(12), &R.coerce(&S, S.from_int(12))));
-/// assert!(S.eq(&S.from_int(12), &R.cast(&S, R.from_int(12))));
+/// assert!(R.eq_el(&R.from_int(12), &R.coerce(&S, S.from_int(12))));
+/// assert!(S.eq_el(&S.from_int(12), &R.cast(&S, R.from_int(12))));
 /// ```
 /// and a canonical homomorphism from any integer ring
 /// ```
@@ -50,7 +50,7 @@ use crate::rings::zn::*;
 /// # use feanor_math::primitive_int::*;
 /// let R = Zn::from_primes(StaticRing::<i16>::RING, DefaultBigIntRing::RING, vec![3, 5, 7]);
 /// let S = DefaultBigIntRing::RING;
-/// assert!(R.eq(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
+/// assert!(R.eq_el(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
 /// ```
 /// 
 pub struct ZnBase<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>> = AllocatingMemoryProvider> 
@@ -221,8 +221,8 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> RingBase for
 
     }
 
-    fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-        (0..self.components.len()).zip(lhs.0.iter()).zip(rhs.0.iter()).all(|((i, l), r)| self.components[i].eq(l, r))
+    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+        (0..self.components.len()).zip(lhs.0.iter()).zip(rhs.0.iter()).all(|((i, l), r)| self.components[i].eq_el(l, r))
     }
 
     fn is_zero(&self, value: &Self::Element) -> bool {
@@ -590,7 +590,7 @@ fn test_map_in_map_out() {
     let ring2 = zn_barett::Zn::new(StaticRing::<i64>::RING, 7 * 11 * 17);
     for x in [0, 1, 7, 8, 9, 10, 11, 17, 7 * 17, 11 * 8, 11 * 17, 7 * 11 * 17 - 1] {
         let value = ring2.from_int(x);
-        assert!(ring2.eq(&value, &ring1.cast(&ring2, ring1.coerce(&ring2, value.clone()))));
+        assert!(ring2.eq_el(&value, &ring1.cast(&ring2, ring1.coerce(&ring2, value.clone()))));
     }
 }
 
@@ -622,5 +622,5 @@ fn test_zn_map_in_large_int() {
 
     let R = Zn::from_primes(StaticRing::<i16>::RING, DefaultBigIntRing::RING, vec![3, 5, 7]);
     let S = DefaultBigIntRing::RING;
-    assert!(R.eq(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
+    assert!(R.eq_el(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
 }

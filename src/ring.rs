@@ -44,7 +44,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore,
 /// 
 ///     fn from_int(&self, value: i32) -> Self::Element { Box::new(value) }
 /// 
-///     fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { **lhs == **rhs }
+///     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { **lhs == **rhs }
 /// 
 ///     fn is_commutative(&self) -> bool { true }
 /// 
@@ -86,7 +86,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore,
 /// }
 /// 
 /// let ring = MyRingBase::RING;
-/// assert!(ring.eq(
+/// assert!(ring.eq_el(
 ///     &ring.from_int(6), 
 ///     &ring.mul(ring.from_int(3), ring.from_int(2))
 /// ));
@@ -122,7 +122,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore,
 ///         (((value % 2) + 2) % 2) as u8
 ///     }
 /// 
-///     fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+///     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
 ///         // elements are always represented by 0 or 1
 ///         *lhs == *rhs
 ///     }
@@ -173,7 +173,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore,
 /// 
 /// pub const F2: RingValue<F2Base> = RingValue::from(F2Base);
 /// 
-/// assert!(F2.eq(&F2.from_int(1), &F2.add(F2.one(), F2.zero())));
+/// assert!(F2.eq_el(&F2.from_int(1), &F2.add(F2.one(), F2.zero())));
 /// ```
 /// 
 /// 
@@ -192,10 +192,10 @@ pub trait RingBase {
     fn one(&self) -> Self::Element { self.from_int(1) }
     fn neg_one(&self) -> Self::Element { self.from_int(-1) }
     fn from_int(&self, value: i32) -> Self::Element;
-    fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool;
-    fn is_zero(&self, value: &Self::Element) -> bool { self.eq(value, &self.zero()) }
-    fn is_one(&self, value: &Self::Element) -> bool { self.eq(value, &self.one()) }
-    fn is_neg_one(&self, value: &Self::Element) -> bool { self.eq(value, &self.neg_one()) }
+    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool;
+    fn is_zero(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.zero()) }
+    fn is_one(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.one()) }
+    fn is_neg_one(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.neg_one()) }
     fn is_commutative(&self) -> bool;
     fn is_noetherian(&self) -> bool;
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
@@ -346,7 +346,7 @@ macro_rules! delegate {
 /// }
 /// 
 /// let ring: RingValue<StaticRingBase<i64>> = StaticRing::<i64>::RING;
-/// assert!(ring.eq(&7, &add_in_ring(ring, 3, 4)));
+/// assert!(ring.eq_el(&7, &add_in_ring(ring, 3, 4)));
 /// ```
 /// The next example is the one from the Readme
 /// ```
@@ -373,7 +373,7 @@ macro_rules! delegate {
 ///     for _ in 0..6 {
 ///         let a = Zn.random_element(|| rng.rand_u64());
 ///         let a_n = Zn.pow(Zn.clone_el(&a), n as usize);
-///         if !Zn.eq(&a, &a_n) {
+///         if !Zn.eq_el(&a, &a_n) {
 ///             return false;
 ///         }
 ///     }
@@ -412,7 +412,7 @@ macro_rules! delegate {
 ///         // use a generic square-and-multiply powering function that works with any implementation
 ///         // of integers
 ///         let a_n = Zn.pow_gen(Zn.clone_el(&a), &n, &ZZ);
-///         if !Zn.eq(&a, &a_n) {
+///         if !Zn.eq_el(&a, &a_n) {
 ///             return false;
 ///         }
 ///     }
@@ -464,7 +464,7 @@ pub trait RingStore {
     delegate!{ fn one(&self) -> El<Self> }
     delegate!{ fn neg_one(&self) -> El<Self> }
     delegate!{ fn from_int(&self, value: i32) -> El<Self> }
-    delegate!{ fn eq(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
+    delegate!{ fn eq_el(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
     delegate!{ fn is_zero(&self, value: &El<Self>) -> bool }
     delegate!{ fn is_one(&self, value: &El<Self>) -> bool }
     delegate!{ fn is_neg_one(&self, value: &El<Self>) -> bool }
@@ -878,7 +878,7 @@ fn test_internal_wrappings_dont_matter() {
             *lhs = -*lhs;
         }
 
-        fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+        fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
             *lhs == *rhs
         }
 
@@ -943,7 +943,7 @@ fn test_internal_wrappings_dont_matter() {
             *lhs = -*lhs;
         }
 
-        fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+        fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
             *lhs == *rhs
         }
 
@@ -1032,11 +1032,11 @@ pub fn generic_test_canonical_hom_axioms<R: RingStore, S: RingStore, I: Iterator
 
     for a in &elements {
         for b in &elements {
-            assert!(to.eq(
+            assert!(to.eq_el(
                 &to.add(to.get_ring().map_in_ref(from.get_ring(), a, &hom), to.get_ring().map_in_ref(from.get_ring(), b, &hom)),
                 &to.get_ring().map_in(from.get_ring(), from.add_ref(a, b), &hom)
             ));
-            assert!(to.eq(
+            assert!(to.eq_el(
                 &to.mul(to.get_ring().map_in_ref(from.get_ring(), a, &hom), to.get_ring().map_in_ref(from.get_ring(), b, &hom)),
                 &to.get_ring().map_in(from.get_ring(), from.mul_ref(a, b), &hom)
             ));
@@ -1054,7 +1054,7 @@ pub fn generic_test_canonical_iso_axioms<R: RingStore, S: RingStore, I: Iterator
 
     for a in &elements {
         assert!(
-            from.eq(a, &to.get_ring().map_out(from.get_ring(), to.get_ring().map_in_ref(from.get_ring(), a, &hom), &iso))
+            from.eq_el(a, &to.get_ring().map_out(from.get_ring(), to.get_ring().map_in_ref(from.get_ring(), a, &hom), &iso))
         )
     }
 }
@@ -1067,25 +1067,25 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
 
     // check self-subtraction
     for a in &elements {
-        assert!(ring.eq(&zero, &ring.sub(ring.clone_el(a), ring.clone_el(a))));
+        assert!(ring.eq_el(&zero, &ring.sub(ring.clone_el(a), ring.clone_el(a))));
     }
 
     // check identity elements
     for a in &elements {
-        assert!(ring.eq(&a, &ring.add(ring.clone_el(a), ring.clone_el(&zero))));
-        assert!(ring.eq(&a, &ring.mul(ring.clone_el(a), ring.clone_el(&one))));
+        assert!(ring.eq_el(&a, &ring.add(ring.clone_el(a), ring.clone_el(&zero))));
+        assert!(ring.eq_el(&a, &ring.mul(ring.clone_el(a), ring.clone_el(&one))));
     }
 
     // check commutativity
     for a in &elements {
         for b in &elements {
-            assert!(ring.eq(
+            assert!(ring.eq_el(
                 &ring.add(ring.clone_el(a), ring.clone_el(b)), 
                 &ring.add(ring.clone_el(b), ring.clone_el(a))
             ));
                 
             if ring.is_commutative() {
-                assert!(ring.eq(
+                assert!(ring.eq_el(
                     &ring.mul(ring.clone_el(a), ring.clone_el(b)), 
                     &ring.mul(ring.clone_el(b), ring.clone_el(a))
                 ));
@@ -1097,11 +1097,11 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
     for a in &elements {
         for b in &elements {
             for c in &elements {
-                assert!(ring.eq(
+                assert!(ring.eq_el(
                     &ring.add(ring.clone_el(a), ring.add(ring.clone_el(b), ring.clone_el(c))), 
                     &ring.add(ring.add(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c))
                 ));
-                assert!(ring.eq(
+                assert!(ring.eq_el(
                     &ring.mul(ring.clone_el(a), ring.mul(ring.clone_el(b), ring.clone_el(c))), 
                     &ring.mul(ring.mul(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c))
                 ));
@@ -1113,11 +1113,11 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
     for a in &elements {
         for b in &elements {
             for c in &elements {
-                assert!(ring.eq(
+                assert!(ring.eq_el(
                     &ring.mul(ring.clone_el(a), ring.add(ring.clone_el(b), ring.clone_el(c))), 
                     &ring.add(ring.mul(ring.clone_el(a), ring.clone_el(b)), ring.mul(ring.clone_el(a), ring.clone_el(c)))
                 ));
-                assert!(ring.eq(
+                assert!(ring.eq_el(
                     &ring.mul(ring.add(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c)), 
                     &ring.add(ring.mul(ring.clone_el(a), ring.clone_el(c)), ring.mul(ring.clone_el(b), ring.clone_el(c)))
                 ));

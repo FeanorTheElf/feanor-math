@@ -51,7 +51,7 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD>
         RingRef::new(self).coerce(&StaticRing::<i64>::RING, value as i64)
     }
 
-    fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         *lhs == *rhs
     }
     

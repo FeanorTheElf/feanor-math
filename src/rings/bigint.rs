@@ -122,7 +122,7 @@ impl RingBase for DefaultBigIntRing {
         DefaultBigIntRingEl(value < 0, vec![(value as i64).abs() as u64])
     }
 
-    fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         if lhs.0 == rhs.0 {
             algorithms::bigint::bigint_cmp(&lhs.1, &rhs.1) == Equal
         } else {
@@ -351,6 +351,9 @@ impl IntegerRing for DefaultBigIntRing {
 #[cfg(test)]
 use crate::divisibility::generic_test_divisibility_axioms;
 
+#[cfg(test)]
+const ZZ: RingValue<DefaultBigIntRing> = DefaultBigIntRing::RING;
+
 #[test]
 fn test_print_power_2() {
     let x = DefaultBigIntRingEl(false, vec![0, 0, 1]);
@@ -359,25 +362,25 @@ fn test_print_power_2() {
 
 #[test]
 fn test_from() {
-    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRingEl(false, vec![]), &DefaultBigIntRing::RING.from_int(0)));
-    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRingEl(false, vec![2138479]), &DefaultBigIntRing::RING.from_int(2138479)));
-    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRingEl(true, vec![2138479]), &DefaultBigIntRing::RING.from_int(-2138479)));
-    // assert!(DefaultBigIntRing::RING.eq(&DefaultBigInt(false, vec![0x38691a350bf12fca, 0x1]), &DefaultBigIntRing::RING.from_z_gen(0x138691a350bf12fca, &i128::RING)));
+    assert!(ZZ.eq_el(&DefaultBigIntRingEl(false, vec![]), &ZZ.from_int(0)));
+    assert!(ZZ.eq_el(&DefaultBigIntRingEl(false, vec![2138479]), &ZZ.from_int(2138479)));
+    assert!(ZZ.eq_el(&DefaultBigIntRingEl(true, vec![2138479]), &ZZ.from_int(-2138479)));
+    // assert!(ZZ.eq(&DefaultBigInt(false, vec![0x38691a350bf12fca, 0x1]), &ZZ.from_z_gen(0x138691a350bf12fca, &i128::RING)));
 }
 
 #[test]
 fn test_to_i128() {
-    assert_eq!(0, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![])));
-    assert_eq!(2138479, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![2138479])));
-    assert_eq!(-2138479, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(true, vec![2138479])));
-    assert_eq!(0x138691a350bf12fca, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![0x38691a350bf12fca, 0x1])));
+    assert_eq!(0, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![])));
+    assert_eq!(2138479, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![2138479])));
+    assert_eq!(-2138479, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(true, vec![2138479])));
+    assert_eq!(0x138691a350bf12fca, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![0x38691a350bf12fca, 0x1])));
     // assert_eq!(Err(()), DefaultBigInt(false, vec![0x38691a350bf12fca, 0x38691a350bf12fca, 0x1]).to_i128());
-    assert_eq!(i128::MAX, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
-    assert_eq!(i128::MIN + 1, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(true, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
+    assert_eq!(i128::MAX, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
+    assert_eq!(i128::MIN + 1, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(true, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
     // this is the possibly surprising, exceptional case
     // assert_eq!(Err(()), DefaultBigInt(true, vec![0, (i128::MAX >> 64) as u64 + 1]).to_i128());
-    assert_eq!(i64::MAX as i128 + 1, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![i64::MAX as u64 + 1])));
-    assert_eq!(u64::MAX as i128, DefaultBigIntRing::RING.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![u64::MAX])));
+    assert_eq!(i64::MAX as i128 + 1, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![i64::MAX as u64 + 1])));
+    assert_eq!(u64::MAX as i128, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![u64::MAX])));
 }
 
 #[test]
@@ -385,21 +388,21 @@ fn test_sub_assign() {
     let mut x = DefaultBigIntRingEl::parse("4294836225", 10).unwrap();
     let y =     DefaultBigIntRingEl::parse("4294967297", 10).unwrap();
     let z =     DefaultBigIntRingEl::parse("-131072", 10).unwrap();
-    x = DefaultBigIntRing::RING.sub_ref_fst(&x, y);
-    assert!(DefaultBigIntRing::RING.eq(&z, &x));
+    x = ZZ.sub_ref_fst(&x, y);
+    assert!(ZZ.eq_el(&z, &x));
 }
 
 #[test]
 fn test_shift_right() {
     let mut x = DefaultBigIntRingEl::parse("9843a756781b34567f81394", 16).unwrap();
     let z = DefaultBigIntRingEl::parse("9843a756781b34567", 16).unwrap();
-    DefaultBigIntRing::RING.euclidean_div_pow_2(&mut x, 24);
-    assert!(DefaultBigIntRing::RING.eq(&z, &x));
+    ZZ.euclidean_div_pow_2(&mut x, 24);
+    assert!(ZZ.eq_el(&z, &x));
 
     let mut x = DefaultBigIntRingEl::parse("-9843a756781b34567f81394", 16).unwrap();
     let z = DefaultBigIntRingEl::parse("-9843a756781b34567", 16).unwrap();
-    DefaultBigIntRing::RING.euclidean_div_pow_2(&mut x, 24);
-    assert!(DefaultBigIntRing::RING.eq(&z, &x));
+    ZZ.euclidean_div_pow_2(&mut x, 24);
+    assert!(ZZ.eq_el(&z, &x));
 }
 
 #[test]
@@ -436,22 +439,22 @@ fn numbers_iter() -> impl Iterator<Item = DefaultBigIntRingEl> {
 
 #[test]
 fn test_bigint_ring_axioms() {
-    generic_test_ring_axioms(DefaultBigIntRing::RING, numbers_iter())
+    generic_test_ring_axioms(ZZ, numbers_iter())
 }
 
 #[test]
 fn test_bigint_divisibility_ring_axioms() {
-    generic_test_divisibility_axioms(DefaultBigIntRing::RING, numbers_iter())
+    generic_test_divisibility_axioms(ZZ, numbers_iter())
 }
 
 #[test]
 fn test_bigint_euclidean_ring_axioms() {
-    generic_test_euclidean_axioms(DefaultBigIntRing::RING, numbers_iter())
+    generic_test_euclidean_axioms(ZZ, numbers_iter())
 }
 
 #[test]
 fn test_bigint_integer_ring_axioms() {
-    generic_test_integer_axioms(DefaultBigIntRing::RING, numbers_iter())
+    generic_test_integer_axioms(ZZ, numbers_iter())
 }
 
 #[bench]
@@ -460,15 +463,15 @@ fn bench_mul(bencher: &mut test::Bencher) {
     let y = DefaultBigIntRingEl::parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
     let z = DefaultBigIntRingEl::parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap();
     bencher.iter(|| {
-        let p = DefaultBigIntRing::RING.mul_ref(&x, &y);
-        assert!(DefaultBigIntRing::RING.eq(&z, &p));
+        let p = ZZ.mul_ref(&x, &y);
+        assert!(ZZ.eq_el(&z, &p));
     })
 }
 
 #[test]
 fn from_to_float_approx() {
     let x: f64 = 83465209236517892563478156042389675783219532497861237985328563.;
-    let y = DefaultBigIntRing::RING.to_float_approx(&DefaultBigIntRing::RING.from_float_approx(x).unwrap());
+    let y = ZZ.to_float_approx(&ZZ.from_float_approx(x).unwrap());
     assert!(x * 0.99 < y);
     assert!(y < x * 1.01);
 }
@@ -479,55 +482,55 @@ fn bench_div(bencher: &mut test::Bencher) {
     let y = DefaultBigIntRingEl::parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
     let z = DefaultBigIntRingEl::parse("48682207850683149082203680872586784064678018", 10).unwrap();
     bencher.iter(|| {
-        let q = DefaultBigIntRing::RING.euclidean_div(x.clone(), &y);
-        assert!(DefaultBigIntRing::RING.eq(&z, &q));
+        let q = ZZ.euclidean_div(x.clone(), &y);
+        assert!(ZZ.eq_el(&z, &q));
     })
 }
 
 #[test]
 fn test_is_zero() {
-    let zero = DefaultBigIntRing::RING.zero();
-    let mut nonzero = DefaultBigIntRing::RING.one();
-    DefaultBigIntRing::RING.mul_pow_2(&mut nonzero, 83124);
-    assert!(DefaultBigIntRing::RING.is_zero(&zero));
-    assert!(DefaultBigIntRing::RING.is_zero(&DefaultBigIntRing::RING.negate(zero)));
-    assert!(!DefaultBigIntRing::RING.is_zero(&nonzero));
-    assert!(!DefaultBigIntRing::RING.is_zero(&DefaultBigIntRing::RING.negate(nonzero)));
+    let zero = ZZ.zero();
+    let mut nonzero = ZZ.one();
+    ZZ.mul_pow_2(&mut nonzero, 83124);
+    assert!(ZZ.is_zero(&zero));
+    assert!(ZZ.is_zero(&ZZ.negate(zero)));
+    assert!(!ZZ.is_zero(&nonzero));
+    assert!(!ZZ.is_zero(&ZZ.negate(nonzero)));
 }
 
 #[test]
 fn test_cmp() {
-    assert_eq!(true, DefaultBigIntRing::RING.is_lt(&DefaultBigIntRing::RING.from_int(-1), &DefaultBigIntRing::RING.from_int(2)));
-    assert_eq!(true, DefaultBigIntRing::RING.is_lt(&DefaultBigIntRing::RING.from_int(1), &DefaultBigIntRing::RING.from_int(2)));
-    assert_eq!(false, DefaultBigIntRing::RING.is_lt(&DefaultBigIntRing::RING.from_int(2), &DefaultBigIntRing::RING.from_int(2)));
-    assert_eq!(false, DefaultBigIntRing::RING.is_lt(&DefaultBigIntRing::RING.from_int(3), &DefaultBigIntRing::RING.from_int(2)));
-    assert_eq!(true, DefaultBigIntRing::RING.is_gt(&DefaultBigIntRing::RING.from_int(-1), &DefaultBigIntRing::RING.from_int(-2)));
+    assert_eq!(true, ZZ.is_lt(&ZZ.from_int(-1), &ZZ.from_int(2)));
+    assert_eq!(true, ZZ.is_lt(&ZZ.from_int(1), &ZZ.from_int(2)));
+    assert_eq!(false, ZZ.is_lt(&ZZ.from_int(2), &ZZ.from_int(2)));
+    assert_eq!(false, ZZ.is_lt(&ZZ.from_int(3), &ZZ.from_int(2)));
+    assert_eq!(true, ZZ.is_gt(&ZZ.from_int(-1), &ZZ.from_int(-2)));
 }
 
 #[test]
 fn test_mul_pow_2() {
-    let mut x = DefaultBigIntRing::RING.from_int(2);
-    DefaultBigIntRing::RING.mul_pow_2(&mut x, 0);
-    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRing::RING.from_int(2), &x));
+    let mut x = ZZ.from_int(2);
+    ZZ.mul_pow_2(&mut x, 0);
+    assert!(ZZ.eq_el(&ZZ.from_int(2), &x));
 
-    let mut x = DefaultBigIntRing::RING.from_int(4829192);
-    DefaultBigIntRing::RING.mul_pow_2(&mut x, 3);
-    assert!(DefaultBigIntRing::RING.eq(&DefaultBigIntRing::RING.from_int(4829192 * 8), &x));
+    let mut x = ZZ.from_int(4829192);
+    ZZ.mul_pow_2(&mut x, 3);
+    assert!(ZZ.eq_el(&ZZ.from_int(4829192 * 8), &x));
 
-    let mut x = DefaultBigIntRing::RING.one();
-    DefaultBigIntRing::RING.mul_pow_2(&mut x, 64);
-    DefaultBigIntRing::RING.mul_assign(&mut x, DefaultBigIntRing::RING.from_int(4829192));
+    let mut x = ZZ.one();
+    ZZ.mul_pow_2(&mut x, 64);
+    ZZ.mul_assign(&mut x, ZZ.from_int(4829192));
 
-    let mut z = DefaultBigIntRing::RING.from_int(4829192);
-    DefaultBigIntRing::RING.mul_pow_2(&mut z, 64);
-    assert!(DefaultBigIntRing::RING.eq(&x, &z));
+    let mut z = ZZ.from_int(4829192);
+    ZZ.mul_pow_2(&mut z, 64);
+    assert!(ZZ.eq_el(&x, &z));
 }
 
 #[test]
 fn test_get_uniformly_random() {
-    generic_test_integer_uniformly_random(DefaultBigIntRing::RING);
+    generic_test_integer_uniformly_random(ZZ);
 
-    let ring = DefaultBigIntRing::RING;
+    let ring = ZZ;
     let bound = DefaultBigIntRingEl::parse("11000000000000000", 16).unwrap();
     let block_bound = DefaultBigIntRingEl::parse("10000000000000000", 16).unwrap();
     let mut rng = oorandom::Rand64::new(0);
@@ -540,6 +543,6 @@ fn test_get_uniformly_random() {
 #[test]
 fn test_canonical_iso_static_int() {
     // for the hom test, we have to be able to multiply elements in `StaticRing::<i128>::RING`, so we cannot test `i128::MAX` or `i128::MIN`
-    generic_test_canonical_hom_axioms(StaticRing::<i128>::RING, DefaultBigIntRing::RING, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128].iter().copied());
-    generic_test_canonical_iso_axioms(StaticRing::<i128>::RING, DefaultBigIntRing::RING, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128, i128::MAX, i128::MIN].iter().copied());
+    generic_test_canonical_hom_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128].iter().copied());
+    generic_test_canonical_iso_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128, i128::MAX, i128::MIN].iter().copied());
 }

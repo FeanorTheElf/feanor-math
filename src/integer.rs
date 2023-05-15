@@ -88,7 +88,7 @@ pub fn generic_test_integer_uniformly_random<R: IntegerRingStore>(ring: R)
         let mut rng = oorandom::Rand64::new(0);
         let elements: Vec<El<R>> = (0..1000).map(|_| ring.get_uniformly_random(&bound, || rng.rand_u64())).collect();
         for i in 0..b {
-            assert!(elements.iter().any(|x| ring.eq(x, &ring.from_int(i))))
+            assert!(elements.iter().any(|x| ring.eq_el(x, &ring.from_int(i))))
         }
         for x in &elements {
             assert!(ring.is_lt(x, &bound));
@@ -112,11 +112,11 @@ pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>
             ring.mul_pow_2(&mut pow_2, i);
             let mut b = ring.clone_el(a);
             ring.mul_pow_2(&mut b, i);
-            assert!(ring.eq(&b, &ring.mul(ring.clone_el(a), ring.clone_el(&pow_2))));
+            assert!(ring.eq_el(&b, &ring.mul(ring.clone_el(a), ring.clone_el(&pow_2))));
             ring.euclidean_div_pow_2(&mut b, i);
-            assert!(ring.eq(&b, a));
+            assert!(ring.eq_el(&b, a));
             ring.euclidean_div_pow_2(&mut b, i);
-            assert!(ring.eq(&b, &ring.euclidean_div(ring.clone_el(a), &pow_2)));
+            assert!(ring.eq_el(&b, &ring.euclidean_div(ring.clone_el(a), &pow_2)));
         }
     }
 }

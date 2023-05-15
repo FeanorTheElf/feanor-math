@@ -85,7 +85,7 @@ impl RingBase for ZnBase {
         }
     }
 
-    fn eq(&self, ZnEl(lhs): &Self::Element, ZnEl(rhs): &Self::Element) -> bool {
+    fn eq_el(&self, ZnEl(lhs): &Self::Element, ZnEl(rhs): &Self::Element) -> bool {
         *lhs == *rhs
     }
     

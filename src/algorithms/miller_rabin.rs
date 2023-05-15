@@ -31,7 +31,7 @@ pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
         I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
 {
     if ZZ.is_leq(n, &ZZ.from_int(2)) {
-        return ZZ.eq(n, &ZZ.from_int(2));
+        return ZZ.eq_el(n, &ZZ.from_int(2));
     }
 
     let mut rng = oorandom::Rand64::new(ZZ.default_hash(n) as u128);

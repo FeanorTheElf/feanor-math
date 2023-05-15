@@ -215,7 +215,7 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
 
     fn from_int(&self, value: i32) -> Self::Element { T::try_from(value).map_err(|_| ()).unwrap() }
 
-    fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         *lhs == *rhs
     }
     
@@ -227,7 +227,11 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     }
 }
 
-impl<T: PrimitiveInt> KaratsubaHint for StaticRingBase<T> {}
+impl KaratsubaHint for StaticRingBase<i8> {}
+impl KaratsubaHint for StaticRingBase<i16> {}
+impl KaratsubaHint for StaticRingBase<i32> {}
+impl KaratsubaHint for StaticRingBase<i64> {}
+impl KaratsubaHint for StaticRingBase<i128> {}
 
 pub type StaticRing<T> = RingValue<StaticRingBase<T>>;
 

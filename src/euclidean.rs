@@ -17,7 +17,7 @@ use crate::divisibility::*;
 /// # use feanor_math::primitive_int::*;
 /// let ring = StaticRing::<i64>::RING;
 /// let (q, r) = ring.euclidean_div_rem(14, &6);
-/// assert!(ring.eq(&14, &ring.add(ring.mul(q, 6), r)));
+/// assert!(ring.eq_el(&14, &ring.add(ring.mul(q, 6), r)));
 /// assert!(ring.euclidean_deg(&r) < ring.euclidean_deg(&6));
 /// ```
 /// 
@@ -62,7 +62,7 @@ pub fn generic_test_euclidean_axioms<R: EuclideanRingStore, I: Iterator<Item = E
             }
             let (q, r) = ring.euclidean_div_rem(ring.clone_el(a), b);
             assert!(ring.euclidean_deg(b).is_none() || ring.euclidean_deg(&r).unwrap_or(usize::MAX) < ring.euclidean_deg(b).unwrap());
-            assert!(ring.eq(a, &ring.add(ring.mul(q, ring.clone_el(b)), r)));
+            assert!(ring.eq_el(a, &ring.add(ring.mul(q, ring.clone_el(b)), r)));
         }
     }
 }

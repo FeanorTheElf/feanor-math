@@ -99,9 +99,9 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
         self.memory_provider.get_new_init(1, |_| self.base_ring.from_int(value))
     }
 
-    fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         for i in 0..min(lhs.len(), rhs.len()) {
-            if !self.base_ring.eq(&lhs[i], &rhs[i]) {
+            if !self.base_ring.eq_el(&lhs[i], &rhs[i]) {
                 return false;
             }
         }

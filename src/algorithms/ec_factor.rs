@@ -111,7 +111,7 @@ fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &Point<I>) -> boo
         I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
 {
     let (x, y, z) = &P;
-    Zn.eq(
+    Zn.eq_el(
         &Zn.mul_ref_snd(Zn.mul_ref(y, y), &z),
         &Zn.add(
             Zn.pow(Zn.clone_el(x), 3), Zn.mul(

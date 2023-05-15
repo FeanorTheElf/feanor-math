@@ -129,7 +129,7 @@ pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R)
     assert_eq!(ZZ.cast::<StaticRing<i64>>(&StaticRing::<i64>::RING, ZZ.clone_el(n)) as usize, all_elements.len());
     for (i, x) in all_elements.iter().enumerate() {
         for (j, y) in all_elements.iter().enumerate() {
-            assert!(i == j || !R.eq(x, y));
+            assert!(i == j || !R.eq_el(x, y));
         }
     }
 }
@@ -141,5 +141,5 @@ pub fn generic_test_map_in_large_int<R: ZnRingStore>(R: R)
     let ZZ_big = DefaultBigIntRing::RING;
     let n = ZZ_big.power_of_two(1000);
     let x = R.coerce(&ZZ_big, n);
-    assert!(R.eq(&R.pow(R.from_int(2), 1000), &x));
+    assert!(R.eq_el(&R.pow(R.from_int(2), 1000), &x));
 }
