@@ -227,11 +227,25 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     }
 }
 
-impl KaratsubaHint for StaticRingBase<i8> {}
-impl KaratsubaHint for StaticRingBase<i16> {}
-impl KaratsubaHint for StaticRingBase<i32> {}
-impl KaratsubaHint for StaticRingBase<i64> {}
-impl KaratsubaHint for StaticRingBase<i128> {}
+impl KaratsubaHint for StaticRingBase<i8> {
+    fn karatsuba_threshold(&self) -> usize { 4 }
+}
+
+impl KaratsubaHint for StaticRingBase<i16> {
+    fn karatsuba_threshold(&self) -> usize { 4 }
+}
+
+impl KaratsubaHint for StaticRingBase<i32> {
+    fn karatsuba_threshold(&self) -> usize { 4 }
+}
+
+impl KaratsubaHint for StaticRingBase<i64> {
+    fn karatsuba_threshold(&self) -> usize { 4 }
+}
+
+impl KaratsubaHint for StaticRingBase<i128> {
+    fn karatsuba_threshold(&self) -> usize { 3 }
+}
 
 pub type StaticRing<T> = RingValue<StaticRingBase<T>>;
 
