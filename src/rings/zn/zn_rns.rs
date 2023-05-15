@@ -366,7 +366,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider
     }
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalIso<zn_barett::ZnBase<K>> for ZnBase<C, J> 
+impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider<El<C>>> CanonicalIso<zn_barett::ZnBase<K>> for ZnBase<C, J, M> 
     where C::Type: ZnRing + CanonicalHom<J::Type>,
         J::Type: IntegerRing + CanonicalIso<K::Type>,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
@@ -393,7 +393,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore> CanonicalIso<zn_b
         let result = <_ as RingStore>::sum(&self.total_ring,
             self.components.iter()
                 .zip(el.0.into_iter())
-                .map(|(fp, x)| (fp.integer_ring().get_ring(), fp.smallest_positive_lift(x)))
+                .map(|(fp, x)| (fp.integer_ring().get_ring(), fp.smallest_positive_lift(fp.clone(x))))
                 .zip(self.unit_vectors.iter())
                 .zip(homs.iter())
                 .map(|(((integers, x), u), hom)| (integers, x, u, hom))
