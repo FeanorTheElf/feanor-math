@@ -180,6 +180,8 @@ impl RingBase for DefaultBigIntRing {
 
 impl CanonicalHom<DefaultBigIntRing> for DefaultBigIntRing {
     
+    type Homomorphism = ();
+    
     fn has_canonical_hom(&self, _: &DefaultBigIntRing) -> Option<()> { Some(()) }
 
     fn map_in(&self, _: &DefaultBigIntRing, el: DefaultBigIntRingEl, _: &()) -> Self::Element { el }
@@ -187,6 +189,8 @@ impl CanonicalHom<DefaultBigIntRing> for DefaultBigIntRing {
 
 impl CanonicalIso<DefaultBigIntRing> for DefaultBigIntRing {
     
+    type Isomorphism = ();
+
     fn has_canonical_iso(&self, _: &DefaultBigIntRing) -> Option<()> { Some(()) }
 
     fn map_out(&self, _: &DefaultBigIntRing, el: DefaultBigIntRingEl, _: &()) -> Self::Element { el }
@@ -240,6 +244,8 @@ impl EuclideanRing for DefaultBigIntRing {
 
 impl<T: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for DefaultBigIntRing {
     
+    type Homomorphism = ();
+
     fn has_canonical_hom(&self, _: &StaticRingBase<T>) -> Option<()> { Some(()) }
 
     fn map_in(&self, _: &StaticRingBase<T>, el: T, _: &()) -> Self::Element {
@@ -251,6 +257,8 @@ impl<T: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for DefaultBigIntRing {
 
 impl<T: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for DefaultBigIntRing {
     
+    type Isomorphism = ();
+
     fn has_canonical_iso(&self, _: &StaticRingBase<T>) -> Option<()> { Some(()) }
 
     fn map_out(&self, _: &StaticRingBase<T>, el: Self::Element, _: &()) -> T {

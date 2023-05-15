@@ -1,4 +1,5 @@
 use crate::primitive_int::StaticRing;
+use crate::primitive_int::StaticRingBase;
 use crate::ring::*;
 use crate::integer::*;
 
@@ -22,7 +23,7 @@ pub fn erathostenes(B: u64) -> Vec<u64> {
 
 pub fn enumerate_primes<I>(ZZ: I, B: &El<I>) -> Vec<El<I>> 
     where I: IntegerRingStore,
-        I::Type: IntegerRing
+        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i128>>
 {
     let bound = ZZ.cast::<StaticRing<i128>>(&StaticRing::<i128>::RING, ZZ.clone(B)) as u64;
     erathostenes(bound).into_iter().map(|p| ZZ.coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, p as i128)).collect()

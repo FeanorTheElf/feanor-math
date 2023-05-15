@@ -1,6 +1,7 @@
 use crate::ring::*;
 use crate::euclidean::*;
 use crate::ordered::*;
+use crate::primitive_int::*;
 use crate::algorithms;
 
 ///
@@ -10,7 +11,7 @@ use crate::algorithms;
 /// a positive integer. While this is not really general, it is often required
 /// for fast operations with integers.
 /// 
-pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + SelfIso {
+pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + SelfIso + CanonicalIso<StaticRingBase<i32>> {
 
     fn to_float_approx(&self, value: &Self::Element) -> f64;
     fn from_float_approx(&self, value: f64) -> Option<Self::Element>;
@@ -28,42 +29,41 @@ pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + SelfIso {
     }
 }
 
-impl<I: IntegerRing + CanonicalIso<I> + ?Sized, J: IntegerRing + ?Sized> CanonicalHom<I> for J {
+// impl<I: IntegerRing + CanonicalIso<I> + ?Sized, J: IntegerRing + ?Sized> CanonicalHom<I> for J {
 
-    type Homomorphism = ();
+//     type Homomorphism = ();
     
-    default fn has_canonical_hom(&self, _: &I) -> Option<()> { Some(()) }
+//     default fn has_canonical_hom(&self, _: &I) -> Option<()> { Some(()) }
 
-    default fn map_in(&self, from: &I, el: I::Element, _: &()) -> Self::Element {
-        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(self.one(), &el, RingRef::new(from), |a, b| self.add(a, b), |a, b| self.add_ref(a, b), self.zero());
-        if from.is_neg(&el) {
-            return self.negate(result);
-        } else {
-            return result;
-        }
-    }
-}
+//     default fn map_in(&self, from: &I, el: I::Element, _: &()) -> Self::Element {
+//         let result = algorithms::sqr_mul::generic_abs_square_and_multiply(self.one(), &el, RingRef::new(from), |a, b| self.add(a, b), |a, b| self.add_ref(a, b), self.zero());
+//         if from.is_neg(&el) {
+//             return self.negate(result);
+//         } else {
+//             return result;
+//         }
+//     }
+// }
 
-impl<I: IntegerRing + CanonicalIso<I> + ?Sized, J: IntegerRing + CanonicalIso<J> + ?Sized> CanonicalIso<I> for J {
+// impl<I: IntegerRing + CanonicalIso<I> + ?Sized, J: IntegerRing + CanonicalIso<J> + ?Sized> CanonicalIso<I> for J {
 
-    type Isomorphism = ();
+//     type Isomorphism = ();
     
-    default fn has_canonical_iso(&self, _: &I) -> Option<()> { Some(()) }
+//     default fn has_canonical_iso(&self, _: &I) -> Option<()> { Some(()) }
 
-    default fn map_out(&self, from: &I, el: Self::Element, _: &()) -> I::Element {
-        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(from.one(), &el, RingRef::new(self), |a, b| from.add(a, b), |a, b| from.add_ref(a, b), from.zero());
-        if self.is_neg(&el) {
-            return from.negate(result);
-        } else {
-            return result;
-        }
-    }
-}
+//     default fn map_out(&self, from: &I, el: Self::Element, _: &()) -> I::Element {
+//         let result = algorithms::sqr_mul::generic_abs_square_and_multiply(from.one(), &el, RingRef::new(self), |a, b| from.add(a, b), |a, b| from.add_ref(a, b), from.zero());
+//         if self.is_neg(&el) {
+//             return from.negate(result);
+//         } else {
+//             return result;
+//         }
+//     }
+// }
 
 pub trait IntegerRingStore: RingStore
     where Self::Type: IntegerRing
 {
-
     delegate!{ fn to_float_approx(&self, value: &El<Self>) -> f64 }
     delegate!{ fn from_float_approx(&self, value: f64) -> Option<El<Self>> }
     delegate!{ fn abs_is_bit_set(&self, value: &El<Self>, i: usize) -> bool }

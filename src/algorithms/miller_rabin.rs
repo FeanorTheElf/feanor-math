@@ -3,6 +3,7 @@ use crate::ring::*;
 use crate::integer::*;
 use crate::algorithms;
 use crate::rings::zn::zn_barett::*;
+use crate::primitive_int::*;
 
 use oorandom;
 
@@ -27,7 +28,7 @@ use oorandom;
 /// 
 pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool 
     where I: IntegerRingStore + HashableElRingStore,
-        I::Type: IntegerRing
+        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
 {
     if ZZ.is_leq(n, &ZZ.from_int(2)) {
         return ZZ.eq(n, &ZZ.from_int(2));

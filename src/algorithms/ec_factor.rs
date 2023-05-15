@@ -1,6 +1,7 @@
 use crate::algorithms;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
+use crate::primitive_int::StaticRingBase;
 use crate::ring::*;
 use crate::integer::*;
 use crate::rings::zn::ZnRingStore;
@@ -11,7 +12,7 @@ type Point<I: IntegerRingStore> = (El<Zn<I>>, El<Zn<I>>, El<Zn<I>>);
 
 fn ec_group_action_proj<I>(Zn: &Zn<I>, _A: &El<Zn<I>>, _B: &El<Zn<I>>, P: Point<I>, Q: &Point<I>) -> Point<I> 
     where I: IntegerRingStore,
-        I::Type: IntegerRing
+        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
 {
     if Zn.is_zero(&Q.2) {
         return P;
@@ -48,7 +49,7 @@ fn ec_group_action_proj<I>(Zn: &Zn<I>, _A: &El<Zn<I>>, _B: &El<Zn<I>>, P: Point<
 
 fn ec_group_double_proj<I>(Zn: &Zn<I>, A: &El<Zn<I>>, _B: &El<Zn<I>>, P: &Point<I>) -> Point<I>
     where I: IntegerRingStore,
-        I::Type: IntegerRing
+        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
 {
     let (x, y, z) = P;
 
@@ -81,7 +82,7 @@ fn ec_group_double_proj<I>(Zn: &Zn<I>, A: &El<Zn<I>>, _B: &El<Zn<I>>, P: &Point<
 
 pub fn ec_mul_abort<I>(base: &Point<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, power: &El<I>, ZZ: &I, Zn: &Zn<I>) -> Point<I>
     where I: IntegerRingStore,
-        I::Type: IntegerRing
+        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
 {
     if ZZ.is_zero(&power) {
         return (Zn.zero(), Zn.one(), Zn.zero());
@@ -107,7 +108,7 @@ pub fn ec_mul_abort<I>(base: &Point<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, power: &El
 
 fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &Point<I>) -> bool
     where I: IntegerRingStore,
-        I::Type: IntegerRing
+        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
 {
     let (x, y, z) = &P;
     Zn.eq(
@@ -126,7 +127,7 @@ fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &Point<I>) -> boo
 /// 
 pub fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
     where I: IntegerRingStore,
-        I::Type: IntegerRing
+        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i128>> + CanonicalIso<StaticRingBase<i32>>
 {
     assert!(algorithms::miller_rabin::is_prime(&ZZ, N, 6) == false);
     assert!(ZZ.is_geq(N, &ZZ.from_int(100)));
