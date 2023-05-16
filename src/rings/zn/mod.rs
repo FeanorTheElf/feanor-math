@@ -3,7 +3,7 @@ use crate::integer::*;
 use crate::ordered::*;
 
 pub mod zn_barett;
-pub mod zn_63bit;
+pub mod zn_42;
 pub mod zn_static;
 pub mod zn_rns;
 

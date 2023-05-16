@@ -443,8 +443,8 @@ const EDGE_CASE_ELEMENTS: [i32; 10] = [0, 1, 3, 7, 9, 62, 8, 10, 11, 12];
 
 #[test]
 fn test_ring_axioms_znbase() {
-    let ZZ = Zn::new(StaticRing::<i64>::RING, 63);
-    generic_test_ring_axioms(&ZZ, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ZZ.from_int(x)))
+    let ring = Zn::new(StaticRing::<i64>::RING, 63);
+    generic_test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.from_int(x)))
 }
 
 #[test]
@@ -452,7 +452,7 @@ fn test_canonical_iso_axioms_zn_barett() {
     let from = Zn::new(StaticRing::<i128>::RING, 7 * 11);
     let to = Zn::new(DefaultBigIntRing::RING, DefaultBigIntRing::RING.from_int(7 * 11));
     generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
-    generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    generic_test_canonical_iso_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
 }
 
 #[test]
