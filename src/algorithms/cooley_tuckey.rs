@@ -215,6 +215,8 @@ use crate::rings::zn::zn_static::Zn;
 #[cfg(test)]
 use crate::rings::zn::zn_barett;
 #[cfg(test)]
+use crate::rings::zn::zn_42;
+#[cfg(test)]
 use crate::primitive_int::*;
 #[cfg(test)]
 use crate::field::*;
@@ -285,6 +287,17 @@ fn test_for_zn() {
     assert!(ring.is_neg_one(&ring.pow(fft.inv_root_of_unity, 8)));
 }
 
+#[cfg(test)]
+fn run_fft_bench_round<R>(ring: R, fft: &FFTTableCooleyTuckey<R>, data: &Vec<El<R>>, copy: &mut Vec<El<R>>)
+    where R: ZnRingStore, R::Type: ZnRing
+{
+    copy.clear();
+    copy.extend(data.iter().map(|x| ring.clone_el(x)));
+    fft.bitreverse_fft_inplace(&mut copy[..]);
+    fft.bitreverse_inv_fft_inplace(&mut copy[..]);
+    assert!(ring.eq_el(&copy[0], &data[0]));
+}
+
 #[bench]
 fn bench_fft(bencher: &mut test::Bencher) {
     let ring = zn_barett::Zn::new(StaticRing::<i128>::RING, 65537);
@@ -292,10 +305,17 @@ fn bench_fft(bencher: &mut test::Bencher) {
     let data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << 15);
     bencher.iter(|| {
-        copy.clear();
-        copy.extend(data.iter().cloned());
-        fft.bitreverse_fft_inplace(&mut copy[..]);
-        fft.bitreverse_inv_fft_inplace(&mut copy[..]);
-        assert!(ring.eq_el(&copy[0], &data[0]));
+        run_fft_bench_round(&ring, &fft, &data, &mut copy)
+    });
+}
+
+#[bench]
+fn bench_fft_lazy(bencher: &mut test::Bencher) {
+    let ring = zn_42::ZnLazy::new(65537);
+    let fft = FFTTableCooleyTuckey::for_zn(&ring, 15).unwrap();
+    let data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+    let mut copy = Vec::with_capacity(1 << 15);
+    bencher.iter(|| {
+        run_fft_bench_round(&ring, &fft, &data, &mut copy)
     });
 }
