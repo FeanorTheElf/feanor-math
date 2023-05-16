@@ -286,6 +286,253 @@ impl ZnRing for ZnLazyBase {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct ZnBase {
+    base: ZnLazyBase
+}
+
+#[derive(Clone, Copy)]
+pub struct ZnEl(ZnLazyEl);
+
+pub type Zn = RingValue<ZnBase>;
+
+impl Zn {
+    
+    pub fn new(modulus: u64) -> Self {
+        RingValue::from(ZnBase::new(modulus))
+    }
+}
+
+impl ZnBase {
+    
+    pub fn new(modulus: u64) -> Self {
+        ZnBase { base: ZnLazyBase::new(modulus) }
+    }
+
+    fn reduce_once(&self, ZnLazyEl(val): &mut ZnLazyEl) {
+        if *val >= self.base.modulus {
+            *val -= self.base.modulus;
+        }
+    }
+
+    fn assert_valid(&self, ZnLazyEl(val): &ZnLazyEl) {
+        debug_assert!(*val <= self.base.modulus);
+    }
+}
+
+impl RingBase for ZnBase {
+    
+    type Element = ZnEl;
+
+    fn clone_el(&self, val: &Self::Element) -> Self::Element {
+        *val
+    }
+    
+    fn add_assign(&self, ZnEl(lhs): &mut Self::Element, ZnEl(rhs): Self::Element) {
+        self.assert_valid(lhs);
+        self.assert_valid(&rhs);
+        lhs.0 += rhs.0;
+        self.reduce_once(lhs);
+        self.assert_valid(lhs);
+    }
+    
+    fn negate_inplace(&self, ZnEl(lhs): &mut Self::Element) {
+        self.assert_valid(lhs);
+        lhs.0 = self.base.modulus - lhs.0;
+        self.assert_valid(lhs);
+    }
+
+    fn mul_assign(&self, ZnEl(lhs): &mut Self::Element, ZnEl(rhs): Self::Element) {
+        self.assert_valid(lhs);
+        self.assert_valid(&rhs);
+        self.base.mul_assign(lhs, rhs);
+        self.reduce_once(lhs);
+        self.assert_valid(lhs);
+    }
+
+    fn from_int(&self, value: i32) -> Self::Element {
+        let mut result = self.base.from_int(value);
+        self.reduce_once(&mut result);
+        self.assert_valid(&result);
+        return ZnEl(result);
+    }
+
+    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+        self.is_zero(&self.sub_ref(lhs, rhs))
+    }
+
+    fn is_zero(&self, ZnEl(val): &Self::Element) -> bool {
+        self.assert_valid(val);
+        val.0 == 0 || val.0 == self.base.modulus
+    }
+    
+    fn is_commutative(&self) -> bool { true }
+    fn is_noetherian(&self) -> bool { true }
+
+    fn dbg<'a>(&self, ZnEl(val): &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        self.base.dbg(val, out)
+    }
+
+}
+
+impl CanonicalHom<ZnBase> for ZnBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
+        self.base.has_canonical_hom(&from.base)
+    }
+
+    fn map_in(&self, from: &ZnBase, ZnEl(el): <ZnBase as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        ZnEl(self.base.map_in(&from.base, el, hom))
+    }
+}
+
+impl CanonicalIso<ZnBase> for ZnBase {
+
+    type Isomorphism = ();
+
+    fn has_canonical_iso(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
+        self.base.has_canonical_iso(&from.base)
+    }
+
+    fn map_out(&self, from: &ZnBase, ZnEl(el): Self::Element, iso: &Self::Isomorphism) -> <ZnBase as RingBase>::Element {
+        ZnEl(self.base.map_out(&from.base, el, iso))
+    }
+}
+
+impl CanonicalHom<ZnLazyBase> for ZnBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, from: &ZnLazyBase) -> Option<Self::Homomorphism> {
+        self.base.has_canonical_hom(from)
+    }
+
+    fn map_in(&self, _: &ZnLazyBase, el: <ZnLazyBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
+        let mut result = ZnLazyEl(self.base.complete_reduce(el.0 as u128));
+        self.reduce_once(&mut result);
+        return ZnEl(result);
+    }
+}
+
+impl CanonicalIso<ZnLazyBase> for ZnBase {
+
+    type Isomorphism = ();
+
+    fn has_canonical_iso(&self, from: &ZnLazyBase) -> Option<Self::Homomorphism> {
+        self.base.has_canonical_iso(from)
+    }
+
+    fn map_out(&self, _: &ZnLazyBase, ZnEl(el): Self::Element, _: &Self::Isomorphism) -> <ZnLazyBase as RingBase>::Element {
+        el
+    }
+}
+
+impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalHom<zn_barett::ZnBase<I>> for ZnBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, from: &zn_barett::ZnBase<I>) -> Option<Self::Homomorphism> {
+        self.base.has_canonical_hom(from)
+    }
+
+    fn map_in(&self, from: &zn_barett::ZnBase<I>, el: <zn_barett::ZnBase<I> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        ZnEl(self.base.map_in(from, el, hom))
+    }
+}
+
+impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalIso<zn_barett::ZnBase<I>> for ZnBase {
+
+    type Isomorphism = ();
+
+    fn has_canonical_iso(&self, from: &zn_barett::ZnBase<I>) -> Option<Self::Homomorphism> {
+        self.base.has_canonical_iso(from)
+    }
+
+    fn map_out(&self, from: &zn_barett::ZnBase<I>, ZnEl(el): <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <zn_barett::ZnBase<I> as RingBase>::Element {
+        self.base.map_out(from, el, iso)
+    }
+}
+
+impl CanonicalHom<StaticRingBase<i128>> for ZnBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, from: &StaticRingBase<i128>) -> Option<Self::Homomorphism> {
+       self.base.has_canonical_hom(from)
+    }
+
+    fn map_in(&self, from: &StaticRingBase<i128>, el: i128, hom: &Self::Homomorphism) -> Self::Element {
+        let mut result = self.base.map_in(from, el, hom);
+        self.reduce_once(&mut result);
+        self.assert_valid(&result);
+        return ZnEl(result);
+    }
+}
+
+impl DivisibilityRing for ZnBase {
+
+    fn checked_left_div(&self, ZnEl(lhs): &Self::Element, ZnEl(rhs): &Self::Element) -> Option<Self::Element> {
+        let mut result = self.base.checked_left_div(lhs, rhs)?;
+        self.reduce_once(&mut result);
+        self.assert_valid(&result);
+        return Some(ZnEl(result));
+    }
+}
+
+
+pub struct ZnBaseElementsIter<'a> {
+    ring: &'a ZnBase,
+    current: u64
+}
+
+impl<'a> Iterator for ZnBaseElementsIter<'a> {
+
+    type Item = ZnEl;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current < self.ring.base.modulus {
+            let result = self.current;
+            self.current += 1;
+            return Some(ZnEl(ZnLazyEl(result)));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl ZnRing for ZnBase {
+    
+    type IntegerRingBase = StaticRingBase<i128>;
+    type Integers = StaticRing<i128>;
+    type ElementsIter<'a> = ZnBaseElementsIter<'a>;
+
+    fn integer_ring(&self) -> &Self::Integers {
+        self.base.integer_ring()
+    }
+
+    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
+        ZnBaseElementsIter {
+            ring: self,
+            current: 0
+        }
+    }
+
+    fn smallest_positive_lift(&self, ZnEl(el): Self::Element) -> El<Self::Integers> {
+        self.assert_valid(&el);
+        if el.0 == self.base.modulus {
+            0
+        } else {
+            el.0 as i128
+        }
+    }
+
+    fn modulus(&self) -> &El<Self::Integers> {
+        self.base.modulus()
+    }
+}
+
 #[cfg(test)]
 use crate::divisibility::generic_test_divisibility_axioms;
 
@@ -294,33 +541,66 @@ const EDGE_CASE_ELEMENTS: [i32; 10] = [0, 1, 3, 7, 9, 62, 8, 10, 11, 12];
 
 #[test]
 fn test_ring_axioms() {
-    let ring = ZnLazy::new(63);
-    generic_test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.from_int(x)))
+    {
+        let ring = ZnLazy::new(63);
+        generic_test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.from_int(x)));
+    }
+    {
+        let ring = Zn::new(63);
+        generic_test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.from_int(x)));
+    }
 }
 
 #[test]
 fn test_canonical_iso_axioms_zn_barett() {
-    let from = zn_barett::Zn::new(StaticRing::<i128>::RING, 7 * 11);
-    let to = ZnLazy::new(7 * 11);
-    generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
-    generic_test_canonical_iso_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    {
+        let from = zn_barett::Zn::new(StaticRing::<i128>::RING, 7 * 11);
+        let to = ZnLazy::new(7 * 11);
+        generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+        generic_test_canonical_iso_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    }
+    {
+        let from = zn_barett::Zn::new(StaticRing::<i128>::RING, 7 * 11);
+        let to = Zn::new(7 * 11);
+        generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+        generic_test_canonical_iso_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    }
 }
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {
-    let from = StaticRing::<i128>::RING;
-    let to = ZnLazy::new(7 * 11);
-    generic_test_canonical_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    {
+        let from = StaticRing::<i128>::RING;
+        let to = ZnLazy::new(7 * 11);
+        generic_test_canonical_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    }
+    {
+        let from = StaticRing::<i128>::RING;
+        let to = Zn::new(7 * 11);
+        generic_test_canonical_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    }
 }
 
 #[test]
 fn test_zn_ring_axioms() {
-    generic_test_zn_ring_axioms(ZnLazy::new(17));
-    generic_test_zn_ring_axioms(ZnLazy::new(63));
+    {
+        generic_test_zn_ring_axioms(ZnLazy::new(17));
+        generic_test_zn_ring_axioms(ZnLazy::new(63));
+    }
+    {
+        generic_test_zn_ring_axioms(Zn::new(17));
+        generic_test_zn_ring_axioms(Zn::new(63));
+    }
 }
 
 #[test]
 fn test_divisibility_axioms() {
-    let R = ZnLazy::new(17);
-    generic_test_divisibility_axioms(&R, R.elements());
+    {
+        let R = ZnLazy::new(17);
+        generic_test_divisibility_axioms(&R, R.elements());
+    }
+    {
+        let R = Zn::new(17);
+        generic_test_divisibility_axioms(&R, R.elements());
+    }
 }
