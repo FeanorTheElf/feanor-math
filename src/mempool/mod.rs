@@ -166,7 +166,7 @@ impl Default for AllocatingMemoryProvider {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct LoggingMemoryProvider {
     description: String
 }
