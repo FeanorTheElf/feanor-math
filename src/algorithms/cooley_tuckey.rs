@@ -300,7 +300,7 @@ fn run_fft_bench_round<R>(ring: R, fft: &FFTTableCooleyTuckey<R>, data: &Vec<El<
 
 #[bench]
 fn bench_fft(bencher: &mut test::Bencher) {
-    let ring = zn_barett::Zn::new(StaticRing::<i128>::RING, 65537);
+    let ring = zn_barett::Zn::new(StaticRing::<i128>::RING, 1073872897);
     let fft = FFTTableCooleyTuckey::for_zn(&ring, 15).unwrap();
     let data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << 15);
@@ -311,7 +311,7 @@ fn bench_fft(bencher: &mut test::Bencher) {
 
 #[bench]
 fn bench_fft_lazy(bencher: &mut test::Bencher) {
-    let ring = zn_42::ZnLazy::new(65537);
+    let ring = zn_42::ZnLazy::new(1073872897);
     let fft = FFTTableCooleyTuckey::for_zn(&ring, 15).unwrap();
     let data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << 15);
