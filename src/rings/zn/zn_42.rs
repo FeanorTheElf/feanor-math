@@ -171,6 +171,32 @@ impl CanonicalIso<ZnLazyBase> for ZnLazyBase {
     }
 }
 
+impl CanonicalHom<ZnBase> for ZnLazyBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
+        self.has_canonical_hom(&from.base)
+    }
+
+    fn map_in(&self, _: &ZnBase, ZnEl(el): <ZnBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
+        el
+    }
+}
+
+impl CanonicalIso<ZnBase> for ZnLazyBase {
+
+    type Isomorphism = ();
+
+    fn has_canonical_iso(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
+        self.has_canonical_iso(&from.base)
+    }
+
+    fn map_out(&self, from: &ZnBase, el: Self::Element, _: &Self::Isomorphism) -> <ZnBase as RingBase>::Element {
+        from.map_in(self, el, &())
+    }
+}
+
 impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalHom<zn_barett::ZnBase<I>> for ZnLazyBase {
 
     type Homomorphism = ();
