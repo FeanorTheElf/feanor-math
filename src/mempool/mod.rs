@@ -134,6 +134,7 @@ impl<T, M: ?Sized> MemoryProvider<T> for Rc<M>
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct AllocatingMemoryProvider;
 
 impl<T> MemoryProvider<T> for AllocatingMemoryProvider {
@@ -165,6 +166,7 @@ impl Default for AllocatingMemoryProvider {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct LoggingMemoryProvider {
     description: String
 }
