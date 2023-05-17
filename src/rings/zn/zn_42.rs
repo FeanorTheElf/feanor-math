@@ -205,24 +205,27 @@ impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalIso<zn_barett::Z
     }
 }
 
-impl CanonicalHom<StaticRingBase<i128>> for ZnLazyBase {
+impl<I: IntegerRing + CanonicalIso<StaticRingBase<i128>>> CanonicalHom<I> for ZnLazyBase {
 
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, _: &StaticRingBase<i128>) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, _: &I) -> Option<Self::Homomorphism> {
        Some(())
     }
 
-    fn map_in(&self, _: &StaticRingBase<i128>, el: i128, _: &Self::Homomorphism) -> Self::Element {
-        let (neg, n) = if el < 0 {
-            (true, -el as u128)
+    fn map_in(&self, from: &I, el: I::Element, _: &Self::Homomorphism) -> Self::Element {
+        let (neg, n) = if from.is_neg(&el) {
+            (true, from.negate(el))
         } else {
-            (false, el as u128)
+            (false, el)
         };
-        let reduced = if n < (1 << BITSHIFT) {
-            self.bounded_reduce(n)
+        let ZZ128 = StaticRing::<i128>::RING.get_ring();
+        let as_u128 = |x: I::Element| from.map_out(ZZ128, x, &from.has_canonical_iso(ZZ128).unwrap()) as u128;
+        let from_u128 = |x: u128| from.map_in(ZZ128, x as i128, &from.has_canonical_hom(ZZ128).unwrap());
+        let reduced = if from.is_lt(&n, &from.power_of_two(BITSHIFT as usize)) {
+            self.bounded_reduce(as_u128(n))
         } else {
-            (n % self.modulus as u128) as u64
+            as_u128(from.euclidean_rem(n, &from_u128(self.modulus as u128))) as u64
         };
         if neg {
             self.negate(ZnLazyEl(reduced))
@@ -384,7 +387,9 @@ impl CanonicalHom<ZnBase> for ZnBase {
     }
 
     fn map_in(&self, from: &ZnBase, ZnEl(el): <ZnBase as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        ZnEl(self.base.map_in(&from.base, el, hom))
+        let result = self.base.map_in(&from.base, el, hom);
+        self.assert_valid(&result);
+        return ZnEl(result);
     }
 }
 
@@ -397,7 +402,9 @@ impl CanonicalIso<ZnBase> for ZnBase {
     }
 
     fn map_out(&self, from: &ZnBase, ZnEl(el): Self::Element, iso: &Self::Isomorphism) -> <ZnBase as RingBase>::Element {
-        ZnEl(self.base.map_out(&from.base, el, iso))
+        let result = self.base.map_out(&from.base, el, iso);
+        self.assert_valid(&result);
+        return ZnEl(result);
     }
 }
 
@@ -412,6 +419,7 @@ impl CanonicalHom<ZnLazyBase> for ZnBase {
     fn map_in(&self, _: &ZnLazyBase, el: <ZnLazyBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
         let mut result = ZnLazyEl(self.base.complete_reduce(el.0 as u128));
         self.reduce_once(&mut result);
+        self.assert_valid(&result);
         return ZnEl(result);
     }
 }
@@ -438,7 +446,9 @@ impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalHom<zn_barett::Z
     }
 
     fn map_in(&self, from: &zn_barett::ZnBase<I>, el: <zn_barett::ZnBase<I> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        ZnEl(self.base.map_in(from, el, hom))
+        let result = self.base.map_in(from, el, hom);
+        self.assert_valid(&result);
+        return ZnEl(result);
     }
 }
 
@@ -455,15 +465,15 @@ impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalIso<zn_barett::Z
     }
 }
 
-impl CanonicalHom<StaticRingBase<i128>> for ZnBase {
+impl<I: IntegerRing + CanonicalIso<StaticRingBase<i128>>> CanonicalHom<I> for ZnBase {
 
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, from: &StaticRingBase<i128>) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
        self.base.has_canonical_hom(from)
     }
 
-    fn map_in(&self, from: &StaticRingBase<i128>, el: i128, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
         let mut result = self.base.map_in(from, el, hom);
         self.reduce_once(&mut result);
         self.assert_valid(&result);
@@ -602,5 +612,17 @@ fn test_divisibility_axioms() {
     {
         let R = Zn::new(17);
         generic_test_divisibility_axioms(&R, R.elements());
+    }
+}
+
+#[test]
+fn test_zn_map_in_large_int() {
+    {
+        let R = ZnLazy::new(17);
+        generic_test_map_in_large_int(R);
+    }
+    {
+        let R = Zn::new(17);
+        generic_test_map_in_large_int(R);
     }
 }
