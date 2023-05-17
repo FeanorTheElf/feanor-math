@@ -35,7 +35,7 @@ const MAX_MODULUS_LOG2: u32 = 36;
 const MAX_SIZE_LOG2: u32 = 42;
 const BITSHIFT: u32 = 2 * MAX_SIZE_LOG2;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct ZnLazyEl(u64);
 
 impl ZnLazy {
@@ -320,7 +320,7 @@ pub struct ZnBase {
     base: ZnLazyBase
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ZnEl(ZnLazyEl);
 
 pub type Zn = RingValue<ZnBase>;
