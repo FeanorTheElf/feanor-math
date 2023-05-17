@@ -311,7 +311,7 @@ fn bench_fft(bencher: &mut test::Bencher) {
 
 #[bench]
 fn bench_fft_lazy(bencher: &mut test::Bencher) {
-    let ring = zn_42::ZnLazy::new(1073872897);
+    let ring = zn_42::Zn::new(1073872897);
     let fft = FFTTableCooleyTuckey::for_zn(&ring, 15).unwrap();
     let data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << 15);

@@ -14,7 +14,7 @@ use super::zn_barett;
 /// Any modular reductions are performed lazily.
 /// 
 #[derive(Clone, Copy)]
-pub struct ZnLazyBase {
+pub struct ZnBase {
     // must be 128 bit to deal with very small moduli
     inv_modulus: u128,
     modulus: u64,
@@ -22,7 +22,7 @@ pub struct ZnLazyBase {
     modulus_i128: i128
 }
 
-pub type ZnLazy = RingValue<ZnLazyBase>;
+pub type Zn = RingValue<ZnBase>;
 
 ///
 /// The number of bits to which we approximate the quotient `1 / modulus`.
@@ -33,23 +33,23 @@ const BITSHIFT: u32 = 84;
 const MAX_MODULUS_BITS: u32 = BITSHIFT / 2;
 
 #[derive(Copy, Clone, Debug)]
-pub struct ZnLazyEl(u64);
+pub struct ZnEl(u64);
 
-impl ZnLazy {
+impl Zn {
 
     pub fn new(modulus: u64) -> Self {
-        RingValue::from(ZnLazyBase::new(modulus))
+        RingValue::from(ZnBase::new(modulus))
     }
 }
 
-impl ZnLazyBase {
+impl ZnBase {
 
     pub fn new(modulus: u64) -> Self {
         assert!(modulus <= (1 << MAX_MODULUS_BITS));
         let inv_modulus = (1 << BITSHIFT) / modulus as u128;
         let repr_bound = 1 << (inv_modulus.leading_zeros() / 2);
         assert!(2 * modulus < repr_bound);
-        return ZnLazyBase {
+        return ZnBase {
             modulus: modulus,
             modulus_i128: modulus as i128,
             inv_modulus: inv_modulus,
@@ -88,68 +88,68 @@ impl ZnLazyBase {
     }
 }
 
-impl RingBase for ZnLazyBase {
+impl RingBase for ZnBase {
 
-    type Element = ZnLazyEl;
+    type Element = ZnEl;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
         *val
     }
     
-    fn add_assign(&self, ZnLazyEl(lhs): &mut Self::Element, ZnLazyEl(rhs): Self::Element) {
+    fn add_assign(&self, ZnEl(lhs): &mut Self::Element, ZnEl(rhs): Self::Element) {
         *lhs += rhs;
         self.potential_reduce(lhs);
     }
     
-    fn negate_inplace(&self, ZnLazyEl(lhs): &mut Self::Element) {
+    fn negate_inplace(&self, ZnEl(lhs): &mut Self::Element) {
         *lhs = 2 * self.modulus - self.bounded_reduce(*lhs as u128);
     }
 
-    fn mul_assign(&self, ZnLazyEl(lhs): &mut Self::Element, ZnLazyEl(rhs): Self::Element) {
+    fn mul_assign(&self, ZnEl(lhs): &mut Self::Element, ZnEl(rhs): Self::Element) {
         *lhs = self.bounded_reduce(*lhs as u128 * rhs as u128);
     }
 
     fn from_int(&self, value: i32) -> Self::Element {
         if value < 0 {
-            return self.negate(ZnLazyEl(self.bounded_reduce(-value as u128)));
+            return self.negate(ZnEl(self.bounded_reduce(-value as u128)));
         } else {
-            return ZnLazyEl(self.bounded_reduce(value as u128));
+            return ZnEl(self.bounded_reduce(value as u128));
         }
     }
 
-    fn eq_el(&self, ZnLazyEl(lhs): &Self::Element, ZnLazyEl(rhs): &Self::Element) -> bool {
+    fn eq_el(&self, ZnEl(lhs): &Self::Element, ZnEl(rhs): &Self::Element) -> bool {
         if *lhs >= *rhs {
-            self.is_zero(&ZnLazyEl(*lhs - *rhs))
+            self.is_zero(&ZnEl(*lhs - *rhs))
         } else {
-            self.is_zero(&ZnLazyEl(*rhs - *lhs))
+            self.is_zero(&ZnEl(*rhs - *lhs))
         }
     }
 
-    fn is_one(&self, ZnLazyEl(value): &Self::Element) -> bool {
-        *value != 0 && self.is_zero(&ZnLazyEl(*value - 1))
+    fn is_one(&self, ZnEl(value): &Self::Element) -> bool {
+        *value != 0 && self.is_zero(&ZnEl(*value - 1))
     }
 
-    fn is_zero(&self, ZnLazyEl(value): &Self::Element) -> bool {
+    fn is_zero(&self, ZnEl(value): &Self::Element) -> bool {
         self.complete_reduce(*value as u128) == 0
     }
     
-    fn is_neg_one(&self, ZnLazyEl(value): &Self::Element) -> bool {
-        self.is_zero(&ZnLazyEl(*value + 1))
+    fn is_neg_one(&self, ZnEl(value): &Self::Element) -> bool {
+        self.is_zero(&ZnEl(*value + 1))
     }
 
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
     
-    fn dbg<'a>(&self, ZnLazyEl(value): &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+    fn dbg<'a>(&self, ZnEl(value): &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         write!(out, "{}", self.complete_reduce(*value as u128))
     }
 }
 
-impl CanonicalHom<ZnLazyBase> for ZnLazyBase {
+impl CanonicalHom<ZnBase> for ZnBase {
 
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, from: &ZnLazyBase) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
         if self.modulus == from.modulus {
             Some(())
         } else {
@@ -157,16 +157,16 @@ impl CanonicalHom<ZnLazyBase> for ZnLazyBase {
         }
     }
 
-    fn map_in(&self, _: &ZnLazyBase, el: <ZnLazyBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, _: &ZnBase, el: <ZnBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
         el
     }
 }
 
-impl CanonicalIso<ZnLazyBase> for ZnLazyBase {
+impl CanonicalIso<ZnBase> for ZnBase {
 
     type Isomorphism = ();
 
-    fn has_canonical_iso(&self, from: &ZnLazyBase) -> Option<Self::Homomorphism> {
+    fn has_canonical_iso(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
         if self.modulus == from.modulus {
             Some(())
         } else {
@@ -174,12 +174,12 @@ impl CanonicalIso<ZnLazyBase> for ZnLazyBase {
         }
     }
 
-    fn map_out(&self, _: &ZnLazyBase, el: Self::Element, _: &Self::Isomorphism) -> <ZnLazyBase as RingBase>::Element {
+    fn map_out(&self, _: &ZnBase, el: Self::Element, _: &Self::Isomorphism) -> <ZnBase as RingBase>::Element {
         el
     }
 }
 
-impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalHom<zn_barett::ZnBase<I>> for ZnLazyBase {
+impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalHom<zn_barett::ZnBase<I>> for ZnBase {
 
     type Homomorphism = ();
 
@@ -192,11 +192,11 @@ impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalHom<zn_barett::Z
     }
 
     fn map_in(&self, from: &zn_barett::ZnBase<I>, el: <zn_barett::ZnBase<I> as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
-        ZnLazyEl(from.smallest_positive_lift(el) as u64)
+        ZnEl(from.smallest_positive_lift(el) as u64)
     }
 }
 
-impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalIso<zn_barett::ZnBase<I>> for ZnLazyBase {
+impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalIso<zn_barett::ZnBase<I>> for ZnBase {
 
     type Isomorphism = ();
 
@@ -213,7 +213,7 @@ impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalIso<zn_barett::Z
     }
 }
 
-impl<I: IntegerRing + CanonicalIso<StaticRingBase<i128>>> CanonicalHom<I> for ZnLazyBase {
+impl<I: IntegerRing + CanonicalIso<StaticRingBase<i128>>> CanonicalHom<I> for ZnBase {
 
     type Homomorphism = ();
 
@@ -236,14 +236,14 @@ impl<I: IntegerRing + CanonicalIso<StaticRingBase<i128>>> CanonicalHom<I> for Zn
             as_u128(from.euclidean_rem(n, &from_u128(self.modulus as u128))) as u64
         };
         if neg {
-            self.negate(ZnLazyEl(reduced))
+            self.negate(ZnEl(reduced))
         } else {
-            ZnLazyEl(reduced)
+            ZnEl(reduced)
         }
     }
 }
 
-impl DivisibilityRing for ZnLazyBase {
+impl DivisibilityRing for ZnBase {
 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let ring = self.non_lazy();
@@ -252,26 +252,26 @@ impl DivisibilityRing for ZnLazyBase {
 }
 
 pub struct ZnLazyBaseElementsIter<'a> {
-    ring: &'a ZnLazyBase,
+    ring: &'a ZnBase,
     current: u64
 }
 
 impl<'a> Iterator for ZnLazyBaseElementsIter<'a> {
 
-    type Item = ZnLazyEl;
+    type Item = ZnEl;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.current < self.ring.modulus {
             let result = self.current;
             self.current += 1;
-            return Some(ZnLazyEl(result));
+            return Some(ZnEl(result));
         } else {
             return None;
         }
     }
 }
 
-impl ZnRing for ZnLazyBase {
+impl ZnRing for ZnBase {
 
     type IntegerRingBase = StaticRingBase<i128>;
     type Integers = StaticRing<i128>;
@@ -306,7 +306,7 @@ const EDGE_CASE_ELEMENTS: [i32; 10] = [0, 1, 3, 7, 9, 62, 8, 10, 11, 12];
 #[test]
 fn test_ring_axioms() {
     {
-        let ring = ZnLazy::new(63);
+        let ring = Zn::new(63);
         generic_test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.from_int(x)));
     }
 }
@@ -315,7 +315,7 @@ fn test_ring_axioms() {
 fn test_canonical_iso_axioms_zn_barett() {
     {
         let from = zn_barett::Zn::new(StaticRing::<i128>::RING, 7 * 11);
-        let to = ZnLazy::new(7 * 11);
+        let to = Zn::new(7 * 11);
         generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
         generic_test_canonical_iso_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
     }
@@ -325,7 +325,7 @@ fn test_canonical_iso_axioms_zn_barett() {
 fn test_canonical_hom_axioms_static_int() {
     {
         let from = StaticRing::<i128>::RING;
-        let to = ZnLazy::new(7 * 11);
+        let to = Zn::new(7 * 11);
         generic_test_canonical_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
     }
 }
@@ -333,15 +333,15 @@ fn test_canonical_hom_axioms_static_int() {
 #[test]
 fn test_zn_ring_axioms() {
     {
-        generic_test_zn_ring_axioms(ZnLazy::new(17));
-        generic_test_zn_ring_axioms(ZnLazy::new(63));
+        generic_test_zn_ring_axioms(Zn::new(17));
+        generic_test_zn_ring_axioms(Zn::new(63));
     }
 }
 
 #[test]
 fn test_divisibility_axioms() {
     {
-        let R = ZnLazy::new(17);
+        let R = Zn::new(17);
         generic_test_divisibility_axioms(&R, R.elements());
     }
 }
@@ -349,7 +349,7 @@ fn test_divisibility_axioms() {
 #[test]
 fn test_zn_map_in_large_int() {
     {
-        let R = ZnLazy::new(17);
+        let R = Zn::new(17);
         generic_test_map_in_large_int(R);
     }
 }
