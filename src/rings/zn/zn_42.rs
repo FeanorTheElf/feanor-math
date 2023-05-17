@@ -312,6 +312,10 @@ impl ZnBase {
         ZnBase { base: ZnLazyBase::new(modulus) }
     }
 
+    pub fn lazy_reduction<'a>(&'a self) -> &'a ZnLazyBase {
+        &self.base
+    }
+
     fn reduce_once(&self, ZnLazyEl(val): &mut ZnLazyEl) {
         if *val >= self.base.modulus {
             *val -= self.base.modulus;
