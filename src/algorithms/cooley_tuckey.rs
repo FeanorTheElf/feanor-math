@@ -115,6 +115,7 @@ impl<R> FFTTableCooleyTuckey<R>
     /// where `z` is an N-th root of unity. Since this is a bitreverse FFT, the output are not the `Fa_i`
     /// but instead the numbers `Fa_(bitrev(k))`, i.e. the same values in another order.
     /// 
+    #[inline(never)]
     pub fn bitreverse_fft_inplace_base<V, S>(&self, mut values: V, ring: S)
         where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
     {
@@ -165,6 +166,7 @@ impl<R> FFTTableCooleyTuckey<R>
     ///
     /// this is exactly `bitreverse_fft_inplace_base()` with all operations reversed
     /// 
+    #[inline(never)]
     pub fn bitreverse_inv_fft_inplace_base<V, S>(&self, mut values: V, ring: S)
         where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
     {
