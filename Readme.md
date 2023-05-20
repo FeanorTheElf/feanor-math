@@ -24,7 +24,7 @@ As simple example of how to use the library, we implement Fermat primality test 
 ```rust
 use feanor_math::ring::*;
 use feanor_math::primitive_int::*;
-use feanor_math::rings::zn::zn_dyn::*;
+use feanor_math::rings::zn::zn_barett::*;
 use feanor_math::rings::zn::*;
 use feanor_math::algorithms;
 
@@ -44,8 +44,8 @@ fn fermat_is_prime(n: i64) -> bool {
     let mut rng = oorandom::Rand64::new(0);
     for _ in 0..6 {
         let a = Zn.random_element(|| rng.rand_u64());
-        let a_n = Zn.pow(&a, n as usize);
-        if !Zn.eq(&a, &a_n) {
+        let a_n = Zn.pow(Zn.clone_el(&a), n as usize);
+        if !Zn.eq_el(&a, &a_n) {
             return false;
         }
     }
@@ -63,13 +63,15 @@ implementation of arbitrary-precision integers - we could make the function gene
 use feanor_math::ring::*;
 use feanor_math::integer::*;
 use feanor_math::rings::bigint::*;
-use feanor_math::rings::zn::zn_dyn::*;
+use feanor_math::rings::zn::zn_barett::*;
 use feanor_math::rings::zn::*;
 use feanor_math::algorithms;
 
 use oorandom;
 
-fn fermat_is_prime<R: IntegerRingStore>(ZZ: R, n: El<R>) -> bool {
+fn fermat_is_prime<R>(ZZ: R, n: El<R>) -> bool 
+    where R: RingStore, R::Type: IntegerRing
+{
     // the Fermat primality test is based on the observation that a^n == a mod n if n
     // is a prime; On the other hand, if n is not prime, we hope that there are many
     // a such that this is not the case. 
@@ -77,7 +79,7 @@ fn fermat_is_prime<R: IntegerRingStore>(ZZ: R, n: El<R>) -> bool {
     // be used in practice. This is just a proof of concept.
 
     // ZZ is not guaranteed to be Copy anymore, so use reference instead
-    let Zn = Zn::new(&ZZ, ZZ.clone(&n)); // the ring Z/nZ
+    let Zn = Zn::new(&ZZ, ZZ.clone_el(&n)); // the ring Z/nZ
 
     // check for 6 random a whether a^n == a mod n
     let mut rng = oorandom::Rand64::new(0);
@@ -85,8 +87,8 @@ fn fermat_is_prime<R: IntegerRingStore>(ZZ: R, n: El<R>) -> bool {
         let a = Zn.random_element(|| rng.rand_u64());
         // use a generic square-and-multiply powering function that works with any implementation
         // of integers
-        let a_n = Zn.pow_gen(Zn.clone(&a), &n, &ZZ);
-        if !Zn.eq(&a, &a_n) {
+        let a_n = Zn.pow_gen(Zn.clone_el(&a), &n, &ZZ);
+        if !Zn.eq_el(&a, &a_n) {
             return false;
         }
     }
@@ -106,17 +108,17 @@ To implement a custom ring, just create a struct and add an `impl RingBase` and 
 Assuming we want to provide our own implementation of the finite binary field F2, we could do it as follows.
 ```rust
 use feanor_math::ring::*;
-
+ 
 struct F2Base;
-
+ 
 impl RingBase for F2Base {
    
     type Element = u8;
-
-    fn clone(&self, val: &Self::Element) -> Self::Element {
+ 
+    fn clone_el(&self, val: &Self::Element) -> Self::Element {
         *val
     }
-
+ 
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         *lhs = (*lhs + rhs) % 2;
     }
@@ -124,7 +126,7 @@ impl RingBase for F2Base {
     fn negate_inplace(&self, lhs: &mut Self::Element) {
         *lhs = (2 - *lhs) % 2;
     }
-
+ 
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         *lhs = (*lhs * rhs) % 2;
     }
@@ -133,59 +135,59 @@ impl RingBase for F2Base {
         // make sure that we handle negative numbers correctly
         (((value % 2) + 2) % 2) as u8
     }
-
-    fn eq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+ 
+    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         // elements are always represented by 0 or 1
         *lhs == *rhs
     }
     
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
-
+ 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         write!(out, "{}", *value)
     }
 }
-
+ 
 // To properly use a ring, in addition to RingBase we have to implement CanonicalHom<Self> and
 // CanonicalIso<Self>. This ensures that the ring works well with the canonical ring mapping
 // framework, that later allows us to use functions like `cast()` or `coerce()`.
 // In practice, we might also want to add implementations like `CanonicalHom<I> where I: IntegerRing`
 // or CanonicalIso<feanor_math::rings::zn::zn_static::ZnBase<2, true>>.
-
+ 
 impl CanonicalHom<F2Base> for F2Base {
     
     type Homomorphism = ();
-
+ 
     fn has_canonical_hom(&self, from: &Self) -> Option<Self::Homomorphism> {
         // a canonical homomorphism F -> F exists for all rings F of type F2Base, as
         // there is only one possible instance of F2Base
         Some(())
     }
-
+ 
     fn map_in(&self, from: &Self, el: Self::Element, hom: &Self::Homomorphism) -> Self::Element {
         el
     }
 }
-
+ 
 impl CanonicalIso<F2Base> for F2Base {
     
     type Isomorphism = ();
-
+ 
     fn has_canonical_iso(&self, from: &Self) -> Option<Self::Isomorphism> {
         // a canonical isomorphism F -> F exists for all rings F of type F2Base, as
         // there is only one possible instance of F2Base
         Some(())
     }
-
+ 
     fn map_out(&self, from: &Self, el: Self::Element, hom: &Self::Homomorphism) -> Self::Element {
         el
     }
 }
-
+ 
 pub const F2: RingValue<F2Base> = RingValue::from(F2Base);
-
-assert!(F2.eq(&F2.from_int(1), &F2.add(F2.one(), F2.zero())));
+ 
+assert!(F2.eq_el(&F2.from_int(1), &F2.add(F2.one(), F2.zero())));
 ```
 
 ## `RingBase` vs `RingStore`
@@ -203,6 +205,16 @@ The main power of this separation becomes apparent when we start nesting rings.
 Say we have a ring type that builds on an underlying ring type, for example a polynomial ring `PolyRing<R>` over a base ring `R`.
 In this case, `PolyRing` implements `RingBase`, but the underlying ring `R` is constrained to be `RingStore`.
 As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` can all be used equivalently, which provides a lot of flexibility, but still works both with expensive-to-clone rings and zero-sized rings.
+
+# Performance
+
+Generally speaking, I want performance to be a high priority in this crate.
+However, I did not have the time so far to thoroughly optimize many of the algorithms.
+
+## Tipps for achieving optimal performance
+
+ - Use `lto = "fat"` in the `Cargo.toml` of your project. This is absolutely vital to enable inlining across crate boundaries, and can have a huge impact if you extensively use rings that have "simple" basic arithmetic - like `zn_42::Zn` or `primitive_int::StaticRing`.
+ - If you extensively use rings whose elements require dynamic memory allocation, be careful to choose good memory providers. This is currently still WIP. 
 
 # Design decisions
 
