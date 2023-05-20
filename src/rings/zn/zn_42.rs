@@ -67,6 +67,7 @@ impl ZnBase {
     /// If input is smaller than `1 << BITSHIFT`, the output is smaller
     /// than `2 * self.modulus` and congruent to the input.
     /// 
+    #[inline]
     fn bounded_reduce(&self, value: u128) -> u64 {
         assert!(value < (1 << BITSHIFT));
         let result = (value - ((value * self.inv_modulus) >> BITSHIFT) * self.modulus as u128) as u64;
@@ -92,19 +93,23 @@ impl RingBase for ZnBase {
 
     type Element = ZnEl;
 
+    #[inline]
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
         *val
     }
     
+    #[inline]
     fn add_assign(&self, ZnEl(lhs): &mut Self::Element, ZnEl(rhs): Self::Element) {
         *lhs += rhs;
         self.potential_reduce(lhs);
     }
     
+    #[inline]
     fn negate_inplace(&self, ZnEl(lhs): &mut Self::Element) {
         *lhs = 2 * self.modulus - self.bounded_reduce(*lhs as u128);
     }
 
+    #[inline]
     fn mul_assign(&self, ZnEl(lhs): &mut Self::Element, ZnEl(rhs): Self::Element) {
         *lhs = self.bounded_reduce(*lhs as u128 * rhs as u128);
     }
@@ -117,6 +122,7 @@ impl RingBase for ZnBase {
         }
     }
 
+    #[inline]
     fn eq_el(&self, ZnEl(lhs): &Self::Element, ZnEl(rhs): &Self::Element) -> bool {
         if *lhs >= *rhs {
             self.is_zero(&ZnEl(*lhs - *rhs))
@@ -125,14 +131,17 @@ impl RingBase for ZnBase {
         }
     }
 
+    #[inline]
     fn is_one(&self, ZnEl(value): &Self::Element) -> bool {
         *value != 0 && self.is_zero(&ZnEl(*value - 1))
     }
 
+    #[inline]
     fn is_zero(&self, ZnEl(value): &Self::Element) -> bool {
         self.complete_reduce(*value as u128) == 0
     }
     
+    #[inline]
     fn is_neg_one(&self, ZnEl(value): &Self::Element) -> bool {
         self.is_zero(&ZnEl(*value + 1))
     }
@@ -156,7 +165,7 @@ impl CanonicalHom<ZnBase> for ZnBase {
             None
         }
     }
-
+    
     fn map_in(&self, _: &ZnBase, el: <ZnBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
         el
     }
@@ -277,6 +286,7 @@ impl ZnRing for ZnBase {
     type Integers = StaticRing<i128>;
     type ElementsIter<'a> = ZnLazyBaseElementsIter<'a>;
 
+    #[inline]
     fn integer_ring(&self) -> &Self::Integers {
         &StaticRing::<i128>::RING
     }
@@ -288,10 +298,12 @@ impl ZnRing for ZnBase {
         }
     }
 
+    #[inline]
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
         self.complete_reduce(el.0 as u128) as i128
     }
 
+    #[inline]
     fn modulus(&self) -> &El<Self::Integers> {
         &self.modulus_i128
     }

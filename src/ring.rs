@@ -182,42 +182,47 @@ pub trait RingBase {
     type Element;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element;
-    fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.add_assign(lhs, self.clone_el(rhs)) }
+    #[inline] fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.add_assign(lhs, self.clone_el(rhs)) }
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element);
-    fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.sub_assign(lhs, self.clone_el(rhs)) }
+    #[inline] fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.sub_assign(lhs, self.clone_el(rhs)) }
     fn negate_inplace(&self, lhs: &mut Self::Element);
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element);
-    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.mul_assign(lhs, self.clone_el(rhs)) }
-    fn zero(&self) -> Self::Element { self.from_int(0) }
-    fn one(&self) -> Self::Element { self.from_int(1) }
-    fn neg_one(&self) -> Self::Element { self.from_int(-1) }
+    #[inline] fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.mul_assign(lhs, self.clone_el(rhs)) }
+    #[inline] fn zero(&self) -> Self::Element { self.from_int(0) }
+    #[inline] fn one(&self) -> Self::Element { self.from_int(1) }
+    #[inline] fn neg_one(&self) -> Self::Element { self.from_int(-1) }
     fn from_int(&self, value: i32) -> Self::Element;
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool;
-    fn is_zero(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.zero()) }
-    fn is_one(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.one()) }
-    fn is_neg_one(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.neg_one()) }
+    #[inline] fn is_zero(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.zero()) }
+    #[inline] fn is_one(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.one()) }
+    #[inline] fn is_neg_one(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.neg_one()) }
     fn is_commutative(&self) -> bool;
     fn is_noetherian(&self) -> bool;
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
 
+    #[inline]
     fn square(&self, value: &mut Self::Element) {
         self.mul_assign(value, self.clone_el(value));
     }
 
+    #[inline]
     fn negate(&self, mut value: Self::Element) -> Self::Element {
         self.negate_inplace(&mut value);
         return value;
     }
     
+    #[inline]
     fn sub_assign(&self, lhs: &mut Self::Element, mut rhs: Self::Element) {
         self.negate_inplace(&mut rhs);
         self.add_assign(lhs, rhs);
     }
 
+    #[inline]
     fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
         self.mul_assign(lhs, self.from_int(rhs));
     }
 
+    #[inline]
     fn mul_int(&self, mut lhs: Self::Element, rhs: i32) -> Self::Element {
         self.mul_assign_int(&mut lhs, rhs);
         return lhs;
@@ -226,6 +231,7 @@ pub trait RingBase {
     ///
     /// Computes `lhs = rhs - lhs`
     /// 
+    #[inline]
     fn sub_self_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         self.negate_inplace(lhs);
         self.add_assign(lhs, rhs);
@@ -234,60 +240,71 @@ pub trait RingBase {
     ///
     /// Computes `lhs = rhs - lhs`
     /// 
+    #[inline]
     fn sub_self_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         self.negate_inplace(lhs);
         self.add_assign_ref(lhs, rhs);
     }
 
+    #[inline]
     fn add_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         let mut result = self.clone_el(lhs);
         self.add_assign_ref(&mut result, rhs);
         return result;
     }
 
+    #[inline]
     fn add_ref_fst(&self, lhs: &Self::Element, mut rhs: Self::Element) -> Self::Element {
         self.add_assign_ref(&mut rhs, lhs);
         return rhs;
     }
 
+    #[inline]
     fn add_ref_snd(&self, mut lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
         self.add_assign_ref(&mut lhs, rhs);
         return lhs;
     }
 
+    #[inline]
     fn add(&self, mut lhs: Self::Element, rhs: Self::Element) -> Self::Element {
         self.add_assign(&mut lhs, rhs);
         return lhs;
     }
 
+    #[inline]
     fn sub_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         let mut result = self.clone_el(lhs);
         self.sub_assign_ref(&mut result, rhs);
         return result;
     }
 
+    #[inline]
     fn sub_ref_fst(&self, lhs: &Self::Element, mut rhs: Self::Element) -> Self::Element {
         self.sub_assign_ref(&mut rhs, lhs);
         self.negate_inplace(&mut rhs);
         return rhs;
     }
 
+    #[inline]
     fn sub_ref_snd(&self, mut lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
         self.sub_assign_ref(&mut lhs, rhs);
         return lhs;
     }
 
+    #[inline]
     fn sub(&self, mut lhs: Self::Element, rhs: Self::Element) -> Self::Element {
         self.sub_assign(&mut lhs, rhs);
         return lhs;
     }
 
+    #[inline]
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         let mut result = self.clone_el(lhs);
         self.mul_assign_ref(&mut result, rhs);
         return result;
     }
 
+    #[inline]
     fn mul_ref_fst(&self, lhs: &Self::Element, mut rhs: Self::Element) -> Self::Element {
         if self.is_commutative() {
             self.mul_assign_ref(&mut rhs, lhs);
@@ -299,11 +316,13 @@ pub trait RingBase {
         }
     }
 
+    #[inline]
     fn mul_ref_snd(&self, mut lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
         self.mul_assign_ref(&mut lhs, rhs);
         return lhs;
     }
 
+    #[inline]
     fn mul(&self, mut lhs: Self::Element, rhs: Self::Element) -> Self::Element {
         self.mul_assign(&mut lhs, rhs);
         return lhs;
@@ -312,11 +331,13 @@ pub trait RingBase {
 
 macro_rules! delegate {
     (fn $name:ident (&self, $($pname:ident: $ptype:ty),*) -> $rtype:ty) => {
+        #[inline]
         fn $name (&self, $($pname: $ptype),*) -> $rtype {
             self.get_ring().$name($($pname),*)
         }
     };
     (fn $name:ident (&self) -> $rtype:ty) => {
+        #[inline]
         fn $name (&self) -> $rtype {
             self.get_ring().$name()
         }
@@ -488,48 +509,56 @@ pub trait RingStore {
     delegate!{ fn mul_assign_int(&self, lhs: &mut El<Self>, rhs: i32) -> () }
     delegate!{ fn mul_int(&self, lhs: El<Self>, rhs: i32) -> El<Self> }
     
+    #[inline]
     fn coerce<S>(&self, from: &S, el: El<S>) -> El<Self>
         where S: RingStore, Self::Type: CanonicalHom<S::Type> 
     {
         self.get_ring().map_in(from.get_ring(), el, &self.get_ring().has_canonical_hom(from.get_ring()).unwrap())
     }
 
+    #[inline]
     fn cast<S>(&self, to: &S, el: El<Self>) -> El<S>
         where S: RingStore, Self::Type: CanonicalIso<S::Type> 
     {
         self.get_ring().map_out(to.get_ring(), el, &self.get_ring().has_canonical_iso(to.get_ring()).unwrap())
     }
 
+    #[inline]
     fn sum<I>(&self, els: I) -> El<Self> 
         where I: Iterator<Item = El<Self>>
     {
         els.fold(self.zero(), |a, b| self.add(a, b))
     }
 
+    #[inline]
     fn prod<I>(&self, els: I) -> El<Self> 
         where I: Iterator<Item = El<Self>>
     {
         els.fold(self.one(), |a, b| self.mul(a, b))
     }
 
+    #[inline]
     fn base_ring<'a>(&'a self) -> &'a <Self::Type as RingExtension>::BaseRing
         where Self::Type: RingExtension
     {
         self.get_ring().base_ring()
     }
 
+    #[inline]
     fn from(&self, x: El<<Self::Type as RingExtension>::BaseRing>) -> El<Self>
         where Self::Type: RingExtension
     {
         self.get_ring().from(x)
     }
 
+    #[inline]
     fn from_ref(&self, x: &El<<Self::Type as RingExtension>::BaseRing>) -> El<Self>
         where Self::Type: RingExtension
     {
         self.get_ring().from_ref(x)
     }
 
+    #[inline]
     fn pow(&self, x: El<Self>, power: usize) -> El<Self> {
         if power == 1 {
             return x;
@@ -549,6 +578,7 @@ pub trait RingStore {
         )
     }
 
+    #[inline]
     fn pow_gen<R: IntegerRingStore>(&self, x: El<Self>, power: &El<R>, integers: R) -> El<Self> 
         where R::Type: IntegerRing
     {
@@ -644,7 +674,8 @@ pub trait CanonicalHom<S>: RingBase
 
     fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism>;
     fn map_in(&self, from: &S, el: S::Element, hom: &Self::Homomorphism) -> Self::Element;
-
+    
+    #[inline]
     fn map_in_ref(&self, from: &S, el: &S::Element, hom: &Self::Homomorphism) -> Self::Element {
         self.map_in(from, from.clone_el(el), hom)
     }
