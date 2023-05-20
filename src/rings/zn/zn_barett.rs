@@ -93,7 +93,6 @@ impl<I: IntegerRingStore> ZnBase<I>
         };
     }
 
-    #[inline]
     fn project_leq_n_square(&self, n: &mut El<I>) {
         assert!(!self.integer_ring.is_neg(&n));
         let mut subtract = self.integer_ring.mul_ref(&n, &self.inverse_modulus);
@@ -106,7 +105,6 @@ impl<I: IntegerRingStore> ZnBase<I>
         assert!(self.integer_ring.is_lt(&n, &self.modulus), "The input is not smaller than {}^2", self.integer_ring.format(&self.modulus));
     }
 
-    #[inline]
     pub fn project(&self, n: El<I>) -> <Self as RingBase>::Element {
         self.project_gen(n, &self.integer_ring)
     }
@@ -173,12 +171,10 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
 {
     type Element = ZnEl<I>;
 
-    #[inline]
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
         ZnEl(self.integer_ring().clone_el(&val.0))
     }
 
-    #[inline]
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         self.integer_ring.add_assign_ref(&mut lhs.0, &rhs.0);
         if self.integer_ring.is_geq(&lhs.0, &self.modulus) {
@@ -186,7 +182,6 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
         }
     }
 
-    #[inline]
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         self.integer_ring.add_assign(&mut lhs.0, rhs.0);
         if self.integer_ring.is_geq(&lhs.0, &self.modulus) {
@@ -194,7 +189,6 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
         }
     }
 
-    #[inline]
     fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         self.integer_ring.sub_assign_ref(&mut lhs.0, &rhs.0);
         if self.integer_ring.is_neg(&lhs.0) {
@@ -202,7 +196,6 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
         }
     }
 
-    #[inline]
     fn negate_inplace(&self, lhs: &mut Self::Element) {
         if !self.integer_ring.is_zero(&lhs.0) {
             self.integer_ring.negate_inplace(&mut lhs.0);
@@ -210,13 +203,11 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
         }
     }
 
-    #[inline]
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         self.integer_ring.mul_assign(&mut lhs.0, rhs.0);
         self.project_leq_n_square(&mut lhs.0);
     }
 
-    #[inline]
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         self.integer_ring.mul_assign_ref(&mut lhs.0, &rhs.0);
         self.project_leq_n_square(&mut lhs.0);
@@ -226,17 +217,14 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
         self.project_gen(value, &StaticRing::<i32>::RING)
     }
 
-    #[inline]
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         self.integer_ring.eq_el(&lhs.0, &rhs.0)
     }
 
-    #[inline]
     fn is_zero(&self, value: &Self::Element) -> bool {
         self.integer_ring.is_zero(&value.0)
     }
 
-    #[inline]
     fn is_one(&self, value: &Self::Element) -> bool {
         self.integer_ring.is_one(&value.0)
     }
@@ -380,17 +368,14 @@ impl<I: IntegerRingStore> ZnRing for ZnBase<I>
     type ElementsIter<'a> = ZnBaseElementsIter<'a, I>
         where Self: 'a;
 
-    #[inline]
     fn integer_ring(&self) -> &Self::Integers {
         &self.integer_ring
     }
 
-    #[inline]
     fn modulus(&self) -> &El<Self::Integers> {
         &self.modulus
     }
 
-    #[inline]
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
         el.0
     }

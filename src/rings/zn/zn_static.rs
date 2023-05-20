@@ -26,19 +26,16 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD>
 {
     type Element = u64;
 
-    #[inline]
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
         *val
     }
 
-    #[inline]
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         *lhs += rhs;
         if *lhs >= N {
             *lhs -= N;
         }
     }
-    #[inline]
 
     fn negate_inplace(&self, lhs: &mut Self::Element) {
         if *lhs != 0 {
@@ -46,7 +43,6 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD>
         }
     }
 
-    #[inline]
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         *lhs = ((*lhs as u128 * rhs as u128) % (N as u128)) as u64
     }
@@ -55,7 +51,6 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD>
         RingRef::new(self).coerce(&StaticRing::<i64>::RING, value as i64)
     }
 
-    #[inline]
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         *lhs == *rhs
     }
@@ -162,17 +157,14 @@ impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD>
     type Integers = RingValue<StaticRingBase<i64>>;
     type ElementsIter<'a> = ZnBaseElementsIter<N>;
 
-    #[inline]
     fn integer_ring(&self) -> &Self::Integers {
         &StaticRing::<i64>::RING
     }
 
-    #[inline]
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
         el as i64
     }
 
-    #[inline]
     fn modulus(&self) -> &El<Self::Integers> {
         &(N as i64)
     }
