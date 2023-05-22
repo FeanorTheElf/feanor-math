@@ -151,10 +151,10 @@ impl<R> FFTTableCooleyTuckey<R>
                     let index1 = i_bitreverse * m + k;
                     let index2 = (i_bitreverse + 1) * m + k;
 
-                    let current_twiddle = ring.get_ring().map_in_ref(self.ring.get_ring(), self.inv_root_of_unity_pow(s, i_bitreverse), &hom);
+                    let current_twiddle = self.inv_root_of_unity_pow(s, i_bitreverse);
 
                     // `(values_i1, values_i2) = (values_i1 + twiddle * values_i2, values_i1 - twiddle * values_i2)`
-                    ring.mul_assign(values.at_mut(index2), current_twiddle);
+                    ring.get_ring().mul_assign_map_in_ref(self.ring.get_ring(), values.at_mut(index2), current_twiddle, &hom);
                     let new_a = ring.add_ref(values.at(index1), values.at(index2));
                     let a = std::mem::replace(values.at_mut(index1), new_a);
                     ring.sub_self_assign(values.at_mut(index2), a);
@@ -185,12 +185,12 @@ impl<R> FFTTableCooleyTuckey<R>
                     let index1 = i_bitreverse * m + k;
                     let index2 = (i_bitreverse + 1) * m + k;
 
-                    let current_twiddle = ring.get_ring().map_in_ref(self.ring.get_ring(), self.root_of_unity_pow(s, i_bitreverse), &hom);
+                    let current_twiddle = self.root_of_unity_pow(s, i_bitreverse);
 
                     let new_a = ring.add_ref(values.at(index1), values.at(index2));
                     let a = std::mem::replace(values.at_mut(index1), new_a);
                     ring.sub_self_assign(values.at_mut(index2), a);
-                    ring.mul_assign(values.at_mut(index2), current_twiddle);
+                    ring.get_ring().mul_assign_map_in_ref(self.ring.get_ring(), values.at_mut(index2), current_twiddle, &hom);
                 }
             }
         }
@@ -308,13 +308,13 @@ fn test_for_zn() {
 }
 
 #[cfg(test)]
-fn run_fft_bench_round<R>(ring: R, fft: &FFTTableCooleyTuckey<R>, data: &Vec<El<R>>, copy: &mut Vec<El<R>>)
-    where R: ZnRingStore, R::Type: ZnRing
+fn run_fft_bench_round<R, S>(ring: S, fft: &FFTTableCooleyTuckey<R>, data: &Vec<El<S>>, copy: &mut Vec<El<S>>)
+    where R: ZnRingStore, R::Type: ZnRing, S: ZnRingStore, S::Type: ZnRing + CanonicalHom<R::Type>
 {
     copy.clear();
     copy.extend(data.iter().map(|x| ring.clone_el(x)));
-    fft.bitreverse_fft_inplace(&mut copy[..]);
-    fft.bitreverse_inv_fft_inplace(&mut copy[..]);
+    fft.bitreverse_fft_inplace_base(&mut copy[..], &ring);
+    fft.bitreverse_inv_fft_inplace_base(&mut copy[..], &ring);
     assert!(ring.eq_el(&copy[0], &data[0]));
 }
 
@@ -332,7 +332,8 @@ fn bench_fft(bencher: &mut test::Bencher) {
 #[bench]
 fn bench_fft_lazy(bencher: &mut test::Bencher) {
     let ring = zn_42::Zn::new(1073872897);
-    let fft = FFTTableCooleyTuckey::for_zn(&ring, 15).unwrap();
+    let fastmul_ring = zn_42::ZnFastmul::new(ring);
+    let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, 15).unwrap();
     let data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << 15);
     bencher.iter(|| {

@@ -70,7 +70,8 @@ impl ZnBase {
     /// 
     fn bounded_reduce(&self, value: u128) -> u64 {
         assert!(value < (1 << BITSHIFT));
-        let result = (value - ((value * self.inv_modulus) >> BITSHIFT) * self.modulus as u128) as u64;
+        let quotient = ((value * self.inv_modulus) >> BITSHIFT) as u64;
+        let result = (value - quotient as u128 * self.modulus as u128) as u64;
         debug_assert!(result < 2 * self.modulus);
         return result;
     }
@@ -302,6 +303,22 @@ pub struct ZnFastmulBase {
     base: ZnBase
 }
 
+pub type ZnFastmul = RingValue<ZnFastmulBase>;
+
+impl ZnFastmul {
+
+    pub fn new(base: Zn) -> Self {
+        RingValue::from(ZnFastmulBase::new(*base.get_ring()))
+    }
+}
+
+impl ZnFastmulBase {
+
+    pub fn new(base: ZnBase) -> Self {
+        ZnFastmulBase { base }
+    }
+}
+
 pub struct ZnFastmulEl(ZnEl, u128);
 
 impl DelegateRing for ZnFastmulBase {
@@ -333,6 +350,99 @@ impl DelegateRing for ZnFastmulBase {
         let mut result = ZnFastmulEl(el, 0);
         self.postprocess_delegate_mut(&mut result);
         return result;
+    }
+}
+
+
+impl CanonicalHom<ZnFastmulBase> for ZnFastmulBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, from: &ZnFastmulBase) -> Option<Self::Homomorphism> {
+        if self.base.modulus == from.base.modulus {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn map_in(&self, _: &ZnFastmulBase, el: Self::Element, _: &Self::Homomorphism) -> Self::Element {
+        el
+    }
+}
+
+impl CanonicalIso<ZnFastmulBase> for ZnFastmulBase {
+
+    type Isomorphism = ();
+
+    fn has_canonical_iso(&self, from: &ZnFastmulBase) -> Option<Self::Isomorphism> {
+        if self.base.modulus == from.base.modulus {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn map_out(&self, _: &ZnFastmulBase, el: Self::Element, _: &Self::Homomorphism) -> Self::Element {
+        el
+    }
+}
+
+impl CanonicalHom<ZnFastmulBase> for ZnBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, from: &ZnFastmulBase) -> Option<Self::Homomorphism> {
+        if self.modulus == from.base.modulus {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn map_in(&self, from: &ZnFastmulBase, el: <ZnFastmulBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
+        from.delegate(el)
+    }
+
+    fn mul_assign_map_in_ref(&self, _: &ZnFastmulBase, ZnEl(lhs): &mut Self::Element, ZnFastmulEl(ZnEl(rhs), rhs_inv_mod): &<ZnFastmulBase as RingBase>::Element, _: &Self::Homomorphism) {
+        let quotient = ((*lhs as u128 * *rhs_inv_mod) >> BITSHIFT) as u64;
+        let result = (*lhs as u128 * *rhs as u128 - quotient as u128 * self.modulus as u128) as u64;
+        *lhs = result;
+        debug_assert!(*lhs < 2 * self.modulus);
+    }
+
+    fn mul_assign_map_in(&self, from: &ZnFastmulBase, lhs: &mut Self::Element, rhs: <ZnFastmulBase as RingBase>::Element, hom: &Self::Homomorphism) {
+        self.mul_assign_map_in_ref(from, lhs, &rhs, hom);
+    }
+}
+
+impl CanonicalHom<StaticRingBase<i128>> for ZnFastmulBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, _: &StaticRingBase<i128>) -> Option<Self::Homomorphism> {
+        Some(())
+    }
+
+    fn map_in(&self, from: &StaticRingBase<i128>, el: i128, hom: &Self::Homomorphism) -> Self::Element {
+        self.rev_delegate(self.base.map_in(from, el, hom))
+    }
+}
+
+impl CanonicalIso<ZnFastmulBase> for ZnBase {
+
+    type Isomorphism = ();
+
+    fn has_canonical_iso(&self, from: &ZnFastmulBase) -> Option<Self::Isomorphism> {
+        if self.modulus == from.base.modulus {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn map_out(&self, _: &ZnFastmulBase, el: Self::Element, _: &Self::Isomorphism) -> <ZnFastmulBase as RingBase>::Element {
+        ZnFastmulEl(el, el.0 as u128 * self.inv_modulus)
     }
 }
 
