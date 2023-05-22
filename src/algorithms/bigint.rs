@@ -1,6 +1,6 @@
 use crate::vector::*;
 
-use std::{cmp::Ordering, alloc::Allocator};
+use std::{cmp::{Ordering, min}, alloc::Allocator};
 
 type BlockInt = u64;
 type DoubleBlockInt = u128;
@@ -174,7 +174,7 @@ pub fn bigint_rshift(lhs: &mut [BlockInt], power: usize) {
 		}
 		let blocks = power / BlockInt::BITS as usize;
 		if blocks != 0 {
-			for i in 0..blocks {
+			for i in 0..min(blocks, lhs.len()) {
 				lhs[i] = 0;
 			}
 			for i in blocks..=high {
@@ -464,6 +464,12 @@ fn test_sub() {
     let z = parse("865215213413124715622302551667065");
     bigint_sub(&mut x, &y, 0);
     assert_eq!(truncate_zeros(z), truncate_zeros(x));
+
+    let x = parse("4294836225");
+    let mut y = parse("4294967297");
+    let z = parse("131072");
+    bigint_sub(&mut y, &x, 0);
+    assert_eq!(truncate_zeros(y), truncate_zeros(z));
 }
 
 #[test]
@@ -548,4 +554,31 @@ fn test_div_small() {
     let q = parse("255380794307875708133829534685810678413226048190730686328066348384175908769916152734376393945793473738133");
     bigint_div_small(&mut x, 3489);
     assert_eq!(truncate_zeros(q), truncate_zeros(x));
+}
+
+#[test]
+fn test_bigint_rshift() {
+    let mut x = from_str_radix("9843a756781b34567f81394", 16, Vec::new()).unwrap();
+    let z = from_str_radix("9843a756781b34567", 16, Vec::new()).unwrap();
+	bigint_rshift(&mut x, 24);
+    assert_eq!(truncate_zeros(x), truncate_zeros(z));
+
+    let mut x = from_str_radix("9843a756781b34567f81394", 16, Vec::new()).unwrap();
+	bigint_rshift(&mut x, 1000);
+    assert_eq!(truncate_zeros(x), Vec::new());
+}
+
+#[test]
+fn test_bigint_lshift() {
+    let mut x = parse("2");
+	bigint_lshift(&mut x, 0);
+    assert_eq!(parse("2"), truncate_zeros(x));
+
+    let mut x = parse("4829192");
+	bigint_lshift(&mut x, 3);
+    assert_eq!(parse("38633536"), truncate_zeros(x));
+
+    let mut x = parse("4829192");
+	bigint_lshift(&mut x, 64);
+    assert_eq!(parse("89082868906805576987574272"), truncate_zeros(x));
 }

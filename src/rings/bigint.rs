@@ -386,22 +386,9 @@ fn test_to_i128() {
 #[test]
 fn test_sub_assign() {
     let mut x = DefaultBigIntRingEl::parse("4294836225", 10).unwrap();
-    let y =     DefaultBigIntRingEl::parse("4294967297", 10).unwrap();
-    let z =     DefaultBigIntRingEl::parse("-131072", 10).unwrap();
+    let y = DefaultBigIntRingEl::parse("4294967297", 10).unwrap();
+    let z = DefaultBigIntRingEl::parse("-131072", 10).unwrap();
     x = ZZ.sub_ref_fst(&x, y);
-    assert!(ZZ.eq_el(&z, &x));
-}
-
-#[test]
-fn test_shift_right() {
-    let mut x = DefaultBigIntRingEl::parse("9843a756781b34567f81394", 16).unwrap();
-    let z = DefaultBigIntRingEl::parse("9843a756781b34567", 16).unwrap();
-    ZZ.euclidean_div_pow_2(&mut x, 24);
-    assert!(ZZ.eq_el(&z, &x));
-
-    let mut x = DefaultBigIntRingEl::parse("-9843a756781b34567f81394", 16).unwrap();
-    let z = DefaultBigIntRingEl::parse("-9843a756781b34567", 16).unwrap();
-    ZZ.euclidean_div_pow_2(&mut x, 24);
     assert!(ZZ.eq_el(&z, &x));
 }
 
@@ -505,25 +492,6 @@ fn test_cmp() {
     assert_eq!(false, ZZ.is_lt(&ZZ.from_int(2), &ZZ.from_int(2)));
     assert_eq!(false, ZZ.is_lt(&ZZ.from_int(3), &ZZ.from_int(2)));
     assert_eq!(true, ZZ.is_gt(&ZZ.from_int(-1), &ZZ.from_int(-2)));
-}
-
-#[test]
-fn test_mul_pow_2() {
-    let mut x = ZZ.from_int(2);
-    ZZ.mul_pow_2(&mut x, 0);
-    assert!(ZZ.eq_el(&ZZ.from_int(2), &x));
-
-    let mut x = ZZ.from_int(4829192);
-    ZZ.mul_pow_2(&mut x, 3);
-    assert!(ZZ.eq_el(&ZZ.from_int(4829192 * 8), &x));
-
-    let mut x = ZZ.one();
-    ZZ.mul_pow_2(&mut x, 64);
-    ZZ.mul_assign(&mut x, ZZ.from_int(4829192));
-
-    let mut z = ZZ.from_int(4829192);
-    ZZ.mul_pow_2(&mut z, 64);
-    assert!(ZZ.eq_el(&x, &z));
 }
 
 #[test]
