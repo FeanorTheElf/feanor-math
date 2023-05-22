@@ -648,6 +648,14 @@ pub trait CanonicalHom<S>: RingBase
     fn map_in_ref(&self, from: &S, el: &S::Element, hom: &Self::Homomorphism) -> Self::Element {
         self.map_in(from, from.clone_el(el), hom)
     }
+
+    fn mul_assign_map_in(&self, from: &S, lhs: &mut Self::Element, rhs: S::Element, hom: &Self::Homomorphism) {
+        self.mul_assign(lhs, self.map_in(from, rhs, hom));
+    }
+
+    fn mul_assign_map_in_ref(&self, from: &S, lhs: &mut Self::Element, rhs: &S::Element, hom: &Self::Homomorphism) {
+        self.mul_assign(lhs, self.map_in_ref(from, rhs, hom));
+    }
 }
 
 ///

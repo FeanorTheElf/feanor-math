@@ -1,3 +1,4 @@
+use crate::delegate::DelegateRing;
 use crate::divisibility::DivisibilityRingStore;
 use crate::integer::IntegerRingStore;
 use crate::ring::*;
@@ -294,6 +295,44 @@ impl ZnRing for ZnBase {
 
     fn modulus(&self) -> &El<Self::Integers> {
         &self.modulus_i128
+    }
+}
+
+pub struct ZnFastmulBase {
+    base: ZnBase
+}
+
+pub struct ZnFastmulEl(ZnEl, u128);
+
+impl DelegateRing for ZnFastmulBase {
+
+    type Base = ZnBase;
+    type Element = ZnFastmulEl;
+
+    fn get_delegate(&self) -> &Self::Base {
+        &self.base
+    }
+    
+    fn delegate(&self, ZnFastmulEl(el, _): Self::Element) -> <Self::Base as RingBase>::Element {
+        el
+    }
+
+    fn delegate_mut<'a>(&self, ZnFastmulEl(el, _): &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element {
+        el
+    }
+
+    fn delegate_ref<'a>(&self, ZnFastmulEl(el, _): &'a Self::Element) -> &'a <Self::Base as RingBase>::Element {
+        el
+    }
+
+    fn postprocess_delegate_mut(&self, ZnFastmulEl(el, additional): &mut Self::Element) {
+        *additional = el.0 as u128 * self.base.inv_modulus;
+    }
+
+    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element {
+        let mut result = ZnFastmulEl(el, 0);
+        self.postprocess_delegate_mut(&mut result);
+        return result;
     }
 }
 

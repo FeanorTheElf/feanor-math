@@ -4,7 +4,6 @@ use crate::euclidean::EuclideanRing;
 use crate::field::Field;
 use crate::integer::IntegerRing;
 use crate::ring::*;
-use crate::rings::zn::{ZnRingStore, ZnRing};
 
 #[derive(Clone, Copy)]
 pub struct AsFieldBase<R: DivisibilityRingStore> 
@@ -186,55 +185,14 @@ impl<R: DivisibilityRingStore> Field for AsFieldBase<R>
     }
 }
 
-pub struct FpBaseElementsIter<'a, R>
-    where R: ZnRingStore, R::Type: 'a + ZnRing
-{
-    iter: <R::Type as ZnRing>::ElementsIter<'a>
-}
-
-impl<'a, R> Iterator for FpBaseElementsIter<'a, R>
-    where R: ZnRingStore, R::Type: 'a + ZnRing
-{
-    type Item = FieldEl<R>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(FieldEl)
-    }
-}
-
-impl<R: ZnRingStore> ZnRing for AsFieldBase<R>
-    where R::Type: ZnRing + CanonicalHom<<R::Type as ZnRing>::IntegerRingBase>
-{
-    type IntegerRingBase = <R::Type as ZnRing>::IntegerRingBase;
-    type Integers = <R::Type as ZnRing>::Integers;
-    type ElementsIter<'a> = FpBaseElementsIter<'a, R>
-        where Self: 'a;
-
-    fn integer_ring(&self) -> &Self::Integers {
-        self.base_ring().integer_ring()
-    }
-
-    fn modulus(&self) -> &El<Self::Integers> {
-        self.base_ring().modulus()
-    }
-
-    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
-        self.base_ring().smallest_positive_lift(el.0)
-    }
-
-    fn elements<'a>(&'a self) -> FpBaseElementsIter<'a, R> {
-        FpBaseElementsIter {
-            iter: self.base_ring().elements()
-        }
-    }
-}
-
 #[cfg(test)]
 use crate::divisibility::generic_test_divisibility_axioms;
 #[cfg(test)]
 use crate::rings::zn::zn_barett::Zn;
 #[cfg(test)]
 use crate::primitive_int::*;
+#[cfg(test)]
+use crate::rings::zn::*;
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {

@@ -1,4 +1,4 @@
-use crate::ring::*;
+use crate::{ring::*, divisibility::DivisibilityRing, rings::zn::ZnRing};
 
 ///
 /// Trait to simplify implementing newtype-pattern for rings.
@@ -17,9 +17,23 @@ pub trait DelegateRing {
     fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element;
     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element;
     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element;
+    
+    fn postprocess_delegate_mut(&self, el: &mut Self::Element) {
+        *el = self.rev_delegate(self.get_delegate().clone_el(self.delegate_ref(el)));
+    }
+
+    // necessary in some locations to satisfy the type system
+    fn element_cast(&self, el: Self::Element) -> <Self as RingBase>::Element {
+        el
+    }
+
+    // necessary in some locations to satisfy the type system
+    fn rev_element_cast(&self, el: <Self as RingBase>::Element) -> Self::Element {
+        el
+    }
 }
 
-impl<R: DelegateRing> RingBase for R {
+impl<R: DelegateRing + ?Sized> RingBase for R {
 
     type Element = <Self as DelegateRing>::Element;
 
@@ -28,35 +42,43 @@ impl<R: DelegateRing> RingBase for R {
     }
     
     default fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        self.get_delegate().add_assign_ref(self.delegate_mut(lhs), self.delegate_ref(rhs))
+        self.get_delegate().add_assign_ref(self.delegate_mut(lhs), self.delegate_ref(rhs));
+        self.postprocess_delegate_mut(lhs);
     }
 
     default fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        self.get_delegate().add_assign(self.delegate_mut(lhs), self.delegate(rhs))
+        self.get_delegate().add_assign(self.delegate_mut(lhs), self.delegate(rhs));
+        self.postprocess_delegate_mut(lhs);
     }
 
     default fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        self.get_delegate().sub_assign_ref(self.delegate_mut(lhs), self.delegate_ref(rhs))
+        self.get_delegate().sub_assign_ref(self.delegate_mut(lhs), self.delegate_ref(rhs));
+        self.postprocess_delegate_mut(lhs);
     }
 
     default fn sub_self_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        self.get_delegate().sub_self_assign(self.delegate_mut(lhs), self.delegate(rhs))
+        self.get_delegate().sub_self_assign(self.delegate_mut(lhs), self.delegate(rhs));
+        self.postprocess_delegate_mut(lhs);
     }
 
     default fn sub_self_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        self.get_delegate().sub_self_assign_ref(self.delegate_mut(lhs), self.delegate_ref(rhs))
+        self.get_delegate().sub_self_assign_ref(self.delegate_mut(lhs), self.delegate_ref(rhs));
+        self.postprocess_delegate_mut(lhs);
     }
 
     default fn negate_inplace(&self, lhs: &mut Self::Element) {
-        self.get_delegate().negate_inplace(self.delegate_mut(lhs))
+        self.get_delegate().negate_inplace(self.delegate_mut(lhs));
+        self.postprocess_delegate_mut(lhs);
     }
 
     default fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        self.get_delegate().mul_assign(self.delegate_mut(lhs), self.delegate(rhs))
+        self.get_delegate().mul_assign(self.delegate_mut(lhs), self.delegate(rhs));
+        self.postprocess_delegate_mut(lhs);
     }
 
     default fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        self.get_delegate().mul_assign_ref(self.delegate_mut(lhs), self.delegate_ref(rhs))
+        self.get_delegate().mul_assign_ref(self.delegate_mut(lhs), self.delegate_ref(rhs));
+        self.postprocess_delegate_mut(lhs);
     }
 
     default fn zero(&self) -> Self::Element {
@@ -108,7 +130,8 @@ impl<R: DelegateRing> RingBase for R {
     }
     
     default fn sub_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        self.get_delegate().sub_assign(self.delegate_mut(lhs), self.delegate(rhs))
+        self.get_delegate().sub_assign(self.delegate_mut(lhs), self.delegate(rhs));
+        self.postprocess_delegate_mut(lhs);
     }
 
     default fn add_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
@@ -159,3 +182,66 @@ impl<R: DelegateRing> RingBase for R {
         self.rev_delegate(self.get_delegate().mul(self.delegate(lhs), self.delegate(rhs)))
     }
 }
+
+impl<R: DelegateRing + ?Sized> DivisibilityRing for R
+    where R::Base: DivisibilityRing
+{
+    default fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        self.get_delegate().checked_left_div(self.delegate_ref(lhs), self.delegate_ref(rhs))
+            .map(|x| self.rev_delegate(x))
+    }
+}
+
+pub struct DelegateZnRingElementsIter<'a, R: ?Sized>
+    where R: DelegateRing, R::Base: ZnRing
+{
+    ring: &'a R,
+    base: <R::Base as ZnRing>::ElementsIter<'a>
+}
+
+impl<'a, R: ?Sized> Iterator for DelegateZnRingElementsIter<'a, R>
+    where R: DelegateRing, R::Base: ZnRing
+{
+    type Item = <R as RingBase>::Element;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.base.next().map(|x| self.ring.rev_delegate(x))
+    }
+}
+
+impl<R: DelegateRing + ?Sized> ZnRing for R
+    where R::Base: ZnRing, R: CanonicalHom<<R::Base as ZnRing>::IntegerRingBase>
+{
+    type IntegerRingBase = <R::Base as ZnRing>::IntegerRingBase;
+    type Integers = <R::Base as ZnRing>::Integers;
+    type ElementsIter<'a> = DelegateZnRingElementsIter<'a, R>
+        where R: 'a;
+
+    fn integer_ring(&self) -> &Self::Integers {
+        self.get_delegate().integer_ring()
+    }
+
+    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
+        DelegateZnRingElementsIter {
+            ring: self,
+            base: self.get_delegate().elements()
+        }
+    }
+
+    fn modulus(&self) -> &El<Self::Integers> {
+        self.get_delegate().modulus()
+    }
+
+    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <R as RingBase>::Element {
+        self.element_cast(self.rev_delegate(self.get_delegate().random_element(rng)))
+    }
+
+    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
+        self.get_delegate().smallest_positive_lift(self.delegate(self.rev_element_cast(el)))
+    }
+
+    fn smallest_lift(&self, el: Self::Element) -> El<Self::Integers> {
+        self.get_delegate().smallest_lift(self.delegate(self.rev_element_cast(el)))
+    }
+}
+
