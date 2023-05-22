@@ -33,7 +33,7 @@ pub mod generic_maps {
     use super::IntegerRing;
 
     pub fn generic_map_in<R: IntegerRing, S: RingBase>(from: &R, to: &S, el: R::Element) -> S::Element {
-        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(to.one(), &el, RingRef::new(from), |a, b| to.add(a, b), |a, b| to.add_ref(a, b), to.zero());
+        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(to.one(), &el, RingRef::new(from), |a| to.add_ref(&a, &a), |a, b| to.add_ref_fst(a, b), to.zero());
         if from.is_neg(&el) {
             return to.negate(result);
         } else {

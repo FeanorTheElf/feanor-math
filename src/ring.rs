@@ -542,9 +542,8 @@ pub trait RingStore {
             x, 
             &(power as i64), 
             StaticRing::<i64>::RING, 
-            |a, 
-            b| self.mul(a, b), 
-            |a, b| self.mul_ref(a, b), 
+            |mut a| { self.square(&mut a); a }, 
+            |a, b| self.mul_ref_fst(a, b), 
             self.one()
         )
     }
@@ -556,9 +555,8 @@ pub trait RingStore {
             x, 
             power, 
             integers, 
-            |a, 
-            b| self.mul(a, b), 
-            |a, b| self.mul_ref(a, b), 
+            |mut a| { self.square(&mut a); a }, 
+            |a, b| self.mul_ref_fst(a, b), 
             self.one()
         )
     }

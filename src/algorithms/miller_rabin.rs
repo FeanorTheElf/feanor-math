@@ -1,7 +1,6 @@
 use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 use crate::integer::*;
-use crate::algorithms;
 use crate::rings::zn::zn_barett::*;
 use crate::primitive_int::*;
 
@@ -46,7 +45,7 @@ pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
         if Zn.is_zero(&a) {
             continue;
         }
-        let mut current = algorithms::sqr_mul::generic_abs_square_and_multiply(a, &d, &ZZ, |a, b| Zn.mul(a, b), |a, b| Zn.mul_ref(a, b), Zn.one());
+        let mut current = Zn.pow_gen(a, &d, &ZZ);
         let mut miller_rabin_condition = Zn.is_one(&current);
         for _r in 0..s {
             miller_rabin_condition |= Zn.is_neg_one(&current);

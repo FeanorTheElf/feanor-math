@@ -255,8 +255,8 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clone for Zn
 {
     fn clone(&self) -> Self {
         ZnBase {
-            components: <_ as Clone>::clone(&self.components),
-            total_ring: <_ as Clone>::clone(&self.total_ring),
+            components: self.components.clone(),
+            total_ring: self.total_ring.clone(),
             unit_vectors: self.unit_vectors.iter().map(|e| self.total_ring.clone_el(e)).collect(),
             memory_provider: self.memory_provider.clone()
         }
