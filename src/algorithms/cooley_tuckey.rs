@@ -119,7 +119,7 @@ impl<R> FFTTableCooleyTuckey<R>
     pub fn bitreverse_fft_inplace_base<V, S>(&self, mut values: V, ring: S)
         where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
     {
-        assert!(values.len() == 1 << self.log2_n);
+        assert!(values.len() == (1 << self.log2_n));
         let hom = ring.get_ring().has_canonical_hom(self.ring.get_ring()).unwrap();
         // check if the canonical hom `R -> S` maps `self.root_of_unity` to a primitive N-th root of unity
         debug_assert!(ring.is_neg_one(&ring.pow(ring.get_ring().map_in_ref(self.ring.get_ring(), &self.root_of_unity, &hom), 1 << (self.log2_n - 1))));

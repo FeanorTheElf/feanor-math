@@ -299,6 +299,28 @@ impl ZnRing for ZnBase {
     }
 }
 
+///
+/// Wraps [`ZnBase`] to represent an instance of the ring `Z/nZ`.
+/// As opposed to [`ZnBase`], elements are stored with additional information
+/// to speed up multiplication `ZnBase x ZnFastmulBase -> ZnBase`, by
+/// using [`CanonicalHom::mul_assign_map_in()`].
+/// Note that normal arithmetic in this ring is slower than [`ZnBase`].
+/// 
+/// # Example
+/// The following use of the FFT is usually faster than the standard use, as
+/// the FFT requires a high amount of multiplications with the internally stored
+/// roots of unity.
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::zn_42::*;
+/// # use feanor_math::algorithms::cooley_tuckey::*;
+/// let ring = Zn::new(1073872897);
+/// let fastmul_ring = ZnFastmul::new(ring);
+/// let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, 15).unwrap();
+/// let mut data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+/// fft.bitreverse_fft_inplace_base(&mut data[..], &ring);
+/// ```
+/// 
 pub struct ZnFastmulBase {
     base: ZnBase
 }
