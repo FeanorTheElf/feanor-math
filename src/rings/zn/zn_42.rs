@@ -84,10 +84,6 @@ impl ZnBase {
         debug_assert!(result < self.modulus);
         return result;
     }
-
-    fn non_lazy(&self) -> zn_barett::Zn<StaticRing<i128>> {
-        zn_barett::Zn::new(StaticRing::<i128>::RING, self.modulus as i128)
-    }
 }
 
 impl RingBase for ZnBase {
@@ -248,17 +244,17 @@ impl<I: IntegerRing + CanonicalIso<StaticRingBase<i128>>> CanonicalHom<I> for Zn
 impl DivisibilityRing for ZnBase {
 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        let ring = self.non_lazy();
+        let ring = zn_barett::Zn::new(StaticRing::<i128>::RING, self.modulus as i128);
         Some(RingRef::new(self).coerce(&ring, ring.checked_div(&RingRef::new(self).cast(&ring, *lhs), &RingRef::new(self).cast(&ring, *rhs))?))
     }
 }
 
-pub struct ZnLazyBaseElementsIter<'a> {
+pub struct ZnBaseElementsIter<'a> {
     ring: &'a ZnBase,
     current: u64
 }
 
-impl<'a> Iterator for ZnLazyBaseElementsIter<'a> {
+impl<'a> Iterator for ZnBaseElementsIter<'a> {
 
     type Item = ZnEl;
 
@@ -277,14 +273,14 @@ impl ZnRing for ZnBase {
 
     type IntegerRingBase = StaticRingBase<i128>;
     type Integers = StaticRing<i128>;
-    type ElementsIter<'a> = ZnLazyBaseElementsIter<'a>;
+    type ElementsIter<'a> = ZnBaseElementsIter<'a>;
 
     fn integer_ring(&self) -> &Self::Integers {
         &StaticRing::<i128>::RING
     }
 
     fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
-        ZnLazyBaseElementsIter {
+        ZnBaseElementsIter {
             ring: self,
             current: 0
         }
