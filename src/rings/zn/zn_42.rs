@@ -141,6 +141,14 @@ impl RingBase for ZnBase {
     fn dbg<'a>(&self, ZnEl(value): &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         write!(out, "{}", self.complete_reduce(*value as u128))
     }
+
+    fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
+            where R::Type: IntegerRing,
+                Self: SelfIso
+    {
+        let fastmul_ring = ZnFastmul::from(ZnFastmulBase::new(*self));
+        algorithms::sqr_mul::generic_pow(RingRef::new(self).cast(&fastmul_ring, x), power, &fastmul_ring, &RingRef::new(self), &integers)
+    }
 }
 
 impl CanonicalHom<ZnBase> for ZnBase {
