@@ -23,6 +23,30 @@ pub fn generic_abs_square_and_multiply<T, U, F, H, I>(base: U, power: &El<I>, in
     return result;
 }
 
+pub fn generic_pow<R: ?Sized, S: ?Sized, I>(base: El<R>, power: &El<I>, base_ring: &R, ring: &S, int_ring: &I) -> El<S>
+    where R: RingStore, 
+        S: RingStore,
+        S::Type: CanonicalHom<R::Type>,
+        I: IntegerRingStore,
+        I::Type: IntegerRing
+{
+    let hom = ring.get_ring().has_canonical_hom(base_ring.get_ring()).unwrap();
+    generic_abs_square_and_multiply(
+        base, 
+        power, 
+        int_ring, 
+        |mut x| {
+            ring.square(&mut x);
+            x
+        }, 
+        |x, mut y| { 
+            ring.get_ring().mul_assign_map_in_ref(base_ring.get_ring(), &mut y, x, &hom);
+            y
+        }, 
+        ring.one()
+    )
+}
+
 #[cfg(test)]
 use crate::primitive_int::*;
 

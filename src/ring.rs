@@ -308,6 +308,19 @@ pub trait RingBase {
         self.mul_assign(&mut lhs, rhs);
         return lhs;
     }
+    
+    fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
+        where R::Type: IntegerRing,
+            Self: SelfIso
+    {
+        algorithms::sqr_mul::generic_pow(
+            x, 
+            power, 
+            &RingRef::new(self),
+            &RingRef::new(self),
+            &integers
+        )
+    }
 }
 
 macro_rules! delegate {
@@ -447,7 +460,7 @@ macro_rules! delegate {
 /// 
 pub trait RingStore {
     
-    type Type: RingBase + CanonicalIso<Self::Type> + ?Sized;
+    type Type: RingBase + SelfIso + ?Sized;
 
     fn get_ring<'a>(&'a self) -> &'a Self::Type;
 
@@ -531,34 +544,13 @@ pub trait RingStore {
     }
 
     fn pow(&self, x: El<Self>, power: usize) -> El<Self> {
-        if power == 1 {
-            return x;
-        } else if power == 2 {
-            let mut result = x;
-            self.square(&mut result);
-            return result;
-        }
-        algorithms::sqr_mul::generic_abs_square_and_multiply(
-            x, 
-            &(power as i64), 
-            StaticRing::<i64>::RING, 
-            |mut a| { self.square(&mut a); a }, 
-            |a, b| self.mul_ref_fst(a, b), 
-            self.one()
-        )
+        self.pow_gen(x, &(power as i64), StaticRing::<i64>::RING)
     }
 
     fn pow_gen<R: IntegerRingStore>(&self, x: El<Self>, power: &El<R>, integers: R) -> El<Self> 
         where R::Type: IntegerRing
     {
-        algorithms::sqr_mul::generic_abs_square_and_multiply(
-            x, 
-            power, 
-            integers, 
-            |mut a| { self.square(&mut a); a }, 
-            |a, b| self.mul_ref_fst(a, b), 
-            self.one()
-        )
+        self.get_ring().pow_gen(x, power, integers)
     }
 
     fn format<'a>(&'a self, value: &'a El<Self>) -> RingElementDisplayWrapper<'a, Self> {
