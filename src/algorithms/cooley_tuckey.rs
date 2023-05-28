@@ -1,10 +1,11 @@
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::integer::IntegerRingStore;
+use crate::mempool::{MemoryProvider, AllocatingMemoryProvider};
 use crate::rings::zn::{ZnRingStore, ZnRing};
 use crate::vector::SwappableVectorViewMut;
 use crate::{ring::*, vector::VectorViewMut};
 
-pub struct FFTTableCooleyTuckey<R> 
+pub struct FFTTableCooleyTuckey<R, M: MemoryProvider<El<R>> = AllocatingMemoryProvider> 
     where R: RingStore
 {
     ring: R,
@@ -12,9 +13,9 @@ pub struct FFTTableCooleyTuckey<R>
     inv_root_of_unity: El<R>,
     log2_n: usize,
     // stores the powers of root_of_unity in special bitreversed order
-    root_of_unity_list: Vec<Vec<El<R>>>,
+    root_of_unity_list: M::Object,
     // stores the powers of inv_root_of_unity in special bitreversed order
-    inv_root_of_unity_list: Vec<Vec<El<R>>>
+    inv_root_of_unity_list: M::Object
 }
 
 pub fn bitreverse(index: usize, bits: usize) -> usize {
@@ -26,27 +27,45 @@ impl<R> FFTTableCooleyTuckey<R>
         R::Type: DivisibilityRing
 {
     pub fn new(ring: R, root_of_unity: El<R>, log2_n: usize) -> Self {
+        Self::new_with_mem(ring, root_of_unity, log2_n, &AllocatingMemoryProvider)
+    }
+    
+    pub fn for_zn(ring: R, log2_n: usize) -> Option<Self>
+        where R: ZnRingStore,
+            R::Type: ZnRing
+    {
+        Self::for_zn_with_mem(ring, log2_n, &AllocatingMemoryProvider)
+    }
+}
+
+impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
+    where R: DivisibilityRingStore, 
+        R::Type: DivisibilityRing
+{
+    pub fn new_with_mem(ring: R, root_of_unity: El<R>, log2_n: usize, memory_provider: &M) -> Self {
         assert!(ring.is_commutative());
         assert!(log2_n > 0);
         assert!(ring.is_neg_one(&ring.pow(ring.clone_el(&root_of_unity), 1 << (log2_n - 1))));
-        let root_of_unity_list = Self::create_root_of_unity_list(&ring, &root_of_unity, log2_n);
+        let root_of_unity_list = Self::create_root_of_unity_list(&ring, &root_of_unity, log2_n, memory_provider);
         let inv_root_of_unity = ring.pow(ring.clone_el(&root_of_unity), (1 << log2_n) - 1);
-        let inv_root_of_unity_list = Self::create_root_of_unity_list(&ring, &inv_root_of_unity, log2_n);
+        let inv_root_of_unity_list = Self::create_root_of_unity_list(&ring, &inv_root_of_unity, log2_n, memory_provider);
         FFTTableCooleyTuckey { ring, root_of_unity, inv_root_of_unity, log2_n, root_of_unity_list, inv_root_of_unity_list }
     }
 
-    fn create_root_of_unity_list(ring: &R, root_of_unity: &El<R>, log2_n: usize) -> Vec<Vec<El<R>>> {
-        let mut root_of_unity_list = Vec::new();
+    fn create_root_of_unity_list(ring: &R, root_of_unity: &El<R>, log2_n: usize, memory_provider: &M) -> M::Object {
+        let mut root_of_unity_list = memory_provider.get_new_init((1 << log2_n) - 1, |_| ring.zero());
+        let mut index = 0;
         for s in 0..log2_n {
             let m = 1 << s;
             let log2_group_size = log2_n - s;
             let twiddle_root = ring.pow(ring.clone_el(&root_of_unity), m);
-            root_of_unity_list.push(Vec::new());
             for i_bitreverse in (0..(1 << log2_group_size)).step_by(2) {
                 let current_twiddle = ring.pow(ring.clone_el(&twiddle_root), bitreverse(i_bitreverse, log2_group_size));
-                root_of_unity_list.last_mut().unwrap().push(current_twiddle);
+                root_of_unity_list[index] = current_twiddle;
+                index += 1;
             }
         }
+        assert_eq!(index, (1 << log2_n) - 1);
         return root_of_unity_list;
     }
 
@@ -54,7 +73,7 @@ impl<R> FFTTableCooleyTuckey<R>
     /// Returns `inv_root_of_unity^(2^exp_2 * bitreverse(bitreverse_exp, log2_n - exp_2))`.
     /// 
     fn inv_root_of_unity_pow(&self, exp_2: usize, bitreverse_exp: usize) -> &El<R> {
-        let result = &self.inv_root_of_unity_list[exp_2][bitreverse_exp / 2];
+        let result = &self.inv_root_of_unity_list[(1 << self.log2_n) - (1 << (self.log2_n - exp_2)) + (bitreverse_exp / 2)];
         debug_assert!(self.ring.eq_el(result, &self.ring.pow(self.ring.clone_el(&self.inv_root_of_unity), (1 << exp_2) * bitreverse(bitreverse_exp, self.log2_n - exp_2))));
         return result;
     }
@@ -63,7 +82,7 @@ impl<R> FFTTableCooleyTuckey<R>
     /// Returns `root_of_unity^(2^exp_2 * bitreverse(bitreverse_exp, log2_n - exp_2))`.
     /// 
     fn root_of_unity_pow(&self, exp_2: usize, bitreverse_exp: usize) -> &El<R> {
-        let result = &self.root_of_unity_list[exp_2][bitreverse_exp / 2];
+        let result = &self.root_of_unity_list[(1 << self.log2_n) - (1 << (self.log2_n - exp_2)) + (bitreverse_exp / 2)];
         debug_assert!(self.ring.eq_el(result, &self.ring.pow(self.ring.clone_el(&self.root_of_unity), (1 << exp_2) * bitreverse(bitreverse_exp, self.log2_n - exp_2))));
         return result;
     }
@@ -76,7 +95,7 @@ impl<R> FFTTableCooleyTuckey<R>
         &self.ring
     }
 
-    pub fn for_zn(ring: R, log2_n: usize) -> Option<Self>
+    pub fn for_zn_with_mem(ring: R, log2_n: usize, memory_provider: &M) -> Option<Self>
         where R: ZnRingStore,
             R::Type: ZnRing
     {
@@ -101,7 +120,7 @@ impl<R> FFTTableCooleyTuckey<R>
         while !ring.is_neg_one(&pow_n_half(ring.clone_el(&current))) {
             current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZ);
         }
-        return Some(Self::new(ring, current, log2_n));
+        return Some(Self::new_with_mem(ring, current, log2_n, memory_provider));
     }
 
     ///
