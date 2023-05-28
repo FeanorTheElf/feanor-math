@@ -29,6 +29,10 @@ pub trait DivisibilityRingStore: RingStore
         assert!(self.is_commutative());
         self.checked_left_div(lhs, rhs)
     }
+
+    fn invert(&self, el: &El<Self>) -> Option<El<Self>> {
+        self.checked_div(&self.one(), el)
+    }
 }
 
 impl<R> DivisibilityRingStore for R

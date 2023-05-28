@@ -120,9 +120,9 @@ impl<R> FFTTableCooleyTuckey<R>
         where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
     {
         assert!(values.len() == (1 << self.log2_n));
-        let hom = ring.get_ring().has_canonical_hom(self.ring.get_ring()).unwrap();
+        let hom = ring.can_hom(&self.ring).unwrap();
         // check if the canonical hom `R -> S` maps `self.root_of_unity` to a primitive N-th root of unity
-        debug_assert!(ring.is_neg_one(&ring.pow(ring.get_ring().map_in_ref(self.ring.get_ring(), &self.root_of_unity, &hom), 1 << (self.log2_n - 1))));
+        debug_assert!(ring.is_neg_one(&ring.pow(hom.map_ref(&self.root_of_unity), 1 << (self.log2_n - 1))));
 
         for s in (0..self.log2_n).rev() {
             let m = 1 << s;
@@ -154,7 +154,7 @@ impl<R> FFTTableCooleyTuckey<R>
                     let current_twiddle = self.inv_root_of_unity_pow(s, i_bitreverse);
 
                     // `(values_i1, values_i2) = (values_i1 + twiddle * values_i2, values_i1 - twiddle * values_i2)`
-                    ring.get_ring().mul_assign_map_in_ref(self.ring.get_ring(), values.at_mut(index2), current_twiddle, &hom);
+                    ring.get_ring().mul_assign_map_in_ref(self.ring.get_ring(), values.at_mut(index2), current_twiddle, hom.raw_hom());
                     let new_a = ring.add_ref(values.at(index1), values.at(index2));
                     let a = std::mem::replace(values.at_mut(index1), new_a);
                     ring.sub_self_assign(values.at_mut(index2), a);
@@ -171,8 +171,8 @@ impl<R> FFTTableCooleyTuckey<R>
         where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
     {
         assert!(values.len() == 1 << self.log2_n);
-        let hom = ring.get_ring().has_canonical_hom(self.ring.get_ring()).unwrap();
-        debug_assert!(ring.is_neg_one(&ring.pow(ring.get_ring().map_in_ref(self.ring.get_ring(), &self.root_of_unity, &hom), 1 << (self.log2_n - 1))));
+        let hom = ring.can_hom(&self.ring).unwrap();
+        debug_assert!(ring.is_neg_one(&ring.pow(hom.map_ref(&self.root_of_unity), 1 << (self.log2_n - 1))));
 
         for s in 0..self.log2_n {
             let m = 1 << s;
@@ -190,7 +190,7 @@ impl<R> FFTTableCooleyTuckey<R>
                     let new_a = ring.add_ref(values.at(index1), values.at(index2));
                     let a = std::mem::replace(values.at_mut(index1), new_a);
                     ring.sub_self_assign(values.at_mut(index2), a);
-                    ring.get_ring().mul_assign_map_in_ref(self.ring.get_ring(), values.at_mut(index2), current_twiddle, &hom);
+                    ring.get_ring().mul_assign_map_in_ref(self.ring.get_ring(), values.at_mut(index2), current_twiddle, hom.raw_hom());
                 }
             }
         }

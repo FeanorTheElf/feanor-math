@@ -30,7 +30,7 @@ pub fn generic_pow<R: ?Sized, S: ?Sized, I>(base: El<R>, power: &El<I>, base_rin
         I: IntegerRingStore,
         I::Type: IntegerRing
 {
-    let hom = ring.get_ring().has_canonical_hom(base_ring.get_ring()).unwrap();
+    let hom = ring.can_hom(&base_ring).unwrap();
     generic_abs_square_and_multiply(
         base, 
         power, 
@@ -40,7 +40,7 @@ pub fn generic_pow<R: ?Sized, S: ?Sized, I>(base: El<R>, power: &El<I>, base_rin
             x
         }, 
         |x, mut y| { 
-            ring.get_ring().mul_assign_map_in_ref(base_ring.get_ring(), &mut y, x, &hom);
+            ring.get_ring().mul_assign_map_in_ref(base_ring.get_ring(), &mut y, x, hom.raw_hom());
             y
         }, 
         ring.one()
