@@ -10,6 +10,9 @@ use crate::primitive_int::*;
 /// a positive integer. While this is not really general, it is often required
 /// for fast operations with integers.
 /// 
+/// As an additional requirement, the euclidean division (i.e. [`EuclideanRing::euclidean_div_rem()`] and
+/// [`IntegerRing::euclidean_div_pow_2()`]) are expected to round towards zero.
+/// 
 pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + SelfIso + CanonicalIso<StaticRingBase<i32>> {
 
     fn to_float_approx(&self, value: &Self::Element) -> f64;
@@ -72,6 +75,14 @@ pub trait IntegerRingStore: RingStore
             return Some(highest_bit + 1);
         }
     }
+
+    fn is_even(&self, value: &El<Self>) -> bool {
+        !self.abs_is_bit_set(value, 0)
+    }
+
+    fn is_odd(&self, value: &El<Self>) -> bool {
+        !self.is_even(value)
+    }
 }
 
 impl<R> IntegerRingStore for R
@@ -119,4 +130,26 @@ pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>
             assert!(ring.eq_el(&b, &ring.euclidean_div(ring.clone_el(a), &pow_2)));
         }
     }
+
+    // test euclidean div round to zero
+    let d = ring.from_int(8);
+    for k in -10..=10 {
+        let mut a = ring.from_int(k);
+        assert!(ring.eq_el(&ring.from_int(k / 8), &ring.euclidean_div(ring.clone_el(&a), &d)));
+        ring.euclidean_div_pow_2(&mut a, 3);
+        assert!(ring.eq_el(&ring.from_int(k / 8), &a));
+    }
+    let d = ring.from_int(-8);
+    for k in -10..=10 {
+        let a = ring.from_int(k);
+        assert!(ring.eq_el(&ring.from_int(k / -8), &ring.euclidean_div(ring.clone_el(&a), &d)));
+    }
+}
+
+#[test]
+fn test_int_div_assumption() {
+    assert_eq!(-1, -10 / 8);
+    assert_eq!(-1, 10 / -8);
+    assert_eq!(1, 10 / 8);
+    assert_eq!(1, -10 / -8);
 }

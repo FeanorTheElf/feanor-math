@@ -8,5 +8,6 @@ pub mod miller_rabin;
 pub mod ec_factor;
 pub mod primes;
 pub mod bluestein;
+pub mod int_bisect;
 //pub mod int_factor;
 //pub mod discrete_log;

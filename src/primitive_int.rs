@@ -152,7 +152,7 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
 
     fn euclidean_div_pow_2(&self, value: &mut Self::Element, power: usize) {
         *value = RingRef::new(self).coerce(&StaticRing::<i128>::RING, 
-            RingRef::new(self).cast(&StaticRing::<i128>::RING, *value) >> power);
+            RingRef::new(self).cast(&StaticRing::<i128>::RING, *value) / (1 << power));
     }
 
     fn mul_pow_2(&self, value: &mut Self::Element, power: usize) {
@@ -274,4 +274,13 @@ fn test_get_uniformly_random() {
     generic_test_integer_uniformly_random(StaticRing::<i32>::RING);
     generic_test_integer_uniformly_random(StaticRing::<i64>::RING);
     generic_test_integer_uniformly_random(StaticRing::<i128>::RING);
+}
+
+#[test]
+fn test_integer_axioms() {
+    generic_test_integer_axioms(StaticRing::<i8>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    generic_test_integer_axioms(StaticRing::<i16>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    generic_test_integer_axioms(StaticRing::<i32>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    generic_test_integer_axioms(StaticRing::<i64>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    generic_test_integer_axioms(StaticRing::<i128>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
 }
