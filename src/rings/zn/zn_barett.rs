@@ -27,13 +27,13 @@ use crate::primitive_int::*;
 /// assert!(R.eq_el(&R.from_int(-1), &R.mul_ref(&a, &a)));
 /// assert!(R.is_one(&R.pow(a, 4)));
 /// ```
-/// However, this will panic as `257^4 > i32::MAX`.
+/// However, this will panic as `2053^3 > i32::MAX`.
 /// ```should_panic
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_barett::*;
 /// # use feanor_math::primitive_int::*;
-/// let R = Zn::new(StaticRing::<i32>::RING, 257);
+/// let R = Zn::new(StaticRing::<i32>::RING, 2053);
 /// ```
 ///
 /// # Canonical mappings
@@ -80,11 +80,11 @@ impl<I: IntegerRingStore> ZnBase<I>
         let k = integer_ring.abs_log2_ceil(&modulus).unwrap() * 2;
         let mut mod_square_bound = integer_ring.one();
         integer_ring.mul_pow_2(&mut mod_square_bound, k);
+        let inverse_modulus = integer_ring.euclidean_div(mod_square_bound, &modulus);
 
         // check that this expression does not overflow
-        integer_ring.mul_ref_snd(integer_ring.pow(integer_ring.clone_el(&modulus), 2), &mod_square_bound);
+        integer_ring.mul_ref_snd(integer_ring.pow(integer_ring.clone_el(&modulus), 2), &inverse_modulus);
 
-        let inverse_modulus = integer_ring.euclidean_div(mod_square_bound, &modulus);
         return ZnBase {
             integer_ring: integer_ring,
             modulus: modulus,
@@ -477,4 +477,10 @@ fn test_zn_map_in_large_int_znbase() {
 fn test_divisibility_axioms() {
     let R = Zn::new(StaticRing::<i64>::RING, 17);
     generic_test_divisibility_axioms(&R, R.elements());
+}
+
+#[test]
+fn test_self_iso() {
+    let R = Zn::new(StaticRing::<i128>::RING, 17);
+    generic_test_self_iso(&R, R.elements());
 }

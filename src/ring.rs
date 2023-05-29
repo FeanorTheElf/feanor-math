@@ -1066,6 +1066,23 @@ pub fn generic_test_canonical_iso_axioms<R: RingStore, S: RingStore, I: Iterator
 }
 
 #[cfg(test)]
+pub fn generic_test_self_iso<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
+    where R::Type: SelfIso
+{
+    let hom = ring.get_ring().has_canonical_hom(ring.get_ring()).unwrap();
+    let iso = ring.get_ring().has_canonical_iso(ring.get_ring()).unwrap();
+    let elements = edge_case_elements.collect::<Vec<_>>();
+
+    generic_test_canonical_hom_axioms(&ring, &ring, elements.iter().map(|x| ring.clone_el(x)));
+    generic_test_canonical_iso_axioms(&ring, &ring, elements.iter().map(|x| ring.clone_el(x)));
+
+    for a in &elements {
+        assert!(ring.eq_el(a, &ring.get_ring().map_in_ref(ring.get_ring(), a, &hom)));
+        assert!(ring.eq_el(a, &ring.get_ring().map_out(ring.get_ring(), ring.clone_el(a), &iso)));
+    }
+}
+
+#[cfg(test)]
 pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
     let elements = edge_case_elements.collect::<Vec<_>>();
     let zero = ring.zero();

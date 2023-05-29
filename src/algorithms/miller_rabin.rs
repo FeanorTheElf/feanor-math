@@ -70,6 +70,7 @@ pub fn test_is_prime() {
     assert!(is_prime(StaticRing::<i128>::RING, &11, 5));
     assert!(is_prime(StaticRing::<i128>::RING, &22531, 5));
     assert!(is_prime(StaticRing::<i128>::RING, &417581, 5));
+    assert!(is_prime(StaticRing::<i128>::RING, &68719476767, 5));
 
     assert!(!is_prime(StaticRing::<i128>::RING, &4, 5));
     assert!(!is_prime(StaticRing::<i128>::RING, &6, 5));
