@@ -59,7 +59,7 @@ pub fn find_root_floor<R, F>(ZZ: R, approx: El<R>, mut func: F) -> El<R>
     return bisect_floor(ZZ, left, right, func);
 }
 
-pub fn sqrt_floor<R>(ZZ: R, n: El<R>, root: usize) -> El<R>
+pub fn root_floor<R>(ZZ: R, n: El<R>, root: usize) -> El<R>
     where R: IntegerRingStore, R::Type: IntegerRing
 {
     assert!(root > 0);
@@ -86,11 +86,11 @@ fn test_bisect_floor() {
 }
 
 #[test]
-fn test_sqrt_floor() {
-    assert_eq!(4, sqrt_floor(&StaticRing::<i64>::RING, 16, 2));
-    assert_eq!(3, sqrt_floor(&StaticRing::<i64>::RING, 27, 3));
-    assert_eq!(4, sqrt_floor(&StaticRing::<i64>::RING, 17, 2));
-    assert_eq!(3, sqrt_floor(&StaticRing::<i64>::RING, 28, 3));
-    assert_eq!(4, sqrt_floor(&StaticRing::<i64>::RING, 24, 2));
-    assert_eq!(3, sqrt_floor(&StaticRing::<i64>::RING, 63, 3));
+fn test_root_floor() {
+    assert_eq!(4, root_floor(&StaticRing::<i64>::RING, 16, 2));
+    assert_eq!(3, root_floor(&StaticRing::<i64>::RING, 27, 3));
+    assert_eq!(4, root_floor(&StaticRing::<i64>::RING, 17, 2));
+    assert_eq!(3, root_floor(&StaticRing::<i64>::RING, 28, 3));
+    assert_eq!(4, root_floor(&StaticRing::<i64>::RING, 24, 2));
+    assert_eq!(3, root_floor(&StaticRing::<i64>::RING, 63, 3));
 }
