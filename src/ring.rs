@@ -7,7 +7,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore,
 /// 
 /// Implementors of this trait should provide the basic ring operations,
 /// and additionally operators for displaying and equality testing. If
-/// a performance advantage can be achieved by accepting some arguments by
+/// a performance advantage can be achieved by acceFpting some arguments by
 /// reference instead of by value, the default-implemented functions for
 /// ring operations on references should be overwritten.
 /// 
@@ -308,6 +308,19 @@ pub trait RingBase {
         self.mul_assign(&mut lhs, rhs);
         return lhs;
     }
+    
+    fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
+        where R::Type: IntegerRing,
+            Self: SelfIso
+    {
+        algorithms::sqr_mul::generic_pow(
+            x, 
+            power, 
+            &RingRef::new(self),
+            &RingRef::new(self),
+            &integers
+        )
+    }
 }
 
 macro_rules! delegate {
@@ -321,6 +334,79 @@ macro_rules! delegate {
             self.get_ring().$name()
         }
     };
+}
+
+pub struct CanHom<R, S>
+    where R: RingStore, S: RingStore, S::Type: CanonicalHom<R::Type>
+{
+    from: R,
+    to: S,
+    data: <S::Type as CanonicalHom<R::Type>>::Homomorphism
+}
+
+impl<R, S> CanHom<R, S>
+    where R: RingStore, S: RingStore, S::Type: CanonicalHom<R::Type>
+{
+    pub fn map(&self, el: El<R>) -> El<S> {
+        self.to.get_ring().map_in(self.from.get_ring(), el, &self.data)
+    }
+
+    pub fn map_ref(&self, el: &El<R>) -> El<S> {
+        self.to.get_ring().map_in_ref(self.from.get_ring(), el, &self.data)
+    }
+
+    pub fn raw_hom(&self) -> &<S::Type as CanonicalHom<R::Type>>::Homomorphism {
+        &self.data
+    }
+
+    pub fn domain(&self) -> &R {
+        &self.from
+    }
+
+    pub fn codomain(&self) -> &S {
+        &self.to
+    }
+}
+
+pub struct CanIso<R, S>
+    where R: RingStore, S: RingStore, S::Type: CanonicalIso<R::Type>
+{
+    from: R,
+    to: S,
+    data: <S::Type as CanonicalHom<R::Type>>::Homomorphism,
+    data_back: <S::Type as CanonicalIso<R::Type>>::Isomorphism
+}
+
+impl<R, S> CanIso<R, S>
+    where R: RingStore, S: RingStore, S::Type: CanonicalIso<R::Type>
+{
+    pub fn map(&self, el: El<R>) -> El<S> {
+        self.to.get_ring().map_in(self.from.get_ring(), el, &self.data)
+    }
+
+    pub fn map_ref(&self, el: &El<R>) -> El<S> {
+        self.to.get_ring().map_in_ref(self.from.get_ring(), el, &self.data)
+    }
+
+    pub fn map_back(&self, el: El<S>) -> El<R> {
+        self.to.get_ring().map_out(self.from.get_ring(), el, &self.data_back)
+    }
+
+    pub fn domain(&self) -> &R {
+        &self.from
+    }
+
+    pub fn raw_hom(&self) -> &<S::Type as CanonicalHom<R::Type>>::Homomorphism {
+        &self.data
+    }
+
+    pub fn raw_iso(&self) -> &<S::Type as CanonicalIso<R::Type>>::Isomorphism {
+        &self.data_back
+    }
+
+    pub fn codomain(&self) -> &S {
+        &self.to
+    }
 }
 
 ///
@@ -447,7 +533,7 @@ macro_rules! delegate {
 /// 
 pub trait RingStore {
     
-    type Type: RingBase + CanonicalIso<Self::Type> + ?Sized;
+    type Type: RingBase + SelfIso + ?Sized;
 
     fn get_ring<'a>(&'a self) -> &'a Self::Type;
 
@@ -500,6 +586,36 @@ pub trait RingStore {
         self.get_ring().map_out(to.get_ring(), el, &self.get_ring().has_canonical_iso(to.get_ring()).unwrap())
     }
 
+    fn into_can_hom<S>(self, from: S) -> Result<CanHom<S, Self>, (Self, S)>
+        where Self: Sized, S: RingStore, Self::Type: CanonicalHom<S::Type>
+    {
+        match self.get_ring().has_canonical_hom(from.get_ring()) {
+            Some(hom) => Ok(CanHom { from: from, to: self, data: hom }),
+            None => Err((self, from))
+        }
+    }
+
+    fn into_can_iso<S>(self, from: S) -> Result<CanIso<S, Self>, (Self, S)>
+        where Self: Sized, S: RingStore, Self::Type: CanonicalIso<S::Type>
+    {
+        match (self.get_ring().has_canonical_hom(from.get_ring()), self.get_ring().has_canonical_iso(from.get_ring())) {
+            (Some(hom), Some(iso)) => Ok(CanIso { from: from, to: self, data: hom, data_back: iso }),
+            _ => Err((self, from))
+        }
+    }
+
+    fn can_hom<'a, S>(&'a self, from: &'a S) -> Option<CanHom<&'a S, &'a Self>>
+        where S: RingStore, Self::Type: CanonicalHom<S::Type>
+    {
+        self.into_can_hom(from).ok()
+    }
+
+    fn can_iso<'a, S>(&'a self, from: &'a S) -> Option<CanIso<&'a S, &'a Self>>
+        where S: RingStore, Self::Type: CanonicalIso<S::Type>
+    {
+        self.into_can_iso(from).ok()
+    }
+
     fn sum<I>(&self, els: I) -> El<Self> 
         where I: Iterator<Item = El<Self>>
     {
@@ -512,53 +628,14 @@ pub trait RingStore {
         els.fold(self.one(), |a, b| self.mul(a, b))
     }
 
-    fn base_ring<'a>(&'a self) -> &'a <Self::Type as RingExtension>::BaseRing
-        where Self::Type: RingExtension
-    {
-        self.get_ring().base_ring()
-    }
-
-    fn from(&self, x: El<<Self::Type as RingExtension>::BaseRing>) -> El<Self>
-        where Self::Type: RingExtension
-    {
-        self.get_ring().from(x)
-    }
-
-    fn from_ref(&self, x: &El<<Self::Type as RingExtension>::BaseRing>) -> El<Self>
-        where Self::Type: RingExtension
-    {
-        self.get_ring().from_ref(x)
-    }
-
     fn pow(&self, x: El<Self>, power: usize) -> El<Self> {
-        if power == 1 {
-            return x;
-        } else if power == 2 {
-            let mut result = x;
-            self.square(&mut result);
-            return result;
-        }
-        algorithms::sqr_mul::generic_abs_square_and_multiply(
-            x, 
-            &(power as i64), 
-            StaticRing::<i64>::RING, 
-            |mut a| { self.square(&mut a); a }, 
-            |a, b| self.mul_ref_fst(a, b), 
-            self.one()
-        )
+        self.pow_gen(x, &(power as i64), StaticRing::<i64>::RING)
     }
 
     fn pow_gen<R: IntegerRingStore>(&self, x: El<Self>, power: &El<R>, integers: R) -> El<Self> 
         where R::Type: IntegerRing
     {
-        algorithms::sqr_mul::generic_abs_square_and_multiply(
-            x, 
-            power, 
-            integers, 
-            |mut a| { self.square(&mut a); a }, 
-            |a, b| self.mul_ref_fst(a, b), 
-            self.one()
-        )
+        self.get_ring().pow_gen(x, power, integers)
     }
 
     fn format<'a>(&'a self, value: &'a El<Self>) -> RingElementDisplayWrapper<'a, Self> {
@@ -569,6 +646,26 @@ pub trait RingStore {
         println!("{}", self.format(value));
     }
 }
+
+pub trait RingExtensionStore: RingStore
+    where Self::Type: RingExtension
+{
+    fn base_ring<'a>(&'a self) -> &'a <Self::Type as RingExtension>::BaseRing {
+        self.get_ring().base_ring()
+    }
+
+    fn from(&self, x: El<<Self::Type as RingExtension>::BaseRing>) -> El<Self> {
+        self.get_ring().from(x)
+    }
+
+    fn from_ref(&self, x: &El<<Self::Type as RingExtension>::BaseRing>) -> El<Self> {
+        self.get_ring().from_ref(x)
+    }
+}
+
+impl<R: RingStore> RingExtensionStore for R
+    where R::Type: RingExtension
+{}
 
 pub struct RingElementDisplayWrapper<'a, R: RingStore + ?Sized> {
     ring: &'a R,
