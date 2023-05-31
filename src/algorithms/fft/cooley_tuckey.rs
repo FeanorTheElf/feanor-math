@@ -123,20 +123,46 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
         return Some(Self::new_with_mem(ring, current, log2_n, memory_provider));
     }
 
-    ///
-    /// Computes the bitreverse FFT of the given values, using the Cooley-Tuckey FFT algorithm.
-    /// 
-    /// This supports any given ring, as long as the precomputed values stored in the table are
-    /// also contained in the new ring. The result is wrong however if the canonical homomorphism
-    /// `R -> S` does not map the N-th root of unity to a primitive N-th root of unity.
-    /// 
-    /// Note that the FFT of a sequence `a_0, ..., a_(N - 1)` is defined as `Fa_k = sum_i a_i z^(-ik)`
-    /// where `z` is an N-th root of unity. Since this is a bitreverse FFT, the output are not the `Fa_i`
-    /// but instead the numbers `Fa_(bitrev(k))`, i.e. the same values in another order.
-    /// 
-    #[inline(never)]
-    pub fn bitreverse_fft_inplace_base<V, S>(&self, mut values: V, ring: S)
-        where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
+    pub fn bitreverse_permute_inplace<V, T>(&self, mut values: V) 
+        where V: SwappableVectorViewMut<T>
+    {
+        assert!(values.len() == 1 << self.log2_n);
+        for i in 0..(1 << self.log2_n) {
+            if bitreverse(i, self.log2_n) < i {
+                values.swap(i, bitreverse(i, self.log2_n));
+            }
+        }
+    }
+}
+
+impl<R, M: MemoryProvider<El<R>>> FFTTable<R> for FFTTableCooleyTuckey<R, M> 
+    where R: DivisibilityRingStore, 
+        R::Type: DivisibilityRing
+{
+    fn len(&self) -> usize {
+        1 << self.log2_n
+    }
+
+    fn ring(&self) -> &R {
+        &self.ring
+    }
+
+    fn fft<V, S>(&self, mut values: V, ring: S)
+        where S: RingStore, S::Type: CanonicalHom<R::Type>, V: SwappableVectorViewMut<El<S>>
+    {
+        self.unordered_fft(&mut values, ring);
+        self.bitreverse_permute_inplace(&mut values);
+    }
+        
+    fn inv_fft<V, S>(&self, mut values: V, ring: S)
+        where S: RingStore, S::Type: CanonicalHom<R::Type>, V: SwappableVectorViewMut<El<S>>
+    {
+        self.bitreverse_permute_inplace(&mut values);
+        self.unordered_inv_fft(&mut values, ring);
+    }
+
+    fn unordered_fft<V, S>(&self, mut values: V, ring: S)
+        where S: RingStore, S::Type: CanonicalHom<R::Type>, V: VectorViewMut<El<S>> 
     {
         assert!(values.len() == (1 << self.log2_n));
         let hom = ring.can_hom(&self.ring).unwrap();
@@ -181,14 +207,11 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
             }
         }
     }
-
-    ///
-    /// this is exactly `bitreverse_fft_inplace_base()` with all operations reversed
-    /// 
-    #[inline(never)]
-    pub fn bitreverse_inv_fft_inplace_base<V, S>(&self, mut values: V, ring: S)
-        where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
+        
+    fn unordered_inv_fft<V, S>(&self, mut values: V, ring: S)
+        where S: RingStore, S::Type: CanonicalHom<R::Type>, V: VectorViewMut<El<S>>
     {
+        // this is exactly `bitreverse_fft_inplace_base()` with all operations reversed
         assert!(values.len() == 1 << self.log2_n);
         let hom = ring.can_hom(&self.ring).unwrap();
         debug_assert!(ring.is_neg_one(&ring.pow(hom.map_ref(&self.root_of_unity), 1 << (self.log2_n - 1))));
@@ -220,43 +243,6 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
             ring.mul_assign_ref(values.at_mut(i), &scale);
         }
     }
-
-    pub fn bitreverse_permute_inplace<V>(&self, mut values: V) 
-        where V: SwappableVectorViewMut<El<R>>
-    {
-        assert!(values.len() == 1 << self.log2_n);
-        for i in 0..(1 << self.log2_n) {
-            if bitreverse(i, self.log2_n) < i {
-                values.swap(i, bitreverse(i, self.log2_n));
-            }
-        }
-    }
-    
-    pub fn bitreverse_fft_inplace<V>(&self, values: V)
-        where V: VectorViewMut<El<R>>
-    {
-        self.bitreverse_fft_inplace_base::<V, &R>(values, &self.ring);
-    }
-
-    pub fn bitreverse_inv_fft_inplace<V>(&self, mut values: V)
-        where V: VectorViewMut<El<R>>
-    {
-        self.bitreverse_inv_fft_inplace_base::<&mut V, &R>(&mut values, &self.ring);
-    }
-
-    pub fn fft_inplace<V>(&self, mut values: V)
-        where V: SwappableVectorViewMut<El<R>>
-    {
-        self.bitreverse_fft_inplace(&mut values);
-        self.bitreverse_permute_inplace(&mut values);
-    }
-
-    pub fn inv_fft_inplace<V>(&self, mut values: V)
-        where V: SwappableVectorViewMut<El<R>>
-    {
-        self.bitreverse_permute_inplace(&mut values);
-        self.bitreverse_fft_inplace(&mut values);
-    }
 }
 
 #[cfg(test)]
@@ -270,8 +256,10 @@ use crate::primitive_int::*;
 #[cfg(test)]
 use crate::field::*;
 
+use super::FFTTable;
+
 #[test]
-fn test_bitreverse_fft_inplace_base() {
+fn test_bitreverse_fft_inplace_basic() {
     let ring = Zn::<5>::RING;
     let z = ring.from_int(2);
     let fft = FFTTableCooleyTuckey::new(ring, ring.div(&1, &z), 2);
@@ -282,12 +270,12 @@ fn test_bitreverse_fft_inplace_base() {
         bitreverse_expected[i] = expected[bitreverse(i, 2)];
     }
 
-    fft.bitreverse_fft_inplace_base(&mut values, ring);
+    fft.unordered_fft(&mut values, ring);
     assert_eq!(values, bitreverse_expected);
 }
 
 #[test]
-fn test_bitreverse_fft_inplace() {
+fn test_bitreverse_fft_inplace_advanced() {
     let ring = Zn::<17>::RING;
     let z = ring.from_int(3);
     let fft = FFTTableCooleyTuckey::new(ring, z, 4);
@@ -298,7 +286,7 @@ fn test_bitreverse_fft_inplace() {
         bitreverse_expected[i] = expected[bitreverse(i, 4)];
     }
 
-    fft.bitreverse_fft_inplace(&mut values);
+    fft.unordered_fft(&mut values, fft.ring());
     assert_eq!(values, bitreverse_expected);
 }
 
@@ -308,8 +296,8 @@ fn test_bitreverse_inv_fft_inplace() {
     let fft = FFTTableCooleyTuckey::for_zn(&ring, 4).unwrap();
     let values: [u64; 16] = [1, 2, 3, 2, 1, 0, 17 - 1, 17 - 2, 17 - 1, 0, 1, 2, 3, 4, 5, 6];
     let mut work = values;
-    fft.bitreverse_fft_inplace(&mut work);
-    fft.bitreverse_inv_fft_inplace(&mut work);
+    fft.unordered_fft(&mut work, fft.ring());
+    fft.unordered_inv_fft(&mut work, fft.ring());
     assert_eq!(&work, &values);
 }
 
@@ -332,8 +320,8 @@ fn run_fft_bench_round<R, S>(ring: S, fft: &FFTTableCooleyTuckey<R>, data: &Vec<
 {
     copy.clear();
     copy.extend(data.iter().map(|x| ring.clone_el(x)));
-    fft.bitreverse_fft_inplace_base(&mut copy[..], &ring);
-    fft.bitreverse_inv_fft_inplace_base(&mut copy[..], &ring);
+    fft.unordered_fft(&mut copy[..], &ring);
+    fft.unordered_inv_fft(&mut copy[..], &ring);
     assert!(ring.eq_el(&copy[0], &data[0]));
 }
 

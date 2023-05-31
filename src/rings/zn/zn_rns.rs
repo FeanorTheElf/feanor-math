@@ -1,6 +1,5 @@
-use crate::algorithms::cooley_tuckey::FFTTableCooleyTuckey;
 use crate::mempool::{MemoryProvider, AllocatingMemoryProvider};
-use crate::vector::{VectorViewMut, VectorView};
+use crate::vector::VectorView;
 use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
 use crate::rings::zn::*;
 
@@ -530,45 +529,6 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnRing for Z
 
     fn random_element<G: FnMut() -> u64>(&self, mut rng: G) -> ZnEl<C, M> {
         ZnEl(self.memory_provider.get_new_init(self.len(), |i| self.at(i).random_element(&mut rng)))
-    }
-}
-
-pub struct RNSFFTTable<'a, C: ZnRingStore> 
-    where C::Type: ZnRing
-{
-    part_tables: Vec<FFTTableCooleyTuckey<&'a C>>
-}
-
-impl<'a, C: ZnRingStore> RNSFFTTable<'a, C> 
-    where C::Type: ZnRing
-{
-    pub fn new<J: IntegerRingStore>(ring: &'a ZnBase<C, J>, log2_n: usize) -> Option<Self> 
-        where C::Type: ZnRing + CanonicalHom<J::Type>,
-            J::Type: IntegerRing,
-            <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
-    {
-        Some(RNSFFTTable {
-            part_tables: ring.components.iter()
-                .map(|r| FFTTableCooleyTuckey::for_zn(r, log2_n).ok_or(()))
-                .collect::<Result<Vec<_>, ()>>()
-                .ok()?
-        })
-    }
-}
-
-impl<'a, C: ZnRingStore> RNSFFTTable<'a, C> 
-    where C::Type: ZnRing
-{
-    pub fn bitreverse_fft_inplace<M: MemoryProvider<El<C>>, V: VectorViewMut<ZnEl<C, M>>>(&self, mut values: V) {
-        for i in 0..self.part_tables.len() {
-            self.part_tables[i].bitreverse_fft_inplace((&mut values).map_mut(|x| &x.0[i], |x| &mut x.0[i]));
-        }
-    }
-
-    pub fn bitreverse_inv_fft_inplace<M: MemoryProvider<El<C>>, V: VectorViewMut<ZnEl<C, M>>>(&self, mut values: V) {
-        for i in 0..self.part_tables.len() {
-            self.part_tables[i].bitreverse_inv_fft_inplace((&mut values).map_mut(|x| &x.0[i], |x| &mut x.0[i]));
-        }
     }
 }
 

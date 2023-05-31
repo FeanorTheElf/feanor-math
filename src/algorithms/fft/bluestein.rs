@@ -1,13 +1,16 @@
+use crate::algorithms::fft::FFTTable;
 use crate::divisibility::DivisibilityRing;
 use crate::divisibility::DivisibilityRingStore;
+use crate::mempool::AllocatingMemoryProvider;
+use crate::mempool::MemoryProvider;
 use crate::ring::*;
 use crate::algorithms;
 use crate::vector::VectorViewMut;
 
-pub struct FFTTableBluestein<R>
+pub struct FFTTableBluestein<R, M: MemoryProvider<El<R>> = AllocatingMemoryProvider>
     where R: RingStore
 {
-    m_fft_table: algorithms::cooley_tuckey::FFTTableCooleyTuckey<R>,
+    m_fft_table: algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey<R, M>,
     ///
     /// This is the bitreverse fft of a part of the sequence b_i := z^(i^2) where
     /// z is a 2n-th root of unity.
@@ -15,10 +18,11 @@ pub struct FFTTableBluestein<R>
     /// at a negative index i must be stored at index (i + m). The other values are
     /// irrelevant.
     /// 
-    b_bitreverse_fft: Vec<El<R>>,
+    b_bitreverse_fft: M::Object,
     /// contrary to expectations, this should be a 2n-th root of unity
     inv_root_of_unity: El<R>,
-    n: usize
+    n: usize,
+    memory_provider: M
 }
 
 impl<R> FFTTableBluestein<R> 
@@ -26,24 +30,35 @@ impl<R> FFTTableBluestein<R>
         R::Type: DivisibilityRing
 {
     pub fn new(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize) -> Self {
+        Self::new_with_mem(ring, root_of_unity_2n, root_of_unity_m, n, log2_m, AllocatingMemoryProvider)
+    }
+}
+
+impl<R, M> FFTTableBluestein<R, M> 
+    where R: DivisibilityRingStore,
+        R::Type: DivisibilityRing,
+        M: MemoryProvider<El<R>>
+{
+    pub fn new_with_mem(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize, memory_provider: M) -> Self {
         // checks on m and root_of_unity_m are done by the FFTTableCooleyTuckey
         assert!((1 << log2_m) >= 2 * n + 1);
 
         let m = 1 << log2_m;
-        let mut b = (0..m).map(|_| ring.zero()).collect::<Vec<_>>();
+        let mut b = memory_provider.get_new_init(m, |_| ring.zero());
         b[0] = ring.one();
         for i in 1..n {
             b[i] = ring.pow(ring.clone_el(&root_of_unity_2n), i * i);
             b[m - i] = ring.clone_el(&b[i]);
         }
         let inv_root_of_unity = ring.pow(ring.clone_el(&root_of_unity_2n), 2 * n - 1);
-        let m_fft_table = algorithms::cooley_tuckey::FFTTableCooleyTuckey::new(ring, root_of_unity_m, log2_m);
-        m_fft_table.bitreverse_fft_inplace(&mut b);
+        let m_fft_table = algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey::new_with_mem(ring, root_of_unity_m, log2_m, &memory_provider);
+        m_fft_table.unordered_fft(&mut b[..], m_fft_table.ring());
         return FFTTableBluestein { 
             m_fft_table: m_fft_table, 
             b_bitreverse_fft: b, 
             inv_root_of_unity: inv_root_of_unity, 
-            n: n
+            n: n,
+            memory_provider: memory_provider
         };
     }
 
@@ -83,11 +98,11 @@ impl<R> FFTTableBluestein<R>
         }
 
         // perform convoluted product with b using a power-of-two fft
-        self.m_fft_table.bitreverse_fft_inplace_base(&mut buffer, &ring);
+        self.m_fft_table.unordered_fft(&mut buffer, &ring);
         for i in 0..self.m_fft_table.len() {
             ring.mul_assign(buffer.at_mut(i), ring.coerce(base_ring, base_ring.clone_el(&self.b_bitreverse_fft[i])));
         }
-        self.m_fft_table.bitreverse_inv_fft_inplace_base(&mut buffer, &ring);
+        self.m_fft_table.unordered_inv_fft(&mut buffer, &ring);
 
         // write values back, and multiply them with a twiddle factor
         for i in 0..self.n {
@@ -102,19 +117,47 @@ impl<R> FFTTableBluestein<R>
             }
         }
     }
+}
 
-    pub fn fft<V>(&self, values: V) 
-        where V: VectorViewMut<El<R>>
-    {
-        let buffer = (0..self.m_fft_table.len()).map(|_| self.m_fft_table.ring().zero()).collect::<Vec<_>>();
-        self.fft_base::<_, _, _, false>(values, self.m_fft_table.ring(), buffer);
+
+impl<R> FFTTable<R> for FFTTableBluestein<R> 
+    where R: DivisibilityRingStore,
+        R::Type: DivisibilityRing
+{
+    fn len(&self) -> usize {
+        self.n
     }
 
-    pub fn inv_fft<V>(&self, values: V) 
-        where V: VectorViewMut<El<R>>
+    fn ring(&self) -> &R {
+        self.m_fft_table.ring()
+    }
+
+    fn unordered_fft<V, S>(&self, values: V, ring: S)
+        where S: RingStore, S::Type: CanonicalHom<<R as RingStore>::Type>, V: VectorViewMut<El<S>>
     {
-        let buffer = (0..self.m_fft_table.len()).map(|_| self.m_fft_table.ring().zero()).collect::<Vec<_>>();
-        self.fft_base::<_, _, _, true>(values, self.m_fft_table.ring(), buffer);
+        let buffer = self.memory_provider.get_new_init(self.m_fft_table.len(), |_| ring.zero());
+        self.fft_base::<_, _, _, false>(values, ring, buffer);
+    }
+
+    fn unordered_inv_fft<V, S>(&self, values: V, ring: S)
+        where S: RingStore, S::Type: CanonicalHom<<R as RingStore>::Type>, V: VectorViewMut<El<S>> 
+    {
+        let buffer = self.memory_provider.get_new_init(self.m_fft_table.len(), |_| ring.zero());
+        self.fft_base::<_, _, _, true>(values, ring, buffer);
+    }
+
+    fn fft<V, S>(&self, values: V, ring: S) 
+        where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
+    {
+        let buffer = self.memory_provider.get_new_init(self.m_fft_table.len(), |_| ring.zero());
+        self.fft_base::<_, _, _, false>(values, ring, buffer);
+    }
+
+    fn inv_fft<V, S>(&self, values: V, ring: S) 
+        where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
+    {
+        let buffer = self.memory_provider.get_new_init(self.m_fft_table.len(), |_| ring.zero());
+        self.fft_base::<_, _, _, true>(values, ring, buffer);
     }
 }
 

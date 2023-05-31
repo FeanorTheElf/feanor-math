@@ -317,14 +317,15 @@ impl ZnRing for ZnBase {
 /// ```
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::zn_42::*;
-/// # use feanor_math::algorithms::cooley_tuckey::*;
+/// # use feanor_math::algorithms::fft::*;
+/// # use feanor_math::algorithms::fft::cooley_tuckey::*;
 /// let ring = Zn::new(1073872897);
 /// let fastmul_ring = ZnFastmul::new(ring);
 /// // The values stored by the FFT table are elements of `ZnFastmulBase`
 /// let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, 15).unwrap();
 /// // Note that data uses `ZnBase`
 /// let mut data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
-/// fft.bitreverse_fft_inplace_base(&mut data[..], &ring);
+/// fft.unordered_fft(&mut data[..], &ring);
 /// ```
 /// 
 pub struct ZnFastmulBase {
