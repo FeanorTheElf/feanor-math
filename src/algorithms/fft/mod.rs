@@ -9,6 +9,12 @@ pub trait FFTTable<R: RingStore> {
     fn len(&self) -> usize;
     fn ring(&self) -> &R;
 
+    ///
+    /// On input `i`, returns `j` such that `unordered_fft(values)[i]` contains the evaluation
+    /// at `zeta^j` of values.
+    /// 
+    fn unordered_fft_permutation(&self, i: usize) -> usize;
+
     fn fft<V, S>(&self, values: V, ring: S)
         where S: RingStore, S::Type: CanonicalHom<R::Type>, V: SwappableVectorViewMut<El<S>>;
         

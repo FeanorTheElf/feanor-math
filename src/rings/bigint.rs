@@ -26,7 +26,7 @@ impl DefaultBigIntRingEl {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub struct DefaultBigIntRing;
 
 impl DefaultBigIntRing {

@@ -298,6 +298,14 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalHom<ZnBase<J>> for ZnBas
     }
 }
 
+impl<I: IntegerRingStore> PartialEq for ZnBase<I>
+    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.integer_ring.get_ring() == other.integer_ring.get_ring() && self.integer_ring.eq_el(&self.modulus, &other.modulus)
+    }
+}
+
 impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for ZnBase<I>
     where I::Type: IntegerRing + CanonicalIso<J::Type> + CanonicalIso<StaticRingBase<i32>>,
         J::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>

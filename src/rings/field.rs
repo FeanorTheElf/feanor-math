@@ -12,6 +12,15 @@ pub struct AsFieldBase<R: DivisibilityRingStore>
     base: R
 }
 
+impl<R> PartialEq for AsFieldBase<R>
+    where R: DivisibilityRingStore,
+        R::Type: DivisibilityRing
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.base.get_ring() == other.base.get_ring()
+    }
+}
+
 #[allow(type_alias_bounds)]
 pub type AsField<R: DivisibilityRingStore> = RingValue<AsFieldBase<R>>;
 

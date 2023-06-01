@@ -187,6 +187,14 @@ impl<R, P, M> CanonicalHom<P> for DensePolyRingBase<R, M>
     }
 }
 
+impl<R, M> PartialEq for DensePolyRingBase<R, M> 
+    where R: RingStore, M: GrowableMemoryProvider<El<R>>
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.base_ring.get_ring() == other.base_ring.get_ring()
+    }
+}
+
 impl<R, P, M> CanonicalIso<P> for DensePolyRingBase<R, M> 
     where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: PolyRing, M: GrowableMemoryProvider<El<R>>
 {

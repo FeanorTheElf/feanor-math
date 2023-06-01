@@ -28,6 +28,8 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore,
 /// 32-bit integers stored on the heap.
 /// ```
 /// # use feanor_math::ring::*;
+/// 
+/// #[derive(PartialEq)]
 /// struct MyRingBase;
 /// 
 /// impl RingBase for MyRingBase {
@@ -95,6 +97,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore,
 /// ```
 /// use feanor_math::ring::*;
 /// 
+/// #[derive(PartialEq)]
 /// struct F2Base;
 /// 
 /// impl RingBase for F2Base {
@@ -176,8 +179,39 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore,
 /// assert!(F2.eq_el(&F2.from_int(1), &F2.add(F2.one(), F2.zero())));
 /// ```
 /// 
+/// # A note on equality
 /// 
-pub trait RingBase {
+/// Generally speaking, the notion of being canonically isomorphic 
+/// (given by [`CanonicalIso`] is often more useful for rings than 
+/// equality (defined by [`PartialEq`]).
+/// 
+/// In particular, being canonically isomorphic means that that there
+/// is a bidirectional mapping of elements `a in Ring1 <-> b in Ring2`
+/// such that `a` and `b` behave exactly the same. This mapping is provided
+/// by the functions of [`CanonicalIso`]. Note that every ring is supposed
+/// to be canonically isomorphic to itself, via the identiy mapping.
+/// 
+/// The notion of equality is stronger than that. In particular, implementors
+/// of [`PartialEq`] must ensure that if rings `R` and `S` are equal, then
+/// they are canonically isomorphic and the canonical isomorphism is given
+/// by bitwise identity map. In particular, elements of `R` and `S` must have
+/// the same type.
+/// 
+/// Hence, be careful to not mix up elements of different rings, even if they
+/// have the same type. This can easily lead to nasty errors. For example, 
+/// consider the following code
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::zn::*;
+/// 
+/// let Z7 = zn_barett::Zn::new(StaticRing::<i64>::RING, 7);
+/// let Z11 = zn_barett::Zn::new(StaticRing::<i64>::RING, 11);
+/// let neg_one = Z7.from_int(-1);
+/// assert!(!Z11.is_neg_one(&neg_one));
+/// ```
+/// 
+pub trait RingBase: PartialEq {
 
     type Element;
 
@@ -957,13 +991,19 @@ fn test_ring_rc_lifetimes() {
 #[test]
 fn test_internal_wrappings_dont_matter() {
     
-    #[derive(Copy, Clone)]
+    #[derive(Copy, Clone, PartialEq)]
     pub struct ABase;
 
     #[allow(unused)]
     #[derive(Copy, Clone)]
     pub struct BBase<R: RingStore> {
         base: R
+    }
+
+    impl<R: RingStore> PartialEq for BBase<R> {
+        fn eq(&self, other: &Self) -> bool {
+            self.base.get_ring() == other.base.get_ring()
+        }
     }
 
     impl RingBase for ABase {

@@ -147,6 +147,10 @@ impl<R, M: MemoryProvider<El<R>>> FFTTable<R> for FFTTableCooleyTuckey<R, M>
         &self.ring
     }
 
+    fn unordered_fft_permutation(&self, i: usize) -> usize {
+        bitreverse(i, self.log2_n)
+    }
+
     fn fft<V, S>(&self, mut values: V, ring: S)
         where S: RingStore, S::Type: CanonicalHom<R::Type>, V: SwappableVectorViewMut<El<S>>
     {

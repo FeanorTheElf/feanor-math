@@ -78,6 +78,7 @@ impl<R, M> FFTTableBluestein<R, M>
     {
         assert!(values.len() == self.n);
         assert!(buffer.len() == self.m_fft_table.len());
+        let hom = ring.can_hom(self.m_fft_table.ring()).unwrap();
 
         let base_ring = self.m_fft_table.ring();
 
@@ -88,10 +89,8 @@ impl<R, M> FFTTableBluestein<R, M>
             } else {
                 values.at(i)
             };
-            *buffer.at_mut(i) = ring.mul_ref_fst(
-                value,
-                ring.coerce(base_ring, base_ring.pow(base_ring.clone_el(&self.inv_root_of_unity), i * i))
-            );
+            *buffer.at_mut(i) = ring.clone_el(value);
+            ring.get_ring().mul_assign_map_in(base_ring.get_ring(), buffer.at_mut(i), base_ring.pow(base_ring.clone_el(&self.inv_root_of_unity), i * i), hom.raw_hom());
         }
         for i in self.n..self.m_fft_table.len() {
             *buffer.at_mut(i) = ring.zero();
@@ -100,13 +99,14 @@ impl<R, M> FFTTableBluestein<R, M>
         // perform convoluted product with b using a power-of-two fft
         self.m_fft_table.unordered_fft(&mut buffer, &ring);
         for i in 0..self.m_fft_table.len() {
-            ring.mul_assign(buffer.at_mut(i), ring.coerce(base_ring, base_ring.clone_el(&self.b_bitreverse_fft[i])));
+            ring.get_ring().mul_assign_map_in_ref(base_ring.get_ring(), buffer.at_mut(i), &self.b_bitreverse_fft[i], hom.raw_hom());
         }
         self.m_fft_table.unordered_inv_fft(&mut buffer, &ring);
 
         // write values back, and multiply them with a twiddle factor
         for i in 0..self.n {
-            *values.at_mut(i) = ring.mul_ref_fst(buffer.at(i), ring.coerce(base_ring, base_ring.pow(base_ring.clone_el(&self.inv_root_of_unity), i * i)));
+            *values.at_mut(i) = std::mem::replace(buffer.at_mut(i), ring.zero());
+            ring.get_ring().mul_assign_map_in(base_ring.get_ring(), values.at_mut(i), base_ring.pow(base_ring.clone_el(&self.inv_root_of_unity), i * i), hom.raw_hom());
         }
 
         if INV {
@@ -132,6 +132,10 @@ impl<R> FFTTable<R> for FFTTableBluestein<R>
         self.m_fft_table.ring()
     }
 
+    fn unordered_fft_permutation(&self, i: usize) -> usize {
+        i
+    }
+
     fn unordered_fft<V, S>(&self, values: V, ring: S)
         where S: RingStore, S::Type: CanonicalHom<<R as RingStore>::Type>, V: VectorViewMut<El<S>>
     {
@@ -149,15 +153,13 @@ impl<R> FFTTable<R> for FFTTableBluestein<R>
     fn fft<V, S>(&self, values: V, ring: S) 
         where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
     {
-        let buffer = self.memory_provider.get_new_init(self.m_fft_table.len(), |_| ring.zero());
-        self.fft_base::<_, _, _, false>(values, ring, buffer);
+        self.unordered_fft(values, ring);
     }
 
     fn inv_fft<V, S>(&self, values: V, ring: S) 
         where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
     {
-        let buffer = self.memory_provider.get_new_init(self.m_fft_table.len(), |_| ring.zero());
-        self.fft_base::<_, _, _, true>(values, ring, buffer);
+        self.unordered_inv_fft(values, ring);
     }
 }
 

@@ -7,7 +7,7 @@ use crate::{ring::*, divisibility::DivisibilityRing, rings::zn::ZnRing};
 /// instead of `RingBase`, and just provide how to map elements in the new
 /// ring to the wrapped ring and vice versa.
 /// 
-pub trait DelegateRing {
+pub trait DelegateRing: PartialEq {
 
     type Base: ?Sized + RingBase;
     type Element;
@@ -33,7 +33,7 @@ pub trait DelegateRing {
     }
 }
 
-impl<R: DelegateRing + ?Sized> RingBase for R {
+impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
 
     type Element = <Self as DelegateRing>::Element;
 

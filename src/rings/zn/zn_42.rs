@@ -14,7 +14,7 @@ use super::zn_barett;
 /// 
 /// Any modular reductions are performed lazily.
 /// 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct ZnBase {
     // must be 128 bit to deal with very small moduli
     inv_modulus: u128,
@@ -328,6 +328,7 @@ impl ZnRing for ZnBase {
 /// fft.unordered_fft(&mut data[..], &ring);
 /// ```
 /// 
+#[derive(PartialEq)]
 pub struct ZnFastmulBase {
     base: ZnBase
 }

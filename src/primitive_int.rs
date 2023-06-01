@@ -180,6 +180,12 @@ pub struct StaticRingBase<T> {
     element: PhantomData<T>
 }
 
+impl<T> PartialEq for StaticRingBase<T> {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
 impl<T: PrimitiveInt> RingValue<StaticRingBase<T>> {
     pub const RING: StaticRing<T> = RingValue::from(StaticRingBase { element: PhantomData });
 }

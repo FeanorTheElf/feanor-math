@@ -296,6 +296,16 @@ impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStor
     }
 }
 
+impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> PartialEq for ZnBase<C, J, M> 
+    where C::Type: ZnRing + CanonicalHom<J::Type>,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
+        J::Type: IntegerRing
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.components.len() == other.components.len() && self.components.iter().zip(other.components.iter()).all(|(R1, R2)| R1.get_ring() == R2.get_ring())
+    }
+}
+
 impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStore, M1: MemoryProvider<El<C1>>, M2: MemoryProvider<El<C2>>> CanonicalIso<ZnBase<C2, J2, M2>> for ZnBase<C1, J1, M1> 
     where C1::Type: ZnRing + CanonicalIso<C2::Type> + CanonicalHom<J1::Type>,
         <C1::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J1::Type>,
