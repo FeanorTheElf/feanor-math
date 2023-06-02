@@ -8,6 +8,7 @@ pub trait FFTTable<R: RingStore> {
 
     fn len(&self) -> usize;
     fn ring(&self) -> &R;
+    fn root_of_unity(&self) -> &El<R>;
 
     ///
     /// On input `i`, returns `j` such that `unordered_fft(values)[i]` contains the evaluation

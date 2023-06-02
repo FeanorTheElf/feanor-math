@@ -4,6 +4,7 @@ use crate::mempool::{MemoryProvider, AllocatingMemoryProvider};
 use crate::rings::zn::{ZnRingStore, ZnRing};
 use crate::vector::SwappableVectorViewMut;
 use crate::{ring::*, vector::VectorViewMut};
+use crate::algorithms::fft::*;
 
 pub struct FFTTableCooleyTuckey<R, M: MemoryProvider<El<R>> = AllocatingMemoryProvider> 
     where R: RingStore
@@ -147,6 +148,10 @@ impl<R, M: MemoryProvider<El<R>>> FFTTable<R> for FFTTableCooleyTuckey<R, M>
         &self.ring
     }
 
+    fn root_of_unity(&self) -> &El<R> {
+        &self.root_of_unity
+    }
+
     fn unordered_fft_permutation(&self, i: usize) -> usize {
         bitreverse(i, self.log2_n)
     }
@@ -259,8 +264,6 @@ use crate::rings::zn::zn_42;
 use crate::primitive_int::*;
 #[cfg(test)]
 use crate::field::*;
-
-use super::FFTTable;
 
 #[test]
 fn test_bitreverse_fft_inplace_basic() {

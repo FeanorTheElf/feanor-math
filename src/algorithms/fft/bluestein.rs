@@ -20,7 +20,9 @@ pub struct FFTTableBluestein<R, M: MemoryProvider<El<R>> = AllocatingMemoryProvi
     /// 
     b_bitreverse_fft: M::Object,
     /// contrary to expectations, this should be a 2n-th root of unity
-    inv_root_of_unity: El<R>,
+    inv_root_of_unity_2n: El<R>,
+    /// contrary to expectations, this should be an n-th root of unity and inverse to `inv_root_of_unity^2`
+    root_of_unity_n: El<R>,
     n: usize,
     memory_provider: M
 }
@@ -51,12 +53,14 @@ impl<R, M> FFTTableBluestein<R, M>
             b[m - i] = ring.clone_el(&b[i]);
         }
         let inv_root_of_unity = ring.pow(ring.clone_el(&root_of_unity_2n), 2 * n - 1);
+        let root_of_unity_n = ring.pow(root_of_unity_2n, 2);
         let m_fft_table = algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey::new_with_mem(ring, root_of_unity_m, log2_m, &memory_provider);
         m_fft_table.unordered_fft(&mut b[..], m_fft_table.ring());
         return FFTTableBluestein { 
             m_fft_table: m_fft_table, 
             b_bitreverse_fft: b, 
-            inv_root_of_unity: inv_root_of_unity, 
+            inv_root_of_unity_2n: inv_root_of_unity, 
+            root_of_unity_n: root_of_unity_n,
             n: n,
             memory_provider: memory_provider
         };
@@ -76,8 +80,8 @@ impl<R, M> FFTTableBluestein<R, M>
     pub fn fft_base<V, W, S, const INV: bool>(&self, mut values: V, ring: S, mut buffer: W)
         where V: VectorViewMut<El<S>>, W: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
     {
-        assert!(values.len() == self.n);
-        assert!(buffer.len() == self.m_fft_table.len());
+        assert_eq!(values.len(), self.n);
+        assert_eq!(buffer.len(), self.m_fft_table.len());
         let hom = ring.can_hom(self.m_fft_table.ring()).unwrap();
 
         let base_ring = self.m_fft_table.ring();
@@ -90,7 +94,7 @@ impl<R, M> FFTTableBluestein<R, M>
                 values.at(i)
             };
             *buffer.at_mut(i) = ring.clone_el(value);
-            ring.get_ring().mul_assign_map_in(base_ring.get_ring(), buffer.at_mut(i), base_ring.pow(base_ring.clone_el(&self.inv_root_of_unity), i * i), hom.raw_hom());
+            ring.get_ring().mul_assign_map_in(base_ring.get_ring(), buffer.at_mut(i), base_ring.pow(base_ring.clone_el(&self.inv_root_of_unity_2n), i * i), hom.raw_hom());
         }
         for i in self.n..self.m_fft_table.len() {
             *buffer.at_mut(i) = ring.zero();
@@ -106,7 +110,7 @@ impl<R, M> FFTTableBluestein<R, M>
         // write values back, and multiply them with a twiddle factor
         for i in 0..self.n {
             *values.at_mut(i) = std::mem::replace(buffer.at_mut(i), ring.zero());
-            ring.get_ring().mul_assign_map_in(base_ring.get_ring(), values.at_mut(i), base_ring.pow(base_ring.clone_el(&self.inv_root_of_unity), i * i), hom.raw_hom());
+            ring.get_ring().mul_assign_map_in(base_ring.get_ring(), values.at_mut(i), base_ring.pow(base_ring.clone_el(&self.inv_root_of_unity_2n), i * i), hom.raw_hom());
         }
 
         if INV {
@@ -130,6 +134,10 @@ impl<R> FFTTable<R> for FFTTableBluestein<R>
 
     fn ring(&self) -> &R {
         self.m_fft_table.ring()
+    }
+
+    fn root_of_unity(&self) -> &El<R> {
+        &self.root_of_unity_n
     }
 
     fn unordered_fft_permutation(&self, i: usize) -> usize {
