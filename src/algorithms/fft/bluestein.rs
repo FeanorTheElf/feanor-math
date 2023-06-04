@@ -124,10 +124,12 @@ impl<R, M> FFTTableBluestein<R, M>
 }
 
 
-impl<R> FFTTable<R> for FFTTableBluestein<R> 
+impl<R> FFTTable for FFTTableBluestein<R> 
     where R: DivisibilityRingStore,
         R::Type: DivisibilityRing
 {
+    type Ring = R;
+
     fn len(&self) -> usize {
         self.n
     }

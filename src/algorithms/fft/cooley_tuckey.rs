@@ -136,10 +136,12 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
     }
 }
 
-impl<R, M: MemoryProvider<El<R>>> FFTTable<R> for FFTTableCooleyTuckey<R, M> 
+impl<R, M: MemoryProvider<El<R>>> FFTTable for FFTTableCooleyTuckey<R, M> 
     where R: DivisibilityRingStore, 
         R::Type: DivisibilityRing
 {
+    type Ring = R;
+    
     fn len(&self) -> usize {
         1 << self.log2_n
     }

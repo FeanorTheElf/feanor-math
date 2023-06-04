@@ -934,20 +934,20 @@ impl<R: RingBase + CanonicalIso<R>> RingStore for RingValue<R> {
 /// or [`crate::algorithms::sqr_mul`]). In this case, we only have a reference to a [`crate::ring::RingBase`]
 /// object, but require a [`crate::ring::RingStore`] object to use the algorithm.
 /// 
-pub struct RingRef<'a, R: RingBase + ?Sized> {
+pub struct RingRef<'a, R: RingBase + CanonicalIso<R> + ?Sized> {
     ring: &'a R
 }
 
-impl<'a, R: RingBase + ?Sized> Clone for RingRef<'a, R> {
+impl<'a, R: RingBase + CanonicalIso<R> + ?Sized> Clone for RingRef<'a, R> {
 
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<'a, R: RingBase + ?Sized> Copy for RingRef<'a, R> {}
+impl<'a, R: RingBase + CanonicalIso<R> + ?Sized> Copy for RingRef<'a, R> {}
 
-impl<'a, R: RingBase + ?Sized> RingRef<'a, R> {
+impl<'a, R: RingBase + CanonicalIso<R> + ?Sized> RingRef<'a, R> {
 
     pub const fn new(value: &'a R) -> Self {
         RingRef { ring: value }

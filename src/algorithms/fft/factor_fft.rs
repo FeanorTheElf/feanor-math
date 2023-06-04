@@ -3,8 +3,8 @@ use crate::algorithms::fft::*;
 
 pub struct FFTTableGenCooleyTuckey<R, T1, T2, M = AllocatingMemoryProvider> 
     where R: RingStore,
-        T1: FFTTable<R>,
-        T2: FFTTable<R>,
+        T1: FFTTable<Ring = R>,
+        T2: FFTTable<Ring = R>,
         M: MemoryProvider<El<R>>
 {
     twiddle_factors: M::Object,
@@ -16,8 +16,8 @@ pub struct FFTTableGenCooleyTuckey<R, T1, T2, M = AllocatingMemoryProvider>
 
 impl<R, T1, T2> FFTTableGenCooleyTuckey<R, T1, T2>
     where R: RingStore,
-        T1: FFTTable<R>,
-        T2: FFTTable<R>
+        T1: FFTTable<Ring = R>,
+        T2: FFTTable<Ring = R>
 {
     pub fn new(root_of_unity: El<R>, left_table: T1, right_table: T2) -> Self {
         Self::new_with_mem(root_of_unity, left_table, right_table, &AllocatingMemoryProvider)
@@ -25,8 +25,8 @@ impl<R, T1, T2> FFTTableGenCooleyTuckey<R, T1, T2>
 }
 impl<R, T1, T2, M> FFTTableGenCooleyTuckey<R, T1, T2, M>
     where R: RingStore,
-        T1: FFTTable<R>,
-        T2: FFTTable<R>,
+        T1: FFTTable<Ring = R>,
+        T2: FFTTable<Ring = R>,
         M: MemoryProvider<El<R>>
 {
     pub fn new_with_mem(root_of_unity: El<R>, left_table: T1, right_table: T2, memory_provider: &M) -> Self {
@@ -58,12 +58,14 @@ impl<R, T1, T2, M> FFTTableGenCooleyTuckey<R, T1, T2, M>
     }
 }
 
-impl<R, T1, T2, M> FFTTable<R> for FFTTableGenCooleyTuckey<R, T1, T2, M>
+impl<R, T1, T2, M> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2, M>
     where R: RingStore,
-        T1: FFTTable<R>,
-        T2: FFTTable<R>,
+        T1: FFTTable<Ring = R>,
+        T2: FFTTable<Ring = R>,
         M: MemoryProvider<El<R>>
 {
+    type Ring = R;
+
     fn len(&self) -> usize {
         self.left_table.len() * self.right_table.len()
     }
