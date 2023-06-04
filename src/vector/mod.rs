@@ -1,6 +1,7 @@
 pub mod map;
 pub mod stride;
 pub mod chain;
+pub mod permute;
 
 use std::ops::{RangeBounds, Bound, Index, IndexMut};
 use std::marker::PhantomData;

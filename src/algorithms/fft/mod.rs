@@ -1,4 +1,4 @@
-use crate::{ring::*, vector::*};
+use crate::{ring::*, vector::*, mempool::*};
 
 pub mod cooley_tuckey;
 pub mod bluestein;
@@ -16,11 +16,19 @@ pub trait FFTTable<R: RingStore> {
     /// 
     fn unordered_fft_permutation(&self, i: usize) -> usize;
 
-    fn fft<V, S>(&self, values: V, ring: S)
-        where S: RingStore, S::Type: CanonicalHom<R::Type>, V: SwappableVectorViewMut<El<S>>;
+    fn fft<V, S>(&self, mut values: V, ring: S)
+        where S: RingStore, S::Type: CanonicalHom<R::Type>, V: SwappableVectorViewMut<El<S>>
+    {
+        self.unordered_fft(&mut values, ring);
+        permute::permute_inv(&mut values, |i| self.unordered_fft_permutation(i), &AllocatingMemoryProvider);
+    }
         
-    fn inv_fft<V, S>(&self, values: V, ring: S)
-        where S: RingStore, S::Type: CanonicalHom<R::Type>, V: SwappableVectorViewMut<El<S>>;
+    fn inv_fft<V, S>(&self, mut values: V, ring: S)
+        where S: RingStore, S::Type: CanonicalHom<R::Type>, V: SwappableVectorViewMut<El<S>>
+    {
+        permute::permute(&mut values, |i| self.unordered_fft_permutation(i), &AllocatingMemoryProvider);
+        self.unordered_inv_fft(&mut values, ring);
+    }
 
     ///
     /// Computes the FFT of the given values, but the output values are arbitrarily permuted
