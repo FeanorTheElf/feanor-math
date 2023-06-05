@@ -1,3 +1,5 @@
+use std::ops::DerefMut;
+
 use crate::algorithms::fft::FFTTable;
 use crate::divisibility::DivisibilityRing;
 use crate::divisibility::DivisibilityRingStore;
@@ -26,8 +28,7 @@ pub struct FFTTableBluestein<R, M: MemoryProvider<El<R>> = AllocatingMemoryProvi
     inv_root_of_unity_2n: El<R>,
     /// contrary to expectations, this should be an n-th root of unity and inverse to `inv_root_of_unity^2`
     root_of_unity_n: El<R>,
-    n: usize,
-    memory_provider: M
+    n: usize
 }
 
 impl<R> FFTTableBluestein<R> 
@@ -35,7 +36,7 @@ impl<R> FFTTableBluestein<R>
         R::Type: DivisibilityRing
 {
     pub fn new(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize) -> Self {
-        Self::new_with_mem(ring, root_of_unity_2n, root_of_unity_m, n, log2_m, AllocatingMemoryProvider)
+        Self::new_with_mem(ring, root_of_unity_2n, root_of_unity_m, n, log2_m, &AllocatingMemoryProvider)
     }
 
     pub fn for_zn(ring: R, n: usize) -> Option<Self>
@@ -43,7 +44,7 @@ impl<R> FFTTableBluestein<R>
             R::Type: ZnRing,
             <R::Type as ZnRing>::IntegerRingBase: CanonicalHom<StaticRingBase<i64>>
     {
-        Self::for_zn_with_mem(ring, n, AllocatingMemoryProvider)
+        Self::for_zn_with_mem(ring, n, &AllocatingMemoryProvider)
     }
 }
 
@@ -52,7 +53,7 @@ impl<R, M> FFTTableBluestein<R, M>
         R::Type: DivisibilityRing,
         M: MemoryProvider<El<R>>
 {
-    pub fn new_with_mem(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize, memory_provider: M) -> Self {
+    pub fn new_with_mem(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize, memory_provider: &M) -> Self {
         // checks on m and root_of_unity_m are done by the FFTTableCooleyTuckey
         assert!((1 << log2_m) >= 2 * n + 1);
 
@@ -65,19 +66,18 @@ impl<R, M> FFTTableBluestein<R, M>
         }
         let inv_root_of_unity = ring.pow(ring.clone_el(&root_of_unity_2n), 2 * n - 1);
         let root_of_unity_n = ring.pow(root_of_unity_2n, 2);
-        let m_fft_table = algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey::new_with_mem(ring, root_of_unity_m, log2_m, &memory_provider);
-        m_fft_table.unordered_fft(&mut b[..], m_fft_table.ring());
+        let m_fft_table = algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey::new_with_mem(ring, root_of_unity_m, log2_m, memory_provider);
+        m_fft_table.unordered_fft(&mut b[..], m_fft_table.ring(), memory_provider);
         return FFTTableBluestein { 
             m_fft_table: m_fft_table, 
             b_bitreverse_fft: b, 
             inv_root_of_unity_2n: inv_root_of_unity, 
             root_of_unity_n: root_of_unity_n,
-            n: n,
-            memory_provider: memory_provider
+            n: n
         };
     }
 
-    pub fn for_zn_with_mem(ring: R, n: usize, memory_provider: M) -> Option<Self>
+    pub fn for_zn_with_mem(ring: R, n: usize, memory_provider: &M) -> Option<Self>
         where R: ZnRingStore,
             R::Type: ZnRing,
             <R::Type as ZnRing>::IntegerRingBase: CanonicalHom<StaticRingBase<i64>>
@@ -100,8 +100,12 @@ impl<R, M> FFTTableBluestein<R, M>
     /// and compute the convolution efficiently using a power-of-two FFT (e.g. with the Cooley-Tuckey 
     /// algorithm).
     /// 
-    pub fn fft_base<V, W, S, const INV: bool>(&self, mut values: V, ring: S, mut buffer: W)
-        where V: VectorViewMut<El<S>>, W: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
+    pub fn fft_base<V, W, S, N, const INV: bool>(&self, mut values: V, ring: S, mut buffer: W, memory_provider: &N)
+        where V: VectorViewMut<El<S>>, 
+            W: VectorViewMut<El<S>>, 
+            S: RingStore, 
+            S::Type: CanonicalHom<R::Type>,
+            N: MemoryProvider<El<S>>
     {
         assert_eq!(values.len(), self.n);
         assert_eq!(buffer.len(), self.m_fft_table.len());
@@ -124,11 +128,11 @@ impl<R, M> FFTTableBluestein<R, M>
         }
 
         // perform convoluted product with b using a power-of-two fft
-        self.m_fft_table.unordered_fft(&mut buffer, &ring);
+        self.m_fft_table.unordered_fft(&mut buffer, &ring, memory_provider);
         for i in 0..self.m_fft_table.len() {
             ring.get_ring().mul_assign_map_in_ref(base_ring.get_ring(), buffer.at_mut(i), &self.b_bitreverse_fft[i], hom.raw_hom());
         }
-        self.m_fft_table.unordered_inv_fft(&mut buffer, &ring);
+        self.m_fft_table.unordered_inv_fft(&mut buffer, &ring, memory_provider);
 
         // write values back, and multiply them with a twiddle factor
         for i in 0..self.n {
@@ -147,9 +151,10 @@ impl<R, M> FFTTableBluestein<R, M>
 }
 
 
-impl<R> FFTTable for FFTTableBluestein<R> 
+impl<R, M> FFTTable for FFTTableBluestein<R, M> 
     where R: DivisibilityRingStore,
-        R::Type: DivisibilityRing
+        R::Type: DivisibilityRing,
+        M: MemoryProvider<El<R>>
 {
     type Ring = R;
 
@@ -169,30 +174,42 @@ impl<R> FFTTable for FFTTableBluestein<R>
         i
     }
 
-    fn unordered_fft<V, S>(&self, values: V, ring: S)
-        where S: RingStore, S::Type: CanonicalHom<<R as RingStore>::Type>, V: VectorViewMut<El<S>>
+    fn unordered_fft<V, S, N>(&self, values: V, ring: S, memory_provider: &N)
+        where S: RingStore,
+            S::Type: CanonicalHom<<R as RingStore>::Type>, 
+            V: VectorViewMut<El<S>>,
+            N: MemoryProvider<El<S>>
     {
-        let buffer = self.memory_provider.get_new_init(self.m_fft_table.len(), |_| ring.zero());
-        self.fft_base::<_, _, _, false>(values, ring, buffer);
+        let mut buffer = memory_provider.get_new_init(self.m_fft_table.len(), |_| ring.zero());
+        self.fft_base::<_, _, _, N, false>(values, ring, buffer.deref_mut(), memory_provider);
     }
 
-    fn unordered_inv_fft<V, S>(&self, values: V, ring: S)
-        where S: RingStore, S::Type: CanonicalHom<<R as RingStore>::Type>, V: VectorViewMut<El<S>> 
+    fn unordered_inv_fft<V, S, N>(&self, values: V, ring: S, memory_provider: &N)
+        where S: RingStore,
+            S::Type: CanonicalHom<<R as RingStore>::Type>, 
+            V: VectorViewMut<El<S>>,
+            N: MemoryProvider<El<S>>
     {
-        let buffer = self.memory_provider.get_new_init(self.m_fft_table.len(), |_| ring.zero());
-        self.fft_base::<_, _, _, true>(values, ring, buffer);
+        let mut buffer = memory_provider.get_new_init(self.m_fft_table.len(), |_| ring.zero());
+        self.fft_base::<_, _, _, _, true>(values, ring, buffer.deref_mut(), memory_provider);
     }
 
-    fn fft<V, S>(&self, values: V, ring: S) 
-        where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
+    fn fft<V, S, N>(&self, values: V, ring: S, memory_provider: &N) 
+        where V: VectorViewMut<El<S>>, 
+            S: RingStore, 
+            S::Type: CanonicalHom<R::Type>,
+            N: MemoryProvider<El<S>>
     {
-        self.unordered_fft(values, ring);
+        self.unordered_fft(values, ring, memory_provider);
     }
 
-    fn inv_fft<V, S>(&self, values: V, ring: S) 
-        where V: VectorViewMut<El<S>>, S: RingStore, S::Type: CanonicalHom<R::Type>
+    fn inv_fft<V, S, N>(&self, values: V, ring: S, memory_provider: &N) 
+        where V: VectorViewMut<El<S>>, 
+            S: RingStore, 
+            S::Type: CanonicalHom<R::Type>,
+            N: MemoryProvider<El<S>>
     {
-        self.unordered_inv_fft(values, ring);
+        self.unordered_inv_fft(values, ring, memory_provider);
     }
 }
 
@@ -206,7 +223,7 @@ fn test_fft_base() {
     let fft = FFTTableBluestein::new(ring, ring.from_int(36), ring.from_int(111), 5, 4);
     let mut values = [1, 3, 2, 0, 7];
     let mut buffer = [0; 16];
-    fft.fft_base::<_, _, _, false>(&mut values, ring, &mut buffer);
+    fft.fft_base::<_, _, _, _, false>(&mut values, ring, &mut buffer, &AllocatingMemoryProvider);
     let expected = [13, 137, 202, 206, 170];
     assert_eq!(expected, values);
 }
@@ -219,7 +236,7 @@ fn test_inv_fft_base() {
     let values = [1, 3, 2, 0, 7];
     let mut work = values;
     let mut buffer = [0; 16];
-    fft.fft_base::<_, _, _, false>(&mut work, ring, &mut buffer);
-    fft.fft_base::<_, _, _, true>(&mut work, ring, &mut buffer);
+    fft.fft_base::<_, _, _, _, false>(&mut work, ring, &mut buffer, &AllocatingMemoryProvider);
+    fft.fft_base::<_, _, _, _, true>(&mut work, ring, &mut buffer, &AllocatingMemoryProvider);
     assert_eq!(values, work);
 }

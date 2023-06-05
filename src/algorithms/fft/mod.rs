@@ -19,18 +19,24 @@ pub trait FFTTable {
     /// 
     fn unordered_fft_permutation(&self, i: usize) -> usize;
 
-    fn fft<V, S>(&self, mut values: V, ring: S)
-        where S: RingStore, S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, V: SwappableVectorViewMut<El<S>>
+    fn fft<V, S, M>(&self, mut values: V, ring: S, memory_provider: &M)
+        where S: RingStore, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
+            V: SwappableVectorViewMut<El<S>>,
+            M: MemoryProvider<El<S>>
     {
-        self.unordered_fft(&mut values, ring);
+        self.unordered_fft(&mut values, ring, memory_provider);
         permute::permute_inv(&mut values, |i| self.unordered_fft_permutation(i), &AllocatingMemoryProvider);
     }
         
-    fn inv_fft<V, S>(&self, mut values: V, ring: S)
-        where S: RingStore, S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, V: SwappableVectorViewMut<El<S>>
+    fn inv_fft<V, S, M>(&self, mut values: V, ring: S, memory_provider: &M)
+        where S: RingStore, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
+            V: SwappableVectorViewMut<El<S>>,
+            M: MemoryProvider<El<S>>
     {
         permute::permute(&mut values, |i| self.unordered_fft_permutation(i), &AllocatingMemoryProvider);
-        self.unordered_inv_fft(&mut values, ring);
+        self.unordered_inv_fft(&mut values, ring, memory_provider);
     }
 
     ///
@@ -44,48 +50,15 @@ pub trait FFTTable {
     /// Note that the FFT of a sequence `a_0, ..., a_(N - 1)` is defined as `Fa_k = sum_i a_i z^(-ik)`
     /// where `z` is an N-th root of unity.
     /// 
-    fn unordered_fft<V, S>(&self, values: V, ring: S)
-        where S: RingStore, S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, V: VectorViewMut<El<S>>;
+    fn unordered_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
+        where S: RingStore, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
+            V: VectorViewMut<El<S>>,
+            M: MemoryProvider<El<S>>;
         
-    fn unordered_inv_fft<V, S>(&self, values: V, ring: S)
-        where S: RingStore, S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, V: VectorViewMut<El<S>>;
-}
-
-pub trait FFTTableDyn<R>
-    where R: RingBase
-{
-    fn dyn_len(&self) -> usize;
-    fn dyn_root_of_unity(&self, ring: &R) -> R::Element;
-    fn dyn_fft(&self, values: &mut [R::Element], ring: &R);
-    fn dyn_inv_fft(&self, values: &mut [R::Element], ring: &R);
-    fn dyn_unordered_fft(&self, values: &mut [R::Element], ring: &R);
-    fn dyn_unordered_inv_fft(&self, values: &mut [R::Element], ring: &R);
-}
-
-impl<R, F> FFTTableDyn<R> for F
-    where F: FFTTable, R: CanonicalHom<<F::Ring as RingStore>::Type> + SelfIso
-{
-    fn dyn_len(&self) -> usize {
-        <Self as FFTTable>::len(self)
-    }
-
-    fn dyn_root_of_unity(&self, ring: &R) -> R::Element {
-        ring.map_in_ref(self.ring().get_ring(), self.root_of_unity(), &ring.has_canonical_hom(self.ring().get_ring()).unwrap())
-    }
-
-    fn dyn_fft(&self, values: &mut [<R as RingBase>::Element], ring: &R) {
-        self.fft(values, &RingRef::new(ring));
-    }
-    
-    fn dyn_inv_fft(&self, values: &mut [<R as RingBase>::Element], ring: &R) {
-        self.inv_fft(values, &RingRef::new(ring));
-    }
-
-    fn dyn_unordered_fft(&self, values: &mut [<R as RingBase>::Element], ring: &R) {
-        self.unordered_fft(values, &RingRef::new(ring));
-    }
-    
-    fn dyn_unordered_inv_fft(&self, values: &mut [<R as RingBase>::Element], ring: &R) {
-        self.unordered_inv_fft(values, &RingRef::new(ring));
-    }
+    fn unordered_inv_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
+        where S: RingStore, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
+            V: VectorViewMut<El<S>>,
+            M: MemoryProvider<El<S>>;
 }

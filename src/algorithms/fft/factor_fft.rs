@@ -78,37 +78,43 @@ impl<R, T1, T2, M> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2, M>
         &self.root_of_unity
     }
 
-    fn unordered_fft<V, S>(&self, mut values: V, ring: S)
-        where S: RingStore, S::Type: CanonicalHom<<R as RingStore>::Type>, V: VectorViewMut<El<S>>
+    fn unordered_fft<V, S, N>(&self, mut values: V, ring: S, memory_provider: &N)
+        where S: RingStore,
+            S::Type: CanonicalHom<<R as RingStore>::Type>,
+            V: VectorViewMut<El<S>>,
+            N: MemoryProvider<El<S>>
     {
         let hom = ring.can_hom(self.ring()).unwrap();
         for i in 0..self.right_table.len() {
             let mut v = Subvector::new(&mut values).subvector(i..).stride(self.right_table.len());
-            self.left_table.unordered_fft(&mut v, &ring);
+            self.left_table.unordered_fft(&mut v, &ring, memory_provider);
         }
         for i in 0..self.len() {
             ring.get_ring().mul_assign_map_in_ref(self.ring().get_ring(), values.at_mut(i), self.inv_twiddle_factors.at(i), hom.raw_hom());
         }
         for i in 0..self.left_table.len() {
             let mut v = Subvector::new(&mut values).subvector((i * self.right_table.len())..((i + 1) * self.right_table.len()));
-            self.right_table.unordered_fft(&mut v, &ring);
+            self.right_table.unordered_fft(&mut v, &ring, memory_provider);
         }
     }
 
-    fn unordered_inv_fft<V, S>(&self, mut values: V, ring: S)
-        where S: RingStore, S::Type: CanonicalHom<<R as RingStore>::Type>, V: VectorViewMut<El<S>> 
+    fn unordered_inv_fft<V, S, N>(&self, mut values: V, ring: S, memory_provider: &N)
+        where S: RingStore,
+            S::Type: CanonicalHom<<R as RingStore>::Type>,
+            V: VectorViewMut<El<S>>,
+            N: MemoryProvider<El<S>>
     {
         let hom = ring.can_hom(self.ring()).unwrap();
         for i in 0..self.left_table.len() {
             let mut v = Subvector::new(&mut values).subvector((i * self.right_table.len())..((i + 1) * self.right_table.len()));
-            self.right_table.unordered_inv_fft(&mut v, &ring);
+            self.right_table.unordered_inv_fft(&mut v, &ring, memory_provider);
         }
         for i in 0..self.len() {
             ring.get_ring().mul_assign_map_in_ref(self.ring().get_ring(), values.at_mut(i), self.twiddle_factors.at(i), hom.raw_hom());
         }
         for i in 0..self.right_table.len() {
             let mut v = Subvector::new(&mut values).subvector(i..).stride(self.right_table.len());
-            self.left_table.unordered_inv_fft(&mut v, &ring);
+            self.left_table.unordered_inv_fft(&mut v, &ring, memory_provider);
         }
     }
 
@@ -137,7 +143,7 @@ fn test_fft_basic() {
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
-    fft.unordered_fft(&mut values, ring);
+    fft.unordered_fft(&mut values, ring, &AllocatingMemoryProvider);
     assert_eq!(values, permuted_expected);
 }
 
@@ -156,7 +162,7 @@ fn test_fft_long() {
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
-    fft.unordered_fft(&mut values, ring);
+    fft.unordered_fft(&mut values, ring, &AllocatingMemoryProvider);
     assert_eq!(values, permuted_expected);
 }
 
@@ -171,6 +177,6 @@ fn test_inv_fft() {
     let mut values = [3, 62, 63, 96, 37, 36];
     let expected = [1, 0, 0, 1, 0, 1];
 
-    fft.inv_fft(&mut values, ring);
+    fft.inv_fft(&mut values, ring, &AllocatingMemoryProvider);
     assert_eq!(values, expected);
 }
