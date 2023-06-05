@@ -55,7 +55,6 @@ pub fn factor<I>(ZZ: &I, mut n: El<I>) -> Vec<(El<I>, usize)>
             count += 1;
         }
         if count >= 1 {
-            println!("add {}", p);
             result.push((ZZ_p, count));
         }
     }

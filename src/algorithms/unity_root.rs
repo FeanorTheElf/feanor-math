@@ -15,12 +15,10 @@ pub fn is_root_of_unity<R: RingStore>(ring: R, el: &El<R>, n: usize) -> bool {
 pub fn is_prim_root_of_unity<R: RingStore>(ring: R, el: &El<R>, n: usize) -> bool {
     assert!(n > 1);
     if !is_root_of_unity(&ring, el, n) {
-        println!("{}^{} = {}", ring.format(&el), n, ring.format(&ring.pow(ring.clone_el(&el), n)));
         return false;
     }
     for (p, _) in factor(&StaticRing::<i64>::RING, n as i64) {
         if is_root_of_unity(&ring, el, n / p as usize) {
-            println!("{}^{} = {}", ring.format(&el), n as i64 / p, ring.format(&ring.pow(ring.clone_el(&el), n / p as usize)));
             return false;
         }
     }
