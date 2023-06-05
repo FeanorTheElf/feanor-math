@@ -2,6 +2,7 @@ pub mod karatsuba;
 pub mod conv_mul;
 pub mod sqr_mul;
 pub mod eea;
+pub mod unity_root;
 pub mod fft;
 pub mod bigint;
 pub mod miller_rabin;

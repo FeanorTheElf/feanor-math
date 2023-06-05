@@ -3,6 +3,7 @@ use crate::{ring::*, vector::*, mempool::*};
 pub mod cooley_tuckey;
 pub mod bluestein;
 pub mod factor_fft;
+pub mod primitive;
 
 pub trait FFTTable {
 

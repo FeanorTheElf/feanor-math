@@ -1,10 +1,13 @@
 use crate::algorithms::fft::FFTTable;
 use crate::divisibility::DivisibilityRing;
 use crate::divisibility::DivisibilityRingStore;
+use crate::integer::IntegerRingStore;
 use crate::mempool::AllocatingMemoryProvider;
 use crate::mempool::MemoryProvider;
+use crate::primitive_int::*;
 use crate::ring::*;
 use crate::algorithms;
+use crate::rings::zn::*;
 use crate::vector::VectorViewMut;
 
 pub struct FFTTableBluestein<R, M: MemoryProvider<El<R>> = AllocatingMemoryProvider>
@@ -33,6 +36,14 @@ impl<R> FFTTableBluestein<R>
 {
     pub fn new(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize) -> Self {
         Self::new_with_mem(ring, root_of_unity_2n, root_of_unity_m, n, log2_m, AllocatingMemoryProvider)
+    }
+
+    pub fn for_zn(ring: R, n: usize) -> Option<Self>
+        where R: ZnRingStore,
+            R::Type: ZnRing,
+            <R::Type as ZnRing>::IntegerRingBase: CanonicalHom<StaticRingBase<i64>>
+    {
+        Self::for_zn_with_mem(ring, n, AllocatingMemoryProvider)
     }
 }
 
@@ -64,6 +75,18 @@ impl<R, M> FFTTableBluestein<R, M>
             n: n,
             memory_provider: memory_provider
         };
+    }
+
+    pub fn for_zn_with_mem(ring: R, n: usize, memory_provider: M) -> Option<Self>
+        where R: ZnRingStore,
+            R::Type: ZnRing,
+            <R::Type as ZnRing>::IntegerRingBase: CanonicalHom<StaticRingBase<i64>>
+    {
+        let ZZ = StaticRing::<i64>::RING;
+        let log2_m = ZZ.abs_log2_ceil(&(2 * n as i64 + 1)).unwrap();
+        let root_of_unity_2n = algorithms::unity_root::get_prim_root_of_unity(&ring, 2 * n)?;
+        let root_of_unity_m = algorithms::unity_root::get_prim_root_of_unity_pow2(&ring, log2_m)?;
+        Some(Self::new_with_mem(ring, root_of_unity_2n, root_of_unity_m, n, log2_m, memory_provider))
     }
 
     ///

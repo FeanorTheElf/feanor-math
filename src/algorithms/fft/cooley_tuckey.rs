@@ -1,10 +1,10 @@
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
-use crate::integer::IntegerRingStore;
+use crate::primitive_int::*;
 use crate::mempool::{MemoryProvider, AllocatingMemoryProvider};
 use crate::rings::zn::{ZnRingStore, ZnRing};
 use crate::vector::SwappableVectorViewMut;
 use crate::{ring::*, vector::VectorViewMut};
-use crate::algorithms::fft::*;
+use crate::algorithms::{fft::*, self};
 
 pub struct FFTTableCooleyTuckey<R, M: MemoryProvider<El<R>> = AllocatingMemoryProvider> 
     where R: RingStore
@@ -33,7 +33,8 @@ impl<R> FFTTableCooleyTuckey<R>
     
     pub fn for_zn(ring: R, log2_n: usize) -> Option<Self>
         where R: ZnRingStore,
-            R::Type: ZnRing
+            R::Type: ZnRing,
+            <R::Type as ZnRing>::IntegerRingBase: CanonicalHom<StaticRingBase<i64>>
     {
         Self::for_zn_with_mem(ring, log2_n, &AllocatingMemoryProvider)
     }
@@ -54,7 +55,8 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
     }
 
     fn create_root_of_unity_list(ring: &R, root_of_unity: &El<R>, log2_n: usize, memory_provider: &M) -> M::Object {
-        let mut root_of_unity_list = memory_provider.get_new_init((1 << log2_n) - 1, |_| ring.zero());
+        // in fact, we could choose this to have only length `(1 << log2_n) - 1`, but a power of two length is probably faster
+        let mut root_of_unity_list = memory_provider.get_new_init(1 << log2_n, |_| ring.zero());
         let mut index = 0;
         for s in 0..log2_n {
             let m = 1 << s;
@@ -98,30 +100,11 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
 
     pub fn for_zn_with_mem(ring: R, log2_n: usize, memory_provider: &M) -> Option<Self>
         where R: ZnRingStore,
-            R::Type: ZnRing
+            R::Type: ZnRing,
+            <R::Type as ZnRing>::IntegerRingBase: CanonicalHom<StaticRingBase<i64>>
     {
-        assert!(log2_n > 0);
-        assert!(ring.is_field());
-        let ZZ = ring.integer_ring();
-        let mut n = ZZ.one();
-        ZZ.mul_pow_2(&mut n, log2_n);
-        let order = ZZ.sub_ref_fst(ring.modulus(), ZZ.one());
-        let power = ZZ.checked_div(&order, &n)?;
-        
-        let pow_n_half = |mut x: El<R>| {
-            for _ in 1..log2_n {
-                let x_copy = ring.clone_el(&x);
-                ring.mul_assign(&mut x, x_copy);
-            }
-            return x;
-        };
-
-        let mut rng = oorandom::Rand64::new(ZZ.default_hash(ring.modulus()) as u128);
-        let mut current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZ);
-        while !ring.is_neg_one(&pow_n_half(ring.clone_el(&current))) {
-            current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZ);
-        }
-        return Some(Self::new_with_mem(ring, current, log2_n, memory_provider));
+        let root_of_unity = algorithms::unity_root::get_prim_root_of_unity_pow2(&ring, log2_n)?;
+        Some(Self::new_with_mem(ring, root_of_unity, log2_n, memory_provider))
     }
 
     pub fn bitreverse_permute_inplace<V, T>(&self, mut values: V) 
@@ -262,8 +245,6 @@ use crate::rings::zn::zn_static::Zn;
 use crate::rings::zn::zn_barett;
 #[cfg(test)]
 use crate::rings::zn::zn_42;
-#[cfg(test)]
-use crate::primitive_int::*;
 #[cfg(test)]
 use crate::field::*;
 
