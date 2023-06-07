@@ -1,9 +1,15 @@
+use crate::algorithms::poly_div::left_poly_div;
+use crate::divisibility::*;
+use crate::euclidean::*;
+use crate::field::Field;
 use crate::mempool::{AllocatingMemoryProvider, GrowableMemoryProvider};
 use crate::vector::VectorViewMut;
-use crate::{ring::*, algorithms};
+use crate::ring::*;
+use crate::algorithms;
 use crate::rings::poly::*;
 
 use std::cmp::min;
+use std::ops::{DerefMut, Deref};
 
 pub struct DensePolyRingBase<R: RingStore, M: GrowableMemoryProvider<El<R>> = AllocatingMemoryProvider> {
     base_ring: R,
@@ -302,6 +308,42 @@ impl<R, M: GrowableMemoryProvider<El<R>>> PolyRing for DensePolyRingBase<R, M>
     }
 }
 
+impl<R, M: GrowableMemoryProvider<El<R>>> DivisibilityRing for DensePolyRingBase<R, M> 
+    where R: DivisibilityRingStore, R::Type: DivisibilityRing + CanonicalIso<R::Type>
+{
+    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        if let Some(d) = self.degree(rhs) {
+            let lc = &rhs[d];
+            let mut lhs_copy = self.memory_provider.get_new_init(lhs.len(), |i| self.base_ring.clone_el(&lhs[i]));
+            left_poly_div(lhs_copy.deref_mut(), rhs.deref(), self.base_ring(), |x| self.base_ring().checked_left_div(&x, lc), &self.memory_provider)
+        } else if self.is_zero(lhs) {
+            Some(self.zero())
+        } else {
+            None
+        }
+    }
+}
+
+impl<R, M: GrowableMemoryProvider<El<R>>> EuclideanRing for DensePolyRingBase<R, M> 
+    where R: RingStore, R::Type: Field + CanonicalIso<R::Type>
+{
+    fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+        let lc_inv = self.base_ring.invert(&rhs[self.degree(rhs).unwrap()]).unwrap();
+        let quo = left_poly_div(
+            lhs.deref_mut(), 
+            rhs.deref(), 
+            self.base_ring(), 
+            |x| Some(self.base_ring().mul_ref_snd(x, &lc_inv)), 
+            &self.memory_provider
+        ).unwrap();
+        return (quo, lhs);
+    }
+
+    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
+        return Some(self.degree(val).map(|x| x + 1).unwrap_or(0));
+    }
+}
+
 #[cfg(test)]
 use crate::rings::zn::*;
 #[cfg(test)]
@@ -331,4 +373,16 @@ fn test_ring_axioms() {
 fn test_poly_ring_axioms() {
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
     generic_test_poly_ring_axioms(poly_ring, Zn::<7>::RING.elements());
+}
+
+#[test]
+fn test_divisibility_ring_axioms() {
+    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    generic_test_divisibility_axioms(&poly_ring, edge_case_elements(&poly_ring));
+}
+
+#[test]
+fn test_euclidean_ring_axioms() {
+    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    generic_test_euclidean_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
