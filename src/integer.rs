@@ -123,11 +123,11 @@ pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>
             ring.mul_pow_2(&mut pow_2, i);
             let mut b = ring.clone_el(a);
             ring.mul_pow_2(&mut b, i);
-            assert!(ring.eq_el(&b, &ring.mul(ring.clone_el(a), ring.clone_el(&pow_2))));
+            assert_el_eq!(&ring, &b, &ring.mul(ring.clone_el(a), ring.clone_el(&pow_2)));
             ring.euclidean_div_pow_2(&mut b, i);
-            assert!(ring.eq_el(&b, a));
+            assert_el_eq!(&ring, &b, a);
             ring.euclidean_div_pow_2(&mut b, i);
-            assert!(ring.eq_el(&b, &ring.euclidean_div(ring.clone_el(a), &pow_2)));
+            assert_el_eq!(&ring, &b, &ring.euclidean_div(ring.clone_el(a), &pow_2));
         }
     }
 
@@ -135,14 +135,14 @@ pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>
     let d = ring.from_int(8);
     for k in -10..=10 {
         let mut a = ring.from_int(k);
-        assert!(ring.eq_el(&ring.from_int(k / 8), &ring.euclidean_div(ring.clone_el(&a), &d)));
+        assert_el_eq!(&ring, &ring.from_int(k / 8), &ring.euclidean_div(ring.clone_el(&a), &d));
         ring.euclidean_div_pow_2(&mut a, 3);
-        assert!(ring.eq_el(&ring.from_int(k / 8), &a));
+        assert_el_eq!(&ring, &ring.from_int(k / 8), &a);
     }
     let d = ring.from_int(-8);
     for k in -10..=10 {
         let a = ring.from_int(k);
-        assert!(ring.eq_el(&ring.from_int(k / -8), &ring.euclidean_div(ring.clone_el(&a), &d)));
+        assert_el_eq!(&ring, &ring.from_int(k / -8), &ring.euclidean_div(ring.clone_el(&a), &d));
     }
 }
 

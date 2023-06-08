@@ -26,6 +26,8 @@ pub trait PolyRing: RingExtension + CanonicalIso<Self> {
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, i: usize) -> &'a El<Self::BaseRing>;
 
     fn degree(&self, f: &Self::Element) -> Option<usize>;
+
+    fn div_rem_monic(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element);
 }
 
 pub trait PolyRingStore: RingStore
@@ -33,6 +35,7 @@ pub trait PolyRingStore: RingStore
 {
     delegate!{ fn indeterminate(&self) -> El<Self> }
     delegate!{ fn degree(&self, f: &El<Self>) -> Option<usize> }
+    delegate!{ fn div_rem_monic(&self, lhs: El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>) }
 
     fn coefficient_at<'a>(&'a self, f: &'a El<Self>, i: usize) -> &'a El<<Self::Type as RingExtension>::BaseRing> {
         self.get_ring().coefficient_at(f, i)
@@ -88,7 +91,7 @@ pub fn generic_test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R:
                         ring.mul(ring.from_ref(b), ring.mul_ref_snd(ring.from_ref(c), &x)),
                         ring.mul(ring.from_ref(b), ring.mul(ring.from_ref(d), ring.pow(ring.clone_el(&x), 2)))
                     ].into_iter());
-                    assert!(ring.eq_el(&result, &ring.mul(a_bx, c_dx)));
+                    assert_el_eq!(&ring, &result, &ring.mul(a_bx, c_dx));
                 }
             }
         }
@@ -104,8 +107,30 @@ pub fn generic_test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R:
                     ring.mul(ring.from_ref(c), ring.pow(ring.clone_el(&x), 3))
                 ].into_iter());
                 let actual = ring.from_terms([(ring.base_ring().clone_el(a), 0), (ring.base_ring().clone_el(c), 3), (ring.base_ring().clone_el(b), 1)].into_iter());
-                assert!(ring.eq_el(&f, &actual));
-                assert!(ring.eq_el(&f, &ring.from_terms(ring.terms(&f).map(|(c, i)| (ring.base_ring().clone_el(c), i)))));
+                assert_el_eq!(&ring, &f, &actual);
+                assert_el_eq!(&ring, &f, &ring.from_terms(ring.terms(&f).map(|(c, i)| (ring.base_ring().clone_el(c), i))));
+            }
+        }
+    }
+
+    // test div_rem_monic()
+    for a in &elements {
+        for b in &elements {
+            for c in &elements {
+                let f = ring.from_terms([(ring.base_ring().clone_el(a), 0), (ring.base_ring().clone_el(b), 3)].into_iter());
+                let g = ring.from_terms([(ring.base_ring().negate(ring.base_ring().clone_el(c)), 0), (ring.base_ring().one(), 1)].into_iter());
+
+                let (quo, rem) = ring.div_rem_monic(ring.clone_el(&f), &g);
+                assert_el_eq!(
+                    &ring,
+                    &ring.from_terms([(ring.base_ring().add_ref_fst(a, ring.base_ring().mul_ref_fst(b, ring.base_ring().pow(ring.base_ring().clone_el(c), 3))), 0)].into_iter()),
+                    &rem
+                );
+                assert_el_eq!(
+                    &ring,
+                    &f,
+                    &ring.add(rem, ring.mul(quo, g))
+                );
             }
         }
     }

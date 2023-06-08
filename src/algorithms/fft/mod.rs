@@ -6,7 +6,7 @@ pub mod factor_fft;
 
 pub trait FFTTable {
 
-    type Ring: RingStore;
+    type Ring: ?Sized + RingStore;
 
     fn len(&self) -> usize;
     fn ring(&self) -> &Self::Ring;

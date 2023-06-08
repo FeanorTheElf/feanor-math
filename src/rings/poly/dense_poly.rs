@@ -306,6 +306,18 @@ impl<R, M: GrowableMemoryProvider<El<R>>> PolyRing for DensePolyRingBase<R, M>
         }
         return None;
     }
+
+    fn div_rem_monic(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+        assert!(self.base_ring().is_one(self.coefficient_at(rhs, self.degree(rhs).unwrap())));
+        let quo = left_poly_div(
+            lhs.deref_mut(), 
+            rhs.deref(), 
+            self.base_ring(), 
+            |x| Some(x), 
+            &self.memory_provider
+        ).unwrap();
+        return (quo, lhs);
+    }
 }
 
 impl<R, M: GrowableMemoryProvider<El<R>>> DivisibilityRing for DensePolyRingBase<R, M> 

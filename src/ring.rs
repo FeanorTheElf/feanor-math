@@ -357,6 +357,7 @@ pub trait RingBase: PartialEq {
     }
 }
 
+#[macro_export]
 macro_rules! delegate {
     (fn $name:ident (&self, $($pname:ident: $ptype:ty),*) -> $rtype:ty) => {
         fn $name (&self, $($pname: $ptype),*) -> $rtype {
@@ -368,6 +369,17 @@ macro_rules! delegate {
             self.get_ring().$name()
         }
     };
+}
+
+#[macro_export]
+macro_rules! assert_el_eq {
+    ($ring:expr, $lhs:expr, $rhs:expr) => {
+        match ($ring, $lhs, $rhs) {
+            (ring_val, lhs_val, rhs_val) => {
+                assert!(ring_val.eq_el(lhs_val, rhs_val), "Assertion failed: {} != {}", ring_val.format(lhs_val), ring_val.format(rhs_val));
+            }
+        }
+    }
 }
 
 pub struct CanHom<R, S>
@@ -459,6 +471,7 @@ impl<R, S> CanIso<R, S>
 /// # Example
 /// 
 /// ```
+/// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
 /// fn add_in_ring<R: RingStore>(ring: R, a: El<R>, b: El<R>) -> El<R> {
@@ -466,10 +479,11 @@ impl<R, S> CanIso<R, S>
 /// }
 /// 
 /// let ring: RingValue<StaticRingBase<i64>> = StaticRing::<i64>::RING;
-/// assert!(ring.eq_el(&7, &add_in_ring(ring, 3, 4)));
+/// assert_el_eq!(&ring, &7, &add_in_ring(ring, 3, 4));
 /// ```
 /// The next example is the one from the Readme
 /// ```
+/// use feanor_math::assert_el_eq;
 /// use feanor_math::ring::*;
 /// use feanor_math::primitive_int::*;
 /// use feanor_math::rings::zn::zn_barett::*;
@@ -1214,8 +1228,8 @@ pub fn generic_test_self_iso<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, e
     generic_test_canonical_iso_axioms(&ring, &ring, elements.iter().map(|x| ring.clone_el(x)));
 
     for a in &elements {
-        assert!(ring.eq_el(a, &ring.get_ring().map_in_ref(ring.get_ring(), a, &hom)));
-        assert!(ring.eq_el(a, &ring.get_ring().map_out(ring.get_ring(), ring.clone_el(a), &iso)));
+        assert_el_eq!(&ring, a, &ring.get_ring().map_in_ref(ring.get_ring(), a, &hom));
+        assert_el_eq!(&ring, a, &ring.get_ring().map_out(ring.get_ring(), ring.clone_el(a), &iso));
     }
 }
 
@@ -1227,13 +1241,13 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
 
     // check self-subtraction
     for a in &elements {
-        assert!(ring.eq_el(&zero, &ring.sub(ring.clone_el(a), ring.clone_el(a))));
+        assert_el_eq!(&ring, &zero, &ring.sub(ring.clone_el(a), ring.clone_el(a)));
     }
 
     // check identity elements
     for a in &elements {
-        assert!(ring.eq_el(&a, &ring.add(ring.clone_el(a), ring.clone_el(&zero))));
-        assert!(ring.eq_el(&a, &ring.mul(ring.clone_el(a), ring.clone_el(&one))));
+        assert_el_eq!(&ring, &a, &ring.add(ring.clone_el(a), ring.clone_el(&zero)));
+        assert_el_eq!(&ring, &a, &ring.mul(ring.clone_el(a), ring.clone_el(&one)));
     }
 
     // check commutativity
@@ -1285,4 +1299,3 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
         }
     }
 }
-

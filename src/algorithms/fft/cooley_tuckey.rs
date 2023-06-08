@@ -322,7 +322,7 @@ fn run_fft_bench_round<R, S>(ring: S, fft: &FFTTableCooleyTuckey<R>, data: &Vec<
     copy.extend(data.iter().map(|x| ring.clone_el(x)));
     fft.unordered_fft(&mut copy[..], &ring, &AllocatingMemoryProvider);
     fft.unordered_inv_fft(&mut copy[..], &ring, &AllocatingMemoryProvider);
-    assert!(ring.eq_el(&copy[0], &data[0]));
+    assert_el_eq!(&ring, &copy[0], &data[0]);
 }
 
 #[bench]
