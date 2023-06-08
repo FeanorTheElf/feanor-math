@@ -337,7 +337,7 @@ fn bench_fft(bencher: &mut test::Bencher) {
 }
 
 #[bench]
-fn bench_fft_lazy(bencher: &mut test::Bencher) {
+fn bench_fft_optimized(bencher: &mut test::Bencher) {
     let ring = zn_42::Zn::new(1073872897);
     let fastmul_ring = zn_42::ZnFastmul::new(ring);
     let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, 15).unwrap();

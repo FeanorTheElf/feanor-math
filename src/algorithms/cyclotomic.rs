@@ -8,16 +8,16 @@ pub fn cyclotomic_polynomial<P>(P: P, n: usize) -> El<P>
     where P: PolyRingStore, P::Type: PolyRing + DivisibilityRing
 {
     let mut current = P.sub(P.indeterminate(), P.one());
-    let ZZ = StaticRing::<i64>::RING;
-    for (p, e) in algorithms::int_factor::factor(&ZZ, n as i64) {
-        let pe = ZZ.pow(p, e) as usize;
-        let p_e_minus_one = ZZ.pow(p, e - 1) as usize;
+    let ZZ = StaticRing::<i128>::RING;
+    let mut power_of_x = 1;
+    for (p, e) in algorithms::int_factor::factor(&ZZ, n as i128) {
+        power_of_x *= ZZ.pow(p, e - 1) as usize;
         current = P.checked_div(
-            &P.from_terms(P.terms(&current).map(|(c, d)| (P.base_ring().clone_el(c), d * pe))), 
-            &P.from_terms(P.terms(&current).map(|(c, d)| (P.base_ring().clone_el(c), d * p_e_minus_one))), 
+            &P.from_terms(P.terms(&current).map(|(c, d)| (P.base_ring().clone_el(c), d * p as usize))), 
+            &current, 
         ).unwrap();
     }
-    return current;
+    return P.from_terms(P.terms(&current).map(|(c, d)| (P.base_ring().clone_el(c), d * power_of_x)));
 }
 
 #[cfg(test)]
@@ -59,4 +59,12 @@ pub fn test_cyclotomic_polynomial() {
         ].into_iter()),
         &cyclotomic_polynomial(&poly_ring, 105)
     ));
+}
+
+#[bench]
+pub fn bench_cyclotomic_polynomial(bencher: &mut test::Bencher) {
+    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    bencher.iter(|| {
+        std::hint::black_box(cyclotomic_polynomial(&poly_ring, std::hint::black_box(257 * 257 * 65)));
+    });
 }
