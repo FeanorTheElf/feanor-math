@@ -1,3 +1,6 @@
+use crate::divisibility::*;
+use crate::euclidean::*;
+use crate::field::Field;
 use crate::vector::VectorViewMut;
 use crate::ring::*;
 use crate::rings::poly::*;
@@ -312,6 +315,36 @@ impl<R> PolyRing for SparsePolyRingBase<R>
     }
 }
 
+impl<R,> DivisibilityRing for SparsePolyRingBase<R> 
+    where R: DivisibilityRingStore, R::Type: DivisibilityRing + CanonicalIso<R::Type>
+{
+    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        if let Some(d) = self.degree(rhs) {
+            let lc = rhs.at(d);
+            let mut lhs_copy = lhs.clone();
+            self.poly_div(&mut lhs_copy, rhs, |x| self.base_ring().checked_left_div(&x, lc))
+        } else if self.is_zero(lhs) {
+            Some(self.zero())
+        } else {
+            None
+        }
+    }
+}
+
+impl<R> EuclideanRing for SparsePolyRingBase<R> 
+    where R: RingStore, R::Type: Field + CanonicalIso<R::Type>
+{
+    fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+        let lc_inv = self.base_ring.invert(rhs.at(self.degree(rhs).unwrap())).unwrap();
+        let quo = self.poly_div(&mut lhs, rhs, |x| Some(self.base_ring().mul_ref_snd(x, &lc_inv))).unwrap();
+        return (quo, lhs);
+    }
+
+    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
+        return Some(self.degree(val).map(|x| x + 1).unwrap_or(0));
+    }
+}
+
 #[cfg(test)]
 use crate::rings::zn::*;
 #[cfg(test)]
@@ -357,4 +390,16 @@ fn test_canonical_iso_axioms_different_base_ring() {
     let poly_ring2 = SparsePolyRing::new(zn_42::Zn::new(7), "X");
     generic_test_canonical_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
     generic_test_canonical_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+}
+
+#[test]
+fn test_divisibility_ring_axioms() {
+    let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
+    generic_test_divisibility_axioms(&poly_ring, edge_case_elements(&poly_ring));
+}
+
+#[test]
+fn test_euclidean_ring_axioms() {
+    let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
+    generic_test_euclidean_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }

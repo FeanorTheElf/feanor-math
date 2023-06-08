@@ -23,6 +23,8 @@ pub fn cyclotomic_polynomial<P>(P: P, n: usize) -> El<P>
 #[cfg(test)]
 use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
+use crate::rings::poly::sparse_poly::SparsePolyRing;
+#[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
 
 #[test]
@@ -64,6 +66,14 @@ pub fn test_cyclotomic_polynomial() {
 #[bench]
 pub fn bench_cyclotomic_polynomial(bencher: &mut test::Bencher) {
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    bencher.iter(|| {
+        std::hint::black_box(cyclotomic_polynomial(&poly_ring, std::hint::black_box(257 * 257 * 65)));
+    });
+}
+
+#[bench]
+pub fn bench_cyclotomic_polynomial_sparse(bencher: &mut test::Bencher) {
+    let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
     bencher.iter(|| {
         std::hint::black_box(cyclotomic_polynomial(&poly_ring, std::hint::black_box(257 * 257 * 65)));
     });

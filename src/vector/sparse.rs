@@ -27,7 +27,7 @@ impl<R: RingStore> SparseVectorMut<R> {
 
     pub fn set_len(&mut self, new_len: usize) {
         if new_len < self.len() {
-            for (i, c) in self.nontrivial_entries() {
+            for (i, _) in self.nontrivial_entries() {
                 debug_assert!(i < new_len);
             }
         }
