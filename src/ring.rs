@@ -1234,7 +1234,9 @@ pub fn generic_test_self_iso<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, e
 }
 
 #[cfg(test)]
-pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
+pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
+    where R::Type: SelfIso
+{
     let elements = edge_case_elements.collect::<Vec<_>>();
     let zero = ring.zero();
     let one = ring.one();
@@ -1298,4 +1300,7 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
             }
         }
     }
+
+    generic_test_canonical_hom_axioms(&ring, &ring, elements.iter().map(|x| ring.clone_el(x)));
+    generic_test_canonical_iso_axioms(&ring, &ring, elements.into_iter());
 }

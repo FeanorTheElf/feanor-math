@@ -1,5 +1,7 @@
 use crate::ring::*;
+
 pub mod dense_poly;
+pub mod sparse_poly;
 
 ///
 /// Trait for all rings that represent the polynomial ring `R[X]` with
@@ -55,6 +57,55 @@ pub trait PolyRingStore: RingStore
 impl<R: RingStore> PolyRingStore for R
     where R::Type: PolyRing
 {}
+
+pub mod generic_impls {
+    use crate::ring::*;
+    use super::PolyRing;
+
+    #[allow(type_alias_bounds)]
+    pub type GenericCanonicalHom<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanonicalHom<<P1::BaseRing as RingStore>::Type>>::Homomorphism;
+
+    pub fn generic_map_in<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P1::Element, hom: &GenericCanonicalHom<P1, P2>) -> P2::Element
+        where <P2::BaseRing as RingStore>::Type: CanonicalHom<<P1::BaseRing as RingStore>::Type>
+    {
+        to.from_terms(from.terms(&el).map(|(c, i)| (to.base_ring().get_ring().map_in(from.base_ring().get_ring(), from.base_ring().clone_el(c), hom), i)))
+    }
+
+    #[allow(type_alias_bounds)]
+    pub type GenericCanonicalIso<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanonicalIso<<P1::BaseRing as RingStore>::Type>>::Isomorphism;
+
+    pub fn generic_map_out<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P2::Element, iso: &GenericCanonicalIso<P1, P2>) -> P1::Element
+        where <P2::BaseRing as RingStore>::Type: CanonicalIso<<P1::BaseRing as RingStore>::Type>
+    {
+        from.from_terms(to.terms(&el).map(|(c, i)| (to.base_ring().get_ring().map_out(from.base_ring().get_ring(), to.base_ring().clone_el(c), iso), i)))
+    }
+
+    pub fn dbg_poly<P: PolyRing>(ring: &P, el: &P::Element, out: &mut std::fmt::Formatter, unknown_name: &str) -> std::fmt::Result {
+        let mut terms = ring.terms(el);
+        let print_unknown = |i: usize, out: &mut std::fmt::Formatter| {
+            if i == 0 {
+                // print nothing
+                Ok(())
+            } else if i == 1 {
+                write!(out, "{}", unknown_name)
+            } else {
+                write!(out, "{}^{}", unknown_name, i)
+            }
+        };
+        if let Some((c, i)) = terms.next() {
+            ring.base_ring().get_ring().dbg(c, out)?;
+            print_unknown(i, out)?;
+        } else {
+            write!(out, "0")?;
+        }
+        while let Some((c, i)) = terms.next() {
+            write!(out, " + ")?;
+            ring.base_ring().get_ring().dbg(c, out)?;
+            print_unknown(i, out)?;
+        }
+        return Ok(());
+    }
+}
 
 #[cfg(test)]
 pub fn generic_test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R::Type as RingExtension>::BaseRing>>>(ring: R, interesting_base_ring_elements: I)

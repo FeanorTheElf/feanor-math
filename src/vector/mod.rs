@@ -2,6 +2,7 @@ pub mod map;
 pub mod stride;
 pub mod chain;
 pub mod permute;
+pub mod sparse;
 
 use std::ops::{RangeBounds, Bound, Index, IndexMut};
 use std::marker::PhantomData;
@@ -104,6 +105,14 @@ pub trait VectorFn<T> {
     
     fn len(&self) -> usize;
     fn at(&self, i: usize) -> T;
+}
+
+pub trait VectorViewSparse<T>: VectorView<T> {
+
+    type Iter<'a>: Iterator<Item = (usize, &'a T)>
+        where Self: 'a, T: 'a;
+
+    fn nontrivial_entries<'a>(&'a self) -> Self::Iter<'a>;
 }
 
 impl<T> VectorView<T> for (T, T) {
