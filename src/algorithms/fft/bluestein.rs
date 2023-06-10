@@ -1,6 +1,7 @@
 use std::ops::DerefMut;
 
 use crate::algorithms::fft::FFTTable;
+use crate::algorithms::unity_root::is_prim_root_of_unity;
 use crate::divisibility::DivisibilityRing;
 use crate::divisibility::DivisibilityRingStore;
 use crate::integer::IntegerRingStore;
@@ -56,6 +57,7 @@ impl<R, M> FFTTableBluestein<R, M>
     pub fn new_with_mem(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize, memory_provider: &M) -> Self {
         // checks on m and root_of_unity_m are done by the FFTTableCooleyTuckey
         assert!((1 << log2_m) >= 2 * n + 1);
+        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity(&ring, &root_of_unity_2n, 2 * n));
 
         let m = 1 << log2_m;
         let mut b = memory_provider.get_new_init(m, |_| ring.zero());

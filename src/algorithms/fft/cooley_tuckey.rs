@@ -1,3 +1,4 @@
+use crate::algorithms::unity_root::is_prim_root_of_unity_pow2;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::primitive_int::*;
 use crate::mempool::{MemoryProvider, AllocatingMemoryProvider};
@@ -11,7 +12,6 @@ pub struct FFTTableCooleyTuckey<R, M: MemoryProvider<El<R>> = AllocatingMemoryPr
 {
     ring: R,
     root_of_unity: El<R>,
-    inv_root_of_unity: El<R>,
     log2_n: usize,
     // stores the powers of root_of_unity in special bitreversed order
     root_of_unity_list: M::Object,
@@ -47,11 +47,11 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
     pub fn new_with_mem(ring: R, root_of_unity: El<R>, log2_n: usize, memory_provider: &M) -> Self {
         assert!(ring.is_commutative());
         assert!(log2_n > 0);
-        assert!(ring.is_neg_one(&ring.pow(ring.clone_el(&root_of_unity), 1 << (log2_n - 1))));
+        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &root_of_unity, log2_n));
         let root_of_unity_list = Self::create_root_of_unity_list(&ring, &root_of_unity, log2_n, memory_provider);
         let inv_root_of_unity = ring.pow(ring.clone_el(&root_of_unity), (1 << log2_n) - 1);
         let inv_root_of_unity_list = Self::create_root_of_unity_list(&ring, &inv_root_of_unity, log2_n, memory_provider);
-        FFTTableCooleyTuckey { ring, root_of_unity, inv_root_of_unity, log2_n, root_of_unity_list, inv_root_of_unity_list }
+        FFTTableCooleyTuckey { ring, root_of_unity, log2_n, root_of_unity_list, inv_root_of_unity_list }
     }
 
     fn create_root_of_unity_list(ring: &R, root_of_unity: &El<R>, log2_n: usize, memory_provider: &M) -> M::Object {
@@ -77,7 +77,6 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
     /// 
     fn inv_root_of_unity_pow(&self, exp_2: usize, bitreverse_exp: usize) -> &El<R> {
         let result = &self.inv_root_of_unity_list[(1 << self.log2_n) - (1 << (self.log2_n - exp_2)) + (bitreverse_exp / 2)];
-        debug_assert!(self.ring.eq_el(result, &self.ring.pow(self.ring.clone_el(&self.inv_root_of_unity), (1 << exp_2) * bitreverse(bitreverse_exp, self.log2_n - exp_2))));
         return result;
     }
 
@@ -86,7 +85,6 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
     /// 
     fn root_of_unity_pow(&self, exp_2: usize, bitreverse_exp: usize) -> &El<R> {
         let result = &self.root_of_unity_list[(1 << self.log2_n) - (1 << (self.log2_n - exp_2)) + (bitreverse_exp / 2)];
-        debug_assert!(self.ring.eq_el(result, &self.ring.pow(self.ring.clone_el(&self.root_of_unity), (1 << exp_2) * bitreverse(bitreverse_exp, self.log2_n - exp_2))));
         return result;
     }
 
@@ -169,7 +167,7 @@ impl<R, M: MemoryProvider<El<R>>> FFTTable for FFTTableCooleyTuckey<R, M>
         assert!(values.len() == (1 << self.log2_n));
         let hom = ring.can_hom(&self.ring).unwrap();
         // check if the canonical hom `R -> S` maps `self.root_of_unity` to a primitive N-th root of unity
-        debug_assert!(ring.is_neg_one(&ring.pow(hom.map_ref(&self.root_of_unity), 1 << (self.log2_n - 1))));
+        debug_assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &hom.map_ref(&self.root_of_unity), self.log2_n));
 
         for s in (0..self.log2_n).rev() {
             let m = 1 << s;
@@ -218,7 +216,7 @@ impl<R, M: MemoryProvider<El<R>>> FFTTable for FFTTableCooleyTuckey<R, M>
         // this is exactly `bitreverse_fft_inplace_base()` with all operations reversed
         assert!(values.len() == 1 << self.log2_n);
         let hom = ring.can_hom(&self.ring).unwrap();
-        debug_assert!(ring.is_neg_one(&ring.pow(hom.map_ref(&self.root_of_unity), 1 << (self.log2_n - 1))));
+        debug_assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &hom.map_ref(&self.root_of_unity), self.log2_n));
 
         for s in 0..self.log2_n {
             let m = 1 << s;
@@ -306,12 +304,10 @@ fn test_for_zn() {
     let ring = Zn::<17>::RING;
     let fft = FFTTableCooleyTuckey::for_zn(ring, 4).unwrap();
     assert!(ring.is_neg_one(&ring.pow(fft.root_of_unity, 8)));
-    assert!(ring.is_neg_one(&ring.pow(fft.inv_root_of_unity, 8)));
 
     let ring = Zn::<97>::RING;
     let fft = FFTTableCooleyTuckey::for_zn(ring, 4).unwrap();
     assert!(ring.is_neg_one(&ring.pow(fft.root_of_unity, 8)));
-    assert!(ring.is_neg_one(&ring.pow(fft.inv_root_of_unity, 8)));
 }
 
 #[cfg(test)]

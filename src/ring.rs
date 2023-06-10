@@ -232,6 +232,7 @@ pub trait RingBase: PartialEq {
     fn is_neg_one(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.neg_one()) }
     fn is_commutative(&self) -> bool;
     fn is_noetherian(&self) -> bool;
+    fn is_approximate(&self) -> bool { false }
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
 
     fn square(&self, value: &mut Self::Element) {

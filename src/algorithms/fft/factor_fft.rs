@@ -33,8 +33,8 @@ impl<R, T1, T2, M> FFTTableGenCooleyTuckey<R, T1, T2, M>
         assert!(left_table.ring().get_ring() == right_table.ring().get_ring());
 
         let ring = left_table.ring();
-        assert_el_eq!(&ring, &ring.pow(ring.clone_el(&root_of_unity), right_table.len()), left_table.root_of_unity());
-        assert_el_eq!(&ring, &ring.pow(ring.clone_el(&root_of_unity), left_table.len()), right_table.root_of_unity());
+        assert!(ring.get_ring().is_approximate() || ring.eq_el(&ring.pow(ring.clone_el(&root_of_unity), right_table.len()), left_table.root_of_unity()));
+        assert!(ring.get_ring().is_approximate() || ring.eq_el(&ring.pow(ring.clone_el(&root_of_unity), left_table.len()), right_table.root_of_unity()));
 
         let inv_root_of_unity = ring.pow(ring.clone_el(&root_of_unity), right_table.len() * left_table.len() - 1);
         let inv_twiddle_factors = memory_provider.get_new_init(left_table.len() * right_table.len(), |i| {
