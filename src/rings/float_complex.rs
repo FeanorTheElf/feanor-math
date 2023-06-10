@@ -1,5 +1,4 @@
 use std::f64::EPSILON;
-use std::f64::consts::PI;
 
 use crate::euclidean::EuclideanRing;
 use crate::field::Field;
@@ -20,7 +19,7 @@ impl Complex64 {
     pub const I: Complex64El = Complex64El(0., 1.);
 
     pub fn abs(&self, Complex64El(re, im): Complex64El) -> f64 {
-        re * re + im * im
+        (re * re + im * im).sqrt()
     }
 
     pub fn conjugate(&self, Complex64El(re, im): Complex64El) -> Complex64El {
@@ -28,7 +27,7 @@ impl Complex64 {
     }
 
     pub fn exp(&self, Complex64El(exp_re, exp_im): Complex64El) -> Complex64El {
-        let angle = exp_im * PI;
+        let angle = exp_im;
         let abs = exp_re.exp();
         Complex64El(abs * angle.cos(), abs * angle.sin())
     }
@@ -38,10 +37,12 @@ impl Complex64 {
     }
 
     pub fn ln_main_branch(&self, Complex64El(re, im): Complex64El) -> Complex64El {
-        Complex64El(self.abs(Complex64El(re, im)).ln(), im.atan2(re) /  PI)
+        Complex64El(self.abs(Complex64El(re, im)).ln(), im.atan2(re))
     }
 
     pub fn is_absolute_approx_eq(&self, lhs: Complex64El, rhs: Complex64El, absolute_threshold: f64) -> bool {
+        RingRef::new(self).println(&self.sub(lhs, rhs));
+        println!("{}, {}", self.abs(self.sub(lhs, rhs)), absolute_threshold);
         self.abs(self.sub(lhs, rhs)) < absolute_threshold
     }
 
@@ -189,8 +190,12 @@ fn test_pow() {
     let CC = Complex64::RING;
     let i = Complex64::I;
     assert!(CC.is_approx_eq(CC.negate(i), CC.pow(i, 3), 1));
-    assert!(CC.is_approx_eq(CC.negate(i), CC.pow(i, 1024 + 3), 1));
-    assert!(CC.is_approx_eq(CC.exp(CC.mul(CC.from_f64(0.25), i)), CC.mul(CC.add(CC.one(), i), CC.from_f64(2f64.powf(-0.5))), 1));
+    assert!(!CC.is_approx_eq(CC.negate(i), CC.pow(i, 1024 + 3), 1));
+    assert!(CC.is_approx_eq(CC.negate(i), CC.pow(i, 1024 + 3), 100));
+    assert!(CC.is_approx_eq(CC.exp(CC.mul(CC.from_f64(std::f64::consts::PI / 4.), i)), CC.mul(CC.add(CC.one(), i), CC.from_f64(2f64.powf(-0.5))), 1));
+
+    let seventh_root_of_unity = CC.exp(CC.mul(i, CC.from_f64(2. * std::f64::consts::PI / 7.)));
+    assert!(CC.is_approx_eq(CC.pow(seventh_root_of_unity, 7 * 100 + 1), seventh_root_of_unity, 1000));
 }
 
 #[test]

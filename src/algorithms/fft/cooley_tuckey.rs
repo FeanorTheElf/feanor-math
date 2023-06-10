@@ -4,8 +4,12 @@ use crate::primitive_int::*;
 use crate::mempool::{MemoryProvider, AllocatingMemoryProvider};
 use crate::rings::zn::{ZnRingStore, ZnRing};
 use crate::vector::SwappableVectorViewMut;
-use crate::{ring::*, vector::VectorViewMut};
-use crate::algorithms::{fft::*, self};
+use crate::ring::*;
+use crate::vector::VectorViewMut;
+use crate::algorithms::fft::*;
+use crate::algorithms;
+use crate::rings::float_complex::*;
+use super::complex_fft::*;
 
 pub struct FFTTableCooleyTuckey<R, M: MemoryProvider<El<R>> = AllocatingMemoryProvider> 
     where R: RingStore
@@ -45,23 +49,43 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
         R::Type: DivisibilityRing
 {
     pub fn new_with_mem(ring: R, root_of_unity: El<R>, log2_n: usize, memory_provider: &M) -> Self {
+        let mut root_of_unity_pow = |i: i64| if i >= 0 {
+            ring.pow(ring.clone_el(&root_of_unity), i as usize)
+        } else {
+            ring.invert(&ring.pow(ring.clone_el(&root_of_unity), (-i) as usize)).unwrap()
+        };
+        // cannot call new_with_mem_and_pows() because of borrowing conflict
         assert!(ring.is_commutative());
         assert!(log2_n > 0);
-        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &root_of_unity, log2_n));
-        let root_of_unity_list = Self::create_root_of_unity_list(&ring, &root_of_unity, log2_n, memory_provider);
-        let inv_root_of_unity = ring.pow(ring.clone_el(&root_of_unity), (1 << log2_n) - 1);
-        let inv_root_of_unity_list = Self::create_root_of_unity_list(&ring, &inv_root_of_unity, log2_n, memory_provider);
+        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &root_of_unity_pow(1), log2_n));
+        let root_of_unity_list = Self::create_root_of_unity_list(&ring, &mut root_of_unity_pow, log2_n, memory_provider);
+        let inv_root_of_unity_list = Self::create_root_of_unity_list(&ring, |i| root_of_unity_pow(-i), log2_n, memory_provider);
+        let root_of_unity = root_of_unity_pow(1);
         FFTTableCooleyTuckey { ring, root_of_unity, log2_n, root_of_unity_list, inv_root_of_unity_list }
     }
 
-    fn create_root_of_unity_list(ring: &R, root_of_unity: &El<R>, log2_n: usize, memory_provider: &M) -> M::Object {
+    pub fn new_with_mem_and_pows<F>(ring: R, mut root_of_unity_pow: F, log2_n: usize, memory_provider: &M) -> Self 
+        where F: FnMut(i64) -> El<R>
+    {
+        assert!(ring.is_commutative());
+        assert!(log2_n > 0);
+        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &root_of_unity_pow(1), log2_n));
+        let root_of_unity_list = Self::create_root_of_unity_list(&ring, &mut root_of_unity_pow, log2_n, memory_provider);
+        let inv_root_of_unity_list = Self::create_root_of_unity_list(&ring, |i| root_of_unity_pow(-i), log2_n, memory_provider);
+        let root_of_unity = root_of_unity_pow(1);
+        FFTTableCooleyTuckey { ring, root_of_unity, log2_n, root_of_unity_list, inv_root_of_unity_list }
+    }
+
+    fn create_root_of_unity_list<F>(ring: &R, mut root_of_unity_pow: F, log2_n: usize, memory_provider: &M) -> M::Object
+        where F: FnMut(i64) -> El<R>
+    {
         // in fact, we could choose this to have only length `(1 << log2_n) - 1`, but a power of two length is probably faster
         let mut root_of_unity_list = memory_provider.get_new_init(1 << log2_n, |_| ring.zero());
         let mut index = 0;
         for s in 0..log2_n {
             let m = 1 << s;
             let log2_group_size = log2_n - s;
-            let twiddle_root = ring.pow(ring.clone_el(&root_of_unity), m);
+            let twiddle_root = root_of_unity_pow(m);
             for i_bitreverse in (0..(1 << log2_group_size)).step_by(2) {
                 let current_twiddle = ring.pow(ring.clone_el(&twiddle_root), bitreverse(i_bitreverse, log2_group_size));
                 root_of_unity_list[index] = current_twiddle;
@@ -75,7 +99,7 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
     ///
     /// Returns `inv_root_of_unity^(2^exp_2 * bitreverse(bitreverse_exp, log2_n - exp_2))`.
     /// 
-    fn inv_root_of_unity_pow(&self, exp_2: usize, bitreverse_exp: usize) -> &El<R> {
+    pub(super) fn inv_root_of_unity_pow(&self, exp_2: usize, bitreverse_exp: usize) -> &El<R> {
         let result = &self.inv_root_of_unity_list[(1 << self.log2_n) - (1 << (self.log2_n - exp_2)) + (bitreverse_exp / 2)];
         return result;
     }
@@ -83,7 +107,7 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
     ///
     /// Returns `root_of_unity^(2^exp_2 * bitreverse(bitreverse_exp, log2_n - exp_2))`.
     /// 
-    fn root_of_unity_pow(&self, exp_2: usize, bitreverse_exp: usize) -> &El<R> {
+    pub(super) fn root_of_unity_pow(&self, exp_2: usize, bitreverse_exp: usize) -> &El<R> {
         let result = &self.root_of_unity_list[(1 << self.log2_n) - (1 << (self.log2_n - exp_2)) + (bitreverse_exp / 2)];
         return result;
     }
@@ -244,6 +268,13 @@ impl<R, M: MemoryProvider<El<R>>> FFTTable for FFTTableCooleyTuckey<R, M>
         for i in 0..values.len() {
             ring.mul_assign_ref(values.at_mut(i), &scale);
         }
+    }
+}
+
+impl<R: RingStore<Type = Complex64>> ErrorEstimate for Complex64FFTTable<FFTTableCooleyTuckey<R>> {
+    
+    fn expected_absolute_error(&self, input_bound: f64) -> f64 {
+        unimplemented!()
     }
 }
 
