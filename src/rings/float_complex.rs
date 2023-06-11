@@ -1,4 +1,5 @@
 use std::f64::EPSILON;
+use std::f64::consts::PI;
 
 use crate::euclidean::EuclideanRing;
 use crate::field::Field;
@@ -41,8 +42,6 @@ impl Complex64 {
     }
 
     pub fn is_absolute_approx_eq(&self, lhs: Complex64El, rhs: Complex64El, absolute_threshold: f64) -> bool {
-        RingRef::new(self).println(&self.sub(lhs, rhs));
-        println!("{}, {}", self.abs(self.sub(lhs, rhs)), absolute_threshold);
         self.abs(self.sub(lhs, rhs)) < absolute_threshold
     }
 
@@ -61,6 +60,10 @@ impl Complex64 {
 
     pub fn from_f64(&self, x: f64) -> Complex64El {
         Complex64El(x, 0.)
+    }
+
+    pub fn root_of_unity(&self, i: i64, n: i64) -> Complex64El {
+        self.exp(self.mul(self.from_f64((i as f64 / n as f64) * (2. * PI)), Self::I))
     }
 }
 
@@ -83,6 +86,8 @@ impl RingValue<Complex64> {
     pub fn is_approx_eq(&self, lhs: Complex64El, rhs: Complex64El, precision: u64) -> bool { self.get_ring().is_approx_eq(lhs, rhs, precision) }
 
     pub fn from_f64(&self, x: f64) -> Complex64El { self.get_ring().from_f64(x) }
+
+    pub fn root_of_unity(&self, i: i64, n: i64) -> Complex64El { self.get_ring().root_of_unity(i, n) }
 }
 
 impl RingBase for Complex64 {
@@ -164,9 +169,9 @@ impl CanonicalIso<Complex64> for Complex64 {
 impl DivisibilityRing for Complex64 {
 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        let abs = self.abs(*rhs);
+        let abs_sqr = self.abs(*rhs) * self.abs(*rhs);
         let Complex64El(res_re, res_im) =  self.mul(*lhs, self.conjugate(*rhs));
-        return Some(Complex64El(res_re / abs, res_im / abs));
+        return Some(Complex64El(res_re / abs_sqr, res_im / abs_sqr));
     }
 }
 

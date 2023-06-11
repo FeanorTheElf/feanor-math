@@ -1,5 +1,7 @@
 use crate::{ring::*, mempool::*};
 use crate::algorithms::fft::*;
+use crate::algorithms::fft::complex_fft::*;
+use crate::rings::float_complex::*;
 
 pub struct FFTTableGenCooleyTuckey<R, T1, T2, M = AllocatingMemoryProvider> 
     where R: RingStore,
@@ -122,6 +124,20 @@ impl<R, T1, T2, M> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2, M>
         let ri = i % self.right_table.len();
         let li = i / self.right_table.len();
         return self.left_table.unordered_fft_permutation(li) + self.left_table.len() * self.right_table.unordered_fft_permutation(ri);
+    }
+}
+
+impl<R, T1, T2, M> ErrorEstimate for FFTTableGenCooleyTuckey<R, T1, T2, M> 
+    where R: RingStore<Type = Complex64>, 
+        T1: FFTTable<Ring = R> + ErrorEstimate, 
+        T2: FFTTable<Ring = R> + ErrorEstimate, 
+        M: MemoryProvider<El<R>>
+{
+    fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
+        let error_after_first_fft = self.left_table.expected_absolute_error(input_bound, input_error);
+        let new_input_bound = self.left_table.len() as f64 * input_bound;
+        let error_after_twiddling = error_after_first_fft + new_input_bound * (root_of_unity_error() + f64::EPSILON);
+        return self.right_table.expected_absolute_error(new_input_bound, error_after_twiddling);
     }
 }
 

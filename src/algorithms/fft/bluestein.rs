@@ -10,8 +10,9 @@ use crate::mempool::MemoryProvider;
 use crate::primitive_int::*;
 use crate::ring::*;
 use crate::algorithms;
-use crate::rings::zn::*;
+use crate::rings::zn::*;use crate::rings::float_complex::*;
 use crate::vector::VectorViewMut;
+use super::complex_fft::*;
 
 pub struct FFTTableBluestein<R, M: MemoryProvider<El<R>> = AllocatingMemoryProvider>
     where R: RingStore
@@ -25,8 +26,8 @@ pub struct FFTTableBluestein<R, M: MemoryProvider<El<R>> = AllocatingMemoryProvi
     /// irrelevant.
     /// 
     b_bitreverse_fft: M::Object,
-    /// contrary to expectations, this should be a 2n-th root of unity
-    inv_root_of_unity_2n: El<R>,
+    /// the powers `zeta^(-i * i)` for `zeta` the 2n-th root of unity
+    inv_root_of_unity_2n: M::Object,
     /// contrary to expectations, this should be an n-th root of unity and inverse to `inv_root_of_unity^2`
     root_of_unity_n: El<R>,
     n: usize
@@ -55,25 +56,61 @@ impl<R, M> FFTTableBluestein<R, M>
         M: MemoryProvider<El<R>>
 {
     pub fn new_with_mem(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize, memory_provider: &M) -> Self {
+        // we cannot cannot call `new_with_mem_and_pows` because of borrowing conflicts 
+
         // checks on m and root_of_unity_m are done by the FFTTableCooleyTuckey
         assert!((1 << log2_m) >= 2 * n + 1);
         assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity(&ring, &root_of_unity_2n, 2 * n));
 
-        let m = 1 << log2_m;
-        let mut b = memory_provider.get_new_init(m, |_| ring.zero());
-        b[0] = ring.one();
-        for i in 1..n {
-            b[i] = ring.pow(ring.clone_el(&root_of_unity_2n), i * i);
-            b[m - i] = ring.clone_el(&b[i]);
-        }
-        let inv_root_of_unity = ring.pow(ring.clone_el(&root_of_unity_2n), 2 * n - 1);
-        let root_of_unity_n = ring.pow(root_of_unity_2n, 2);
+        let root_of_unity_2n_pows = |x: i64| if x >= 0 {
+            ring.pow(ring.clone_el(&root_of_unity_2n), x as usize % (2 * n))
+        } else {
+            ring.invert(&ring.pow(ring.clone_el(&root_of_unity_2n), (-x) as usize % (2 * n))).unwrap()
+        };
+        
+        let mut b = Self::create_b_array(&ring, root_of_unity_2n_pows, n, 1 << log2_m, memory_provider);
+        let inv_root_of_unity_2n = memory_provider.get_new_init(n, |i| root_of_unity_2n_pows(-((i * i) as i64)));
+        let root_of_unity_n = ring.pow(ring.clone_el(&root_of_unity_2n), 2);
         let m_fft_table = algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey::new_with_mem(ring, root_of_unity_m, log2_m, memory_provider);
         m_fft_table.unordered_fft(&mut b[..], m_fft_table.ring(), memory_provider);
         return FFTTableBluestein { 
             m_fft_table: m_fft_table, 
             b_bitreverse_fft: b, 
-            inv_root_of_unity_2n: inv_root_of_unity, 
+            inv_root_of_unity_2n: inv_root_of_unity_2n, 
+            root_of_unity_n: root_of_unity_n,
+            n: n
+        };
+    }
+    
+    fn create_b_array<F>(ring: &R, mut root_of_unity_2n_pows: F, n: usize, m: usize, memory_provider: &M) -> M::Object
+        where F: FnMut(i64) -> El<R>
+    {
+        let mut b = memory_provider.get_new_init(m, |_| ring.zero());
+        b[0] = ring.one();
+        for i in 1..n {
+            b[i] = root_of_unity_2n_pows((i * i) as i64 % (2 * n) as i64);
+            b[m - i] = ring.clone_el(&b[i]);
+        }
+        return b;
+    }
+
+    pub fn new_with_mem_and_pows<F, G>(ring: R, mut root_of_unity_2n_pows: F, root_of_unity_m_pows: G, n: usize, log2_m: usize, memory_provider: &M) -> Self
+        where F: FnMut(i64) -> El<R>,
+            G: FnMut(i64) -> El<R>
+    {
+        // checks on m and root_of_unity_m are done by the FFTTableCooleyTuckey
+        assert!((1 << log2_m) >= 2 * n + 1);
+        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity(&ring, &root_of_unity_2n_pows(1), 2 * n));
+
+        let mut b = Self::create_b_array(&ring, &mut root_of_unity_2n_pows, n, 1 << log2_m, memory_provider);
+        let inv_root_of_unity_2n = memory_provider.get_new_init(n, |i| root_of_unity_2n_pows(-((i * i) as i64)));
+        let root_of_unity_n = root_of_unity_2n_pows(2);
+        let m_fft_table = algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey::new_with_mem_and_pows(ring, root_of_unity_m_pows, log2_m, memory_provider);
+        m_fft_table.unordered_fft(&mut b[..], m_fft_table.ring(), memory_provider);
+        return FFTTableBluestein { 
+            m_fft_table: m_fft_table, 
+            b_bitreverse_fft: b, 
+            inv_root_of_unity_2n: inv_root_of_unity_2n, 
             root_of_unity_n: root_of_unity_n,
             n: n
         };
@@ -123,7 +160,7 @@ impl<R, M> FFTTableBluestein<R, M>
                 values.at(i)
             };
             *buffer.at_mut(i) = ring.clone_el(value);
-            ring.get_ring().mul_assign_map_in(base_ring.get_ring(), buffer.at_mut(i), base_ring.pow(base_ring.clone_el(&self.inv_root_of_unity_2n), i * i), hom.raw_hom());
+            ring.get_ring().mul_assign_map_in_ref(base_ring.get_ring(), buffer.at_mut(i), &self.inv_root_of_unity_2n[i], hom.raw_hom());
         }
         for i in self.n..self.m_fft_table.len() {
             *buffer.at_mut(i) = ring.zero();
@@ -139,7 +176,7 @@ impl<R, M> FFTTableBluestein<R, M>
         // write values back, and multiply them with a twiddle factor
         for i in 0..self.n {
             *values.at_mut(i) = std::mem::replace(buffer.at_mut(i), ring.zero());
-            ring.get_ring().mul_assign_map_in(base_ring.get_ring(), values.at_mut(i), base_ring.pow(base_ring.clone_el(&self.inv_root_of_unity_2n), i * i), hom.raw_hom());
+            ring.get_ring().mul_assign_map_in_ref(base_ring.get_ring(), values.at_mut(i), &self.inv_root_of_unity_2n[i], hom.raw_hom());
         }
 
         if INV {
@@ -151,7 +188,6 @@ impl<R, M> FFTTableBluestein<R, M>
         }
     }
 }
-
 
 impl<R, M> FFTTable for FFTTableBluestein<R, M> 
     where R: DivisibilityRingStore,
@@ -215,6 +251,22 @@ impl<R, M> FFTTable for FFTTableBluestein<R, M>
     }
 }
 
+impl<R: RingStore<Type = Complex64>, M: MemoryProvider<El<R>>> ErrorEstimate for FFTTableBluestein<R, M> {
+    
+    fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
+        let error_after_twiddling = input_error + input_bound * (root_of_unity_error() + f64::EPSILON);
+        let error_after_fft = self.m_fft_table.expected_absolute_error(input_bound, error_after_twiddling);
+        let b_bitreverse_fft_error = self.m_fft_table.expected_absolute_error(1., root_of_unity_error());
+        // now the values are increased by up to a factor of m, so use `input_bound * m` instead
+        let new_input_bound = input_bound * self.m_fft_table.len() as f64;
+        let b_bitreverse_fft_bound = self.m_fft_table.len() as f64;
+        let error_after_mul = new_input_bound * b_bitreverse_fft_error + b_bitreverse_fft_bound * error_after_fft + f64::EPSILON * new_input_bound * b_bitreverse_fft_bound;
+        let error_after_inv_fft = self.m_fft_table.expected_absolute_error(new_input_bound * b_bitreverse_fft_bound, error_after_mul) / self.m_fft_table.len() as f64;
+        let error_end = error_after_inv_fft + new_input_bound * (root_of_unity_error() + f64::EPSILON);
+        return error_end;
+    }
+}
+
 #[cfg(test)]
 use crate::rings::zn::zn_static::*;
 
@@ -241,4 +293,20 @@ fn test_inv_fft_base() {
     fft.fft_base::<_, _, _, _, false>(&mut work, ring, &mut buffer, &AllocatingMemoryProvider);
     fft.fft_base::<_, _, _, _, true>(&mut work, ring, &mut buffer, &AllocatingMemoryProvider);
     assert_eq!(values, work);
+}
+
+#[test]
+fn test_approximate_fft() {
+    let CC = Complex64::RING;
+    for (p, log2_m) in [(5, 4), (53, 7), (1009, 11)] {
+        let fft = FFTTableBluestein::new_with_mem_and_pows(CC, |x| CC.root_of_unity(x, p * 2), |x| CC.root_of_unity(x, 1 << log2_m), p as usize, log2_m, &AllocatingMemoryProvider);
+        let mut array = AllocatingMemoryProvider.get_new_init(p as usize, |i| CC.root_of_unity(i as i64, p));
+        fft.fft(&mut array, CC, &AllocatingMemoryProvider);
+        let err = fft.expected_absolute_error(1., 0.);
+        assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
+        assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
+        for i in 2..fft.len() {
+            assert!(CC.is_absolute_approx_eq(array[i], CC.zero(), err));
+        }
+    }
 }

@@ -56,6 +56,7 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
         };
         // cannot call new_with_mem_and_pows() because of borrowing conflict
         assert!(ring.is_commutative());
+        assert!(!ring.get_ring().is_approximate());
         assert!(log2_n > 0);
         assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &root_of_unity_pow(1), log2_n));
         let root_of_unity_list = Self::create_root_of_unity_list(&ring, &mut root_of_unity_pow, log2_n, memory_provider);
@@ -85,9 +86,8 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
         for s in 0..log2_n {
             let m = 1 << s;
             let log2_group_size = log2_n - s;
-            let twiddle_root = root_of_unity_pow(m);
             for i_bitreverse in (0..(1 << log2_group_size)).step_by(2) {
-                let current_twiddle = ring.pow(ring.clone_el(&twiddle_root), bitreverse(i_bitreverse, log2_group_size));
+                let current_twiddle = root_of_unity_pow(m * bitreverse(i_bitreverse, log2_group_size) as i64);
                 root_of_unity_list[index] = current_twiddle;
                 index += 1;
             }
@@ -271,10 +271,13 @@ impl<R, M: MemoryProvider<El<R>>> FFTTable for FFTTableCooleyTuckey<R, M>
     }
 }
 
-impl<R: RingStore<Type = Complex64>> ErrorEstimate for Complex64FFTTable<FFTTableCooleyTuckey<R>> {
+impl<R: RingStore<Type = Complex64>, M: MemoryProvider<El<R>>> ErrorEstimate for FFTTableCooleyTuckey<R, M> {
     
-    fn expected_absolute_error(&self, input_bound: f64) -> f64 {
-        unimplemented!()
+    fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
+        // each butterfly doubles the error, and then adds up to 
+        let butterfly_absolute_error = input_bound * (root_of_unity_error() + f64::EPSILON);
+        // the operator inf-norm of the FFT is its length
+        return 2. * self.len() as f64 * butterfly_absolute_error + self.len() as f64 * input_error;
     }
 }
 
@@ -373,4 +376,20 @@ fn bench_fft_optimized(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         run_fft_bench_round(&ring, &fft, &data, &mut copy)
     });
+}
+
+#[test]
+fn test_approximate_fft() {
+    let CC = Complex64::RING;
+    for log2_n in [4, 7, 11, 15] {
+        let fft = FFTTableCooleyTuckey::new_with_mem_and_pows(CC, |x| CC.root_of_unity(x, 1 << log2_n), log2_n, &AllocatingMemoryProvider);
+        let mut array = AllocatingMemoryProvider.get_new_init(1 << log2_n, |i|  CC.root_of_unity(i as i64, 1 << log2_n));
+        fft.fft(&mut array, CC, &AllocatingMemoryProvider);
+        let err = fft.expected_absolute_error(1., 0.);
+        assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
+        assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
+        for i in 2..fft.len() {
+            assert!(CC.is_absolute_approx_eq(array[i], CC.zero(), err));
+        }
+    }
 }
