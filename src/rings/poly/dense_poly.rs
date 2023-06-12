@@ -54,20 +54,16 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> DensePolyRingBase<R, M> {
     fn poly_div<F>(&self, lhs: &mut M::Object, rhs: &M::Object, mut left_div_lc: F) -> Option<M::Object>
         where F: FnMut(El<R>) -> Option<El<R>>
     {
-        let rhs_len = self.degree(rhs).map(|d| d + 1).unwrap_or(0);
-        assert!(rhs_len > 0);
-        let lhs_len = self.degree(&lhs).map(|d| d + 1).unwrap_or(0);
-        if lhs_len < rhs_len {
-            return Some(self.zero());
-        }
-        let mut result = self.memory_provider.get_new_init(lhs_len + 1 - rhs_len, |_| self.base_ring().zero());
-        for i in (0..result.len()).rev() {
-            *result.at_mut(i) = left_div_lc(std::mem::replace(&mut lhs[i + rhs_len - 1], self.base_ring().zero()))?;
-            for j in 0..(rhs_len - 1) {
-                self.base_ring().sub_assign(lhs.at_mut(i + j), self.base_ring().mul_ref(&rhs[j], &result[i]));
-            }
-        }
-        return Some(result);
+        let lhs_val = std::mem::replace(lhs, self.zero());
+        let (quo, rem) = algorithms::poly_div::sparse_poly_div(
+            lhs_val, 
+            rhs, 
+            RingRef::new(self), 
+            RingRef::new(self), 
+            |x| left_div_lc(self.base_ring().clone_el(x)).ok_or(())
+        ).ok()?;
+        *lhs = rem;
+        return Some(quo);
     }
 }
 

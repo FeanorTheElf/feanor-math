@@ -63,7 +63,13 @@ impl<R: RingStore> SparsePolyRingBase<R> {
         where F: FnMut(El<R>) -> Option<El<R>>
     {
         let lhs_val = std::mem::replace(lhs, self.zero());
-        let (quo, rem) = algorithms::sparse_poly_div::sparse_poly_div(lhs_val, rhs, RingRef::new(self), self, |x| left_div_lc(self.base_ring().clone_el(x)).ok_or(())).ok()?;
+        let (quo, rem) = algorithms::poly_div::sparse_poly_div(
+            lhs_val, 
+            rhs, 
+            RingRef::new(self), 
+            RingRef::new(self), 
+            |x| left_div_lc(self.base_ring().clone_el(x)).ok_or(())
+        ).ok()?;
         *lhs = rem;
         return Some(quo);
     }

@@ -11,5 +11,5 @@ pub mod erathostenes;
 pub mod int_bisect;
 pub mod int_factor;
 pub mod cyclotomic;
-pub mod sparse_poly_div;
+pub mod poly_div;
 //pub mod discrete_log;
