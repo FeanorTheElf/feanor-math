@@ -16,13 +16,13 @@ pub trait PolyRing: RingExtension + CanonicalIso<Self> {
 
     fn terms<'a>(&'a self, f: &'a Self::Element) -> Self::TermsIterator<'a>;
     
-    fn from_terms<I>(&self, iter: I) -> Self::Element
+    fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
         where I: Iterator<Item = (El<Self::BaseRing>, usize)>
     {
         let self_ring = RingRef::new(self);
-        self_ring.sum(
-            iter.map(|(c, i)| self.mul(self.from(c), self_ring.pow(self.indeterminate(), i)))
-        )
+        self.add_assign(lhs, self_ring.sum(
+            rhs.map(|(c, i)| self.mul(self.from(c), self_ring.pow(self.indeterminate(), i)))
+        ));
     }
 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, i: usize) -> &'a El<Self::BaseRing>;
@@ -50,7 +50,9 @@ pub trait PolyRingStore: RingStore
     fn from_terms<I>(&self, iter: I) -> El<Self>
         where I: Iterator<Item = (El<<Self::Type as RingExtension>::BaseRing>, usize)>,
     {
-        self.get_ring().from_terms(iter)
+        let mut result = self.zero();
+        self.get_ring().add_assign_from_terms(&mut result, iter);
+        return result;
     }
 }
 
@@ -68,7 +70,9 @@ pub mod generic_impls {
     pub fn generic_map_in<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P1::Element, hom: &GenericCanonicalHom<P1, P2>) -> P2::Element
         where <P2::BaseRing as RingStore>::Type: CanonicalHom<<P1::BaseRing as RingStore>::Type>
     {
-        to.from_terms(from.terms(&el).map(|(c, i)| (to.base_ring().get_ring().map_in(from.base_ring().get_ring(), from.base_ring().clone_el(c), hom), i)))
+        let mut result = to.zero();
+        to.add_assign_from_terms(&mut result, from.terms(&el).map(|(c, i)| (to.base_ring().get_ring().map_in(from.base_ring().get_ring(), from.base_ring().clone_el(c), hom), i)));
+        return result;
     }
 
     #[allow(type_alias_bounds)]
@@ -77,7 +81,9 @@ pub mod generic_impls {
     pub fn generic_map_out<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P2::Element, iso: &GenericCanonicalIso<P1, P2>) -> P1::Element
         where <P2::BaseRing as RingStore>::Type: CanonicalIso<<P1::BaseRing as RingStore>::Type>
     {
-        from.from_terms(to.terms(&el).map(|(c, i)| (to.base_ring().get_ring().map_out(from.base_ring().get_ring(), to.base_ring().clone_el(c), iso), i)))
+        let mut result = from.zero();
+        from.add_assign_from_terms(&mut result, to.terms(&el).map(|(c, i)| (to.base_ring().get_ring().map_out(from.base_ring().get_ring(), to.base_ring().clone_el(c), iso), i)));
+        return result;
     }
 
     pub fn dbg_poly<P: PolyRing>(ring: &P, el: &P::Element, out: &mut std::fmt::Formatter, unknown_name: &str) -> std::fmt::Result {

@@ -1,3 +1,4 @@
+use crate::algorithms;
 use crate::divisibility::*;
 use crate::euclidean::*;
 use crate::field::Field;
@@ -61,25 +62,10 @@ impl<R: RingStore> SparsePolyRingBase<R> {
     fn poly_div<F>(&self, lhs: &mut SparseVectorMut<Rc<R>>, rhs: &SparseVectorMut<Rc<R>>, mut left_div_lc: F) -> Option<SparseVectorMut<Rc<R>>>
         where F: FnMut(El<R>) -> Option<El<R>>
     {
-        assert!(rhs.len() > 0);
-        if lhs.len() < rhs.len() {
-            return Some(self.zero());
-        }
-        let mut result = SparseVectorMut::new(lhs.len() + 1 - rhs.len(), self.base_ring.clone());
-        for i in (0..result.len()).rev() {
-            *result.at_mut(i) = left_div_lc(std::mem::replace(lhs.at_mut(i + rhs.len() - 1), self.base_ring().zero()))?;
-            if !self.base_ring.is_zero(result.at(i)) {
-                for (j, c) in rhs.nontrivial_entries() {
-                    if j + 1 != rhs.len() {
-                        let lhs_current = lhs.at_mut(i + j);
-                        self.base_ring().sub_assign(lhs_current, self.base_ring().mul_ref(c, result.at(i)));
-                    }
-                }
-            }
-        }
-        self.degree_truncate(lhs);
-        self.degree_truncate(&mut result);
-        return Some(result);
+        let lhs_val = std::mem::replace(lhs, self.zero());
+        let (quo, rem) = algorithms::sparse_poly_div::sparse_poly_div(lhs_val, rhs, RingRef::new(self), self, |x| left_div_lc(self.base_ring().clone_el(x)).ok_or(())).ok()?;
+        *lhs = rem;
+        return Some(quo);
     }
 }
 
@@ -283,17 +269,15 @@ impl<R> PolyRing for SparsePolyRingBase<R>
         }
     }
 
-    fn from_terms<I>(&self, iter: I) -> Self::Element
+    fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
         where I: Iterator<Item = (El<Self::BaseRing>, usize)>
     {
-        let mut result = self.zero();
-        for (c, i) in iter {
-            result.set_len(max(result.len(), i + 1));
-            *result.at_mut(i) = c;
+        for (c, i) in rhs {
+            lhs.set_len(max(lhs.len(), i + 1));
+            self.base_ring().add_assign(lhs.at_mut(i), c);
         }
-        // if a previously set entry is then set to zero, this might be not truncated
-        self.degree_truncate(&mut result);
-        return result;
+        // if a previously set entry is then set to zero or adds up to zero, this might be not truncated
+        self.degree_truncate(lhs);
     }
 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, i: usize) -> &'a El<Self::BaseRing> {

@@ -271,15 +271,13 @@ impl<R, M: GrowableMemoryProvider<El<R>>> PolyRing for DensePolyRingBase<R, M>
         }
     }
 
-    fn from_terms<I>(&self, iter: I) -> Self::Element
+    fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
         where I: Iterator<Item = (El<Self::BaseRing>, usize)>
     {
-        let mut result = self.memory_provider.get_new_init(iter.size_hint().0, |_| self.base_ring.zero());
-        for (c, i) in iter {
-            self.grow(&mut result, i + 1);
-            result[i] = c;
+        for (c, i) in rhs {
+            self.grow(lhs, i + 1);
+            self.base_ring().add_assign(&mut lhs[i], c);
         }
-        return result;
     }
 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, i: usize) -> &'a El<Self::BaseRing> {
