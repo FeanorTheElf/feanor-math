@@ -1,6 +1,7 @@
 use crate::{divisibility::DivisibilityRing, ring::*, algorithms};
 use crate::integer::*;
 use crate::ordered::*;
+use super::field::AsFieldBase;
 
 pub mod zn_barett;
 pub mod zn_42;
@@ -102,11 +103,10 @@ impl<R: RingStore> ZnRingStore for R
     where R::Type: ZnRing
 {}
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 use crate::primitive_int::*;
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 use super::bigint::DefaultBigIntRing;
-use super::field::AsFieldBase;
 
 #[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R)
