@@ -1,4 +1,5 @@
-use crate::{ring::*, mempool::*};
+use crate::ring::*;
+use crate::mempool::*;
 use crate::algorithms::fft::*;
 use crate::algorithms::fft::complex_fft::*;
 use crate::rings::float_complex::*;
@@ -187,6 +188,7 @@ fn test_fft_basic() {
     let expected = [3, 62, 63, 96, 37, 36];
     let mut permuted_expected = [0; 6];
     for i in 0..6 {
+        println!("{}, {}", i, fft.unordered_fft_permutation(i));
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
@@ -211,6 +213,27 @@ fn test_fft_long() {
 
     fft.unordered_fft(&mut values, ring, &AllocatingMemoryProvider);
     assert_eq!(values, permuted_expected);
+}
+
+#[test]
+fn test_fft_unordered() {
+    let ring = Zn::<1409>::RING;
+    let z = algorithms::unity_root::get_prim_root_of_unity(ring, 64 * 11).unwrap();
+    let fft = FFTTableGenCooleyTuckey::new(z,
+        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5),
+        cooley_tuckey::FFTTableCooleyTuckey::new(ring, ring.pow(z, 11), 6)
+    );
+    let mut values = [0; 704];
+    let original = values;
+    values[0] = 1;
+
+    fft.unordered_fft(&mut values, ring, &AllocatingMemoryProvider);
+    fft.unordered_inv_fft(&mut values, ring, &AllocatingMemoryProvider);
+    assert_eq!(values, original);
+
+    fft.fft(&mut values, ring, &AllocatingMemoryProvider);
+    fft.inv_fft(&mut values, ring, &AllocatingMemoryProvider);
+    assert_eq!(values, original);
 }
 
 #[test]
