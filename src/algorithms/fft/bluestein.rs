@@ -128,6 +128,15 @@ impl<R, M> FFTTableBluestein<R, M>
         Some(Self::new_with_mem(ring, root_of_unity_2n, root_of_unity_m, n, log2_m, memory_provider))
     }
 
+    pub fn for_complex_with_mem(ring: R, n: usize, memory_provider: &M) -> Self
+        where R: RingStore<Type = Complex64>
+    {
+        let ZZ = StaticRing::<i64>::RING;
+        let CC = Complex64::RING;
+        let log2_m = ZZ.abs_log2_ceil(&(2 * n as i64 + 1)).unwrap();
+        Self::new_with_mem_and_pows(ring, |x| CC.root_of_unity(x, 2 * n as i64), |x| CC.root_of_unity(x, 1 << log2_m), n, log2_m, memory_provider)
+    }
+
     ///
     /// Computes the FFT of the given values using Bluestein's algorithm.
     /// 
@@ -298,9 +307,9 @@ fn test_inv_fft_base() {
 #[test]
 fn test_approximate_fft() {
     let CC = Complex64::RING;
-    for (p, log2_m) in [(5, 4), (53, 7), (1009, 11)] {
-        let fft = FFTTableBluestein::new_with_mem_and_pows(CC, |x| CC.root_of_unity(x, p * 2), |x| CC.root_of_unity(x, 1 << log2_m), p as usize, log2_m, &AllocatingMemoryProvider);
-        let mut array = AllocatingMemoryProvider.get_new_init(p as usize, |i| CC.root_of_unity(i as i64, p));
+    for (p, _log2_m) in [(5, 4), (53, 7), (1009, 11)] {
+        let fft = FFTTableBluestein::for_complex_with_mem(&CC, p, &AllocatingMemoryProvider);
+        let mut array = AllocatingMemoryProvider.get_new_init(p as usize, |i| CC.root_of_unity(i as i64, p as i64));
         fft.fft(&mut array, CC, &AllocatingMemoryProvider);
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));

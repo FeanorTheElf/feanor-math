@@ -31,24 +31,18 @@ impl<R, T1, T2, M> FFTTableGenCooleyTuckey<R, T1, T2, M>
         T2: FFTTable<Ring = R>,
         M: MemoryProvider<El<R>>
 {
-    pub fn new_with_mem(root_of_unity: El<R>, left_table: T1, right_table: T2, memory_provider: &M) -> Self {
+    pub fn new_with_mem_and_pows<F>(mut root_of_unity_pows: F, left_table: T1, right_table: T2, memory_provider: &M) -> Self
+        where F: FnMut(i64) -> El<R>
+    {
         assert!(left_table.ring().get_ring() == right_table.ring().get_ring());
 
         let ring = left_table.ring();
-        assert!(ring.get_ring().is_approximate() || ring.eq_el(&ring.pow(ring.clone_el(&root_of_unity), right_table.len()), left_table.root_of_unity()));
-        assert!(ring.get_ring().is_approximate() || ring.eq_el(&ring.pow(ring.clone_el(&root_of_unity), left_table.len()), right_table.root_of_unity()));
+        assert!(ring.get_ring().is_approximate() || ring.eq_el(&root_of_unity_pows(right_table.len() as i64), left_table.root_of_unity()));
+        assert!(ring.get_ring().is_approximate() || ring.eq_el(&root_of_unity_pows(left_table.len() as i64), right_table.root_of_unity()));
 
-        let inv_root_of_unity = ring.pow(ring.clone_el(&root_of_unity), right_table.len() * left_table.len() - 1);
-        let inv_twiddle_factors = memory_provider.get_new_init(left_table.len() * right_table.len(), |i| {
-            let ri = i % right_table.len();
-            let li = i / right_table.len();
-            return ring.pow(ring.clone_el(&inv_root_of_unity), left_table.unordered_fft_permutation(li) * ri);
-        });
-        let twiddle_factors = memory_provider.get_new_init(left_table.len() * right_table.len(), |i| {
-            let ri = i % right_table.len();
-            let li = i / right_table.len();
-            return ring.pow(ring.clone_el(&root_of_unity), left_table.unordered_fft_permutation(li) * ri);
-        });
+        let root_of_unity = root_of_unity_pows(1);
+        let inv_twiddle_factors = Self::create_twiddle_factors(|i| root_of_unity_pows(-i), &left_table, &right_table, memory_provider);
+        let twiddle_factors = Self::create_twiddle_factors(root_of_unity_pows, &left_table, &right_table, memory_provider);
 
         FFTTableGenCooleyTuckey {
             twiddle_factors: twiddle_factors,
@@ -57,6 +51,43 @@ impl<R, T1, T2, M> FFTTableGenCooleyTuckey<R, T1, T2, M>
             right_table: right_table,
             root_of_unity: root_of_unity
         }
+    }
+
+    pub fn new_with_mem(root_of_unity: El<R>, left_table: T1, right_table: T2, memory_provider: &M) -> Self {
+        assert!(left_table.ring().get_ring() == right_table.ring().get_ring());
+        let ring = left_table.ring();
+        assert!(!ring.get_ring().is_approximate());
+
+        let len = left_table.len() * right_table.len();
+        let root_of_unity_pows = |i: i64| if i >= 0 {
+            ring.pow(ring.clone_el(&root_of_unity), i as usize)
+        } else {
+            ring.pow(ring.clone_el(&root_of_unity), (len as i64 + (i % len as i64)) as usize)
+        };
+
+        assert!(ring.eq_el(&root_of_unity_pows(right_table.len() as i64), left_table.root_of_unity()));
+        assert!(ring.eq_el(&root_of_unity_pows(left_table.len() as i64), right_table.root_of_unity()));
+
+        let inv_twiddle_factors = Self::create_twiddle_factors(|i| root_of_unity_pows(-i), &left_table, &right_table, memory_provider);
+        let twiddle_factors = Self::create_twiddle_factors(root_of_unity_pows, &left_table, &right_table, memory_provider);
+
+        FFTTableGenCooleyTuckey {
+            twiddle_factors: twiddle_factors,
+            inv_twiddle_factors: inv_twiddle_factors,
+            left_table: left_table, 
+            right_table: right_table,
+            root_of_unity: root_of_unity
+        }
+    }
+
+    fn create_twiddle_factors<F>(mut root_of_unity_pows: F, left_table: &T1, right_table: &T2, memory_provider: &M) -> M::Object
+        where F: FnMut(i64) -> El<R>
+    {
+        memory_provider.get_new_init(left_table.len() * right_table.len(), |i| {
+            let ri = i % right_table.len();
+            let li = i / right_table.len();
+            return root_of_unity_pows(left_table.unordered_fft_permutation(li) as i64 * ri as i64);
+        })
     }
 }
 
@@ -195,4 +226,26 @@ fn test_inv_fft() {
 
     fft.inv_fft(&mut values, ring, &AllocatingMemoryProvider);
     assert_eq!(values, expected);
+}
+
+#[test]
+fn test_approximate_fft() {
+    let CC = Complex64::RING;
+    for (p, log2_n) in [(5, 3), (53, 5), (101, 8), (503, 10)] {
+        let fft = FFTTableGenCooleyTuckey::new_with_mem_and_pows(
+            |i| CC.root_of_unity(i, (p as i64) << log2_n), 
+            bluestein::FFTTableBluestein::for_complex_with_mem(CC, p, &AllocatingMemoryProvider), 
+            cooley_tuckey::FFTTableCooleyTuckey::for_complex_with_mem(CC, log2_n, &AllocatingMemoryProvider), 
+            &AllocatingMemoryProvider
+        );
+        let mut array = AllocatingMemoryProvider.get_new_init(p << log2_n, |i| CC.root_of_unity(i as i64, (p as i64) << log2_n));
+        fft.fft(&mut array, CC, &AllocatingMemoryProvider);
+        let err = fft.expected_absolute_error(1., 0.);
+        println!("{}, {}", err, err / CC.abs(CC.sub(array[1], CC.from_f64(fft.len() as f64))));
+        assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
+        assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
+        for i in 2..fft.len() {
+            assert!(CC.is_absolute_approx_eq(array[i], CC.zero(), err));
+        }
+    }
 }

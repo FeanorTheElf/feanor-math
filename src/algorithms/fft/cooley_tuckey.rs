@@ -129,6 +129,13 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
         Some(Self::new_with_mem(ring, root_of_unity, log2_n, memory_provider))
     }
 
+    pub fn for_complex_with_mem(ring: R, log2_n: usize, memory_provider: &M) -> Self
+        where R: RingStore<Type = Complex64>
+    {
+        let CC = Complex64::RING;
+        Self::new_with_mem_and_pows(ring, |i| CC.root_of_unity(i, 1 << log2_n), log2_n, memory_provider)
+    }
+
     pub fn bitreverse_permute_inplace<V, T>(&self, mut values: V) 
         where V: SwappableVectorViewMut<T>
     {
