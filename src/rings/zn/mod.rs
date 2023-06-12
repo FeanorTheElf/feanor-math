@@ -108,7 +108,7 @@ use crate::primitive_int::*;
 use super::bigint::DefaultBigIntRing;
 use super::field::AsFieldBase;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R)
     where R::Type: ZnRing,
         <R::Type as ZnRing>::IntegerRingBase: CanonicalIso<StaticRingBase<i64>> + CanonicalIso<StaticRingBase<i32>>

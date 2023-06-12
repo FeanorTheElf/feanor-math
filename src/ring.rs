@@ -1181,7 +1181,7 @@ fn test_internal_wrappings_dont_matter() {
     (&b2).coerce(&&&b3, 0);
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_canonical_hom_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
     where S::Type: CanonicalHom<R::Type>
 {
@@ -1217,7 +1217,7 @@ pub fn generic_test_canonical_iso_axioms<R: RingStore, S: RingStore, I: Iterator
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_self_iso<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
     where R::Type: SelfIso
 {
@@ -1234,7 +1234,7 @@ pub fn generic_test_self_iso<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, e
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
     where R::Type: SelfIso
 {

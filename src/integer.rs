@@ -107,7 +107,7 @@ pub fn generic_test_integer_uniformly_random<R: IntegerRingStore>(ring: R)
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) 
     where R::Type: IntegerRing
 {

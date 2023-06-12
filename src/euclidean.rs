@@ -49,7 +49,7 @@ impl<R> EuclideanRingStore for R
     where R: RingStore, R::Type: EuclideanRing
 {}
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_euclidean_axioms<R: EuclideanRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) 
     where R::Type: EuclideanRing
 {

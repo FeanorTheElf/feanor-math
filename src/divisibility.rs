@@ -39,7 +39,7 @@ impl<R> DivisibilityRingStore for R
     where R: RingStore, R::Type: DivisibilityRing
 {}
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_divisibility_axioms<R: DivisibilityRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
     where R::Type: DivisibilityRing
 {

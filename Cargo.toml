@@ -12,6 +12,9 @@ bench = true
 [dependencies]
 oorandom = "11.1.3"
 
+[features]
+generic_tests = []
+
 [profile.profiling]
 inherits = "bench"
 debug = true
