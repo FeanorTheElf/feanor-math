@@ -145,6 +145,7 @@ impl<R, T1, T2, M> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2, M>
         }
         for i in 0..self.len() {
             ring.get_ring().mul_assign_map_in_ref(self.ring().get_ring(), values.at_mut(i), self.twiddle_factors.at(i), hom.raw_hom());
+            debug_assert!(self.ring().get_ring().is_approximate() || self.ring().is_one(&self.ring().mul_ref(self.twiddle_factors.at(i), self.inv_twiddle_factors.at(i))));
         }
         for i in 0..self.right_table.len() {
             let mut v = Subvector::new(&mut values).subvector(i..).stride(self.right_table.len());
@@ -175,6 +176,8 @@ impl<R, T1, T2, M> ErrorEstimate for FFTTableGenCooleyTuckey<R, T1, T2, M>
 
 #[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
+#[cfg(test)]
+use crate::algorithms;
 
 #[test]
 fn test_fft_basic() {
@@ -188,7 +191,6 @@ fn test_fft_basic() {
     let expected = [3, 62, 63, 96, 37, 36];
     let mut permuted_expected = [0; 6];
     for i in 0..6 {
-        println!("{}, {}", i, fft.unordered_fft_permutation(i));
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
@@ -219,21 +221,30 @@ fn test_fft_long() {
 fn test_fft_unordered() {
     let ring = Zn::<1409>::RING;
     let z = algorithms::unity_root::get_prim_root_of_unity(ring, 64 * 11).unwrap();
-    let fft = FFTTableGenCooleyTuckey::new(z,
+    let fft = FFTTableGenCooleyTuckey::new(ring.pow(z, 4),
+        cooley_tuckey::FFTTableCooleyTuckey::new(ring, ring.pow(z, 44), 4),
         bluestein::FFTTableBluestein::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5),
-        cooley_tuckey::FFTTableCooleyTuckey::new(ring, ring.pow(z, 11), 6)
+        // bluestein::FFTTableBluestein::new(ring, ring.pow(z, 22), ring.pow(z, 11), 16, 6)
     );
-    let mut values = [0; 704];
+    const LEN: usize = 16 * 11;
+    let mut values = [0; LEN];
+    for i in 0..LEN {
+        values[i] = ring.from_int(i as i32);
+    }
     let original = values;
-    values[0] = 1;
 
     fft.unordered_fft(&mut values, ring, &AllocatingMemoryProvider);
+
+    let mut ordered_fft = [0; LEN];
+    for i in 0..LEN {
+        ordered_fft[fft.unordered_fft_permutation(i)] = values[i];
+    }
+
     fft.unordered_inv_fft(&mut values, ring, &AllocatingMemoryProvider);
     assert_eq!(values, original);
 
-    fft.fft(&mut values, ring, &AllocatingMemoryProvider);
-    fft.inv_fft(&mut values, ring, &AllocatingMemoryProvider);
-    assert_eq!(values, original);
+    fft.inv_fft(&mut ordered_fft, ring, &AllocatingMemoryProvider);
+    assert_eq!(ordered_fft, original);
 }
 
 #[test]
