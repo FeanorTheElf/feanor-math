@@ -424,6 +424,34 @@ impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalIso<ZnBase<
     }
 }
 
+impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalHom<AsFieldBase<R>> for ZnBase<I>
+    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+{
+    type Homomorphism = <ZnBase<I> as CanonicalHom<ZnBase<I>>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &AsFieldBase<R>) -> Option<Self::Homomorphism> {
+        <ZnBase<I> as CanonicalHom<ZnBase<I>>>::has_canonical_hom(self, from.base_ring().get_ring())
+    }
+
+    fn map_in(&self, from: &AsFieldBase<R>, el: <AsFieldBase<R> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        <ZnBase<I> as CanonicalHom<ZnBase<I>>>::map_in(self, from.base_ring().get_ring(), from.unwrap_element(el), hom)
+    }
+}
+
+impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalIso<AsFieldBase<R>> for ZnBase<I>
+    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+{
+    type Isomorphism = <ZnBase<I> as CanonicalIso<ZnBase<I>>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &AsFieldBase<R>) -> Option<Self::Isomorphism> {
+        <ZnBase<I> as CanonicalIso<ZnBase<I>>>::has_canonical_iso(self, from.base_ring().get_ring())
+    }
+
+    fn map_out(&self, from: &AsFieldBase<R>, el: <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <AsFieldBase<R> as RingBase>::Element {
+        from.from(<ZnBase<I> as CanonicalIso<ZnBase<I>>>::map_out(self, from.base_ring().get_ring(), el, iso))
+    }
+}
+
 #[cfg(test)]
 use crate::rings::bigint::*;
 #[cfg(test)]
@@ -461,6 +489,7 @@ fn test_canonical_iso_axioms_zn_barett() {
     let to = Zn::new(DefaultBigIntRing::RING, DefaultBigIntRing::RING.from_int(7 * 11));
     generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
     generic_test_canonical_iso_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    assert!(from.can_hom(&Zn::new(StaticRing::<i64>::RING, 19)).is_none());
 }
 
 #[test]
@@ -488,7 +517,11 @@ fn test_divisibility_axioms() {
 }
 
 #[test]
-fn test_self_iso() {
+fn test_canonical_iso_axioms_as_field() {
     let R = Zn::new(StaticRing::<i128>::RING, 17);
-    generic_test_self_iso(&R, R.elements());
+    let R2 = R.clone().as_field().ok().unwrap();
+    generic_test_canonical_hom_axioms(&R, &R2, R.elements());
+    generic_test_canonical_iso_axioms(&R, &R2, R.elements());
+    generic_test_canonical_hom_axioms(&R2, &R, R2.elements());
+    generic_test_canonical_iso_axioms(&R2, &R, R2.elements());
 }

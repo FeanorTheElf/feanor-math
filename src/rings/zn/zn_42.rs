@@ -477,6 +477,58 @@ impl CanonicalIso<ZnFastmulBase> for ZnBase {
     }
 }
 
+impl<R: ZnRingStore<Type = ZnBase>> CanonicalHom<ZnBase> for AsFieldBase<R> {
+    
+    type Homomorphism = <ZnBase as CanonicalHom<ZnBase>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
+        <ZnBase as CanonicalHom<ZnBase>>::has_canonical_hom(self.base_ring().get_ring(), from)
+    }
+
+    fn map_in(&self, from: &ZnBase, el: <ZnBase as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.from(<ZnBase as CanonicalHom<ZnBase>>::map_in(self.base_ring().get_ring(), from, el, hom))
+    }
+}
+
+impl<R: ZnRingStore<Type = ZnBase>> CanonicalIso<ZnBase> for AsFieldBase<R> {
+
+    type Isomorphism = <ZnBase as CanonicalIso<ZnBase>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &ZnBase) -> Option<Self::Isomorphism> {
+        <ZnBase as CanonicalIso<ZnBase>>::has_canonical_iso(self.base_ring().get_ring(), from)
+    }
+
+    fn map_out(&self, from: &ZnBase, el: <AsFieldBase<R> as RingBase>::Element, iso: &Self::Isomorphism) -> <ZnBase as RingBase>::Element {
+        <ZnBase as CanonicalIso<ZnBase>>::map_out(self.base_ring().get_ring(), from, self.unwrap_element(el), iso)
+    }
+}
+
+impl<R: ZnRingStore<Type = ZnBase>> CanonicalHom<AsFieldBase<R>> for ZnBase {
+    
+    type Homomorphism = <ZnBase as CanonicalHom<ZnBase>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &AsFieldBase<R>) -> Option<Self::Homomorphism> {
+        self.has_canonical_hom(from.base_ring().get_ring())
+    }
+
+    fn map_in(&self, from: &AsFieldBase<R>, el: <AsFieldBase<R> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in(from.base_ring().get_ring(), from.unwrap_element(el), hom)
+    }
+}
+
+impl<R: ZnRingStore<Type = ZnBase>> CanonicalIso<AsFieldBase<R>> for ZnBase {
+
+    type Isomorphism = <ZnBase as CanonicalIso<ZnBase>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &AsFieldBase<R>) -> Option<Self::Isomorphism> {
+        self.has_canonical_iso(from.base_ring().get_ring())
+    }
+
+    fn map_out(&self, from: &AsFieldBase<R>, el: <ZnBase as RingBase>::Element, iso: &Self::Isomorphism) -> <AsFieldBase<R> as RingBase>::Element {
+        from.from(self.map_out(from.base_ring().get_ring(), el, iso))
+    }
+}
+
 #[cfg(test)]
 use crate::divisibility::generic_test_divisibility_axioms;
 
@@ -485,51 +537,49 @@ const EDGE_CASE_ELEMENTS: [i32; 10] = [0, 1, 3, 7, 9, 62, 8, 10, 11, 12];
 
 #[test]
 fn test_ring_axioms() {
-    {
-        let ring = Zn::new(63);
-        generic_test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.from_int(x)));
-    }
+    let ring = Zn::new(63);
+    generic_test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.from_int(x)));
 }
 
 #[test]
 fn test_canonical_iso_axioms_zn_barett() {
-    {
-        let from = zn_barett::Zn::new(StaticRing::<i128>::RING, 7 * 11);
-        let to = Zn::new(7 * 11);
-        generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
-        generic_test_canonical_iso_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
-    }
+    let from = zn_barett::Zn::new(StaticRing::<i128>::RING, 7 * 11);
+    let to = Zn::new(7 * 11);
+    generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    generic_test_canonical_iso_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
 }
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {
-    {
-        let from = StaticRing::<i128>::RING;
-        let to = Zn::new(7 * 11);
-        generic_test_canonical_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
-    }
+    let from = StaticRing::<i128>::RING;
+    let to = Zn::new(7 * 11);
+    generic_test_canonical_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
 }
 
 #[test]
 fn test_zn_ring_axioms() {
-    {
-        generic_test_zn_ring_axioms(Zn::new(17));
-        generic_test_zn_ring_axioms(Zn::new(63));
-    }
+    generic_test_zn_ring_axioms(Zn::new(17));
+    generic_test_zn_ring_axioms(Zn::new(63));
 }
 
 #[test]
 fn test_divisibility_axioms() {
-    {
-        let R = Zn::new(17);
-        generic_test_divisibility_axioms(&R, R.elements());
-    }
+    let R = Zn::new(17);
+    generic_test_divisibility_axioms(&R, R.elements());
 }
 
 #[test]
 fn test_zn_map_in_large_int() {
-    {
-        let R = Zn::new(17);
-        generic_test_map_in_large_int(R);
-    }
+    let R = Zn::new(17);
+    generic_test_map_in_large_int(R);
+}
+
+#[test]
+fn test_canonical_iso_axioms_as_field() {
+    let R = Zn::new(17);
+    let R2 = R.clone().as_field().ok().unwrap();
+    generic_test_canonical_hom_axioms(&R, &R2, R.elements());
+    generic_test_canonical_iso_axioms(&R, &R2, R.elements());
+    generic_test_canonical_hom_axioms(&R2, &R, R2.elements());
+    generic_test_canonical_iso_axioms(&R2, &R, R2.elements());
 }
