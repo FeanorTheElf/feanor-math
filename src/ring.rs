@@ -629,6 +629,12 @@ pub trait RingStore {
         self.get_ring().map_in(from.get_ring(), el, &self.get_ring().has_canonical_hom(from.get_ring()).unwrap())
     }
 
+    fn coerce_ref<S>(&self, from: &S, el: &El<S>) -> El<Self>
+        where S: RingStore, Self::Type: CanonicalHom<S::Type> 
+    {
+        self.get_ring().map_in_ref(from.get_ring(), el, &self.get_ring().has_canonical_hom(from.get_ring()).unwrap())
+    }
+
     fn cast<S>(&self, to: &S, el: El<Self>) -> El<S>
         where S: RingStore, Self::Type: CanonicalIso<S::Type> 
     {
