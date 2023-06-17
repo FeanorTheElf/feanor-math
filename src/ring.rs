@@ -95,6 +95,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore,
 /// ```
 /// And here is the example from the Readme, for the finite binary field F2
 /// ```
+/// use feanor_math::assert_el_eq;
 /// use feanor_math::ring::*;
 /// 
 /// #[derive(PartialEq)]
@@ -176,7 +177,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore,
 /// 
 /// pub const F2: RingValue<F2Base> = RingValue::from(F2Base);
 /// 
-/// assert!(F2.eq_el(&F2.from_int(1), &F2.add(F2.one(), F2.zero())));
+/// assert_el_eq!(&F2, &F2.from_int(1), &F2.add(F2.one(), F2.zero()));
 /// ```
 /// 
 /// # A note on equality
