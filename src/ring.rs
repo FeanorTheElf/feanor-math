@@ -1197,14 +1197,14 @@ pub fn generic_test_canonical_hom_axioms<R: RingStore, S: RingStore, I: Iterator
 
     for a in &elements {
         for b in &elements {
-            assert!(to.eq_el(
+            assert_el_eq!(&to,
                 &to.add(to.get_ring().map_in_ref(from.get_ring(), a, &hom), to.get_ring().map_in_ref(from.get_ring(), b, &hom)),
                 &to.get_ring().map_in(from.get_ring(), from.add_ref(a, b), &hom)
-            ));
-            assert!(to.eq_el(
+            );
+            assert_el_eq!(&to,
                 &to.mul(to.get_ring().map_in_ref(from.get_ring(), a, &hom), to.get_ring().map_in_ref(from.get_ring(), b, &hom)),
                 &to.get_ring().map_in(from.get_ring(), from.mul_ref(a, b), &hom)
-            ));
+            );
         }
     }
 }
@@ -1218,9 +1218,10 @@ pub fn generic_test_canonical_iso_axioms<R: RingStore, S: RingStore, I: Iterator
     let elements = edge_case_elements.collect::<Vec<_>>();
 
     for a in &elements {
-        assert!(
-            from.eq_el(a, &to.get_ring().map_out(from.get_ring(), to.get_ring().map_in_ref(from.get_ring(), a, &hom), &iso))
-        )
+        assert_el_eq!(&from,
+            a, 
+            &to.get_ring().map_out(from.get_ring(), to.get_ring().map_in_ref(from.get_ring(), a, &hom), &iso)
+        );
     }
 }
 
@@ -1263,16 +1264,16 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
     // check commutativity
     for a in &elements {
         for b in &elements {
-            assert!(ring.eq_el(
+            assert_el_eq!(&ring,
                 &ring.add(ring.clone_el(a), ring.clone_el(b)), 
                 &ring.add(ring.clone_el(b), ring.clone_el(a))
-            ));
+            );
                 
             if ring.is_commutative() {
-                assert!(ring.eq_el(
+                assert_el_eq!(&ring,
                     &ring.mul(ring.clone_el(a), ring.clone_el(b)), 
                     &ring.mul(ring.clone_el(b), ring.clone_el(a))
-                ));
+                );
             }
         }
     }
@@ -1281,14 +1282,14 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
     for a in &elements {
         for b in &elements {
             for c in &elements {
-                assert!(ring.eq_el(
+                assert_el_eq!(&ring,
                     &ring.add(ring.clone_el(a), ring.add(ring.clone_el(b), ring.clone_el(c))), 
                     &ring.add(ring.add(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c))
-                ));
-                assert!(ring.eq_el(
+                );
+                assert_el_eq!(&ring,
                     &ring.mul(ring.clone_el(a), ring.mul(ring.clone_el(b), ring.clone_el(c))), 
                     &ring.mul(ring.mul(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c))
-                ));
+                );
             }
         }
     }
@@ -1297,14 +1298,15 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
     for a in &elements {
         for b in &elements {
             for c in &elements {
-                assert!(ring.eq_el(
+                assert_el_eq!(
+                    &ring,
                     &ring.mul(ring.clone_el(a), ring.add(ring.clone_el(b), ring.clone_el(c))), 
                     &ring.add(ring.mul(ring.clone_el(a), ring.clone_el(b)), ring.mul(ring.clone_el(a), ring.clone_el(c)))
-                ));
-                assert!(ring.eq_el(
+                );
+                assert_el_eq!(&ring,
                     &ring.mul(ring.add(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c)), 
                     &ring.add(ring.mul(ring.clone_el(a), ring.clone_el(c)), ring.mul(ring.clone_el(b), ring.clone_el(c)))
-                ));
+                );
             }
         }
     }
