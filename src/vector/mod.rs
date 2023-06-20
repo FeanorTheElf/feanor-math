@@ -404,3 +404,20 @@ impl<T, V> SelfSubvectorView<T> for Subvector<T, V>
         return self;
     }
 }
+
+impl<T, V> Copy for Subvector<T, V>
+    where V: VectorView<T> + Copy
+{}
+
+impl<T, V> Clone for Subvector<T, V>
+    where V: VectorView<T> + Clone
+{
+    fn clone(&self) -> Self {
+        Self {
+            base: self.base.clone(),
+            from: self.from,
+            to: self.to,
+            element: PhantomData
+        }
+    }
+}
