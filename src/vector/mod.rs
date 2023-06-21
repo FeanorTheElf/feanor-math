@@ -309,25 +309,6 @@ impl<'a, T, V: ?Sized> SwappableVectorViewMut<T> for &'a mut V
     }
 }
 
-pub trait BorrowableVectorViewMut<T>: VectorViewMut<T> {
-
-    type Borrowed<'a>: VectorViewMut<T>
-        where Self: 'a;
-
-    fn borrow<'a>(&'a mut self) -> Self::Borrowed<'a>;
-}
-
-impl<'a, T, V: ?Sized> BorrowableVectorViewMut<T> for &'a mut V 
-    where V: VectorViewMut<T>
-{
-    type Borrowed<'b> = &'b mut V
-        where Self: 'b;
-
-    fn borrow<'b>(&'b mut self) -> Self::Borrowed<'b> {
-        &mut *self
-    }
-}
-
 pub trait SelfSubvectorView<T>: VectorView<T> {
 
     fn subvector<R: RangeBounds<usize>>(self, range: R) -> Self;
