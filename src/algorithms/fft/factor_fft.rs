@@ -92,6 +92,20 @@ impl<R, T1, T2, M> FFTTableGenCooleyTuckey<R, T1, T2, M>
     }
 }
 
+impl<R, T1, T2, M> PartialEq for FFTTableGenCooleyTuckey<R, T1, T2, M>
+    where R: RingStore,
+        T1: FFTTable<Ring = R> + PartialEq,
+        T2: FFTTable<Ring = R> + PartialEq,
+        M: MemoryProvider<El<R>>
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.ring().get_ring() == other.ring().get_ring() &&
+            self.left_table == other.left_table &&
+            self.right_table == other.right_table &&
+            self.ring().eq_el(self.root_of_unity(), other.root_of_unity())
+    }
+}
+
 impl<R, T1, T2, M> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2, M>
     where R: RingStore,
         T1: FFTTable<Ring = R>,

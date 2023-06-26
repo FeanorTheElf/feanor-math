@@ -198,6 +198,18 @@ impl<R, M> FFTTableBluestein<R, M>
     }
 }
 
+impl<R, M> PartialEq for FFTTableBluestein<R, M> 
+    where R: DivisibilityRingStore,
+        R::Type: DivisibilityRing,
+        M: MemoryProvider<El<R>>
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.ring().get_ring() == other.ring().get_ring() &&
+            self.n == other.n &&
+            self.ring().eq_el(self.root_of_unity(), other.root_of_unity())
+    }
+}
+
 impl<R, M> FFTTable for FFTTableBluestein<R, M> 
     where R: DivisibilityRingStore,
         R::Type: DivisibilityRing,

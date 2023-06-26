@@ -148,6 +148,17 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
     }
 }
 
+impl<R, M: MemoryProvider<El<R>>> PartialEq for FFTTableCooleyTuckey<R, M> 
+    where R: DivisibilityRingStore, 
+        R::Type: DivisibilityRing
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.ring().get_ring() == other.ring().get_ring() &&
+            self.log2_n == other.log2_n &&
+            self.ring().eq_el(self.root_of_unity(), other.root_of_unity())
+    }
+}
+
 impl<R, M: MemoryProvider<El<R>>> FFTTable for FFTTableCooleyTuckey<R, M> 
     where R: DivisibilityRingStore, 
         R::Type: DivisibilityRing
