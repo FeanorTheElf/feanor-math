@@ -236,7 +236,8 @@ impl<I: IntegerRing + CanonicalIso<StaticRingBase<i128>>> CanonicalHom<I> for Zn
         let ZZ128 = StaticRing::<i128>::RING.get_ring();
         let as_u128 = |x: I::Element| from.map_out(ZZ128, x, &from.has_canonical_iso(ZZ128).unwrap()) as u128;
         let from_u128 = |x: u128| from.map_in(ZZ128, x as i128, &from.has_canonical_hom(ZZ128).unwrap());
-        let reduced = if from.is_lt(&n, &from.power_of_two(BITSHIFT as usize)) {
+        let bounded_reduce_bound = from.map_in(ZZ128, self.repr_bound as i128 * self.repr_bound as i128, &from.has_canonical_hom(ZZ128).unwrap());
+        let reduced = if from.is_lt(&n, &bounded_reduce_bound) {
             self.bounded_reduce(as_u128(n))
         } else {
             as_u128(from.euclidean_rem(n, &from_u128(self.modulus as u128))) as u64
@@ -572,6 +573,10 @@ fn test_divisibility_axioms() {
 fn test_zn_map_in_large_int() {
     let R = Zn::new(17);
     generic_test_map_in_large_int(R);
+
+    let ZZbig = DefaultBigIntRing::RING;
+    let R = Zn::new(3);
+    assert_el_eq!(&R, &R.from_int(0), &R.coerce(&ZZbig, ZZbig.sub(ZZbig.power_of_two(84), ZZbig.one())));
 }
 
 #[test]
