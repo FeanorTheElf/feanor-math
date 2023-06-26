@@ -19,7 +19,7 @@ pub fn is_prim_root_of_unity<R: RingStore>(ring: R, el: &El<R>, n: usize) -> boo
     if !is_root_of_unity(&ring, el, n) {
         return false;
     }
-    for (p, _) in factor(&StaticRing::<i64>::RING, n as i64) {
+    for (p, _) in factor(&StaticRing::<i128>::RING, n as i128) {
         if is_root_of_unity(&ring, el, n / p as usize) {
             return false;
         }
