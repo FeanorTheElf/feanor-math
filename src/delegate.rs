@@ -81,6 +81,11 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
         self.postprocess_delegate_mut(lhs);
     }
 
+    default fn square(&self, value: &mut Self::Element) {
+        self.get_delegate().square(self.delegate_mut(value));
+        self.postprocess_delegate_mut(value);
+    }
+
     default fn zero(&self) -> Self::Element {
         self.rev_delegate(self.get_delegate().zero())
     }

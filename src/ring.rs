@@ -684,7 +684,16 @@ pub trait RingStore {
         els.fold(self.one(), |a, b| self.mul(a, b))
     }
 
-    fn pow(&self, x: El<Self>, power: usize) -> El<Self> {
+    fn pow(&self, mut x: El<Self>, power: usize) -> El<Self> {
+        // special cases to increase performance
+        if power == 0 {
+            return self.one();
+        } else if power == 1 {
+            return x;
+        } else if power == 2 {
+            self.square(&mut x);
+            return x;
+        }
         self.pow_gen(x, &(power as i64), StaticRing::<i64>::RING)
     }
 
