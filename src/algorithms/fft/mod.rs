@@ -30,7 +30,7 @@ pub trait FFTTable {
 
     ///
     /// On input `i`, returns `j` such that `unordered_fft(values)[i]` contains the evaluation
-    /// at `zeta^j` of values.
+    /// at `zeta^j` of values. Here `zeta` is the value returned by [`root_of_unity()`]
     /// 
     fn unordered_fft_permutation(&self, i: usize) -> usize;
 

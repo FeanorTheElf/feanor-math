@@ -1,4 +1,4 @@
-use crate::{ring::*, divisibility::DivisibilityRing, rings::zn::ZnRing};
+use crate::{ring::*, divisibility::DivisibilityRing, rings::zn::ZnRing, integer::{IntegerRingStore, IntegerRing}};
 
 ///
 /// Trait to simplify implementing newtype-pattern for rings.
@@ -9,7 +9,7 @@ use crate::{ring::*, divisibility::DivisibilityRing, rings::zn::ZnRing};
 /// 
 pub trait DelegateRing: PartialEq {
 
-    type Base: ?Sized + RingBase;
+    type Base: ?Sized + RingBase + SelfIso;
     type Element;
 
     fn get_delegate(&self) -> &Self::Base;
@@ -185,6 +185,23 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
 
     default fn mul(&self, lhs: Self::Element, rhs: Self::Element) -> Self::Element {
         self.rev_delegate(self.get_delegate().mul(self.delegate(lhs), self.delegate(rhs)))
+    }
+    
+    default fn is_approximate(&self) -> bool { self.get_delegate().is_approximate() }
+
+    default fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
+        self.get_delegate().mul_assign_int(self.delegate_mut(lhs), rhs);
+        self.postprocess_delegate_mut(lhs);
+    }
+
+    fn mul_int(&self, lhs: Self::Element, rhs: i32) -> Self::Element {
+        self.rev_delegate(self.get_delegate().mul_int(self.delegate(lhs), rhs))
+    }
+    
+    fn pow_gen<S: IntegerRingStore>(&self, x: Self::Element, power: &El<S>, integers: S) -> Self::Element 
+        where S::Type: IntegerRing
+    {
+        self.rev_delegate(self.get_delegate().pow_gen(self.delegate(x), power, integers))
     }
 }
 
