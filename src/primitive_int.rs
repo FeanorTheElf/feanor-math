@@ -176,7 +176,6 @@ impl<T: PrimitiveInt> HashableElRing for StaticRingBase<T> {
     }
 }
 
-#[fundamental]
 pub struct StaticRingBase<T> {
     element: PhantomData<T>
 }

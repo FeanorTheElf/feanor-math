@@ -796,7 +796,7 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// an implementation of `CanonicalHom<Self::BaseRing>`. Hence, if you as a user
 /// miss a certain implementation of `CanonicalHom`, check whether there maybe
 /// is a corresponding implementation of [`RingExtension`], or a member function.
-///
+/// 
 pub trait CanonicalHom<S>: RingBase
     where S: RingBase + ?Sized
 {
