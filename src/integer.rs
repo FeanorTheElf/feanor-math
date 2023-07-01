@@ -13,7 +13,7 @@ use crate::primitive_int::*;
 /// As an additional requirement, the euclidean division (i.e. [`EuclideanRing::euclidean_div_rem()`] and
 /// [`IntegerRing::euclidean_div_pow_2()`]) are expected to round towards zero.
 /// 
-pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + SelfIso + CanonicalIso<StaticRingBase<i32>> {
+pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + SelfIso + CanonicalIso<StaticRingBase<i32>> + CanonicalIntegerHom {
 
     fn to_float_approx(&self, value: &Self::Element) -> f64;
     fn from_float_approx(&self, value: f64) -> Option<Self::Element>;
@@ -31,18 +31,113 @@ pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + SelfIso + 
     }
 }
 
-pub mod generic_maps {
-    use crate::{algorithms, ring::{RingRef, RingBase}};
-    use super::IntegerRing;
-
-    pub fn generic_map_in<R: IntegerRing, S: RingBase>(from: &R, to: &S, el: R::Element) -> S::Element {
-        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(to.one(), &el, RingRef::new(from), |a| to.add_ref(&a, &a), |a, b| to.add_ref_fst(a, b), to.zero());
+pub trait CanonicalIntegerHom: RingBase {
+    
+    fn map_in_int<R: IntegerRing>(&self, from: &R, el: R::Element) -> Self::Element {
+        let result = crate::algorithms::sqr_mul::generic_abs_square_and_multiply(
+            self.one(), 
+            &el, 
+            RingRef::new(from), 
+            |a| self.add_ref(&a, &a), 
+            |a, b| self.add_ref_fst(a, b), 
+            self.zero()
+        );
         if from.is_neg(&el) {
-            return to.negate(result);
+            return self.negate(result);
         } else {
             return result;
         }
     }
+
+    fn map_in_int_ref<R: IntegerRing>(&self, from: &R, el: &R::Element) -> Self::Element {
+        self.map_in_int(from, from.clone_el(el))
+    }
+
+    fn mul_assign_map_in_int<R: IntegerRing>(&self, from: &R, lhs: &mut Self::Element, rhs: R::Element) {
+        self.mul_assign(lhs, self.map_in_int(from, rhs));
+    }
+
+    fn mul_assign_map_in_int_ref<R: IntegerRing>(&self, from: &R, lhs: &mut Self::Element, rhs: &R::Element) {
+        self.mul_assign(lhs, self.map_in_int_ref(from, rhs));
+    }
+}
+
+macro_rules! impl_from_integer_canonical_hom {
+    ($from:ty => $to:ty; $($constraints:tt)*) => {
+        impl<$($constraints)*> CanonicalHom<$from> for $to {
+
+            type Homomorphism = ();
+
+            fn has_canonical_hom(&self, _from: &$from) -> Option<Self::Homomorphism> { Some(()) }
+    
+            fn map_in(&self, from: &$from, el: <$from as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
+                <Self as CanonicalIntegerHom>::map_in_int::<$from>(self, from, el)
+            }
+        
+            fn map_in_ref(&self, from: &$from, el: &<$from as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
+                <Self as CanonicalIntegerHom>::map_in_int_ref::<$from>(self, from, el)
+            }
+        
+            fn mul_assign_map_in(&self, from: &$from, lhs: &mut Self::Element, rhs: <$from as RingBase>::Element, _hom: &Self::Homomorphism) {
+                <Self as CanonicalIntegerHom>::mul_assign_map_in_int::<$from>(self, from, lhs, rhs)
+            }
+        
+            fn mul_assign_map_in_ref(&self, from: &$from, lhs: &mut Self::Element, rhs: &<$from as RingBase>::Element, _hom: &Self::Homomorphism) {
+                <Self as CanonicalIntegerHom>::mul_assign_map_in_int_ref::<$from>(self, from, lhs, rhs)
+            }
+        }
+    };
+    ($from:ty => $to:ty) => {
+        impl CanonicalHom<$from> for $to {
+
+            type Homomorphism = ();
+
+            fn has_canonical_hom(&self, _from: &$from) -> Option<Self::Homomorphism> { Some(()) }
+    
+            fn map_in(&self, from: &$from, el: <$from as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
+                <Self as CanonicalIntegerHom>::map_in_int::<$from>(self, from, el)
+            }
+        
+            fn map_in_ref(&self, from: &$from, el: &<$from as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
+                <Self as CanonicalIntegerHom>::map_in_int_ref::<$from>(self, from, el)
+            }
+        
+            fn mul_assign_map_in(&self, from: &$from, lhs: &mut Self::Element, rhs: <$from as RingBase>::Element, _hom: &Self::Homomorphism) {
+                <Self as CanonicalIntegerHom>::mul_assign_map_in_int::<$from>(self, from, lhs, rhs)
+            }
+        
+            fn mul_assign_map_in_ref(&self, from: &$from, lhs: &mut Self::Element, rhs: &<$from as RingBase>::Element, _hom: &Self::Homomorphism) {
+                <Self as CanonicalIntegerHom>::mul_assign_map_in_int_ref::<$from>(self, from, lhs, rhs)
+            }
+        }
+    };
+}
+
+macro_rules! impl_from_integer_canonical_iso {
+    ($from:ty => $to:ty; $($constraints:tt)*) => {
+        impl<$($constraints)*> CanonicalIso<$from> for $to {
+
+            type Isomorphism = ();
+
+            fn has_canonical_iso(&self, _from: &$from) -> Option<Self::Isomorphism> { Some(()) }
+    
+            fn map_out(&self, from: &$from, el: Self::Element, _hom: &Self::Isomorphism) -> <$from as RingBase>::Element {
+                <$from as CanonicalIntegerHom>::map_in_int::<Self>(from, self, el)
+            }
+        }
+    };
+    ($from:ty => $to:ty) => {
+        impl CanonicalIso<$from> for $to {
+
+            type Isomorphism = ();
+
+            fn has_canonical_iso(&self, _from: &$from) -> Option<Self::Isomorphism> { Some(()) }
+    
+            fn map_out(&self, from: &$from, el: Self::Element, _hom: &Self::Isomorphism) -> <$from as RingBase>::Element {
+                <$from as CanonicalIntegerHom>::map_in_int::<Self>(from, self, el)
+            }
+        }
+    };
 }
 
 pub trait IntegerRingStore: RingStore

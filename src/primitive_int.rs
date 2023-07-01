@@ -1,5 +1,5 @@
 use std::{ops::{AddAssign, SubAssign, MulAssign, Neg, Div, Rem}, marker::PhantomData, fmt::Display};
-use crate::{ring::*, euclidean::EuclideanRing, divisibility::DivisibilityRing, ordered::OrderedRing, rings::bigint::{DefaultBigIntRing, DefaultBigIntRingEl}};
+use crate::{ring::*, euclidean::EuclideanRing, divisibility::DivisibilityRing, ordered::OrderedRing, rings::bigint::DefaultBigIntRing};
 use crate::integer::*;
 use crate::algorithms::conv_mul::KaratsubaHint;
 
@@ -28,57 +28,17 @@ impl PrimitiveInt for i128 {
     fn bits() -> usize { Self::BITS as usize }
 }
 
-impl<T: PrimitiveInt, S: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for StaticRingBase<S> {
-
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, _: &StaticRingBase<T>) -> Option<()> {
-        Some(())
-    }
-
-    fn map_in(&self, _: &StaticRingBase<T>, el: T, _: &()) -> S {
-        S::try_from(el.into()).map_err(|_| ()).unwrap()
-    }
-}
-
-impl<T: PrimitiveInt, S: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for StaticRingBase<S> {
+impl<T: PrimitiveInt> CanonicalIntegerHom for StaticRingBase<T> {
     
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, _: &StaticRingBase<T>) -> Option<()> {
-        Some(())
-    }
-
-    fn map_out(&self, _: &StaticRingBase<T>, el: S, _: &()) -> T {
-        T::try_from(el.into()).map_err(|_| ()).unwrap()
+    fn map_in_int<R: IntegerRing>(&self, from: &R, el: R::Element) -> Self::Element {
+        unimplemented!()
     }
 }
 
-impl<T: PrimitiveInt> CanonicalHom<DefaultBigIntRing> for StaticRingBase<T> {
-    
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, _: &DefaultBigIntRing) -> Option<()> {
-        Some(())
-    }
-
-    fn map_in(&self, from: &DefaultBigIntRing, el: DefaultBigIntRingEl, _: &()) -> T {
-        from.map_out(self, el, &())
-    }
-}
-
-impl<T: PrimitiveInt> CanonicalIso<DefaultBigIntRing> for StaticRingBase<T> {
-    
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, _: &DefaultBigIntRing) -> Option<()> {
-        Some(())
-    }
-
-    fn map_out(&self, from: &DefaultBigIntRing, el: T, _: &()) -> DefaultBigIntRingEl {
-        from.map_in(self, el, &())
-    }
-}
+impl_from_integer_canonical_hom!{StaticRingBase<T> => StaticRingBase<S>; T: PrimitiveInt, S: PrimitiveInt}
+impl_from_integer_canonical_hom!{DefaultBigIntRing => StaticRingBase<S>; S: PrimitiveInt}
+impl_from_integer_canonical_iso!{StaticRingBase<T> => StaticRingBase<S>; T: PrimitiveInt, S: PrimitiveInt}
+impl_from_integer_canonical_iso!{DefaultBigIntRing => StaticRingBase<S>; S: PrimitiveInt}
 
 impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
     

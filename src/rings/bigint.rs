@@ -178,24 +178,6 @@ impl RingBase for DefaultBigIntRing {
 
 }
 
-impl CanonicalHom<DefaultBigIntRing> for DefaultBigIntRing {
-    
-    type Homomorphism = ();
-    
-    fn has_canonical_hom(&self, _: &DefaultBigIntRing) -> Option<()> { Some(()) }
-
-    fn map_in(&self, _: &DefaultBigIntRing, el: DefaultBigIntRingEl, _: &()) -> Self::Element { el }
-}
-
-impl CanonicalIso<DefaultBigIntRing> for DefaultBigIntRing {
-    
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, _: &DefaultBigIntRing) -> Option<()> { Some(()) }
-
-    fn map_out(&self, _: &DefaultBigIntRing, el: DefaultBigIntRingEl, _: &()) -> Self::Element { el }
-}
-
 impl OrderedRing for DefaultBigIntRing {
 
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
@@ -242,29 +224,12 @@ impl EuclideanRing for DefaultBigIntRing {
     }
 }
 
-impl<T: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for DefaultBigIntRing {
-    
-    type Homomorphism = ();
+impl CanonicalIntegerHom for DefaultBigIntRing {}
 
-    fn has_canonical_hom(&self, _: &StaticRingBase<T>) -> Option<()> { Some(()) }
-
-    fn map_in(&self, _: &StaticRingBase<T>, el: T, _: &()) -> Self::Element {
-        let negative = el.into() < 0;
-        let value = el.into().checked_abs().map(|x| x as u128).unwrap_or(1 << (u128::BITS - 1));
-        DefaultBigIntRingEl(negative, vec![(value & ((1 << u64::BITS) - 1)) as u64, (value >> u64::BITS) as u64])
-    }
-}
-
-impl<T: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for DefaultBigIntRing {
-    
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, _: &StaticRingBase<T>) -> Option<()> { Some(()) }
-
-    fn map_out(&self, _: &StaticRingBase<T>, el: Self::Element, _: &()) -> T {
-        T::try_from(self.map_i128(&el).unwrap()).ok().unwrap()
-    }
-}
+impl_from_integer_canonical_hom!{StaticRingBase<T> => DefaultBigIntRing; T: PrimitiveInt}
+impl_from_integer_canonical_hom!{DefaultBigIntRing => DefaultBigIntRing}
+impl_from_integer_canonical_iso!{StaticRingBase<T> => DefaultBigIntRing; T: PrimitiveInt}
+impl_from_integer_canonical_iso!{DefaultBigIntRing => DefaultBigIntRing}
 
 impl HashableElRing for DefaultBigIntRing {
 

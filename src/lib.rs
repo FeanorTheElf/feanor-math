@@ -17,6 +17,8 @@ impl<T: ?Sized> Exists for T {}
 pub mod mempool;
 #[macro_use]
 pub mod ring;
+#[macro_use]
+pub mod integer;
 pub mod delegate;
 pub mod vector;
 pub mod divisibility;
@@ -24,6 +26,5 @@ pub mod field;
 pub mod euclidean;
 pub mod ordered;
 pub mod primitive_int;
-pub mod integer;
 pub mod algorithms;
 pub mod rings;

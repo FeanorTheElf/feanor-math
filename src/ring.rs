@@ -803,6 +803,7 @@ pub trait CanonicalHom<S>: RingBase
     type Homomorphism;
 
     fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism>;
+    
     fn map_in(&self, from: &S, el: S::Element, hom: &Self::Homomorphism) -> Self::Element;
 
     fn map_in_ref(&self, from: &S, el: &S::Element, hom: &Self::Homomorphism) -> Self::Element {
