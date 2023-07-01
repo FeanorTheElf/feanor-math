@@ -67,6 +67,20 @@ impl<V, T> VectorFn<T> for VectorViewFn<V, T>
     }
 }
 
+impl<V, T> Clone for VectorViewFn<V, T>
+    where T: Clone,
+        V: Clone + VectorView<T>
+{
+    fn clone(&self) -> Self {
+        Self::new(self.base.clone())
+    }
+}
+
+impl<V, T> Copy for VectorViewFn<V, T>
+    where T: Clone,
+        V: Copy + VectorView<T>
+{}
+
 impl<'a, T, V: ?Sized> VectorFn<T> for &'a V 
     where V: VectorFn<T>
 {
