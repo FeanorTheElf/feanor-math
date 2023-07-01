@@ -3,6 +3,7 @@ use crate::mempool::*;
 use crate::algorithms::fft::*;
 use crate::algorithms::fft::complex_fft::*;
 use crate::rings::float_complex::*;
+use crate::vector::subvector::*;
 
 pub struct FFTTableGenCooleyTuckey<R, T1, T2, M = AllocatingMemoryProvider> 
     where R: RingStore,

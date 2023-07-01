@@ -3,13 +3,15 @@ pub mod stride;
 pub mod chain;
 pub mod permute;
 pub mod sparse;
+pub mod vec_fn;
+pub mod subvector;
 
-use std::ops::{RangeBounds, Bound, Index, IndexMut};
 use std::marker::PhantomData;
 
 use self::chain::Chain;
 use self::map::{Map, MapMut};
 use self::stride::Stride;
+use self::vec_fn::VectorViewFn;
 
 ///
 /// A trait for objects that provides read access to a 1-dimensional
@@ -45,10 +47,15 @@ pub trait VectorView<T> {
         Chain::new(self, rhs)
     }
 
-    fn clone_to_vec(&self) -> Vec<T>
-        where T: Clone
+    fn as_fn(self) -> VectorViewFn<Self, T>
+        where Self: Sized, 
+            T: Clone
     {
-        (0..self.len()).map(|i| self.at(i).clone()).collect()
+        VectorViewFn::new(self)
+    }
+
+    fn iter<'a>(&'a self) -> VectorViewIter<'a, Self, T> {
+        VectorViewIter { begin: 0, end: self.len(), base: self, item: PhantomData }
     }
 }
 
@@ -59,6 +66,13 @@ pub trait VectorView<T> {
 /// # Related traits
 /// 
 /// If only immutable access is provided, use [crate::vector::VectorViewMut].
+/// 
+/// # Iterators
+/// 
+/// Note that we cannot provide an `iter_mut()` function - it is not clear that
+/// the underlying vector allows elements at different indices to be borrowed
+/// mutably at once (e.g. sparse implementations). 
+/// This is of course different in the immutable case. 
 /// 
 pub trait VectorViewMut<T>: VectorView<T> {
 
@@ -74,37 +88,6 @@ pub trait VectorViewMut<T>: VectorView<T> {
 pub trait SwappableVectorViewMut<T>: VectorViewMut<T> {
 
     fn swap(&mut self, i: usize, j: usize);
-}
-
-///
-/// A trait for objects that have the structure of a one-dimensional array,
-/// and can produce objects at each entry.
-/// 
-/// # Related traits
-/// 
-/// If the entries are owned by the object, consider using the trait [crate::vector::VectorView].
-/// Instead of returning entries by value, it returns entries by reference.
-/// 
-/// # Blanket implementations
-/// 
-/// There are many kinds of blanket implementations thinkable, e.g.
-/// ```ignore
-/// impl<T: Clone, V> VectorFn<T> for VectorView<T> { ... }
-/// ```
-/// or
-/// ```ignore
-/// impl<'a, T, V> VectorFn<&'a T> for &'a VectorView<T> { ... }
-/// ```
-/// However, these do not represent the standard use cases and clutter the space of
-/// possible implementations. For now, we just provide
-/// ```ignore
-/// impl<T: Copy, V> VectorFn<T> for VectorView<T> { ... }
-/// ```
-/// 
-pub trait VectorFn<T> {
-    
-    fn len(&self) -> usize;
-    fn at(&self, i: usize) -> T;
 }
 
 pub trait VectorViewSparse<T>: VectorView<T> {
@@ -309,115 +292,48 @@ impl<'a, T, V: ?Sized> SwappableVectorViewMut<T> for &'a mut V
     }
 }
 
-pub trait SelfSubvectorView<T>: VectorView<T> {
-
-    fn subvector<R: RangeBounds<usize>>(self, range: R) -> Self;
-}
-
-impl<'a, T> SelfSubvectorView<T> for &'a [T] {
-
-    fn subvector<R: RangeBounds<usize>>(self, range: R) -> Self {
-        self.index((range.start_bound().cloned(), range.end_bound().cloned()))
-    }
-}
-
-impl<'a, T> SelfSubvectorView<T> for &'a mut [T] {
-
-    fn subvector<R: RangeBounds<usize>>(self, range: R) -> Self {
-        self.index_mut((range.start_bound().cloned(), range.end_bound().cloned()))
-    }
-}
-
-pub struct Subvector<T, V> 
-    where V: VectorView<T>
+pub struct VectorViewIter<'a, V: ?Sized, T>
+    where V: 'a + VectorView<T>, T: 'a
 {
-    from: usize,
-    to: usize,
-    base: V,
-    element: PhantomData<T>
+    begin: usize,
+    end: usize,
+    base: &'a V,
+    item: PhantomData<T>
 }
 
-impl<T, V> Subvector<T, V>
-    where V: VectorView<T>
+impl<'a, V: ?Sized, T> Iterator for VectorViewIter<'a, V, T>
+    where V: 'a + VectorView<T>, T: 'a
 {
-    pub fn new(base: V) -> Self {
-        Subvector { 
-            from: 0, 
-            to: base.len(), 
-            base: base, 
-            element: PhantomData 
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.begin != self.end {
+            let result = self.base.at(self.begin);
+            self.begin += 1;
+            return Some(result);
+        } else {
+            return None;
         }
     }
 }
 
-impl<T, V> VectorView<T> for Subvector<T, V>
-    where V: VectorView<T>
+impl<'a, V: ?Sized, T> DoubleEndedIterator for VectorViewIter<'a, V, T>
+    where V: 'a + VectorView<T>, T: 'a
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.begin != self.end {
+            self.end -= 1;
+            return Some(self.base.at(self.end));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl<'a, V: ?Sized, T> ExactSizeIterator for VectorViewIter<'a, V, T>
+    where V: 'a + VectorView<T>, T: 'a
 {
     fn len(&self) -> usize {
-        self.to - self.from
-    }
-
-    fn at(&self, i: usize) -> &T {
-        debug_assert!(i < self.len());
-        self.base.at(i + self.from)
-    }
-}
-
-impl<T, V> VectorViewMut<T> for Subvector<T, V>
-    where V: VectorViewMut<T>
-{
-    fn at_mut(&mut self, i: usize) -> &mut T {
-        debug_assert!(i < self.len());
-        self.base.at_mut(i + self.from)
-    }
-}
-
-impl<T, V> SwappableVectorViewMut<T> for Subvector<T, V>
-    where V: SwappableVectorViewMut<T>
-{
-    fn swap(&mut self, i: usize, j: usize) {
-        debug_assert!(i < self.len());
-        debug_assert!(j < self.len());
-        self.base.swap(i + self.from, j + self.from);
-    }
-}
-
-impl<T, V> SelfSubvectorView<T> for Subvector<T, V>
-    where V: VectorView<T>
-{
-    fn subvector<R: RangeBounds<usize>>(mut self, range: R) -> Self {
-        let from = match range.start_bound() {
-            Bound::Included(x) => *x,
-            Bound::Excluded(x) => *x + 1,
-            Bound::Unbounded => 0
-        };
-        assert!(from <= self.len());
-        let to = match range.end_bound() {
-            Bound::Included(x) => *x - 1,
-            Bound::Excluded(x) => *x,
-            Bound::Unbounded => self.len()
-        };
-        assert!(to <= self.len());
-        assert!(to >= from);
-        self.to = to + self.from;
-        self.from = from + self.from;
-        return self;
-    }
-}
-
-impl<T, V> Copy for Subvector<T, V>
-    where V: VectorView<T> + Copy
-{}
-
-impl<T, V> Clone for Subvector<T, V>
-    where V: VectorView<T> + Clone
-{
-    fn clone(&self) -> Self {
-        Self {
-            base: self.base.clone(),
-            from: self.from,
-            to: self.to,
-            element: PhantomData
-        }
+        self.end - self.begin
     }
 }

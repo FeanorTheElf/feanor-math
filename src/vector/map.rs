@@ -2,6 +2,8 @@ use std::marker::PhantomData;
 
 use crate::vector::*;
 
+use super::{vec_fn::VectorFn, subvector::{SelfSubvectorFn, SelfSubvectorView}};
+
 pub struct Map<V, F, T> 
     where V: VectorView<T>
 {
@@ -43,6 +45,14 @@ impl<V, F, T, U> VectorView<U> for Map<V, F, T>
 
     fn len(&self) -> usize {
         self.base_view.len()
+    }
+}
+
+impl<V, F, T, U> SelfSubvectorView<U> for Map<V, F, T>
+    where V: SelfSubvectorView<T>, F: Fn(&T) -> &U
+{
+    fn subvector<R: std::ops::RangeBounds<usize>>(self, range: R) -> Self {
+        Map { base_view: self.base_view.subvector(range), accessor: self.accessor, base_element: self.base_element }
     }
 }
 
@@ -107,3 +117,55 @@ impl<V, F, G, T, U> Clone for MapMut<V, F, G, T>
 impl<V, F, G, T, U> Copy for MapMut<V, F, G, T>
     where V: VectorViewMut<T> + Copy, F: Copy + Fn(&T) -> &U, G: Copy + Fn(&mut T) -> &mut U
 {}
+
+pub struct MapFn<V, F, T> 
+    where V: VectorFn<T>
+{
+    base_view: V,
+    accessor: F,
+    base_element: PhantomData<T>
+}
+
+impl<V, F, T, U> MapFn<V, F, T>
+    where V: VectorFn<T>, F: Fn(T) -> U
+{
+    pub const fn new(base_view: V, accessor: F) -> Self {
+        MapFn {
+            base_view: base_view,
+            accessor: accessor,
+            base_element: PhantomData
+        }
+    }
+}
+
+impl<V, F, T, U> Clone for MapFn<V, F, T>
+    where V: VectorFn<T> + Clone, F: Clone + Fn(T) -> U
+{
+    fn clone(&self) -> Self {
+        MapFn::new(self.base_view.clone(), self.accessor.clone())
+    }
+}
+
+impl<V, F, T, U> Copy for MapFn<V, F, T>
+    where V: VectorFn<T> + Copy, F: Copy + Fn(T) -> U
+{}
+
+impl<V, F, T, U> VectorFn<U> for MapFn<V, F, T>
+    where V: VectorFn<T>, F: Fn(T) -> U
+{
+    fn at(&self, i: usize) -> U {
+        (self.accessor)(self.base_view.at(i))
+    }
+
+    fn len(&self) -> usize {
+        self.base_view.len()
+    }
+}
+
+impl<V, F, T, U> SelfSubvectorFn<U> for MapFn<V, F, T>
+    where V: SelfSubvectorFn<T>, F: Fn(T) -> U
+{
+    fn subvector<R: std::ops::RangeBounds<usize>>(self, range: R) -> Self {
+        MapFn { base_view: self.base_view.subvector(range), accessor: self.accessor, base_element: self.base_element }
+    }
+}
