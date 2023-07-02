@@ -357,6 +357,18 @@ pub trait RingBase: PartialEq {
             &integers
         )
     }
+
+    fn sum<I>(&self, els: I) -> Self::Element 
+        where I: Iterator<Item = Self::Element>
+    {
+        els.fold(self.zero(), |a, b| self.add(a, b))
+    }
+
+    fn prod<I>(&self, els: I) -> Self::Element 
+        where I: Iterator<Item = Self::Element>
+    {
+        els.fold(self.one(), |a, b| self.mul(a, b))
+    }
 }
 
 #[macro_export]
@@ -675,13 +687,13 @@ pub trait RingStore {
     fn sum<I>(&self, els: I) -> El<Self> 
         where I: Iterator<Item = El<Self>>
     {
-        els.fold(self.zero(), |a, b| self.add(a, b))
+        self.get_ring().sum(els)
     }
 
     fn prod<I>(&self, els: I) -> El<Self> 
         where I: Iterator<Item = El<Self>>
     {
-        els.fold(self.one(), |a, b| self.mul(a, b))
+        self.get_ring().prod(els)
     }
 
     fn pow(&self, mut x: El<Self>, power: usize) -> El<Self> {

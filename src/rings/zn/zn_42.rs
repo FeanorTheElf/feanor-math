@@ -12,13 +12,32 @@ use super::zn_barett;
 /// A special implementation of non-standard Barett reduction
 /// that uses 128-bit integer but provides moduli up to 42 bit.
 /// 
-/// Any modular reductions are performed lazily.
+/// Any modular reductions are performed lazily on-demand.
+/// 
+/// # Example
+/// 
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_42::*;
+/// let zn = Zn::new(7);
+/// assert_el_eq!(&zn, &zn.one(), &zn.mul(zn.from_int(3), zn.from_int(5)));
+/// ```
+/// For moduli larger than 42 bit, this will panic
+/// ```should_panic
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_42::*;
+/// let zn = Zn::new((1 << 42) + 1);
+/// ```
 /// 
 #[derive(Clone, Copy, PartialEq)]
 pub struct ZnBase {
     // must be 128 bit to deal with very small moduli
     inv_modulus: u128,
     modulus: u64,
+    /// Representatives of elements may grow up to this bound
     repr_bound: u64,
     modulus_i128: i128
 }
@@ -95,15 +114,20 @@ impl RingBase for ZnBase {
     }
     
     fn add_assign(&self, ZnEl(lhs): &mut Self::Element, ZnEl(rhs): Self::Element) {
+        debug_assert!(*lhs < self.repr_bound);
+        debug_assert!(rhs < self.repr_bound);
         *lhs += rhs;
         self.potential_reduce(lhs);
     }
     
     fn negate_inplace(&self, ZnEl(lhs): &mut Self::Element) {
+        debug_assert!(*lhs < self.repr_bound);
         *lhs = 2 * self.modulus - self.bounded_reduce(*lhs as u128);
     }
 
     fn mul_assign(&self, ZnEl(lhs): &mut Self::Element, ZnEl(rhs): Self::Element) {
+        debug_assert!(*lhs < self.repr_bound);
+        debug_assert!(rhs < self.repr_bound);
         *lhs = self.bounded_reduce(*lhs as u128 * rhs as u128);
     }
 
