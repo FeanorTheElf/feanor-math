@@ -10,7 +10,7 @@ use super::zn_barett;
 ///
 /// Represents the ring `Z/nZ`.
 /// A special implementation of non-standard Barett reduction
-/// that uses 128-bit integer but provides moduli up to 42 bit.
+/// that uses 128-bit integer but provides moduli up to 41 bits.
 /// 
 /// Any modular reductions are performed lazily on-demand.
 /// 
@@ -34,7 +34,7 @@ use super::zn_barett;
 /// 
 #[derive(Clone, Copy, PartialEq)]
 pub struct ZnBase {
-    // must be 128 bit to deal with very small moduli
+    /// must be 128 bit to deal with very small moduli
     inv_modulus: u128,
     modulus: u64,
     /// Representatives of elements may grow up to this bound
@@ -50,7 +50,11 @@ pub type Zn = RingValue<ZnBase>;
 /// `x / modulus` by `(floor(2^b / modulus) * x) / 2^b`.
 /// 
 const BITSHIFT: u32 = 84;
-const MAX_MODULUS_BITS: u32 = BITSHIFT / 2;
+///
+/// Subtract one bit, as we need this to efficiently implement negate - 
+/// see also constructor assertion `2 * modulus < repr_bound`.
+/// 
+const MAX_MODULUS_BITS: u32 = (BITSHIFT / 2) - 1;
 
 #[derive(Copy, Clone, Debug)]
 pub struct ZnEl(u64);
@@ -65,9 +69,12 @@ impl Zn {
 impl ZnBase {
 
     pub fn new(modulus: u64) -> Self {
-        assert!(modulus <= (1 << MAX_MODULUS_BITS));
+        assert!(modulus < (1 << MAX_MODULUS_BITS));
         let inv_modulus = (1 << BITSHIFT) / modulus as u128;
         let repr_bound = 1 << (inv_modulus.leading_zeros() / 2);
+        // necessary for from_int to work
+        assert!(repr_bound >= (1 << 16));
+        // necessary for negate to work
         assert!(2 * modulus < repr_bound);
         return ZnBase {
             modulus: modulus,
@@ -86,6 +93,9 @@ impl ZnBase {
     ///
     /// If input is smaller than `1 << BITSHIFT`, the output is smaller
     /// than `2 * self.modulus` and congruent to the input.
+    /// 
+    /// Note that we also need `input < repr_bound * repr_bound`, otherwise
+    /// the 128-bit multiplication will overflow.
     /// 
     fn bounded_reduce(&self, value: u128) -> u64 {
         assert!(value < (1 << BITSHIFT));
@@ -122,6 +132,8 @@ impl RingBase for ZnBase {
     
     fn negate_inplace(&self, ZnEl(lhs): &mut Self::Element) {
         debug_assert!(*lhs < self.repr_bound);
+        // we check this in the constructor also during release
+        debug_assert!(2 * self.modulus < self.repr_bound);
         *lhs = 2 * self.modulus - self.bounded_reduce(*lhs as u128);
     }
 
@@ -132,6 +144,8 @@ impl RingBase for ZnBase {
     }
 
     fn from_int(&self, value: i32) -> Self::Element {
+        // we check this in the constructor also during release
+        debug_assert!(self.repr_bound >= (1 << 16));
         if value < 0 {
             return self.negate(ZnEl(self.bounded_reduce(-value as u128)));
         } else {
@@ -564,6 +578,9 @@ const EDGE_CASE_ELEMENTS: [i32; 10] = [0, 1, 3, 7, 9, 62, 8, 10, 11, 12];
 fn test_ring_axioms() {
     let ring = Zn::new(63);
     generic_test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.from_int(x)));
+
+    let ring = Zn::new((1 << 41) - 1);
+    generic_test_ring_axioms(&ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.from_int(x)));
 }
 
 #[test]
@@ -601,6 +618,15 @@ fn test_zn_map_in_large_int() {
     let ZZbig = DefaultBigIntRing::RING;
     let R = Zn::new(3);
     assert_el_eq!(&R, &R.from_int(0), &R.coerce(&ZZbig, ZZbig.sub(ZZbig.power_of_two(84), ZZbig.one())));
+}
+
+#[test]
+fn test_from_int() {
+    let R = Zn::new(2);
+    assert_el_eq!(&R, &R.from_int(1), &R.from_int(i32::MAX));
+
+    let R = Zn::new((1 << 41) - 1);
+    assert_el_eq!(&R, &R.pow(R.from_int(2), 30), &R.from_int(1 << 30));
 }
 
 #[test]
