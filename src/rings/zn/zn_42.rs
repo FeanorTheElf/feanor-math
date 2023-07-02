@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::delegate::DelegateRing;
 use crate::divisibility::DivisibilityRingStore;
 use crate::integer::IntegerRingStore;
@@ -271,25 +273,43 @@ impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalIso<zn_barett::Z
     }
 }
 
+pub struct IntegerToZnHom<I: IntegerRing + CanonicalIso<StaticRingBase<i128>>> {
+    highbit_mod: usize,
+    highbit_bound: usize,
+    int_ring: PhantomData<I>,
+    hom: <I as CanonicalHom<StaticRingBase<i128>>>::Homomorphism,
+    iso: <I as CanonicalIso<StaticRingBase<i128>>>::Isomorphism
+}
+
 impl<I: IntegerRing + CanonicalIso<StaticRingBase<i128>>> CanonicalHom<I> for ZnBase {
 
-    type Homomorphism = ();
+    type Homomorphism = IntegerToZnHom<I>;
 
-    fn has_canonical_hom(&self, _: &I) -> Option<Self::Homomorphism> {
-       Some(())
+    fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
+        Some(IntegerToZnHom {
+            highbit_mod: StaticRing::<i128>::RING.abs_highest_set_bit(&self.modulus_i128).unwrap(),
+            highbit_bound: StaticRing::<i128>::RING.abs_highest_set_bit(&(self.repr_bound as i128 * self.repr_bound as i128)).unwrap(),
+            int_ring: PhantomData,
+            hom: from.has_canonical_hom(StaticRing::<i128>::RING.get_ring()).unwrap(),
+            iso: from.has_canonical_iso(StaticRing::<i128>::RING.get_ring()).unwrap()
+        })
     }
 
-    fn map_in(&self, from: &I, el: I::Element, _: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
         let (neg, n) = if from.is_neg(&el) {
             (true, from.negate(el))
         } else {
             (false, el)
         };
         let ZZ128 = StaticRing::<i128>::RING.get_ring();
-        let as_u128 = |x: I::Element| from.map_out(ZZ128, x, &from.has_canonical_iso(ZZ128).unwrap()) as u128;
-        let from_u128 = |x: u128| from.map_in(ZZ128, x as i128, &from.has_canonical_hom(ZZ128).unwrap());
-        let bounded_reduce_bound = from.map_in(ZZ128, self.repr_bound as i128 * self.repr_bound as i128, &from.has_canonical_hom(ZZ128).unwrap());
-        let reduced = if from.is_lt(&n, &bounded_reduce_bound) {
+        let as_u128 = |x: I::Element| from.map_out(ZZ128, x, &hom.iso) as u128;
+        let from_u128 = |x: u128| from.map_in(ZZ128, x as i128, &hom.hom);
+        
+        let highbit_el = from.abs_highest_set_bit(&n).unwrap_or(0);
+
+        let reduced = if highbit_el < hom.highbit_mod {
+            as_u128(n) as u64
+        } else if highbit_el < hom.highbit_bound {
             self.bounded_reduce(as_u128(n))
         } else {
             as_u128(from.euclidean_rem(n, &from_u128(self.modulus as u128))) as u64
@@ -502,10 +522,10 @@ impl CanonicalHom<ZnFastmulBase> for ZnBase {
 
 impl CanonicalHom<StaticRingBase<i128>> for ZnFastmulBase {
 
-    type Homomorphism = ();
+    type Homomorphism = <ZnBase as CanonicalHom<StaticRingBase<i128>>>::Homomorphism;
 
-    fn has_canonical_hom(&self, _: &StaticRingBase<i128>) -> Option<Self::Homomorphism> {
-        Some(())
+    fn has_canonical_hom(&self, from: &StaticRingBase<i128>) -> Option<Self::Homomorphism> {
+        self.base.has_canonical_hom(from)
     }
 
     fn map_in(&self, from: &StaticRingBase<i128>, el: i128, hom: &Self::Homomorphism) -> Self::Element {
@@ -641,6 +661,12 @@ fn test_zn_map_in_large_int() {
     let ZZbig = DefaultBigIntRing::RING;
     let R = Zn::new(3);
     assert_el_eq!(&R, &R.from_int(0), &R.coerce(&ZZbig, ZZbig.sub(ZZbig.power_of_two(84), ZZbig.one())));
+}
+
+#[test]
+fn test_zn_map_in_small_int() {
+    let R = Zn::new((1 << 41) - 1);
+    assert_el_eq!(&R, &R.from_int(1), &R.coerce(&StaticRing::<i8>::RING, 1));
 }
 
 #[test]
