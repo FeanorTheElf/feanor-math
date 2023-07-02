@@ -187,6 +187,20 @@ impl RingBase for ZnBase {
         let fastmul_ring = ZnFastmul::from(ZnFastmulBase::new(*self));
         algorithms::sqr_mul::generic_pow(RingRef::new(self).cast(&fastmul_ring, x), power, &fastmul_ring, &RingRef::new(self), &integers)
     }
+
+    fn sum<I>(&self, mut els: I) -> Self::Element 
+        where I: Iterator<Item = Self::Element>
+    {
+        let mut result = self.zero();
+        while let Some(ZnEl(start)) = els.next() {
+            let mut current = start as u128;
+            for ZnEl(c) in els.by_ref().take(self.repr_bound as usize - 1) {
+                current += c as u128;
+            }
+            self.add_assign(&mut result, ZnEl(self.bounded_reduce(current)));
+        }
+        return result;
+    }
 }
 
 impl CanonicalHom<ZnBase> for ZnBase {
@@ -581,6 +595,15 @@ fn test_ring_axioms() {
 
     let ring = Zn::new((1 << 41) - 1);
     generic_test_ring_axioms(&ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.from_int(x)));
+}
+
+#[test]
+fn test_sum() {
+    let ring = Zn::new(17);
+    assert_el_eq!(&ring, &ring.from_int(10001 * 5000), &ring.sum((0..=10000).map(|x| ring.from_int(x))));
+
+    let ring = Zn::new((1 << 41) - 1);
+    assert_el_eq!(&ring, &ring.from_int(10001 * 5000), &ring.sum((0..=10000).map(|x| ring.from_int(x))));
 }
 
 #[test]
