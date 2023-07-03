@@ -134,7 +134,7 @@ pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R)
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_map_in_large_int<R: ZnRingStore>(R: R)
     where <R as RingStore>::Type: ZnRing + CanonicalHom<DefaultBigIntRing>
 {
