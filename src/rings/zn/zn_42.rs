@@ -56,7 +56,7 @@ const BITSHIFT: u32 = 84;
 /// Subtract one bit, as we need this to efficiently implement negate - 
 /// see also constructor assertion `2 * modulus < repr_bound`.
 /// 
-const MAX_MODULUS_BITS: u32 = (BITSHIFT / 2) - 1;
+pub const MAX_MODULUS_BITS: u32 = (BITSHIFT / 2) - 1;
 
 #[derive(Copy, Clone, Debug)]
 pub struct ZnEl(u64);

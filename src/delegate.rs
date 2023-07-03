@@ -232,7 +232,7 @@ impl<'a, R: ?Sized> Iterator for DelegateZnRingElementsIter<'a, R>
 }
 
 impl<R: DelegateRing + ?Sized> ZnRing for R
-    where R::Base: ZnRing, R: CanonicalHom<<R::Base as ZnRing>::IntegerRingBase>
+    where R::Base: ZnRing, R: CanonicalHom<<R::Base as ZnRing>::IntegerRingBase> + SelfIso
 {
     type IntegerRingBase = <R::Base as ZnRing>::IntegerRingBase;
     type Integers = <R::Base as ZnRing>::Integers;

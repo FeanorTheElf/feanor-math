@@ -123,6 +123,13 @@ pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>
     where R::Type: IntegerRing
 {
     let elements = edge_case_elements.collect::<Vec<_>>();
+
+    // test abs_highest_set_bit on standard values
+    assert_eq!(None, ring.abs_highest_set_bit(&ring.from_int(0)));
+    assert_eq!(Some(0), ring.abs_highest_set_bit(&ring.from_int(1)));
+    assert_eq!(Some(1), ring.abs_highest_set_bit(&ring.from_int(2)));
+
+    // generic test of mul_pow_2 resp. euclidean_div_pow_2
     for a in &elements {
         let mut ceil_pow_2 = ring.from_int(2);
         ring.mul_pow_2(&mut ceil_pow_2, ring.abs_highest_set_bit(a).unwrap_or(0));

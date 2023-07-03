@@ -8,7 +8,7 @@ pub mod zn_42;
 pub mod zn_static;
 pub mod zn_rns;
 
-pub trait ZnRing: DivisibilityRing + CanonicalHom<Self::IntegerRingBase> {
+pub trait ZnRing: DivisibilityRing + CanonicalHom<Self::IntegerRingBase> + SelfIso {
 
     // there seems to be a problem with associated type bounds, hence we cannot use `Integers: IntegerRingStore`
     // or `Integers: RingStore<Type: IntegerRing>`
@@ -34,7 +34,7 @@ pub trait ZnRing: DivisibilityRing + CanonicalHom<Self::IntegerRingBase> {
     }
 
     fn is_field(&self) -> bool {
-        algorithms::miller_rabin::is_prime(self.integer_ring(), self.modulus(), 6)
+        algorithms::miller_rabin::is_prime_base(RingRef::new(self), 10)
     }
 
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> Self::Element {
@@ -91,7 +91,7 @@ pub trait ZnRingStore: RingStore
     fn as_field(self) -> Result<RingValue<AsFieldBase<Self>>, Self> 
         where Self: Sized
     {
-        if algorithms::miller_rabin::is_prime(self.integer_ring(), self.modulus(), 10) {
+        if self.is_field() {
             Ok(RingValue::from(unsafe { AsFieldBase::unsafe_create(self) }))
         } else {
             Err(self)
@@ -111,7 +111,7 @@ use super::bigint::DefaultBigIntRing;
 #[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R)
     where R::Type: ZnRing,
-        <R::Type as ZnRing>::IntegerRingBase: CanonicalIso<StaticRingBase<i64>> + CanonicalIso<StaticRingBase<i32>>
+        <R::Type as ZnRing>::IntegerRingBase: CanonicalIso<StaticRingBase<i128>> + CanonicalIso<StaticRingBase<i32>>
 {
     let ZZ = R.integer_ring();
     let n = R.modulus();
@@ -126,7 +126,7 @@ pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R)
     }
 
     let all_elements = R.elements().collect::<Vec<_>>();
-    assert_eq!(ZZ.cast::<StaticRing<i64>>(&StaticRing::<i64>::RING, ZZ.clone_el(n)) as usize, all_elements.len());
+    assert_eq!(ZZ.cast(&StaticRing::<i128>::RING, ZZ.clone_el(n)) as usize, all_elements.len());
     for (i, x) in all_elements.iter().enumerate() {
         for (j, y) in all_elements.iter().enumerate() {
             assert!(i == j || !R.eq_el(x, y));

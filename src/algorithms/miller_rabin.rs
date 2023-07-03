@@ -1,10 +1,33 @@
 use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 use crate::integer::*;
-use crate::rings::zn::zn_barett::*;
+use crate::rings::zn;
+use crate::rings::zn::ZnRing;
+use crate::rings::zn::ZnRingStore;
 use crate::primitive_int::*;
 
 use oorandom;
+
+///
+/// Miller-Rabin primality test.
+/// 
+/// If n is a prime, this returns true.
+/// If n is not a prime, this returns false with probability greater or 
+/// equal than 1 - 4^(-k).
+/// 
+/// For details, see [`is_prime_base()`]
+/// 
+pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool 
+    where I: IntegerRingStore + HashableElRingStore,
+        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i128>>
+{
+    if ZZ.abs_highest_set_bit(n).unwrap_or(0) < zn::zn_42::MAX_MODULUS_BITS as usize {
+        is_prime_base(zn::zn_42::Zn::new(ZZ.cast(&StaticRing::<i128>::RING, ZZ.clone_el(n)) as u64), k)
+    } else {
+        let n_value = ZZ.clone_el(n);
+        is_prime_base(zn::zn_barett::Zn::new(ZZ, n_value), k)
+    }
+}
 
 ///
 /// Miller-Rabin primality test.
@@ -25,10 +48,12 @@ use oorandom;
 /// PRNG would be random, then the probability of a wrong output is at 
 /// most 4^(-k).
 /// 
-pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool 
-    where I: IntegerRingStore + HashableElRingStore,
-        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+pub fn is_prime_base<R>(Zn: R, k: usize) -> bool 
+    where R: ZnRingStore,
+        R::Type: ZnRing
 {
+    let ZZ = Zn.integer_ring();
+    let n = Zn.modulus();
     if ZZ.is_leq(n, &ZZ.from_int(2)) {
         return ZZ.eq_el(n, &ZZ.from_int(2));
     }
@@ -38,10 +63,9 @@ pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
     let s = ZZ.abs_lowest_set_bit(&n_minus_one).unwrap();
     ZZ.euclidean_div_pow_2(&mut n_minus_one, s as usize);
     let d = n_minus_one;
-    let Zn = Zn::new(&ZZ, ZZ.clone_el(n));
 
     for _i in 0..k {
-        let a = Zn.get_ring().project(ZZ.add(ZZ.get_uniformly_random(n, || rng.rand_u64()), ZZ.one()));
+        let a = Zn.random_element(|| rng.rand_u64());
         if Zn.is_zero(&a) {
             continue;
         }
