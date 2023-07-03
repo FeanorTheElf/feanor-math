@@ -9,6 +9,11 @@ use crate::primitive_int::*;
 
 use super::zn_barett;
 
+fn usigned_as_signed_ref<'a>(x: &'a u64) -> &'a i64 {
+    assert!(*x <= i64::MAX as u64);
+    unsafe { std::mem::transmute(x) }
+}
+
 ///
 /// Represents the ring `Z/nZ`.
 /// A special implementation of non-standard Barett reduction
@@ -40,8 +45,7 @@ pub struct ZnBase {
     inv_modulus: u128,
     modulus: u64,
     /// Representatives of elements may grow up to this bound
-    repr_bound: u64,
-    modulus_i128: i128
+    repr_bound: u64
 }
 
 pub type Zn = RingValue<ZnBase>;
@@ -80,7 +84,6 @@ impl ZnBase {
         assert!(2 * modulus < repr_bound);
         return ZnBase {
             modulus: modulus,
-            modulus_i128: modulus as i128,
             inv_modulus: inv_modulus,
             repr_bound: repr_bound
         }
@@ -287,7 +290,7 @@ impl<I: IntegerRing + CanonicalIso<StaticRingBase<i128>>> CanonicalHom<I> for Zn
 
     fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
         Some(IntegerToZnHom {
-            highbit_mod: StaticRing::<i128>::RING.abs_highest_set_bit(&self.modulus_i128).unwrap(),
+            highbit_mod: StaticRing::<i64>::RING.abs_highest_set_bit(&(self.modulus as i64)).unwrap(),
             highbit_bound: StaticRing::<i128>::RING.abs_highest_set_bit(&(self.repr_bound as i128 * self.repr_bound as i128)).unwrap(),
             int_ring: PhantomData,
             hom: from.has_canonical_hom(StaticRing::<i128>::RING.get_ring()).unwrap(),
@@ -352,12 +355,12 @@ impl<'a> Iterator for ZnBaseElementsIter<'a> {
 
 impl ZnRing for ZnBase {
 
-    type IntegerRingBase = StaticRingBase<i128>;
-    type Integers = StaticRing<i128>;
+    type IntegerRingBase = StaticRingBase<i64>;
+    type Integers = StaticRing<i64>;
     type ElementsIter<'a> = ZnBaseElementsIter<'a>;
 
     fn integer_ring(&self) -> &Self::Integers {
-        &StaticRing::<i128>::RING
+        &StaticRing::<i64>::RING
     }
 
     fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
@@ -368,11 +371,11 @@ impl ZnRing for ZnBase {
     }
 
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
-        self.complete_reduce(el.0 as u128) as i128
+        self.complete_reduce(el.0 as u128) as i64
     }
 
     fn modulus(&self) -> &El<Self::Integers> {
-        &self.modulus_i128
+        usigned_as_signed_ref(&self.modulus)
     }
 }
 
@@ -520,15 +523,15 @@ impl CanonicalHom<ZnFastmulBase> for ZnBase {
     }
 }
 
-impl CanonicalHom<StaticRingBase<i128>> for ZnFastmulBase {
+impl CanonicalHom<StaticRingBase<i64>> for ZnFastmulBase {
 
-    type Homomorphism = <ZnBase as CanonicalHom<StaticRingBase<i128>>>::Homomorphism;
+    type Homomorphism = <ZnBase as CanonicalHom<StaticRingBase<i64>>>::Homomorphism;
 
-    fn has_canonical_hom(&self, from: &StaticRingBase<i128>) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &StaticRingBase<i64>) -> Option<Self::Homomorphism> {
         self.base.has_canonical_hom(from)
     }
 
-    fn map_in(&self, from: &StaticRingBase<i128>, el: i128, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &StaticRingBase<i64>, el: i64, hom: &Self::Homomorphism) -> Self::Element {
         self.rev_delegate(self.base.map_in(from, el, hom))
     }
 }

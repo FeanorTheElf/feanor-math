@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use super::{VectorView, map::MapFn};
+use super::{VectorView, map::MapFn, subvector::{SelfSubvectorView, SelfSubvectorFn}};
 
 ///
 /// A trait for objects that have the structure of a one-dimensional array,
@@ -51,6 +51,15 @@ impl<V, T> VectorViewFn<V, T>
 {
     pub fn new(base: V) -> Self {
         VectorViewFn { base: base, element: PhantomData }
+    }
+}
+
+impl<V, T> SelfSubvectorFn<T> for VectorViewFn<V, T>
+    where T: Clone,
+        V: SelfSubvectorView<T>
+{
+    fn subvector<R: std::ops::RangeBounds<usize>>(self, range: R) -> Self {
+        VectorViewFn { base: self.base.subvector(range), element: PhantomData }
     }
 }
 
