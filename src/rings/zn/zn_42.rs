@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use crate::delegate::DelegateRing;
 use crate::divisibility::DivisibilityRingStore;
 use crate::integer::IntegerRingStore;
@@ -261,67 +259,38 @@ impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalHom<zn_barett::Z
 
 impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalIso<zn_barett::ZnBase<I>> for ZnBase {
 
-    type Isomorphism = ();
+    type Isomorphism = <zn_barett::ZnBase<I> as CanonicalHom<StaticRingBase<i64>>>::Homomorphism;
 
-    fn has_canonical_iso(&self, from: &zn_barett::ZnBase<I>) -> Option<Self::Homomorphism> {
+    fn has_canonical_iso(&self, from: &zn_barett::ZnBase<I>) -> Option<Self::Isomorphism> {
         if self.modulus as i128 == *from.modulus() {
-            Some(())
+            from.has_canonical_hom(self.integer_ring().get_ring())
         } else {
             None
         }
     }
 
-    fn map_out(&self, from: &zn_barett::ZnBase<I>, el: <Self as RingBase>::Element, _: &Self::Homomorphism) -> <zn_barett::ZnBase<I> as RingBase>::Element {
-        from.project_gen(el.0 as i64, &StaticRing::<i64>::RING)
+    fn map_out(&self, from: &zn_barett::ZnBase<I>, el: <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <zn_barett::ZnBase<I> as RingBase>::Element {
+        from.map_in(self.integer_ring().get_ring(), el.0 as i64, iso)
     }
 }
 
-pub struct IntegerToZnHom<I: IntegerRing + CanonicalIso<StaticRingBase<i128>>> {
-    highbit_mod: usize,
-    highbit_bound: usize,
-    int_ring: PhantomData<I>,
-    hom: <I as CanonicalHom<StaticRingBase<i128>>>::Homomorphism,
-    iso: <I as CanonicalIso<StaticRingBase<i128>>>::Isomorphism
-}
-
-impl<I: IntegerRing + CanonicalIso<StaticRingBase<i128>>> CanonicalHom<I> for ZnBase {
-
-    type Homomorphism = IntegerToZnHom<I>;
+impl<I: ?Sized + IntegerRing> CanonicalHom<I> for ZnBase 
+    where I: CanonicalIso<StaticRingBase<i128>> + CanonicalIso<StaticRingBase<i64>>
+{
+    type Homomorphism = generic_impls::GenericIntegerToZnHom<I, StaticRingBase<i128>, Self>;
 
     fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
-        Some(IntegerToZnHom {
-            highbit_mod: StaticRing::<i64>::RING.abs_highest_set_bit(&(self.modulus as i64)).unwrap(),
-            highbit_bound: StaticRing::<i128>::RING.abs_highest_set_bit(&(self.repr_bound as i128 * self.repr_bound as i128)).unwrap(),
-            int_ring: PhantomData,
-            hom: from.has_canonical_hom(StaticRing::<i128>::RING.get_ring()).unwrap(),
-            iso: from.has_canonical_iso(StaticRing::<i128>::RING.get_ring()).unwrap()
-        })
+        generic_impls::generic_has_canonical_hom_from_int(from, self, StaticRing::<i128>::RING.get_ring(), Some(&(self.repr_bound as i128 * self.repr_bound as i128)))
     }
 
     fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
-        let (neg, n) = if from.is_neg(&el) {
-            (true, from.negate(el))
-        } else {
-            (false, el)
-        };
-        let ZZ128 = StaticRing::<i128>::RING.get_ring();
-        let as_u128 = |x: I::Element| from.map_out(ZZ128, x, &hom.iso) as u128;
-        let from_u128 = |x: u128| from.map_in(ZZ128, x as i128, &hom.hom);
-        
-        let highbit_el = from.abs_highest_set_bit(&n).unwrap_or(0);
-
-        let reduced = if highbit_el < hom.highbit_mod {
-            as_u128(n) as u64
-        } else if highbit_el < hom.highbit_bound {
-            self.bounded_reduce(as_u128(n))
-        } else {
-            as_u128(from.euclidean_rem(n, &from_u128(self.modulus as u128))) as u64
-        };
-        if neg {
-            self.negate(ZnEl(reduced))
-        } else {
-            ZnEl(reduced)
-        }
+        generic_impls::generic_map_in_from_int(from, self, StaticRing::<i128>::RING.get_ring(), el, hom, |n| {
+            debug_assert!((n as u64) < self.modulus);
+            ZnEl(n as u64)
+        }, |n| {
+            debug_assert!(n < (self.repr_bound as i128 * self.repr_bound as i128));
+            ZnEl(self.bounded_reduce(n as u128))
+        })
     }
 }
 

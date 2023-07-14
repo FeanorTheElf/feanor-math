@@ -3,7 +3,7 @@ use crate::euclidean::*;
 use crate::integer::*;
 use crate::ordered::*;
 use crate::primitive_int::StaticRingBase;
-use crate::{ring::*};
+use crate::ring::*;
 use crate::algorithms;
 use crate::primitive_int::*;
 use std::cmp::Ordering::*;
