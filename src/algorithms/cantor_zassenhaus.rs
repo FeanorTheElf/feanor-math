@@ -4,6 +4,7 @@ use crate::euclidean::{EuclideanRingStore, EuclideanRing};
 use crate::field::{Field, FieldStore};
 use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::ordered::OrderedRingStore;
+use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::poly::{PolyRingStore, PolyRing};
 use crate::rings::zn::{ZnRingStore, ZnRing};
@@ -41,7 +42,10 @@ fn derive_poly<P>(poly_ring: P, poly: &El<P>) -> El<P>
     where P: PolyRingStore,
         P::Type: PolyRing
 {
-    poly_ring.from_terms(poly_ring.terms(poly).filter(|(_, i)| *i > 0).map(|(c, i)| (poly_ring.base_ring().mul_int_ref(c, i as i32), i - 1)))
+    poly_ring.from_terms(poly_ring.terms(poly)
+        .filter(|(_, i)| *i > 0)
+        .map(|(c, i)| (poly_ring.base_ring().mul_int_ref(c, i as i32), i - 1))
+    )
 }
 
 pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>>
@@ -139,11 +143,20 @@ pub fn cantor_zassenhaus<P>(poly_ring: P, f: El<P>, d: usize) -> El<P>
 
 pub fn poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
     where P: PolyRingStore,
-        P::Type: PolyRing + EuclideanRing
+        P::Type: PolyRing + EuclideanRing,
+        <P::Type as RingExtension>::BaseRing: ZnRingStore,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing
 {
+    assert!(!poly_ring.is_zero(&poly));
     let derivate = derive_poly(&poly_ring, &poly);
-    let square_part = algorithms::eea::gcd(poly_ring.clone_el(&poly), derivate, &poly_ring);
-    return poly_ring.checked_div(&poly, &square_part).unwrap();
+    if poly_ring.is_zero(&derivate) {
+        let p = poly_ring.base_ring().integer_ring().cast(&StaticRing::<i32>::RING, poly_ring.base_ring().integer_ring().clone_el(poly_ring.base_ring().modulus()));
+        let base_poly = poly_ring.from_terms(poly_ring.terms(&poly).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i / p as usize)));
+        return poly_squarefree_part(poly_ring, base_poly);
+    } else {
+        let square_part = algorithms::eea::gcd(poly_ring.clone_el(&poly), derivate, &poly_ring);
+        return poly_ring.checked_div(&poly, &square_part).unwrap();
+    }
 }
 
 pub fn factor_complete<'a, P>(poly_ring: P, mut el: El<P>) -> Vec<(El<P>, usize)> 
@@ -160,6 +173,7 @@ pub fn factor_complete<'a, P>(poly_ring: P, mut el: El<P>) -> Vec<(El<P>, usize)
     // we repeatedly remove the square-free part
     while !poly_ring.is_unit(&el) {
         let sqrfree_part = poly_squarefree_part(&poly_ring, poly_ring.clone_el(&el));
+        assert!(!poly_ring.is_unit(&sqrfree_part));
 
         // factor the square-free part into distinct-degree factors
         for (d, factor_d) in distinct_degree_factorization(&poly_ring, poly_ring.clone_el(&sqrfree_part)).into_iter().enumerate() {
@@ -210,6 +224,8 @@ pub fn factor_complete<'a, P>(poly_ring: P, mut el: El<P>) -> Vec<(El<P>, usize)
 use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
+#[cfg(test)]
+use crate::rings::zn::zn_42;
 
 #[test]
 fn test_poly_squarefree_part() {
@@ -233,6 +249,16 @@ fn test_poly_squarefree_part() {
     let mut squarefree_part = poly_squarefree_part(&ring, a);
     normalize_poly(&ring, &mut squarefree_part);
     assert_el_eq!(&ring, &b, &squarefree_part);
+}
+
+#[test]
+fn test_poly_squarefree_part_multiplicity_p() {
+    let ring = DensePolyRing::new(zn_42::Zn::new(5).as_field().ok().unwrap(), "X");
+    let f = ring.from_terms([(ring.base_ring().from_int(3), 0), (ring.base_ring().from_int(1), 10)].into_iter());
+    let g = ring.from_terms([(ring.base_ring().from_int(3), 0), (ring.base_ring().from_int(1), 2)].into_iter());
+    let mut actual = poly_squarefree_part(&ring, f);
+    normalize_poly(&ring, &mut actual);
+    assert_el_eq!(&ring, &g, &actual);
 }
 
 #[test]
