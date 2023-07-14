@@ -6,6 +6,7 @@ use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
+use crate::rings::bigint::DefaultBigIntRing;
 use crate::rings::poly::{PolyRingStore, PolyRing};
 use crate::rings::zn::{ZnRingStore, ZnRing};
 
@@ -117,16 +118,16 @@ pub fn cantor_zassenhaus<P>(poly_ring: P, f: El<P>, d: usize) -> El<P>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
+        <<<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::IntegerRingBase: CanonicalIso<DefaultBigIntRing>
 {
-    let p = poly_ring.base_ring().modulus();
-    let ZZ = poly_ring.base_ring().integer_ring();
-    assert!(ZZ.is_odd(p));
+    let ZZ = DefaultBigIntRing::RING;
+    let p = poly_ring.base_ring().integer_ring().cast(&ZZ, poly_ring.base_ring().integer_ring().clone_el(poly_ring.base_ring().modulus()));
+    assert!(ZZ.is_odd(&p));
     assert!(poly_ring.degree(&f).unwrap() % d == 0);
     assert!(poly_ring.degree(&f).unwrap() > d);
-    let exp = ZZ.half_exact(ZZ.sub(ZZ.pow(ZZ.clone_el(p), d), ZZ.one()));
-
-    let mut rng = oorandom::Rand64::new(ZZ.default_hash(p) as u128);
+    let mut rng = oorandom::Rand64::new(ZZ.default_hash(&p) as u128);
+    let exp = ZZ.half_exact(ZZ.sub(ZZ.pow(p, d), ZZ.one()));
 
     loop {
         let T = poly_ring.from_terms(
@@ -163,7 +164,8 @@ pub fn factor_complete<'a, P>(poly_ring: P, mut el: El<P>) -> Vec<(El<P>, usize)
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
+        <<<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::IntegerRingBase: CanonicalIso<DefaultBigIntRing>
 {
     assert!(!poly_ring.is_zero(&el));
 
