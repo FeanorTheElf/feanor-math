@@ -27,6 +27,7 @@ fn pow_mod_f<P, I>(poly_ring: P, g: El<P>, f: &El<P>, pow: &El<I>, ZZ: I) -> El<
     );
 }
 
+#[cfg(test)]
 fn normalize_poly<P>(poly_ring: P, poly: &mut El<P>)
     where P: PolyRingStore,
         P::Type: PolyRing,
