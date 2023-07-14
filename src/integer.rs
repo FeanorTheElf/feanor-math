@@ -94,6 +94,12 @@ pub trait IntegerRingStore: RingStore
     fn is_odd(&self, value: &El<Self>) -> bool {
         !self.is_even(value)
     }
+
+    fn half_exact(&self, mut value: El<Self>) -> El<Self> {
+        assert!(self.is_even(&value));
+        self.euclidean_div_pow_2(&mut value, 1);
+        return value;
+    }
 }
 
 impl<R> IntegerRingStore for R

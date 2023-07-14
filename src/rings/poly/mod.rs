@@ -54,6 +54,10 @@ pub trait PolyRingStore: RingStore
         self.get_ring().add_assign_from_terms(&mut result, iter);
         return result;
     }
+
+    fn lc<'a>(&'a self, f: &'a El<Self>) -> Option<&'a El<<Self::Type as RingExtension>::BaseRing>> {
+        Some(self.coefficient_at(f, self.degree(f)?))
+    }
 }
 
 impl<R: RingStore> PolyRingStore for R
@@ -142,7 +146,7 @@ pub fn generic_test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R:
                 for d in &elements {
                     let a_bx = ring.add(ring.from_ref(a), ring.mul_ref_snd(ring.from_ref(b), &x));
                     let c_dx = ring.add(ring.from_ref(c), ring.mul_ref_snd(ring.from_ref(d), &x));
-                    let result = ring.sum([
+                    let result = <_ as RingStore>::sum(&ring, [
                         ring.mul(ring.from_ref(a), ring.from_ref(c)),
                         ring.mul(ring.from_ref(a), ring.mul_ref_snd(ring.from_ref(d), &x)),
                         ring.mul(ring.from_ref(b), ring.mul_ref_snd(ring.from_ref(c), &x)),
@@ -158,7 +162,7 @@ pub fn generic_test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R:
     for a in &elements {
         for b in &elements {
             for c in &elements {
-                let f = ring.sum([
+                let f = <_ as RingStore>::sum(&ring, [
                     ring.from_ref(a),
                     ring.mul_ref_snd(ring.from_ref(b), &x),
                     ring.mul(ring.from_ref(c), ring.pow(ring.clone_el(&x), 3))

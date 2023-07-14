@@ -312,7 +312,12 @@ impl<R,> DivisibilityRing for SparsePolyRingBase<R>
         if let Some(d) = self.degree(rhs) {
             let lc = rhs.at(d);
             let mut lhs_copy = lhs.clone();
-            self.poly_div(&mut lhs_copy, rhs, |x| self.base_ring().checked_left_div(&x, lc))
+            let quo = self.poly_div(&mut lhs_copy, rhs, |x| self.base_ring().checked_left_div(&x, lc))?;
+            if self.is_zero(&lhs_copy) {
+                Some(quo)
+            } else {
+                None
+            }
         } else if self.is_zero(lhs) {
             Some(self.zero())
         } else {

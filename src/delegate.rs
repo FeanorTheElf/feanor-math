@@ -194,11 +194,15 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
         self.postprocess_delegate_mut(lhs);
     }
 
-    fn mul_int(&self, lhs: Self::Element, rhs: i32) -> Self::Element {
+    default fn mul_int(&self, lhs: Self::Element, rhs: i32) -> Self::Element {
         self.rev_delegate(self.get_delegate().mul_int(self.delegate(lhs), rhs))
     }
+
+    default fn mul_int_ref(&self, lhs: &Self::Element, rhs: i32) -> Self::Element {
+        self.rev_delegate(self.get_delegate().mul_int_ref(self.delegate_ref(lhs), rhs))
+    }
     
-    fn pow_gen<S: IntegerRingStore>(&self, x: Self::Element, power: &El<S>, integers: S) -> Self::Element 
+    default fn pow_gen<S: IntegerRingStore>(&self, x: Self::Element, power: &El<S>, integers: S) -> Self::Element 
         where S::Type: IntegerRing
     {
         self.rev_delegate(self.get_delegate().pow_gen(self.delegate(x), power, integers))

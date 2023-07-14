@@ -1,6 +1,8 @@
 use std::ops::Deref;
 
-use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore, IntegerRing}};
+use crate::primitive_int::StaticRing;
+use crate::integer::{IntegerRingStore, IntegerRing};
+use crate::algorithms;
 
 ///
 /// Basic trait for objects that have a ring structure.
@@ -257,6 +259,10 @@ pub trait RingBase: PartialEq {
     fn mul_int(&self, mut lhs: Self::Element, rhs: i32) -> Self::Element {
         self.mul_assign_int(&mut lhs, rhs);
         return lhs;
+    }
+
+    fn mul_int_ref(&self, lhs: &Self::Element, rhs: i32) -> Self::Element {
+        self.mul_int(self.clone_el(lhs), rhs)
     }
 
     ///
@@ -635,6 +641,7 @@ pub trait RingStore {
     delegate!{ fn square(&self, value: &mut El<Self>) -> () }
     delegate!{ fn mul_assign_int(&self, lhs: &mut El<Self>, rhs: i32) -> () }
     delegate!{ fn mul_int(&self, lhs: El<Self>, rhs: i32) -> El<Self> }
+    delegate!{ fn mul_int_ref(&self, lhs: &El<Self>, rhs: i32) -> El<Self> }
     
     fn coerce<S>(&self, from: &S, el: El<S>) -> El<Self>
         where S: RingStore, Self::Type: CanonicalHom<S::Type> 
@@ -731,13 +738,9 @@ pub trait RingExtensionStore: RingStore
         self.get_ring().base_ring()
     }
 
-    fn from(&self, x: El<<Self::Type as RingExtension>::BaseRing>) -> El<Self> {
-        self.get_ring().from(x)
-    }
-
-    fn from_ref(&self, x: &El<<Self::Type as RingExtension>::BaseRing>) -> El<Self> {
-        self.get_ring().from_ref(x)
-    }
+    delegate!{ fn from(&self, x: El<<Self::Type as RingExtension>::BaseRing>) -> El<Self> }
+    delegate!{ fn from_ref(&self, x: &El<<Self::Type as RingExtension>::BaseRing>) -> El<Self> }
+    delegate!{ fn mul_assign_base(&self, lhs: &mut El<Self>, rhs: &El<<Self::Type as RingExtension>::BaseRing>) -> () }
 }
 
 impl<R: RingStore> RingExtensionStore for R
@@ -878,6 +881,10 @@ pub trait RingExtension: RingBase {
     
     fn from_ref(&self, x: &El<Self::BaseRing>) -> Self::Element {
         self.from(self.base_ring().get_ring().clone_el(x))
+    }
+
+    fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {
+        self.mul_assign(lhs, self.from_ref(rhs));
     }
 }
 
