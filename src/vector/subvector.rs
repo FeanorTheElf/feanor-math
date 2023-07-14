@@ -4,6 +4,80 @@ use super::vec_fn::VectorFn;
 use std::ops::{RangeBounds, Bound, Index, IndexMut};
 use std::marker::PhantomData;
 
+///
+/// Trait for all vector views that "shrink" the section of the vector
+/// that is represented, without changing the type. This is mainly important
+/// in combination with recursive algorithms.
+/// 
+/// # Example
+/// 
+/// Assuming we wanted to implement a (very stupid) recursive variant of summing
+/// all values in a vector. We would like to do it as
+/// ```ignore
+/// # use feanor_math::vector::*;
+/// # use feanor_math::vector::subvector::*;
+/// 
+/// // Compiler error: overflow evaluating the requirement `&Vec<i64>: Sized
+/// fn sum<V: VectorView<i64> + Copy>(vector: V) -> i64 {
+///     if vector.len() == 0 { 0 } else { sum(Subvector::new(vector).subvector(1..)) + *vector.at(0) }
+/// }
+/// 
+/// assert_eq!(7, sum(&[1, 1, 1, 1, 1, 1, 1][..]));
+/// ```
+/// but this clearly cannot work - this can never be monomorphized.
+/// Instead, use
+/// ```
+/// # use feanor_math::vector::*;
+/// # use feanor_math::vector::subvector::*;
+/// 
+/// // This works!
+/// fn sum<V: SelfSubvectorView<i64> + Copy>(vector: V) -> i64 {
+///     if vector.len() == 0 { 0 } else { sum(vector.subvector(1..)) + *vector.at(0) }
+/// }
+/// 
+/// assert_eq!(7, sum(&[1, 1, 1, 1, 1, 1, 1][..]));
+/// ```
+/// 
+/// ## The mutable case
+/// 
+/// In the mutable case, this is much more difficult, as we cannot have vectors that are `Copy`.
+/// Simple examples still work:
+/// ```
+/// # use feanor_math::vector::*;
+/// # use feanor_math::vector::subvector::*;
+/// 
+/// fn inc<V: VectorViewMut<i64> + SelfSubvectorView<i64>>(mut vector: V) {
+///     if vector.len() > 0 { 
+///         *vector.at_mut(0) += 1;
+///         inc(vector.subvector(1..));
+///     }
+/// }
+/// 
+/// let mut data = [1, 1, 1, 0, 0, 0];
+/// inc(Subvector::new(&mut data));
+/// assert_eq!([2, 2, 2, 1, 1, 1], data);
+/// ```
+/// But it is a problem that [`SelfSubvectorView::subvector()`] moves the current object.
+/// In particular, the following does not work:
+/// ```ignore
+/// # use feanor_math::vector::*;
+/// # use feanor_math::vector::subvector::*;
+/// 
+/// fn inc<V: VectorViewMut<i64> + SelfSubvectorView<i64>>(mut vector: V) {
+///     if vector.len() > 0 { 
+///         inc(vector.subvector(1..));
+///         *vector.at_mut(0) += 1;
+///     }
+/// }
+/// 
+/// let mut data = [1, 1, 1, 0, 0, 0];
+/// inc(Subvector::new(&mut data));
+/// assert_eq!([2, 2, 2, 1, 1, 1], data);
+/// ```
+/// Currently, there is no solution implemented for this, as in most cases mutable
+/// slices do the job. However, it might be solved with a `BorrowableMut`-trait in
+/// the future.
+/// 
 pub trait SelfSubvectorView<T>: VectorView<T> {
 
     fn subvector<R: RangeBounds<usize>>(self, range: R) -> Self;
@@ -23,6 +97,9 @@ impl<'a, T> SelfSubvectorView<T> for &'a mut [T] {
     }
 }
 
+///
+/// A view on a part of another vector view.
+/// 
 pub struct Subvector<T, V> 
     where V: VectorView<T>
 {
