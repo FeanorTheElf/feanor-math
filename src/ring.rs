@@ -763,6 +763,8 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// Trait for rings R that have a canonical homomorphism `S -> R`.
 /// A ring homomorphism is expected to be unital.
 /// 
+/// # Exact requirements
+/// 
 /// Which homomorphisms are considered canonical is up to implementors,
 /// as long as any diagram of canonical homomorphisms commutes. In
 /// other words, if there are rings `R, S` and "intermediate rings"
@@ -783,7 +785,7 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// 
 /// # Example
 /// 
-/// All integer rings support canonical homomorphisms between them.
+/// Most integer rings support canonical homomorphisms between them.
 /// ```
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
@@ -812,6 +814,127 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// miss a certain implementation of `CanonicalHom`, check whether there maybe
 /// is a corresponding implementation of [`RingExtension`], or a member function.
 /// 
+/// # More examples
+/// 
+/// ## Integer rings
+/// 
+/// Basically, all given integer rings have canonical isomorphisms between each other.
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::bigint::*;
+/// let Z_i8 = StaticRing::<i8>::RING;
+/// let Z_i32 = StaticRing::<i32>::RING;
+/// let Z_i128 = StaticRing::<i128>::RING;
+/// let Z_big = DefaultBigIntRing::RING;
+/// 
+/// assert!(Z_i8.can_iso(&Z_i8).is_some());
+/// assert!(Z_i8.can_iso(&Z_i32).is_some());
+/// assert!(Z_i8.can_iso(&Z_i128).is_some());
+/// assert!(Z_i8.can_iso(&Z_big).is_some());
+/// 
+/// assert!(Z_i32.can_iso(&Z_i8).is_some());
+/// assert!(Z_i32.can_iso(&Z_i32).is_some());
+/// assert!(Z_i32.can_iso(&Z_i128).is_some());
+/// assert!(Z_i32.can_iso(&Z_big).is_some());
+/// 
+/// assert!(Z_i128.can_iso(&Z_i8).is_some());
+/// assert!(Z_i128.can_iso(&Z_i32).is_some());
+/// assert!(Z_i128.can_iso(&Z_i128).is_some());
+/// assert!(Z_i128.can_iso(&Z_big).is_some());
+/// 
+/// assert!(Z_big.can_iso(&Z_i8).is_some());
+/// assert!(Z_big.can_iso(&Z_i32).is_some());
+/// assert!(Z_big.can_iso(&Z_i128).is_some());
+/// assert!(Z_big.can_iso(&Z_big).is_some());
+/// ```
+/// Notably, the only blanket implementations are currently
+/// 
+/// ## Integer quotient rings `Z/nZ`
+/// 
+/// Due to conflicting implementations, only the most useful conversions
+/// are implemented for `Z/nZ`.
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_42;
+/// # use feanor_math::rings::zn::zn_barett;
+/// # use feanor_math::rings::zn::zn_rns;
+/// 
+/// let ZZ = StaticRing::<i128>::RING;
+/// let ZZ_big = DefaultBigIntRing::RING;
+/// 
+/// let Zn_barett_i128 = zn_barett::Zn::new(ZZ, 17 * 257);
+/// let Zn_barett_big = zn_barett::Zn::new(ZZ_big, ZZ_big.from_int(17 * 257));
+/// let Zn_std = zn_42::Zn::new(17 * 257);
+/// let Zn_rns = zn_rns::Zn::from_primes(ZZ_big, vec![17, 257]);
+/// 
+/// assert!(Zn_barett_i128.can_iso(&Zn_barett_i128).is_some());
+/// assert!(Zn_barett_i128.can_iso(&Zn_barett_big).is_some());
+/// 
+/// assert!(Zn_barett_big.can_iso(&Zn_barett_i128).is_some());
+/// assert!(Zn_barett_big.can_iso(&Zn_barett_big).is_some());
+/// 
+/// assert!(Zn_std.can_iso(&Zn_barett_i128).is_some());
+/// assert!(Zn_std.can_iso(&Zn_std).is_some());
+/// 
+/// assert!(Zn_rns.can_iso(&Zn_barett_i128).is_some());
+/// assert!(Zn_rns.can_iso(&Zn_barett_big).is_some());
+/// assert!(Zn_rns.can_iso(&Zn_rns).is_some());
+/// ```
+/// Additionally, there are the projections `Z -> Z/nZ`.
+/// They are all implemented, even though [`crate::rings::zn::ZnRing`] currently
+/// only requires the projection from the "associated" integer ring.
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::rings::zn::*;
+/// 
+/// let ZZ = StaticRing::<i128>::RING;
+/// let ZZ_big = DefaultBigIntRing::RING;
+/// 
+/// let Zn_barett_i128 = zn_barett::Zn::new(ZZ, 17 * 257);
+/// let Zn_barett_big = zn_barett::Zn::new(ZZ_big, ZZ_big.from_int(17 * 257));
+/// let Zn_std = zn_42::Zn::new(17 * 257);
+/// let Zn_rns = zn_rns::Zn::from_primes(ZZ_big, vec![17, 257]);
+/// 
+/// assert!(Zn_barett_i128.can_hom(&ZZ).is_some());
+/// assert!(Zn_barett_i128.can_hom(&ZZ_big).is_some());
+/// 
+/// assert!(Zn_barett_big.can_hom(&ZZ).is_some());
+/// assert!(Zn_barett_big.can_hom(&ZZ_big).is_some());
+/// 
+/// assert!(Zn_std.can_hom(&ZZ).is_some());
+/// assert!(Zn_std.can_hom(&ZZ_big).is_some());
+/// 
+/// assert!(Zn_rns.can_hom(&ZZ).is_some());
+/// assert!(Zn_rns.can_hom(&ZZ_big).is_some());
+/// ```
+/// 
+/// ## Polynomial Rings
+/// 
+/// For the two provided univariate polynomial ring implementations, we have the isomorphisms
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::rings::poly::*;
+/// 
+/// let ZZ = StaticRing::<i128>::RING;
+/// let P_dense = dense_poly::DensePolyRing::new(ZZ, "X");
+/// let P_sparse = sparse_poly::SparsePolyRing::new(ZZ, "X");
+/// 
+/// assert!(P_dense.can_iso(&P_dense).is_some());
+/// assert!(P_dense.can_iso(&P_sparse).is_some());
+/// assert!(P_sparse.can_iso(&P_dense).is_some());
+/// assert!(P_sparse.can_iso(&P_sparse).is_some());
+/// ```
+/// Unfortunately, the inclusions `R -> R[X]` are not implemented as canonical homomorphisms,
+/// however provided by the functions of [`RingExtension`].
+/// 
 pub trait CanonicalHom<S>: RingBase
     where S: RingBase + ?Sized
 {
@@ -836,6 +959,8 @@ pub trait CanonicalHom<S>: RingBase
 ///
 /// Trait for rings R that have a canonical isomorphism `S -> R`.
 /// A ring homomorphism is expected to be unital.
+/// 
+/// # Exact requirements
 /// 
 /// Same as for [`CanonicalHom`], it is up to implementors to decide which
 /// isomorphisms are canonical, as long as each diagram that contains

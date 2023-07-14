@@ -7,7 +7,7 @@ pub mod sparse_poly;
 /// Trait for all rings that represent the polynomial ring `R[X]` with
 /// any base ring R.
 /// 
-pub trait PolyRing: RingExtension + CanonicalIso<Self> {
+pub trait PolyRing: RingExtension + SelfIso {
 
     type TermsIterator<'a>: Iterator<Item = (&'a El<Self::BaseRing>, usize)>
         where Self: 'a;
