@@ -35,6 +35,10 @@ pub trait VectorFn<T> {
     {
         MapFn::new(self, f)
     }
+
+    fn to_vec(&self) -> Vec<T> {
+        (0..self.len()).map(|i| self.at(i)).collect()
+    }
 }
 
 pub struct VectorViewFn<V, T>
