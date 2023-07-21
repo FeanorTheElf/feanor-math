@@ -2,6 +2,7 @@ use crate::mempool::{MemoryProvider, AllocatingMemoryProvider};
 use crate::vector::VectorView;
 use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
 use crate::rings::zn::*;
+use crate::primitive_int::*;
 
 ///
 /// A ring representing `Z/nZ` for composite n by storing the
@@ -19,7 +20,7 @@ use crate::rings::zn::*;
 /// # use feanor_math::rings::bigint::*;
 /// # use feanor_math::vector::*;
 /// 
-/// let R = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![17, 19]);
+/// let R = Zn::from_primes(StaticRing::<i64>::RING, vec![17, 19]);
 /// let x = R.get_ring().from_congruence([R.get_ring().at(0).from_int(1), R.get_ring().at(1).from_int(16)]);
 /// assert_eq!(35, R.smallest_lift(R.clone_el(&x)));
 /// let y = R.mul_ref(&x, &x);
@@ -35,7 +36,7 @@ use crate::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_rns::*;
 /// # use feanor_math::rings::bigint::*;
 /// # use feanor_math::primitive_int::*;
-/// let R = Zn::from_primes(StaticRing::<i64>::RING, DefaultBigIntRing::RING, vec![17, 19]);
+/// let R = Zn::from_primes(DefaultBigIntRing::RING, vec![17, 19]);
 /// let S = zn_barett::Zn::new(StaticRing::<i64>::RING, 17 * 19);
 /// assert!(R.eq_el(&R.from_int(12), &R.coerce(&S, S.from_int(12))));
 /// assert!(S.eq_el(&S.from_int(12), &R.cast(&S, R.from_int(12))));
@@ -47,7 +48,7 @@ use crate::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_rns::*;
 /// # use feanor_math::rings::bigint::*;
 /// # use feanor_math::primitive_int::*;
-/// let R = Zn::from_primes(StaticRing::<i16>::RING, DefaultBigIntRing::RING, vec![3, 5, 7]);
+/// let R = Zn::from_primes(DefaultBigIntRing::RING, vec![3, 5, 7]);
 /// let S = DefaultBigIntRing::RING;
 /// assert!(R.eq_el(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
 /// ```
@@ -75,22 +76,22 @@ impl<C: ZnRingStore + Clone, J: IntegerRingStore> Zn<C, J>
     }
 }
 
-impl<I: IntegerRingStore + Clone, J: IntegerRingStore> Zn<zn_barett::Zn<I>, J> 
-    where I::Type: IntegerRing + CanonicalIso<J::Type>, 
-        J::Type: IntegerRing
+impl<J: IntegerRingStore> Zn<zn_42::Zn, J> 
+    where J::Type: IntegerRing + CanonicalIso<StaticRingBase<i64>> + CanonicalIso<StaticRingBase<i128>>,
+        StaticRingBase<i64>: CanonicalIso<J::Type>
 {
-    pub fn from_primes(integers: I, large_integers: J, primes: Vec<El<I>>) -> Self {
-        Self::from(ZnBase::from_primes(integers, large_integers, primes))
+    pub fn from_primes(large_integers: J, primes: Vec<u64>) -> Self {
+        Self::from(ZnBase::from_primes(large_integers, primes))
     }
 }
 
-impl<I: IntegerRingStore + Clone, J: IntegerRingStore> ZnBase<zn_barett::Zn<I>, J> 
-    where I::Type: IntegerRing + CanonicalIso<J::Type>, 
-        J::Type: IntegerRing
+impl<J: IntegerRingStore> ZnBase<zn_42::Zn, J> 
+    where J::Type: IntegerRing + CanonicalIso<StaticRingBase<i64>> + CanonicalIso<StaticRingBase<i128>>,
+        StaticRingBase<i64>: CanonicalIso<J::Type>
 {
-    pub fn from_primes(integers: I, large_integers: J, primes: Vec<El<I>>) -> Self {
+    pub fn from_primes(large_integers: J, primes: Vec<u64>) -> Self {
         Self::new(
-            primes.into_iter().map(|n| zn_barett::Zn::new(<I as Clone>::clone(&integers), n)).collect(),
+            primes.into_iter().map(|n| zn_42::Zn::new(n)).collect(),
             large_integers,
             AllocatingMemoryProvider
         )
@@ -550,13 +551,13 @@ const EDGE_CASE_ELEMENTS: [i32; 9] = [0, 1, 7, 9, 62, 8, 10, 11, 12];
 
 #[test]
 fn test_ring_axioms() {
-    let ring = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]);
+    let ring = Zn::from_primes(StaticRing::<i64>::RING, vec![7, 11]);
     generic_test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.from_int(x)))
 }
 
 #[test]
 fn test_map_in_map_out() {
-    let ring1 = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11, 17]);
+    let ring1 = Zn::from_primes(StaticRing::<i64>::RING, vec![7, 11, 17]);
     let ring2 = zn_barett::Zn::new(StaticRing::<i64>::RING, 7 * 11 * 17);
     for x in [0, 1, 7, 8, 9, 10, 11, 17, 7 * 17, 11 * 8, 11 * 17, 7 * 11 * 17 - 1] {
         let value = ring2.from_int(x);
@@ -567,7 +568,7 @@ fn test_map_in_map_out() {
 #[test]
 fn test_canonical_iso_axioms_zn_barett() {
     let from = zn_barett::Zn::new(StaticRing::<i128>::RING, 7 * 11);
-    let to = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]);
+    let to = Zn::from_primes(StaticRing::<i64>::RING, vec![7, 11]);
     generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
     generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
 }
@@ -575,22 +576,22 @@ fn test_canonical_iso_axioms_zn_barett() {
 #[test]
 fn test_canonical_hom_axioms_static_int() {
     let from = StaticRing::<i32>::RING;
-    let to = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]);
+    let to = Zn::from_primes(StaticRing::<i64>::RING, vec![7, 11]);
     generic_test_canonical_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
 }
 
 #[test]
 fn test_zn_ring_axioms() {
-    let ring = Zn::from_primes(StaticRing::<i64>::RING, StaticRing::<i64>::RING, vec![7, 11]);
+    let ring = Zn::from_primes(StaticRing::<i64>::RING, vec![7, 11]);
     generic_test_zn_ring_axioms(ring);
 }
 
 #[test]
 fn test_zn_map_in_large_int() {
-    let ring = Zn::from_primes(StaticRing::<i64>::RING, DefaultBigIntRing::RING, vec![7, 11]);
+    let ring = Zn::from_primes(DefaultBigIntRing::RING, vec![7, 11]);
     generic_test_map_in_large_int(ring);
 
-    let R = Zn::from_primes(StaticRing::<i16>::RING, DefaultBigIntRing::RING, vec![3, 5, 7]);
+    let R = Zn::from_primes(DefaultBigIntRing::RING, vec![3, 5, 7]);
     let S = DefaultBigIntRing::RING;
     assert!(R.eq_el(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
 }

@@ -46,8 +46,10 @@ pub trait ZnRing: DivisibilityRing + CanonicalHom<Self::IntegerRingBase> + SelfI
     }
 }
 
-pub mod generic_maps {
-    use crate::{ring::*, divisibility::DivisibilityRingStore};
+pub mod generic_impls {
+    use std::marker::PhantomData;
+
+    use crate::{ring::*, divisibility::DivisibilityRingStore, integer::{IntegerRing, IntegerRingStore}};
     use super::ZnRing;
 
     #[allow(type_alias_bounds)]
@@ -68,6 +70,96 @@ pub mod generic_maps {
         where S::IntegerRingBase: CanonicalHom<R::IntegerRingBase>
     {
         to.map_in(to.integer_ring().get_ring(), <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::map_in(to.integer_ring().get_ring(), from.integer_ring().get_ring(), from.smallest_positive_lift(el), &hom.1), &hom.0)
+    }
+
+    pub struct GenericIntegerToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
+        where I: CanonicalIso<R::IntegerRingBase> + CanonicalIso<J>
+    {
+        highbit_mod: usize,
+        highbit_bound: usize,
+        int_ring: PhantomData<I>,
+        to_large_int_ring: PhantomData<J>,
+        hom: <I as CanonicalHom<R::IntegerRingBase>>::Homomorphism,
+        iso: <I as CanonicalIso<R::IntegerRingBase>>::Isomorphism,
+        iso2: <I as CanonicalIso<J>>::Isomorphism
+    }
+
+    ///
+    /// See [`generic_map_in_from_int()`].
+    /// This will only ever return `None` if one of the integer ring `has_canonical_hom/iso` returns `None`.
+    /// 
+    pub fn generic_has_canonical_hom_from_int<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>(from: &I, to: &R, to_large_int_ring: &J, bounded_reduce_bound: Option<&J::Element>) -> Option<GenericIntegerToZnHom<I, J, R>>
+        where I: CanonicalIso<R::IntegerRingBase> + CanonicalIso<J>
+    {
+        if let Some(bound) = bounded_reduce_bound {
+            Some(GenericIntegerToZnHom {
+                highbit_mod: to.integer_ring().abs_highest_set_bit(to.modulus()).unwrap(),
+                highbit_bound: to_large_int_ring.abs_highest_set_bit(bound).unwrap(),
+                int_ring: PhantomData,
+                to_large_int_ring: PhantomData,
+                hom: from.has_canonical_hom(to.integer_ring().get_ring())?,
+                iso: from.has_canonical_iso(to.integer_ring().get_ring())?,
+                iso2: from.has_canonical_iso(to_large_int_ring)?
+            })
+        } else {
+            Some(GenericIntegerToZnHom {
+                highbit_mod: to.integer_ring().abs_highest_set_bit(to.modulus()).unwrap(),
+                highbit_bound: usize::MAX,
+                int_ring: PhantomData,
+                to_large_int_ring: PhantomData,
+                hom: from.has_canonical_hom(to.integer_ring().get_ring())?,
+                iso: from.has_canonical_iso(to.integer_ring().get_ring())?,
+                iso2: from.has_canonical_iso(to_large_int_ring)?
+            })
+        }
+    }
+
+    ///
+    /// A parameterized, generic variant of the reduction `Z -> Z/nZ`.
+    /// It considers the following situations:
+    ///  - the source ring `Z` might not be large enough to represent `n`
+    ///  - the integer ring associated to the destination ring `Z/nZ` might not be large enough to represent the input
+    ///  - the destination ring might use Barett reductions (or similar) for fast modular reduction if the input is bounded by some fixed bound `B`
+    ///  - general modular reduction modulo `n` is only performed in the source ring if necessary
+    /// 
+    /// In particular, we use the following additional parameters:
+    ///  - `to_large_int_ring`: an integer ring that can represent all integers for which we can perform fast modular reduction (i.e. those bounded by `B`)
+    ///  - `from_positive_representative_exact`: a function that performs the restricted reduction `{0, ..., n - 1} -> Z/nZ`
+    ///  - `from_positive_representative_bounded`: a function that performs the restricted reduction `{0, ..., B - 1} -> Z/nZ`
+    /// 
+    /// Note that the input size estimates consider only the bitlength of numbers, and so there is a small margin in which a reduction method for larger
+    /// numbers than necessary is used. Furthermore, if the integer rings used can represent some but not all positive numbers of a certain bitlength, 
+    /// there might be rare edge cases with panics/overflows. 
+    /// 
+    /// In particular, if the input integer ring `Z` can represent the input `x`, but not `n` AND `x` and `n` have the same bitlength, this function might
+    /// decide that we have to perform generic modular reduction (even though `x < n`), and try to map `n` into `Z`. This is never a problem if the primitive
+    /// integer rings `StaticRing::<ixx>::RING` are used, or if `B >= 2n`.
+    /// 
+    pub fn generic_map_in_from_int<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing, F, G>(from: &I, to: &R, to_large_int_ring: &J, el: I::Element, hom: &GenericIntegerToZnHom<I, J, R>, from_positive_representative_exact: F, from_positive_representative_bounded: G) -> R::Element
+        where I: CanonicalIso<R::IntegerRingBase> + CanonicalIso<J>,
+            F: FnOnce(El<R::Integers>) -> R::Element,
+            G: FnOnce(J::Element) -> R::Element
+    {
+        let (neg, n) = if from.is_neg(&el) {
+            (true, from.negate(el))
+        } else {
+            (false, el)
+        };
+        let ZZ = to.integer_ring().get_ring();
+        let highbit_el = from.abs_highest_set_bit(&n).unwrap_or(0);
+
+        let reduced = if highbit_el < hom.highbit_mod {
+            from_positive_representative_exact(from.map_out(ZZ, n, &hom.iso))
+        } else if highbit_el < hom.highbit_bound {
+            from_positive_representative_bounded(from.map_out(to_large_int_ring, n, &hom.iso2))
+        } else {
+            from_positive_representative_exact(from.map_out(ZZ, from.euclidean_rem(n, &from.map_in_ref(ZZ, to.modulus(), &hom.hom)), &hom.iso))
+        };
+        if neg {
+            to.negate(reduced)
+        } else {
+            reduced
+        }
     }
 }
 

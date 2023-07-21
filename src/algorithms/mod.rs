@@ -12,4 +12,5 @@ pub mod int_bisect;
 pub mod int_factor;
 pub mod cyclotomic;
 pub mod poly_div;
+pub mod cantor_zassenhaus;
 //pub mod discrete_log;

@@ -23,7 +23,7 @@ use super::{VectorView, map::MapFn, subvector::{SelfSubvectorView, SelfSubvector
 /// impl<'a, T, V> VectorFn<&'a T> for &'a VectorView<T> { ... }
 /// ```
 /// However, these do not represent the standard use cases and clutter the space of
-/// possible implementations.
+/// possible implementations. Instead, use the function [`crate::vector::VectorView::as_fn()`].
 /// 
 pub trait VectorFn<T> {
     

@@ -6,6 +6,9 @@ use std::cmp::*;
 /// The ordering must be compatible with addition and multiplication
 /// in the usual sense.
 /// 
+/// In particular, this should only be implemented for rings that are
+/// subrings of the real numbers.
+/// 
 pub trait OrderedRing: RingBase {
 
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> Ordering;

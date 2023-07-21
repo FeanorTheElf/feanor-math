@@ -94,12 +94,35 @@ pub trait IntegerRingStore: RingStore
     fn is_odd(&self, value: &El<Self>) -> bool {
         !self.is_even(value)
     }
+
+    fn half_exact(&self, mut value: El<Self>) -> El<Self> {
+        assert!(self.is_even(&value));
+        self.euclidean_div_pow_2(&mut value, 1);
+        return value;
+    }
 }
 
 impl<R> IntegerRingStore for R
     where R: RingStore,
         R::Type: IntegerRing
 {}
+
+pub mod generic_impls {
+    use crate::{algorithms, ring::RingRef};
+
+    use super::IntegerRing;
+
+    pub fn generic_map_in<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing>(from: &I, to: &J, el: &I::Element) -> J::Element {
+        algorithms::sqr_mul::generic_abs_square_and_multiply(
+            to.one(), 
+            el, 
+            RingRef::new(from), 
+            |a| to.add_ref(&a, &a), 
+            |a, b| to.add_ref_fst(a, b), 
+            to.zero()
+        )
+    }
+}
 
 #[cfg(test)]
 pub fn generic_test_integer_uniformly_random<R: IntegerRingStore>(ring: R) 

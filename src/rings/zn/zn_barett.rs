@@ -105,33 +105,14 @@ impl<I: IntegerRingStore> ZnBase<I>
         assert!(self.integer_ring.is_lt(&n, &self.modulus), "The input is not smaller than {}^2", self.integer_ring.format(&self.modulus));
     }
 
-    pub fn project(&self, n: El<I>) -> <Self as RingBase>::Element {
-        self.project_gen(n, &self.integer_ring)
-    }
-
-    pub fn project_gen<J: IntegerRingStore>(&self, n: El<J>, ZZ: &J) -> <Self as RingBase>::Element 
-        where J::Type: IntegerRing, I::Type: CanonicalIso<J::Type>
-    {
-        let mut red_n = n;
-        let negated = ZZ.is_neg(&red_n);
-        if negated {
-            ZZ.negate_inplace(&mut red_n);
-        }
-        let result = if ZZ.abs_highest_set_bit(&red_n).unwrap_or(0) + 1 < self.integer_ring.abs_highest_set_bit(&self.modulus).unwrap() * 2 {
-            let mut result = self.integer_ring.coerce::<J>(ZZ, red_n);
-            if !self.integer_ring.is_lt(&result, &self.modulus) {
-                self.project_leq_n_square(&mut result);
-            }
-            result
+    fn from_exact(&self, mut n: El<I>) -> ZnEl<I> {
+        let negative = self.integer_ring.is_neg(&n);
+        n = self.integer_ring.abs(n);
+        assert!(self.integer_ring.is_lt(&n, &self.modulus));
+        if negative {
+            self.negate(ZnEl(n))
         } else {
-            let modulus = self.integer_ring.cast::<J>(ZZ, self.integer_ring().clone_el(&self.modulus));
-            red_n = ZZ.euclidean_rem(red_n, &modulus);
-            self.integer_ring.coerce::<J>(ZZ, red_n)
-        };
-        if negated {
-            return self.negate(ZnEl(result));
-        } else {
-            return ZnEl(result);
+            ZnEl(n)
         }
     }
 
@@ -142,7 +123,7 @@ impl<I: IntegerRingStore> ZnBase<I>
     pub fn invert(&self, x: ZnEl<I>) -> Result<ZnEl<I>, El<I>> {
         let (s, _, d) = algorithms::eea::eea(self.integer_ring().clone_el(&x.0), self.integer_ring().clone_el(self.modulus()), &self.integer_ring);
         if self.integer_ring.is_neg_one(&d) || self.integer_ring.is_one(&d) {
-            Ok(self.project(s))
+            Ok(self.from_exact(s))
         } else {
             Err(d)
         }
@@ -214,7 +195,7 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
     }
 
     fn from_int(&self, value: i32) -> Self::Element {
-        self.project_gen(value, &StaticRing::<i32>::RING)
+        RingRef::new(self).coerce(&StaticRing::<i32>::RING, value)
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -258,8 +239,8 @@ impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I>
         let d = algorithms::eea::gcd(self.integer_ring().clone_el(&lhs.0), self.integer_ring().clone_el(&rhs.0), &self.integer_ring);
         if self.integer_ring.is_zero(&d) {
             return Some(self.zero());
-        } else if let Ok(inv) = self.invert(self.project(self.integer_ring.checked_div(&rhs.0, &d).unwrap())) {
-            return Some(self.mul(inv, self.project(self.integer_ring.checked_div(&lhs.0, &d).unwrap())));
+        } else if let Ok(inv) = self.invert(self.from_exact(self.integer_ring.checked_div(&rhs.0, &d).unwrap())) {
+            return Some(self.mul(inv, self.from_exact(self.integer_ring.checked_div(&lhs.0, &d).unwrap())));
         } else {
             return None;
         }
@@ -330,16 +311,24 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for ZnBas
 }
 
 impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanonicalHom<J> for ZnBase<I>
-    where I::Type: IntegerRing + CanonicalIso<J> + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing, 
+        J: CanonicalIso<I::Type>
 {
-    type Homomorphism = <I::Type as CanonicalHom<J>>::Homomorphism;
+    type Homomorphism = generic_impls::GenericIntegerToZnHom<J, I::Type, ZnBase<I>>;
 
     fn has_canonical_hom(&self, from: &J) -> Option<Self::Homomorphism> {
-        self.integer_ring.get_ring().has_canonical_hom(from)
+        generic_impls::generic_has_canonical_hom_from_int(from, self, self.integer_ring.get_ring(), Some(&self.integer_ring.mul_ref(self.modulus(), self.modulus())))
     }
 
-    fn map_in(&self, from: &J, el: J::Element, _hom: &Self::Homomorphism) -> Self::Element {
-        self.project_gen(el, &RingRef::new(from))
+    fn map_in(&self, from: &J, el: J::Element, hom: &Self::Homomorphism) -> Self::Element {
+        generic_impls::generic_map_in_from_int(from, self, self.integer_ring.get_ring(), el, hom, |n| {
+            debug_assert!(self.integer_ring.is_lt(&n, &self.modulus));
+            ZnEl(n)
+        }, |mut n| {
+            debug_assert!(self.integer_ring.is_lt(&n, &self.integer_ring.mul_ref(&self.modulus, &self.modulus)));
+            self.project_leq_n_square(&mut n);
+            ZnEl(n)
+        })
     }
 }
 
@@ -460,9 +449,9 @@ use crate::divisibility::generic_test_divisibility_axioms;
 #[test]
 fn test_mul() {
     const ZZ: RingValue<DefaultBigIntRing> = DefaultBigIntRing::RING;
-    let Z257 = ZnBase::new(ZZ, ZZ.from_int(257));
-    let x = Z257.project(ZZ.from_int(256));
-    assert!(Z257.eq_el(&Z257.one(), &Z257.mul_ref(&x, &x)));
+    let Z257 = Zn::new(ZZ, ZZ.from_int(257));
+    let x = Z257.coerce(&ZZ, ZZ.from_int(256));
+    assert_el_eq!(&Z257, &Z257.one(), &Z257.mul_ref(&x, &x));
 }
 
 #[test]
@@ -470,7 +459,7 @@ fn test_project() {
     const ZZ: StaticRing<i64> = StaticRing::RING;
     let Z17 = Zn::new(ZZ, 17);
     for k in 0..289 {
-        assert!(Z17.eq_el(&Z17.from_int((289 - k) % 17), &Z17.get_ring().project(-k as i64)));
+        assert_el_eq!(&Z17, &Z17.from_int((289 - k) % 17), &Z17.coerce(&ZZ, -k as i64));
     }
 }
 
@@ -508,6 +497,12 @@ fn test_zn_ring_axioms_znbase() {
 #[test]
 fn test_zn_map_in_large_int_znbase() {
     generic_test_map_in_large_int(Zn::new(StaticRing::<i64>::RING, 63));
+}
+
+#[test]
+fn test_zn_map_in_small_int() {
+    let ring = Zn::new(StaticRing::<i64>::RING, 257);
+    assert_el_eq!(&ring, &ring.one(), &ring.coerce(&StaticRing::<i8>::RING, 1));
 }
 
 #[test]
