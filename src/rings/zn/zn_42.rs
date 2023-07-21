@@ -11,6 +11,7 @@ use super::zn_barett;
 
 fn usigned_as_signed_ref<'a>(x: &'a u64) -> &'a i64 {
     assert!(*x <= i64::MAX as u64);
+    assert!(std::mem::align_of::<i64>() <= std::mem::align_of::<u64>());
     unsafe { std::mem::transmute(x) }
 }
 
