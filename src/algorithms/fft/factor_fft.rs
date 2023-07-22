@@ -177,9 +177,15 @@ impl<R, T1, T2, M> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2, M>
     }
 
     fn unordered_fft_permutation(&self, i: usize) -> usize {
+        assert!(i < self.len());
         let ri = i % self.right_table.len();
         let li = i / self.right_table.len();
         return self.left_table.unordered_fft_permutation(li) + self.left_table.len() * self.right_table.unordered_fft_permutation(ri);
+    }
+
+    fn unordered_fft_permutation_inv(&self, i: usize) -> usize {
+        assert!(i < self.len());
+        self.left_table.unordered_fft_permutation_inv(i % self.left_table.len()) + self.right_table.len() * self.right_table.unordered_fft_permutation_inv(i / self.left_table.len())
     }
 }
 

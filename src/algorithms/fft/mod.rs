@@ -36,6 +36,12 @@ pub trait FFTTable {
     /// 
     fn unordered_fft_permutation(&self, i: usize) -> usize;
 
+    ///
+    /// The inverse of [`unordered_fft_permutation()`], i.e. for all i, have
+    /// `self.unordered_fft_permutation_inv(self.unordered_fft_permutation(i)) == i`.
+    /// 
+    fn unordered_fft_permutation_inv(&self, i: usize) -> usize;
+
     fn fft<V, S, M>(&self, mut values: V, ring: S, memory_provider: &M)
         where S: RingStore, 
             S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
@@ -99,6 +105,10 @@ impl<T> FFTTable for T
 
     fn unordered_fft_permutation(&self, i: usize) -> usize {
         self.deref().unordered_fft_permutation(i)
+    }
+
+    fn unordered_fft_permutation_inv(&self, i: usize) -> usize {
+        self.deref().unordered_fft_permutation_inv(i)
     }
 
     fn fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)

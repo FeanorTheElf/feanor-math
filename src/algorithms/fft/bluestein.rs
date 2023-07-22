@@ -233,6 +233,10 @@ impl<R, M> FFTTable for FFTTableBluestein<R, M>
         i
     }
 
+    fn unordered_fft_permutation_inv(&self, i: usize) -> usize {
+        i
+    }
+
     fn unordered_fft<V, S, N>(&self, values: V, ring: S, memory_provider: &N)
         where S: RingStore,
             S::Type: CanonicalHom<<R as RingStore>::Type>, 

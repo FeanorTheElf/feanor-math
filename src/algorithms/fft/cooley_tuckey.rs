@@ -181,6 +181,10 @@ impl<R, M: MemoryProvider<El<R>>> FFTTable for FFTTableCooleyTuckey<R, M>
         bitreverse(i, self.log2_n)
     }
 
+    fn unordered_fft_permutation_inv(&self, i: usize) -> usize {
+        bitreverse(i, self.log2_n)
+    }
+
     fn fft<V, S, N>(&self, mut values: V, ring: S, memory_provider: &N)
         where S: RingStore, 
             S::Type: CanonicalHom<R::Type>, 
