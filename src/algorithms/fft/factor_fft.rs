@@ -55,6 +55,14 @@ impl<R, T1, T2, M> FFTTableGenCooleyTuckey<R, T1, T2, M>
         }
     }
 
+    pub fn left_fft_table(&self) -> &T1 {
+        &self.left_table
+    }
+    
+    pub fn right_fft_table(&self) -> &T2 {
+        &self.right_table
+    }
+    
     pub fn new_with_mem(root_of_unity: El<R>, left_table: T1, right_table: T2, memory_provider: &M) -> Self {
         assert!(left_table.ring().get_ring() == right_table.ring().get_ring());
         let ring = left_table.ring();
