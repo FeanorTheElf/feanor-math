@@ -3,12 +3,14 @@ use crate::{ring::*, primitive_int::{StaticRing, StaticRingBase}, rings::zn::{Zn
 use super::int_factor::factor;
 
 pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usize) -> bool {
-    assert!(log2_n > 0);
+    if log2_n == 0 {
+        return ring.is_one(el);
+    }
     ring.is_neg_one(&ring.pow(ring.clone_el(&el), 1 << (log2_n - 1)))
 }
 
 pub fn is_root_of_unity<R: RingStore>(ring: R, el: &El<R>, n: usize) -> bool {
-    assert!(n > 1);
+    assert!(n >= 1);
     ring.is_one(&ring.pow(ring.clone_el(&el), n))
 }
 
@@ -17,7 +19,7 @@ pub fn is_prim_root_of_unity<R: RingStore>(ring: R, el: &El<R>, n: usize) -> boo
     if !is_root_of_unity(&ring, el, n) {
         return false;
     }
-    for (p, _) in factor(&StaticRing::<i64>::RING, n as i64) {
+    for (p, _) in factor(&StaticRing::<i128>::RING, n as i128) {
         if is_root_of_unity(&ring, el, n / p as usize) {
             return false;
         }
@@ -70,6 +72,7 @@ fn test_is_prim_root_of_unity() {
     assert!(is_prim_root_of_unity_pow2(ring, &ring.from_int(3), 4));
 
     let ring = Zn::<101>::RING;
+    assert!(is_prim_root_of_unity(&ring, &ring.from_int(36), 5));
     assert!(is_prim_root_of_unity(&ring, &ring.from_int(3), 100));
     assert!(is_prim_root_of_unity(&ring, &ring.from_int(5), 25));
     assert!(!is_prim_root_of_unity(&ring, &ring.from_int(5), 50));

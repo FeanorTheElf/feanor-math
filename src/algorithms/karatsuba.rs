@@ -1,4 +1,6 @@
-use crate::{ring::*, vector::*};
+use crate::ring::*;
+use crate::vector::*;
+use crate::vector::subvector::*;
 
 use std::cmp::{ max, min };
 

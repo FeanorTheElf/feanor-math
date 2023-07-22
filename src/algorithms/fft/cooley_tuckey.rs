@@ -1,17 +1,21 @@
+use crate::algorithms::unity_root::is_prim_root_of_unity_pow2;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::primitive_int::*;
 use crate::mempool::{MemoryProvider, AllocatingMemoryProvider};
 use crate::rings::zn::{ZnRingStore, ZnRing};
 use crate::vector::SwappableVectorViewMut;
-use crate::{ring::*, vector::VectorViewMut};
-use crate::algorithms::{fft::*, self};
+use crate::ring::*;
+use crate::vector::VectorViewMut;
+use crate::algorithms::fft::*;
+use crate::algorithms;
+use crate::rings::float_complex::*;
+use super::complex_fft::*;
 
 pub struct FFTTableCooleyTuckey<R, M: MemoryProvider<El<R>> = AllocatingMemoryProvider> 
     where R: RingStore
 {
     ring: R,
     root_of_unity: El<R>,
-    inv_root_of_unity: El<R>,
     log2_n: usize,
     // stores the powers of root_of_unity in special bitreversed order
     root_of_unity_list: M::Object,
@@ -45,25 +49,45 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
         R::Type: DivisibilityRing
 {
     pub fn new_with_mem(ring: R, root_of_unity: El<R>, log2_n: usize, memory_provider: &M) -> Self {
+        let mut root_of_unity_pow = |i: i64| if i >= 0 {
+            ring.pow(ring.clone_el(&root_of_unity), i as usize)
+        } else {
+            ring.invert(&ring.pow(ring.clone_el(&root_of_unity), (-i) as usize)).unwrap()
+        };
+        // cannot call new_with_mem_and_pows() because of borrowing conflict
         assert!(ring.is_commutative());
+        assert!(!ring.get_ring().is_approximate());
         assert!(log2_n > 0);
-        assert!(ring.is_neg_one(&ring.pow(ring.clone_el(&root_of_unity), 1 << (log2_n - 1))));
-        let root_of_unity_list = Self::create_root_of_unity_list(&ring, &root_of_unity, log2_n, memory_provider);
-        let inv_root_of_unity = ring.pow(ring.clone_el(&root_of_unity), (1 << log2_n) - 1);
-        let inv_root_of_unity_list = Self::create_root_of_unity_list(&ring, &inv_root_of_unity, log2_n, memory_provider);
-        FFTTableCooleyTuckey { ring, root_of_unity, inv_root_of_unity, log2_n, root_of_unity_list, inv_root_of_unity_list }
+        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &root_of_unity_pow(1), log2_n));
+        let root_of_unity_list = Self::create_root_of_unity_list(&ring, &mut root_of_unity_pow, log2_n, memory_provider);
+        let inv_root_of_unity_list = Self::create_root_of_unity_list(&ring, |i| root_of_unity_pow(-i), log2_n, memory_provider);
+        let root_of_unity = root_of_unity_pow(1);
+        FFTTableCooleyTuckey { ring, root_of_unity, log2_n, root_of_unity_list, inv_root_of_unity_list }
     }
 
-    fn create_root_of_unity_list(ring: &R, root_of_unity: &El<R>, log2_n: usize, memory_provider: &M) -> M::Object {
+    pub fn new_with_mem_and_pows<F>(ring: R, mut root_of_unity_pow: F, log2_n: usize, memory_provider: &M) -> Self 
+        where F: FnMut(i64) -> El<R>
+    {
+        assert!(ring.is_commutative());
+        assert!(log2_n > 0);
+        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &root_of_unity_pow(1), log2_n));
+        let root_of_unity_list = Self::create_root_of_unity_list(&ring, &mut root_of_unity_pow, log2_n, memory_provider);
+        let inv_root_of_unity_list = Self::create_root_of_unity_list(&ring, |i| root_of_unity_pow(-i), log2_n, memory_provider);
+        let root_of_unity = root_of_unity_pow(1);
+        FFTTableCooleyTuckey { ring, root_of_unity, log2_n, root_of_unity_list, inv_root_of_unity_list }
+    }
+
+    fn create_root_of_unity_list<F>(ring: &R, mut root_of_unity_pow: F, log2_n: usize, memory_provider: &M) -> M::Object
+        where F: FnMut(i64) -> El<R>
+    {
         // in fact, we could choose this to have only length `(1 << log2_n) - 1`, but a power of two length is probably faster
         let mut root_of_unity_list = memory_provider.get_new_init(1 << log2_n, |_| ring.zero());
         let mut index = 0;
         for s in 0..log2_n {
             let m = 1 << s;
             let log2_group_size = log2_n - s;
-            let twiddle_root = ring.pow(ring.clone_el(&root_of_unity), m);
             for i_bitreverse in (0..(1 << log2_group_size)).step_by(2) {
-                let current_twiddle = ring.pow(ring.clone_el(&twiddle_root), bitreverse(i_bitreverse, log2_group_size));
+                let current_twiddle = root_of_unity_pow(m * bitreverse(i_bitreverse, log2_group_size) as i64);
                 root_of_unity_list[index] = current_twiddle;
                 index += 1;
             }
@@ -77,7 +101,6 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
     /// 
     fn inv_root_of_unity_pow(&self, exp_2: usize, bitreverse_exp: usize) -> &El<R> {
         let result = &self.inv_root_of_unity_list[(1 << self.log2_n) - (1 << (self.log2_n - exp_2)) + (bitreverse_exp / 2)];
-        debug_assert!(self.ring.eq_el(result, &self.ring.pow(self.ring.clone_el(&self.inv_root_of_unity), (1 << exp_2) * bitreverse(bitreverse_exp, self.log2_n - exp_2))));
         return result;
     }
 
@@ -86,7 +109,6 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
     /// 
     fn root_of_unity_pow(&self, exp_2: usize, bitreverse_exp: usize) -> &El<R> {
         let result = &self.root_of_unity_list[(1 << self.log2_n) - (1 << (self.log2_n - exp_2)) + (bitreverse_exp / 2)];
-        debug_assert!(self.ring.eq_el(result, &self.ring.pow(self.ring.clone_el(&self.root_of_unity), (1 << exp_2) * bitreverse(bitreverse_exp, self.log2_n - exp_2))));
         return result;
     }
 
@@ -107,6 +129,13 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
         Some(Self::new_with_mem(ring, root_of_unity, log2_n, memory_provider))
     }
 
+    pub fn for_complex_with_mem(ring: R, log2_n: usize, memory_provider: &M) -> Self
+        where R: RingStore<Type = Complex64>
+    {
+        let CC = Complex64::RING;
+        Self::new_with_mem_and_pows(ring, |i| CC.root_of_unity(i, 1 << log2_n), log2_n, memory_provider)
+    }
+
     pub fn bitreverse_permute_inplace<V, T>(&self, mut values: V) 
         where V: SwappableVectorViewMut<T>
     {
@@ -116,6 +145,17 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
                 values.swap(i, bitreverse(i, self.log2_n));
             }
         }
+    }
+}
+
+impl<R, M: MemoryProvider<El<R>>> PartialEq for FFTTableCooleyTuckey<R, M> 
+    where R: DivisibilityRingStore, 
+        R::Type: DivisibilityRing
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.ring().get_ring() == other.ring().get_ring() &&
+            self.log2_n == other.log2_n &&
+            self.ring().eq_el(self.root_of_unity(), other.root_of_unity())
     }
 }
 
@@ -169,7 +209,7 @@ impl<R, M: MemoryProvider<El<R>>> FFTTable for FFTTableCooleyTuckey<R, M>
         assert!(values.len() == (1 << self.log2_n));
         let hom = ring.can_hom(&self.ring).unwrap();
         // check if the canonical hom `R -> S` maps `self.root_of_unity` to a primitive N-th root of unity
-        debug_assert!(ring.is_neg_one(&ring.pow(hom.map_ref(&self.root_of_unity), 1 << (self.log2_n - 1))));
+        debug_assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &hom.map_ref(&self.root_of_unity), self.log2_n));
 
         for s in (0..self.log2_n).rev() {
             let m = 1 << s;
@@ -218,7 +258,7 @@ impl<R, M: MemoryProvider<El<R>>> FFTTable for FFTTableCooleyTuckey<R, M>
         // this is exactly `bitreverse_fft_inplace_base()` with all operations reversed
         assert!(values.len() == 1 << self.log2_n);
         let hom = ring.can_hom(&self.ring).unwrap();
-        debug_assert!(ring.is_neg_one(&ring.pow(hom.map_ref(&self.root_of_unity), 1 << (self.log2_n - 1))));
+        debug_assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &hom.map_ref(&self.root_of_unity), self.log2_n));
 
         for s in 0..self.log2_n {
             let m = 1 << s;
@@ -246,6 +286,16 @@ impl<R, M: MemoryProvider<El<R>>> FFTTable for FFTTableCooleyTuckey<R, M>
         for i in 0..values.len() {
             ring.mul_assign_ref(values.at_mut(i), &scale);
         }
+    }
+}
+
+impl<R: RingStore<Type = Complex64>, M: MemoryProvider<El<R>>> ErrorEstimate for FFTTableCooleyTuckey<R, M> {
+    
+    fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
+        // each butterfly doubles the error, and then adds up to 
+        let butterfly_absolute_error = input_bound * (root_of_unity_error() + f64::EPSILON);
+        // the operator inf-norm of the FFT is its length
+        return 2. * self.len() as f64 * butterfly_absolute_error + self.len() as f64 * input_error;
     }
 }
 
@@ -306,12 +356,10 @@ fn test_for_zn() {
     let ring = Zn::<17>::RING;
     let fft = FFTTableCooleyTuckey::for_zn(ring, 4).unwrap();
     assert!(ring.is_neg_one(&ring.pow(fft.root_of_unity, 8)));
-    assert!(ring.is_neg_one(&ring.pow(fft.inv_root_of_unity, 8)));
 
     let ring = Zn::<97>::RING;
     let fft = FFTTableCooleyTuckey::for_zn(ring, 4).unwrap();
     assert!(ring.is_neg_one(&ring.pow(fft.root_of_unity, 8)));
-    assert!(ring.is_neg_one(&ring.pow(fft.inv_root_of_unity, 8)));
 }
 
 #[cfg(test)]
@@ -322,7 +370,7 @@ fn run_fft_bench_round<R, S>(ring: S, fft: &FFTTableCooleyTuckey<R>, data: &Vec<
     copy.extend(data.iter().map(|x| ring.clone_el(x)));
     fft.unordered_fft(&mut copy[..], &ring, &AllocatingMemoryProvider);
     fft.unordered_inv_fft(&mut copy[..], &ring, &AllocatingMemoryProvider);
-    assert!(ring.eq_el(&copy[0], &data[0]));
+    assert_el_eq!(&ring, &copy[0], &data[0]);
 }
 
 #[bench]
@@ -337,7 +385,7 @@ fn bench_fft(bencher: &mut test::Bencher) {
 }
 
 #[bench]
-fn bench_fft_lazy(bencher: &mut test::Bencher) {
+fn bench_fft_optimized(bencher: &mut test::Bencher) {
     let ring = zn_42::Zn::new(1073872897);
     let fastmul_ring = zn_42::ZnFastmul::new(ring);
     let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, 15).unwrap();
@@ -346,4 +394,20 @@ fn bench_fft_lazy(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         run_fft_bench_round(&ring, &fft, &data, &mut copy)
     });
+}
+
+#[test]
+fn test_approximate_fft() {
+    let CC = Complex64::RING;
+    for log2_n in [4, 7, 11, 15] {
+        let fft = FFTTableCooleyTuckey::new_with_mem_and_pows(CC, |x| CC.root_of_unity(x, 1 << log2_n), log2_n, &AllocatingMemoryProvider);
+        let mut array = AllocatingMemoryProvider.get_new_init(1 << log2_n, |i|  CC.root_of_unity(i as i64, 1 << log2_n));
+        fft.fft(&mut array, CC, &AllocatingMemoryProvider);
+        let err = fft.expected_absolute_error(1., 0.);
+        assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
+        assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
+        for i in 2..fft.len() {
+            assert!(CC.is_absolute_approx_eq(array[i], CC.zero(), err));
+        }
+    }
 }

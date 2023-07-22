@@ -1,57 +1,65 @@
+use crate::algorithms;
 use crate::divisibility::*;
 use crate::euclidean::*;
 use crate::field::Field;
-use crate::mempool::{AllocatingMemoryProvider, GrowableMemoryProvider};
 use crate::vector::VectorViewMut;
 use crate::ring::*;
-use crate::algorithms;
 use crate::rings::poly::*;
+use crate::vector::*;
+use crate::vector::sparse::*;
 
-use std::cmp::min;
+use std::cmp::max;
+use std::rc::Rc;
 
-pub struct DensePolyRingBase<R: RingStore, M: GrowableMemoryProvider<El<R>> = AllocatingMemoryProvider> {
-    base_ring: R,
+pub struct SparsePolyRingBase<R: RingStore> {
+    base_ring: Rc<R>,
     unknown_name: &'static str,
-    zero: El<R>,
-    memory_provider: M
+    zero: El<R>
 }
 
-impl<R: RingStore + Clone, M: GrowableMemoryProvider<El<R>> + Clone> Clone for DensePolyRingBase<R, M> {
+impl<R: RingStore + Clone> Clone for SparsePolyRingBase<R> {
     
     fn clone(&self) -> Self {
-        DensePolyRingBase {
-            base_ring: <R as Clone>::clone(&self.base_ring), 
+        SparsePolyRingBase {
+            base_ring: self.base_ring.clone(), 
             unknown_name: self.unknown_name, 
-            zero: self.base_ring.zero() ,
-            memory_provider: self.memory_provider.clone()
+            zero: self.base_ring.zero()
         }
     }
 }
 
 #[allow(type_alias_bounds)]
-pub type DensePolyRing<R: RingStore, M: GrowableMemoryProvider<El<R>> = AllocatingMemoryProvider> = RingValue<DensePolyRingBase<R, M>>;
+pub type SparsePolyRing<R: RingStore> = RingValue<SparsePolyRingBase<R>>;
 
-impl<R: RingStore> DensePolyRing<R> {
+impl<R: RingStore> SparsePolyRing<R> {
 
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        Self::from(DensePolyRingBase::new(base_ring, unknown_name, AllocatingMemoryProvider::default()))
+        Self::from(SparsePolyRingBase::new(base_ring, unknown_name))
     }
 }
 
-impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> DensePolyRingBase<R, M> {
+impl<R: RingStore> SparsePolyRingBase<R> {
 
-    pub fn new(base_ring: R, unknown_name: &'static str, memory_provider: M) -> Self {
+    pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
         let zero = base_ring.zero();
-        DensePolyRingBase { base_ring, unknown_name, zero, memory_provider }
-    }
-
-    fn grow(&self, vector: &mut M::Object, size: usize) {
-        if vector.len() < size {
-           self.memory_provider.grow_init(vector, size, |_| self.base_ring.zero());
+        SparsePolyRingBase { 
+            base_ring: Rc::new(base_ring), 
+            unknown_name: unknown_name, 
+            zero: zero
         }
     }
 
-    fn poly_div<F>(&self, lhs: &mut M::Object, rhs: &M::Object, mut left_div_lc: F) -> Option<M::Object>
+    fn degree_truncate(&self, el: &mut <Self as RingBase>::Element) {
+        for i in (0..el.len()).rev() {
+            if !self.base_ring.is_zero(&el.at(i)) {
+                el.set_len(i + 1);
+                return;
+            }
+        }
+        el.set_len(0);
+    }
+
+    fn poly_div<F>(&self, lhs: &mut SparseVectorMut<Rc<R>>, rhs: &SparseVectorMut<Rc<R>>, mut left_div_lc: F) -> Option<SparseVectorMut<Rc<R>>>
         where F: FnMut(El<R>) -> Option<El<R>>
     {
         let lhs_val = std::mem::replace(lhs, self.zero());
@@ -67,19 +75,20 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> DensePolyRingBase<R, M> {
     }
 }
 
-impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingBase<R, M> {
+impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
     
-    type Element = M::Object;
+    type Element = SparseVectorMut<Rc<R>>;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        self.memory_provider.get_new_init(self.degree(val).map(|d| d + 1).unwrap_or(0), |i| self.base_ring.clone_el(&val[i]))
+        val.clone()
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        self.grow(lhs, rhs.len());
-        for i in 0..rhs.len() {
-            self.base_ring.add_assign_ref(&mut lhs[i], &rhs[i])
+        lhs.set_len(max(lhs.len(), rhs.len()));
+        for (i, c) in rhs.nontrivial_entries() {
+            self.base_ring.add_assign_ref(lhs.at_mut(i), c);
         }
+        self.degree_truncate(lhs);
     }
 
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
@@ -87,16 +96,15 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
     }
 
     fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        self.grow(lhs, rhs.len());
-        for i in 0..rhs.len() {
-            self.base_ring.sub_assign_ref(&mut lhs[i], &rhs[i])
+        lhs.set_len(max(lhs.len(), rhs.len()));
+        for (i, c) in rhs.nontrivial_entries() {
+            self.base_ring.sub_assign_ref(lhs.at_mut(i), c);
         }
+        self.degree_truncate(lhs);
     }
 
     fn negate_inplace(&self, lhs: &mut Self::Element) {
-        for i in 0..lhs.len() {
-            self.base_ring.negate_inplace(&mut lhs[i]);
-        }
+        lhs.scan(|_, c| self.base_ring.negate_inplace(c));
     }
 
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
@@ -108,22 +116,27 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
     }
 
     fn zero(&self) -> Self::Element {
-        self.memory_provider.get_new_init(0, |_| self.base_ring.zero())
+        SparseVectorMut::new(0, self.base_ring.clone())
     }
     
     fn from_int(&self, value: i32) -> Self::Element {
-        self.memory_provider.get_new_init(1, |_| self.base_ring.from_int(value))
+        let mut result = self.zero();
+        result.set_len(1);
+        *result.at_mut(0) = self.base_ring.from_int(value);
+        return result;
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-        for i in 0..min(lhs.len(), rhs.len()) {
-            if !self.base_ring.eq_el(&lhs[i], &rhs[i]) {
+        if lhs.len() != rhs.len() {
+            return false;
+        }
+        for (i, c) in lhs.nontrivial_entries() {
+            if !self.base_ring.eq_el(rhs.at(i), c) {
                 return false;
             }
         }
-        let longer = if lhs.len() > rhs.len() { lhs } else { rhs };
-        for i in min(lhs.len(), rhs.len())..longer.len() {
-            if !self.base_ring.is_zero(&longer[i]) {
+        for (i, c) in rhs.nontrivial_entries() {
+            if !self.base_ring.eq_el(lhs.at(i), c) {
                 return false;
             }
         }
@@ -148,35 +161,55 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
     }
 
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        let lhs_len = self.degree(lhs).map(|i| i + 1).unwrap_or(0);
-        let rhs_len = self.degree(rhs).map(|i| i + 1).unwrap_or(0);
-        let mut result = self.memory_provider.get_new_init(lhs_len + rhs_len, |_| self.base_ring.zero());
-        algorithms::conv_mul::add_assign_convoluted_mul(
-            &mut result[..], 
-            &lhs[0..lhs_len], 
-            &rhs[0..rhs_len], 
-            &self.base_ring
-        );
+        if lhs.len() == 0 || rhs.len() == 0 {
+            return self.zero();
+        }
+        let mut result = SparseVectorMut::new(lhs.len() + rhs.len() - 1, self.base_ring.clone());
+        for (i, c1) in lhs.nontrivial_entries() {
+            for (j, c2) in rhs.nontrivial_entries() {
+                self.base_ring.add_assign(result.at_mut(i + j), self.base_ring.mul_ref(c1, c2));
+            }
+        }
+        // if the ring is not zero-divisor free
+        self.degree_truncate(&mut result);
         return result;
     }
 
     fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
-        for i in 0..lhs.len() {
-            self.base_ring().mul_assign_int(lhs.at_mut(i), rhs);
+        if rhs == 0 {
+            *lhs = self.zero();
+        } else {
+            lhs.scan(|_, c| self.base_ring.mul_assign_int(c, rhs));
         }
     }
 }
 
-impl<R, M> PartialEq for DensePolyRingBase<R, M> 
-    where R: RingStore, M: GrowableMemoryProvider<El<R>>
+impl<R> PartialEq for SparsePolyRingBase<R> 
+    where R: RingStore
 {
     fn eq(&self, other: &Self) -> bool {
         self.base_ring.get_ring() == other.base_ring.get_ring()
     }
 }
 
-impl<R, P, M> CanonicalHom<P> for DensePolyRingBase<R, M> 
-    where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: PolyRing, M: GrowableMemoryProvider<El<R>>
+impl<R: RingStore> RingExtension for SparsePolyRingBase<R> {
+    
+    type BaseRing = R;
+
+    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing {
+        &self.base_ring
+    }
+
+    fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
+        let mut result = self.zero();
+        result.set_len(1);
+        *result.at_mut(0) = x;
+        return result;
+    }
+}
+
+impl<R, P> CanonicalHom<P> for SparsePolyRingBase<R> 
+    where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: PolyRing
 {
     type Homomorphism = super::generic_impls::GenericCanonicalHom<P, Self>;
 
@@ -189,8 +222,8 @@ impl<R, P, M> CanonicalHom<P> for DensePolyRingBase<R, M>
     }
 }
 
-impl<R, P, M> CanonicalIso<P> for DensePolyRingBase<R, M> 
-    where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: PolyRing, M: GrowableMemoryProvider<El<R>>
+impl<R, P> CanonicalIso<P> for SparsePolyRingBase<R> 
+    where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: PolyRing
 {
     type Isomorphism = super::generic_impls::GenericCanonicalIso<P, Self>;
 
@@ -203,36 +236,10 @@ impl<R, P, M> CanonicalIso<P> for DensePolyRingBase<R, M>
     }
 }
 
-impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingExtension for DensePolyRingBase<R, M> {
-    
-    type BaseRing = R;
-
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing {
-        &self.base_ring
-    }
-
-    fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
-        let mut value = Some(x);
-        self.memory_provider.get_new_init(1, |_| std::mem::replace(&mut value, None).unwrap())
-    }
-}
-
 pub struct TermIterator<'a, R>
     where R: RingStore
 {
-    iter: std::iter::Enumerate<std::slice::Iter<'a, El<R>>>,
-    ring: &'a R
-}
-
-impl<'a, R> Clone for TermIterator<'a, R>
-    where R: RingStore
-{
-    fn clone(&self) -> Self {
-        TermIterator {
-            iter: self.iter.clone(),
-            ring: self.ring
-        }
-    }
+    iter: sparse::SparseVectorMutIter<'a, Rc<R>>
 }
 
 impl<'a, R> Iterator for TermIterator<'a, R>
@@ -241,29 +248,30 @@ impl<'a, R> Iterator for TermIterator<'a, R>
     type Item = (&'a El<R>, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((i, c)) = self.iter.next() {
-            if !self.ring.is_zero(c) {
-                return Some((c, i));
-            }
+        if let Some((i, c)) = self.iter.next() {
+            Some((c, i))
+        } else {
+            None
         }
-        return None;
     }
 }
 
-impl<R, M: GrowableMemoryProvider<El<R>>> PolyRing for DensePolyRingBase<R, M> 
+impl<R> PolyRing for SparsePolyRingBase<R> 
     where R: RingStore, R::Type: CanonicalIso<R::Type>
 {
     type TermsIterator<'a> = TermIterator<'a, R>
         where Self: 'a;
 
     fn indeterminate(&self) -> Self::Element {
-        self.memory_provider.get_new_init(2, |i| if i == 0 { self.base_ring().zero() } else { self.base_ring().one() })
+        let mut result = self.zero();
+        result.set_len(2);
+        *result.at_mut(1) = self.base_ring.one();
+        return result;
     }
 
     fn terms<'a>(&'a self, f: &'a Self::Element) -> TermIterator<'a, R> {
         TermIterator {
-            iter: f.iter().enumerate(), 
-            ring: self.base_ring()
+            iter: f.nontrivial_entries()
         }
     }
 
@@ -271,26 +279,23 @@ impl<R, M: GrowableMemoryProvider<El<R>>> PolyRing for DensePolyRingBase<R, M>
         where I: Iterator<Item = (El<Self::BaseRing>, usize)>
     {
         for (c, i) in rhs {
-            self.grow(lhs, i + 1);
-            self.base_ring().add_assign(&mut lhs[i], c);
+            lhs.set_len(max(lhs.len(), i + 1));
+            self.base_ring().add_assign(lhs.at_mut(i), c);
         }
+        // if a previously set entry is then set to zero or adds up to zero, this might be not truncated
+        self.degree_truncate(lhs);
     }
 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, i: usize) -> &'a El<Self::BaseRing> {
         if i < f.len() {
-            return &f[i];
+            return f.at(i);
         } else {
             return &self.zero;
         }
     }
 
     fn degree(&self, f: &Self::Element) -> Option<usize> {
-        for i in (0..f.len()).rev() {
-            if !self.base_ring().is_zero(&f[i]) {
-                return Some(i);
-            }
-        }
-        return None;
+        f.len().checked_sub(1)
     }
 
     fn div_rem_monic(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
@@ -300,13 +305,13 @@ impl<R, M: GrowableMemoryProvider<El<R>>> PolyRing for DensePolyRingBase<R, M>
     }
 }
 
-impl<R, M: GrowableMemoryProvider<El<R>>> DivisibilityRing for DensePolyRingBase<R, M> 
+impl<R,> DivisibilityRing for SparsePolyRingBase<R> 
     where R: DivisibilityRingStore, R::Type: DivisibilityRing + CanonicalIso<R::Type>
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if let Some(d) = self.degree(rhs) {
-            let lc = &rhs[d];
-            let mut lhs_copy = self.memory_provider.get_new_init(lhs.len(), |i| self.base_ring.clone_el(&lhs[i]));
+            let lc = rhs.at(d);
+            let mut lhs_copy = lhs.clone();
             let quo = self.poly_div(&mut lhs_copy, rhs, |x| self.base_ring().checked_left_div(&x, lc))?;
             if self.is_zero(&lhs_copy) {
                 Some(quo)
@@ -321,11 +326,11 @@ impl<R, M: GrowableMemoryProvider<El<R>>> DivisibilityRing for DensePolyRingBase
     }
 }
 
-impl<R, M: GrowableMemoryProvider<El<R>>> EuclideanRing for DensePolyRingBase<R, M> 
+impl<R> EuclideanRing for SparsePolyRingBase<R> 
     where R: RingStore, R::Type: Field + CanonicalIso<R::Type>
 {
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
-        let lc_inv = self.base_ring.invert(&rhs[self.degree(rhs).unwrap()]).unwrap();
+        let lc_inv = self.base_ring.invert(rhs.at(self.degree(rhs).unwrap())).unwrap();
         let quo = self.poly_div(&mut lhs, rhs, |x| Some(self.base_ring().mul_ref_snd(x, &lc_inv))).unwrap();
         return (quo, lhs);
     }
@@ -355,38 +360,41 @@ fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El
         poly_ring.from_terms([(base_ring.from_int(-1), 0)].into_iter()),
         poly_ring.from_terms([(base_ring.from_int(-1), 1)].into_iter()),
         poly_ring.from_terms([(base_ring.from_int(-1), 0), (base_ring.from_int(1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(1), 0), (base_ring.from_int(-1), 1)].into_iter())
+        poly_ring.from_terms([(base_ring.from_int(1), 0), (base_ring.from_int(-1), 1)].into_iter()),
+        poly_ring.from_terms([(base_ring.from_int(-1), 0), (base_ring.from_int(1), 2)].into_iter()),
+        poly_ring.from_terms([(base_ring.from_int(1), 0), (base_ring.from_int(-1), 2)].into_iter()),
+        poly_ring.from_terms([(base_ring.from_int(1), 0), (base_ring.from_int(-1), 2), (base_ring.from_int(0), 2)].into_iter())
     ].into_iter()
 }
 
 #[test]
 fn test_ring_axioms() {
-    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
     generic_test_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_poly_ring_axioms() {
-    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
     generic_test_poly_ring_axioms(poly_ring, Zn::<7>::RING.elements());
 }
 
 #[test]
+fn test_canonical_iso_axioms_different_base_ring() {
+    let poly_ring1 = SparsePolyRing::new(zn_barett::Zn::new(StaticRing::<i128>::RING, 7), "X");
+    let poly_ring2 = SparsePolyRing::new(zn_42::Zn::new(7), "X");
+    generic_test_canonical_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+    generic_test_canonical_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+}
+
+#[test]
 fn test_divisibility_ring_axioms() {
-    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
     generic_test_divisibility_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_euclidean_ring_axioms() {
-    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
     generic_test_euclidean_axioms(&poly_ring, edge_case_elements(&poly_ring));
-}
-
-#[test]
-fn test_canonical_iso_axioms_different_base_ring() {
-    let poly_ring1 = DensePolyRing::new(zn_barett::Zn::new(StaticRing::<i128>::RING, 7), "X");
-    let poly_ring2 = DensePolyRing::new(zn_42::Zn::new(7), "X");
-    generic_test_canonical_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
-    generic_test_canonical_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
 }

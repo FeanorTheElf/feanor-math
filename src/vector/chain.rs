@@ -1,6 +1,7 @@
 use std::{marker::PhantomData, cmp::{min, max}};
 
-use super::{VectorView, VectorViewMut, SwappableVectorViewMut, SelfSubvectorView};
+use super::*;
+use crate::vector::subvector::*;
 
 pub struct Chain<V1, V2, T>
     where V1: VectorView<T>, V2: VectorView<T>

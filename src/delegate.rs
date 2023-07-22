@@ -1,4 +1,4 @@
-use crate::{ring::*, divisibility::DivisibilityRing, rings::zn::ZnRing};
+use crate::{ring::*, divisibility::DivisibilityRing, rings::zn::ZnRing, integer::{IntegerRingStore, IntegerRing}};
 
 ///
 /// Trait to simplify implementing newtype-pattern for rings.
@@ -9,7 +9,7 @@ use crate::{ring::*, divisibility::DivisibilityRing, rings::zn::ZnRing};
 /// 
 pub trait DelegateRing: PartialEq {
 
-    type Base: ?Sized + RingBase;
+    type Base: ?Sized + RingBase + SelfIso;
     type Element;
 
     fn get_delegate(&self) -> &Self::Base;
@@ -79,6 +79,11 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
     default fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         self.get_delegate().mul_assign_ref(self.delegate_mut(lhs), self.delegate_ref(rhs));
         self.postprocess_delegate_mut(lhs);
+    }
+
+    default fn square(&self, value: &mut Self::Element) {
+        self.get_delegate().square(self.delegate_mut(value));
+        self.postprocess_delegate_mut(value);
     }
 
     default fn zero(&self) -> Self::Element {
@@ -181,6 +186,27 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
     default fn mul(&self, lhs: Self::Element, rhs: Self::Element) -> Self::Element {
         self.rev_delegate(self.get_delegate().mul(self.delegate(lhs), self.delegate(rhs)))
     }
+    
+    default fn is_approximate(&self) -> bool { self.get_delegate().is_approximate() }
+
+    default fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
+        self.get_delegate().mul_assign_int(self.delegate_mut(lhs), rhs);
+        self.postprocess_delegate_mut(lhs);
+    }
+
+    default fn mul_int(&self, lhs: Self::Element, rhs: i32) -> Self::Element {
+        self.rev_delegate(self.get_delegate().mul_int(self.delegate(lhs), rhs))
+    }
+
+    default fn mul_int_ref(&self, lhs: &Self::Element, rhs: i32) -> Self::Element {
+        self.rev_delegate(self.get_delegate().mul_int_ref(self.delegate_ref(lhs), rhs))
+    }
+    
+    default fn pow_gen<S: IntegerRingStore>(&self, x: Self::Element, power: &El<S>, integers: S) -> Self::Element 
+        where S::Type: IntegerRing
+    {
+        self.rev_delegate(self.get_delegate().pow_gen(self.delegate(x), power, integers))
+    }
 }
 
 impl<R: DelegateRing + ?Sized> DivisibilityRing for R
@@ -210,7 +236,7 @@ impl<'a, R: ?Sized> Iterator for DelegateZnRingElementsIter<'a, R>
 }
 
 impl<R: DelegateRing + ?Sized> ZnRing for R
-    where R::Base: ZnRing, R: CanonicalHom<<R::Base as ZnRing>::IntegerRingBase>
+    where R::Base: ZnRing, R: CanonicalHom<<R::Base as ZnRing>::IntegerRingBase> + SelfIso
 {
     type IntegerRingBase = <R::Base as ZnRing>::IntegerRingBase;
     type Integers = <R::Base as ZnRing>::Integers;

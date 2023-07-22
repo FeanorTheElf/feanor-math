@@ -39,7 +39,7 @@ impl<R> DivisibilityRingStore for R
     where R: RingStore, R::Type: DivisibilityRing
 {}
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_divisibility_axioms<R: DivisibilityRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
     where R::Type: DivisibilityRing
 {
@@ -49,11 +49,13 @@ pub fn generic_test_divisibility_axioms<R: DivisibilityRingStore, I: Iterator<It
             let ab = ring.mul(ring.clone_el(a), ring.clone_el(b));
             let c = ring.checked_left_div(&ab, &a);
             assert!(c.is_some());
-            assert!(ring.eq_el(&ab, &ring.mul(ring.clone_el(a), c.unwrap())));
+            assert_el_eq!(&ring, &ab, &ring.mul(ring.clone_el(a), c.unwrap()));
 
             if !ring.is_unit(b) {
                 assert!(ring.checked_left_div(&ring.add(ring.clone_el(&ab), ring.one()), &b).is_none());
                 assert!(ring.checked_left_div(&ring.sub(ring.clone_el(&ab), ring.one()), &b).is_none());
+            } else {
+                assert_el_eq!(&ring, &ring.one(), &ring.mul_ref_fst(b, ring.checked_left_div(&ring.one(), b).unwrap()));
             }
         }
     }

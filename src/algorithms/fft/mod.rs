@@ -3,11 +3,26 @@ use crate::{ring::*, vector::*, mempool::*};
 pub mod cooley_tuckey;
 pub mod bluestein;
 pub mod factor_fft;
-pub mod primitive;
+pub mod complex_fft;
 
+///
+/// Trait for objects that can perform a fast fourier transform over some
+/// ring.
+/// 
+/// # Note on equality
+/// If you choose to implement [`PartialEq`] for an FFTTable, and `F == G`, then
+/// `F` and `G` should satisfy the following properties:
+///  - `F.ring() == G.ring()`, i.e. elements can be transferred between rings
+///    without applying homomorphisms
+///  - `F.len() == G.len()`
+///  - `F.root_of_unity() == G.root_of_unity()`
+///  - `F.unordered_fft_permutation(i) == G.unordered_fft_permutation(i)` for all `i`
+/// In other words, `F` and `G` must have exactly the same output for `unordered_fft`
+/// (and thus `fft`, `inv_fft`, ...) on same inputs.
+/// 
 pub trait FFTTable {
 
-    type Ring: RingStore;
+    type Ring: ?Sized + RingStore;
 
     fn len(&self) -> usize;
     fn ring(&self) -> &Self::Ring;
@@ -15,7 +30,7 @@ pub trait FFTTable {
 
     ///
     /// On input `i`, returns `j` such that `unordered_fft(values)[i]` contains the evaluation
-    /// at `zeta^j` of values.
+    /// at `zeta^j` of values. Here `zeta` is the value returned by [`root_of_unity()`]
     /// 
     fn unordered_fft_permutation(&self, i: usize) -> usize;
 

@@ -24,6 +24,16 @@ pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + SelfIso + 
     fn mul_pow_2(&self, value: &mut Self::Element, power: usize);
     fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, rng: G) -> Self::Element;
 
+    fn rounded_div(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
+        let mut rhs_half = self.abs(self.clone_el(rhs));
+        self.euclidean_div_pow_2(&mut rhs_half, 1);
+        if self.is_neg(&lhs) {
+            return self.euclidean_div(self.sub(lhs, rhs_half), rhs);
+        } else {
+            return self.euclidean_div(self.add(lhs, rhs_half), rhs);
+        }
+    }
+
     fn power_of_two(&self, power: usize) -> Self::Element {
         let mut result = self.one();
         self.mul_pow_2(&mut result, power);
@@ -56,6 +66,7 @@ pub trait IntegerRingStore: RingStore
     delegate!{ fn euclidean_div_pow_2(&self, value: &mut El<Self>, power: usize) -> () }
     delegate!{ fn mul_pow_2(&self, value: &mut El<Self>, power: usize) -> () }
     delegate!{ fn power_of_two(&self, power: usize) -> El<Self> }
+    delegate!{ fn rounded_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
 
     fn get_uniformly_random<G: FnMut() -> u64>(&self, bound_exclusive: &El<Self>, mut rng: G) -> El<Self> {
         assert!(self.is_gt(bound_exclusive, &self.zero()));
@@ -83,12 +94,35 @@ pub trait IntegerRingStore: RingStore
     fn is_odd(&self, value: &El<Self>) -> bool {
         !self.is_even(value)
     }
+
+    fn half_exact(&self, mut value: El<Self>) -> El<Self> {
+        assert!(self.is_even(&value));
+        self.euclidean_div_pow_2(&mut value, 1);
+        return value;
+    }
 }
 
 impl<R> IntegerRingStore for R
     where R: RingStore,
         R::Type: IntegerRing
 {}
+
+pub mod generic_impls {
+    use crate::{algorithms, ring::RingRef};
+
+    use super::IntegerRing;
+
+    pub fn generic_map_in<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing>(from: &I, to: &J, el: &I::Element) -> J::Element {
+        algorithms::sqr_mul::generic_abs_square_and_multiply(
+            to.one(), 
+            el, 
+            RingRef::new(from), 
+            |a| to.add_ref(&a, &a), 
+            |a, b| to.add_ref_fst(a, b), 
+            to.zero()
+        )
+    }
+}
 
 #[cfg(test)]
 pub fn generic_test_integer_uniformly_random<R: IntegerRingStore>(ring: R) 
@@ -107,11 +141,18 @@ pub fn generic_test_integer_uniformly_random<R: IntegerRingStore>(ring: R)
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) 
     where R::Type: IntegerRing
 {
     let elements = edge_case_elements.collect::<Vec<_>>();
+
+    // test abs_highest_set_bit on standard values
+    assert_eq!(None, ring.abs_highest_set_bit(&ring.from_int(0)));
+    assert_eq!(Some(0), ring.abs_highest_set_bit(&ring.from_int(1)));
+    assert_eq!(Some(1), ring.abs_highest_set_bit(&ring.from_int(2)));
+
+    // generic test of mul_pow_2 resp. euclidean_div_pow_2
     for a in &elements {
         let mut ceil_pow_2 = ring.from_int(2);
         ring.mul_pow_2(&mut ceil_pow_2, ring.abs_highest_set_bit(a).unwrap_or(0));
@@ -123,11 +164,11 @@ pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>
             ring.mul_pow_2(&mut pow_2, i);
             let mut b = ring.clone_el(a);
             ring.mul_pow_2(&mut b, i);
-            assert!(ring.eq_el(&b, &ring.mul(ring.clone_el(a), ring.clone_el(&pow_2))));
+            assert_el_eq!(&ring, &b, &ring.mul(ring.clone_el(a), ring.clone_el(&pow_2)));
             ring.euclidean_div_pow_2(&mut b, i);
-            assert!(ring.eq_el(&b, a));
+            assert_el_eq!(&ring, &b, a);
             ring.euclidean_div_pow_2(&mut b, i);
-            assert!(ring.eq_el(&b, &ring.euclidean_div(ring.clone_el(a), &pow_2)));
+            assert_el_eq!(&ring, &b, &ring.euclidean_div(ring.clone_el(a), &pow_2));
         }
     }
 
@@ -135,14 +176,14 @@ pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>
     let d = ring.from_int(8);
     for k in -10..=10 {
         let mut a = ring.from_int(k);
-        assert!(ring.eq_el(&ring.from_int(k / 8), &ring.euclidean_div(ring.clone_el(&a), &d)));
+        assert_el_eq!(&ring, &ring.from_int(k / 8), &ring.euclidean_div(ring.clone_el(&a), &d));
         ring.euclidean_div_pow_2(&mut a, 3);
-        assert!(ring.eq_el(&ring.from_int(k / 8), &a));
+        assert_el_eq!(&ring, &ring.from_int(k / 8), &a);
     }
     let d = ring.from_int(-8);
     for k in -10..=10 {
         let a = ring.from_int(k);
-        assert!(ring.eq_el(&ring.from_int(k / -8), &ring.euclidean_div(ring.clone_el(&a), &d)));
+        assert_el_eq!(&ring, &ring.from_int(k / -8), &ring.euclidean_div(ring.clone_el(&a), &d));
     }
 }
 
@@ -152,4 +193,17 @@ fn test_int_div_assumption() {
     assert_eq!(-1, 10 / -8);
     assert_eq!(1, 10 / 8);
     assert_eq!(1, -10 / -8);
+}
+
+#[test]
+fn test_rounded_div() {
+    let ZZ = StaticRing::<i32>::RING;
+    assert_el_eq!(&ZZ, &3, &ZZ.rounded_div(20, &7));
+    assert_el_eq!(&ZZ, &-3, &ZZ.rounded_div(-20, &7));
+    assert_el_eq!(&ZZ, &-3, &ZZ.rounded_div(20, &-7));
+    assert_el_eq!(&ZZ, &3, &ZZ.rounded_div(-20, &-7));
+    assert_el_eq!(&ZZ, &3, &ZZ.rounded_div(22, &7));
+    assert_el_eq!(&ZZ, &-3, &ZZ.rounded_div(-22, &7));
+    assert_el_eq!(&ZZ, &-3, &ZZ.rounded_div(22, &-7));
+    assert_el_eq!(&ZZ, &3, &ZZ.rounded_div(-22, &-7));
 }

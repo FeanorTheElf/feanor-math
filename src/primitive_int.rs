@@ -28,35 +28,64 @@ impl PrimitiveInt for i128 {
     fn bits() -> usize { Self::BITS as usize }
 }
 
-impl<T: PrimitiveInt, S: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for StaticRingBase<S> {
+impl<I: ?Sized + IntegerRing, S: PrimitiveInt> CanonicalHom<I> for StaticRingBase<S> {
 
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, _: &StaticRingBase<T>) -> Option<()> {
+    default fn has_canonical_hom(&self, _: &I) -> Option<()> {
         Some(())
     }
 
-    fn map_in(&self, _: &StaticRingBase<T>, el: T, _: &()) -> S {
-        S::try_from(el.into()).map_err(|_| ()).unwrap()
+    default fn map_in(&self, from: &I, el: I::Element, _: &()) -> S {
+        generic_impls::generic_map_in(from, self, &el)
     }
 }
 
-impl<T: PrimitiveInt, S: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for StaticRingBase<S> {
-    
+impl<I: ?Sized + IntegerRing, S: PrimitiveInt> CanonicalIso<I> for StaticRingBase<S> {
+
     type Isomorphism = ();
 
-    fn has_canonical_iso(&self, _: &StaticRingBase<T>) -> Option<()> {
+    default fn has_canonical_iso(&self, _: &I) -> Option<()> {
         Some(())
     }
 
-    fn map_out(&self, _: &StaticRingBase<T>, el: S, _: &()) -> T {
-        T::try_from(el.into()).map_err(|_| ()).unwrap()
+    default fn map_out(&self, from: &I, el: S, _: &()) -> I::Element {
+        generic_impls::generic_map_in(self, from, &el)
     }
 }
 
+macro_rules! specialize_map_from_primitive_int {
+    ($($int:ty),*) => {
+        $(            
+            impl<S: PrimitiveInt> CanonicalHom<StaticRingBase<$int>> for StaticRingBase<S> {
+
+                fn has_canonical_hom(&self, _: &StaticRingBase<$int>) -> Option<()> {
+                    Some(())
+                }
+
+                fn map_in(&self, _: &StaticRingBase<$int>, el: $int, _: &()) -> S {
+                    S::try_from(<_ as Into<i128>>::into(el)).map_err(|_| ()).unwrap()
+                }
+            }
+                        
+            impl<S: PrimitiveInt> CanonicalIso<StaticRingBase<$int>> for StaticRingBase<S> {
+
+                fn has_canonical_iso(&self, _: &StaticRingBase<$int>) -> Option<()> {
+                    Some(())
+                }
+
+                fn map_out(&self, from: &StaticRingBase<$int>, el: S, _: &()) -> $int {
+                    from.map_in(self, el, &())
+                }
+            }
+
+        )*
+    };
+}
+
+specialize_map_from_primitive_int!{i8, i16, i32, i64, i128}
+
 impl<T: PrimitiveInt> CanonicalHom<DefaultBigIntRing> for StaticRingBase<T> {
-    
-    type Homomorphism = ();
 
     fn has_canonical_hom(&self, _: &DefaultBigIntRing) -> Option<()> {
         Some(())
@@ -68,8 +97,6 @@ impl<T: PrimitiveInt> CanonicalHom<DefaultBigIntRing> for StaticRingBase<T> {
 }
 
 impl<T: PrimitiveInt> CanonicalIso<DefaultBigIntRing> for StaticRingBase<T> {
-    
-    type Isomorphism = ();
 
     fn has_canonical_iso(&self, _: &DefaultBigIntRing) -> Option<()> {
         Some(())

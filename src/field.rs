@@ -15,12 +15,12 @@ pub trait Field: EuclideanRing {
     }
 }
 
-pub trait FieldWrapper: RingStore + EuclideanRingStore
+pub trait FieldStore: RingStore + EuclideanRingStore
     where Self::Type: Field
 {
     delegate!{ fn div(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
 }
 
-impl<R> FieldWrapper for R
+impl<R> FieldStore for R
     where R: RingStore, R::Type: Field
 {}

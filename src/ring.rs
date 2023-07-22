@@ -1,6 +1,8 @@
 use std::ops::Deref;
 
-use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore, IntegerRing}};
+use crate::primitive_int::StaticRing;
+use crate::integer::{IntegerRingStore, IntegerRing};
+use crate::algorithms;
 
 ///
 /// Basic trait for objects that have a ring structure.
@@ -95,6 +97,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore,
 /// ```
 /// And here is the example from the Readme, for the finite binary field F2
 /// ```
+/// use feanor_math::assert_el_eq;
 /// use feanor_math::ring::*;
 /// 
 /// #[derive(PartialEq)]
@@ -176,7 +179,7 @@ use crate::{algorithms, primitive_int::{StaticRing}, integer::{IntegerRingStore,
 /// 
 /// pub const F2: RingValue<F2Base> = RingValue::from(F2Base);
 /// 
-/// assert!(F2.eq_el(&F2.from_int(1), &F2.add(F2.one(), F2.zero())));
+/// assert_el_eq!(&F2, &F2.from_int(1), &F2.add(F2.one(), F2.zero()));
 /// ```
 /// 
 /// # A note on equality
@@ -232,6 +235,7 @@ pub trait RingBase: PartialEq {
     fn is_neg_one(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.neg_one()) }
     fn is_commutative(&self) -> bool;
     fn is_noetherian(&self) -> bool;
+    fn is_approximate(&self) -> bool { false }
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
 
     fn square(&self, value: &mut Self::Element) {
@@ -255,6 +259,10 @@ pub trait RingBase: PartialEq {
     fn mul_int(&self, mut lhs: Self::Element, rhs: i32) -> Self::Element {
         self.mul_assign_int(&mut lhs, rhs);
         return lhs;
+    }
+
+    fn mul_int_ref(&self, lhs: &Self::Element, rhs: i32) -> Self::Element {
+        self.mul_int(self.clone_el(lhs), rhs)
     }
 
     ///
@@ -355,8 +363,21 @@ pub trait RingBase: PartialEq {
             &integers
         )
     }
+
+    fn sum<I>(&self, els: I) -> Self::Element 
+        where I: Iterator<Item = Self::Element>
+    {
+        els.fold(self.zero(), |a, b| self.add(a, b))
+    }
+
+    fn prod<I>(&self, els: I) -> Self::Element 
+        where I: Iterator<Item = Self::Element>
+    {
+        els.fold(self.one(), |a, b| self.mul(a, b))
+    }
 }
 
+#[macro_export]
 macro_rules! delegate {
     (fn $name:ident (&self, $($pname:ident: $ptype:ty),*) -> $rtype:ty) => {
         fn $name (&self, $($pname: $ptype),*) -> $rtype {
@@ -368,6 +389,17 @@ macro_rules! delegate {
             self.get_ring().$name()
         }
     };
+}
+
+#[macro_export]
+macro_rules! assert_el_eq {
+    ($ring:expr, $lhs:expr, $rhs:expr) => {
+        match ($ring, $lhs, $rhs) {
+            (ring_val, lhs_val, rhs_val) => {
+                assert!(ring_val.eq_el(lhs_val, rhs_val), "Assertion failed: {} != {}", ring_val.format(lhs_val), ring_val.format(rhs_val));
+            }
+        }
+    }
 }
 
 pub struct CanHom<R, S>
@@ -459,6 +491,7 @@ impl<R, S> CanIso<R, S>
 /// # Example
 /// 
 /// ```
+/// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
 /// fn add_in_ring<R: RingStore>(ring: R, a: El<R>, b: El<R>) -> El<R> {
@@ -466,10 +499,11 @@ impl<R, S> CanIso<R, S>
 /// }
 /// 
 /// let ring: RingValue<StaticRingBase<i64>> = StaticRing::<i64>::RING;
-/// assert!(ring.eq_el(&7, &add_in_ring(ring, 3, 4)));
+/// assert_el_eq!(&ring, &7, &add_in_ring(ring, 3, 4));
 /// ```
 /// The next example is the one from the Readme
 /// ```
+/// use feanor_math::assert_el_eq;
 /// use feanor_math::ring::*;
 /// use feanor_math::primitive_int::*;
 /// use feanor_math::rings::zn::zn_barett::*;
@@ -607,11 +641,18 @@ pub trait RingStore {
     delegate!{ fn square(&self, value: &mut El<Self>) -> () }
     delegate!{ fn mul_assign_int(&self, lhs: &mut El<Self>, rhs: i32) -> () }
     delegate!{ fn mul_int(&self, lhs: El<Self>, rhs: i32) -> El<Self> }
+    delegate!{ fn mul_int_ref(&self, lhs: &El<Self>, rhs: i32) -> El<Self> }
     
     fn coerce<S>(&self, from: &S, el: El<S>) -> El<Self>
         where S: RingStore, Self::Type: CanonicalHom<S::Type> 
     {
         self.get_ring().map_in(from.get_ring(), el, &self.get_ring().has_canonical_hom(from.get_ring()).unwrap())
+    }
+
+    fn coerce_ref<S>(&self, from: &S, el: &El<S>) -> El<Self>
+        where S: RingStore, Self::Type: CanonicalHom<S::Type> 
+    {
+        self.get_ring().map_in_ref(from.get_ring(), el, &self.get_ring().has_canonical_hom(from.get_ring()).unwrap())
     }
 
     fn cast<S>(&self, to: &S, el: El<Self>) -> El<S>
@@ -653,16 +694,25 @@ pub trait RingStore {
     fn sum<I>(&self, els: I) -> El<Self> 
         where I: Iterator<Item = El<Self>>
     {
-        els.fold(self.zero(), |a, b| self.add(a, b))
+        self.get_ring().sum(els)
     }
 
     fn prod<I>(&self, els: I) -> El<Self> 
         where I: Iterator<Item = El<Self>>
     {
-        els.fold(self.one(), |a, b| self.mul(a, b))
+        self.get_ring().prod(els)
     }
 
-    fn pow(&self, x: El<Self>, power: usize) -> El<Self> {
+    fn pow(&self, mut x: El<Self>, power: usize) -> El<Self> {
+        // special cases to increase performance
+        if power == 0 {
+            return self.one();
+        } else if power == 1 {
+            return x;
+        } else if power == 2 {
+            self.square(&mut x);
+            return x;
+        }
         self.pow_gen(x, &(power as i64), StaticRing::<i64>::RING)
     }
 
@@ -688,13 +738,9 @@ pub trait RingExtensionStore: RingStore
         self.get_ring().base_ring()
     }
 
-    fn from(&self, x: El<<Self::Type as RingExtension>::BaseRing>) -> El<Self> {
-        self.get_ring().from(x)
-    }
-
-    fn from_ref(&self, x: &El<<Self::Type as RingExtension>::BaseRing>) -> El<Self> {
-        self.get_ring().from_ref(x)
-    }
+    delegate!{ fn from(&self, x: El<<Self::Type as RingExtension>::BaseRing>) -> El<Self> }
+    delegate!{ fn from_ref(&self, x: &El<<Self::Type as RingExtension>::BaseRing>) -> El<Self> }
+    delegate!{ fn mul_assign_base(&self, lhs: &mut El<Self>, rhs: &El<<Self::Type as RingExtension>::BaseRing>) -> () }
 }
 
 impl<R: RingStore> RingExtensionStore for R
@@ -717,6 +763,8 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// Trait for rings R that have a canonical homomorphism `S -> R`.
 /// A ring homomorphism is expected to be unital.
 /// 
+/// # Exact requirements
+/// 
 /// Which homomorphisms are considered canonical is up to implementors,
 /// as long as any diagram of canonical homomorphisms commutes. In
 /// other words, if there are rings `R, S` and "intermediate rings"
@@ -737,18 +785,18 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// 
 /// # Example
 /// 
-/// All integer rings support canonical homomorphisms between them.
+/// Most integer rings support canonical homomorphisms between them.
 /// ```
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::bigint::*;
-/// let r = StaticRing::<i64>::RING;
-/// let s = DefaultBigIntRing::RING;
+/// let R = StaticRing::<i64>::RING;
+/// let S = DefaultBigIntRing::RING;
 /// // on RingBase level
-/// let hom = r.get_ring().has_canonical_hom(s.get_ring()).unwrap();
-/// assert_eq!(8, r.get_ring().map_in(s.get_ring(), s.from_int(8), &hom));
+/// let hom = R.get_ring().has_canonical_hom(S.get_ring()).unwrap();
+/// assert_eq!(8, R.get_ring().map_in(S.get_ring(), S.from_int(8), &hom));
 /// // on RingStore level
-/// assert_eq!(8, r.coerce(&s, s.from_int(8)));
+/// assert_eq!(8, R.coerce(&S, S.from_int(8)));
 /// ```
 /// 
 /// # Limitations
@@ -765,6 +813,137 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// an implementation of `CanonicalHom<Self::BaseRing>`. Hence, if you as a user
 /// miss a certain implementation of `CanonicalHom`, check whether there maybe
 /// is a corresponding implementation of [`RingExtension`], or a member function.
+/// 
+/// # More examples
+/// 
+/// ## Integer rings
+/// 
+/// Basically, all given integer rings have canonical isomorphisms between each other.
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::integer::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::bigint::*;
+/// let Z_i8 = StaticRing::<i8>::RING;
+/// let Z_i32 = StaticRing::<i32>::RING;
+/// let Z_i128 = StaticRing::<i128>::RING;
+/// let Z_big = DefaultBigIntRing::RING;
+/// 
+/// assert!(Z_i8.can_iso(&Z_i8).is_some());
+/// assert!(Z_i8.can_iso(&Z_i32).is_some());
+/// assert!(Z_i8.can_iso(&Z_i128).is_some());
+/// assert!(Z_i8.can_iso(&Z_big).is_some());
+/// 
+/// assert!(Z_i32.can_iso(&Z_i8).is_some());
+/// assert!(Z_i32.can_iso(&Z_i32).is_some());
+/// assert!(Z_i32.can_iso(&Z_i128).is_some());
+/// assert!(Z_i32.can_iso(&Z_big).is_some());
+/// 
+/// assert!(Z_i128.can_iso(&Z_i8).is_some());
+/// assert!(Z_i128.can_iso(&Z_i32).is_some());
+/// assert!(Z_i128.can_iso(&Z_i128).is_some());
+/// assert!(Z_i128.can_iso(&Z_big).is_some());
+/// 
+/// assert!(Z_big.can_iso(&Z_i8).is_some());
+/// assert!(Z_big.can_iso(&Z_i32).is_some());
+/// assert!(Z_big.can_iso(&Z_i128).is_some());
+/// assert!(Z_big.can_iso(&Z_big).is_some());
+/// 
+/// // there are also some blanket implementations/trait bounds
+/// fn from_i32<I: IntegerRingStore>(to: &I) where I::Type: IntegerRing {
+///     to.can_hom(&StaticRing::<i32>::RING);
+/// }
+/// 
+/// fn to_i32<I: IntegerRingStore>(from: &I) where I::Type: IntegerRing {
+///     StaticRing::<i32>::RING.can_hom(from);
+/// }
+/// ```
+/// Notably, the only blanket implementations are currently
+/// 
+/// ## Integer quotient rings `Z/nZ`
+/// 
+/// Due to conflicting implementations, only the most useful conversions
+/// are implemented for `Z/nZ`.
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_42;
+/// # use feanor_math::rings::zn::zn_barett;
+/// # use feanor_math::rings::zn::zn_rns;
+/// 
+/// let ZZ = StaticRing::<i128>::RING;
+/// let ZZ_big = DefaultBigIntRing::RING;
+/// 
+/// let Zn_barett_i128 = zn_barett::Zn::new(ZZ, 17 * 257);
+/// let Zn_barett_big = zn_barett::Zn::new(ZZ_big, ZZ_big.from_int(17 * 257));
+/// let Zn_std = zn_42::Zn::new(17 * 257);
+/// let Zn_rns = zn_rns::Zn::from_primes(ZZ_big, vec![17, 257]);
+/// 
+/// assert!(Zn_barett_i128.can_iso(&Zn_barett_i128).is_some());
+/// assert!(Zn_barett_i128.can_iso(&Zn_barett_big).is_some());
+/// 
+/// assert!(Zn_barett_big.can_iso(&Zn_barett_i128).is_some());
+/// assert!(Zn_barett_big.can_iso(&Zn_barett_big).is_some());
+/// 
+/// assert!(Zn_std.can_iso(&Zn_barett_i128).is_some());
+/// assert!(Zn_std.can_iso(&Zn_std).is_some());
+/// 
+/// assert!(Zn_rns.can_iso(&Zn_barett_i128).is_some());
+/// assert!(Zn_rns.can_iso(&Zn_barett_big).is_some());
+/// assert!(Zn_rns.can_iso(&Zn_rns).is_some());
+/// ```
+/// Additionally, there are the projections `Z -> Z/nZ`.
+/// They are all implemented, even though [`crate::rings::zn::ZnRing`] currently
+/// only requires the projection from the "associated" integer ring.
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::rings::zn::*;
+/// 
+/// let ZZ = StaticRing::<i128>::RING;
+/// let ZZ_big = DefaultBigIntRing::RING;
+/// 
+/// let Zn_barett_i128 = zn_barett::Zn::new(ZZ, 17 * 257);
+/// let Zn_barett_big = zn_barett::Zn::new(ZZ_big, ZZ_big.from_int(17 * 257));
+/// let Zn_std = zn_42::Zn::new(17 * 257);
+/// let Zn_rns = zn_rns::Zn::from_primes(ZZ_big, vec![17, 257]);
+/// 
+/// assert!(Zn_barett_i128.can_hom(&ZZ).is_some());
+/// assert!(Zn_barett_i128.can_hom(&ZZ_big).is_some());
+/// 
+/// assert!(Zn_barett_big.can_hom(&ZZ).is_some());
+/// assert!(Zn_barett_big.can_hom(&ZZ_big).is_some());
+/// 
+/// assert!(Zn_std.can_hom(&ZZ).is_some());
+/// assert!(Zn_std.can_hom(&ZZ_big).is_some());
+/// 
+/// assert!(Zn_rns.can_hom(&ZZ).is_some());
+/// assert!(Zn_rns.can_hom(&ZZ_big).is_some());
+/// ```
+/// 
+/// ## Polynomial Rings
+/// 
+/// For the two provided univariate polynomial ring implementations, we have the isomorphisms
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::rings::poly::*;
+/// 
+/// let ZZ = StaticRing::<i128>::RING;
+/// let P_dense = dense_poly::DensePolyRing::new(ZZ, "X");
+/// let P_sparse = sparse_poly::SparsePolyRing::new(ZZ, "X");
+/// 
+/// assert!(P_dense.can_iso(&P_dense).is_some());
+/// assert!(P_dense.can_iso(&P_sparse).is_some());
+/// assert!(P_sparse.can_iso(&P_dense).is_some());
+/// assert!(P_sparse.can_iso(&P_sparse).is_some());
+/// ```
+/// Unfortunately, the inclusions `R -> R[X]` are not implemented as canonical homomorphisms,
+/// however provided by the functions of [`RingExtension`].
 /// 
 pub trait CanonicalHom<S>: RingBase
     where S: RingBase + ?Sized
@@ -790,6 +969,8 @@ pub trait CanonicalHom<S>: RingBase
 ///
 /// Trait for rings R that have a canonical isomorphism `S -> R`.
 /// A ring homomorphism is expected to be unital.
+/// 
+/// # Exact requirements
 /// 
 /// Same as for [`CanonicalHom`], it is up to implementors to decide which
 /// isomorphisms are canonical, as long as each diagram that contains
@@ -835,6 +1016,10 @@ pub trait RingExtension: RingBase {
     
     fn from_ref(&self, x: &El<Self::BaseRing>) -> Self::Element {
         self.from(self.base_ring().get_ring().clone_el(x))
+    }
+
+    fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {
+        self.mul_assign(lhs, self.from_ref(rhs));
     }
 }
 
@@ -1166,7 +1351,7 @@ fn test_internal_wrappings_dont_matter() {
     (&b2).coerce(&&&b3, 0);
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_canonical_hom_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
     where S::Type: CanonicalHom<R::Type>
 {
@@ -1175,19 +1360,19 @@ pub fn generic_test_canonical_hom_axioms<R: RingStore, S: RingStore, I: Iterator
 
     for a in &elements {
         for b in &elements {
-            assert!(to.eq_el(
+            assert_el_eq!(&to,
                 &to.add(to.get_ring().map_in_ref(from.get_ring(), a, &hom), to.get_ring().map_in_ref(from.get_ring(), b, &hom)),
                 &to.get_ring().map_in(from.get_ring(), from.add_ref(a, b), &hom)
-            ));
-            assert!(to.eq_el(
+            );
+            assert_el_eq!(&to,
                 &to.mul(to.get_ring().map_in_ref(from.get_ring(), a, &hom), to.get_ring().map_in_ref(from.get_ring(), b, &hom)),
                 &to.get_ring().map_in(from.get_ring(), from.mul_ref(a, b), &hom)
-            ));
+            );
         }
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_canonical_iso_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
     where S::Type: CanonicalIso<R::Type>
 {
@@ -1196,13 +1381,14 @@ pub fn generic_test_canonical_iso_axioms<R: RingStore, S: RingStore, I: Iterator
     let elements = edge_case_elements.collect::<Vec<_>>();
 
     for a in &elements {
-        assert!(
-            from.eq_el(a, &to.get_ring().map_out(from.get_ring(), to.get_ring().map_in_ref(from.get_ring(), a, &hom), &iso))
-        )
+        assert_el_eq!(&from,
+            a, 
+            &to.get_ring().map_out(from.get_ring(), to.get_ring().map_in_ref(from.get_ring(), a, &hom), &iso)
+        );
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_self_iso<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
     where R::Type: SelfIso
 {
@@ -1214,41 +1400,43 @@ pub fn generic_test_self_iso<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, e
     generic_test_canonical_iso_axioms(&ring, &ring, elements.iter().map(|x| ring.clone_el(x)));
 
     for a in &elements {
-        assert!(ring.eq_el(a, &ring.get_ring().map_in_ref(ring.get_ring(), a, &hom)));
-        assert!(ring.eq_el(a, &ring.get_ring().map_out(ring.get_ring(), ring.clone_el(a), &iso)));
+        assert_el_eq!(&ring, a, &ring.get_ring().map_in_ref(ring.get_ring(), a, &hom));
+        assert_el_eq!(&ring, a, &ring.get_ring().map_out(ring.get_ring(), ring.clone_el(a), &iso));
     }
 }
 
-#[cfg(test)]
-pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
+#[cfg(any(test, feature = "generic_tests"))]
+pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
+    where R::Type: SelfIso
+{
     let elements = edge_case_elements.collect::<Vec<_>>();
     let zero = ring.zero();
     let one = ring.one();
 
     // check self-subtraction
     for a in &elements {
-        assert!(ring.eq_el(&zero, &ring.sub(ring.clone_el(a), ring.clone_el(a))));
+        assert_el_eq!(&ring, &zero, &ring.sub(ring.clone_el(a), ring.clone_el(a)));
     }
 
     // check identity elements
     for a in &elements {
-        assert!(ring.eq_el(&a, &ring.add(ring.clone_el(a), ring.clone_el(&zero))));
-        assert!(ring.eq_el(&a, &ring.mul(ring.clone_el(a), ring.clone_el(&one))));
+        assert_el_eq!(&ring, &a, &ring.add(ring.clone_el(a), ring.clone_el(&zero)));
+        assert_el_eq!(&ring, &a, &ring.mul(ring.clone_el(a), ring.clone_el(&one)));
     }
 
     // check commutativity
     for a in &elements {
         for b in &elements {
-            assert!(ring.eq_el(
+            assert_el_eq!(&ring,
                 &ring.add(ring.clone_el(a), ring.clone_el(b)), 
                 &ring.add(ring.clone_el(b), ring.clone_el(a))
-            ));
+            );
                 
             if ring.is_commutative() {
-                assert!(ring.eq_el(
+                assert_el_eq!(&ring,
                     &ring.mul(ring.clone_el(a), ring.clone_el(b)), 
                     &ring.mul(ring.clone_el(b), ring.clone_el(a))
-                ));
+                );
             }
         }
     }
@@ -1257,14 +1445,14 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
     for a in &elements {
         for b in &elements {
             for c in &elements {
-                assert!(ring.eq_el(
+                assert_el_eq!(&ring,
                     &ring.add(ring.clone_el(a), ring.add(ring.clone_el(b), ring.clone_el(c))), 
                     &ring.add(ring.add(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c))
-                ));
-                assert!(ring.eq_el(
+                );
+                assert_el_eq!(&ring,
                     &ring.mul(ring.clone_el(a), ring.mul(ring.clone_el(b), ring.clone_el(c))), 
                     &ring.mul(ring.mul(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c))
-                ));
+                );
             }
         }
     }
@@ -1273,16 +1461,19 @@ pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R
     for a in &elements {
         for b in &elements {
             for c in &elements {
-                assert!(ring.eq_el(
+                assert_el_eq!(
+                    &ring,
                     &ring.mul(ring.clone_el(a), ring.add(ring.clone_el(b), ring.clone_el(c))), 
                     &ring.add(ring.mul(ring.clone_el(a), ring.clone_el(b)), ring.mul(ring.clone_el(a), ring.clone_el(c)))
-                ));
-                assert!(ring.eq_el(
+                );
+                assert_el_eq!(&ring,
                     &ring.mul(ring.add(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c)), 
                     &ring.add(ring.mul(ring.clone_el(a), ring.clone_el(c)), ring.mul(ring.clone_el(b), ring.clone_el(c)))
-                ));
+                );
             }
         }
     }
-}
 
+    generic_test_canonical_hom_axioms(&ring, &ring, elements.iter().map(|x| ring.clone_el(x)));
+    generic_test_canonical_iso_axioms(&ring, &ring, elements.into_iter());
+}
