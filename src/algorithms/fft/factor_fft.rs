@@ -56,6 +56,14 @@ impl<R, T1, T2, M> FFTTableGenCooleyTuckey<R, T1, T2, M>
             root_of_unity: root_of_unity
         }
     }
+
+    pub fn left_fft_table(&self) -> &T1 {
+        &self.left_table
+    }
+    
+    pub fn right_fft_table(&self) -> &T2 {
+        &self.right_table
+    }
 }
 
 impl<R, T1, T2, M> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2, M>
