@@ -178,14 +178,12 @@ impl<R, T1, T2, M> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2, M>
 
     fn unordered_fft_permutation(&self, i: usize) -> usize {
         assert!(i < self.len());
-        let ri = i % self.right_table.len();
-        let li = i / self.right_table.len();
-        return self.left_table.unordered_fft_permutation(li) + self.left_table.len() * self.right_table.unordered_fft_permutation(ri);
+        self.left_table.unordered_fft_permutation(i / self.right_table.len()) + self.left_table.len() * self.right_table.unordered_fft_permutation(i % self.right_table.len())
     }
 
     fn unordered_fft_permutation_inv(&self, i: usize) -> usize {
         assert!(i < self.len());
-        self.left_table.unordered_fft_permutation_inv(i % self.left_table.len()) + self.right_table.len() * self.right_table.unordered_fft_permutation_inv(i / self.left_table.len())
+        self.left_table.unordered_fft_permutation_inv(i % self.left_table.len()) * self.right_table.len() + self.right_table.unordered_fft_permutation_inv(i / self.left_table.len())
     }
 }
 
@@ -250,10 +248,10 @@ fn test_fft_long() {
 fn test_fft_unordered() {
     let ring = Zn::<1409>::RING;
     let z = algorithms::unity_root::get_prim_root_of_unity(ring, 64 * 11).unwrap();
-    let fft = FFTTableGenCooleyTuckey::new(ring.pow(z, 4),
+    let fft = FFTTableGenCooleyTuckey::new(
+        ring.pow(z, 4),
         cooley_tuckey::FFTTableCooleyTuckey::new(ring, ring.pow(z, 44), 4),
         bluestein::FFTTableBluestein::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5),
-        // bluestein::FFTTableBluestein::new(ring, ring.pow(z, 22), ring.pow(z, 11), 16, 6)
     );
     const LEN: usize = 16 * 11;
     let mut values = [0; LEN];
@@ -274,6 +272,22 @@ fn test_fft_unordered() {
 
     fft.inv_fft(&mut ordered_fft, ring, &AllocatingMemoryProvider);
     assert_eq!(ordered_fft, original);
+}
+
+
+#[test]
+fn test_unordered_fft_permutation_inv() {
+    let ring = Zn::<1409>::RING;
+    let z = algorithms::unity_root::get_prim_root_of_unity(ring, 64 * 11).unwrap();
+    let fft = FFTTableGenCooleyTuckey::new(
+        ring.pow(z, 4),
+        cooley_tuckey::FFTTableCooleyTuckey::new(ring, ring.pow(z, 44), 4),
+        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5),
+    );
+    for i in 0..(16 * 11) {
+        assert_eq!(fft.unordered_fft_permutation_inv(fft.unordered_fft_permutation(i)), i);
+        assert_eq!(fft.unordered_fft_permutation(fft.unordered_fft_permutation_inv(i)), i);
+    }
 }
 
 #[test]
