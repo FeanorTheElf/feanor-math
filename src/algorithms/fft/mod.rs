@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use crate::{ring::*, vector::*, mempool::*};
 
 pub mod cooley_tuckey;
@@ -76,4 +78,62 @@ pub trait FFTTable {
             S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
             V: VectorViewMut<El<S>>,
             M: MemoryProvider<El<S>>;
+}
+
+impl<T> FFTTable for T
+    where T: Deref, T::Target: FFTTable
+{
+    type Ring = <T::Target as FFTTable>::Ring;
+    
+    fn len(&self) -> usize {
+        self.deref().len()
+    }
+
+    fn ring(&self) -> &Self::Ring {
+        self.deref().ring()
+    }
+
+    fn root_of_unity(&self) -> &El<Self::Ring> {
+        self.deref().root_of_unity()
+    }
+
+    fn unordered_fft_permutation(&self, i: usize) -> usize {
+        self.deref().unordered_fft_permutation(i)
+    }
+
+    fn fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
+        where S: RingStore, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
+            V: SwappableVectorViewMut<El<S>>,
+            M: MemoryProvider<El<S>>
+    {
+        self.deref().fft(values, ring, memory_provider)
+    }
+        
+    fn inv_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
+        where S: RingStore, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
+            V: SwappableVectorViewMut<El<S>>,
+            M: MemoryProvider<El<S>>
+    {
+        self.deref().inv_fft(values, ring, memory_provider)
+    }
+
+    fn unordered_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
+        where S: RingStore, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
+            V: VectorViewMut<El<S>>,
+            M: MemoryProvider<El<S>>
+    {
+        self.deref().unordered_fft(values, ring, memory_provider)
+    }
+        
+    fn unordered_inv_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
+        where S: RingStore, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
+            V: VectorViewMut<El<S>>,
+            M: MemoryProvider<El<S>>
+    {
+        self.deref().unordered_inv_fft(values, ring, memory_provider)
+    }
 }
