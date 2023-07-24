@@ -8,10 +8,12 @@ pub mod subvector;
 
 use std::marker::PhantomData;
 
+use crate::ring::{RingStore, RingBase};
+
 use self::chain::Chain;
 use self::map::{Map, MapMut};
 use self::stride::Stride;
-use self::vec_fn::VectorViewFn;
+use self::vec_fn::{VectorViewFn, RingElVectorViewFn};
 
 ///
 /// A trait for objects that provides read access to a 1-dimensional
@@ -52,6 +54,14 @@ pub trait VectorView<T> {
             T: Clone
     {
         VectorViewFn::new(self)
+    }
+
+    fn as_el_fn<R>(self, ring: R) -> RingElVectorViewFn<R, Self, T>
+        where Self: Sized,
+            R: RingStore,
+            R::Type: RingBase<Element = T>
+    {
+        RingElVectorViewFn::new(self, ring)
     }
 
     fn iter<'a>(&'a self) -> VectorViewIter<'a, Self, T> {

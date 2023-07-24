@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use crate::ring::{RingStore, RingBase};
+
 use super::{VectorView, map::MapFn, subvector::{SelfSubvectorView, SelfSubvectorFn}};
 
 ///
@@ -117,3 +119,63 @@ impl<'a, T, V: ?Sized> VectorFn<T> for &'a mut V
         V::at(*self, i)
     }
 }
+
+pub struct RingElVectorViewFn<R, V, T>
+    where R: RingStore,
+        R::Type: RingBase<Element = T>,
+        V: VectorView<T>
+{
+    ring: R,
+    base: V,
+    element: PhantomData<T>
+}
+
+impl<R, V, T> RingElVectorViewFn<R, V, T>
+    where R: RingStore,
+        R::Type: RingBase<Element = T>,
+        V: VectorView<T>
+{
+    pub fn new(base: V, ring: R) -> Self {
+        RingElVectorViewFn { ring: ring, base: base, element: PhantomData }
+    }
+}
+
+impl<R, V, T> SelfSubvectorFn<T> for RingElVectorViewFn<R, V, T>
+    where R: RingStore,
+        R::Type: RingBase<Element = T>,
+        V: SelfSubvectorView<T>
+{
+    fn subvector<S: std::ops::RangeBounds<usize>>(self, range: S) -> Self {
+        RingElVectorViewFn { ring: self.ring, base: self.base.subvector(range), element: PhantomData }
+    }
+}
+
+impl<R, V, T> VectorFn<T> for RingElVectorViewFn<R, V, T>
+    where R: RingStore,
+        R::Type: RingBase<Element = T>,
+        V: VectorView<T>
+{
+    fn at(&self, i: usize) -> T {
+        self.ring.clone_el(self.base.at(i))
+    }
+
+    fn len(&self) -> usize {
+        self.base.len()
+    }
+}
+
+impl<R, V, T> Clone for RingElVectorViewFn<R, V, T>
+    where R: Clone + RingStore,
+        R::Type: RingBase<Element = T>,
+        V: Clone + VectorView<T>
+{
+    fn clone(&self) -> Self {
+        Self::new(self.base.clone(), self.ring.clone())
+    }
+}
+
+impl<R, V, T> Copy for RingElVectorViewFn<R, V, T>
+    where R: Copy + RingStore,
+        R::Type: RingBase<Element = T>,
+        V: Copy + VectorView<T>
+{}
