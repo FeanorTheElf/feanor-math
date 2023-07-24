@@ -24,7 +24,7 @@ pub struct FFTTableCooleyTuckey<R, M: MemoryProvider<El<R>> = AllocatingMemoryPr
 }
 
 pub fn bitreverse(index: usize, bits: usize) -> usize {
-    index.reverse_bits() >> (usize::BITS as usize - bits)
+    index.reverse_bits().checked_shr(usize::BITS - bits as u32).unwrap_or(0)
 }
 
 impl<R> FFTTableCooleyTuckey<R>
@@ -425,4 +425,6 @@ fn test_size_1_fft() {
     assert_eq!(&work, &values);
     fft.unordered_inv_fft(&mut work, fft.ring(), &AllocatingMemoryProvider);
     assert_eq!(&work, &values);
+    assert_eq!(0, fft.unordered_fft_permutation(0));
+    assert_eq!(0, fft.unordered_fft_permutation_inv(0));
 }
