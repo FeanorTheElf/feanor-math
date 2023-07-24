@@ -57,7 +57,6 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
         // cannot call new_with_mem_and_pows() because of borrowing conflict
         assert!(ring.is_commutative());
         assert!(!ring.get_ring().is_approximate());
-        assert!(log2_n > 0);
         assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &root_of_unity_pow(1), log2_n));
         let root_of_unity_list = Self::create_root_of_unity_list(&ring, &mut root_of_unity_pow, log2_n, memory_provider);
         let inv_root_of_unity_list = Self::create_root_of_unity_list(&ring, |i| root_of_unity_pow(-i), log2_n, memory_provider);
@@ -414,4 +413,16 @@ fn test_approximate_fft() {
             assert!(CC.is_absolute_approx_eq(array[i], CC.zero(), err));
         }
     }
+}
+
+#[test]
+fn test_size_1_fft() {
+    let ring = Zn::<17>::RING;
+    let fft = FFTTableCooleyTuckey::for_zn(&ring, 0).unwrap();
+    let values: [u64; 1] = [3];
+    let mut work = values;
+    fft.unordered_fft(&mut work, fft.ring(), &AllocatingMemoryProvider);
+    assert_eq!(&work, &values);
+    fft.unordered_inv_fft(&mut work, fft.ring(), &AllocatingMemoryProvider);
+    assert_eq!(&work, &values);
 }
