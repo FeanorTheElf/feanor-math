@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ops::Range};
 
 use crate::ring::{RingStore, RingBase};
 
@@ -39,7 +39,7 @@ pub trait VectorFn<T> {
     }
 
     fn to_vec(&self) -> Vec<T> {
-        (0..self.len()).map(|i| self.at(i)).collect()
+        Iterator::map(0..self.len(), |i| self.at(i)).collect()
     }
 }
 
@@ -179,3 +179,15 @@ impl<R, V, T> Copy for RingElVectorViewFn<R, V, T>
         R::Type: RingBase<Element = T>,
         V: Copy + VectorView<T>
 {}
+
+impl VectorFn<usize> for Range<usize> {
+
+    fn len(&self) -> usize {
+        self.end - self.start
+    }
+
+    fn at(&self, i: usize) -> usize {
+        assert!(i >= self.start && i < self.end);
+        return i;
+    }
+}
