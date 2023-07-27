@@ -1,7 +1,7 @@
 #![allow(soft_unstable)]
 #![allow(non_snake_case)]
 #![feature(test)]
-#![feature(min_specialization)]
+#![feature(specialization)]
 #![feature(generic_const_exprs)]
 #![feature(allocator_api)]
 #![feature(new_uninit)] 
