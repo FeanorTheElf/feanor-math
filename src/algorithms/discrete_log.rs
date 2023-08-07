@@ -1,6 +1,10 @@
+use crate::field::Field;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::algorithms;
+use crate::rings::finite::FiniteRing;
+use crate::rings::finite::FiniteRingStore;
+use crate::wrapper::RingElementWrapper;
 
 use std::hash::Hash;
 use std::collections::HashMap;
@@ -92,8 +96,18 @@ pub fn discrete_log<T, F>(value: T, base: &T, order: i64, op: F, identity: T) ->
     return Some(current_log);
 }
 
+pub fn finite_field_log<R: FiniteRingStore>(value: El<R>, base: El<R>, Fq: R) -> Option<i64>
+    where R::Type: FiniteRing + Field + HashableElRing
+{
+    discrete_log(RingElementWrapper::new(&Fq, value), &RingElementWrapper::new(&Fq, base), Fq.size(&StaticRing::<i64>::RING) - 1, |a, b| a * b, RingElementWrapper::new(&Fq, Fq.one()))
+}
+
 #[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
+#[cfg(test)]
+use crate::rings::zn::zn_42;
+#[cfg(test)]
+use crate::rings::zn::ZnRingStore;
 
 #[test]
 fn test_baby_giant_step() {
@@ -117,4 +131,10 @@ fn test_discrete_log() {
         Some(78), 
         discrete_log(78, &1, 132, |a, b| Zn::<132>::RING.add(a, b), 0)
     );
+}
+
+#[test]
+fn test_finite_field_log() {
+    let Fp = zn_42::Zn::new(1009).as_field().ok().unwrap();
+    assert_eq!(Some(486), finite_field_log(Fp.pow(Fp.from_int(11), 486), Fp.from_int(11), &Fp));
 }

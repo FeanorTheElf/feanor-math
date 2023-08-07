@@ -186,6 +186,14 @@ impl<R: DivisibilityRingStore> EuclideanRing for AsFieldBase<R>
     }
 }
 
+impl<R: DivisibilityRingStore> HashableElRing for AsFieldBase<R> 
+    where R::Type: DivisibilityRing + HashableElRing
+{
+    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
+        self.base_ring().hash(&el.0, h)
+    }
+}
+
 impl<R: DivisibilityRingStore> Field for AsFieldBase<R>
     where R::Type: DivisibilityRing
 {

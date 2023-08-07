@@ -1,4 +1,4 @@
-use std::{ops::*, hash::Hash, fmt::Display};
+use std::{ops::*, hash::Hash, fmt::{Display, Debug}};
 
 use crate::ring::*;
 
@@ -7,6 +7,13 @@ pub struct RingElementWrapper<R>
 {
     ring: R,
     element: El<R>
+}
+
+impl<R: RingStore> RingElementWrapper<R> {
+
+    pub const fn new(ring: R, element: El<R>) -> Self {
+        Self { ring, element }
+    }
 }
 
 macro_rules! impl_xassign_trait {
@@ -77,6 +84,13 @@ impl<R: RingStore + HashableElRingStore> Hash for RingElementWrapper<R>
 }
 
 impl<R: RingStore> Display for RingElementWrapper<R> {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.ring.get_ring().dbg(&self.element, f)
+    }
+}
+
+impl<R: RingStore> Debug for RingElementWrapper<R> {
 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.ring.get_ring().dbg(&self.element, f)

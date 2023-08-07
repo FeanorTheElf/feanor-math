@@ -363,6 +363,13 @@ impl ZnRing for ZnBase {
     }
 }
 
+impl HashableElRing for ZnBase {
+
+    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
+        self.integer_ring().hash(&self.smallest_positive_lift(*el), h)
+    }
+}
+
 ///
 /// Wraps [`ZnBase`] to represent an instance of the ring `Z/nZ`.
 /// As opposed to [`ZnBase`], elements are stored with additional information
