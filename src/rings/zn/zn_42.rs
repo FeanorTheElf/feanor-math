@@ -323,21 +323,35 @@ impl<'a> Iterator for ZnBaseElementsIter<'a> {
     }
 }
 
-impl ZnRing for ZnBase {
+impl FiniteRing for ZnBase {
 
-    type IntegerRingBase = StaticRingBase<i64>;
-    type Integers = StaticRing<i64>;
     type ElementsIter<'a> = ZnBaseElementsIter<'a>;
-
-    fn integer_ring(&self) -> &Self::Integers {
-        &StaticRing::<i64>::RING
-    }
 
     fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
         ZnBaseElementsIter {
             ring: self,
             current: 0
         }
+    }
+
+    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> Self::Element {
+        generic_impls::generic_random_element(self, rng)
+    }
+
+    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> El<I>
+        where I::Type: IntegerRing
+    {
+        int_cast(*self.modulus(), ZZ, self.integer_ring())
+    }
+}
+
+impl ZnRing for ZnBase {
+
+    type IntegerRingBase = StaticRingBase<i64>;
+    type Integers = StaticRing<i64>;
+
+    fn integer_ring(&self) -> &Self::Integers {
+        &StaticRing::<i64>::RING
     }
 
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {

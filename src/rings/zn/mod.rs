@@ -1,26 +1,26 @@
-use crate::{divisibility::DivisibilityRing, ring::*, algorithms};
+use crate::ring::*;
+use crate::divisibility::DivisibilityRing;
+use crate::algorithms;
 use crate::integer::*;
 use crate::ordered::*;
 use super::field::AsFieldBase;
+use super::finite::FiniteRing;
 
 pub mod zn_barett;
 pub mod zn_42;
 pub mod zn_static;
 pub mod zn_rns;
 
-pub trait ZnRing: DivisibilityRing + CanonicalHom<Self::IntegerRingBase> + SelfIso {
+pub trait ZnRing: DivisibilityRing + FiniteRing + CanonicalHom<Self::IntegerRingBase> + SelfIso {
 
     // there seems to be a problem with associated type bounds, hence we cannot use `Integers: IntegerRingStore`
     // or `Integers: RingStore<Type: IntegerRing>`
     type IntegerRingBase: IntegerRing + ?Sized;
     type Integers: RingStore<Type = Self::IntegerRingBase>;
-    type ElementsIter<'a>: Iterator<Item = Self::Element>
-        where Self: 'a;
 
     fn integer_ring(&self) -> &Self::Integers;
     fn modulus(&self) -> &El<Self::Integers>;
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers>;
-    fn elements<'a>(&'a self) -> Self::ElementsIter<'a>;
 
     fn smallest_lift(&self, el: Self::Element) -> El<Self::Integers> {
         let result = self.smallest_positive_lift(el);
@@ -35,14 +35,6 @@ pub trait ZnRing: DivisibilityRing + CanonicalHom<Self::IntegerRingBase> + SelfI
 
     fn is_field(&self) -> bool {
         algorithms::miller_rabin::is_prime_base(RingRef::new(self), 10)
-    }
-
-    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> Self::Element {
-        self.map_in(
-            self.integer_ring().get_ring(), 
-            self.integer_ring().get_uniformly_random(self.modulus(), rng), 
-            &self.has_canonical_hom(self.integer_ring().get_ring()).unwrap()
-        )
     }
 }
 
@@ -161,6 +153,14 @@ pub mod generic_impls {
             reduced
         }
     }
+
+    pub fn generic_random_element<R: ZnRing, G: FnMut() -> u64>(ring: &R, rng: G) -> R::Element {
+        ring.map_in(
+            ring.integer_ring().get_ring(), 
+            ring.integer_ring().get_uniformly_random(ring.modulus(), rng), 
+            &ring.has_canonical_hom(ring.integer_ring().get_ring()).unwrap()
+        )
+    }
 }
 
 pub trait ZnRingStore: RingStore
@@ -172,7 +172,7 @@ pub trait ZnRingStore: RingStore
     delegate!{ fn smallest_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::Integers> }
     delegate!{ fn is_field(&self) -> bool }
 
-    fn elements<'a>(&'a self) -> <Self::Type as ZnRing>::ElementsIter<'a> {
+    fn elements<'a>(&'a self) -> <Self::Type as FiniteRing>::ElementsIter<'a> {
         self.get_ring().elements()
     }
 

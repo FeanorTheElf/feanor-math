@@ -1,4 +1,5 @@
 use crate::euclidean::{EuclideanRingStore, EuclideanRing};
+use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::ordered::{OrderedRingStore, OrderedRing};
 use crate::ring::*;
 
@@ -142,6 +143,25 @@ pub fn lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
 {
     ring.euclidean_div(ring.mul_ref(&fst, &snd), &gcd(fst, snd, &ring))
 }
+
+///
+/// Computes x such that `x = a mod p` and `x = b mod q`. Requires that p and q are coprime.
+/// 
+pub fn crt<I>(a: El<I>, b: El<I>, p: &El<I>, q: &El<I>, ZZ: I) -> El<I>
+    where I: IntegerRingStore, I::Type: IntegerRing
+{
+    let (s, t, d) = signed_eea(ZZ.clone_el(p), ZZ.clone_el(q), &ZZ);
+    assert!(ZZ.is_one(&d) || ZZ.is_neg_one(&d));
+    let mut result = ZZ.add(ZZ.prod([a, t, ZZ.clone_el(q)].into_iter()), ZZ.prod([b, s, ZZ.clone_el(p)].into_iter()));
+
+    let n = ZZ.mul_ref(p, q);
+    result = ZZ.euclidean_rem(result, &n);
+    if ZZ.is_neg(&result) {
+        ZZ.add_assign(&mut result, n);
+    }
+    return result;
+}
+
 
 #[cfg(test)]
 use crate::primitive_int::*;

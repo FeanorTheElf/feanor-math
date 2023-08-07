@@ -461,7 +461,7 @@ pub struct ZnBaseElementsIterator<'a, C: ZnRingStore, J: IntegerRingStore, M: Me
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
     ring: &'a ZnBase<C, J, M>,
-    part_iters: Option<Vec<std::iter::Peekable<<C::Type as ZnRing>::ElementsIter<'a>>>>
+    part_iters: Option<Vec<std::iter::Peekable<<C::Type as FiniteRing>::ElementsIter<'a>>>>
 }
 
 impl<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Iterator for ZnBaseElementsIterator<'a, C, J, M>
@@ -498,6 +498,32 @@ impl<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Iterator
     }
 }
 
+impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FiniteRing for ZnBase<C, J, M> 
+    where C::Type: ZnRing + CanonicalHom<J::Type>,
+        J::Type: IntegerRing + SelfIso,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+{
+    type ElementsIter<'a> = ZnBaseElementsIterator<'a, C, J, M>
+        where Self: 'a;
+
+    fn elements<'a>(&'a self) -> ZnBaseElementsIterator<'a, C, J, M> {
+        ZnBaseElementsIterator {
+            ring: self,
+            part_iters: Some(Vec::new())
+        }
+    }
+
+    fn random_element<G: FnMut() -> u64>(&self, mut rng: G) -> ZnEl<C, M> {
+        ZnEl(self.memory_provider.get_new_init(self.len(), |i| self.at(i).random_element(&mut rng)))
+    }
+
+    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> El<I>
+        where I::Type: IntegerRing
+    {
+        int_cast(self.integer_ring().clone_el(self.modulus()), ZZ, self.integer_ring())
+    }
+}
+
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnRing for ZnBase<C, J, M> 
     where C::Type: ZnRing + CanonicalHom<J::Type>,
         J::Type: IntegerRing + SelfIso,
@@ -505,8 +531,6 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnRing for Z
 {
     type IntegerRingBase = J::Type;
     type Integers = J;
-    type ElementsIter<'a> = ZnBaseElementsIterator<'a, C, J, M>
-        where Self: 'a;
 
     fn integer_ring(&self) -> &Self::Integers {
         self.ZZ()
@@ -527,19 +551,8 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnRing for Z
         )
     }
 
-    fn elements<'a>(&'a self) -> ZnBaseElementsIterator<'a, C, J, M> {
-        ZnBaseElementsIterator {
-            ring: self,
-            part_iters: Some(Vec::new())
-        }
-    }
-
     fn is_field(&self) -> bool {
         self.components.len() == 1
-    }
-
-    fn random_element<G: FnMut() -> u64>(&self, mut rng: G) -> ZnEl<C, M> {
-        ZnEl(self.memory_provider.get_new_init(self.len(), |i| self.at(i).random_element(&mut rng)))
     }
 }
 

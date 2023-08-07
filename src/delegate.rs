@@ -1,4 +1,4 @@
-use crate::{ring::*, divisibility::DivisibilityRing, rings::zn::ZnRing, integer::{IntegerRingStore, IntegerRing}};
+use crate::{ring::*, divisibility::DivisibilityRing, rings::{zn::ZnRing, finite::FiniteRing}, integer::{IntegerRingStore, IntegerRing}};
 
 ///
 /// Trait to simplify implementing newtype-pattern for rings.
@@ -219,14 +219,14 @@ impl<R: DelegateRing + ?Sized> DivisibilityRing for R
 }
 
 pub struct DelegateZnRingElementsIter<'a, R: ?Sized>
-    where R: DelegateRing, R::Base: ZnRing
+    where R: DelegateRing, R::Base: FiniteRing
 {
     ring: &'a R,
-    base: <R::Base as ZnRing>::ElementsIter<'a>
+    base: <R::Base as FiniteRing>::ElementsIter<'a>
 }
 
 impl<'a, R: ?Sized> Iterator for DelegateZnRingElementsIter<'a, R>
-    where R: DelegateRing, R::Base: ZnRing
+    where R: DelegateRing, R::Base: FiniteRing
 {
     type Item = <R as RingBase>::Element;
 
@@ -235,17 +235,11 @@ impl<'a, R: ?Sized> Iterator for DelegateZnRingElementsIter<'a, R>
     }
 }
 
-impl<R: DelegateRing + ?Sized> ZnRing for R
-    where R::Base: ZnRing, R: CanonicalHom<<R::Base as ZnRing>::IntegerRingBase> + SelfIso
+impl<R: DelegateRing + ?Sized + SelfIso> FiniteRing for R
+    where R::Base: FiniteRing
 {
-    type IntegerRingBase = <R::Base as ZnRing>::IntegerRingBase;
-    type Integers = <R::Base as ZnRing>::Integers;
     type ElementsIter<'a> = DelegateZnRingElementsIter<'a, R>
         where R: 'a;
-
-    fn integer_ring(&self) -> &Self::Integers {
-        self.get_delegate().integer_ring()
-    }
 
     fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
         DelegateZnRingElementsIter {
@@ -253,13 +247,30 @@ impl<R: DelegateRing + ?Sized> ZnRing for R
             base: self.get_delegate().elements()
         }
     }
+    
+    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <R as RingBase>::Element {
+        self.element_cast(self.rev_delegate(self.get_delegate().random_element(rng)))
+    }
+
+    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> El<I>
+        where I::Type: IntegerRing
+    {
+        self.get_delegate().size(ZZ)
+    }
+}
+
+impl<R: DelegateRing + ?Sized> ZnRing for R
+    where R::Base: ZnRing, R: CanonicalHom<<R::Base as ZnRing>::IntegerRingBase> + SelfIso
+{
+    type IntegerRingBase = <R::Base as ZnRing>::IntegerRingBase;
+    type Integers = <R::Base as ZnRing>::Integers;
+    fn integer_ring(&self) -> &Self::Integers {
+        self.get_delegate().integer_ring()
+    }
+
 
     fn modulus(&self) -> &El<Self::Integers> {
         self.get_delegate().modulus()
-    }
-
-    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <R as RingBase>::Element {
-        self.element_cast(self.rev_delegate(self.get_delegate().random_element(rng)))
     }
 
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {

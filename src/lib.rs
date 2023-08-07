@@ -27,3 +27,4 @@ pub mod primitive_int;
 pub mod integer;
 pub mod algorithms;
 pub mod rings;
+pub mod wrapper;

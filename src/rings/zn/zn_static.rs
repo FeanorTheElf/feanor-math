@@ -149,13 +149,31 @@ impl<const N: u64> Iterator for ZnBaseElementsIter<N> {
     }
 }
 
+impl<const N: u64, const IS_FIELD: bool> FiniteRing for ZnBase<N, IS_FIELD> 
+    where Expr<{N as i64 as usize}>: Exists
+{
+    type ElementsIter<'a> = ZnBaseElementsIter<N>;
+
+    fn elements<'a>(&'a self) -> ZnBaseElementsIter<N> {
+        ZnBaseElementsIter { current: 0 }
+    }
+
+    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> Self::Element {
+        generic_impls::generic_random_element(self, rng)
+    }
+
+    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> El<I>
+        where I::Type: IntegerRing
+    {
+        int_cast(*self.modulus(), ZZ, self.integer_ring())
+    }
+}
 
 impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD> 
     where Expr<{N as i64 as usize}>: Exists
 {
     type IntegerRingBase = StaticRingBase<i64>;
     type Integers = RingValue<StaticRingBase<i64>>;
-    type ElementsIter<'a> = ZnBaseElementsIter<N>;
 
     fn integer_ring(&self) -> &Self::Integers {
         &StaticRing::<i64>::RING
@@ -167,10 +185,6 @@ impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD>
 
     fn modulus(&self) -> &El<Self::Integers> {
         &(N as i64)
-    }
-    
-    fn elements<'a>(&'a self) -> ZnBaseElementsIter<N> {
-        ZnBaseElementsIter { current: 0 }
     }
 }
 
