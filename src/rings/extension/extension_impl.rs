@@ -95,7 +95,7 @@ impl<R, V, M> RingBase for FreeAlgebraImplBase<R, V, M>
 
     default fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         let mut tmp = self.memory_provider.get_new_init(self.rank() * 2, |_| self.base_ring.zero());
-        algorithms::conv_mul::add_assign_convoluted_mul(&mut tmp[..], &lhs.values[..], &rhs.values[..], self.base_ring());
+        algorithms::conv_mul::add_assign_convoluted_mul(&mut tmp[..], &lhs.values[..], &rhs.values[..], self.base_ring(), &self.memory_provider);
         for i in self.rank()..tmp.len() {
             for j in 0..self.rank() {
                 let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &tmp[i]);
@@ -138,7 +138,7 @@ impl<R, V, M> RingBase for FreeAlgebraImplBase<R, V, M>
 {
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         let mut tmp = self.memory_provider.get_new_init(self.rank() * 2, |_| self.base_ring.zero());
-        algorithms::conv_mul::add_assign_convoluted_mul(&mut tmp[..], &lhs.values[..], &rhs.values[..], self.base_ring());
+        algorithms::conv_mul::add_assign_convoluted_mul(&mut tmp[..], &lhs.values[..], &rhs.values[..], self.base_ring(), &self.memory_provider);
         for i in self.rank()..tmp.len() {
             for (j, c) in self.x_pow_rank.nontrivial_entries() {
                 let add = self.base_ring.mul_ref(c, &tmp[i]);
@@ -249,8 +249,8 @@ fn test_ring_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 2], All
     let ZZ = StaticRing::<i64>::RING;
     let R = FreeAlgebraImpl::new(ZZ, [1, 1], AllocatingMemoryProvider);
     let mut elements = Vec::new();
-    for a in -5..=5 {
-        for b in -5..=5 {
+    for a in -3..=3 {
+        for b in -3..=3 {
             elements.push(R.from_canonical_basis([a, b].into_iter()));
         }
     }

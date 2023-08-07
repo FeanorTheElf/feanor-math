@@ -43,6 +43,13 @@ pub trait VectorFn<T> {
     }
 }
 
+pub trait IntoVectorFn<T> {
+
+    type Target: VectorFn<T>;
+
+    fn into_fn(self) -> Self::Target;
+}
+
 pub struct VectorViewFn<V, T>
     where T: Clone,
         V: VectorView<T>
@@ -180,14 +187,35 @@ impl<R, V, T> Copy for RingElVectorViewFn<R, V, T>
         V: Copy + VectorView<T>
 {}
 
-impl VectorFn<usize> for Range<usize> {
+pub struct RangeFn(Range<usize>);
+
+impl IntoVectorFn<usize> for Range<usize> {
+
+    type Target = RangeFn;
+
+    fn into_fn(self) -> Self::Target {
+        RangeFn(self)
+    }
+}
+
+impl VectorFn<usize> for RangeFn {
 
     fn len(&self) -> usize {
-        self.end - self.start
+        self.0.end - self.0.start
     }
 
     fn at(&self, i: usize) -> usize {
-        assert!(i >= self.start && i < self.end);
+        assert!(i >= self.0.start && i < self.0.end);
         return i;
+    }
+}
+
+impl<T, V> IntoVectorFn<T> for V
+    where T: Clone, V: VectorView<T>
+{
+    type Target = VectorViewFn<V, T>;
+
+    fn into_fn(self) -> Self::Target {
+        VectorViewFn::new(self)
     }
 }

@@ -13,7 +13,7 @@ use crate::ring::{RingStore, RingBase};
 use self::chain::Chain;
 use self::map::{Map, MapMut};
 use self::stride::Stride;
-use self::vec_fn::{VectorViewFn, RingElVectorViewFn};
+use self::vec_fn::RingElVectorViewFn;
 
 ///
 /// A trait for objects that provides read access to a 1-dimensional
@@ -47,13 +47,6 @@ pub trait VectorView<T> {
         where Self: Sized, V: VectorView<T>
     {
         Chain::new(self, rhs)
-    }
-
-    fn as_fn(self) -> VectorViewFn<Self, T>
-        where Self: Sized, 
-            T: Clone
-    {
-        VectorViewFn::new(self)
     }
 
     fn as_el_fn<R>(self, ring: R) -> RingElVectorViewFn<R, Self, T>

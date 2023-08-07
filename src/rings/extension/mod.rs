@@ -70,7 +70,7 @@ pub fn generic_test_free_algebra_axioms<R: FreeAlgebraStore>(ring: R)
     let xn = ring.sum(Iterator::map(0..n, |i| ring.mul(ring.from(xn_vec.at(i)), ring.pow(ring.clone_el(&x), i))));
     assert_el_eq!(&ring, &xn_original, &xn);
 
-    let x_n_1_vec_expected = VectorFn::map(0..n, |i| if i > 0 {
+    let x_n_1_vec_expected = (0..n).into_fn().map(|i| if i > 0 {
         ring.base_ring().add(ring.base_ring().mul(xn_vec.at(n - 1), xn_vec.at(i)), xn_vec.at(i - 1))
     } else {
         ring.base_ring().mul(xn_vec.at(n - 1), xn_vec.at(0))

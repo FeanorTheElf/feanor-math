@@ -1,3 +1,4 @@
+use crate::mempool::MemoryProvider;
 use crate::ring::*;
 use crate::vector::*;
 use crate::vector::subvector::*;
@@ -126,8 +127,8 @@ karatsuba_impl!{
     (16, karatsuba_impl_16, karatsuba_impl_15)
 }
 
-pub fn karatsuba<R, V1, V2>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: V1, rhs: V2, ring: R) 
-    where R: RingStore + Copy, V1: SelfSubvectorView<El<R>> + Copy, V2: SelfSubvectorView<El<R>> + Copy
+pub fn karatsuba<R, V1, V2, M>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: V1, rhs: V2, ring: R, memory_provider: &M) 
+    where R: RingStore + Copy, V1: SelfSubvectorView<El<R>> + Copy, V2: SelfSubvectorView<El<R>> + Copy, M: MemoryProvider<El<R>>
 {
     if lhs.len() == 0 || rhs.len() == 0 {
         return;
@@ -139,8 +140,7 @@ pub fn karatsuba<R, V1, V2>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: 
     assert!(rhs.len() >= n);
     assert!(lhs.len() < 2 * n || rhs.len() < 2 * n);
 
-    let mut memory = Vec::new();
-    memory.resize_with(karatsuba_mem_size(block_size_log2, threshold_size_log2), || ring.zero());
+    let mut memory = memory_provider.get_new_init(karatsuba_mem_size(block_size_log2, threshold_size_log2), |_| ring.zero());
     for i in (0..=(lhs.len() - n)).step_by(n) {
         for j in (0..=(rhs.len() - n)).step_by(n) {
             dispatch_karatsuba_impl::<R, _, _, true>(
@@ -204,6 +204,8 @@ fn karatsuba_mem_size(block_size_log2: usize, threshold_size_log2: usize) -> usi
 
 #[cfg(test)]
 use crate::primitive_int::*;
+#[cfg(test)]
+use crate::mempool::AllocatingMemoryProvider;
 
 #[test]
 fn test_karatsuba_impl() {
@@ -218,12 +220,12 @@ fn test_karatsuba_impl() {
 #[test]
 fn test_karatsuba_mul() {
     let mut c = vec![0, 0, 0, 0];
-    karatsuba(0, &mut c[..], &[-1, 0][..], &[1, 0][..], StaticRing::<i64>::RING);
+    karatsuba(0, &mut c[..], &[-1, 0][..], &[1, 0][..], StaticRing::<i64>::RING, &AllocatingMemoryProvider);
     assert_eq!(vec![-1, 0, 0, 0], c);
 
     let a = vec![1, 0, 1, 0, 1, 2, 3];
     let b = vec![3, 4];
     let mut c = vec![0, 0, 0, 0, 0, 0, 0, 0, 0];
-    karatsuba(0, &mut c[..], &a[..], &b[..], StaticRing::<i64>::RING);
+    karatsuba(0, &mut c[..], &a[..], &b[..], StaticRing::<i64>::RING, &AllocatingMemoryProvider);
     assert_eq!(vec![3, 4, 3, 4, 3, 10, 17, 12, 0], c);
 }

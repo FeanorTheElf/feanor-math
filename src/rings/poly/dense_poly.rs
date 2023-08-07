@@ -155,7 +155,8 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
             &mut result[..], 
             &lhs[0..lhs_len], 
             &rhs[0..rhs_len], 
-            &self.base_ring
+            &self.base_ring,
+            &self.memory_provider
         );
         return result;
     }

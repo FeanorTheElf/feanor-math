@@ -1,4 +1,5 @@
 use crate::ring::*;
+use crate::mempool::*;
 use super::karatsuba::*;
 
 pub trait KaratsubaHint: RingBase {
@@ -13,9 +14,9 @@ impl<R: RingBase + ?Sized> KaratsubaHint for R {
     }
 }
 
-pub fn add_assign_convoluted_mul<R: RingStore + Copy>(dst: &mut [El<R>], lhs: &[El<R>], rhs: &[El<R>], ring: R) {
+pub fn add_assign_convoluted_mul<R: RingStore + Copy, M: MemoryProvider<El<R>>>(dst: &mut [El<R>], lhs: &[El<R>], rhs: &[El<R>], ring: R, memory_provider: &M) {
     // checks are done by karatsuba()
-    karatsuba(ring.get_ring().karatsuba_threshold(), dst, lhs, rhs, ring);
+    karatsuba(ring.get_ring().karatsuba_threshold(), dst, lhs, rhs, ring, memory_provider);
 }
 
 #[cfg(test)]
@@ -31,7 +32,7 @@ fn bench_naive_mul(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         c.clear();
         c.resize(64, 0);
-        karatsuba(10, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING);
+        karatsuba(10, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &AllocatingMemoryProvider);
         assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
         assert_eq!(c[62], 31 * 31);
     });
@@ -45,7 +46,7 @@ fn bench_karatsuba_mul(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         c.clear();
         c.resize(64, 0);
-        karatsuba(4, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING);
+        karatsuba(4, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &AllocatingMemoryProvider);
         assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
         assert_eq!(c[62], 31 * 31);
     });
