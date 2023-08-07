@@ -1,6 +1,8 @@
 use crate::ring::*;
 use crate::vector::vec_fn::*;
 
+use super::poly::{PolyRingStore, PolyRing};
+
 pub mod extension_impl;
 
 ///
@@ -57,6 +59,21 @@ pub trait FreeAlgebraStore: RingStore
 impl<R: RingStore> FreeAlgebraStore for R
     where R::Type: FreeAlgebra
 {}
+
+pub fn poly_repr<P: PolyRingStore, R: FreeAlgebraStore>(from: R, to: P, el: &El<R>) -> El<P>
+    where P::Type: PolyRing, 
+        R::Type: FreeAlgebra,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: CanonicalHom<<<R::Type as RingExtension>::BaseRing as RingStore>::Type>
+{
+    let hom = to.base_ring().can_hom(from.base_ring()).unwrap();
+    let coeff_vec = from.wrt_canonical_basis(el);
+    to.from_terms(
+        (0..from.rank()).map(|i| coeff_vec.at(i)).enumerate()
+            .filter(|(_, x)| !from.base_ring().is_zero(x))
+            .map(|(j, x)| (hom.map(x), j))
+    )
+
+}
 
 #[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_free_algebra_axioms<R: FreeAlgebraStore>(ring: R)
