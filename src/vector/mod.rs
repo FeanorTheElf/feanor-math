@@ -340,3 +340,15 @@ impl<'a, V: ?Sized, T> ExactSizeIterator for VectorViewIter<'a, V, T>
         self.end - self.begin
     }
 }
+
+impl<'a, V: ?Sized, T> Clone for VectorViewIter<'a, V, T>
+    where V: 'a + VectorView<T>, T: 'a
+{
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'a, V: ?Sized, T> Copy for VectorViewIter<'a, V, T>
+    where V: 'a + VectorView<T>, T: 'a
+{}
