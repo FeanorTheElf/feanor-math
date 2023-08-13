@@ -11,6 +11,9 @@ pub trait ErrorEstimate {
     ///
     /// This is only true if the table is created with the [`Complex64`]-specific creator functions.
     /// Note that this is a worst-case estimate and likely to significantly overestimate the error.
+    /// 
+    /// This estimates the error from [`super::FFTTable::unordered_fft()`]. The error during the inverse
+    /// FFT is the same, but will be scaled by `1/n`.
     ///
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64;
 }
