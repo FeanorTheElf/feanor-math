@@ -172,14 +172,6 @@ pub trait ZnRingStore: RingStore
     delegate!{ fn smallest_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::Integers> }
     delegate!{ fn is_field(&self) -> bool }
 
-    fn elements<'a>(&'a self) -> <Self::Type as FiniteRing>::ElementsIter<'a> {
-        self.get_ring().elements()
-    }
-
-    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> El<Self> {
-        self.get_ring().random_element(rng)
-    }
-    
     fn as_field(self) -> Result<RingValue<AsFieldBase<Self>>, Self> 
         where Self: Sized
     {
