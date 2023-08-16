@@ -96,3 +96,11 @@ impl<R: RingStore> Debug for RingElementWrapper<R> {
         self.ring.get_ring().dbg(&self.element, f)
     }
 }
+
+impl<R: RingStore> Deref for RingElementWrapper<R> {
+    type Target = El<R>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.element
+    }
+}
