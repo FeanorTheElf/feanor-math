@@ -210,6 +210,9 @@ use crate::rings::zn::zn_barett::Zn;
 use crate::primitive_int::*;
 #[cfg(test)]
 use crate::rings::zn::*;
+#[cfg(test)]
+use crate::rings::finite::FiniteRingStore;
+
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {

@@ -460,6 +460,8 @@ impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalIso<AsField
 use crate::rings::bigint::*;
 #[cfg(test)]
 use crate::divisibility::generic_test_divisibility_axioms;
+#[cfg(test)]
+use crate::rings::finite::FiniteRingStore;
 
 #[test]
 fn test_mul() {

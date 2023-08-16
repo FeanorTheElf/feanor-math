@@ -5,6 +5,7 @@ use crate::integer::*;
 use crate::ordered::*;
 use super::field::AsFieldBase;
 use super::finite::FiniteRing;
+use crate::rings::finite::FiniteRingStore;
 
 pub mod zn_barett;
 pub mod zn_42;
@@ -163,7 +164,7 @@ pub mod generic_impls {
     }
 }
 
-pub trait ZnRingStore: RingStore
+pub trait ZnRingStore: FiniteRingStore
     where Self::Type: ZnRing
 {    
     delegate!{ fn integer_ring(&self) -> &<Self::Type as ZnRing>::Integers }

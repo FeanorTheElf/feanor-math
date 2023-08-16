@@ -9,6 +9,7 @@ use crate::ring::*;
 use crate::rings::bigint::DefaultBigIntRing;
 use crate::rings::poly::{PolyRingStore, PolyRing};
 use crate::rings::zn::{ZnRingStore, ZnRing};
+use crate::rings::finite::FiniteRingStore;
 
 use oorandom;
 

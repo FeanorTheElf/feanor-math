@@ -3,8 +3,8 @@ use crate::ring::*;
 use crate::integer::*;
 use crate::rings::zn;
 use crate::rings::zn::ZnRing;
-use crate::rings::zn::ZnRingStore;
 use crate::primitive_int::*;
+use crate::rings::zn::ZnRingStore;
 
 use oorandom;
 

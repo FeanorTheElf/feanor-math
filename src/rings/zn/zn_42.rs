@@ -598,6 +598,8 @@ impl<R: ZnRingStore<Type = ZnBase>> CanonicalIso<AsFieldBase<R>> for ZnBase {
 
 #[cfg(test)]
 use crate::divisibility::generic_test_divisibility_axioms;
+#[cfg(test)]
+use crate::rings::finite::FiniteRingStore;
 
 #[cfg(test)]
 const EDGE_CASE_ELEMENTS: [i32; 10] = [0, 1, 3, 7, 9, 62, 8, 10, 11, 12];

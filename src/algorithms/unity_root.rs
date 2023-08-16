@@ -1,4 +1,8 @@
-use crate::{ring::*, primitive_int::{StaticRing, StaticRingBase}, rings::zn::{ZnRingStore, ZnRing}, divisibility::DivisibilityRingStore, integer::IntegerRingStore};
+use crate::ring::*;
+use crate::primitive_int::{StaticRing, StaticRingBase};
+use crate::rings::zn::{ZnRing, ZnRingStore};
+use crate::divisibility::DivisibilityRingStore;
+use crate::integer::IntegerRingStore;
 
 use super::int_factor::factor;
 

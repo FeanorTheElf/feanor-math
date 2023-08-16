@@ -4,7 +4,7 @@ use crate::primitive_int::StaticRing;
 use crate::primitive_int::StaticRingBase;
 use crate::ring::*;
 use crate::integer::*;
-use crate::rings::zn::ZnRingStore;
+use crate::rings::finite::FiniteRingStore;
 use crate::rings::zn::zn_barett::Zn;
 
 #[allow(type_alias_bounds)]

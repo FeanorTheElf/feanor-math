@@ -508,6 +508,7 @@ impl<R, S> CanIso<R, S>
 /// use feanor_math::primitive_int::*;
 /// use feanor_math::rings::zn::zn_barett::*;
 /// use feanor_math::rings::zn::*;
+/// use feanor_math::rings::finite::*;
 /// use feanor_math::algorithms;
 ///
 /// use oorandom;
@@ -543,6 +544,7 @@ impl<R, S> CanIso<R, S>
 /// use feanor_math::rings::bigint::*;
 /// use feanor_math::rings::zn::zn_barett::*;
 /// use feanor_math::rings::zn::*;
+/// use feanor_math::rings::finite::*;
 /// use feanor_math::algorithms;
 /// 
 /// use oorandom;
