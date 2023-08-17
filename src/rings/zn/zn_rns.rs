@@ -21,10 +21,10 @@ use crate::primitive_int::*;
 /// # use feanor_math::vector::*;
 /// 
 /// let R = Zn::from_primes(StaticRing::<i64>::RING, vec![17, 19]);
-/// let x = R.get_ring().from_congruence([R.get_ring().at(0).from_int(1), R.get_ring().at(1).from_int(16)]);
+/// let x = R.get_ring().from_congruence([R.get_ring().at(0).from_int(1), R.get_ring().at(1).from_int(16)].into_iter());
 /// assert_eq!(35, R.smallest_lift(R.clone_el(&x)));
 /// let y = R.mul_ref(&x, &x);
-/// let z = R.get_ring().from_congruence([R.get_ring().at(0).from_int(1 * 1), R.get_ring().at(1).from_int(16 * 16)]);
+/// let z = R.get_ring().from_congruence([R.get_ring().at(0).from_int(1 * 1), R.get_ring().at(1).from_int(16 * 16)].into_iter());
 /// assert!(R.eq_el(&z, &y));
 /// ```
 /// 
@@ -136,9 +136,11 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnBase<C, J,
         self.total_ring.integer_ring()
     }
 
-    pub fn from_congruence<V: VectorView<El<C>>>(&self, el: V) -> ZnEl<C, M> {
+    pub fn from_congruence<I>(&self, mut el: I) -> ZnEl<C, M>
+        where I: ExactSizeIterator<Item = El<C>>
+    {
         assert_eq!(self.components.len(), el.len());
-        ZnEl(self.memory_provider.get_new_init(self.len(), |i| self.at(i).clone_el(el.at(i))))
+        ZnEl(self.memory_provider.get_new_init(self.len(), |_| el.next().unwrap()))
     }
 
     pub fn get_congruence<'a>(&self, el: &'a ZnEl<C, M>) -> impl 'a + VectorView<El<C>> {
