@@ -31,7 +31,7 @@ pub trait VectorView<T: ?Sized> {
     fn len(&self) -> usize;
     fn at(&self, i: usize) -> &T;
 
-    fn map<U, F: Fn(&T) -> &U>(self, f: F) -> Map<Self, F, T>
+    fn map<U: ?Sized, F: Fn(&T) -> &U>(self, f: F) -> Map<Self, F, T>
         where Self: Sized
     {
         Map::new(self, f)
