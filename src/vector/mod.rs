@@ -26,7 +26,7 @@ use self::vec_fn::RingElVectorViewFn;
 /// can be used.
 /// Furthermore, for mutable access, use [crate::vector::VectorViewMut].
 /// 
-pub trait VectorView<T> {
+pub trait VectorView<T: ?Sized> {
 
     fn len(&self) -> usize;
     fn at(&self, i: usize) -> &T;
@@ -52,7 +52,8 @@ pub trait VectorView<T> {
     fn as_el_fn<R>(self, ring: R) -> RingElVectorViewFn<R, Self, T>
         where Self: Sized,
             R: RingStore,
-            R::Type: RingBase<Element = T>
+            R::Type: RingBase<Element = T>,
+            T: Sized
     {
         RingElVectorViewFn::new(self, ring)
     }
@@ -77,7 +78,7 @@ pub trait VectorView<T> {
 /// mutably at once (e.g. sparse implementations). 
 /// This is of course different in the immutable case. 
 /// 
-pub trait VectorViewMut<T>: VectorView<T> {
+pub trait VectorViewMut<T: ?Sized>: VectorView<T> {
 
     fn at_mut(&mut self, i: usize) -> &mut T;
 
@@ -93,7 +94,7 @@ pub trait SwappableVectorViewMut<T>: VectorViewMut<T> {
     fn swap(&mut self, i: usize, j: usize);
 }
 
-pub trait VectorViewSparse<T>: VectorView<T> {
+pub trait VectorViewSparse<T: ?Sized>: VectorView<T> {
 
     type Iter<'a>: Iterator<Item = (usize, &'a T)>
         where Self: 'a, T: 'a;
@@ -255,7 +256,7 @@ impl<T, const N: usize> SwappableVectorViewMut<T> for [T; N] {
     }
 }
 
-impl<'a, T, V: ?Sized> VectorView<T> for &'a V 
+impl<'a, T: ?Sized, V: ?Sized> VectorView<T> for &'a V 
     where V: VectorView<T>
 {
     fn len(&self) -> usize {
@@ -267,7 +268,7 @@ impl<'a, T, V: ?Sized> VectorView<T> for &'a V
     }
 }
 
-impl<'a, T, V: ?Sized> VectorView<T> for &'a mut V 
+impl<'a, T: ?Sized, V: ?Sized> VectorView<T> for &'a mut V 
     where V: VectorView<T>
 {
     fn len(&self) -> usize {
@@ -279,7 +280,7 @@ impl<'a, T, V: ?Sized> VectorView<T> for &'a mut V
     }
 }
 
-impl<'a, T, V: ?Sized> VectorViewMut<T> for &'a mut V 
+impl<'a, T: ?Sized, V: ?Sized> VectorViewMut<T> for &'a mut V 
     where V: VectorViewMut<T>
 {
     fn at_mut(&mut self, i: usize) -> &mut T {
@@ -295,7 +296,7 @@ impl<'a, T, V: ?Sized> SwappableVectorViewMut<T> for &'a mut V
     }
 }
 
-pub struct VectorViewIter<'a, V: ?Sized, T>
+pub struct VectorViewIter<'a, V: ?Sized, T: ?Sized>
     where V: 'a + VectorView<T>, T: 'a
 {
     begin: usize,
@@ -304,7 +305,7 @@ pub struct VectorViewIter<'a, V: ?Sized, T>
     item: PhantomData<T>
 }
 
-impl<'a, V: ?Sized, T> Iterator for VectorViewIter<'a, V, T>
+impl<'a, V: ?Sized, T: ?Sized> Iterator for VectorViewIter<'a, V, T>
     where V: 'a + VectorView<T>, T: 'a
 {
     type Item = &'a T;
@@ -320,7 +321,7 @@ impl<'a, V: ?Sized, T> Iterator for VectorViewIter<'a, V, T>
     }
 }
 
-impl<'a, V: ?Sized, T> DoubleEndedIterator for VectorViewIter<'a, V, T>
+impl<'a, V: ?Sized, T: ?Sized> DoubleEndedIterator for VectorViewIter<'a, V, T>
     where V: 'a + VectorView<T>, T: 'a
 {
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -333,7 +334,7 @@ impl<'a, V: ?Sized, T> DoubleEndedIterator for VectorViewIter<'a, V, T>
     }
 }
 
-impl<'a, V: ?Sized, T> ExactSizeIterator for VectorViewIter<'a, V, T>
+impl<'a, V: ?Sized, T: ?Sized> ExactSizeIterator for VectorViewIter<'a, V, T>
     where V: 'a + VectorView<T>, T: 'a
 {
     fn len(&self) -> usize {
@@ -341,7 +342,7 @@ impl<'a, V: ?Sized, T> ExactSizeIterator for VectorViewIter<'a, V, T>
     }
 }
 
-impl<'a, V: ?Sized, T> Clone for VectorViewIter<'a, V, T>
+impl<'a, V: ?Sized, T: ?Sized> Clone for VectorViewIter<'a, V, T>
     where V: 'a + VectorView<T>, T: 'a
 {
     fn clone(&self) -> Self {
@@ -349,6 +350,6 @@ impl<'a, V: ?Sized, T> Clone for VectorViewIter<'a, V, T>
     }
 }
 
-impl<'a, V: ?Sized, T> Copy for VectorViewIter<'a, V, T>
+impl<'a, V: ?Sized, T: ?Sized> Copy for VectorViewIter<'a, V, T>
     where V: 'a + VectorView<T>, T: 'a
 {}

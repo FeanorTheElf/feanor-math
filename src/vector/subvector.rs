@@ -78,7 +78,7 @@ use std::marker::PhantomData;
 /// slices do the job. However, it might be solved with a `BorrowableMut`-trait in
 /// the future.
 /// 
-pub trait SelfSubvectorView<T>: VectorView<T> {
+pub trait SelfSubvectorView<T: ?Sized>: VectorView<T> {
 
     fn subvector<R: RangeBounds<usize>>(self, range: R) -> Self;
 }
@@ -100,7 +100,7 @@ impl<'a, T> SelfSubvectorView<T> for &'a mut [T] {
 ///
 /// A view on a part of another vector view.
 /// 
-pub struct Subvector<T, V> 
+pub struct Subvector<T: ?Sized, V> 
     where V: VectorView<T>
 {
     from: usize,
@@ -109,7 +109,7 @@ pub struct Subvector<T, V>
     element: PhantomData<T>
 }
 
-impl<T, V> Subvector<T, V>
+impl<T: ?Sized, V> Subvector<T, V>
     where V: VectorView<T>
 {
     pub fn new(base: V) -> Self {
@@ -122,7 +122,7 @@ impl<T, V> Subvector<T, V>
     }
 }
 
-impl<T, V> VectorView<T> for Subvector<T, V>
+impl<T: ?Sized, V> VectorView<T> for Subvector<T, V>
     where V: VectorView<T>
 {
     fn len(&self) -> usize {
@@ -135,7 +135,7 @@ impl<T, V> VectorView<T> for Subvector<T, V>
     }
 }
 
-impl<T, V> VectorViewMut<T> for Subvector<T, V>
+impl<T: ?Sized, V> VectorViewMut<T> for Subvector<T, V>
     where V: VectorViewMut<T>
 {
     fn at_mut(&mut self, i: usize) -> &mut T {
@@ -154,7 +154,7 @@ impl<T, V> SwappableVectorViewMut<T> for Subvector<T, V>
     }
 }
 
-impl<T, V> SelfSubvectorView<T> for Subvector<T, V>
+impl<T: ?Sized, V> SelfSubvectorView<T> for Subvector<T, V>
     where V: VectorView<T>
 {
     fn subvector<R: RangeBounds<usize>>(mut self, range: R) -> Self {
@@ -177,11 +177,11 @@ impl<T, V> SelfSubvectorView<T> for Subvector<T, V>
     }
 }
 
-impl<T, V> Copy for Subvector<T, V>
+impl<T: ?Sized, V> Copy for Subvector<T, V>
     where V: VectorView<T> + Copy
 {}
 
-impl<T, V> Clone for Subvector<T, V>
+impl<T: ?Sized, V> Clone for Subvector<T, V>
     where V: VectorView<T> + Clone
 {
     fn clone(&self) -> Self {

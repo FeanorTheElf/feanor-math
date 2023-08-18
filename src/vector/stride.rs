@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::vector::*;
 
-pub struct Stride<T, V> 
+pub struct Stride<T: ?Sized, V> 
     where V: VectorView<T>
 {
     base_view: V,
@@ -10,7 +10,7 @@ pub struct Stride<T, V>
     stride: usize
 }
 
-impl<T, V> Stride<T, V> 
+impl<T: ?Sized, V> Stride<T, V> 
     where V: VectorView<T>
 {
     pub const fn new(base_view: V, stride: usize) -> Self {
@@ -22,7 +22,7 @@ impl<T, V> Stride<T, V>
     }
 }
 
-impl<T, V> Clone for Stride<T, V> 
+impl<T: ?Sized, V> Clone for Stride<T, V> 
     where V: VectorView<T> + Clone
 {
     fn clone(&self) -> Self {
@@ -30,11 +30,11 @@ impl<T, V> Clone for Stride<T, V>
     }
 }
 
-impl<T, V> Copy for Stride<T, V> 
+impl<T: ?Sized, V> Copy for Stride<T, V> 
     where V: VectorView<T> + Copy
 {}
 
-impl<T, V> VectorView<T> for Stride<T, V> 
+impl<T: ?Sized, V> VectorView<T> for Stride<T, V> 
     where V: VectorView<T>
 {
     fn at(&self, i: usize) -> &T {
@@ -50,7 +50,7 @@ impl<T, V> VectorView<T> for Stride<T, V>
     }
 }
 
-impl<T, V> VectorViewMut<T> for Stride<T, V> 
+impl<T: ?Sized, V> VectorViewMut<T> for Stride<T, V> 
     where V: VectorViewMut<T>
 {
     fn at_mut(&mut self, i: usize) -> &mut T {

@@ -3,7 +3,7 @@ use std::{marker::PhantomData, cmp::{min, max}};
 use super::*;
 use crate::vector::subvector::*;
 
-pub struct Chain<V1, V2, T>
+pub struct Chain<V1, V2, T: ?Sized>
     where V1: VectorView<T>, V2: VectorView<T>
 {
     el: PhantomData<T>,
@@ -11,7 +11,7 @@ pub struct Chain<V1, V2, T>
     second: V2
 }
 
-impl<V1, V2, T> Chain<V1, V2, T>
+impl<V1, V2, T: ?Sized> Chain<V1, V2, T>
     where V1: VectorView<T>, V2: VectorView<T>
 {
     pub fn new(first: V1, second: V2) -> Self {
@@ -23,7 +23,7 @@ impl<V1, V2, T> Chain<V1, V2, T>
     }
 }
 
-impl<V1, V2, T> VectorView<T> for Chain<V1, V2, T>
+impl<V1, V2, T: ?Sized> VectorView<T> for Chain<V1, V2, T>
     where V1: VectorView<T>, V2: VectorView<T>
 {
     fn len(&self) -> usize {
@@ -39,7 +39,7 @@ impl<V1, V2, T> VectorView<T> for Chain<V1, V2, T>
     }
 }
 
-impl<V1, V2, T> VectorViewMut<T> for Chain<V1, V2, T>
+impl<V1, V2, T: ?Sized> VectorViewMut<T> for Chain<V1, V2, T>
     where V1: VectorViewMut<T>, V2: VectorViewMut<T>
 {
     fn at_mut(&mut self, i: usize) -> &mut T {
@@ -65,7 +65,7 @@ impl<V1, V2, T> SwappableVectorViewMut<T> for Chain<V1, V2, T>
     }
 }
 
-impl<V1, V2, T> SelfSubvectorView<T> for Chain<V1, V2, T>
+impl<V1, V2, T: ?Sized> SelfSubvectorView<T> for Chain<V1, V2, T>
     where V1: SelfSubvectorView<T>, V2: SelfSubvectorView<T>
 {
     fn subvector<R: std::ops::RangeBounds<usize>>(self, range: R) -> Self {

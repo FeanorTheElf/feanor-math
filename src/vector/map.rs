@@ -4,7 +4,7 @@ use crate::vector::*;
 
 use super::{vec_fn::VectorFn, subvector::{SelfSubvectorFn, SelfSubvectorView}};
 
-pub struct Map<V, F, T> 
+pub struct Map<V, F, T: ?Sized> 
     where V: VectorView<T>
 {
     base_view: V,
@@ -12,7 +12,7 @@ pub struct Map<V, F, T>
     base_element: PhantomData<T>
 }
 
-impl<V, F, T, U> Map<V, F, T>
+impl<V, F, T: ?Sized, U: ?Sized> Map<V, F, T>
     where V: VectorView<T>, F: Fn(&T) -> &U
 {
     pub const fn new(base_view: V, accessor: F) -> Self {
@@ -24,7 +24,7 @@ impl<V, F, T, U> Map<V, F, T>
     }
 }
 
-impl<V, F, T, U> Clone for Map<V, F, T>
+impl<V, F, T: ?Sized, U: ?Sized> Clone for Map<V, F, T>
     where V: VectorView<T> + Clone, F: Clone + Fn(&T) -> &U
 {
     fn clone(&self) -> Self {
@@ -32,11 +32,11 @@ impl<V, F, T, U> Clone for Map<V, F, T>
     }
 }
 
-impl<V, F, T, U> Copy for Map<V, F, T>
+impl<V, F, T: ?Sized, U: ?Sized> Copy for Map<V, F, T>
     where V: VectorView<T> + Copy, F: Copy + Fn(&T) -> &U
 {}
 
-impl<V, F, T, U> VectorView<U> for Map<V, F, T>
+impl<V, F, T: ?Sized, U: ?Sized> VectorView<U> for Map<V, F, T>
     where V: VectorView<T>, F: Fn(&T) -> &U
 {
     fn at(&self, i: usize) -> &U {
@@ -48,7 +48,7 @@ impl<V, F, T, U> VectorView<U> for Map<V, F, T>
     }
 }
 
-impl<V, F, T, U> SelfSubvectorView<U> for Map<V, F, T>
+impl<V, F, T: ?Sized, U: ?Sized> SelfSubvectorView<U> for Map<V, F, T>
     where V: SelfSubvectorView<T>, F: Fn(&T) -> &U
 {
     fn subvector<R: std::ops::RangeBounds<usize>>(self, range: R) -> Self {
@@ -56,7 +56,7 @@ impl<V, F, T, U> SelfSubvectorView<U> for Map<V, F, T>
     }
 }
 
-pub struct MapMut<V, F, G, T> 
+pub struct MapMut<V, F, G, T: ?Sized> 
     where V: VectorView<T>
 {
     base_view: V,
@@ -65,7 +65,7 @@ pub struct MapMut<V, F, G, T>
     base_element: PhantomData<T>
 }
 
-impl<V, F, G, T, U> MapMut<V, F, G, T>
+impl<V, F, G, T: ?Sized, U: ?Sized> MapMut<V, F, G, T>
     where V: VectorView<T>, F: Fn(&T) -> &U, G: Fn(&mut T) -> &mut U
 {
     pub const fn new(base_view: V, accessor: F, accessor_mut: G) -> Self {
@@ -78,7 +78,7 @@ impl<V, F, G, T, U> MapMut<V, F, G, T>
     }
 }
 
-impl<V, F, G, T, U> VectorView<U> for MapMut<V, F, G, T>
+impl<V, F, G, T: ?Sized, U: ?Sized> VectorView<U> for MapMut<V, F, G, T>
     where V: VectorView<T>, F: Fn(&T) -> &U, G: Fn(&mut T) -> &mut U
 {
     fn at(&self, i: usize) -> &U {
@@ -90,7 +90,7 @@ impl<V, F, G, T, U> VectorView<U> for MapMut<V, F, G, T>
     }
 }
 
-impl<V, F, G, T, U> VectorViewMut<U> for MapMut<V, F, G, T>
+impl<V, F, G, T: ?Sized, U: ?Sized> VectorViewMut<U> for MapMut<V, F, G, T>
     where V: VectorViewMut<T>, F: Fn(&T) -> &U, G: Fn(&mut T) -> &mut U
 {
     fn at_mut(&mut self, i: usize) -> &mut U {
@@ -106,7 +106,7 @@ impl<V, F, G, T, U> SwappableVectorViewMut<U> for MapMut<V, F, G, T>
     }
 }
 
-impl<V, F, G, T, U> Clone for MapMut<V, F, G, T>
+impl<V, F, G, T: ?Sized, U: ?Sized> Clone for MapMut<V, F, G, T>
     where V: VectorViewMut<T> + Clone, F: Clone + Fn(&T) -> &U, G: Clone + Fn(&mut T) -> &mut U
 {
     fn clone(&self) -> Self {
@@ -114,7 +114,7 @@ impl<V, F, G, T, U> Clone for MapMut<V, F, G, T>
     }
 }
 
-impl<V, F, G, T, U> Copy for MapMut<V, F, G, T>
+impl<V, F, G, T: ?Sized, U: ?Sized> Copy for MapMut<V, F, G, T>
     where V: VectorViewMut<T> + Copy, F: Copy + Fn(&T) -> &U, G: Copy + Fn(&mut T) -> &mut U
 {}
 
