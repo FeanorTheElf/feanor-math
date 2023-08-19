@@ -3,6 +3,7 @@
 #![feature(test)]
 #![feature(specialization)]
 #![feature(generic_const_exprs)]
+#![feature(maybe_uninit_slice)]
 #![feature(allocator_api)]
 #![feature(new_uninit)] 
 #![feature(core_intrinsics)]
