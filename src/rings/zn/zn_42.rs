@@ -503,7 +503,7 @@ impl CanonicalHom<ZnFastmulBase> for ZnBase {
     }
 
     fn mul_assign_map_in_ref(&self, _: &ZnFastmulBase, ZnEl(lhs): &mut Self::Element, ZnFastmulEl(ZnEl(rhs), rhs_inv_mod): &<ZnFastmulBase as RingBase>::Element, _: &Self::Homomorphism) {
-        let quotient = ((*lhs as u128 * *rhs_inv_mod) >> BITSHIFT) as u64;
+        let quotient: u64 = ((*lhs as u128 * *rhs_inv_mod) >> BITSHIFT) as u64;
         let result = (*lhs as u128 * *rhs as u128 - quotient as u128 * self.modulus as u128) as u64;
         *lhs = result;
         debug_assert!(*lhs < 2 * self.modulus);
