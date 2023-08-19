@@ -1,6 +1,8 @@
-use std::{mem::MaybeUninit, rc::Rc, collections::{HashMap, hash_map::Entry, HashSet}, ops::{Deref, DerefMut}, cell::{RefCell, Ref}, sync::{Mutex, atomic::AtomicBool}, hash::Hash};
+use std::{mem::MaybeUninit, rc::Rc, collections::{HashMap, hash_map::Entry, HashSet}, ops::{Deref, DerefMut, Index, IndexMut}, cell::{RefCell, Ref}, sync::{Mutex, atomic::AtomicBool}, hash::Hash};
 
-use super::{MemoryProvider, AllocatingMemoryProvider};
+use crate::vector::{VectorView, VectorViewMut};
+
+use super::MemoryProvider;
 
 pub struct CachedMemoryData<T: Sized> {
     data: Option<Box<[MaybeUninit<T>]>>,
@@ -24,6 +26,24 @@ impl<T: Sized> DerefMut for CachedMemoryData<T> {
         unsafe {
             MaybeUninit::slice_assume_init_mut(self.data.as_mut().unwrap())
         }
+    }
+}
+
+impl<T: Sized> VectorView<T> for CachedMemoryData<T> {
+
+    fn at(&self, i: usize) -> &T {
+        <[T] as Index<usize>>::index(self, i)
+    }
+
+    fn len(&self) -> usize {
+        <[T]>::len(self)
+    }
+}
+
+impl<T: Sized> VectorViewMut<T> for CachedMemoryData<T> {
+
+    fn at_mut(&mut self, i: usize) -> &mut T {
+        <[T] as IndexMut<usize>>::index_mut(self, i)
     }
 }
 
@@ -104,6 +124,7 @@ fn test_caching_memory_provider() {
     assert_eq!(2, c[1]);
 }
 
+#[allow(unused)]
 #[test]
 fn test_caching_memory_provider_drop_exactly_once() {
 
@@ -118,7 +139,7 @@ fn test_caching_memory_provider_drop_exactly_once() {
 
         fn drop(&mut self) {
             let mut locked = DROPPED.lock().unwrap();
-            let mut locked = locked.as_mut().unwrap();
+            let locked = locked.as_mut().unwrap();
             if locked.contains(&self.0) {
                 FAILED.fetch_or(true, std::sync::atomic::Ordering::SeqCst);
             } else {

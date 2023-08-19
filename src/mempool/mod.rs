@@ -1,10 +1,12 @@
 use std::{ops::{Deref, DerefMut}, mem::MaybeUninit};
 
+use crate::vector::VectorViewMut;
+
 pub mod caching;
 
 pub trait MemoryProvider<T> {
 
-    type Object: Deref<Target = [T]> + DerefMut;
+    type Object: Deref<Target = [T]> + DerefMut + VectorViewMut<T>;
 
     unsafe fn get_new<F: FnOnce(&mut [MaybeUninit<T>])>(&self, size: usize, initializer: F) -> Self::Object;
 
