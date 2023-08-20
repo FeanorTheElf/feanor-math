@@ -12,6 +12,7 @@ pub mod complex_fft;
 /// ring.
 /// 
 /// # Note on equality
+/// 
 /// If you choose to implement [`PartialEq`] for an FFTTable, and `F == G`, then
 /// `F` and `G` should satisfy the following properties:
 ///  - `F.ring() == G.ring()`, i.e. elements can be transferred between rings

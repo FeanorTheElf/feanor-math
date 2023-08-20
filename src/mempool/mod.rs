@@ -4,6 +4,12 @@ use crate::vector::VectorViewMut;
 
 pub mod caching;
 
+///
+/// Trait for objects that can provide memory, often for short-term use.
+/// This includes naive implementations like [`AllocatingMemoryProvider`] that
+/// just allocate memory, or alternatively all kinds of memory pools and recyclers
+/// (e.g. [`caching::CachingMemoryProvider`]).
+/// 
 pub trait MemoryProvider<T> {
 
     type Object: Deref<Target = [T]> + DerefMut + VectorViewMut<T>;

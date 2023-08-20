@@ -1025,6 +1025,10 @@ pub trait RingExtension: RingBase {
     }
 }
 
+///
+/// Trait for rings that can compute hashes for their elements.
+/// This should be compatible with [`RingBase::eq_el`] in the usual way.
+/// 
 pub trait HashableElRing: RingBase {
 
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H);

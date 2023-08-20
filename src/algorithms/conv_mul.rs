@@ -2,6 +2,14 @@ use crate::ring::*;
 use crate::mempool::*;
 use super::karatsuba::*;
 
+///
+/// Helper trait that gives rings the ability to specify to which length naive multiplication
+/// should be used (as opposed to karatsuba convolution).
+/// 
+/// This is default implemented for all rings, but if a ring provides very cheap multiplication,
+/// it might be worth considering specializing `KaratsubaHint` with a larger value, to gain a 
+/// performance benefit.
+/// 
 pub trait KaratsubaHint: RingBase {
 
     fn karatsuba_threshold(&self) -> usize;

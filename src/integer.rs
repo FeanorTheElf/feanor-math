@@ -41,6 +41,15 @@ pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + SelfIso + 
     }
 }
 
+///
+/// Helper trait to simplify conversion between ints.
+/// While for all integer rings `I`, `J`, one usually has `I: CanonicalIso<J>`,
+/// this might not be the case for rings in different crates, or it is too cumbersome
+/// to include the trait bounds when writing generic code.
+/// `IntCast` allows the conversion between arbitrary integer rings, using a
+/// "double-and-add"-approach. However, if `I: CanonicalHom<J>` is implemented, a
+/// specialization uses the (hopefully more efficient) variant. 
+/// 
 pub trait IntCast<F: ?Sized + IntegerRing>: IntegerRing {
 
     fn cast(&self, from: &F, value: F::Element) -> Self::Element;
