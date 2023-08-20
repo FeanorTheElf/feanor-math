@@ -458,6 +458,7 @@ impl HashableElRing for ZnBase {
 
 impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
 
+    #[inline(always)]
     fn butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, _: &ZnBase, _: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnBase as RingBase>::Element, i1: usize, i2: usize) {
         let a = *values.at(i1);
         let mut b = *values.at(i2);
@@ -471,6 +472,7 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
         *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus - b.0));
     }
 
+    #[inline(always)]
     fn inv_butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, _: &ZnBase, _: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnBase as RingBase>::Element, i1: usize, i2: usize) {
         let a = *values.at(i1);
         let b = *values.at(i2);
@@ -630,6 +632,7 @@ impl CanonicalHom<ZnFastmulBase> for ZnBase {
 
 impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
 
+    #[inline(always)]
     fn butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, from: &ZnFastmulBase, hom: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
         let a = *values.at(i1);
         let mut b = *values.at(i2);
@@ -643,6 +646,7 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
         *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus - b.0));
     }
 
+    #[inline(always)]
     fn inv_butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, from: &ZnFastmulBase, hom: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
         let a = *values.at(i1);
         let b = *values.at(i2);

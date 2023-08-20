@@ -95,24 +95,6 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
         return root_of_unity_list;
     }
 
-    ///
-    /// Returns `inv_root_of_unity^(2^exp_2 * bitreverse(bitreverse_exp, log2_n - exp_2))`.
-    /// 
-    #[inline(always)]
-    fn inv_root_of_unity_pow(&self, exp_2: usize, bitreverse_exp: usize) -> &El<R> {
-        let result = &self.inv_root_of_unity_list[(1 << self.log2_n) - (1 << (self.log2_n - exp_2)) + (bitreverse_exp / 2)];
-        return result;
-    }
-
-    ///
-    /// Returns `root_of_unity^(2^exp_2 * bitreverse(bitreverse_exp, log2_n - exp_2))`.
-    /// 
-    #[inline(always)]
-    fn root_of_unity_pow(&self, exp_2: usize, bitreverse_exp: usize) -> &El<R> {
-        let result = &self.root_of_unity_list[(1 << self.log2_n) - (1 << (self.log2_n - exp_2)) + (bitreverse_exp / 2)];
-        return result;
-    }
-
     pub fn len(&self) -> usize {
         1 << self.log2_n
     }
@@ -182,6 +164,7 @@ pub trait CooleyTuckeyButterfly<S>: RingBase + CanonicalHom<S>
 impl<R, S> CooleyTuckeyButterfly<S> for R
     where S: ?Sized + RingBase, R: ?Sized + RingBase + CanonicalHom<S>
 {
+    #[inline(always)]
     default fn butterfly<V: VectorViewMut<Self::Element>>(&self, from: &S, hom: &<Self as CanonicalHom<S>>::Homomorphism, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
         self.mul_assign_map_in_ref(from, values.at_mut(i2), twiddle, hom);
         let new_a = self.add_ref(values.at(i1), values.at(i2));
@@ -189,6 +172,7 @@ impl<R, S> CooleyTuckeyButterfly<S> for R
         self.sub_self_assign(values.at_mut(i2), a);
     }
 
+    #[inline(always)]
     default fn inv_butterfly<V: VectorViewMut<Self::Element>>(&self, from: &S, hom: &<Self as CanonicalHom<S>>::Homomorphism, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
         let new_a = self.add_ref(values.at(i1), values.at(i2));
         let a = std::mem::replace(values.at_mut(i1), new_a);
@@ -201,6 +185,11 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
     where R: DivisibilityRingStore, 
         R::Type: DivisibilityRing
 {
+    ///
+    /// Optimized implementation of the inplace Cooley-Tuckey FFT algorithm.
+    /// Note that setting `INV = true` will perform an inverse fourier transform,
+    /// except that the division by `n` is not included.
+    /// 
     fn unordered_fft_dispatch<V, S, const INV: bool>(&self, values: &mut V, ring: &S)
         where S: RingStore, 
             S::Type: CanonicalHom<R::Type>, 
@@ -211,20 +200,28 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
         // check if the canonical hom `R -> S` maps `self.root_of_unity` to a primitive N-th root of unity
         debug_assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &hom.map_ref(&self.root_of_unity), self.log2_n));
 
+        let base_hom = hom.raw_hom();
+        let base_ring = self.ring().get_ring();
+        let R = ring.get_ring();
 
-        for s in 0..self.log2_n {
-            let (m, group_size_half) = if INV {
-                (1 << s, 1 << (self.log2_n - s - 1)) 
+        for step in 0..self.log2_n {
+
+            let (log2_m, log2_group_size_half) = if !INV {
+                (self.log2_n - step - 1, step)  
             } else {
-                (1 << (self.log2_n - s - 1), 1 << s)  
+                (step, self.log2_n - step - 1)
             };
-            let m_times_2 = 2 * m;
-
+            let group_size_half = 1 << log2_group_size_half;
+            let m = 1 << log2_m;
+            let two_m = 2 << log2_m;
             const UNROLL_COUNT: usize = 4;
 
             if group_size_half < UNROLL_COUNT {
 
-                for k in 0..m {
+                for k in 0..(1 << log2_m) {
+
+                    let mut root_of_unity_index = (1 << self.log2_n) - 2 * group_size_half;
+
                     // 
                     // we want to compute a bitreverse_fft_inplace for `v_k, v_(k + m), v_(k + 2m), ..., v_(k + n - m)`;
                     // call this sequence a
@@ -244,34 +241,42 @@ impl<R, M: MemoryProvider<El<R>>> FFTTableCooleyTuckey<R, M>
                         // `i_bitreverse     = bitrev(i, group_size) = 2 bitrev(i, group_size/2)` and
                         // `i_bitreverse + 1 = bitrev(i + group_size/2, group_size) = 2 bitrev(i, group_size/2) + 1`
                         //
-                        let index1 = i_bitreverse * m_times_2 + k;
+                        let index1 = i_bitreverse * two_m + k;
                         let index2 = index1 + m;
     
                         if !INV {
-                            let current_twiddle = self.inv_root_of_unity_pow(self.log2_n - s - 1, 2 * i_bitreverse);
-                            ring.get_ring().butterfly(self.ring.get_ring(), hom.raw_hom(), values, current_twiddle, index1, index2);
+                            let current_twiddle = &self.inv_root_of_unity_list[root_of_unity_index];
+                            R.butterfly(base_ring, base_hom, values, current_twiddle, index1, index2);
                         } else {
-                            let current_twiddle = self.root_of_unity_pow(s, 2 * i_bitreverse);
-                            ring.get_ring().inv_butterfly(self.ring.get_ring(), hom.raw_hom(), values, current_twiddle, index1, index2);
+                            let current_twiddle = &self.root_of_unity_list[root_of_unity_index];
+                            R.inv_butterfly(base_ring, base_hom, values, current_twiddle, index1, index2);
                         }
+                        root_of_unity_index += 1;
                     }
                 }
 
             } else {
             
+                // same but loop is unrolled
+
                 for k in 0..m {
-                    for i_bitreverse_base in (0..group_size_half).step_by(UNROLL_COUNT) {
-                        for i_bitreverse_delta in 0..UNROLL_COUNT {
-                            let index1 = (i_bitreverse_base + i_bitreverse_delta) * m_times_2 + k;
-                            let index2 = index1 + m;
-        
+
+                    let mut root_of_unity_index = (1 << self.log2_n) - 2 * group_size_half;
+                    let mut index1 = k;
+
+                    for _ in (0..group_size_half).step_by(UNROLL_COUNT) {
+                        for _ in 0..UNROLL_COUNT {
+
                             if !INV {
-                                let current_twiddle = self.inv_root_of_unity_pow(self.log2_n - s - 1, 2 * (i_bitreverse_base + i_bitreverse_delta));
-                                ring.get_ring().butterfly(self.ring.get_ring(), hom.raw_hom(), values, current_twiddle, index1, index2);
+                                let current_twiddle = &self.inv_root_of_unity_list[root_of_unity_index];
+                                R.butterfly(base_ring, base_hom, values, current_twiddle, index1, index1 + m);
                             } else {
-                                let current_twiddle = self.root_of_unity_pow(s, 2 * (i_bitreverse_base + i_bitreverse_delta));
-                                ring.get_ring().inv_butterfly(self.ring.get_ring(), hom.raw_hom(), values, current_twiddle, index1, index2);
+                                let current_twiddle = &self.root_of_unity_list[root_of_unity_index];
+                                R.inv_butterfly(base_ring, base_hom, values, current_twiddle, index1, index1 + m);
                             }
+                            root_of_unity_index += 1;
+                            index1 += two_m;
+
                         }
                     }
                 }
@@ -436,24 +441,38 @@ fn run_fft_bench_round<R, S>(ring: S, fft: &FFTTableCooleyTuckey<R>, data: &Vec<
     assert_el_eq!(&ring, &copy[0], &data[0]);
 }
 
+#[cfg(test)]
+const BENCH_SIZE_LOG2: usize = 13;
+
 #[bench]
 fn bench_fft(bencher: &mut test::Bencher) {
     let ring = zn_barett::Zn::new(StaticRing::<i128>::RING, 1073872897);
-    let fft = FFTTableCooleyTuckey::for_zn(&ring, 15).unwrap();
-    let data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
-    let mut copy = Vec::with_capacity(1 << 15);
+    let fft = FFTTableCooleyTuckey::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
+    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+    let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
     bencher.iter(|| {
         run_fft_bench_round(&ring, &fft, &data, &mut copy)
     });
 }
 
 #[bench]
-fn bench_fft_optimized(bencher: &mut test::Bencher) {
+fn bench_fft_zn42(bencher: &mut test::Bencher) {
+    let ring = zn_42::Zn::new(1073872897);
+    let fft = FFTTableCooleyTuckey::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
+    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+    let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
+    bencher.iter(|| {
+        run_fft_bench_round(&ring, &fft, &data, &mut copy)
+    });
+}
+
+#[bench]
+fn bench_fft_zn42_fastmul(bencher: &mut test::Bencher) {
     let ring = zn_42::Zn::new(1073872897);
     let fastmul_ring = zn_42::ZnFastmul::new(ring);
-    let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, 15).unwrap();
-    let data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
-    let mut copy = Vec::with_capacity(1 << 15);
+    let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, BENCH_SIZE_LOG2).unwrap();
+    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+    let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
     bencher.iter(|| {
         run_fft_bench_round(&ring, &fft, &data, &mut copy)
     });

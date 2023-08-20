@@ -18,3 +18,5 @@ generic_tests = []
 [profile.profiling]
 inherits = "bench"
 debug = true
+panic = "abort"
+codegen-unit = 1
