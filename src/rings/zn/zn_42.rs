@@ -659,15 +659,17 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
     }
 }
 
-impl CanonicalHom<StaticRingBase<i64>> for ZnFastmulBase {
+impl<I: ?Sized + IntegerRing> CanonicalHom<I> for ZnFastmulBase 
+    where ZnBase: CanonicalHom<I>
+{
 
-    type Homomorphism = <ZnBase as CanonicalHom<StaticRingBase<i64>>>::Homomorphism;
+    type Homomorphism = <ZnBase as CanonicalHom<I>>::Homomorphism;
 
-    fn has_canonical_hom(&self, from: &StaticRingBase<i64>) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
         self.base.has_canonical_hom(from)
     }
 
-    fn map_in(&self, from: &StaticRingBase<i64>, el: i64, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
         self.rev_delegate(self.base.map_in(from, el, hom))
     }
 }
