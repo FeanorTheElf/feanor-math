@@ -15,6 +15,14 @@ use crate::primitive_int::*;
 /// via a Barett-reduction algorithm. This is a fast general-purpose
 /// method, but note that it is required that `n^4` fits into the
 /// supplied integer type.
+/// 
+/// # Performance
+/// 
+/// For small moduli, this implementation cannot use all the bounds
+/// on the representative sizes, and hence often has to compute with
+/// more precision than necessary.
+/// In these cases, specialized implementations (like [`crate::rings::zn::zn_42::Zn`])
+/// can be much faster.
 ///
 /// # Example
 /// ```

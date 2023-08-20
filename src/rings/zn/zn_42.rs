@@ -1,3 +1,4 @@
+use crate::algorithms::fft::cooley_tuckey::*;
 use crate::delegate::DelegateRing;
 use crate::divisibility::DivisibilityRingStore;
 use crate::integer::IntegerRingStore;
@@ -455,6 +456,33 @@ impl HashableElRing for ZnBase {
     }
 }
 
+impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
+
+    fn butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, _: &ZnBase, _: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnBase as RingBase>::Element, i1: usize, i2: usize) {
+        let a = *values.at(i1);
+        let mut b = *values.at(i2);
+        self.mul_assign_ref(&mut b, twiddle);
+
+        // this is implied by `bounded_reduce`, check anyway
+        debug_assert!(b.0 < self.modulus * 2);
+        debug_assert!(self.repr_bound >= self.modulus * 2);
+
+        *values.at_mut(i1) = self.add(a, b);
+        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus - b.0));
+    }
+
+    fn inv_butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, _: &ZnBase, _: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnBase as RingBase>::Element, i1: usize, i2: usize) {
+        let a = *values.at(i1);
+        let b = *values.at(i2);
+
+        let b_reduced = ZnEl(self.bounded_reduce(b.0 as u128));
+
+        *values.at_mut(i1) = self.add(a, b_reduced);
+        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus - b_reduced.0));
+        self.mul_assign_ref(values.at_mut(i2), twiddle);
+    }
+}
+
 ///
 /// Wraps [`ZnBase`] to represent an instance of the ring `Z/nZ`.
 /// As opposed to [`ZnBase`], elements are stored with additional information
@@ -481,7 +509,7 @@ impl HashableElRing for ZnBase {
 /// fft.unordered_fft(&mut data[..], &ring, &AllocatingMemoryProvider);
 /// ```
 /// 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 pub struct ZnFastmulBase {
     base: ZnBase
 }
@@ -597,6 +625,33 @@ impl CanonicalHom<ZnFastmulBase> for ZnBase {
 
     fn mul_assign_map_in(&self, from: &ZnFastmulBase, lhs: &mut Self::Element, rhs: <ZnFastmulBase as RingBase>::Element, hom: &Self::Homomorphism) {
         self.mul_assign_map_in_ref(from, lhs, &rhs, hom);
+    }
+}
+
+impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
+
+    fn butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, from: &ZnFastmulBase, hom: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
+        let a = *values.at(i1);
+        let mut b = *values.at(i2);
+        self.mul_assign_map_in_ref(from, &mut b, twiddle, hom);
+
+        // this is implied by `bounded_reduce`, check anyway
+        debug_assert!(b.0 < self.modulus * 2);
+        debug_assert!(self.repr_bound >= self.modulus * 2);
+
+        *values.at_mut(i1) = self.add(a, b);
+        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus - b.0));
+    }
+
+    fn inv_butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, from: &ZnFastmulBase, hom: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
+        let a = *values.at(i1);
+        let b = *values.at(i2);
+
+        let b_reduced = ZnEl(self.bounded_reduce(b.0 as u128));
+
+        *values.at_mut(i1) = self.add(a, b_reduced);
+        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus - b_reduced.0));
+        self.mul_assign_map_in_ref(from, values.at_mut(i2), twiddle, hom);
     }
 }
 
@@ -777,4 +832,31 @@ fn test_canonical_iso_axioms_as_field() {
     generic_test_canonical_iso_axioms(&R, &R2, R.elements());
     generic_test_canonical_hom_axioms(&R2, &R, R2.elements());
     generic_test_canonical_iso_axioms(&R2, &R, R2.elements());
+}
+
+#[test]
+fn test_cooley_tuckey_butterfly() {
+    let ring = Zn::new(2);
+    generic_test_cooley_tuckey_butterfly(ring, ring, ring.elements(), &ring.one());
+
+    let ring = Zn::new(97);
+    generic_test_cooley_tuckey_butterfly(ring, ring, ring.elements(), &ring.from_int(3));
+
+    let ring = Zn::new((1 << 41) - 1);
+    generic_test_cooley_tuckey_butterfly(ring, ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.from_int(x)), &ring.from_int(3));
+}
+
+#[test]
+fn test_cooley_tuckey_butterfly_fastmul() {
+    let ring = Zn::new(2);
+    let fastmul_ring = ZnFastmul::new(ring);
+    generic_test_cooley_tuckey_butterfly(ring, fastmul_ring, ring.elements(), &fastmul_ring.one());
+
+    let ring = Zn::new(97);
+    let fastmul_ring = ZnFastmul::new(ring);
+    generic_test_cooley_tuckey_butterfly(ring, fastmul_ring, ring.elements(), &fastmul_ring.from_int(3));
+
+    let ring = Zn::new((1 << 41) - 1);
+    let fastmul_ring = ZnFastmul::new(ring);
+    generic_test_cooley_tuckey_butterfly(ring, fastmul_ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.from_int(x)), &fastmul_ring.from_int(3));
 }
