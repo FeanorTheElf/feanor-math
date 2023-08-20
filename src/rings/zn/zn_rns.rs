@@ -77,7 +77,8 @@ impl<C: ZnRingStore + Clone, J: IntegerRingStore> Zn<C, J>
 }
 
 impl<J: IntegerRingStore> Zn<zn_42::Zn, J> 
-    where J::Type: IntegerRing + CanonicalIso<StaticRingBase<i64>> + CanonicalIso<StaticRingBase<i128>>,
+    where J::Type: IntegerRing,
+        zn_42::ZnBase: CanonicalHom<J::Type>,
         StaticRingBase<i64>: CanonicalIso<J::Type>
 {
     pub fn from_primes(large_integers: J, primes: Vec<u64>) -> Self {
@@ -86,7 +87,8 @@ impl<J: IntegerRingStore> Zn<zn_42::Zn, J>
 }
 
 impl<J: IntegerRingStore> ZnBase<zn_42::Zn, J> 
-    where J::Type: IntegerRing + CanonicalIso<StaticRingBase<i64>> + CanonicalIso<StaticRingBase<i128>>,
+    where J::Type: IntegerRing,
+        zn_42::ZnBase: CanonicalHom<J::Type>,
         StaticRingBase<i64>: CanonicalIso<J::Type>
 {
     pub fn from_primes(large_integers: J, primes: Vec<u64>) -> Self {
@@ -421,28 +423,25 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider
 }
 
 impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRing, M: MemoryProvider<El<C>>> CanonicalHom<K> for ZnBase<C, J, M> 
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
-        J::Type: IntegerRing + CanonicalIso<K>,
+    where C::Type: ZnRing + CanonicalHom<J::Type> + CanonicalHom<K>,
+        J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
         K: ?Sized + SelfIso
 {
-    type Homomorphism = (<J::Type as CanonicalHom<K>>::Homomorphism, Vec<<C::Type as CanonicalHom<J::Type>>::Homomorphism>);
+    type Homomorphism = Vec<<C::Type as CanonicalHom<K>>::Homomorphism>;
 
     fn has_canonical_hom(&self, from: &K) -> Option<Self::Homomorphism> {
-        Some((
-            <J::Type as CanonicalHom<K>>::has_canonical_hom(self.ZZ().get_ring(), from)?,
-            self.components.iter()
-                .map(|R| <C::Type as CanonicalHom<J::Type>>::has_canonical_hom(R.get_ring(), self.ZZ().get_ring()).ok_or(()))
+        Some(self.components.iter()
+                .map(|R| <C::Type as CanonicalHom<K>>::has_canonical_hom(R.get_ring(), from).ok_or(()))
                 .collect::<Result<Vec<_>, ()>>()
                 .ok()?
-        ))
+        )
     }
 
     fn map_in(&self, from: &K, el: K::Element, hom: &Self::Homomorphism) -> Self::Element {
-        let mapped_el = <J::Type as CanonicalHom<K>>::map_in(self.ZZ().get_ring(), from, el, &hom.0);
         ZnEl(self.memory_provider.get_new_init(
             self.len(),
-            |i| <C::Type as CanonicalHom<J::Type>>::map_in_ref(self.at(i).get_ring(), self.ZZ().get_ring(), &mapped_el, &hom.1[i])
+            |i| <C::Type as CanonicalHom<K>>::map_in_ref(self.at(i).get_ring(), from, &el, &hom[i])
         ))
     }
 }

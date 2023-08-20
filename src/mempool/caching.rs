@@ -1,4 +1,9 @@
-use std::{mem::MaybeUninit, rc::Rc, collections::{HashMap, hash_map::Entry, HashSet}, ops::{Deref, DerefMut, Index, IndexMut}, cell::{RefCell, Ref}, sync::{Mutex, atomic::AtomicBool}, hash::Hash};
+use std::mem::MaybeUninit;
+use std::rc::Rc;
+use std::collections::*;
+use std::collections::hash_map::Entry;
+use std::ops::{Deref, DerefMut, Index, IndexMut};
+use std::cell::RefCell;
 
 use crate::vector::{VectorView, VectorViewMut};
 
@@ -106,6 +111,11 @@ impl<T: Sized> MemoryProvider<T> for Rc<CachingMemoryProvider<T>> {
         };
     }
 }
+
+#[cfg(test)]
+use std::sync::Mutex;
+#[cfg(test)]
+use std::sync::atomic::AtomicBool;
 
 #[test]
 fn test_caching_memory_provider() {
