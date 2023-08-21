@@ -165,7 +165,7 @@ impl<T: ?Sized, V> SelfSubvectorView<T> for Subvector<T, V>
         };
         assert!(from <= self.len());
         let to = match range.end_bound() {
-            Bound::Included(x) => *x - 1,
+            Bound::Included(x) => *x + 1,
             Bound::Excluded(x) => *x,
             Bound::Unbounded => self.len()
         };
@@ -244,7 +244,7 @@ impl<T, V> SelfSubvectorFn<T> for SubvectorFn<T, V>
         };
         assert!(from <= self.len());
         let to = match range.end_bound() {
-            Bound::Included(x) => *x - 1,
+            Bound::Included(x) => *x + 1,
             Bound::Excluded(x) => *x,
             Bound::Unbounded => self.len()
         };
@@ -273,9 +273,22 @@ impl<T, V> Clone for SubvectorFn<T, V>
     }
 }
 
+#[cfg(test)]
+use super::vec_fn::IntoVectorFn;
+
 #[test]
 fn test_subvector_ranges() {
     let a = Subvector::new([0, 1, 2, 3, 4]);
+    assert_eq!(3, a.subvector(0..3).len());
+    assert_eq!(3, a.subvector(0..=2).len());
+    assert_eq!(5, a.subvector(0..).len());
+    assert_eq!(5, a.subvector(..).len());
+    assert_eq!(2, a.subvector(3..).len());
+}
+
+#[test]
+fn test_subvector_fn_ranges() {
+    let a = SubvectorFn::new([0, 1, 2, 3, 4].into_fn());
     assert_eq!(3, a.subvector(0..3).len());
     assert_eq!(3, a.subvector(0..=2).len());
     assert_eq!(5, a.subvector(0..).len());
