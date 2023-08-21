@@ -21,7 +21,10 @@ pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
     where I: IntegerRingStore + HashableElRingStore,
         I::Type: IntegerRing + CanonicalIso<StaticRingBase<i128>>
 {
-    if ZZ.abs_highest_set_bit(n).unwrap_or(0) < zn::zn_42::MAX_MODULUS_BITS as usize {
+    assert!(ZZ.is_pos(n));
+    if ZZ.is_zero(n) || ZZ.is_one(n) {
+        false
+    } else if ZZ.abs_highest_set_bit(n).unwrap_or(0) < zn::zn_42::MAX_MODULUS_BITS as usize {
         is_prime_base(zn::zn_42::Zn::new(ZZ.cast(&StaticRing::<i128>::RING, ZZ.clone_el(n)) as u64), k)
     } else {
         let n_value = ZZ.clone_el(n);
@@ -54,9 +57,7 @@ pub fn is_prime_base<R>(Zn: R, k: usize) -> bool
 {
     let ZZ = Zn.integer_ring();
     let n = Zn.modulus();
-    if ZZ.is_leq(n, &ZZ.from_int(2)) {
-        return ZZ.eq_el(n, &ZZ.from_int(2));
-    }
+    assert!(ZZ.is_pos(n));
 
     let mut rng = oorandom::Rand64::new(ZZ.default_hash(n) as u128);
     let mut n_minus_one = ZZ.sub_ref_fst(n, ZZ.one());
@@ -96,6 +97,7 @@ pub fn test_is_prime() {
     assert!(is_prime(StaticRing::<i128>::RING, &417581, 5));
     assert!(is_prime(StaticRing::<i128>::RING, &68719476767, 5));
 
+    assert!(!is_prime(StaticRing::<i128>::RING, &1, 5));
     assert!(!is_prime(StaticRing::<i128>::RING, &4, 5));
     assert!(!is_prime(StaticRing::<i128>::RING, &6, 5));
     assert!(!is_prime(StaticRing::<i128>::RING, &8, 5));
