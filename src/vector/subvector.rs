@@ -272,3 +272,13 @@ impl<T, V> Clone for SubvectorFn<T, V>
         }
     }
 }
+
+#[test]
+fn test_subvector_ranges() {
+    let a = Subvector::new([0, 1, 2, 3, 4]);
+    assert_eq!(3, a.subvector(0..3).len());
+    assert_eq!(3, a.subvector(0..=2).len());
+    assert_eq!(5, a.subvector(0..).len());
+    assert_eq!(5, a.subvector(..).len());
+    assert_eq!(2, a.subvector(3..).len());
+}
