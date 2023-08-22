@@ -119,14 +119,14 @@ impl Default for AllocatingMemoryProvider {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct LoggingMemoryProvider {
-    description: String
+    description: &'static str
 }
 
 impl LoggingMemoryProvider {
 
-    pub fn new(description: String) -> Self {
+    pub const fn new(description: &'static str) -> Self {
         LoggingMemoryProvider { description }
     }
 }

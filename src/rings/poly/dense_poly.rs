@@ -1,6 +1,7 @@
 use crate::divisibility::*;
 use crate::euclidean::*;
 use crate::field::Field;
+use crate::mempool::DEFAULT_MEMORY_PROVIDER;
 use crate::mempool::{DefaultMemoryProvider, GrowableMemoryProvider};
 use crate::vector::VectorViewMut;
 use crate::ring::*;
@@ -34,7 +35,7 @@ pub type DensePolyRing<R: RingStore, M: GrowableMemoryProvider<El<R>> = DefaultM
 impl<R: RingStore> DensePolyRing<R> {
 
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        Self::from(DensePolyRingBase::new(base_ring, unknown_name, DefaultMemoryProvider::default()))
+        Self::from(DensePolyRingBase::new(base_ring, unknown_name, DEFAULT_MEMORY_PROVIDER))
     }
 }
 

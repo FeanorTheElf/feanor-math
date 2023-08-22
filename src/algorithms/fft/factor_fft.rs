@@ -305,7 +305,6 @@ fn test_approximate_fft() {
         let mut array = DEFAULT_MEMORY_PROVIDER.get_new_init(p << log2_n, |i| CC.root_of_unity(i as i64, (p as i64) << log2_n));
         fft.fft(&mut array, CC, &DEFAULT_MEMORY_PROVIDER);
         let err = fft.expected_absolute_error(1., 0.);
-        println!("{}, {}", err, err / CC.abs(CC.sub(array[1], CC.from_f64(fft.len() as f64))));
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
         for i in 2..fft.len() {
