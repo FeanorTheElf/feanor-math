@@ -319,6 +319,10 @@ impl<'a, V: ?Sized, T: ?Sized> Iterator for VectorViewIter<'a, V, T>
             return None;
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len(), Some(self.len()))
+    }
 }
 
 impl<'a, V: ?Sized, T: ?Sized> DoubleEndedIterator for VectorViewIter<'a, V, T>
