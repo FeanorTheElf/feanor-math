@@ -112,6 +112,8 @@ impl<T> GrowableMemoryProvider<T> for AllocatingMemoryProvider {
     }
 }
 
+pub static ALLOCATING_MEMORY_PROVIDER_SINGLETON: AllocatingMemoryProvider = AllocatingMemoryProvider;
+
 impl Default for AllocatingMemoryProvider {
 
     fn default() -> Self {
@@ -131,7 +133,7 @@ impl LoggingMemoryProvider {
     }
 }
 
-impl<T> MemoryProvider<T> for LoggingMemoryProvider {
+impl<'a, T> MemoryProvider<T> for &'a LoggingMemoryProvider {
     
     type Object = Vec<T>;
 
@@ -141,7 +143,7 @@ impl<T> MemoryProvider<T> for LoggingMemoryProvider {
     }
 }
 
-impl<T> GrowableMemoryProvider<T> for LoggingMemoryProvider {
+impl<'a, T> GrowableMemoryProvider<T> for &'a LoggingMemoryProvider {
     
     unsafe fn grow<F: FnOnce(&mut [MaybeUninit<T>])>(&self, el: &mut Vec<T>, new_size: usize, initializer: F) {
         assert!(new_size > el.len());
@@ -154,9 +156,33 @@ impl<T> GrowableMemoryProvider<T> for LoggingMemoryProvider {
 
 #[cfg(not(feature = "log_memory"))]
 pub type DefaultMemoryProvider = AllocatingMemoryProvider;
+
+#[cfg(feature = "log_memory")]
+pub type DefaultMemoryProvider = &'static LoggingMemoryProvider;
+
+#[macro_export]
+macro_rules! current_function {
+    () => {{
+        struct LocalMemoryProvider;
+        std::any::type_name::<LocalMemoryProvider>()
+    }}
+}
+
+#[macro_export]
 #[cfg(not(feature = "log_memory"))]
-pub static DEFAULT_MEMORY_PROVIDER: DefaultMemoryProvider = AllocatingMemoryProvider;
+macro_rules! default_memory_provider {
+    () => {
+        $crate::mempool::ALLOCATING_MEMORY_PROVIDER_SINGLETON
+    };
+}
+
+#[macro_export]
 #[cfg(feature = "log_memory")]
-pub type DefaultMemoryProvider = LoggingMemoryProvider;
-#[cfg(feature = "log_memory")]
-pub static DEFAULT_MEMORY_PROVIDER: DefaultMemoryProvider = LoggingMemoryProvider::new("global");
+macro_rules! default_memory_provider {
+    () => {
+        {
+            static LOCAL_MEMORY_PROVIDER: $crate::mempool::LoggingMemoryProvider = $crate::mempool::LoggingMemoryProvider::new($crate::current_function!());
+            &LOCAL_MEMORY_PROVIDER as &'static $crate::mempool::LoggingMemoryProvider
+        }
+    };
+}

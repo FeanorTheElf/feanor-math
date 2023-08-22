@@ -193,6 +193,8 @@ use crate::rings::zn::zn_static::Zn;
 use crate::algorithms;
 #[cfg(test)]
 use crate::rings::zn::zn_42;
+#[cfg(test)]
+use crate::default_memory_provider;
 
 #[test]
 fn test_fft_basic() {
@@ -209,7 +211,7 @@ fn test_fft_basic() {
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
-    fft.unordered_fft(&mut values, ring, &DEFAULT_MEMORY_PROVIDER);
+    fft.unordered_fft(&mut values, ring, &default_memory_provider!());
     assert_eq!(values, permuted_expected);
 }
 
@@ -228,7 +230,7 @@ fn test_fft_long() {
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
-    fft.unordered_fft(&mut values, ring, &DEFAULT_MEMORY_PROVIDER);
+    fft.unordered_fft(&mut values, ring, &default_memory_provider!());
     assert_eq!(values, permuted_expected);
 }
 
@@ -248,17 +250,17 @@ fn test_fft_unordered() {
     }
     let original = values;
 
-    fft.unordered_fft(&mut values, ring, &DEFAULT_MEMORY_PROVIDER);
+    fft.unordered_fft(&mut values, ring, &default_memory_provider!());
 
     let mut ordered_fft = [0; LEN];
     for i in 0..LEN {
         ordered_fft[fft.unordered_fft_permutation(i)] = values[i];
     }
 
-    fft.unordered_inv_fft(&mut values, ring, &DEFAULT_MEMORY_PROVIDER);
+    fft.unordered_inv_fft(&mut values, ring, &default_memory_provider!());
     assert_eq!(values, original);
 
-    fft.inv_fft(&mut ordered_fft, ring, &DEFAULT_MEMORY_PROVIDER);
+    fft.inv_fft(&mut ordered_fft, ring, &default_memory_provider!());
     assert_eq!(ordered_fft, original);
 }
 
@@ -289,7 +291,7 @@ fn test_inv_fft() {
     let mut values = [3, 62, 63, 96, 37, 36];
     let expected = [1, 0, 0, 1, 0, 1];
 
-    fft.inv_fft(&mut values, ring, &DEFAULT_MEMORY_PROVIDER);
+    fft.inv_fft(&mut values, ring, &default_memory_provider!());
     assert_eq!(values, expected);
 }
 
@@ -302,8 +304,8 @@ fn test_approximate_fft() {
             bluestein::FFTTableBluestein::for_complex(CC, p), 
             cooley_tuckey::FFTTableCooleyTuckey::for_complex(CC, log2_n)
         );
-        let mut array = DEFAULT_MEMORY_PROVIDER.get_new_init(p << log2_n, |i| CC.root_of_unity(i as i64, (p as i64) << log2_n));
-        fft.fft(&mut array, CC, &DEFAULT_MEMORY_PROVIDER);
+        let mut array = default_memory_provider!().get_new_init(p << log2_n, |i| CC.root_of_unity(i as i64, (p as i64) << log2_n));
+        fft.fft(&mut array, CC, &default_memory_provider!());
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
@@ -329,8 +331,8 @@ fn bench_factor_fft(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         copy.clear();
         copy.extend(data.iter().map(|x| ring.clone_el(x)));
-        fft.unordered_fft(&mut copy[..], &ring, &DEFAULT_MEMORY_PROVIDER);
-        fft.unordered_inv_fft(&mut copy[..], &ring, &DEFAULT_MEMORY_PROVIDER);
+        fft.unordered_fft(&mut copy[..], &ring, &default_memory_provider!());
+        fft.unordered_inv_fft(&mut copy[..], &ring, &default_memory_provider!());
         assert_el_eq!(&ring, &copy[0], &data[0]);
     });
 }

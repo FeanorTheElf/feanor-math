@@ -1,6 +1,9 @@
 use std::ops::Deref;
 
-use crate::{ring::*, vector::*, mempool::*};
+use crate::ring::*;
+use crate::vector::*;
+use crate::mempool::*;
+use crate::default_memory_provider;
 
 pub mod cooley_tuckey;
 pub mod bluestein;
@@ -50,7 +53,7 @@ pub trait FFTTable {
             M: MemoryProvider<El<S>>
     {
         self.unordered_fft(&mut values, ring, memory_provider);
-        permute::permute_inv(&mut values, |i| self.unordered_fft_permutation(i), &DEFAULT_MEMORY_PROVIDER);
+        permute::permute_inv(&mut values, |i| self.unordered_fft_permutation(i), &default_memory_provider!());
     }
         
     fn inv_fft<V, S, M>(&self, mut values: V, ring: S, memory_provider: &M)
@@ -59,7 +62,7 @@ pub trait FFTTable {
             V: SwappableVectorViewMut<El<S>>,
             M: MemoryProvider<El<S>>
     {
-        permute::permute(&mut values, |i| self.unordered_fft_permutation(i), &DEFAULT_MEMORY_PROVIDER);
+        permute::permute(&mut values, |i| self.unordered_fft_permutation(i), &default_memory_provider!());
         self.unordered_inv_fft(&mut values, ring, memory_provider);
     }
 

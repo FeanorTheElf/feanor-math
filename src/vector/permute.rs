@@ -45,11 +45,14 @@ pub fn permute_inv<V, T, F, M: MemoryProvider<bool>>(mut values: V, perm: F, mem
     }
 }
 
+#[cfg(test)]
+use crate::default_memory_provider;
+
 #[test]
 fn test_permute() {
     let mut values = [0, 1, 2, 3, 4, 5, 6, 7];
     let permutation = [2, 1, 7, 5, 6, 3, 4, 0];
-    permute(&mut values, |i| permutation[i], &DEFAULT_MEMORY_PROVIDER);
+    permute(&mut values, |i| permutation[i], &default_memory_provider!());
     assert_eq!(values, permutation);
 }
 
@@ -57,6 +60,6 @@ fn test_permute() {
 fn test_permute_inv() {
     let mut values = [2, 1, 7, 5, 6, 3, 4, 0];
     let permutation = [2, 1, 7, 5, 6, 3, 4, 0];
-    permute_inv(&mut values, |i| permutation[i], &DEFAULT_MEMORY_PROVIDER);
+    permute_inv(&mut values, |i| permutation[i], &default_memory_provider!());
     assert_eq!(values, [0, 1, 2, 3, 4, 5, 6, 7]);
 }

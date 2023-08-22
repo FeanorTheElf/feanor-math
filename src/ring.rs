@@ -396,7 +396,7 @@ macro_rules! assert_el_eq {
     ($ring:expr, $lhs:expr, $rhs:expr) => {
         match ($ring, $lhs, $rhs) {
             (ring_val, lhs_val, rhs_val) => {
-                assert!(ring_val.eq_el(lhs_val, rhs_val), "Assertion failed: {} != {}", ring_val.format(lhs_val), ring_val.format(rhs_val));
+                assert!(ring_val.eq_el(lhs_val, rhs_val), "Assertion failed: {} != {}", <_ as $crate::ring::RingStore>::format(ring_val, lhs_val), <_ as $crate::ring::RingStore>::format(ring_val, rhs_val));
             }
         }
     }

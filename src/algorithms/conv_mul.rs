@@ -31,6 +31,8 @@ pub fn add_assign_convoluted_mul<R: RingStore + Copy, M: MemoryProvider<El<R>>>(
 use test;
 #[cfg(test)]
 use crate::primitive_int::*;
+#[cfg(test)]
+use crate::default_memory_provider;
 
 #[bench]
 fn bench_naive_mul(bencher: &mut test::Bencher) {
@@ -40,7 +42,7 @@ fn bench_naive_mul(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         c.clear();
         c.resize(64, 0);
-        karatsuba(10, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &DEFAULT_MEMORY_PROVIDER);
+        karatsuba(10, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &default_memory_provider!());
         assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
         assert_eq!(c[62], 31 * 31);
     });
@@ -54,7 +56,7 @@ fn bench_karatsuba_mul(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         c.clear();
         c.resize(64, 0);
-        karatsuba(4, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &DEFAULT_MEMORY_PROVIDER);
+        karatsuba(4, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &default_memory_provider!());
         assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
         assert_eq!(c[62], 31 * 31);
     });

@@ -1,8 +1,10 @@
 use crate::mempool::*;
 use crate::vector::VectorView;
-use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
+use crate::integer::IntegerRingStore;
+use crate::divisibility::DivisibilityRingStore;
 use crate::rings::zn::*;
 use crate::primitive_int::*;
+use crate::default_memory_provider;
 
 ///
 /// A ring representing `Z/nZ` for composite n by storing the
@@ -72,7 +74,7 @@ impl<C: ZnRingStore + Clone, J: IntegerRingStore> Zn<C, J>
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
     pub fn new(component_rings: Vec<C>, large_integers: J) -> Self {
-        Self::from(ZnBase::new(component_rings, large_integers, DEFAULT_MEMORY_PROVIDER))
+        Self::from(ZnBase::new(component_rings, large_integers, default_memory_provider!()))
     }
 }
 
@@ -95,7 +97,7 @@ impl<J: IntegerRingStore> ZnBase<zn_42::Zn, J>
         Self::new(
             primes.into_iter().map(|n| zn_42::Zn::new(n)).collect(),
             large_integers,
-            DEFAULT_MEMORY_PROVIDER
+            default_memory_provider!()
         )
     }
 }

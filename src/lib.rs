@@ -7,6 +7,7 @@
 #![feature(allocator_api)]
 #![feature(new_uninit)] 
 #![feature(core_intrinsics)]
+#![feature(const_type_name)]
 
 extern crate test;
 

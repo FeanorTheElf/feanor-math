@@ -6,7 +6,7 @@ use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::cell::RefCell;
 
 use crate::vector::{VectorView, VectorViewMut};
-
+use crate::default_memory_provider;
 use super::MemoryProvider;
 
 pub struct CachedMemoryData<T: Sized> {
@@ -86,6 +86,10 @@ impl<T: Sized> CachingMemoryProvider<T> {
             Entry::Vacant(mems) => { mems.insert(vec![element]); }
         };
     }
+
+    unsafe fn create_new(&self, size: usize) -> Box<[MaybeUninit<T>]> {
+        default_memory_provider!().get_new(size, |_| {}).into_boxed_slice()
+    }
 }
 
 impl<T: Sized> MemoryProvider<T> for Rc<CachingMemoryProvider<T>> {
@@ -103,7 +107,7 @@ impl<T: Sized> MemoryProvider<T> for Rc<CachingMemoryProvider<T>> {
                 };
             }
         }
-        let mut result = Box::new_uninit_slice(size);
+        let mut result = self.create_new(size);
         initializer(&mut *result);
         return CachedMemoryData {
             data: Some(result),

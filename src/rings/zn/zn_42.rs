@@ -497,18 +497,20 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
 /// the FFT requires a high amount of multiplications with the internally stored
 /// roots of unity.
 /// ```
+/// # #![feature(const_type_name)]
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::zn_42::*;
 /// # use feanor_math::algorithms::fft::*;
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
 /// # use feanor_math::mempool::*;
+/// # use feanor_math::default_memory_provider;
 /// let ring = Zn::new(1073872897);
 /// let fastmul_ring = ZnFastmul::new(ring);
 /// // The values stored by the FFT table are elements of `ZnFastmulBase`
 /// let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, 15).unwrap();
 /// // Note that data uses `ZnBase`
 /// let mut data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
-/// fft.unordered_fft(&mut data[..], &ring, &DEFAULT_MEMORY_PROVIDER);
+/// fft.unordered_fft(&mut data[..], &ring, &default_memory_provider!());
 /// ```
 /// 
 #[derive(PartialEq, Clone, Copy)]

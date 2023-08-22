@@ -243,13 +243,13 @@ impl<R1, V1, M1, R2, V2, M2> CanonicalIso<FreeAlgebraImplBase<R1, V1, M1>> for F
 
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use crate::default_memory_provider;
 
 #[cfg(test)]
 fn test_ring_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 2], DefaultMemoryProvider>, Vec<FreeAlgebraEl<StaticRing<i64>, DefaultMemoryProvider>>) {
-    use crate::mempool::DEFAULT_MEMORY_PROVIDER;
-
     let ZZ = StaticRing::<i64>::RING;
-    let R = FreeAlgebraImpl::new(ZZ, [1, 1], DEFAULT_MEMORY_PROVIDER);
+    let R = FreeAlgebraImpl::new(ZZ, [1, 1], default_memory_provider!());
     let mut elements = Vec::new();
     for a in -3..=3 {
         for b in -3..=3 {
