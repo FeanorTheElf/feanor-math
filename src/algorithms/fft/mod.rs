@@ -50,7 +50,7 @@ pub trait FFTTable {
             M: MemoryProvider<El<S>>
     {
         self.unordered_fft(&mut values, ring, memory_provider);
-        permute::permute_inv(&mut values, |i| self.unordered_fft_permutation(i), &AllocatingMemoryProvider);
+        permute::permute_inv(&mut values, |i| self.unordered_fft_permutation(i), &DEFAULT_MEMORY_PROVIDER);
     }
         
     fn inv_fft<V, S, M>(&self, mut values: V, ring: S, memory_provider: &M)
@@ -59,7 +59,7 @@ pub trait FFTTable {
             V: SwappableVectorViewMut<El<S>>,
             M: MemoryProvider<El<S>>
     {
-        permute::permute(&mut values, |i| self.unordered_fft_permutation(i), &AllocatingMemoryProvider);
+        permute::permute(&mut values, |i| self.unordered_fft_permutation(i), &DEFAULT_MEMORY_PROVIDER);
         self.unordered_inv_fft(&mut values, ring, memory_provider);
     }
 
@@ -74,12 +74,18 @@ pub trait FFTTable {
     /// Note that the FFT of a sequence `a_0, ..., a_(N - 1)` is defined as `Fa_k = sum_i a_i z^(-ik)`
     /// where `z` is an N-th root of unity.
     /// 
+    /// The given memory_provider is used in the case that temporary memory is required, as e.g.
+    /// for [`crate::algorithms::fft::bluestein::FFTTableBluestein`] .
+    /// 
     fn unordered_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
         where S: RingStore, 
             S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
             V: VectorViewMut<El<S>>,
             M: MemoryProvider<El<S>>;
-        
+    
+    ///
+    /// Inverse to [`Self::unordered_fft()`], with basically the same contract.
+    /// 
     fn unordered_inv_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
         where S: RingStore, 
             S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 

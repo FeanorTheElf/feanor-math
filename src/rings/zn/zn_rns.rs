@@ -1,4 +1,4 @@
-use crate::mempool::{MemoryProvider, AllocatingMemoryProvider};
+use crate::mempool::*;
 use crate::vector::VectorView;
 use crate::{integer::IntegerRingStore, divisibility::DivisibilityRingStore};
 use crate::rings::zn::*;
@@ -53,7 +53,7 @@ use crate::primitive_int::*;
 /// assert!(R.eq_el(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
 /// ```
 /// 
-pub struct ZnBase<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>> = AllocatingMemoryProvider> 
+pub struct ZnBase<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>> = DefaultMemoryProvider> 
     where C::Type: ZnRing + CanonicalHom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
@@ -72,7 +72,7 @@ impl<C: ZnRingStore + Clone, J: IntegerRingStore> Zn<C, J>
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
     pub fn new(component_rings: Vec<C>, large_integers: J) -> Self {
-        Self::from(ZnBase::new(component_rings, large_integers, AllocatingMemoryProvider))
+        Self::from(ZnBase::new(component_rings, large_integers, DEFAULT_MEMORY_PROVIDER))
     }
 }
 
@@ -95,7 +95,7 @@ impl<J: IntegerRingStore> ZnBase<zn_42::Zn, J>
         Self::new(
             primes.into_iter().map(|n| zn_42::Zn::new(n)).collect(),
             large_integers,
-            AllocatingMemoryProvider
+            DEFAULT_MEMORY_PROVIDER
         )
     }
 }

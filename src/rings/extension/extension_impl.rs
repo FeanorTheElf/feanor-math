@@ -7,7 +7,7 @@ use crate::vector::vec_fn::RingElVectorViewFn;
 use crate::ring::*;
 use crate::algorithms;
 use crate::vector::VectorView;
-use crate::mempool::AllocatingMemoryProvider;
+use crate::mempool::DefaultMemoryProvider;
 
 use super::*;
 
@@ -25,7 +25,7 @@ pub struct FreeAlgebraEl<R, M>
     values: M::Object
 }
 
-pub type FreeAlgebraImpl<R, V, M = AllocatingMemoryProvider> = RingValue<FreeAlgebraImplBase<R, V, M>>;
+pub type FreeAlgebraImpl<R, V, M = DefaultMemoryProvider> = RingValue<FreeAlgebraImplBase<R, V, M>>;
 
 impl<R, V, M> FreeAlgebraImpl<R, V, M>
     where R: RingStore, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
@@ -245,9 +245,11 @@ impl<R1, V1, M1, R2, V2, M2> CanonicalIso<FreeAlgebraImplBase<R1, V1, M1>> for F
 use crate::primitive_int::StaticRing;
 
 #[cfg(test)]
-fn test_ring_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 2], AllocatingMemoryProvider>, Vec<FreeAlgebraEl<StaticRing<i64>, AllocatingMemoryProvider>>) {
+fn test_ring_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 2], DefaultMemoryProvider>, Vec<FreeAlgebraEl<StaticRing<i64>, DefaultMemoryProvider>>) {
+    use crate::mempool::DEFAULT_MEMORY_PROVIDER;
+
     let ZZ = StaticRing::<i64>::RING;
-    let R = FreeAlgebraImpl::new(ZZ, [1, 1], AllocatingMemoryProvider);
+    let R = FreeAlgebraImpl::new(ZZ, [1, 1], DEFAULT_MEMORY_PROVIDER);
     let mut elements = Vec::new();
     for a in -3..=3 {
         for b in -3..=3 {

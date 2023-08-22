@@ -10,6 +10,16 @@ pub mod caching;
 /// just allocate memory, or alternatively all kinds of memory pools and recyclers
 /// (e.g. [`caching::CachingMemoryProvider`]).
 /// 
+/// This is related to [`std::alloc::Allocator`], but less restrictive, as it may
+/// return objects with certain structure. In particular, it naturally allows e.g.
+/// memory pools or memory recycling.
+/// 
+/// It is usually used when certain objects or algorithms need frequent allocations
+/// (often all of the same size), either because they need temporary, internal memory,
+/// or they represent rings and have to allocate memory for elements. On the other hand,
+/// if a struct just needs to store some data during its lifetime, memory pooling is
+/// usually not useful, and a standard `Vec` is often used instead.
+/// 
 pub trait MemoryProvider<T> {
 
     type Object: Deref<Target = [T]> + DerefMut + VectorViewMut<T>;
@@ -126,7 +136,7 @@ impl<T> MemoryProvider<T> for LoggingMemoryProvider {
     type Object = Vec<T>;
 
     unsafe fn get_new<F: FnOnce(&mut [MaybeUninit<T>])>(&self, size: usize, initializer: F) -> Self::Object {
-        println!("[{}]: Allocating {} entries", self.description, size);
+        println!("[{}]: Allocating {} entries of size {}", self.description, size, std::mem::size_of::<T>());
         AllocatingMemoryProvider.get_new(size, initializer)
     }
 }
@@ -141,3 +151,12 @@ impl<T> GrowableMemoryProvider<T> for LoggingMemoryProvider {
         el.set_len(new_size);
     }
 }
+
+#[cfg(not(feature = "log_memory"))]
+pub type DefaultMemoryProvider = AllocatingMemoryProvider;
+#[cfg(not(feature = "log_memory"))]
+pub static DEFAULT_MEMORY_PROVIDER: DefaultMemoryProvider = AllocatingMemoryProvider;
+#[cfg(feature = "log_memory")]
+pub type DefaultMemoryProvider = LoggingMemoryProvider;
+#[cfg(feature = "log_memory")]
+pub static DEFAULT_MEMORY_PROVIDER: DefaultMemoryProvider = LoggingMemoryProvider::new("global");

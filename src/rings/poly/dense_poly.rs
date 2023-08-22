@@ -1,7 +1,7 @@
 use crate::divisibility::*;
 use crate::euclidean::*;
 use crate::field::Field;
-use crate::mempool::{AllocatingMemoryProvider, GrowableMemoryProvider};
+use crate::mempool::{DefaultMemoryProvider, GrowableMemoryProvider};
 use crate::vector::VectorViewMut;
 use crate::ring::*;
 use crate::algorithms;
@@ -9,7 +9,7 @@ use crate::rings::poly::*;
 
 use std::cmp::min;
 
-pub struct DensePolyRingBase<R: RingStore, M: GrowableMemoryProvider<El<R>> = AllocatingMemoryProvider> {
+pub struct DensePolyRingBase<R: RingStore, M: GrowableMemoryProvider<El<R>> = DefaultMemoryProvider> {
     base_ring: R,
     unknown_name: &'static str,
     zero: El<R>,
@@ -29,12 +29,12 @@ impl<R: RingStore + Clone, M: GrowableMemoryProvider<El<R>> + Clone> Clone for D
 }
 
 #[allow(type_alias_bounds)]
-pub type DensePolyRing<R: RingStore, M: GrowableMemoryProvider<El<R>> = AllocatingMemoryProvider> = RingValue<DensePolyRingBase<R, M>>;
+pub type DensePolyRing<R: RingStore, M: GrowableMemoryProvider<El<R>> = DefaultMemoryProvider> = RingValue<DensePolyRingBase<R, M>>;
 
 impl<R: RingStore> DensePolyRing<R> {
 
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        Self::from(DensePolyRingBase::new(base_ring, unknown_name, AllocatingMemoryProvider::default()))
+        Self::from(DensePolyRingBase::new(base_ring, unknown_name, DefaultMemoryProvider::default()))
     }
 }
 

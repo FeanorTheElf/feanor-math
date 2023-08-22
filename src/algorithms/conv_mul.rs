@@ -40,7 +40,7 @@ fn bench_naive_mul(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         c.clear();
         c.resize(64, 0);
-        karatsuba(10, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &AllocatingMemoryProvider);
+        karatsuba(10, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &DEFAULT_MEMORY_PROVIDER);
         assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
         assert_eq!(c[62], 31 * 31);
     });
@@ -54,7 +54,7 @@ fn bench_karatsuba_mul(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         c.clear();
         c.resize(64, 0);
-        karatsuba(4, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &AllocatingMemoryProvider);
+        karatsuba(4, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &DEFAULT_MEMORY_PROVIDER);
         assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
         assert_eq!(c[62], 31 * 31);
     });

@@ -9,10 +9,14 @@ use super::{VectorView, map::MapFn, subvector::{SelfSubvectorView, SelfSubvector
 /// and can produce objects at each entry. In other words, this is like a 
 /// "random-access iterator".
 /// 
+/// In my experience, in most cases, you want to use [`std::iter::ExactSizeIterator`] instead.
+/// 
 /// # Related traits
 /// 
 /// If the entries are owned by the object, consider using the trait [crate::vector::VectorView].
-/// Instead of returning entries by value, it returns entries by reference.
+/// Instead of returning entries by value, it returns entries by reference. Otherwise, it is often
+/// better to use an [`std::iter::ExactSizeIterator`], as it allows move-semantics and can avoid
+/// cloning (if random access is not necessary).
 /// 
 /// # Blanket implementations
 /// 

@@ -508,7 +508,7 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
 /// let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, 15).unwrap();
 /// // Note that data uses `ZnBase`
 /// let mut data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
-/// fft.unordered_fft(&mut data[..], &ring, &AllocatingMemoryProvider);
+/// fft.unordered_fft(&mut data[..], &ring, &DEFAULT_MEMORY_PROVIDER);
 /// ```
 /// 
 #[derive(PartialEq, Clone, Copy)]

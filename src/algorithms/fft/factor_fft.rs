@@ -5,14 +5,13 @@ use crate::algorithms::fft::complex_fft::*;
 use crate::rings::float_complex::*;
 use crate::vector::subvector::*;
 
-pub struct FFTTableGenCooleyTuckey<R, T1, T2, M = AllocatingMemoryProvider> 
+pub struct FFTTableGenCooleyTuckey<R, T1, T2> 
     where R: RingStore,
         T1: FFTTable<Ring = R>,
-        T2: FFTTable<Ring = R>,
-        M: MemoryProvider<El<R>>
+        T2: FFTTable<Ring = R>
 {
-    twiddle_factors: M::Object,
-    inv_twiddle_factors: M::Object,
+    twiddle_factors: Vec<El<R>>,
+    inv_twiddle_factors: Vec<El<R>>,
     left_table: T1,
     right_table: T2,
     root_of_unity: El<R>
@@ -23,17 +22,7 @@ impl<R, T1, T2> FFTTableGenCooleyTuckey<R, T1, T2>
         T1: FFTTable<Ring = R>,
         T2: FFTTable<Ring = R>
 {
-    pub fn new(root_of_unity: El<R>, left_table: T1, right_table: T2) -> Self {
-        Self::new_with_mem(root_of_unity, left_table, right_table, &AllocatingMemoryProvider)
-    }
-}
-impl<R, T1, T2, M> FFTTableGenCooleyTuckey<R, T1, T2, M>
-    where R: RingStore,
-        T1: FFTTable<Ring = R>,
-        T2: FFTTable<Ring = R>,
-        M: MemoryProvider<El<R>>
-{
-    pub fn new_with_mem_and_pows<F>(mut root_of_unity_pows: F, left_table: T1, right_table: T2, memory_provider: &M) -> Self
+    pub fn new_with_pows<F>(mut root_of_unity_pows: F, left_table: T1, right_table: T2) -> Self
         where F: FnMut(i64) -> El<R>
     {
         assert!(left_table.ring().get_ring() == right_table.ring().get_ring());
@@ -43,8 +32,8 @@ impl<R, T1, T2, M> FFTTableGenCooleyTuckey<R, T1, T2, M>
         assert!(ring.get_ring().is_approximate() || ring.eq_el(&root_of_unity_pows(left_table.len() as i64), right_table.root_of_unity()));
 
         let root_of_unity = root_of_unity_pows(1);
-        let inv_twiddle_factors = Self::create_twiddle_factors(|i| root_of_unity_pows(-i), &left_table, &right_table, memory_provider);
-        let twiddle_factors = Self::create_twiddle_factors(root_of_unity_pows, &left_table, &right_table, memory_provider);
+        let inv_twiddle_factors = Self::create_twiddle_factors(|i| root_of_unity_pows(-i), &left_table, &right_table);
+        let twiddle_factors = Self::create_twiddle_factors(root_of_unity_pows, &left_table, &right_table);
 
         FFTTableGenCooleyTuckey {
             twiddle_factors: twiddle_factors,
@@ -63,7 +52,7 @@ impl<R, T1, T2, M> FFTTableGenCooleyTuckey<R, T1, T2, M>
         &self.right_table
     }
     
-    pub fn new_with_mem(root_of_unity: El<R>, left_table: T1, right_table: T2, memory_provider: &M) -> Self {
+    pub fn new(root_of_unity: El<R>, left_table: T1, right_table: T2) -> Self {
         assert!(left_table.ring().get_ring() == right_table.ring().get_ring());
         let ring = left_table.ring();
         assert!(!ring.get_ring().is_approximate());
@@ -78,8 +67,8 @@ impl<R, T1, T2, M> FFTTableGenCooleyTuckey<R, T1, T2, M>
         assert!(ring.eq_el(&root_of_unity_pows(right_table.len() as i64), left_table.root_of_unity()));
         assert!(ring.eq_el(&root_of_unity_pows(left_table.len() as i64), right_table.root_of_unity()));
 
-        let inv_twiddle_factors = Self::create_twiddle_factors(|i| root_of_unity_pows(-i), &left_table, &right_table, memory_provider);
-        let twiddle_factors = Self::create_twiddle_factors(root_of_unity_pows, &left_table, &right_table, memory_provider);
+        let inv_twiddle_factors = Self::create_twiddle_factors(|i| root_of_unity_pows(-i), &left_table, &right_table);
+        let twiddle_factors = Self::create_twiddle_factors(root_of_unity_pows, &left_table, &right_table);
 
         FFTTableGenCooleyTuckey {
             twiddle_factors: twiddle_factors,
@@ -90,10 +79,10 @@ impl<R, T1, T2, M> FFTTableGenCooleyTuckey<R, T1, T2, M>
         }
     }
 
-    fn create_twiddle_factors<F>(mut root_of_unity_pows: F, left_table: &T1, right_table: &T2, memory_provider: &M) -> M::Object
+    fn create_twiddle_factors<F>(mut root_of_unity_pows: F, left_table: &T1, right_table: &T2) -> Vec<El<R>>
         where F: FnMut(i64) -> El<R>
     {
-        memory_provider.get_new_init(left_table.len() * right_table.len(), |i| {
+        AllocatingMemoryProvider.get_new_init(left_table.len() * right_table.len(), |i| {
             let ri = i % right_table.len();
             let li = i / right_table.len();
             return root_of_unity_pows(left_table.unordered_fft_permutation(li) as i64 * ri as i64);
@@ -101,11 +90,10 @@ impl<R, T1, T2, M> FFTTableGenCooleyTuckey<R, T1, T2, M>
     }
 }
 
-impl<R, T1, T2, M> PartialEq for FFTTableGenCooleyTuckey<R, T1, T2, M>
+impl<R, T1, T2> PartialEq for FFTTableGenCooleyTuckey<R, T1, T2>
     where R: RingStore,
         T1: FFTTable<Ring = R> + PartialEq,
-        T2: FFTTable<Ring = R> + PartialEq,
-        M: MemoryProvider<El<R>>
+        T2: FFTTable<Ring = R> + PartialEq
 {
     fn eq(&self, other: &Self) -> bool {
         self.ring().get_ring() == other.ring().get_ring() &&
@@ -115,11 +103,10 @@ impl<R, T1, T2, M> PartialEq for FFTTableGenCooleyTuckey<R, T1, T2, M>
     }
 }
 
-impl<R, T1, T2, M> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2, M>
+impl<R, T1, T2> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2>
     where R: RingStore,
         T1: FFTTable<Ring = R>,
-        T2: FFTTable<Ring = R>,
-        M: MemoryProvider<El<R>>
+        T2: FFTTable<Ring = R>
 {
     type Ring = R;
 
@@ -187,11 +174,10 @@ impl<R, T1, T2, M> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2, M>
     }
 }
 
-impl<R, T1, T2, M> ErrorEstimate for FFTTableGenCooleyTuckey<R, T1, T2, M> 
+impl<R, T1, T2> ErrorEstimate for FFTTableGenCooleyTuckey<R, T1, T2> 
     where R: RingStore<Type = Complex64>, 
         T1: FFTTable<Ring = R> + ErrorEstimate, 
-        T2: FFTTable<Ring = R> + ErrorEstimate, 
-        M: MemoryProvider<El<R>>
+        T2: FFTTable<Ring = R> + ErrorEstimate
 {
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
         let error_after_first_fft = self.left_table.expected_absolute_error(input_bound, input_error);
@@ -205,6 +191,8 @@ impl<R, T1, T2, M> ErrorEstimate for FFTTableGenCooleyTuckey<R, T1, T2, M>
 use crate::rings::zn::zn_static::Zn;
 #[cfg(test)]
 use crate::algorithms;
+#[cfg(test)]
+use crate::rings::zn::zn_42;
 
 #[test]
 fn test_fft_basic() {
@@ -221,7 +209,7 @@ fn test_fft_basic() {
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
-    fft.unordered_fft(&mut values, ring, &AllocatingMemoryProvider);
+    fft.unordered_fft(&mut values, ring, &DEFAULT_MEMORY_PROVIDER);
     assert_eq!(values, permuted_expected);
 }
 
@@ -240,7 +228,7 @@ fn test_fft_long() {
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
-    fft.unordered_fft(&mut values, ring, &AllocatingMemoryProvider);
+    fft.unordered_fft(&mut values, ring, &DEFAULT_MEMORY_PROVIDER);
     assert_eq!(values, permuted_expected);
 }
 
@@ -260,17 +248,17 @@ fn test_fft_unordered() {
     }
     let original = values;
 
-    fft.unordered_fft(&mut values, ring, &AllocatingMemoryProvider);
+    fft.unordered_fft(&mut values, ring, &DEFAULT_MEMORY_PROVIDER);
 
     let mut ordered_fft = [0; LEN];
     for i in 0..LEN {
         ordered_fft[fft.unordered_fft_permutation(i)] = values[i];
     }
 
-    fft.unordered_inv_fft(&mut values, ring, &AllocatingMemoryProvider);
+    fft.unordered_inv_fft(&mut values, ring, &DEFAULT_MEMORY_PROVIDER);
     assert_eq!(values, original);
 
-    fft.inv_fft(&mut ordered_fft, ring, &AllocatingMemoryProvider);
+    fft.inv_fft(&mut ordered_fft, ring, &DEFAULT_MEMORY_PROVIDER);
     assert_eq!(ordered_fft, original);
 }
 
@@ -301,7 +289,7 @@ fn test_inv_fft() {
     let mut values = [3, 62, 63, 96, 37, 36];
     let expected = [1, 0, 0, 1, 0, 1];
 
-    fft.inv_fft(&mut values, ring, &AllocatingMemoryProvider);
+    fft.inv_fft(&mut values, ring, &DEFAULT_MEMORY_PROVIDER);
     assert_eq!(values, expected);
 }
 
@@ -309,14 +297,13 @@ fn test_inv_fft() {
 fn test_approximate_fft() {
     let CC = Complex64::RING;
     for (p, log2_n) in [(5, 3), (53, 5), (101, 8), (503, 10)] {
-        let fft = FFTTableGenCooleyTuckey::new_with_mem_and_pows(
+        let fft = FFTTableGenCooleyTuckey::new_with_pows(
             |i| CC.root_of_unity(i, (p as i64) << log2_n), 
-            bluestein::FFTTableBluestein::for_complex_with_mem(CC, p, &AllocatingMemoryProvider), 
-            cooley_tuckey::FFTTableCooleyTuckey::for_complex_with_mem(CC, log2_n, &AllocatingMemoryProvider), 
-            &AllocatingMemoryProvider
+            bluestein::FFTTableBluestein::for_complex(CC, p), 
+            cooley_tuckey::FFTTableCooleyTuckey::for_complex(CC, log2_n)
         );
-        let mut array = AllocatingMemoryProvider.get_new_init(p << log2_n, |i| CC.root_of_unity(i as i64, (p as i64) << log2_n));
-        fft.fft(&mut array, CC, &AllocatingMemoryProvider);
+        let mut array = DEFAULT_MEMORY_PROVIDER.get_new_init(p << log2_n, |i| CC.root_of_unity(i as i64, (p as i64) << log2_n));
+        fft.fft(&mut array, CC, &DEFAULT_MEMORY_PROVIDER);
         let err = fft.expected_absolute_error(1., 0.);
         println!("{}, {}", err, err / CC.abs(CC.sub(array[1], CC.from_f64(fft.len() as f64))));
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
@@ -325,4 +312,26 @@ fn test_approximate_fft() {
             assert!(CC.is_absolute_approx_eq(array[i], CC.zero(), err));
         }
     }
+}
+
+#[bench]
+fn bench_factor_fft(bencher: &mut test::Bencher) {
+    let ring = zn_42::Zn::new(1602564097);
+    let fastmul_ring = zn_42::ZnFastmul::new(ring);
+    let embed = |x: El<zn_42::Zn>| ring.cast(&fastmul_ring, x);
+    let root_of_unity = algorithms::unity_root::get_prim_root_of_unity(&ring, 2 * 31 * 601).unwrap();
+    let fft = FFTTableGenCooleyTuckey::new(
+        embed(ring.pow(root_of_unity, 2)),
+        bluestein::FFTTableBluestein::new(fastmul_ring, embed(ring.pow(root_of_unity, 31)), embed(algorithms::unity_root::get_prim_root_of_unity_pow2(&ring, 11).unwrap()), 601, 11),
+        bluestein::FFTTableBluestein::new(fastmul_ring, embed(ring.pow(root_of_unity, 601)), embed(algorithms::unity_root::get_prim_root_of_unity_pow2(&ring, 6).unwrap()), 31, 6),
+    );
+    let data = (0..(31 * 601)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+    let mut copy = Vec::with_capacity(31 * 601);
+    bencher.iter(|| {
+        copy.clear();
+        copy.extend(data.iter().map(|x| ring.clone_el(x)));
+        fft.unordered_fft(&mut copy[..], &ring, &DEFAULT_MEMORY_PROVIDER);
+        fft.unordered_inv_fft(&mut copy[..], &ring, &DEFAULT_MEMORY_PROVIDER);
+        assert_el_eq!(&ring, &copy[0], &data[0]);
+    });
 }

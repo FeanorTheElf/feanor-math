@@ -1,4 +1,4 @@
-use crate::mempool::MemoryProvider;
+use crate::mempool::*;
 use crate::ring::*;
 use crate::vector::*;
 use crate::vector::subvector::*;
@@ -204,8 +204,6 @@ fn karatsuba_mem_size(block_size_log2: usize, threshold_size_log2: usize) -> usi
 
 #[cfg(test)]
 use crate::primitive_int::*;
-#[cfg(test)]
-use crate::mempool::AllocatingMemoryProvider;
 
 #[test]
 fn test_karatsuba_impl() {
@@ -220,12 +218,12 @@ fn test_karatsuba_impl() {
 #[test]
 fn test_karatsuba_mul() {
     let mut c = vec![0, 0, 0, 0];
-    karatsuba(0, &mut c[..], &[-1, 0][..], &[1, 0][..], StaticRing::<i64>::RING, &AllocatingMemoryProvider);
+    karatsuba(0, &mut c[..], &[-1, 0][..], &[1, 0][..], StaticRing::<i64>::RING, &DEFAULT_MEMORY_PROVIDER);
     assert_eq!(vec![-1, 0, 0, 0], c);
 
     let a = vec![1, 0, 1, 0, 1, 2, 3];
     let b = vec![3, 4];
     let mut c = vec![0, 0, 0, 0, 0, 0, 0, 0, 0];
-    karatsuba(0, &mut c[..], &a[..], &b[..], StaticRing::<i64>::RING, &AllocatingMemoryProvider);
+    karatsuba(0, &mut c[..], &a[..], &b[..], StaticRing::<i64>::RING, &DEFAULT_MEMORY_PROVIDER);
     assert_eq!(vec![3, 4, 3, 4, 3, 10, 17, 12, 0], c);
 }
