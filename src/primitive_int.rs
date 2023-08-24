@@ -114,6 +114,30 @@ impl<T: PrimitiveInt> CanonicalIso<RustBigintRingBase> for StaticRingBase<T> {
     }
 }
 
+#[cfg(feature = "mpir")]
+impl<T: PrimitiveInt> CanonicalHom<crate::rings::mpir::MPZBase> for StaticRingBase<T> {
+
+    fn has_canonical_hom(&self, _: &crate::rings::mpir::MPZBase) -> Option<()> {
+        Some(())
+    }
+
+    fn map_in(&self, from: &crate::rings::mpir::MPZBase, el: crate::rings::mpir::MPZEl, _: &()) -> T {
+        from.map_out(self, el, &())
+    }
+}
+
+#[cfg(feature = "mpir")]
+impl<T: PrimitiveInt> CanonicalIso<crate::rings::mpir::MPZBase> for StaticRingBase<T> {
+
+    fn has_canonical_iso(&self, _: &crate::rings::mpir::MPZBase) -> Option<()> {
+        Some(())
+    }
+
+    fn map_out(&self, from: &crate::rings::mpir::MPZBase, el: T, _: &()) -> crate::rings::mpir::MPZEl {
+        from.map_in(self, el, &())
+    }
+}
+
 impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
     
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {

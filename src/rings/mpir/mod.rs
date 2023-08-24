@@ -9,6 +9,7 @@ use crate::primitive_int::StaticRingBase;
 use crate::ring::*;
 use crate::integer::*;
 use crate::rings::rust_bigint::*;
+use crate::primitive_int::PrimitiveInt;
 
 mod mpir_bindings;
 
@@ -510,87 +511,33 @@ impl CanonicalIso<RustBigintRingBase> for MPZBase {
     }
 }
 
-impl CanonicalHom<StaticRingBase<i8>> for MPZBase {
+impl<T: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for MPZBase {
 
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, _: &StaticRingBase<i8>) -> Option<Self::Homomorphism> {
+    default fn has_canonical_hom(&self, _: &StaticRingBase<T>) -> Option<Self::Homomorphism> {
         Some(())
     }
 
-    fn map_in(&self, _: &StaticRingBase<i8>, el: i8, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in(StaticRing::<i64>::RING.get_ring(), el.into(), hom)
+    default fn map_in(&self, _: &StaticRingBase<T>, el: T, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in(StaticRing::<i64>::RING.get_ring(), <_ as Into<i128>>::into(el).try_into().unwrap(), hom)
     }
 }
 
-impl CanonicalIso<StaticRingBase<i8>> for MPZBase {
+impl<T: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for MPZBase {
 
     type Isomorphism = ();
 
-    fn has_canonical_iso(&self, _: &StaticRingBase<i8>) -> Option<Self::Isomorphism> {
+    default fn has_canonical_iso(&self, _: &StaticRingBase<T>) -> Option<Self::Isomorphism> {
         Some(())
     }
 
-    fn map_out(&self, _: &StaticRingBase<i8>, el: Self::Element, iso: &Self::Isomorphism) -> <StaticRingBase<i8> as RingBase>::Element {
-        self.map_out(StaticRing::<i64>::RING.get_ring(), el, iso).try_into().unwrap()
-    }
-}
-
-impl CanonicalHom<StaticRingBase<i16>> for MPZBase {
-
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, _: &StaticRingBase<i16>) -> Option<Self::Homomorphism> {
-        Some(())
-    }
-
-    fn map_in(&self, _: &StaticRingBase<i16>, el: i16, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in(StaticRing::<i64>::RING.get_ring(), el.into(), hom)
-    }
-}
-
-impl CanonicalIso<StaticRingBase<i16>> for MPZBase {
-
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, _: &StaticRingBase<i16>) -> Option<Self::Isomorphism> {
-        Some(())
-    }
-
-    fn map_out(&self, _: &StaticRingBase<i16>, el: Self::Element, iso: &Self::Isomorphism) -> <StaticRingBase<i16> as RingBase>::Element {
-        self.map_out(StaticRing::<i64>::RING.get_ring(), el, iso).try_into().unwrap()
-    }
-}
-
-impl CanonicalHom<StaticRingBase<i32>> for MPZBase {
-
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, _: &StaticRingBase<i32>) -> Option<Self::Homomorphism> {
-        Some(())
-    }
-
-    fn map_in(&self, _: &StaticRingBase<i32>, el: i32, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in(StaticRing::<i64>::RING.get_ring(), el.into(), hom)
-    }
-}
-
-impl CanonicalIso<StaticRingBase<i32>> for MPZBase {
-
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, _: &StaticRingBase<i32>) -> Option<Self::Isomorphism> {
-        Some(())
-    }
-
-    fn map_out(&self, _: &StaticRingBase<i32>, el: Self::Element, iso: &Self::Isomorphism) -> <StaticRingBase<i32> as RingBase>::Element {
-        self.map_out(StaticRing::<i64>::RING.get_ring(), el, iso).try_into().unwrap()
+    default fn map_out(&self, _: &StaticRingBase<T>, el: Self::Element, iso: &Self::Isomorphism) -> T {
+        i128::from(self.map_out(StaticRing::<i64>::RING.get_ring(), el, iso)).try_into().ok().unwrap()
     }
 }
 
 impl CanonicalHom<StaticRingBase<i64>> for MPZBase {
-
-    type Homomorphism = ();
 
     fn has_canonical_hom(&self, _: &StaticRingBase<i64>) -> Option<Self::Homomorphism> {
         Some(())
@@ -606,8 +553,6 @@ impl CanonicalHom<StaticRingBase<i64>> for MPZBase {
 }
 
 impl CanonicalIso<StaticRingBase<i64>> for MPZBase {
-
-    type Isomorphism = ();
 
     fn has_canonical_iso(&self, _: &StaticRingBase<i64>) -> Option<Self::Isomorphism> {
         Some(())
@@ -631,8 +576,6 @@ impl CanonicalIso<StaticRingBase<i64>> for MPZBase {
 
 impl CanonicalHom<StaticRingBase<i128>> for MPZBase {
 
-    type Homomorphism = ();
-
     fn has_canonical_hom(&self, _: &StaticRingBase<i128>) -> Option<Self::Homomorphism> {
         Some(())
     }
@@ -650,8 +593,6 @@ impl CanonicalHom<StaticRingBase<i128>> for MPZBase {
 }
 
 impl CanonicalIso<StaticRingBase<i128>> for MPZBase {
-
-    type Isomorphism = ();
 
     fn has_canonical_iso(&self, _: &StaticRingBase<i128>) -> Option<Self::Isomorphism> {
         Some(())

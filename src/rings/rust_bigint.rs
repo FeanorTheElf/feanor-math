@@ -215,6 +215,34 @@ impl CanonicalIso<RustBigintRingBase> for RustBigintRingBase {
     fn map_out(&self, _: &RustBigintRingBase, el: RustBigint, _: &()) -> Self::Element { el }
 }
 
+#[cfg(feature = "mpir")]
+impl CanonicalHom<crate::rings::mpir::MPZBase> for RustBigintRingBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, _: &crate::rings::mpir::MPZBase) -> Option<()> {
+        Some(())
+    }
+
+    fn map_in(&self, from: &crate::rings::mpir::MPZBase, el: crate::rings::mpir::MPZEl, _: &()) -> RustBigint {
+        from.map_out(self, el, &())
+    }
+}
+
+#[cfg(feature = "mpir")]
+impl CanonicalIso<crate::rings::mpir::MPZBase> for RustBigintRingBase {
+
+    type Isomorphism = ();
+
+    fn has_canonical_iso(&self, _: &crate::rings::mpir::MPZBase) -> Option<()> {
+        Some(())
+    }
+
+    fn map_out(&self, from: &crate::rings::mpir::MPZBase, el: RustBigint, _: &()) -> crate::rings::mpir::MPZEl {
+        from.map_in(self, el, &())
+    }
+}
+
 impl OrderedRing for RustBigintRingBase {
 
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
