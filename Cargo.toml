@@ -2,6 +2,16 @@
 name = "feanor-math"
 version = "1.0.0"
 edition = "2021"
+authors = ["Simon Pohmann <simon@pohmann.de>"]
+
+repository = "https://github.com/FeanorTheElf/feanor-math"
+homepage = "https://github.com/FeanorTheElf/feanor-math"
+keywords = ["math", "mathematics", "primes", "number-theory"]
+readme = "Readme.md"
+description = "A library for number theory, providing implementations for the arithmetic in various rings and algorithms working on them."
+
+[badges]
+maintenance = { status = "actively-developed" }
 
 [lib]
 crate-type = ["rlib"]
