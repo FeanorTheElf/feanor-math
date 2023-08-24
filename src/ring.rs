@@ -1388,7 +1388,6 @@ pub fn generic_test_canonical_iso_axioms<R: RingStore, S: RingStore, I: Iterator
     let elements = edge_case_elements.collect::<Vec<_>>();
 
     for a in &elements {
-        to.println(&to.get_ring().map_in_ref(from.get_ring(), a, &hom));
         assert_el_eq!(&from,
             a, 
             &to.get_ring().map_out(from.get_ring(), to.get_ring().map_in_ref(from.get_ring(), a, &hom), &iso)

@@ -8,7 +8,7 @@ use crate::primitive_int::StaticRing;
 use crate::primitive_int::StaticRingBase;
 use crate::ring::*;
 use crate::integer::*;
-use super::bigint::*;
+use crate::rings::rust_bigint::*;
 
 mod mpir_bindings;
 
@@ -58,38 +58,38 @@ impl MPZ {
 
 impl MPZBase {
 
-    pub fn from_base_u64_repr<I: IntoIterator<Item = u64>>(&self, dst: &mut MPZEl, input: I) {
+    pub fn from_base_u64_repr(&self, dst: &mut MPZEl, input: &[u64]) {
         unsafe {
             assert_eq!(std::mem::size_of::<mpir_bindings::mpir_ui>(), std::mem::size_of::<u64>());
-            let data: Vec<mpir_bindings::mpir_ui> = input.into_iter().collect();
-            if data.len() == 0 {
+            if input.len() == 0 {
                 mpir_bindings::__gmpz_set_ui(&mut dst.integer as mpir_bindings::mpz_ptr, 0);
                 return;
             }
-            assert!(data.len() > 0);
+            assert!(input.len() > 0);
             mpir_bindings::__gmpz_import(
                 &mut dst.integer as mpir_bindings::mpz_ptr, 
-                data.len(), 
+                input.len(), 
                 -1i32,
                 (u64::BITS / 8) as libc::size_t,
                 0, 
                 0, 
-                (data.as_ptr() as *const mpir_bindings::mpir_ui) as *const libc::c_void
+                (input.as_ptr() as *const mpir_bindings::mpir_ui) as *const libc::c_void
             );
         }
     }
 
-    pub fn abs_base_u64_repr(&self, src: &MPZEl) -> impl 'static + Iterator<Item = u64> {
-        unsafe {
-            let size = self.abs_highest_set_bit(src).map(|n| n + 1).unwrap_or(0);
-            let mut data = Vec::new();
+    pub fn abs_base_u64_repr_len(&self, src: &MPZEl) -> usize {
+        self.abs_highest_set_bit(src).map(|n| (n / u64::BITS as usize) + 1).unwrap_or(0)
+    }
 
-            if size > 0 {
-                data.resize(size, 0u64);
+    pub fn abs_base_u64_repr(&self, src: &MPZEl, out: &mut [u64]) {
+        unsafe {
+            if self.abs_base_u64_repr_len(src) > 0 {
+                assert!(out.len() >= self.abs_base_u64_repr_len(src));
                 let mut size = 0;
         
                 mpir_bindings::__gmpz_export(
-                    (data.as_mut_ptr() as *mut mpir_bindings::mpir_ui) as *mut libc::c_void,
+                    (out.as_mut_ptr() as *mut mpir_bindings::mpir_ui) as *mut libc::c_void,
                     &mut size,
                     -1,
                     (u64::BITS / 8) as libc::size_t,
@@ -97,9 +97,14 @@ impl MPZBase {
                     0,
                     &src.integer as mpir_bindings::mpz_srcptr
                 );
-                assert_eq!(size, size);
+                for i in size..out.len() {
+                    out[i] = 0;
+                }
+            } else {
+                for i in 0..out.len() {
+                    out[i] = 0;
+                }
             }
-            return data.into_iter();
         }
     }
 }
@@ -422,7 +427,7 @@ impl IntegerRing for MPZBase {
                 (data.as_ptr() as *const mpir_bindings::mpir_ui) as *const libc::c_void
             );
 
-            self.euclidean_div_pow_2(&mut result, len * 8 - log2_bound_exclusive);
+            self.euclidean_div_pow_2(&mut result, len * u64::BITS as usize - log2_bound_exclusive);
             return result;
         }
     }
@@ -473,7 +478,7 @@ impl CanonicalHom<RustBigintRingBase> for MPZBase {
 
     fn map_in_ref(&self, _: &RustBigintRingBase, el: &RustBigint, _: &Self::Homomorphism) -> Self::Element {
         let mut result = MPZEl::new();
-        self.from_base_u64_repr(&mut result, RustBigintRing::RING.get_ring().abs_base_u64_repr(&el));
+        self.from_base_u64_repr(&mut result, &RustBigintRing::RING.get_ring().abs_base_u64_repr(&el).collect::<Vec<_>>()[..]);
         if RustBigintRing::RING.is_neg(el) {
             self.negate_inplace(&mut result);
         }
@@ -494,12 +499,66 @@ impl CanonicalIso<RustBigintRingBase> for MPZBase {
     }
 
     fn map_out(&self, _: &RustBigintRingBase, el: Self::Element, _: &Self::Isomorphism) -> RustBigint {
-        let result = RustBigintRing::RING.get_ring().from_base_u64_repr(self.abs_base_u64_repr(&el));
+        let mut result = (0..self.abs_base_u64_repr_len(&el)).map(|_| 0u64).collect::<Vec<_>>();
+        self.abs_base_u64_repr(&el, &mut result[..]);
+        let result = RustBigintRing::RING.get_ring().from_base_u64_repr(result.into_iter());
         if self.is_neg(&el) {
             return RustBigintRing::RING.negate(result);
         } else {
             return result;
         }
+    }
+}
+
+impl CanonicalHom<StaticRingBase<i8>> for MPZBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, _: &StaticRingBase<i8>) -> Option<Self::Homomorphism> {
+        Some(())
+    }
+
+    fn map_in(&self, _: &StaticRingBase<i8>, el: i8, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in(StaticRing::<i64>::RING.get_ring(), el.into(), hom)
+    }
+}
+
+impl CanonicalIso<StaticRingBase<i8>> for MPZBase {
+
+    type Isomorphism = ();
+
+    fn has_canonical_iso(&self, _: &StaticRingBase<i8>) -> Option<Self::Isomorphism> {
+        Some(())
+    }
+
+    fn map_out(&self, _: &StaticRingBase<i8>, el: Self::Element, iso: &Self::Isomorphism) -> <StaticRingBase<i8> as RingBase>::Element {
+        self.map_out(StaticRing::<i64>::RING.get_ring(), el, iso).try_into().unwrap()
+    }
+}
+
+impl CanonicalHom<StaticRingBase<i16>> for MPZBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, _: &StaticRingBase<i16>) -> Option<Self::Homomorphism> {
+        Some(())
+    }
+
+    fn map_in(&self, _: &StaticRingBase<i16>, el: i16, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in(StaticRing::<i64>::RING.get_ring(), el.into(), hom)
+    }
+}
+
+impl CanonicalIso<StaticRingBase<i16>> for MPZBase {
+
+    type Isomorphism = ();
+
+    fn has_canonical_iso(&self, _: &StaticRingBase<i16>) -> Option<Self::Isomorphism> {
+        Some(())
+    }
+
+    fn map_out(&self, _: &StaticRingBase<i16>, el: Self::Element, iso: &Self::Isomorphism) -> <StaticRingBase<i16> as RingBase>::Element {
+        self.map_out(StaticRing::<i64>::RING.get_ring(), el, iso).try_into().unwrap()
     }
 }
 
@@ -566,6 +625,51 @@ impl CanonicalIso<StaticRingBase<i64>> for MPZBase {
             } else {
                 -i64::try_from(result).unwrap()
             }
+        }
+    }
+}
+
+impl CanonicalHom<StaticRingBase<i128>> for MPZBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, _: &StaticRingBase<i128>) -> Option<Self::Homomorphism> {
+        Some(())
+    }
+
+    fn map_in(&self, _: &StaticRingBase<i128>, el: i128, _: &Self::Homomorphism) -> Self::Element {
+        let el_abs = el.unsigned_abs();
+        let data = [(el_abs & u64::MAX as u128) as u64, (el_abs >> u64::BITS) as u64];
+        let mut result = MPZEl::new();
+        self.from_base_u64_repr(&mut result, &data[..]);
+        if el < 0 {
+            self.negate_inplace(&mut result);
+        }
+        return result;
+    }
+}
+
+impl CanonicalIso<StaticRingBase<i128>> for MPZBase {
+
+    type Isomorphism = ();
+
+    fn has_canonical_iso(&self, _: &StaticRingBase<i128>) -> Option<Self::Isomorphism> {
+        Some(())
+    }
+
+    fn map_out(&self, _: &StaticRingBase<i128>, el: Self::Element, _: &Self::Isomorphism) -> <StaticRingBase<i128> as RingBase>::Element {
+        assert!(self.abs_base_u64_repr_len(&el) <= 2);
+        let mut data = [0u64; 2];
+        self.abs_base_u64_repr(&el, &mut data);
+        let result = data[0] as u128 + ((data[1] as u128) << u64::BITS);
+        if self.is_neg(&el) {
+            if result == i128::MIN.unsigned_abs() {
+                return i128::MIN;
+            } else {
+                return -i128::try_from(result).unwrap();
+            }
+        } else {
+            return result.try_into().unwrap();
         }
     }
 }
@@ -647,6 +751,22 @@ fn test_canonical_iso_axioms_i32() {
 fn test_canonical_iso_axioms_i64() {
     generic_test_canonical_hom_axioms(StaticRing::<i64>::RING, MPZ::RING, [0, -1, 1, i32::MAX as i64, i32::MIN as i64].into_iter());
     generic_test_canonical_iso_axioms(StaticRing::<i64>::RING, MPZ::RING, [0, -1, 1, i32::MIN as i64, i32::MAX as i64].into_iter());
+
+    assert_el_eq!(&MPZ::RING, &MPZ::RING.sub(MPZ::RING.power_of_two(63), MPZ::RING.one()), &MPZ::RING.coerce(&StaticRing::<i64>::RING, i64::MAX));
+    assert_el_eq!(&MPZ::RING, &MPZ::RING.negate(MPZ::RING.power_of_two(63)), &MPZ::RING.coerce(&StaticRing::<i64>::RING, i64::MIN));
+    assert_eq!(i64::MAX, MPZ::RING.cast(&StaticRing::<i64>::RING, MPZ::RING.sub(MPZ::RING.power_of_two(63), MPZ::RING.one())));
+    assert_eq!(i64::MIN, MPZ::RING.cast(&StaticRing::<i64>::RING, MPZ::RING.negate(MPZ::RING.power_of_two(63))));
+}
+
+#[test]
+fn test_canonical_iso_axioms_i128() {
+    generic_test_canonical_hom_axioms(StaticRing::<i128>::RING, MPZ::RING, [0, -1, 1, i64::MAX as i128, i64::MIN as i128].into_iter());
+    generic_test_canonical_iso_axioms(StaticRing::<i128>::RING, MPZ::RING, [0, -1, 1, i64::MIN as i128, i64::MAX as i128].into_iter());
+
+    assert_el_eq!(&MPZ::RING, &MPZ::RING.sub(MPZ::RING.power_of_two(127), MPZ::RING.one()), &MPZ::RING.coerce(&StaticRing::<i128>::RING, i128::MAX));
+    assert_el_eq!(&MPZ::RING, &MPZ::RING.negate(MPZ::RING.power_of_two(127)), &MPZ::RING.coerce(&StaticRing::<i128>::RING, i128::MIN));
+    assert_eq!(i128::MAX, MPZ::RING.cast(&StaticRing::<i128>::RING, MPZ::RING.sub(MPZ::RING.power_of_two(127), MPZ::RING.one())));
+    assert_eq!(i128::MIN, MPZ::RING.cast(&StaticRing::<i128>::RING, MPZ::RING.negate(MPZ::RING.power_of_two(127))));
 }
 
 #[test]
