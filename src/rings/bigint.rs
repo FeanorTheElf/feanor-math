@@ -11,21 +11,6 @@ use std::cmp::Ordering::*;
 #[derive(Clone, Debug)]
 pub struct DefaultBigIntRingEl(bool, Vec<u64>);
 
-impl DefaultBigIntRingEl {
-    
-    pub fn parse(string: &str, base: u32) -> Result<DefaultBigIntRingEl, ()> {
-        let result = Vec::new();
-        let (negative, rest) = if string.chars().next() == Some('-') {
-            (true, string.split_at(1).1)
-        } else if string.chars().next() == Some('+') {
-            (false, string.split_at(1).1)
-        } else {
-            (false, string)
-        };
-        Ok(DefaultBigIntRingEl(negative, algorithms::bigint::from_str_radix(rest, base, result)?))
-    }
-}
-
 #[derive(Copy, Clone, PartialEq)]
 pub struct DefaultBigIntRing;
 
@@ -49,6 +34,28 @@ impl DefaultBigIntRing {
             Some(1) if !val.0 => i128::try_from(val.1[0] as u128 + ((val.1[1] as u128) << u64::BITS)).ok(),
             Some(_) => None
         }
+    }
+
+    pub fn parse(&self, string: &str, base: u32) -> Result<DefaultBigIntRingEl, ()> {
+        let result = Vec::new();
+        let (negative, rest) = if string.chars().next() == Some('-') {
+            (true, string.split_at(1).1)
+        } else if string.chars().next() == Some('+') {
+            (false, string.split_at(1).1)
+        } else {
+            (false, string)
+        };
+        Ok(DefaultBigIntRingEl(negative, algorithms::bigint::from_str_radix(rest, base, result)?))
+    }
+
+    pub fn abs_base_u64_repr<'a>(&self, el: &'a DefaultBigIntRingEl) -> impl 'a + Iterator<Item = u64> {
+        el.1.iter().copied()
+    }
+
+    pub fn from_base_u64_repr<I>(&self, data: I) -> <Self as RingBase>::Element
+        where I: Iterator<Item = u64>
+    {
+        DefaultBigIntRingEl(false, data.collect())
     }
 }
 
@@ -385,9 +392,9 @@ fn test_to_i128() {
 
 #[test]
 fn test_sub_assign() {
-    let mut x = DefaultBigIntRingEl::parse("4294836225", 10).unwrap();
-    let y = DefaultBigIntRingEl::parse("4294967297", 10).unwrap();
-    let z = DefaultBigIntRingEl::parse("-131072", 10).unwrap();
+    let mut x = DefaultBigIntRing::RING.get_ring().parse("4294836225", 10).unwrap();
+    let y = DefaultBigIntRing::RING.get_ring().parse("4294967297", 10).unwrap();
+    let z = DefaultBigIntRing::RING.get_ring().parse("-131072", 10).unwrap();
     x = ZZ.sub_ref_fst(&x, y);
     assert!(ZZ.eq_el(&z, &x));
 }
@@ -406,7 +413,7 @@ fn test_assumptions_integer_division() {
 }
 
 #[cfg(test)]
-fn numbers_iter() -> impl Iterator<Item = DefaultBigIntRingEl> {
+fn edge_case_elements() -> impl Iterator<Item = DefaultBigIntRingEl> {
     
     const NUMBERS: [&'static str; 10] = [
         "5444517870735015415413993718908291383295", // power of two - 1
@@ -421,34 +428,34 @@ fn numbers_iter() -> impl Iterator<Item = DefaultBigIntRingEl> {
         "+1278367182354612381234568509783420989356938472561078564732895634928563482349872698723465"
     ];
 
-    NUMBERS.iter().cloned().map(|s| DefaultBigIntRingEl::parse(s, 10)).map(Result::unwrap)
+    NUMBERS.iter().cloned().map(|s| DefaultBigIntRing::RING.get_ring().parse(s, 10)).map(Result::unwrap)
 }
 
 #[test]
 fn test_bigint_ring_axioms() {
-    generic_test_ring_axioms(ZZ, numbers_iter())
+    generic_test_ring_axioms(ZZ, edge_case_elements())
 }
 
 #[test]
 fn test_bigint_divisibility_ring_axioms() {
-    generic_test_divisibility_axioms(ZZ, numbers_iter())
+    generic_test_divisibility_axioms(ZZ, edge_case_elements())
 }
 
 #[test]
 fn test_bigint_euclidean_ring_axioms() {
-    generic_test_euclidean_axioms(ZZ, numbers_iter())
+    generic_test_euclidean_axioms(ZZ, edge_case_elements())
 }
 
 #[test]
 fn test_bigint_integer_ring_axioms() {
-    generic_test_integer_axioms(ZZ, numbers_iter())
+    generic_test_integer_axioms(ZZ, edge_case_elements())
 }
 
 #[bench]
 fn bench_mul(bencher: &mut test::Bencher) {
-    let x = DefaultBigIntRingEl::parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
-    let y = DefaultBigIntRingEl::parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
-    let z = DefaultBigIntRingEl::parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap();
+    let x = DefaultBigIntRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
+    let y = DefaultBigIntRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
+    let z = DefaultBigIntRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap();
     bencher.iter(|| {
         let p = ZZ.mul_ref(&x, &y);
         assert!(ZZ.eq_el(&z, &p));
@@ -465,9 +472,9 @@ fn from_to_float_approx() {
 
 #[bench]
 fn bench_div(bencher: &mut test::Bencher) {
-    let x = DefaultBigIntRingEl::parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
-    let y = DefaultBigIntRingEl::parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
-    let z = DefaultBigIntRingEl::parse("48682207850683149082203680872586784064678018", 10).unwrap();
+    let x = DefaultBigIntRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
+    let y = DefaultBigIntRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
+    let z = DefaultBigIntRing::RING.get_ring().parse("48682207850683149082203680872586784064678018", 10).unwrap();
     bencher.iter(|| {
         let q = ZZ.euclidean_div(x.clone(), &y);
         assert!(ZZ.eq_el(&z, &q));
@@ -499,8 +506,8 @@ fn test_get_uniformly_random() {
     generic_test_integer_uniformly_random(ZZ);
 
     let ring = ZZ;
-    let bound = DefaultBigIntRingEl::parse("11000000000000000", 16).unwrap();
-    let block_bound = DefaultBigIntRingEl::parse("10000000000000000", 16).unwrap();
+    let bound = DefaultBigIntRing::RING.get_ring().parse("11000000000000000", 16).unwrap();
+    let block_bound = DefaultBigIntRing::RING.get_ring().parse("10000000000000000", 16).unwrap();
     let mut rng = oorandom::Rand64::new(0);
     let elements: Vec<_> = (0..1000).map(|_| ring.get_uniformly_random(&bound, || rng.rand_u64())).collect();
     assert!(elements.iter().any(|x| ring.is_lt(x, &block_bound)));

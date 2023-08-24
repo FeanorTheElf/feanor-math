@@ -5,3 +5,4 @@ pub mod field;
 pub mod float_complex;
 pub mod extension;
 pub mod finite;
+pub mod mpir;

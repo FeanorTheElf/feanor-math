@@ -15,15 +15,127 @@ use crate::primitive_int::*;
 /// 
 pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + SelfIso + CanonicalIso<StaticRingBase<i32>> {
 
+    ///
+    /// Computes a float value that is supposed to be close to value.
+    /// However, no guarantees are made on how close it must be, in particular,
+    /// this function may also always return `0.`. It is supposed to be used for
+    /// optimization purposes only, e.g. in the case where an approximate value is
+    /// necessary to determine performance-controlling parameters, or as an initial
+    /// value for some iterative root-finding algorithm.
+    /// 
     fn to_float_approx(&self, value: &Self::Element) -> f64;
+
+    ///
+    /// Computes a value that is "close" to the given float. However, no guarantees
+    /// are made on the definition of close, in particular, this does not have to be
+    /// the closest integer to the given float, and cannot be used to compute rounding.
+    /// It is also implementation-defined when to return `None`, although this is usually
+    /// the case on infinity and NaN.
+    /// 
     fn from_float_approx(&self, value: f64) -> Option<Self::Element>;
+
+    ///
+    /// Return whether the `i`-th bit in the two-complements representation of `abs(value)`
+    /// is `1`.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::integer::*;
+    /// # use feanor_math::ring::*;
+    /// assert_eq!(false, StaticRing::<i32>::RING.abs_is_bit_set(&4, 1));
+    /// assert_eq!(true, StaticRing::<i32>::RING.abs_is_bit_set(&4, 2));
+    /// assert_eq!(true, StaticRing::<i32>::RING.abs_is_bit_set(&-4, 2));
+    /// ```
+    /// 
     fn abs_is_bit_set(&self, value: &Self::Element, i: usize) -> bool;
+
+    ///
+    /// Returns the index of the highest set bit in the two-complements representation of `abs(value)`,
+    /// or `None` if the value is zero.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::integer::*;
+    /// # use feanor_math::ring::*;
+    /// assert_eq!(None, StaticRing::<i32>::RING.abs_highest_set_bit(&0));
+    /// assert_eq!(Some(0), StaticRing::<i32>::RING.abs_highest_set_bit(&-1));
+    /// assert_eq!(Some(2), StaticRing::<i32>::RING.abs_highest_set_bit(&4));
+    /// ```
+    /// 
     fn abs_highest_set_bit(&self, value: &Self::Element) -> Option<usize>;
+
+    ///
+    /// Returns the index of the lowest set bit in the two-complements representation of `abs(value)`,
+    /// or `None` if the value is zero.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::integer::*;
+    /// # use feanor_math::ring::*;
+    /// assert_eq!(None, StaticRing::<i32>::RING.abs_lowest_set_bit(&0));
+    /// assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&1));
+    /// assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&-3));
+    /// assert_eq!(Some(2), StaticRing::<i32>::RING.abs_lowest_set_bit(&4));
+    /// ```
+    /// 
     fn abs_lowest_set_bit(&self, value: &Self::Element) -> Option<usize>;
+
+    ///
+    /// Computes the euclidean division by a power of two, always rounding to zero (note that
+    /// euclidean division requires that `|remainder| < |divisor|`, and thus would otherwise
+    /// leave multiple possible results).
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::integer::*;
+    /// # use feanor_math::ring::*;
+    /// let mut value = -7;
+    /// StaticRing::<i32>::RING.euclidean_div_pow_2(&mut value, 1);
+    /// assert_eq!(-3, value);
+    /// ```
+    /// 
     fn euclidean_div_pow_2(&self, value: &mut Self::Element, power: usize);
+
+    ///
+    /// Multiplies the element by a power of two.
+    /// 
     fn mul_pow_2(&self, value: &mut Self::Element, power: usize);
+
+    ///
+    /// Computes a uniformly random integer in `[0, 2^log_bound_exclusive - 1]`, assuming that
+    /// `rng` provides uniformly random values in the whole range of `u64`.
+    /// 
     fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, rng: G) -> Self::Element;
 
+    ///
+    /// Computes the rounded division, i.e. rounding to the closest integer.
+    /// In the case of a tie (i.e. `round(0.5)`), we round towards `+/- infinity`.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::integer::*;
+    /// # use feanor_math::ring::*;
+    /// assert_eq!(2, StaticRing::<i32>::RING.rounded_div(7, &3));
+    /// assert_eq!(-2, StaticRing::<i32>::RING.rounded_div(-7, &3));
+    /// assert_eq!(-2, StaticRing::<i32>::RING.rounded_div(7, &-3));
+    /// assert_eq!(2, StaticRing::<i32>::RING.rounded_div(-7, &-3));
+    /// 
+    /// assert_eq!(3, StaticRing::<i32>::RING.rounded_div(8, &3));
+    /// assert_eq!(-3, StaticRing::<i32>::RING.rounded_div(-8, &3));
+    /// assert_eq!(-3, StaticRing::<i32>::RING.rounded_div(8, &-3));
+    /// assert_eq!(3, StaticRing::<i32>::RING.rounded_div(-8, &-3));
+    /// 
+    /// assert_eq!(4, StaticRing::<i32>::RING.rounded_div(7, &2));
+    /// assert_eq!(-4, StaticRing::<i32>::RING.rounded_div(-7, &2));
+    /// assert_eq!(-4, StaticRing::<i32>::RING.rounded_div(7, &-2));
+    /// assert_eq!(4, StaticRing::<i32>::RING.rounded_div(-7, &-2));
+    /// ```
+    /// 
     fn rounded_div(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
         let mut rhs_half = self.abs(self.clone_el(rhs));
         self.euclidean_div_pow_2(&mut rhs_half, 1);
@@ -220,6 +332,22 @@ pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>
         let a = ring.from_int(k);
         assert_el_eq!(&ring, &ring.from_int(k / -8), &ring.euclidean_div(ring.clone_el(&a), &d));
     }
+
+    // test rounded_div
+    assert_el_eq!(&ring, &ring.from_int(2), &ring.rounded_div(ring.from_int(7), &ring.from_int(3)));
+    assert_el_eq!(&ring, &ring.from_int(-2), &ring.rounded_div(ring.from_int(-7), &ring.from_int(3)));
+    assert_el_eq!(&ring, &ring.from_int(-2), &ring.rounded_div(ring.from_int(7), &ring.from_int(-3)));
+    assert_el_eq!(&ring, &ring.from_int(2), &ring.rounded_div(ring.from_int(-7), &ring.from_int(-3)));
+
+    assert_el_eq!(&ring, &ring.from_int(3), &ring.rounded_div(ring.from_int(8), &ring.from_int(3)));
+    assert_el_eq!(&ring, &ring.from_int(-3), &ring.rounded_div(ring.from_int(-8), &ring.from_int(3)));
+    assert_el_eq!(&ring, &ring.from_int(-3), &ring.rounded_div(ring.from_int(8), &ring.from_int(-3)));
+    assert_el_eq!(&ring, &ring.from_int(3), &ring.rounded_div(ring.from_int(-8), &ring.from_int(-3)));
+
+    assert_el_eq!(&ring, &ring.from_int(4), &ring.rounded_div(ring.from_int(7), &ring.from_int(2)));
+    assert_el_eq!(&ring, &ring.from_int(-4), &ring.rounded_div(ring.from_int(-7), &ring.from_int(2)));
+    assert_el_eq!(&ring, &ring.from_int(-4), &ring.rounded_div(ring.from_int(7), &ring.from_int(-2)));
+    assert_el_eq!(&ring, &ring.from_int(4), &ring.rounded_div(ring.from_int(-7), &ring.from_int(-2)));
 }
 
 #[test]

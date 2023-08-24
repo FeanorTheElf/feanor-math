@@ -172,7 +172,7 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
     fn abs_lowest_set_bit(&self, value: &Self::Element) -> Option<usize> {
         match RingRef::new(self).cast(&StaticRing::<i128>::RING, *value) {
             0 => None,
-            i128::MIN => Some(0),
+            i128::MIN => Some(i128::BITS as usize - 1),
             x => Some(x.abs().trailing_zeros() as usize)
         }
     }
@@ -316,4 +316,14 @@ fn test_integer_axioms() {
     generic_test_integer_axioms(StaticRing::<i32>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
     generic_test_integer_axioms(StaticRing::<i64>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
     generic_test_integer_axioms(StaticRing::<i128>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+}
+
+#[test]
+fn test_lowest_set_bit() {
+    assert_eq!(None, StaticRing::<i32>::RING.abs_lowest_set_bit(&0));
+    assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&3));
+    assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&-3));
+    assert_eq!(None, StaticRing::<i128>::RING.abs_lowest_set_bit(&0));
+    assert_eq!(Some(127), StaticRing::<i128>::RING.abs_lowest_set_bit(&i128::MIN));
+    assert_eq!(Some(0), StaticRing::<i128>::RING.abs_lowest_set_bit(&i128::MAX));
 }
