@@ -6,7 +6,6 @@ use crate::primitive_int::StaticRingBase;
 use crate::ring::*;
 use crate::integer::*;
 use crate::algorithms;
-use crate::rings::bigint::DefaultBigIntRing;
 
 fn is_power<I: IntegerRingStore>(ZZ: &I, n: &El<I>) -> Option<(El<I>, usize)>
     where I::Type: IntegerRing
@@ -22,7 +21,7 @@ fn is_power<I: IntegerRingStore>(ZZ: &I, n: &El<I>) -> Option<(El<I>, usize)>
 
 pub fn factor<I>(ZZ: &I, mut n: El<I>) -> Vec<(El<I>, usize)> 
     where I: IntegerRingStore + OrderedRingStore, 
-        I::Type: IntegerRing + OrderedRing + CanonicalIso<DefaultBigIntRing> + CanonicalIso<StaticRingBase<i128>>
+        I::Type: IntegerRing + OrderedRing + CanonicalIso<Base<BigIntRing>> + CanonicalIso<StaticRingBase<i128>>
 {
     const SMALL_PRIME_BOUND: i32 = 1000;
     let mut result = Vec::new();
@@ -120,7 +119,7 @@ pub fn factor<I>(ZZ: &I, mut n: El<I>) -> Vec<(El<I>, usize)>
 
 #[test]
 fn test_factor() {
-    let ZZbig = DefaultBigIntRing::RING;
+    let ZZbig = BigIntRing::RING;
     assert_eq!(vec![(3, 2), (5, 1), (29, 1)], factor(&StaticRing::<i64>::RING, 3 * 3 * 5 * 29));
     assert_eq!(vec![(2, 8)], factor(&StaticRing::<i64>::RING, 256));
     assert_eq!(vec![(1009, 2)], factor(&StaticRing::<i64>::RING, 1009 * 1009));

@@ -191,7 +191,7 @@ impl<R: RingStore> ZnRingStore for R
 #[cfg(any(test, feature = "generic_tests"))]
 use crate::primitive_int::*;
 #[cfg(any(test, feature = "generic_tests"))]
-use super::bigint::DefaultBigIntRing;
+use crate::rings::rust_bigint::*;
 
 #[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R)
@@ -221,9 +221,9 @@ pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R)
 
 #[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_map_in_large_int<R: ZnRingStore>(R: R)
-    where <R as RingStore>::Type: ZnRing + CanonicalHom<DefaultBigIntRing>
+    where <R as RingStore>::Type: ZnRing + CanonicalHom<RustBigintRingBase>
 {
-    let ZZ_big = DefaultBigIntRing::RING;
+    let ZZ_big = RustBigintRing::RING;
     let n = ZZ_big.power_of_two(1000);
     let x = R.coerce(&ZZ_big, n);
     assert!(R.eq_el(&R.pow(R.from_int(2), 1000), &x));

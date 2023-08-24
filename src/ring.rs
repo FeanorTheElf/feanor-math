@@ -541,7 +541,7 @@ impl<R, S> CanIso<R, S>
 /// ```
 /// use feanor_math::ring::*;
 /// use feanor_math::integer::*;
-/// use feanor_math::rings::bigint::*;
+/// use feanor_math::integer::*;
 /// use feanor_math::rings::zn::zn_barett::*;
 /// use feanor_math::rings::zn::*;
 /// use feanor_math::rings::finite::*;
@@ -577,8 +577,8 @@ impl<R, S> CanIso<R, S>
 /// 
 /// // the miller-rabin primality test is implemented in feanor_math::algorithms, so we can
 /// // check our implementation
-/// let n = DefaultBigIntRing::RING.from_int(91);
-/// assert!(algorithms::miller_rabin::is_prime(DefaultBigIntRing::RING, &n, 6) == fermat_is_prime(DefaultBigIntRing::RING, n));
+/// let n = BigIntRing::RING.from_int(91);
+/// assert!(algorithms::miller_rabin::is_prime(BigIntRing::RING, &n, 6) == fermat_is_prime(BigIntRing::RING, n));
 /// ```
 /// 
 /// # What does this do?
@@ -791,9 +791,9 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// ```
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::integer::*;
 /// let R = StaticRing::<i64>::RING;
-/// let S = DefaultBigIntRing::RING;
+/// let S = BigIntRing::RING;
 /// // on RingBase level
 /// let hom = R.get_ring().has_canonical_hom(S.get_ring()).unwrap();
 /// assert_eq!(8, R.get_ring().map_in(S.get_ring(), S.from_int(8), &hom));
@@ -825,11 +825,11 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// # use feanor_math::ring::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::integer::*;
 /// let Z_i8 = StaticRing::<i8>::RING;
 /// let Z_i32 = StaticRing::<i32>::RING;
 /// let Z_i128 = StaticRing::<i128>::RING;
-/// let Z_big = DefaultBigIntRing::RING;
+/// let Z_big = BigIntRing::RING;
 /// 
 /// assert!(Z_i8.can_iso(&Z_i8).is_some());
 /// assert!(Z_i8.can_iso(&Z_i32).is_some());
@@ -869,14 +869,14 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// ```
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::integer::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_42;
 /// # use feanor_math::rings::zn::zn_barett;
 /// # use feanor_math::rings::zn::zn_rns;
 /// 
 /// let ZZ = StaticRing::<i128>::RING;
-/// let ZZ_big = DefaultBigIntRing::RING;
+/// let ZZ_big = BigIntRing::RING;
 /// 
 /// let Zn_barett_i128 = zn_barett::Zn::new(ZZ, 17 * 257);
 /// let Zn_barett_big = zn_barett::Zn::new(ZZ_big, ZZ_big.from_int(17 * 257));
@@ -902,11 +902,11 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// ```
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::integer::*;
 /// # use feanor_math::rings::zn::*;
 /// 
 /// let ZZ = StaticRing::<i128>::RING;
-/// let ZZ_big = DefaultBigIntRing::RING;
+/// let ZZ_big = BigIntRing::RING;
 /// 
 /// let Zn_barett_i128 = zn_barett::Zn::new(ZZ, 17 * 257);
 /// let Zn_barett_big = zn_barett::Zn::new(ZZ_big, ZZ_big.from_int(17 * 257));
@@ -932,7 +932,7 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// ```
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::integer::*;
 /// # use feanor_math::rings::poly::*;
 /// 
 /// let ZZ = StaticRing::<i128>::RING;
@@ -1054,6 +1054,7 @@ impl<R> HashableElRingStore for R
 {}
 
 pub type El<R> = <<R as RingStore>::Type as RingBase>::Element;
+pub type Base<R> = <R as RingStore>::Type;
 
 ///
 /// The most fundamental [`crate::ring::RingStore`]. It is basically

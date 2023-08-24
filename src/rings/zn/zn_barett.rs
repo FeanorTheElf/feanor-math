@@ -50,10 +50,10 @@ use crate::primitive_int::*;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_barett::*;
-/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::integer::*;
 /// # use feanor_math::primitive_int::*;
 /// let R = Zn::new(StaticRing::<i16>::RING, 7);
-/// let S = DefaultBigIntRing::RING;
+/// let S = BigIntRing::RING;
 /// assert!(R.eq_el(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
 /// ```
 ///
@@ -465,15 +465,15 @@ impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalIso<AsField
 }
 
 #[cfg(test)]
-use crate::rings::bigint::*;
-#[cfg(test)]
 use crate::divisibility::generic_test_divisibility_axioms;
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
+#[cfg(test)]
+use crate::integer::BigIntRing;
 
 #[test]
 fn test_mul() {
-    const ZZ: RingValue<DefaultBigIntRing> = DefaultBigIntRing::RING;
+    const ZZ: BigIntRing = BigIntRing::RING;
     let Z257 = Zn::new(ZZ, ZZ.from_int(257));
     let x = Z257.coerce(&ZZ, ZZ.from_int(256));
     assert_el_eq!(&Z257, &Z257.one(), &Z257.mul_ref(&x, &x));
@@ -500,7 +500,7 @@ fn test_ring_axioms_znbase() {
 #[test]
 fn test_canonical_iso_axioms_zn_barett() {
     let from = Zn::new(StaticRing::<i128>::RING, 7 * 11);
-    let to = Zn::new(DefaultBigIntRing::RING, DefaultBigIntRing::RING.from_int(7 * 11));
+    let to = Zn::new(BigIntRing::RING, BigIntRing::RING.from_int(7 * 11));
     generic_test_canonical_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
     generic_test_canonical_iso_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
     assert!(from.can_hom(&Zn::new(StaticRing::<i64>::RING, 19)).is_none());

@@ -81,6 +81,42 @@ impl<const N: u64, const IS_FIELD: bool> CanonicalHom<StaticRingBase<i64>> for Z
     }
 }
 
+impl<const N: u64, const IS_FIELD: bool> CanonicalHom<zn_42::ZnBase> for ZnBase<N, IS_FIELD>
+    where Expr<{N as i64 as usize}>: Exists
+{
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, from: &zn_42::ZnBase) -> Option<()> {
+        if *from.modulus() == N as i64 {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn map_in(&self, from: &zn_42::ZnBase, el: zn_42::ZnEl, _: &()) -> Self::Element {
+        from.smallest_positive_lift(el) as u64
+    }
+}
+
+impl<const N: u64, const IS_FIELD: bool> CanonicalIso<zn_42::ZnBase> for ZnBase<N, IS_FIELD>
+    where Expr<{N as i64 as usize}>: Exists
+{
+    type Isomorphism = ();
+
+    fn has_canonical_iso(&self, from: &zn_42::ZnBase) -> Option<()> {
+        if *from.modulus() == N as i64 {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn map_out(&self, from: &zn_42::ZnBase, el: Self::Element, _: &()) -> zn_42::ZnEl {
+        RingRef::new(from).coerce(&StaticRing::<i128>::RING, el as i128)
+    }
+}
+
 
 impl<const N: u64, const IS_FIELD: bool> CanonicalHom<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD>
     where Expr<{N as i64 as usize}>: Exists

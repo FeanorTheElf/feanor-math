@@ -157,7 +157,7 @@ pub fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
 #[cfg(test)]
 use crate::divisibility::DivisibilityRingStore;
 #[cfg(test)]
-use crate::rings::bigint::DefaultBigIntRing;
+use crate::integer::BigIntRing;
 
 #[test]
 fn test_ec_factor() {
@@ -172,7 +172,7 @@ fn test_ec_factor() {
 
 #[bench]
 fn bench_ec_factor(bencher: &mut test::Bencher) {
-    let ZZ = DefaultBigIntRing::RING;
+    let ZZ = BigIntRing::RING;
     let mut n = ZZ.one();
     ZZ.mul_pow_2(&mut n, 48);
     ZZ.add_assign(&mut n, ZZ.one());

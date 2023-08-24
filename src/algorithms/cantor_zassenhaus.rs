@@ -2,11 +2,10 @@ use crate::algorithms;
 use crate::divisibility::DivisibilityRingStore;
 use crate::euclidean::{EuclideanRingStore, EuclideanRing};
 use crate::field::{Field, FieldStore};
-use crate::integer::{IntegerRingStore, IntegerRing};
+use crate::integer::{IntegerRingStore, IntegerRing, BigIntRing};
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
-use crate::rings::bigint::DefaultBigIntRing;
 use crate::rings::poly::{PolyRingStore, PolyRing};
 use crate::rings::zn::{ZnRingStore, ZnRing};
 use crate::rings::finite::FiniteRingStore;
@@ -120,9 +119,9 @@ pub fn cantor_zassenhaus<P>(poly_ring: P, f: El<P>, d: usize) -> El<P>
         P::Type: PolyRing + EuclideanRing,
         <<P as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
         <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
-        <<<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::IntegerRingBase: CanonicalIso<DefaultBigIntRing>
+        <<<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::IntegerRingBase: CanonicalIso<Base<BigIntRing>>
 {
-    let ZZ = DefaultBigIntRing::RING;
+    let ZZ = BigIntRing::RING;
     let p = poly_ring.base_ring().integer_ring().cast(&ZZ, poly_ring.base_ring().integer_ring().clone_el(poly_ring.base_ring().modulus()));
     assert!(ZZ.is_odd(&p));
     assert!(poly_ring.degree(&f).unwrap() % d == 0);
@@ -166,7 +165,7 @@ pub fn factor_complete<'a, P>(poly_ring: P, mut el: El<P>) -> Vec<(El<P>, usize)
         P::Type: PolyRing + EuclideanRing,
         <<P as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
         <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
-        <<<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::IntegerRingBase: CanonicalIso<DefaultBigIntRing>
+        <<<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::IntegerRingBase: CanonicalIso<Base<BigIntRing>>
 {
     assert!(!poly_ring.is_zero(&el));
 

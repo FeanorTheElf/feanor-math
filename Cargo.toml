@@ -16,6 +16,7 @@ libc = "0.2"
 [features]
 generic_tests = []
 log_memory = []
+mpir = []
 
 [profile.profiling]
 inherits = "bench"

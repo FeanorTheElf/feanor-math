@@ -3,6 +3,11 @@ use crate::euclidean::*;
 use crate::ordered::*;
 use crate::primitive_int::*;
 
+#[cfg(feature = "mpir")]
+pub type BigIntRing = crate::rings::mpir::MPZ;
+#[cfg(not(feature = "mpir"))]
+pub type BigIntRing = crate::rings::rust_bigint::RustBigintRing;
+
 ///
 /// Trait for rings that are isomorphic to the ring of integers `ZZ = { ..., -2, -1, 0, 1, 2, ... }`.
 /// 

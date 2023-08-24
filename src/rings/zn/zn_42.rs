@@ -5,7 +5,7 @@ use crate::integer::IntegerRingStore;
 use crate::ring::*;
 use crate::rings::zn::*;
 use crate::primitive_int::*;
-use crate::rings::bigint::DefaultBigIntRing;
+use crate::rings::rust_bigint::RustBigintRingBase;
 
 use super::zn_barett;
 
@@ -286,7 +286,10 @@ trait GenericMapInFromInt: IntegerRing + CanonicalIso<StaticRingBase<i128>> + Ca
 
 impl GenericMapInFromInt for StaticRingBase<i64> {}
 impl GenericMapInFromInt for StaticRingBase<i128> {}
-impl GenericMapInFromInt for DefaultBigIntRing {}
+impl GenericMapInFromInt for RustBigintRingBase {}
+
+#[cfg(feature = "mpir")]
+impl GenericMapInFromInt for crate::rings::mpir::MPZBase {}
 
 impl<I: ?Sized + GenericMapInFromInt> CanonicalHom<I> for ZnBase {
 
@@ -803,7 +806,7 @@ fn test_zn_map_in_large_int() {
     let R = Zn::new(17);
     generic_test_map_in_large_int(R);
 
-    let ZZbig = DefaultBigIntRing::RING;
+    let ZZbig = RustBigintRing::RING;
     let R = Zn::new(3);
     assert_el_eq!(&R, &R.from_int(0), &R.coerce(&ZZbig, ZZbig.sub(ZZbig.power_of_two(84), ZZbig.one())));
 }

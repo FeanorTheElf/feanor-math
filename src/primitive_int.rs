@@ -1,5 +1,12 @@
-use std::{ops::{AddAssign, SubAssign, MulAssign, Neg, Div, Rem}, marker::PhantomData, fmt::Display};
-use crate::{ring::*, euclidean::EuclideanRing, divisibility::DivisibilityRing, ordered::OrderedRing, rings::bigint::{DefaultBigIntRing, DefaultBigIntRingEl}};
+use std::ops::{AddAssign, SubAssign, MulAssign, Neg, Div, Rem};
+use std::marker::PhantomData;
+use std::fmt::Display;
+
+use crate::ring::*;
+use crate::euclidean::EuclideanRing;
+use crate::divisibility::DivisibilityRing;
+use crate::ordered::OrderedRing;
+use crate::rings::rust_bigint::{RustBigint, RustBigintRingBase};
 use crate::integer::*;
 use crate::algorithms::conv_mul::KaratsubaHint;
 
@@ -85,24 +92,24 @@ macro_rules! specialize_map_from_primitive_int {
 
 specialize_map_from_primitive_int!{i8, i16, i32, i64, i128}
 
-impl<T: PrimitiveInt> CanonicalHom<DefaultBigIntRing> for StaticRingBase<T> {
+impl<T: PrimitiveInt> CanonicalHom<RustBigintRingBase> for StaticRingBase<T> {
 
-    fn has_canonical_hom(&self, _: &DefaultBigIntRing) -> Option<()> {
+    fn has_canonical_hom(&self, _: &RustBigintRingBase) -> Option<()> {
         Some(())
     }
 
-    fn map_in(&self, from: &DefaultBigIntRing, el: DefaultBigIntRingEl, _: &()) -> T {
+    fn map_in(&self, from: &RustBigintRingBase, el: RustBigint, _: &()) -> T {
         from.map_out(self, el, &())
     }
 }
 
-impl<T: PrimitiveInt> CanonicalIso<DefaultBigIntRing> for StaticRingBase<T> {
+impl<T: PrimitiveInt> CanonicalIso<RustBigintRingBase> for StaticRingBase<T> {
 
-    fn has_canonical_iso(&self, _: &DefaultBigIntRing) -> Option<()> {
+    fn has_canonical_iso(&self, _: &RustBigintRingBase) -> Option<()> {
         Some(())
     }
 
-    fn map_out(&self, from: &DefaultBigIntRing, el: T, _: &()) -> DefaultBigIntRingEl {
+    fn map_out(&self, from: &RustBigintRingBase, el: T, _: &()) -> RustBigint {
         from.map_in(self, el, &())
     }
 }

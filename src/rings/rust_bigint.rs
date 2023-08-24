@@ -9,16 +9,28 @@ use crate::primitive_int::*;
 use std::cmp::Ordering::*;
 
 #[derive(Clone, Debug)]
-pub struct DefaultBigIntRingEl(bool, Vec<u64>);
+pub struct RustBigint(bool, Vec<u64>);
 
+///
+/// Arbitrary-precision integer implementation.
+/// 
+/// This is a not-too-well optimized implementation, written in pure Rust.
+/// If you need very high performance, consider using [`crate::rings::mpir::MPZ`]
+/// (requires an installation of mpir).
+/// 
 #[derive(Copy, Clone, PartialEq)]
-pub struct DefaultBigIntRing;
+pub struct RustBigintRingBase;
 
-impl DefaultBigIntRing {
+pub type RustBigintRing = RingValue<RustBigintRingBase>;
 
-    pub const RING: RingValue<DefaultBigIntRing> = RingValue::from(DefaultBigIntRing);
+impl RustBigintRing {
+    
+    pub const RING: RustBigintRing = RingValue::from(RustBigintRingBase);
+}
 
-    pub fn map_i128(&self, val: &<Self as RingBase>::Element) -> Option<i128> {
+impl RustBigintRingBase {
+
+    pub fn map_i128(&self, val: &RustBigint) -> Option<i128> {
         match algorithms::bigint::highest_set_block(&val.1) {
             None => Some(0),
             Some(0) if val.0 => Some(-(val.1[0] as i128)),
@@ -36,7 +48,7 @@ impl DefaultBigIntRing {
         }
     }
 
-    pub fn parse(&self, string: &str, base: u32) -> Result<DefaultBigIntRingEl, ()> {
+    pub fn parse(&self, string: &str, base: u32) -> Result<RustBigint, ()> {
         let result = Vec::new();
         let (negative, rest) = if string.chars().next() == Some('-') {
             (true, string.split_at(1).1)
@@ -45,23 +57,23 @@ impl DefaultBigIntRing {
         } else {
             (false, string)
         };
-        Ok(DefaultBigIntRingEl(negative, algorithms::bigint::from_str_radix(rest, base, result)?))
+        Ok(RustBigint(negative, algorithms::bigint::from_str_radix(rest, base, result)?))
     }
 
-    pub fn abs_base_u64_repr<'a>(&self, el: &'a DefaultBigIntRingEl) -> impl 'a + Iterator<Item = u64> {
+    pub fn abs_base_u64_repr<'a>(&self, el: &'a RustBigint) -> impl 'a + Iterator<Item = u64> {
         el.1.iter().copied()
     }
 
-    pub fn from_base_u64_repr<I>(&self, data: I) -> <Self as RingBase>::Element
+    pub fn from_base_u64_repr<I>(&self, data: I) -> RustBigint
         where I: Iterator<Item = u64>
     {
-        DefaultBigIntRingEl(false, data.collect())
+        RustBigint(false, data.collect())
     }
 }
 
-impl RingBase for DefaultBigIntRing {
+impl RingBase for RustBigintRingBase {
     
-    type Element = DefaultBigIntRingEl;
+    type Element = RustBigint;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
         val.clone()
@@ -69,11 +81,11 @@ impl RingBase for DefaultBigIntRing {
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         match (lhs, rhs) {
-            (DefaultBigIntRingEl(false, lhs_val), DefaultBigIntRingEl(false, rhs_val)) |
-            (DefaultBigIntRingEl(true, lhs_val), DefaultBigIntRingEl(true, rhs_val)) => {
+            (RustBigint(false, lhs_val), RustBigint(false, rhs_val)) |
+            (RustBigint(true, lhs_val), RustBigint(true, rhs_val)) => {
                 algorithms::bigint::bigint_add(lhs_val, rhs_val, 0);
             },
-            (DefaultBigIntRingEl(lhs_sgn, lhs_val), DefaultBigIntRingEl(_, rhs_val)) => {
+            (RustBigint(lhs_sgn, lhs_val), RustBigint(_, rhs_val)) => {
                 match algorithms::bigint::bigint_cmp(lhs_val, rhs_val) {
                     Less => {
                         algorithms::bigint::bigint_sub_self(lhs_val, rhs_val);
@@ -110,15 +122,15 @@ impl RingBase for DefaultBigIntRing {
 
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         let result = algorithms::bigint::bigint_mul(&lhs.1, &rhs.1, Vec::new());
-        *lhs = DefaultBigIntRingEl(lhs.0 ^ rhs.0, result);
+        *lhs = RustBigint(lhs.0 ^ rhs.0, result);
     }
 
     fn zero(&self) -> Self::Element {
-        DefaultBigIntRingEl(false, Vec::new())
+        RustBigint(false, Vec::new())
     }
 
     fn one(&self) -> Self::Element {
-        DefaultBigIntRingEl(false, vec![1])
+        RustBigint(false, vec![1])
     }
 
     fn neg_one(&self) -> Self::Element {
@@ -126,7 +138,7 @@ impl RingBase for DefaultBigIntRing {
     }
 
     fn from_int(&self, value: i32) -> Self::Element {
-        DefaultBigIntRingEl(value < 0, vec![(value as i64).abs() as u64])
+        RustBigint(value < 0, vec![(value as i64).abs() as u64])
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -185,25 +197,25 @@ impl RingBase for DefaultBigIntRing {
 
 }
 
-impl CanonicalHom<DefaultBigIntRing> for DefaultBigIntRing {
+impl CanonicalHom<RustBigintRingBase> for RustBigintRingBase {
     
     type Homomorphism = ();
     
-    fn has_canonical_hom(&self, _: &DefaultBigIntRing) -> Option<()> { Some(()) }
+    fn has_canonical_hom(&self, _: &RustBigintRingBase) -> Option<()> { Some(()) }
 
-    fn map_in(&self, _: &DefaultBigIntRing, el: DefaultBigIntRingEl, _: &()) -> Self::Element { el }
+    fn map_in(&self, _: &RustBigintRingBase, el: RustBigint, _: &()) -> Self::Element { el }
 }
 
-impl CanonicalIso<DefaultBigIntRing> for DefaultBigIntRing {
+impl CanonicalIso<RustBigintRingBase> for RustBigintRingBase {
     
     type Isomorphism = ();
 
-    fn has_canonical_iso(&self, _: &DefaultBigIntRing) -> Option<()> { Some(()) }
+    fn has_canonical_iso(&self, _: &RustBigintRingBase) -> Option<()> { Some(()) }
 
-    fn map_out(&self, _: &DefaultBigIntRing, el: DefaultBigIntRingEl, _: &()) -> Self::Element { el }
+    fn map_out(&self, _: &RustBigintRingBase, el: RustBigint, _: &()) -> Self::Element { el }
 }
 
-impl OrderedRing for DefaultBigIntRing {
+impl OrderedRing for RustBigintRingBase {
 
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
         match (lhs.0, rhs.0) {
@@ -216,7 +228,7 @@ impl OrderedRing for DefaultBigIntRing {
     }
 }
 
-impl DivisibilityRing for DefaultBigIntRing {
+impl DivisibilityRing for RustBigintRingBase {
     
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(rhs) && self.is_zero(lhs) {
@@ -233,11 +245,11 @@ impl DivisibilityRing for DefaultBigIntRing {
     }
 }
 
-impl EuclideanRing for DefaultBigIntRing {
+impl EuclideanRing for RustBigintRingBase {
 
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
-        let mut quo = DefaultBigIntRingEl(false, algorithms::bigint::bigint_div(&mut lhs.1, &rhs.1, Vec::new()));
+        let mut quo = RustBigint(false, algorithms::bigint::bigint_div(&mut lhs.1, &rhs.1, Vec::new()));
         if rhs.0 ^ lhs.0 {// if result of division is zero, `.is_neg(&lhs)` does not work as expected
             self.negate_inplace(&mut quo);
         }
@@ -249,7 +261,7 @@ impl EuclideanRing for DefaultBigIntRing {
     }
 }
 
-impl<T: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for DefaultBigIntRing {
+impl<T: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for RustBigintRingBase {
     
     type Homomorphism = ();
 
@@ -258,11 +270,11 @@ impl<T: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for DefaultBigIntRing {
     fn map_in(&self, _: &StaticRingBase<T>, el: T, _: &()) -> Self::Element {
         let negative = el.into() < 0;
         let value = el.into().checked_abs().map(|x| x as u128).unwrap_or(1 << (u128::BITS - 1));
-        DefaultBigIntRingEl(negative, vec![(value & ((1 << u64::BITS) - 1)) as u64, (value >> u64::BITS) as u64])
+        RustBigint(negative, vec![(value & ((1 << u64::BITS) - 1)) as u64, (value >> u64::BITS) as u64])
     }
 }
 
-impl<T: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for DefaultBigIntRing {
+impl<T: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for RustBigintRingBase {
     
     type Isomorphism = ();
 
@@ -273,7 +285,7 @@ impl<T: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for DefaultBigIntRing {
     }
 }
 
-impl HashableElRing for DefaultBigIntRing {
+impl HashableElRing for RustBigintRingBase {
 
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
         let block = algorithms::bigint::highest_set_block(&el.1);
@@ -285,7 +297,7 @@ impl HashableElRing for DefaultBigIntRing {
     }
 }
 
-impl IntegerRing for DefaultBigIntRing {
+impl IntegerRing for RustBigintRingBase {
 
     fn to_float_approx(&self, value: &Self::Element) -> f64 {
         let sign = if value.0 { -1. } else { 1. };
@@ -305,7 +317,7 @@ impl IntegerRing for DefaultBigIntRing {
         let scale = value.log2().ceil() as i32;
         let significant_digits = std::cmp::min(scale, u64::BITS as i32);
         let most_significant_bits = (value / 2f64.powi(scale - significant_digits)) as u64;
-        let mut result = DefaultBigIntRingEl(sign, vec![most_significant_bits]);
+        let mut result = RustBigint(sign, vec![most_significant_bits]);
         self.mul_pow_2(&mut result, (scale - significant_digits) as usize);
         return Some(result);
     }
@@ -347,10 +359,10 @@ impl IntegerRing for DefaultBigIntRing {
         let blocks = log2_bound_exclusive / u64::BITS as usize;
         let in_block = log2_bound_exclusive % u64::BITS as usize;
         if in_block == 0 {
-            DefaultBigIntRingEl(false, (0..blocks).map(|_| rng()).collect())
+            RustBigint(false, (0..blocks).map(|_| rng()).collect())
         } else {
             let last = rng() & 1u64.overflowing_shl(in_block as u32).0.overflowing_sub(1).0;
-            DefaultBigIntRingEl(false, (0..blocks).map(|_| rng()).chain(std::iter::once(last)).collect())
+            RustBigint(false, (0..blocks).map(|_| rng()).chain(std::iter::once(last)).collect())
         }
     }
 }
@@ -359,42 +371,42 @@ impl IntegerRing for DefaultBigIntRing {
 use crate::divisibility::generic_test_divisibility_axioms;
 
 #[cfg(test)]
-const ZZ: RingValue<DefaultBigIntRing> = DefaultBigIntRing::RING;
+const ZZ: RustBigintRing = RustBigintRing::RING;
 
 #[test]
 fn test_print_power_2() {
-    let x = DefaultBigIntRingEl(false, vec![0, 0, 1]);
-    assert_eq!("340282366920938463463374607431768211456", format!("{}", DefaultBigIntRing::RING.format(&x)));
+    let x = RustBigint(false, vec![0, 0, 1]);
+    assert_eq!("340282366920938463463374607431768211456", format!("{}", RustBigintRing::RING.format(&x)));
 }
 
 #[test]
 fn test_from() {
-    assert!(ZZ.eq_el(&DefaultBigIntRingEl(false, vec![]), &ZZ.from_int(0)));
-    assert!(ZZ.eq_el(&DefaultBigIntRingEl(false, vec![2138479]), &ZZ.from_int(2138479)));
-    assert!(ZZ.eq_el(&DefaultBigIntRingEl(true, vec![2138479]), &ZZ.from_int(-2138479)));
+    assert!(ZZ.eq_el(&RustBigint(false, vec![]), &ZZ.from_int(0)));
+    assert!(ZZ.eq_el(&RustBigint(false, vec![2138479]), &ZZ.from_int(2138479)));
+    assert!(ZZ.eq_el(&RustBigint(true, vec![2138479]), &ZZ.from_int(-2138479)));
     // assert!(ZZ.eq(&DefaultBigInt(false, vec![0x38691a350bf12fca, 0x1]), &ZZ.from_z_gen(0x138691a350bf12fca, &i128::RING)));
 }
 
 #[test]
 fn test_to_i128() {
-    assert_eq!(0, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![])));
-    assert_eq!(2138479, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![2138479])));
-    assert_eq!(-2138479, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(true, vec![2138479])));
-    assert_eq!(0x138691a350bf12fca, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![0x38691a350bf12fca, 0x1])));
+    assert_eq!(0, ZZ.cast(&StaticRing::<i128>::RING, RustBigint(false, vec![])));
+    assert_eq!(2138479, ZZ.cast(&StaticRing::<i128>::RING, RustBigint(false, vec![2138479])));
+    assert_eq!(-2138479, ZZ.cast(&StaticRing::<i128>::RING, RustBigint(true, vec![2138479])));
+    assert_eq!(0x138691a350bf12fca, ZZ.cast(&StaticRing::<i128>::RING, RustBigint(false, vec![0x38691a350bf12fca, 0x1])));
     // assert_eq!(Err(()), DefaultBigInt(false, vec![0x38691a350bf12fca, 0x38691a350bf12fca, 0x1]).to_i128());
-    assert_eq!(i128::MAX, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
-    assert_eq!(i128::MIN + 1, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(true, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
+    assert_eq!(i128::MAX, ZZ.cast(&StaticRing::<i128>::RING, RustBigint(false, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
+    assert_eq!(i128::MIN + 1, ZZ.cast(&StaticRing::<i128>::RING, RustBigint(true, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
     // this is the possibly surprising, exceptional case
     // assert_eq!(Err(()), DefaultBigInt(true, vec![0, (i128::MAX >> 64) as u64 + 1]).to_i128());
-    assert_eq!(i64::MAX as i128 + 1, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![i64::MAX as u64 + 1])));
-    assert_eq!(u64::MAX as i128, ZZ.cast(&StaticRing::<i128>::RING, DefaultBigIntRingEl(false, vec![u64::MAX])));
+    assert_eq!(i64::MAX as i128 + 1, ZZ.cast(&StaticRing::<i128>::RING, RustBigint(false, vec![i64::MAX as u64 + 1])));
+    assert_eq!(u64::MAX as i128, ZZ.cast(&StaticRing::<i128>::RING, RustBigint(false, vec![u64::MAX])));
 }
 
 #[test]
 fn test_sub_assign() {
-    let mut x = DefaultBigIntRing::RING.get_ring().parse("4294836225", 10).unwrap();
-    let y = DefaultBigIntRing::RING.get_ring().parse("4294967297", 10).unwrap();
-    let z = DefaultBigIntRing::RING.get_ring().parse("-131072", 10).unwrap();
+    let mut x = RustBigintRing::RING.get_ring().parse("4294836225", 10).unwrap();
+    let y = RustBigintRing::RING.get_ring().parse("4294967297", 10).unwrap();
+    let z = RustBigintRing::RING.get_ring().parse("-131072", 10).unwrap();
     x = ZZ.sub_ref_fst(&x, y);
     assert!(ZZ.eq_el(&z, &x));
 }
@@ -413,7 +425,7 @@ fn test_assumptions_integer_division() {
 }
 
 #[cfg(test)]
-fn edge_case_elements() -> impl Iterator<Item = DefaultBigIntRingEl> {
+fn edge_case_elements() -> impl Iterator<Item = RustBigint> {
     
     const NUMBERS: [&'static str; 10] = [
         "5444517870735015415413993718908291383295", // power of two - 1
@@ -428,7 +440,7 @@ fn edge_case_elements() -> impl Iterator<Item = DefaultBigIntRingEl> {
         "+1278367182354612381234568509783420989356938472561078564732895634928563482349872698723465"
     ];
 
-    NUMBERS.iter().cloned().map(|s| DefaultBigIntRing::RING.get_ring().parse(s, 10)).map(Result::unwrap)
+    NUMBERS.iter().cloned().map(|s| RustBigintRing::RING.get_ring().parse(s, 10)).map(Result::unwrap)
 }
 
 #[test]
@@ -453,9 +465,9 @@ fn test_bigint_integer_ring_axioms() {
 
 #[bench]
 fn bench_mul(bencher: &mut test::Bencher) {
-    let x = DefaultBigIntRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
-    let y = DefaultBigIntRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
-    let z = DefaultBigIntRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap();
+    let x = RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
+    let y = RustBigintRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
+    let z = RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap();
     bencher.iter(|| {
         let p = ZZ.mul_ref(&x, &y);
         assert!(ZZ.eq_el(&z, &p));
@@ -472,9 +484,9 @@ fn from_to_float_approx() {
 
 #[bench]
 fn bench_div(bencher: &mut test::Bencher) {
-    let x = DefaultBigIntRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
-    let y = DefaultBigIntRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
-    let z = DefaultBigIntRing::RING.get_ring().parse("48682207850683149082203680872586784064678018", 10).unwrap();
+    let x = RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
+    let y = RustBigintRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
+    let z = RustBigintRing::RING.get_ring().parse("48682207850683149082203680872586784064678018", 10).unwrap();
     bencher.iter(|| {
         let q = ZZ.euclidean_div(x.clone(), &y);
         assert!(ZZ.eq_el(&z, &q));
@@ -506,8 +518,8 @@ fn test_get_uniformly_random() {
     generic_test_integer_uniformly_random(ZZ);
 
     let ring = ZZ;
-    let bound = DefaultBigIntRing::RING.get_ring().parse("11000000000000000", 16).unwrap();
-    let block_bound = DefaultBigIntRing::RING.get_ring().parse("10000000000000000", 16).unwrap();
+    let bound = RustBigintRing::RING.get_ring().parse("11000000000000000", 16).unwrap();
+    let block_bound = RustBigintRing::RING.get_ring().parse("10000000000000000", 16).unwrap();
     let mut rng = oorandom::Rand64::new(0);
     let elements: Vec<_> = (0..1000).map(|_| ring.get_uniformly_random(&bound, || rng.rand_u64())).collect();
     assert!(elements.iter().any(|x| ring.is_lt(x, &block_bound)));

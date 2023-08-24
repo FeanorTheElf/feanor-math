@@ -42,12 +42,21 @@ impl Drop for MPZEl {
     }
 }
 
+///
+/// Arbitrary-precision integer ring, implemented by binding to the well-known
+/// and heavily optimized library mpir (fork of gmp).
+/// 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MPZ;
+pub struct MPZBase;
+
+pub type MPZ = RingValue<MPZBase>;
 
 impl MPZ {
+    
+    pub const RING: MPZ = RingValue::from(MPZBase);
+}
 
-    pub const RING: RingValue<MPZ> = RingValue::from(MPZ);
+impl MPZBase {
 
     pub fn from_base_u64_repr<I: IntoIterator<Item = u64>>(&self, dst: &mut MPZEl, input: I) {
         unsafe {
@@ -95,7 +104,7 @@ impl MPZ {
     }
 }
 
-impl RingBase for MPZ {
+impl RingBase for MPZBase {
     
     type Element = MPZEl;
 
@@ -221,11 +230,11 @@ impl RingBase for MPZ {
     }
 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        DefaultBigIntRing::RING.get_ring().dbg(&self.map_out(DefaultBigIntRing::RING.get_ring(), self.clone_el(value), &()), out)
+        RustBigintRing::RING.get_ring().dbg(&self.map_out(RustBigintRing::RING.get_ring(), self.clone_el(value), &()), out)
     }
 }
 
-impl OrderedRing for MPZ {
+impl OrderedRing for MPZBase {
 
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
         unsafe {
@@ -250,7 +259,7 @@ impl OrderedRing for MPZ {
     }
 }
 
-impl DivisibilityRing for MPZ {
+impl DivisibilityRing for MPZBase {
 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(rhs) {
@@ -269,7 +278,7 @@ impl DivisibilityRing for MPZ {
     }
 }
 
-impl EuclideanRing for MPZ {
+impl EuclideanRing for MPZBase {
     
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         unsafe {
@@ -322,7 +331,7 @@ impl EuclideanRing for MPZ {
     }
 }
 
-impl IntegerRing for MPZ {
+impl IntegerRing for MPZBase {
     
     fn to_float_approx(&self, el: &Self::Element) -> f64 {
         unsafe {
@@ -419,7 +428,7 @@ impl IntegerRing for MPZ {
     }
 }
 
-impl HashableElRing for MPZ {
+impl HashableElRing for MPZBase {
 
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
         unsafe {
@@ -428,73 +437,73 @@ impl HashableElRing for MPZ {
     }
 }
 
-impl CanonicalHom<MPZ> for MPZ {
+impl CanonicalHom<MPZBase> for MPZBase {
 
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, _: &MPZ) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, _: &MPZBase) -> Option<Self::Homomorphism> {
         Some(())
     }
 
-    fn map_in(&self, _: &MPZ, el: MPZEl, _: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, _: &MPZBase, el: MPZEl, _: &Self::Homomorphism) -> Self::Element {
         el
     }
 }
 
-impl CanonicalIso<MPZ> for MPZ {
+impl CanonicalIso<MPZBase> for MPZBase {
 
     type Isomorphism = ();
 
-    fn has_canonical_iso(&self, _: &MPZ) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, _: &MPZBase) -> Option<Self::Isomorphism> {
         Some(())
     }
 
-    fn map_out(&self, _: &MPZ, el: Self::Element, _: &Self::Isomorphism) -> <MPZ as RingBase>::Element {
+    fn map_out(&self, _: &MPZBase, el: Self::Element, _: &Self::Isomorphism) -> <MPZBase as RingBase>::Element {
         el
     }
 }
 
-impl CanonicalHom<DefaultBigIntRing> for MPZ {
+impl CanonicalHom<RustBigintRingBase> for MPZBase {
 
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, _: &DefaultBigIntRing) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, _: &RustBigintRingBase) -> Option<Self::Homomorphism> {
         Some(())
     }
 
-    fn map_in_ref(&self, _: &DefaultBigIntRing, el: &DefaultBigIntRingEl, _: &Self::Homomorphism) -> Self::Element {
+    fn map_in_ref(&self, _: &RustBigintRingBase, el: &RustBigint, _: &Self::Homomorphism) -> Self::Element {
         let mut result = MPZEl::new();
-        self.from_base_u64_repr(&mut result, DefaultBigIntRing::RING.get_ring().abs_base_u64_repr(&el));
-        if DefaultBigIntRing::RING.is_neg(el) {
+        self.from_base_u64_repr(&mut result, RustBigintRing::RING.get_ring().abs_base_u64_repr(&el));
+        if RustBigintRing::RING.is_neg(el) {
             self.negate_inplace(&mut result);
         }
         return result;
     }
 
-    fn map_in(&self, from: &DefaultBigIntRing, el: <DefaultBigIntRing as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &RustBigintRingBase, el: RustBigint, hom: &Self::Homomorphism) -> Self::Element {
         self.map_in_ref(from, &el, hom)
     }
 }
 
-impl CanonicalIso<DefaultBigIntRing> for MPZ {
+impl CanonicalIso<RustBigintRingBase> for MPZBase {
 
     type Isomorphism = ();
 
-    fn has_canonical_iso(&self, _: &DefaultBigIntRing) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, _: &RustBigintRingBase) -> Option<Self::Isomorphism> {
         Some(())
     }
 
-    fn map_out(&self, _: &DefaultBigIntRing, el: Self::Element, _: &Self::Isomorphism) -> DefaultBigIntRingEl {
-        let result = DefaultBigIntRing::RING.get_ring().from_base_u64_repr(self.abs_base_u64_repr(&el));
+    fn map_out(&self, _: &RustBigintRingBase, el: Self::Element, _: &Self::Isomorphism) -> RustBigint {
+        let result = RustBigintRing::RING.get_ring().from_base_u64_repr(self.abs_base_u64_repr(&el));
         if self.is_neg(&el) {
-            return DefaultBigIntRing::RING.negate(result);
+            return RustBigintRing::RING.negate(result);
         } else {
             return result;
         }
     }
 }
 
-impl CanonicalHom<StaticRingBase<i32>> for MPZ {
+impl CanonicalHom<StaticRingBase<i32>> for MPZBase {
 
     type Homomorphism = ();
 
@@ -507,7 +516,7 @@ impl CanonicalHom<StaticRingBase<i32>> for MPZ {
     }
 }
 
-impl CanonicalIso<StaticRingBase<i32>> for MPZ {
+impl CanonicalIso<StaticRingBase<i32>> for MPZBase {
 
     type Isomorphism = ();
 
@@ -520,7 +529,7 @@ impl CanonicalIso<StaticRingBase<i32>> for MPZ {
     }
 }
 
-impl CanonicalHom<StaticRingBase<i64>> for MPZ {
+impl CanonicalHom<StaticRingBase<i64>> for MPZBase {
 
     type Homomorphism = ();
 
@@ -537,7 +546,7 @@ impl CanonicalHom<StaticRingBase<i64>> for MPZ {
     }
 }
 
-impl CanonicalIso<StaticRingBase<i64>> for MPZ {
+impl CanonicalIso<StaticRingBase<i64>> for MPZBase {
 
     type Isomorphism = ();
 
@@ -569,30 +578,30 @@ use crate::divisibility::generic_test_divisibility_axioms;
 use crate::euclidean::generic_test_euclidean_axioms;
 
 #[cfg(test)]
-fn edge_case_elements_bigint() -> impl Iterator<Item = DefaultBigIntRingEl> {
+fn edge_case_elements_bigint() -> impl Iterator<Item = RustBigint> {
     [
-        DefaultBigIntRing::RING.from_int(0),
-        DefaultBigIntRing::RING.from_int(1),
-        DefaultBigIntRing::RING.from_int(-1),
-        DefaultBigIntRing::RING.from_int(7),
-        DefaultBigIntRing::RING.from_int(-7),
-        DefaultBigIntRing::RING.from_int(i32::MAX),
-        DefaultBigIntRing::RING.from_int(i32::MIN),
-        DefaultBigIntRing::RING.power_of_two(64),
-        DefaultBigIntRing::RING.negate(DefaultBigIntRing::RING.power_of_two(64)),
-        DefaultBigIntRing::RING.sub(DefaultBigIntRing::RING.power_of_two(64), DefaultBigIntRing::RING.one()),
-        DefaultBigIntRing::RING.power_of_two(128),
-        DefaultBigIntRing::RING.negate(DefaultBigIntRing::RING.power_of_two(128)),
-        DefaultBigIntRing::RING.sub(DefaultBigIntRing::RING.power_of_two(128), DefaultBigIntRing::RING.one()),
-        DefaultBigIntRing::RING.power_of_two(192),
-        DefaultBigIntRing::RING.negate(DefaultBigIntRing::RING.power_of_two(192)),
-        DefaultBigIntRing::RING.sub(DefaultBigIntRing::RING.power_of_two(192), DefaultBigIntRing::RING.one())
+        RustBigintRing::RING.from_int(0),
+        RustBigintRing::RING.from_int(1),
+        RustBigintRing::RING.from_int(-1),
+        RustBigintRing::RING.from_int(7),
+        RustBigintRing::RING.from_int(-7),
+        RustBigintRing::RING.from_int(i32::MAX),
+        RustBigintRing::RING.from_int(i32::MIN),
+        RustBigintRing::RING.power_of_two(64),
+        RustBigintRing::RING.negate(RustBigintRing::RING.power_of_two(64)),
+        RustBigintRing::RING.sub(RustBigintRing::RING.power_of_two(64), RustBigintRing::RING.one()),
+        RustBigintRing::RING.power_of_two(128),
+        RustBigintRing::RING.negate(RustBigintRing::RING.power_of_two(128)),
+        RustBigintRing::RING.sub(RustBigintRing::RING.power_of_two(128), RustBigintRing::RING.one()),
+        RustBigintRing::RING.power_of_two(192),
+        RustBigintRing::RING.negate(RustBigintRing::RING.power_of_two(192)),
+        RustBigintRing::RING.sub(RustBigintRing::RING.power_of_two(192), RustBigintRing::RING.one())
     ].into_iter()
 }
 
 #[cfg(test)]
 fn edge_case_elements() -> impl Iterator<Item = MPZEl> {
-    edge_case_elements_bigint().map(|n| MPZ::RING.coerce(&DefaultBigIntRing::RING, n))
+    edge_case_elements_bigint().map(|n| MPZ::RING.coerce(&RustBigintRing::RING, n))
 }
 
 #[test]
@@ -642,8 +651,8 @@ fn test_canonical_iso_axioms_i64() {
 
 #[test]
 fn test_canonical_iso_axioms_bigint() {
-    generic_test_canonical_hom_axioms(DefaultBigIntRing::RING, MPZ::RING, edge_case_elements_bigint());
-    generic_test_canonical_iso_axioms(DefaultBigIntRing::RING, MPZ::RING, edge_case_elements_bigint());
+    generic_test_canonical_hom_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
+    generic_test_canonical_iso_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
 }
 
 #[test]
@@ -693,9 +702,9 @@ fn test_lowest_set_bit() {
 
 #[bench]
 fn bench_mul(bencher: &mut test::Bencher) {
-    let x = MPZ::RING.coerce(&DefaultBigIntRing::RING, DefaultBigIntRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap());
-    let y = MPZ::RING.coerce(&DefaultBigIntRing::RING, DefaultBigIntRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap());
-    let z = MPZ::RING.coerce(&DefaultBigIntRing::RING, DefaultBigIntRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());
+    let x = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap());
+    let y = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap());
+    let z = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());
     bencher.iter(|| {
         let p = MPZ::RING.mul_ref(&x, &y);
         assert_el_eq!(&MPZ::RING, &z, &p);
@@ -704,9 +713,9 @@ fn bench_mul(bencher: &mut test::Bencher) {
 
 #[bench]
 fn bench_div(bencher: &mut test::Bencher) {
-    let x = MPZ::RING.coerce(&DefaultBigIntRing::RING, DefaultBigIntRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap());
-    let y = MPZ::RING.coerce(&DefaultBigIntRing::RING, DefaultBigIntRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap());
-    let z = MPZ::RING.coerce(&DefaultBigIntRing::RING, DefaultBigIntRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());
+    let x = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap());
+    let y = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap());
+    let z = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());
     bencher.iter(|| {
         let q = MPZ::RING.euclidean_div(MPZ::RING.clone_el(&z), &y);
         assert_el_eq!(&MPZ::RING, &x, &q);

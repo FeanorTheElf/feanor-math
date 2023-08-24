@@ -19,7 +19,7 @@ use crate::default_memory_provider;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_rns::*;
 /// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::integer::*;
 /// # use feanor_math::vector::*;
 /// 
 /// let R = Zn::from_primes(StaticRing::<i64>::RING, vec![17, 19]);
@@ -36,9 +36,9 @@ use crate::default_memory_provider;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_rns::*;
-/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::integer::*;
 /// # use feanor_math::primitive_int::*;
-/// let R = Zn::from_primes(DefaultBigIntRing::RING, vec![17, 19]);
+/// let R = Zn::from_primes(BigIntRing::RING, vec![17, 19]);
 /// let S = zn_barett::Zn::new(StaticRing::<i64>::RING, 17 * 19);
 /// assert!(R.eq_el(&R.from_int(12), &R.coerce(&S, S.from_int(12))));
 /// assert!(S.eq_el(&S.from_int(12), &R.cast(&S, R.from_int(12))));
@@ -48,10 +48,10 @@ use crate::default_memory_provider;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_rns::*;
-/// # use feanor_math::rings::bigint::*;
+/// # use feanor_math::integer::*;
 /// # use feanor_math::primitive_int::*;
-/// let R = Zn::from_primes(DefaultBigIntRing::RING, vec![3, 5, 7]);
-/// let S = DefaultBigIntRing::RING;
+/// let R = Zn::from_primes(BigIntRing::RING, vec![3, 5, 7]);
+/// let S = BigIntRing::RING;
 /// assert!(R.eq_el(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
 /// ```
 /// 
@@ -604,10 +604,10 @@ fn test_zn_ring_axioms() {
 
 #[test]
 fn test_zn_map_in_large_int() {
-    let ring = Zn::from_primes(DefaultBigIntRing::RING, vec![7, 11]);
+    let ring = Zn::from_primes(RustBigintRing::RING, vec![7, 11]);
     generic_test_map_in_large_int(ring);
 
-    let R = Zn::from_primes(DefaultBigIntRing::RING, vec![3, 5, 7]);
-    let S = DefaultBigIntRing::RING;
+    let R = Zn::from_primes(RustBigintRing::RING, vec![3, 5, 7]);
+    let S = RustBigintRing::RING;
     assert!(R.eq_el(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
 }
