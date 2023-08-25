@@ -9,7 +9,7 @@ pub fn root_of_unity_error() -> f64 {
 pub trait ErrorEstimate {
 
     ///
-    /// This is only true if the table is created with the [`Complex64`]-specific creator functions.
+    /// This is only true if the table is created with the [`crate::rings::float_complex::Complex64`]-specific creator functions.
     /// Note that this is a worst-case estimate and likely to significantly overestimate the error.
     /// 
     /// This estimates the error from [`super::FFTTable::unordered_fft()`]. The error during the inverse

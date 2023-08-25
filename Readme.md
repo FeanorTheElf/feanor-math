@@ -15,6 +15,8 @@ In particular, I will make changes to interfaces and implementations without war
 Furthermore, there might be bugs, and many implementations are not particularly optimized.
 Nevertheless, I think this library can already be useful, and I regularly use it for various applications, including cryptography.
 
+This library uses nightly Rust, and even unstable features like const-generics and specialization.
+
 ## A short introduction
 
 The two fundamental traits in this crate are `RingBase` and `RingStore`.

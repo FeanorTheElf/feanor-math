@@ -16,7 +16,7 @@ pub struct RustBigint(bool, Vec<u64>);
 /// 
 /// This is a not-too-well optimized implementation, written in pure Rust.
 /// If you need very high performance, consider using [`crate::rings::mpir::MPZ`]
-/// (requires an installation of mpir).
+/// (requires an installation of mpir and activating the feature "mpir").
 /// 
 /// For the difference to [`RustBigintRing`], see the documentation of [`crate::ring::RingStore`].
 /// 
@@ -28,7 +28,7 @@ pub struct RustBigintRingBase;
 /// 
 /// This is a not-too-well optimized implementation, written in pure Rust.
 /// If you need very high performance, consider using [`crate::rings::mpir::MPZ`]
-/// (requires an installation of mpir).
+/// (requires an installation of mpir, and activating the feature "mpir").
 /// 
 pub type RustBigintRing = RingValue<RustBigintRingBase>;
 

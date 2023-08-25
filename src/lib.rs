@@ -42,56 +42,56 @@ pub trait Exists {}
 impl<T: ?Sized> Exists for T {}
 
 ///
-/// Module containing different implementations of [`MemoryProvider`],
+/// Module containing different implementations of [`mempool::MemoryProvider`],
 /// which can be used to tell algorithms and ring implementations how to allocate internally
 /// used memory.
 /// 
 pub mod mempool;
 #[macro_use]
 ///
-/// This module contains the core traits of the library - [`RingBase`] and [`RingStore`],
-/// as well as [`CanonicalHom`] and [`CanonicalIso`].
+/// This module contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`],
+/// as well as [`ring::CanonicalHom`] and [`ring::CanonicalIso`].
 /// 
 pub mod ring;
 ///
-/// This module contains the trait [`DelegateRing`] that simplifies implementing the 
+/// This module contains the trait [`delegate::DelegateRing`] that simplifies implementing the 
 /// newtype-pattern for rings.
 /// 
 pub mod delegate;
 ///
-/// This module contains the trait [`VectorView`] for objects that provide access to 
+/// This module contains the trait [`vector::VectorView`] for objects that provide access to 
 /// some kind of linear container.
 /// 
 /// This module is currently slightly chaotic, as there is significant functionality overlap
-/// between [`VectorView`], [`vec_fn::VectorFn`] and [`std::iter::Iterator`]
+/// between [`vector::VectorView`], [`vector::vec_fn::VectorFn`] and [`std::iter::Iterator`]
 /// 
 pub mod vector;
 ///
-/// This module contains the trait [`DivisibilityRing`] for rings that provide information
+/// This module contains the trait [`divisibility::DivisibilityRing`] for rings that provide information
 /// about divisibility of their elements.
 /// 
 pub mod divisibility;
 ///
-/// This module contains the trait [`Field`] for rings that are fields.
+/// This module contains the trait [`field::Field`] for rings that are fields.
 /// 
 pub mod field;
 ///
-/// This module contains the trait [`EuclideanRing`] for rings that provide euclidean division
+/// This module contains the trait [`euclidean::EuclideanRing`] for rings that provide euclidean division
 /// between their elements.
 /// 
 pub mod euclidean;
 ///
-/// This module contains the trait [`OrderedRing`] for rings with a total ordering that is compatible
+/// This module contains the trait [`ordered::OrderedRing`] for rings with a total ordering that is compatible
 /// with the ring operations.
 /// 
 pub mod ordered;
 ///
-/// This module provides the ring implementation [`StaticRing`] that represents the integer ring
+/// This module provides the ring implementation [`primitive_int::StaticRing`] that represents the integer ring
 /// with arithmetic given by the primitive integer types ``i8` to `i128`.
 /// 
 pub mod primitive_int;
 ///
-/// This module contains the trait [`IntegerRing`] for rings that represent the ring of integers `Z`.
+/// This module contains the trait [`integer::IntegerRing`] for rings that represent the ring of integers `Z`.
 /// 
 pub mod integer;
 ///
@@ -105,7 +105,7 @@ pub mod algorithms;
 /// 
 pub mod rings;
 ///
-/// This module contains the struct [`RingElementWrapper`] that contains an element together with its ring,
+/// This module contains the struct [`wrapper::RingElementWrapper`] that contains an element together with its ring,
 /// and thus can provide ring operations without explicit access to the ring.
 /// 
 /// Using this is for example necessary if you want to use elements of a [`crate::ring::HashableElRing`]-ring

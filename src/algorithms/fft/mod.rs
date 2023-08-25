@@ -59,12 +59,12 @@ pub trait FFTTable {
 
     ///
     /// On input `i`, returns `j` such that `unordered_fft(values)[i]` contains the evaluation
-    /// at `zeta^j` of values. Here `zeta` is the value returned by [`root_of_unity()`]
+    /// at `zeta^j` of values. Here `zeta` is the value returned by [`Self::root_of_unity()`]
     /// 
     fn unordered_fft_permutation(&self, i: usize) -> usize;
 
     ///
-    /// The inverse of [`unordered_fft_permutation()`], i.e. for all i, have
+    /// The inverse of [`Self::unordered_fft_permutation()`], i.e. for all i, have
     /// `self.unordered_fft_permutation_inv(self.unordered_fft_permutation(i)) == i`.
     /// 
     fn unordered_fft_permutation_inv(&self, i: usize) -> usize;

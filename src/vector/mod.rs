@@ -22,9 +22,9 @@ use self::vec_fn::RingElVectorViewFn;
 /// # Related traits
 /// 
 /// If the entries are not owned by the object, but e.g. produced on the fly,
-/// or just "associated" in a more general sense, the trait [crate::vector::VectorFn]
+/// or just "associated" in a more general sense, the trait [vec_fn::VectorFn]
 /// can be used.
-/// Furthermore, for mutable access, use [crate::vector::VectorViewMut].
+/// Furthermore, for mutable access, use [VectorViewMut].
 /// 
 pub trait VectorView<T: ?Sized> {
 
