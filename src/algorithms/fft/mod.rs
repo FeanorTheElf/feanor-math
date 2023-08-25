@@ -11,8 +11,16 @@ pub mod factor_fft;
 pub mod complex_fft;
 
 ///
-/// Trait for objects that can perform a fast fourier transform over some
-/// ring.
+/// Trait for objects that can perform a fast fourier transform over some ring. 
+/// 
+/// Usually fast implementations of FFTs have to store a lot of precomputed data
+/// (e.g. powers of roots of unity), hence they should be represented as objects
+/// implementing this trait.
+/// 
+/// The trait is very generic, and its functions can be called on any
+/// [`VectorView`] of elements of any ring `R` with `R: CanonicalHom<Base<Self::Ring>>`.
+/// Of course, the roots of unity of the stored ring must map to corresponding roots
+/// of unity in `R` via the canonical homomorphism.
 /// 
 /// # Note on equality
 /// 
@@ -30,8 +38,23 @@ pub trait FFTTable {
 
     type Ring: ?Sized + RingStore;
 
+    ///
+    /// This FFTTable can compute the FFT of arrays of this length.
+    /// 
     fn len(&self) -> usize;
+
+    ///
+    /// The underlying ring whose roots of unity are used by the FFT.
+    /// 
     fn ring(&self) -> &Self::Ring;
+
+    ///
+    /// The root of unity used for the FFT. While all primitive `n`-th roots
+    /// of unity can be used equally for computing a Fourier transform, the 
+    /// concrete one used determines the order of the output values.
+    /// 
+    /// See also [`FFTTable::unordered_fft_permutation`].
+    /// 
     fn root_of_unity(&self) -> &El<Self::Ring>;
 
     ///
@@ -46,6 +69,20 @@ pub trait FFTTable {
     /// 
     fn unordered_fft_permutation_inv(&self, i: usize) -> usize;
 
+    ///
+    /// Computes inplace the Fourier transform of the given `values` over the given `ring`.
+    /// The output is in standard order, i.e. the `i`-th output element is the evaluation
+    /// of the input at `self.root_of_unity()^-i` (note the `-`, which is standard
+    /// convention for Fourier transforms).
+    /// 
+    /// If necessary, temporary memory is allocated using the given memory provider.
+    /// In some cases, it can be faster to use [`FFTTable::unordered_fft`], if the ordering
+    /// of the result is not relevant.
+    /// 
+    /// # Panics
+    /// 
+    /// This function panics if `values.len() != self.len()`.
+    ///
     fn fft<V, S, M>(&self, mut values: V, ring: S, memory_provider: &M)
         where S: RingStore, 
             S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
@@ -56,6 +93,19 @@ pub trait FFTTable {
         permute::permute_inv(&mut values, |i| self.unordered_fft_permutation(i), &default_memory_provider!());
     }
         
+    ///
+    /// Computes inplace the inverse Fourier transform of the given `values` over the given `ring`.
+    /// The output is in standard order, i.e. the `i`-th output element is the evaluation
+    /// of the input at `self.root_of_unity()^i`, divided by `self.len()`.
+    /// 
+    /// If necessary, temporary memory is allocated using the given memory provider.
+    /// In some cases, it can be faster to use [`FFTTable::unordered_inv_fft`], if the ordering
+    /// of the result is not relevant.
+    /// 
+    /// # Panics
+    /// 
+    /// This function panics if `values.len() != self.len()`.
+    ///
     fn inv_fft<V, S, M>(&self, mut values: V, ring: S, memory_provider: &M)
         where S: RingStore, 
             S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
@@ -67,7 +117,7 @@ pub trait FFTTable {
     }
 
     ///
-    /// Computes the FFT of the given values, but the output values are arbitrarily permuted
+    /// Computes the Fourier transform of the given values, but the output values are arbitrarily permuted
     /// (in a way compatible with [`FFTTable::unordered_inv_fft()`]).
     /// 
     /// This supports any given ring, as long as the precomputed values stored in the table are
@@ -77,7 +127,7 @@ pub trait FFTTable {
     /// Note that the FFT of a sequence `a_0, ..., a_(N - 1)` is defined as `Fa_k = sum_i a_i z^(-ik)`
     /// where `z` is an N-th root of unity.
     /// 
-    /// The given memory_provider is used in the case that temporary memory is required, as e.g.
+    /// The given `memory_provider` is used in the case that temporary memory is required, as e.g.
     /// for [`crate::algorithms::fft::bluestein::FFTTableBluestein`] .
     /// 
     fn unordered_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)

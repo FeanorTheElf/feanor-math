@@ -4,6 +4,37 @@ use crate::rings::poly::*;
 use crate::ring::*;
 use crate::algorithms;
 
+///
+/// Computes the `n`-th cyclotomic polynomial.
+/// 
+/// The `n`-cyclotomic polynomial is the unique polynomial with integer
+/// coefficients whose roots are the primitive `n`-th roots of unity.
+/// In other words, we find
+/// ```text
+/// cyclotomic_polynomial(n) = prod_{i in (Z/nZ)*} X - exp(2 pi i / n)
+/// ```
+/// 
+/// # Performance
+/// 
+/// The implementation uses an efficient algorithm based on the factorization of `n`.
+/// However, since the degree of the result is `phi(n)` (about the same size as `n`),
+/// it is recommended to pass a polynomial ring using a sparse representation, as this
+/// will significantly improve performance (both within the algorithm, and the size of
+/// the result).
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::poly::sparse_poly::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::assert_el_eq;
+/// 
+/// let poly_ring = SparsePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let cyclo_poly = feanor_math::algorithms::cyclotomic::cyclotomic_polynomial(&poly_ring, 3);
+/// assert_el_eq!(&poly_ring, &poly_ring.from_terms([(1, 0), (1, 1), (1, 2)].into_iter()), &cyclo_poly);
+/// ```
+/// 
 pub fn cyclotomic_polynomial<P>(P: P, n: usize) -> El<P>
     where P: PolyRingStore, P::Type: PolyRing + DivisibilityRing
 {

@@ -18,9 +18,18 @@ pub struct RustBigint(bool, Vec<u64>);
 /// If you need very high performance, consider using [`crate::rings::mpir::MPZ`]
 /// (requires an installation of mpir).
 /// 
+/// For the difference to [`RustBigintRing`], see the documentation of [`crate::ring::RingStore`].
+/// 
 #[derive(Copy, Clone, PartialEq)]
 pub struct RustBigintRingBase;
 
+///
+/// Arbitrary-precision integer implementation.
+/// 
+/// This is a not-too-well optimized implementation, written in pure Rust.
+/// If you need very high performance, consider using [`crate::rings::mpir::MPZ`]
+/// (requires an installation of mpir).
+/// 
 pub type RustBigintRing = RingValue<RustBigintRingBase>;
 
 impl RustBigintRing {

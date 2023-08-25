@@ -151,6 +151,9 @@ pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + SelfIso + 
         }
     }
 
+    ///
+    /// Returns the value `2^power` in this integer ring.
+    /// 
     fn power_of_two(&self, power: usize) -> Self::Element {
         let mut result = self.one();
         self.mul_pow_2(&mut result, power);

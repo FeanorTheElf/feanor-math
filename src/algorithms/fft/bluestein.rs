@@ -15,6 +15,10 @@ use crate::rings::zn::*;use crate::rings::float_complex::*;
 use crate::vector::VectorViewMut;
 use super::complex_fft::*;
 
+///
+/// Bluestein's FFT algorithm (also known as Chirp-Z-transform) to compute the Fourier
+/// transform of arbitrary length (including prime numbers).
+/// 
 pub struct FFTTableBluestein<R>
     where R: RingStore
 {

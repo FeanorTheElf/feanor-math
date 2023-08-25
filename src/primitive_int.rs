@@ -234,6 +234,11 @@ impl<T: PrimitiveInt> HashableElRing for StaticRingBase<T> {
     }
 }
 
+///
+/// The ring of integers `Z`, using the arithmetic of the primitive integer type `T`.
+/// 
+/// For the difference to [`StaticRing`], see the documentation of [`crate::ring::RingStore`].
+/// 
 pub struct StaticRingBase<T> {
     element: PhantomData<T>
 }
@@ -311,6 +316,9 @@ impl KaratsubaHint for StaticRingBase<i128> {
     fn karatsuba_threshold(&self) -> usize { 3 }
 }
 
+///
+/// The ring of integers `Z`, using the arithmetic of the primitive integer type `T`.
+/// 
 pub type StaticRing<T> = RingValue<StaticRingBase<T>>;
 
 #[test]

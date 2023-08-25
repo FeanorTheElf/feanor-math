@@ -11,6 +11,10 @@ use crate::algorithms;
 use crate::rings::float_complex::*;
 use super::complex_fft::*;
 
+///
+/// An optimized implementation of the Cooley-Tuckey FFT algorithm, to compute
+/// the Fourier transform of an array with power-of-two length.
+/// 
 pub struct FFTTableCooleyTuckey<R> 
     where R: RingStore
 {

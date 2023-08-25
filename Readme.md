@@ -254,7 +254,7 @@ Mainly, this is the result of the headache I got in the first version of this cr
 It seems to be a reasonably common requirement that elements of a ring may contain references to the ring.
 For example, this is the case if the element uses memory that is managed by a memory pool of the ring.
 In other words, we would define `RingBase` as
-```
+```rust,ignore
 trait RingBase {
 
     type Element<'a> where Self: 'a;
@@ -266,7 +266,7 @@ However, this conflicts with another design decision:
 We want to be able to nest rings, and allow the nested rings to be owned (not just borrowed).
 If we allow ring-referential elements, this now prevents us from defining rings that store the nested ring and some of its elements.
 For example, an implementation of Z/qZ might look like
-```rust
+```rust,ignore
 struct Zn<I: IntegerRingStore> {
     integer_ring: I,
     modulus: El<I>
@@ -276,7 +276,7 @@ If `El<I>` may contain a reference to `I`, then this struct is self-referential,
 
 Now it seems somewhat more natural to forbid owning nested rings instead of ring-referential elements, but this then severly limits which rings can be returned from functions.
 For example we might want a function to produce Fq with a mempool-based big integer implementation like
-```rust
+```rust,ignore
 fn galois_field(q: i64, exponent: usize) -> RingExtension<ZnBarett<MempoolBigIntRing>> {
     ...
 }

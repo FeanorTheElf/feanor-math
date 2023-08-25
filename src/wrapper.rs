@@ -2,6 +2,28 @@ use std::{ops::*, hash::Hash, fmt::{Display, Debug}};
 
 use crate::ring::*;
 
+///
+/// Stores a ring element together with its ring, so that ring operations do
+/// not require explicit mention of the ring object. This can be used both for
+/// convenience of notation (i.e. use `a + b` instead of `ring.add(a, b)`) and
+/// might also be necessary when e.g. storing elements in a set.
+/// 
+/// # Examples
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::wrapper::*;
+/// # use feanor_math::primitive_int::*;
+/// 
+/// let ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let x = RingElementWrapper::new(&ring, ring.indeterminate());
+/// println!("The result is: {}", x.clone() + x.clone() * x);
+/// // instead of
+/// let x = ring.indeterminate();
+/// println!("The result is: {}", ring.format(&ring.add(ring.mul(ring.clone_el(&x), ring.clone_el(&x)), ring.clone_el(&x))));
+/// ```
+/// 
 pub struct RingElementWrapper<R>
     where R: RingStore
 {
