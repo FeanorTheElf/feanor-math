@@ -2,7 +2,7 @@ use crate::algorithms::unity_root::*;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::primitive_int::*;
 use crate::mempool::*;
-use crate::rings::zn::{ZnRingStore, ZnRing};
+use crate::rings::zn::{ZnRingStore, ZnRing, fast_fft};
 use crate::vector::SwappableVectorViewMut;
 use crate::ring::*;
 use crate::vector::VectorViewMut;
@@ -475,6 +475,16 @@ fn bench_fft_zn42_fastmul(bencher: &mut test::Bencher) {
     });
 }
 
+#[bench]
+fn bench_fft_zn_bitshift(bencher: &mut test::Bencher) {
+    let ring = RingValue::from(fast_fft::FastFFTZn::new(1152921504606584833));
+    let fft = FFTTableCooleyTuckey::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
+    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+    let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
+    bencher.iter(|| {
+        run_fft_bench_round(&ring, &fft, &data, &mut copy)
+    });
+}
 #[test]
 fn test_approximate_fft() {
     let CC = Complex64::RING;
