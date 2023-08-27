@@ -7,6 +7,10 @@ use crate::primitive_int::*;
 pub type BigIntRing = crate::rings::mpir::MPZ;
 #[cfg(not(feature = "mpir"))]
 pub type BigIntRing = crate::rings::rust_bigint::RustBigintRing;
+#[cfg(feature = "mpir")]
+pub type BigIntRingBase = crate::rings::mpir::MPZBase;
+#[cfg(not(feature = "mpir"))]
+pub type BigIntRingBase = crate::rings::rust_bigint::RustBigintRingBase;
 
 ///
 /// Trait for rings that are isomorphic to the ring of integers `ZZ = { ..., -2, -1, 0, 1, 2, ... }`.

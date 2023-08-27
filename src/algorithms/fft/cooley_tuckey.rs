@@ -350,13 +350,21 @@ impl<R: RingStore<Type = Complex64>> ErrorEstimate for FFTTableCooleyTuckey<R> {
     }
 }
 
+pub fn dummy(fft_table: &FFTTableCooleyTuckey<zn_42::Zn>, values: &mut [El<zn_42::Zn>], ring: zn_42::Zn) {
+    fft_table.unordered_fft(values, ring, &AllocatingMemoryProvider)
+}
+
+pub fn dummy2(ring: &zn_42::Zn, mut data: &mut [El<zn_42::Zn>], i1: usize, i2: usize, twiddle: &El<zn_42::Zn>) {
+    ring.get_ring().butterfly(ring.get_ring(), &(), &mut data, twiddle, i1, i2);
+}
+
 #[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
 #[cfg(test)]
 use crate::rings::zn::zn_barett;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
-#[cfg(test)]
+// #[cfg(test)]
 use crate::rings::zn::zn_42;
 #[cfg(test)]
 use crate::field::*;

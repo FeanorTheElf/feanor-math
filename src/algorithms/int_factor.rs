@@ -21,7 +21,7 @@ fn is_power<I: IntegerRingStore>(ZZ: &I, n: &El<I>) -> Option<(El<I>, usize)>
 
 pub fn factor<I>(ZZ: &I, mut n: El<I>) -> Vec<(El<I>, usize)> 
     where I: IntegerRingStore + OrderedRingStore, 
-        I::Type: IntegerRing + OrderedRing + CanonicalIso<Base<BigIntRing>> + CanonicalIso<StaticRingBase<i128>>
+        I::Type: IntegerRing + OrderedRing + CanonicalIso<BigIntRingBase> + CanonicalIso<StaticRingBase<i128>>
 {
     const SMALL_PRIME_BOUND: i32 = 1000;
     let mut result = Vec::new();

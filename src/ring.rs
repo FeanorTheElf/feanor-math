@@ -1066,10 +1066,6 @@ impl<R> HashableElRingStore for R
 /// Alias for `<<Self as RingStore>::Type as RingBase>::Element`.
 /// 
 pub type El<R> = <<R as RingStore>::Type as RingBase>::Element;
-///
-/// Alias for `<Self as RingStore>::Type`.
-/// 
-pub type Base<R> = <R as RingStore>::Type;
 
 ///
 /// The most fundamental [`crate::ring::RingStore`]. It is basically
