@@ -11,7 +11,6 @@ pub mod zn_barett;
 pub mod zn_42;
 pub mod zn_static;
 pub mod zn_rns;
-pub mod fast_fft;
 
 pub trait ZnRing: DivisibilityRing + FiniteRing + CanonicalHom<Self::IntegerRingBase> + SelfIso {
 
