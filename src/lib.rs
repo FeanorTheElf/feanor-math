@@ -8,6 +8,7 @@
 #![feature(new_uninit)] 
 #![feature(core_intrinsics)]
 #![feature(const_type_name)]
+#![feature(portable_simd)]
 
 #![doc = include_str!("../Readme.md")]
 

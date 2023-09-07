@@ -40,6 +40,21 @@ pub fn usigned_as_signed_ref<'a>(x: &'a u64) -> &'a i64 {
 /// let zn = Zn::new((1 << 42) + 1);
 /// ```
 /// 
+/// # Implementation
+/// 
+/// The basic idea of Barett reduction is that if `a * b <= 2^k`
+/// then `floor(a * b * floor(2^k / n) / 2^k)` is at most one smaller than
+/// `floor(a * b / n)`. For the product `a * b * floor(2^k / n)` to fit
+/// into `u128`, we could restrict `n` to be at most 42 bits, and `a, b < n`.
+/// 
+/// However, for efficiency reasons, we would like to allow representatives
+/// that can reach at least `2n`. This is useful, as we do not have to additively
+/// reduce after multiplications in this case (remember that the floor-formula can
+/// be 1 off the real result). Hence, we restrict `n` to have at most 41 bits,
+/// and compute a dynamic bound `repr_bound >= 2n` to which representatives of
+/// elements in `Z/nZ` may grow before they have to be reduced. As `n` approaches
+/// `2^41`, `repr_bound/n` will approach 2, but may be larger for smaller `n`.
+/// 
 #[derive(Clone, Copy, PartialEq)]
 pub struct ZnBase {
     /// must be 128 bit to deal with very small moduli

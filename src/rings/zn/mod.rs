@@ -9,10 +9,30 @@ use crate::rings::finite::FiniteRingStore;
 
 pub mod zn_barett;
 pub mod zn_42;
+pub mod zn_64;
 pub mod zn_static;
 pub mod zn_rns;
 pub mod fast_fft;
 
+///
+/// Trait for rings that represent a quotient of the integers, i.e. `Z/nZ` for some
+/// integer `n`.
+/// 
+/// # On implementations
+/// 
+/// Simple implementations like [`zn_barett::Zn`] are easy, but when aiming for maximum
+/// performance, things get difficult. There are generally two main methods for implementations
+/// that are fast on "standard" systems: Barett and Montgomery reduction.
+/// 
+/// Barett reduction is simpler, and hence more commonly used. Basically, the idea is to use
+/// `x / n ~ x * floor(2^k / n) / 2^k`, where `floor(2^k / n)` can be precomputed. Using an approach
+/// like this, we can then try to minimize the arithmetic operations required. However, the
+/// exact situation depends on the size of the modulus `n`.
+///  - If `n` has at most 42 bits, we can compute a product `a * b * floor(2^k / n)` within
+///    an `u128`. A variant of this is implemented in [`zn_42::Zn`].
+///  - If `n` has at most 64 bits, I think the best way is to set `k = 128` and hence compute only
+///    the upper 128 bit of `a * b * floor(2^128 / n)`.
+/// 
 pub trait ZnRing: DivisibilityRing + FiniteRing + CanonicalHom<Self::IntegerRingBase> + SelfIso {
 
     // there seems to be a problem with associated type bounds, hence we cannot use `Integers: IntegerRingStore`
