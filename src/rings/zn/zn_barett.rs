@@ -12,7 +12,7 @@ use crate::primitive_int::*;
 
 ///
 /// Ring representing `Z/nZ`, computing the modular reductions
-/// via a Barett-reduction algorithm. This is a fast general-purpose
+/// via a Barett-reduction algorithm. This is a general-purpose
 /// method, but note that it is required that `n^3` fits into the
 /// supplied integer type.
 /// 
@@ -66,6 +66,10 @@ pub struct ZnBase<I: IntegerRingStore>
     inverse_modulus_bitshift: usize,
 }
 
+///
+/// Ring representing `Z/nZ`, computing the modular reductions
+/// via a Barett-reduction algorithm. For details, see [`ZnBase`].
+/// 
 pub type Zn<I> = RingValue<ZnBase<I>>;
 
 impl<I: IntegerRingStore> Zn<I>

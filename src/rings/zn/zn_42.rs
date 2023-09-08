@@ -20,7 +20,12 @@ fn usigned_as_signed_ref<'a>(x: &'a u64) -> &'a i64 {
 /// A special implementation of non-standard Barett reduction
 /// that uses 128-bit integer but provides moduli up to 41 bits.
 /// 
-/// Any modular reductions are performed lazily on-demand.
+/// The basic idea underlying this implementation is the fact
+/// that for Barett reduction, we have to multiply three numbers
+/// of roughly equal size. If the result should fit into `u128`, each
+/// number can be at most 42 bits. Hence, we restrict moduli to at
+/// most 42 bits, but for efficiency reasons, we want to allow
+/// representatives to grow up to `2 * n`, hence only 41 bits are left.
 /// 
 /// # Example
 /// 
@@ -32,12 +37,12 @@ fn usigned_as_signed_ref<'a>(x: &'a u64) -> &'a i64 {
 /// let zn = Zn::new(7);
 /// assert_el_eq!(&zn, &zn.one(), &zn.mul(zn.from_int(3), zn.from_int(5)));
 /// ```
-/// For moduli larger than 42 bit, this will panic
+/// For moduli larger than 41 bit, this will panic
 /// ```should_panic
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_42::*;
-/// let zn = Zn::new((1 << 42) + 1);
+/// let zn = Zn::new((1 << 41) + 1);
 /// ```
 /// 
 #[derive(Clone, Copy, PartialEq)]
@@ -49,6 +54,10 @@ pub struct ZnBase {
     repr_bound: u64
 }
 
+///
+/// A heavily optimized implementation of `Z/nZ` for `n` that have at most
+/// 41 bits. For details, see [`ZnBase`].
+/// 
 pub type Zn = RingValue<ZnBase>;
 
 ///

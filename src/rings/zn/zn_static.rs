@@ -6,6 +6,10 @@ use crate::primitive_int::{StaticRing, StaticRingBase};
 use crate::ring::*;
 use crate::rings::zn::*;
 
+///
+/// Ring that implements arithmetic in `Z/nZ` for a small `n` known
+/// at compile time.
+/// 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ZnBase<const N: u64, const IS_FIELD: bool>;
 
@@ -234,6 +238,10 @@ impl<const N: u64, const IS_FIELD: bool> RingValue<ZnBase<N, IS_FIELD>>
     pub const RING: Self = Self::from(ZnBase);
 }
 
+///
+/// Ring that implements arithmetic in `Z/nZ` for a small `n` known
+/// at compile time. For details, see [`ZnBase`].
+/// 
 pub type Zn<const N: u64> = RingValue<ZnBase<N, {is_prime(N)}>>;
 
 #[test]

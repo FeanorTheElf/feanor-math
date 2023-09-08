@@ -13,6 +13,9 @@ use crate::default_memory_provider;
 /// where `m1`, ..., `mr` are sufficiently small, and can e.g.
 /// by implemented without large integers.
 /// 
+/// Note that the component rings `Z/miZ` of this ring can be
+/// accessed via the [`crate::vector::VectorView`]-functions.
+/// 
 /// # Example
 /// ```
 /// # use feanor_math::ring::*;
@@ -66,29 +69,14 @@ pub struct ZnBase<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>> 
     memory_provider: M
 }
 
-pub type Zn<C, J> = RingValue<ZnBase<C, J>>;
-
-impl<C: ZnRingStore + Clone, J: IntegerRingStore> Zn<C, J> 
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
-        J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
-{
-    pub fn new(component_rings: Vec<C>, large_integers: J) -> Self {
-        Self::from(ZnBase::new(component_rings, large_integers, default_memory_provider!()))
-    }
-}
+///
+/// The ring `Z/nZ` for composite `n` implemented using the residue number system (RNS), 
+/// i.e. storing values by storing their value modulo every factor of `n`.
+/// For details, see [`ZnBase`].
+/// 
+pub type Zn<C, J, M = DefaultMemoryProvider> = RingValue<ZnBase<C, J, M>>;
 
 impl<J: IntegerRingStore> Zn<zn_42::Zn, J> 
-    where J::Type: IntegerRing,
-        zn_42::ZnBase: CanonicalHom<J::Type>,
-        StaticRingBase<i64>: CanonicalIso<J::Type>
-{
-    pub fn from_primes(large_integers: J, primes: Vec<u64>) -> Self {
-        Self::from(ZnBase::from_primes(large_integers, primes))
-    }
-}
-
-impl<J: IntegerRingStore> ZnBase<zn_42::Zn, J> 
     where J::Type: IntegerRing,
         zn_42::ZnBase: CanonicalHom<J::Type>,
         StaticRingBase<i64>: CanonicalIso<J::Type>
@@ -102,11 +90,16 @@ impl<J: IntegerRingStore> ZnBase<zn_42::Zn, J>
     }
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnBase<C, J, M> 
+impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Zn<C, J, M> 
     where C::Type: ZnRing + CanonicalHom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
+    ///
+    /// Creates a new ring for `Z/nZ` with `n = m1 ... mr` where the `mi` are the moduli
+    /// of the given component rings. Furthermore, the corresponding large integer ring must be
+    /// provided, which has to be able to store values of size at least `n^3`.
+    /// 
     pub fn new(component_rings: Vec<C>, large_integers: J, memory_provider: M) -> Self {
         assert!(component_rings.len() > 0);
         let total_modulus = large_integers.prod(
@@ -128,18 +121,28 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnBase<C, J,
             .zip(component_rings.iter())
             .map(|(n, R)| total_ring.pow_gen(n, &R.integer_ring().sub_ref_fst(R.modulus(), R.integer_ring().one()), R.integer_ring()))
             .collect();
-        ZnBase {
+        RingValue::from(ZnBase {
             components: component_rings,
             total_ring: total_ring,
             unit_vectors: unit_vectors,
             memory_provider: memory_provider
-        }
+        })
     }
+}
 
+impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnBase<C, J, M> 
+    where C::Type: ZnRing + CanonicalHom<J::Type>,
+        J::Type: IntegerRing,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+{
     fn ZZ(&self) -> &J {
         self.total_ring.integer_ring()
     }
 
+    ///
+    /// Given values `ai` for each component ring `Z/miZ`, computes the unique element in this
+    /// ring `Z/nZ` that is congruent to `ai` modulo `mi`. The "opposite" function is [`get_congruence()`].
+    /// 
     pub fn from_congruence<I>(&self, mut el: I) -> ZnEl<C, M>
         where I: ExactSizeIterator<Item = El<C>>
     {
@@ -147,6 +150,10 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnBase<C, J,
         ZnEl(self.memory_provider.get_new_init(self.len(), |_| el.next().unwrap()))
     }
 
+    ///
+    /// Given `a` in `Z/nZ`, returns the vector whose `i`-th entry is `a mod mi`, where the `mi` are the
+    /// moduli of the component rings of this ring.
+    /// 
     pub fn get_congruence<'a>(&self, el: &'a ZnEl<C, M>) -> impl 'a + VectorView<El<C>> {
         &el.0 as &[El<C>]
     }

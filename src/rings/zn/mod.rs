@@ -7,22 +7,59 @@ use super::field::AsFieldBase;
 use super::finite::FiniteRing;
 use crate::rings::finite::FiniteRingStore;
 
+///
+/// This module contains [`zn_barett::Zn`], a general-purpose implementation of
+/// Barett reduction. It is relatively slow when instantiated with small fixed-size
+/// integer type. 
+/// 
 pub mod zn_barett;
+///
+/// This module contains [`zn_42::Zn`], a heavily optimized implementation of `Z/nZ`
+/// for moduli `n` with at most 41 bits.
+/// 
 pub mod zn_42;
+///
+/// This module contains [`zn_static::Zn`], an implementation of `Z/nZ` for a small `n`
+/// that is known at compile-time.
+/// 
 pub mod zn_static;
+///
+/// This module contains [`zn_rns::Zn`], a residue number system (RNS) implementation of
+/// `Z/nZ` for highly composite `n`. 
+/// 
 pub mod zn_rns;
 
+///
+/// Trait for all rings that represent a quotient of the integers `Z/nZ` for some integer `n`.
+/// 
 pub trait ZnRing: DivisibilityRing + FiniteRing + CanonicalHom<Self::IntegerRingBase> + SelfIso {
 
-    // there seems to be a problem with associated type bounds, hence we cannot use `Integers: IntegerRingStore`
-    // or `Integers: RingStore<Type: IntegerRing>`
+    /// 
+    /// there seems to be a problem with associated type bounds, hence we cannot use `Integers: IntegerRingStore`
+    /// or `Integers: RingStore<Type: IntegerRing>`
+    /// 
     type IntegerRingBase: IntegerRing + ?Sized;
     type Integers: RingStore<Type = Self::IntegerRingBase>;
 
     fn integer_ring(&self) -> &Self::Integers;
     fn modulus(&self) -> &El<Self::Integers>;
+
+    ///
+    /// Computes the smallest positive lift for some `x` in `Z/nZ`, i.e. the smallest positive integer `m` such that
+    /// `m = x mod n`.
+    /// 
+    /// This will be one of `0, 1, ..., n - 1`. If an integer in `-(n - 1)/2, ..., -1, 0, 1, ..., (n - 1)/2` (for odd `n`)
+    /// is needed instead, use [`ZnRing::smallest_lift()`].
+    /// 
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers>;
 
+    ///
+    /// Computes the smallest lift for some `x` in `Z/nZ`, i.e. the smallest integer `m` such that
+    /// `m = x mod n`.
+    /// 
+    /// This will be one of `-(n - 1)/2, ..., -1, 0, 1, ..., (n - 1)/2` (for odd `n`). If an integer in `0, 1, ..., n - 1`
+    /// is needed instead, use [`ZnRing::smallest_positive_lift()`].
+    /// 
     fn smallest_lift(&self, el: Self::Element) -> El<Self::Integers> {
         let result = self.smallest_positive_lift(el);
         let mut mod_half = self.integer_ring().clone_el(self.modulus());
@@ -34,6 +71,9 @@ pub trait ZnRing: DivisibilityRing + FiniteRing + CanonicalHom<Self::IntegerRing
         }
     }
 
+    ///
+    /// Returns whether this ring is a field, i.e. whether `n` is prime.
+    /// 
     fn is_field(&self) -> bool {
         algorithms::miller_rabin::is_prime_base(RingRef::new(self), 10)
     }
