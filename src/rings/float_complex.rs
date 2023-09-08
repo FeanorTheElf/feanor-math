@@ -140,31 +140,7 @@ impl RingBase for Complex64 {
     }
 }
 
-impl CanonicalHom<Complex64> for Complex64 {
-
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, _: &Complex64) -> Option<Self::Homomorphism> {
-        Some(())
-    }
-
-    fn map_in(&self, _: &Complex64, el: <Complex64 as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
-        el
-    }
-}
-
-impl CanonicalIso<Complex64> for Complex64 {
-
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, _: &Complex64) -> Option<Self::Isomorphism> {
-        Some(())
-    }
-
-    fn map_out(&self, _: &Complex64, el: Self::Element, _: &Self::Isomorphism) -> <Complex64 as RingBase>::Element {
-        el
-    }
-}
+impl_eq_based_self_iso!{ Complex64 }
 
 impl DivisibilityRing for Complex64 {
 

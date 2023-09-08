@@ -351,6 +351,107 @@ macro_rules! delegate {
 }
 
 ///
+/// Implements the trivial canonical isomorphism `Self: CanonicalIso<Self>` for the
+/// given type. 
+/// 
+/// Note that this does not support generic types, as for those, it is
+/// usually better to implement
+/// ```ignore
+/// RingConstructor<R>: CanonicalIso<RingConstructor<S>>
+///     where R: CanonicalIso<S>
+/// ```
+/// or something similar.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::delegate::*;
+/// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
+/// 
+/// #[derive(PartialEq, Clone, Copy)]
+/// struct MyI32Ring;
+/// 
+/// impl DelegateRing for MyI32Ring {
+/// 
+///     type Base = StaticRingBase<i32>;
+///     type Element = i32;
+/// 
+///     fn get_delegate(&self) -> &Self::Base {
+///         StaticRing::<i32>::RING.get_ring()
+///     }
+/// 
+///     fn delegate_ref<'a>(&self, el: &'a i32) -> &'a i32 {
+///         el
+///     }
+/// 
+///     fn delegate_mut<'a>(&self, el: &'a mut i32) -> &'a mut i32 {
+///         el
+///     }
+/// 
+///     fn delegate(&self, el: i32) -> i32 {
+///         el
+///     }
+/// 
+///     fn postprocess_delegate_mut(&self, _: &mut i32) {
+///         // sometimes it might be necessary to fix some data of `Self::Element`
+///         // if the underlying `Self::Base::Element` was modified via `delegate_mut()`;
+///         // this is not the case here, so leave empty
+///     }
+/// 
+///     fn rev_delegate(&self, el: i32) -> i32 {
+///         el
+///     }
+/// }
+/// 
+/// // since we provide `PartialEq`, the trait `CanonicalIso<Self>` is trivial
+/// // to implement
+/// impl_eq_based_self_iso!{ MyI32Ring }
+/// 
+/// let ring = RingValue::from(MyI32Ring);
+/// assert_el_eq!(&ring, &ring.from_int(1), &ring.one());
+/// ```
+/// 
+#[macro_export]
+macro_rules! impl_eq_based_self_iso {
+    ($type:ty) => {
+        impl CanonicalHom<Self> for $type {
+
+            type Homomorphism = ();
+
+            fn has_canonical_hom(&self, from: &Self) -> Option<()> {
+                if self == from {
+                    Some(())
+                } else {
+                    None
+                }
+            }
+
+            fn map_in(&self, _from: &Self, el: <Self as RingBase>::Element, _: &Self::Homomorphism) -> <Self as RingBase>::Element {
+                el
+            }
+        }
+        
+        impl CanonicalIso<Self> for $type {
+
+            type Isomorphism = ();
+
+            fn has_canonical_iso(&self, from: &Self) -> Option<()> {
+                if self == from {
+                    Some(())
+                } else {
+                    None
+                }
+            }
+
+            fn map_out(&self, _from: &Self, el: <Self as RingBase>::Element, _: &Self::Homomorphism) -> <Self as RingBase>::Element {
+                el
+            }
+        }
+    };
+}
+
+///
 /// Equivalent to `assert_eq!` to assert that two ring elements are equal.
 /// Frequently used in tests
 /// 
@@ -1249,31 +1350,7 @@ fn test_internal_wrappings_dont_matter() {
         }
     }
 
-    impl CanonicalHom<ABase> for ABase {
-
-        type Homomorphism = ();
-        
-        fn has_canonical_hom(&self, _: &ABase) -> Option<()> {
-            Some(())
-        }
-
-        fn map_in(&self, _: &ABase, el: <ABase as RingBase>::Element, _: &()) -> Self::Element {
-            el
-        }
-    }
-
-    impl CanonicalIso<ABase> for ABase {
-        
-        type Isomorphism = ();
-
-        fn has_canonical_iso(&self, _: &ABase) -> Option<()> {
-            Some(())
-        }
-
-        fn map_out(&self, _: &ABase, el: <ABase as RingBase>::Element, _: &()) -> Self::Element {
-            el
-        }
-    }
+    impl_eq_based_self_iso!{ ABase }
 
     impl<R: RingStore> RingBase for BBase<R> {
         type Element = i32;

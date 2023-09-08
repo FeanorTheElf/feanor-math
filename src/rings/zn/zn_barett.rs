@@ -13,7 +13,7 @@ use crate::primitive_int::*;
 ///
 /// Ring representing `Z/nZ`, computing the modular reductions
 /// via a Barett-reduction algorithm. This is a fast general-purpose
-/// method, but note that it is required that `n^4` fits into the
+/// method, but note that it is required that `n^3` fits into the
 /// supplied integer type.
 /// 
 /// # Performance

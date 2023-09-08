@@ -214,39 +214,7 @@ impl RingBase for ZnBase {
     }
 }
 
-impl CanonicalHom<ZnBase> for ZnBase {
-
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
-        if self.modulus == from.modulus {
-            Some(())
-        } else {
-            None
-        }
-    }
-
-    fn map_in(&self, _: &ZnBase, el: <ZnBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
-        el
-    }
-}
-
-impl CanonicalIso<ZnBase> for ZnBase {
-
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
-        if self.modulus == from.modulus {
-            Some(())
-        } else {
-            None
-        }
-    }
-
-    fn map_out(&self, _: &ZnBase, el: Self::Element, _: &Self::Isomorphism) -> <ZnBase as RingBase>::Element {
-        el
-    }
-}
+impl_eq_based_self_iso!{ ZnBase }
 
 impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalHom<zn_barett::ZnBase<I>> for ZnBase {
 
@@ -493,7 +461,7 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
 /// As opposed to [`ZnBase`], elements are stored with additional information
 /// to speed up multiplication `ZnBase x ZnFastmulBase -> ZnBase`, by
 /// using [`CanonicalHom::mul_assign_map_in()`].
-/// Note that normal arithmetic in this ring is slower than [`ZnBase`].
+/// Note that normal arithmetic in this ring is much slower than [`ZnBase`].
 /// 
 /// # Example
 /// The following use of the FFT is usually faster than the standard use, as
@@ -537,7 +505,15 @@ impl ZnFastmulBase {
     }
 }
 
-pub struct ZnFastmulEl(ZnEl, u128);
+///
+/// An element of [`ZnFastmulBase`].
+/// 
+pub struct ZnFastmulEl {
+    // representatives are always reduced, except temporarily when using `delegate_mut()`
+    base: ZnEl,
+    // the value `floor((x * 2^42) / p)`
+    x_shift_over_p: u64
+}
 
 impl DelegateRing for ZnFastmulBase {
 
@@ -548,63 +524,34 @@ impl DelegateRing for ZnFastmulBase {
         &self.base
     }
     
-    fn delegate(&self, ZnFastmulEl(el, _): Self::Element) -> <Self::Base as RingBase>::Element {
-        el
+    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element {
+        el.base
     }
 
-    fn delegate_mut<'a>(&self, ZnFastmulEl(el, _): &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element {
-        el
+    fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element {
+        &mut el.base
     }
 
-    fn delegate_ref<'a>(&self, ZnFastmulEl(el, _): &'a Self::Element) -> &'a <Self::Base as RingBase>::Element {
-        el
+    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element {
+        &el.base
     }
 
-    fn postprocess_delegate_mut(&self, ZnFastmulEl(el, additional): &mut Self::Element) {
-        *additional = el.0 as u128 * self.base.inv_modulus;
+    fn postprocess_delegate_mut(&self, el: &mut Self::Element) {
+        el.base.0 = el.base.0 % self.base.modulus;
+        el.x_shift_over_p = (el.base.0 as u128 * (1u128 << (BITSHIFT / 2)) as u128 / self.base.modulus as u128) as u64;
     }
 
     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element {
-        let mut result = ZnFastmulEl(el, 0);
+        let mut result = ZnFastmulEl {
+            base: el,
+            x_shift_over_p: 0
+        };
         self.postprocess_delegate_mut(&mut result);
         return result;
     }
 }
 
-
-impl CanonicalHom<ZnFastmulBase> for ZnFastmulBase {
-
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, from: &ZnFastmulBase) -> Option<Self::Homomorphism> {
-        if self.base.modulus == from.base.modulus {
-            Some(())
-        } else {
-            None
-        }
-    }
-
-    fn map_in(&self, _: &ZnFastmulBase, el: Self::Element, _: &Self::Homomorphism) -> Self::Element {
-        el
-    }
-}
-
-impl CanonicalIso<ZnFastmulBase> for ZnFastmulBase {
-
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, from: &ZnFastmulBase) -> Option<Self::Isomorphism> {
-        if self.base.modulus == from.base.modulus {
-            Some(())
-        } else {
-            None
-        }
-    }
-
-    fn map_out(&self, _: &ZnFastmulBase, el: Self::Element, _: &Self::Homomorphism) -> Self::Element {
-        el
-    }
-}
+impl_eq_based_self_iso!{ ZnFastmulBase }
 
 impl CanonicalHom<ZnFastmulBase> for ZnBase {
 
@@ -622,12 +569,15 @@ impl CanonicalHom<ZnFastmulBase> for ZnBase {
         from.delegate(el)
     }
 
-    fn mul_assign_map_in_ref(&self, _: &ZnFastmulBase, ZnEl(lhs): &mut Self::Element, ZnFastmulEl(ZnEl(rhs), rhs_inv_mod): &<ZnFastmulBase as RingBase>::Element, _: &Self::Homomorphism) {
-        let quotient: u64 = ((*lhs as u128 * *rhs_inv_mod) >> BITSHIFT) as u64;
-        let result = (*lhs as u128 * *rhs as u128 - quotient as u128 * self.modulus as u128) as u64;
-        *lhs = result;
-        debug_assert!(*lhs < 2 * self.modulus);
+    fn mul_assign_map_in_ref(&self, _: &ZnFastmulBase, ZnEl(lhs): &mut Self::Element, twiddle: &<ZnFastmulBase as RingBase>::Element, _: &Self::Homomorphism) {
         debug_assert!(*lhs <= self.repr_bound);
+        debug_assert!(twiddle.base.0 < self.modulus);
+        // the upper parts of product will cancel out, so only compute the lower parts
+        let product = (*lhs).wrapping_mul(twiddle.base.0);
+        // the quotient fits into u64 as `*lhs <= self.repr_bound` has at most `BITSHIFT / 2` bits
+        let quotient = ((*lhs as u128 * twiddle.x_shift_over_p as u128) >> (BITSHIFT / 2)) as u64;
+        *lhs = product.wrapping_sub(quotient.wrapping_mul(self.modulus)) as u64;
+        debug_assert!(*lhs < 2 * self.modulus);
     }
 
     fn mul_assign_map_in(&self, from: &ZnFastmulBase, lhs: &mut Self::Element, rhs: <ZnFastmulBase as RingBase>::Element, hom: &Self::Homomorphism) {
@@ -691,8 +641,13 @@ impl CanonicalIso<ZnFastmulBase> for ZnBase {
         }
     }
 
-    fn map_out(&self, _: &ZnFastmulBase, el: Self::Element, _: &Self::Isomorphism) -> <ZnFastmulBase as RingBase>::Element {
-        ZnFastmulEl(el, el.0 as u128 * self.inv_modulus)
+    fn map_out(&self, from: &ZnFastmulBase, el: Self::Element, _: &Self::Isomorphism) -> <ZnFastmulBase as RingBase>::Element {
+        let mut result = ZnFastmulEl {
+            base: el,
+            x_shift_over_p: 0
+        };
+        from.postprocess_delegate_mut(&mut result);
+        return result;
     }
 }
 

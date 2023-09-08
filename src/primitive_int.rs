@@ -10,6 +10,9 @@ use crate::rings::rust_bigint::{RustBigint, RustBigintRingBase};
 use crate::integer::*;
 use crate::algorithms::conv_mul::KaratsubaHint;
 
+///
+/// Trait for `i8` to `i128`.
+/// 
 pub trait PrimitiveInt: AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Eq + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy + Div<Self, Output = Self> + Rem<Self, Output = Self> + Display {
 
     fn bits() -> usize;

@@ -42,6 +42,7 @@ fn slice_sub_assign<R, V1, V2>(mut dst: V1, src: V2, ring: R)
         ring.sub_assign_ref(dst.at_mut(i), src.at(i));
     }
 }
+
 macro_rules! karatsuba_impl {
     ($( ($num:literal, $fun:ident, $prev:ident) ),*) => {
         fn dispatch_karatsuba_impl<R, V2, V3, const ADD_ASSIGN: bool>(

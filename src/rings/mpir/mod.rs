@@ -443,31 +443,7 @@ impl HashableElRing for MPZBase {
     }
 }
 
-impl CanonicalHom<MPZBase> for MPZBase {
-
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, _: &MPZBase) -> Option<Self::Homomorphism> {
-        Some(())
-    }
-
-    fn map_in(&self, _: &MPZBase, el: MPZEl, _: &Self::Homomorphism) -> Self::Element {
-        el
-    }
-}
-
-impl CanonicalIso<MPZBase> for MPZBase {
-
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, _: &MPZBase) -> Option<Self::Isomorphism> {
-        Some(())
-    }
-
-    fn map_out(&self, _: &MPZBase, el: Self::Element, _: &Self::Isomorphism) -> <MPZBase as RingBase>::Element {
-        el
-    }
-}
+impl_eq_based_self_iso!{ MPZBase }
 
 impl CanonicalHom<RustBigintRingBase> for MPZBase {
 

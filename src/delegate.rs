@@ -7,6 +7,56 @@ use crate::{ring::*, divisibility::DivisibilityRing, rings::{zn::ZnRing, finite:
 /// instead of `RingBase`, and just provide how to map elements in the new
 /// ring to the wrapped ring and vice versa.
 /// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::delegate::*;
+/// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
+/// 
+/// #[derive(PartialEq, Clone, Copy)]
+/// struct MyI32Ring;
+/// struct MyI32RingEl(i32);
+/// 
+/// impl DelegateRing for MyI32Ring {
+/// 
+///     type Base = StaticRingBase<i32>;
+///     type Element = MyI32RingEl;
+/// 
+///     fn get_delegate(&self) -> &Self::Base {
+///         StaticRing::<i32>::RING.get_ring()
+///     }
+/// 
+///     fn delegate_ref<'a>(&self, MyI32RingEl(el): &'a MyI32RingEl) -> &'a i32 {
+///         el
+///     }
+/// 
+///     fn delegate_mut<'a>(&self, MyI32RingEl(el): &'a mut MyI32RingEl) -> &'a mut i32 {
+///         el
+///     }
+/// 
+///     fn delegate(&self, MyI32RingEl(el): MyI32RingEl) -> i32 {
+///         el
+///     }
+/// 
+///     fn postprocess_delegate_mut(&self, _: &mut MyI32RingEl) {
+///         // sometimes it might be necessary to fix some data of `Self::Element`
+///         // if the underlying `Self::Base::Element` was modified via `delegate_mut()`;
+///         // this is not the case here, so leave empty
+///     }
+/// 
+///     fn rev_delegate(&self, el: i32) -> MyI32RingEl {
+///         MyI32RingEl(el)
+///     }
+/// }
+/// 
+/// // you will have to implement `CanonicalIso<Self>`
+/// impl_eq_based_self_iso!{ MyI32Ring }
+/// 
+/// let ring = RingValue::from(MyI32Ring);
+/// assert_el_eq!(&ring, &ring.from_int(1), &ring.one());
+/// ```
+/// 
 pub trait DelegateRing: PartialEq {
 
     type Base: ?Sized + RingBase + SelfIso;
@@ -22,12 +72,16 @@ pub trait DelegateRing: PartialEq {
         *el = self.rev_delegate(self.get_delegate().clone_el(self.delegate_ref(el)));
     }
 
-    // necessary in some locations to satisfy the type system
+    ///
+    /// Necessary in some locations to satisfy the type system
+    /// 
     fn element_cast(&self, el: Self::Element) -> <Self as RingBase>::Element {
         el
     }
 
-    // necessary in some locations to satisfy the type system
+    ///
+    /// Necessary in some locations to satisfy the type system
+    /// 
     fn rev_element_cast(&self, el: <Self as RingBase>::Element) -> Self::Element {
         el
     }
