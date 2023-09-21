@@ -660,14 +660,14 @@ fn test_integer_ring_axioms() {
 
 #[test]
 fn test_canonical_iso_axioms_i32() {
-    generic_test_canonical_hom_axioms(StaticRing::<i32>::RING, MPZ::RING, [0, -1, 1, i16::MAX as i32, i16::MIN as i32].into_iter());
-    generic_test_canonical_iso_axioms(StaticRing::<i32>::RING, MPZ::RING, [0, -1, 1, i16::MIN as i32, i16::MAX as i32].into_iter());
+    generic_tests::test_hom_axioms(StaticRing::<i32>::RING, MPZ::RING, [0, -1, 1, i16::MAX as i32, i16::MIN as i32].into_iter());
+    generic_tests::test_iso_axioms(StaticRing::<i32>::RING, MPZ::RING, [0, -1, 1, i16::MIN as i32, i16::MAX as i32].into_iter());
 }
 
 #[test]
 fn test_canonical_iso_axioms_i64() {
-    generic_test_canonical_hom_axioms(StaticRing::<i64>::RING, MPZ::RING, [0, -1, 1, i32::MAX as i64, i32::MIN as i64].into_iter());
-    generic_test_canonical_iso_axioms(StaticRing::<i64>::RING, MPZ::RING, [0, -1, 1, i32::MIN as i64, i32::MAX as i64].into_iter());
+    generic_tests::test_hom_axioms(StaticRing::<i64>::RING, MPZ::RING, [0, -1, 1, i32::MAX as i64, i32::MIN as i64].into_iter());
+    generic_tests::test_iso_axioms(StaticRing::<i64>::RING, MPZ::RING, [0, -1, 1, i32::MIN as i64, i32::MAX as i64].into_iter());
 
     assert_el_eq!(&MPZ::RING, &MPZ::RING.sub(MPZ::RING.power_of_two(63), MPZ::RING.one()), &MPZ::RING.coerce(&StaticRing::<i64>::RING, i64::MAX));
     assert_el_eq!(&MPZ::RING, &MPZ::RING.negate(MPZ::RING.power_of_two(63)), &MPZ::RING.coerce(&StaticRing::<i64>::RING, i64::MIN));
@@ -677,8 +677,8 @@ fn test_canonical_iso_axioms_i64() {
 
 #[test]
 fn test_canonical_iso_axioms_i128() {
-    generic_test_canonical_hom_axioms(StaticRing::<i128>::RING, MPZ::RING, [0, -1, 1, i64::MAX as i128, i64::MIN as i128].into_iter());
-    generic_test_canonical_iso_axioms(StaticRing::<i128>::RING, MPZ::RING, [0, -1, 1, i64::MIN as i128, i64::MAX as i128].into_iter());
+    generic_tests::test_hom_axioms(StaticRing::<i128>::RING, MPZ::RING, [0, -1, 1, i64::MAX as i128, i64::MIN as i128].into_iter());
+    generic_tests::test_iso_axioms(StaticRing::<i128>::RING, MPZ::RING, [0, -1, 1, i64::MIN as i128, i64::MAX as i128].into_iter());
 
     assert_el_eq!(&MPZ::RING, &MPZ::RING.sub(MPZ::RING.power_of_two(127), MPZ::RING.one()), &MPZ::RING.coerce(&StaticRing::<i128>::RING, i128::MAX));
     assert_el_eq!(&MPZ::RING, &MPZ::RING.negate(MPZ::RING.power_of_two(127)), &MPZ::RING.coerce(&StaticRing::<i128>::RING, i128::MIN));
@@ -688,8 +688,8 @@ fn test_canonical_iso_axioms_i128() {
 
 #[test]
 fn test_canonical_iso_axioms_bigint() {
-    generic_test_canonical_hom_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
-    generic_test_canonical_iso_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
+    generic_tests::test_hom_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
+    generic_tests::test_iso_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
 }
 
 #[test]

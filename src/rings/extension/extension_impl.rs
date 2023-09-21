@@ -262,7 +262,7 @@ fn test_ring_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 2], Def
 #[test]
 fn test_ring_axioms() {
     let (ring, els) = test_ring_and_elements();
-    generic_test_ring_axioms(ring, els.into_iter());
+    generic_tests::test_ring_axioms(ring, els.into_iter());
 }
 
 #[test]

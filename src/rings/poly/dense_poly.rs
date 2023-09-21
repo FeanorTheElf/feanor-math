@@ -366,7 +366,7 @@ fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El
 #[test]
 fn test_ring_axioms() {
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
-    generic_test_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
+    generic_tests::test_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
@@ -391,6 +391,6 @@ fn test_euclidean_ring_axioms() {
 fn test_canonical_iso_axioms_different_base_ring() {
     let poly_ring1 = DensePolyRing::new(zn_barett::Zn::new(StaticRing::<i128>::RING, 7), "X");
     let poly_ring2 = DensePolyRing::new(zn_42::Zn::new(7), "X");
-    generic_test_canonical_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
-    generic_test_canonical_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+    generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+    generic_tests::test_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
 }

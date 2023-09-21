@@ -1446,128 +1446,147 @@ fn test_internal_wrappings_dont_matter() {
     (&b2).coerce(&&&b3, 0);
 }
 
-#[cfg(any(test, feature = "generic_tests"))]
-pub fn generic_test_canonical_hom_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
-    where S::Type: CanonicalHom<R::Type>
-{
-    let hom = to.get_ring().has_canonical_hom(from.get_ring()).unwrap();
-    let elements = edge_case_elements.collect::<Vec<_>>();
 
-    for a in &elements {
-        for b in &elements {
-            assert_el_eq!(&to,
-                &to.add(to.get_ring().map_in_ref(from.get_ring(), a, &hom), to.get_ring().map_in_ref(from.get_ring(), b, &hom)),
-                &to.get_ring().map_in(from.get_ring(), from.add_ref(a, b), &hom)
-            );
-            assert_el_eq!(&to,
-                &to.mul(to.get_ring().map_in_ref(from.get_ring(), a, &hom), to.get_ring().map_in_ref(from.get_ring(), b, &hom)),
-                &to.get_ring().map_in(from.get_ring(), from.mul_ref(a, b), &hom)
-            );
-        }
-    }
-}
 
 #[cfg(any(test, feature = "generic_tests"))]
-pub fn generic_test_canonical_iso_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
-    where S::Type: CanonicalIso<R::Type>
-{
-    let hom = to.get_ring().has_canonical_hom(from.get_ring()).unwrap();
-    let iso = to.get_ring().has_canonical_iso(from.get_ring()).unwrap();
-    let elements = edge_case_elements.collect::<Vec<_>>();
+pub mod generic_tests {
 
-    for a in &elements {
-        assert_el_eq!(&from,
-            a, 
-            &to.get_ring().map_out(from.get_ring(), to.get_ring().map_in_ref(from.get_ring(), a, &hom), &iso)
-        );
-    }
-}
+    use super::*;
 
-#[cfg(any(test, feature = "generic_tests"))]
-pub fn generic_test_self_iso<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
-    where R::Type: SelfIso
-{
-    let hom = ring.get_ring().has_canonical_hom(ring.get_ring()).unwrap();
-    let iso = ring.get_ring().has_canonical_iso(ring.get_ring()).unwrap();
-    let elements = edge_case_elements.collect::<Vec<_>>();
+    pub fn test_hom_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
+        where S::Type: CanonicalHom<R::Type>
+    {
+        let hom = to.get_ring().has_canonical_hom(from.get_ring()).unwrap();
+        let elements = edge_case_elements.collect::<Vec<_>>();
 
-    generic_test_canonical_hom_axioms(&ring, &ring, elements.iter().map(|x| ring.clone_el(x)));
-    generic_test_canonical_iso_axioms(&ring, &ring, elements.iter().map(|x| ring.clone_el(x)));
-
-    for a in &elements {
-        assert_el_eq!(&ring, a, &ring.get_ring().map_in_ref(ring.get_ring(), a, &hom));
-        assert_el_eq!(&ring, a, &ring.get_ring().map_out(ring.get_ring(), ring.clone_el(a), &iso));
-    }
-}
-
-#[cfg(any(test, feature = "generic_tests"))]
-pub fn generic_test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
-    where R::Type: SelfIso
-{
-    let elements = edge_case_elements.collect::<Vec<_>>();
-    let zero = ring.zero();
-    let one = ring.one();
-
-    // check self-subtraction
-    for a in &elements {
-        assert_el_eq!(&ring, &zero, &ring.sub(ring.clone_el(a), ring.clone_el(a)));
-    }
-
-    // check identity elements
-    for a in &elements {
-        assert_el_eq!(&ring, &a, &ring.add(ring.clone_el(a), ring.clone_el(&zero)));
-        assert_el_eq!(&ring, &a, &ring.mul(ring.clone_el(a), ring.clone_el(&one)));
-    }
-
-    // check commutativity
-    for a in &elements {
-        for b in &elements {
-            assert_el_eq!(&ring,
-                &ring.add(ring.clone_el(a), ring.clone_el(b)), 
-                &ring.add(ring.clone_el(b), ring.clone_el(a))
-            );
-                
-            if ring.is_commutative() {
-                assert_el_eq!(&ring,
-                    &ring.mul(ring.clone_el(a), ring.clone_el(b)), 
-                    &ring.mul(ring.clone_el(b), ring.clone_el(a))
-                );
+        for a in &elements {
+            for b in &elements {
+                {
+                    let map_a = to.get_ring().map_in_ref(from.get_ring(), a, &hom);
+                    let map_b = to.get_ring().map_in_ref(from.get_ring(), b, &hom);
+                    let map_add = to.add_ref(&map_a, &map_b);
+                    let add_map = to.get_ring().map_in(from.get_ring(), from.add_ref(a, b), &hom);
+                    assert!(to.eq_el(&map_add, &add_map), "Additive homomorphic property failed: hom({} + {}) = {} != {} = {} + {}", from.format(a), from.format(b), to.format(&add_map), to.format(&map_add), to.format(&map_a), to.format(&map_b));
+                }
+                {
+                    let map_a = to.get_ring().map_in_ref(from.get_ring(), a, &hom);
+                    let map_b = to.get_ring().map_in_ref(from.get_ring(), b, &hom);
+                    let map_mul = to.mul_ref(&map_a, &map_b);
+                    let mul_map = to.get_ring().map_in(from.get_ring(), from.mul_ref(a, b), &hom);
+                    assert!(to.eq_el(&map_mul, &mul_map), "Multiplicative homomorphic property failed: hom({} * {}) = {} != {} = {} * {}", from.format(a), from.format(b), to.format(&mul_map), to.format(&map_mul), to.format(&map_a), to.format(&map_b));
+                }
+                {
+                    let map_a = to.get_ring().map_in_ref(from.get_ring(), a, &hom);
+                    let mul_map = to.get_ring().map_in(from.get_ring(), from.mul_ref(a, b), &hom);
+                    let mut mul_assign = to.clone_el(&map_a);
+                    to.get_ring().mul_assign_map_in_ref(from.get_ring(), &mut mul_assign, b, &hom);
+                    assert!(to.eq_el(&mul_assign, &mul_map), "mul_assign_map_in_ref() failed: hom({} * {}) = {} != {} = mul_map_in(hom({}), {})", from.format(a), from.format(b), to.format(&mul_map), to.format(&mul_assign), to.format(&map_a), from.format(b));
+                }
             }
         }
     }
 
-    // check associativity
-    for a in &elements {
-        for b in &elements {
-            for c in &elements {
-                assert_el_eq!(&ring,
-                    &ring.add(ring.clone_el(a), ring.add(ring.clone_el(b), ring.clone_el(c))), 
-                    &ring.add(ring.add(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c))
-                );
-                assert_el_eq!(&ring,
-                    &ring.mul(ring.clone_el(a), ring.mul(ring.clone_el(b), ring.clone_el(c))), 
-                    &ring.mul(ring.mul(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c))
-                );
-            }
-        }
-    }
-    
-    // check distributivity
-    for a in &elements {
-        for b in &elements {
-            for c in &elements {
-                assert_el_eq!(
-                    &ring,
-                    &ring.mul(ring.clone_el(a), ring.add(ring.clone_el(b), ring.clone_el(c))), 
-                    &ring.add(ring.mul(ring.clone_el(a), ring.clone_el(b)), ring.mul(ring.clone_el(a), ring.clone_el(c)))
-                );
-                assert_el_eq!(&ring,
-                    &ring.mul(ring.add(ring.clone_el(a), ring.clone_el(b)), ring.clone_el(c)), 
-                    &ring.add(ring.mul(ring.clone_el(a), ring.clone_el(c)), ring.mul(ring.clone_el(b), ring.clone_el(c)))
-                );
-            }
+    pub fn test_iso_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
+        where S::Type: CanonicalIso<R::Type>
+    {
+        let hom = to.get_ring().has_canonical_hom(from.get_ring()).unwrap();
+        let iso = to.get_ring().has_canonical_iso(from.get_ring()).unwrap();
+        let elements = edge_case_elements.collect::<Vec<_>>();
+
+        for a in &elements {
+            let map_in = to.get_ring().map_in_ref(from.get_ring(), a, &hom);
+            let map_in_out = to.get_ring().map_out(from.get_ring(), to.clone_el(&map_in), &iso);
+            assert!(from.eq_el(&map_in_out, &a), "Bijectivity failed: {} != {} = hom^-1({}) = hom^-1(hom({}))", from.format(a), from.format(&map_in_out), to.format(&map_in), from.format(a));
         }
     }
 
-    generic_test_self_iso(&ring, elements.iter().map(|x| ring.clone_el(x)));
+    pub fn test_self_iso<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
+        where R::Type: SelfIso
+    {
+        let hom = ring.get_ring().has_canonical_hom(ring.get_ring()).unwrap();
+        let iso = ring.get_ring().has_canonical_iso(ring.get_ring()).unwrap();
+        let elements = edge_case_elements.collect::<Vec<_>>();
+
+        test_hom_axioms(&ring, &ring, elements.iter().map(|x| ring.clone_el(x)));
+        test_iso_axioms(&ring, &ring, elements.iter().map(|x| ring.clone_el(x)));
+
+        for a in &elements {
+            assert_el_eq!(&ring, a, &ring.get_ring().map_in_ref(ring.get_ring(), a, &hom));
+            assert_el_eq!(&ring, a, &ring.get_ring().map_out(ring.get_ring(), ring.clone_el(a), &iso));
+        }
+    }
+
+    pub fn test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
+        where R::Type: SelfIso
+    {
+        let elements = edge_case_elements.collect::<Vec<_>>();
+        let zero = ring.zero();
+        let one = ring.one();
+
+        // check self-subtraction
+        for a in &elements {
+            let a_minus_a = ring.sub(ring.clone_el(a), ring.clone_el(a));
+            assert!(ring.eq_el(&zero, &a_minus_a), "Additive inverse failed: {} - {} = {} != {}", ring.format(a), ring.format(a), ring.format(&a_minus_a), ring.format(&zero));
+        }
+
+        // check identity elements
+        for a in &elements {
+            let a_plus_zero = ring.add(ring.clone_el(a), ring.clone_el(&zero));
+            assert!(ring.eq_el(a, &a_plus_zero), "Additive neutral element failed: {} + {} = {} != {}", ring.format(a), ring.format(&zero), ring.format(&a_plus_zero), ring.format(a));
+            
+            let a_times_one = ring.mul(ring.clone_el(a), ring.clone_el(&one));
+            assert!(ring.eq_el(a, &a_times_one), "Multiplicative neutral element failed: {} * {} = {} != {}", ring.format(a), ring.format(&one), ring.format(&a_times_one), ring.format(a));
+        }
+
+        // check commutativity
+        for a in &elements {
+            for b in &elements {
+                {
+                    let ab = ring.add_ref(a, b);
+                    let ba = ring.add_ref(b, a);
+                    assert!(ring.eq_el(&ab, &ba), "Additive commutativity failed: {} + {} = {} != {} = {} + {}", ring.format(a), ring.format(b), ring.format(&ab), ring.format(&ba), ring.format(b), ring.format(a));
+                }
+                    
+                if ring.is_commutative() {
+                    let ab = ring.mul_ref(a, b);
+                    let ba = ring.mul_ref(b, a);
+                    assert!(ring.eq_el(&ab, &ba), "Multiplicative commutativity failed: {} * {} = {} != {} = {} * {}", ring.format(a), ring.format(b), ring.format(&ab), ring.format(&ba), ring.format(b), ring.format(a));
+                }
+            }
+        }
+
+        // check associativity
+        for a in &elements {
+            for b in &elements {
+                for c in &elements {
+                    {
+                        let ab_c = ring.add_ref_snd(ring.add_ref(a, b), c);
+                        let a_bc = ring.add_ref_fst(c, ring.add_ref(b, a));
+                        assert!(ring.eq_el(&ab_c, &a_bc), "Additive associativity failed: ({} + {}) + {} = {} != {} = {} + ({} + {})", ring.format(a), ring.format(b), ring.format(c), ring.format(&ab_c), ring.format(&a_bc), ring.format(a), ring.format(b), ring.format(c));
+                    }
+                    {
+                        let ab_c = ring.mul_ref_snd(ring.mul_ref(a, b), c);
+                        let a_bc = ring.mul_ref_fst(c, ring.mul_ref(b, a));
+                        assert!(ring.eq_el(&ab_c, &a_bc), "Multiplicative associativity failed: ({} * {}) * {} = {} != {} = {} * ({} * {})", ring.format(a), ring.format(b), ring.format(c), ring.format(&ab_c), ring.format(&a_bc), ring.format(a), ring.format(b), ring.format(c));
+                    }
+                }
+            }
+        }
+        
+        // check distributivity
+        for a in &elements {
+            for b in &elements {
+                for c in &elements {
+                    let ab_c = ring.mul_ref_snd(ring.add_ref(a, b), c);
+                    let ac_bc = ring.add(ring.mul_ref(a, c), ring.mul_ref(b, c));
+                    assert!(ring.eq_el(&ab_c, &ac_bc), "Distributivity failed: ({} + {}) * {} = {} != {} = {} * {} + {} * {}", ring.format(a), ring.format(b), ring.format(c), ring.format(&ab_c), ring.format(&ac_bc), ring.format(a), ring.format(c), ring.format(b), ring.format(c));
+
+                    let a_bc = ring.mul_ref_fst(a, ring.add_ref(b, c));
+                    let ab_ac = ring.add(ring.mul_ref(a, b), ring.mul_ref(a, c));
+                    assert!(ring.eq_el(&a_bc, &ab_ac), "Distributivity failed: {} * ({} + {}) = {} != {} = {} * {} + {} * {}", ring.format(a), ring.format(b), ring.format(c), ring.format(&a_bc), ring.format(&ab_ac), ring.format(a), ring.format(b), ring.format(a), ring.format(c));                }
+            }
+        }
+
+        test_self_iso(&ring, elements.iter().map(|x| ring.clone_el(x)));
+    }
 }

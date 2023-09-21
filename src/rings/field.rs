@@ -217,7 +217,7 @@ use crate::rings::finite::FiniteRingStore;
 #[test]
 fn test_canonical_hom_axioms_static_int() {
     let R = Zn::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
-    generic_test_canonical_hom_axioms(StaticRing::<i64>::RING, &R, 0..17);
+    generic_tests::test_hom_axioms(StaticRing::<i64>::RING, &R, 0..17);
 }
 
 #[test]
@@ -229,6 +229,6 @@ fn test_divisibility_axioms() {
 #[test]
 fn test_canonical_hom_axioms_zn_barett() {
     let R = Zn::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
-    generic_test_canonical_hom_axioms(R.base_ring(), &R, R.base_ring().elements());
-    generic_test_canonical_iso_axioms(R.base_ring(), &R, R.base_ring().elements());
+    generic_tests::test_hom_axioms(R.base_ring(), &R, R.base_ring().elements());
+    generic_tests::test_iso_axioms(R.base_ring(), &R, R.base_ring().elements());
 }

@@ -482,7 +482,7 @@ fn edge_case_elements() -> impl Iterator<Item = RustBigint> {
 
 #[test]
 fn test_bigint_ring_axioms() {
-    generic_test_ring_axioms(ZZ, edge_case_elements())
+    generic_tests::test_ring_axioms(ZZ, edge_case_elements())
 }
 
 #[test]
@@ -567,6 +567,6 @@ fn test_get_uniformly_random() {
 #[test]
 fn test_canonical_iso_static_int() {
     // for the hom test, we have to be able to multiply elements in `StaticRing::<i128>::RING`, so we cannot test `i128::MAX` or `i128::MIN`
-    generic_test_canonical_hom_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128].iter().copied());
-    generic_test_canonical_iso_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128, i128::MAX, i128::MIN].iter().copied());
+    generic_tests::test_hom_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128].iter().copied());
+    generic_tests::test_iso_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128, i128::MAX, i128::MIN].iter().copied());
 }

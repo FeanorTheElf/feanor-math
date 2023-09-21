@@ -720,13 +720,13 @@ use crate::rings::finite::FiniteRingStore;
 #[test]
 fn test_ring_axioms() {
     let ring = Zn::new(2);
-    generic_test_ring_axioms(&ring, ring.elements());
+    generic_tests::test_ring_axioms(&ring, ring.elements());
 
     let ring = Zn::new(63);
-    generic_test_ring_axioms(&ring, ring.elements());
+    generic_tests::test_ring_axioms(&ring, ring.elements());
 
     let ring = Zn::new((1 << 41) - 1);
-    generic_test_ring_axioms(&ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.from_int(x)));
+    generic_tests::test_ring_axioms(&ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.from_int(x)));
 }
 
 #[test]
@@ -742,15 +742,15 @@ fn test_sum() {
 fn test_canonical_iso_axioms_zn_barett() {
     let from = zn_barett::Zn::new(StaticRing::<i128>::RING, 7 * 11);
     let to = Zn::new(7 * 11);
-    generic_test_canonical_hom_axioms(&from, &to, from.elements());
-    generic_test_canonical_iso_axioms(&from, &to, from.elements());
+    generic_tests::test_hom_axioms(&from, &to, from.elements());
+    generic_tests::test_iso_axioms(&from, &to, from.elements());
 }
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {
     let from = StaticRing::<i128>::RING;
     let to = Zn::new(7 * 11);
-    generic_test_canonical_hom_axioms(&from, to, 0..(7 * 11));
+    generic_tests::test_hom_axioms(&from, to, 0..(7 * 11));
 }
 
 #[test]
@@ -803,10 +803,10 @@ fn test_from_int() {
 fn test_canonical_iso_axioms_as_field() {
     let R = Zn::new(17);
     let R2 = R.clone().as_field().ok().unwrap();
-    generic_test_canonical_hom_axioms(&R, &R2, R.elements());
-    generic_test_canonical_iso_axioms(&R, &R2, R.elements());
-    generic_test_canonical_hom_axioms(&R2, &R, R2.elements());
-    generic_test_canonical_iso_axioms(&R2, &R, R2.elements());
+    generic_tests::test_hom_axioms(&R, &R2, R.elements());
+    generic_tests::test_iso_axioms(&R, &R2, R.elements());
+    generic_tests::test_hom_axioms(&R2, &R, R2.elements());
+    generic_tests::test_iso_axioms(&R2, &R, R2.elements());
 }
 
 #[test]
