@@ -86,9 +86,9 @@ pub mod generic_impls {
     use super::ZnRing;
 
     #[allow(type_alias_bounds)]
-    pub type GenericHomomorphism<R: ZnRing, S: ZnRing> = (<S as CanonicalHom<S::IntegerRingBase>>::Homomorphism, <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::Homomorphism);
+    pub type Homomorphism<R: ZnRing, S: ZnRing> = (<S as CanonicalHom<S::IntegerRingBase>>::Homomorphism, <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::Homomorphism);
 
-    pub fn generic_has_canonical_hom<R: ZnRing, S: ZnRing>(from: &R, to: &S) -> Option<GenericHomomorphism<R, S>> 
+    pub fn has_canonical_hom<R: ZnRing, S: ZnRing>(from: &R, to: &S) -> Option<Homomorphism<R, S>> 
         where S::IntegerRingBase: CanonicalHom<R::IntegerRingBase>
     {
         let hom = <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::has_canonical_hom(to.integer_ring().get_ring(), from.integer_ring().get_ring())?;
@@ -99,13 +99,13 @@ pub mod generic_impls {
         }
     }
 
-    pub fn generic_map_in<R: ZnRing, S: ZnRing>(from: &R, to: &S, el: R::Element, hom: &GenericHomomorphism<R, S>) -> S::Element 
+    pub fn map_in<R: ZnRing, S: ZnRing>(from: &R, to: &S, el: R::Element, hom: &Homomorphism<R, S>) -> S::Element 
         where S::IntegerRingBase: CanonicalHom<R::IntegerRingBase>
     {
         to.map_in(to.integer_ring().get_ring(), <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::map_in(to.integer_ring().get_ring(), from.integer_ring().get_ring(), from.smallest_positive_lift(el), &hom.1), &hom.0)
     }
 
-    pub struct GenericIntegerToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
+    pub struct IntegerToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
         where I: CanonicalIso<R::IntegerRingBase> + CanonicalIso<J>
     {
         highbit_mod: usize,
@@ -118,14 +118,14 @@ pub mod generic_impls {
     }
 
     ///
-    /// See [`generic_map_in_from_int()`].
+    /// See [`map_in_from_int()`].
     /// This will only ever return `None` if one of the integer ring `has_canonical_hom/iso` returns `None`.
     /// 
-    pub fn generic_has_canonical_hom_from_int<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>(from: &I, to: &R, to_large_int_ring: &J, bounded_reduce_bound: Option<&J::Element>) -> Option<GenericIntegerToZnHom<I, J, R>>
+    pub fn has_canonical_hom_from_int<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>(from: &I, to: &R, to_large_int_ring: &J, bounded_reduce_bound: Option<&J::Element>) -> Option<IntegerToZnHom<I, J, R>>
         where I: CanonicalIso<R::IntegerRingBase> + CanonicalIso<J>
     {
         if let Some(bound) = bounded_reduce_bound {
-            Some(GenericIntegerToZnHom {
+            Some(IntegerToZnHom {
                 highbit_mod: to.integer_ring().abs_highest_set_bit(to.modulus()).unwrap(),
                 highbit_bound: to_large_int_ring.abs_highest_set_bit(bound).unwrap(),
                 int_ring: PhantomData,
@@ -135,7 +135,7 @@ pub mod generic_impls {
                 iso2: from.has_canonical_iso(to_large_int_ring)?
             })
         } else {
-            Some(GenericIntegerToZnHom {
+            Some(IntegerToZnHom {
                 highbit_mod: to.integer_ring().abs_highest_set_bit(to.modulus()).unwrap(),
                 highbit_bound: usize::MAX,
                 int_ring: PhantomData,
@@ -168,7 +168,7 @@ pub mod generic_impls {
     /// decide that we have to perform generic modular reduction (even though `x < n`), and try to map `n` into `Z`. This is never a problem if the primitive
     /// integer rings `StaticRing::<ixx>::RING` are used, or if `B >= 2n`.
     /// 
-    pub fn generic_map_in_from_int<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing, F, G>(from: &I, to: &R, to_large_int_ring: &J, el: I::Element, hom: &GenericIntegerToZnHom<I, J, R>, from_positive_representative_exact: F, from_positive_representative_bounded: G) -> R::Element
+    pub fn map_in_from_int<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing, F, G>(from: &I, to: &R, to_large_int_ring: &J, el: I::Element, hom: &IntegerToZnHom<I, J, R>, from_positive_representative_exact: F, from_positive_representative_bounded: G) -> R::Element
         where I: CanonicalIso<R::IntegerRingBase> + CanonicalIso<J>,
             F: FnOnce(El<R::Integers>) -> R::Element,
             G: FnOnce(J::Element) -> R::Element
@@ -195,7 +195,7 @@ pub mod generic_impls {
         }
     }
 
-    pub fn generic_random_element<R: ZnRing, G: FnMut() -> u64>(ring: &R, rng: G) -> R::Element {
+    pub fn random_element<R: ZnRing, G: FnMut() -> u64>(ring: &R, rng: G) -> R::Element {
         ring.map_in(
             ring.integer_ring().get_ring(), 
             ring.integer_ring().get_uniformly_random(ring.modulus(), rng), 
@@ -217,7 +217,7 @@ pub trait ZnRingStore: FiniteRingStore
         where Self: Sized
     {
         if self.is_field() {
-            Ok(RingValue::from(unsafe { AsFieldBase::unsafe_create(self) }))
+            Ok(RingValue::from(AsFieldBase::unsafe_create(self)))
         } else {
             Err(self)
         }

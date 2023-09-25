@@ -49,7 +49,7 @@ impl<R: DivisibilityRingStore> AsFieldBase<R>
     /// it with rings that are fields. This cannot be checked in here, so must be checked
     /// by the caller.
     /// 
-    pub unsafe fn unsafe_create(base: R) -> Self {
+    pub fn unsafe_create(base: R) -> Self {
         Self { base }
     }
 

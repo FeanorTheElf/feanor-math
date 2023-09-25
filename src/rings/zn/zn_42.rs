@@ -9,12 +9,6 @@ use crate::rings::rust_bigint::RustBigintRingBase;
 
 use super::zn_barett;
 
-fn usigned_as_signed_ref<'a>(x: &'a u64) -> &'a i64 {
-    assert!(*x <= i64::MAX as u64);
-    assert!(std::mem::align_of::<i64>() <= std::mem::align_of::<u64>());
-    unsafe { std::mem::transmute(x) }
-}
-
 ///
 /// Represents the ring `Z/nZ`.
 /// A special implementation of non-standard Barett reduction
@@ -49,7 +43,7 @@ fn usigned_as_signed_ref<'a>(x: &'a u64) -> &'a i64 {
 pub struct ZnBase {
     /// must be 128 bit to deal with very small moduli
     inv_modulus: u128,
-    modulus: u64,
+    modulus: i64,
     /// Representatives of elements may grow up to (including) this bound
     repr_bound: u64
 }
@@ -99,7 +93,7 @@ impl ZnBase {
         // necessary for negate to work
         assert!(repr_bound % modulus == 0);
         return ZnBase {
-            modulus: modulus,
+            modulus: modulus as i64,
             inv_modulus: inv_modulus,
             repr_bound: repr_bound
         }
@@ -123,17 +117,21 @@ impl ZnBase {
         debug_assert!(value <= self.repr_bound as u128 * self.repr_bound as u128);
         let quotient = ((value * self.inv_modulus) >> BITSHIFT) as u64;
         let result = (value - quotient as u128 * self.modulus as u128) as u64;
-        debug_assert!(result < 2 * self.modulus);
+        debug_assert!(result < 2 * self.modulus_u64());
         return result;
     }
 
     fn complete_reduce(&self, value: u128) -> u64 {
         let mut result = self.bounded_reduce(value);
-        if result >= self.modulus {
-            result -= self.modulus;
+        if result >= self.modulus_u64() {
+            result -= self.modulus_u64();
         }
-        debug_assert!(result < self.modulus);
+        debug_assert!(result < self.modulus_u64());
         return result;
+    }
+
+    fn modulus_u64(&self) -> u64 {
+        self.modulus as u64
     }
 }
 
@@ -270,15 +268,15 @@ impl GenericMapInFromInt for crate::rings::mpir::MPZBase {}
 
 impl<I: ?Sized + GenericMapInFromInt> CanonicalHom<I> for ZnBase {
 
-    type Homomorphism = generic_impls::GenericIntegerToZnHom<I, StaticRingBase<i128>, Self>;
+    type Homomorphism = generic_impls::IntegerToZnHom<I, StaticRingBase<i128>, Self>;
 
     fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
-        generic_impls::generic_has_canonical_hom_from_int(from, self, StaticRing::<i128>::RING.get_ring(), Some(&(self.repr_bound as i128 * self.repr_bound as i128)))
+        generic_impls::has_canonical_hom_from_int(from, self, StaticRing::<i128>::RING.get_ring(), Some(&(self.repr_bound as i128 * self.repr_bound as i128)))
     }
 
     fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
-        generic_impls::generic_map_in_from_int(from, self, StaticRing::<i128>::RING.get_ring(), el, hom, |n| {
-            debug_assert!((n as u64) < self.modulus);
+        generic_impls::map_in_from_int(from, self, StaticRing::<i128>::RING.get_ring(), el, hom, |n| {
+            debug_assert!((n as u64) < self.modulus_u64());
             ZnEl(n as u64)
         }, |n| {
             debug_assert!(n <= (self.repr_bound as i128 * self.repr_bound as i128));
@@ -327,25 +325,27 @@ impl CanonicalHom<StaticRingBase<i8>> for ZnBase {
     }
 }
 
-pub struct TrivialMapInFromI32(bool);
+pub struct I32ToZnHom {
+    reduction_is_trivial: bool
+}
 
 impl CanonicalHom<StaticRingBase<i32>> for ZnBase {
 
-    type Homomorphism = TrivialMapInFromI32;
+    type Homomorphism = I32ToZnHom;
 
     fn has_canonical_hom(&self, _from: &StaticRingBase<i32>) -> Option<Self::Homomorphism> {
         if self.repr_bound > i32::MAX as u64 {
-            Some(TrivialMapInFromI32(true))
+            Some(I32ToZnHom { reduction_is_trivial: true })
         } else {
-            Some(TrivialMapInFromI32(false))
+            Some(I32ToZnHom { reduction_is_trivial: false })
         }
     }
 
-    fn map_in(&self, _from: &StaticRingBase<i32>, el: i32, TrivialMapInFromI32(supports_trivial_map_in): &TrivialMapInFromI32) -> Self::Element {
+    fn map_in(&self, _from: &StaticRingBase<i32>, el: i32, hom: &I32ToZnHom) -> Self::Element {
         // we check this in the constructor also during release
         debug_assert!(self.repr_bound >= (1 << 16));
 
-        if std::intrinsics::likely(*supports_trivial_map_in) {
+        if std::intrinsics::likely(hom.reduction_is_trivial) {
             if el < 0 {
                 self.negate(ZnEl(-(el as i64) as u64))
             } else {
@@ -379,7 +379,7 @@ impl<'a> Iterator for ZnBaseElementsIter<'a> {
     type Item = ZnEl;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current < self.ring.modulus {
+        if self.current < self.ring.modulus_u64() {
             let result = self.current;
             self.current += 1;
             return Some(ZnEl(result));
@@ -401,7 +401,7 @@ impl FiniteRing for ZnBase {
     }
 
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> Self::Element {
-        generic_impls::generic_random_element(self, rng)
+        generic_impls::random_element(self, rng)
     }
 
     fn size<I: IntegerRingStore>(&self, ZZ: &I) -> El<I>
@@ -425,7 +425,7 @@ impl ZnRing for ZnBase {
     }
 
     fn modulus(&self) -> &El<Self::Integers> {
-        usigned_as_signed_ref(&self.modulus)
+        &self.modulus
     }
 }
 
@@ -445,11 +445,11 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
         self.mul_assign_ref(&mut b, twiddle);
 
         // this is implied by `bounded_reduce`, check anyway
-        debug_assert!(b.0 < self.modulus * 2);
-        debug_assert!(self.repr_bound >= self.modulus * 2);
+        debug_assert!(b.0 < self.modulus_u64() * 2);
+        debug_assert!(self.repr_bound >= self.modulus_u64() * 2);
 
         *values.at_mut(i1) = self.add(a, b);
-        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus - b.0));
+        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus_u64() - b.0));
     }
 
     #[inline(always)]
@@ -460,7 +460,7 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
         let b_reduced = ZnEl(self.bounded_reduce(b.0 as u128));
 
         *values.at_mut(i1) = self.add(a, b_reduced);
-        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus - b_reduced.0));
+        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus_u64() - b_reduced.0));
         self.mul_assign_ref(values.at_mut(i2), twiddle);
     }
 }
@@ -546,7 +546,7 @@ impl DelegateRing for ZnFastmulBase {
     }
 
     fn postprocess_delegate_mut(&self, el: &mut Self::Element) {
-        el.base.0 = el.base.0 % self.base.modulus;
+        el.base.0 = el.base.0 % self.base.modulus_u64();
         el.x_shift_over_p = (el.base.0 as u128 * (1u128 << (BITSHIFT / 2)) as u128 / self.base.modulus as u128) as u64;
     }
 
@@ -580,13 +580,13 @@ impl CanonicalHom<ZnFastmulBase> for ZnBase {
 
     fn mul_assign_map_in_ref(&self, _: &ZnFastmulBase, ZnEl(lhs): &mut Self::Element, twiddle: &<ZnFastmulBase as RingBase>::Element, _: &Self::Homomorphism) {
         debug_assert!(*lhs <= self.repr_bound);
-        debug_assert!(twiddle.base.0 < self.modulus);
+        debug_assert!(twiddle.base.0 < self.modulus_u64());
         // the upper parts of product will cancel out, so only compute the lower parts
         let product = (*lhs).wrapping_mul(twiddle.base.0);
         // the quotient fits into u64 as `*lhs <= self.repr_bound` has at most `BITSHIFT / 2` bits
         let quotient = ((*lhs as u128 * twiddle.x_shift_over_p as u128) >> (BITSHIFT / 2)) as u64;
-        *lhs = product.wrapping_sub(quotient.wrapping_mul(self.modulus)) as u64;
-        debug_assert!(*lhs < 2 * self.modulus);
+        *lhs = product.wrapping_sub(quotient.wrapping_mul(self.modulus_u64())) as u64;
+        debug_assert!(*lhs < 2 * self.modulus_u64());
     }
 
     fn mul_assign_map_in(&self, from: &ZnFastmulBase, lhs: &mut Self::Element, rhs: <ZnFastmulBase as RingBase>::Element, hom: &Self::Homomorphism) {
@@ -603,11 +603,11 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
         self.mul_assign_map_in_ref(from, &mut b, twiddle, hom);
 
         // this is implied by `bounded_reduce`, check anyway
-        debug_assert!(b.0 < self.modulus * 2);
-        debug_assert!(self.repr_bound >= self.modulus * 2);
+        debug_assert!(b.0 < self.modulus_u64() * 2);
+        debug_assert!(self.repr_bound >= self.modulus_u64() * 2);
 
         *values.at_mut(i1) = self.add(a, b);
-        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus - b.0));
+        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus_u64() - b.0));
     }
 
     #[inline(always)]
@@ -618,7 +618,7 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
         let b_reduced = ZnEl(self.bounded_reduce(b.0 as u128));
 
         *values.at_mut(i1) = self.add(a, b_reduced);
-        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus - b_reduced.0));
+        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus_u64() - b_reduced.0));
         self.mul_assign_map_in_ref(from, values.at_mut(i2), twiddle, hom);
     }
 }
@@ -626,7 +626,6 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
 impl<I: ?Sized + IntegerRing> CanonicalHom<I> for ZnFastmulBase 
     where ZnBase: CanonicalHom<I>
 {
-
     type Homomorphism = <ZnBase as CanonicalHom<I>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
@@ -778,8 +777,8 @@ fn test_zn_map_in_large_int() {
 #[test]
 fn test_zn_map_in_small_int() {
     let R = Zn::new((1 << 41) - 1);
-    let hom = generic_impls::generic_has_canonical_hom_from_int(StaticRing::<i8>::RING.get_ring(), R.get_ring(), StaticRing::<i128>::RING.get_ring(), Some(&(*R.modulus() as i128 * *R.modulus() as i128))).unwrap();
-    assert_el_eq!(&R, &R.from_int(1), &generic_impls::generic_map_in_from_int(
+    let hom = generic_impls::has_canonical_hom_from_int(StaticRing::<i8>::RING.get_ring(), R.get_ring(), StaticRing::<i128>::RING.get_ring(), Some(&(*R.modulus() as i128 * *R.modulus() as i128))).unwrap();
+    assert_el_eq!(&R, &R.from_int(1), &generic_impls::map_in_from_int(
         StaticRing::<i8>::RING.get_ring(), 
         R.get_ring(), 
         StaticRing::<i128>::RING.get_ring(), 

@@ -199,7 +199,7 @@ impl<const N: u64, const IS_FIELD: bool> FiniteRing for ZnBase<N, IS_FIELD>
     }
 
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> Self::Element {
-        generic_impls::generic_random_element(self, rng)
+        generic_impls::random_element(self, rng)
     }
 
     fn size<I: IntegerRingStore>(&self, ZZ: &I) -> El<I>

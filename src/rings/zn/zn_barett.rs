@@ -326,14 +326,14 @@ impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanonicalHom<J> for ZnBase<I>
     where I::Type: IntegerRing, 
         J: CanonicalIso<I::Type>
 {
-    type Homomorphism = generic_impls::GenericIntegerToZnHom<J, I::Type, ZnBase<I>>;
+    type Homomorphism = generic_impls::IntegerToZnHom<J, I::Type, ZnBase<I>>;
 
     fn has_canonical_hom(&self, from: &J) -> Option<Self::Homomorphism> {
-        generic_impls::generic_has_canonical_hom_from_int(from, self, self.integer_ring.get_ring(), Some(&self.integer_ring.mul_ref(self.modulus(), self.modulus())))
+        generic_impls::has_canonical_hom_from_int(from, self, self.integer_ring.get_ring(), Some(&self.integer_ring.mul_ref(self.modulus(), self.modulus())))
     }
 
     fn map_in(&self, from: &J, el: J::Element, hom: &Self::Homomorphism) -> Self::Element {
-        generic_impls::generic_map_in_from_int(from, self, self.integer_ring.get_ring(), el, hom, |n| {
+        generic_impls::map_in_from_int(from, self, self.integer_ring.get_ring(), el, hom, |n| {
             debug_assert!(self.integer_ring.is_lt(&n, &self.modulus));
             ZnEl(n)
         }, |mut n| {
@@ -383,7 +383,7 @@ impl<I: IntegerRingStore> FiniteRing for ZnBase<I>
     }
 
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> Self::Element {
-        generic_impls::generic_random_element(self, rng)
+        generic_impls::random_element(self, rng)
     }
     
     fn size<J: IntegerRingStore>(&self, ZZ: &J) -> El<J>

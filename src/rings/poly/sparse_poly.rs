@@ -11,6 +11,40 @@ use crate::vector::sparse::*;
 use std::cmp::max;
 use std::rc::Rc;
 
+///
+/// The univariate polynomial ring `R[X]`. Polynomials are stored as sparse vectors of
+/// coefficients, thus giving improved performance in the case that most coefficients are
+/// zero.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::poly::sparse_poly::*;
+/// # use feanor_math::primitive_int::*;
+/// 
+/// let ZZ = StaticRing::<i32>::RING;
+/// let P = SparsePolyRing::new(ZZ, "X");
+/// let x10_plus_1 = P.add(P.pow(P.indeterminate(), 10), P.from_int(1));
+/// let power = P.pow(x10_plus_1, 10);
+/// assert_eq!(0, *P.coefficient_at(&power, 1));
+/// ```
+/// This ring has a [`CanonicalIso`] to [`dense_poly::DensePolyRingBase`].
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::rings::poly::sparse_poly::*;
+/// # use feanor_math::primitive_int::*;
+/// 
+/// let ZZ = StaticRing::<i32>::RING;
+/// let P = SparsePolyRing::new(ZZ, "X");
+/// let P2 = DensePolyRing::new(ZZ, "X");
+/// let high_power_of_x = P.pow(P.indeterminate(), 10);
+/// assert_el_eq!(&P2, &P2.pow(P2.indeterminate(), 10), &P.cast(&P2, high_power_of_x));
+/// ```
+/// 
 pub struct SparsePolyRingBase<R: RingStore> {
     base_ring: Rc<R>,
     unknown_name: &'static str,
@@ -208,17 +242,47 @@ impl<R: RingStore> RingExtension for SparsePolyRingBase<R> {
     }
 }
 
+pub enum CanonicalHomFromPolyRing<R, P>
+    where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: PolyRing
+{
+    Trivial, Generic(super::generic_impls::GenericCanonicalHom<P, SparsePolyRingBase<R>>)
+}
+
 impl<R, P> CanonicalHom<P> for SparsePolyRingBase<R> 
     where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: PolyRing
 {
-    type Homomorphism = super::generic_impls::GenericCanonicalHom<P, Self>;
+    type Homomorphism = CanonicalHomFromPolyRing<R, P>;
 
-    fn has_canonical_hom(&self, from: &P) -> Option<Self::Homomorphism> {
-        self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
+    default fn has_canonical_hom(&self, from: &P) -> Option<Self::Homomorphism> {
+        Some(CanonicalHomFromPolyRing::Generic(super::generic_impls::generic_has_canonical_hom(from, self)?))
     }
 
-    fn map_in(&self, from: &P, el: P::Element, hom: &Self::Homomorphism) -> Self::Element {
-        super::generic_impls::generic_map_in(from, self, el, hom)
+    default fn map_in(&self, from: &P, el: P::Element, hom: &Self::Homomorphism) -> Self::Element {
+        if let CanonicalHomFromPolyRing::Generic(generic_hom) = hom {
+            super::generic_impls::generic_map_in(from, self, el, generic_hom)
+        } else {
+            panic!("Can only have a trivial automorphism if the base rings are equal")
+        }
+    }
+}
+
+impl<R> CanonicalHom<SparsePolyRingBase<R> > for SparsePolyRingBase<R> 
+    where R: RingStore
+{
+    fn has_canonical_hom(&self, from: &SparsePolyRingBase<R>) -> Option<Self::Homomorphism> {
+        if self == from {
+            Some(CanonicalHomFromPolyRing::Trivial)
+        } else {
+            Some(CanonicalHomFromPolyRing::Generic(super::generic_impls::generic_has_canonical_hom(from, self)?))
+        }
+    }
+
+    fn map_in(&self, from: &SparsePolyRingBase<R> , el: SparseVectorMut<Rc<R>>, hom: &Self::Homomorphism) -> Self::Element {
+        if let CanonicalHomFromPolyRing::Generic(generic_hom) = hom {
+            super::generic_impls::generic_map_in(from, self, el, generic_hom)
+        } else {
+            el
+        }
     }
 }
 
@@ -348,6 +412,8 @@ use crate::rings::zn::zn_static::Zn;
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
+#[cfg(test)]
+use super::dense_poly::DensePolyRing;
 
 #[cfg(test)]
 fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El<P>>
@@ -372,21 +438,29 @@ fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El
 #[test]
 fn test_ring_axioms() {
     let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
-    generic_tests::test_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
+    crate::ring::generic_tests::test_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_poly_ring_axioms() {
     let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
-    generic_test_poly_ring_axioms(poly_ring, Zn::<7>::RING.elements());
+    super::generic_tests::test_poly_ring_axioms(poly_ring, Zn::<7>::RING.elements());
 }
 
 #[test]
 fn test_canonical_iso_axioms_different_base_ring() {
     let poly_ring1 = SparsePolyRing::new(zn_barett::Zn::new(StaticRing::<i128>::RING, 7), "X");
     let poly_ring2 = SparsePolyRing::new(zn_42::Zn::new(7), "X");
-    generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
-    generic_tests::test_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+    crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+    crate::ring::generic_tests::test_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+}
+
+#[test]
+fn test_canonical_iso_dense_poly_ring() {
+    let poly_ring1 = SparsePolyRing::new(zn_42::Zn::new(7), "X");
+    let poly_ring2 = DensePolyRing::new(zn_42::Zn::new(7), "X");
+    crate::ring::generic_tests::test_hom_axioms(&poly_ring2, &poly_ring1, edge_case_elements(&poly_ring2));
+    crate::ring::generic_tests::test_iso_axioms(&poly_ring2, &poly_ring1, edge_case_elements(&poly_ring2));
 }
 
 #[test]
