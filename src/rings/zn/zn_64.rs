@@ -10,6 +10,48 @@ use crate::rings::rust_bigint::*;
 use super::*;
 use super::zn_barett;
 
+///
+/// Represents the ring `Z/nZ`.
+/// A variant of Barett reduction is used to perform fast modular
+/// arithmetic for `n` slightly smaller than 64 bit.
+/// 
+/// More concretely, the currently maximal supported modulus is `floor(2^62 / 9)`.
+/// Note that the exact value might change in the future.
+/// 
+/// Standard arithmetic in this ring is slightly slower than in [`super::zn_42::ZnBase`],
+/// which supports moduli up to 41 bits. However, this ring is perfectly suited for the
+/// number theoretic transform together with [`ZnFastmulBase`], where it achieves basically 
+/// the same speed as the 42-bit ring.
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_64::*;
+/// let zn = Zn::new(7);
+/// assert_el_eq!(&zn, &zn.one(), &zn.mul(zn.from_int(3), zn.from_int(5)));
+/// ```
+/// We have natural isomorphisms to [`super::zn_42::ZnBase`] that are extremely fast.
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// let R1 = zn_42::Zn::new(17);
+/// let R2 = zn_64::Zn::new(17);
+/// assert_el_eq!(&R2, &R2.from_int(6), &R2.coerce(&R1, R1.from_int(6)));
+/// assert_el_eq!(&R1, &R1.from_int(16), &R2.cast(&R1, R2.from_int(16)));
+/// ```
+/// Too large moduli will give an error.
+/// ```should_panic
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_64::*;
+/// Zn::new((1 << 62) / 9 + 1);
+/// ```
+/// 
 pub struct ZnBase {
     modulus: i64,
     inv_modulus: u128
@@ -24,7 +66,7 @@ impl ZnBase {
     pub fn new(modulus: u64) -> Self {
         assert!(modulus > 1);
         // this should imply the statement we need later
-        assert!(modulus < ((1 << 62) / 9));
+        assert!(modulus <= ((1 << 62) / 9));
         // we want representatives to grow up to 6 * modulus
         assert!(modulus as u128 * 6 <= u64::MAX as u128);
         let inv_modulus = ZZbig.euclidean_div(ZZbig.power_of_two(128), &ZZbig.coerce(&ZZ, modulus as i64));
@@ -86,6 +128,10 @@ impl ZnBase {
     }
 }
 
+/// 
+/// Represents the ring `Z/nZ`, using a variant of Barett reduction
+/// for moduli somewhat smaller than 64 bits. For details, see [`ZnBase`].
+/// 
 pub type Zn = RingValue<ZnBase>;
 
 impl Zn {
