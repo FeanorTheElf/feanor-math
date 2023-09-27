@@ -30,7 +30,11 @@ impl ZnBase {
         let inv_modulus = ZZbig.euclidean_div(ZZbig.power_of_two(128), &ZZbig.coerce(&ZZ, modulus as i64));
         // we need the product `inv_modulus * (6 * modulus)^2` to fit into 192 bit, should be implied by `modulus < ((1 << 62) / 9)`
         debug_assert!(ZZbig.is_lt(&ZZbig.mul_ref_fst(&inv_modulus, ZZbig.pow(ZZbig.mul_int(ZZbig.coerce(&ZZ, modulus as i64), 6), 2)), &ZZbig.power_of_two(192)));
-        let inv_modulus = ZZbig.cast(&StaticRing::<i128>::RING, inv_modulus) as u128;
+        let inv_modulus = if ZZbig.eq_el(&inv_modulus, &ZZbig.power_of_two(127)) {
+            1u128 << 127
+        } else {
+            ZZbig.cast(&StaticRing::<i128>::RING, inv_modulus) as u128
+        };
         Self {
             modulus: modulus as i64,
             inv_modulus: inv_modulus
@@ -79,6 +83,15 @@ impl ZnBase {
         }
         debug_assert!(value < self.modulus_u64());
         return value;
+    }
+}
+
+pub type Zn = RingValue<ZnBase>;
+
+impl Zn {
+
+    pub fn new(modulus: u64) -> Self {
+        RingValue::from(ZnBase::new(modulus))
     }
 }
 
@@ -176,6 +189,53 @@ impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalIso<zn_barett::Z
 
     fn map_out(&self, from: &zn_barett::ZnBase<I>, el: <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <zn_barett::ZnBase<I> as RingBase>::Element {
         from.map_in(self.integer_ring().get_ring(), el.0 as i64, iso)
+    }
+}
+
+impl CanonicalHom<zn_42::ZnBase> for ZnBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, from: &zn_42::ZnBase) -> Option<Self::Homomorphism> {
+        if *self.modulus() == *from.modulus() {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn map_in(&self, from: &zn_42::ZnBase, el: <zn_42::ZnBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
+        // we usually require much smaller representatives as zn_42 (except for very large moduli), so do not
+        // specialize this
+        ZnEl(from.smallest_positive_lift(el) as u64)
+    }
+}
+
+pub enum ToZn42Iso {
+    Trivial, ReduceRequired(<zn_42::ZnBase as CanonicalHom<StaticRingBase<i64>>>::Homomorphism)
+}
+
+impl CanonicalIso<zn_42::ZnBase> for ZnBase {
+
+    type Isomorphism = ToZn42Iso;
+
+    fn has_canonical_iso(&self, from: &zn_42::ZnBase) -> Option<Self::Isomorphism> {
+        if *self.modulus() == *from.modulus() {
+            if from.repr_bound() >= self.repr_bound() {
+                Some(ToZn42Iso::Trivial)
+            } else {
+                Some(ToZn42Iso::ReduceRequired(from.has_canonical_hom(self.integer_ring().get_ring())?))
+            }
+        } else {
+            None
+        }
+    }
+
+    fn map_out(&self, from: &zn_42::ZnBase, el: <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <zn_42::ZnBase as RingBase>::Element {
+        match iso {
+            ToZn42Iso::Trivial => from.from_bounded(el.0),
+            ToZn42Iso::ReduceRequired(reduce_hom) => from.map_in(self.integer_ring().get_ring(), el.0 as i64, reduce_hom)
+        }
     }
 }
 
@@ -319,5 +379,53 @@ impl HashableElRing for ZnBase {
 
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
         self.integer_ring().hash(&self.smallest_positive_lift(*el), h)
+    }
+}
+
+#[cfg(test)]
+fn elements<'a>(ring: &'a Zn) -> impl 'a + Iterator<Item = El<Zn>> {
+    (0..63).map(|i| ring.coerce(&ZZ, 1 << i))
+}
+
+#[test]
+fn test_ring_axioms() {
+    for n in [2, 5, 7, 17] {
+        let Zn = Zn::new(n);
+        crate::ring::generic_tests::test_ring_axioms(&Zn, Zn.elements());
+    }
+    for n in [(1 << 41) - 1, (1 << 42) - 1, (1 << 58) - 1, (1 << 58) + 1, (3 << 57) - 1, (3 << 57) + 1] {
+        let Zn = Zn::new(n);
+        crate::ring::generic_tests::test_ring_axioms(&Zn, elements(&Zn));
+    }
+}
+
+#[test]
+fn test_iso_zn_42() {
+    for n in [2, 5, 17, (1 << 41) - 1] {
+        let R1 = Zn::new(n);
+        let R2 = zn_42::Zn::new(n);
+        let elements = (1..42).map(|i| 1 << i).map(|x| R2.coerce(&ZZ, x));
+        crate::ring::generic_tests::test_hom_axioms(&R2, &R1, elements.clone());
+        crate::ring::generic_tests::test_iso_axioms(&R2, &R1, elements);
+    }
+}
+
+#[test]
+fn test_divisibility_axioms() {
+    for n in [2, 5, 7, 17] {
+        let Zn = Zn::new(n);
+        crate::divisibility::generic_tests::test_divisibility_axioms(&Zn, Zn.elements());
+    }
+    for n in [(1 << 41) - 1, (1 << 42) - 1, (1 << 58) - 1, (1 << 58) + 1, (3 << 57) - 1, (3 << 57) + 1] {
+        let Zn = Zn::new(n);
+        crate::divisibility::generic_tests::test_divisibility_axioms(&Zn, elements(&Zn));
+    }
+}
+
+#[test]
+fn test_finite_ring_axioms() {
+    for n in [2, 5, 7, 17] {
+        let Zn = Zn::new(n);
+        super::generic_tests::test_zn_axioms(&Zn);
     }
 }

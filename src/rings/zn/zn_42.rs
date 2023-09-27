@@ -129,6 +129,18 @@ impl ZnBase {
     fn modulus_u64(&self) -> u64 {
         self.modulus as u64
     }
+
+    pub(super) fn repr_bound(&self) -> u64 {
+        self.repr_bound
+    }
+
+    ///
+    /// This does a bounded check ONLY when debug assertions are enabled.
+    /// 
+    pub(super) fn from_bounded(&self, value: u64) -> ZnEl {
+        debug_assert!(value <= self.repr_bound);
+        ZnEl(value)
+    }
 }
 
 impl RingBase for ZnBase {
@@ -166,14 +178,14 @@ impl RingBase for ZnBase {
 
     fn eq_el(&self, ZnEl(lhs): &Self::Element, ZnEl(rhs): &Self::Element) -> bool {
         if *lhs >= *rhs {
-            self.is_zero(&ZnEl(*lhs - *rhs))
+            self.is_zero(&self.from_bounded(*lhs - *rhs))
         } else {
-            self.is_zero(&ZnEl(*rhs - *lhs))
+            self.is_zero(&self.from_bounded(*rhs - *lhs))
         }
     }
 
     fn is_one(&self, ZnEl(value): &Self::Element) -> bool {
-        *value != 0 && self.is_zero(&ZnEl(*value - 1))
+        *value != 0 && self.is_zero(&self.from_bounded(*value - 1))
     }
 
     fn is_zero(&self, ZnEl(value): &Self::Element) -> bool {
@@ -183,7 +195,7 @@ impl RingBase for ZnBase {
     
     fn is_neg_one(&self, ZnEl(value): &Self::Element) -> bool {
         debug_assert!(*value <= self.repr_bound);
-        self.is_zero(&ZnEl(*value + 1))
+        *value == self.repr_bound || self.is_zero(&self.from_bounded(*value + 1))
     }
 
     fn is_commutative(&self) -> bool { true }
@@ -210,7 +222,7 @@ impl RingBase for ZnBase {
             for ZnEl(c) in els.by_ref().take(self.repr_bound as usize - 1) {
                 current += c as u128;
             }
-            self.add_assign(&mut result, ZnEl(self.bounded_reduce(current)));
+            self.add_assign(&mut result, self.from_bounded(self.bounded_reduce(current)));
         }
         debug_assert!(result.0 <= self.repr_bound);
         return result;
@@ -232,7 +244,7 @@ impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalHom<zn_barett::Z
     }
 
     fn map_in(&self, from: &zn_barett::ZnBase<I>, el: <zn_barett::ZnBase<I> as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
-        ZnEl(from.smallest_positive_lift(el) as u64)
+        self.from_bounded(from.smallest_positive_lift(el) as u64)
     }
 }
 
@@ -273,10 +285,10 @@ impl<I: ?Sized + GenericMapInFromInt> CanonicalHom<I> for ZnBase {
     fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
         generic_impls::map_in_from_int(from, self, StaticRing::<i128>::RING.get_ring(), el, hom, |n| {
             debug_assert!((n as u64) < self.modulus_u64());
-            ZnEl(n as u64)
+            self.from_bounded(n as u64)
         }, |n| {
             debug_assert!(n <= (self.repr_bound as i128 * self.repr_bound as i128));
-            ZnEl(self.bounded_reduce(n as u128))
+            self.from_bounded(self.bounded_reduce(n as u128))
         })
     }
 }
@@ -294,9 +306,9 @@ impl CanonicalHom<StaticRingBase<i16>> for ZnBase {
         debug_assert!(self.repr_bound >= (1 << 16));
 
         if el < 0 {
-            self.negate(ZnEl(-(el as i32) as u64))
+            self.negate(self.from_bounded(-(el as i32) as u64))
         } else {
-            ZnEl(el as u64)
+            self.from_bounded(el as u64)
         }
     }
 }
@@ -314,9 +326,9 @@ impl CanonicalHom<StaticRingBase<i8>> for ZnBase {
         debug_assert!(self.repr_bound >= (1 << 16));
 
         if el < 0 {
-            self.negate(ZnEl(-(el as i16) as u64))
+            self.negate(self.from_bounded(-(el as i16) as u64))
         } else {
-            ZnEl(el as u64)
+            self.from_bounded(el as u64)
         }
     }
 }
@@ -343,15 +355,15 @@ impl CanonicalHom<StaticRingBase<i32>> for ZnBase {
 
         if std::intrinsics::likely(hom.reduction_is_trivial) {
             if el < 0 {
-                self.negate(ZnEl(-(el as i64) as u64))
+                self.negate(self.from_bounded(-(el as i64) as u64))
             } else {
-                ZnEl(el as u64)
+                self.from_bounded(el as u64)
             }
         } else {
             if el < 0 {
-                self.negate(ZnEl(self.bounded_reduce(-(el as i64) as u128)))
+                self.negate(self.from_bounded(self.bounded_reduce(-(el as i64) as u128)))
             } else {
-                ZnEl(self.bounded_reduce(el as u128))
+                self.from_bounded(self.bounded_reduce(el as u128))
             }
         }
     }
@@ -377,7 +389,7 @@ impl<'a> Iterator for ZnBaseElementsIter<'a> {
         if self.current < self.ring.modulus_u64() {
             let result = self.current;
             self.current += 1;
-            return Some(ZnEl(result));
+            return Some(self.ring.from_bounded(result));
         } else {
             return None;
         }
@@ -444,7 +456,7 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
         debug_assert!(self.repr_bound >= self.modulus_u64() * 2);
 
         *values.at_mut(i1) = self.add(a, b);
-        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus_u64() - b.0));
+        *values.at_mut(i2) = self.add(a, self.from_bounded(2 * self.modulus_u64() - b.0));
     }
 
     #[inline(always)]
@@ -452,10 +464,10 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
         let a = *values.at(i1);
         let b = *values.at(i2);
 
-        let b_reduced = ZnEl(self.bounded_reduce(b.0 as u128));
+        let b_reduced = self.from_bounded(self.bounded_reduce(b.0 as u128));
 
         *values.at_mut(i1) = self.add(a, b_reduced);
-        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus_u64() - b_reduced.0));
+        *values.at_mut(i2) = self.add(a, self.from_bounded(2 * self.modulus_u64() - b_reduced.0));
         self.mul_assign_ref(values.at_mut(i2), twiddle);
     }
 }
@@ -602,7 +614,7 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
         debug_assert!(self.repr_bound >= self.modulus_u64() * 2);
 
         *values.at_mut(i1) = self.add(a, b);
-        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus_u64() - b.0));
+        *values.at_mut(i2) = self.add(a, self.from_bounded(2 * self.modulus_u64() - b.0));
     }
 
     #[inline(always)]
@@ -610,10 +622,10 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
         let a = *values.at(i1);
         let b = *values.at(i2);
 
-        let b_reduced = ZnEl(self.bounded_reduce(b.0 as u128));
+        let b_reduced = self.from_bounded(self.bounded_reduce(b.0 as u128));
 
         *values.at_mut(i1) = self.add(a, b_reduced);
-        *values.at_mut(i2) = self.add(a, ZnEl(2 * self.modulus_u64() - b_reduced.0));
+        *values.at_mut(i2) = self.add(a, self.from_bounded(2 * self.modulus_u64() - b_reduced.0));
         self.mul_assign_map_in_ref(from, values.at_mut(i2), twiddle, hom);
     }
 }
@@ -712,13 +724,13 @@ use crate::rings::finite::FiniteRingStore;
 #[test]
 fn test_ring_axioms() {
     let ring = Zn::new(2);
-    generic_tests::test_ring_axioms(&ring, ring.elements());
+    crate::ring::generic_tests::test_ring_axioms(&ring, ring.elements());
 
     let ring = Zn::new(63);
-    generic_tests::test_ring_axioms(&ring, ring.elements());
+    crate::ring::generic_tests::test_ring_axioms(&ring, ring.elements());
 
     let ring = Zn::new((1 << 41) - 1);
-    generic_tests::test_ring_axioms(&ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.from_int(x)));
+    crate::ring::generic_tests::test_ring_axioms(&ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.from_int(x)));
 }
 
 #[test]
@@ -734,21 +746,21 @@ fn test_sum() {
 fn test_canonical_iso_axioms_zn_barett() {
     let from = zn_barett::Zn::new(StaticRing::<i128>::RING, 7 * 11);
     let to = Zn::new(7 * 11);
-    generic_tests::test_hom_axioms(&from, &to, from.elements());
-    generic_tests::test_iso_axioms(&from, &to, from.elements());
+    crate::ring::generic_tests::test_hom_axioms(&from, &to, from.elements());
+    crate::ring::generic_tests::test_iso_axioms(&from, &to, from.elements());
 }
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {
     let from = StaticRing::<i128>::RING;
     let to = Zn::new(7 * 11);
-    generic_tests::test_hom_axioms(&from, to, 0..(7 * 11));
+    crate::ring::generic_tests::test_hom_axioms(&from, to, 0..(7 * 11));
 }
 
 #[test]
 fn test_zn_ring_axioms() {
-    generic_test_zn_ring_axioms(Zn::new(17));
-    generic_test_zn_ring_axioms(Zn::new(63));
+    super::generic_tests::test_zn_axioms(Zn::new(17));
+    super::generic_tests::test_zn_axioms(Zn::new(63));
 }
 
 #[test]
@@ -760,9 +772,9 @@ fn test_divisibility_axioms() {
 #[test]
 fn test_zn_map_in_large_int() {
     let R = Zn::new(17);
-    generic_test_map_in_large_int(R);
+    super::generic_tests::test_map_in_large_int(R);
 
-    let ZZbig = RustBigintRing::RING;
+    let ZZbig = BigIntRing::RING;
     let R = Zn::new(3);
     assert_el_eq!(&R, &R.from_int(0), &R.coerce(&ZZbig, ZZbig.sub(ZZbig.power_of_two(84), ZZbig.one())));
 }
@@ -795,10 +807,10 @@ fn test_from_int() {
 fn test_canonical_iso_axioms_as_field() {
     let R = Zn::new(17);
     let R2 = R.clone().as_field().ok().unwrap();
-    generic_tests::test_hom_axioms(&R, &R2, R.elements());
-    generic_tests::test_iso_axioms(&R, &R2, R.elements());
-    generic_tests::test_hom_axioms(&R2, &R, R2.elements());
-    generic_tests::test_iso_axioms(&R2, &R, R2.elements());
+    crate::ring::generic_tests::test_hom_axioms(&R, &R2, R.elements());
+    crate::ring::generic_tests::test_iso_axioms(&R, &R2, R.elements());
+    crate::ring::generic_tests::test_hom_axioms(&R2, &R, R2.elements());
+    crate::ring::generic_tests::test_iso_axioms(&R2, &R, R2.elements());
 }
 
 #[test]

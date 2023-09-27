@@ -247,42 +247,42 @@ impl<R: RingStore> ZnRingStore for R
 {}
 
 #[cfg(any(test, feature = "generic_tests"))]
-use crate::primitive_int::*;
-#[cfg(any(test, feature = "generic_tests"))]
-use crate::rings::rust_bigint::*;
+pub mod generic_tests {
 
-#[cfg(any(test, feature = "generic_tests"))]
-pub fn generic_test_zn_ring_axioms<R: ZnRingStore>(R: R)
-    where R::Type: ZnRing,
-        <R::Type as ZnRing>::IntegerRingBase: CanonicalIso<StaticRingBase<i128>> + CanonicalIso<StaticRingBase<i32>>
-{
-    let ZZ = R.integer_ring();
-    let n = R.modulus();
+    use super::*;
+    use crate::primitive_int::{StaticRingBase, StaticRing};
 
-    assert!(R.is_zero(&R.coerce(ZZ, ZZ.clone_el(n))));
-    assert!(R.is_field() == algorithms::miller_rabin::is_prime(ZZ, n, 10));
+    pub fn test_zn_axioms<R: ZnRingStore>(R: R)
+        where R::Type: ZnRing,
+            <R::Type as ZnRing>::IntegerRingBase: CanonicalIso<StaticRingBase<i128>> + CanonicalIso<StaticRingBase<i32>>
+    {
+        let ZZ = R.integer_ring();
+        let n = R.modulus();
 
-    let mut k = ZZ.one();
-    while ZZ.is_lt(&k, &n) {
-        assert!(!R.is_zero(&R.coerce(ZZ, ZZ.clone_el(&k))));
-        ZZ.add_assign(&mut k, ZZ.one());
-    }
+        assert!(R.is_zero(&R.coerce(ZZ, ZZ.clone_el(n))));
+        assert!(R.is_field() == algorithms::miller_rabin::is_prime(ZZ, n, 10));
 
-    let all_elements = R.elements().collect::<Vec<_>>();
-    assert_eq!(ZZ.cast(&StaticRing::<i128>::RING, ZZ.clone_el(n)) as usize, all_elements.len());
-    for (i, x) in all_elements.iter().enumerate() {
-        for (j, y) in all_elements.iter().enumerate() {
-            assert!(i == j || !R.eq_el(x, y));
+        let mut k = ZZ.one();
+        while ZZ.is_lt(&k, &n) {
+            assert!(!R.is_zero(&R.coerce(ZZ, ZZ.clone_el(&k))));
+            ZZ.add_assign(&mut k, ZZ.one());
+        }
+
+        let all_elements = R.elements().collect::<Vec<_>>();
+        assert_eq!(ZZ.cast(&StaticRing::<i128>::RING, ZZ.clone_el(n)) as usize, all_elements.len());
+        for (i, x) in all_elements.iter().enumerate() {
+            for (j, y) in all_elements.iter().enumerate() {
+                assert!(i == j || !R.eq_el(x, y));
+            }
         }
     }
-}
 
-#[cfg(any(test, feature = "generic_tests"))]
-pub fn generic_test_map_in_large_int<R: ZnRingStore>(R: R)
-    where <R as RingStore>::Type: ZnRing + CanonicalHom<RustBigintRingBase>
-{
-    let ZZ_big = RustBigintRing::RING;
-    let n = ZZ_big.power_of_two(1000);
-    let x = R.coerce(&ZZ_big, n);
-    assert!(R.eq_el(&R.pow(R.from_int(2), 1000), &x));
+    pub fn test_map_in_large_int<R: ZnRingStore>(R: R)
+        where <R as RingStore>::Type: ZnRing + CanonicalHom<BigIntRingBase>
+    {
+        let ZZ_big = BigIntRing::RING;
+        let n = ZZ_big.power_of_two(1000);
+        let x = R.coerce(&ZZ_big, n);
+        assert!(R.eq_el(&R.pow(R.from_int(2), 1000), &x));
+    }
 }

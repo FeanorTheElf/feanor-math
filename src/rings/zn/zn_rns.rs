@@ -441,9 +441,9 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRing, M: MemoryProvider<El<C
 
     fn has_canonical_hom(&self, from: &K) -> Option<Self::Homomorphism> {
         Some(self.components.iter()
-                .map(|R| <C::Type as CanonicalHom<K>>::has_canonical_hom(R.get_ring(), from).ok_or(()))
-                .collect::<Result<Vec<_>, ()>>()
-                .ok()?
+            .map(|R| <C::Type as CanonicalHom<K>>::has_canonical_hom(R.get_ring(), from).ok_or(()))
+            .collect::<Result<Vec<_>, ()>>()
+            .ok()?
         )
     }
 
@@ -575,7 +575,7 @@ const EDGE_CASE_ELEMENTS: [i32; 9] = [0, 1, 7, 9, 62, 8, 10, 11, 12];
 #[test]
 fn test_ring_axioms() {
     let ring = Zn::from_primes(StaticRing::<i64>::RING, vec![7, 11]);
-    generic_tests::test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.from_int(x)))
+    crate::ring::generic_tests::test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.from_int(x)))
 }
 
 #[test]
@@ -592,29 +592,29 @@ fn test_map_in_map_out() {
 fn test_canonical_iso_axioms_zn_barett() {
     let from = zn_barett::Zn::new(StaticRing::<i128>::RING, 7 * 11);
     let to = Zn::from_primes(StaticRing::<i64>::RING, vec![7, 11]);
-    generic_tests::test_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
-    generic_tests::test_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    crate::ring::generic_tests::test_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    crate::ring::generic_tests::test_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
 }
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {
     let from = StaticRing::<i32>::RING;
     let to = Zn::from_primes(StaticRing::<i64>::RING, vec![7, 11]);
-    generic_tests::test_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    crate::ring::generic_tests::test_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
 }
 
 #[test]
 fn test_zn_ring_axioms() {
     let ring = Zn::from_primes(StaticRing::<i64>::RING, vec![7, 11]);
-    generic_test_zn_ring_axioms(ring);
+    super::generic_tests::test_zn_axioms(ring);
 }
 
 #[test]
 fn test_zn_map_in_large_int() {
-    let ring = Zn::from_primes(RustBigintRing::RING, vec![7, 11]);
-    generic_test_map_in_large_int(ring);
+    let ring = Zn::from_primes(BigIntRing::RING, vec![7, 11]);
+    super::generic_tests::test_map_in_large_int(ring);
 
-    let R = Zn::from_primes(RustBigintRing::RING, vec![3, 5, 7]);
-    let S = RustBigintRing::RING;
+    let R = Zn::from_primes(BigIntRing::RING, vec![3, 5, 7]);
+    let S = BigIntRing::RING;
     assert!(R.eq_el(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
 }

@@ -12,6 +12,9 @@
 #![doc = include_str!("../Readme.md")]
 
 extern crate test;
+extern crate cxx;
+extern crate libc;
+extern crate oorandom;
 
 ///
 /// Struct that may be used to refer to a generic computation.

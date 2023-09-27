@@ -289,6 +289,6 @@ fn fn_test_div_impossible() {
 
 #[test]
 fn test_zn_ring_axioms_znbase() {
-    generic_test_zn_ring_axioms(Zn::<17>::RING);
-    generic_test_zn_ring_axioms(Zn::<63>::RING);
+    super::generic_tests::test_zn_axioms(Zn::<17>::RING);
+    super::generic_tests::test_zn_axioms(Zn::<63>::RING);
 }
