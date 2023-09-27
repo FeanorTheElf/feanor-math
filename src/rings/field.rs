@@ -203,8 +203,6 @@ impl<R: DivisibilityRingStore> Field for AsFieldBase<R>
 }
 
 #[cfg(test)]
-use crate::divisibility::generic_test_divisibility_axioms;
-#[cfg(test)]
 use crate::rings::zn::zn_barett::Zn;
 #[cfg(test)]
 use crate::primitive_int::*;
@@ -223,7 +221,7 @@ fn test_canonical_hom_axioms_static_int() {
 #[test]
 fn test_divisibility_axioms() {
     let R = Zn::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
-    generic_test_divisibility_axioms(&R, R.elements());
+    crate::divisibility::generic_tests::test_divisibility_axioms(&R, R.elements());
 }
 
 #[test]

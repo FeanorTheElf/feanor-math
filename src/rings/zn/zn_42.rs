@@ -1,6 +1,5 @@
 use crate::algorithms::fft::cooley_tuckey::*;
 use crate::delegate::DelegateRing;
-use crate::divisibility::DivisibilityRingStore;
 use crate::integer::IntegerRingStore;
 use crate::ring::*;
 use crate::rings::zn::*;
@@ -108,9 +107,6 @@ impl ZnBase {
     ///
     /// If input is `< 1 << BITSHIFT` (and `<= repr_bound * repr_bound`), 
     /// then output is smaller than `2 * self.modulus` and congruent to the input.
-    /// 
-    /// Note that we also need `input < repr_bound * repr_bound`, otherwise
-    /// the 128-bit multiplication will overflow.
     /// 
     fn bounded_reduce(&self, value: u128) -> u64 {
         debug_assert!((self.repr_bound as u128 * self.repr_bound as u128) < (1 << BITSHIFT));
@@ -364,8 +360,7 @@ impl CanonicalHom<StaticRingBase<i32>> for ZnBase {
 impl DivisibilityRing for ZnBase {
 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        let ring = zn_barett::Zn::new(StaticRing::<i128>::RING, self.modulus as i128);
-        Some(RingRef::new(self).coerce(&ring, ring.checked_div(&RingRef::new(self).cast(&ring, *lhs), &RingRef::new(self).cast(&ring, *rhs))?))
+        super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs, self.modulus())
     }
 }
 
@@ -712,8 +707,6 @@ impl<R: ZnRingStore<Type = ZnBase>> CanonicalIso<AsFieldBase<R>> for ZnBase {
 }
 
 #[cfg(test)]
-use crate::divisibility::generic_test_divisibility_axioms;
-#[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
 
 #[test]
@@ -761,7 +754,7 @@ fn test_zn_ring_axioms() {
 #[test]
 fn test_divisibility_axioms() {
     let R = Zn::new(17);
-    generic_test_divisibility_axioms(&R, R.elements());
+    crate::divisibility::generic_tests::test_divisibility_axioms(&R, R.elements());
 }
 
 #[test]

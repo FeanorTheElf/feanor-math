@@ -405,9 +405,6 @@ impl IntegerRing for RustBigintRingBase {
 }
 
 #[cfg(test)]
-use crate::divisibility::generic_test_divisibility_axioms;
-
-#[cfg(test)]
 const ZZ: RustBigintRing = RustBigintRing::RING;
 
 #[test]
@@ -487,7 +484,7 @@ fn test_bigint_ring_axioms() {
 
 #[test]
 fn test_bigint_divisibility_ring_axioms() {
-    generic_test_divisibility_axioms(ZZ, edge_case_elements())
+    crate::divisibility::generic_tests::test_divisibility_axioms(ZZ, edge_case_elements())
 }
 
 #[test]

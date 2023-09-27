@@ -18,6 +18,7 @@ pub mod zn_barett;
 /// for moduli `n` with at most 41 bits.
 /// 
 pub mod zn_42;
+pub mod zn_64;
 ///
 /// This module contains [`zn_static::Zn`], an implementation of `Z/nZ` for a small `n`
 /// that is known at compile-time.
@@ -82,8 +83,8 @@ pub trait ZnRing: DivisibilityRing + FiniteRing + CanonicalHom<Self::IntegerRing
 pub mod generic_impls {
     use std::marker::PhantomData;
 
-    use crate::{ring::*, divisibility::DivisibilityRingStore, integer::{IntegerRing, IntegerRingStore}};
-    use super::ZnRing;
+    use crate::{ring::*, divisibility::DivisibilityRingStore, integer::{IntegerRing, IntegerRingStore}, algorithms};
+    use super::{ZnRing, ZnRingStore};
 
     #[allow(type_alias_bounds)]
     pub type Homomorphism<R: ZnRing, S: ZnRing> = (<S as CanonicalHom<S::IntegerRingBase>>::Homomorphism, <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::Homomorphism);
@@ -201,6 +202,23 @@ pub mod generic_impls {
             ring.integer_ring().get_uniformly_random(ring.modulus(), rng), 
             &ring.has_canonical_hom(ring.integer_ring().get_ring()).unwrap()
         )
+    }
+
+    pub fn checked_left_div<R: ZnRingStore>(ring: R, lhs: &El<R>, rhs: &El<R>, modulus: &El<<R::Type as ZnRing>::Integers>) -> Option<El<R>>
+        where R::Type: ZnRing
+    {
+        if ring.is_zero(lhs) {
+            return Some(ring.zero());
+        }
+        let int_ring = ring.integer_ring();
+        let lhs_lift = ring.smallest_positive_lift(ring.clone_el(lhs));
+        let rhs_lift = ring.smallest_positive_lift(ring.clone_el(rhs));
+        let (s, _, d) = algorithms::eea::signed_eea(int_ring.clone_el(&rhs_lift), int_ring.clone_el(&modulus), int_ring);
+        if let Some(quotient) = int_ring.checked_div(&lhs_lift, &d) {
+            Some(ring.mul(ring.coerce(int_ring, quotient), ring.coerce(int_ring, s)))
+        } else {
+            None
+        }
     }
 }
 

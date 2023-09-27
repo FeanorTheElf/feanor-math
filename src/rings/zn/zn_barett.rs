@@ -1,5 +1,4 @@
 use crate::divisibility::DivisibilityRing;
-use crate::divisibility::DivisibilityRingStore;
 use crate::euclidean::EuclideanRingStore;
 use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
@@ -248,14 +247,7 @@ impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I>
     where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        let d = algorithms::eea::gcd(self.integer_ring().clone_el(&lhs.0), self.integer_ring().clone_el(&rhs.0), &self.integer_ring);
-        if self.integer_ring.is_zero(&d) {
-            return Some(self.zero());
-        } else if let Ok(inv) = self.invert(self.from_exact(self.integer_ring.checked_div(&rhs.0, &d).unwrap())) {
-            return Some(self.mul(inv, self.from_exact(self.integer_ring.checked_div(&lhs.0, &d).unwrap())));
-        } else {
-            return None;
-        }
+        super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs, self.modulus())
     }
 }
 
@@ -469,8 +461,6 @@ impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalIso<AsField
 }
 
 #[cfg(test)]
-use crate::divisibility::generic_test_divisibility_axioms;
-#[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
 #[cfg(test)]
 use crate::integer::BigIntRing;
@@ -537,7 +527,7 @@ fn test_zn_map_in_small_int() {
 #[test]
 fn test_divisibility_axioms() {
     let R = Zn::new(StaticRing::<i64>::RING, 17);
-    generic_test_divisibility_axioms(&R, R.elements());
+    crate::divisibility::generic_tests::test_divisibility_axioms(&R, R.elements());
 }
 
 #[test]
