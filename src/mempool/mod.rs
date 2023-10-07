@@ -71,6 +71,8 @@ pub trait MemoryProvider<T> {
 
 pub trait GrowableMemoryProvider<T>: MemoryProvider<T> {
 
+    fn shrink(&self, el: &mut Self::Object, new_len: usize);
+
     unsafe fn grow<F: FnOnce(&mut [MaybeUninit<T>])>(&self, el: &mut Self::Object, new_size: usize, initializer: F);
 
     fn grow_init<F: FnMut(usize) -> T>(&self, el: &mut Self::Object, new_size: usize, mut initializer: F) {
@@ -109,6 +111,10 @@ impl<T> GrowableMemoryProvider<T> for AllocatingMemoryProvider {
         el.reserve(new_size - old_len);
         initializer(&mut el.spare_capacity_mut()[..(new_size - old_len)]);
         el.set_len(new_size);
+    }
+
+    fn shrink(&self, el: &mut Self::Object, new_len: usize) {
+        el.truncate(new_len)
     }
 }
 
@@ -151,6 +157,10 @@ impl<'a, T> GrowableMemoryProvider<T> for &'a LoggingMemoryProvider {
         el.reserve(new_size - old_len);
         initializer(&mut el.spare_capacity_mut()[..(new_size - old_len)]);
         el.set_len(new_size);
+    }
+
+    fn shrink(&self, el: &mut Self::Object, new_len: usize) {
+        el.truncate(new_len)
     }
 }
 
