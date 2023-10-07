@@ -8,27 +8,29 @@ pub struct SparseGaussianElimMatrix<F: FieldStore>
     rows: Vec<Vec<(usize, El<F>)>>,
     zero: El<F>,
     col_permutation: Vec<usize>,
-    n: usize,
+    row_count: usize,
+    col_count: usize,
     col_nonzero_entry_counts: Vec<usize>
 }
 
 impl<F: FieldStore> SparseGaussianElimMatrix<F>
     where F::Type: Field
 {
-    pub fn new<I>(field: F, n: usize, entries: I) -> Self
+    pub fn new<I>(field: F, (row_count, col_count): (usize, usize), entries: I) -> Self
         where I: Iterator<Item = (usize, usize, El<F>)>
     {
         let mut rows = Vec::new();
-        rows.resize_with(n, Vec::new);
+        rows.resize_with(row_count, Vec::new);
         
         let mut col_nonzero_entry_counts = Vec::new();
-        col_nonzero_entry_counts.resize(n, 0);
-        let col_permutation = (0..n).collect();
+        col_nonzero_entry_counts.resize(col_count, 0);
+        let col_permutation = (0..col_count).collect();
 
         let mut result = SparseGaussianElimMatrix { 
             col_nonzero_entry_counts, 
             col_permutation, 
-            n, 
+            row_count: row_count,
+            col_count: col_count, 
             zero: field.zero(),
             field, 
             rows
@@ -36,13 +38,13 @@ impl<F: FieldStore> SparseGaussianElimMatrix<F>
 
         for (i, j, e) in entries {
             assert!(!result.field.is_zero(&e));
-            let global_i = result.global_index(i);
-            let global_j = result.global_index(j);
+            let global_i = result.global_row_index(i);
+            let global_j = result.global_col_index(j);
             result.rows[global_i].push((global_j, e));
             result.col_nonzero_entry_counts[global_j] += 1;
         }
 
-        for i in 0..n {
+        for i in 0..row_count {
             result.rows[i].sort_by_key(|(j, _)| *j);
         }
 
@@ -51,8 +53,8 @@ impl<F: FieldStore> SparseGaussianElimMatrix<F>
 
     #[cfg(test)]
     fn check_invariants(&self) {
-        for j in 0..self.n {
-            let nonzero_entry_count = (0..self.n).filter(|i| self.rows[*i].iter().any(|(j2, _)| *j2 == j)).count();
+        for j in 0..self.col_count {
+            let nonzero_entry_count = (0..self.col_count).filter(|i| self.rows[*i].iter().any(|(j2, _)| *j2 == j)).count();
             assert_eq!(nonzero_entry_count, self.col_nonzero_entry_counts[j]);
         }
     }
@@ -68,51 +70,63 @@ impl<F: FieldStore> SparseGaussianElimMatrix<F>
         col_nonzero_entry_counts[global_col] -= 1;
     }
 
-    fn global_index(&self, i: usize) -> usize {
-        self.n - i - 1
+    fn global_row_index(&self, i: usize) -> usize {
+        self.row_count - i - 1
+    }
+    
+    fn global_col_index(&self, j: usize) -> usize {
+        self.col_count - j - 1
+    }
+
+    pub fn row_count(&self) -> usize {
+        self.row_count
+    }
+
+    pub fn col_count(&self) -> usize {
+        self.col_count
     }
 
     pub fn at(&self, i: usize, j: usize) -> &El<F> {
-        assert!(i < self.n);
-        assert!(j < self.n);
-        let hard_column = self.col_permutation[self.global_index(j)];
-        self.rows[self.global_index(i)].binary_search_by_key(&hard_column, |(index, _)| *index).map(|index| &self.rows[self.global_index(i)][index].1).unwrap_or(&self.zero)
+        assert!(i < self.row_count);
+        assert!(j < self.col_count);
+        let hard_column = self.col_permutation[self.global_col_index(j)];
+        self.rows[self.global_row_index(i)].binary_search_by_key(&hard_column, |(index, _)| *index).map(|index| &self.rows[self.global_row_index(i)][index].1).unwrap_or(&self.zero)
     }
 
     pub fn swap_cols(&mut self, j1: usize, j2: usize) {
-        assert!(j1 < self.n);
-        assert!(j2 < self.n);
+        assert!(j1 < self.col_count);
+        assert!(j2 < self.col_count);
         if j1 == j2 {
             return;
         }
         self.check_invariants();
-        let global1 = self.global_index(j1);
-        let global2 = self.global_index(j2);
+        let global1 = self.global_col_index(j1);
+        let global2 = self.global_col_index(j2);
         self.col_permutation.swap(global1, global2);
         self.check_invariants();
     }
 
     pub fn swap_rows(&mut self, i1: usize, i2: usize) {
-        assert!(i1 < self.n);
-        assert!(i2 < self.n);
+        assert!(i1 < self.row_count);
+        assert!(i2 < self.row_count);
         if i1 == i2 {
             return;
         }
         self.check_invariants();
-        let global1 = self.global_index(i1);
-        let global2 = self.global_index(i2);
+        let global1 = self.global_row_index(i1);
+        let global2 = self.global_row_index(i2);
         self.rows.swap(global1, global2);
         self.check_invariants();
     }
 
     pub fn nonzero_entries_in_row(&self, i: usize) -> usize {
-        assert!(i < self.n);
-        self.rows[self.global_index(i)].len()
+        assert!(i < self.row_count);
+        self.rows[self.global_row_index(i)].len()
     }
 
     pub fn nonzero_entries_in_col(&self, j: usize) -> usize {
-        assert!(j < self.n);
-        self.col_nonzero_entry_counts[self.col_permutation[self.global_index(j)]]
+        assert!(j < self.col_count);
+        self.col_nonzero_entry_counts[self.col_permutation[self.global_col_index(j)]]
     }
 
     pub fn sub_row(&mut self, dst_i: usize, src_i: usize, factor: &El<F>) {
@@ -120,8 +134,8 @@ impl<F: FieldStore> SparseGaussianElimMatrix<F>
         let mut new_row = Vec::new();
         let mut dst_index = 0;
         let mut src_index = 0;
-        let dst_i_global = self.global_index(dst_i);
-        let src_i_global = self.global_index(src_i);
+        let dst_i_global = self.global_row_index(dst_i);
+        let src_i_global = self.global_row_index(src_i);
         let dst = &self.rows[dst_i_global];
         let src = &self.rows[src_i_global];
         while dst_index != dst.len() || src_index != src.len() {
@@ -159,19 +173,28 @@ impl<F: FieldStore> SparseGaussianElimMatrix<F>
     /// 
     pub fn into_lower_right_submatrix(mut self) -> Self {
         self.check_invariants();
-        self.n -= 1;
+        self.row_count -= 1;
+        self.col_count -= 1;
 
         #[cfg(test)] {
-            for i in 0..self.n {
-                assert!(!self.rows[i].iter().any(|(j, _)| *j == self.col_permutation[self.n]));
+            for i in 0..self.row_count {
+                assert!(!self.rows[i].iter().any(|(j, _)| *j == self.col_permutation[self.col_count]));
             }
         }
-        for (i, _) in &self.rows[self.n] {
+
+        for (i, _) in &self.rows[self.row_count] {
             self.col_nonzero_entry_counts[*i] -= 1;
         }
         self.check_invariants();
         return self;
     }
+}
+
+pub fn sparse_gaussian_elimination<F: FieldStore>(mut A: SparseGaussianElimMatrix<F>)
+    where F::Type: Field
+{
+    let best_row = (0..A.row_count()).filter(|i| A.nonzero_entries_in_row(*i) > 0).min_by_key(|i| A.nonzero_entries_in_row(*i)).unwrap();
+    let best_col = unimplemented!();
 }
 
 #[cfg(test)]
@@ -180,7 +203,7 @@ use crate::rings::zn::zn_static::Zn;
 #[test]
 fn test_sub_row() {
     let field = Zn::<17>::RING;
-    let mut a = SparseGaussianElimMatrix::new(field, 8, [
+    let mut a = SparseGaussianElimMatrix::new(field, (8, 8), [
         (0, 0, 5), (1, 1, 3), (2, 2, 1), (3, 3, 16), (4, 4, 12), (5, 5, 3), (6, 6, 1), (7, 7, 6), 
         (0, 3, 8), (5, 2, 1), (4, 0, 5)
     ].into_iter());
@@ -254,7 +277,7 @@ fn test_swap_rows() {
     // 9 2
     //     3 8
     //   6   4
-    let mut a = SparseGaussianElimMatrix::new(field, 4, [
+    let mut a = SparseGaussianElimMatrix::new(field, (4, 4), [
         (0, 0, 1), (1, 1, 2), (2, 2, 3), (3, 3, 4),
         (1, 0, 9), (2, 3, 8), (0, 3, 7), (3, 1, 6)
     ].into_iter());
