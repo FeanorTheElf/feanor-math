@@ -117,7 +117,8 @@ impl<'a, T> VectorViewSparse<T> for WorkMatrixRow<'a, T> {
 pub struct WorkMatrixColIter<'a, T> {
     curent: std::slice::Iter<'a, usize>,
     col_index: usize,
-    row_data: &'a [Vec<(usize, T)>]
+    row_data: &'a [Vec<(usize, T)>],
+    len: usize
 }
 
 impl<'a, T> Iterator for WorkMatrixColIter<'a, T> {
@@ -126,7 +127,8 @@ impl<'a, T> Iterator for WorkMatrixColIter<'a, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let row_index = self.curent.next()?;
-        return Some((self.row_data.len() - 1 - row_index, &self.row_data[*row_index][self.col_index].1))
+        let entry = self.row_data[*row_index].binary_search_by_key(&self.col_index, |(j, _)| *j).map(|index| &self.row_data[*row_index][index].1).unwrap();
+        return Some((self.len - 1 - row_index, entry));
     }
 }
 
@@ -158,7 +160,8 @@ impl<'a, T> VectorViewSparse<T> for WorkMatrixCol<'a, T> {
         WorkMatrixColIter {
             col_index: self.col_index,
             curent: self.col.iter(),
-            row_data: self.row_data
+            row_data: self.row_data,
+            len: self.len
         }
     }
 }
@@ -207,10 +210,10 @@ impl<F: FieldStore> SparseWorkMatrix<F>
         }
 
         for i in 0..row_count {
-            result.rows[i].sort_by_key(|(j, _)| *j);
+            result.rows[i].sort_unstable_by_key(|(j, _)| *j);
         }
         for j in 0..col_count {
-            result.cols[j].sort_by_key(|i| *i);
+            result.cols[j].sort_unstable_by_key(|i| *i);
         }
 
         return result;
@@ -258,6 +261,9 @@ impl<F: FieldStore> SparseWorkMatrix<F>
         }
     }
 
+    ///
+    /// Complexity O(c) where c is the maximal number of entries in a column
+    /// 
     fn nonzero_entry_added(cols: &mut Vec<Vec<usize>>, row_nonzero_entry_counts: &mut Vec<usize>, col_nonzero_entry_counts: &mut Vec<usize>, global_col: usize, global_row: usize) {
         let index = cols[global_col].binary_search_by_key(&global_row, |index| *index).expect_err("element present");
         cols[global_col].insert(index, global_row);
@@ -265,6 +271,9 @@ impl<F: FieldStore> SparseWorkMatrix<F>
         col_nonzero_entry_counts[global_col] += 1;
     }
 
+    /// 
+    /// Complexity O(c) where c is the maximal number of entries in a column
+    /// 
     fn nonzero_entry_cancelled(cols: &mut Vec<Vec<usize>>, row_nonzero_entry_counts: &mut Vec<usize>, col_nonzero_entry_counts: &mut Vec<usize>, global_col: usize, global_row: usize) {
         cols[global_col].retain(|x| *x != global_row);
         row_nonzero_entry_counts[global_row] -= 1;
@@ -279,6 +288,9 @@ impl<F: FieldStore> SparseWorkMatrix<F>
         self.col_count - j - 1
     }
 
+    ///
+    /// Complexity O(log r) where r is the number of entries in one row
+    /// 
     pub fn at(&self, i: usize, j: usize) -> &El<F> {
         assert!(i < self.row_count);
         assert!(j < self.col_count);
@@ -293,7 +305,7 @@ impl<F: FieldStore> SparseWorkMatrix<F>
     }
 
     pub fn get_row<'a>(&'a self, i: usize) -> WorkMatrixRow<'a, El<F>> {
-        WorkMatrixRow { data: &self.rows[self.global_row_index(i)], len: self.row_count, permutation: &self.col_permutation, permutation_inv: &self.col_permutation_inv, zero: &self.zero }
+        WorkMatrixRow { data: &self.rows[self.global_row_index(i)], len: self.col_count, permutation: &self.col_permutation, permutation_inv: &self.col_permutation_inv, zero: &self.zero }
     }
 
     pub fn get_col<'a>(&'a self, j: usize) -> WorkMatrixCol<'a, El<F>> {
@@ -301,6 +313,9 @@ impl<F: FieldStore> SparseWorkMatrix<F>
         WorkMatrixCol { row_data: &self.rows, col: &self.cols[global_index], col_index: global_index, zero: &self.zero, len: self.row_count }
     }
 
+    ///
+    /// Complexity O(1)
+    /// 
     pub fn swap_cols(&mut self, j1: usize, j2: usize) {
         assert!(j1 < self.col_count);
         assert!(j2 < self.col_count);
@@ -315,6 +330,9 @@ impl<F: FieldStore> SparseWorkMatrix<F>
         self.check_invariants();
     }
 
+    ///
+    /// Complexity O(t) where t is the number of nonzero entries
+    /// 
     pub fn swap_rows(&mut self, i1: usize, i2: usize) {
         assert!(i1 < self.row_count);
         assert!(i2 < self.row_count);
@@ -335,16 +353,25 @@ impl<F: FieldStore> SparseWorkMatrix<F>
         self.check_invariants();
     }
 
+    ///
+    /// Complexity O(1)
+    /// 
     pub fn nonzero_entries_in_row(&self, i: usize) -> usize {
         assert!(i < self.row_count);
         self.row_nonzero_entry_counts[self.global_row_index(i)]
     }
 
+    ///
+    /// Complexity O(1)
+    /// 
     pub fn nonzero_entries_in_col(&self, j: usize) -> usize {
         assert!(j < self.col_count);
         self.col_nonzero_entry_counts[self.col_permutation[self.global_col_index(j)]]
     }
 
+    ///
+    /// Complexity O(t) where t is the number of nonzero entries
+    /// 
     pub fn sub_row(&mut self, dst_i: usize, src_i: usize, factor: &El<F>) {
         self.check_invariants();
         let mut new_row = Vec::new();
@@ -584,5 +611,7 @@ fn test_nonsquare() {
 
     assert_eq!(vec![(1, &2), (2, &5)], a.get_row(1).nontrivial_entries().collect::<Vec<_>>());
 
-    let mut a = a.into_lower_right_submatrix();
+    let a = a.into_lower_right_submatrix();
+
+    assert_eq!(vec![(3, &6), (0, &2)], a.get_col(0).nontrivial_entries().collect::<Vec<_>>());
 }
