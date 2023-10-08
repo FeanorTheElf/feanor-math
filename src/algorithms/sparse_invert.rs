@@ -4,20 +4,63 @@ use crate::field::*;
 struct WorkMatrix<F: FieldStore>
     where F::Type: Field
 {
-    // base data
     field: F,
-    rows: Vec<Vec<(usize, El<F>)>>,
     zero: El<F>,
+
+    ///
+    /// Stores the nontrivial entries of each row, in global coordinates.
+    /// This always contains the whole matrix, even if we are currently
+    /// considering only a submatrix.
+    /// 
+    rows: Vec<Vec<(usize, El<F>)>>,
+
+    ///
+    /// The order of the columns. In other words, the first column is the one
+    /// with global index `col_permutation[0]` and so on.
+    /// This always refers to the whole matrix, even if we are currently
+    /// considering only a submatrix.
+    /// 
     col_permutation: Vec<usize>,
-    col_permutation_inv: Vec<usize>,
+    ///
+    /// Row count of the current matrix
+    /// 
     row_count: usize,
+    ///
+    /// Column count of the current matrix
+    /// 
     col_count: usize,
+    ///
+    /// Row count of the whole matrix
+    /// 
     base_row_count: usize,
+    ///
+    /// Column count of the whole matrix
+    /// 
     base_col_count: usize,
-    // derived data from here
+    ///
+    /// For each row of the current matrix, stores the number of
+    /// nonzero entries in that row (indexed by global indices).
+    /// This does not refer to the whole matrix, even though the
+    /// difference is more conceptual, as we currently only allow
+    /// shrinking the current matrix by zero columns.
+    /// 
     row_nonzero_entry_counts: Vec<usize>,
+    ///
+    /// For each column of the current matrix, stores the number
+    /// of nonzero entries in that column (indexed by global indices).
+    /// This does not refer to the whole matrix, in particular this is
+    /// usually different from `cols[j].len()`.
+    ///  
     col_nonzero_entry_counts: Vec<usize>,
+    ///
+    /// The row indices of the nonzero entries in each column.
+    /// THis refers to the whole matrix.
+    /// 
     cols: Vec<Vec<usize>>,
+    ///
+    /// Inverse permutation of `col_permutation`
+    /// 
+    col_permutation_inv: Vec<usize>,
 }
 
 struct WorkMatrixRowIter<'a, T> {
@@ -90,17 +133,18 @@ struct WorkMatrixCol<'a, T> {
     row_data: &'a [Vec<(usize, T)>],
     col: &'a [usize],
     col_index: usize,
-    zero: &'a T
+    zero: &'a T,
+    len: usize
 }
 
 impl<'a, T> VectorView<T> for WorkMatrixCol<'a, T> {
 
     fn len(&self) -> usize {
-        self.row_data.len()
+        self.len
     }
 
     fn at(&self, i: usize) -> &T {
-        self.row_data[self.row_data.len() - 1 - i].binary_search_by_key(&self.col_index, |(j, _)| *j).map(|index| &self.row_data[self.row_data.len() - 1 - i][index].1).unwrap_or(self.zero)
+        self.row_data[self.len - 1 - i].binary_search_by_key(&self.col_index, |(j, _)| *j).map(|index| &self.row_data[self.len - 1 - i][index].1).unwrap_or(self.zero)
     }
 }
 
@@ -121,7 +165,7 @@ impl<'a, T> VectorViewSparse<T> for WorkMatrixCol<'a, T> {
 impl<F: FieldStore> WorkMatrix<F>
     where F::Type: Field
 {
-    fn new<I>(field: F, row_count: usize, col_count: usize, entries: I) -> Self
+    pub fn new<I>(field: F, row_count: usize, col_count: usize, entries: I) -> Self
         where I: Iterator<Item = (usize, usize, El<F>)>
     {
         let mut rows = Vec::new();
@@ -253,7 +297,7 @@ impl<F: FieldStore> WorkMatrix<F>
 
     pub fn get_col<'a>(&'a self, j: usize) -> WorkMatrixCol<'a, El<F>> {
         let global_index = self.col_permutation[self.global_col_index(j)];
-        WorkMatrixCol { row_data: &self.rows, col: &self.cols[global_index], col_index: global_index, zero: &self.zero }
+        WorkMatrixCol { row_data: &self.rows, col: &self.cols[global_index], col_index: global_index, zero: &self.zero, len: self.row_count }
     }
 
     pub fn swap_cols(&mut self, j1: usize, j2: usize) {
@@ -266,6 +310,7 @@ impl<F: FieldStore> WorkMatrix<F>
         let global1 = self.global_col_index(j1);
         let global2 = self.global_col_index(j2);
         self.col_permutation.swap(global1, global2);
+        self.col_permutation_inv.swap(self.col_permutation[global1], self.col_permutation[global2]);
         self.check_invariants();
     }
 
@@ -348,7 +393,9 @@ impl<F: FieldStore> WorkMatrix<F>
         for (i, _) in &self.rows[self.row_count] {
             self.col_nonzero_entry_counts[*i] -= 1;
         }
-        debug_assert!(self.cols[self.col_permutation[self.col_count]].len() == 0);
+        debug_assert!(self.cols[self.col_permutation[self.col_count]].len() == 0 || (
+            self.cols[self.col_permutation[self.col_count]].len() == 1 && self.cols[self.col_permutation[self.col_count]][0] == self.row_count
+        ));
         self.check_invariants();
         return self;
     }
