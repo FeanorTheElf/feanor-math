@@ -1,7 +1,8 @@
 use crate::ring::*;
 use crate::field::*;
+use crate::vector::*;
 
-struct WorkMatrix<F: FieldStore>
+pub struct SparseWorkMatrix<F: FieldStore>
     where F::Type: Field
 {
     field: F,
@@ -63,7 +64,7 @@ struct WorkMatrix<F: FieldStore>
     col_permutation_inv: Vec<usize>,
 }
 
-struct WorkMatrixRowIter<'a, T> {
+pub struct WorkMatrixRowIter<'a, T> {
     current: std::slice::Iter<'a, (usize, T)>,
     permutation_inv: &'a [usize],
     len: usize
@@ -79,7 +80,7 @@ impl<'a, T> Iterator for WorkMatrixRowIter<'a, T> {
     }
 }
 
-struct WorkMatrixRow<'a, T> {
+pub struct WorkMatrixRow<'a, T> {
     data: &'a [(usize, T)],
     len: usize,
     permutation: &'a [usize],
@@ -113,7 +114,7 @@ impl<'a, T> VectorViewSparse<T> for WorkMatrixRow<'a, T> {
     }
 }
 
-struct WorkMatrixColIter<'a, T> {
+pub struct WorkMatrixColIter<'a, T> {
     curent: std::slice::Iter<'a, usize>,
     col_index: usize,
     row_data: &'a [Vec<(usize, T)>]
@@ -129,7 +130,7 @@ impl<'a, T> Iterator for WorkMatrixColIter<'a, T> {
     }
 }
 
-struct WorkMatrixCol<'a, T> {
+pub struct WorkMatrixCol<'a, T> {
     row_data: &'a [Vec<(usize, T)>],
     col: &'a [usize],
     col_index: usize,
@@ -162,7 +163,7 @@ impl<'a, T> VectorViewSparse<T> for WorkMatrixCol<'a, T> {
     }
 }
 
-impl<F: FieldStore> WorkMatrix<F>
+impl<F: FieldStore> SparseWorkMatrix<F>
     where F::Type: Field
 {
     pub fn new<I>(field: F, row_count: usize, col_count: usize, entries: I) -> Self
@@ -180,7 +181,7 @@ impl<F: FieldStore> WorkMatrix<F>
         let col_permutation = (0..col_count).collect();
         let col_permutation_inv = (0..col_count).collect();
 
-        let mut result = WorkMatrix { 
+        let mut result = SparseWorkMatrix { 
             row_nonzero_entry_counts, 
             col_nonzero_entry_counts, 
             col_permutation, 
@@ -197,7 +198,7 @@ impl<F: FieldStore> WorkMatrix<F>
 
         for (i, j, e) in entries {
             assert!(!result.field.is_zero(&e));
-            let global_i = result.global_col_index(i);
+            let global_i = result.global_row_index(i);
             let global_j = result.global_col_index(j);
             result.rows[global_i].push((global_j, e));
             result.cols[global_j].push(global_i);
@@ -403,13 +404,11 @@ impl<F: FieldStore> WorkMatrix<F>
 
 #[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
-use crate::vector::VectorView;
-use crate::vector::VectorViewSparse;
 
 #[test]
 fn test_sub_row() {
     let field = Zn::<17>::RING;
-    let mut a = WorkMatrix::new(field, 8, 8, [
+    let mut a = SparseWorkMatrix::new(field, 8, 8, [
         (0, 0, 5), (1, 1, 3), (2, 2, 1), (3, 3, 16), (4, 4, 12), (5, 5, 3), (6, 6, 1), (7, 7, 6), 
         (0, 3, 8), (5, 2, 1), (4, 0, 5)
     ].into_iter());
@@ -484,7 +483,7 @@ fn test_swap_rows() {
     // 9 2
     //     3 8
     //   6   4
-    let mut a = WorkMatrix::new(field, 4, 4, [
+    let mut a = SparseWorkMatrix::new(field, 4, 4, [
         (0, 0, 1), (1, 1, 2), (2, 2, 3), (3, 3, 4),
         (1, 0, 9), (2, 3, 8), (0, 3, 7), (3, 1, 6)
     ].into_iter());
@@ -553,4 +552,37 @@ fn test_swap_rows() {
     assert_eq!(2, a.nonzero_entries_in_col(1));
 
     assert_eq!(10, *a.at(1, 1));
+}
+
+#[test]
+fn test_nonsquare() {
+    let field = Zn::<17>::RING;
+    // 6   5
+    //   2 3
+    // 2    
+    // 4   1
+    //   6
+    let mut a = SparseWorkMatrix::new(field, 5, 3, [
+        (0, 0, 1), (0, 2, 5), (1, 1, 2), (1, 2, 3), (2, 0, 2), (3, 0, 4), (3, 2, 1), (4, 1, 6)
+    ].into_iter());
+
+    a.swap_rows(0, 3);
+    a.swap_cols(0, 2);
+    a.sub_row(1, 0, &3);
+    a.sub_row(3, 0, &5);
+    // 1   4
+    //   2 5
+    //     2
+    //     3
+    //   6  
+
+    assert_eq!(2, a.nonzero_entries_in_row(0));
+    assert_eq!(2, a.nonzero_entries_in_row(1));
+    assert_eq!(1, a.nonzero_entries_in_row(2));
+    assert_eq!(1, a.nonzero_entries_in_row(3));
+    assert_eq!(1, a.nonzero_entries_in_row(4));
+
+    assert_eq!(vec![(1, &2), (2, &5)], a.get_row(1).nontrivial_entries().collect::<Vec<_>>());
+
+    let mut a = a.into_lower_right_submatrix();
 }
