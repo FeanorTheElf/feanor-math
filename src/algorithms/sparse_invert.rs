@@ -11,7 +11,10 @@ struct WorkMatrix<F: FieldStore>
     col_permutation: Vec<usize>,
     n: usize,
     base_n: usize,
-    col_nonzero_entry_counts: Vec<usize>
+    // derived data from here
+    row_nonzero_entry_counts: Vec<usize>,
+    col_nonzero_entry_counts: Vec<usize>,
+    cols: Vec<Vec<usize>>,
 }
 
 impl<F: FieldStore> WorkMatrix<F>
@@ -21,20 +24,26 @@ impl<F: FieldStore> WorkMatrix<F>
         where I: Iterator<Item = (usize, usize, El<F>)>
     {
         let mut rows = Vec::new();
+        let mut cols = Vec::new();
         rows.resize_with(n, Vec::new);
+        cols.resize(n, Vec::new());
         
+        let mut row_nonzero_entry_counts = Vec::new();
         let mut col_nonzero_entry_counts = Vec::new();
+        row_nonzero_entry_counts.resize(n, 0);
         col_nonzero_entry_counts.resize(n, 0);
         let col_permutation = (0..n).collect();
 
         let mut result = WorkMatrix { 
+            row_nonzero_entry_counts, 
             col_nonzero_entry_counts, 
             col_permutation, 
             n, 
             base_n: n,
             zero: field.zero(),
             field, 
-            rows
+            rows, 
+            cols
         };
 
         for (i, j, e) in entries {
@@ -42,20 +51,33 @@ impl<F: FieldStore> WorkMatrix<F>
             let global_i = result.global_index(i);
             let global_j = result.global_index(j);
             result.rows[global_i].push((global_j, e));
+            result.cols[global_j].push(global_i);
+            result.row_nonzero_entry_counts[global_i] += 1;
             result.col_nonzero_entry_counts[global_j] += 1;
         }
 
         for i in 0..n {
             result.rows[i].sort_by_key(|(j, _)| *j);
+            result.cols[i].sort_by_key(|j| *j);
         }
 
         return result;
     }
 
     fn check_invariants(&self) {
+        for j in 0..self.base_n {
+            let mut nonzero_entries_this_column = (0..self.base_n).filter(|i| self.rows[*i].iter().any(|(j2, _)| *j2 == j)).collect::<Vec<_>>();
+            nonzero_entries_this_column.sort();
+            assert_eq!(nonzero_entries_this_column, self.cols[j]);
+        }
+
         for j in 0..self.n {
             let nonzero_entry_count = (0..self.n).filter(|i| self.rows[*i].iter().any(|(j2, _)| *j2 == j)).count();
             assert_eq!(nonzero_entry_count, self.col_nonzero_entry_counts[j]);
+        }
+
+        for i in 0..self.n {
+            assert_eq!(self.rows[i].iter().filter(|(j, _)| (&self.col_permutation[0..self.n]).contains(j)).count(), self.row_nonzero_entry_counts[i]);
         }
     }
 
@@ -80,11 +102,16 @@ impl<F: FieldStore> WorkMatrix<F>
         }
     }
 
-    fn nonzero_entry_added(col_nonzero_entry_counts: &mut Vec<usize>, global_col: usize, global_row: usize) {
+    fn nonzero_entry_added(cols: &mut Vec<Vec<usize>>, row_nonzero_entry_counts: &mut Vec<usize>, col_nonzero_entry_counts: &mut Vec<usize>, global_col: usize, global_row: usize) {
+        let index = cols[global_col].binary_search_by_key(&global_row, |index| *index).expect_err("element present");
+        cols[global_col].insert(index, global_row);
+        row_nonzero_entry_counts[global_row] += 1;
         col_nonzero_entry_counts[global_col] += 1;
     }
 
-    fn nonzero_entry_cancelled(col_nonzero_entry_counts: &mut Vec<usize>, global_col: usize, global_row: usize) {
+    fn nonzero_entry_cancelled(cols: &mut Vec<Vec<usize>>, row_nonzero_entry_counts: &mut Vec<usize>, col_nonzero_entry_counts: &mut Vec<usize>, global_col: usize, global_row: usize) {
+        cols[global_col].retain(|x| *x != global_row);
+        row_nonzero_entry_counts[global_row] -= 1;
         col_nonzero_entry_counts[global_col] -= 1;
     }
 
@@ -121,13 +148,20 @@ impl<F: FieldStore> WorkMatrix<F>
         self.check_invariants();
         let global1 = self.global_index(i1);
         let global2 = self.global_index(i2);
+        for (j, _) in &self.rows[global1] {
+            Self::replace_entry_in_cols(&mut self.cols, *j, global1, global2);
+        }
+        for (j, _) in &self.rows[global2] {
+            Self::replace_entry_in_cols(&mut self.cols, *j, global2, global1);
+        }
         self.rows.swap(global1, global2);
+        self.row_nonzero_entry_counts.swap(global1, global2);
         self.check_invariants();
     }
 
     fn nonzero_entries_in_row(&self, i: usize) -> usize {
         assert!(i < self.n);
-        self.rows[self.global_index(i)].len()
+        self.row_nonzero_entry_counts[self.global_index(i)]
     }
 
     fn nonzero_entries_in_col(&self, j: usize) -> usize {
@@ -152,7 +186,7 @@ impl<F: FieldStore> WorkMatrix<F>
                 let new_value = self.field.sub_ref_fst(&dst[dst_index].1, self.field.mul_ref(&src[src_index].1, factor));
                 if self.field.is_zero(&new_value) {
                     // cancellation occurs - we have to adjust every value that depends on the position of nonzero entries
-                    Self::nonzero_entry_cancelled(&mut self.col_nonzero_entry_counts, src_j, dst_i_global);
+                    Self::nonzero_entry_cancelled(&mut self.cols, &mut self.row_nonzero_entry_counts, &mut self.col_nonzero_entry_counts, src_j, dst_i_global);
                 } else {
                     // no cancellation - this entry remains nonzero
                     new_row.push((dst_j, new_value));
@@ -165,7 +199,7 @@ impl<F: FieldStore> WorkMatrix<F>
                 dst_index += 1;
             } else {
                 // we get a new entry, thus we have to update position of nonzero entries
-                Self::nonzero_entry_added(&mut self.col_nonzero_entry_counts, src_j, dst_i_global);
+                Self::nonzero_entry_added(&mut self.cols, &mut self.row_nonzero_entry_counts, &mut self.col_nonzero_entry_counts, src_j, dst_i_global);
                 new_row.push((src_j, self.field.negate(self.field.mul_ref(&src[src_index].1, factor))));
                 src_index += 1;
             }
@@ -183,6 +217,9 @@ impl<F: FieldStore> WorkMatrix<F>
         for (i, _) in &self.rows[self.n] {
             self.col_nonzero_entry_counts[*i] -= 1;
         }
+        for j in &self.cols[self.col_permutation[self.n]] {
+            self.row_nonzero_entry_counts[*j] -= 1;
+        }
         self.check_invariants();
         return self;
     }
@@ -196,21 +233,21 @@ fn test_sub_row() {
     let field = Zn::<17>::RING;
     let mut a = WorkMatrix::new(field, 8, [
         (0, 0, 5), (1, 1, 3), (2, 2, 1), (3, 3, 16), (4, 4, 12), (5, 5, 3), (6, 6, 1), (7, 7, 6), 
-        (0, 3, 8), (5, 2, 1), (4, 0, 5)
+        (0, 3, 8), (5, 2, 1)
     ].into_iter());
 
     assert_eq!(2, a.nonzero_entries_in_row(0));
     assert_eq!(1, a.nonzero_entries_in_row(1));
     assert_eq!(2, a.nonzero_entries_in_row(5));
 
-    assert_eq!(2, a.nonzero_entries_in_col(0));
+    assert_eq!(1, a.nonzero_entries_in_col(0));
     assert_eq!(1, a.nonzero_entries_in_col(1));
     assert_eq!(2, a.nonzero_entries_in_col(2));
 
     a.sub_row(4, 0, &1);
-    assert_eq!(2, a.nonzero_entries_in_row(4));
+    assert_eq!(3, a.nonzero_entries_in_row(4));
     
-    assert_eq!(0, *a.at(4, 0));
+    assert_eq!(12, *a.at(4, 0));
     assert_eq!(0, *a.at(4, 1));
     assert_eq!(0, *a.at(4, 2));
     assert_eq!(9, *a.at(4, 3));
@@ -233,7 +270,7 @@ fn test_sub_row() {
     assert_eq!(0, *a.at(5, 6));
     assert_eq!(0, *a.at(5, 7));
 
-    assert_eq!(1, a.nonzero_entries_in_col(0));
+    assert_eq!(2, a.nonzero_entries_in_col(0));
     assert_eq!(1, a.nonzero_entries_in_col(1));
     assert_eq!(1, a.nonzero_entries_in_col(2));
     assert_eq!(3, a.nonzero_entries_in_col(3));
@@ -312,6 +349,8 @@ fn test_swap_rows() {
     assert_eq!(1, a.nonzero_entries_in_col(0));
     assert_eq!(3, a.nonzero_entries_in_col(1));
     assert_eq!(2, a.nonzero_entries_in_col(2));
+
+    println!("{:?}", a.cols);
 
     let mut a = a.into_lower_right_submatrix();
 
