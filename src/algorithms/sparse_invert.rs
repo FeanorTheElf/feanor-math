@@ -20,6 +20,104 @@ struct WorkMatrix<F: FieldStore>
     cols: Vec<Vec<usize>>,
 }
 
+struct WorkMatrixRowIter<'a, T> {
+    current: std::slice::Iter<'a, (usize, T)>,
+    permutation_inv: &'a [usize],
+    len: usize
+}
+
+impl<'a, T> Iterator for WorkMatrixRowIter<'a, T> {
+
+    type Item = (usize, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (index, el) = self.current.next()?;
+        return Some((self.len - 1 - self.permutation_inv[*index], el));
+    }
+}
+
+struct WorkMatrixRow<'a, T> {
+    data: &'a [(usize, T)],
+    len: usize,
+    permutation: &'a [usize],
+    permutation_inv: &'a [usize],
+    zero: &'a T
+}
+
+impl<'a, T> VectorView<T> for WorkMatrixRow<'a, T> {
+
+    fn len(&self) -> usize {
+        self.len
+    }
+    
+    fn at(&self, i: usize) -> &T {
+        let global_index = self.permutation[self.len - 1 - i];
+        self.data.binary_search_by_key(&global_index, |(index, _)| *index).map(|index| &self.data[index].1).unwrap_or(&self.zero)
+    }
+}
+
+impl<'a, T> VectorViewSparse<T> for WorkMatrixRow<'a, T> {
+
+    type Iter<'b> = WorkMatrixRowIter<'b, T>
+        where Self: 'b, T: 'b;
+
+    fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> {
+        WorkMatrixRowIter {
+            current: self.data.iter(),
+            len: self.len,
+            permutation_inv: self.permutation_inv
+        }
+    }
+}
+
+struct WorkMatrixColIter<'a, T> {
+    curent: std::slice::Iter<'a, usize>,
+    col_index: usize,
+    row_data: &'a [Vec<(usize, T)>]
+}
+
+impl<'a, T> Iterator for WorkMatrixColIter<'a, T> {
+
+    type Item = (usize, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let row_index = self.curent.next()?;
+        return Some((self.row_data.len() - 1 - row_index, &self.row_data[*row_index][self.col_index].1))
+    }
+}
+
+struct WorkMatrixCol<'a, T> {
+    row_data: &'a [Vec<(usize, T)>],
+    col: &'a [usize],
+    col_index: usize,
+    zero: &'a T
+}
+
+impl<'a, T> VectorView<T> for WorkMatrixCol<'a, T> {
+
+    fn len(&self) -> usize {
+        self.row_data.len()
+    }
+
+    fn at(&self, i: usize) -> &T {
+        self.row_data[self.row_data.len() - 1 - i].binary_search_by_key(&self.col_index, |(j, _)| *j).map(|index| &self.row_data[self.row_data.len() - 1 - i][index].1).unwrap_or(self.zero)
+    }
+}
+
+impl<'a, T> VectorViewSparse<T> for WorkMatrixCol<'a, T> {
+
+    type Iter<'b> = WorkMatrixColIter<'b, T>
+        where Self: 'b, T: 'b;
+
+    fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> {
+        WorkMatrixColIter {
+            col_index: self.col_index,
+            curent: self.col.iter(),
+            row_data: self.row_data
+        }
+    }
+}
+
 impl<F: FieldStore> WorkMatrix<F>
     where F::Type: Field
 {
@@ -136,14 +234,29 @@ impl<F: FieldStore> WorkMatrix<F>
         self.col_count - j - 1
     }
 
-    fn at(&self, i: usize, j: usize) -> &El<F> {
+    pub fn at(&self, i: usize, j: usize) -> &El<F> {
         assert!(i < self.row_count);
         assert!(j < self.col_count);
         let hard_column = self.col_permutation[self.global_col_index(j)];
-        self.rows[self.global_row_index(i)].binary_search_by_key(&hard_column, |(index, _)| *index).map(|index| &self.rows[self.global_row_index(i)][index].1).unwrap_or(&self.zero)
+        let result = self.rows[self.global_row_index(i)].binary_search_by_key(&hard_column, |(index, _)| *index).map(|index| &self.rows[self.global_row_index(i)][index].1).unwrap_or(&self.zero);
+        
+        #[cfg(test)] {
+            assert_eq!(result as *const _, self.get_row(i).at(j) as *const _);
+            assert_eq!(result as *const _, self.get_col(j).at(i) as *const _);
+        }
+        return result;
     }
 
-    fn swap_cols(&mut self, j1: usize, j2: usize) {
+    pub fn get_row<'a>(&'a self, i: usize) -> WorkMatrixRow<'a, El<F>> {
+        WorkMatrixRow { data: &self.rows[self.global_row_index(i)], len: self.row_count, permutation: &self.col_permutation, permutation_inv: &self.col_permutation_inv, zero: &self.zero }
+    }
+
+    pub fn get_col<'a>(&'a self, j: usize) -> WorkMatrixCol<'a, El<F>> {
+        let global_index = self.col_permutation[self.global_col_index(j)];
+        WorkMatrixCol { row_data: &self.rows, col: &self.cols[global_index], col_index: global_index, zero: &self.zero }
+    }
+
+    pub fn swap_cols(&mut self, j1: usize, j2: usize) {
         assert!(j1 < self.col_count);
         assert!(j2 < self.col_count);
         if j1 == j2 {
@@ -156,7 +269,7 @@ impl<F: FieldStore> WorkMatrix<F>
         self.check_invariants();
     }
 
-    fn swap_rows(&mut self, i1: usize, i2: usize) {
+    pub fn swap_rows(&mut self, i1: usize, i2: usize) {
         assert!(i1 < self.row_count);
         assert!(i2 < self.row_count);
         if i1 == i2 {
@@ -176,17 +289,17 @@ impl<F: FieldStore> WorkMatrix<F>
         self.check_invariants();
     }
 
-    fn nonzero_entries_in_row(&self, i: usize) -> usize {
+    pub fn nonzero_entries_in_row(&self, i: usize) -> usize {
         assert!(i < self.row_count);
         self.row_nonzero_entry_counts[self.global_row_index(i)]
     }
 
-    fn nonzero_entries_in_col(&self, j: usize) -> usize {
+    pub fn nonzero_entries_in_col(&self, j: usize) -> usize {
         assert!(j < self.col_count);
         self.col_nonzero_entry_counts[self.col_permutation[self.global_col_index(j)]]
     }
 
-    fn sub_row(&mut self, dst_i: usize, src_i: usize, factor: &El<F>) {
+    pub fn sub_row(&mut self, dst_i: usize, src_i: usize, factor: &El<F>) {
         self.check_invariants();
         let mut new_row = Vec::new();
         let mut dst_index = 0;
@@ -228,7 +341,7 @@ impl<F: FieldStore> WorkMatrix<F>
     ///
     /// This requires that the area left of the lower right submatrix is completely zero!
     /// 
-    fn into_lower_right_submatrix(mut self) -> Self {
+    pub fn into_lower_right_submatrix(mut self) -> Self {
         self.check_invariants();
         self.row_count -= 1;
         self.col_count -= 1;
@@ -243,27 +356,30 @@ impl<F: FieldStore> WorkMatrix<F>
 
 #[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
+use crate::vector::VectorView;
+use crate::vector::VectorViewSparse;
 
 #[test]
 fn test_sub_row() {
     let field = Zn::<17>::RING;
     let mut a = WorkMatrix::new(field, 8, 8, [
         (0, 0, 5), (1, 1, 3), (2, 2, 1), (3, 3, 16), (4, 4, 12), (5, 5, 3), (6, 6, 1), (7, 7, 6), 
-        (0, 3, 8), (5, 2, 1)
+        (0, 3, 8), (5, 2, 1), (4, 0, 5)
     ].into_iter());
 
     assert_eq!(2, a.nonzero_entries_in_row(0));
     assert_eq!(1, a.nonzero_entries_in_row(1));
+    assert_eq!(2, a.nonzero_entries_in_row(4));
     assert_eq!(2, a.nonzero_entries_in_row(5));
 
-    assert_eq!(1, a.nonzero_entries_in_col(0));
+    assert_eq!(2, a.nonzero_entries_in_col(0));
     assert_eq!(1, a.nonzero_entries_in_col(1));
     assert_eq!(2, a.nonzero_entries_in_col(2));
 
     a.sub_row(4, 0, &1);
-    assert_eq!(3, a.nonzero_entries_in_row(4));
+    assert_eq!(2, a.nonzero_entries_in_row(4));
     
-    assert_eq!(12, *a.at(4, 0));
+    assert_eq!(0, *a.at(4, 0));
     assert_eq!(0, *a.at(4, 1));
     assert_eq!(0, *a.at(4, 2));
     assert_eq!(9, *a.at(4, 3));
@@ -286,7 +402,7 @@ fn test_sub_row() {
     assert_eq!(0, *a.at(5, 6));
     assert_eq!(0, *a.at(5, 7));
 
-    assert_eq!(2, a.nonzero_entries_in_col(0));
+    assert_eq!(1, a.nonzero_entries_in_col(0));
     assert_eq!(1, a.nonzero_entries_in_col(1));
     assert_eq!(1, a.nonzero_entries_in_col(2));
     assert_eq!(3, a.nonzero_entries_in_col(3));
