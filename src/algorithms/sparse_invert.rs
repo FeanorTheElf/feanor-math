@@ -64,6 +64,7 @@ pub struct SparseWorkMatrix<'a, F: FieldStore>
     /// Column count of the current matrix
     /// 
     col_count: usize,
+    recycle_vec: Option<Vec<(usize, El<F>)>>
 }
 
 pub struct WorkMatrixRowIter<'a, T> {
@@ -280,7 +281,8 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
             col_nonzero_entry_counts: (0..base.col_count).map(|_| 0).collect(),
             row_count: base.row_count,
             col_count: base.col_count,
-            base: base
+            base: base,
+            recycle_vec: Some(Vec::new())
         };
         for i in 0..result.base.row_count {
             for (j, _) in &result.base.rows[i] {
@@ -392,7 +394,8 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
 
     pub fn sub_row(&mut self, dst_i: usize, src_i: usize, factor: &El<F>) {
         self.check_invariants();
-        let mut new_row = Vec::new();
+        let mut new_row = self.recycle_vec.take().unwrap();
+        new_row.clear();
         let mut dst_index = 0;
         let mut src_index = 0;
         let dst_i_global = self.global_row_index(dst_i);
@@ -425,7 +428,7 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
                 src_index += 1;
             }
         }
-        self.base.rows[dst_i_global] = new_row;
+        self.recycle_vec = Some(std::mem::replace(&mut self.base.rows[dst_i_global], new_row));
         self.check_invariants();
     }
 
@@ -722,9 +725,9 @@ fn bench_sparse_row_echelon(bencher: &mut Bencher) {
 #[test]
 fn test_perf_sparse_row_echelon() {
     let field = Zn::<17>::RING;
-    let row_count = 10000;
-    let col_count = 5000;
-    let row_entries = 5;
+    let row_count = 20000;
+    let col_count = 10000;
+    let row_entries = 10;
     let mut rand = oorandom::Rand32::from_state((1, 1));
     let base = SparseBaseMatrix::new(field, row_count, col_count, (0..row_count).flat_map(|i| {
         let mut entries = (0..row_entries).map(|_| rand.rand_u32() as usize % col_count).collect::<Vec<_>>();
