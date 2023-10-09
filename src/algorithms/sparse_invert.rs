@@ -252,12 +252,12 @@ impl<F: FieldStore> SparseBaseMatrix<F>
         WorkMatrixCol { row_data: &self.rows, col: &self.cols[global_index], col_index: global_index, zero: &self.zero, len: self.row_count }
     }
 
-    pub fn column_permutation(&self) -> &[usize] {
-        &self.col_permutation
+    pub fn column_permutation<'a>(&'a self) -> impl 'a + Iterator<Item = usize> {
+        self.col_permutation.iter().rev().map(|j| self.col_count - 1 - *j)
     }
 
-    pub fn column_permutation_inv(&self) -> &[usize] {
-        &self.col_permutation_inv
+    pub fn column_permutation_inv<'a>(&'a self) -> impl 'a + Iterator<Item = usize> {
+        self.col_permutation_inv.iter().rev().map(|j| self.col_count - 1 - *j)
     }
 }
 
@@ -282,6 +282,7 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
         return result;
     }
 
+    #[cfg(test)]
     fn check_invariants(&self) {
         for j in 0..self.base.col_count {
             let mut nonzero_entries_this_column = (0..self.base.row_count).filter(|i| self.base.rows[*i].iter().any(|(j2, _)| *j2 == j)).collect::<Vec<_>>();
@@ -300,8 +301,12 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
 
         for j in 0..self.col_count {
             assert_eq!(j, self.base.col_permutation_inv[self.base.col_permutation[j]]);
+            assert_eq!(j, self.base.col_permutation[self.base.col_permutation_inv[j]]);
         }
     }
+    
+    #[cfg(not(test))]
+    fn check_invariants(&self) {}
 
     fn replace_entry_in_cols(cols: &mut Vec<Vec<usize>>, global_col: usize, old: usize, new: usize) {
         let old_index = cols[global_col].binary_search_by_key(&old, |index| *index).unwrap();
@@ -314,7 +319,7 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
                 }
                 cols[global_col][new_index - 1] = new;
             } else {
-                for i in new_index..old_index {
+                for i in (new_index..old_index).rev() {
                     cols[global_col][i + 1] = cols[global_col][i];
                 }
                 cols[global_col][new_index] = new;
@@ -455,12 +460,6 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
 
             if dst_j == src_j {
                 let new_value = self.base.field.sub_ref_fst(&dst[dst_index].1, self.base.field.mul_ref(&src[src_index].1, factor));
-                self.base.field.println(&dst[dst_index].1);
-                self.base.field.println(&src[src_index].1);
-                self.base.field.println(&factor);
-                self.base.field.println(&self.base.field.mul_ref(&src[src_index].1, factor));
-                self.base.field.println(&new_value);
-                println!();
                 if self.base.field.is_zero(&new_value) {
                     // cancellation occurs - we have to adjust every value that depends on the position of nonzero entries
                     Self::nonzero_entry_cancelled(&mut self.base.cols, &mut self.row_nonzero_entry_counts, &mut self.col_nonzero_entry_counts, src_j, dst_i_global);
@@ -495,9 +494,10 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
         for (i, _) in &self.base.rows[self.row_count] {
             self.col_nonzero_entry_counts[*i] -= 1;
         }
-        debug_assert!(self.base.cols[self.base.col_permutation[self.col_count]].len() == 0 || (
-            self.base.cols[self.base.col_permutation[self.col_count]].len() == 1 && self.base.cols[self.base.col_permutation[self.col_count]][0] == self.row_count
-        ));
+        let removed_column = &self.base.cols[self.base.col_permutation[self.col_count]];
+        for i in removed_column {
+            debug_assert!(*i >= self.row_count);
+        }
         self.check_invariants();
         return self;
     }
@@ -508,20 +508,49 @@ pub fn sparse_row_echelon<F>(mut A: SparseWorkMatrix<F>)
         F::Type: Field
 {
     let field = A.base_field().clone();
-    let pivot_i = (0..A.row_count()).filter(|i| A.nonzero_entries_in_row(*i) > 0).min_by_key(|i| A.nonzero_entries_in_row(*i)).unwrap();
-    A.swap_rows(0, pivot_i);
+    if let Some(pivot_i) = (0..A.row_count()).filter(|i| A.nonzero_entries_in_row(*i) > 0).min_by_key(|i| A.nonzero_entries_in_row(*i)) {
 
-    let pivot_row = A.get_row(0);
-    let (pivot_j, _) = pivot_row.nontrivial_entries().min_by_key(|(j, _)| A.nonzero_entries_in_col(*j)).unwrap();
-    A.swap_cols(0, pivot_j);
+            
+        for i in 0..A.row_count {
+            for j in 0..A.col_count {
+                print!("{} ", field.format(A.at(i, j)));
+            }
+            println!();
+        }
+        println!();
+        
+        A.swap_rows(0, pivot_i);
 
-    let pivot_inv = field.invert(A.at(0, 0)).unwrap();
-    let sub_row_is = A.get_col(0).nontrivial_entries().map(|(i, _)| i).filter(|i| *i != 0).collect::<Vec<_>>();
-
-    for i in sub_row_is {
-        A.sub_row(i, 0, &field.mul_ref(A.at(i, 0), &pivot_inv));
+        let pivot_row = A.get_row(0);
+        let (pivot_j, _) = pivot_row.nontrivial_entries().min_by_key(|(j, _)| A.nonzero_entries_in_col(*j)).unwrap();
+        A.swap_cols(0, pivot_j);
+        println!("Swap {} <-> {}", 0, pivot_j);
+    
+        let pivot_inv = field.invert(A.at(0, 0)).unwrap();
+        let sub_row_is = A.get_col(0).nontrivial_entries().map(|(i, _)| i).filter(|i| *i != 0).collect::<Vec<_>>();
+        for i in 0..A.row_count {
+            for j in 0..A.col_count {
+                print!("{} ", field.format(A.at(i, j)));
+            }
+            println!();
+        }
+        println!();
+    
+        for i in sub_row_is {
+            A.sub_row(i, 0, &field.mul_ref(A.at(i, 0), &pivot_inv));
+            for i in 0..A.row_count {
+                for j in 0..A.col_count {
+                    print!("{} ", field.format(A.at(i, j)));
+                }
+                println!();
+            }
+            println!();
+        }
+    
+        sparse_row_echelon(A.into_lower_right_submatrix());
+    } else {
+        // we are left with the zero matrix
     }
-    sparse_row_echelon(A.into_lower_right_submatrix());
 }
 
 #[cfg(test)]
@@ -726,4 +755,36 @@ fn test_nonsquare() {
 
     assert_eq!(1, a.nonzero_entries_in_row(1));
     assert_eq!(vec![(2, &3), (1, &2), (0, &5)], a.get_col(1).nontrivial_entries().collect::<Vec<_>>());
+}
+
+#[test]
+fn test_sparse_row_echelon() {
+    let field = Zn::<17>::RING;
+    let mut base = SparseBaseMatrix::new(field, 6, 5, [
+        (0, 1, 8), (0, 2, 2), (0, 4, 1), (1, 1, 2), (1, 2, 1), (1, 4, 1), (2, 0, 3), (2, 3, 1), (3, 0, 2), (3, 3, 1), (3, 4, 16), (4, 0, 4), (4, 1, 10), (4, 2, 3), (4, 3, 2), (5, 0, 3), (5, 1, 15), (5, 2, 16), (5, 3, 1), (5, 4, 16)
+    ].into_iter());
+    //   8 2   1
+    //   2 1   1
+    // 3     1
+    // 2     1 16
+    // 4 10 3 2 
+    // 3 15 16 1 16
+
+    sparse_row_echelon(SparseWorkMatrix::new(&mut base));
+
+    for i in 0..6 {
+        for j in 0..5 {
+            print!("{} ", base.at(i, j));
+        }
+        println!();
+    }
+
+    let zero_vec = [1, 4, 10, 14, 16]; //[14, 1, 16, 4, 10]
+    let mut permuted_zero_vec = [0; 5];
+    for (j1, j2) in base.column_permutation().enumerate() {
+        permuted_zero_vec[j1] = zero_vec[j2];
+    }
+    for i in 0..6 {
+        assert_el_eq!(&field, &0, &field.sum((0..5).map(|j| field.mul_ref(base.at(i, j), &permuted_zero_vec[j]))));
+    }
 }
