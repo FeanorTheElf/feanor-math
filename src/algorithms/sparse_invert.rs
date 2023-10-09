@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::ring::*;
 use crate::field::*;
 use crate::vector::*;
@@ -31,7 +33,7 @@ pub struct SparseBaseMatrix<F: FieldStore>
     col_count: usize,
     ///
     /// The row indices of the nonzero entries in each column.
-    /// THis refers to the whole matrix.
+    /// This refers to the whole matrix.
     /// 
     cols: Vec<Vec<usize>>,
     ///
@@ -176,6 +178,24 @@ impl<'a, T> VectorViewSparse<T> for WorkMatrixCol<'a, T> {
     }
 }
 
+impl<F: FieldStore> Clone for SparseBaseMatrix<F>
+    where F::Type: Field,
+        F: Clone
+{
+    fn clone(&self) -> Self {
+        Self {
+            col_count: self.col_count,
+            row_count: self.row_count,
+            col_permutation: self.col_permutation.clone(),
+            col_permutation_inv: self.col_permutation_inv.clone(),
+            field: self.field.clone(),
+            cols: self.cols.clone(),
+            zero: self.field.zero(),
+            rows: self.rows.iter().map(|data| data.iter().map(|(j, c)| (*j, self.field.clone_el(c))).collect()).collect()
+        }
+    }
+}
+
 impl<F: FieldStore> SparseBaseMatrix<F>
     where F::Type: Field
 {
@@ -211,6 +231,9 @@ impl<F: FieldStore> SparseBaseMatrix<F>
 
         for i in 0..row_count {
             result.rows[i].sort_unstable_by_key(|(j, _)| *j);
+            for index in 1..result.rows[i].len() {
+                assert!(result.rows[i][index - 1].0 != result.rows[i][index].0);
+            }
         }
         for j in 0..col_count {
             result.cols[j].sort_unstable_by_key(|i| *i);
@@ -227,6 +250,14 @@ impl<F: FieldStore> SparseBaseMatrix<F>
         self.col_count - j - 1
     }
 
+    pub fn row_count(&self) -> usize {
+        self.row_count
+    }
+
+    pub fn col_count(&self) -> usize {
+        self.col_count
+    }
+
     ///
     /// Complexity O(log r) where r is the number of entries in one row
     /// 
@@ -236,7 +267,7 @@ impl<F: FieldStore> SparseBaseMatrix<F>
         let hard_column = self.col_permutation[self.global_col_index(j)];
         let result = self.rows[self.global_row_index(i)].binary_search_by_key(&hard_column, |(index, _)| *index).map(|index| &self.rows[self.global_row_index(i)][index].1).unwrap_or(&self.zero);
         
-        #[cfg(test)] {
+        #[cfg(feature = "expensive_checks")] {
             assert_eq!(result as *const _, self.get_row(i).at(j) as *const _);
             assert_eq!(result as *const _, self.get_col(j).at(i) as *const _);
         }
@@ -266,23 +297,16 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
     where F::Type: Field
 {
     pub fn new(base: &'a mut SparseBaseMatrix<F>) -> Self {
-        let mut result = SparseWorkMatrix {
-            row_nonzero_entry_counts: (0..base.row_count).map(|_| 0).collect(),
-            col_nonzero_entry_counts: (0..base.col_count).map(|_| 0).collect(),
+        SparseWorkMatrix {
+            row_nonzero_entry_counts: (0..base.row_count).map(|i| base.rows[i].len()).collect(),
+            col_nonzero_entry_counts: (0..base.col_count).map(|j| base.cols[j].len()).collect(),
             row_count: base.row_count,
             col_count: base.col_count,
             base: base
-        };
-        for i in 0..result.base.row_count {
-            for (j, _) in &result.base.rows[i] {
-                result.row_nonzero_entry_counts[i] += 1;
-                result.col_nonzero_entry_counts[*j] += 1;
-            }
         }
-        return result;
     }
 
-    #[cfg(test)]
+    #[cfg(feature = "expensive_checks")]
     fn check_invariants(&self) {
         for j in 0..self.base.col_count {
             let mut nonzero_entries_this_column = (0..self.base.row_count).filter(|i| self.base.rows[*i].iter().any(|(j2, _)| *j2 == j)).collect::<Vec<_>>();
@@ -305,7 +329,7 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
         }
     }
     
-    #[cfg(not(test))]
+    #[cfg(not(feature = "expensive_checks"))]
     fn check_invariants(&self) {}
 
     fn replace_entry_in_cols(cols: &mut Vec<Vec<usize>>, global_col: usize, old: usize, new: usize) {
@@ -509,42 +533,18 @@ pub fn sparse_row_echelon<F>(mut A: SparseWorkMatrix<F>)
 {
     let field = A.base_field().clone();
     if let Some(pivot_i) = (0..A.row_count()).filter(|i| A.nonzero_entries_in_row(*i) > 0).min_by_key(|i| A.nonzero_entries_in_row(*i)) {
-
-            
-        for i in 0..A.row_count {
-            for j in 0..A.col_count {
-                print!("{} ", field.format(A.at(i, j)));
-            }
-            println!();
-        }
-        println!();
         
         A.swap_rows(0, pivot_i);
 
         let pivot_row = A.get_row(0);
         let (pivot_j, _) = pivot_row.nontrivial_entries().min_by_key(|(j, _)| A.nonzero_entries_in_col(*j)).unwrap();
         A.swap_cols(0, pivot_j);
-        println!("Swap {} <-> {}", 0, pivot_j);
     
         let pivot_inv = field.invert(A.at(0, 0)).unwrap();
         let sub_row_is = A.get_col(0).nontrivial_entries().map(|(i, _)| i).filter(|i| *i != 0).collect::<Vec<_>>();
-        for i in 0..A.row_count {
-            for j in 0..A.col_count {
-                print!("{} ", field.format(A.at(i, j)));
-            }
-            println!();
-        }
-        println!();
     
         for i in sub_row_is {
             A.sub_row(i, 0, &field.mul_ref(A.at(i, 0), &pivot_inv));
-            for i in 0..A.row_count {
-                for j in 0..A.col_count {
-                    print!("{} ", field.format(A.at(i, j)));
-                }
-                println!();
-            }
-            println!();
         }
     
         sparse_row_echelon(A.into_lower_right_submatrix());
@@ -555,6 +555,8 @@ pub fn sparse_row_echelon<F>(mut A: SparseWorkMatrix<F>)
 
 #[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
+#[cfg(test)]
+use test::Bencher;
 
 #[test]
 fn test_sub_row() {
@@ -772,13 +774,6 @@ fn test_sparse_row_echelon() {
 
     sparse_row_echelon(SparseWorkMatrix::new(&mut base));
 
-    for i in 0..6 {
-        for j in 0..5 {
-            print!("{} ", base.at(i, j));
-        }
-        println!();
-    }
-
     let zero_vec = [1, 4, 10, 14, 16]; //[14, 1, 16, 4, 10]
     let mut permuted_zero_vec = [0; 5];
     for (j1, j2) in base.column_permutation().enumerate() {
@@ -787,4 +782,50 @@ fn test_sparse_row_echelon() {
     for i in 0..6 {
         assert_el_eq!(&field, &0, &field.sum((0..5).map(|j| field.mul_ref(base.at(i, j), &permuted_zero_vec[j]))));
     }
+}
+
+#[ignore]
+#[bench]
+fn bench_sparse_row_echelon(bencher: &mut Bencher) {
+    let field = Zn::<17>::RING;
+    let row_count = 100;
+    let col_count = 100;
+    let row_entries = 5;
+    let mut rand = oorandom::Rand32::from_state((1, 1));
+    let base = SparseBaseMatrix::new(field, row_count, col_count, (0..row_count).flat_map(|i| {
+        let mut entries = (0..row_entries).map(|_| rand.rand_u32() as usize % col_count).collect::<Vec<_>>();
+        entries.sort();
+        entries.dedup();
+        return entries.into_iter().map(move |j| (i, j, field.from_int((rand.rand_u32() % 16) as i32 + 1)));
+    }));
+
+    bencher.iter(|| {
+        let mut current_base = base.clone();
+        sparse_row_echelon(SparseWorkMatrix::new(&mut current_base));
+        std::hint::black_box(current_base);
+    });
+}
+
+#[test]
+fn test_perf_sparse_row_echelon() {
+    let field = Zn::<17>::RING;
+    let row_count = 10000;
+    let col_count = 5000;
+    let row_entries = 5;
+    let mut rand = oorandom::Rand32::from_state((1, 1));
+    let base = SparseBaseMatrix::new(field, row_count, col_count, (0..row_count).flat_map(|i| {
+        let mut entries = (0..row_entries).map(|_| rand.rand_u32() as usize % col_count).collect::<Vec<_>>();
+        entries.sort();
+        entries.dedup();
+        return entries.into_iter().map(move |j| (i, j, field.from_int((rand.rand_u32() % 16) as i32 + 1)));
+    }));
+
+    let start = Instant::now();
+    {
+        let mut current_base = base.clone();
+        sparse_row_echelon(SparseWorkMatrix::new(&mut current_base));
+        std::hint::black_box(current_base);
+    }
+    let end = Instant::now();
+    println!("Time {} ms", (end - start).as_millis());
 }

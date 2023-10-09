@@ -29,6 +29,7 @@ cxx = "1.0.107"
 generic_tests = []
 log_memory = []
 mpir = []
+expensive_checks = []
 
 [profile.profiling]
 inherits = "bench"
