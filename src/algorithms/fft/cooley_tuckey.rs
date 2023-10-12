@@ -2,7 +2,7 @@ use crate::algorithms::unity_root::*;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::primitive_int::*;
 use crate::mempool::*;
-use crate::rings::zn::{ZnRingStore, ZnRing};
+use crate::rings::zn::*;
 use crate::vector::SwappableVectorViewMut;
 use crate::ring::*;
 use crate::vector::VectorViewMut;
@@ -364,8 +364,6 @@ use crate::rings::zn::zn_static::Zn;
 use crate::rings::zn::zn_barett;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
-// #[cfg(test)]
-use crate::rings::zn::zn_42;
 #[cfg(test)]
 use crate::field::*;
 #[cfg(test)]
@@ -467,6 +465,18 @@ fn bench_fft_zn42(bencher: &mut test::Bencher) {
 fn bench_fft_zn42_fastmul(bencher: &mut test::Bencher) {
     let ring = zn_42::Zn::new(1073872897);
     let fastmul_ring = zn_42::ZnFastmul::new(ring);
+    let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, BENCH_SIZE_LOG2).unwrap();
+    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+    let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
+    bencher.iter(|| {
+        run_fft_bench_round(&ring, &fft, &data, &mut copy)
+    });
+}
+
+#[bench]
+fn bench_fft_zn64_fastmul(bencher: &mut test::Bencher) {
+    let ring = zn_64::Zn::new(1073872897);
+    let fastmul_ring = zn_64::ZnFastmul::new(ring);
     let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, BENCH_SIZE_LOG2).unwrap();
     let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);

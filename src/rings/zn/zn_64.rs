@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
+use crate::delegate::DelegateRing;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::*;
 use crate::integer::*;
@@ -9,6 +11,22 @@ use crate::rings::rust_bigint::*;
 
 use super::*;
 use super::zn_barett;
+
+fn high(x: u128) -> u64 {
+    (x >> 64) as u64
+}
+
+fn low(x: u128) -> u64 {
+    (x & ((1 << 64) - 1)) as u64
+}
+
+fn mulhi(lhs: u64, rhs: u64) -> u64 {
+    high(lhs as u128 * rhs as u128)
+}
+
+fn mullo(lhs: u64, rhs: u64) -> u64 {
+    lhs.wrapping_mul(rhs)
+}
 
 ///
 /// Represents the ring `Z/nZ`.
@@ -52,6 +70,7 @@ use super::zn_barett;
 /// Zn::new((1 << 62) / 9 + 1);
 /// ```
 /// 
+#[derive(Clone, Copy)]
 pub struct ZnBase {
     modulus: i64,
     inv_modulus: u128
@@ -97,13 +116,14 @@ impl ZnBase {
     /// 
     fn bounded_reduce(&self, value: u128) -> u64 {
         debug_assert!(value <= 4 * self.repr_bound() as u128 * self.repr_bound() as u128);
-        let (in_low, in_high) = ((value & ((1 << 64) - 1)) as u64, (value >> 64) as u64);
-        let (invmod_low, invmod_high) = ((self.inv_modulus & ((1 << 64) - 1)) as u64, (self.inv_modulus >> 64) as u64);
+        let (in_low, in_high) = (low(value), high(value));
+        let (invmod_low, invmod_high) = (low(self.inv_modulus), high(self.inv_modulus));
         // we ignore the lowest part of the sum, causing an error of at most 1;
         // we also assume that `repr_bound * repr_bound * inv_modulus` fits into 192 bit
-        let approx_quotient = ((in_low as u128 * invmod_high as u128 + in_high as u128 * invmod_low as u128) >> 64) as u64 + in_high * invmod_high;
-        let result = (value - approx_quotient as u128 * self.modulus_u64() as u128) as u64;
-        debug_assert!(result < 3 * self.modulus_u64());
+        let approx_quotient = mulhi(in_low, invmod_high) + mulhi(in_high, invmod_low) + mullo(in_high, invmod_high);
+        let result = low(value).wrapping_sub(mullo(approx_quotient, self.modulus_u64()));
+        debug_assert!(result < self.repr_bound());
+        debug_assert!((value - result as u128) % (self.modulus_u64() as u128) == 0);
         return result;
     }
 
@@ -428,6 +448,162 @@ impl HashableElRing for ZnBase {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct ZnFastmulBase {
+    base: RingValue<ZnBase>
+}
+
+pub type ZnFastmul = RingValue<ZnFastmulBase>;
+
+impl ZnFastmul {
+
+    pub fn new(base: Zn) -> Self {
+        RingValue::from(ZnFastmulBase { base })
+    }
+}
+
+impl PartialEq for ZnFastmulBase {
+    
+    fn eq(&self, other: &Self) -> bool {
+        self.base.get_ring() == other.base.get_ring()
+    }
+}
+
+impl_eq_based_self_iso!{ ZnFastmulBase }
+
+#[derive(Clone, Copy)]
+pub struct ZnFastmulEl {
+    el: ZnEl,
+    value_invmod_shifted: u128
+}
+
+impl DelegateRing for ZnFastmulBase {
+
+    type Base = ZnBase;
+    type Element = ZnFastmulEl;
+
+    fn get_delegate(&self) -> &Self::Base {
+        self.base.get_ring()
+    }
+
+    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element {
+        el.el
+    }
+
+    fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element {
+        &mut el.el
+    }
+
+    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element {
+        &el.el
+    }
+
+    fn postprocess_delegate_mut(&self, el: &mut Self::Element) {
+        assert!(el.el.0 <= self.base.get_ring().repr_bound());
+        let value = el.el.0;
+        el.value_invmod_shifted = ((value as u128) << 64) / self.base.get_ring().modulus_u64() as u128;
+    }
+
+    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element {
+        let mut result = ZnFastmulEl {
+            el: el,
+            value_invmod_shifted: 0
+        };
+        self.postprocess_delegate_mut(&mut result);
+        return result;
+    }
+}
+
+impl CanonicalHom<ZnBase> for ZnFastmulBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
+        if from == self.base.get_ring() {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn map_in(&self, _from: &ZnBase, el: <ZnBase as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
+        self.rev_delegate(el)
+    }
+}
+
+impl CanonicalHom<ZnFastmulBase> for ZnBase {
+
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, from: &ZnFastmulBase) -> Option<Self::Homomorphism> {
+        if self == from.base.get_ring() {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn map_in(&self, _from: &ZnFastmulBase, el: <ZnFastmulBase as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
+        el.el
+    }
+
+    fn mul_assign_map_in(&self, _from: &ZnFastmulBase, lhs: &mut Self::Element, rhs: <ZnFastmulBase as RingBase>::Element, _hom: &Self::Homomorphism) {
+        debug_assert!(lhs.0 <= 2 * self.repr_bound());
+        let lhs_original = lhs.0;
+        let product = mullo(lhs.0, rhs.el.0);
+        let approx_quotient = mullo(lhs.0, high(rhs.value_invmod_shifted)).wrapping_add(mulhi(lhs.0, low(rhs.value_invmod_shifted)));
+        lhs.0 = product.wrapping_sub(mullo(approx_quotient, self.modulus_u64()));
+        debug_assert!(lhs.0 < self.repr_bound());
+        debug_assert!((lhs_original as u128 * rhs.el.0 as u128 - lhs.0 as u128) % (self.modulus_u64() as u128) == 0);
+    }
+
+    fn mul_assign_map_in_ref(&self, from: &ZnFastmulBase, lhs: &mut Self::Element, rhs: &<ZnFastmulBase as RingBase>::Element, hom: &Self::Homomorphism) {
+        self.mul_assign_map_in(from, lhs, *rhs, hom);
+    }
+}
+
+impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
+
+    #[inline(always)]
+    fn butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, from: &ZnFastmulBase, hom: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
+        let a = *values.at(i1);
+        let mut b = *values.at(i2);
+        self.mul_assign_map_in_ref(from, &mut b, twiddle, hom);
+
+        // this is implied by `bounded_reduce`, check anyway
+        debug_assert!(b.0 < self.modulus_u64() * 3);
+        debug_assert!(self.repr_bound() >= self.modulus_u64() * 3);
+
+        *values.at_mut(i1) = self.add(a, b);
+        *values.at_mut(i2) = self.sub(a, b);
+    }
+
+    #[inline(always)]
+    fn inv_butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, from: &ZnFastmulBase, hom: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
+        let a = *values.at(i1);
+        let b = *values.at(i2);
+
+        *values.at_mut(i1) = self.add(a, b);
+        // this works, as mul_assign_map_in_ref() works with values up to 6 * self.modulus
+        *values.at_mut(i2) = ZnEl(a.0 + 3 * self.modulus_u64() - b.0);
+        self.mul_assign_map_in_ref(from, values.at_mut(i2), twiddle, hom);
+    }
+}
+
+impl<I: ?Sized + IntegerRing> CanonicalHom<I> for ZnFastmulBase 
+    where ZnBase: CanonicalHom<I>
+{
+    type Homomorphism = <ZnBase as CanonicalHom<I>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
+        self.base.get_ring().has_canonical_hom(from)
+    }
+
+    fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.rev_delegate(self.base.get_ring().map_in(from, el, hom))
+    }
+}
+
 #[cfg(test)]
 fn elements<'a>(ring: &'a Zn) -> impl 'a + Iterator<Item = El<Zn>> {
     (0..63).map(|i| ring.coerce(&ZZ, 1 << i))
@@ -473,5 +649,19 @@ fn test_finite_ring_axioms() {
     for n in [2, 5, 7, 17] {
         let Zn = Zn::new(n);
         super::generic_tests::test_zn_axioms(&Zn);
+    }
+}
+
+#[test]
+fn test_hom_from_fastmul() {
+    for n in [2, 5, 7, 17] {
+        let Zn = Zn::new(n);
+        let Zn_fastmul = ZnFastmul::new(Zn);
+        crate::ring::generic_tests::test_hom_axioms(Zn_fastmul, Zn, Zn.elements().map(|x| Zn_fastmul.coerce(&Zn, x)));
+    }
+    for n in [(1 << 41) - 1, (1 << 42) - 1, (1 << 58) - 1, (1 << 58) + 1, (3 << 57) - 1, (3 << 57) + 1] {
+        let Zn = Zn::new(n);
+        let Zn_fastmul = ZnFastmul::new(Zn);
+        crate::ring::generic_tests::test_hom_axioms(Zn_fastmul, Zn, elements(&Zn).map(|x| Zn_fastmul.coerce(&Zn, x)));
     }
 }
