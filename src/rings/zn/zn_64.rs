@@ -73,6 +73,7 @@ fn mullo(lhs: u64, rhs: u64) -> u64 {
 #[derive(Clone, Copy)]
 pub struct ZnBase {
     modulus: i64,
+    modulus_times_three: u64,
     inv_modulus: u128
 }
 
@@ -98,7 +99,8 @@ impl ZnBase {
         };
         Self {
             modulus: modulus as i64,
-            inv_modulus: inv_modulus
+            inv_modulus: inv_modulus,
+            modulus_times_three: modulus * 3
         }
     }
 
@@ -107,36 +109,41 @@ impl ZnBase {
     }
 
     fn repr_bound(&self) -> u64 {
-        self.modulus_u64() * 3
+        self.modulus_u64() * 6
     }
 
     ///
-    /// If input is bounded by `4 * self.repr_bound() * self.repr_bound()`, then the output
+    /// If input is bounded by `self.repr_bound() * self.repr_bound()`, then the output
     /// is `< 3 * modulus` and congruent to the input.
     /// 
     fn bounded_reduce(&self, value: u128) -> u64 {
-        debug_assert!(value <= 4 * self.repr_bound() as u128 * self.repr_bound() as u128);
+        debug_assert!(value <= self.repr_bound() as u128 * self.repr_bound() as u128);
         let (in_low, in_high) = (low(value), high(value));
         let (invmod_low, invmod_high) = (low(self.inv_modulus), high(self.inv_modulus));
         // we ignore the lowest part of the sum, causing an error of at most 1;
         // we also assume that `repr_bound * repr_bound * inv_modulus` fits into 192 bit
         let approx_quotient = mulhi(in_low, invmod_high) + mulhi(in_high, invmod_low) + mullo(in_high, invmod_high);
         let result = low(value).wrapping_sub(mullo(approx_quotient, self.modulus_u64()));
-        debug_assert!(result < self.repr_bound());
+        debug_assert!(result < self.modulus_times_three);
         debug_assert!((value - result as u128) % (self.modulus_u64() as u128) == 0);
         return result;
     }
 
-    fn potential_reduce(&self, value: u64) -> u64 {
-        if value > self.repr_bound() {
-            value - self.repr_bound()
-        } else {
-            value
+    fn potential_reduce(&self, mut value: u64) -> u64 {
+        if std::intrinsics::unlikely(value >= self.repr_bound()) {
+            value -= self.repr_bound();
         }
+        if value >= self.modulus_times_three {
+            value -= self.modulus_times_three;
+        }
+        return value;
     }
 
     fn complete_reduce(&self, mut value: u64) -> u64 {
         debug_assert!(value <= self.repr_bound());
+        if value >= 4 * self.modulus_u64() {
+            value -= 4 * self.modulus_u64();
+        }
         if value >= 2 * self.modulus_u64() {
             value -= 2 * self.modulus_u64();
         }
@@ -548,12 +555,12 @@ impl CanonicalHom<ZnFastmulBase> for ZnBase {
     }
 
     fn mul_assign_map_in(&self, _from: &ZnFastmulBase, lhs: &mut Self::Element, rhs: <ZnFastmulBase as RingBase>::Element, _hom: &Self::Homomorphism) {
-        debug_assert!(lhs.0 <= 2 * self.repr_bound());
+        debug_assert!(lhs.0 <= self.repr_bound());
         let lhs_original = lhs.0;
         let product = mullo(lhs.0, rhs.el.0);
         let approx_quotient = mullo(lhs.0, high(rhs.value_invmod_shifted)).wrapping_add(mulhi(lhs.0, low(rhs.value_invmod_shifted)));
         lhs.0 = product.wrapping_sub(mullo(approx_quotient, self.modulus_u64()));
-        debug_assert!(lhs.0 < self.repr_bound());
+        debug_assert!(lhs.0 < self.modulus_times_three);
         debug_assert!((lhs_original as u128 * rhs.el.0 as u128 - lhs.0 as u128) % (self.modulus_u64() as u128) == 0);
     }
 
@@ -566,16 +573,20 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
 
     #[inline(always)]
     fn butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, from: &ZnFastmulBase, hom: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
-        let a = *values.at(i1);
+        let mut a = *values.at(i1);
+        if a.0 >= self.modulus_times_three {
+            a.0 -= self.modulus_times_three;
+        }
         let mut b = *values.at(i2);
         self.mul_assign_map_in_ref(from, &mut b, twiddle, hom);
 
         // this is implied by `bounded_reduce`, check anyway
-        debug_assert!(b.0 < self.modulus_u64() * 3);
-        debug_assert!(self.repr_bound() >= self.modulus_u64() * 3);
+        debug_assert!(a.0 <= self.modulus_times_three);
+        debug_assert!(b.0 < self.modulus_times_three);
+        debug_assert!(self.repr_bound() >= self.modulus_u64() * 6);
 
-        *values.at_mut(i1) = self.add(a, b);
-        *values.at_mut(i2) = self.sub(a, b);
+        *values.at_mut(i1) = ZnEl(a.0 + b.0);
+        *values.at_mut(i2) = ZnEl(a.0 + self.modulus_times_three - b.0);
     }
 
     #[inline(always)]
@@ -585,7 +596,7 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
 
         *values.at_mut(i1) = self.add(a, b);
         // this works, as mul_assign_map_in_ref() works with values up to 6 * self.modulus
-        *values.at_mut(i2) = ZnEl(a.0 + 3 * self.modulus_u64() - b.0);
+        *values.at_mut(i2) = ZnEl(a.0 + self.modulus_times_three - b.0);
         self.mul_assign_map_in_ref(from, values.at_mut(i2), twiddle, hom);
     }
 }
