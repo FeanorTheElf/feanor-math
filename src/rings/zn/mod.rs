@@ -254,13 +254,13 @@ pub trait ZnOperation {
 }
 
 #[macro_export]
-macro_rules! zn_op {
-    (< $({$gen_param:tt $(: $($gen_constraint:tt)*)?}),* > [$args:ident: $args_type:ty = $args_expr:expr] $lambda:expr) => {
+macro_rules! generate_zn_function {
+    (< $({$gen_param:tt $(: $($gen_constraint:tt)*)?}),* > $bindings:tt $lambda:expr) => {
         {
             struct LocalZnOperation<$($gen_param),*> 
                 where $($($gen_param: $($gen_constraint)*,)?)*
             {
-                args: $args_type
+                args: $crate::generate_binding_type!{ $bindings }
             }
 
             impl<$($gen_param),*>  $crate::rings::zn::ZnOperation for LocalZnOperation<$($gen_param),*> 
@@ -274,7 +274,7 @@ macro_rules! zn_op {
                 } 
             }
 
-            LocalZnOperation { args: $args_expr }
+            LocalZnOperation { args: $crate::generate_binding_value!($bindings) }
         }
     };
 }

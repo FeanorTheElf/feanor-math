@@ -5,7 +5,7 @@ use crate::rings::zn::ZnRing;
 use crate::primitive_int::*;
 use crate::rings::zn::ZnRingStore;
 use crate::rings::zn::choose_zn_impl;
-use crate::zn_op;
+use crate::generate_zn_function;
 
 use oorandom;
 
@@ -28,9 +28,16 @@ pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
     } else {
         let mut result = false;
         let n_copy = ZZ.clone_el(n);
-        choose_zn_impl(ZZ, n_copy, zn_op!{ <{'a}> [args: (&'a mut bool, usize) = (&mut result, k)] |ring, (result, k): (&mut bool, usize)| {
-            *result = is_prime_base(ring, k);
-        } });
+        choose_zn_impl(
+            ZZ, 
+            n_copy, 
+            generate_zn_function!{ 
+                <{'a}> [_: &'a mut bool = &mut result, _: usize = k] 
+                |ring, (result, k): (&mut bool, usize)| {
+                    *result = is_prime_base(ring, k);
+                }
+            }
+        );
         return result;
     }
 }

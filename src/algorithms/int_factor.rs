@@ -4,12 +4,11 @@ use crate::ordered::OrderedRing;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::primitive_int::StaticRingBase;
-use crate::rings::zn::*;
 use crate::ring::*;
 use crate::integer::*;
 use crate::algorithms;
 use crate::rings::zn::choose_zn_impl;
-use crate::zn_op;
+use crate::generate_zn_function;
 
 fn is_power<I: IntegerRingStore>(ZZ: &I, n: &El<I>) -> Option<(El<I>, usize)>
     where I::Type: IntegerRing
@@ -86,11 +85,13 @@ pub fn factor<I>(ZZ: &I, mut n: El<I>) -> Vec<(El<I>, usize)>
     choose_zn_impl(
         ZZ, 
         ZZ.clone_el(&n), 
-        zn_op!{ 
+        generate_zn_function!{ 
             <{'a}, {I: IntegerRingStore<Type = J>}, {J: ?Sized + IntegerRing}> 
-            [args: (&'a mut Option<El<I>>, &'a I) = (&mut m, ZZ)] 
+            [_: &'a mut Option<El<I>> = &mut m, _: &'a I = ZZ] 
             |ring, (result, ZZ): (&mut Option<El<I>>, &I)| {
-                *result = Some(int_cast(lenstra_ec_factor::<&R>(&ring), ZZ, ring.integer_ring()));
+                *result = Some(int_cast(
+                    lenstra_ec_factor::<&R>(&ring), ZZ, ring.integer_ring()
+                ));
             }
         }
     );

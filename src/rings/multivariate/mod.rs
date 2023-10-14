@@ -254,7 +254,10 @@ pub trait MonomialOrder {
 
     fn is_graded(&self) -> bool;
     fn cmp<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering;
-    fn is_same<O: ?Sized + MonomialOrder>(&self, other: &O) -> bool;
+
+    fn is_same<O: ?Sized + MonomialOrder>(&self, _other: &O) -> bool {
+        type_eq::<Self, O>()
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -284,10 +287,6 @@ impl MonomialOrder for DegRevLex {
             return Ordering::Equal;
         }
     }
-
-    fn is_same<O: ?Sized + MonomialOrder>(&self, _: &O) -> bool {
-        type_eq::<Self, O>()
-    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -308,10 +307,6 @@ impl MonomialOrder for Lex {
             }
         }
         return Ordering::Equal;
-    }
-
-    fn is_same<O: ?Sized + MonomialOrder>(&self, _: &O) -> bool {
-        type_eq::<Self, O>()
     }
 }
 

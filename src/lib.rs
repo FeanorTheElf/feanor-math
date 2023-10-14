@@ -8,6 +8,8 @@
 #![feature(new_uninit)] 
 #![feature(core_intrinsics)]
 #![feature(const_type_name)]
+#![feature(fn_traits)]
+#![feature(unboxed_closures)]
 
 #![doc = include_str!("../Readme.md")]
 
@@ -15,6 +17,7 @@ extern crate test;
 extern crate libc;
 extern crate oorandom;
 
+pub mod named_closure;
 ///
 /// Struct that may be used to refer to a generic computation.
 /// Use it together with [`Exists`] to ensure that a const generic
