@@ -7,7 +7,7 @@ use crate::vector::VectorViewMut;
 
 use super::*;
 
-pub struct MultivariatePolyRingBaseImpl<R, O, M, const N: usize>
+pub struct MultivariatePolyRingImplBase<R, O, M, const N: usize>
     where R: RingStore,
         O: MonomialOrder,
         M: GrowableMemoryProvider<(El<R>, Monomial<[MonomialExponent; N]>)>
@@ -18,20 +18,28 @@ pub struct MultivariatePolyRingBaseImpl<R, O, M, const N: usize>
     zero: El<R>
 }
 
-impl<R, O, M, const N: usize> MultivariatePolyRingBaseImpl<R, O, M, N>
+pub type MultivariatePolyRingImpl<R, O, M, const N: usize> = RingValue<MultivariatePolyRingImplBase<R, O, M, N>>;
+
+impl<R, O, M, const N: usize> MultivariatePolyRingImpl<R, O, M, N>
     where R: RingStore,
         O: MonomialOrder,
         M: GrowableMemoryProvider<(El<R>, Monomial<[MonomialExponent; N]>)>
 {
     pub fn new(base_ring: R, monomial_order: O, memory_provider: M) -> Self {
-        Self {
+        RingValue::from(MultivariatePolyRingImplBase {
             zero: base_ring.zero(),
             base_ring,
             memory_provider: memory_provider,
             order: monomial_order
-        }
+        })
     }
+}
 
+impl<R, O, M, const N: usize> MultivariatePolyRingImplBase<R, O, M, N>
+    where R: RingStore,
+        O: MonomialOrder,
+        M: GrowableMemoryProvider<(El<R>, Monomial<[MonomialExponent; N]>)>
+{
     fn is_valid(&self, el: &<Self as RingBase>::Element) -> bool {
         for i in 1..el.len() {
             if self.order.cmp(&el.at(i - 1).1, &el.at(i).1) != Ordering::Less {
@@ -111,7 +119,7 @@ impl<R, O, M, const N: usize> MultivariatePolyRingBaseImpl<R, O, M, N>
     }
 }
 
-impl<R, O, M, const N: usize> PartialEq for MultivariatePolyRingBaseImpl<R, O, M, N>
+impl<R, O, M, const N: usize> PartialEq for MultivariatePolyRingImplBase<R, O, M, N>
     where R: RingStore,
         O: MonomialOrder,
         M: GrowableMemoryProvider<(El<R>, Monomial<[MonomialExponent; N]>)>
@@ -121,7 +129,7 @@ impl<R, O, M, const N: usize> PartialEq for MultivariatePolyRingBaseImpl<R, O, M
     }
 }
 
-impl<R, O, M, const N: usize> RingBase for MultivariatePolyRingBaseImpl<R, O, M, N>
+impl<R, O, M, const N: usize> RingBase for MultivariatePolyRingImplBase<R, O, M, N>
     where R: RingStore,
         O: MonomialOrder,
         M: GrowableMemoryProvider<(El<R>, Monomial<[MonomialExponent; N]>)>
@@ -236,7 +244,7 @@ impl<R, O, M, const N: usize> RingBase for MultivariatePolyRingBaseImpl<R, O, M,
 }
 
 
-impl<R, O, M, const N: usize> RingExtension for MultivariatePolyRingBaseImpl<R, O, M, N>
+impl<R, O, M, const N: usize> RingExtension for MultivariatePolyRingImplBase<R, O, M, N>
     where R: RingStore,
         O: MonomialOrder,
         M: GrowableMemoryProvider<(El<R>, Monomial<[MonomialExponent; N]>)>
@@ -264,7 +272,7 @@ impl<R, O, M, const N: usize> RingExtension for MultivariatePolyRingBaseImpl<R, 
     }
 }
 
-impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalHom<MultivariatePolyRingBaseImpl<R2, O2, M2, N2>> for MultivariatePolyRingBaseImpl<R1, O1, M1, N1>
+impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalHom<MultivariatePolyRingImplBase<R2, O2, M2, N2>> for MultivariatePolyRingImplBase<R1, O1, M1, N1>
     where R1: RingStore,
         O1: MonomialOrder,
         M1: GrowableMemoryProvider<(El<R1>, Monomial<[MonomialExponent; N1]>)>,
@@ -275,7 +283,7 @@ impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalHom<Mult
 {
     type Homomorphism = <R1::Type as CanonicalHom<R2::Type>>::Homomorphism;
 
-    fn has_canonical_hom(&self, from: &MultivariatePolyRingBaseImpl<R2, O2, M2, N2>) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &MultivariatePolyRingImplBase<R2, O2, M2, N2>) -> Option<Self::Homomorphism> {
         if N1 >= N2 {
             self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
         } else {
@@ -283,7 +291,7 @@ impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalHom<Mult
         }
     }
 
-    default fn map_in_ref(&self, from: &MultivariatePolyRingBaseImpl<R2, O2, M2, N2>, el: &<MultivariatePolyRingBaseImpl<R2, O2, M2, N2> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+    default fn map_in_ref(&self, from: &MultivariatePolyRingImplBase<R2, O2, M2, N2>, el: &<MultivariatePolyRingImplBase<R2, O2, M2, N2> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         let mut result = self.memory_provider.get_new_init(el.len(), |i| (
             self.base_ring.get_ring().map_in_ref(from.base_ring().get_ring(), &el.at(i).0, hom), 
             Monomial::new(std::array::from_fn(|j| el.at(i).1[j] ))
@@ -292,12 +300,12 @@ impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalHom<Mult
         return result;
     }
 
-    default fn map_in(&self, from: &MultivariatePolyRingBaseImpl<R2, O2, M2, N2>, el: <MultivariatePolyRingBaseImpl<R2, O2, M2, N2> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+    default fn map_in(&self, from: &MultivariatePolyRingImplBase<R2, O2, M2, N2>, el: <MultivariatePolyRingImplBase<R2, O2, M2, N2> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         self.map_in_ref(from, &el, hom)
     }
 }
 
-impl<R1, O, M1, R2, M2, const N: usize> CanonicalHom<MultivariatePolyRingBaseImpl<R2, O, M2, N>> for MultivariatePolyRingBaseImpl<R1, O, M1, N>
+impl<R1, O, M1, R2, M2, const N: usize> CanonicalHom<MultivariatePolyRingImplBase<R2, O, M2, N>> for MultivariatePolyRingImplBase<R1, O, M1, N>
     where R1: RingStore,
         O: MonomialOrder + PartialEq,
         M1: GrowableMemoryProvider<(El<R1>, Monomial<[MonomialExponent; N]>)>,
@@ -305,7 +313,7 @@ impl<R1, O, M1, R2, M2, const N: usize> CanonicalHom<MultivariatePolyRingBaseImp
         M2: GrowableMemoryProvider<(El<R2>, Monomial<[MonomialExponent; N]>)>,
         R1::Type: CanonicalHom<R2::Type>
 {
-    fn map_in_ref(&self, from: &MultivariatePolyRingBaseImpl<R2, O, M2, N>, el: &<MultivariatePolyRingBaseImpl<R2, O, M2, N> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in_ref(&self, from: &MultivariatePolyRingImplBase<R2, O, M2, N>, el: &<MultivariatePolyRingImplBase<R2, O, M2, N> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         let mut result = self.memory_provider.get_new_init(el.len(), |i| (self.base_ring.get_ring().map_in_ref(from.base_ring().get_ring(), &el.at(i).0, hom), el.at(i).1));
         if self.order != from.order {
             result.sort_by(|l, r| self.order.cmp(&l.1, &r.1));
@@ -313,12 +321,12 @@ impl<R1, O, M1, R2, M2, const N: usize> CanonicalHom<MultivariatePolyRingBaseImp
         return result;
     }
 
-    fn map_in(&self, from: &MultivariatePolyRingBaseImpl<R2, O, M2, N>, el: <MultivariatePolyRingBaseImpl<R2, O, M2, N> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &MultivariatePolyRingImplBase<R2, O, M2, N>, el: <MultivariatePolyRingImplBase<R2, O, M2, N> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         self.map_in_ref(from, &el, hom)
     }
 }
 
-impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalIso<MultivariatePolyRingBaseImpl<R2, O2, M2, N2>> for MultivariatePolyRingBaseImpl<R1, O1, M1, N1>
+impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalIso<MultivariatePolyRingImplBase<R2, O2, M2, N2>> for MultivariatePolyRingImplBase<R1, O1, M1, N1>
     where R1: RingStore,
         O1: MonomialOrder,
         M1: GrowableMemoryProvider<(El<R1>, Monomial<[MonomialExponent; N1]>)>,
@@ -329,7 +337,7 @@ impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalIso<Mult
 {
     type Isomorphism = <R1::Type as CanonicalIso<R2::Type>>::Isomorphism;
 
-    fn has_canonical_iso(&self, from: &MultivariatePolyRingBaseImpl<R2, O2, M2, N2>) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, from: &MultivariatePolyRingImplBase<R2, O2, M2, N2>) -> Option<Self::Isomorphism> {
         if N1 == N2 {
             self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
         } else {
@@ -337,7 +345,7 @@ impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalIso<Mult
         }
     }
 
-    default fn map_out(&self, from: &MultivariatePolyRingBaseImpl<R2, O2, M2, N2>, el: Self::Element, iso: &Self::Isomorphism) -> <MultivariatePolyRingBaseImpl<R2, O2, M2, N2> as RingBase>::Element {
+    default fn map_out(&self, from: &MultivariatePolyRingImplBase<R2, O2, M2, N2>, el: Self::Element, iso: &Self::Isomorphism) -> <MultivariatePolyRingImplBase<R2, O2, M2, N2> as RingBase>::Element {
         let mut result = from.memory_provider.get_new_init(el.len(), |i| (
             self.base_ring.get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(&el.at(i).0), iso), 
             Monomial::new(std::array::from_fn(|j| el.at(i).1[j] ))
@@ -347,7 +355,7 @@ impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalIso<Mult
     }
 }
 
-impl<R1, O, M1, R2, M2, const N: usize> CanonicalIso<MultivariatePolyRingBaseImpl<R2, O, M2, N>> for MultivariatePolyRingBaseImpl<R1, O, M1, N>
+impl<R1, O, M1, R2, M2, const N: usize> CanonicalIso<MultivariatePolyRingImplBase<R2, O, M2, N>> for MultivariatePolyRingImplBase<R1, O, M1, N>
     where R1: RingStore,
         O: MonomialOrder + PartialEq,
         M1: GrowableMemoryProvider<(El<R1>, Monomial<[MonomialExponent; N]>)>,
@@ -355,7 +363,7 @@ impl<R1, O, M1, R2, M2, const N: usize> CanonicalIso<MultivariatePolyRingBaseImp
         M2: GrowableMemoryProvider<(El<R2>, Monomial<[MonomialExponent; N]>)>,
         R1::Type: CanonicalIso<R2::Type>
 {
-    fn map_out(&self, from: &MultivariatePolyRingBaseImpl<R2, O, M2, N>, el: Self::Element, iso: &Self::Isomorphism) -> <MultivariatePolyRingBaseImpl<R2, O, M2, N> as RingBase>::Element {
+    fn map_out(&self, from: &MultivariatePolyRingImplBase<R2, O, M2, N>, el: Self::Element, iso: &Self::Isomorphism) -> <MultivariatePolyRingImplBase<R2, O, M2, N> as RingBase>::Element {
         let mut result = from.memory_provider.get_new_init(el.len(), |i| (
             self.base_ring.get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(&el.at(i).0), iso), 
             el.at(i).1
@@ -389,7 +397,7 @@ impl<'a, R, O, M, const N: usize> Iterator for MultivariatePolyRingBaseTermsIter
     }
 }
 
-impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingBaseImpl<R, O, M, N>
+impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplBase<R, O, M, N>
     where R: RingStore,
         O: MonomialOrder,
         M: GrowableMemoryProvider<(El<R>, Monomial<[MonomialExponent; N]>)>
@@ -461,7 +469,7 @@ use crate::default_memory_provider;
 
 #[test]
 fn test_add() {
-    let ring: RingValue<MultivariatePolyRingBaseImpl<_, _, _, 3>> = RingValue::from(MultivariatePolyRingBaseImpl::new(StaticRing::<i64>::RING, Lex, default_memory_provider!()));
+    let ring: MultivariatePolyRingImpl<_, _, _, 3> = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, Lex, default_memory_provider!());
     let lhs = ring.from_terms([
         (1, &Monomial::new([1, 0, 0]))
     ].into_iter());
@@ -505,7 +513,7 @@ fn test_add() {
 }
 
 #[cfg(test)]
-fn edge_case_elements<'a, M: GrowableMemoryProvider<(i64, Monomial<[MonomialExponent; 3]>)>>(ring: &'a RingValue<MultivariatePolyRingBaseImpl<StaticRing<i64>, DegRevLex, M, 3>>) -> impl 'a + Iterator<Item = <MultivariatePolyRingBaseImpl<StaticRing<i64>, DegRevLex, M, 3> as RingBase>::Element> {
+fn edge_case_elements<'a, M: GrowableMemoryProvider<(i64, Monomial<[MonomialExponent; 3]>)>>(ring: &'a RingValue<MultivariatePolyRingImplBase<StaticRing<i64>, DegRevLex, M, 3>>) -> impl 'a + Iterator<Item = <MultivariatePolyRingImplBase<StaticRing<i64>, DegRevLex, M, 3> as RingBase>::Element> {
     let mut result = vec![];
     let monomials = [
         Monomial::new([1, 0, 0]),
@@ -527,6 +535,6 @@ fn edge_case_elements<'a, M: GrowableMemoryProvider<(i64, Monomial<[MonomialExpo
 
 #[test]
 fn test_ring_axioms() {
-    let ring = RingValue::from(MultivariatePolyRingBaseImpl::new(StaticRing::<i64>::RING, DegRevLex, default_memory_provider!()));
+    let ring = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, DegRevLex, default_memory_provider!());
     generic_tests::test_ring_axioms(&ring, edge_case_elements(&ring));
 }

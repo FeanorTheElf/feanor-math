@@ -228,6 +228,27 @@ impl<F: FieldStore> SparseBaseMatrix<F>
         return result;
     }
 
+    pub fn add_column(&mut self, j: usize) {
+        assert!(j <= self.col_count);
+        self.col_permutation.insert(self.col_count - j, self.col_count);
+        self.col_permutation_inv.push(0);
+        for j2 in (self.col_count - j)..self.col_count {
+            self.col_permutation_inv[self.col_permutation[j2]] = j2;
+        }
+        self.col_count += 1;
+    }
+
+    pub fn add_row(&mut self, i: usize) {
+        self.rows.insert(self.row_count - i, Vec::new());
+        self.row_count += 1;
+    }
+
+    pub fn set(&mut self, i: usize, j: usize, value: El<F>) {
+        if !self.field.is_zero(&value) {
+            let mut row = &mut self.rows[i];
+        }
+    }
+
     fn global_row_index(&self, i: usize) -> usize {
         self.row_count - i - 1
     }

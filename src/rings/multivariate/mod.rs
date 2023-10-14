@@ -7,7 +7,7 @@ use std::cmp::{min, max};
 use crate::{ring::*, type_eq};
 use crate::vector::{VectorView, VectorViewMut};
 
-pub mod vec_based;
+pub mod ordered;
 
 type MonomialExponent = u16;
 
@@ -125,6 +125,11 @@ impl<V: VectorView<MonomialExponent>> Monomial<V> {
         self.exponents
     }
 
+    pub fn divides(&self, rhs: &Self) -> bool {
+        assert_eq!(self.exponents.len(), rhs.exponents.len());
+        (0..self.exponents.len()).all(|i| *self.exponents.at(i) <= *rhs.exponents.at(i))
+    }
+
     pub fn is_coprime(&self, rhs: &Self) -> bool {
         assert_eq!(self.exponents.len(), rhs.exponents.len());
         (0..self.exponents.len()).all(|i| *self.exponents.at(i) == 0 || *rhs.exponents.at(i) == 0)
@@ -132,6 +137,26 @@ impl<V: VectorView<MonomialExponent>> Monomial<V> {
 }
 
 impl<V: VectorViewMut<MonomialExponent>> Monomial<V> {
+
+    pub fn gcd(mut self, rhs: &Self) -> Self {
+        self.gcd_assign(rhs);
+        self
+    }
+
+    pub fn lcm(mut self, rhs: &Self) -> Self {
+        self.lcm_assign(rhs);
+        self
+    }
+
+    pub fn mul(mut self, rhs: &Self) -> Self {
+        self.mul_assign(rhs);
+        self
+    }
+
+    pub fn div(mut self, rhs: &Self) -> Self {
+        self.div_assign(rhs);
+        self
+    }
 
     pub fn gcd_assign(&mut self, rhs: &Self) {
         assert_eq!(self.len(), rhs.len());
@@ -206,14 +231,15 @@ impl<V: VectorViewMut<MonomialExponent> + Clone> Iterator for DividingMonomialIt
             *current.exponents.at_mut(self.monomial.len() - 1) = 0;
 
             // we did all combinations with the current number of elements, so increase element number by one
-            refill += 1;let mut j = 0;
+            refill += 1;
+            let mut j = 0;
 
             while refill > 0 && j < self.monomial.len() {
                 *current.exponents.at_mut(j) = min(refill, self.monomial[j]);
                 refill -= current[j];
                 j += 1;
             }
-            if j == self.monomial.len() {
+            if j == self.monomial.len() && refill != 0 {
                 self.current = None;
             }
             return Some(result);
@@ -257,6 +283,59 @@ pub trait MonomialOrder {
 
     fn is_same<O: ?Sized + MonomialOrder>(&self, _other: &O) -> bool {
         type_eq::<Self, O>()
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct FixedOrderMonomial<V, O>
+    where V: VectorView<MonomialExponent>, O: MonomialOrder
+{
+    m: Monomial<V>,
+    order: O
+}
+
+impl<V, O> FixedOrderMonomial<V, O>
+    where V: VectorView<MonomialExponent>, O: MonomialOrder
+{
+    pub fn new(m: Monomial<V>, order: O) -> Self {
+        Self { m, order }
+    }
+
+    pub fn into(self) -> Monomial<V> {
+        self.m
+    }
+
+    pub fn order(&self) -> &O {
+        &self.order
+    }
+}
+
+impl<V, O> PartialEq for FixedOrderMonomial<V, O>
+    where V: VectorView<MonomialExponent>, O: MonomialOrder
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl<V, O> Eq for FixedOrderMonomial<V, O>
+    where V: VectorView<MonomialExponent>, O: MonomialOrder
+{}
+
+impl<V, O> PartialOrd for FixedOrderMonomial<V, O>
+    where V: VectorView<MonomialExponent>, O: MonomialOrder
+{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<V, O> Ord for FixedOrderMonomial<V, O>
+    where V: VectorView<MonomialExponent>, O: MonomialOrder
+{
+    fn cmp(&self, other: &Self) -> Ordering {
+        assert!(self.order().is_same(other.order()));
+        self.order.cmp(&self.m, &other.m)
     }
 }
 
