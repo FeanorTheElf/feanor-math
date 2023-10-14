@@ -1,10 +1,11 @@
 use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 use crate::integer::*;
-use crate::rings::zn;
 use crate::rings::zn::ZnRing;
 use crate::primitive_int::*;
 use crate::rings::zn::ZnRingStore;
+use crate::rings::zn::choose_zn_impl;
+use crate::zn_op;
 
 use oorandom;
 
@@ -24,11 +25,13 @@ pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
     assert!(ZZ.is_pos(n));
     if ZZ.is_zero(n) || ZZ.is_one(n) {
         false
-    } else if ZZ.abs_highest_set_bit(n).unwrap_or(0) < zn::zn_42::MAX_MODULUS_BITS as usize {
-        is_prime_base(zn::zn_42::Zn::new(ZZ.cast(&StaticRing::<i128>::RING, ZZ.clone_el(n)) as u64), k)
     } else {
-        let n_value = ZZ.clone_el(n);
-        is_prime_base(zn::zn_barett::Zn::new(ZZ, n_value), k)
+        let mut result = false;
+        let n_copy = ZZ.clone_el(n);
+        choose_zn_impl(ZZ, n_copy, zn_op!{ <{'a}> [args: (&'a mut bool, usize) = (&mut result, k)] |ring, (result, k): (&mut bool, usize)| {
+            *result = is_prime_base(ring, k);
+        } });
+        return result;
     }
 }
 

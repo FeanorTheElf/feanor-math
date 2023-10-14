@@ -440,6 +440,18 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingBaseI
             el.at_mut(i).1.mul_assign(m);
         }
     }
+
+    fn lm<'a, O2>(&'a self, f: &'a Self::Element, order: O2) -> Option<&'a Monomial<Self::MonomialVector>>
+        where O2: MonomialOrder
+    {
+        if f.len() == 0 {
+            return None;
+        } else if self.order.is_same(&order) {
+            return Some(&f.at(f.len() - 1).1);
+        } else {
+            return Some(&f.iter().max_by(|(_, ml), (_, mr)| order.cmp(ml, mr)).unwrap().1);
+        }
+    }
 }
 
 #[cfg(test)]

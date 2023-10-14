@@ -1,3 +1,4 @@
+use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::divisibility::DivisibilityRing;
 use crate::algorithms;
@@ -245,6 +246,50 @@ pub trait ZnRingStore: FiniteRingStore
 impl<R: RingStore> ZnRingStore for R
     where R::Type: ZnRing
 {}
+
+pub trait ZnOperation {
+    
+    fn call<R: ZnRingStore>(self, ring: R)
+        where R::Type: ZnRing;
+}
+
+#[macro_export]
+macro_rules! zn_op {
+    (< $({$gen_param:tt $(: $($gen_constraint:tt)*)?}),* > [$args:ident: $args_type:ty = $args_expr:expr] $lambda:expr) => {
+        {
+            struct LocalZnOperation<$($gen_param),*> 
+                where $($($gen_param: $($gen_constraint)*,)?)*
+            {
+                args: $args_type
+            }
+
+            impl<$($gen_param),*>  $crate::rings::zn::ZnOperation for LocalZnOperation<$($gen_param),*> 
+                where $($($gen_param: $($gen_constraint)*,)?)*
+            {
+                
+                fn call<R: $crate::rings::zn::ZnRingStore>(self, ring: R)
+                    where <R as $crate::ring::RingStore>::Type: $crate::rings::zn::ZnRing
+                {
+                    ($lambda)(ring, self.args);
+                } 
+            }
+
+            LocalZnOperation { args: $args_expr }
+        }
+    };
+}
+
+pub fn choose_zn_impl<I, F>(ZZ: I, n: El<I>, f: F)
+    where I: IntegerRingStore,
+        I::Type: IntegerRing,
+        F: ZnOperation
+{
+    if ZZ.abs_highest_set_bit(&n).unwrap_or(0) < 57 {
+        f.call(zn_64::Zn::new(StaticRing::<i64>::RING.coerce(&ZZ, n) as u64));
+    } else {
+        f.call(zn_barett::Zn::new(ZZ, n));
+    }
+}
 
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {

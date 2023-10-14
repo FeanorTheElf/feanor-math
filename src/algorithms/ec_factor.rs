@@ -1,18 +1,18 @@
 use crate::algorithms;
+use crate::divisibility::*;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
-use crate::primitive_int::StaticRingBase;
 use crate::ring::*;
 use crate::integer::*;
-use crate::rings::finite::FiniteRingStore;
-use crate::rings::zn::zn_barett::Zn;
+use crate::rings::zn::ZnRing;
+use crate::rings::zn::ZnRingStore;
 
 #[allow(type_alias_bounds)]
-type Point<I: IntegerRingStore> = (El<Zn<I>>, El<Zn<I>>, El<Zn<I>>);
+type Point<R> = (El<R>, El<R>, El<R>);
 
-fn ec_group_action_proj<I>(Zn: &Zn<I>, _A: &El<Zn<I>>, _B: &El<Zn<I>>, P: Point<I>, Q: &Point<I>) -> Point<I> 
-    where I: IntegerRingStore,
-        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+fn ec_group_action_proj<R>(Zn: &R, _A: &El<R>, _B: &El<R>, P: Point<R>, Q: &Point<R>) -> Point<R> 
+    where R: ZnRingStore,
+        R::Type: ZnRing
 {
     if Zn.is_zero(&Q.2) {
         return P;
@@ -47,9 +47,9 @@ fn ec_group_action_proj<I>(Zn: &Zn<I>, _A: &El<Zn<I>>, _B: &El<Zn<I>>, P: Point<
     );
 }
 
-fn ec_group_double_proj<I>(Zn: &Zn<I>, A: &El<Zn<I>>, _B: &El<Zn<I>>, P: &Point<I>) -> Point<I>
-    where I: IntegerRingStore,
-        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+fn ec_group_double_proj<R>(Zn: &R, A: &El<R>, _B: &El<R>, P: &Point<R>) -> Point<R>
+    where R: ZnRingStore,
+        R::Type: ZnRing
 {
     let (x, y, z) = P;
 
@@ -80,9 +80,11 @@ fn ec_group_double_proj<I>(Zn: &Zn<I>, A: &El<Zn<I>>, _B: &El<Zn<I>>, P: &Point<
     );
 }
 
-pub fn ec_mul_abort<I>(base: &Point<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, power: &El<I>, ZZ: &I, Zn: &Zn<I>) -> Point<I>
-    where I: IntegerRingStore,
-        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+pub fn ec_mul_abort<R, I>(base: &Point<R>, A: &El<R>, B: &El<R>, power: &El<I>, Zn: &R, ZZ: &I) -> Point<R>
+    where R: ZnRingStore,
+        R::Type: ZnRing,
+        I: IntegerRingStore,
+        I::Type: IntegerRing
 {
     if ZZ.is_zero(&power) {
         return (Zn.zero(), Zn.one(), Zn.zero());
@@ -106,9 +108,9 @@ pub fn ec_mul_abort<I>(base: &Point<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, power: &El
     return result;
 }
 
-fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &Point<I>) -> bool
-    where I: IntegerRingStore,
-        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+fn is_on_curve<R>(Zn: &R, A: &El<R>, B: &El<R>, P: &Point<R>) -> bool
+    where R: ZnRingStore,
+        R::Type: ZnRing
 {
     let (x, y, z) = &P;
     Zn.eq_el(
@@ -125,59 +127,64 @@ fn is_on_curve<I>(Zn: &Zn<I>, A: &El<Zn<I>>, B: &El<Zn<I>>, P: &Point<I>) -> boo
 ///
 /// Runtime `L_N(1/2, 1) = exp((1 + o(1)) ln(N)^1/2 lnln(N)^1/2)`
 /// 
-pub fn lenstra_ec_factor<I>(ZZ: I, N: &El<I>) -> El<I>
-    where I: IntegerRingStore,
-        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i128>> + CanonicalIso<StaticRingBase<i32>>
+pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::Integers>
+    where R: ZnRingStore + DivisibilityRingStore,
+        R::Type: ZnRing + DivisibilityRing
 {
-    assert!(algorithms::miller_rabin::is_prime(&ZZ, N, 6) == false);
-    assert!(ZZ.is_geq(N, &ZZ.from_int(100)));
-    let Nf = ZZ.to_float_approx(N);
+    assert!(algorithms::miller_rabin::is_prime_base(&Zn, 6) == false);
+    let ZZ = BigIntRing::RING;
+    assert!(ZZ.is_geq(&int_cast(Zn.integer_ring().clone_el(Zn.modulus()), ZZ, Zn.integer_ring()), &ZZ.from_int(100)));
+    let Nf = Zn.integer_ring().to_float_approx(Zn.modulus());
     // smoothness bound, choose L_N(1/2, 1/2)
     let B = (0.5 * Nf.ln().sqrt() * Nf.ln().ln().sqrt()).exp() as usize;
-    let primes = algorithms::erathostenes::enumerate_primes(&ZZ, &ZZ.coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, B as i128));
+    let primes = algorithms::erathostenes::enumerate_primes(&StaticRing::<i128>::RING, &(B as i128));
     let k = ZZ.prod(
         primes.iter()
-            .map(|p| (Nf.log2() / ZZ.to_float_approx(&p).log2(), p))
-            .map(|(e, p)| ZZ.pow(ZZ.clone_el(p), e as usize + 1))
+            .map(|p| (Nf.log2() / StaticRing::<i128>::RING.to_float_approx(&p).log2(), p))
+            .map(|(e, p)| ZZ.pow(int_cast(*p, ZZ, StaticRing::<i128>::RING), e as usize + 1))
     );
-    let Zn = Zn::new(&ZZ, ZZ.clone_el(&N));
-    let mut rng = oorandom::Rand64::new(ZZ.default_hash(N) as u128);
+    let mut rng = oorandom::Rand64::new(Zn.integer_ring().default_hash(Zn.modulus()) as u128);
     loop {
         let P = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()), Zn.one());
         let A = Zn.random_element(|| rng.rand_u64());
         let B = Zn.sub(Zn.mul_ref(&P.1, &P.1), Zn.add(Zn.pow(Zn.clone_el(&P.0), 3), Zn.mul_ref(&A, &P.0)));
         debug_assert!(is_on_curve(&Zn, &A, &B, &P));
-        let result = ec_mul_abort(&P, &A, &B, &k, &&ZZ, &Zn);
-        if let Err(factor) = Zn.get_ring().invert(result.2) {
-            return factor;
+        let result = ec_mul_abort(&P, &A, &B, &k, &Zn, &ZZ);
+        let possible_factor = algorithms::eea::gcd(Zn.smallest_positive_lift(result.2), Zn.integer_ring().clone_el(Zn.modulus()), Zn.integer_ring());
+        if !Zn.integer_ring().is_unit(&possible_factor) {
+            return possible_factor;
         }
     }
 }
 
 #[cfg(test)]
-use crate::divisibility::DivisibilityRingStore;
-#[cfg(test)]
-use crate::integer::BigIntRing;
+use crate::rings::zn::zn_64::Zn;
 
 #[test]
 fn test_ec_factor() {
     let n = 11 * 17;
-    let actual = lenstra_ec_factor(StaticRing::<i64>::RING, &n);
+    let actual = lenstra_ec_factor(Zn::new(n as u64));
     assert!(actual != 1 && actual != n && n % actual == 0);
     
     let n = 23 * 59 * 113;
-    let actual = lenstra_ec_factor(StaticRing::<i128>::RING, &n);
+    let actual = lenstra_ec_factor(Zn::new(n as u64));
     assert!(actual != 1 && actual != n && n % actual == 0);
 }
 
-#[bench]
-fn bench_ec_factor(bencher: &mut test::Bencher) {
-    let ZZ = BigIntRing::RING;
+#[test]
+#[ignore]
+fn test_perf_ec_factor() {
+    let ZZ = StaticRing::<i64>::RING;
     let mut n = ZZ.one();
-    ZZ.mul_pow_2(&mut n, 48);
+    let bits = 60;
+    ZZ.mul_pow_2(&mut n, bits);
     ZZ.add_assign(&mut n, ZZ.one());
-    bencher.iter(|| {
-        let p = lenstra_ec_factor(ZZ, &n);
+
+    let start = std::time::Instant::now();
+    {
+        let p = lenstra_ec_factor(Zn::new(n as u64));
         assert!(ZZ.checked_div(&n, &p).is_some());
-    });
+    };
+    let end = std::time::Instant::now();
+    println!("Found factor of {} bit number in {} ms", bits, (start - end).as_millis());
 }

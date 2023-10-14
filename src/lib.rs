@@ -12,7 +12,6 @@
 #![doc = include_str!("../Readme.md")]
 
 extern crate test;
-extern crate cxx;
 extern crate libc;
 extern crate oorandom;
 
@@ -125,3 +124,23 @@ pub mod rings;
 /// ```
 /// 
 pub mod wrapper;
+
+pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
+    // Helper trait. `VALUE` is false, except for the specialization of the
+    // case where `T == U`.
+    trait TypeEq<U: ?Sized> {
+        const VALUE: bool;
+    }
+
+    // Default implementation.
+    impl<T: ?Sized, U: ?Sized> TypeEq<U> for T {
+        default const VALUE: bool = false;
+    }
+
+    // Specialization for `T == U`.
+    impl<T: ?Sized> TypeEq<T> for T {
+        const VALUE: bool = true;
+    }
+
+    <T as TypeEq<U>>::VALUE
+}

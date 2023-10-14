@@ -450,7 +450,7 @@ pub fn sparse_row_echelon<F>(mut A: SparseWorkMatrix<F>)
         F::Type: Field
 {
     let field = A.base_field().clone();
-    if let Some(pivot_i) = (0..A.row_count()).filter(|i| A.nonzero_entries_in_row(*i) > 0).min_by_key(|i| A.nonzero_entries_in_row(*i)) {
+    while let Some(pivot_i) = (0..A.row_count()).filter(|i| A.nonzero_entries_in_row(*i) > 0).min_by_key(|i| A.nonzero_entries_in_row(*i)) {
         
         A.swap_rows(0, pivot_i);
 
@@ -466,9 +466,7 @@ pub fn sparse_row_echelon<F>(mut A: SparseWorkMatrix<F>)
             }
         }
     
-        sparse_row_echelon(A.into_lower_right_submatrix());
-    } else {
-        // we are left with the zero matrix
+        A = A.into_lower_right_submatrix();
     }
 }
 
@@ -700,9 +698,9 @@ fn test_sparse_row_echelon() {
 #[ignore]
 fn test_perf_sparse_row_echelon() {
     let field = Zn::<17>::RING;
-    let row_count = 20000;
-    let col_count = 10000;
-    let row_entries = 10;
+    let row_count = 10000;
+    let col_count = 6000;
+    let row_entries = 8;
     let mut rand = oorandom::Rand32::from_state((1, 1));
     let base = SparseBaseMatrix::new(field, row_count, col_count, (0..row_count).flat_map(|i| {
         let mut entries = (0..row_entries).map(|_| rand.rand_u32() as usize % col_count).collect::<Vec<_>>();
@@ -718,5 +716,5 @@ fn test_perf_sparse_row_echelon() {
         std::hint::black_box(current_base);
     }
     let end = std::time::Instant::now();
-    println!("Time {} ms", (end - start).as_millis());
+    println!("Inverted {}x{} sparse matrix in {} ms", row_count, col_count, (end - start).as_millis());
 }
