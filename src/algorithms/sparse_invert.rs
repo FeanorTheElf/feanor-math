@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use crate::ring::*;
 use crate::field::*;
 use crate::vector::*;
@@ -476,8 +474,6 @@ pub fn sparse_row_echelon<F>(mut A: SparseWorkMatrix<F>)
 
 #[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
-#[cfg(test)]
-use test::Bencher;
 
 #[test]
 fn test_sub_row() {
@@ -700,29 +696,8 @@ fn test_sparse_row_echelon() {
     }
 }
 
-#[ignore]
-#[bench]
-fn bench_sparse_row_echelon(bencher: &mut Bencher) {
-    let field = Zn::<17>::RING;
-    let row_count = 100;
-    let col_count = 100;
-    let row_entries = 5;
-    let mut rand = oorandom::Rand32::from_state((1, 1));
-    let base = SparseBaseMatrix::new(field, row_count, col_count, (0..row_count).flat_map(|i| {
-        let mut entries = (0..row_entries).map(|_| rand.rand_u32() as usize % col_count).collect::<Vec<_>>();
-        entries.sort();
-        entries.dedup();
-        return entries.into_iter().map(move |j| (i, j, field.from_int((rand.rand_u32() % 16) as i32 + 1)));
-    }));
-
-    bencher.iter(|| {
-        let mut current_base = base.clone();
-        sparse_row_echelon(SparseWorkMatrix::new(&mut current_base));
-        std::hint::black_box(current_base);
-    });
-}
-
 #[test]
+#[ignore]
 fn test_perf_sparse_row_echelon() {
     let field = Zn::<17>::RING;
     let row_count = 20000;
@@ -736,12 +711,12 @@ fn test_perf_sparse_row_echelon() {
         return entries.into_iter().map(move |j| (i, j, field.from_int((rand.rand_u32() % 16) as i32 + 1)));
     }));
 
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     {
         let mut current_base = base.clone();
         sparse_row_echelon(SparseWorkMatrix::new(&mut current_base));
         std::hint::black_box(current_base);
     }
-    let end = Instant::now();
+    let end = std::time::Instant::now();
     println!("Time {} ms", (end - start).as_millis());
 }
