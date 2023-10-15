@@ -2,6 +2,8 @@ use crate::ring::*;
 use crate::field::*;
 use crate::vector::*;
 
+use std::cmp::min;
+
 pub struct SparseBaseMatrix<F: FieldStore>
     where F::Type: Field
 {
@@ -232,10 +234,17 @@ impl<F: FieldStore> SparseBaseMatrix<F>
         assert!(j <= self.col_count);
         self.col_permutation.insert(self.col_count - j, self.col_count);
         self.col_permutation_inv.push(0);
-        for j2 in (self.col_count - j)..self.col_count {
+        for j2 in (self.col_count - j)..=self.col_count {
             self.col_permutation_inv[self.col_permutation[j2]] = j2;
         }
         self.col_count += 1;
+    }
+
+    pub fn reverse_cols(&mut self) {
+        self.col_permutation.reverse();
+        for j in 0..self.col_count {
+            self.col_permutation_inv[j] = self.col_count - 1 - self.col_permutation_inv[j];
+        }
     }
 
     pub fn add_row(&mut self, i: usize) {
@@ -245,7 +254,20 @@ impl<F: FieldStore> SparseBaseMatrix<F>
 
     pub fn set(&mut self, i: usize, j: usize, value: El<F>) {
         if !self.field.is_zero(&value) {
-            let mut row = &mut self.rows[i];
+            let global_i = self.global_row_index(i);
+            let global_j = self.col_permutation[self.global_col_index(j)];
+            let row = &mut self.rows[global_i];
+            match row.binary_search_by_key(&global_j, |(index, _)| *index) {
+                Ok(index) => row[index] = (global_j, value),
+                Err(index) => row.insert(index, (global_j, value))
+            };
+        } else {
+            let global_i = self.global_row_index(i);
+            let global_j = self.col_permutation[self.global_col_index(j)];
+            let row = &mut self.rows[global_i];
+            if let Ok(index) = row.binary_search_by_key(&global_j, |(index, _)| *index) {
+                row.remove(index);
+            }
         }
     }
 
@@ -314,6 +336,12 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
 
     #[cfg(feature = "expensive_checks")]
     fn check_invariants(&self) {
+
+        for i in 0..self.base.row_count {
+            for index in 0..self.base.rows[i].len() {
+                assert!(!self.base.field.is_zero(&self.base.rows[i][index].1));
+            }
+        }
 
         for j in 0..self.col_count {
             let nonzero_entry_count = (0..self.row_count).filter(|i| self.base.rows[*i].iter().any(|(j2, _)| *j2 == j)).count();
@@ -466,11 +494,13 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
     }
 }
 
-pub fn sparse_row_echelon<F>(mut A: SparseWorkMatrix<F>) 
+pub fn sparse_row_echelon<F, G>(mut A: SparseWorkMatrix<F>, mut col_swapped: G) 
     where F: FieldStore + Clone,
-        F::Type: Field
+        F::Type: Field,
+        G: FnMut(usize, usize)
 {
     let field = A.base_field().clone();
+    let mut offset = 0;
     while let Some(pivot_i) = (0..A.row_count()).filter(|i| A.nonzero_entries_in_row(*i) > 0).min_by_key(|i| A.nonzero_entries_in_row(*i)) {
         
         A.swap_rows(0, pivot_i);
@@ -478,6 +508,7 @@ pub fn sparse_row_echelon<F>(mut A: SparseWorkMatrix<F>)
         let pivot_row = A.get_row(0);
         let (pivot_j, _) = pivot_row.nontrivial_entries().min_by_key(|(j, _)| A.nonzero_entries_in_col(*j)).unwrap();
         A.swap_cols(0, pivot_j);
+        col_swapped(offset, pivot_j + offset);
     
         let pivot_inv = field.invert(A.at(0, 0)).unwrap();
     
@@ -488,6 +519,29 @@ pub fn sparse_row_echelon<F>(mut A: SparseWorkMatrix<F>)
         }
     
         A = A.into_lower_right_submatrix();
+        offset += 1;
+    }
+}
+
+pub fn gb_sparse_row_echelon<F>(mut A: SparseWorkMatrix<F>) 
+    where F: FieldStore + Clone,
+        F::Type: Field
+{
+    let field = A.base_field().clone();
+    for pivot in 0..min(A.row_count(), A.col_count()) {
+
+        if let Some(pivot_i) = (pivot..A.row_count()).filter(|i| !field.is_zero(A.at(*i, pivot))).min_by_key(|i| A.nonzero_entries_in_row(*i)) {
+            
+            A.swap_rows(pivot, pivot_i);
+
+            let pivot_inv = field.invert(A.at(pivot, pivot)).unwrap();
+        
+            for i in 0..A.row_count() {
+                if i != pivot && !field.is_zero(A.at(i, pivot)) {
+                    A.sub_row(i, pivot, &field.mul_ref(A.at(i, pivot), &pivot_inv));
+                }
+            }
+        }
     }
 }
 
@@ -703,7 +757,7 @@ fn test_sparse_row_echelon() {
     // 4 10 3 2 
     // 3 15 16 1 16
 
-    sparse_row_echelon(SparseWorkMatrix::new(&mut base));
+    sparse_row_echelon(SparseWorkMatrix::new(&mut base), |_, _| {});
 
     let zero_vec = [1, 4, 10, 14, 16];
     let mut permuted_zero_vec = [0; 5];
@@ -733,7 +787,7 @@ fn test_perf_sparse_row_echelon() {
     let start = std::time::Instant::now();
     {
         let mut current_base = base.clone();
-        sparse_row_echelon(SparseWorkMatrix::new(&mut current_base));
+        sparse_row_echelon(SparseWorkMatrix::new(&mut current_base), |_, _| {});
         std::hint::black_box(current_base);
     }
     let end = std::time::Instant::now();

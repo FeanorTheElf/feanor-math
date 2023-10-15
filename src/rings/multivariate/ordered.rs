@@ -209,7 +209,7 @@ impl<R, O, M, const N: usize> RingBase for MultivariatePolyRingImplBase<R, O, M,
             if with_plus {
                 write!(out, " + ")?;
             }
-            if !self.base_ring.is_one(c) {
+            if !self.base_ring.is_one(c) || self.order.cmp(m, &Monomial::new([0; N])) == Ordering::Equal {
                 write!(out, "{}", self.base_ring.format(c))?;
                 if self.order.cmp(m, &Monomial::new([0; N])) != Ordering::Equal {
                     write!(out, " * ")?;
@@ -219,7 +219,7 @@ impl<R, O, M, const N: usize> RingBase for MultivariatePolyRingImplBase<R, O, M,
             for i in 0..N {
                 if m[i] > 0 {
                     if needs_space {
-                        write!(out, " ")?;
+                        write!(out, " * ")?;
                     }
                     write!(out, "X{}", i)?;
                     needs_space = true;
