@@ -1,9 +1,10 @@
 use std::hash::Hash;
-use std::ops::Index;
+use std::ops::{Index, RangeTo, RangeFrom};
 use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::cmp::{min, max};
 
+use crate::vector::subvector::{Subvector, SelfSubvectorView};
 use crate::{ring::*, type_eq};
 use crate::vector::{VectorView, VectorViewMut};
 
@@ -108,6 +109,10 @@ impl<V: VectorView<MonomialExponent>> Hash for Monomial<V> {
 }
 
 impl<V: VectorView<MonomialExponent>> Monomial<V> {
+
+    pub fn from_vector_ref<'a>(vector: &'a V) -> &'a Self {
+        unsafe { std::mem::transmute(vector) }
+    }
     
     pub fn new(exponents: V) -> Self {
         Self { exponents }
@@ -341,6 +346,49 @@ impl<V, O> Ord for FixedOrderMonomial<V, O>
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct DegRevLex;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct BlockLexDegRevLex {
+    larger_block: usize
+}
+
+impl BlockLexDegRevLex {
+
+    pub fn new(larger_block: RangeTo<usize>, smaller_block: RangeFrom<usize>) -> Self {
+        assert_eq!(larger_block.end, smaller_block.start);
+        Self {
+            larger_block: larger_block.end
+        }
+    }
+}
+
+impl MonomialOrder for BlockLexDegRevLex {
+
+    fn is_graded(&self) -> bool {
+        false
+    }
+
+    fn cmp<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering {
+        match DegRevLex.cmp(
+            &Monomial::new(Subvector::new(&lhs.exponents).subvector(..self.larger_block)), 
+            &Monomial::new(Subvector::new(&rhs.exponents).subvector(..self.larger_block))
+        ) {
+            Ordering::Equal => DegRevLex.cmp(
+                &Monomial::new(Subvector::new(&lhs.exponents).subvector(self.larger_block..)), 
+                &Monomial::new(Subvector::new(&rhs.exponents).subvector(self.larger_block..))
+            ),
+            ordering => ordering
+        }
+    }
+
+    fn is_same<O: ?Sized + MonomialOrder>(&self, other: &O) -> bool {
+        if type_eq::<O, Self>() {
+            unsafe { *self == *std::mem::transmute::<_, *const Self>(other as *const O as *const ()) }
+        } else {
+            false
+        }
+    }
+}
 
 impl MonomialOrder for DegRevLex {
 

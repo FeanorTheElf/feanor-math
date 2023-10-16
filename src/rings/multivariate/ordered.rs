@@ -414,21 +414,9 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
     }
 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, m: &Monomial<Self::MonomialVector>) -> &'a El<Self::BaseRing> {
-        // binary search
-        let mut l_i = 0;
-        let mut r_i = f.len();
-        while l_i + 1 != r_i {
-            let mid = (l_i + r_i) / 2;
-            match self.order.cmp(&f.at(mid).1, m) {
-                Ordering::Equal => break,
-                Ordering::Less => l_i = mid,
-                Ordering::Greater => r_i = mid
-            };
-        }
-        if self.order.cmp(&f.at(l_i).1, m) == Ordering::Equal {
-            return &f.at(l_i).0;
-        } else {
-            return &self.zero;
+        match f.binary_search_by(|x| self.order.cmp(&x.1, m)) {
+            Ok(i) => &f.at(i).0,
+            Err(_) => &self.zero
         }
     }
 

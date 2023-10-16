@@ -492,6 +492,16 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
         self.check_invariants();
         return self;
     }
+
+    ///
+    /// This requires that the area left of the lower right submatrix is completely zero!
+    /// 
+    pub fn into_right_submatrix(mut self) -> Self {
+        self.check_invariants();
+        self.col_count -= 1;
+        self.check_invariants();
+        return self;
+    }
 }
 
 pub fn sparse_row_echelon<F, G>(mut A: SparseWorkMatrix<F>, mut col_swapped: G) 
@@ -528,18 +538,24 @@ pub fn gb_sparse_row_echelon<F>(mut A: SparseWorkMatrix<F>)
         F::Type: Field
 {
     let field = A.base_field().clone();
-    for pivot in 0..min(A.row_count(), A.col_count()) {
+    let mut pivot_row = 0;
+    for pivot_col in 0..A.col_count() {
 
-        if let Some(pivot_i) = (pivot..A.row_count()).filter(|i| !field.is_zero(A.at(*i, pivot))).min_by_key(|i| A.nonzero_entries_in_row(*i)) {
+        if let Some(pivot_i) = (pivot_row..A.row_count()).filter(|i| !field.is_zero(A.at(*i, pivot_col))).min_by_key(|i| A.nonzero_entries_in_row(*i)) {
             
-            A.swap_rows(pivot, pivot_i);
+            A.swap_rows(pivot_row, pivot_i);
 
-            let pivot_inv = field.invert(A.at(pivot, pivot)).unwrap();
+            let pivot_inv = field.invert(A.at(pivot_row, pivot_col)).unwrap();
         
             for i in 0..A.row_count() {
-                if i != pivot && !field.is_zero(A.at(i, pivot)) {
-                    A.sub_row(i, pivot, &field.mul_ref(A.at(i, pivot), &pivot_inv));
+                if i != pivot_row && !field.is_zero(A.at(i, pivot_col)) {
+                    A.sub_row(i, pivot_row, &field.mul_ref(A.at(i, pivot_col), &pivot_inv));
                 }
+            }
+
+            pivot_row += 1;
+            if pivot_col == A.row_count() {
+                return;
             }
         }
     }
@@ -767,6 +783,25 @@ fn test_sparse_row_echelon() {
     for i in 0..6 {
         assert_el_eq!(&field, &0, &field.sum((0..5).map(|j| field.mul_ref(base.at(i, j), &permuted_zero_vec[j]))));
     }
+}
+
+#[test]
+fn test_move_zero_rows_down() {
+    let field = Zn::<17>::RING;
+    let mut base = SparseBaseMatrix::new(field, 4, 4, [
+        (0, 0, 1), (1, 3, 2), (2, 1, 1), (3, 3, 1)
+    ].into_iter());
+    // 1 0 0 0
+    //       2
+    //   1 0 0
+    //       1
+
+    gb_sparse_row_echelon(SparseWorkMatrix::new(&mut base));
+
+    assert_el_eq!(&field, &1, base.at(0, 0));
+    assert_el_eq!(&field, &1, base.at(1, 1));
+    assert_el_eq!(&field, &2, base.at(2, 3));
+    assert_eq!(0, base.get_row(3).nontrivial_entries().count());
 }
 
 #[test]
