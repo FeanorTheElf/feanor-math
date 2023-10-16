@@ -82,33 +82,11 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
         }
     }
     reduction_monomials.sort_by(|l, r| order.cmp(l, r));
-    println!("{:?}", columns);
-    println!("{:?}", reduction_monomials);
-
-    if S_polys.len() == 1 {
-        println!();
-        for i in 0..A.row_count() {
-            for j in 0..A.col_count() {
-                print!("{}, ", ring.base_ring().format(A.at(i, j)));
-            }
-            println!();
-        }
-    }
 
     // we have ordered the monomials in ascending order, but we want to reduce towards smaller ones
     A.reverse_cols();
     gb_sparse_row_echelon(SparseWorkMatrix::new(&mut A));
     A.reverse_cols();
-
-    if S_polys.len() == 1 {
-        println!();
-        for i in 0..A.row_count() {
-            for j in 0..A.col_count() {
-                print!("{}, ", ring.base_ring().format(A.at(i, j)));
-            }
-            println!();
-        }
-    }
 
     let mut result = Vec::new();
     for i in 0..A.row_count() {
@@ -161,35 +139,51 @@ pub fn f4<P, O>(ring: P, mut basis: Vec<El<P>>, order: O) -> Vec<El<P>>
 
         let S_polys: Vec<_> = process.iter().cloned().map(|(i, j)| S(&ring, &basis[i], &basis[j], order)).collect();
 
-        println!("S-polys are");
-        for ((i, j), p) in process.iter().zip(S_polys.iter()) {
-            print!("{}, {}, ", i, j);
-            ring.println(p);
-        }
-        println!();
-
         let new_polys = reduce_S_matrix(&ring, &S_polys, &basis, order);
-
-        println!("Found {} new polynomials", new_polys.len());
-        for p in &new_polys {
-            ring.println(p);
-        }
-        println!();
 
         if new_polys.len() == 0 {
             degree_bound += 1;
         } else {
-            let old_len = basis.len();
             basis.extend(new_polys.into_iter());
-            open.extend((0..basis.len()).flat_map(|i| (old_len..basis.len()).map(move |j| (i, j)))
+            basis = reduce(&ring, basis, order).0;
+            open = (0..basis.len()).flat_map(|i| (0..i).map(move |j| (i, j)))
                 .filter(|(i, j)| filter_S_pair(&basis[*i], &basis[*j]))
-            );
+                .collect::<Vec<_>>();
         }
     }
     return basis;
 }
 
-pub fn multivariate_division<P, V, O>(ring: &P, mut f: El<P>, set: V, order: O) -> El<P>
+fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> (Vec<El<P>>, bool)
+    where P: MultivariatePolyRingStore,
+        P::Type: MultivariatePolyRing,
+        <P::Type as RingExtension>::BaseRing: FieldStore,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
+        O: MonomialOrder + Copy
+{
+    let mut changed_last_iter = true;
+    let mut changed_at_all = false;
+    while changed_last_iter {
+        changed_last_iter = false;
+        for i in 0..polys.len() {
+            let f = ring.clone_el(&polys[i]);
+            let reduced = multivariate_division(&ring, f, (&polys[..i]).chain(&polys[(i + 1)..]), order);
+            if !ring.eq_el(&polys[i], &reduced) {
+                changed_last_iter = true;
+                changed_at_all = true;
+                if ring.is_zero(&reduced) {
+                    polys.remove(i);
+                } else {
+                    polys[i] = reduced;
+                }
+                break;
+            }
+        }
+    }
+    return (polys, changed_at_all);
+}
+
+pub fn multivariate_division<P, V, O>(ring: P, mut f: El<P>, set: V, order: O) -> El<P>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: FieldStore,
@@ -201,9 +195,7 @@ pub fn multivariate_division<P, V, O>(ring: &P, mut f: El<P>, set: V, order: O) 
     while let Some(g) = set.iter().filter(|g| ring.lm(g, order).unwrap().divides(&f_lm)).next() {
         let g_lm = ring.lm(g, order).unwrap();
         let f_lc = ring.coefficient_at(&f, &f_lm);
-        println!();
         let g_lc = ring.coefficient_at(&g, &g_lm);
-        println!("{}, {:?}, {}", ring.format(g), g_lm, ring.base_ring().format(g_lc));
         let div_monomial = f_lm.div(&g_lm);
         let div_coeff = ring.base_ring().div(&f_lc, &g_lc);
         let mut g_scaled = ring.clone_el(g);
@@ -302,10 +294,6 @@ fn test_f4_larger() {
         (9, &Monomial::new([0, 0, 0]))
     ].into_iter());
 
-    for f in &actual {
-        println!("{},", ring.format(f));
-    }
-
     assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, g1, &actual, order));
 }
 
@@ -334,10 +322,6 @@ fn test_f4_larger_elim() {
         (7, &Monomial::new([0, 0, 0]))
     ].into_iter());
 
-    for f in [&f1, &f2, &f3] {
-        ring.println(f);
-    }
-
     let actual = f4(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], order);
 
     let g1 = ring.from_terms([
@@ -356,10 +340,6 @@ fn test_f4_larger_elim() {
         (13, &Monomial::new([0, 0, 1])),
         (9, &Monomial::new([0, 0, 0]))
     ].into_iter());
-    
-    for f in &actual {
-        println!("{},", ring.format(f));
-    }
 
     assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, g1, &actual, order));
 }
@@ -367,7 +347,7 @@ fn test_f4_larger_elim() {
 #[test]
 #[ignore]
 fn test_generic_computation() {
-    let order = DegRevLex;
+    let order = BlockLexDegRevLex::new(..1, 1..);
     let base = zn_static::Z17;
     let ring: MultivariatePolyRingImpl<_, _, _, 6> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
     let poly_ring = dense_poly::DensePolyRing::new(&ring, "X");
@@ -385,9 +365,6 @@ fn test_generic_computation() {
         ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&x2, 1)),
         ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&x2, 2)),
     ];
-    for b in &basis {
-        ring.println(b);
-    }
     let gb = f4(&ring, basis, order);
     for f in &gb {
         ring.println(f);

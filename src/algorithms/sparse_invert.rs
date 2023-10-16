@@ -2,8 +2,6 @@ use crate::ring::*;
 use crate::field::*;
 use crate::vector::*;
 
-use std::cmp::min;
-
 pub struct SparseBaseMatrix<F: FieldStore>
     where F::Type: Field
 {
