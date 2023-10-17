@@ -35,7 +35,7 @@ pub struct SparseBaseMatrix<F: FieldStore>
     col_permutation_inv: Vec<usize>,
 }
 
-pub struct SparseWorkMatrix<'a, F: FieldStore>
+pub struct StandardWorkMatrix<'a, F: FieldStore>
     where F::Type: Field
 {
     base: &'a mut SparseBaseMatrix<F>,
@@ -65,13 +65,29 @@ pub struct SparseWorkMatrix<'a, F: FieldStore>
     recycle_vec: Option<Vec<(usize, El<F>)>>
 }
 
-pub struct WorkMatrixRowIter<'a, T> {
+pub struct GBWorkMatrix<'a, F: FieldStore>
+    where F::Type: Field
+{
+    base: &'a mut SparseBaseMatrix<F>,
+    ///
+    /// For each row of the current matrix, stores the number of
+    /// nonzero entries in that row (indexed by global indices).
+    /// This does not refer to the whole matrix, even though the
+    /// difference is more conceptual, as we currently only allow
+    /// shrinking the current matrix by zero columns.
+    /// 
+    row_nonzero_entry_counts: Vec<usize>,
+    recycle_vec: Option<Vec<(usize, El<F>)>>
+}
+
+
+pub struct MatrixRowIter<'a, T> {
     current: std::slice::Iter<'a, (usize, T)>,
     permutation_inv: &'a [usize],
     len: usize
 }
 
-impl<'a, T> Iterator for WorkMatrixRowIter<'a, T> {
+impl<'a, T> Iterator for MatrixRowIter<'a, T> {
 
     type Item = (usize, &'a T);
 
@@ -83,7 +99,7 @@ impl<'a, T> Iterator for WorkMatrixRowIter<'a, T> {
     }
 }
 
-pub struct WorkMatrixRow<'a, T> {
+pub struct MatrixRow<'a, T> {
     data: &'a [(usize, T)],
     len: usize,
     permutation: &'a [usize],
@@ -91,7 +107,7 @@ pub struct WorkMatrixRow<'a, T> {
     zero: &'a T
 }
 
-impl<'a, T> VectorView<T> for WorkMatrixRow<'a, T> {
+impl<'a, T> VectorView<T> for MatrixRow<'a, T> {
 
     fn len(&self) -> usize {
         self.len
@@ -103,13 +119,13 @@ impl<'a, T> VectorView<T> for WorkMatrixRow<'a, T> {
     }
 }
 
-impl<'a, T> VectorViewSparse<T> for WorkMatrixRow<'a, T> {
+impl<'a, T> VectorViewSparse<T> for MatrixRow<'a, T> {
 
-    type Iter<'b> = WorkMatrixRowIter<'b, T>
+    type Iter<'b> = MatrixRowIter<'b, T>
         where Self: 'b, T: 'b;
 
     fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> {
-        WorkMatrixRowIter {
+        MatrixRowIter {
             current: self.data.iter(),
             len: self.len,
             permutation_inv: self.permutation_inv
@@ -117,14 +133,14 @@ impl<'a, T> VectorViewSparse<T> for WorkMatrixRow<'a, T> {
     }
 }
 
-pub struct WorkMatrixColIter<'a, T> {
+pub struct MatrixColIter<'a, T> {
     curent: std::slice::Iter<'a, usize>,
     col_index: usize,
     row_data: &'a [Vec<(usize, T)>],
     len: usize
 }
 
-impl<'a, T> Iterator for WorkMatrixColIter<'a, T> {
+impl<'a, T> Iterator for MatrixColIter<'a, T> {
 
     type Item = (usize, &'a T);
 
@@ -138,7 +154,7 @@ impl<'a, T> Iterator for WorkMatrixColIter<'a, T> {
     }
 }
 
-pub struct WorkMatrixCol<'a, T> {
+pub struct MatrixCol<'a, T> {
     row_data: &'a [Vec<(usize, T)>],
     col: &'a [usize],
     col_index: usize,
@@ -146,7 +162,7 @@ pub struct WorkMatrixCol<'a, T> {
     len: usize
 }
 
-impl<'a, T> VectorView<T> for WorkMatrixCol<'a, T> {
+impl<'a, T> VectorView<T> for MatrixCol<'a, T> {
 
     fn len(&self) -> usize {
         self.len
@@ -157,13 +173,13 @@ impl<'a, T> VectorView<T> for WorkMatrixCol<'a, T> {
     }
 }
 
-impl<'a, T> VectorViewSparse<T> for WorkMatrixCol<'a, T> {
+impl<'a, T> VectorViewSparse<T> for MatrixCol<'a, T> {
 
-    type Iter<'b> = WorkMatrixColIter<'b, T>
+    type Iter<'b> = MatrixColIter<'b, T>
         where Self: 'b, T: 'b;
 
     fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> {
-        WorkMatrixColIter {
+        MatrixColIter {
             col_index: self.col_index,
             curent: self.col.iter(),
             row_data: self.row_data,
@@ -269,6 +285,29 @@ impl<F: FieldStore> SparseBaseMatrix<F>
         }
     }
 
+    pub fn swap_cols(&mut self, j1: usize, j2: usize) {
+        assert!(j1 < self.col_count);
+        assert!(j2 < self.col_count);
+        if j1 == j2 {
+            return;
+        }
+        let global1 = self.global_col_index(j1);
+        let global2 = self.global_col_index(j2);
+        self.col_permutation.swap(global1, global2);
+        self.col_permutation_inv.swap(self.col_permutation[global1], self.col_permutation[global2]);
+    }
+
+    pub fn swap_rows(&mut self, i1: usize, i2: usize) {
+        assert!(i1 < self.row_count);
+        assert!(i2 < self.row_count);
+        if i1 == i2 {
+            return;
+        }
+        let global1 = self.global_row_index(i1);
+        let global2 = self.global_row_index(i2);
+        self.rows.swap(global1, global2);
+    }
+
     fn global_row_index(&self, i: usize) -> usize {
         self.row_count - i - 1
     }
@@ -297,8 +336,8 @@ impl<F: FieldStore> SparseBaseMatrix<F>
         return result;
     }
 
-    pub fn get_row<'a>(&'a self, i: usize) -> WorkMatrixRow<'a, El<F>> {
-        WorkMatrixRow { data: &self.rows[self.global_row_index(i)], len: self.col_count, permutation: &self.col_permutation, permutation_inv: &self.col_permutation_inv, zero: &self.zero }
+    pub fn get_row<'a>(&'a self, i: usize) -> MatrixRow<'a, El<F>> {
+        MatrixRow { data: &self.rows[self.global_row_index(i)], len: self.col_count, permutation: &self.col_permutation, permutation_inv: &self.col_permutation_inv, zero: &self.zero }
     }
 
     pub fn column_permutation<'a>(&'a self) -> impl 'a + Iterator<Item = usize> {
@@ -308,14 +347,53 @@ impl<F: FieldStore> SparseBaseMatrix<F>
     pub fn column_permutation_inv<'a>(&'a self) -> impl 'a + Iterator<Item = usize> {
         self.col_permutation_inv.iter().rev().map(|j| self.col_count - 1 - *j)
     }
+
+    fn sub_row<F1>(&mut self, dst_i: usize, src_i: usize, factor: &El<F>, recycle_vec: &mut Option<Vec<(usize, El<F>)>>, mut entry_added_cancelled: F1)
+        where F1: FnMut(/* local row */ usize, /* local col */ usize, /* added? */ bool, /* global row */ usize, /* global col */ usize)
+    {
+        let mut new_row = recycle_vec.take().unwrap_or(Vec::new());
+        new_row.clear();
+        let mut dst_index = 0;
+        let mut src_index = 0;
+        let dst_i_global = self.global_row_index(dst_i);
+        let src_i_global = self.global_row_index(src_i);
+        let dst = &self.rows[dst_i_global];
+        let src = &self.rows[src_i_global];
+        while dst_index != dst.len() || src_index != src.len() {
+            let dst_j_global = dst.get(dst_index).map(|e| e.0).unwrap_or(usize::MAX);
+            let src_j_global = src.get(src_index).map(|e| e.0).unwrap_or(usize::MAX);
+
+            if dst_j_global == src_j_global {
+                let new_value = self.field.sub_ref_fst(&dst[dst_index].1, self.field.mul_ref(&src[src_index].1, factor));
+                if self.field.is_zero(&new_value) {
+                    entry_added_cancelled(dst_i, self.col_count - 1 - self.col_permutation_inv[dst_j_global], false, dst_i_global, dst_j_global);
+                } else {
+                    // no cancellation - this entry remains nonzero
+                    new_row.push((dst_j_global, new_value));
+                }
+                dst_index += 1;
+                src_index += 1;
+            } else if dst_j_global < src_j_global {
+                // we just keep this entry, thus it remains nonzero
+                new_row.push((dst_j_global, self.field.clone_el(&dst[dst_index].1)));
+                dst_index += 1;
+            } else {
+                // we get a new entry, thus we have to update position of nonzero entries
+                entry_added_cancelled(dst_i, self.col_count - 1 - self.col_permutation_inv[src_j_global], true, dst_i_global, src_j_global);
+                new_row.push((src_j_global, self.field.negate(self.field.mul_ref(&src[src_index].1, factor))));
+                src_index += 1;
+            }
+        }
+        *recycle_vec = Some(std::mem::replace(&mut self.rows[dst_i_global], new_row));
+    }
 }
 
 
-impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
+impl<'a, F: FieldStore> StandardWorkMatrix<'a, F>
     where F::Type: Field
 {
     pub fn new(base: &'a mut SparseBaseMatrix<F>) -> Self {
-        let mut result = SparseWorkMatrix {
+        let mut result = StandardWorkMatrix {
             row_nonzero_entry_counts: (0..base.row_count).map(|i| base.rows[i].len()).collect(),
             col_nonzero_entry_counts: (0..base.col_count).map(|_| 0).collect(),
             row_count: base.row_count,
@@ -377,11 +455,19 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
         self.col_count - j - 1
     }
 
+    fn col_offset(&self) -> usize {
+        self.base.col_count - self.col_count
+    }
+
+    fn row_offset(&self) -> usize {
+        self.base.row_count - self.row_count
+    }
+
     pub fn at(&self, i: usize, j: usize) -> &El<F> {
         self.base.at(i + self.base.row_count - self.row_count, j + self.base.row_count - self.row_count)
     }
 
-    pub fn get_row<'b>(&'b self, i: usize) -> WorkMatrixRow<'b, El<F>> {
+    pub fn get_row<'b>(&'b self, i: usize) -> MatrixRow<'b, El<F>> {
         let mut result = self.base.get_row(i + self.base.row_count - self.row_count);
         result.len = self.col_count;
         return result;
@@ -402,28 +488,17 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
     pub fn swap_cols(&mut self, j1: usize, j2: usize) {
         assert!(j1 < self.col_count);
         assert!(j2 < self.col_count);
-        if j1 == j2 {
-            return;
-        }
         self.check_invariants();
-        let global1 = self.global_col_index(j1);
-        let global2 = self.global_col_index(j2);
-        self.base.col_permutation.swap(global1, global2);
-        self.base.col_permutation_inv.swap(self.base.col_permutation[global1], self.base.col_permutation[global2]);
+        self.base.swap_cols(j1 + self.col_offset(), j2 + self.col_offset());
         self.check_invariants();
     }
 
     pub fn swap_rows(&mut self, i1: usize, i2: usize) {
         assert!(i1 < self.row_count);
         assert!(i2 < self.row_count);
-        if i1 == i2 {
-            return;
-        }
         self.check_invariants();
-        let global1 = self.global_row_index(i1);
-        let global2 = self.global_row_index(i2);
-        self.base.rows.swap(global1, global2);
-        self.row_nonzero_entry_counts.swap(global1, global2);
+        self.base.swap_rows(i1 + self.row_offset(), i2 + self.row_offset());
+        self.row_nonzero_entry_counts.swap(self.global_row_index(i1), self.global_row_index(i2));
         self.check_invariants();
     }
 
@@ -439,41 +514,17 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
 
     pub fn sub_row(&mut self, dst_i: usize, src_i: usize, factor: &El<F>) {
         self.check_invariants();
-        let mut new_row = self.recycle_vec.take().unwrap();
-        new_row.clear();
-        let mut dst_index = 0;
-        let mut src_index = 0;
-        let dst_i_global = self.global_row_index(dst_i);
-        let src_i_global = self.global_row_index(src_i);
-        let dst = &self.base.rows[dst_i_global];
-        let src = &self.base.rows[src_i_global];
-        while dst_index != dst.len() || src_index != src.len() {
-            let dst_j = dst.get(dst_index).map(|e| e.0).unwrap_or(usize::MAX);
-            let src_j = src.get(src_index).map(|e| e.0).unwrap_or(usize::MAX);
-
-            if dst_j == src_j {
-                let new_value = self.base.field.sub_ref_fst(&dst[dst_index].1, self.base.field.mul_ref(&src[src_index].1, factor));
-                if self.base.field.is_zero(&new_value) {
-                    // cancellation occurs - we have to adjust every value that depends on the position of nonzero entries
-                    Self::nonzero_entry_cancelled(&mut self.row_nonzero_entry_counts, &mut self.col_nonzero_entry_counts, src_j, dst_i_global);
-                } else {
-                    // no cancellation - this entry remains nonzero
-                    new_row.push((dst_j, new_value));
-                }
-                dst_index += 1;
-                src_index += 1;
-            } else if dst_j < src_j {
-                // we just keep this entry, thus it remains nonzero
-                new_row.push((dst_j, self.base.field.clone_el(&dst[dst_index].1)));
-                dst_index += 1;
+        self.base.sub_row(
+            dst_i + self.row_offset(), 
+            src_i + self.row_offset(), 
+            factor, 
+            &mut self.recycle_vec, 
+            |_i, _j, added, global_i, global_j| if added {
+                Self::nonzero_entry_added(&mut self.row_nonzero_entry_counts, &mut self.col_nonzero_entry_counts, global_j, global_i)
             } else {
-                // we get a new entry, thus we have to update position of nonzero entries
-                Self::nonzero_entry_added(&mut self.row_nonzero_entry_counts, &mut self.col_nonzero_entry_counts, src_j, dst_i_global);
-                new_row.push((src_j, self.base.field.negate(self.base.field.mul_ref(&src[src_index].1, factor))));
-                src_index += 1;
+                Self::nonzero_entry_cancelled(&mut self.row_nonzero_entry_counts, &mut self.col_nonzero_entry_counts, global_j, global_i)
             }
-        }
-        self.recycle_vec = Some(std::mem::replace(&mut self.base.rows[dst_i_global], new_row));
+        );
         self.check_invariants();
     }
 
@@ -490,19 +541,9 @@ impl<'a, F: FieldStore> SparseWorkMatrix<'a, F>
         self.check_invariants();
         return self;
     }
-
-    ///
-    /// This requires that the area left of the lower right submatrix is completely zero!
-    /// 
-    pub fn into_right_submatrix(mut self) -> Self {
-        self.check_invariants();
-        self.col_count -= 1;
-        self.check_invariants();
-        return self;
-    }
 }
 
-pub fn sparse_row_echelon<F, G>(mut A: SparseWorkMatrix<F>, mut col_swapped: G) 
+pub fn sparse_row_echelon<F, G>(mut A: StandardWorkMatrix<F>, mut col_swapped: G) 
     where F: FieldStore + Clone,
         F::Type: Field,
         G: FnMut(usize, usize)
@@ -531,7 +572,7 @@ pub fn sparse_row_echelon<F, G>(mut A: SparseWorkMatrix<F>, mut col_swapped: G)
     }
 }
 
-pub fn gb_sparse_row_echelon<F>(mut A: SparseWorkMatrix<F>) 
+pub fn gb_sparse_row_echelon<F>(mut A: StandardWorkMatrix<F>) 
     where F: FieldStore + Clone,
         F::Type: Field
 {
@@ -569,7 +610,7 @@ fn test_sub_row() {
         (0, 0, 5), (1, 1, 3), (2, 2, 1), (3, 3, 16), (4, 4, 12), (5, 5, 3), (6, 6, 1), (7, 7, 6), 
         (0, 3, 8), (5, 2, 1), (4, 0, 5)
     ].into_iter());
-    let mut a = SparseWorkMatrix::new(&mut base);
+    let mut a = StandardWorkMatrix::new(&mut base);
 
     assert_eq!(2, a.nonzero_entries_in_row(0));
     assert_eq!(1, a.nonzero_entries_in_row(1));
@@ -645,7 +686,7 @@ fn test_swap_rows() {
         (0, 0, 1), (1, 1, 2), (2, 2, 3), (3, 3, 4),
         (1, 0, 9), (2, 3, 8), (0, 3, 7), (3, 1, 6)
     ].into_iter());
-    let mut a = SparseWorkMatrix::new(&mut base);
+    let mut a = StandardWorkMatrix::new(&mut base);
 
     a.swap_cols(0, 2);
     a.swap_rows(0, 2);
@@ -720,7 +761,7 @@ fn test_nonsquare() {
     let mut base = SparseBaseMatrix::new(field, 5, 3, [
         (0, 0, 6), (0, 2, 5), (1, 1, 2), (1, 2, 3), (2, 0, 2), (3, 0, 4), (3, 2, 1), (4, 1, 6)
     ].into_iter());
-    let mut a = SparseWorkMatrix::new(&mut base);
+    let mut a = StandardWorkMatrix::new(&mut base);
     // 6   5
     //   2 3
     // 2    
@@ -771,7 +812,7 @@ fn test_sparse_row_echelon() {
     // 4 10 3 2 
     // 3 15 16 1 16
 
-    sparse_row_echelon(SparseWorkMatrix::new(&mut base), |_, _| {});
+    sparse_row_echelon(StandardWorkMatrix::new(&mut base), |_, _| {});
 
     let zero_vec = [1, 4, 10, 14, 16];
     let mut permuted_zero_vec = [0; 5];
@@ -794,7 +835,7 @@ fn test_move_zero_rows_down() {
     //   1 0 0
     //       1
 
-    gb_sparse_row_echelon(SparseWorkMatrix::new(&mut base));
+    gb_sparse_row_echelon(StandardWorkMatrix::new(&mut base));
 
     assert_el_eq!(&field, &1, base.at(0, 0));
     assert_el_eq!(&field, &1, base.at(1, 1));
@@ -820,7 +861,7 @@ fn test_perf_sparse_row_echelon() {
     let start = std::time::Instant::now();
     {
         let mut current_base = base.clone();
-        sparse_row_echelon(SparseWorkMatrix::new(&mut current_base), |_, _| {});
+        sparse_row_echelon(StandardWorkMatrix::new(&mut current_base), |_, _| {});
         std::hint::black_box(current_base);
     }
     let end = std::time::Instant::now();
