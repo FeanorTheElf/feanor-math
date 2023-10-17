@@ -3,7 +3,7 @@ use crate::ring::*;
 use crate::rings::multivariate::*;
 use crate::vector::*;
 
-use super::sparse_invert::{SparseBaseMatrix, StandardWorkMatrix, gb_sparse_row_echelon};
+use super::sparse_invert::{SparseMatrix, RowColTrackingMatrix, gb_sparse_row_echelon};
 
 fn S<P, O>(ring: P, f1: &El<P>, f2: &El<P>, order: O) -> El<P> 
     where P: MultivariatePolyRingStore,
@@ -41,7 +41,7 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
         }
     }
     let monomials_ref = &columns;
-    let mut A = SparseBaseMatrix::new(
+    let mut A = SparseMatrix::new(
         ring.base_ring(),
         S_polys.len(),
         columns.len(),
@@ -85,7 +85,7 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
 
     // we have ordered the monomials in ascending order, but we want to reduce towards smaller ones
     A.reverse_cols();
-    gb_sparse_row_echelon(StandardWorkMatrix::new(&mut A));
+    gb_sparse_row_echelon(&mut A);
     A.reverse_cols();
 
     let mut result = Vec::new();
@@ -108,7 +108,7 @@ pub fn f4_new<P, O>(ring: P, mut basis: Vec<El<P>>, order: O) -> Vec<El<P>>
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
         O: MonomialOrder + Copy
 {
-    let mut A = SparseBaseMatrix::new(ring.base_ring(), 0, 0, None.into_iter());
+    let mut A = SparseMatrix::new(ring.base_ring(), 0, 0, None.into_iter());
     unimplemented!()
 }
 
