@@ -3,7 +3,7 @@ use crate::ring::*;
 use crate::rings::multivariate::*;
 use crate::vector::*;
 
-use super::sparse_invert::{SparseMatrix, gb_sparse_row_echelon};
+use super::sparse_invert::{SparseMatrix, gb_rowrev_sparse_row_echelon};
 
 fn S<P, O>(ring: P, f1: &El<P>, f2: &El<P>, order: O) -> El<P> 
     where P: MultivariatePolyRingStore,
@@ -85,7 +85,7 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
 
     // we have ordered the monomials in ascending order, but we want to reduce towards smaller ones
     A.reverse_cols();
-    gb_sparse_row_echelon(&mut A);
+    gb_rowrev_sparse_row_echelon(&mut A);
     A.reverse_cols();
 
     let mut result = Vec::new();
@@ -101,27 +101,39 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
     return result;
 }
 
-fn add_poly_to_matrix<P, O>(
-    ring: &P, 
-    poly: El<P>, 
-    A: &mut SparseMatrix<&<P::Type as RingExtension>::BaseRing>, 
-    columns: &mut Vec<Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>>, 
-    order: O
-) -> usize
+fn leading_monomial<'a, P, O>(
+    i: usize,
+    A: &'a SparseMatrix<&<P::Type as RingExtension>::BaseRing>,
+    columns: &'a MonomialSet<P, O>
+) -> Option<&'a Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: FieldStore,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
         O: MonomialOrder + Copy
 {
-    let monomial_column = |m: &Monomial<_>, columns: &[Monomial<_>]| columns.binary_search_by(|x: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>| order.compare(x, m).reverse()).unwrap();
-    let column_monomial = |j: usize, columns: &[Monomial<_>]| columns[j].clone();
-    let leading_monomial = |i: usize, A: &SparseMatrix<_>, columns: &[Monomial<_>]| A.get_row(i).nontrivial_entries().map(|(j, _)| j).min().map(|j| column_monomial(j, columns));
-    let ensure_column_exists = |m: &Monomial<_>, columns: &mut Vec<Monomial<_>>, A: &mut SparseMatrix<&<P::Type as RingExtension>::BaseRing>| match columns.binary_search_by(|x: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>| order.compare(x, m).reverse()) {
-        Ok(_) => false,
-        Err(i) => {
-            A.add_column(i);
-            columns.insert(i, m.clone());
+    A.get_row(i).nontrivial_entries().map(|(j, _)| j).min().map(|j| columns.at_index(j))
+}
+
+fn add_reduction_rows_for_poly<P, O>(
+    ring: &P, 
+    poly: &El<P>, 
+    A: &mut SparseMatrix<&<P::Type as RingExtension>::BaseRing>, 
+    columns: &mut MonomialSet<P, O>, 
+    ignore_row: usize,
+    force_add: bool
+)
+    where P: MultivariatePolyRingStore,
+        P::Type: MultivariatePolyRing,
+        <P::Type as RingExtension>::BaseRing: FieldStore,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
+        O: MonomialOrder + Copy
+{
+    let ensure_column_exists = |m: &Monomial<_>, columns: &mut MonomialSet<_, _>, A: &mut SparseMatrix<&<P::Type as RingExtension>::BaseRing>| {
+        if columns.add(m.clone()) {
+            false
+        } else {
+            A.add_column(columns.index_of(m).unwrap());
             true
         }
     };
@@ -129,37 +141,122 @@ fn add_poly_to_matrix<P, O>(
     let mut new_monomials = Vec::new();
 
     for (_, m) in ring.terms(&poly) {
-        if ensure_column_exists(&m, columns, A) {
+        if ensure_column_exists(&m, columns, A) || force_add {
             new_monomials.push(m.clone());
         }
     }
 
     while let Some(m) = new_monomials.pop() {
-        if let Some(i) = (0..A.row_count()).filter(|i| leading_monomial(*i, &A, &columns[..]).map(|lm| lm.divides(&m)).unwrap_or(false)).next() {
-            let quo_m = m.clone().div(&leading_monomial(i, &A, &columns[..]).unwrap());
+        if let Some(i) = (0..A.row_count()).filter(|i| *i != ignore_row).filter(|i| leading_monomial(*i, &A, &columns).map(|lm| lm.divides(&m)).unwrap_or(false)).next() {
+            let quo_m = m.clone().div(leading_monomial(i, &A, &columns).unwrap());
 
             let new_row_index = A.row_count();
             A.add_row(new_row_index);
 
-            let A_row = A.get_row(i).nontrivial_entries().map(|(j, c)| (column_monomial(j, &columns[..]), ring.base_ring().clone_el(c))).collect::<Vec<_>>();
+            let A_row = A.get_row(i).nontrivial_entries().map(|(j, c)| (columns.at_index(j).clone(), ring.base_ring().clone_el(c))).collect::<Vec<_>>();
             for (base_m, c) in A_row.into_iter() {
                 let new_m = base_m.mul(&quo_m);
                 if ensure_column_exists(&new_m, columns, A) {
                     new_monomials.push(new_m.clone());
                 }
-                A.set(new_row_index, monomial_column(&new_m, &columns[..]), c);
+                A.set(new_row_index, columns.index_of(&new_m).unwrap(), c);
             }
         }
     }
+}
+
+fn add_poly_to_matrix<P, O>(
+    ring: &P, 
+    poly: El<P>, 
+    A: &mut SparseMatrix<&<P::Type as RingExtension>::BaseRing>, 
+    columns: &mut MonomialSet<P, O>, 
+    order: O
+) -> usize
+    where P: MultivariatePolyRingStore,
+        P::Type: MultivariatePolyRing,
+        <P::Type as RingExtension>::BaseRing: FieldStore,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
+        O: MonomialOrder + Copy
+{    
+    add_reduction_rows_for_poly(ring, &poly, A, columns, usize::MAX, false);
 
     let new_row_index = A.row_count();
     A.add_row(new_row_index);
 
     for (c, m) in ring.terms(&poly) {
-        A.set(new_row_index, monomial_column(m, &columns[..]), ring.base_ring().clone_el(c));
+        A.set(new_row_index, columns.index_of(m).unwrap(), ring.base_ring().clone_el(c));
     }
 
     return new_row_index;
+}
+
+struct MonomialSet<P, O>
+    where P: MultivariatePolyRingStore,
+        P::Type: MultivariatePolyRing,
+        <P::Type as RingExtension>::BaseRing: FieldStore,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
+        O: MonomialOrder + Copy
+{
+    data: Vec<Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>>,
+    order: O
+}
+
+impl<P, O> MonomialSet<P, O>
+where P: MultivariatePolyRingStore,
+    P::Type: MultivariatePolyRing,
+    <P::Type as RingExtension>::BaseRing: FieldStore,
+    <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
+    O: MonomialOrder + Copy
+{
+    pub fn new(order: O) -> Self {
+        Self {
+            data: Vec::new(),
+            order: order
+        }
+    }
+
+    fn add(&mut self, m: Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> bool {
+        match self.data.binary_search_by(|x| self.order.compare(x, &m).reverse()) {
+            Ok(_) => return true,
+            Err(i) => {
+                self.data.insert(i, m);
+                return false;
+            }
+        }
+    }
+
+    fn remove(&mut self, m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> bool {
+        match self.data.binary_search_by(|x| self.order.compare(x, m).reverse()) {
+            Ok(i) => {
+                self.data.remove(i);
+                return true;
+            },
+            Err(_) => return false
+        }
+    }
+
+    fn contains(&self, m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> bool {
+        match self.data.binary_search_by(|x| self.order.compare(x, m).reverse()) {
+            Ok(_) => true,
+            Err(_) => false
+        }
+    }
+
+    fn iter<'a>(&'a self) -> impl 'a + Iterator<Item = &'a Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>> {
+        self.data.iter()
+    }
+
+    fn at_index(&self, i: usize) -> &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector> {
+        &self.data[i]
+    }
+
+    fn index_of(&self, m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> Option<usize> {
+        self.data.binary_search_by(|x| self.order.compare(x, &m).reverse()).ok()
+    }
+
+    fn len(&self) -> usize {
+        self.data.len()
+    }
 }
 
 pub fn f4<P, O>(ring: P, basis: Vec<El<P>>, order: O) -> Vec<El<P>>
@@ -169,76 +266,59 @@ pub fn f4<P, O>(ring: P, basis: Vec<El<P>>, order: O) -> Vec<El<P>>
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
         O: MonomialOrder + Copy
 {
-    let leading_monomial = |i: usize, A: &SparseMatrix<&<P::Type as RingExtension>::BaseRing>, columns: &[Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>]| A.get_row(i).nontrivial_entries().map(|(j, _)| j).min().map(|j| columns[j].clone());
-    let row_poly = |i: usize, A: &SparseMatrix<&<P::Type as RingExtension>::BaseRing>, columns: &[Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>]| ring.from_terms(
-        A.get_row(i).nontrivial_entries().map(|(j, c)| (ring.base_ring().clone_el(c), &columns[j]))
+    let row_poly = |i: usize, A: &SparseMatrix<&<P::Type as RingExtension>::BaseRing>, columns: &MonomialSet<P, O>| ring.from_terms(
+        A.get_row(i).nontrivial_entries().map(|(j, c)| (ring.base_ring().clone_el(c), columns.at_index(j)))
     );
 
     let mut A = SparseMatrix::new(ring.base_ring(), 0, 0, None.into_iter());
-    let mut columns: Vec<Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>> = Vec::new();
+    let mut columns = MonomialSet::new(order);
 
     let mut to_process = basis.iter().map(|f| ring.lm(f, order).unwrap()).flat_map(|m1| basis.iter().map(|f| (m1.clone(), ring.lm(f, order).unwrap().clone()))).collect::<Vec<_>>();
-    for b in basis {
+    for b in reduce(&ring, basis, order).0 {
         add_poly_to_matrix(&ring, b, &mut A, &mut columns, order);
     }
     
     // A set of monomials such that the rows with these leading monomials already suffice to reduce all other rows to 0 via multivariate division
-    let mut current_monomial_basis: Vec<Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>> = Vec::new();
+    // A is in echelon form, so there is at most one row for any leading monomial
+    let mut current_monomial_basis: MonomialSet<P, O> = MonomialSet::new(order);
+
     let mut degree_bound = 0;
 
     while to_process.len() != 0 {
 
-        println!("Basis has {} elements", current_monomial_basis.len());
-        println!("We have currently queued {} S-polys", to_process.len());
-        println!("Current matrix dimension is {}x{}", A.row_count(), A.col_count());
-        if let Some(m) = current_monomial_basis.last() {
-            println!("Largest monomial in basis is {}", ring.format(&ring.monomial(m)));
-        }
-        println!("Currently considering S-polys with lcm(lm(f), lm(g)) at most degree {}", degree_bound);
-        println!();
-
-        // this basically reduces the current basis with each other
-        let mut deleted_monomials = Vec::new();
-        let mut index1 = 0;
-        while index1 < current_monomial_basis.len() {
-            let potential_divisor = current_monomial_basis[index1].clone();
-            current_monomial_basis.retain(|m| {
-                if *m != potential_divisor && potential_divisor.divides(m) {
-                    deleted_monomials.push((m.clone(), potential_divisor.clone()));
-                    false
-                } else {
-                    true
-                }
-            });
-            index1 += 1;
-        }
-
         let mut current_basis_rows = Vec::new();
         current_basis_rows.resize(current_monomial_basis.len(), 0);
         for i in 0..A.row_count() {
-            if let Some(m) = leading_monomial(i, &A, &columns[..]) {
-                if let Ok(monomial_i) = current_monomial_basis.binary_search_by(|x| order.compare(x, &m)) {
+            if let Some(m) = leading_monomial(i, &A, &columns) {
+                if let Some(monomial_i) = current_monomial_basis.index_of(m) {
                     current_basis_rows[monomial_i] = i;
                 }
             }
         }
 
-        for (deleted_m, divisor_m) in deleted_monomials {
-            let quo_m = deleted_m.clone().div(&divisor_m);
-            let mut poly = row_poly(current_basis_rows[current_monomial_basis.binary_search_by(|x| order.compare(x, &divisor_m)).unwrap()], &A, &columns[..]);
-            ring.mul_monomial(&mut poly, &quo_m);
-            add_poly_to_matrix(&ring, poly, &mut A, &mut columns, order);
+        // this basically reduces the current basis with each other
+        let mut index = 0;
+        while index < current_monomial_basis.len() {
+            let m = current_monomial_basis.at_index(index);
+            if current_monomial_basis.iter().any(|x| x.divides(m) && x != m) {
+                let row = current_basis_rows[index];
+                current_basis_rows.remove(index);
+                current_monomial_basis.remove(&m.clone());
+                add_reduction_rows_for_poly(&ring, &row_poly(row, &A, &columns), &mut A, &mut columns, row, true);
+            }
+            index += 1;
         }
 
         // now add S-polys
         let mut deleted_any = false;
         to_process.retain(|(m1, m2)| {
-            if let Ok(f_i) = current_monomial_basis.binary_search_by(|x| order.compare(x, &m1)).map(|index| current_basis_rows[index]) {
-                if let Ok(g_i) = current_monomial_basis.binary_search_by(|x| order.compare(x, &m2)).map(|index| current_basis_rows[index]) {
-                    let f_m = leading_monomial(f_i, &A, &columns[..]).unwrap();
-                    let g_m = leading_monomial(g_i, &A, &columns[..]).unwrap();
+            if let Some(f_i) = current_monomial_basis.index_of(&m1) {
+                if let Some(g_i) = current_monomial_basis.index_of(&m2) {
+                    let f_m = leading_monomial(f_i, &A, &columns).unwrap();
+                    let g_m = leading_monomial(g_i, &A, &columns).unwrap();
                     if f_m.clone().lcm(&g_m).deg() < degree_bound {
-                        add_poly_to_matrix(&ring, S(&ring, &row_poly(f_i, &A, &columns[..]), &row_poly(g_i, &A, &columns[..]), order), &mut A, &mut columns, order);
+                        let S_poly = S(&ring, &row_poly(f_i, &A, &columns), &row_poly(g_i, &A, &columns), order);
+                        add_poly_to_matrix(&ring, S_poly, &mut A, &mut columns, order);
                         deleted_any = true;
                         return false;
                     } else {
@@ -252,27 +332,28 @@ pub fn f4<P, O>(ring: P, basis: Vec<El<P>>, order: O) -> Vec<El<P>>
             degree_bound += 1;
         }
 
-        gb_sparse_row_echelon(&mut A);
+        gb_rowrev_sparse_row_echelon(&mut A);
         A.drop_zero_rows();
 
         for i in 0..A.row_count() {
-            if let Some(m) = leading_monomial(i, &A, &columns[..]) {
+            if let Some(m) = leading_monomial(i, &A, &columns) {
                 if current_monomial_basis.iter().all(|x| !x.divides(&m)) {
                     to_process.extend(current_monomial_basis.iter().cloned()
                         .map(|other_m| (m.clone(), other_m))
                         .filter(|(m1, m2)| m1 != m2 && !m1.is_coprime(m2))
                     );
-                    current_monomial_basis.insert(current_monomial_basis.binary_search_by(|x| order.compare(x, &m)).unwrap_err(), m.clone());
+                    current_monomial_basis.add(m.clone());
                 }
             }
         }
     }
-    
+
     let mut result = Vec::new();
-    for i in (0..A.row_count()).rev() {
-        if let Some(m) = leading_monomial(i, &A, &columns[..]) {
-            if current_monomial_basis.iter().any(|x| *x == m) {
-                result.push(row_poly(i, &A, &columns[..]));
+    for i in 0..A.row_count() {
+        if let Some(m) = leading_monomial(i, &A, &columns) {
+            debug_assert!(result.iter().all(|f| *ring.lm(f, order).unwrap() != *m));
+            if current_monomial_basis.iter().any(|x| x == m) {
+                result.push(row_poly(i, &A, &columns));
             }
         }
     }
@@ -417,6 +498,9 @@ fn test_f4_small() {
         (15, &Monomial::new([0, 0]))
     ].into_iter());
 
+    ring.println(&f1);
+    ring.println(&f2);
+
     let actual = f4(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], order);
 
     let expected = ring.from_terms([
@@ -492,9 +576,9 @@ fn test_f4_larger_elim() {
         (1, &Monomial::new([0, 0, 0]))
     ].into_iter());
     let f2 = ring.from_terms([
+        (1, &Monomial::new([1, 1, 0])),
         (1, &Monomial::new([0, 3, 1])),
-        (1, &Monomial::new([0, 0, 3])),
-        (1, &Monomial::new([1, 1, 0]))
+        (1, &Monomial::new([0, 0, 3]))
     ].into_iter());
     let f3 = ring.from_terms([
         (1, &Monomial::new([1, 0, 2])),
@@ -504,10 +588,9 @@ fn test_f4_larger_elim() {
     ].into_iter());
 
     let actual = f4(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], order);
-
+    
     for f in &actual {
-        ring.println(f);
-        println!();
+        println!("{}, ", ring.format(f));
     }
 
     let g1 = ring.from_terms([
@@ -552,21 +635,27 @@ fn test_generic_computation() {
         ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&x2, 2)),
     ];
 
-    // for f in &basis {
-    //     println!("{}, ", ring.format(f));
-    // }
+    for f in &basis {
+        println!("{}, ", ring.format(f));
+    }
 
     let start = std::time::Instant::now();
     let gb1 = f4(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), order);
-    std::hint::black_box(gb1);
+    std::hint::black_box(&gb1);
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());
-    // let gb2 = f4_old(&ring, basis, order);
-    // for f in &gb1 {
-    //     assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, ring.clone_el(f), &gb2, order));
-    // }
-    // for f in &gb2 {
-    //     assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, ring.clone_el(f), &gb1, order));
-    // }
+
+    let start = std::time::Instant::now();
+    let gb2 = f4_old(&ring, basis, order);
+    let end = std::time::Instant::now();
+
+    println!("Old algorithm took {} ms", (end - start).as_millis());
+
+    for f in &gb1 {
+        assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, ring.clone_el(f), &gb2, order));
+    }
+    for f in &gb2 {
+        assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, ring.clone_el(f), &gb1, order));
+    }
 }
