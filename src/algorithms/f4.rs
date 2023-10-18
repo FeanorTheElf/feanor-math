@@ -5,6 +5,75 @@ use crate::vector::*;
 
 use super::sparse_invert::{SparseMatrix, gb_rowrev_sparse_row_echelon};
 
+pub struct MonomialSet<P, O>
+    where P: MultivariatePolyRingStore,
+        P::Type: MultivariatePolyRing,
+        <P::Type as RingExtension>::BaseRing: FieldStore,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
+        O: MonomialOrder + Copy
+{
+    data: Vec<Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>>,
+    order: O
+}
+
+impl<P, O> MonomialSet<P, O>
+where P: MultivariatePolyRingStore,
+    P::Type: MultivariatePolyRing,
+    <P::Type as RingExtension>::BaseRing: FieldStore,
+    <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
+    O: MonomialOrder + Copy
+{
+    pub fn new(order: O) -> Self {
+        Self {
+            data: Vec::new(),
+            order: order
+        }
+    }
+
+    fn add(&mut self, m: Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> bool {
+        match self.data.binary_search_by(|x| self.order.compare(x, &m).reverse()) {
+            Ok(_) => return true,
+            Err(i) => {
+                self.data.insert(i, m);
+                return false;
+            }
+        }
+    }
+
+    fn remove(&mut self, m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> bool {
+        match self.data.binary_search_by(|x| self.order.compare(x, m).reverse()) {
+            Ok(i) => {
+                self.data.remove(i);
+                return true;
+            },
+            Err(_) => return false
+        }
+    }
+
+    fn contains(&self, m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> bool {
+        match self.data.binary_search_by(|x| self.order.compare(x, m).reverse()) {
+            Ok(_) => true,
+            Err(_) => false
+        }
+    }
+
+    fn iter<'a>(&'a self) -> impl 'a + Iterator<Item = &'a Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>> {
+        self.data.iter()
+    }
+
+    fn at_index(&self, i: usize) -> &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector> {
+        &self.data[i]
+    }
+
+    fn index_of(&self, m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> Option<usize> {
+        self.data.binary_search_by(|x| self.order.compare(x, &m).reverse()).ok()
+    }
+
+    fn len(&self) -> usize {
+        self.data.len()
+    }
+}
+
 fn S<P, O>(ring: P, f1: &El<P>, f2: &El<P>, order: O) -> El<P> 
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
@@ -115,13 +184,51 @@ fn leading_monomial<'a, P, O>(
     A.get_row(i).nontrivial_entries().map(|(j, _)| j).min().map(|j| columns.at_index(j))
 }
 
+///
+/// Requires that A is in lower right triangle form
+/// 
+fn leading_monomial_row<'a, P, O>(
+    m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>,
+    A: &'a SparseMatrix<&<P::Type as RingExtension>::BaseRing>,
+    columns: &'a MonomialSet<P, O>,
+    order: O,
+    ignore_last: usize
+) -> Result<usize, usize>
+    where P: MultivariatePolyRingStore,
+        P::Type: MultivariatePolyRing,
+        <P::Type as RingExtension>::BaseRing: FieldStore,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
+        O: MonomialOrder + Copy
+{
+    let mut start = 0;
+    let mut end = A.row_count() - ignore_last;
+    while start + 1 < end {
+        let mid = (start + end) / 2;
+        match order.compare(m, leading_monomial(mid, A, columns).unwrap()) {
+            std::cmp::Ordering::Equal => return Ok(mid),
+            std::cmp::Ordering::Greater => start = mid + 1,
+            std::cmp::Ordering::Less => end = mid,
+        }
+    }
+    if start < end {
+        match order.compare(m, leading_monomial(start, A, columns).unwrap()) {
+            std::cmp::Ordering::Equal => Ok(start),
+            std::cmp::Ordering::Less => Err(start),
+            std::cmp::Ordering::Greater => Err(start + 1)
+        }
+    } else {
+        Err(start)
+    }
+}
+
 fn add_reduction_rows_for_poly<P, O>(
     ring: &P, 
     poly: &El<P>, 
     A: &mut SparseMatrix<&<P::Type as RingExtension>::BaseRing>, 
     columns: &mut MonomialSet<P, O>, 
-    ignore_row: usize,
-    force_add: bool
+    do_not_reduce_with_self: bool,
+    order: O,
+    ignore_last: usize
 )
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
@@ -141,25 +248,34 @@ fn add_reduction_rows_for_poly<P, O>(
     let mut new_monomials = Vec::new();
 
     for (_, m) in ring.terms(&poly) {
-        if ensure_column_exists(&m, columns, A) || force_add {
-            new_monomials.push(m.clone());
-        }
+        ensure_column_exists(&m, columns, A);
+        new_monomials.push(m.clone());
     }
 
     while let Some(m) = new_monomials.pop() {
-        if let Some(i) = (0..A.row_count()).filter(|i| *i != ignore_row).filter(|i| leading_monomial(*i, &A, &columns).map(|lm| lm.divides(&m)).unwrap_or(false)).next() {
-            let quo_m = m.clone().div(leading_monomial(i, &A, &columns).unwrap());
 
-            let new_row_index = A.row_count();
-            A.add_row(new_row_index);
+        if let Err(insert_at) = leading_monomial_row(&m, A, columns, order, ignore_last) {
 
-            let A_row = A.get_row(i).nontrivial_entries().map(|(j, c)| (columns.at_index(j).clone(), ring.base_ring().clone_el(c))).collect::<Vec<_>>();
-            for (base_m, c) in A_row.into_iter() {
-                let new_m = base_m.mul(&quo_m);
-                if ensure_column_exists(&new_m, columns, A) {
+            let mut reduction_rows = (0..A.row_count())
+                .filter(|i| if let Some(i_m) = leading_monomial(*i, &A, &columns) {
+                    i_m.divides(&m) && (*i_m != m || !do_not_reduce_with_self)
+                } else {
+                    false
+                });
+
+            if let Some(i) = reduction_rows.next() {
+                
+                assert!(i < insert_at);
+                A.add_row(insert_at);
+
+                let quo_m = m.clone().div(leading_monomial(i, &A, &columns).unwrap());
+                let A_row = A.get_row(i).nontrivial_entries().map(|(j, c)| (columns.at_index(j).clone(), ring.base_ring().clone_el(c))).collect::<Vec<_>>();
+                for (base_m, c) in A_row.into_iter() {
+                    let new_m = base_m.mul(&quo_m);
+                    ensure_column_exists(&new_m, columns, A);
                     new_monomials.push(new_m.clone());
+                    A.set(insert_at, columns.index_of(&new_m).unwrap(), c);
                 }
-                A.set(new_row_index, columns.index_of(&new_m).unwrap(), c);
             }
         }
     }
@@ -169,8 +285,9 @@ fn add_poly_to_matrix<P, O>(
     ring: &P, 
     poly: El<P>, 
     A: &mut SparseMatrix<&<P::Type as RingExtension>::BaseRing>, 
-    columns: &mut MonomialSet<P, O>, 
-    order: O
+    columns: &mut MonomialSet<P, O>,
+    order: O,
+    ignore_last: &mut usize
 ) -> usize
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
@@ -178,10 +295,11 @@ fn add_poly_to_matrix<P, O>(
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
         O: MonomialOrder + Copy
 {    
-    add_reduction_rows_for_poly(ring, &poly, A, columns, usize::MAX, false);
+    add_reduction_rows_for_poly(ring, &poly, A, columns, false, order, *ignore_last);
 
     let new_row_index = A.row_count();
     A.add_row(new_row_index);
+    *ignore_last += 1;
 
     for (c, m) in ring.terms(&poly) {
         A.set(new_row_index, columns.index_of(m).unwrap(), ring.base_ring().clone_el(c));
@@ -190,73 +308,75 @@ fn add_poly_to_matrix<P, O>(
     return new_row_index;
 }
 
-struct MonomialSet<P, O>
+pub fn reduce_basis_polys<P, O>(
+    ring: &P, 
+    current_monomial_basis: &mut MonomialSet<P, O>,
+    A: &mut SparseMatrix<&<P::Type as RingExtension>::BaseRing>, 
+    columns: &mut MonomialSet<P, O>, 
+    order: O
+) -> bool
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: FieldStore,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
         O: MonomialOrder + Copy
 {
-    data: Vec<Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>>,
-    order: O
+    let row_poly = |i: usize, A: &SparseMatrix<&<P::Type as RingExtension>::BaseRing>, columns: &MonomialSet<P, O>| ring.from_terms(
+        A.get_row(i).nontrivial_entries().map(|(j, c)| (ring.base_ring().clone_el(c), columns.at_index(j)))
+    );
+    let mut deleted_any = false;
+    let mut index = 0;
+    while index < current_monomial_basis.len() {
+        let m = current_monomial_basis.at_index(index);
+        if current_monomial_basis.iter().any(|x| x.divides(m) && x != m) {
+            deleted_any = true;
+            println!("del {:?} of {:?}", m, current_monomial_basis.iter().filter(|x| x.divides(m) && *x != m).collect::<Vec<_>>());
+            let row = leading_monomial_row(m, A, columns, order, 0).unwrap();
+            current_monomial_basis.remove(&m.clone());
+            add_reduction_rows_for_poly(ring, &row_poly(row, &A, &columns), A, columns, true, order, 0);
+        } else {
+            index += 1;
+        }
+    }
+    return deleted_any;
 }
 
-impl<P, O> MonomialSet<P, O>
-where P: MultivariatePolyRingStore,
-    P::Type: MultivariatePolyRing,
-    <P::Type as RingExtension>::BaseRing: FieldStore,
-    <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
-    O: MonomialOrder + Copy
+pub fn add_S_polys<P, O>(
+    ring: &P, 
+    to_process: &mut Vec<(Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>, Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>)>,
+    current_monomial_basis: &MonomialSet<P, O>,
+    A: &mut SparseMatrix<&<P::Type as RingExtension>::BaseRing>, 
+    columns: &mut MonomialSet<P, O>, 
+    order: O,
+    degree_bound: usize
+) -> bool
+    where P: MultivariatePolyRingStore,
+        P::Type: MultivariatePolyRing,
+        <P::Type as RingExtension>::BaseRing: FieldStore,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
+        O: MonomialOrder + Copy
 {
-    pub fn new(order: O) -> Self {
-        Self {
-            data: Vec::new(),
-            order: order
-        }
-    }
-
-    fn add(&mut self, m: Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> bool {
-        match self.data.binary_search_by(|x| self.order.compare(x, &m).reverse()) {
-            Ok(_) => return true,
-            Err(i) => {
-                self.data.insert(i, m);
+    let row_poly = |i: usize, A: &SparseMatrix<&<P::Type as RingExtension>::BaseRing>, columns: &MonomialSet<P, O>| ring.from_terms(
+        A.get_row(i).nontrivial_entries().map(|(j, c)| (ring.base_ring().clone_el(c), columns.at_index(j)))
+    );
+    let mut added_S_polys = 0;
+    to_process.retain(|(m1, m2)| {
+        if current_monomial_basis.contains(m1) && current_monomial_basis.contains(m2) {
+            if (m1.clone().lcm(&m2).deg() as usize) < degree_bound {
+                println!("S-poly for {:?}, {:?}", m1, m2);
+                let i1 = leading_monomial_row(m1, A, columns, order, added_S_polys).unwrap();
+                let i2 = leading_monomial_row(m2, A, columns, order, added_S_polys).unwrap();
+                let S_poly = S(&ring, &row_poly(i1, &A, &columns), &row_poly(i2, &A, &columns), order);
+                ring.println(&S_poly);
+                add_poly_to_matrix(ring, S_poly, A, columns, order, &mut added_S_polys);
                 return false;
+            } else {
+                return true;
             }
         }
-    }
-
-    fn remove(&mut self, m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> bool {
-        match self.data.binary_search_by(|x| self.order.compare(x, m).reverse()) {
-            Ok(i) => {
-                self.data.remove(i);
-                return true;
-            },
-            Err(_) => return false
-        }
-    }
-
-    fn contains(&self, m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> bool {
-        match self.data.binary_search_by(|x| self.order.compare(x, m).reverse()) {
-            Ok(_) => true,
-            Err(_) => false
-        }
-    }
-
-    fn iter<'a>(&'a self) -> impl 'a + Iterator<Item = &'a Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>> {
-        self.data.iter()
-    }
-
-    fn at_index(&self, i: usize) -> &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector> {
-        &self.data[i]
-    }
-
-    fn index_of(&self, m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> Option<usize> {
-        self.data.binary_search_by(|x| self.order.compare(x, &m).reverse()).ok()
-    }
-
-    fn len(&self) -> usize {
-        self.data.len()
-    }
+        return false;
+    });
+    return added_S_polys > 0;
 }
 
 pub fn f4<P, O>(ring: P, basis: Vec<El<P>>, order: O) -> Vec<El<P>>
@@ -271,11 +391,18 @@ pub fn f4<P, O>(ring: P, basis: Vec<El<P>>, order: O) -> Vec<El<P>>
     );
 
     let mut A = SparseMatrix::new(ring.base_ring(), 0, 0, None.into_iter());
+
+    // the monomials belonging to the columns of A, in the same order
     let mut columns = MonomialSet::new(order);
 
+    // the S-polynomials we still have to add
     let mut to_process = basis.iter().map(|f| ring.lm(f, order).unwrap()).flat_map(|m1| basis.iter().map(|f| (m1.clone(), ring.lm(f, order).unwrap().clone()))).collect::<Vec<_>>();
-    for b in reduce(&ring, basis, order).0 {
-        add_poly_to_matrix(&ring, b, &mut A, &mut columns, order);
+
+    let mut reduced_basis = reduce(&ring, basis, order).0;
+    reduced_basis.sort_by(|l, r| order.compare(ring.lm(l, order).unwrap(), ring.lm(r, order).unwrap()));
+    for b in reduced_basis {
+        let mut len = A.row_count();
+        add_poly_to_matrix(&ring, b, &mut A, &mut columns, order, &mut len);
     }
     
     // A set of monomials such that the rows with these leading monomials already suffice to reduce all other rows to 0 via multivariate division
@@ -286,50 +413,29 @@ pub fn f4<P, O>(ring: P, basis: Vec<El<P>>, order: O) -> Vec<El<P>>
 
     while to_process.len() != 0 {
 
-        let mut current_basis_rows = Vec::new();
-        current_basis_rows.resize(current_monomial_basis.len(), 0);
+        #[cfg(debug_assertions)]
+        {
+            for i in 1..A.row_count() {
+                assert!(order.compare(leading_monomial(i - 1, &A, &columns).unwrap(), leading_monomial(i, &A, &columns).unwrap()) == std::cmp::Ordering::Less);
+            }
+        }
+
+        println!("Current basis");
         for i in 0..A.row_count() {
             if let Some(m) = leading_monomial(i, &A, &columns) {
-                if let Some(monomial_i) = current_monomial_basis.index_of(m) {
-                    current_basis_rows[monomial_i] = i;
+                if let Some(_) = current_monomial_basis.index_of(m) {
+                    println!("{}, ", ring.format(&row_poly(i, &A, &columns)));
                 }
             }
         }
+        println!();
 
-        // this basically reduces the current basis with each other
-        let mut index = 0;
-        while index < current_monomial_basis.len() {
-            let m = current_monomial_basis.at_index(index);
-            if current_monomial_basis.iter().any(|x| x.divides(m) && x != m) {
-                let row = current_basis_rows[index];
-                current_basis_rows.remove(index);
-                current_monomial_basis.remove(&m.clone());
-                add_reduction_rows_for_poly(&ring, &row_poly(row, &A, &columns), &mut A, &mut columns, row, true);
+        // we either reduce the basis or add S-polys, doing both causes polys to be forgotten
+        if !reduce_basis_polys(&ring, &mut current_monomial_basis, &mut A, &mut columns, order) {
+            if !add_S_polys(&ring, &mut to_process, &current_monomial_basis, &mut A, &mut columns, order, degree_bound) {
+                println!("Increase degree bound to {}", degree_bound);
+                degree_bound += 1;
             }
-            index += 1;
-        }
-
-        // now add S-polys
-        let mut deleted_any = false;
-        to_process.retain(|(m1, m2)| {
-            if let Some(f_i) = current_monomial_basis.index_of(&m1) {
-                if let Some(g_i) = current_monomial_basis.index_of(&m2) {
-                    let f_m = leading_monomial(f_i, &A, &columns).unwrap();
-                    let g_m = leading_monomial(g_i, &A, &columns).unwrap();
-                    if f_m.clone().lcm(&g_m).deg() < degree_bound {
-                        let S_poly = S(&ring, &row_poly(f_i, &A, &columns), &row_poly(g_i, &A, &columns), order);
-                        add_poly_to_matrix(&ring, S_poly, &mut A, &mut columns, order);
-                        deleted_any = true;
-                        return false;
-                    } else {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        });
-        if !deleted_any {
-            degree_bound += 1;
         }
 
         gb_rowrev_sparse_row_echelon(&mut A);
@@ -337,7 +443,9 @@ pub fn f4<P, O>(ring: P, basis: Vec<El<P>>, order: O) -> Vec<El<P>>
 
         for i in 0..A.row_count() {
             if let Some(m) = leading_monomial(i, &A, &columns) {
+                println!("{:?}", m);
                 if current_monomial_basis.iter().all(|x| !x.divides(&m)) {
+                    println!("add {:?}", m);
                     to_process.extend(current_monomial_basis.iter().cloned()
                         .map(|other_m| (m.clone(), other_m))
                         .filter(|(m1, m2)| m1 != m2 && !m1.is_coprime(m2))
@@ -512,7 +620,7 @@ fn test_f4_small() {
     assert_eq!(3, actual.len());
     assert_el_eq!(&ring, &f2, actual.at(0));
     assert_el_eq!(&ring, &f1, actual.at(1));
-    assert_el_eq!(&ring, &expected, actual.at(2));
+    assert_el_eq!(&ring, &ring.negate(expected), actual.at(2));
 }
 
 #[test]
