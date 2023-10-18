@@ -211,7 +211,6 @@ fn leading_monomial_row<'a, P, O>(
         }
     }
     if start < end {
-        println!("{:?}, {:?}, {:?}", m, leading_monomial(start, A, columns).unwrap(), order.compare(m, leading_monomial(start, A, columns).unwrap()));
         match order.compare(m, leading_monomial(start, A, columns).unwrap()) {
             std::cmp::Ordering::Equal => Ok(start),
             std::cmp::Ordering::Less => Err(start),
