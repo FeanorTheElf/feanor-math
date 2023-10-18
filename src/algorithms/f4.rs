@@ -3,7 +3,7 @@ use crate::ring::*;
 use crate::rings::multivariate::*;
 use crate::vector::*;
 
-use super::sparse_invert::{SparseMatrix, RowColTrackingMatrix, gb_sparse_row_echelon};
+use super::sparse_invert::{SparseMatrix, gb_sparse_row_echelon};
 
 fn S<P, O>(ring: P, f1: &El<P>, f2: &El<P>, order: O) -> El<P> 
     where P: MultivariatePolyRingStore,
@@ -177,25 +177,34 @@ pub fn f4<P, O>(ring: P, basis: Vec<El<P>>, order: O) -> Vec<El<P>>
     let mut A = SparseMatrix::new(ring.base_ring(), 0, 0, None.into_iter());
     let mut columns: Vec<Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>> = Vec::new();
 
-    let mut new_element_row_indices = Vec::new();
+    let mut to_process = basis.iter().map(|f| ring.lm(f, order).unwrap()).flat_map(|m1| basis.iter().map(|f| (m1.clone(), ring.lm(f, order).unwrap().clone()))).collect::<Vec<_>>();
     for b in basis {
-        new_element_row_indices.push(add_poly_to_matrix(&ring, b, &mut A, &mut columns, order));
+        add_poly_to_matrix(&ring, b, &mut A, &mut columns, order);
     }
     
     // A set of monomials such that the rows with these leading monomials already suffice to reduce all other rows to 0 via multivariate division
-    let mut current_basis_monomials: Vec<Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>> = Vec::new();
+    let mut current_monomial_basis: Vec<Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>> = Vec::new();
+    let mut degree_bound = 0;
 
-    while new_element_row_indices.len() != 0 {
+    while to_process.len() != 0 {
+
+        println!("Basis has {} elements", current_monomial_basis.len());
+        println!("We have currently queued {} S-polys", to_process.len());
+        println!("Current matrix dimension is {}x{}", A.row_count(), A.col_count());
+        if let Some(m) = current_monomial_basis.last() {
+            println!("Largest monomial in basis is {}", ring.format(&ring.monomial(m)));
+        }
+        println!("Currently considering S-polys with lcm(lm(f), lm(g)) at most degree {}", degree_bound);
+        println!();
 
         // this basically reduces the current basis with each other
         let mut deleted_monomials = Vec::new();
         let mut index1 = 0;
-        while index1 < current_basis_monomials.len() {
-            let potential_divisor = current_basis_monomials[index1].clone();
-            current_basis_monomials.retain(|m| {
+        while index1 < current_monomial_basis.len() {
+            let potential_divisor = current_monomial_basis[index1].clone();
+            current_monomial_basis.retain(|m| {
                 if *m != potential_divisor && potential_divisor.divides(m) {
-                    println!("Removing {} from basis", ring.format(&ring.monomial(m)));
-                    deleted_monomials.push(m.clone());
+                    deleted_monomials.push((m.clone(), potential_divisor.clone()));
                     false
                 } else {
                     true
@@ -204,54 +213,65 @@ pub fn f4<P, O>(ring: P, basis: Vec<El<P>>, order: O) -> Vec<El<P>>
             index1 += 1;
         }
 
-        let mut basis = Vec::new();
-        let original_row_count = A.row_count();
-        for i in 0..original_row_count {
+        let mut current_basis_rows = Vec::new();
+        current_basis_rows.resize(current_monomial_basis.len(), 0);
+        for i in 0..A.row_count() {
             if let Some(m) = leading_monomial(i, &A, &columns[..]) {
-                if current_basis_monomials.iter().any(|x| *x == m) {
-                    basis.push(i);
-                    for deleted_m in deleted_monomials.iter().filter(|x| m.divides(x)) {
-                        let quo_m = deleted_m.clone().div(&m);
-                        let mut poly = row_poly(i, &A, &columns[..]);
-                        ring.mul_monomial(&mut poly, &quo_m);
-                        add_poly_to_matrix(&ring, poly, &mut A, &mut columns, order);
-                    }
+                if let Ok(monomial_i) = current_monomial_basis.binary_search_by(|x| order.compare(x, &m)) {
+                    current_basis_rows[monomial_i] = i;
                 }
             }
         }
-        
+
+        for (deleted_m, divisor_m) in deleted_monomials {
+            let quo_m = deleted_m.clone().div(&divisor_m);
+            let mut poly = row_poly(current_basis_rows[current_monomial_basis.binary_search_by(|x| order.compare(x, &divisor_m)).unwrap()], &A, &columns[..]);
+            ring.mul_monomial(&mut poly, &quo_m);
+            add_poly_to_matrix(&ring, poly, &mut A, &mut columns, order);
+        }
+
         // now add S-polys
-        for new_i in &new_element_row_indices {
-            for old_i in &basis {
-                if new_i != old_i {
-                    let S_poly = S(&ring, &row_poly(*new_i, &A, &columns[..]), &row_poly(*old_i, &A, &columns[..]), order);
-                    add_poly_to_matrix(&ring, S_poly, &mut A, &mut columns, order);
+        let mut deleted_any = false;
+        to_process.retain(|(m1, m2)| {
+            if let Ok(f_i) = current_monomial_basis.binary_search_by(|x| order.compare(x, &m1)).map(|index| current_basis_rows[index]) {
+                if let Ok(g_i) = current_monomial_basis.binary_search_by(|x| order.compare(x, &m2)).map(|index| current_basis_rows[index]) {
+                    let f_m = leading_monomial(f_i, &A, &columns[..]).unwrap();
+                    let g_m = leading_monomial(g_i, &A, &columns[..]).unwrap();
+                    if f_m.clone().lcm(&g_m).deg() < degree_bound {
+                        add_poly_to_matrix(&ring, S(&ring, &row_poly(f_i, &A, &columns[..]), &row_poly(g_i, &A, &columns[..]), order), &mut A, &mut columns, order);
+                        deleted_any = true;
+                        return false;
+                    } else {
+                        return true;
+                    }
                 }
             }
+            return false;
+        });
+        if !deleted_any {
+            degree_bound += 1;
         }
 
         gb_sparse_row_echelon(&mut A);
         A.drop_zero_rows();
-        new_element_row_indices.clear();
 
-        // find the nontrivial new rows
-        println!("New polys");
         for i in 0..A.row_count() {
             if let Some(m) = leading_monomial(i, &A, &columns[..]) {
-                if current_basis_monomials.iter().all(|x: &Monomial<_>| !x.divides(&m)) {
-                    new_element_row_indices.push(i);
-                    current_basis_monomials.push(m.clone());
-                    ring.println(&row_poly(i, &A, &columns[..]));
+                if current_monomial_basis.iter().all(|x| !x.divides(&m)) {
+                    to_process.extend(current_monomial_basis.iter().cloned()
+                        .map(|other_m| (m.clone(), other_m))
+                        .filter(|(m1, m2)| m1 != m2 && !m1.is_coprime(m2))
+                    );
+                    current_monomial_basis.insert(current_monomial_basis.binary_search_by(|x| order.compare(x, &m)).unwrap_err(), m.clone());
                 }
             }
         }
-        println!();
     }
     
     let mut result = Vec::new();
     for i in (0..A.row_count()).rev() {
         if let Some(m) = leading_monomial(i, &A, &columns[..]) {
-            if current_basis_monomials.iter().any(|x| *x == m) {
+            if current_monomial_basis.iter().any(|x| *x == m) {
                 result.push(row_poly(i, &A, &columns[..]));
             }
         }
@@ -408,7 +428,7 @@ fn test_f4_small() {
     assert_eq!(3, actual.len());
     assert_el_eq!(&ring, &f2, actual.at(0));
     assert_el_eq!(&ring, &f1, actual.at(1));
-    assert_el_eq!(&ring, &ring.negate(expected), actual.at(2));
+    assert_el_eq!(&ring, &expected, actual.at(2));
 }
 
 #[test]
@@ -531,8 +551,22 @@ fn test_generic_computation() {
         ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&x2, 1)),
         ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&x2, 2)),
     ];
-    let gb = f4(&ring, basis, order);
-    for f in &gb {
-        ring.println(f);
-    }
+
+    // for f in &basis {
+    //     println!("{}, ", ring.format(f));
+    // }
+
+    let start = std::time::Instant::now();
+    let gb1 = f4(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), order);
+    std::hint::black_box(gb1);
+    let end = std::time::Instant::now();
+
+    println!("Computed GB in {} ms", (end - start).as_millis());
+    // let gb2 = f4_old(&ring, basis, order);
+    // for f in &gb1 {
+    //     assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, ring.clone_el(f), &gb2, order));
+    // }
+    // for f in &gb2 {
+    //     assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, ring.clone_el(f), &gb1, order));
+    // }
 }
