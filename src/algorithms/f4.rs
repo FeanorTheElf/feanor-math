@@ -211,6 +211,7 @@ fn leading_monomial_row<'a, P, O>(
         }
     }
     if start < end {
+        println!("{:?}, {:?}, {:?}", m, leading_monomial(start, A, columns).unwrap(), order.compare(m, leading_monomial(start, A, columns).unwrap()));
         match order.compare(m, leading_monomial(start, A, columns).unwrap()) {
             std::cmp::Ordering::Equal => Ok(start),
             std::cmp::Ordering::Less => Err(start),
@@ -256,7 +257,7 @@ fn add_reduction_rows_for_poly<P, O>(
 
         if let Err(insert_at) = leading_monomial_row(&m, A, columns, order, ignore_last) {
 
-            let mut reduction_rows = (0..A.row_count())
+            let mut reduction_rows = (0..(A.row_count() - ignore_last))
                 .filter(|i| if let Some(i_m) = leading_monomial(*i, &A, &columns) {
                     i_m.divides(&m) && (*i_m != m || !do_not_reduce_with_self)
                 } else {
