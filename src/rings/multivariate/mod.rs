@@ -284,7 +284,7 @@ impl<V: VectorView<MonomialExponent>> Index<usize> for Monomial<V> {
 pub trait MonomialOrder {
 
     fn is_graded(&self) -> bool;
-    fn cmp<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering;
+    fn compare<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering;
 
     fn is_same<O: ?Sized + MonomialOrder>(&self, _other: &O) -> bool {
         type_eq::<Self, O>()
@@ -340,7 +340,7 @@ impl<V, O> Ord for FixedOrderMonomial<V, O>
 {
     fn cmp(&self, other: &Self) -> Ordering {
         assert!(self.order().is_same(other.order()));
-        self.order.cmp(&self.m, &other.m)
+        self.order.compare(&self.m, &other.m)
     }
 }
 
@@ -368,12 +368,12 @@ impl MonomialOrder for BlockLexDegRevLex {
         false
     }
 
-    fn cmp<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering {
-        match DegRevLex.cmp(
+    fn compare<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering {
+        match DegRevLex.compare(
             &Monomial::new(Subvector::new(&lhs.exponents).subvector(..self.larger_block)), 
             &Monomial::new(Subvector::new(&rhs.exponents).subvector(..self.larger_block))
         ) {
-            Ordering::Equal => DegRevLex.cmp(
+            Ordering::Equal => DegRevLex.compare(
                 &Monomial::new(Subvector::new(&lhs.exponents).subvector(self.larger_block..)), 
                 &Monomial::new(Subvector::new(&rhs.exponents).subvector(self.larger_block..))
             ),
@@ -396,7 +396,7 @@ impl MonomialOrder for DegRevLex {
         true
     }
 
-    fn cmp<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering {
+    fn compare<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering {
         let lhs_deg = lhs.deg();
         let rhs_deg = rhs.deg();
         if lhs_deg < rhs_deg {
@@ -425,7 +425,7 @@ impl MonomialOrder for Lex {
         false
     }
 
-    fn cmp<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering {
+    fn compare<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering {
         for i in 0..max(lhs.len(), rhs.len()) {
             if lhs[i] < rhs[i] {
                 return Ordering::Less;
@@ -451,7 +451,7 @@ fn test_lex() {
         Monomial::new([1, 1, 0]),
         Monomial::new([2, 0, 0])
     ];
-    monomials.sort_by(|l, r| Lex.cmp(l, r).reverse());
+    monomials.sort_by(|l, r| Lex.compare(l, r).reverse());
     assert_eq!(vec![
         Monomial::new([2, 0, 0]),
         Monomial::new([1, 1, 0]),
@@ -480,7 +480,7 @@ fn test_degrevlex() {
         Monomial::new([1, 1, 0]),
         Monomial::new([2, 0, 0])
     ];
-    monomials.sort_by(|l, r| DegRevLex.cmp(l, r).reverse());
+    monomials.sort_by(|l, r| DegRevLex.compare(l, r).reverse());
     assert_eq!(vec![
         Monomial::new([2, 0, 0]),
         Monomial::new([1, 1, 0]),

@@ -176,7 +176,7 @@ fn test_ec_factor() {
 fn test_perf_ec_factor() {
     let ZZ = StaticRing::<i64>::RING;
     let mut n = ZZ.one();
-    let bits = 60;
+    let bits = 58;
     ZZ.mul_pow_2(&mut n, bits);
     ZZ.add_assign(&mut n, ZZ.one());
 

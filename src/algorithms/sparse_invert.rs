@@ -22,10 +22,6 @@ pub struct SparseMatrix<F: FieldStore>
     /// 
     col_permutation: Vec<usize>,
     ///
-    /// Row count of the whole matrix
-    /// 
-    row_count: usize,
-    ///
     /// Column count of the whole matrix
     /// 
     col_count: usize,
@@ -69,7 +65,6 @@ pub struct RowTrackingMatrix<'a, F: FieldStore>
     where F::Type: Field
 {
     base: &'a mut SparseMatrix<F>,
-    row_nonzero_entry_counts: Vec<usize>,
     recycle_vec: Option<Vec<(usize, El<F>)>>
 }
 
@@ -188,7 +183,6 @@ impl<F: FieldStore> Clone for SparseMatrix<F>
     fn clone(&self) -> Self {
         Self {
             col_count: self.col_count,
-            row_count: self.row_count,
             col_permutation: self.col_permutation.clone(),
             col_permutation_inv: self.col_permutation_inv.clone(),
             field: self.field.clone(),
@@ -213,7 +207,6 @@ impl<F: FieldStore> SparseMatrix<F>
         let mut result = SparseMatrix { 
             col_permutation, 
             col_permutation_inv,
-            row_count,
             col_count,
             zero: field.zero(),
             field, 
@@ -255,8 +248,7 @@ impl<F: FieldStore> SparseMatrix<F>
     }
 
     pub fn add_row(&mut self, i: usize) {
-        self.rows.insert(self.row_count - i, Vec::new());
-        self.row_count += 1;
+        self.rows.insert(self.rows.len() - i, Vec::new());
     }
 
     pub fn set(&mut self, i: usize, j: usize, value: El<F>) {
@@ -291,8 +283,8 @@ impl<F: FieldStore> SparseMatrix<F>
     }
 
     pub fn swap_rows(&mut self, i1: usize, i2: usize) {
-        assert!(i1 < self.row_count);
-        assert!(i2 < self.row_count);
+        assert!(i1 < self.row_count());
+        assert!(i2 < self.row_count());
         if i1 == i2 {
             return;
         }
@@ -302,7 +294,7 @@ impl<F: FieldStore> SparseMatrix<F>
     }
 
     fn global_row_index(&self, i: usize) -> usize {
-        self.row_count - i - 1
+        self.row_count() - i - 1
     }
 
     fn global_col_index(&self, j: usize) -> usize {
@@ -310,7 +302,7 @@ impl<F: FieldStore> SparseMatrix<F>
     }
 
     pub fn row_count(&self) -> usize {
-        self.row_count
+        self.rows.len()
     }
 
     pub fn col_count(&self) -> usize {
@@ -318,8 +310,8 @@ impl<F: FieldStore> SparseMatrix<F>
     }
 
     pub fn at(&self, i: usize, j: usize) -> &El<F> {
-        assert!(i < self.row_count);
-        assert!(j < self.col_count);
+        assert!(i < self.row_count());
+        assert!(j < self.col_count());
         let hard_column = self.col_permutation[self.global_col_index(j)];
         let result = self.rows[self.global_row_index(i)].binary_search_by_key(&hard_column, |(index, _)| *index).map(|index| &self.rows[self.global_row_index(i)][index].1).unwrap_or(&self.zero);
         
@@ -379,6 +371,10 @@ impl<F: FieldStore> SparseMatrix<F>
         }
         *recycle_vec = Some(std::mem::replace(&mut self.rows[dst_i_global], new_row));
     }
+
+    pub fn drop_zero_rows(&mut self) {
+        self.rows.retain(|r| r.len() > 0);
+    }
 }
 
 
@@ -387,14 +383,14 @@ impl<'a, F: FieldStore> RowColTrackingMatrix<'a, F>
 {
     pub fn new(base: &'a mut SparseMatrix<F>) -> Self {
         let mut result = RowColTrackingMatrix {
-            row_nonzero_entry_counts: (0..base.row_count).map(|i| base.rows[i].len()).collect(),
-            col_nonzero_entry_counts: (0..base.col_count).map(|_| 0).collect(),
-            row_count: base.row_count,
-            col_count: base.col_count,
+            row_nonzero_entry_counts: (0..base.row_count()).map(|i| base.rows[i].len()).collect(),
+            col_nonzero_entry_counts: (0..base.col_count()).map(|_| 0).collect(),
+            row_count: base.row_count(),
+            col_count: base.col_count(),
             base: base,
             recycle_vec: Some(Vec::new())
         };
-        for i in 0..result.base.row_count {
+        for i in 0..result.base.row_count() {
             for (j, _) in &result.base.rows[i] {
                 result.col_nonzero_entry_counts[*j] += 1;
             }
@@ -453,7 +449,7 @@ impl<'a, F: FieldStore> RowColTrackingMatrix<'a, F>
     }
 
     fn row_offset(&self) -> usize {
-        self.base.row_count - self.row_count
+        self.base.row_count() - self.row_count
     }
 
     pub fn at(&self, i: usize, j: usize) -> &El<F> {
@@ -461,7 +457,7 @@ impl<'a, F: FieldStore> RowColTrackingMatrix<'a, F>
     }
 
     pub fn get_row<'b>(&'b self, i: usize) -> MatrixRow<'b, El<F>> {
-        let mut result = self.base.get_row(i + self.base.row_count - self.row_count);
+        let mut result = self.base.get_row(i + self.base.row_count() - self.row_count);
         result.len = self.col_count;
         return result;
     }
@@ -541,23 +537,13 @@ impl<'a, F: FieldStore> RowTrackingMatrix<'a, F>
 {
     pub fn new(base: &'a mut SparseMatrix<F>) -> Self {
         RowTrackingMatrix {
-            row_nonzero_entry_counts: (0..base.row_count).map(|i| base.rows[i].len()).collect(),
             base: base,
             recycle_vec: Some(Vec::new())
         }
     }
-    
-
-    fn nonzero_entry_added(row_nonzero_entry_counts: &mut Vec<usize>, global_row: usize) {
-        row_nonzero_entry_counts[global_row] += 1;
-    }
-
-    fn nonzero_entry_cancelled(row_nonzero_entry_counts: &mut Vec<usize>, global_row: usize) {
-        row_nonzero_entry_counts[global_row] -= 1;
-    }
 
     fn global_row_index(&self, i: usize) -> usize {
-        self.base.row_count - i - 1
+        self.base.row_count() - i - 1
     }
 
     pub fn at(&self, i: usize, j: usize) -> &El<F> {
@@ -573,7 +559,7 @@ impl<'a, F: FieldStore> RowTrackingMatrix<'a, F>
     }
 
     pub fn row_count(&self) -> usize {
-        self.base.row_count
+        self.base.row_count()
     }
 
     pub fn col_count(&self) -> usize {
@@ -586,11 +572,10 @@ impl<'a, F: FieldStore> RowTrackingMatrix<'a, F>
 
     pub fn swap_rows(&mut self, i1: usize, i2: usize) {
         self.base.swap_rows(i1, i2);
-        self.row_nonzero_entry_counts.swap(self.global_row_index(i1), self.global_row_index(i2));
     }
 
     pub fn nonzero_entries_in_row(&self, i: usize) -> usize {
-        self.row_nonzero_entry_counts[self.global_row_index(i)]
+        self.base.rows[self.global_row_index(i)].len()
     }
 
     pub fn sub_row(&mut self, dst_i: usize, src_i: usize, factor: &El<F>) {
@@ -599,11 +584,7 @@ impl<'a, F: FieldStore> RowTrackingMatrix<'a, F>
             src_i, 
             factor, 
             &mut self.recycle_vec, 
-            |_i, _j, added, global_i, _global_j| if added {
-                Self::nonzero_entry_added(&mut self.row_nonzero_entry_counts, global_i)
-            } else {
-                Self::nonzero_entry_cancelled(&mut self.row_nonzero_entry_counts, global_i)
-            }
+            |_i, _j, _added, _global_i, _global_j| {}
         );
     }
 }

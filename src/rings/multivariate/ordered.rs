@@ -42,7 +42,7 @@ impl<R, O, M, const N: usize> MultivariatePolyRingImplBase<R, O, M, N>
 {
     fn is_valid(&self, el: &<Self as RingBase>::Element) -> bool {
         for i in 1..el.len() {
-            if self.order.cmp(&el.at(i - 1).1, &el.at(i).1) != Ordering::Less {
+            if self.order.compare(&el.at(i - 1).1, &el.at(i).1) != Ordering::Less {
                 return false;
             }
         }
@@ -76,7 +76,7 @@ impl<R, O, M, const N: usize> MultivariatePolyRingImplBase<R, O, M, N>
         while i_l < lhs.len() && i_r < rhs.len() {
             let mut rhs_monomial = rhs.at(i_r).1;
             rhs_monomial.mul_assign(m);
-            match self.order.cmp(&lhs.at(i_l).1, &rhs_monomial) {
+            match self.order.compare(&lhs.at(i_l).1, &rhs_monomial) {
                 Ordering::Equal => {
                     *result.at_mut(i_o) = (self.base_ring.add_ref_fst(&lhs.at(i_l).0, self.base_ring.mul_ref(&rhs.at(i_r).0, factor)), lhs.at(i_l).1);
                     i_l += 1;
@@ -209,9 +209,9 @@ impl<R, O, M, const N: usize> RingBase for MultivariatePolyRingImplBase<R, O, M,
             if with_plus {
                 write!(out, " + ")?;
             }
-            if !self.base_ring.is_one(c) || self.order.cmp(m, &Monomial::new([0; N])) == Ordering::Equal {
+            if !self.base_ring.is_one(c) || self.order.compare(m, &Monomial::new([0; N])) == Ordering::Equal {
                 write!(out, "{}", self.base_ring.format(c))?;
-                if self.order.cmp(m, &Monomial::new([0; N])) != Ordering::Equal {
+                if self.order.compare(m, &Monomial::new([0; N])) != Ordering::Equal {
                     write!(out, " * ")?;
                 }
             }
@@ -296,7 +296,7 @@ impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalHom<Mult
             self.base_ring.get_ring().map_in_ref(from.base_ring().get_ring(), &el.at(i).0, hom), 
             Monomial::new(std::array::from_fn(|j| el.at(i).1[j] ))
         ));
-        result.sort_by(|l, r| self.order.cmp(&l.1, &r.1));
+        result.sort_by(|l, r| self.order.compare(&l.1, &r.1));
         return result;
     }
 
@@ -316,7 +316,7 @@ impl<R1, O, M1, R2, M2, const N: usize> CanonicalHom<MultivariatePolyRingImplBas
     fn map_in_ref(&self, from: &MultivariatePolyRingImplBase<R2, O, M2, N>, el: &<MultivariatePolyRingImplBase<R2, O, M2, N> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         let mut result = self.memory_provider.get_new_init(el.len(), |i| (self.base_ring.get_ring().map_in_ref(from.base_ring().get_ring(), &el.at(i).0, hom), el.at(i).1));
         if self.order != from.order {
-            result.sort_by(|l, r| self.order.cmp(&l.1, &r.1));
+            result.sort_by(|l, r| self.order.compare(&l.1, &r.1));
         }
         return result;
     }
@@ -350,7 +350,7 @@ impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalIso<Mult
             self.base_ring.get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(&el.at(i).0), iso), 
             Monomial::new(std::array::from_fn(|j| el.at(i).1[j] ))
         ));
-        result.sort_by(|l, r| from.order.cmp(&l.1, &r.1));
+        result.sort_by(|l, r| from.order.compare(&l.1, &r.1));
         return result;
     }
 }
@@ -369,7 +369,7 @@ impl<R1, O, M1, R2, M2, const N: usize> CanonicalIso<MultivariatePolyRingImplBas
             el.at(i).1
         ));
         if self.order != from.order {
-            result.sort_by(|l, r| self.order.cmp(&l.1, &r.1));
+            result.sort_by(|l, r| self.order.compare(&l.1, &r.1));
         }
         return result;
     }
@@ -414,7 +414,7 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
     }
 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, m: &Monomial<Self::MonomialVector>) -> &'a El<Self::BaseRing> {
-        match f.binary_search_by(|x| self.order.cmp(&x.1, m)) {
+        match f.binary_search_by(|x| self.order.compare(&x.1, m)) {
             Ok(i) => &f.at(i).0,
             Err(_) => &self.zero
         }
@@ -445,7 +445,7 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
         } else if self.order.is_same(&order) {
             return Some(&f.at(f.len() - 1).1);
         } else {
-            return Some(&f.iter().max_by(|(_, ml), (_, mr)| order.cmp(ml, mr)).unwrap().1);
+            return Some(&f.iter().max_by(|(_, ml), (_, mr)| order.compare(ml, mr)).unwrap().1);
         }
     }
 }
