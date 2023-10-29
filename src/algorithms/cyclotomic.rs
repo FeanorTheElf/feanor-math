@@ -95,7 +95,7 @@ pub fn test_cyclotomic_polynomial() {
 }
 
 #[bench]
-pub fn bench_cyclotomic_polynomial(bencher: &mut test::Bencher) {
+pub fn bench_cyclotomic_polynomial_3965585_dense(bencher: &mut test::Bencher) {
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
     bencher.iter(|| {
         std::hint::black_box(cyclotomic_polynomial(&poly_ring, std::hint::black_box(257 * 257 * 65)));
@@ -103,7 +103,7 @@ pub fn bench_cyclotomic_polynomial(bencher: &mut test::Bencher) {
 }
 
 #[bench]
-pub fn bench_cyclotomic_polynomial_sparse(bencher: &mut test::Bencher) {
+pub fn bench_cyclotomic_polynomial_3965585_sparse(bencher: &mut test::Bencher) {
     let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
     bencher.iter(|| {
         std::hint::black_box(cyclotomic_polynomial(&poly_ring, std::hint::black_box(257 * 257 * 65)));

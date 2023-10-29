@@ -593,10 +593,6 @@ impl CanonicalIso<StaticRingBase<i128>> for MPZBase {
 
 #[cfg(test)]
 use crate::euclidean::EuclideanRingStore;
-#[cfg(test)]
-use crate::divisibility::generic_test_divisibility_axioms;
-#[cfg(test)]
-use crate::euclidean::generic_test_euclidean_axioms;
 
 #[cfg(test)]
 fn edge_case_elements_bigint() -> impl Iterator<Item = RustBigint> {
@@ -640,34 +636,34 @@ fn test_negate_inplace() {
 
 #[test]
 fn test_ring_axioms() {
-    generic_test_ring_axioms(MPZ::RING, edge_case_elements())
+    crate::ring::generic_tests::test_ring_axioms(MPZ::RING, edge_case_elements())
 }
 
 #[test]
 fn test_divisibility_ring_axioms() {
-    generic_test_divisibility_axioms(MPZ::RING, edge_case_elements())
+    crate::divisibility::generic_tests::test_divisibility_axioms(MPZ::RING, edge_case_elements())
 }
 
 #[test]
 fn test_euclidean_ring_axioms() {
-    generic_test_euclidean_axioms(MPZ::RING, edge_case_elements())
+    crate::euclidean::generic_tests::test_euclidean_ring_axioms(MPZ::RING, edge_case_elements())
 }
 
 #[test]
 fn test_integer_ring_axioms() {
-    generic_test_integer_axioms(MPZ::RING, edge_case_elements())
+    crate::integer::generic_tests::test_integer_axioms(MPZ::RING, edge_case_elements())
 }
 
 #[test]
 fn test_canonical_iso_axioms_i32() {
-    generic_tests::test_hom_axioms(StaticRing::<i32>::RING, MPZ::RING, [0, -1, 1, i16::MAX as i32, i16::MIN as i32].into_iter());
-    generic_tests::test_iso_axioms(StaticRing::<i32>::RING, MPZ::RING, [0, -1, 1, i16::MIN as i32, i16::MAX as i32].into_iter());
+    crate::ring::generic_tests::test_hom_axioms(StaticRing::<i32>::RING, MPZ::RING, [0, -1, 1, i16::MAX as i32, i16::MIN as i32].into_iter());
+    crate::ring::generic_tests::test_iso_axioms(StaticRing::<i32>::RING, MPZ::RING, [0, -1, 1, i16::MIN as i32, i16::MAX as i32].into_iter());
 }
 
 #[test]
 fn test_canonical_iso_axioms_i64() {
-    generic_tests::test_hom_axioms(StaticRing::<i64>::RING, MPZ::RING, [0, -1, 1, i32::MAX as i64, i32::MIN as i64].into_iter());
-    generic_tests::test_iso_axioms(StaticRing::<i64>::RING, MPZ::RING, [0, -1, 1, i32::MIN as i64, i32::MAX as i64].into_iter());
+    crate::ring::generic_tests::test_hom_axioms(StaticRing::<i64>::RING, MPZ::RING, [0, -1, 1, i32::MAX as i64, i32::MIN as i64].into_iter());
+    crate::ring::generic_tests::test_iso_axioms(StaticRing::<i64>::RING, MPZ::RING, [0, -1, 1, i32::MIN as i64, i32::MAX as i64].into_iter());
 
     assert_el_eq!(&MPZ::RING, &MPZ::RING.sub(MPZ::RING.power_of_two(63), MPZ::RING.one()), &MPZ::RING.coerce(&StaticRing::<i64>::RING, i64::MAX));
     assert_el_eq!(&MPZ::RING, &MPZ::RING.negate(MPZ::RING.power_of_two(63)), &MPZ::RING.coerce(&StaticRing::<i64>::RING, i64::MIN));
@@ -677,8 +673,8 @@ fn test_canonical_iso_axioms_i64() {
 
 #[test]
 fn test_canonical_iso_axioms_i128() {
-    generic_tests::test_hom_axioms(StaticRing::<i128>::RING, MPZ::RING, [0, -1, 1, i64::MAX as i128, i64::MIN as i128].into_iter());
-    generic_tests::test_iso_axioms(StaticRing::<i128>::RING, MPZ::RING, [0, -1, 1, i64::MIN as i128, i64::MAX as i128].into_iter());
+    crate::ring::generic_tests::test_hom_axioms(StaticRing::<i128>::RING, MPZ::RING, [0, -1, 1, i64::MAX as i128, i64::MIN as i128].into_iter());
+    crate::ring::generic_tests::test_iso_axioms(StaticRing::<i128>::RING, MPZ::RING, [0, -1, 1, i64::MIN as i128, i64::MAX as i128].into_iter());
 
     assert_el_eq!(&MPZ::RING, &MPZ::RING.sub(MPZ::RING.power_of_two(127), MPZ::RING.one()), &MPZ::RING.coerce(&StaticRing::<i128>::RING, i128::MAX));
     assert_el_eq!(&MPZ::RING, &MPZ::RING.negate(MPZ::RING.power_of_two(127)), &MPZ::RING.coerce(&StaticRing::<i128>::RING, i128::MIN));
@@ -688,8 +684,8 @@ fn test_canonical_iso_axioms_i128() {
 
 #[test]
 fn test_canonical_iso_axioms_bigint() {
-    generic_tests::test_hom_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
-    generic_tests::test_iso_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
+    crate::ring::generic_tests::test_hom_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
+    crate::ring::generic_tests::test_iso_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
 }
 
 #[test]
@@ -738,7 +734,7 @@ fn test_lowest_set_bit() {
 }
 
 #[bench]
-fn bench_mul(bencher: &mut test::Bencher) {
+fn bench_mul_300_bits(bencher: &mut test::Bencher) {
     let x = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap());
     let y = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap());
     let z = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());
@@ -749,7 +745,7 @@ fn bench_mul(bencher: &mut test::Bencher) {
 }
 
 #[bench]
-fn bench_div(bencher: &mut test::Bencher) {
+fn bench_div_300_bits(bencher: &mut test::Bencher) {
     let x = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap());
     let y = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap());
     let z = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());

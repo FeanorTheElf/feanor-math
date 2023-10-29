@@ -479,7 +479,7 @@ fn edge_case_elements() -> impl Iterator<Item = RustBigint> {
 
 #[test]
 fn test_bigint_ring_axioms() {
-    generic_tests::test_ring_axioms(ZZ, edge_case_elements())
+    crate::ring::generic_tests::test_ring_axioms(ZZ, edge_case_elements())
 }
 
 #[test]
@@ -489,23 +489,12 @@ fn test_bigint_divisibility_ring_axioms() {
 
 #[test]
 fn test_bigint_euclidean_ring_axioms() {
-    generic_test_euclidean_axioms(ZZ, edge_case_elements())
+    crate::euclidean::generic_tests::test_euclidean_ring_axioms(ZZ, edge_case_elements());
 }
 
 #[test]
 fn test_bigint_integer_ring_axioms() {
-    generic_test_integer_axioms(ZZ, edge_case_elements())
-}
-
-#[bench]
-fn bench_mul(bencher: &mut test::Bencher) {
-    let x = RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
-    let y = RustBigintRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
-    let z = RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap();
-    bencher.iter(|| {
-        let p = ZZ.mul_ref(&x, &y);
-        assert!(ZZ.eq_el(&z, &p));
-    })
+    crate::integer::generic_tests::test_integer_axioms(ZZ, edge_case_elements())
 }
 
 #[test]
@@ -517,13 +506,24 @@ fn from_to_float_approx() {
 }
 
 #[bench]
-fn bench_div(bencher: &mut test::Bencher) {
+fn bench_div_300_bits(bencher: &mut test::Bencher) {
     let x = RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
     let y = RustBigintRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
     let z = RustBigintRing::RING.get_ring().parse("48682207850683149082203680872586784064678018", 10).unwrap();
     bencher.iter(|| {
         let q = ZZ.euclidean_div(x.clone(), &y);
         assert!(ZZ.eq_el(&z, &q));
+    })
+}
+
+#[bench]
+fn bench_mul_300_bits(bencher: &mut test::Bencher) {
+    let x = RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
+    let y = RustBigintRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
+    let z = RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap();
+    bencher.iter(|| {
+        let p = ZZ.mul_ref(&x, &y);
+        assert!(ZZ.eq_el(&z, &p));
     })
 }
 
@@ -549,7 +549,7 @@ fn test_cmp() {
 
 #[test]
 fn test_get_uniformly_random() {
-    generic_test_integer_uniformly_random(ZZ);
+    crate::integer::generic_tests::test_integer_get_uniformly_random(ZZ);
 
     let ring = ZZ;
     let bound = RustBigintRing::RING.get_ring().parse("11000000000000000", 16).unwrap();
@@ -564,6 +564,6 @@ fn test_get_uniformly_random() {
 #[test]
 fn test_canonical_iso_static_int() {
     // for the hom test, we have to be able to multiply elements in `StaticRing::<i128>::RING`, so we cannot test `i128::MAX` or `i128::MIN`
-    generic_tests::test_hom_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128].iter().copied());
-    generic_tests::test_iso_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128, i128::MAX, i128::MIN].iter().copied());
+    crate::ring::generic_tests::test_hom_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128].iter().copied());
+    crate::ring::generic_tests::test_iso_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128, i128::MAX, i128::MIN].iter().copied());
 }

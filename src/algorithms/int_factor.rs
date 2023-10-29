@@ -88,9 +88,9 @@ pub fn factor<I>(ZZ: &I, mut n: El<I>) -> Vec<(El<I>, usize)>
         generate_zn_function!{ 
             <{'a}, {I: IntegerRingStore<Type = J>}, {J: ?Sized + IntegerRing}> 
             [_: &'a mut Option<El<I>> = &mut m, _: &'a I = ZZ] 
-            |ring, (result, ZZ): (&mut Option<El<I>>, &I)| {
+            |ring: R, (result, ZZ): (&mut Option<El<I>>, &I)| {
                 *result = Some(int_cast(
-                    lenstra_ec_factor::<&R>(&ring), ZZ, ring.integer_ring()
+                    lenstra_ec_factor(&ring), ZZ, ring.integer_ring()
                 ));
             }
         }

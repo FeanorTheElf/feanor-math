@@ -183,6 +183,10 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
 /// This implementation does currently not include the Buchberger criteria, and thus
 /// cannot compete with highly optimized implementations (Singular, Macaulay2, Magma etc).
 /// 
+/// Note that Groebner basis algorithms are still the subject of ongoing research, and
+/// whether the Groebner basis of even a simple example can be efficiently computed is
+/// hard to predict from the example itself. 
+/// 
 /// As an additional note, if you want to compute a GB w.r.t. a term ordering that is
 /// not degrevlex, it might be faster to first compute a degrevlex-GB and use that as input
 /// for a new invocation of f4.
@@ -490,9 +494,8 @@ fn test_f4_larger_elim() {
     assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, g1, &actual, order));
 }
 
-#[test]
-#[ignore]
-fn test_generic_computation() {
+#[bench]
+fn test_generic_computation(bencher: &mut test::Bencher) {
     let order = DegRevLex;
     let base = zn_static::Z17;
     let ring: MultivariatePolyRingImpl<_, _, _, 6> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
@@ -512,10 +515,8 @@ fn test_generic_computation() {
         ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&x2, 2)),
     ];
 
-    let start = std::time::Instant::now();
-    let gb1 = f4::<_, _, true>(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), order);
-    std::hint::black_box(&gb1);
-    let end = std::time::Instant::now();
-
-    println!("Computed GB in {} ms", (end - start).as_millis());
+    bencher.iter(|| {
+        let gb1 = f4::<_, _, true>(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), order);
+        std::hint::black_box(&gb1);
+    });
 }

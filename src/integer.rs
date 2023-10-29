@@ -283,83 +283,88 @@ pub mod generic_impls {
     }
 }
 
-#[cfg(test)]
-pub fn generic_test_integer_uniformly_random<R: IntegerRingStore>(ring: R) 
-    where R::Type: IntegerRing
-{
-    for b in [15, 16] {
-        let bound = ring.from_int(b);
-        let mut rng = oorandom::Rand64::new(0);
-        let elements: Vec<El<R>> = (0..1000).map(|_| ring.get_uniformly_random(&bound, || rng.rand_u64())).collect();
-        for i in 0..b {
-            assert!(elements.iter().any(|x| ring.eq_el(x, &ring.from_int(i))))
-        }
-        for x in &elements {
-            assert!(ring.is_lt(x, &bound));
-        }
-    }
-}
-
 #[cfg(any(test, feature = "generic_tests"))]
-pub fn generic_test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) 
-    where R::Type: IntegerRing
-{
-    let elements = edge_case_elements.collect::<Vec<_>>();
+pub mod generic_tests {
 
-    // test abs_highest_set_bit on standard values
-    assert_eq!(None, ring.abs_highest_set_bit(&ring.from_int(0)));
-    assert_eq!(Some(0), ring.abs_highest_set_bit(&ring.from_int(1)));
-    assert_eq!(Some(1), ring.abs_highest_set_bit(&ring.from_int(2)));
-
-    // generic test of mul_pow_2 resp. euclidean_div_pow_2
-    for a in &elements {
-        let mut ceil_pow_2 = ring.from_int(2);
-        ring.mul_pow_2(&mut ceil_pow_2, ring.abs_highest_set_bit(a).unwrap_or(0));
-        assert!(ring.is_lt(a, &ceil_pow_2));
-        assert!(ring.is_lt(&ring.negate(ring.clone_el(a)), &ceil_pow_2));
+    use crate::ring::El;
+    use super::*;
         
-        for i in 0..ring.abs_highest_set_bit(a).unwrap_or(0) {
-            let mut pow_2 = ring.one();
-            ring.mul_pow_2(&mut pow_2, i);
-            let mut b = ring.clone_el(a);
-            ring.mul_pow_2(&mut b, i);
-            assert_el_eq!(&ring, &b, &ring.mul(ring.clone_el(a), ring.clone_el(&pow_2)));
-            ring.euclidean_div_pow_2(&mut b, i);
-            assert_el_eq!(&ring, &b, a);
-            ring.euclidean_div_pow_2(&mut b, i);
-            assert_el_eq!(&ring, &b, &ring.euclidean_div(ring.clone_el(a), &pow_2));
+    pub fn test_integer_get_uniformly_random<R: IntegerRingStore>(ring: R) 
+        where R::Type: IntegerRing
+    {
+        for b in [15, 16] {
+            let bound = ring.from_int(b);
+            let mut rng = oorandom::Rand64::new(0);
+            let elements: Vec<El<R>> = (0..1000).map(|_| ring.get_uniformly_random(&bound, || rng.rand_u64())).collect();
+            for i in 0..b {
+                assert!(elements.iter().any(|x| ring.eq_el(x, &ring.from_int(i))))
+            }
+            for x in &elements {
+                assert!(ring.is_lt(x, &bound));
+            }
         }
     }
 
-    // test euclidean div round to zero
-    let d = ring.from_int(8);
-    for k in -10..=10 {
-        let mut a = ring.from_int(k);
-        assert_el_eq!(&ring, &ring.from_int(k / 8), &ring.euclidean_div(ring.clone_el(&a), &d));
-        ring.euclidean_div_pow_2(&mut a, 3);
-        assert_el_eq!(&ring, &ring.from_int(k / 8), &a);
+    pub fn test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) 
+        where R::Type: IntegerRing
+    {
+        let elements = edge_case_elements.collect::<Vec<_>>();
+
+        // test abs_highest_set_bit on standard values
+        assert_eq!(None, ring.abs_highest_set_bit(&ring.from_int(0)));
+        assert_eq!(Some(0), ring.abs_highest_set_bit(&ring.from_int(1)));
+        assert_eq!(Some(1), ring.abs_highest_set_bit(&ring.from_int(2)));
+
+        // generic test of mul_pow_2 resp. euclidean_div_pow_2
+        for a in &elements {
+            let mut ceil_pow_2 = ring.from_int(2);
+            ring.mul_pow_2(&mut ceil_pow_2, ring.abs_highest_set_bit(a).unwrap_or(0));
+            assert!(ring.is_lt(a, &ceil_pow_2));
+            assert!(ring.is_lt(&ring.negate(ring.clone_el(a)), &ceil_pow_2));
+            
+            for i in 0..ring.abs_highest_set_bit(a).unwrap_or(0) {
+                let mut pow_2 = ring.one();
+                ring.mul_pow_2(&mut pow_2, i);
+                let mut b = ring.clone_el(a);
+                ring.mul_pow_2(&mut b, i);
+                assert_el_eq!(&ring, &b, &ring.mul(ring.clone_el(a), ring.clone_el(&pow_2)));
+                ring.euclidean_div_pow_2(&mut b, i);
+                assert_el_eq!(&ring, &b, a);
+                ring.euclidean_div_pow_2(&mut b, i);
+                assert_el_eq!(&ring, &b, &ring.euclidean_div(ring.clone_el(a), &pow_2));
+            }
+        }
+
+        // test euclidean div round to zero
+        let d = ring.from_int(8);
+        for k in -10..=10 {
+            let mut a = ring.from_int(k);
+            assert_el_eq!(&ring, &ring.from_int(k / 8), &ring.euclidean_div(ring.clone_el(&a), &d));
+            ring.euclidean_div_pow_2(&mut a, 3);
+            assert_el_eq!(&ring, &ring.from_int(k / 8), &a);
+        }
+        let d = ring.from_int(-8);
+        for k in -10..=10 {
+            let a = ring.from_int(k);
+            assert_el_eq!(&ring, &ring.from_int(k / -8), &ring.euclidean_div(ring.clone_el(&a), &d));
+        }
+
+        // test rounded_div
+        assert_el_eq!(&ring, &ring.from_int(2), &ring.rounded_div(ring.from_int(7), &ring.from_int(3)));
+        assert_el_eq!(&ring, &ring.from_int(-2), &ring.rounded_div(ring.from_int(-7), &ring.from_int(3)));
+        assert_el_eq!(&ring, &ring.from_int(-2), &ring.rounded_div(ring.from_int(7), &ring.from_int(-3)));
+        assert_el_eq!(&ring, &ring.from_int(2), &ring.rounded_div(ring.from_int(-7), &ring.from_int(-3)));
+
+        assert_el_eq!(&ring, &ring.from_int(3), &ring.rounded_div(ring.from_int(8), &ring.from_int(3)));
+        assert_el_eq!(&ring, &ring.from_int(-3), &ring.rounded_div(ring.from_int(-8), &ring.from_int(3)));
+        assert_el_eq!(&ring, &ring.from_int(-3), &ring.rounded_div(ring.from_int(8), &ring.from_int(-3)));
+        assert_el_eq!(&ring, &ring.from_int(3), &ring.rounded_div(ring.from_int(-8), &ring.from_int(-3)));
+
+        assert_el_eq!(&ring, &ring.from_int(4), &ring.rounded_div(ring.from_int(7), &ring.from_int(2)));
+        assert_el_eq!(&ring, &ring.from_int(-4), &ring.rounded_div(ring.from_int(-7), &ring.from_int(2)));
+        assert_el_eq!(&ring, &ring.from_int(-4), &ring.rounded_div(ring.from_int(7), &ring.from_int(-2)));
+        assert_el_eq!(&ring, &ring.from_int(4), &ring.rounded_div(ring.from_int(-7), &ring.from_int(-2)));
     }
-    let d = ring.from_int(-8);
-    for k in -10..=10 {
-        let a = ring.from_int(k);
-        assert_el_eq!(&ring, &ring.from_int(k / -8), &ring.euclidean_div(ring.clone_el(&a), &d));
-    }
-
-    // test rounded_div
-    assert_el_eq!(&ring, &ring.from_int(2), &ring.rounded_div(ring.from_int(7), &ring.from_int(3)));
-    assert_el_eq!(&ring, &ring.from_int(-2), &ring.rounded_div(ring.from_int(-7), &ring.from_int(3)));
-    assert_el_eq!(&ring, &ring.from_int(-2), &ring.rounded_div(ring.from_int(7), &ring.from_int(-3)));
-    assert_el_eq!(&ring, &ring.from_int(2), &ring.rounded_div(ring.from_int(-7), &ring.from_int(-3)));
-
-    assert_el_eq!(&ring, &ring.from_int(3), &ring.rounded_div(ring.from_int(8), &ring.from_int(3)));
-    assert_el_eq!(&ring, &ring.from_int(-3), &ring.rounded_div(ring.from_int(-8), &ring.from_int(3)));
-    assert_el_eq!(&ring, &ring.from_int(-3), &ring.rounded_div(ring.from_int(8), &ring.from_int(-3)));
-    assert_el_eq!(&ring, &ring.from_int(3), &ring.rounded_div(ring.from_int(-8), &ring.from_int(-3)));
-
-    assert_el_eq!(&ring, &ring.from_int(4), &ring.rounded_div(ring.from_int(7), &ring.from_int(2)));
-    assert_el_eq!(&ring, &ring.from_int(-4), &ring.rounded_div(ring.from_int(-7), &ring.from_int(2)));
-    assert_el_eq!(&ring, &ring.from_int(-4), &ring.rounded_div(ring.from_int(7), &ring.from_int(-2)));
-    assert_el_eq!(&ring, &ring.from_int(4), &ring.rounded_div(ring.from_int(-7), &ring.from_int(-2)));
 }
 
 #[test]

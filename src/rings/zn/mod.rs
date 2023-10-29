@@ -16,9 +16,14 @@ use crate::rings::finite::FiniteRingStore;
 pub mod zn_barett;
 ///
 /// This module contains [`zn_42::Zn`], a heavily optimized implementation of `Z/nZ`
-/// for moduli `n` with at most 41 bits.
+/// for moduli `n` with at most 41 bits. Note that for most purposes, this should be
+/// replace by the new module [`zn_64::Zn`].
 /// 
 pub mod zn_42;
+///
+/// This module contains [`zn_64::Zn`], the new, heavily optimized implementation of `Z/nZ`
+/// for moduli `n` of size slightly smaller than 64 bits.
+/// 
 pub mod zn_64;
 ///
 /// This module contains [`zn_static::Zn`], an implementation of `Z/nZ` for a small `n`
@@ -247,12 +252,49 @@ impl<R: RingStore> ZnRingStore for R
     where R::Type: ZnRing
 {}
 
+///
+/// Trait for algorithms that require some implementation of
+/// `Z/nZ`, but do not care which.
+/// 
+/// If you want to avoid the boilerplate code to create such an
+/// object, look at the experimental macro [`generate_zn_function`].
+/// 
 pub trait ZnOperation {
     
     fn call<R: ZnRingStore>(self, ring: R)
         where R::Type: ZnRing;
 }
 
+///
+/// A helper macro to easily create an object implementing [`ZnOperation`].
+/// This is experimental, and tries to make it easy to write code that requires
+/// some finite field `Z/nZ`, but does not care about its implementation.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::generate_zn_function;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::integer::*;
+/// # use feanor_math::assert_el_eq;
+/// 
+/// let int_value = 4;
+/// // work in Z/17Z without explicitly choosing an implementation
+/// choose_zn_impl(StaticRing::<i64>::RING, 17, generate_zn_function!(
+///     < {'a} > [_: &'a i64 = &int_value] |Zn: R, (int_value, ): (&i64, )| {
+///         let value = Zn.coerce(Zn.integer_ring(), int_cast(*int_value, Zn.integer_ring(), &StaticRing::<i64>::RING));
+///         assert_el_eq!(&Zn, &Zn.from_int(-1), &Zn.mul_ref(&value, &value));
+///     }
+/// ));
+/// ```
+/// 
+/// # Warning
+/// 
+/// As type for the ring parameter, you can use `R` - I do not think Rust should allow this
+/// (it violates macro hygenie), but let's be happy that it works, otherwise this would be
+/// impossible.
+/// 
 #[macro_export]
 macro_rules! generate_zn_function {
     (< $({$gen_param:tt $(: $($gen_constraint:tt)*)?}),* > $bindings:tt $lambda:expr) => {
@@ -279,6 +321,32 @@ macro_rules! generate_zn_function {
     };
 }
 
+///
+/// Calls the given function with some implementation of the ring
+/// `Z/nZ`, chosen depending on `n` to provide best performance.
+/// 
+/// To avoid the boilerplate code that comes with manually implementing
+/// [`ZnOperation`], consider using the experimental macro [`generate_zn_operation`].
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::generate_zn_function;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::integer::*;
+/// # use feanor_math::assert_el_eq;
+/// 
+/// let int_value = 4;
+/// // work in Z/17Z without explicitly choosing an implementation
+/// choose_zn_impl(StaticRing::<i64>::RING, 17, generate_zn_function!(
+///     < {'a} > [_: &'a i64 = &int_value] |Zn: R, (int_value, ): (&i64, )| {
+///         let value = Zn.coerce(Zn.integer_ring(), int_cast(*int_value, Zn.integer_ring(), &StaticRing::<i64>::RING));
+///         assert_el_eq!(&Zn, &Zn.from_int(-1), &Zn.mul_ref(&value, &value));
+///     }
+/// ));
+/// ```
+/// 
 pub fn choose_zn_impl<I, F>(ZZ: I, n: El<I>, f: F)
     where I: IntegerRingStore,
         I::Type: IntegerRing,

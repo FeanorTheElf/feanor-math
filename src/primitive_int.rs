@@ -344,20 +344,20 @@ fn test_ixx_bit_op() {
 
 #[test]
 fn test_get_uniformly_random() {
-    generic_test_integer_uniformly_random(StaticRing::<i8>::RING);
-    generic_test_integer_uniformly_random(StaticRing::<i16>::RING);
-    generic_test_integer_uniformly_random(StaticRing::<i32>::RING);
-    generic_test_integer_uniformly_random(StaticRing::<i64>::RING);
-    generic_test_integer_uniformly_random(StaticRing::<i128>::RING);
+    crate::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i8>::RING);
+    crate::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i16>::RING);
+    crate::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i32>::RING);
+    crate::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i64>::RING);
+    crate::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i128>::RING);
 }
 
 #[test]
 fn test_integer_axioms() {
-    generic_test_integer_axioms(StaticRing::<i8>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
-    generic_test_integer_axioms(StaticRing::<i16>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
-    generic_test_integer_axioms(StaticRing::<i32>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
-    generic_test_integer_axioms(StaticRing::<i64>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
-    generic_test_integer_axioms(StaticRing::<i128>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    crate::integer::generic_tests::test_integer_axioms(StaticRing::<i8>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    crate::integer::generic_tests::test_integer_axioms(StaticRing::<i16>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    crate::integer::generic_tests::test_integer_axioms(StaticRing::<i32>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    crate::integer::generic_tests::test_integer_axioms(StaticRing::<i64>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    crate::integer::generic_tests::test_integer_axioms(StaticRing::<i128>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
 }
 
 #[test]

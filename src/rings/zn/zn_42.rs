@@ -9,6 +9,10 @@ use crate::rings::rust_bigint::RustBigintRingBase;
 use super::zn_barett;
 
 ///
+/// This implementation is deprecated in favor of the new module
+/// [`crate::rings::zn::zn_64::Zn`] which provides basically 
+/// the same performance, but supports larger moduli.
+/// 
 /// Represents the ring `Z/nZ`.
 /// A special implementation of non-standard Barett reduction
 /// that uses 128-bit integer but provides moduli up to 41 bits.

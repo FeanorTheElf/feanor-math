@@ -7,6 +7,19 @@ use crate::vector::VectorViewMut;
 
 use super::*;
 
+///
+/// Represents the multivariate polynomial ring `R[X1, ..., XN]` in `N` unknowns.
+/// Polynomials are stored as lists of their terms, ordered by the given monomial
+/// ordering.
+/// 
+/// Note that the specific ordering does not matter in principle, but when frequently
+/// accessing the leading monomial (as e.g. done by Groebner basis algorithms, see
+/// [`crate::algorithms::f4::f4()`]), choosing the ordering to match the ordering
+/// used for the GB algorithm can significantly improve performance.
+/// 
+/// Note that there is currently no implementation of multivariate polynomial rings
+/// with a number of unknowns chosen at runtime.
+/// 
 pub struct MultivariatePolyRingImplBase<R, O, M, const N: usize>
     where R: RingStore,
         O: MonomialOrder,

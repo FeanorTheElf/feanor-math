@@ -36,13 +36,12 @@ fn mullo(lhs: u64, rhs: u64) -> u64 {
 /// More concretely, the currently maximal supported modulus is `floor(2^62 / 9)`.
 /// Note that the exact value might change in the future.
 /// 
-/// Standard arithmetic in this ring is slightly slower than in [`super::zn_42::ZnBase`],
+/// Standard arithmetic in this ring is about the same as in [`super::zn_42::ZnBase`],
 /// which supports moduli up to 41 bits. However, this ring is perfectly suited for the
-/// number theoretic transform together with [`ZnFastmulBase`], where it achieves basically 
-/// the same speed as the 42-bit ring.
+/// number theoretic transform together with [`ZnFastmulBase`], where it is possibly even
+/// slightly faster than the 42-bit ring.
 /// 
 /// # Examples
-/// 
 /// ```
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;

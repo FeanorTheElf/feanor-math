@@ -50,20 +50,25 @@ impl<R> EuclideanRingStore for R
 {}
 
 #[cfg(any(test, feature = "generic_tests"))]
-pub fn generic_test_euclidean_axioms<R: EuclideanRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) 
-    where R::Type: EuclideanRing
-{
-    assert!(ring.is_commutative());
-    assert!(ring.is_noetherian());
-    let elements = edge_case_elements.collect::<Vec<_>>();
-    for a in &elements {
-        for b in &elements {
-            if ring.is_zero(b) {
-                continue;
+pub mod generic_tests {
+    use super::*;
+    use crate::ring::El;
+
+    pub fn test_euclidean_ring_axioms<R: EuclideanRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) 
+        where R::Type: EuclideanRing
+    {
+        assert!(ring.is_commutative());
+        assert!(ring.is_noetherian());
+        let elements = edge_case_elements.collect::<Vec<_>>();
+        for a in &elements {
+            for b in &elements {
+                if ring.is_zero(b) {
+                    continue;
+                }
+                let (q, r) = ring.euclidean_div_rem(ring.clone_el(a), b);
+                assert!(ring.euclidean_deg(b).is_none() || ring.euclidean_deg(&r).unwrap_or(usize::MAX) < ring.euclidean_deg(b).unwrap());
+                assert_el_eq!(&ring, a, &ring.add(ring.mul(q, ring.clone_el(b)), r));
             }
-            let (q, r) = ring.euclidean_div_rem(ring.clone_el(a), b);
-            assert!(ring.euclidean_deg(b).is_none() || ring.euclidean_deg(&r).unwrap_or(usize::MAX) < ring.euclidean_deg(b).unwrap());
-            assert_el_eq!(&ring, a, &ring.add(ring.mul(q, ring.clone_el(b)), r));
         }
     }
 }

@@ -13,7 +13,7 @@ macro_rules! generate_binding_value {
     };
 }
 
-#[macro_export]
+#[allow(unused)]
 macro_rules! named_closure_type {
     ($name:ident < $({$gen_param:tt $(: $($gen_constraint:tt)*)?}),* > $bindings:tt $params:tt $lambda:expr) => {
         pub struct $name<$($gen_param),*> 
@@ -66,7 +66,8 @@ macro_rules! named_closure_type {
         }
     };
 }
-#[macro_export]
+
+#[allow(unused)]
 macro_rules! named_closure {
     ($name:ident < $({$gen_param:tt $(: $($gen_constraint:tt)*)?}),* > $bindings:tt $params:tt $lambda:expr) => {
         {

@@ -44,6 +44,10 @@ pub mod extension;
 /// 
 pub mod finite;
 
+///
+/// This module contains the trait [`multivariate::MultivariatePolyRing`] for all multivariate polynomial
+/// rings.
+/// 
 pub mod multivariate;
 
 ///

@@ -17,7 +17,16 @@ extern crate test;
 extern crate libc;
 extern crate oorandom;
 
-pub mod named_closure;
+///
+/// This is currently experimental, we strongly discourage you
+/// from using it, except through [`crate::generate_zn_function`].
+/// 
+/// This module contains macros that allow defining simple objects
+/// implementing the function trait [`std::ops::Fn`]. The advantage
+/// over standard closures is that they have a name, and thus can be
+/// returned from functions.
+/// 
+mod named_closure;
 ///
 /// Struct that may be used to refer to a generic computation.
 /// Use it together with [`Exists`] to ensure that a const generic

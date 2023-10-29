@@ -467,7 +467,7 @@ fn test_divisibility_ring_axioms() {
 #[test]
 fn test_euclidean_ring_axioms() {
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
-    generic_test_euclidean_axioms(&poly_ring, edge_case_elements(&poly_ring));
+    crate::euclidean::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]

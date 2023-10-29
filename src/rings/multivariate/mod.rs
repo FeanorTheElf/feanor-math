@@ -8,28 +8,57 @@ use crate::vector::subvector::{Subvector, SelfSubvectorView};
 use crate::{ring::*, type_eq};
 use crate::vector::{VectorView, VectorViewMut};
 
+///
+/// This module contains [`ordered::MultivariatePolyRingImpl`], an implementation
+/// of multivariate polynomials using a sparse representation.
+/// 
 pub mod ordered;
 
 type MonomialExponent = u16;
 
+///
+/// Trait for rings that represent multivariate polynomial rings.
+/// 
 pub trait MultivariatePolyRing: RingExtension + SelfIso {
 
     type MonomialVector: VectorViewMut<MonomialExponent> + Clone;
     type TermsIterator<'a>: Iterator<Item = (&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)>
         where Self: 'a;
 
+    ///
+    /// Returns the number of indeterminates, i.e. the transcendence degree
+    /// of this ring over its base ring.
+    /// 
     fn indeterminate_len(&self) -> usize;
 
+    ///
+    /// Returns the i-th indeterminate/variable/unknown as a ring element
+    /// 
     fn indeterminate(&self, i: usize) -> Self::Element;
-        
+    
+    ///
+    /// Returns the given monomial as a ring element
+    /// 
     fn monomial(&self, m: &Monomial<Self::MonomialVector>) -> Self::Element {
         RingRef::new(self).prod((0..m.len()).flat_map(|i| std::iter::repeat_with(move || self.indeterminate(i)).take(m[i] as usize)))
     }
 
+    ///
+    /// Returns all terms of the given polynomial. A term is a product
+    /// `c * m` with a nonzero coefficient `c` (i.e. element of the base ring)
+    /// and a monomial `m`.
+    /// 
     fn terms<'a>(&'a self, f: &'a Self::Element) -> Self::TermsIterator<'a>;
 
+    ///
+    /// Multiplies the given polynomial with a monomial.
+    /// 
     fn mul_monomial(&self, el: &mut Self::Element, m: &Monomial<Self::MonomialVector>);
     
+    ///
+    /// Add-assigns to the given polynomial the polynomial implicitly given by the
+    /// iterator over terms.
+    /// 
     fn add_assign_from_terms<'a, I>(&self, lhs: &mut Self::Element, rhs: I)
         where I: Iterator<Item = (El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)>,
             Self: 'a
@@ -40,8 +69,15 @@ pub trait MultivariatePolyRing: RingExtension + SelfIso {
         ));
     }
 
+    ///
+    /// Returns the coefficient of the polynomial of the given monomial. If
+    /// the monomial does not appear in the polynomial, this returns zero.
+    /// 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, m: &Monomial<Self::MonomialVector>) -> &'a El<Self::BaseRing>;
 
+    ///
+    /// Returns the leading monomial of `f` w.r.t. the given term ordering.
+    /// 
     fn lm<'a, O>(&'a self, f: &'a Self::Element, order: O) -> Option<&'a Monomial<Self::MonomialVector>>
         where O: MonomialOrder;
 }
@@ -85,6 +121,15 @@ impl<R> MultivariatePolyRingStore for R
 
 static ZERO: MonomialExponent = 0;
 
+///
+/// A monomial, i.e. a power-product of indeterminates.
+/// 
+/// From a low-level point of view, this is just a wrapper around some
+/// short sequence of nonnegative numbers. Note that monomials for the
+/// same multivariate polynomial ring should always contain all variables,
+/// i.e. contain (possibly trailing) zeros for variables that do not occur
+/// in the monomial.
+/// 
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Monomial<V: VectorView<MonomialExponent>> {
@@ -194,6 +239,10 @@ impl<V: VectorViewMut<MonomialExponent>> Monomial<V> {
 
 impl<V: VectorViewMut<MonomialExponent> + Clone> Monomial<V> {
 
+    ///
+    /// Returns all monomials that divide this one, i.e. all sequences
+    /// of same length such that `result[i] <= self[i]`.
+    /// 
     pub fn dividing_monomials(self) -> DividingMonomialIter<V> {
         let mut start = self.clone();
         for i in 0..self.len() {
@@ -281,6 +330,16 @@ impl<V: VectorView<MonomialExponent>> Index<usize> for Monomial<V> {
     }
 }
 
+///
+/// Trait for term orders, that is an ordering on all monomials with
+/// a fixed number of variables subject to the constraints
+///  - `mp < np` whenever `m < n`
+///  - `m <= mp`
+/// for all monomials `m, n, p`.
+/// 
+/// Monomial/Term orders are particularly important in the context of
+/// Groebner basis (see e.g. [`crate::algorithms::f4::f4()`]).
+/// 
 pub trait MonomialOrder {
 
     fn is_graded(&self) -> bool;
@@ -344,9 +403,37 @@ impl<V, O> Ord for FixedOrderMonomial<V, O>
     }
 }
 
+///
+/// Graded reverse lexicographic order.
+/// 
+/// It is defined by first comparing the degree of monomials, and
+/// in case of equality, reverse the result of a lexicographic comparison,
+/// using reversed variable order.
+/// 
+/// # Example
+/// 
+/// The smallest example where this differs from the graded lexicographic order
+/// is as follows.
+/// ```
+/// # use feanor_math::rings::multivariate::*;
+/// 
+/// let a = Monomial::new([1, 0, 1]);
+/// let b = Monomial::new([0, 2, 0]);
+/// assert_eq!(std::cmp::Ordering::Less, DegRevLex.compare(&a, &b));
+/// assert_eq!(std::cmp::Ordering::Greater, Lex.compare(&a, &b));
+/// ```
+/// 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct DegRevLex;
 
+///
+/// Block-wise graded reverse lexicographic order.
+/// 
+/// This order is defined by first comparing the monomials induced by the
+/// first variables via degrevlex, and in the case of equality compare the
+/// monomials induced by the rest of the variables. Its main use is the fact
+/// that it can serve as an elimination order.
+/// 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct BlockLexDegRevLex {
     larger_block: usize
