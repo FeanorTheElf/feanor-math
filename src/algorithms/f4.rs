@@ -345,8 +345,8 @@ fn test_f4_small() {
     ].into_iter());
 
     assert_eq!(3, actual.len());
-    assert_el_eq!(&ring, &f1, actual.at(0));
-    assert_el_eq!(&ring, &f2, actual.at(1));
+    assert_el_eq!(&ring, &f2, actual.at(0));
+    assert_el_eq!(&ring, &f1, actual.at(1));
     assert_el_eq!(&ring, &expected, actual.at(2));
 }
 
