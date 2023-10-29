@@ -178,7 +178,52 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
     return result;
 }
 
-pub fn f4_base<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Vec<El<P>>
+///
+/// A simple implementation of the F4 algorithm for computing Groebner basis.
+/// This implementation does currently not include the Buchberger criteria, and thus
+/// cannot compete with highly optimized implementations (Singular, Macaulay2, Magma etc).
+/// 
+/// As an additional note, if you want to compute a GB w.r.t. a term ordering that is
+/// not degrevlex, it might be faster to first compute a degrevlex-GB and use that as input
+/// for a new invocation of f4.
+/// 
+/// # Example
+/// 
+/// ```
+/// #![feature(generic_const_exprs)]
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::multivariate::*;
+/// # use feanor_math::algorithms::f4::*;
+/// # use feanor_math::{assert_el_eq, default_memory_provider};
+/// # use feanor_math::rings::zn::zn_static;
+/// 
+/// let order = DegRevLex;
+/// let base = zn_static::Z17;
+/// let ring: ordered::MultivariatePolyRingImpl<_, _, _, 2> = ordered::MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
+/// 
+/// // the classical GB example: x^2 + y^2 - 1, xy - 2
+/// let f1 = ring.from_terms([
+///     (1, &Monomial::new([2, 0])),
+///     (1, &Monomial::new([0, 2])),
+///     (16, &Monomial::new([0, 0]))
+/// ].into_iter());
+/// let f2 = ring.from_terms([
+///     (1, &Monomial::new([1, 1])),
+///     (15, &Monomial::new([0, 0]))
+/// ].into_iter());
+/// 
+/// let gb = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], order);
+/// 
+/// let in_ideal = ring.from_terms([
+///     (16, &Monomial::new([0, 3])),
+///     (15, &Monomial::new([1, 0])),
+///     (1, &Monomial::new([0, 1])),
+/// ].into_iter());
+/// 
+/// assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, in_ideal, &gb, order));
+/// ```
+/// 
+pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: FieldStore,
@@ -333,10 +378,7 @@ fn test_f4_small() {
         (15, &Monomial::new([0, 0]))
     ].into_iter());
 
-    ring.println(&f1);
-    ring.println(&f2);
-
-    let actual = f4_base::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], order);
+    let actual = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], order);
 
     let expected = ring.from_terms([
         (16, &Monomial::new([0, 3])),
@@ -375,7 +417,7 @@ fn test_f4_larger() {
         (7, &Monomial::new([0, 0, 0]))
     ].into_iter());
 
-    let actual = f4_base::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], order);
+    let actual = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], order);
 
     let g1 = ring.from_terms([
         (1, &Monomial::new([0, 4, 0])),
@@ -422,7 +464,7 @@ fn test_f4_larger_elim() {
         (7, &Monomial::new([0, 0, 0]))
     ].into_iter());
 
-    let actual = f4_base::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], order);
+    let actual = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], order);
     
     for f in &actual {
         println!("{}, ", ring.format(f));
@@ -471,7 +513,7 @@ fn test_generic_computation() {
     ];
 
     let start = std::time::Instant::now();
-    let gb1 = f4_base::<_, _, true>(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), order);
+    let gb1 = f4::<_, _, true>(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), order);
     std::hint::black_box(&gb1);
     let end = std::time::Instant::now();
 
