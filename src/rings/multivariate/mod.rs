@@ -6,7 +6,7 @@ use std::cmp::{min, max};
 
 use crate::vector::subvector::{Subvector, SelfSubvectorView};
 use crate::ring::*;
-use crate::type_eq;
+use crate::generic_cast::generic_cast;
 use crate::vector::{VectorView, VectorViewMut};
 
 pub mod ordered;
@@ -301,24 +301,17 @@ impl<V: VectorView<MonomialExponent>> Index<usize> for Monomial<V> {
     }
 }
 
-pub trait MonomialOrder {
+pub trait MonomialOrder: Clone + Sized + 'static {
 
     fn is_graded(&self) -> bool;
     fn compare<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering;
 
-    fn is_same<O: ?Sized + MonomialOrder>(&self, _other: &O) -> bool {
-
-        trait IsSized {
-            const SIZE: Option<usize>;
+    fn is_same<O: MonomialOrder>(&self, other: O) -> bool {
+        assert!(std::mem::size_of::<Self>() == 0);
+        match generic_cast::<_, Self>(other) {
+            Some(_) => true,
+            None => false
         }
-        impl<T: ?Sized> IsSized for T {
-            default const SIZE: Option<usize> = None;
-        }
-        impl<T: Sized> IsSized for T {
-            const SIZE: Option<usize> = Some(std::mem::size_of::<T>());
-        }
-        assert!(<Self as IsSized>::SIZE == Some(0));
-        type_eq::<Self, O>()
     }
 }
 
@@ -370,7 +363,7 @@ impl<V, O> Ord for FixedOrderMonomial<V, O>
     where V: VectorView<MonomialExponent>, O: MonomialOrder
 {
     fn cmp(&self, other: &Self) -> Ordering {
-        assert!(self.order().is_same(other.order()));
+        assert!(self.order().is_same(other.order().clone()));
         self.order.compare(&self.m, &other.m)
     }
 }
@@ -412,11 +405,10 @@ impl MonomialOrder for BlockLexDegRevLex {
         }
     }
 
-    fn is_same<O: ?Sized + MonomialOrder>(&self, other: &O) -> bool {
-        if type_eq::<O, Self>() {
-            unsafe { *self == *std::mem::transmute::<_, *const Self>(other as *const O as *const ()) }
-        } else {
-            false
+    fn is_same<O: ?Sized + MonomialOrder>(&self, other: O) -> bool {
+        match generic_cast::<_, Self>(other) {
+            Some(other) => self.larger_block == other.larger_block,
+            None => false
         }
     }
 }

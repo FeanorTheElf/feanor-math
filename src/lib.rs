@@ -128,18 +128,4 @@ pub mod rings;
 /// 
 pub mod wrapper;
 
-pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
-    trait TypeEq<U: ?Sized> {
-        const VALUE: bool;
-    }
-
-    impl<T: ?Sized, U: ?Sized> TypeEq<U> for T {
-        default const VALUE: bool = false;
-    }
-
-    impl<T: ?Sized> TypeEq<T> for T {
-        const VALUE: bool = true;
-    }
-
-    <T as TypeEq<U>>::VALUE
-}
+pub mod generic_cast;
