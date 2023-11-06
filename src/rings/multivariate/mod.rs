@@ -56,9 +56,6 @@ pub trait MultivariatePolyRing: RingExtension + SelfIso {
             *new_m.exponents.at_mut(var) = 0;
             self.add_assign_from_terms(&mut parts[m[var] as usize], Some((self.base_ring().clone_el(c), &new_m)).into_iter());
         }
-        for p in &parts {
-            RingRef::new(self).println(p);
-        }
         let mut current = parts.pop().unwrap();
         while let Some(new) = parts.pop() {
             self.mul_assign_ref(&mut current, val);
