@@ -5,7 +5,7 @@ use crate::vector::*;
 
 use super::sparse_invert::{SparseMatrix, gb_rowrev_sparse_row_echelon};
 
-pub struct MonomialSet<P, O>
+struct MonomialSet<P, O>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: FieldStore,
@@ -27,7 +27,7 @@ impl<P, O> MonomialSet<P, O>
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
         O: MonomialOrder + Copy
 {
-    pub fn new(order: O) -> Self {
+    fn new(order: O) -> Self {
         Self {
             data: Vec::new(),
             order: order
@@ -178,6 +178,10 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
     return result;
 }
 
+///
+/// A relatively simple implementation of the F4 algorithm to compute a Groebner Basis.
+/// This currently does not include the Buchberger 
+/// 
 pub fn f4_base<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,

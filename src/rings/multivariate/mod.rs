@@ -287,6 +287,17 @@ pub trait MonomialOrder {
     fn compare<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering;
 
     fn is_same<O: ?Sized + MonomialOrder>(&self, _other: &O) -> bool {
+
+        trait IsSized {
+            const SIZE: Option<usize>;
+        }
+        impl<T: ?Sized> IsSized for T {
+            default const SIZE: Option<usize> = None;
+        }
+        impl<T: Sized> IsSized for T {
+            const SIZE: Option<usize> = Some(std::mem::size_of::<T>());
+        }
+        assert!(<Self as IsSized>::SIZE == Some(0));
         type_eq::<Self, O>()
     }
 }
