@@ -5,7 +5,8 @@ use std::fmt::Debug;
 use std::cmp::{min, max};
 
 use crate::vector::subvector::{Subvector, SelfSubvectorView};
-use crate::{ring::*, type_eq};
+use crate::ring::*;
+use crate::type_eq;
 use crate::vector::{VectorView, VectorViewMut};
 
 pub mod ordered;
@@ -44,6 +45,27 @@ pub trait MultivariatePolyRing: RingExtension + SelfIso {
 
     fn lm<'a, O>(&'a self, f: &'a Self::Element, order: O) -> Option<&'a Monomial<Self::MonomialVector>>
         where O: MonomialOrder;
+
+    fn specialize(&self, f: &Self::Element, var: usize, val: &Self::Element) -> Self::Element {
+        let mut parts = Vec::new();
+        for (c, m) in self.terms(f) {
+            while m[var] as usize >= parts.len() {
+                parts.push(self.zero());
+            }
+            let mut new_m = m.clone();
+            *new_m.exponents.at_mut(var) = 0;
+            self.add_assign_from_terms(&mut parts[m[var] as usize], Some((self.base_ring().clone_el(c), &new_m)).into_iter());
+        }
+        for p in &parts {
+            RingRef::new(self).println(p);
+        }
+        let mut current = parts.pop().unwrap();
+        while let Some(new) = parts.pop() {
+            self.mul_assign_ref(&mut current, val);
+            self.add_assign(&mut current, new);
+        }
+        return current;
+    }
 }
 
 pub trait MultivariatePolyRingStore: RingStore
@@ -53,6 +75,7 @@ pub trait MultivariatePolyRingStore: RingStore
     delegate!{ fn indeterminate(&self, i: usize) -> El<Self> }
     delegate!{ fn monomial(&self, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> El<Self> }
     delegate!{ fn mul_monomial(&self, el: &mut El<Self>, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> () }
+    delegate!{ fn specialize(&self, f: &El<Self>, var: usize, val: &El<Self>) -> El<Self> }
 
     fn coefficient_at<'a>(&'a self, f: &'a El<Self>, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> &'a El<<Self::Type as RingExtension>::BaseRing> {
         self.get_ring().coefficient_at(f, m)
@@ -448,6 +471,11 @@ impl MonomialOrder for Lex {
     }
 }
 
+#[cfg(test)]
+use crate::default_memory_provider;
+#[cfg(test)]
+use super::zn::zn_static::Zn;
+
 #[test]
 fn test_lex() {
     let mut monomials: Vec<Monomial<[u16; 3]>> = vec![
@@ -517,4 +545,19 @@ fn test_dividing_monomials() {
         Monomial::new([2, 1, 2]), Monomial::new([2, 0, 3]), Monomial::new([1, 1, 3]), 
         Monomial::new([2, 1, 3])
     ], m.dividing_monomials().collect::<Vec<_>>());
+}
+
+#[test]
+fn test_specialize() {
+    let ring: ordered::MultivariatePolyRingImpl<_, _, _, 1> = ordered::MultivariatePolyRingImpl::new(Zn::<17>::RING, DegRevLex, default_memory_provider!());
+    let f = ring.from_terms([(1, &Monomial::new([2])), (1, &Monomial::new([1]))].into_iter());
+    let g = ring.from_terms([(1, &Monomial::new([2])), (16, &Monomial::new([1]))].into_iter());
+
+    assert_el_eq!(&ring, &ring.add_ref_snd(ring.mul_ref(&g, &g), &g), &ring.specialize(&f, 0, &g));
+
+    let ring: ordered::MultivariatePolyRingImpl<_, _, _, 2> = ordered::MultivariatePolyRingImpl::new(Zn::<17>::RING, DegRevLex, default_memory_provider!());
+    let f = ring.from_terms([(1, &Monomial::new([2, 0])), (1, &Monomial::new([0, 1]))].into_iter());
+    let g = ring.from_terms([(1, &Monomial::new([0, 2])), (16, &Monomial::new([0, 1]))].into_iter());
+
+    assert_el_eq!(&ring, &ring.add(ring.mul_ref(&g, &g), ring.indeterminate(1)), &ring.specialize(&f, 0, &g));
 }
