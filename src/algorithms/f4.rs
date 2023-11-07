@@ -518,5 +518,6 @@ fn test_difficult_gb() {
 
     let gb = f4_base::<_, _, true>(ring, basis, order);
 
+    println!("{}", gb.len());
     std::hint::black_box(gb);
 }
