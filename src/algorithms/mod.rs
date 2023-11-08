@@ -16,4 +16,3 @@ pub mod cantor_zassenhaus;
 pub mod discrete_log;
 pub mod sparse_invert;
 pub mod f4;
-pub mod sparse_invert_new;
