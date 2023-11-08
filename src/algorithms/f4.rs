@@ -7,7 +7,8 @@ use crate::rings::multivariate::*;
 use crate::vector::*;
 use crate::wrapper::RingElementWrapper;
 
-use super::sparse_invert::{SparseMatrix, gb_rowrev_sparse_row_echelon};
+use super::sparse_invert::{SparseMatrix, gb_rowrev_sparse_row_echelon, self};
+use super::sparse_invert_new;
 
 struct MonomialSet<P, O>
     where P: MultivariatePolyRingStore,
@@ -167,15 +168,21 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
         }
     }
 
-    gb_rowrev_sparse_row_echelon::<_, true>(&mut A);
+    let mut entries = A.into_entries();
+    entries = sparse_invert_new::gb_sparse_row_echelon::<_, true>(ring.base_ring(), entries, columns.len());
+    entries.reverse();
+    A = SparseMatrix::from_entries(ring.base_ring(), entries, columns.len());
+
+    // sparse_invert::gb_rowrev_sparse_row_echelon::<_, true>(&mut A);
 
     let mut result = Vec::new();
     for i in 0..A.row_count() {
         if let Some(j) = A.get_row(i).nontrivial_entries().map(|(j, _)| j).min() {
             if basis.iter().all(|f| !ring.lm(f, order).unwrap().divides(columns.at_index(j))) {
-                result.push(ring.from_terms(
-                    A.get_row(i).nontrivial_entries().map(|(j, c)| (ring.base_ring().clone_el(c), columns.at_index(j)))
-                ))
+                let f = ring.from_terms(A.get_row(i).nontrivial_entries().map(|(j, c)| (ring.base_ring().clone_el(c), columns.at_index(j))));
+                println!();
+                println!("{}", ring.format(&f));
+                result.push(f)
             }
         }
     }
@@ -487,6 +494,10 @@ fn test_generic_computation() {
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());
+    for f in &gb1 {
+        println!("{}", ring.format(f));
+    }
+    println!("{}", gb1.len());
 }
 
 #[test]
@@ -516,7 +527,11 @@ fn test_difficult_gb() {
         i(2) * X0.clone() * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(4)
     ].into_iter().map(|f| f.unwrap()).collect();
 
+    let start = std::time::Instant::now();
     let gb = f4_base::<_, _, true>(ring, basis, order);
+    let end = std::time::Instant::now();
+
+    println!("Computed GB in {} ms", (end - start).as_millis());
 
     println!("{}", gb.len());
     std::hint::black_box(gb);

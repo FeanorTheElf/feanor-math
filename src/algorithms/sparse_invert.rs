@@ -189,6 +189,14 @@ impl<F: FieldStore> SparseMatrix<F>
         return result;
     }
 
+    pub fn into_entries(self) -> Vec<Vec<(usize, El<F>)>> {
+        self.rows.into_iter().map(|row| row.into_iter().map(|(j, c)| (self.col_permutation_inv[j], c)).collect()).collect()
+    }
+
+    pub fn from_entries(field: F, entries: Vec<Vec<(usize, El<F>)>>, col_count: usize) -> Self {
+        return Self::new(field, entries.len(), col_count, entries.into_iter().enumerate().flat_map(|(i, row)| row.into_iter().map(move |(j, c)| (i, j, c))))
+    }
+
     pub fn base_field(&self) -> &F {
         &self.field
     }

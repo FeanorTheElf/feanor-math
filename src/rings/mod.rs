@@ -55,5 +55,3 @@ pub mod multivariate;
 /// 
 #[cfg(feature = "mpir")]
 pub mod mpir;
-
-pub mod matrix;

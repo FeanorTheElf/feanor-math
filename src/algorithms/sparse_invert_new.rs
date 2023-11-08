@@ -1,8 +1,12 @@
-use std::{ops::Range, cmp::Ordering};
+use std::io::Write;
+use std::ops::Range;
+use std::cmp::{min, Ordering};
 
-use crate::{ring::*, divisibility::{DivisibilityRingStore, DivisibilityRing}, vector::VectorView};
+use crate::ring::*;
+use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
+use crate::vector::VectorView;
 
-use super::zn::zn_static::Zn;
+use crate::rings::zn::zn_static::Zn;
 
 struct Matrix<T> {
     n: usize,
@@ -73,7 +77,8 @@ fn print<R>(ring: R, matrix: &Matrix<El<R>>)
     let zero = ring.zero();
     for i in 0..matrix.row_count() {
         for j in 0..matrix.col_count() {
-            print!("{}, ", ring.format(matrix.at(i, j).unwrap_or(&zero)));
+            let string = format!("{}", ring.format(matrix.at(i, j).unwrap_or(&zero)));
+            print!("{}{}, ", " ".repeat(2 - string.len()), string);
         }
         println!();
     }
@@ -162,12 +167,6 @@ fn check_no_zeros<R>(ring: R, matrix: &Matrix<El<R>>)
     }
 }
 
-fn get_two_mut<'a, T>(slice: &'a mut [T], i1: usize, i2: usize) -> (&'a mut T, &'a mut T) {
-    assert!(i1 < i2);
-    let (fst, snd) = slice.split_at_mut(i1 + 1);
-    return (&mut fst[i1], &mut snd[i2 - i1 - 1]);
-}
-
 fn sub_assign_product<R>(ring: R, main: &mut Matrix<El<R>>, out_block: Block, lhs_block: Block, rhs_block: Block)
     where R: RingStore
 {
@@ -212,10 +211,99 @@ fn sub_assign_product<R>(ring: R, main: &mut Matrix<El<R>>, out_block: Block, lh
     check_no_zeros(ring, main);
 }
 
-fn blocked_row_echelon<R>(ring: R, matrix: &mut Matrix<El<R>>)
+///
+/// Note that this considers the whole matrix `block.matrix` to find a pivoting row;
+/// Apart from that, it only operates within `block``
+/// 
+fn local_row_echelon<R>(ring: R, block: &mut MatrixBlock<El<R>>, transform_block: &mut MatrixBlock<El<R>>) -> usize
     where R: DivisibilityRingStore + Copy,
         R::Type: DivisibilityRing
 {
+    let n = block.col_count();
+    let mut i = 0;  
+    for j in 0..n {
+        let mut new_pivot_row = None;
+        {
+            let matrix = &mut block.matrix;
+            // leave block to find pivot row
+            for potential_pivot_row in (block.block.row_start + i)..matrix.row_count() {
+                if matrix.at(potential_pivot_row, block.block.global_col * n + j).is_some() {
+                    new_pivot_row = Some(potential_pivot_row);
+                    break;
+                }
+            }
+        }
+        if let Some(row) = new_pivot_row {
+            block.matrix.rows.swap(row, block.block.row_start + i);
+
+            println!("Swap {}, {}", row, block.block.row_start + i);
+            assert!(block.at(i, j).is_some());
+
+            // if the swapped up row is not part of the block, its first components are not yet eliminated
+            if row >= block.block.row_start + n {
+                for elim_i in 0..i {
+                    if let Some(factor) = block.at(i, block.row(elim_i)[0].0) {
+                        assert!(block.row(elim_i)[0].0 < j);
+                        let factor = ring.clone_el(factor);
+                        sub_row_local(ring, block, i, elim_i, &factor);
+                        sub_row_local(ring, transform_block, i, elim_i, &factor);
+                    }
+                }
+            }
+
+        } else {
+            continue;
+        }
+
+        // now the pivot should be nonzero, so eliminate within the block
+
+        // check that the left block is zero
+        #[cfg(test)] {
+            assert!(block.at(i, j).is_some());
+            for col in 0..j {
+                for row in min(i + 1, col + 1)..n {
+                    if !(block.at(row, col).is_none()) {
+                        println!();
+                        println!("{}, {}", i, j);
+                        print(ring, &block.matrix);
+                        println!();
+                        assert!(false);
+                    }
+                }
+            }
+        }
+
+        let pivot_inv = ring.checked_div(&ring.one(), block.at(i, j).unwrap()).unwrap();
+
+        for (_, c) in block.row_mut(i) {
+            ring.mul_assign_ref(c, &pivot_inv);
+        }
+        for (_, c) in transform_block.row_mut(i) {
+            ring.mul_assign_ref(c, &pivot_inv);
+        }
+        for elim_i in 0..n {
+            if elim_i == i {
+                continue;
+            }
+            if let Some(factor) = block.at(elim_i, j) {
+                let factor = ring.clone_el(factor);
+                sub_row_local(ring, block, elim_i, i, &factor);
+                sub_row_local(ring, transform_block, elim_i, i, &factor);
+            }
+        }
+        i += 1;
+    }
+    return i;
+}
+
+fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut Matrix<El<R>>)
+    where R: DivisibilityRingStore + Copy,
+        R::Type: DivisibilityRing
+{
+    if LOG {
+        print!("[{}x{}]", matrix.row_count(), matrix.col_count());
+        std::io::stdout().flush().unwrap();
+    }
     let mut pivot_row = 0;
     let mut pivot_col = 0;
     let n = matrix.n;
@@ -230,55 +318,19 @@ fn blocked_row_echelon<R>(ring: R, matrix: &mut Matrix<El<R>>)
         let mut transform_transposed = identity(ring, n);
         let mut transform_transposed_block = transform_transposed.block(0..n, 0);
 
-        // we prepare the current block
+        // now we have the nxn block in row echelon form, with the last (n - produced rows) being zero
+        let produced_rows = local_row_echelon(ring, &mut matrix.block(pivot_row..(pivot_row + n), pivot_col), &mut transform_transposed_block);
 
-        let mut i = 0;  
-        for j in 0..n {
-            let mut new_pivot_row = None;
-            for potential_pivot_row in (pivot_row + i)..matrix.row_count() {
-                if matrix.at(potential_pivot_row, pivot_col * n + j).is_some() {
-                    new_pivot_row = Some(potential_pivot_row);
-                    break;
-                }
-            }
-            if let Some(row) = new_pivot_row {
-                matrix.rows.swap(row, pivot_row + i);
-            } else {
-                continue;
-            }
-
-            // now the pivot should be nonzero, so eliminate within the block
-
-            let mut block = matrix.block(pivot_row..(pivot_row + n), pivot_col);
-            let pivot_inv = ring.checked_div(&ring.one(), block.at(i, j).unwrap()).unwrap();
-
-            for (_, c) in block.row_mut(i) {
-                ring.mul_assign_ref(c, &pivot_inv);
-            }
-            for (_, c) in transform_transposed_block.row_mut(i) {
-                ring.mul_assign_ref(c, &pivot_inv);
-            }
-            for elim_i in 0..n {
-                if elim_i == i {
-                    continue;
-                }
-                if let Some(factor) = block.at(elim_i, j) {
-                    let factor = ring.clone_el(factor);
-                    sub_row_local(ring, &mut block, elim_i, i, &factor);
-                    sub_row_local(ring, &mut transform_transposed_block, elim_i, i, &factor);
-                }
-            }
-            i += 1;
-        }
-        let produced_rows = i;
-
+        // we have to apply the transformation to the other blocks in the same rows
         let mut tmp = Matrix { rows: Vec::new(), n: n };
         for col in (pivot_col + 1)..col_block_count {
             let new = mul_assign(ring, &mut transform_transposed_block, &mut matrix.block(pivot_row..(pivot_row + n), col), tmp);
             tmp = set_block(&mut matrix.block(pivot_row..(pivot_row + n), col), new);
             check_no_zeros(ring, matrix);
         }
+        assert!(matrix.at(1, 0).is_none());
 
+        // and then we can eliminate the column, using matrix blocks
         for row in ((pivot_row + n)..(matrix.row_count() - n)).step_by(n) {
             if (row..(row + n)).any(|i| matrix.rows[i][pivot_col].len() > 0) {
                 let mut out_block = Block { global_col: 0, row_start: row, row_end: row + n };
@@ -294,15 +346,49 @@ fn blocked_row_echelon<R>(ring: R, matrix: &mut Matrix<El<R>>)
                 }
             }
         }
+        assert!(matrix.at(1, 0).is_none());
 
         pivot_col += 1;
         pivot_row += produced_rows;
+
+        if LOG {
+            print!(".");
+            std::io::stdout().flush().unwrap();
+        }
     }
 
     // remove the padding
     for _ in 0..n {
         matrix.rows.pop();
     }
+}
+
+pub fn gb_sparse_row_echelon<F, const LOG: bool>(ring: F, rows: Vec<Vec<(usize, El<F>)>>, col_count: usize) -> Vec<Vec<(usize, El<F>)>>
+    where F: DivisibilityRingStore + Copy,
+        F::Type: DivisibilityRing
+{
+    let n = 128;
+    let global_cols = (col_count - 1) / n + 1;
+    let mut matrix = Matrix {
+        n: n,
+        rows: rows.into_iter().map(|row| {
+            let mut cols = (0..global_cols).map(|_| Vec::new()).collect::<Vec<_>>();
+            for (j, c) in row.into_iter() {
+                cols[j / n].push((j % n, c))
+            }
+            for i in 0..global_cols {
+                cols[i].sort_by_key(|(j, _)| *j)
+            }
+            return cols;
+        }).collect()
+    };
+    blocked_row_echelon::<_, LOG>(ring, &mut matrix);
+    println!();
+    print(ring, &matrix);
+    println!();
+    return matrix.rows.into_iter().map(|row| 
+        row.into_iter().enumerate().flat_map(|(i, r)| r.into_iter().map(move |(j, c)| (j + i * n, c))).collect()
+    ).collect();
 }
 
 #[test]
@@ -316,7 +402,7 @@ fn test() {
     };
     print(ring, &matrix);
 
-    blocked_row_echelon(ring, &mut matrix);
+    blocked_row_echelon::<_, false>(ring, &mut matrix);
 
     println!();
     print(ring, &matrix);
