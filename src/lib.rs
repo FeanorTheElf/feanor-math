@@ -8,6 +8,7 @@
 #![feature(new_uninit)] 
 #![feature(core_intrinsics)]
 #![feature(const_type_name)]
+#![feature(is_sorted)]
 #![feature(fn_traits)]
 #![feature(unboxed_closures)]
 

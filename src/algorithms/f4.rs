@@ -10,6 +10,8 @@ use crate::wrapper::RingElementWrapper;
 use super::sparse_invert::{SparseMatrix, gb_rowrev_sparse_row_echelon, self};
 use super::sparse_invert_new;
 
+const COMPARE_ECHELON_ALGO_WITH_OLD: bool = true;
+
 struct MonomialSet<P, O>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
@@ -168,9 +170,36 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
         }
     }
 
-    let mut entries = A.into_entries();
+    let mut entries = A.clone().into_entries();
+    let mut C: Option<SparseMatrix<&<P::Type as RingExtension>::BaseRing>> = None;
+
+    if COMPARE_ECHELON_ALGO_WITH_OLD {
+        C = Some(A.clone());
+    }
+
     entries = sparse_invert_new::gb_sparse_row_echelon::<_, true>(ring.base_ring(), entries, columns.len());
-    A = SparseMatrix::from_entries(ring.base_ring(), entries, columns.len());
+
+    if COMPARE_ECHELON_ALGO_WITH_OLD {
+        entries.reverse();
+    }
+    
+    let B = SparseMatrix::from_entries(ring.base_ring(), entries, columns.len());
+
+    if COMPARE_ECHELON_ALGO_WITH_OLD {
+        gb_rowrev_sparse_row_echelon::<_, false>(&mut A);
+        A.normalize();
+        if A != B {
+            println!();
+            C.unwrap().print();
+            println!();
+            A.print();
+            println!();
+            B.print();
+            println!();
+            panic!();
+        }
+    }
+    A = B;
 
     // sparse_invert::gb_rowrev_sparse_row_echelon::<_, true>(&mut A);
 
@@ -179,8 +208,6 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
         if let Some(j) = A.get_row(i).nontrivial_entries().map(|(j, _)| j).min() {
             if basis.iter().all(|f| !ring.lm(f, order).unwrap().divides(columns.at_index(j))) {
                 let f = ring.from_terms(A.get_row(i).nontrivial_entries().map(|(j, c)| (ring.base_ring().clone_el(c), columns.at_index(j))));
-                ring.println(&f);
-                println!();
                 result.push(f)
             }
         }
