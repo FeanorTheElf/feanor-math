@@ -153,7 +153,7 @@ impl<F: FieldStore> Clone for SparseMatrix<F>
     }
 }
 
-impl<F: FieldStore> SparseMatrix<F>
+impl<F: FieldStore + Clone> SparseMatrix<F>
     where F::Type: Field
 {
     pub fn new<I>(field: F, row_count: usize, col_count: usize, entries: I) -> Self
@@ -194,7 +194,14 @@ impl<F: FieldStore> SparseMatrix<F>
     }
 
     pub fn from_entries(field: F, entries: Vec<Vec<(usize, El<F>)>>, col_count: usize) -> Self {
-        return Self::new(field, entries.len(), col_count, entries.into_iter().enumerate().flat_map(|(i, row)| row.into_iter().map(move |(j, c)| (i, j, c))))
+        let result = Self::new(field.clone(), entries.len(), col_count, entries.into_iter().enumerate().flat_map(|(i, row)| row.into_iter().map(move |(j, c)| (i, j, c))));
+        // for i in 0..result.row_count() {
+        //     for j in 0..col_count {
+        //         print!("{}, ", field.format(result.at(i, j)));
+        //     }
+        //     println!();
+        // }
+        return result;
     }
 
     pub fn base_field(&self) -> &F {
