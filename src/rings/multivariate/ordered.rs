@@ -455,7 +455,7 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
     {
         if f.len() == 0 {
             return None;
-        } else if self.order.is_same(&order) {
+        } else if self.order.is_same(order.clone()) {
             return Some(&f.at(f.len() - 1).1);
         } else {
             return Some(&f.iter().max_by(|(_, ml), (_, mr)| order.compare(ml, mr)).unwrap().1);

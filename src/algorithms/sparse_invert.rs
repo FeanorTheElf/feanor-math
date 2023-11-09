@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use crate::ring::*;
 use crate::field::*;
 use crate::vector::*;
@@ -316,14 +318,23 @@ impl<F: FieldStore> SparseMatrix<F>
     }
 }
 
-pub fn gb_rowrev_sparse_row_echelon<F>(matrix: &mut SparseMatrix<F>) 
+pub fn gb_rowrev_sparse_row_echelon<F, const LOG: bool>(matrix: &mut SparseMatrix<F>) 
     where F: FieldStore + Clone,
         F::Type: Field
 {
+    if LOG {
+        print!("[{}x{}]", matrix.row_count(), matrix.col_count());
+        std::io::stdout().flush().unwrap();
+    }
     let field = matrix.base_field().clone();
     let A = matrix;
     let mut pivot_row = A.row_count() - 1;
     for pivot_col in 0..A.col_count() {
+        
+        if LOG && pivot_col % 64 == 0 {
+            print!(".");
+            std::io::stdout().flush().unwrap();
+        }
         
         for j in 0..pivot_col {
             for i in 0..=pivot_row {
@@ -401,7 +412,7 @@ fn test_move_zero_rows_down() {
     //   1 0 0
     //       1
 
-    gb_rowrev_sparse_row_echelon(&mut base);
+    gb_rowrev_sparse_row_echelon::<_, false>(&mut base);
 
     assert_el_eq!(&field, &1, base.at(3, 0));
     assert_el_eq!(&field, &1, base.at(2, 1));

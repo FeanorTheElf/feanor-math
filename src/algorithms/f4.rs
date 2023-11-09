@@ -1,11 +1,15 @@
+use std::io::Write;
+
 use crate::field::{FieldStore, Field};
+use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::multivariate::*;
 use crate::vector::*;
+use crate::wrapper::RingElementWrapper;
 
 use super::sparse_invert::{SparseMatrix, gb_rowrev_sparse_row_echelon};
 
-pub struct MonomialSet<P, O>
+struct MonomialSet<P, O>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: FieldStore,
@@ -27,7 +31,7 @@ impl<P, O> MonomialSet<P, O>
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
         O: MonomialOrder + Copy
 {
-    pub fn new(order: O) -> Self {
+    fn new(order: O) -> Self {
         Self {
             data: Vec::new(),
             order: order
@@ -163,7 +167,7 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
         }
     }
 
-    gb_rowrev_sparse_row_echelon(&mut A);
+    gb_rowrev_sparse_row_echelon::<_, true>(&mut A);
 
     let mut result = Vec::new();
     for i in 0..A.row_count() {
@@ -270,6 +274,7 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Ve
             degree_bound += 1;
             if LOG {
                 print!("{{{}}}", degree_bound);
+                std::io::stdout().flush().unwrap();
             }
             continue;
         }
@@ -280,6 +285,7 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Ve
             degree_bound += 1;
             if LOG {
                 print!("{{{}}}", degree_bound);
+                std::io::stdout().flush().unwrap();
             }
             continue;
         }
@@ -295,6 +301,7 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Ve
 
         if LOG {
             print!("({})", open.len());
+            std::io::stdout().flush().unwrap();
         }
     }
     if LOG {
@@ -501,22 +508,56 @@ fn test_generic_computation(bencher: &mut test::Bencher) {
     let ring: MultivariatePolyRingImpl<_, _, _, 6> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
     let poly_ring = dense_poly::DensePolyRing::new(&ring, "X");
 
-    let x1 = poly_ring.mul(
+    let X1 = poly_ring.mul(
         poly_ring.from_terms([(ring.indeterminate(0), 0), (ring.one(), 1)].into_iter()),
         poly_ring.from_terms([(ring.indeterminate(1), 0), (ring.one(), 1)].into_iter())
     );
-    let x2 = poly_ring.mul(
-        poly_ring.add(poly_ring.clone_el(&x1), poly_ring.from_terms([(ring.indeterminate(2), 0), (ring.indeterminate(3), 1)].into_iter())),
-        poly_ring.add(poly_ring.clone_el(&x1), poly_ring.from_terms([(ring.indeterminate(4), 0), (ring.indeterminate(5), 1)].into_iter()))
+    let X2 = poly_ring.mul(
+        poly_ring.add(poly_ring.clone_el(&X1.clone()), poly_ring.from_terms([(ring.indeterminate(2), 0), (ring.indeterminate(3), 1)].into_iter())),
+        poly_ring.add(poly_ring.clone_el(&X1.clone()), poly_ring.from_terms([(ring.indeterminate(4), 0), (ring.indeterminate(5), 1)].into_iter()))
     );
     let basis = vec![
-        ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&x2, 0)),
-        ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&x2, 1)),
-        ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&x2, 2)),
+        ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&X2.clone(), 0)),
+        ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&X2.clone(), 1)),
+        ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&X2.clone(), 2)),
     ];
 
-    bencher.iter(|| {
-        let gb1 = f4::<_, _, true>(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), order);
-        std::hint::black_box(&gb1);
-    });
+    let start = std::time::Instant::now();
+    let gb1 = f4_base::<_, _, true>(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), order);
+    std::hint::black_box(&gb1);
+    let end = std::time::Instant::now();
+
+    println!("Computed GB in {} ms", (end - start).as_millis());
+}
+
+#[test]
+#[ignore]
+fn test_difficult_gb() {
+    let order = DegRevLex;
+    let base = zn_static::Zn::<7>::RING;
+    let ring: MultivariatePolyRingImpl<_, _, _, 7> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
+
+    let X0 = RingElementWrapper::new(&ring, ring.indeterminate(0));
+    let X1 = RingElementWrapper::new(&ring, ring.indeterminate(1));
+    let X2 = RingElementWrapper::new(&ring, ring.indeterminate(2));
+    let X3 = RingElementWrapper::new(&ring, ring.indeterminate(3));
+    let X4 = RingElementWrapper::new(&ring, ring.indeterminate(4));
+    let X5 = RingElementWrapper::new(&ring, ring.indeterminate(5));
+    let X6 = RingElementWrapper::new(&ring, ring.indeterminate(6));
+
+    let i = |x: i64| RingElementWrapper::new(&ring, ring.from(ring.base_ring().coerce(&StaticRing::<i64>::RING, x)));
+
+    let basis = vec![
+        i(6) + i(2) * X5.clone() + i(2) * X4.clone() + X6.clone() + i(4) * X0.clone() + i(5) * X6.clone() * X5.clone() + X6.clone() * X4.clone() + i(3) * X0.clone() * X4.clone() + i(6) * X0.clone() * X6.clone() + i(2) * X0.clone() * X3.clone() + X0.clone() * X2.clone() + i(4) * X0.clone() * X1.clone() + i(2) * X3.clone() * X4.clone() * X5.clone() + i(4) * X0.clone() * X6.clone() * X5.clone() + i(6) * X0.clone() * X2.clone() * X5.clone() + i(5) * X0.clone() * X6.clone() * X4.clone() + i(2) * X0.clone() * X3.clone() * X4.clone() + i(4) * X0.clone() * X1.clone() * X4.clone() + X0.clone() * X6.clone().pow(2) + i(3) * X0.clone() * X3.clone() * X6.clone() + i(5) * X0.clone() * X2.clone() * X6.clone() + i(2) * X0.clone() * X1.clone() * X6.clone() + X0.clone() * X3.clone().pow(2) + i(2) * X0.clone() * X2.clone() * X3.clone() + i(3) * X0.clone() * X3.clone() * X4.clone() * X5.clone() + i(4) * X0.clone() * X3.clone() * X6.clone() * X5.clone() + i(3) * X0.clone() * X1.clone() * X6.clone() * X5.clone() + i(3) * X0.clone() * X2.clone() * X3.clone() * X5.clone() + i(3) * X0.clone() * X3.clone() * X6.clone() * X4.clone() + i(2) * X0.clone() * X1.clone() * X6.clone() * X4.clone() + i(2) * X0.clone() * X3.clone().pow(2) * X4.clone() + i(2) * X0.clone() * X2.clone() * X3.clone() * X4.clone() + i(3) * X0.clone() * X3.clone().pow(2) * X4.clone() * X5.clone() + i(4) * X0.clone() * X1.clone() * X3.clone() * X4.clone() * X5.clone() + X0.clone() * X3.clone().pow(2) * X4.clone().pow(2),
+        i(5) + i(4) * X0.clone() + i(6) * X4.clone() * X5.clone() + i(3) * X6.clone() * X5.clone() + i(4) * X0.clone() * X4.clone() + i(3) * X0.clone() * X6.clone() + i(6) * X0.clone() * X3.clone() + i(6) * X0.clone() * X2.clone() + i(6) * X6.clone() * X4.clone() * X5.clone() + i(2) * X0.clone() * X4.clone() * X5.clone() + i(4) * X0.clone() * X6.clone() * X5.clone() + i(3) * X0.clone() * X2.clone() * X5.clone() + i(3) * X0.clone() * X6.clone() * X4.clone() + i(5) * X0.clone() * X3.clone() * X4.clone() + i(6) * X0.clone() * X2.clone() * X4.clone() + i(4) * X0.clone() * X6.clone().pow(2) + i(3) * X0.clone() * X3.clone() * X6.clone() + i(3) * X0.clone() * X2.clone() * X6.clone() + i(2) * X0.clone() * X6.clone() * X4.clone() * X5.clone() + i(6) * X0.clone() * X3.clone() * X4.clone() * X5.clone() + i(5) * X0.clone() * X1.clone() * X4.clone() * X5.clone() + i(6) * X0.clone() * X6.clone().pow(2) * X5.clone() + i(2) * X0.clone() * X3.clone() * X6.clone() * X5.clone() + i(2) * X0.clone() * X2.clone() * X6.clone() * X5.clone() + i(6) * X0.clone() * X1.clone() * X6.clone() * X5.clone() + i(6) * X0.clone() * X2.clone() * X3.clone() * X5.clone() + i(6) * X0.clone() * X3.clone() * X4.clone().pow(2) + i(4) * X0.clone() * X6.clone().pow(2) * X4.clone() + i(6) * X0.clone() * X3.clone() * X6.clone() * X4.clone() + i(3) * X0.clone() * X2.clone() * X6.clone() * X4.clone() + i(4) * X0.clone() * X3.clone() * X6.clone() * X4.clone() * X5.clone() + i(5) * X0.clone() * X1.clone() * X6.clone() * X4.clone() * X5.clone() + i(6) * X0.clone() * X3.clone().pow(2) * X4.clone() * X5.clone() + i(5) * X0.clone() * X2.clone() * X3.clone() * X4.clone() * X5.clone() + i(3) * X0.clone() * X3.clone() * X6.clone() * X4.clone().pow(2) + i(6) * X0.clone() * X3.clone().pow(2) * X4.clone().pow(2) * X5.clone(),
+        i(2) + i(2) * X0.clone() + i(4) * X0.clone() * X4.clone() + i(2) * X0.clone() * X6.clone() + i(5) * X0.clone() * X4.clone() * X5.clone() + i(2) * X0.clone() * X6.clone() * X5.clone() + i(4) * X0.clone() * X2.clone() * X5.clone() + i(2) * X0.clone() * X4.clone().pow(2) + i(4) * X0.clone() * X6.clone() * X4.clone() + i(4) * X0.clone() * X6.clone().pow(2) + i(2) * X6.clone() * X4.clone() * X5.clone().pow(2) + i(4) * X0.clone() * X6.clone() * X4.clone() * X5.clone() + X0.clone() * X3.clone() * X4.clone() * X5.clone() + X0.clone() * X2.clone() * X4.clone() * X5.clone() + i(3) * X0.clone() * X6.clone().pow(2) * X5.clone() + i(2) * X0.clone() * X3.clone() * X6.clone() * X5.clone() + i(4) * X0.clone() * X2.clone() * X6.clone() * X5.clone() + i(2) * X0.clone() * X6.clone() * X4.clone().pow(2) + X0.clone() * X6.clone().pow(2) * X4.clone() + i(3) * X0.clone() * X6.clone() * X4.clone() * X5.clone().pow(2) + i(2) * X0.clone() * X6.clone().pow(2) * X5.clone().pow(2) + i(3) * X0.clone() * X2.clone() * X6.clone() * X5.clone().pow(2) + X0.clone() * X3.clone() * X4.clone().pow(2) * X5.clone() + X0.clone() * X6.clone().pow(2) * X4.clone() * X5.clone() + X0.clone() * X3.clone() * X6.clone() * X4.clone() * X5.clone() + i(6) * X0.clone() * X2.clone() * X6.clone() * X4.clone() * X5.clone() + i(4) * X0.clone() * X6.clone().pow(2) * X4.clone().pow(2) + i(6) * X0.clone() * X3.clone() * X6.clone() * X4.clone() * X5.clone().pow(2) + i(4) * X0.clone() * X1.clone() * X6.clone() * X4.clone() * X5.clone().pow(2) + i(4) * X0.clone() * X2.clone() * X3.clone() * X4.clone() * X5.clone().pow(2) + i(6) * X0.clone() * X3.clone() * X6.clone() * X4.clone().pow(2) * X5.clone() + i(2) * X0.clone() * X3.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(2),
+        i(4) + i(5) * X0.clone() * X4.clone() * X5.clone() + i(6) * X0.clone() * X6.clone() * X5.clone() + i(5) * X0.clone() * X4.clone().pow(2) * X5.clone() + i(3) * X0.clone() * X6.clone() * X4.clone() * X5.clone() + i(3) * X0.clone() * X6.clone().pow(2) * X5.clone() + i(6) * X0.clone() * X6.clone() * X4.clone() * X5.clone().pow(2) + i(5) * X0.clone() * X2.clone() * X4.clone() * X5.clone().pow(2) + X0.clone() * X6.clone().pow(2) * X5.clone().pow(2) + i(6) * X0.clone() * X2.clone() * X6.clone() * X5.clone().pow(2) + i(4) * X0.clone() * X6.clone() * X4.clone().pow(2) * X5.clone() + i(2) * X0.clone() * X6.clone().pow(2) * X4.clone() * X5.clone() + i(5) * X0.clone() * X3.clone() * X4.clone().pow(2) * X5.clone().pow(2) + i(3) * X0.clone() * X6.clone().pow(2) * X4.clone() * X5.clone().pow(2) + i(5) * X0.clone() * X3.clone() * X6.clone() * X4.clone() * X5.clone().pow(2) + i(4) * X0.clone() * X2.clone() * X6.clone() * X4.clone() * X5.clone().pow(2) + i(6) * X0.clone() * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone() + i(4) * X0.clone() * X3.clone() * X6.clone() * X4.clone().pow(2) * X5.clone().pow(2),
+        i(4) + i(4) * X0.clone() * X4.clone().pow(2) * X5.clone().pow(2) + X0.clone() * X6.clone() * X4.clone() * X5.clone().pow(2) + X0.clone() * X6.clone().pow(2) * X5.clone().pow(2) + i(5) * X0.clone() * X6.clone() * X4.clone().pow(2) * X5.clone().pow(2) + i(6) * X0.clone() * X6.clone().pow(2) * X4.clone() * X5.clone().pow(2) + i(3) * X0.clone() * X6.clone().pow(2) * X4.clone() * X5.clone().pow(3) + i(4) * X0.clone() * X2.clone() * X6.clone() * X4.clone() * X5.clone().pow(3) + i(6) * X0.clone() * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(2) + i(4) * X0.clone() * X3.clone() * X6.clone() * X4.clone().pow(2) * X5.clone().pow(3),
+        i(5) * X0.clone() * X6.clone() * X4.clone().pow(2) * X5.clone().pow(3) + i(6) * X0.clone() * X6.clone().pow(2) * X4.clone() * X5.clone().pow(3) + i(5) * X0.clone() * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(3),
+        i(2) * X0.clone() * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(4)
+    ].into_iter().map(|f| f.unwrap()).collect();
+
+    let gb = f4_base::<_, _, true>(ring, basis, order);
+
+    std::hint::black_box(gb);
 }
