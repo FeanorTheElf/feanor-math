@@ -501,8 +501,9 @@ fn test_f4_larger_elim() {
     assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, g1, &actual, order));
 }
 
-#[bench]
-fn test_generic_computation(bencher: &mut test::Bencher) {
+#[test]
+#[ignore]
+fn test_generic_computation() {
     let order = DegRevLex;
     let base = zn_static::Z17;
     let ring: MultivariatePolyRingImpl<_, _, _, 6> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
@@ -523,7 +524,7 @@ fn test_generic_computation(bencher: &mut test::Bencher) {
     ];
 
     let start = std::time::Instant::now();
-    let gb1 = f4_base::<_, _, true>(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), order);
+    let gb1 = f4::<_, _, true>(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), order);
     std::hint::black_box(&gb1);
     let end = std::time::Instant::now();
 
@@ -557,7 +558,7 @@ fn test_difficult_gb() {
         i(2) * X0.clone() * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(4)
     ].into_iter().map(|f| f.unwrap()).collect();
 
-    let gb = f4_base::<_, _, true>(ring, basis, order);
+    let gb = f4::<_, _, true>(ring, basis, order);
 
     std::hint::black_box(gb);
 }
