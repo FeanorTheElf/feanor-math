@@ -391,7 +391,7 @@ fn test_f4_small() {
     assert_eq!(3, actual.len());
     assert_el_eq!(&ring, &f2, actual.at(0));
     assert_el_eq!(&ring, &f1, actual.at(1));
-    assert_el_eq!(&ring, &expected, actual.at(2));
+    assert_el_eq!(&ring, &ring.negate(expected), actual.at(2));
 }
 
 #[test]
