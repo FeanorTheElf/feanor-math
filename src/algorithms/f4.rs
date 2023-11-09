@@ -1,16 +1,14 @@
 use std::io::Write;
 
 use crate::field::{FieldStore, Field};
-use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::multivariate::*;
 use crate::vector::*;
-use crate::wrapper::RingElementWrapper;
 
-use super::sparse_invert::{SparseMatrix, gb_rowrev_sparse_row_echelon, self};
+use super::sparse_invert::{SparseMatrix, gb_rowrev_sparse_row_echelon};
 use super::sparse_invert_new;
 
-const COMPARE_ECHELON_ALGO_WITH_OLD: bool = true;
+const COMPARE_ECHELON_ALGO_WITH_OLD: bool = false;
 
 struct MonomialSet<P, O>
     where P: MultivariatePolyRingStore,
@@ -360,6 +358,10 @@ use crate::rings::zn::zn_static;
 use crate::default_memory_provider;
 #[cfg(test)]
 use crate::rings::poly::*;
+#[cfg(test)]
+use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use crate::wrapper::RingElementWrapper;
 
 #[test]
 fn test_f4_small() {
