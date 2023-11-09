@@ -377,6 +377,7 @@ pub fn gb_rowrev_sparse_row_echelon<F, const LOG: bool>(matrix: &mut SparseMatri
     where F: FieldStore + Clone,
         F::Type: Field
 {
+    let start = std::time::Instant::now();
     if LOG {
         print!("[{}x{}]", matrix.row_count(), matrix.col_count());
         std::io::stdout().flush().unwrap();
@@ -414,12 +415,18 @@ pub fn gb_rowrev_sparse_row_echelon<F, const LOG: bool>(matrix: &mut SparseMatri
             }
 
             if pivot_row == 0 {
+                let end = std::time::Instant::now();
+                print!("old[{}ms]", (end - start).as_millis());
+                std::io::stdout().flush().unwrap();
                 return;
             } else {
                 pivot_row -= 1;
             }
         }
     }
+    let end = std::time::Instant::now();
+    print!("old[{}ms]", (end - start).as_millis());
+    std::io::stdout().flush().unwrap();
 }
 
 #[cfg(test)]

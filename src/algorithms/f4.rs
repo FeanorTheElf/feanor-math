@@ -8,7 +8,7 @@ use crate::vector::*;
 use super::sparse_invert::{SparseMatrix, gb_rowrev_sparse_row_echelon};
 use super::sparse_invert_new;
 
-const COMPARE_ECHELON_ALGO_WITH_OLD: bool = false;
+const COMPARE_ECHELON_ALGO_WITH_OLD: bool = true;
 
 struct MonomialSet<P, O>
     where P: MultivariatePolyRingStore,
