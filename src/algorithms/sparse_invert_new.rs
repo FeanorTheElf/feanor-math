@@ -242,19 +242,6 @@ fn search_pivot_outside_block<T>(matrix: &mut Matrix<T>, local_pivot_i: usize, l
     return false;
 }
 
-fn sub_row_global<R>(ring: R, matrix: &mut Matrix<El<R>>, i_dst: usize, i_src: usize, global_col_start: usize, factor: &El<R>)
-    where R: RingStore + Copy
-{
-    let n = matrix.n;
-    let lhs_factor = ring.one();
-    let rhs_factor = ring.negate(ring.clone_el(factor));
-    let mut tmp = Vec::new();
-    for col in global_col_start..(matrix.col_count() / n) {
-        let new = add_row_local::<_, true>(ring, &matrix.rows[i_dst][col], &matrix.rows[i_src][col], &lhs_factor, &rhs_factor, tmp);
-        tmp = std::mem::replace(&mut matrix.rows[i_dst][col], new);
-    }
-}
-
 #[inline(never)]
 /* GPU */ fn update_rows_with_transform<R>(ring: R, matrix: &mut Matrix<El<R>>, rows_start: usize, rows_end: usize, pivot_col: usize, transform: &MatrixBlock<El<R>>) 
 where R: RingStore + Copy
@@ -267,39 +254,10 @@ where R: RingStore + Copy
     }
 }
 
-#[inline(never)]
 /* GPU */ fn eliminate_exterior_rows<R>(ring: R, matrix: &mut Matrix<El<R>>, rows_start: usize, rows_end: usize, pivot_rows_start: usize, pivot_rows_end: usize, global_col: usize)
     where R: RingStore + Copy
 {
-    if pivot_rows_end <= pivot_rows_start {
-        return;
-    }
-    let mut coefficients = Vec::new();
-    let mut reduction_row = Vec::new();
-    let mut tmp = Vec::new();
-    let n = matrix.n;
-    let lhs_factor = ring.one();
-    let rhs_factor = ring.neg_one();
-
-    for i in rows_start..rows_end {
-        coefficients.clear();
-        for pivot_i in pivot_rows_start..pivot_rows_end {
-            let (j, c) = leading_entry(matrix, pivot_i, global_col);
-            debug_assert!(ring.eq_el(&lhs_factor, c));
-            if let Some(factor) = matrix.at(i, global_col * n + j) {
-                coefficients.push((pivot_i - pivot_rows_start, ring.clone_el(factor)));
-            }
-        }
-        coefficients.push((usize::MAX, ring.zero()));
-        if coefficients.len() > 1 {
-            for col in global_col..(matrix.col_count() / n) {
-                reduction_row = linear_combine_rows(ring, &coefficients, &matrix.block(pivot_rows_start..pivot_rows_end, col), reduction_row, &mut tmp);
-                let new = add_row_local::<_, true>(ring, &matrix.rows[i][col], &reduction_row, &lhs_factor, &rhs_factor, tmp);
-                tmp = std::mem::replace(&mut matrix.rows[i][col], new);
-            }
-        }
-    }
-    matrix.check();
+    eliminate_interior_rows(ring, matrix, rows_start, rows_end, pivot_rows_start, pivot_rows_end, global_col)
 }
 
 #[inline(never)]
@@ -310,16 +268,27 @@ where R: RingStore + Copy
         return;
     }
     let n = matrix.n;
-    matrix.check();
+    let mut coefficients = Vec::new();
+    let mut new_row = Vec::new();
+    let mut tmp = Vec::new();
+
     for i in rows_start..rows_end {
+        coefficients.clear();
         for pivot_i in pivot_rows_start..pivot_rows_end {
-            if let Some(factor) = matrix.at(i, global_col * n + leading_entry(matrix, pivot_i, global_col).0) {
-                let factor = ring.clone_el(factor);
-                sub_row_global(ring, matrix, i, pivot_i, global_col, &factor);
+            let (j, _) = leading_entry(matrix, pivot_i, global_col);
+            if let Some(factor) = matrix.at(i, global_col * n + j) {
+                coefficients.push((pivot_i, ring.negate(ring.clone_el(factor))));
+            }
+        }
+        coefficients.push((i, ring.one()));
+        coefficients.push((usize::MAX, ring.zero()));
+        if coefficients.len() > 2 {
+            for col in global_col..(matrix.col_count() / n) {
+                new_row = linear_combine_rows(ring, &coefficients, &matrix.block(0..i, col), new_row, &mut tmp);
+                swap(&mut new_row, &mut matrix.rows[i][col]);
             }
         }
     }
-    matrix.check();
 }
 
 fn get_two_mut<'a, T>(slice: &'a mut [T], i1: usize, i2: usize) -> (&'a mut T, &'a mut T) {
@@ -328,6 +297,7 @@ fn get_two_mut<'a, T>(slice: &'a mut [T], i1: usize, i2: usize) -> (&'a mut T, &
     return (&mut s1[0], &mut s2[s2.len() - 1]);
 }
 
+#[inline(never)]
 fn local_row_echelon<R>(ring: R, matrix: &mut Matrix<El<R>>, transform_block: &mut MatrixBlock<El<R>>, global_pivot_i: usize, global_pivot_j: usize, start_pivot: (usize, usize)) -> (usize, Result<(), usize>)
     where R: DivisibilityRingStore + Copy,
         R::Type: DivisibilityRing
@@ -403,6 +373,7 @@ fn local_row_echelon<R>(ring: R, matrix: &mut Matrix<El<R>>, transform_block: &m
     return (i, Ok(()));
 }
 
+#[inline(never)]
 fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut Matrix<El<R>>)
     where R: DivisibilityRingStore + Copy,
         R::Type: DivisibilityRing
@@ -480,7 +451,7 @@ pub fn gb_sparse_row_echelon<F, const LOG: bool>(ring: F, rows: Vec<Vec<(usize, 
     where F: DivisibilityRingStore + Copy,
         F::Type: DivisibilityRing
 {
-    let n = 64;
+    let n = 1024;
     let global_cols = (col_count - 1) / n + 1;
     let mut matrix = Matrix {
         n: n,
