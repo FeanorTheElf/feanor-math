@@ -220,14 +220,14 @@ fn update_rows_with_transform<R>(ring: R, matrix: &mut Matrix<El<R>>, rows_start
         || Vec::new(), 
         |tmp, rows| 
     {
-        let rows = rows.collect::<Vec<_>>();
+        let mut rows = rows;
         let mut new = mul_assign(
             ring, 
             transform, 
             rows.iter().map(|x| &x[..]), 
             std::mem::replace(tmp, Vec::new())
         );
-        for (target, new) in rows.into_iter().zip(new.iter_mut()) {
+        for (target, new) in rows.iter_mut().zip(new.iter_mut()) {
             swap(target, new);
         }
         *tmp = new;
