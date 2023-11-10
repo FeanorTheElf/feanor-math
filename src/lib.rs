@@ -11,12 +11,15 @@
 #![feature(is_sorted)]
 #![feature(fn_traits)]
 #![feature(unboxed_closures)]
+#![feature(iter_advance_by)]
 
 #![doc = include_str!("../Readme.md")]
 
 extern crate test;
 extern crate libc;
 extern crate oorandom;
+#[cfg(feature = "parallel")]
+extern crate rayon;
 
 ///
 /// This is currently experimental, we strongly discourage you
@@ -139,3 +142,5 @@ pub mod rings;
 pub mod wrapper;
 
 pub mod generic_cast;
+
+pub mod parallel;

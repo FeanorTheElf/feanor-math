@@ -120,9 +120,10 @@ fn S_deg<P, O>(ring: P, f1: &El<P>, f2: &El<P>, order: O) -> u16
 pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order: O) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
-        <P::Type as RingExtension>::BaseRing: FieldStore,
+        <P::Type as RingExtension>::BaseRing: FieldStore + Sync,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
-        O: MonomialOrder + Copy
+        O: MonomialOrder + Copy,
+        El<<P::Type as RingExtension>::BaseRing>: Send + Sync
 {
     if S_polys.len() == 0 {
         return Vec::new();
@@ -265,9 +266,10 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
 pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
-        <P::Type as RingExtension>::BaseRing: FieldStore,
+        <P::Type as RingExtension>::BaseRing: FieldStore + Sync,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
-        O: MonomialOrder + Copy
+        O: MonomialOrder + Copy,
+        El<<P::Type as RingExtension>::BaseRing>: Send + Sync
 {
     let filter_S_pair = |f: &El<P>, g: &El<P>| {
         f as *const _ != g as *const _ &&
