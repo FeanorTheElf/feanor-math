@@ -17,7 +17,7 @@ pub fn column_iterator<'a, T>(data: &'a mut [Vec<T>], cols: Range<usize>) -> imp
 
 #[cfg(feature = "parallel")]
 pub fn column_iterator<'a, T>(data: &'a mut [Vec<T>], cols: Range<usize>) -> impl 'a + rayon::iter::ParallelIterator<Item = impl 'a + Iterator<Item = &'a mut T>> 
-    where T: Sync
+    where T: Send
 {
     assert!(data.len() > 0);
     let col_count = data[0].len();

@@ -259,7 +259,6 @@ fn eliminate_interior_rows<R>(ring: R, matrix: &mut Matrix<El<R>>, rows_start: u
     }
     assert!(rows_start >= pivot_rows_end || pivot_rows_start >= rows_end);
 
-    let n = matrix.n;
     let global_col_count = matrix.global_col_count;
 
     let (pivot_rows, work_rows) = if rows_start >= pivot_rows_end {
