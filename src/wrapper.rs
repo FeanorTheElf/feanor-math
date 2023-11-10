@@ -1,7 +1,6 @@
 use std::{ops::*, hash::Hash, fmt::{Display, Debug}};
 
 use crate::ring::*;
-use crate::generic_cast::generic_cast;
 
 ///
 /// Stores a ring element together with its ring, so that ring operations do
@@ -141,29 +140,4 @@ impl<R: RingStore> Deref for RingElementWrapper<R> {
     fn deref(&self) -> &Self::Target {
         &self.element
     }
-}
-
-pub fn wrap_if_necessary<R: RingStore, T>(ring: R, value: T) -> RingElementWrapper<R> 
-    where El<R>: 'static
-{
-    trait WrapIfNecessary<R: RingStore>
-        where El<R>: 'static
-    {
-        fn do_wrap(self, ring: R) -> RingElementWrapper<R>;
-    }
-    impl<R: RingStore, T> WrapIfNecessary<R> for T 
-        where El<R>: 'static
-    {
-        default fn do_wrap(self, ring: R) -> RingElementWrapper<R> {
-            RingElementWrapper::new(ring, generic_cast::<_, El<R>>(self).unwrap())
-        }
-    }
-    impl<R: RingStore> WrapIfNecessary<R> for RingElementWrapper<R> 
-        where El<R>: 'static
-    {
-        fn do_wrap(self, _: R) -> RingElementWrapper<R> {
-            self
-        }
-    }
-    <T as WrapIfNecessary<R>>::do_wrap(value, ring)
 }

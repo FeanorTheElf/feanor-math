@@ -223,6 +223,9 @@ pub mod generic_impls {
     }
 }
 
+///
+/// The [`crate::ring::RingStore`] corresponding to [`ZnRing`].
+/// 
 pub trait ZnRingStore: FiniteRingStore
     where Self::Type: ZnRing
 {    

@@ -1,13 +1,10 @@
 use std::io::Write;
 use std::mem::swap;
-use std::ops::Range;
 use std::cmp::{min, Ordering};
 
 use crate::ring::*;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::vector::VectorView;
-
-use crate::rings::zn::zn_static::Zn;
 
 const EXTENSIVE_RUNTIME_ASSERTS: bool = false;
 
@@ -19,7 +16,6 @@ struct Matrix<T> {
 #[derive(Copy, Clone)]
 struct Block {
     row_start: usize,
-    row_end: usize,
     global_col: usize
 }
 
@@ -44,8 +40,8 @@ impl<T> Matrix<T> {
         self.rows[0].len() * self.n
     }
 
-    fn block<'a>(&'a mut self, rows: Range<usize>, global_col: usize) -> MatrixBlock<'a, T> {
-        MatrixBlock { matrix: self, block: Block { row_start: rows.start, row_end: rows.end, global_col: global_col } }
+    fn block<'a>(&'a mut self, rows_start: usize, global_col: usize) -> MatrixBlock<'a, T> {
+        MatrixBlock { matrix: self, block: Block { row_start: rows_start, global_col: global_col } }
     }
 
     fn check(&self) {
@@ -67,10 +63,6 @@ impl<'a, T> MatrixBlock<'a, T> {
         where 'b: 'a
     {
         self.matrix.at(self.block.row_start + i, self.block.global_col * self.matrix.n + j)
-    }
-
-    fn row_count(&self) -> usize {
-        self.block.row_end - self.block.row_start
     }
 
     fn col_count(&self) -> usize {
@@ -243,14 +235,14 @@ fn search_pivot_outside_block<T>(matrix: &mut Matrix<T>, local_pivot_i: usize, l
 }
 
 #[inline(never)]
-/* GPU */ fn update_rows_with_transform<R>(ring: R, matrix: &mut Matrix<El<R>>, rows_start: usize, rows_end: usize, pivot_col: usize, transform: &MatrixBlock<El<R>>) 
+/* GPU */ fn update_rows_with_transform<R>(ring: R, matrix: &mut Matrix<El<R>>, rows_start: usize, pivot_col: usize, transform: &MatrixBlock<El<R>>) 
 where R: RingStore + Copy
 {
     let n = matrix.n;
     let mut tmp = empty(n);
     for col in (pivot_col + 1)..(matrix.col_count() / n) {
-        let new = mul_assign(ring, transform, &mut matrix.block(rows_start..rows_end, col), tmp);
-        tmp = set_block(&mut matrix.block(rows_start..rows_end, col), new);
+        let new = mul_assign(ring, transform, &mut matrix.block(rows_start, col), tmp);
+        tmp = set_block(&mut matrix.block(rows_start, col), new);
     }
 }
 
@@ -284,7 +276,7 @@ where R: RingStore + Copy
         coefficients.push((usize::MAX, ring.zero()));
         if coefficients.len() > 2 {
             for col in global_col..(matrix.col_count() / n) {
-                new_row = linear_combine_rows(ring, &coefficients, &matrix.block(0..i, col), new_row, &mut tmp);
+                new_row = linear_combine_rows(ring, &coefficients, &matrix.block(0, col), new_row, &mut tmp);
                 swap(&mut new_row, &mut matrix.rows[i][col]);
             }
         }
@@ -304,7 +296,7 @@ fn local_row_echelon<R>(ring: R, matrix: &mut Matrix<El<R>>, transform_block: &m
 {
     matrix.check();
     let n = matrix.n;
-    let mut block = matrix.block(global_pivot_i..(global_pivot_i + n), global_pivot_j);
+    let mut block = matrix.block(global_pivot_i, global_pivot_j);
     let mut i = start_pivot.0;
     let mut tmp = Vec::new();
     for j in start_pivot.1..n {
@@ -398,12 +390,12 @@ fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut Matrix<El<R>>)
     let mut transform = empty(n);
     while pivot_row + n < matrix.row_count() && pivot_col < col_block_count {
         transform = identity(ring, n, transform);
-        let mut transform_block = transform.block(0..n, 0);
+        let mut transform_block = transform.block(0, 0);
 
         // now we have the nxn block in row echelon form, with the last (n - produced rows) being zero
         let (new_local_i, current_result) = local_row_echelon(ring, matrix, &mut transform_block, pivot_row, pivot_col, (local_pivot_i, local_pivot_j));
 
-        update_rows_with_transform(ring, matrix, pivot_row, pivot_row + n, pivot_col, &transform_block);
+        update_rows_with_transform(ring, matrix, pivot_row, pivot_col, &transform_block);
         
         eliminate_exterior_rows(ring, matrix, pivot_row + n, matrix.row_count() - n, pivot_row + local_pivot_i, pivot_row + new_local_i, pivot_col);
 
@@ -491,13 +483,16 @@ pub fn gb_sparse_row_echelon<F, const LOG: bool>(ring: F, rows: Vec<Vec<(usize, 
     ).collect();
 }
 
+#[cfg(test)]
+use crate::rings::zn::zn_static::Zn;
+
 #[test]
 fn test() {
     let ring = Zn::<7>::RING;
     let mut counter1 = 0;
     let mut counter2 = 0;
     let mut matrix = Matrix {
-        rows: (0..10).map(|i| (0..3).map(|j| (0..4).map(|k| { counter1 += 1; (k, (counter1 % 6) + 1) }).filter(|_| { counter2 = (counter2 + 1) % 7; counter2 < 2 }).chain(Some((usize::MAX, 0)).into_iter()).collect()).collect()).collect(),
+        rows: (0..10).map(|_| (0..3).map(|_| (0..4).map(|k| { counter1 += 1; (k, (counter1 % 6) + 1) }).filter(|_| { counter2 = (counter2 + 1) % 7; counter2 < 2 }).chain(Some((usize::MAX, 0)).into_iter()).collect()).collect()).collect(),
         n: 4
     };
 

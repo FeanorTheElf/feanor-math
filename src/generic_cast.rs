@@ -1,16 +1,8 @@
 use std::any::Any;
 
-pub fn generic_cast<T, U: Any>(val: T) -> Option<U> {
-
-    trait TryCast<U> {
-        fn try_cast(self) -> Option<U>;
-    }
-    impl<T, U> TryCast<U> for T {
-        default fn try_cast(self) -> Option<U> { None }
-    }
-    impl<T> TryCast<T> for T {
-        fn try_cast(self) -> Option<T> { Some(self) }
-    }
-
-    <T as TryCast<U>>::try_cast(val)
+pub fn generic_cast<T: Any, U: Any>(val: T) -> Option<U> {
+    let mut val_opt = Some(val);
+    let val_opt_any: &mut dyn Any = &mut val_opt as &mut dyn Any;
+    let result: &mut Option<U> = val_opt_any.downcast_mut::<Option<U>>()?;
+    return result.take();
 }

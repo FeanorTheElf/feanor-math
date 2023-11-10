@@ -7,6 +7,9 @@ pub mod sparse_poly;
 /// Trait for all rings that represent the polynomial ring `R[X]` with
 /// any base ring R.
 /// 
+/// Currently, the two implementations of this type of ring are [`dense_poly::DensePolyRing`]
+/// and [`sparse_poly::SparsePolyRing`].
+/// 
 pub trait PolyRing: RingExtension + SelfIso {
 
     type TermsIterator<'a>: Iterator<Item = (&'a El<Self::BaseRing>, usize)>

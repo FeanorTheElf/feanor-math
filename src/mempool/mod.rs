@@ -170,6 +170,11 @@ pub type DefaultMemoryProvider = AllocatingMemoryProvider;
 #[cfg(feature = "log_memory")]
 pub type DefaultMemoryProvider = &'static LoggingMemoryProvider;
 
+///
+/// Returns an expression that evaluates to an identifier for the current function.
+/// The exact syntax of that expression is not specified, and the value should
+/// only be used for debugging/tracing purposes.
+/// 
 #[macro_export]
 macro_rules! current_function {
     () => {{
@@ -178,6 +183,12 @@ macro_rules! current_function {
     }}
 }
 
+///
+/// Returns an instance of the current default memory provider.
+/// 
+/// The used memory provider can change depending on enabled features
+/// and conditional compilation.
+/// 
 #[macro_export]
 #[cfg(not(feature = "log_memory"))]
 macro_rules! default_memory_provider {
@@ -186,6 +197,12 @@ macro_rules! default_memory_provider {
     };
 }
 
+///
+/// Returns an instance of the current default memory provider.
+/// 
+/// The used memory provider can change depending on enabled features
+/// and conditional compilation.
+/// 
 #[macro_export]
 #[cfg(feature = "log_memory")]
 macro_rules! default_memory_provider {

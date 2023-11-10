@@ -13,6 +13,13 @@ pub mod ordered;
 
 type MonomialExponent = u16;
 
+///
+/// Trait for rings that are multivariate polynomial rings in finitely many indeterminates
+/// over a base ring, i.e. `R[X0, X1, X2, ..., XN]`.
+/// 
+/// Currently, the only implementation of such rings is [`ordered::MultivariatePolyRingImpl`],
+/// which is stores all monomials in an ordered vector.
+/// 
 pub trait MultivariatePolyRing: RingExtension + SelfIso {
 
     type MonomialVector: VectorViewMut<MonomialExponent> + Clone;
@@ -43,9 +50,20 @@ pub trait MultivariatePolyRing: RingExtension + SelfIso {
 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, m: &Monomial<Self::MonomialVector>) -> &'a El<Self::BaseRing>;
 
+    ///
+    /// Returns the leading monomial of the given polynomial.
+    /// 
+    /// The leading monomial is the monomial with nonzero coefficient that is
+    /// largest w.r.t. the given monomial ordering.
+    /// 
     fn lm<'a, O>(&'a self, f: &'a Self::Element, order: O) -> Option<&'a Monomial<Self::MonomialVector>>
         where O: MonomialOrder;
 
+    ///
+    /// Replaces the given indeterminate in the given polynomial by the value `val`.
+    /// The implementation is optimized using the facts that only one indeterminate is
+    /// replaced, and the new value is in the same ring (it can be a polynomial however).
+    /// 
     fn specialize(&self, f: &Self::Element, var: usize, val: &Self::Element) -> Self::Element {
         let mut parts = Vec::new();
         for (c, m) in self.terms(f) {

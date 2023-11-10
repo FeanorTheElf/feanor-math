@@ -455,11 +455,43 @@ impl HashableElRing for ZnBase {
     }
 }
 
+///
+/// Wraps [`ZnBase`] to represent an instance of the ring `Z/nZ`.
+/// As opposed to [`ZnBase`], elements are stored with additional information
+/// to speed up multiplication `ZnBase x ZnFastmulBase -> ZnBase`, by
+/// using [`CanonicalHom::mul_assign_map_in()`].
+/// Note that normal arithmetic in this ring is much slower than [`ZnBase`].
+/// 
+/// # Example
+/// The following use of the FFT is usually faster than the standard use, as
+/// the FFT requires a high amount of multiplications with the internally stored
+/// roots of unity.
+/// ```
+/// # #![feature(const_type_name)]
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::algorithms::fft::*;
+/// # use feanor_math::algorithms::fft::cooley_tuckey::*;
+/// # use feanor_math::mempool::*;
+/// # use feanor_math::default_memory_provider;
+/// let ring = Zn::new(1073872897);
+/// let fastmul_ring = ZnFastmul::new(ring);
+/// // The values stored by the FFT table are elements of `ZnFastmulBase`
+/// let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, 15).unwrap();
+/// // Note that data uses `ZnBase`
+/// let mut data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+/// fft.unordered_fft(&mut data[..], &ring, &default_memory_provider!());
+/// ```
+/// 
 #[derive(Clone, Copy)]
 pub struct ZnFastmulBase {
     base: RingValue<ZnBase>
 }
 
+///
+/// An implementation of `Z/nZ` for `n` that have at most 41 bits that is optimized for multiplication with elements
+/// of [`Zn`]. For details, see [`ZnFastmulBase`].
+/// 
 pub type ZnFastmul = RingValue<ZnFastmulBase>;
 
 impl ZnFastmul {

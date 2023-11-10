@@ -1,7 +1,7 @@
 #![allow(soft_unstable)]
 #![allow(non_snake_case)]
 #![feature(test)]
-#![feature(specialization)]
+#![feature(min_specialization)]
 #![feature(generic_const_exprs)]
 #![feature(maybe_uninit_slice)]
 #![feature(allocator_api)]
@@ -18,6 +18,10 @@ extern crate test;
 extern crate libc;
 extern crate oorandom;
 
+///
+/// Experimental module containing macros for simple generation
+/// of objects implementing `Fn`-traits.
+/// 
 pub mod named_closure;
 ///
 /// Struct that may be used to refer to a generic computation.
