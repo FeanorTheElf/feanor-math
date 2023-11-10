@@ -2,6 +2,7 @@ use crate::algorithms;
 use crate::divisibility::*;
 use crate::euclidean::*;
 use crate::field::Field;
+use crate::mempool::GrowableMemoryProvider;
 use crate::vector::VectorViewMut;
 use crate::ring::*;
 use crate::rings::poly::*;
@@ -246,52 +247,50 @@ impl<R: RingStore> RingExtension for SparsePolyRingBase<R> {
     }
 }
 
-pub enum CanonicalHomFromPolyRing<R, P>
-    where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: PolyRing
-{
-    Trivial, Generic(super::generic_impls::GenericCanonicalHom<P, SparsePolyRingBase<R>>)
-}
+pub trait CanonicalIsoToSparsePolyRing: PolyRing {}
+
+impl<R, M> CanonicalIsoToSparsePolyRing for dense_poly::DensePolyRingBase<R, M> 
+    where R: RingStore, M: GrowableMemoryProvider<El<R>>
+{}
 
 impl<R, P> CanonicalHom<P> for SparsePolyRingBase<R> 
-    where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: PolyRing
+    where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: CanonicalIsoToSparsePolyRing
 {
-    type Homomorphism = CanonicalHomFromPolyRing<R, P>;
+    type Homomorphism = super::generic_impls::GenericCanonicalHom<P, Self>;
 
-    default fn has_canonical_hom(&self, from: &P) -> Option<Self::Homomorphism> {
-        Some(CanonicalHomFromPolyRing::Generic(super::generic_impls::generic_has_canonical_hom(from, self)?))
+    fn has_canonical_hom(&self, from: &P) -> Option<Self::Homomorphism> {
+        super::generic_impls::generic_has_canonical_hom(from, self)
     }
 
-    default fn map_in(&self, from: &P, el: P::Element, hom: &Self::Homomorphism) -> Self::Element {
-        if let CanonicalHomFromPolyRing::Generic(generic_hom) = hom {
-            super::generic_impls::generic_map_in(from, self, el, generic_hom)
-        } else {
-            panic!("Can only have a trivial automorphism if the base rings are equal")
-        }
+    fn map_in(&self, from: &P, el: P::Element, hom: &Self::Homomorphism) -> Self::Element {
+        super::generic_impls::generic_map_in(from, self, el, hom)
     }
 }
 
-impl<R> CanonicalHom<SparsePolyRingBase<R> > for SparsePolyRingBase<R> 
-    where R: RingStore
+impl<R1, R2> CanonicalHom<SparsePolyRingBase<R1> > for SparsePolyRingBase<R2> 
+    where R1: RingStore, R2: RingStore, R2::Type: CanonicalHom<R1::Type>
 {
-    fn has_canonical_hom(&self, from: &SparsePolyRingBase<R>) -> Option<Self::Homomorphism> {
-        if self == from {
-            Some(CanonicalHomFromPolyRing::Trivial)
-        } else {
-            Some(CanonicalHomFromPolyRing::Generic(super::generic_impls::generic_has_canonical_hom(from, self)?))
-        }
+    type Homomorphism = <R2::Type as CanonicalHom<R1::Type>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &SparsePolyRingBase<R1>) -> Option<Self::Homomorphism> {
+        self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
     }
 
-    fn map_in(&self, from: &SparsePolyRingBase<R> , el: SparseVectorMut<Rc<R>>, hom: &Self::Homomorphism) -> Self::Element {
-        if let CanonicalHomFromPolyRing::Generic(generic_hom) = hom {
-            super::generic_impls::generic_map_in(from, self, el, generic_hom)
-        } else {
-            el
+    fn map_in_ref(&self, from: &SparsePolyRingBase<R1> , el: &SparseVectorMut<Rc<R1>>, hom: &Self::Homomorphism) -> Self::Element {
+        let mut result = SparseVectorMut::new(el.len(), self.base_ring.clone());
+        for (j, c) in el.nontrivial_entries() {
+            *result.at_mut(j) = self.base_ring().get_ring().map_in_ref(from.base_ring().get_ring(), c, hom);
         }
+        return result;
+    }
+
+    fn map_in(&self, from: &SparsePolyRingBase<R1>, el: <SparsePolyRingBase<R1> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in_ref(from, &el, hom)
     }
 }
 
 impl<R, P> CanonicalIso<P> for SparsePolyRingBase<R> 
-    where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: PolyRing
+    where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: CanonicalIsoToSparsePolyRing
 {
     type Isomorphism = super::generic_impls::GenericCanonicalIso<P, Self>;
 
@@ -301,6 +300,24 @@ impl<R, P> CanonicalIso<P> for SparsePolyRingBase<R>
 
     fn map_out(&self, from: &P, el: Self::Element, iso: &Self::Isomorphism) -> P::Element {
         super::generic_impls::generic_map_out(from, self, el, iso)
+    }
+}
+
+impl<R1, R2> CanonicalIso<SparsePolyRingBase<R1>> for SparsePolyRingBase<R2> 
+    where R1: RingStore, R2: RingStore, R2::Type: CanonicalIso<R1::Type>
+{
+    type Isomorphism = <R2::Type as CanonicalIso<R1::Type>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &SparsePolyRingBase<R1>) -> Option<Self::Isomorphism> {
+        self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
+    }
+
+    fn map_out(&self, from: &SparsePolyRingBase<R1>, el: Self::Element, iso: &Self::Isomorphism) -> SparseVectorMut<Rc<R1>> {
+        let mut result = SparseVectorMut::new(el.len(), from.base_ring.clone());
+        for (j, c) in el.nontrivial_entries() {
+            *result.at_mut(j) = self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(c), iso);
+        }
+        return result;
     }
 }
 

@@ -509,6 +509,10 @@ pub struct ZnFastmulBase {
     base: ZnBase
 }
 
+///
+/// An implementation of `Z/nZ` for `n` that have at most 41 bits that is optimized for multiplication with elements
+/// of [`Zn`]. For details, see [`ZnFastmulBase`].
+/// 
 pub type ZnFastmul = RingValue<ZnFastmulBase>;
 
 impl ZnFastmul {
@@ -525,9 +529,6 @@ impl ZnFastmulBase {
     }
 }
 
-///
-/// An element of [`ZnFastmulBase`].
-/// 
 pub struct ZnFastmulEl {
     // representatives are always reduced, except temporarily when using `delegate_mut()`
     base: ZnEl,

@@ -1,13 +1,14 @@
 use std::io::Write;
 
 use crate::field::{FieldStore, Field};
-use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::multivariate::*;
 use crate::vector::*;
-use crate::wrapper::RingElementWrapper;
 
 use super::sparse_invert::{SparseMatrix, gb_rowrev_sparse_row_echelon};
+use super::sparse_invert_new;
+
+const COMPARE_ECHELON_ALGO_WITH_OLD: bool = false;
 
 struct MonomialSet<P, O>
     where P: MultivariatePolyRingStore,
@@ -167,15 +168,45 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
         }
     }
 
-    gb_rowrev_sparse_row_echelon::<_, true>(&mut A);
+    let mut entries = A.clone().into_entries();
+    let mut C: Option<SparseMatrix<&<P::Type as RingExtension>::BaseRing>> = None;
+
+    if COMPARE_ECHELON_ALGO_WITH_OLD {
+        C = Some(A.clone());
+    }
+
+    entries = sparse_invert_new::gb_sparse_row_echelon::<_, true>(ring.base_ring(), entries, columns.len());
+
+    if COMPARE_ECHELON_ALGO_WITH_OLD {
+        entries.reverse();
+    }
+    
+    let B = SparseMatrix::from_entries(ring.base_ring(), entries, columns.len());
+
+    if COMPARE_ECHELON_ALGO_WITH_OLD {
+        gb_rowrev_sparse_row_echelon::<_, false>(&mut A);
+        A.normalize();
+        if A != B {
+            println!();
+            C.unwrap().print();
+            println!();
+            A.print();
+            println!();
+            B.print();
+            println!();
+            panic!();
+        }
+    }
+    A = B;
+
+    // sparse_invert::gb_rowrev_sparse_row_echelon::<_, true>(&mut A);
 
     let mut result = Vec::new();
     for i in 0..A.row_count() {
         if let Some(j) = A.get_row(i).nontrivial_entries().map(|(j, _)| j).min() {
             if basis.iter().all(|f| !ring.lm(f, order).unwrap().divides(columns.at_index(j))) {
-                result.push(ring.from_terms(
-                    A.get_row(i).nontrivial_entries().map(|(j, c)| (ring.base_ring().clone_el(c), columns.at_index(j)))
-                ))
+                let f = ring.from_terms(A.get_row(i).nontrivial_entries().map(|(j, c)| (ring.base_ring().clone_el(c), columns.at_index(j))));
+                result.push(f)
             }
         }
     }
@@ -372,6 +403,10 @@ use crate::rings::zn::zn_static;
 use crate::default_memory_provider;
 #[cfg(test)]
 use crate::rings::poly::*;
+#[cfg(test)]
+use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use crate::wrapper::RingElementWrapper;
 
 #[test]
 fn test_f4_small() {
@@ -400,7 +435,7 @@ fn test_f4_small() {
     assert_eq!(3, actual.len());
     assert_el_eq!(&ring, &f2, actual.at(0));
     assert_el_eq!(&ring, &f1, actual.at(1));
-    assert_el_eq!(&ring, &expected, actual.at(2));
+    assert_el_eq!(&ring, &ring.negate(expected), actual.at(2));
 }
 
 #[test]
@@ -529,6 +564,10 @@ fn test_generic_computation() {
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());
+    for f in &gb1 {
+        println!("{}", ring.format(f));
+    }
+    println!("{}", gb1.len());
 }
 
 #[test]
@@ -558,7 +597,12 @@ fn test_difficult_gb() {
         i(2) * X0.clone() * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(4)
     ].into_iter().map(|f| f.unwrap()).collect();
 
+    let start = std::time::Instant::now();
     let gb = f4::<_, _, true>(ring, basis, order);
+    let end = std::time::Instant::now();
 
+    println!("Computed GB in {} ms", (end - start).as_millis());
+
+    println!("{}", gb.len());
     std::hint::black_box(gb);
 }

@@ -304,37 +304,18 @@ impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalHom<Mult
         }
     }
 
-    default fn map_in_ref(&self, from: &MultivariatePolyRingImplBase<R2, O2, M2, N2>, el: &<MultivariatePolyRingImplBase<R2, O2, M2, N2> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in_ref(&self, from: &MultivariatePolyRingImplBase<R2, O2, M2, N2>, el: &<MultivariatePolyRingImplBase<R2, O2, M2, N2> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         let mut result = self.memory_provider.get_new_init(el.len(), |i| (
             self.base_ring.get_ring().map_in_ref(from.base_ring().get_ring(), &el.at(i).0, hom), 
             Monomial::new(std::array::from_fn(|j| el.at(i).1[j] ))
         ));
-        result.sort_by(|l, r| self.order.compare(&l.1, &r.1));
-        return result;
-    }
-
-    default fn map_in(&self, from: &MultivariatePolyRingImplBase<R2, O2, M2, N2>, el: <MultivariatePolyRingImplBase<R2, O2, M2, N2> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in_ref(from, &el, hom)
-    }
-}
-
-impl<R1, O, M1, R2, M2, const N: usize> CanonicalHom<MultivariatePolyRingImplBase<R2, O, M2, N>> for MultivariatePolyRingImplBase<R1, O, M1, N>
-    where R1: RingStore,
-        O: MonomialOrder + PartialEq,
-        M1: GrowableMemoryProvider<(El<R1>, Monomial<[MonomialExponent; N]>)>,
-        R2: RingStore,
-        M2: GrowableMemoryProvider<(El<R2>, Monomial<[MonomialExponent; N]>)>,
-        R1::Type: CanonicalHom<R2::Type>
-{
-    fn map_in_ref(&self, from: &MultivariatePolyRingImplBase<R2, O, M2, N>, el: &<MultivariatePolyRingImplBase<R2, O, M2, N> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        let mut result = self.memory_provider.get_new_init(el.len(), |i| (self.base_ring.get_ring().map_in_ref(from.base_ring().get_ring(), &el.at(i).0, hom), el.at(i).1));
-        if self.order != from.order {
+        if !self.order.is_same(from.order.clone()) {
             result.sort_by(|l, r| self.order.compare(&l.1, &r.1));
         }
         return result;
     }
 
-    fn map_in(&self, from: &MultivariatePolyRingImplBase<R2, O, M2, N>, el: <MultivariatePolyRingImplBase<R2, O, M2, N> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &MultivariatePolyRingImplBase<R2, O2, M2, N2>, el: <MultivariatePolyRingImplBase<R2, O2, M2, N2> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         self.map_in_ref(from, &el, hom)
     }
 }
@@ -358,30 +339,12 @@ impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalIso<Mult
         }
     }
 
-    default fn map_out(&self, from: &MultivariatePolyRingImplBase<R2, O2, M2, N2>, el: Self::Element, iso: &Self::Isomorphism) -> <MultivariatePolyRingImplBase<R2, O2, M2, N2> as RingBase>::Element {
+    fn map_out(&self, from: &MultivariatePolyRingImplBase<R2, O2, M2, N2>, el: Self::Element, iso: &Self::Isomorphism) -> <MultivariatePolyRingImplBase<R2, O2, M2, N2> as RingBase>::Element {
         let mut result = from.memory_provider.get_new_init(el.len(), |i| (
             self.base_ring.get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(&el.at(i).0), iso), 
             Monomial::new(std::array::from_fn(|j| el.at(i).1[j] ))
         ));
-        result.sort_by(|l, r| from.order.compare(&l.1, &r.1));
-        return result;
-    }
-}
-
-impl<R1, O, M1, R2, M2, const N: usize> CanonicalIso<MultivariatePolyRingImplBase<R2, O, M2, N>> for MultivariatePolyRingImplBase<R1, O, M1, N>
-    where R1: RingStore,
-        O: MonomialOrder + PartialEq,
-        M1: GrowableMemoryProvider<(El<R1>, Monomial<[MonomialExponent; N]>)>,
-        R2: RingStore,
-        M2: GrowableMemoryProvider<(El<R2>, Monomial<[MonomialExponent; N]>)>,
-        R1::Type: CanonicalIso<R2::Type>
-{
-    fn map_out(&self, from: &MultivariatePolyRingImplBase<R2, O, M2, N>, el: Self::Element, iso: &Self::Isomorphism) -> <MultivariatePolyRingImplBase<R2, O, M2, N> as RingBase>::Element {
-        let mut result = from.memory_provider.get_new_init(el.len(), |i| (
-            self.base_ring.get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(&el.at(i).0), iso), 
-            el.at(i).1
-        ));
-        if self.order != from.order {
+        if !self.order.is_same(from.order.clone()) {
             result.sort_by(|l, r| self.order.compare(&l.1, &r.1));
         }
         return result;

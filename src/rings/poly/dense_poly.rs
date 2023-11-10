@@ -228,52 +228,64 @@ impl<R, M> PartialEq for DensePolyRingBase<R, M>
     }
 }
 
-pub enum CanonicalHomFromPolyRing<R, P, M>
-    where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: PolyRing, M: GrowableMemoryProvider<El<R>>
-{
-    Trivial, Generic(super::generic_impls::GenericCanonicalHom<P, DensePolyRingBase<R, M>>)
-}
+pub trait CanonicalIsoToDensePolyRing: PolyRing {}
+
+impl<R> CanonicalIsoToDensePolyRing for sparse_poly::SparsePolyRingBase<R> 
+    where R: RingStore
+{}
 
 impl<R, P, M> CanonicalHom<P> for DensePolyRingBase<R, M> 
-    where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: PolyRing, M: GrowableMemoryProvider<El<R>>
+    where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: CanonicalIsoToDensePolyRing, M: GrowableMemoryProvider<El<R>>
 {
-    type Homomorphism = CanonicalHomFromPolyRing<R, P, M>;
+    type Homomorphism = super::generic_impls::GenericCanonicalHom<P, DensePolyRingBase<R, M>>;
 
-    default fn has_canonical_hom(&self, from: &P) -> Option<Self::Homomorphism> {
-        Some(CanonicalHomFromPolyRing::Generic(self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())?))
+    fn has_canonical_hom(&self, from: &P) -> Option<Self::Homomorphism> {
+        super::generic_impls::generic_has_canonical_hom(from, self)
     }
 
-    default fn map_in(&self, from: &P, el: P::Element, hom: &Self::Homomorphism) -> Self::Element {
-        if let CanonicalHomFromPolyRing::Generic(generic_hom) = hom {
-            super::generic_impls::generic_map_in(from, self, el, generic_hom)
-        } else {
-            panic!("Can only have a trivial automorphism if the base rings are equal")
-        }
+    fn map_in(&self, from: &P, el: P::Element, hom: &Self::Homomorphism) -> Self::Element {
+        super::generic_impls::generic_map_in(from, self, el, hom)
     }
 }
 
-impl<R, M> CanonicalHom<DensePolyRingBase<R, M>> for DensePolyRingBase<R, M> 
-    where R: RingStore, M: GrowableMemoryProvider<El<R>>
+impl<R1, M1, R2, M2> CanonicalHom<DensePolyRingBase<R1, M1>> for DensePolyRingBase<R2, M2> 
+    where R1: RingStore, M1: GrowableMemoryProvider<El<R1>>, 
+        R2: RingStore, M2: GrowableMemoryProvider<El<R2>>,
+        R2::Type: CanonicalHom<R1::Type>
 {
-    fn has_canonical_hom(&self, from: &DensePolyRingBase<R, M>) -> Option<Self::Homomorphism> {
-        if self == from {
-            Some(CanonicalHomFromPolyRing::Trivial)
-        } else {
-            Some(CanonicalHomFromPolyRing::Generic(self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())?))
-        }
+    type Homomorphism = <R2::Type as CanonicalHom<R1::Type>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &DensePolyRingBase<R1, M1>) -> Option<Self::Homomorphism> {
+        self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
     }
 
-    fn map_in(&self, from: &DensePolyRingBase<R, M>, el: M::Object, hom: &Self::Homomorphism) -> Self::Element {
-        if let CanonicalHomFromPolyRing::Generic(generic_hom) = hom {
-            super::generic_impls::generic_map_in(from, self, el, generic_hom)
-        } else {
-            el
-        }
+    fn map_in_ref(&self, from: &DensePolyRingBase<R1, M1>, el: &M1::Object, hom: &Self::Homomorphism) -> Self::Element {
+        self.memory_provider.get_new_init(el.len(), |i| self.base_ring().get_ring().map_in_ref(from.base_ring().get_ring(), &el[i], hom))
+    }
+
+    fn map_in(&self, from: &DensePolyRingBase<R1, M1>, el: M1::Object, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in_ref(from, &el, hom)    
+    }
+}
+
+impl<R1, M1, R2, M2> CanonicalIso<DensePolyRingBase<R1, M1>> for DensePolyRingBase<R2, M2> 
+    where R1: RingStore, M1: GrowableMemoryProvider<El<R1>>, 
+        R2: RingStore, M2: GrowableMemoryProvider<El<R2>>,
+        R2::Type: CanonicalIso<R1::Type>
+{
+    type Isomorphism = <R2::Type as CanonicalIso<R1::Type>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &DensePolyRingBase<R1, M1>) -> Option<Self::Isomorphism> {
+        self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
+    }
+
+    fn map_out(&self, from: &DensePolyRingBase<R1, M1>, el: M2::Object, hom: &Self::Isomorphism) -> M1::Object {
+        from.memory_provider.get_new_init(el.len(), |i| self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(&el[i]), hom))
     }
 }
 
 impl<R, P, M> CanonicalIso<P> for DensePolyRingBase<R, M> 
-    where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: PolyRing, M: GrowableMemoryProvider<El<R>>
+    where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: CanonicalIsoToDensePolyRing, M: GrowableMemoryProvider<El<R>>
 {
     type Isomorphism = super::generic_impls::GenericCanonicalIso<P, Self>;
 

@@ -2,7 +2,6 @@ use crate::mempool::MemoryProvider;
 use crate::rings::poly::PolyRing;
 use crate::rings::poly::PolyRingStore;
 use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::vector::VectorViewSparse;
 use crate::vector::vec_fn::RingElVectorViewFn;
 use crate::ring::*;
 use crate::algorithms;
@@ -133,23 +132,23 @@ impl<R, V, M> RingBase for FreeAlgebraImplBase<R, V, M>
     }
 }
 
-impl<R, V, M> RingBase for FreeAlgebraImplBase<R, V, M>
-    where R: RingStore, V: VectorViewSparse<El<R>>, M: MemoryProvider<El<R>>
-{
-    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        let mut tmp = self.memory_provider.get_new_init(self.rank() * 2, |_| self.base_ring.zero());
-        algorithms::conv_mul::add_assign_convoluted_mul(&mut tmp[..], &lhs.values[..], &rhs.values[..], self.base_ring(), &self.memory_provider);
-        for i in self.rank()..tmp.len() {
-            for (j, c) in self.x_pow_rank.nontrivial_entries() {
-                let add = self.base_ring.mul_ref(c, &tmp[i]);
-                self.base_ring.add_assign(&mut tmp[i - self.rank() + j], add);
-            }
-        }
-        for i in 0..self.rank() {
-            lhs.values[i] = std::mem::replace(&mut tmp[i], self.base_ring.zero());
-        }
-    }
-}
+// impl<R, M> RingBase for FreeAlgebraImplBase<R, SparseVectorMut<R>, M>
+//     where R: RingStore, M: MemoryProvider<El<R>>
+// {
+//     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
+//         let mut tmp = self.memory_provider.get_new_init(self.rank() * 2, |_| self.base_ring.zero());
+//         algorithms::conv_mul::add_assign_convoluted_mul(&mut tmp[..], &lhs.values[..], &rhs.values[..], self.base_ring(), &self.memory_provider);
+//         for i in self.rank()..tmp.len() {
+//             for (j, c) in self.x_pow_rank.nontrivial_entries() {
+//                 let add = self.base_ring.mul_ref(c, &tmp[i]);
+//                 self.base_ring.add_assign(&mut tmp[i - self.rank() + j], add);
+//             }
+//         }
+//         for i in 0..self.rank() {
+//             lhs.values[i] = std::mem::replace(&mut tmp[i], self.base_ring.zero());
+//         }
+//     }
+// }
 
 impl<R, V, M> RingExtension for FreeAlgebraImplBase<R, V, M>
     where R: RingStore, V: VectorView<El<R>>, M: MemoryProvider<El<R>>

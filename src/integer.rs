@@ -186,14 +186,6 @@ impl<F: ?Sized + IntegerRing, T: ?Sized + IntegerRing> IntCast<F> for T {
     }
 }
 
-impl<F: ?Sized + IntegerRing, T: ?Sized + IntegerRing> IntCast<F> for T
-    where T: CanonicalHom<F>
-{
-    default fn cast(&self, from: &F, value: F::Element) -> Self::Element {
-        self.map_in(from, value, &self.has_canonical_hom(from).unwrap())
-    }
-}
-
 pub fn int_cast<T: IntegerRingStore, F: IntegerRingStore>(value: El<F>, to: T, from: F) -> El<T>
     where T::Type: IntegerRing, F::Type: IntegerRing
 {

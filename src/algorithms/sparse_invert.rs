@@ -153,7 +153,28 @@ impl<F: FieldStore> Clone for SparseMatrix<F>
     }
 }
 
-impl<F: FieldStore> SparseMatrix<F>
+impl<F: FieldStore> PartialEq for SparseMatrix<F>
+    where F::Type: Field,
+        F: Clone
+{
+    fn eq(&self, other: &Self) -> bool {
+        if self.col_count != other.col_count || self.row_count() != other.row_count() {
+            println!("dim different");
+            return false;
+        }
+        for i in 0..self.row_count() {
+            for j in 0..self.col_count() {
+                if !self.field.eq_el(self.at(i, j), other.at(i, j)) {
+                    println!("coeffs different {}, {}, {}, {}",  i, j, self.field.format(self.at(i, j)), self.field.format(other.at(i, j)));
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+}
+
+impl<F: FieldStore + Clone> SparseMatrix<F>
     where F::Type: Field
 {
     pub fn new<I>(field: F, row_count: usize, col_count: usize, entries: I) -> Self
@@ -186,6 +207,40 @@ impl<F: FieldStore> SparseMatrix<F>
             }
         }
 
+        return result;
+    }
+
+    pub fn normalize(&mut self) {
+        for i in 0..self.row_count() {
+            assert!(self.rows[i].is_sorted_by_key(|(j, _)| *j));
+            if let Some((j, factor)) = self.rows[i].iter().min_by_key(|(j, _)| self.col_permutation_inv[*j]) {
+                let j = *j;
+                let inv_factor = self.field.div(&self.field.one(), factor);
+                for (_, e) in &mut self.rows[i] {
+                    self.field.mul_assign_ref(e, &inv_factor);
+                }
+                if self.rows[i].len() > 0 {
+                    assert_el_eq!(&self.field, &self.field.one(), self.at(i, self.col_permutation_inv[j]));
+                }
+            }
+        }
+    }
+
+    pub fn print(&self) {
+        for i in 0..self.row_count() {
+            for j in 0..self.col_count {
+                print!("{}, ", self.field.format(self.at(i, j)));
+            }
+            println!();
+        }
+    }
+
+    pub fn into_entries(self) -> Vec<Vec<(usize, El<F>)>> {
+        self.rows.into_iter().map(|row| row.into_iter().map(|(j, c)| (self.col_permutation_inv[j], c)).collect()).collect()
+    }
+
+    pub fn from_entries(field: F, entries: Vec<Vec<(usize, El<F>)>>, col_count: usize) -> Self {
+        let result = Self::new(field.clone(), entries.len(), col_count, entries.into_iter().enumerate().flat_map(|(i, row)| row.into_iter().map(move |(j, c)| (i, j, c))));
         return result;
     }
 
@@ -322,6 +377,7 @@ pub fn gb_rowrev_sparse_row_echelon<F, const LOG: bool>(matrix: &mut SparseMatri
     where F: FieldStore + Clone,
         F::Type: Field
 {
+    let start = std::time::Instant::now();
     if LOG {
         print!("[{}x{}]", matrix.row_count(), matrix.col_count());
         std::io::stdout().flush().unwrap();
@@ -359,12 +415,18 @@ pub fn gb_rowrev_sparse_row_echelon<F, const LOG: bool>(matrix: &mut SparseMatri
             }
 
             if pivot_row == 0 {
+                let end = std::time::Instant::now();
+                print!("old[{}ms]", (end - start).as_millis());
+                std::io::stdout().flush().unwrap();
                 return;
             } else {
                 pivot_row -= 1;
             }
         }
     }
+    let end = std::time::Instant::now();
+    print!("old[{}ms]", (end - start).as_millis());
+    std::io::stdout().flush().unwrap();
 }
 
 #[cfg(test)]
