@@ -5,27 +5,27 @@ use crate::ring::*;
 use crate::rings::multivariate::*;
 use crate::vector::*;
 
-use super::sparse_invert::{SparseMatrix, gb_rowrev_sparse_row_echelon};
+use super::sparse_invert::SparseMatrix;
 use super::sparse_invert_new;
 
 const COMPARE_ECHELON_ALGO_WITH_OLD: bool = false;
 
-struct MonomialSet<P, O>
+struct MonomialMap<P, O, K = ()>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: FieldStore,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
         O: MonomialOrder + Copy
 {
-    data: Vec<Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>>,
+    data: Vec<(Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>, K)>,
     order: O
 }
 
-enum AddResult {
-    Present(usize), Added(usize)
+enum AddResult<K = ()> {
+    Present(usize, K), Added(usize)
 }
 
-impl<P, O> MonomialSet<P, O>
+impl<P, O, K> MonomialMap<P, O, K>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: FieldStore,
@@ -39,45 +39,48 @@ impl<P, O> MonomialSet<P, O>
         }
     }
 
-    fn add(&mut self, m: Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> AddResult {
-        match self.data.binary_search_by(|x| self.order.compare(x, &m).reverse()) {
-            Ok(i) => AddResult::Present(i),
+    fn add(&mut self, m: Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>, k: K) -> AddResult<K> {
+        match self.data.binary_search_by(|(x, _)| self.order.compare(x, &m).reverse()) {
+            Ok(i) => {
+                let old = std::mem::replace(&mut self.data[i].1, k);
+                AddResult::Present(i, old)
+            },
             Err(i) => {
-                self.data.insert(i, m);
+                self.data.insert(i, (m, k));
                 AddResult::Added(i)
             }
         }
     }
 
     #[allow(unused)]
-    fn remove(&mut self, m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> bool {
-        match self.data.binary_search_by(|x| self.order.compare(x, m).reverse()) {
+    fn remove(&mut self, m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> Option<K> {
+        match self.data.binary_search_by(|(x, _)| self.order.compare(x, m).reverse()) {
             Ok(i) => {
-                self.data.remove(i);
-                return true;
+                let (_, result) = self.data.remove(i);
+                return Some(result);
             },
-            Err(_) => return false
+            Err(_) => return None
         }
     }
 
     #[allow(unused)]
-    fn contains(&self, m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> bool {
-        match self.data.binary_search_by(|x| self.order.compare(x, m).reverse()) {
-            Ok(_) => true,
-            Err(_) => false
+    fn contains<'a>(&'a self, m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> Option<&'a K> {
+        match self.data.binary_search_by(|(x, _)| self.order.compare(x, m).reverse()) {
+            Ok(i) => Some(&self.data[i].1),
+            Err(_) => None
         }
     }
 
-    fn iter<'a>(&'a self) -> impl 'a + Iterator<Item = &'a Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>> {
+    fn iter<'a>(&'a self) -> impl 'a + Iterator<Item = &'a (Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>, K)> {
         self.data.iter()
     }
 
     fn at_index(&self, i: usize) -> &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector> {
-        &self.data[i]
+        &self.data[i].0
     }
 
     fn index_of(&self, m: &Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>) -> Option<usize> {
-        self.data.binary_search_by(|x| self.order.compare(x, &m).reverse()).ok()
+        self.data.binary_search_by(|(x, _)| self.order.compare(x, &m).reverse()).ok()
     }
 
     fn len(&self) -> usize {
@@ -130,10 +133,10 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
     }
 
     let ring_ref = &ring;
-    let mut columns: MonomialSet<P, O> = MonomialSet::new(order);
+    let mut columns: MonomialMap<P, O> = MonomialMap::new(order);
     for b in S_polys {
         for (_, b_m) in ring.terms(b) {
-            columns.add(b_m.clone());
+            columns.add(b_m.clone(), ());
         }
     }
     let columns_ref = &columns;
@@ -151,7 +154,7 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
     );
 
     // all monomials for which we have to add a row to A to enable eliminating them
-    let mut open = columns.iter().cloned().collect::<Vec<_>>();
+    let mut open = columns.iter().cloned().map(|(m, _)| m).collect::<Vec<_>>();
     
     while let Some(m) = open.pop() {
         if let Some(f) = basis.iter().filter(|f| ring.lm(f, order).unwrap().divides(&m)).next() {
@@ -159,9 +162,9 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
             A.add_row(0);
             for (c, f_m) in ring.terms(f) {
                 let final_monomial = div_monomial.clone().mul(f_m);
-                let col = match columns.add(final_monomial.clone()) {
+                let col = match columns.add(final_monomial.clone(), ()) {
                     AddResult::Added(i) => { A.add_column(i); open.push(final_monomial); i },
-                    AddResult::Present(i) => i
+                    AddResult::Present(i, _) => i
                 };
 
                 A.set(0, col, ring.base_ring().clone_el(c));
@@ -185,7 +188,7 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
     let B = SparseMatrix::from_entries(ring.base_ring(), entries, columns.len());
 
     if COMPARE_ECHELON_ALGO_WITH_OLD {
-        gb_rowrev_sparse_row_echelon::<_, false>(&mut A);
+        // gb_rowrev_sparse_row_echelon::<_, false>(&mut A);
         A.normalize();
         if A != B {
             println!();
@@ -212,6 +215,14 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
         }
     }
     return result;
+}
+
+fn sym_tuple(a: usize, b: usize) -> (usize, usize) {
+    if a < b {
+        (b, a)
+    } else {
+        (a, b)
+    }
 }
 
 ///
@@ -271,9 +282,17 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Ve
         O: MonomialOrder + Copy,
         El<<P::Type as RingExtension>::BaseRing>: Send + Sync
 {
-    let filter_S_pair = |f: &El<P>, g: &El<P>| {
-        f as *const _ != g as *const _ &&
-            !ring.lm(f, order).unwrap().is_coprime(ring.lm(g, order).unwrap())
+    basis = reduce(&ring, basis, order);
+
+    let filter_product_criterion = |f_i: usize, g_i: usize, basis: &[El<P>]| {
+        ring.lm(&basis[f_i], order).unwrap().is_coprime(ring.lm(&basis[g_i], order).unwrap())
+    };
+
+    let mut chain_criterion_reduced_pairs = Vec::new();
+    let filter_chain_criterion = |f_i: usize, g_i: usize, basis: &[El<P>], reduced_pairs: &[(usize, usize)]| {
+        let m = ring.lm(&basis[f_i], order).unwrap().clone().lcm(ring.lm(&basis[g_i], order).unwrap());
+        (0..basis.len()).filter(|k| ring.lm(&basis[*k], order).unwrap().divides(&m))
+            .any(|k| reduced_pairs.binary_search(&sym_tuple(f_i, k)).is_ok() && reduced_pairs.binary_search(&sym_tuple(k, g_i)).is_ok())
     };
 
     let select = |ring: &P, f: &El<P>, g: &El<P>, degree_bound: usize| {
@@ -284,24 +303,36 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Ve
         }
     };
 
-    let mut open = (0..basis.len()).flat_map(|i| (0..i).map(move |j| (i, j)))
-        .filter(|(i, j)| filter_S_pair(&basis[*i], &basis[*j]))
-        .collect::<Vec<_>>();
+    let mut product_criterion_skipped = 0;
+    let mut chain_criterion_skipped = 0;
+
+    let mut open = (0..basis.len()).flat_map(|i| (0..i).map(move |j: usize| (i, j))).collect::<Vec<_>>();
     
     let mut degree_bound = 1;
     while open.len() > 0 {
-        let mut process = Vec::new();
+        if LOG {
+            print!("S({})", open.len());
+            std::io::stdout().flush().unwrap();
+        }
 
-        open.retain(|(i, j)| 
-            if select(&ring, &basis[*i], &basis[*j], degree_bound) { 
-                process.push((*i, *j));
+        let mut S_polys = Vec::new();
+        let mut new_reduced_pairs = Vec::new();
+
+        open.retain(|(i, j)| {
+            if filter_product_criterion(*i, *j, &basis) {
+                product_criterion_skipped += 1;
+                false
+            } else if filter_chain_criterion(*i, *j, &basis, &chain_criterion_reduced_pairs[..]) {
+                chain_criterion_skipped += 1;
+                false
+            } else if select(&ring, &basis[*i], &basis[*j], degree_bound) { 
+                S_polys.push(S(&ring, &basis[*i], &basis[*j], order));
+                new_reduced_pairs.push(sym_tuple(*i, *j));
                 false
             } else {
                 true
             }
-        );
-
-        let S_polys: Vec<_> = process.iter().cloned().map(|(i, j)| S(&ring, &basis[i], &basis[j], order)).collect();
+        });
 
         if S_polys.len() == 0 {
             degree_bound += 1;
@@ -312,7 +343,18 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Ve
             continue;
         }
 
-        let new_polys = reduce_S_matrix(&ring, &S_polys, &basis, order);
+        let new_polys = if S_polys.len() > 20 {
+            reduce_S_matrix(&ring, &S_polys, &basis, order)
+        } else {
+            let start = std::time::Instant::now();
+            let result = S_polys.into_iter().map(|f| multivariate_division(&ring, f, &basis, order)).filter(|f| !ring.is_zero(f)).collect();
+            let end = std::time::Instant::now();
+            print!("[{}ms]", (end - start).as_millis());
+            result
+        };
+
+        chain_criterion_reduced_pairs.extend(new_reduced_pairs.into_iter());
+        chain_criterion_reduced_pairs.sort_unstable();
 
         if new_polys.len() == 0 {
             degree_bound += 1;
@@ -320,50 +362,63 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Ve
                 print!("{{{}}}", degree_bound);
                 std::io::stdout().flush().unwrap();
             }
-            continue;
-        }
+        } else {
 
-        basis.extend(new_polys
-            .into_iter()
-            .inspect(|f| if LOG { print!("a{:?}", ring.lm(f, order).unwrap()); })
-        );
-        basis = reduce(&ring, basis, order).0;
-        open = (0..basis.len()).flat_map(|i| (0..i).map(move |j| (i, j)))
-            .filter(|(i, j)| filter_S_pair(&basis[*i], &basis[*j]))
-            .collect::<Vec<_>>();
+            degree_bound = 0;
+            chain_criterion_reduced_pairs = Vec::new();
+            basis.extend(new_polys.into_iter());
+            basis = reduce(&ring, basis, order);
 
-        if LOG {
-            print!("({})", open.len());
-            std::io::stdout().flush().unwrap();
+            open = (0..basis.len()).flat_map(|i| (0..i).map(move |j: usize| (i, j)))
+                .collect::<Vec<_>>();
+    
+            if LOG {
+                print!("b({})", basis.len());
+                std::io::stdout().flush().unwrap();
+            }
         }
     }
     if LOG {
         println!();
+        println!("Redundant S-pairs: {} (prod), {} (chain)", product_criterion_skipped, chain_criterion_skipped);
     }
     return basis;
 }
 
-fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> (Vec<El<P>>, bool)
+fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: FieldStore,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
         O: MonomialOrder + Copy
 {
-    polys.sort_by(|l, r| order.compare(ring.lm(l, order).unwrap(), ring.lm(r, order).unwrap()));
-    let mut i = 0;
-    let mut removed_any = false;
-    while i < polys.len() {
-        let reduced = multivariate_division(&ring, ring.clone_el(&polys[i]), &polys[..i], order);
-        if !ring.is_zero(&reduced) {
-            polys[i] = reduced;
-            i += 1;
-        } else {
-            polys.remove(i);
-            removed_any = true;
+    let mut changed = true;
+    while changed {
+        changed = false;
+        polys.sort_by(|l, r| order.compare(ring.lm(l, order).unwrap(), ring.lm(r, order).unwrap()));
+        let mut i = 0;
+        while i < polys.len() {
+            let reduced = multivariate_division(&ring, ring.clone_el(&polys[i]), &polys[..i], order);
+            if !ring.is_zero(&reduced) {
+                if !ring.eq_el(&reduced, &polys[i]) {
+                    changed = true;
+                    polys[i] = reduced;
+                }
+                i += 1;
+            } else {
+                polys.remove(i);
+                changed = true;
+            }
         }
     }
-    return (polys, removed_any);
+    for b1 in &polys {
+        for b2 in &polys {
+            if b1 as *const _ != b2 as *const _ {
+                assert!(!ring.lm(b1, order).unwrap().divides(ring.lm(b2, order).unwrap()));
+            }
+        }
+    }
+    return polys;
 }
 
 pub fn multivariate_division<P, V, O>(ring: P, mut f: El<P>, set: V, order: O) -> El<P>
@@ -569,7 +624,7 @@ fn test_generic_computation() {
     for f in &gb1 {
         println!("{}", ring.format(f));
     }
-    println!("{}", gb1.len());
+    assert_eq!(11, gb1.len());
 }
 
 #[test]
@@ -605,6 +660,6 @@ fn test_difficult_gb() {
 
     println!("Computed GB in {} ms", (end - start).as_millis());
 
-    println!("{}", gb.len());
+    assert_eq!(130, gb.len());
     std::hint::black_box(gb);
 }

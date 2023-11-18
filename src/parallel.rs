@@ -44,7 +44,7 @@ pub fn column_iterator<'a, T>(data: &'a mut [Vec<T>], cols: Range<usize>) -> imp
     for i in 0..row_count {
         assert!(data[i].len() == col_count);
     }
-    <_ as rayon::iter::ParallelIterator>::map(<_ as rayon::iter::IntoParallelIterator>::into_par_iter(cols), move |j| unsafe { Column { element: PhantomData, pointer: data_ptr as *mut _, len: row_count, col: j } })
+    <_ as rayon::iter::ParallelIterator>::map(<_ as rayon::iter::IntoParallelIterator>::into_par_iter(cols), move |j| Column { element: PhantomData, pointer: data_ptr as *mut _, len: row_count, col: j })
 }
 
 #[cfg(feature = "parallel")]

@@ -448,14 +448,14 @@ fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut Matrix<El<R>>)
         print!("[{}ms]", (end - start).as_millis());
         std::io::stdout().flush().unwrap();
     }
-    println!();
-    println!("Statistics");
-    println!("  short rounds: {}", SHORT_REDUCTION_ROUND.load(std::sync::atomic::Ordering::SeqCst));
-    println!("  long rounds: {}", LONG_REDUCTION_ROUND.load(std::sync::atomic::Ordering::SeqCst));
-    println!("  short time: {} ms", SHORT_REDUCTION_TIME.load(std::sync::atomic::Ordering::SeqCst));
-    println!("  long time: {} ms", LONG_REDUCTION_TIME.load(std::sync::atomic::Ordering::SeqCst));
-    println!("  transform rounds: {}", TRANSFORM_ROUND.load(std::sync::atomic::Ordering::SeqCst));
-    println!("  transform time: {} ms", TRANSFORM_TIME.load(std::sync::atomic::Ordering::SeqCst));
+    // println!();
+    // println!("Statistics");
+    // println!("  short rounds: {}", SHORT_REDUCTION_ROUND.load(std::sync::atomic::Ordering::SeqCst));
+    // println!("  long rounds: {}", LONG_REDUCTION_ROUND.load(std::sync::atomic::Ordering::SeqCst));
+    // println!("  short time: {} ms", SHORT_REDUCTION_TIME.load(std::sync::atomic::Ordering::SeqCst));
+    // println!("  long time: {} ms", LONG_REDUCTION_TIME.load(std::sync::atomic::Ordering::SeqCst));
+    // println!("  transform rounds: {}", TRANSFORM_ROUND.load(std::sync::atomic::Ordering::SeqCst));
+    // println!("  transform time: {} ms", TRANSFORM_TIME.load(std::sync::atomic::Ordering::SeqCst));
 }
 
 #[inline(never)]
