@@ -498,7 +498,7 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
         let mut to_add = self.memory_provider.get_new_init(rhs.size_hint().0, |_| rhs.next().unwrap());
         let mut rhs_peekable = rhs.peekable();
         while rhs_peekable.peek().is_some() {
-            let new_size = 2 * to_add.len();
+            let new_size = 2 * to_add.len() + 1;
             filled_until = new_size;
             self.memory_provider.grow_init(&mut to_add, new_size, |_| rhs_peekable.next().unwrap_or_else(|| {
                 filled_until -= 1;
