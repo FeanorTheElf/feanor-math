@@ -614,4 +614,8 @@ fn test_add_assign_from_terms() {
         assert_eq!(e.1, *a.1);
         assert_el_eq!(ring.base_ring(), &e.0, &a.0);
     }
+
+    let lhs = ring.from_terms([(1, Monomial::new([0, 0, 0]))].into_iter().filter(|_| std::hint::black_box(true)));
+
+    assert_el_eq!(&ring, &ring.one(), &lhs);
 }
