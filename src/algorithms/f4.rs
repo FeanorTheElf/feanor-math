@@ -95,8 +95,8 @@ fn S<P, O>(ring: P, f1: &El<P>, f2: &El<P>, order: O) -> El<P>
 {
     let f1_lm = ring.lm(f1, order).unwrap();
     let f2_lm = ring.lm(f2, order).unwrap();
-    let lcm = f1_lm.clone().lcm(&f2_lm);
-    let f1_factor = lcm.clone().div(&f1_lm);
+    let lcm = ring.clone_monomial(&f1_lm).lcm(&f2_lm);
+    let f1_factor = ring.clone_monomial(&lcm).div(&f1_lm);
     let f2_factor = lcm.div(&f2_lm);
     let mut f1_scaled = ring.clone_el(f1);
     ring.mul_monomial(&mut f1_scaled, &f1_factor);
@@ -112,7 +112,7 @@ fn S_deg<P, O>(ring: P, f1: &El<P>, f2: &El<P>, order: O) -> u16
 {
     let f1_lm = ring.lm(f1, order).unwrap();
     let f2_lm = ring.lm(f2, order).unwrap();
-    let lcm = f1_lm.clone().lcm(&f2_lm);
+    let lcm = ring.clone_monomial(&f1_lm).lcm(&f2_lm);
     let f1_factor = lcm.deg() - f1_lm.deg();
     let f2_factor = lcm.deg() - f2_lm.deg();
     return ring.terms(f1).filter(|(_, m)| *m != f1_lm).map(|(_, m)| m.deg() + f1_factor)
@@ -136,7 +136,7 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
     let mut columns: MonomialMap<P, O> = MonomialMap::new(order);
     for b in S_polys {
         for (_, b_m) in ring.terms(b) {
-            columns.add(b_m.clone(), ());
+            columns.add(ring.clone_monomial(&b_m), ());
         }
     }
     let columns_ref = &columns;
@@ -154,15 +154,15 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
     );
 
     // all monomials for which we have to add a row to A to enable eliminating them
-    let mut open = columns.iter().cloned().map(|(m, _)| m).collect::<Vec<_>>();
+    let mut open = columns.iter().map(|(m, _)| ring.clone_monomial(m)).collect::<Vec<_>>();
     
     while let Some(m) = open.pop() {
         if let Some(f) = basis.iter().filter(|f| ring.lm(f, order).unwrap().divides(&m)).next() {
-            let div_monomial = m.clone().div(ring.lm(f, order).unwrap());
+            let div_monomial = ring.clone_monomial(&m).div(ring.lm(f, order).unwrap());
             A.add_row(0);
             for (c, f_m) in ring.terms(f) {
-                let final_monomial = div_monomial.clone().mul(f_m);
-                let col = match columns.add(final_monomial.clone(), ()) {
+                let final_monomial = ring.clone_monomial(&div_monomial).mul(f_m);
+                let col = match columns.add(ring.clone_monomial(&final_monomial), ()) {
                     AddResult::Added(i) => { A.add_column(i); open.push(final_monomial); i },
                     AddResult::Present(i, _) => i
                 };
@@ -209,7 +209,7 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
     for i in 0..A.row_count() {
         if let Some(j) = A.get_row(i).nontrivial_entries().map(|(j, _)| j).min() {
             if basis.iter().all(|f| !ring.lm(f, order).unwrap().divides(columns.at_index(j))) {
-                let f = ring.from_terms(A.get_row(i).nontrivial_entries().map(|(j, c)| (ring.base_ring().clone_el(c), columns.at_index(j))));
+                let f = ring.from_terms(A.get_row(i).nontrivial_entries().map(|(j, c)| (ring.base_ring().clone_el(c), ring.clone_monomial(columns.at_index(j)))));
                 result.push(f)
             }
         }
@@ -254,21 +254,21 @@ fn sym_tuple(a: usize, b: usize) -> (usize, usize) {
 /// 
 /// // the classical GB example: x^2 + y^2 - 1, xy - 2
 /// let f1 = ring.from_terms([
-///     (1, &Monomial::new([2, 0])),
-///     (1, &Monomial::new([0, 2])),
-///     (16, &Monomial::new([0, 0]))
+///     (1, Monomial::new([2, 0])),
+///     (1, Monomial::new([0, 2])),
+///     (16, Monomial::new([0, 0]))
 /// ].into_iter());
 /// let f2 = ring.from_terms([
-///     (1, &Monomial::new([1, 1])),
-///     (15, &Monomial::new([0, 0]))
+///     (1, Monomial::new([1, 1])),
+///     (15, Monomial::new([0, 0]))
 /// ].into_iter());
 /// 
 /// let gb = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], order);
 /// 
 /// let in_ideal = ring.from_terms([
-///     (16, &Monomial::new([0, 3])),
-///     (15, &Monomial::new([1, 0])),
-///     (1, &Monomial::new([0, 1])),
+///     (16, Monomial::new([0, 3])),
+///     (15, Monomial::new([1, 0])),
+///     (1, Monomial::new([0, 1])),
 /// ].into_iter());
 /// 
 /// assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, in_ideal, &gb, order));
@@ -290,7 +290,7 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Ve
 
     let mut chain_criterion_reduced_pairs = Vec::new();
     let filter_chain_criterion = |f_i: usize, g_i: usize, basis: &[El<P>], reduced_pairs: &[(usize, usize)]| {
-        let m = ring.lm(&basis[f_i], order).unwrap().clone().lcm(ring.lm(&basis[g_i], order).unwrap());
+        let m = ring.clone_monomial(ring.lm(&basis[f_i], order).unwrap()).lcm(ring.lm(&basis[g_i], order).unwrap());
         (0..basis.len()).filter(|k| ring.lm(&basis[*k], order).unwrap().divides(&m))
             .any(|k| reduced_pairs.binary_search(&sym_tuple(f_i, k)).is_ok() && reduced_pairs.binary_search(&sym_tuple(k, g_i)).is_ok())
     };
@@ -432,7 +432,7 @@ pub fn multivariate_division<P, V, O>(ring: P, mut f: El<P>, set: V, order: O) -
     if ring.is_zero(&f) {
         return f;
     }
-    let mut f_lm = ring.lm(&f, order).unwrap().clone();
+    let mut f_lm = ring.clone_monomial(ring.lm(&f, order).unwrap());
     while let Some(g) = set.iter().filter(|g| ring.lm(g, order).unwrap().divides(&f_lm)).next() {
         let g_lm = ring.lm(g, order).unwrap();
         let f_lc = ring.coefficient_at(&f, &f_lm);
@@ -444,7 +444,7 @@ pub fn multivariate_division<P, V, O>(ring: P, mut f: El<P>, set: V, order: O) -
         ring.mul_assign_base(&mut g_scaled, &div_coeff);
         ring.sub_assign(&mut f, g_scaled);
         if let Some(m) = ring.lm(&f, order) {
-            f_lm = m.clone();
+            f_lm = ring.clone_monomial(m);
         } else {
             return f;
         }
@@ -472,21 +472,21 @@ fn test_f4_small() {
     let ring: MultivariatePolyRingImpl<_, _, _, 2> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
 
     let f1 = ring.from_terms([
-        (1, &Monomial::new([2, 0])),
-        (1, &Monomial::new([0, 2])),
-        (16, &Monomial::new([0, 0]))
+        (1, Monomial::new([2, 0])),
+        (1, Monomial::new([0, 2])),
+        (16, Monomial::new([0, 0]))
     ].into_iter());
     let f2 = ring.from_terms([
-        (1, &Monomial::new([1, 1])),
-        (15, &Monomial::new([0, 0]))
+        (1, Monomial::new([1, 1])),
+        (15, Monomial::new([0, 0]))
     ].into_iter());
 
     let actual = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], order);
 
     let expected = ring.from_terms([
-        (16, &Monomial::new([0, 3])),
-        (15, &Monomial::new([1, 0])),
-        (1, &Monomial::new([0, 1])),
+        (16, Monomial::new([0, 3])),
+        (15, Monomial::new([1, 0])),
+        (1, Monomial::new([0, 1])),
     ].into_iter());
 
     assert_eq!(3, actual.len());
@@ -502,41 +502,41 @@ fn test_f4_larger() {
     let ring: MultivariatePolyRingImpl<_, _, _, 3> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
 
     let f1 = ring.from_terms([
-        (1, &Monomial::new([2, 1, 1])),
-        (1, &Monomial::new([0, 2, 0])),
-        (1, &Monomial::new([1, 0, 1])),
-        (2, &Monomial::new([1, 0, 0])),
-        (1, &Monomial::new([0, 0, 0]))
+        (1, Monomial::new([2, 1, 1])),
+        (1, Monomial::new([0, 2, 0])),
+        (1, Monomial::new([1, 0, 1])),
+        (2, Monomial::new([1, 0, 0])),
+        (1, Monomial::new([0, 0, 0]))
     ].into_iter());
     let f2 = ring.from_terms([
-        (1, &Monomial::new([0, 3, 1])),
-        (1, &Monomial::new([0, 0, 3])),
-        (1, &Monomial::new([1, 1, 0]))
+        (1, Monomial::new([0, 3, 1])),
+        (1, Monomial::new([0, 0, 3])),
+        (1, Monomial::new([1, 1, 0]))
     ].into_iter());
     let f3 = ring.from_terms([
-        (1, &Monomial::new([1, 0, 2])),
-        (1, &Monomial::new([1, 0, 1])),
-        (2, &Monomial::new([0, 1, 1])),
-        (7, &Monomial::new([0, 0, 0]))
+        (1, Monomial::new([1, 0, 2])),
+        (1, Monomial::new([1, 0, 1])),
+        (2, Monomial::new([0, 1, 1])),
+        (7, Monomial::new([0, 0, 0]))
     ].into_iter());
 
     let actual = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], order);
 
     let g1 = ring.from_terms([
-        (1, &Monomial::new([0, 4, 0])),
-        (8, &Monomial::new([0, 3, 1])),
-        (12, &Monomial::new([0, 1, 3])),
-        (6, &Monomial::new([0, 0, 4])),
-        (1, &Monomial::new([0, 3, 0])),
-        (13, &Monomial::new([0, 2, 1])),
-        (11, &Monomial::new([0, 1, 2])),
-        (10, &Monomial::new([0, 0, 3])),
-        (11, &Monomial::new([0, 2, 0])),
-        (12, &Monomial::new([0, 1, 1])),
-        (6, &Monomial::new([0, 0, 2])),
-        (6, &Monomial::new([0, 1, 0])),
-        (13, &Monomial::new([0, 0, 1])),
-        (9, &Monomial::new([0, 0, 0]))
+        (1, Monomial::new([0, 4, 0])),
+        (8, Monomial::new([0, 3, 1])),
+        (12, Monomial::new([0, 1, 3])),
+        (6, Monomial::new([0, 0, 4])),
+        (1, Monomial::new([0, 3, 0])),
+        (13, Monomial::new([0, 2, 1])),
+        (11, Monomial::new([0, 1, 2])),
+        (10, Monomial::new([0, 0, 3])),
+        (11, Monomial::new([0, 2, 0])),
+        (12, Monomial::new([0, 1, 1])),
+        (6, Monomial::new([0, 0, 2])),
+        (6, Monomial::new([0, 1, 0])),
+        (13, Monomial::new([0, 0, 1])),
+        (9, Monomial::new([0, 0, 0]))
     ].into_iter());
 
     assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, g1, &actual, order));
@@ -549,22 +549,22 @@ fn test_f4_larger_elim() {
     let ring: MultivariatePolyRingImpl<_, _, _, 3> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
 
     let f1 = ring.from_terms([
-        (1, &Monomial::new([2, 1, 1])),
-        (1, &Monomial::new([0, 2, 0])),
-        (1, &Monomial::new([1, 0, 1])),
-        (2, &Monomial::new([1, 0, 0])),
-        (1, &Monomial::new([0, 0, 0]))
+        (1, Monomial::new([2, 1, 1])),
+        (1, Monomial::new([0, 2, 0])),
+        (1, Monomial::new([1, 0, 1])),
+        (2, Monomial::new([1, 0, 0])),
+        (1, Monomial::new([0, 0, 0]))
     ].into_iter());
     let f2 = ring.from_terms([
-        (1, &Monomial::new([1, 1, 0])),
-        (1, &Monomial::new([0, 3, 1])),
-        (1, &Monomial::new([0, 0, 3]))
+        (1, Monomial::new([1, 1, 0])),
+        (1, Monomial::new([0, 3, 1])),
+        (1, Monomial::new([0, 0, 3]))
     ].into_iter());
     let f3 = ring.from_terms([
-        (1, &Monomial::new([1, 0, 2])),
-        (1, &Monomial::new([1, 0, 1])),
-        (2, &Monomial::new([0, 1, 1])),
-        (7, &Monomial::new([0, 0, 0]))
+        (1, Monomial::new([1, 0, 2])),
+        (1, Monomial::new([1, 0, 1])),
+        (2, Monomial::new([0, 1, 1])),
+        (7, Monomial::new([0, 0, 0]))
     ].into_iter());
 
     let actual = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], order);
@@ -574,20 +574,20 @@ fn test_f4_larger_elim() {
     }
 
     let g1 = ring.from_terms([
-        (1, &Monomial::new([0, 4, 0])),
-        (8, &Monomial::new([0, 3, 1])),
-        (12, &Monomial::new([0, 1, 3])),
-        (6, &Monomial::new([0, 0, 4])),
-        (1, &Monomial::new([0, 3, 0])),
-        (13, &Monomial::new([0, 2, 1])),
-        (11, &Monomial::new([0, 1, 2])),
-        (10, &Monomial::new([0, 0, 3])),
-        (11, &Monomial::new([0, 2, 0])),
-        (12, &Monomial::new([0, 1, 1])),
-        (6, &Monomial::new([0, 0, 2])),
-        (6, &Monomial::new([0, 1, 0])),
-        (13, &Monomial::new([0, 0, 1])),
-        (9, &Monomial::new([0, 0, 0]))
+        (1, Monomial::new([0, 4, 0])),
+        (8, Monomial::new([0, 3, 1])),
+        (12, Monomial::new([0, 1, 3])),
+        (6, Monomial::new([0, 0, 4])),
+        (1, Monomial::new([0, 3, 0])),
+        (13, Monomial::new([0, 2, 1])),
+        (11, Monomial::new([0, 1, 2])),
+        (10, Monomial::new([0, 0, 3])),
+        (11, Monomial::new([0, 2, 0])),
+        (12, Monomial::new([0, 1, 1])),
+        (6, Monomial::new([0, 0, 2])),
+        (6, Monomial::new([0, 1, 0])),
+        (13, Monomial::new([0, 0, 1])),
+        (9, Monomial::new([0, 0, 0]))
     ].into_iter());
 
     assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, g1, &actual, order));

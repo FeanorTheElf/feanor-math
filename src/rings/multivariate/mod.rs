@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::hash::Hash;
 use std::ops::{Index, RangeTo, RangeFrom};
 use std::cmp::Ordering;
@@ -26,7 +27,7 @@ type MonomialExponent = u16;
 /// 
 pub trait MultivariatePolyRing: RingExtension + SelfIso {
 
-    type MonomialVector: VectorViewMut<MonomialExponent> + Clone;
+    type MonomialVector: VectorViewMut<MonomialExponent>;
     type TermsIterator<'a>: Iterator<Item = (&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)>
         where Self: 'a;
 
@@ -64,13 +65,12 @@ pub trait MultivariatePolyRing: RingExtension + SelfIso {
     /// Add-assigns to the given polynomial the polynomial implicitly given by the
     /// iterator over terms.
     /// 
-    fn add_assign_from_terms<'a, I>(&self, lhs: &mut Self::Element, rhs: I)
-        where I: Iterator<Item = (El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)>,
-            Self: 'a
+    fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
+        where I: Iterator<Item = (El<Self::BaseRing>, Monomial<Self::MonomialVector>)>
     {
         let self_ring = RingRef::new(self);
         self.add_assign(lhs, self_ring.sum(
-            rhs.map(|(c, m)| self.mul(self.from(c), self.monomial(m)))
+            rhs.map(|(c, m)| self.mul(self.from(c), self.monomial(&m)))
         ));
     }
 
@@ -100,9 +100,8 @@ pub trait MultivariatePolyRing: RingExtension + SelfIso {
             while m[var] as usize >= parts.len() {
                 parts.push(self.zero());
             }
-            let mut new_m = m.clone();
-            *new_m.exponents.at_mut(var) = 0;
-            self.add_assign_from_terms(&mut parts[m[var] as usize], Some((self.base_ring().clone_el(c), &new_m)).into_iter());
+            let new_m = self.create_monomial((0..m.len()).map(|i| if i == var { 0 } else { m[i] }));
+            self.add_assign_from_terms(&mut parts[m[var] as usize], Some((self.base_ring().clone_el(c), new_m)).into_iter());
         }
         let mut current = parts.pop().unwrap();
         while let Some(new) = parts.pop() {
@@ -111,6 +110,25 @@ pub trait MultivariatePolyRing: RingExtension + SelfIso {
         }
         return current;
     }
+
+    fn create_monomial<I: ExactSizeIterator<Item = MonomialExponent>>(&self, exponents: I) -> Monomial<Self::MonomialVector>;
+
+    fn appearing_variables(&self, f: &Self::Element) -> BTreeSet<usize> {
+        let mut result = BTreeSet::new();
+        for (_, m) in self.terms(f) {
+            for i in 0..self.indeterminate_len() {
+                if m[i] > 0 {
+                    result.insert(i);
+                }
+            }
+        }
+        return result;
+    }
+
+    fn evaluate<R, V>(&self, f: &Self::Element, values: V, ring: R) -> El<R>
+        where R: RingStore,
+            R::Type: CanonicalHom<<Self::BaseRing as RingStore>::Type>,
+            V: VectorView<El<R>>;
 }
 
 pub trait MultivariatePolyRingStore: RingStore
@@ -130,9 +148,8 @@ pub trait MultivariatePolyRingStore: RingStore
         self.get_ring().terms(f)
     }
 
-    fn from_terms<'a, I>(&self, iter: I) -> El<Self>
-        where I: Iterator<Item = (El<<Self::Type as RingExtension>::BaseRing>, &'a Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>)>,
-            Self: 'a
+    fn from_terms<I>(&self, iter: I) -> El<Self>
+        where I: Iterator<Item = (El<<Self::Type as RingExtension>::BaseRing>, Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>)>
     {
         let mut result = self.zero();
         self.get_ring().add_assign_from_terms(&mut result, iter);
@@ -143,6 +160,10 @@ pub trait MultivariatePolyRingStore: RingStore
         where O: MonomialOrder
     {
         self.get_ring().lm(f, order)
+    }
+
+    fn clone_monomial(&self, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector> {
+        self.get_ring().create_monomial((0..m.len()).map(|i| m[i]))
     }
 }
 
@@ -638,14 +659,14 @@ fn test_dividing_monomials() {
 #[test]
 fn test_specialize() {
     let ring: ordered::MultivariatePolyRingImpl<_, _, _, 1> = ordered::MultivariatePolyRingImpl::new(Zn::<17>::RING, DegRevLex, default_memory_provider!());
-    let f = ring.from_terms([(1, &Monomial::new([2])), (1, &Monomial::new([1]))].into_iter());
-    let g = ring.from_terms([(1, &Monomial::new([2])), (16, &Monomial::new([1]))].into_iter());
+    let f = ring.from_terms([(1, Monomial::new([2])), (1, Monomial::new([1]))].into_iter());
+    let g = ring.from_terms([(1, Monomial::new([2])), (16, Monomial::new([1]))].into_iter());
 
     assert_el_eq!(&ring, &ring.add_ref_snd(ring.mul_ref(&g, &g), &g), &ring.specialize(&f, 0, &g));
 
     let ring: ordered::MultivariatePolyRingImpl<_, _, _, 2> = ordered::MultivariatePolyRingImpl::new(Zn::<17>::RING, DegRevLex, default_memory_provider!());
-    let f = ring.from_terms([(1, &Monomial::new([2, 0])), (1, &Monomial::new([0, 1]))].into_iter());
-    let g = ring.from_terms([(1, &Monomial::new([0, 2])), (16, &Monomial::new([0, 1]))].into_iter());
+    let f = ring.from_terms([(1, Monomial::new([2, 0])), (1, Monomial::new([0, 1]))].into_iter());
+    let g = ring.from_terms([(1, Monomial::new([0, 2])), (16, Monomial::new([0, 1]))].into_iter());
 
     assert_el_eq!(&ring, &ring.add(ring.mul_ref(&g, &g), ring.indeterminate(1)), &ring.specialize(&f, 0, &g));
 }

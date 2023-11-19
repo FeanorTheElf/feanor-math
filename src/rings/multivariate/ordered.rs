@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 
+use crate::default_memory_provider;
 use crate::ring::*;
 use crate::mempool::*;
 use crate::vector::VectorViewIter;
@@ -53,7 +54,7 @@ impl<R, O, M, const N: usize> MultivariatePolyRingImplBase<R, O, M, N>
         O: MonomialOrder,
         M: GrowableMemoryProvider<(El<R>, Monomial<[MonomialExponent; N]>)>
 {
-    fn is_valid(&self, el: &<Self as RingBase>::Element) -> bool {
+    fn is_valid(&self, el: &[(El<R>, Monomial<[MonomialExponent; N]>)]) -> bool {
         for i in 1..el.len() {
             if self.order.compare(&el.at(i - 1).1, &el.at(i).1) != Ordering::Less {
                 return false;
@@ -74,6 +75,50 @@ impl<R, O, M, const N: usize> MultivariatePolyRingImplBase<R, O, M, N>
             }
         }
         self.memory_provider.shrink(el, i);
+    }
+
+    #[inline]
+    fn add_invalid(&self, lhs: <Self as RingBase>::Element, rhs_sorted: &[(El<R>, Monomial<[MonomialExponent; N]>)]) -> <Self as RingBase>::Element {
+        debug_assert!(self.is_valid(&lhs));
+        
+        let mut result = self.memory_provider.get_new_init(lhs.len() + rhs_sorted.len(), |_| (self.base_ring.zero(), Monomial::new([0; N])));
+        
+        let mut i_l = 0;
+        let mut i_r = 0;
+        let mut i_o = 0;
+
+        if lhs.len() > 0 && self.order.compare(&lhs.at(0).1, &rhs_sorted.at(0).1) != Ordering::Greater {
+            *result.at_mut(i_o) = (self.base_ring.clone_el(&lhs.at(i_l).0), lhs.at(i_l).1);
+            i_l += 1;
+        } else {
+            *result.at_mut(i_o) = (self.base_ring.clone_el(&rhs_sorted.at(i_r).0), rhs_sorted.at(i_r).1);
+            i_r += 1;
+        }
+
+        while i_r < rhs_sorted.len() {
+            match self.order.compare(&result.at(i_o).1, &rhs_sorted.at(i_r).1) {
+                Ordering::Equal => {
+                    self.base_ring.add_assign_ref(&mut result.at_mut(i_o).0, &rhs_sorted.at(i_r).0);
+                    i_r += 1;
+                },
+                Ordering::Greater => unreachable!(),
+                Ordering::Less => if i_l < lhs.len() && self.order.compare(&lhs.at(i_l).1, &rhs_sorted.at(i_r).1) != Ordering::Greater {
+                    i_o += 1;
+                    *result.at_mut(i_o) = (self.base_ring.clone_el(&lhs.at(i_l).0), lhs.at(i_l).1);
+                    i_l += 1;
+                } else {
+                    i_o += 1;
+                    *result.at_mut(i_o) = (self.base_ring.clone_el(&rhs_sorted.at(i_r).0), rhs_sorted.at(i_r).1);
+                    i_r += 1;
+                }
+            }
+        }
+        for i in i_l..lhs.len() {
+            *result.at_mut(i_o) = (self.base_ring.clone_el(&lhs.at(i).0), lhs.at(i).1);
+            i_o += 1;
+        }
+        self.remove_zeros(&mut result);
+        return result;
     }
 
     #[inline]
@@ -424,52 +469,88 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
             return Some(&f.iter().max_by(|(_, ml), (_, mr)| order.compare(ml, mr)).unwrap().1);
         }
     }
+
+    fn create_monomial<I: ExactSizeIterator<Item = MonomialExponent>>(&self, mut exponents: I) -> Monomial<Self::MonomialVector> {
+        assert!(exponents.len() == self.indeterminate_len());
+        Monomial::new(std::array::from_fn(|_| exponents.next().unwrap()))
+    }
+
+    fn evaluate<S, V>(&self, f: &Self::Element, values: V, ring: S) -> El<S>
+        where S: RingStore,
+            S::Type: CanonicalHom<<Self::BaseRing as RingStore>::Type>,
+            V: VectorView<El<S>>
+    {
+        assert_eq!(values.len(), self.indeterminate_len());
+        let new_ring: MultivariatePolyRingImpl<&S, _, _, N> = MultivariatePolyRingImpl::new(&ring, self.order.clone(), default_memory_provider!());
+        let mut result = new_ring.coerce_ref(&RingRef::new(self), f);
+        for i in 0..self.indeterminate_len() {
+            result = new_ring.specialize(&result, i, &new_ring.from_ref(values.at(i)));
+        }
+        debug_assert!(result.len() == 1);
+        debug_assert!(result[0].1.deg() == 0);
+        return result.into_iter().next().unwrap().0;
+    }
+
+    fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, mut rhs: I)
+        where I: Iterator<Item = (El<Self::BaseRing>, Monomial<Self::MonomialVector>)>
+    {
+        let mut filled_until = rhs.size_hint().0;
+        let mut to_add = self.memory_provider.get_new_init(rhs.size_hint().0, |_| rhs.next().unwrap());
+        let mut rhs_peekable = rhs.peekable();
+        while rhs_peekable.peek().is_some() {
+            let new_size = 2 * to_add.len();
+            filled_until = new_size;
+            self.memory_provider.grow_init(&mut to_add, new_size, |_| rhs_peekable.next().unwrap_or_else(|| {
+                filled_until -= 1;
+                (self.base_ring().zero(), Monomial::new([0; N]))
+            }));
+        }
+        to_add.sort_unstable_by(|(_, l), (_, r)| self.order.compare(l, r));
+        *lhs = self.add_invalid(std::mem::replace(lhs, self.zero()), &to_add[..filled_until]);
+    }
 }
 
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
-#[cfg(test)]
-use crate::default_memory_provider;
 
 #[test]
 fn test_add() {
     let ring: MultivariatePolyRingImpl<_, _, _, 3> = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, Lex, default_memory_provider!());
     let lhs = ring.from_terms([
-        (1, &Monomial::new([1, 0, 0]))
+        (1, Monomial::new([1, 0, 0]))
     ].into_iter());
-    ring.println(&lhs);
 
     let rhs = ring.from_terms([
-        (1, &Monomial::new([1, 0, 0])),
-        (1, &Monomial::new([1, 0, 1])),
+        (1, Monomial::new([1, 0, 0])),
+        (1, Monomial::new([1, 0, 1])),
     ].into_iter());
 
     let expected = ring.from_terms([
-        (2, &Monomial::new([1, 0, 0])),
-        (1, &Monomial::new([1, 0, 1]))
+        (2, Monomial::new([1, 0, 0])),
+        (1, Monomial::new([1, 0, 1]))
     ].into_iter());
 
     let actual = ring.add_ref(&lhs, &rhs);
     assert_el_eq!(&ring, &expected, &actual);
 
     let lhs = ring.from_terms([
-        (1, &Monomial::new([1, 0, 0])),
-        (2, &Monomial::new([1, 0, 1])),
-        (4, &Monomial::new([0, 2, 1])),
-        (8, &Monomial::new([0, 0, 0]))
+        (1, Monomial::new([1, 0, 0])),
+        (2, Monomial::new([1, 0, 1])),
+        (4, Monomial::new([0, 2, 1])),
+        (8, Monomial::new([0, 0, 0]))
     ].into_iter());
 
     let rhs = ring.from_terms([
-        (-1, &Monomial::new([1, 0, 0])),
-        (3, &Monomial::new([1, 0, 1])),
-        (9, &Monomial::new([0, 0, 1]))
+        (-1, Monomial::new([1, 0, 0])),
+        (3, Monomial::new([1, 0, 1])),
+        (9, Monomial::new([0, 0, 1]))
     ].into_iter());
 
     let expected = ring.from_terms([
-        (5, &Monomial::new([1, 0, 1])),
-        (4, &Monomial::new([0, 2, 1])),
-        (8, &Monomial::new([0, 0, 0])),
-        (9, &Monomial::new([0, 0, 1]))
+        (5, Monomial::new([1, 0, 1])),
+        (4, Monomial::new([0, 2, 1])),
+        (8, Monomial::new([0, 0, 0])),
+        (9, Monomial::new([0, 0, 1]))
     ].into_iter());
 
     let actual = ring.add_ref(&lhs, &rhs);
@@ -487,11 +568,11 @@ fn edge_case_elements<'a, M: GrowableMemoryProvider<(i64, Monomial<[MonomialExpo
 
     ];
     for m1 in &monomials {
-        result.push(ring.from_terms([(1, m1)].into_iter()));
+        result.push(ring.from_terms([(1, m1.clone())].into_iter()));
     }
     for m1 in &monomials {
         for m2 in &monomials {
-            result.push(ring.from_terms([(1, m1), (-2, m2)].into_iter()));
+            result.push(ring.from_terms([(1, m1.clone()), (-2, m2.clone())].into_iter()));
         }
     }
     return result.into_iter();
@@ -501,4 +582,36 @@ fn edge_case_elements<'a, M: GrowableMemoryProvider<(i64, Monomial<[MonomialExpo
 fn test_ring_axioms() {
     let ring = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, DegRevLex, default_memory_provider!());
     generic_tests::test_ring_axioms(&ring, edge_case_elements(&ring));
+}
+
+#[test]
+fn test_add_assign_from_terms() {
+    let ring: MultivariatePolyRingImpl<_, _, _, 3> = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, Lex, default_memory_provider!());
+    let mut lhs = ring.from_terms([
+        (0, Monomial::new([0, 2, 0])),
+        (1, Monomial::new([1, 0, 0])),
+        (1, Monomial::new([1, 1, 1]))
+    ].into_iter());
+
+    ring.get_ring().add_assign_from_terms(&mut lhs, [
+        (1, Monomial::new([0, 0, 0])),
+        (1, Monomial::new([0, 0, 0])),
+        (0, Monomial::new([1, 0, 0])),
+        (1, Monomial::new([1, 0, 0])),
+        (0, Monomial::new([1, 1, 0])),
+        (1, Monomial::new([0, 1, 1])),
+        (-1, Monomial::new([1, 1, 1]))
+    ].into_iter());
+
+    let expected = [
+        (2, Monomial::new([0, 0, 0])),
+        (1, Monomial::new([0, 1, 1])),
+        (2, Monomial::new([1, 0, 0]))
+    ];
+
+    assert_eq!(expected.len(), ring.terms(&lhs).count());
+    for (e, a) in expected.iter().zip(ring.terms(&lhs)) {
+        assert_eq!(e.1, *a.1);
+        assert_el_eq!(ring.base_ring(), &e.0, &a.0);
+    }
 }
