@@ -442,7 +442,7 @@ pub fn multivariate_division<P, V, O>(ring: P, mut f: El<P>, set: V, order: O) -
         let div_coeff = ring.base_ring().div(&f_lc, &g_lc);
         let mut g_scaled = ring.clone_el(g);
         ring.mul_monomial(&mut g_scaled, &div_monomial);
-        ring.base_ring_embedding().mul_assign_map_ref(&mut g_scaled, &div_coeff);
+        ring.inclusion().mul_assign_map_ref(&mut g_scaled, &div_coeff);
         ring.sub_assign(&mut f, g_scaled);
         if let Some(m) = ring.lm(&f, order) {
             f_lm = ring.clone_monomial(m);
@@ -643,7 +643,7 @@ fn test_difficult_gb() {
     let X5 = RingElementWrapper::new(&ring, ring.indeterminate(5));
     let X6 = RingElementWrapper::new(&ring, ring.indeterminate(6));
 
-    let i = |x: i64| RingElementWrapper::new(&ring, ring.base_ring_embedding().map(ring.base_ring().coerce(&StaticRing::<i64>::RING, x)));
+    let i = |x: i64| RingElementWrapper::new(&ring, ring.inclusion().map(ring.base_ring().coerce(&StaticRing::<i64>::RING, x)));
 
     let basis = vec![
         i(6) + i(2) * X5.clone() + i(2) * X4.clone() + X6.clone() + i(4) * X0.clone() + i(5) * X6.clone() * X5.clone() + X6.clone() * X4.clone() + i(3) * X0.clone() * X4.clone() + i(6) * X0.clone() * X6.clone() + i(2) * X0.clone() * X3.clone() + X0.clone() * X2.clone() + i(4) * X0.clone() * X1.clone() + i(2) * X3.clone() * X4.clone() * X5.clone() + i(4) * X0.clone() * X6.clone() * X5.clone() + i(6) * X0.clone() * X2.clone() * X5.clone() + i(5) * X0.clone() * X6.clone() * X4.clone() + i(2) * X0.clone() * X3.clone() * X4.clone() + i(4) * X0.clone() * X1.clone() * X4.clone() + X0.clone() * X6.clone().pow(2) + i(3) * X0.clone() * X3.clone() * X6.clone() + i(5) * X0.clone() * X2.clone() * X6.clone() + i(2) * X0.clone() * X1.clone() * X6.clone() + X0.clone() * X3.clone().pow(2) + i(2) * X0.clone() * X2.clone() * X3.clone() + i(3) * X0.clone() * X3.clone() * X4.clone() * X5.clone() + i(4) * X0.clone() * X3.clone() * X6.clone() * X5.clone() + i(3) * X0.clone() * X1.clone() * X6.clone() * X5.clone() + i(3) * X0.clone() * X2.clone() * X3.clone() * X5.clone() + i(3) * X0.clone() * X3.clone() * X6.clone() * X4.clone() + i(2) * X0.clone() * X1.clone() * X6.clone() * X4.clone() + i(2) * X0.clone() * X3.clone().pow(2) * X4.clone() + i(2) * X0.clone() * X2.clone() * X3.clone() * X4.clone() + i(3) * X0.clone() * X3.clone().pow(2) * X4.clone() * X5.clone() + i(4) * X0.clone() * X1.clone() * X3.clone() * X4.clone() * X5.clone() + X0.clone() * X3.clone().pow(2) * X4.clone().pow(2),

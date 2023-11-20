@@ -37,7 +37,7 @@ fn normalize_poly<P>(poly_ring: P, poly: &mut El<P>)
         <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: Field
 {
     let inv_lc = poly_ring.base_ring().div(&poly_ring.base_ring().one(), poly_ring.lc(poly).unwrap());
-    poly_ring.base_ring_embedding().mul_assign_map_ref(poly, &inv_lc);
+    poly_ring.inclusion().mul_assign_map_ref(poly, &inv_lc);
 }
 
 fn derive_poly<P>(poly_ring: P, poly: &El<P>) -> El<P>
@@ -189,7 +189,7 @@ pub fn factor_complete<'a, P>(poly_ring: P, mut el: El<P>) -> Vec<(El<P>, usize)
                 let lc = poly_ring.lc(&current).unwrap();
                 poly_ring.base_ring().mul_assign_ref(&mut unit, lc);
                 let lc_inv = poly_ring.base_ring().div(&poly_ring.base_ring().one(), lc);
-                poly_ring.base_ring_embedding().mul_assign_map_ref(&mut current, &lc_inv);
+                poly_ring.inclusion().mul_assign_map_ref(&mut current, &lc_inv);
 
                 if poly_ring.is_one(&current) {
                     continue;
@@ -218,7 +218,7 @@ pub fn factor_complete<'a, P>(poly_ring: P, mut el: El<P>) -> Vec<(El<P>, usize)
     poly_ring.base_ring().mul_assign_ref(&mut unit, poly_ring.coefficient_at(&el, 0));
     debug_assert!(!poly_ring.base_ring().is_zero(&unit));
     if !poly_ring.base_ring().is_one(&unit) {
-        result.push((poly_ring.base_ring_embedding().map(unit), 1));
+        result.push((poly_ring.inclusion().map(unit), 1));
     }
     return result;
 }

@@ -6,7 +6,6 @@ use crate::mempool::GrowableMemoryProvider;
 use crate::vector::VectorViewMut;
 use crate::ring::*;
 use crate::rings::poly::*;
-use crate::homomorphism::*;
 use crate::vector::*;
 use crate::vector::sparse::*;
 
@@ -255,10 +254,10 @@ impl<R, M> CanonicalIsoToSparsePolyRing for dense_poly::DensePolyRingBase<R, M>
     where R: RingStore, M: GrowableMemoryProvider<El<R>>
 {}
 
-impl<R, P> CanonicalHom<P> for SparsePolyRingBase<R> 
-    where R: RingStore, R::Type: CanonicalHom<<P::BaseRing as RingStore>::Type>, P: CanonicalIsoToSparsePolyRing
+impl<R, P> CanHomFrom<P> for SparsePolyRingBase<R> 
+    where R: RingStore, R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>, P: CanonicalIsoToSparsePolyRing
 {
-    type Homomorphism = super::generic_impls::GenericCanonicalHom<P, Self>;
+    type Homomorphism = super::generic_impls::GenericCanHomFrom<P, Self>;
 
     fn has_canonical_hom(&self, from: &P) -> Option<Self::Homomorphism> {
         super::generic_impls::generic_has_canonical_hom(from, self)
@@ -269,10 +268,10 @@ impl<R, P> CanonicalHom<P> for SparsePolyRingBase<R>
     }
 }
 
-impl<R1, R2> CanonicalHom<SparsePolyRingBase<R1> > for SparsePolyRingBase<R2> 
-    where R1: RingStore, R2: RingStore, R2::Type: CanonicalHom<R1::Type>
+impl<R1, R2> CanHomFrom<SparsePolyRingBase<R1> > for SparsePolyRingBase<R2> 
+    where R1: RingStore, R2: RingStore, R2::Type: CanHomFrom<R1::Type>
 {
-    type Homomorphism = <R2::Type as CanonicalHom<R1::Type>>::Homomorphism;
+    type Homomorphism = <R2::Type as CanHomFrom<R1::Type>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &SparsePolyRingBase<R1>) -> Option<Self::Homomorphism> {
         self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())

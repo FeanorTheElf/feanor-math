@@ -63,7 +63,7 @@ impl<R: RingStore> FreeAlgebraStore for R
 pub fn poly_repr<P: PolyRingStore, R: FreeAlgebraStore>(from: R, to: P, el: &El<R>) -> El<P>
     where P::Type: PolyRing, 
         R::Type: FreeAlgebra,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: CanonicalHom<<<R::Type as RingExtension>::BaseRing as RingStore>::Type>
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: CanHomFrom<<<R::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
     let hom = to.base_ring().can_hom(from.base_ring()).unwrap();
     let coeff_vec = from.wrt_canonical_basis(el);
@@ -84,7 +84,7 @@ pub fn generic_test_free_algebra_axioms<R: FreeAlgebraStore>(ring: R)
     
     let xn_original = ring.pow(ring.clone_el(&x), n);
     let xn_vec = ring.wrt_canonical_basis(&xn_original);
-    let xn = ring.sum(Iterator::map(0..n, |i| ring.mul(ring.base_ring_embedding().map(xn_vec.at(i)), ring.pow(ring.clone_el(&x), i))));
+    let xn = ring.sum(Iterator::map(0..n, |i| ring.mul(ring.inclusion().map(xn_vec.at(i)), ring.pow(ring.clone_el(&x), i))));
     assert_el_eq!(&ring, &xn_original, &xn);
 
     let x_n_1_vec_expected = (0..n).into_fn().map(|i| if i > 0 {

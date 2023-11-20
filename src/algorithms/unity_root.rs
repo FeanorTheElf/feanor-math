@@ -33,7 +33,7 @@ pub fn is_prim_root_of_unity<R: RingStore>(ring: R, el: &El<R>, n: usize) -> boo
 }
 
 pub fn get_prim_root_of_unity<R>(ring: R, n: usize) -> Option<El<R>>
-    where R: ZnRingStore, R::Type: ZnRing, <R::Type as ZnRing>::IntegerRingBase: CanonicalHom<StaticRingBase<i64>>
+    where R: ZnRingStore, R::Type: ZnRing, <R::Type as ZnRing>::IntegerRingBase: CanHomFrom<StaticRingBase<i64>>
 {
     assert!(ring.is_field());
     let ZZ = ring.integer_ring();
@@ -50,7 +50,7 @@ pub fn get_prim_root_of_unity<R>(ring: R, n: usize) -> Option<El<R>>
 }
 
 pub fn get_prim_root_of_unity_pow2<R>(ring: R, log2_n: usize) -> Option<El<R>>
-    where R: ZnRingStore, R::Type: ZnRing, <R::Type as ZnRing>::IntegerRingBase: CanonicalHom<StaticRingBase<i64>>
+    where R: ZnRingStore, R::Type: ZnRing, <R::Type as ZnRing>::IntegerRingBase: CanHomFrom<StaticRingBase<i64>>
 {
     assert!(ring.is_field());
     let ZZ = ring.integer_ring();

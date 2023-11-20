@@ -331,16 +331,16 @@ impl<R, O, M, const N: usize> RingExtension for MultivariatePolyRingImplBase<R, 
     }
 }
 
-impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalHom<MultivariatePolyRingImplBase<R2, O2, M2, N2>> for MultivariatePolyRingImplBase<R1, O1, M1, N1>
+impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanHomFrom<MultivariatePolyRingImplBase<R2, O2, M2, N2>> for MultivariatePolyRingImplBase<R1, O1, M1, N1>
     where R1: RingStore,
         O1: MonomialOrder,
         M1: GrowableMemoryProvider<(El<R1>, Monomial<[MonomialExponent; N1]>)>,
         R2: RingStore,
         O2: MonomialOrder,
         M2: GrowableMemoryProvider<(El<R2>, Monomial<[MonomialExponent; N2]>)>,
-        R1::Type: CanonicalHom<R2::Type>
+        R1::Type: CanHomFrom<R2::Type>
 {
-    type Homomorphism = <R1::Type as CanonicalHom<R2::Type>>::Homomorphism;
+    type Homomorphism = <R1::Type as CanHomFrom<R2::Type>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &MultivariatePolyRingImplBase<R2, O2, M2, N2>) -> Option<Self::Homomorphism> {
         if N1 >= N2 {
@@ -478,14 +478,14 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
 
     fn evaluate<S, V>(&self, f: &Self::Element, values: V, ring: S) -> El<S>
         where S: RingStore,
-            S::Type: CanonicalHom<<Self::BaseRing as RingStore>::Type>,
+            S::Type: CanHomFrom<<Self::BaseRing as RingStore>::Type>,
             V: VectorView<El<S>>
     {
         assert_eq!(values.len(), self.indeterminate_len());
         let new_ring: MultivariatePolyRingImpl<&S, _, _, N> = MultivariatePolyRingImpl::new(&ring, self.order.clone(), default_memory_provider!());
         let mut result = new_ring.coerce_ref(&RingRef::new(self), f);
         for i in 0..self.indeterminate_len() {
-            result = new_ring.specialize(&result, i, &new_ring.base_ring_embedding().map_ref(values.at(i)));
+            result = new_ring.specialize(&result, i, &new_ring.inclusion().map_ref(values.at(i)));
         }
         debug_assert!(result.len() == 1);
         debug_assert!(result[0].1.deg() == 0);

@@ -128,7 +128,7 @@ pub trait MultivariatePolyRing: RingExtension + SelfIso {
 
     fn evaluate<R, V>(&self, f: &Self::Element, values: V, ring: R) -> El<R>
         where R: RingStore,
-            R::Type: CanonicalHom<<Self::BaseRing as RingStore>::Type>,
+            R::Type: CanHomFrom<<Self::BaseRing as RingStore>::Type>,
             V: VectorView<El<R>>;
 }
 

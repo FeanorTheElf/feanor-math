@@ -86,18 +86,18 @@ impl<R: DivisibilityRingStore> DelegateRing for AsFieldBase<R>
     }
 }
 
-impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanonicalHom<AsFieldBase<S>> for AsFieldBase<R> 
-    where R::Type: DivisibilityRing + CanonicalHom<S::Type>,
+impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanHomFrom<AsFieldBase<S>> for AsFieldBase<R> 
+    where R::Type: DivisibilityRing + CanHomFrom<S::Type>,
         S::Type: DivisibilityRing
 {
-    type Homomorphism = <R::Type as CanonicalHom<S::Type>>::Homomorphism;
+    type Homomorphism = <R::Type as CanHomFrom<S::Type>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &AsFieldBase<S>) -> Option<Self::Homomorphism> {
-        <R::Type as CanonicalHom<S::Type>>::has_canonical_hom(self.base_ring().get_ring(), from.base_ring().get_ring())
+        <R::Type as CanHomFrom<S::Type>>::has_canonical_hom(self.base_ring().get_ring(), from.base_ring().get_ring())
     }
 
     fn map_in(&self, from: &AsFieldBase<S>, el: FieldEl<S>, hom: &Self::Homomorphism) -> Self::Element {
-        FieldEl(<R::Type as CanonicalHom<S::Type>>::map_in(self.base_ring().get_ring(), from.base_ring().get_ring(), el.0, hom))
+        FieldEl(<R::Type as CanHomFrom<S::Type>>::map_in(self.base_ring().get_ring(), from.base_ring().get_ring(), el.0, hom))
     }
 }
 
@@ -130,17 +130,17 @@ impl<R: DivisibilityRingStore> RingExtension for AsFieldBase<R>
     }
 }
 
-impl<R: DivisibilityRingStore, S: IntegerRing + ?Sized> CanonicalHom<S> for AsFieldBase<R> 
-    where R::Type: DivisibilityRing + CanonicalHom<S>
+impl<R: DivisibilityRingStore, S: IntegerRing + ?Sized> CanHomFrom<S> for AsFieldBase<R> 
+    where R::Type: DivisibilityRing + CanHomFrom<S>
 {
-    type Homomorphism = <R::Type as CanonicalHom<S>>::Homomorphism;
+    type Homomorphism = <R::Type as CanHomFrom<S>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism> {
         self.base_ring().get_ring().has_canonical_hom(from)
     }
 
     fn map_in(&self, from: &S, el: S::Element, hom: &Self::Homomorphism) -> Self::Element {
-        FieldEl(<R::Type as CanonicalHom<S>>::map_in(self.base_ring().get_ring(), from, el, hom))
+        FieldEl(<R::Type as CanHomFrom<S>>::map_in(self.base_ring().get_ring(), from, el, hom))
     }
 }
 
@@ -148,14 +148,6 @@ pub trait AssumeFieldDivision: RingBase {
 
     fn assume_field_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element;
 }
-
-// impl<R: ?Sized + DivisibilityRing> AssumeFieldDivision for R {
-    
-//     default fn assume_field_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-//         assert!(!self.is_zero(rhs));
-//         return self.checked_left_div(lhs, rhs).unwrap();
-//     }
-// }
 
 impl<R: DivisibilityRingStore> DivisibilityRing for AsFieldBase<R> 
     where R::Type: DivisibilityRing

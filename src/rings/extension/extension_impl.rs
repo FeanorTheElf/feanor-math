@@ -42,7 +42,7 @@ impl<R, V, M> FreeAlgebraImplBase<R, V, M>
     pub fn poly_repr<P>(&self, poly_ring: P, el: &<Self as RingBase>::Element) -> El<P>
         where P: PolyRingStore,
             P::Type: PolyRing,
-            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: CanonicalHom<R::Type>
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: CanHomFrom<R::Type>
     {
         let hom = poly_ring.base_ring().can_hom(self.base_ring()).unwrap();
         poly_ring.from_terms(Iterator::map(0..self.rank(), |i| (hom.map(self.base_ring.clone_el(el.values.at(i))), i)))
@@ -190,12 +190,12 @@ impl<R, V, M> FreeAlgebra for FreeAlgebraImplBase<R, V, M>
     }
 }
 
-impl<R1, V1, M1, R2, V2, M2> CanonicalHom<FreeAlgebraImplBase<R1, V1, M1>> for FreeAlgebraImplBase<R2, V2, M2>
+impl<R1, V1, M1, R2, V2, M2> CanHomFrom<FreeAlgebraImplBase<R1, V1, M1>> for FreeAlgebraImplBase<R2, V2, M2>
     where R1: RingStore, V1: VectorView<El<R1>>, M1: MemoryProvider<El<R1>>,
         R2: RingStore, V2: VectorView<El<R2>>, M2: MemoryProvider<El<R2>>,
-        R2::Type: CanonicalHom<R1::Type>
+        R2::Type: CanHomFrom<R1::Type>
 {
-    type Homomorphism = <R2::Type as CanonicalHom<R1::Type>>::Homomorphism;
+    type Homomorphism = <R2::Type as CanHomFrom<R1::Type>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &FreeAlgebraImplBase<R1, V1, M1>) -> Option<Self::Homomorphism> {
         if self.rank() == from.rank() {

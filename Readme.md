@@ -176,13 +176,13 @@ impl RingBase for F2Base {
     }
 }
 
-// To properly use a ring, in addition to RingBase we have to implement CanonicalHom<Self> and
+// To properly use a ring, in addition to RingBase we have to implement CanHomFrom<Self> and
 // CanonicalIso<Self>. This ensures that the ring works well with the canonical ring mapping
 // framework, that later allows us to use functions like `cast()` or `coerce()`.
-// In practice, we might also want to add implementations like `CanonicalHom<I> where I: IntegerRing`
+// In practice, we might also want to add implementations like `CanHomFrom<I> where I: IntegerRing`
 // or CanonicalIso<feanor_math::rings::zn::zn_static::ZnBase<2, true>>.
 
-impl CanonicalHom<F2Base> for F2Base {
+impl CanHomFrom<F2Base> for F2Base {
     
     type Homomorphism = ();
 

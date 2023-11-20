@@ -27,7 +27,7 @@ pub fn generic_abs_square_and_multiply<T, U, F, H, I>(base: U, power: &El<I>, in
 pub fn generic_pow<R: ?Sized, S: ?Sized, I>(base: El<R>, power: &El<I>, base_ring: &R, ring: &S, int_ring: &I) -> El<S>
     where R: RingStore, 
         S: RingStore,
-        S::Type: CanonicalHom<R::Type>,
+        S::Type: CanHomFrom<R::Type>,
         I: IntegerRingStore,
         I::Type: IntegerRing
 {

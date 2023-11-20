@@ -74,16 +74,16 @@ pub mod generic_impls {
     use crate::homomorphism::*;
 
     #[allow(type_alias_bounds)]
-    pub type GenericCanonicalHom<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanonicalHom<<P1::BaseRing as RingStore>::Type>>::Homomorphism;
+    pub type GenericCanHomFrom<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanHomFrom<<P1::BaseRing as RingStore>::Type>>::Homomorphism;
 
-    pub fn generic_has_canonical_hom<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2) -> Option<GenericCanonicalHom<P1, P2>> 
-        where <P2::BaseRing as RingStore>::Type: CanonicalHom<<P1::BaseRing as RingStore>::Type>
+    pub fn generic_has_canonical_hom<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2) -> Option<GenericCanHomFrom<P1, P2>> 
+        where <P2::BaseRing as RingStore>::Type: CanHomFrom<<P1::BaseRing as RingStore>::Type>
     {
         to.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
     }
 
-    pub fn generic_map_in<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P1::Element, hom: &GenericCanonicalHom<P1, P2>) -> P2::Element
-        where <P2::BaseRing as RingStore>::Type: CanonicalHom<<P1::BaseRing as RingStore>::Type>
+    pub fn generic_map_in<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P1::Element, hom: &GenericCanHomFrom<P1, P2>) -> P2::Element
+        where <P2::BaseRing as RingStore>::Type: CanHomFrom<<P1::BaseRing as RingStore>::Type>
     {
         let mut result = to.zero();
         to.add_assign_from_terms(&mut result, from.terms(&el).map(|(c, i)| (to.base_ring().get_ring().map_in(from.base_ring().get_ring(), from.base_ring().clone_el(c), hom), i)));
@@ -143,8 +143,8 @@ pub mod generic_tests {
             for b in &elements {
                 for c in &elements {
                     for d in &elements {
-                        let a_bx = ring.add(ring.base_ring_embedding().map_ref(a), ring.mul_ref_snd(ring.base_ring_embedding().map_ref(b), &x));
-                        let c_dx = ring.add(ring.base_ring_embedding().map_ref(c), ring.mul_ref_snd(ring.base_ring_embedding().map_ref(d), &x));
+                        let a_bx = ring.add(ring.inclusion().map_ref(a), ring.mul_ref_snd(ring.inclusion().map_ref(b), &x));
+                        let c_dx = ring.add(ring.inclusion().map_ref(c), ring.mul_ref_snd(ring.inclusion().map_ref(d), &x));
                         assert!(ring.eq_el(&a_bx, &c_dx) == (ring.base_ring().eq_el(a, c) && ring.base_ring().eq_el(b, d)));
                     }
                 }
@@ -158,13 +158,13 @@ pub mod generic_tests {
             for b in &elements {
                 for c in &elements {
                     for d in &elements {
-                        let a_bx = ring.add(ring.base_ring_embedding().map_ref(a), ring.mul_ref_snd(ring.base_ring_embedding().map_ref(b), &x));
-                        let c_dx = ring.add(ring.base_ring_embedding().map_ref(c), ring.mul_ref_snd(ring.base_ring_embedding().map_ref(d), &x));
+                        let a_bx = ring.add(ring.inclusion().map_ref(a), ring.mul_ref_snd(ring.inclusion().map_ref(b), &x));
+                        let c_dx = ring.add(ring.inclusion().map_ref(c), ring.mul_ref_snd(ring.inclusion().map_ref(d), &x));
                         let result = <_ as RingStore>::sum(&ring, [
-                            ring.mul(ring.base_ring_embedding().map_ref(a), ring.base_ring_embedding().map_ref(c)),
-                            ring.mul(ring.base_ring_embedding().map_ref(a), ring.mul_ref_snd(ring.base_ring_embedding().map_ref(d), &x)),
-                            ring.mul(ring.base_ring_embedding().map_ref(b), ring.mul_ref_snd(ring.base_ring_embedding().map_ref(c), &x)),
-                            ring.mul(ring.base_ring_embedding().map_ref(b), ring.mul(ring.base_ring_embedding().map_ref(d), ring.pow(ring.clone_el(&x), 2)))
+                            ring.mul(ring.inclusion().map_ref(a), ring.inclusion().map_ref(c)),
+                            ring.mul(ring.inclusion().map_ref(a), ring.mul_ref_snd(ring.inclusion().map_ref(d), &x)),
+                            ring.mul(ring.inclusion().map_ref(b), ring.mul_ref_snd(ring.inclusion().map_ref(c), &x)),
+                            ring.mul(ring.inclusion().map_ref(b), ring.mul(ring.inclusion().map_ref(d), ring.pow(ring.clone_el(&x), 2)))
                         ].into_iter());
                         assert_el_eq!(&ring, &result, &ring.mul(a_bx, c_dx));
                     }
@@ -177,9 +177,9 @@ pub mod generic_tests {
             for b in &elements {
                 for c in &elements {
                     let f = <_ as RingStore>::sum(&ring, [
-                        ring.base_ring_embedding().map_ref(a),
-                        ring.mul_ref_snd(ring.base_ring_embedding().map_ref(b), &x),
-                        ring.mul(ring.base_ring_embedding().map_ref(c), ring.pow(ring.clone_el(&x), 3))
+                        ring.inclusion().map_ref(a),
+                        ring.mul_ref_snd(ring.inclusion().map_ref(b), &x),
+                        ring.mul(ring.inclusion().map_ref(c), ring.pow(ring.clone_el(&x), 3))
                     ].into_iter());
                     let actual = ring.from_terms([(ring.base_ring().clone_el(a), 0), (ring.base_ring().clone_el(c), 3), (ring.base_ring().clone_el(b), 1)].into_iter());
                     assert_el_eq!(&ring, &f, &actual);

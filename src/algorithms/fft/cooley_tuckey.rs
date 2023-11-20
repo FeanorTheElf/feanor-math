@@ -94,7 +94,7 @@ impl<R> FFTTableCooleyTuckey<R>
     pub fn for_zn(ring: R, log2_n: usize) -> Option<Self>
         where R: ZnRingStore,
             R::Type: ZnRing,
-            <R::Type as ZnRing>::IntegerRingBase: CanonicalHom<StaticRingBase<i64>>
+            <R::Type as ZnRing>::IntegerRingBase: CanHomFrom<StaticRingBase<i64>>
     {
         let root_of_unity = algorithms::unity_root::get_prim_root_of_unity_pow2(&ring, log2_n)?;
         Some(Self::new(ring, root_of_unity, log2_n))
@@ -135,25 +135,25 @@ impl<R> PartialEq for FFTTableCooleyTuckey<R>
 /// It is default-implemented for all rings, but for increase FFT performance, some rings
 /// might wish to provide a specialization.
 /// 
-pub trait CooleyTuckeyButterfly<S>: RingBase + CanonicalHom<S>
+pub trait CooleyTuckeyButterfly<S>: RingBase + CanHomFrom<S>
     where S: ?Sized + RingBase
 {
     ///
     /// Should compute `(values[i1], values[i2]) := (values[i1] + twiddle * values[i2], values[i1] - twiddle * values[i2])`
     /// 
-    fn butterfly<V: VectorViewMut<Self::Element>>(&self, from: &S, hom: &<Self as CanonicalHom<S>>::Homomorphism, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
+    fn butterfly<V: VectorViewMut<Self::Element>>(&self, from: &S, hom: &<Self as CanHomFrom<S>>::Homomorphism, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
 
     ///
     /// Should compute `(values[i1], values[i2]) := (values[i1] + values[i2], (values[i1] - values[i2]) * twiddle)`
     /// 
-    fn inv_butterfly<V: VectorViewMut<Self::Element>>(&self, from: &S, hom: &<Self as CanonicalHom<S>>::Homomorphism, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
+    fn inv_butterfly<V: VectorViewMut<Self::Element>>(&self, from: &S, hom: &<Self as CanHomFrom<S>>::Homomorphism, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
 }
 
 impl<R, S> CooleyTuckeyButterfly<S> for R
-    where S: ?Sized + RingBase, R: ?Sized + RingBase + CanonicalHom<S>
+    where S: ?Sized + RingBase, R: ?Sized + RingBase + CanHomFrom<S>
 {
     #[inline(always)]
-    default fn butterfly<V: VectorViewMut<Self::Element>>(&self, from: &S, hom: &<Self as CanonicalHom<S>>::Homomorphism, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
+    default fn butterfly<V: VectorViewMut<Self::Element>>(&self, from: &S, hom: &<Self as CanHomFrom<S>>::Homomorphism, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
         self.mul_assign_map_in_ref(from, values.at_mut(i2), twiddle, hom);
         let new_a = self.add_ref(values.at(i1), values.at(i2));
         let a = std::mem::replace(values.at_mut(i1), new_a);
@@ -161,7 +161,7 @@ impl<R, S> CooleyTuckeyButterfly<S> for R
     }
 
     #[inline(always)]
-    default fn inv_butterfly<V: VectorViewMut<Self::Element>>(&self, from: &S, hom: &<Self as CanonicalHom<S>>::Homomorphism, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
+    default fn inv_butterfly<V: VectorViewMut<Self::Element>>(&self, from: &S, hom: &<Self as CanHomFrom<S>>::Homomorphism, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
         let new_a = self.add_ref(values.at(i1), values.at(i2));
         let a = std::mem::replace(values.at_mut(i1), new_a);
         self.sub_self_assign(values.at_mut(i2), a);
@@ -180,7 +180,7 @@ impl<R> FFTTableCooleyTuckey<R>
     /// 
     fn unordered_fft_dispatch<V, S, const INV: bool>(&self, values: &mut V, ring: &S)
         where S: RingStore, 
-            S::Type: CanonicalHom<R::Type>, 
+            S::Type: CanHomFrom<R::Type>, 
             V: VectorViewMut<El<S>> 
     {
         assert!(values.len() == (1 << self.log2_n));
@@ -301,7 +301,7 @@ impl<R> FFTTable for FFTTableCooleyTuckey<R>
 
     fn fft<V, S, N>(&self, mut values: V, ring: S, memory_provider: &N)
         where S: RingStore, 
-            S::Type: CanonicalHom<R::Type>, 
+            S::Type: CanHomFrom<R::Type>, 
             V: SwappableVectorViewMut<El<S>>,
             N: MemoryProvider<El<S>>
     {
@@ -311,7 +311,7 @@ impl<R> FFTTable for FFTTableCooleyTuckey<R>
         
     fn inv_fft<V, S, N>(&self, mut values: V, ring: S, memory_provider: &N)
         where S: RingStore, 
-            S::Type: CanonicalHom<R::Type>, 
+            S::Type: CanHomFrom<R::Type>, 
             V: SwappableVectorViewMut<El<S>>,
             N: MemoryProvider<El<S>>
     {
@@ -321,7 +321,7 @@ impl<R> FFTTable for FFTTableCooleyTuckey<R>
 
     fn unordered_fft<V, S, N>(&self, mut values: V, ring: S, _: &N)
         where S: RingStore, 
-            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
+            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
             V: VectorViewMut<El<S>>,
             N: MemoryProvider<El<S>> 
     {
@@ -330,7 +330,7 @@ impl<R> FFTTable for FFTTableCooleyTuckey<R>
         
     fn unordered_inv_fft<V, S, N>(&self, mut values: V, ring: S, _: &N)
         where S: RingStore,
-            S::Type: CanonicalHom<R::Type>,
+            S::Type: CanHomFrom<R::Type>,
             V: VectorViewMut<El<S>>
     {
         self.unordered_fft_dispatch::<V, S, true>(&mut values, &ring);
@@ -428,7 +428,7 @@ fn test_for_zn() {
 
 #[cfg(test)]
 fn run_fft_bench_round<R, S>(ring: S, fft: &FFTTableCooleyTuckey<R>, data: &Vec<El<S>>, copy: &mut Vec<El<S>>)
-    where R: ZnRingStore, R::Type: ZnRing, S: ZnRingStore, S::Type: ZnRing + CanonicalHom<R::Type>
+    where R: ZnRingStore, R::Type: ZnRing, S: ZnRingStore, S::Type: ZnRing + CanHomFrom<R::Type>
 {
     copy.clear();
     copy.extend(data.iter().map(|x| ring.clone_el(x)));
@@ -518,7 +518,7 @@ fn test_size_1_fft() {
 
 #[cfg(any(test, feature = "generic_tests"))]
 pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(ring: R, base: S, edge_case_elements: I, test_twiddle: &El<S>)
-    where R::Type: CanonicalHom<S::Type>,
+    where R::Type: CanHomFrom<S::Type>,
         S::Type: DivisibilityRing
 {
     let test_inv_twiddle = base.invert(&test_twiddle).unwrap();
