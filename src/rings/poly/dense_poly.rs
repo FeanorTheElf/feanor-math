@@ -20,13 +20,14 @@ use std::cmp::min;
 /// # Example
 /// ```
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
 /// # use feanor_math::primitive_int::*;
 /// 
 /// let ZZ = StaticRing::<i32>::RING;
 /// let P = DensePolyRing::new(ZZ, "X");
-/// let x_plus_1 = P.add(P.indeterminate(), P.from_int(1));
+/// let x_plus_1 = P.add(P.indeterminate(), P.int_hom().map(1));
 /// let binomial_coefficients = P.pow(x_plus_1, 10);
 /// assert_eq!(10 * 9 * 8 * 7 * 6 / 120, *P.coefficient_at(&binomial_coefficients, 5));
 /// ```
@@ -164,7 +165,7 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
     }
     
     fn from_int(&self, value: i32) -> Self::Element {
-        self.memory_provider.get_new_init(1, |_| self.base_ring.from_int(value))
+        self.memory_provider.get_new_init(1, |_| self.base_ring.int_hom().map(value))
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -215,7 +216,7 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
 
     fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
         for i in 0..lhs.len() {
-            self.base_ring().mul_assign_int(lhs.at_mut(i), rhs);
+            self.base_ring().int_hom().mul_assign_map(lhs.at_mut(i), rhs);
         }
     }
 }
@@ -433,7 +434,7 @@ impl<R, M: GrowableMemoryProvider<El<R>>> EuclideanRing for DensePolyRingBase<R,
 #[cfg(test)]
 use crate::rings::zn::*;
 #[cfg(test)]
-use crate::rings::zn::zn_static::Zn;
+use crate::rings::zn::zn_static::{Zn, Fp};
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
@@ -448,13 +449,13 @@ fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El
     let base_ring = poly_ring.base_ring();
     vec![ 
         poly_ring.from_terms([].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(1), 0)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(1), 0), (base_ring.from_int(1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(-1), 0)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(-1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(-1), 0), (base_ring.from_int(1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(1), 0), (base_ring.from_int(-1), 1)].into_iter())
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 0)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 1)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(-1), 0)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(-1), 1)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(-1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(-1), 1)].into_iter())
     ].into_iter()
 }
 
@@ -478,7 +479,7 @@ fn test_divisibility_ring_axioms() {
 
 #[test]
 fn test_euclidean_ring_axioms() {
-    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
     crate::euclidean::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 

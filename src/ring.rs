@@ -1,5 +1,6 @@
 use std::ops::Deref;
 
+use crate::homomorphism::*;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::integer::{IntegerRingStore, IntegerRing};
@@ -31,6 +32,7 @@ use crate::algorithms;
 /// 32-bit integers stored on the heap.
 /// ```
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// 
 /// #[derive(PartialEq)]
 /// struct MyRingBase;
@@ -91,8 +93,8 @@ use crate::algorithms;
 /// 
 /// let ring = MyRingBase::RING;
 /// assert!(ring.eq_el(
-///     &ring.from_int(6), 
-///     &ring.mul(ring.from_int(3), ring.from_int(2))
+///     &ring.int_hom().map(6), 
+///     &ring.mul(ring.int_hom().map(3), ring.int_hom().map(2))
 /// ));
 /// ```
 /// 
@@ -119,12 +121,13 @@ use crate::algorithms;
 /// consider the following code
 /// ```
 /// # use feanor_math::ring::*;
+    /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::zn::*;
 /// 
 /// let Z7 = zn_barett::Zn::new(StaticRing::<i64>::RING, 7);
 /// let Z11 = zn_barett::Zn::new(StaticRing::<i64>::RING, 11);
-/// let neg_one = Z7.from_int(-1);
+/// let neg_one = Z7.int_hom().map(-1);
 /// assert!(!Z11.is_neg_one(&neg_one));
 /// ```
 /// 
@@ -365,6 +368,7 @@ macro_rules! delegate {
 /// # Example
 /// ```
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
@@ -409,7 +413,7 @@ macro_rules! delegate {
 /// impl_eq_based_self_iso!{ MyI32Ring }
 /// 
 /// let ring = RingValue::from(MyI32Ring);
-/// assert_el_eq!(&ring, &ring.from_int(1), &ring.one());
+/// assert_el_eq!(&ring, &ring.int_hom().map(1), &ring.one());
 /// ```
 /// 
 #[macro_export]
@@ -468,11 +472,12 @@ macro_rules! impl_eq_based_self_iso {
 /// If the ring elements are not comparable on their own, this is really useful
 /// ```
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::assert_el_eq;
 /// 
 /// // this does not have an equivalent representation with assert_eq!
-/// assert_el_eq!(&BigIntRing::RING, &BigIntRing::RING.from_int(3), &BigIntRing::RING.from_int(3));
+/// assert_el_eq!(&BigIntRing::RING, &BigIntRing::RING.int_hom().map(3), &BigIntRing::RING.int_hom().map(3));
 /// ```
 /// 
 #[macro_export]
@@ -483,131 +488,6 @@ macro_rules! assert_el_eq {
                 assert!(ring_val.eq_el(lhs_val, rhs_val), "Assertion failed: {} != {}", <_ as $crate::ring::RingStore>::format(ring_val, lhs_val), <_ as $crate::ring::RingStore>::format(ring_val, rhs_val));
             }
         }
-    }
-}
-
-///
-/// A high-level wrapper of [`CanonicalHom::Homomorphism`] that references the
-/// domain and codomain rings, and is much easier to use.
-/// 
-/// # Example
-/// ```
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
-/// 
-/// let from = StaticRing::<i32>::RING;
-/// let to = StaticRing::<i64>::RING;
-/// let hom = to.can_hom(&from).unwrap();
-/// assert_eq!(7, hom.map(7));
-/// // instead of
-/// let hom = to.get_ring().has_canonical_hom(from.get_ring()).unwrap();
-/// assert_eq!(7, to.get_ring().map_in(from.get_ring(), 7, &hom));
-/// ```
-/// 
-/// # See also
-/// The "bi-directional" variant [`CanHom`], the basic interfaces [`CanonicalHom`] and
-/// [`CanonicalIso`] and the very simplified functions [`RingStore::coerce`], [`RingStore::coerce_ref`]
-/// and [`RingStore::cast`].
-/// 
-pub struct CanHom<R, S>
-    where R: RingStore, S: RingStore, S::Type: CanonicalHom<R::Type>
-{
-    from: R,
-    to: S,
-    data: <S::Type as CanonicalHom<R::Type>>::Homomorphism
-}
-
-impl<R, S> CanHom<R, S>
-    where R: RingStore, S: RingStore, S::Type: CanonicalHom<R::Type>
-{
-    pub fn map(&self, el: El<R>) -> El<S> {
-        self.to.get_ring().map_in(self.from.get_ring(), el, &self.data)
-    }
-
-    pub fn map_ref(&self, el: &El<R>) -> El<S> {
-        self.to.get_ring().map_in_ref(self.from.get_ring(), el, &self.data)
-    }
-
-    pub fn raw_hom(&self) -> &<S::Type as CanonicalHom<R::Type>>::Homomorphism {
-        &self.data
-    }
-
-    pub fn domain(&self) -> &R {
-        &self.from
-    }
-
-    pub fn codomain(&self) -> &S {
-        &self.to
-    }
-}
-
-///
-/// A wrapper around [`CanonicalIso::Isomorphism`] that references the domain and
-/// codomain rings, making it much easier to use. This also contains the homomorphism
-/// in the other direction, i.e. allows mapping in both directions.
-/// 
-/// # Example
-/// ```
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
-/// 
-/// let from = StaticRing::<i32>::RING;
-/// let to = StaticRing::<i64>::RING;
-/// let hom = to.can_iso(&from).unwrap();
-/// assert_eq!(7, hom.map_back(7));
-/// // instead of
-/// let hom = to.get_ring().has_canonical_iso(from.get_ring()).unwrap();
-/// assert_eq!(7, from.get_ring().map_out(to.get_ring(), 7, &hom));
-/// ```
-/// 
-/// # See also
-/// The "one-directional" variant [`CanHom`], the basic interfaces [`CanonicalHom`] and
-/// [`CanonicalIso`] and the very simplified functions [`RingStore::coerce`], [`RingStore::coerce_ref`]
-/// and [`RingStore::cast`].
-/// 
-pub struct CanIso<R, S>
-    where R: RingStore, S: RingStore, S::Type: CanonicalIso<R::Type>
-{
-    from: R,
-    to: S,
-    data: <S::Type as CanonicalHom<R::Type>>::Homomorphism,
-    data_back: <S::Type as CanonicalIso<R::Type>>::Isomorphism
-}
-
-impl<R, S> CanIso<R, S>
-    where R: RingStore, S: RingStore, S::Type: CanonicalIso<R::Type>
-{
-    pub fn map(&self, el: El<R>) -> El<S> {
-        self.to.get_ring().map_in(self.from.get_ring(), el, &self.data)
-    }
-
-    pub fn map_ref(&self, el: &El<R>) -> El<S> {
-        self.to.get_ring().map_in_ref(self.from.get_ring(), el, &self.data)
-    }
-
-    ///
-    /// Computes the unique preimage under the map `from -> to`.
-    /// As opposed for the forward direction, there is no `map_ref`-variant
-    /// of this function, as this function seems to be less used.
-    /// 
-    pub fn map_back(&self, el: El<S>) -> El<R> {
-        self.to.get_ring().map_out(self.from.get_ring(), el, &self.data_back)
-    }
-
-    pub fn domain(&self) -> &R {
-        &self.from
-    }
-
-    pub fn raw_hom(&self) -> &<S::Type as CanonicalHom<R::Type>>::Homomorphism {
-        &self.data
-    }
-
-    pub fn raw_iso(&self) -> &<S::Type as CanonicalIso<R::Type>>::Isomorphism {
-        &self.data_back
-    }
-
-    pub fn codomain(&self) -> &S {
-        &self.to
     }
 }
 
@@ -658,7 +538,7 @@ impl<R, S> CanIso<R, S>
 /// just provide an implementation of `get_ring()` and put ring functionality in
 /// a custom implementation of [`RingBase`].
 /// 
-pub trait RingStore {
+pub trait RingStore: Sized {
     
     type Type: RingBase + SelfIso + ?Sized;
 
@@ -676,7 +556,6 @@ pub trait RingStore {
     delegate!{ fn zero(&self) -> El<Self> }
     delegate!{ fn one(&self) -> El<Self> }
     delegate!{ fn neg_one(&self) -> El<Self> }
-    delegate!{ fn from_int(&self, value: i32) -> El<Self> }
     delegate!{ fn eq_el(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
     delegate!{ fn is_zero(&self, value: &El<Self>) -> bool }
     delegate!{ fn is_one(&self, value: &El<Self>) -> bool }
@@ -698,9 +577,6 @@ pub trait RingStore {
     delegate!{ fn mul_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
     delegate!{ fn mul(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
     delegate!{ fn square(&self, value: &mut El<Self>) -> () }
-    delegate!{ fn mul_assign_int(&self, lhs: &mut El<Self>, rhs: i32) -> () }
-    delegate!{ fn mul_int(&self, lhs: El<Self>, rhs: i32) -> El<Self> }
-    delegate!{ fn mul_int_ref(&self, lhs: &El<Self>, rhs: i32) -> El<Self> }
     
     fn coerce<S>(&self, from: &S, el: El<S>) -> El<Self>
         where S: RingStore, Self::Type: CanonicalHom<S::Type> 
@@ -724,26 +600,20 @@ pub trait RingStore {
     /// Returns the canonical homomorphism `from -> self`, if it exists,
     /// moving both rings into the [`CanHom`] object.
     /// 
-    fn into_can_hom<S>(self, from: S) -> Result<CanHom<S, Self>, (Self, S)>
+    fn into_can_hom<S>(self, from: S) -> Result<CanHom<S, Self>, (S, Self)>
         where Self: Sized, S: RingStore, Self::Type: CanonicalHom<S::Type>
     {
-        match self.get_ring().has_canonical_hom(from.get_ring()) {
-            Some(hom) => Ok(CanHom { from: from, to: self, data: hom }),
-            None => Err((self, from))
-        }
+        CanHom::new(from, self)
     }
 
     ///
     /// Returns the canonical isomorphism `from -> self`, if it exists,
     /// moving both rings into the [`CanHom`] object.
     /// 
-    fn into_can_iso<S>(self, from: S) -> Result<CanIso<S, Self>, (Self, S)>
+    fn into_can_iso<S>(self, from: S) -> Result<CanIso<S, Self>, (S, Self)>
         where Self: Sized, S: RingStore, Self::Type: CanonicalIso<S::Type>
     {
-        match (self.get_ring().has_canonical_hom(from.get_ring()), self.get_ring().has_canonical_iso(from.get_ring())) {
-            (Some(hom), Some(iso)) => Ok(CanIso { from: from, to: self, data: hom, data_back: iso }),
-            _ => Err((self, from))
-        }
+        CanIso::new(from, self)
     }
 
     ///
@@ -762,6 +632,14 @@ pub trait RingStore {
         where S: RingStore, Self::Type: CanonicalIso<S::Type>
     {
         self.into_can_iso(from).ok()
+    }
+
+    fn into_int_hom(self) -> IntHom<Self> {
+        IntHom::new(self)
+    }
+
+    fn int_hom<'a>(&'a self) -> IntHom<&'a Self> {
+        self.into_int_hom()
     }
 
     fn sum<I>(&self, els: I) -> El<Self> 
@@ -802,9 +680,10 @@ pub trait RingStore {
     /// # Example
     /// ```
     /// # use feanor_math::ring::*;
+    /// # use feanor_math::homomorphism::*;
     /// # use feanor_math::integer::*;
     /// let ring = BigIntRing::RING;
-    /// let element = ring.from_int(3);
+    /// let element = ring.int_hom().map(3);
     /// println!("{}", ring.format(&element));
     /// 
     fn format<'a>(&'a self, value: &'a El<Self>) -> RingElementDisplayWrapper<'a, Self> {
@@ -823,9 +702,13 @@ pub trait RingExtensionStore: RingStore
         self.get_ring().base_ring()
     }
 
-    delegate!{ fn from(&self, x: El<<Self::Type as RingExtension>::BaseRing>) -> El<Self> }
-    delegate!{ fn from_ref(&self, x: &El<<Self::Type as RingExtension>::BaseRing>) -> El<Self> }
-    delegate!{ fn mul_assign_base(&self, lhs: &mut El<Self>, rhs: &El<<Self::Type as RingExtension>::BaseRing>) -> () }
+    fn into_base_ring_embedding(self) -> Inclusion<Self> {
+        Inclusion::new(self)
+    }
+
+    fn base_ring_embedding<'a>(&'a self) -> Inclusion<&'a Self> {
+        self.into_base_ring_embedding()
+    }
 }
 
 impl<R: RingStore> RingExtensionStore for R
@@ -843,258 +726,6 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
         self.ring.get_ring().dbg(self.element, f)
     }
 }
-
-///
-/// Trait for rings R that have a canonical homomorphism `S -> R`.
-/// A ring homomorphism is expected to be unital.
-/// 
-/// # Exact requirements
-/// 
-/// Which homomorphisms are considered canonical is up to implementors,
-/// as long as any diagram of canonical homomorphisms commutes. In
-/// other words, if there are rings `R, S` and "intermediate rings"
-/// `R1, ..., Rn` resp. `R1', ..., Rm'` such that there are canonical
-/// homomorphisms
-/// ```text
-/// S -> R1 -> R2 -> ... -> Rn -> R
-/// ```
-/// and
-/// ```text
-/// S -> R1' -> R2' -> ... -> Rm' -> R
-/// ```
-/// then both homomorphism chains should yield same results on same
-/// inputs.
-/// 
-/// If the canonical homomorphism might be an isomorphism, consider also
-/// implementing [`CanonicalIso`].
-/// 
-/// # Example
-/// 
-/// Most integer rings support canonical homomorphisms between them.
-/// ```
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::integer::*;
-/// let R = StaticRing::<i64>::RING;
-/// let S = BigIntRing::RING;
-/// // on RingBase level
-/// let hom = R.get_ring().has_canonical_hom(S.get_ring()).unwrap();
-/// assert_eq!(8, R.get_ring().map_in(S.get_ring(), S.from_int(8), &hom));
-/// // on RingStore level
-/// assert_eq!(8, R.coerce(&S, S.from_int(8)));
-/// ```
-/// 
-/// # Limitations
-/// 
-/// The rust constraints regarding conflicting impl make it, in some cases,
-/// impossible to implement all the canonical homomorphisms that we would like.
-/// This is true in particular, if the rings are highly generic, and build
-/// on base rings. In this case, it should always be preferred to implement
-/// `CanonicalIso` for rings that are "the same", and on the other hand not
-/// to implement classical homomorphisms, like `ZZ -> R` which exists for any
-/// ring R. In applicable cases, consider also implementing [`RingExtension`].
-/// 
-/// Because of this reason, implementing [`RingExtension`] also does not require
-/// an implementation of `CanonicalHom<Self::BaseRing>`. Hence, if you as a user
-/// miss a certain implementation of `CanonicalHom`, check whether there maybe
-/// is a corresponding implementation of [`RingExtension`], or a member function.
-/// 
-/// # More examples
-/// 
-/// ## Integer rings
-/// 
-/// Basically, all given integer rings have canonical isomorphisms between each other.
-/// ```
-/// # use feanor_math::ring::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::integer::*;
-/// let Z_i8 = StaticRing::<i8>::RING;
-/// let Z_i32 = StaticRing::<i32>::RING;
-/// let Z_i128 = StaticRing::<i128>::RING;
-/// let Z_big = BigIntRing::RING;
-/// 
-/// assert!(Z_i8.can_iso(&Z_i8).is_some());
-/// assert!(Z_i8.can_iso(&Z_i32).is_some());
-/// assert!(Z_i8.can_iso(&Z_i128).is_some());
-/// assert!(Z_i8.can_iso(&Z_big).is_some());
-/// 
-/// assert!(Z_i32.can_iso(&Z_i8).is_some());
-/// assert!(Z_i32.can_iso(&Z_i32).is_some());
-/// assert!(Z_i32.can_iso(&Z_i128).is_some());
-/// assert!(Z_i32.can_iso(&Z_big).is_some());
-/// 
-/// assert!(Z_i128.can_iso(&Z_i8).is_some());
-/// assert!(Z_i128.can_iso(&Z_i32).is_some());
-/// assert!(Z_i128.can_iso(&Z_i128).is_some());
-/// assert!(Z_i128.can_iso(&Z_big).is_some());
-/// 
-/// assert!(Z_big.can_iso(&Z_i8).is_some());
-/// assert!(Z_big.can_iso(&Z_i32).is_some());
-/// assert!(Z_big.can_iso(&Z_i128).is_some());
-/// assert!(Z_big.can_iso(&Z_big).is_some());
-/// 
-/// // there are also some blanket implementations/trait bounds
-/// fn from_i32<I: IntegerRingStore>(to: &I) where I::Type: IntegerRing {
-///     to.can_hom(&StaticRing::<i32>::RING);
-/// }
-/// 
-/// fn to_i32<I: IntegerRingStore>(from: &I) where I::Type: IntegerRing {
-///     StaticRing::<i32>::RING.can_hom(from);
-/// }
-/// ```
-/// Notably, the only blanket implementations are currently
-/// 
-/// ## Integer quotient rings `Z/nZ`
-/// 
-/// Due to conflicting implementations, only the most useful conversions
-/// are implemented for `Z/nZ`.
-/// ```
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_42;
-/// # use feanor_math::rings::zn::zn_barett;
-/// # use feanor_math::rings::zn::zn_rns;
-/// 
-/// let ZZ = StaticRing::<i128>::RING;
-/// let ZZ_big = BigIntRing::RING;
-/// 
-/// let Zn_barett_i128 = zn_barett::Zn::new(ZZ, 17 * 257);
-/// let Zn_barett_big = zn_barett::Zn::new(ZZ_big, ZZ_big.from_int(17 * 257));
-/// let Zn_std = zn_42::Zn::new(17 * 257);
-/// let Zn_rns = zn_rns::Zn::from_primes(ZZ_big, vec![17, 257]);
-/// 
-/// assert!(Zn_barett_i128.can_iso(&Zn_barett_i128).is_some());
-/// assert!(Zn_barett_i128.can_iso(&Zn_barett_big).is_some());
-/// 
-/// assert!(Zn_barett_big.can_iso(&Zn_barett_i128).is_some());
-/// assert!(Zn_barett_big.can_iso(&Zn_barett_big).is_some());
-/// 
-/// assert!(Zn_std.can_iso(&Zn_barett_i128).is_some());
-/// assert!(Zn_std.can_iso(&Zn_std).is_some());
-/// 
-/// assert!(Zn_rns.can_iso(&Zn_barett_i128).is_some());
-/// assert!(Zn_rns.can_iso(&Zn_barett_big).is_some());
-/// assert!(Zn_rns.can_iso(&Zn_rns).is_some());
-/// ```
-/// Additionally, there are the projections `Z -> Z/nZ`.
-/// They are all implemented, even though [`crate::rings::zn::ZnRing`] currently
-/// only requires the projection from the "associated" integer ring.
-/// ```
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::rings::zn::*;
-/// 
-/// let ZZ = StaticRing::<i128>::RING;
-/// let ZZ_big = BigIntRing::RING;
-/// 
-/// let Zn_barett_i128 = zn_barett::Zn::new(ZZ, 17 * 257);
-/// let Zn_barett_big = zn_barett::Zn::new(ZZ_big, ZZ_big.from_int(17 * 257));
-/// let Zn_std = zn_42::Zn::new(17 * 257);
-/// let Zn_rns = zn_rns::Zn::from_primes(ZZ_big, vec![17, 257]);
-/// 
-/// assert!(Zn_barett_i128.can_hom(&ZZ).is_some());
-/// assert!(Zn_barett_i128.can_hom(&ZZ_big).is_some());
-/// 
-/// assert!(Zn_barett_big.can_hom(&ZZ).is_some());
-/// assert!(Zn_barett_big.can_hom(&ZZ_big).is_some());
-/// 
-/// assert!(Zn_std.can_hom(&ZZ).is_some());
-/// assert!(Zn_std.can_hom(&ZZ_big).is_some());
-/// 
-/// assert!(Zn_rns.can_hom(&ZZ).is_some());
-/// assert!(Zn_rns.can_hom(&ZZ_big).is_some());
-/// ```
-/// 
-/// ## Polynomial Rings
-/// 
-/// For the two provided univariate polynomial ring implementations, we have the isomorphisms
-/// ```
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::rings::poly::*;
-/// 
-/// let ZZ = StaticRing::<i128>::RING;
-/// let P_dense = dense_poly::DensePolyRing::new(ZZ, "X");
-/// let P_sparse = sparse_poly::SparsePolyRing::new(ZZ, "X");
-/// 
-/// assert!(P_dense.can_iso(&P_dense).is_some());
-/// assert!(P_dense.can_iso(&P_sparse).is_some());
-/// assert!(P_sparse.can_iso(&P_dense).is_some());
-/// assert!(P_sparse.can_iso(&P_sparse).is_some());
-/// ```
-/// Unfortunately, the inclusions `R -> R[X]` are not implemented as canonical homomorphisms,
-/// however provided by the functions of [`RingExtension`].
-/// 
-pub trait CanonicalHom<S>: RingBase
-    where S: RingBase + ?Sized
-{
-    type Homomorphism;
-
-    fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism>;
-    fn map_in(&self, from: &S, el: S::Element, hom: &Self::Homomorphism) -> Self::Element;
-
-    fn map_in_ref(&self, from: &S, el: &S::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in(from, from.clone_el(el), hom)
-    }
-
-    fn mul_assign_map_in(&self, from: &S, lhs: &mut Self::Element, rhs: S::Element, hom: &Self::Homomorphism) {
-        self.mul_assign(lhs, self.map_in(from, rhs, hom));
-    }
-
-    fn mul_assign_map_in_ref(&self, from: &S, lhs: &mut Self::Element, rhs: &S::Element, hom: &Self::Homomorphism) {
-        self.mul_assign(lhs, self.map_in_ref(from, rhs, hom));
-    }
-}
-
-///
-/// Trait for rings R that have a canonical isomorphism `S -> R`.
-/// A ring homomorphism is expected to be unital.
-/// 
-/// # Exact requirements
-/// 
-/// Same as for [`CanonicalHom`], it is up to implementors to decide which
-/// isomorphisms are canonical, as long as each diagram that contains
-/// only canonical homomorphisms, canonical isomorphisms and their inverses
-/// commutes.
-/// In other words, if there are rings `R, S` and "intermediate rings"
-/// `R1, ..., Rn` resp. `R1', ..., Rm'` such that there are canonical
-/// homomorphisms `->` or isomorphisms `<~>` connecting them - e.g. like
-/// ```text
-/// S -> R1 -> R2 <~> R3 <~> R4 -> ... -> Rn -> R
-/// ```
-/// and
-/// ```text
-/// S <~> R1' -> R2' -> ... -> Rm' -> R
-/// ```
-/// then both chains should yield same results on same inputs.
-/// 
-/// Hence, it would be natural if the trait were symmetrical, i.e.
-///  for any implementation `R: CanonicalIso<S>` there is also an
-/// implementation `S: CanonicalIso<R>`. However, because of the trait
-/// impl constraints of Rust, this is unpracticable and so we only
-/// require the implementation `R: CanonicalHom<S>`.
-/// 
-pub trait CanonicalIso<S>: CanonicalHom<S>
-    where S: RingBase + ?Sized
-{
-    type Isomorphism;
-
-    fn has_canonical_iso(&self, from: &S) -> Option<Self::Isomorphism>;
-    fn map_out(&self, from: &S, el: Self::Element, iso: &Self::Isomorphism) -> S::Element;
-}
-
-///
-/// Basically an alias for `CanonicalIso<Self>`, but implemented as new
-/// trait since trait aliases are not available.
-/// 
-pub trait SelfIso: CanonicalIso<Self> {}
-
-impl<R: ?Sized + CanonicalIso<R>> SelfIso for R {}
 
 ///
 /// Trait for rings that are an extension ring of a base ring.

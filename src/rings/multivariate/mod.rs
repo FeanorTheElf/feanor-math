@@ -7,6 +7,7 @@ use std::cmp::{min, max};
 
 use crate::vector::subvector::{Subvector, SelfSubvectorView};
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::generic_cast::generic_cast;
 use crate::vector::{VectorView, VectorViewMut};
 

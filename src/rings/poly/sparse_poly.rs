@@ -6,6 +6,7 @@ use crate::mempool::GrowableMemoryProvider;
 use crate::vector::VectorViewMut;
 use crate::ring::*;
 use crate::rings::poly::*;
+use crate::homomorphism::*;
 use crate::vector::*;
 use crate::vector::sparse::*;
 
@@ -20,13 +21,14 @@ use std::rc::Rc;
 /// # Example
 /// ```
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::rings::poly::sparse_poly::*;
 /// # use feanor_math::primitive_int::*;
 /// 
 /// let ZZ = StaticRing::<i32>::RING;
 /// let P = SparsePolyRing::new(ZZ, "X");
-/// let x10_plus_1 = P.add(P.pow(P.indeterminate(), 10), P.from_int(1));
+/// let x10_plus_1 = P.add(P.pow(P.indeterminate(), 10), P.int_hom().map(1));
 /// let power = P.pow(x10_plus_1, 10);
 /// assert_eq!(0, *P.coefficient_at(&power, 1));
 /// ```
@@ -161,7 +163,7 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
     fn from_int(&self, value: i32) -> Self::Element {
         let mut result = self.zero();
         result.set_len(1);
-        *result.at_mut(0) = self.base_ring.from_int(value);
+        *result.at_mut(0) = self.base_ring.int_hom().map(value);
         return result;
     }
 
@@ -218,7 +220,7 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         if rhs == 0 {
             *lhs = self.zero();
         } else {
-            lhs.scan(|_, c| self.base_ring.mul_assign_int(c, rhs));
+            lhs.scan(|_, c| self.base_ring.int_hom().mul_assign_map(c, rhs));
         }
     }
 }
@@ -428,7 +430,7 @@ impl<R> EuclideanRing for SparsePolyRingBase<R>
 #[cfg(test)]
 use crate::rings::zn::*;
 #[cfg(test)]
-use crate::rings::zn::zn_static::Zn;
+use crate::rings::zn::zn_static::{Zn, Fp};
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
@@ -443,16 +445,16 @@ fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El
     let base_ring = poly_ring.base_ring();
     vec![ 
         poly_ring.from_terms([].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(1), 0)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(1), 0), (base_ring.from_int(1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(-1), 0)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(-1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(-1), 0), (base_ring.from_int(1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(1), 0), (base_ring.from_int(-1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(-1), 0), (base_ring.from_int(1), 2)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(1), 0), (base_ring.from_int(-1), 2)].into_iter()),
-        poly_ring.from_terms([(base_ring.from_int(1), 0), (base_ring.from_int(-1), 2), (base_ring.from_int(0), 2)].into_iter())
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 0)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 1)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(-1), 0)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(-1), 1)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(-1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(-1), 1)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(-1), 0), (base_ring.int_hom().map(1), 2)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(-1), 2)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(-1), 2), (base_ring.int_hom().map(0), 2)].into_iter())
     ].into_iter()
 }
 
@@ -492,6 +494,6 @@ fn test_divisibility_ring_axioms() {
 
 #[test]
 fn test_euclidean_ring_axioms() {
-    let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
+    let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
     crate::euclidean::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }

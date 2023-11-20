@@ -107,7 +107,7 @@ impl<R, V, M> RingBase for FreeAlgebraImplBase<R, V, M>
     }
 
     fn from_int(&self, value: i32) -> Self::Element {
-        self.from(self.base_ring.from_int(value))
+        self.from(self.base_ring.int_hom().map(value))
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {

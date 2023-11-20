@@ -1,4 +1,8 @@
-use crate::{ring::*, divisibility::DivisibilityRing, rings::{zn::ZnRing, finite::FiniteRing}, integer::{IntegerRingStore, IntegerRing}};
+use crate::ring::*;
+use crate::homomorphism::*;
+use crate::divisibility::DivisibilityRing;
+use crate::rings::{zn::ZnRing, finite::FiniteRing};
+use crate::integer::{IntegerRingStore, IntegerRing};
 
 ///
 /// Trait to simplify implementing newtype-pattern for rings.
@@ -10,6 +14,7 @@ use crate::{ring::*, divisibility::DivisibilityRing, rings::{zn::ZnRing, finite:
 /// # Example
 /// ```
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
@@ -54,7 +59,7 @@ use crate::{ring::*, divisibility::DivisibilityRing, rings::{zn::ZnRing, finite:
 /// impl_eq_based_self_iso!{ MyI32Ring }
 /// 
 /// let ring = RingValue::from(MyI32Ring);
-/// assert_el_eq!(&ring, &ring.from_int(1), &ring.one());
+/// assert_el_eq!(&ring, &ring.int_hom().map(1), &ring.one());
 /// ```
 /// 
 pub trait DelegateRing: PartialEq {

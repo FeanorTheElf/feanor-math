@@ -6,6 +6,7 @@ use crate::integer::*;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::rings::poly::{PolyRingStore, PolyRing};
 use crate::rings::zn::{ZnRingStore, ZnRing};
 use crate::rings::finite::FiniteRingStore;
@@ -36,7 +37,7 @@ fn normalize_poly<P>(poly_ring: P, poly: &mut El<P>)
         <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: Field
 {
     let inv_lc = poly_ring.base_ring().div(&poly_ring.base_ring().one(), poly_ring.lc(poly).unwrap());
-    poly_ring.mul_assign_base(poly, &inv_lc);
+    poly_ring.base_ring_embedding().mul_assign_map_ref(poly, &inv_lc);
 }
 
 fn derive_poly<P>(poly_ring: P, poly: &El<P>) -> El<P>
@@ -45,7 +46,7 @@ fn derive_poly<P>(poly_ring: P, poly: &El<P>) -> El<P>
 {
     poly_ring.from_terms(poly_ring.terms(poly)
         .filter(|(_, i)| *i > 0)
-        .map(|(c, i)| (poly_ring.base_ring().mul_int_ref(c, i as i32), i - 1))
+        .map(|(c, i)| (poly_ring.base_ring().int_hom().mul_ref_map(c, i as i32), i - 1))
     )
 }
 
@@ -188,7 +189,7 @@ pub fn factor_complete<'a, P>(poly_ring: P, mut el: El<P>) -> Vec<(El<P>, usize)
                 let lc = poly_ring.lc(&current).unwrap();
                 poly_ring.base_ring().mul_assign_ref(&mut unit, lc);
                 let lc_inv = poly_ring.base_ring().div(&poly_ring.base_ring().one(), lc);
-                poly_ring.mul_assign_base(&mut current, &lc_inv);
+                poly_ring.base_ring_embedding().mul_assign_map_ref(&mut current, &lc_inv);
 
                 if poly_ring.is_one(&current) {
                     continue;
@@ -217,7 +218,7 @@ pub fn factor_complete<'a, P>(poly_ring: P, mut el: El<P>) -> Vec<(El<P>, usize)
     poly_ring.base_ring().mul_assign_ref(&mut unit, poly_ring.coefficient_at(&el, 0));
     debug_assert!(!poly_ring.base_ring().is_zero(&unit));
     if !poly_ring.base_ring().is_one(&unit) {
-        result.push((poly_ring.from(unit), 1));
+        result.push((poly_ring.base_ring_embedding().map(unit), 1));
     }
     return result;
 }
@@ -225,13 +226,13 @@ pub fn factor_complete<'a, P>(poly_ring: P, mut el: El<P>) -> Vec<(El<P>, usize)
 #[cfg(test)]
 use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
-use crate::rings::zn::zn_static::Zn;
+use crate::rings::zn::zn_static::Fp;
 #[cfg(test)]
 use crate::rings::zn::zn_42;
 
 #[test]
 fn test_poly_squarefree_part() {
-    let ring = DensePolyRing::new(Zn::<257>::RING, "X");
+    let ring = DensePolyRing::new(Fp::<257>::RING, "X");
     let a = ring.prod([
         ring.from_terms([(4, 0), (1, 1)].into_iter()),
         ring.from_terms([(6, 0), (1, 1)].into_iter()),
@@ -256,8 +257,8 @@ fn test_poly_squarefree_part() {
 #[test]
 fn test_poly_squarefree_part_multiplicity_p() {
     let ring = DensePolyRing::new(zn_42::Zn::new(5).as_field().ok().unwrap(), "X");
-    let f = ring.from_terms([(ring.base_ring().from_int(3), 0), (ring.base_ring().from_int(1), 10)].into_iter());
-    let g = ring.from_terms([(ring.base_ring().from_int(3), 0), (ring.base_ring().from_int(1), 2)].into_iter());
+    let f = ring.from_terms([(ring.base_ring().int_hom().map(3), 0), (ring.base_ring().int_hom().map(1), 10)].into_iter());
+    let g = ring.from_terms([(ring.base_ring().int_hom().map(3), 0), (ring.base_ring().int_hom().map(1), 2)].into_iter());
     let mut actual = poly_squarefree_part(&ring, f);
     normalize_poly(&ring, &mut actual);
     assert_el_eq!(&ring, &g, &actual);
@@ -265,7 +266,7 @@ fn test_poly_squarefree_part_multiplicity_p() {
 
 #[test]
 fn test_distinct_degree_factorization() {
-    let field = Zn::<2>::RING;
+    let field = Fp::<2>::RING;
     let ring = DensePolyRing::new(field, "X");
     let a0 = ring.one();
     let a1 = ring.mul(ring.indeterminate(), ring.from_terms([(1, 0), (1, 1)].into_iter()));
@@ -283,7 +284,7 @@ fn test_distinct_degree_factorization() {
 
 #[test]
 fn test_cantor_zassenhaus() {
-    let ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    let ring = DensePolyRing::new(Fp::<7>::RING, "X");
     let f = ring.from_terms([(1, 0), (1, 2)].into_iter());
     let g = ring.from_terms([(3, 0), (1, 1), (1, 2)].into_iter());
     let p = ring.mul_ref(&f, &g);

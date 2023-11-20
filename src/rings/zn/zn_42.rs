@@ -2,6 +2,7 @@ use crate::algorithms::fft::cooley_tuckey::*;
 use crate::delegate::DelegateRing;
 use crate::integer::IntegerRingStore;
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::rings::zn::*;
 use crate::primitive_int::*;
 use crate::rings::rust_bigint::RustBigintRingBase;
@@ -29,10 +30,11 @@ use super::zn_barett;
 /// ```
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_42::*;
 /// let zn = Zn::new(7);
-/// assert_el_eq!(&zn, &zn.one(), &zn.mul(zn.from_int(3), zn.from_int(5)));
+/// assert_el_eq!(&zn, &zn.one(), &zn.mul(zn.int_hom().map(3), zn.int_hom().map(5)));
 /// ```
 /// For moduli larger than 41 bit, this will panic
 /// ```should_panic
@@ -91,7 +93,7 @@ impl ZnBase {
         assert!(repr_bound >= 2 * modulus);
         // necessary for bounded_reduce to work
         assert!((repr_bound as u128 * repr_bound as u128) < (1 << BITSHIFT));
-        // necessary for from_int to work
+        // necessary for int_hom().map to work
         assert!(repr_bound >= (1 << 16));
         // necessary for negate to work
         assert!(repr_bound % modulus == 0);
@@ -490,6 +492,7 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
 /// ```
 /// # #![feature(const_type_name)]
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::zn_42::*;
 /// # use feanor_math::algorithms::fft::*;
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
@@ -500,7 +503,7 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
 /// // The values stored by the FFT table are elements of `ZnFastmulBase`
 /// let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, 15).unwrap();
 /// // Note that data uses `ZnBase`
-/// let mut data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+/// let mut data = (0..(1 << 15)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
 /// fft.unordered_fft(&mut data[..], &ring, &default_memory_provider!());
 /// ```
 /// 
@@ -735,16 +738,16 @@ fn test_ring_axioms() {
     crate::ring::generic_tests::test_ring_axioms(&ring, ring.elements());
 
     let ring = Zn::new((1 << 41) - 1);
-    crate::ring::generic_tests::test_ring_axioms(&ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.from_int(x)));
+    crate::ring::generic_tests::test_ring_axioms(&ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.int_hom().map(x)));
 }
 
 #[test]
 fn test_sum() {
     let ring = Zn::new(17);
-    assert_el_eq!(&ring, &ring.from_int(10001 * 5000), &ring.sum((0..=10000).map(|x| ring.from_int(x))));
+    assert_el_eq!(&ring, &ring.int_hom().map(10001 * 5000), &ring.sum((0..=10000).map(|x| ring.int_hom().map(x))));
 
     let ring = Zn::new((1 << 41) - 1);
-    assert_el_eq!(&ring, &ring.from_int(10001 * 5000), &ring.sum((0..=10000).map(|x| ring.from_int(x))));
+    assert_el_eq!(&ring, &ring.int_hom().map(10001 * 5000), &ring.sum((0..=10000).map(|x| ring.int_hom().map(x))));
 }
 
 #[test]
@@ -781,14 +784,14 @@ fn test_zn_map_in_large_int() {
 
     let ZZbig = BigIntRing::RING;
     let R = Zn::new(3);
-    assert_el_eq!(&R, &R.from_int(0), &R.coerce(&ZZbig, ZZbig.sub(ZZbig.power_of_two(84), ZZbig.one())));
+    assert_el_eq!(&R, &R.int_hom().map(0), &R.coerce(&ZZbig, ZZbig.sub(ZZbig.power_of_two(84), ZZbig.one())));
 }
 
 #[test]
 fn test_zn_map_in_small_int() {
     let R = Zn::new((1 << 41) - 1);
     let hom = generic_impls::has_canonical_hom_from_int(StaticRing::<i8>::RING.get_ring(), R.get_ring(), StaticRing::<i128>::RING.get_ring(), Some(&(*R.modulus() as i128 * *R.modulus() as i128))).unwrap();
-    assert_el_eq!(&R, &R.from_int(1), &generic_impls::map_in_from_int(
+    assert_el_eq!(&R, &R.int_hom().map(1), &generic_impls::map_in_from_int(
         StaticRing::<i8>::RING.get_ring(), 
         R.get_ring(), 
         StaticRing::<i128>::RING.get_ring(), 
@@ -802,10 +805,10 @@ fn test_zn_map_in_small_int() {
 #[test]
 fn test_from_int() {
     let R = Zn::new(2);
-    assert_el_eq!(&R, &R.from_int(1), &R.from_int(i32::MAX));
+    assert_el_eq!(&R, &R.int_hom().map(1), &R.int_hom().map(i32::MAX));
 
     let R = Zn::new((1 << 41) - 1);
-    assert_el_eq!(&R, &R.pow(R.from_int(2), 30), &R.from_int(1 << 30));
+    assert_el_eq!(&R, &R.pow(R.int_hom().map(2), 30), &R.int_hom().map(1 << 30));
 }
 
 #[test]
@@ -824,10 +827,10 @@ fn test_cooley_tuckey_butterfly() {
     generic_test_cooley_tuckey_butterfly(ring, ring, ring.elements(), &ring.one());
 
     let ring = Zn::new(97);
-    generic_test_cooley_tuckey_butterfly(ring, ring, ring.elements(), &ring.from_int(3));
+    generic_test_cooley_tuckey_butterfly(ring, ring, ring.elements(), &ring.int_hom().map(3));
 
     let ring = Zn::new((1 << 41) - 1);
-    generic_test_cooley_tuckey_butterfly(ring, ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.from_int(x)), &ring.from_int(3));
+    generic_test_cooley_tuckey_butterfly(ring, ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.int_hom().map(x)), &ring.int_hom().map(3));
 }
 
 #[test]
@@ -838,9 +841,9 @@ fn test_cooley_tuckey_butterfly_fastmul() {
 
     let ring = Zn::new(97);
     let fastmul_ring = ZnFastmul::new(ring);
-    generic_test_cooley_tuckey_butterfly(ring, fastmul_ring, ring.elements(), &fastmul_ring.from_int(3));
+    generic_test_cooley_tuckey_butterfly(ring, fastmul_ring, ring.elements(), &fastmul_ring.int_hom().map(3));
 
     let ring = Zn::new((1 << 41) - 1);
     let fastmul_ring = ZnFastmul::new(ring);
-    generic_test_cooley_tuckey_butterfly(ring, fastmul_ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.from_int(x)), &fastmul_ring.from_int(3));
+    generic_test_cooley_tuckey_butterfly(ring, fastmul_ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.int_hom().map(x)), &fastmul_ring.int_hom().map(3));
 }

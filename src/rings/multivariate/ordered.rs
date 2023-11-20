@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use crate::default_memory_provider;
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::mempool::*;
 use crate::vector::VectorViewIter;
 use crate::vector::VectorViewMut;
@@ -233,7 +234,7 @@ impl<R, O, M, const N: usize> RingBase for MultivariatePolyRingImplBase<R, O, M,
     }
     
     fn from_int(&self, value: i32) -> Self::Element {
-        self.from(self.base_ring.from_int(value))
+        self.from(self.base_ring.int_hom().map(value))
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -484,7 +485,7 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
         let new_ring: MultivariatePolyRingImpl<&S, _, _, N> = MultivariatePolyRingImpl::new(&ring, self.order.clone(), default_memory_provider!());
         let mut result = new_ring.coerce_ref(&RingRef::new(self), f);
         for i in 0..self.indeterminate_len() {
-            result = new_ring.specialize(&result, i, &new_ring.from_ref(values.at(i)));
+            result = new_ring.specialize(&result, i, &new_ring.base_ring_embedding().map_ref(values.at(i)));
         }
         debug_assert!(result.len() == 1);
         debug_assert!(result[0].1.deg() == 0);

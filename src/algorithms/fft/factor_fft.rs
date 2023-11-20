@@ -1,4 +1,5 @@
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::mempool::*;
 use crate::algorithms::fft::*;
 use crate::algorithms::fft::complex_fft::*;
@@ -199,7 +200,7 @@ use crate::default_memory_provider;
 #[test]
 fn test_fft_basic() {
     let ring = Zn::<97>::RING;
-    let z = ring.from_int(39);
+    let z = ring.int_hom().map(39);
     let fft = FFTTableGenCooleyTuckey::new(ring.pow(z, 16), 
         bluestein::FFTTableBluestein::new(ring, ring.pow(z, 24), ring.pow(z, 12), 2, 3),
         bluestein::FFTTableBluestein::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3),
@@ -218,7 +219,7 @@ fn test_fft_basic() {
 #[test]
 fn test_fft_long() {
     let ring = Zn::<97>::RING;
-    let z = ring.from_int(39);
+    let z = ring.int_hom().map(39);
     let fft = FFTTableGenCooleyTuckey::new(ring.pow(z, 4), 
         bluestein::FFTTableBluestein::new(ring, ring.pow(z, 6), ring.pow(z, 3), 8, 5),
         bluestein::FFTTableBluestein::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3),
@@ -246,7 +247,7 @@ fn test_fft_unordered() {
     const LEN: usize = 16 * 11;
     let mut values = [0; LEN];
     for i in 0..LEN {
-        values[i] = ring.from_int(i as i32);
+        values[i] = ring.int_hom().map(i as i32);
     }
     let original = values;
 
@@ -283,7 +284,7 @@ fn test_unordered_fft_permutation_inv() {
 #[test]
 fn test_inv_fft() {
     let ring = Zn::<97>::RING;
-    let z = ring.from_int(39);
+    let z = ring.int_hom().map(39);
     let fft = FFTTableGenCooleyTuckey::new(ring.pow(z, 16), 
         bluestein::FFTTableBluestein::new(ring, ring.pow(z, 24), ring.pow(z, 12), 2, 3),
         bluestein::FFTTableBluestein::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3),
@@ -326,7 +327,7 @@ fn bench_factor_fft(bencher: &mut test::Bencher) {
         bluestein::FFTTableBluestein::new(fastmul_ring, embed(ring.pow(root_of_unity, 31)), embed(algorithms::unity_root::get_prim_root_of_unity_pow2(&ring, 11).unwrap()), 601, 11),
         bluestein::FFTTableBluestein::new(fastmul_ring, embed(ring.pow(root_of_unity, 601)), embed(algorithms::unity_root::get_prim_root_of_unity_pow2(&ring, 6).unwrap()), 31, 6),
     );
-    let data = (0..(31 * 601)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+    let data = (0..(31 * 601)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(31 * 601);
     bencher.iter(|| {
         copy.clear();

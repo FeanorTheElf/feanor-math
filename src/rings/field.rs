@@ -4,6 +4,7 @@ use crate::euclidean::EuclideanRing;
 use crate::field::Field;
 use crate::integer::IntegerRing;
 use crate::ring::*;
+use crate::homomorphism::*;
 
 #[derive(Clone, Copy)]
 pub struct AsFieldBase<R: DivisibilityRingStore> 

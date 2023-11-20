@@ -1,5 +1,6 @@
 use crate::ordered::OrderedRingStore;
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::integer::*;
 use crate::rings::zn::ZnRing;
 use crate::primitive_int::*;

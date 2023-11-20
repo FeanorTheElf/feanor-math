@@ -7,6 +7,7 @@ use crate::primitive_int::*;
 use crate::integer::*;
 use crate::euclidean::EuclideanRingStore;
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::rings::rust_bigint::*;
 
 use super::*;
@@ -45,20 +46,22 @@ fn mullo(lhs: u64, rhs: u64) -> u64 {
 /// ```
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// let zn = Zn::new(7);
-/// assert_el_eq!(&zn, &zn.one(), &zn.mul(zn.from_int(3), zn.from_int(5)));
+/// assert_el_eq!(&zn, &zn.one(), &zn.mul(zn.int_hom().map(3), zn.int_hom().map(5)));
 /// ```
 /// We have natural isomorphisms to [`super::zn_42::ZnBase`] that are extremely fast.
 /// ```
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
 /// let R1 = zn_42::Zn::new(17);
 /// let R2 = zn_64::Zn::new(17);
-/// assert_el_eq!(&R2, &R2.from_int(6), &R2.coerce(&R1, R1.from_int(6)));
-/// assert_el_eq!(&R1, &R1.from_int(16), &R2.cast(&R1, R2.from_int(16)));
+/// assert_el_eq!(&R2, &R2.int_hom().map(6), &R2.coerce(&R1, R1.int_hom().map(6)));
+/// assert_el_eq!(&R1, &R1.int_hom().map(16), &R2.cast(&R1, R2.int_hom().map(16)));
 /// ```
 /// Too large moduli will give an error.
 /// ```should_panic
@@ -90,7 +93,7 @@ impl ZnBase {
         assert!(modulus as u128 * 6 <= u64::MAX as u128);
         let inv_modulus = ZZbig.euclidean_div(ZZbig.power_of_two(128), &ZZbig.coerce(&ZZ, modulus as i64));
         // we need the product `inv_modulus * (6 * modulus)^2` to fit into 192 bit, should be implied by `modulus < ((1 << 62) / 9)`
-        debug_assert!(ZZbig.is_lt(&ZZbig.mul_ref_fst(&inv_modulus, ZZbig.pow(ZZbig.mul_int(ZZbig.coerce(&ZZ, modulus as i64), 6), 2)), &ZZbig.power_of_two(192)));
+        debug_assert!(ZZbig.is_lt(&ZZbig.mul_ref_fst(&inv_modulus, ZZbig.pow(ZZbig.int_hom().mul_map(ZZbig.coerce(&ZZ, modulus as i64), 6), 2)), &ZZbig.power_of_two(192)));
         let inv_modulus = if ZZbig.eq_el(&inv_modulus, &ZZbig.power_of_two(127)) {
             1u128 << 127
         } else {
@@ -467,6 +470,7 @@ impl HashableElRing for ZnBase {
 /// roots of unity.
 /// ```
 /// # #![feature(const_type_name)]
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::algorithms::fft::*;
@@ -478,7 +482,7 @@ impl HashableElRing for ZnBase {
 /// // The values stored by the FFT table are elements of `ZnFastmulBase`
 /// let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, 15).unwrap();
 /// // Note that data uses `ZnBase`
-/// let mut data = (0..(1 << 15)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+/// let mut data = (0..(1 << 15)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
 /// fft.unordered_fft(&mut data[..], &ring, &default_memory_provider!());
 /// ```
 /// 

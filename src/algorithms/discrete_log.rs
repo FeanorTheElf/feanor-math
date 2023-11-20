@@ -1,4 +1,5 @@
 use crate::field::Field;
+use crate::homomorphism::Homomorphism;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::algorithms;
@@ -136,5 +137,5 @@ fn test_discrete_log() {
 #[test]
 fn test_finite_field_log() {
     let Fp = zn_42::Zn::new(1009).as_field().ok().unwrap();
-    assert_eq!(Some(486), finite_field_log(Fp.pow(Fp.from_int(11), 486), Fp.from_int(11), &Fp));
+    assert_eq!(Some(486), finite_field_log(Fp.pow(Fp.int_hom().map(11), 486), Fp.int_hom().map(11), &Fp));
 }

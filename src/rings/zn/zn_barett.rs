@@ -4,6 +4,7 @@ use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
 use crate::ordered::OrderedRingStore;
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::rings::field::AssumeFieldDivision;
 use crate::rings::zn::*;
 use crate::algorithms;
@@ -26,12 +27,13 @@ use crate::primitive_int::*;
 /// # Example
 /// ```
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_barett::*;
 /// # use feanor_math::primitive_int::*;
 /// let R = Zn::new(StaticRing::<i64>::RING, 257);
-/// let a = R.from_int(16);
-/// assert!(R.eq_el(&R.from_int(-1), &R.mul_ref(&a, &a)));
+/// let a = R.int_hom().map(16);
+/// assert!(R.eq_el(&R.int_hom().map(-1), &R.mul_ref(&a, &a)));
 /// assert!(R.is_one(&R.pow(a, 4)));
 /// ```
 /// However, this will panic as `2053^3 > i32::MAX`.
@@ -47,13 +49,14 @@ use crate::primitive_int::*;
 /// This ring has a canonical homomorphism from any integer ring
 /// ```
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_barett::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::primitive_int::*;
 /// let R = Zn::new(StaticRing::<i16>::RING, 7);
 /// let S = BigIntRing::RING;
-/// assert!(R.eq_el(&R.from_int(120493), &R.coerce(&S, S.from_int(120493))));
+/// assert!(R.eq_el(&R.int_hom().map(120493), &R.coerce(&S, S.int_hom().map(120493))));
 /// ```
 ///
 pub struct ZnBase<I: IntegerRingStore> 
@@ -83,7 +86,7 @@ impl<I: IntegerRingStore> ZnBase<I>
     where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
 {
     pub fn new(integer_ring: I, modulus: El<I>) -> Self {
-        assert!(integer_ring.is_geq(&modulus, &integer_ring.from_int(2)));
+        assert!(integer_ring.is_geq(&modulus, &integer_ring.int_hom().map(2)));
 
         // have k such that `2^k >= modulus^2`
         // then `floor(2^k / modulus) * x >> k` differs at most 1 from `floor(x / modulus)`
@@ -468,8 +471,8 @@ use crate::integer::BigIntRing;
 #[test]
 fn test_mul() {
     const ZZ: BigIntRing = BigIntRing::RING;
-    let Z257 = Zn::new(ZZ, ZZ.from_int(257));
-    let x = Z257.coerce(&ZZ, ZZ.from_int(256));
+    let Z257 = Zn::new(ZZ, ZZ.int_hom().map(257));
+    let x = Z257.coerce(&ZZ, ZZ.int_hom().map(256));
     assert_el_eq!(&Z257, &Z257.one(), &Z257.mul_ref(&x, &x));
 }
 
@@ -478,7 +481,7 @@ fn test_project() {
     const ZZ: StaticRing<i64> = StaticRing::RING;
     let Z17 = Zn::new(ZZ, 17);
     for k in 0..289 {
-        assert_el_eq!(&Z17, &Z17.from_int((289 - k) % 17), &Z17.coerce(&ZZ, -k as i64));
+        assert_el_eq!(&Z17, &Z17.int_hom().map((289 - k) % 17), &Z17.coerce(&ZZ, -k as i64));
     }
 }
 
@@ -488,15 +491,15 @@ const EDGE_CASE_ELEMENTS: [i32; 10] = [0, 1, 3, 7, 9, 62, 8, 10, 11, 12];
 #[test]
 fn test_ring_axioms_znbase() {
     let ring = Zn::new(StaticRing::<i64>::RING, 63);
-    crate::ring::generic_tests::test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.from_int(x)))
+    crate::ring::generic_tests::test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.int_hom().map(x)))
 }
 
 #[test]
 fn test_canonical_iso_axioms_zn_barett() {
     let from = Zn::new(StaticRing::<i128>::RING, 7 * 11);
-    let to = Zn::new(BigIntRing::RING, BigIntRing::RING.from_int(7 * 11));
-    crate::ring::generic_tests::test_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
-    crate::ring::generic_tests::test_iso_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    let to = Zn::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(7 * 11));
+    crate::ring::generic_tests::test_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.int_hom().map(x)));
+    crate::ring::generic_tests::test_iso_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.int_hom().map(x)));
     assert!(from.can_hom(&Zn::new(StaticRing::<i64>::RING, 19)).is_none());
 }
 
@@ -504,7 +507,7 @@ fn test_canonical_iso_axioms_zn_barett() {
 fn test_canonical_hom_axioms_static_int() {
     let from = StaticRing::<i32>::RING;
     let to = Zn::new(StaticRing::<i128>::RING, 7 * 11);
-    crate::ring::generic_tests::test_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.from_int(x)));
+    crate::ring::generic_tests::test_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.int_hom().map(x)));
 }
 
 #[test]

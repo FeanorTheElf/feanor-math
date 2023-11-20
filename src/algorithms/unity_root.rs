@@ -1,4 +1,5 @@
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::primitive_int::{StaticRing, StaticRingBase};
 use crate::rings::zn::{ZnRing, ZnRingStore};
 use crate::divisibility::DivisibilityRingStore;
@@ -71,15 +72,15 @@ use crate::rings::zn::zn_static::Zn;
 #[test]
 fn test_is_prim_root_of_unity() {
     let ring = Zn::<17>::RING;
-    assert!(is_prim_root_of_unity_pow2(ring, &ring.from_int(2), 3));
-    assert!(!is_prim_root_of_unity_pow2(ring, &ring.from_int(2), 4));
-    assert!(is_prim_root_of_unity_pow2(ring, &ring.from_int(3), 4));
+    assert!(is_prim_root_of_unity_pow2(ring, &ring.int_hom().map(2), 3));
+    assert!(!is_prim_root_of_unity_pow2(ring, &ring.int_hom().map(2), 4));
+    assert!(is_prim_root_of_unity_pow2(ring, &ring.int_hom().map(3), 4));
 
     let ring = Zn::<101>::RING;
-    assert!(is_prim_root_of_unity(&ring, &ring.from_int(36), 5));
-    assert!(is_prim_root_of_unity(&ring, &ring.from_int(3), 100));
-    assert!(is_prim_root_of_unity(&ring, &ring.from_int(5), 25));
-    assert!(!is_prim_root_of_unity(&ring, &ring.from_int(5), 50));
-    assert!(is_prim_root_of_unity(&ring, &ring.from_int(6), 10));
-    assert!(!is_prim_root_of_unity(&ring, &ring.from_int(6), 50));
+    assert!(is_prim_root_of_unity(&ring, &ring.int_hom().map(36), 5));
+    assert!(is_prim_root_of_unity(&ring, &ring.int_hom().map(3), 100));
+    assert!(is_prim_root_of_unity(&ring, &ring.int_hom().map(5), 25));
+    assert!(!is_prim_root_of_unity(&ring, &ring.int_hom().map(5), 50));
+    assert!(is_prim_root_of_unity(&ring, &ring.int_hom().map(6), 10));
+    assert!(!is_prim_root_of_unity(&ring, &ring.int_hom().map(6), 50));
 }

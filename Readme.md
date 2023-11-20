@@ -44,6 +44,7 @@ The following algorithms are implemented
 
 As simple example of how to use the library, we implement Fermat primality test here
 ```rust
+use feanor_math::homomorphism::*;
 use feanor_math::assert_el_eq;
 use feanor_math::ring::*;
 use feanor_math::primitive_int::*;
@@ -81,6 +82,7 @@ If we want to support arbitrary rings of integers - e.g. `RustBigintRing::RING`,
 implementation of arbitrary-precision integers - we could make the function generic as
 
 ```rust
+use feanor_math::homomorphism::*;
 use feanor_math::ring::*;
 use feanor_math::integer::*;
 use feanor_math::integer::*;
@@ -119,7 +121,7 @@ fn fermat_is_prime<R>(ZZ: R, n: El<R>) -> bool
 
 // the miller-rabin primality test is implemented in feanor_math::algorithms, so we can
 // check our implementation
-let n = BigIntRing::RING.from_int(91);
+let n = BigIntRing::RING.int_hom().map(91);
 assert!(algorithms::miller_rabin::is_prime(BigIntRing::RING, &n, 6) == fermat_is_prime(BigIntRing::RING, n));
 ```
 This function now works with any ring that implements `IntegerRing`, a subtrait of `RingBase`.
@@ -129,6 +131,7 @@ This function now works with any ring that implements `IntegerRing`, a subtrait 
 To implement a custom ring, just create a struct and add an `impl RingBase` and an `impl CanonicalIso<Self>` - that's it!
 Assuming we want to provide our own implementation of the finite binary field F2, we could do it as follows.
 ```rust
+use feanor_math::homomorphism::*;
 use feanor_math::assert_el_eq;
 use feanor_math::ring::*;
 
@@ -211,7 +214,7 @@ impl CanonicalIso<F2Base> for F2Base {
 
 pub const F2: RingValue<F2Base> = RingValue::from(F2Base);
 
-assert_el_eq!(&F2, &F2.from_int(1), &F2.add(F2.one(), F2.zero()));
+assert_el_eq!(&F2, &F2.int_hom().map(1), &F2.add(F2.one(), F2.zero()));
 ```
 
 ## `RingBase` vs `RingStore`

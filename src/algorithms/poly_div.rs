@@ -1,4 +1,5 @@
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::rings::poly::*;
 
 pub fn sparse_poly_div<P, S, F, E>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_ring: S, mut left_div_lc: F) -> Result<(El<P>, El<P>), E>

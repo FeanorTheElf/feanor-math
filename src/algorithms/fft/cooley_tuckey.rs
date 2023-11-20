@@ -6,6 +6,7 @@ use crate::rings::zn::*;
 use crate::vector::SwappableVectorViewMut;
 use crate::ring::*;
 use crate::vector::VectorViewMut;
+use crate::homomorphism::*;
 use crate::algorithms::fft::*;
 use crate::algorithms;
 use crate::rings::float_complex::*;
@@ -333,7 +334,7 @@ impl<R> FFTTable for FFTTableCooleyTuckey<R>
             V: VectorViewMut<El<S>>
     {
         self.unordered_fft_dispatch::<V, S, true>(&mut values, &ring);
-        let inv = ring.coerce(&self.ring, self.ring.invert(&self.ring.from_int(1 << self.log2_n)).unwrap());
+        let inv = ring.coerce(&self.ring, self.ring.invert(&self.ring.int_hom().map(1 << self.log2_n)).unwrap());
         for i in 0..values.len() {
             ring.mul_assign_ref(values.at_mut(i), &inv);
         }
@@ -359,7 +360,7 @@ pub fn dummy2(ring: &zn_42::Zn, mut data: &mut [El<zn_42::Zn>], i1: usize, i2: u
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_static::Zn;
+use crate::rings::zn::zn_static::Fp;
 #[cfg(test)]
 use crate::rings::zn::zn_barett;
 #[cfg(test)]
@@ -373,8 +374,8 @@ use crate::default_memory_provider;
 
 #[test]
 fn test_bitreverse_fft_inplace_basic() {
-    let ring = Zn::<5>::RING;
-    let z = ring.from_int(2);
+    let ring = Fp::<5>::RING;
+    let z = ring.int_hom().map(2);
     let fft = FFTTableCooleyTuckey::new(ring, ring.div(&1, &z), 2);
     let mut values = [1, 0, 0, 1];
     let expected = [2, 4, 0, 3];
@@ -389,8 +390,8 @@ fn test_bitreverse_fft_inplace_basic() {
 
 #[test]
 fn test_bitreverse_fft_inplace_advanced() {
-    let ring = Zn::<17>::RING;
-    let z = ring.from_int(3);
+    let ring = Fp::<17>::RING;
+    let z = ring.int_hom().map(3);
     let fft = FFTTableCooleyTuckey::new(ring, z, 4);
     let mut values = [1, 0, 0, 0, 1, 0, 0, 0, 4, 3, 2, 1, 4, 3, 2, 1];
     let expected = [5, 2, 0, 11, 5, 4, 0, 6, 6, 13, 0, 1, 7, 6, 0, 1];
@@ -405,7 +406,7 @@ fn test_bitreverse_fft_inplace_advanced() {
 
 #[test]
 fn test_bitreverse_inv_fft_inplace() {
-    let ring = Zn::<17>::RING;
+    let ring = Fp::<17>::RING;
     let fft = FFTTableCooleyTuckey::for_zn(&ring, 4).unwrap();
     let values: [u64; 16] = [1, 2, 3, 2, 1, 0, 17 - 1, 17 - 2, 17 - 1, 0, 1, 2, 3, 4, 5, 6];
     let mut work = values;
@@ -416,11 +417,11 @@ fn test_bitreverse_inv_fft_inplace() {
 
 #[test]
 fn test_for_zn() {
-    let ring = Zn::<17>::RING;
+    let ring = Fp::<17>::RING;
     let fft = FFTTableCooleyTuckey::for_zn(ring, 4).unwrap();
     assert!(ring.is_neg_one(&ring.pow(fft.root_of_unity, 8)));
 
-    let ring = Zn::<97>::RING;
+    let ring = Fp::<97>::RING;
     let fft = FFTTableCooleyTuckey::for_zn(ring, 4).unwrap();
     assert!(ring.is_neg_one(&ring.pow(fft.root_of_unity, 8)));
 }
@@ -443,7 +444,7 @@ const BENCH_SIZE_LOG2: usize = 13;
 fn bench_fft(bencher: &mut test::Bencher) {
     let ring = zn_barett::Zn::new(StaticRing::<i128>::RING, 1073872897);
     let fft = FFTTableCooleyTuckey::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
-    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
     bencher.iter(|| {
         run_fft_bench_round(&ring, &fft, &data, &mut copy)
@@ -454,7 +455,7 @@ fn bench_fft(bencher: &mut test::Bencher) {
 fn bench_fft_zn42(bencher: &mut test::Bencher) {
     let ring = zn_42::Zn::new(1073872897);
     let fft = FFTTableCooleyTuckey::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
-    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
     bencher.iter(|| {
         run_fft_bench_round(&ring, &fft, &data, &mut copy)
@@ -466,7 +467,7 @@ fn bench_fft_zn42_fastmul(bencher: &mut test::Bencher) {
     let ring = zn_42::Zn::new(1073872897);
     let fastmul_ring = zn_42::ZnFastmul::new(ring);
     let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, BENCH_SIZE_LOG2).unwrap();
-    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
     bencher.iter(|| {
         run_fft_bench_round(&ring, &fft, &data, &mut copy)
@@ -478,7 +479,7 @@ fn bench_fft_zn64_fastmul(bencher: &mut test::Bencher) {
     let ring = zn_64::Zn::new(1073872897);
     let fastmul_ring = zn_64::ZnFastmul::new(ring);
     let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, BENCH_SIZE_LOG2).unwrap();
-    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.from_int(i)).collect::<Vec<_>>();
+    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
     bencher.iter(|| {
         run_fft_bench_round(&ring, &fft, &data, &mut copy)
@@ -503,7 +504,7 @@ fn test_approximate_fft() {
 
 #[test]
 fn test_size_1_fft() {
-    let ring = Zn::<17>::RING;
+    let ring = Fp::<17>::RING;
     let fft = FFTTableCooleyTuckey::for_zn(&ring, 0).unwrap();
     let values: [u64; 1] = [3];
     let mut work = values;
@@ -533,8 +534,8 @@ pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Itera
             assert_el_eq!(&ring, &ring.sub_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &vector[1]);
 
             ring.get_ring().inv_butterfly(base.get_ring(), hom.raw_hom(), &mut vector, &test_inv_twiddle, 0, 1);
-            assert_el_eq!(&ring, &ring.mul_int_ref(a, 2), &vector[0]);
-            assert_el_eq!(&ring, &ring.mul_int_ref(b, 2), &vector[1]);
+            assert_el_eq!(&ring, &ring.int_hom().mul_ref_map(a, 2), &vector[0]);
+            assert_el_eq!(&ring, &ring.int_hom().mul_ref_map(b, 2), &vector[1]);
 
             let mut vector = [ring.clone_el(a), ring.clone_el(b)];
             ring.get_ring().butterfly(base.get_ring(), hom.raw_hom(), &mut vector, &test_twiddle, 1, 0);
@@ -542,13 +543,13 @@ pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Itera
             assert_el_eq!(&ring, &ring.sub_ref_fst(b, ring.mul_ref_fst(a, hom.map_ref(test_twiddle))), &vector[0]);
 
             ring.get_ring().inv_butterfly(base.get_ring(), hom.raw_hom(), &mut vector, &test_inv_twiddle, 1, 0);
-            assert_el_eq!(&ring, &ring.mul_int_ref(a, 2), &vector[0]);
-            assert_el_eq!(&ring, &ring.mul_int_ref(b, 2), &vector[1]);
+            assert_el_eq!(&ring, &ring.int_hom().mul_ref_map(a, 2), &vector[0]);
+            assert_el_eq!(&ring, &ring.int_hom().mul_ref_map(b, 2), &vector[1]);
         }
     }
 }
 
 #[test]
 fn test_butterfly() {
-    generic_test_cooley_tuckey_butterfly(zn_static::Z17, zn_static::Z17, zn_static::Z17.elements(), &get_prim_root_of_unity_pow2(zn_static::Z17, 4).unwrap());
+    generic_test_cooley_tuckey_butterfly(zn_static::F17, zn_static::F17, zn_static::F17.elements(), &get_prim_root_of_unity_pow2(zn_static::F17, 4).unwrap());
 }

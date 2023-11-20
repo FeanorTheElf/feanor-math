@@ -1,4 +1,5 @@
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::integer::*;
 
 pub fn generic_abs_square_and_multiply<T, U, F, H, I>(base: U, power: &El<I>, int_ring: I, mut square: F, mut multiply_base: H, identity: T) -> T

@@ -1,5 +1,6 @@
 use crate::algorithms;
 use crate::divisibility::*;
+use crate::homomorphism::Homomorphism;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
@@ -133,7 +134,7 @@ pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::Integers>
 {
     assert!(algorithms::miller_rabin::is_prime_base(&Zn, 6) == false);
     let ZZ = BigIntRing::RING;
-    assert!(ZZ.is_geq(&int_cast(Zn.integer_ring().clone_el(Zn.modulus()), ZZ, Zn.integer_ring()), &ZZ.from_int(100)));
+    assert!(ZZ.is_geq(&int_cast(Zn.integer_ring().clone_el(Zn.modulus()), ZZ, Zn.integer_ring()), &ZZ.int_hom().map(100)));
     let Nf = Zn.integer_ring().to_float_approx(Zn.modulus());
     // smoothness bound, choose L_N(1/2, 1/2)
     let B = (0.5 * Nf.ln().sqrt() * Nf.ln().ln().sqrt()).exp() as usize;

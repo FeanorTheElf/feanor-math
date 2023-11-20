@@ -430,11 +430,11 @@ pub fn gb_rowrev_sparse_row_echelon<F, const LOG: bool>(matrix: &mut SparseMatri
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_static::Zn;
+use crate::rings::zn::zn_static::Fp;
 
 #[test]
 fn test_sub_row() {
-    let field = Zn::<17>::RING;
+    let field = Fp::<17>::RING;
     let mut base = SparseMatrix::new(field, 4, 6, [
         (0, 0, 1), (0, 3, 2), (0, 5, 4), (1, 1, 2), (1, 2, 3), (1, 5, 1), (2, 0, 3), (2, 2, 1), (3, 0, 5), (3, 4, 6)
     ].into_iter());
@@ -465,7 +465,7 @@ fn test_sub_row() {
 
 #[test]
 fn test_move_zero_rows_down() {
-    let field = Zn::<17>::RING;
+    let field = Fp::<17>::RING;
     let mut base = SparseMatrix::new(field, 4, 4, [
         (0, 0, 1), (1, 3, 2), (2, 1, 1), (3, 3, 1)
     ].into_iter());

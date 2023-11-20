@@ -3,6 +3,7 @@ use crate::ring::*;
 use crate::divisibility::DivisibilityRing;
 use crate::algorithms;
 use crate::integer::*;
+use crate::homomorphism::*;
 use crate::ordered::*;
 use super::field::AsFieldBase;
 use super::finite::FiniteRing;
@@ -89,8 +90,12 @@ pub trait ZnRing: DivisibilityRing + FiniteRing + CanonicalHom<Self::IntegerRing
 pub mod generic_impls {
     use std::marker::PhantomData;
 
-    use crate::{ring::*, divisibility::DivisibilityRingStore, integer::{IntegerRing, IntegerRingStore}, algorithms};
+    use crate::ring::*;
+    use crate::divisibility::DivisibilityRingStore;
+    use crate::integer::{IntegerRing, IntegerRingStore};
+    use crate::algorithms;
     use super::{ZnRing, ZnRingStore};
+    use crate::homomorphism::*;
 
     #[allow(type_alias_bounds)]
     pub type Homomorphism<R: ZnRing, S: ZnRing> = (<S as CanonicalHom<S::IntegerRingBase>>::Homomorphism, <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::Homomorphism);
@@ -276,6 +281,7 @@ pub trait ZnOperation {
 /// # Example
 /// ```
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::generate_zn_function;
 /// # use feanor_math::primitive_int::*;
@@ -287,7 +293,7 @@ pub trait ZnOperation {
 /// choose_zn_impl(StaticRing::<i64>::RING, 17, generate_zn_function!(
 ///     < {'a} > [_: &'a i64 = &int_value] |Zn: R, (int_value, ): (&i64, )| {
 ///         let value = Zn.coerce(Zn.integer_ring(), int_cast(*int_value, Zn.integer_ring(), &StaticRing::<i64>::RING));
-///         assert_el_eq!(&Zn, &Zn.from_int(-1), &Zn.mul_ref(&value, &value));
+///         assert_el_eq!(&Zn, &Zn.int_hom().map(-1), &Zn.mul_ref(&value, &value));
 ///     }
 /// ));
 /// ```
@@ -334,6 +340,7 @@ macro_rules! generate_zn_function {
 /// # Example
 /// ```
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::generate_zn_function;
 /// # use feanor_math::primitive_int::*;
@@ -345,7 +352,7 @@ macro_rules! generate_zn_function {
 /// choose_zn_impl(StaticRing::<i64>::RING, 17, generate_zn_function!(
 ///     < {'a} > [_: &'a i64 = &int_value] |Zn: R, (int_value, ): (&i64, )| {
 ///         let value = Zn.coerce(Zn.integer_ring(), int_cast(*int_value, Zn.integer_ring(), &StaticRing::<i64>::RING));
-///         assert_el_eq!(&Zn, &Zn.from_int(-1), &Zn.mul_ref(&value, &value));
+///         assert_el_eq!(&Zn, &Zn.int_hom().map(-1), &Zn.mul_ref(&value, &value));
 ///     }
 /// ));
 /// ```
@@ -399,6 +406,6 @@ pub mod generic_tests {
         let ZZ_big = BigIntRing::RING;
         let n = ZZ_big.power_of_two(1000);
         let x = R.coerce(&ZZ_big, n);
-        assert!(R.eq_el(&R.pow(R.from_int(2), 1000), &x));
+        assert!(R.eq_el(&R.pow(R.int_hom().map(2), 1000), &x));
     }
 }

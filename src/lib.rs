@@ -2,7 +2,7 @@
 #![allow(non_snake_case)]
 #![feature(test)]
 #![feature(min_specialization)]
-#![feature(generic_const_exprs)]
+// #![feature(generic_const_exprs)]
 #![feature(maybe_uninit_slice)]
 #![feature(allocator_api)]
 #![feature(new_uninit)] 
@@ -31,33 +31,6 @@ extern crate rayon;
 /// returned from functions.
 /// 
 mod named_closure;
-///
-/// Struct that may be used to refer to a generic computation.
-/// Use it together with [`Exists`] to ensure that a const generic
-/// computation works. 
-/// 
-/// Use as
-/// ```
-/// #![feature(generic_const_exprs)]
-/// # use feanor_math::*; 
-/// pub struct Foo<const N: usize>
-///     where Expr<{N * N}>: Exists;
-/// ```
-/// 
-pub struct Expr<const VALUE: usize>;
-///
-/// Trait used to represent that a const generic computation works
-/// 
-/// Use together with [`Expr`] as
-/// ```
-/// #![feature(generic_const_exprs)]
-/// # use feanor_math::*; 
-/// pub struct Foo<const N: usize>
-///     where Expr<{N * N}>: Exists;
-/// ```
-/// 
-pub trait Exists {}
-impl<T: ?Sized> Exists for T {}
 
 ///
 /// Module containing different implementations of [`mempool::MemoryProvider`],
@@ -130,13 +103,14 @@ pub mod rings;
 /// as elements in a [`std::collections::HashSet`].
 /// ```
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::wrapper::*;
 /// # use feanor_math::integer::*;
 /// # use std::collections::HashSet;
 /// 
 /// let mut set = HashSet::new();
-/// set.insert(RingElementWrapper::new(BigIntRing::RING, BigIntRing::RING.from_int(3)));
-/// assert!(set.contains(&RingElementWrapper::new(BigIntRing::RING, BigIntRing::RING.from_int(3))));
+/// set.insert(RingElementWrapper::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(3)));
+/// assert!(set.contains(&RingElementWrapper::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(3))));
 /// ```
 /// 
 pub mod wrapper;
@@ -144,3 +118,5 @@ pub mod wrapper;
 pub mod generic_cast;
 
 pub mod parallel;
+
+pub mod homomorphism;

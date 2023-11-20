@@ -1,6 +1,7 @@
 use std::io::Write;
 
 use crate::field::{FieldStore, Field};
+use crate::homomorphism::Homomorphism;
 use crate::ring::*;
 use crate::rings::multivariate::*;
 use crate::vector::*;
@@ -249,7 +250,7 @@ fn sym_tuple(a: usize, b: usize) -> (usize, usize) {
 /// # use feanor_math::rings::zn::zn_static;
 /// 
 /// let order = DegRevLex;
-/// let base = zn_static::Z17;
+/// let base = zn_static::F17;
 /// let ring: ordered::MultivariatePolyRingImpl<_, _, _, 2> = ordered::MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
 /// 
 /// // the classical GB example: x^2 + y^2 - 1, xy - 2
@@ -441,7 +442,7 @@ pub fn multivariate_division<P, V, O>(ring: P, mut f: El<P>, set: V, order: O) -
         let div_coeff = ring.base_ring().div(&f_lc, &g_lc);
         let mut g_scaled = ring.clone_el(g);
         ring.mul_monomial(&mut g_scaled, &div_monomial);
-        ring.mul_assign_base(&mut g_scaled, &div_coeff);
+        ring.base_ring_embedding().mul_assign_map_ref(&mut g_scaled, &div_coeff);
         ring.sub_assign(&mut f, g_scaled);
         if let Some(m) = ring.lm(&f, order) {
             f_lm = ring.clone_monomial(m);
@@ -468,7 +469,7 @@ use crate::wrapper::RingElementWrapper;
 #[test]
 fn test_f4_small() {
     let order = DegRevLex;
-    let base = zn_static::Z17;
+    let base: RingValue<zn_static::ZnBase<17, true>> = zn_static::F17;
     let ring: MultivariatePolyRingImpl<_, _, _, 2> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
 
     let f1 = ring.from_terms([
@@ -498,7 +499,7 @@ fn test_f4_small() {
 #[test]
 fn test_f4_larger() {
     let order = DegRevLex;
-    let base = zn_static::Z17;
+    let base = zn_static::F17;
     let ring: MultivariatePolyRingImpl<_, _, _, 3> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
 
     let f1 = ring.from_terms([
@@ -545,7 +546,7 @@ fn test_f4_larger() {
 #[test]
 fn test_f4_larger_elim() {
     let order = BlockLexDegRevLex::new(..1, 1..);
-    let base = zn_static::Z17;
+    let base = zn_static::F17;
     let ring: MultivariatePolyRingImpl<_, _, _, 3> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
 
     let f1 = ring.from_terms([
@@ -597,7 +598,7 @@ fn test_f4_larger_elim() {
 #[ignore]
 fn test_generic_computation() {
     let order = DegRevLex;
-    let base = zn_static::Z17;
+    let base = zn_static::F17;
     let ring: MultivariatePolyRingImpl<_, _, _, 6> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
     let poly_ring = dense_poly::DensePolyRing::new(&ring, "X");
 
@@ -610,9 +611,9 @@ fn test_generic_computation() {
         poly_ring.add(poly_ring.clone_el(&X1.clone()), poly_ring.from_terms([(ring.indeterminate(4), 0), (ring.indeterminate(5), 1)].into_iter()))
     );
     let basis = vec![
-        ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&X2.clone(), 0)),
-        ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&X2.clone(), 1)),
-        ring.sub_ref_snd(ring.from_int(1), poly_ring.coefficient_at(&X2.clone(), 2)),
+        ring.sub_ref_snd(ring.int_hom().map(1), poly_ring.coefficient_at(&X2.clone(), 0)),
+        ring.sub_ref_snd(ring.int_hom().map(1), poly_ring.coefficient_at(&X2.clone(), 1)),
+        ring.sub_ref_snd(ring.int_hom().map(1), poly_ring.coefficient_at(&X2.clone(), 2)),
     ];
 
     let start = std::time::Instant::now();
@@ -631,7 +632,7 @@ fn test_generic_computation() {
 #[ignore]
 fn test_difficult_gb() {
     let order = DegRevLex;
-    let base = zn_static::Zn::<7>::RING;
+    let base = zn_static::Fp::<7>::RING;
     let ring: MultivariatePolyRingImpl<_, _, _, 7> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
 
     let X0 = RingElementWrapper::new(&ring, ring.indeterminate(0));
@@ -642,7 +643,7 @@ fn test_difficult_gb() {
     let X5 = RingElementWrapper::new(&ring, ring.indeterminate(5));
     let X6 = RingElementWrapper::new(&ring, ring.indeterminate(6));
 
-    let i = |x: i64| RingElementWrapper::new(&ring, ring.from(ring.base_ring().coerce(&StaticRing::<i64>::RING, x)));
+    let i = |x: i64| RingElementWrapper::new(&ring, ring.base_ring_embedding().map(ring.base_ring().coerce(&StaticRing::<i64>::RING, x)));
 
     let basis = vec![
         i(6) + i(2) * X5.clone() + i(2) * X4.clone() + X6.clone() + i(4) * X0.clone() + i(5) * X6.clone() * X5.clone() + X6.clone() * X4.clone() + i(3) * X0.clone() * X4.clone() + i(6) * X0.clone() * X6.clone() + i(2) * X0.clone() * X3.clone() + X0.clone() * X2.clone() + i(4) * X0.clone() * X1.clone() + i(2) * X3.clone() * X4.clone() * X5.clone() + i(4) * X0.clone() * X6.clone() * X5.clone() + i(6) * X0.clone() * X2.clone() * X5.clone() + i(5) * X0.clone() * X6.clone() * X4.clone() + i(2) * X0.clone() * X3.clone() * X4.clone() + i(4) * X0.clone() * X1.clone() * X4.clone() + X0.clone() * X6.clone().pow(2) + i(3) * X0.clone() * X3.clone() * X6.clone() + i(5) * X0.clone() * X2.clone() * X6.clone() + i(2) * X0.clone() * X1.clone() * X6.clone() + X0.clone() * X3.clone().pow(2) + i(2) * X0.clone() * X2.clone() * X3.clone() + i(3) * X0.clone() * X3.clone() * X4.clone() * X5.clone() + i(4) * X0.clone() * X3.clone() * X6.clone() * X5.clone() + i(3) * X0.clone() * X1.clone() * X6.clone() * X5.clone() + i(3) * X0.clone() * X2.clone() * X3.clone() * X5.clone() + i(3) * X0.clone() * X3.clone() * X6.clone() * X4.clone() + i(2) * X0.clone() * X1.clone() * X6.clone() * X4.clone() + i(2) * X0.clone() * X3.clone().pow(2) * X4.clone() + i(2) * X0.clone() * X2.clone() * X3.clone() * X4.clone() + i(3) * X0.clone() * X3.clone().pow(2) * X4.clone() * X5.clone() + i(4) * X0.clone() * X1.clone() * X3.clone() * X4.clone() * X5.clone() + X0.clone() * X3.clone().pow(2) * X4.clone().pow(2),

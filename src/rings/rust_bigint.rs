@@ -4,6 +4,7 @@ use crate::integer::*;
 use crate::ordered::*;
 use crate::primitive_int::StaticRingBase;
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::algorithms;
 use crate::primitive_int::*;
 use std::cmp::Ordering::*;
@@ -415,9 +416,9 @@ fn test_print_power_2() {
 
 #[test]
 fn test_from() {
-    assert!(ZZ.eq_el(&RustBigint(false, vec![]), &ZZ.from_int(0)));
-    assert!(ZZ.eq_el(&RustBigint(false, vec![2138479]), &ZZ.from_int(2138479)));
-    assert!(ZZ.eq_el(&RustBigint(true, vec![2138479]), &ZZ.from_int(-2138479)));
+    assert!(ZZ.eq_el(&RustBigint(false, vec![]), &ZZ.int_hom().map(0)));
+    assert!(ZZ.eq_el(&RustBigint(false, vec![2138479]), &ZZ.int_hom().map(2138479)));
+    assert!(ZZ.eq_el(&RustBigint(true, vec![2138479]), &ZZ.int_hom().map(-2138479)));
     // assert!(ZZ.eq(&DefaultBigInt(false, vec![0x38691a350bf12fca, 0x1]), &ZZ.from_z_gen(0x138691a350bf12fca, &i128::RING)));
 }
 
@@ -540,11 +541,11 @@ fn test_is_zero() {
 
 #[test]
 fn test_cmp() {
-    assert_eq!(true, ZZ.is_lt(&ZZ.from_int(-1), &ZZ.from_int(2)));
-    assert_eq!(true, ZZ.is_lt(&ZZ.from_int(1), &ZZ.from_int(2)));
-    assert_eq!(false, ZZ.is_lt(&ZZ.from_int(2), &ZZ.from_int(2)));
-    assert_eq!(false, ZZ.is_lt(&ZZ.from_int(3), &ZZ.from_int(2)));
-    assert_eq!(true, ZZ.is_gt(&ZZ.from_int(-1), &ZZ.from_int(-2)));
+    assert_eq!(true, ZZ.is_lt(&ZZ.int_hom().map(-1), &ZZ.int_hom().map(2)));
+    assert_eq!(true, ZZ.is_lt(&ZZ.int_hom().map(1), &ZZ.int_hom().map(2)));
+    assert_eq!(false, ZZ.is_lt(&ZZ.int_hom().map(2), &ZZ.int_hom().map(2)));
+    assert_eq!(false, ZZ.is_lt(&ZZ.int_hom().map(3), &ZZ.int_hom().map(2)));
+    assert_eq!(true, ZZ.is_gt(&ZZ.int_hom().map(-1), &ZZ.int_hom().map(-2)));
 }
 
 #[test]

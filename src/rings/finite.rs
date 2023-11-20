@@ -1,4 +1,6 @@
-use crate::{ring::*, integer::{IntegerRingStore, IntegerRing}};
+use crate::ring::*;
+use crate::integer::{IntegerRingStore, IntegerRing};
+use crate::homomorphism::*;
 
 pub trait FiniteRing: SelfIso {
 

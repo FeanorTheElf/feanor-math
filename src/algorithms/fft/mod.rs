@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::vector::*;
 use crate::mempool::*;
 use crate::default_memory_provider;

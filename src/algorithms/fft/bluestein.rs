@@ -10,6 +10,7 @@ use crate::mempool::MemoryProvider;
 use crate::default_memory_provider;
 use crate::primitive_int::*;
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::algorithms;
 use crate::rings::zn::*;use crate::rings::float_complex::*;
 use crate::vector::VectorViewMut;
@@ -177,7 +178,7 @@ impl<R> FFTTableBluestein<R>
 
         if INV {
             // finally, scale by 1/n
-            let scale = ring.coerce(&base_ring, base_ring.checked_div(&base_ring.one(), &base_ring.from_int(self.n as i32)).unwrap());
+            let scale = ring.coerce(&base_ring, base_ring.checked_div(&base_ring.one(), &base_ring.int_hom().map(self.n as i32)).unwrap());
             for i in 0..values.len() {
                 ring.mul_assign_ref(values.at_mut(i), &scale);
             }
@@ -284,7 +285,7 @@ use crate::rings::zn::zn_static::*;
 fn test_fft_base() {
     let ring = Zn::<241>::RING;
     // a 5-th root of unity is 91 
-    let fft = FFTTableBluestein::new(ring, ring.from_int(36), ring.from_int(111), 5, 4);
+    let fft = FFTTableBluestein::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4);
     let mut values = [1, 3, 2, 0, 7];
     let mut buffer = [0; 16];
     fft.fft_base::<_, _, _, _, false>(&mut values, ring, &mut buffer, &default_memory_provider!());
@@ -296,7 +297,7 @@ fn test_fft_base() {
 fn test_inv_fft_base() {
     let ring = Zn::<241>::RING;
     // a 5-th root of unity is 91 
-    let fft = FFTTableBluestein::new(ring, ring.from_int(36), ring.from_int(111), 5, 4);
+    let fft = FFTTableBluestein::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4);
     let values = [1, 3, 2, 0, 7];
     let mut work = values;
     let mut buffer = [0; 16];

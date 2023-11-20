@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use std::fmt::Display;
 
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::euclidean::EuclideanRing;
 use crate::divisibility::DivisibilityRing;
 use crate::ordered::OrderedRing;

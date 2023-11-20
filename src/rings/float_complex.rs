@@ -5,6 +5,7 @@ use crate::euclidean::EuclideanRing;
 use crate::field::Field;
 use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::divisibility::DivisibilityRing;
 
 #[derive(Clone, Copy, PartialEq)]
