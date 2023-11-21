@@ -135,10 +135,10 @@ pub trait MultivariatePolyRing: RingExtension {
         RingRef::new(self).from_terms(from.terms(el).map(|(c, m)| (hom.map_ref(c), self.create_monomial((0..m.len()).map(|i| m[i])))))
     }
 
-    fn evaluate<R, V>(&self, f: &Self::Element, values: V, ring: R) -> El<R>
-        where R: RingStore,
-            R::Type: CanHomFrom<<Self::BaseRing as RingStore>::Type>,
-            V: VectorView<El<R>>;
+    fn evaluate<R, V, H>(&self, f: &Self::Element, values: V, hom: &H) -> R::Element
+        where R: ?Sized + RingBase,
+            H: Homomorphism<<Self::BaseRing as RingStore>::Type, R> + Clone,
+            V: VectorView<R::Element>;
 }
 
 pub struct CoefficientHom<PFrom, PTo, H>

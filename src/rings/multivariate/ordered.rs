@@ -476,14 +476,14 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
         Monomial::new(std::array::from_fn(|_| exponents.next().unwrap()))
     }
 
-    fn evaluate<S, V>(&self, f: &Self::Element, values: V, ring: S) -> El<S>
-        where S: RingStore,
-            S::Type: CanHomFrom<<Self::BaseRing as RingStore>::Type>,
-            V: VectorView<El<S>>
+    fn evaluate<S, V, H>(&self, f: &Self::Element, values: V, hom: &H) -> S::Element
+        where S: ?Sized + RingBase,
+            H: Homomorphism<R::Type, S> + Clone,
+            V: VectorView<S::Element> 
     {
         assert_eq!(values.len(), self.indeterminate_len());
-        let new_ring: MultivariatePolyRingImpl<&S, _, _, N> = MultivariatePolyRingImpl::new(&ring, self.order.clone(), default_memory_provider!());
-        let mut result = new_ring.coerce_ref(&RingRef::new(self), f);
+        let new_ring: MultivariatePolyRingImpl<_, _, _, N> = MultivariatePolyRingImpl::new(hom.codomain(), self.order.clone(), default_memory_provider!());
+        let mut result = new_ring.lifted_hom(&RingRef::new(self), hom.clone()).map_ref(f);
         for i in 0..self.indeterminate_len() {
             result = new_ring.specialize(&result, i, &new_ring.base_ring_embedding().map_ref(values.at(i)));
         }

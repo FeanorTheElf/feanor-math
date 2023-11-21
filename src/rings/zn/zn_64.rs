@@ -320,16 +320,16 @@ impl DivisibilityRing for ZnBase {
         super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs, self.modulus())
     }
 }
-trait GenericMapInFromInt: IntegerRing + CanonicalIso<StaticRingBase<i128>> + CanonicalIso<StaticRingBase<i64>> {}
+trait ImplGenericIntHomomorphismMarker: IntegerRing + CanonicalIso<StaticRingBase<i128>> + CanonicalIso<StaticRingBase<i64>> {}
 
-impl GenericMapInFromInt for StaticRingBase<i64> {}
-impl GenericMapInFromInt for StaticRingBase<i128> {}
-impl GenericMapInFromInt for RustBigintRingBase {}
+impl ImplGenericIntHomomorphismMarker for StaticRingBase<i64> {}
+impl ImplGenericIntHomomorphismMarker for StaticRingBase<i128> {}
+impl ImplGenericIntHomomorphismMarker for RustBigintRingBase {}
 
 #[cfg(feature = "mpir")]
-impl GenericMapInFromInt for crate::rings::mpir::MPZBase {}
+impl ImplGenericIntHomomorphismMarker for crate::rings::mpir::MPZBase {}
 
-impl<I: ?Sized + GenericMapInFromInt> CanHomFrom<I> for ZnBase {
+impl<I: ?Sized + ImplGenericIntHomomorphismMarker> CanHomFrom<I> for ZnBase {
 
     type Homomorphism = super::generic_impls::IntegerToZnHom<I, StaticRingBase<i128>, Self>;
 

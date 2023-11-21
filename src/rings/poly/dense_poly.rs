@@ -230,14 +230,14 @@ impl<R, M> PartialEq for DensePolyRingBase<R, M>
     }
 }
 
-pub trait CanonicalIsoToDensePolyRing: PolyRing {}
+pub trait ImplGenericCanonicalIsoMarker: PolyRing {}
 
-impl<R> CanonicalIsoToDensePolyRing for sparse_poly::SparsePolyRingBase<R> 
+impl<R> ImplGenericCanonicalIsoMarker for sparse_poly::SparsePolyRingBase<R> 
     where R: RingStore
 {}
 
 impl<R, P, M> CanHomFrom<P> for DensePolyRingBase<R, M> 
-    where R: RingStore, R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>, P: CanonicalIsoToDensePolyRing, M: GrowableMemoryProvider<El<R>>
+    where R: RingStore, R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanonicalIsoMarker, M: GrowableMemoryProvider<El<R>>
 {
     type Homomorphism = super::generic_impls::GenericCanHomFrom<P, DensePolyRingBase<R, M>>;
 
@@ -287,7 +287,7 @@ impl<R1, M1, R2, M2> CanonicalIso<DensePolyRingBase<R1, M1>> for DensePolyRingBa
 }
 
 impl<R, P, M> CanonicalIso<P> for DensePolyRingBase<R, M> 
-    where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: CanonicalIsoToDensePolyRing, M: GrowableMemoryProvider<El<R>>
+    where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanonicalIsoMarker, M: GrowableMemoryProvider<El<R>>
 {
     type Isomorphism = super::generic_impls::GenericCanonicalIso<P, Self>;
 
