@@ -478,6 +478,14 @@ impl<R> Homomorphism<<<R::Type as RingExtension>::BaseRing as RingStore>::Type, 
     fn map_ref(&self, x: &<<<R::Type as RingExtension>::BaseRing as RingStore>::Type as RingBase>::Element) -> <R::Type as RingBase>::Element {
         self.ring.get_ring().from_ref(x)
     }
+
+    fn mul_assign_map_ref(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: &<<<R::Type as RingExtension>::BaseRing as RingStore>::Type as RingBase>::Element) {
+        self.ring.get_ring().mul_assign_base(lhs, rhs)
+    }
+
+    fn mul_assign_map(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: <<<R::Type as RingExtension>::BaseRing as RingStore>::Type as RingBase>::Element) {
+        self.mul_assign_map_ref(lhs, &rhs)
+    }
 }
 
 pub struct IntHom<R>
@@ -502,6 +510,14 @@ impl<R> Homomorphism<StaticRingBase<i32>, R::Type> for IntHom<R>
 
     fn map(&self, x: i32) -> <R::Type as RingBase>::Element {
         self.ring.get_ring().from_int(x)
+    }
+
+    fn mul_assign_map(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: i32) {
+        self.ring.get_ring().mul_assign_int(lhs, rhs)
+    }
+
+    fn mul_assign_map_ref(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: &<StaticRingBase<i32> as RingBase>::Element) {
+        self.mul_assign_map(lhs, *rhs)
     }
 }
 
@@ -560,5 +576,15 @@ impl<'a, S, R, H> Homomorphism<S, R> for &'a H
         (*self).map(x)
     }
 
-    
+    fn map_ref(&self, x: &<S as RingBase>::Element) -> <R as RingBase>::Element {
+        (*self).map_ref(x)
+    }
+
+    fn mul_assign_map(&self, lhs: &mut <R as RingBase>::Element, rhs: <S as RingBase>::Element) {
+        (*self).mul_assign_map(lhs, rhs)
+    }
+
+    fn mul_assign_map_ref(&self, lhs: &mut <R as RingBase>::Element, rhs: &<S as RingBase>::Element) {
+        (*self).mul_assign_map_ref(lhs, rhs)
+    }
 }

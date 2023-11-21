@@ -708,12 +708,12 @@ pub trait RingExtensionStore: RingStore
         self.get_ring().base_ring()
     }
 
-    fn into_base_ring_embedding(self) -> Inclusion<Self> {
+    fn into_inclusion(self) -> Inclusion<Self> {
         Inclusion::new(self)
     }
 
-    fn base_ring_embedding<'a>(&'a self) -> Inclusion<&'a Self> {
-        self.into_base_ring_embedding()
+    fn inclusion<'a>(&'a self) -> Inclusion<&'a Self> {
+        self.into_inclusion()
     }
 }
 

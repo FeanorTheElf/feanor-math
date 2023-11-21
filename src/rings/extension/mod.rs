@@ -84,7 +84,7 @@ pub fn generic_test_free_algebra_axioms<R: FreeAlgebraStore>(ring: R)
     
     let xn_original = ring.pow(ring.clone_el(&x), n);
     let xn_vec = ring.wrt_canonical_basis(&xn_original);
-    let xn = ring.sum(Iterator::map(0..n, |i| ring.mul(ring.base_ring_embedding().map(xn_vec.at(i)), ring.pow(ring.clone_el(&x), i))));
+    let xn = ring.sum(Iterator::map(0..n, |i| ring.mul(ring.inclusion().map(xn_vec.at(i)), ring.pow(ring.clone_el(&x), i))));
     assert_el_eq!(&ring, &xn_original, &xn);
 
     let x_n_1_vec_expected = (0..n).into_fn().map(|i| if i > 0 {

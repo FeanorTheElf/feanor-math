@@ -485,7 +485,7 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
         let new_ring: MultivariatePolyRingImpl<_, _, _, N> = MultivariatePolyRingImpl::new(hom.codomain(), self.order.clone(), default_memory_provider!());
         let mut result = new_ring.lifted_hom(&RingRef::new(self), hom).map_ref(f);
         for i in 0..self.indeterminate_len() {
-            result = new_ring.specialize(&result, i, &new_ring.base_ring_embedding().map_ref(values.at(i)));
+            result = new_ring.specialize(&result, i, &new_ring.inclusion().map_ref(values.at(i)));
         }
         debug_assert!(result.len() == 1);
         debug_assert!(result[0].1.deg() == 0);
