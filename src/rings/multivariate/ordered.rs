@@ -506,7 +506,7 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
                 (self.base_ring().zero(), Monomial::new([0; N]))
             }));
         }
-        to_add.sort_unstable_by(|(_, l), (_, r)| self.order.compare(l, r));
+        to_add[..filled_until].sort_unstable_by(|(_, l), (_, r)| self.order.compare(l, r));
         *lhs = self.add_invalid(std::mem::replace(lhs, self.zero()), &to_add[..filled_until]);
     }
 }
