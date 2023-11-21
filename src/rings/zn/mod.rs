@@ -40,7 +40,7 @@ pub mod zn_rns;
 ///
 /// Trait for all rings that represent a quotient of the integers `Z/nZ` for some integer `n`.
 /// 
-pub trait ZnRing: DivisibilityRing + FiniteRing + CanHomFrom<Self::IntegerRingBase> + SelfIso {
+pub trait ZnRing: DivisibilityRing + FiniteRing + CanonicalHom<Self::IntegerRingBase> + SelfIso {
 
     /// 
     /// there seems to be a problem with associated type bounds, hence we cannot use `Integers: IntegerRingStore`
@@ -98,13 +98,13 @@ pub mod generic_impls {
     use crate::homomorphism::*;
 
     #[allow(type_alias_bounds)]
-    pub type Homomorphism<R: ZnRing, S: ZnRing> = (<S as CanHomFrom<S::IntegerRingBase>>::Homomorphism, <S::IntegerRingBase as CanHomFrom<R::IntegerRingBase>>::Homomorphism);
+    pub type Homomorphism<R: ZnRing, S: ZnRing> = (<S as CanonicalHom<S::IntegerRingBase>>::Homomorphism, <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::Homomorphism);
 
     pub fn has_canonical_hom<R: ZnRing, S: ZnRing>(from: &R, to: &S) -> Option<Homomorphism<R, S>> 
-        where S::IntegerRingBase: CanHomFrom<R::IntegerRingBase>
+        where S::IntegerRingBase: CanonicalHom<R::IntegerRingBase>
     {
-        let hom = <S::IntegerRingBase as CanHomFrom<R::IntegerRingBase>>::has_canonical_hom(to.integer_ring().get_ring(), from.integer_ring().get_ring())?;
-        if to.integer_ring().checked_div(&<S::IntegerRingBase as CanHomFrom<R::IntegerRingBase>>::map_in_ref(&to.integer_ring().get_ring(), from.integer_ring().get_ring(), from.modulus(), &hom), &to.modulus()).is_some() {
+        let hom = <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::has_canonical_hom(to.integer_ring().get_ring(), from.integer_ring().get_ring())?;
+        if to.integer_ring().checked_div(&<S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::map_in_ref(&to.integer_ring().get_ring(), from.integer_ring().get_ring(), from.modulus(), &hom), &to.modulus()).is_some() {
             Some((to.has_canonical_hom(to.integer_ring().get_ring()).unwrap(), hom))
         } else {
             None
@@ -112,9 +112,9 @@ pub mod generic_impls {
     }
 
     pub fn map_in<R: ZnRing, S: ZnRing>(from: &R, to: &S, el: R::Element, hom: &Homomorphism<R, S>) -> S::Element 
-        where S::IntegerRingBase: CanHomFrom<R::IntegerRingBase>
+        where S::IntegerRingBase: CanonicalHom<R::IntegerRingBase>
     {
-        to.map_in(to.integer_ring().get_ring(), <S::IntegerRingBase as CanHomFrom<R::IntegerRingBase>>::map_in(to.integer_ring().get_ring(), from.integer_ring().get_ring(), from.smallest_positive_lift(el), &hom.1), &hom.0)
+        to.map_in(to.integer_ring().get_ring(), <S::IntegerRingBase as CanonicalHom<R::IntegerRingBase>>::map_in(to.integer_ring().get_ring(), from.integer_ring().get_ring(), from.smallest_positive_lift(el), &hom.1), &hom.0)
     }
 
     pub struct IntegerToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
@@ -124,7 +124,7 @@ pub mod generic_impls {
         highbit_bound: usize,
         int_ring: PhantomData<I>,
         to_large_int_ring: PhantomData<J>,
-        hom: <I as CanHomFrom<R::IntegerRingBase>>::Homomorphism,
+        hom: <I as CanonicalHom<R::IntegerRingBase>>::Homomorphism,
         iso: <I as CanonicalIso<R::IntegerRingBase>>::Isomorphism,
         iso2: <I as CanonicalIso<J>>::Isomorphism
     }
@@ -401,7 +401,7 @@ pub mod generic_tests {
     }
 
     pub fn test_map_in_large_int<R: ZnRingStore>(R: R)
-        where <R as RingStore>::Type: ZnRing + CanHomFrom<BigIntRingBase>
+        where <R as RingStore>::Type: ZnRing + CanonicalHom<BigIntRingBase>
     {
         let ZZ_big = BigIntRing::RING;
         let n = ZZ_big.power_of_two(1000);

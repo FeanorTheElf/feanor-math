@@ -39,7 +39,7 @@ impl PrimitiveInt for i128 {
     fn bits() -> usize { Self::BITS as usize }
 }
 
-impl<I: ?Sized + IntegerRing, S: PrimitiveInt> CanHomFrom<I> for StaticRingBase<S> {
+impl<I: ?Sized + IntegerRing, S: PrimitiveInt> CanonicalHom<I> for StaticRingBase<S> {
 
     type Homomorphism = ();
 
@@ -68,7 +68,7 @@ impl<I: ?Sized + IntegerRing, S: PrimitiveInt> CanonicalIso<I> for StaticRingBas
 macro_rules! specialize_map_from_primitive_int {
     ($($int:ty),*) => {
         $(            
-            impl<S: PrimitiveInt> CanHomFrom<StaticRingBase<$int>> for StaticRingBase<S> {
+            impl<S: PrimitiveInt> CanonicalHom<StaticRingBase<$int>> for StaticRingBase<S> {
 
                 fn has_canonical_hom(&self, _: &StaticRingBase<$int>) -> Option<()> {
                     Some(())
@@ -96,7 +96,7 @@ macro_rules! specialize_map_from_primitive_int {
 
 specialize_map_from_primitive_int!{i8, i16, i32, i64, i128}
 
-impl<T: PrimitiveInt> CanHomFrom<RustBigintRingBase> for StaticRingBase<T> {
+impl<T: PrimitiveInt> CanonicalHom<RustBigintRingBase> for StaticRingBase<T> {
 
     fn has_canonical_hom(&self, _: &RustBigintRingBase) -> Option<()> {
         Some(())
@@ -119,7 +119,7 @@ impl<T: PrimitiveInt> CanonicalIso<RustBigintRingBase> for StaticRingBase<T> {
 }
 
 #[cfg(feature = "mpir")]
-impl<T: PrimitiveInt> CanHomFrom<crate::rings::mpir::MPZBase> for StaticRingBase<T> {
+impl<T: PrimitiveInt> CanonicalHom<crate::rings::mpir::MPZBase> for StaticRingBase<T> {
 
     fn has_canonical_hom(&self, _: &crate::rings::mpir::MPZBase) -> Option<()> {
         Some(())

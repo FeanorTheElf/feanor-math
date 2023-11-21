@@ -319,7 +319,7 @@ impl<R: DelegateRing + ?Sized + SelfIso> FiniteRing for R
 }
 
 impl<R: DelegateRing + ?Sized> ZnRing for R
-    where R::Base: ZnRing, R: CanHomFrom<<R::Base as ZnRing>::IntegerRingBase> + SelfIso
+    where R::Base: ZnRing, R: CanonicalHom<<R::Base as ZnRing>::IntegerRingBase> + SelfIso
 {
     type IntegerRingBase = <R::Base as ZnRing>::IntegerRingBase;
     type Integers = <R::Base as ZnRing>::Integers;

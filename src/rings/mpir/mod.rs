@@ -445,7 +445,7 @@ impl HashableElRing for MPZBase {
 
 impl_eq_based_self_iso!{ MPZBase }
 
-impl CanHomFrom<RustBigintRingBase> for MPZBase {
+impl CanonicalHom<RustBigintRingBase> for MPZBase {
 
     type Homomorphism = ();
 
@@ -487,7 +487,7 @@ impl CanonicalIso<RustBigintRingBase> for MPZBase {
     }
 }
 
-impl<T: PrimitiveInt> CanHomFrom<StaticRingBase<T>> for MPZBase {
+impl<T: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for MPZBase {
 
     type Homomorphism = ();
 
@@ -513,7 +513,7 @@ impl<T: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for MPZBase {
     }
 }
 
-impl CanHomFrom<StaticRingBase<i64>> for MPZBase {
+impl CanonicalHom<StaticRingBase<i64>> for MPZBase {
 
     fn has_canonical_hom(&self, _: &StaticRingBase<i64>) -> Option<Self::Homomorphism> {
         Some(())
@@ -550,7 +550,7 @@ impl CanonicalIso<StaticRingBase<i64>> for MPZBase {
     }
 }
 
-impl CanHomFrom<StaticRingBase<i128>> for MPZBase {
+impl CanonicalHom<StaticRingBase<i128>> for MPZBase {
 
     fn has_canonical_hom(&self, _: &StaticRingBase<i128>) -> Option<Self::Homomorphism> {
         Some(())

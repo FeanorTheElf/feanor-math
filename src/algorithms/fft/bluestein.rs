@@ -107,7 +107,7 @@ impl<R> FFTTableBluestein<R>
     pub fn for_zn(ring: R, n: usize) -> Option<Self>
         where R: ZnRingStore,
             R::Type: ZnRing,
-            <R::Type as ZnRing>::IntegerRingBase: CanHomFrom<StaticRingBase<i64>>
+            <R::Type as ZnRing>::IntegerRingBase: CanonicalHom<StaticRingBase<i64>>
     {
         let ZZ = StaticRing::<i64>::RING;
         let log2_m = ZZ.abs_log2_ceil(&(2 * n as i64 + 1)).unwrap();
@@ -140,7 +140,7 @@ impl<R> FFTTableBluestein<R>
         where V: VectorViewMut<El<S>>, 
             W: VectorViewMut<El<S>>, 
             S: RingStore, 
-            S::Type: CanHomFrom<R::Type>,
+            S::Type: CanonicalHom<R::Type>,
             N: MemoryProvider<El<S>>
     {
         assert_eq!(values.len(), self.n);
@@ -225,7 +225,7 @@ impl<R> FFTTable for FFTTableBluestein<R>
 
     fn unordered_fft<V, S, N>(&self, values: V, ring: S, memory_provider: &N)
         where S: RingStore,
-            S::Type: CanHomFrom<<R as RingStore>::Type>, 
+            S::Type: CanonicalHom<<R as RingStore>::Type>, 
             V: VectorViewMut<El<S>>,
             N: MemoryProvider<El<S>>
     {
@@ -235,7 +235,7 @@ impl<R> FFTTable for FFTTableBluestein<R>
 
     fn unordered_inv_fft<V, S, N>(&self, values: V, ring: S, memory_provider: &N)
         where S: RingStore,
-            S::Type: CanHomFrom<<R as RingStore>::Type>, 
+            S::Type: CanonicalHom<<R as RingStore>::Type>, 
             V: VectorViewMut<El<S>>,
             N: MemoryProvider<El<S>>
     {
@@ -246,7 +246,7 @@ impl<R> FFTTable for FFTTableBluestein<R>
     fn fft<V, S, N>(&self, values: V, ring: S, memory_provider: &N) 
         where V: VectorViewMut<El<S>>, 
             S: RingStore, 
-            S::Type: CanHomFrom<R::Type>,
+            S::Type: CanonicalHom<R::Type>,
             N: MemoryProvider<El<S>>
     {
         self.unordered_fft(values, ring, memory_provider);
@@ -255,7 +255,7 @@ impl<R> FFTTable for FFTTableBluestein<R>
     fn inv_fft<V, S, N>(&self, values: V, ring: S, memory_provider: &N) 
         where V: VectorViewMut<El<S>>, 
             S: RingStore, 
-            S::Type: CanHomFrom<R::Type>,
+            S::Type: CanonicalHom<R::Type>,
             N: MemoryProvider<El<S>>
     {
         self.unordered_inv_fft(values, ring, memory_provider);

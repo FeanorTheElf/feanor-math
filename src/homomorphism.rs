@@ -1,38 +1,5 @@
 use crate::{ring::*, primitive_int::{StaticRingBase, StaticRing}};
 
-///
-/// Trait for objects that represent homomorphisms between rings.
-/// 
-/// Implementors of this trait have to store domain and
-/// codomain rings (in form of [`RingStore`]s). In that sense,
-/// this trait is high-level, and designed to be convenient to use.
-/// When implementing homomorphisms for rings, consider using
-/// [`CanHomFrom`] instead.
-/// 
-/// # Design overview on the homomorphism traits
-/// 
-/// This module contains the following traits and structs:
-/// [`Homomorphism`], [`CanHomFrom`], [`CanonicalIso`], [`CanHom`],
-/// [`CanIso`], [`Inclusion`], [`IntHom`].
-/// 
-/// The basic idea is again a functionality/storage separation
-/// 
-/// | Functionality    | Storage        |
-/// |------------------|----------------|
-/// | [`RingBase`]     | [`RingStore`]  |
-/// | [`Homomorphism`] | [`CanHomFrom`] |
-/// |                  | [`CanonicalIso`]   |
-/// 
-/// In particular, these are the most important differences
-///  - [`CanHomFrom`] is meant to be implemented, but usually not
-///    to be used directly
-///  - [`Homomorphism`] is meant to be used, but only implemented
-///    when introducing "new" types of homomorphisms
-///  - [`CanHom`], [`CanIso`], [`Inclusion`], [`IntHom`] are implementations
-///    of [`Homomorphism`], based on homomorphic properties given by
-///    the underlying rings (in particular, by [`CanHomFrom`], by [`RingExtension`]
-///    or by [`RingBase::from_int()`]).
-/// 
 pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized> 
     where Domain: RingBase, Codomain: RingBase
 {
@@ -121,10 +88,6 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// Trait for rings R that have a canonical homomorphism `S -> R`.
 /// A ring homomorphism is expected to be unital.
 /// 
-/// This trait is designed for implementors, if you just want to
-/// map elements between rings, consider using [`CanHom`]. For an
-/// explanation, see [`Homomorphism`].
-/// 
 /// # Exact requirements
 /// 
 /// Which homomorphisms are considered canonical is up to implementors,
@@ -141,6 +104,9 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// ```
 /// then both homomorphism chains should yield same results on same
 /// inputs.
+/// 
+/// If the canonical homomorphism might be an isomorphism, consider also
+/// implementing [`CanonicalIso`].
 /// 
 /// # Example
 /// 
@@ -170,8 +136,8 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// ring R. In applicable cases, consider also implementing [`RingExtension`].
 /// 
 /// Because of this reason, implementing [`RingExtension`] also does not require
-/// an implementation of `CanHomFrom<Self::BaseRing>`. Hence, if you as a user
-/// miss a certain implementation of `CanHomFrom`, check whether there maybe
+/// an implementation of `CanonicalHom<Self::BaseRing>`. Hence, if you as a user
+/// miss a certain implementation of `CanonicalHom`, check whether there maybe
 /// is a corresponding implementation of [`RingExtension`], or a member function.
 /// 
 /// # More examples
@@ -307,7 +273,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// Unfortunately, the inclusions `R -> R[X]` are not implemented as canonical homomorphisms,
 /// however provided by the functions of [`RingExtension`].
 /// 
-pub trait CanHomFrom<S>: RingBase
+pub trait CanonicalHom<S>: RingBase
     where S: RingBase + ?Sized
 {
     type Homomorphism;
@@ -332,15 +298,9 @@ pub trait CanHomFrom<S>: RingBase
 /// Trait for rings R that have a canonical isomorphism `S -> R`.
 /// A ring homomorphism is expected to be unital.
 /// 
-/// This is deprecated, as I am currently evaluating whether it
-/// is really needed or I can completely remove it, and just keep
-/// [`CanHomFrom`]. Alternatively, I might change the contract to
-/// `CanHomTo`, i.e. just allow for homomorphisms into the other
-/// direction.
-/// 
 /// # Exact requirements
 /// 
-/// Same as for [`CanHomFrom`], it is up to implementors to decide which
+/// Same as for [`CanonicalHom`], it is up to implementors to decide which
 /// isomorphisms are canonical, as long as each diagram that contains
 /// only canonical homomorphisms, canonical isomorphisms and their inverses
 /// commutes.
@@ -360,10 +320,9 @@ pub trait CanHomFrom<S>: RingBase
 ///  for any implementation `R: CanonicalIso<S>` there is also an
 /// implementation `S: CanonicalIso<R>`. However, because of the trait
 /// impl constraints of Rust, this is unpracticable and so we only
-/// require the implementation `R: CanHomFrom<S>`.
+/// require the implementation `R: CanonicalHom<S>`.
 /// 
-#[deprecated]
-pub trait CanonicalIso<S>: CanHomFrom<S>
+pub trait CanonicalIso<S>: CanonicalHom<S>
     where S: RingBase + ?Sized
 {
     type Isomorphism;
@@ -376,13 +335,12 @@ pub trait CanonicalIso<S>: CanHomFrom<S>
 /// Basically an alias for `CanonicalIso<Self>`, but implemented as new
 /// trait since trait aliases are not available.
 /// 
-#[deprecated]
 pub trait SelfIso: CanonicalIso<Self> {}
 
 impl<R: ?Sized + CanonicalIso<R>> SelfIso for R {}
 
 ///
-/// A high-level wrapper of [`CanHomFrom::Homomorphism`] that references the
+/// A high-level wrapper of [`CanonicalHom::Homomorphism`] that references the
 /// domain and codomain rings, and is much easier to use.
 /// 
 /// # Example
@@ -402,20 +360,20 @@ impl<R: ?Sized + CanonicalIso<R>> SelfIso for R {}
 /// ```
 /// 
 /// # See also
-/// The "bi-directional" variant [`CanHom`], the basic interfaces [`CanHomFrom`] and
+/// The "bi-directional" variant [`CanHom`], the basic interfaces [`CanonicalHom`] and
 /// [`CanonicalIso`] and the very simplified functions [`RingStore::coerce`], [`RingStore::coerce_ref`]
 /// and [`RingStore::cast`].
 /// 
 pub struct CanHom<R, S>
-    where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
+    where R: RingStore, S: RingStore, S::Type: CanonicalHom<R::Type>
 {
     from: R,
     to: S,
-    data: <S::Type as CanHomFrom<R::Type>>::Homomorphism
+    data: <S::Type as CanonicalHom<R::Type>>::Homomorphism
 }
 
 impl<R, S> CanHom<R, S>
-    where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
+    where R: RingStore, S: RingStore, S::Type: CanonicalHom<R::Type>
 {
     pub fn new(from: R, to: S) -> Result<Self, (R, S)> {
         match to.get_ring().has_canonical_hom(from.get_ring()) {
@@ -424,13 +382,13 @@ impl<R, S> CanHom<R, S>
         }
     }
 
-    pub fn raw_hom(&self) -> &<S::Type as CanHomFrom<R::Type>>::Homomorphism {
+    pub fn raw_hom(&self) -> &<S::Type as CanonicalHom<R::Type>>::Homomorphism {
         &self.data
     }
 }
 
 impl<R, S> Homomorphism<R::Type, S::Type> for CanHom<R, S>
-    where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
+    where R: RingStore, S: RingStore, S::Type: CanonicalHom<R::Type>
 {
     type CodomainStore = S;
     type DomainStore = R;
@@ -472,11 +430,10 @@ impl<R, S> Homomorphism<R::Type, S::Type> for CanHom<R, S>
 /// ```
 /// 
 /// # See also
-/// The "one-directional" variant [`CanHom`], the basic interfaces [`CanHomFrom`] and
+/// The "one-directional" variant [`CanHom`], the basic interfaces [`CanonicalHom`] and
 /// [`CanonicalIso`] and the very simplified functions [`RingStore::coerce`], [`RingStore::coerce_ref`]
 /// and [`RingStore::cast`].
 /// 
-#[deprecated]
 pub struct CanIso<R, S>
     where R: RingStore, S: RingStore, S::Type: CanonicalIso<R::Type>
 {

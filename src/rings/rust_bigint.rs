@@ -207,7 +207,7 @@ impl RingBase for RustBigintRingBase {
 
 }
 
-impl CanHomFrom<RustBigintRingBase> for RustBigintRingBase {
+impl CanonicalHom<RustBigintRingBase> for RustBigintRingBase {
     
     type Homomorphism = ();
     
@@ -226,7 +226,7 @@ impl CanonicalIso<RustBigintRingBase> for RustBigintRingBase {
 }
 
 #[cfg(feature = "mpir")]
-impl CanHomFrom<crate::rings::mpir::MPZBase> for RustBigintRingBase {
+impl CanonicalHom<crate::rings::mpir::MPZBase> for RustBigintRingBase {
 
     type Homomorphism = ();
 
@@ -299,7 +299,7 @@ impl EuclideanRing for RustBigintRingBase {
     }
 }
 
-impl<T: PrimitiveInt> CanHomFrom<StaticRingBase<T>> for RustBigintRingBase {
+impl<T: PrimitiveInt> CanonicalHom<StaticRingBase<T>> for RustBigintRingBase {
     
     type Homomorphism = ();
 

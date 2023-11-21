@@ -19,7 +19,7 @@ pub mod complex_fft;
 /// implementing this trait.
 /// 
 /// The trait is very generic, and its functions can be called on any
-/// [`VectorView`] of elements of any ring `R` with `R: CanHomFrom<Base<Self::Ring>>`.
+/// [`VectorView`] of elements of any ring `R` with `R: CanonicalHom<Base<Self::Ring>>`.
 /// Of course, the roots of unity of the stored ring must map to corresponding roots
 /// of unity in `R` via the canonical homomorphism.
 /// 
@@ -86,7 +86,7 @@ pub trait FFTTable {
     ///
     fn fft<V, S, M>(&self, mut values: V, ring: S, memory_provider: &M)
         where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
             V: SwappableVectorViewMut<El<S>>,
             M: MemoryProvider<El<S>>
     {
@@ -109,7 +109,7 @@ pub trait FFTTable {
     ///
     fn inv_fft<V, S, M>(&self, mut values: V, ring: S, memory_provider: &M)
         where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
             V: SwappableVectorViewMut<El<S>>,
             M: MemoryProvider<El<S>>
     {
@@ -133,7 +133,7 @@ pub trait FFTTable {
     /// 
     fn unordered_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
         where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
             V: VectorViewMut<El<S>>,
             M: MemoryProvider<El<S>>;
     
@@ -142,7 +142,7 @@ pub trait FFTTable {
     /// 
     fn unordered_inv_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
         where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
             V: VectorViewMut<El<S>>,
             M: MemoryProvider<El<S>>;
 }
@@ -174,7 +174,7 @@ impl<T> FFTTable for T
 
     fn fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
         where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
             V: SwappableVectorViewMut<El<S>>,
             M: MemoryProvider<El<S>>
     {
@@ -183,7 +183,7 @@ impl<T> FFTTable for T
         
     fn inv_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
         where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
             V: SwappableVectorViewMut<El<S>>,
             M: MemoryProvider<El<S>>
     {
@@ -192,7 +192,7 @@ impl<T> FFTTable for T
 
     fn unordered_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
         where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
             V: VectorViewMut<El<S>>,
             M: MemoryProvider<El<S>>
     {
@@ -201,7 +201,7 @@ impl<T> FFTTable for T
         
     fn unordered_inv_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
         where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
+            S::Type: CanonicalHom<<Self::Ring as RingStore>::Type>, 
             V: VectorViewMut<El<S>>,
             M: MemoryProvider<El<S>>
     {
