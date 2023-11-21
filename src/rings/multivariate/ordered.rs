@@ -619,4 +619,8 @@ fn test_add_assign_from_terms() {
     let lhs = ring.from_terms([(1, Monomial::new([0, 0, 0]))].into_iter().filter(|_| std::hint::black_box(true)));
 
     assert_el_eq!(&ring, &ring.one(), &lhs);
+
+    let value = ring.from_terms((0..100).map(|i| (1, Monomial::new([i, 0, 0]))).chain((0..100).map(|i| (0, Monomial::new([0, i, 0])))).filter(|_| true));
+
+    assert_eq!(100, ring.terms(&value).count());
 }
