@@ -7,6 +7,7 @@ use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::primitive_int::StaticRingBase;
 use crate::ring::*;
+use crate::homomorphism::*;
 use crate::integer::*;
 use crate::rings::rust_bigint::*;
 use crate::primitive_int::PrimitiveInt;
@@ -597,13 +598,13 @@ use crate::euclidean::EuclideanRingStore;
 #[cfg(test)]
 fn edge_case_elements_bigint() -> impl Iterator<Item = RustBigint> {
     [
-        RustBigintRing::RING.from_int(0),
-        RustBigintRing::RING.from_int(1),
-        RustBigintRing::RING.from_int(-1),
-        RustBigintRing::RING.from_int(7),
-        RustBigintRing::RING.from_int(-7),
-        RustBigintRing::RING.from_int(i32::MAX),
-        RustBigintRing::RING.from_int(i32::MIN),
+        RustBigintRing::RING.int_hom().map(0),
+        RustBigintRing::RING.int_hom().map(1),
+        RustBigintRing::RING.int_hom().map(-1),
+        RustBigintRing::RING.int_hom().map(7),
+        RustBigintRing::RING.int_hom().map(-7),
+        RustBigintRing::RING.int_hom().map(i32::MAX),
+        RustBigintRing::RING.int_hom().map(i32::MIN),
         RustBigintRing::RING.power_of_two(64),
         RustBigintRing::RING.negate(RustBigintRing::RING.power_of_two(64)),
         RustBigintRing::RING.sub(RustBigintRing::RING.power_of_two(64), RustBigintRing::RING.one()),
@@ -690,18 +691,18 @@ fn test_canonical_iso_axioms_bigint() {
 
 #[test]
 fn test_abs_is_bit_set() {
-    let a = MPZ::RING.from_int(1 << 15);
+    let a = MPZ::RING.int_hom().map(1 << 15);
     assert_eq!(true, MPZ::RING.abs_is_bit_set(&a, 15));
     assert_eq!(false, MPZ::RING.abs_is_bit_set(&a, 16));
     assert_eq!(false, MPZ::RING.abs_is_bit_set(&a, 14));
 
-    let a = MPZ::RING.from_int(-7);
+    let a = MPZ::RING.int_hom().map(-7);
     assert_eq!(true, MPZ::RING.abs_is_bit_set(&a, 0));
     assert_eq!(true, MPZ::RING.abs_is_bit_set(&a, 1));
     assert_eq!(true, MPZ::RING.abs_is_bit_set(&a, 2));
     assert_eq!(false, MPZ::RING.abs_is_bit_set(&a, 3));
 
-    let a = MPZ::RING.from_int(-1 << 15);
+    let a = MPZ::RING.int_hom().map(-1 << 15);
     assert_eq!(true, MPZ::RING.abs_is_bit_set(&a, 15));
     assert_eq!(false, MPZ::RING.abs_is_bit_set(&a, 16));
     assert_eq!(false, MPZ::RING.abs_is_bit_set(&a, 14));
@@ -709,28 +710,28 @@ fn test_abs_is_bit_set() {
 
 #[test]
 fn test_highest_set_bit() {
-    assert_eq!(None, MPZ::RING.abs_highest_set_bit(&MPZ::RING.from_int(0)));
-    assert_eq!(Some(0), MPZ::RING.abs_highest_set_bit(&MPZ::RING.from_int(1)));
-    assert_eq!(Some(0), MPZ::RING.abs_highest_set_bit(&MPZ::RING.from_int(-1)));
-    assert_eq!(Some(1), MPZ::RING.abs_highest_set_bit(&MPZ::RING.from_int(2)));
-    assert_eq!(Some(1), MPZ::RING.abs_highest_set_bit(&MPZ::RING.from_int(-2)));
-    assert_eq!(Some(1), MPZ::RING.abs_highest_set_bit(&MPZ::RING.from_int(3)));
-    assert_eq!(Some(1), MPZ::RING.abs_highest_set_bit(&MPZ::RING.from_int(-3)));
-    assert_eq!(Some(2), MPZ::RING.abs_highest_set_bit(&MPZ::RING.from_int(4)));
-    assert_eq!(Some(2), MPZ::RING.abs_highest_set_bit(&MPZ::RING.from_int(-4)));
+    assert_eq!(None, MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(0)));
+    assert_eq!(Some(0), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(1)));
+    assert_eq!(Some(0), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(-1)));
+    assert_eq!(Some(1), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(2)));
+    assert_eq!(Some(1), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(-2)));
+    assert_eq!(Some(1), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(3)));
+    assert_eq!(Some(1), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(-3)));
+    assert_eq!(Some(2), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(4)));
+    assert_eq!(Some(2), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(-4)));
 }
 
 #[test]
 fn test_lowest_set_bit() {
-    assert_eq!(None, MPZ::RING.abs_highest_set_bit(&MPZ::RING.from_int(0)));
-    assert_eq!(Some(0), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.from_int(1)));
-    assert_eq!(Some(0), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.from_int(-1)));
-    assert_eq!(Some(1), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.from_int(2)));
-    assert_eq!(Some(1), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.from_int(-2)));
-    assert_eq!(Some(0), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.from_int(3)));
-    assert_eq!(Some(0), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.from_int(-3)));
-    assert_eq!(Some(2), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.from_int(4)));
-    assert_eq!(Some(2), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.from_int(-4)));
+    assert_eq!(None, MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(0)));
+    assert_eq!(Some(0), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(1)));
+    assert_eq!(Some(0), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(-1)));
+    assert_eq!(Some(1), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(2)));
+    assert_eq!(Some(1), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(-2)));
+    assert_eq!(Some(0), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(3)));
+    assert_eq!(Some(0), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(-3)));
+    assert_eq!(Some(2), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(4)));
+    assert_eq!(Some(2), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(-4)));
 }
 
 #[bench]
