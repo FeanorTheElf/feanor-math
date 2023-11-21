@@ -2,7 +2,6 @@
 #![allow(non_snake_case)]
 #![feature(test)]
 #![feature(min_specialization)]
-// #![feature(generic_const_exprs)]
 #![feature(maybe_uninit_slice)]
 #![feature(allocator_api)]
 #![feature(new_uninit)] 
@@ -41,7 +40,7 @@ pub mod mempool;
 #[macro_use]
 ///
 /// This module contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`],
-/// as well as [`ring::CanonicalHom`] and [`ring::CanonicalIso`].
+/// as well as [`ring::CanHomFrom`] and [`ring::CanonicalIso`].
 /// 
 pub mod ring;
 ///

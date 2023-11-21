@@ -15,14 +15,6 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
         self.map(self.domain().clone_el(x))
     }
 
-    fn add_assign_map(&self, lhs: &mut Codomain::Element, rhs: Domain::Element) {
-        self.codomain().add_assign(lhs, self.map(rhs))
-    }
-
-    fn add_assign_map_ref(&self, lhs: &mut Codomain::Element, rhs: &Domain::Element) {
-        self.codomain().add_assign(lhs, self.map_ref(rhs))
-    }
-
     fn mul_assign_map(&self, lhs: &mut Codomain::Element, rhs: Domain::Element) {
         self.codomain().mul_assign(lhs, self.map(rhs))
     }
@@ -31,56 +23,22 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
         self.codomain().mul_assign(lhs, self.map_ref(rhs))
     }
 
-    fn sub_assign_map(&self, lhs: &mut Codomain::Element, rhs: Domain::Element) {
-        self.codomain().sub_assign(lhs, self.map(rhs))
-    }
-
-    fn sub_assign_map_ref(&self, lhs: &mut Codomain::Element, rhs: &Domain::Element) {
-        self.codomain().sub_assign(lhs, self.map_ref(rhs))
-    }
-
-    fn sub_self_assign_map(&self, lhs: &mut Codomain::Element, rhs: Domain::Element) {
-        self.codomain().sub_self_assign(lhs, self.map(rhs))
-    }
-
-    fn sub_self_assign_map_ref(&self, lhs: &mut Codomain::Element, rhs: &Domain::Element) {
-        self.codomain().sub_self_assign(lhs, self.map_ref(rhs))
-    }
-
-    fn add_map(&self, mut lhs: Codomain::Element, rhs: Domain::Element) -> Codomain::Element {
-        self.add_assign_map(&mut lhs, rhs);
-        lhs
-    }
-
     fn mul_map(&self, mut lhs: Codomain::Element, rhs: Domain::Element) -> Codomain::Element {
         self.mul_assign_map(&mut lhs, rhs);
         lhs
     }
 
-    fn sub_map(&self, mut lhs: Codomain::Element, rhs: Domain::Element) -> Codomain::Element {
-        self.sub_assign_map(&mut lhs, rhs);
-        lhs
-    }
-
-    fn sub_self_map(&self, mut lhs: Codomain::Element, rhs: Domain::Element) -> Codomain::Element {
-        self.sub_self_assign_map(&mut lhs, rhs);
-        lhs
-    }
-
-    fn add_ref_map(&self, lhs: &Codomain::Element, rhs: Domain::Element) -> Codomain::Element {
-        self.add_map(self.codomain().clone_el(lhs), rhs)
-    }
-
-    fn mul_ref_map(&self, lhs: &Codomain::Element, rhs: Domain::Element) -> Codomain::Element {
+    fn mul_ref_fst_map(&self, lhs: &Codomain::Element, rhs: Domain::Element) -> Codomain::Element {
         self.mul_map(self.codomain().clone_el(lhs), rhs)
     }
 
-    fn sub_ref_map(&self, lhs: &Codomain::Element, rhs: Domain::Element) -> Codomain::Element {
-        self.sub_map(self.codomain().clone_el(lhs), rhs)
+    fn mul_ref_snd_map(&self, mut lhs: Codomain::Element, rhs: &Domain::Element) -> Codomain::Element {
+        self.mul_assign_map_ref(&mut lhs, rhs);
+        lhs
     }
 
-    fn sub_self_ref_map(&self, lhs: &Codomain::Element, rhs: Domain::Element) -> Codomain::Element {
-        self.sub_self_map(self.codomain().clone_el(lhs), rhs)
+    fn mul_ref_map(&self, lhs: &Codomain::Element, rhs: &Domain::Element) -> Codomain::Element {
+        self.mul_ref_snd_map(self.codomain().clone_el(lhs), rhs)
     }
 }
 
@@ -136,8 +94,8 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// ring R. In applicable cases, consider also implementing [`RingExtension`].
 /// 
 /// Because of this reason, implementing [`RingExtension`] also does not require
-/// an implementation of `CanonicalHom<Self::BaseRing>`. Hence, if you as a user
-/// miss a certain implementation of `CanonicalHom`, check whether there maybe
+/// an implementation of `CanHomFrom<Self::BaseRing>`. Hence, if you as a user
+/// miss a certain implementation of `CanHomFrom`, check whether there maybe
 /// is a corresponding implementation of [`RingExtension`], or a member function.
 /// 
 /// # More examples
@@ -273,7 +231,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// Unfortunately, the inclusions `R -> R[X]` are not implemented as canonical homomorphisms,
 /// however provided by the functions of [`RingExtension`].
 /// 
-pub trait CanonicalHom<S>: RingBase
+pub trait CanHomFrom<S>: RingBase
     where S: RingBase + ?Sized
 {
     type Homomorphism;
@@ -300,7 +258,7 @@ pub trait CanonicalHom<S>: RingBase
 /// 
 /// # Exact requirements
 /// 
-/// Same as for [`CanonicalHom`], it is up to implementors to decide which
+/// Same as for [`CanHomFrom`], it is up to implementors to decide which
 /// isomorphisms are canonical, as long as each diagram that contains
 /// only canonical homomorphisms, canonical isomorphisms and their inverses
 /// commutes.
@@ -320,9 +278,9 @@ pub trait CanonicalHom<S>: RingBase
 ///  for any implementation `R: CanonicalIso<S>` there is also an
 /// implementation `S: CanonicalIso<R>`. However, because of the trait
 /// impl constraints of Rust, this is unpracticable and so we only
-/// require the implementation `R: CanonicalHom<S>`.
+/// require the implementation `R: CanHomFrom<S>`.
 /// 
-pub trait CanonicalIso<S>: CanonicalHom<S>
+pub trait CanonicalIso<S>: CanHomFrom<S>
     where S: RingBase + ?Sized
 {
     type Isomorphism;
@@ -340,7 +298,7 @@ pub trait SelfIso: CanonicalIso<Self> {}
 impl<R: ?Sized + CanonicalIso<R>> SelfIso for R {}
 
 ///
-/// A high-level wrapper of [`CanonicalHom::Homomorphism`] that references the
+/// A high-level wrapper of [`CanHomFrom::Homomorphism`] that references the
 /// domain and codomain rings, and is much easier to use.
 /// 
 /// # Example
@@ -360,20 +318,20 @@ impl<R: ?Sized + CanonicalIso<R>> SelfIso for R {}
 /// ```
 /// 
 /// # See also
-/// The "bi-directional" variant [`CanHom`], the basic interfaces [`CanonicalHom`] and
+/// The "bi-directional" variant [`CanHom`], the basic interfaces [`CanHomFrom`] and
 /// [`CanonicalIso`] and the very simplified functions [`RingStore::coerce`], [`RingStore::coerce_ref`]
 /// and [`RingStore::cast`].
 /// 
 pub struct CanHom<R, S>
-    where R: RingStore, S: RingStore, S::Type: CanonicalHom<R::Type>
+    where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
 {
     from: R,
     to: S,
-    data: <S::Type as CanonicalHom<R::Type>>::Homomorphism
+    data: <S::Type as CanHomFrom<R::Type>>::Homomorphism
 }
 
 impl<R, S> CanHom<R, S>
-    where R: RingStore, S: RingStore, S::Type: CanonicalHom<R::Type>
+    where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
 {
     pub fn new(from: R, to: S) -> Result<Self, (R, S)> {
         match to.get_ring().has_canonical_hom(from.get_ring()) {
@@ -382,13 +340,13 @@ impl<R, S> CanHom<R, S>
         }
     }
 
-    pub fn raw_hom(&self) -> &<S::Type as CanonicalHom<R::Type>>::Homomorphism {
+    pub fn raw_hom(&self) -> &<S::Type as CanHomFrom<R::Type>>::Homomorphism {
         &self.data
     }
 }
 
 impl<R, S> Homomorphism<R::Type, S::Type> for CanHom<R, S>
-    where R: RingStore, S: RingStore, S::Type: CanonicalHom<R::Type>
+    where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
 {
     type CodomainStore = S;
     type DomainStore = R;
@@ -430,7 +388,7 @@ impl<R, S> Homomorphism<R::Type, S::Type> for CanHom<R, S>
 /// ```
 /// 
 /// # See also
-/// The "one-directional" variant [`CanHom`], the basic interfaces [`CanonicalHom`] and
+/// The "one-directional" variant [`CanHom`], the basic interfaces [`CanHomFrom`] and
 /// [`CanonicalIso`] and the very simplified functions [`RingStore::coerce`], [`RingStore::coerce_ref`]
 /// and [`RingStore::cast`].
 /// 
@@ -463,7 +421,6 @@ impl<R, S> CanIso<R, S>
         &self.data
     }
 }
-
 
 impl<R, S> Homomorphism<S::Type,R::Type> for CanIso<R, S>
     where R: RingStore, S: RingStore, S::Type: CanonicalIso<R::Type>

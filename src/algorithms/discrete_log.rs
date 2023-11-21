@@ -1,5 +1,4 @@
 use crate::field::Field;
-use crate::homomorphism::Homomorphism;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::algorithms;
@@ -109,6 +108,8 @@ use crate::rings::zn::zn_static::Zn;
 use crate::rings::zn::zn_42;
 #[cfg(test)]
 use crate::rings::zn::ZnRingStore;
+#[cfg(test)]
+use crate::homomorphism::Homomorphism;
 
 #[test]
 fn test_baby_giant_step() {

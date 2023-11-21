@@ -62,10 +62,10 @@ use crate::algorithms;
 ///     }
 /// }
 /// 
-/// // To use the ring through a RingStore, it is also required to implement CanonicalHom<Self>
+/// // To use the ring through a RingStore, it is also required to implement CanHomFrom<Self>
 /// // and CanonicalIso<Self>.
 /// 
-/// impl CanonicalHom<MyRingBase> for MyRingBase {
+/// impl CanHomFrom<MyRingBase> for MyRingBase {
 /// 
 ///     type Homomorphism = ();
 /// 
@@ -419,7 +419,7 @@ macro_rules! delegate {
 #[macro_export]
 macro_rules! impl_eq_based_self_iso {
     ($type:ty) => {
-        impl CanonicalHom<Self> for $type {
+        impl CanHomFrom<Self> for $type {
 
             type Homomorphism = ();
 
@@ -579,13 +579,13 @@ pub trait RingStore: Sized {
     delegate!{ fn square(&self, value: &mut El<Self>) -> () }
     
     fn coerce<S>(&self, from: &S, el: El<S>) -> El<Self>
-        where S: RingStore, Self::Type: CanonicalHom<S::Type> 
+        where S: RingStore, Self::Type: CanHomFrom<S::Type> 
     {
         self.get_ring().map_in(from.get_ring(), el, &self.get_ring().has_canonical_hom(from.get_ring()).unwrap())
     }
 
     fn coerce_ref<S>(&self, from: &S, el: &El<S>) -> El<Self>
-        where S: RingStore, Self::Type: CanonicalHom<S::Type> 
+        where S: RingStore, Self::Type: CanHomFrom<S::Type> 
     {
         self.get_ring().map_in_ref(from.get_ring(), el, &self.get_ring().has_canonical_hom(from.get_ring()).unwrap())
     }
@@ -601,7 +601,7 @@ pub trait RingStore: Sized {
     /// moving both rings into the [`CanHom`] object.
     /// 
     fn into_can_hom<S>(self, from: S) -> Result<CanHom<S, Self>, (S, Self)>
-        where Self: Sized, S: RingStore, Self::Type: CanonicalHom<S::Type>
+        where Self: Sized, S: RingStore, Self::Type: CanHomFrom<S::Type>
     {
         CanHom::new(from, self)
     }
@@ -620,7 +620,7 @@ pub trait RingStore: Sized {
     /// Returns the canonical homomorphism `from -> self`, if it exists.
     /// 
     fn can_hom<'a, S>(&'a self, from: &'a S) -> Option<CanHom<&'a S, &'a Self>>
-        where S: RingStore, Self::Type: CanonicalHom<S::Type>
+        where S: RingStore, Self::Type: CanHomFrom<S::Type>
     {
         self.into_can_hom(from).ok()
     }
@@ -734,16 +734,16 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
 /// object that represents the same ring.
 /// 
 /// Hence, this is technically just a ring `R` with an injective homomorphism
-/// `BaseRing -> R`, but unlike [`CanonicalHom`], implementors must provide
+/// `BaseRing -> R`, but unlike [`CanHomFrom`], implementors must provide
 /// a reference to `BaseRing` via [`RingExtension::base_ring()`].
 /// 
-/// # Overlap with [`CanonicalHom`]
+/// # Overlap with [`CanHomFrom`]
 /// 
-/// There is a certain amount of functionality overlap with [`CanonicalHom`], and
-/// in a perfect world, this trait would also be a subtrait of `CanonicalHom<<Self::BaseRing as RingStore>::Type>`.
-/// However, due to the issue with multiple blanket implementations for [`CanonicalHom`] (see
+/// There is a certain amount of functionality overlap with [`CanHomFrom`], and
+/// in a perfect world, this trait would also be a subtrait of `CanHomFrom<<Self::BaseRing as RingStore>::Type>`.
+/// However, due to the issue with multiple blanket implementations for [`CanHomFrom`] (see
 /// the docs), this is not the case and in fact there are ring extensions that do not implement
-/// `CanonicalHom<<Self::BaseRing as RingStore>::Type>`.
+/// `CanHomFrom<<Self::BaseRing as RingStore>::Type>`.
 /// 
 pub trait RingExtension: RingBase {
     
@@ -864,7 +864,7 @@ impl<R: RingBase + CanonicalIso<R>> RingStore for RingValue<R> {
 /// 
 /// The role of `RingRef` is much more niche than the role of [`crate::ring::RingValue`].
 /// However, it might happen that we want to implement [`crate::ring::RingBase`]-functions (or traits on the
-/// same level, e.g. [`crate::ring::CanonicalHom`], [`crate::divisibility::DivisibilityRing`]),
+/// same level, e.g. [`crate::ring::CanHomFrom`], [`crate::divisibility::DivisibilityRing`]),
 /// and use more high-level techniques for that (e.g. complex algorithms, for example [`crate::algorithms::eea`]
 /// or [`crate::algorithms::sqr_mul`]). In this case, we only have a reference to a [`crate::ring::RingBase`]
 /// object, but require a [`crate::ring::RingStore`] object to use the algorithm.
@@ -1022,7 +1022,7 @@ fn test_internal_wrappings_dont_matter() {
         }
     }
 
-    impl<R: RingStore> CanonicalHom<ABase> for BBase<R> {
+    impl<R: RingStore> CanHomFrom<ABase> for BBase<R> {
 
         type Homomorphism = ();
 
@@ -1035,8 +1035,8 @@ fn test_internal_wrappings_dont_matter() {
         }
     }
 
-    impl<R: RingStore, S: RingStore> CanonicalHom<BBase<S>> for BBase<R> 
-        where R::Type: CanonicalHom<S::Type>
+    impl<R: RingStore, S: RingStore> CanHomFrom<BBase<S>> for BBase<R> 
+        where R::Type: CanHomFrom<S::Type>
     {
         type Homomorphism = ();
 
@@ -1085,7 +1085,7 @@ pub mod generic_tests {
     use super::*;
 
     pub fn test_hom_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
-        where S::Type: CanonicalHom<R::Type>
+        where S::Type: CanHomFrom<R::Type>
     {
         let hom = to.get_ring().has_canonical_hom(from.get_ring()).unwrap();
         let elements = edge_case_elements.collect::<Vec<_>>();

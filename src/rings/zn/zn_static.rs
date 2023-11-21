@@ -75,7 +75,7 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD> {
     }
 }
 
-impl<const N: u64, const IS_FIELD: bool> CanonicalHom<StaticRingBase<i64>> for ZnBase<N, IS_FIELD> {
+impl<const N: u64, const IS_FIELD: bool> CanHomFrom<StaticRingBase<i64>> for ZnBase<N, IS_FIELD> {
     type Homomorphism = ();
 
     fn has_canonical_hom(&self, _: &StaticRingBase<i64>) -> Option<()> { Some(()) }
@@ -90,7 +90,7 @@ impl<const N: u64, const IS_FIELD: bool> CanonicalHom<StaticRingBase<i64>> for Z
     }
 }
 
-impl<const N: u64, const IS_FIELD: bool> CanonicalHom<zn_42::ZnBase> for ZnBase<N, IS_FIELD> {
+impl<const N: u64, const IS_FIELD: bool> CanHomFrom<zn_42::ZnBase> for ZnBase<N, IS_FIELD> {
     type Homomorphism = ();
 
     fn has_canonical_hom(&self, from: &zn_42::ZnBase) -> Option<()> {
@@ -123,7 +123,7 @@ impl<const N: u64, const IS_FIELD: bool> CanonicalIso<zn_42::ZnBase> for ZnBase<
 }
 
 
-impl<const N: u64, const IS_FIELD: bool> CanonicalHom<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD> {
+impl<const N: u64, const IS_FIELD: bool> CanHomFrom<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD> {
     type Homomorphism = ();
     fn has_canonical_hom(&self, _: &Self) -> Option<()> { Some(()) }
     fn map_in(&self, _: &Self, el: Self::Element, _: &()) -> Self::Element { el }

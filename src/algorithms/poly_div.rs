@@ -7,7 +7,7 @@ pub fn sparse_poly_div<P, S, F, E>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs
         S::Type: PolyRing,
         P: PolyRingStore,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: CanonicalHom<<<S::Type as RingExtension>::BaseRing as RingStore>::Type>,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: CanHomFrom<<<S::Type as RingExtension>::BaseRing as RingStore>::Type>,
         F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>
 {
     assert!(rhs_ring.degree(rhs).is_some());

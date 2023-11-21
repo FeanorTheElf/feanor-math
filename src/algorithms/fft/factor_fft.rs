@@ -125,7 +125,7 @@ impl<R, T1, T2> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2>
 
     fn unordered_fft<V, S, N>(&self, mut values: V, ring: S, memory_provider: &N)
         where S: RingStore,
-            S::Type: CanonicalHom<<R as RingStore>::Type>,
+            S::Type: CanHomFrom<<R as RingStore>::Type>,
             V: VectorViewMut<El<S>>,
             N: MemoryProvider<El<S>>
     {
@@ -145,7 +145,7 @@ impl<R, T1, T2> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2>
 
     fn unordered_inv_fft<V, S, N>(&self, mut values: V, ring: S, memory_provider: &N)
         where S: RingStore,
-            S::Type: CanonicalHom<<R as RingStore>::Type>,
+            S::Type: CanHomFrom<<R as RingStore>::Type>,
             V: VectorViewMut<El<S>>,
             N: MemoryProvider<El<S>>
     {

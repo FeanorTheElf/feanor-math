@@ -237,7 +237,7 @@ impl RingBase for ZnBase {
 
 impl_eq_based_self_iso!{ ZnBase }
 
-impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalHom<zn_barett::ZnBase<I>> for ZnBase {
+impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanHomFrom<zn_barett::ZnBase<I>> for ZnBase {
 
     type Homomorphism = ();
 
@@ -256,7 +256,7 @@ impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalHom<zn_barett::Z
 
 impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalIso<zn_barett::ZnBase<I>> for ZnBase {
 
-    type Isomorphism = <zn_barett::ZnBase<I> as CanonicalHom<StaticRingBase<i64>>>::Homomorphism;
+    type Isomorphism = <zn_barett::ZnBase<I> as CanHomFrom<StaticRingBase<i64>>>::Homomorphism;
 
     fn has_canonical_iso(&self, from: &zn_barett::ZnBase<I>) -> Option<Self::Isomorphism> {
         if self.modulus as i128 == *from.modulus() {
@@ -280,7 +280,7 @@ impl GenericMapInFromInt for RustBigintRingBase {}
 #[cfg(feature = "mpir")]
 impl GenericMapInFromInt for crate::rings::mpir::MPZBase {}
 
-impl<I: ?Sized + GenericMapInFromInt> CanonicalHom<I> for ZnBase {
+impl<I: ?Sized + GenericMapInFromInt> CanHomFrom<I> for ZnBase {
 
     type Homomorphism = generic_impls::IntegerToZnHom<I, StaticRingBase<i128>, Self>;
 
@@ -299,7 +299,7 @@ impl<I: ?Sized + GenericMapInFromInt> CanonicalHom<I> for ZnBase {
     }
 }
 
-impl CanonicalHom<StaticRingBase<i16>> for ZnBase {
+impl CanHomFrom<StaticRingBase<i16>> for ZnBase {
 
     type Homomorphism = ();
 
@@ -319,7 +319,7 @@ impl CanonicalHom<StaticRingBase<i16>> for ZnBase {
     }
 }
 
-impl CanonicalHom<StaticRingBase<i8>> for ZnBase {
+impl CanHomFrom<StaticRingBase<i8>> for ZnBase {
 
     type Homomorphism = ();
 
@@ -343,7 +343,7 @@ pub struct I32ToZnHom {
     reduction_is_trivial: bool
 }
 
-impl CanonicalHom<StaticRingBase<i32>> for ZnBase {
+impl CanHomFrom<StaticRingBase<i32>> for ZnBase {
 
     type Homomorphism = I32ToZnHom;
 
@@ -452,7 +452,7 @@ impl HashableElRing for ZnBase {
 impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
 
     #[inline(always)]
-    fn butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, _: &ZnBase, _: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnBase as RingBase>::Element, i1: usize, i2: usize) {
+    fn butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, _: &ZnBase, _: &<Self as CanHomFrom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnBase as RingBase>::Element, i1: usize, i2: usize) {
         let a = *values.at(i1);
         let mut b = *values.at(i2);
         self.mul_assign_ref(&mut b, twiddle);
@@ -466,7 +466,7 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
     }
 
     #[inline(always)]
-    fn inv_butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, _: &ZnBase, _: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnBase as RingBase>::Element, i1: usize, i2: usize) {
+    fn inv_butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, _: &ZnBase, _: &<Self as CanHomFrom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnBase as RingBase>::Element, i1: usize, i2: usize) {
         let a = *values.at(i1);
         let b = *values.at(i2);
 
@@ -482,7 +482,7 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
 /// Wraps [`ZnBase`] to represent an instance of the ring `Z/nZ`.
 /// As opposed to [`ZnBase`], elements are stored with additional information
 /// to speed up multiplication `ZnBase x ZnFastmulBase -> ZnBase`, by
-/// using [`CanonicalHom::mul_assign_map_in()`].
+/// using [`CanHomFrom::mul_assign_map_in()`].
 /// Note that normal arithmetic in this ring is much slower than [`ZnBase`].
 /// 
 /// # Example
@@ -577,7 +577,7 @@ impl DelegateRing for ZnFastmulBase {
 
 impl_eq_based_self_iso!{ ZnFastmulBase }
 
-impl CanonicalHom<ZnFastmulBase> for ZnBase {
+impl CanHomFrom<ZnFastmulBase> for ZnBase {
 
     type Homomorphism = ();
 
@@ -612,7 +612,7 @@ impl CanonicalHom<ZnFastmulBase> for ZnBase {
 impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
 
     #[inline(always)]
-    fn butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, from: &ZnFastmulBase, hom: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
+    fn butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, from: &ZnFastmulBase, hom: &<Self as CanHomFrom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
         let a = *values.at(i1);
         let mut b = *values.at(i2);
         self.mul_assign_map_in_ref(from, &mut b, twiddle, hom);
@@ -626,7 +626,7 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
     }
 
     #[inline(always)]
-    fn inv_butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, from: &ZnFastmulBase, hom: &<Self as CanonicalHom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
+    fn inv_butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, from: &ZnFastmulBase, hom: &<Self as CanHomFrom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
         let a = *values.at(i1);
         let b = *values.at(i2);
 
@@ -638,10 +638,10 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
     }
 }
 
-impl<I: ?Sized + IntegerRing> CanonicalHom<I> for ZnFastmulBase 
-    where ZnBase: CanonicalHom<I>
+impl<I: ?Sized + IntegerRing> CanHomFrom<I> for ZnFastmulBase 
+    where ZnBase: CanHomFrom<I>
 {
-    type Homomorphism = <ZnBase as CanonicalHom<I>>::Homomorphism;
+    type Homomorphism = <ZnBase as CanHomFrom<I>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
         self.base.has_canonical_hom(from)
@@ -674,16 +674,16 @@ impl CanonicalIso<ZnFastmulBase> for ZnBase {
     }
 }
 
-impl<R: ZnRingStore<Type = ZnBase>> CanonicalHom<ZnBase> for AsFieldBase<R> {
+impl<R: ZnRingStore<Type = ZnBase>> CanHomFrom<ZnBase> for AsFieldBase<R> {
     
-    type Homomorphism = <ZnBase as CanonicalHom<ZnBase>>::Homomorphism;
+    type Homomorphism = <ZnBase as CanHomFrom<ZnBase>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
-        <ZnBase as CanonicalHom<ZnBase>>::has_canonical_hom(self.base_ring().get_ring(), from)
+        <ZnBase as CanHomFrom<ZnBase>>::has_canonical_hom(self.base_ring().get_ring(), from)
     }
 
     fn map_in(&self, from: &ZnBase, el: <ZnBase as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.from(<ZnBase as CanonicalHom<ZnBase>>::map_in(self.base_ring().get_ring(), from, el, hom))
+        self.from(<ZnBase as CanHomFrom<ZnBase>>::map_in(self.base_ring().get_ring(), from, el, hom))
     }
 }
 
@@ -700,9 +700,9 @@ impl<R: ZnRingStore<Type = ZnBase>> CanonicalIso<ZnBase> for AsFieldBase<R> {
     }
 }
 
-impl<R: ZnRingStore<Type = ZnBase>> CanonicalHom<AsFieldBase<R>> for ZnBase {
+impl<R: ZnRingStore<Type = ZnBase>> CanHomFrom<AsFieldBase<R>> for ZnBase {
     
-    type Homomorphism = <ZnBase as CanonicalHom<ZnBase>>::Homomorphism;
+    type Homomorphism = <ZnBase as CanHomFrom<ZnBase>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &AsFieldBase<R>) -> Option<Self::Homomorphism> {
         self.has_canonical_hom(from.base_ring().get_ring())

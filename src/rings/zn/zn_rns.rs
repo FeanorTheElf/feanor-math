@@ -3,7 +3,6 @@ use crate::vector::VectorView;
 use crate::integer::IntegerRingStore;
 use crate::divisibility::DivisibilityRingStore;
 use crate::rings::zn::*;
-use crate::homomorphism::*;
 use crate::primitive_int::*;
 use crate::default_memory_provider;
 
@@ -63,7 +62,7 @@ use crate::default_memory_provider;
 /// ```
 /// 
 pub struct ZnBase<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>> = DefaultMemoryProvider> 
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
@@ -82,7 +81,7 @@ pub type Zn<C, J, M = DefaultMemoryProvider> = RingValue<ZnBase<C, J, M>>;
 
 impl<J: IntegerRingStore> Zn<zn_42::Zn, J> 
     where J::Type: IntegerRing,
-        zn_42::ZnBase: CanonicalHom<J::Type>,
+        zn_42::ZnBase: CanHomFrom<J::Type>,
         StaticRingBase<i64>: CanonicalIso<J::Type>
 {
     pub fn from_primes(large_integers: J, primes: Vec<u64>) -> Self {
@@ -95,7 +94,7 @@ impl<J: IntegerRingStore> Zn<zn_42::Zn, J>
 }
 
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Zn<C, J, M> 
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
@@ -135,7 +134,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Zn<C, J, M>
 }
 
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnBase<C, J, M> 
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
@@ -164,7 +163,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnBase<C, J,
 }
 
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> VectorView<C> for ZnBase<C, J, M>
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
@@ -181,7 +180,7 @@ pub struct ZnEl<C: ZnRingStore, M: MemoryProvider<El<C>>>(M::Object)
     where C::Type: ZnRing;
 
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> RingBase for ZnBase<C, J, M> 
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
@@ -263,7 +262,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> RingBase for
 }
 
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clone for ZnBase<C, J, M> 
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
         C: Clone,
@@ -280,15 +279,15 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clone for Zn
     }
 }
 
-impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStore, M1: MemoryProvider<El<C1>>, M2: MemoryProvider<El<C2>>> CanonicalHom<ZnBase<C2, J2, M2>> for ZnBase<C1, J1, M1> 
-    where C1::Type: ZnRing + CanonicalHom<C2::Type> + CanonicalHom<J1::Type>,
+impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStore, M1: MemoryProvider<El<C1>>, M2: MemoryProvider<El<C2>>> CanHomFrom<ZnBase<C2, J2, M2>> for ZnBase<C1, J1, M1> 
+    where C1::Type: ZnRing + CanHomFrom<C2::Type> + CanHomFrom<J1::Type>,
         <C1::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J1::Type>,
-        C2::Type: ZnRing + CanonicalHom<J2::Type>,
+        C2::Type: ZnRing + CanHomFrom<J2::Type>,
         <C2::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J2::Type>,
         J1::Type: IntegerRing,
         J2::Type: IntegerRing
 {
-    type Homomorphism = Vec<<C1::Type as CanonicalHom<C2::Type>>::Homomorphism>;
+    type Homomorphism = Vec<<C1::Type as CanHomFrom<C2::Type>>::Homomorphism>;
 
     fn has_canonical_hom(&self, from: &ZnBase<C2, J2, M2>) -> Option<Self::Homomorphism> {
         if self.components.len() == from.components.len() {
@@ -315,7 +314,7 @@ impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStor
 }
 
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> PartialEq for ZnBase<C, J, M> 
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
         J::Type: IntegerRing
 {
@@ -325,9 +324,9 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> PartialEq fo
 }
 
 impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStore, M1: MemoryProvider<El<C1>>, M2: MemoryProvider<El<C2>>> CanonicalIso<ZnBase<C2, J2, M2>> for ZnBase<C1, J1, M1> 
-    where C1::Type: ZnRing + CanonicalIso<C2::Type> + CanonicalHom<J1::Type>,
+    where C1::Type: ZnRing + CanonicalIso<C2::Type> + CanHomFrom<J1::Type>,
         <C1::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J1::Type>,
-        C2::Type: ZnRing + CanonicalHom<J2::Type>,
+        C2::Type: ZnRing + CanHomFrom<J2::Type>,
         <C2::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J2::Type>,
         J1::Type: IntegerRing,
         J2::Type: IntegerRing
@@ -354,13 +353,13 @@ impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStor
     }
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider<El<C>>> CanonicalHom<zn_barett::ZnBase<K>> for ZnBase<C, J, M> 
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
+impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider<El<C>>> CanHomFrom<zn_barett::ZnBase<K>> for ZnBase<C, J, M> 
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing + CanonicalIso<K::Type>,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
         K::Type: IntegerRing
 {
-    type Homomorphism = (<J::Type as CanonicalHom<K::Type>>::Homomorphism, Vec<<C::Type as CanonicalHom<J::Type>>::Homomorphism>);
+    type Homomorphism = (<J::Type as CanHomFrom<K::Type>>::Homomorphism, Vec<<C::Type as CanHomFrom<J::Type>>::Homomorphism>);
 
     fn has_canonical_hom(&self, from: &zn_barett::ZnBase<K>) -> Option<Self::Homomorphism> {
         if self.total_ring.get_ring().has_canonical_hom(from).is_some() {
@@ -379,7 +378,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider
 
     fn map_in(&self, from: &zn_barett::ZnBase<K>, el: zn_barett::ZnEl<K>, hom: &Self::Homomorphism) -> ZnEl<C, M> {
         let lift = from.smallest_positive_lift(el);
-        let mapped_lift = <J::Type as CanonicalHom<K::Type>>::map_in(
+        let mapped_lift = <J::Type as CanHomFrom<K::Type>>::map_in(
             self.ZZ().get_ring(), 
             from.integer_ring().get_ring(), 
             lift, 
@@ -393,14 +392,14 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider
 }
 
 impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider<El<C>>> CanonicalIso<zn_barett::ZnBase<K>> for ZnBase<C, J, M> 
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing + CanonicalIso<K::Type>,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
         K::Type: IntegerRing
 {
     type Isomorphism = (
         <zn_barett::ZnBase<J> as CanonicalIso<zn_barett::ZnBase<K>>>::Isomorphism, 
-        <zn_barett::ZnBase<J> as CanonicalHom<J::Type>>::Homomorphism,
+        <zn_barett::ZnBase<J> as CanHomFrom<J::Type>>::Homomorphism,
         Vec<<<C::Type as ZnRing>::IntegerRingBase as CanonicalIso<J::Type>>::Isomorphism>
     );
 
@@ -435,17 +434,17 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider
     }
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRing, M: MemoryProvider<El<C>>> CanonicalHom<K> for ZnBase<C, J, M> 
-    where C::Type: ZnRing + CanonicalHom<J::Type> + CanonicalHom<K>,
+impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRing, M: MemoryProvider<El<C>>> CanHomFrom<K> for ZnBase<C, J, M> 
+    where C::Type: ZnRing + CanHomFrom<J::Type> + CanHomFrom<K>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
         K: ?Sized + SelfIso
 {
-    type Homomorphism = Vec<<C::Type as CanonicalHom<K>>::Homomorphism>;
+    type Homomorphism = Vec<<C::Type as CanHomFrom<K>>::Homomorphism>;
 
     fn has_canonical_hom(&self, from: &K) -> Option<Self::Homomorphism> {
         Some(self.components.iter()
-            .map(|R| <C::Type as CanonicalHom<K>>::has_canonical_hom(R.get_ring(), from).ok_or(()))
+            .map(|R| <C::Type as CanHomFrom<K>>::has_canonical_hom(R.get_ring(), from).ok_or(()))
             .collect::<Result<Vec<_>, ()>>()
             .ok()?
         )
@@ -454,13 +453,13 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRing, M: MemoryProvider<El<C
     fn map_in(&self, from: &K, el: K::Element, hom: &Self::Homomorphism) -> Self::Element {
         ZnEl(self.memory_provider.get_new_init(
             self.len(),
-            |i| <C::Type as CanonicalHom<K>>::map_in_ref(self.at(i).get_ring(), from, &el, &hom[i])
+            |i| <C::Type as CanHomFrom<K>>::map_in_ref(self.at(i).get_ring(), from, &el, &hom[i])
         ))
     }
 }
 
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> DivisibilityRing for ZnBase<C, J, M> 
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
@@ -470,7 +469,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Divisibility
 }
 
 pub struct ZnBaseElementsIterator<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>>
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
@@ -479,7 +478,7 @@ pub struct ZnBaseElementsIterator<'a, C: ZnRingStore, J: IntegerRingStore, M: Me
 }
 
 impl<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Iterator for ZnBaseElementsIterator<'a, C, J, M>
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
@@ -513,7 +512,7 @@ impl<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Iterator
 }
 
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FiniteRing for ZnBase<C, J, M> 
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing + SelfIso,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
@@ -539,7 +538,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FiniteRing f
 }
 
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnRing for ZnBase<C, J, M> 
-    where C::Type: ZnRing + CanonicalHom<J::Type>,
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing + SelfIso,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {

@@ -263,17 +263,17 @@ impl<I: IntegerRingStore> AssumeFieldDivision for ZnBase<I>
     }
 }
 
-impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalHom<ZnBase<J>> for ZnBase<I> 
-    where I::Type: IntegerRing + CanonicalHom<J::Type> + CanonicalIso<StaticRingBase<i32>>,
+impl<I: IntegerRingStore, J: IntegerRingStore> CanHomFrom<ZnBase<J>> for ZnBase<I> 
+    where I::Type: IntegerRing + CanHomFrom<J::Type> + CanonicalIso<StaticRingBase<i32>>,
         J::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
 {
-    type Homomorphism =  <I::Type as CanonicalHom<J::Type>>::Homomorphism;
+    type Homomorphism =  <I::Type as CanHomFrom<J::Type>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &ZnBase<J>) -> Option<Self::Homomorphism> {
-        let base_hom = <I::Type as CanonicalHom<J::Type>>::has_canonical_hom(self.integer_ring.get_ring(), from.integer_ring.get_ring())?;
+        let base_hom = <I::Type as CanHomFrom<J::Type>>::has_canonical_hom(self.integer_ring.get_ring(), from.integer_ring.get_ring())?;
         if self.integer_ring.eq_el(
             &self.modulus,
-            &<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), from.integer_ring().clone_el(&from.modulus), &base_hom)
+            &<I::Type as CanHomFrom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), from.integer_ring().clone_el(&from.modulus), &base_hom)
         ) {
             Some(base_hom)
         } else {
@@ -282,7 +282,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalHom<ZnBase<J>> for ZnBas
     }
 
     fn map_in(&self, from: &ZnBase<J>, el: <ZnBase<J> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        ZnEl(<I::Type as CanonicalHom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), el.0, hom))
+        ZnEl(<I::Type as CanHomFrom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), el.0, hom))
     }
 }
 
@@ -317,7 +317,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for ZnBas
     }
 }
 
-impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanonicalHom<J> for ZnBase<I>
+impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanHomFrom<J> for ZnBase<I>
     where I::Type: IntegerRing, 
         J: CanonicalIso<I::Type>
 {
@@ -407,17 +407,17 @@ impl<I: IntegerRingStore> ZnRing for ZnBase<I>
     }
 }
 
-impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalHom<ZnBase<I>> for AsFieldBase<R>
+impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanHomFrom<ZnBase<I>> for AsFieldBase<R>
     where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
 {
-    type Homomorphism = <ZnBase<I> as CanonicalHom<ZnBase<I>>>::Homomorphism;
+    type Homomorphism = <ZnBase<I> as CanHomFrom<ZnBase<I>>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &ZnBase<I>) -> Option<Self::Homomorphism> {
-        <ZnBase<I> as CanonicalHom<ZnBase<I>>>::has_canonical_hom(self.base_ring().get_ring(), from)
+        <ZnBase<I> as CanHomFrom<ZnBase<I>>>::has_canonical_hom(self.base_ring().get_ring(), from)
     }
 
     fn map_in(&self, from: &ZnBase<I>, el: <ZnBase<I> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.from(<ZnBase<I> as CanonicalHom<ZnBase<I>>>::map_in(self.base_ring().get_ring(), from, el, hom))
+        self.from(<ZnBase<I> as CanHomFrom<ZnBase<I>>>::map_in(self.base_ring().get_ring(), from, el, hom))
     }
 }
 
@@ -435,17 +435,17 @@ impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalIso<ZnBase<
     }
 }
 
-impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalHom<AsFieldBase<R>> for ZnBase<I>
+impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanHomFrom<AsFieldBase<R>> for ZnBase<I>
     where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
 {
-    type Homomorphism = <ZnBase<I> as CanonicalHom<ZnBase<I>>>::Homomorphism;
+    type Homomorphism = <ZnBase<I> as CanHomFrom<ZnBase<I>>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &AsFieldBase<R>) -> Option<Self::Homomorphism> {
-        <ZnBase<I> as CanonicalHom<ZnBase<I>>>::has_canonical_hom(self, from.base_ring().get_ring())
+        <ZnBase<I> as CanHomFrom<ZnBase<I>>>::has_canonical_hom(self, from.base_ring().get_ring())
     }
 
     fn map_in(&self, from: &AsFieldBase<R>, el: <AsFieldBase<R> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        <ZnBase<I> as CanonicalHom<ZnBase<I>>>::map_in(self, from.base_ring().get_ring(), from.unwrap_element(el), hom)
+        <ZnBase<I> as CanHomFrom<ZnBase<I>>>::map_in(self, from.base_ring().get_ring(), from.unwrap_element(el), hom)
     }
 }
 

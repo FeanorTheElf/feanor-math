@@ -63,7 +63,7 @@ impl<R: RingStore> FreeAlgebraStore for R
 pub fn poly_repr<P: PolyRingStore, R: FreeAlgebraStore>(from: R, to: P, el: &El<R>) -> El<P>
     where P::Type: PolyRing, 
         R::Type: FreeAlgebra,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: CanonicalHom<<<R::Type as RingExtension>::BaseRing as RingStore>::Type>
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: CanHomFrom<<<R::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
     let hom = to.base_ring().can_hom(from.base_ring()).unwrap();
     let coeff_vec = from.wrt_canonical_basis(el);

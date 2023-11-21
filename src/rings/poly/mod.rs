@@ -74,16 +74,16 @@ pub mod generic_impls {
     use crate::homomorphism::*;
 
     #[allow(type_alias_bounds)]
-    pub type GenericCanonicalHom<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanonicalHom<<P1::BaseRing as RingStore>::Type>>::Homomorphism;
+    pub type GenericCanHomFrom<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanHomFrom<<P1::BaseRing as RingStore>::Type>>::Homomorphism;
 
-    pub fn generic_has_canonical_hom<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2) -> Option<GenericCanonicalHom<P1, P2>> 
-        where <P2::BaseRing as RingStore>::Type: CanonicalHom<<P1::BaseRing as RingStore>::Type>
+    pub fn generic_has_canonical_hom<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2) -> Option<GenericCanHomFrom<P1, P2>> 
+        where <P2::BaseRing as RingStore>::Type: CanHomFrom<<P1::BaseRing as RingStore>::Type>
     {
         to.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
     }
 
-    pub fn generic_map_in<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P1::Element, hom: &GenericCanonicalHom<P1, P2>) -> P2::Element
-        where <P2::BaseRing as RingStore>::Type: CanonicalHom<<P1::BaseRing as RingStore>::Type>
+    pub fn generic_map_in<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P1::Element, hom: &GenericCanHomFrom<P1, P2>) -> P2::Element
+        where <P2::BaseRing as RingStore>::Type: CanHomFrom<<P1::BaseRing as RingStore>::Type>
     {
         let mut result = to.zero();
         to.add_assign_from_terms(&mut result, from.terms(&el).map(|(c, i)| (to.base_ring().get_ring().map_in(from.base_ring().get_ring(), from.base_ring().clone_el(c), hom), i)));

@@ -46,7 +46,7 @@ fn derive_poly<P>(poly_ring: P, poly: &El<P>) -> El<P>
 {
     poly_ring.from_terms(poly_ring.terms(poly)
         .filter(|(_, i)| *i > 0)
-        .map(|(c, i)| (poly_ring.base_ring().int_hom().mul_ref_map(c, i as i32), i - 1))
+        .map(|(c, i)| (poly_ring.base_ring().int_hom().mul_ref_fst_map(c, i as i32), i - 1))
     )
 }
 
