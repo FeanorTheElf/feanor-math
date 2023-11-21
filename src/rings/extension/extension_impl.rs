@@ -39,12 +39,11 @@ impl<R, V, M> FreeAlgebraImpl<R, V, M>
 impl<R, V, M> FreeAlgebraImplBase<R, V, M>
     where R: RingStore, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
 {
-    pub fn poly_repr<P>(&self, poly_ring: P, el: &<Self as RingBase>::Element) -> El<P>
+    pub fn poly_repr<P, H>(&self, poly_ring: P, el: &<Self as RingBase>::Element, hom: &H) -> El<P>
         where P: PolyRingStore,
             P::Type: PolyRing,
-            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: CanHomFrom<R::Type>
+            H: Homomorphism<R::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
     {
-        let hom = poly_ring.base_ring().can_hom(self.base_ring()).unwrap();
         poly_ring.from_terms(Iterator::map(0..self.rank(), |i| (hom.map(self.base_ring.clone_el(el.values.at(i))), i)))
     }
 }
@@ -124,7 +123,7 @@ impl<R, V, M> RingBase for FreeAlgebraImplBase<R, V, M>
     
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         let poly_ring = DensePolyRing::new(self.base_ring(), "θ");
-        poly_ring.get_ring().dbg(&self.poly_repr(&poly_ring, value), out)
+        poly_ring.get_ring().dbg(&self.poly_repr(&poly_ring, value, &self.base_ring().identity()), out)
     }
 
     fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {

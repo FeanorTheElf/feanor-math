@@ -135,37 +135,37 @@ impl<R> PartialEq for FFTTableCooleyTuckey<R>
 /// It is default-implemented for all rings, but for increase FFT performance, some rings
 /// might wish to provide a specialization.
 /// 
-pub trait CooleyTuckeyButterfly<S>: RingBase + CanHomFrom<S>
+pub trait CooleyTuckeyButterfly<S>: RingBase
     where S: ?Sized + RingBase
 {
     ///
     /// Should compute `(values[i1], values[i2]) := (values[i1] + twiddle * values[i2], values[i1] - twiddle * values[i2])`
     /// 
-    fn butterfly<V: VectorViewMut<Self::Element>>(&self, from: &S, hom: &<Self as CanHomFrom<S>>::Homomorphism, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
+    fn butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: &H, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
 
     ///
     /// Should compute `(values[i1], values[i2]) := (values[i1] + values[i2], (values[i1] - values[i2]) * twiddle)`
     /// 
-    fn inv_butterfly<V: VectorViewMut<Self::Element>>(&self, from: &S, hom: &<Self as CanHomFrom<S>>::Homomorphism, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
+    fn inv_butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: &H, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
 }
 
 impl<R, S> CooleyTuckeyButterfly<S> for R
-    where S: ?Sized + RingBase, R: ?Sized + RingBase + CanHomFrom<S>
+    where S: ?Sized + RingBase, R: ?Sized + RingBase
 {
     #[inline(always)]
-    default fn butterfly<V: VectorViewMut<Self::Element>>(&self, from: &S, hom: &<Self as CanHomFrom<S>>::Homomorphism, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
-        self.mul_assign_map_in_ref(from, values.at_mut(i2), twiddle, hom);
+    default fn butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: &H, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
+        hom.mul_assign_map_ref(values.at_mut(i2), twiddle);
         let new_a = self.add_ref(values.at(i1), values.at(i2));
         let a = std::mem::replace(values.at_mut(i1), new_a);
         self.sub_self_assign(values.at_mut(i2), a);
     }
 
     #[inline(always)]
-    default fn inv_butterfly<V: VectorViewMut<Self::Element>>(&self, from: &S, hom: &<Self as CanHomFrom<S>>::Homomorphism, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
+    default fn inv_butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: &H, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
         let new_a = self.add_ref(values.at(i1), values.at(i2));
         let a = std::mem::replace(values.at_mut(i1), new_a);
         self.sub_self_assign(values.at_mut(i2), a);
-        self.mul_assign_map_in_ref(from, values.at_mut(i2), twiddle, hom);
+        hom.mul_assign_map_ref(values.at_mut(i2), twiddle);
     }
 }
 
@@ -178,19 +178,18 @@ impl<R> FFTTableCooleyTuckey<R>
     /// Note that setting `INV = true` will perform an inverse fourier transform,
     /// except that the division by `n` is not included.
     /// 
-    fn unordered_fft_dispatch<V, S, const INV: bool>(&self, values: &mut V, ring: &S)
-        where S: RingStore, 
-            S::Type: CanHomFrom<R::Type>, 
-            V: VectorViewMut<El<S>> 
+    fn unordered_fft_dispatch<V, S, H, const INV: bool>(&self, values: &mut V, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<R::Type, S>, 
+            V: VectorViewMut<S::Element> 
     {
         assert!(values.len() == (1 << self.log2_n));
-        let hom = ring.can_hom(&self.ring).unwrap();
-        // check if the canonical hom `R -> S` maps `self.root_of_unity` to a primitive N-th root of unity
-        debug_assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &hom.map_ref(&self.root_of_unity), self.log2_n));
+        assert!(hom.domain().get_ring() == self.ring().get_ring());
 
-        let base_hom = hom.raw_hom();
-        let base_ring = self.ring().get_ring();
-        let R = ring.get_ring();
+        // check if the canonical hom `R -> S` maps `self.root_of_unity` to a primitive N-th root of unity
+        debug_assert!(hom.codomain().get_ring().is_approximate() || is_prim_root_of_unity_pow2(&hom.codomain(), &hom.map_ref(&self.root_of_unity), self.log2_n));
+
+        let R = hom.codomain();
 
         for step in 0..self.log2_n {
 
@@ -234,10 +233,10 @@ impl<R> FFTTableCooleyTuckey<R>
     
                         if !INV {
                             let current_twiddle = &self.inv_root_of_unity_list[root_of_unity_index];
-                            R.butterfly(base_ring, base_hom, values, current_twiddle, index1, index2);
+                            R.get_ring().butterfly(hom, values, current_twiddle, index1, index2);
                         } else {
                             let current_twiddle = &self.root_of_unity_list[root_of_unity_index];
-                            R.inv_butterfly(base_ring, base_hom, values, current_twiddle, index1, index2);
+                            R.get_ring().inv_butterfly(hom, values, current_twiddle, index1, index2);
                         }
                         root_of_unity_index += 1;
                     }
@@ -257,10 +256,10 @@ impl<R> FFTTableCooleyTuckey<R>
 
                             if !INV {
                                 let current_twiddle = &self.inv_root_of_unity_list[root_of_unity_index];
-                                R.butterfly(base_ring, base_hom, values, current_twiddle, index1, index1 + m);
+                                R.get_ring().butterfly(hom, values, current_twiddle, index1, index1 + m);
                             } else {
                                 let current_twiddle = &self.root_of_unity_list[root_of_unity_index];
-                                R.inv_butterfly(base_ring, base_hom, values, current_twiddle, index1, index1 + m);
+                                R.get_ring().inv_butterfly(hom, values, current_twiddle, index1, index1 + m);
                             }
                             root_of_unity_index += 1;
                             index1 += two_m;
@@ -299,44 +298,45 @@ impl<R> FFTTable for FFTTableCooleyTuckey<R>
         bitreverse(i, self.log2_n)
     }
 
-    fn fft<V, S, N>(&self, mut values: V, ring: S, memory_provider: &N)
-        where S: RingStore, 
-            S::Type: CanHomFrom<R::Type>, 
-            V: SwappableVectorViewMut<El<S>>,
-            N: MemoryProvider<El<S>>
+    fn fft<V, S, M, H>(&self, mut values: V, memory_provider: &M, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
+            V: SwappableVectorViewMut<S::Element>,
+            M: MemoryProvider<S::Element>
     {
-        self.unordered_fft(&mut values, ring, memory_provider);
+        self.unordered_fft(&mut values, memory_provider, hom);
         self.bitreverse_permute_inplace(&mut values);
-    }
-        
-    fn inv_fft<V, S, N>(&self, mut values: V, ring: S, memory_provider: &N)
-        where S: RingStore, 
-            S::Type: CanHomFrom<R::Type>, 
-            V: SwappableVectorViewMut<El<S>>,
-            N: MemoryProvider<El<S>>
-    {
-        self.bitreverse_permute_inplace(&mut values);
-        self.unordered_inv_fft(&mut values, ring, memory_provider);
     }
 
-    fn unordered_fft<V, S, N>(&self, mut values: V, ring: S, _: &N)
-        where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
-            V: VectorViewMut<El<S>>,
-            N: MemoryProvider<El<S>> 
+    fn inv_fft<V, S, M, H>(&self, mut values: V, memory_provider: &M, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
+            V: SwappableVectorViewMut<S::Element>,
+            M: MemoryProvider<S::Element> 
     {
-        self.unordered_fft_dispatch::<V, S, false>(&mut values, &ring);
-    }    
-        
-    fn unordered_inv_fft<V, S, N>(&self, mut values: V, ring: S, _: &N)
-        where S: RingStore,
-            S::Type: CanHomFrom<R::Type>,
-            V: VectorViewMut<El<S>>
+        self.bitreverse_permute_inplace(&mut values);
+        self.unordered_inv_fft(&mut values, memory_provider, hom);
+    }
+
+    fn unordered_fft<V, S, M, H>(&self, mut values: V, _memory_provider: &M, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
+            V: VectorViewMut<S::Element>,
+            M: MemoryProvider<S::Element>
     {
-        self.unordered_fft_dispatch::<V, S, true>(&mut values, &ring);
-        let inv = ring.coerce(&self.ring, self.ring.invert(&self.ring.int_hom().map(1 << self.log2_n)).unwrap());
+        self.unordered_fft_dispatch::<V, S, H, false>(&mut values, hom);
+    }
+    
+    fn unordered_inv_fft<V, S, M, H>(&self, mut values: V, _memory_provider: &M, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
+            V: VectorViewMut<S::Element>,
+            M: MemoryProvider<S::Element>
+    {
+        self.unordered_fft_dispatch::<V, S, H, true>(&mut values, hom);
+        let inv = hom.map(self.ring.invert(&self.ring.int_hom().map(1 << self.log2_n)).unwrap());
         for i in 0..values.len() {
-            ring.mul_assign_ref(values.at_mut(i), &inv);
+            hom.codomain().mul_assign_ref(values.at_mut(i), &inv);
         }
     }
 }
@@ -349,14 +349,6 @@ impl<R: RingStore<Type = Complex64>> ErrorEstimate for FFTTableCooleyTuckey<R> {
         // the operator inf-norm of the FFT is its length
         return 2. * self.len() as f64 * butterfly_absolute_error + self.len() as f64 * input_error;
     }
-}
-
-pub fn dummy(fft_table: &FFTTableCooleyTuckey<zn_42::Zn>, values: &mut [El<zn_42::Zn>], ring: zn_42::Zn) {
-    fft_table.unordered_fft(values, ring, &AllocatingMemoryProvider)
-}
-
-pub fn dummy2(ring: &zn_42::Zn, mut data: &mut [El<zn_42::Zn>], i1: usize, i2: usize, twiddle: &El<zn_42::Zn>) {
-    ring.get_ring().butterfly(ring.get_ring(), &(), &mut data, twiddle, i1, i2);
 }
 
 #[cfg(test)]
@@ -384,7 +376,7 @@ fn test_bitreverse_fft_inplace_basic() {
         bitreverse_expected[i] = expected[bitreverse(i, 2)];
     }
 
-    fft.unordered_fft(&mut values, ring, &default_memory_provider!());
+    fft.unordered_fft(&mut values, &default_memory_provider!(), &fft.ring().identity());
     assert_eq!(values, bitreverse_expected);
 }
 
@@ -400,7 +392,7 @@ fn test_bitreverse_fft_inplace_advanced() {
         bitreverse_expected[i] = expected[bitreverse(i, 4)];
     }
 
-    fft.unordered_fft(&mut values, fft.ring(), &default_memory_provider!());
+    fft.unordered_fft(&mut values, &default_memory_provider!(), &fft.ring().identity());
     assert_eq!(values, bitreverse_expected);
 }
 
@@ -410,8 +402,8 @@ fn test_bitreverse_inv_fft_inplace() {
     let fft = FFTTableCooleyTuckey::for_zn(&ring, 4).unwrap();
     let values: [u64; 16] = [1, 2, 3, 2, 1, 0, 17 - 1, 17 - 2, 17 - 1, 0, 1, 2, 3, 4, 5, 6];
     let mut work = values;
-    fft.unordered_fft(&mut work, fft.ring(), &default_memory_provider!());
-    fft.unordered_inv_fft(&mut work, fft.ring(), &default_memory_provider!());
+    fft.unordered_fft(&mut work, &default_memory_provider!(), &fft.ring().identity());
+    fft.unordered_inv_fft(&mut work, &default_memory_provider!(), &fft.ring().identity());
     assert_eq!(&work, &values);
 }
 
@@ -432,8 +424,8 @@ fn run_fft_bench_round<R, S>(ring: S, fft: &FFTTableCooleyTuckey<R>, data: &Vec<
 {
     copy.clear();
     copy.extend(data.iter().map(|x| ring.clone_el(x)));
-    fft.unordered_fft(&mut copy[..], &ring, &default_memory_provider!());
-    fft.unordered_inv_fft(&mut copy[..], &ring, &default_memory_provider!());
+    fft.unordered_fft(&mut copy[..], &default_memory_provider!(), &ring.can_hom(fft.ring()).unwrap());
+    fft.unordered_inv_fft(&mut copy[..], &default_memory_provider!(), &ring.can_hom(fft.ring()).unwrap());
     assert_el_eq!(&ring, &copy[0], &data[0]);
 }
 
@@ -492,7 +484,7 @@ fn test_approximate_fft() {
     for log2_n in [4, 7, 11, 15] {
         let fft = FFTTableCooleyTuckey::new_with_pows(CC, |x| CC.root_of_unity(x, 1 << log2_n), log2_n);
         let mut array = default_memory_provider!().get_new_init(1 << log2_n, |i|  CC.root_of_unity(i as i64, 1 << log2_n));
-        fft.fft(&mut array, CC, &default_memory_provider!());
+        fft.fft(&mut array, &default_memory_provider!(), &CC.identity());
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
@@ -508,9 +500,9 @@ fn test_size_1_fft() {
     let fft = FFTTableCooleyTuckey::for_zn(&ring, 0).unwrap();
     let values: [u64; 1] = [3];
     let mut work = values;
-    fft.unordered_fft(&mut work, fft.ring(), &default_memory_provider!());
+    fft.unordered_fft(&mut work, &default_memory_provider!(), &fft.ring().identity());
     assert_eq!(&work, &values);
-    fft.unordered_inv_fft(&mut work, fft.ring(), &default_memory_provider!());
+    fft.unordered_inv_fft(&mut work, &default_memory_provider!(), &fft.ring().identity());
     assert_eq!(&work, &values);
     assert_eq!(0, fft.unordered_fft_permutation(0));
     assert_eq!(0, fft.unordered_fft_permutation_inv(0));
@@ -529,20 +521,20 @@ pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Itera
         for b in &elements {
 
             let mut vector = [ring.clone_el(a), ring.clone_el(b)];
-            ring.get_ring().butterfly(base.get_ring(), hom.raw_hom(), &mut vector, &test_twiddle, 0, 1);
+            ring.get_ring().butterfly(&hom, &mut vector, &test_twiddle, 0, 1);
             assert_el_eq!(&ring, &ring.add_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &vector[0]);
             assert_el_eq!(&ring, &ring.sub_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &vector[1]);
 
-            ring.get_ring().inv_butterfly(base.get_ring(), hom.raw_hom(), &mut vector, &test_inv_twiddle, 0, 1);
+            ring.get_ring().inv_butterfly(&hom, &mut vector, &test_inv_twiddle, 0, 1);
             assert_el_eq!(&ring, &ring.int_hom().mul_ref_fst_map(a, 2), &vector[0]);
             assert_el_eq!(&ring, &ring.int_hom().mul_ref_fst_map(b, 2), &vector[1]);
 
             let mut vector = [ring.clone_el(a), ring.clone_el(b)];
-            ring.get_ring().butterfly(base.get_ring(), hom.raw_hom(), &mut vector, &test_twiddle, 1, 0);
+            ring.get_ring().butterfly(&hom, &mut vector, &test_twiddle, 1, 0);
             assert_el_eq!(&ring, &ring.add_ref_fst(b, ring.mul_ref_fst(a, hom.map_ref(test_twiddle))), &vector[1]);
             assert_el_eq!(&ring, &ring.sub_ref_fst(b, ring.mul_ref_fst(a, hom.map_ref(test_twiddle))), &vector[0]);
 
-            ring.get_ring().inv_butterfly(base.get_ring(), hom.raw_hom(), &mut vector, &test_inv_twiddle, 1, 0);
+            ring.get_ring().inv_butterfly(&hom, &mut vector, &test_inv_twiddle, 1, 0);
             assert_el_eq!(&ring, &ring.int_hom().mul_ref_fst_map(a, 2), &vector[0]);
             assert_el_eq!(&ring, &ring.int_hom().mul_ref_fst_map(b, 2), &vector[1]);
         }

@@ -75,7 +75,7 @@ pub struct ZnBase<I: IntegerRingStore>
 pub type Zn<I> = RingValue<ZnBase<I>>;
 
 impl<I: IntegerRingStore> Zn<I>
-    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing
 {
     pub fn new(integer_ring: I, modulus: El<I>) -> Self {
         RingValue::from(ZnBase::new(integer_ring, modulus))
@@ -83,7 +83,7 @@ impl<I: IntegerRingStore> Zn<I>
 }
 
 impl<I: IntegerRingStore> ZnBase<I> 
-    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing
 {
     pub fn new(integer_ring: I, modulus: El<I>) -> Self {
         assert!(integer_ring.is_geq(&modulus, &integer_ring.int_hom().map(2)));
@@ -145,11 +145,11 @@ impl<I: IntegerRingStore> ZnBase<I>
 }
 
 pub struct ZnEl<I: IntegerRingStore>(El<I>)
-    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>;
+    where I::Type: IntegerRing;
 
 impl<I: IntegerRingStore> Clone for ZnEl<I> 
     where El<I>: Clone,
-        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+        I::Type: IntegerRing
 {
     fn clone(&self) -> Self {
         ZnEl(self.0.clone())
@@ -158,11 +158,11 @@ impl<I: IntegerRingStore> Clone for ZnEl<I>
 
 impl<I: IntegerRingStore> Copy for ZnEl<I>
     where El<I>: Copy,
-        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+        I::Type: IntegerRing
 {}
 
 impl<I: IntegerRingStore> RingBase for ZnBase<I> 
-    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing
 {
     type Element = ZnEl<I>;
 
@@ -234,7 +234,7 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
 
 impl<I: IntegerRingStore> Clone for ZnBase<I> 
     where I: Clone,
-        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+        I::Type: IntegerRing
 {
     fn clone(&self) -> Self {
         ZnBase {
@@ -247,7 +247,7 @@ impl<I: IntegerRingStore> Clone for ZnBase<I>
 }
 
 impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I> 
-    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs, self.modulus())
@@ -255,7 +255,7 @@ impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I>
 }
 
 impl<I: IntegerRingStore> AssumeFieldDivision for ZnBase<I>
-    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing
 {
     fn assume_field_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         assert!(!self.is_zero(rhs));
@@ -264,8 +264,8 @@ impl<I: IntegerRingStore> AssumeFieldDivision for ZnBase<I>
 }
 
 impl<I: IntegerRingStore, J: IntegerRingStore> CanHomFrom<ZnBase<J>> for ZnBase<I> 
-    where I::Type: IntegerRing + CanHomFrom<J::Type> + CanonicalIso<StaticRingBase<i32>>,
-        J::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing + CanHomFrom<J::Type>,
+        J::Type: IntegerRing
 {
     type Homomorphism =  <I::Type as CanHomFrom<J::Type>>::Homomorphism;
 
@@ -287,7 +287,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanHomFrom<ZnBase<J>> for ZnBase<
 }
 
 impl<I: IntegerRingStore> PartialEq for ZnBase<I>
-    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing
 {
     fn eq(&self, other: &Self) -> bool {
         self.integer_ring.get_ring() == other.integer_ring.get_ring() && self.integer_ring.eq_el(&self.modulus, &other.modulus)
@@ -295,8 +295,8 @@ impl<I: IntegerRingStore> PartialEq for ZnBase<I>
 }
 
 impl<I: IntegerRingStore, J: IntegerRingStore> CanonicalIso<ZnBase<J>> for ZnBase<I>
-    where I::Type: IntegerRing + CanonicalIso<J::Type> + CanonicalIso<StaticRingBase<i32>>,
-        J::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing + CanonicalIso<J::Type>,
+        J::Type: IntegerRing
 {
     type Isomorphism = <I::Type as CanonicalIso<J::Type>>::Isomorphism;
 
@@ -377,7 +377,7 @@ impl<I: IntegerRingStore> FiniteRing for ZnBase<I>
         }
     }
 
-    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> Self::Element {
+    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element {
         generic_impls::random_element(self, rng)
     }
     
@@ -389,7 +389,7 @@ impl<I: IntegerRingStore> FiniteRing for ZnBase<I>
 }
 
 impl<I: IntegerRingStore> ZnRing for ZnBase<I>
-    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing
 {
     type IntegerRingBase = I::Type;
     type Integers = I;
@@ -408,7 +408,7 @@ impl<I: IntegerRingStore> ZnRing for ZnBase<I>
 }
 
 impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanHomFrom<ZnBase<I>> for AsFieldBase<R>
-    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing
 {
     type Homomorphism = <ZnBase<I> as CanHomFrom<ZnBase<I>>>::Homomorphism;
 
@@ -422,7 +422,7 @@ impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanHomFrom<ZnBase<I>
 }
 
 impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalIso<ZnBase<I>> for AsFieldBase<R>
-    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing
 {
     type Isomorphism = <ZnBase<I> as CanonicalIso<ZnBase<I>>>::Isomorphism;
 
@@ -436,7 +436,7 @@ impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalIso<ZnBase<
 }
 
 impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanHomFrom<AsFieldBase<R>> for ZnBase<I>
-    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing
 {
     type Homomorphism = <ZnBase<I> as CanHomFrom<ZnBase<I>>>::Homomorphism;
 
@@ -450,7 +450,7 @@ impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanHomFrom<AsFieldBa
 }
 
 impl<R: ZnRingStore<Type = ZnBase<I>>, I: IntegerRingStore> CanonicalIso<AsFieldBase<R>> for ZnBase<I>
-    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing
 {
     type Isomorphism = <ZnBase<I> as CanonicalIso<ZnBase<I>>>::Isomorphism;
 

@@ -11,7 +11,7 @@ pub mod sparse_poly;
 /// Currently, the two implementations of this type of ring are [`dense_poly::DensePolyRing`]
 /// and [`sparse_poly::SparsePolyRing`].
 /// 
-pub trait PolyRing: RingExtension + SelfIso {
+pub trait PolyRing: RingExtension {
 
     type TermsIterator<'a>: Iterator<Item = (&'a El<Self::BaseRing>, usize)>
         where Self: 'a;

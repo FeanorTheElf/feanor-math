@@ -24,14 +24,14 @@ pub fn generic_abs_square_and_multiply<T, U, F, H, I>(base: U, power: &El<I>, in
     return result;
 }
 
-pub fn generic_pow<R: ?Sized, S: ?Sized, I>(base: El<R>, power: &El<I>, base_ring: &R, ring: &S, int_ring: &I) -> El<S>
-    where R: RingStore, 
-        S: RingStore,
-        S::Type: CanHomFrom<R::Type>,
+pub fn generic_pow<H, R, S, I>(base: R::Element, power: &El<I>, int_ring: I, hom: &H) -> S::Element
+    where R: ?Sized + RingBase, 
+        S: ?Sized + RingBase,
+        H: Homomorphism<R, S>,
         I: IntegerRingStore,
         I::Type: IntegerRing
 {
-    let hom = ring.can_hom(&base_ring).unwrap();
+    let ring = hom.codomain();
     generic_abs_square_and_multiply(
         base, 
         power, 
@@ -41,7 +41,7 @@ pub fn generic_pow<R: ?Sized, S: ?Sized, I>(base: El<R>, power: &El<I>, base_rin
             x
         }, 
         |x, mut y| { 
-            ring.get_ring().mul_assign_map_in_ref(base_ring.get_ring(), &mut y, x, hom.raw_hom());
+            hom.mul_assign_map_ref(&mut y, x);
             y
         }, 
         ring.one()

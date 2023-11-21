@@ -292,16 +292,14 @@ pub trait RingBase: PartialEq {
     /// This may panic if `power` is negative.
     /// 
     fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
-        where R::Type: IntegerRing,
-            Self: SelfIso
+        where R::Type: IntegerRing
     {
         assert!(!integers.is_neg(power));
         algorithms::sqr_mul::generic_pow(
             x, 
             power, 
-            &RingRef::new(self),
-            &RingRef::new(self),
-            &integers
+            &integers,
+            &RingRef::new(self).identity()
         )
     }
 
@@ -540,7 +538,7 @@ macro_rules! assert_el_eq {
 /// 
 pub trait RingStore: Sized {
     
-    type Type: RingBase + SelfIso + ?Sized;
+    type Type: RingBase + ?Sized;
 
     fn get_ring<'a>(&'a self) -> &'a Self::Type;
 
@@ -594,6 +592,14 @@ pub trait RingStore: Sized {
         where S: RingStore, Self::Type: CanonicalIso<S::Type> 
     {
         self.get_ring().map_out(to.get_ring(), el, &self.get_ring().has_canonical_iso(to.get_ring()).unwrap())
+    }
+
+    fn into_identity(self) -> Identity<Self> {
+        Identity::new(self)
+    }
+
+    fn identity<'a>(&'a self) -> Identity<&'a Self> {
+        self.into_identity()
     }
 
     ///
@@ -847,7 +853,7 @@ impl<R: RingBase> RingValue<R> {
     }
 }
 
-impl<R: RingBase + CanonicalIso<R>> RingStore for RingValue<R> {
+impl<R: RingBase> RingStore for RingValue<R> {
 
     type Type = R;
     
@@ -869,27 +875,27 @@ impl<R: RingBase + CanonicalIso<R>> RingStore for RingValue<R> {
 /// or [`crate::algorithms::sqr_mul`]). In this case, we only have a reference to a [`crate::ring::RingBase`]
 /// object, but require a [`crate::ring::RingStore`] object to use the algorithm.
 /// 
-pub struct RingRef<'a, R: RingBase + CanonicalIso<R> + ?Sized> {
+pub struct RingRef<'a, R: RingBase + ?Sized> {
     ring: &'a R
 }
 
-impl<'a, R: RingBase + CanonicalIso<R> + ?Sized> Clone for RingRef<'a, R> {
+impl<'a, R: RingBase + ?Sized> Clone for RingRef<'a, R> {
 
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<'a, R: RingBase + CanonicalIso<R> + ?Sized> Copy for RingRef<'a, R> {}
+impl<'a, R: RingBase + ?Sized> Copy for RingRef<'a, R> {}
 
-impl<'a, R: RingBase + CanonicalIso<R> + ?Sized> RingRef<'a, R> {
+impl<'a, R: RingBase + ?Sized> RingRef<'a, R> {
 
     pub const fn new(value: &'a R) -> Self {
         RingRef { ring: value }
     }
 }
 
-impl<'a, R: RingBase + CanonicalIso<R> + ?Sized> RingStore for RingRef<'a, R> {
+impl<'a, R: RingBase + ?Sized> RingStore for RingRef<'a, R> {
 
     type Type = R;
     
@@ -1049,8 +1055,9 @@ fn test_internal_wrappings_dont_matter() {
         }
     }
 
-    impl<R: RingStore> CanonicalIso<BBase<R>> for BBase<R> {
-
+    impl<R: RingStore> CanonicalIso<BBase<R>> for BBase<R> 
+        where R::Type: CanHomFrom<R::Type>
+    {
         type Isomorphism = ();
 
         fn has_canonical_iso(&self, _: &BBase<R>) -> Option<()> {
@@ -1147,9 +1154,7 @@ pub mod generic_tests {
         }
     }
 
-    pub fn test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
-        where R::Type: SelfIso
-    {
+    pub fn test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
         let elements = edge_case_elements.collect::<Vec<_>>();
         let zero = ring.zero();
         let one = ring.one();
@@ -1217,7 +1222,5 @@ pub mod generic_tests {
                     assert!(ring.eq_el(&a_bc, &ab_ac), "Distributivity failed: {} * ({} + {}) = {} != {} = {} * {} + {} * {}", ring.format(a), ring.format(b), ring.format(c), ring.format(&a_bc), ring.format(&ab_ac), ring.format(a), ring.format(b), ring.format(a), ring.format(c));                }
             }
         }
-
-        test_self_iso(&ring, elements.iter().map(|x| ring.clone_el(x)));
     }
 }

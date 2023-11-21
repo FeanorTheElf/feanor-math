@@ -84,13 +84,13 @@ pub trait FFTTable {
     /// 
     /// This function panics if `values.len() != self.len()`.
     ///
-    fn fft<V, S, M>(&self, mut values: V, ring: S, memory_provider: &M)
-        where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
-            V: SwappableVectorViewMut<El<S>>,
-            M: MemoryProvider<El<S>>
+    fn fft<V, S, M, H>(&self, mut values: V, memory_provider: &M, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
+            V: SwappableVectorViewMut<S::Element>,
+            M: MemoryProvider<S::Element>
     {
-        self.unordered_fft(&mut values, ring, memory_provider);
+        self.unordered_fft(&mut values, memory_provider, hom);
         permute::permute_inv(&mut values, |i| self.unordered_fft_permutation(i), &default_memory_provider!());
     }
         
@@ -107,14 +107,14 @@ pub trait FFTTable {
     /// 
     /// This function panics if `values.len() != self.len()`.
     ///
-    fn inv_fft<V, S, M>(&self, mut values: V, ring: S, memory_provider: &M)
-        where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
-            V: SwappableVectorViewMut<El<S>>,
-            M: MemoryProvider<El<S>>
+    fn inv_fft<V, S, M, H>(&self, mut values: V, memory_provider: &M, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
+            V: SwappableVectorViewMut<S::Element>,
+            M: MemoryProvider<S::Element>
     {
         permute::permute(&mut values, |i| self.unordered_fft_permutation(i), &default_memory_provider!());
-        self.unordered_inv_fft(&mut values, ring, memory_provider);
+        self.unordered_inv_fft(&mut values, memory_provider, hom);
     }
 
     ///
@@ -131,20 +131,20 @@ pub trait FFTTable {
     /// The given `memory_provider` is used in the case that temporary memory is required, as e.g.
     /// for [`crate::algorithms::fft::bluestein::FFTTableBluestein`] .
     /// 
-    fn unordered_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
-        where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
-            V: VectorViewMut<El<S>>,
-            M: MemoryProvider<El<S>>;
+    fn unordered_fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
+            V: VectorViewMut<S::Element>,
+            M: MemoryProvider<S::Element>;
     
     ///
     /// Inverse to [`Self::unordered_fft()`], with basically the same contract.
     /// 
-    fn unordered_inv_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
-        where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
-            V: VectorViewMut<El<S>>,
-            M: MemoryProvider<El<S>>;
+    fn unordered_inv_fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
+            V: VectorViewMut<S::Element>,
+            M: MemoryProvider<S::Element>;
 }
 
 impl<T> FFTTable for T
@@ -172,39 +172,39 @@ impl<T> FFTTable for T
         self.deref().unordered_fft_permutation_inv(i)
     }
 
-    fn fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
-        where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
-            V: SwappableVectorViewMut<El<S>>,
-            M: MemoryProvider<El<S>>
+    fn fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
+            V: SwappableVectorViewMut<S::Element>,
+            M: MemoryProvider<S::Element>
     {
-        self.deref().fft(values, ring, memory_provider)
+        self.deref().fft(values, memory_provider, hom)
     }
-        
-    fn inv_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
-        where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
-            V: SwappableVectorViewMut<El<S>>,
-            M: MemoryProvider<El<S>>
+    
+    fn inv_fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
+            V: SwappableVectorViewMut<S::Element>,
+            M: MemoryProvider<S::Element>
     {
-        self.deref().inv_fft(values, ring, memory_provider)
+        self.deref().inv_fft(values, memory_provider, hom)
     }
 
-    fn unordered_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
-        where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
-            V: VectorViewMut<El<S>>,
-            M: MemoryProvider<El<S>>
+    fn unordered_fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
+            V: VectorViewMut<S::Element>,
+            M: MemoryProvider<S::Element>
     {
-        self.deref().unordered_fft(values, ring, memory_provider)
+        self.deref().unordered_fft(values, memory_provider, hom)
     }
         
-    fn unordered_inv_fft<V, S, M>(&self, values: V, ring: S, memory_provider: &M)
-        where S: RingStore, 
-            S::Type: CanHomFrom<<Self::Ring as RingStore>::Type>, 
-            V: VectorViewMut<El<S>>,
-            M: MemoryProvider<El<S>>
+    fn unordered_inv_fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
+            V: VectorViewMut<S::Element>,
+            M: MemoryProvider<S::Element>
     {
-        self.deref().unordered_inv_fft(values, ring, memory_provider)
+        self.deref().unordered_inv_fft(values, memory_provider, hom)
     }
 }

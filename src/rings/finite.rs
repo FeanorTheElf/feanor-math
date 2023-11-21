@@ -1,14 +1,15 @@
 use crate::ring::*;
 use crate::integer::{IntegerRingStore, IntegerRing};
-use crate::homomorphism::*;
 
-pub trait FiniteRing: SelfIso {
+pub trait FiniteRing: RingBase {
 
-    type ElementsIter<'a>: Iterator<Item = Self::Element>
+    type ElementsIter<'a>: Iterator<Item = <Self as RingBase>::Element>
         where Self: 'a;
 
     fn elements<'a>(&'a self) -> Self::ElementsIter<'a>;
-    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> Self::Element;
+
+    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element;
+
     fn size<I: IntegerRingStore>(&self, ZZ: &I) -> El<I>
         where I::Type: IntegerRing;
 }

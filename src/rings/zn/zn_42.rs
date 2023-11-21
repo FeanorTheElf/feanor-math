@@ -212,11 +212,10 @@ impl RingBase for ZnBase {
     }
 
     fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
-            where R::Type: IntegerRing,
-                Self: SelfIso
+        where R::Type: IntegerRing
     {
         let fastmul_ring = ZnFastmul::from(ZnFastmulBase::new(*self));
-        algorithms::sqr_mul::generic_pow(RingRef::new(self).cast(&fastmul_ring, x), power, &fastmul_ring, &RingRef::new(self), &integers)
+        algorithms::sqr_mul::generic_pow(RingRef::new(self).cast(&fastmul_ring, x), power, integers, &RingRef::new(self).can_hom(&fastmul_ring).unwrap())
     }
 
     fn sum<I>(&self, mut els: I) -> Self::Element 
@@ -413,7 +412,7 @@ impl FiniteRing for ZnBase {
         }
     }
 
-    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> Self::Element {
+    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element {
         generic_impls::random_element(self, rng)
     }
 
@@ -449,35 +448,6 @@ impl HashableElRing for ZnBase {
     }
 }
 
-impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
-
-    #[inline(always)]
-    fn butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, _: &ZnBase, _: &<Self as CanHomFrom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnBase as RingBase>::Element, i1: usize, i2: usize) {
-        let a = *values.at(i1);
-        let mut b = *values.at(i2);
-        self.mul_assign_ref(&mut b, twiddle);
-
-        // this is implied by `bounded_reduce`, check anyway
-        debug_assert!(b.0 < self.modulus_u64() * 2);
-        debug_assert!(self.repr_bound >= self.modulus_u64() * 2);
-
-        *values.at_mut(i1) = self.add(a, b);
-        *values.at_mut(i2) = self.add(a, self.from_bounded(2 * self.modulus_u64() - b.0));
-    }
-
-    #[inline(always)]
-    fn inv_butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, _: &ZnBase, _: &<Self as CanHomFrom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnBase as RingBase>::Element, i1: usize, i2: usize) {
-        let a = *values.at(i1);
-        let b = *values.at(i2);
-
-        let b_reduced = self.from_bounded(self.bounded_reduce(b.0 as u128));
-
-        *values.at_mut(i1) = self.add(a, b_reduced);
-        *values.at_mut(i2) = self.add(a, self.from_bounded(2 * self.modulus_u64() - b_reduced.0));
-        self.mul_assign_ref(values.at_mut(i2), twiddle);
-    }
-}
-
 ///
 /// Wraps [`ZnBase`] to represent an instance of the ring `Z/nZ`.
 /// As opposed to [`ZnBase`], elements are stored with additional information
@@ -504,7 +474,7 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
 /// let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, 15).unwrap();
 /// // Note that data uses `ZnBase`
 /// let mut data = (0..(1 << 15)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
-/// fft.unordered_fft(&mut data[..], &ring, &default_memory_provider!());
+/// fft.unordered_fft(&mut data[..], &default_memory_provider!(), &ring.can_hom(&fastmul_ring).unwrap());
 /// ```
 /// 
 #[derive(PartialEq, Clone, Copy)]
@@ -612,10 +582,10 @@ impl CanHomFrom<ZnFastmulBase> for ZnBase {
 impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
 
     #[inline(always)]
-    fn butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, from: &ZnFastmulBase, hom: &<Self as CanHomFrom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
+    fn butterfly<V: crate::vector::VectorViewMut<Self::Element>, H: Homomorphism<ZnFastmulBase, Self>>(&self, hom: &H, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
         let a = *values.at(i1);
         let mut b = *values.at(i2);
-        self.mul_assign_map_in_ref(from, &mut b, twiddle, hom);
+        hom.mul_assign_map_ref(&mut b, twiddle);
 
         // this is implied by `bounded_reduce`, check anyway
         debug_assert!(b.0 < self.modulus_u64() * 2);
@@ -626,7 +596,7 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
     }
 
     #[inline(always)]
-    fn inv_butterfly<V: crate::vector::VectorViewMut<Self::Element>>(&self, from: &ZnFastmulBase, hom: &<Self as CanHomFrom<ZnBase>>::Homomorphism, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
+    fn inv_butterfly<V: crate::vector::VectorViewMut<Self::Element>, H: Homomorphism<ZnFastmulBase, Self>>(&self, hom: &H, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
         let a = *values.at(i1);
         let b = *values.at(i2);
 
@@ -634,7 +604,7 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
 
         *values.at_mut(i1) = self.add(a, b_reduced);
         *values.at_mut(i2) = self.add(a, self.from_bounded(2 * self.modulus_u64() - b_reduced.0));
-        self.mul_assign_map_in_ref(from, values.at_mut(i2), twiddle, hom);
+        hom.mul_assign_map_ref(values.at_mut(i2), twiddle);
     }
 }
 

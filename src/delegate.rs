@@ -64,7 +64,7 @@ use crate::integer::{IntegerRingStore, IntegerRing};
 /// 
 pub trait DelegateRing: PartialEq {
 
-    type Base: ?Sized + RingBase + SelfIso;
+    type Base: ?Sized + RingBase;
     type Element;
 
     fn get_delegate(&self) -> &Self::Base;
@@ -294,7 +294,7 @@ impl<'a, R: ?Sized> Iterator for DelegateZnRingElementsIter<'a, R>
     }
 }
 
-impl<R: DelegateRing + ?Sized + SelfIso> FiniteRing for R
+impl<R: DelegateRing + ?Sized> FiniteRing for R
     where R::Base: FiniteRing
 {
     type ElementsIter<'a> = DelegateZnRingElementsIter<'a, R>
@@ -319,7 +319,7 @@ impl<R: DelegateRing + ?Sized + SelfIso> FiniteRing for R
 }
 
 impl<R: DelegateRing + ?Sized> ZnRing for R
-    where R::Base: ZnRing, R: CanHomFrom<<R::Base as ZnRing>::IntegerRingBase> + SelfIso
+    where R::Base: ZnRing, R: CanHomFrom<<R::Base as ZnRing>::IntegerRingBase>
 {
     type IntegerRingBase = <R::Base as ZnRing>::IntegerRingBase;
     type Integers = <R::Base as ZnRing>::Integers;

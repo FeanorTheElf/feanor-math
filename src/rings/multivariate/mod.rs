@@ -26,7 +26,7 @@ type MonomialExponent = u16;
 /// Currently, the only implementation of such rings is [`ordered::MultivariatePolyRingImpl`],
 /// which is stores all monomials in an ordered vector.
 /// 
-pub trait MultivariatePolyRing: RingExtension + SelfIso {
+pub trait MultivariatePolyRing: RingExtension {
 
     type MonomialVector: VectorViewMut<MonomialExponent>;
     type TermsIterator<'a>: Iterator<Item = (&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)>

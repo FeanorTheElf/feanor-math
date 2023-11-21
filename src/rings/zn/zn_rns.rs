@@ -438,7 +438,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRing, M: MemoryProvider<El<C
     where C::Type: ZnRing + CanHomFrom<J::Type> + CanHomFrom<K>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
-        K: ?Sized + SelfIso
+        K: ?Sized
 {
     type Homomorphism = Vec<<C::Type as CanHomFrom<K>>::Homomorphism>;
 
@@ -513,7 +513,7 @@ impl<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Iterator
 
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FiniteRing for ZnBase<C, J, M> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
-        J::Type: IntegerRing + SelfIso,
+        J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
     type ElementsIter<'a> = ZnBaseElementsIterator<'a, C, J, M>
@@ -539,7 +539,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FiniteRing f
 
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnRing for ZnBase<C, J, M> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
-        J::Type: IntegerRing + SelfIso,
+        J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
     type IntegerRingBase = J::Type;

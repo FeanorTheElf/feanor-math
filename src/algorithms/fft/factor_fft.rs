@@ -123,44 +123,42 @@ impl<R, T1, T2> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2>
         &self.root_of_unity
     }
 
-    fn unordered_fft<V, S, N>(&self, mut values: V, ring: S, memory_provider: &N)
-        where S: RingStore,
-            S::Type: CanHomFrom<<R as RingStore>::Type>,
-            V: VectorViewMut<El<S>>,
-            N: MemoryProvider<El<S>>
+    fn unordered_fft<V, S, M, H>(&self, mut values: V, memory_provider: &M, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
+            V: VectorViewMut<S::Element>,
+            M: MemoryProvider<S::Element>
     {
-        let hom = ring.can_hom(self.ring()).unwrap();
         for i in 0..self.right_table.len() {
             let mut v = Subvector::new(&mut values).subvector(i..).stride(self.right_table.len());
-            self.left_table.unordered_fft(&mut v, &ring, memory_provider);
+            self.left_table.unordered_fft(&mut v, memory_provider, hom);
         }
         for i in 0..self.len() {
-            ring.get_ring().mul_assign_map_in_ref(self.ring().get_ring(), values.at_mut(i), self.inv_twiddle_factors.at(i), hom.raw_hom());
+            hom.mul_assign_map_ref(values.at_mut(i), self.inv_twiddle_factors.at(i));
         }
         for i in 0..self.left_table.len() {
             let mut v = Subvector::new(&mut values).subvector((i * self.right_table.len())..((i + 1) * self.right_table.len()));
-            self.right_table.unordered_fft(&mut v, &ring, memory_provider);
+            self.right_table.unordered_fft(&mut v, memory_provider, hom);
         }
     }
 
-    fn unordered_inv_fft<V, S, N>(&self, mut values: V, ring: S, memory_provider: &N)
-        where S: RingStore,
-            S::Type: CanHomFrom<<R as RingStore>::Type>,
-            V: VectorViewMut<El<S>>,
-            N: MemoryProvider<El<S>>
+    fn unordered_inv_fft<V, S, M, H>(&self, mut values: V, memory_provider: &M, hom: &H)
+        where S: ?Sized + RingBase, 
+            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
+            V: VectorViewMut<S::Element>,
+            M: MemoryProvider<S::Element>
     {
-        let hom = ring.can_hom(self.ring()).unwrap();
         for i in 0..self.left_table.len() {
             let mut v = Subvector::new(&mut values).subvector((i * self.right_table.len())..((i + 1) * self.right_table.len()));
-            self.right_table.unordered_inv_fft(&mut v, &ring, memory_provider);
+            self.right_table.unordered_inv_fft(&mut v, memory_provider, hom);
         }
         for i in 0..self.len() {
-            ring.get_ring().mul_assign_map_in_ref(self.ring().get_ring(), values.at_mut(i), self.twiddle_factors.at(i), hom.raw_hom());
+            hom.mul_assign_map_ref(values.at_mut(i), self.twiddle_factors.at(i));
             debug_assert!(self.ring().get_ring().is_approximate() || self.ring().is_one(&self.ring().mul_ref(self.twiddle_factors.at(i), self.inv_twiddle_factors.at(i))));
         }
         for i in 0..self.right_table.len() {
             let mut v = Subvector::new(&mut values).subvector(i..).stride(self.right_table.len());
-            self.left_table.unordered_inv_fft(&mut v, &ring, memory_provider);
+            self.left_table.unordered_inv_fft(&mut v, memory_provider, hom);
         }
     }
 
@@ -212,7 +210,7 @@ fn test_fft_basic() {
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
-    fft.unordered_fft(&mut values, ring, &default_memory_provider!());
+    fft.unordered_fft(&mut values, &default_memory_provider!(), &ring.identity());
     assert_eq!(values, permuted_expected);
 }
 
@@ -231,7 +229,7 @@ fn test_fft_long() {
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
-    fft.unordered_fft(&mut values, ring, &default_memory_provider!());
+    fft.unordered_fft(&mut values, &default_memory_provider!(), &ring.identity());
     assert_eq!(values, permuted_expected);
 }
 
@@ -251,17 +249,17 @@ fn test_fft_unordered() {
     }
     let original = values;
 
-    fft.unordered_fft(&mut values, ring, &default_memory_provider!());
+    fft.unordered_fft(&mut values, &default_memory_provider!(), &ring.identity());
 
     let mut ordered_fft = [0; LEN];
     for i in 0..LEN {
         ordered_fft[fft.unordered_fft_permutation(i)] = values[i];
     }
 
-    fft.unordered_inv_fft(&mut values, ring, &default_memory_provider!());
+    fft.unordered_inv_fft(&mut values, &default_memory_provider!(), &ring.identity());
     assert_eq!(values, original);
 
-    fft.inv_fft(&mut ordered_fft, ring, &default_memory_provider!());
+    fft.inv_fft(&mut ordered_fft, &default_memory_provider!(), &ring.identity());
     assert_eq!(ordered_fft, original);
 }
 
@@ -292,7 +290,7 @@ fn test_inv_fft() {
     let mut values = [3, 62, 63, 96, 37, 36];
     let expected = [1, 0, 0, 1, 0, 1];
 
-    fft.inv_fft(&mut values, ring, &default_memory_provider!());
+    fft.inv_fft(&mut values, &default_memory_provider!(), &ring.identity());
     assert_eq!(values, expected);
 }
 
@@ -306,7 +304,7 @@ fn test_approximate_fft() {
             cooley_tuckey::FFTTableCooleyTuckey::for_complex(CC, log2_n)
         );
         let mut array = default_memory_provider!().get_new_init(p << log2_n, |i| CC.root_of_unity(i as i64, (p as i64) << log2_n));
-        fft.fft(&mut array, CC, &default_memory_provider!());
+        fft.fft(&mut array, &default_memory_provider!(), &CC.identity());
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
@@ -332,8 +330,8 @@ fn bench_factor_fft(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         copy.clear();
         copy.extend(data.iter().map(|x| ring.clone_el(x)));
-        fft.unordered_fft(&mut copy[..], &ring, &default_memory_provider!());
-        fft.unordered_inv_fft(&mut copy[..], &ring, &default_memory_provider!());
+        fft.unordered_fft(&mut copy[..], &default_memory_provider!(), &ring.can_hom(&fastmul_ring).unwrap());
+        fft.unordered_inv_fft(&mut copy[..], &default_memory_provider!(), &ring.can_hom(&fastmul_ring).unwrap());
         assert_el_eq!(&ring, &copy[0], &data[0]);
     });
 }

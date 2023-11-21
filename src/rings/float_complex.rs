@@ -124,8 +124,7 @@ impl RingBase for Complex64 {
     }
 
     fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
-        where R::Type: IntegerRing,
-            Self: SelfIso 
+        where R::Type: IntegerRing
     {
         self.exp(self.mul(self.ln_main_branch(x), Complex64El(integers.to_float_approx(power), 0.)))
     }

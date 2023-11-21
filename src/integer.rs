@@ -23,7 +23,7 @@ pub type BigIntRingBase = crate::rings::rust_bigint::RustBigintRingBase;
 /// As an additional requirement, the euclidean division (i.e. [`EuclideanRing::euclidean_div_rem()`] and
 /// [`IntegerRing::euclidean_div_pow_2()`]) are expected to round towards zero.
 /// 
-pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + SelfIso + CanonicalIso<StaticRingBase<i32>> {
+pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + CanonicalIso<Self> + CanonicalIso<StaticRingBase<i32>> {
 
     ///
     /// Computes a float value that is supposed to be close to value.

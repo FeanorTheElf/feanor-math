@@ -113,7 +113,8 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> DensePolyRingBase<R, M> {
             rhs, 
             RingRef::new(self), 
             RingRef::new(self), 
-            |x| left_div_lc(self.base_ring().clone_el(x)).ok_or(())
+            |x| left_div_lc(self.base_ring().clone_el(x)).ok_or(()),
+            &self.base_ring().identity()
         ).ok()?;
         *lhs = rem;
         return Some(quo);
@@ -347,7 +348,7 @@ impl<'a, R> Iterator for TermIterator<'a, R>
 }
 
 impl<R, M: GrowableMemoryProvider<El<R>>> PolyRing for DensePolyRingBase<R, M> 
-    where R: RingStore, R::Type: CanonicalIso<R::Type>
+    where R: RingStore
 {
     type TermsIterator<'a> = TermIterator<'a, R>
         where Self: 'a;

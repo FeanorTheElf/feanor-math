@@ -2,16 +2,18 @@ use crate::ring::*;
 use crate::homomorphism::*;
 use crate::rings::poly::*;
 
-pub fn sparse_poly_div<P, S, F, E>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_ring: S, mut left_div_lc: F) -> Result<(El<P>, El<P>), E>
+pub fn sparse_poly_div<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_ring: S, mut left_div_lc: F, hom: &H) -> Result<(El<P>, El<P>), E>
     where S: PolyRingStore,
         S::Type: PolyRing,
         P: PolyRingStore,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: CanHomFrom<<<S::Type as RingExtension>::BaseRing as RingStore>::Type>,
+        H: Homomorphism<<<S::Type as RingExtension>::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>,
         F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>
 {
     assert!(rhs_ring.degree(rhs).is_some());
-    let hom = lhs_ring.base_ring().can_hom(rhs_ring.base_ring()).unwrap();
+    assert!(lhs_ring.base_ring().get_ring() == hom.codomain().get_ring());
+    assert!(rhs_ring.base_ring().get_ring() == hom.domain().get_ring());
+
     let rhs_deg = rhs_ring.degree(rhs).unwrap();
     if lhs_ring.degree(&lhs).is_none() {
         return Ok((lhs_ring.zero(), lhs));
@@ -29,7 +31,7 @@ pub fn sparse_poly_div<P, S, F, E>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs
                 rhs_ring.terms(rhs)
                     .map(|(c, j)| {
                         let mut subtract = lhs_ring.base_ring().clone_el(&quo);
-                        lhs_ring.base_ring().get_ring().mul_assign_map_in_ref(rhs_ring.base_ring().get_ring(), &mut subtract, c, hom.raw_hom());
+                        hom.mul_assign_map_ref(&mut subtract, c);
                         return (lhs_ring.base_ring().negate(subtract), i + j);
                     })
             );

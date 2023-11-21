@@ -256,6 +256,8 @@ pub trait CanHomFrom<S>: RingBase
 /// Trait for rings R that have a canonical isomorphism `S -> R`.
 /// A ring homomorphism is expected to be unital.
 /// 
+/// I am currently thinking about removing this trait entirely.
+/// 
 /// # Exact requirements
 /// 
 /// Same as for [`CanHomFrom`], it is up to implementors to decide which
@@ -508,5 +510,34 @@ impl<R> IntHom<R>
 {
     pub fn new(ring: R) -> Self {
         Self { ring }
+    }
+}
+
+pub struct Identity<R: RingStore> {
+    ring: R
+}
+
+impl<R: RingStore> Identity<R> {
+
+    pub fn new(ring: R) -> Self {
+        Identity { ring }
+    }
+}
+
+impl<R: RingStore> Homomorphism<R::Type, R::Type> for Identity<R> {
+
+    type CodomainStore = R;
+    type DomainStore = R;
+
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
+        &self.ring
+    }
+
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
+        &self.ring
+    }
+
+    fn map(&self, x: <R::Type as RingBase>::Element) -> <R::Type as RingBase>::Element {
+        x
     }
 }
