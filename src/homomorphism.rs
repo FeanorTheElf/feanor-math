@@ -541,3 +541,24 @@ impl<R: RingStore> Homomorphism<R::Type, R::Type> for Identity<R> {
         x
     }
 }
+
+impl<'a, S, R, H> Homomorphism<S, R> for &'a H 
+    where S: ?Sized + RingBase, R: ?Sized + RingBase, H: Homomorphism<S, R>
+{
+    type CodomainStore = H::CodomainStore;
+    type DomainStore = H::DomainStore;
+
+    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
+        (*self).codomain()
+    }
+
+    fn domain<'b>(&'b self) -> &'b Self::DomainStore {
+        (*self).domain()
+    }
+
+    fn map(&self, x: <S as RingBase>::Element) -> <R as RingBase>::Element {
+        (*self).map(x)
+    }
+
+    
+}

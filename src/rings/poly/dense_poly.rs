@@ -395,6 +395,22 @@ impl<R, M: GrowableMemoryProvider<El<R>>> PolyRing for DensePolyRingBase<R, M>
         let quo = self.poly_div(&mut lhs, rhs, |x| Some(x)).unwrap();
         return (quo, lhs);
     }
+
+    fn evaluate<S, H>(&self, f: &Self::Element, value: &S::Element, hom: &H) -> S::Element
+        where S: ?Sized + RingBase,
+            H: Homomorphism<R::Type, S>
+    {
+        if self.is_zero(f) {
+            return hom.codomain().zero();
+        }
+        let d = self.degree(f).unwrap();
+        let mut current = hom.map_ref(self.coefficient_at(f, d));
+        for i in (0..d).rev() {
+            hom.codomain().mul_assign_ref(&mut current, value);
+            hom.codomain().add_assign(&mut current, hom.map_ref(self.coefficient_at(f, i)));
+        }
+        return current;
+    }
 }
 
 impl<R, M: GrowableMemoryProvider<El<R>>> DivisibilityRing for DensePolyRingBase<R, M> 

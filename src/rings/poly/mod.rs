@@ -34,6 +34,25 @@ pub trait PolyRing: RingExtension {
     fn degree(&self, f: &Self::Element) -> Option<usize>;
 
     fn div_rem_monic(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element);
+    
+    fn map_terms<P, H>(&self, from: &P, el: &P::Element, hom: &H) -> Self::Element
+        where P: ?Sized + PolyRing,
+            H: Homomorphism<<P::BaseRing as RingStore>::Type, <Self::BaseRing as RingStore>::Type>
+    {
+        assert!(self.base_ring().get_ring() == hom.codomain().get_ring());
+        assert!(from.base_ring().get_ring() == hom.domain().get_ring());
+        RingRef::new(self).from_terms(from.terms(el).map(|(c, i)| (hom.map_ref(c), i)))
+    }
+
+    fn evaluate<R, H>(&self, f: &Self::Element, value: &R::Element, hom: &H) -> R::Element
+        where R: ?Sized + RingBase,
+            H: Homomorphism<<Self::BaseRing as RingStore>::Type, R>
+    {
+        hom.codomain().sum(self.terms(f).map(|(c, i)| {
+            let result = hom.codomain().pow(hom.codomain().clone_el(value), i);
+            hom.mul_ref_snd_map(result, c)
+        }))
+    }
 }
 
 pub trait PolyRingStore: RingStore
@@ -61,6 +80,13 @@ pub trait PolyRingStore: RingStore
 
     fn lc<'a>(&'a self, f: &'a El<Self>) -> Option<&'a El<<Self::Type as RingExtension>::BaseRing>> {
         Some(self.coefficient_at(f, self.degree(f)?))
+    }
+
+    fn evaluate<R, H>(&self, f: &El<Self>, value: &R::Element, hom: &H) -> R::Element
+        where R: ?Sized + RingBase,
+            H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, R>
+    {
+        self.get_ring().evaluate(f, value, hom)
     }
 }
 
@@ -208,6 +234,18 @@ pub mod generic_tests {
                     );
                 }
             }
+        }
+
+        // test evaluate()
+        let hom = ring.base_ring().int_hom();
+        let base_ring = hom.codomain();
+        let f = ring.from_terms([(hom.map(1), 0), (hom.map(3), 1), (hom.map(7), 3)].into_iter());
+        for a in &elements {
+            assert_el_eq!(
+                &base_ring,
+                &base_ring.add(base_ring.one(), base_ring.add(base_ring.mul_ref_snd(hom.map(3), a), base_ring.mul(hom.map(7), base_ring.pow(base_ring.clone_el(a), 3)))),
+                &ring.evaluate(&f, a, &base_ring.identity())
+            )
         }
     }
 }

@@ -478,12 +478,12 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
 
     fn evaluate<S, V, H>(&self, f: &Self::Element, values: V, hom: &H) -> S::Element
         where S: ?Sized + RingBase,
-            H: Homomorphism<R::Type, S> + Clone,
+            H: Homomorphism<R::Type, S>,
             V: VectorView<S::Element> 
     {
         assert_eq!(values.len(), self.indeterminate_len());
         let new_ring: MultivariatePolyRingImpl<_, _, _, N> = MultivariatePolyRingImpl::new(hom.codomain(), self.order.clone(), default_memory_provider!());
-        let mut result = new_ring.lifted_hom(&RingRef::new(self), hom.clone()).map_ref(f);
+        let mut result = new_ring.lifted_hom(&RingRef::new(self), hom).map_ref(f);
         for i in 0..self.indeterminate_len() {
             result = new_ring.specialize(&result, i, &new_ring.base_ring_embedding().map_ref(values.at(i)));
         }

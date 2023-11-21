@@ -432,11 +432,11 @@ use crate::rings::zn::*;
 #[cfg(test)]
 use crate::rings::zn::zn_static::{Zn, Fp};
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
-#[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
 #[cfg(test)]
 use super::dense_poly::DensePolyRing;
+#[cfg(test)]
+use crate::primitive_int::StaticRing;
 
 #[cfg(test)]
 fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El<P>>
