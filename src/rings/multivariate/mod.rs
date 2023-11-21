@@ -126,10 +126,58 @@ pub trait MultivariatePolyRing: RingExtension + SelfIso {
         return result;
     }
 
+    fn map_terms<P, H>(&self, from: &P, el: &P::Element, hom: &H) -> Self::Element
+        where P: ?Sized + MultivariatePolyRing,
+            H: Homomorphism<<P::BaseRing as RingStore>::Type, <Self::BaseRing as RingStore>::Type>
+    {
+        assert!(self.base_ring().get_ring() == hom.codomain().get_ring());
+        assert!(from.base_ring().get_ring() == hom.domain().get_ring());
+        RingRef::new(self).from_terms(from.terms(el).map(|(c, m)| (hom.map_ref(c), self.create_monomial((0..m.len()).map(|i| m[i])))))
+    }
+
     fn evaluate<R, V>(&self, f: &Self::Element, values: V, ring: R) -> El<R>
         where R: RingStore,
             R::Type: CanHomFrom<<Self::BaseRing as RingStore>::Type>,
             V: VectorView<El<R>>;
+}
+
+pub struct CoefficientHom<PFrom, PTo, H>
+    where PFrom: MultivariatePolyRingStore,
+        PTo: MultivariatePolyRingStore,
+        PFrom::Type: MultivariatePolyRing,
+        PTo::Type: MultivariatePolyRing,
+        H: Homomorphism<<<PFrom::Type as RingExtension>::BaseRing as RingStore>::Type, <<PTo::Type as RingExtension>::BaseRing as RingStore>::Type>
+{
+    from: PFrom,
+    to: PTo,
+    hom: H
+}
+
+impl<PFrom, PTo, H> Homomorphism<PFrom::Type, PTo::Type> for CoefficientHom<PFrom, PTo, H>
+    where PFrom: MultivariatePolyRingStore,
+        PTo: MultivariatePolyRingStore,
+        PFrom::Type: MultivariatePolyRing,
+        PTo::Type: MultivariatePolyRing,
+        H: Homomorphism<<<PFrom::Type as RingExtension>::BaseRing as RingStore>::Type, <<PTo::Type as RingExtension>::BaseRing as RingStore>::Type>
+{
+    type DomainStore = PFrom;
+    type CodomainStore = PTo;
+
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
+        &self.to
+    }
+
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
+        &self.from
+    }
+
+    fn map(&self, x: <PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element {
+        self.map_ref(&x)
+    }
+
+    fn map_ref(&self, x: &<PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element {
+        self.to.get_ring().map_terms(self.from.get_ring(), x, &self.hom)
+    }
 }
 
 pub trait MultivariatePolyRingStore: RingStore
@@ -147,6 +195,26 @@ pub trait MultivariatePolyRingStore: RingStore
 
     fn terms<'a>(&'a self, f: &'a El<Self>) -> <Self::Type as MultivariatePolyRing>::TermsIterator<'a> {
         self.get_ring().terms(f)
+    }
+
+    fn into_lifted_hom<P, H>(self, from: P, hom: H) -> CoefficientHom<P, Self, H>
+        where P: MultivariatePolyRingStore,
+            P::Type: MultivariatePolyRing,
+            H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
+    {
+        CoefficientHom {
+            from: from,
+            to: self,
+            hom: hom
+        }
+    }
+
+    fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
+        where P: MultivariatePolyRingStore,
+            P::Type: MultivariatePolyRing,
+            H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
+    {
+        self.into_lifted_hom(from, hom)
     }
 
     fn from_terms<I>(&self, iter: I) -> El<Self>
