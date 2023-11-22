@@ -197,6 +197,14 @@ pub trait MultivariatePolyRingStore: RingStore
         self.get_ring().terms(f)
     }
 
+    fn evaluate<R, V, H>(&self, f: &El<Self>, values: V, hom: &H) -> R::Element
+        where R: ?Sized + RingBase,
+            H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, R> + Clone,
+            V: VectorView<R::Element>
+    {
+        self.get_ring().evaluate(f, values, hom)
+    }
+
     fn into_lifted_hom<P, H>(self, from: P, hom: H) -> CoefficientHom<P, Self, H>
         where P: MultivariatePolyRingStore,
             P::Type: MultivariatePolyRing,
