@@ -137,7 +137,7 @@ pub trait MultivariatePolyRing: RingExtension {
 
     fn evaluate<R, V, H>(&self, f: &Self::Element, values: V, hom: &H) -> R::Element
         where R: ?Sized + RingBase,
-            H: Homomorphism<<Self::BaseRing as RingStore>::Type, R> + Clone,
+            H: Homomorphism<<Self::BaseRing as RingStore>::Type, R>,
             V: VectorView<R::Element>;
 }
 
@@ -199,7 +199,7 @@ pub trait MultivariatePolyRingStore: RingStore
 
     fn evaluate<R, V, H>(&self, f: &El<Self>, values: V, hom: &H) -> R::Element
         where R: ?Sized + RingBase,
-            H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, R> + Clone,
+            H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, R>,
             V: VectorView<R::Element>
     {
         self.get_ring().evaluate(f, values, hom)
