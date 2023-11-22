@@ -19,18 +19,20 @@ This library uses nightly Rust, and even unstable features like const-generics a
 
 ## A short introduction
 
-The two fundamental traits in this crate are `RingBase` and `RingStore`.
-The trait `RingBase` is designed for implementors, i.e. to define a ring structure as simply as possible.
-The trait `RingStore` on the other hand is designed for using a ring, and is implemented by objects that provide access to an underlying `RingBase` object.
-The reasons for this separation are explained further down this page.
+This library is designed by considering rings and their arithmetic as the most fundamental concept.
+This gives rise to the two traits `RingBase` and `RingStore`.
+These two traits mirror a general design strategy in this crate, which is to provide both implementor-facing traits (e.g. `RingBase`) and user-facing traits (e.g. `RingStore`).
+The former try to make it easy to implement a new ring with custom arithmetic, which the latter make it easy to write code that performs arithmetic within a ring.
+More reasons for this separation are explained further down this page.
 
 ## Features
 
 The following rings are provided
  - The integer ring `Z`, as a trait `crate::integer::IntegerRing` with implementations for all primitive ints (`i8` to `i128`), an arbitrary-precision implementation `crate::rings::rust_bigint::RustBigintRing`, and an optional implementation using bindings to the heavily optimized library [mpir](https://github.com/wbhart/mpir)
- - The quotient ring `Z/nZ`, as a trait `crate::rings::zn::ZnRing` with four implementations. One where the modulus is small and known at compile-time `crate::rings::zn::zn_static::Zn`, an optimized implementation of Barett-reductions for moduli up to 41 bits `crate::rings::zn::zn_42::Zn`, a generic implementation of Barett-reductions for any modulus and any integer ring (including arbitrary-precision ones) `crate::rings::zn::zn_barett::Zn` and a residue-number-system implementation for highly composite moduli `crate::rings::zn::zn_rns::Zn`.
+ - The quotient ring `Z/nZ`, as a trait `crate::rings::zn::ZnRing` with four implementations. One where the modulus is small and known at compile-time `crate::rings::zn::zn_static::Zn`, an optimized implementation of Barett-reductions for moduli somewhat smaller than 64 bits `crate::rings::zn::zn_64::Zn`, a generic implementation of Barett-reductions for any modulus and any integer ring (including arbitrary-precision ones) `crate::rings::zn::zn_barett::Zn` and a residue-number-system implementation for highly composite moduli `crate::rings::zn::zn_rns::Zn`.
  - The polynomial ring `R[X]` over any base ring, as a trait `crate::rings::poly::PolyRing` with two implementations, one for densely filled polynomials `crate::rings::poly::dense_poly::DensePolyRing` and one for sparsely filled polynomials `crate::rings::poly::sparse_poly::SparsePolyRing`.
  - Finite-rank simple and free ring extensions, as a trait `crate::rings::extension::FreeAlgebra`, with an implementation based on polynomial division `crate::rings::extension::FreeAlgebraImpl`
+ - Multivariate polynomial rings `R[X1, ..., XN]` over any base ring, as the trait `crate::rings::multivariate::MultivariatePolyRing` and one implementation `crate::rings::multivariate::ordered::MultivariatePolyRingImpl` based on a sparse representation using ordered vectors.
 
 The following algorithms are implemented
  - Fast Fourier transforms, including an optimized implementation of the Cooley-Tuckey algorithm for the power-of-two case, an implementation of the Bluestein algorithm for arbitrary lengths, and a factor FFT implementation (also based on the Cooley-Tuckey algorithm). The Fourier transforms work on all rings that have suitable roots of unity, in particular the complex numbers `C` and suitable finite rings `Fq`
@@ -39,6 +41,7 @@ The following algorithms are implemented
  - Lenstra's Elliptic Curve algorithm to factor integers (although the current implementation is very slow)
  - Miller-Rabin test to check primality of integers
  - A baby-step-giant-step and factorization-based algorithm to compute arbitrary discrete logarithms
+ - Faugere's F4 to compute Gröbner basis
 
 ## Using rings
 
@@ -78,7 +81,7 @@ fn fermat_is_prime(n: i64) -> bool {
 
 assert!(algorithms::miller_rabin::is_prime(StaticRing::<i64>::RING, &91, 6) == fermat_is_prime(91));
 ```
-If we want to support arbitrary rings of integers - e.g. `RustBigintRing::RING`, which is a simple
+If we want to support arbitrary rings of integers - e.g. `BigIntRing::RING`, which is a simple
 implementation of arbitrary-precision integers - we could make the function generic as
 
 ```rust
@@ -176,45 +179,121 @@ impl RingBase for F2Base {
     }
 }
 
-// To properly use a ring, in addition to RingBase we have to implement CanHomFrom<Self> and
-// CanonicalIso<Self>. This ensures that the ring works well with the canonical ring mapping
-// framework, that later allows us to use functions like `cast()` or `coerce()`.
-// In practice, we might also want to add implementations like `CanHomFrom<I> where I: IntegerRing`
-// or CanonicalIso<feanor_math::rings::zn::zn_static::ZnBase<2, true>>.
-
-impl CanHomFrom<F2Base> for F2Base {
-    
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, from: &Self) -> Option<Self::Homomorphism> {
-        // a canonical homomorphism F -> F exists for all rings F of type F2Base, as
-        // there is only one possible instance of F2Base
-        Some(())
-    }
-
-    fn map_in(&self, from: &Self, el: Self::Element, hom: &Self::Homomorphism) -> Self::Element {
-        el
-    }
-}
-
-impl CanonicalIso<F2Base> for F2Base {
-    
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, from: &Self) -> Option<Self::Isomorphism> {
-        // a canonical isomorphism F -> F exists for all rings F of type F2Base, as
-        // there is only one possible instance of F2Base
-        Some(())
-    }
-
-    fn map_out(&self, from: &Self, el: Self::Element, hom: &Self::Homomorphism) -> Self::Element {
-        el
-    }
-}
-
 pub const F2: RingValue<F2Base> = RingValue::from(F2Base);
 
 assert_el_eq!(&F2, &F2.int_hom().map(1), &F2.add(F2.one(), F2.zero()));
+```
+
+## Both together
+
+One of the main goals of this trait was to make it easy to nest rings, so implement a functor on the category of rings.
+Classical examples are polynomial rings `R[X]` that exist for any ring `R`.
+Since in that case we are both using and implementing rings, we should use both sides of the framework.
+For example, a simple polynomial ring implementation could look like this.
+```
+# use feanor_math::assert_el_eq;
+# use feanor_math::ring::*;
+# use feanor_math::homomorphism::*;
+# use feanor_math::rings::zn::*;
+# use std::cmp::{min, max};
+
+pub struct MyPolyRing<R: RingStore> {
+    base_ring: R
+}
+
+impl<R: RingStore> PartialEq for MyPolyRing<R> {
+
+    fn eq(&self, other: &Self) -> bool {
+        self.base_ring.get_ring() == other.base_ring.get_ring()
+    }
+}
+
+impl<R: RingStore> RingBase for MyPolyRing<R> {
+
+    // in a real implementation, we might want to wrap this in a newtype, to avoid
+    // exposing the vector interface (although exposing that interface might be intended - 
+    // the crate does not judge whether this is a good idea)
+    type Element = Vec<El<R>>;
+
+    fn clone_el(&self, el: &Self::Element) -> Self::Element {
+        el.iter().map(|x| self.base_ring.clone_el(x)).collect()
+    }
+
+    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
+        for i in 0..min(lhs.len(), rhs.len()) {
+            self.base_ring.add_assign_ref(&mut lhs[i], &rhs[i]);
+        }
+        for i in lhs.len()..rhs.len() {
+            lhs.push(self.base_ring.clone_el(&rhs[i]))
+        }
+    }
+
+    fn negate_inplace(&self, val: &mut Self::Element) {
+        for x in val {
+            self.base_ring.negate_inplace(x);
+        }
+    }
+
+    fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+        // this is just for demonstration purposes - note that the length of the vectors would slowly increase,
+        // even if the degree of the polynomials doesn't
+        let mut result = (0..(lhs.len() + rhs.len())).map(|_| self.base_ring.zero()).collect::<Vec<_>>();
+        for i in 0..lhs.len() {
+            for j in 0..rhs.len() {
+                self.base_ring.add_assign(&mut result[i + j], self.base_ring.mul_ref(&lhs[i], &rhs[j]));
+            }
+        }
+        return result;
+    }
+
+    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
+        *lhs = self.mul_ref(lhs, &rhs);
+    }
+
+    fn from_int(&self, x: i32) -> Self::Element {
+        vec![self.base_ring.int_hom().map(x)]
+    }
+
+    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+        let zero = self.base_ring.zero();
+        for i in 0..max(lhs.len(), rhs.len()) {
+            if !self.base_ring.eq_el(lhs.get(i).unwrap_or(&zero), rhs.get(i).unwrap_or(&zero)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    fn is_commutative(&self) -> bool {
+        self.base_ring.is_commutative()
+    }
+
+    fn is_noetherian(&self) -> bool {
+        // by Hilbert's basis theorem
+        self.base_ring.is_noetherian()
+    }
+
+    fn dbg(&self, val: &Self::Element, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        // this is just for demonstration purposes - note that this prints zero coefficients
+        for i in 0..(val.len() - 1) {
+            write!(f, "{} * X^{} + ", self.base_ring.format(&val[i]), i)?;
+        }
+        write!(f, "{} * X^{}", self.base_ring.format(val.last().unwrap()), val.len() - 1)
+    }
+}
+
+// in a real implementation, we definitely should implement also `feanor_math::rings::poly::PolyRing`, and
+// possibly other traits (`CanHomFrom<other polynomial rings>`, `RingExtension`, `DivisibilityRing`, `EuclideanRing`)
+
+let base = zn_static::F17;
+// we do not use the `RingBase`-implementor directly, but wrap it in a `RingStore`;
+// note that here, this is not strictly necessary, but still recommended
+let ring = RingValue::from(MyPolyRing { base_ring: base });
+let x = vec![0, 1];
+let f = ring.add_ref(&x, &ring.int_hom().map(8));
+let g = ring.add_ref(&x, &ring.int_hom().map(7));
+let h = ring.add(ring.mul_ref(&x, &x), ring.add_ref(&ring.mul_ref(&x, &ring.int_hom().map(-2)), &ring.int_hom().map(5)));
+assert_el_eq!(&ring, &h, &ring.mul(f, g));
 ```
 
 ## `RingBase` vs `RingStore`

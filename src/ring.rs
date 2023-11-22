@@ -7,11 +7,13 @@ use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::algorithms;
 
 ///
-/// Basic trait for objects that have a ring structure.
+/// Basic trait for objects that have a ring structure. This trait is 
+/// implementor-facing, so designed to be used for implementing new
+/// rings.
 /// 
 /// Implementors of this trait should provide the basic ring operations,
 /// and additionally operators for displaying and equality testing. If
-/// a performance advantage can be achieved by acceFpting some arguments by
+/// a performance advantage can be achieved by accepting some arguments by
 /// reference instead of by value, the default-implemented functions for
 /// ring operations on references should be overwritten.
 /// 
@@ -490,8 +492,11 @@ macro_rules! assert_el_eq {
 }
 
 ///
-/// Basic trait for objects that store (in some sense) a ring. This can
-/// be a ring-by-value, a reference to a ring, or really any object that
+/// Basic trait for objects that store (in some sense) a ring. It can also
+/// be considered the user-facing trait for rings, so rings are always supposed
+/// to be used through a `RingStore`-object.
+/// 
+/// This can be a ring-by-value, a reference to a ring, or really any object that
 /// provides access to a [`RingBase`] object.
 /// 
 /// As opposed to [`RingBase`], which is responsible for the
@@ -508,12 +513,15 @@ macro_rules! assert_el_eq {
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
+/// # use std::rc::Rc;
 /// fn add_in_ring<R: RingStore>(ring: R, a: El<R>, b: El<R>) -> El<R> {
 ///     ring.add(a, b)
 /// }
 /// 
 /// let ring: RingValue<StaticRingBase<i64>> = StaticRing::<i64>::RING;
 /// assert_el_eq!(&ring, &7, &add_in_ring(ring, 3, 4));
+/// assert_el_eq!(&ring, &7, &add_in_ring(&ring, 3, 4));
+/// assert_el_eq!(&ring, &7, &add_in_ring(Rc::new(ring), 3, 4));
 /// ```
 /// 
 /// # What does this do?

@@ -1,5 +1,28 @@
-use crate::{ring::*, primitive_int::{StaticRingBase, StaticRing}};
+use crate::ring::*;
+use crate::primitive_int::{StaticRingBase, StaticRing};
 
+///
+/// The user-facing trait for ring homomorphisms, i.e. maps `R -> S`
+/// between rings that respect the ring structure.
+/// 
+/// Objects are expected to know their domain and codomain rings and
+/// can thus make sense without an implicit ambient ring (unlike e.g.
+/// ring elements).
+/// 
+/// Ring homomorphisms are usually obtained by a corresponding method
+/// on [`RingStore`], and their functionality is provided by underlying
+/// functions of [`RingBase`]. Main examples include
+///  - Every ring `R` has a homomorphism `Z -> R`. The corresponding
+///    [`Homomorphism`]-object is obtained with [`RingStore::int_hom()`],
+///    and the functionality provided by [`RingBase::from_int()`].
+///  - [`RingExtension`]s have give a (injective) homomorphism `R -> S`
+///    which can be obtained by [`RingExtensionStore::inclusion()`].
+///    The functionality is provided by functions on [`RingExtension`],
+///    like [`RingExtension::from()`].
+///  - Other "natural" homomorphisms can be obtained via [`RingStore::can_hom()`].
+///    This requires the underlying [`RingBase`]s to implement [`CanHomFrom`],
+///    and the functions of that trait define the homomorphism.
+///  
 pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized> 
     where Domain: RingBase, Codomain: RingBase
 {
@@ -44,7 +67,13 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 
 ///
 /// Trait for rings R that have a canonical homomorphism `S -> R`.
-/// A ring homomorphism is expected to be unital.
+/// A ring homomorphism is expected to be unital. 
+/// 
+/// This trait is
+/// considered implementor-facing, so it is designed to easily implement
+/// natural maps between rings. When using homomorphisms, consider
+/// using instead [`CanHom`], as it does not require weird syntax like
+/// `R.get_ring().map_in(S.get_ring(), x, &hom)`.
 /// 
 /// # Exact requirements
 /// 
@@ -76,11 +105,15 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// # use feanor_math::integer::*;
 /// let R = StaticRing::<i64>::RING;
 /// let S = BigIntRing::RING;
+/// let eight = S.int_hom().map(8);
 /// // on RingBase level
 /// let hom = R.get_ring().has_canonical_hom(S.get_ring()).unwrap();
-/// assert_eq!(8, R.get_ring().map_in(S.get_ring(), S.int_hom().map(8), &hom));
+/// assert_eq!(8, R.get_ring().map_in(S.get_ring(), S.clone_el(&eight), &hom));
 /// // on RingStore level
-/// assert_eq!(8, R.coerce(&S, S.int_hom().map(8)));
+/// assert_eq!(8, R.coerce(&S, S.clone_el(&eight)));
+/// // or
+/// let hom = R.can_hom(&S).unwrap();
+/// assert_eq!(8, hom.map_ref(&eight));
 /// ```
 /// 
 /// # Limitations
@@ -309,7 +342,6 @@ impl<R: ?Sized + CanonicalIso<R>> SelfIso for R {}
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
-/// 
 /// let from = StaticRing::<i32>::RING;
 /// let to = StaticRing::<i64>::RING;
 /// let hom = to.can_hom(&from).unwrap();
@@ -443,6 +475,23 @@ impl<R, S> Homomorphism<S::Type,R::Type> for CanIso<R, S>
     }
 }
 
+///
+/// The ring homomorphism induced by a [`RingExtension`].
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::rings::poly::*;
+/// let base = StaticRing::<i32>::RING;
+/// let extension = dense_poly::DensePolyRing::new(base, "X");
+/// let hom = extension.inclusion();
+/// let f = extension.add(hom.map(8), extension.indeterminate());
+/// assert_el_eq!(&extension, &extension.from_terms([(8, 0), (1, 1)].into_iter()), &f);
+/// ```
+/// 
 pub struct Inclusion<R>
     where R: RingStore, R::Type: RingExtension
 {
@@ -488,6 +537,21 @@ impl<R> Homomorphism<<<R::Type as RingExtension>::BaseRing as RingStore>::Type, 
     }
 }
 
+///
+/// The ring homomorphism `Z -> R` that exists for any ring `R`.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::rings::zn::*;
+/// let ring = zn_static::F17;
+/// let hom = ring.int_hom();
+/// assert_el_eq!(&ring, &hom.map(1), &hom.map(18));
+/// ```
+/// 
 pub struct IntHom<R>
     where R: RingStore
 {
