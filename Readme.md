@@ -191,11 +191,11 @@ Classical examples are polynomial rings `R[X]` that exist for any ring `R`.
 Since in that case we are both using and implementing rings, we should use both sides of the framework.
 For example, a simple polynomial ring implementation could look like this.
 ```rust
-# use feanor_math::assert_el_eq;
-# use feanor_math::ring::*;
-# use feanor_math::homomorphism::*;
-# use feanor_math::rings::zn::*;
-# use std::cmp::{min, max};
+use feanor_math::assert_el_eq;
+use feanor_math::ring::*;
+use feanor_math::homomorphism::*;
+use feanor_math::rings::zn::*;
+use std::cmp::{min, max};
 
 pub struct MyPolyRing<R: RingStore> {
     base_ring: R
