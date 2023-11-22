@@ -15,7 +15,7 @@ In particular, I will make changes to interfaces and implementations without war
 Furthermore, there might be bugs, and many implementations are not particularly optimized.
 Nevertheless, I think this library can already be useful, and I regularly use it for various applications, including cryptography.
 
-This library uses nightly Rust, and even unstable features like const-generics and specialization.
+This library uses nightly Rust, ~~and even unstable features like const-generics and specialization~~ - this caused too much of a headache, so I removed those uses again.
 
 ## A short introduction
 
@@ -322,7 +322,7 @@ However, I did not have the time so far to thoroughly optimize many of the algor
  - Use `lto = "fat"` in the `Cargo.toml` of your project. This is absolutely vital to enable inlining across crate boundaries, and can have a huge impact if you extensively use rings that have "simple" basic arithmetic - like `zn_42::Zn` or `primitive_int::StaticRing`.
  - Different parts of this library are at different stages of optimization. While I have spent some time on the FFT algorithms, for example integer factorization are currently relatively slow.
  - If you extensively use rings whose elements require dynamic memory allocation, be careful to choose good memory providers. This is currently still WIP. 
- - The default arbitrary-precision integer arithmetic is very slow currently. Use the feature "mpir" together with an installation of the [mpir](https://github.com/wbhart/mpir) library if you heavily use arbitrary-precision integers. 
+ - The default arbitrary-precision integer arithmetic is currently slow. Use the feature "mpir" together with an installation of the [mpir](https://github.com/wbhart/mpir) library if you heavily use arbitrary-precision integers. 
 
 # Design decisions
 
