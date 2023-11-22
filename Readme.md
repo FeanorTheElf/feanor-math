@@ -190,7 +190,7 @@ One of the main goals of this trait was to make it easy to nest rings, so implem
 Classical examples are polynomial rings `R[X]` that exist for any ring `R`.
 Since in that case we are both using and implementing rings, we should use both sides of the framework.
 For example, a simple polynomial ring implementation could look like this.
-```
+```rust
 # use feanor_math::assert_el_eq;
 # use feanor_math::ring::*;
 # use feanor_math::homomorphism::*;
