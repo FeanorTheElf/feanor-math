@@ -517,6 +517,8 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
 
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use crate::rings::zn::zn_static;
 
 #[test]
 fn test_add() {
@@ -639,4 +641,13 @@ fn test_evaluate() {
     ].into_iter());
     assert_eq!(3, ring.evaluate(&poly, [1, 1, 0], &ring.base_ring().identity()));
     assert_eq!(0, ring.evaluate(&poly, [-2, 2, 0], &ring.base_ring().identity()));
+
+    let ring: MultivariatePolyRingImpl<_, _, _, 3> = MultivariatePolyRingImpl::new(zn_static::Zn::<8>::RING, DegRevLex, default_memory_provider!());
+    let poly = ring.from_terms([
+        (2, Monomial::new([0, 0, 0])),
+        (1, Monomial::new([0, 1, 0])),
+        (3, Monomial::new([0, 2, 0]))
+    ].into_iter());
+    assert_eq!(6, ring.evaluate(&poly, [1, 1, 0], &ring.base_ring().identity()));
+    assert_eq!(0, ring.evaluate(&poly, [2, 2, 0], &ring.base_ring().identity()));
 }
