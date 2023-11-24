@@ -104,12 +104,15 @@ pub trait MultivariatePolyRing: RingExtension {
             let new_m = self.create_monomial((0..m.len()).map(|i| if i == var { 0 } else { m[i] }));
             self.add_assign_from_terms(&mut parts[m[var] as usize], Some((self.base_ring().clone_el(c), new_m)).into_iter());
         }
-        let mut current = parts.pop().unwrap();
-        while let Some(new) = parts.pop() {
-            self.mul_assign_ref(&mut current, val);
-            self.add_assign(&mut current, new);
+        if let Some(mut current) = parts.pop() {
+            while let Some(new) = parts.pop() {
+                self.mul_assign_ref(&mut current, val);
+                self.add_assign(&mut current, new);
+            }
+            return current;
+        } else {
+            return self.zero();
         }
-        return current;
     }
 
     fn create_monomial<I: ExactSizeIterator<Item = MonomialExponent>>(&self, exponents: I) -> Monomial<Self::MonomialVector>;
