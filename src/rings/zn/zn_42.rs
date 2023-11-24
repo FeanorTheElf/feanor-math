@@ -215,7 +215,7 @@ impl RingBase for ZnBase {
         where R::Type: IntegerRing
     {
         let fastmul_ring = ZnFastmul::from(ZnFastmulBase::new(*self));
-        algorithms::sqr_mul::generic_pow(RingRef::new(self).cast(&fastmul_ring, x), power, integers, &RingRef::new(self).can_hom(&fastmul_ring).unwrap())
+        algorithms::sqr_mul::generic_pow(RingRef::new(self).can_iso(&fastmul_ring).unwrap().map(x), power, integers, &RingRef::new(self).can_hom(&fastmul_ring).unwrap())
     }
 
     fn sum<I>(&self, mut els: I) -> Self::Element 

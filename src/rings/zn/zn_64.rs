@@ -61,7 +61,7 @@ fn mullo(lhs: u64, rhs: u64) -> u64 {
 /// let R1 = zn_42::Zn::new(17);
 /// let R2 = zn_64::Zn::new(17);
 /// assert_el_eq!(&R2, &R2.int_hom().map(6), &R2.coerce(&R1, R1.int_hom().map(6)));
-/// assert_el_eq!(&R1, &R1.int_hom().map(16), &R2.cast(&R1, R2.int_hom().map(16)));
+/// assert_el_eq!(&R1, &R1.int_hom().map(16), &R2.can_iso(&R1).unwrap().map(R2.int_hom().map(16)));
 /// ```
 /// Too large moduli will give an error.
 /// ```should_panic
@@ -97,7 +97,7 @@ impl ZnBase {
         let inv_modulus = if ZZbig.eq_el(&inv_modulus, &ZZbig.power_of_two(127)) {
             1u128 << 127
         } else {
-            ZZbig.cast(&StaticRing::<i128>::RING, inv_modulus) as u128
+            int_cast(inv_modulus, &StaticRing::<i128>::RING, &ZZbig) as u128
         };
         Self {
             modulus: modulus as i64,

@@ -487,9 +487,13 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
         for i in 0..self.indeterminate_len() {
             result = new_ring.specialize(&result, i, &new_ring.inclusion().map_ref(values.at(i)));
         }
-        debug_assert!(result.len() == 1);
-        debug_assert!(result[0].1.deg() == 0);
-        return result.into_iter().next().unwrap().0;
+        debug_assert!(result.len() <= 1);
+        if result.len() == 0 {
+            return hom.codomain().zero();
+        } else {
+            debug_assert!(result[0].1.deg() == 0);
+            return result.into_iter().next().unwrap().0;
+        }
     }
 
     fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, mut rhs: I)
@@ -623,4 +627,16 @@ fn test_add_assign_from_terms() {
     let value = ring.from_terms((0..100).map(|i| (1, Monomial::new([i, 0, 0]))).chain((0..100).map(|i| (0, Monomial::new([0, i, 0])))).filter(|_| true));
 
     assert_eq!(100, ring.terms(&value).count());
+}
+
+#[test]
+fn test_evaluate() {
+    let ring: MultivariatePolyRingImpl<_, _, _, 3> = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, Lex, default_memory_provider!());
+    let poly = ring.from_terms([
+        (1, Monomial::new([0, 2, 0])),
+        (2, Monomial::new([1, 0, 0])),
+        (3, Monomial::new([1, 1, 1]))
+    ].into_iter());
+    assert_eq!(3, ring.evaluate(&poly, [1, 1, 0], &ring.base_ring().identity()));
+    assert_eq!(0, ring.evaluate(&poly, [-2, 2, 0], &ring.base_ring().identity()));
 }

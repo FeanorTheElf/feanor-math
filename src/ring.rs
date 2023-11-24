@@ -590,22 +590,16 @@ pub trait RingStore: Sized {
         self.get_ring().map_in(from.get_ring(), el, &self.get_ring().has_canonical_hom(from.get_ring()).unwrap())
     }
 
-    fn coerce_ref<S>(&self, from: &S, el: &El<S>) -> El<Self>
-        where S: RingStore, Self::Type: CanHomFrom<S::Type> 
-    {
-        self.get_ring().map_in_ref(from.get_ring(), el, &self.get_ring().has_canonical_hom(from.get_ring()).unwrap())
-    }
-
-    fn cast<S>(&self, to: &S, el: El<Self>) -> El<S>
-        where S: RingStore, Self::Type: CanonicalIso<S::Type> 
-    {
-        self.get_ring().map_out(to.get_ring(), el, &self.get_ring().has_canonical_iso(to.get_ring()).unwrap())
-    }
-
+    ///
+    /// Returns the identity map `self -> self`.
+    /// 
     fn into_identity(self) -> Identity<Self> {
         Identity::new(self)
     }
 
+    ///
+    /// Returns the identity map `self -> self`.
+    /// 
     fn identity<'a>(&'a self) -> Identity<&'a Self> {
         self.into_identity()
     }
@@ -648,10 +642,16 @@ pub trait RingStore: Sized {
         self.into_can_iso(from).ok()
     }
 
+    ///
+    /// Returns the homomorphism `Z -> self` that exists for any ring.
+    /// 
     fn into_int_hom(self) -> IntHom<Self> {
         IntHom::new(self)
     }
 
+    ///
+    /// Returns the homomorphism `Z -> self` that exists for any ring.
+    /// 
     fn int_hom<'a>(&'a self) -> IntHom<&'a Self> {
         self.into_int_hom()
     }
@@ -716,10 +716,16 @@ pub trait RingExtensionStore: RingStore
         self.get_ring().base_ring()
     }
 
+    ///
+    /// Returns the inclusion map of the base ring `R -> self`.
+    /// 
     fn into_inclusion(self) -> Inclusion<Self> {
         Inclusion::new(self)
     }
 
+    ///
+    /// Returns the inclusion map of the base ring `R -> self`.
+    /// 
     fn inclusion<'a>(&'a self) -> Inclusion<&'a Self> {
         self.into_inclusion()
     }

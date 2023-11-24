@@ -123,7 +123,7 @@ pub fn cantor_zassenhaus<P>(poly_ring: P, f: El<P>, d: usize) -> El<P>
         <<<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::IntegerRingBase: CanonicalIso<BigIntRingBase>
 {
     let ZZ = BigIntRing::RING;
-    let p = poly_ring.base_ring().integer_ring().cast(&ZZ, poly_ring.base_ring().integer_ring().clone_el(poly_ring.base_ring().modulus()));
+    let p = int_cast(poly_ring.base_ring().integer_ring().clone_el(poly_ring.base_ring().modulus()), &ZZ, poly_ring.base_ring().integer_ring());
     assert!(ZZ.is_odd(&p));
     assert!(poly_ring.degree(&f).unwrap() % d == 0);
     assert!(poly_ring.degree(&f).unwrap() > d);
@@ -152,7 +152,7 @@ pub fn poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
     assert!(!poly_ring.is_zero(&poly));
     let derivate = derive_poly(&poly_ring, &poly);
     if poly_ring.is_zero(&derivate) {
-        let p = poly_ring.base_ring().integer_ring().cast(&StaticRing::<i32>::RING, poly_ring.base_ring().integer_ring().clone_el(poly_ring.base_ring().modulus()));
+        let p = int_cast(poly_ring.base_ring().integer_ring().clone_el(poly_ring.base_ring().modulus()), &StaticRing::<i128>::RING, poly_ring.base_ring().integer_ring());
         let base_poly = poly_ring.from_terms(poly_ring.terms(&poly).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i / p as usize)));
         return poly_squarefree_part(poly_ring, base_poly);
     } else {

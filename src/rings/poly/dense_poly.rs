@@ -46,6 +46,7 @@ use std::cmp::min;
 /// ```
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
 /// # use feanor_math::rings::poly::sparse_poly::*;
@@ -55,7 +56,7 @@ use std::cmp::min;
 /// let P = DensePolyRing::new(ZZ, "X");
 /// let P2 = SparsePolyRing::new(ZZ, "X");
 /// let high_power_of_x = P.pow(P.indeterminate(), 10);
-/// assert_el_eq!(&P2, &P2.pow(P2.indeterminate(), 10), &P.cast(&P2, high_power_of_x));
+/// assert_el_eq!(&P2, &P2.pow(P2.indeterminate(), 10), &P.can_iso(&P2).unwrap().map(high_power_of_x));
 /// ```
 /// 
 pub struct DensePolyRingBase<R: RingStore, M: GrowableMemoryProvider<El<R>> = DefaultMemoryProvider> {

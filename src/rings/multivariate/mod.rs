@@ -126,6 +126,10 @@ pub trait MultivariatePolyRing: RingExtension {
         return result;
     }
 
+    ///
+    /// Computes the polynomial that results from applying `hom` to each coefficient of the input
+    /// polynomial. This is used to implement [`MultivariatePolyRingStore::lifted_hom()`].
+    /// 
     fn map_terms<P, H>(&self, from: &P, el: &P::Element, hom: &H) -> Self::Element
         where P: ?Sized + MultivariatePolyRing,
             H: Homomorphism<<P::BaseRing as RingStore>::Type, <Self::BaseRing as RingStore>::Type>

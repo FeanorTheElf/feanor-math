@@ -392,7 +392,7 @@ pub mod generic_tests {
         }
 
         let all_elements = R.elements().collect::<Vec<_>>();
-        assert_eq!(ZZ.cast(&StaticRing::<i128>::RING, ZZ.clone_el(n)) as usize, all_elements.len());
+        assert_eq!(int_cast(ZZ.clone_el(n), &StaticRing::<i128>::RING, &ZZ) as usize, all_elements.len());
         for (i, x) in all_elements.iter().enumerate() {
             for (j, y) in all_elements.iter().enumerate() {
                 assert!(i == j || !R.eq_el(x, y));

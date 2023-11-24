@@ -46,7 +46,7 @@ use crate::default_memory_provider;
 /// let R = Zn::from_primes(BigIntRing::RING, vec![17, 19]);
 /// let S = zn_barett::Zn::new(StaticRing::<i64>::RING, 17 * 19);
 /// assert!(R.eq_el(&R.int_hom().map(12), &R.coerce(&S, S.int_hom().map(12))));
-/// assert!(S.eq_el(&S.int_hom().map(12), &R.cast(&S, R.int_hom().map(12))));
+/// assert!(S.eq_el(&S.int_hom().map(12), &R.can_iso(&S).unwrap().map(R.int_hom().map(12))));
 /// ```
 /// and a canonical homomorphism from any integer ring
 /// ```
@@ -106,19 +106,19 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Zn<C, J, M>
     pub fn new(component_rings: Vec<C>, large_integers: J, memory_provider: M) -> Self {
         assert!(component_rings.len() > 0);
         let total_modulus = large_integers.prod(
-            component_rings.iter().map(|R| R.integer_ring().cast::<J>(&large_integers, R.integer_ring().clone_el(R.modulus())))
+            component_rings.iter().map(|R| R.integer_ring().can_iso(&large_integers).unwrap().map_ref(R.modulus()))
         );
         let total_ring = zn_barett::Zn::new(large_integers, total_modulus);
         let ZZ = total_ring.integer_ring();
         for R in &component_rings {
-            let R_modulus = R.integer_ring().cast::<J>(ZZ, R.integer_ring().clone_el(R.modulus()));
+            let R_modulus = R.integer_ring().can_iso(ZZ).unwrap().map_ref(R.modulus());
             assert!(
                 ZZ.is_one(&algorithms::eea::signed_gcd(ZZ.checked_div(total_ring.modulus(), &R_modulus).unwrap(), R_modulus, ZZ)),
                 "all moduli must be coprime"
             );
         }
         let unit_vectors = component_rings.iter()
-            .map(|R| ZZ.checked_div(total_ring.modulus(), &R.integer_ring().cast::<J>(ZZ, R.integer_ring().clone_el(R.modulus()))))
+            .map(|R| ZZ.checked_div(total_ring.modulus(), &R.integer_ring().can_iso(ZZ).unwrap().map_ref(R.modulus())))
             .map(Option::unwrap)
             .map(|n| total_ring.coerce(&ZZ, n))
             .zip(component_rings.iter())
@@ -257,7 +257,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> RingBase for
     fn is_noetherian(&self) -> bool { true }
 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        self.total_ring.get_ring().dbg(&RingRef::new(self).cast::<zn_barett::Zn<_>>(&self.total_ring, self.clone_el(value)), out)
+        self.total_ring.get_ring().dbg(&RingRef::new(self).can_iso(&self.total_ring).unwrap().map_ref(value), out)
     }
 }
 
@@ -587,7 +587,7 @@ fn test_map_in_map_out() {
     let ring2 = zn_barett::Zn::new(StaticRing::<i64>::RING, 7 * 11 * 17);
     for x in [0, 1, 7, 8, 9, 10, 11, 17, 7 * 17, 11 * 8, 11 * 17, 7 * 11 * 17 - 1] {
         let value = ring2.int_hom().map(x);
-        assert!(ring2.eq_el(&value, &ring1.cast(&ring2, ring1.coerce(&ring2, value.clone()))));
+        assert!(ring2.eq_el(&value, &ring1.can_iso(&ring2).unwrap().map(ring1.coerce(&ring2, value.clone()))));
     }
 }
 

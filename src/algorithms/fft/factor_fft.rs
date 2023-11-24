@@ -318,7 +318,7 @@ fn test_approximate_fft() {
 fn bench_factor_fft(bencher: &mut test::Bencher) {
     let ring = zn_42::Zn::new(1602564097);
     let fastmul_ring = zn_42::ZnFastmul::new(ring);
-    let embed = |x: El<zn_42::Zn>| ring.cast(&fastmul_ring, x);
+    let embed = |x: El<zn_42::Zn>| ring.can_iso(&fastmul_ring).unwrap().map(x);
     let root_of_unity = algorithms::unity_root::get_prim_root_of_unity(&ring, 2 * 31 * 601).unwrap();
     let fft = FFTTableGenCooleyTuckey::new(
         embed(ring.pow(root_of_unity, 2)),
