@@ -88,7 +88,9 @@ impl<R, O, M, const N: usize> MultivariatePolyRingImplBase<R, O, M, N>
         let mut i_r = 0;
         let mut i_o = 0;
 
-        if lhs.len() > 0 && self.order.compare(&lhs.at(0).1, &rhs_sorted.at(0).1) != Ordering::Greater {
+        if lhs.len() == 0 && rhs_sorted.len() == 0 {
+            return lhs;
+        } else if lhs.len() > 0 && self.order.compare(&lhs.at(0).1, &rhs_sorted.at(0).1) != Ordering::Greater {
             *result.at_mut(i_o) = (self.base_ring.clone_el(&lhs.at(i_l).0), lhs.at(i_l).1);
             i_l += 1;
         } else {
@@ -629,6 +631,8 @@ fn test_add_assign_from_terms() {
     let value = ring.from_terms((0..100).map(|i| (1, Monomial::new([i, 0, 0]))).chain((0..100).map(|i| (0, Monomial::new([0, i, 0])))).filter(|_| true));
 
     assert_eq!(100, ring.terms(&value).count());
+
+    assert_el_eq!(&ring, &ring.zero(), &ring.from_terms([].into_iter()));
 }
 
 #[test]
