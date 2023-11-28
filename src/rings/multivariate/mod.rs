@@ -446,7 +446,8 @@ impl<V: VectorViewMut<MonomialExponent> + Clone> Iterator for DividingMonomialIt
             let mut refill = 0;
             for i in 1..self.monomial.len() {
                 if current[i - 1] > 0 && current[i] < self.monomial[i] {
-                    *current.exponents.at_mut(i - 1) -= 1;
+                    refill += *current.exponents.at(i - 1) - 1;
+                    *current.exponents.at_mut(i - 1) = 0;
                     *current.exponents.at_mut(i) += 1;
                     let mut j = 0;
                     while refill > 0 {
@@ -785,8 +786,8 @@ fn test_dividing_monomials() {
     assert_eq!(vec![
         Monomial::new([0, 0, 0]), Monomial::new([1, 0, 0]), Monomial::new([0, 1, 0]), Monomial::new([0, 0, 1]),
         Monomial::new([2, 0, 0]), Monomial::new([1, 1, 0]), Monomial::new([0, 2, 0]), Monomial::new([1, 0, 1]), Monomial::new([0, 1, 1]), Monomial::new([0, 0, 2]),
-        Monomial::new([3, 0, 0]), Monomial::new([2, 1, 0]), Monomial::new([1, 2, 0]), Monomial::new([2, 0, 1]), Monomial::new([1, 1, 1]), Monomial::new([0, 2, 1]), Monomial::new([1, 0, 2]), Monomial::new([0, 1, 2]), Monomial::new([0, 0, 3])
-    ], m.dividing_monomials().take(19).collect::<Vec<_>>());
+        Monomial::new([2, 1, 0]), Monomial::new([1, 2, 0]), Monomial::new([2, 0, 1]), Monomial::new([1, 1, 1]), Monomial::new([0, 2, 1]), Monomial::new([1, 0, 2]), Monomial::new([0, 1, 2]), Monomial::new([0, 0, 3])
+    ], m.dividing_monomials().take(18).collect::<Vec<_>>());
 }
 
 #[test]
