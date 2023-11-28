@@ -378,7 +378,9 @@ impl<V: VectorViewMut<MonomialExponent> + Clone> Monomial<V> {
 
     ///
     /// Returns all monomials that divide this one, i.e. all sequences
-    /// of same length such that `result[i] <= self[i]`.
+    /// of same length such that `result[i] <= self[i]`. These monomials
+    /// are given in an order that respects divisibility, i.e a monomial
+    /// `m` is given before `t` if `m | t` and `m != t`.
     /// 
     pub fn dividing_monomials(self) -> DividingMonomialIter<V> {
         let mut start = self.clone();
@@ -386,6 +388,25 @@ impl<V: VectorViewMut<MonomialExponent> + Clone> Monomial<V> {
             *start.exponents.at_mut(i) = 0;
         }
         DividingMonomialIter { monomial: self, current: Some(start) }
+    }
+
+    ///
+    /// Returns the monomial `m / xi` and `i`, where `xi` is any variable
+    /// occurring in `m`. If the monomial is `1`, this returns None.
+    /// 
+    /// Often used for recursive traversal of many monomials.
+    /// 
+    /// ```
+    /// # use feanor_math::rings::multivariate::*;
+    /// 
+    /// let m = Monomial::new([0, 1, 0]);
+    /// assert_eq!((Monomial::new([0, 0, 0]), 1), m.div_variable().unwrap());
+    /// ```
+    /// 
+    pub fn div_variable(mut self) -> Option<(Monomial<V>, usize)> {
+        let i = (0..self.len()).filter(|i| self[*i] > 0).next()?;
+        *self.exponents.at_mut(i) -= 1;
+        return Some((self, i));
     }
 }
 
