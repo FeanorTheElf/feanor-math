@@ -444,10 +444,9 @@ impl<V: VectorViewMut<MonomialExponent> + Clone> Iterator for DividingMonomialIt
         if let Some(current) = &mut self.current {
             let result = current.clone();
             let mut refill = 0;
-            for i in 1..self.monomial.len() {
-                if current[i - 1] > 0 && current[i] < self.monomial[i] {
-                    refill += *current.exponents.at(i - 1) - 1;
-                    *current.exponents.at_mut(i - 1) = 0;
+            for i in 0..self.monomial.len() {
+                if refill > 0 && current[i] < self.monomial[i] {
+                    refill -= 1;
                     *current.exponents.at_mut(i) += 1;
                     let mut j = 0;
                     while refill > 0 {
@@ -455,10 +454,10 @@ impl<V: VectorViewMut<MonomialExponent> + Clone> Iterator for DividingMonomialIt
                         refill -= current[j];
                         j += 1;
                     }
-                    return Some(result); 
+                    return Some(result);
                 } else {
-                    refill += current[i - 1];
-                    *current.exponents.at_mut(i - 1) = 0;
+                    refill += current[i];
+                    *current.exponents.at_mut(i) = 0;
                 }
             }
             refill += current[self.monomial.len() - 1];
