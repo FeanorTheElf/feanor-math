@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::hash::Hash;
 use std::ops::{Index, RangeTo, RangeFrom};
 use std::cmp::Ordering;
@@ -117,12 +117,32 @@ pub trait MultivariatePolyRing: RingExtension {
 
     fn create_monomial<I: ExactSizeIterator<Item = MonomialExponent>>(&self, exponents: I) -> Monomial<Self::MonomialVector>;
 
-    fn appearing_variables(&self, f: &Self::Element) -> BTreeSet<usize> {
-        let mut result = BTreeSet::new();
+    ///
+    /// Returns all variables appearing in the given polynomial, together
+    /// with their respective degrees.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::default_memory_provider;
+    /// # use feanor_math::rings::multivariate::*;
+    /// # use feanor_math::primitive_int::*;
+    /// # use std::collections::BTreeMap;
+    /// 
+    /// let ring = ordered::MultivariatePolyRingImpl::<_, _, _, 3>::new(StaticRing::<i32>::RING, DegRevLex, default_memory_provider!());
+    /// let x = ring.indeterminate(0);
+    /// let y = ring.indeterminate(1);
+    /// let z = ring.indeterminate(2);
+    /// let poly = ring.add(x, ring.pow(z, 2));
+    /// assert_eq!([(0, 1), (2, 2)].into_iter().collect::<BTreeMap<_, _>>(), ring.appearing_variables(&poly));
+    /// ```
+    /// 
+    fn appearing_variables(&self, f: &Self::Element) -> BTreeMap<usize, MonomialExponent> {
+        let mut result = BTreeMap::new();
         for (_, m) in self.terms(f) {
             for i in 0..self.indeterminate_len() {
                 if m[i] > 0 {
-                    result.insert(i);
+                    result.insert(i, m[i]);
                 }
             }
         }
@@ -195,6 +215,7 @@ pub trait MultivariatePolyRingStore: RingStore
     delegate!{ fn monomial(&self, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> El<Self> }
     delegate!{ fn mul_monomial(&self, el: &mut El<Self>, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> () }
     delegate!{ fn specialize(&self, f: &El<Self>, var: usize, val: &El<Self>) -> El<Self> }
+    delegate!{ fn appearing_variables(&self, f: &El<Self>) -> BTreeMap<usize, MonomialExponent> }
 
     fn coefficient_at<'a>(&'a self, f: &'a El<Self>, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> &'a El<<Self::Type as RingExtension>::BaseRing> {
         self.get_ring().coefficient_at(f, m)
