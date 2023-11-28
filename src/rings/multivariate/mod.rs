@@ -780,6 +780,13 @@ fn test_dividing_monomials() {
         Monomial::new([2, 1, 2]), Monomial::new([2, 0, 3]), Monomial::new([1, 1, 3]), 
         Monomial::new([2, 1, 3])
     ], m.dividing_monomials().collect::<Vec<_>>());
+    
+    let m = Monomial::new([2, 2, 5]);
+    assert_eq!(vec![
+        Monomial::new([0, 0, 0]), Monomial::new([1, 0, 0]), Monomial::new([0, 1, 0]), Monomial::new([0, 0, 1]),
+        Monomial::new([2, 0, 0]), Monomial::new([1, 1, 0]), Monomial::new([0, 2, 0]), Monomial::new([1, 0, 1]), Monomial::new([0, 1, 1]), Monomial::new([0, 0, 2]),
+        Monomial::new([3, 0, 0]), Monomial::new([2, 1, 0]), Monomial::new([1, 2, 0]), Monomial::new([2, 0, 1]), Monomial::new([1, 1, 1]), Monomial::new([0, 2, 1]), Monomial::new([1, 0, 2]), Monomial::new([0, 1, 2]), Monomial::new([0, 0, 3])
+    ], m.dividing_monomials().take(19).collect::<Vec<_>>());
 }
 
 #[test]
