@@ -1,24 +1,28 @@
 use crate::ring::*;
 use crate::divisibility::*;
 
-pub trait PID: DivisibilityRing {
+///
+/// Trait for rings that are principal ideal rings, i.e. every ideal is generated
+/// by a single element. 
+/// 
+pub trait PrincipalIdealRing: DivisibilityRing {
 
     ///
-    /// Returns (g, s, t) such that g is a generator of the ideal `(lhs, rhs)`
+    /// Returns (s, t, g) such that g is a generator of the ideal `(lhs, rhs)`
     /// and `g = s * lhs + t * rhs`.
     /// 
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element);
 }
 
 pub trait PIDStore: RingStore
-    where Self::Type: PID
+    where Self::Type: PrincipalIdealRing
 {
     delegate!{ fn ideal_gen(&self, lhs: &El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>, El<Self>) }
 }
 
 impl<R> PIDStore for R
     where R: RingStore,
-        R::Type: PID
+        R::Type: PrincipalIdealRing
 {}
 
 ///
@@ -42,7 +46,7 @@ impl<R> PIDStore for R
 /// assert!(ring.euclidean_deg(&r) < ring.euclidean_deg(&6));
 /// ```
 /// 
-pub trait EuclideanRing: PID {
+pub trait EuclideanRing: PrincipalIdealRing {
 
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element);
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize>;

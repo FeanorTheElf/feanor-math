@@ -394,7 +394,7 @@ impl<R> PolyRing for SparsePolyRingBase<R>
 }
 
 impl<R,> DivisibilityRing for SparsePolyRingBase<R> 
-    where R: DivisibilityRingStore, R::Type: DivisibilityRing + CanonicalIso<R::Type>
+    where R: DivisibilityRingStore, R::Type: DivisibilityRing
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if let Some(d) = self.degree(rhs) {
@@ -414,8 +414,16 @@ impl<R,> DivisibilityRing for SparsePolyRingBase<R>
     }
 }
 
+impl<R> PrincipalIdealRing for SparsePolyRingBase<R>
+    where R: RingStore, R::Type: Field
+{
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), RingRef::new(self))
+    }
+}
+
 impl<R> EuclideanRing for SparsePolyRingBase<R> 
-    where R: RingStore, R::Type: Field + CanonicalIso<R::Type>
+    where R: RingStore, R::Type: Field
 {
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         let lc_inv = self.base_ring.invert(rhs.at(self.degree(rhs).unwrap())).unwrap();

@@ -1,11 +1,7 @@
-use crate::algorithms::int_factor;
-use crate::divisibility::DivisibilityRing;
 use crate::mempool::MemoryProvider;
 use crate::rings::poly::PolyRing;
 use crate::rings::poly::PolyRingStore;
 use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::rings::zn::ZnRing;
-use crate::rings::zn::ZnRingStore;
 use crate::vector::vec_fn::RingElVectorViewFn;
 use crate::ring::*;
 use crate::algorithms;

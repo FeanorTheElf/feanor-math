@@ -1,7 +1,8 @@
 use libc;
 
 use crate::divisibility::DivisibilityRing;
-use crate::pid::EuclideanRing;
+use crate::algorithms;
+use crate::pid::*;
 use crate::ordered::OrderedRing;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
@@ -282,6 +283,13 @@ impl DivisibilityRing for MPZBase {
         } else {
             return None;
         }
+    }
+}
+
+impl PrincipalIdealRing for MPZBase {
+    
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), MPZ::RING)
     }
 }
 
@@ -592,6 +600,20 @@ impl CanonicalIso<StaticRingBase<i128>> for MPZBase {
     }
 }
 
+impl IntCast<MPZBase> for StaticRingBase<i128> {
+
+    fn cast(&self, from: &MPZBase, value: MPZEl) -> i128 {
+        MPZ::RING.get_ring().map_out(StaticRing::<i128>::RING.get_ring(), value, &MPZ::RING.get_ring().has_canonical_iso(StaticRing::<i128>::RING.get_ring()).unwrap())
+    }
+}
+
+impl IntCast<MPZBase> for StaticRingBase<i64> {
+
+    fn cast(&self, from: &MPZBase, value: MPZEl) -> i64 {
+        MPZ::RING.get_ring().map_out(StaticRing::<i64>::RING.get_ring(), value, &MPZ::RING.get_ring().has_canonical_iso(StaticRing::<i64>::RING.get_ring()).unwrap())
+    }
+}
+
 #[cfg(test)]
 use crate::pid::EuclideanRingStore;
 
@@ -668,8 +690,8 @@ fn test_canonical_iso_axioms_i64() {
 
     assert_el_eq!(&MPZ::RING, &MPZ::RING.sub(MPZ::RING.power_of_two(63), MPZ::RING.one()), &MPZ::RING.coerce(&StaticRing::<i64>::RING, i64::MAX));
     assert_el_eq!(&MPZ::RING, &MPZ::RING.negate(MPZ::RING.power_of_two(63)), &MPZ::RING.coerce(&StaticRing::<i64>::RING, i64::MIN));
-    assert_eq!(i64::MAX, MPZ::RING.cast(&StaticRing::<i64>::RING, MPZ::RING.sub(MPZ::RING.power_of_two(63), MPZ::RING.one())));
-    assert_eq!(i64::MIN, MPZ::RING.cast(&StaticRing::<i64>::RING, MPZ::RING.negate(MPZ::RING.power_of_two(63))));
+    assert_eq!(i64::MAX, int_cast(MPZ::RING.sub(MPZ::RING.power_of_two(63), MPZ::RING.one()), &StaticRing::<i64>::RING, MPZ::RING));
+    assert_eq!(i64::MIN, int_cast(MPZ::RING.negate(MPZ::RING.power_of_two(63)), &StaticRing::<i64>::RING, MPZ::RING));
 }
 
 #[test]
@@ -679,8 +701,8 @@ fn test_canonical_iso_axioms_i128() {
 
     assert_el_eq!(&MPZ::RING, &MPZ::RING.sub(MPZ::RING.power_of_two(127), MPZ::RING.one()), &MPZ::RING.coerce(&StaticRing::<i128>::RING, i128::MAX));
     assert_el_eq!(&MPZ::RING, &MPZ::RING.negate(MPZ::RING.power_of_two(127)), &MPZ::RING.coerce(&StaticRing::<i128>::RING, i128::MIN));
-    assert_eq!(i128::MAX, MPZ::RING.cast(&StaticRing::<i128>::RING, MPZ::RING.sub(MPZ::RING.power_of_two(127), MPZ::RING.one())));
-    assert_eq!(i128::MIN, MPZ::RING.cast(&StaticRing::<i128>::RING, MPZ::RING.negate(MPZ::RING.power_of_two(127))));
+    assert_eq!(i128::MAX, int_cast(MPZ::RING.sub(MPZ::RING.power_of_two(127), MPZ::RING.one()), &StaticRing::<i128>::RING, MPZ::RING));
+    assert_eq!(i128::MIN, int_cast(MPZ::RING.negate(MPZ::RING.power_of_two(127)), &StaticRing::<i128>::RING, MPZ::RING));
 }
 
 #[test]

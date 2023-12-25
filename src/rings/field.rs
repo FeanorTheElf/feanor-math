@@ -1,6 +1,6 @@
 use crate::delegate::DelegateRing;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
-use crate::pid::EuclideanRing;
+use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::Field;
 use crate::integer::IntegerRing;
 use crate::ring::*;
@@ -162,6 +162,18 @@ impl<R: DivisibilityRingStore> DivisibilityRing for AsFieldBase<R>
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         self.base_ring().checked_left_div(&lhs.0, &rhs.0).map(FieldEl)
+    }
+}
+
+impl<R: DivisibilityRingStore> PrincipalIdealRing for AsFieldBase<R>
+    where R::Type: DivisibilityRing
+{
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        match (self.is_zero(lhs), self.is_zero(rhs)) {
+            (true, true) => (self.zero(), self.zero(), self.zero()),
+            (false, true) => (self.div(&self.one(), lhs), self.zero(), self.one()),
+            (_, false) => (self.zero(), self.div(&self.one(), rhs), self.one()),
+        }
     }
 }
 

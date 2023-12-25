@@ -1,7 +1,7 @@
 use std::f64::EPSILON;
 use std::f64::consts::PI;
 
-use crate::pid::EuclideanRing;
+use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::Field;
 use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::ring::*;
@@ -151,16 +151,21 @@ impl DivisibilityRing for Complex64 {
     }
 }
 
+impl PrincipalIdealRing for Complex64 {
+
+    fn ideal_gen(&self, _lhs: &Self::Element, _rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        panic!("Since Complex64 is only approximate, this cannot be implemented properly")
+    }
+}
+
 impl EuclideanRing for Complex64 {
 
-    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
-        (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
+    fn euclidean_div_rem(&self, _lhs: Self::Element, _rhs: &Self::Element) -> (Self::Element, Self::Element) {
+        panic!("Since Complex64 is only approximate, this cannot be implemented properly")
     }
 
     fn euclidean_deg(&self, _: &Self::Element) -> Option<usize> {
-        // since we do not provide equality checking, we cannot really implement this correctly;
-        // anyway, this should do in almost all situations
-        None
+        panic!("Since Complex64 is only approximate, this cannot be implemented properly")
     }
 }
 

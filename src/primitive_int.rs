@@ -2,9 +2,9 @@ use std::ops::{AddAssign, SubAssign, MulAssign, Neg, Div, Rem};
 use std::marker::PhantomData;
 use std::fmt::Display;
 
-use crate::ring::*;
+use crate::{ring::*, algorithms};
 use crate::homomorphism::*;
-use crate::pid::EuclideanRing;
+use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::divisibility::DivisibilityRing;
 use crate::ordered::OrderedRing;
 use crate::rings::rust_bigint::{RustBigint, RustBigintRingBase};
@@ -156,6 +156,13 @@ impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
         } else {
             return None;
         }
+    }
+}
+
+impl<T: PrimitiveInt> PrincipalIdealRing for StaticRingBase<T> {
+    
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        algorithms::eea::eea(*lhs, *rhs, StaticRing::<T>::RING)
     }
 }
 

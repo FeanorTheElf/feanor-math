@@ -1,5 +1,5 @@
 use crate::algorithms::eea::*;
-use crate::pid::EuclideanRing;
+use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::Field;
 use crate::divisibility::*;
 use crate::primitive_int::{StaticRing, StaticRingBase};
@@ -146,6 +146,17 @@ impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnBase<N, IS_FIELD
             Some(self.mul(*lhs, rhs_inv))
         } else {
             None
+        }
+    }
+}
+
+impl<const N: u64> PrincipalIdealRing for ZnBase<N, true> {
+    
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        match (self.is_zero(lhs), self.is_zero(rhs)) {
+            (true, true) => (self.zero(), self.zero(), self.zero()),
+            (true, false) => (self.zero(), self.div(&self.one(), rhs), self.one()),
+            (false, _) => (self.div(&self.one(), lhs), self.zero(), self.one())
         }
     }
 }
