@@ -1,5 +1,5 @@
 use crate::algorithms::eea::*;
-use crate::euclidean::EuclideanRing;
+use crate::pid::EuclideanRing;
 use crate::field::Field;
 use crate::divisibility::*;
 use crate::primitive_int::{StaticRing, StaticRingBase};

@@ -5,7 +5,7 @@ use crate::delegate::DelegateRing;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::*;
 use crate::integer::*;
-use crate::euclidean::EuclideanRingStore;
+use crate::pid::EuclideanRingStore;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::rings::rust_bigint::*;

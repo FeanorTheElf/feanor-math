@@ -1,7 +1,7 @@
 use std::f64::EPSILON;
 use std::f64::consts::PI;
 
-use crate::euclidean::EuclideanRing;
+use crate::pid::EuclideanRing;
 use crate::field::Field;
 use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::ring::*;

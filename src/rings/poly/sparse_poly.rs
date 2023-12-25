@@ -1,6 +1,6 @@
 use crate::algorithms;
 use crate::divisibility::*;
-use crate::euclidean::*;
+use crate::pid::*;
 use crate::field::Field;
 use crate::mempool::GrowableMemoryProvider;
 use crate::vector::VectorViewMut;
@@ -496,5 +496,5 @@ fn test_divisibility_ring_axioms() {
 #[test]
 fn test_euclidean_ring_axioms() {
     let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
-    crate::euclidean::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
+    crate::pid::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }

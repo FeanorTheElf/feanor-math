@@ -23,7 +23,8 @@ use super::*;
 ///  - if the base ring is a field, then F[X] is a PID - we can use XGCD
 ///  - if the base ring is Z, then we can consider Z[X]/(f(X)) ⊗ Q and f has the same factorization in Q as
 ///    in Z (Gauss' lemma)
-///  - if the base ring is Z/nZ, then it is already quite difficult (GB-like difficulties, see the following)
+///  - if the base ring is Z/nZ, then it is already quite difficult (GB-like difficulties, see the following).
+///    We need to use either general linear algebra or GBs (if that is not really the same anyway)
 ///  - if the base ring is a free extension itself, things are again complicated. In general,
 ///    it seems like we cannot avoid Groebner basis here, as even checking whether a polynomial is
 ///    in (f(X), g(X, Y), h(X, Y, Z), ...) - i.e. is zero modulo that ideal - requires them;

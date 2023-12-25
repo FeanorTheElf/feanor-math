@@ -1,4 +1,4 @@
-use crate::euclidean::{EuclideanRingStore, EuclideanRing};
+use crate::pid::{EuclideanRingStore, EuclideanRing};
 use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::ordered::{OrderedRingStore, OrderedRing};
 use crate::ring::*;

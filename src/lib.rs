@@ -65,11 +65,7 @@ pub mod divisibility;
 /// This module contains the trait [`field::Field`] for rings that are fields.
 /// 
 pub mod field;
-///
-/// This module contains the trait [`euclidean::EuclideanRing`] for rings that provide euclidean division
-/// between their elements.
-/// 
-pub mod euclidean;
+pub mod pid;
 ///
 /// This module contains the trait [`ordered::OrderedRing`] for rings with a total ordering that is compatible
 /// with the ring operations.

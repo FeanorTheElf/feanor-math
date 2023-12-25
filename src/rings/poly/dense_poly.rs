@@ -1,5 +1,5 @@
 use crate::divisibility::*;
-use crate::euclidean::*;
+use crate::pid::*;
 use crate::field::Field;
 use crate::default_memory_provider;
 use crate::mempool::{DefaultMemoryProvider, GrowableMemoryProvider};
@@ -498,7 +498,7 @@ fn test_divisibility_ring_axioms() {
 #[test]
 fn test_euclidean_ring_axioms() {
     let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
-    crate::euclidean::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
+    crate::pid::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]

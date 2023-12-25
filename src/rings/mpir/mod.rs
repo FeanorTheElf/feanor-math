@@ -1,7 +1,7 @@
 use libc;
 
 use crate::divisibility::DivisibilityRing;
-use crate::euclidean::EuclideanRing;
+use crate::pid::EuclideanRing;
 use crate::ordered::OrderedRing;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
@@ -593,7 +593,7 @@ impl CanonicalIso<StaticRingBase<i128>> for MPZBase {
 }
 
 #[cfg(test)]
-use crate::euclidean::EuclideanRingStore;
+use crate::pid::EuclideanRingStore;
 
 #[cfg(test)]
 fn edge_case_elements_bigint() -> impl Iterator<Item = RustBigint> {
@@ -647,7 +647,7 @@ fn test_divisibility_ring_axioms() {
 
 #[test]
 fn test_euclidean_ring_axioms() {
-    crate::euclidean::generic_tests::test_euclidean_ring_axioms(MPZ::RING, edge_case_elements())
+    crate::pid::generic_tests::test_euclidean_ring_axioms(MPZ::RING, edge_case_elements())
 }
 
 #[test]

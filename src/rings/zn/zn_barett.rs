@@ -1,5 +1,5 @@
 use crate::divisibility::DivisibilityRing;
-use crate::euclidean::EuclideanRingStore;
+use crate::pid::EuclideanRingStore;
 use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
 use crate::ordered::OrderedRingStore;

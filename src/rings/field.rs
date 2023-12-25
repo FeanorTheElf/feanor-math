@@ -1,6 +1,6 @@
 use crate::delegate::DelegateRing;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
-use crate::euclidean::EuclideanRing;
+use crate::pid::EuclideanRing;
 use crate::field::Field;
 use crate::integer::IntegerRing;
 use crate::ring::*;

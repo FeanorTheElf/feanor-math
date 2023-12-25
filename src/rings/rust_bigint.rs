@@ -1,5 +1,5 @@
 use crate::divisibility::DivisibilityRing;
-use crate::euclidean::*;
+use crate::pid::*;
 use crate::integer::*;
 use crate::ordered::*;
 use crate::primitive_int::StaticRingBase;
@@ -491,7 +491,7 @@ fn test_bigint_divisibility_ring_axioms() {
 
 #[test]
 fn test_bigint_euclidean_ring_axioms() {
-    crate::euclidean::generic_tests::test_euclidean_ring_axioms(ZZ, edge_case_elements());
+    crate::pid::generic_tests::test_euclidean_ring_axioms(ZZ, edge_case_elements());
 }
 
 #[test]

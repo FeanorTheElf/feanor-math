@@ -1,6 +1,6 @@
 use crate::ring::*;
 use crate::homomorphism::*;
-use crate::euclidean::*;
+use crate::pid::*;
 use crate::ordered::*;
 use crate::primitive_int::*;
 

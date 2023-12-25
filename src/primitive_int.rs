@@ -4,7 +4,7 @@ use std::fmt::Display;
 
 use crate::ring::*;
 use crate::homomorphism::*;
-use crate::euclidean::EuclideanRing;
+use crate::pid::EuclideanRing;
 use crate::divisibility::DivisibilityRing;
 use crate::ordered::OrderedRing;
 use crate::rings::rust_bigint::{RustBigint, RustBigintRingBase};

@@ -1,5 +1,5 @@
 use crate::ring::*;
-use crate::euclidean::*;
+use crate::pid::*;
 
 ///
 /// Trait for rings that are fields, i.e. where every

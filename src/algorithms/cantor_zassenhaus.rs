@@ -1,6 +1,6 @@
 use crate::algorithms;
 use crate::divisibility::DivisibilityRingStore;
-use crate::euclidean::{EuclideanRingStore, EuclideanRing};
+use crate::pid::{EuclideanRingStore, EuclideanRing};
 use crate::field::{Field, FieldStore};
 use crate::integer::*;
 use crate::ordered::OrderedRingStore;
