@@ -1,7 +1,7 @@
 use crate::algorithms::eea::*;
 use crate::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::field::Field;
-use crate::divisibility::{*, self};
+use crate::divisibility::*;
 use crate::primitive_int::{StaticRing, StaticRingBase};
 use crate::ring::*;
 use crate::homomorphism::*;
@@ -297,7 +297,7 @@ fn test_zn_ring_axioms_znbase() {
 
 #[test]
 fn test_divisibility_axioms() {
-    divisibility::generic_tests::test_divisibility_axioms(Zn::<17>::RING, Zn::<17>::RING.elements());
-    divisibility::generic_tests::test_divisibility_axioms(Zn::<9>::RING, Zn::<9>::RING.elements());
-    divisibility::generic_tests::test_divisibility_axioms(Zn::<12>::RING, Zn::<12>::RING.elements());
+    crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<17>::RING, Zn::<17>::RING.elements());
+    crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<9>::RING, Zn::<9>::RING.elements());
+    crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<12>::RING, Zn::<12>::RING.elements());
 }

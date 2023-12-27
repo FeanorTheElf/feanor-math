@@ -3,20 +3,90 @@ use std::mem::swap;
 use std::cmp::{min, Ordering};
 use std::sync::atomic::AtomicUsize;
 
+use crate::matrix::Matrix;
 use crate::parallel::{potential_parallel_for_each, column_iterator};
 use crate::ring::*;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
-use crate::vector::VectorView;
+use crate::vector::{VectorView, VectorViewMut};
 
 const EXTENSIVE_RUNTIME_ASSERTS: bool = false;
 
-struct Matrix<T> {
-    rows: Vec<Vec<Vec<(usize, T)>>>,
-    global_col_count: usize,
-    n: usize
+pub struct SparseMatrixBuilder<R>
+    where R: RingStore
+{
+    zero: El<R>,
+    rows: Vec<Vec<(usize, El<R>)>>,
+    col_permutation: Vec<usize>,
+    col_count: usize
 }
 
-impl<T> Matrix<T> {
+impl<R> SparseMatrixBuilder<R>
+    where R: RingStore
+{
+    pub fn new(ring: &R) -> Self {
+        SparseMatrixBuilder {
+            rows: Vec::new(),
+            col_count: 0,
+            col_permutation: Vec::new(),
+            zero: ring.zero()
+        }
+    }
+
+    pub fn add_col(&mut self, j: usize) {
+        self.col_permutation.insert(j, self.col_count);
+        self.col_count += 1;
+    }
+
+    pub fn add_zero_row(&mut self, i: usize) {
+        self.rows.insert(i, Vec::new())
+    }
+
+    pub fn add_row<I>(&mut self, i: usize, values: I)
+        where I: Iterator<Item = (usize, El<R>)>
+    {
+        let row = values.map(|(j, x)| (self.col_permutation[j], x))
+            .collect::<Vec<_>>();
+        self.rows.insert(i, row);
+    }
+
+    pub fn set(&mut self, i: usize, j: usize, el: El<R>) -> Option<El<R>> {
+        match self.rows.at(i).binary_search_by_key(&self.col_permutation[j], |(c, _)| *c) {
+            Ok(idx) => Some(std::mem::replace(&mut self.rows.at_mut(i).at_mut(idx).1, el)),
+            Err(idx) => {
+                self.rows.at_mut(i).insert(idx, (j, el));
+                None
+            }
+        }
+    }
+}
+
+impl<R> Matrix<R> for SparseMatrixBuilder<R> 
+    where R: RingStore
+{    
+    fn col_count(&self) -> usize {
+        self.col_count
+    }
+
+    fn row_count(&self) -> usize {
+        self.rows.len()
+    }
+
+    fn at(&self, i: usize, j: usize) -> &El<R> {
+        match self.rows.at(i).binary_search_by_key(&self.col_permutation[j], |(c, _)| *c) {
+            Ok(idx) => &self.rows.at(i).at(idx).1,
+            Err(_) => &self.zero
+        }
+    }
+}
+
+struct InternalMatrix<T> {
+    rows: Vec<Vec<Vec<(usize, T)>>>,
+    global_col_count: usize,
+    n: usize,
+    zero: T
+}
+
+impl<T> InternalMatrix<T> {
 
     fn entry_at<'a>(&'a self, i: usize, j_global: usize, j_local: usize) -> Option<&'a T> {
         at(j_local, &self.rows[i][j_global])
@@ -39,30 +109,31 @@ impl<T> Matrix<T> {
     }
 }
 
-fn print<R>(ring: R, matrix: &Matrix<El<R>>)
+impl<R> Matrix<R> for InternalMatrix<El<R>>
     where R: RingStore
 {
-    let zero = ring.zero();
-    for i in 0..matrix.row_count() {
-        for j_global in 0..matrix.global_col_count {
-            for j_local in 0..matrix.n {
-                let string = format!("{}", ring.format(matrix.entry_at(i, j_global, j_local).unwrap_or(&zero)));
-                print!("{}{}, ", " ".repeat(2 - string.len()), string);
-            }
-        }
-        println!();
+    fn row_count(&self) -> usize {
+        self.rows.len()
+    }
+
+    fn col_count(&self) -> usize {
+        self.global_col_count * self.n
+    }
+
+    fn at(&self, i: usize, j: usize) -> &El<R> {
+        self.entry_at(i, j / self.n, j % self.n).unwrap_or(&self.zero)
     }
 }
 
-fn empty<T>(n: usize, global_col_count: usize) -> Matrix<T> {
-    Matrix { n: n, global_col_count: global_col_count, rows: Vec::new() }
+fn empty<T>(n: usize, global_col_count: usize, zero: T) -> InternalMatrix<T> {
+    InternalMatrix { n: n, global_col_count: global_col_count, rows: Vec::new(), zero: zero }
 }
 
 fn at<'a, T>(i: usize, data: &'a [(usize, T)]) -> Option<&'a T> {
     data.binary_search_by_key(&i, |(j, _)| *j).ok().map(|idx| &data[idx].1)
 }
 
-fn identity<R>(ring: R, n: usize, mut use_mem: Matrix<El<R>>) -> Matrix<El<R>>
+fn identity<R>(ring: R, n: usize, mut use_mem: InternalMatrix<El<R>>) -> InternalMatrix<El<R>>
     where R: RingStore
 {
     while use_mem.rows.len() < n {
@@ -163,13 +234,13 @@ fn mul_assign<'a, R, I>(ring: R, lhs: &[Vec<(usize, El<R>)>], rhs: I, mut out: V
     return out;
 }
 
-fn leading_entry<'a, T>(matrix: &'a Matrix<T>, row: usize, global_col: usize) -> (usize, &'a T) {
+fn leading_entry<'a, T>(matrix: &'a InternalMatrix<T>, row: usize, global_col: usize) -> (usize, &'a T) {
     let (j, c) = &matrix.rows[row][global_col][0];
     return (*j, c);
 }
 
 #[inline(never)]
-fn search_pivot_in_block<T>(matrix: &mut Matrix<T>, local_pivot_i: usize, local_pivot_j: usize, global_pivot_i: usize, global_pivot_j: usize) -> Option<usize> {
+fn search_pivot_in_block<T>(matrix: &mut InternalMatrix<T>, local_pivot_i: usize, local_pivot_j: usize, global_pivot_i: usize, global_pivot_j: usize) -> Option<usize> {
     matrix.check();
     let n = matrix.n;
     for i in local_pivot_i..n {
@@ -181,7 +252,7 @@ fn search_pivot_in_block<T>(matrix: &mut Matrix<T>, local_pivot_i: usize, local_
 }
 
 #[inline(never)]
-fn search_pivot_outside_block<T>(matrix: &mut Matrix<T>, local_pivot_i: usize, local_pivot_j: usize, global_pivot_i: usize, global_pivot_j: usize) -> bool {
+fn search_pivot_outside_block<T>(matrix: &mut InternalMatrix<T>, local_pivot_i: usize, local_pivot_j: usize, global_pivot_i: usize, global_pivot_j: usize) -> bool {
     let n = matrix.n;
     matrix.check();
     // there is no solution within the block, start reducing and looking
@@ -210,7 +281,7 @@ static SHORT_REDUCTION_TIME: AtomicUsize = AtomicUsize::new(0);
 static LONG_REDUCTION_TIME: AtomicUsize = AtomicUsize::new(0);
 
 #[inline(never)]
-fn update_rows_with_transform<R>(ring: R, matrix: &mut Matrix<El<R>>, rows_start: usize, pivot_col: usize, transform: &[Vec<(usize, El<R>)>]) 
+fn update_rows_with_transform<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, rows_start: usize, pivot_col: usize, transform: &[Vec<(usize, El<R>)>]) 
     where R: RingStore + Copy + Sync,
         El<R>: Send + Sync
 {
@@ -237,7 +308,7 @@ fn update_rows_with_transform<R>(ring: R, matrix: &mut Matrix<El<R>>, rows_start
     TRANSFORM_TIME.fetch_add((end - start).as_millis() as usize, std::sync::atomic::Ordering::Relaxed);
 }
 
-fn eliminate_exterior_rows<R>(ring: R, matrix: &mut Matrix<El<R>>, rows_start: usize, rows_end: usize, pivot_rows_start: usize, pivot_rows_end: usize, global_col: usize)
+fn eliminate_exterior_rows<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, rows_start: usize, rows_end: usize, pivot_rows_start: usize, pivot_rows_end: usize, global_col: usize)
     where R: RingStore + Copy,
         El<R>: Send + Sync,
         R: Sync
@@ -246,7 +317,7 @@ fn eliminate_exterior_rows<R>(ring: R, matrix: &mut Matrix<El<R>>, rows_start: u
 }
 
 #[inline(never)]
-fn eliminate_interior_rows<R>(ring: R, matrix: &mut Matrix<El<R>>, rows_start: usize, rows_end: usize, pivot_rows_start: usize, pivot_rows_end: usize, global_col: usize)
+fn eliminate_interior_rows<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, rows_start: usize, rows_end: usize, pivot_rows_start: usize, pivot_rows_end: usize, global_col: usize)
     where R: RingStore + Copy,
         El<R>: Send + Sync,
         R: Sync
@@ -304,7 +375,7 @@ fn get_two_mut<'a, T>(slice: &'a mut [T], i1: usize, i2: usize) -> (&'a mut T, &
 }
 
 #[inline(never)]
-fn local_row_echelon<R>(ring: R, matrix: &mut Matrix<El<R>>, transform: &mut Matrix<El<R>>, global_pivot_i: usize, global_pivot_j: usize, start_pivot: (usize, usize)) -> (usize, Result<(), usize>)
+fn local_row_echelon<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, transform: &mut InternalMatrix<El<R>>, global_pivot_i: usize, global_pivot_j: usize, start_pivot: (usize, usize)) -> (usize, Result<(), usize>)
     where R: DivisibilityRingStore + Copy,
         R::Type: DivisibilityRing
 {
@@ -328,7 +399,7 @@ fn local_row_echelon<R>(ring: R, matrix: &mut Matrix<El<R>>, transform: &mut Mat
                     for row in min(i + 1, col + 1)..n {
                         if !(matrix.entry_at(global_pivot_i + row, global_pivot_j, col).is_none()) {
                             println!();
-                            print(ring, &matrix);
+                            println!("{}", matrix.format(&ring));
                             println!();
                             assert!(false);
                         }
@@ -374,7 +445,7 @@ fn local_row_echelon<R>(ring: R, matrix: &mut Matrix<El<R>>, transform: &mut Mat
 }
 
 #[inline(never)]
-fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut Matrix<El<R>>)
+fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut InternalMatrix<El<R>>)
     where R: DivisibilityRingStore + Copy,
         R::Type: DivisibilityRing,
         El<R>: Send + Sync,
@@ -402,7 +473,7 @@ fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut Matrix<El<R>>)
     let mut local_pivot_i = 0;
     let mut local_pivot_j = 0;
     while pivot_row + n < matrix.row_count() && pivot_col < col_block_count {
-        let mut transform = identity(ring, n, empty(n, 1));
+        let mut transform = identity(ring, n, empty(n, 1, ring.zero()));
 
         // now we have the nxn block in row echelon form, with the last (n - produced rows) being zero
         let (new_local_i, current_result) = local_row_echelon(ring, matrix, &mut transform, pivot_row, pivot_col, (local_pivot_i, local_pivot_j));
@@ -467,7 +538,8 @@ pub fn gb_sparse_row_echelon<R, const LOG: bool>(ring: R, rows: Vec<Vec<(usize, 
 {
     let n = 256;
     let global_cols = (col_count - 1) / n + 1;
-    let mut matrix = Matrix {
+    let mut matrix = InternalMatrix {
+        zero: ring.zero(),
         n: n,
         global_col_count: global_cols,
         rows: rows.into_iter().rev().map(|row| {
@@ -514,13 +586,14 @@ fn test() {
     let ring = Zn::<7>::RING;
     let mut counter1 = 0;
     let mut counter2 = 0;
-    let mut matrix = Matrix {
+    let mut matrix = InternalMatrix {
         rows: (0..10).map(|_| (0..3).map(|_| (0..4).map(|k| { counter1 += 1; (k, (counter1 % 6) + 1) }).filter(|_| { counter2 = (counter2 + 1) % 7; counter2 < 2 }).chain(Some((usize::MAX, 0)).into_iter()).collect()).collect()).collect(),
         n: 4,
-        global_col_count: 3
+        global_col_count: 3,
+        zero: 0
     };
 
     blocked_row_echelon::<_, false>(ring, &mut matrix);
 
-    print(ring, &matrix);
+    println!("{}", matrix.format(&ring));
 }

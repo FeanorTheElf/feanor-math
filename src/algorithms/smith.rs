@@ -51,9 +51,28 @@ fn transform_cols<R>(ring: &R, A: &mut Matrix<El<R>>, k: usize, j: usize, transf
 
 ///
 /// Transforms `(L, R, A)` into `(L', R', A')` such that
-/// `L' A R' = L A' R` and `A'` is in Smith normal form.
+/// `L' A R' = L A' R` and `A'` is diagonal.
 /// 
-pub fn smith_like<R>(ring: R, L: &mut Matrix<El<R>>, R: &mut Matrix<El<R>>, A: &mut Matrix<El<R>>)
+/// # (Non-)Uniqueness of the solution
+/// 
+/// Note that this is not the complete Smith normal form, 
+/// as that requires the entries on the diagonal to divide
+/// each other. However, computing this pre-smith form is much
+/// faster, and can still be used for solving equations (the main
+/// use case). However, it is not unique.
+/// 
+/// # Warning on infinite rings (in particular Z)
+/// 
+/// For infinite principal ideal rings, this function is correct,
+/// but in some situations, the performance can be terrible. The
+/// reason is that no care is taken which of the many possible results
+/// is returned - and in fact, this algorithm can sometimes choose
+/// one that has exponential size in the input. Hence, in these
+/// cases it is recommended to use another algorithm, e.g. based on
+/// LLL to perform intermediate lattice reductions (not yet implemented
+/// in feanor_math).
+/// 
+pub fn pre_smith<R>(ring: R, L: &mut Matrix<El<R>>, R: &mut Matrix<El<R>>, A: &mut Matrix<El<R>>)
     where R: RingStore,
         R::Type: PrincipalIdealRing
 {
@@ -160,6 +179,7 @@ impl<T> Debug for Matrix<T>
 
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
+#[cfg(test)]
 use crate::rings::zn::zn_static;
 
 #[test]
@@ -173,7 +193,7 @@ fn test_smith_integers() {
     };
     let mut L = Matrix::identity(3, 0, 1);
     let mut R = Matrix::identity(4, 0, 1);
-    smith_like(ring, &mut L, &mut R, &mut A);
+    pre_smith(ring, &mut L, &mut R, &mut A);
     
     let expected = Matrix {
         data: vec![ 1,  0, 0, 0,
@@ -197,12 +217,12 @@ fn test_smith_zn() {
     };
     let mut L = Matrix::identity(5, ring.zero(), ring.one());
     let mut R = Matrix::identity(4, ring.zero(), ring.one());
-    smith_like(ring, &mut L, &mut R, &mut A);
+    pre_smith(ring, &mut L, &mut R, &mut A);
 
     let expected = Matrix {
-        data: vec![ 3, 0, 0, 0,
-                    0, 9, 0, 0,
-                    0, 0, 5, 0, 
+        data: vec![ 8, 0, 0, 0,
+                    0, 3, 0, 0,
+                    0, 0, 0, 0, 
                     0, 0, 0, 15,
                     0, 0, 0, 0 ].into_boxed_slice(),
         col_count: 4

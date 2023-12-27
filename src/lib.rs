@@ -66,6 +66,7 @@ pub mod divisibility;
 /// 
 pub mod field;
 pub mod pid;
+pub mod matrix;
 ///
 /// This module contains the trait [`ordered::OrderedRing`] for rings with a total ordering that is compatible
 /// with the ring operations.
