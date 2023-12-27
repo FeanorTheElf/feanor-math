@@ -5,7 +5,7 @@ use crate::delegate::DelegateRing;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::*;
 use crate::integer::*;
-use crate::pid::EuclideanRingStore;
+use crate::pid::*;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::rings::rust_bigint::*;
@@ -429,6 +429,15 @@ impl FiniteRing for ZnBase {
         where I::Type: IntegerRing
     {
         int_cast(*self.modulus(), other_ZZ, self.integer_ring())
+    }
+}
+
+impl PrincipalIdealRing for ZnBase {
+
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        let (s, t, d) = StaticRing::<i64>::RING.ideal_gen(&(lhs.0 as i64), &(rhs.0 as i64));
+        let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
+        (quo.map(s), quo.map(t), quo.map(d))
     }
 }
 

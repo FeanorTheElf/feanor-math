@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use crate::divisibility::DivisibilityRingStore;
 use crate::ring::*;
-use crate::pid::{PrincipalIdealRing, PIDStore};
+use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 
 fn sub_row<R>(ring: &R, A: &mut Matrix<El<R>>, k: usize, i: usize, factor: &El<R>)
     where R: RingStore
@@ -69,6 +69,7 @@ pub fn smith_like<R>(ring: R, L: &mut Matrix<El<R>>, R: &mut Matrix<El<R>>, A: &
                 sub_row(&ring, L, k, i, &quo);
             } else {
                 let (s, t, d) = ring.ideal_gen(A.at(k, k), A.at(i, k));
+                println!("{}, {}, {}, {}, {}", ring.format(A.at(k, k)), ring.format(A.at(i, k)), ring.format(&s), ring.format(&t), ring.format(&d));
                 let transform = [s, t, ring.negate(ring.checked_div(A.at(i, k), &d).unwrap()), ring.checked_div(A.at(k, k), &d).unwrap()];
                 transform_rows(&ring, A, k, i, &transform);
                 transform_rows(&ring, L, k, i, &transform);
@@ -159,6 +160,7 @@ impl<T> Debug for Matrix<T>
 
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
+use crate::rings::zn::zn_static;
 
 #[test]
 fn test_smith_integers() {
@@ -177,6 +179,32 @@ fn test_smith_integers() {
         data: vec![ 1,  0, 0, 0,
                     0, -1, 0, 0,
                     0,  0, 0, 0 ].into_boxed_slice(),
+        col_count: 4
+    };
+    assert_eq!(&expected, &A);
+}
+
+#[test]
+fn test_smith_zn() {
+    let ring = zn_static::Zn::<45>::RING;
+    let mut A = Matrix {
+        data: vec![ 8, 3, 5, 8,
+                    0, 9, 0, 9,
+                    5, 9, 5, 14,
+                    8, 3, 5, 23,
+                    3,39, 0, 39 ].into_boxed_slice(),
+        col_count: 4
+    };
+    let mut L = Matrix::identity(5, ring.zero(), ring.one());
+    let mut R = Matrix::identity(4, ring.zero(), ring.one());
+    smith_like(ring, &mut L, &mut R, &mut A);
+
+    let expected = Matrix {
+        data: vec![ 3, 0, 0, 0,
+                    0, 9, 0, 0,
+                    0, 0, 5, 0, 
+                    0, 0, 0, 15,
+                    0, 0, 0, 0 ].into_boxed_slice(),
         col_count: 4
     };
     assert_eq!(&expected, &A);

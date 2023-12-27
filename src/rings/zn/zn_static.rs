@@ -1,7 +1,7 @@
 use crate::algorithms::eea::*;
-use crate::pid::{EuclideanRing, PrincipalIdealRing};
+use crate::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::field::Field;
-use crate::divisibility::*;
+use crate::divisibility::{*, self};
 use crate::primitive_int::{StaticRing, StaticRingBase};
 use crate::ring::*;
 use crate::homomorphism::*;
@@ -136,32 +136,32 @@ impl<const N: u64, const IS_FIELD: bool> CanonicalIso<ZnBase<N, IS_FIELD>> for Z
 }
 
 impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnBase<N, IS_FIELD> {
+
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let (s, _, d) = signed_eea(*rhs as i64, N as i64, StaticRing::<i64>::RING);
         let mut rhs_inv = ((s % (N as i64)) + (N as i64)) as u64;
         if rhs_inv >= N {
             rhs_inv -= N;
         }
-        if d == 1 {
-            Some(self.mul(*lhs, rhs_inv))
+        if *lhs % d as u64 == 0 {
+            Some(self.mul(*lhs / d as u64, rhs_inv))
         } else {
             None
         }
     }
 }
 
-impl<const N: u64> PrincipalIdealRing for ZnBase<N, true> {
+impl<const N: u64, const IS_FIELD: bool> PrincipalIdealRing for ZnBase<N, IS_FIELD> {
     
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        match (self.is_zero(lhs), self.is_zero(rhs)) {
-            (true, true) => (self.zero(), self.zero(), self.zero()),
-            (true, false) => (self.zero(), self.div(&self.one(), rhs), self.one()),
-            (false, _) => (self.div(&self.one(), lhs), self.zero(), self.one())
-        }
+        let (s, t, d) = StaticRing::<i64>::RING.ideal_gen(&(*lhs as i64), &(*rhs as i64));
+        let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
+        (quo.map(s), quo.map(t), quo.map(d))
     }
 }
 
 impl<const N: u64> EuclideanRing for ZnBase<N, true> {
+
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
         (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
@@ -293,4 +293,11 @@ fn fn_test_div_impossible() {
 fn test_zn_ring_axioms_znbase() {
     super::generic_tests::test_zn_axioms(Zn::<17>::RING);
     super::generic_tests::test_zn_axioms(Zn::<63>::RING);
+}
+
+#[test]
+fn test_divisibility_axioms() {
+    divisibility::generic_tests::test_divisibility_axioms(Zn::<17>::RING, Zn::<17>::RING.elements());
+    divisibility::generic_tests::test_divisibility_axioms(Zn::<9>::RING, Zn::<9>::RING.elements());
+    divisibility::generic_tests::test_divisibility_axioms(Zn::<12>::RING, Zn::<12>::RING.elements());
 }

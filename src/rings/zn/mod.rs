@@ -1,3 +1,4 @@
+use crate::pid::PrincipalIdealRing;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::divisibility::DivisibilityRing;
@@ -40,7 +41,7 @@ pub mod zn_rns;
 ///
 /// Trait for all rings that represent a quotient of the integers `Z/nZ` for some integer `n`.
 /// 
-pub trait ZnRing: DivisibilityRing + FiniteRing + CanHomFrom<Self::IntegerRingBase> {
+pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRingBase> {
 
     /// 
     /// there seems to be a problem with associated type bounds, hence we cannot use `Integers: IntegerRingStore`

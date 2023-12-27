@@ -1,3 +1,4 @@
+use crate::pid::PrincipalIdealRing;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::divisibility::DivisibilityRing;
@@ -294,6 +295,15 @@ impl<'a, R: ?Sized> Iterator for DelegateZnRingElementsIter<'a, R>
     }
 }
 
+impl<R: DelegateRing + ?Sized> PrincipalIdealRing for R
+    where R::Base: PrincipalIdealRing
+{
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        let (s, t, d) = self.get_delegate().ideal_gen(self.delegate_ref(lhs), self.delegate_ref(rhs));
+        (self.rev_delegate(s), self.rev_delegate(t), self.rev_delegate(d))
+    }
+}
+
 impl<R: DelegateRing + ?Sized> FiniteRing for R
     where R::Base: FiniteRing
 {
@@ -323,6 +333,7 @@ impl<R: DelegateRing + ?Sized> ZnRing for R
 {
     type IntegerRingBase = <R::Base as ZnRing>::IntegerRingBase;
     type Integers = <R::Base as ZnRing>::Integers;
+
     fn integer_ring(&self) -> &Self::Integers {
         self.get_delegate().integer_ring()
     }

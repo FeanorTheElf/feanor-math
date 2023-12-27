@@ -1,6 +1,7 @@
 use crate::algorithms::fft::cooley_tuckey::*;
 use crate::delegate::DelegateRing;
 use crate::integer::IntegerRingStore;
+use crate::pid::PrincipalIdealRingStore;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::rings::zn::*;
@@ -420,6 +421,15 @@ impl FiniteRing for ZnBase {
         where I::Type: IntegerRing
     {
         int_cast(*self.modulus(), ZZ, self.integer_ring())
+    }
+}
+
+impl PrincipalIdealRing for ZnBase {
+
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        let (s, t, d) = StaticRing::<i64>::RING.ideal_gen(&(lhs.0 as i64), &(rhs.0 as i64));
+        let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
+        (quo.map(s), quo.map(t), quo.map(d))
     }
 }
 

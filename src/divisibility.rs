@@ -54,7 +54,7 @@ pub mod generic_tests {
             for b in &elements {
                 let ab = ring.mul(ring.clone_el(a), ring.clone_el(b));
                 let c = ring.checked_left_div(&ab, &a);
-                assert!(c.is_some(), "Divisibility existence failed: there is b = {} such that {} = b * {}", ring.format(b), ring.format(&ab), ring.format(&a));
+                assert!(c.is_some(), "Divisibility existence failed: there should exist b = {} such that {} = b * {}, but none was found", ring.format(b), ring.format(&ab), ring.format(&a));
                 assert!(ring.eq_el(&ab, &ring.mul_ref_snd(ring.clone_el(a), c.as_ref().unwrap())), "Division failed: {} * {} != {} but {} = checked_div({}, {})", ring.format(a), ring.format(c.as_ref().unwrap()), ring.format(&ab), ring.format(c.as_ref().unwrap()), ring.format(&ab), ring.format(&a));
 
                 if !ring.is_unit(a) {
