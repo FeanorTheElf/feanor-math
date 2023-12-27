@@ -17,4 +17,4 @@ pub mod discrete_log;
 pub mod sparse_invert;
 pub mod f4;
 pub mod sparse_invert_new;
-pub mod elim_dvr;
+pub mod smith;
