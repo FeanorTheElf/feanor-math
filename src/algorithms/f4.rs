@@ -6,10 +6,7 @@ use crate::ring::*;
 use crate::rings::multivariate::*;
 use crate::vector::*;
 
-use super::sparse_invert::SparseMatrix;
-use super::sparse_invert_new;
-
-const COMPARE_ECHELON_ALGO_WITH_OLD: bool = false;
+use super::sparse_invert::*;
 
 struct MonomialMap<P, O, K = ()>
     where P: MultivariatePolyRingStore,
@@ -141,18 +138,16 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
         }
     }
     let columns_ref = &columns;
-    let mut A = SparseMatrix::new(
-        ring.base_ring(),
-        S_polys.len(),
-        columns.len(),
-        S_polys.iter().enumerate().flat_map(move |(i, f)|
-            ring_ref.terms(f).map(move |(c, m)| {
-                let row = i;
-                let col = columns_ref.index_of(m).unwrap();
-                return (row, col, ring_ref.base_ring().clone_el(c));
-            })
-        )
-    );
+    let mut A = SparseMatrixBuilder::new(&ring.base_ring());
+    for j in 0..columns.len() {
+        A.add_col(j);
+    }
+    for (i, S_poly) in S_polys.iter().enumerate() {
+        A.add_row(i, ring.terms(S_poly).map(move |(c, m)| {
+            let col = columns_ref.index_of(m).unwrap();
+            return (col, ring_ref.base_ring().clone_el(c));
+        }));
+    }
 
     // all monomials for which we have to add a row to A to enable eliminating them
     let mut open = columns.iter().map(|(m, _)| ring.clone_monomial(m)).collect::<Vec<_>>();
@@ -160,11 +155,11 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
     while let Some(m) = open.pop() {
         if let Some(f) = basis.iter().filter(|f| ring.lm(f, order).unwrap().divides(&m)).next() {
             let div_monomial = ring.clone_monomial(&m).div(ring.lm(f, order).unwrap());
-            A.add_row(0);
+            A.add_zero_row(0);
             for (c, f_m) in ring.terms(f) {
                 let final_monomial = ring.clone_monomial(&div_monomial).mul(f_m);
                 let col = match columns.add(ring.clone_monomial(&final_monomial), ()) {
-                    AddResult::Added(i) => { A.add_column(i); open.push(final_monomial); i },
+                    AddResult::Added(i) => { A.add_col(i); open.push(final_monomial); i },
                     AddResult::Present(i, _) => i
                 };
 
@@ -173,44 +168,22 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
         }
     }
 
-    let mut entries = A.clone().into_entries();
-    let mut C: Option<SparseMatrix<&<P::Type as RingExtension>::BaseRing>> = None;
-
-    if COMPARE_ECHELON_ALGO_WITH_OLD {
-        C = Some(A.clone());
-    }
-
-    entries = sparse_invert_new::gb_sparse_row_echelon::<_, true>(ring.base_ring(), entries, columns.len());
-
-    if COMPARE_ECHELON_ALGO_WITH_OLD {
-        entries.reverse();
-    }
-    
-    let B = SparseMatrix::from_entries(ring.base_ring(), entries, columns.len());
-
-    if COMPARE_ECHELON_ALGO_WITH_OLD {
-        // gb_rowrev_sparse_row_echelon::<_, false>(&mut A);
-        A.normalize();
-        if A != B {
-            println!();
-            C.unwrap().print();
-            println!();
-            A.print();
-            println!();
-            B.print();
-            println!();
-            panic!();
-        }
-    }
-    A = B;
-
-    // sparse_invert::gb_rowrev_sparse_row_echelon::<_, true>(&mut A);
+    let entries = gb_sparse_row_echelon::<_, true>(ring.base_ring(), A);
 
     let mut result = Vec::new();
-    for i in 0..A.row_count() {
-        if let Some(j) = A.get_row(i).nontrivial_entries().map(|(j, _)| j).min() {
+    for i in 0..entries.len() {
+        if let Some(j) = entries[i].iter().inspect(|(_, c)| assert!(!ring.base_ring().is_zero(c))).map(|(j, _)| *j).min() {
             if basis.iter().all(|f| !ring.lm(f, order).unwrap().divides(columns.at_index(j))) {
-                let f = ring.from_terms(A.get_row(i).nontrivial_entries().map(|(j, c)| (ring.base_ring().clone_el(c), ring.clone_monomial(columns.at_index(j)))));
+                let f = ring.from_terms(entries[i].iter().map(|(j, c)| (ring.base_ring().clone_el(c), ring.clone_monomial(columns.at_index(*j)))));
+                if ring.is_zero(&f) {
+                    println!();
+                    ring.println(&f);
+                    for (j, c) in &entries[i] {
+                        print!("({}, {}, {}), ", j, ring.format(&ring.monomial(columns.at_index(*j))), ring.base_ring().format(c));
+                    }
+                    println!();
+                    panic!()
+                }
                 result.push(f)
             }
         }
