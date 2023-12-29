@@ -276,6 +276,8 @@ impl<R1, V1, M1, R2, V2, M2> CanonicalIso<FreeAlgebraImplBase<R1, V1, M1>> for F
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::default_memory_provider;
+#[cfg(test)]
+use crate::rings::zn::zn_64::Zn;
 
 #[cfg(test)]
 fn test_ring_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 2], DefaultMemoryProvider>, Vec<FreeAlgebraEl<StaticRing<i64>, DefaultMemoryProvider>>) {
@@ -300,4 +302,22 @@ fn test_ring_axioms() {
 fn test_free_algebra_axioms() {
     let (ring, _) = test_ring_and_elements();
     generic_test_free_algebra_axioms(ring);
+}
+
+#[test]
+fn test_division() {
+    let base_ring = Zn::new(4);
+    let i = base_ring.int_hom();
+    let ring = FreeAlgebraImpl::new(base_ring, [i.map(-1), i.map(-1)], default_memory_provider!());
+
+    assert_el_eq!(&ring, 
+        &ring.from_canonical_basis([i.map(1), i.map(3)].into_iter()), 
+        &ring.checked_div(&ring.one(), &ring.from_canonical_basis([i.map(2), i.map(3)].into_iter()))
+    );
+
+    let a = ring.from_canonical_basis([i.map(2), i.map(2)].into_iter());
+    let b = ring.from_canonical_basis([i.map(0), i.map(2)].into_iter());
+    assert_el_eq!(&ring, &a, &ring.mul(ring.checked_div(&a, &b).unwrap(), b));
+
+    assert!(ring.checked_div(&ring.one(), &a).is_none());
 }
