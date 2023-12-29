@@ -12,18 +12,20 @@ use crate::vector::{VectorView, VectorViewMut};
 const EXTENSIVE_RUNTIME_ASSERTS: bool = false;
 
 pub struct SparseMatrixBuilder<R>
-    where R: RingStore
+    where R: ?Sized + RingBase
 {
-    zero: El<R>,
-    rows: Vec<Vec<(usize, El<R>)>>,
+    zero: R::Element,
+    rows: Vec<Vec<(usize, R::Element)>>,
     col_permutation: Vec<usize>,
     col_count: usize
 }
 
 impl<R> SparseMatrixBuilder<R>
-    where R: RingStore
+    where R: ?Sized + RingBase
 {
-    pub fn new(ring: &R) -> Self {
+    pub fn new<S>(ring: &S) -> Self
+        where S: RingStore<Type = R>
+    {
         SparseMatrixBuilder {
             rows: Vec::new(),
             col_count: 0,
@@ -42,7 +44,7 @@ impl<R> SparseMatrixBuilder<R>
     }
 
     pub fn add_row<I>(&mut self, i: usize, values: I)
-        where I: Iterator<Item = (usize, El<R>)>
+        where I: Iterator<Item = (usize, R::Element)>
     {
         let mut row = values
             .map(|(j, x)| (self.col_permutation[j], x))
@@ -52,7 +54,7 @@ impl<R> SparseMatrixBuilder<R>
         self.rows.insert(i, row);
     }
 
-    pub fn set(&mut self, i: usize, j: usize, el: El<R>) -> Option<El<R>> {
+    pub fn set(&mut self, i: usize, j: usize, el: R::Element) -> Option<R::Element> {
         let row = &mut self.rows[i];
         let result = match row.binary_search_by_key(&self.col_permutation[j], |(c, _)| *c) {
             Ok(idx) => Some(std::mem::replace(&mut row.at_mut(idx).1, el)),
@@ -65,7 +67,7 @@ impl<R> SparseMatrixBuilder<R>
         return result;
     }
 
-    fn into_internal_matrix(self, n: usize, ring: &R) -> InternalMatrix<El<R>> {
+    fn into_internal_matrix(self, n: usize, ring: &R) -> InternalMatrix<R::Element> {
         let mut inverted_permutation = (0..self.col_permutation.len()).collect::<Vec<_>>();
         for (i, j) in self.col_permutation.iter().enumerate() {
             inverted_permutation[*j] = i;
@@ -98,7 +100,7 @@ impl<R> SparseMatrixBuilder<R>
 }
 
 impl<R> Matrix<R> for SparseMatrixBuilder<R> 
-    where R: RingStore
+    where R: ?Sized + RingBase
 {    
     fn col_count(&self) -> usize {
         self.col_count
@@ -108,7 +110,7 @@ impl<R> Matrix<R> for SparseMatrixBuilder<R>
         self.rows.len()
     }
 
-    fn at(&self, i: usize, j: usize) -> &El<R> {
+    fn at(&self, i: usize, j: usize) -> &R::Element {
         match self.rows.at(i).binary_search_by_key(&self.col_permutation[j], |(c, _)| *c) {
             Ok(idx) => &self.rows.at(i).at(idx).1,
             Err(_) => &self.zero
@@ -147,8 +149,8 @@ impl<T> InternalMatrix<T> {
     }
 }
 
-impl<R> Matrix<R> for InternalMatrix<El<R>>
-    where R: RingStore
+impl<R> Matrix<R> for InternalMatrix<R::Element>
+    where R: ?Sized + RingBase
 {
     fn row_count(&self) -> usize {
         self.rows.len()
@@ -158,7 +160,7 @@ impl<R> Matrix<R> for InternalMatrix<El<R>>
         self.global_col_count * self.n
     }
 
-    fn at(&self, i: usize, j: usize) -> &El<R> {
+    fn at(&self, i: usize, j: usize) -> &R::Element {
         self.entry_at(i, j / self.n, j % self.n).unwrap_or(&self.zero)
     }
 }
@@ -573,7 +575,7 @@ fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut InternalMatrix<
 }
 
 #[inline(never)]
-pub fn gb_sparse_row_echelon<R, const LOG: bool>(ring: R, matrix: SparseMatrixBuilder<R>) -> Vec<Vec<(usize, El<R>)>>
+pub fn gb_sparse_row_echelon<R, const LOG: bool>(ring: R, matrix: SparseMatrixBuilder<R::Type>) -> Vec<Vec<(usize, El<R>)>>
     where R: DivisibilityRingStore + Copy,
         R::Type: DivisibilityRing,
         El<R>: Send + Sync,
@@ -581,7 +583,7 @@ pub fn gb_sparse_row_echelon<R, const LOG: bool>(ring: R, matrix: SparseMatrixBu
 {
     let n = 256;
     let global_cols = (matrix.col_count() - 1) / n + 1;
-    let mut matrix = matrix.into_internal_matrix(n, &ring);
+    let mut matrix = matrix.into_internal_matrix(n, ring.get_ring());
     matrix.check();
     blocked_row_echelon::<_, LOG>(ring, &mut matrix);
 
