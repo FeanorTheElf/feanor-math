@@ -294,3 +294,17 @@ fn test_solve_zn() {
 
     assert_matrix_eq!(&ring, &A.mul(&solution, &ring), &B);
 }
+
+#[test]
+fn test_solve_int() {
+    let ring = StaticRing::<i64>::RING;
+    let A = DenseMatrix {
+        data: vec![3, 6, 2, 0, 4, 7,
+                   5, 5, 4, 5, 5, 5].into_boxed_slice(),
+        col_count: 6
+    };
+    let B = DenseMatrix::identity(2, ring);
+    let solution = solve_right(&mut A.clone_matrix(ring), B.clone_matrix(ring), ring).unwrap();
+
+    assert_matrix_eq!(&ring, &A.mul(&solution, &ring), &B);
+}

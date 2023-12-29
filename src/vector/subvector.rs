@@ -13,7 +13,7 @@ use std::marker::PhantomData;
 /// 
 /// Assuming we wanted to implement a (very stupid) recursive variant of summing
 /// all values in a vector. We would like to do it as
-/// ```ignore
+/// ```rust,ignore
 /// # use feanor_math::vector::*;
 /// # use feanor_math::vector::subvector::*;
 /// 
@@ -59,7 +59,7 @@ use std::marker::PhantomData;
 /// ```
 /// But it is a problem that [`SelfSubvectorView::subvector()`] moves the current object.
 /// In particular, the following does not work:
-/// ```ignore
+/// ```rust,ignore
 /// # use feanor_math::vector::*;
 /// # use feanor_math::vector::subvector::*;
 /// 

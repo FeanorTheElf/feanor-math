@@ -608,23 +608,3 @@ pub fn gb_sparse_row_echelon<R, const LOG: bool>(ring: R, matrix: SparseMatrixBu
         row.into_iter().enumerate().flat_map(|(i, r)| r.into_iter().rev().skip(1).rev().map(move |(j, c)| (j + i * n, c)).inspect(|(_, c)| assert!(!ring.is_zero(c)))).collect()
     ).collect();
 }
-
-#[cfg(test)]
-use crate::rings::zn::zn_static::Zn;
-
-#[test]
-fn test() {
-    let ring = Zn::<7>::RING;
-    let mut counter1 = 0;
-    let mut counter2 = 0;
-    let mut matrix = InternalMatrix {
-        rows: (0..10).map(|_| (0..3).map(|_| (0..4).map(|k| { counter1 += 1; (k, (counter1 % 6) + 1) }).filter(|_| { counter2 = (counter2 + 1) % 7; counter2 < 2 }).chain(Some((usize::MAX, 0)).into_iter()).collect()).collect()).collect(),
-        n: 4,
-        global_col_count: 3,
-        zero: 0
-    };
-
-    blocked_row_echelon::<_, false>(ring, &mut matrix);
-
-    println!("{}", matrix.format(&ring));
-}

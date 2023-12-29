@@ -359,7 +359,7 @@ macro_rules! delegate {
 /// 
 /// Note that this does not support generic types, as for those, it is
 /// usually better to implement
-/// ```ignore
+/// ```rust,ignore
 /// RingConstructor<R>: CanonicalIso<RingConstructor<S>>
 ///     where R: CanonicalIso<S>
 /// ```
@@ -529,7 +529,7 @@ macro_rules! assert_el_eq {
 /// We need a framework that allows nesting rings, e.g. to provide a polynomial ring
 /// over a finite field - say `PolyRing<FiniteField>`. However, the simplest
 /// implementation
-/// ```ignore
+/// ```rust,ignore
 /// struct PolyRing<BaseRing: Ring> { /* omitted */ }
 /// ```
 /// would have the effect that `PolyRing<FiniteField>` and `PolyRing<&FiniteField>`
@@ -828,13 +828,13 @@ pub type El<R> = <<R as RingStore>::Type as RingBase>::Element;
 /// 
 /// In fact, that we need this trait is just the result of a technical
 /// detail. We cannot implement
-/// ```ignore
+/// ```rust,ignore
 /// impl<R: RingBase> RingStore for R {}
 /// impl<'a, R: RingStore> RingStore for &;a R {}
 /// ```
 /// since this might cause conflicting implementations.
 /// Instead, we implement
-/// ```ignore
+/// ```rust,ignore
 /// impl<R: RingBase> RingStore for RingValue<R> {}
 /// impl<'a, R: RingStore> RingStore for &;a R {}
 /// ```
@@ -846,12 +846,12 @@ pub type El<R> = <<R as RingStore>::Type as RingBase>::Element;
 /// 
 /// To simplify this, we propose to use the following simple pattern:
 /// Create your ring type as
-/// ```ignore
+/// ```rust,ignore
 /// struct ABase { ... }
 /// impl RingBase for ABase { ... } 
 /// ```
 /// and then provide a type alias
-/// ```ignore
+/// ```rust,ignore
 /// type A = RingValue<ABase>;
 /// ```
 /// 

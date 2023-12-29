@@ -21,11 +21,11 @@ use super::{VectorView, map::MapFn, subvector::{SelfSubvectorView, SelfSubvector
 /// # Blanket implementations
 /// 
 /// There are many kinds of blanket implementations thinkable, e.g.
-/// ```ignore
+/// ```rust,ignore
 /// impl<T: Clone, V> VectorFn<T> for VectorView<T> { ... }
 /// ```
 /// or
-/// ```ignore
+/// ```rust,ignore
 /// impl<'a, T, V> VectorFn<&'a T> for &'a VectorView<T> { ... }
 /// ```
 /// However, these do not represent the standard use cases and clutter the space of
