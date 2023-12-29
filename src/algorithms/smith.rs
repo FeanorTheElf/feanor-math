@@ -67,6 +67,36 @@ pub fn pre_smith<R, TL, TR>(ring: R, L: &mut TL, R: &mut TR, A: &mut DenseMatrix
     }
 }
 
+pub fn solve_right<R>(A: &mut DenseMatrix<R::Type>, mut rhs: DenseMatrix<R::Type>, ring: R) -> Option<DenseMatrix<R::Type>>
+    where R: RingStore + Copy,
+        R::Type: PrincipalIdealRing
+{
+    assert_eq!(A.row_count(), rhs.row_count());
+    let mut R = DenseMatrix::identity(A.col_count(), ring);
+    pre_smith(ring, &mut TransformRows(&mut rhs), &mut TransformCols(&mut R), A);
+
+    // resize rhs
+    for i in A.row_count()..rhs.row_count() {
+        for j in 0..rhs.col_count() {
+            if !ring.is_zero(rhs.at(i, j)) {
+                return None;
+            }
+        }
+    }
+    let mut data = rhs.data.into_vec();
+    data.resize_with(A.col_count() * rhs.col_count, || ring.zero());
+    rhs.data = data.into_boxed_slice();
+
+    let zero = ring.zero();
+    for i in 0..min(A.row_count(), A.col_count()) {
+        let pivot = if i < A.col_count() { A.at(i, i) } else { &zero };
+        for j in 0..rhs.col_count() {
+            *rhs.at_mut(i, j) = ring.checked_div(rhs.at(i, j), pivot)?;
+        }
+    }
+    return Some(R.mul(&rhs, ring));
+}
+
 pub struct DenseMatrix<R>
     where R: ?Sized + RingBase
 {
@@ -103,6 +133,15 @@ impl<R> DenseMatrix<R>
             data: (0..self.row_count()).flat_map(|i| (0..other.col_count()).map(move |j|
                 ring.sum((0..self.col_count()).map(|k| ring.mul_ref(self.at(i, k), other.at(k, j))))
             )).collect::<Vec<_>>().into_boxed_slice()
+        }
+    }
+
+    pub fn clone_matrix<S>(&self, ring: S) -> Self
+        where S: RingStore<Type = R>
+    {
+        DenseMatrix {
+            col_count: self.col_count,
+            data: self.data.iter().map(|x| ring.clone_el(x)).collect::<Vec<_>>().into_boxed_slice()
         }
     }
 }
@@ -193,6 +232,7 @@ fn test_smith_integers() {
                     3, 4, 5, 6 ].into_boxed_slice(),
         col_count: 4
     };
+    let original_A = A.clone_matrix(&ring);
     let mut L = DenseMatrix::identity(3, StaticRing::<i64>::RING);
     let mut R = DenseMatrix::identity(4, StaticRing::<i64>::RING);
     pre_smith(ring, &mut TransformRows(&mut L), &mut TransformCols(&mut R), &mut A);
@@ -201,6 +241,8 @@ fn test_smith_integers() {
         [1, 0, 0, 0],
         [0,-1, 0, 0],
         [0, 0, 0, 0]], &A);
+
+    assert_matrix_eq!(&ring, &L.mul(&original_A, &ring).mul(&R, &ring), &A);
 }
 
 #[test]
@@ -214,6 +256,7 @@ fn test_smith_zn() {
                     3,39, 0, 39 ].into_boxed_slice(),
         col_count: 4
     };
+    let original_A = A.clone_matrix(&ring);
     let mut L = DenseMatrix::identity(5, ring);
     let mut R = DenseMatrix::identity(4, ring);
     pre_smith(ring, &mut TransformRows(&mut L), &mut TransformCols(&mut R), &mut A);
@@ -224,4 +267,30 @@ fn test_smith_zn() {
         [0, 0, 0, 0], 
         [0, 0, 0, 15],
         [0, 0, 0, 0]], &A);
+        
+    assert_matrix_eq!(&ring, &L.mul(&original_A, &ring).mul(&R, &ring), &A);
+}
+
+#[test]
+fn test_solve_zn() {
+    let ring = zn_static::Zn::<45>::RING;
+    let A = DenseMatrix {
+        data: vec![ 8, 3, 5, 8,
+                    0, 9, 0, 9,
+                    5, 9, 5, 14,
+                    8, 3, 5, 23,
+                    3,39, 0, 39 ].into_boxed_slice(),
+        col_count: 4
+    };
+    let B = DenseMatrix {
+        data: vec![11, 43, 10, 22,
+                   18,  9, 27, 27,
+                    8, 34,  7, 22,
+                   41, 13, 40, 37,
+                    3,  9,  3,  0].into_boxed_slice(),
+        col_count: 4
+    };
+    let solution = solve_right(&mut A.clone_matrix(ring), B.clone_matrix(ring), ring).unwrap();
+
+    assert_matrix_eq!(&ring, &A.mul(&solution, &ring), &B);
 }
