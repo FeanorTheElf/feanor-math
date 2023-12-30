@@ -1,4 +1,7 @@
+use crate::divisibility::*;
+use crate::matrix::Matrix;
 use crate::mempool::MemoryProvider;
+use crate::pid::PrincipalIdealRing;
 use crate::rings::poly::PolyRing;
 use crate::rings::poly::PolyRingStore;
 use crate::rings::poly::dense_poly::DensePolyRing;
@@ -182,6 +185,30 @@ impl<R, V, M> RingBase for FreeAlgebraImplBase<R, V, M>
 //     }
 // }
 
+
+impl<R, V, M> DivisibilityRing for FreeAlgebraImplBase<R, V, M>
+    where R: RingStore, R::Type: PrincipalIdealRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+{
+    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        let mut mul_matrix = algorithms::smith::DenseMatrix::zero(self.rank(), self.rank(), self.base_ring());
+        let mut current = self.clone_el(rhs);
+        for i in 0..self.rank() {
+            let data = self.wrt_canonical_basis(&current);
+            for j in 0..self.rank() {
+                *mul_matrix.at_mut(j, i) = data.at(j);
+            }
+            self.mul_assign(&mut current, self.canonical_gen());
+        }
+        let mut lhs_matrix = algorithms::smith::DenseMatrix::zero(self.rank(), 1, self.base_ring());
+        let data = self.wrt_canonical_basis(&lhs);
+        for j in 0..self.rank() {
+            *lhs_matrix.at_mut(j, 0) = data.at(j);
+        }
+        let solution = algorithms::smith::solve_right(&mut mul_matrix, lhs_matrix, self.base_ring())?;
+        return Some(self.from_canonical_basis((0..self.rank()).map(|i| self.base_ring().clone_el(solution.at(i, 0)))));
+    }
+}
+
 impl<R, V, M> RingExtension for FreeAlgebraImplBase<R, V, M>
     where R: RingStore, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
 {
@@ -295,7 +322,7 @@ fn test_ring_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 2], Def
 #[test]
 fn test_ring_axioms() {
     let (ring, els) = test_ring_and_elements();
-    generic_tests::test_ring_axioms(ring, els.into_iter());
+    crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
 }
 
 #[test]
@@ -312,7 +339,7 @@ fn test_division() {
 
     assert_el_eq!(&ring, 
         &ring.from_canonical_basis([i.map(1), i.map(3)].into_iter()), 
-        &ring.checked_div(&ring.one(), &ring.from_canonical_basis([i.map(2), i.map(3)].into_iter()))
+        &ring.checked_div(&ring.one(), &ring.from_canonical_basis([i.map(2), i.map(3)].into_iter())).unwrap()
     );
 
     let a = ring.from_canonical_basis([i.map(2), i.map(2)].into_iter());
@@ -320,4 +347,25 @@ fn test_division() {
     assert_el_eq!(&ring, &a, &ring.mul(ring.checked_div(&a, &b).unwrap(), b));
 
     assert!(ring.checked_div(&ring.one(), &a).is_none());
+}
+
+#[test]
+fn test_division_ring_of_integers() {
+    let base_ring = StaticRing::<i64>::RING;
+    let ring = FreeAlgebraImpl::new(base_ring, [11, 0], default_memory_provider!());
+
+    // the solution to Pell's equation is 10^2 - 3^2 * 11 = 1
+    let u = ring.from_canonical_basis([10, 3].into_iter());
+    let u_inv = ring.from_canonical_basis([10, -3].into_iter());
+
+    assert_el_eq!(&ring, &u_inv, &ring.checked_div(&ring.one(), &u).unwrap());
+    assert_el_eq!(&ring, &ring.pow(u_inv, 3), &ring.checked_div(&ring.one(), &ring.pow(u, 3)).unwrap());
+
+    assert!(ring.checked_div(&ring.from_canonical_basis([2, 0].into_iter()), &ring.from_canonical_basis([3, 0].into_iter())).is_none());
+}
+
+#[test]
+fn test_divisibility_axioms() {
+    let (ring, els) = test_ring_and_elements();
+    crate::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
 }

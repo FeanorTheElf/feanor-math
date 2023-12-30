@@ -124,6 +124,16 @@ impl<R> DenseMatrix<R>
         return result;
     }
 
+    pub fn zero<S>(n: usize, m: usize, ring: S) -> Self
+        where S: RingStore<Type = R>
+    {
+        let result = DenseMatrix {
+            data: (0..(n * m)).map(|_| ring.zero()).collect::<Vec<_>>().into_boxed_slice(),
+            col_count: m
+        };
+        return result;
+    }
+
     pub fn mul<S>(&self, other: &DenseMatrix<R>, ring: S) -> Self
         where S: RingStore<Type = R> + Copy
     {
