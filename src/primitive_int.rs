@@ -7,7 +7,6 @@ use crate::homomorphism::*;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::divisibility::DivisibilityRing;
 use crate::ordered::OrderedRing;
-use crate::rings::rust_bigint::{RustBigint, RustBigintRingBase};
 use crate::integer::*;
 use crate::algorithms::conv_mul::KaratsubaHint;
 
@@ -39,120 +38,25 @@ impl PrimitiveInt for i128 {
     fn bits() -> usize { Self::BITS as usize }
 }
 
-impl<I: ?Sized + IntegerRing, S: PrimitiveInt> CanHomFrom<I> for StaticRingBase<S> {
-
-    type Homomorphism = ();
-
-    default fn has_canonical_hom(&self, _: &I) -> Option<()> {
-        Some(())
-    }
-
-    default fn map_in(&self, from: &I, el: I::Element, _: &()) -> S {
-        generic_impls::generic_map_in(from, self, &el)
-    }
-}
-
-impl<I: ?Sized + IntegerRing, S: PrimitiveInt> CanonicalIso<I> for StaticRingBase<S> {
-
-    type Isomorphism = ();
-
-    default fn has_canonical_iso(&self, _: &I) -> Option<()> {
-        Some(())
-    }
-
-    default fn map_out(&self, from: &I, el: S, _: &()) -> I::Element {
-        generic_impls::generic_map_in(self, from, &el)
-    }
-}
-
-macro_rules! specialize_map_from_primitive_int {
+macro_rules! specialize_int_cast {
     ($(($int_from:ty, $int_to:ty)),*) => {
-        $(            
-            impl CanHomFrom<StaticRingBase<$int_from>> for StaticRingBase<$int_to> {
-
-                fn has_canonical_hom(&self, _: &StaticRingBase<$int_from>) -> Option<()> {
-                    Some(())
-                }
-
-                fn map_in(&self, _: &StaticRingBase<$int_from>, el: $int_from, _: &()) -> $int_to {
-                    <$int_to>::try_from(<_ as Into<i128>>::into(el)).map_err(|_| ()).unwrap()
-                }
-            }
-
+        $(
             impl IntCast<StaticRingBase<$int_from>> for StaticRingBase<$int_to> {
                 
-                fn cast(&self, from: &StaticRingBase<$int_from>, value: $int_from) -> Self::Element {
-                    self.map_in(from, value, &self.has_canonical_hom(from).unwrap())
+                fn cast(&self, _: &StaticRingBase<$int_from>, value: $int_from) -> Self::Element {
+                    <$int_to>::try_from(<_ as Into<i128>>::into(value)).map_err(|_| ()).unwrap()
                 }
             }
-                        
-            impl CanonicalIso<StaticRingBase<$int_from>> for StaticRingBase<$int_to> {
-
-                fn has_canonical_iso(&self, _: &StaticRingBase<$int_from>) -> Option<()> {
-                    Some(())
-                }
-
-                fn map_out(&self, from: &StaticRingBase<$int_from>, el: $int_to, _: &()) -> $int_from {
-                    from.map_in(self, el, &())
-                }
-            }
-
         )*
     };
 }
 
-specialize_map_from_primitive_int!{
+specialize_int_cast!{
     (i8, i8), (i8, i16), (i8, i32), (i8, i64), (i8, i128),
     (i16, i8), (i16, i16), (i16, i32), (i16, i64), (i16, i128),
     (i32, i8), (i32, i16), (i32, i32), (i32, i64), (i32, i128),
     (i64, i8), (i64, i16), (i64, i32), (i64, i64), (i64, i128),
     (i128, i8), (i128, i16), (i128, i32), (i128, i64), (i128, i128)
-}
-
-impl<T: PrimitiveInt> CanHomFrom<RustBigintRingBase> for StaticRingBase<T> {
-
-    fn has_canonical_hom(&self, _: &RustBigintRingBase) -> Option<()> {
-        Some(())
-    }
-
-    fn map_in(&self, from: &RustBigintRingBase, el: RustBigint, _: &()) -> T {
-        from.map_out(self, el, &())
-    }
-}
-
-impl<T: PrimitiveInt> CanonicalIso<RustBigintRingBase> for StaticRingBase<T> {
-
-    fn has_canonical_iso(&self, _: &RustBigintRingBase) -> Option<()> {
-        Some(())
-    }
-
-    fn map_out(&self, from: &RustBigintRingBase, el: T, _: &()) -> RustBigint {
-        from.map_in(self, el, &())
-    }
-}
-
-#[cfg(feature = "mpir")]
-impl<T: PrimitiveInt> CanHomFrom<crate::rings::mpir::MPZBase> for StaticRingBase<T> {
-
-    fn has_canonical_hom(&self, _: &crate::rings::mpir::MPZBase) -> Option<()> {
-        Some(())
-    }
-
-    fn map_in(&self, from: &crate::rings::mpir::MPZBase, el: crate::rings::mpir::MPZEl, _: &()) -> T {
-        from.map_out(self, el, &())
-    }
-}
-
-#[cfg(feature = "mpir")]
-impl<T: PrimitiveInt> CanonicalIso<crate::rings::mpir::MPZBase> for StaticRingBase<T> {
-
-    fn has_canonical_iso(&self, _: &crate::rings::mpir::MPZBase) -> Option<()> {
-        Some(())
-    }
-
-    fn map_out(&self, from: &crate::rings::mpir::MPZBase, el: T, _: &()) -> crate::rings::mpir::MPZEl {
-        from.map_in(self, el, &())
-    }
 }
 
 impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {

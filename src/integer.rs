@@ -165,14 +165,57 @@ pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + CanonicalI
     }
 }
 
+impl<I, J> CanHomFrom<I> for J
+    where I: ?Sized + IntegerRing, J: ?Sized + IntegerRing
+{
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, _: &I) -> Option<Self::Homomorphism> {
+        Some(())
+    }
+
+    fn map_in(&self, from: &I, el: <I as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
+        int_cast(el, &RingRef::new(self), &RingRef::new(from))
+    }
+
+    default fn map_in_ref(&self, from: &I, el: &<I as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        <J as CanHomFrom<I>>::map_in(self, from, from.clone_el(el), hom)
+    }
+}
+
+impl<I, J> CanonicalIso<I> for J
+    where I: ?Sized + IntegerRing, J: ?Sized + IntegerRing
+{
+    type Isomorphism = ();
+
+    fn has_canonical_iso(&self, _: &I) -> Option<Self::Isomorphism> {
+        Some(())
+    }
+
+    fn map_out(&self, from: &I, el: Self::Element, _: &Self::Isomorphism) -> <I as RingBase>::Element {
+        int_cast(el, &RingRef::new(from), &RingRef::new(self))
+    }
+}
+
 ///
 /// Helper trait to simplify conversion between ints.
-/// While for all integer rings `I`, `J`, one usually has `I: CanonicalIso<J>`,
-/// this might not be the case for rings in different crates, or it is too cumbersome
-/// to include the trait bounds when writing generic code.
-/// `IntCast` allows the conversion between arbitrary integer rings, using a
-/// "double-and-add"-approach. However, if `I: CanHomFrom<J>` is implemented, a
-/// specialization uses the (hopefully more efficient) variant. 
+/// 
+/// More concretely, `IntCast` defines a conversion between two
+/// integer rings, and is default-implemented for all integer rings
+/// using a double-and-and technique. All implementors of integer
+/// rings are encouraged to provide specializations for improved performance.
+/// 
+/// # Why yet another conversion trait?
+/// 
+/// It is a common requirement to convert between arbitrary (i.e. generic)
+/// integer rings. To achieve this, we require a blanket implementation
+/// anyway.
+/// 
+/// Now it would be possible to just provide a blanket implementation of
+/// [`CanHomFrom`] and specialize it for all integer rings. However, it turned
+/// out that in all implementations, the homomorphism requires no additional
+/// data and always exists. Hence, it seemed easier to add another, simpler
+/// trait for the same thing.
 /// 
 pub trait IntCast<F: ?Sized + IntegerRing>: IntegerRing {
 

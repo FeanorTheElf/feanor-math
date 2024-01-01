@@ -135,7 +135,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// 
 /// ## Integer rings
 /// 
-/// Basically, all given integer rings have canonical isomorphisms between each other.
+/// All given integer rings have canonical isomorphisms between each other.
 /// ```
 /// # use feanor_math::ring::*;
 /// # use feanor_math::integer::*;
@@ -165,15 +165,6 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// assert!(Z_big.can_iso(&Z_i32).is_some());
 /// assert!(Z_big.can_iso(&Z_i128).is_some());
 /// assert!(Z_big.can_iso(&Z_big).is_some());
-/// 
-/// // there are also some blanket implementations/trait bounds
-/// fn from_i32<I: IntegerRingStore>(to: &I) where I::Type: IntegerRing {
-///     to.can_hom(&StaticRing::<i32>::RING);
-/// }
-/// 
-/// fn to_i32<I: IntegerRingStore>(from: &I) where I::Type: IntegerRing {
-///     StaticRing::<i32>::RING.can_hom(from);
-/// }
 /// ```
 /// 
 /// ## Integer quotient rings `Z/nZ`

@@ -11,7 +11,6 @@ use crate::ring::*;
 use crate::homomorphism::*;
 use crate::integer::*;
 use crate::rings::rust_bigint::*;
-use crate::primitive_int::PrimitiveInt;
 
 mod mpir_bindings;
 
@@ -452,43 +451,25 @@ impl HashableElRing for MPZBase {
     }
 }
 
-impl_eq_based_self_iso!{ MPZBase }
+impl IntCast<RustBigintRingBase> for MPZBase {
 
-impl CanHomFrom<RustBigintRingBase> for MPZBase {
-
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, _: &RustBigintRingBase) -> Option<Self::Homomorphism> {
-        Some(())
-    }
-
-    fn map_in_ref(&self, _: &RustBigintRingBase, el: &RustBigint, _: &Self::Homomorphism) -> Self::Element {
+    fn cast(&self, _: &RustBigintRingBase, el: RustBigint) -> Self::Element {
         let mut result = MPZEl::new();
         self.from_base_u64_repr(&mut result, &RustBigintRing::RING.get_ring().abs_base_u64_repr(&el).collect::<Vec<_>>()[..]);
-        if RustBigintRing::RING.is_neg(el) {
+        if RustBigintRing::RING.is_neg(&el) {
             self.negate_inplace(&mut result);
         }
         return result;
     }
-
-    fn map_in(&self, from: &RustBigintRingBase, el: RustBigint, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in_ref(from, &el, hom)
-    }
 }
 
-impl CanonicalIso<RustBigintRingBase> for MPZBase {
+impl IntCast<MPZBase> for RustBigintRingBase {
 
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, _: &RustBigintRingBase) -> Option<Self::Isomorphism> {
-        Some(())
-    }
-
-    fn map_out(&self, _: &RustBigintRingBase, el: Self::Element, _: &Self::Isomorphism) -> RustBigint {
-        let mut result = (0..self.abs_base_u64_repr_len(&el)).map(|_| 0u64).collect::<Vec<_>>();
-        self.abs_base_u64_repr(&el, &mut result[..]);
+    fn cast(&self, from: &MPZBase, el: MPZEl) -> RustBigint {
+        let mut result = (0..from.abs_base_u64_repr_len(&el)).map(|_| 0u64).collect::<Vec<_>>();
+        from.abs_base_u64_repr(&el, &mut result[..]);
         let result = RustBigintRing::RING.get_ring().from_base_u64_repr(result.into_iter());
-        if self.is_neg(&el) {
+        if from.is_neg(&el) {
             return RustBigintRing::RING.negate(result);
         } else {
             return result;
@@ -496,39 +477,9 @@ impl CanonicalIso<RustBigintRingBase> for MPZBase {
     }
 }
 
-impl<T: PrimitiveInt> CanHomFrom<StaticRingBase<T>> for MPZBase {
+impl IntCast<StaticRingBase<i64>> for MPZBase {
 
-    type Homomorphism = ();
-
-    default fn has_canonical_hom(&self, _: &StaticRingBase<T>) -> Option<Self::Homomorphism> {
-        Some(())
-    }
-
-    default fn map_in(&self, _: &StaticRingBase<T>, el: T, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in(StaticRing::<i64>::RING.get_ring(), <_ as Into<i128>>::into(el).try_into().unwrap(), hom)
-    }
-}
-
-impl<T: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for MPZBase {
-
-    type Isomorphism = ();
-
-    default fn has_canonical_iso(&self, _: &StaticRingBase<T>) -> Option<Self::Isomorphism> {
-        Some(())
-    }
-
-    default fn map_out(&self, _: &StaticRingBase<T>, el: Self::Element, iso: &Self::Isomorphism) -> T {
-        i128::from(self.map_out(StaticRing::<i64>::RING.get_ring(), el, iso)).try_into().ok().unwrap()
-    }
-}
-
-impl CanHomFrom<StaticRingBase<i64>> for MPZBase {
-
-    fn has_canonical_hom(&self, _: &StaticRingBase<i64>) -> Option<Self::Homomorphism> {
-        Some(())
-    }
-
-    fn map_in(&self, _: &StaticRingBase<i64>, el: i64, _: &Self::Homomorphism) -> Self::Element {
+    fn cast(&self, _: &StaticRingBase<i64>, el: i64) -> Self::Element {
         unsafe {
             let mut result = MPZEl::new(); 
             mpir_bindings::__gmpz_set_si(&mut result.integer as *mut _, el);
@@ -537,15 +488,11 @@ impl CanHomFrom<StaticRingBase<i64>> for MPZBase {
     }
 }
 
-impl CanonicalIso<StaticRingBase<i64>> for MPZBase {
+impl IntCast<MPZBase> for StaticRingBase<i64> {
 
-    fn has_canonical_iso(&self, _: &StaticRingBase<i64>) -> Option<Self::Isomorphism> {
-        Some(())
-    }
-
-    fn map_out(&self, _: &StaticRingBase<i64>, el: Self::Element, _: &Self::Isomorphism) -> <StaticRingBase<i64> as RingBase>::Element {
-        assert!(self.abs_highest_set_bit(&el).unwrap_or(0) < u64::BITS as usize);
-        let negative = self.is_neg(&el);
+    fn cast(&self, from: &MPZBase, el: MPZEl) -> i64 {
+        assert!(from.abs_highest_set_bit(&el).unwrap_or(0) < u64::BITS as usize);
+        let negative = from.is_neg(&el);
         unsafe {
             let result = mpir_bindings::__gmpz_get_ui(&el.integer as mpir_bindings::mpz_srcptr);
             if !negative {
@@ -559,13 +506,9 @@ impl CanonicalIso<StaticRingBase<i64>> for MPZBase {
     }
 }
 
-impl CanHomFrom<StaticRingBase<i128>> for MPZBase {
+impl IntCast<StaticRingBase<i128>> for MPZBase {
 
-    fn has_canonical_hom(&self, _: &StaticRingBase<i128>) -> Option<Self::Homomorphism> {
-        Some(())
-    }
-
-    fn map_in(&self, _: &StaticRingBase<i128>, el: i128, _: &Self::Homomorphism) -> Self::Element {
+    fn cast(&self, _: &StaticRingBase<i128>, el: i128) -> MPZEl {
         let el_abs = el.unsigned_abs();
         let data = [(el_abs & u64::MAX as u128) as u64, (el_abs >> u64::BITS) as u64];
         let mut result = MPZEl::new();
@@ -577,18 +520,14 @@ impl CanHomFrom<StaticRingBase<i128>> for MPZBase {
     }
 }
 
-impl CanonicalIso<StaticRingBase<i128>> for MPZBase {
+impl IntCast<MPZBase> for StaticRingBase<i128> {
 
-    fn has_canonical_iso(&self, _: &StaticRingBase<i128>) -> Option<Self::Isomorphism> {
-        Some(())
-    }
-
-    fn map_out(&self, _: &StaticRingBase<i128>, el: Self::Element, _: &Self::Isomorphism) -> <StaticRingBase<i128> as RingBase>::Element {
-        assert!(self.abs_base_u64_repr_len(&el) <= 2);
+    fn cast(&self, from: &MPZBase, el: MPZEl) -> i128 {
+        assert!(from.abs_base_u64_repr_len(&el) <= 2);
         let mut data = [0u64; 2];
-        self.abs_base_u64_repr(&el, &mut data);
+        from.abs_base_u64_repr(&el, &mut data);
         let result = data[0] as u128 + ((data[1] as u128) << u64::BITS);
-        if self.is_neg(&el) {
+        if from.is_neg(&el) {
             if result == i128::MIN.unsigned_abs() {
                 return i128::MIN;
             } else {
@@ -603,35 +542,24 @@ impl CanonicalIso<StaticRingBase<i128>> for MPZBase {
 macro_rules! specialize_int_cast {
     ($($from:ty),*) => {
         $(
-            impl IntCast<$from> for MPZBase {
+            impl IntCast<StaticRingBase<$from>> for MPZBase {
 
-                fn cast(&self, from: &$from, value: <$from as RingBase>::Element) -> MPZEl {
-                    self.map_in(from, value, &self.has_canonical_hom(from).unwrap())
+                fn cast(&self, _: &StaticRingBase<$from>, el: $from) -> MPZEl {
+                    int_cast(el as i64, &RingRef::new(self), StaticRing::<i64>::RING)
+                }
+            }
+
+            impl IntCast<MPZBase> for StaticRingBase<$from> {
+
+                fn cast(&self, _: &MPZBase, el: MPZEl) -> $from {
+                    int_cast(el, &StaticRing::<i64>::RING, &MPZ::RING) as $from
                 }
             }
         )*
-    };
-}
-
-specialize_int_cast!{
-    StaticRingBase<i8>, StaticRingBase<i16>, StaticRingBase<i32>,
-    StaticRingBase<i64>, StaticRingBase<i128>, RustBigintRingBase,
-    MPZBase
-}
-
-impl IntCast<MPZBase> for StaticRingBase<i128> {
-
-    fn cast(&self, _from: &MPZBase, value: MPZEl) -> i128 {
-        MPZ::RING.get_ring().map_out(StaticRing::<i128>::RING.get_ring(), value, &MPZ::RING.get_ring().has_canonical_iso(StaticRing::<i128>::RING.get_ring()).unwrap())
     }
 }
 
-impl IntCast<MPZBase> for StaticRingBase<i64> {
-
-    fn cast(&self, _from: &MPZBase, value: MPZEl) -> i64 {
-        MPZ::RING.get_ring().map_out(StaticRing::<i64>::RING.get_ring(), value, &MPZ::RING.get_ring().has_canonical_iso(StaticRing::<i64>::RING.get_ring()).unwrap())
-    }
-}
+specialize_int_cast!{ i8, i16, i32 }
 
 #[cfg(test)]
 use crate::pid::EuclideanRingStore;

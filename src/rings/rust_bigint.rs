@@ -4,9 +4,7 @@ use crate::integer::*;
 use crate::ordered::*;
 use crate::primitive_int::StaticRingBase;
 use crate::ring::*;
-use crate::homomorphism::*;
 use crate::algorithms;
-use crate::primitive_int::*;
 use std::cmp::Ordering::*;
 
 #[derive(Clone, Debug)]
@@ -207,72 +205,36 @@ impl RingBase for RustBigintRingBase {
 
 }
 
-impl CanHomFrom<RustBigintRingBase> for RustBigintRingBase {
+impl IntCast<RustBigintRingBase> for RustBigintRingBase {
     
-    type Homomorphism = ();
-    
-    fn has_canonical_hom(&self, _: &RustBigintRingBase) -> Option<()> { Some(()) }
-
-    fn map_in(&self, _: &RustBigintRingBase, el: RustBigint, _: &()) -> Self::Element { el }
-}
-
-impl CanonicalIso<RustBigintRingBase> for RustBigintRingBase {
-    
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, _: &RustBigintRingBase) -> Option<()> { Some(()) }
-
-    fn map_out(&self, _: &RustBigintRingBase, el: RustBigint, _: &()) -> Self::Element { el }
+    fn cast(&self, _: &RustBigintRingBase, value: Self::Element) -> Self::Element {
+        value
+    }
 }
 
 macro_rules! specialize_int_cast {
     ($($from:ty),*) => {
         $(
-            impl IntCast<$from> for RustBigintRingBase {
+            impl IntCast<StaticRingBase<$from>> for RustBigintRingBase {
 
-                fn cast(&self, from: &$from, value: <$from as RingBase>::Element) -> RustBigint {
-                    self.map_in(from, value, &self.has_canonical_hom(from).unwrap())
+                fn cast(&self, _: &StaticRingBase<$from>, value: $from) -> RustBigint {
+                    let negative = value < 0;
+                    let value = <_ as Into<i128>>::into(value).checked_abs().map(|x| x as u128).unwrap_or(1 << (u128::BITS - 1));
+                    RustBigint(negative, vec![(value & ((1 << u64::BITS) - 1)) as u64, (value >> u64::BITS) as u64])
+                }
+            }
+
+            impl IntCast<RustBigintRingBase> for StaticRingBase<$from> {
+
+                fn cast(&self, from: &RustBigintRingBase, value: RustBigint) -> $from {
+                    <$from>::try_from(from.map_i128(&value).unwrap()).ok().unwrap()
                 }
             }
         )*
     };
 }
 
-specialize_int_cast!{ 
-    StaticRingBase<i8>, StaticRingBase<i16>, StaticRingBase<i32>,
-    StaticRingBase<i64>, StaticRingBase<i128>, RustBigintRingBase
-}
-
-#[cfg(feature = "mpir")]
-specialize_int_cast!{ crate::rings::mpir::MPZBase }
-
-#[cfg(feature = "mpir")]
-impl CanHomFrom<crate::rings::mpir::MPZBase> for RustBigintRingBase {
-
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, _: &crate::rings::mpir::MPZBase) -> Option<()> {
-        Some(())
-    }
-
-    fn map_in(&self, from: &crate::rings::mpir::MPZBase, el: crate::rings::mpir::MPZEl, _: &()) -> RustBigint {
-        from.map_out(self, el, &())
-    }
-}
-
-#[cfg(feature = "mpir")]
-impl CanonicalIso<crate::rings::mpir::MPZBase> for RustBigintRingBase {
-
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, _: &crate::rings::mpir::MPZBase) -> Option<()> {
-        Some(())
-    }
-
-    fn map_out(&self, from: &crate::rings::mpir::MPZBase, el: RustBigint, _: &()) -> crate::rings::mpir::MPZEl {
-        from.map_in(self, el, &())
-    }
-}
+specialize_int_cast!{ i8, i16, i32, i64, i128 }
 
 impl OrderedRing for RustBigintRingBase {
 
@@ -324,30 +286,6 @@ impl EuclideanRing for RustBigintRingBase {
 
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
         self.map_i128(val).and_then(|x| x.checked_abs()).and_then(|x| usize::try_from(x).ok())
-    }
-}
-
-impl<T: PrimitiveInt> CanHomFrom<StaticRingBase<T>> for RustBigintRingBase {
-    
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, _: &StaticRingBase<T>) -> Option<()> { Some(()) }
-
-    fn map_in(&self, _: &StaticRingBase<T>, el: T, _: &()) -> Self::Element {
-        let negative = el.into() < 0;
-        let value = el.into().checked_abs().map(|x| x as u128).unwrap_or(1 << (u128::BITS - 1));
-        RustBigint(negative, vec![(value & ((1 << u64::BITS) - 1)) as u64, (value >> u64::BITS) as u64])
-    }
-}
-
-impl<T: PrimitiveInt> CanonicalIso<StaticRingBase<T>> for RustBigintRingBase {
-    
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, _: &StaticRingBase<T>) -> Option<()> { Some(()) }
-
-    fn map_out(&self, _: &StaticRingBase<T>, el: Self::Element, _: &()) -> T {
-        T::try_from(self.map_i128(&el).unwrap()).ok().unwrap()
     }
 }
 
@@ -432,6 +370,11 @@ impl IntegerRing for RustBigintRingBase {
         }
     }
 }
+
+#[cfg(test)]
+use crate::primitive_int::*;
+#[cfg(test)]
+use crate::homomorphism::*;
 
 #[cfg(test)]
 const ZZ: RustBigintRing = RustBigintRing::RING;
