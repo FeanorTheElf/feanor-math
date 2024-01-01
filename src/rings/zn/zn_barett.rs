@@ -8,7 +8,6 @@ use crate::homomorphism::*;
 use crate::rings::field::AssumeFieldDivision;
 use crate::rings::zn::*;
 use crate::algorithms;
-use crate::primitive_int::*;
 
 ///
 /// Ring representing `Z/nZ`, computing the modular reductions
@@ -347,7 +346,7 @@ impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanHomFrom<J> for ZnBase<I>
 
 pub struct ZnBaseElementsIter<'a, I>
     where I: IntegerRingStore,
-        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+        I::Type: IntegerRing
 {
     ring: &'a ZnBase<I>,
     current: El<I>
@@ -355,7 +354,7 @@ pub struct ZnBaseElementsIter<'a, I>
 
 impl<'a, I> Iterator for ZnBaseElementsIter<'a, I>
     where I: IntegerRingStore,
-        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+        I::Type: IntegerRing
 {
     type Item = ZnEl<I>;
 
@@ -371,7 +370,7 @@ impl<'a, I> Iterator for ZnBaseElementsIter<'a, I>
 }
 
 impl<I: IntegerRingStore> FiniteRing for ZnBase<I>
-    where I::Type: IntegerRing + CanonicalIso<StaticRingBase<i32>>
+    where I::Type: IntegerRing
 {
     type ElementsIter<'a> = ZnBaseElementsIter<'a, I>
         where Self: 'a;

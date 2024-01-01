@@ -2,7 +2,6 @@ use crate::ring::*;
 use crate::homomorphism::*;
 use crate::pid::*;
 use crate::ordered::*;
-use crate::primitive_int::*;
 
 #[cfg(feature = "mpir")]
 pub type BigIntRing = crate::rings::mpir::MPZ;
@@ -23,7 +22,7 @@ pub type BigIntRingBase = crate::rings::rust_bigint::RustBigintRingBase;
 /// As an additional requirement, the euclidean division (i.e. [`EuclideanRing::euclidean_div_rem()`] and
 /// [`IntegerRing::euclidean_div_pow_2()`]) are expected to round towards zero.
 /// 
-pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + CanonicalIso<Self> + CanonicalIso<StaticRingBase<i32>> {
+pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + CanonicalIso<Self> {
 
     ///
     /// Computes a float value that is supposed to be close to value.
@@ -278,6 +277,9 @@ pub mod generic_impls {
         )
     }
 }
+
+#[cfg(test)]
+use crate::primitive_int::*;
 
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {

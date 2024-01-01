@@ -175,7 +175,6 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 ///     StaticRing::<i32>::RING.can_hom(from);
 /// }
 /// ```
-/// Notably, the only blanket implementations are currently
 /// 
 /// ## Integer quotient rings `Z/nZ`
 /// 
