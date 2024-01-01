@@ -246,6 +246,12 @@ impl<I: IntegerRingStore> Clone for ZnBase<I>
     }
 }
 
+impl<I: IntegerRingStore> Copy for ZnBase<I> 
+    where I: Copy,
+        El<I>: Copy,
+        I::Type: IntegerRing
+{}
+
 impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I> 
     where I::Type: IntegerRing
 {
@@ -541,6 +547,14 @@ fn test_zn_map_in_small_int() {
 fn test_divisibility_axioms() {
     let R = Zn::new(StaticRing::<i64>::RING, 17);
     crate::divisibility::generic_tests::test_divisibility_axioms(&R, R.elements());
+}
+
+#[test]
+fn test_principal_ideal_ring_axioms() {
+    let R = Zn::new(StaticRing::<i64>::RING, 17);
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
+    let R = Zn::new(StaticRing::<i64>::RING, 63);
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
 }
 
 #[test]

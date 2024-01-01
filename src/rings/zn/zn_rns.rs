@@ -4,6 +4,7 @@ use crate::integer::IntegerRingStore;
 use crate::divisibility::DivisibilityRingStore;
 use crate::rings::zn::*;
 use crate::primitive_int::*;
+use crate::pid::*;
 use crate::default_memory_provider;
 
 ///
@@ -543,7 +544,11 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> PrincipalIde
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        unimplemented!()
+        let mut result = (self.zero(), self.zero(), self.zero());
+        for (i, Zn) in self.iter().enumerate() {
+            (result.0.0[i], result.1.0[i], result.2.0[i]) = Zn.ideal_gen(&lhs.0[i], &rhs.0[i]);
+        }
+        return result;
     }
 }
 
@@ -630,4 +635,23 @@ fn test_zn_map_in_large_int() {
     let R = Zn::from_primes(BigIntRing::RING, vec![3, 5, 7]);
     let S = BigIntRing::RING;
     assert!(R.eq_el(&R.int_hom().map(120493), &R.coerce(&S, S.int_hom().map(120493))));
+}
+
+#[test]
+fn test_principal_ideal_ring_axioms() {
+    let R = Zn::from_primes(BigIntRing::RING, vec![5]);
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
+    
+    let R = Zn::from_primes(BigIntRing::RING, vec![3, 5]);
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
+    
+    let R = Zn::from_primes(BigIntRing::RING, vec![2, 3, 5]);
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
+
+    let R = Zn::from_primes(BigIntRing::RING, vec![9, 8, 5]);
+    let modulo = R.int_hom();
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(
+        &R,
+        [-1, 0, 1, 3, 2, 4, 5, 9, 18, 15, 30].into_iter().map(|x| modulo.map(x))
+    );
 }

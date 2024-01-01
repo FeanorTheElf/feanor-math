@@ -369,6 +369,16 @@ fn test_integer_axioms() {
 }
 
 #[test]
+fn test_euclidean_ring_axioms() {
+    crate::pid::generic_tests::test_euclidean_ring_axioms(StaticRing::<i8>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    crate::pid::generic_tests::test_euclidean_ring_axioms(StaticRing::<i16>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    crate::pid::generic_tests::test_euclidean_ring_axioms(StaticRing::<i32>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    crate::pid::generic_tests::test_euclidean_ring_axioms(StaticRing::<i64>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    crate::pid::generic_tests::test_euclidean_ring_axioms(StaticRing::<i128>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+
+}
+
+#[test]
 fn test_lowest_set_bit() {
     assert_eq!(None, StaticRing::<i32>::RING.abs_lowest_set_bit(&0));
     assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&3));

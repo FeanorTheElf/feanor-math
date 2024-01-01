@@ -8,8 +8,10 @@ use crate::divisibility::*;
 pub trait PrincipalIdealRing: DivisibilityRing {
 
     ///
-    /// Returns (s, t, g) such that g is a generator of the ideal `(lhs, rhs)`
-    /// and `g = s * lhs + t * rhs`.
+    /// Computes a Bezout identity.
+    /// 
+    /// More concretely, this returns (s, t, g) such that g is a generator 
+    /// of the ideal `(lhs, rhs)` and `g = s * lhs + t * rhs`.
     /// 
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element);
 }
@@ -29,7 +31,7 @@ impl<R> PrincipalIdealRingStore for R
 /// Trait for rings that support euclidean division.
 /// 
 /// In other words, there is a degree function d(.) 
-/// returning positive integers such that for every `x, y` 
+/// returning nonnegative integers such that for every `x, y` 
 /// with `y != 0` there are `q, r` with `x = qy + r` and 
 /// `d(r) < d(y)`. Note that `q, r` do not have to be unique, 
 /// and implementations are free to use any choice.
@@ -92,6 +94,34 @@ pub mod generic_tests {
                 let (q, r) = ring.euclidean_div_rem(ring.clone_el(a), b);
                 assert!(ring.euclidean_deg(b).is_none() || ring.euclidean_deg(&r).unwrap_or(usize::MAX) < ring.euclidean_deg(b).unwrap());
                 assert_el_eq!(&ring, a, &ring.add(ring.mul(q, ring.clone_el(b)), r));
+            }
+        }
+    }
+
+    pub fn test_principal_ideal_ring_axioms<R: PrincipalIdealRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
+        where R::Type: PrincipalIdealRing
+    {
+        assert!(ring.is_commutative());
+        assert!(ring.is_noetherian());
+        let elements = edge_case_elements.collect::<Vec<_>>();
+        for a in &elements {
+            for b in &elements {
+                for c in &elements {
+                    let g1 = ring.mul_ref(a, b);
+                    let g2 = ring.mul_ref(a, c);
+                    let (s, t, g) = ring.ideal_gen(&g1, &g2);
+                    assert!(ring.checked_div(&g, a).is_some(), "Wrong ideal generator: ({}) contains the ideal I = ({}, {}), but ideal_gen() found a generator I = ({}) that does not satisfy {} | {}", ring.format(a), ring.format(&g1), ring.format(&g2), ring.format(&g), ring.format(a), ring.format(&g));
+                    assert_el_eq!(&ring, &g, &ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2)));
+                }
+            }
+        }
+        for a in &elements {
+            for b in &elements {
+                let g1 = ring.mul_ref(a, b);
+                let g2 = ring.mul_ref_fst(a, ring.add_ref_fst(b, ring.one()));
+                let (s, t, g) = ring.ideal_gen(&g1, &g2);
+                assert!(ring.checked_div(&g, a).is_some() && ring.checked_div(a, &g).is_some(), "Expected ideals ({}) and I = ({}, {}) to be equal, but ideal_gen() returned generator {} of I", ring.format(a), ring.format(&g1), ring.format(&g2), ring.format(&g));
+                assert_el_eq!(&ring, &g, &ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2)));
             }
         }
     }

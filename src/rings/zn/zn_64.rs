@@ -707,6 +707,14 @@ fn test_finite_ring_axioms() {
 }
 
 #[test]
+fn test_principal_ideal_ring_axioms() {
+    let R = Zn::new(17);
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
+    let R = Zn::new(63);
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
+}
+
+#[test]
 fn test_hom_from_fastmul() {
     for n in [2, 5, 7, 17] {
         let Zn = Zn::new(n);

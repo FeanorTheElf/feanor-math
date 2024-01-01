@@ -123,7 +123,7 @@ use crate::algorithms;
 /// consider the following code
 /// ```
 /// # use feanor_math::ring::*;
-    /// # use feanor_math::homomorphism::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::zn::*;
 /// 
@@ -583,7 +583,7 @@ pub trait RingStore: Sized {
     delegate!{ fn mul_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
     delegate!{ fn mul(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
     delegate!{ fn square(&self, value: &mut El<Self>) -> () }
-    
+
     fn coerce<S>(&self, from: &S, el: El<S>) -> El<Self>
         where S: RingStore, Self::Type: CanHomFrom<S::Type> 
     {

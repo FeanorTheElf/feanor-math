@@ -752,6 +752,14 @@ fn test_zn_ring_axioms() {
 }
 
 #[test]
+fn test_principal_ideal_ring_axioms() {
+    let R = Zn::new(17);
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
+    let R = Zn::new(63);
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
+}
+
+#[test]
 fn test_divisibility_axioms() {
     let R = Zn::new(17);
     crate::divisibility::generic_tests::test_divisibility_axioms(&R, R.elements());

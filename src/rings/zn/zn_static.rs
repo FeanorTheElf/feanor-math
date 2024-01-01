@@ -301,3 +301,11 @@ fn test_divisibility_axioms() {
     crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<9>::RING, Zn::<9>::RING.elements());
     crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<12>::RING, Zn::<12>::RING.elements());
 }
+
+#[test]
+fn test_principal_ideal_ring_axioms() {
+    let R = Zn::<17>::RING;
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
+    let R = Zn::<63>::RING;
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
+}
