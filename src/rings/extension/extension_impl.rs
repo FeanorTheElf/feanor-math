@@ -130,11 +130,19 @@ impl<R, V, M> RingBase for FreeAlgebraImplBase<R, V, M>
     default fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         let mut tmp = self.memory_provider.get_new_init(self.rank() * 2, |_| self.base_ring.zero());
         algorithms::conv_mul::add_assign_convoluted_mul(&mut tmp[..], &lhs.values[..], &rhs.values[..], self.base_ring(), &self.memory_provider);
-        for i in self.rank()..tmp.len() {
+        for i in 0..tmp.len() {
+            self.base_ring().println(&tmp[i]);
+        }
+        println!();
+        for i in (self.rank()..tmp.len()).rev() {
             for j in 0..self.rank() {
                 let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &tmp[i]);
                 self.base_ring.add_assign(&mut tmp[i - self.rank() + j], add);
             }
+            for i in 0..tmp.len() {
+                self.base_ring().println(&tmp[i]);
+            }
+            println!();
         }
         for i in 0..self.rank() {
             lhs.values[i] = std::mem::replace(&mut tmp[i], self.base_ring.zero());
@@ -305,6 +313,8 @@ use crate::primitive_int::StaticRing;
 use crate::default_memory_provider;
 #[cfg(test)]
 use crate::rings::zn::zn_64::Zn;
+#[cfg(test)]
+use crate::rings::zn::zn_static;
 
 #[cfg(test)]
 fn test_ring_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 2], DefaultMemoryProvider>, Vec<FreeAlgebraEl<StaticRing<i64>, DefaultMemoryProvider>>) {
@@ -368,4 +378,14 @@ fn test_division_ring_of_integers() {
 fn test_divisibility_axioms() {
     let (ring, els) = test_ring_and_elements();
     crate::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
+}
+
+#[test]
+fn test_square() {
+    let base_ring = zn_static::Zn::<256>::RING;
+    let modulo = base_ring.int_hom();
+    let ring = FreeAlgebraImpl::new(base_ring, [modulo.map(-1), modulo.map(-1), modulo.map(-1)], default_memory_provider!());
+    let a = ring.from_canonical_basis([modulo.map(0), modulo.map(-1), modulo.map(-1)].into_iter());
+    let b = ring.from_canonical_basis([modulo.map(-1), modulo.map(-2), modulo.map(-1)].into_iter());
+    assert_el_eq!(&ring, &b, &ring.pow(a, 2));
 }
