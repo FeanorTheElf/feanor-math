@@ -16,6 +16,9 @@ pub trait PrincipalIdealRing: DivisibilityRing {
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element);
 }
 
+///
+/// [`RingStore`] for [`PrincipalIdealRing`]s
+/// 
 pub trait PrincipalIdealRingStore: RingStore
     where Self::Type: PrincipalIdealRing
 {
@@ -62,6 +65,9 @@ pub trait EuclideanRing: PrincipalIdealRing {
     }
 }
 
+///
+/// [`RingStore`] for [`EuclideanRing`]s
+/// 
 pub trait EuclideanRingStore: RingStore + DivisibilityRingStore
     where Self::Type: EuclideanRing
 {

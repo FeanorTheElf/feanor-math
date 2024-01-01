@@ -67,6 +67,11 @@ pub fn pre_smith<R, TL, TR>(ring: R, L: &mut TL, R: &mut TR, A: &mut DenseMatrix
     }
 }
 
+///
+/// Finds a solution to the system `AX = B`, if it exists.
+/// In the case that there are multiple solutions, an unspecified
+/// one is returned.
+/// 
 pub fn solve_right<R>(A: &mut DenseMatrix<R::Type>, mut rhs: DenseMatrix<R::Type>, ring: R) -> Option<DenseMatrix<R::Type>>
     where R: RingStore + Copy,
         R::Type: PrincipalIdealRing

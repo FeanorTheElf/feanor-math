@@ -207,6 +207,9 @@ pub mod generic_maps {
     }
 }
 
+///
+/// [`RingStore`] for [`IntegerRing`]s
+/// 
 pub trait IntegerRingStore: RingStore
     where Self::Type: IntegerRing
 {

@@ -600,16 +600,35 @@ impl CanonicalIso<StaticRingBase<i128>> for MPZBase {
     }
 }
 
+macro_rules! specialize_int_cast {
+    ($($from:ty),*) => {
+        $(
+            impl IntCast<$from> for MPZBase {
+
+                fn cast(&self, from: &$from, value: <$from as RingBase>::Element) -> MPZEl {
+                    self.map_in(from, value, &self.has_canonical_hom(from).unwrap())
+                }
+            }
+        )*
+    };
+}
+
+specialize_int_cast!{
+    StaticRingBase<i8>, StaticRingBase<i16>, StaticRingBase<i32>,
+    StaticRingBase<i64>, StaticRingBase<i128>, RustBigintRingBase,
+    MPZBase
+}
+
 impl IntCast<MPZBase> for StaticRingBase<i128> {
 
-    fn cast(&self, from: &MPZBase, value: MPZEl) -> i128 {
+    fn cast(&self, _from: &MPZBase, value: MPZEl) -> i128 {
         MPZ::RING.get_ring().map_out(StaticRing::<i128>::RING.get_ring(), value, &MPZ::RING.get_ring().has_canonical_iso(StaticRing::<i128>::RING.get_ring()).unwrap())
     }
 }
 
 impl IntCast<MPZBase> for StaticRingBase<i64> {
 
-    fn cast(&self, from: &MPZBase, value: MPZEl) -> i64 {
+    fn cast(&self, _from: &MPZBase, value: MPZEl) -> i64 {
         MPZ::RING.get_ring().map_out(StaticRing::<i64>::RING.get_ring(), value, &MPZ::RING.get_ring().has_canonical_iso(StaticRing::<i64>::RING.get_ring()).unwrap())
     }
 }

@@ -225,6 +225,27 @@ impl CanonicalIso<RustBigintRingBase> for RustBigintRingBase {
     fn map_out(&self, _: &RustBigintRingBase, el: RustBigint, _: &()) -> Self::Element { el }
 }
 
+macro_rules! specialize_int_cast {
+    ($($from:ty),*) => {
+        $(
+            impl IntCast<$from> for RustBigintRingBase {
+
+                fn cast(&self, from: &$from, value: <$from as RingBase>::Element) -> RustBigint {
+                    self.map_in(from, value, &self.has_canonical_hom(from).unwrap())
+                }
+            }
+        )*
+    };
+}
+
+specialize_int_cast!{ 
+    StaticRingBase<i8>, StaticRingBase<i16>, StaticRingBase<i32>,
+    StaticRingBase<i64>, StaticRingBase<i128>, RustBigintRingBase
+}
+
+#[cfg(feature = "mpir")]
+specialize_int_cast!{ crate::rings::mpir::MPZBase }
+
 #[cfg(feature = "mpir")]
 impl CanHomFrom<crate::rings::mpir::MPZBase> for RustBigintRingBase {
 

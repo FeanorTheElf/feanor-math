@@ -310,7 +310,7 @@ pub trait CanHomFrom<S>: RingBase
 /// then both chains should yield same results on same inputs.
 /// 
 /// Hence, it would be natural if the trait were symmetrical, i.e.
-///  for any implementation `R: CanonicalIso<S>` there is also an
+/// for any implementation `R: CanonicalIso<S>` there is also an
 /// implementation `S: CanonicalIso<R>`. However, because of the trait
 /// impl constraints of Rust, this is unpracticable and so we only
 /// require the implementation `R: CanHomFrom<S>`.

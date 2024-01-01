@@ -339,6 +339,11 @@ pub trait RingBase: PartialEq {
 /// }
 /// ```
 /// 
+/// # Limitations
+/// 
+/// This macro does not work if the function takes generic parameters.
+/// In this case, write the delegation manually.
+/// 
 #[macro_export]
 macro_rules! delegate {
     (fn $name:ident (&self, $($pname:ident: $ptype:ty),*) -> $rtype:ty) => {
@@ -709,6 +714,9 @@ pub trait RingStore: Sized {
     }
 }
 
+///
+/// [`RingStore`] for [`RingExtension`]s
+/// 
 pub trait RingExtensionStore: RingStore
     where Self::Type: RingExtension
 {
@@ -795,6 +803,9 @@ pub trait HashableElRing: RingBase {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H);
 }
 
+///
+/// [`RingStore`] for [`HashableElRing`]s
+/// 
 pub trait HashableElRingStore: RingStore
     where Self::Type: HashableElRing
 {

@@ -46,6 +46,10 @@ pub trait OrderedRing: RingBase {
     }
 }
 
+
+///
+/// [`RingStore`] for [`OrderedRing`]s
+/// 
 pub trait OrderedRingStore: RingStore
     where Self::Type: OrderedRing
 {
