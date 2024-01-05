@@ -686,3 +686,32 @@ fn test_gb_sparse_row_echelon_4x6() {
         assert_matrix_eq!(&R, &expected, &actual);
     }
 }
+
+#[test]
+fn test_gb_sparse_row_echelon_no_field() {
+    let R = Zn::<18>::RING;
+    let sparsify = |row: [u64; 5]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));
+
+    let mut matrix: SparseMatrixBuilder<_> = SparseMatrixBuilder::new(&R);
+    matrix.add_cols(5);
+    matrix.add_row(0, sparsify([9, 3, 0, 1, 1]));
+    matrix.add_row(1, sparsify([6, 13, 0, 0, 1]));
+    matrix.add_row(2, sparsify([0, 0, 11, 0, 1]));
+    matrix.add_row(3, sparsify([0, 12, 0, 0, 1]));
+
+    let mut expected = SparseMatrixBuilder::new(&R);
+    expected.add_cols(5);
+    matrix.add_row(0, sparsify([3, 8, 0, 1, 0]));
+    matrix.add_row(1, sparsify([0, 3, 0, 0, 16]));
+    matrix.add_row(2, sparsify([0, 0, 1, 0, 5]));
+    matrix.add_row(3, sparsify([0, 0, 0, 2, 7]));
+
+    for block_size in 1..10 {
+        let mut actual = SparseMatrixBuilder::new(&R);
+        actual.add_cols(5);
+        for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), block_size) {
+            actual.add_row(actual.row_count(), row.into_iter());
+        }
+        assert_matrix_eq!(&R, &expected, &actual);
+    }
+}
