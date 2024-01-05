@@ -34,9 +34,26 @@ impl<R> SparseMatrixBuilder<R>
         }
     }
 
+    pub fn clone_matrix<S>(&self, ring: S) -> Self
+        where S: RingStore<Type = R>
+    {
+        SparseMatrixBuilder {
+            zero: ring.clone_el(&self.zero), 
+            rows: self.rows.iter().map(|row| row.iter().map(|(i, x)| (*i, ring.clone_el(x))).collect()).collect(), 
+            col_permutation: self.col_permutation.clone(), 
+            col_count: self.col_count
+        }
+    }
+
     pub fn add_col(&mut self, j: usize) {
         self.col_permutation.insert(j, self.col_count);
         self.col_count += 1;
+    }
+
+    pub fn add_cols(&mut self, number: usize) {
+        for _ in 0..number {
+            self.add_col(self.col_count());
+        }
     }
 
     pub fn add_zero_row(&mut self, i: usize) {
@@ -575,13 +592,13 @@ fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut InternalMatrix<
 }
 
 #[inline(never)]
-pub fn gb_sparse_row_echelon<R, const LOG: bool>(ring: R, matrix: SparseMatrixBuilder<R::Type>) -> Vec<Vec<(usize, El<R>)>>
+pub fn gb_sparse_row_echelon<R, const LOG: bool>(ring: R, matrix: SparseMatrixBuilder<R::Type>, block_size: usize) -> Vec<Vec<(usize, El<R>)>>
     where R: DivisibilityRingStore + Copy,
         R::Type: DivisibilityRing,
         El<R>: Send + Sync,
         R: Sync
 {
-    let n = 256;
+    let n = block_size;
     let global_cols = (matrix.col_count() - 1) / n + 1;
     let mut matrix = matrix.into_internal_matrix(n, ring.get_ring());
     matrix.check();
@@ -607,4 +624,65 @@ pub fn gb_sparse_row_echelon<R, const LOG: bool>(ring: R, matrix: SparseMatrixBu
     return matrix.rows.into_iter().map(|row| 
         row.into_iter().enumerate().flat_map(|(i, r)| r.into_iter().rev().skip(1).rev().map(move |(j, c)| (j + i * n, c)).inspect(|(_, c)| assert!(!ring.is_zero(c)))).collect()
     ).collect();
+}
+
+#[cfg(test)]
+use crate::rings::zn::zn_static::*;
+#[cfg(test)]
+use crate::assert_matrix_eq;
+
+#[test]
+fn test_gb_sparse_row_echelon_3x5() {
+    let R = Zn::<7>::RING;
+    let sparsify = |row: [u64; 5]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));
+
+    let mut matrix: SparseMatrixBuilder<_> = SparseMatrixBuilder::new(&R);
+    matrix.add_cols(5);
+    matrix.add_row(0, sparsify([0, 0, 3, 0, 4]));
+    matrix.add_row(1, sparsify([0, 2, 1, 0, 4]));
+    matrix.add_row(2, sparsify([6, 0, 1, 0, 1]));
+
+    let mut expected = SparseMatrixBuilder::new(&R);
+    expected.add_cols(5);
+    expected.add_row(0, sparsify([1, 0, 0, 0, 5]));
+    expected.add_row(1, sparsify([0, 1, 0, 0, 6]));
+    expected.add_row(2, sparsify([0, 0, 1, 0, 6]));
+
+    for block_size in 1..10 {
+        let mut actual = SparseMatrixBuilder::new(&R);
+        actual.add_cols(5);
+        for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), block_size) {
+            actual.add_row(actual.row_count(), row.into_iter());
+        }
+        assert_matrix_eq!(&R, &expected, &actual);
+    }
+}
+
+#[test]
+fn test_gb_sparse_row_echelon_4x6() {
+    let R = Zn::<17>::RING;
+    let sparsify = |row: [u64; 6]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));
+
+    let mut matrix: SparseMatrixBuilder<_> = SparseMatrixBuilder::new(&R);
+    matrix.add_cols(6);
+    matrix.add_row(0, sparsify([2, 3, 0, 1, 0, 1]));
+    matrix.add_row(1, sparsify([3, 13, 0, 1, 0, 1]));
+    matrix.add_row(2, sparsify([0, 0, 11, 1, 0, 1]));
+    matrix.add_row(3, sparsify([0, 0, 0, 0, 4, 1]));
+
+    let mut expected = SparseMatrixBuilder::new(&R);
+    expected.add_cols(6);
+    expected.add_row(0, sparsify([1, 10, 0, 0, 0, 0]));
+    expected.add_row(1, sparsify([0, 0, 1, 0, 0, 0]));
+    expected.add_row(2, sparsify([0, 0, 0, 1, 0, 1]));
+    expected.add_row(3, sparsify([0, 0, 0, 0, 1, 13]));
+
+    for block_size in 1..10 {
+        let mut actual = SparseMatrixBuilder::new(&R);
+        actual.add_cols(6);
+        for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), block_size) {
+            actual.add_row(actual.row_count(), row.into_iter());
+        }
+        assert_matrix_eq!(&R, &expected, &actual);
+    }
 }

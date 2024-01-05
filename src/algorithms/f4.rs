@@ -168,7 +168,7 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
         }
     }
 
-    let entries = gb_sparse_row_echelon::<_, true>(ring.base_ring(), A);
+    let entries = gb_sparse_row_echelon::<_, true>(ring.base_ring(), A, 256);
 
     let mut result = Vec::new();
     for i in 0..entries.len() {
