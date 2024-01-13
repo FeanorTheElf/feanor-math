@@ -34,7 +34,7 @@ pub fn column_iterator<'a, T>(data: &'a mut [Vec<T>], cols: Range<usize>) -> imp
 }
 
 #[cfg(feature = "parallel")]
-pub fn column_iterator<'a, T>(data: &'a mut [Vec<T>], cols: Range<usize>) -> impl 'a + rayon::iter::ParallelIterator<Item = Column<'a, T>> 
+pub fn column_iterator<'a, T>(data: &'a mut [Vec<T>], cols: Range<usize>) -> impl 'a + rayon::iter::IndexedParallelIterator<Item = Column<'a, T>> 
     where T: Send
 {
     assert!(data.len() > 0);
@@ -49,22 +49,23 @@ pub fn column_iterator<'a, T>(data: &'a mut [Vec<T>], cols: Range<usize>) -> imp
 
 #[cfg(feature = "parallel")]
 pub fn potential_parallel_for_each<D, T, F, G, S>(data: D, init_thread: G, body: F)
-    where F: Fn(&mut S, T) + Send + Sync,
+    where F: Fn(&mut S, usize, T) + Send + Sync,
         G: Fn() -> S + Send + Sync,
         T: Send,
-        D: rayon::iter::IntoParallelIterator<Item = T>
+        D: rayon::iter::IntoParallelIterator<Item = T>,
+        <D as rayon::iter::IntoParallelIterator>::Iter: rayon::iter::IndexedParallelIterator
 {
-    <_ as rayon::iter::ParallelIterator>::for_each_init(<_ as rayon::iter::IntoParallelIterator>::into_par_iter(data), init_thread, body)
+    <_ as rayon::iter::ParallelIterator>::for_each_init(<_ as rayon::iter::IndexedParallelIterator>::enumerate(<_ as rayon::iter::IntoParallelIterator>::into_par_iter(data)), init_thread, |state, (i, el)| body(state, i, el))
 }
 
 #[cfg(not(feature = "parallel"))]
 pub fn potential_parallel_for_each<D, T, F, G, S>(data: D, init_thread: G, body: F)
-    where F: Fn(&mut S, T) + Send + Sync,
+    where F: Fn(&mut S, usize, T) + Send + Sync,
         G: Fn() -> S + Send + Sync,
         D: IntoIterator<Item = T>
 {
     let mut state = init_thread();
-    for el in data {
-        body(&mut state, el);
+    for (i, el) in data.into_iter().enumerate() {
+        body(&mut state, i, el);
     }
 }

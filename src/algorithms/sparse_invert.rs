@@ -1,16 +1,17 @@
 use std::io::Write;
 use std::mem::swap;
 use std::cmp::{min, Ordering};
+use std::sync::atomic::AtomicUsize;
 use std::time::Instant;
 
 use crate::matrix::Matrix;
 use crate::parallel::{potential_parallel_for_each, column_iterator};
 use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::ring::*;
-use crate::divisibility::DivisibilityRingStore;
+use crate::divisibility::*;
 use crate::vector::{VectorView, VectorViewMut};
 
-const EXTENSIVE_RUNTIME_ASSERTS: bool = true;
+const EXTENSIVE_RUNTIME_ASSERTS: bool = false;
 
 pub struct SparseMatrixBuilder<R>
     where R: ?Sized + RingBase
@@ -279,14 +280,14 @@ fn linear_combine_rows<'a, R, I>(ring: R, coeffs: &[(usize, El<R>)], mut rows: I
         out.push((usize::MAX, ring.zero()));
         return out;
     }
-    let mut last = coeffs[0].0;
-    rows.advance_by(last).unwrap();
+    let mut last_idx = coeffs[0].0;
+    rows.advance_by(last_idx).unwrap();
     out.extend(rows.next().unwrap().iter().map(|(j, c)| (*j, ring.mul_ref(c, &coeffs[0].1))));
     tmp.clear();
     let lhs_factor = ring.one();
     for (idx, c) in coeffs[1..(coeffs.len() - 1)].iter() {
-        rows.advance_by(*idx - last - 1).unwrap();
-        last = *idx;
+        rows.advance_by(*idx - last_idx - 1).unwrap();
+        last_idx = *idx;
         *tmp = add_row_local::<_, true>(ring, &out, rows.next().unwrap(), &lhs_factor, c, std::mem::replace(tmp, Vec::new()));
         swap(&mut out, tmp);
     }
@@ -330,90 +331,13 @@ fn leading_entry<'a, T>(matrix: &'a InternalMatrix<T>, row: usize, global_col: u
     return (*j, c);
 }
 
-///
-/// In the block of matrtix given by `global_pivot`, performs unimodular row operation
-/// to ensure that the element in the pivot position divides all elements below it. 
-/// 
-#[inline(never)]
-fn local_make_pivot_ideal_gen<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, transform: &mut InternalMatrix<El<R>>, local_pivot: (usize, usize), global_pivot: (usize, usize), tmp: &mut [Vec<(usize, El<R>)>; 2]) 
-    where R: PrincipalIdealRingStore + Copy,
-        R::Type: PrincipalIdealRing
-{
-    let n = matrix.n;
-    matrix.check(ring);
-    transform.check(ring);
-    let current = leading_entry(&matrix, local_pivot.0 + global_pivot.0, global_pivot.1);
-    let mut current = if current.0 != local_pivot.1 {
-        ring.zero()
+fn leading_entry_at<'a, T>(matrix: &'a InternalMatrix<T>, row: usize, col: usize, global_col: usize) -> Option<&'a T> {
+    debug_assert!(leading_entry(matrix, row, global_col).0 >= col);
+    if leading_entry(matrix, row, global_col).0 == col {
+        Some(leading_entry(matrix, row, global_col).1)
     } else {
-        ring.clone_el(current.1)
-    };
-    for i in (local_pivot.0 + 1)..n {
-        if ring.is_unit(&current) {
-            break;
-        }
-        let entry = leading_entry(matrix, i + global_pivot.0, global_pivot.1);
-        debug_assert!(entry.0 >= local_pivot.1);
-        if entry.0 == local_pivot.1 && ring.checked_div(entry.1, &current).is_none() {
-            let (s, t, d) = ring.ideal_gen(&current, entry.1);
-            let local_transform = [[s, t], [ring.checked_div(entry.1, &d).unwrap(), ring.checked_div(&current, &d).unwrap()]];
-            let (fst_row, snd_row) = get_two_mut(&mut matrix.rows, local_pivot.0 + global_pivot.0, i + global_pivot.0);
-            transform_2d(ring, &local_transform, [&mut fst_row[global_pivot.1], &mut snd_row[global_pivot.1]], tmp);
-            let (fst_row, snd_row) = get_two_mut(&mut transform.rows, local_pivot.0, i);
-            transform_2d(ring, &local_transform, [&mut fst_row[0], &mut snd_row[0]], tmp);
-            current = d;
-        }
+        None
     }
-    matrix.check(ring);
-    transform.check(ring);
-}
-
-#[inline(never)]
-fn search_pivot_outside_block<R>(ring: R, matrix: &InternalMatrix<El<R>>, local_pivot: (usize, usize), global_pivot: (usize, usize)) -> Option<usize>
-    where R: RingStore + Copy,
-        R::Type: PrincipalIdealRing
-{
-    let n = matrix.n;
-    let current_pivot = if leading_entry(matrix, local_pivot.0 + global_pivot.0, global_pivot.1).0 == local_pivot.1 {
-        leading_entry(matrix, local_pivot.0 + global_pivot.0, global_pivot.1).1
-    } else {
-        &matrix.zero
-    };
-    for i in (global_pivot.0 + n)..matrix.row_count() {
-
-        if EXTENSIVE_RUNTIME_ASSERTS {
-            for j in 0..local_pivot.1 {
-                assert!(matrix.entry_at(i, global_pivot.1, j).is_none());
-            }
-        }
-
-        if leading_entry(matrix, i, global_pivot.1).0 == local_pivot.1 &&
-            ring.checked_div(leading_entry(matrix, i, global_pivot.1).1, &current_pivot).is_none()
-        {
-            return Some(i);
-        }
-    }
-    return None;
-}
-
-#[inline(never)]
-fn swap_pivot_outside_block<T>(matrix: &mut InternalMatrix<T>, local_pivot_i: usize, local_pivot_j: usize, global_pivot_i: usize, global_pivot_j: usize) -> bool {
-    let n = matrix.n;
-    // there is no solution within the block, start reducing and looking
-    for i in (global_pivot_i + local_pivot_i + 1)..matrix.row_count() {
-
-        if EXTENSIVE_RUNTIME_ASSERTS {
-            for j in 0..local_pivot_j {
-                assert!(matrix.entry_at(i, global_pivot_j, j).is_none());
-            }
-        }
-
-        if leading_entry(matrix, i, global_pivot_j).0 == local_pivot_j {
-            matrix.rows.swap(i, global_pivot_i + local_pivot_i);
-            return true;
-        }
-    }
-    return false;
 }
 
 #[inline(never)]
@@ -425,7 +349,7 @@ fn update_rows_with_transform<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, ro
     potential_parallel_for_each(
         column_iterator(&mut matrix.rows[rows_start..], (pivot_col + 1)..(matrix.global_col_count)), 
         || Vec::new(), 
-        |tmp, rows| 
+        |tmp, _, rows| 
     {
         let mut rows = rows;
         let mut new = mul_assign(
@@ -442,26 +366,61 @@ fn update_rows_with_transform<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, ro
     matrix.check(ring);
 }
 
-#[inline(never)]
-fn eliminate_interior_rows<R>(_ring: R, _matrix: &mut InternalMatrix<El<R>>, _rows_start: usize, _rows_end: usize, _pivot_rows_start: usize, _pivot_rows_end: usize, _global_col: usize)
-    where R: RingStore + Copy,
-        El<R>: Send + Sync,
-        R: Sync
+///
+/// Computes a vector `result` such that `result * echelon_form_matrix = current_row`, if it exists.
+/// Note that if the vector does not exist, this function will not throw an error but return a
+/// vector that can be thought of as a "best effort solution". This is important in combination
+/// with the optimistic elimination strategy.
+/// 
+fn preimage_echelon_form_matrix<R>(ring: R, echelon_form_matrix: &[Vec<Vec<(usize, El<R>)>>], current_row: &[(usize, El<R>)], mut out: Vec<(usize, El<R>)>, global_col: usize) -> Vec<(usize, El<R>)>
+    where R: DivisibilityRingStore + Copy,
+        R::Type: DivisibilityRing
 {
-    // it turns out that we are faster by not eliminating the upper corner
+    let zero = ring.zero();
+    out.clear();
+    for (i, row) in echelon_form_matrix.iter().enumerate() {
+        let (j, pivot) = &row[global_col][0];
+        let mut current = ring.clone_el(at(*j, current_row).unwrap_or(&zero));
+        for (k, c) in &out {
+            ring.sub_assign(&mut current, ring.mul_ref(c, at(*j, &echelon_form_matrix[*k][global_col]).unwrap_or(&zero)));
+        }
+        if !ring.is_zero(&current) {
+            if let Some(quo) = ring.checked_div(&current, pivot) {
+                out.push((i, ring.negate(quo)));
+            }
+        }
+    }
+    out.push((usize::MAX, ring.one()));
+    return out;
 }
 
-fn eliminate_exterior_rows<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, rows_start: usize, rows_end: usize, pivot_rows_start: usize, pivot_rows_end: usize, global_col: usize)
-    where R: RingStore + Copy,
+fn global_eliminate_row<R>(ring: R, elim_coefficients: &[(usize, El<R>)], pivot_rows: &[Vec<Vec<(usize, El<R>)>>], row: &mut [Vec<(usize, El<R>)>], global_col: usize, global_col_count: usize, tmp1: &mut Vec<(usize, El<R>)>, tmp2: &mut Vec<(usize, El<R>)>)
+    where R: RingStore + Copy
+{
+    let tmp = tmp2;
+    let new_row = tmp1;
+    for col in global_col..global_col_count {
+        *new_row = linear_combine_rows(ring, &elim_coefficients, pivot_rows.iter().map(|r| &r[col][..]), std::mem::replace(new_row, Vec::new()), tmp);
+        *tmp = add_row_local::<_, true>(ring, &row[col], &new_row, &ring.one(), &ring.one(), std::mem::replace(tmp, Vec::new()));
+        swap(tmp, &mut row[col]);
+    }
+}
+
+///
+/// Returns `None` if all entries were successfully eliminated.
+/// 
+/// If some were not (because a pivot is a non-unit), then any number (at least one) of indices of 
+/// rows with remaining entries are returned. These rows have to be swapped into the 
+/// local block and the whole operation must be performed again.
+/// 
+fn eliminate_exterior_rows_optimistic<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, rows_start: usize, rows_end: usize, pivot_rows_start: usize, pivot_rows_end: usize, pivot_cols_end: usize, global_col: usize) -> Option<usize>
+    where R: DivisibilityRingStore + Copy + Sync,
         El<R>: Send + Sync,
-        R: Sync
+        R::Type: DivisibilityRing
 {
     matrix.check(ring);
-    if pivot_rows_end <= pivot_rows_start {
-        return;
-    }
     if rows_end <= rows_start {
-        return;
+        return None;
     }
     assert!(rows_start >= pivot_rows_end || pivot_rows_start >= rows_end);
 
@@ -475,90 +434,121 @@ fn eliminate_exterior_rows<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, rows_
         (pivot_rows, &mut work_rows[..(rows_end - rows_start)])
     };
 
-    potential_parallel_for_each(work_rows, || (Vec::new(), Vec::new(), Vec::new()), |(coefficients, new_row, tmp), row| {
-        coefficients.clear();
-        for pivot_i in 0..pivot_rows.len() {
-            let (j, _) = pivot_rows[pivot_i][global_col][0];
-            if let Some(factor) = at(j, &row[global_col]) {
-                coefficients.push((pivot_i, ring.negate(ring.clone_el(factor))));
-            }
-        }
-        coefficients.push((usize::MAX, ring.zero()));
+    let unreduced_row_index = AtomicUsize::new(usize::MAX);
+
+    potential_parallel_for_each(work_rows, || (Vec::new(), Vec::new(), Vec::new()), |(coefficients, new_row, tmp), row_index, row| {
+        *coefficients = preimage_echelon_form_matrix(ring, pivot_rows, &row[global_col], std::mem::replace(coefficients, Vec::new()), global_col);
         if coefficients.len() > 1 {
-            for col in global_col..global_col_count {
-                *new_row = linear_combine_rows(ring, &coefficients, pivot_rows.iter().map(|r| &r[col][..]), std::mem::replace(new_row, Vec::new()), tmp);
-                *tmp = add_row_local::<_, true>(ring, &row[col], &new_row, &ring.one(), &ring.one(), std::mem::replace(tmp, Vec::new()));
-                swap(tmp, &mut row[col]);
-            }
+            global_eliminate_row(ring, coefficients, pivot_rows, row, global_col, global_col_count, new_row, tmp);
+        }
+        if unreduced_row_index.load(std::sync::atomic::Ordering::SeqCst) == usize::MAX && row[global_col][0].0 <= pivot_cols_end {
+            unreduced_row_index.store(row_index, std::sync::atomic::Ordering::SeqCst);
         }
     });
+    matrix.check(ring);
+    if unreduced_row_index.load(std::sync::atomic::Ordering::SeqCst) != usize::MAX {
+        return Some(unreduced_row_index.load(std::sync::atomic::Ordering::SeqCst) + rows_start);
+    } else {
+        return None;
+    }
+}
+
+///
+/// In the block of matrtix given by `global_pivot`, performs unimodular row operation
+/// to ensure that the element in the pivot position divides all elements below it. 
+/// 
+#[inline(never)]
+fn local_make_pivot_ideal_gen<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, transform: &mut InternalMatrix<El<R>>, row_block: usize, local_pivot: (usize, usize), global_pivot: (usize, usize), tmp: &mut [Vec<(usize, El<R>)>; 2]) 
+    where R: PrincipalIdealRingStore + Copy,
+        R::Type: PrincipalIdealRing
+{
+    matrix.check(ring);
+    transform.check(ring);
+    let mut current = ring.clone_el(leading_entry_at(&matrix, local_pivot.0 + global_pivot.0, local_pivot.1, global_pivot.1).unwrap_or(&ring.zero()));
+    for i in (local_pivot.0 + 1)..row_block {
+        if ring.is_unit(&current) {
+            break;
+        }
+        if let Some(entry) = leading_entry_at(matrix, i + global_pivot.0, local_pivot.1, global_pivot.1) {
+            if ring.checked_div(entry, &current).is_none() {
+                let (s, t, d) = ring.ideal_gen(&current, entry);
+                let local_transform = [[s, t], [ring.checked_div(entry, &d).unwrap(), ring.checked_div(&current, &d).unwrap()]];
+                let (fst_row, snd_row) = get_two_mut(&mut matrix.rows, local_pivot.0 + global_pivot.0, i + global_pivot.0);
+                transform_2d(ring, &local_transform, [&mut fst_row[global_pivot.1], &mut snd_row[global_pivot.1]], tmp);
+                let (fst_row, snd_row) = get_two_mut(&mut transform.rows, local_pivot.0, i);
+                transform_2d(ring, &local_transform, [&mut fst_row[0], &mut snd_row[0]], tmp);
+                current = d;
+            }
+        }
+    }
+    matrix.check(ring);
+    transform.check(ring);
+}
+
+fn local_eliminate_row<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, transform: &mut InternalMatrix<El<R>>, row_block: usize, local_pivot: (usize, usize), global_pivot: (usize, usize), tmp: &mut [Vec<(usize, El<R>)>; 2])
+    where R: RingStore + Copy,
+        R::Type: DivisibilityRing
+{
+    matrix.check(ring);
+    // check that the left part remains zero and the pivot is nonzero
+    if EXTENSIVE_RUNTIME_ASSERTS {
+        assert!(matrix.entry_at(global_pivot.0 + local_pivot.0, global_pivot.1, local_pivot.1).is_some());
+        for col in 0..local_pivot.1 {
+            for row in min(local_pivot.0 + 1, col + 1)..row_block {
+                if !(matrix.entry_at(global_pivot.0 + row, global_pivot.1, col).is_none()) {
+                    println!();
+                    println!("{}", matrix.format(&ring));
+                    panic!();
+                }
+            }
+        }
+    }
+
+    let pivot_entry = leading_entry_at(matrix, local_pivot.0 + global_pivot.0, local_pivot.1, global_pivot.1).unwrap();
+    let pivot_entry = ring.clone_el(pivot_entry);
+    // TODO if field - better normalize
+
+    for elim_i in 0..row_block {
+        if elim_i == local_pivot.0 {
+            continue;
+        }
+        if let Some(factor) = matrix.entry_at(global_pivot.0 + elim_i, global_pivot.1, local_pivot.1) {
+            debug_assert!(elim_i < local_pivot.0 || leading_entry_at(&matrix, elim_i + global_pivot.0, local_pivot.1, global_pivot.1).is_some());
+            let lhs_factor = ring.one();
+            if let Some(quo) = ring.checked_div(factor, &pivot_entry) {
+                let rhs_factor = ring.negate(quo);
+
+                let new = add_row_local::<_, true>(ring, &matrix.rows[global_pivot.0 + elim_i][global_pivot.1], &matrix.rows[global_pivot.0 + local_pivot.0][global_pivot.1], &lhs_factor, &rhs_factor, std::mem::replace(&mut tmp[0], Vec::new()));
+                tmp[0] = std::mem::replace(&mut matrix.rows[global_pivot.0 + elim_i][global_pivot.1], new);
+
+                let new = add_row_local::<_, true>(ring, &transform.rows[elim_i][0], &transform.rows[local_pivot.0][0], &lhs_factor, &rhs_factor, std::mem::replace(&mut tmp[0], Vec::new()));
+                tmp[0] = std::mem::replace(&mut transform.rows[elim_i][0], new);
+            } else {
+                assert!(elim_i < local_pivot.0);
+            }
+        }
+    }
     matrix.check(ring);
 }
 
 #[inline(never)]
-fn local_row_echelon<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, transform: &mut InternalMatrix<El<R>>, global_pivot_i: usize, global_pivot_j: usize, start_pivot: (usize, usize)) -> (usize, Result<(), usize>)
+fn local_row_echelon_optimistic<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, transform: &mut InternalMatrix<El<R>>, row_block: usize, global_pivot_i: usize, global_pivot_j: usize) -> usize
     where R: RingStore + Copy,
         R::Type: PrincipalIdealRing
 {
     matrix.check(ring);
-    let n = matrix.n;
-    let mut i = start_pivot.0;
+    let col_block = matrix.n;
+    let mut i = 0;
     let mut tmp = [Vec::new(), Vec::new()];
-    for j in start_pivot.1..n {
-        local_make_pivot_ideal_gen(ring, matrix, transform, (i, j), (global_pivot_i, global_pivot_j), &mut tmp);
-        let pivot_entry = leading_entry(&matrix, i + global_pivot_i, global_pivot_j);
-        if pivot_entry.0 == j && ring.is_unit(pivot_entry.1) {
-
-            // check that the left part remains zero and the pivot is nonzero
-            if EXTENSIVE_RUNTIME_ASSERTS {
-                assert!(matrix.entry_at(global_pivot_i + i, global_pivot_j, j).is_some());
-                for col in 0..j {
-                    for row in min(i + 1, col + 1)..n {
-                        if !(matrix.entry_at(global_pivot_i + row, global_pivot_j, col).is_none()) {
-                            println!();
-                            println!("{}", matrix.format(&ring));
-                            println!();
-                            assert!(false);
-                        }
-                    }
-                }
-            }
-
-            debug_assert!(leading_entry(&matrix, i + global_pivot_i, global_pivot_j).0 == j);
-            let pivot_inv = ring.checked_div(&ring.one(), &leading_entry(&matrix, i + global_pivot_i, global_pivot_j).1).unwrap();
-
-            for (_, c) in &mut matrix.rows[global_pivot_i + i][global_pivot_j] {
-                ring.mul_assign_ref(c, &pivot_inv);
-            }
-            for (_, c) in &mut transform.rows[i][0] {
-                ring.mul_assign_ref(c, &pivot_inv);
-            }
-            for elim_i in 0..n {
-                if elim_i == i {
-                    continue;
-                }
-                if let Some(factor) = matrix.entry_at(global_pivot_i + elim_i, global_pivot_j, j) {
-                    debug_assert!(elim_i < i || leading_entry(&matrix, elim_i + global_pivot_i, global_pivot_j).0 == j);
-                    let lhs_factor = ring.one();
-                    let rhs_factor = ring.negate(ring.clone_el(factor));
-
-                    let new = add_row_local::<_, true>(ring, &matrix.rows[global_pivot_i + elim_i][global_pivot_j], &matrix.rows[global_pivot_i + i][global_pivot_j], &lhs_factor, &rhs_factor, std::mem::replace(&mut tmp[0], Vec::new()));
-                    tmp[0] = std::mem::replace(&mut matrix.rows[global_pivot_i + elim_i][global_pivot_j], new);
-
-                    let new = add_row_local::<_, true>(ring, &transform.rows[elim_i][0], &transform.rows[i][0], &lhs_factor, &rhs_factor, std::mem::replace(&mut tmp[0], Vec::new()));
-                    tmp[0] = std::mem::replace(&mut transform.rows[elim_i][0], new);
-                }
-            }
+    for j in 0..col_block {
+        local_make_pivot_ideal_gen(ring, matrix, transform, row_block, (i, j), (global_pivot_i, global_pivot_j), &mut tmp);
+        if leading_entry_at(matrix, i + global_pivot_i, j, global_pivot_j).is_some() {
+            local_eliminate_row(ring, matrix, transform, row_block, (i, j), (global_pivot_i, global_pivot_j), &mut tmp);
             i += 1;
-
-        } else {
-            matrix.check(ring);
-            return (i, Err(j));
         }
-
     }
     matrix.check(ring);
-    return (i, Ok(()));
+    return i;
 }
 
 #[inline(never)]
@@ -576,58 +566,36 @@ fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut InternalMatrix<
 
     let mut pivot_row = 0;
     let mut pivot_col = 0;
-    let n = matrix.n;
+    let row_block = matrix.n + 1;
+    let col_block = matrix.n;
     let col_block_count = matrix.global_col_count;
 
     // we have to pad matrix with n zero rows...
-    for _ in 0..n {
+    for _ in 0..row_block {
         matrix.rows.push((0..col_block_count).map(|_| vec![(usize::MAX, ring.zero())]).collect());
     }
     
-    let mut local_pivot_i = 0;
-    let mut local_pivot_j = 0;
-    while pivot_row + n < matrix.row_count() && pivot_col < col_block_count {
-        let mut transform = identity(ring, n, empty(n, 1, ring.zero()));
-
-        // now we have the nxn block in row echelon form, with the last (n - produced rows) being zero
-        let (new_local_i, current_result) = 
-            local_row_echelon(ring, matrix, &mut transform, pivot_row, pivot_col, (local_pivot_i, local_pivot_j));
+    while pivot_row + row_block < matrix.row_count() && pivot_col < col_block_count {
+        let mut transform = identity(ring, row_block, empty(row_block, 1, ring.zero()));
+        let new_rows = local_row_echelon_optimistic(ring, matrix, &mut transform, row_block, pivot_row, pivot_col);
 
         update_rows_with_transform(ring, matrix, pivot_row, pivot_col, &transform.rows.into_iter().map(|r| r.into_iter().next().unwrap()).collect::<Vec<_>>());
+        let reduction_result = eliminate_exterior_rows_optimistic(ring, matrix, pivot_row + row_block, matrix.row_count() - row_block, pivot_row, pivot_row + new_rows, col_block, pivot_col);
         
-        eliminate_exterior_rows(ring, matrix, pivot_row + n, matrix.row_count() - n, pivot_row + local_pivot_i, pivot_row + new_local_i, pivot_col);
-
-        match current_result {
-            Ok(()) => {
-
-                eliminate_interior_rows(ring, matrix, 0, pivot_row, pivot_row, pivot_row + new_local_i, pivot_col);
-
-                pivot_col += 1;
-                pivot_row += new_local_i;
-                local_pivot_i = 0;
-                local_pivot_j = 0;
-
-                if LOG {
-                    print!(".");
-                    std::io::stdout().flush().unwrap();
-                }
-            },
-            Err(local_j) => {
-
-                pivot_row += new_local_i;
-                local_pivot_i = 0;
-
-                if swap_pivot_outside_block(matrix, 0, local_j, pivot_row, pivot_col) {
-                    local_pivot_j = local_j;
-                } else {
-                    local_pivot_j = local_j + 1;
-                }
+        if let Some(unreduced_row) = reduction_result {
+            matrix.rows.swap(pivot_row + new_rows, unreduced_row);
+        } else {
+            pivot_row += new_rows;
+            pivot_col += 1;
+            if LOG {
+                print!(".");
+                std::io::stdout().flush().unwrap();
             }
         }
     }
 
     // remove the padding
-    for _ in 0..n {
+    for _ in 0..row_block {
         matrix.rows.pop();
     }
     if LOG {
@@ -679,7 +647,8 @@ use crate::assert_matrix_eq;
 
 #[cfg(test)]
 fn assert_is_correct_row_echelon<R>(ring: R, expected: SparseMatrixBuilder<R::Type>, actual: &SparseMatrixBuilder<R::Type>)
-    where R: RingStore
+    where R: RingStore,
+        R::Type: DivisibilityRing
 {
     let n = actual.row_count();
     let m = actual.col_count();
@@ -694,13 +663,28 @@ fn assert_is_correct_row_echelon<R>(ring: R, expected: SparseMatrixBuilder<R::Ty
             if last_pivot_i.is_some() && pivot_i <= last_pivot_i.unwrap() {
                 continue;
             }
-            assert!(ring.is_one(<_ as Matrix<R::Type>>::at(&expected, pivot_i, j)));
+            // assert!(ring.is_one(<_ as Matrix<R::Type>>::at(&expected, pivot_i, j)));
             for i in 0..pivot_i {
-                assert!(ring.is_zero(<_ as Matrix<R::Type>>::at(&expected, i, j)));
-                expected.rows[i][0] = add_row_local::<_, true>(&ring, &expected.rows[i][0], &expected.rows[pivot_i][0], &ring.one(), <_ as Matrix<R::Type>>::at(actual, i, j), Vec::new());
+                // assert!(ring.is_zero(<_ as Matrix<R::Type>>::at(&expected, i, j)));
+                expected.rows[i][0] = add_row_local::<_, true>(
+                    &ring,
+                    &expected.rows[i][0], 
+                    &expected.rows[pivot_i][0], 
+                    &ring.one(), 
+                    &ring.checked_div(&ring.sub_ref(<_ as Matrix<R::Type>>::at(actual, i, j), <_ as Matrix<R::Type>>::at(&expected, i, j)), <_ as Matrix<R::Type>>::at(&expected, pivot_i, j)).unwrap(), 
+                    Vec::new()
+                );
             }
-            for (_, x) in &mut expected.rows[pivot_i][0] {
-                ring.mul_assign_ref(x, <_ as Matrix<R::Type>>::at(actual, pivot_i, j))
+            // this is a nasty situation - theoretically, we need to compute a `unit` such that `unit * expected = actual`;
+            // however, `checked_div()` can only give us an arbitrary element; hence we only take care of two situations:
+            // either `checked_div()` gives us a unit, or we can take `1`; if this does not work, the test case has to be
+            // adjusted
+            if !ring.eq_el(<_ as Matrix<R::Type>>::at(actual, pivot_i, j), <_ as Matrix<R::Type>>::at(&expected, pivot_i, j)) {
+                let factor = ring.checked_div(<_ as Matrix<R::Type>>::at(actual, pivot_i, j), <_ as Matrix<R::Type>>::at(&expected, pivot_i, j)).unwrap();
+                assert!(ring.is_unit(&factor));
+                for (_, x) in &mut expected.rows[pivot_i][0] {
+                    ring.mul_assign_ref(x, &factor);
+                }
             }
             last_pivot_i = Some(pivot_i);
         }
@@ -765,7 +749,39 @@ fn test_gb_sparse_row_echelon_4x6() {
 }
 
 #[test]
-#[ignore]
+fn test_gb_sparse_row_echelon_large() {
+    let R = Zn::<17>::RING;
+    let sparsify = |row: [u64; 10]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));
+
+    let mut matrix: SparseMatrixBuilder<_> = SparseMatrixBuilder::new(&R);
+    matrix.add_cols(10);
+    matrix.add_row(0, sparsify([ 0,  9,  2,  5, 12, 16,  8,  4, 15,  8]));
+    matrix.add_row(1, sparsify([ 1,  2,  0,  7, 13, 13, 16,  5,  1,  3]));
+    matrix.add_row(2, sparsify([11,  2, 10, 16, 10,  4, 16,  3,  9, 12]));
+    matrix.add_row(3, sparsify([ 5,  7, 12,  5,  1, 11, 14, 15, 12,  7]));
+    matrix.add_row(4, sparsify([15,  9, 15, 10,  8,  0, 16,  7, 12, 12]));
+    matrix.add_row(5, sparsify([12,  2,  7,  7, 11, 16,  1,  7, 15,  5]));
+    matrix.add_row(6, sparsify([12,  9, 13, 16,  6,  0,  3,  8, 16,  2]));
+    matrix.add_row(7, sparsify([ 1, 14, 16, 14,  4,  7,  1,  2,  0,  0]));
+    matrix.add_row(8, sparsify([ 9, 10,  5,  7,  4,  1,  6,  8, 15, 11]));
+    matrix.add_row(9, sparsify([ 6,  0,  6, 12, 15, 11, 15,  0,  2,  6]));
+    let mut expected = SparseMatrixBuilder::new(&R);
+    expected.add_cols(10);
+    for i in 0..10 {
+        expected.add_row(i, [(i, R.one())].into_iter());
+    }
+
+    for block_size in 1..15 {
+        let mut actual = SparseMatrixBuilder::new(&R);
+        actual.add_cols(10);
+        for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), block_size) {
+            actual.add_row(actual.row_count(), row.into_iter());
+        }
+        assert_is_correct_row_echelon(R, expected.clone_matrix(R), &actual);
+    }
+}
+
+#[test]
 fn test_gb_sparse_row_echelon_no_field() {
     let R = Zn::<18>::RING;
     let sparsify = |row: [u64; 5]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));
@@ -779,10 +795,10 @@ fn test_gb_sparse_row_echelon_no_field() {
 
     let mut expected = SparseMatrixBuilder::new(&R);
     expected.add_cols(5);
-    matrix.add_row(0, sparsify([3, 8, 0, 1, 0]));
-    matrix.add_row(1, sparsify([0, 3, 0, 0, 16]));
-    matrix.add_row(2, sparsify([0, 0, 1, 0, 5]));
-    matrix.add_row(3, sparsify([0, 0, 0, 2, 7]));
+    expected.add_row(0, sparsify([3, 8, 0, 1, 0]));
+    expected.add_row(1, sparsify([0, 3, 0, 0, 16]));
+    expected.add_row(2, sparsify([0, 0, 1, 0, 5]));
+    expected.add_row(3, sparsify([0, 0, 0, 8, 1]));
 
     for block_size in 1..10 {
         let mut actual = SparseMatrixBuilder::new(&R);
