@@ -10,7 +10,7 @@ use crate::ring::*;
 use crate::divisibility::DivisibilityRingStore;
 use crate::vector::{VectorView, VectorViewMut};
 
-const EXTENSIVE_RUNTIME_ASSERTS: bool = false;
+const EXTENSIVE_RUNTIME_ASSERTS: bool = true;
 
 pub struct SparseMatrixBuilder<R>
     where R: ?Sized + RingBase
@@ -369,10 +369,27 @@ fn local_make_pivot_ideal_gen<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, tr
 }
 
 #[inline(never)]
-fn search_pivot_in_block<T>(matrix: &InternalMatrix<T>, local_pivot_i: usize, local_pivot_j: usize, global_pivot_i: usize, global_pivot_j: usize) -> Option<usize> {
+fn search_pivot_outside_block<R>(ring: R, matrix: &InternalMatrix<El<R>>, local_pivot: (usize, usize), global_pivot: (usize, usize)) -> Option<usize>
+    where R: RingStore + Copy,
+        R::Type: PrincipalIdealRing
+{
     let n = matrix.n;
-    for i in local_pivot_i..n {
-        if leading_entry(matrix, global_pivot_i + i, global_pivot_j).0 == local_pivot_j {
+    let current_pivot = if leading_entry(matrix, local_pivot.0 + global_pivot.0, global_pivot.1).0 == local_pivot.1 {
+        leading_entry(matrix, local_pivot.0 + global_pivot.0, global_pivot.1).1
+    } else {
+        &matrix.zero
+    };
+    for i in (global_pivot.0 + n)..matrix.row_count() {
+
+        if EXTENSIVE_RUNTIME_ASSERTS {
+            for j in 0..local_pivot.1 {
+                assert!(matrix.entry_at(i, global_pivot.1, j).is_none());
+            }
+        }
+
+        if leading_entry(matrix, i, global_pivot.1).0 == local_pivot.1 &&
+            ring.checked_div(leading_entry(matrix, i, global_pivot.1).1, &current_pivot).is_none()
+        {
             return Some(i);
         }
     }
@@ -383,7 +400,7 @@ fn search_pivot_in_block<T>(matrix: &InternalMatrix<T>, local_pivot_i: usize, lo
 fn swap_pivot_outside_block<T>(matrix: &mut InternalMatrix<T>, local_pivot_i: usize, local_pivot_j: usize, global_pivot_i: usize, global_pivot_j: usize) -> bool {
     let n = matrix.n;
     // there is no solution within the block, start reducing and looking
-    for i in (global_pivot_i + n)..matrix.row_count() {
+    for i in (global_pivot_i + local_pivot_i + 1)..matrix.row_count() {
 
         if EXTENSIVE_RUNTIME_ASSERTS {
             for j in 0..local_pivot_j {
@@ -597,11 +614,12 @@ fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut InternalMatrix<
             },
             Err(local_j) => {
 
-                if swap_pivot_outside_block(matrix, new_local_i, local_j, pivot_row, pivot_col) {
-                    local_pivot_i = new_local_i;
+                pivot_row += new_local_i;
+                local_pivot_i = 0;
+
+                if swap_pivot_outside_block(matrix, 0, local_j, pivot_row, pivot_col) {
                     local_pivot_j = local_j;
                 } else {
-                    local_pivot_i = new_local_i;
                     local_pivot_j = local_j + 1;
                 }
             }
