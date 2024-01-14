@@ -605,6 +605,56 @@ fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut InternalMatrix<
     }
 }
 
+///
+/// Computes the row echelon form of the given matrix `A`, using elementary row
+/// operations. Be careful if the ring is not a field, however!
+/// 
+/// # What about rings that are not fields?
+/// 
+/// In the case that the underlying ring is not a field (or might even have
+/// zero-divisors), this is considered to be any matrix `B` that follows the
+/// "row-echelon" pattern (i.e. the first nonzero entry in each row has a larger
+/// column index than the first non-zero entry in the previous row), and there is
+/// a matrix `T` with unit determinant such that `A = T B`. Not that this does
+/// not have to be unique, and in fact, weird situations are possible.
+/// 
+/// This is demonstrated by the following example.
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::algorithms::smith::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::matrix::*;
+/// let ring = Zn::new(18);
+/// let modulo = ring.int_hom();
+/// let mut A_transposed = DenseMatrix::zero(5, 4, ring);
+/// let mut B_transposed = DenseMatrix::zero(5, 4, ring);
+/// 
+/// // both matrices are in row-echelon form and the same except for the last column
+/// let data_A = [
+///     [3, 8, 0, 1, 0],
+///     [0, 3, 0,16, 0],
+///     [0, 0,11, 0, 1],
+///     [0, 0, 0, 8, 1]
+/// ];
+/// let data_B = [
+///     [3, 8, 0, 1, 0],
+///     [0, 3, 0,16,14],
+///     [0, 0,11, 0, 1],
+///     [0, 0, 0, 8, 5]
+/// ];
+/// for (i, j) in (0..4).flat_map(|i| (0..5).map(move |j| (i, j))) {
+///     *A_transposed.at_mut(j, i) = modulo.map(data_A[i][j]);
+///     *B_transposed.at_mut(j, i) = modulo.map(data_B[i][j]);
+/// }
+/// // this shows that in fact, A and B are equivalent up to row operations!
+/// // In other words, there are S, T such that STA = SB = A, which implies that
+/// // det(S) det(T) = 1, so both S and T have unit determinant
+/// assert!(solve_right(&mut A_transposed.clone_matrix(&ring), B_transposed.clone_matrix(&ring), &ring).is_some());
+/// assert!(solve_right(&mut B_transposed.clone_matrix(&ring), A_transposed.clone_matrix(&ring), &ring).is_some());
+/// ```
+/// 
 #[inline(never)]
 pub fn gb_sparse_row_echelon<R, const LOG: bool>(ring: R, matrix: SparseMatrixBuilder<R::Type>, block_size: usize) -> Vec<Vec<(usize, El<R>)>>
     where R: RingStore + Copy,
@@ -782,6 +832,35 @@ fn test_gb_sparse_row_echelon_large() {
 }
 
 #[test]
+fn test_gb_sparse_row_echelon_local_ring() {
+    let R = Zn::<18>::RING;
+    let sparsify = |row: [u64; 5]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));
+
+    let mut matrix: SparseMatrixBuilder<_> = SparseMatrixBuilder::new(&R);
+    matrix.add_cols(5);
+    matrix.add_row(0, sparsify([9, 3, 0, 1, 1]));
+    matrix.add_row(1, sparsify([6, 13, 0, 0, 1]));
+    matrix.add_row(2, sparsify([0, 0, 11, 0, 1]));
+    matrix.add_row(3, sparsify([0, 12, 0, 0, 1]));
+
+    let mut expected = SparseMatrixBuilder::new(&R);
+    expected.add_cols(5);
+    expected.add_row(0, sparsify([3, 8, 0, 1, 0]));
+    expected.add_row(1, sparsify([0, 3, 0,16,14]));
+    expected.add_row(2, sparsify([0, 0,11, 0, 1]));
+    expected.add_row(3, sparsify([0, 0, 0, 8, 5]));
+
+    for block_size in 1..10 {
+        let mut actual = SparseMatrixBuilder::new(&R);
+        actual.add_cols(5);
+        for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), block_size) {
+            actual.add_row(actual.row_count(), row.into_iter());
+        }
+        assert_is_correct_row_echelon(R, expected.clone_matrix(R), &actual);
+    }
+}
+
+#[test]
 fn test_gb_sparse_row_echelon_no_field() {
     let R = Zn::<18>::RING;
     let sparsify = |row: [u64; 5]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));
@@ -796,9 +875,9 @@ fn test_gb_sparse_row_echelon_no_field() {
     let mut expected = SparseMatrixBuilder::new(&R);
     expected.add_cols(5);
     expected.add_row(0, sparsify([3, 8, 0, 1, 0]));
-    expected.add_row(1, sparsify([0, 3, 0, 0, 16]));
-    expected.add_row(2, sparsify([0, 0, 1, 0, 5]));
-    expected.add_row(3, sparsify([0, 0, 0, 8, 1]));
+    expected.add_row(1, sparsify([0, 3, 0, 16, 14]));
+    expected.add_row(2, sparsify([0, 0, 11, 0, 1]));
+    expected.add_row(3, sparsify([0, 0, 0, 8, 5]));
 
     for block_size in 1..10 {
         let mut actual = SparseMatrixBuilder::new(&R);
