@@ -692,54 +692,33 @@ pub fn gb_sparse_row_echelon<R, const LOG: bool>(ring: R, matrix: SparseMatrixBu
 
 #[cfg(test)]
 use crate::rings::zn::zn_static::*;
-#[cfg(test)]
-use crate::assert_matrix_eq;
 
 #[cfg(test)]
-fn assert_is_correct_row_echelon<R>(ring: R, expected: SparseMatrixBuilder<R::Type>, actual: &SparseMatrixBuilder<R::Type>)
+fn assert_is_correct_row_echelon<R>(ring: R, original: &SparseMatrixBuilder<R::Type>, row_echelon_form: &SparseMatrixBuilder<R::Type>)
     where R: RingStore,
-        R::Type: DivisibilityRing
+        R::Type: PrincipalIdealRing
 {
-    let n = actual.row_count();
-    let m = actual.col_count();
-    assert_eq!(n, expected.row_count());
-    assert_eq!(m, expected.col_count());
-    let mut expected: InternalMatrix<<<R as RingStore>::Type as RingBase>::Element> = expected.into_internal_matrix(m, ring.get_ring());
-    let mut last_pivot_i = None;
-    for j in 0..m {
-        let pivot_i = (0..n).rev().filter(|i| !ring.is_zero(actual.at(*i, j))).next();
-        assert_eq!((0..n).rev().filter(|i| !ring.is_zero(<_ as Matrix<R::Type>>::at(&expected, *i, j))).next(), pivot_i);
-        if let Some(pivot_i) = pivot_i {
-            if last_pivot_i.is_some() && pivot_i <= last_pivot_i.unwrap() {
-                continue;
-            }
-            // assert!(ring.is_one(<_ as Matrix<R::Type>>::at(&expected, pivot_i, j)));
-            for i in 0..pivot_i {
-                // assert!(ring.is_zero(<_ as Matrix<R::Type>>::at(&expected, i, j)));
-                expected.rows[i][0] = add_row_local::<_, true>(
-                    &ring,
-                    &expected.rows[i][0], 
-                    &expected.rows[pivot_i][0], 
-                    &ring.one(), 
-                    &ring.checked_div(&ring.sub_ref(<_ as Matrix<R::Type>>::at(actual, i, j), <_ as Matrix<R::Type>>::at(&expected, i, j)), <_ as Matrix<R::Type>>::at(&expected, pivot_i, j)).unwrap(), 
-                    Vec::new()
-                );
-            }
-            // this is a nasty situation - theoretically, we need to compute a `unit` such that `unit * expected = actual`;
-            // however, `checked_div()` can only give us an arbitrary element; hence we only take care of two situations:
-            // either `checked_div()` gives us a unit, or we can take `1`; if this does not work, the test case has to be
-            // adjusted
-            if !ring.eq_el(<_ as Matrix<R::Type>>::at(actual, pivot_i, j), <_ as Matrix<R::Type>>::at(&expected, pivot_i, j)) {
-                let factor = ring.checked_div(<_ as Matrix<R::Type>>::at(actual, pivot_i, j), <_ as Matrix<R::Type>>::at(&expected, pivot_i, j)).unwrap();
-                assert!(ring.is_unit(&factor));
-                for (_, x) in &mut expected.rows[pivot_i][0] {
-                    ring.mul_assign_ref(x, &factor);
-                }
-            }
-            last_pivot_i = Some(pivot_i);
+    use crate::algorithms::smith;
+
+    let n = original.row_count();
+    let m = original.col_count();
+    assert_eq!(n, row_echelon_form.row_count());
+    assert_eq!(m, row_echelon_form.col_count());
+
+    for i in 1..n {
+        assert!(row_echelon_form.rows[i][0].0 > row_echelon_form.rows[i - 1][0].0);
+    }
+
+    let mut original_transposed = smith::DenseMatrix::zero(m, n, &ring);
+    let mut actual_transposed = smith::DenseMatrix::zero(m, n, &ring);
+    for i in 0..n {
+        for j in 0..m {
+            *original_transposed.at_mut(j, i) = ring.clone_el(original.at(i, j));
+            *actual_transposed.at_mut(j, i) = ring.clone_el(row_echelon_form.at(i, j));
         }
     }
-    assert_matrix_eq!(&ring, &expected, actual);
+    assert!(smith::solve_right::<&R>(&mut original_transposed.clone_matrix(&ring), actual_transposed.clone_matrix(&ring), &ring).is_some());
+    assert!(smith::solve_right::<&R>(&mut actual_transposed.clone_matrix(&ring), original_transposed.clone_matrix(&ring), &ring).is_some());
 }
 
 #[test]
@@ -753,19 +732,13 @@ fn test_gb_sparse_row_echelon_3x5() {
     matrix.add_row(1, sparsify([0, 2, 1, 0, 4]));
     matrix.add_row(2, sparsify([6, 0, 1, 0, 1]));
 
-    let mut expected = SparseMatrixBuilder::new(&R);
-    expected.add_cols(5);
-    expected.add_row(0, sparsify([1, 0, 0, 0, 5]));
-    expected.add_row(1, sparsify([0, 1, 0, 0, 6]));
-    expected.add_row(2, sparsify([0, 0, 1, 0, 6]));
-
     for block_size in 1..10 {
         let mut actual = SparseMatrixBuilder::new(&R);
         actual.add_cols(5);
         for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), block_size) {
             actual.add_row(actual.row_count(), row.into_iter());
         }
-        assert_is_correct_row_echelon(R, expected.clone_matrix(R), &actual);
+        assert_is_correct_row_echelon(R, &matrix, &actual);
     }
 }
 
@@ -781,20 +754,13 @@ fn test_gb_sparse_row_echelon_4x6() {
     matrix.add_row(2, sparsify([0, 0, 11, 1, 0, 1]));
     matrix.add_row(3, sparsify([0, 0, 0, 0, 4, 1]));
 
-    let mut expected = SparseMatrixBuilder::new(&R);
-    expected.add_cols(6);
-    expected.add_row(0, sparsify([1, 10, 0, 0, 0, 0]));
-    expected.add_row(1, sparsify([0, 0, 1, 0, 0, 0]));
-    expected.add_row(2, sparsify([0, 0, 0, 1, 0, 1]));
-    expected.add_row(3, sparsify([0, 0, 0, 0, 1, 13]));
-
     for block_size in 1..10 {
         let mut actual = SparseMatrixBuilder::new(&R);
         actual.add_cols(6);
         for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), block_size) {
             actual.add_row(actual.row_count(), row.into_iter());
         }
-        assert_is_correct_row_echelon(R, expected.clone_matrix(R), &actual);
+        assert_is_correct_row_echelon(R, &matrix, &actual);
     }
 }
 
@@ -815,11 +781,6 @@ fn test_gb_sparse_row_echelon_large() {
     matrix.add_row(7, sparsify([ 1, 14, 16, 14,  4,  7,  1,  2,  0,  0]));
     matrix.add_row(8, sparsify([ 9, 10,  5,  7,  4,  1,  6,  8, 15, 11]));
     matrix.add_row(9, sparsify([ 6,  0,  6, 12, 15, 11, 15,  0,  2,  6]));
-    let mut expected = SparseMatrixBuilder::new(&R);
-    expected.add_cols(10);
-    for i in 0..10 {
-        expected.add_row(i, [(i, R.one())].into_iter());
-    }
 
     for block_size in 1..15 {
         let mut actual = SparseMatrixBuilder::new(&R);
@@ -827,28 +788,21 @@ fn test_gb_sparse_row_echelon_large() {
         for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), block_size) {
             actual.add_row(actual.row_count(), row.into_iter());
         }
-        assert_is_correct_row_echelon(R, expected.clone_matrix(R), &actual);
+        assert_is_correct_row_echelon(R, &matrix, &actual);
     }
 }
 
 #[test]
 fn test_gb_sparse_row_echelon_local_ring() {
-    let R = Zn::<18>::RING;
+    let R = Zn::<8>::RING;
     let sparsify = |row: [u64; 5]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));
 
     let mut matrix: SparseMatrixBuilder<_> = SparseMatrixBuilder::new(&R);
     matrix.add_cols(5);
-    matrix.add_row(0, sparsify([9, 3, 0, 1, 1]));
-    matrix.add_row(1, sparsify([6, 13, 0, 0, 1]));
-    matrix.add_row(2, sparsify([0, 0, 11, 0, 1]));
-    matrix.add_row(3, sparsify([0, 12, 0, 0, 1]));
-
-    let mut expected = SparseMatrixBuilder::new(&R);
-    expected.add_cols(5);
-    expected.add_row(0, sparsify([3, 8, 0, 1, 0]));
-    expected.add_row(1, sparsify([0, 3, 0,16,14]));
-    expected.add_row(2, sparsify([0, 0,11, 0, 1]));
-    expected.add_row(3, sparsify([0, 0, 0, 8, 5]));
+    matrix.add_row(0, sparsify([4, 4, 6, 5, 4]));
+    matrix.add_row(1, sparsify([5, 0, 6, 2, 1]));
+    matrix.add_row(2, sparsify([2, 0, 7, 1, 5]));
+    matrix.add_row(3, sparsify([3, 4, 3, 2, 5]));
 
     for block_size in 1..10 {
         let mut actual = SparseMatrixBuilder::new(&R);
@@ -856,7 +810,9 @@ fn test_gb_sparse_row_echelon_local_ring() {
         for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), block_size) {
             actual.add_row(actual.row_count(), row.into_iter());
         }
-        assert_is_correct_row_echelon(R, expected.clone_matrix(R), &actual);
+        println!("{}", actual.format(&R));
+        println!();
+        assert_is_correct_row_echelon(R, &matrix, &actual);
     }
 }
 
@@ -872,19 +828,12 @@ fn test_gb_sparse_row_echelon_no_field() {
     matrix.add_row(2, sparsify([0, 0, 11, 0, 1]));
     matrix.add_row(3, sparsify([0, 12, 0, 0, 1]));
 
-    let mut expected = SparseMatrixBuilder::new(&R);
-    expected.add_cols(5);
-    expected.add_row(0, sparsify([3, 8, 0, 1, 0]));
-    expected.add_row(1, sparsify([0, 3, 0, 16, 14]));
-    expected.add_row(2, sparsify([0, 0, 11, 0, 1]));
-    expected.add_row(3, sparsify([0, 0, 0, 8, 5]));
-
     for block_size in 1..10 {
         let mut actual = SparseMatrixBuilder::new(&R);
         actual.add_cols(5);
         for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), block_size) {
             actual.add_row(actual.row_count(), row.into_iter());
         }
-        assert_is_correct_row_echelon(R, expected.clone_matrix(R), &actual);
+        assert_is_correct_row_echelon(R, &matrix, &actual);
     }
 }
