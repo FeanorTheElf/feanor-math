@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::ring::*;
 use crate::primitive_int::{StaticRingBase, StaticRing};
 
@@ -640,5 +642,54 @@ impl<'a, S, R, H> Homomorphism<S, R> for &'a H
 
     fn mul_assign_map_ref(&self, lhs: &mut <R as RingBase>::Element, rhs: &<S as RingBase>::Element) {
         (*self).mul_assign_map_ref(lhs, rhs)
+    }
+}
+
+pub struct ComposedHom<R, S, T, F, G>
+    where F: Homomorphism<R, S>,
+        G: Homomorphism<S, T>,
+        R: RingBase,
+        S: RingBase,
+        T: RingBase
+{
+    f: F,
+    g: G,
+    domain: PhantomData<R>,
+    intermediate: PhantomData<S>,
+    codomain: PhantomData<T>
+}
+
+impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
+    where F: Homomorphism<R, S>,
+        G: Homomorphism<S, T>,
+        R: RingBase,
+        S: RingBase,
+        T: RingBase
+{
+    type DomainStore = <F as Homomorphism<R, S>>::DomainStore;
+    type CodomainStore = <G as Homomorphism<S, T>>::CodomainStore;
+
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
+        self.f.domain()
+    }
+
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
+        self.g.codomain()
+    }
+
+    fn map(&self, x: <R as RingBase>::Element) -> <T as RingBase>::Element {
+        self.g.map(self.f.map(x))
+    }
+
+    fn map_ref(&self, x: &<R as RingBase>::Element) -> <T as RingBase>::Element {
+        self.g.map(self.f.map_ref(x))
+    }
+
+    fn mul_assign_map(&self, lhs: &mut <T as RingBase>::Element, rhs: <R as RingBase>::Element) {
+        self.g.mul_assign_map(lhs, self.f.map(rhs))
+    }
+
+    fn mul_assign_map_ref(&self, lhs: &mut <T as RingBase>::Element, rhs: &<R as RingBase>::Element) {
+        self.g.mul_assign_map(lhs, self.f.map_ref(rhs))
     }
 }

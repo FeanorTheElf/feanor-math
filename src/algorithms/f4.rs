@@ -1,18 +1,22 @@
 use std::io::Write;
 
+use crate::algorithms::miller_rabin::is_prime;
+use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::field::{FieldStore, Field};
 use crate::homomorphism::Homomorphism;
+use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::ring::*;
 use crate::rings::multivariate::*;
+use crate::rings::zn::{ZnRingStore, ZnRing};
 use crate::vector::*;
 
+use super::int_factor::factor;
 use super::sparse_invert::*;
 
 struct MonomialMap<P, O, K = ()>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
-        <P::Type as RingExtension>::BaseRing: FieldStore,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
+        <P::Type as RingExtension>::BaseRing: RingStore,
         O: MonomialOrder + Copy
 {
     data: Vec<(Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>, K)>,
@@ -26,8 +30,7 @@ enum AddResult<K = ()> {
 impl<P, O, K> MonomialMap<P, O, K>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
-        <P::Type as RingExtension>::BaseRing: FieldStore,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
+        <P::Type as RingExtension>::BaseRing: RingStore,
         O: MonomialOrder + Copy
 {
     fn new(order: O) -> Self {
@@ -89,17 +92,23 @@ impl<P, O, K> MonomialMap<P, O, K>
 fn S<P, O>(ring: P, f1: &El<P>, f2: &El<P>, order: O) -> El<P> 
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
         O: MonomialOrder + Copy
 {
     let f1_lm = ring.lm(f1, order).unwrap();
     let f2_lm = ring.lm(f2, order).unwrap();
-    let lcm = ring.clone_monomial(&f1_lm).lcm(&f2_lm);
-    let f1_factor = ring.clone_monomial(&lcm).div(&f1_lm);
-    let f2_factor = lcm.div(&f2_lm);
+    let mon_lc = ring.clone_monomial(&f1_lm).lcm(&f2_lm);
+    let f1_factor = ring.clone_monomial(&mon_lc).div(&f1_lm);
+    let f2_factor = mon_lc.div(&f2_lm);
+    let f1_lc = ring.coefficient_at(f1, f1_lm);
+    let f2_lc = ring.coefficient_at(f2, f2_lm);
+    let coeff_gcd = ring.base_ring().ideal_gen(f1_lc, f2_lc).2;
     let mut f1_scaled = ring.clone_el(f1);
     ring.mul_monomial(&mut f1_scaled, &f1_factor);
+    ring.inclusion().mul_assign_map(&mut f1_scaled, ring.base_ring().checked_div(f2_lc, &coeff_gcd).unwrap());
     let mut f2_scaled = ring.clone_el(f2);
     ring.mul_monomial(&mut f2_scaled, &f2_factor);
+    ring.inclusion().mul_assign_map(&mut f2_scaled, ring.base_ring().checked_div(f1_lc, &coeff_gcd).unwrap());
     return ring.sub(f1_scaled, f2_scaled);
 }
 
@@ -118,11 +127,38 @@ fn S_deg<P, O>(ring: P, f1: &El<P>, f2: &El<P>, order: O) -> u16
         .max().unwrap_or(0);
 }
 
+fn nil_S<P>(ring: P, p: &El<<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::Integers>, e: usize, f: &El<P>, k: usize) -> El<P> 
+    where P: MultivariatePolyRingStore,
+        P::Type: MultivariatePolyRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing
+{
+    debug_assert!(is_prime(ring.base_ring().integer_ring(), p, 10));
+    debug_assert!(ring.base_ring().integer_ring().eq_el(ring.base_ring().modulus(), &ring.base_ring().integer_ring().pow(ring.base_ring().integer_ring().clone_el(p), e)));
+    let mut result = ring.clone_el(f);
+    let modulo = ring.base_ring().can_hom(ring.base_ring().integer_ring()).unwrap();
+    ring.inclusion().mul_assign_map(&mut result, ring.base_ring().pow(modulo.map_ref(p), k));
+    return result;
+}
+
+fn nil_S_deg<P>(ring: P, p: &El<<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::Integers>, e: usize, f: &El<P>, k: usize) -> u16
+    where P: MultivariatePolyRingStore,
+        P::Type: MultivariatePolyRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing
+{
+    debug_assert!(is_prime(ring.base_ring().integer_ring(), p, 10));
+    debug_assert!(ring.base_ring().integer_ring().eq_el(ring.base_ring().modulus(), &ring.base_ring().integer_ring().pow(ring.base_ring().integer_ring().clone_el(p), e)));
+    let annihilator_gen = ring.base_ring().integer_ring().checked_div(ring.base_ring().modulus(), &ring.base_ring().integer_ring().pow(ring.base_ring().integer_ring().clone_el(p), k)).unwrap();
+    let modulo = ring.base_ring().can_hom(ring.base_ring().integer_ring()).unwrap();
+    let annihilator_gen = modulo.map(annihilator_gen);
+    return ring.terms(f).filter(|(c, _)| ring.base_ring().checked_div(c, &annihilator_gen).is_none())
+        .map(|(_, m)| m.deg()).max().unwrap_or(0);
+}
+
 pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order: O) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
-        <P::Type as RingExtension>::BaseRing: FieldStore + Sync,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
+        <P::Type as RingExtension>::BaseRing: RingStore + Sync,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
         O: MonomialOrder + Copy,
         El<<P::Type as RingExtension>::BaseRing>: Send + Sync
 {
@@ -357,13 +393,106 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Ve
         println!("Redundant S-pairs: {} (prod), {} (chain)", product_criterion_skipped, chain_criterion_skipped);
     }
     return basis;
+} 
+
+///
+/// Works on rings `Z/p^eZ` for `p` a prime.
+/// 
+pub fn f4_local<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Vec<El<P>>
+    where P: MultivariatePolyRingStore,
+        P::Type: MultivariatePolyRing,
+        <P::Type as RingExtension>::BaseRing: ZnRingStore + Sync,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
+        O: MonomialOrder + Copy,
+        El<<P::Type as RingExtension>::BaseRing>: Send + Sync
+{
+    let factorization = factor(ring.base_ring().integer_ring(), ring.base_ring().integer_ring().clone_el(ring.base_ring().modulus()));
+    assert!(factorization.len() == 1);
+    let p = &factorization[0].0;
+    let e = factorization[0].1;
+
+    basis = reduce(&ring, basis, order);
+
+    enum SPoly {
+        Standard(usize, usize), Nilpotent(usize, usize)
+    }
+
+    let select = |s_poly: &SPoly, basis: &[El<P>], degree_bound: u16| match s_poly {
+        SPoly::Standard(i, j) => if S_deg(&ring, &basis[*i], &basis[*j], order) <= degree_bound { Some(S(&ring, &basis[*i], &basis[*j], order)) } else { None },
+        SPoly::Nilpotent(i, k) => if nil_S_deg(&ring, p, e, &basis[*i], *k) <= degree_bound { Some(nil_S(&ring, p, e, &basis[*i], *k)) } else { None }
+    };
+
+    let mut open = (0..basis.len()).flat_map(|i| (0..i).map(move |j: usize| SPoly::Standard(i, j)))
+        .chain((0..basis.len()).flat_map(|i| (0..e).map(move |k: usize| SPoly::Nilpotent(i, k))))
+        .collect::<Vec<_>>();
+    
+    let mut degree_bound = 1;
+    while open.len() > 0 {
+        if LOG {
+            print!("S({})", open.len());
+            std::io::stdout().flush().unwrap();
+        }
+
+        let mut S_polys = Vec::new();
+
+        open.retain(|S_poly| {
+            if let Some(poly) = select(&S_poly, &basis[..], degree_bound) { 
+                S_polys.push(poly);
+                false
+            } else {
+                true
+            }
+        });
+
+        if S_polys.len() == 0 {
+            degree_bound += 1;
+            if LOG {
+                print!("{{{}}}", degree_bound);
+                std::io::stdout().flush().unwrap();
+            }
+            continue;
+        }
+
+        let new_polys: Vec<_> = if S_polys.len() > 20 {
+            reduce_S_matrix(&ring, &S_polys, &basis, order)
+        } else {
+            let start = std::time::Instant::now();
+            let result = S_polys.into_iter().map(|f| multivariate_division(&ring, f, &basis, order)).filter(|f| !ring.is_zero(f)).collect();
+            let end = std::time::Instant::now();
+            print!("[{}ms]", (end - start).as_millis());
+            result
+        };
+
+        if new_polys.len() == 0 {
+            degree_bound += 1;
+            if LOG {
+                print!("{{{}}}", degree_bound);
+                std::io::stdout().flush().unwrap();
+            }
+        } else {
+
+            degree_bound = 0;
+            basis.extend(new_polys.into_iter());
+            basis = reduce(&ring, basis, order);
+
+            open = (0..basis.len()).flat_map(|i| (0..i).map(move |j: usize| SPoly::Standard(i, j)))
+                .chain((0..basis.len()).flat_map(|i| (0..e).map(move |k: usize| SPoly::Nilpotent(i, k))))
+                .collect::<Vec<_>>();
+    
+            if LOG {
+                print!("b({})", basis.len());
+                std::io::stdout().flush().unwrap();
+            }
+        }
+    }
+    return basis;
 }
 
 fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
-        <P::Type as RingExtension>::BaseRing: FieldStore,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
+        <P::Type as RingExtension>::BaseRing: DivisibilityRingStore,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing,
         O: MonomialOrder + Copy
 {
     let mut changed = true;
@@ -372,7 +501,7 @@ fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
         polys.sort_by(|l, r| order.compare(ring.lm(l, order).unwrap(), ring.lm(r, order).unwrap()));
         let mut i = 0;
         while i < polys.len() {
-            let reduced = multivariate_division(&ring, ring.clone_el(&polys[i]), &polys[..i], order);
+            let reduced = multivariate_division(&ring, ring.clone_el(&polys[i]), (&polys[..i]).chain(&polys[(i + 1)..]), order);
             if !ring.is_zero(&reduced) {
                 if !ring.eq_el(&reduced, &polys[i]) {
                     changed = true;
@@ -388,7 +517,9 @@ fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
     for b1 in &polys {
         for b2 in &polys {
             if b1 as *const _ != b2 as *const _ {
-                assert!(!ring.lm(b1, order).unwrap().divides(ring.lm(b2, order).unwrap()));
+                let b1_lm = ring.lm(b1, order).unwrap();
+                let b2_lm = ring.lm(b2, order).unwrap();
+                assert!(!b1_lm.divides(b2_lm) || ring.base_ring().checked_div(ring.coefficient_at(b2, b2_lm), ring.coefficient_at(b1, b1_lm)).is_none());
             }
         }
     }
@@ -398,8 +529,8 @@ fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
 pub fn multivariate_division<P, V, O>(ring: P, mut f: El<P>, set: V, order: O) -> El<P>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
-        <P::Type as RingExtension>::BaseRing: FieldStore,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
+        <P::Type as RingExtension>::BaseRing: DivisibilityRingStore,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing,
         O: MonomialOrder + Copy,
         V: VectorView<El<P>>
 {
@@ -407,19 +538,22 @@ pub fn multivariate_division<P, V, O>(ring: P, mut f: El<P>, set: V, order: O) -
         return f;
     }
     let mut f_lm = ring.clone_monomial(ring.lm(&f, order).unwrap());
+    let mut f_lc = ring.base_ring().clone_el(ring.coefficient_at(&f, &f_lm));
     let incl = ring.inclusion();
-    while let Some(g) = set.iter().filter(|g| ring.lm(g, order).unwrap().divides(&f_lm)).next() {
+    while let Some((quo, g)) = set.iter()
+        .filter(|g| ring.lm(g, order).unwrap().divides(&f_lm))
+        .filter_map(|g| ring.base_ring().checked_div(&f_lc, ring.coefficient_at(g, ring.lm(g, order).unwrap())).map(|quo| (quo, g)))
+        .next()
+    {
         let g_lm = ring.lm(g, order).unwrap();
-        let f_lc = ring.coefficient_at(&f, &f_lm);
-        let g_lc = ring.coefficient_at(&g, &g_lm);
         let div_monomial = f_lm.div(&g_lm);
-        let div_coeff = ring.base_ring().div(&f_lc, &g_lc);
         let mut g_scaled = ring.clone_el(g);
         ring.mul_monomial(&mut g_scaled, &div_monomial);
-        incl.mul_assign_map_ref(&mut g_scaled, &div_coeff);
+        incl.mul_assign_map_ref(&mut g_scaled, &quo);
         ring.sub_assign(&mut f, g_scaled);
         if let Some(m) = ring.lm(&f, order) {
             f_lm = ring.clone_monomial(m);
+            f_lc = ring.base_ring().clone_el(ring.coefficient_at(&f, &f_lm))
         } else {
             return f;
         }
@@ -543,10 +677,6 @@ fn test_f4_larger_elim() {
     ].into_iter());
 
     let actual = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], order);
-    
-    for f in &actual {
-        println!("{}, ", ring.format(f));
-    }
 
     let g1 = ring.from_terms([
         (1, Monomial::new([0, 4, 0])),
@@ -569,7 +699,53 @@ fn test_f4_larger_elim() {
 }
 
 #[test]
-#[ignore]
+fn test_gb_local_ring() {
+    let order = DegRevLex;
+    let base = zn_static::Zn::<16>::RING;
+    let ring: MultivariatePolyRingImpl<_, _, _, 1> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
+    
+    let f = ring.from_terms([(4, Monomial::new([1])), (1, Monomial::new([0]))].into_iter());
+    let gb = f4_local::<_, _, true>(&ring, vec![f], order);
+
+    assert_eq!(1, gb.len());
+    assert_el_eq!(&ring, &ring.one(), &gb[0]);
+}
+
+#[test]
+fn test_gb_local_ring_large() {
+    let order = DegRevLex;
+    let base = zn_static::Zn::<16>::RING;
+    let ring: MultivariatePolyRingImpl<_, _, _, 11> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
+
+    let Y0 = RingElementWrapper::new(&ring, ring.indeterminate(0));
+    let Y1 = RingElementWrapper::new(&ring, ring.indeterminate(1));
+    let Y2 = RingElementWrapper::new(&ring, ring.indeterminate(2));
+    let Y3 = RingElementWrapper::new(&ring, ring.indeterminate(3));
+    let Y4 = RingElementWrapper::new(&ring, ring.indeterminate(4));
+    let Y5 = RingElementWrapper::new(&ring, ring.indeterminate(5));
+    let Y6 = RingElementWrapper::new(&ring, ring.indeterminate(6));
+    let Y7 = RingElementWrapper::new(&ring, ring.indeterminate(7));
+    let Y8 = RingElementWrapper::new(&ring, ring.indeterminate(8));
+    let Y9 = RingElementWrapper::new(&ring, ring.indeterminate(9));
+    let Y10 = RingElementWrapper::new(&ring, ring.indeterminate(10));
+    let Y11 = RingElementWrapper::new(&ring, ring.indeterminate(11));
+    let scalar = |x: i32| RingElementWrapper::new(&ring, ring.int_hom().map(x));
+
+    let system = [
+        Y0.clone() * Y1.clone() * Y2.clone() * Y3.clone().pow(2) * Y4.clone().pow(2) + scalar(4) * Y0.clone() * Y1.clone() * Y2.clone() * Y3.clone() * Y4.clone() * Y5.clone() * Y8.clone() + Y0.clone() * Y1.clone() * Y2.clone() * Y5.clone().pow(2) * Y8.clone().pow(2) + Y0.clone() * Y2.clone() * Y3.clone() * Y4.clone() * Y6.clone() + Y0.clone() * Y1.clone() * Y3.clone() * Y4.clone() * Y7.clone() + Y0.clone() * Y2.clone() * Y5.clone() * Y6.clone() * Y8.clone() + Y0.clone() * Y1.clone() * Y5.clone() * Y7.clone() * Y8.clone() + Y0.clone() * Y2.clone() * Y3.clone() * Y5.clone() * Y10.clone() + Y0.clone() * Y1.clone() * Y3.clone() * Y5.clone() * Y11.clone() + Y0.clone() * Y6.clone() * Y7.clone() + Y3.clone() * Y5.clone() * Y9.clone() - scalar(4),
+        scalar(2) * Y0.clone() * Y1.clone() * Y2.clone() * Y3.clone().pow(2) * Y4.clone() * Y5.clone() + scalar(2) * Y0.clone() * Y1.clone() * Y2.clone() * Y3.clone() * Y5.clone().pow(2) * Y8.clone() + Y0.clone() * Y2.clone() * Y3.clone() * Y5.clone() * Y6.clone() + Y0.clone() * Y1.clone() * Y3.clone() * Y5.clone() * Y7.clone() + scalar(8),
+        Y0.clone() * Y1.clone() * Y2.clone() * Y3.clone().pow(2) * Y5.clone().pow(2) - scalar(5)
+    ].into_iter().map(|f| f.unwrap()).collect::<Vec<_>>();
+
+    let part_of_result = [
+        scalar(4) * Y2.clone().pow(2) * Y6.clone().pow(2) - scalar(4) * Y1.clone().pow(2) * Y7.clone().pow(2),
+        scalar(8) * Y2.clone() * Y6.clone() + scalar(8) * Y1.clone() * Y7.clone()
+    ];
+
+    let gb = f4_local::<_, _, true>(ring, system, order);
+}
+
+#[test]
 fn test_generic_computation() {
     let order = DegRevLex;
     let base = zn_static::F17;
