@@ -219,6 +219,7 @@ fn identity<R>(ring: R, n: usize, mut use_mem: InternalMatrix<El<R>>) -> Interna
     return use_mem;
 }
 
+#[allow(unused)]
 fn increase_square_matrix<R>(ring: R, new_size: usize, matrix: &mut InternalMatrix<El<R>>)
     where R: Copy + RingStore
 {
