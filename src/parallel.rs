@@ -12,11 +12,11 @@ unsafe impl<'a, T> Send for Column<'a, T> {}
 
 impl<'a, T> Column<'a, T> {
 
-    pub fn iter_mut<'b>(&'b mut self) -> impl 'b + Iterator<Item = &'a mut T> {
+    pub fn iter_mut<'b>(&'b mut self) -> impl 'b + ExactSizeIterator<Item = &'a mut T> {
         (0..self.len).map(|i| unsafe { &mut *(*self.pointer.offset(i as isize)).as_mut_ptr().offset(self.col as isize) })
     }
 
-    pub fn iter<'b>(&'b self) -> impl 'b + Clone + Iterator<Item = &'a T> {
+    pub fn iter<'b>(&'b self) -> impl 'b + Clone + ExactSizeIterator<Item = &'a T> {
         (0..self.len).map(|i| unsafe { &*(*self.pointer.offset(i as isize)).as_mut_ptr().offset(self.col as isize) })
     }
 }

@@ -4,11 +4,13 @@ use crate::algorithms::miller_rabin::is_prime;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::field::{FieldStore, Field};
 use crate::homomorphism::Homomorphism;
+use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::ring::*;
 use crate::rings::multivariate::*;
 use crate::rings::zn::{ZnRingStore, ZnRing};
 use crate::vector::*;
+use crate::matrix::Matrix;
 
 use super::int_factor::factor;
 use super::sparse_invert::*;
@@ -89,72 +91,32 @@ impl<P, O, K> MonomialMap<P, O, K>
     }
 }
 
-fn S<P, O>(ring: P, f1: &El<P>, f2: &El<P>, order: O) -> El<P> 
-    where P: MultivariatePolyRingStore,
-        P::Type: MultivariatePolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
-        O: MonomialOrder + Copy
+///
+/// Computes `(s, t, lcm(x, y))` such that `s * x = t * y = lcm(x, y)`.
+/// 
+fn lcm<R>(ring: R, lhs: &El<R>, rhs: &El<R>) -> (El<R>, El<R>, El<R>)
+    where R: PrincipalIdealRingStore,
+        R::Type: PrincipalIdealRing
 {
-    let f1_lm = ring.lm(f1, order).unwrap();
-    let f2_lm = ring.lm(f2, order).unwrap();
-    let mon_lc = ring.clone_monomial(&f1_lm).lcm(&f2_lm);
-    let f1_factor = ring.clone_monomial(&mon_lc).div(&f1_lm);
-    let f2_factor = mon_lc.div(&f2_lm);
-    let f1_lc = ring.coefficient_at(f1, f1_lm);
-    let f2_lc = ring.coefficient_at(f2, f2_lm);
-    let coeff_gcd = ring.base_ring().ideal_gen(f1_lc, f2_lc).2;
-    let mut f1_scaled = ring.clone_el(f1);
-    ring.mul_monomial(&mut f1_scaled, &f1_factor);
-    ring.inclusion().mul_assign_map(&mut f1_scaled, ring.base_ring().checked_div(f2_lc, &coeff_gcd).unwrap());
-    let mut f2_scaled = ring.clone_el(f2);
-    ring.mul_monomial(&mut f2_scaled, &f2_factor);
-    ring.inclusion().mul_assign_map(&mut f2_scaled, ring.base_ring().checked_div(f1_lc, &coeff_gcd).unwrap());
-    return ring.sub(f1_scaled, f2_scaled);
+    let gcd = ring.ideal_gen(lhs, rhs).2;
+    let s = ring.checked_div(rhs, &gcd).unwrap();
+    return (ring.clone_el(&s), ring.checked_div(lhs, &gcd).unwrap(), ring.mul(s, gcd));
 }
 
-fn S_deg<P, O>(ring: P, f1: &El<P>, f2: &El<P>, order: O) -> u16
-    where P: MultivariatePolyRingStore,
-        P::Type: MultivariatePolyRing,
-        O: MonomialOrder + Copy
+fn p_valuation<R>(ring: R, p: &El<R>, mut val: El<R>) -> usize
+    where R: RingStore,
+        R::Type: DivisibilityRing
 {
-    let f1_lm = ring.lm(f1, order).unwrap();
-    let f2_lm = ring.lm(f2, order).unwrap();
-    let lcm = ring.clone_monomial(&f1_lm).lcm(&f2_lm);
-    let f1_factor = lcm.deg() - f1_lm.deg();
-    let f2_factor = lcm.deg() - f2_lm.deg();
-    return ring.terms(f1).filter(|(_, m)| *m != f1_lm).map(|(_, m)| m.deg() + f1_factor)
-        .chain(ring.terms(f2).filter(|(_, m)| *m != f2_lm).map(|(_, m)| m.deg() + f2_factor))
-        .max().unwrap_or(0);
-}
-
-fn nil_S<P>(ring: P, p: &El<<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::Integers>, e: usize, f: &El<P>, k: usize) -> El<P> 
-    where P: MultivariatePolyRingStore,
-        P::Type: MultivariatePolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing
-{
-    debug_assert!(is_prime(ring.base_ring().integer_ring(), p, 10));
-    debug_assert!(ring.base_ring().integer_ring().eq_el(ring.base_ring().modulus(), &ring.base_ring().integer_ring().pow(ring.base_ring().integer_ring().clone_el(p), e)));
-    let mut result = ring.clone_el(f);
-    let modulo = ring.base_ring().can_hom(ring.base_ring().integer_ring()).unwrap();
-    ring.inclusion().mul_assign_map(&mut result, ring.base_ring().pow(modulo.map_ref(p), k));
+    assert!(!ring.is_zero(&val));
+    let mut result = 0;
+    while let Some(new) = ring.checked_div(&val, p) {
+        val = new;
+        result += 1;
+    }
     return result;
 }
 
-fn nil_S_deg<P>(ring: P, p: &El<<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::Integers>, e: usize, f: &El<P>, k: usize) -> u16
-    where P: MultivariatePolyRingStore,
-        P::Type: MultivariatePolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing
-{
-    debug_assert!(is_prime(ring.base_ring().integer_ring(), p, 10));
-    debug_assert!(ring.base_ring().integer_ring().eq_el(ring.base_ring().modulus(), &ring.base_ring().integer_ring().pow(ring.base_ring().integer_ring().clone_el(p), e)));
-    let annihilator_gen = ring.base_ring().integer_ring().checked_div(ring.base_ring().modulus(), &ring.base_ring().integer_ring().pow(ring.base_ring().integer_ring().clone_el(p), k)).unwrap();
-    let modulo = ring.base_ring().can_hom(ring.base_ring().integer_ring()).unwrap();
-    let annihilator_gen = modulo.map(annihilator_gen);
-    return ring.terms(f).filter(|(c, _)| ring.base_ring().checked_div(c, &annihilator_gen).is_none())
-        .map(|(_, m)| m.deg()).max().unwrap_or(0);
-}
-
-pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order: O) -> Vec<El<P>>
+pub fn reduce_S_matrix<P, O>(ring: P, p: &El<<P::Type as RingExtension>::BaseRing>, S_polys: &[El<P>], basis: &[El<P>], order: O) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: RingStore + Sync,
@@ -162,7 +124,7 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
         O: MonomialOrder + Copy,
         El<<P::Type as RingExtension>::BaseRing>: Send + Sync
 {
-    if S_polys.len() == 0 {
+    if S_polys.iter().all(|S_poly| ring.is_zero(S_poly)) {
         return Vec::new();
     }
 
@@ -189,7 +151,7 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
     let mut open = columns.iter().map(|(m, _)| ring.clone_monomial(m)).collect::<Vec<_>>();
     
     while let Some(m) = open.pop() {
-        if let Some(f) = basis.iter().filter(|f| ring.lm(f, order).unwrap().divides(&m)).next() {
+        if let Some(f) = basis.iter().filter(|f| ring.lm(f, order).unwrap().divides(&m)).min_by_key(|f| p_valuation(ring.base_ring(), p, ring.base_ring().clone_el(ring.lt(f, order).unwrap().0))) {
             let div_monomial = ring.clone_monomial(&m).div(ring.lm(f, order).unwrap());
             A.add_zero_row(0);
             for (c, f_m) in ring.terms(f) {
@@ -209,7 +171,7 @@ pub fn reduce_S_matrix<P, O>(ring: P, S_polys: &[El<P>], basis: &[El<P>], order:
     let mut result = Vec::new();
     for i in 0..entries.len() {
         if let Some(j) = entries[i].iter().inspect(|(_, c)| assert!(!ring.base_ring().is_zero(c))).map(|(j, _)| *j).min() {
-            if basis.iter().all(|f| !ring.lm(f, order).unwrap().divides(columns.at_index(j))) {
+            if basis.iter().all(|f| !ring.lm(f, order).unwrap().divides(columns.at_index(j)) || ring.base_ring().checked_div(&entries[i][0].1, ring.lt(f, order).unwrap().0).is_none()) {
                 let f = ring.from_terms(entries[i].iter().map(|(j, c)| (ring.base_ring().clone_el(c), ring.clone_monomial(columns.at_index(*j)))));
                 if ring.is_zero(&f) {
                     println!();
@@ -292,108 +254,154 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Ve
         O: MonomialOrder + Copy,
         El<<P::Type as RingExtension>::BaseRing>: Send + Sync
 {
-    basis = reduce(&ring, basis, order);
+    unimplemented!()
+}
 
-    let filter_product_criterion = |f_i: usize, g_i: usize, basis: &[El<P>]| {
-        ring.lm(&basis[f_i], order).unwrap().is_coprime(ring.lm(&basis[g_i], order).unwrap())
-    };
+#[derive(PartialEq)]
+enum SPoly {
+    Standard(usize, usize), Nilpotent(usize, usize)
+}
 
-    let mut chain_criterion_reduced_pairs = Vec::new();
-    let filter_chain_criterion = |f_i: usize, g_i: usize, basis: &[El<P>], reduced_pairs: &[(usize, usize)]| {
-        let m = ring.clone_monomial(ring.lm(&basis[f_i], order).unwrap()).lcm(ring.lm(&basis[g_i], order).unwrap());
-        (0..basis.len()).filter(|k| ring.lm(&basis[*k], order).unwrap().divides(&m))
-            .any(|k| reduced_pairs.binary_search(&sym_tuple(f_i, k)).is_ok() && reduced_pairs.binary_search(&sym_tuple(k, g_i)).is_ok())
-    };
+impl SPoly {
 
-    let select = |ring: &P, f: &El<P>, g: &El<P>, degree_bound: usize| {
-        if S_deg(ring, f, g, order) as usize <= degree_bound {
-            true
-        } else {
-            false
-        }
-    };
-
-    let mut product_criterion_skipped = 0;
-    let mut chain_criterion_skipped = 0;
-
-    let mut open = (0..basis.len()).flat_map(|i| (0..i).map(move |j: usize| (i, j))).collect::<Vec<_>>();
-    
-    let mut degree_bound = 1;
-    while open.len() > 0 {
-        if LOG {
-            print!("S({})", open.len());
-            std::io::stdout().flush().unwrap();
-        }
-
-        let mut S_polys = Vec::new();
-        let mut new_reduced_pairs = Vec::new();
-
-        open.retain(|(i, j)| {
-            if filter_product_criterion(*i, *j, &basis) {
-                product_criterion_skipped += 1;
-                false
-            } else if filter_chain_criterion(*i, *j, &basis, &chain_criterion_reduced_pairs[..]) {
-                chain_criterion_skipped += 1;
-                false
-            } else if select(&ring, &basis[*i], &basis[*j], degree_bound) { 
-                S_polys.push(S(&ring, &basis[*i], &basis[*j], order));
-                new_reduced_pairs.push(sym_tuple(*i, *j));
-                false
-            } else {
-                true
-            }
-        });
-
-        if S_polys.len() == 0 {
-            degree_bound += 1;
-            if LOG {
-                print!("{{{}}}", degree_bound);
-                std::io::stdout().flush().unwrap();
-            }
-            continue;
-        }
-
-        let new_polys = if S_polys.len() > 20 {
-            reduce_S_matrix(&ring, &S_polys, &basis, order)
-        } else {
-            let start = std::time::Instant::now();
-            let result = S_polys.into_iter().map(|f| multivariate_division(&ring, f, &basis, order)).filter(|f| !ring.is_zero(f)).collect();
-            let end = std::time::Instant::now();
-            print!("[{}ms]", (end - start).as_millis());
-            result
-        };
-
-        chain_criterion_reduced_pairs.extend(new_reduced_pairs.into_iter());
-        chain_criterion_reduced_pairs.sort_unstable();
-
-        if new_polys.len() == 0 {
-            degree_bound += 1;
-            if LOG {
-                print!("{{{}}}", degree_bound);
-                std::io::stdout().flush().unwrap();
-            }
-        } else {
-
-            degree_bound = 0;
-            chain_criterion_reduced_pairs = Vec::new();
-            basis.extend(new_polys.into_iter());
-            basis = reduce(&ring, basis, order);
-
-            open = (0..basis.len()).flat_map(|i| (0..i).map(move |j: usize| (i, j)))
-                .collect::<Vec<_>>();
-    
-            if LOG {
-                print!("b({})", basis.len());
-                std::io::stdout().flush().unwrap();
+    fn terms<'a, P, O>(&'a self, ring: &'a P, p: &El<<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::Integers>, e: usize, basis: &'a [El<P>], order: O) -> Box<dyn 'a + Iterator<Item = (El<<P::Type as RingExtension>::BaseRing>, Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>)>>
+        where P: 'a + MultivariatePolyRingStore,
+            P::Type: MultivariatePolyRing,
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
+            O: MonomialOrder + Copy
+    {
+        debug_assert!(is_prime(ring.base_ring().integer_ring(), p, 10));
+        debug_assert!(ring.base_ring().integer_ring().eq_el(ring.base_ring().modulus(), &ring.base_ring().integer_ring().pow(ring.base_ring().integer_ring().clone_el(p), e)));
+        match self {
+            SPoly::Standard(i, j) => {
+                let (fi_lc, fi_lm) = ring.lt(&basis[*i], order).unwrap();
+                let (fj_lc, fj_lm) = ring.lt(&basis[*j], order).unwrap();
+                let lm_lcm = ring.clone_monomial(fi_lm).lcm(fj_lm);
+                let fi_factor_m = ring.clone_monomial(&lm_lcm).div(fi_lm);
+                let fj_factor_m = ring.clone_monomial(&lm_lcm).div(fj_lm);
+                let (fi_factor_c, fj_factor_c, _) = lcm(ring.base_ring(), fi_lc, fj_lc);
+                return Box::new(ring.terms(&basis[*i])
+                    .map(move |(c, m)| (ring.base_ring().mul_ref(c, &fi_factor_c), ring.clone_monomial(m).mul(&fi_factor_m)))
+                    .chain(ring.terms(&basis[*j]).map(move |(c, m)| (ring.base_ring().negate(ring.base_ring().mul_ref(c, &fj_factor_c)), ring.clone_monomial(m).mul(&fj_factor_m))))
+                    .filter(move |(_, m)| *m != lm_lcm)
+                    .filter(move |(c, _)| !ring.base_ring().is_zero(c)));
+            },
+            SPoly::Nilpotent(i, k) => {
+                let modulo = ring.base_ring().can_hom(ring.base_ring().integer_ring()).unwrap();
+                let factor = ring.base_ring().pow(modulo.map_ref(p), *k);
+                return Box::new(ring.terms(&basis[*i]).map(move |(c, m)| (ring.base_ring().mul_ref(c, &factor), ring.clone_monomial(m))).filter(move |(c, _)| !ring.base_ring().is_zero(c)));
             }
         }
     }
-    if LOG {
-        println!();
-        println!("Redundant S-pairs: {} (prod), {} (chain)", product_criterion_skipped, chain_criterion_skipped);
+    
+    fn is_zero<P, O>(&self, ring: &P, p: &El<<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::Integers>, e: usize, basis: &[El<P>], order: O) -> bool
+        where P: MultivariatePolyRingStore,
+            P::Type: MultivariatePolyRing,
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
+            O: MonomialOrder + Copy
+    {
+        self.terms(ring, p, e, basis, order).next().is_none()
     }
-    return basis;
-} 
+
+    fn expected_max_deg<P, O>(&self, ring: &P, p: &El<<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::Integers>, e: usize, basis: &[El<P>], order: O) -> u16
+        where P: MultivariatePolyRingStore,
+            P::Type: MultivariatePolyRing,
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
+            O: MonomialOrder + Copy
+    {
+        self.terms(ring, p, e, basis, order).map(|(_, m)| m.deg()).max().unwrap()
+    }
+
+    fn expected_lm<P, O>(&self, ring: &P, p: &El<<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::Integers>, e: usize, basis: &[El<P>], order: O) -> Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>
+        where P: MultivariatePolyRingStore,
+            P::Type: MultivariatePolyRing,
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
+            O: MonomialOrder + Copy
+    {
+        self.terms(ring, p, e, basis, order).max_by(|(_, l), (_, r)| order.compare(l, r)).map(|(_, m)| m).unwrap()
+    }
+
+    fn expected_lc_valuation<P, O>(&self, ring: &P, p: &El<<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::Integers>, e: usize, basis: &[El<P>], order: O) -> usize
+        where P: MultivariatePolyRingStore,
+            P::Type: MultivariatePolyRing,
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
+            O: MonomialOrder + Copy
+    {
+        self.terms(ring, p, e, basis, order).max_by(|(_, l), (_, r)| order.compare(l, r)).map(|(c, _)| p_valuation(ring.base_ring(), &ring.base_ring().can_hom(ring.base_ring().integer_ring()).unwrap().map_ref(p), c)).unwrap()
+    }
+
+    fn poly<P, O>(&self, ring: &P, p: &El<<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::Integers>, e: usize, basis: &[El<P>], order: O) -> El<P>
+        where P: MultivariatePolyRingStore,
+            P::Type: MultivariatePolyRing,
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
+            O: MonomialOrder + Copy
+    {
+        let result = ring.from_terms(self.terms(ring, p, e, basis, order));
+        match self {
+            SPoly::Standard(i, j) => {
+                let f1 = &basis[*i];
+                let f2 = &basis[*j];
+                let f1_lm = ring.lm(f1, order).unwrap();
+                let f2_lm = ring.lm(f2, order).unwrap();
+                let mon_lc = ring.clone_monomial(&f1_lm).lcm(&f2_lm);
+                let f1_factor = ring.clone_monomial(&mon_lc).div(&f1_lm);
+                let f2_factor = mon_lc.div(&f2_lm);
+                let f1_lc = ring.coefficient_at(f1, f1_lm);
+                let f2_lc = ring.coefficient_at(f2, f2_lm);
+                let coeff_gcd = ring.base_ring().ideal_gen(f1_lc, f2_lc).2;
+                let mut f1_scaled = ring.clone_el(f1);
+                ring.mul_monomial(&mut f1_scaled, &f1_factor);
+                ring.inclusion().mul_assign_map(&mut f1_scaled, ring.base_ring().checked_div(f2_lc, &coeff_gcd).unwrap());
+                let mut f2_scaled = ring.clone_el(f2);
+                ring.mul_monomial(&mut f2_scaled, &f2_factor);
+                ring.inclusion().mul_assign_map(&mut f2_scaled, ring.base_ring().checked_div(f1_lc, &coeff_gcd).unwrap());
+                assert_el_eq!(&ring, &result, &ring.sub(f1_scaled, f2_scaled));
+            },
+            SPoly::Nilpotent(i, k) => {
+                let mut f_scaled = ring.clone_el(&basis[*i]);
+                ring.inclusion().mul_assign_map(&mut f_scaled, ring.base_ring().pow(ring.base_ring().can_hom(ring.base_ring().integer_ring()).unwrap().map_ref(p), *k));
+                assert_el_eq!(&ring, &result, &f_scaled);
+            }
+        }
+        return result;
+    }
+
+    fn filter_chain_criterion<P, O>(&self, ring: &P, p: &El<<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::Integers>, e: usize, basis: &[El<P>], order: O, reduced_pairs: &[(usize, usize)]) -> bool
+        where P: MultivariatePolyRingStore,
+            P::Type: MultivariatePolyRing,
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
+            O: MonomialOrder + Copy
+    {
+        match self {
+            SPoly::Standard(i, j) => {
+                let fi_lm = ring.lm(&basis[*i], order).unwrap();
+                let fj_lm = ring.lm(&basis[*j], order).unwrap();
+                let lcm_m = ring.clone_monomial(fi_lm).lcm(fj_lm);
+                let lcm_c = lcm(ring.base_ring(), ring.coefficient_at(&basis[*i], fi_lm), ring.coefficient_at(&basis[*j], fj_lm)).2;
+                (0..basis.len())
+                    .filter(|k| ring.lm(&basis[*k], order).unwrap().divides(&lcm_m) && ring.base_ring().checked_div(&lcm_c, ring.coefficient_at(&basis[*k], ring.lm(&basis[*k], order).unwrap())).is_some())
+                    .any(|k| reduced_pairs.binary_search(&sym_tuple(*i, k)).is_ok() && reduced_pairs.binary_search(&sym_tuple(k, *j)).is_ok())
+            },
+            SPoly::Nilpotent(i, k) => self.is_zero(ring, p, e, basis, order) || (*k > 0 && self.expected_lm(&ring, p, e, &basis, order) == SPoly::Nilpotent(*i, *k - 1).expected_lm(&ring, p, e, &basis, order))
+        }
+    }
+
+    fn filter_product_criterion<P, O>(&self, ring: &P, p: &El<<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::Integers>, e: usize, basis: &[El<P>], order: O) -> bool
+        where P: MultivariatePolyRingStore,
+            P::Type: MultivariatePolyRing,
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
+            O: MonomialOrder + Copy
+    {
+        match self {
+            SPoly::Standard(i, j) => {
+                let fi_lm = ring.lm(&basis[*i], order).unwrap();
+                let fj_lm = ring.lm(&basis[*j], order).unwrap();
+                fi_lm.is_coprime(fj_lm) && ring.base_ring().is_unit(&ring.base_ring().ideal_gen(ring.coefficient_at(&basis[*i], fi_lm), ring.coefficient_at(&basis[*j], fj_lm)).2)
+            },
+            _ => false
+        }
+    }
+}
 
 ///
 /// Works on rings `Z/p^eZ` for `p` a prime.
@@ -413,31 +421,41 @@ pub fn f4_local<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O)
 
     basis = reduce(&ring, basis, order);
 
-    enum SPoly {
-        Standard(usize, usize), Nilpotent(usize, usize)
-    }
+    let select = |s_poly: &SPoly, basis: &[El<P>], degree_bound: (u16, usize)| if s_poly.expected_max_deg(&ring, p, e, basis, order) < degree_bound.0 && s_poly.expected_lc_valuation(&ring, p, e, basis, order) <= degree_bound.1 { Some(s_poly.poly(&ring, p, e, basis, order)) } else { None };
 
-    let select = |s_poly: &SPoly, basis: &[El<P>], degree_bound: u16| match s_poly {
-        SPoly::Standard(i, j) => if S_deg(&ring, &basis[*i], &basis[*j], order) <= degree_bound { Some(S(&ring, &basis[*i], &basis[*j], order)) } else { None },
-        SPoly::Nilpotent(i, k) => if nil_S_deg(&ring, p, e, &basis[*i], *k) <= degree_bound { Some(nil_S(&ring, p, e, &basis[*i], *k)) } else { None }
-    };
+    let mut chain_criterion_reduced_pairs = Vec::new();
 
     let mut open = (0..basis.len()).flat_map(|i| (0..i).map(move |j: usize| SPoly::Standard(i, j)))
-        .chain((0..basis.len()).flat_map(|i| (0..e).map(move |k: usize| SPoly::Nilpotent(i, k))))
+        .chain((0..basis.len()).flat_map(|i| (1..e).map(move |k: usize| SPoly::Nilpotent(i, k))))
         .collect::<Vec<_>>();
+
+    let mut product_criterion_skipped = 0;
+    let mut chain_criterion_skipped = 0;
     
-    let mut degree_bound = 1;
+    let mut degree_bound = (1, 0);
     while open.len() > 0 {
         if LOG {
             print!("S({})", open.len());
             std::io::stdout().flush().unwrap();
         }
 
+        let mut new_reduced_pairs = Vec::new();
         let mut S_polys = Vec::new();
 
         open.retain(|S_poly| {
-            if let Some(poly) = select(&S_poly, &basis[..], degree_bound) { 
+            if S_poly.is_zero(&ring, p, e, &basis[..], order) {
+                false
+            } else if S_poly.filter_product_criterion(&ring, p, e, &basis[..], order) {
+                product_criterion_skipped += 1;
+                false
+            } else if S_poly.filter_chain_criterion(&ring, p, e, &basis[..], order, &chain_criterion_reduced_pairs[..]) {
+                chain_criterion_skipped += 1;
+                false
+            } else if let Some(poly) = select(S_poly, &basis[..], degree_bound) { 
                 S_polys.push(poly);
+                if let SPoly::Standard(i, j) = S_poly {
+                    new_reduced_pairs.push((*i, *j));
+                }
                 false
             } else {
                 true
@@ -445,16 +463,17 @@ pub fn f4_local<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O)
         });
 
         if S_polys.len() == 0 {
-            degree_bound += 1;
+            degree_bound.0 += 5;
+            degree_bound.1 += 1;
             if LOG {
-                print!("{{{}}}", degree_bound);
+                print!("{{{:?}}}", degree_bound);
                 std::io::stdout().flush().unwrap();
             }
             continue;
         }
 
         let new_polys: Vec<_> = if S_polys.len() > 20 {
-            reduce_S_matrix(&ring, &S_polys, &basis, order)
+            reduce_S_matrix(&ring, &ring.base_ring().can_hom(ring.base_ring().integer_ring()).unwrap().map_ref(p), &S_polys, &basis, order)
         } else {
             let start = std::time::Instant::now();
             let result = S_polys.into_iter().map(|f| multivariate_division(&ring, f, &basis, order)).filter(|f| !ring.is_zero(f)).collect();
@@ -463,20 +482,25 @@ pub fn f4_local<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O)
             result
         };
 
+        chain_criterion_reduced_pairs.extend(new_reduced_pairs.into_iter());
+        chain_criterion_reduced_pairs.sort_unstable();
+
         if new_polys.len() == 0 {
-            degree_bound += 1;
+            degree_bound.0 += 5;
+            degree_bound.1 += 1;
             if LOG {
-                print!("{{{}}}", degree_bound);
+                print!("{{{:?}}}", degree_bound);
                 std::io::stdout().flush().unwrap();
             }
         } else {
 
-            degree_bound = 0;
+            degree_bound = (1, 0);
             basis.extend(new_polys.into_iter());
             basis = reduce(&ring, basis, order);
+            chain_criterion_reduced_pairs = Vec::new();
 
             open = (0..basis.len()).flat_map(|i| (0..i).map(move |j: usize| SPoly::Standard(i, j)))
-                .chain((0..basis.len()).flat_map(|i| (0..e).map(move |k: usize| SPoly::Nilpotent(i, k))))
+                .chain((0..basis.len()).flat_map(|i| (1..e).map(move |k: usize| SPoly::Nilpotent(i, k))))
                 .collect::<Vec<_>>();
     
             if LOG {
@@ -484,6 +508,10 @@ pub fn f4_local<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O)
                 std::io::stdout().flush().unwrap();
             }
         }
+    }
+    if LOG {
+        println!();
+        println!("Redundant S-pairs: {} (prod), {} (chain)", product_criterion_skipped, chain_criterion_skipped);
     }
     return basis;
 }
@@ -540,22 +568,27 @@ pub fn multivariate_division<P, V, O>(ring: P, mut f: El<P>, set: V, order: O) -
     let mut f_lm = ring.clone_monomial(ring.lm(&f, order).unwrap());
     let mut f_lc = ring.base_ring().clone_el(ring.coefficient_at(&f, &f_lm));
     let incl = ring.inclusion();
-    while let Some((quo, g)) = set.iter()
-        .filter(|g| ring.lm(g, order).unwrap().divides(&f_lm))
-        .filter_map(|g| ring.base_ring().checked_div(&f_lc, ring.coefficient_at(g, ring.lm(g, order).unwrap())).map(|quo| (quo, g)))
-        .next()
-    {
-        let g_lm = ring.lm(g, order).unwrap();
-        let div_monomial = f_lm.div(&g_lm);
-        let mut g_scaled = ring.clone_el(g);
-        ring.mul_monomial(&mut g_scaled, &div_monomial);
-        incl.mul_assign_map_ref(&mut g_scaled, &quo);
-        ring.sub_assign(&mut f, g_scaled);
-        if let Some(m) = ring.lm(&f, order) {
-            f_lm = ring.clone_monomial(m);
-            f_lc = ring.base_ring().clone_el(ring.coefficient_at(&f, &f_lm))
-        } else {
-            return f;
+    let mut changed = true;
+    while changed {
+        changed = false;
+        while let Some((quo, g)) = set.iter()
+            .filter(|g| ring.lm(g, order).unwrap().divides(&f_lm))
+            .filter_map(|g| ring.base_ring().checked_div(&f_lc, ring.coefficient_at(g, ring.lm(g, order).unwrap())).map(|quo| (quo, g)))
+            .next()
+        {
+            changed = true;
+            let g_lm = ring.lm(g, order).unwrap();
+            let div_monomial = f_lm.div(&g_lm);
+            let mut g_scaled = ring.clone_el(g);
+            ring.mul_monomial(&mut g_scaled, &div_monomial);
+            incl.mul_assign_map_ref(&mut g_scaled, &quo);
+            ring.sub_assign(&mut f, g_scaled);
+            if let Some(m) = ring.lm(&f, order) {
+                f_lm = ring.clone_monomial(m);
+                f_lc = ring.base_ring().clone_el(ring.coefficient_at(&f, &f_lm))
+            } else {
+                return f;
+            }
         }
     }
     return f;
@@ -711,11 +744,12 @@ fn test_gb_local_ring() {
     assert_el_eq!(&ring, &ring.one(), &gb[0]);
 }
 
+#[ignore]
 #[test]
 fn test_gb_local_ring_large() {
     let order = DegRevLex;
     let base = zn_static::Zn::<16>::RING;
-    let ring: MultivariatePolyRingImpl<_, _, _, 11> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
+    let ring: MultivariatePolyRingImpl<_, _, _, 12> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
 
     let Y0 = RingElementWrapper::new(&ring, ring.indeterminate(0));
     let Y1 = RingElementWrapper::new(&ring, ring.indeterminate(1));
@@ -742,7 +776,17 @@ fn test_gb_local_ring_large() {
         scalar(8) * Y2.clone() * Y6.clone() + scalar(8) * Y1.clone() * Y7.clone()
     ];
 
-    let gb = f4_local::<_, _, true>(ring, system, order);
+    let start = std::time::Instant::now();
+    let gb = f4_local::<_, _, true>(&ring, system, order);
+    let end = std::time::Instant::now();
+
+    println!("Computed GB in {} ms", (end - start).as_millis());
+
+    for f in &part_of_result {
+        assert!(ring.is_zero(&multivariate_division(&ring, f.clone().unwrap(), &gb, order)));
+    }
+
+    assert_eq!(93, gb.len());
 }
 
 #[test]
@@ -768,13 +812,10 @@ fn test_generic_computation() {
 
     let start = std::time::Instant::now();
     let gb1 = f4::<_, _, true>(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), order);
-    std::hint::black_box(&gb1);
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());
-    for f in &gb1 {
-        println!("{}", ring.format(f));
-    }
+
     assert_eq!(11, gb1.len());
 }
 

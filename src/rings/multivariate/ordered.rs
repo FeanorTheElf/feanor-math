@@ -449,6 +449,7 @@ impl<R, O, M, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplB
     }
 
     fn indeterminate(&self, i: usize) -> Self::Element {
+        assert!(i < self.indeterminate_len());
         self.memory_provider.get_new_init(1, |_| (
             self.base_ring.one(),
             Monomial::new(std::array::from_fn(|j| if i == j { 1 } else { 0 }))

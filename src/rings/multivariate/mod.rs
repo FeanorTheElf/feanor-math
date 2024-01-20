@@ -90,6 +90,13 @@ pub trait MultivariatePolyRing: RingExtension {
     fn lm<'a, O>(&'a self, f: &'a Self::Element, order: O) -> Option<&'a Monomial<Self::MonomialVector>>
         where O: MonomialOrder;
 
+    fn lt<'a, O>(&'a self, f: &'a Self::Element, order: O) -> Option<(&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)>
+        where O: MonomialOrder
+    {
+        let lm = self.lm(f, order)?;
+        return Some((self.coefficient_at(f, lm), lm));
+    }
+
     ///
     /// Replaces the given indeterminate in the given polynomial by the value `val`.
     /// The implementation is optimized using the facts that only one indeterminate is
@@ -265,6 +272,12 @@ pub trait MultivariatePolyRingStore: RingStore
         where O: MonomialOrder
     {
         self.get_ring().lm(f, order)
+    }
+
+    fn lt<'a, O>(&'a self, f: &'a El<Self>, order: O) -> Option<(&'a El<<Self::Type as RingExtension>::BaseRing>, &'a Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>)>
+        where O: MonomialOrder
+    {
+        self.get_ring().lt(f, order)
     }
 
     fn clone_monomial(&self, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector> {

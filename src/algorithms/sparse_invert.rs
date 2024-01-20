@@ -162,6 +162,7 @@ impl<T> InternalMatrix<T> {
             for i in 0..self.row_count() {
                 for j in 0..self.rows[i].len() {
                     assert!(self.rows[i][j].is_sorted_by_key(|(idx, _)| *idx));
+                    assert!(self.rows[i][j].iter().rev().skip(1).all(|(j, _)| *j < usize::MAX));
                     assert!(self.rows[i][j].iter().rev().skip(1).all(|(_, x)| !ring.is_zero(x)));
                     assert!((1..self.rows[i][j].len()).all(|k| self.rows[i][j][k - 1].0 != self.rows[i][j][k].0));
                     assert!(self.rows[i][j].last().unwrap().0 == usize::MAX);
@@ -218,6 +219,18 @@ fn identity<R>(ring: R, n: usize, mut use_mem: InternalMatrix<El<R>>) -> Interna
     return use_mem;
 }
 
+fn increase_square_matrix<R>(ring: R, new_size: usize, matrix: &mut InternalMatrix<El<R>>)
+    where R: Copy + RingStore
+{
+    matrix.check(ring);
+    let old_size = matrix.rows.len();
+    assert!(old_size <= new_size);
+    for i in old_size..new_size {
+        matrix.rows.push(vec![vec![(i, ring.one()), (usize::MAX, ring.zero())]]);
+    }
+    matrix.check(ring);
+}
+
 #[inline(always)]
 fn add_row_local<R, const LHS_FACTOR_ONE: bool>(ring: R, lhs: &[(usize, El<R>)], rhs: &[(usize, El<R>)], lhs_factor: &El<R>, rhs_factor: &El<R>, mut out: Vec<(usize, El<R>)>) -> Vec<(usize, El<R>)>
     where R: RingStore
@@ -230,15 +243,17 @@ fn add_row_local<R, const LHS_FACTOR_ONE: bool>(ring: R, lhs: &[(usize, El<R>)],
     while lhs_idx + 1 < lhs.len() || rhs_idx + 1 < rhs.len() {
         let lhs_j = lhs[lhs_idx].0;
         let rhs_j = rhs[rhs_idx].0;
-        
+
         match lhs_j.cmp(&rhs_j) {
             Ordering::Less => {
+                debug_assert!(!ring.is_zero(&lhs[lhs_idx].1));
                 let lhs_val = if LHS_FACTOR_ONE {
                     ring.clone_el(&lhs[lhs_idx].1)
                 } else {
                     ring.mul_ref(&lhs[lhs_idx].1, lhs_factor)
                 };
                 if LHS_FACTOR_ONE || !ring.is_zero(&lhs_val) {
+                    debug_assert!(!ring.is_zero(&lhs_val));
                     out.push((lhs_j, lhs_val))
                 };
                 lhs_idx += 1;
@@ -282,7 +297,11 @@ fn linear_combine_rows<'a, R, I>(ring: R, coeffs: &[(usize, El<R>)], mut rows: I
     }
     let mut last_idx = coeffs[0].0;
     rows.advance_by(last_idx).unwrap();
-    out.extend(rows.next().unwrap().iter().map(|(j, c)| (*j, ring.mul_ref(c, &coeffs[0].1))));
+    out.extend(rows.next().unwrap().iter()
+        .map(|(j, c)| (*j, ring.mul_ref(c, &coeffs[0].1)))
+        .filter(|(_, c)| !ring.is_zero(c))
+        .chain([(usize::MAX, ring.zero())].into_iter())
+    );
     tmp.clear();
     let lhs_factor = ring.one();
     for (idx, c) in coeffs[1..(coeffs.len() - 1)].iter() {
@@ -295,12 +314,15 @@ fn linear_combine_rows<'a, R, I>(ring: R, coeffs: &[(usize, El<R>)], mut rows: I
 }
 
 #[inline(always)]
-fn mul_assign<'a, R, I>(ring: R, lhs: &[Vec<(usize, El<R>)>], rhs: I, mut out: Vec<Vec<(usize, El<R>)>>) -> Vec<Vec<(usize, El<R>)>>
+fn mul_assign<'a, R, I>(ring: R, lhs: &InternalMatrix<El<R>>, rhs: I, mut out: Vec<Vec<(usize, El<R>)>>) -> Vec<Vec<(usize, El<R>)>>
     where R: RingStore + Copy,
-        I: Iterator<Item = &'a [(usize, El<R>)]> + Clone,
+        I: ExactSizeIterator<Item = &'a [(usize, El<R>)]> + Clone,
         El<R>: 'a
 {
-    let n = lhs.len();
+    // lhs is n x n
+    // rhs is n x m
+    let n = lhs.rows.len();
+    assert_eq!(rhs.len(), n);
     while out.len() < n {
         out.push(Vec::new());
     }
@@ -310,7 +332,7 @@ fn mul_assign<'a, R, I>(ring: R, lhs: &[Vec<(usize, El<R>)>], rhs: I, mut out: V
     }
     let mut tmp = Vec::new();
     for i in 0..n {
-        out[i] = linear_combine_rows(ring, &lhs[i], rhs.clone(), std::mem::replace(&mut out[i], Vec::new()), &mut tmp);
+        out[i] = linear_combine_rows(ring, &lhs.rows[i][0], rhs.clone(), std::mem::replace(&mut out[i], Vec::new()), &mut tmp);
     }
     return out;
 }
@@ -341,13 +363,14 @@ fn leading_entry_at<'a, T>(matrix: &'a InternalMatrix<T>, row: usize, col: usize
 }
 
 #[inline(never)]
-fn update_rows_with_transform<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, rows_start: usize, pivot_col: usize, transform: &[Vec<(usize, El<R>)>]) 
+fn update_rows_with_transform<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, rows_start: usize, pivot_col: usize, transform: &InternalMatrix<El<R>>) 
     where R: RingStore + Copy + Sync,
         El<R>: Send + Sync
 {
     matrix.check(ring);
+    let rows_end = rows_start + transform.rows.len();
     potential_parallel_for_each(
-        column_iterator(&mut matrix.rows[rows_start..], (pivot_col + 1)..(matrix.global_col_count)), 
+        column_iterator(&mut matrix.rows[rows_start..rows_end], (pivot_col + 1)..(matrix.global_col_count)), 
         || Vec::new(), 
         |tmp, _, rows| 
     {
@@ -413,14 +436,14 @@ fn global_eliminate_row<R>(ring: R, elim_coefficients: &[(usize, El<R>)], pivot_
 /// rows with remaining entries are returned. These rows have to be swapped into the 
 /// local block and the whole operation must be performed again.
 /// 
-fn eliminate_exterior_rows_optimistic<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, rows_start: usize, rows_end: usize, pivot_rows_start: usize, pivot_rows_end: usize, pivot_cols_end: usize, global_col: usize) -> Option<usize>
+fn eliminate_exterior_rows_optimistic<R>(ring: R, matrix: &mut InternalMatrix<El<R>>, rows_start: usize, rows_end: usize, pivot_rows_start: usize, pivot_rows_end: usize, pivot_cols_end: usize, global_col: usize) -> impl ExactSizeIterator<Item = usize>
     where R: DivisibilityRingStore + Copy + Sync,
         El<R>: Send + Sync,
         R::Type: DivisibilityRing
 {
     matrix.check(ring);
     if rows_end <= rows_start {
-        return None;
+        return Vec::new().into_iter();
     }
     assert!(rows_start >= pivot_rows_end || pivot_rows_start >= rows_end);
 
@@ -434,23 +457,20 @@ fn eliminate_exterior_rows_optimistic<R>(ring: R, matrix: &mut InternalMatrix<El
         (pivot_rows, &mut work_rows[..(rows_end - rows_start)])
     };
 
-    let unreduced_row_index = AtomicUsize::new(usize::MAX);
+    let unreduced_row_index = (0..=pivot_cols_end).map(|_| AtomicUsize::new(usize::MAX)).collect::<Vec<_>>();
 
     potential_parallel_for_each(work_rows, || (Vec::new(), Vec::new(), Vec::new()), |(coefficients, new_row, tmp), row_index, row| {
         *coefficients = preimage_echelon_form_matrix(ring, pivot_rows, &row[global_col], std::mem::replace(coefficients, Vec::new()), global_col);
         if coefficients.len() > 1 {
             global_eliminate_row(ring, coefficients, pivot_rows, row, global_col, global_col_count, new_row, tmp);
         }
-        if unreduced_row_index.load(std::sync::atomic::Ordering::SeqCst) == usize::MAX && row[global_col][0].0 <= pivot_cols_end {
-            unreduced_row_index.store(row_index, std::sync::atomic::Ordering::SeqCst);
+        let unreduced_j = row[global_col][0].0;
+        if unreduced_j <= pivot_cols_end && unreduced_row_index[unreduced_j].load(std::sync::atomic::Ordering::SeqCst) == usize::MAX{
+            unreduced_row_index[unreduced_j].store(row_index, std::sync::atomic::Ordering::SeqCst);
         }
     });
     matrix.check(ring);
-    if unreduced_row_index.load(std::sync::atomic::Ordering::SeqCst) != usize::MAX {
-        return Some(unreduced_row_index.load(std::sync::atomic::Ordering::SeqCst) + rows_start);
-    } else {
-        return None;
-    }
+    return unreduced_row_index.into_iter().map(|index| index.load(std::sync::atomic::Ordering::SeqCst)).filter(|index| *index != usize::MAX).map(|index| index + rows_start).collect::<Vec<_>>().into_iter();
 }
 
 ///
@@ -566,27 +586,35 @@ fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut InternalMatrix<
 
     let mut pivot_row = 0;
     let mut pivot_col = 0;
-    let row_block = matrix.n + 1;
     let col_block = matrix.n;
     let col_block_count = matrix.global_col_count;
 
     // we have to pad matrix with n zero rows...
-    for _ in 0..row_block {
+    for _ in 0..matrix.n {
         matrix.rows.push((0..col_block_count).map(|_| vec![(usize::MAX, ring.zero())]).collect());
     }
-    
-    while pivot_row + row_block < matrix.row_count() && pivot_col < col_block_count {
-        let mut transform = identity(ring, row_block, empty(row_block, 1, ring.zero()));
-        let new_rows = local_row_echelon_optimistic(ring, matrix, &mut transform, row_block, pivot_row, pivot_col);
 
-        update_rows_with_transform(ring, matrix, pivot_row, pivot_col, &transform.rows.into_iter().map(|r| r.into_iter().next().unwrap()).collect::<Vec<_>>());
-        let reduction_result = eliminate_exterior_rows_optimistic(ring, matrix, pivot_row + row_block, matrix.row_count() - row_block, pivot_row, pivot_row + new_rows, col_block, pivot_col);
+    let mut row_block = matrix.n;
+    let mut transform = identity(ring, row_block, empty(row_block, 1, ring.zero()));
+
+    while pivot_row + row_block < matrix.row_count() && pivot_col < col_block_count {
+        let nonzero_row_count = local_row_echelon_optimistic(ring, matrix, &mut transform, row_block, pivot_row, pivot_col);
+
+        update_rows_with_transform(ring, matrix, pivot_row, pivot_col, &transform);
+        let mut reduction_result = eliminate_exterior_rows_optimistic(ring, matrix, pivot_row + row_block, matrix.row_count() - matrix.n, pivot_row, pivot_row + nonzero_row_count, col_block, pivot_col);
         
-        if let Some(unreduced_row) = reduction_result {
-            matrix.rows.swap(pivot_row + new_rows, unreduced_row);
+        if reduction_result.len() > 0 {
+            row_block = nonzero_row_count + reduction_result.len();
+            transform = identity(ring, row_block, transform);
+            for i in nonzero_row_count..row_block {
+                matrix.rows.swap(pivot_row + i, reduction_result.next().unwrap());
+            }
+            assert!(reduction_result.next().is_none());
         } else {
-            pivot_row += new_rows;
+            pivot_row += nonzero_row_count;
             pivot_col += 1;
+            row_block = matrix.n;
+            transform = identity(ring, row_block, transform);
             if LOG {
                 print!(".");
                 std::io::stdout().flush().unwrap();
