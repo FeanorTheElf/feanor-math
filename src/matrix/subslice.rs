@@ -50,7 +50,7 @@ impl<'a, V, T> Iterator for ColumnMutIter<'a, V, T>
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.data.len > 0 {
-            let result = unsafe { ColumnMut::unsafe_at(NonNull::from(&self.data), 0).as_mut() };
+            let result = unsafe { ColumnMut::raw_at(NonNull::from(&self.data), 0).as_mut() };
             self.data.rows = unsafe { NonNull::new(self.data.rows.as_ptr().offset(1)).unwrap_unchecked() };
             self.data.len -= 1;
             return Some(result);
@@ -113,7 +113,7 @@ impl<'a, V, T> ColumnMut<'a, V, T>
         ColumnMut { entry: PhantomData, rows: self.rows, len: self.len, col_index: self.col_index }
     }
 
-    unsafe fn unsafe_at(this: NonNull<Self>, index: usize) -> NonNull<T> {
+    unsafe fn raw_at(this: NonNull<Self>, index: usize) -> NonNull<T> {
         // the row might be shared, but we only access it via an immutable reference;
         // it must be guaranteed that the `self.col_index`-th entry of `row.get_pointer()`
         // is not shared
@@ -161,7 +161,7 @@ impl<'a, V, T> VectorView<T> for ColumnMut<'a, V, T>
 {
     fn at(&self, i: usize) -> &T {
         assert!(i < self.len);
-        unsafe { Self::unsafe_at(NonNull::from(self), i).as_ref() }
+        unsafe { Self::raw_at(NonNull::from(self), i).as_ref() }
     }
 
     fn len(&self) -> usize {
@@ -173,7 +173,7 @@ impl<'a, V, T> VectorViewMut<T> for ColumnMut<'a, V, T>
     where V: AsPointerToSlice<T>
 {
     fn at_mut(&mut self, i: usize) -> &mut T {
-        unsafe { Self::unsafe_at(NonNull::from(self), i).as_mut() }
+        unsafe { Self::raw_at(NonNull::from(self), i).as_mut() }
     }
 }
 
@@ -215,12 +215,12 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         };
     }
 
-    unsafe fn unsafe_rows(data: NonNull<V>, row_offset: usize) -> NonNull<V> {
+    unsafe fn raw_row_slice(data: NonNull<V>, row_offset: usize) -> NonNull<V> {
         unsafe { NonNull::new(data.as_ptr().offset(row_offset as isize)).unwrap_unchecked() }
     }
 
-    unsafe fn unsafe_row(data: NonNull<V>, row: usize, cols_start: usize, cols_end: usize) -> NonNull<[T]> {
-        let row_ref = unsafe { Self::unsafe_rows(data, row).as_ref() };
+    unsafe fn raw_row(data: NonNull<V>, row: usize, cols_start: usize, cols_end: usize) -> NonNull<[T]> {
+        let row_ref = unsafe { Self::raw_row_slice(data, row).as_ref() };
         let begin_entry = unsafe { NonNull::new(row_ref.get_pointer().as_ptr().offset(cols_start as isize)).unwrap_unchecked() };
         NonNull::slice_from_raw_parts(begin_entry, cols_end - cols_start)
     }
@@ -245,7 +245,7 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
             cols_start: cols.start + self.cols_start,
             entry: PhantomData,
             len: rows.end - rows.start,
-            rows: unsafe { Self::unsafe_rows(self.rows, rows.start) },
+            rows: unsafe { Self::raw_row_slice(self.rows, rows.start) },
         }
     }
 
@@ -256,14 +256,14 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         (
             SubmatrixMut {
                 entry: PhantomData,
-                rows: unsafe { Self::unsafe_rows(self.rows, fst.start) },
+                rows: unsafe { Self::raw_row_slice(self.rows, fst.start) },
                 cols_start: self.cols_start,
                 cols_end: self.cols_end,
                 len: fst.end - fst.start
             },
             SubmatrixMut {
                 entry: PhantomData,
-                rows: unsafe { Self::unsafe_rows(self.rows, snd.start) },
+                rows: unsafe { Self::raw_row_slice(self.rows, snd.start) },
                 cols_start: self.cols_start,
                 cols_end: self.cols_end,
                 len: snd.end - snd.start
@@ -309,7 +309,7 @@ impl<'a, V, T> Index<usize> for SubmatrixMut<'a, V, T>
 
     fn index(&self, index: usize) -> &Self::Output {
         assert!(index < self.len);
-        unsafe { Self::unsafe_row(self.rows, index, self.cols_start, self.cols_end).as_ref() }
+        unsafe { Self::raw_row(self.rows, index, self.cols_start, self.cols_end).as_ref() }
     }
 }
 
@@ -318,7 +318,7 @@ impl<'a, V, T> IndexMut<usize> for SubmatrixMut<'a, V, T>
 {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         assert!(index < self.len);
-        unsafe { Self::unsafe_row(self.rows, index, self.cols_start, self.cols_end).as_mut() }
+        unsafe { Self::raw_row(self.rows, index, self.cols_start, self.cols_end).as_mut() }
     }
 }
 
@@ -326,14 +326,14 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
     where V: AsPointerToSlice<T>
 {
     pub fn row_iter<'b>(&'b self) -> impl 'b + Clone + ExactSizeIterator<Item = &'b [T]> {
-        (0..self.row_count()).map(move |i| unsafe { Self::unsafe_row(self.rows, i, self.cols_start, self.cols_end).as_ref() })
+        (0..self.row_count()).map(move |i| unsafe { Self::raw_row(self.rows, i, self.cols_start, self.cols_end).as_ref() })
     }
 
     pub fn row_iter_mut<'b>(&'b mut self) -> impl 'b + ExactSizeIterator<Item = &'b mut [T]> {
         let data = self.rows;
         let cols_start = self.cols_start;
         let cols_end = self.cols_end;
-        (0..self.row_count()).map(move |i| unsafe { Self::unsafe_row(data, i, cols_start, cols_end).as_mut() })
+        (0..self.row_count()).map(move |i| unsafe { Self::raw_row(data, i, cols_start, cols_end).as_mut() })
     }
 
     pub fn col_iter_mut<'b>(&'b mut self) -> impl 'b + ExactSizeIterator<Item = ColumnMut<'b, V, T>> {
@@ -366,7 +366,7 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         let data: NonZeroIsize = unsafe { std::mem::transmute(self.rows) };
         let cols_start = self.cols_start;
         let cols_end = self.cols_end;
-        <_ as rayon::iter::ParallelIterator>::map(<_ as rayon::iter::IntoParallelIterator>::into_par_iter(0..self.row_count()), move |row| unsafe { Self::unsafe_row(std::mem::transmute(data), row, cols_start, cols_end).as_mut() })
+        <_ as rayon::iter::ParallelIterator>::map(<_ as rayon::iter::IntoParallelIterator>::into_par_iter(0..self.row_count()), move |row| unsafe { Self::raw_row(std::mem::transmute(data), row, cols_start, cols_end).as_mut() })
     }
 
     #[cfg(feature = "parallel")]
