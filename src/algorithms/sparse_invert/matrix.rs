@@ -1,20 +1,20 @@
 
 use std::ops::Range;
 
-use crate::parallel::Column;
+use crate::matrix::subslice::*;
+use crate::vector::vec_fn::{self, IntoVectorFn};
 
 use super::*;
 
 pub struct InternalMatrix<T> {
-    rows: Vec<Vec<InternalRow<T>>>,
-    global_col_count: usize,
+    cols: Vec<Vec<InternalRow<T>>>,
+    row_count: usize,
     n: usize,
     zero: T
 }
 
 pub struct InternalMatrixRef<'a, T> {
-    rows: &'a mut [Vec<InternalRow<T>>],
-    global_cols: Range<usize>
+    data: SubmatrixMut<'a, Vec<InternalRow<T>>, InternalRow<T>>
 }
 
 pub struct InternalRow<T> {
@@ -90,6 +90,7 @@ impl<T> InternalMatrix<T> {
     pub fn from_builder<R: ?Sized>(builder: SparseMatrixBuilder<R>, n: usize, ring: &R) -> InternalMatrix<R::Element>
         where R: RingBase<Element = T>
     {
+        let row_count = builder.row_count();
         let mut inverted_permutation = (0..builder.col_permutation.len()).collect::<Vec<_>>();
         for (i, j) in builder.col_permutation.iter().enumerate() {
             inverted_permutation[*j] = i;
@@ -99,24 +100,24 @@ impl<T> InternalMatrix<T> {
             debug_assert!(builder.col_permutation[inverted_permutation[i]] == i);
         }
         let global_cols = (builder.col_count - 1) / n + 1;
+        let mut cols = (0..global_cols).map(|_| (0..row_count).map(|_| InternalRow::placeholder()).collect::<Vec<_>>()).collect::<Vec<_>>();
+        for (i, row) in builder.rows.into_iter().enumerate() {
+            for (j, c) in row.into_iter() {
+                if !ring.is_zero(&c) {
+                    let col = inverted_permutation[j];
+                    cols[col / n][i].data.push((col % n, c));
+                }
+            }
+            for j in 0..global_cols {
+                cols[j][i].data.sort_by_key(|(j, _)| *j);
+                cols[j][i].data.push((usize::MAX, ring.zero()));
+            }
+        }
         InternalMatrix {
-            global_col_count: global_cols,
+            row_count: row_count,
             n: n,
             zero: builder.zero,
-            rows: builder.rows.into_iter().map(|row| {
-                let mut cols = (0..global_cols).map(|_| InternalRow::placeholder()).collect::<Vec<_>>();
-                for (j, c) in row.into_iter() {
-                    if !ring.is_zero(&c) {
-                        let col = inverted_permutation[j];
-                        cols[col / n].data.push((col % n, c));
-                    }
-                }
-                for i in 0..global_cols {
-                    cols[i].data.sort_by_key(|(j, _)| *j);
-                    cols[i].data.push((usize::MAX, ring.zero()));
-                }
-                cols
-            }).collect()
+            cols: cols
         }
     }
 
@@ -125,19 +126,21 @@ impl<T> InternalMatrix<T> {
     }
 
     pub fn local_row<'a>(&'a self, i: usize, global_j: usize) -> &'a InternalRow<T> {
-        &self.rows[i][global_j]
+        &self.cols[global_j][i]
     }
 
     pub fn local_row_mut<'a>(&'a mut self, i: usize, global_j: usize) -> &'a mut InternalRow<T> {
-        &mut self.rows[i][global_j]
+        &mut self.cols[global_j][i]
     }
 
     pub fn row_count(&self) -> usize {
-        self.rows.len()
+        self.row_count
     }
 
     pub fn swap_rows(&mut self, fst: usize, snd: usize) {
-        self.rows.swap(fst, snd)
+        for col in &mut self.cols {
+            col.swap(fst, snd)
+        }
     }
 
     pub fn check<R>(&self, ring: &R)
@@ -146,54 +149,44 @@ impl<T> InternalMatrix<T> {
     {
         if EXTENSIVE_RUNTIME_ASSERTS {
             for i in 0..self.row_count() {
-                for j in 0..self.rows[i].len() {
+                for j in 0..self.global_col_count() {
                     self.local_row(i, j).check(ring);
                 }
             }
         }
     }
 
-    pub const fn empty(n: usize, global_col_count: usize, zero: T) -> InternalMatrix<T> {
-        InternalMatrix { n: n, global_col_count: global_col_count, rows: Vec::new(), zero: zero }
+    pub const fn empty(n: usize, zero: T) -> InternalMatrix<T> {
+        InternalMatrix { n: n, row_count: 0, cols: Vec::new(), zero: zero }
     }
     
-    pub fn make_identity<R>(mut self, ring: R, n: usize) -> InternalMatrix<El<R>>
+    pub fn make_identity<R>(mut self, ring: R, new_n: usize) -> InternalMatrix<El<R>>
         where R: RingStore,
             R::Type: RingBase<Element = T>
     {
-        while self.rows.len() < n {
-            self.rows.push(Vec::new());
-        }
-        self.rows.truncate(n);
-        for i in 0..n {
-            self.rows[i].resize_with(1, || InternalRow::placeholder());
-            self.rows[i][0].data.clear();
-            self.rows[i][0].data.extend([(i, ring.one()), (usize::MAX, ring.zero())].into_iter());
-        }
-        self.check(&ring);
+        self.n = new_n;
+        self.row_count = new_n;
+        self.cols.clear();
+        self.cols.push((0..new_n).map(|i| InternalRow { data: vec![ (i, ring.one()), (usize::MAX, ring.zero()) ] }).collect());
         return self;
     }
 
     pub fn global_col_count(&self) -> usize {
-        self.global_col_count
+        self.cols.len()
     }
 
     pub fn one_block<'a>(&'a mut self, rows: Range<usize>, global_cols: Range<usize>) -> InternalMatrixRef<'a, T> {
-        InternalMatrixRef { rows: &mut self.rows[rows], global_cols: global_cols }
+        InternalMatrixRef {
+            data: SubmatrixMut::new(&mut self.cols).submatrix(global_cols, rows)
+        }
     }
 
     pub fn two_blocks<'a>(&'a mut self, fst: Range<usize>, snd: Range<usize>, global_cols: Range<usize>) -> (InternalMatrixRef<'a, T>, InternalMatrixRef<'a, T>) {
-        let (fst_rows, snd_rows) = if fst.start >= snd.end {
-            let (snd_rows, fst_rows) = (&mut self.rows[snd.start..fst.end]).split_at_mut(fst.start - snd.start);
-            (fst_rows, &mut snd_rows[..(snd.end - snd.start)])
-        } else {
-            assert!(fst.end <= snd.start);
-            let (fst_rows, snd_rows) = (&mut self.rows[fst.start..snd.end]).split_at_mut(snd.end - fst.start);
-            (&mut fst_rows[..(fst.end - fst.start)], snd_rows)
-        };
-        (
-            InternalMatrixRef { rows: fst_rows, global_cols: global_cols.clone() },
-            InternalMatrixRef { rows: snd_rows, global_cols: global_cols.clone() }
+        let row_count = self.row_count();
+        let (fst, snd) = SubmatrixMut::new(&mut self.cols).submatrix(global_cols, 0..row_count).split_cols(fst, snd);
+        return (
+            InternalMatrixRef { data: fst },
+            InternalMatrixRef { data: snd }
         )
     }
 
@@ -201,69 +194,85 @@ impl<T> InternalMatrix<T> {
         where R: RingStore,
             R::Type: RingBase<Element = T>
     {
-        self.rows.push((0..self.global_col_count).map(|_| InternalRow { data: vec![(usize::MAX, ring.zero())] }).collect())
+        for col in &mut self.cols {
+            col.push(InternalRow { data: vec![ (usize::MAX, ring.zero()) ] });
+        }
+        self.row_count += 1;
     }
 
     pub fn pop_row(&mut self) {
-        self.rows.pop();
+        for col in &mut self.cols {
+            col.pop();
+        }
+        self.row_count -= 1;
     }
 
-    pub fn destruct<R>(self, ring: &R) -> Vec<Vec<(usize, T)>> 
+    pub fn destruct<R>(self, _ring: &R) -> Vec<Vec<(usize, T)>> 
         where R: RingStore,
             R::Type: RingBase<Element = T>
     {
-        let n = self.n();
-        self.rows.into_iter().map(|row| 
-            row.into_iter().enumerate().flat_map(|(i, r)| r.data.into_iter().rev().skip(1).rev().map(move |(j, c)| (j + i * n, c)).inspect(|(_, c)| assert!(!ring.is_zero(c)))).collect()
-        ).collect()
+        let mut result = (0..self.row_count()).map(|_| Vec::new()).collect::<Vec<_>>();
+        for (j, col) in self.cols.into_iter().enumerate() {
+            for (i, local_row) in col.into_iter().enumerate() {
+                for (local_j, x) in local_row.data.into_iter().rev().skip(1).rev() {
+                    result[i].push((local_j + j * self.n, x));
+                }
+            }
+        }
+        return result
     }
 
-    pub fn get_two_rows<'a>(&'a mut self, fst: usize, snd: usize, global_col: usize) -> (&'a mut InternalRow<T>, &'a mut InternalRow<T>) {
-        debug_assert!(snd > fst);
-        let (fst_part, snd_part) = self.rows.split_at_mut(snd);
-        return (&mut fst_part[fst][global_col], &mut snd_part[0][global_col]);
+    pub fn two_rows<'a>(&'a mut self, fst: usize, snd: usize, global_col: usize) -> (&'a mut InternalRow<T>, &'a mut InternalRow<T>) {
+        assert!(fst < snd);
+        let col = &mut self.cols[global_col];
+        let (fst_slice, snd_slice) = (&mut col[fst..=snd]).split_at_mut(snd - fst);
+        return (&mut fst_slice[0], &mut snd_slice[0]);
     }
 }
 
 impl<'b, T> InternalMatrixRef<'b, T> {
 
     pub fn local_row<'a>(&'a self, i: usize, global_j: usize) -> &'a InternalRow<T> {
-        &self.rows[i][global_j]
+        &self.data[global_j][i]
     }
 
+    pub fn row_iter<'a>(&'a self) -> impl 'a + Iterator<Item = impl 'a + vec_fn::VectorFn<&'a InternalRow<T>>> {
+        (0..self.data.col_count()).map(move |i| vec_fn::VectorFn::map((0..self.data.row_count()).into_fn(), move |j| &self.data[j][i]))
+    }
+
+    #[allow(unused)]
+    pub fn row_iter_mut<'a>(&'a mut self) -> impl 'a + Iterator<Item = ColumnMut<'a, Vec<InternalRow<T>>, InternalRow<T>>> {
+        self.data.col_iter_mut()
+    }
+}
+
+impl<'b, T> InternalMatrixRef<'b, T> 
+    where T: Send + Sync
+{
     #[cfg(not(feature = "parallel"))]
-    pub fn col_iter_mut<'a>(&'a mut self) -> impl 'a + Iterator<Item = Column<'a, InternalRow<T>>>
-        where T: Send
-    {
-        column_iterator(&mut *self.rows, self.global_cols.clone())
+    pub fn concurrent_row_iter_mut<'a>(&'a mut self) -> impl 'a + Iterator<Item = ColumnMut<'a, Vec<InternalRow<T>>, InternalRow<T>>> {
+        self.data.concurrent_col_iter_mut()
     }
 
     #[cfg(feature = "parallel")]
-    pub fn col_iter_mut<'a>(&'a mut self) -> impl 'a + rayon::iter::IndexedParallelIterator<Item = Column<'a, InternalRow<T>>>
+    pub fn concurrent_row_iter_mut<'a>(&'a mut self) -> impl 'a + rayon::iter::IndexedParallelIterator<Item = ColumnMut<'a, Vec<InternalRow<T>>, InternalRow<T>>>
         where T: Send
     {
-        column_iterator(&mut *self.rows, self.global_cols.clone())
-    }
-
-    pub fn row_iter<'a>(&'a self) -> impl 'a + Iterator<Item = &'a [InternalRow<T>]> {
-        let cols = self.global_cols.clone();
-        (&*self.rows).into_iter().map(move |row: &'a Vec<InternalRow<T>>| &row[cols.clone()])
+        self.data.concurrent_col_iter_mut()
     }
 
     #[cfg(not(feature = "parallel"))]
-    pub fn row_iter_mut<'a>(&'a mut self) -> impl 'a + Iterator<Item = &'a mut [InternalRow<T>]>
+    pub fn concurrent_col_iter_mut<'a>(&'a mut self) -> impl 'a + Iterator<Item = &'a mut [InternalRow<T>]>
         where T: Send
     {
-        let cols = self.global_cols.clone();
-        (&mut *self.rows).into_iter().map(move |row: &'a mut Vec<InternalRow<T>>| &mut row[cols.clone()])
+        self.data.concurrent_row_iter_mut()
     }
 
     #[cfg(feature = "parallel")]
-    pub fn row_iter_mut<'a>(&'a mut self) -> impl 'a + rayon::iter::IndexedParallelIterator<Item = &'a mut [InternalRow<T>]>
+    pub fn concurrent_col_iter_mut<'a>(&'a mut self) -> impl 'a + rayon::iter::IndexedParallelIterator<Item = &'a mut [InternalRow<T>]>
         where T: Send
     {
-        let cols = self.global_cols.clone();
-        <_ as rayon::iter::IntoParallelIterator>::into_par_iter(&mut *self.rows).map(move |row| &mut row[cols.clone()])
+        self.data.concurrent_row_iter_mut()
     }
 }
 
@@ -271,11 +280,11 @@ impl<R> Matrix<R> for InternalMatrix<R::Element>
     where R: ?Sized + RingBase
 {
     fn row_count(&self) -> usize {
-        self.rows.len()
+        self.row_count
     }
 
     fn col_count(&self) -> usize {
-        self.global_col_count * self.n
+        self.global_col_count() * self.n
     }
 
     fn at(&self, i: usize, j: usize) -> &R::Element {
@@ -283,7 +292,6 @@ impl<R> Matrix<R> for InternalMatrix<R::Element>
     }
 }
 
-#[inline(never)]
 pub fn add_row_local<R, const LHS_FACTOR_ONE: bool>(ring: R, lhs: &InternalRow<El<R>>, rhs: &InternalRow<El<R>>, lhs_factor: &El<R>, rhs_factor: &El<R>, mut out: InternalRow<El<R>>) -> InternalRow<El<R>>
     where R: RingStore
 {
@@ -334,7 +342,6 @@ pub fn add_row_local<R, const LHS_FACTOR_ONE: bool>(ring: R, lhs: &InternalRow<E
     return out;
 }
 
-#[inline(never)]
 pub fn linear_combine_rows<'a, R, I>(ring: R, coeffs: &InternalRow<El<R>>, mut rows: I, mut out: InternalRow<El<R>>, tmp: &mut InternalRow<El<R>>) -> InternalRow<El<R>>
     where R: RingStore + Copy,
         I: Iterator<Item = &'a InternalRow<El<R>>>,
@@ -366,7 +373,6 @@ pub fn linear_combine_rows<'a, R, I>(ring: R, coeffs: &InternalRow<El<R>>, mut r
 /// vector that can be thought of as a "best effort solution". This is important in combination
 /// with the optimistic elimination strategy.
 /// 
-#[inline(never)]
 pub fn preimage_echelon_form_matrix<R>(ring: R, echelon_form_matrix: &InternalMatrixRef<El<R>>, current_row: &InternalRow<El<R>>, mut out: InternalRow<El<R>>) -> InternalRow<El<R>>
     where R: DivisibilityRingStore + Copy,
         R::Type: DivisibilityRing
@@ -376,10 +382,10 @@ pub fn preimage_echelon_form_matrix<R>(ring: R, echelon_form_matrix: &InternalMa
     out = out.make_empty(&ring);
     out.data.pop();
     for (i, row) in echelon_form_matrix.row_iter().enumerate() {
-        let (j, pivot) = &row[0].leading_entry();
-        let mut current = ring.clone_el(current_row.at(*j).unwrap_or(&zero));
+        let (j, pivot) = vec_fn::VectorFn::at(&row, 0).leading_entry();
+        let mut current = ring.clone_el(current_row.at(j).unwrap_or(&zero));
         for (k, c) in out.data.iter().rev().skip(1).rev() {
-            ring.sub_assign(&mut current, ring.mul_ref(c, echelon_form_matrix.local_row(*k, 0).at(*j).unwrap_or(&zero)));
+            ring.sub_assign(&mut current, ring.mul_ref(c, echelon_form_matrix.local_row(*k, 0).at(j).unwrap_or(&zero)));
         }
         if !ring.is_zero(&current) {
             if let Some(quo) = ring.checked_div(&current, pivot) {

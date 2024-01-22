@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+pub mod subslice;
+
 use crate::ring::*;
 
 pub trait Matrix<R>
