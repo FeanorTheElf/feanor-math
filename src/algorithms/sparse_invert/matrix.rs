@@ -4,6 +4,8 @@ use std::ops::Range;
 use crate::matrix::subslice::*;
 use crate::vector::vec_fn::{self, IntoVectorFn};
 
+use self::builder::SparseMatrixBuilder;
+
 use super::*;
 
 pub struct InternalMatrix<T> {
@@ -14,7 +16,8 @@ pub struct InternalMatrix<T> {
 }
 
 pub struct InternalMatrixRef<'a, T> {
-    data: SubmatrixMut<'a, Vec<InternalRow<T>>, InternalRow<T>>
+    data: SubmatrixMut<'a, Vec<InternalRow<T>>, InternalRow<T>>,
+    n: usize
 }
 
 pub struct InternalRow<T> {
@@ -177,7 +180,8 @@ impl<T> InternalMatrix<T> {
 
     pub fn one_block<'a>(&'a mut self, rows: Range<usize>, global_cols: Range<usize>) -> InternalMatrixRef<'a, T> {
         InternalMatrixRef {
-            data: SubmatrixMut::new(&mut self.cols).submatrix(global_cols, rows)
+            data: SubmatrixMut::new(&mut self.cols).submatrix(global_cols, rows),
+            n: self.n
         }
     }
 
@@ -185,8 +189,8 @@ impl<T> InternalMatrix<T> {
         let row_count = self.row_count();
         let (fst, snd) = SubmatrixMut::new(&mut self.cols).submatrix(global_cols, 0..row_count).split_cols(fst, snd);
         return (
-            InternalMatrixRef { data: fst },
-            InternalMatrixRef { data: snd }
+            InternalMatrixRef { data: fst, n: self.n },
+            InternalMatrixRef { data: snd, n: self.n }
         )
     }
 
@@ -207,6 +211,13 @@ impl<T> InternalMatrix<T> {
         self.row_count -= 1;
     }
 
+    pub fn two_local_rows<'a>(&'a mut self, fst: usize, snd: usize, global_col: usize) -> (&'a mut InternalRow<T>, &'a mut InternalRow<T>) {
+        assert!(fst < snd);
+        let col = &mut self.cols[global_col];
+        let (fst_slice, snd_slice) = (&mut col[fst..=snd]).split_at_mut(snd - fst);
+        return (&mut fst_slice[0], &mut snd_slice[0]);
+    }
+
     pub fn destruct<R>(self, _ring: &R) -> Vec<Vec<(usize, T)>> 
         where R: RingStore,
             R::Type: RingBase<Element = T>
@@ -221,23 +232,42 @@ impl<T> InternalMatrix<T> {
         }
         return result
     }
-
-    pub fn two_rows<'a>(&'a mut self, fst: usize, snd: usize, global_col: usize) -> (&'a mut InternalRow<T>, &'a mut InternalRow<T>) {
-        assert!(fst < snd);
-        let col = &mut self.cols[global_col];
-        let (fst_slice, snd_slice) = (&mut col[fst..=snd]).split_at_mut(snd - fst);
-        return (&mut fst_slice[0], &mut snd_slice[0]);
-    }
 }
 
 impl<'b, T> InternalMatrixRef<'b, T> {
+
+    pub fn reborrow<'c>(&'c mut self) -> InternalMatrixRef<'c, T> {
+        InternalMatrixRef {
+            data: self.data.reborrow(),
+            n: self.n
+        }
+    }
+
+    pub fn n(&self) -> usize {
+        self.n
+    }
+
+    pub fn row_count(&self) -> usize {
+        self.data.col_count()
+    }
 
     pub fn local_row<'a>(&'a self, i: usize, global_j: usize) -> &'a InternalRow<T> {
         &self.data[global_j][i]
     }
 
+    pub fn local_row_mut<'a>(&'a mut self, i: usize, global_j: usize) -> &'a mut InternalRow<T> {
+        &mut self.data[global_j][i]
+    }
+
     pub fn row_iter<'a>(&'a self) -> impl 'a + Iterator<Item = impl 'a + vec_fn::VectorFn<&'a InternalRow<T>>> {
         (0..self.data.col_count()).map(move |i| vec_fn::VectorFn::map((0..self.data.row_count()).into_fn(), move |j| &self.data[j][i]))
+    }
+
+    pub fn two_local_rows<'a>(&'a mut self, fst: usize, snd: usize, global_col: usize) -> (&'a mut InternalRow<T>, &'a mut InternalRow<T>) {
+        assert!(fst < snd);
+        let col = &mut self.data[global_col];
+        let (fst_slice, snd_slice) = (&mut col[fst..=snd]).split_at_mut(snd - fst);
+        return (&mut fst_slice[0], &mut snd_slice[0]);
     }
 
     #[allow(unused)]

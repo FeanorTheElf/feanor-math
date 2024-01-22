@@ -173,7 +173,7 @@ pub fn reduce_S_matrix<P, O>(ring: P, p: &Coeff<P>, S_polys: &[El<P>], basis: &[
         }
     }
     let columns_ref = &columns;
-    let mut A = SparseMatrixBuilder::new(&ring.base_ring());
+    let mut A = algorithms::sparse_invert::builder::SparseMatrixBuilder::new(&ring.base_ring());
     for j in 0..columns.len() {
         A.add_col(j);
     }
@@ -205,7 +205,7 @@ pub fn reduce_S_matrix<P, O>(ring: P, p: &Coeff<P>, S_polys: &[El<P>], basis: &[
         }
     }
 
-    let entries = gb_sparse_row_echelon::<_, true>(ring.base_ring(), A, 256);
+    let entries = gb_sparse_row_echelon::<_, true>(ring.base_ring(), A, 512);
 
     let mut result = Vec::new();
     for i in 0..entries.len() {
