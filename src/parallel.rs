@@ -1,28 +1,58 @@
 
 use std::{ops::Range, marker::PhantomData};
 
-pub struct Column<'a, T> {
+use crate::vector::{VectorView, VectorViewMut};
+
+pub struct Column<'a, T>
+    where T: Send
+{
     element: PhantomData<&'a mut T>,
     pointer: *mut Vec<T>,
     col: usize,
     len: usize
 }
 
-unsafe impl<'a, T> Send for Column<'a, T> {}
+unsafe impl<'a, T> Send for Column<'a, T> where T: Send {}
 
-impl<'a, T> Column<'a, T> {
-
+impl<'a, T> Column<'a, T> 
+    where T: Send
+{
     pub fn iter_mut<'b>(&'b mut self) -> impl 'b + ExactSizeIterator<Item = &'a mut T> {
         (0..self.len).map(|i| unsafe { &mut *(*self.pointer.offset(i as isize)).as_mut_ptr().offset(self.col as isize) })
     }
 
     pub fn iter<'b>(&'b self) -> impl 'b + Clone + ExactSizeIterator<Item = &'a T> {
-        (0..self.len).map(|i| unsafe { &*(*self.pointer.offset(i as isize)).as_mut_ptr().offset(self.col as isize) })
+        let self_ref: &'b Self = self;
+        (0..self.len).map(move |i| unsafe { &*(*self.pointer.offset(i as isize)).as_mut_ptr().offset(self.col as isize) })
+    }
+}
+
+impl<'a, T> VectorView<T> for Column<'a, T> 
+    where T: Send
+{
+    fn len(&self) -> usize {
+        self.len
+    }
+
+    fn at(&self, i: usize) -> &T {
+        assert!(i < self.len());
+        unsafe { &*(*self.pointer.offset(i as isize)).as_mut_ptr().offset(self.col as isize) }
+    }
+}
+
+impl<'a, T> VectorViewMut<T> for Column<'a, T>
+    where T: Send
+{
+    fn at_mut(&mut self, i: usize) -> &mut T {
+        assert!(i < self.len());
+        unsafe { &mut *(*self.pointer.offset(i as isize)).as_mut_ptr().offset(self.col as isize) }
     }
 }
 
 #[cfg(not(feature = "parallel"))]
-pub fn column_iterator<'a, T>(data: &'a mut [Vec<T>], cols: Range<usize>) -> impl 'a + Iterator<Item = Column<'a, T>> {
+pub fn column_iterator<'a, T>(data: &'a mut [Vec<T>], cols: Range<usize>) -> impl 'a + Iterator<Item = Column<'a, T>>
+    where T: Send
+{
     assert!(data.len() > 0);
     let col_count = data[0].len();
     let row_count = data.len();

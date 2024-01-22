@@ -367,7 +367,7 @@ impl SPoly {
         }
     }
 
-    fn filter_product_criterion<P, O>(&self, ring: &P, ring_info: &RingInfo<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>, basis: &[El<P>], order: O) -> bool
+    fn filter_product_criterion<P, O>(&self, ring: &P, _ring_info: &RingInfo<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>, basis: &[El<P>], order: O) -> bool
         where P: MultivariatePolyRingStore,
             P::Type: MultivariatePolyRing,
             <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
