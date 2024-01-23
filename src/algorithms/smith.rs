@@ -42,7 +42,7 @@ pub fn pre_smith<R, TL, TR>(ring: R, L: &mut TL, R: &mut TR, A: &mut DenseMatrix
         let mut changed = true;
         while changed {
             changed = false;
-
+            
             // eliminate the column
             for i in (k + 1)..A.row_count() {
                 if ring.is_zero(A.at(i, k)) {
