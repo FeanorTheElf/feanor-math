@@ -42,7 +42,7 @@ pub fn pre_smith<R, TL, TR>(ring: R, L: &mut TL, R: &mut TR, A: &mut DenseMatrix
         let mut changed = true;
         while changed {
             changed = false;
-            
+
             // eliminate the column
             for i in (k + 1)..A.row_count() {
                 if ring.is_zero(A.at(i, k)) {
@@ -90,9 +90,6 @@ pub fn solve_right<R>(A: &mut DenseMatrix<R::Type>, mut rhs: DenseMatrix<R::Type
     assert_eq!(A.row_count(), rhs.row_count());
     let mut R = DenseMatrix::identity(A.col_count(), ring);
     pre_smith(ring, &mut TransformRows(&mut rhs), &mut TransformCols(&mut R), A);
-    println!("{}", A.format(&ring));
-    println!();
-    println!("{}", rhs.format(&ring));
 
     // resize rhs
     for i in A.row_count()..rhs.row_count() {
@@ -112,7 +109,6 @@ pub fn solve_right<R>(A: &mut DenseMatrix<R::Type>, mut rhs: DenseMatrix<R::Type
     for i in 0..min(A.row_count(), A.col_count()) {
         let pivot = if i < A.col_count() { A.at(i, i) } else { &zero };
         for j in 0..rhs.col_count() {
-            // println!("{}, {}, {}, {}, {:?}", i, j, ring.format(rhs.at(i, j)), ring.format(pivot), ring.checked_div(rhs.at(i, j), pivot).as_ref().map(|x| format!("{}", ring.format(x))));
             *rhs.at_mut(i, j) = ring.checked_div(rhs.at(i, j), pivot)?;
         }
     }

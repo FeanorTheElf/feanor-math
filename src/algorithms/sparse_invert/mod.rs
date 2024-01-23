@@ -456,7 +456,6 @@ fn assert_left_equivalent<R>(ring: R, original: &InternalMatrixRef<El<R>>, new: 
             *actual_transposed.at_mut(j, i) = ring.clone_el(<_ as Matrix<R::Type>>::at(new, i, j));
         }
     }
-    println!("{}", original_transposed.format(&ring));
     assert!(smith::solve_right::<&R>(&mut original_transposed.clone_matrix(&ring), actual_transposed.clone_matrix(&ring), &ring).is_some());
     assert!(smith::solve_right::<&R>(&mut actual_transposed.clone_matrix(&ring), original_transposed.clone_matrix(&ring), &ring).is_some());
 }
