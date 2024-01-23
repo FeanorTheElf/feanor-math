@@ -17,11 +17,12 @@ pub struct InternalMatrix<T> {
 
 pub struct InternalMatrixRef<'a, T> {
     data: SubmatrixMut<'a, Vec<InternalRow<T>>, InternalRow<T>>,
-    n: usize
+    n: usize,
+    zero: &'a T
 }
 
 pub struct InternalRow<T> {
-    data: Vec<(usize, T)>
+    pub data: Vec<(usize, T)>
 }
 
 impl<T> InternalRow<T> {
@@ -200,7 +201,8 @@ impl<T> InternalMatrix<T> {
     pub fn block<'a>(&'a mut self, rows: Range<usize>, global_cols: Range<usize>) -> InternalMatrixRef<'a, T> {
         InternalMatrixRef {
             data: SubmatrixMut::new(&mut self.cols).submatrix(global_cols, rows),
-            n: self.n
+            n: self.n,
+            zero: &self.zero
         }
     }
 
@@ -208,8 +210,8 @@ impl<T> InternalMatrix<T> {
         let row_count = self.row_count();
         let (fst, snd) = SubmatrixMut::new(&mut self.cols).submatrix(global_cols, 0..row_count).split_cols(fst, snd);
         return (
-            InternalMatrixRef { data: fst, n: self.n },
-            InternalMatrixRef { data: snd, n: self.n }
+            InternalMatrixRef { data: fst, n: self.n, zero: &self.zero },
+            InternalMatrixRef { data: snd, n: self.n, zero: &self.zero }
         )
     }
 
@@ -217,8 +219,8 @@ impl<T> InternalMatrix<T> {
         let global_col_count = self.global_col_count();
         let (fst, snd) = SubmatrixMut::new(&mut self.cols).submatrix(0..global_col_count, rows).split_cols(fst, snd);
         return (
-            InternalMatrixRef { data: fst, n: self.n },
-            InternalMatrixRef { data: snd, n: self.n }
+            InternalMatrixRef { data: fst, n: self.n,zero: &self.zero },
+            InternalMatrixRef { data: snd, n: self.n,zero: &self.zero }
         )
     }
 
@@ -264,10 +266,23 @@ impl<T> InternalMatrix<T> {
 
 impl<'b, T> InternalMatrixRef<'b, T> {
 
+    pub fn clone_to_owned<R>(&self, ring: &R) -> InternalMatrix<T>
+        where R: RingStore,
+            R::Type: RingBase<Element = T>
+    {
+        InternalMatrix {
+            n: self.n,
+            row_count: self.row_count(),
+            zero: ring.zero(),
+            cols: (0..self.global_col_count()).map(|j| (0..self.row_count()).map(|i| InternalRow { data: self.local_row(i, j).data.iter().map(|(local_j, c)| (*local_j, ring.clone_el(c))).collect() }).collect()).collect()
+        }
+    }
+
     pub fn reborrow<'c>(&'c mut self) -> InternalMatrixRef<'c, T> {
         InternalMatrixRef {
             data: self.data.reborrow(),
-            n: self.n
+            n: self.n,
+            zero: &self.zero
         }
     }
 
@@ -382,7 +397,23 @@ impl<R> Matrix<R> for InternalMatrix<R::Element>
     }
 
     fn col_count(&self) -> usize {
-        self.global_col_count() * self.n
+        self.cols.len() * self.n
+    }
+
+    fn at(&self, i: usize, j: usize) -> &R::Element {
+        self.local_row(i, j / self.n).at(j % self.n).unwrap_or(&self.zero)
+    }
+}
+
+impl<'a, R> Matrix<R> for InternalMatrixRef<'a, R::Element>
+    where R: ?Sized + RingBase
+{
+    fn row_count(&self) -> usize {
+        self.data.col_count()
+    }
+
+    fn col_count(&self) -> usize {
+        self.data.row_count() * self.n
     }
 
     fn at(&self, i: usize, j: usize) -> &R::Element {
