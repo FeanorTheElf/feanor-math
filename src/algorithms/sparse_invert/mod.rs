@@ -8,7 +8,7 @@ use crate::algorithms::sparse_invert::matrix::{linear_combine_rows, preimage_ech
 use crate::matrix::Matrix;
 use crate::parallel::potential_parallel_for_each;
 use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
-use crate::{assert_matrix_eq, ring::*};
+use crate::ring::*;
 use crate::divisibility::*;
 use crate::vector::{vec_fn, VectorView, VectorViewMut};
 
@@ -158,7 +158,7 @@ fn subtract_pivot_rows<R>(ring: R, pivot_rows: &InternalMatrixRef<El<R>>, mut bo
 /// to ensure that the element in the pivot position divides all elements below it. 
 /// 
 #[inline(never)]
-fn local_make_pivot_ideal_gen<R>(ring: R, mut matrix: InternalMatrixRef<El<R>>, mut transform: InternalMatrixRef<El<R>>, local_pivot: (usize, usize), tmp: &mut [InternalRow<El<R>>; 2], original: &InternalMatrix<El<R>>) 
+fn local_make_pivot_ideal_gen<R>(ring: R, mut matrix: InternalMatrixRef<El<R>>, mut transform: InternalMatrixRef<El<R>>, local_pivot: (usize, usize), tmp: &mut [InternalRow<El<R>>; 2]) 
     where R: PrincipalIdealRingStore + Copy,
         R::Type: PrincipalIdealRing
 {
@@ -178,9 +178,6 @@ fn local_make_pivot_ideal_gen<R>(ring: R, mut matrix: InternalMatrixRef<El<R>>, 
                 let (fst_row, snd_row) = transform.two_local_rows(local_pivot.0, i, 0);
                 transform_2d(ring, &local_transform, [fst_row, snd_row], tmp);
                 current = d;
-                
-                let mut original2 = matrix.clone_to_owned(&ring);
-                assert_left_equivalent(&ring, &original2.block(0..256, 0..1), &matrix);
             }
         }
     }
@@ -226,14 +223,13 @@ fn local_row_echelon_optimistic<R>(ring: R, mut matrix: InternalMatrixRef<El<R>>
     where R: RingStore + Copy,
         R::Type: PrincipalIdealRing
 {
-    let original = matrix.clone_to_owned(&ring);
     matrix.check(&ring);
     transform.check(&ring);
     let col_block = matrix.n();
     let mut i = 0;
     let mut tmp = [InternalRow::placeholder(), InternalRow::placeholder()];
     for j in 0..col_block {
-        local_make_pivot_ideal_gen(ring, matrix.reborrow(), transform.reborrow(), (i, j), &mut tmp, &original);
+        local_make_pivot_ideal_gen(ring, matrix.reborrow(), transform.reborrow(), (i, j), &mut tmp);
         if matrix.local_row(i, 0).leading_entry_at(j).is_some() {
             local_eliminate_row(ring, matrix.reborrow(), transform.reborrow(), (i, j), &mut tmp);
             i += 1;
@@ -272,6 +268,7 @@ fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut InternalMatrix<
 
     let row_count = matrix.row_count();
     let global_col_count = matrix.global_col_count();
+    let mut original = matrix.block(0..row_count, 0..global_col_count).clone_to_owned(&ring);
 
     let mut row_block = matrix.n();
     let mut transform = InternalMatrix::empty(ring.zero());
@@ -302,6 +299,8 @@ fn blocked_row_echelon<R, const LOG: bool>(ring: R, matrix: &mut InternalMatrix<
             update_rows_with_transform(ring, matrix.block(pivot_row..(pivot_row + row_block), (pivot_col + 1)..global_col_count), &transform.block(pivot_row..(pivot_row + row_block), 0..1));
             let (pivot_rows, rest) = matrix.split_rows(pivot_row..(pivot_row + row_block), (pivot_row + row_block)..row_count, (pivot_col + 1)..global_col_count);
             subtract_pivot_rows(ring, &pivot_rows, rest, &transform.block((pivot_row + row_block)..row_count, 0..1));
+
+            assert_left_equivalent(&ring, &original.block(0..row_count, 0..global_col_count), &matrix.block(0..row_count, 0..global_col_count));
             pivot_row += nonzero_row_count;
             pivot_col += 1;
             row_block = col_block;
@@ -414,29 +413,6 @@ use crate::rings::zn::zn_static::*;
 use self::builder::SparseMatrixBuilder;
 use self::matrix::{InternalMatrix, InternalRow, add_row_local, InternalMatrixRef};
 
-fn assert_left_equivalent_ex<R>(ring: R, original: &InternalMatrix<El<R>>, new: &InternalMatrixRef<El<R>>)
-    where R: RingStore,
-        R::Type: PrincipalIdealRing
-{
-    use crate::algorithms::smith;
-
-    let n = original.row_count();
-    let m = <_ as Matrix<R::Type>>::col_count(original);
-    assert_eq!(n, new.row_count());
-    assert_eq!(m, <_ as Matrix<R::Type>>::col_count(new));
-
-    let mut original_transposed = smith::DenseMatrix::zero(m, n, &ring);
-    let mut actual_transposed = smith::DenseMatrix::zero(m, n, &ring);
-    for i in 0..n {
-        for j in 0..m {
-            *original_transposed.at_mut(j, i) = ring.clone_el(<_ as Matrix<R::Type>>::at(original, i, j));
-            *actual_transposed.at_mut(j, i) = ring.clone_el(<_ as Matrix<R::Type>>::at(new, i, j));
-        }
-    }
-    assert!(smith::solve_right::<&R>(&mut original_transposed.clone_matrix(&ring), actual_transposed.clone_matrix(&ring), &ring).is_some());
-    assert!(smith::solve_right::<&R>(&mut actual_transposed.clone_matrix(&ring), original_transposed.clone_matrix(&ring), &ring).is_some());
-}
-
 fn assert_left_equivalent<R>(ring: R, original: &InternalMatrixRef<El<R>>, new: &InternalMatrixRef<El<R>>)
     where R: RingStore,
         R::Type: PrincipalIdealRing
@@ -529,6 +505,26 @@ fn test_gb_sparse_row_echelon_4x6() {
         }
         assert_is_correct_row_echelon(R, &matrix, &actual);
     }
+}
+
+#[test]
+fn test_gb_sparse_row_echelon_recompute_pivot() {
+    let R = Zn::<17>::RING;
+    let sparsify = |row: [u64; 3]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));
+    
+    let mut matrix: SparseMatrixBuilder<_> = SparseMatrixBuilder::new(&R);
+    matrix.add_cols(3);
+    matrix.add_row(0, sparsify([0, 1, 1]));
+    matrix.add_row(1, sparsify([0, 0, 0]));
+    matrix.add_row(2, sparsify([0, 1, 0]));
+    matrix.add_row(3, sparsify([1, 0, 0]));
+    
+    let mut actual = SparseMatrixBuilder::new(&R);
+    actual.add_cols(3);
+    for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), 2) {
+        actual.add_row(actual.row_count(), row.into_iter());
+    }
+    assert_is_correct_row_echelon(R, &matrix, &actual);
 }
 
 #[test]
