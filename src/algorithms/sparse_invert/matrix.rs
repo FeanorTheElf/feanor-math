@@ -30,11 +30,16 @@ impl<T> InternalRow<T> {
         self.data.binary_search_by_key(&local_j, |(j, _)| *j).ok().map(|idx| &self.data[idx].1)
     }
 
+    ///
+    /// Creates a new, defined (i.e. no UB) but invalid value for an InternalRow.
+    /// This can be used to temporarily fill a variable, or initialize (e.g. via
+    /// [`make_zero()`]). This function will never allocate memory.
+    /// 
     pub const fn placeholder() -> InternalRow<T> {
         InternalRow { data: Vec::new() }
     }
 
-    pub fn make_empty<R>(mut self, ring: &R) -> InternalRow<T> 
+    pub fn make_zero<R>(mut self, ring: &R) -> InternalRow<T> 
         where R: RingStore,
             R::Type: RingBase<Element = T>
     {
@@ -85,6 +90,14 @@ impl<T> InternalRow<T> {
             .filter(|(_, c)| !ring.is_zero(c))
             .chain([(usize::MAX, ring.zero())].into_iter()));
         return self;
+    }
+
+    pub fn append_one<R>(&mut self, ring: &R, j: usize)
+        where R: RingStore,
+            R::Type: RingBase<Element = T>
+    {
+        self.data.insert(self.data.len() - 1, (j, ring.one()));
+        self.check(ring);
     }
 }
 
@@ -159,35 +172,50 @@ impl<T> InternalMatrix<T> {
         }
     }
 
-    pub const fn empty(n: usize, zero: T) -> InternalMatrix<T> {
-        InternalMatrix { n: n, row_count: 0, cols: Vec::new(), zero: zero }
+    pub const fn empty(zero: T) -> InternalMatrix<T> {
+        InternalMatrix { n: 0, row_count: 0, cols: Vec::new(), zero: zero }
     }
-    
-    pub fn make_identity<R>(mut self, ring: R, new_n: usize) -> InternalMatrix<El<R>>
+
+    pub fn set_n(&mut self, new_n: usize) {
+        self.n = new_n;
+    }
+
+    ///
+    /// This will clear the matrix
+    /// 
+    pub fn clear<R>(&mut self, ring: &R, row_count: usize, global_col_count: usize)
         where R: RingStore,
             R::Type: RingBase<Element = T>
     {
-        self.n = new_n;
-        self.row_count = new_n;
         self.cols.clear();
-        self.cols.push((0..new_n).map(|i| InternalRow { data: vec![ (i, ring.one()), (usize::MAX, ring.zero()) ] }).collect());
-        return self;
+        self.cols.extend((0..global_col_count).map(|_| (0..row_count).map(|_| InternalRow::placeholder()).collect()));
+        self.row_count = row_count;
+        self.block(0..self.row_count(), 0..self.global_col_count()).make_zero(ring);
     }
-
+    
     pub fn global_col_count(&self) -> usize {
         self.cols.len()
     }
 
-    pub fn one_block<'a>(&'a mut self, rows: Range<usize>, global_cols: Range<usize>) -> InternalMatrixRef<'a, T> {
+    pub fn block<'a>(&'a mut self, rows: Range<usize>, global_cols: Range<usize>) -> InternalMatrixRef<'a, T> {
         InternalMatrixRef {
             data: SubmatrixMut::new(&mut self.cols).submatrix(global_cols, rows),
             n: self.n
         }
     }
 
-    pub fn two_blocks<'a>(&'a mut self, fst: Range<usize>, snd: Range<usize>, global_cols: Range<usize>) -> (InternalMatrixRef<'a, T>, InternalMatrixRef<'a, T>) {
+    pub fn split_rows<'a>(&'a mut self, fst: Range<usize>, snd: Range<usize>, global_cols: Range<usize>) -> (InternalMatrixRef<'a, T>, InternalMatrixRef<'a, T>) {
         let row_count = self.row_count();
         let (fst, snd) = SubmatrixMut::new(&mut self.cols).submatrix(global_cols, 0..row_count).split_cols(fst, snd);
+        return (
+            InternalMatrixRef { data: fst, n: self.n },
+            InternalMatrixRef { data: snd, n: self.n }
+        )
+    }
+
+    pub fn split_cols<'a>(&'a mut self, rows: Range<usize>, fst: Range<usize>, snd: Range<usize>) -> (InternalMatrixRef<'a, T>, InternalMatrixRef<'a, T>) {
+        let global_col_count = self.global_col_count();
+        let (fst, snd) = SubmatrixMut::new(&mut self.cols).submatrix(0..global_col_count, rows).split_cols(fst, snd);
         return (
             InternalMatrixRef { data: fst, n: self.n },
             InternalMatrixRef { data: snd, n: self.n }
@@ -251,6 +279,23 @@ impl<'b, T> InternalMatrixRef<'b, T> {
         self.data.col_count()
     }
 
+    pub fn global_col_count(&self) -> usize {
+        self.data.row_count()
+    }
+
+    pub fn check<R>(&self, ring: &R)
+        where R: RingStore,
+            R::Type: RingBase<Element = T>
+    {
+        if EXTENSIVE_RUNTIME_ASSERTS {
+            for i in 0..self.row_count() {
+                for j in 0..self.global_col_count() {
+                    self.local_row(i, j).check(ring);
+                }
+            }
+        }
+    }
+
     pub fn local_row<'a>(&'a self, i: usize, global_j: usize) -> &'a InternalRow<T> {
         &self.data[global_j][i]
     }
@@ -273,6 +318,29 @@ impl<'b, T> InternalMatrixRef<'b, T> {
     #[allow(unused)]
     pub fn row_iter_mut<'a>(&'a mut self) -> impl 'a + Iterator<Item = ColumnMut<'a, Vec<InternalRow<T>>, InternalRow<T>>> {
         self.data.col_iter_mut()
+    }
+
+    pub fn make_zero<R>(&mut self, ring: &R)
+        where R: RingStore,
+            R::Type: RingBase<Element = T>
+    {
+        for i in 0..self.row_count() {
+            for j in 0..self.global_col_count() {
+                *self.local_row_mut(i, j) = std::mem::replace(self.local_row_mut(i, j), InternalRow::placeholder()).make_zero(ring);
+            }
+        }
+    }
+
+    pub fn make_identity<R>(&mut self, ring: &R)
+        where R: RingStore,
+            R::Type: RingBase<Element = T>
+    {
+        assert_eq!(self.row_count(), self.n() * self.global_col_count());
+        self.make_zero(ring);
+        let n = self.n();
+        for i in 0..self.row_count() {
+            self.local_row_mut(i, i / n).data.insert(0, (i % n, ring.one()));
+        }
     }
 }
 
@@ -378,14 +446,14 @@ pub fn linear_combine_rows<'a, R, I>(ring: R, coeffs: &InternalRow<El<R>>, mut r
         El<R>: 'a
 {
     coeffs.check(&ring);
-    out = out.make_empty(&ring);
+    out = out.make_zero(&ring);
     if coeffs.is_empty() {
         return out;
     }
     let mut last_idx = coeffs.leading_entry().0;
     rows.advance_by(last_idx).unwrap();
     out = out.make_multiple(&ring, coeffs.leading_entry().1, rows.next().unwrap());
-    *tmp = std::mem::replace(tmp, InternalRow::placeholder()).make_empty(&ring);
+    *tmp = std::mem::replace(tmp, InternalRow::placeholder()).make_zero(&ring);
     let lhs_factor = ring.one();
     for (idx, c) in coeffs.data[1..(coeffs.data.len() - 1)].iter() {
         rows.advance_by(*idx - last_idx - 1).unwrap();
@@ -409,7 +477,7 @@ pub fn preimage_echelon_form_matrix<R>(ring: R, echelon_form_matrix: &InternalMa
 {
     current_row.check(&ring);
     let zero = ring.zero();
-    out = out.make_empty(&ring);
+    out = out.make_zero(&ring);
     out.data.pop();
     for (i, row) in echelon_form_matrix.row_iter().enumerate() {
         let (j, pivot) = vec_fn::VectorFn::at(&row, 0).leading_entry();
