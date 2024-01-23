@@ -39,29 +39,40 @@ pub fn pre_smith<R, TL, TR>(ring: R, L: &mut TL, R: &mut TR, A: &mut DenseMatrix
     assert!(ring.is_commutative());
 
     for k in 0..min(A.row_count(), A.col_count()) {
-        // eliminate the column
-        for i in (k + 1)..A.row_count() {
-            if let Some(quo) = ring.checked_div(A.at(i, k), A.at(k, k)) {
-                TransformRows(A).subtract(ring.get_ring(), k, i, &quo);
-                L.subtract(ring.get_ring(), k, i, &quo);
-            } else {
-                let (s, t, d) = ring.ideal_gen(A.at(k, k), A.at(i, k));
-                let transform = [s, t, ring.negate(ring.checked_div(A.at(i, k), &d).unwrap()), ring.checked_div(A.at(k, k), &d).unwrap()];
-                TransformRows(A).transform(ring.get_ring(), k, i, &transform);
-                L.transform(ring.get_ring(), k, i, &transform);
+        let mut changed = true;
+        while changed {
+            changed = false;
+            
+            // eliminate the column
+            for i in (k + 1)..A.row_count() {
+                if ring.is_zero(A.at(i, k)) {
+                    continue;
+                } else if let Some(quo) = ring.checked_div(A.at(i, k), A.at(k, k)) {
+                    TransformRows(A).subtract(ring.get_ring(), k, i, &quo);
+                    L.subtract(ring.get_ring(), k, i, &quo);
+                } else {
+                    let (s, t, d) = ring.ideal_gen(A.at(k, k), A.at(i, k));
+                    let transform = [s, t, ring.negate(ring.checked_div(A.at(i, k), &d).unwrap()), ring.checked_div(A.at(k, k), &d).unwrap()];
+                    TransformRows(A).transform(ring.get_ring(), k, i, &transform);
+                    L.transform(ring.get_ring(), k, i, &transform);
+                }
             }
-        }
-        
-        // now eliminate the row
-        for j in (k + 1)..A.col_count() {
-            if let Some(quo) = ring.checked_div(A.at(k, j), A.at(k, k)) {
-                TransformCols(A).subtract(ring.get_ring(), k, j, &quo);
-                R.subtract(ring.get_ring(), k, j, &quo);
-            } else {
-                let (s, t, d) = ring.ideal_gen(A.at(k, k), A.at(k, j));
-                let transform = [s, t, ring.negate(ring.checked_div(A.at(k, j), &d).unwrap()), ring.checked_div(A.at(k, k), &d).unwrap()];
-                TransformCols(A).transform(ring.get_ring(), k, j, &transform);
-                R.transform(ring.get_ring(), k, j, &transform);
+            
+            // now eliminate the row
+            for j in (k + 1)..A.col_count() {
+                if ring.is_zero(A.at(k, j)) {
+                    continue;
+                } else if let Some(quo) = ring.checked_div(A.at(k, j), A.at(k, k)) {
+                    changed = true;
+                    TransformCols(A).subtract(ring.get_ring(), k, j, &quo);
+                    R.subtract(ring.get_ring(), k, j, &quo);
+                } else {
+                    changed = true;
+                    let (s, t, d) = ring.ideal_gen(A.at(k, k), A.at(k, j));
+                    let transform = [s, t, ring.negate(ring.checked_div(A.at(k, j), &d).unwrap()), ring.checked_div(A.at(k, k), &d).unwrap()];
+                    TransformCols(A).transform(ring.get_ring(), k, j, &transform);
+                    R.transform(ring.get_ring(), k, j, &transform);
+                }
             }
         }
     }
@@ -88,9 +99,11 @@ pub fn solve_right<R>(A: &mut DenseMatrix<R::Type>, mut rhs: DenseMatrix<R::Type
             }
         }
     }
+
     let mut data = rhs.data.into_vec();
     data.resize_with(A.col_count() * rhs.col_count, || ring.zero());
     rhs.data = data.into_boxed_slice();
+
 
     let zero = ring.zero();
     for i in 0..min(A.row_count(), A.col_count()) {
@@ -322,4 +335,24 @@ fn test_solve_int() {
     let solution = solve_right(&mut A.clone_matrix(ring), B.clone_matrix(ring), ring).unwrap();
 
     assert_matrix_eq!(&ring, &A.mul(&solution, &ring), &B);
+}
+
+#[test]
+fn test_large() {
+    let ring = zn_static::Zn::<16>::RING;
+    let data_A = [
+        [0, 0, 0, 0, 0, 0, 0, 0,11, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0,10],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ];
+    let mut A = DenseMatrix::zero(6, 11, &ring);
+    for i in 0..6 {
+        for j in 0..11 {
+            *A.at_mut(i, j) = data_A[i][j];
+        }
+    }
+    assert!(solve_right(&mut A.clone_matrix(&ring), A, &ring).is_some());
 }
