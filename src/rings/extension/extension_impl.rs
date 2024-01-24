@@ -85,7 +85,7 @@ pub type FreeAlgebraImpl<R, V, M = DefaultMemoryProvider> = RingValue<FreeAlgebr
 impl<R, V, M> FreeAlgebraImpl<R, V, M>
     where R: RingStore, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
 {
-    pub fn new(base_ring: R, x_pow_rank: V, memory_provider: M) -> FreeAlgebraImpl<R, V, M> {
+    pub const fn new(base_ring: R, x_pow_rank: V, memory_provider: M) -> FreeAlgebraImpl<R, V, M> {
         RingValue::from(FreeAlgebraImplBase {
             base_ring, x_pow_rank, memory_provider
         })
