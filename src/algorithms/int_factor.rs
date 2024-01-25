@@ -9,7 +9,27 @@ use crate::homomorphism::*;
 use crate::integer::*;
 use crate::algorithms;
 use crate::rings::zn::choose_zn_impl;
-use crate::generate_zn_function;
+use crate::rings::zn::ZnOperation;
+use crate::rings::zn::ZnRing;
+use crate::rings::zn::ZnRingStore;
+
+struct ECFactorInt<I>
+    where I: IntegerRingStore,
+        I::Type: IntegerRing 
+{
+    result_ring: I
+}
+
+impl<I> ZnOperation<El<I>> for ECFactorInt<I>
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
+{
+    fn call<R: ZnRingStore>(self, ring: R) -> El<I>
+        where R::Type: ZnRing
+    {
+        int_cast(lenstra_ec_factor(&ring), self.result_ring, ring.integer_ring())
+    }
+}
 
 pub fn is_prime_power<I: IntegerRingStore>(ZZ: &I, n: &El<I>) -> Option<(El<I>, usize)>
     where I::Type: IntegerRing
@@ -96,21 +116,8 @@ pub fn factor<I>(ZZ: &I, mut n: El<I>) -> Vec<(El<I>, usize)>
     }
 
     // then we use EC factor to factor the result
-    let mut m = None;
-    choose_zn_impl(
-        ZZ, 
-        ZZ.clone_el(&n), 
-        generate_zn_function!{ 
-            <{'a}, {I: IntegerRingStore<Type = J>}, {J: ?Sized + IntegerRing}> 
-            [_: &'a mut Option<El<I>> = &mut m, _: &'a I = ZZ] 
-            |ring: R, (result, ZZ): (&mut Option<El<I>>, &I)| {
-                *result = Some(int_cast(
-                    lenstra_ec_factor(&ring), ZZ, ring.integer_ring()
-                ));
-            }
-        }
-    );
-    let m = m.unwrap();
+    let m = choose_zn_impl(ZZ, ZZ.clone_el(&n), ECFactorInt { result_ring: ZZ });
+
     let mut factors1 = factor(ZZ, ZZ.checked_div(&n, &m).unwrap());
     let mut factors2 = factor(ZZ, m);
 

@@ -2,13 +2,26 @@ use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::integer::*;
+use crate::rings::zn::ZnOperation;
 use crate::rings::zn::ZnRing;
 use crate::primitive_int::*;
 use crate::rings::zn::ZnRingStore;
 use crate::rings::zn::choose_zn_impl;
-use crate::generate_zn_function;
 
 use oorandom;
+
+struct CheckIsFieldMillerRabin {
+    probability_param: usize
+}
+
+impl ZnOperation<bool> for CheckIsFieldMillerRabin {
+
+    fn call<R: ZnRingStore>(self, ring: R) -> bool
+        where R::Type: ZnRing
+    {
+        is_prime_base(ring, self.probability_param)
+    }
+}
 
 ///
 /// Miller-Rabin primality test.
@@ -27,19 +40,8 @@ pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
     if ZZ.is_zero(n) || ZZ.is_one(n) {
         false
     } else {
-        let mut result = false;
         let n_copy = ZZ.clone_el(n);
-        choose_zn_impl(
-            ZZ, 
-            n_copy, 
-            generate_zn_function!{ 
-                <{'a}> [_: &'a mut bool = &mut result, _: usize = k] 
-                |ring, (result, k): (&mut bool, usize)| {
-                    *result = is_prime_base(ring, k);
-                }
-            }
-        );
-        return result;
+        choose_zn_impl(ZZ, n_copy, CheckIsFieldMillerRabin { probability_param: k })
     }
 }
 

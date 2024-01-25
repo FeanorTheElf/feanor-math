@@ -269,9 +269,9 @@ impl<R: RingStore> ZnRingStore for R
 /// If you want to avoid the boilerplate code to create such an
 /// object, look at the experimental macro [`generate_zn_function`].
 /// 
-pub trait ZnOperation {
+pub trait ZnOperation<Result> {
     
-    fn call<R: ZnRingStore>(self, ring: R)
+    fn call<R: ZnRingStore>(self, ring: R) -> Result
         where R::Type: ZnRing;
 }
 
@@ -306,6 +306,7 @@ pub trait ZnOperation {
 /// (it violates macro hygenie), but let's be happy that it works, otherwise this would be
 /// impossible.
 /// 
+#[deprecated]
 #[macro_export]
 macro_rules! generate_zn_function {
     (< $({$gen_param:tt $(: $($gen_constraint:tt)*)?}),* > $bindings:tt $lambda:expr) => {
@@ -316,7 +317,7 @@ macro_rules! generate_zn_function {
                 args: $crate::generate_binding_type!{ $bindings }
             }
 
-            impl<$($gen_param),*>  $crate::rings::zn::ZnOperation for LocalZnOperation<$($gen_param),*> 
+            impl<$($gen_param),*>  $crate::rings::zn::ZnOperation<()> for LocalZnOperation<$($gen_param),*> 
                 where $($($gen_param: $($gen_constraint)*,)?)*
             {
                 
@@ -359,15 +360,15 @@ macro_rules! generate_zn_function {
 /// ));
 /// ```
 /// 
-pub fn choose_zn_impl<I, F>(ZZ: I, n: El<I>, f: F)
+pub fn choose_zn_impl<I, F, R>(ZZ: I, n: El<I>, f: F) -> R
     where I: IntegerRingStore,
         I::Type: IntegerRing,
-        F: ZnOperation
+        F: ZnOperation<R>
 {
     if ZZ.abs_highest_set_bit(&n).unwrap_or(0) < 57 {
-        f.call(zn_64::Zn::new(StaticRing::<i64>::RING.coerce(&ZZ, n) as u64));
+        f.call(zn_64::Zn::new(StaticRing::<i64>::RING.coerce(&ZZ, n) as u64))
     } else {
-        f.call(zn_barett::Zn::new(ZZ, n));
+        f.call(zn_barett::Zn::new(ZZ, n))
     }
 }
 

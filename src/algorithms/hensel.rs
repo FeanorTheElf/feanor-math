@@ -15,7 +15,7 @@ use super::int_factor::is_prime_power;
 /// `f = g' h'` with `g', h'` monic polynomials modulo `p^r` that reduce to `g, h`
 /// modulo `p^e`.
 /// 
-pub fn lift_factorization<P, R, S>(target_ring: &P, source_ring: &R, prime_ring: &S, f: &El<P>, factors: (&El<R>, &El<R>)) -> (El<P>, El<P>)
+pub fn hensel_lift<P, R, S>(target_ring: &P, source_ring: &R, prime_ring: &S, f: &El<P>, factors: (&El<R>, &El<R>)) -> (El<P>, El<P>)
     where P: PolyRingStore, P::Type: PolyRing,
         R: PolyRingStore, R::Type: PolyRing,
         S: PolyRingStore, S::Type: PolyRing + EuclideanRing,
@@ -54,19 +54,47 @@ pub fn lift_factorization<P, R, S>(target_ring: &P, source_ring: &R, prime_ring:
     assert!(prime_ring.is_unit(&d));
     let lifted_s = target_ring.from_terms(prime_ring.terms(&prime_ring.checked_div(&s, &d).unwrap()).map(|(c, i)| (pr_to_p.smallest_lift_ref(c), i)));
     let lifted_t = target_ring.from_terms(prime_ring.terms(&prime_ring.checked_div(&t, &d).unwrap()).map(|(c, i)| (pr_to_p.smallest_lift_ref(c), i)));
-    target_ring.println(&lifted_s);
-    target_ring.println(&lifted_t);
 
     let mut current_g = target_ring.from_terms(source_ring.terms(factors.0).map(|(c, i)| (pr_to_pe.smallest_lift_ref(c), i)));
     let mut current_h = target_ring.from_terms(source_ring.terms(factors.1).map(|(c, i)| (pr_to_pe.smallest_lift_ref(c), i)));
+    
     for _ in e..r {
         let delta = target_ring.sub_ref_fst(f, target_ring.mul_ref(&current_g, &current_h));
-        target_ring.println(&delta);
-        target_ring.add_assign(&mut current_g, target_ring.mul_ref(&lifted_t, &delta));
-        target_ring.add_assign(&mut current_h, target_ring.mul_ref(&lifted_s, &delta));
+        let mut delta_g = target_ring.mul_ref(&lifted_t, &delta);
+        let mut delta_h = target_ring.mul_ref(&lifted_s, &delta);
+        delta_g = target_ring.div_rem_monic(delta_g, &current_g).1;
+        delta_h = target_ring.div_rem_monic(delta_h, &current_h).1;
+        target_ring.add_assign(&mut current_g, delta_g);
+        target_ring.add_assign(&mut current_h, delta_h);
+        debug_assert!(target_ring.degree(&current_g).unwrap() == source_ring.degree(&g).unwrap());
+        debug_assert!(target_ring.degree(&current_h).unwrap() == source_ring.degree(&h).unwrap());
     }
     assert_el_eq!(&target_ring, &f, &target_ring.mul_ref(&current_g, &current_h));
     return (current_g, current_h);
+}
+
+///
+/// Like [`hensel_lift()`] but for an arbitrary number of factors.
+/// 
+pub fn hensel_lift_factorization<P, R, S>(target_ring: &P, source_ring: &R, prime_ring: &S, f: &El<P>, factors: &[El<R>]) -> Vec<El<P>>
+    where P: PolyRingStore, P::Type: PolyRing,
+        R: PolyRingStore, R::Type: PolyRing,
+        S: PolyRingStore, S::Type: PolyRing + EuclideanRing,
+        <<P as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
+        <<R as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
+        <<<R as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
+        <<S as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
+        <<<S as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
+{
+    if factors.len() == 1 {
+        return vec![target_ring.clone_el(f)];
+    }
+    let (g, h) = (&factors[0], source_ring.prod(factors[1..].iter().map(|h| source_ring.clone_el(h))));
+    let (g_lifted, h_lifted) = hensel_lift(target_ring, source_ring, prime_ring, &f, (g, &h));
+    let mut result = hensel_lift_factorization(target_ring, source_ring, prime_ring, &h_lifted, &factors[1..]);
+    result.insert(0, g_lifted);
+    return result;
 }
 
 #[cfg(test)]
@@ -87,7 +115,7 @@ fn test_lift_factorization() {
     let g = R.from_terms([(2, 0), (2, 1), (1, 2)].into_iter());
     let h = R.from_terms([(2, 0), (1, 1), (1, 2)].into_iter());
 
-    let (lifted_g, lifted_h) = lift_factorization(&P, &R, &R, &f, (&g, &h));
+    let (lifted_g, lifted_h) = hensel_lift(&P, &R, &R, &f, (&g, &h));
 
     assert_el_eq!(&P, &f, &P.mul_ref(&lifted_g, &lifted_h));
 }
@@ -107,7 +135,7 @@ fn test_lift_factorization_nonfield_base() {
     let g = R.from_terms([(2, 0), (1, 1), (1, 2)].into_iter());
     let h = R.from_terms([(1, 0), (1, 1), (5, 2), (1, 3)].into_iter());
 
-    let (lifted_g, lifted_h) = lift_factorization(&P, &R, &S, &f, (&g, &h));
+    let (lifted_g, lifted_h) = hensel_lift(&P, &R, &S, &f, (&g, &h));
 
     assert_el_eq!(&P, &f, &P.mul_ref(&lifted_g, &lifted_h));
 }
