@@ -99,7 +99,13 @@ pub fn discrete_log<T, F>(value: T, base: &T, order: i64, op: F, identity: T) ->
 pub fn finite_field_log<R: FiniteRingStore>(value: El<R>, base: El<R>, Fq: R) -> Option<i64>
     where R::Type: FiniteRing + Field + HashableElRing
 {
-    discrete_log(RingElementWrapper::new(&Fq, value), &RingElementWrapper::new(&Fq, base), Fq.size(&StaticRing::<i64>::RING) - 1, |a, b| a * b, RingElementWrapper::new(&Fq, Fq.one()))
+    discrete_log(
+        RingElementWrapper::new(&Fq, value), 
+        &RingElementWrapper::new(&Fq, base), 
+        Fq.size(&StaticRing::<i64>::RING).unwrap() - 1, 
+        |a, b| a * b, 
+        RingElementWrapper::new(&Fq, Fq.one())
+    )
 }
 
 #[cfg(test)]

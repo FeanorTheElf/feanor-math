@@ -73,6 +73,12 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD> {
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         write!(out, "{}", *value)
     }
+    
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        self.size(ZZ)
+    }
 }
 
 impl<const N: u64, const IS_FIELD: bool> CanHomFrom<StaticRingBase<i64>> for ZnBase<N, IS_FIELD> {
@@ -204,10 +210,14 @@ impl<const N: u64, const IS_FIELD: bool> FiniteRing for ZnBase<N, IS_FIELD> {
         generic_impls::random_element(self, rng)
     }
 
-    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> El<I>
+    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
-        int_cast(*self.modulus(), ZZ, self.integer_ring())
+        if ZZ.get_ring().representable_bits().is_none() || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits() {
+            Some(int_cast(*self.modulus(), ZZ, self.integer_ring()))
+        } else {
+            None
+        }
     }
 }
 
@@ -253,6 +263,14 @@ fn test_is_prime() {
 }
 
 pub const F17: Fp<17> = Fp::<17>::RING;
+
+#[test]
+fn test_finite_field_axioms() {
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&F17);
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::<128>::RING);
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Fp::<257>::RING);
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::<256>::RING);
+}
 
 #[test]
 fn test_zn_el_add() {

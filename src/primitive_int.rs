@@ -153,6 +153,10 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
             ((((rng() as u128) << u64::BITS as u32) | (rng() as u128)) & ((1 << log2_bound_exclusive) - 1)) as i128
         )
     }
+
+    fn representable_bits(&self) -> Option<usize> {
+        Some(T::bits() - 1)
+    }
 }
 
 impl<T: PrimitiveInt> HashableElRing for StaticRingBase<T> {
@@ -221,6 +225,12 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         write!(out, "{}", *value)
+    }
+    
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+    Some(ZZ.zero())
     }
 }
 

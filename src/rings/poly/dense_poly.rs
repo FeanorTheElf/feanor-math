@@ -1,4 +1,5 @@
 use crate::divisibility::*;
+use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::pid::*;
 use crate::field::Field;
 use crate::default_memory_provider;
@@ -220,6 +221,12 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
         for i in 0..lhs.len() {
             self.base_ring().int_hom().mul_assign_map(lhs.at_mut(i), rhs);
         }
+    }
+    
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        self.base_ring().characteristic(ZZ)
     }
 }
 

@@ -1,6 +1,8 @@
 use std::marker::PhantomData;
 
 use crate::default_memory_provider;
+use crate::integer::IntegerRing;
+use crate::integer::IntegerRingStore;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::mempool::*;
@@ -301,6 +303,12 @@ impl<R, O, M, const N: usize> RingBase for MultivariatePolyRingImplBase<R, O, M,
         }
 
         return Ok(());
+    }
+    
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        self.base_ring().characteristic(ZZ)
     }
 }
 

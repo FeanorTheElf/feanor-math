@@ -13,6 +13,8 @@ pub mod int_factor;
 pub mod cyclotomic;
 pub mod poly_div;
 pub mod cantor_zassenhaus;
+pub mod hensel;
+pub mod poly_factor;
 pub mod discrete_log;
 pub mod f4;
 pub mod sparse_invert;

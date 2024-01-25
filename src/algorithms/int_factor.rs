@@ -11,10 +11,24 @@ use crate::algorithms;
 use crate::rings::zn::choose_zn_impl;
 use crate::generate_zn_function;
 
+pub fn is_prime_power<I: IntegerRingStore>(ZZ: &I, n: &El<I>) -> Option<(El<I>, usize)>
+    where I::Type: IntegerRing
+{
+    if algorithms::miller_rabin::is_prime(ZZ, n, 10) {
+        return Some((ZZ.clone_el(n), 1));
+    }
+    let (p, e) = is_power(ZZ, n)?;
+    if algorithms::miller_rabin::is_prime(ZZ, &p, 10) {
+        return Some((p, e));
+    } else {
+        return None;
+    }
+}
+
 fn is_power<I: IntegerRingStore>(ZZ: &I, n: &El<I>) -> Option<(El<I>, usize)>
     where I::Type: IntegerRing
 {
-    for i in 2..ZZ.abs_log2_ceil(n).unwrap() {
+    for i in (2..ZZ.abs_log2_ceil(n).unwrap()).rev() {
         let root = algorithms::int_bisect::root_floor(ZZ, ZZ.clone_el(n), i);
         if ZZ.eq_el(&ZZ.pow(root, i), n) {
             return Some((algorithms::int_bisect::root_floor(ZZ, ZZ.clone_el(n), i), i));

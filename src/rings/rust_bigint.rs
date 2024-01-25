@@ -203,6 +203,11 @@ impl RingBase for RustBigintRingBase {
         return Ok(());
     }
 
+    fn characteristic<I: IntegerRingStore>(&self, other_ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        Some(other_ZZ.zero())
+    }
 }
 
 impl IntCast<RustBigintRingBase> for RustBigintRingBase {
@@ -368,6 +373,10 @@ impl IntegerRing for RustBigintRingBase {
             let last = rng() & 1u64.overflowing_shl(in_block as u32).0.overflowing_sub(1).0;
             RustBigint(false, (0..blocks).map(|_| rng()).chain(std::iter::once(last)).collect())
         }
+    }
+    
+    fn representable_bits(&self) -> Option<usize> {
+        None
     }
 }
 

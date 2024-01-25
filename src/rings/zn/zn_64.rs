@@ -229,6 +229,12 @@ impl RingBase for ZnBase {
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         write!(out, "{}", self.complete_reduce(value.0))
     }
+    
+    fn characteristic<I: IntegerRingStore>(&self, other_ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        self.size(other_ZZ)
+    }
 }
 
 impl_eq_based_self_iso!{ ZnBase }
@@ -425,10 +431,14 @@ impl FiniteRing for ZnBase {
         super::generic_impls::random_element(self, rng)
     }
 
-    fn size<I: IntegerRingStore>(&self, other_ZZ: &I) -> El<I>
+    fn size<I: IntegerRingStore>(&self, other_ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
-        int_cast(*self.modulus(), other_ZZ, self.integer_ring())
+        if other_ZZ.get_ring().representable_bits().is_none() || self.integer_ring().abs_log2_ceil(&(self.modulus() + 1)) <= other_ZZ.get_ring().representable_bits() {
+            Some(int_cast(*self.modulus(), other_ZZ, self.integer_ring()))
+        } else {
+            None
+        }
     }
 }
 
@@ -726,4 +736,11 @@ fn test_hom_from_fastmul() {
         let Zn_fastmul = ZnFastmul::new(Zn);
         crate::ring::generic_tests::test_hom_axioms(Zn_fastmul, Zn, elements(&Zn).map(|x| Zn_fastmul.coerce(&Zn, x)));
     }
+}
+
+#[test]
+fn test_finite_field_axioms() {
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(128));
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(15));
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(1 << 32));
 }

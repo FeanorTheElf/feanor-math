@@ -1,4 +1,6 @@
 use crate::divisibility::*;
+use crate::integer::IntegerRing;
+use crate::integer::IntegerRingStore;
 use crate::matrix::Matrix;
 use crate::mempool::MemoryProvider;
 use crate::pid::PrincipalIdealRing;
@@ -184,6 +186,12 @@ impl<R, V, M> RingBase for FreeAlgebraImplBase<R, V, M>
 
     fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
         self.mul_assign(lhs, self.from_int(rhs));
+    }
+    
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        self.base_ring().characteristic(ZZ)
     }
 }
 

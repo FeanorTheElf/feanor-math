@@ -260,6 +260,12 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> RingBase for
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         self.total_ring.get_ring().dbg(&RingRef::new(self).can_iso(&self.total_ring).unwrap().map_ref(value), out)
     }
+    
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        self.size(ZZ)
+    }
 }
 
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clone for ZnBase<C, J, M> 
@@ -531,10 +537,14 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FiniteRing f
         ZnEl(self.memory_provider.get_new_init(self.len(), |i| self.at(i).random_element(&mut rng)))
     }
 
-    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> El<I>
+    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
-        int_cast(self.integer_ring().clone_el(self.modulus()), ZZ, self.integer_ring())
+        if ZZ.get_ring().representable_bits().is_none() || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits() {
+            Some(int_cast(self.integer_ring().clone_el(self.modulus()), ZZ, self.integer_ring()))
+        } else {
+            None
+        }
     }
 }
 
@@ -654,4 +664,12 @@ fn test_principal_ideal_ring_axioms() {
         &R,
         [-1, 0, 1, 3, 2, 4, 5, 9, 18, 15, 30].into_iter().map(|x| modulo.map(x))
     );
+}
+
+#[test]
+fn test_finite_field_axioms() {
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![3, 5, 7, 11]));
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![3, 5]));
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![3]));
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![128]));
 }

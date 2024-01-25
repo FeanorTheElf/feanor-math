@@ -316,6 +316,31 @@ pub trait RingBase: PartialEq {
     {
         els.fold(self.one(), |a, b| self.mul(a, b))
     }
+    
+    ///
+    /// Returns the characteristic of this ring as an element of the given
+    /// implementation of `ZZ`. 
+    /// 
+    /// If `None` is returned, this means the given integer ring might not be able
+    /// to represent the characteristic. This must never happen if the given implementation
+    /// of `ZZ` allows for unbounded integers (like [`crate::integer::BigIntRing`]).
+    /// In other cases however, we allow to perform the size check heuristically only,
+    /// so this might return `None` even in some cases where the integer ring would in
+    /// fact be able to represent the characteristic.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::rings::zn::;
+    /// let ZZ = StaticRing::<i16>::RING;
+    /// assert_eq!(Some(0), StaticRing::<i64>::RING.characteristic(&ZZ));
+    /// assert_eq!(None, zn_64::Zn::new(i16::MAX as u64)::RING.characteristic(&ZZ));
+    /// assert_eq!(Some(i16::MAX), zn_64::Zn::new(i16::MAX as u64)::RING.characteristic(&StaticRing::<i16>::RING));
+    /// ```
+    /// 
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing;
 }
 
 ///
@@ -712,6 +737,12 @@ pub trait RingStore: Sized {
     fn println(&self, value: &El<Self>) {
         println!("{}", self.format(value));
     }
+    
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        self.get_ring().characteristic(ZZ)
+    }
 }
 
 ///
@@ -1010,6 +1041,12 @@ fn test_internal_wrappings_dont_matter() {
         fn dbg<'a>(&self, _: &Self::Element, _: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
             Ok(())
         }
+
+        fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+                where I::Type: IntegerRing
+        {
+            Some(ZZ.zero())
+        }
     }
 
     impl_eq_based_self_iso!{ ABase }
@@ -1050,6 +1087,12 @@ fn test_internal_wrappings_dont_matter() {
 
         fn dbg<'a>(&self, _: &Self::Element, _: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
             Ok(())
+        }
+        
+        fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+                where I::Type: IntegerRing
+        {
+            Some(ZZ.zero())
         }
     }
 
@@ -1113,6 +1156,8 @@ fn test_internal_wrappings_dont_matter() {
 
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
+
+    use crate::integer::{int_cast, BigIntRing};
 
     use super::*;
 
@@ -1247,5 +1292,41 @@ pub mod generic_tests {
                     assert!(ring.eq_el(&a_bc, &ab_ac), "Distributivity failed: {} * ({} + {}) = {} != {} = {} * {} + {} * {}", ring.format(a), ring.format(b), ring.format(c), ring.format(&a_bc), ring.format(&ab_ac), ring.format(a), ring.format(b), ring.format(a), ring.format(c));                }
             }
         }
+
+        // check characteristic
+        let ZZbig = BigIntRing::RING;
+        let char = ring.characteristic(&ZZbig).unwrap();
+        
+        if ZZbig.is_geq(&char, &ZZbig.power_of_two(7)) {
+            assert_eq!(None, ring.characteristic(&StaticRing::<i8>::RING));
+        }
+        if ZZbig.is_geq(&char, &ZZbig.power_of_two(15)) {
+            assert_eq!(None, ring.characteristic(&StaticRing::<i16>::RING));
+        }
+        if ZZbig.is_geq(&char, &ZZbig.power_of_two(31)) {
+            assert_eq!(None, ring.characteristic(&StaticRing::<i32>::RING));
+        }
+        if ZZbig.is_geq(&char, &ZZbig.power_of_two(63)) {
+            assert_eq!(None, ring.characteristic(&StaticRing::<i64>::RING));
+        }
+        if ZZbig.is_geq(&char, &ZZbig.power_of_two(127)) {
+            assert_eq!(None, ring.characteristic(&StaticRing::<i128>::RING));
+        }
+        if ZZbig.is_lt(&char, &ZZbig.power_of_two(31)) {
+            let char = int_cast(char, &StaticRing::<i32>::RING, &ZZbig);
+
+            assert_el_eq!(&ring, &ring.zero(), &ring.get_ring().from_int(char));
+            
+            if char == 0 {
+                for i in 1..(1 << 10) {
+                    assert!(!ring.is_zero(&ring.get_ring().from_int(i)));
+                }
+            } else {
+                for i in 1..char {
+                    assert!(!ring.is_zero(&ring.get_ring().from_int(i)));
+                }
+            }
+        }
+
     }
 }

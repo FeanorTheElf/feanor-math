@@ -138,6 +138,12 @@ impl RingBase for Complex64 {
     fn dbg<'a>(&self, Complex64El(re, im): &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         write!(out, "{} + {}i", re, im)
     }
+    
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        Some(ZZ.zero())
+    }
 }
 
 impl_eq_based_self_iso!{ Complex64 }

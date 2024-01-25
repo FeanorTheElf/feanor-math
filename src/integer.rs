@@ -163,6 +163,12 @@ pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + CanonicalI
         self.mul_pow_2(&mut result, power);
         return result;
     }
+
+    ///
+    /// Returns `n` such that this ring can represent at least `[-2^n, ..., 2^n - 1]`.
+    /// Returning `None` means that the size of representable integers is unbounded.
+    /// 
+    fn representable_bits(&self) -> Option<usize>;
 }
 
 impl<I, J> CanHomFrom<I> for J

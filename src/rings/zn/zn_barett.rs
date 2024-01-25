@@ -229,6 +229,12 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         self.integer_ring.get_ring().dbg(&value.0, out)
     }
+    
+    fn characteristic<J: IntegerRingStore>(&self, ZZ: &J) -> Option<El<J>>
+        where J::Type: IntegerRing
+    {
+        self.size(ZZ)
+    }
 }
 
 impl<I: IntegerRingStore> Clone for ZnBase<I> 
@@ -386,10 +392,14 @@ impl<I: IntegerRingStore> FiniteRing for ZnBase<I>
         generic_impls::random_element(self, rng)
     }
     
-    fn size<J: IntegerRingStore>(&self, ZZ: &J) -> El<J>
+    fn size<J: IntegerRingStore>(&self, ZZ: &J) -> Option<El<J>>
         where J::Type: IntegerRing
     {
-        int_cast(self.integer_ring().clone_el(self.modulus()), ZZ, self.integer_ring())
+        if ZZ.get_ring().representable_bits().is_none() || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits() {
+            Some(int_cast(self.integer_ring().clone_el(self.modulus()), ZZ, self.integer_ring()))
+        } else {
+            None
+        }
     }
 }
 
@@ -564,4 +574,11 @@ fn test_canonical_iso_axioms_as_field() {
     crate::ring::generic_tests::test_iso_axioms(&R, &R2, R.elements());
     crate::ring::generic_tests::test_hom_axioms(&R2, &R, R2.elements());
     crate::ring::generic_tests::test_iso_axioms(&R2, &R, R2.elements());
+}
+
+#[test]
+fn test_finite_field_axioms() {
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(&StaticRing::<i64>::RING, 128));
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(&StaticRing::<i64>::RING, 15));
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(&StaticRing::<i128>::RING, 1 << 32));
 }

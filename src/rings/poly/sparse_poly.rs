@@ -1,5 +1,7 @@
 use crate::algorithms;
 use crate::divisibility::*;
+use crate::integer::IntegerRing;
+use crate::integer::IntegerRingStore;
 use crate::pid::*;
 use crate::field::Field;
 use crate::mempool::GrowableMemoryProvider;
@@ -162,10 +164,7 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
     }
     
     fn from_int(&self, value: i32) -> Self::Element {
-        let mut result = self.zero();
-        result.set_len(1);
-        *result.at_mut(0) = self.base_ring.int_hom().map(value);
-        return result;
+        self.from(self.base_ring().get_ring().from_int(value))
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -224,6 +223,12 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
             lhs.scan(|_, c| self.base_ring.int_hom().mul_assign_map(c, rhs));
         }
     }
+    
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        self.base_ring().characteristic(ZZ)
+    }
 }
 
 impl<R> PartialEq for SparsePolyRingBase<R> 
@@ -244,8 +249,10 @@ impl<R: RingStore> RingExtension for SparsePolyRingBase<R> {
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
         let mut result = self.zero();
-        result.set_len(1);
-        *result.at_mut(0) = x;
+        if !self.base_ring().is_zero(&x) {
+            result.set_len(1);
+            *result.at_mut(0) = x;
+        }
         return result;
     }
 }

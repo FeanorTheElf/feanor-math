@@ -8,8 +8,7 @@ use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::rings::poly::{PolyRingStore, PolyRing};
-use crate::rings::zn::{ZnRingStore, ZnRing};
-use crate::rings::finite::FiniteRingStore;
+use crate::rings::finite::{FiniteRing, FiniteRingStore};
 
 use oorandom;
 
@@ -53,22 +52,23 @@ fn derive_poly<P>(poly_ring: P, poly: &El<P>) -> El<P>
 pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
+        <<P as RingStore>::Type as RingExtension>::BaseRing: FieldStore + FiniteRingStore,
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
 {
-    let p = poly_ring.base_ring().modulus();
-    let ZZ = poly_ring.base_ring().integer_ring();
+    let ZZ = BigIntRing::RING;
+    let q = poly_ring.base_ring().size(&ZZ).unwrap();
+    debug_assert!(ZZ.eq_el(&algorithms::int_factor::is_prime_power(&ZZ, &q).unwrap().0, &poly_ring.base_ring().characteristic(&ZZ).unwrap()));
     assert!(!poly_ring.is_zero(&f));
 
     let mut result = Vec::new();
     result.push(poly_ring.one());
-    let mut x_power_q_mod_f = poly_ring.indeterminate();
+    let mut x_power_Q_mod_f = poly_ring.indeterminate();
     while poly_ring.degree(&f) != Some(0) {
-        // technically, we could just compute gcd(f, X^(p^i) - X), however p^i might be
+        // technically, we could just compute gcd(f, X^(q^i) - X), however q^i might be
         // really large and eea will be very slow. Hence, we do the first modulo operation
-        // X^(p^i) mod f using square-and-multiply in the ring F[X]/(f)
-        x_power_q_mod_f = pow_mod_f(&poly_ring, x_power_q_mod_f, &f, p, ZZ);
-        let fq_defining_poly_mod_f = poly_ring.sub_ref_fst(&x_power_q_mod_f, poly_ring.indeterminate());
+        // X^(q^i) mod f using square-and-multiply in the ring F[X]/(f)
+        x_power_Q_mod_f = pow_mod_f(&poly_ring, x_power_Q_mod_f, &f, &q, ZZ);
+        let fq_defining_poly_mod_f = poly_ring.sub_ref_fst(&x_power_Q_mod_f, poly_ring.indeterminate());
         let deg_i_factor = algorithms::eea::gcd(poly_ring.clone_el(&f), poly_ring.clone_el(&fq_defining_poly_mod_f), &poly_ring);
         f = poly_ring.euclidean_div(f, &deg_i_factor);
         result.push(deg_i_factor);
@@ -84,51 +84,51 @@ pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>
 /// 
 /// # Algorithm
 /// 
-/// The algorithm relies on the fact that for some monic polynomial T over Fp have
+/// The algorithm relies on the fact that for some monic polynomial T over Fq have
 /// ```text
-/// T^q - T = T (T^((q - 1)/2) + 1) (T^((q - 1)/2) - 1)
+/// T^Q - T = T (T^((Q - 1)/2) + 1) (T^((Q - 1)/2) - 1)
 /// ```
-/// where `q = p^d`. Furthermore, the three factors are pairwise coprime.
-/// Since `X^q - X` divides `T^q - T`, and f is squarefree, we see that
-/// f divides `T^q - T` and so
+/// where `Q = q^d`. Furthermore, the three factors are pairwise coprime.
+/// Since `X^Q - X` divides `T^Q - T`, and f is squarefree (so divides `X^Q - X`), 
+/// we see that `f` also divides `T^Q - T` and so
 /// ```text
-/// f = gcd(T, f) gcd((T^((q - 1)/2) + 1, f) gcd(T^((q - 1)/2) - 1, f)
+/// f = gcd(T, f) gcd((T^((Q - 1)/2) + 1, f) gcd(T^((Q - 1)/2) - 1, f)
 /// ```
-/// The idea is now to choose a random T and check whether `gcd(T^((q - 1)/2) - 1, f)`
+/// The idea is now to choose a random T and check whether `gcd(T^((Q - 1)/2) - 1, f)`
 /// gives a nontrivial factor of f. When f has two irreducible factors, with roots a, b
-/// in Fq, then this works if exactly one of them maps to zero under the polynomial
-/// `T^((q - 1)/2) - 1`. Now observe that this is the case if and only if `T(a)` resp.
-/// `T(b)` is a square in Fq. Now apparently, for a polynomial chosen uniformly at random
-/// among all monic polynomials of degree 2d in Fp\[X\], the values T(a) and T(b) are close
-/// to independent and uniform on Fq, and thus the probability that one is a square and
+/// in FQ, then this works if exactly one of them maps to zero under the polynomial
+/// `T^((Q - 1)/2) - 1`. Now observe that this is the case if and only if `T(a)` resp.
+/// `T(b)` is a square in FQ. Now apparently, for a polynomial chosen uniformly at random
+/// among all monic polynomials of degree 2d in Fq[X], the values T(a) and T(b) are close
+/// to independent and uniform on FQ, and thus the probability that one is a square and
 /// the other is not is approximately 1/2.
 /// 
 /// ## Why is the degree of T equal to 2d ?
 /// 
-/// Pick an Fp-vector space basis of Fq and write a, b as dxs matrices A, B over Fp, where the
+/// Pick an Fq-vector space basis of FQ and write a, b as dxs matrices A, B over Fq, where the
 /// i-th column is the representation of `a^i` resp. `b^i` w.r.t. that basis. Then the
 /// evaluation of `T(a)` resp. `T(b)` is the matrix-vector product `w^T A` resp. `w^T B` where
-/// w is the coefficient vector of T (a vector over Fp). We want that `w^T A` and `w^T B` are
+/// w is the coefficient vector of T (a vector over Fq). We want that `w^T A` and `w^T B` are
 /// uniform and independent. Hence, we want all `w^T c` to be uniform and independent, where
 /// c runs through the columns of A resp. B. There are 2d such columns in total, thus s = 2d
-/// will do (note that all columns are different, as `1, a, ..., a^(d - 1)` is a basis of Fq
+/// will do (note that all columns are different, as `1, a, ..., a^(d - 1)` is a basis of FQ
 /// and similarly for b). 
 ///
 #[allow(non_snake_case)]
 pub fn cantor_zassenhaus<P>(poly_ring: P, f: El<P>, d: usize) -> El<P>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
-        <<<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::IntegerRingBase: CanonicalIso<BigIntRingBase>
+        <<P as RingStore>::Type as RingExtension>::BaseRing: FiniteRingStore + FieldStore,
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
 {
     let ZZ = BigIntRing::RING;
-    let p = int_cast(poly_ring.base_ring().integer_ring().clone_el(poly_ring.base_ring().modulus()), &ZZ, poly_ring.base_ring().integer_ring());
-    assert!(ZZ.is_odd(&p));
+    let q = poly_ring.base_ring().size(&ZZ).unwrap();
+    debug_assert!(ZZ.eq_el(&algorithms::int_factor::is_prime_power(&ZZ, &q).unwrap().0, &poly_ring.base_ring().characteristic(&ZZ).unwrap()));
+    assert!(ZZ.is_odd(&q));
     assert!(poly_ring.degree(&f).unwrap() % d == 0);
     assert!(poly_ring.degree(&f).unwrap() > d);
-    let mut rng = oorandom::Rand64::new(ZZ.default_hash(&p) as u128);
-    let exp = ZZ.half_exact(ZZ.sub(ZZ.pow(p, d), ZZ.one()));
+    let mut rng = oorandom::Rand64::new(ZZ.default_hash(&q) as u128);
+    let exp = ZZ.half_exact(ZZ.sub(ZZ.pow(q, d), ZZ.one()));
 
     loop {
         let T = poly_ring.from_terms(
@@ -146,14 +146,19 @@ pub fn cantor_zassenhaus<P>(poly_ring: P, f: El<P>, d: usize) -> El<P>
 pub fn poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
-        <P::Type as RingExtension>::BaseRing: ZnRingStore,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing
+        <P::Type as RingExtension>::BaseRing: FieldStore,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field
 {
     assert!(!poly_ring.is_zero(&poly));
     let derivate = derive_poly(&poly_ring, &poly);
     if poly_ring.is_zero(&derivate) {
-        let p = int_cast(poly_ring.base_ring().integer_ring().clone_el(poly_ring.base_ring().modulus()), &StaticRing::<i128>::RING, poly_ring.base_ring().integer_ring());
-        let base_poly = poly_ring.from_terms(poly_ring.terms(&poly).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i / p as usize)));
+        let p = poly_ring.base_ring().characteristic(&StaticRing::<i64>::RING).unwrap() as usize;
+        if poly_ring.terms(&poly).all(|(_, i)| i == 0) {
+            return poly;
+        } else {
+            assert!(p > 0);
+        }
+        let base_poly = poly_ring.from_terms(poly_ring.terms(&poly).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i / p)));
         return poly_squarefree_part(poly_ring, base_poly);
     } else {
         let square_part = algorithms::eea::gcd(poly_ring.clone_el(&poly), derivate, &poly_ring);
@@ -164,9 +169,8 @@ pub fn poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
 pub fn factor_complete<'a, P>(poly_ring: P, mut el: El<P>) -> Vec<(El<P>, usize)> 
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
-        <<<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::IntegerRingBase: CanonicalIso<BigIntRingBase>
+        <<P as RingStore>::Type as RingExtension>::BaseRing: FieldStore + FiniteRingStore,
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FiniteRing
 {
     assert!(!poly_ring.is_zero(&el));
 
@@ -229,6 +233,8 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::zn::zn_static::Fp;
 #[cfg(test)]
 use crate::rings::zn::zn_42;
+#[cfg(test)]
+use crate::rings::zn::ZnRingStore;
 
 #[test]
 fn test_poly_squarefree_part() {

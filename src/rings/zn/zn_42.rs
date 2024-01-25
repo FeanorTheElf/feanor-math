@@ -233,6 +233,12 @@ impl RingBase for ZnBase {
         debug_assert!(result.0 <= self.repr_bound);
         return result;
     }
+
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        self.size(ZZ)
+    }
 }
 
 impl_eq_based_self_iso!{ ZnBase }
@@ -417,10 +423,14 @@ impl FiniteRing for ZnBase {
         generic_impls::random_element(self, rng)
     }
 
-    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> El<I>
+    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
-        int_cast(*self.modulus(), ZZ, self.integer_ring())
+        if ZZ.get_ring().representable_bits().is_none() || self.integer_ring().abs_log2_ceil(&(self.modulus() + 1)) <= ZZ.get_ring().representable_bits() {
+            Some(int_cast(*self.modulus(), ZZ, self.integer_ring()))
+        } else {
+            None
+        }
     }
 }
 
@@ -834,4 +844,11 @@ fn test_cooley_tuckey_butterfly_fastmul() {
     let ring = Zn::new((1 << 41) - 1);
     let fastmul_ring = ZnFastmul::new(ring);
     generic_test_cooley_tuckey_butterfly(ring, fastmul_ring, [0, 1, 2, 3, 4, (1 << 20), (1 << 20) + 1, (1 << 21), (1 << 21) + 1].iter().cloned().map(|x| ring.int_hom().map(x)), &fastmul_ring.int_hom().map(3));
+}
+
+#[test]
+fn test_finite_field_axioms() {
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(128));
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(15));
+    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(1 << 32));
 }
