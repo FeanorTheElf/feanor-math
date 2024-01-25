@@ -3,7 +3,7 @@ use crate::integer::{IntegerRingStore, IntegerRing};
 
 pub trait FiniteRing: RingBase {
 
-    type ElementsIter<'a>: Iterator<Item = <Self as RingBase>::Element>
+    type ElementsIter<'a>: Clone + Iterator<Item = <Self as RingBase>::Element>
         where Self: 'a;
 
     fn elements<'a>(&'a self) -> Self::ElementsIter<'a>;

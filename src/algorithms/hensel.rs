@@ -52,6 +52,7 @@ pub fn hensel_lift<P, R, S>(target_ring: &P, source_ring: &R, prime_ring: &S, f:
     let reduced_h = prime_ring.from_terms(source_ring.terms(h).map(|(c, i)| (pe_to_p.map_ref(c), i)));
     let (s, t, d) = algorithms::eea::eea(reduced_g, reduced_h, &prime_ring);
     assert!(prime_ring.is_unit(&d));
+    
     let lifted_s = target_ring.from_terms(prime_ring.terms(&prime_ring.checked_div(&s, &d).unwrap()).map(|(c, i)| (pr_to_p.smallest_lift_ref(c), i)));
     let lifted_t = target_ring.from_terms(prime_ring.terms(&prime_ring.checked_div(&t, &d).unwrap()).map(|(c, i)| (pr_to_p.smallest_lift_ref(c), i)));
 

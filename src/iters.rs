@@ -315,7 +315,7 @@ impl<I, F, T> Clone for MultiProduct<I, F, T>
 }
 
 impl<I, F, T> Iterator for MultiProduct<I, F, T>
-where I: Iterator + Clone, F: FnMut(&[I::Item]) -> T
+    where I: Iterator + Clone, F: FnMut(&[I::Item]) -> T
 {
     type Item = T;
 

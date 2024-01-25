@@ -4,6 +4,7 @@ use crate::integer::IntegerRingStore;
 use crate::matrix::Matrix;
 use crate::mempool::MemoryProvider;
 use crate::pid::PrincipalIdealRing;
+use crate::rings::finite::*;
 use crate::rings::poly::PolyRing;
 use crate::rings::poly::PolyRingStore;
 use crate::rings::poly::dense_poly::DensePolyRing;
@@ -11,6 +12,7 @@ use crate::vector::vec_fn::RingElVectorViewFn;
 use crate::ring::*;
 use crate::algorithms;
 use crate::vector::VectorView;
+use crate::iters::*;
 use crate::mempool::DefaultMemoryProvider;
 
 use super::*;
@@ -213,6 +215,65 @@ impl<R, V, M> RingBase for FreeAlgebraImplBase<R, V, M>
 //     }
 // }
 
+pub struct WRTCanonicalBasisElementCreator<'a, R, V, M>
+    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+{
+    base_ring: &'a FreeAlgebraImplBase<R, V, M>
+}
+
+impl<'a, R, V, M> Clone for WRTCanonicalBasisElementCreator<'a, R, V, M>
+    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+{
+    fn clone(&self) -> Self { *self }
+}
+
+impl<'a, 'b, R, V, M> FnOnce<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator<'a, R, V, M>
+    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+{
+    type Output = El<FreeAlgebraImpl<R, V, M>>;
+
+    extern "rust-call" fn call_once(self, args: (&'b [El<R>], )) -> Self::Output {
+        self.call_mut(args)
+    }
+}
+
+impl<'a, 'b, R, V, M> FnMut<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator<'a, R, V, M>
+    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+{
+    extern "rust-call" fn call_mut(&mut self, args: (&'b [El<R>], )) -> Self::Output {
+        self.base_ring.from_canonical_basis(args.0.iter().map(|x| self.base_ring.base_ring().clone_el(x)))
+    }
+}
+
+impl<'a, R, V, M> Copy for WRTCanonicalBasisElementCreator<'a, R, V, M>
+    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+{}
+
+impl<R, V, M> FiniteRing for FreeAlgebraImplBase<R, V, M>
+    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+{
+    type ElementsIter<'a> = MultiProduct<<R::Type as FiniteRing>::ElementsIter<'a>, WRTCanonicalBasisElementCreator<'a, R, V, M>, Self::Element>
+        where Self: 'a;
+
+    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
+        multi_cartesian_product(self.base_ring().elements(), WRTCanonicalBasisElementCreator { base_ring: self })
+    }
+
+    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        let base_ring_size = self.base_ring().size(ZZ)?;
+        if ZZ.get_ring().representable_bits().is_none() || ZZ.abs_log2_ceil(&base_ring_size).unwrap() * self.rank() < ZZ.get_ring().representable_bits().unwrap() {
+            Some(ZZ.pow(base_ring_size, self.rank()))
+        } else {
+            None
+        }
+    }
+
+    fn random_element<G: FnMut() -> u64>(&self, mut rng: G) -> <Self as RingBase>::Element {
+        self.from_canonical_basis((0..self.rank()).map(|_| self.base_ring().random_element(&mut rng)))
+    }
+}
 
 impl<R, V, M> DivisibilityRing for FreeAlgebraImplBase<R, V, M>
     where R: RingStore, R::Type: PrincipalIdealRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>

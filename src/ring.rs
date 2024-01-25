@@ -62,6 +62,12 @@ use crate::algorithms;
 ///     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
 ///         write!(out, "{}", **value)
 ///     }
+/// 
+///     fn characteristic<I>(&self, ZZ: &I) -> Option<El<I>>
+///         where I: IntegerRingStore, I::Type: IntegerRing
+///     {
+///         Some(ZZ.zero())
+///     }
 /// }
 /// 
 /// // To use the ring through a RingStore, it is also required to implement CanHomFrom<Self>
@@ -332,11 +338,11 @@ pub trait RingBase: PartialEq {
     /// ```
     /// # use feanor_math::ring::*;
     /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::rings::zn::;
+    /// # use feanor_math::rings::zn::*;
     /// let ZZ = StaticRing::<i16>::RING;
     /// assert_eq!(Some(0), StaticRing::<i64>::RING.characteristic(&ZZ));
-    /// assert_eq!(None, zn_64::Zn::new(i16::MAX as u64)::RING.characteristic(&ZZ));
-    /// assert_eq!(Some(i16::MAX), zn_64::Zn::new(i16::MAX as u64)::RING.characteristic(&StaticRing::<i16>::RING));
+    /// assert_eq!(None, zn_64::Zn::new(i16::MAX as u64).characteristic(&ZZ));
+    /// assert_eq!(Some(i16::MAX), zn_64::Zn::new(i16::MAX as u64).characteristic(&StaticRing::<i16>::RING));
     /// ```
     /// 
     fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>

@@ -291,6 +291,14 @@ pub struct DelegateZnRingElementsIter<'a, R: ?Sized>
     base: <R::Base as FiniteRing>::ElementsIter<'a>
 }
 
+impl<'a, R: ?Sized> Clone for DelegateZnRingElementsIter<'a, R>
+    where R: DelegateRing, R::Base: FiniteRing
+{
+    fn clone(&self) -> Self {
+        Self { ring: self.ring, base: self.base.clone() }
+    }
+}
+
 impl<'a, R: ?Sized> Iterator for DelegateZnRingElementsIter<'a, R>
     where R: DelegateRing, R::Base: FiniteRing
 {

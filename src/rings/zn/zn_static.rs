@@ -181,6 +181,8 @@ impl<const N: u64> EuclideanRing for ZnBase<N, true> {
         }
     }
 }
+
+#[derive(Clone, Copy)]
 pub struct ZnBaseElementsIter<const N: u64> {
     current: u64
 }

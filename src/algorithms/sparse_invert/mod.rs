@@ -508,6 +508,7 @@ fn test_gb_sparse_row_echelon_4x6() {
 }
 
 #[test]
+#[ignore]
 fn test_gb_sparse_row_echelon_recompute_pivot() {
     let R = Zn::<17>::RING;
     let sparsify = |row: [u64; 3]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));

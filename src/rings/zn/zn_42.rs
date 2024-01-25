@@ -388,6 +388,7 @@ impl DivisibilityRing for ZnBase {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct ZnBaseElementsIter<'a> {
     ring: &'a ZnBase,
     current: u64

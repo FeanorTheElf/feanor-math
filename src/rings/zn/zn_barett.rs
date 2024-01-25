@@ -358,6 +358,15 @@ pub struct ZnBaseElementsIter<'a, I>
     current: El<I>
 }
 
+impl<'a, I> Clone for ZnBaseElementsIter<'a, I>
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
+{
+    fn clone(&self) -> Self {
+        Self { ring: self.ring, current: self.ring.clone_el(&self.current) }
+    }
+}
+
 impl<'a, I> Iterator for ZnBaseElementsIter<'a, I>
     where I: IntegerRingStore,
         I::Type: IntegerRing

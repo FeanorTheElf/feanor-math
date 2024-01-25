@@ -484,6 +484,21 @@ pub struct ZnBaseElementsIterator<'a, C: ZnRingStore, J: IntegerRingStore, M: Me
     part_iters: Option<Vec<std::iter::Peekable<<C::Type as FiniteRing>::ElementsIter<'a>>>>
 }
 
+impl<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clone for ZnBaseElementsIterator<'a, C, J, M>
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
+        J::Type: IntegerRing,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+{
+    fn clone(&self) -> Self {
+        Self {
+            ring: self.ring,
+            part_iters: self.part_iters.as_ref().map(|part_iters| part_iters.iter().map(|part_it| 
+                Peek
+            ))
+        }
+    }
+}
+
 impl<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Iterator for ZnBaseElementsIterator<'a, C, J, M>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,

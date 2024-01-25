@@ -396,6 +396,7 @@ macro_rules! impl_static_int_to_zn {
 
 impl_static_int_to_zn!{ i8, i16, i32 }
 
+#[derive(Clone, Copy)]
 pub struct ZnBaseElementsIter<'a> {
     ring: &'a ZnBase,
     current: u64

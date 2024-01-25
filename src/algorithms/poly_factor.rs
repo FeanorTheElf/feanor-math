@@ -28,7 +28,7 @@ pub fn binomial(n: usize, mut k: usize) -> usize {
     }
 }
 
-struct ComputeFactorizationUsingHenselLifting<'a, P, R>
+struct FactorizeMonicIntegerPolynomialUsingHenselLifting<'a, P, R>
     where P: PolyRingStore,
         P::Type: PolyRing,
         R: PolyRingStore,
@@ -43,7 +43,7 @@ struct ComputeFactorizationUsingHenselLifting<'a, P, R>
     bound: El<BigIntRing>
 }
 
-impl<'a, P, R> ZnOperation<Vec<El<P>>> for ComputeFactorizationUsingHenselLifting<'a, P, R>
+impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingHenselLifting<'a, P, R>
     where P: PolyRingStore,
         P::Type: PolyRing,
         R: PolyRingStore,
@@ -62,20 +62,13 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for ComputeFactorizationUsingHenselLiftin
         let factorization = factor_complete(&self.prime_poly_ring, self.poly_mod_p).into_iter().inspect(|(_, e)| assert!(*e == 1)).map(|(f, _)| f).collect::<Vec<_>>();
         let mut poly = prime_power_poly_ring.from_terms(self.poly_ring.terms(&self.poly).map(|(c, i)| (reduce(self.poly_ring.base_ring().clone_el(c)), i)));
         let lifted_factorization = hensel_lift_factorization(&prime_power_poly_ring, &self.prime_poly_ring, &self.prime_poly_ring, &poly, &factorization);
-        println!();
-        for f in &lifted_factorization {
-            prime_power_poly_ring.println(f);
-        }
 
         let mut ungrouped_factors = (0..lifted_factorization.len()).collect::<Vec<_>>();
         let mut result = Vec::new();
         while !prime_power_poly_ring.is_unit(&poly) {
-            println!("{:?}", crate::iters::basic_powerset(ungrouped_factors.iter().copied()).next().unwrap());
             let (factor, factor_group) = crate::iters::basic_powerset(ungrouped_factors.iter().copied())
                 .skip(1)
                 .map(|slice| (prime_power_poly_ring.prod(slice.iter().copied().map(|i| prime_power_poly_ring.clone_el(&lifted_factorization[i]))), slice))
-                .inspect(|(_, slice)| println!("{:?}", slice))
-                .inspect(|(f, _)| prime_power_poly_ring.println(f))
                 .filter(|(f, _)| prime_power_poly_ring.terms(f).all(|(c, _)| ZZ.is_lt(&ZZ.abs(Zpe.smallest_lift(Zpe.clone_el(c))), &bound)))
                 .next().unwrap();
             ungrouped_factors.retain(|j| !factor_group.contains(j));
@@ -87,7 +80,11 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for ComputeFactorizationUsingHenselLiftin
     }
 }
 
-fn factor_squarefree_int_poly<'a, P>(poly_ring: &'a P, poly: &El<P>) -> Vec<El<P>>
+///
+/// The given polynomial is assumed to be square-free, monic and should have integral
+/// coefficients.
+/// 
+fn factor_int_poly<'a, P>(poly_ring: &'a P, poly: &El<P>) -> Vec<El<P>>
     where P: PolyRingStore,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
@@ -123,12 +120,15 @@ fn factor_squarefree_int_poly<'a, P>(poly_ring: &'a P, poly: &El<P>) -> Vec<El<P
             ), 2);
             let bound = ZZbig.add(
                 ZZbig.mul(poly_norm, ZZbig.coerce(&ZZ, binomial(d, d / 2) as i64)),
-                ZZbig.mul(int_cast(poly_ring.base_ring().clone_el(poly_ring.lc(poly).unwrap()), ZZbig, poly_ring.base_ring()), ZZbig.coerce(&ZZ, binomial(d, d / 2) as i64))
+                ZZbig.mul(
+                    int_cast(poly_ring.base_ring().clone_el(poly_ring.lc(poly).unwrap()), ZZbig, poly_ring.base_ring()), 
+                    ZZbig.coerce(&ZZ, binomial(d, d / 2) as i64)
+                )
             );
             let exponent = ZZbig.abs_log2_ceil(&bound).unwrap() / (ZZ.abs_log2_ceil(&(p + 1)).unwrap() - 1) + 1;
             let modulus = ZZbig.pow(int_cast(p, &ZZbig, &ZZ), exponent);
 
-            return choose_zn_impl(ZZbig, modulus, ComputeFactorizationUsingHenselLifting {
+            return choose_zn_impl(ZZbig, modulus, FactorizeMonicIntegerPolynomialUsingHenselLifting {
                 poly, poly_ring, poly_mod_p, prime_poly_ring, bound
             });
         }
@@ -165,7 +165,7 @@ pub fn factor_rational_poly<P, I>(poly_ring: &P, poly: &El<P>) -> Vec<(El<P>, us
             assert!(poly_ring.base_ring().base_ring().is_one(&den));
             (nom, i)
         }));
-        for factor in factor_squarefree_int_poly(&int_poly_ring, &squarefree_part_int) {
+        for factor in factor_int_poly(&int_poly_ring, &squarefree_part_int) {
             let factor_rational = poly_ring.from_terms(int_poly_ring.terms(&factor).map(|(c, i)| (inclusion.map_ref(c), i)));
             if let Some((i, _)) = result.iter().enumerate().filter(|(_, (f, _))| poly_ring.eq_el(f, &factor_rational)).next() {
                 result[i].1 += 1;
@@ -178,11 +178,11 @@ pub fn factor_rational_poly<P, I>(poly_ring: &P, poly: &El<P>) -> Vec<(El<P>, us
 }
 
 #[test]
-fn test_squarefree_factor_int_poly() {
+fn test_factor_int_poly() {
     let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
     let f = poly_ring.from_terms([(2, 0), (1, 3)].into_iter());
     let g = poly_ring.from_terms([(1, 0), (2, 1), (1, 2), (1, 4)].into_iter());
-    let actual = factor_squarefree_int_poly(&poly_ring, &poly_ring.mul_ref(&f, &g));
+    let actual = factor_int_poly(&poly_ring, &poly_ring.mul_ref(&f, &g));
     assert_eq!(2, actual.len());
     assert_el_eq!(&poly_ring, &f, &actual[0]);
     assert_el_eq!(&poly_ring, &g, &actual[1]);
