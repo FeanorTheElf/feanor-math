@@ -50,6 +50,8 @@ pub mod finite;
 /// 
 pub mod multivariate;
 
+pub mod rational;
+
 ///
 /// This module contains the ring [`MPZ`] that represents the integers `Z` and uses the heavily
 /// optimized arbitrary-precision integer library mpir as implementation.

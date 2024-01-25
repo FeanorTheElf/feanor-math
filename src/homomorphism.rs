@@ -544,6 +544,7 @@ impl<R> Homomorphism<<<R::Type as RingExtension>::BaseRing as RingStore>::Type, 
 /// assert_el_eq!(&ring, &hom.map(1), &hom.map(18));
 /// ```
 /// 
+#[derive(Clone, Copy)]
 pub struct IntHom<R>
     where R: RingStore
 {
@@ -585,6 +586,7 @@ impl<R> IntHom<R>
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Identity<R: RingStore> {
     ring: R
 }
@@ -658,6 +660,32 @@ pub struct ComposedHom<R, S, T, F, G>
     intermediate: PhantomData<S>,
     codomain: PhantomData<T>
 }
+
+impl<R, S, T, F, G> Clone for ComposedHom<R, S, T, F, G>
+    where F: Clone + Homomorphism<R, S>,
+        G: Clone + Homomorphism<S, T>,
+        R: RingBase,
+        S: RingBase,
+        T: RingBase
+{
+    fn clone(&self) -> Self {
+        Self {
+            f: self.f.clone(),
+            g: self.g.clone(),
+            domain: PhantomData,
+            codomain: PhantomData,
+            intermediate: PhantomData
+        }
+    }
+}
+
+impl<R, S, T, F, G> Copy for ComposedHom<R, S, T, F, G>
+    where F: Copy + Homomorphism<R, S>,
+        G: Copy + Homomorphism<S, T>,
+        R: RingBase,
+        S: RingBase,
+        T: RingBase
+{}
 
 impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
     where F: Homomorphism<R, S>,
