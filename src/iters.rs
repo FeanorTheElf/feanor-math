@@ -36,8 +36,8 @@ impl<I, F, T> Iterator for IterCombinations<I, F, T>
                 index + 1 < *next_index
             };
             if can_forward {
-                let (_, x) = it.next().unwrap();
-                self.buffer[i] = x;
+                it.next().unwrap();
+                self.buffer[i] = it.peek().unwrap().1.clone();
                 return Some(result);
             } else {
                 // reset and continue with next iterator
@@ -51,7 +51,11 @@ impl<I, F, T> Iterator for IterCombinations<I, F, T>
         }
         if let Some(last_it) = self.iterators.last_mut() {
             last_it.next();
-            self.done |= last_it.peek().is_none();
+            if let Some(x) = last_it.peek() {
+                *self.buffer.last_mut().unwrap() = x.1.clone();
+            } else {
+                self.done = true;
+            }
         }
         return Some(result);
     }
@@ -470,6 +474,18 @@ fn test_powerset() {
         vec![2].into_boxed_slice(),
         vec![3].into_boxed_slice(),
         vec![2, 3].into_boxed_slice() 
+    ], basic_powerset(a.iter().copied()).collect::<Vec<_>>());
+
+    let a = [1, 2, 3];
+    assert_eq!(vec![
+        vec![].into_boxed_slice(),
+        vec![1].into_boxed_slice(),
+        vec![2].into_boxed_slice(),
+        vec![3].into_boxed_slice(),
+        vec![1, 2].into_boxed_slice(),
+        vec![1, 3].into_boxed_slice(),
+        vec![2, 3].into_boxed_slice(),
+        vec![1, 2, 3].into_boxed_slice()
     ], basic_powerset(a.iter().copied()).collect::<Vec<_>>());
 }
 
