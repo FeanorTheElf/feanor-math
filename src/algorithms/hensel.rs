@@ -1,7 +1,13 @@
+use crate::divisibility::DivisibilityRingStore;
+use crate::field::Field;
+use crate::homomorphism::Homomorphism;
+use crate::integer::int_cast;
 use crate::pid::EuclideanRing;
 use crate::rings::poly::{PolyRing, PolyRingStore};
-use crate::rings::zn::{ZnRing, ZnRingStore};
-use crate::ring::*;
+use crate::rings::zn::{ReductionMap, ZnRing, ZnRingStore};
+use crate::{algorithms, ring::*};
+
+use super::int_factor::is_prime_power;
 
 ///
 /// Given a monic polynomial `f` modulo `p^r` and a factorization `f = gh mod p^e`
@@ -9,15 +15,99 @@ use crate::ring::*;
 /// `f = g' h'` with `g', h'` monic polynomials modulo `p^r` that reduce to `g, h`
 /// modulo `p^e`.
 /// 
-pub fn lift_factorization<P, R>(target_ring: &P, prime_ring: &R, f: &El<P>, factors: (&El<P>, &El<P>))
-    where P: PolyRingStore,
-        P::Type: PolyRing,
-        R: PolyRingStore,
-        R::Type: PolyRing,
+pub fn lift_factorization<P, R, S>(target_ring: &P, source_ring: &R, prime_ring: &S, f: &El<P>, factors: (&El<R>, &El<R>)) -> (El<P>, El<P>)
+    where P: PolyRingStore, P::Type: PolyRing,
+        R: PolyRingStore, R::Type: PolyRing,
+        S: PolyRingStore, S::Type: PolyRing + EuclideanRing,
         <<P as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
         <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
         <<R as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
-        <<<R as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing
+        <<<R as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
+        <<S as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
+        <<<S as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
+    let ZZ = prime_ring.base_ring().integer_ring();
+    let ZZ_source = source_ring.base_ring().integer_ring();
+    let ZZ_target = target_ring.base_ring().integer_ring();
 
+    let p = prime_ring.base_ring().modulus();
+    let (p_source, e) = is_prime_power(ZZ_source, source_ring.base_ring().modulus()).unwrap();
+    let (p_target, r) = is_prime_power(ZZ_target, target_ring.base_ring().modulus()).unwrap();
+    assert_el_eq!(ZZ, p, &int_cast(p_source, ZZ, ZZ_source));
+    assert_el_eq!(ZZ, p, &int_cast(ZZ_target.clone_el(&p_target), ZZ, ZZ_target));
+
+    assert!(r > e);
+    assert!(target_ring.base_ring().is_one(target_ring.lc(f).unwrap()));
+    assert!(source_ring.base_ring().is_one(source_ring.lc(factors.0).unwrap()));
+    assert!(source_ring.base_ring().is_one(source_ring.lc(factors.1).unwrap()));
+
+    let pe_to_p = ReductionMap::new(source_ring.base_ring(), prime_ring.base_ring()).unwrap();
+    let pr_to_pe = ReductionMap::new(target_ring.base_ring(), source_ring.base_ring()).unwrap();
+    let pr_to_p = ReductionMap::new(target_ring.base_ring(), prime_ring.base_ring()).unwrap();
+
+    assert_el_eq!(&source_ring, &source_ring.mul_ref(factors.0, factors.1), &source_ring.from_terms(target_ring.terms(f).map(|(c, i)| (pr_to_pe.map_ref(c), i))));
+
+    let (g, h) = factors;
+    let reduced_g = prime_ring.from_terms(source_ring.terms(g).map(|(c, i)| (pe_to_p.map_ref(c), i)));
+    let reduced_h = prime_ring.from_terms(source_ring.terms(h).map(|(c, i)| (pe_to_p.map_ref(c), i)));
+    let (s, t, d) = algorithms::eea::eea(reduced_g, reduced_h, &prime_ring);
+    assert!(prime_ring.is_unit(&d));
+    let lifted_s = target_ring.from_terms(prime_ring.terms(&prime_ring.checked_div(&s, &d).unwrap()).map(|(c, i)| (pr_to_p.smallest_lift_ref(c), i)));
+    let lifted_t = target_ring.from_terms(prime_ring.terms(&prime_ring.checked_div(&t, &d).unwrap()).map(|(c, i)| (pr_to_p.smallest_lift_ref(c), i)));
+    target_ring.println(&lifted_s);
+    target_ring.println(&lifted_t);
+
+    let mut current_g = target_ring.from_terms(source_ring.terms(factors.0).map(|(c, i)| (pr_to_pe.smallest_lift_ref(c), i)));
+    let mut current_h = target_ring.from_terms(source_ring.terms(factors.1).map(|(c, i)| (pr_to_pe.smallest_lift_ref(c), i)));
+    for _ in e..r {
+        let delta = target_ring.sub_ref_fst(f, target_ring.mul_ref(&current_g, &current_h));
+        target_ring.println(&delta);
+        target_ring.add_assign(&mut current_g, target_ring.mul_ref(&lifted_t, &delta));
+        target_ring.add_assign(&mut current_h, target_ring.mul_ref(&lifted_s, &delta));
+    }
+    assert_el_eq!(&target_ring, &f, &target_ring.mul_ref(&current_g, &current_h));
+    return (current_g, current_h);
+}
+
+#[cfg(test)]
+use crate::rings::zn::zn_static::{Zn, Fp};
+#[cfg(test)]
+use crate::rings::poly::dense_poly::DensePolyRing;
+
+#[test]
+fn test_lift_factorization() {
+    let source_ring = Fp::<3>::RING;
+    let target_ring = Zn::<27>::RING;
+
+    let P = DensePolyRing::new(target_ring, "X");
+    let R = DensePolyRing::new(source_ring, "X");
+
+    // we lift the factorization `X^4 + 1 = (X^2 + 2 X + 2)(X^2 + X + 2)`
+    let f = P.from_terms([(10, 0), (21, 1), (15, 2), (3, 3), (1, 4)].into_iter());
+    let g = R.from_terms([(2, 0), (2, 1), (1, 2)].into_iter());
+    let h = R.from_terms([(2, 0), (1, 1), (1, 2)].into_iter());
+
+    let (lifted_g, lifted_h) = lift_factorization(&P, &R, &R, &f, (&g, &h));
+
+    assert_el_eq!(&P, &f, &P.mul_ref(&lifted_g, &lifted_h));
+}
+
+#[test]
+fn test_lift_factorization_nonfield_base() {
+    let prime_ring = Fp::<5>::RING;
+    let source_ring = Zn::<25>::RING;
+    let target_ring = Zn::<125>::RING;
+
+    let P = DensePolyRing::new(target_ring, "X");
+    let R = DensePolyRing::new(source_ring, "X");
+    let S = DensePolyRing::new(prime_ring, "X");
+
+    // we lift the factorization `X^5 + 6 X^4 + 8 X^3 + 12 X^2 + 3 X + 2 = (X^2 + X + 2)(X^3 + X + 1)`
+    let f = P.from_terms([(2, 0), (3, 1), (12, 2), (8, 3), (6, 4), (1, 5)].into_iter());
+    let g = R.from_terms([(2, 0), (1, 1), (1, 2)].into_iter());
+    let h = R.from_terms([(1, 0), (1, 1), (5, 2), (1, 3)].into_iter());
+
+    let (lifted_g, lifted_h) = lift_factorization(&P, &R, &S, &f, (&g, &h));
+
+    assert_el_eq!(&P, &f, &P.mul_ref(&lifted_g, &lifted_h));
 }

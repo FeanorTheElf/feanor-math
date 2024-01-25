@@ -1,3 +1,4 @@
+use crate::divisibility::DivisibilityRingStore;
 use crate::pid::PrincipalIdealRing;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
@@ -367,6 +368,70 @@ pub fn choose_zn_impl<I, F>(ZZ: I, n: El<I>, f: F)
         f.call(zn_64::Zn::new(StaticRing::<i64>::RING.coerce(&ZZ, n) as u64));
     } else {
         f.call(zn_barett::Zn::new(ZZ, n));
+    }
+}
+
+pub struct ReductionMap<R, S>
+    where R: ZnRingStore,
+        R::Type: ZnRing,
+        S: ZnRingStore,
+        S::Type: ZnRing
+{
+    from: R,
+    to: S,
+    to_from_int: <S::Type as CanHomFrom<<S::Type as ZnRing>::IntegerRingBase>>::Homomorphism,
+    from_from_int: <R::Type as CanHomFrom<<R::Type as ZnRing>::IntegerRingBase>>::Homomorphism
+}
+
+impl<R, S> ReductionMap<R, S>
+    where R: ZnRingStore,
+        R::Type: ZnRing,
+        S: ZnRingStore,
+        S::Type: ZnRing
+{
+    pub fn new(from: R, to: S) -> Option<Self> {
+        let from_char = from.characteristic(&BigIntRing::RING).unwrap();
+        let to_char = to.characteristic(&BigIntRing::RING).unwrap();
+        if BigIntRing::RING.checked_div(&from_char, &to_char).is_some() {
+            Some(Self {
+                to_from_int: to.get_ring().has_canonical_hom(to.integer_ring().get_ring()).unwrap(),
+                from_from_int: from.get_ring().has_canonical_hom(from.integer_ring().get_ring()).unwrap(),
+                from: from,
+                to: to,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn smallest_lift(&self, x: El<S>) -> El<R> {
+        self.from.get_ring().map_in(self.from.integer_ring().get_ring(), int_cast(self.to.smallest_lift(x), self.from.integer_ring(), self.to.integer_ring()), &self.from_from_int)
+    }
+
+    pub fn smallest_lift_ref(&self, x: &El<S>) -> El<R> {
+        self.smallest_lift(self.codomain().clone_el(x))
+    }
+}
+
+impl<R, S> Homomorphism<R::Type, S::Type> for ReductionMap<R, S>
+    where R: ZnRingStore,
+        R::Type: ZnRing,
+        S: ZnRingStore,
+        S::Type: ZnRing
+{
+    type CodomainStore = S;
+    type DomainStore = R;
+
+    fn map(&self, x: El<R>) -> El<S> {
+        self.to.get_ring().map_in(self.to.integer_ring().get_ring(), int_cast(self.from.smallest_lift(x), self.to.integer_ring(), self.from.integer_ring()), &self.to_from_int)
+    }
+
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
+        &self.to
+    }
+
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
+        &self.from
     }
 }
 
