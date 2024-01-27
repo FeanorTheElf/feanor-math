@@ -25,14 +25,19 @@ impl<I> PartialEq for RationalFieldBase<I>
     }
 }
 
+impl<I> RationalField<I>
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
+{
+    pub const fn new(integers: I) -> Self {
+        RingValue::from(RationalFieldBase { integers })
+    }
+}
+
 impl<I> RationalFieldBase<I>
     where I: IntegerRingStore,
         I::Type: IntegerRing
 {
-    pub const fn new(integers: I) -> RationalField<I> {
-        RingValue::from(Self { integers })
-    }
-
     fn reduce(&self, value: (&mut El<I>, &mut El<I>)) {
         // take the denominator first, as in this case gcd will have the same sign, and the final denominator will be positive
         let gcd = algorithms::eea::signed_gcd(self.integers.clone_el(&*value.1), self.integers.clone_el(&*value.0), &self.integers);
@@ -121,7 +126,11 @@ impl<I> RingBase for RationalFieldBase<I>
     }
 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        write!(out, "{}/{}", self.integers.format(&value.0), self.integers.format(&value.1))
+        if self.base_ring().is_one(&value.1) {
+            write!(out, "{}", self.integers.format(&value.0))
+        } else {
+            write!(out, "{}/{}", self.integers.format(&value.0), self.integers.format(&value.1))
+        }
     }
 
     fn from_int(&self, value: i32) -> Self::Element {
@@ -254,14 +263,14 @@ use crate::homomorphism::Homomorphism;
 
 #[cfg(test)]
 fn edge_case_elements() -> impl Iterator<Item = El<RationalField<StaticRing<i64>>>> {
-    let ring = RationalFieldBase::new(StaticRing::<i64>::RING);
+    let ring = RationalField::new(StaticRing::<i64>::RING);
     let incl = ring.into_int_hom();
     (-6..8).flat_map(move |x| (-2..5).filter(|y| *y != 0).map(move |y| ring.checked_div(&incl.map(x), &incl.map(y)).unwrap()))
 }
 
 #[test]
 fn test_ring_axioms() {
-    let ring = RationalFieldBase::new(StaticRing::<i64>::RING);
+    let ring = RationalField::new(StaticRing::<i64>::RING);
 
     let half = ring.checked_div(&ring.int_hom().map(1), &ring.int_hom().map(2)).unwrap();
     assert!(!ring.is_one(&half));
@@ -272,19 +281,19 @@ fn test_ring_axioms() {
 
 #[test]
 fn test_divisibility_axioms() {
-    let ring = RationalFieldBase::new(StaticRing::<i64>::RING);
+    let ring = RationalField::new(StaticRing::<i64>::RING);
     crate::divisibility::generic_tests::test_divisibility_axioms(ring, edge_case_elements());
 }
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
-    let ring = RationalFieldBase::new(StaticRing::<i64>::RING);
+    let ring = RationalField::new(StaticRing::<i64>::RING);
     crate::pid::generic_tests::test_euclidean_ring_axioms(ring, edge_case_elements());
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(ring, edge_case_elements());
 }
 
 #[test]
 fn test_int_hom_axioms() {
-    let ring = RationalFieldBase::new(StaticRing::<i64>::RING);
+    let ring = RationalField::new(StaticRing::<i64>::RING);
     crate::ring::generic_tests::test_hom_axioms(&StaticRing::<i64>::RING, ring, -16..15);
 }

@@ -48,7 +48,11 @@ pub fn is_prime_power<I: IntegerRingStore>(ZZ: &I, n: &El<I>) -> Option<(El<I>, 
 fn is_power<I: IntegerRingStore>(ZZ: &I, n: &El<I>) -> Option<(El<I>, usize)>
     where I::Type: IntegerRing
 {
-    for i in (2..ZZ.abs_log2_ceil(n).unwrap()).rev() {
+    assert!(!ZZ.is_zero(n));
+    if ZZ.abs_highest_set_bit(n) == ZZ.abs_lowest_set_bit(n) {
+        return Some((ZZ.int_hom().map(2), ZZ.abs_log2_ceil(n).unwrap()));
+    }
+    for i in (2..((ZZ.abs_log2_ceil(n).unwrap() * 2 - 1) / 3 + 1)).rev() {
         let root = algorithms::int_bisect::root_floor(ZZ, ZZ.clone_el(n), i);
         if ZZ.eq_el(&ZZ.pow(root, i), n) {
             return Some((algorithms::int_bisect::root_floor(ZZ, ZZ.clone_el(n), i), i));

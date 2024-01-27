@@ -84,21 +84,19 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
 /// The given polynomial is assumed to be square-free, monic and should have integral
 /// coefficients.
 /// 
-fn factor_int_poly<'a, P>(poly_ring: &'a P, poly: &El<P>) -> Vec<El<P>>
+fn factor_monic_int_poly<'a, P>(poly_ring: &'a P, poly: &El<P>) -> Vec<El<P>>
     where P: PolyRingStore,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
 {
+    println!("Factor int poly: {}", poly_ring.format(poly));
     let d = poly_ring.degree(poly).unwrap();
-    let poly_lc = poly_ring.base_ring().clone_el(poly_ring.lc(poly).unwrap());
+    let poly_lc = poly_ring.lc(poly).unwrap();
+    assert!(poly_ring.base_ring().is_one(poly_lc));
     let ZZ = StaticRing::<i64>::RING;
 
     // Cantor-Zassenhaus does not directly work for p = 2, so skip the first prime
     for p in erathostenes::enumerate_primes(&ZZ, &1000).into_iter().skip(1) {
-
-        if poly_ring.base_ring().checked_div(&poly_lc, &int_cast(p, poly_ring.base_ring(), &ZZ)).is_some() {
-            continue;
-        }
 
         // check whether f mod p is square-free
         let Fp = Zn::new(p as u64).as_field().ok().unwrap();
@@ -106,7 +104,9 @@ fn factor_int_poly<'a, P>(poly_ring: &'a P, poly: &El<P>) -> Vec<El<P>>
         let reduce = |x: El<<P::Type as RingExtension>::BaseRing>| mod_p.map(int_cast(x, &ZZ, poly_ring.base_ring()));
         let prime_poly_ring = DensePolyRing::new(Fp, "X");
         let poly_mod_p = prime_poly_ring.from_terms(poly_ring.terms(&poly).map(|(c, i)| (reduce(poly_ring.base_ring().clone_el(c)), i)));
-        let squarefree_part = poly_squarefree_part(&prime_poly_ring, prime_poly_ring.clone_el(&poly_mod_p));
+        let mut squarefree_part = poly_squarefree_part(&prime_poly_ring, prime_poly_ring.clone_el(&poly_mod_p));
+        let inv_lc = Fp.div(&Fp.one(), prime_poly_ring.lc(&squarefree_part).unwrap());
+        prime_poly_ring.inclusion().mul_assign_map(&mut squarefree_part, inv_lc);
 
         if prime_poly_ring.eq_el(&squarefree_part, &poly_mod_p) {
 
@@ -136,43 +136,101 @@ fn factor_int_poly<'a, P>(poly_ring: &'a P, poly: &El<P>) -> Vec<El<P>>
     unreachable!()
 }
 
+///
+/// Factors a unipolynomial with rational coefficients into its irreducible factors.
+/// All factors are normalized and returned in any order (with multiplicities), and
+/// the corresponding unit - if not 1 - is returned as last element of the list (with multiplicity 1).
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::rational::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::field::*;
+/// # use feanor_math::algorithms::poly_factor::*;
+/// // Unfortunately, the internal gcd computations will *extremely* blow up coefficients;
+/// // If you are unsure, use BigIntRing::RING as underlying implementation of ZZ
+/// let ZZ = StaticRing::<i128>::RING;
+/// let QQ = RationalField::new(ZZ);
+/// let P = dense_poly::DensePolyRing::new(QQ, "X");
+/// let ZZ_to_QQ = QQ.can_hom(&ZZ).unwrap();
+/// let fraction = |nom: i128, den: i128| QQ.div(&ZZ_to_QQ.map(nom), &ZZ_to_QQ.map(den));
+/// 
+/// // f is X^2 + 3/2
+/// let f = P.from_terms([(fraction(3, 2), 0), (fraction(1, 1), 2)].into_iter());
+/// 
+/// // g is X^2 + 2/3 X + 1
+/// let g = P.from_terms([(fraction(1, 1), 0), (fraction(2, 3), 1), (fraction(1, 1), 2)].into_iter());
+/// 
+/// let fgg = P.prod([&f, &g, &g, &P.int_hom().map(6)].iter().map(|poly| P.clone_el(poly)));
+/// let factorization = factor_rational_poly(&P, &fgg);
+/// assert_eq!(3, factorization.len());
+/// if P.eq_el(&f, &factorization[0].0) {
+///     assert_eq!(1, factorization[0].1);
+///     assert_eq!(2, factorization[1].1);
+///     assert_el_eq!(&P, &g, &factorization[1].0);
+/// } else {
+///     assert_eq!(2, factorization[0].1);
+///     assert_eq!(1, factorization[1].1);
+///     assert_el_eq!(&P, &g, &factorization[0].0);
+///     assert_el_eq!(&P, &f, &factorization[1].0);
+/// }
+/// assert_el_eq!(&P, &P.int_hom().map(6), &factorization[2].0);
+/// ```
+/// 
 pub fn factor_rational_poly<P, I>(poly_ring: &P, poly: &El<P>) -> Vec<(El<P>, usize)>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing + RingExtension<BaseRing = RationalField<I>>,
         I: IntegerRingStore,
         I::Type: IntegerRing
 {
+    assert!(!poly_ring.is_zero(poly));
+    let QQ = poly_ring.base_ring();
+    let ZZ = QQ.base_ring();
     let mut result = Vec::new();
     let mut current = poly_ring.clone_el(poly);
-    let mut unit = poly_ring.base_ring().one();
     while !poly_ring.is_unit(&current) {
-        let squarefree_part = algorithms::cantor_zassenhaus::poly_squarefree_part(poly_ring, poly_ring.clone_el(&current));
+        let mut squarefree_part = algorithms::cantor_zassenhaus::poly_squarefree_part(poly_ring, poly_ring.clone_el(&current));
         current = poly_ring.checked_div(&current, &squarefree_part).unwrap();
 
-        let mut nom_gcd = poly_ring.base_ring().base_ring().one();
-        let mut den_lcm = poly_ring.base_ring().base_ring().one();
-        for ((nom, den), _) in poly_ring.terms(&squarefree_part) {
-            nom_gcd = algorithms::eea::signed_gcd(nom_gcd, poly_ring.base_ring().base_ring().clone_el(nom), poly_ring.base_ring().base_ring());
-            den_lcm = algorithms::eea::signed_lcm(den_lcm, poly_ring.base_ring().base_ring().clone_el(den), poly_ring.base_ring().base_ring());
-        }
-        let inclusion = poly_ring.base_ring().inclusion();
-        let factor = poly_ring.base_ring().div(&inclusion.map(den_lcm), &inclusion.map(nom_gcd));
-        unit = poly_ring.base_ring().div(&unit, &factor);
+        let lc = QQ.clone_el(poly_ring.lc(&squarefree_part).unwrap());
+        let inclusion = poly_ring.inclusion();
+        inclusion.mul_assign_map(&mut squarefree_part, QQ.checked_div(&QQ.one(), &lc).unwrap());
+        inclusion.mul_assign_map(&mut current, lc);
 
-        let int_poly_ring = DensePolyRing::new(poly_ring.base_ring().base_ring(), "X");
-        let squarefree_part_int = int_poly_ring.from_terms(poly_ring.terms(&squarefree_part).map(|(c, i)| {
-            let (nom, den) = poly_ring.base_ring().mul_ref(c, &factor);
-            assert!(poly_ring.base_ring().base_ring().is_one(&den));
-            (nom, i)
-        }));
-        for factor in factor_int_poly(&int_poly_ring, &squarefree_part_int) {
-            let factor_rational = poly_ring.from_terms(int_poly_ring.terms(&factor).map(|(c, i)| (inclusion.map_ref(c), i)));
+        // we switch from `f(X)` to `c^d f(X/c)`, where c is the lcm of all denominators;
+        // this will make the polynomial integral
+        let mut den_lcm = ZZ.one();
+        for (c, _) in poly_ring.terms(&squarefree_part) {
+            den_lcm = algorithms::eea::signed_lcm(den_lcm, ZZ.clone_el(&c.1), ZZ);
+        }
+        let poly_d = poly_ring.degree(&squarefree_part).unwrap();
+        let int_poly_ring = DensePolyRing::new(ZZ, "X");
+        let integral_poly = int_poly_ring.from_terms(poly_ring.terms(&squarefree_part).map(|(c, i)|
+            (ZZ.checked_div(&ZZ.mul_ref_fst(&c.0, ZZ.pow(ZZ.clone_el(&den_lcm), poly_d - i)), &c.1).unwrap(), i)
+        ));
+        for factor in factor_monic_int_poly(&int_poly_ring, &integral_poly) {
+            let factor_d = int_poly_ring.degree(&factor).unwrap();
+            let inclusion = QQ.inclusion();
+
+            // go back from `c^d f(X/c)` to `f(X)` - as the degrees of the factors must add up to the total degree,
+            // we can do this individually for each factor
+            let factor_rational = poly_ring.from_terms(int_poly_ring.terms(&factor).map(|(c, i)| 
+                (QQ.div(&inclusion.map_ref(c), &QQ.pow(inclusion.map_ref(&den_lcm), factor_d - i)), i)
+            ));
             if let Some((i, _)) = result.iter().enumerate().filter(|(_, (f, _))| poly_ring.eq_el(f, &factor_rational)).next() {
                 result[i].1 += 1;
             } else {
                 result.push((factor_rational, 1));
             }
         }
+    }
+    // add the unit
+    if !poly_ring.is_one(&current) {
+        result.push((current, 1));
     }
     return result;
 }
@@ -182,8 +240,41 @@ fn test_factor_int_poly() {
     let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
     let f = poly_ring.from_terms([(2, 0), (1, 3)].into_iter());
     let g = poly_ring.from_terms([(1, 0), (2, 1), (1, 2), (1, 4)].into_iter());
-    let actual = factor_int_poly(&poly_ring, &poly_ring.mul_ref(&f, &g));
+    let actual = factor_monic_int_poly(&poly_ring, &poly_ring.mul_ref(&f, &g));
     assert_eq!(2, actual.len());
     assert_el_eq!(&poly_ring, &f, &actual[0]);
     assert_el_eq!(&poly_ring, &g, &actual[1]);
+}
+
+#[test]
+fn test_factor_rational_poly() {
+    let QQ = RationalField::new(BigIntRing::RING);
+    let incl = QQ.int_hom();
+    let poly_ring = DensePolyRing::new(QQ, "X");
+    let f = poly_ring.from_terms([(incl.map(2), 0), (incl.map(1), 3)].into_iter());
+    let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
+    let actual = factor_rational_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f), poly_ring.clone_el(&f), poly_ring.clone_el(&g)].into_iter()));
+    assert_eq!(2, actual.len());
+    assert_el_eq!(&poly_ring, &f, &actual[0].0);
+    assert_eq!(2, actual[0].1);
+    assert_el_eq!(&poly_ring, &g, &actual[1].0);
+    assert_eq!(1, actual[1].1);
+}
+
+#[test]
+fn test_factor_nonmonic_poly() {
+    let QQ = RationalField::new(BigIntRing::RING);
+    let incl = QQ.int_hom();
+    let poly_ring = DensePolyRing::new(QQ, "X");
+    let f = poly_ring.from_terms([(QQ.div(&incl.map(3), &incl.map(5)), 0), (incl.map(1), 4)].into_iter());
+    let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
+    let actual = factor_rational_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f), poly_ring.clone_el(&f), poly_ring.clone_el(&g), poly_ring.int_hom().map(100)].into_iter()));
+    assert_eq!(3, actual.len());
+
+    assert_el_eq!(&poly_ring, &g, &actual[0].0);
+    assert_eq!(1, actual[0].1);
+    assert_el_eq!(&poly_ring, &f, &actual[1].0);
+    assert_eq!(2, actual[1].1);
+    assert_el_eq!(&poly_ring, &poly_ring.int_hom().map(100), &actual[2].0);
+    assert_eq!(1, actual[2].1);
 }
