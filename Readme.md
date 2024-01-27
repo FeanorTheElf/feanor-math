@@ -135,6 +135,7 @@ To implement a custom ring, just create a struct and add an `impl RingBase` and 
 Assuming we want to provide our own implementation of the finite binary field F2, we could do it as follows.
 ```rust
 use feanor_math::homomorphism::*;
+use feanor_math::integer::*;
 use feanor_math::assert_el_eq;
 use feanor_math::ring::*;
 
@@ -170,7 +171,13 @@ impl RingBase for F2Base {
         // elements are always represented by 0 or 1
         *lhs == *rhs
     }
-    
+
+    fn characteristic<I>(&self, ZZ: &I) -> Option<El<I>>
+        where I: IntegerRingStore, I::Type: IntegerRing
+    {
+        Some(ZZ.int_hom().map(2))
+    }
+
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
 
@@ -193,6 +200,7 @@ For example, a simple polynomial ring implementation could look like this.
 ```rust
 use feanor_math::assert_el_eq;
 use feanor_math::ring::*;
+use feanor_math::integer::*;
 use feanor_math::homomorphism::*;
 use feanor_math::rings::zn::*;
 use std::cmp::{min, max};
@@ -279,6 +287,12 @@ impl<R: RingStore> RingBase for MyPolyRing<R> {
             write!(f, "{} * X^{} + ", self.base_ring.format(&val[i]), i)?;
         }
         write!(f, "{} * X^{}", self.base_ring.format(val.last().unwrap()), val.len() - 1)
+    }
+
+    fn characteristic<I>(&self, ZZ: &I) -> Option<El<I>>
+        where I: IntegerRingStore, I::Type: IntegerRing
+    {
+        self.base_ring.get_ring().characteristic(ZZ)
     }
 }
 

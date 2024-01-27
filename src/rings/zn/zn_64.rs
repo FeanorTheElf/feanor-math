@@ -741,7 +741,7 @@ fn test_hom_from_fastmul() {
 
 #[test]
 fn test_finite_field_axioms() {
-    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(128));
-    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(15));
-    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(1 << 32));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(128));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(15));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(1 << 32));
 }

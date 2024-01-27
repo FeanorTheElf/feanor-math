@@ -1,3 +1,5 @@
+use crate::iters::multi_cartesian_product;
+use crate::iters::MultiProduct;
 use crate::mempool::*;
 use crate::vector::VectorView;
 use crate::integer::IntegerRingStore;
@@ -475,61 +477,105 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Divisibility
     }
 }
 
-pub struct ZnBaseElementsIterator<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>>
+pub struct FromCongruenceElementCreator<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
-    ring: &'a ZnBase<C, J, M>,
-    part_iters: Option<Vec<std::iter::Peekable<<C::Type as FiniteRing>::ElementsIter<'a>>>>
+    ring: &'a ZnBase<C, J, M>
 }
 
-impl<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clone for ZnBaseElementsIterator<'a, C, J, M>
+impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clone for FromCongruenceElementCreator<'a, C, J, M>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
     fn clone(&self) -> Self {
-        Self {
-            ring: self.ring,
-            part_iters: self.part_iters.as_ref().map(|part_iters| part_iters.iter().map(|part_it| 
-                Peek
-            ))
-        }
+        *self
     }
 }
 
-impl<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Iterator for ZnBaseElementsIterator<'a, C, J, M>
+impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Copy for FromCongruenceElementCreator<'a, C, J, M>
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
+        J::Type: IntegerRing,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+{}
+
+impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FnOnce<(&'b [El<C>],)> for FromCongruenceElementCreator<'a, C, J, M>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
-    type Item = ZnEl<C, M>;
+    type Output = <ZnBase<C, J, M> as RingBase>::Element;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(part_iters) = &mut self.part_iters {
-            while part_iters.len() < self.ring.components.len() {
-                part_iters.push(self.ring.components[part_iters.len()].elements().peekable());
-            }
+    extern "rust-call" fn call_once(mut self, args: (&'b [El<C>],)) -> Self::Output {
+        self.call_mut(args)
+    }
+}
 
-            let result = self.ring.memory_provider.get_new_init(
-                self.ring.len(),
-                |i: usize| self.ring.at(i).clone_el(part_iters[i].peek().unwrap())
-            );
-            part_iters.last_mut().unwrap().next();
-            while part_iters.last_mut().unwrap().peek().is_none() {
-                part_iters.pop();
-                if part_iters.len() > 0 {
-                    part_iters.last_mut().unwrap().next();
-                } else {
-                    self.part_iters = None;
-                    return Some(ZnEl(result));
-                }
-            }
-            return Some(ZnEl(result));
-        } else {
-            return None;
-        }
+impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FnMut<(&'b [El<C>],)> for FromCongruenceElementCreator<'a, C, J, M>
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
+        J::Type: IntegerRing,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+{
+    extern "rust-call" fn call_mut(&mut self, args: (&'b [El<C>],)) -> Self::Output {
+        self.ring.from_congruence(args.0.into_iter().enumerate().map(|(i, x)| self.ring.at(i).clone_el(x)))
+    }
+}
+
+pub struct CloneComponentElement<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>>
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
+        J::Type: IntegerRing,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+{
+    ring: &'a ZnBase<C, J, M>
+}
+
+impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clone for CloneComponentElement<'a, C, J, M>
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
+        J::Type: IntegerRing,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+{
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Copy for CloneComponentElement<'a, C, J, M>
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
+        J::Type: IntegerRing,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+{}
+
+impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FnOnce<(usize, &'b El<C>)> for CloneComponentElement<'a, C, J, M>
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
+        J::Type: IntegerRing,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+{
+    type Output = El<C>;
+
+    extern "rust-call" fn call_once(mut self, args: (usize, &'b El<C>)) -> Self::Output {
+        self.call_mut(args)
+    }
+}
+
+impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FnMut<(usize, &'b El<C>)> for CloneComponentElement<'a, C, J, M>
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
+        J::Type: IntegerRing,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+{
+    extern "rust-call" fn call_mut(&mut self, args: (usize, &'b El<C>)) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Fn<(usize, &'b El<C>)> for CloneComponentElement<'a, C, J, M>
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
+        J::Type: IntegerRing,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+{
+    extern "rust-call" fn call(&self, args: (usize, &'b El<C>)) -> Self::Output {
+        self.ring.at(args.0).clone_el(args.1)
     }
 }
 
@@ -538,14 +584,11 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FiniteRing f
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
 {
-    type ElementsIter<'a> = ZnBaseElementsIterator<'a, C, J, M>
+    type ElementsIter<'a> = MultiProduct<<C::Type as FiniteRing>::ElementsIter<'a>, FromCongruenceElementCreator<'a, C, J, M>, CloneComponentElement<'a, C, J, M>, Self::Element>
         where Self: 'a;
 
-    fn elements<'a>(&'a self) -> ZnBaseElementsIterator<'a, C, J, M> {
-        ZnBaseElementsIterator {
-            ring: self,
-            part_iters: Some(Vec::new())
-        }
+    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
+        multi_cartesian_product((0..self.len()).map(|i| self.at(i).elements()), FromCongruenceElementCreator { ring: self }, CloneComponentElement { ring: self })
     }
 
     fn random_element<G: FnMut() -> u64>(&self, mut rng: G) -> ZnEl<C, M> {
@@ -682,9 +725,9 @@ fn test_principal_ideal_ring_axioms() {
 }
 
 #[test]
-fn test_finite_field_axioms() {
-    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![3, 5, 7, 11]));
-    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![3, 5]));
-    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![3]));
-    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![128]));
+fn test_finite_ring_axioms() {
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![3, 5, 7, 11]));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![3, 5]));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![3]));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![128]));
 }

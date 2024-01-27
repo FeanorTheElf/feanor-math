@@ -46,7 +46,7 @@ pub mod generic_tests {
 
     use super::{FiniteRing, FiniteRingStore};
 
-    pub fn test_finite_field_axioms<R>(ring: &R)
+    pub fn test_finite_ring_axioms<R>(ring: &R)
         where R: FiniteRingStore,
             R::Type: FiniteRing
     {

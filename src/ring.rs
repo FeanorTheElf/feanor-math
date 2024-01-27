@@ -35,6 +35,7 @@ use crate::algorithms;
 /// ```
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
+/// # use feanor_math::integer::*;
 /// 
 /// #[derive(PartialEq)]
 /// struct MyRingBase;
@@ -341,8 +342,8 @@ pub trait RingBase: PartialEq {
     /// # use feanor_math::rings::zn::*;
     /// let ZZ = StaticRing::<i16>::RING;
     /// assert_eq!(Some(0), StaticRing::<i64>::RING.characteristic(&ZZ));
-    /// assert_eq!(None, zn_64::Zn::new(i16::MAX as u64).characteristic(&ZZ));
-    /// assert_eq!(Some(i16::MAX), zn_64::Zn::new(i16::MAX as u64).characteristic(&StaticRing::<i16>::RING));
+    /// assert_eq!(None, zn_64::Zn::new(i16::MAX as u64 + 1).characteristic(&ZZ));
+    /// assert_eq!(Some(i16::MAX), zn_64::Zn::new(i16::MAX as u64).characteristic(&ZZ));
     /// ```
     /// 
     fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>

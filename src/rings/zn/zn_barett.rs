@@ -363,7 +363,7 @@ impl<'a, I> Clone for ZnBaseElementsIter<'a, I>
         I::Type: IntegerRing
 {
     fn clone(&self) -> Self {
-        Self { ring: self.ring, current: self.ring.clone_el(&self.current) }
+        Self { ring: self.ring, current: self.ring.integer_ring().clone_el(&self.current) }
     }
 }
 
@@ -587,7 +587,7 @@ fn test_canonical_iso_axioms_as_field() {
 
 #[test]
 fn test_finite_field_axioms() {
-    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(&StaticRing::<i64>::RING, 128));
-    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(&StaticRing::<i64>::RING, 15));
-    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::new(&StaticRing::<i128>::RING, 1 << 32));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(&StaticRing::<i64>::RING, 128));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(&StaticRing::<i64>::RING, 15));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(&StaticRing::<i128>::RING, 1 << 32));
 }

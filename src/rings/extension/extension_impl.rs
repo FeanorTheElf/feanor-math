@@ -232,7 +232,7 @@ impl<'a, 'b, R, V, M> FnOnce<(&'b [El<R>], )> for WRTCanonicalBasisElementCreato
 {
     type Output = El<FreeAlgebraImpl<R, V, M>>;
 
-    extern "rust-call" fn call_once(self, args: (&'b [El<R>], )) -> Self::Output {
+    extern "rust-call" fn call_once(mut self, args: (&'b [El<R>], )) -> Self::Output {
         self.call_mut(args)
     }
 }
@@ -252,11 +252,11 @@ impl<'a, R, V, M> Copy for WRTCanonicalBasisElementCreator<'a, R, V, M>
 impl<R, V, M> FiniteRing for FreeAlgebraImplBase<R, V, M>
     where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
 {
-    type ElementsIter<'a> = MultiProduct<<R::Type as FiniteRing>::ElementsIter<'a>, WRTCanonicalBasisElementCreator<'a, R, V, M>, Self::Element>
+    type ElementsIter<'a> = MultiProduct<<R::Type as FiniteRing>::ElementsIter<'a>, WRTCanonicalBasisElementCreator<'a, R, V, M>, RingElementClone<'a, R::Type>, Self::Element>
         where Self: 'a;
 
     fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
-        multi_cartesian_product(self.base_ring().elements(), WRTCanonicalBasisElementCreator { base_ring: self })
+        multi_cartesian_product((0..self.rank()).map(|_| self.base_ring().elements()), WRTCanonicalBasisElementCreator { base_ring: self }, RingElementClone::new(self.base_ring().get_ring()))
     }
 
     fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>

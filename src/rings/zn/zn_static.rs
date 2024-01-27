@@ -268,10 +268,10 @@ pub const F17: Fp<17> = Fp::<17>::RING;
 
 #[test]
 fn test_finite_field_axioms() {
-    crate::rings::finite::generic_tests::test_finite_field_axioms(&F17);
-    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::<128>::RING);
-    crate::rings::finite::generic_tests::test_finite_field_axioms(&Fp::<257>::RING);
-    crate::rings::finite::generic_tests::test_finite_field_axioms(&Zn::<256>::RING);
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&F17);
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::<128>::RING);
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Fp::<257>::RING);
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::<256>::RING);
 }
 
 #[test]

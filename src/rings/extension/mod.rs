@@ -32,14 +32,15 @@ pub mod extension_impl;
 /// # use feanor_math::rings::finite::*;
 /// // we have to decide for an implementation of the prime field
 /// let prime_field = zn_static::Fp::<3>::RING;
-/// let galois_field = extension_impl::FreeAlgebraImpl::new(prime_field, [2, 0, 0], default_memory_provider!());
-/// // this is now the finite field with 27 elements, or F_27 or GF(27) since X^3 + 1 is irreducible modulo 3
+/// let galois_field = extension_impl::FreeAlgebraImpl::new(prime_field, [2, 1, 0], default_memory_provider!());
+/// // this is now the finite field with 27 elements, or F_27 or GF(27) since X^3 + 2X + 1 is irreducible modulo 3
 /// 
-/// assert_eq!(27, galois_field.size(&StaticRing::<i64>::RING));
+/// assert_eq!(Some(27), galois_field.size(&StaticRing::<i64>::RING));
 /// 
 /// // currently, this ring unfortunately does not implement `Field`; However, we can already do division
 /// for x in galois_field.elements() {
 ///     if !galois_field.is_zero(&x) {
+///         galois_field.println(&x);
 ///         let inv_x = galois_field.checked_div(&galois_field.one(), &x).unwrap();
 ///         assert_el_eq!(&galois_field, &galois_field.one(), &galois_field.mul(x, inv_x));
 ///     }

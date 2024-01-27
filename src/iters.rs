@@ -1,5 +1,85 @@
 use std::{convert::TryInto, cmp::min};
 
+use crate::ring::RingBase;
+
+pub struct RingElementClone<'a, R>
+    where R: ?Sized + RingBase
+{
+    ring: &'a R
+}
+
+impl<'a, R> RingElementClone<'a, R>
+    where R: ?Sized + RingBase
+{
+    pub const fn new(ring: &'a R) -> Self {
+        Self { ring }
+    }
+}
+
+impl<'a, R> Copy for RingElementClone<'a, R>
+    where R: ?Sized + RingBase
+{}
+
+impl<'a, R> Clone for RingElementClone<'a, R>
+    where R: ?Sized + RingBase
+{
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'a, R> FnOnce<(&R::Element, )> for RingElementClone<'a, R>
+    where R: ?Sized + RingBase
+{
+    type Output = R::Element;
+
+    extern "rust-call" fn call_once(self, args: (&R::Element, )) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, R> FnMut<(&R::Element, )> for RingElementClone<'a, R>
+    where R: ?Sized + RingBase
+{
+    extern "rust-call" fn call_mut(&mut self, args: (&R::Element, )) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, R> Fn<(&R::Element, )> for RingElementClone<'a, R>
+    where R: ?Sized + RingBase
+{
+    extern "rust-call" fn call(&self, args: (&R::Element, )) -> Self::Output {
+        self.ring.clone_el(args.0)
+    }
+}
+
+impl<'a, R> FnOnce<(usize, &R::Element, )> for RingElementClone<'a, R>
+    where R: ?Sized + RingBase
+{
+    type Output = R::Element;
+
+    extern "rust-call" fn call_once(self, args: (usize, &R::Element, )) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, R> FnMut<(usize, &R::Element, )> for RingElementClone<'a, R>
+    where R: ?Sized + RingBase
+{
+    extern "rust-call" fn call_mut(&mut self, args: (usize, &R::Element, )) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, R> Fn<(usize, &R::Element, )> for RingElementClone<'a, R>
+    where R: ?Sized + RingBase
+{
+    extern "rust-call" fn call(&self, args: (usize, &R::Element, )) -> Self::Output {
+        self.ring.clone_el(args.1)
+    }
+}
+
 ///
 /// Clones of the used base iterator must have the same iteration order as the iterator itself
 /// 
@@ -190,7 +270,7 @@ impl<'a, F, T> std::iter::FusedIterator for MultisetCombinations<'a, F, T>
 /// # Example
 /// 
 /// ```
-/// # use feanor_la::combinatorics::iters::multiset_combinations;
+/// # use feanor_math::iters::multiset_combinations;
 /// assert_eq!(
 ///     vec![(1, 1, 0), (1, 0, 1), (0, 2, 0), (0, 1, 1), (0, 0, 2)],
 ///     multiset_combinations(
@@ -290,32 +370,40 @@ pub fn cartesian_product<I, J>(mut it1: I, it2: J) -> Product<I, J>
     }
 }
 
-pub struct MultiProduct<I, F, T> 
-    where I: Iterator + Clone, F: FnMut(&[I::Item]) -> T
+pub struct MultiProduct<I, F, G, T> 
+    where I: Iterator + Clone, 
+        F: FnMut(&[I::Item]) -> T,
+        G: Clone + Fn(usize, &I::Item) -> I::Item
 {
     base_iters: Vec<I>,
     current_iters: Vec<I>,
     current: Vec<I::Item>,
+    clone_el: G,
     converter: F,
     done: bool
 }
 
-impl<I, F, T> Clone for MultiProduct<I, F, T>
-    where I: Iterator + Clone, F: Clone + FnMut(&[I::Item]) -> T, I::Item: Clone
+impl<I, F, G, T> Clone for MultiProduct<I, F, G, T>
+    where I: Iterator + Clone, 
+        F: Clone + FnMut(&[I::Item]) -> T,
+        G: Clone + Fn(usize, &I::Item) -> I::Item
 {
     fn clone(&self) -> Self {
         MultiProduct {
             base_iters: self.base_iters.clone(),
             current_iters: self.current_iters.clone(),
-            current: self.current.clone(),
+            current: self.current.iter().enumerate().map(|(i, x)| (self.clone_el)(i, x)).collect(),
+            clone_el: self.clone_el.clone(),
             converter: self.converter.clone(),
             done: self.done
         }
     }
 }
 
-impl<I, F, T> Iterator for MultiProduct<I, F, T>
-    where I: Iterator + Clone, F: FnMut(&[I::Item]) -> T
+impl<I, F, G, T> Iterator for MultiProduct<I, F, G, T>
+    where I: Iterator + Clone, 
+        F: Clone + FnMut(&[I::Item]) -> T,
+        G: Clone + Fn(usize, &I::Item) -> I::Item
 {
     type Item = T;
 
@@ -356,18 +444,22 @@ impl<I, F, T> Iterator for MultiProduct<I, F, T>
 /// # Example
 /// 
 /// ```
-/// # use feanor_la::combinatorics::iters::multi_cartesian_product;
+/// # use feanor_math::iters::multi_cartesian_product;
 /// assert_eq!(
 ///     vec![(2, 0), (2, 1), (2, 2), (3, 0), (3, 1), (3, 2)],
 ///     multi_cartesian_product(
 ///         vec![(2..=3), (0..=2)].into_iter(),
-///         |x| (x[0], x[1])
+///         |x| (x[0], x[1]),
+///         |_, x| *x
 ///     ).collect::<Vec<_>>()
 /// );
 /// ```
 /// 
-pub fn multi_cartesian_product<J, F, T>(iters: J, converter: F) -> MultiProduct<J::Item, F, T>
-    where J: Iterator, J::Item: Iterator + Clone, F: FnMut(&[<J::Item as Iterator>::Item]) -> T
+pub fn multi_cartesian_product<J, F, G, T>(iters: J, converter: F, clone_el: G) -> MultiProduct<J::Item, F, G, T>
+    where J: Iterator, 
+        J::Item: Iterator + Clone, 
+        F: FnMut(&[<J::Item as Iterator>::Item]) -> T,
+        G: Clone + Fn(usize, &<J::Item as Iterator>::Item) -> <J::Item as Iterator>::Item
 {
     let base_iters = iters.collect::<Vec<_>>();
     let mut current_iters = base_iters.clone();
@@ -380,6 +472,7 @@ pub fn multi_cartesian_product<J, F, T>(iters: J, converter: F) -> MultiProduct<
                 done: true,
                 converter: converter,
                 base_iters: base_iters,
+                clone_el: clone_el,
                 current_iters: current_iters,
                 current: current
             };
@@ -390,6 +483,7 @@ pub fn multi_cartesian_product<J, F, T>(iters: J, converter: F) -> MultiProduct<
         converter: converter,
         base_iters: base_iters,
         current_iters: current_iters,
+        clone_el: clone_el,
         current: current
     };
 }
@@ -433,7 +527,7 @@ impl<I, F, T> std::iter::FusedIterator for CondenseIter<I, F, T>
 /// # Example
 /// 
 /// ```
-/// # use feanor_la::combinatorics::iters::condense;
+/// # use feanor_math::iters::condense;
 /// let mut accumulator = 0;
 /// assert_eq!(vec![6, 9, 6, 7], condense(vec![1, 2, 3, 4, 5, 6, 7].into_iter(), move |a| {
 ///     accumulator += a;
@@ -507,7 +601,8 @@ fn test_multi_cartesian_product() {
     let all = [a, b, c];
     let it = multi_cartesian_product(
         all.iter().map(|l| l.iter().map(|x| *x)), 
-        |x| [x[0], x[1], x[2]]
+        |x| [x[0], x[1], x[2]],
+        |_, x| *x
     );
     let expected = vec![
         [0, 0, -1],
