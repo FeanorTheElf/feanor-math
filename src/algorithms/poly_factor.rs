@@ -66,6 +66,9 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
         let mut ungrouped_factors = (0..lifted_factorization.len()).collect::<Vec<_>>();
         let mut result = Vec::new();
         while !prime_power_poly_ring.is_unit(&poly) {
+            // Here we use the naive approach to group the factors in the p-adic numbers such that the product of each group
+            // is integral - just try all combinations. It might be worth using LLL for this instead (as soon as LLL is implemented
+            // in this library).
             let (factor, factor_group) = crate::iters::basic_powerset(ungrouped_factors.iter().copied())
                 .skip(1)
                 .map(|slice| (prime_power_poly_ring.prod(slice.iter().copied().map(|i| prime_power_poly_ring.clone_el(&lifted_factorization[i]))), slice))
@@ -81,8 +84,8 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
 }
 
 ///
-/// The given polynomial is assumed to be square-free, monic and should have integral
-/// coefficients.
+/// The given polynomial must be square-free, monic and should have integral
+/// coefficients. In this case, all factors are also monic integral polynomials.
 /// 
 fn factor_monic_int_poly<'a, P>(poly_ring: &'a P, poly: &El<P>) -> Vec<El<P>>
     where P: PolyRingStore,
