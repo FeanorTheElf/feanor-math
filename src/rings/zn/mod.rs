@@ -269,68 +269,10 @@ impl<R: RingStore> ZnRingStore for R
 /// If you want to avoid the boilerplate code to create such an
 /// object, look at the experimental macro [`generate_zn_function`].
 /// 
-pub trait ZnOperation<Result> {
+pub trait ZnOperation<Result = ()> {
     
     fn call<R: ZnRingStore>(self, ring: R) -> Result
         where R::Type: ZnRing;
-}
-
-///
-/// A helper macro to easily create an object implementing [`ZnOperation`].
-/// This is experimental, and tries to make it easy to write code that requires
-/// some finite field `Z/nZ`, but does not care about its implementation.
-/// 
-/// # Example
-/// ```
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::generate_zn_function;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::assert_el_eq;
-/// 
-/// let int_value = 4;
-/// // work in Z/17Z without explicitly choosing an implementation
-/// choose_zn_impl(StaticRing::<i64>::RING, 17, generate_zn_function!(
-///     < {'a} > [_: &'a i64 = &int_value] |Zn: R, (int_value, ): (&i64, )| {
-///         let value = Zn.coerce(Zn.integer_ring(), int_cast(*int_value, Zn.integer_ring(), &StaticRing::<i64>::RING));
-///         assert_el_eq!(&Zn, &Zn.int_hom().map(-1), &Zn.mul_ref(&value, &value));
-///     }
-/// ));
-/// ```
-/// 
-/// # Warning
-/// 
-/// As type for the ring parameter, you can use `R` - I do not think Rust should allow this
-/// (it violates macro hygenie), but let's be happy that it works, otherwise this would be
-/// impossible.
-/// 
-#[deprecated]
-#[macro_export]
-macro_rules! generate_zn_function {
-    (< $({$gen_param:tt $(: $($gen_constraint:tt)*)?}),* > $bindings:tt $lambda:expr) => {
-        {
-            struct LocalZnOperation<$($gen_param),*> 
-                where $($($gen_param: $($gen_constraint)*,)?)*
-            {
-                args: $crate::generate_binding_type!{ $bindings }
-            }
-
-            impl<$($gen_param),*>  $crate::rings::zn::ZnOperation<()> for LocalZnOperation<$($gen_param),*> 
-                where $($($gen_param: $($gen_constraint)*,)?)*
-            {
-                
-                fn call<R: $crate::rings::zn::ZnRingStore>(self, ring: R)
-                    where <R as $crate::ring::RingStore>::Type: $crate::rings::zn::ZnRing
-                {
-                    ($lambda)(ring, self.args);
-                } 
-            }
-
-            LocalZnOperation { args: $crate::generate_binding_value!($bindings) }
-        }
-    };
 }
 
 ///
@@ -345,19 +287,23 @@ macro_rules! generate_zn_function {
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
-/// # use feanor_math::generate_zn_function;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::assert_el_eq;
 /// 
 /// let int_value = 4;
 /// // work in Z/17Z without explicitly choosing an implementation
-/// choose_zn_impl(StaticRing::<i64>::RING, 17, generate_zn_function!(
-///     < {'a} > [_: &'a i64 = &int_value] |Zn: R, (int_value, ): (&i64, )| {
-///         let value = Zn.coerce(Zn.integer_ring(), int_cast(*int_value, Zn.integer_ring(), &StaticRing::<i64>::RING));
+/// struct DoStuff { int_value: i64 }
+/// impl ZnOperation for DoStuff {
+///     fn call<R>(self, Zn: R) -> ()
+///         where R: RingStore,
+///             R::Type: ZnRing
+///     {
+///         let value = Zn.coerce(Zn.integer_ring(), int_cast(self.int_value, Zn.integer_ring(), &StaticRing::<i64>::RING));
 ///         assert_el_eq!(&Zn, &Zn.int_hom().map(-1), &Zn.mul_ref(&value, &value));
-///     }
-/// ));
+///     } 
+/// }
+/// choose_zn_impl(StaticRing::<i64>::RING, 17, DoStuff { int_value });
 /// ```
 /// 
 pub fn choose_zn_impl<I, F, R>(ZZ: I, n: El<I>, f: F) -> R
@@ -370,6 +316,22 @@ pub fn choose_zn_impl<I, F, R>(ZZ: I, n: El<I>, f: F) -> R
     } else {
         f.call(zn_barett::Zn::new(ZZ, n))
     }
+}
+
+#[test]
+fn test_choose_zn_impl() {
+    let int_value = 4;
+    // work in Z/17Z without explicitly choosing an implementation
+    struct DoStuff { int_value: i64 }
+    impl ZnOperation<()> for DoStuff {
+        fn call<R: ZnRingStore>(self, Zn: R)
+            where R::Type: ZnRing
+        {
+            let value = Zn.coerce(Zn.integer_ring(), int_cast(self.int_value, Zn.integer_ring(), &StaticRing::<i64>::RING));
+            assert_el_eq!(&Zn, &Zn.int_hom().map(-1), &Zn.mul_ref(&value, &value));
+        } 
+    }
+    choose_zn_impl(StaticRing::<i64>::RING, 17, DoStuff { int_value });
 }
 
 pub struct ReductionMap<R, S>

@@ -81,7 +81,7 @@ impl<R: RingStore> VectorView<El<R>> for SparseVectorMut<R> {
 
     fn at(&self, i: usize) -> &El<R> {
         assert!(i < self.len());
-        if std::intrinsics::unlikely(i == self.modify_entry.0) {
+        if i == self.modify_entry.0 {
             &self.modify_entry.1
         } else if let Some(res) = self.data.get(&i) {
             res

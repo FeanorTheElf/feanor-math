@@ -3,6 +3,10 @@ use crate::vector::vec_fn::*;
 use crate::homomorphism::*;
 use super::poly::{PolyRingStore, PolyRing};
 
+///
+/// Contains [`extension_impl::FreeAlgebraImpl`], an implementation of [`FreeAlgebra`] based
+/// on polynomial division.
+/// 
 pub mod extension_impl;
 
 ///

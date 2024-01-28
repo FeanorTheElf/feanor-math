@@ -106,7 +106,7 @@ impl ZnBase {
     }
 
     fn potential_reduce(&self, val: &mut u64) {
-        if std::intrinsics::unlikely(*val > self.repr_bound) {
+        if *val > self.repr_bound {
             *val = self.bounded_reduce(*val as u128);
         }
     }
@@ -365,7 +365,7 @@ impl CanHomFrom<StaticRingBase<i32>> for ZnBase {
         // we check this in the constructor also during release
         debug_assert!(self.repr_bound >= (1 << 16));
 
-        if std::intrinsics::likely(hom.reduction_is_trivial) {
+        if hom.reduction_is_trivial {
             if el < 0 {
                 self.negate(self.from_bounded(-(el as i64) as u64))
             } else {

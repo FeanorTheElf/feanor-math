@@ -92,7 +92,6 @@ fn factor_monic_int_poly<'a, P>(poly_ring: &'a P, poly: &El<P>) -> Vec<El<P>>
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
 {
-    println!("Factor int poly: {}", poly_ring.format(poly));
     let d = poly_ring.degree(poly).unwrap();
     let poly_lc = poly_ring.lc(poly).unwrap();
     assert!(poly_ring.base_ring().is_one(poly_lc));
@@ -169,8 +168,8 @@ fn factor_monic_int_poly<'a, P>(poly_ring: &'a P, poly: &El<P>) -> Vec<El<P>>
 /// let g = P.from_terms([(fraction(1, 1), 0), (fraction(2, 3), 1), (fraction(1, 1), 2)].into_iter());
 /// 
 /// let fgg = P.prod([&f, &g, &g, &P.int_hom().map(6)].iter().map(|poly| P.clone_el(poly)));
-/// let factorization = factor_rational_poly(&P, &fgg);
-/// assert_eq!(3, factorization.len());
+/// let (factorization, unit) = factor_rational_poly(&P, &fgg);
+/// assert_eq!(2, factorization.len());
 /// if P.eq_el(&f, &factorization[0].0) {
 ///     assert_eq!(1, factorization[0].1);
 ///     assert_eq!(2, factorization[1].1);
@@ -181,10 +180,10 @@ fn factor_monic_int_poly<'a, P>(poly_ring: &'a P, poly: &El<P>) -> Vec<El<P>>
 ///     assert_el_eq!(&P, &g, &factorization[0].0);
 ///     assert_el_eq!(&P, &f, &factorization[1].0);
 /// }
-/// assert_el_eq!(&P, &P.int_hom().map(6), &factorization[2].0);
+/// assert_el_eq!(&QQ, &ZZ_to_QQ.map(6), &unit);
 /// ```
 /// 
-pub fn factor_rational_poly<P, I>(poly_ring: &P, poly: &El<P>) -> Vec<(El<P>, usize)>
+pub fn factor_rational_poly<P, I>(poly_ring: &P, poly: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing + RingExtension<BaseRing = RationalField<I>>,
         I: IntegerRingStore,
@@ -231,11 +230,9 @@ pub fn factor_rational_poly<P, I>(poly_ring: &P, poly: &El<P>) -> Vec<(El<P>, us
             }
         }
     }
-    // add the unit
-    if !poly_ring.is_one(&current) {
-        result.push((current, 1));
-    }
-    return result;
+    let unit = QQ.clone_el(poly_ring.coefficient_at(&current, 0));
+    assert_el_eq!(&poly_ring, &poly_ring.inclusion().map_ref(&unit), &current);
+    return (result, unit);
 }
 
 #[test]
@@ -256,7 +253,7 @@ fn test_factor_rational_poly() {
     let poly_ring = DensePolyRing::new(QQ, "X");
     let f = poly_ring.from_terms([(incl.map(2), 0), (incl.map(1), 3)].into_iter());
     let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
-    let actual = factor_rational_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f), poly_ring.clone_el(&f), poly_ring.clone_el(&g)].into_iter()));
+    let (actual, unit) = factor_rational_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f), poly_ring.clone_el(&f), poly_ring.clone_el(&g)].into_iter()));
     assert_eq!(2, actual.len());
     assert_el_eq!(&poly_ring, &f, &actual[0].0);
     assert_eq!(2, actual[0].1);
@@ -271,13 +268,12 @@ fn test_factor_nonmonic_poly() {
     let poly_ring = DensePolyRing::new(QQ, "X");
     let f = poly_ring.from_terms([(QQ.div(&incl.map(3), &incl.map(5)), 0), (incl.map(1), 4)].into_iter());
     let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
-    let actual = factor_rational_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f), poly_ring.clone_el(&f), poly_ring.clone_el(&g), poly_ring.int_hom().map(100)].into_iter()));
-    assert_eq!(3, actual.len());
+    let (actual, unit) = factor_rational_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f), poly_ring.clone_el(&f), poly_ring.clone_el(&g), poly_ring.int_hom().map(100)].into_iter()));
+    assert_eq!(2, actual.len());
 
     assert_el_eq!(&poly_ring, &g, &actual[0].0);
     assert_eq!(1, actual[0].1);
     assert_el_eq!(&poly_ring, &f, &actual[1].0);
     assert_eq!(2, actual[1].1);
-    assert_el_eq!(&poly_ring, &poly_ring.int_hom().map(100), &actual[2].0);
-    assert_eq!(1, actual[2].1);
+    assert_el_eq!(&QQ, &incl.map(100), &unit);
 }

@@ -132,7 +132,7 @@ impl ZnBase {
     }
 
     fn potential_reduce(&self, mut value: u64) -> u64 {
-        if std::intrinsics::unlikely(value >= self.repr_bound()) {
+        if value >= self.repr_bound() {
             value -= self.repr_bound();
         }
         if value >= self.modulus_times_three {
@@ -375,7 +375,7 @@ macro_rules! impl_static_int_to_zn {
                 }
 
                 fn map_in(&self, _from: &StaticRingBase<$int>, el: $int, hom: &IntToZnHom<$int>) -> Self::Element {
-                    if std::intrinsics::likely(hom.reduction_is_trivial) {
+                    if hom.reduction_is_trivial {
                         if el < 0 {
                             self.negate(ZnEl(-(el as i128) as u64))
                         } else {

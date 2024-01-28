@@ -4,8 +4,7 @@
 #![feature(min_specialization)]
 #![feature(maybe_uninit_slice)]
 #![feature(allocator_api)]
-#![feature(new_uninit)] 
-#![feature(core_intrinsics)]
+#![feature(new_uninit)]
 #![feature(const_type_name)]
 #![feature(is_sorted)]
 #![feature(fn_traits)]
@@ -21,35 +20,24 @@ extern crate oorandom;
 extern crate rayon;
 
 ///
-/// This is currently experimental, we strongly discourage you
-/// from using it, except through [`crate::generate_zn_function`].
-/// 
-/// This module contains macros that allow defining simple objects
-/// implementing the function trait [`std::ops::Fn`]. The advantage
-/// over standard closures is that they have a name, and thus can be
-/// returned from functions.
-/// 
-mod named_closure;
-
-///
-/// Module containing different implementations of [`mempool::MemoryProvider`],
+/// Contains different implementations of [`mempool::MemoryProvider`],
 /// which can be used to tell algorithms and ring implementations how to allocate internally
 /// used memory.
 /// 
 pub mod mempool;
 #[macro_use]
 ///
-/// This module contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`],
+/// Contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`],
 /// as well as [`ring::CanHomFrom`] and [`ring::CanonicalIso`].
 /// 
 pub mod ring;
 ///
-/// This module contains the trait [`delegate::DelegateRing`] that simplifies implementing the 
+/// Contains the trait [`delegate::DelegateRing`] that simplifies implementing the 
 /// newtype-pattern for rings.
 /// 
 pub mod delegate;
 ///
-/// This module contains the trait [`vector::VectorView`] for objects that provide access to 
+/// Contains the trait [`vector::VectorView`] for objects that provide access to 
 /// some kind of linear container.
 /// 
 /// This module is currently slightly chaotic, as there is significant functionality overlap
@@ -57,42 +45,42 @@ pub mod delegate;
 /// 
 pub mod vector;
 ///
-/// This module contains the trait [`divisibility::DivisibilityRing`] for rings that provide information
+/// Contains the trait [`divisibility::DivisibilityRing`] for rings that provide information
 /// about divisibility of their elements.
 /// 
 pub mod divisibility;
 ///
-/// This module contains the trait [`field::Field`] for rings that are fields.
+/// Contains the trait [`field::Field`] for rings that are fields.
 /// 
 pub mod field;
 pub mod pid;
 pub mod matrix;
 ///
-/// This module contains the trait [`ordered::OrderedRing`] for rings with a total ordering that is compatible
+/// Contains the trait [`ordered::OrderedRing`] for rings with a total ordering that is compatible
 /// with the ring operations.
 /// 
 pub mod ordered;
 ///
-/// This module provides the ring implementation [`primitive_int::StaticRing`] that represents the integer ring
+/// Provides the ring implementation [`primitive_int::StaticRing`] that represents the integer ring
 /// with arithmetic given by the primitive integer types ``i8` to `i128`.
 /// 
 pub mod primitive_int;
 ///
-/// This module contains the trait [`integer::IntegerRing`] for rings that represent the ring of integers `Z`.
+/// Contains the trait [`integer::IntegerRing`] for rings that represent the ring of integers `Z`.
 /// 
 pub mod integer;
 ///
-/// This module is a collection of all number-theoretic algorithms that are currently implemented in
+/// A collection of all number-theoretic algorithms that are currently implemented in
 /// this crate.
 /// 
 pub mod algorithms;
 ///
-/// This module is a collection of various more complicated ring traits and implementations, in particular
+/// A collection of various more complicated ring traits and implementations, in particular
 /// arbitrary-precision integer rings, the integer quotients `Z/nZ` or polynomial rings.
 /// 
 pub mod rings;
 ///
-/// This module contains the struct [`wrapper::RingElementWrapper`] that contains an element together with its ring,
+/// Ccontains the struct [`wrapper::RingElementWrapper`] that contains an element together with its ring,
 /// and thus can provide ring operations without explicit access to the ring.
 /// 
 /// Using this is for example necessary if you want to use elements of a [`crate::ring::HashableElRing`]-ring
@@ -110,11 +98,18 @@ pub mod rings;
 /// ```
 /// 
 pub mod wrapper;
-
-pub mod generic_cast;
-
+///
+/// Contains functions to conditionally enable parallel execution of some algorithms.
+/// 
 pub mod parallel;
-
+///
+/// Contains the trait [`homomorphism::Homomorphism`], [`homomorphism::CanHomFrom`] and
+/// others that are the foundation of the homomorphism framework, that enables mapping
+/// elements between different rings.
+/// 
 pub mod homomorphism;
-
+///
+/// Contains implementations of various iterators and combinators, like [`iters::powerset()`]
+/// or [`iters::cartesian_product`].
+/// 
 pub mod iters;

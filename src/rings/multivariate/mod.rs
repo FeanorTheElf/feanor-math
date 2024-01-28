@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::BTreeMap;
 use std::hash::Hash;
 use std::ops::{Index, RangeTo, RangeFrom};
@@ -8,11 +9,10 @@ use std::cmp::{min, max};
 use crate::vector::subvector::{Subvector, SelfSubvectorView};
 use crate::ring::*;
 use crate::homomorphism::*;
-use crate::generic_cast::generic_cast;
 use crate::vector::{VectorView, VectorViewMut};
 
 ///
-/// This module contains [`ordered::MultivariatePolyRingImpl`], an implementation
+/// Contains [`ordered::MultivariatePolyRingImpl`], an implementation
 /// of multivariate polynomials using a sparse representation.
 /// 
 pub mod ordered;
@@ -539,7 +539,7 @@ pub trait MonomialOrder: Clone + Sized + 'static {
 
     fn is_same<O: MonomialOrder>(&self, other: O) -> bool {
         assert!(std::mem::size_of::<Self>() == 0);
-        match generic_cast::<_, Self>(other) {
+        match (&other as &dyn Any).downcast_ref::<Self>() {
             Some(_) => true,
             None => false
         }
@@ -665,7 +665,7 @@ impl MonomialOrder for BlockLexDegRevLex {
     }
 
     fn is_same<O: ?Sized + MonomialOrder>(&self, other: O) -> bool {
-        match generic_cast::<_, Self>(other) {
+        match (&other as &dyn Any).downcast_ref::<Self>() {
             Some(other) => self.larger_block == other.larger_block,
             None => false
         }
