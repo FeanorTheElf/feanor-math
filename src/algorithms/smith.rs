@@ -78,6 +78,17 @@ pub fn pre_smith<R, TL, TR>(ring: R, L: &mut TL, R: &mut TR, A: &mut DenseMatrix
     }
 }
 
+pub fn determinant<R>(A: &mut DenseMatrix<R::Type>, ring: R) -> El<R>
+    where R: RingStore + Copy,
+        R::Type: PrincipalIdealRing
+{
+    assert_eq!(A.row_count(), A.col_count());
+    let mut unit_part_rows = ring.one();
+    let mut unit_part_cols = ring.one();
+    pre_smith(ring, &mut DetUnit { current_unit: &mut unit_part_rows }, &mut DetUnit { current_unit: &mut unit_part_cols }, A);
+    return ring.prod((0..A.row_count()).map(|i| ring.clone_el(A.at(i, i))).chain([unit_part_rows, unit_part_cols].into_iter()));
+}
+
 ///
 /// Finds a solution to the system `AX = B`, if it exists.
 /// In the case that there are multiple solutions, an unspecified
@@ -244,6 +255,26 @@ impl<'a, R> TransformTarget<R> for TransformCols<'a, R>
     }
 }
 
+pub struct DetUnit<'a, R: ?Sized + RingBase> {
+    current_unit: &'a mut R::Element
+}
+
+impl<'a, R> TransformTarget<R> for DetUnit<'a, R>
+    where R: ?Sized + RingBase
+{
+    fn subtract(&mut self, _ring: &R, _src: usize, _dst: usize, _factor: &<R as RingBase>::Element) {
+        // determinant does not change
+    }
+
+    fn swap_rows(&mut self, ring: &R, _i: usize, _j: usize) {
+        ring.negate_inplace(&mut self.current_unit)
+    }
+
+    fn transform(&mut self, ring: &R, _i: usize, _j: usize, transform: &[<R as RingBase>::Element; 4]) {
+        ring.mul_assign(&mut self.current_unit, ring.sub(ring.mul_ref(&transform[0], &transform[3]), ring.mul_ref(&transform[1], &transform[2])));
+    }
+}
+
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
@@ -355,4 +386,16 @@ fn test_large() {
         }
     }
     assert!(solve_right(&mut A.clone_matrix(&ring), A, &ring).is_some());
+}
+
+#[test]
+fn test_determinant() {
+    let ring = StaticRing::<i64>::RING;
+    let A = DenseMatrix {
+        data: vec![1, 0, 3, 
+                   2, 1, 0, 
+                   9, 8, 7].into_boxed_slice(),
+        col_count: 3
+    };
+    assert_el_eq!(&ring, &(7 + 48 - 27), &determinant(&mut A.clone_matrix(&ring), &ring));
 }

@@ -302,15 +302,7 @@ impl<R, V, M> DivisibilityRing for FreeAlgebraImplBase<R, V, M>
     where R: RingStore, R::Type: PrincipalIdealRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        let mut mul_matrix = algorithms::smith::DenseMatrix::zero(self.rank(), self.rank(), self.base_ring());
-        let mut current = self.clone_el(rhs);
-        for i in 0..self.rank() {
-            let data = self.wrt_canonical_basis(&current);
-            for j in 0..self.rank() {
-                *mul_matrix.at_mut(j, i) = data.at(j);
-            }
-            self.mul_assign(&mut current, self.canonical_gen());
-        }
+        let mut mul_matrix = RingRef::new(self).create_multiplication_matrix(rhs);
         let mut lhs_matrix = algorithms::smith::DenseMatrix::zero(self.rank(), 1, self.base_ring());
         let data = self.wrt_canonical_basis(&lhs);
         for j in 0..self.rank() {

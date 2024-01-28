@@ -1,4 +1,4 @@
-use crate::ring::*;
+use crate::{algorithms::smith::DenseMatrix, ring::*};
 use crate::vector::vec_fn::*;
 use crate::homomorphism::*;
 use super::poly::{PolyRingStore, PolyRing};
@@ -90,6 +90,22 @@ pub trait FreeAlgebraStore: RingStore
         where V: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = El<<Self::Type as RingExtension>::BaseRing>>
     {
         self.get_ring().from_canonical_basis(vec)
+    }
+
+    fn create_multiplication_matrix(&self, el: &El<Self>) -> DenseMatrix<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type> {
+        let mut result = DenseMatrix::zero(self.rank(), self.rank(), self.base_ring());
+        let mut current = self.clone_el(el);
+        let gen = self.canonical_gen();
+        for i in 0..self.rank() {
+            {
+                let current_basis_repr = self.wrt_canonical_basis(&current);
+                for j in 0..self.rank() {
+                    *result.at_mut(j, i) = current_basis_repr.at(j);
+                }
+            }
+            self.mul_assign_ref(&mut current, &gen);
+        }
+        return result;
     }
 }
 
