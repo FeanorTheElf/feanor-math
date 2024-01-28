@@ -1,9 +1,13 @@
+use crate::algorithms::poly_factor::FactorPolyField;
 use crate::divisibility::*;
 use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
 use crate::matrix::Matrix;
 use crate::mempool::MemoryProvider;
 use crate::pid::PrincipalIdealRing;
+use crate::rings::field::AsField;
+use crate::rings::field::AsFieldBase;
+use crate::delegate::DelegateRing;
 use crate::rings::finite::*;
 use crate::rings::poly::PolyRing;
 use crate::rings::poly::PolyRingStore;
@@ -105,6 +109,25 @@ impl<R, V, M> FreeAlgebraImplBase<R, V, M>
             H: Homomorphism<R::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
     {
         poly_ring.from_terms(Iterator::map(0..self.rank(), |i| (hom.map(self.base_ring.clone_el(el.values.at(i))), i)))
+    }
+}
+
+impl<R, V, M> FreeAlgebraImpl<R, V, M>
+    where R: RingStore, R::Type: FactorPolyField, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+{
+    pub fn as_field(self) -> Result<AsField<Self>, Self> {
+        let poly_ring = DensePolyRing::new(self.base_ring(), "X");
+        let f = poly_ring.from_terms(
+            self.get_ring().x_pow_rank.iter().enumerate().map(|(i, c)| (self.base_ring().negate(self.base_ring().clone_el(c)), i))
+                .chain([(self.base_ring().one(), self.get_ring().x_pow_rank.len())].into_iter())
+        );
+        let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
+        assert_el_eq!(self.base_ring(), &self.base_ring().one(), &unit);
+        if factorization.len() == 0 || (factorization.len() == 1 && factorization[0].1 == 1) {
+            return Ok(RingValue::from(AsFieldBase::promise_is_field(self)));
+        } else {
+            return Err(self);
+        }
     }
 }
 
@@ -335,6 +358,74 @@ impl<R, V, M> FreeAlgebra for FreeAlgebraImplBase<R, V, M>
 
     fn rank(&self) -> usize {
         self.x_pow_rank.len()
+    }
+}
+
+impl<R, R1, V1, M1, R2, V2, M2> CanHomFrom<FreeAlgebraImplBase<R1, V1, M1>> for AsFieldBase<R>
+    where R1: RingStore, R1::Type: PrincipalIdealRing, V1: VectorView<El<R1>>, M1: MemoryProvider<El<R1>>,
+        R2: RingStore, R2::Type: PrincipalIdealRing, V2: VectorView<El<R2>>, M2: MemoryProvider<El<R2>>,
+        R2::Type: CanHomFrom<R1::Type>,
+        R: RingStore<Type = FreeAlgebraImplBase<R2, V2, M2>>
+{
+    type Homomorphism = <FreeAlgebraImplBase<R2, V2, M2> as CanHomFrom<FreeAlgebraImplBase<R1, V1, M1>>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &FreeAlgebraImplBase<R1, V1, M1>) -> Option<Self::Homomorphism> {
+        self.get_delegate().has_canonical_hom(from)
+    }
+
+    fn map_in(&self, from: &FreeAlgebraImplBase<R1, V1, M1>, el: <FreeAlgebraImplBase<R1, V1, M1> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.rev_delegate(<FreeAlgebraImplBase<R2, V2, M2> as CanHomFrom<FreeAlgebraImplBase<R1, V1, M1>>>::map_in(self.get_delegate(), from, el, hom))
+    }
+}
+
+impl<R, R1, V1, M1, R2, V2, M2> CanonicalIso<FreeAlgebraImplBase<R1, V1, M1>> for AsFieldBase<R>
+    where R1: RingStore, R1::Type: PrincipalIdealRing, V1: VectorView<El<R1>>, M1: MemoryProvider<El<R1>>,
+        R2: RingStore, R2::Type: PrincipalIdealRing, V2: VectorView<El<R2>>, M2: MemoryProvider<El<R2>>,
+        R: RingStore<Type = FreeAlgebraImplBase<R2, V2, M2>>,
+        R2::Type: CanonicalIso<R1::Type>
+{
+    type Isomorphism = <FreeAlgebraImplBase<R2, V2, M2> as CanonicalIso<FreeAlgebraImplBase<R1, V1, M1>>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &FreeAlgebraImplBase<R1, V1, M1>) -> Option<Self::Isomorphism> {
+        self.get_delegate().has_canonical_iso(from)
+    }
+
+    fn map_out(&self, from: &FreeAlgebraImplBase<R1, V1, M1>, el: Self::Element, iso: &Self::Isomorphism) -> <FreeAlgebraImplBase<R1, V1, M1> as RingBase>::Element {
+        <FreeAlgebraImplBase<R2, V2, M2> as CanonicalIso<FreeAlgebraImplBase<R1, V1, M1>>>::map_out(self.get_delegate(), from, self.unwrap_element(el), iso)
+    }
+}
+
+impl<R, R1, V1, M1, R2, V2, M2> CanHomFrom<AsFieldBase<R>> for FreeAlgebraImplBase<R1, V1, M1>
+    where R1: RingStore, R1::Type: PrincipalIdealRing, V1: VectorView<El<R1>>, M1: MemoryProvider<El<R1>>,
+        R2: RingStore, R2::Type: PrincipalIdealRing, V2: VectorView<El<R2>>, M2: MemoryProvider<El<R2>>,
+        R1::Type: CanHomFrom<R2::Type>,
+        R: RingStore<Type = FreeAlgebraImplBase<R2, V2, M2>>
+{
+    type Homomorphism = <FreeAlgebraImplBase<R1, V1, M1> as CanHomFrom<FreeAlgebraImplBase<R2, V2, M2>>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &AsFieldBase<R>) -> Option<Self::Homomorphism> {
+        self.has_canonical_hom(from.get_delegate())
+    }
+
+    fn map_in(&self, from: &AsFieldBase<R>, el: <AsFieldBase<R> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        <FreeAlgebraImplBase<R1, V1, M1> as CanHomFrom<FreeAlgebraImplBase<R2, V2, M2>>>::map_in(self, from.get_delegate(), from.unwrap_element(el), hom)
+    }
+}
+
+impl<R, R1, V1, M1, R2, V2, M2> CanonicalIso<AsFieldBase<R>> for FreeAlgebraImplBase<R1, V1, M1>
+    where R1: RingStore, R1::Type: PrincipalIdealRing, V1: VectorView<El<R1>>, M1: MemoryProvider<El<R1>>,
+        R2: RingStore, R2::Type: PrincipalIdealRing, V2: VectorView<El<R2>>, M2: MemoryProvider<El<R2>>,
+        R: RingStore<Type = FreeAlgebraImplBase<R2, V2, M2>>,
+        R1::Type: CanonicalIso<R2::Type>
+{
+    type Isomorphism = <FreeAlgebraImplBase<R1, V1, M1> as CanonicalIso<FreeAlgebraImplBase<R2, V2, M2>>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &AsFieldBase<R>) -> Option<Self::Isomorphism> {
+        self.has_canonical_iso(from.get_delegate())
+    }
+
+    fn map_out(&self, from: &AsFieldBase<R>, el: Self::Element, iso: &Self::Isomorphism) -> <AsFieldBase<R> as RingBase>::Element {
+        from.rev_delegate(<FreeAlgebraImplBase<R1, V1, M1> as CanonicalIso<FreeAlgebraImplBase<R2, V2, M2>>>::map_out(self, from.get_delegate(), el, iso))
     }
 }
 

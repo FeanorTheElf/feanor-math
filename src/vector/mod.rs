@@ -205,6 +205,31 @@ impl<T> SwappableVectorViewMut<T> for Vec<T> {
     }
 }
 
+impl<T> VectorView<T> for Box<[T]> {
+    
+    fn len(&self) -> usize {
+        <[T]>::len(self)
+    }
+
+    fn at(&self, i: usize) -> &T {
+        &(*self)[i]
+    }
+}
+
+impl<T> VectorViewMut<T> for Box<[T]> {
+    
+    fn at_mut(&mut self, i: usize) -> &mut T {
+        &mut (*self)[i]
+    }
+}
+
+impl<T> SwappableVectorViewMut<T> for Box<[T]> {
+    
+    fn swap(&mut self, i: usize, j: usize) {
+        <[T]>::swap(&mut self[..], i, j);
+    }
+}
+
 impl<T> VectorView<T> for [T] {
     
     fn len(&self) -> usize {

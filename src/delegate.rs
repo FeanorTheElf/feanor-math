@@ -309,15 +309,6 @@ impl<'a, R: ?Sized> Iterator for DelegateZnRingElementsIter<'a, R>
     }
 }
 
-impl<R: DelegateRing + ?Sized> PrincipalIdealRing for R
-    where R::Base: PrincipalIdealRing
-{
-    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        let (s, t, d) = self.get_delegate().ideal_gen(self.delegate_ref(lhs), self.delegate_ref(rhs));
-        (self.rev_delegate(s), self.rev_delegate(t), self.rev_delegate(d))
-    }
-}
-
 impl<R: DelegateRing + ?Sized> FiniteRing for R
     where R::Base: FiniteRing
 {
@@ -343,7 +334,9 @@ impl<R: DelegateRing + ?Sized> FiniteRing for R
 }
 
 impl<R: DelegateRing + ?Sized> ZnRing for R
-    where R::Base: ZnRing, R: CanHomFrom<<R::Base as ZnRing>::IntegerRingBase>
+    where R::Base: ZnRing, 
+        Self: PrincipalIdealRing,
+        R: CanHomFrom<<R::Base as ZnRing>::IntegerRingBase>
 {
     type IntegerRingBase = <R::Base as ZnRing>::IntegerRingBase;
     type Integers = <R::Base as ZnRing>::Integers;

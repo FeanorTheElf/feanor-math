@@ -251,7 +251,7 @@ pub trait ZnRingStore: FiniteRingStore
         where Self: Sized
     {
         if self.is_field() {
-            Ok(RingValue::from(AsFieldBase::unsafe_create(self)))
+            Ok(RingValue::from(AsFieldBase::promise_is_field(self)))
         } else {
             Err(self)
         }

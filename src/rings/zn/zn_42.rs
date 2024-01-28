@@ -530,6 +530,14 @@ pub struct ZnFastmulEl {
     x_shift_over_p: u64
 }
 
+impl PrincipalIdealRing for ZnFastmulBase {
+
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        let (s, t, d) = self.get_delegate().ideal_gen(self.delegate_ref(lhs), self.delegate_ref(rhs));
+        (self.rev_delegate(s), self.rev_delegate(t), self.rev_delegate(d))
+    }
+}
+
 impl DelegateRing for ZnFastmulBase {
 
     type Base = ZnBase;
@@ -670,11 +678,11 @@ impl<R: ZnRingStore<Type = ZnBase>> CanHomFrom<ZnBase> for AsFieldBase<R> {
     type Homomorphism = <ZnBase as CanHomFrom<ZnBase>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
-        <ZnBase as CanHomFrom<ZnBase>>::has_canonical_hom(self.base_ring().get_ring(), from)
+        <ZnBase as CanHomFrom<ZnBase>>::has_canonical_hom(self.get_delegate(), from)
     }
 
     fn map_in(&self, from: &ZnBase, el: <ZnBase as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.from(<ZnBase as CanHomFrom<ZnBase>>::map_in(self.base_ring().get_ring(), from, el, hom))
+        self.rev_delegate(<ZnBase as CanHomFrom<ZnBase>>::map_in(self.get_delegate(), from, el, hom))
     }
 }
 
@@ -683,11 +691,11 @@ impl<R: ZnRingStore<Type = ZnBase>> CanonicalIso<ZnBase> for AsFieldBase<R> {
     type Isomorphism = <ZnBase as CanonicalIso<ZnBase>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &ZnBase) -> Option<Self::Isomorphism> {
-        <ZnBase as CanonicalIso<ZnBase>>::has_canonical_iso(self.base_ring().get_ring(), from)
+        <ZnBase as CanonicalIso<ZnBase>>::has_canonical_iso(self.get_delegate(), from)
     }
 
     fn map_out(&self, from: &ZnBase, el: <AsFieldBase<R> as RingBase>::Element, iso: &Self::Isomorphism) -> <ZnBase as RingBase>::Element {
-        <ZnBase as CanonicalIso<ZnBase>>::map_out(self.base_ring().get_ring(), from, self.unwrap_element(el), iso)
+        <ZnBase as CanonicalIso<ZnBase>>::map_out(self.get_delegate(), from, self.unwrap_element(el), iso)
     }
 }
 
@@ -696,11 +704,11 @@ impl<R: ZnRingStore<Type = ZnBase>> CanHomFrom<AsFieldBase<R>> for ZnBase {
     type Homomorphism = <ZnBase as CanHomFrom<ZnBase>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &AsFieldBase<R>) -> Option<Self::Homomorphism> {
-        self.has_canonical_hom(from.base_ring().get_ring())
+        self.has_canonical_hom(from.get_delegate())
     }
 
     fn map_in(&self, from: &AsFieldBase<R>, el: <AsFieldBase<R> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in(from.base_ring().get_ring(), from.unwrap_element(el), hom)
+        self.map_in(from.get_delegate(), from.unwrap_element(el), hom)
     }
 }
 
@@ -709,11 +717,11 @@ impl<R: ZnRingStore<Type = ZnBase>> CanonicalIso<AsFieldBase<R>> for ZnBase {
     type Isomorphism = <ZnBase as CanonicalIso<ZnBase>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &AsFieldBase<R>) -> Option<Self::Isomorphism> {
-        self.has_canonical_iso(from.base_ring().get_ring())
+        self.has_canonical_iso(from.get_delegate())
     }
 
     fn map_out(&self, from: &AsFieldBase<R>, el: <ZnBase as RingBase>::Element, iso: &Self::Isomorphism) -> <AsFieldBase<R> as RingBase>::Element {
-        from.from(self.map_out(from.base_ring().get_ring(), el, iso))
+        from.rev_delegate(self.map_out(from.get_delegate(), el, iso))
     }
 }
 
