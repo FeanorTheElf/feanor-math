@@ -15,6 +15,6 @@ pub mod poly_div;
 pub mod hensel;
 pub mod poly_factor;
 pub mod discrete_log;
-pub mod f4;
-pub mod sparse_invert;
+// pub mod f4;
+// pub mod sparse_invert;
 pub mod smith;

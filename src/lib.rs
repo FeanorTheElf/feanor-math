@@ -10,6 +10,7 @@
 #![feature(fn_traits)]
 #![feature(unboxed_closures)]
 #![feature(iter_advance_by)]
+#![feature(non_null_convenience)]
 
 #![doc = include_str!("../Readme.md")]
 

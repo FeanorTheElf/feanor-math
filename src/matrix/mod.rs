@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-pub mod subslice;
+pub mod submatrix;
 
 use crate::ring::*;
 

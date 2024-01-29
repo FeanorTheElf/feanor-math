@@ -1,7 +1,7 @@
 
 use std::ops::Range;
 
-use crate::matrix::subslice::*;
+use crate::matrix::dense::*;
 use crate::vector::vec_fn::{self, IntoVectorFn};
 
 use self::builder::SparseMatrixBuilder;
@@ -152,6 +152,21 @@ impl<T> InternalMatrix<T> {
 
     pub fn row_count(&self) -> usize {
         self.row_count
+    }
+
+    pub fn add_identity_row<R>(&mut self, i: usize, ring: &R)
+        where R: RingStore,
+            R::Type: RingBase<Element = T>
+    {
+        assert!(i == self.row_count);
+        for j in 0..self.cols.len() {
+            if i / self.n == j {
+                self.cols[j].push(InternalRow { data: vec![(i % self.n, ring.one()), (usize::MAX, ring.zero())] });
+            } else {
+                self.cols[j].push(InternalRow::placeholder().make_zero(ring));
+            }
+        }
+        self.row_count += 1;
     }
 
     pub fn swap_rows(&mut self, fst: usize, snd: usize) {
