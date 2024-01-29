@@ -150,9 +150,9 @@ pub fn linear_combine_rows<'a, R, V>(ring: R, coeffs: &InternalRow<El<R>>, rows:
         out.make_zero(&ring);
         return out;
     }
-    let last_idx = coeffs.leading_entry().0;
 
     out.data.clear();
+    let last_idx = coeffs.leading_entry().0;
     let scale = coeffs.leading_entry().1;
     out.data.extend(
         rows.at(last_idx).data.iter().map(|(j, c) | (*j, ring.mul_ref(c, scale)))
@@ -359,23 +359,25 @@ mod local {
         assert_eq!(matrix.col_count(), 1);
         assert_eq!(transform.col_count(), 1);
 
-        let mut matrix = matrix.col_at(0);
-        let mut transform = transform.col_at(0);
-
         let col_block = n;
+        let row_block = matrix.row_count();
         let mut i = 0;
         let mut tmp = [InternalRow::placeholder(), InternalRow::placeholder()];
+
+        let mut matrix = matrix.col_at(0);
+        let mut transform = transform.col_at(0);
 
         for j in 0..col_block {
             make_pivot_ideal_gen(ring, matrix.reborrow(), transform.reborrow(), (i, j), &mut tmp);
             if matrix.at(i).leading_entry_at(j).is_some() {
                 eliminate_row(ring, matrix.reborrow(), transform.reborrow(), (i, j), &mut tmp[0]);
                 i += 1;
-                if i >= matrix.len() {
-                    return i;
+                if i >= row_block {
+                    break;
                 }
             }
         }
+
         return i;
     }
 }
@@ -388,7 +390,7 @@ mod global {
 
     use super::*;
     
-    pub fn check_for_independent_rows<R, V1, V2>(ring: R, pivot_matrix: Submatrix<V1, InternalRow<El<R>>>, column: Submatrix<V1, InternalRow<El<R>>>, transform: SubmatrixMut<V2, InternalRow<El<R>>>, n: usize) -> impl ExactSizeIterator<Item = usize>
+    pub fn check_for_independent_rows<R, V1, V2>(ring: R, pivot_matrix: Submatrix<V1, InternalRow<El<R>>>, column: Submatrix<V1, InternalRow<El<R>>>, transform: SubmatrixMut<V2, InternalRow<El<R>>>, n: usize) -> Vec<usize>
         where R: DivisibilityRingStore + Copy + Sync,
             El<R>: Send + Sync,
             R::Type: DivisibilityRing,
@@ -422,7 +424,7 @@ mod global {
             }
         });
         
-        return unreduced_row_index.into_iter().map(|index| index.load(std::sync::atomic::Ordering::SeqCst)).filter(|index| *index != usize::MAX).collect::<Vec<_>>().into_iter();
+        return unreduced_row_index.into_iter().map(|index| index.load(std::sync::atomic::Ordering::SeqCst)).filter(|index| *index != usize::MAX).collect::<Vec<_>>();
     }
 
     #[inline(never)]
@@ -529,7 +531,6 @@ fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: SubmatrixMut<
 
         let (mut pivot_transform, mut pivot_column_transform) = transform.reborrow().restrict_cols(0..1).split_rows(i..(i + row_block), (i + row_block)..row_count);
         let (mut pivot_matrix, pivot_column) = matrix.reborrow().restrict_cols(j..(j + 1)).split_rows(i..(i + row_block), (i + row_block)..row_count);
-        
         let nonzero_row_count = local::row_echelon_optimistic(ring, pivot_matrix.reborrow(), pivot_transform.reborrow(), n);
         let mut swap_in_rows = global::check_for_independent_rows(ring, pivot_matrix.as_const(), pivot_column.as_const(), pivot_column_transform.reborrow(), n);
 
@@ -544,25 +545,27 @@ fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: SubmatrixMut<
                 println!("Swap in {} rows", swap_in_rows.len());
             }
 
+            // this is necessary, otherwise we might swap back and forth the same rows
+            swap_in_rows.sort_unstable();
+
             let new_row_block = row_block + swap_in_rows.len();
             for target_i in 0..swap_in_rows.len() {
-                let swap_row_index = swap_in_rows.next().unwrap();
+                let swap_row_index = swap_in_rows[target_i];
                 swap_rows(ring, matrix.reborrow(), i + row_block + target_i, i + row_block + swap_row_index, n);
                 swap_rows(ring, transform.reborrow(), i + row_block + target_i, i + row_block + swap_row_index, n);
 
                 transform.at(i + row_block + target_i, 0).make_zero(&ring);
                 transform.at(i + row_block + target_i, 0).data.insert(0, (row_block + target_i, ring.one()));
+                transform.at(i + row_block + target_i, 0).check(&ring);
             }
             row_block = new_row_block;
-            assert!(swap_in_rows.next().is_none());
         } else {
             if EXTENSIVE_LOG {
                 println!("Eliminate column");
             }
             assert!(nonzero_row_count <= row_block);
-
+            
             let (mut pivot_row, other_rows) = matrix.reborrow().restrict_cols(j..global_col_count).split_rows(i..(i + row_block), (i + row_block)..row_count);
-
             global::apply_pivot_row_transform(ring, pivot_row.reborrow().restrict_cols(1..(global_col_count - j)), pivot_transform.as_const());
             global::eliminate_pivot_column(ring, pivot_row.as_const(), other_rows, pivot_column_transform.as_const());
 
@@ -701,7 +704,7 @@ fn as_sparse_matrix_builder<R, V>(ring: R, matrix: Submatrix<V, InternalRow<El<R
 use crate::rings::zn::zn_static::*;
 
 fn assert_left_equivalent<R, V1, V2>(ring: R, original: Submatrix<V1, InternalRow<El<R>>>, new: Submatrix<V2, InternalRow<El<R>>>, n: usize)
-    where R: RingStore,
+    where R: RingStore + Copy,
         R::Type: PrincipalIdealRing,
         V1: AsPointerToSlice<InternalRow<El<R>>>,
         V2: AsPointerToSlice<InternalRow<El<R>>>
@@ -723,8 +726,14 @@ fn assert_left_equivalent<R, V1, V2>(ring: R, original: Submatrix<V1, InternalRo
             }
         }
     }
-    assert!(smith::solve_right::<&R>(&mut original_transposed.clone_matrix(&ring), actual_transposed.clone_matrix(&ring), &ring).is_some());
-    assert!(smith::solve_right::<&R>(&mut actual_transposed.clone_matrix(&ring), original_transposed.clone_matrix(&ring), &ring).is_some());
+    if !smith::solve_right::<&R>(&mut original_transposed.clone_matrix(&ring), actual_transposed.clone_matrix(&ring), &ring).is_some() {
+        // println!("{:?}", original.row_iter().map(|row| row.iter().enumerate().flat_map(move |(j, local_row)| local_row.data.iter().map(move |(k, c)| (j * n + k, format!("{}", ring.format(c))))).collect::<Vec<_>>()).collect::<Vec<_>>());
+        panic!();
+    }
+    if !smith::solve_right::<&R>(&mut actual_transposed.clone_matrix(&ring), original_transposed.clone_matrix(&ring), &ring).is_some() {
+        // println!("{:?}", original.row_iter().map(|row| row.iter().enumerate().flat_map(move |(j, local_row)| local_row.data.iter().map(move |(k, c)| (j * n + k, format!("{}", ring.format(c))))).collect::<Vec<_>>()).collect::<Vec<_>>());
+        panic!();
+    }
 }
 
 fn assert_is_correct_row_echelon<R>(ring: R, original: &SparseMatrixBuilder<R::Type>, row_echelon_form: &SparseMatrixBuilder<R::Type>)
@@ -818,6 +827,27 @@ fn test_gb_sparse_row_echelon_recompute_pivot() {
 }
 
 #[test]
+fn test_gb_sparse_row_echelon_swap_in_twice() {
+    let R = Zn::<17>::RING;
+    let sparsify = |row: [u64; 3]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));
+    
+    let mut matrix: SparseMatrixBuilder<_> = SparseMatrixBuilder::new(&R);
+    matrix.add_cols(3);
+    matrix.add_row(0, sparsify([0, 0, 1]));
+    matrix.add_row(1, sparsify([0, 0, 0]));
+    matrix.add_row(2, sparsify([1, 1, 1]));
+    matrix.add_row(3, sparsify([1, 2, 3]));
+    matrix.add_row(3, sparsify([1, 3, 3]));
+    
+    let mut actual = SparseMatrixBuilder::new(&R);
+    actual.add_cols(3);
+    for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), 2) {
+        actual.add_row(<_ as crate::matrix::Matrix<_>>::row_count(&actual), row.into_iter());
+    }
+    assert_is_correct_row_echelon(R, &matrix, &actual);
+}
+
+#[test]
 fn test_gb_sparse_row_echelon_large() {
     let R = Zn::<17>::RING;
     let sparsify = |row: [u64; 10]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));
@@ -887,4 +917,25 @@ fn test_gb_sparse_row_echelon_no_field() {
         }
         assert_is_correct_row_echelon(R, &matrix, &actual);
     }
+}
+
+#[test]
+fn test_bad_swapping_order() {
+    let R = Zn::<3>::RING;
+    let sparsify = |row: [u64; 10]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));
+
+    let mut matrix: SparseMatrixBuilder<_> = SparseMatrixBuilder::new(&R);
+    matrix.add_cols(10);
+    matrix.add_row(0, sparsify([0, 0, 1, 0, 0, 0, 1, 0, 0, 0]));
+    matrix.add_row(1, sparsify([0, 0, 0, 1, 0, 0, 0, 1, 0, 0]));
+    matrix.add_row(2, sparsify([0, 1, 0, 0, 1, 0, 0, 0, 1, 0]));
+    matrix.add_row(3, sparsify([1, 0, 0, 0, 0, 1, 0, 0, 0, 1]));
+
+    let mut actual = SparseMatrixBuilder::new(&R);
+    actual.add_cols(10);
+    for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), 2) {
+        actual.add_row(<_ as crate::matrix::Matrix<_>>::row_count(&actual), row.into_iter());
+    }
+    assert_is_correct_row_echelon(R, &matrix, &actual);
+    
 }
