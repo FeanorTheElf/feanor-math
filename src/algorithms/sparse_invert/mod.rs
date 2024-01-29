@@ -10,7 +10,7 @@ use self::builder::SparseMatrixBuilder;
 
 pub mod builder;
 
-pub const EXTENSIVE_RUNTIME_ASSERTS: bool = true;
+pub const EXTENSIVE_RUNTIME_ASSERTS: bool = false;
 pub const EXTENSIVE_LOG: bool = false;
 
 pub struct InternalRow<T> {
@@ -388,6 +388,9 @@ mod global {
     use crate::parallel::potential_parallel_for_each;
     use crate::vector::VectorViewMut;
 
+    #[cfg(feature = "parallel")]
+    use rayon::iter::IndexedParallelIterator;
+
     use super::*;
     
     pub fn check_for_independent_rows<R, V1, V2>(ring: R, pivot_matrix: Submatrix<V1, InternalRow<El<R>>>, column: Submatrix<V1, InternalRow<El<R>>>, transform: SubmatrixMut<V2, InternalRow<El<R>>>, n: usize) -> Vec<usize>
@@ -406,7 +409,7 @@ mod global {
 
         let unreduced_row_index = (0..n).map(|_| AtomicUsize::new(usize::MAX)).collect::<Vec<_>>();
 
-        potential_parallel_for_each(column.row_iter().zip(transform.row_iter()), 
+        potential_parallel_for_each(column.concurrent_row_iter().zip(transform.concurrent_row_iter()), 
             || (InternalRow::placeholder(), InternalRow::placeholder()), 
             |(new_row, tmp), row_index, (matrix_row, transform_row)|
         {
@@ -435,7 +438,7 @@ mod global {
             V2: Sync + AsPointerToSlice<InternalRow<El<R>>>
     {
         potential_parallel_for_each(
-            matrix.col_iter(), 
+            matrix.concurrent_col_iter(), 
             || Vec::new(), 
             |tmp, _, rows| 
         {
@@ -473,7 +476,7 @@ mod global {
             return;
         }
         
-        potential_parallel_for_each(column.row_iter(), 
+        potential_parallel_for_each(column.concurrent_row_iter(), 
             || (InternalRow::placeholder(), InternalRow::placeholder()), 
             |(new_row, tmp), row_index, matrix_row|
         {

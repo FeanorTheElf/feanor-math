@@ -630,16 +630,17 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
     where V: 'a + Sync + AsPointerToSlice<T>,
         T: Send
 {
-    // #[cfg(not(feature = "parallel"))]
-    // pub fn concurrent_row_iter(self) -> impl 'a + ExactSizeIterator<Item = &'a mut [T]> {
-    //     self.row_iter()
-    // }
+    #[cfg(not(feature = "parallel"))]
+    pub fn concurrent_row_iter(self) -> impl 'a + ExactSizeIterator<Item = &'a mut [T]> {
+        self.row_iter()
+    }
 
-    // #[cfg(not(feature = "parallel"))]
-    // pub fn concurrent_col_iter(self) -> impl 'a + ExactSizeIterator<Item = ColumnMut<'a, V, T>> {
-    //     self.col_iter()
-    // }
+    #[cfg(not(feature = "parallel"))]
+    pub fn concurrent_col_iter(self) -> impl 'a + ExactSizeIterator<Item = ColumnMut<'a, V, T>> {
+        self.col_iter()
+    }
     
+    #[cfg(feature = "parallel")]
     pub fn concurrent_row_iter(self) -> impl 'a + rayon::iter::IndexedParallelIterator<Item = &'a mut [T]> {
         
         struct AccessIthRow<'a, V, T>
@@ -691,6 +692,7 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         )
     }
 
+    #[cfg(feature = "parallel")]
     pub fn concurrent_col_iter(self) -> impl 'a + rayon::iter::IndexedParallelIterator<Item = ColumnMut<'a, V, T>> {
         
         struct AccessIthCol<'a, V, T>
@@ -742,6 +744,24 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         rayon::iter::ParallelIterator::map(
             rayon::iter::IntoParallelIterator::into_par_iter(0..self.col_count()),
             AccessIthCol { entry: PhantomData, raw_data: self.raw_data }
+        )
+    }
+}
+
+impl<'a, V, T> Submatrix<'a, V, T>
+    where V: 'a + Sync + AsPointerToSlice<T>,
+        T: Sync
+{
+    #[cfg(not(feature = "parallel"))]
+    pub fn concurrent_row_iter(self) -> impl 'a + ExactSizeIterator<Item = &'a [T]> {
+        self.row_iter()
+    }
+    
+    #[cfg(feature = "parallel")]
+    pub fn concurrent_row_iter(self) -> impl 'a + rayon::iter::IndexedParallelIterator<Item = &'a [T]> {
+        rayon::iter::ParallelIterator::map(
+            rayon::iter::IntoParallelIterator::into_par_iter(0..self.row_count()),
+            move |i| unsafe { self.raw_data.row_at(i).as_ref() }
         )
     }
 }
