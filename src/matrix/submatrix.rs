@@ -309,6 +309,21 @@ impl<'a, V, T> ColumnMut<'a, V, T>
             raw_data: self.raw_data
         }
     }
+
+    pub fn two_entries<'b>(&'b mut self, i: usize, j: usize) -> (&'b mut T, &'b mut T) {
+        assert!(i != j);
+        // safe since i != j
+        unsafe {
+            (self.raw_data.entry_at(i, 0).as_mut(), self.raw_data.entry_at(j, 0).as_mut())
+        }
+    }
+    
+    pub fn as_const<'b>(&'b self) -> Column<'b, V, T> {
+        Column {
+            entry: PhantomData,
+            raw_data: self.raw_data
+        }
+    }
 }
 
 unsafe impl<'a, V, T> Send for ColumnMut<'a, V, T>

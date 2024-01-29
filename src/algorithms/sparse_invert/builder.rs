@@ -1,3 +1,5 @@
+use crate::matrix::Matrix;
+
 use super::*;
 
 pub struct SparseMatrixBuilder<R>
@@ -73,8 +75,36 @@ impl<R> SparseMatrixBuilder<R>
         return result;
     }
 
-    pub(super) fn into_internal_matrix(self, n: usize, ring: &R) -> InternalMatrix<R::Element> {
-        InternalMatrix::from_builder(self, n, ring)
+    pub(super) fn into_internal_matrix(self, n: usize, ring: &R) -> Vec<InternalRow<R::Element>> {
+        let row_count = self.row_count();
+        let mut inverted_permutation = (0..self.col_permutation.len()).collect::<Vec<_>>();
+        for (i, j) in self.col_permutation.iter().enumerate() {
+            inverted_permutation[*j] = i;
+        }
+        for i in 0..self.col_permutation.len() {
+            debug_assert!(inverted_permutation[self.col_permutation[i]] == i);
+            debug_assert!(self.col_permutation[inverted_permutation[i]] == i);
+        }
+        let global_cols = (self.col_count - 1) / n + 1;
+        let mut result = (0..(global_cols * (row_count + n))).map(|_| InternalRow::placeholder()).collect::<Vec<_>>();
+        for (i, row) in self.rows.into_iter().enumerate() {
+            for (j, c) in row.into_iter() {
+                if !ring.is_zero(&c) {
+                    let col = inverted_permutation[j];
+                    result[i * global_cols + col / n].data.push((col % n, c));
+                }
+            }
+            for j in 0..global_cols {
+                result[i * global_cols + j].data.sort_by_key(|(j, _)| *j);
+                result[i * global_cols + j].data.push((usize::MAX, ring.zero()));
+            }
+        }
+        for i in row_count..(row_count + n) {
+            for j in 0..global_cols {
+                result[i * global_cols + j].make_zero(&RingRef::new(ring));
+            }
+        }
+        return result;
     }
 }
 
