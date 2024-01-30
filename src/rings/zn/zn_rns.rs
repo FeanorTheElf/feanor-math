@@ -106,29 +106,30 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Zn<C, J, M>
     /// of the given component rings. Furthermore, the corresponding large integer ring must be
     /// provided, which has to be able to store values of size at least `n^3`.
     /// 
-    pub fn new(component_rings: Vec<C>, large_integers: J, memory_provider: M) -> Self {
-        assert!(component_rings.len() > 0);
+    pub fn new(summands: Vec<C>, large_integers: J, memory_provider: M) -> Self {
+        assert!(summands.len() > 0);
         let total_modulus = large_integers.prod(
-            component_rings.iter().map(|R| R.integer_ring().can_iso(&large_integers).unwrap().map_ref(R.modulus()))
+            summands.iter().map(|R| R.integer_ring().can_iso(&large_integers).unwrap().map_ref(R.modulus()))
         );
         let total_ring = zn_barett::Zn::new(large_integers, total_modulus);
         let ZZ = total_ring.integer_ring();
-        for R in &component_rings {
+        for R in &summands {
+            assert!(R.is_field());
             let R_modulus = R.integer_ring().can_iso(ZZ).unwrap().map_ref(R.modulus());
             assert!(
                 ZZ.is_one(&algorithms::eea::signed_gcd(ZZ.checked_div(total_ring.modulus(), &R_modulus).unwrap(), R_modulus, ZZ)),
                 "all moduli must be coprime"
             );
         }
-        let unit_vectors = component_rings.iter()
-            .map(|R| ZZ.checked_div(total_ring.modulus(), &R.integer_ring().can_iso(ZZ).unwrap().map_ref(R.modulus())))
+        let unit_vectors = summands.iter()
+            .map(|R: &C| ZZ.checked_div(total_ring.modulus(), &R.integer_ring().can_iso(ZZ).unwrap().map_ref(R.modulus())))
             .map(Option::unwrap)
-            .map(|n| total_ring.coerce(&ZZ, n))
-            .zip(component_rings.iter())
+            .map(|n: El<J>| total_ring.coerce(&ZZ, n))
+            .zip(summands.iter())
             .map(|(n, R)| total_ring.pow_gen(n, &R.integer_ring().sub_ref_fst(R.modulus(), R.integer_ring().one()), R.integer_ring()))
             .collect();
         RingValue::from(ZnBase {
-            components: component_rings,
+            components: summands,
             total_ring: total_ring,
             unit_vectors: unit_vectors,
             memory_provider: memory_provider
@@ -406,6 +407,9 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
         K::Type: IntegerRing
 {
+    // we first map each `lift(x[i]) into `self.total_ring.integer_ring(): J`, then reduce it to 
+    // `self.total_ring: Zn<J>`, then compute the value `sum_i lift(x[i]) * unit_vectors[i]` 
+    // in `self.total_ring: Zn<J>` and then map this to `from: Zn<K>`.
     type Isomorphism = (
         <zn_barett::ZnBase<J> as CanonicalIso<zn_barett::ZnBase<K>>>::Isomorphism, 
         <zn_barett::ZnBase<J> as CanHomFrom<J::Type>>::Homomorphism,
@@ -427,10 +431,10 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider
         let result = <_ as RingStore>::sum(&self.total_ring,
             self.components.iter()
                 .zip(el.0.into_iter())
-                .map(|(component_ring, x): (&C, &El<C>)| (component_ring.integer_ring().get_ring(), component_ring.smallest_positive_lift(component_ring.clone_el(x))))
+                .map(|(R, x): (&C, &El<C>)| (R.integer_ring().get_ring(), R.smallest_positive_lift(R.clone_el(x))))
                 .zip(self.unit_vectors.iter())
                 .zip(homs.iter())
-                .map(|(((integers, x), u), hom)| (integers, x, u, hom))
+                .map(|(((integers, x), u), hom): (((&<C::Type as ZnRing>::IntegerRingBase, _), _), _)| (integers, x, u, hom))
                 .map(|(integers, x, u, hom)| 
                     self.total_ring.mul_ref_snd(self.total_ring.get_ring().map_in(
                         self.total_ring.integer_ring().get_ring(), 
@@ -453,8 +457,8 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRing, M: MemoryProvider<El<C
 
     fn has_canonical_hom(&self, from: &K) -> Option<Self::Homomorphism> {
         Some(self.components.iter()
-            .map(|component_ring: &C| <C::Type as CanHomFrom<K>>::has_canonical_hom(component_ring.get_ring(), from).ok_or(()))
-            .collect::<Result<Vec<_>, ()>>()
+            .map(|R| <C::Type as CanHomFrom<K>>::has_canonical_hom(R.get_ring(), from).ok_or(()))
+            .collect::<Result<Vec<<C::Type as CanHomFrom<K>>::Homomorphism>, ()>>()
             .ok()?
         )
     }
@@ -727,7 +731,7 @@ fn test_principal_ideal_ring_axioms() {
     let R = Zn::from_primes(BigIntRing::RING, vec![2, 3, 5]);
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
 
-    let R = Zn::from_primes(BigIntRing::RING, vec![9, 8, 5]);
+    let R = Zn::from_primes(BigIntRing::RING, vec![3, 5, 2]);
     let modulo = R.int_hom();
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(
         &R,
@@ -740,10 +744,11 @@ fn test_finite_ring_axioms() {
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![3, 5, 7, 11]));
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![3, 5]));
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![3]));
-    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![128]));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![2]));
 }
 
 #[test]
+#[should_panic]
 fn test_nonprime() {
     let R = Zn::from_primes(StaticRing::<i64>::RING, vec![15, 7]);
     assert_eq!(7, R.smallest_lift(R.int_hom().map(7)));
