@@ -1,6 +1,6 @@
 use crate::algorithms;
 use crate::divisibility::DivisibilityRingStore;
-use crate::pid::{EuclideanRingStore, EuclideanRing};
+use crate::pid::{EuclideanRing, EuclideanRingStore, PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::field::{Field, FieldStore};
 use crate::integer::*;
 use crate::ordered::OrderedRingStore;
@@ -69,7 +69,7 @@ pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>
         // X^(q^i) mod f using square-and-multiply in the ring F[X]/(f)
         x_power_Q_mod_f = pow_mod_f(&poly_ring, x_power_Q_mod_f, &f, &q, ZZ);
         let fq_defining_poly_mod_f = poly_ring.sub_ref_fst(&x_power_Q_mod_f, poly_ring.indeterminate());
-        let deg_i_factor = algorithms::eea::gcd(poly_ring.clone_el(&f), poly_ring.clone_el(&fq_defining_poly_mod_f), &poly_ring);
+        let deg_i_factor = poly_ring.ideal_gen(&f, &fq_defining_poly_mod_f).2;
         f = poly_ring.euclidean_div(f, &deg_i_factor);
         result.push(deg_i_factor);
     }
@@ -136,7 +136,7 @@ pub fn cantor_zassenhaus<P>(poly_ring: P, f: El<P>, d: usize) -> El<P>
                 .chain(Some((poly_ring.base_ring().one(), 2 * d)))
         );
         let G = poly_ring.sub(pow_mod_f(&poly_ring, T, &f, &exp, ZZ), poly_ring.one());
-        let g = algorithms::eea::gcd(poly_ring.clone_el(&f), G, &poly_ring);
+        let g = poly_ring.ideal_gen(&f, &G).2;
         if !poly_ring.is_unit(&g) && poly_ring.checked_div(&g, &f).is_none() {
             return g;
         }
@@ -145,7 +145,7 @@ pub fn cantor_zassenhaus<P>(poly_ring: P, f: El<P>, d: usize) -> El<P>
 
 pub fn poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
     where P: PolyRingStore,
-        P::Type: PolyRing + EuclideanRing,
+        P::Type: PolyRing + PrincipalIdealRing,
         <P::Type as RingExtension>::BaseRing: FieldStore,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field
 {
@@ -161,7 +161,7 @@ pub fn poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
         let base_poly = poly_ring.from_terms(poly_ring.terms(&poly).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i / p)));
         return poly_squarefree_part(poly_ring, base_poly);
     } else {
-        let square_part = algorithms::eea::gcd(poly_ring.clone_el(&poly), derivate, &poly_ring);
+        let square_part = poly_ring.ideal_gen(&poly, &derivate).2;
         return poly_ring.checked_div(&poly, &square_part).unwrap();
     }
 }

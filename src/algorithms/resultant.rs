@@ -4,7 +4,6 @@ use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::rings::poly::*;
 use crate::ring::*;
 
-
 pub fn resultant<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<P>
     where P: PolyRingStore,
         P::Type: PolyRing,

@@ -2,10 +2,10 @@ use crate::divisibility::DivisibilityRingStore;
 use crate::field::Field;
 use crate::homomorphism::Homomorphism;
 use crate::integer::int_cast;
-use crate::pid::EuclideanRing;
+use crate::pid::{EuclideanRing, PrincipalIdealRingStore};
 use crate::rings::poly::{PolyRing, PolyRingStore};
 use crate::rings::zn::{ReductionMap, ZnRing, ZnRingStore};
-use crate::{algorithms, ring::*};
+use crate::ring::*;
 
 use super::int_factor::is_prime_power;
 
@@ -50,7 +50,7 @@ pub fn hensel_lift<P, R, S>(target_ring: &P, source_ring: &R, prime_ring: &S, f:
     let (g, h) = factors;
     let reduced_g = prime_ring.from_terms(source_ring.terms(g).map(|(c, i)| (pe_to_p.map_ref(c), i)));
     let reduced_h = prime_ring.from_terms(source_ring.terms(h).map(|(c, i)| (pe_to_p.map_ref(c), i)));
-    let (s, t, d) = algorithms::eea::eea(reduced_g, reduced_h, &prime_ring);
+    let (s, t, d) = prime_ring.ideal_gen(&reduced_g, &reduced_h);
     assert!(prime_ring.is_unit(&d));
     
     let lifted_s = target_ring.from_terms(prime_ring.terms(&prime_ring.checked_div(&s, &d).unwrap()).map(|(c, i)| (pr_to_p.smallest_lift_ref(c), i)));
