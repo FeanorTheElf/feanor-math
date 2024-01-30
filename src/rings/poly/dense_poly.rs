@@ -110,7 +110,7 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> DensePolyRingBase<R, M> {
         where F: FnMut(El<R>) -> Option<El<R>>
     {
         let lhs_val = std::mem::replace(lhs, self.zero());
-        let (quo, rem) = algorithms::poly_div::sparse_poly_div(
+        let (quo, rem) = algorithms::poly_div::poly_div(
             lhs_val, 
             rhs, 
             RingRef::new(self), 
@@ -420,6 +420,10 @@ impl<R, M: GrowableMemoryProvider<El<R>>> PolyRing for DensePolyRingBase<R, M>
         return current;
     }
 }
+
+impl<R, M: GrowableMemoryProvider<El<R>>> Domain for DensePolyRingBase<R, M> 
+    where R: RingStore, R::Type: Domain
+{}
 
 impl<R, M: GrowableMemoryProvider<El<R>>> DivisibilityRing for DensePolyRingBase<R, M> 
     where R: DivisibilityRingStore, R::Type: DivisibilityRing

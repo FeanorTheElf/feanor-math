@@ -106,7 +106,7 @@ impl<R: RingStore> SparsePolyRingBase<R> {
         where F: FnMut(El<R>) -> Option<El<R>>
     {
         let lhs_val = std::mem::replace(lhs, self.zero());
-        let (quo, rem) = algorithms::poly_div::sparse_poly_div(
+        let (quo, rem) = algorithms::poly_div::poly_div(
             lhs_val, 
             rhs, 
             RingRef::new(self), 
@@ -399,6 +399,10 @@ impl<R> PolyRing for SparsePolyRingBase<R>
         return (quo, lhs);
     }
 }
+
+impl<R> Domain for SparsePolyRingBase<R> 
+    where R: RingStore, R::Type: Domain
+{}
 
 impl<R,> DivisibilityRing for SparsePolyRingBase<R> 
     where R: DivisibilityRingStore, R::Type: DivisibilityRing

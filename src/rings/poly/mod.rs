@@ -29,6 +29,10 @@ pub trait PolyRing: RingExtension {
         ));
     }
 
+    fn mul_assign_monomial(&self, lhs: &mut Self::Element, rhs_power: usize) {
+        self.mul_assign(lhs, RingRef::new(self).pow(self.indeterminate(), rhs_power));
+    }
+
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, i: usize) -> &'a El<Self::BaseRing>;
 
     fn degree(&self, f: &Self::Element) -> Option<usize>;
@@ -60,6 +64,7 @@ pub trait PolyRingStore: RingStore
 {
     delegate!{ fn indeterminate(&self) -> El<Self> }
     delegate!{ fn degree(&self, f: &El<Self>) -> Option<usize> }
+    delegate!{ fn mul_assign_monomial(&self, lhs: &mut El<Self>, rhs_power: usize) -> () }
     delegate!{ fn div_rem_monic(&self, lhs: El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>) }
 
     fn coefficient_at<'a>(&'a self, f: &'a El<Self>, i: usize) -> &'a El<<Self::Type as RingExtension>::BaseRing> {

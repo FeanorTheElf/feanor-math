@@ -557,7 +557,10 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Ve
             let start = std::time::Instant::now();
             let result = S_polys.into_iter().map(|f| multivariate_division(&ring, f, &basis, order)).filter(|f| !ring.is_zero(f)).collect();
             let end = std::time::Instant::now();
-            print!("[{}ms]", (end - start).as_millis());
+            if LOG {
+                print!("[{}ms]", (end - start).as_millis());
+                std::io::stdout().flush().unwrap();
+            }
             result
         };
 
