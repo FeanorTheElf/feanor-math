@@ -134,7 +134,7 @@ pub fn add_row_local<R, const LHS_FACTOR_ONE: bool>(ring: R, lhs: &InternalRow<E
             }
         }
     }
-    assert!(lhs_idx + 1 == lhs.data.len() && rhs_idx + 1 == rhs.data.len());
+    debug_assert!(lhs_idx + 1 == lhs.data.len() && rhs_idx + 1 == rhs.data.len());
     out.data.push((usize::MAX, ring.zero()));
     out.check(&ring);
     return out;

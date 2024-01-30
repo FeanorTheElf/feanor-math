@@ -1,5 +1,5 @@
 use crate::delegate::DelegateRing;
-use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
+use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::Field;
 use crate::integer::IntegerRing;
@@ -195,6 +195,10 @@ impl<R: DivisibilityRingStore> HashableElRing for AsFieldBase<R>
         self.get_delegate().hash(&el.0, h)
     }
 }
+
+impl<R: DivisibilityRingStore> Domain for AsFieldBase<R> 
+    where R::Type: DivisibilityRing
+{}
 
 impl<R: DivisibilityRingStore> Field for AsFieldBase<R>
     where R::Type: DivisibilityRing

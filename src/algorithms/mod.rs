@@ -18,3 +18,4 @@ pub mod discrete_log;
 pub mod f4;
 pub mod sparse_invert;
 pub mod smith;
+pub mod resultant;

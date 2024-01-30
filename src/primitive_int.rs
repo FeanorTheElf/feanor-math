@@ -5,7 +5,7 @@ use std::fmt::Display;
 use crate::{ring::*, algorithms};
 use crate::homomorphism::*;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
-use crate::divisibility::DivisibilityRing;
+use crate::divisibility::{DivisibilityRing, Domain};
 use crate::ordered::OrderedRing;
 use crate::integer::*;
 use crate::algorithms::conv_mul::KaratsubaHint;
@@ -75,6 +75,8 @@ impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
         }
     }
 }
+
+impl<T: PrimitiveInt> Domain for StaticRingBase<T> {}
 
 impl<T: PrimitiveInt> PrincipalIdealRing for StaticRingBase<T> {
     

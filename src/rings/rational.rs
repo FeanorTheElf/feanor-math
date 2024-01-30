@@ -1,4 +1,4 @@
-use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::Field;
 use crate::homomorphism::CanHomFrom;
 use crate::integer::{int_cast, IntegerRing, IntegerRingStore};
@@ -240,6 +240,11 @@ impl<I> EuclideanRing for RationalFieldBase<I>
         (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
     }
 }
+
+impl<I> Domain for RationalFieldBase<I>
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
+{}
 
 impl<I> Field for RationalFieldBase<I>
     where I: IntegerRingStore,

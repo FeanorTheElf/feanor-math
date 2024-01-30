@@ -46,9 +46,9 @@ pub trait OrderedRing: RingBase {
     }
 }
 
-
 ///
-/// [`RingStore`] for [`OrderedRing`]s
+/// Trait for [`RingStore`]s that store [`OrderedRing`]s. Mainly used
+/// to provide a convenient interface to the `OrderedRing`-functions.
 /// 
 pub trait OrderedRingStore: RingStore
     where Self::Type: OrderedRing

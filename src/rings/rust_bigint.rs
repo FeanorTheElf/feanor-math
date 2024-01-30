@@ -1,4 +1,5 @@
 use crate::divisibility::DivisibilityRing;
+use crate::divisibility::Domain;
 use crate::pid::*;
 use crate::integer::*;
 use crate::ordered::*;
@@ -240,6 +241,8 @@ macro_rules! specialize_int_cast {
 }
 
 specialize_int_cast!{ i8, i16, i32, i64, i128 }
+
+impl Domain for RustBigintRingBase {}
 
 impl OrderedRing for RustBigintRingBase {
 

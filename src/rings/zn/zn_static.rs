@@ -238,7 +238,13 @@ impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD> {
     fn modulus(&self) -> &El<Self::Integers> {
         &(N as i64)
     }
+
+    fn is_field(&self) -> bool {
+        is_prime(N)
+    }
 }
+
+impl<const N: u64> Domain for ZnBase<N, true> {}
 
 impl<const N: u64> Field for ZnBase<N, true> {}
 

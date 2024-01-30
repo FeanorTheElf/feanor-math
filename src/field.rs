@@ -1,3 +1,4 @@
+use crate::divisibility::Domain;
 use crate::ring::*;
 use crate::pid::*;
 
@@ -7,7 +8,7 @@ use crate::pid::*;
 /// 
 /// Note that fields must be commutative.
 /// 
-pub trait Field: EuclideanRing {
+pub trait Field: Domain + EuclideanRing {
 
     fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         assert!(!self.is_zero(rhs));
@@ -15,6 +16,10 @@ pub trait Field: EuclideanRing {
     }
 }
 
+///
+/// Trait for [`RingStore`]s that store [`Field`]s. Mainly used
+/// to provide a convenient interface to the `Field`-functions.
+/// 
 pub trait FieldStore: RingStore + EuclideanRingStore
     where Self::Type: Field
 {

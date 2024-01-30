@@ -6,7 +6,7 @@ use crate::field::Field;
 use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::ring::*;
 use crate::homomorphism::*;
-use crate::divisibility::DivisibilityRing;
+use crate::divisibility::{DivisibilityRing, Domain};
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct Complex64;
@@ -147,6 +147,8 @@ impl RingBase for Complex64 {
 }
 
 impl_eq_based_self_iso!{ Complex64 }
+
+impl Domain for Complex64 {}
 
 impl DivisibilityRing for Complex64 {
 

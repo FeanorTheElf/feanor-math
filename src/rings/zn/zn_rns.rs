@@ -427,7 +427,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider
         let result = <_ as RingStore>::sum(&self.total_ring,
             self.components.iter()
                 .zip(el.0.into_iter())
-                .map(|(fp, x)| (fp.integer_ring().get_ring(), fp.smallest_positive_lift(fp.clone_el(x))))
+                .map(|(component_ring, x): (&C, &El<C>)| (component_ring.integer_ring().get_ring(), component_ring.smallest_positive_lift(component_ring.clone_el(x))))
                 .zip(self.unit_vectors.iter())
                 .zip(homs.iter())
                 .map(|(((integers, x), u), hom)| (integers, x, u, hom))
@@ -453,7 +453,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRing, M: MemoryProvider<El<C
 
     fn has_canonical_hom(&self, from: &K) -> Option<Self::Homomorphism> {
         Some(self.components.iter()
-            .map(|R| <C::Type as CanHomFrom<K>>::has_canonical_hom(R.get_ring(), from).ok_or(()))
+            .map(|component_ring: &C| <C::Type as CanHomFrom<K>>::has_canonical_hom(component_ring.get_ring(), from).ok_or(()))
             .collect::<Result<Vec<_>, ()>>()
             .ok()?
         )
@@ -647,6 +647,17 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnRing for Z
         )
     }
 
+    fn smallest_lift(&self, el: Self::Element) -> El<Self::Integers> {
+        self.total_ring.smallest_lift(
+            <Self as CanonicalIso<zn_barett::ZnBase<J>>>::map_out(
+                self, 
+                self.total_ring.get_ring(), 
+                el, 
+                &<Self as CanonicalIso<zn_barett::ZnBase<J>>>::has_canonical_iso(self, self.total_ring.get_ring()).unwrap()
+            )
+        )
+    }
+
     fn is_field(&self) -> bool {
         self.components.len() == 1
     }
@@ -730,4 +741,10 @@ fn test_finite_ring_axioms() {
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![3, 5]));
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![3]));
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::from_primes(StaticRing::<i64>::RING, vec![128]));
+}
+
+#[test]
+fn test_nonprime() {
+    let R = Zn::from_primes(StaticRing::<i64>::RING, vec![15, 7]);
+    assert_eq!(7, R.smallest_lift(R.int_hom().map(7)));
 }

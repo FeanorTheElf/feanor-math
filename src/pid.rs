@@ -17,7 +17,8 @@ pub trait PrincipalIdealRing: DivisibilityRing {
 }
 
 ///
-/// [`RingStore`] for [`PrincipalIdealRing`]s
+/// Trait for [`RingStore`]s that store [`PrincipalIdealRing`]s. Mainly used
+/// to provide a convenient interface to the `PrincipalIdealRing`-functions.
 /// 
 pub trait PrincipalIdealRingStore: RingStore
     where Self::Type: PrincipalIdealRing

@@ -19,6 +19,18 @@ pub trait DivisibilityRing: RingBase {
     }
 }
 
+///
+/// Trait for rings that are integral, i.e. have no zero divisors.
+/// 
+/// A zero divisor is a nonzero element `a` such that there is a nonzero
+/// element `b` with `ab = 0`.
+/// 
+pub trait Domain: DivisibilityRing {}
+
+///
+/// Trait for [`RingStore`]s that store [`DivisibilityRing`]s. Mainly used
+/// to provide a convenient interface to the `DivisibilityRing`-functions.
+/// 
 pub trait DivisibilityRingStore: RingStore
     where Self::Type: DivisibilityRing
 {

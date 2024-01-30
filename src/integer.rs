@@ -1,3 +1,4 @@
+use crate::divisibility::Domain;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::pid::*;
@@ -22,7 +23,7 @@ pub type BigIntRingBase = crate::rings::rust_bigint::RustBigintRingBase;
 /// As an additional requirement, the euclidean division (i.e. [`EuclideanRing::euclidean_div_rem()`] and
 /// [`IntegerRing::euclidean_div_pow_2()`]) are expected to round towards zero.
 /// 
-pub trait IntegerRing: EuclideanRing + OrderedRing + HashableElRing + CanonicalIso<Self> {
+pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + CanonicalIso<Self> {
 
     ///
     /// Computes a float value that is supposed to be close to value.
@@ -256,7 +257,8 @@ pub mod generic_maps {
 }
 
 ///
-/// [`RingStore`] for [`IntegerRing`]s
+/// Trait for [`RingStore`]s that store [`IntegerRing`]s. Mainly used
+/// to provide a convenient interface to the `IntegerRing`-functions.
 /// 
 pub trait IntegerRingStore: RingStore
     where Self::Type: IntegerRing
