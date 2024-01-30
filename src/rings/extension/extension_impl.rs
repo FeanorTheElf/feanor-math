@@ -118,6 +118,18 @@ impl<R, V, M> FreeAlgebraImpl<R, V, M>
     }
 }
 
+impl<R, V, M> Clone for FreeAlgebraImplBase<R, V, M>
+    where R: RingStore + Clone, V: VectorView<El<R>> + Clone, M: MemoryProvider<El<R>> + Clone
+{
+    fn clone(&self) -> Self {
+        Self {
+            base_ring: self.base_ring.clone(),
+            x_pow_rank: self.x_pow_rank.clone(),
+            memory_provider: self.memory_provider.clone()
+        }
+    }
+}
+
 impl<R, V, M> PartialEq for FreeAlgebraImplBase<R, V, M>
     where R: RingStore, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
 {

@@ -277,7 +277,6 @@ macro_rules! impl_factor_poly_number_fields {
                 number_field::factor_over_number_field(poly_ring, f)
             }
         }
-
     };
 }
 
