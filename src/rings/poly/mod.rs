@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::ring::*;
 use crate::homomorphism::*;
 
@@ -93,6 +95,65 @@ pub trait PolyRingStore: RingStore
     {
         self.get_ring().evaluate(f, value, hom)
     }
+
+    fn into_lifted_hom<P, H>(self, from: P, hom: H) -> CoefficientHom<P, Self, H>
+        where P: PolyRingStore,
+            P::Type: PolyRing,
+            H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
+    {
+        CoefficientHom {
+            from: from,
+            to: self,
+            hom: hom
+        }
+    }
+
+    fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
+        where P: PolyRingStore,
+            P::Type: PolyRing,
+            H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
+    {
+        self.into_lifted_hom(from, hom)
+    }
+}
+
+pub struct CoefficientHom<PFrom, PTo, H>
+    where PFrom: PolyRingStore,
+        PTo: PolyRingStore,
+        PFrom::Type: PolyRing,
+        PTo::Type: PolyRing,
+        H: Homomorphism<<<PFrom::Type as RingExtension>::BaseRing as RingStore>::Type, <<PTo::Type as RingExtension>::BaseRing as RingStore>::Type>
+{
+    from: PFrom,
+    to: PTo,
+    hom: H
+}
+
+impl<PFrom, PTo, H> Homomorphism<PFrom::Type, PTo::Type> for CoefficientHom<PFrom, PTo, H>
+    where PFrom: PolyRingStore,
+        PTo: PolyRingStore,
+        PFrom::Type: PolyRing,
+        PTo::Type: PolyRing,
+        H: Homomorphism<<<PFrom::Type as RingExtension>::BaseRing as RingStore>::Type, <<PTo::Type as RingExtension>::BaseRing as RingStore>::Type>
+{
+    type DomainStore = PFrom;
+    type CodomainStore = PTo;
+
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
+        &self.to
+    }
+
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
+        &self.from
+    }
+
+    fn map(&self, x: <PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element {
+        self.map_ref(&x)
+    }
+
+    fn map_ref(&self, x: &<PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element {
+        self.to.get_ring().map_terms(self.from.get_ring(), x, &self.hom)
+    }
 }
 
 impl<R: RingStore> PolyRingStore for R
@@ -157,6 +218,28 @@ pub mod generic_impls {
         }
         return Ok(());
     }
+}
+
+pub fn transpose_indeterminates<P1, P2, H>(from: P1, to: P2, base_hom: H) -> impl Homomorphism<P1::Type, P2::Type>
+    where P1: RingStore, P1::Type: PolyRing,
+        P2: RingStore, P2::Type: PolyRing,
+        <<P1::Type as RingExtension>::BaseRing as RingStore>::Type: PolyRing,
+        <<P2::Type as RingExtension>::BaseRing as RingStore>::Type: PolyRing,
+        H: Homomorphism<<<<<P1::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type,
+            <<<<P2::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type>
+{
+    LambdaHom::new(from, to, move |from, to, x| {
+        let mut result_terms: HashMap<usize, Vec<(_, usize)>> = HashMap::new();
+        for (f, i) in from.terms(x) {
+            for (c, j) in from.base_ring().terms(f) {
+                match result_terms.entry(j) {
+                    std::collections::hash_map::Entry::Occupied(mut e) => { e.get_mut().push((base_hom.map_ref(c), i)); },
+                    std::collections::hash_map::Entry::Vacant(e) => { e.insert(vec![(base_hom.map_ref(c), i)]); }
+                }
+            }
+        }
+        return to.from_terms(result_terms.into_iter().map(|(j, f)| (to.base_ring().from_terms(f.into_iter()), j)));
+    })
 }
 
 #[cfg(any(test, feature = "generic_tests"))]

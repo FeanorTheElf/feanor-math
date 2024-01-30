@@ -647,6 +647,46 @@ impl<'a, S, R, H> Homomorphism<S, R> for &'a H
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct LambdaHom<R: RingStore, S: RingStore, F>
+    where F: Fn(&R, &S, &El<R>) -> El<S>
+{
+    from: R,
+    to: S,
+    f: F
+}
+
+impl<R: RingStore, S: RingStore, F> LambdaHom<R, S, F>
+    where F: Fn(&R, &S, &El<R>) -> El<S>
+{
+    pub fn new(from: R, to: S, f: F) -> Self {
+        Self { from, to, f }
+    }
+}
+
+impl<R: RingStore, S: RingStore, F> Homomorphism<R::Type, S::Type> for LambdaHom<R, S, F>
+    where F: Fn(&R, &S, &El<R>) -> El<S>
+{
+    type CodomainStore = S;
+    type DomainStore = R;
+
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
+        &self.to
+    }
+
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
+        &self.from
+    }
+
+    fn map(&self, x: <R::Type as RingBase>::Element) -> <S::Type as RingBase>::Element {
+        (self.f)(self.domain(), self.codomain(), &x)
+    }
+
+    fn map_ref(&self, x: &<R::Type as RingBase>::Element) -> <S::Type as RingBase>::Element {
+        (self.f)(self.domain(), self.codomain(), x)
+    }
+}
+
 pub struct ComposedHom<R, S, T, F, G>
     where F: Homomorphism<R, S>,
         G: Homomorphism<S, T>,

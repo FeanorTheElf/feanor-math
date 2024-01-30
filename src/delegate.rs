@@ -1,6 +1,3 @@
-use std::default;
-
-use crate::divisibility::Domain;
 use crate::pid::PrincipalIdealRing;
 use crate::ring::*;
 use crate::homomorphism::*;

@@ -4,17 +4,21 @@ use crate::divisibility::*;
 use crate::field::{Field, FieldStore};
 use crate::homomorphism::Homomorphism;
 use crate::integer::{int_cast, BigIntRing, IntegerRing, IntegerRingStore};
+use crate::mempool::MemoryProvider;
 use crate::ordered::*;
 use crate::pid::EuclideanRing;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
+use crate::rings::extension::extension_impl::{FreeAlgebraImpl, FreeAlgebraImplBase};
+use crate::rings::field::AsFieldBase;
 use crate::rings::finite::FiniteRing;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::{PolyRing, PolyRingStore};
 use crate::algorithms::{self, int_bisect};
-use crate::rings::rational::RationalFieldBase;
+use crate::rings::rational::*;
 use crate::rings::zn::zn_64::Zn;
 use crate::rings::zn::{choose_zn_impl, ZnOperation, ZnRing, ZnRingStore};
+use crate::vector::VectorView;
 
 use cantor_zassenhaus::poly_squarefree_part;
 use super::erathostenes;
@@ -163,8 +167,8 @@ fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
     // Cantor-Zassenhaus does not directly work for p = 2, so skip the first prime
     for p in erathostenes::enumerate_primes(&ZZ, &1000).into_iter().skip(1) {
 
-        // check whether f mod p is also square-free, there are only finitely many primes
-        // where this would not be square-free
+        // check whether `f mod p` is also square-free, there are only finitely many primes
+        // where this would not be the case
         let Fp = Zn::new(p as u64).as_field().ok().unwrap();
         let mod_p = Fp.can_hom(&ZZ).unwrap();
         let reduce = |x: El<<P::Type as RingExtension>::BaseRing>| mod_p.map(int_cast(x, &ZZ, ZZX.base_ring()));
@@ -177,7 +181,7 @@ fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
         if FpX.eq_el(&squarefree_part, &f_mod_p) {
 
             // we found a prime such that f remains square-free mod p;
-            // now we can use the factorization of f mod p to derive a factorization of f
+            // now we can use the factorization of `f mod p` to derive a factorization of f
             let ZZbig = BigIntRing::RING;
 
             // we use Theorem 3.5.1 from "A course in computational algebraic number theory", Cohen
@@ -255,6 +259,37 @@ impl<I> FactorPolyField for RationalFieldBase<I>
     }
 }
 
+macro_rules! impl_factor_poly_number_fields {
+    ($number_field_type:ty, $($lifetimes:lifetime),*) => {
+
+        impl<$($lifetimes,)* I, V, M> FactorPolyField for $number_field_type
+            where I: IntegerRingStore,
+                I::Type: IntegerRing,
+                RationalFieldBase<I>: FactorPolyField,
+                V: VectorView<El<RationalField<I>>>,
+                M: MemoryProvider<El<RationalField<I>>>
+        {
+            fn factor_poly<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
+                where P: PolyRingStore,
+                    P::Type: PolyRing + EuclideanRing,
+                    <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+            {
+                number_field::factor_over_number_field(poly_ring, f)
+            }
+        }
+
+    };
+}
+
+// unfortunately, any blanket impl conflicts with the one for finite fields...
+impl_factor_poly_number_fields!{ AsFieldBase<FreeAlgebraImpl<RationalField<I>, V, M>>, }
+impl_factor_poly_number_fields!{ AsFieldBase<RingRef<'a, FreeAlgebraImplBase<RationalField<I>, V, M>>>, 'a }
+impl_factor_poly_number_fields!{ AsFieldBase<FreeAlgebraImpl<RingRef<'a, RationalFieldBase<I>>, V, M>>, 'a }
+impl_factor_poly_number_fields!{ AsFieldBase<RingRef<'a, FreeAlgebraImplBase<RingRef<'b, RationalFieldBase<I>>, V, M>>>, 'a, 'b }
+impl_factor_poly_number_fields!{ AsFieldBase<&'a FreeAlgebraImpl<RationalField<I>, V, M>>, 'a }
+impl_factor_poly_number_fields!{ AsFieldBase<FreeAlgebraImpl<&'a RationalField<I>, V, M>>, 'a }
+impl_factor_poly_number_fields!{ AsFieldBase<&'a FreeAlgebraImpl<&'b RationalField<I>, V, M>>, 'a, 'b }
+
 impl<R> FactorPolyField for R
     where R: ?Sized + FiniteRing + Field
 {
@@ -317,8 +352,6 @@ impl<R> FactorPolyField for R
     }
 }
 
-#[cfg(test)]
-use crate::rings::rational::*;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
 
