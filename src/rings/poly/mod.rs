@@ -160,6 +160,16 @@ impl<R: RingStore> PolyRingStore for R
     where R::Type: PolyRing
 {}
 
+pub fn derive_poly<P>(poly_ring: P, poly: &El<P>) -> El<P>
+    where P: PolyRingStore,
+        P::Type: PolyRing
+{
+    poly_ring.from_terms(poly_ring.terms(poly)
+        .filter(|(_, i)| *i > 0)
+        .map(|(c, i)| (poly_ring.base_ring().int_hom().mul_ref_fst_map(c, i as i32), i - 1))
+    )
+}
+
 pub mod generic_impls {
     use crate::ring::*;
     use super::PolyRing;

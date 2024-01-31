@@ -379,11 +379,17 @@ pub trait RingBase: PartialEq {
 #[macro_export]
 macro_rules! delegate {
     (fn $name:ident (&self, $($pname:ident: $ptype:ty),*) -> $rtype:ty) => {
+        ///
+        /// See the corresponding function of [`RingStore`].
+        /// 
         fn $name (&self, $($pname: $ptype),*) -> $rtype {
             self.get_ring().$name($($pname),*)
         }
     };
     (fn $name:ident (&self) -> $rtype:ty) => {
+        ///
+        /// See the corresponding function of [`RingStore`].
+        /// 
         fn $name (&self) -> $rtype {
             self.get_ring().$name()
         }
@@ -1171,34 +1177,8 @@ pub mod generic_tests {
     pub fn test_hom_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
         where S::Type: CanHomFrom<R::Type>
     {
-        let hom = to.get_ring().has_canonical_hom(from.get_ring()).unwrap();
-        let elements = edge_case_elements.collect::<Vec<_>>();
-
-        for a in &elements {
-            for b in &elements {
-                {
-                    let map_a = to.get_ring().map_in_ref(from.get_ring(), a, &hom);
-                    let map_b = to.get_ring().map_in_ref(from.get_ring(), b, &hom);
-                    let map_add = to.add_ref(&map_a, &map_b);
-                    let add_map = to.get_ring().map_in(from.get_ring(), from.add_ref(a, b), &hom);
-                    assert!(to.eq_el(&map_add, &add_map), "Additive homomorphic property failed: hom({} + {}) = {} != {} = {} + {}", from.format(a), from.format(b), to.format(&add_map), to.format(&map_add), to.format(&map_a), to.format(&map_b));
-                }
-                {
-                    let map_a = to.get_ring().map_in_ref(from.get_ring(), a, &hom);
-                    let map_b = to.get_ring().map_in_ref(from.get_ring(), b, &hom);
-                    let map_mul = to.mul_ref(&map_a, &map_b);
-                    let mul_map = to.get_ring().map_in(from.get_ring(), from.mul_ref(a, b), &hom);
-                    assert!(to.eq_el(&map_mul, &mul_map), "Multiplicative homomorphic property failed: hom({} * {}) = {} != {} = {} * {}", from.format(a), from.format(b), to.format(&mul_map), to.format(&map_mul), to.format(&map_a), to.format(&map_b));
-                }
-                {
-                    let map_a = to.get_ring().map_in_ref(from.get_ring(), a, &hom);
-                    let mul_map = to.get_ring().map_in(from.get_ring(), from.mul_ref(a, b), &hom);
-                    let mut mul_assign = to.clone_el(&map_a);
-                    to.get_ring().mul_assign_map_in_ref(from.get_ring(), &mut mul_assign, b, &hom);
-                    assert!(to.eq_el(&mul_assign, &mul_map), "mul_assign_map_in_ref() failed: hom({} * {}) = {} != {} = mul_map_in(hom({}), {})", from.format(a), from.format(b), to.format(&mul_map), to.format(&mul_assign), to.format(&map_a), from.format(b));
-                }
-            }
-        }
+        let hom = to.can_hom(&from).unwrap();
+        crate::homomorphism::generic_tests::test_homomorphism_axioms(hom, edge_case_elements);
     }
 
     pub fn test_iso_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)

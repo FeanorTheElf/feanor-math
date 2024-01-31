@@ -65,6 +65,13 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
     fn mul_ref_map(&self, lhs: &Codomain::Element, rhs: &Domain::Element) -> Codomain::Element {
         self.mul_ref_snd_map(self.codomain().clone_el(lhs), rhs)
     }
+
+    fn compose<F, PrevDomain: ?Sized + RingBase>(self, prev: F) -> ComposedHom<PrevDomain, Domain, Codomain, F, Self>
+        where Self: Sized, F: Homomorphism<PrevDomain, Domain>
+    {
+        assert!(prev.codomain().get_ring() == self.domain().get_ring());
+        ComposedHom { f: prev, g: self, domain: PhantomData, intermediate: PhantomData, codomain: PhantomData }
+    }
 }
 
 ///
@@ -690,9 +697,9 @@ impl<R: RingStore, S: RingStore, F> Homomorphism<R::Type, S::Type> for LambdaHom
 pub struct ComposedHom<R, S, T, F, G>
     where F: Homomorphism<R, S>,
         G: Homomorphism<S, T>,
-        R: RingBase,
-        S: RingBase,
-        T: RingBase
+        R: ?Sized + RingBase,
+        S: ?Sized + RingBase,
+        T: ?Sized + RingBase
 {
     f: F,
     g: G,
@@ -704,9 +711,9 @@ pub struct ComposedHom<R, S, T, F, G>
 impl<R, S, T, F, G> Clone for ComposedHom<R, S, T, F, G>
     where F: Clone + Homomorphism<R, S>,
         G: Clone + Homomorphism<S, T>,
-        R: RingBase,
-        S: RingBase,
-        T: RingBase
+        R: ?Sized + RingBase,
+        S: ?Sized + RingBase,
+        T: ?Sized + RingBase
 {
     fn clone(&self) -> Self {
         Self {
@@ -722,17 +729,17 @@ impl<R, S, T, F, G> Clone for ComposedHom<R, S, T, F, G>
 impl<R, S, T, F, G> Copy for ComposedHom<R, S, T, F, G>
     where F: Copy + Homomorphism<R, S>,
         G: Copy + Homomorphism<S, T>,
-        R: RingBase,
-        S: RingBase,
-        T: RingBase
+        R: ?Sized + RingBase,
+        S: ?Sized + RingBase,
+        T: ?Sized + RingBase
 {}
 
 impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
     where F: Homomorphism<R, S>,
         G: Homomorphism<S, T>,
-        R: RingBase,
-        S: RingBase,
-        T: RingBase
+        R: ?Sized + RingBase,
+        S: ?Sized + RingBase,
+        T: ?Sized + RingBase
 {
     type DomainStore = <F as Homomorphism<R, S>>::DomainStore;
     type CodomainStore = <G as Homomorphism<S, T>>::CodomainStore;
@@ -759,5 +766,45 @@ impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
 
     fn mul_assign_map_ref(&self, lhs: &mut <T as RingBase>::Element, rhs: &<R as RingBase>::Element) {
         self.g.mul_assign_map(lhs, self.f.map_ref(rhs))
+    }
+}
+
+#[cfg(any(test, feature = "generic_tests"))]
+pub mod generic_tests {
+
+    use super::*;
+
+    pub fn test_homomorphism_axioms<R: ?Sized + RingBase, S: ?Sized + RingBase, H, I: Iterator<Item = R::Element>>(hom: H, edge_case_elements: I)
+        where H: Homomorphism<R, S>
+    {
+        let from = hom.domain();
+        let to = hom.codomain();
+        let elements = edge_case_elements.collect::<Vec<_>>();
+
+        for a in &elements {
+            for b in &elements {
+                {
+                    let map_a = hom.map_ref(a);
+                    let map_b = hom.map_ref(b);
+                    let map_sum = to.add_ref(&map_a, &map_b);
+                    let sum_map = hom.map(from.add_ref(a, b));
+                    assert!(to.eq_el(&map_sum, &sum_map), "Additive homomorphic property failed: hom({} + {}) = {} != {} = {} + {}", from.format(a), from.format(b), to.format(&sum_map), to.format(&map_sum), to.format(&map_a), to.format(&map_b));
+                }
+                {
+                    let map_a = hom.map_ref(a);
+                    let map_b = hom.map_ref(b);
+                    let map_prod = to.mul_ref(&map_a, &map_b);
+                    let prod_map = hom.map(from.mul_ref(a, b));
+                    assert!(to.eq_el(&map_prod, &prod_map), "Multiplicative homomorphic property failed: hom({} * {}) = {} != {} = {} * {}", from.format(a), from.format(b), to.format(&prod_map), to.format(&map_prod), to.format(&map_a), to.format(&map_b));
+                }
+                {
+                    let map_a = hom.map_ref(a);
+                    let prod_map = hom.map(from.mul_ref(a, b));
+                    let mut mul_assign = to.clone_el(&map_a);
+                    hom.mul_assign_map_ref( &mut mul_assign, b);
+                    assert!(to.eq_el(&mul_assign, &prod_map), "mul_assign_map_ref() failed: hom({} * {}) = {} != {} = mul_map_in(hom({}), {})", from.format(a), from.format(b), to.format(&prod_map), to.format(&mul_assign), to.format(&map_a), from.format(b));
+                }
+            }
+        }
     }
 }

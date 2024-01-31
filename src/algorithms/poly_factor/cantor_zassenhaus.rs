@@ -6,8 +6,7 @@ use crate::integer::*;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
-use crate::homomorphism::*;
-use crate::rings::poly::{PolyRingStore, PolyRing};
+use crate::rings::poly::{derive_poly, PolyRing, PolyRingStore};
 use crate::rings::finite::{FiniteRing, FiniteRingStore};
 
 use oorandom;
@@ -27,26 +26,6 @@ fn pow_mod_f<P, I>(poly_ring: P, g: El<P>, f: &El<P>, pow: &El<I>, ZZ: I) -> El<
         |a, b| poly_ring.euclidean_rem(poly_ring.mul_ref_fst(a, b), f),
         poly_ring.one()
     );
-}
-
-#[cfg(test)]
-fn normalize_poly<P>(poly_ring: P, poly: &mut El<P>)
-    where P: PolyRingStore,
-        P::Type: PolyRing,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: Field
-{
-    let inv_lc = poly_ring.base_ring().div(&poly_ring.base_ring().one(), poly_ring.lc(poly).unwrap());
-    poly_ring.inclusion().mul_assign_map_ref(poly, &inv_lc);
-}
-
-fn derive_poly<P>(poly_ring: P, poly: &El<P>) -> El<P>
-    where P: PolyRingStore,
-        P::Type: PolyRing
-{
-    poly_ring.from_terms(poly_ring.terms(poly)
-        .filter(|(_, i)| *i > 0)
-        .map(|(c, i)| (poly_ring.base_ring().int_hom().mul_ref_fst_map(c, i as i32), i - 1))
-    )
 }
 
 pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>>
@@ -174,6 +153,18 @@ use crate::rings::zn::zn_static::Fp;
 use crate::rings::zn::zn_42;
 #[cfg(test)]
 use crate::rings::zn::ZnRingStore;
+#[cfg(test)]
+use crate::homomorphism::*;
+
+#[cfg(test)]
+fn normalize_poly<P>(poly_ring: P, poly: &mut El<P>)
+    where P: PolyRingStore,
+        P::Type: PolyRing,
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: Field
+{
+    let inv_lc = poly_ring.base_ring().div(&poly_ring.base_ring().one(), poly_ring.lc(poly).unwrap());
+    poly_ring.inclusion().mul_assign_map_ref(poly, &inv_lc);
+}
 
 #[test]
 fn test_poly_squarefree_part() {

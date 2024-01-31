@@ -599,7 +599,7 @@ fn edge_case_elements<'a, M: GrowableMemoryProvider<(i64, Monomial<[MonomialExpo
 #[test]
 fn test_ring_axioms() {
     let ring = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, DegRevLex, default_memory_provider!());
-    generic_tests::test_ring_axioms(&ring, edge_case_elements(&ring));
+    crate::ring::generic_tests::test_ring_axioms(&ring, edge_case_elements(&ring));
 }
 
 #[test]

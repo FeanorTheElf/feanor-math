@@ -10,6 +10,7 @@ use crate::pid::EuclideanRing;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::extension::extension_impl::{FreeAlgebraImpl, FreeAlgebraImplBase};
+use crate::rings::extension::FreeAlgebra;
 use crate::rings::field::AsFieldBase;
 use crate::rings::finite::FiniteRing;
 use crate::rings::poly::dense_poly::DensePolyRing;
@@ -19,6 +20,7 @@ use crate::rings::rational::*;
 use crate::rings::zn::zn_64::Zn;
 use crate::rings::zn::{choose_zn_impl, ZnOperation, ZnRing, ZnRingStore};
 use crate::vector::VectorView;
+use crate::rings::fieldextension::*;
 
 use cantor_zassenhaus::poly_squarefree_part;
 use super::erathostenes;
@@ -277,6 +279,14 @@ macro_rules! impl_factor_poly_number_fields {
                 number_field::factor_over_number_field(poly_ring, f)
             }
         }
+
+        impl<$($lifetimes,)* I, V, M> ExtensionField for $number_field_type
+            where I: IntegerRingStore,
+                I::Type: IntegerRing,
+                RationalFieldBase<I>: FactorPolyField,
+                V: VectorView<El<RationalField<I>>>,
+                M: MemoryProvider<El<RationalField<I>>>
+        {}
     };
 }
 
@@ -288,6 +298,11 @@ impl_factor_poly_number_fields!{ AsFieldBase<RingRef<'a, FreeAlgebraImplBase<Rin
 impl_factor_poly_number_fields!{ AsFieldBase<&'a FreeAlgebraImpl<RationalField<I>, V, M>>, 'a }
 impl_factor_poly_number_fields!{ AsFieldBase<FreeAlgebraImpl<&'a RationalField<I>, V, M>>, 'a }
 impl_factor_poly_number_fields!{ AsFieldBase<&'a FreeAlgebraImpl<&'b RationalField<I>, V, M>>, 'a, 'b }
+
+
+impl<R> ExtensionField for R
+    where R: ?Sized + FiniteRing + Field + FreeAlgebra
+{}
 
 impl<R> FactorPolyField for R
     where R: ?Sized + FiniteRing + Field

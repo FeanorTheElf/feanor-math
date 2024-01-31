@@ -61,3 +61,5 @@ pub mod rational;
 /// 
 #[cfg(feature = "mpir")]
 pub mod mpir;
+
+pub mod fieldextension;
