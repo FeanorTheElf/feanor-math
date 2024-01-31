@@ -1,12 +1,12 @@
 use libc;
 
-use crate::divisibility::DivisibilityRing;
 use crate::algorithms;
 use crate::pid::*;
 use crate::ordered::OrderedRing;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::primitive_int::StaticRingBase;
+use crate::divisibility::*;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::integer::*;
@@ -239,6 +239,12 @@ impl RingBase for MPZBase {
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         RustBigintRing::RING.get_ring().dbg(&self.map_out(RustBigintRing::RING.get_ring(), self.clone_el(value), &()), out)
     }
+    
+    fn characteristic<I: IntegerRingStore>(&self, other_ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        Some(other_ZZ.zero())
+    }
 }
 
 impl OrderedRing for MPZBase {
@@ -345,6 +351,8 @@ impl EuclideanRing for MPZBase {
     }
 }
 
+impl Domain for MPZBase {}
+
 impl IntegerRing for MPZBase {
     
     fn to_float_approx(&self, el: &Self::Element) -> f64 {
@@ -439,6 +447,10 @@ impl IntegerRing for MPZBase {
             self.euclidean_div_pow_2(&mut result, len * u64::BITS as usize - log2_bound_exclusive);
             return result;
         }
+    }
+
+    fn representable_bits(&self) -> Option<usize> {
+        None
     }
 }
 

@@ -100,14 +100,14 @@ pub trait FactorPolyField: Field {
 
 struct FactorizeMonicIntegerPolynomialUsingHenselLifting<'a, P, R>
     where P: PolyRingStore,
-        P::Type: PolyRing,
+        P::Type: PolyRing + DivisibilityRing,
         R: PolyRingStore,
         R::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
         <<R::Type as RingExtension>::BaseRing as RingStore>::Type: Field + ZnRing
 {
-    prime_poly_ring: R,
-    poly_ring: P,
+    FpX: R,
+    ZZX: P,
     poly_mod_p: El<R>,
     poly: &'a El<P>,
     bound: El<BigIntRing>
@@ -115,7 +115,7 @@ struct FactorizeMonicIntegerPolynomialUsingHenselLifting<'a, P, R>
 
 impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingHenselLifting<'a, P, R>
     where P: PolyRingStore,
-        P::Type: PolyRing,
+        P::Type: PolyRing + DivisibilityRing,
         R: PolyRingStore,
         R::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
@@ -127,28 +127,47 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
         let ZZ = Zpe.integer_ring();
         let bound = int_cast(self.bound, ZZ, &BigIntRing::RING);
         let mod_pe = Zpe.can_hom(ZZ).unwrap();
-        let reduce = |x: El<<P::Type as RingExtension>::BaseRing>| mod_pe.map(int_cast(x, ZZ, self.poly_ring.base_ring()));
-        let prime_power_poly_ring = DensePolyRing::new(&Zpe, "X");
-        let factorization = <_ as FactorPolyField>::factor_poly(&self.prime_poly_ring, &self.poly_mod_p).0.into_iter().inspect(|(_, e)| assert!(*e == 1)).map(|(f, _)| f).collect::<Vec<_>>();
-        let mut poly = prime_power_poly_ring.from_terms(self.poly_ring.terms(&self.poly).map(|(c, i)| (reduce(self.poly_ring.base_ring().clone_el(c)), i)));
-        let lifted_factorization = hensel_lift_factorization(&prime_power_poly_ring, &self.prime_poly_ring, &self.prime_poly_ring, &poly, &factorization);
+        let reduce = |x: El<<P::Type as RingExtension>::BaseRing>| mod_pe.map(int_cast(x, ZZ, self.ZZX.base_ring()));
+        let ZpeX = DensePolyRing::new(&Zpe, "X");
+        let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&self.FpX, &self.poly_mod_p);
+        debug_assert!(self.FpX.base_ring().is_one(&unit));
+        debug_assert!(factorization.iter().all(|(_, e)| *e == 1));
+        debug_assert!(factorization.iter().map(|(f, _)| self.FpX.degree(f).unwrap()).sum::<usize>() == self.ZZX.degree(&self.poly).unwrap());
+        
+        let lifted_factorization = hensel_lift_factorization(
+            &ZpeX, 
+            &self.FpX, 
+            &self.FpX, 
+            &ZpeX.from_terms(self.ZZX.terms(self.poly).map(|(c, i)| (reduce(self.ZZX.base_ring().clone_el(c)), i))), 
+            &factorization.into_iter().map(|(f, _)| f).collect::<Vec<_>>()
+        );
 
+        let mut current = self.ZZX.clone_el(self.poly);
         let mut ungrouped_factors = (0..lifted_factorization.len()).collect::<Vec<_>>();
         let mut result = Vec::new();
-        while !prime_power_poly_ring.is_unit(&poly) {
+        while !self.ZZX.is_unit(&current) {
+
             // Here we use the naive approach to group the factors in the p-adic numbers such that the product of each group
             // is integral - just try all combinations. It might be worth using LLL for this instead (as soon as LLL is implemented
             // in this library).
-            let (factor, factor_group) = crate::iters::basic_powerset(ungrouped_factors.iter().copied())
+            let (factor, new_poly, factor_group) = crate::iters::basic_powerset(ungrouped_factors.iter().copied())
+                // skip the empty set
                 .skip(1)
-                .map(|slice| (prime_power_poly_ring.prod(slice.iter().copied().map(|i| prime_power_poly_ring.clone_el(&lifted_factorization[i]))), slice))
-                .filter(|(f, _)| prime_power_poly_ring.terms(f).all(|(c, _)| ZZ.is_lt(&ZZ.abs(Zpe.smallest_lift(Zpe.clone_el(c))), &bound)))
+                // compute the product of a subset of factors
+                .map(|slice| (ZpeX.prod(slice.iter().copied().map(|i| ZpeX.clone_el(&lifted_factorization[i]))), slice))
+                // if this is not bounded by `bound`, there is no chance it gives a factor over ZZ
+                .filter(|(f, _)| ZpeX.terms(f).all(|(c, _)| ZZ.is_lt(&ZZ.abs(Zpe.smallest_lift(Zpe.clone_el(c))), &bound)))
+                // lift it to ZZ
+                .map(|(f, slice)| (self.ZZX.from_terms(ZpeX.terms(&f).map(|(c, i)| (int_cast(Zpe.smallest_lift(Zpe.clone_el(c)), self.ZZX.base_ring(), ZZ), i))), slice))
+                // check if it is indeed a factor
+                .filter_map(|(f, slice)| self.ZZX.checked_div(&current, &f).map(|quo| (f, quo, slice)))
                 .next().unwrap();
+
             ungrouped_factors.retain(|j| !factor_group.contains(j));
-            poly = prime_power_poly_ring.checked_div(&poly, &factor).unwrap();
-            result.push(self.poly_ring.from_terms(prime_power_poly_ring.terms(&factor).map(|(c, i)| (int_cast(Zpe.smallest_lift(Zpe.clone_el(c)), self.poly_ring.base_ring(), ZZ), i))));
+            current = new_poly;
+            result.push(factor);
         }
-        assert!(prime_power_poly_ring.is_one(&poly));
+        assert!(self.ZZX.is_one(&current));
         return result;
     }
 }
@@ -159,7 +178,7 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
 /// 
 fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
     where P: PolyRingStore,
-        P::Type: PolyRing,
+        P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
 {
     let ZZ = StaticRing::<i64>::RING;
@@ -201,7 +220,7 @@ fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
             let modulus = ZZbig.pow(int_cast(p, &ZZbig, &ZZ), exponent);
 
             return choose_zn_impl(ZZbig, modulus, FactorizeMonicIntegerPolynomialUsingHenselLifting {
-                poly: f, poly_ring: ZZX, poly_mod_p: f_mod_p, prime_poly_ring: FpX, bound
+                poly: f, ZZX: ZZX, poly_mod_p: f_mod_p, FpX: FpX, bound
             });
         }
     }
