@@ -1,9 +1,29 @@
 use std::fmt::Display;
 
+///
+/// Functionality for providing mutable and immutable views on submatrices
+/// of `Vec<Vec<T>>` or similar owned 2d-data structures. 
+/// 
+/// In particular, this enables to have simultaneous mutable references to disjoint 
+/// parts of a matrix, which is very useful in algorithms, but can only be
+/// achieved using unsafe code. This module provides a safe wrapper around that.
+/// 
 pub mod submatrix;
 
 use crate::ring::*;
 
+///
+/// A very minimalistic approach to implement matrices.
+/// 
+/// I have not yet decided on how exactly this library should "do" matrices.
+/// One problem is that efficient algorithms on matrices often need their own
+/// layout of data - e.g. sparse vs dense, column-vs row-major storage, maybe
+/// support for submatrices is needed, ...
+/// 
+/// Hence, for now, we just have this trait to support writing and equality
+/// checking, which should at least vastly simplify testing matrix implementations
+/// and algorithms.
+/// 
 pub trait Matrix<R>
     where R: ?Sized + RingBase
 {
@@ -40,6 +60,9 @@ macro_rules! assert_matrix_eq {
     }
 }
 
+///
+/// A wrapper for a reference to [`Matrix`] that implements [`std::fmt::Display`] to write the matrix.
+/// 
 pub struct MatrixDisplayWrapper<'a, R, M>
     where R: ?Sized + RingBase, M: ?Sized + Matrix<R>
 {
@@ -75,11 +98,48 @@ impl<'a, R, M> Display for MatrixDisplayWrapper<'a, R, M>
     }
 }
 
+///
+/// A trait for a "target" that can "consume" elementary operations on matrices.
+/// 
+/// This is mainly used during algorithms that work on matrices, since in many cases
+/// they transform matrices using elementary row or column operations, and have to
+/// accumulate data depending on these operations.
+/// 
 pub trait TransformTarget<R>
     where R: ?Sized + RingBase
 {
+    ///
+    /// The transformation given by the matrix `A` with `A[k, l]` being
+    ///  - `1` if `k = l` and `k != i, j`
+    ///  - `transform[0]` if `(k, l) = (i, i)`
+    ///  - `transform[1]` if `(k, l) = (i, j)`
+    ///  - `transform[2]` if `(k, l) = (j, i)`
+    ///  - `transform[3]` if `(k, l) = (j, j)`
+    ///  - `0` otherwise
+    /// 
+    /// In other words, the matrix looks like
+    /// ```text
+    /// | 1  ...  0                       |
+    /// | ⋮        ⋮                       |
+    /// | 0  ...  1                       |
+    /// |    A             B              | <- i-th row
+    /// |            1  ...  0            |
+    /// |            ⋮        ⋮            |
+    /// |            0  ...  1            |
+    /// |    C             D              | <- j-th row
+    /// |                       1  ...  0 |
+    /// |                       ⋮        ⋮ |
+    /// |                       0  ...  1 |
+    ///      ^ i-th col    ^ j-th col
+    /// ```
+    /// where `transform = [A, B, C, D]`.
+    /// 
     fn transform(&mut self, ring: &R, i: usize, j: usize, transform: &[R::Element; 4]);
 
+    ///
+    /// The transformation corresponding to subtracting `factor` times the `src`-th row
+    /// from the `dst`-th row.
+    /// 
     fn subtract(&mut self, ring: &R, src: usize, dst: usize, factor: &R::Element) {
         self.transform(ring, src, dst, &[ring.one(), ring.zero(), ring.negate(ring.clone_el(factor)), ring.one()])
     }

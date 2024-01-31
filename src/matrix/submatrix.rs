@@ -49,6 +49,11 @@ unsafe impl<'a, T> AsPointerToSlice<T> for [T] {
     }
 }
 
+///
+/// Represents a contiguous batch of `T`s by their first element.
+/// In other words, a pointer to the batch is equal to a pointer to 
+/// the first value.
+/// 
 #[repr(transparent)]
 pub struct AsFirstElement<T>(T);
 
@@ -106,6 +111,9 @@ pub struct SubmatrixRaw<V, T>
 /// acts as a mutable reference, we would only require `T: Send`, but we also
 /// want `SubmatrixRaw` to be usable as an immutable reference, thus it can be
 /// shared between threads, which requires `T: Sync`.
+/// 
+/// This makes implementing [`SubmatrixMut::concurrent_row_iter()`] and [`SubmatrixMut::concurrent_col_iter()`]
+/// slightly more complicated.
 /// 
 unsafe impl<V, T> Send for SubmatrixRaw<V, T> 
     where V: AsPointerToSlice<T> + Sync, T: Sync

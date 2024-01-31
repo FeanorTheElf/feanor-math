@@ -54,7 +54,16 @@ pub mod divisibility;
 /// Contains the trait [`field::Field`] for rings that are fields.
 /// 
 pub mod field;
+///
+/// Contains the trait [`pid::PrincipalIdealRing`] for rings in whom every ideal is principal.
+/// Also contains [`pid::EuclideanRing`], which is the simplest way how a ring can become a
+/// principal idea ring.
+/// 
 pub mod pid;
+///
+/// Contains the trait [`matrix::Matrix`], which is a very minimalistic approach to implement
+/// matrices in this library.
+/// 
 pub mod matrix;
 ///
 /// Contains the trait [`ordered::OrderedRing`] for rings with a total ordering that is compatible
