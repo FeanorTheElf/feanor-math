@@ -379,13 +379,13 @@ pub trait RingBase: PartialEq {
 #[macro_export]
 macro_rules! delegate {
     ($base_trait:ty, fn $name:ident (&self, $($pname:ident: $ptype:ty),*) -> $rtype:ty) => {
-        #[doc = r" See [`$base_trait::$name()`]"]
+        #[doc = concat!(" See [`", stringify!($base_trait), "::", stringify!($name), "()`]")]
         fn $name (&self, $($pname: $ptype),*) -> $rtype {
             <Self::Type as $base_trait>::$name(self.get_ring(), $($pname),*)
         }
     };
     ($base_trait:ty, fn $name:ident (&self) -> $rtype:ty) => {
-        #[doc = r" See [`$base_trait::$name()`]"]
+        #[doc = concat!(" See [`", stringify!($base_trait), "::", stringify!($name), "()`]")]
         fn $name (&self) -> $rtype {
             <Self::Type as $base_trait>::$name(self.get_ring())
         }
