@@ -4,6 +4,33 @@ use crate::rings::poly::*;
 use crate::algorithms;
 use crate::ring::*;
 
+///
+/// Computes the resultant of `f` and `g` over the base ring.
+/// 
+/// The resultant is the determinant of the linear map
+/// ```text
+/// R[X]_deg(g)  x  R[X]_deg(f)  ->  R[X]_deg(fg),
+///      a       ,       b       ->    af + bg
+/// ```
+/// where `R[X]_d` refers to the vector space of polynomials in `R[X]` of degree
+/// less than `d`.
+/// 
+/// # Example
+/// ```
+/// use feanor_math::ring::*;
+/// use feanor_math::primitive_int::*;
+/// use feanor_math::rings::poly::dense_poly::DensePolyRing;
+/// use feanor_math::rings::poly::*;
+/// use feanor_math::algorithms::resultant::*;
+/// let ZZ = StaticRing::<i64>::RING;
+/// let ZZX = DensePolyRing::new(ZZ, "X");
+/// // f = X^2 - 2X + 1
+/// let f = ZZX.from_terms([(2, 0), (-3, 1), (1, 2)].into_iter());
+/// // the discrimiant is the resultant of f and f'
+/// let discriminant = resultant(&ZZX, ZZX.clone_el(&f), derive_poly(&ZZX, &f));
+/// assert_eq!(9 - 8, discriminant);
+/// ```
+/// 
 pub fn resultant<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
     where P: PolyRingStore + Copy,
         P::Type: PolyRing,
