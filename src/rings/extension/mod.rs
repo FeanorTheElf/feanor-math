@@ -79,8 +79,8 @@ pub trait FreeAlgebra: RingExtension {
 pub trait FreeAlgebraStore: RingStore
     where Self::Type: FreeAlgebra
 {
-    delegate!{ fn canonical_gen(&self) -> El<Self> }
-    delegate!{ fn rank(&self) -> usize }
+    delegate!{ FreeAlgebra, fn canonical_gen(&self) -> El<Self> }
+    delegate!{ FreeAlgebra, fn rank(&self) -> usize }
 
     fn wrt_canonical_basis<'a>(&'a self, el: &'a El<Self>) -> <Self::Type as FreeAlgebra>::VectorRepresentation<'a> {
         self.get_ring().wrt_canonical_basis(el)

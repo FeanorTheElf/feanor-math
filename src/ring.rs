@@ -367,7 +367,7 @@ pub trait RingBase: PartialEq {
 /// trait WeirdRingStore: RingStore
 ///     where Self::Type: WeirdRingBase
 /// {
-///     delegate!{ fn foo(&self) -> El<Self> }
+///     delegate!{ WeirdRingBase, fn foo(&self) -> El<Self> }
 /// }
 /// ```
 /// 
@@ -378,20 +378,16 @@ pub trait RingBase: PartialEq {
 /// 
 #[macro_export]
 macro_rules! delegate {
-    (fn $name:ident (&self, $($pname:ident: $ptype:ty),*) -> $rtype:ty) => {
-        ///
-        /// See the corresponding function of [`RingStore`].
-        /// 
+    ($base_trait:ty, fn $name:ident (&self, $($pname:ident: $ptype:ty),*) -> $rtype:ty) => {
+        #[doc = r" See [`$base_trait::$name()`]"]
         fn $name (&self, $($pname: $ptype),*) -> $rtype {
-            self.get_ring().$name($($pname),*)
+            <Self::Type as $base_trait>::$name(self.get_ring(), $($pname),*)
         }
     };
-    (fn $name:ident (&self) -> $rtype:ty) => {
-        ///
-        /// See the corresponding function of [`RingStore`].
-        /// 
+    ($base_trait:ty, fn $name:ident (&self) -> $rtype:ty) => {
+        #[doc = r" See [`$base_trait::$name()`]"]
         fn $name (&self) -> $rtype {
-            self.get_ring().$name()
+            <Self::Type as $base_trait>::$name(self.get_ring())
         }
     };
 }
@@ -593,39 +589,39 @@ pub trait RingStore: Sized {
 
     fn get_ring<'a>(&'a self) -> &'a Self::Type;
 
-    delegate!{ fn clone_el(&self, val: &El<Self>) -> El<Self> }
-    delegate!{ fn add_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
-    delegate!{ fn add_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
-    delegate!{ fn sub_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
-    delegate!{ fn sub_self_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
-    delegate!{ fn sub_self_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
-    delegate!{ fn negate_inplace(&self, lhs: &mut El<Self>) -> () }
-    delegate!{ fn mul_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
-    delegate!{ fn mul_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
-    delegate!{ fn zero(&self) -> El<Self> }
-    delegate!{ fn one(&self) -> El<Self> }
-    delegate!{ fn neg_one(&self) -> El<Self> }
-    delegate!{ fn eq_el(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
-    delegate!{ fn is_zero(&self, value: &El<Self>) -> bool }
-    delegate!{ fn is_one(&self, value: &El<Self>) -> bool }
-    delegate!{ fn is_neg_one(&self, value: &El<Self>) -> bool }
-    delegate!{ fn is_commutative(&self) -> bool }
-    delegate!{ fn is_noetherian(&self) -> bool }
-    delegate!{ fn negate(&self, value: El<Self>) -> El<Self> }
-    delegate!{ fn sub_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
-    delegate!{ fn add_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
-    delegate!{ fn add_ref_fst(&self, lhs: &El<Self>, rhs: El<Self>) -> El<Self> }
-    delegate!{ fn add_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
-    delegate!{ fn add(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
-    delegate!{ fn sub_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
-    delegate!{ fn sub_ref_fst(&self, lhs: &El<Self>, rhs: El<Self>) -> El<Self> }
-    delegate!{ fn sub_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
-    delegate!{ fn sub(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
-    delegate!{ fn mul_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
-    delegate!{ fn mul_ref_fst(&self, lhs: &El<Self>, rhs: El<Self>) -> El<Self> }
-    delegate!{ fn mul_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
-    delegate!{ fn mul(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
-    delegate!{ fn square(&self, value: &mut El<Self>) -> () }
+    delegate!{ RingBase, fn clone_el(&self, val: &El<Self>) -> El<Self> }
+    delegate!{ RingBase, fn add_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
+    delegate!{ RingBase, fn add_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
+    delegate!{ RingBase, fn sub_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
+    delegate!{ RingBase, fn sub_self_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
+    delegate!{ RingBase, fn sub_self_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
+    delegate!{ RingBase, fn negate_inplace(&self, lhs: &mut El<Self>) -> () }
+    delegate!{ RingBase, fn mul_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
+    delegate!{ RingBase, fn mul_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
+    delegate!{ RingBase, fn zero(&self) -> El<Self> }
+    delegate!{ RingBase, fn one(&self) -> El<Self> }
+    delegate!{ RingBase, fn neg_one(&self) -> El<Self> }
+    delegate!{ RingBase, fn eq_el(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
+    delegate!{ RingBase, fn is_zero(&self, value: &El<Self>) -> bool }
+    delegate!{ RingBase, fn is_one(&self, value: &El<Self>) -> bool }
+    delegate!{ RingBase, fn is_neg_one(&self, value: &El<Self>) -> bool }
+    delegate!{ RingBase, fn is_commutative(&self) -> bool }
+    delegate!{ RingBase, fn is_noetherian(&self) -> bool }
+    delegate!{ RingBase, fn negate(&self, value: El<Self>) -> El<Self> }
+    delegate!{ RingBase, fn sub_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
+    delegate!{ RingBase, fn add_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ RingBase, fn add_ref_fst(&self, lhs: &El<Self>, rhs: El<Self>) -> El<Self> }
+    delegate!{ RingBase, fn add_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ RingBase, fn add(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
+    delegate!{ RingBase, fn sub_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ RingBase, fn sub_ref_fst(&self, lhs: &El<Self>, rhs: El<Self>) -> El<Self> }
+    delegate!{ RingBase, fn sub_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ RingBase, fn sub(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
+    delegate!{ RingBase, fn mul_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ RingBase, fn mul_ref_fst(&self, lhs: &El<Self>, rhs: El<Self>) -> El<Self> }
+    delegate!{ RingBase, fn mul_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ RingBase, fn mul(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
+    delegate!{ RingBase, fn square(&self, value: &mut El<Self>) -> () }
 
     fn coerce<S>(&self, from: &S, el: El<S>) -> El<Self>
         where S: RingStore, Self::Type: CanHomFrom<S::Type> 

@@ -263,15 +263,15 @@ pub mod generic_maps {
 pub trait IntegerRingStore: RingStore
     where Self::Type: IntegerRing
 {
-    delegate!{ fn to_float_approx(&self, value: &El<Self>) -> f64 }
-    delegate!{ fn from_float_approx(&self, value: f64) -> Option<El<Self>> }
-    delegate!{ fn abs_is_bit_set(&self, value: &El<Self>, i: usize) -> bool }
-    delegate!{ fn abs_highest_set_bit(&self, value: &El<Self>) -> Option<usize> }
-    delegate!{ fn abs_lowest_set_bit(&self, value: &El<Self>) -> Option<usize> }
-    delegate!{ fn euclidean_div_pow_2(&self, value: &mut El<Self>, power: usize) -> () }
-    delegate!{ fn mul_pow_2(&self, value: &mut El<Self>, power: usize) -> () }
-    delegate!{ fn power_of_two(&self, power: usize) -> El<Self> }
-    delegate!{ fn rounded_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ IntegerRing, fn to_float_approx(&self, value: &El<Self>) -> f64 }
+    delegate!{ IntegerRing, fn from_float_approx(&self, value: f64) -> Option<El<Self>> }
+    delegate!{ IntegerRing, fn abs_is_bit_set(&self, value: &El<Self>, i: usize) -> bool }
+    delegate!{ IntegerRing, fn abs_highest_set_bit(&self, value: &El<Self>) -> Option<usize> }
+    delegate!{ IntegerRing, fn abs_lowest_set_bit(&self, value: &El<Self>) -> Option<usize> }
+    delegate!{ IntegerRing, fn euclidean_div_pow_2(&self, value: &mut El<Self>, power: usize) -> () }
+    delegate!{ IntegerRing, fn mul_pow_2(&self, value: &mut El<Self>, power: usize) -> () }
+    delegate!{ IntegerRing, fn power_of_two(&self, power: usize) -> El<Self> }
+    delegate!{ IntegerRing, fn rounded_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
 
     fn get_uniformly_random<G: FnMut() -> u64>(&self, bound_exclusive: &El<Self>, mut rng: G) -> El<Self> {
         assert!(self.is_gt(bound_exclusive, &self.zero()));

@@ -23,7 +23,7 @@ pub trait Field: Domain + EuclideanRing {
 pub trait FieldStore: RingStore + EuclideanRingStore
     where Self::Type: Field
 {
-    delegate!{ fn div(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ Field, fn div(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
 }
 
 impl<R> FieldStore for R

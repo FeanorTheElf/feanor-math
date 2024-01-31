@@ -29,7 +29,7 @@ use super::hensel::hensel_lift_factorization;
 pub mod cantor_zassenhaus;
 pub mod number_field;
 
-pub fn binomial(n: usize, mut k: usize) -> usize {
+fn binomial(n: usize, mut k: usize) -> usize {
     if k > n {
         0
     } else {

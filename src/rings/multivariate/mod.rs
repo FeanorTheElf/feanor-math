@@ -217,12 +217,12 @@ impl<PFrom, PTo, H> Homomorphism<PFrom::Type, PTo::Type> for CoefficientHom<PFro
 pub trait MultivariatePolyRingStore: RingStore
     where Self::Type: MultivariatePolyRing
 {
-    delegate!{ fn indeterminate_len(&self) -> usize }
-    delegate!{ fn indeterminate(&self, i: usize) -> El<Self> }
-    delegate!{ fn monomial(&self, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> El<Self> }
-    delegate!{ fn mul_monomial(&self, el: &mut El<Self>, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> () }
-    delegate!{ fn specialize(&self, f: &El<Self>, var: usize, val: &El<Self>) -> El<Self> }
-    delegate!{ fn appearing_variables(&self, f: &El<Self>) -> BTreeMap<usize, MonomialExponent> }
+    delegate!{ MultivariatePolyRing, fn indeterminate_len(&self) -> usize }
+    delegate!{ MultivariatePolyRing, fn indeterminate(&self, i: usize) -> El<Self> }
+    delegate!{ MultivariatePolyRing, fn monomial(&self, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> El<Self> }
+    delegate!{ MultivariatePolyRing, fn mul_monomial(&self, el: &mut El<Self>, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> () }
+    delegate!{ MultivariatePolyRing, fn specialize(&self, f: &El<Self>, var: usize, val: &El<Self>) -> El<Self> }
+    delegate!{ MultivariatePolyRing, fn appearing_variables(&self, f: &El<Self>) -> BTreeMap<usize, MonomialExponent> }
 
     fn coefficient_at<'a>(&'a self, f: &'a El<Self>, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> &'a El<<Self::Type as RingExtension>::BaseRing> {
         self.get_ring().coefficient_at(f, m)

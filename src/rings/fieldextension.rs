@@ -154,7 +154,7 @@ impl<F: RingStore, T: RingStore, H> Homomorphism<F::Type, T::Type> for Extension
 pub trait ExtensionFieldStore: FieldStore + FreeAlgebraStore
     where Self::Type: ExtensionField
 {
-    delegate!{ fn is_galois(&self) -> bool }
+    delegate!{ ExtensionField, fn is_galois(&self) -> bool }
 
     ///
     /// See [`ExtensionField::into_hom()`].

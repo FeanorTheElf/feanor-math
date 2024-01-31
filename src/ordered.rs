@@ -53,14 +53,14 @@ pub trait OrderedRing: RingBase {
 pub trait OrderedRingStore: RingStore
     where Self::Type: OrderedRing
 {
-    delegate!{ fn cmp(&self, lhs: &El<Self>, rhs: &El<Self>) -> Ordering }
-    delegate!{ fn is_leq(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
-    delegate!{ fn is_geq(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
-    delegate!{ fn is_lt(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
-    delegate!{ fn is_gt(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
-    delegate!{ fn is_neg(&self, value: &El<Self>) -> bool }
-    delegate!{ fn is_pos(&self, value: &El<Self>) -> bool }
-    delegate!{ fn abs(&self, value: El<Self>) -> El<Self> }
+    delegate!{ OrderedRing, fn cmp(&self, lhs: &El<Self>, rhs: &El<Self>) -> Ordering }
+    delegate!{ OrderedRing, fn is_leq(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
+    delegate!{ OrderedRing, fn is_geq(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
+    delegate!{ OrderedRing, fn is_lt(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
+    delegate!{ OrderedRing, fn is_gt(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
+    delegate!{ OrderedRing, fn is_neg(&self, value: &El<Self>) -> bool }
+    delegate!{ OrderedRing, fn is_pos(&self, value: &El<Self>) -> bool }
+    delegate!{ OrderedRing, fn abs(&self, value: El<Self>) -> El<Self> }
 }
 
 impl<R: ?Sized> OrderedRingStore for R

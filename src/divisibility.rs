@@ -34,8 +34,8 @@ pub trait Domain: DivisibilityRing {}
 pub trait DivisibilityRingStore: RingStore
     where Self::Type: DivisibilityRing
 {
-    delegate!{ fn checked_left_div(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> }
-    delegate!{ fn is_unit(&self, x: &El<Self>) -> bool }
+    delegate!{ DivisibilityRing, fn checked_left_div(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> }
+    delegate!{ DivisibilityRing, fn is_unit(&self, x: &El<Self>) -> bool }
 
     fn checked_div(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> {
         assert!(self.is_commutative());

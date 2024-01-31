@@ -241,11 +241,11 @@ pub mod generic_impls {
 pub trait ZnRingStore: FiniteRingStore
     where Self::Type: ZnRing
 {    
-    delegate!{ fn integer_ring(&self) -> &<Self::Type as ZnRing>::Integers }
-    delegate!{ fn modulus(&self) -> &El<<Self::Type as ZnRing>::Integers> }
-    delegate!{ fn smallest_positive_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::Integers> }
-    delegate!{ fn smallest_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::Integers> }
-    delegate!{ fn is_field(&self) -> bool }
+    delegate!{ ZnRing, fn integer_ring(&self) -> &<Self::Type as ZnRing>::Integers }
+    delegate!{ ZnRing, fn modulus(&self) -> &El<<Self::Type as ZnRing>::Integers> }
+    delegate!{ ZnRing, fn smallest_positive_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::Integers> }
+    delegate!{ ZnRing, fn smallest_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::Integers> }
+    delegate!{ ZnRing, fn is_field(&self) -> bool }
 
     fn as_field(self) -> Result<RingValue<AsFieldBase<Self>>, Self> 
         where Self: Sized

@@ -23,7 +23,7 @@ pub trait PrincipalIdealRing: DivisibilityRing {
 pub trait PrincipalIdealRingStore: RingStore
     where Self::Type: PrincipalIdealRing
 {
-    delegate!{ fn ideal_gen(&self, lhs: &El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>, El<Self>) }
+    delegate!{ PrincipalIdealRing, fn ideal_gen(&self, lhs: &El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>, El<Self>) }
 }
 
 impl<R> PrincipalIdealRingStore for R
@@ -72,10 +72,10 @@ pub trait EuclideanRing: PrincipalIdealRing {
 pub trait EuclideanRingStore: RingStore + DivisibilityRingStore
     where Self::Type: EuclideanRing
 {
-    delegate!{ fn euclidean_div_rem(&self, lhs: El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>) }
-    delegate!{ fn euclidean_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
-    delegate!{ fn euclidean_rem(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
-    delegate!{ fn euclidean_deg(&self, val: &El<Self>) -> Option<usize> }
+    delegate!{ EuclideanRing, fn euclidean_div_rem(&self, lhs: El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>) }
+    delegate!{ EuclideanRing, fn euclidean_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ EuclideanRing, fn euclidean_rem(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ EuclideanRing, fn euclidean_deg(&self, val: &El<Self>) -> Option<usize> }
 }
 
 impl<R> EuclideanRingStore for R
