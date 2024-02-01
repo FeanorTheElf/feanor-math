@@ -315,6 +315,17 @@ fn test_choose_zn_impl() {
     choose_zn_impl(StaticRing::<i64>::RING, 17, DoStuff { int_value });
 }
 
+///
+/// The homomorphism `Z/nZ -> Z/mZ` that exists whenever `m | n`. In
+/// addition to the map, this also provides a function [`ReductionMap::smallest_lift()`]
+/// that computes the "smallest" preimage under the map. This is very
+/// useful in many number theoretic applications, where one often has to switch
+/// between `Z/nZ` and `Z/mZ`.
+/// 
+/// Furthermore, many implementations of `ZnRing` currently do not support
+/// [`CanHomFrom`]-homomorphisms when the moduli are different (but divide each
+/// other).
+/// 
 pub struct ReductionMap<R, S>
     where R: ZnRingStore,
         R::Type: ZnRing,
@@ -324,6 +335,7 @@ pub struct ReductionMap<R, S>
     from: R,
     to: S,
     to_modulus: El<<R::Type as ZnRing>::Integers>,
+    requires_explicit_reduction: bool,
     to_from_int: <S::Type as CanHomFrom<<S::Type as ZnRing>::IntegerRingBase>>::Homomorphism,
     from_from_int: <R::Type as CanHomFrom<<R::Type as ZnRing>::IntegerRingBase>>::Homomorphism
 }
@@ -339,6 +351,7 @@ impl<R, S> ReductionMap<R, S>
         let to_char = to.characteristic(&BigIntRing::RING).unwrap();
         if BigIntRing::RING.checked_div(&from_char, &to_char).is_some() {
             Some(Self {
+                requires_explicit_reduction: to.integer_ring().get_ring().representable_bits().is_some() && BigIntRing::RING.is_gt(&from_char, &BigIntRing::RING.power_of_two(to.integer_ring().get_ring().representable_bits().unwrap())),
                 to_modulus: int_cast(to.integer_ring().clone_el(to.modulus()), from.integer_ring(), to.integer_ring()),
                 to_from_int: to.get_ring().has_canonical_hom(to.integer_ring().get_ring()).unwrap(),
                 from_from_int: from.get_ring().has_canonical_hom(from.integer_ring().get_ring()).unwrap(),
@@ -369,7 +382,11 @@ impl<R, S> Homomorphism<R::Type, S::Type> for ReductionMap<R, S>
     type DomainStore = R;
 
     fn map(&self, x: El<R>) -> El<S> {
-        let value = self.from.integer_ring().euclidean_rem(self.from.smallest_lift(x), &self.to_modulus);
+        let value = if self.requires_explicit_reduction {
+            self.from.integer_ring().euclidean_rem(self.from.smallest_lift(x), &self.to_modulus)
+        } else {
+            self.from.smallest_lift(x)
+        };
         self.to.get_ring().map_in(self.to.integer_ring().get_ring(), int_cast(value, self.to.integer_ring(), self.from.integer_ring()), &self.to_from_int)
     }
 
@@ -429,4 +446,17 @@ fn test_reduction_map_large_value() {
     let ring2 = zn_barett::Zn::new(BigIntRing::RING, BigIntRing::RING.power_of_two(666));
     let reduce = ReductionMap::new(&ring2, ring1).unwrap();
     assert_el_eq!(&ring1, &ring1.zero(), &reduce.map(ring2.pow(ring2.int_hom().map(2), 665)));
+}
+
+#[test]
+fn test_reduction_map() {
+    let ring1 = zn_64::Zn::new(257);
+    let ring2 = zn_barett::Zn::new(StaticRing::<i128>::RING, 257 * 7);
+
+    crate::homomorphism::generic_tests::test_homomorphism_axioms(ReductionMap::new(&ring2, &ring1).unwrap(), ring2.elements().step_by(8));
+
+    let ring1 = zn_barett::Zn::new(StaticRing::<i8>::RING, 3);
+    let ring2 = zn_barett::Zn::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(257 * 3));
+
+    crate::homomorphism::generic_tests::test_homomorphism_axioms(ReductionMap::new(&ring2, &ring1).unwrap(), ring2.elements().step_by(8));
 }
