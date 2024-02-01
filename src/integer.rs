@@ -23,7 +23,7 @@ pub type BigIntRingBase = crate::rings::rust_bigint::RustBigintRingBase;
 /// As an additional requirement, the euclidean division (i.e. [`EuclideanRing::euclidean_div_rem()`] and
 /// [`IntegerRing::euclidean_div_pow_2()`]) are expected to round towards zero.
 /// 
-pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + CanonicalIso<Self> {
+pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing {
 
     ///
     /// Computes a float value that is supposed to be close to value.
@@ -311,23 +311,6 @@ impl<R> IntegerRingStore for R
     where R: RingStore,
         R::Type: IntegerRing
 {}
-
-pub mod generic_impls {
-    use crate::{algorithms, ring::RingRef};
-
-    use super::IntegerRing;
-
-    pub fn generic_map_in<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing>(from: &I, to: &J, el: &I::Element) -> J::Element {
-        algorithms::sqr_mul::generic_abs_square_and_multiply(
-            to.one(), 
-            el, 
-            RingRef::new(from), 
-            |a| to.add_ref(&a, &a), 
-            |a, b| to.add_ref_fst(a, b), 
-            to.zero()
-        )
-    }
-}
 
 #[cfg(test)]
 use crate::primitive_int::*;

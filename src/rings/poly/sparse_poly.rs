@@ -266,14 +266,14 @@ impl<R, M> ImplGenericCanonicalIsoMarker for dense_poly::DensePolyRingBase<R, M>
 impl<R, P> CanHomFrom<P> for SparsePolyRingBase<R> 
     where R: RingStore, R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanonicalIsoMarker
 {
-    type Homomorphism = super::generic_impls::GenericCanHomFrom<P, Self>;
+    type Homomorphism = super::generic_impls::Homomorphism<P, Self>;
 
     fn has_canonical_hom(&self, from: &P) -> Option<Self::Homomorphism> {
-        super::generic_impls::generic_has_canonical_hom(from, self)
+        super::generic_impls::has_canonical_hom(from, self)
     }
 
     fn map_in(&self, from: &P, el: P::Element, hom: &Self::Homomorphism) -> Self::Element {
-        super::generic_impls::generic_map_in(from, self, el, hom)
+        super::generic_impls::map_in(from, self, el, hom)
     }
 }
 
@@ -302,14 +302,14 @@ impl<R1, R2> CanHomFrom<SparsePolyRingBase<R1> > for SparsePolyRingBase<R2>
 impl<R, P> CanonicalIso<P> for SparsePolyRingBase<R> 
     where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanonicalIsoMarker
 {
-    type Isomorphism = super::generic_impls::GenericCanonicalIso<P, Self>;
+    type Isomorphism = super::generic_impls::Isomorphism<P, Self>;
 
     fn has_canonical_iso(&self, from: &P) -> Option<Self::Isomorphism> {
         self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
     }
 
     fn map_out(&self, from: &P, el: Self::Element, iso: &Self::Isomorphism) -> P::Element {
-        super::generic_impls::generic_map_out(from, self, el, iso)
+        super::generic_impls::map_out(from, self, el, iso)
     }
 }
 

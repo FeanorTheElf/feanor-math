@@ -176,15 +176,15 @@ pub mod generic_impls {
     use crate::homomorphism::*;
 
     #[allow(type_alias_bounds)]
-    pub type GenericCanHomFrom<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanHomFrom<<P1::BaseRing as RingStore>::Type>>::Homomorphism;
+    pub type Homomorphism<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanHomFrom<<P1::BaseRing as RingStore>::Type>>::Homomorphism;
 
-    pub fn generic_has_canonical_hom<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2) -> Option<GenericCanHomFrom<P1, P2>> 
+    pub fn has_canonical_hom<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2) -> Option<Homomorphism<P1, P2>> 
         where <P2::BaseRing as RingStore>::Type: CanHomFrom<<P1::BaseRing as RingStore>::Type>
     {
         to.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
     }
 
-    pub fn generic_map_in<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P1::Element, hom: &GenericCanHomFrom<P1, P2>) -> P2::Element
+    pub fn map_in<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P1::Element, hom: &Homomorphism<P1, P2>) -> P2::Element
         where <P2::BaseRing as RingStore>::Type: CanHomFrom<<P1::BaseRing as RingStore>::Type>
     {
         let mut result = to.zero();
@@ -193,9 +193,9 @@ pub mod generic_impls {
     }
 
     #[allow(type_alias_bounds)]
-    pub type GenericCanonicalIso<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanonicalIso<<P1::BaseRing as RingStore>::Type>>::Isomorphism;
+    pub type Isomorphism<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanonicalIso<<P1::BaseRing as RingStore>::Type>>::Isomorphism;
 
-    pub fn generic_map_out<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P2::Element, iso: &GenericCanonicalIso<P1, P2>) -> P1::Element
+    pub fn map_out<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P2::Element, iso: &Isomorphism<P1, P2>) -> P1::Element
         where <P2::BaseRing as RingStore>::Type: CanonicalIso<<P1::BaseRing as RingStore>::Type>
     {
         let mut result = from.zero();

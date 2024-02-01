@@ -1,4 +1,5 @@
 use crate::divisibility::DivisibilityRingStore;
+use crate::pid::EuclideanRingStore;
 use crate::pid::PrincipalIdealRing;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
@@ -98,26 +99,6 @@ pub mod generic_impls {
     use crate::algorithms;
     use super::{ZnRing, ZnRingStore};
     use crate::homomorphism::*;
-
-    #[allow(type_alias_bounds)]
-    pub type Homomorphism<R: ZnRing, S: ZnRing> = (<S as CanHomFrom<S::IntegerRingBase>>::Homomorphism, <S::IntegerRingBase as CanHomFrom<R::IntegerRingBase>>::Homomorphism);
-
-    pub fn has_canonical_hom<R: ZnRing, S: ZnRing>(from: &R, to: &S) -> Option<Homomorphism<R, S>> 
-        where S::IntegerRingBase: CanHomFrom<R::IntegerRingBase>
-    {
-        let hom = <S::IntegerRingBase as CanHomFrom<R::IntegerRingBase>>::has_canonical_hom(to.integer_ring().get_ring(), from.integer_ring().get_ring())?;
-        if to.integer_ring().checked_div(&<S::IntegerRingBase as CanHomFrom<R::IntegerRingBase>>::map_in_ref(&to.integer_ring().get_ring(), from.integer_ring().get_ring(), from.modulus(), &hom), &to.modulus()).is_some() {
-            Some((to.has_canonical_hom(to.integer_ring().get_ring()).unwrap(), hom))
-        } else {
-            None
-        }
-    }
-
-    pub fn map_in<R: ZnRing, S: ZnRing>(from: &R, to: &S, el: R::Element, hom: &Homomorphism<R, S>) -> S::Element 
-        where S::IntegerRingBase: CanHomFrom<R::IntegerRingBase>
-    {
-        to.map_in(to.integer_ring().get_ring(), <S::IntegerRingBase as CanHomFrom<R::IntegerRingBase>>::map_in(to.integer_ring().get_ring(), from.integer_ring().get_ring(), from.smallest_positive_lift(el), &hom.1), &hom.0)
-    }
 
     pub struct IntegerToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
         where I: CanonicalIso<R::IntegerRingBase> + CanonicalIso<J>
@@ -342,6 +323,7 @@ pub struct ReductionMap<R, S>
 {
     from: R,
     to: S,
+    to_modulus: El<<R::Type as ZnRing>::Integers>,
     to_from_int: <S::Type as CanHomFrom<<S::Type as ZnRing>::IntegerRingBase>>::Homomorphism,
     from_from_int: <R::Type as CanHomFrom<<R::Type as ZnRing>::IntegerRingBase>>::Homomorphism
 }
@@ -357,6 +339,7 @@ impl<R, S> ReductionMap<R, S>
         let to_char = to.characteristic(&BigIntRing::RING).unwrap();
         if BigIntRing::RING.checked_div(&from_char, &to_char).is_some() {
             Some(Self {
+                to_modulus: int_cast(to.integer_ring().clone_el(to.modulus()), from.integer_ring(), to.integer_ring()),
                 to_from_int: to.get_ring().has_canonical_hom(to.integer_ring().get_ring()).unwrap(),
                 from_from_int: from.get_ring().has_canonical_hom(from.integer_ring().get_ring()).unwrap(),
                 from: from,
@@ -386,7 +369,8 @@ impl<R, S> Homomorphism<R::Type, S::Type> for ReductionMap<R, S>
     type DomainStore = R;
 
     fn map(&self, x: El<R>) -> El<S> {
-        self.to.get_ring().map_in(self.to.integer_ring().get_ring(), int_cast(self.from.smallest_lift(x), self.to.integer_ring(), self.from.integer_ring()), &self.to_from_int)
+        let value = self.from.integer_ring().euclidean_rem(self.from.smallest_lift(x), &self.to_modulus);
+        self.to.get_ring().map_in(self.to.integer_ring().get_ring(), int_cast(value, self.to.integer_ring(), self.from.integer_ring()), &self.to_from_int)
     }
 
     fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
@@ -437,4 +421,12 @@ pub mod generic_tests {
         let x = R.coerce(&ZZ_big, n);
         assert!(R.eq_el(&R.pow(R.int_hom().map(2), 1000), &x));
     }
+}
+
+#[test]
+fn test_reduction_map_large_value() {
+    let ring1 = zn_64::Zn::new(1 << 42);
+    let ring2 = zn_barett::Zn::new(BigIntRing::RING, BigIntRing::RING.power_of_two(666));
+    let reduce = ReductionMap::new(&ring2, ring1).unwrap();
+    assert_el_eq!(&ring1, &ring1.zero(), &reduce.map(ring2.pow(ring2.int_hom().map(2), 665)));
 }

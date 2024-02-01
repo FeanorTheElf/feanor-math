@@ -247,14 +247,14 @@ impl<R> ImplGenericCanonicalIsoMarker for sparse_poly::SparsePolyRingBase<R>
 impl<R, P, M> CanHomFrom<P> for DensePolyRingBase<R, M> 
     where R: RingStore, R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanonicalIsoMarker, M: GrowableMemoryProvider<El<R>>
 {
-    type Homomorphism = super::generic_impls::GenericCanHomFrom<P, DensePolyRingBase<R, M>>;
+    type Homomorphism = super::generic_impls::Homomorphism<P, DensePolyRingBase<R, M>>;
 
     fn has_canonical_hom(&self, from: &P) -> Option<Self::Homomorphism> {
-        super::generic_impls::generic_has_canonical_hom(from, self)
+        super::generic_impls::has_canonical_hom(from, self)
     }
 
     fn map_in(&self, from: &P, el: P::Element, hom: &Self::Homomorphism) -> Self::Element {
-        super::generic_impls::generic_map_in(from, self, el, hom)
+        super::generic_impls::map_in(from, self, el, hom)
     }
 }
 
@@ -297,14 +297,14 @@ impl<R1, M1, R2, M2> CanonicalIso<DensePolyRingBase<R1, M1>> for DensePolyRingBa
 impl<R, P, M> CanonicalIso<P> for DensePolyRingBase<R, M> 
     where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanonicalIsoMarker, M: GrowableMemoryProvider<El<R>>
 {
-    type Isomorphism = super::generic_impls::GenericCanonicalIso<P, Self>;
+    type Isomorphism = super::generic_impls::Isomorphism<P, Self>;
 
     fn has_canonical_iso(&self, from: &P) -> Option<Self::Isomorphism> {
         self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
     }
 
     fn map_out(&self, from: &P, el: Self::Element, iso: &Self::Isomorphism) -> P::Element {
-        super::generic_impls::generic_map_out(from, self, el, iso)
+        super::generic_impls::map_out(from, self, el, iso)
     }
 }
 
