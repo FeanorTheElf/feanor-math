@@ -59,20 +59,71 @@ pub fn find_root_floor<R, F>(ZZ: R, approx: El<R>, mut func: F) -> El<R>
     return bisect_floor(ZZ, left, right, func);
 }
 
+///
+/// Computes the largest integer `x` such that `x^root <= n`, where `n` is a positive integer.
+/// 
+/// # Integer overflow
+/// 
+/// This function is designed to avoid integer overflow if possible without a huge performance
+/// benefit. In particular, in some cases the naive way would require evaluating `(x + 1)^root`
+/// to ensure this is really larger than `n` - however, this might lead to integer overflow as in
+/// ```should_panic
+/// // compute the 62nd root of 2^62
+/// let result: i64 = 2;
+/// assert!(result.pow(62) <= (1 << 62) && (result + 1).pow(62) > (1 << 62));
+/// ```
+/// These cases can somewhat be avoided by first doing a size estimate.
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::algorithms::int_bisect::*;
+/// # use feanor_math::primitive_int::*;
+/// let ZZ = StaticRing::<i64>::RING;
+/// assert_eq!(2, root_floor(&ZZ, 1 << 62, 62));
+/// ```
+/// I some edge cases this is not enough, and so integer overflow can occur.
+/// ```should_panic
+/// # use feanor_math::ring::*;
+/// # use feanor_math::algorithms::int_bisect::*;
+/// # use feanor_math::primitive_int::*;
+/// let ZZ = StaticRing::<i64>::RING;
+/// assert_eq!(26, root_floor(&ZZ, ZZ.pow(5, 26), 26));
+/// ```
+/// 
 pub fn root_floor<R>(ZZ: R, n: El<R>, root: usize) -> El<R>
     where R: IntegerRingStore, R::Type: IntegerRing
 {
     assert!(root > 0);
-    assert!(!ZZ.is_neg(&n));
-    if ZZ.is_odd(&n) {
-        return find_root_floor(&ZZ, ZZ.from_float_approx(ZZ.to_float_approx(&n).powf(1. / root as f64)).unwrap_or(ZZ.zero()), |x| {
-            return ZZ.sub_ref_snd(ZZ.pow(ZZ.clone_el(x), root), &n);
-        });
-    } else {
-        return find_root_floor(&ZZ, ZZ.from_float_approx(ZZ.to_float_approx(&n).powf(1. / root as f64)).unwrap_or(ZZ.zero()), |x| {
-            return ZZ.sub_ref_snd(ZZ.mul_ref_snd(ZZ.pow(ZZ.clone_el(x), root - 1), x), &n);
-        });
+    if root == 1 {
+        return n;
     }
+    if ZZ.is_zero(&n) {
+        return ZZ.zero();
+    }
+    assert!(!ZZ.is_neg(&n));
+    let log2_ceil_n = ZZ.abs_log2_ceil(&n).unwrap();
+
+    return find_root_floor(
+        &ZZ, 
+        ZZ.from_float_approx(ZZ.to_float_approx(&n).powf(1. / root as f64)).unwrap_or(ZZ.zero()), 
+        |x| {
+            let x_pow_root_half = ZZ.pow(ZZ.clone_el(x), root / 2);
+            // we first make a size estimate, mainly to avoid situations (high `root`) where we get avoidable integer overflow (also might improve performance)
+            if ZZ.abs_log2_ceil(x).unwrap_or(0) >= 2 && (ZZ.abs_log2_ceil(&x_pow_root_half).unwrap() - 1) * 2 >= log2_ceil_n {
+                if ZZ.is_neg(x) {
+                    return ZZ.negate(ZZ.clone_el(&n));
+                } else {
+                    return ZZ.clone_el(&n);
+                }
+            } else {
+                let x_pow_root = if root % 2 == 0 {
+                    ZZ.pow(x_pow_root_half, 2)
+                } else {
+                    ZZ.mul_ref_snd(ZZ.pow(x_pow_root_half, 2), x)
+                };
+                return ZZ.sub_ref_snd(x_pow_root, &n);
+            }
+        }
+    );
 }
 
 #[cfg(test)]
@@ -93,4 +144,8 @@ fn test_root_floor() {
     assert_eq!(3, root_floor(&StaticRing::<i64>::RING, 28, 3));
     assert_eq!(4, root_floor(&StaticRing::<i64>::RING, 24, 2));
     assert_eq!(3, root_floor(&StaticRing::<i64>::RING, 63, 3));
+    assert_eq!(5, root_floor(&StaticRing::<i64>::RING, StaticRing::<i64>::RING.pow(5, 25), 25));
+    assert_eq!(4, root_floor(&StaticRing::<i64>::RING, StaticRing::<i64>::RING.pow(5, 25), 26));
+    assert_eq!(4, root_floor(&StaticRing::<i64>::RING, StaticRing::<i64>::RING.pow(5, 25), 27));
+    assert_eq!(4, root_floor(&StaticRing::<i64>::RING, StaticRing::<i64>::RING.pow(5, 25), 28));
 }

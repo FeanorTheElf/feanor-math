@@ -314,7 +314,7 @@ pub fn choose_zn_impl<I, F, R>(ZZ: I, n: El<I>, f: F) -> R
     if ZZ.abs_highest_set_bit(&n).unwrap_or(0) < 57 {
         f.call(zn_64::Zn::new(StaticRing::<i64>::RING.coerce(&ZZ, n) as u64))
     } else {
-        f.call(zn_barett::Zn::new(ZZ, n))
+        f.call(zn_barett::Zn::new(BigIntRing::RING, int_cast(n, &BigIntRing::RING, &ZZ)))
     }
 }
 

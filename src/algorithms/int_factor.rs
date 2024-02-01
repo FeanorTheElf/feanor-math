@@ -49,10 +49,7 @@ fn is_power<I: IntegerRingStore>(ZZ: &I, n: &El<I>) -> Option<(El<I>, usize)>
     where I::Type: IntegerRing
 {
     assert!(!ZZ.is_zero(n));
-    if ZZ.abs_highest_set_bit(n) == ZZ.abs_lowest_set_bit(n) {
-        return Some((ZZ.int_hom().map(2), ZZ.abs_log2_ceil(n).unwrap()));
-    }
-    for i in (2..((ZZ.abs_log2_ceil(n).unwrap() * 2 - 1) / 3 + 1)).rev() {
+    for i in (2..ZZ.abs_log2_ceil(n).unwrap()).rev() {
         let root = algorithms::int_bisect::root_floor(ZZ, ZZ.clone_el(n), i);
         if ZZ.eq_el(&ZZ.pow(root, i), n) {
             return Some((algorithms::int_bisect::root_floor(ZZ, ZZ.clone_el(n), i), i));
@@ -186,4 +183,9 @@ fn test_factor() {
         assert_eq!(expected_multiplicity, actual_multiplicity);
         assert!(ZZbig.eq_el(expected_factor, actual_factor));
     }
+}
+
+#[test]
+fn test_is_prime_power_large_n() {
+    assert_eq!(Some((5, 25)), is_prime_power(&StaticRing::<i64>::RING, &StaticRing::<i64>::RING.pow(5, 25)));
 }
