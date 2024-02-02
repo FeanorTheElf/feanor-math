@@ -4,7 +4,7 @@
 This is a library for number theory, written completely in Rust. 
 The idea is to provide a more modern alternative to projects like NTL or FLINT, however due to the large scope of those projects, the current implementation is still far away from that.
 More concretely, we use modern language features - in particular the trait system - to provide a generic framework for rings, that makes it easy to nest them, or create custom rings, while still achieving high performance.
-This is impossible in NTL, and while FLINT provides a framework for this, it is quite complicated and not very extensible.
+This is impossible in NTL, and while FLINT provides a framework for this, it is quite complicated and (since FLINT is written in C) relies on runtime polymorphism - which prevents thorough type checking.
 From a user's point of view, we thus envision this library to be somewhat closer to high-level computer algebra systems like sagemath, but also have a strong static type system and very high performance.
 
 ## Current State
@@ -28,20 +28,32 @@ More reasons for this separation are explained further down this page.
 ## Features
 
 The following rings are provided
- - The integer ring `Z`, as a trait `crate::integer::IntegerRing` with implementations for all primitive ints (`i8` to `i128`), an arbitrary-precision implementation `crate::rings::rust_bigint::RustBigintRing`, and an optional implementation using bindings to the heavily optimized library [mpir](https://github.com/wbhart/mpir)
+ - The integer ring `Z`, as a trait `crate::integer::IntegerRing` with implementations for all primitive ints (`i8` to `i128`), an arbitrary-precision implementation `crate::rings::rust_bigint::RustBigintRing`, and an optional implementation using bindings to the heavily optimized library [mpir](https://github.com/wbhart/mpir) (enable with `features=mpir`).
  - The quotient ring `Z/nZ`, as a trait `crate::rings::zn::ZnRing` with four implementations. One where the modulus is small and known at compile-time `crate::rings::zn::zn_static::Zn`, an optimized implementation of Barett-reductions for moduli somewhat smaller than 64 bits `crate::rings::zn::zn_64::Zn`, a generic implementation of Barett-reductions for any modulus and any integer ring (including arbitrary-precision ones) `crate::rings::zn::zn_barett::Zn` and a residue-number-system implementation for highly composite moduli `crate::rings::zn::zn_rns::Zn`.
  - The polynomial ring `R[X]` over any base ring, as a trait `crate::rings::poly::PolyRing` with two implementations, one for densely filled polynomials `crate::rings::poly::dense_poly::DensePolyRing` and one for sparsely filled polynomials `crate::rings::poly::sparse_poly::SparsePolyRing`.
- - Finite-rank simple and free ring extensions, as a trait `crate::rings::extension::FreeAlgebra`, with an implementation based on polynomial division `crate::rings::extension::FreeAlgebraImpl`
+ - Finite-rank simple and free ring extensions, as a trait `crate::rings::extension::FreeAlgebra`, with an implementation based on polynomial division `crate::rings::extension::FreeAlgebraImpl`. In particular, this includes finite/galois fields and number fields.
  - Multivariate polynomial rings `R[X1, ..., XN]` over any base ring, as the trait `crate::rings::multivariate::MultivariatePolyRing` and one implementation `crate::rings::multivariate::ordered::MultivariatePolyRingImpl` based on a sparse representation using ordered vectors.
 
 The following algorithms are implemented
- - Fast Fourier transforms, including an optimized implementation of the Cooley-Tuckey algorithm for the power-of-two case, an implementation of the Bluestein algorithm for arbitrary lengths, and a factor FFT implementation (also based on the Cooley-Tuckey algorithm). The Fourier transforms work on all rings that have suitable roots of unity, in particular the complex numbers `C` and suitable finite rings `Fq`
- - An optimized variant of the Karatsuba algorithm for fast convolution
- - An implementation (currently not very optimized) of the Cantor-Zassenhaus algorithm to factor polynomials over finite fields
- - Lenstra's Elliptic Curve algorithm to factor integers (although the current implementation is very slow)
- - Miller-Rabin test to check primality of integers
- - A baby-step-giant-step and factorization-based algorithm to compute arbitrary discrete logarithms
- - Faugere's F4 to compute Gröbner basis
+ - Fast Fourier transforms, including an optimized implementation of the Cooley-Tuckey algorithm for the power-of-two case, an implementation of the Bluestein algorithm for arbitrary lengths, and a factor FFT implementation (also based on the Cooley-Tuckey algorithm). The Fourier transforms work on all rings that have suitable roots of unity, in particular the complex numbers `C` and suitable finite rings `Fq`.
+ - An optimized variant of the Karatsuba algorithm for fast convolution.
+ - An implementation of the Cantor-Zassenhaus algorithm to factor polynomials over finite fields.
+ - Factoring polynomials over the rationals/integers (using Hensel lifting) and over number fields.
+ - Lenstra's Elliptic Curve algorithm to factor integers (currently very slow).
+ - Basic linear algebra over principal ideal rings.
+ - Miller-Rabin test to check primality of integers.
+ - A baby-step-giant-step and factorization-based algorithm to compute arbitrary discrete logarithms.
+ - Faugere's F4 to compute Gröbner basis.
+
+Unfortunately, operations with polynomials over infinite rings (integers, rationals, number fields) are currently very slow, since efficient implementation require a lot of care to prevent coefficient blowup, which I did not have time or need to invest.
+
+### Most important missing features
+
+ - Comprehensive treatment of matrices and linear algebra. Currently there is only a very minimalistic abstraction of matrices [`crate::matrix::*`] and linear algebra, mainly for internal use.
+ - Careful treatment of polynomials over infinite rings, primarily with specialized implementations that prevent coefficient blowup.
+ - Lattice reduction and the LLL algorithm. This might also be necessary for above point.
+ - More carefully designed memory allocation abstractions (preferably we would use a new crate `memory-provider` or similar).
+ - More number theory algorithms, e.g. computing Galois groups. I am not yet sure where to draw the line here, as I think high-level number theory algorithms (Elliptic Curves, Class Groups, ...) are out of scope for this project. Technically I would include integer factoring here, but it is too important a primitive for other algorithms.
 
 ## Using rings
 
