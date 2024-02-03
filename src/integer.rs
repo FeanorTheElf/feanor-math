@@ -28,10 +28,11 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing {
     ///
     /// Computes a float value that is supposed to be close to value.
     /// However, no guarantees are made on how close it must be, in particular,
-    /// this function may also always return `0.`. It is supposed to be used for
-    /// optimization purposes only, e.g. in the case where an approximate value is
-    /// necessary to determine performance-controlling parameters, or as an initial
-    /// value for some iterative root-finding algorithm.
+    /// this function may also always return `0.` (this is just an example - 
+    /// it's not a good idea). It is supposed to be used for optimization purposes only,
+    /// e.g. in the case where an approximate value is necessary to determine 
+    /// performance-controlling parameters, or as an initial value for some iterative 
+    /// root-finding algorithm.
     /// 
     fn to_float_approx(&self, value: &Self::Element) -> f64;
 

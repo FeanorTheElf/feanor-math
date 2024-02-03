@@ -144,7 +144,7 @@ pub trait TransformTarget<R>
         self.transform(ring, src, dst, &[ring.one(), ring.zero(), ring.negate(ring.clone_el(factor)), ring.one()])
     }
 
-    fn swap_rows(&mut self, ring: &R, i: usize, j: usize) {
+    fn swap(&mut self, ring: &R, i: usize, j: usize) {
         self.transform(ring, i, j, &[ring.zero(), ring.one(), ring.one(), ring.zero()])
     }
 }

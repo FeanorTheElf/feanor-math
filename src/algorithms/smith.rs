@@ -266,7 +266,7 @@ impl<'a, R> TransformTarget<R> for DetUnit<'a, R>
         // determinant does not change
     }
 
-    fn swap_rows(&mut self, ring: &R, _i: usize, _j: usize) {
+    fn swap(&mut self, ring: &R, _i: usize, _j: usize) {
         ring.negate_inplace(&mut self.current_unit)
     }
 

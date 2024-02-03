@@ -10,6 +10,7 @@ pub mod ec_factor;
 pub mod erathostenes;
 pub mod int_bisect;
 pub mod int_factor;
+pub mod lll;
 pub mod cyclotomic;
 pub mod poly_div;
 pub mod hensel;
