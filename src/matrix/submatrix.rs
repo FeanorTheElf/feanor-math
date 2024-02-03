@@ -39,7 +39,7 @@ unsafe impl<T> AsPointerToSlice<T> for Vec<T> {
     }
 }
 
-unsafe impl<'a, T> AsPointerToSlice<T> for [T] {
+unsafe impl<'a, T, const N: usize> AsPointerToSlice<T> for [T; N] {
 
     unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> {
         let self_ref = unsafe {
@@ -422,7 +422,7 @@ impl<'a, V, T> SwappableVectorViewMut<T> for ColumnMut<'a, V, T>
 }
 
 pub struct Submatrix<'a, V, T>
-    where V: 'a +AsPointerToSlice<T>
+    where V: 'a + AsPointerToSlice<T>
 {
     entry: PhantomData<&'a T>,
     raw_data: SubmatrixRaw<V, T>
@@ -805,8 +805,26 @@ impl<'a, T> SubmatrixMut<'a, Vec<T>, T> {
     }
 }
 
+impl<'a, T, const N: usize> SubmatrixMut<'a, [T; N], T> {
+
+    pub fn new(data: &'a mut [[T; N]]) -> Self {
+        assert!(data.len() > 0);
+        let row_count = data.len();
+        let col_count = data[0].len();
+        for row in data.iter_mut() {
+            assert_eq!(col_count, row.len());
+        }
+        unsafe {
+            Self {
+                entry: PhantomData,
+                raw_data: SubmatrixRaw::new(NonNull::new(data.as_mut_ptr()).unwrap_unchecked(), row_count, 1, 0, col_count)
+            }
+        }
+    }
+}
+
 impl<'a, V, R> super::Matrix<R> for Submatrix<'a, V, R::Element>
-    where V: 'a + AsPointerToSlice<R::Element>, R: ?Sized + RingBase
+    where V: 'a + AsPointerToSlice<R::Element>, R: RingBase
 {
     fn at(&self, i: usize, j: usize) -> &<R as RingBase>::Element {
         self.row_at(i).at(j)
@@ -822,7 +840,7 @@ impl<'a, V, R> super::Matrix<R> for Submatrix<'a, V, R::Element>
 }
 
 impl<'a, V, R> super::Matrix<R> for SubmatrixMut<'a, V, R::Element>
-    where V: 'a + AsPointerToSlice<R::Element>, R: ?Sized + RingBase
+    where V: 'a + AsPointerToSlice<R::Element>, R: RingBase
 {
     fn at(&self, i: usize, j: usize) -> &<R as RingBase>::Element {
         unsafe {
@@ -854,14 +872,52 @@ fn assert_submatrix_eq<V: AsPointerToSlice<T>, T: PartialEq + Debug, const N: us
     }
 }
 
-#[test]
-fn test_submatrix() {
+#[cfg(test)]
+fn with_testmatrix_vec<F>(f: F)
+    where F: FnOnce(SubmatrixMut<Vec<i64>, i64>)
+{
     let mut data = vec![
         vec![1, 2, 3, 4, 5],
         vec![6, 7, 8, 9, 10],
-        vec![11, 12, 13, 14, 15],
+        vec![11, 12, 13, 14, 15]
     ];
-    let mut matrix = SubmatrixMut::<Vec<_>, _>::new(&mut data);
+    let matrix = SubmatrixMut::<Vec<_>, _>::new(&mut data[..]);
+    f(matrix)
+}
+
+#[cfg(test)]
+fn with_testmatrix_array<F>(f: F)
+    where F: FnOnce(SubmatrixMut<[i64; 5], i64>)
+{
+    let mut data = vec![
+        [1, 2, 3, 4, 5],
+        [6, 7, 8, 9, 10],
+        [11, 12, 13, 14, 15]
+    ];
+    let matrix = SubmatrixMut::<[_; 5], _>::new(&mut data[..]);
+    f(matrix)
+}
+
+#[cfg(test)]
+fn with_testmatrix_linmem<F>(f: F)
+    where F: FnOnce(SubmatrixMut<AsFirstElement<i64>, i64>)
+{
+    let mut data = vec![
+        1, 2, 3, 4, 5,
+        6, 7, 8, 9, 10,
+        11, 12, 13, 14, 15
+    ];
+    let matrix = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut data[..], 3, 5);
+    f(matrix)
+}
+
+#[cfg(test)]
+fn test_submatrix<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i64>) {
+    assert_submatrix_eq([
+        [1, 2, 3, 4, 5],
+        [6, 7, 8, 9, 10],
+        [11, 12, 13, 14, 15]
+    ], &mut matrix);
     assert_submatrix_eq([[2, 3], [7, 8]], &mut matrix.reborrow().submatrix(0..2, 1..3));
     assert_submatrix_eq([[8, 9, 10]], &mut matrix.reborrow().submatrix(1..2, 2..5));
     assert_submatrix_eq([[8, 9, 10], [13, 14, 15]], &mut matrix.reborrow().submatrix(1..3, 2..5));
@@ -872,13 +928,19 @@ fn test_submatrix() {
 }
 
 #[test]
-fn test_submatrix_mutate() {
-    let mut data = vec![
-        vec![1, 2, 3, 4, 5],
-        vec![6, 7, 8, 9, 10],
-        vec![11, 12, 13, 14, 15],
-    ];
-    let matrix = SubmatrixMut::<Vec<_>, _>::new(&mut data);
+fn test_submatrix_wrapper() {
+    with_testmatrix_vec(test_submatrix);
+    with_testmatrix_array(test_submatrix);
+    with_testmatrix_linmem(test_submatrix);
+}
+
+#[cfg(test)]
+fn test_submatrix_mutate<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i64>) {
+    assert_submatrix_eq([
+        [1, 2, 3, 4, 5],
+        [6, 7, 8, 9, 10],
+        [11, 12, 13, 14, 15]
+    ], &mut matrix);
     let (mut left, mut right) = matrix.split_cols(0..3, 3..5);
     assert_submatrix_eq([[1, 2, 3], [6, 7, 8], [11, 12, 13]], &mut left);
     assert_submatrix_eq([[4, 5], [9, 10], [14, 15]], &mut right);
@@ -900,13 +962,19 @@ fn test_submatrix_mutate() {
 }
 
 #[test]
-fn test_submatrix_col_iter() {
-    let mut data = vec![
-        vec![1, 2, 3, 4, 5],
-        vec![6, 7, 8, 9, 10],
-        vec![11, 12, 13, 14, 15],
-    ];
-    let mut matrix = SubmatrixMut::<Vec<_>, _>::new(&mut data);
+fn test_submatrix_mutate_wrapper() {
+    with_testmatrix_vec(test_submatrix_mutate);
+    with_testmatrix_array(test_submatrix_mutate);
+    with_testmatrix_linmem(test_submatrix_mutate);
+}
+
+#[cfg(test)]
+fn test_submatrix_col_iter<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i64>) {
+    assert_submatrix_eq([
+        [1, 2, 3, 4, 5],
+        [6, 7, 8, 9, 10],
+        [11, 12, 13, 14, 15]
+    ], &mut matrix);
     {
         let mut it = matrix.reborrow().col_iter();
         assert_eq!(vec![2, 7, 12], it.by_ref().skip(1).next().unwrap().into_iter().map(|x| *x).collect::<Vec<_>>());
@@ -960,13 +1028,19 @@ fn test_submatrix_col_iter() {
 }
 
 #[test]
-fn test_submatrix_row_iter() {
-    let mut data = vec![
-        vec![1, 2, 3, 4, 5],
-        vec![6, 7, 8, 9, 10],
-        vec![11, 12, 13, 14, 15],
-    ];
-    let mut matrix = SubmatrixMut::<Vec<_>, _>::new(&mut data);
+fn test_submatrix_col_iter_wrapper() {
+    with_testmatrix_vec(test_submatrix_col_iter);
+    with_testmatrix_array(test_submatrix_col_iter);
+    with_testmatrix_linmem(test_submatrix_col_iter);
+}
+
+#[cfg(test)]
+fn test_submatrix_row_iter<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i64>) {
+    assert_submatrix_eq([
+        [1, 2, 3, 4, 5],
+        [6, 7, 8, 9, 10],
+        [11, 12, 13, 14, 15]
+    ], &mut matrix);
     {
         let mut it = matrix.reborrow().row_iter();
         assert_eq!(&[6, 7, 8, 9, 10], it.by_ref().skip(1).next().unwrap());
@@ -1015,227 +1089,19 @@ fn test_submatrix_row_iter() {
 }
 
 #[test]
-fn test_submatrix_col_at() {
-    let mut data = vec![
-        vec![1, 2, 3, 4, 5],
-        vec![6, 7, 8, 9, 10],
-        vec![11, 12, 13, 14, 15],
-    ];
-    let mut matrix = SubmatrixMut::<Vec<_>, _>::new(&mut data);
-    assert_eq!(&[2, 7, 12], &matrix.col_at(1).iter().copied().collect::<Vec<_>>()[..]);
-    assert_eq!(&[2, 7, 12], &matrix.as_const().col_at(1).iter().copied().collect::<Vec<_>>()[..]);
-    assert_eq!(&[5, 10, 15], &matrix.col_at(4).iter().copied().collect::<Vec<_>>()[..]);
-    assert_eq!(&[5, 10, 15], &matrix.as_const().col_at(4).iter().copied().collect::<Vec<_>>()[..]);
-
-    {
-        let (mut top, mut bottom) = matrix.reborrow().restrict_rows(0..2).split_rows(0..1, 1..2);
-        assert_eq!(&[1], &top.col_at(0).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[1], &top.as_const().col_at(0).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[5], &top.col_at(4).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[5], &top.as_const().col_at(4).iter().copied().collect::<Vec<_>>()[..]);
-
-        assert_eq!(&[6], &bottom.col_at(0).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[6], &bottom.as_const().col_at(0).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[10], &bottom.col_at(4).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[10], &bottom.as_const().col_at(4).iter().copied().collect::<Vec<_>>()[..]);
-    }
+fn test_submatrix_row_iter_wrapper() {
+    with_testmatrix_vec(test_submatrix_row_iter);
+    with_testmatrix_array(test_submatrix_row_iter);
+    with_testmatrix_linmem(test_submatrix_row_iter);
 }
 
-#[test]
-fn test_submatrix_row_at() {
-    let mut data = vec![
-        vec![1, 2, 3, 4, 5],
-        vec![6, 7, 8, 9, 10],
-        vec![11, 12, 13, 14, 15],
-    ];
-    let mut matrix = SubmatrixMut::<Vec<_>, _>::new(&mut data);
-    assert_eq!(&[2, 7, 12], &matrix.col_at(1).iter().copied().collect::<Vec<_>>()[..]);
-    assert_eq!(&[2, 7, 12], &matrix.as_const().col_at(1).iter().copied().collect::<Vec<_>>()[..]);
-    assert_eq!(&[5, 10, 15], &matrix.col_at(4).iter().copied().collect::<Vec<_>>()[..]);
-    assert_eq!(&[5, 10, 15], &matrix.as_const().col_at(4).iter().copied().collect::<Vec<_>>()[..]);
-
-    {
-        let (mut left, mut right) = matrix.reborrow().restrict_cols(1..5).split_cols(0..2, 2..4);
-        assert_eq!(&[2, 3], left.row_at(0));
-        assert_eq!(&[4, 5], right.row_at(0));
-        assert_eq!(&[2, 3], left.as_const().row_at(0));
-        assert_eq!(&[4, 5], right.as_const().row_at(0));
-
-        assert_eq!(&[7, 8], left.row_at(1));
-        assert_eq!(&[9, 10], right.row_at(1));
-        assert_eq!(&[7, 8], left.as_const().row_at(1));
-        assert_eq!(&[9, 10], right.as_const().row_at(1));
-    }
-}
-
-#[test]
-fn test_linmem_submatrix() {
-    let mut data = vec![
-        1, 2, 3, 4, 5,
-        6, 7, 8, 9, 10,
-        11, 12, 13, 14, 15,
-    ];
-    let mut matrix = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut data, 3, 5);
-    assert_submatrix_eq([[2, 3], [7, 8]], &mut matrix.reborrow().submatrix(0..2, 1..3));
-    assert_submatrix_eq([[8, 9, 10]], &mut matrix.reborrow().submatrix(1..2, 2..5));
-    assert_submatrix_eq([[8, 9, 10], [13, 14, 15]], &mut matrix.reborrow().submatrix(1..3, 2..5));
-
-    let (mut left, mut right) = matrix.split_cols(0..3, 3..5);
-    assert_submatrix_eq([[1, 2, 3], [6, 7, 8], [11, 12, 13]], &mut left);
-    assert_submatrix_eq([[4, 5], [9, 10], [14, 15]], &mut right);
-}
-
-#[test]
-fn test_linmem_submatrix_mutate() {
-    let mut data = vec![
-        1, 2, 3, 4, 5,
-        6, 7, 8, 9, 10,
-        11, 12, 13, 14, 15,
-    ];
-    let matrix = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut data, 3, 5);
-    let (mut left, mut right) = matrix.split_cols(0..3, 3..5);
-    assert_submatrix_eq([[1, 2, 3], [6, 7, 8], [11, 12, 13]], &mut left);
-    assert_submatrix_eq([[4, 5], [9, 10], [14, 15]], &mut right);
-    *left.at(1, 1) += 1;
-    *right.at(0, 0) += 1;
-    *right.at(2, 1) += 1;
-    assert_submatrix_eq([[1, 2, 3], [6, 8, 8], [11, 12, 13]], &mut left);
-    assert_submatrix_eq([[5, 5], [9, 10], [14, 16]], &mut right);
-
-    let (mut top, mut bottom) = left.split_rows(0..1, 1..3);
-    assert_submatrix_eq([[1, 2, 3]], &mut top);
-    assert_submatrix_eq([[6, 8, 8], [11, 12, 13]], &mut bottom);
-    *top.at(0, 0) -= 1;
-    *top.at(0, 2) += 3;
-    *bottom.at(0, 2) -= 1;
-    *bottom.at(1, 0) += 3;
-    assert_submatrix_eq([[0, 2, 6]], &mut top);
-    assert_submatrix_eq([[6, 8, 7], [14, 12, 13]], &mut bottom);
-}
-
-#[test]
-fn test_linmem_submatrix_col_iter() {
-    let mut data = vec![
-        1, 2, 3, 4, 5,
-        6, 7, 8, 9, 10,
-        11, 12, 13, 14, 15,
-    ];
-    let mut matrix = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut data, 3, 5);
-    {
-        let mut it = matrix.reborrow().col_iter();
-        assert_eq!(vec![2, 7, 12], it.by_ref().skip(1).next().unwrap().into_iter().map(|x| *x).collect::<Vec<_>>());
-        assert_eq!(vec![4, 9, 14], it.by_ref().skip(1).next().unwrap().into_iter().map(|x| *x).collect::<Vec<_>>());
-        let mut last_col = it.next().unwrap();
-        for x in last_col.reborrow() {
-            *x *= 2;
-        }
-        assert_eq!(vec![10, 20, 30], last_col.into_iter().map(|x| *x).collect::<Vec<_>>());
-    }
-    assert_submatrix_eq([
-        [1, 2, 3, 4, 10],
-        [6, 7, 8, 9, 20],
-        [11, 12, 13, 14, 30]], 
-        &mut matrix
-    );
-    
-    let (left, _right) = matrix.reborrow().split_cols(0..2, 3..4);
-    {
-        let mut it = left.col_iter();
-        let mut col1 = it.next().unwrap();
-        let mut col2 = it.next().unwrap();
-        assert!(it.next().is_none());
-        assert_eq!(vec![1, 6, 11], col1.iter().map(|x| *x).collect::<Vec<_>>());
-        assert_eq!(vec![2, 7, 12], col2.iter().map(|x| *x).collect::<Vec<_>>());
-        assert_eq!(vec![1, 6, 11], col1.reborrow().into_iter().map(|x| *x).collect::<Vec<_>>());
-        assert_eq!(vec![2, 7, 12], col2.reborrow().into_iter().map(|x| *x).collect::<Vec<_>>());
-        *col1.into_iter().skip(1).next().unwrap() += 5;
-    }
-    assert_submatrix_eq([
-        [1, 2, 3, 4, 10],
-        [11, 7, 8, 9, 20],
-        [11, 12, 13, 14, 30]], 
-        &mut matrix
-    );
-
-    let (_left, right) = matrix.reborrow().split_cols(0..2, 3..4);
-    {
-        let mut it = right.col_iter();
-        let mut col = it.next().unwrap();
-        assert!(it.next().is_none());
-        assert_eq!(vec![4, 9, 14], col.reborrow().iter().map(|x| *x).collect::<Vec<_>>());
-        *col.into_iter().next().unwrap() += 3;
-    }
-    assert_submatrix_eq([
-        [1, 2, 3, 7, 10],
-        [11, 7, 8, 9, 20],
-        [11, 12, 13, 14, 30]], 
-        &mut matrix
-    );
-}
-
-#[test]
-fn test_linmem_submatrix_row_iter() {
-    let mut data = vec![
-        1, 2, 3, 4, 5,
-        6, 7, 8, 9, 10,
-        11, 12, 13, 14, 15,
-    ];
-    let mut matrix = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut data, 3, 5);
-    {
-        let mut it = matrix.reborrow().row_iter();
-        assert_eq!(&[6, 7, 8, 9, 10], it.by_ref().skip(1).next().unwrap());
-        let row = it.next().unwrap();
-        assert!(it.next().is_none());
-        row[1] += 6;
-        row[4] *= 2;
-    }
+#[cfg(test)]
+fn test_submatrix_col_at<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i64>) {
     assert_submatrix_eq([
         [1, 2, 3, 4, 5],
         [6, 7, 8, 9, 10],
-        [11, 18, 13, 14, 30]], 
-        &mut matrix
-    );
-    let (mut left, mut right) = matrix.reborrow().split_cols(0..2, 3..4);
-    {
-        let mut it = left.reborrow().row_iter();
-        let row1 = it.next().unwrap();
-        let row2 = it.next().unwrap();
-        assert!(it.next().is_some());
-        assert!(it.next().is_none());
-        assert_eq!(&[1, 2], row1);
-        assert_eq!(&[6, 7], row2);
-    }
-    {
-        let mut it = left.reborrow().row_iter();
-        let row1 = it.next().unwrap();
-        let row2 = it.next().unwrap();
-        assert!(it.next().is_some());
-        assert!(it.next().is_none());
-        assert_eq!(&[1, 2], row1);
-        assert_eq!(&[6, 7], row2);
-        row2[1] += 1;
-    }
-    assert_submatrix_eq([[1, 2], [6, 8], [11, 18]], &mut left);
-    {
-        right = right.submatrix(1..3, 0..1);
-        let mut it = right.reborrow().row_iter();
-        let row1 = it.next().unwrap();
-        let row2 = it.next().unwrap();
-        assert_eq!(&[9], row1);
-        assert_eq!(&[14], row2);
-        row1[0] += 1;
-    }
-    assert_submatrix_eq([[10], [14]], &mut right);
-}
-
-#[test]
-fn test_linmem_submatrix_col_at() {
-    let mut data = vec![
-        1, 2, 3, 4, 5,
-        6, 7, 8, 9, 10,
-        11, 12, 13, 14, 15,
-    ];
-    let mut matrix = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut data, 3, 5);
+        [11, 12, 13, 14, 15]
+    ], &mut matrix);
     assert_eq!(&[2, 7, 12], &matrix.col_at(1).iter().copied().collect::<Vec<_>>()[..]);
     assert_eq!(&[2, 7, 12], &matrix.as_const().col_at(1).iter().copied().collect::<Vec<_>>()[..]);
     assert_eq!(&[5, 10, 15], &matrix.col_at(4).iter().copied().collect::<Vec<_>>()[..]);
@@ -1256,13 +1122,19 @@ fn test_linmem_submatrix_col_at() {
 }
 
 #[test]
-fn test_linmem_submatrix_row_at() {
-    let mut data = vec![
-        1, 2, 3, 4, 5,
-        6, 7, 8, 9, 10,
-        11, 12, 13, 14, 15,
-    ];
-    let mut matrix = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut data, 3, 5);
+fn test_submatrix_col_at_wrapper() {
+    with_testmatrix_vec(test_submatrix_col_at);
+    with_testmatrix_array(test_submatrix_col_at);
+    with_testmatrix_linmem(test_submatrix_col_at);
+}
+
+#[cfg(test)]
+fn test_submatrix_row_at<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i64>) {
+    assert_submatrix_eq([
+        [1, 2, 3, 4, 5],
+        [6, 7, 8, 9, 10],
+        [11, 12, 13, 14, 15]
+    ], &mut matrix);
     assert_eq!(&[2, 7, 12], &matrix.col_at(1).iter().copied().collect::<Vec<_>>()[..]);
     assert_eq!(&[2, 7, 12], &matrix.as_const().col_at(1).iter().copied().collect::<Vec<_>>()[..]);
     assert_eq!(&[5, 10, 15], &matrix.col_at(4).iter().copied().collect::<Vec<_>>()[..]);
@@ -1280,4 +1152,11 @@ fn test_linmem_submatrix_row_at() {
         assert_eq!(&[7, 8], left.as_const().row_at(1));
         assert_eq!(&[9, 10], right.as_const().row_at(1));
     }
+}
+
+#[test]
+fn test_submatrix_row_at_wrapper() {
+    with_testmatrix_vec(test_submatrix_row_at);
+    with_testmatrix_array(test_submatrix_row_at);
+    with_testmatrix_linmem(test_submatrix_row_at);
 }
