@@ -261,3 +261,65 @@ fn test_lll_2d() {
     assert_eq!(2, norm_squared(&reduced_matrix.as_const().col_at(0)));
     assert_eq!(10, norm_squared(&reduced_matrix.as_const().col_at(1)));
 }
+
+#[test]
+fn test_lll_3d() {
+    let ZZ = StaticRing::<i64>::RING;
+    // in this case, the shortest vector is shorter than half the second successive minimum,
+    // so LLL will find it (for delta = 0.9 > 0.75)
+    let original = [
+        [72, 0, 0],
+        [0,  9, 0],
+        [8432, 7344, 16864]
+    ];
+    let _expected = [
+        [144, 72, 72],
+        [0, 279, -72],
+        [0,   0, 272]
+    ];
+
+    let mut reduced = original;
+    let mut reduced_matrix = SubmatrixMut::<[_; 3], _>::new(&mut reduced);
+    lll(&ZZ, reduced_matrix.reborrow(), 0.9);
+
+    assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
+    assert_eq!(144 * 144, norm_squared(&reduced_matrix.as_const().col_at(0)));
+    assert_eq!(72 * 72 + 279 * 279, norm_squared(&reduced_matrix.as_const().col_at(1)));
+    assert_eq!(72 * 72 * 2 + 272 * 272, norm_squared(&reduced_matrix.as_const().col_at(2)));
+}
+
+#[test]
+fn test_lll_10d() {
+    let ZZ = StaticRing::<i64>::RING;
+
+    let original = [
+        [       1,        0,        0,        0,        0,        0,        0,        0,        0,        0],
+        [       0,        1,        0,        0,        0,        0,        0,        0,        0,        0],
+        [       0,        0,        1,        0,        0,        0,        0,        0,        0,        0],
+        [       0,        0,        0,        1,        0,        0,        0,        0,        0,        0],
+        [       0,        0,        0,        0,        1,        0,        0,        0,        0,        0],
+        [       0,        0,        0,        0,        0,        1,        0,        0,        0,        0],
+        [       0,        0,        0,        0,        0,        0,        1,        0,        0,        0],
+        [       2,        2,        2,        2,        0,        0,        1,        4,        0,        0],
+        [       4,        3,        3,        3,        1,        2,        1,        0,        5,        0],
+        [ 3433883, 14315221, 24549008,  6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304]
+    ];
+    let _expected = [
+        [  2,   0,   0,  -2,  -6,  -2,  -3,   1,  -1,  -1],
+        [  0,   0,   1,  -2,  -1,   2,  -7,  -8,   8,   1],
+        [ -1,   1,   0,   4,  -1,   1,  -1,  -5,   1, -11],
+        [  3,   1,  -2,   0,   2,   1,  -2,   1,   5, -11],
+        [ -1,   5,   3,  -1,  -1,  -2,  -3,   1,  -3,   5],
+        [  1,  -1,   3,   1,   1,   2,  -1,   0,  -6,   2],
+        [  1,   1,   0,   3,   0,  -2,   1,  -1,   4,   6],
+        [  1,   1,   2,  -1,   0,   2,   7,   1,   2,   2],
+        [  1,   0,  -4,   2,   2,   4,  -1,   3,  -3,   8],
+        [ -1,  -2,   1,   1,   0,   3,   0,   7,   5,  -2]
+    ];
+    let mut reduced = original;
+    let mut reduced_matrix = SubmatrixMut::<[_; 10], _>::new(&mut reduced);
+    lll(&ZZ, reduced_matrix.reborrow(), 0.9);
+
+    assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
+    assert_eq!(16 * 16, norm_squared(&reduced_matrix.as_const().col_at(0)));
+}
