@@ -1,6 +1,7 @@
 use std::{cmp::Ordering, io::Write, time::Instant};
 
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::matrix::dense::DenseMatrix;
 use crate::matrix::submatrix::*;
 use crate::pid::PrincipalIdealRing;
 use crate::ring::*;
@@ -719,8 +720,8 @@ fn assert_left_equivalent<R, V1, V2>(ring: R, original: Submatrix<V1, InternalRo
 
     let zero = ring.zero();
 
-    let mut original_transposed = smith::DenseMatrix::zero(original.col_count() * n, original.row_count(), &ring);
-    let mut actual_transposed = smith::DenseMatrix::zero(original.col_count() * n, original.row_count(), &ring);
+    let mut original_transposed = DenseMatrix::zero(original.col_count() * n, original.row_count(), &ring);
+    let mut actual_transposed = DenseMatrix::zero(original.col_count() * n, original.row_count(), &ring);
     for i in 0..original.row_count() {
         for j in 0..original.col_count() {
             for k in 0..n {
@@ -754,8 +755,8 @@ fn assert_is_correct_row_echelon<R>(ring: R, original: &SparseMatrixBuilder<R::T
         assert!(row_echelon_form.rows[i].len() == 0 || row_echelon_form.rows[i][0].0 > row_echelon_form.rows[i - 1][0].0);
     }
 
-    let mut original_transposed = smith::DenseMatrix::zero(m, n, &ring);
-    let mut actual_transposed = smith::DenseMatrix::zero(m, n, &ring);
+    let mut original_transposed = DenseMatrix::zero(m, n, &ring);
+    let mut actual_transposed = DenseMatrix::zero(m, n, &ring);
     for i in 0..n {
         for j in 0..m {
             *original_transposed.at_mut(j, i) = ring.clone_el(<_ as crate::matrix::Matrix<_>>::at(original, i, j));

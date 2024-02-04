@@ -9,6 +9,7 @@ use std::fmt::Display;
 /// achieved using unsafe code. This module provides a safe wrapper around that.
 /// 
 pub mod submatrix;
+pub mod dense;
 
 use crate::ring::*;
 

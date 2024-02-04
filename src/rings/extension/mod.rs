@@ -1,4 +1,4 @@
-use crate::{algorithms::smith::DenseMatrix, ring::*};
+use crate::{matrix::dense::DenseMatrix, ring::*};
 use crate::vector::vec_fn::*;
 use crate::homomorphism::*;
 use super::poly::{PolyRingStore, PolyRing};

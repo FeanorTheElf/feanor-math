@@ -156,6 +156,12 @@ pub fn lll<I, V>(ring: I, matrix: SubmatrixMut<V, El<I>>, delta: f64)
         I::Type: IntegerRing,
         V: AsPointerToSlice<El<I>>
 {
+    let lll_reals = RationalField::new(&ring);
+    let mut gso = (0..matrix.row_count()).flat_map(|_i| (0..matrix.col_count()).map(|_j| lll_reals.zero()));
+    let col_count = matrix.col_count();
+    for n in 2..col_count {
+
+    }
     unimplemented!()
 }
 
@@ -219,11 +225,13 @@ fn norm_squared<V>(col: &Column<V, i64>) -> i64
 fn assert_lattice_isomorphic<V, const N: usize, const M: usize>(lhs: &[[i64; M]; N], rhs: &Submatrix<V, i64>)
     where V: AsPointerToSlice<i64>
 {
+    use crate::matrix::dense::DenseMatrix;
+
     assert_eq!(rhs.row_count(), N);
     assert_eq!(rhs.col_count(), M);
     let ZZ = StaticRing::<i64>::RING;
-    let mut A = algorithms::smith::DenseMatrix::zero(N, M, ZZ);
-    let mut B = algorithms::smith::DenseMatrix::zero(N, M, ZZ);
+    let mut A = DenseMatrix::zero(N, M, ZZ);
+    let mut B = DenseMatrix::zero(N, M, ZZ);
     for i in 0..N {
         for j in 0..M {
             *A.at_mut(i, j) = lhs[i][j];
