@@ -83,11 +83,13 @@ pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField {
     /// # use feanor_math::rings::zn::zn_64::*;
     /// # use feanor_math::homomorphism::*;
     /// # use feanor_math::rings::extension::*;
+    /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::rings::zn::*;
     /// // we create the field tower F3/F2/F1
-    /// let F1 = GFdyn(9);
-    /// let F2 = GFdyn(81);
-    /// let F3 = GFdyn(6561);
+    /// let p = 11;
+    /// let F1 = GFdyn(StaticRing::<i64>::RING.pow(p, 2) as u64);
+    /// let F2 = GFdyn(StaticRing::<i64>::RING.pow(p, 4) as u64);
+    /// let F3 = GFdyn(StaticRing::<i64>::RING.pow(p, 8) as u64);
     /// let f = F1.has_hom(&F3).unwrap();
     /// let g = F2.has_hom(&F3).unwrap().compose(F1.has_hom(&F2).unwrap());
     /// assert!(!F3.eq_el(&F3.canonical_gen(), &f.map(F1.canonical_gen())));

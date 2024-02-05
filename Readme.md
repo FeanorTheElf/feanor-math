@@ -40,6 +40,7 @@ The following algorithms are implemented
  - An implementation of the Cantor-Zassenhaus algorithm to factor polynomials over finite fields.
  - Factoring polynomials over the rationals/integers (using Hensel lifting) and over number fields.
  - Lenstra's Elliptic Curve algorithm to factor integers (currently very slow).
+ - LLL algorithm for lattice reduction.
  - Basic linear algebra over principal ideal rings.
  - Miller-Rabin test to check primality of integers.
  - A baby-step-giant-step and factorization-based algorithm to compute arbitrary discrete logarithms.
@@ -51,7 +52,7 @@ Unfortunately, operations with polynomials over infinite rings (integers, ration
 
  - Comprehensive treatment of matrices and linear algebra. Currently there is only a very minimalistic abstraction of matrices [`crate::matrix::*`] and linear algebra, mainly for internal use.
  - Careful treatment of polynomials over infinite rings, primarily with specialized implementations that prevent coefficient blowup.
- - Lattice reduction and the LLL algorithm. This might also be necessary for above point.
+ - ~~Lattice reduction and the LLL algorithm. This might also be necessary for above point.~~ Implemented now!
  - More carefully designed memory allocation abstractions (preferably we would use a new crate `memory-provider` or similar).
  - More number theory algorithms, e.g. computing Galois groups. I am not yet sure where to draw the line here, as I think high-level number theory algorithms (Elliptic Curves, Class Groups, ...) are out of scope for this project. Technically I would include integer factoring here, but it is too important a primitive for other algorithms.
 

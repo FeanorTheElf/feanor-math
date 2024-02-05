@@ -715,6 +715,14 @@ fn test_lowest_set_bit() {
     assert_eq!(Some(2), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(-4)));
 }
 
+#[test]
+fn from_to_float_approx() {
+    let x: f64 = 83465209236517892563478156042389675783219532497861237985328563.;
+    let y = MPZ::RING.to_float_approx(&MPZ::RING.from_float_approx(x).unwrap());
+    assert!(x * 0.99 < y);
+    assert!(y < x * 1.01);
+}
+
 #[bench]
 fn bench_mul_300_bits(bencher: &mut test::Bencher) {
     let x = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap());
