@@ -619,7 +619,8 @@ fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: SubmatrixMut<
 /// This is demonstrated by the following example.
 /// ```
 /// # use feanor_math::ring::*;
-/// # use feanor_math::algorithms::smith::*;
+/// # use feanor_math::algorithms::smith::solve_right;
+/// # use feanor_math::matrix::dense::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::homomorphism::*;

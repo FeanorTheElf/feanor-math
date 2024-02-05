@@ -195,7 +195,27 @@ fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>)
     }
 }
 
-pub fn lll<I, V>(ring: I, matrix: SubmatrixMut<V, El<I>>, delta: f64)
+///
+/// LLL-reduces the given matrix, i.e. transforms `B` into `B'` such that
+/// `B' = BU` with `U in GL(Z)` and the columns of `B'` are "short".
+/// 
+/// The exact restrictions imposed on `B'` are that its columns `b1, ..., bn`
+/// are "LLL-reduced". This means
+///  - (size-reduced) `|<bi,bj*>| < <bj*,bj*> / 2` whenever `i > j`
+///  - (Lovasz-condition) `delta |b(k - 1)|^2 - <bk, b(k - 1)*>^2 / |b(k - 1)|^2 <= |bk*|^2`
+/// Here the `bi*` refer to the Gram-Schmidt orthogonalization of the `bi`.
+/// 
+/// # Internal computations with floating point numbers
+/// 
+/// For efficiency reasons, this function performs computations with floating point
+/// number internally. It is ensured that all operations are unimodular, so the result
+/// `B'` will always satisfy `B' = BU`. However (in particular if the conversion between
+/// `I` and `f64` is not implemented with high quality), the vectors in `B'` might be
+/// somewhat longer than explained above.
+/// 
+/// The exact ways of handling this are very likely to change in the future.
+/// 
+pub fn lll_float<I, V>(ring: I, matrix: SubmatrixMut<V, El<I>>, delta: f64)
     where I: IntegerRingStore,
         I::Type: IntegerRing,
         V: AsPointerToSlice<El<I>>
@@ -212,6 +232,49 @@ pub fn lll<I, V>(ring: I, matrix: SubmatrixMut<V, El<I>>, delta: f64)
     matmul_fst_transposed(&matrix, &matrix, gso.reborrow(), &lll_reals.can_hom(&ring).unwrap());
     ldl(&lll_reals, gso.reborrow());
     println!("{}", gso.format(&lll_reals));
+    lll_raw::<_, _, _, TransformLatticeBasis<I, _>>(&lll_reals, &ring, gso, TransformLatticeBasis { basis: matrix }, &delta);
+}
+
+///
+/// LLL-reduces the given matrix, i.e. transforms `B` into `B'` such that
+/// `B' = BU` with `U in GL(Z)` and the columns of `B'` are "short".
+/// 
+/// The exact restrictions imposed on `B'` are that its columns `b1, ..., bn`
+/// are "LLL-reduced". This means
+///  - (size-reduced) `|<bi,bj*>| < <bj*,bj*> / 2` whenever `i > j`
+///  - (Lovasz-condition) `delta |b(k - 1)|^2 - <bk, b(k - 1)*>^2 / |b(k - 1)|^2 <= |bk*|^2`
+/// Here the `bi*` refer to the Gram-Schmidt orthogonalization of the `bi`.
+/// 
+/// # Internal computations with floating point numbers
+/// 
+/// The LLL algorithm has to handle fractional values internally, which can get huge
+/// denominators. Since only their size is relevant, it is usually much better to work
+/// with floating point numbers instead. This is done as a precomputation in this function,
+/// and as the only version in [`lll_float()`].
+/// 
+/// Despite precomputing the floating-point LLL in this function, we still perform the
+/// computation with rationals here, hence the runtime is likely to be vastly longer than
+/// the one of [`lll_float()`]. Since it is very unlikely that you need the exact guarantees
+/// of [`lll_exact()`], but just want a "short" matrix, prefer using [`lll_float()`] instead.
+/// 
+/// The exact ways of handling this are very likely to change in the future.
+/// 
+pub fn lll_exact<I, V>(ring: I, matrix: SubmatrixMut<V, El<I>>, delta: f64)
+    where I: IntegerRingStore,
+        I::Type: IntegerRing,
+        V: AsPointerToSlice<El<I>>
+{
+    assert!(delta < 1.);
+    assert!(delta > 0.25);
+    let lll_reals = RationalField::new(BigIntRing::RING);
+    let delta_int = ring.from_float_approx(delta * 2f64.powi(20)).unwrap();
+    let delta = lll_reals.div(&lll_reals.get_ring().from_integer(delta_int, ring.get_ring()), &lll_reals.get_ring().from_integer(ring.power_of_two(20), ring.get_ring()));
+
+    let n = matrix.col_count();
+    let mut gso_data = (0..n).flat_map(|_i| (0..n).map(|_j| lll_reals.zero())).collect::<Vec<_>>();
+    let mut gso = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut gso_data, n, n);
+    matmul_fst_transposed(&matrix, &matrix, gso.reborrow(), &lll_reals.inclusion().compose(BigIntRing::RING.can_hom(&ring).unwrap()));
+    ldl(&lll_reals, gso.reborrow());
     lll_raw::<_, _, _, TransformLatticeBasis<I, _>>(&lll_reals, &ring, gso, TransformLatticeBasis { basis: matrix }, &delta);
 }
 
@@ -244,9 +307,6 @@ impl<'a, I, V> TransformTarget<I::Type> for TransformLatticeBasis<'a, I, V>
             let subtract = ring.mul_ref(self.basis.at(k, src), factor);
             ring.sub_assign(self.basis.at(k, dst), subtract);
         }
-        println!("Subtract");
-        println!("{}", self.basis.format(&RingRef::new(ring)));
-        println!();
     }
 
     fn swap(&mut self, _ring: &I::Type, i: usize, j: usize) {
@@ -258,9 +318,6 @@ impl<'a, I, V> TransformTarget<I::Type> for TransformLatticeBasis<'a, I, V>
         for k in 0..col_count {
             std::mem::swap(col_i.at(k, 0), col_j.at(k, 0));
         }
-        println!("Swap");
-        println!("{}", self.basis.format(&RingRef::new(_ring)));
-        println!();
     }
 }
 
@@ -270,6 +327,8 @@ use crate::vector::*;
 use crate::algorithms;
 #[cfg(test)]
 use crate::assert_matrix_eq;
+#[cfg(test)]
+use test::Bencher;
 
 #[cfg(test)]
 const QQ: RationalField<StaticRing<i64>> = RationalField::new(StaticRing::<i64>::RING);
@@ -366,7 +425,7 @@ fn assert_lattice_isomorphic<V, const N: usize, const M: usize>(lhs: &[[i64; M];
 }
 
 #[test]
-fn test_lll_2d() {
+fn test_lll_float_2d() {
     let ZZ = StaticRing::<i64>::RING;
     let original = [
         [5,   9],
@@ -374,7 +433,7 @@ fn test_lll_2d() {
     ];
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<[_; 2], _>::new(&mut reduced);
-    lll(&ZZ, reduced_matrix.reborrow(), 0.9);
+    lll_float(&ZZ, reduced_matrix.reborrow(), 0.9);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(1, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -386,7 +445,7 @@ fn test_lll_2d() {
     ];
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<[_; 2], _>::new(&mut reduced);
-    lll(&ZZ, reduced_matrix.reborrow(), 0.9);
+    lll_float(&ZZ, reduced_matrix.reborrow(), 0.9);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(4, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -394,7 +453,7 @@ fn test_lll_2d() {
 }
 
 #[test]
-fn test_lll_3d() {
+fn test_lll_float_3d() {
     let ZZ = StaticRing::<i64>::RING;
     // in this case, the shortest vector is shorter than half the second successive minimum,
     // so LLL will find it (for delta = 0.9 > 0.75)
@@ -411,7 +470,7 @@ fn test_lll_3d() {
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<[_; 3], _>::new(&mut reduced);
-    lll(&ZZ, reduced_matrix.reborrow(), 0.999);
+    lll_float(&ZZ, reduced_matrix.reborrow(), 0.999);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(144 * 144, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -419,22 +478,10 @@ fn test_lll_3d() {
     assert_eq!(72 * 72 * 2 + 272 * 272, norm_squared(&reduced_matrix.as_const().col_at(2)));
 }
 
-#[test]
-fn test_lll_10d() {
+#[bench]
+fn bench_lll_float_10d(bencher: &mut Bencher) {
     let ZZ = StaticRing::<i64>::RING;
 
-    let original = [
-        [       1,        0,        0,        0,        0,        0,        0,        0,        0,        0],
-        [       0,        1,        0,        0,        0,        0,        0,        0,        0,        0],
-        [       0,        0,        1,        0,        0,        0,        0,        0,        0,        0],
-        [       0,        0,        0,        1,        0,        0,        0,        0,        0,        0],
-        [       0,        0,        0,        0,        1,        0,        0,        0,        0,        0],
-        [       0,        0,        0,        0,        0,        1,        0,        0,        0,        0],
-        [       0,        0,        0,        0,        0,        0,        1,        0,        0,        0],
-        [       2,        2,        2,        2,        0,        0,        1,        4,        0,        0],
-        [       4,        3,        3,        3,        1,        2,        1,        0,        5,        0],
-        [ 3433883, 14315221, 24549008,  6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304]
-    ];
     let _expected = [
         [  2,   0,   0,  -2,  -6,  -2,  -3,   1,  -1,  -1],
         [  0,   0,   1,  -2,  -1,   2,  -7,  -8,   8,   1],
@@ -447,10 +494,116 @@ fn test_lll_10d() {
         [  1,   0,  -4,   2,   2,   4,  -1,   3,  -3,   8],
         [ -1,  -2,   1,   1,   0,   3,   0,   7,   5,  -2]
     ];
+    bencher.iter(|| {
+        let original = [
+            [       1,        0,        0,        0,        0,        0,        0,        0,        0,        0],
+            [       0,        1,        0,        0,        0,        0,        0,        0,        0,        0],
+            [       0,        0,        1,        0,        0,        0,        0,        0,        0,        0],
+            [       0,        0,        0,        1,        0,        0,        0,        0,        0,        0],
+            [       0,        0,        0,        0,        1,        0,        0,        0,        0,        0],
+            [       0,        0,        0,        0,        0,        1,        0,        0,        0,        0],
+            [       0,        0,        0,        0,        0,        0,        1,        0,        0,        0],
+            [       2,        2,        2,        2,        0,        0,        1,        4,        0,        0],
+            [       4,        3,        3,        3,        1,        2,        1,        0,        5,        0],
+            [ 3433883, 14315221, 24549008,  6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304]
+        ];
+        let mut reduced = original;
+        let mut reduced_matrix = SubmatrixMut::<[_; 10], _>::new(&mut reduced);
+        lll_float(&ZZ, reduced_matrix.reborrow(), 0.9);
+
+        assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
+        assert!(16 * 16 > norm_squared(&reduced_matrix.as_const().col_at(0)));
+    });
+}
+
+#[test]
+fn test_lll_exact_2d() {
+    let ZZ = StaticRing::<i64>::RING;
+    let original = [
+        [5,   9],
+        [11, 20]
+    ];
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<[_; 10], _>::new(&mut reduced);
-    lll(&ZZ, reduced_matrix.reborrow(), 0.9);
+    let mut reduced_matrix = SubmatrixMut::<[_; 2], _>::new(&mut reduced);
+    lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
-    assert!(16 * 16 > norm_squared(&reduced_matrix.as_const().col_at(0)));
+    assert_eq!(1, norm_squared(&reduced_matrix.as_const().col_at(0)));
+    assert_eq!(1, norm_squared(&reduced_matrix.as_const().col_at(1)));
+
+    let original = [
+        [10, 8],
+        [27, 22]
+    ];
+    let mut reduced = original;
+    let mut reduced_matrix = SubmatrixMut::<[_; 2], _>::new(&mut reduced);
+    lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9);
+
+    assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
+    assert_eq!(4, norm_squared(&reduced_matrix.as_const().col_at(0)));
+    assert_eq!(5, norm_squared(&reduced_matrix.as_const().col_at(1)));
+}
+
+#[test]
+fn test_lll_exact_3d() {
+    let ZZ = StaticRing::<i64>::RING;
+    // in this case, the shortest vector is shorter than half the second successive minimum,
+    // so LLL will find it (for delta = 0.9 > 0.75)
+    let original = [
+        [72, 0, 0],
+        [0,  9, 0],
+        [8432, 7344, 16864]
+    ];
+    let _expected = [
+        [144, 72, 72],
+        [0, 279, -72],
+        [0,   0, 272]
+    ];
+
+    let mut reduced = original;
+    let mut reduced_matrix = SubmatrixMut::<[_; 3], _>::new(&mut reduced);
+    lll_exact(&ZZ, reduced_matrix.reborrow(), 0.999);
+
+    assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
+    assert_eq!(144 * 144, norm_squared(&reduced_matrix.as_const().col_at(0)));
+    assert_eq!(72 * 72 + 279 * 279, norm_squared(&reduced_matrix.as_const().col_at(1)));
+    assert_eq!(72 * 72 * 2 + 272 * 272, norm_squared(&reduced_matrix.as_const().col_at(2)));
+}
+
+#[bench]
+fn bench_lll_exact_10d(bencher: &mut Bencher) {
+    let ZZ = StaticRing::<i64>::RING;
+
+    let _expected = [
+        [  2,   0,   0,  -2,  -6,  -2,  -3,   1,  -1,  -1],
+        [  0,   0,   1,  -2,  -1,   2,  -7,  -8,   8,   1],
+        [ -1,   1,   0,   4,  -1,   1,  -1,  -5,   1, -11],
+        [  3,   1,  -2,   0,   2,   1,  -2,   1,   5, -11],
+        [ -1,   5,   3,  -1,  -1,  -2,  -3,   1,  -3,   5],
+        [  1,  -1,   3,   1,   1,   2,  -1,   0,  -6,   2],
+        [  1,   1,   0,   3,   0,  -2,   1,  -1,   4,   6],
+        [  1,   1,   2,  -1,   0,   2,   7,   1,   2,   2],
+        [  1,   0,  -4,   2,   2,   4,  -1,   3,  -3,   8],
+        [ -1,  -2,   1,   1,   0,   3,   0,   7,   5,  -2]
+    ];
+    bencher.iter(|| {
+        let original = [
+            [       1,        0,        0,        0,        0,        0,        0,        0,        0,        0],
+            [       0,        1,        0,        0,        0,        0,        0,        0,        0,        0],
+            [       0,        0,        1,        0,        0,        0,        0,        0,        0,        0],
+            [       0,        0,        0,        1,        0,        0,        0,        0,        0,        0],
+            [       0,        0,        0,        0,        1,        0,        0,        0,        0,        0],
+            [       0,        0,        0,        0,        0,        1,        0,        0,        0,        0],
+            [       0,        0,        0,        0,        0,        0,        1,        0,        0,        0],
+            [       2,        2,        2,        2,        0,        0,        1,        4,        0,        0],
+            [       4,        3,        3,        3,        1,        2,        1,        0,        5,        0],
+            [ 3433883, 14315221, 24549008,  6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304]
+        ];
+        let mut reduced = original;
+        let mut reduced_matrix = SubmatrixMut::<[_; 10], _>::new(&mut reduced);
+        lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9);
+
+        assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
+        assert!(16 * 16 > norm_squared(&reduced_matrix.as_const().col_at(0)));
+    });
 }
