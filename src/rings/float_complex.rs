@@ -72,6 +72,14 @@ impl Complex64Base {
     pub fn root_of_unity(&self, i: i64, n: i64) -> Complex64El {
         self.exp(self.mul(self.from_f64((i as f64 / n as f64) * (2. * PI)), Complex64::I))
     }
+
+    pub fn re(&self, Complex64El(re, _im): Complex64El) -> f64 {
+        re
+    }
+
+    pub fn im(&self, Complex64El(_re, im): Complex64El) -> f64 {
+        im
+    }
 }
 
 impl Complex64 {
@@ -95,6 +103,10 @@ impl Complex64 {
     pub fn from_f64(&self, x: f64) -> Complex64El { self.get_ring().from_f64(x) }
 
     pub fn root_of_unity(&self, i: i64, n: i64) -> Complex64El { self.get_ring().root_of_unity(i, n) }
+
+    pub fn re(&self, x: Complex64El) -> f64 { self.get_ring().re(x) }
+
+    pub fn im(&self, x: Complex64El) -> f64 { self.get_ring().im(x) }
 }
 
 impl RingBase for Complex64Base {
