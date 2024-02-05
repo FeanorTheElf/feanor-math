@@ -1,5 +1,9 @@
 use std::fmt::Display;
 
+use crate::{homomorphism::Homomorphism, ring::*};
+
+use self::submatrix::{AsPointerToSlice, SubmatrixMut};
+
 ///
 /// Functionality for providing mutable and immutable views on submatrices
 /// of `Vec<Vec<T>>` or similar owned 2d-data structures. 
@@ -10,10 +14,6 @@ use std::fmt::Display;
 /// 
 pub mod submatrix;
 pub mod dense;
-
-use crate::{homomorphism::Homomorphism, ring::*};
-
-use self::submatrix::{AsPointerToSlice, SubmatrixMut};
 
 ///
 /// A very minimalistic approach to implement matrices.
@@ -26,6 +26,10 @@ use self::submatrix::{AsPointerToSlice, SubmatrixMut};
 /// Hence, for now, we just have this trait to support writing and equality
 /// checking, which should at least vastly simplify testing matrix implementations
 /// and algorithms.
+/// 
+/// Also, note that this is not a library for numeric computations, we will never
+/// get linear algebra operations that efficiently work on floating point numbers.
+/// Use e.g. `ndarray` for that.
 /// 
 pub trait Matrix<R>
     where R: ?Sized + RingBase

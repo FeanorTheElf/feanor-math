@@ -19,6 +19,8 @@ extern crate libc;
 extern crate oorandom;
 #[cfg(feature = "parallel")]
 extern crate rayon;
+#[cfg(feature = "ndarray")]
+extern crate ndarray;
 
 ///
 /// Contains different implementations of [`mempool::MemoryProvider`],

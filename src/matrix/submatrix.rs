@@ -1,6 +1,10 @@
 use std::ops::Range;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
+
+#[cfg(feature = "ndarray")]
+use ndarray::{ArrayBase, DataMut, Ix2};
+
 use crate::ring::*;
 
 use crate::vector::SwappableVectorViewMut;
@@ -39,7 +43,7 @@ unsafe impl<T> AsPointerToSlice<T> for Vec<T> {
     }
 }
 
-unsafe impl<'a, T, const N: usize> AsPointerToSlice<T> for [T; N] {
+unsafe impl<T, const N: usize> AsPointerToSlice<T> for [T; N] {
 
     unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> {
         std::mem::transmute(NonNull::from(self_))
@@ -782,6 +786,15 @@ impl<'a, T> SubmatrixMut<'a, AsFirstElement<T>, T> {
             }
         }
     }
+
+    #[cfg(feature = "ndarray")]
+    pub fn from_ndarray<S>(data: &'a mut ArrayBase<S, Ix2>) -> Self
+        where S: DataMut<Elem = T>
+    {
+        assert!(data.is_standard_layout());
+        let (nrows, ncols) = (data.nrows(), data.ncols());
+        return Self::new(data.as_slice_mut().unwrap(), nrows, ncols);
+    }
 }
 
 impl<'a, T> SubmatrixMut<'a, Vec<T>, T> {
@@ -829,6 +842,14 @@ impl<'a, T> Submatrix<'a, AsFirstElement<T>, T> {
                 raw_data: SubmatrixRaw::new(std::mem::transmute(NonNull::new(data.as_ptr() as *mut T).unwrap_unchecked()), row_count, col_count as isize, 0, col_count)
             }
         }
+    }
+
+    #[cfg(feature = "ndarray")]
+    pub fn from_ndarray<S>(data: &'a ArrayBase<S, Ix2>) -> Self
+        where S: DataMut<Elem = T>
+    {
+        let (nrows, ncols) = (data.nrows(), data.ncols());
+        return Self::new(data.as_slice().unwrap(), nrows, ncols);
     }
 }
 
@@ -956,6 +977,30 @@ fn with_testmatrix_linmem<F>(f: F)
     f(matrix)
 }
 
+#[cfg(feature = "ndarray")]
+#[cfg(test)]
+fn with_testmatrix_ndarray<F>(f: F)
+    where F: FnOnce(SubmatrixMut<AsFirstElement<i64>, i64>)
+{
+    use ndarray::array;
+
+    let mut data = array![
+        [1, 2, 3, 4, 5],
+        [6, 7, 8, 9, 10],
+        [11, 12, 13, 14, 15]
+    ];
+    let matrix = SubmatrixMut::<AsFirstElement<_>, _>::from_ndarray(&mut data);
+    f(matrix)
+}
+
+#[cfg(not(feature = "ndarray"))]
+#[cfg(test)]
+fn with_testmatrix_ndarray<F>(_: F)
+    where F: FnOnce(SubmatrixMut<AsFirstElement<i64>, i64>)
+{
+    // do nothing
+}
+
 #[cfg(test)]
 fn test_submatrix<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i64>) {
     assert_submatrix_eq([
@@ -977,6 +1022,7 @@ fn test_submatrix_wrapper() {
     with_testmatrix_vec(test_submatrix);
     with_testmatrix_array(test_submatrix);
     with_testmatrix_linmem(test_submatrix);
+    with_testmatrix_ndarray(test_submatrix);
 }
 
 #[cfg(test)]
@@ -1011,6 +1057,7 @@ fn test_submatrix_mutate_wrapper() {
     with_testmatrix_vec(test_submatrix_mutate);
     with_testmatrix_array(test_submatrix_mutate);
     with_testmatrix_linmem(test_submatrix_mutate);
+    with_testmatrix_ndarray(test_submatrix_mutate);
 }
 
 #[cfg(test)]
@@ -1077,6 +1124,7 @@ fn test_submatrix_col_iter_wrapper() {
     with_testmatrix_vec(test_submatrix_col_iter);
     with_testmatrix_array(test_submatrix_col_iter);
     with_testmatrix_linmem(test_submatrix_col_iter);
+    with_testmatrix_ndarray(test_submatrix_col_iter);
 }
 
 #[cfg(test)]
@@ -1138,6 +1186,7 @@ fn test_submatrix_row_iter_wrapper() {
     with_testmatrix_vec(test_submatrix_row_iter);
     with_testmatrix_array(test_submatrix_row_iter);
     with_testmatrix_linmem(test_submatrix_row_iter);
+    with_testmatrix_ndarray(test_submatrix_row_iter);
 }
 
 #[cfg(test)]
@@ -1171,6 +1220,7 @@ fn test_submatrix_col_at_wrapper() {
     with_testmatrix_vec(test_submatrix_col_at);
     with_testmatrix_array(test_submatrix_col_at);
     with_testmatrix_linmem(test_submatrix_col_at);
+    with_testmatrix_ndarray(test_submatrix_col_at);
 }
 
 #[cfg(test)]
@@ -1204,4 +1254,5 @@ fn test_submatrix_row_at_wrapper() {
     with_testmatrix_vec(test_submatrix_row_at);
     with_testmatrix_array(test_submatrix_row_at);
     with_testmatrix_linmem(test_submatrix_row_at);
+    with_testmatrix_ndarray(test_submatrix_row_at);
 }
