@@ -122,7 +122,7 @@ pub fn solve_right<R>(A: &mut DenseMatrix<R::Type>, mut rhs: DenseMatrix<R::Type
         }
     }
     let mut out = DenseMatrix::zero(R.row_count(), rhs.col_count(), ring);
-    matmul(&R, &rhs, out.data_mut(), &ring.identity());
+    matmul(&R, &rhs, out.data_mut(), &ring.identity(), &ring.identity());
     return Some(out);
 }
 
@@ -161,7 +161,7 @@ fn multiply<'a, R: RingStore, I: IntoIterator<Item = &'a DenseMatrix<R::Type>>>(
     let mut result = it.next().unwrap().clone_matrix(&ring);
     for m in it {
         let mut new_result = DenseMatrix::zero(result.row_count(), m.col_count(), &ring);
-        matmul(&result, m, new_result.data_mut(), &ring.identity());
+        matmul(&result, m, new_result.data_mut(), &ring.identity(), &ring.identity());
         result = new_result;
     }
     return result;

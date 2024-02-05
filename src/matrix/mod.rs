@@ -168,38 +168,46 @@ impl<const N: usize, const M: usize, R> Matrix<R> for [[R::Element; N]; M]
     }
 }
 
-pub fn matmul<M1, M2, R, S, V, H>(lhs: &M1, rhs: &M2, mut out: SubmatrixMut<V, S::Element>, hom: &H)
+pub fn matmul<M1, M2, R1, R2, S, V, H1, H2>(lhs: &M1, rhs: &M2, mut out: SubmatrixMut<V, S::Element>, hom1: &H1, hom2: &H2)
     where V: AsPointerToSlice<S::Element>,
-        R: ?Sized + RingBase,
+        R1: ?Sized + RingBase,
+        R2: ?Sized + RingBase,
         S: ?Sized + RingBase,
-        M1: Matrix<R>,
-        M2: Matrix<R>,
-        H: Homomorphism<R, S>
+        M1: Matrix<R1>,
+        M2: Matrix<R2>,
+        H1: Homomorphism<R1, S>,
+        H2: Homomorphism<R2, S>
 {
+    assert!(hom1.codomain().get_ring() == hom2.codomain().get_ring());
     assert_eq!(lhs.col_count(), rhs.row_count());
     assert_eq!(lhs.row_count(), out.row_count());
     assert_eq!(rhs.col_count(), out.col_count());
+    let target_ring = hom1.codomain();
     for i in 0..out.row_count() {
         for j in 0..out.col_count() {
-            *<SubmatrixMut<V, S::Element>>::at(&mut out, i, j) = hom.codomain().sum((0..lhs.col_count()).map(|k| hom.codomain().mul(hom.map_ref(lhs.entry_at(i, k)), hom.map_ref(rhs.entry_at(k, j)))));
+            *<SubmatrixMut<V, S::Element>>::at(&mut out, i, j) = target_ring.sum((0..lhs.col_count()).map(|k| target_ring.mul(hom1.map_ref(lhs.entry_at(i, k)), hom2.map_ref(rhs.entry_at(k, j)))));
         }
     }
 }
 
-pub fn matmul_fst_transposed<M1, M2, R, S, V, H>(lhs_T: &M1, rhs: &M2, mut out: SubmatrixMut<V, S::Element>, hom: &H)
+pub fn matmul_fst_transposed<M1, M2, R1, R2, S, V, H1, H2>(lhs_T: &M1, rhs: &M2, mut out: SubmatrixMut<V, S::Element>, hom1: &H1, hom2: &H2)
     where V: AsPointerToSlice<S::Element>,
-        R: ?Sized + RingBase,
+        R1: ?Sized + RingBase,
+        R2: ?Sized + RingBase,
         S: ?Sized + RingBase,
-        M1: Matrix<R>,
-        M2: Matrix<R>,
-        H: Homomorphism<R, S>
+        M1: Matrix<R1>,
+        M2: Matrix<R2>,
+        H1: Homomorphism<R1, S>,
+        H2: Homomorphism<R2, S>
 {
+    assert!(hom1.codomain().get_ring() == hom2.codomain().get_ring());
     assert_eq!(lhs_T.row_count(), rhs.row_count());
     assert_eq!(lhs_T.col_count(), out.row_count());
     assert_eq!(rhs.col_count(), out.col_count());
+    let target_ring = hom1.codomain();
     for i in 0..out.row_count() {
         for j in 0..out.col_count() {
-            *<SubmatrixMut<V, S::Element>>::at(&mut out, i, j) = hom.codomain().sum((0..lhs_T.row_count()).map(|k| hom.codomain().mul(hom.map_ref(lhs_T.entry_at(k, i)), hom.map_ref(rhs.entry_at(k, j)))));
+            *<SubmatrixMut<V, S::Element>>::at(&mut out, i, j) = target_ring.sum((0..lhs_T.row_count()).map(|k| target_ring.mul(hom1.map_ref(lhs_T.entry_at(k, i)), hom2.map_ref(rhs.entry_at(k, j)))));
         }
     }
 }

@@ -1,8 +1,11 @@
 use crate::field::*;
 use crate::integer::*;
 use crate::homomorphism::*;
+use crate::matrix::dense::DenseMatrix;
+use crate::matrix::matmul;
 use crate::matrix::matmul_fst_transposed;
 use crate::matrix::submatrix::*;
+use crate::matrix::Matrix;
 use crate::primitive_int::*;
 use crate::matrix::TransformTarget;
 use crate::rings::float_real::Real64;
@@ -134,7 +137,7 @@ fn swap_gso_cols<R, V>(ring: R, mut gso: SubmatrixMut<V, El<R>>, i: usize, j: us
 /// gso contains on the diagonal the squared lengths of the GS-orthogonalized basis vectors `|bi*|^2`,
 /// and above it the GS-coefficients `mu_ij = <bi, bj*> / <bj*, bj*>`.
 /// 
-fn lll_raw<R, I, V, T>(ring: R, int_ring: I, mut gso: SubmatrixMut<V, El<R>>, mut col_ops: T, delta: &El<R>)
+fn lll_base<R, I, V, T>(ring: R, int_ring: I, mut gso: SubmatrixMut<V, El<R>>, mut col_ops: T, delta: &El<R>)
     where R: RingStore + Copy,
         R::Type: LLLRealField<I::Type>,
         I: IntegerRingStore + Copy,
@@ -203,7 +206,9 @@ fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>)
 /// are "LLL-reduced". This means
 ///  - (size-reduced) `|<bi,bj*>| < <bj*,bj*> / 2` whenever `i > j`
 ///  - (Lovasz-condition) `delta |b(k - 1)|^2 - <bk, b(k - 1)*>^2 / |b(k - 1)|^2 <= |bk*|^2`
-/// Here the `bi*` refer to the Gram-Schmidt orthogonalization of the `bi`.
+/// 
+/// Here the `bi*` refer to the Gram-Schmidt orthogonalization of the `bi`, and
+/// `<.,.>` is the inner product induced by `quadratic_form`.
 /// 
 /// # Internal computations with floating point numbers
 /// 
@@ -215,43 +220,27 @@ fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>)
 /// 
 /// The exact ways of handling this are very likely to change in the future.
 /// 
-pub fn lll_float<I, V>(ring: I, matrix: SubmatrixMut<V, El<I>>, delta: f64)
+pub fn lll_float<I, V1, V2>(ring: I, quadratic_form: Submatrix<V1, El<Real64>>, matrix: SubmatrixMut<V2, El<I>>, delta: f64)
     where I: IntegerRingStore,
         I::Type: IntegerRing,
-        V: AsPointerToSlice<El<I>>
+        V1: AsPointerToSlice<El<Real64>>,
+        V2: AsPointerToSlice<El<I>>
 {
     assert!(delta < 1.);
     assert!(delta > 0.25);
+    assert_eq!(quadratic_form.row_count(), quadratic_form.col_count());
+    assert_eq!(matrix.col_count(), quadratic_form.col_count());
+
     let lll_reals = Real64::RING;
-    // let delta_int = ring.from_float_approx(delta * 2f64.powi(20)).unwrap();
-    // let delta = lll_reals.div(&lll_reals.get_ring().from_integer(delta_int, ring.get_ring()), &lll_reals.get_ring().from_integer(ring.power_of_two(20), ring.get_ring()));
 
     let n = matrix.col_count();
-    let mut gso_data = (0..n).flat_map(|_i| (0..n).map(|_j| lll_reals.zero())).collect::<Vec<_>>();
-    let mut gso = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut gso_data, n, n);
-    matmul_fst_transposed(&matrix, &matrix, gso.reborrow(), &lll_reals.can_hom(&ring).unwrap());
-    ldl(&lll_reals, gso.reborrow());
-    lll_raw::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso, TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);
-}
-
-pub fn lll_float_rational<I, R, V>(ring: R, matrix: SubmatrixMut<V, El<R>>, delta: f64)
-    where R: RingStore<Type = RationalFieldBase<I>>,
-        I: IntegerRingStore,
-        I::Type: IntegerRing,
-        V: AsPointerToSlice<El<R>>
-{
-    assert!(delta < 1.);
-    assert!(delta > 0.25);
-    let lll_reals = Real64::RING;
-    // let delta_int = ring.from_float_approx(delta * 2f64.powi(20)).unwrap();
-    // let delta = lll_reals.div(&lll_reals.get_ring().from_integer(delta_int, ring.get_ring()), &lll_reals.get_ring().from_integer(ring.power_of_two(20), ring.get_ring()));
-
-    let n = matrix.col_count();
-    let mut gso_data = (0..n).flat_map(|_i| (0..n).map(|_j| lll_reals.zero())).collect::<Vec<_>>();
-    let mut gso = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut gso_data, n, n);
-    matmul_fst_transposed(&matrix, &matrix, gso.reborrow(), &lll_reals.can_hom(&ring).unwrap());
-    ldl(&lll_reals, gso.reborrow());
-    lll_raw::<_, _, _, TransformLatticeBasis<R::Type, I::Type, _, _>>(&lll_reals, ring.base_ring(), gso, TransformLatticeBasis { basis: matrix, hom: ring.inclusion(), int_ring: PhantomData }, &delta);
+    let mut gso = DenseMatrix::zero(n, n, &lll_reals);
+    let mut tmp = DenseMatrix::zero(n, n, &lll_reals);
+    let hom = lll_reals.can_hom(&ring).unwrap();
+    matmul_fst_transposed(&matrix, &quadratic_form, tmp.data_mut(), &hom, &lll_reals.identity());
+    matmul(&tmp, &matrix, gso.data_mut(), &lll_reals.identity(), &hom);
+    ldl(&lll_reals, gso.data_mut());
+    lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut(), TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);
 }
 
 ///
@@ -285,7 +274,7 @@ pub fn lll_exact<I, V>(ring: I, mut matrix: SubmatrixMut<V, El<I>>, delta: f64)
 {
     assert!(delta < 1.);
     assert!(delta > 0.25);
-    lll_float(&ring, matrix.reborrow(), delta);
+    lll_float(&ring, DenseMatrix::identity(matrix.col_count(), Real64::RING).data(), matrix.reborrow(), delta);
 
     let lll_reals = RationalField::new(BigIntRing::RING);
     let delta_int = ring.from_float_approx(delta * 2f64.powi(20)).unwrap();
@@ -294,9 +283,10 @@ pub fn lll_exact<I, V>(ring: I, mut matrix: SubmatrixMut<V, El<I>>, delta: f64)
     let n = matrix.col_count();
     let mut gso_data = (0..n).flat_map(|_i| (0..n).map(|_j| lll_reals.zero())).collect::<Vec<_>>();
     let mut gso = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut gso_data, n, n);
-    matmul_fst_transposed(&matrix, &matrix, gso.reborrow(), &lll_reals.inclusion().compose(BigIntRing::RING.can_hom(&ring).unwrap()));
+    let hom = lll_reals.inclusion().compose(BigIntRing::RING.can_hom(&ring).unwrap());
+    matmul_fst_transposed(&matrix, &matrix, gso.reborrow(), &hom, &hom);
     ldl(&lll_reals, gso.reborrow());
-    lll_raw::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso, TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);
+    lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso, TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);
 }
 
 struct TransformLatticeBasis<'a, R, I, V, H>
@@ -436,8 +426,6 @@ fn norm_squared<V>(col: &Column<V, i64>) -> i64
 fn assert_lattice_isomorphic<V, const N: usize, const M: usize>(lhs: &[[i64; M]; N], rhs: &Submatrix<V, i64>)
     where V: AsPointerToSlice<i64>
 {
-    use crate::matrix::dense::DenseMatrix;
-
     assert_eq!(rhs.row_count(), N);
     assert_eq!(rhs.col_count(), M);
     let ZZbig = BigIntRing::RING;
@@ -463,7 +451,7 @@ fn test_lll_float_2d() {
     ];
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<[_; 2], _>::new(&mut reduced);
-    lll_float(&ZZ, reduced_matrix.reborrow(), 0.9);
+    lll_float(&ZZ, DenseMatrix::identity(2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(1, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -475,7 +463,7 @@ fn test_lll_float_2d() {
     ];
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<[_; 2], _>::new(&mut reduced);
-    lll_float(&ZZ, reduced_matrix.reborrow(), 0.9);
+    lll_float(&ZZ, DenseMatrix::identity(2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(4, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -500,7 +488,7 @@ fn test_lll_float_3d() {
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<[_; 3], _>::new(&mut reduced);
-    lll_float(&ZZ, reduced_matrix.reborrow(), 0.999);
+    lll_float(&ZZ, DenseMatrix::identity(3, Real64::RING).data(), reduced_matrix.reborrow(), 0.999);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(144 * 144, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -539,7 +527,7 @@ fn bench_lll_float_10d(bencher: &mut Bencher) {
         ];
         let mut reduced = original;
         let mut reduced_matrix = SubmatrixMut::<[_; 10], _>::new(&mut reduced);
-        lll_float(&ZZ, reduced_matrix.reborrow(), 0.9);
+        lll_float(&ZZ, DenseMatrix::identity(10, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
 
         assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
         assert!(16 * 16 > norm_squared(&reduced_matrix.as_const().col_at(0)));
