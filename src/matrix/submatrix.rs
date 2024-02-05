@@ -42,10 +42,7 @@ unsafe impl<T> AsPointerToSlice<T> for Vec<T> {
 unsafe impl<'a, T, const N: usize> AsPointerToSlice<T> for [T; N] {
 
     unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> {
-        let self_ref = unsafe {
-            self_.as_ref()
-        };
-        NonNull::new(self_ref.as_ptr() as *mut T).unwrap()
+        std::mem::transmute(NonNull::from(self_))
     }
 }
 
@@ -99,11 +96,11 @@ pub struct SubmatrixRaw<V, T>
     where V: AsPointerToSlice<T>
 {
     entry: PhantomData<*mut T>,
-    pub rows: NonNull<V>,
-    pub row_count: usize,
-    pub row_step: isize,
-    pub col_start: usize,
-    pub col_count: usize
+    rows: NonNull<V>,
+    row_count: usize,
+    row_step: isize,
+    col_start: usize,
+    col_count: usize
 }
 
 ///
@@ -517,7 +514,7 @@ pub struct SubmatrixMut<'a, V, T>
     where V: 'a + AsPointerToSlice<T>
 {
     entry: PhantomData<&'a mut T>,
-    pub raw_data: SubmatrixRaw<V, T>
+    raw_data: SubmatrixRaw<V, T>
 }
 
 impl<'a, V, T> SubmatrixMut<'a, V, T>
@@ -822,11 +819,59 @@ impl<'a, T, const N: usize> SubmatrixMut<'a, [T; N], T> {
         }
     }
 }
+impl<'a, T> Submatrix<'a, AsFirstElement<T>, T> {
+
+    pub fn new(data: &'a [T], row_count: usize, col_count: usize) -> Self {
+        assert_eq!(row_count * col_count, data.len());
+        unsafe {
+            Self {
+                entry: PhantomData,
+                raw_data: SubmatrixRaw::new(std::mem::transmute(NonNull::new(data.as_ptr() as *mut T).unwrap_unchecked()), row_count, col_count as isize, 0, col_count)
+            }
+        }
+    }
+}
+
+impl<'a, T> Submatrix<'a, Vec<T>, T> {
+
+    pub fn new(data: &'a [Vec<T>]) -> Self {
+        assert!(data.len() > 0);
+        let row_count = data.len();
+        let col_count = data[0].len();
+        for row in data.iter() {
+            assert_eq!(col_count, row.len());
+        }
+        unsafe {
+            Self {
+                entry: PhantomData,
+                raw_data: SubmatrixRaw::new(NonNull::new(data.as_ptr() as *mut _).unwrap_unchecked(), row_count, 1, 0, col_count)
+            }
+        }
+    }
+}
+
+impl<'a, T, const N: usize> Submatrix<'a, [T; N], T> {
+
+    pub fn new(data: &'a [[T; N]]) -> Self {
+        assert!(data.len() > 0);
+        let row_count = data.len();
+        let col_count = data[0].len();
+        for row in data.iter() {
+            assert_eq!(col_count, row.len());
+        }
+        unsafe {
+            Self {
+                entry: PhantomData,
+                raw_data: SubmatrixRaw::new(NonNull::new(data.as_ptr() as *mut _).unwrap_unchecked(), row_count, 1, 0, col_count)
+            }
+        }
+    }
+}
 
 impl<'a, V, R> super::Matrix<R> for Submatrix<'a, V, R::Element>
     where V: 'a + AsPointerToSlice<R::Element>, R: RingBase
 {
-    fn at(&self, i: usize, j: usize) -> &<R as RingBase>::Element {
+    fn entry_at(&self, i: usize, j: usize) -> &<R as RingBase>::Element {
         self.row_at(i).at(j)
     }
 
@@ -840,9 +885,9 @@ impl<'a, V, R> super::Matrix<R> for Submatrix<'a, V, R::Element>
 }
 
 impl<'a, V, R> super::Matrix<R> for SubmatrixMut<'a, V, R::Element>
-    where V: 'a + AsPointerToSlice<R::Element>, R: RingBase
+    where V: 'a + AsPointerToSlice<R::Element>, R: ?Sized + RingBase
 {
-    fn at(&self, i: usize, j: usize) -> &<R as RingBase>::Element {
+    fn entry_at(&self, i: usize, j: usize) -> &<R as RingBase>::Element {
         unsafe {
             self.raw_data.entry_at(i, j).as_ref()
         }

@@ -302,13 +302,13 @@ impl<R, V, M> DivisibilityRing for FreeAlgebraImplBase<R, V, M>
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let mut mul_matrix = RingRef::new(self).create_multiplication_matrix(rhs);
-        let mut lhs_matrix = algorithms::smith::DenseMatrix::zero(self.rank(), 1, self.base_ring());
+        let mut lhs_matrix = DenseMatrix::zero(self.rank(), 1, self.base_ring());
         let data = self.wrt_canonical_basis(&lhs);
         for j in 0..self.rank() {
             *lhs_matrix.at_mut(j, 0) = data.at(j);
         }
         let solution = algorithms::smith::solve_right(&mut mul_matrix, lhs_matrix, self.base_ring())?;
-        return Some(self.from_canonical_basis((0..self.rank()).map(|i| self.base_ring().clone_el(solution.at(i, 0)))));
+        return Some(self.from_canonical_basis((0..self.rank()).map(|i| self.base_ring().clone_el(solution.entry_at(i, 0)))));
     }
 }
 
