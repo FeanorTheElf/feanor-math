@@ -195,7 +195,12 @@ impl EuclideanRing for Complex64Base {
     }
 }
 
-impl Field for Complex64Base {}
+impl Field for Complex64Base {
+    
+    fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+        self.checked_left_div(lhs, rhs).unwrap()
+    }
+}
 
 impl RingExtension for Complex64Base {
 
