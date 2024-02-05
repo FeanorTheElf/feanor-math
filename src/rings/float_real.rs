@@ -9,6 +9,8 @@ use crate::ring::*;
 use crate::homomorphism::*;
 use crate::divisibility::{DivisibilityRing, Domain};
 
+use super::rational::{RationalField, RationalFieldBase};
+
 #[derive(Clone, Copy, PartialEq)]
 pub struct Real64Base;
 
@@ -153,5 +155,24 @@ impl<I> CanHomFrom<I> for Real64Base
 
     fn map_in_ref(&self, from: &I, el: &<I as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
         from.to_float_approx(el)
+    }
+}
+
+impl<I> CanHomFrom<RationalFieldBase<I>> for Real64Base 
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
+{
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, _from: &RationalFieldBase<I>) -> Option<Self::Homomorphism> {
+        Some(())
+    }
+
+    fn map_in(&self, from: &RationalFieldBase<I>, el: El<RationalField<I>>, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in_ref(from, &el, hom)
+    }
+
+    fn map_in_ref(&self, from: &RationalFieldBase<I>, el: &El<RationalField<I>>, _hom: &Self::Homomorphism) -> Self::Element {
+        from.base_ring().to_float_approx(&el.0) / from.base_ring().to_float_approx(&el.1)
     }
 }

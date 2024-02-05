@@ -3,7 +3,6 @@ use crate::integer::*;
 use crate::homomorphism::*;
 use crate::matrix::matmul_fst_transposed;
 use crate::matrix::submatrix::*;
-use crate::matrix::Matrix;
 use crate::primitive_int::*;
 use crate::matrix::TransformTarget;
 use crate::rings::float_real::Real64;
@@ -13,6 +12,7 @@ use crate::ordered::{OrderedRing, OrderedRingStore};
 use crate::ring::*;
 
 use std::cmp::max;
+use std::marker::PhantomData;
 
 pub trait LLLRealField<I>: OrderedRing + Field
     where I: ?Sized + IntegerRing
@@ -231,8 +231,27 @@ pub fn lll_float<I, V>(ring: I, matrix: SubmatrixMut<V, El<I>>, delta: f64)
     let mut gso = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut gso_data, n, n);
     matmul_fst_transposed(&matrix, &matrix, gso.reborrow(), &lll_reals.can_hom(&ring).unwrap());
     ldl(&lll_reals, gso.reborrow());
-    println!("{}", gso.format(&lll_reals));
-    lll_raw::<_, _, _, TransformLatticeBasis<I, _>>(&lll_reals, &ring, gso, TransformLatticeBasis { basis: matrix }, &delta);
+    lll_raw::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso, TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);
+}
+
+pub fn lll_float_rational<I, R, V>(ring: R, matrix: SubmatrixMut<V, El<R>>, delta: f64)
+    where R: RingStore<Type = RationalFieldBase<I>>,
+        I: IntegerRingStore,
+        I::Type: IntegerRing,
+        V: AsPointerToSlice<El<R>>
+{
+    assert!(delta < 1.);
+    assert!(delta > 0.25);
+    let lll_reals = Real64::RING;
+    // let delta_int = ring.from_float_approx(delta * 2f64.powi(20)).unwrap();
+    // let delta = lll_reals.div(&lll_reals.get_ring().from_integer(delta_int, ring.get_ring()), &lll_reals.get_ring().from_integer(ring.power_of_two(20), ring.get_ring()));
+
+    let n = matrix.col_count();
+    let mut gso_data = (0..n).flat_map(|_i| (0..n).map(|_j| lll_reals.zero())).collect::<Vec<_>>();
+    let mut gso = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut gso_data, n, n);
+    matmul_fst_transposed(&matrix, &matrix, gso.reborrow(), &lll_reals.can_hom(&ring).unwrap());
+    ldl(&lll_reals, gso.reborrow());
+    lll_raw::<_, _, _, TransformLatticeBasis<R::Type, I::Type, _, _>>(&lll_reals, ring.base_ring(), gso, TransformLatticeBasis { basis: matrix, hom: ring.inclusion(), int_ring: PhantomData }, &delta);
 }
 
 ///
@@ -277,41 +296,50 @@ pub fn lll_exact<I, V>(ring: I, mut matrix: SubmatrixMut<V, El<I>>, delta: f64)
     let mut gso = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut gso_data, n, n);
     matmul_fst_transposed(&matrix, &matrix, gso.reborrow(), &lll_reals.inclusion().compose(BigIntRing::RING.can_hom(&ring).unwrap()));
     ldl(&lll_reals, gso.reborrow());
-    lll_raw::<_, _, _, TransformLatticeBasis<I, _>>(&lll_reals, &ring, gso, TransformLatticeBasis { basis: matrix }, &delta);
+    lll_raw::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso, TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);
 }
 
-struct TransformLatticeBasis<'a, I, V>
-    where I: IntegerRingStore,
-        I::Type: IntegerRing,
-        V: AsPointerToSlice<El<I>>
+struct TransformLatticeBasis<'a, R, I, V, H>
+    where R: ?Sized + RingBase,
+        I: ?Sized + IntegerRing,
+        H: Homomorphism<I, R>,
+        V: AsPointerToSlice<R::Element>
 {
-    basis: SubmatrixMut<'a, V, El<I>>
+    basis: SubmatrixMut<'a, V, R::Element>,
+    int_ring: PhantomData<I>,
+    hom: H
 }
 
-impl<'a, I, V> TransformTarget<I::Type> for TransformLatticeBasis<'a, I, V>
-    where I: IntegerRingStore,
-            I::Type: IntegerRing,
-            V: AsPointerToSlice<El<I>>
+impl<'a, R, I, V, H> TransformTarget<I> for TransformLatticeBasis<'a, R, I, V, H>
+    where R: ?Sized + RingBase,
+        I: ?Sized + IntegerRing,
+        H: Homomorphism<I, R>,
+        V: AsPointerToSlice<R::Element>
 {
-    fn transform(&mut self, ring: &I::Type, i: usize, j: usize, transform: &[El<I>; 4]) {
+    fn transform(&mut self, ring: &I, i: usize, j: usize, transform: &[I::Element; 4]) {
+        assert!(ring == self.hom.domain().get_ring());
         assert!(i != j);
+        let ring = self.hom.codomain();
         for k in 0..self.basis.row_count() {
             let a = ring.clone_el(self.basis.at(k, i));
             let b = ring.clone_el(self.basis.at(k, j));
-            *self.basis.at(k, i) = ring.add(ring.mul_ref(&a, &transform[0]), ring.mul_ref(&b, &transform[1]));
-            *self.basis.at(k, i) = ring.add(ring.mul_ref_snd(a, &transform[2]), ring.mul_ref_snd(b, &transform[3]));
+            *self.basis.at(k, i) = ring.add(self.hom.mul_ref_map(&a, &transform[0]), self.hom.mul_ref_map(&b, &transform[1]));
+            *self.basis.at(k, i) = ring.add(self.hom.mul_ref_snd_map(a, &transform[2]), self.hom.mul_ref_snd_map(b, &transform[3]));
         }
     }
 
-    fn subtract(&mut self, ring: &I::Type, src: usize, dst: usize, factor: &<I::Type as RingBase>::Element) {
+    fn subtract(&mut self, ring: &I, src: usize, dst: usize, factor: &I::Element) {
+        assert!(ring == self.hom.domain().get_ring());
         assert!(src != dst);
+        let ring = self.hom.codomain();
         for k in 0..self.basis.row_count() {
-            let subtract = ring.mul_ref(self.basis.at(k, src), factor);
+            let subtract = self.hom.mul_ref_map(self.basis.at(k, src), factor);
             ring.sub_assign(self.basis.at(k, dst), subtract);
         }
     }
 
-    fn swap(&mut self, _ring: &I::Type, i: usize, j: usize) {
+    fn swap(&mut self, ring: &I, i: usize, j: usize) {
+        assert!(ring == self.hom.domain().get_ring());
         if i == j {
             return;
         }
