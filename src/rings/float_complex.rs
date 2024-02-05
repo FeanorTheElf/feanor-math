@@ -9,16 +9,20 @@ use crate::homomorphism::*;
 use crate::divisibility::{DivisibilityRing, Domain};
 
 #[derive(Clone, Copy, PartialEq)]
-pub struct Complex64;
+pub struct Complex64Base;
 
 #[derive(Clone, Copy)]
 pub struct Complex64El(f64, f64);
 
+pub type Complex64 = RingValue<Complex64Base>;
+
 impl Complex64 {
 
-    pub const RING: RingValue<Complex64> = RingValue::from(Complex64);
-
+    pub const RING: Self = RingValue::from(Complex64Base);
     pub const I: Complex64El = Complex64El(0., 1.);
+}
+
+impl Complex64Base {
 
     pub fn abs(&self, Complex64El(re, im): Complex64El) -> f64 {
         (re * re + im * im).sqrt()
@@ -64,11 +68,11 @@ impl Complex64 {
     }
 
     pub fn root_of_unity(&self, i: i64, n: i64) -> Complex64El {
-        self.exp(self.mul(self.from_f64((i as f64 / n as f64) * (2. * PI)), Self::I))
+        self.exp(self.mul(self.from_f64((i as f64 / n as f64) * (2. * PI)), Complex64::I))
     }
 }
 
-impl RingValue<Complex64> {
+impl Complex64 {
     
     pub fn abs(&self, val: Complex64El) -> f64 { self.get_ring().abs(val) }
 
@@ -91,7 +95,7 @@ impl RingValue<Complex64> {
     pub fn root_of_unity(&self, i: i64, n: i64) -> Complex64El { self.get_ring().root_of_unity(i, n) }
 }
 
-impl RingBase for Complex64 {
+impl RingBase for Complex64Base {
  
     type Element = Complex64El;
     
@@ -146,11 +150,11 @@ impl RingBase for Complex64 {
     }
 }
 
-impl_eq_based_self_iso!{ Complex64 }
+impl_eq_based_self_iso!{ Complex64Base }
 
-impl Domain for Complex64 {}
+impl Domain for Complex64Base {}
 
-impl DivisibilityRing for Complex64 {
+impl DivisibilityRing for Complex64Base {
 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let abs_sqr = self.abs(*rhs) * self.abs(*rhs);
@@ -159,14 +163,14 @@ impl DivisibilityRing for Complex64 {
     }
 }
 
-impl PrincipalIdealRing for Complex64 {
+impl PrincipalIdealRing for Complex64Base {
 
     fn ideal_gen(&self, _lhs: &Self::Element, _rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         panic!("Since Complex64 is only approximate, this cannot be implemented properly")
     }
 }
 
-impl EuclideanRing for Complex64 {
+impl EuclideanRing for Complex64Base {
 
     fn euclidean_div_rem(&self, _lhs: Self::Element, _rhs: &Self::Element) -> (Self::Element, Self::Element) {
         panic!("Since Complex64 is only approximate, this cannot be implemented properly")
@@ -177,7 +181,7 @@ impl EuclideanRing for Complex64 {
     }
 }
 
-impl Field for Complex64 {}
+impl Field for Complex64Base {}
 
 #[test]
 fn test_pow() {

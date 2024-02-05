@@ -1,9 +1,9 @@
 use std::f64::EPSILON;
-use std::f64::consts::PI;
 
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::Field;
-use crate::integer::{IntegerRingStore, IntegerRing};
+use crate::integer::{int_cast, IntegerRing, IntegerRingStore};
+use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::divisibility::{DivisibilityRing, Domain};
@@ -21,11 +21,11 @@ impl Real64 {
 impl Real64Base {
 
     pub fn is_absolute_approx_eq(&self, lhs: <Self as RingBase>::Element, rhs: <Self as RingBase>::Element, absolute_threshold: f64) -> bool {
-        self.abs(self.sub(lhs, rhs)) < absolute_threshold
+        (lhs - rhs).abs() < absolute_threshold
     }
 
     pub fn is_relative_approx_eq(&self, lhs: <Self as RingBase>::Element, rhs: <Self as RingBase>::Element, relative_threshold: f64) -> bool {
-        self.is_absolute_approx_eq(lhs, rhs, self.abs(lhs) * relative_threshold)
+        self.is_absolute_approx_eq(lhs, rhs, (lhs.abs() + rhs.abs()) * relative_threshold)
     }
 
     pub fn is_approx_eq(&self, lhs: <Self as RingBase>::Element, rhs: <Self as RingBase>::Element, precision: u64) -> bool {
@@ -46,24 +46,20 @@ impl RingBase for Real64Base {
         *val
     }
 
-    fn add_assign(&self, Complex64El(lhs_re, lhs_im): &mut Self::Element, Complex64El(rhs_re, rhs_im): Self::Element) {
-        *lhs_re += rhs_re;
-        *lhs_im += rhs_im;
+    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
+        *lhs += rhs;
     }
 
-    fn negate_inplace(&self, Complex64El(re, im): &mut Self::Element) {
-        *re = -*re;
-        *im = -*im;
+    fn negate_inplace(&self, x: &mut Self::Element) {
+        *x = -*x;
     }
 
-    fn mul_assign(&self, Complex64El(lhs_re, lhs_im): &mut Self::Element, Complex64El(rhs_re, rhs_im): Self::Element) {
-        let new_im = *lhs_re * rhs_im + *lhs_im * rhs_re;
-        *lhs_re = *lhs_re * rhs_re - *lhs_im * rhs_im;
-        *lhs_im = new_im;
+    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
+        *lhs *= rhs;
     }
 
     fn from_int(&self, value: i32) -> Self::Element {
-        Complex64El(value as f64, 0.)
+        value as f64
     }
     
     fn eq_el(&self, _: &Self::Element, _: &Self::Element) -> bool {
@@ -73,7 +69,11 @@ impl RingBase for Real64Base {
     fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
         where R::Type: IntegerRing
     {
-        self.exp(self.mul(self.ln_main_branch(x), Complex64El(integers.to_float_approx(power), 0.)))
+        if integers.get_ring().representable_bits().is_some() && integers.get_ring().representable_bits().unwrap() < i32::BITS as usize {
+            x.powi(int_cast(integers.clone_el(power), &StaticRing::<i32>::RING, integers))
+        } else {
+            x.powf(integers.to_float_approx(power))
+        }
     }
 
     fn is_commutative(&self) -> bool { true }
@@ -82,8 +82,8 @@ impl RingBase for Real64Base {
 
     fn is_approximate(&self) -> bool { true }
 
-    fn dbg<'a>(&self, Complex64El(re, im): &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        write!(out, "{} + {}i", re, im)
+    fn dbg<'a>(&self, x: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        write!(out, "{}", x)
     }
     
     fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
@@ -93,27 +93,26 @@ impl RingBase for Real64Base {
     }
 }
 
-impl_eq_based_self_iso!{ Complex64 }
+impl_eq_based_self_iso!{ Real64Base }
 
-impl Domain for Complex64 {}
+impl Domain for Real64Base {}
 
-impl DivisibilityRing for Complex64 {
+impl DivisibilityRing for Real64Base {
 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        let abs_sqr = self.abs(*rhs) * self.abs(*rhs);
-        let Complex64El(res_re, res_im) =  self.mul(*lhs, self.conjugate(*rhs));
-        return Some(Complex64El(res_re / abs_sqr, res_im / abs_sqr));
+        assert!(*rhs != 0.);
+        return Some(*lhs / *rhs);
     }
 }
 
-impl PrincipalIdealRing for Complex64 {
+impl PrincipalIdealRing for Real64Base {
 
     fn ideal_gen(&self, _lhs: &Self::Element, _rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         panic!("Since Complex64 is only approximate, this cannot be implemented properly")
     }
 }
 
-impl EuclideanRing for Complex64 {
+impl EuclideanRing for Real64Base {
 
     fn euclidean_div_rem(&self, _lhs: Self::Element, _rhs: &Self::Element) -> (Self::Element, Self::Element) {
         panic!("Since Complex64 is only approximate, this cannot be implemented properly")
@@ -124,26 +123,4 @@ impl EuclideanRing for Complex64 {
     }
 }
 
-impl Field for Complex64 {}
-
-#[test]
-fn test_pow() {
-    let CC = Complex64::RING;
-    let i = Complex64::I;
-    assert!(CC.is_approx_eq(CC.negate(i), CC.pow(i, 3), 1));
-    assert!(!CC.is_approx_eq(CC.negate(i), CC.pow(i, 1024 + 3), 1));
-    assert!(CC.is_approx_eq(CC.negate(i), CC.pow(i, 1024 + 3), 100));
-    assert!(CC.is_approx_eq(CC.exp(CC.mul(CC.from_f64(std::f64::consts::PI / 4.), i)), CC.mul(CC.add(CC.one(), i), CC.from_f64(2f64.powf(-0.5))), 1));
-
-    let seventh_root_of_unity = CC.exp(CC.mul(i, CC.from_f64(2. * std::f64::consts::PI / 7.)));
-    assert!(CC.is_approx_eq(CC.pow(seventh_root_of_unity, 7 * 100 + 1), seventh_root_of_unity, 1000));
-}
-
-#[test]
-fn test_mul() {
-    let CC = Complex64::RING;
-    let i = Complex64::I;
-    assert!(CC.is_approx_eq(CC.mul(i, i), CC.from_f64(-1.), 1));
-    assert!(CC.is_approx_eq(CC.mul(i, CC.negate(i)), CC.from_f64(1.), 1));
-    assert!(CC.is_approx_eq(CC.mul(CC.add(i, CC.one()), i), CC.sub(i, CC.one()), 1));
-}
+impl Field for Real64Base {}

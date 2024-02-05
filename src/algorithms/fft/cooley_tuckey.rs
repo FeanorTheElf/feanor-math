@@ -101,7 +101,7 @@ impl<R> FFTTableCooleyTuckey<R>
     }
 
     pub fn for_complex(ring: R, log2_n: usize) -> Self
-        where R: RingStore<Type = Complex64>
+        where R: RingStore<Type = Complex64Base>
     {
         let CC = Complex64::RING;
         Self::new_with_pows(ring, |i| CC.root_of_unity(i, 1 << log2_n), log2_n)
@@ -341,7 +341,7 @@ impl<R> FFTTable for FFTTableCooleyTuckey<R>
     }
 }
 
-impl<R: RingStore<Type = Complex64>> ErrorEstimate for FFTTableCooleyTuckey<R> {
+impl<R: RingStore<Type = Complex64Base>> ErrorEstimate for FFTTableCooleyTuckey<R> {
     
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
         // each butterfly doubles the error, and then adds up to 

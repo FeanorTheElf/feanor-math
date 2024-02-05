@@ -174,7 +174,7 @@ impl<R, T1, T2> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2>
 }
 
 impl<R, T1, T2> ErrorEstimate for FFTTableGenCooleyTuckey<R, T1, T2> 
-    where R: RingStore<Type = Complex64>, 
+    where R: RingStore<Type = Complex64Base>, 
         T1: FFTTable<Ring = R> + ErrorEstimate, 
         T2: FFTTable<Ring = R> + ErrorEstimate
 {

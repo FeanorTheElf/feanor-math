@@ -117,7 +117,7 @@ impl<R> FFTTableBluestein<R>
     }
 
     pub fn for_complex(ring: R, n: usize) -> Self
-        where R: RingStore<Type = Complex64>
+        where R: RingStore<Type = Complex64Base>
     {
         let ZZ = StaticRing::<i64>::RING;
         let CC = Complex64::RING;
@@ -262,7 +262,7 @@ impl<R> FFTTable for FFTTableBluestein<R>
     }
 }
 
-impl<R: RingStore<Type = Complex64>> ErrorEstimate for FFTTableBluestein<R> {
+impl<R: RingStore<Type = Complex64Base>> ErrorEstimate for FFTTableBluestein<R> {
     
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
         let error_after_twiddling = input_error + input_bound * (root_of_unity_error() + f64::EPSILON);
