@@ -5,7 +5,6 @@ use crate::matrix::dense::DenseMatrix;
 use crate::matrix::matmul;
 use crate::matrix::matmul_fst_transposed;
 use crate::matrix::submatrix::*;
-use crate::matrix::Matrix;
 use crate::primitive_int::*;
 use crate::matrix::TransformTarget;
 use crate::rings::float_real::Real64;

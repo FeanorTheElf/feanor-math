@@ -8,6 +8,8 @@ use crate::ring::*;
 use crate::homomorphism::*;
 use crate::divisibility::{DivisibilityRing, Domain};
 
+use super::float_real::Real64;
+
 #[derive(Clone, Copy, PartialEq)]
 pub struct Complex64Base;
 
@@ -182,6 +184,24 @@ impl EuclideanRing for Complex64Base {
 }
 
 impl Field for Complex64Base {}
+
+impl RingExtension for Complex64Base {
+
+    type BaseRing = Real64;
+
+    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing {
+        &Real64::RING
+    }
+
+    fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
+        self.from_f64(x)
+    }
+
+    fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {
+        lhs.0 *= *rhs;
+        lhs.1 *= *rhs;
+    }
+}
 
 #[test]
 fn test_pow() {
