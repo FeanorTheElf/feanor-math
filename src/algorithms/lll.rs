@@ -259,13 +259,15 @@ pub fn lll_float<I, V>(ring: I, matrix: SubmatrixMut<V, El<I>>, delta: f64)
 /// 
 /// The exact ways of handling this are very likely to change in the future.
 /// 
-pub fn lll_exact<I, V>(ring: I, matrix: SubmatrixMut<V, El<I>>, delta: f64)
+pub fn lll_exact<I, V>(ring: I, mut matrix: SubmatrixMut<V, El<I>>, delta: f64)
     where I: IntegerRingStore,
         I::Type: IntegerRing,
         V: AsPointerToSlice<El<I>>
 {
     assert!(delta < 1.);
     assert!(delta > 0.25);
+    lll_float(&ring, matrix.reborrow(), delta);
+
     let lll_reals = RationalField::new(BigIntRing::RING);
     let delta_int = ring.from_float_approx(delta * 2f64.powi(20)).unwrap();
     let delta = lll_reals.div(&lll_reals.get_ring().from_integer(delta_int, ring.get_ring()), &lll_reals.get_ring().from_integer(ring.power_of_two(20), ring.get_ring()));
