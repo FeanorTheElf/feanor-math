@@ -308,7 +308,7 @@ impl<R, V, M> DivisibilityRing for FreeAlgebraImplBase<R, V, M>
             *lhs_matrix.at_mut(j, 0) = data.at(j);
         }
         let solution = algorithms::smith::solve_right(&mut mul_matrix, lhs_matrix, self.base_ring())?;
-        return Some(self.from_canonical_basis((0..self.rank()).map(|i| self.base_ring().clone_el(solution.at(i, 0)))));
+        return Some(self.from_canonical_basis((0..self.rank()).map(|i| self.base_ring().clone_el(solution.entry_at(i, 0)))));
     }
 }
 

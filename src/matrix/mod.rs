@@ -11,7 +11,9 @@ use std::fmt::Display;
 pub mod submatrix;
 pub mod dense;
 
-use crate::ring::*;
+use crate::{homomorphism::Homomorphism, ring::*};
+
+use self::submatrix::{AsPointerToSlice, SubmatrixMut};
 
 ///
 /// A very minimalistic approach to implement matrices.
@@ -30,7 +32,7 @@ pub trait Matrix<R>
 {
     fn row_count(&self) -> usize;
     fn col_count(&self) -> usize;
-    fn at(&self, i: usize, j: usize) -> &R::Element;
+    fn entry_at(&self, i: usize, j: usize) -> &R::Element;
 
     fn format<'a, S>(&'a self, ring: &'a S) -> MatrixDisplayWrapper<'a, R, Self>
         where S: RingStore<Type = R>
@@ -46,7 +48,7 @@ pub trait Matrix<R>
     {
         assert_eq!(self.row_count(), other.row_count());
         assert_eq!(self.col_count(), other.col_count());
-        (0..self.row_count()).all(|i| (0..self.col_count()).all(|j| ring.eq_el(self.at(i, j), other.at(i, j))))
+        (0..self.row_count()).all(|i| (0..self.col_count()).all(|j| ring.eq_el(self.entry_at(i, j), other.entry_at(i, j))))
     }
 }
 
@@ -77,7 +79,7 @@ impl<'a, R, M> Display for MatrixDisplayWrapper<'a, R, M>
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let ring = RingRef::new(self.ring);
         let strings = (0..self.matrix.row_count()).flat_map(|i| (0..self.matrix.col_count()).map(move |j| (i, j)))
-            .map(|(i, j)| format!("{}", ring.format(self.matrix.at(i, j))))
+            .map(|(i, j)| format!("{}", ring.format(self.matrix.entry_at(i, j))))
             .collect::<Vec<_>>();
         let max_len = strings.iter().map(|s| s.chars().count()).chain([2].into_iter()).max().unwrap();
         let mut strings = strings.into_iter();
@@ -161,7 +163,43 @@ impl<const N: usize, const M: usize, R> Matrix<R> for [[R::Element; N]; M]
         M
     }
 
-    fn at(&self, i: usize, j: usize) -> &<R as RingBase>::Element {
+    fn entry_at(&self, i: usize, j: usize) -> &<R as RingBase>::Element {
         &self[i][j]
+    }
+}
+
+pub fn matmul<M1, M2, R, S, V, H>(lhs: &M1, rhs: &M2, mut out: SubmatrixMut<V, S::Element>, hom: &H)
+    where V: AsPointerToSlice<S::Element>,
+        R: ?Sized + RingBase,
+        S: ?Sized + RingBase,
+        M1: Matrix<R>,
+        M2: Matrix<R>,
+        H: Homomorphism<R, S>
+{
+    assert_eq!(lhs.col_count(), rhs.row_count());
+    assert_eq!(lhs.row_count(), out.row_count());
+    assert_eq!(rhs.col_count(), out.col_count());
+    for i in 0..out.row_count() {
+        for j in 0..out.col_count() {
+            *<SubmatrixMut<V, S::Element>>::at(&mut out, i, j) = hom.codomain().sum((0..lhs.col_count()).map(|k| hom.codomain().mul(hom.map_ref(lhs.entry_at(i, k)), hom.map_ref(rhs.entry_at(k, j)))));
+        }
+    }
+}
+
+pub fn matmul_fst_transposed<M1, M2, R, S, V, H>(lhs_T: &M1, rhs: &M2, mut out: SubmatrixMut<V, S::Element>, hom: &H)
+    where V: AsPointerToSlice<S::Element>,
+        R: ?Sized + RingBase,
+        S: ?Sized + RingBase,
+        M1: Matrix<R>,
+        M2: Matrix<R>,
+        H: Homomorphism<R, S>
+{
+    assert_eq!(lhs_T.row_count(), rhs.row_count());
+    assert_eq!(lhs_T.col_count(), out.row_count());
+    assert_eq!(rhs.col_count(), out.col_count());
+    for i in 0..out.row_count() {
+        for j in 0..out.col_count() {
+            *<SubmatrixMut<V, S::Element>>::at(&mut out, i, j) = hom.codomain().sum((0..lhs_T.row_count()).map(|k| hom.codomain().mul(hom.map_ref(lhs_T.entry_at(k, i)), hom.map_ref(rhs.entry_at(k, j)))));
+        }
     }
 }

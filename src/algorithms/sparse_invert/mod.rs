@@ -759,8 +759,8 @@ fn assert_is_correct_row_echelon<R>(ring: R, original: &SparseMatrixBuilder<R::T
     let mut actual_transposed = DenseMatrix::zero(m, n, &ring);
     for i in 0..n {
         for j in 0..m {
-            *original_transposed.at_mut(j, i) = ring.clone_el(<_ as crate::matrix::Matrix<_>>::at(original, i, j));
-            *actual_transposed.at_mut(j, i) = ring.clone_el(<_ as crate::matrix::Matrix<_>>::at(row_echelon_form, i, j));
+            *original_transposed.at_mut(j, i) = ring.clone_el(<_ as crate::matrix::Matrix<_>>::entry_at(original, i, j));
+            *actual_transposed.at_mut(j, i) = ring.clone_el(<_ as crate::matrix::Matrix<_>>::entry_at(row_echelon_form, i, j));
         }
     }
     assert!(smith::solve_right::<&R>(&mut original_transposed.clone_matrix(&ring), actual_transposed.clone_matrix(&ring), &ring).is_some());

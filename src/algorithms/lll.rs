@@ -1,8 +1,9 @@
 use crate::field::*;
 use crate::integer::*;
 use crate::homomorphism::*;
-use crate::primitive_int::*;
+use crate::matrix::matmul_fst_transposed;
 use crate::matrix::submatrix::*;
+use crate::matrix::Matrix;
 use crate::matrix::TransformTarget;
 use crate::rings::rational::*;
 use crate::ordered::{OrderedRing, OrderedRingStore};
@@ -48,7 +49,7 @@ fn size_reduce<R, V, T>(ring: R, mut target: SubmatrixMut<V, El<R>>, target_j: u
 {
     for j in (0..matrix.col_count()).rev() {
         let factor = ring.get_ring().round_to_integer(target.as_const().at(j, 0));
-        col_ops.subtract(ring.get_ring().integer_ring().get_ring(), target_j, j, &factor);
+        col_ops.subtract(ring.get_ring().integer_ring().get_ring(), j, target_j, &factor);
         let factor = ring.get_ring().from_integer(factor);
         ring.sub_assign_ref(target.at(j, 0), &factor);
         for k in 0..j {
@@ -133,8 +134,8 @@ fn lll_raw<R, V, T>(ring: R, mut gso: SubmatrixMut<V, El<R>>, mut col_ops: T, de
 {
     let mut i = 0;
     while i + 1 < gso.col_count() {
-        let (target, matrix) = gso.reborrow().split_cols(i..(i + 1), 0..i);
-        size_reduce(ring, target, i, matrix.as_const(), &mut col_ops);
+        let (target, matrix) = gso.reborrow().split_cols((i + 1)..(i + 2), 0..(i + 1));
+        size_reduce(ring, target, i + 1, matrix.as_const(), &mut col_ops);
         if ring.is_gt(
             &ring.mul_ref_snd(
                 ring.sub_ref_fst(delta, ring.mul_ref(gso.as_const().at(i, i + 1), gso.as_const().at(i, i + 1))),
@@ -151,22 +152,111 @@ fn lll_raw<R, V, T>(ring: R, mut gso: SubmatrixMut<V, El<R>>, mut col_ops: T, de
     }
 }
 
+///
+/// Computes the LDL-decomposition of the given matrix, i.e. writes it as
+/// a product `L * D * L^T`, where `D` is diagonal and `L` is lower triangle.
+/// 
+/// Currently this requires that the input matrix is invertible (or in the 
+/// floating point case that no eigenvalues are very small in absolute value).
+/// 
+/// `D` is returned on the diagonal of the matrix, and `L^T` is returned in
+/// the upper triangle of the matrix.
+/// 
+fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>)
+    where R: RingStore,
+        R::Type: Field, 
+        V: AsPointerToSlice<El<R>>
+{
+    // only the upper triangle part of matrix is used
+    assert_eq!(matrix.row_count(), matrix.col_count());
+    let n = matrix.row_count();
+    for i in 0..n {
+        let pivot = ring.clone_el(matrix.at(i, i));
+        let pivot_inv = ring.div(&ring.one(), matrix.at(i, i));
+        for j in (i + 1)..n {
+            ring.mul_assign_ref(matrix.at(i, j), &pivot_inv);
+        }
+        for k in (i + 1)..n {
+            for l in k..n {
+                let subtract = ring.mul_ref_snd(ring.mul_ref(matrix.as_const().at(i, k), matrix.as_const().at(i, l)), &pivot);
+                ring.sub_assign(matrix.at(k, l), subtract);
+            }
+        }
+    }
+}
+
 pub fn lll<I, V>(ring: I, matrix: SubmatrixMut<V, El<I>>, delta: f64)
     where I: IntegerRingStore,
         I::Type: IntegerRing,
         V: AsPointerToSlice<El<I>>
 {
+    assert!(delta < 1.);
+    assert!(delta > 0.25);
     let lll_reals = RationalField::new(&ring);
-    let mut gso = (0..matrix.row_count()).flat_map(|_i| (0..matrix.col_count()).map(|_j| lll_reals.zero()));
-    let col_count = matrix.col_count();
-    for n in 2..col_count {
+    let delta_int = ring.from_float_approx(delta * 2f64.powi(20)).unwrap();
+    let delta = lll_reals.div(&lll_reals.get_ring().from_integer(delta_int), &lll_reals.get_ring().from_integer(ring.power_of_two(20)));
+    let n = matrix.col_count();
+    let mut gso_data = (0..n).flat_map(|_i| (0..n).map(|_j| lll_reals.zero())).collect::<Vec<_>>();
+    let mut gso = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut gso_data, n, n);
+    matmul_fst_transposed(&matrix, &matrix, gso.reborrow(), &lll_reals.inclusion());
+    ldl(&lll_reals, gso.reborrow());
+    println!("{}", gso.format(&lll_reals));
+    lll_raw::<_, _, TransformLatticeBasis<I, _>>(&lll_reals, gso, TransformLatticeBasis { basis: matrix }, &delta);
+}
 
+struct TransformLatticeBasis<'a, I, V>
+    where I: IntegerRingStore,
+        I::Type: IntegerRing,
+        V: AsPointerToSlice<El<I>>
+{
+    basis: SubmatrixMut<'a, V, El<I>>
+}
+
+impl<'a, I, V> TransformTarget<I::Type> for TransformLatticeBasis<'a, I, V>
+    where I: IntegerRingStore,
+            I::Type: IntegerRing,
+            V: AsPointerToSlice<El<I>>
+{
+    fn transform(&mut self, ring: &I::Type, i: usize, j: usize, transform: &[El<I>; 4]) {
+        assert!(i != j);
+        for k in 0..self.basis.row_count() {
+            let a = ring.clone_el(self.basis.at(k, i));
+            let b = ring.clone_el(self.basis.at(k, j));
+            *self.basis.at(k, i) = ring.add(ring.mul_ref(&a, &transform[0]), ring.mul_ref(&b, &transform[1]));
+            *self.basis.at(k, i) = ring.add(ring.mul_ref_snd(a, &transform[2]), ring.mul_ref_snd(b, &transform[3]));
+        }
     }
-    unimplemented!()
+
+    fn subtract(&mut self, ring: &I::Type, src: usize, dst: usize, factor: &<I::Type as RingBase>::Element) {
+        assert!(src != dst);
+        for k in 0..self.basis.row_count() {
+            let subtract = ring.mul_ref(self.basis.at(k, src), factor);
+            ring.sub_assign(self.basis.at(k, dst), subtract);
+        }
+        println!("Subtract");
+        println!("{}", self.basis.format(&RingRef::new(ring)));
+        println!();
+    }
+
+    fn swap(&mut self, _ring: &I::Type, i: usize, j: usize) {
+        if i == j {
+            return;
+        }
+        let col_count = self.basis.col_count();
+        let (mut col_i, mut col_j) = self.basis.reborrow().split_cols(i..(i + 1), j..(j + 1));
+        for k in 0..col_count {
+            std::mem::swap(col_i.at(k, 0), col_j.at(k, 0));
+        }
+        println!("Swap");
+        println!("{}", self.basis.format(&RingRef::new(_ring)));
+        println!();
+    }
 }
 
 #[cfg(test)]
 use crate::vector::*;
+#[cfg(test)]
+use crate::primitive_int::*;
 #[cfg(test)]
 use crate::algorithms;
 #[cfg(test)]
@@ -193,6 +283,29 @@ macro_rules! in_QQ {
             ]
         }
     };
+}
+
+#[test]
+fn test_ldl() {
+    let mut data = in_QQ![
+        [1, 2, 1],
+        [2, 5, 0],
+        [1, 0, 7]
+    ];
+    let mut matrix = SubmatrixMut::<[_; 3], _>::new(&mut data);
+    let mut expected = in_QQ![
+        [1, 2, 1],
+        [0, 1, -2],
+        [0, 0, 2]
+    ];
+    ldl(QQ, matrix.reborrow());
+
+    // only the upper triangle is filled
+    expected[1][0] = *matrix.at(1, 0);
+    expected[2][0] = *matrix.at(2, 0);
+    expected[2][1] = *matrix.at(2, 1);
+
+    assert_matrix_eq!(&QQ, &expected, &matrix);
 }
 
 #[test]
@@ -266,8 +379,8 @@ fn test_lll_2d() {
     lll(&ZZ, reduced_matrix.reborrow(), 0.9);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
-    assert_eq!(2, norm_squared(&reduced_matrix.as_const().col_at(0)));
-    assert_eq!(10, norm_squared(&reduced_matrix.as_const().col_at(1)));
+    assert_eq!(4, norm_squared(&reduced_matrix.as_const().col_at(0)));
+    assert_eq!(5, norm_squared(&reduced_matrix.as_const().col_at(1)));
 }
 
 #[test]

@@ -119,7 +119,7 @@ impl<R> Matrix<R> for SparseMatrixBuilder<R>
         self.rows.len()
     }
 
-    fn at(&self, i: usize, j: usize) -> &R::Element {
+    fn entry_at(&self, i: usize, j: usize) -> &R::Element {
         match self.rows.at(i).binary_search_by_key(&self.col_permutation[j], |(c, _)| *c) {
             Ok(idx) => &self.rows.at(i).at(idx).1,
             Err(_) => &self.zero

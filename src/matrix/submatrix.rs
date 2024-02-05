@@ -871,7 +871,7 @@ impl<'a, T, const N: usize> Submatrix<'a, [T; N], T> {
 impl<'a, V, R> super::Matrix<R> for Submatrix<'a, V, R::Element>
     where V: 'a + AsPointerToSlice<R::Element>, R: RingBase
 {
-    fn at(&self, i: usize, j: usize) -> &<R as RingBase>::Element {
+    fn entry_at(&self, i: usize, j: usize) -> &<R as RingBase>::Element {
         self.row_at(i).at(j)
     }
 
@@ -885,9 +885,9 @@ impl<'a, V, R> super::Matrix<R> for Submatrix<'a, V, R::Element>
 }
 
 impl<'a, V, R> super::Matrix<R> for SubmatrixMut<'a, V, R::Element>
-    where V: 'a + AsPointerToSlice<R::Element>, R: RingBase
+    where V: 'a + AsPointerToSlice<R::Element>, R: ?Sized + RingBase
 {
-    fn at(&self, i: usize, j: usize) -> &<R as RingBase>::Element {
+    fn entry_at(&self, i: usize, j: usize) -> &<R as RingBase>::Element {
         unsafe {
             self.raw_data.entry_at(i, j).as_ref()
         }

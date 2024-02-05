@@ -2,7 +2,7 @@ use std::cmp::min;
 
 use crate::divisibility::DivisibilityRingStore;
 use crate::matrix::dense::{DenseMatrix, TransformCols, TransformRows};
-use crate::matrix::{TransformTarget, Matrix};
+use crate::matrix::{matmul, Matrix, TransformTarget};
 use crate::ring::*;
 use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 
@@ -121,7 +121,9 @@ pub fn solve_right<R>(A: &mut DenseMatrix<R::Type>, mut rhs: DenseMatrix<R::Type
             *rhs.at_mut(i, j) = ring.checked_div(rhs.at(i, j), pivot)?;
         }
     }
-    return Some(R.mul(&rhs, ring));
+    let mut out = DenseMatrix::zero(R.row_count(), rhs.col_count(), ring);
+    matmul(&R, &rhs, out.data_mut(), &ring.identity());
+    return Some(out);
 }
 
 pub struct DetUnit<'a, R: ?Sized + RingBase> {
@@ -151,6 +153,20 @@ use crate::rings::zn::zn_static;
 #[cfg(test)]
 use crate::assert_matrix_eq;
 
+#[cfg(test)]
+fn multiply<'a, R: RingStore, I: IntoIterator<Item = &'a DenseMatrix<R::Type>>>(matrices: I, ring: R) -> DenseMatrix<R::Type>
+    where R::Type: 'a
+{
+    let mut it = matrices.into_iter();
+    let mut result = it.next().unwrap().clone_matrix(&ring);
+    for m in it {
+        let mut new_result = DenseMatrix::zero(result.row_count(), m.col_count(), &ring);
+        matmul(&result, m, new_result.data_mut(), &ring.identity());
+        result = new_result;
+    }
+    return result;
+}
+
 #[test]
 fn test_smith_integers() {
     let ring = StaticRing::<i64>::RING;
@@ -170,7 +186,7 @@ fn test_smith_integers() {
         [0,-1, 0, 0],
         [0, 0, 0, 0]], &A);
 
-    assert_matrix_eq!(&ring, &L.mul(&original_A, &ring).mul(&R, &ring), &A);
+    assert_matrix_eq!(&ring, &multiply([&L, &original_A, &R], ring), &A);
 }
 
 #[test]
@@ -196,7 +212,7 @@ fn test_smith_zn() {
         [0, 0, 0, 15],
         [0, 0, 0, 0]], &A);
         
-    assert_matrix_eq!(&ring, &L.mul(&original_A, &ring).mul(&R, &ring), &A);
+    assert_matrix_eq!(&ring, &multiply([&L, &original_A, &R], ring), &A);
 }
 
 #[test]
@@ -220,7 +236,7 @@ fn test_solve_zn() {
     );
     let solution = solve_right(&mut A.clone_matrix(ring), B.clone_matrix(ring), ring).unwrap();
 
-    assert_matrix_eq!(&ring, &A.mul(&solution, &ring), &B);
+    assert_matrix_eq!(&ring, &multiply([&A, &solution], ring), &B);
 }
 
 #[test]
@@ -234,7 +250,7 @@ fn test_solve_int() {
     let B = DenseMatrix::identity(2, ring);
     let solution = solve_right(&mut A.clone_matrix(ring), B.clone_matrix(ring), ring).unwrap();
 
-    assert_matrix_eq!(&ring, &A.mul(&solution, &ring), &B);
+    assert_matrix_eq!(&ring, &multiply([&A, &solution], &ring), &B);
 }
 
 #[test]
