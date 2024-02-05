@@ -45,14 +45,14 @@ pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField {
     fn is_galois(&self) -> bool {
         let K = RingRef::new(self);
         let KX = DensePolyRing::new(K, "X");
-        let gen_poly = RingRef::new(self).generating_poly(&KX, K.inclusion());
+        let gen_poly = K.generating_poly(&KX, K.inclusion());
         if KX.is_zero(&derive_poly(&KX, &gen_poly)) {
             // not separable
             return false;
         }
         let (factorization, unit) = Self::factor_poly(&KX, &gen_poly);
         debug_assert!(K.is_one(&unit));
-        return factorization.len() == self.rank();
+        return factorization.len() == K.rank();
     }
     
     ///
@@ -113,6 +113,72 @@ pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField {
             return Ok(ExtensionFieldEmbedding { from: self_, to: target, map_generator_to: root, base_ring_hom: base_ring_hom });
         } else {
             return Err((self_, target));
+        }
+    }
+
+    ///
+    /// Computes the Galois group of this ring if it is galois, and otherwise it returns `None`.
+    /// 
+    /// The galois group is the group of all automorphisms that fix the base field.
+    /// 
+    fn galois_group<'a, S>(self_: S) -> Option<Vec<GaloisAutomorphism<S>>>
+        where S: 'a + RingStore<Type = Self> + Clone,
+            El<S>: 'a
+    {
+        let K = self_;
+        let KX = DensePolyRing::new(K.clone(), "X");
+        let gen_poly = K.generating_poly(&KX, K.inclusion());
+        if KX.is_zero(&derive_poly(&KX, &gen_poly)) {
+            debug_assert!(!K.is_galois());
+            return None;
+        }
+        let (factorization, unit) = Self::factor_poly(&KX, &gen_poly);
+        debug_assert!(K.is_one(&unit));
+        if factorization.len() != K.rank() {
+            debug_assert!(!K.is_galois());
+            return None;
+        } else {
+            return Some(
+                factorization.into_iter().map(move |(factor, _)| {
+                    assert!(KX.degree(&factor) == Some(1));
+                    KX.base_ring().negate(KX.base_ring().div(KX.coefficient_at(&factor, 0), KX.coefficient_at(&factor, 1)))
+                }).map(move |x| GaloisAutomorphism { ring: K.clone(), map_generator_to: x })
+                .collect()
+            );
+        }
+    }
+}
+
+pub struct GaloisAutomorphism<F: RingStore>
+    where F::Type: ExtensionField
+{
+    ring: F,
+    map_generator_to: El<F>
+}
+
+impl<F: RingStore> GaloisAutomorphism<F>
+    where F::Type: ExtensionField
+{
+    pub fn get_map<'a>(&'a self) -> ExtensionFieldEmbedding<&'a F, &'a F, Identity<&'a <F::Type as RingExtension>::BaseRing>> {
+        ExtensionFieldEmbedding {
+            from: &self.ring,
+            to: &self.ring,
+            map_generator_to: self.ring.clone_el(&self.map_generator_to),
+            base_ring_hom: self.ring.base_ring().identity()
+        }
+    }
+
+    pub fn is_identity(&self) -> bool {
+        self.ring.eq_el(&self.map_generator_to, &self.ring.canonical_gen())
+    }
+
+    pub fn compose(&self, rhs: &GaloisAutomorphism<F>) -> GaloisAutomorphism<F>
+        where F: Clone
+    {
+        assert!(self.ring.get_ring() == rhs.ring.get_ring());
+        GaloisAutomorphism {
+            ring: self.ring.clone(),
+            map_generator_to: self.get_map().map_ref(&rhs.map_generator_to)
         }
     }
 }
@@ -180,6 +246,10 @@ pub trait ExtensionFieldStore: FieldStore + FreeAlgebraStore
         assert!(self.base_ring().get_ring() == target.base_ring().get_ring());
         self.into_hom(target, self.base_ring().identity()).ok()
     }
+
+    fn galois_group<'a>(&'a self) -> Option<Vec<GaloisAutomorphism<&'a Self>>> {
+        <Self::Type as ExtensionField>::galois_group(self)
+    }
 }
 
 impl<R> ExtensionFieldStore for R
@@ -200,4 +270,32 @@ fn test_as_embedding() {
     
     let S = GF::<4>(5);
     assert!(R.has_hom(&S).is_none());
+}
+
+#[test]
+fn test_galois_group() {
+    let Fq = GF::<5>(3);
+
+    let mut galois_group = Fq.galois_group().unwrap();
+
+    assert_eq!(5, galois_group.len());
+    let id = galois_group.remove(
+        galois_group.iter().enumerate().filter(|(_, g)| g.is_identity()).next().unwrap().0
+    );
+    let frob = galois_group.remove(
+        galois_group.iter().enumerate().filter(|(_, g)| Fq.eq_el(&Fq.pow(Fq.canonical_gen(), 3), &g.get_map().map(Fq.canonical_gen()))).next().unwrap().0
+    );
+    let frob2 = galois_group.remove(
+        galois_group.iter().enumerate().filter(|(_, g)| Fq.eq_el(&Fq.pow(Fq.canonical_gen(), 9), &g.get_map().map(Fq.canonical_gen()))).next().unwrap().0
+    );
+    let frob3 = galois_group.remove(
+        galois_group.iter().enumerate().filter(|(_, g)| Fq.eq_el(&Fq.pow(Fq.canonical_gen(), 27), &g.get_map().map(Fq.canonical_gen()))).next().unwrap().0
+    );
+    let frob4 = galois_group.remove(
+        galois_group.iter().enumerate().filter(|(_, g)| Fq.eq_el(&Fq.pow(Fq.canonical_gen(), 81), &g.get_map().map(Fq.canonical_gen()))).next().unwrap().0
+    );
+    let ordered_galois_group = [id, frob, frob2, frob3, frob4];
+    for i in 0..5 {
+        assert!(ordered_galois_group[i].compose(&ordered_galois_group[(5 - i) % 5]).is_identity());
+    }
 }
