@@ -1,5 +1,6 @@
 use std::f64::EPSILON;
 
+use crate::ordered::OrderedRing;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::Field;
 use crate::integer::{int_cast, IntegerRing, IntegerRingStore};
@@ -123,4 +124,34 @@ impl EuclideanRing for Real64Base {
     }
 }
 
-impl Field for Real64Base {}
+impl Field for Real64Base {
+
+    fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+        self.checked_left_div(lhs, rhs).unwrap()
+    }
+}
+
+impl OrderedRing for Real64Base {
+
+    fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
+        f64::partial_cmp(lhs, rhs).unwrap()
+    }
+}
+
+impl<I> CanHomFrom<I> for Real64Base 
+    where I: ?Sized + IntegerRing
+{
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, _from: &I) -> Option<Self::Homomorphism> {
+        Some(())
+    }
+
+    fn map_in(&self, from: &I, el: <I as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
+        from.to_float_approx(&el)
+    }
+
+    fn map_in_ref(&self, from: &I, el: &<I as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
+        from.to_float_approx(el)
+    }
+}

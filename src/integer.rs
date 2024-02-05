@@ -29,10 +29,17 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing {
     /// Computes a float value that is supposed to be close to value.
     /// However, no guarantees are made on how close it must be, in particular,
     /// this function may also always return `0.` (this is just an example - 
-    /// it's not a good idea). It is supposed to be used for optimization purposes only,
-    /// e.g. in the case where an approximate value is necessary to determine 
-    /// performance-controlling parameters, or as an initial value for some iterative 
-    /// root-finding algorithm.
+    /// it's not a good idea).
+    /// 
+    /// Some use cases include:
+    ///  - Estimating control parameters (e.g. bounds for prime numbers
+    ///    during factoring algorithms)
+    ///  - First performing some operation on floating point numbers, and
+    ///    then refining it to integers.
+    /// 
+    /// Note that a high-quality implementation of this function can vastly improve
+    /// performance in some cases, e.g. of [`crate::algorithms::int_bisect::root_floor()`] or 
+    /// [`crate::algorithms::lll::lll()`].
     /// 
     fn to_float_approx(&self, value: &Self::Element) -> f64;
 

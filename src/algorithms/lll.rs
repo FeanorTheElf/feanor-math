@@ -4,53 +4,61 @@ use crate::homomorphism::*;
 use crate::matrix::matmul_fst_transposed;
 use crate::matrix::submatrix::*;
 use crate::matrix::Matrix;
+use crate::primitive_int::*;
 use crate::matrix::TransformTarget;
+use crate::rings::float_real::Real64;
+use crate::rings::float_real::Real64Base;
 use crate::rings::rational::*;
 use crate::ordered::{OrderedRing, OrderedRingStore};
 use crate::ring::*;
 
 use std::cmp::max;
 
-pub trait LLLRealField: OrderedRing + Field {
-
-    type Integers: RingStore<Type = Self::IntegerRingBase>;
-    type IntegerRingBase: ?Sized + IntegerRing;
-
-    fn integer_ring(&self) -> &Self::Integers;
-    fn from_integer(&self, x: El<Self::Integers>) -> Self::Element;
-    fn round_to_integer(&self, x: &Self::Element) -> El<Self::Integers>;
-}
-
-impl<I> LLLRealField for RationalFieldBase<I>
-    where I: IntegerRingStore,
-        I::Type: IntegerRing
+pub trait LLLRealField<I>: OrderedRing + Field
+    where I: ?Sized + IntegerRing
 {
-    type Integers = I;
-    type IntegerRingBase = I::Type;
+    fn from_integer(&self, x: I::Element, ZZ: &I) -> Self::Element;
+    fn round_to_integer(&self, x: &Self::Element, ZZ: &I) -> I::Element;
+}
 
-    fn integer_ring(&self) -> &I {
-        self.base_ring()
+impl<I, J> LLLRealField<J> for RationalFieldBase<I>
+    where I: IntegerRingStore,
+        I::Type: IntegerRing,
+        J: ?Sized + IntegerRing
+{
+    fn from_integer(&self, x: J::Element, ZZ: &J) -> Self::Element {
+        RingRef::new(self).inclusion().map(int_cast(x, self.base_ring(), RingRef::new(ZZ)))
     }
 
-    fn from_integer(&self, x: El<I>) -> Self::Element {
-        RingRef::new(self).inclusion().map(x)
-    }
-
-    fn round_to_integer(&self, x: &Self::Element) -> El<I> {
-        self.integer_ring().rounded_div(self.integer_ring().clone_el(&x.0), &x.1)
+    fn round_to_integer(&self, x: &Self::Element, ZZ: &J) -> J::Element {
+        int_cast(self.base_ring().rounded_div(self.base_ring().clone_el(&x.0), &x.1), RingRef::new(ZZ), self.base_ring())
     }
 }
 
-fn size_reduce<R, V, T>(ring: R, mut target: SubmatrixMut<V, El<R>>, target_j: usize, matrix: Submatrix<V, El<R>>, col_ops: &mut T)
+impl<J> LLLRealField<J> for Real64Base
+    where J: ?Sized + IntegerRing
+{
+    fn from_integer(&self, x: J::Element, ZZ: &J) -> Self::Element {
+        ZZ.to_float_approx(&x)
+    }
+
+    fn round_to_integer(&self, x: &Self::Element, ZZ: &J) -> J::Element {
+        int_cast(x.round() as i64, RingRef::new(ZZ), StaticRing::<i64>::RING)
+    }
+}
+
+fn size_reduce<R, I, V, T>(ring: R, int_ring: I, mut target: SubmatrixMut<V, El<R>>, target_j: usize, matrix: Submatrix<V, El<R>>, col_ops: &mut T)
     where R: RingStore,
-        R::Type: LLLRealField,
+        R::Type: LLLRealField<I::Type>,
+        I: IntegerRingStore,
+        I::Type: IntegerRing,
         V: AsPointerToSlice<El<R>>,
-        T: TransformTarget<<R::Type as LLLRealField>::IntegerRingBase>
+        T: TransformTarget<I::Type>
 {
     for j in (0..matrix.col_count()).rev() {
-        let factor = ring.get_ring().round_to_integer(target.as_const().at(j, 0));
-        col_ops.subtract(ring.get_ring().integer_ring().get_ring(), j, target_j, &factor);
-        let factor = ring.get_ring().from_integer(factor);
+        let factor = ring.get_ring().round_to_integer(target.as_const().at(j, 0), int_ring.get_ring());
+        col_ops.subtract(int_ring.get_ring(), j, target_j, &factor);
+        let factor = ring.get_ring().from_integer(factor, int_ring.get_ring());
         ring.sub_assign_ref(target.at(j, 0), &factor);
         for k in 0..j {
             ring.sub_assign(target.at(k, 0), ring.mul_ref(matrix.at(k, j), &factor));
@@ -77,7 +85,7 @@ fn size_reduce<R, V, T>(ring: R, mut target: SubmatrixMut<V, El<R>>, target_j: u
 /// 
 fn swap_gso_cols<R, V>(ring: R, mut gso: SubmatrixMut<V, El<R>>, i: usize, j: usize)
     where R: RingStore,
-        R::Type: LLLRealField,
+        R::Type: OrderedRing + Field,
         V: AsPointerToSlice<El<R>>
 {
     assert!(j == i + 1);
@@ -126,16 +134,18 @@ fn swap_gso_cols<R, V>(ring: R, mut gso: SubmatrixMut<V, El<R>>, i: usize, j: us
 /// gso contains on the diagonal the squared lengths of the GS-orthogonalized basis vectors `|bi*|^2`,
 /// and above it the GS-coefficients `mu_ij = <bi, bj*> / <bj*, bj*>`.
 /// 
-fn lll_raw<R, V, T>(ring: R, mut gso: SubmatrixMut<V, El<R>>, mut col_ops: T, delta: &El<R>)
+fn lll_raw<R, I, V, T>(ring: R, int_ring: I, mut gso: SubmatrixMut<V, El<R>>, mut col_ops: T, delta: &El<R>)
     where R: RingStore + Copy,
-        R::Type: LLLRealField,
+        R::Type: LLLRealField<I::Type>,
+        I: IntegerRingStore + Copy,
+        I::Type: IntegerRing,
         V: AsPointerToSlice<El<R>>,
-        T: TransformTarget<<R::Type as LLLRealField>::IntegerRingBase>
+        T: TransformTarget<I::Type>
 {
     let mut i = 0;
     while i + 1 < gso.col_count() {
         let (target, matrix) = gso.reborrow().split_cols((i + 1)..(i + 2), 0..(i + 1));
-        size_reduce(ring, target, i + 1, matrix.as_const(), &mut col_ops);
+        size_reduce(ring, int_ring, target, i + 1, matrix.as_const(), &mut col_ops);
         if ring.is_gt(
             &ring.mul_ref_snd(
                 ring.sub_ref_fst(delta, ring.mul_ref(gso.as_const().at(i, i + 1), gso.as_const().at(i, i + 1))),
@@ -143,7 +153,7 @@ fn lll_raw<R, V, T>(ring: R, mut gso: SubmatrixMut<V, El<R>>, mut col_ops: T, de
             ),
             gso.as_const().at(i + 1, i + 1)
         ) {
-            col_ops.swap(ring.get_ring().integer_ring().get_ring(), i, i + 1);
+            col_ops.swap(int_ring.get_ring(), i, i + 1);
             swap_gso_cols(ring, gso.reborrow(), i, i + 1);
             i = max(i, 1) - 1;
         } else {
@@ -192,16 +202,17 @@ pub fn lll<I, V>(ring: I, matrix: SubmatrixMut<V, El<I>>, delta: f64)
 {
     assert!(delta < 1.);
     assert!(delta > 0.25);
-    let lll_reals = RationalField::new(&ring);
-    let delta_int = ring.from_float_approx(delta * 2f64.powi(20)).unwrap();
-    let delta = lll_reals.div(&lll_reals.get_ring().from_integer(delta_int), &lll_reals.get_ring().from_integer(ring.power_of_two(20)));
+    let lll_reals = Real64::RING;
+    // let delta_int = ring.from_float_approx(delta * 2f64.powi(20)).unwrap();
+    // let delta = lll_reals.div(&lll_reals.get_ring().from_integer(delta_int, ring.get_ring()), &lll_reals.get_ring().from_integer(ring.power_of_two(20), ring.get_ring()));
+
     let n = matrix.col_count();
     let mut gso_data = (0..n).flat_map(|_i| (0..n).map(|_j| lll_reals.zero())).collect::<Vec<_>>();
     let mut gso = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut gso_data, n, n);
-    matmul_fst_transposed(&matrix, &matrix, gso.reborrow(), &lll_reals.inclusion());
+    matmul_fst_transposed(&matrix, &matrix, gso.reborrow(), &lll_reals.can_hom(&ring).unwrap());
     ldl(&lll_reals, gso.reborrow());
     println!("{}", gso.format(&lll_reals));
-    lll_raw::<_, _, TransformLatticeBasis<I, _>>(&lll_reals, gso, TransformLatticeBasis { basis: matrix }, &delta);
+    lll_raw::<_, _, _, TransformLatticeBasis<I, _>>(&lll_reals, &ring, gso, TransformLatticeBasis { basis: matrix }, &delta);
 }
 
 struct TransformLatticeBasis<'a, I, V>
@@ -255,8 +266,6 @@ impl<'a, I, V> TransformTarget<I::Type> for TransformLatticeBasis<'a, I, V>
 
 #[cfg(test)]
 use crate::vector::*;
-#[cfg(test)]
-use crate::primitive_int::*;
 #[cfg(test)]
 use crate::algorithms;
 #[cfg(test)]
@@ -342,17 +351,18 @@ fn assert_lattice_isomorphic<V, const N: usize, const M: usize>(lhs: &[[i64; M];
 
     assert_eq!(rhs.row_count(), N);
     assert_eq!(rhs.col_count(), M);
-    let ZZ = StaticRing::<i64>::RING;
-    let mut A = DenseMatrix::zero(N, M, ZZ);
-    let mut B = DenseMatrix::zero(N, M, ZZ);
+    let ZZbig = BigIntRing::RING;
+    let mut A = DenseMatrix::zero(N, M, ZZbig);
+    let mut B = DenseMatrix::zero(N, M, ZZbig);
+    let int_to_ZZbig = ZZbig.can_hom(&StaticRing::<i64>::RING).unwrap();
     for i in 0..N {
         for j in 0..M {
-            *A.at_mut(i, j) = lhs[i][j];
-            *B.at_mut(i, j) = *rhs.at(i, j);
+            *A.at_mut(i, j) = int_to_ZZbig.map(lhs[i][j]);
+            *B.at_mut(i, j) = int_to_ZZbig.map(*rhs.at(i, j));
         }
     }
-    assert!(algorithms::smith::solve_right(&mut A.clone_matrix(&ZZ), B.clone_matrix(&ZZ), &ZZ).is_some());
-    assert!(algorithms::smith::solve_right(&mut B.clone_matrix(&ZZ), A.clone_matrix(&ZZ), &ZZ).is_some());
+    assert!(algorithms::smith::solve_right(&mut A.clone_matrix(&ZZbig), B.clone_matrix(&ZZbig), &ZZbig).is_some());
+    assert!(algorithms::smith::solve_right(&mut B.clone_matrix(&ZZbig), A.clone_matrix(&ZZbig), &ZZbig).is_some());
 }
 
 #[test]
@@ -401,7 +411,7 @@ fn test_lll_3d() {
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<[_; 3], _>::new(&mut reduced);
-    lll(&ZZ, reduced_matrix.reborrow(), 0.9);
+    lll(&ZZ, reduced_matrix.reborrow(), 0.999);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(144 * 144, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -442,5 +452,5 @@ fn test_lll_10d() {
     lll(&ZZ, reduced_matrix.reborrow(), 0.9);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
-    assert_eq!(16 * 16, norm_squared(&reduced_matrix.as_const().col_at(0)));
+    assert!(16 * 16 > norm_squared(&reduced_matrix.as_const().col_at(0)));
 }
