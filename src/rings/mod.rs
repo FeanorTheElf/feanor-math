@@ -31,6 +31,7 @@ pub mod field;
 /// numbers.
 /// 
 pub mod float_complex;
+pub mod float_real;
 
 ///
 /// This module contains the trait [`extension::FreeAlgebra`] for rings that are free modules of finite
