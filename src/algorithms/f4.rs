@@ -1,5 +1,6 @@
 use std::io::Write;
 use std::marker::PhantomData;
+use std::cmp::min;
 
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::field::Field;
@@ -442,6 +443,11 @@ impl<const N: u64> GBRingDescriptorRing for zn_static::ZnBase<N, false> {
 /// This implementation does currently not include the Buchberger criteria, and thus
 /// cannot compete with highly optimized implementations (Singular, Macaulay2, Magma etc).
 /// 
+/// This algorithm will only consider S-polynomials of degree smaller than the given bound.
+/// Ignoring S-polynomials this way might cause the resulting basis not to be a Groebner basis,
+/// but can drastically speed up computatations. If you are unsure which bound to use, set
+/// it to `u16::MAX` to get an actual GB.
+/// 
 /// Note that Groebner basis algorithms are still the subject of ongoing research, and
 /// whether the Groebner basis of even a simple example can be efficiently computed is
 /// hard to predict from the example itself. 
@@ -475,7 +481,7 @@ impl<const N: u64> GBRingDescriptorRing for zn_static::ZnBase<N, false> {
 ///     (15, Monomial::new([0, 0]))
 /// ].into_iter());
 /// 
-/// let gb = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], order);
+/// let gb = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], order, u16::MAX);
 /// 
 /// let in_ideal = ring.from_terms([
 ///     (16, Monomial::new([0, 3])),
@@ -486,7 +492,7 @@ impl<const N: u64> GBRingDescriptorRing for zn_static::ZnBase<N, false> {
 /// assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, in_ideal, &gb, order));
 /// ```
 /// 
-pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Vec<El<P>>
+pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_poly_degree_bound: u16) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: Sync,
@@ -541,34 +547,38 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Ve
             }
         });
 
-        if S_polys.len() == 0 {
-            degree_bound.0 += 5;
-            degree_bound.1 += 1;
-            if LOG {
-                print!("{{{:?}}}", degree_bound);
-                std::io::stdout().flush().unwrap();
+        let new_polys: Vec<_> = if S_polys.len() > 0 {
+            
+            if S_polys.len() > 20 {
+                reduce_S_matrix(&ring, &ring_info.ideal_generator, &S_polys, &basis, order)
+            } else {
+                let start = std::time::Instant::now();
+                let result = S_polys.into_iter().map(|f| multivariate_division(&ring, f, &basis, order)).filter(|f| !ring.is_zero(f)).collect();
+                let end = std::time::Instant::now();
+                if LOG {
+                    print!("[{}ms]", (end - start).as_millis());
+                    std::io::stdout().flush().unwrap();
+                }
+                result
             }
-            continue;
-        }
 
-        let new_polys: Vec<_> = if S_polys.len() > 20 {
-            reduce_S_matrix(&ring, &ring_info.ideal_generator, &S_polys, &basis, order)
         } else {
-            let start = std::time::Instant::now();
-            let result = S_polys.into_iter().map(|f| multivariate_division(&ring, f, &basis, order)).filter(|f| !ring.is_zero(f)).collect();
-            let end = std::time::Instant::now();
-            if LOG {
-                print!("[{}ms]", (end - start).as_millis());
-                std::io::stdout().flush().unwrap();
-            }
-            result
+            Vec::new()
         };
 
         chain_criterion_reduced_pairs.extend(new_reduced_pairs.into_iter());
         chain_criterion_reduced_pairs.sort_unstable();
 
         if new_polys.len() == 0 {
-            degree_bound.0 += 5;
+            if degree_bound.0 == S_poly_degree_bound && degree_bound.1 >= ring_info.annihilating_power.unwrap_or(0) {
+                if LOG {
+                    println!();
+                    println!("S-poly degree bound exceeded, aborting GB computation");
+                    println!("Redundant S-pairs: {} (prod), {} (chain)", product_criterion_skipped, chain_criterion_skipped);
+                }
+                return basis;
+            }
+            degree_bound.0 = min(degree_bound.0 + 5, S_poly_degree_bound);
             degree_bound.1 += 1;
             if LOG {
                 print!("{{{:?}}}", degree_bound);
@@ -596,7 +606,7 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O) -> Ve
     return basis;
 }
 
-fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
+pub fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: DivisibilityRingStore,
@@ -701,7 +711,7 @@ fn test_f4_small() {
         (15, Monomial::new([0, 0]))
     ].into_iter());
 
-    let actual = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], order);
+    let actual = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], order, u16::MAX);
 
     let expected = ring.from_terms([
         (16, Monomial::new([0, 3])),
@@ -740,7 +750,7 @@ fn test_f4_larger() {
         (7, Monomial::new([0, 0, 0]))
     ].into_iter());
 
-    let actual = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], order);
+    let actual = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], order, u16::MAX);
 
     let g1 = ring.from_terms([
         (1, Monomial::new([0, 4, 0])),
@@ -787,7 +797,7 @@ fn test_f4_larger_elim() {
         (7, Monomial::new([0, 0, 0]))
     ].into_iter());
 
-    let actual = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], order);
+    let actual = f4::<_, _, true>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], order, u16::MAX);
 
     let g1 = ring.from_terms([
         (1, Monomial::new([0, 4, 0])),
@@ -816,7 +826,7 @@ fn test_gb_local_ring() {
     let ring: MultivariatePolyRingImpl<_, _, _, 1> = MultivariatePolyRingImpl::new(base, order, default_memory_provider!());
     
     let f = ring.from_terms([(4, Monomial::new([1])), (1, Monomial::new([0]))].into_iter());
-    let gb = f4::<_, _, true>(&ring, vec![f], order);
+    let gb = f4::<_, _, true>(&ring, vec![f], order, u16::MAX);
 
     assert_eq!(1, gb.len());
     assert_el_eq!(&ring, &ring.one(), &gb[0]);
@@ -844,7 +854,7 @@ fn test_generic_computation() {
     ];
 
     let start = std::time::Instant::now();
-    let gb1 = f4::<_, _, true>(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), order);
+    let gb1 = f4::<_, _, true>(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), order, u16::MAX);
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());
@@ -885,7 +895,7 @@ fn test_gb_local_ring_large() {
     ];
 
     let start = std::time::Instant::now();
-    let gb = f4::<_, _, true>(&ring, system, order);
+    let gb = f4::<_, _, true>(&ring, system, order, u16::MAX);
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());
@@ -925,7 +935,7 @@ fn test_difficult_gb() {
     ].into_iter().map(|f| f.unwrap()).collect();
 
     let start = std::time::Instant::now();
-    let gb = f4::<_, _, true>(ring, basis, order);
+    let gb = f4::<_, _, true>(ring, basis, order, u16::MAX);
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());

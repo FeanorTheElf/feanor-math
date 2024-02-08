@@ -162,7 +162,7 @@ fn test_resultant_polynomial() {
         (1, Monomial::new([2, 2]))
     ].into_iter().map(|(c, m)| (ZZ_to_QQ.map(c), m)));
 
-    let expected = f4::<_, _, false>(&QQYX, vec![f, g], Lex).into_iter().filter(|poly| QQYX.appearing_variables(&poly).len() == 1).collect::<Vec<_>>();
+    let expected = f4::<_, _, false>(&QQYX, vec![f, g], Lex, u16::MAX).into_iter().filter(|poly| QQYX.appearing_variables(&poly).len() == 1).collect::<Vec<_>>();
     assert!(expected.len() == 1);
     let mut expected = QQX.from_terms(QQYX.terms(&expected[0]).map(|(c, m)| (*c, m[1] as usize)));
     let expected_lc_inv = QQ.div(&QQ.one(), QQX.lc(&expected).unwrap());
