@@ -154,7 +154,7 @@ fn p_valuation<R>(ring: R, p: &El<R>, mut val: El<R>) -> usize
     return result;
 }
 
-pub fn reduce_S_matrix<P, O>(ring: P, p: &Coeff<P>, S_polys: &[El<P>], basis: &[El<P>], order: O) -> Vec<El<P>>
+fn reduce_S_matrix<P, O>(ring: P, p: &Coeff<P>, S_polys: &[El<P>], basis: &[El<P>], order: O) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: RingStore + Sync,
