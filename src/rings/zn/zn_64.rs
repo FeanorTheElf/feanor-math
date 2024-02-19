@@ -632,6 +632,19 @@ impl CanHomFrom<ZnFastmulBase> for ZnBase {
     }
 }
 
+impl CanonicalIso<ZnFastmulBase> for ZnBase {
+
+    type Isomorphism = <ZnFastmulBase as CanHomFrom<Self>>::Homomorphism;
+
+    fn has_canonical_iso(&self, from: &ZnFastmulBase) -> Option<Self::Isomorphism> {
+        from.has_canonical_hom(self)
+    }
+
+    fn map_out(&self, from: &ZnFastmulBase, el: Self::Element, iso: &Self::Isomorphism) -> <ZnFastmulBase as RingBase>::Element {
+        from.map_in(self, el, iso)
+    }
+}
+
 impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
 
     #[inline(always)]
