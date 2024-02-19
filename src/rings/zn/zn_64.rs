@@ -235,6 +235,22 @@ impl RingBase for ZnBase {
     {
         self.size(other_ZZ)
     }
+    
+    fn sum<I>(&self, mut els: I) -> Self::Element 
+        where I: Iterator<Item = Self::Element>
+    {
+        let mut result = self.zero();
+        while let Some(ZnEl(start)) = els.next() {
+            let mut current = start as u128;
+            for ZnEl(c) in els.by_ref().take(self.repr_bound() as usize / 2 - 1) {
+                current += c as u128;
+            }
+            self.add_assign(&mut result, ZnEl(self.bounded_reduce(current)));
+        }
+        debug_assert!(result.0 <= self.repr_bound());
+        return result;
+    }
+
 }
 
 impl_eq_based_self_iso!{ ZnBase }
@@ -745,6 +761,14 @@ impl<R: ZnRingStore<Type = ZnBase>> CanonicalIso<AsFieldBase<R>> for ZnBase {
 #[cfg(test)]
 fn elements<'a>(ring: &'a Zn) -> impl 'a + Iterator<Item = El<Zn>> {
     (0..63).map(|i| ring.coerce(&ZZ, 1 << i))
+}
+
+#[test]
+fn test_sum() {
+    for n in [(1 << 41) - 1, (1 << 42) - 1, (1 << 58) - 1, (1 << 58) + 1, (3 << 57) - 1, (3 << 57) + 1] {
+        let Zn = Zn::new(n);
+        assert_el_eq!(&Zn, &Zn.int_hom().map(10001 * 5000), &Zn.sum((0..=10000).map(|x| Zn.int_hom().map(x))));
+    }
 }
 
 #[test]
