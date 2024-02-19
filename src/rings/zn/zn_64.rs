@@ -371,39 +371,37 @@ impl<I: ?Sized + ImplGenericIntHomomorphismMarker> CanHomFrom<I> for ZnBase {
     }
 }
 
-pub enum IntToZnHom<T: PrimitiveInt> {
-    Trivial, Nontrivial(super::generic_impls::IntegerToZnHom<StaticRingBase<T>, StaticRingBase<i128>, ZnBase>)
-}
-
 macro_rules! impl_static_int_to_zn {
     ($($int:ident),*) => {
         $(
             impl CanHomFrom<StaticRingBase<$int>> for ZnBase {
-
-                type Homomorphism = IntToZnHom<$int>;
-
-                fn has_canonical_hom(&self, from: &StaticRingBase<$int>) -> Option<Self::Homomorphism> {
-                    if self.repr_bound() > $int::MAX as u64 {
-                        Some(IntToZnHom::Trivial)
-                    } else {
-                        Some(IntToZnHom::Nontrivial(super::generic_impls::has_canonical_hom_from_int(from, self, StaticRing::<i128>::RING.get_ring(), Some(&(self.repr_bound() as i128 * self.repr_bound() as i128)))?))
-                    }
+            
+                type Homomorphism = (/* bound for direct reduction */ $int, /* bound for bounded reduction */ $int);
+            
+                fn has_canonical_hom(&self, _from: &StaticRingBase<$int>) -> Option<Self::Homomorphism> {
+                    let bounded_reduce_bound = self.repr_bound() as i128 * self.repr_bound() as i128;
+                    Some((self.repr_bound() as $int, if bounded_reduce_bound > $int::MAX as i128 { $int::MAX } else { bounded_reduce_bound as $int }))
                 }
-
-                fn map_in(&self, from: &StaticRingBase<$int>, el: $int, hom: &IntToZnHom<$int>) -> Self::Element {
-                    match hom {
-                        IntToZnHom::Trivial => if el < 0 {
-                                self.negate(self.promise_is_reduced(-(el as i128) as u64))
-                            } else {
-                                self.promise_is_reduced(el as u64)
-                            },
-                        IntToZnHom::Nontrivial(hom) => super::generic_impls::map_in_from_int(from, self, StaticRing::<i128>::RING.get_ring(), el, hom, |n| {
-                            debug_assert!((n as u64) < self.modulus_u64());
-                                self.promise_is_reduced(n as u64)
-                            }, |n| {
-                                debug_assert!(n <= (self.repr_bound() as i128 * self.repr_bound() as i128));
-                                self.promise_is_reduced(self.bounded_reduce(n as u128))
-                            })
+            
+                fn map_in(&self, _from: &StaticRingBase<$int>, el: $int, hom: &($int, $int)) -> Self::Element {
+                    if el.abs() <= hom.0 {
+                        if el < 0 {
+                            self.negate(self.promise_is_reduced(-(el as i128) as u64))
+                        } else {
+                            self.promise_is_reduced(el as u64)
+                        }
+                    } else if el.abs() <= hom.1 {
+                        if el < 0 {
+                            self.negate(self.promise_is_reduced(self.bounded_reduce(-(el as i128) as u128)))
+                        } else {
+                            self.promise_is_reduced(self.bounded_reduce(el as u128))
+                        }
+                    } else {
+                        if el < 0 {
+                            self.promise_is_reduced(((el as i128 % self.modulus as i128) as i64 + self.modulus) as u64)
+                        } else {
+                            self.promise_is_reduced((el as i128 % self.modulus as i128) as u64)
+                        }
                     }
                 }
             }
@@ -760,6 +758,9 @@ impl<R: ZnRingStore<Type = ZnBase>> CanonicalIso<AsFieldBase<R>> for ZnBase {
 }
 
 #[cfg(test)]
+use test::Bencher;
+
+#[cfg(test)]
 fn elements<'a>(ring: &'a Zn) -> impl 'a + Iterator<Item = El<Zn>> {
     (0..63).map(|i| ring.coerce(&ZZ, 1 << i))
 }
@@ -854,4 +855,16 @@ fn test_from_int_hom() {
         crate::ring::generic_tests::test_hom_axioms(StaticRing::<i64>::RING, Zn, -8..8);
         crate::ring::generic_tests::test_hom_axioms(StaticRing::<i128>::RING, Zn, -8..8);
     }
+    let Zn = Zn::new(5);
+    assert_el_eq!(&Zn, &Zn.int_hom().map(3), &Zn.can_hom(&StaticRing::<i64>::RING).unwrap().map(-1596802));
+}
+
+#[bench]
+fn bench_hom_from_i64(bencher: &mut Bencher) {
+    // we are mainly interested in the case that the modulus is large (e.g. for FHE)
+    let Zn = Zn::new(36028797018963971 /* = 2^55 + 3 */);
+    bencher.iter(|| {
+        let hom = Zn.can_hom(&StaticRing::<i64>::RING).unwrap();
+        assert_el_eq!(&Zn, &Zn.int_hom().map(-1300), &Zn.sum((0..100).flat_map(|_| (0..=56).map(|k| 1 << k)).map(|x| hom.map(x))))
+    });
 }
