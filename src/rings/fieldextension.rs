@@ -92,9 +92,9 @@ pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField {
     /// let F3 = GFdyn(StaticRing::<i64>::RING.pow(p, 8) as u64);
     /// let f = F1.has_hom(&F3).unwrap();
     /// let g = F2.has_hom(&F3).unwrap().compose(F1.has_hom(&F2).unwrap());
-    /// assert!(!F3.eq_el(&F3.canonical_gen(), &f.map(F1.canonical_gen())));
-    /// assert!(!F3.eq_el(&F3.canonical_gen(), &g.map(F1.canonical_gen())));
-    /// assert!(!F3.eq_el(&f.map(F1.canonical_gen()), &g.map(F1.canonical_gen())));
+    /// assert!(!F3.eq_el(&F3.canonical_gen(), &f.map(F1.canonical_gen())) ||
+    ///         !F3.eq_el(&F3.canonical_gen(), &g.map(F1.canonical_gen())) ||
+    ///         !F3.eq_el(&f.map(F1.canonical_gen()), &g.map(F1.canonical_gen())));
     /// ```
     /// 
     fn into_hom<F, T, H>(self_: F, target: T, base_ring_hom: H) -> Result<ExtensionFieldEmbedding<F, T, H>, (F, T)>
