@@ -347,6 +347,13 @@ impl<R, V, M> FreeAlgebra for FreeAlgebraImplBase<R, V, M>
         (&el.values[..]).as_el_fn(self.base_ring())
     }
 
+    fn from_canonical_basis<W>(&self, mut vec: W) -> Self::Element
+        where W: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = El<Self::BaseRing>>
+    {
+        assert_eq!(self.rank(), <_ as ExactSizeIterator>::len(&vec));
+        FreeAlgebraEl { values: self.memory_provider.get_new_init(self.rank(), |_| vec.next().unwrap()) }
+    }
+
     fn rank(&self) -> usize {
         self.x_pow_rank.len()
     }
@@ -513,6 +520,13 @@ fn test_ring_axioms() {
     crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
     let (ring, els) = test_ring2_and_elements();
     crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
+
+    let base_ring = zn_static::Fp::<257>::RING;
+    let x_pow_rank = vec![base_ring.neg_one(); 64];
+    let ring = FreeAlgebraImpl::new(base_ring, x_pow_rank, default_memory_provider!());
+    let mut rng = oorandom::Rand64::new(0);
+    let els = (0..10).map(|_| ring.from_canonical_basis((0..64).map(|_| ring.base_ring().random_element(|| rng.rand_u64()))));
+    crate::ring::generic_tests::test_ring_axioms(&ring, els);
 }
 
 #[test]
