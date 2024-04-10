@@ -100,13 +100,6 @@ pub mod generic_impls {
     use super::{ZnRing, ZnRingStore};
     use crate::homomorphism::*;
 
-    #[macro_export]
-    macro_rules! impl_generic_zn_ring_iso {
-        () => {
-            
-        };
-    }
-
     pub struct IntegerToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
         where I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>
     {
