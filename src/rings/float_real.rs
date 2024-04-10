@@ -5,7 +5,7 @@ use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::Field;
 use crate::integer::{int_cast, IntegerRing, IntegerRingStore};
 use crate::primitive_int::StaticRing;
-use crate::ring::*;
+use crate::{impl_eq_based_self_iso, ring::*};
 use crate::homomorphism::*;
 use crate::divisibility::{DivisibilityRing, Domain};
 

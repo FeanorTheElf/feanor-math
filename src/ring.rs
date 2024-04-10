@@ -72,7 +72,7 @@ use crate::algorithms;
 /// }
 /// 
 /// // To use the ring through a RingStore, it is also required to implement CanHomFrom<Self>
-/// // and CanonicalIso<Self>.
+/// // and CanIsoFromTo<Self>.
 /// 
 /// impl CanHomFrom<MyRingBase> for MyRingBase {
 /// 
@@ -83,7 +83,7 @@ use crate::algorithms;
 ///     fn map_in(&self, _from: &MyRingBase, el: Self::Element, _: &()) -> Self::Element { el }
 /// }
 /// 
-/// impl CanonicalIso<MyRingBase> for MyRingBase {
+/// impl CanIsoFromTo<MyRingBase> for MyRingBase {
 /// 
 ///     type Isomorphism = ();
 /// 
@@ -110,13 +110,13 @@ use crate::algorithms;
 /// # A note on equality
 /// 
 /// Generally speaking, the notion of being canonically isomorphic 
-/// (given by [`CanonicalIso`] is often more useful for rings than 
+/// (given by [`CanIsoFromTo`] is often more useful for rings than 
 /// equality (defined by [`PartialEq`]).
 /// 
 /// In particular, being canonically isomorphic means that that there
 /// is a bidirectional mapping of elements `a in Ring1 <-> b in Ring2`
 /// such that `a` and `b` behave exactly the same. This mapping is provided
-/// by the functions of [`CanonicalIso`]. Note that every ring is supposed
+/// by the functions of [`CanIsoFromTo`]. Note that every ring is supposed
 /// to be canonically isomorphic to itself, via the identiy mapping.
 /// 
 /// The notion of equality is stronger than that. In particular, implementors
@@ -393,108 +393,6 @@ macro_rules! delegate {
 }
 
 ///
-/// Implements the trivial canonical isomorphism `Self: CanonicalIso<Self>` for the
-/// given type. 
-/// 
-/// Note that this does not support generic types, as for those, it is
-/// usually better to implement
-/// ```rust,ignore
-/// RingConstructor<R>: CanonicalIso<RingConstructor<S>>
-///     where R: CanonicalIso<S>
-/// ```
-/// or something similar.
-/// 
-/// # Example
-/// ```
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::delegate::*;
-/// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
-/// 
-/// #[derive(PartialEq, Clone, Copy)]
-/// struct MyI32Ring;
-/// 
-/// impl DelegateRing for MyI32Ring {
-/// 
-///     type Base = StaticRingBase<i32>;
-///     type Element = i32;
-/// 
-///     fn get_delegate(&self) -> &Self::Base {
-///         StaticRing::<i32>::RING.get_ring()
-///     }
-/// 
-///     fn delegate_ref<'a>(&self, el: &'a i32) -> &'a i32 {
-///         el
-///     }
-/// 
-///     fn delegate_mut<'a>(&self, el: &'a mut i32) -> &'a mut i32 {
-///         el
-///     }
-/// 
-///     fn delegate(&self, el: i32) -> i32 {
-///         el
-///     }
-/// 
-///     fn postprocess_delegate_mut(&self, _: &mut i32) {
-///         // sometimes it might be necessary to fix some data of `Self::Element`
-///         // if the underlying `Self::Base::Element` was modified via `delegate_mut()`;
-///         // this is not the case here, so leave empty
-///     }
-/// 
-///     fn rev_delegate(&self, el: i32) -> i32 {
-///         el
-///     }
-/// }
-/// 
-/// // since we provide `PartialEq`, the trait `CanonicalIso<Self>` is trivial
-/// // to implement
-/// impl_eq_based_self_iso!{ MyI32Ring }
-/// 
-/// let ring = RingValue::from(MyI32Ring);
-/// assert_el_eq!(&ring, &ring.int_hom().map(1), &ring.one());
-/// ```
-/// 
-#[macro_export]
-macro_rules! impl_eq_based_self_iso {
-    ($type:ty) => {
-        impl CanHomFrom<Self> for $type {
-
-            type Homomorphism = ();
-
-            fn has_canonical_hom(&self, from: &Self) -> Option<()> {
-                if self == from {
-                    Some(())
-                } else {
-                    None
-                }
-            }
-
-            fn map_in(&self, _from: &Self, el: <Self as RingBase>::Element, _: &Self::Homomorphism) -> <Self as RingBase>::Element {
-                el
-            }
-        }
-        
-        impl CanonicalIso<Self> for $type {
-
-            type Isomorphism = ();
-
-            fn has_canonical_iso(&self, from: &Self) -> Option<()> {
-                if self == from {
-                    Some(())
-                } else {
-                    None
-                }
-            }
-
-            fn map_out(&self, _from: &Self, el: <Self as RingBase>::Element, _: &Self::Homomorphism) -> <Self as RingBase>::Element {
-                el
-            }
-        }
-    };
-}
-
-///
 /// Equivalent to `assert_eq!` to assert that two ring elements are equal.
 /// Frequently used in tests
 /// 
@@ -658,7 +556,7 @@ pub trait RingStore: Sized {
     /// moving both rings into the [`CanHom`] object.
     /// 
     fn into_can_iso<S>(self, from: S) -> Result<CanIso<S, Self>, (S, Self)>
-        where Self: Sized, S: RingStore, Self::Type: CanonicalIso<S::Type>
+        where Self: Sized, S: RingStore, Self::Type: CanIsoFromTo<S::Type>
     {
         CanIso::new(from, self)
     }
@@ -676,7 +574,7 @@ pub trait RingStore: Sized {
     /// Returns the canonical isomorphism `from -> self`, if it exists.
     /// 
     fn can_iso<'a, S>(&'a self, from: &'a S) -> Option<CanIso<&'a S, &'a Self>>
-        where S: RingStore, Self::Type: CanonicalIso<S::Type>
+        where S: RingStore, Self::Type: CanIsoFromTo<S::Type>
     {
         self.into_can_iso(from).ok()
     }
@@ -981,6 +879,8 @@ impl<'a, S: Deref> RingStore for S
 
 #[cfg(test)]
 use std::rc::Rc;
+#[cfg(test)]
+use crate::impl_eq_based_self_iso;
 
 #[test]
 fn test_ring_rc_lifetimes() {
@@ -1132,7 +1032,7 @@ fn test_internal_wrappings_dont_matter() {
         }
     }
 
-    impl<R: RingStore> CanonicalIso<BBase<R>> for BBase<R> 
+    impl<R: RingStore> CanIsoFromTo<BBase<R>> for BBase<R> 
         where R::Type: CanHomFrom<R::Type>
     {
         type Isomorphism = ();
@@ -1178,7 +1078,7 @@ pub mod generic_tests {
     }
 
     pub fn test_iso_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
-        where S::Type: CanonicalIso<R::Type>
+        where S::Type: CanIsoFromTo<R::Type>
     {
         let hom = to.get_ring().has_canonical_hom(from.get_ring()).unwrap();
         let iso = to.get_ring().has_canonical_iso(from.get_ring()).unwrap();

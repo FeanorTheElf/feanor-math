@@ -1,5 +1,8 @@
 use crate::algorithms::fft::cooley_tuckey::*;
 use crate::delegate::DelegateRing;
+use crate::impl_eq_based_self_iso;
+use crate::impl_wrap_unwrap_homs;
+use crate::impl_wrap_unwrap_isos;
 use crate::integer::IntegerRingStore;
 use crate::pid::PrincipalIdealRingStore;
 use crate::ring::*;
@@ -260,7 +263,7 @@ impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanHomFrom<zn_barett::ZnB
     }
 }
 
-impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalIso<zn_barett::ZnBase<I>> for ZnBase {
+impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanIsoFromTo<zn_barett::ZnBase<I>> for ZnBase {
 
     type Isomorphism = <zn_barett::ZnBase<I> as CanHomFrom<StaticRingBase<i64>>>::Homomorphism;
 
@@ -277,7 +280,7 @@ impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalIso<zn_barett::Z
     }
 }
 
-trait ImplGenericIntHomomorphismMarker: IntegerRing + CanonicalIso<StaticRingBase<i128>> + CanonicalIso<StaticRingBase<i64>> {}
+trait ImplGenericIntHomomorphismMarker: IntegerRing + CanIsoFromTo<StaticRingBase<i128>> + CanIsoFromTo<StaticRingBase<i64>> {}
 
 impl ImplGenericIntHomomorphismMarker for StaticRingBase<i64> {}
 impl ImplGenericIntHomomorphismMarker for StaticRingBase<i128> {}
@@ -651,7 +654,7 @@ impl<I: ?Sized + IntegerRing> CanHomFrom<I> for ZnFastmulBase
     }
 }
 
-impl CanonicalIso<ZnFastmulBase> for ZnBase {
+impl CanIsoFromTo<ZnFastmulBase> for ZnBase {
 
     type Isomorphism = ();
 
@@ -673,57 +676,8 @@ impl CanonicalIso<ZnFastmulBase> for ZnBase {
     }
 }
 
-impl<R: ZnRingStore<Type = ZnBase>> CanHomFrom<ZnBase> for AsFieldBase<R> {
-    
-    type Homomorphism = <ZnBase as CanHomFrom<ZnBase>>::Homomorphism;
-
-    fn has_canonical_hom(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
-        <ZnBase as CanHomFrom<ZnBase>>::has_canonical_hom(self.get_delegate(), from)
-    }
-
-    fn map_in(&self, from: &ZnBase, el: <ZnBase as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.rev_delegate(<ZnBase as CanHomFrom<ZnBase>>::map_in(self.get_delegate(), from, el, hom))
-    }
-}
-
-impl<R: ZnRingStore<Type = ZnBase>> CanonicalIso<ZnBase> for AsFieldBase<R> {
-
-    type Isomorphism = <ZnBase as CanonicalIso<ZnBase>>::Isomorphism;
-
-    fn has_canonical_iso(&self, from: &ZnBase) -> Option<Self::Isomorphism> {
-        <ZnBase as CanonicalIso<ZnBase>>::has_canonical_iso(self.get_delegate(), from)
-    }
-
-    fn map_out(&self, from: &ZnBase, el: <AsFieldBase<R> as RingBase>::Element, iso: &Self::Isomorphism) -> <ZnBase as RingBase>::Element {
-        <ZnBase as CanonicalIso<ZnBase>>::map_out(self.get_delegate(), from, self.unwrap_element(el), iso)
-    }
-}
-
-impl<R: ZnRingStore<Type = ZnBase>> CanHomFrom<AsFieldBase<R>> for ZnBase {
-    
-    type Homomorphism = <ZnBase as CanHomFrom<ZnBase>>::Homomorphism;
-
-    fn has_canonical_hom(&self, from: &AsFieldBase<R>) -> Option<Self::Homomorphism> {
-        self.has_canonical_hom(from.get_delegate())
-    }
-
-    fn map_in(&self, from: &AsFieldBase<R>, el: <AsFieldBase<R> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in(from.get_delegate(), from.unwrap_element(el), hom)
-    }
-}
-
-impl<R: ZnRingStore<Type = ZnBase>> CanonicalIso<AsFieldBase<R>> for ZnBase {
-
-    type Isomorphism = <ZnBase as CanonicalIso<ZnBase>>::Isomorphism;
-
-    fn has_canonical_iso(&self, from: &AsFieldBase<R>) -> Option<Self::Isomorphism> {
-        self.has_canonical_iso(from.get_delegate())
-    }
-
-    fn map_out(&self, from: &AsFieldBase<R>, el: <ZnBase as RingBase>::Element, iso: &Self::Isomorphism) -> <AsFieldBase<R> as RingBase>::Element {
-        from.rev_delegate(self.map_out(from.get_delegate(), el, iso))
-    }
-}
+impl_wrap_unwrap_homs!{ ZnBase, ZnBase }
+impl_wrap_unwrap_isos!{ ZnBase, ZnBase }
 
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;

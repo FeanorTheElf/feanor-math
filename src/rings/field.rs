@@ -103,18 +103,18 @@ impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanHomFrom<AsFieldBase<
     }
 }
 
-impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanonicalIso<AsFieldBase<S>> for AsFieldBase<R> 
-    where R::Type: DivisibilityRing + CanonicalIso<S::Type>,
+impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanIsoFromTo<AsFieldBase<S>> for AsFieldBase<R> 
+    where R::Type: DivisibilityRing + CanIsoFromTo<S::Type>,
         S::Type: DivisibilityRing
 {
-    type Isomorphism = <R::Type as CanonicalIso<S::Type>>::Isomorphism;
+    type Isomorphism = <R::Type as CanIsoFromTo<S::Type>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &AsFieldBase<S>) -> Option<Self::Isomorphism> {
-        <R::Type as CanonicalIso<S::Type>>::has_canonical_iso(self.get_delegate(), from.get_delegate())
+        <R::Type as CanIsoFromTo<S::Type>>::has_canonical_iso(self.get_delegate(), from.get_delegate())
     }
 
     fn map_out(&self, from: &AsFieldBase<S>, el: Self::Element, iso: &Self::Isomorphism) -> FieldEl<S> {
-        FieldEl(<R::Type as CanonicalIso<S::Type>>::map_out(self.get_delegate(), from.get_delegate(), el.0, iso))
+        FieldEl(<R::Type as CanIsoFromTo<S::Type>>::map_out(self.get_delegate(), from.get_delegate(), el.0, iso))
     }
 }
 
@@ -132,6 +132,9 @@ impl<R: DivisibilityRingStore> RingExtension for AsFieldBase<R>
     }
 }
 
+///
+/// Necessary to potentially implement [`ZnRing`].
+/// 
 impl<R: DivisibilityRingStore, S: IntegerRing + ?Sized> CanHomFrom<S> for AsFieldBase<R> 
     where R::Type: DivisibilityRing + CanHomFrom<S>
 {
@@ -231,6 +234,145 @@ impl<R: DivisibilityRingStore> FreeAlgebra for AsFieldBase<R>
     fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a> {
         self.get_delegate().wrt_canonical_basis(self.delegate_ref(el))
     }
+}
+
+///
+/// Implements the isomorphisms `S: CanHomFrom<AsFieldBase<RingStore<Type = R>>>` and 
+/// `AsFieldBase<RingStore<Type = S>>: CanHomFrom<R>`.
+/// 
+/// This has to be a macro, as a blanket implementation would unfortunately cause conflicting impls.
+/// Usually, whenever a ring naturally might be a ring (e.g. like [`crate::rings::zn::zn_64::Zn`] or
+/// [`crate::rings::extension::extension_impl::FreeAlgebraImpl`], which even provide a function like 
+/// [`crate::rings::zn::ZnRingStore::as_field()`]), you might use this macro to implement [`CanHomFrom`]
+/// that simplify conversion from and to the field wrapper.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::field::*;
+/// # use feanor_math::delegate::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::{impl_eq_based_self_iso, impl_wrap_unwrap_homs, impl_wrap_unwrap_isos};
+/// // A no-op wrapper around Zn
+/// #[derive(Copy, Clone)]
+/// struct MyPossibleField {
+///     base_zn: Zn
+/// }
+/// 
+/// impl PartialEq for MyPossibleField {
+/// 
+///     fn eq(&self, other: &Self) -> bool {
+///         self.base_zn.get_ring() == other.base_zn.get_ring()
+///     }
+/// }
+/// 
+/// // impl_wrap_unwrap_homs! relies on the homs/isos of the wrapped ring, so provide those
+/// impl_eq_based_self_iso!{ MyPossibleField }
+/// 
+/// impl DelegateRing for MyPossibleField {
+///     
+///     type Base = ZnBase;
+///     type Element = ZnEl;
+///
+///     fn get_delegate(&self) -> &Self::Base { self.base_zn.get_ring() }
+///     fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
+///     fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
+///     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+///     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
+/// }
+/// 
+/// impl_wrap_unwrap_homs!{ MyPossibleField, MyPossibleField }
+/// 
+/// // there is also a generic verision, which looks like
+/// impl_wrap_unwrap_isos!{ <{ /* type params here */ }> MyPossibleField, MyPossibleField where /* constraints here */ }
+/// 
+/// let R = RingValue::from(MyPossibleField { base_zn: Zn::new(5) });
+/// let R_field = RingValue::from(AsFieldBase::promise_is_field(R));
+/// let _ = R.can_hom(&R_field).unwrap();
+/// let _ = R_field.can_hom(&R).unwrap();
+/// let _ = R.can_iso(&R_field).unwrap();
+/// let _ = R_field.can_iso(&R).unwrap();
+/// ```
+/// 
+#[macro_export]
+macro_rules! impl_wrap_unwrap_homs {
+    (<{$($gen_args:tt)*}> $self_type_from:ty, $self_type_to:ty where $($constraints:tt)*) => {
+        
+        impl<AsFieldRingStore, $($gen_args)*> CanHomFrom<$self_type_from> for $crate::rings::field::AsFieldBase<AsFieldRingStore>
+            where AsFieldRingStore: RingStore<Type = $self_type_to>, $($constraints)*
+        {
+            type Homomorphism = <$self_type_to as CanHomFrom<$self_type_from>>::Homomorphism;
+
+            fn has_canonical_hom(&self, from: &$self_type_from) -> Option<Self::Homomorphism> {
+                self.get_delegate().has_canonical_hom(from)
+            }
+
+            fn map_in(&self, from: &$self_type_from, el: <$self_type_from as $crate::ring::RingBase>::Element, hom: &Self::Homomorphism) -> <Self as $crate::ring::RingBase>::Element {
+                self.rev_delegate(self.get_delegate().map_in(from, el, hom))
+            }
+        }
+        
+        impl<AsFieldRingStore, $($gen_args)*> CanHomFrom<$crate::rings::field::AsFieldBase<AsFieldRingStore>> for $self_type_to
+            where AsFieldRingStore: RingStore<Type = $self_type_from>, $($constraints)*
+        {
+            type Homomorphism = <$self_type_to as CanHomFrom<$self_type_from>>::Homomorphism;
+
+            fn has_canonical_hom(&self, from: &$crate::rings::field::AsFieldBase<AsFieldRingStore>) -> Option<Self::Homomorphism> {
+                self.has_canonical_hom(from.get_delegate())
+            }
+
+            fn map_in(&self, from: &$crate::rings::field::AsFieldBase<AsFieldRingStore>, el: $crate::rings::field::FieldEl<AsFieldRingStore>, hom: &Self::Homomorphism) -> <Self as $crate::ring::RingBase>::Element {
+                self.map_in(from.get_delegate(), from.delegate(el), hom)
+            }
+        }
+    };
+    ($self_type_from:ty, $self_type_to:ty) => {
+        impl_wrap_unwrap_homs!{ <{}> $self_type_from, $self_type_to where }
+    };
+}
+
+///
+/// Implements the isomorphisms `S: CanIsoFromTo<AsFieldBase<RingStore<Type = R>>>` and `AsFieldBase<RingStore<Type = S>>: CanIsoFromTo<R>`.
+/// 
+/// This has to be a macro, as a blanket implementation would unfortunately cause conflicting impls.
+/// For an example and more detailed explanation, see [`impl_wrap_unwrap_homs!`]; 
+/// 
+#[macro_export]
+macro_rules! impl_wrap_unwrap_isos {
+    (<{$($gen_args:tt)*}> $self_type_from:ty, $self_type_to:ty where $($constraints:tt)*) => {
+        
+        impl<AsFieldRingStore, $($gen_args)*> CanIsoFromTo<$self_type_from> for $crate::rings::field::AsFieldBase<AsFieldRingStore>
+            where AsFieldRingStore: RingStore<Type = $self_type_to>, $($constraints)*
+        {
+            type Isomorphism = <$self_type_to as CanIsoFromTo<$self_type_from>>::Isomorphism;
+
+            fn has_canonical_iso(&self, from: &$self_type_from) -> Option<Self::Isomorphism> {
+                self.get_delegate().has_canonical_iso(from)
+            }
+
+            fn map_out(&self, from: &$self_type_from, el: <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <$self_type_from as RingBase>::Element {
+                self.get_delegate().map_out(from, self.delegate(el), iso)
+            }
+        }
+        
+        impl<AsFieldRingStore, $($gen_args)*> CanIsoFromTo<$crate::rings::field::AsFieldBase<AsFieldRingStore>> for $self_type_to
+            where AsFieldRingStore: RingStore<Type = $self_type_from>, $($constraints)*
+        {
+            type Isomorphism = <$self_type_to as CanIsoFromTo<$self_type_from>>::Isomorphism;
+
+            fn has_canonical_iso(&self, from: &$crate::rings::field::AsFieldBase<AsFieldRingStore>) -> Option<Self::Isomorphism> {
+                self.has_canonical_iso(from.get_delegate())
+            }
+
+            fn map_out(&self, from: &$crate::rings::field::AsFieldBase<AsFieldRingStore>, el: <Self as RingBase>::Element, hom: &Self::Isomorphism) -> $crate::rings::field::FieldEl<AsFieldRingStore> {
+                from.rev_delegate(self.map_out(from.get_delegate(), el, hom))
+            }
+        }
+    };
+    ($self_type_from:ty, $self_type_to:ty) => {
+        impl_wrap_unwrap_isos!{ <{}> $self_type_from, $self_type_to where }
+    };
 }
 
 #[cfg(test)]

@@ -4,8 +4,8 @@ use std::f64::consts::PI;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::Field;
 use crate::integer::{IntegerRingStore, IntegerRing};
+use crate::impl_eq_based_self_iso;
 use crate::ring::*;
-use crate::homomorphism::*;
 use crate::divisibility::{DivisibilityRing, Domain};
 
 use super::float_real::Real64;

@@ -31,7 +31,7 @@ pub mod mempool;
 #[macro_use]
 ///
 /// Contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`],
-/// as well as [`ring::CanHomFrom`] and [`ring::CanonicalIso`].
+/// as well as [`ring::CanHomFrom`] and [`ring::CanIsoFromTo`].
 /// 
 pub mod ring;
 ///

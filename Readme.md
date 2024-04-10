@@ -144,7 +144,7 @@ This function now works with any ring that implements `IntegerRing`, a subtrait 
 
 ## Implementing rings
 
-To implement a custom ring, just create a struct and add an `impl RingBase` and an `impl CanonicalIso<Self>` - that's it!
+To implement a custom ring, just create a struct and add an `impl RingBase` and an `impl CanIsoFromTo<Self>` - that's it!
 Assuming we want to provide our own implementation of the finite binary field F2, we could do it as follows.
 ```rust
 use feanor_math::homomorphism::*;

@@ -33,7 +33,7 @@ use std::rc::Rc;
 /// let power = P.pow(x10_plus_1, 10);
 /// assert_eq!(0, *P.coefficient_at(&power, 1));
 /// ```
-/// This ring has a [`CanonicalIso`] to [`dense_poly::DensePolyRingBase`].
+/// This ring has a [`CanIsoFromTo`] to [`dense_poly::DensePolyRingBase`].
 /// ```
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::homomorphism::*;
@@ -257,14 +257,14 @@ impl<R: RingStore> RingExtension for SparsePolyRingBase<R> {
     }
 }
 
-pub trait ImplGenericCanonicalIsoMarker: PolyRing {}
+pub trait ImplGenericCanIsoFromToMarker: PolyRing {}
 
-impl<R, M> ImplGenericCanonicalIsoMarker for dense_poly::DensePolyRingBase<R, M> 
+impl<R, M> ImplGenericCanIsoFromToMarker for dense_poly::DensePolyRingBase<R, M> 
     where R: RingStore, M: GrowableMemoryProvider<El<R>>
 {}
 
 impl<R, P> CanHomFrom<P> for SparsePolyRingBase<R> 
-    where R: RingStore, R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanonicalIsoMarker
+    where R: RingStore, R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanIsoFromToMarker
 {
     type Homomorphism = super::generic_impls::Homomorphism<P, Self>;
 
@@ -299,8 +299,8 @@ impl<R1, R2> CanHomFrom<SparsePolyRingBase<R1> > for SparsePolyRingBase<R2>
     }
 }
 
-impl<R, P> CanonicalIso<P> for SparsePolyRingBase<R> 
-    where R: RingStore, R::Type: CanonicalIso<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanonicalIsoMarker
+impl<R, P> CanIsoFromTo<P> for SparsePolyRingBase<R> 
+    where R: RingStore, R::Type: CanIsoFromTo<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanIsoFromToMarker
 {
     type Isomorphism = super::generic_impls::Isomorphism<P, Self>;
 
@@ -313,10 +313,10 @@ impl<R, P> CanonicalIso<P> for SparsePolyRingBase<R>
     }
 }
 
-impl<R1, R2> CanonicalIso<SparsePolyRingBase<R1>> for SparsePolyRingBase<R2> 
-    where R1: RingStore, R2: RingStore, R2::Type: CanonicalIso<R1::Type>
+impl<R1, R2> CanIsoFromTo<SparsePolyRingBase<R1>> for SparsePolyRingBase<R2> 
+    where R1: RingStore, R2: RingStore, R2::Type: CanIsoFromTo<R1::Type>
 {
-    type Isomorphism = <R2::Type as CanonicalIso<R1::Type>>::Isomorphism;
+    type Isomorphism = <R2::Type as CanIsoFromTo<R1::Type>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &SparsePolyRingBase<R1>) -> Option<Self::Isomorphism> {
         self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())

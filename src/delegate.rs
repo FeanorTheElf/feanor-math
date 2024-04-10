@@ -56,7 +56,7 @@ use crate::integer::{IntegerRingStore, IntegerRing};
 ///     }
 /// }
 /// 
-/// // you will have to implement `CanonicalIso<Self>`
+/// // you will have to implement `CanIsoFromTo<Self>`
 /// impl_eq_based_self_iso!{ MyI32Ring }
 /// 
 /// let ring = RingValue::from(MyI32Ring);

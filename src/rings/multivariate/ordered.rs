@@ -376,16 +376,16 @@ impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanHomFrom<Multiv
     }
 }
 
-impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanonicalIso<MultivariatePolyRingImplBase<R2, O2, M2, N2>> for MultivariatePolyRingImplBase<R1, O1, M1, N1>
+impl<R1, O1, M1, R2, O2, M2, const N1: usize, const N2: usize> CanIsoFromTo<MultivariatePolyRingImplBase<R2, O2, M2, N2>> for MultivariatePolyRingImplBase<R1, O1, M1, N1>
     where R1: RingStore,
         O1: MonomialOrder,
         M1: GrowableMemoryProvider<(El<R1>, Monomial<[MonomialExponent; N1]>)>,
         R2: RingStore,
         O2: MonomialOrder,
         M2: GrowableMemoryProvider<(El<R2>, Monomial<[MonomialExponent; N2]>)>,
-        R1::Type: CanonicalIso<R2::Type>
+        R1::Type: CanIsoFromTo<R2::Type>
 {
-    type Isomorphism = <R1::Type as CanonicalIso<R2::Type>>::Isomorphism;
+    type Isomorphism = <R1::Type as CanIsoFromTo<R2::Type>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &MultivariatePolyRingImplBase<R2, O2, M2, N2>) -> Option<Self::Isomorphism> {
         if N1 == N2 {

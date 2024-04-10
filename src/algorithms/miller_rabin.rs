@@ -34,7 +34,7 @@ impl ZnOperation<bool> for CheckIsFieldMillerRabin {
 /// 
 pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool 
     where I: IntegerRingStore + HashableElRingStore,
-        I::Type: IntegerRing + CanonicalIso<StaticRingBase<i128>>
+        I::Type: IntegerRing + CanIsoFromTo<StaticRingBase<i128>>
 {
     assert!(ZZ.is_pos(n));
     if ZZ.is_zero(n) || ZZ.is_one(n) {

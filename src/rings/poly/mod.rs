@@ -193,10 +193,10 @@ pub mod generic_impls {
     }
 
     #[allow(type_alias_bounds)]
-    pub type Isomorphism<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanonicalIso<<P1::BaseRing as RingStore>::Type>>::Isomorphism;
+    pub type Isomorphism<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanIsoFromTo<<P1::BaseRing as RingStore>::Type>>::Isomorphism;
 
     pub fn map_out<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P2::Element, iso: &Isomorphism<P1, P2>) -> P1::Element
-        where <P2::BaseRing as RingStore>::Type: CanonicalIso<<P1::BaseRing as RingStore>::Type>
+        where <P2::BaseRing as RingStore>::Type: CanIsoFromTo<<P1::BaseRing as RingStore>::Type>
     {
         let mut result = from.zero();
         from.add_assign_from_terms(&mut result, to.terms(&el).map(|(c, i)| (to.base_ring().get_ring().map_out(from.base_ring().get_ring(), to.base_ring().clone_el(c), iso), i)));

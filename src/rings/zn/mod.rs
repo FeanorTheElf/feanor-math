@@ -100,16 +100,23 @@ pub mod generic_impls {
     use super::{ZnRing, ZnRingStore};
     use crate::homomorphism::*;
 
+    #[macro_export]
+    macro_rules! impl_generic_zn_ring_iso {
+        () => {
+            
+        };
+    }
+
     pub struct IntegerToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
-        where I: CanonicalIso<R::IntegerRingBase> + CanonicalIso<J>
+        where I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>
     {
         highbit_mod: usize,
         highbit_bound: usize,
         int_ring: PhantomData<I>,
         to_large_int_ring: PhantomData<J>,
         hom: <I as CanHomFrom<R::IntegerRingBase>>::Homomorphism,
-        iso: <I as CanonicalIso<R::IntegerRingBase>>::Isomorphism,
-        iso2: <I as CanonicalIso<J>>::Isomorphism
+        iso: <I as CanIsoFromTo<R::IntegerRingBase>>::Isomorphism,
+        iso2: <I as CanIsoFromTo<J>>::Isomorphism
     }
 
     ///
@@ -117,7 +124,7 @@ pub mod generic_impls {
     /// This will only ever return `None` if one of the integer ring `has_canonical_hom/iso` returns `None`.
     /// 
     pub fn has_canonical_hom_from_int<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>(from: &I, to: &R, to_large_int_ring: &J, bounded_reduce_bound: Option<&J::Element>) -> Option<IntegerToZnHom<I, J, R>>
-        where I: CanonicalIso<R::IntegerRingBase> + CanonicalIso<J>
+        where I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>
     {
         if let Some(bound) = bounded_reduce_bound {
             Some(IntegerToZnHom {
@@ -164,7 +171,7 @@ pub mod generic_impls {
     /// integer rings `StaticRing::<ixx>::RING` are used, or if `B >= 2n`.
     /// 
     pub fn map_in_from_int<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing, F, G>(from: &I, to: &R, to_large_int_ring: &J, el: I::Element, hom: &IntegerToZnHom<I, J, R>, from_positive_representative_exact: F, from_positive_representative_bounded: G) -> R::Element
-        where I: CanonicalIso<R::IntegerRingBase> + CanonicalIso<J>,
+        where I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>,
             F: FnOnce(El<R::Integers>) -> R::Element,
             G: FnOnce(J::Element) -> R::Element
     {
@@ -407,7 +414,7 @@ pub mod generic_tests {
 
     pub fn test_zn_axioms<R: ZnRingStore>(R: R)
         where R::Type: ZnRing,
-            <R::Type as ZnRing>::IntegerRingBase: CanonicalIso<StaticRingBase<i128>> + CanonicalIso<StaticRingBase<i32>>
+            <R::Type as ZnRing>::IntegerRingBase: CanIsoFromTo<StaticRingBase<i128>> + CanIsoFromTo<StaticRingBase<i32>>
     {
         let ZZ = R.integer_ring();
         let n = R.modulus();

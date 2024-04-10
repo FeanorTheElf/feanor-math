@@ -1,5 +1,8 @@
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
 use crate::delegate::DelegateRing;
+use crate::impl_eq_based_self_iso;
+use crate::impl_wrap_unwrap_homs;
+use crate::impl_wrap_unwrap_isos;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::*;
 use crate::integer::*;
@@ -258,30 +261,40 @@ impl RingBase for ZnBase {
 
 impl_eq_based_self_iso!{ ZnBase }
 
-impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanHomFrom<zn_barett::ZnBase<I>> for ZnBase {
-
+impl<I: IntegerRingStore> CanHomFrom<zn_barett::ZnBase<I>> for ZnBase
+    where I::Type: IntegerRing
+{
     type Homomorphism = ();
 
     fn has_canonical_hom(&self, from: &zn_barett::ZnBase<I>) -> Option<Self::Homomorphism> {
-        if self.modulus as i128 == *from.modulus() {
-            Some(())
+        if from.integer_ring().get_ring().representable_bits().is_none() || from.integer_ring().get_ring().representable_bits().unwrap() >= self.integer_ring().abs_log2_ceil(self.modulus()).unwrap() {
+            if from.integer_ring().eq_el(from.modulus(), &int_cast(*self.modulus(), from.integer_ring(), self.integer_ring())) {
+                Some(())
+            } else {
+                None
+            }
         } else {
             None
         }
     }
 
     fn map_in(&self, from: &zn_barett::ZnBase<I>, el: <zn_barett::ZnBase<I> as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
-        self.promise_is_reduced(from.smallest_positive_lift(el) as u64)
+        self.promise_is_reduced(int_cast(from.smallest_positive_lift(el), self.integer_ring(), from.integer_ring()) as u64)
     }
 }
 
-impl<I: IntegerRingStore<Type = StaticRingBase<i128>>> CanonicalIso<zn_barett::ZnBase<I>> for ZnBase {
-
+impl<I: IntegerRingStore> CanIsoFromTo<zn_barett::ZnBase<I>> for ZnBase
+    where I::Type: IntegerRing
+{
     type Isomorphism = <zn_barett::ZnBase<I> as CanHomFrom<StaticRingBase<i64>>>::Homomorphism;
 
     fn has_canonical_iso(&self, from: &zn_barett::ZnBase<I>) -> Option<Self::Isomorphism> {
-        if self.modulus as i128 == *from.modulus() {
-            from.has_canonical_hom(self.integer_ring().get_ring())
+        if from.integer_ring().get_ring().representable_bits().is_none() || from.integer_ring().get_ring().representable_bits().unwrap() >= self.integer_ring().abs_log2_ceil(self.modulus()).unwrap() {
+            if from.integer_ring().eq_el(from.modulus(), &int_cast(*self.modulus(), from.integer_ring(), self.integer_ring())) {
+                from.has_canonical_hom(self.integer_ring().get_ring())
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -315,7 +328,7 @@ pub enum ToZn42Iso {
     Trivial, ReduceRequired(<zn_42::ZnBase as CanHomFrom<StaticRingBase<i64>>>::Homomorphism)
 }
 
-impl CanonicalIso<zn_42::ZnBase> for ZnBase {
+impl CanIsoFromTo<zn_42::ZnBase> for ZnBase {
 
     type Isomorphism = ToZn42Iso;
 
@@ -345,7 +358,7 @@ impl DivisibilityRing for ZnBase {
         super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs, self.modulus())
     }
 }
-trait ImplGenericIntHomomorphismMarker: IntegerRing + CanonicalIso<StaticRingBase<i128>> + CanonicalIso<StaticRingBase<i64>> {}
+trait ImplGenericIntHomomorphismMarker: IntegerRing + CanIsoFromTo<StaticRingBase<i128>> + CanIsoFromTo<StaticRingBase<i64>> {}
 
 impl ImplGenericIntHomomorphismMarker for RustBigintRingBase {}
 
@@ -647,7 +660,7 @@ impl CanHomFrom<ZnFastmulBase> for ZnBase {
     }
 }
 
-impl CanonicalIso<ZnFastmulBase> for ZnBase {
+impl CanIsoFromTo<ZnFastmulBase> for ZnBase {
 
     type Isomorphism = <ZnFastmulBase as CanHomFrom<Self>>::Homomorphism;
 
@@ -705,57 +718,8 @@ impl<I: ?Sized + IntegerRing> CanHomFrom<I> for ZnFastmulBase
     }
 }
 
-impl<R: ZnRingStore<Type = ZnBase>> CanHomFrom<ZnBase> for AsFieldBase<R> {
-    
-    type Homomorphism = <ZnBase as CanHomFrom<ZnBase>>::Homomorphism;
-
-    fn has_canonical_hom(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
-        <ZnBase as CanHomFrom<ZnBase>>::has_canonical_hom(self.get_delegate(), from)
-    }
-
-    fn map_in(&self, from: &ZnBase, el: <ZnBase as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.rev_delegate(<ZnBase as CanHomFrom<ZnBase>>::map_in(self.get_delegate(), from, el, hom))
-    }
-}
-
-impl<R: ZnRingStore<Type = ZnBase>> CanonicalIso<ZnBase> for AsFieldBase<R> {
-
-    type Isomorphism = <ZnBase as CanonicalIso<ZnBase>>::Isomorphism;
-
-    fn has_canonical_iso(&self, from: &ZnBase) -> Option<Self::Isomorphism> {
-        <ZnBase as CanonicalIso<ZnBase>>::has_canonical_iso(self.get_delegate(), from)
-    }
-
-    fn map_out(&self, from: &ZnBase, el: <AsFieldBase<R> as RingBase>::Element, iso: &Self::Isomorphism) -> <ZnBase as RingBase>::Element {
-        <ZnBase as CanonicalIso<ZnBase>>::map_out(self.get_delegate(), from, self.unwrap_element(el), iso)
-    }
-}
-
-impl<R: ZnRingStore<Type = ZnBase>> CanHomFrom<AsFieldBase<R>> for ZnBase {
-    
-    type Homomorphism = <ZnBase as CanHomFrom<ZnBase>>::Homomorphism;
-
-    fn has_canonical_hom(&self, from: &AsFieldBase<R>) -> Option<Self::Homomorphism> {
-        self.has_canonical_hom(from.get_delegate())
-    }
-
-    fn map_in(&self, from: &AsFieldBase<R>, el: <AsFieldBase<R> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in(from.get_delegate(), from.unwrap_element(el), hom)
-    }
-}
-
-impl<R: ZnRingStore<Type = ZnBase>> CanonicalIso<AsFieldBase<R>> for ZnBase {
-
-    type Isomorphism = <ZnBase as CanonicalIso<ZnBase>>::Isomorphism;
-
-    fn has_canonical_iso(&self, from: &AsFieldBase<R>) -> Option<Self::Isomorphism> {
-        self.has_canonical_iso(from.get_delegate())
-    }
-
-    fn map_out(&self, from: &AsFieldBase<R>, el: <ZnBase as RingBase>::Element, iso: &Self::Isomorphism) -> <AsFieldBase<R> as RingBase>::Element {
-        from.rev_delegate(self.map_out(from.get_delegate(), el, iso))
-    }
-}
+impl_wrap_unwrap_homs!{ ZnBase, ZnBase }
+impl_wrap_unwrap_isos!{ ZnBase, ZnBase }
 
 #[cfg(test)]
 use test::Bencher;

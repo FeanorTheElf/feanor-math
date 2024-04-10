@@ -198,7 +198,7 @@ impl<I, J> CanHomFrom<I> for J
     }
 }
 
-impl<I, J> CanonicalIso<I> for J
+impl<I, J> CanIsoFromTo<I> for J
     where I: ?Sized + IntegerRing, J: ?Sized + IntegerRing
 {
     type Isomorphism = ();

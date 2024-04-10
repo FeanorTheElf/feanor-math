@@ -102,7 +102,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// inputs.
 /// 
 /// If the canonical homomorphism might be an isomorphism, consider also
-/// implementing [`CanonicalIso`].
+/// implementing [`CanIsoFromTo`].
 /// 
 /// # Example
 /// 
@@ -131,7 +131,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// impossible to implement all the canonical homomorphisms that we would like.
 /// This is true in particular, if the rings are highly generic, and build
 /// on base rings. In this case, it should always be preferred to implement
-/// `CanonicalIso` for rings that are "the same", and on the other hand not
+/// `CanIsoFromTo` for rings that are "the same", and on the other hand not
 /// to implement classical homomorphisms, like `ZZ -> R` which exists for any
 /// ring R. In applicable cases, consider also implementing [`RingExtension`].
 /// 
@@ -309,12 +309,12 @@ pub trait CanHomFrom<S>: RingBase
 /// then both chains should yield same results on same inputs.
 /// 
 /// Hence, it would be natural if the trait were symmetrical, i.e.
-/// for any implementation `R: CanonicalIso<S>` there is also an
-/// implementation `S: CanonicalIso<R>`. However, because of the trait
+/// for any implementation `R: CanIsoFromTo<S>` there is also an
+/// implementation `S: CanIsoFromTo<R>`. However, because of the trait
 /// impl constraints of Rust, this is unpracticable and so we only
 /// require the implementation `R: CanHomFrom<S>`.
 /// 
-pub trait CanonicalIso<S>: CanHomFrom<S>
+pub trait CanIsoFromTo<S>: CanHomFrom<S>
     where S: RingBase + ?Sized
 {
     type Isomorphism;
@@ -324,12 +324,12 @@ pub trait CanonicalIso<S>: CanHomFrom<S>
 }
 
 ///
-/// Basically an alias for `CanonicalIso<Self>`, but implemented as new
+/// Basically an alias for `CanIsoFromTo<Self>`, but implemented as new
 /// trait since trait aliases are not available.
 /// 
-pub trait SelfIso: CanonicalIso<Self> {}
+pub trait SelfIso: CanIsoFromTo<Self> {}
 
-impl<R: ?Sized + CanonicalIso<R>> SelfIso for R {}
+impl<R: ?Sized + CanIsoFromTo<R>> SelfIso for R {}
 
 ///
 /// A high-level wrapper of [`CanHomFrom::Homomorphism`] that references the
@@ -352,7 +352,7 @@ impl<R: ?Sized + CanonicalIso<R>> SelfIso for R {}
 /// 
 /// # See also
 /// The "bi-directional" variant [`CanHom`], the basic interfaces [`CanHomFrom`] and
-/// [`CanonicalIso`] and the very simplified functions [`RingStore::coerce`], [`RingStore::coerce_ref`]
+/// [`CanIsoFromTo`] and the very simplified functions [`RingStore::coerce`], [`RingStore::coerce_ref`]
 /// and [`RingStore::cast`].
 /// 
 pub struct CanHom<R, S>
@@ -401,7 +401,7 @@ impl<R, S> Homomorphism<R::Type, S::Type> for CanHom<R, S>
 }
 
 ///
-/// A wrapper around [`CanonicalIso::Isomorphism`] that references the domain and
+/// A wrapper around [`CanIsoFromTo::Isomorphism`] that references the domain and
 /// codomain rings, making it much easier to use. This also contains the homomorphism
 /// in the other direction, i.e. allows mapping in both directions.
 /// 
@@ -422,19 +422,19 @@ impl<R, S> Homomorphism<R::Type, S::Type> for CanHom<R, S>
 /// 
 /// # See also
 /// The "one-directional" variant [`CanHom`], the basic interfaces [`CanHomFrom`] and
-/// [`CanonicalIso`] and the very simplified functions [`RingStore::coerce`], [`RingStore::coerce_ref`]
+/// [`CanIsoFromTo`] and the very simplified functions [`RingStore::coerce`], [`RingStore::coerce_ref`]
 /// and [`RingStore::cast`].
 /// 
 pub struct CanIso<R, S>
-    where R: RingStore, S: RingStore, S::Type: CanonicalIso<R::Type>
+    where R: RingStore, S: RingStore, S::Type: CanIsoFromTo<R::Type>
 {
     from: R,
     to: S,
-    data: <S::Type as CanonicalIso<R::Type>>::Isomorphism
+    data: <S::Type as CanIsoFromTo<R::Type>>::Isomorphism
 }
 
 impl<R, S> CanIso<R, S>
-    where R: RingStore, S: RingStore, S::Type: CanonicalIso<R::Type>
+    where R: RingStore, S: RingStore, S::Type: CanIsoFromTo<R::Type>
 {
     pub fn new(from: R, to: S) -> Result<Self, (R, S)> {
         match to.get_ring().has_canonical_iso(from.get_ring()) {
@@ -450,13 +450,13 @@ impl<R, S> CanIso<R, S>
         CanHom::new(&self.from, &self.to).unwrap_or_else(|_| unreachable!())
     }
 
-    pub fn raw_iso(&self) -> &<S::Type as CanonicalIso<R::Type>>::Isomorphism {
+    pub fn raw_iso(&self) -> &<S::Type as CanIsoFromTo<R::Type>>::Isomorphism {
         &self.data
     }
 }
 
 impl<R, S> Homomorphism<S::Type,R::Type> for CanIso<R, S>
-    where R: RingStore, S: RingStore, S::Type: CanonicalIso<R::Type>
+    where R: RingStore, S: RingStore, S::Type: CanIsoFromTo<R::Type>
 {
     type DomainStore = S;
     type CodomainStore = R;
@@ -767,6 +767,108 @@ impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
     fn mul_assign_map_ref(&self, lhs: &mut <T as RingBase>::Element, rhs: &<R as RingBase>::Element) {
         self.g.mul_assign_map(lhs, self.f.map_ref(rhs))
     }
+}
+
+///
+/// Implements the trivial canonical isomorphism `Self: CanIsoFromTo<Self>` for the
+/// given type. 
+/// 
+/// Note that this does not support generic types, as for those, it is
+/// usually better to implement
+/// ```rust,ignore
+/// RingConstructor<R>: CanIsoFromTo<RingConstructor<S>>
+///     where R: CanIsoFromTo<S>
+/// ```
+/// or something similar.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::delegate::*;
+/// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
+/// 
+/// #[derive(PartialEq, Clone, Copy)]
+/// struct MyI32Ring;
+/// 
+/// impl DelegateRing for MyI32Ring {
+/// 
+///     type Base = StaticRingBase<i32>;
+///     type Element = i32;
+/// 
+///     fn get_delegate(&self) -> &Self::Base {
+///         StaticRing::<i32>::RING.get_ring()
+///     }
+/// 
+///     fn delegate_ref<'a>(&self, el: &'a i32) -> &'a i32 {
+///         el
+///     }
+/// 
+///     fn delegate_mut<'a>(&self, el: &'a mut i32) -> &'a mut i32 {
+///         el
+///     }
+/// 
+///     fn delegate(&self, el: i32) -> i32 {
+///         el
+///     }
+/// 
+///     fn postprocess_delegate_mut(&self, _: &mut i32) {
+///         // sometimes it might be necessary to fix some data of `Self::Element`
+///         // if the underlying `Self::Base::Element` was modified via `delegate_mut()`;
+///         // this is not the case here, so leave empty
+///     }
+/// 
+///     fn rev_delegate(&self, el: i32) -> i32 {
+///         el
+///     }
+/// }
+/// 
+/// // since we provide `PartialEq`, the trait `CanIsoFromTo<Self>` is trivial
+/// // to implement
+/// impl_eq_based_self_iso!{ MyI32Ring }
+/// 
+/// let ring = RingValue::from(MyI32Ring);
+/// assert_el_eq!(&ring, &ring.int_hom().map(1), &ring.one());
+/// ```
+/// 
+#[macro_export]
+macro_rules! impl_eq_based_self_iso {
+    ($type:ty) => {
+        impl $crate::homomorphism::CanHomFrom<Self> for $type {
+
+            type Homomorphism = ();
+
+            fn has_canonical_hom(&self, from: &Self) -> Option<()> {
+                if self == from {
+                    Some(())
+                } else {
+                    None
+                }
+            }
+
+            fn map_in(&self, _from: &Self, el: <Self as $crate::ring::RingBase>::Element, _: &Self::Homomorphism) -> <Self as $crate::ring::RingBase>::Element {
+                el
+            }
+        }
+        
+        impl $crate::homomorphism::CanIsoFromTo<Self> for $type {
+
+            type Isomorphism = ();
+
+            fn has_canonical_iso(&self, from: &Self) -> Option<()> {
+                if self == from {
+                    Some(())
+                } else {
+                    None
+                }
+            }
+
+            fn map_out(&self, _from: &Self, el: <Self as $crate::ring::RingBase>::Element, _: &Self::Homomorphism) -> <Self as $crate::ring::RingBase>::Element {
+                el
+            }
+        }
+    };
 }
 
 #[cfg(any(test, feature = "generic_tests"))]

@@ -67,7 +67,7 @@ use crate::default_memory_provider;
 pub struct ZnBase<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>> = DefaultMemoryProvider> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     components: Vec<C>,
     total_ring: zn_barett::Zn<J>,
@@ -85,7 +85,7 @@ pub type Zn<C, J, M = DefaultMemoryProvider> = RingValue<ZnBase<C, J, M>>;
 impl<J: IntegerRingStore> Zn<zn_42::Zn, J> 
     where J::Type: IntegerRing,
         zn_42::ZnBase: CanHomFrom<J::Type>,
-        StaticRingBase<i64>: CanonicalIso<J::Type>
+        StaticRingBase<i64>: CanIsoFromTo<J::Type>
 {
     pub fn from_primes(large_integers: J, primes: Vec<u64>) -> Self {
         Self::new(
@@ -99,7 +99,7 @@ impl<J: IntegerRingStore> Zn<zn_42::Zn, J>
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Zn<C, J, M> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     ///
     /// Creates a new ring for `Z/nZ` with `n = m1 ... mr` where the `mi` are the moduli
@@ -122,8 +122,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Zn<C, J, M>
             );
         }
         let unit_vectors = summands.iter()
-            .map(|R: &C| ZZ.checked_div(total_ring.modulus(), &R.integer_ring().can_iso(ZZ).unwrap().map_ref(R.modulus())))
-            .map(Option::unwrap)
+            .map(|R: &C| ZZ.checked_div(total_ring.modulus(), &R.integer_ring().can_iso(ZZ).unwrap().map_ref(R.modulus())).unwrap())
             .map(|n: El<J>| total_ring.coerce(&ZZ, n))
             .zip(summands.iter())
             .map(|(n, R)| total_ring.pow_gen(n, &R.integer_ring().sub_ref_fst(R.modulus(), R.integer_ring().one()), R.integer_ring()))
@@ -140,7 +139,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Zn<C, J, M>
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnBase<C, J, M> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     fn ZZ(&self) -> &J {
         self.total_ring.integer_ring()
@@ -169,7 +168,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnBase<C, J,
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> VectorView<C> for ZnBase<C, J, M>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     fn len(&self) -> usize {
         self.components.len()
@@ -186,7 +185,7 @@ pub struct ZnEl<C: ZnRingStore, M: MemoryProvider<El<C>>>(M::Object)
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> RingBase for ZnBase<C, J, M> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     type Element = ZnEl<C, M>;
 
@@ -274,7 +273,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> RingBase for
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clone for ZnBase<C, J, M> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>,
         C: Clone,
         J: Clone,
         M: Clone
@@ -291,9 +290,9 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clone for Zn
 
 impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStore, M1: MemoryProvider<El<C1>>, M2: MemoryProvider<El<C2>>> CanHomFrom<ZnBase<C2, J2, M2>> for ZnBase<C1, J1, M1> 
     where C1::Type: ZnRing + CanHomFrom<C2::Type> + CanHomFrom<J1::Type>,
-        <C1::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J1::Type>,
+        <C1::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J1::Type>,
         C2::Type: ZnRing + CanHomFrom<J2::Type>,
-        <C2::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J2::Type>,
+        <C2::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J2::Type>,
         J1::Type: IntegerRing,
         J2::Type: IntegerRing
 {
@@ -325,7 +324,7 @@ impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStor
 
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> PartialEq for ZnBase<C, J, M> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>,
         J::Type: IntegerRing
 {
     fn eq(&self, other: &Self) -> bool {
@@ -333,15 +332,15 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> PartialEq fo
     }
 }
 
-impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStore, M1: MemoryProvider<El<C1>>, M2: MemoryProvider<El<C2>>> CanonicalIso<ZnBase<C2, J2, M2>> for ZnBase<C1, J1, M1> 
-    where C1::Type: ZnRing + CanonicalIso<C2::Type> + CanHomFrom<J1::Type>,
-        <C1::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J1::Type>,
+impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStore, M1: MemoryProvider<El<C1>>, M2: MemoryProvider<El<C2>>> CanIsoFromTo<ZnBase<C2, J2, M2>> for ZnBase<C1, J1, M1> 
+    where C1::Type: ZnRing + CanIsoFromTo<C2::Type> + CanHomFrom<J1::Type>,
+        <C1::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J1::Type>,
         C2::Type: ZnRing + CanHomFrom<J2::Type>,
-        <C2::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J2::Type>,
+        <C2::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J2::Type>,
         J1::Type: IntegerRing,
         J2::Type: IntegerRing
 {
-    type Isomorphism = Vec<<C1::Type as CanonicalIso<C2::Type>>::Isomorphism>;
+    type Isomorphism = Vec<<C1::Type as CanIsoFromTo<C2::Type>>::Isomorphism>;
 
     fn has_canonical_iso(&self, from: &ZnBase<C2, J2, M2>) -> Option<Self::Isomorphism> {
         if self.components.len() == from.components.len() {
@@ -365,8 +364,8 @@ impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStor
 
 impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider<El<C>>> CanHomFrom<zn_barett::ZnBase<K>> for ZnBase<C, J, M> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
-        J::Type: IntegerRing + CanonicalIso<K::Type>,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
+        J::Type: IntegerRing + CanIsoFromTo<K::Type>,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>,
         K::Type: IntegerRing
 {
     type Homomorphism = (<J::Type as CanHomFrom<K::Type>>::Homomorphism, Vec<<C::Type as CanHomFrom<J::Type>>::Homomorphism>);
@@ -401,24 +400,24 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider
     }
 }
 
-impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider<El<C>>> CanonicalIso<zn_barett::ZnBase<K>> for ZnBase<C, J, M> 
+impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider<El<C>>> CanIsoFromTo<zn_barett::ZnBase<K>> for ZnBase<C, J, M> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
-        J::Type: IntegerRing + CanonicalIso<K::Type>,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
+        J::Type: IntegerRing + CanIsoFromTo<K::Type>,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>,
         K::Type: IntegerRing
 {
     // we first map each `lift(x[i]) into `self.total_ring.integer_ring(): J`, then reduce it to 
     // `self.total_ring: Zn<J>`, then compute the value `sum_i lift(x[i]) * unit_vectors[i]` 
     // in `self.total_ring: Zn<J>` and then map this to `from: Zn<K>`.
     type Isomorphism = (
-        <zn_barett::ZnBase<J> as CanonicalIso<zn_barett::ZnBase<K>>>::Isomorphism, 
+        <zn_barett::ZnBase<J> as CanIsoFromTo<zn_barett::ZnBase<K>>>::Isomorphism, 
         <zn_barett::ZnBase<J> as CanHomFrom<J::Type>>::Homomorphism,
-        Vec<<<C::Type as ZnRing>::IntegerRingBase as CanonicalIso<J::Type>>::Isomorphism>
+        Vec<<<C::Type as ZnRing>::IntegerRingBase as CanIsoFromTo<J::Type>>::Isomorphism>
     );
 
     fn has_canonical_iso(&self, from: &zn_barett::ZnBase<K>) -> Option<Self::Isomorphism> {
         Some((
-            <zn_barett::ZnBase<J> as CanonicalIso<zn_barett::ZnBase<K>>>::has_canonical_iso(self.total_ring.get_ring(), from)?,
+            <zn_barett::ZnBase<J> as CanIsoFromTo<zn_barett::ZnBase<K>>>::has_canonical_iso(self.total_ring.get_ring(), from)?,
             self.total_ring.get_ring().has_canonical_hom(self.total_ring.integer_ring().get_ring())?,
             self.components.iter()
                 .map(|s| s.integer_ring().get_ring())
@@ -438,19 +437,35 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider
                 .map(|(integers, x, u, hom)| 
                     self.total_ring.mul_ref_snd(self.total_ring.get_ring().map_in(
                         self.total_ring.integer_ring().get_ring(), 
-                        <_ as CanonicalIso<_>>::map_out(integers, self.total_ring.integer_ring().get_ring(), x, hom), 
+                        <_ as CanIsoFromTo<_>>::map_out(integers, self.total_ring.integer_ring().get_ring(), x, hom), 
                         red
                     ), u)
                 )
         );
-        return <zn_barett::ZnBase<J> as CanonicalIso<zn_barett::ZnBase<K>>>::map_out(self.total_ring.get_ring(), from, result, final_iso);
+        return <zn_barett::ZnBase<J> as CanIsoFromTo<zn_barett::ZnBase<K>>>::map_out(self.total_ring.get_ring(), from, result, final_iso);
+    }
+}
+
+impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> CanHomFrom<zn_64::ZnBase> for ZnBase<C, J, M> 
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
+        J::Type: IntegerRing + CanIsoFromTo<StaticRingBase<i64>>,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
+{
+    type Homomorphism = (<Self as CanHomFrom<zn_barett::ZnBase<J>>>::Homomorphism, <zn_barett::ZnBase<J> as CanHomFrom<zn_64::ZnBase>>::Homomorphism);
+
+    fn has_canonical_hom(&self, from: &zn_64::ZnBase) -> Option<Self::Homomorphism> {
+        Some((self.has_canonical_hom(self.total_ring.get_ring())?, self.total_ring.get_ring().has_canonical_hom(from)?))
+    }
+    
+    fn map_in(&self, from: &zn_64::ZnBase, el: zn_64::ZnEl, hom: &Self::Homomorphism) -> ZnEl<C, M> {
+        self.map_in(self.total_ring.get_ring(), self.total_ring.get_ring().map_in(from, el, &hom.1), &hom.0)
     }
 }
 
 impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRing, M: MemoryProvider<El<C>>> CanHomFrom<K> for ZnBase<C, J, M> 
     where C::Type: ZnRing + CanHomFrom<J::Type> + CanHomFrom<K>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>,
         K: ?Sized
 {
     type Homomorphism = Vec<<C::Type as CanHomFrom<K>>::Homomorphism>;
@@ -474,7 +489,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRing, M: MemoryProvider<El<C
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> DivisibilityRing for ZnBase<C, J, M> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         Some(ZnEl(self.memory_provider.try_get_new_init(self.len(), |i| self.at(i).checked_div(lhs.0.at(i), rhs.0.at(i)).ok_or(())).ok()?))
@@ -484,7 +499,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Divisibility
 pub struct FromCongruenceElementCreator<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     ring: &'a ZnBase<C, J, M>
 }
@@ -492,7 +507,7 @@ pub struct FromCongruenceElementCreator<'a, C: ZnRingStore, J: IntegerRingStore,
 impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clone for FromCongruenceElementCreator<'a, C, J, M>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     fn clone(&self) -> Self {
         *self
@@ -502,13 +517,13 @@ impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clon
 impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Copy for FromCongruenceElementCreator<'a, C, J, M>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {}
 
 impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FnOnce<(&'b [El<C>],)> for FromCongruenceElementCreator<'a, C, J, M>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     type Output = <ZnBase<C, J, M> as RingBase>::Element;
 
@@ -520,7 +535,7 @@ impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FnOn
 impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FnMut<(&'b [El<C>],)> for FromCongruenceElementCreator<'a, C, J, M>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     extern "rust-call" fn call_mut(&mut self, args: (&'b [El<C>],)) -> Self::Output {
         self.ring.from_congruence(args.0.into_iter().enumerate().map(|(i, x)| self.ring.at(i).clone_el(x)))
@@ -530,7 +545,7 @@ impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FnMu
 pub struct CloneComponentElement<'a, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     ring: &'a ZnBase<C, J, M>
 }
@@ -538,7 +553,7 @@ pub struct CloneComponentElement<'a, C: ZnRingStore, J: IntegerRingStore, M: Mem
 impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clone for CloneComponentElement<'a, C, J, M>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     fn clone(&self) -> Self {
         *self
@@ -548,13 +563,13 @@ impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Clon
 impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Copy for CloneComponentElement<'a, C, J, M>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {}
 
 impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FnOnce<(usize, &'b El<C>)> for CloneComponentElement<'a, C, J, M>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     type Output = El<C>;
 
@@ -566,7 +581,7 @@ impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FnOn
 impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FnMut<(usize, &'b El<C>)> for CloneComponentElement<'a, C, J, M>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     extern "rust-call" fn call_mut(&mut self, args: (usize, &'b El<C>)) -> Self::Output {
         self.call(args)
@@ -576,7 +591,7 @@ impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FnMu
 impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Fn<(usize, &'b El<C>)> for CloneComponentElement<'a, C, J, M>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     extern "rust-call" fn call(&self, args: (usize, &'b El<C>)) -> Self::Output {
         self.ring.at(args.0).clone_el(args.1)
@@ -586,7 +601,7 @@ impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Fn<(
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FiniteRing for ZnBase<C, J, M> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     type ElementsIter<'a> = MultiProduct<<C::Type as FiniteRing>::ElementsIter<'a>, FromCongruenceElementCreator<'a, C, J, M>, CloneComponentElement<'a, C, J, M>, Self::Element>
         where Self: 'a;
@@ -613,7 +628,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> FiniteRing f
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> PrincipalIdealRing for ZnBase<C, J, M> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         let mut result = (self.zero(), self.zero(), self.zero());
@@ -627,7 +642,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> PrincipalIde
 impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnRing for ZnBase<C, J, M> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
-        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanonicalIso<J::Type>
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     type IntegerRingBase = J::Type;
     type Integers = J;
@@ -642,22 +657,22 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnRing for Z
 
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
         self.total_ring.smallest_positive_lift(
-            <Self as CanonicalIso<zn_barett::ZnBase<J>>>::map_out(
+            <Self as CanIsoFromTo<zn_barett::ZnBase<J>>>::map_out(
                 self, 
                 self.total_ring.get_ring(), 
                 el, 
-                &<Self as CanonicalIso<zn_barett::ZnBase<J>>>::has_canonical_iso(self, self.total_ring.get_ring()).unwrap()
+                &<Self as CanIsoFromTo<zn_barett::ZnBase<J>>>::has_canonical_iso(self, self.total_ring.get_ring()).unwrap()
             )
         )
     }
 
     fn smallest_lift(&self, el: Self::Element) -> El<Self::Integers> {
         self.total_ring.smallest_lift(
-            <Self as CanonicalIso<zn_barett::ZnBase<J>>>::map_out(
+            <Self as CanIsoFromTo<zn_barett::ZnBase<J>>>::map_out(
                 self, 
                 self.total_ring.get_ring(), 
                 el, 
-                &<Self as CanonicalIso<zn_barett::ZnBase<J>>>::has_canonical_iso(self, self.total_ring.get_ring()).unwrap()
+                &<Self as CanIsoFromTo<zn_barett::ZnBase<J>>>::has_canonical_iso(self, self.total_ring.get_ring()).unwrap()
             )
         )
     }

@@ -112,7 +112,7 @@ impl<const N: u64, const IS_FIELD: bool> CanHomFrom<zn_42::ZnBase> for ZnBase<N,
     }
 }
 
-impl<const N: u64, const IS_FIELD: bool> CanonicalIso<zn_42::ZnBase> for ZnBase<N, IS_FIELD> {
+impl<const N: u64, const IS_FIELD: bool> CanIsoFromTo<zn_42::ZnBase> for ZnBase<N, IS_FIELD> {
     type Isomorphism = ();
 
     fn has_canonical_iso(&self, from: &zn_42::ZnBase) -> Option<()> {
@@ -135,7 +135,7 @@ impl<const N: u64, const IS_FIELD: bool> CanHomFrom<ZnBase<N, IS_FIELD>> for ZnB
     fn map_in(&self, _: &Self, el: Self::Element, _: &()) -> Self::Element { el }
 }
 
-impl<const N: u64, const IS_FIELD: bool> CanonicalIso<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD> {
+impl<const N: u64, const IS_FIELD: bool> CanIsoFromTo<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD> {
     type Isomorphism = ();
     fn has_canonical_iso(&self, _: &Self) -> Option<()> { Some(()) }
     fn map_out(&self, _: &Self, el: Self::Element, _: &()) -> Self::Element { el }
