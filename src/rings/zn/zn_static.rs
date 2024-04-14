@@ -96,6 +96,7 @@ impl<const N: u64, const IS_FIELD: bool> CanHomFrom<StaticRingBase<i64>> for ZnB
     }
 }
 
+#[allow(deprecated)]
 impl<const N: u64, const IS_FIELD: bool> CanHomFrom<zn_42::ZnBase> for ZnBase<N, IS_FIELD> {
     type Homomorphism = ();
 
@@ -112,6 +113,7 @@ impl<const N: u64, const IS_FIELD: bool> CanHomFrom<zn_42::ZnBase> for ZnBase<N,
     }
 }
 
+#[allow(deprecated)]
 impl<const N: u64, const IS_FIELD: bool> CanIsoFromTo<zn_42::ZnBase> for ZnBase<N, IS_FIELD> {
     type Isomorphism = ();
 

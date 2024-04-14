@@ -150,7 +150,7 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
 #[cfg(test)]
-use crate::rings::zn::zn_42;
+use crate::rings::zn::zn_64;
 #[cfg(test)]
 use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
@@ -192,7 +192,7 @@ fn test_poly_squarefree_part() {
 
 #[test]
 fn test_poly_squarefree_part_multiplicity_p() {
-    let ring = DensePolyRing::new(zn_42::Zn::new(5).as_field().ok().unwrap(), "X");
+    let ring = DensePolyRing::new(zn_64::Zn::new(5).as_field().ok().unwrap(), "X");
     let f = ring.from_terms([(ring.base_ring().int_hom().map(3), 0), (ring.base_ring().int_hom().map(1), 10)].into_iter());
     let g = ring.from_terms([(ring.base_ring().int_hom().map(3), 0), (ring.base_ring().int_hom().map(1), 2)].into_iter());
     let mut actual = poly_squarefree_part(&ring, f);

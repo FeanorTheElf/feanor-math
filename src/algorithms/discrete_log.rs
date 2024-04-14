@@ -111,7 +111,7 @@ pub fn finite_field_log<R: FiniteRingStore>(value: El<R>, base: El<R>, Fq: R) ->
 #[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
 #[cfg(test)]
-use crate::rings::zn::zn_42;
+use crate::rings::zn::zn_64;
 #[cfg(test)]
 use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
@@ -143,6 +143,6 @@ fn test_discrete_log() {
 
 #[test]
 fn test_finite_field_log() {
-    let Fp = zn_42::Zn::new(1009).as_field().ok().unwrap();
+    let Fp = zn_64::Zn::new(1009).as_field().ok().unwrap();
     assert_eq!(Some(486), finite_field_log(Fp.pow(Fp.int_hom().map(11), 486), Fp.int_hom().map(11), &Fp));
 }

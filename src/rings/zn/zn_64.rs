@@ -305,6 +305,7 @@ impl<I: IntegerRingStore> CanIsoFromTo<zn_barett::ZnBase<I>> for ZnBase
     }
 }
 
+#[allow(deprecated)]
 impl CanHomFrom<zn_42::ZnBase> for ZnBase {
 
     type Homomorphism = ();
@@ -324,10 +325,12 @@ impl CanHomFrom<zn_42::ZnBase> for ZnBase {
     }
 }
 
-pub enum ToZn42Iso {
+
+#[allow(deprecated)]pub enum ToZn42Iso {
     Trivial, ReduceRequired(<zn_42::ZnBase as CanHomFrom<StaticRingBase<i64>>>::Homomorphism)
 }
 
+#[allow(deprecated)]
 impl CanIsoFromTo<zn_42::ZnBase> for ZnBase {
 
     type Isomorphism = ToZn42Iso;
@@ -750,6 +753,7 @@ fn test_ring_axioms() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn test_iso_zn_42() {
     for n in [2, 5, 17, (1 << 41) - 1] {
         let R1 = Zn::new(n);

@@ -8,7 +8,7 @@ use crate::homomorphism::Homomorphism;
 use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::ring::*;
 use crate::rings::multivariate::*;
-use crate::rings::zn::{ZnRing, zn_64, ZnRingStore, zn_42, zn_static};
+use crate::rings::zn::{ZnRing, zn_64, ZnRingStore, zn_static};
 use crate::vector::*;
 use crate::algorithms;
 
@@ -424,7 +424,8 @@ impl GBRingDescriptorRing for zn_64::ZnBase {
     }
 }
 
-impl GBRingDescriptorRing for zn_42::ZnBase {
+#[allow(deprecated)]
+impl GBRingDescriptorRing for crate::rings::zn::zn_42::ZnBase {
 
     fn create_ring_info(&self) -> RingInfo<Self> {
         ring_info_local_zn_ring(RingRef::new(self)).expect("Currently GBRingDescriptorRing only works for local rings Z/nZ, i.e. Z/p^eZ with p prime")
