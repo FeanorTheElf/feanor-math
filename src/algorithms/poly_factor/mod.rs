@@ -29,12 +29,13 @@ use super::hensel::hensel_lift_factorization;
 pub mod cantor_zassenhaus;
 pub mod number_field;
 
-fn binomial(n: usize, mut k: usize) -> usize {
+fn binomial(n: usize, mut k: usize) -> El<BigIntRing> {
     if k > n {
-        0
+        BigIntRing::RING.zero()
     } else {
         k = min(k, n - k);
-        ((n - k + 1)..=n).product::<usize>() / (1..=k).product::<usize>()
+        let to_ZZbig = BigIntRing::RING.can_hom(&StaticRing::<i64>::RING).unwrap();
+        BigIntRing::RING.checked_div(&BigIntRing::RING.prod(((n - k + 1)..=n).map(|k| to_ZZbig.map(k as i64))), &BigIntRing::RING.prod((1..=k).map(|k| to_ZZbig.map(k as i64)))).unwrap()
     }
 }
 
@@ -98,6 +99,11 @@ pub trait FactorPolyField: Field {
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
 }
 
+///
+/// Local struct that implements [`ZnOperation`] to factor a polynomial over the integers,
+/// by factoring it over `Fp`, lifting the factorization to `Z/p^eZ` and then extracting
+/// integral factors. Used only in [`factor_integer_poly()`].
+/// 
 struct FactorizeMonicIntegerPolynomialUsingHenselLifting<'a, P, R>
     where P: PolyRingStore,
         P::Type: PolyRing + DivisibilityRing,
@@ -142,7 +148,6 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
             &factorization.into_iter().map(|(f, _)| f).collect::<Vec<_>>()
         );
 
-        let start = Instant::now();
         let mut current = self.ZZX.clone_el(self.poly);
         let mut ungrouped_factors = (0..lifted_factorization.len()).collect::<Vec<_>>();
         let mut result = Vec::new();
@@ -173,6 +178,10 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
     }
 }
 
+///
+/// Computes the square-free part of a polynomial `f`, i.e. the greatest (w.r.t.
+/// divisibility) polynomial `g | f` that is square-free.
+/// 
 pub fn poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
     where P: PolyRingStore,
         P::Type: PolyRing + PrincipalIdealRing,
@@ -234,10 +243,10 @@ fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
                 .map(|(c, _)| ZZbig.pow(int_cast(ZZX.base_ring().clone_el(c), &ZZbig, ZZX.base_ring()), 2))
             ), 2);
             let bound = ZZbig.add(
-                ZZbig.mul(poly_norm, ZZbig.coerce(&ZZ, binomial(d, d / 2) as i64)),
+                ZZbig.mul(poly_norm, binomial(d, d / 2)),
                 ZZbig.mul(
                     int_cast(ZZX.base_ring().clone_el(ZZX.lc(f).unwrap()), ZZbig, ZZX.base_ring()), 
-                    ZZbig.coerce(&ZZ, binomial(d, d / 2) as i64)
+                    binomial(d, d / 2)
                 )
             );
             let exponent = ZZbig.abs_log2_ceil(&bound).unwrap() / (ZZ.abs_log2_ceil(&(p + 1)).unwrap() - 1) + 1;
@@ -528,10 +537,10 @@ fn bench_factor_rational_poly(bencher: &mut Bencher) {
     let poly_ring = DensePolyRing::new(QQ, "X");
     let f1 = poly_ring.checked_div(&poly_ring.from_terms([(incl.map(1), 0), (incl.map(1), 2), (incl.map(1), 4), (incl.map(3), 8)].into_iter()), &poly_ring.int_hom().map(3)).unwrap();
     let f2 = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4), (incl.map(1), 5), (incl.map(1), 10)].into_iter());
-    // let f3 = poly_ring.from_terms([(incl.map(1), 0), (incl.map(1), 1), (incl.map(-2), 5), (incl.map(1), 17)].into_iter());
+    let f3 = poly_ring.from_terms([(incl.map(1), 0), (incl.map(1), 1), (incl.map(-2), 5), (incl.map(1), 17)].into_iter());
     bencher.iter(|| {
-        let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f1), poly_ring.clone_el(&f1), poly_ring.clone_el(&f2)/* , poly_ring.clone_el(&f3) */, poly_ring.int_hom().map(9)].into_iter()));
-        assert_eq!(2, actual.len());
+        let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f1), poly_ring.clone_el(&f1), poly_ring.clone_el(&f2), poly_ring.clone_el(&f3), poly_ring.int_hom().map(9)].into_iter()));
+        assert_eq!(3, actual.len());
         assert_el_eq!(&QQ, &QQ.int_hom().map(9), &unit);
         for (f, e) in actual.iter() {
             if poly_ring.eq_el(f, &f1) {
@@ -540,11 +549,11 @@ fn bench_factor_rational_poly(bencher: &mut Bencher) {
             } else if poly_ring.eq_el(f, &f2) {
                 assert_el_eq!(&poly_ring, &f2, f);
                 assert_eq!(1, *e);
-            // } else if poly_ring.eq_el(f, &f3) {
-            //     assert_el_eq!(&poly_ring, &f3, f);
-            //     assert_eq!(1, *e);
+           } else if poly_ring.eq_el(f, &f3) {
+               assert_el_eq!(&poly_ring, &f3, f);
+               assert_eq!(1, *e);
             } else {
-                panic!("Factorization returned wrong factor {} of ({})^2 * {}", poly_ring.format(f), poly_ring.format(&f1), poly_ring.format(&f2) /* , poly_ring.format(&f3) */);
+                panic!("Factorization returned wrong factor {} of ({})^2 * {} * {}", poly_ring.format(f), poly_ring.format(&f1), poly_ring.format(&f2), poly_ring.format(&f3));
             }
         }
     });
