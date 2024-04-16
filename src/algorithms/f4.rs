@@ -110,7 +110,7 @@ fn coeff_lcm<R>(ring: R, lhs: &El<R>, rhs: &El<R>) -> (El<R>, El<R>, El<R>)
     where R: PrincipalIdealRingStore,
         R::Type: PrincipalIdealRing
 {
-    let gcd = ring.ideal_gen(lhs, rhs).2;
+    let gcd = ring.ideal_gen(lhs, rhs);
     let s = ring.checked_div(rhs, &gcd).unwrap();
     return (ring.clone_el(&s), ring.checked_div(lhs, &gcd).unwrap(), ring.mul(s, gcd));
 }
@@ -241,7 +241,7 @@ pub struct RingInfo<R: ?Sized>
     where R: RingBase
 {
     pub ring: PhantomData<R>,
-    pub ideal_generator: R::Element,
+    pub extended_ideal_generator: R::Element,
     pub annihilating_power: Option<usize>
 }
 
@@ -286,7 +286,7 @@ impl SPoly {
             },
             SPoly::Nilpotent(i, k) => {
                 assert!(ring_info.annihilating_power.is_some());
-                let factor = ring.base_ring().pow(ring.base_ring().clone_el(&ring_info.ideal_generator), *k);
+                let factor = ring.base_ring().pow(ring.base_ring().clone_el(&ring_info.extended_ideal_generator), *k);
                 return Box::new(ring.terms(&basis[*i]).map(move |(c, m)| (ring.base_ring().mul_ref(c, &factor), ring.clone_monomial(m))).filter(move |(c, _)| !ring.base_ring().is_zero(c)));
             }
         }
@@ -325,7 +325,7 @@ impl SPoly {
             <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
             O: MonomialOrder + Copy
     {
-        self.terms(ring, ring_info, basis, order).max_by(|(_, l), (_, r)| order.compare(l, r)).map(|(c, _)| p_valuation(ring.base_ring(), &ring_info.ideal_generator, c)).unwrap()
+        self.terms(ring, ring_info, basis, order).max_by(|(_, l), (_, r)| order.compare(l, r)).map(|(c, _)| p_valuation(ring.base_ring(), &ring_info.extended_ideal_generator, c)).unwrap()
     }
 
     fn poly<P, O>(&self, ring: &P, ring_info: &RingInfo<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>, basis: &[El<P>], order: O) -> El<P>
@@ -378,7 +378,7 @@ impl SPoly {
             SPoly::Standard(i, j) => {
                 let fi_lm = ring.lm(&basis[*i], order).unwrap();
                 let fj_lm = ring.lm(&basis[*j], order).unwrap();
-                fi_lm.is_coprime(fj_lm) && ring.base_ring().is_unit(&ring.base_ring().ideal_gen(ring.coefficient_at(&basis[*i], fi_lm), ring.coefficient_at(&basis[*j], fj_lm)).2)
+                fi_lm.is_coprime(fj_lm) && ring.base_ring().is_unit(&ring.base_ring().extended_ideal_gen(ring.coefficient_at(&basis[*i], fi_lm), ring.coefficient_at(&basis[*j], fj_lm)).2)
             },
             _ => false
         }
@@ -396,7 +396,7 @@ impl<F: Field> GBRingDescriptorRing for F {
         RingInfo {
             annihilating_power: None,
             ring: PhantomData,
-            ideal_generator: self.zero()
+            extended_ideal_generator: self.zero()
         }
     }
 }
@@ -413,7 +413,7 @@ fn ring_info_local_zn_ring<R>(ring: R) -> Option<RingInfo<R::Type>>
     return Some(RingInfo {
         annihilating_power: Some(e),
         ring: PhantomData,
-        ideal_generator: ring.can_hom(ring.integer_ring()).unwrap().map(p)
+        extended_ideal_generator: ring.can_hom(ring.integer_ring()).unwrap().map(p)
     });
 }
 
@@ -551,7 +551,7 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
         let new_polys: Vec<_> = if S_polys.len() > 0 {
             
             if S_polys.len() > 20 {
-                reduce_S_matrix(&ring, &ring_info.ideal_generator, &S_polys, &basis, order)
+                reduce_S_matrix(&ring, &ring_info.extended_ideal_generator, &S_polys, &basis, order)
             } else {
                 let start = std::time::Instant::now();
                 let result = S_polys.into_iter().map(|f| multivariate_division(&ring, f, &basis, order)).filter(|f| !ring.is_zero(f)).collect();

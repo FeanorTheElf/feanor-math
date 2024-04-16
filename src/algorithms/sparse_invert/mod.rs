@@ -293,7 +293,7 @@ mod local {
     /// In the block of matrix given by `global_pivot`, performs unimodular row operation
     /// to ensure that the element in the pivot position divides all elements below it. 
     /// 
-    fn make_pivot_ideal_gen<R, V1, V2>(ring: R, mut matrix: ColumnMut<V1, InternalRow<El<R>>>, mut transform: ColumnMut<V2, InternalRow<El<R>>>, (pivot_i, pivot_j): (usize, usize), tmp: &mut [InternalRow<El<R>>; 2]) 
+    fn make_pivot_extended_ideal_gen<R, V1, V2>(ring: R, mut matrix: ColumnMut<V1, InternalRow<El<R>>>, mut transform: ColumnMut<V2, InternalRow<El<R>>>, (pivot_i, pivot_j): (usize, usize), tmp: &mut [InternalRow<El<R>>; 2]) 
         where R: PrincipalIdealRingStore + Copy,
             R::Type: PrincipalIdealRing,
             V1: AsPointerToSlice<InternalRow<El<R>>>,
@@ -306,7 +306,7 @@ mod local {
             }
             if let Some(entry) = matrix.at(i).leading_entry_at(pivot_j) {
                 if ring.checked_div(entry, &current).is_none() {
-                    let (s, t, d) = ring.ideal_gen(&current, entry);
+                    let (s, t, d) = ring.extended_ideal_gen(&current, entry);
                     let local_transform = [[s, t], [ring.checked_div(entry, &d).unwrap(), ring.checked_div(&current, &d).unwrap()]];
                     let (fst_row, snd_row) = matrix.two_entries(pivot_i, i);
                     transform_2d(ring, &local_transform, [fst_row, snd_row], tmp);
@@ -369,7 +369,7 @@ mod local {
         let mut transform = transform.col_at(0);
 
         for j in 0..col_block {
-            make_pivot_ideal_gen(ring, matrix.reborrow(), transform.reborrow(), (i, j), &mut tmp);
+            make_pivot_extended_ideal_gen(ring, matrix.reborrow(), transform.reborrow(), (i, j), &mut tmp);
             if matrix.at(i).leading_entry_at(j).is_some() {
                 eliminate_row(ring, matrix.reborrow(), transform.reborrow(), (i, j), &mut tmp[0]);
                 i += 1;

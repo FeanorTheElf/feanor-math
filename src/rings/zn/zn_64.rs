@@ -476,8 +476,8 @@ impl FiniteRing for ZnBase {
 
 impl PrincipalIdealRing for ZnBase {
 
-    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        let (s, t, d) = StaticRing::<i64>::RING.ideal_gen(&(lhs.0 as i64), &(rhs.0 as i64));
+    fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        let (s, t, d) = StaticRing::<i64>::RING.extended_ideal_gen(&(lhs.0 as i64), &(rhs.0 as i64));
         let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
     }
@@ -564,8 +564,8 @@ impl PartialEq for ZnFastmulBase {
 
 impl PrincipalIdealRing for ZnFastmulBase {
 
-    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        let (s, t, d) = self.get_delegate().ideal_gen(self.delegate_ref(lhs), self.delegate_ref(rhs));
+    fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        let (s, t, d) = self.get_delegate().extended_ideal_gen(self.delegate_ref(lhs), self.delegate_ref(rhs));
         (self.rev_delegate(s), self.rev_delegate(t), self.rev_delegate(d))
     }
 }

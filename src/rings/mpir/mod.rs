@@ -293,7 +293,7 @@ impl DivisibilityRing for MPZBase {
 
 impl PrincipalIdealRing for MPZBase {
     
-    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+    fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), MPZ::RING)
     }
 }

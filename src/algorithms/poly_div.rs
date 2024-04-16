@@ -57,6 +57,8 @@ pub fn poly_div<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_rin
 
 ///
 /// Computes `(q, r, a)` such that `a * lhs = q * rhs + r` and `deg(r) < deg(rhs)`.
+/// The chosen factor `a` is a unit in the base ring and is the smallest possible w.r.t.
+/// divisibility.
 /// 
 pub fn poly_div_domain<P>(ring: P, mut lhs: El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<<P::Type as RingExtension>::BaseRing>)
     where P: PolyRingStore,
@@ -75,7 +77,7 @@ pub fn poly_div_domain<P>(ring: P, mut lhs: El<P>, rhs: &El<P>) -> (El<P>, El<P>
             break;
         }
         let lhs_lc = base_ring.clone_el(ring.lc(&lhs).unwrap());
-        let gcd = base_ring.ideal_gen(&lhs_lc, &rhs_lc).2;
+        let gcd = base_ring.ideal_gen(&lhs_lc, &rhs_lc);
         let additional_scale = base_ring.checked_div(&rhs_lc, &gcd).unwrap();
 
         base_ring.mul_assign_ref(&mut current_scale, &additional_scale);

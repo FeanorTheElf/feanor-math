@@ -216,7 +216,7 @@ impl<I> PrincipalIdealRing for RationalFieldBase<I>
     where I: IntegerRingStore,
         I::Type: IntegerRing
 {
-    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+    fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         if self.is_zero(lhs) && self.is_zero(rhs) {
             return (self.zero(), self.zero(), self.zero());
         } else if self.is_zero(lhs) {

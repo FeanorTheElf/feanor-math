@@ -428,7 +428,7 @@ impl<R,> DivisibilityRing for SparsePolyRingBase<R>
 impl<R> PrincipalIdealRing for SparsePolyRingBase<R>
     where R: RingStore, R::Type: Field
 {
-    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+    fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), RingRef::new(self))
     }
 }

@@ -110,7 +110,7 @@ impl DivisibilityRing for Real64Base {
 
 impl PrincipalIdealRing for Real64Base {
 
-    fn ideal_gen(&self, _lhs: &Self::Element, _rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+    fn extended_ideal_gen(&self, _lhs: &Self::Element, _rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         panic!("Since Complex64 is only approximate, this cannot be implemented properly")
     }
 }

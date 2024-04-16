@@ -167,8 +167,8 @@ pub trait RingBase: PartialEq {
     /// This would usually be the case for rings that are based on `f32` or
     /// `f64`, to represent real or complex numbers.
     /// 
-    /// Note that these rings cannot provide implementations for [`Self::eq_el()`], 
-    /// [`Self::is_zero()`] etc, and hence are of limited use in this crate.
+    /// Note that these rings cannot provide implementations for [`RingBase::eq_el()`], 
+    /// [`RingBase::is_zero()`] etc, and hence are of limited use in this crate.
     /// Currently, the only way how approximate rings are used is a complex-valued
     /// fast Fourier transform, via [`crate::rings::float_complex::Complex64`].
     /// 

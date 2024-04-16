@@ -57,7 +57,7 @@ pub fn resultant<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type as RingE
         // adjust the scaling factor - we cancel out gcd's to prevent excessive number growth
         base_ring.mul_assign(&mut scale_den, base_ring.pow(a, ring.degree(&f).unwrap()));
         base_ring.mul_assign(&mut scale_num, base_ring.pow(base_ring.clone_el(ring.lc(&f).unwrap()), deg_g - deg_r));
-        let gcd = base_ring.ideal_gen(&scale_den, &scale_num).2;
+        let gcd = base_ring.ideal_gen(&scale_den, &scale_num);
         scale_den = base_ring.checked_div(&scale_den, &gcd).unwrap();
         scale_num = base_ring.checked_div(&scale_num, &gcd).unwrap();
 

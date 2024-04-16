@@ -1,5 +1,4 @@
 use crate::algorithms;
-use crate::algorithms::poly_factor::cantor_zassenhaus;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::divisibility::*;
 use crate::field::*;
@@ -14,6 +13,8 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::{PolyRing, PolyRingStore};
 use crate::rings::rational::*;
 use crate::vector::VectorView;
+
+use super::poly_squarefree_part;
 
 fn factor_squarefree_over_number_field<'a, P, I>(KX: &'a P, f: El<P>) -> impl 'a + Iterator<Item = El<P>>
     where P: PolyRingStore,
@@ -51,13 +52,13 @@ fn factor_squarefree_over_number_field<'a, P, I>(KX: &'a P, f: El<P>) -> impl 'a
         let f_transformed = KX.evaluate(&f, &lin_transform, &KX.inclusion());
         let norm_f_transformed = N(KX.clone_el(&f_transformed));
         let degree = QQX.degree(&norm_f_transformed).unwrap();
-        let squarefree_part = cantor_zassenhaus::poly_squarefree_part(&QQX, norm_f_transformed);
+        let squarefree_part = poly_squarefree_part(&QQX, norm_f_transformed);
         if QQX.degree(&squarefree_part).unwrap() == degree {
             let lin_transform_rev = KX.from_terms([(K.mul(K.canonical_gen(), K.int_hom().map(-k)), 0), (K.one(), 1)].into_iter());
             let (factorization, _unit) = <RationalFieldBase<_> as FactorPolyField>::factor_poly(&QQX, &squarefree_part);
             return factorization.into_iter().map(move |(factor, e)| {
                 assert!(e == 1);
-                let mut f_factor = KX.ideal_gen(&f_transformed, &KX.lifted_hom(&QQX, K.inclusion()).map(factor)).2;
+                let mut f_factor = KX.extended_ideal_gen(&f_transformed, &KX.lifted_hom(&QQX, K.inclusion()).map(factor)).2;
                 let lc_inv = K.div(&K.one(), KX.lc(&f_factor).unwrap());
                 KX.inclusion().mul_assign_map(&mut f_factor, lc_inv);
                 return KX.evaluate(&f_factor, &lin_transform_rev, &KX.inclusion());
@@ -92,7 +93,7 @@ pub fn factor_over_number_field<P, I>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, u
     let mut result: Vec<(El<P>, usize)> = Vec::new();
     let mut current = KX.clone_el(f);
     while !KX.is_unit(&current) {
-        let mut squarefree_part = cantor_zassenhaus::poly_squarefree_part(KX, KX.clone_el(&current));
+        let mut squarefree_part = poly_squarefree_part(KX, KX.clone_el(&current));
         let lc_inv = K.div(&K.one(), KX.lc(&squarefree_part).unwrap());
         KX.inclusion().mul_assign_map(&mut squarefree_part, lc_inv);
         current = KX.checked_div(&current, &squarefree_part).unwrap();

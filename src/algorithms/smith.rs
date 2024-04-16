@@ -52,7 +52,7 @@ pub fn pre_smith<R, TL, TR>(ring: R, L: &mut TL, R: &mut TR, A: &mut DenseMatrix
                     TransformRows(A).subtract(ring.get_ring(), k, i, &quo);
                     L.subtract(ring.get_ring(), k, i, &quo);
                 } else {
-                    let (s, t, d) = ring.ideal_gen(A.at(k, k), A.at(i, k));
+                    let (s, t, d) = ring.extended_ideal_gen(A.at(k, k), A.at(i, k));
                     let transform = [s, t, ring.negate(ring.checked_div(A.at(i, k), &d).unwrap()), ring.checked_div(A.at(k, k), &d).unwrap()];
                     TransformRows(A).transform(ring.get_ring(), k, i, &transform);
                     L.transform(ring.get_ring(), k, i, &transform);
@@ -69,7 +69,7 @@ pub fn pre_smith<R, TL, TR>(ring: R, L: &mut TL, R: &mut TR, A: &mut DenseMatrix
                     R.subtract(ring.get_ring(), k, j, &quo);
                 } else {
                     changed = true;
-                    let (s, t, d) = ring.ideal_gen(A.at(k, k), A.at(k, j));
+                    let (s, t, d) = ring.extended_ideal_gen(A.at(k, k), A.at(k, j));
                     let transform = [s, t, ring.negate(ring.checked_div(A.at(k, j), &d).unwrap()), ring.checked_div(A.at(k, k), &d).unwrap()];
                     TransformCols(A).transform(ring.get_ring(), k, j, &transform);
                     R.transform(ring.get_ring(), k, j, &transform);

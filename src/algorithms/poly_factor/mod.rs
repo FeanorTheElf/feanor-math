@@ -1,4 +1,5 @@
 use std::cmp::min;
+use std::time::Instant;
 
 use crate::divisibility::*;
 use crate::field::{Field, FieldStore};
@@ -6,7 +7,7 @@ use crate::homomorphism::Homomorphism;
 use crate::integer::{int_cast, BigIntRing, IntegerRing, IntegerRingStore};
 use crate::mempool::MemoryProvider;
 use crate::ordered::*;
-use crate::pid::EuclideanRing;
+use crate::pid::*;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::extension::extension_impl::{FreeAlgebraImpl, FreeAlgebraImplBase};
@@ -14,15 +15,14 @@ use crate::rings::extension::FreeAlgebra;
 use crate::rings::field::AsFieldBase;
 use crate::rings::finite::FiniteRing;
 use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::rings::poly::{PolyRing, PolyRingStore};
+use crate::rings::poly::{derive_poly, PolyRing, PolyRingStore};
 use crate::algorithms::{self, int_bisect};
 use crate::rings::rational::*;
-use crate::rings::zn::zn_64::Zn;
+use crate::rings::zn::zn_64::*;
 use crate::rings::zn::{choose_zn_impl, ZnOperation, ZnRing, ZnRingStore};
 use crate::vector::VectorView;
 use crate::rings::fieldextension::*;
 
-use cantor_zassenhaus::poly_squarefree_part;
 use super::erathostenes;
 use super::hensel::hensel_lift_factorization;
 
@@ -142,6 +142,7 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
             &factorization.into_iter().map(|(f, _)| f).collect::<Vec<_>>()
         );
 
+        let start = Instant::now();
         let mut current = self.ZZX.clone_el(self.poly);
         let mut ungrouped_factors = (0..lifted_factorization.len()).collect::<Vec<_>>();
         let mut result = Vec::new();
@@ -169,6 +170,29 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
         }
         assert!(self.ZZX.is_one(&current));
         return result;
+    }
+}
+
+pub fn poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
+    where P: PolyRingStore,
+        P::Type: PolyRing + PrincipalIdealRing,
+        <P::Type as RingExtension>::BaseRing: FieldStore,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field
+{
+    assert!(!poly_ring.is_zero(&poly));
+    let derivate = derive_poly(&poly_ring, &poly);
+    if poly_ring.is_zero(&derivate) {
+        let p = poly_ring.base_ring().characteristic(&StaticRing::<i64>::RING).unwrap() as usize;
+        if poly_ring.terms(&poly).all(|(_, i)| i == 0) {
+            return poly;
+        } else {
+            assert!(p > 0);
+        }
+        let base_poly = poly_ring.from_terms(poly_ring.terms(&poly).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i / p)));
+        return poly_squarefree_part(poly_ring, base_poly);
+    } else {
+        let square_part = poly_ring.ideal_gen(&poly, &derivate);
+        return poly_ring.checked_div(&poly, &square_part).unwrap();
     }
 }
 
@@ -242,7 +266,7 @@ impl<I> FactorPolyField for RationalFieldBase<I>
         let mut result = Vec::new();
         let mut current = QQX.clone_el(poly);
         while !QQX.is_unit(&current) {
-            let mut squarefree_part = cantor_zassenhaus::poly_squarefree_part(&poly_ring, QQX.clone_el(&current));
+            let mut squarefree_part = poly_squarefree_part(&poly_ring, QQX.clone_el(&current));
             let lc_inv = QQ.div(&QQ.one(), &QQX.lc(&squarefree_part).unwrap());
             QQX.inclusion().mul_assign_map(&mut squarefree_part, lc_inv);
             current = QQX.checked_div(&current, &squarefree_part).unwrap();
@@ -386,7 +410,19 @@ impl<R> FactorPolyField for R
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_static;
+use crate::rings::zn::{zn_static, zn_64};
+#[cfg(test)]
+use test::Bencher;
+
+#[cfg(test)]
+fn normalize_poly<P>(poly_ring: P, poly: &mut El<P>)
+    where P: PolyRingStore,
+        P::Type: PolyRing,
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: Field
+{
+    let inv_lc = poly_ring.base_ring().div(&poly_ring.base_ring().one(), poly_ring.lc(poly).unwrap());
+    poly_ring.inclusion().mul_assign_map_ref(poly, &inv_lc);
+}
 
 #[test]
 fn test_factor_int_poly() {
@@ -449,4 +485,67 @@ fn test_factor_fp() {
     assert_el_eq!(&poly_ring, &h, &factorization[1].0);
     assert_eq!(1, factorization[2].1);
     assert_el_eq!(&poly_ring, &f, &factorization[2].0);
+}
+
+#[test]
+fn test_poly_squarefree_part() {
+    let ring = DensePolyRing::new(zn_static::Fp::<257>::RING, "X");
+    let a = ring.prod([
+        ring.from_terms([(4, 0), (1, 1)].into_iter()),
+        ring.from_terms([(6, 0), (1, 1)].into_iter()),
+        ring.from_terms([(6, 0), (1, 1)].into_iter()),
+        ring.from_terms([(255, 0), (1, 1)].into_iter()),
+        ring.from_terms([(255, 0), (1, 1)].into_iter()),
+        ring.from_terms([(8, 0), (1, 1)].into_iter()),
+        ring.from_terms([(8, 0), (1, 1)].into_iter()),
+        ring.from_terms([(8, 0), (1, 1)].into_iter())
+    ].into_iter());
+    let b = ring.prod([
+        ring.from_terms([(4, 0), (1, 1)].into_iter()),
+        ring.from_terms([(6, 0), (1, 1)].into_iter()),
+        ring.from_terms([(255, 0), (1, 1)].into_iter()),
+        ring.from_terms([(8, 0), (1, 1)].into_iter())
+    ].into_iter());
+    let mut squarefree_part = poly_squarefree_part(&ring, a);
+    normalize_poly(&ring, &mut squarefree_part);
+    assert_el_eq!(&ring, &b, &squarefree_part);
+}
+
+#[test]
+fn test_poly_squarefree_part_multiplicity_p() {
+    let ring = DensePolyRing::new(zn_64::Zn::new(5).as_field().ok().unwrap(), "X");
+    let f = ring.from_terms([(ring.base_ring().int_hom().map(3), 0), (ring.base_ring().int_hom().map(1), 10)].into_iter());
+    let g = ring.from_terms([(ring.base_ring().int_hom().map(3), 0), (ring.base_ring().int_hom().map(1), 2)].into_iter());
+    let mut actual = poly_squarefree_part(&ring, f);
+    normalize_poly(&ring, &mut actual);
+    assert_el_eq!(&ring, &g, &actual);
+}
+
+#[bench]
+fn bench_factor_rational_poly(bencher: &mut Bencher) {
+    let QQ = RationalField::new(BigIntRing::RING);
+    let incl = QQ.int_hom();
+    let poly_ring = DensePolyRing::new(QQ, "X");
+    let f1 = poly_ring.checked_div(&poly_ring.from_terms([(incl.map(1), 0), (incl.map(1), 2), (incl.map(1), 4), (incl.map(3), 8)].into_iter()), &poly_ring.int_hom().map(3)).unwrap();
+    let f2 = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4), (incl.map(1), 5), (incl.map(1), 10)].into_iter());
+    // let f3 = poly_ring.from_terms([(incl.map(1), 0), (incl.map(1), 1), (incl.map(-2), 5), (incl.map(1), 17)].into_iter());
+    bencher.iter(|| {
+        let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f1), poly_ring.clone_el(&f1), poly_ring.clone_el(&f2)/* , poly_ring.clone_el(&f3) */, poly_ring.int_hom().map(9)].into_iter()));
+        assert_eq!(2, actual.len());
+        assert_el_eq!(&QQ, &QQ.int_hom().map(9), &unit);
+        for (f, e) in actual.iter() {
+            if poly_ring.eq_el(f, &f1) {
+                assert_el_eq!(&poly_ring, &f1, f);
+                assert_eq!(2, *e);
+            } else if poly_ring.eq_el(f, &f2) {
+                assert_el_eq!(&poly_ring, &f2, f);
+                assert_eq!(1, *e);
+            // } else if poly_ring.eq_el(f, &f3) {
+            //     assert_el_eq!(&poly_ring, &f3, f);
+            //     assert_eq!(1, *e);
+            } else {
+                panic!("Factorization returned wrong factor {} of ({})^2 * {}", poly_ring.format(f), poly_ring.format(&f1), poly_ring.format(&f2) /* , poly_ring.format(&f3) */);
+            }
+        }
+    });
 }

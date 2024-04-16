@@ -436,8 +436,8 @@ impl<I: IntegerRingStore> FiniteRing for ZnBase<I>
 impl<I: IntegerRingStore> PrincipalIdealRing for ZnBase<I>
     where I::Type: IntegerRing
 {
-    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        let (s, t, d) = self.integer_ring().ideal_gen(&lhs.0, &rhs.0);
+    fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        let (s, t, d) = self.integer_ring().extended_ideal_gen(&lhs.0, &rhs.0);
         let quo = RingRef::new(self).into_can_hom(self.integer_ring()).ok().unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
     }

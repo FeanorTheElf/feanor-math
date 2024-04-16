@@ -645,10 +645,10 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> PrincipalIde
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
-    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+    fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         let mut result = (self.zero(), self.zero(), self.zero());
         for (i, Zn) in self.iter().enumerate() {
-            (result.0.0[i], result.1.0[i], result.2.0[i]) = Zn.ideal_gen(&lhs.0[i], &rhs.0[i]);
+            (result.0.0[i], result.1.0[i], result.2.0[i]) = Zn.extended_ideal_gen(&lhs.0[i], &rhs.0[i]);
         }
         return result;
     }

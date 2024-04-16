@@ -1,9 +1,11 @@
+use crate::algorithms::eea::poly_pid_fractionfield_gcd;
 use crate::divisibility::*;
 use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::pid::*;
 use crate::field::Field;
 use crate::default_memory_provider;
 use crate::mempool::{DefaultMemoryProvider, GrowableMemoryProvider};
+use crate::rings::rational::RationalFieldBase;
 use crate::vector::VectorViewMut;
 use crate::ring::*;
 use crate::algorithms;
@@ -446,11 +448,73 @@ impl<R, M: GrowableMemoryProvider<El<R>>> DivisibilityRing for DensePolyRingBase
     }
 }
 
+trait ImplPrincipalIdealRing: Field {
+
+    fn extended_ideal_gen<P, R, M>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
+        where P: PolyRingStore<Type = DensePolyRingBase<R, M>>,
+            R: RingStore<Type = Self>,
+            M: GrowableMemoryProvider<El<R>>;
+
+    fn ideal_gen<P, R, M>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+        where P: PolyRingStore<Type = DensePolyRingBase<R, M>>,
+            R: RingStore<Type = Self>,
+            M: GrowableMemoryProvider<El<R>>;
+}
+
+impl<F: ?Sized + Field> ImplPrincipalIdealRing for F {
+
+    default fn extended_ideal_gen<P, R, M>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
+        where P: PolyRingStore<Type = DensePolyRingBase<R, M>>,
+            R: RingStore<Type = Self>,
+            M: GrowableMemoryProvider<El<R>>
+    {
+        algorithms::eea::eea(poly_ring.clone_el(lhs), poly_ring.clone_el(rhs), poly_ring)
+    }
+
+    default fn ideal_gen<P, R, M>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+        where P: PolyRingStore<Type = DensePolyRingBase<R, M>>,
+            R: RingStore<Type = Self>,
+            M: GrowableMemoryProvider<El<R>>
+    {
+        <Self as ImplPrincipalIdealRing>::extended_ideal_gen::<P, R, M>(poly_ring, lhs, rhs).2
+    }
+}
+
+impl<I: IntegerRingStore> ImplPrincipalIdealRing for RationalFieldBase<I>
+    where I::Type: IntegerRing
+{
+    fn extended_ideal_gen<P, R, M>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
+        where P: PolyRingStore<Type = DensePolyRingBase<R, M>>,
+            R: RingStore<Type = Self>,
+            M: GrowableMemoryProvider<El<R>>
+    {
+        algorithms::eea::eea(poly_ring.clone_el(lhs), poly_ring.clone_el(rhs), poly_ring)
+    }
+
+    fn ideal_gen<P, R, M>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+        where P: PolyRingStore<Type = DensePolyRingBase<R, M>>,
+            R: RingStore<Type = Self>,
+            M: GrowableMemoryProvider<El<R>>
+    {
+        let QQ = poly_ring.base_ring();
+        let ZZX = DensePolyRing::new(QQ.base_ring(), "X");
+        let lhs_factor = poly_ring.terms(lhs).map(|(c, _)| c).fold(QQ.one(), |x, y| QQ.lcm(&x, y));
+        let lhs = ZZX.from_terms(poly_ring.terms(lhs).map(|(c, d)| (QQ.mul_ref(c, &lhs_factor).0, d)));
+        let rhs_factor = poly_ring.terms(rhs).map(|(c, _)| c).fold(QQ.one(), |x, y| QQ.lcm(&x, y));
+        let rhs = ZZX.from_terms(poly_ring.terms(rhs).map(|(c, d)| (QQ.mul_ref(c, &rhs_factor).0, d)));
+        return poly_ring.lifted_hom(&ZZX, QQ.inclusion()).map(poly_pid_fractionfield_gcd(&ZZX, &lhs, &rhs));
+    }
+}
+
 impl<R, M: GrowableMemoryProvider<El<R>>> PrincipalIdealRing for DensePolyRingBase<R, M>
     where R: RingStore, R::Type: Field
 {
-    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), RingRef::new(self))
+    fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        <R::Type as ImplPrincipalIdealRing>::extended_ideal_gen(&RingRef::new(self), lhs, rhs)
+    }
+
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+        <R::Type as ImplPrincipalIdealRing>::ideal_gen(&RingRef::new(self), lhs, rhs)
     }
 }
 

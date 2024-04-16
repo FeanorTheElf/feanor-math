@@ -80,7 +80,7 @@ impl<T: PrimitiveInt> Domain for StaticRingBase<T> {}
 
 impl<T: PrimitiveInt> PrincipalIdealRing for StaticRingBase<T> {
     
-    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+    fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         algorithms::eea::eea(*lhs, *rhs, StaticRing::<T>::RING)
     }
 }

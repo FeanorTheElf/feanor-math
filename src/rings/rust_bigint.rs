@@ -276,7 +276,7 @@ impl DivisibilityRing for RustBigintRingBase {
 
 impl PrincipalIdealRing for RustBigintRingBase {
 
-    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+    fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), RustBigintRing::RING)
     }
 }

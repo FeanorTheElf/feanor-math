@@ -8,12 +8,39 @@ use crate::divisibility::*;
 pub trait PrincipalIdealRing: DivisibilityRing {
 
     ///
-    /// Computes a Bezout identity.
+    /// Computes a Bezout identity for the generator `g` of the ideal `(lhs, rhs)`
+    /// as `g = s * lhs + t * rhs`.
     /// 
     /// More concretely, this returns (s, t, g) such that g is a generator 
-    /// of the ideal `(lhs, rhs)` and `g = s * lhs + t * rhs`.
+    /// of the ideal `(lhs, rhs)` and `g = s * lhs + t * rhs`. This `g` is also known
+    /// as the greatest common divisor of `lhs` and `rhs`, since `g | lhs, rhs` and
+    /// for every `g'` with this property, have `g' | g`. Note that this `g` is only
+    /// unique up to multiplication by units.
     /// 
-    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element);
+    fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element);
+
+    ///
+    /// Computes a generator `g` of the ideal `(lhs, rhs) = (g)`, also known as greatest
+    /// common divisor.
+    /// 
+    /// If you require also a Bezout identiy, i.e. `g = s * lhs + t * rhs`, consider
+    /// using [`PrincipalIdealRing::extended_ideal_gen()`].
+    /// 
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+        self.extended_ideal_gen(lhs, rhs).2
+    }
+
+    ///
+    /// Computes a generator of the ideal `(lhs) ∩ (rhs)`, also known as least common
+    /// multiple.
+    /// 
+    /// In other words, computes a ring element `g` such that `lhs, rhs | g` and for every
+    /// `g'` with this property, have `g | g'`. Note that such an `g` is only unique up to
+    /// multiplication by units.
+    /// 
+    fn lcm(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+        self.checked_left_div(&self.mul_ref(lhs, rhs), &self.ideal_gen(lhs, rhs)).unwrap()
+    }
 }
 
 ///
@@ -23,7 +50,16 @@ pub trait PrincipalIdealRing: DivisibilityRing {
 pub trait PrincipalIdealRingStore: RingStore
     where Self::Type: PrincipalIdealRing
 {
-    delegate!{ PrincipalIdealRing, fn ideal_gen(&self, lhs: &El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>, El<Self>) }
+    delegate!{ PrincipalIdealRing, fn extended_ideal_gen(&self, lhs: &El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>, El<Self>) }
+    delegate!{ PrincipalIdealRing, fn ideal_gen(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ PrincipalIdealRing, fn lcm(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
+
+    ///
+    /// Alias for [`PrincipalIdealRingStore::ideal_gen()`].
+    /// 
+    fn gcd(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> {
+        self.ideal_gen(lhs, rhs)
+    }
 }
 
 impl<R> PrincipalIdealRingStore for R
@@ -116,8 +152,8 @@ pub mod generic_tests {
                 for c in &elements {
                     let g1 = ring.mul_ref(a, b);
                     let g2 = ring.mul_ref(a, c);
-                    let (s, t, g) = ring.ideal_gen(&g1, &g2);
-                    assert!(ring.checked_div(&g, a).is_some(), "Wrong ideal generator: ({}) contains the ideal I = ({}, {}), but ideal_gen() found a generator I = ({}) that does not satisfy {} | {}", ring.format(a), ring.format(&g1), ring.format(&g2), ring.format(&g), ring.format(a), ring.format(&g));
+                    let (s, t, g) = ring.extended_ideal_gen(&g1, &g2);
+                    assert!(ring.checked_div(&g, a).is_some(), "Wrong ideal generator: ({}) contains the ideal I = ({}, {}), but extended_ideal_gen() found a generator I = ({}) that does not satisfy {} | {}", ring.format(a), ring.format(&g1), ring.format(&g2), ring.format(&g), ring.format(a), ring.format(&g));
                     assert_el_eq!(&ring, &g, &ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2)));
                 }
             }
@@ -126,8 +162,8 @@ pub mod generic_tests {
             for b in &elements {
                 let g1 = ring.mul_ref(a, b);
                 let g2 = ring.mul_ref_fst(a, ring.add_ref_fst(b, ring.one()));
-                let (s, t, g) = ring.ideal_gen(&g1, &g2);
-                assert!(ring.checked_div(&g, a).is_some() && ring.checked_div(a, &g).is_some(), "Expected ideals ({}) and I = ({}, {}) to be equal, but ideal_gen() returned generator {} of I", ring.format(a), ring.format(&g1), ring.format(&g2), ring.format(&g));
+                let (s, t, g) = ring.extended_ideal_gen(&g1, &g2);
+                assert!(ring.checked_div(&g, a).is_some() && ring.checked_div(a, &g).is_some(), "Expected ideals ({}) and I = ({}, {}) to be equal, but extended_ideal_gen() returned generator {} of I", ring.format(a), ring.format(&g1), ring.format(&g2), ring.format(&g));
                 assert_el_eq!(&ring, &g, &ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2)));
             }
         }
