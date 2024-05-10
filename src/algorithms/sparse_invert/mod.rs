@@ -191,6 +191,7 @@ fn sub_assign_mul<R, V>(ring: R, elim_coefficients: &InternalRow<El<R>>, pivot_r
 /// vector that can be thought of as a "best effort solution". This is important in combination
 /// with the optimistic elimination strategy.
 /// 
+#[inline(never)]
 pub fn preimage_echelon_form_matrix<R, V>(ring: R, echelon_form_matrix: Column<V, InternalRow<El<R>>>, current_row: &InternalRow<El<R>>, mut out: InternalRow<El<R>>) -> InternalRow<El<R>>
     where R: DivisibilityRingStore + Copy,
         R::Type: DivisibilityRing,
@@ -200,7 +201,15 @@ pub fn preimage_echelon_form_matrix<R, V>(ring: R, echelon_form_matrix: Column<V
     let zero = ring.zero();
     out.make_zero(&ring);
     out.data.pop();
-    for (i, row) in echelon_form_matrix.iter().enumerate() {
+
+
+    // currently extracted to simplify profiling
+    #[inline(always)]
+    fn perform_inner<R, V>(ring: R, i: usize, row: &InternalRow<El<R>>, current_row: &InternalRow<El<R>>, echelon_form_matrix: &Column<V, InternalRow<El<R>>>, zero: &El<R>, out: &mut InternalRow<El<R>>)
+        where R: DivisibilityRingStore + Copy,
+            R::Type: DivisibilityRing,
+            V: AsPointerToSlice<InternalRow<El<R>>>
+    {
         let (j, pivot) = row.leading_entry();
         let mut current = ring.clone_el(current_row.at(j).unwrap_or(&zero));
         for (k, c) in out.data.iter().rev().skip(1).rev() {
@@ -211,6 +220,10 @@ pub fn preimage_echelon_form_matrix<R, V>(ring: R, echelon_form_matrix: Column<V
                 out.data.push((i, ring.negate(quo)));
             }
         }
+    }
+
+    for (i, row) in echelon_form_matrix.iter().enumerate() {
+        perform_inner(ring, i, row, current_row, &echelon_form_matrix, &zero, &mut out);
     }
     out.data.push((usize::MAX, ring.one()));
     out.check(&ring);
@@ -394,7 +407,7 @@ mod global {
 
     use super::*;
     
-    pub fn check_for_independent_rows<R, V1, V2>(ring: R, pivot_matrix: Submatrix<V1, InternalRow<El<R>>>, column: Submatrix<V1, InternalRow<El<R>>>, transform: SubmatrixMut<V2, InternalRow<El<R>>>, n: usize) -> Vec<usize>
+    pub fn search_for_independent_rows<R, V1, V2>(ring: R, pivot_matrix: Submatrix<V1, InternalRow<El<R>>>, column: Submatrix<V1, InternalRow<El<R>>>, transform: SubmatrixMut<V2, InternalRow<El<R>>>, n: usize) -> Vec<usize>
         where R: DivisibilityRingStore + Copy + Sync,
             El<R>: Send + Sync,
             R::Type: DivisibilityRing,
@@ -536,7 +549,7 @@ fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: SubmatrixMut<
         let (mut pivot_transform, mut pivot_column_transform) = transform.reborrow().restrict_cols(0..1).split_rows(i..(i + row_block), (i + row_block)..row_count);
         let (mut pivot_matrix, pivot_column) = matrix.reborrow().restrict_cols(j..(j + 1)).split_rows(i..(i + row_block), (i + row_block)..row_count);
         let nonzero_row_count = local::row_echelon_optimistic(ring, pivot_matrix.reborrow(), pivot_transform.reborrow(), n);
-        let mut swap_in_rows = global::check_for_independent_rows(ring, pivot_matrix.as_const(), pivot_column.as_const(), pivot_column_transform.reborrow(), n);
+        let mut swap_in_rows = global::search_for_independent_rows(ring, pivot_matrix.as_const(), pivot_column.as_const(), pivot_column_transform.reborrow(), n);
 
         if EXTENSIVE_LOG {
             println!();

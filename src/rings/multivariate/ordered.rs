@@ -52,6 +52,21 @@ impl<R, O, M, const N: usize> MultivariatePolyRingImpl<R, O, M, N>
     }
 }
 
+impl<R, O, M, const N: usize> Clone for MultivariatePolyRingImplBase<R, O, M, N>
+    where R: RingStore + Clone,
+        O: MonomialOrder + Clone,
+        M: GrowableMemoryProvider<(El<R>, Monomial<[MonomialExponent; N]>)> + Clone
+{
+    fn clone(&self) -> Self {
+        Self {
+            base_ring: self.base_ring().clone(),
+            memory_provider: self.memory_provider.clone(),
+            order: self.order.clone(),
+            zero: self.base_ring().zero()
+        }
+    }
+}
+
 impl<R, O, M, const N: usize> MultivariatePolyRingImplBase<R, O, M, N>
     where R: RingStore,
         O: MonomialOrder,

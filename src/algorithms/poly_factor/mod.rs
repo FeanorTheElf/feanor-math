@@ -1,5 +1,4 @@
 use std::cmp::min;
-use std::time::Instant;
 
 use crate::divisibility::*;
 use crate::field::{Field, FieldStore};
