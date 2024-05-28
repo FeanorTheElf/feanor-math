@@ -67,6 +67,16 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers>;
 
     ///
+    /// Computes any lift for some `x` in `Z/nZ`, i.e. the some integer `m` such that `m = x mod n`.
+    /// 
+    /// The only requirement is that `m` is a valid element of the integer ring, in particular that
+    /// it fits within the required amount of bits, if `Self::Integers` is a fixed-size integer ring.
+    /// 
+    fn any_lift(&self, el: Self::Element) -> El<Self::Integers> {
+        self.smallest_positive_lift(el)
+    }
+
+    ///
     /// Computes the smallest lift for some `x` in `Z/nZ`, i.e. the smallest integer `m` such that
     /// `m = x mod n`.
     /// 
@@ -102,7 +112,7 @@ pub mod generic_impls {
     use super::{ZnRing, ZnRingStore};
     use crate::homomorphism::*;
 
-    pub struct IntegerToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
+    pub struct BigIntToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
         where I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>
     {
         highbit_mod: usize,
@@ -118,11 +128,11 @@ pub mod generic_impls {
     /// See [`map_in_from_int()`].
     /// This will only ever return `None` if one of the integer ring `has_canonical_hom/iso` returns `None`.
     /// 
-    pub fn has_canonical_hom_from_int<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>(from: &I, to: &R, to_large_int_ring: &J, bounded_reduce_bound: Option<&J::Element>) -> Option<IntegerToZnHom<I, J, R>>
+    pub fn has_canonical_hom_from_bigint<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>(from: &I, to: &R, to_large_int_ring: &J, bounded_reduce_bound: Option<&J::Element>) -> Option<BigIntToZnHom<I, J, R>>
         where I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>
     {
         if let Some(bound) = bounded_reduce_bound {
-            Some(IntegerToZnHom {
+            Some(BigIntToZnHom {
                 highbit_mod: to.integer_ring().abs_highest_set_bit(to.modulus()).unwrap(),
                 highbit_bound: to_large_int_ring.abs_highest_set_bit(bound).unwrap(),
                 int_ring: PhantomData,
@@ -132,7 +142,7 @@ pub mod generic_impls {
                 iso2: from.has_canonical_iso(to_large_int_ring)?
             })
         } else {
-            Some(IntegerToZnHom {
+            Some(BigIntToZnHom {
                 highbit_mod: to.integer_ring().abs_highest_set_bit(to.modulus()).unwrap(),
                 highbit_bound: usize::MAX,
                 int_ring: PhantomData,
@@ -157,6 +167,9 @@ pub mod generic_impls {
     ///  - `from_positive_representative_exact`: a function that performs the restricted reduction `{0, ..., n - 1} -> Z/nZ`
     ///  - `from_positive_representative_bounded`: a function that performs the restricted reduction `{0, ..., B - 1} -> Z/nZ`
     /// 
+    /// It first estimates the size of numbers by their bitlength, so don't use this for small integers (i.e. `ixx`-types), as the estimation
+    /// is likely to take longer than the actual modular reduction.
+    /// 
     /// Note that the input size estimates consider only the bitlength of numbers, and so there is a small margin in which a reduction method for larger
     /// numbers than necessary is used. Furthermore, if the integer rings used can represent some but not all positive numbers of a certain bitlength, 
     /// there might be rare edge cases with panics/overflows. 
@@ -165,7 +178,7 @@ pub mod generic_impls {
     /// decide that we have to perform generic modular reduction (even though `x < n`), and try to map `n` into `Z`. This is never a problem if the primitive
     /// integer rings `StaticRing::<ixx>::RING` are used, or if `B >= 2n`.
     /// 
-    pub fn map_in_from_int<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing, F, G>(from: &I, to: &R, to_large_int_ring: &J, el: I::Element, hom: &IntegerToZnHom<I, J, R>, from_positive_representative_exact: F, from_positive_representative_bounded: G) -> R::Element
+    pub fn map_in_from_bigint<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing, F, G>(from: &I, to: &R, to_large_int_ring: &J, el: I::Element, hom: &BigIntToZnHom<I, J, R>, from_positive_representative_exact: F, from_positive_representative_bounded: G) -> R::Element
         where I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>,
             F: FnOnce(El<R::Integers>) -> R::Element,
             G: FnOnce(J::Element) -> R::Element
@@ -228,6 +241,7 @@ pub trait ZnRingStore: FiniteRingStore
     delegate!{ ZnRing, fn modulus(&self) -> &El<<Self::Type as ZnRing>::Integers> }
     delegate!{ ZnRing, fn smallest_positive_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::Integers> }
     delegate!{ ZnRing, fn smallest_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::Integers> }
+    delegate!{ ZnRing, fn any_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::Integers> }
     delegate!{ ZnRing, fn is_field(&self) -> bool }
 
     fn as_field(self) -> Result<RingValue<AsFieldBase<Self>>, Self> 
@@ -317,10 +331,18 @@ fn test_choose_zn_impl() {
     choose_zn_impl(StaticRing::<i64>::RING, 17, DoStuff { int_value });
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReductionMapRequirements {
+    SmallestLift,
+    ExplicitReduce
+}
+
 ///
 /// The homomorphism `Z/nZ -> Z/mZ` that exists whenever `m | n`. In
 /// addition to the map, this also provides a function [`ReductionMap::smallest_lift()`]
-/// that computes the "smallest" preimage under the map. This is very
+/// that computes the "smallest" preimage under the map, and a function
+/// [`ReductionMap::mul_quotient_fraction()`], that computes the multiplication
+/// with `n/m` while also changing from `Z/mZ` to `Z/nZ`. This is very
 /// useful in many number theoretic applications, where one often has to switch
 /// between `Z/nZ` and `Z/mZ`.
 /// 
@@ -336,10 +358,11 @@ pub struct ReductionMap<R, S>
 {
     from: R,
     to: S,
+    fraction_of_quotients: El<R>,
     to_modulus: El<<R::Type as ZnRing>::Integers>,
-    requires_explicit_reduction: bool,
     to_from_int: <S::Type as CanHomFrom<<S::Type as ZnRing>::IntegerRingBase>>::Homomorphism,
-    from_from_int: <R::Type as CanHomFrom<<R::Type as ZnRing>::IntegerRingBase>>::Homomorphism
+    from_from_int: <R::Type as CanHomFrom<<R::Type as ZnRing>::IntegerRingBase>>::Homomorphism,
+    map_forward_requirement: ReductionMapRequirements
 }
 
 impl<R, S> ReductionMap<R, S>
@@ -351,12 +374,18 @@ impl<R, S> ReductionMap<R, S>
     pub fn new(from: R, to: S) -> Option<Self> {
         let from_char = from.characteristic(&BigIntRing::RING).unwrap();
         let to_char = to.characteristic(&BigIntRing::RING).unwrap();
-        if BigIntRing::RING.checked_div(&from_char, &to_char).is_some() {
+        if let Some(frac) = BigIntRing::RING.checked_div(&from_char, &to_char) {
+            let map_forward_requirement: ReductionMapRequirements = if to.integer_ring().get_ring().representable_bits().is_none() || BigIntRing::RING.is_lt(&from_char, &BigIntRing::RING.power_of_two(to.integer_ring().get_ring().representable_bits().unwrap())) {
+                ReductionMapRequirements::SmallestLift
+            } else {
+                ReductionMapRequirements::ExplicitReduce
+            };
             Some(Self {
-                requires_explicit_reduction: to.integer_ring().get_ring().representable_bits().is_some() && BigIntRing::RING.is_gt(&from_char, &BigIntRing::RING.power_of_two(to.integer_ring().get_ring().representable_bits().unwrap())),
+                map_forward_requirement: map_forward_requirement,
                 to_modulus: int_cast(to.integer_ring().clone_el(to.modulus()), from.integer_ring(), to.integer_ring()),
                 to_from_int: to.get_ring().has_canonical_hom(to.integer_ring().get_ring()).unwrap(),
                 from_from_int: from.get_ring().has_canonical_hom(from.integer_ring().get_ring()).unwrap(),
+                fraction_of_quotients: from.can_hom(from.integer_ring()).unwrap().map(int_cast(frac, from.integer_ring(), BigIntRing::RING)),
                 from: from,
                 to: to,
             })
@@ -365,8 +394,52 @@ impl<R, S> ReductionMap<R, S>
         }
     }
 
+    ///
+    /// Computes the additive group homomorphism `Z/mZ -> Z/nZ, x -> (n/m)x`.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::assert_el_eq;
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::homomorphism::*;
+    /// # use feanor_math::rings::zn::*;
+    /// # use feanor_math::rings::zn::zn_64::*;
+    /// let Z5 = Zn::new(5);
+    /// let Z25 = Zn::new(25);
+    /// let f = ReductionMap::new(&Z25, &Z5).unwrap();
+    /// assert_el_eq!(&Z25, &Z25.int_hom().map(15), &f.mul_quotient_fraction(Z5.int_hom().map(3)));
+    /// ```
+    /// 
+    pub fn mul_quotient_fraction(&self, x: El<S>) -> El<R> {
+        self.from.mul_ref_snd(self.any_preimage(x), &self.fraction_of_quotients)
+    }
+
+    ///
+    /// Computes the smallest preimage under the reduction map `Z/nZ -> Z/mZ`, where
+    /// "smallest" refers to the element that has the smallest lift to `Z`.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::assert_el_eq;
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::homomorphism::*;
+    /// # use feanor_math::rings::zn::*;
+    /// # use feanor_math::rings::zn::zn_64::*;
+    /// let Z5 = Zn::new(5);
+    /// let Z25 = Zn::new(25);
+    /// let f = ReductionMap::new(&Z25, &Z5).unwrap();
+    /// assert_el_eq!(&Z25, &Z25.int_hom().map(-2), &f.smallest_lift(Z5.int_hom().map(3)));
+    /// ```
+    /// 
     pub fn smallest_lift(&self, x: El<S>) -> El<R> {
         self.from.get_ring().map_in(self.from.integer_ring().get_ring(), int_cast(self.to.smallest_lift(x), self.from.integer_ring(), self.to.integer_ring()), &self.from_from_int)
+    }
+
+    pub fn any_preimage(&self, x: El<S>) -> El<R> {
+        // the problem is that we don't know if `to.any_lift(x)` will fit into `from.integer_ring()`;
+        // furthermore, profiling indicates that it won't help a lot anyway, since taking the smallest lift
+        // now will usually make reduction cheaper later
+        self.smallest_lift(x)
     }
 
     pub fn smallest_lift_ref(&self, x: &El<S>) -> El<R> {
@@ -384,10 +457,9 @@ impl<R, S> Homomorphism<R::Type, S::Type> for ReductionMap<R, S>
     type DomainStore = R;
 
     fn map(&self, x: El<R>) -> El<S> {
-        let value = if self.requires_explicit_reduction {
-            self.from.integer_ring().euclidean_rem(self.from.smallest_lift(x), &self.to_modulus)
-        } else {
-            self.from.smallest_lift(x)
+        let value = match self.map_forward_requirement {
+            ReductionMapRequirements::SmallestLift => self.from.smallest_lift(x),
+            ReductionMapRequirements::ExplicitReduce => self.from.integer_ring().euclidean_rem(self.from.any_lift(x), &self.to_modulus)
         };
         self.to.get_ring().map_in(self.to.integer_ring().get_ring(), int_cast(value, self.to.integer_ring(), self.from.integer_ring()), &self.to_from_int)
     }

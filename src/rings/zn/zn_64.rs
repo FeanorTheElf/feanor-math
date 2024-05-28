@@ -1,5 +1,6 @@
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
 use crate::delegate::DelegateRing;
+use crate::divisibility::*;
 use crate::impl_eq_based_self_iso;
 use crate::impl_wrap_unwrap_homs;
 use crate::impl_wrap_unwrap_isos;
@@ -76,6 +77,7 @@ fn mullo(lhs: u64, rhs: u64) -> u64 {
 #[derive(Clone, Copy)]
 pub struct ZnBase {
     modulus: i64,
+    modulus_half: i64,
     modulus_times_three: u64,
     inv_modulus: u128
 }
@@ -103,6 +105,7 @@ impl ZnBase {
         Self {
             modulus: modulus as i64,
             inv_modulus: inv_modulus,
+            modulus_half: (modulus as i64 - 1) / 2 + 1,
             modulus_times_three: modulus * 3
         }
     }
@@ -326,7 +329,8 @@ impl CanHomFrom<zn_42::ZnBase> for ZnBase {
 }
 
 
-#[allow(deprecated)]pub enum ToZn42Iso {
+#[allow(deprecated)]
+pub enum ToZn42Iso {
     Trivial, ReduceRequired(<zn_42::ZnBase as CanHomFrom<StaticRingBase<i64>>>::Homomorphism)
 }
 
@@ -355,10 +359,46 @@ impl CanIsoFromTo<zn_42::ZnBase> for ZnBase {
     }
 }
 
+///
+/// An element of [`ZnBase`] together with extra information that allows for
+/// faster division if this element is the divisor. See also [`PreparedDivisibilityRing`].
+/// 
+#[derive(Copy, Clone)]
+pub struct ZnPreparedDivisor {
+    unit_part: El<Zn>,
+    is_unit: bool,
+    smallest_positive_zero_divisor_part: <StaticRingBase<i64> as PreparedDivisibilityRing>::PreparedDivisor
+}
+
+impl PreparedDivisibilityRing for ZnBase {
+
+    type PreparedDivisor = ZnPreparedDivisor;
+
+    fn prepare_divisor(&self, x: &Self::Element) -> Self::PreparedDivisor {
+        let (s, _t, d) = algorithms::eea::signed_eea(self.smallest_positive_lift(*x), *self.modulus(), self.integer_ring());
+        debug_assert!(d > 0);
+        debug_assert!(d <= *self.modulus());
+        return ZnPreparedDivisor {
+            is_unit: d == 1,
+            unit_part: if s < 0 { self.negate(self.promise_is_reduced(-s as u64)) } else { self.promise_is_reduced(s as u64) },
+            smallest_positive_zero_divisor_part: StaticRing::<i64>::RING.prepare_divisor(&d)
+        }
+    }
+
+    fn checked_left_div_prepared(&self, lhs: &Self::Element, rhs: &Self::PreparedDivisor) -> Option<Self::Element> {
+        if rhs.is_unit {
+            Some(self.mul_ref(lhs, &rhs.unit_part))
+        } else {
+            StaticRing::<i64>::RING.checked_div_prepared(&self.smallest_positive_lift(*lhs), &rhs.smallest_positive_zero_divisor_part)
+                .map(|x| self.mul(self.promise_is_reduced(x as u64), rhs.unit_part))
+        }
+    }
+}
+
 impl DivisibilityRing for ZnBase {
 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs, self.modulus())
+        self.checked_left_div_prepared(lhs, &self.prepare_divisor(rhs))
     }
 }
 trait ImplGenericIntHomomorphismMarker: IntegerRing + CanIsoFromTo<StaticRingBase<i128>> + CanIsoFromTo<StaticRingBase<i64>> {}
@@ -370,14 +410,14 @@ impl ImplGenericIntHomomorphismMarker for crate::rings::mpir::MPZBase {}
 
 impl<I: ?Sized + ImplGenericIntHomomorphismMarker> CanHomFrom<I> for ZnBase {
 
-    type Homomorphism = super::generic_impls::IntegerToZnHom<I, StaticRingBase<i128>, Self>;
+    type Homomorphism = super::generic_impls::BigIntToZnHom<I, StaticRingBase<i128>, Self>;
 
     fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
-        super::generic_impls::has_canonical_hom_from_int(from, self, StaticRing::<i128>::RING.get_ring(), Some(&(self.repr_bound() as i128 * self.repr_bound() as i128)))
+        super::generic_impls::has_canonical_hom_from_bigint(from, self, StaticRing::<i128>::RING.get_ring(), Some(&(self.repr_bound() as i128 * self.repr_bound() as i128)))
     }
 
     fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
-        super::generic_impls::map_in_from_int(from, self, StaticRing::<i128>::RING.get_ring(), el, hom, |n| {
+        super::generic_impls::map_in_from_bigint(from, self, StaticRing::<i128>::RING.get_ring(), el, hom, |n| {
             debug_assert!((n as u64) < self.modulus_u64());
             self.promise_is_reduced(n as u64)
         }, |n| {
@@ -496,8 +536,35 @@ impl ZnRing for ZnBase {
         self.complete_reduce(el.0) as i64
     }
 
+    fn smallest_lift(&self, ZnEl(mut value_u64): Self::Element) -> El<Self::Integers> {
+        debug_assert!(value_u64 <= self.repr_bound());
+        // value is in [0, 6 * self.modulus]
+        if value_u64 >= 3 * self.modulus_u64() {
+            value_u64 -= 3 * self.modulus_u64();
+        }
+        // value is in [0, 3 * self.modulus]
+        let mut value_i64 = value_u64 as i64;
+        if value_i64 >= self.modulus + self.modulus_half {
+            value_i64 -= 2 * self.modulus;
+        }
+        // value is in ]-self.modulus_half, self.modulus + self.modulus_half[ if modulus is odd
+        // value is in [-self.modulus_half, self.modulus + self.modulus_half[ if modulus is even
+        if value_i64 >= self.modulus_half {
+            value_i64 -= self.modulus;
+        }
+        // value is in ]-self.modulus_half, self.modulus_half[ if modulus is odd
+        // value is in [-self.modulus_half, self.modulus_half[ if modulus is odd
+        debug_assert!(value_i64 < self.modulus_half);
+        debug_assert!(value_i64 > -self.modulus_half);
+        return value_i64;
+    }
+
     fn modulus(&self) -> &El<Self::Integers> {
         &self.modulus
+    }
+
+    fn any_lift(&self, el: Self::Element) -> El<Self::Integers> {
+        el.0 as i64
     }
 }
 
@@ -733,6 +800,12 @@ fn elements<'a>(ring: &'a Zn) -> impl 'a + Iterator<Item = El<Zn>> {
 }
 
 #[test]
+fn test_complete_reduce() {
+    let ring = Zn::new(32);
+    assert_eq!(31, ring.get_ring().complete_reduce(4 * 32 - 1));
+}
+
+#[test]
 fn test_sum() {
     for n in [(1 << 41) - 1, (1 << 42) - 1, (1 << 58) - 1, (1 << 58) + 1, (3 << 57) - 1, (3 << 57) + 1] {
         let Zn = Zn::new(n);
@@ -828,11 +901,48 @@ fn test_from_int_hom() {
 }
 
 #[bench]
-fn bench_hom_from_i64(bencher: &mut Bencher) {
-    // we are mainly interested in the case that the modulus is large (e.g. for FHE)
+fn bench_hom_from_i64_large_modulus(bencher: &mut Bencher) {
+    // the case that the modulus is large
     let Zn = Zn::new(36028797018963971 /* = 2^55 + 3 */);
     bencher.iter(|| {
         let hom = Zn.can_hom(&StaticRing::<i64>::RING).unwrap();
         assert_el_eq!(&Zn, &Zn.int_hom().map(-1300), &Zn.sum((0..100).flat_map(|_| (0..=56).map(|k| 1 << k)).map(|x| hom.map(x))))
+    });
+}
+
+#[bench]
+fn bench_hom_from_i64_small_modulus(bencher: &mut Bencher) {
+    // the case that the modulus is large
+    let Zn = Zn::new(17);
+    bencher.iter(|| {
+        let hom = Zn.can_hom(&StaticRing::<i64>::RING).unwrap();
+        assert_el_eq!(&Zn, &Zn.int_hom().map(2850 * 5699), &Zn.sum((0..5700).map(|x| hom.map(x))))
+    });
+}
+
+#[bench]
+fn bench_reduction_map_use_case(bencher: &mut Bencher) {
+    // this benchmark is inspired by the use in https://eprint.iacr.org/2023/1510.pdf
+    let p = 17;
+    let Zp2 = Zn::new(p * p);
+    let Zp = Zn::new(p);
+    let Zp2_mod_p = ReductionMap::new(&Zp2, &Zp).unwrap();
+    let Zp2_p = Zp2.prepare_divisor(&Zp2.int_hom().map(p as i32));
+
+    let split_quo_rem = |x: El<Zn>| {
+        let rem = Zp2_mod_p.map_ref(&x);
+        let Zp2_rem = Zp2_mod_p.smallest_lift(rem);
+        let quo = Zp2.checked_div_prepared(&Zp2.sub(x, Zp2_rem), &Zp2_p).unwrap();
+        (rem, Zp2_mod_p.map(quo))
+    };
+
+    bencher.iter(|| {
+        for x in Zp2.elements() {
+            for y in Zp2.elements() {
+                let (x_low, x_high) = split_quo_rem(x);
+                let (y_low, y_high) = split_quo_rem(y);
+                assert_el_eq!(&Zp2, &Zp2.mul(x, y), &Zp2.add(Zp2.mul(Zp2_mod_p.smallest_lift(x_low), Zp2_mod_p.smallest_lift(y_low)), Zp2_mod_p.mul_quotient_fraction(Zp.add(Zp.mul(x_low, y_high), Zp.mul(x_high, y_low)))));
+            }
+        }
     });
 }

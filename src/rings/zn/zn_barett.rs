@@ -353,14 +353,14 @@ impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanHomFrom<J> for ZnBase<I>
     where I::Type: IntegerRing, 
         J: CanIsoFromTo<I::Type>
 {
-    type Homomorphism = generic_impls::IntegerToZnHom<J, I::Type, ZnBase<I>>;
+    type Homomorphism = generic_impls::BigIntToZnHom<J, I::Type, ZnBase<I>>;
 
     fn has_canonical_hom(&self, from: &J) -> Option<Self::Homomorphism> {
-        generic_impls::has_canonical_hom_from_int(from, self, self.integer_ring.get_ring(), Some(&self.integer_ring.mul_ref(self.modulus(), self.modulus())))
+        generic_impls::has_canonical_hom_from_bigint(from, self, self.integer_ring.get_ring(), Some(&self.integer_ring.mul_ref(self.modulus(), self.modulus())))
     }
 
     fn map_in(&self, from: &J, el: J::Element, hom: &Self::Homomorphism) -> Self::Element {
-        generic_impls::map_in_from_int(from, self, self.integer_ring.get_ring(), el, hom, |n| {
+        generic_impls::map_in_from_bigint(from, self, self.integer_ring.get_ring(), el, hom, |n| {
             debug_assert!(self.integer_ring.is_lt(&n, &self.modulus));
             ZnEl(n)
         }, |mut n| {

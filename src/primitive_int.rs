@@ -1,11 +1,13 @@
-use std::ops::{AddAssign, SubAssign, MulAssign, Neg, Div, Rem};
+use std::any::TypeId;
+use std::ops::{AddAssign, Div, MulAssign, Neg, Rem, Shr, SubAssign};
 use std::marker::PhantomData;
 use std::fmt::Display;
 
-use crate::{ring::*, algorithms};
+use crate::ring::*;
+use crate::algorithms;
 use crate::homomorphism::*;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
-use crate::divisibility::{DivisibilityRing, Domain};
+use crate::divisibility::*;
 use crate::ordered::OrderedRing;
 use crate::integer::*;
 use crate::algorithms::conv_mul::KaratsubaHint;
@@ -13,29 +15,58 @@ use crate::algorithms::conv_mul::KaratsubaHint;
 ///
 /// Trait for `i8` to `i128`.
 /// 
-pub trait PrimitiveInt: AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Eq + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy + Div<Self, Output = Self> + Rem<Self, Output = Self> + Display {
+pub trait PrimitiveInt: AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Shr<usize, Output = Self> + Eq + Into<Self::Larger> + TryFrom<Self::Larger> + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy + Div<Self, Output = Self> + Rem<Self, Output = Self> + Display {
+
+    type Larger: PrimitiveInt;
 
     fn bits() -> usize;
+    fn overflowing_mul(self, rhs: Self) -> Self;
+    fn overflowing_sub(self, rhs: Self) -> Self;
 }
 
 impl PrimitiveInt for i8 {
+
+    type Larger = i16;
+
     fn bits() -> usize { Self::BITS as usize }
+    fn overflowing_mul(self, rhs: Self) -> Self { i8::overflowing_mul(self, rhs).0 }
+    fn overflowing_sub(self, rhs: Self) -> Self { i8::overflowing_sub(self, rhs).0 }
 }
 
 impl PrimitiveInt for i16 {
+
+    type Larger = i32;
+
     fn bits() -> usize { Self::BITS as usize }
+    fn overflowing_mul(self, rhs: Self) -> Self { i16::overflowing_mul(self, rhs).0 }
+    fn overflowing_sub(self, rhs: Self) -> Self { i16::overflowing_sub(self, rhs).0 }
 }
 
 impl PrimitiveInt for i32 {
+
+    type Larger = i64;
+
     fn bits() -> usize { Self::BITS as usize }
+    fn overflowing_mul(self, rhs: Self) -> Self { i32::overflowing_mul(self, rhs).0 }
+    fn overflowing_sub(self, rhs: Self) -> Self { i32::overflowing_sub(self, rhs).0 }
 }
 
 impl PrimitiveInt for i64 {
+
+    type Larger = i128;
+
     fn bits() -> usize { Self::BITS as usize }
+    fn overflowing_mul(self, rhs: Self) -> Self { i64::overflowing_mul(self, rhs).0 }
+    fn overflowing_sub(self, rhs: Self) -> Self { i64::overflowing_sub(self, rhs).0 }
 }
 
 impl PrimitiveInt for i128 {
+
+    type Larger = i128;
+
     fn bits() -> usize { Self::BITS as usize }
+    fn overflowing_mul(self, rhs: Self) -> Self { i128::overflowing_mul(self, rhs).0 }
+    fn overflowing_sub(self, rhs: Self) -> Self { i128::overflowing_sub(self, rhs).0 }
 }
 
 macro_rules! specialize_int_cast {
@@ -72,6 +103,51 @@ impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
             return Some(div);
         } else {
             return None;
+        }
+    }
+}
+
+///
+/// An element of [`StaticRing`] together with extra information that allows for
+/// faster division if this element is the divisor. See also [`PreparedDivisibilityRing`].
+/// 
+#[derive(Clone, Copy)]
+pub struct PrimitiveIntPreparedDivisor<T: PrimitiveInt>(T, T);
+
+impl<T: 'static + PrimitiveInt> PreparedDivisibilityRing for StaticRingBase<T> {
+
+    type PreparedDivisor = PrimitiveIntPreparedDivisor<T>;
+    
+    fn prepare_divisor(&self, x: &Self::Element) -> Self::PreparedDivisor {
+        assert!(TypeId::of::<T>() != TypeId::of::<i128>());
+        match <T as Into<i128>>::into(*x) {
+            0 => PrimitiveIntPreparedDivisor(*x, T::from(0)),
+            1 => PrimitiveIntPreparedDivisor(*x, T::try_from((1i128 << (T::bits() - 1)) - 1).ok().unwrap()),
+            -1 => PrimitiveIntPreparedDivisor(*x, T::try_from((-1i128 << (T::bits() - 1)) + 1).ok().unwrap()),
+            val => PrimitiveIntPreparedDivisor(*x, <T as TryFrom<i128>>::try_from((1i128 << (T::bits() - 1)) / val).ok().unwrap())
+        }
+    }
+
+    fn checked_left_div_prepared(&self, lhs: &Self::Element, rhs: &Self::PreparedDivisor) -> Option<Self::Element> {
+        assert!(TypeId::of::<T>() != TypeId::of::<i128>());
+        if rhs.0 == T::from(0) {
+            if *lhs == T::from(0) { Some(T::from(0)) } else { None }
+        } else {
+            let mut prod = <T as Into<T::Larger>>::into(*lhs);
+            prod *=  <T as Into<T::Larger>>::into(rhs.1);
+            let mut result = <T as TryFrom<T::Larger>>::try_from(prod >> (T::bits() - 1)).ok().unwrap();
+            let remainder = lhs.overflowing_sub(result.overflowing_mul(rhs.0));
+            if remainder == T::from(0) {
+                Some(result)
+            } else if remainder == rhs.0 {
+                result += T::from(1);
+                Some(result)
+            } else if -remainder == rhs.0 {
+                result -= T::from(1);
+                Some(result)
+            } else {
+                None
+            }
         }
     }
 }
@@ -315,4 +391,27 @@ fn test_lowest_set_bit() {
     assert_eq!(None, StaticRing::<i128>::RING.abs_lowest_set_bit(&0));
     assert_eq!(Some(127), StaticRing::<i128>::RING.abs_lowest_set_bit(&i128::MIN));
     assert_eq!(Some(0), StaticRing::<i128>::RING.abs_lowest_set_bit(&i128::MAX));
+}
+
+#[test]
+fn test_prepared_div() {
+    type PrimInt = i8;
+    for x in PrimInt::MIN..PrimInt::MAX {
+        let div_x = StaticRing::<PrimInt>::RING.prepare_divisor(&x);
+        for y in PrimInt::MIN..PrimInt::MAX {
+            if x == 0 {
+                if y == 0 {
+                    assert!(StaticRing::<PrimInt>::RING.checked_div_prepared(&y, &div_x).is_some());
+                } else {
+                    assert!(StaticRing::<PrimInt>::RING.checked_div_prepared(&y, &div_x).is_none());
+                }
+            } else if y == PrimInt::MIN && x == -1 {
+                // this cannot be evaluated without overflow
+            } else if y % x == 0 {
+                assert_eq!(y / x, StaticRing::<PrimInt>::RING.checked_div_prepared(&y, &div_x).unwrap());
+            } else {
+                assert!(StaticRing::<PrimInt>::RING.checked_div_prepared(&y, &div_x).is_none());
+            }
+        }
+    }
 }

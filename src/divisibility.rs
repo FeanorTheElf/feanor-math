@@ -20,6 +20,26 @@ pub trait DivisibilityRing: RingBase {
 }
 
 ///
+/// Trait for rings that support "preparing" division by `x`, i.e. compute some
+/// additional data for `x` that can later be used to speed up division by `x`.
+/// 
+/// The semantics are the same as for [`DivisibilityRing`], just the performance 
+/// behavior is different.
+/// 
+pub trait PreparedDivisibilityRing: DivisibilityRing {
+
+    type PreparedDivisor;
+
+    fn prepare_divisor(&self, x: &Self::Element) -> Self::PreparedDivisor;
+
+    fn checked_left_div_prepared(&self, lhs: &Self::Element, rhs: &Self::PreparedDivisor) -> Option<Self::Element>;
+
+    fn is_unit_prepared(&self, x: &Self::PreparedDivisor) -> bool {
+        self.checked_left_div_prepared(&self.one(), x).is_some()
+    }
+}
+
+///
 /// Trait for rings that are integral, i.e. have no zero divisors.
 /// 
 /// A zero divisor is a nonzero element `a` such that there is a nonzero
@@ -49,6 +69,31 @@ pub trait DivisibilityRingStore: RingStore
 
 impl<R> DivisibilityRingStore for R
     where R: RingStore, R::Type: DivisibilityRing
+{}
+
+///
+/// Trait for [`RingStore`]s that store [`PreparedDivisibilityRing`]s. Mainly used
+/// to provide a convenient interface to the `PreparedDivisibilityRing`-functions.
+/// 
+pub trait PreparedDivisibilityRingStore: RingStore
+    where Self::Type: PreparedDivisibilityRing
+{
+    delegate!{ PreparedDivisibilityRing, fn prepare_divisor(&self, x: &El<Self>) -> <Self::Type as PreparedDivisibilityRing>::PreparedDivisor }
+    delegate!{ PreparedDivisibilityRing, fn checked_left_div_prepared(&self, lhs: &El<Self>, rhs: &<Self::Type as PreparedDivisibilityRing>::PreparedDivisor) -> Option<El<Self>> }
+    delegate!{ PreparedDivisibilityRing, fn is_unit_prepared(&self, x: &<Self::Type as PreparedDivisibilityRing>::PreparedDivisor) -> bool }
+
+    fn checked_div_prepared(&self, lhs: &El<Self>, rhs: &<Self::Type as PreparedDivisibilityRing>::PreparedDivisor) -> Option<El<Self>> {
+        assert!(self.is_commutative());
+        self.checked_left_div_prepared(lhs, rhs)
+    }
+
+    fn invert_prepared(&self, el: &<Self::Type as PreparedDivisibilityRing>::PreparedDivisor) -> Option<El<Self>> {
+        self.checked_div_prepared(&self.one(), el)
+    }
+}
+
+impl<R> PreparedDivisibilityRingStore for R
+    where R: RingStore, R::Type: PreparedDivisibilityRing
 {}
 
 #[cfg(any(test, feature = "generic_tests"))]

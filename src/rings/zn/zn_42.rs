@@ -291,14 +291,14 @@ impl ImplGenericIntHomomorphismMarker for crate::rings::mpir::MPZBase {}
 
 impl<I: ?Sized + ImplGenericIntHomomorphismMarker> CanHomFrom<I> for ZnBase {
 
-    type Homomorphism = generic_impls::IntegerToZnHom<I, StaticRingBase<i128>, Self>;
+    type Homomorphism = generic_impls::BigIntToZnHom<I, StaticRingBase<i128>, Self>;
 
     fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
-        generic_impls::has_canonical_hom_from_int(from, self, StaticRing::<i128>::RING.get_ring(), Some(&(self.repr_bound as i128 * self.repr_bound as i128)))
+        generic_impls::has_canonical_hom_from_bigint(from, self, StaticRing::<i128>::RING.get_ring(), Some(&(self.repr_bound as i128 * self.repr_bound as i128)))
     }
 
     fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
-        generic_impls::map_in_from_int(from, self, StaticRing::<i128>::RING.get_ring(), el, hom, |n| {
+        generic_impls::map_in_from_bigint(from, self, StaticRing::<i128>::RING.get_ring(), el, hom, |n| {
             debug_assert!((n as u64) < self.modulus_u64());
             self.from_bounded(n as u64)
         }, |n| {
@@ -761,8 +761,8 @@ fn test_zn_map_in_large_int() {
 #[cfg(never)]
 fn test_zn_map_in_small_int() {
     let R = Zn::new((1 << 41) - 1);
-    let hom = generic_impls::has_canonical_hom_from_int(StaticRing::<i8>::RING.get_ring(), R.get_ring(), StaticRing::<i128>::RING.get_ring(), Some(&(*R.modulus() as i128 * *R.modulus() as i128))).unwrap();
-    assert_el_eq!(&R, &R.int_hom().map(1), &generic_impls::map_in_from_int(
+    let hom = generic_impls::has_canonical_hom_from_bigint(StaticRing::<i8>::RING.get_ring(), R.get_ring(), StaticRing::<i128>::RING.get_ring(), Some(&(*R.modulus() as i128 * *R.modulus() as i128))).unwrap();
+    assert_el_eq!(&R, &R.int_hom().map(1), &generic_impls::map_in_from_bigint(
         StaticRing::<i8>::RING.get_ring(), 
         R.get_ring(), 
         StaticRing::<i128>::RING.get_ring(), 
