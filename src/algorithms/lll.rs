@@ -370,16 +370,26 @@ macro_rules! in_QQ {
             ]
         }
     };
+    ($(DerefArray::from([$($num:literal $(/ $den:literal)?),*])),*) => {
+        {
+            let ZZ_to_QQ = QQ.inclusion();
+            [
+                $(DerefArray::from([$(
+                    in_QQ!(ZZ_to_QQ; $num $(, $den)?)
+                ),*])),*
+            ]
+        }
+    };
 }
 
 #[test]
 fn test_ldl() {
     let mut data = in_QQ![
-        [1, 2, 1],
-        [2, 5, 0],
-        [1, 0, 7]
+        DerefArray::from([1, 2, 1]),
+        DerefArray::from([2, 5, 0]),
+        DerefArray::from([1, 0, 7])
     ];
-    let mut matrix = SubmatrixMut::<[_; 3], _>::new(&mut data);
+    let mut matrix = SubmatrixMut::<DerefArray<_, 3>, _>::new(&mut data);
     let mut expected = in_QQ![
         [1, 2, 1],
         [0, 1, -2],
@@ -398,16 +408,16 @@ fn test_ldl() {
 #[test]
 fn test_swap_gso_cols() {
     let mut matrix = in_QQ![
-        [2, 1/2, 2/5],
-        [0, 3/2, 1/4],
-        [0,   0,   1]
+        DerefArray::from([2, 1/2, 2/5]),
+        DerefArray::from([0, 3/2, 1/4]),
+        DerefArray::from([0,   0,   1])
     ];
     let expected = in_QQ![
         [2, 1/2, 31/80],
         [0, 3/2, 11/40],
         [0,   0,     1]
     ];
-    let matrix_view = SubmatrixMut::<[_; 3], _>::new(&mut matrix);
+    let matrix_view = SubmatrixMut::<DerefArray<_, 3>, _>::new(&mut matrix);
 
     swap_gso_cols(&QQ, matrix_view, 0, 1);
 
@@ -422,7 +432,7 @@ fn norm_squared<V>(col: &Column<V, i64>) -> i64
 }
 
 #[cfg(test)]
-fn assert_lattice_isomorphic<V, const N: usize, const M: usize>(lhs: &[[i64; M]; N], rhs: &Submatrix<V, i64>)
+fn assert_lattice_isomorphic<V, const N: usize, const M: usize>(lhs: &[DerefArray<i64, M>; N], rhs: &Submatrix<V, i64>)
     where V: AsPointerToSlice<i64>
 {
     assert_eq!(rhs.row_count(), N);
@@ -445,11 +455,11 @@ fn assert_lattice_isomorphic<V, const N: usize, const M: usize>(lhs: &[[i64; M];
 fn test_lll_float_2d() {
     let ZZ = StaticRing::<i64>::RING;
     let original = [
-        [5,   9],
-        [11, 20]
+        DerefArray::from([5,   9]),
+        DerefArray::from([11, 20])
     ];
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<[_; 2], _>::new(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut reduced);
     lll_float(&ZZ, DenseMatrix::identity(2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
@@ -457,11 +467,11 @@ fn test_lll_float_2d() {
     assert_eq!(1, norm_squared(&reduced_matrix.as_const().col_at(1)));
 
     let original = [
-        [10, 8],
-        [27, 22]
+        DerefArray::from([10, 8]),
+        DerefArray::from([27, 22])
     ];
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<[_; 2], _>::new(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut reduced);
     lll_float(&ZZ, DenseMatrix::identity(2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
@@ -475,9 +485,9 @@ fn test_lll_float_3d() {
     // in this case, the shortest vector is shorter than half the second successive minimum,
     // so LLL will find it (for delta = 0.9 > 0.75)
     let original = [
-        [72, 0, 0],
-        [0,  9, 0],
-        [8432, 7344, 16864]
+        DerefArray::from([72, 0, 0]),
+        DerefArray::from([0,  9, 0]),
+        DerefArray::from([8432, 7344, 16864])
     ];
     let _expected = [
         [144, 72, 72],
@@ -486,7 +496,7 @@ fn test_lll_float_3d() {
     ];
 
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<[_; 3], _>::new(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 3>, _>::new(&mut reduced);
     lll_float(&ZZ, DenseMatrix::identity(3, Real64::RING).data(), reduced_matrix.reborrow(), 0.999);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
@@ -513,19 +523,19 @@ fn bench_lll_float_10d(bencher: &mut Bencher) {
     ];
     bencher.iter(|| {
         let original = [
-            [       1,        0,        0,        0,        0,        0,        0,        0,        0,        0],
-            [       0,        1,        0,        0,        0,        0,        0,        0,        0,        0],
-            [       0,        0,        1,        0,        0,        0,        0,        0,        0,        0],
-            [       0,        0,        0,        1,        0,        0,        0,        0,        0,        0],
-            [       0,        0,        0,        0,        1,        0,        0,        0,        0,        0],
-            [       0,        0,        0,        0,        0,        1,        0,        0,        0,        0],
-            [       0,        0,        0,        0,        0,        0,        1,        0,        0,        0],
-            [       2,        2,        2,        2,        0,        0,        1,        4,        0,        0],
-            [       4,        3,        3,        3,        1,        2,        1,        0,        5,        0],
-            [ 3433883, 14315221, 24549008,  6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304]
+            DerefArray::from([       1,        0,        0,        0,        0,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        1,        0,        0,        0,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        1,        0,        0,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        0,        1,        0,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        0,        0,        1,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        0,        0,        0,        1,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        0,        0,        0,        0,        1,        0,        0,        0]),
+            DerefArray::from([       2,        2,        2,        2,        0,        0,        1,        4,        0,        0]),
+            DerefArray::from([       4,        3,        3,        3,        1,        2,        1,        0,        5,        0]),
+            DerefArray::from([ 3433883, 14315221, 24549008,  6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304])
         ];
         let mut reduced = original;
-        let mut reduced_matrix = SubmatrixMut::<[_; 10], _>::new(&mut reduced);
+        let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 10>, _>::new(&mut reduced);
         lll_float(&ZZ, DenseMatrix::identity(10, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
 
         assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
@@ -537,11 +547,11 @@ fn bench_lll_float_10d(bencher: &mut Bencher) {
 fn test_lll_exact_2d() {
     let ZZ = StaticRing::<i64>::RING;
     let original = [
-        [5,   9],
-        [11, 20]
+        DerefArray::from([5,   9]),
+        DerefArray::from([11, 20])
     ];
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<[_; 2], _>::new(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut reduced);
     lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
@@ -549,11 +559,11 @@ fn test_lll_exact_2d() {
     assert_eq!(1, norm_squared(&reduced_matrix.as_const().col_at(1)));
 
     let original = [
-        [10, 8],
-        [27, 22]
+        DerefArray::from([10, 8]),
+        DerefArray::from([27, 22])
     ];
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<[_; 2], _>::new(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut reduced);
     lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
@@ -567,9 +577,9 @@ fn test_lll_exact_3d() {
     // in this case, the shortest vector is shorter than half the second successive minimum,
     // so LLL will find it (for delta = 0.9 > 0.75)
     let original = [
-        [72, 0, 0],
-        [0,  9, 0],
-        [8432, 7344, 16864]
+        DerefArray::from([72, 0, 0]),
+        DerefArray::from([0,  9, 0]),
+        DerefArray::from([8432, 7344, 16864])
     ];
     let _expected = [
         [144, 72, 72],
@@ -578,7 +588,7 @@ fn test_lll_exact_3d() {
     ];
 
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<[_; 3], _>::new(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 3>, _>::new(&mut reduced);
     lll_exact(&ZZ, reduced_matrix.reborrow(), 0.999);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
@@ -605,19 +615,19 @@ fn bench_lll_exact_10d(bencher: &mut Bencher) {
     ];
     bencher.iter(|| {
         let original = [
-            [       1,        0,        0,        0,        0,        0,        0,        0,        0,        0],
-            [       0,        1,        0,        0,        0,        0,        0,        0,        0,        0],
-            [       0,        0,        1,        0,        0,        0,        0,        0,        0,        0],
-            [       0,        0,        0,        1,        0,        0,        0,        0,        0,        0],
-            [       0,        0,        0,        0,        1,        0,        0,        0,        0,        0],
-            [       0,        0,        0,        0,        0,        1,        0,        0,        0,        0],
-            [       0,        0,        0,        0,        0,        0,        1,        0,        0,        0],
-            [       2,        2,        2,        2,        0,        0,        1,        4,        0,        0],
-            [       4,        3,        3,        3,        1,        2,        1,        0,        5,        0],
-            [ 3433883, 14315221, 24549008,  6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304]
+            DerefArray::from([       1,        0,        0,        0,        0,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        1,        0,        0,        0,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        1,        0,        0,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        0,        1,        0,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        0,        0,        1,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        0,        0,        0,        1,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        0,        0,        0,        0,        1,        0,        0,        0]),
+            DerefArray::from([       2,        2,        2,        2,        0,        0,        1,        4,        0,        0]),
+            DerefArray::from([       4,        3,        3,        3,        1,        2,        1,        0,        5,        0]),
+            DerefArray::from([ 3433883, 14315221, 24549008,  6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304])
         ];
         let mut reduced = original;
-        let mut reduced_matrix = SubmatrixMut::<[_; 10], _>::new(&mut reduced);
+        let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 10>, _>::new(&mut reduced);
         lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9);
 
         assert_lattice_isomorphic(&original, &reduced_matrix.as_const());

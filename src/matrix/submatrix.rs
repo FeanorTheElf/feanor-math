@@ -1,6 +1,6 @@
-use std::ops::Range;
+use std::ops::{Deref, Range};
 use std::marker::PhantomData;
-use std::ptr::NonNull;
+use std::ptr::{addr_of_mut, NonNull};
 
 #[cfg(feature = "ndarray")]
 use ndarray::{ArrayBase, DataMut, Ix2};
@@ -36,17 +36,56 @@ pub unsafe trait AsPointerToSlice<T> {
 unsafe impl<T> AsPointerToSlice<T> for Vec<T> {
 
     unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> {
-        let self_ref = unsafe {
-            self_.as_ref()
-        };
-        NonNull::new(self_ref.as_ptr() as *mut T).unwrap()
+        unsafe {
+            NonNull::new((*self_.as_ptr()).as_mut_ptr()).unwrap()
+        }
     }
 }
 
-unsafe impl<T, const N: usize> AsPointerToSlice<T> for [T; N] {
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct DerefArray<T, const SIZE: usize> {
+    pub data: [T; SIZE]
+}
+
+impl<T, const SIZE: usize> From<[T; SIZE]> for DerefArray<T, SIZE> {
+
+    fn from(value: [T; SIZE]) -> Self {
+        Self { data: value }
+    }
+}
+
+impl<'a, T, const SIZE: usize> From<&'a [T; SIZE]> for &'a DerefArray<T, SIZE> {
+
+    fn from(value: &'a [T; SIZE]) -> Self {
+        unsafe { std::mem::transmute(value) }
+    }
+}
+
+impl<'a, T, const SIZE: usize> From<&'a mut [T; SIZE]> for &'a mut DerefArray<T, SIZE> {
+
+    fn from(value: &'a mut [T; SIZE]) -> Self {
+        unsafe { std::mem::transmute(value) }
+    }
+}
+
+impl<T, const SIZE: usize> Deref for DerefArray<T, SIZE> {
+
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        &self.data[..]
+    }
+}
+
+unsafe impl<T, const SIZE: usize> AsPointerToSlice<T> for DerefArray<T, SIZE> {
 
     unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> {
-        std::mem::transmute(NonNull::from(self_))
+        unsafe { 
+            let self_ptr = self_.as_ptr();
+            let data_ptr = addr_of_mut!((*self_ptr).data);
+            NonNull::new((*data_ptr).as_mut_ptr()).unwrap()
+        }
     }
 }
 
@@ -61,7 +100,7 @@ pub struct AsFirstElement<T>(T);
 unsafe impl<'a, T> AsPointerToSlice<T> for AsFirstElement<T> {
 
     unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> {
-        std::mem::transmute(NonNull::from(self_))
+        std::mem::transmute(self_)
     }
 }
 
@@ -797,41 +836,24 @@ impl<'a, T> SubmatrixMut<'a, AsFirstElement<T>, T> {
     }
 }
 
-impl<'a, T> SubmatrixMut<'a, Vec<T>, T> {
+impl<'a, V: AsPointerToSlice<T> + Deref<Target = [T]>, T> SubmatrixMut<'a, V, T> {
 
-    pub fn new(data: &'a mut [Vec<T>]) -> Self {
+    pub fn new(data: &'a mut [V]) -> Self {
         assert!(data.len() > 0);
         let row_count = data.len();
         let col_count = data[0].len();
-        for row in data.iter_mut() {
+        for row in data.iter() {
             assert_eq!(col_count, row.len());
         }
         unsafe {
             Self {
                 entry: PhantomData,
-                raw_data: SubmatrixRaw::new(NonNull::new(data.as_mut_ptr()).unwrap_unchecked(), row_count, 1, 0, col_count)
+                raw_data: SubmatrixRaw::new(NonNull::new(data.as_mut_ptr() as *mut _).unwrap_unchecked(), row_count, 1, 0, col_count)
             }
         }
     }
 }
 
-impl<'a, T, const N: usize> SubmatrixMut<'a, [T; N], T> {
-
-    pub fn new(data: &'a mut [[T; N]]) -> Self {
-        assert!(data.len() > 0);
-        let row_count = data.len();
-        let col_count = data[0].len();
-        for row in data.iter_mut() {
-            assert_eq!(col_count, row.len());
-        }
-        unsafe {
-            Self {
-                entry: PhantomData,
-                raw_data: SubmatrixRaw::new(NonNull::new(data.as_mut_ptr()).unwrap_unchecked(), row_count, 1, 0, col_count)
-            }
-        }
-    }
-}
 impl<'a, T> Submatrix<'a, AsFirstElement<T>, T> {
 
     pub fn new(data: &'a [T], row_count: usize, col_count: usize) -> Self {
@@ -853,27 +875,9 @@ impl<'a, T> Submatrix<'a, AsFirstElement<T>, T> {
     }
 }
 
-impl<'a, T> Submatrix<'a, Vec<T>, T> {
+impl<'a, V: AsPointerToSlice<T> + Deref<Target = [T]>, T> Submatrix<'a, V, T> {
 
-    pub fn new(data: &'a [Vec<T>]) -> Self {
-        assert!(data.len() > 0);
-        let row_count = data.len();
-        let col_count = data[0].len();
-        for row in data.iter() {
-            assert_eq!(col_count, row.len());
-        }
-        unsafe {
-            Self {
-                entry: PhantomData,
-                raw_data: SubmatrixRaw::new(NonNull::new(data.as_ptr() as *mut _).unwrap_unchecked(), row_count, 1, 0, col_count)
-            }
-        }
-    }
-}
-
-impl<'a, T, const N: usize> Submatrix<'a, [T; N], T> {
-
-    pub fn new(data: &'a [[T; N]]) -> Self {
+    pub fn new(data: &'a [V]) -> Self {
         assert!(data.len() > 0);
         let row_count = data.len();
         let col_count = data[0].len();
@@ -925,6 +929,8 @@ impl<'a, V, R> super::Matrix<R> for SubmatrixMut<'a, V, R::Element>
 
 #[cfg(test)]
 use std::fmt::Debug;
+#[cfg(test)]
+use crate::mempool::caching::CachedMemoryData;
 
 #[cfg(test)]
 fn assert_submatrix_eq<V: AsPointerToSlice<T>, T: PartialEq + Debug, const N: usize, const M: usize>(expected: [[T; M]; N], actual: &mut SubmatrixMut<V, T>) {
@@ -952,15 +958,31 @@ fn with_testmatrix_vec<F>(f: F)
 }
 
 #[cfg(test)]
+fn with_testmatrix_caching_memprovider_object<F>(f: F)
+    where F: FnOnce(SubmatrixMut<CachedMemoryData<i64>, i64>)
+{
+    use crate::mempool::{caching::CachingMemoryProvider, MemoryProvider};
+
+    let memory_provider = CachingMemoryProvider::new(0);
+    let mut data = vec![
+        memory_provider.get_new_init(5, |i| [1, 2, 3, 4, 5][i]),
+        memory_provider.get_new_init(5, |i| [6, 7, 8, 9, 10][i]),
+        memory_provider.get_new_init(5, |i| [11, 12, 13, 14, 15][i])
+    ];
+    let matrix = SubmatrixMut::<CachedMemoryData<_>, _>::new(&mut data[..]);
+    f(matrix)
+}
+
+#[cfg(test)]
 fn with_testmatrix_array<F>(f: F)
-    where F: FnOnce(SubmatrixMut<[i64; 5], i64>)
+    where F: FnOnce(SubmatrixMut<DerefArray<i64, 5>, i64>)
 {
     let mut data = vec![
-        [1, 2, 3, 4, 5],
-        [6, 7, 8, 9, 10],
-        [11, 12, 13, 14, 15]
+        DerefArray::from([1, 2, 3, 4, 5]),
+        DerefArray::from([6, 7, 8, 9, 10]),
+        DerefArray::from([11, 12, 13, 14, 15])
     ];
-    let matrix = SubmatrixMut::<[_; 5], _>::new(&mut data[..]);
+    let matrix = SubmatrixMut::<DerefArray<_, 5>, _>::new(&mut data[..]);
     f(matrix)
 }
 
@@ -1023,6 +1045,7 @@ fn test_submatrix_wrapper() {
     with_testmatrix_array(test_submatrix);
     with_testmatrix_linmem(test_submatrix);
     with_testmatrix_ndarray(test_submatrix);
+    with_testmatrix_caching_memprovider_object(test_submatrix)
 }
 
 #[cfg(test)]
@@ -1058,6 +1081,7 @@ fn test_submatrix_mutate_wrapper() {
     with_testmatrix_array(test_submatrix_mutate);
     with_testmatrix_linmem(test_submatrix_mutate);
     with_testmatrix_ndarray(test_submatrix_mutate);
+    with_testmatrix_caching_memprovider_object(test_submatrix_mutate)
 }
 
 #[cfg(test)]
@@ -1125,6 +1149,7 @@ fn test_submatrix_col_iter_wrapper() {
     with_testmatrix_array(test_submatrix_col_iter);
     with_testmatrix_linmem(test_submatrix_col_iter);
     with_testmatrix_ndarray(test_submatrix_col_iter);
+    with_testmatrix_caching_memprovider_object(test_submatrix_col_iter);
 }
 
 #[cfg(test)]
@@ -1187,6 +1212,7 @@ fn test_submatrix_row_iter_wrapper() {
     with_testmatrix_array(test_submatrix_row_iter);
     with_testmatrix_linmem(test_submatrix_row_iter);
     with_testmatrix_ndarray(test_submatrix_row_iter);
+    with_testmatrix_caching_memprovider_object(test_submatrix_row_iter);
 }
 
 #[cfg(test)]
@@ -1221,6 +1247,7 @@ fn test_submatrix_col_at_wrapper() {
     with_testmatrix_array(test_submatrix_col_at);
     with_testmatrix_linmem(test_submatrix_col_at);
     with_testmatrix_ndarray(test_submatrix_col_at);
+    with_testmatrix_caching_memprovider_object(test_submatrix_col_at);
 }
 
 #[cfg(test)]
@@ -1255,4 +1282,5 @@ fn test_submatrix_row_at_wrapper() {
     with_testmatrix_array(test_submatrix_row_at);
     with_testmatrix_linmem(test_submatrix_row_at);
     with_testmatrix_ndarray(test_submatrix_row_at);
+    with_testmatrix_caching_memprovider_object(test_submatrix_row_at);
 }

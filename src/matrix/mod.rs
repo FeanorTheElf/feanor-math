@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use submatrix::DerefArray;
+
 use crate::{homomorphism::Homomorphism, ring::*};
 
 use self::submatrix::{AsPointerToSlice, SubmatrixMut};
@@ -157,6 +159,22 @@ pub trait TransformTarget<R>
 }
 
 impl<const N: usize, const M: usize, R> Matrix<R> for [[R::Element; N]; M]
+    where R: ?Sized + RingBase
+{
+    fn col_count(&self) -> usize {
+        N
+    }
+
+    fn row_count(&self) -> usize {
+        M
+    }
+
+    fn entry_at(&self, i: usize, j: usize) -> &<R as RingBase>::Element {
+        &self[i][j]
+    }
+}
+
+impl<const N: usize, const M: usize, R> Matrix<R> for [DerefArray<R::Element, N>; M]
     where R: ?Sized + RingBase
 {
     fn col_count(&self) -> usize {

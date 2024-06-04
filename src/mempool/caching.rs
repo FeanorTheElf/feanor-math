@@ -1,10 +1,12 @@
 use std::mem::MaybeUninit;
+use std::ptr::addr_of_mut;
 use std::rc::Rc;
 use std::collections::*;
 use std::collections::hash_map::Entry;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::cell::RefCell;
 
+use crate::matrix::submatrix::AsPointerToSlice;
 use crate::vector::{VectorView, VectorViewMut};
 use crate::default_memory_provider;
 use super::MemoryProvider;
@@ -21,6 +23,17 @@ impl<T: Sized> Deref for CachedMemoryData<T> {
     fn deref<'a>(&'a self) -> &'a Self::Target {
         unsafe {
             MaybeUninit::slice_assume_init_ref(self.data.as_ref().unwrap())
+        }
+    }
+}
+
+unsafe impl<T: Sized> AsPointerToSlice<T> for CachedMemoryData<T> {
+
+    unsafe fn get_pointer(self_: std::ptr::NonNull<Self>) -> std::ptr::NonNull<T> {
+        unsafe {
+            let self_ptr = self_.as_ptr();
+            let data_ptr = std::mem::transmute::<*mut Option<Box<[MaybeUninit<T>]>>, *mut Box<[MaybeUninit<T>]>>(addr_of_mut!((*self_ptr).data));
+            std::ptr::NonNull::new((*data_ptr).as_mut_ptr() as *mut MaybeUninit<T>).unwrap().cast()
         }
     }
 }
