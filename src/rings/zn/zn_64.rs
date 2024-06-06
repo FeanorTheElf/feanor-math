@@ -288,11 +288,9 @@ impl RingBase for ZnBase {
 
 impl InnerProductComputation for ZnBase {
 
-    fn inner_product<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, mut els: I) -> Self::Element
-        where Self::Element: 'a
+    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, mut els: I) -> Self::Element
     {
-        #[inline(never)]
-        fn body<'a, I: Iterator<Item = (&'a ZnEl, &'a ZnEl)>>(ring: &ZnBase, els: &mut I) -> Option<ZnEl> {
+        fn body<I: Iterator<Item = (ZnEl, ZnEl)>>(ring: &ZnBase, els: &mut I) -> Option<ZnEl> {
             debug_assert!(u128::MAX / (ring.repr_bound() as u128 * ring.repr_bound() as u128) >= 36);
             const REDUCE_AFTER_STEPS: usize = 32;
             
@@ -1059,7 +1057,7 @@ fn bench_inner_product(bencher: &mut Bencher) {
     let expected = (0..len).map(|i| Fp.int_hom().map(i * i)).fold(Fp.zero(), |l, r| Fp.add(l, r));
 
     bencher.iter(|| {
-        let actual = <_ as InnerProductComputation>::inner_product(Fp.get_ring(), std::hint::black_box(lhs.iter().zip(rhs.iter())));
+        let actual = <_ as InnerProductComputation>::inner_product_ref(Fp.get_ring(), std::hint::black_box(lhs.iter().zip(rhs.iter())));
         assert_el_eq!(&Fp, &expected, &actual);
     })
 }
