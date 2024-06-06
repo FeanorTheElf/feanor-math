@@ -32,6 +32,7 @@ log_memory = []
 mpir = []
 parallel = ["dep:rayon"]
 ndarray = ["dep:ndarray"]
+test_deprecated = []
 
 [profile.profiling]
 inherits = "bench"

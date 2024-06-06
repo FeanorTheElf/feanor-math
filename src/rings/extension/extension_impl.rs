@@ -1,3 +1,4 @@
+use crate::algorithms::conv_mul::ConvMulComputation;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::divisibility::*;
 use crate::impl_wrap_unwrap_homs;
@@ -177,7 +178,7 @@ impl<R, V, M> RingBase for FreeAlgebraImplBase<R, V, M>
 
     default fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         let mut tmp = self.memory_provider.get_new_init(self.rank() * 2, |_| self.base_ring.zero());
-        algorithms::conv_mul::add_assign_convoluted_mul(&mut tmp[..], &lhs.values[..], &rhs.values[..], self.base_ring(), &self.memory_provider);
+        <_ as ConvMulComputation>::add_assign_conv_mul(self.base_ring().get_ring(), &mut tmp[..], &lhs.values[..], &rhs.values[..], &self.memory_provider);
         for i in (self.rank()..tmp.len()).rev() {
             for j in 0..self.rank() {
                 let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &tmp[i]);

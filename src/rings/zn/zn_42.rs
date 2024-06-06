@@ -680,11 +680,11 @@ impl_wrap_unwrap_homs!{ ZnBase, ZnBase }
 impl_wrap_unwrap_isos!{ ZnBase, ZnBase }
 
 #[cfg(test)]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 use crate::rings::finite::FiniteRingStore;
 
 #[test]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 fn test_ring_axioms() {
     let ring = Zn::new(2);
     crate::ring::generic_tests::test_ring_axioms(&ring, ring.elements());
@@ -697,7 +697,7 @@ fn test_ring_axioms() {
 }
 
 #[test]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 fn test_sum() {
     let ring = Zn::new(17);
     assert_el_eq!(&ring, &ring.int_hom().map(10001 * 5000), &ring.sum((0..=10000).map(|x| ring.int_hom().map(x))));
@@ -707,7 +707,7 @@ fn test_sum() {
 }
 
 #[test]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 fn test_canonical_iso_axioms_zn_barett() {
     let from = zn_barett::Zn::new(StaticRing::<i128>::RING, 7 * 11);
     let to = Zn::new(7 * 11);
@@ -716,7 +716,7 @@ fn test_canonical_iso_axioms_zn_barett() {
 }
 
 #[test]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 fn test_canonical_hom_axioms_static_int() {
     let from = StaticRing::<i128>::RING;
     let to = Zn::new(7 * 11);
@@ -724,14 +724,14 @@ fn test_canonical_hom_axioms_static_int() {
 }
 
 #[test]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 fn test_zn_ring_axioms() {
     super::generic_tests::test_zn_axioms(Zn::new(17));
     super::generic_tests::test_zn_axioms(Zn::new(63));
 }
 
 #[test]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 fn test_principal_ideal_ring_axioms() {
     let R = Zn::new(17);
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
@@ -740,14 +740,14 @@ fn test_principal_ideal_ring_axioms() {
 }
 
 #[test]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 fn test_divisibility_axioms() {
     let R = Zn::new(17);
     crate::divisibility::generic_tests::test_divisibility_axioms(&R, R.elements());
 }
 
 #[test]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 fn test_zn_map_in_large_int() {
     let R = Zn::new(17);
     super::generic_tests::test_map_in_large_int(R);
@@ -758,7 +758,7 @@ fn test_zn_map_in_large_int() {
 }
 
 #[test]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 fn test_zn_map_in_small_int() {
     let R = Zn::new((1 << 41) - 1);
     let hom = generic_impls::has_canonical_hom_from_bigint(StaticRing::<i8>::RING.get_ring(), R.get_ring(), StaticRing::<i128>::RING.get_ring(), Some(&(*R.modulus() as i128 * *R.modulus() as i128))).unwrap();
@@ -774,7 +774,7 @@ fn test_zn_map_in_small_int() {
 }
 
 #[test]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 fn test_from_int() {
     let R = Zn::new(2);
     assert_el_eq!(&R, &R.int_hom().map(1), &R.int_hom().map(i32::MAX));
@@ -784,7 +784,7 @@ fn test_from_int() {
 }
 
 #[test]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 fn test_canonical_iso_axioms_as_field() {
     let R = Zn::new(17);
     let R2 = R.clone().as_field().ok().unwrap();
@@ -795,7 +795,7 @@ fn test_canonical_iso_axioms_as_field() {
 }
 
 #[test]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 fn test_cooley_tuckey_butterfly() {
     let ring = Zn::new(2);
     generic_test_cooley_tuckey_butterfly(ring, ring, ring.elements(), &ring.one());
@@ -808,7 +808,7 @@ fn test_cooley_tuckey_butterfly() {
 }
 
 #[test]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 fn test_cooley_tuckey_butterfly_fastmul() {
     let ring = Zn::new(2);
     let fastmul_ring = ZnFastmul::new(ring);
@@ -824,7 +824,7 @@ fn test_cooley_tuckey_butterfly_fastmul() {
 }
 
 #[test]
-#[cfg(never)]
+#[cfg(feature = "test_deprecated")]
 fn test_finite_field_axioms() {
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(128));
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(15));

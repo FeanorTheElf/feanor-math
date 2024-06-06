@@ -1,5 +1,6 @@
 pub mod karatsuba;
 pub mod conv_mul;
+pub mod matmul;
 pub mod sqr_mul;
 pub mod eea;
 pub mod unity_root;

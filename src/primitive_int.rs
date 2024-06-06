@@ -10,7 +10,7 @@ use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::divisibility::*;
 use crate::ordered::OrderedRing;
 use crate::integer::*;
-use crate::algorithms::conv_mul::KaratsubaHint;
+use crate::algorithms::conv_mul::ConvMulComputation;
 
 ///
 /// Trait for `i8` to `i128`.
@@ -312,23 +312,23 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     }
 }
 
-impl KaratsubaHint for StaticRingBase<i8> {
+impl ConvMulComputation for StaticRingBase<i8> {
     fn karatsuba_threshold(&self) -> usize { 4 }
 }
 
-impl KaratsubaHint for StaticRingBase<i16> {
+impl ConvMulComputation for StaticRingBase<i16> {
     fn karatsuba_threshold(&self) -> usize { 4 }
 }
 
-impl KaratsubaHint for StaticRingBase<i32> {
+impl ConvMulComputation for StaticRingBase<i32> {
     fn karatsuba_threshold(&self) -> usize { 4 }
 }
 
-impl KaratsubaHint for StaticRingBase<i64> {
+impl ConvMulComputation for StaticRingBase<i64> {
     fn karatsuba_threshold(&self) -> usize { 4 }
 }
 
-impl KaratsubaHint for StaticRingBase<i128> {
+impl ConvMulComputation for StaticRingBase<i128> {
     fn karatsuba_threshold(&self) -> usize { 3 }
 }
 

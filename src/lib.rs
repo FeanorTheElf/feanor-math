@@ -1,16 +1,14 @@
 #![allow(soft_unstable)]
 #![allow(non_snake_case)]
+
 #![feature(test)]
 #![feature(min_specialization)]
 #![feature(maybe_uninit_slice)]
 #![feature(allocator_api)]
 #![feature(new_uninit)]
-#![feature(const_type_name)]
 #![feature(is_sorted)]
 #![feature(fn_traits)]
 #![feature(unboxed_closures)]
-#![feature(iter_advance_by)]
-#![feature(non_null_convenience)]
 
 #![doc = include_str!("../Readme.md")]
 

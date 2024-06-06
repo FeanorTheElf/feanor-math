@@ -3,28 +3,42 @@ use crate::mempool::*;
 use super::karatsuba::*;
 
 ///
-/// Helper trait that gives rings the ability to specify to which length naive multiplication
-/// should be used (as opposed to karatsuba convolution).
+/// Trait to allow rings to provide specialized implementations for computing a convolution,
+/// i.e. the sums `sum_i a[i] * b[j - i]` for all `j`.
 /// 
-/// This is default implemented for all rings, but if a ring provides very cheap multiplication,
-/// it might be worth considering specializing `KaratsubaHint` with a larger value, to gain a 
-/// performance benefit.
-/// 
-pub trait KaratsubaHint: RingBase {
+pub trait ConvMulComputation: RingBase {
 
+    ///
+    /// Define a threshold from which on the default implementation of [`ConvMulComputation::add_assign_conv_mul()`]
+    /// will use the Karatsuba algorithm.
+    /// 
+    /// Concretely, when this returns `k`, [`ConvMulComputation::add_assign_conv_mul()`] will reduce the 
+    /// convolution down to ones on slices of size `2^k`, and compute their convolution naively. The default
+    /// value is `0`, but if the considered rings have fast multiplication (compared to addition), then setting
+    /// it higher may result in a performance gain.
+    /// 
     fn karatsuba_threshold(&self) -> usize;
+
+    ///
+    /// Computes the convolution of `lhs` and `rhs`, and adds the result to `dst`.
+    /// 
+    /// In other words, computes `dst[j] += sum_i lhs[i] * rhs[j - i]` for all `j`,
+    /// where `i` runs through `max(0, j - rhs.len() - 1), ..., min(j, lhs.len() - 1)`.
+    /// Requires that `dst` is of length at least `lhs.len() + rhs.len() + 1`.
+    /// 
+    fn add_assign_conv_mul<M: MemoryProvider<Self::Element>>(&self, dst: &mut [Self::Element], lhs: &[Self::Element], rhs: &[Self::Element], memory_provider: &M);
 }
 
-impl<R: RingBase + ?Sized> KaratsubaHint for R {
+impl<R: RingBase + ?Sized> ConvMulComputation for R {
 
     default fn karatsuba_threshold(&self) -> usize {
         0
     }
-}
 
-pub fn add_assign_convoluted_mul<R: RingStore + Copy, M: MemoryProvider<El<R>>>(dst: &mut [El<R>], lhs: &[El<R>], rhs: &[El<R>], ring: R, memory_provider: &M) {
-    // checks are done by karatsuba()
-    karatsuba(ring.get_ring().karatsuba_threshold(), dst, lhs, rhs, ring, memory_provider);
+    fn add_assign_conv_mul<M: MemoryProvider<Self::Element>>(&self, dst: &mut [Self::Element], lhs: &[Self::Element], rhs: &[Self::Element], memory_provider: &M) {
+        // checks are done by karatsuba()
+        karatsuba(self.karatsuba_threshold(), dst, lhs, rhs, RingRef::new(self), memory_provider);
+    }
 }
 
 #[cfg(test)]

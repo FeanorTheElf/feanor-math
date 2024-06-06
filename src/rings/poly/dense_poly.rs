@@ -1,3 +1,4 @@
+use crate::algorithms::conv_mul::ConvMulComputation;
 use crate::algorithms::eea::poly_pid_fractionfield_gcd;
 use crate::divisibility::*;
 use crate::integer::{IntegerRing, IntegerRingStore};
@@ -209,11 +210,11 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
         let lhs_len = self.degree(lhs).map(|i| i + 1).unwrap_or(0);
         let rhs_len = self.degree(rhs).map(|i| i + 1).unwrap_or(0);
         let mut result = self.memory_provider.get_new_init(lhs_len + rhs_len, |_| self.base_ring.zero());
-        algorithms::conv_mul::add_assign_convoluted_mul(
+        <_ as ConvMulComputation>::add_assign_conv_mul(
+            self.base_ring.get_ring(),
             &mut result[..], 
             &lhs[0..lhs_len], 
             &rhs[0..rhs_len], 
-            &self.base_ring,
             &self.memory_provider
         );
         return result;

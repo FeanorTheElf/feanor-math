@@ -9,6 +9,7 @@ use crate::primitive_int::*;
 use crate::integer::*;
 use crate::pid::*;
 use crate::ring::*;
+use algorithms::matmul::InnerProductComputation;
 use crate::homomorphism::*;
 use crate::rings::rust_bigint::*;
 
@@ -124,15 +125,38 @@ impl ZnBase {
     /// 
     fn bounded_reduce(&self, value: u128) -> u64 {
         debug_assert!(value <= self.repr_bound() as u128 * self.repr_bound() as u128);
+
         let (in_low, in_high) = (low(value), high(value));
         let (invmod_low, invmod_high) = (low(self.inv_modulus), high(self.inv_modulus));
         // we ignore the lowest part of the sum, causing an error of at most 1;
         // we also assume that `repr_bound * repr_bound * inv_modulus` fits into 192 bit
         let approx_quotient = mulhi(in_low, invmod_high) + mulhi(in_high, invmod_low) + mullo(in_high, invmod_high);
         let result = low(value).wrapping_sub(mullo(approx_quotient, self.modulus_u64()));
+
         debug_assert!(result < self.modulus_times_three);
         debug_assert!((value - result as u128) % (self.modulus_u64() as u128) == 0);
         return result;
+    }
+
+    ///
+    /// If input is bounded by `FACTOR * self.repr_bound() * self.repr_bound()`, then the 
+    /// output that is `< 3 * modulus` and congruent to the input.
+    /// 
+    /// As opposed to the faster [`ZnBase::bounded_reduce()`], this should work for all
+    /// inputs in `u128`. Currently only used by the specialization of
+    /// [`InnerProductComputation::inner_product()`].
+    /// 
+    #[inline(never)]
+    fn bounded_reduce_larger<const FACTOR: usize>(&self, value: u128) -> u64 {
+        assert!(FACTOR == 32);
+        debug_assert!(value <= FACTOR as u128 * self.repr_bound() as u128 * self.repr_bound() as u128);
+
+        let (in_low, in_high) = (low(value), high(value));
+        let invmod_high = high(self.inv_modulus);
+        // `approx_quotient` can be just slightly larger than 64 bits, since we optimized for `bounded_reduce()`
+        let approx_quotient = in_high as u128 * invmod_high as u128 + mulhi(in_low, invmod_high) as u128;
+
+        return self.bounded_reduce(value - (approx_quotient * self.modulus as u128));
     }
 
     fn potential_reduce(&self, mut value: u64) -> u64 {
@@ -260,6 +284,37 @@ impl RingBase for ZnBase {
         return result;
     }
 
+}
+
+impl InnerProductComputation for ZnBase {
+
+    fn inner_product<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, mut els: I) -> Self::Element
+        where Self::Element: 'a
+    {
+        #[inline(never)]
+        fn body<'a, I: Iterator<Item = (&'a ZnEl, &'a ZnEl)>>(ring: &ZnBase, els: &mut I) -> Option<ZnEl> {
+            debug_assert!(u128::MAX / (ring.repr_bound() as u128 * ring.repr_bound() as u128) >= 36);
+            const REDUCE_AFTER_STEPS: usize = 32;
+            
+            let mut current = 0;
+            for i in 0..REDUCE_AFTER_STEPS {
+                let next_pair = els.next();
+                if let Some((l, r)) = next_pair {
+                    debug_assert!(l.0 <= ring.repr_bound());
+                    debug_assert!(r.0 <= ring.repr_bound());
+                    current += l.0 as u128 * r.0 as u128;
+                    debug_assert!(current <= (i + 1) as u128 * ring.repr_bound() as u128 * ring.repr_bound() as u128);
+                } else if i == 0 {
+                    return None;
+                } else {
+                    break;
+                }
+            }
+            return Some(ZnEl(ring.bounded_reduce_larger::<REDUCE_AFTER_STEPS>(current)));
+        }
+
+        self.sum((0..).map(|_| body(self, &mut els)).take_while(|x| x.is_some()).map(|x| x.unwrap()))
+    }
 }
 
 impl_eq_based_self_iso!{ ZnBase }
@@ -900,6 +955,54 @@ fn test_from_int_hom() {
     assert_el_eq!(&Zn, &Zn.int_hom().map(3), &Zn.can_hom(&StaticRing::<i64>::RING).unwrap().map(-1596802));
 }
 
+#[test]
+fn test_bounded_reduce_large() {
+    const FACTOR: usize = 32;
+    let n_max = (1 << 62) / 9;
+    for n in (n_max - 10)..=n_max {
+        let Zn = Zn::new(n);
+        let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128 * FACTOR as u128;
+        for k in (val_max - 100)..=val_max {
+            assert_eq!((k % (n as u128)) as i64, Zn.smallest_positive_lift(ZnEl(Zn.get_ring().bounded_reduce_larger::<FACTOR>(k))));
+        }
+    }
+}
+
+#[test]
+fn test_bounded_reduce_small() {
+    for n in 2..=17 {
+        let Zn = Zn::new(n);
+        let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128;
+        for k in (val_max - 100)..=val_max {
+            assert_eq!((k % (n as u128)) as i64, Zn.smallest_positive_lift(ZnEl(Zn.get_ring().bounded_reduce(k))));
+        }
+    }
+}
+
+#[test]
+fn test_bounded_reduce_large_small() {
+    const FACTOR: usize = 32;
+    for n in 2..=17 {
+        let Zn = Zn::new(n);
+        let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128 * FACTOR as u128;
+        for k in (val_max - 100)..=val_max {
+            assert_eq!((k % (n as u128)) as i64, Zn.smallest_positive_lift(ZnEl(Zn.get_ring().bounded_reduce_larger::<FACTOR>(k))));
+        }
+    }
+}
+
+#[test]
+fn test_bounded_reduce() {
+    let n_max = (1 << 62) / 9;
+    for n in (n_max - 10)..=n_max {
+        let Zn = Zn::new(n);
+        let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128;
+        for k in (val_max - 100)..=val_max {
+            assert_eq!((k % (n as u128)) as i64, Zn.smallest_positive_lift(ZnEl(Zn.get_ring().bounded_reduce(k))));
+        }
+    }
+}
+
 #[bench]
 fn bench_hom_from_i64_large_modulus(bencher: &mut Bencher) {
     // the case that the modulus is large
@@ -945,4 +1048,18 @@ fn bench_reduction_map_use_case(bencher: &mut Bencher) {
             }
         }
     });
+}
+
+#[bench]
+fn bench_inner_product(bencher: &mut Bencher) {
+    let Fp = Zn::new(65537);
+    let len = 1 << 12;
+    let lhs = (0..len).map(|i| Fp.int_hom().map(i)).collect::<Vec<_>>();
+    let rhs = (0..len).map(|i| Fp.int_hom().map(i)).collect::<Vec<_>>();
+    let expected = (0..len).map(|i| Fp.int_hom().map(i * i)).fold(Fp.zero(), |l, r| Fp.add(l, r));
+
+    bencher.iter(|| {
+        let actual = <_ as InnerProductComputation>::inner_product(Fp.get_ring(), std::hint::black_box(lhs.iter().zip(rhs.iter())));
+        assert_el_eq!(&Fp, &expected, &actual);
+    })
 }

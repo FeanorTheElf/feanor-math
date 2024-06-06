@@ -391,6 +391,7 @@ impl<R, S> Homomorphism<R::Type, S::Type> for CanHom<R, S>
     fn map_ref(&self, el: &El<R>) -> El<S> {
         self.to.get_ring().map_in_ref(self.from.get_ring(), el, &self.data)
     }
+    
     fn domain(&self) -> &R {
         &self.from
     }
