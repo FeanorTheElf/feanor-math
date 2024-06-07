@@ -244,6 +244,12 @@ impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD> {
     fn is_field(&self) -> bool {
         is_prime(N)
     }
+
+    fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element {
+        debug_assert!(x >= 0);
+        debug_assert!((x as u64) < N);
+        x as u64
+    }
 }
 
 impl<const N: u64> Domain for ZnBase<N, true> {}

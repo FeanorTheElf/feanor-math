@@ -115,8 +115,12 @@ impl ZnBase {
         self.modulus as u64
     }
 
+    ///
+    /// Positive integers bounded by `self.repr_bound()` (inclusive) are considered
+    /// valid representatives of ring elements.
+    /// 
     fn repr_bound(&self) -> u64 {
-        self.modulus_u64() * 6
+        self.modulus_times_three * 2
     }
 
     ///
@@ -169,7 +173,7 @@ impl ZnBase {
         return value;
     }
 
-    pub fn promise_is_reduced(&self, value: u64) -> ZnEl {
+    fn from_u64_promise_reduced(&self, value: u64) -> ZnEl {
         debug_assert!(value <= self.repr_bound());
         ZnEl(value)
     }
@@ -245,9 +249,9 @@ impl RingBase for ZnBase {
         debug_assert!(lhs.0 <= self.repr_bound());
         debug_assert!(rhs.0 <= self.repr_bound());
         if lhs.0 > rhs.0 {
-            self.is_zero(&self.promise_is_reduced(lhs.0 - rhs.0))
+            self.is_zero(&self.from_u64_promise_reduced(lhs.0 - rhs.0))
         } else {
-            self.is_zero(&self.promise_is_reduced(rhs.0 - lhs.0))
+            self.is_zero(&self.from_u64_promise_reduced(rhs.0 - lhs.0))
         }
     }
 
@@ -278,7 +282,7 @@ impl RingBase for ZnBase {
             for ZnEl(c) in els.by_ref().take(self.repr_bound() as usize / 2 - 1) {
                 current += c as u128;
             }
-            self.add_assign(&mut result, self.promise_is_reduced(self.bounded_reduce(current)));
+            self.add_assign(&mut result, self.from_u64_promise_reduced(self.bounded_reduce(current)));
         }
         debug_assert!(result.0 <= self.repr_bound());
         return result;
@@ -335,7 +339,7 @@ impl<I: IntegerRingStore> CanHomFrom<zn_barett::ZnBase<I>> for ZnBase
     }
 
     fn map_in(&self, from: &zn_barett::ZnBase<I>, el: <zn_barett::ZnBase<I> as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
-        self.promise_is_reduced(int_cast(from.smallest_positive_lift(el), self.integer_ring(), from.integer_ring()) as u64)
+        self.from_u64_promise_reduced(int_cast(from.smallest_positive_lift(el), self.integer_ring(), from.integer_ring()) as u64)
     }
 }
 
@@ -377,7 +381,7 @@ impl CanHomFrom<zn_42::ZnBase> for ZnBase {
     fn map_in(&self, from: &zn_42::ZnBase, el: <zn_42::ZnBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
         // we usually require much smaller representatives as zn_42 (except for very large moduli), so do not
         // specialize this
-        self.promise_is_reduced(from.smallest_positive_lift(el) as u64)
+        self.from_u64_promise_reduced(from.smallest_positive_lift(el) as u64)
     }
 }
 
@@ -433,7 +437,7 @@ impl PreparedDivisibilityRing for ZnBase {
         debug_assert!(d <= *self.modulus());
         return ZnPreparedDivisor {
             is_unit: d == 1,
-            unit_part: if s < 0 { self.negate(self.promise_is_reduced(-s as u64)) } else { self.promise_is_reduced(s as u64) },
+            unit_part: if s < 0 { self.negate(self.from_u64_promise_reduced(-s as u64)) } else { self.from_u64_promise_reduced(s as u64) },
             smallest_positive_zero_divisor_part: StaticRing::<i64>::RING.prepare_divisor(&d)
         }
     }
@@ -443,7 +447,7 @@ impl PreparedDivisibilityRing for ZnBase {
             Some(self.mul_ref(lhs, &rhs.unit_part))
         } else {
             StaticRing::<i64>::RING.checked_div_prepared(&self.smallest_positive_lift(*lhs), &rhs.smallest_positive_zero_divisor_part)
-                .map(|x| self.mul(self.promise_is_reduced(x as u64), rhs.unit_part))
+                .map(|x| self.mul(self.from_u64_promise_reduced(x as u64), rhs.unit_part))
         }
     }
 }
@@ -472,10 +476,10 @@ impl<I: ?Sized + ImplGenericIntHomomorphismMarker> CanHomFrom<I> for ZnBase {
     fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
         super::generic_impls::map_in_from_bigint(from, self, StaticRing::<i128>::RING.get_ring(), el, hom, |n| {
             debug_assert!((n as u64) < self.modulus_u64());
-            self.promise_is_reduced(n as u64)
+            self.from_u64_promise_reduced(n as u64)
         }, |n| {
             debug_assert!(n <= (self.repr_bound() as i128 * self.repr_bound() as i128));
-            self.promise_is_reduced(self.bounded_reduce(n as u128))
+            self.from_u64_promise_reduced(self.bounded_reduce(n as u128))
         })
     }
 }
@@ -495,21 +499,21 @@ macro_rules! impl_static_int_to_zn {
                 fn map_in(&self, _from: &StaticRingBase<$int>, el: $int, hom: &($int, $int)) -> Self::Element {
                     if el.abs() <= hom.0 {
                         if el < 0 {
-                            self.negate(self.promise_is_reduced(-(el as i128) as u64))
+                            self.negate(self.from_u64_promise_reduced(el.unsigned_abs() as u64))
                         } else {
-                            self.promise_is_reduced(el as u64)
+                            self.from_u64_promise_reduced(el as u64)
                         }
                     } else if el.abs() <= hom.1 {
                         if el < 0 {
-                            self.negate(self.promise_is_reduced(self.bounded_reduce(-(el as i128) as u128)))
+                            self.negate(self.from_u64_promise_reduced(self.bounded_reduce(el.unsigned_abs() as u128)))
                         } else {
-                            self.promise_is_reduced(self.bounded_reduce(el as u128))
+                            self.from_u64_promise_reduced(self.bounded_reduce(el as u128))
                         }
                     } else {
                         if el < 0 {
-                            self.promise_is_reduced(((el as i128 % self.modulus as i128) as i64 + self.modulus) as u64)
+                            self.from_u64_promise_reduced(((el as i128 % self.modulus as i128) as i64 + self.modulus) as u64)
                         } else {
-                            self.promise_is_reduced((el as i128 % self.modulus as i128) as u64)
+                            self.from_u64_promise_reduced((el as i128 % self.modulus as i128) as u64)
                         }
                     }
                 }
@@ -534,7 +538,7 @@ impl<'a> Iterator for ZnBaseElementsIter<'a> {
         if self.current < self.ring.modulus_u64() {
             let result = self.current;
             self.current += 1;
-            return Some(self.ring.promise_is_reduced(result));
+            return Some(self.ring.from_u64_promise_reduced(result));
         } else {
             return None;
         }
@@ -618,6 +622,39 @@ impl ZnRing for ZnBase {
 
     fn any_lift(&self, el: Self::Element) -> El<Self::Integers> {
         el.0 as i64
+    }
+
+    ///
+    /// If the given integer is within `{ 0, ..., 6 * n }`, returns the corresponding
+    /// element in `Z/nZ`. Any other input is considered a logic error.
+    /// 
+    /// This function follows [`ZnRing::from_int_promise_reduced()`], but is guaranteed
+    /// to work on elements `{ 0, ..., 6 * n }` instead of only `{ 0, ..., n - 1 }`.
+    /// 
+    /// # Examples
+    /// ```
+    /// # use feanor_math::rings::zn::*;
+    /// # use feanor_math::assert_el_eq;
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::rings::zn::zn_64::*;
+    /// let ring = Zn::new(7);
+    /// assert_el_eq!(&ring, &ring.zero(), &ring.get_ring().from_int_promise_reduced(42));
+    /// ```
+    /// Larger values lead to a panic in debug mode, and to a logic error in release mode.
+    /// ```should_panic
+    /// # use feanor_math::rings::zn::*;
+    /// # use feanor_math::assert_el_eq;
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::rings::zn::zn_64::*;
+    /// let ring = Zn::new(7);
+    /// ring.get_ring().from_int_promise_reduced(43);
+    /// ```
+    /// 
+    fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element {
+        debug_assert!(self.repr_bound() == 6 * self.modulus_u64());
+        debug_assert!(x >= 0);
+        debug_assert!(x as u64 <= self.repr_bound());
+        self.from_u64_promise_reduced(x as u64)
     }
 }
 
@@ -812,8 +849,8 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
         debug_assert!(b.0 < self.modulus_times_three);
         debug_assert!(self.repr_bound() >= self.modulus_u64() * 6);
 
-        *values.at_mut(i1) = self.promise_is_reduced(a.0 + b.0);
-        *values.at_mut(i2) = self.promise_is_reduced(a.0 + self.modulus_times_three - b.0);
+        *values.at_mut(i1) = self.from_u64_promise_reduced(a.0 + b.0);
+        *values.at_mut(i2) = self.from_u64_promise_reduced(a.0 + self.modulus_times_three - b.0);
     }
 
     fn inv_butterfly<V: crate::vector::VectorViewMut<Self::Element>, H: Homomorphism<ZnFastmulBase, Self>>(&self, hom: &H, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
@@ -822,7 +859,7 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
 
         *values.at_mut(i1) = self.add(a, b);
         // this works, as mul_assign_map_in_ref() works with values up to 6 * self.modulus
-        *values.at_mut(i2) = self.promise_is_reduced(a.0 + self.modulus_times_three - b.0);
+        *values.at_mut(i2) = self.from_u64_promise_reduced(a.0 + self.modulus_times_three - b.0);
         hom.mul_assign_map_ref(values.at_mut(i2), twiddle);
     }
 }

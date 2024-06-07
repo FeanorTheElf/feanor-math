@@ -15,15 +15,13 @@ use crate::algorithms;
 /// Ring representing `Z/nZ`, computing the modular reductions
 /// via a Barett-reduction algorithm. This is a general-purpose
 /// method, but note that it is required that `n^3` fits into the
-/// supplied integer type.
+/// supplied integer type.]
 /// 
 /// # Performance
 /// 
-/// For small moduli, this implementation cannot use all the bounds
-/// on the representative sizes, and hence often has to compute with
-/// more precision than necessary.
-/// In these cases, specialized implementations (like [`crate::rings::zn::zn_42::Zn`])
-/// can be much faster.
+/// This implementation is optimized for use with large integer
+/// rings. If the moduli are small, consider using specialized implementations 
+/// (like [`crate::rings::zn::zn_64::Zn`]), which will be much faster.
 ///
 /// # Example
 /// ```
@@ -108,7 +106,7 @@ impl<I: IntegerRingStore> ZnBase<I>
         };
     }
 
-    fn project_leq_n_square(&self, n: &mut El<I>) {
+    fn bounded_reduce(&self, n: &mut El<I>) {
         assert!(!self.integer_ring.is_neg(&n));
         let mut subtract = self.integer_ring.mul_ref(&n, &self.inverse_modulus);
         self.integer_ring.euclidean_div_pow_2(&mut subtract, self.inverse_modulus_bitshift);
@@ -201,12 +199,12 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
 
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         self.integer_ring.mul_assign(&mut lhs.0, rhs.0);
-        self.project_leq_n_square(&mut lhs.0);
+        self.bounded_reduce(&mut lhs.0);
     }
 
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         self.integer_ring.mul_assign_ref(&mut lhs.0, &rhs.0);
-        self.project_leq_n_square(&mut lhs.0);
+        self.bounded_reduce(&mut lhs.0);
     }
 
     fn from_int(&self, value: i32) -> Self::Element {
@@ -365,7 +363,7 @@ impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanHomFrom<J> for ZnBase<I>
             ZnEl(n)
         }, |mut n| {
             debug_assert!(self.integer_ring.is_lt(&n, &self.integer_ring.mul_ref(&self.modulus, &self.modulus)));
-            self.project_leq_n_square(&mut n);
+            self.bounded_reduce(&mut n);
             ZnEl(n)
         })
     }
@@ -459,6 +457,12 @@ impl<I: IntegerRingStore> ZnRing for ZnBase<I>
 
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
         el.0
+    }
+
+    fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element {
+        debug_assert!(!self.integer_ring().is_neg(&x));
+        debug_assert!(self.integer_ring().is_lt(&x, self.modulus()));
+        ZnEl(x)
     }
 }
 

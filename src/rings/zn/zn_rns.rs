@@ -1,3 +1,5 @@
+use algorithms::matmul::InnerProductComputation;
+
 use crate::iters::multi_cartesian_product;
 use crate::iters::MultiProduct;
 use crate::mempool::*;
@@ -135,6 +137,8 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> Zn<C, J, M>
                 ZZ.is_one(&algorithms::eea::signed_gcd(ZZ.checked_div(total_ring.modulus(), &R_modulus).unwrap(), R_modulus, ZZ)),
                 "all moduli must be coprime"
             );
+            // makes things much easier, e.g. during CanIsoFromTo implementation
+            assert!(R.integer_ring().get_ring() == summands[0].integer_ring().get_ring());
         }
         let unit_vectors = summands.iter()
             .map(|R: &C| ZZ.checked_div(total_ring.modulus(), &R.integer_ring().can_iso(ZZ).unwrap().map_ref(R.modulus())).unwrap())
@@ -156,10 +160,6 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnBase<C, J,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
-    fn ZZ(&self) -> &J {
-        self.total_ring.integer_ring()
-    }
-
     ///
     /// Given values `ai` for each component ring `Z/miZ`, computes the unique element in this
     /// ring `Z/nZ` that is congruent to `ai` modulo `mi`. The "opposite" function is [`get_congruence()`].
@@ -391,7 +391,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider
                 self.total_ring.get_ring().has_canonical_hom(from)?,
                 self.components.iter()
                     .map(|s| s.get_ring())
-                    .map(|s| s.has_canonical_hom(self.ZZ().get_ring()).ok_or(()))
+                    .map(|s| s.has_canonical_hom(self.integer_ring().get_ring()).ok_or(()))
                     .collect::<Result<Vec<_>, ()>>()
                     .ok()?
             ))
@@ -403,14 +403,14 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider
     fn map_in(&self, from: &zn_barett::ZnBase<K>, el: zn_barett::ZnEl<K>, hom: &Self::Homomorphism) -> ZnEl<C, M> {
         let lift = from.smallest_positive_lift(el);
         let mapped_lift = <J::Type as CanHomFrom<K::Type>>::map_in(
-            self.ZZ().get_ring(), 
+            self.integer_ring().get_ring(), 
             from.integer_ring().get_ring(), 
             lift, 
             &hom.0
         );
         ZnEl(self.memory_provider.get_new_init(
             self.len(),
-            |i| self.at(i).get_ring().map_in_ref(self.ZZ().get_ring(), &mapped_lift, &hom.1[i])
+            |i| self.at(i).get_ring().map_in_ref(self.integer_ring().get_ring(), &mapped_lift, &hom.1[i])
         ))
     }
 }
@@ -426,35 +426,32 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, M: MemoryProvider
     // in `self.total_ring: Zn<J>` and then map this to `from: Zn<K>`.
     type Isomorphism = (
         <zn_barett::ZnBase<J> as CanIsoFromTo<zn_barett::ZnBase<K>>>::Isomorphism, 
-        <zn_barett::ZnBase<J> as CanHomFrom<J::Type>>::Homomorphism,
-        Vec<<<C::Type as ZnRing>::IntegerRingBase as CanIsoFromTo<J::Type>>::Isomorphism>
+        <zn_barett::ZnBase<J> as CanHomFrom<J::Type>>::Homomorphism
     );
 
     fn has_canonical_iso(&self, from: &zn_barett::ZnBase<K>) -> Option<Self::Isomorphism> {
         Some((
             <zn_barett::ZnBase<J> as CanIsoFromTo<zn_barett::ZnBase<K>>>::has_canonical_iso(self.total_ring.get_ring(), from)?,
             self.total_ring.get_ring().has_canonical_hom(self.total_ring.integer_ring().get_ring())?,
-            self.components.iter()
-                .map(|s| s.integer_ring().get_ring())
-                .map(|s| s.has_canonical_iso(self.total_ring.integer_ring().get_ring()).unwrap())
-                .collect()
         ))
     }
 
-    fn map_out(&self, from: &zn_barett::ZnBase<K>, el: Self::Element, (final_iso, red, homs): &Self::Isomorphism) -> zn_barett::ZnEl<K> {
-        let result = <_ as RingStore>::sum(&self.total_ring,
+    fn map_out(&self, from: &zn_barett::ZnBase<K>, el: Self::Element, (final_iso, red): &Self::Isomorphism) -> zn_barett::ZnEl<K> {
+        let small_integer_ring = self.at(0).integer_ring();
+        let result = <_ as InnerProductComputation>::inner_product_ref_fst(self.total_ring.get_ring(),
             self.components.iter()
                 .zip(el.0.into_iter())
-                .map(|(R, x): (&C, &El<C>)| (R.integer_ring().get_ring(), R.smallest_positive_lift(R.clone_el(x))))
+                .map(|(R, x): (&C, &El<C>)| R.smallest_positive_lift(R.clone_el(x)))
                 .zip(self.unit_vectors.iter())
-                .zip(homs.iter())
-                .map(|(((integers, x), u), hom): (((&<C::Type as ZnRing>::IntegerRingBase, _), _), _)| (integers, x, u, hom))
-                .map(|(integers, x, u, hom)| 
-                    self.total_ring.mul_ref_snd(self.total_ring.get_ring().map_in(
-                        self.total_ring.integer_ring().get_ring(), 
-                        <_ as CanIsoFromTo<_>>::map_out(integers, self.total_ring.integer_ring().get_ring(), x, hom), 
-                        red
-                    ), u)
+                .map(|(x, u)| 
+                    (
+                        u,
+                        self.total_ring.get_ring().map_in(
+                            self.total_ring.integer_ring().get_ring(),
+                            int_cast(x, self.total_ring.integer_ring(), small_integer_ring),
+                            red
+                        )
+                    )
                 )
         );
         return <zn_barett::ZnBase<J> as CanIsoFromTo<zn_barett::ZnBase<K>>>::map_out(self.total_ring.get_ring(), from, result, final_iso);
@@ -663,7 +660,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnRing for Z
     type Integers = J;
 
     fn integer_ring(&self) -> &Self::Integers {
-        self.ZZ()
+        self.total_ring.integer_ring()
     }
 
     fn modulus(&self) -> &El<Self::Integers> {
@@ -695,6 +692,12 @@ impl<C: ZnRingStore, J: IntegerRingStore, M: MemoryProvider<El<C>>> ZnRing for Z
     fn is_field(&self) -> bool {
         self.components.len() == 1
     }
+
+    fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element {
+        debug_assert!(!self.integer_ring().is_neg(&x));
+        debug_assert!(self.integer_ring().is_lt(&x, self.modulus()));
+        RingRef::new(self).can_hom(self.integer_ring()).unwrap().map(x)
+    }
 }
 
 #[cfg(test)]
@@ -724,7 +727,12 @@ fn test_canonical_iso_axioms_zn_barett() {
     let from = zn_barett::Zn::new(StaticRing::<i128>::RING, 7 * 11);
     let to = Zn::create_from_primes(StaticRing::<i64>::RING, vec![7, 11]);
     crate::ring::generic_tests::test_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.int_hom().map(x)));
-    crate::ring::generic_tests::test_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.int_hom().map(x)));
+    crate::ring::generic_tests::test_iso_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.int_hom().map(x)));
+
+    let from = zn_barett::Zn::new(StaticRing::<i128>::RING, 7 * 11 * 65537);
+    let to = Zn::create_from_primes(StaticRing::<i128>::RING, vec![7, 11, 65537]);
+    crate::ring::generic_tests::test_hom_axioms(&from, &to, from.elements().step_by(65536));
+    crate::ring::generic_tests::test_iso_axioms(&from, &to, from.elements().step_by(65536));
 }
 
 #[test]

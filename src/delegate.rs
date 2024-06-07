@@ -345,7 +345,6 @@ impl<R: DelegateRing + ?Sized> ZnRing for R
         self.get_delegate().integer_ring()
     }
 
-
     fn modulus(&self) -> &El<Self::Integers> {
         self.get_delegate().modulus()
     }
@@ -356,6 +355,10 @@ impl<R: DelegateRing + ?Sized> ZnRing for R
 
     fn smallest_lift(&self, el: Self::Element) -> El<Self::Integers> {
         self.get_delegate().smallest_lift(self.delegate(self.rev_element_cast(el)))
+    }
+
+    fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element {
+        self.element_cast(self.rev_delegate(self.get_delegate().from_int_promise_reduced(x)))
     }
 }
 

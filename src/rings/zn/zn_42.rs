@@ -463,6 +463,12 @@ impl ZnRing for ZnBase {
     fn modulus(&self) -> &El<Self::Integers> {
         &self.modulus
     }
+
+    fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element {
+        debug_assert!(x < self.modulus);
+        debug_assert!(x >= 0);
+        ZnEl(x as u64)
+    }
 }
 
 impl HashableElRing for ZnBase {

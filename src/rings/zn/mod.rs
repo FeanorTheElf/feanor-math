@@ -77,11 +77,27 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
     }
 
     ///
+    /// If the given integer is within `{ 0, ..., n - 1 }`, returns the corresponding
+    /// element in `Z/nZ`. Any other input is considered a logic error.
+    /// 
+    /// Unless the context is absolutely performance-critical, it might be safer to use
+    /// the homomorphism provided by [`CanHomFrom`] which performs proper modular reduction
+    /// of the input.
+    /// 
+    /// This function never causes undefined behavior, but an invalid input leads to
+    /// a logic error. In particular, the result in such a case does not have to be
+    /// congruent to the input mod `n`, nor does it even have to be a valid element
+    /// of the ring (i.e. operations involving it may not follow the ring axioms).
+    /// Implementors are strongly encouraged to check the element during debug builds. 
+    /// 
+    fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element;
+
+    ///
     /// Computes the smallest lift for some `x` in `Z/nZ`, i.e. the smallest integer `m` such that
     /// `m = x mod n`.
     /// 
-    /// This will be one of `-(n - 1)/2, ..., -1, 0, 1, ..., (n - 1)/2` (for odd `n`). If an integer in `0, 1, ..., n - 1`
-    /// is needed instead, use [`ZnRing::smallest_positive_lift()`].
+    /// This will be one of `-(n - 1)/2, ..., -1, 0, 1, ..., (n - 1)/2` (for odd `n`). If an integer 
+    /// in `0, 1, ..., n - 1` is needed instead, use [`ZnRing::smallest_positive_lift()`].
     /// 
     fn smallest_lift(&self, el: Self::Element) -> El<Self::Integers> {
         let result = self.smallest_positive_lift(el);
