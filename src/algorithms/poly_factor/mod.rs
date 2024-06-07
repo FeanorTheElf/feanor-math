@@ -350,7 +350,6 @@ impl_factor_poly_number_fields!{ AsFieldBase<&'a FreeAlgebraImpl<RationalField<I
 impl_factor_poly_number_fields!{ AsFieldBase<FreeAlgebraImpl<&'a RationalField<I>, V, M>>, 'a }
 impl_factor_poly_number_fields!{ AsFieldBase<&'a FreeAlgebraImpl<&'b RationalField<I>, V, M>>, 'a, 'b }
 
-
 impl<R> ExtensionField for R
     where R: ?Sized + FiniteRing + Field + FreeAlgebra
 {}
