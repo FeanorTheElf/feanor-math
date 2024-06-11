@@ -610,9 +610,10 @@ impl ZnRing for ZnBase {
             value_i64 -= self.modulus;
         }
         // value is in ]-self.modulus_half, self.modulus_half[ if modulus is odd
-        // value is in [-self.modulus_half, self.modulus_half[ if modulus is odd
+        // value is in [-self.modulus_half, self.modulus_half[ if modulus is even
         debug_assert!(value_i64 < self.modulus_half);
-        debug_assert!(value_i64 > -self.modulus_half);
+        debug_assert!(self.modulus() % 2 == 0 || value_i64 > -self.modulus_half);
+        debug_assert!(self.modulus() % 2 == 1 || value_i64 >= -self.modulus_half);
         return value_i64;
     }
 
@@ -889,6 +890,9 @@ fn elements<'a>(ring: &'a Zn) -> impl 'a + Iterator<Item = El<Zn>> {
     (0..63).map(|i| ring.coerce(&ZZ, 1 << i))
 }
 
+#[cfg(test)]
+const LARGE_MODULI: [u64; 6] = [(1 << 41) - 1, (1 << 42) - 1, (1 << 58) - 1, (1 << 58) + 1, (3 << 57) - 1, (3 << 57) + 1];
+
 #[test]
 fn test_complete_reduce() {
     let ring = Zn::new(32);
@@ -897,7 +901,7 @@ fn test_complete_reduce() {
 
 #[test]
 fn test_sum() {
-    for n in [(1 << 41) - 1, (1 << 42) - 1, (1 << 58) - 1, (1 << 58) + 1, (3 << 57) - 1, (3 << 57) + 1] {
+    for n in LARGE_MODULI {
         let Zn = Zn::new(n);
         assert_el_eq!(&Zn, &Zn.int_hom().map(10001 * 5000), &Zn.sum((0..=10000).map(|x| Zn.int_hom().map(x))));
     }
@@ -905,20 +909,20 @@ fn test_sum() {
 
 #[test]
 fn test_ring_axioms() {
-    for n in [2, 5, 7, 17] {
-        let Zn = Zn::new(n);
-        crate::ring::generic_tests::test_ring_axioms(&Zn, Zn.elements());
+    for n in 2..=17 {
+        let ring = Zn::new(n);
+        crate::ring::generic_tests::test_ring_axioms(&ring, (0..=ring.get_ring().repr_bound()).map(|n| ZnEl(n)));
     }
-    for n in [(1 << 41) - 1, (1 << 42) - 1, (1 << 58) - 1, (1 << 58) + 1, (3 << 57) - 1, (3 << 57) + 1] {
-        let Zn = Zn::new(n);
-        crate::ring::generic_tests::test_ring_axioms(&Zn, elements(&Zn));
+    for n in LARGE_MODULI {
+        let ring = Zn::new(n);
+        crate::ring::generic_tests::test_ring_axioms(&ring, elements(&ring));
     }
 }
 
 #[test]
 #[allow(deprecated)]
 fn test_iso_zn_42() {
-    for n in [2, 5, 17, (1 << 41) - 1] {
+    for n in (2..=17).chain([(1 << 41) - 2, (1 << 41) - 1].into_iter()) {
         let R1 = Zn::new(n);
         let R2 = zn_42::Zn::new(n);
         let elements = (1..42).map(|i| 1 << i).map(|x| R2.coerce(&ZZ, x));
@@ -929,11 +933,11 @@ fn test_iso_zn_42() {
 
 #[test]
 fn test_divisibility_axioms() {
-    for n in [2, 5, 7, 17] {
+    for n in 2..=17 {
         let Zn = Zn::new(n);
         crate::divisibility::generic_tests::test_divisibility_axioms(&Zn, Zn.elements());
     }
-    for n in [(1 << 41) - 1, (1 << 42) - 1, (1 << 58) - 1, (1 << 58) + 1, (3 << 57) - 1, (3 << 57) + 1] {
+    for n in LARGE_MODULI {
         let Zn = Zn::new(n);
         crate::divisibility::generic_tests::test_divisibility_axioms(&Zn, elements(&Zn));
     }
@@ -941,7 +945,7 @@ fn test_divisibility_axioms() {
 
 #[test]
 fn test_zn_axioms() {
-    for n in [2, 5, 7, 17] {
+    for n in 2..=17 {
         let Zn = Zn::new(n);
         super::generic_tests::test_zn_axioms(&Zn);
     }
@@ -949,15 +953,17 @@ fn test_zn_axioms() {
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
-    let R = Zn::new(17);
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
+    for n in 2..=17 {
+        let R = Zn::new(n);
+        crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
+    }
     let R = Zn::new(63);
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
 }
 
 #[test]
 fn test_hom_from_fastmul() {
-    for n in [2, 5, 7, 17] {
+    for n in 2..=17 {
         let Zn = Zn::new(n);
         let Zn_fastmul = ZnFastmul::new(Zn);
         crate::ring::generic_tests::test_hom_axioms(Zn_fastmul, Zn, Zn.elements().map(|x| Zn_fastmul.coerce(&Zn, x)));
@@ -970,15 +976,17 @@ fn test_hom_from_fastmul() {
 }
 
 #[test]
-fn test_finite_field_axioms() {
+fn test_finite_ring_axioms() {
+    for n in 2..=17 {
+        crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(n));
+    }
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(128));
-    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(15));
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(1 << 32));
 }
 
 #[test]
 fn test_from_int_hom() {
-    for n in [2, 5, 7, 17] {
+    for n in 2..=17 {
         let Zn = Zn::new(n);
         crate::ring::generic_tests::test_hom_axioms(StaticRing::<i8>::RING, Zn, -8..8);
         crate::ring::generic_tests::test_hom_axioms(StaticRing::<i16>::RING, Zn, -8..8);
@@ -999,6 +1007,32 @@ fn test_bounded_reduce_large() {
         let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128 * FACTOR as u128;
         for k in (val_max - 100)..=val_max {
             assert_eq!((k % (n as u128)) as i64, Zn.smallest_positive_lift(ZnEl(Zn.get_ring().bounded_reduce_larger::<FACTOR>(k))));
+        }
+    }
+}
+
+#[test]
+fn test_smallest_lift() {
+    for n in 2..=17 {
+        let ring = Zn::new(n);
+        for k in 0..=ring.get_ring().repr_bound() {
+            let expected = if (k % n) <= n / 2 { (k % n) as i64 } else { (k % n) as i64 - n as i64 };
+            if n % 2 == 0 && (k % n) == n / 2 {
+                assert!(ring.smallest_lift(ZnEl(k)) == n as i64 / 2 || ring.smallest_lift(ZnEl(k)) == -(n as i64) / 2)
+            } else {
+                assert_eq!(expected, ring.smallest_lift(ZnEl(k)));
+            }
+        }
+    }
+}
+
+#[test]
+fn test_smallest_positive_lift() {
+    for n in 2..=17 {
+        let ring = Zn::new(n);
+        for k in 0..=ring.get_ring().repr_bound() {
+            let expected = (k % n) as i64;
+            assert_eq!(expected, ring.smallest_positive_lift(ZnEl(k)));
         }
     }
 }
@@ -1094,7 +1128,7 @@ fn bench_inner_product(bencher: &mut Bencher) {
     let expected = (0..len).map(|i| Fp.int_hom().map(i * i)).fold(Fp.zero(), |l, r| Fp.add(l, r));
 
     bencher.iter(|| {
-        let actual = <_ as InnerProductComputation>::inner_product_ref(Fp.get_ring(), std::hint::black_box(lhs.iter().zip(rhs.iter())));
+        let actual = <_ as InnerProductComputation>::inner_product_ref(Fp.get_ring(), lhs.iter().zip(rhs.iter()).map(|x| std::hint::black_box(x)));
         assert_el_eq!(&Fp, &expected, &actual);
     })
 }
