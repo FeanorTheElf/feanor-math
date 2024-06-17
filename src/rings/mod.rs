@@ -27,10 +27,15 @@ pub mod poly;
 pub mod field;
 
 ///
-/// An implementation of the field of complex numbers `C`, using 64-bit floating point
+/// An approximate implementation of the field of complex numbers `C`, using 64-bit floating point
 /// numbers.
 /// 
 pub mod float_complex;
+
+///
+/// An approximate implementation of the field of real numbers `R`, using 64-bit floating point
+/// numbers.
+/// 
 pub mod float_real;
 
 ///
@@ -51,6 +56,10 @@ pub mod finite;
 /// 
 pub mod multivariate;
 
+///
+/// This module contains [`rational::RationalField`], which provides an implementation of the field of 
+/// rational numbers `Q`.
+/// 
 pub mod rational;
 
 ///
@@ -63,4 +72,8 @@ pub mod rational;
 #[cfg(feature = "mpir")]
 pub mod mpir;
 
+///
+/// This module contains the trait [`fieldextension::ExtensionField`] that defines operations related to
+/// Galois-theory in a field extension `L/K`.
+/// 
 pub mod fieldextension;

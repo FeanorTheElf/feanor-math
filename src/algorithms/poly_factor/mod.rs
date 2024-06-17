@@ -181,6 +181,30 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
 /// Computes the square-free part of a polynomial `f`, i.e. the greatest (w.r.t.
 /// divisibility) polynomial `g | f` that is square-free.
 /// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::rings::rational::*;
+/// # use feanor_math::algorithms::poly_factor::cantor_zassenhaus::*;
+/// let Fp = Zn::new(3).as_field().unwrap();
+/// let FpX = DensePolyRing::new(Fp, "X");
+/// // f = (X^2 + 1)^2 (X^3 + 2 X + 1)
+/// let f = FpX.prod([
+///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)]),
+///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)]),
+///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 1), (QQ.one(), 3)])
+/// ].into_iter());
+/// let squarefree_part = poly_squarefree_part(&FpX, f);
+/// assert_el_eq!(&FpX, &FpX.prod([
+///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)]),
+///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 1), (QQ.one(), 3)])
+/// ].into_iter()), &squarefree_part);
+/// ```
+/// 
 pub fn poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
     where P: PolyRingStore,
         P::Type: PolyRing + PrincipalIdealRing,

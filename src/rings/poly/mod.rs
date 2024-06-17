@@ -3,7 +3,15 @@ use std::collections::HashMap;
 use crate::ring::*;
 use crate::homomorphism::*;
 
+///
+/// Contains [`dense_poly::DensePolyRing`], an implementation of univariate polynomials
+/// based on dense coefficient storage.
+/// 
 pub mod dense_poly;
+///
+/// Contains [`sparse_poly::SparsePolyRing`], an implementation of univariate polynomials
+/// based on sparse coefficient storage.
+/// 
 pub mod sparse_poly;
 
 ///
@@ -18,10 +26,19 @@ pub trait PolyRing: RingExtension {
     type TermsIterator<'a>: Iterator<Item = (&'a El<Self::BaseRing>, usize)>
         where Self: 'a;
 
+    ///
+    /// Returns the indeterminate `X` generating this polynomial ring.
+    /// 
     fn indeterminate(&self) -> Self::Element;
 
+    ///
+    /// Returns all the nonzero terms of the given polynomial.
+    /// 
     fn terms<'a>(&'a self, f: &'a Self::Element) -> Self::TermsIterator<'a>;
     
+    ///
+    /// Adds the given terms to the given polynomial.
+    /// 
     fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
         where I: Iterator<Item = (El<Self::BaseRing>, usize)>
     {
@@ -31,14 +48,31 @@ pub trait PolyRing: RingExtension {
         ));
     }
 
+    ///
+    /// Multiplies the given polynomial with `X^rhs_power`.
+    /// 
     fn mul_assign_monomial(&self, lhs: &mut Self::Element, rhs_power: usize) {
         self.mul_assign(lhs, RingRef::new(self).pow(self.indeterminate(), rhs_power));
     }
 
+    ///
+    /// Returns the coefficient of `f` that corresponds to the monomial `X^i`.
+    /// 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, i: usize) -> &'a El<Self::BaseRing>;
 
+    ///
+    /// Returns the degree of the polynomial `f`, i.e. the value `d` such that `f` can be written as
+    /// `f(X) = a0 + a1 * X + a2 * X^2 + ... + ad * X^d`. Returns `None` if `f` is zero.
+    /// 
     fn degree(&self, f: &Self::Element) -> Option<usize>;
 
+    ///
+    /// Compute the euclidean division by a monic polynomial `rhs`.
+    /// 
+    /// Concretely, if `rhs` is a monic polynomial (polynomial with highest coefficient equal to 1), then
+    /// there exist unique `q, r` such that `lhs = rhs * q + r` and `deg(r) < deg(rhs)`. These are returned.
+    /// This function panics if `rhs` is not monic.
+    /// 
     fn div_rem_monic(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element);
     
     fn map_terms<P, H>(&self, from: &P, el: &P::Element, hom: &H) -> Self::Element
@@ -50,6 +84,20 @@ pub trait PolyRing: RingExtension {
         RingRef::new(self).from_terms(from.terms(el).map(|(c, i)| (hom.map_ref(c), i)))
     }
 
+    ///
+    /// Evaluates the given polynomial at the given values.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::rings::poly::*;
+    /// # use feanor_math::primitive_int::*; 
+    /// let ring = dense::DensePolyRing::new(StaticRing::<i32>::RING, "X");
+    /// let x = ring.indeterminate();
+    /// let poly = ring.add(ring.clone_el(&x), ring.pow(x, 2));
+    /// assert_eq!(12, ring.evaluate(&poly, &3, &StaticRing::<i32>::RING.identity()));
+    /// ```
+    /// 
     fn evaluate<R, H>(&self, f: &Self::Element, value: &R::Element, hom: &H) -> R::Element
         where R: ?Sized + RingBase,
             H: Homomorphism<<Self::BaseRing as RingStore>::Type, R>
@@ -61,6 +109,9 @@ pub trait PolyRing: RingExtension {
     }
 }
 
+///
+/// [`RingStore`] corresponding to [`PolyRing`].
+/// 
 pub trait PolyRingStore: RingStore
     where Self::Type: PolyRing
 {
@@ -69,14 +120,26 @@ pub trait PolyRingStore: RingStore
     delegate!{ PolyRing, fn mul_assign_monomial(&self, lhs: &mut El<Self>, rhs_power: usize) -> () }
     delegate!{ PolyRing, fn div_rem_monic(&self, lhs: El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>) }
 
+    ///
+    /// See [`PolyRing::coefficient_at()`].
+    /// 
     fn coefficient_at<'a>(&'a self, f: &'a El<Self>, i: usize) -> &'a El<<Self::Type as RingExtension>::BaseRing> {
         self.get_ring().coefficient_at(f, i)
     }
 
+    ///
+    /// See [`PolyRing::terms()`].
+    /// 
     fn terms<'a>(&'a self, f: &'a El<Self>) -> <Self::Type as PolyRing>::TermsIterator<'a> {
         self.get_ring().terms(f)
     }
 
+    ///
+    /// Computes the polynomial from the given terms.
+    /// 
+    /// If the iterator gives a term for the same monomial `X^i` multiple times,
+    /// the corresponding coefficients will be summed up.
+    /// 
     fn from_terms<I>(&self, iter: I) -> El<Self>
         where I: Iterator<Item = (El<<Self::Type as RingExtension>::BaseRing>, usize)>,
     {
@@ -85,10 +148,16 @@ pub trait PolyRingStore: RingStore
         return result;
     }
 
+    ///
+    /// See [`PolyRing::lc()`].
+    /// 
     fn lc<'a>(&'a self, f: &'a El<Self>) -> Option<&'a El<<Self::Type as RingExtension>::BaseRing>> {
         Some(self.coefficient_at(f, self.degree(f)?))
     }
 
+    ///
+    /// See [`PolyRing::evaluate()`].
+    /// 
     fn evaluate<R, H>(&self, f: &El<Self>, value: &R::Element, hom: &H) -> R::Element
         where R: ?Sized + RingBase,
             H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, R>

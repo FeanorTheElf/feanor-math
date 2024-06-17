@@ -17,15 +17,12 @@ use std::cmp::Ordering;
 /// of these solutions is returned. For integers, see signed_eea 
 /// which gives more guarantees.
 /// 
-/// The given ring must be euclidean
+/// The given ring must be euclidean.
 /// 
 pub fn eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>) 
     where R: EuclideanRingStore,
         R::Type: EuclideanRing
 {
-    #[cfg(debug_assertions)]
-    let (mut a, mut b) = (ring.clone_el(&fst), ring.clone_el(&snd));
-    #[cfg(not(debug_assertions))]
     let (mut a, mut b) = (fst, snd);
 
     let (mut sa, mut ta) = (ring.one(), ring.zero());
@@ -143,14 +140,12 @@ pub fn poly_pid_fractionfield_gcd<P>(ring: P, fst: &El<P>, snd: &El<P>) -> El<P>
 /// 
 /// Finds a greatest common divisor of a and b.
 /// 
-/// The gcd of two elements in a euclidean ring is the (w.r.t divisibility) greatest
-/// element that divides both elements. It is unique up to multiplication with units. 
-/// This function makes no guarantees on which of these will be returned.
+/// The gcd of two elements `a, b` in a euclidean ring is the (w.r.t divisibility) greatest
+/// element that divides both elements, i.e. the greatest element (w.r.t. divisibility) `g` such 
+/// that `g | a, b`.
 /// 
-/// If this is required, see also signed_gcd that gives precise statement on the
-/// sign of the gcd in case of two integers.
-/// 
-/// The given ring must be euclidean
+/// In general, the gcd is only unique up to multiplication by units. For integers, the function
+/// [`signed_gcd()`] gives more guarantees.
 /// 
 pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
     where R: EuclideanRingStore,
@@ -181,24 +176,51 @@ pub fn signed_gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
     return d;
 }
 
+///
+/// Finds the least common multiple of two elements in an ordered euclidean ring,
+/// e.g. of two integers.
+/// 
+/// The general lcm is only unique up to multiplication by units. For `signed_lcm`,
+/// the following behavior is guaranteed:
+/// ```text
+/// b > 0 => lcm(a, b) >= 0
+/// b < 0 => lcm(a, b) <= 0
+/// lcm(0, b) = lcm(a, 0) = lcm(0, 0) = 0
+/// ```
+/// 
 pub fn signed_lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
     where R: EuclideanRingStore + OrderedRingStore,
         R::Type: EuclideanRing + OrderedRing
 {
-    ring.mul(ring.euclidean_div(ring.clone_el(&fst), &signed_gcd(fst, ring.clone_el(&snd), &ring)), snd)
+    if ring.is_zero(&fst) || ring.is_zero(&snd) {
+        ring.zero()
+    } else {
+        ring.mul(ring.euclidean_div(ring.clone_el(&fst), &signed_gcd(fst, ring.clone_el(&snd), &ring)), snd)
+    }
 }
 
+///
+/// Finds the least common multiple of two elements `a, b` in a euclidean ring, i.e. the smallest
+/// (w.r.t. divisibility) element `y` with `a, b | y`.
+/// 
+/// In general, the lcm is only unique up to multiplication by units. For integers, the function
+/// [`signed_lcm()`] gives more guarantees.
+/// 
 pub fn lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
     where R: EuclideanRingStore,
         R::Type: EuclideanRing
 {
-    ring.euclidean_div(ring.mul_ref(&fst, &snd), &gcd(fst, snd, &ring))
+    if ring.is_zero(&fst) || ring.is_zero(&snd) {
+        ring.zero()
+    } else {
+        ring.euclidean_div(ring.mul_ref(&fst, &snd), &gcd(fst, snd, &ring))
+    }
 }
 
 ///
 /// Computes x such that `x = a mod p` and `x = b mod q`. Requires that p and q are coprime.
 /// 
-pub fn crt<I>(a: El<I>, b: El<I>, p: &El<I>, q: &El<I>, ZZ: I) -> El<I>
+pub fn inv_crt<I>(a: El<I>, b: El<I>, p: &El<I>, q: &El<I>, ZZ: I) -> El<I>
     where I: IntegerRingStore, I::Type: IntegerRing
 {
     let (s, t, d) = signed_eea(ZZ.clone_el(p), ZZ.clone_el(q), &ZZ);
@@ -261,6 +283,17 @@ fn test_signed_eea() {
     assert_eq!((-1, 1, 2), signed_eea(6, 8, &StaticRing::<i64>::RING));
     assert_eq!((2, -1, 5), signed_eea(15, 25, &StaticRing::<i64>::RING));
     assert_eq!((4, -7, 2), signed_eea(32, 18, &StaticRing::<i64>::RING));
+}
+
+#[test]
+fn test_signed_lcm() {
+    assert_eq!(24, signed_lcm(6, 8, &StaticRing::<i64>::RING));
+    assert_eq!(24, signed_lcm(-6, 8, &StaticRing::<i64>::RING));
+    assert_eq!(-24, signed_lcm(6, -8, &StaticRing::<i64>::RING));
+    assert_eq!(-24, signed_lcm(-6, -8, &StaticRing::<i64>::RING));
+    assert_eq!(0, signed_lcm(0, 0, &StaticRing::<i64>::RING));
+    assert_eq!(0, signed_lcm(6, 0, &StaticRing::<i64>::RING));
+    assert_eq!(0, signed_lcm(0, 8, &StaticRing::<i64>::RING));
 }
 
 #[test]

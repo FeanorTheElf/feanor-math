@@ -34,12 +34,18 @@ pub struct MultivariatePolyRingImplBase<R, O, const N: usize, A = Global>
     zero: El<R>
 }
 
+///
+/// [`RingStore`] corresponding to [`MultivariatePolyRingImplBase`].
+/// 
 pub type MultivariatePolyRingImpl<R, O, const N: usize, A = Global> = RingValue<MultivariatePolyRingImplBase<R, O, N, A>>;
 
 impl<R, O, const N: usize> MultivariatePolyRingImpl<R, O, N>
     where R: RingStore,
         O: MonomialOrder
 {
+    ///
+    /// Creates a new [`MultivariatePolyRingImpl`]
+    /// 
     pub fn new(base_ring: R, monomial_order: O) -> Self {
         Self::new_in(base_ring, monomial_order, Global)
     }
@@ -50,6 +56,10 @@ impl<R, O, const N: usize, A> MultivariatePolyRingImpl<R, O, N, A>
         O: MonomialOrder,
         A: Allocator + Clone
 {
+    ///
+    /// Creates a new [`MultivariatePolyRingImpl`], using the given allocator to allocate
+    /// space for ring elements.
+    /// 
     pub fn new_in(base_ring: R, monomial_order: O, element_allocator: A) -> Self {
         RingValue::from(MultivariatePolyRingImplBase {
             zero: base_ring.zero(),
@@ -461,6 +471,9 @@ impl<R1, O1, R2, O2, const N1: usize, const N2: usize, A1, A2> CanIsoFromTo<Mult
     }
 }
 
+///
+/// Iterator over all terms of an element of [`MultivariatePolyRingImpl`].
+/// 
 pub struct MultivariatePolyRingBaseTermsIter<'a, R, O, const N: usize>
     where R: RingStore,
         O: MonomialOrder

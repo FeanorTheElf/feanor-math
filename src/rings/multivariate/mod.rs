@@ -29,6 +29,7 @@ type MonomialExponent = u16;
 pub trait MultivariatePolyRing: RingExtension {
 
     type MonomialVector: VectorViewMut<MonomialExponent>;
+
     type TermsIterator<'a>: Iterator<Item = (&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)>
         where Self: 'a;
 
@@ -90,6 +91,12 @@ pub trait MultivariatePolyRing: RingExtension {
     fn lm<'a, O>(&'a self, f: &'a Self::Element, order: O) -> Option<&'a Monomial<Self::MonomialVector>>
         where O: MonomialOrder;
 
+    ///
+    /// Returns the leading term of the given polynomial.
+    /// 
+    /// The leading term is the term with nonzero coefficient whose monomial is
+    /// largest w.r.t. the given monomial ordering.
+    /// 
     fn lt<'a, O>(&'a self, f: &'a Self::Element, order: O) -> Option<(&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)>
         where O: MonomialOrder
     {
@@ -122,6 +129,11 @@ pub trait MultivariatePolyRing: RingExtension {
         }
     }
 
+    ///
+    /// Creates the monomial where each indeterminate is taken to the given power.
+    /// 
+    /// The powers `exponents` must be exactly of length [`MultivariatePolyRing::indeterminate_len()`].
+    /// 
     fn create_monomial<I: ExactSizeIterator<Item = MonomialExponent>>(&self, exponents: I) -> Monomial<Self::MonomialVector>;
 
     ///
@@ -158,7 +170,8 @@ pub trait MultivariatePolyRing: RingExtension {
 
     ///
     /// Computes the polynomial that results from applying `hom` to each coefficient of the input
-    /// polynomial. This is used to implement [`MultivariatePolyRingStore::lifted_hom()`].
+    /// polynomial. This is used to implement [`MultivariatePolyRingStore::lifted_hom()`] and
+    /// [`CoefficientHom`].
     /// 
     fn map_terms<P, H>(&self, from: &P, el: &P::Element, hom: &H) -> Self::Element
         where P: ?Sized + MultivariatePolyRing,
@@ -169,12 +182,34 @@ pub trait MultivariatePolyRing: RingExtension {
         RingRef::new(self).from_terms(from.terms(el).map(|(c, m): (&El<P::BaseRing>, &Monomial<P::MonomialVector>)| (hom.map_ref(c), self.create_monomial((0..m.len()).map(|i| m[i])))))
     }
 
+    ///
+    /// Evaluates the given polynomial at the given values.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::default_memory_provider;
+    /// # use feanor_math::rings::multivariate::*;
+    /// # use feanor_math::primitive_int::*;
+    /// # use std::collections::BTreeMap;
+    /// 
+    /// let ring = ordered::MultivariatePolyRingImpl::<_, _, _, 3>::new(StaticRing::<i32>::RING, DegRevLex, default_memory_provider!());
+    /// let x = ring.indeterminate(0);
+    /// let y = ring.indeterminate(1);
+    /// let poly = ring.add(x, ring.pow(y, 2));
+    /// assert_eq!(5, ring.evaluate(&poly, [1, 2]));
+    /// ```
+    /// 
     fn evaluate<R, V, H>(&self, f: &Self::Element, values: V, hom: &H) -> R::Element
         where R: ?Sized + RingBase,
             H: Homomorphism<<Self::BaseRing as RingStore>::Type, R>,
             V: VectorView<R::Element>;
 }
 
+///
+/// The homomorphism `R[X1, ..., Xm] -> S[X1, ..., Xm]` induced by a homomorphism `R -> S`.
+/// In terms of category theory, this is the pushout morphism of `R -> R[X1, ..., Xm]` and `R -> S`.
+/// 
 pub struct CoefficientHom<PFrom, PTo, H>
     where PFrom: MultivariatePolyRingStore,
         PTo: MultivariatePolyRingStore,
@@ -214,6 +249,9 @@ impl<PFrom, PTo, H> Homomorphism<PFrom::Type, PTo::Type> for CoefficientHom<PFro
     }
 }
 
+///
+/// The [`RingStore`] corresponding to [`MultivariatePolyRing`].
+/// 
 pub trait MultivariatePolyRingStore: RingStore
     where Self::Type: MultivariatePolyRing
 {
@@ -224,14 +262,23 @@ pub trait MultivariatePolyRingStore: RingStore
     delegate!{ MultivariatePolyRing, fn specialize(&self, f: &El<Self>, var: usize, val: &El<Self>) -> El<Self> }
     delegate!{ MultivariatePolyRing, fn appearing_variables(&self, f: &El<Self>) -> BTreeMap<usize, MonomialExponent> }
 
+    ///
+    /// See [`MultivariatePolyRing::coefficient_at()`].
+    /// 
     fn coefficient_at<'a>(&'a self, f: &'a El<Self>, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> &'a El<<Self::Type as RingExtension>::BaseRing> {
         self.get_ring().coefficient_at(f, m)
     }
 
+    ///
+    /// See [`MultivariatePolyRing::terms()`].
+    /// 
     fn terms<'a>(&'a self, f: &'a El<Self>) -> <Self::Type as MultivariatePolyRing>::TermsIterator<'a> {
         self.get_ring().terms(f)
     }
 
+    ///
+    /// See [`MultivariatePolyRing::evaluate()`].
+    /// 
     fn evaluate<R, V, H>(&self, f: &El<Self>, values: V, hom: &H) -> R::Element
         where R: ?Sized + RingBase,
             H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, R>,
@@ -240,6 +287,10 @@ pub trait MultivariatePolyRingStore: RingStore
         self.get_ring().evaluate(f, values, hom)
     }
 
+    ///
+    /// Computes the homomorphism `R[X1, ..., Xm] -> S[X1, ..., Xm]` induced by `R -> S`.
+    /// In category-theoretical terms, this is the pushout morphism.
+    /// 
     fn into_lifted_hom<P, H>(self, from: P, hom: H) -> CoefficientHom<P, Self, H>
         where P: MultivariatePolyRingStore,
             P::Type: MultivariatePolyRing,
@@ -252,6 +303,10 @@ pub trait MultivariatePolyRingStore: RingStore
         }
     }
 
+    ///
+    /// Computes the homomorphism `R[X1, ..., Xm] -> S[X1, ..., Xm]` induced by `R -> S`.
+    /// In category-theoretical terms, this is the pushout morphism.
+    /// 
     fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
         where P: MultivariatePolyRingStore,
             P::Type: MultivariatePolyRing,
@@ -260,6 +315,12 @@ pub trait MultivariatePolyRingStore: RingStore
         self.into_lifted_hom(from, hom)
     }
 
+    ///
+    /// Creates a multivariate polynomial from the given terms.
+    /// 
+    /// The iterator may yield the same monomial multiple times, in this case the
+    /// corresponding coefficients are summed up.
+    /// 
     fn from_terms<I>(&self, iter: I) -> El<Self>
         where I: Iterator<Item = (El<<Self::Type as RingExtension>::BaseRing>, Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>)>
     {
@@ -268,18 +329,27 @@ pub trait MultivariatePolyRingStore: RingStore
         return result;
     }
 
+    ///
+    /// See [`MultivariatePolyRing::lm()`].
+    /// 
     fn lm<'a, O>(&'a self, f: &'a El<Self>, order: O) -> Option<&'a Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>>
         where O: MonomialOrder
     {
         self.get_ring().lm(f, order)
     }
 
+    ///
+    /// See [`MultivariatePolyRing::lt()`].
+    /// 
     fn lt<'a, O>(&'a self, f: &'a El<Self>, order: O) -> Option<(&'a El<<Self::Type as RingExtension>::BaseRing>, &'a Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>)>
         where O: MonomialOrder
     {
         self.get_ring().lt(f, order)
     }
 
+    ///
+    /// Copies the given monomial.
+    /// 
     fn clone_monomial(&self, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector> {
         self.get_ring().create_monomial((0..m.len()).map(|i| m[i]))
     }
@@ -359,26 +429,42 @@ impl<V: VectorView<MonomialExponent>> Monomial<V> {
 
 impl<V: VectorViewMut<MonomialExponent>> Monomial<V> {
 
+    ///
+    /// Computes the gcd of two monomials.
+    /// 
     pub fn gcd(mut self, rhs: &Self) -> Self {
         self.gcd_assign(rhs);
         self
     }
 
+    ///
+    /// Computes the lcm of two monomials.
+    /// 
     pub fn lcm(mut self, rhs: &Self) -> Self {
         self.lcm_assign(rhs);
         self
     }
 
+    ///
+    /// Computes the product of two monomials.
+    /// 
     pub fn mul(mut self, rhs: &Self) -> Self {
         self.mul_assign(rhs);
         self
     }
 
+    ///
+    /// Computes the quotient of two monomials. This will panic if the quotient
+    /// is not a monomial, i.e. contains indeterminates raised to negative powers.
+    /// 
     pub fn div(mut self, rhs: &Self) -> Self {
         self.div_assign(rhs);
         self
     }
 
+    ///
+    /// Computes the gcd of two monomials.
+    /// 
     pub fn gcd_assign(&mut self, rhs: &Self) {
         assert_eq!(self.len(), rhs.len());
         for i in 0..self.len() {
@@ -386,6 +472,9 @@ impl<V: VectorViewMut<MonomialExponent>> Monomial<V> {
         }
     }
 
+    ///
+    /// Computes the lcm of two monomials.
+    /// 
     pub fn lcm_assign(&mut self, rhs: &Self) {
         assert_eq!(self.len(), rhs.len());
         for i in 0..self.len() {
@@ -393,6 +482,9 @@ impl<V: VectorViewMut<MonomialExponent>> Monomial<V> {
         }
     }
 
+    ///
+    /// Computes the product of two monomials.
+    /// 
     pub fn mul_assign(&mut self, rhs: &Self) {
         assert_eq!(self.len(), rhs.len());
         for i in 0..self.len() {
@@ -400,9 +492,14 @@ impl<V: VectorViewMut<MonomialExponent>> Monomial<V> {
         }
     }
 
+    ///
+    /// Computes the quotient of two monomials. This will panic if the quotient
+    /// is not a monomial, i.e. contains indeterminates raised to negative powers.
+    /// 
     pub fn div_assign(&mut self, rhs: &Self) {
         assert_eq!(self.len(), rhs.len());
         for i in 0..self.len() {
+            assert!(*self.exponents.at(i) >= *rhs.exponents.at(i));
             *self.exponents.at_mut(i) = *self.exponents.at(i) - *rhs.exponents.at(i);
         }
     }
@@ -432,7 +529,6 @@ impl<V: VectorViewMut<MonomialExponent> + Clone> Monomial<V> {
     /// 
     /// ```
     /// # use feanor_math::rings::multivariate::*;
-    /// 
     /// let m = Monomial::new([0, 1, 0]);
     /// assert_eq!((Monomial::new([0, 0, 0]), 1), m.div_variable().unwrap());
     /// ```
@@ -444,6 +540,10 @@ impl<V: VectorViewMut<MonomialExponent> + Clone> Monomial<V> {
     }
 }
 
+///
+/// Iterator over all monomials that divide a fixed monomial.
+/// Returned by [`Monomial::dividing_monomials()`].
+/// 
 pub struct DividingMonomialIter<V: VectorViewMut<MonomialExponent>> {
     monomial: Monomial<V>,
     current: Option<Monomial<V>>
@@ -534,9 +634,23 @@ impl<V: VectorView<MonomialExponent>> Index<usize> for Monomial<V> {
 /// 
 pub trait MonomialOrder: Clone + Sized + 'static {
 
+    ///
+    /// Returns whether this monomial order is graded or degree-compatible.
+    /// 
+    /// A degree-compatible monomial order is one where `m < m'` for all
+    /// `m, m'` with `deg(m) < deg(m')`. Such monomial orders often behave better
+    /// in various situations, including Groebner basis computations.
+    /// 
     fn is_graded(&self) -> bool;
+
+    ///
+    /// Compares to monomials according to this monomial order.
+    /// 
     fn compare<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering;
 
+    ///
+    /// Checks whether two monomial orders are the same.
+    /// 
     fn is_same<O: MonomialOrder>(&self, other: O) -> bool {
         assert!(std::mem::size_of::<Self>() == 0);
         match (&other as &dyn Any).downcast_ref::<Self>() {
@@ -546,6 +660,11 @@ pub trait MonomialOrder: Clone + Sized + 'static {
     }
 }
 
+///
+/// A monomial together with a monomial order. This means two `FixedOrderMonomial`s
+/// can be compared without additional data, which makes them useful, e.g. as keys
+/// in a [`std::collections::BTreeMap`].
+/// 
 #[derive(Clone, Copy)]
 pub struct FixedOrderMonomial<V, O>
     where V: VectorView<MonomialExponent>, O: MonomialOrder
@@ -557,14 +676,23 @@ pub struct FixedOrderMonomial<V, O>
 impl<V, O> FixedOrderMonomial<V, O>
     where V: VectorView<MonomialExponent>, O: MonomialOrder
 {
+    ///
+    /// Creates a new [`FixedOrderMonomial`] from the given monomial and order.
+    /// 
     pub fn new(m: Monomial<V>, order: O) -> Self {
         Self { m, order }
     }
 
+    ///
+    /// Extracts the monomial without the order.
+    /// 
     pub fn into(self) -> Monomial<V> {
         self.m
     }
 
+    ///
+    /// Returns the order.
+    /// 
     pub fn order(&self) -> &O {
         &self.order
     }
@@ -637,6 +765,13 @@ pub struct BlockLexDegRevLex {
 
 impl BlockLexDegRevLex {
 
+    ///
+    /// Creates a new [`BlockLexDegRevLex`], that orders monomials according to the
+    /// exponents of indeterminates in `larger_block`, and only in case of a tie refers
+    /// to the remaining indeterminates in `smaller_block`.
+    /// 
+    /// It is required that `larger_block.end == smaller_block.start`.
+    /// 
     pub fn new(larger_block: RangeTo<usize>, smaller_block: RangeFrom<usize>) -> Self {
         assert_eq!(larger_block.end, smaller_block.start);
         Self {
@@ -698,6 +833,13 @@ impl MonomialOrder for DegRevLex {
     }
 }
 
+///
+/// Standard lexicographic order of monomials.
+/// 
+/// To compare two monomials lexicographically, just compare the exponents
+/// of one indeterminate after the other, and return the first comparison result
+/// that is not "equal". 
+/// 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Lex;
 

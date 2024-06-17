@@ -8,6 +8,11 @@ use crate::ring::*;
 use super::extension::FreeAlgebra;
 use crate::homomorphism::*;
 
+///
+/// A wrapper around a ring that marks this ring to be a field. In particular,
+/// the functions provided by [`DivisibilityRing`] will be used to provide
+/// field-like division for the wrapped ring.
+/// 
 #[derive(Clone, Copy)]
 pub struct AsFieldBase<R: DivisibilityRingStore> 
     where R::Type: DivisibilityRing
@@ -24,6 +29,9 @@ impl<R> PartialEq for AsFieldBase<R>
     }
 }
 
+///
+/// [`RingStore`] for [`AsFieldBase`].
+/// 
 #[allow(type_alias_bounds)]
 pub type AsField<R: DivisibilityRingStore> = RingValue<AsFieldBase<R>>;
 

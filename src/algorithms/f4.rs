@@ -12,8 +12,6 @@ use crate::rings::zn::{ZnRing, zn_64, ZnRingStore, zn_static};
 use crate::vector::*;
 use crate::algorithms;
 
-use super::sparse_invert::*;
-
 #[allow(type_alias_bounds)]
 type Mon<P: MultivariatePolyRingStore> = Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>;
 
@@ -174,7 +172,7 @@ fn reduce_S_matrix<P, O>(ring: P, p: &Coeff<P>, S_polys: &[El<P>], basis: &[El<P
         }
     }
     let columns_ref = &columns;
-    let mut A = algorithms::sparse_invert::builder::SparseMatrixBuilder::new(&ring.base_ring());
+    let mut A = algorithms::sparse_invert::matrix::SparseMatrix::new(&ring.base_ring());
     for j in 0..columns.len() {
         A.add_col(j);
     }
@@ -237,6 +235,10 @@ fn sym_tuple(a: usize, b: usize) -> (usize, usize) {
     }
 }
 
+///
+/// 
+/// 
+#[stability::unstable(feature = "unstable-items")]
 pub struct RingInfo<R: ?Sized>
     where R: RingBase
 {
@@ -385,6 +387,7 @@ impl SPoly {
     }
 }
 
+#[stability::unstable(feature = "unstable-items")]
 pub trait GBRingDescriptorRing: Sized + PrincipalIdealRing {
 
     fn create_ring_info(&self) -> RingInfo<Self>;
@@ -485,6 +488,7 @@ impl<const N: u64> GBRingDescriptorRing for zn_static::ZnBase<N, false> {
 /// assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, in_ideal, &gb, order));
 /// ```
 /// 
+#[stability::unstable(feature = "unstable-items")]
 pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_poly_degree_bound: u16) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
@@ -599,6 +603,7 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
     return basis;
 }
 
+#[stability::unstable(feature = "unstable-items")]
 pub fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
@@ -637,6 +642,7 @@ pub fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
     return polys;
 }
 
+#[stability::unstable(feature = "unstable-items")]
 pub fn multivariate_division<P, V, O>(ring: P, mut f: El<P>, set: V, order: O) -> El<P>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
@@ -685,6 +691,8 @@ use crate::rings::poly::*;
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::wrapper::RingElementWrapper;
+
+use super::sparse_invert::gb_sparse_row_echelon;
 
 #[ignore]
 #[test]

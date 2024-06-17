@@ -1,12 +1,11 @@
 use crate::field::*;
 use crate::integer::*;
 use crate::homomorphism::*;
-use crate::matrix::dense::DenseMatrix;
 use crate::matrix::matmul;
 use crate::matrix::matmul_fst_transposed;
-use crate::matrix::submatrix::*;
+use crate::matrix::*;
+use crate::matrix::transform::TransformTarget;
 use crate::primitive_int::*;
-use crate::matrix::TransformTarget;
 use crate::rings::float_real::Real64;
 use crate::rings::float_real::Real64Base;
 use crate::rings::rational::*;
@@ -61,9 +60,9 @@ fn size_reduce<R, I, V, T>(ring: R, int_ring: I, mut target: SubmatrixMut<V, El<
         let factor = ring.get_ring().round_to_integer(target.as_const().at(j, 0), int_ring.get_ring());
         col_ops.subtract(int_ring.get_ring(), j, target_j, &factor);
         let factor = ring.get_ring().from_integer(factor, int_ring.get_ring());
-        ring.sub_assign_ref(target.at(j, 0), &factor);
+        ring.sub_assign_ref(target.at_mut(j, 0), &factor);
         for k in 0..j {
-            ring.sub_assign(target.at(k, 0), ring.mul_ref(matrix.at(k, j), &factor));
+            ring.sub_assign(target.at_mut(k, 0), ring.mul_ref(matrix.at(k, j), &factor));
         }
     }
 }
@@ -97,7 +96,7 @@ fn swap_gso_cols<R, V>(ring: R, mut gso: SubmatrixMut<V, El<R>>, i: usize, j: us
     // swap the columns
     let (mut col_i, mut col_i1) = gso.reborrow().restrict_cols(i..(i + 2)).split_cols(0..1, 1..2);
     for k in 0..i {
-        std::mem::swap(col_i.at(k, 0), col_i1.at(k, 0));
+        std::mem::swap(col_i.at_mut(k, 0), col_i1.at_mut(k, 0));
     }
 
     // re-orthogonalize the triangle `i..(i + 2) x i..(i + 2)`
@@ -121,15 +120,15 @@ fn swap_gso_cols<R, V>(ring: R, mut gso: SubmatrixMut<V, El<R>>, i: usize, j: us
     let (mut row_i, mut row_i1) = gso.reborrow().restrict_rows(i..(i + 2)).split_rows(0..1, 1..2);
     for k in (i + 2)..col_count {
         let mu_ki = ring.clone_el(row_i.at(0, k));
-        std::mem::swap(row_i.at(0, k), row_i1.at(0, k));
-        ring.sub_assign(row_i1.at(0, k), ring.mul_ref(&mu, row_i.at(0, k)));
-        ring.mul_assign_ref(row_i.at(0, k), &lin_transform_muki[1]);
-        ring.add_assign(row_i.at(0, k), ring.mul_ref_fst(&lin_transform_muki[0], mu_ki));
+        std::mem::swap(row_i.at_mut(0, k), row_i1.at_mut(0, k));
+        ring.sub_assign(row_i1.at_mut(0, k), ring.mul_ref(&mu, row_i.at(0, k)));
+        ring.mul_assign_ref(row_i.at_mut(0, k), &lin_transform_muki[1]);
+        ring.add_assign(row_i.at_mut(0, k), ring.mul_ref_fst(&lin_transform_muki[0], mu_ki));
     }
 
-    *gso.at(i, i) = new_bi_star_norm_sqr;
-    *gso.at(i, i + 1) = new_mu;
-    *gso.at(i + 1, i + 1) = new_bi1_star_norm_sqr;
+    *gso.at_mut(i, i) = new_bi_star_norm_sqr;
+    *gso.at_mut(i, i + 1) = new_mu;
+    *gso.at_mut(i + 1, i + 1) = new_bi1_star_norm_sqr;
 }
 
 ///
@@ -186,12 +185,12 @@ fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>)
         let pivot = ring.clone_el(matrix.at(i, i));
         let pivot_inv = ring.div(&ring.one(), matrix.at(i, i));
         for j in (i + 1)..n {
-            ring.mul_assign_ref(matrix.at(i, j), &pivot_inv);
+            ring.mul_assign_ref(matrix.at_mut(i, j), &pivot_inv);
         }
         for k in (i + 1)..n {
             for l in k..n {
                 let subtract = ring.mul_ref_snd(ring.mul_ref(matrix.as_const().at(i, k), matrix.as_const().at(i, l)), &pivot);
-                ring.sub_assign(matrix.at(k, l), subtract);
+                ring.sub_assign(matrix.at_mut(k, l), subtract);
             }
         }
     }
@@ -233,11 +232,11 @@ pub fn lll_float<I, V1, V2>(ring: I, quadratic_form: Submatrix<V1, El<Real64>>, 
     let lll_reals = Real64::RING;
 
     let n = matrix.col_count();
-    let mut gso = DenseMatrix::zero(n, n, &lll_reals);
-    let mut tmp = DenseMatrix::zero(n, n, &lll_reals);
+    let mut gso: OwnedMatrix<f64> = OwnedMatrix::zero(n, n, &lll_reals);
+    let mut tmp: OwnedMatrix<f64> = OwnedMatrix::zero(n, n, &lll_reals);
     let hom = lll_reals.can_hom(&ring).unwrap();
-    matmul_fst_transposed(&matrix, &quadratic_form, tmp.data_mut(), &hom, &lll_reals.identity());
-    matmul(&tmp, &matrix, gso.data_mut(), &lll_reals.identity(), &hom);
+    matmul_fst_transposed(matrix.as_const(), quadratic_form, tmp.data_mut(), &hom, &lll_reals.identity());
+    matmul(tmp.data(), matrix.as_const(), gso.data_mut(), &lll_reals.identity(), &hom);
     ldl(&lll_reals, gso.data_mut());
     lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut(), TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);
 }
@@ -273,7 +272,7 @@ pub fn lll_exact<I, V>(ring: I, mut matrix: SubmatrixMut<V, El<I>>, delta: f64)
 {
     assert!(delta < 1.);
     assert!(delta > 0.25);
-    lll_float(&ring, DenseMatrix::identity(matrix.col_count(), Real64::RING).data(), matrix.reborrow(), delta);
+    lll_float(&ring, OwnedMatrix::<f64>::identity(matrix.col_count(), matrix.col_count(), Real64::RING).data(), matrix.reborrow(), delta);
 
     let lll_reals = RationalField::new(BigIntRing::RING);
     let delta_int = ring.from_float_approx(delta * 2f64.powi(20)).unwrap();
@@ -283,7 +282,7 @@ pub fn lll_exact<I, V>(ring: I, mut matrix: SubmatrixMut<V, El<I>>, delta: f64)
     let mut gso_data = (0..n).flat_map(|_i| (0..n).map(|_j| lll_reals.zero())).collect::<Vec<_>>();
     let mut gso = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut gso_data, n, n);
     let hom = lll_reals.inclusion().compose(BigIntRing::RING.can_hom(&ring).unwrap());
-    matmul_fst_transposed(&matrix, &matrix, gso.reborrow(), &hom, &hom);
+    matmul_fst_transposed(matrix.as_const(), matrix.as_const(), gso.reborrow(), &hom, &hom);
     ldl(&lll_reals, gso.reborrow());
     lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso, TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);
 }
@@ -312,8 +311,8 @@ impl<'a, R, I, V, H> TransformTarget<I> for TransformLatticeBasis<'a, R, I, V, H
         for k in 0..self.basis.row_count() {
             let a = ring.clone_el(self.basis.at(k, i));
             let b = ring.clone_el(self.basis.at(k, j));
-            *self.basis.at(k, i) = ring.add(self.hom.mul_ref_map(&a, &transform[0]), self.hom.mul_ref_map(&b, &transform[1]));
-            *self.basis.at(k, i) = ring.add(self.hom.mul_ref_snd_map(a, &transform[2]), self.hom.mul_ref_snd_map(b, &transform[3]));
+            *self.basis.at_mut(k, i) = ring.add(self.hom.mul_ref_map(&a, &transform[0]), self.hom.mul_ref_map(&b, &transform[1]));
+            *self.basis.at_mut(k, i) = ring.add(self.hom.mul_ref_snd_map(a, &transform[2]), self.hom.mul_ref_snd_map(b, &transform[3]));
         }
     }
 
@@ -323,7 +322,7 @@ impl<'a, R, I, V, H> TransformTarget<I> for TransformLatticeBasis<'a, R, I, V, H
         let ring = self.hom.codomain();
         for k in 0..self.basis.row_count() {
             let subtract = self.hom.mul_ref_map(self.basis.at(k, src), factor);
-            ring.sub_assign(self.basis.at(k, dst), subtract);
+            ring.sub_assign(self.basis.at_mut(k, dst), subtract);
         }
     }
 
@@ -335,7 +334,7 @@ impl<'a, R, I, V, H> TransformTarget<I> for TransformLatticeBasis<'a, R, I, V, H
         let col_count = self.basis.col_count();
         let (mut col_i, mut col_j) = self.basis.reborrow().split_cols(i..(i + 1), j..(j + 1));
         for k in 0..col_count {
-            std::mem::swap(col_i.at(k, 0), col_j.at(k, 0));
+            std::mem::swap(col_i.at_mut(k, 0), col_j.at_mut(k, 0));
         }
     }
 }
@@ -345,9 +344,9 @@ use crate::vector::*;
 #[cfg(test)]
 use crate::algorithms;
 #[cfg(test)]
-use crate::assert_matrix_eq;
-#[cfg(test)]
 use test::Bencher;
+#[cfg(test)]
+use crate::assert_matrix_eq;
 
 #[cfg(test)]
 const QQ: RationalField<StaticRing<i64>> = RationalField::new(StaticRing::<i64>::RING);
@@ -438,17 +437,17 @@ fn assert_lattice_isomorphic<V, const N: usize, const M: usize>(lhs: &[DerefArra
     assert_eq!(rhs.row_count(), N);
     assert_eq!(rhs.col_count(), M);
     let ZZbig = BigIntRing::RING;
-    let mut A = DenseMatrix::zero(N, M, ZZbig);
-    let mut B = DenseMatrix::zero(N, M, ZZbig);
-    let int_to_ZZbig = ZZbig.can_hom(&StaticRing::<i64>::RING).unwrap();
+    let mut A: OwnedMatrix<_> = OwnedMatrix::zero(N, M, ZZbig);
+    let mut B: OwnedMatrix<_> = OwnedMatrix::zero(N, M, ZZbig);
+    let int_to_ZZbig: CanHom<&RingValue<StaticRingBase<i64>>, &RingValue<crate::rings::rust_bigint::RustBigintRingBase>> = ZZbig.can_hom(&StaticRing::<i64>::RING).unwrap();
     for i in 0..N {
         for j in 0..M {
             *A.at_mut(i, j) = int_to_ZZbig.map(lhs[i][j]);
             *B.at_mut(i, j) = int_to_ZZbig.map(*rhs.at(i, j));
         }
     }
-    assert!(algorithms::smith::solve_right(&mut A.clone_matrix(&ZZbig), B.clone_matrix(&ZZbig), &ZZbig).is_some());
-    assert!(algorithms::smith::solve_right(&mut B.clone_matrix(&ZZbig), A.clone_matrix(&ZZbig), &ZZbig).is_some());
+    assert!(algorithms::smith::solve_right(A.clone_matrix(&ZZbig).data_mut(), B.clone_matrix(&ZZbig).data_mut(), &ZZbig).is_some());
+    assert!(algorithms::smith::solve_right(B.clone_matrix(&ZZbig).data_mut(), A.clone_matrix(&ZZbig).data_mut(), &ZZbig).is_some());
 }
 
 #[test]
@@ -460,7 +459,7 @@ fn test_lll_float_2d() {
     ];
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut reduced);
-    lll_float(&ZZ, DenseMatrix::identity(2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
+    lll_float(&ZZ, OwnedMatrix::<_>::identity(2, 2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(1, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -472,7 +471,7 @@ fn test_lll_float_2d() {
     ];
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut reduced);
-    lll_float(&ZZ, DenseMatrix::identity(2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
+    lll_float(&ZZ, OwnedMatrix::<_>::identity(2, 2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(4, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -497,7 +496,7 @@ fn test_lll_float_3d() {
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 3>, _>::new(&mut reduced);
-    lll_float(&ZZ, DenseMatrix::identity(3, Real64::RING).data(), reduced_matrix.reborrow(), 0.999);
+    lll_float(&ZZ, OwnedMatrix::<_>::identity(3, 3, Real64::RING).data(), reduced_matrix.reborrow(), 0.999);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(144 * 144, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -536,7 +535,7 @@ fn bench_lll_float_10d(bencher: &mut Bencher) {
         ];
         let mut reduced = original;
         let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 10>, _>::new(&mut reduced);
-        lll_float(&ZZ, DenseMatrix::identity(10, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
+        lll_float(&ZZ, OwnedMatrix::<_>::identity(10, 10, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
 
         assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
         assert!(16 * 16 > norm_squared(&reduced_matrix.as_const().col_at(0)));

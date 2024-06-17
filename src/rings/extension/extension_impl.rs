@@ -8,7 +8,6 @@ use crate::impl_wrap_unwrap_homs;
 use crate::impl_wrap_unwrap_isos;
 use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
-use crate::matrix::Matrix;
 use crate::pid::PrincipalIdealRing;
 use crate::rings::field::AsField;
 use crate::rings::field::AsFieldBase;
@@ -316,14 +315,14 @@ impl<R, V, A> DivisibilityRing for FreeAlgebraImplBase<R, V, A>
     where R: RingStore, R::Type: PrincipalIdealRing, V: VectorView<El<R>>, A: Allocator + Clone
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        let mut mul_matrix = RingRef::new(self).create_multiplication_matrix(rhs);
-        let mut lhs_matrix = DenseMatrix::zero(self.rank(), 1, self.base_ring());
+        let mut mul_matrix: OwnedMatrix<_> = create_multiplication_matrix(RingRef::new(self), rhs);
+        let mut lhs_matrix: OwnedMatrix<_> = OwnedMatrix::zero(self.rank(), 1, self.base_ring());
         let data = self.wrt_canonical_basis(&lhs);
         for j in 0..self.rank() {
             *lhs_matrix.at_mut(j, 0) = data.at(j);
         }
-        let solution = algorithms::smith::solve_right(&mut mul_matrix, lhs_matrix, self.base_ring())?;
-        return Some(self.from_canonical_basis((0..self.rank()).map(|i| self.base_ring().clone_el(solution.entry_at(i, 0)))));
+        let solution = algorithms::smith::solve_right(mul_matrix.data_mut(), lhs_matrix.data_mut(), self.base_ring())?;
+        return Some(self.from_canonical_basis((0..self.rank()).map(|i| self.base_ring().clone_el(solution.at(i, 0)))));
     }
 }
 

@@ -59,7 +59,7 @@ use crate::rings::poly::sparse_poly::SparsePolyRing;
 use crate::rings::zn::zn_static::Zn;
 
 #[test]
-pub fn test_cyclotomic_polynomial() {
+fn test_cyclotomic_polynomial() {
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
     assert!(poly_ring.eq_el(
         &poly_ring.from_terms([(1, 1), (1, 0)].into_iter()),
@@ -95,7 +95,7 @@ pub fn test_cyclotomic_polynomial() {
 }
 
 #[bench]
-pub fn bench_cyclotomic_polynomial_3965585_dense(bencher: &mut test::Bencher) {
+fn bench_cyclotomic_polynomial_3965585_dense(bencher: &mut test::Bencher) {
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
     bencher.iter(|| {
         std::hint::black_box(cyclotomic_polynomial(&poly_ring, std::hint::black_box(257 * 257 * 65)));
@@ -103,7 +103,7 @@ pub fn bench_cyclotomic_polynomial_3965585_dense(bencher: &mut test::Bencher) {
 }
 
 #[bench]
-pub fn bench_cyclotomic_polynomial_3965585_sparse(bencher: &mut test::Bencher) {
+fn bench_cyclotomic_polynomial_3965585_sparse(bencher: &mut test::Bencher) {
     let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
     bencher.iter(|| {
         std::hint::black_box(cyclotomic_polynomial(&poly_ring, std::hint::black_box(257 * 257 * 65)));

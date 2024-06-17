@@ -7,6 +7,14 @@ use crate::algorithms;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::ring::*;
 
+///
+/// An implementation of the rational number `Q`, based on representing them
+/// as a tuple `(numerator, denominator)`.
+/// 
+/// Be careful when instantiating it with finite-precision integers, like `StaticRing<i64>`,
+/// since by nature of the rational numbers, both numerator and denominator can increase
+/// dramatically, even when the numbers itself are of moderate size.
+/// 
 #[derive(Debug, Clone, Copy)]
 pub struct RationalFieldBase<I: IntegerRingStore>
     where I::Type: IntegerRing
@@ -14,6 +22,9 @@ pub struct RationalFieldBase<I: IntegerRingStore>
     integers: I
 }
 
+///
+/// [`RingStore`] corresponding to [`RationalFieldBase`]
+/// 
 pub type RationalField<I> = RingValue<RationalFieldBase<I>>;
 
 impl<I> PartialEq for RationalFieldBase<I>

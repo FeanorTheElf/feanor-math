@@ -120,6 +120,10 @@ pub mod generic_impls {
     use super::{ZnRing, ZnRingStore};
     use crate::homomorphism::*;
 
+    ///
+    /// A generic `ZZ -> Z/nZ` homomorphism. Optimized for the case that values of `ZZ` can be very
+    /// large, but allow for efficient estimation of their approximate size.
+    /// 
     pub struct BigIntToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
         where I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>
     {
@@ -133,7 +137,8 @@ pub mod generic_impls {
     }
 
     ///
-    /// See [`map_in_from_int()`].
+    /// See [`map_in_from_bigint()`].
+    /// 
     /// This will only ever return `None` if one of the integer ring `has_canonical_hom/iso` returns `None`.
     /// 
     pub fn has_canonical_hom_from_bigint<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>(from: &I, to: &R, to_large_int_ring: &J, bounded_reduce_bound: Option<&J::Element>) -> Option<BigIntToZnHom<I, J, R>>
@@ -213,6 +218,10 @@ pub mod generic_impls {
         }
     }
 
+    ///
+    /// Generates a uniformly random element of `Z/nZ` using the randomness of `rng`.
+    /// Designed to be used when implementing [`crate::rings::finite::FiniteRing::random_element()`].
+    /// 
     pub fn random_element<R: ZnRing, G: FnMut() -> u64>(ring: &R, rng: G) -> R::Element {
         ring.map_in(
             ring.integer_ring().get_ring(), 
@@ -221,6 +230,10 @@ pub mod generic_impls {
         )
     }
 
+    ///
+    /// Computes the checked division in `Z/nZ`. Designed to be used when implementing
+    /// [`crate::divisibility::DivisibilityRing::checked_left_div()`].
+    /// 
     pub fn checked_left_div<R: ZnRingStore>(ring: R, lhs: &El<R>, rhs: &El<R>, modulus: &El<<R::Type as ZnRing>::Integers>) -> Option<El<R>>
         where R::Type: ZnRing
     {

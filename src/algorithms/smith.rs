@@ -1,8 +1,9 @@
 use std::cmp::min;
 
 use crate::divisibility::DivisibilityRingStore;
-use crate::matrix::dense::{DenseMatrix, TransformCols, TransformRows};
-use crate::matrix::{matmul, Matrix, TransformTarget};
+use crate::matrix::matmul;
+use crate::matrix::*;
+use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
 use crate::ring::*;
 use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 
@@ -29,11 +30,13 @@ use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 /// LLL to perform intermediate lattice reductions (not yet implemented
 /// in feanor_math).
 /// 
-pub fn pre_smith<R, TL, TR>(ring: R, L: &mut TL, R: &mut TR, A: &mut DenseMatrix<R::Type>)
+#[stability::unstable(feature = "unstable-items")]
+pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: SubmatrixMut<V, El<R>>)
     where R: RingStore + Copy,
         R::Type: PrincipalIdealRing,
         TL: TransformTarget<R::Type>,
-        TR: TransformTarget<R::Type>
+        TR: TransformTarget<R::Type>,
+        V: AsPointerToSlice<El<R>>
 {
     // otherwise we might not terminate...
     assert!(ring.is_noetherian());
@@ -49,12 +52,12 @@ pub fn pre_smith<R, TL, TR>(ring: R, L: &mut TL, R: &mut TR, A: &mut DenseMatrix
                 if ring.is_zero(A.at(i, k)) {
                     continue;
                 } else if let Some(quo) = ring.checked_div(A.at(i, k), A.at(k, k)) {
-                    TransformRows(A).subtract(ring.get_ring(), k, i, &quo);
+                    TransformRows(A.reborrow(), ring.get_ring()).subtract(ring.get_ring(), k, i, &quo);
                     L.subtract(ring.get_ring(), k, i, &quo);
                 } else {
                     let (s, t, d) = ring.extended_ideal_gen(A.at(k, k), A.at(i, k));
                     let transform = [s, t, ring.negate(ring.checked_div(A.at(i, k), &d).unwrap()), ring.checked_div(A.at(k, k), &d).unwrap()];
-                    TransformRows(A).transform(ring.get_ring(), k, i, &transform);
+                    TransformRows(A.reborrow(), ring.get_ring()).transform(ring.get_ring(), k, i, &transform);
                     L.transform(ring.get_ring(), k, i, &transform);
                 }
             }
@@ -65,13 +68,13 @@ pub fn pre_smith<R, TL, TR>(ring: R, L: &mut TL, R: &mut TR, A: &mut DenseMatrix
                     continue;
                 } else if let Some(quo) = ring.checked_div(A.at(k, j), A.at(k, k)) {
                     changed = true;
-                    TransformCols(A).subtract(ring.get_ring(), k, j, &quo);
+                    TransformCols(A.reborrow(), ring.get_ring()).subtract(ring.get_ring(), k, j, &quo);
                     R.subtract(ring.get_ring(), k, j, &quo);
                 } else {
                     changed = true;
                     let (s, t, d) = ring.extended_ideal_gen(A.at(k, k), A.at(k, j));
                     let transform = [s, t, ring.negate(ring.checked_div(A.at(k, j), &d).unwrap()), ring.checked_div(A.at(k, k), &d).unwrap()];
-                    TransformCols(A).transform(ring.get_ring(), k, j, &transform);
+                    TransformCols(A.reborrow(), ring.get_ring()).transform(ring.get_ring(), k, j, &transform);
                     R.transform(ring.get_ring(), k, j, &transform);
                 }
             }
@@ -79,14 +82,20 @@ pub fn pre_smith<R, TL, TR>(ring: R, L: &mut TL, R: &mut TR, A: &mut DenseMatrix
     }
 }
 
-pub fn determinant<R>(A: &mut DenseMatrix<R::Type>, ring: R) -> El<R>
+///
+/// Computes the determinant of `A`.
+/// 
+/// The value of `A` will be changed by the algorithm in an unspecified way.
+/// 
+pub fn determinant<R, V>(mut A: SubmatrixMut<V, El<R>>, ring: R) -> El<R>
     where R: RingStore + Copy,
-        R::Type: PrincipalIdealRing
+        R::Type: PrincipalIdealRing,
+        V: AsPointerToSlice<El<R>>
 {
     assert_eq!(A.row_count(), A.col_count());
     let mut unit_part_rows = ring.one();
     let mut unit_part_cols = ring.one();
-    pre_smith(ring, &mut DetUnit { current_unit: &mut unit_part_rows }, &mut DetUnit { current_unit: &mut unit_part_cols }, A);
+    pre_smith(ring, &mut DetUnit { current_unit: &mut unit_part_rows }, &mut DetUnit { current_unit: &mut unit_part_cols }, A.reborrow());
     return ring.prod((0..A.row_count()).map(|i| ring.clone_el(A.at(i, i))).chain([unit_part_rows, unit_part_cols].into_iter()));
 }
 
@@ -95,38 +104,47 @@ pub fn determinant<R>(A: &mut DenseMatrix<R::Type>, ring: R) -> El<R>
 /// In the case that there are multiple solutions, an unspecified
 /// one is returned.
 /// 
-pub fn solve_right<R>(A: &mut DenseMatrix<R::Type>, mut rhs: DenseMatrix<R::Type>, ring: R) -> Option<DenseMatrix<R::Type>>
+/// The values of `A` and `rhs` will be changed by the algorithm in an 
+/// unspecified way.
+/// 
+pub fn solve_right<R, V1, V2>(mut A: SubmatrixMut<V1, El<R>>, mut rhs: SubmatrixMut<V2, El<R>>, ring: R) -> Option<OwnedMatrix<El<R>>>
     where R: RingStore + Copy,
-        R::Type: PrincipalIdealRing
+        R::Type: PrincipalIdealRing,
+        V1: AsPointerToSlice<El<R>>,
+        V2: AsPointerToSlice<El<R>>
 {
     assert_eq!(A.row_count(), rhs.row_count());
-    let mut R = DenseMatrix::identity(A.col_count(), ring);
-    pre_smith(ring, &mut TransformRows(&mut rhs), &mut TransformCols(&mut R), A);
+    let mut R: OwnedMatrix<El<R>> = OwnedMatrix::identity(A.col_count(), A.col_count(), ring);
+    pre_smith(ring, &mut TransformRows(rhs.reborrow(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), A.reborrow());
 
     // resize rhs
-    for i in A.row_count()..rhs.row_count() {
+    let mut result: OwnedMatrix<El<R>> = OwnedMatrix::zero(A.col_count(), rhs.col_count(), ring);
+    for i in result.row_count()..rhs.row_count() {
         for j in 0..rhs.col_count() {
             if !ring.is_zero(rhs.at(i, j)) {
                 return None;
             }
         }
     }
-
-    rhs.set_row_count(A.col_count(), ring);
+    for i in 0..min(result.row_count(), rhs.row_count()) {
+        for j in 0..rhs.col_count() {
+            *result.at_mut(i, j) = ring.clone_el(rhs.at(i, j));
+        }
+    }
 
     let zero = ring.zero();
     for i in 0..min(A.row_count(), A.col_count()) {
         let pivot = if i < A.col_count() { A.at(i, i) } else { &zero };
         for j in 0..rhs.col_count() {
-            *rhs.at_mut(i, j) = ring.checked_div(rhs.at(i, j), pivot)?;
+            *result.at_mut(i, j) = ring.checked_div(rhs.at(i, j), pivot)?;
         }
     }
-    let mut out = DenseMatrix::zero(R.row_count(), rhs.col_count(), ring);
-    matmul(&R, &rhs, out.data_mut(), &ring.identity(), &ring.identity());
+    let mut out = OwnedMatrix::zero(R.row_count(), rhs.col_count(), ring);
+    matmul(R.data(), result.data(), out.data_mut(), &ring.identity(), &ring.identity());
     return Some(out);
 }
 
-pub struct DetUnit<'a, R: ?Sized + RingBase> {
+struct DetUnit<'a, R: ?Sized + RingBase> {
     current_unit: &'a mut R::Element
 }
 
@@ -154,14 +172,20 @@ use crate::rings::zn::zn_static;
 use crate::assert_matrix_eq;
 
 #[cfg(test)]
-fn multiply<'a, R: RingStore, I: IntoIterator<Item = &'a DenseMatrix<R::Type>>>(matrices: I, ring: R) -> DenseMatrix<R::Type>
-    where R::Type: 'a
+fn multiply<'a, R: RingStore, V: AsPointerToSlice<El<R>>, I: IntoIterator<Item = Submatrix<'a, V, El<R>>>>(matrices: I, ring: R) -> OwnedMatrix<El<R>>
+    where R::Type: 'a,
+        V: 'a
 {
     let mut it = matrices.into_iter();
-    let mut result = it.next().unwrap().clone_matrix(&ring);
+    let fst = it.next().unwrap();
+    let snd = it.next().unwrap();
+    let mut new_result = OwnedMatrix::zero(fst.row_count(), snd.col_count(), &ring);
+    matmul(fst, snd, new_result.data_mut(), &ring.identity(), &ring.identity());
+    let mut result = new_result;
+
     for m in it {
-        let mut new_result = DenseMatrix::zero(result.row_count(), m.col_count(), &ring);
-        matmul(&result, m, new_result.data_mut(), &ring.identity(), &ring.identity());
+        let mut new_result = OwnedMatrix::zero(result.row_count(), m.col_count(), &ring);
+        matmul(result.data(), m, new_result.data_mut(), &ring.identity(), &ring.identity());
         result = new_result;
     }
     return result;
@@ -170,40 +194,40 @@ fn multiply<'a, R: RingStore, I: IntoIterator<Item = &'a DenseMatrix<R::Type>>>(
 #[test]
 fn test_smith_integers() {
     let ring = StaticRing::<i64>::RING;
-    let mut A = DenseMatrix::new(
+    let mut A = OwnedMatrix::new(
         vec![ 1, 2, 3, 4, 
                     2, 3, 4, 5,
-                    3, 4, 5, 6 ].into_boxed_slice(), 
+                    3, 4, 5, 6 ], 
         4
     );
     let original_A = A.clone_matrix(&ring);
-    let mut L = DenseMatrix::identity(3, StaticRing::<i64>::RING);
-    let mut R = DenseMatrix::identity(4, StaticRing::<i64>::RING);
-    pre_smith(ring, &mut TransformRows(&mut L), &mut TransformCols(&mut R), &mut A);
+    let mut L: OwnedMatrix<i64> = OwnedMatrix::identity(3, 3, StaticRing::<i64>::RING);
+    let mut R: OwnedMatrix<i64> = OwnedMatrix::identity(4, 4, StaticRing::<i64>::RING);
+    pre_smith(ring, &mut TransformRows(L.data_mut(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), A.data_mut());
     
     assert_matrix_eq!(&ring, &[
         [1, 0, 0, 0],
         [0,-1, 0, 0],
         [0, 0, 0, 0]], &A);
 
-    assert_matrix_eq!(&ring, &multiply([&L, &original_A, &R], ring), &A);
+    assert_matrix_eq!(&ring, &multiply([L.data(), original_A.data(), R.data()], ring), &A);
 }
 
 #[test]
 fn test_smith_zn() {
     let ring = zn_static::Zn::<45>::RING;
-    let mut A = DenseMatrix::new(
+    let mut A = OwnedMatrix::new(
         vec![ 8, 3, 5, 8,
                     0, 9, 0, 9,
                     5, 9, 5, 14,
                     8, 3, 5, 23,
-                    3,39, 0, 39 ].into_boxed_slice(),
+                    3,39, 0, 39 ],
         4
     );
     let original_A = A.clone_matrix(&ring);
-    let mut L = DenseMatrix::identity(5, ring);
-    let mut R = DenseMatrix::identity(4, ring);
-    pre_smith(ring, &mut TransformRows(&mut L), &mut TransformCols(&mut R), &mut A);
+    let mut L: OwnedMatrix<u64> = OwnedMatrix::identity(5, 5, ring);
+    let mut R: OwnedMatrix<u64> = OwnedMatrix::identity(4, 4, ring);
+    pre_smith(ring, &mut TransformRows(L.data_mut(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), A.data_mut());
 
     assert_matrix_eq!(&ring, &[
         [8, 0, 0, 0],
@@ -212,45 +236,45 @@ fn test_smith_zn() {
         [0, 0, 0, 15],
         [0, 0, 0, 0]], &A);
         
-    assert_matrix_eq!(&ring, &multiply([&L, &original_A, &R], ring), &A);
+    assert_matrix_eq!(&ring, &multiply([L.data(), original_A.data(), R.data()], ring), &A);
 }
 
 #[test]
 fn test_solve_zn() {
     let ring = zn_static::Zn::<45>::RING;
-    let A = DenseMatrix::new(
+    let A = OwnedMatrix::new(
         vec![ 8, 3, 5, 8,
                     0, 9, 0, 9,
                     5, 9, 5, 14,
                     8, 3, 5, 23,
-                    3,39, 0, 39 ].into_boxed_slice(),
+                    3,39, 0, 39 ],
         4
     );
-    let B = DenseMatrix::new(
+    let B = OwnedMatrix::new(
         vec![11, 43, 10, 22,
                    18,  9, 27, 27,
                     8, 34,  7, 22,
                    41, 13, 40, 37,
-                    3,  9,  3,  0].into_boxed_slice(),
+                    3,  9,  3,  0],
         4
     );
-    let solution = solve_right(&mut A.clone_matrix(ring), B.clone_matrix(ring), ring).unwrap();
+    let solution = solve_right(A.clone_matrix(ring).data_mut(), B.clone_matrix(ring).data_mut(), ring).unwrap();
 
-    assert_matrix_eq!(&ring, &multiply([&A, &solution], ring), &B);
+    assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
 }
 
 #[test]
 fn test_solve_int() {
     let ring = StaticRing::<i64>::RING;
-    let A = DenseMatrix::new(
+    let A = OwnedMatrix::new(
         vec![3, 6, 2, 0, 4, 7,
-                   5, 5, 4, 5, 5, 5].into_boxed_slice(),
+                   5, 5, 4, 5, 5, 5],
         6
     );
-    let B = DenseMatrix::identity(2, ring);
-    let solution = solve_right(&mut A.clone_matrix(ring), B.clone_matrix(ring), ring).unwrap();
+    let B: OwnedMatrix<i64> = OwnedMatrix::identity(2, 2, ring);
+    let solution = solve_right(A.clone_matrix(ring).data_mut(), B.clone_matrix(ring).data_mut(), ring).unwrap();
 
-    assert_matrix_eq!(&ring, &multiply([&A, &solution], &ring), &B);
+    assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], &ring), &B);
 }
 
 #[test]
@@ -264,23 +288,23 @@ fn test_large() {
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     ];
-    let mut A = DenseMatrix::zero(6, 11, &ring);
+    let mut A: OwnedMatrix<u64> = OwnedMatrix::zero(6, 11, &ring);
     for i in 0..6 {
         for j in 0..11 {
             *A.at_mut(i, j) = data_A[i][j];
         }
     }
-    assert!(solve_right(&mut A.clone_matrix(&ring), A, &ring).is_some());
+    assert!(solve_right(A.clone_matrix(&ring).data_mut(), A.data_mut(), &ring).is_some());
 }
 
 #[test]
 fn test_determinant() {
     let ring = StaticRing::<i64>::RING;
-    let A = DenseMatrix::new(
+    let A = OwnedMatrix::new(
         vec![1, 0, 3, 
                    2, 1, 0, 
-                   9, 8, 7].into_boxed_slice(),
+                   9, 8, 7],
         3
     );
-    assert_el_eq!(&ring, &(7 + 48 - 27), &determinant(&mut A.clone_matrix(&ring), &ring));
+    assert_el_eq!(&ring, &(7 + 48 - 27), &determinant(A.clone_matrix(&ring).data_mut(), &ring));
 }

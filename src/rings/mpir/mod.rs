@@ -14,6 +14,9 @@ use crate::rings::rust_bigint::*;
 
 mod mpir_bindings;
 
+///
+/// An `mpir` integer.
+/// 
 pub struct MPZEl {
     integer: mpir_bindings::__mpz_struct
 }
@@ -51,6 +54,9 @@ impl Drop for MPZEl {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MPZBase;
 
+///
+/// [`RingStore`] corresponding to [`MPZBase`].
+/// 
 pub type MPZ = RingValue<MPZBase>;
 
 impl MPZ {

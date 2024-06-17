@@ -11,9 +11,11 @@ use crate::rings::zn::*;
 /// Ring that implements arithmetic in `Z/nZ` for a small `n` known
 /// at compile time.
 /// 
+#[stability::unstable(feature = "unstable-items")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ZnBase<const N: u64, const IS_FIELD: bool>;
 
+#[stability::unstable(feature = "unstable-items")]
 pub const fn is_prime(n: u64) -> bool {
     assert!(n >= 2);
     let mut d = 2;
@@ -28,6 +30,7 @@ pub const fn is_prime(n: u64) -> bool {
 
 impl<const N: u64, const IS_FIELD: bool> ZnBase<N, IS_FIELD> {
     
+    #[stability::unstable(feature = "unstable-items")]
     pub const fn new() -> Self {
         assert!(!IS_FIELD || is_prime(N));
         ZnBase
@@ -149,6 +152,7 @@ impl<const N: u64> EuclideanRing for ZnBase<N, true> {
     }
 }
 
+#[stability::unstable(feature = "unstable-items")]
 #[derive(Clone, Copy)]
 pub struct ZnBaseElementsIter<const N: u64> {
     current: u64
@@ -222,6 +226,8 @@ impl<const N: u64> Domain for ZnBase<N, true> {}
 impl<const N: u64> Field for ZnBase<N, true> {}
 
 impl<const N: u64, const IS_FIELD: bool> RingValue<ZnBase<N, IS_FIELD>> {
+
+    #[stability::unstable(feature = "unstable-items")]
     pub const RING: Self = Self::from(ZnBase::new());
 }
 
@@ -229,12 +235,14 @@ impl<const N: u64, const IS_FIELD: bool> RingValue<ZnBase<N, IS_FIELD>> {
 /// Ring that implements arithmetic in `Z/nZ` for a small `n` known
 /// at compile time. For details, see [`ZnBase`].
 /// 
+#[stability::unstable(feature = "unstable-items")]
 pub type Zn<const N: u64> = RingValue<ZnBase<N, false>>;
 
 ///
 /// Ring that implements arithmetic in `Z/nZ` for a small `n` known
 /// at compile time. For details, see [`ZnBase`].
 /// 
+#[stability::unstable(feature = "unstable-items")]
 pub type Fp<const P: u64> = RingValue<ZnBase<P, true>>;
 
 #[test]
@@ -243,6 +251,7 @@ fn test_is_prime() {
     assert_eq!(false, is_prime(49));
 }
 
+#[stability::unstable(feature = "unstable-items")]
 pub const F17: Fp<17> = Fp::<17>::RING;
 
 #[test]

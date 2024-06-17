@@ -81,7 +81,7 @@ fn ec_group_double_proj<R>(Zn: &R, A: &El<R>, _B: &El<R>, P: &Point<R>) -> Point
     );
 }
 
-pub fn ec_mul_abort<R, I>(base: &Point<R>, A: &El<R>, B: &El<R>, power: &El<I>, Zn: &R, ZZ: &I) -> Point<R>
+fn ec_mul_abort<R, I>(base: &Point<R>, A: &El<R>, B: &El<R>, power: &El<I>, Zn: &R, ZZ: &I) -> Point<R>
     where R: ZnRingStore,
         R::Type: ZnRing,
         I: IntegerRingStore,
@@ -128,6 +128,7 @@ fn is_on_curve<R>(Zn: &R, A: &El<R>, B: &El<R>, P: &Point<R>) -> bool
 ///
 /// Runtime `L_N(1/2, 1) = exp((1 + o(1)) ln(N)^1/2 lnln(N)^1/2)`
 /// 
+#[stability::unstable(feature = "unstable-items")]
 pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::Integers>
     where R: ZnRingStore + DivisibilityRingStore,
         R::Type: ZnRing + DivisibilityRing

@@ -10,12 +10,27 @@ use crate::divisibility::{DivisibilityRing, Domain};
 
 use super::float_real::Real64;
 
+///
+/// An approximate implementation of the real number `R`, using 64 bit floating
+/// point numbers.
+/// 
+/// # Warning
+/// 
+/// Since floating point numbers do not exactly represent the reals, and this crate follows
+/// a mathematically precise approach, we cannot provide any function related to equality.
+/// In particular, `Complex64Base.eq_el(a, b)` is not supported, and will panic. 
+/// Hence, this ring has only limited use within this crate, and is currently only used for
+/// floating-point FFTs. 
+/// 
 #[derive(Clone, Copy, PartialEq)]
 pub struct Complex64Base;
 
 #[derive(Clone, Copy)]
 pub struct Complex64El(f64, f64);
 
+///
+/// [`RingStore`] corresponding to [`Complex64Base`]
+/// 
 pub type Complex64 = RingValue<Complex64Base>;
 
 impl Complex64 {

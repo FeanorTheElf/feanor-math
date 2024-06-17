@@ -90,7 +90,7 @@ pub fn discrete_log<T, F>(value: T, base: &T, order: i64, op: F, identity: T) ->
             &op, 
             identity.clone()
         )?;
-        current_log = algorithms::eea::crt(log, current_log, &size, &current_size, ZZ);
+        current_log = algorithms::eea::inv_crt(log, current_log, &size, &current_size, ZZ);
         ZZ.mul_assign(&mut current_size, size);
     }
     return Some(current_log);

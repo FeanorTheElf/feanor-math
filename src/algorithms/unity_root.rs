@@ -7,6 +7,7 @@ use crate::integer::IntegerRingStore;
 
 use super::int_factor::factor;
 
+#[stability::unstable(feature = "unstable-items")]
 pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usize) -> bool {
     if log2_n == 0 {
         return ring.is_one(el);
@@ -14,11 +15,13 @@ pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usi
     ring.is_neg_one(&ring.pow(ring.clone_el(&el), 1 << (log2_n - 1)))
 }
 
+#[stability::unstable(feature = "unstable-items")]
 pub fn is_root_of_unity<R: RingStore>(ring: R, el: &El<R>, n: usize) -> bool {
     assert!(n >= 1);
     ring.is_one(&ring.pow(ring.clone_el(&el), n))
 }
 
+#[stability::unstable(feature = "unstable-items")]
 pub fn is_prim_root_of_unity<R: RingStore>(ring: R, el: &El<R>, n: usize) -> bool {
     assert!(n > 1);
     if !is_root_of_unity(&ring, el, n) {
@@ -32,6 +35,7 @@ pub fn is_prim_root_of_unity<R: RingStore>(ring: R, el: &El<R>, n: usize) -> boo
     return true;
 }
 
+#[stability::unstable(feature = "unstable-items")]
 pub fn get_prim_root_of_unity<R>(ring: R, n: usize) -> Option<El<R>>
     where R: ZnRingStore, R::Type: ZnRing, <R::Type as ZnRing>::IntegerRingBase: CanHomFrom<StaticRingBase<i64>>
 {
@@ -49,6 +53,7 @@ pub fn get_prim_root_of_unity<R>(ring: R, n: usize) -> Option<El<R>>
     return Some(current);
 }
 
+#[stability::unstable(feature = "unstable-items")]
 pub fn get_prim_root_of_unity_pow2<R>(ring: R, log2_n: usize) -> Option<El<R>>
     where R: ZnRingStore, R::Type: ZnRing, <R::Type as ZnRing>::IntegerRingBase: CanHomFrom<StaticRingBase<i64>>
 {

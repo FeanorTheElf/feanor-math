@@ -26,6 +26,7 @@ pub trait DivisibilityRing: RingBase {
 /// The semantics are the same as for [`DivisibilityRing`], just the performance 
 /// behavior is different.
 /// 
+#[stability::unstable(feature = "unstable-items")]
 pub trait PreparedDivisibilityRing: DivisibilityRing {
 
     type PreparedDivisor;
@@ -75,6 +76,7 @@ impl<R> DivisibilityRingStore for R
 /// Trait for [`RingStore`]s that store [`PreparedDivisibilityRing`]s. Mainly used
 /// to provide a convenient interface to the `PreparedDivisibilityRing`-functions.
 /// 
+#[stability::unstable(feature = "unstable-items")]
 pub trait PreparedDivisibilityRingStore: RingStore
     where Self::Type: PreparedDivisibilityRing
 {

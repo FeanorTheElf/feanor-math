@@ -126,6 +126,9 @@ impl<R: RingStore, A: Allocator + Clone> DensePolyRingBase<R, A> {
     }
 }
 
+///
+/// An element of [`DensePolyRing`].
+/// 
 pub struct DensePolyRingEl<R: RingStore, A: Allocator + Clone = Global> {
     data: Vec<El<R>, A>
 }
@@ -257,6 +260,15 @@ impl<R, A> PartialEq for DensePolyRingBase<R, A>
     }
 }
 
+///
+/// Marker trait to signal that for this polynomial ring `P`, we want to use the
+/// default implementation of the potential isomorphism `P <-> DensePolyRing` when
+/// applicable.
+/// 
+/// This is currently necessary, since we want to provide a specialized implementation
+/// of `DensePolyRingBase<R1, A1>: CanHomFrom<DensePolyRingBase<R2, A2>>`, but we cannot
+/// currently specialize on types that still have generic parameters.
+/// 
 pub trait ImplGenericCanIsoFromToMarker: PolyRing {}
 
 impl<R> ImplGenericCanIsoFromToMarker for sparse_poly::SparsePolyRingBase<R> 
@@ -342,6 +354,9 @@ impl<R: RingStore, A: Allocator + Clone> RingExtension for DensePolyRingBase<R, 
     }
 }
 
+///
+/// Iterator over all terms of an element of [`DensePolyRing`].
+/// 
 pub struct TermIterator<'a, R>
     where R: RingStore
 {

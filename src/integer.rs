@@ -1,3 +1,4 @@
+use crate::algorithms;
 use crate::divisibility::Domain;
 use crate::ring::*;
 use crate::homomorphism::*;
@@ -240,7 +241,12 @@ pub trait IntCast<F: ?Sized + IntegerRing>: IntegerRing {
 impl<F: ?Sized + IntegerRing, T: ?Sized + IntegerRing> IntCast<F> for T {
 
     default fn cast(&self, from: &F, value: F::Element) -> Self::Element {
-        generic_maps::generic_map_in(from, self, value)
+        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(self.one(), &value, RingRef::new(from), |a| self.add_ref(&a, &a), |a, b| self.add_ref_fst(a, b), self.zero());
+        if from.is_neg(&value) {
+            return self.negate(result);
+        } else {
+            return result;
+        }
     }
 }
 
@@ -248,20 +254,6 @@ pub fn int_cast<T: IntegerRingStore, F: IntegerRingStore>(value: El<F>, to: T, f
     where T::Type: IntegerRing, F::Type: IntegerRing
 {
     <T::Type as IntCast<F::Type>>::cast(to.get_ring(), from.get_ring(), value)
-}
-
-pub mod generic_maps {
-    use crate::{algorithms, ring::{RingRef, RingBase}};
-    use super::IntegerRing;
-
-    pub fn generic_map_in<R: ?Sized + IntegerRing, S: ?Sized + RingBase>(from: &R, to: &S, el: R::Element) -> S::Element {
-        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(to.one(), &el, RingRef::new(from), |a| to.add_ref(&a, &a), |a, b| to.add_ref_fst(a, b), to.zero());
-        if from.is_neg(&el) {
-            return to.negate(result);
-        } else {
-            return result;
-        }
-    }
 }
 
 ///

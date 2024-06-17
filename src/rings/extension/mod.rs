@@ -1,4 +1,5 @@
-use crate::{matrix::dense::DenseMatrix, ring::*};
+use crate::matrix::OwnedMatrix;
+use crate::ring::*;
 use crate::vector::vec_fn::*;
 use crate::homomorphism::*;
 use super::poly::{PolyRingStore, PolyRing};
@@ -9,6 +10,10 @@ use super::poly::{PolyRingStore, PolyRing};
 /// 
 pub mod extension_impl;
 
+///
+/// Contains [`galois_field::GF()`] and [`galois_field::GFdyn()`] which are simple functions
+/// to create finite fields.
+/// 
 pub mod galois_field;
 
 ///
@@ -58,10 +63,32 @@ pub trait FreeAlgebra: RingExtension {
     type VectorRepresentation<'a>: VectorFn<El<Self::BaseRing>>
         where Self: 'a;
 
+    ///
+    /// Returns a fixed element that generates this ring as a free module over the base ring.
+    /// 
     fn canonical_gen(&self) -> Self::Element;
+
+    ///
+    /// Returns the rank of this ring as a free module over the base ring.
+    /// 
     fn rank(&self) -> usize;
+
+    ///
+    /// Returns the representation of the element w.r.t. the canonical basis, that is the basis given
+    /// by the powers `x^i` where `x` is the canonical generator given by [`FreeAlgebra::canonical_gen()`]
+    /// and `i` goes from `0` to `rank - 1`.
+    /// 
+    /// In this sense, this is the opposite function to [`FreeAlgebra::from_canonical_basis()`].
+    /// 
     fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a>;
 
+    ///
+    /// Returns the element that has the given representation w.r.t. the canonical basis, that is the basis given
+    /// by the powers `x^i` where `x` is the canonical generator given by [`FreeAlgebra::canonical_gen()`]
+    /// and `i` goes from `0` to `rank - 1`.
+    /// 
+    /// In this sense, this is the opposite function to [`FreeAlgebra::wrt_canonical_basis()`].
+    /// 
     fn from_canonical_basis<V>(&self, vec: V) -> Self::Element
         where V: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = El<Self::BaseRing>>
     {
@@ -82,27 +109,43 @@ pub trait FreeAlgebraStore: RingStore
     delegate!{ FreeAlgebra, fn canonical_gen(&self) -> El<Self> }
     delegate!{ FreeAlgebra, fn rank(&self) -> usize }
 
+    ///
+    /// See [`FreeAlgebra::wrt_canonical_basis()`].
+    /// 
     fn wrt_canonical_basis<'a>(&'a self, el: &'a El<Self>) -> <Self::Type as FreeAlgebra>::VectorRepresentation<'a> {
         self.get_ring().wrt_canonical_basis(el)
     }
 
+    ///
+    /// See [`FreeAlgebra::from_canonical_basis()`].
+    /// 
     fn from_canonical_basis<V>(&self, vec: V) -> El<Self>
         where V: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = El<<Self::Type as RingExtension>::BaseRing>>
     {
         self.get_ring().from_canonical_basis(vec)
     }
 
+    ///
+    /// Returns the generating polynomial of this ring, i.e. the monic polynomial `f(X)` such that this ring is isomorphic
+    /// to `R[X]/(f(X))`, where `R` is the base ring.
+    /// 
     fn generating_poly<P, H>(&self, poly_ring: P, hom: H) -> El<P>
         where P: PolyRingStore,
             P::Type: PolyRing,
             H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
     {
+        assert!(hom.domain().get_ring() == self.base_ring().get_ring());
         poly_ring.sub(
             poly_ring.from_terms([(poly_ring.base_ring().one(), self.rank())].into_iter()),
             self.poly_repr(&poly_ring, &self.pow(self.canonical_gen(), self.rank()), hom)
         )
     }
 
+    ///
+    /// Returns the polynomial representation of the given element `y`, i.e. the polynomial `f(X)` of degree at most
+    /// [`FreeAlgebraStore::rank()`] such that `f(x) = y`, where `y` is the canonical generator of this ring, as given by
+    /// [`FreeAlgebraStore::canonical_gen()`].
+    /// 
     fn poly_repr<P, H>(&self, to: P, el: &El<Self>, hom: H) -> El<P>
         where P: PolyRingStore,
             P::Type: PolyRing, 
@@ -114,23 +157,26 @@ pub trait FreeAlgebraStore: RingStore
                 .filter(|(_, x)| !self.base_ring().is_zero(x))
                 .map(|(j, x)| (hom.map(x), j))
         )
+    }
+}
 
-    }
-    fn create_multiplication_matrix(&self, el: &El<Self>) -> DenseMatrix<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type> {
-        let mut result = DenseMatrix::zero(self.rank(), self.rank(), self.base_ring());
-        let mut current = self.clone_el(el);
-        let gen = self.canonical_gen();
-        for i in 0..self.rank() {
-            {
-                let current_basis_repr = self.wrt_canonical_basis(&current);
-                for j in 0..self.rank() {
-                    *result.at_mut(j, i) = current_basis_repr.at(j);
-                }
+#[stability::unstable(feature = "unstable-items")]
+pub fn create_multiplication_matrix<R: FreeAlgebraStore>(ring: R, el: &El<R>) -> OwnedMatrix<El<<R::Type as RingExtension>::BaseRing>> 
+    where R::Type: FreeAlgebra
+{
+    let mut result = OwnedMatrix::zero(ring.rank(), ring.rank(), ring.base_ring());
+    let mut current = ring.clone_el(el);
+    let gen = ring.canonical_gen();
+    for i in 0..ring.rank() {
+        {
+            let current_basis_repr = ring.wrt_canonical_basis(&current);
+            for j in 0..ring.rank() {
+                *result.at_mut(j, i) = current_basis_repr.at(j);
             }
-            self.mul_assign_ref(&mut current, &gen);
         }
-        return result;
+        ring.mul_assign_ref(&mut current, &gen);
     }
+    return result;
 }
 
 impl<R: RingStore> FreeAlgebraStore for R

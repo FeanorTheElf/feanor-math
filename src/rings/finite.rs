@@ -1,30 +1,57 @@
 use crate::ring::*;
 use crate::integer::{IntegerRingStore, IntegerRing};
 
+///
+/// Trait for rings that are finite.
+/// 
 pub trait FiniteRing: RingBase {
 
     type ElementsIter<'a>: Clone + Iterator<Item = <Self as RingBase>::Element>
         where Self: 'a;
 
+    ///
+    /// Returns an iterator over all elements of this ring.
+    /// The order is not specified.
+    /// 
     fn elements<'a>(&'a self) -> Self::ElementsIter<'a>;
 
+    ///
+    /// Returns a uniformly random element from this ring, using the randomness
+    /// provided by `rng`.
+    /// 
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element;
 
+    ///
+    /// Returns the number of elements in this ring, if it fits within
+    /// the given integer ring.
+    /// 
     fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing;
 }
 
+///
+/// [`RingStore`] for [`FiniteRing`]
+/// 
 pub trait FiniteRingStore: RingStore
     where Self::Type: FiniteRing
 {
+    ///
+    /// See [`FiniteRing::elements()`].
+    /// 
     fn elements<'a>(&'a self) -> <Self::Type as FiniteRing>::ElementsIter<'a> {
         self.get_ring().elements()
     }
 
+    ///
+    /// See [`FiniteRing::random_element()`].
+    /// 
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> El<Self> {
         self.get_ring().random_element(rng)
     }
 
+    ///
+    /// See [`FiniteRing::size()`].
+    /// 
     fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
