@@ -6,6 +6,10 @@ pub fn root_of_unity_error() -> f64 {
     6. * f64::EPSILON
 }
 
+///
+/// Trait for operations that perform float-point computations, and thus must
+/// care about precision. Currently only used for [`crate::algorithms::fft::FFTTable`].
+/// 
 pub trait ErrorEstimate {
 
     ///

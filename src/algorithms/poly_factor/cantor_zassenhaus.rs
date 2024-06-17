@@ -27,6 +27,43 @@ fn pow_mod_f<P, I>(poly_ring: P, g: El<P>, f: &El<P>, pow: &El<I>, ZZ: I) -> El<
     );
 }
 
+///
+/// Computes the distinct-degree factorization of a polynomial over a finite
+/// field.
+/// 
+/// Concretely, if a univariate polynomial `f(X)` factors uniquely as
+/// `f(X) = f1(X) ... fr(X)`, then the `d`-th distinct-degree factor of `f` is
+/// `prod_i fi(X)` where `i` runs through all indices with `deg(fi(X)) = d`.
+/// This function returns a list whose `d`-th entry is the `d`-th distinct degree
+/// factor. Once the list ends, all further `d`-th distinct degree factors should
+/// be considered to be `1`.
+/// 
+/// # Example
+/// 
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::rings::rational::*;
+/// # use feanor_math::algorithms::poly_factor::cantor_zassenhaus::*;
+/// let Fp = Zn::new(3);
+/// let FpX = DensePolyRing::new(Fp, "X");
+/// // f = (X^2 + 1)^2 (X^3 + 2 X + 1)
+/// let f = FpX.prod([
+///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)]),
+///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)]),
+///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 1), (QQ.one(), 3)])
+/// ].into_iter());
+/// let factorization = distinct_degree_factorization(&FpX, f);
+/// assert_eq!(4, factorization.len());
+/// assert!(FpX.is_unit(&factorization[0]));
+/// assert!(FpX.is_unit(&factorization[1]));
+/// assert!(!FpX.is_unit(&factorization[2]));
+/// assert!(!FpX.is_unit(&factorization[3]));
+/// ```
+/// 
 pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,

@@ -5,6 +5,10 @@ use crate::algorithms::fft::complex_fft::*;
 use crate::rings::float_complex::*;
 use crate::vector::subvector::*;
 
+/// 
+/// A generic variant of the Cooley-Tuckey FFT algorithm that can be used to compute the Fourier
+/// transform of an array of length `n1 * n2` given Fourier transforms for length `n1` resp. `n2`.
+/// 
 pub struct FFTTableGenCooleyTuckey<R_main, R_twiddle, H, T1, T2> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
