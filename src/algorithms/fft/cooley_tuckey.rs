@@ -1,6 +1,5 @@
 use crate::algorithms::unity_root::*;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
-use crate::primitive_int::*;
 use crate::rings::zn::*;
 use crate::vector::SwappableVectorViewMut;
 use crate::ring::*;
@@ -15,56 +14,117 @@ use super::complex_fft::*;
 /// An optimized implementation of the Cooley-Tuckey FFT algorithm, to compute
 /// the Fourier transform of an array with power-of-two length.
 /// 
-pub struct FFTTableCooleyTuckey<R> 
-    where R: RingStore
+pub struct FFTTableCooleyTuckey<R_main, R_twiddle, H> 
+    where R_main: ?Sized + RingBase,
+        R_twiddle: ?Sized + RingBase,
+        H: Homomorphism<R_twiddle, R_main>
 {
-    ring: R,
-    root_of_unity: El<R>,
+    hom: H,
+    root_of_unity: R_main::Element,
     log2_n: usize,
     // stores the powers of root_of_unity in special bitreversed order
-    root_of_unity_list: Vec<El<R>>,
+    root_of_unity_list: Vec<R_twiddle::Element>,
     // stores the powers of inv_root_of_unity in special bitreversed order
-    inv_root_of_unity_list: Vec<El<R>>
+    inv_root_of_unity_list: Vec<R_twiddle::Element>
 }
 
 pub fn bitreverse(index: usize, bits: usize) -> usize {
     index.reverse_bits().checked_shr(usize::BITS - bits as u32).unwrap_or(0)
 }
 
-impl<R> FFTTableCooleyTuckey<R>
-    where R: DivisibilityRingStore, 
+impl<R_main, H> FFTTableCooleyTuckey<R_main, Complex64Base, H> 
+    where R_main: ?Sized + RingBase,
+        H: Homomorphism<Complex64Base, R_main>
+{
+    pub fn for_complex_with_hom(hom: H, log2_n: usize) -> Self {
+        let CC = *hom.domain().get_ring();
+        Self::new_with_pows_with_hom(hom, |i| CC.root_of_unity(i, 1 << log2_n), log2_n)
+    }
+}
+
+impl<R> FFTTableCooleyTuckey<Complex64Base, Complex64Base, Identity<R>> 
+    where R: RingStore<Type = Complex64Base>
+{
+    pub fn for_complex(ring: R, log2_n: usize) -> Self {
+        Self::for_complex_with_hom(ring.into_identity(), log2_n)
+    }
+}
+
+impl<R> FFTTableCooleyTuckey<R::Type, R::Type, Identity<R>> 
+    where R: RingStore,
         R::Type: DivisibilityRing
 {
     pub fn new(ring: R, root_of_unity: El<R>, log2_n: usize) -> Self {
+        Self::new_with_hom(ring.into_identity(), root_of_unity, log2_n)
+    }
+
+    pub fn new_with_pows<F>(ring: R, root_of_unity_pow: F, log2_n: usize) -> Self 
+        where F: FnMut(i64) -> El<R>
+    {
+        Self::new_with_pows_with_hom(ring.into_identity(), root_of_unity_pow, log2_n)
+    }
+
+    pub fn for_zn(ring: R, log2_n: usize) -> Option<Self>
+        where R::Type: ZnRing
+    {
+        Self::for_zn_with_hom(ring.into_identity(), log2_n)
+    }
+}
+
+impl<R_main, R_twiddle, H> FFTTableCooleyTuckey<R_main, R_twiddle, H> 
+    where R_main: ?Sized + RingBase,
+        R_twiddle: ?Sized + RingBase + DivisibilityRing,
+        H: Homomorphism<R_twiddle, R_main>
+{
+    pub fn new_with_hom(hom: H, root_of_unity: R_twiddle::Element, log2_n: usize) -> Self {
+        let ring = hom.domain();
         let mut root_of_unity_pow = |i: i64| if i >= 0 {
             ring.pow(ring.clone_el(&root_of_unity), i as usize)
         } else {
             ring.invert(&ring.pow(ring.clone_el(&root_of_unity), (-i) as usize)).unwrap()
         };
+
         // cannot call new_with_mem_and_pows() because of borrowing conflict
         assert!(ring.is_commutative());
-        assert!(!ring.get_ring().is_approximate());
-        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &root_of_unity_pow(1), log2_n));
-        let root_of_unity_list = Self::create_root_of_unity_list(&ring, &mut root_of_unity_pow, log2_n);
-        let inv_root_of_unity_list = Self::create_root_of_unity_list(&ring, |i| root_of_unity_pow(-i), log2_n);
+        assert!(!hom.domain().get_ring().is_approximate());
+        assert!(is_prim_root_of_unity_pow2(&ring, &root_of_unity_pow(1), log2_n));
+        assert!(is_prim_root_of_unity_pow2(&hom.codomain(), &hom.map(root_of_unity_pow(1)), log2_n));
+
+        let root_of_unity_list = Self::create_root_of_unity_list(ring.get_ring(), &mut root_of_unity_pow, log2_n);
+        let inv_root_of_unity_list = Self::create_root_of_unity_list(ring.get_ring(), |i| root_of_unity_pow(-i), log2_n);
         let root_of_unity = root_of_unity_pow(1);
-        FFTTableCooleyTuckey { ring, root_of_unity, log2_n, root_of_unity_list, inv_root_of_unity_list }
+        FFTTableCooleyTuckey {
+            root_of_unity: hom.map(root_of_unity), 
+            hom, 
+            log2_n, 
+            root_of_unity_list, 
+            inv_root_of_unity_list
+        }
     }
 
-    pub fn new_with_pows<F>(ring: R, mut root_of_unity_pow: F, log2_n: usize) -> Self 
-        where F: FnMut(i64) -> El<R>
+    pub fn new_with_pows_with_hom<F>(hom: H, mut root_of_unity_pow: F, log2_n: usize) -> Self 
+        where F: FnMut(i64) -> R_twiddle::Element
     {
+        let ring = hom.domain();
         assert!(ring.is_commutative());
         assert!(log2_n > 0);
         assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &root_of_unity_pow(1), log2_n));
-        let root_of_unity_list = Self::create_root_of_unity_list(&ring, &mut root_of_unity_pow, log2_n);
-        let inv_root_of_unity_list = Self::create_root_of_unity_list(&ring, |i| root_of_unity_pow(-i), log2_n);
+        assert!(hom.codomain().get_ring().is_approximate() || is_prim_root_of_unity_pow2(&hom.codomain(), &hom.map(root_of_unity_pow(1)), log2_n));
+
+        let root_of_unity_list = Self::create_root_of_unity_list(ring.get_ring(), &mut root_of_unity_pow, log2_n);
+        let inv_root_of_unity_list = Self::create_root_of_unity_list(ring.get_ring(), |i| root_of_unity_pow(-i), log2_n);
         let root_of_unity = root_of_unity_pow(1);
-        FFTTableCooleyTuckey { ring, root_of_unity, log2_n, root_of_unity_list, inv_root_of_unity_list }
+        FFTTableCooleyTuckey {
+            root_of_unity: hom.map(root_of_unity), 
+            hom, 
+            log2_n, 
+            root_of_unity_list, 
+            inv_root_of_unity_list
+        }
     }
 
-    fn create_root_of_unity_list<F>(ring: &R, mut root_of_unity_pow: F, log2_n: usize) -> Vec<El<R>>
-        where F: FnMut(i64) -> El<R>
+    fn create_root_of_unity_list<F>(ring: &R_twiddle, mut root_of_unity_pow: F, log2_n: usize) -> Vec<R_twiddle::Element>
+        where F: FnMut(i64) -> R_twiddle::Element
     {
         // in fact, we could choose this to have only length `(1 << log2_n) - 1`, but a power of two length is probably faster
         let mut root_of_unity_list = (0..(1 << log2_n)).map(|_| ring.zero()).collect::<Vec<_>>();
@@ -82,28 +142,11 @@ impl<R> FFTTableCooleyTuckey<R>
         return root_of_unity_list;
     }
 
-    pub fn len(&self) -> usize {
-        1 << self.log2_n
-    }
-
-    pub fn ring(&self) -> &R {
-        &self.ring
-    }
-
-    pub fn for_zn(ring: R, log2_n: usize) -> Option<Self>
-        where R: ZnRingStore,
-            R::Type: ZnRing,
-            <R::Type as ZnRing>::IntegerRingBase: CanHomFrom<StaticRingBase<i64>>
+    pub fn for_zn_with_hom(hom: H, log2_n: usize) -> Option<Self>
+        where R_twiddle: ZnRing
     {
-        let root_of_unity = algorithms::unity_root::get_prim_root_of_unity_pow2(&ring, log2_n)?;
-        Some(Self::new(ring, root_of_unity, log2_n))
-    }
-
-    pub fn for_complex(ring: R, log2_n: usize) -> Self
-        where R: RingStore<Type = Complex64Base>
-    {
-        let CC = Complex64::RING;
-        Self::new_with_pows(ring, |i| CC.root_of_unity(i, 1 << log2_n), log2_n)
+        let root_of_unity = algorithms::unity_root::get_prim_root_of_unity_pow2(hom.domain(), log2_n)?;
+        Some(Self::new_with_hom(hom, root_of_unity, log2_n))
     }
 
     pub fn bitreverse_permute_inplace<V, T>(&self, mut values: V) 
@@ -118,9 +161,10 @@ impl<R> FFTTableCooleyTuckey<R>
     }
 }
 
-impl<R> PartialEq for FFTTableCooleyTuckey<R> 
-    where R: DivisibilityRingStore, 
-        R::Type: DivisibilityRing
+impl<R_main, R_twiddle, H> PartialEq for FFTTableCooleyTuckey<R_main, R_twiddle, H> 
+    where R_main: ?Sized + RingBase,
+        R_twiddle: ?Sized + RingBase + DivisibilityRing,
+        H: Homomorphism<R_twiddle, R_main>
 {
     fn eq(&self, other: &Self) -> bool {
         self.ring().get_ring() == other.ring().get_ring() &&
@@ -168,26 +212,22 @@ impl<R, S> CooleyTuckeyButterfly<S> for R
     }
 }
 
-impl<R> FFTTableCooleyTuckey<R> 
-    where R: DivisibilityRingStore, 
-        R::Type: DivisibilityRing
+impl<R_main, R_twiddle, H> FFTTableCooleyTuckey<R_main, R_twiddle, H> 
+    where R_main: ?Sized + RingBase,
+        R_twiddle: ?Sized + RingBase + DivisibilityRing,
+        H: Homomorphism<R_twiddle, R_main>
 {
     ///
     /// Optimized implementation of the inplace Cooley-Tuckey FFT algorithm.
     /// Note that setting `INV = true` will perform an inverse fourier transform,
     /// except that the division by `n` is not included.
     /// 
-    fn unordered_fft_dispatch<V, S, H, const INV: bool>(&self, values: &mut V, hom: &H)
-        where S: ?Sized + RingBase, 
-            H: Homomorphism<R::Type, S>, 
-            V: VectorViewMut<S::Element> 
+    fn unordered_fft_dispatch<V, const INV: bool>(&self, values: &mut V)
+        where V: VectorViewMut<R_main::Element> 
     {
         assert!(values.len() == (1 << self.log2_n));
-        assert!(hom.domain().get_ring() == self.ring().get_ring());
 
-        // check if the canonical hom `R -> S` maps `self.root_of_unity` to a primitive N-th root of unity
-        debug_assert!(hom.codomain().get_ring().is_approximate() || is_prim_root_of_unity_pow2(&hom.codomain(), &hom.map_ref(&self.root_of_unity), self.log2_n));
-
+        let hom = &self.hom;
         let R = hom.codomain();
 
         for step in 0..self.log2_n {
@@ -271,21 +311,22 @@ impl<R> FFTTableCooleyTuckey<R>
     }
 }
 
-impl<R> FFTTable for FFTTableCooleyTuckey<R> 
-    where R: DivisibilityRingStore, 
-        R::Type: DivisibilityRing
+impl<R_main, R_twiddle, H> FFTTable for FFTTableCooleyTuckey<R_main, R_twiddle, H> 
+    where R_main: ?Sized + RingBase,
+        R_twiddle: ?Sized + RingBase + DivisibilityRing,
+        H: Homomorphism<R_twiddle, R_main>
 {
-    type Ring = R;
+    type Ring = <H as Homomorphism<R_twiddle, R_main>>::CodomainStore;
     
     fn len(&self) -> usize {
         1 << self.log2_n
     }
 
-    fn ring(&self) -> &R {
-        &self.ring
+    fn ring(&self) -> &Self::Ring {
+        self.hom.codomain()
     }
 
-    fn root_of_unity(&self) -> &El<R> {
+    fn root_of_unity(&self) -> &R_main::Element {
         &self.root_of_unity
     }
 
@@ -297,47 +338,41 @@ impl<R> FFTTable for FFTTableCooleyTuckey<R>
         bitreverse(i, self.log2_n)
     }
 
-    fn fft<V, S, H>(&self, mut values: V, hom: &H)
-        where S: ?Sized + RingBase, 
-            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: SwappableVectorViewMut<S::Element>
+    fn fft<V>(&self, mut values: V)
+        where V: SwappableVectorViewMut<R_main::Element>
     {
-        self.unordered_fft(&mut values, hom);
+        self.unordered_fft(&mut values);
         self.bitreverse_permute_inplace(&mut values);
     }
 
-    fn inv_fft<V, S, H>(&self, mut values: V, hom: &H)
-        where S: ?Sized + RingBase, 
-            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: SwappableVectorViewMut<S::Element>
+    fn inv_fft<V>(&self, mut values: V)
+        where V: SwappableVectorViewMut<R_main::Element>
     {
         self.bitreverse_permute_inplace(&mut values);
-        self.unordered_inv_fft(&mut values, hom);
+        self.unordered_inv_fft(&mut values);
     }
 
-    fn unordered_fft<V, S, H>(&self, mut values: V, hom: &H)
-        where S: ?Sized + RingBase, 
-            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: VectorViewMut<S::Element>
+    fn unordered_fft<V>(&self, mut values: V)
+        where V: SwappableVectorViewMut<R_main::Element>
     {
-        self.unordered_fft_dispatch::<V, S, H, false>(&mut values, hom);
+        self.unordered_fft_dispatch::<V, false>(&mut values);
     }
     
-    fn unordered_inv_fft<V, S, H>(&self, mut values: V, hom: &H)
-        where S: ?Sized + RingBase, 
-            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: VectorViewMut<S::Element>
+    fn unordered_inv_fft<V>(&self, mut values: V)
+    where V: SwappableVectorViewMut<R_main::Element>
     {
-        self.unordered_fft_dispatch::<V, S, H, true>(&mut values, hom);
-        let inv = hom.map(self.ring.invert(&self.ring.int_hom().map(1 << self.log2_n)).unwrap());
+        self.unordered_fft_dispatch::<V, true>(&mut values);
+        let inv = self.hom.domain().invert(&self.hom.domain().int_hom().map(1 << self.log2_n)).unwrap();
         for i in 0..values.len() {
-            hom.codomain().mul_assign_ref(values.at_mut(i), &inv);
+            self.hom.mul_assign_map_ref(values.at_mut(i), &inv);
+
         }
     }
 }
 
-impl<R: RingStore<Type = Complex64Base>> ErrorEstimate for FFTTableCooleyTuckey<R> {
-    
+impl<H> ErrorEstimate for FFTTableCooleyTuckey<Complex64Base, Complex64Base, H> 
+    where H: Homomorphism<Complex64Base, Complex64Base>
+{
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
         // each butterfly doubles the error, and then adds up to 
         let butterfly_absolute_error = input_bound * (root_of_unity_error() + f64::EPSILON);
@@ -346,6 +381,8 @@ impl<R: RingStore<Type = Complex64Base>> ErrorEstimate for FFTTableCooleyTuckey<
     }
 }
 
+#[cfg(test)]
+use crate::primitive_int::*;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
 #[cfg(test)]
@@ -369,7 +406,7 @@ fn test_bitreverse_fft_inplace_basic() {
         bitreverse_expected[i] = expected[bitreverse(i, 2)];
     }
 
-    fft.unordered_fft(&mut values, &fft.ring().identity());
+    fft.unordered_fft(&mut values);
     assert_eq!(values, bitreverse_expected);
 }
 
@@ -385,7 +422,7 @@ fn test_bitreverse_fft_inplace_advanced() {
         bitreverse_expected[i] = expected[bitreverse(i, 4)];
     }
 
-    fft.unordered_fft(&mut values, &fft.ring().identity());
+    fft.unordered_fft(&mut values);
     assert_eq!(values, bitreverse_expected);
 }
 
@@ -395,8 +432,8 @@ fn test_bitreverse_inv_fft_inplace() {
     let fft = FFTTableCooleyTuckey::for_zn(&ring, 4).unwrap();
     let values: [u64; 16] = [1, 2, 3, 2, 1, 0, 17 - 1, 17 - 2, 17 - 1, 0, 1, 2, 3, 4, 5, 6];
     let mut work = values;
-    fft.unordered_fft(&mut work, &fft.ring().identity());
-    fft.unordered_inv_fft(&mut work, &fft.ring().identity());
+    fft.unordered_fft(&mut work);
+    fft.unordered_inv_fft(&mut work);
     assert_eq!(&work, &values);
 }
 
@@ -412,14 +449,14 @@ fn test_for_zn() {
 }
 
 #[cfg(test)]
-fn run_fft_bench_round<R, S>(ring: S, fft: &FFTTableCooleyTuckey<R>, data: &Vec<El<S>>, copy: &mut Vec<El<S>>)
-    where R: ZnRingStore, R::Type: ZnRing, S: ZnRingStore, S::Type: ZnRing + CanHomFrom<R::Type>
+fn run_fft_bench_round<R, S, H>(fft: &FFTTableCooleyTuckey<S, R, H>, data: &Vec<S::Element>, copy: &mut Vec<S::Element>)
+    where R: ZnRing, S: ZnRing, H: Homomorphism<R, S>
 {
     copy.clear();
-    copy.extend(data.iter().map(|x| ring.clone_el(x)));
-    fft.unordered_fft(&mut copy[..], &ring.can_hom(fft.ring()).unwrap());
-    fft.unordered_inv_fft(&mut copy[..], &ring.can_hom(fft.ring()).unwrap());
-    assert_el_eq!(&ring, &copy[0], &data[0]);
+    copy.extend(data.iter().map(|x| fft.ring().clone_el(x)));
+    fft.unordered_fft(&mut copy[..]);
+    fft.unordered_inv_fft(&mut copy[..]);
+    assert_el_eq!(&fft.ring(), &copy[0], &data[0]);
 }
 
 #[cfg(test)]
@@ -432,7 +469,7 @@ fn bench_fft(bencher: &mut test::Bencher) {
     let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
     bencher.iter(|| {
-        run_fft_bench_round(&ring, &fft, &data, &mut copy)
+        run_fft_bench_round(&fft, &data, &mut copy)
     });
 }
 
@@ -440,11 +477,11 @@ fn bench_fft(bencher: &mut test::Bencher) {
 fn bench_fft_zn64_fastmul(bencher: &mut test::Bencher) {
     let ring = zn_64::Zn::new(1073872897);
     let fastmul_ring = zn_64::ZnFastmul::new(ring);
-    let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, BENCH_SIZE_LOG2).unwrap();
+    let fft = FFTTableCooleyTuckey::for_zn_with_hom(ring.into_can_hom(fastmul_ring).ok().unwrap(), BENCH_SIZE_LOG2).unwrap();
     let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
     bencher.iter(|| {
-        run_fft_bench_round(&ring, &fft, &data, &mut copy)
+        run_fft_bench_round(&fft, &data, &mut copy)
     });
 }
 
@@ -454,7 +491,7 @@ fn test_approximate_fft() {
     for log2_n in [4, 7, 11, 15] {
         let fft = FFTTableCooleyTuckey::new_with_pows(CC, |x| CC.root_of_unity(x, 1 << log2_n), log2_n);
         let mut array = (0..(1 << log2_n)).map(|i|  CC.root_of_unity(i as i64, 1 << log2_n)).collect::<Vec<_>>();
-        fft.fft(&mut array, &CC.identity());
+        fft.fft(&mut array);
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
@@ -470,9 +507,9 @@ fn test_size_1_fft() {
     let fft = FFTTableCooleyTuckey::for_zn(&ring, 0).unwrap();
     let values: [u64; 1] = [3];
     let mut work = values;
-    fft.unordered_fft(&mut work, &fft.ring().identity());
+    fft.unordered_fft(&mut work);
     assert_eq!(&work, &values);
-    fft.unordered_inv_fft(&mut work, &fft.ring().identity());
+    fft.unordered_inv_fft(&mut work);
     assert_eq!(&work, &values);
     assert_eq!(0, fft.unordered_fft_permutation(0));
     assert_eq!(0, fft.unordered_fft_permutation_inv(0));

@@ -238,9 +238,13 @@ fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
             let ZZbig = BigIntRing::RING;
 
             // we use Theorem 3.5.1 from "A course in computational algebraic number theory", Cohen
-            let poly_norm = int_bisect::root_floor(&ZZbig, ZZbig.sum(ZZX.terms(f)
-                .map(|(c, _)| ZZbig.pow(int_cast(ZZX.base_ring().clone_el(c), &ZZbig, ZZX.base_ring()), 2))
-            ), 2);
+            let poly_norm = int_bisect::root_floor(
+                &ZZbig, 
+                <_ as RingStore>::sum(&ZZbig, ZZX.terms(f)
+                    .map(|(c, _)| ZZbig.pow(int_cast(ZZX.base_ring().clone_el(c), &ZZbig, ZZX.base_ring()), 2))
+                ), 
+                2
+            );
             let bound = ZZbig.add(
                 ZZbig.mul(poly_norm, binomial(d, d / 2)),
                 ZZbig.mul(

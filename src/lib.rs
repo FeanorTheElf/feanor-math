@@ -1,5 +1,6 @@
 #![allow(soft_unstable)]
 #![allow(non_snake_case)]
+#![allow(non_camel_case_types)]
 
 #![feature(test)]
 #![feature(min_specialization)]

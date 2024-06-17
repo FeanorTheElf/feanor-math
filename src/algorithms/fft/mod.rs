@@ -1,7 +1,6 @@
 use std::ops::Deref;
 
 use crate::ring::*;
-use crate::homomorphism::*;
 use crate::vector::*;
 
 pub mod cooley_tuckey;
@@ -15,11 +14,6 @@ pub mod complex_fft;
 /// Usually fast implementations of FFTs have to store a lot of precomputed data
 /// (e.g. powers of roots of unity), hence they should be represented as objects
 /// implementing this trait.
-/// 
-/// The trait is very generic, and its functions can be called on any
-/// [`VectorView`] of elements of any ring `R` with `R: CanHomFrom<Base<Self::Ring>>`.
-/// Of course, the roots of unity of the stored ring must map to corresponding roots
-/// of unity in `R` via the canonical homomorphism.
 /// 
 /// # Note on equality
 /// 
@@ -69,73 +63,53 @@ pub trait FFTTable {
     fn unordered_fft_permutation_inv(&self, i: usize) -> usize;
 
     ///
-    /// Computes the Fourier transform of the given `values` over the given `ring`.
+    /// Computes the Fourier transform of the given `values` over the ring [`Self::Ring`].
     /// The output is in standard order, i.e. the `i`-th output element is the evaluation
     /// of the input at `self.root_of_unity()^-i` (note the `-`, which is standard
     /// convention for Fourier transforms).
     /// 
-    /// If necessary, temporary memory is allocated using the given memory provider.
-    /// In some cases, it can be faster to use [`FFTTable::unordered_fft`], if the ordering
-    /// of the result is not relevant.
-    /// 
     /// # Panics
     /// 
     /// This function panics if `values.len() != self.len()`.
     ///
-    fn fft<V, S, H>(&self, mut values: V, hom: &H)
-        where S: ?Sized + RingBase, 
-            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: SwappableVectorViewMut<S::Element>
+    fn fft<V>(&self, mut values: V)
+        where V: SwappableVectorViewMut<El<Self::Ring>>
     {
-        self.unordered_fft(&mut values, hom);
+        self.unordered_fft(&mut values);
         permute::permute_inv(&mut values, |i| self.unordered_fft_permutation(i));
     }
         
     ///
-    /// Computes the inverse Fourier transform of the given `values` over the given `ring`.
+    /// Computes the Fourier transform of the given `values` over the ring [`Self::Ring`].
     /// The output is in standard order, i.e. the `i`-th output element is the evaluation
     /// of the input at `self.root_of_unity()^i`, divided by `self.len()`.
-    /// 
-    /// If necessary, temporary memory is allocated using the given memory provider.
-    /// In some cases, it can be faster to use [`FFTTable::unordered_inv_fft`], if the ordering
-    /// of the result is not relevant.
     /// 
     /// # Panics
     /// 
     /// This function panics if `values.len() != self.len()`.
     ///
-    fn inv_fft<V, S, H>(&self, mut values: V, hom: &H)
-        where S: ?Sized + RingBase, 
-            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: SwappableVectorViewMut<S::Element>
+    fn inv_fft<V>(&self, mut values: V)
+        where V: SwappableVectorViewMut<El<Self::Ring>>
     {
         permute::permute(&mut values, |i| self.unordered_fft_permutation(i));
-        self.unordered_inv_fft(&mut values, hom);
+        self.unordered_inv_fft(&mut values);
     }
 
     ///
     /// Computes the Fourier transform of the given values, but the output values are arbitrarily permuted
     /// (in a way compatible with [`FFTTable::unordered_inv_fft()`]).
     /// 
-    /// This supports any given ring, as long as the precomputed values stored in the table are
-    /// also contained in the new ring. The result is wrong however if the canonical homomorphism
-    /// `R -> S` does not map the N-th root of unity to a primitive N-th root of unity.
-    /// 
     /// Note that the FFT of a sequence `a_0, ..., a_(N - 1)` is defined as `Fa_k = sum_i a_i z^(-ik)`
     /// where `z` is an N-th root of unity.
     /// 
-    fn unordered_fft<V, S, H>(&self, values: V, hom: &H)
-        where S: ?Sized + RingBase, 
-            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: VectorViewMut<S::Element>;
+    fn unordered_fft<V>(&self, values: V)
+        where V: SwappableVectorViewMut<El<Self::Ring>>;
     
     ///
     /// Inverse to [`Self::unordered_fft()`], with basically the same contract.
     /// 
-    fn unordered_inv_fft<V, S, H>(&self, values: V, hom: &H)
-        where S: ?Sized + RingBase, 
-            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: VectorViewMut<S::Element>;
+    fn unordered_inv_fft<V>(&self, values: V)
+        where V: SwappableVectorViewMut<El<Self::Ring>>;
 }
 
 impl<T> FFTTable for T
@@ -163,35 +137,27 @@ impl<T> FFTTable for T
         self.deref().unordered_fft_permutation_inv(i)
     }
 
-    fn fft<V, S, H>(&self, values: V, hom: &H)
-        where S: ?Sized + RingBase, 
-            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: SwappableVectorViewMut<S::Element>
+    fn fft<V>(&self, values: V)
+        where V: SwappableVectorViewMut<El<Self::Ring>>
     {
-        self.deref().fft(values, hom)
-    }
-    
-    fn inv_fft<V, S, H>(&self, values: V, hom: &H)
-        where S: ?Sized + RingBase, 
-            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: SwappableVectorViewMut<S::Element>
-    {
-        self.deref().inv_fft(values, hom)
+        self.deref().fft(values)
     }
 
-    fn unordered_fft<V, S, H>(&self, values: V, hom: &H)
-        where S: ?Sized + RingBase, 
-            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: VectorViewMut<S::Element>
+    fn inv_fft<V>(&self, values: V)
+        where V: SwappableVectorViewMut<El<Self::Ring>>
     {
-        self.deref().unordered_fft(values, hom)
+        self.deref().inv_fft(values)
     }
-        
-    fn unordered_inv_fft<V, S, H>(&self, values: V, hom: &H)
-        where S: ?Sized + RingBase, 
-            H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: VectorViewMut<S::Element>
+
+    fn unordered_fft<V>(&self, values: V)
+        where V: SwappableVectorViewMut<El<Self::Ring>>
     {
-        self.deref().unordered_inv_fft(values, hom)
+        self.deref().unordered_fft(values)
+    }
+
+    fn unordered_inv_fft<V>(&self, values: V)
+        where V: SwappableVectorViewMut<El<Self::Ring>>
+    {
+        self.deref().unordered_inv_fft(values)
     }
 }

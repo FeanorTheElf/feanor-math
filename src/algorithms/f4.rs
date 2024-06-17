@@ -186,7 +186,7 @@ fn reduce_S_matrix<P, O>(ring: P, p: &Coeff<P>, S_polys: &[El<P>], basis: &[El<P
     }
 
     // all monomials for which we have to add a row to A to enable eliminating them
-    let mut open = columns.iter().map(|(m, _)| ring.clone_monomial(m)).collect::<Vec<_>>();
+    let mut open: Vec<Monomial<_>> = columns.iter().map(|(m, _)| ring.clone_monomial(m)).collect();
     
     while let Some(m) = open.pop() {
         if let Some(f) = basis.iter().filter(|f| ring.lm(f, order).unwrap().divides(&m))

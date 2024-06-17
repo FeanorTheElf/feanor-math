@@ -378,6 +378,14 @@ impl<R, S> CanHom<R, S>
     }
 }
 
+impl<R, S> Clone for CanHom<R, S>
+    where R: RingStore + Clone, S: RingStore + Clone, S::Type: CanHomFrom<R::Type>
+{
+    fn clone(&self) -> Self {
+        Self::new(self.from.clone(), self.to.clone()).ok().unwrap()
+    }
+}
+
 impl<R, S> Homomorphism<R::Type, S::Type> for CanHom<R, S>
     where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
 {
@@ -432,6 +440,14 @@ pub struct CanIso<R, S>
     from: R,
     to: S,
     data: <S::Type as CanIsoFromTo<R::Type>>::Isomorphism
+}
+
+impl<R, S> Clone for CanIso<R, S>
+    where R: RingStore + Clone, S: RingStore + Clone, S::Type: CanIsoFromTo<R::Type>
+{
+    fn clone(&self) -> Self {
+        Self::new(self.from.clone(), self.to.clone()).ok().unwrap()
+    }
 }
 
 impl<R, S> CanIso<R, S>
