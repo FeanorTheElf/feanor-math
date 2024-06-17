@@ -24,7 +24,7 @@ fn assign<A: Allocator>(x: &mut Vec<BlockInt, A>, rhs: &[BlockInt]) {
     x.extend((0..rhs.len()).map(|i| rhs[i]))
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn bigint_add<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], block_offset: usize) {
 	let mut buffer: bool = false;
 	let mut i = 0;
@@ -45,7 +45,7 @@ pub fn bigint_add<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], bl
 	}
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn highest_set_block(x: &[BlockInt]) -> Option<usize> {
 	for i in (0..x.len()).rev() {
 		if x[i] != 0 {
@@ -55,7 +55,7 @@ pub fn highest_set_block(x: &[BlockInt]) -> Option<usize> {
 	return None;
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn bigint_cmp(lhs: &[BlockInt], rhs: &[BlockInt]) -> Ordering {
 	match (highest_set_block(lhs.as_ref()), highest_set_block(rhs.as_ref())) {
 		(None, None) => return Ordering::Equal,
@@ -78,7 +78,7 @@ pub fn bigint_cmp(lhs: &[BlockInt], rhs: &[BlockInt]) -> Ordering {
 	};
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn bigint_cmp_small(lhs: &[BlockInt], rhs: DoubleBlockInt) -> Ordering {
 	match highest_set_block(lhs.as_ref()) {
 	   None => 0.cmp(&rhs),
@@ -93,7 +93,7 @@ pub fn bigint_cmp_small(lhs: &[BlockInt], rhs: DoubleBlockInt) -> Ordering {
 /// 
 /// This will panic if the subtraction would result in a negative number
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn bigint_sub(lhs: &mut [BlockInt], rhs: &[BlockInt], block_offset: usize) {
 	assert!(bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Less);
 
@@ -123,7 +123,7 @@ pub fn bigint_sub(lhs: &mut [BlockInt], rhs: &[BlockInt], block_offset: usize) {
 /// 
 /// This will panic or give a wrong result if the subtraction would result in a negative number
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn bigint_sub_self<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt]) {
 	debug_assert!(bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Greater);
 
@@ -146,7 +146,7 @@ pub fn bigint_sub_self<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt
 	assert!(!buffer);
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn bigint_lshift<A: Allocator>(lhs: &mut Vec<BlockInt, A>, power: usize) {
 	if let Some(high) = highest_set_block(&lhs) {
 		let mut buffer: BlockInt = 0;
@@ -167,7 +167,7 @@ pub fn bigint_lshift<A: Allocator>(lhs: &mut Vec<BlockInt, A>, power: usize) {
 	}
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn bigint_rshift(lhs: &mut [BlockInt], power: usize) {
 	if let Some(high) = highest_set_block(lhs) {
 		let mut buffer: BlockInt = 0;
@@ -194,7 +194,7 @@ pub fn bigint_rshift(lhs: &mut [BlockInt], power: usize) {
 	}
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn bigint_mul<A: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt], mut out: Vec<BlockInt, A>) -> Vec<BlockInt, A> {
 	out.clear();
 	out.resize(
@@ -216,7 +216,7 @@ pub fn bigint_mul<A: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt], mut out: Vec
 ///
 /// Complexity O(log(n))
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn bigint_mul_small<A: Allocator>(lhs: &mut Vec<BlockInt, A>, factor: BlockInt) {
 	if let Some(d) = highest_set_block(lhs.as_ref()) {
 		let mut buffer: u64 = 0;
@@ -230,7 +230,7 @@ pub fn bigint_mul_small<A: Allocator>(lhs: &mut Vec<BlockInt, A>, factor: BlockI
 	}
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn bigint_add_small<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: BlockInt) {
 	if lhs.len() > 0 {
 		let (sum, mut buffer) = lhs[0].overflowing_add(rhs);
@@ -374,7 +374,7 @@ fn division_step<A: Allocator>(
 /// 
 /// Complexity O(log(n)^2)
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn bigint_div<A: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], mut out: Vec<BlockInt, A>) -> Vec<BlockInt, A> {
 	assert!(highest_set_block(rhs.as_ref()).is_some());
 	
@@ -414,7 +414,7 @@ pub fn bigint_div<A: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], mut out:
 ///
 /// Calculates self /= divisor and returns the remainder of the division.
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn bigint_div_small(lhs: &mut [BlockInt], rhs: BlockInt) -> BlockInt {
 	assert!(rhs != 0);
 	let highest_block_opt = highest_set_block(lhs.as_ref());
@@ -439,7 +439,7 @@ pub fn bigint_div_small(lhs: &mut [BlockInt], rhs: BlockInt) -> BlockInt {
 	}
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn from_radix<A: Allocator, I: Iterator<Item = Result<u64, E>>, E>(data: I, base: u64, mut out: Vec<BlockInt, A>) -> Result<Vec<BlockInt, A>, E> {
 	out.clear();
 	for value in data {
@@ -451,7 +451,7 @@ pub fn from_radix<A: Allocator, I: Iterator<Item = Result<u64, E>>, E>(data: I, 
 	return Ok(out);
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn from_str_radix<A: Allocator>(string: &str, base: u32, out: Vec<BlockInt, A>) -> Result<Vec<BlockInt, A>, ()> {
 	assert!(base >= 2);
 	// we need the -1 in BLOCK_BITS to ensure that base^chunk_size is 

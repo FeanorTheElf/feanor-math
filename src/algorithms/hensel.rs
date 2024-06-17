@@ -15,7 +15,7 @@ use super::int_factor::is_prime_power;
 /// `f = g' h'` with `g', h'` monic polynomials modulo `p^r` that reduce to `g, h`
 /// modulo `p^e`.
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn hensel_lift<P, R, S>(target_ring: &P, source_ring: &R, prime_ring: &S, f: &El<P>, factors: (&El<R>, &El<R>)) -> (El<P>, El<P>)
     where P: PolyRingStore, P::Type: PolyRing,
         R: PolyRingStore, R::Type: PolyRing,
@@ -79,7 +79,7 @@ pub fn hensel_lift<P, R, S>(target_ring: &P, source_ring: &R, prime_ring: &S, f:
 ///
 /// Like [`hensel_lift()`] but for an arbitrary number of factors.
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn hensel_lift_factorization<P, R, S>(target_ring: &P, source_ring: &R, prime_ring: &S, f: &El<P>, factors: &[El<R>]) -> Vec<El<P>>
     where P: PolyRingStore, P::Type: PolyRing,
         R: PolyRingStore, R::Type: PolyRing,

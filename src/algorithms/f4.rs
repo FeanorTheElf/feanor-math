@@ -238,7 +238,7 @@ fn sym_tuple(a: usize, b: usize) -> (usize, usize) {
 ///
 /// 
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub struct RingInfo<R: ?Sized>
     where R: RingBase
 {
@@ -387,7 +387,7 @@ impl SPoly {
     }
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub trait GBRingDescriptorRing: Sized + PrincipalIdealRing {
 
     fn create_ring_info(&self) -> RingInfo<Self>;
@@ -459,12 +459,11 @@ impl<const N: u64> GBRingDescriptorRing for zn_static::ZnBase<N, false> {
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::multivariate::*;
 /// # use feanor_math::algorithms::f4::*;
-/// # use feanor_math::{assert_el_eq, default_memory_provider};
+/// # use feanor_math::assert_el_eq;
 /// # use feanor_math::rings::zn::zn_static;
-/// 
 /// let order = DegRevLex;
 /// let base = zn_static::F17;
-/// let ring: ordered::MultivariatePolyRingImpl<_, _, _, 2> = ordered::MultivariatePolyRingImpl::new(base, order);
+/// let ring: ordered::MultivariatePolyRingImpl<_, _, 2> = ordered::MultivariatePolyRingImpl::new(base, order);
 /// 
 /// // the classical GB example: x^2 + y^2 - 1, xy - 2
 /// let f1 = ring.from_terms([
@@ -488,7 +487,7 @@ impl<const N: u64> GBRingDescriptorRing for zn_static::ZnBase<N, false> {
 /// assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, in_ideal, &gb, order));
 /// ```
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_poly_degree_bound: u16) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
@@ -603,7 +602,7 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
     return basis;
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
@@ -642,7 +641,7 @@ pub fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
     return polys;
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn multivariate_division<P, V, O>(ring: P, mut f: El<P>, set: V, order: O) -> El<P>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,

@@ -128,7 +128,7 @@ fn is_on_curve<R>(Zn: &R, A: &El<R>, B: &El<R>, P: &Point<R>) -> bool
 ///
 /// Runtime `L_N(1/2, 1) = exp((1 + o(1)) ln(N)^1/2 lnln(N)^1/2)`
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::Integers>
     where R: ZnRingStore + DivisibilityRingStore,
         R::Type: ZnRing + DivisibilityRing

@@ -25,15 +25,14 @@ mod row_echelon;
 /// ```
 /// # use feanor_math::ring::*;
 /// # use feanor_math::algorithms::smith::solve_right;
-/// # use feanor_math::matrix::dense::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::matrix::*;
 /// let ring = Zn::new(18);
 /// let modulo = ring.int_hom();
-/// let mut A_transposed = DenseMatrix::zero(5, 4, ring);
-/// let mut B_transposed = DenseMatrix::zero(5, 4, ring);
+/// let mut A_transposed: OwnedMatrix<ZnEl> = OwnedMatrix::zero(5, 4, ring);
+/// let mut B_transposed: OwnedMatrix<ZnEl> = OwnedMatrix::zero(5, 4, ring);
 /// 
 /// // both matrices are in row-echelon form and the same except for the last column
 /// let data_A = [
@@ -55,12 +54,12 @@ mod row_echelon;
 /// // this shows that in fact, A and B are equivalent up to row operations!
 /// // In other words, there are S, T such that STA = SB = A, which implies that
 /// // det(S) det(T) = 1, so both S and T have unit determinant
-/// assert!(solve_right(&mut A_transposed.clone_matrix(&ring), B_transposed.clone_matrix(&ring), &ring).is_some());
-/// assert!(solve_right(&mut B_transposed.clone_matrix(&ring), A_transposed.clone_matrix(&ring), &ring).is_some());
+/// assert!(solve_right(A_transposed.clone_matrix(&ring).data_mut(), B_transposed.clone_matrix(&ring).data_mut(), &ring).is_some());
+/// assert!(solve_right(B_transposed.clone_matrix(&ring).data_mut(), A_transposed.clone_matrix(&ring).data_mut(), &ring).is_some());
 /// ```
 /// 
 #[inline(never)]
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn gb_sparse_row_echelon<R, const LOG: bool>(ring: R, matrix: SparseMatrix<R::Type>, block_size: usize) -> Vec<Vec<(usize, El<R>)>>
     where R: RingStore + Copy,
         R::Type: PrincipalIdealRing,

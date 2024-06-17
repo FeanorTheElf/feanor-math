@@ -30,7 +30,7 @@ use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 /// LLL to perform intermediate lattice reductions (not yet implemented
 /// in feanor_math).
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: SubmatrixMut<V, El<R>>)
     where R: RingStore + Copy,
         R::Type: PrincipalIdealRing,

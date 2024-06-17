@@ -29,7 +29,7 @@ fn pow_mod_f<P, I>(poly_ring: P, g: El<P>, f: &El<P>, pow: &El<I>, ZZ: I) -> El<
 
 ///
 /// Computes the distinct-degree factorization of a polynomial over a finite
-/// field.
+/// field. The given polynomial must be square-free.
 /// 
 /// Concretely, if a univariate polynomial `f(X)` factors uniquely as
 /// `f(X) = f1(X) ... fr(X)`, then the `d`-th distinct-degree factor of `f` is
@@ -37,6 +37,8 @@ fn pow_mod_f<P, I>(poly_ring: P, g: El<P>, f: &El<P>, pow: &El<I>, ZZ: I) -> El<
 /// This function returns a list whose `d`-th entry is the `d`-th distinct degree
 /// factor. Once the list ends, all further `d`-th distinct degree factors should
 /// be considered to be `1`.
+/// 
+/// To get a square-free polynomial, consider using [`super::poly_squarefree_part()`].
 /// 
 /// # Example
 /// 
@@ -47,21 +49,23 @@ fn pow_mod_f<P, I>(poly_ring: P, g: El<P>, f: &El<P>, pow: &El<I>, ZZ: I) -> El<
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
 /// # use feanor_math::rings::rational::*;
+/// # use feanor_math::divisibility::*;
+/// # use crate::feanor_math::homomorphism::Homomorphism;
 /// # use feanor_math::algorithms::poly_factor::cantor_zassenhaus::*;
-/// let Fp = Zn::new(3);
+/// let Fp = Zn::new(3).as_field().ok().unwrap();
 /// let FpX = DensePolyRing::new(Fp, "X");
-/// // f = (X^2 + 1)^2 (X^3 + 2 X + 1)
+/// // f = (X^3 + 2 X^2 + 1) (X^3 + 2 X + 1) (X^2 + 1)
 /// let f = FpX.prod([
-///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)]),
-///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)]),
-///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 1), (QQ.one(), 3)])
+///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)].into_iter()),
+///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 1), (Fp.one(), 3)].into_iter()),
+///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 2), (Fp.one(), 3)].into_iter())
 /// ].into_iter());
 /// let factorization = distinct_degree_factorization(&FpX, f);
 /// assert_eq!(4, factorization.len());
 /// assert!(FpX.is_unit(&factorization[0]));
 /// assert!(FpX.is_unit(&factorization[1]));
-/// assert!(!FpX.is_unit(&factorization[2]));
-/// assert!(!FpX.is_unit(&factorization[3]));
+/// assert!(!FpX.is_unit(&factorization[2])); // factorization[2] is some scalar multiple of (X^2 + 1)
+/// assert!(!FpX.is_unit(&factorization[3])); // factorization[3] is some scalar multiple of (X^3 + 2 X^2 + 1) (X^3 + 2 X + 1)
 /// ```
 /// 
 pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>>

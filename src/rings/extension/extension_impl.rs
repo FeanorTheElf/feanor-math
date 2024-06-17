@@ -33,11 +33,10 @@ use super::*;
 /// # use feanor_math::rings::extension::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::extension::extension_impl::*;
-/// # use feanor_math::{default_memory_provider, assert_el_eq};
-/// 
+/// # use feanor_math::assert_el_eq;
 /// let base_ring = StaticRing::<i64>::RING;
 /// // ring of integers in the 6th cyclotomic number field
-/// let ring = FreeAlgebraImpl::new(base_ring, [-1, 1], default_memory_provider!());
+/// let ring = FreeAlgebraImpl::new(base_ring, [-1, 1]);
 /// let root_of_unity = ring.canonical_gen();
 /// assert_el_eq!(&ring, &ring.one(), &ring.pow(root_of_unity, 6));
 /// ```

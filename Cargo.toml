@@ -29,15 +29,18 @@ rayon = { version = "1.8.0", optional = true }
 ndarray = { version = "0.15.6", optional = true }
 
 [features]
+default = ["unstable-enable"]
 generic_tests = []
-log_memory = []
+unstable-enable = []
 mpir = []
 parallel = ["dep:rayon"]
 ndarray = ["dep:ndarray"]
-test_deprecated = []
 
 [profile.profiling]
 inherits = "bench"
 debug = true
 panic = "abort"
 codegen-unit = 1
+
+[package.metadata."docs.rs"]
+all-features = true

@@ -186,17 +186,15 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_42;
 /// # use feanor_math::rings::zn::zn_barett;
 /// # use feanor_math::rings::zn::zn_rns;
-/// 
 /// let ZZ = StaticRing::<i128>::RING;
 /// let ZZ_big = BigIntRing::RING;
 /// 
 /// let Zn_barett_i128 = zn_barett::Zn::new(ZZ, 17 * 257);
 /// let Zn_barett_big = zn_barett::Zn::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
-/// let Zn_std = zn_42::Zn::new(17 * 257);
-/// let Zn_rns = zn_rns::Zn::from_primes(ZZ_big, vec![17, 257]);
+/// let Zn_std = zn_64::Zn::new(17 * 257);
+/// let Zn_rns = zn_rns::Zn::create_from_primes(ZZ_big, vec![17, 257]);
 /// 
 /// assert!(Zn_barett_i128.can_iso(&Zn_barett_i128).is_some());
 /// assert!(Zn_barett_i128.can_iso(&Zn_barett_big).is_some());
@@ -216,18 +214,17 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// only requires the projection from the "associated" integer ring.
 /// ```
 /// # use feanor_math::ring::*;
-    /// # use feanor_math::homomorphism::*;
+/// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::rings::zn::*;
-/// 
 /// let ZZ = StaticRing::<i128>::RING;
 /// let ZZ_big = BigIntRing::RING;
 /// 
 /// let Zn_barett_i128 = zn_barett::Zn::new(ZZ, 17 * 257);
 /// let Zn_barett_big = zn_barett::Zn::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
-/// let Zn_std = zn_42::Zn::new(17 * 257);
-/// let Zn_rns = zn_rns::Zn::from_primes(ZZ_big, vec![17, 257]);
+/// let Zn_std = zn_64::Zn::new(17 * 257);
+/// let Zn_rns = zn_rns::Zn::create_from_primes(ZZ_big, vec![17, 257]);
 /// 
 /// assert!(Zn_barett_i128.can_hom(&ZZ).is_some());
 /// assert!(Zn_barett_i128.can_hom(&ZZ_big).is_some());

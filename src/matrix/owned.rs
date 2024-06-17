@@ -41,7 +41,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
         self.col_count
     }
 
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn zero_in<R: RingStore>(row_count: usize, col_count: usize, ring: R, allocator: A) -> Self
         where R::Type: RingBase<Element = T>
     {
@@ -54,7 +54,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
         return Self::new(result, col_count);
     }
 
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn identity_in<R: RingStore>(row_count: usize, col_count: usize, ring: R, allocator: A) -> Self
         where R::Type: RingBase<Element = T>
     {
@@ -71,7 +71,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
         return Self::new(result, col_count);
     }
 
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn clone_matrix<R: RingStore>(&self, ring: R) -> Self
         where R::Type: RingBase<Element = T>,
             A: Clone
@@ -85,7 +85,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
         return Self::new(result, self.col_count());
     }
 
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn set_row_count<F>(&mut self, new_count: usize, new_entries: F)
         where F: FnMut() -> T
     {
@@ -95,14 +95,14 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
 
 impl<T, A: Allocator + Default> OwnedMatrix<T, A> {
 
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn zero<R: RingStore>(row_count: usize, col_count: usize, ring: R) -> Self
         where R::Type: RingBase<Element = T>
     {
         Self::zero_in(row_count, col_count, ring, A::default())
     }
 
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn identity<R: RingStore>(row_count: usize, col_count: usize, ring: R) -> Self
         where R::Type: RingBase<Element = T>
     {

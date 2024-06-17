@@ -143,12 +143,10 @@ pub trait MultivariatePolyRing: RingExtension {
     /// # Example
     /// ```
     /// # use feanor_math::ring::*;
-    /// # use feanor_math::default_memory_provider;
     /// # use feanor_math::rings::multivariate::*;
     /// # use feanor_math::primitive_int::*;
     /// # use std::collections::BTreeMap;
-    /// 
-    /// let ring = ordered::MultivariatePolyRingImpl::<_, _, _, 3>::new(StaticRing::<i32>::RING, DegRevLex, default_memory_provider!());
+    /// let ring = ordered::MultivariatePolyRingImpl::<_, _, 3>::new(StaticRing::<i32>::RING, DegRevLex);
     /// let x = ring.indeterminate(0);
     /// let y = ring.indeterminate(1);
     /// let z = ring.indeterminate(2);
@@ -188,16 +186,14 @@ pub trait MultivariatePolyRing: RingExtension {
     /// # Example
     /// ```
     /// # use feanor_math::ring::*;
-    /// # use feanor_math::default_memory_provider;
     /// # use feanor_math::rings::multivariate::*;
     /// # use feanor_math::primitive_int::*;
     /// # use std::collections::BTreeMap;
-    /// 
-    /// let ring = ordered::MultivariatePolyRingImpl::<_, _, _, 3>::new(StaticRing::<i32>::RING, DegRevLex, default_memory_provider!());
+    /// let ring = ordered::MultivariatePolyRingImpl::<_, _, 3>::new(StaticRing::<i32>::RING, DegRevLex);
     /// let x = ring.indeterminate(0);
     /// let y = ring.indeterminate(1);
     /// let poly = ring.add(x, ring.pow(y, 2));
-    /// assert_eq!(5, ring.evaluate(&poly, [1, 2]));
+    /// assert_eq!(5, ring.evaluate(&poly, [1, 2, 0], &StaticRing::<i32>::RING.identity()));
     /// ```
     /// 
     fn evaluate<R, V, H>(&self, f: &Self::Element, values: V, hom: &H) -> R::Element

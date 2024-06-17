@@ -11,7 +11,7 @@ pub use owned::*;
 
 pub mod transform;
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn matmul<V1, V2, R1, R2, S, V, H1, H2>(lhs: Submatrix<V1, R1::Element>, rhs: Submatrix<V2, R2::Element>, mut out: SubmatrixMut<V, S::Element>, hom1: &H1, hom2: &H2)
     where V: AsPointerToSlice<S::Element>,
         R1: ?Sized + RingBase,
@@ -34,7 +34,7 @@ pub fn matmul<V1, V2, R1, R2, S, V, H1, H2>(lhs: Submatrix<V1, R1::Element>, rhs
     }
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn matmul_fst_transposed<V1, V2, R1, R2, S, V, H1, H2>(lhs_T: Submatrix<V1, R1::Element>, rhs: Submatrix<V2, R2::Element>, mut out: SubmatrixMut<V, S::Element>, hom1: &H1, hom2: &H2)
     where V: AsPointerToSlice<S::Element>,
         R1: ?Sized + RingBase,
@@ -57,7 +57,7 @@ pub fn matmul_fst_transposed<V1, V2, R1, R2, S, V, H1, H2>(lhs_T: Submatrix<V1, 
     }
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn format_matrix<'a, M, R>(row_count: usize, col_count: usize, matrix: M, ring: R) -> impl 'a + Display
     where R: 'a + RingStore, 
         El<R>: 'a,

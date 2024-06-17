@@ -23,6 +23,7 @@ use super::poly::PolyRingStore;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::extension::galois_field::*;
 /// # use feanor_math::rings::fieldextension::*;
+/// # use feanor_math::rings::fieldextension::ExtensionFieldStore;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::rings::zn::*;
 /// let Fp = Zn::new(7).as_field().ok().unwrap();
@@ -31,7 +32,7 @@ use super::poly::PolyRingStore;
 /// assert!(Fq.is_galois());
 /// ```
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField {
 
     ///
@@ -81,6 +82,7 @@ pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField {
     /// # use feanor_math::ring::*;
     /// # use feanor_math::rings::extension::galois_field::*;
     /// # use feanor_math::rings::fieldextension::*;
+    /// # use feanor_math::rings::fieldextension::ExtensionFieldStore;
     /// # use feanor_math::rings::zn::zn_64::*;
     /// # use feanor_math::homomorphism::*;
     /// # use feanor_math::rings::extension::*;
@@ -150,7 +152,7 @@ pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField {
     }
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub struct GaloisAutomorphism<F: RingStore>
     where F::Type: ExtensionField
 {
@@ -161,7 +163,7 @@ pub struct GaloisAutomorphism<F: RingStore>
 impl<F: RingStore> GaloisAutomorphism<F>
     where F::Type: ExtensionField
 {
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn get_map<'a>(&'a self) -> ExtensionFieldEmbedding<&'a F, &'a F, Identity<&'a <F::Type as RingExtension>::BaseRing>> {
         ExtensionFieldEmbedding {
             from: &self.ring,
@@ -171,12 +173,12 @@ impl<F: RingStore> GaloisAutomorphism<F>
         }
     }
 
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn is_identity(&self) -> bool {
         self.ring.eq_el(&self.map_generator_to, &self.ring.canonical_gen())
     }
 
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn compose(&self, rhs: &GaloisAutomorphism<F>) -> GaloisAutomorphism<F>
         where F: Clone
     {
@@ -188,7 +190,7 @@ impl<F: RingStore> GaloisAutomorphism<F>
     }
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub struct ExtensionFieldEmbedding<F: RingStore, T: RingStore, H>
     where F::Type: ExtensionField, T::Type: ExtensionField,
         H: Homomorphism<<<F::Type as RingExtension>::BaseRing as RingStore>::Type, <<T::Type as RingExtension>::BaseRing as RingStore>::Type>
@@ -225,7 +227,7 @@ impl<F: RingStore, T: RingStore, H> Homomorphism<F::Type, T::Type> for Extension
     }
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub trait ExtensionFieldStore: FieldStore + FreeAlgebraStore
     where Self::Type: ExtensionField
 {

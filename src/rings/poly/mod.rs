@@ -92,7 +92,7 @@ pub trait PolyRing: RingExtension {
     /// # use feanor_math::ring::*;
     /// # use feanor_math::rings::poly::*;
     /// # use feanor_math::primitive_int::*; 
-    /// let ring = dense::DensePolyRing::new(StaticRing::<i32>::RING, "X");
+    /// let ring = dense_poly::DensePolyRing::new(StaticRing::<i32>::RING, "X");
     /// let x = ring.indeterminate();
     /// let poly = ring.add(ring.clone_el(&x), ring.pow(x, 2));
     /// assert_eq!(12, ring.evaluate(&poly, &3, &StaticRing::<i32>::RING.identity()));

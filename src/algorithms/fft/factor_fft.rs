@@ -9,7 +9,7 @@ use crate::vector::subvector::*;
 /// A generic variant of the Cooley-Tuckey FFT algorithm that can be used to compute the Fourier
 /// transform of an array of length `n1 * n2` given Fourier transforms for length `n1` resp. `n2`.
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub struct FFTTableGenCooleyTuckey<R_main, R_twiddle, H, T1, T2> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
@@ -34,14 +34,14 @@ impl<R, T1, T2> FFTTableGenCooleyTuckey<R::Type, R::Type, Identity<R>, T1, T2>
         T2: FFTTable,
         T2::Ring: RingStore<Type = R::Type>
 {
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn new_with_pows<F>(ring: R, root_of_unity_pows: F, left_table: T1, right_table: T2) -> Self
         where F: FnMut(i64) -> El<R>
     {
         Self::new_with_pows_with_hom(ring.into_identity(), root_of_unity_pows, left_table, right_table)
     }
 
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn new(ring: R, root_of_unity: El<R>, left_table: T1, right_table: T2) -> Self {
         Self::new_with_hom(ring.into_identity(), root_of_unity, left_table, right_table)
     }
@@ -56,7 +56,7 @@ impl<R_main, R_twiddle, H, T1, T2> FFTTableGenCooleyTuckey<R_main, R_twiddle, H,
         T2: FFTTable,
         T2::Ring: RingStore<Type = R_main>
 {
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn new_with_pows_with_hom<F>(hom: H, mut root_of_unity_pows: F, left_table: T1, right_table: T2) -> Self
         where F: FnMut(i64) -> R_twiddle::Element
     {
@@ -81,17 +81,17 @@ impl<R_main, R_twiddle, H, T1, T2> FFTTableGenCooleyTuckey<R_main, R_twiddle, H,
         }
     }
 
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn left_fft_table(&self) -> &T1 {
         &self.left_table
     }
     
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn right_fft_table(&self) -> &T2 {
         &self.right_table
     }
     
-    #[stability::unstable(feature = "unstable-items")]
+    #[stability::unstable(feature = "enable")]
     pub fn new_with_hom(hom: H, root_of_unity: R_twiddle::Element, left_table: T1, right_table: T2) -> Self {
         assert!(!hom.domain().get_ring().is_approximate());
         assert!(left_table.ring().get_ring() == right_table.ring().get_ring());

@@ -183,25 +183,31 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
 /// 
 /// # Example
 /// ```
+/// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
 /// # use feanor_math::rings::rational::*;
-/// # use feanor_math::algorithms::poly_factor::cantor_zassenhaus::*;
-/// let Fp = Zn::new(3).as_field().unwrap();
+/// # use feanor_math::divisibility::*;
+/// # use feanor_math::homomorphism::Homomorphism;
+/// # use feanor_math::algorithms::poly_factor::poly_squarefree_part;
+/// let Fp = Zn::new(3).as_field().ok().unwrap();
 /// let FpX = DensePolyRing::new(Fp, "X");
 /// // f = (X^2 + 1)^2 (X^3 + 2 X + 1)
 /// let f = FpX.prod([
-///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)]),
-///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)]),
-///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 1), (QQ.one(), 3)])
+///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)].into_iter()),
+///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)].into_iter()),
+///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 1), (Fp.one(), 3)].into_iter())
 /// ].into_iter());
-/// let squarefree_part = poly_squarefree_part(&FpX, f);
+/// let mut squarefree_part = poly_squarefree_part(&FpX, f);
+/// // the result is not necessarily monic, so normalize
+/// let normalization_factor = Fp.invert(FpX.lc(&squarefree_part).unwrap()).unwrap();
+/// FpX.inclusion().mul_assign_map(&mut squarefree_part, normalization_factor);
 /// assert_el_eq!(&FpX, &FpX.prod([
-///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)]),
-///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 1), (QQ.one(), 3)])
+///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)].into_iter()),
+///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 1), (Fp.one(), 3)].into_iter())
 /// ].into_iter()), &squarefree_part);
 /// ```
 /// 

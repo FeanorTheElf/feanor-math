@@ -16,13 +16,14 @@ use super::complex_fft::*;
 /// 
 /// # Example
 /// ```
+/// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::algorithms::fft::*;
-/// # use feanor_math::algorithms::rings::zn::*;
+/// # use feanor_math::rings::zn::*;
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
 /// // this ring has a 256-th primitive root of unity
 /// let ring = zn_64::Zn::new(257);
-/// let fft_table = FFTTableCooleyTuckey::for_zn(ring, 8);
+/// let fft_table = FFTTableCooleyTuckey::for_zn(ring, 8).unwrap();
 /// let mut data = [ring.one()].into_iter().chain((0..255).map(|_| ring.zero())).collect::<Vec<_>>();
 /// fft_table.unordered_fft(&mut data);
 /// assert_el_eq!(&ring, &ring.one(), &data[0]);

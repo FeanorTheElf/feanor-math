@@ -5,7 +5,7 @@ use super::karatsuba::*;
 /// Trait to allow rings to provide specialized implementations for computing a convolution,
 /// i.e. the sums `sum_i a[i] * b[j - i]` for all `j`.
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub trait ConvMulComputation: RingBase {
 
     ///

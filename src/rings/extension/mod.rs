@@ -34,7 +34,7 @@ pub mod galois_field;
 /// One of the most common use cases seems to be the implementation of finite fields (sometimes
 /// called galois fields).
 /// ```
-/// # use feanor_math::{assert_el_eq, default_memory_provider};
+/// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::primitive_int::*;
@@ -43,9 +43,8 @@ pub mod galois_field;
 /// # use feanor_math::rings::finite::*;
 /// // we have to decide for an implementation of the prime field
 /// let prime_field = zn_static::Fp::<3>::RING;
-/// let galois_field = extension_impl::FreeAlgebraImpl::new(prime_field, [2, 1, 0], default_memory_provider!());
+/// let galois_field = extension_impl::FreeAlgebraImpl::new(prime_field, [2, 1, 0]);
 /// // this is now the finite field with 27 elements, or F_27 or GF(27) since X^3 + 2X + 1 is irreducible modulo 3
-/// 
 /// assert_eq!(Some(27), galois_field.size(&StaticRing::<i64>::RING));
 /// 
 /// // currently, this ring unfortunately does not implement `Field`; However, we can already do division
@@ -160,7 +159,7 @@ pub trait FreeAlgebraStore: RingStore
     }
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn create_multiplication_matrix<R: FreeAlgebraStore>(ring: R, el: &El<R>) -> OwnedMatrix<El<<R::Type as RingExtension>::BaseRing>> 
     where R::Type: FreeAlgebra
 {

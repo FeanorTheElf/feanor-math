@@ -11,12 +11,12 @@ use crate::divisibility::{DivisibilityRing, Domain};
 use super::float_real::Real64;
 
 ///
-/// An approximate implementation of the real number `R`, using 64 bit floating
+/// An approximate implementation of the complex numbers `C`, using 64 bit floating
 /// point numbers.
 /// 
 /// # Warning
 /// 
-/// Since floating point numbers do not exactly represent the reals, and this crate follows
+/// Since floating point numbers do not exactly represent the complex numbers, and this crate follows
 /// a mathematically precise approach, we cannot provide any function related to equality.
 /// In particular, `Complex64Base.eq_el(a, b)` is not supported, and will panic. 
 /// Hence, this ring has only limited use within this crate, and is currently only used for

@@ -2,7 +2,7 @@ use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::integer::*;
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn erathostenes(B: u64) -> Vec<u64> {
     let mut primes = Vec::new();
     primes.push(2);
@@ -21,7 +21,7 @@ pub fn erathostenes(B: u64) -> Vec<u64> {
     return primes;
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn enumerate_primes<I>(ZZ: I, B: &El<I>) -> Vec<El<I>> 
     where I: IntegerRingStore,
         I::Type: IntegerRing

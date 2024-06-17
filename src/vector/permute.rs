@@ -5,7 +5,7 @@ use super::SwappableVectorViewMut;
 ///
 /// Computes `values_new[i] = values[perm(i)]`.
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn permute<V, T, F>(values: V, perm: F)
     where V: SwappableVectorViewMut<T>, F: Fn(usize) -> usize
 {
@@ -15,7 +15,7 @@ pub fn permute<V, T, F>(values: V, perm: F)
 ///
 /// Computes `values_new[i] = values[perm(i)]`.
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn permute_using_allocator<V, T, F, A: Allocator>(mut values: V, perm: F, allocator: A)
     where V: SwappableVectorViewMut<T>, F: Fn(usize) -> usize
 {
@@ -39,7 +39,7 @@ pub fn permute_using_allocator<V, T, F, A: Allocator>(mut values: V, perm: F, al
 /// Computes `values_new[perm(i)] = values[i]`.
 /// This is the inverse operation to [`permute()`].
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn permute_inv<V, T, F>(values: V, perm: F)
     where V: SwappableVectorViewMut<T>, F: Fn(usize) -> usize
 {
@@ -50,7 +50,7 @@ pub fn permute_inv<V, T, F>(values: V, perm: F)
 /// Computes `values_new[perm(i)] = values[i]`.
 /// This is the inverse operation to [`permute()`].
 /// 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn permute_inv_using_allocator<V, T, F, A: Allocator>(mut values: V, perm: F, allocator: A)
     where V: SwappableVectorViewMut<T>, F: Fn(usize) -> usize
 {

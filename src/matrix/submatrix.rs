@@ -121,7 +121,7 @@ unsafe impl<'a, T> AsPointerToSlice<T> for AsFirstElement<T> {
 /// 
 /// ## Example of illegal use
 /// ```
-/// # use feanor_math::matrix::submatrix::*;
+/// # use feanor_math::matrix::*;
 /// # use core::ptr::NonNull;
 /// let mut data = [1, 2, 3];
 /// // this is actuall safe and intended use

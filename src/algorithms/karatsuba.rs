@@ -4,7 +4,7 @@ use crate::vector::subvector::*;
 
 use std::cmp::{ max, min };
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn naive_assign_mul<R, V1, V2, V3, const ADD_ASSIGN: bool>(mut dst: V1, lhs: V2, rhs: V3, ring: R) 
     where R: RingStore, V1: VectorViewMut<El<R>>, V2: VectorView<El<R>>, V3: VectorView<El<R>>
 {
@@ -128,7 +128,7 @@ karatsuba_impl!{
     (16, karatsuba_impl_16, karatsuba_impl_15)
 }
 
-#[stability::unstable(feature = "unstable-items")]
+#[stability::unstable(feature = "enable")]
 pub fn karatsuba<R, V1, V2>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: V1, rhs: V2, ring: R) 
     where R: RingStore + Copy, V1: SelfSubvectorView<El<R>> + Copy, V2: SelfSubvectorView<El<R>> + Copy
 {

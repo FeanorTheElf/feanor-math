@@ -55,17 +55,6 @@ fn mullo(lhs: u64, rhs: u64) -> u64 {
 /// let zn = Zn::new(7);
 /// assert_el_eq!(&zn, &zn.one(), &zn.mul(zn.int_hom().map(3), zn.int_hom().map(5)));
 /// ```
-/// We have natural isomorphisms to [`super::zn_42::ZnBase`] that are extremely fast.
-/// ```
-/// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::zn::*;
-/// let R1 = zn_42::Zn::new(17);
-/// let R2 = zn_64::Zn::new(17);
-/// assert_el_eq!(&R2, &R2.int_hom().map(6), &R2.coerce(&R1, R1.int_hom().map(6)));
-/// assert_el_eq!(&R1, &R1.int_hom().map(16), &R2.can_iso(&R1).unwrap().map(R2.int_hom().map(16)));
-/// ```
 /// Too large moduli will give an error.
 /// ```should_panic
 /// # use feanor_math::assert_el_eq;
@@ -633,15 +622,13 @@ impl HashableElRing for ZnBase {
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::algorithms::fft::*;
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
-/// # use feanor_math::mempool::*;
-/// # use feanor_math::default_memory_provider;
 /// let ring = Zn::new(1073872897);
 /// let fastmul_ring = ZnFastmul::new(ring);
 /// // The values stored by the FFT table are elements of `ZnFastmulBase`
-/// let fft = FFTTableCooleyTuckey::for_zn(&fastmul_ring, 15).unwrap();
+/// let fft = FFTTableCooleyTuckey::for_zn_with_hom(ring.can_hom(&fastmul_ring).unwrap(), 15).unwrap();
 /// // Note that data uses `ZnBase`
 /// let mut data = (0..(1 << 15)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
-/// fft.unordered_fft(&mut data[..], &default_memory_provider!(), &ring.can_hom(&fastmul_ring).unwrap());
+/// fft.unordered_fft(&mut data[..]);
 /// ```
 /// 
 #[derive(Clone, Copy)]

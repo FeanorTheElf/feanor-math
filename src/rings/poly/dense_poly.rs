@@ -27,23 +27,24 @@ use std::cmp::min;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
 /// # use feanor_math::primitive_int::*;
-/// 
 /// let ZZ = StaticRing::<i32>::RING;
 /// let P = DensePolyRing::new(ZZ, "X");
 /// let x_plus_1 = P.add(P.indeterminate(), P.int_hom().map(1));
 /// let binomial_coefficients = P.pow(x_plus_1, 10);
 /// assert_eq!(10 * 9 * 8 * 7 * 6 / 120, *P.coefficient_at(&binomial_coefficients, 5));
 /// ```
-/// To create a ring with a custom memory provider, use
+/// To create a ring with a custom allocator, use
 /// ```
-/// # use feanor_math::default_memory_provider;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
 /// # use feanor_math::primitive_int::*;
-/// 
+/// # use std::default::Default;
+/// # use std::rc::Rc;
+/// # use feanor_mempool::*;
 /// let ZZ = StaticRing::<i32>::RING;
-/// let P = RingValue::from(DensePolyRingBase::new(ZZ, "X", default_memory_provider!()));
+/// // use a mempool allocator from feanor_mempool
+/// let P = DensePolyRing::new_in(ZZ, "X", AllocRc(Rc::<dynsize::DynLayoutMempool>::new(dynsize::DynLayoutMempool::default())));
 /// ```
 /// This ring has a [`CanIsoFromTo`] to [`sparse_poly::SparsePolyRingBase`].
 /// ```
@@ -54,7 +55,6 @@ use std::cmp::min;
 /// # use feanor_math::rings::poly::dense_poly::*;
 /// # use feanor_math::rings::poly::sparse_poly::*;
 /// # use feanor_math::primitive_int::*;
-/// 
 /// let ZZ = StaticRing::<i32>::RING;
 /// let P = DensePolyRing::new(ZZ, "X");
 /// let P2 = SparsePolyRing::new(ZZ, "X");
