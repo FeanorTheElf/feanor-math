@@ -46,6 +46,19 @@ impl<H, A> FFTTableBluestein<Complex64Base, Complex64Base, H, A>
     where H: Homomorphism<Complex64Base, Complex64Base> + Clone, 
         A: Allocator + Clone
 {
+    ///
+    /// Creates an [`FFTTableBluestein`] for the complex field, using the given homomorphism
+    /// to connect the ring implementation for twiddles with the main ring implementation.
+    /// 
+    /// This function is mainly provided for parity with other rings, since in the complex case
+    /// it currently does not make much sense to use a different homomorphism than the identity.
+    /// Hence, it is simpler to use [`FFTTableBluestein::for_complex()`].
+    /// 
+    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
+    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
+    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
+    /// of length `2^log2_m`, where `2^log2_m` is the smallest power of two that is `> 2n`.
+    /// 
     pub fn for_complex_with_hom(hom: H, n: usize, tmp_mem_allocator: A) -> Self{
         let ZZ = StaticRing::<i64>::RING;
         let CC = Complex64::RING;
@@ -58,6 +71,14 @@ impl<R, A> FFTTableBluestein<Complex64Base, Complex64Base, Identity<R>, A>
     where R: RingStore<Type = Complex64Base> + Clone, 
         A: Allocator + Clone
 {
+    ///
+    /// Creates an [`FFTTableBluestein`] for the complex field.
+    /// 
+    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
+    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
+    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
+    /// of length `2^log2_m`, where `2^log2_m` is the smallest power of two that is `> 2n`.
+    /// 
     pub fn for_complex(ring: R, n: usize, tmp_mem_allocator: A) -> Self{
         Self::for_complex_with_hom(ring.into_identity(), n, tmp_mem_allocator)
     }
@@ -68,10 +89,38 @@ impl<R, A> FFTTableBluestein<R::Type, R::Type, Identity<R>, A>
         R::Type: DivisibilityRing,
         A: Allocator + Clone
 {
+    ///
+    /// Creates an [`FFTTableBluestein`] for the given ring, using the given root of unity
+    /// as base.
+    /// 
+    /// It is necessary that `root_of_unity_2n` is a primitive `2n`-th root of unity, and
+    /// `root_of_unity_m` is a `2^log2_m`-th root of unity, where `2^log2_m > 2n`.
+    /// 
+    /// Do not use this for approximate rings, as computing the powers of `root_of_unity`
+    /// will incur avoidable precision loss.
+    /// 
+    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
+    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
+    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
+    /// of length `2^log2_m`.
+    /// 
     pub fn new(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize, tmp_mem_allocator: A) -> Self {
         Self::new_with_hom(ring.into_identity(), root_of_unity_2n, root_of_unity_m, n, log2_m, tmp_mem_allocator)
     }
 
+    ///
+    /// Creates an [`FFTTableBluestein`] for the given ring, using the passed function to
+    /// provide the necessary roots of unity.
+    /// 
+    /// Concretely, `root_of_unity_2n_pows(i)` should return `z^i`, where `z` is a `2n`-th
+    /// primitive root of unity, and `root_of_unity_m_pows(i)` should return `w^i` where `w`
+    /// is a `2^log2_m`-th primitive root of unity, where `2^log2_m > 2n`.
+    /// 
+    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
+    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
+    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
+    /// of length `2^log2_m`.
+    /// 
     pub fn new_with_pows<F, G>(ring: R, root_of_unity_2n_pows: F, root_of_unity_m_pows: G, n: usize, log2_m: usize, tmp_mem_allocator: A) -> Self 
         where F: FnMut(i64) -> El<R>,
             G: FnMut(i64) -> El<R>
@@ -79,6 +128,18 @@ impl<R, A> FFTTableBluestein<R::Type, R::Type, Identity<R>, A>
         Self::new_with_pows_with_hom(ring.into_identity(), root_of_unity_2n_pows, root_of_unity_m_pows, n, log2_m, tmp_mem_allocator)
     }
 
+    ///
+    /// Creates an [`FFTTableBluestein`] for a prime field, assuming it has suitable roots of
+    /// unity.
+    /// 
+    /// Concretely, this requires that the characteristic `p` is congruent to 1 modulo
+    /// `2^log2_m n`, where `2^log2_m` is the smallest power of two that is `> 2n`.
+    /// 
+    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
+    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
+    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
+    /// of length `2^log2_m`, where `2^log2_m` is the smallest power of two that is `> 2n`.
+    /// 
     pub fn for_zn(ring: R, n: usize, tmp_mem_allocator: A) -> Option<Self>
         where R::Type: ZnRing
     {
@@ -92,6 +153,25 @@ impl<R_main, R_twiddle, H, A> FFTTableBluestein<R_main, R_twiddle, H, A>
         H: Homomorphism<R_twiddle, R_main> + Clone, 
         A: Allocator + Clone
 {
+    ///
+    /// Creates an [`FFTTableBluestein`] for the given rings, using the given root of unity.
+    /// 
+    /// It is necessary that `root_of_unity_2n` is a primitive `2n`-th root of unity, and
+    /// `root_of_unity_m` is a `2^log2_m`-th root of unity, where `2^log2_m > 2n`.
+    /// 
+    /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
+    /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
+    /// performed in `S`. This allows both implicit ring conversions, and using patterns like 
+    /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
+    /// 
+    /// Do not use this for approximate rings, as computing the powers of `root_of_unity`
+    /// will incur avoidable precision loss.
+    /// 
+    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
+    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
+    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
+    /// of length `2^log2_m`.
+    /// 
     pub fn new_with_hom(hom: H, root_of_unity_2n: R_twiddle::Element, root_of_unity_m: R_twiddle::Element, n: usize, log2_m: usize, tmp_mem_allocator: A) -> Self {
         // we cannot cannot call `new_with_mem_and_pows` because of borrowing conflicts 
 
@@ -141,6 +221,24 @@ impl<R_main, R_twiddle, H, A> FFTTableBluestein<R_main, R_twiddle, H, A>
         return b;
     }
 
+    ///
+    /// Creates an [`FFTTableBluestein`] for the given rings, using the given function to create
+    /// the necessary powers of roots of unity. This is the most generic way to create [`FFTTableBluestein`].
+    /// 
+    /// Concretely, `root_of_unity_2n_pows(i)` should return `z^i`, where `z` is a `2n`-th
+    /// primitive root of unity, and `root_of_unity_m_pows(i)` should return `w^i` where `w`
+    /// is a `2^log2_m`-th primitive root of unity, where `2^log2_m > 2n`.
+    /// 
+    /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
+    /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
+    /// performed in `S`. This allows both implicit ring conversions, and using patterns like 
+    /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
+    /// 
+    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
+    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
+    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
+    /// of length `2^log2_m`
+    /// 
     pub fn new_with_pows_with_hom<F, G>(hom: H, mut root_of_unity_2n_pows: F, mut root_of_unity_m_pows: G, n: usize, log2_m: usize, tmp_mem_allocator: A) -> Self
         where F: FnMut(i64) -> R_twiddle::Element,
             G: FnMut(i64) -> R_twiddle::Element
@@ -172,6 +270,23 @@ impl<R_main, R_twiddle, H, A> FFTTableBluestein<R_main, R_twiddle, H, A>
         };
     }
 
+    ///
+    /// Creates an [`FFTTableBluestein`] for the given prime fields, assuming they have suitable
+    /// roots of unity.
+    /// 
+    /// Concretely, this requires that the characteristic `p` is congruent to 1 modulo
+    /// `2^log2_m n`, where `2^log2_m` is the smallest power of two that is `> 2n`.
+    /// 
+    /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
+    /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
+    /// performed in `S`. This allows both implicit ring conversions, and using patterns like 
+    /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
+    /// 
+    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
+    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
+    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
+    /// of length `2^log2_m`, where `2^log2_m` is the smallest power of two that is `> 2n`. 
+    /// 
     pub fn for_zn_with_hom(hom: H, n: usize, tmp_mem_allocator: A) -> Option<Self>
         where R_twiddle: ZnRing
     {
@@ -183,11 +298,10 @@ impl<R_main, R_twiddle, H, A> FFTTableBluestein<R_main, R_twiddle, H, A>
     }
 
     ///
-    /// Computes the FFT of the given values using Bluestein's algorithm.
+    /// Computes the FFT of the given values using Bluestein's algorithm, using only the passed
+    /// buffer as temporary storage.
     /// 
-    /// This supports any given ring, as long as the precomputed values stored in the table are
-    /// also contained in the new ring. The result is wrong however if the canonical homomorphism
-    /// `R -> S` does not map the N-th root of unity to a primitive N-th root of unity.
+    /// This will not allocate additional memory, as opposed to [`FFTTableBluestein::fft()`] etc.
     /// 
     /// Basically, the idea is to write an FFT of any length (e.g. prime length) as a convolution,
     /// and compute the convolution efficiently using a power-of-two FFT (e.g. with the Cooley-Tuckey 

@@ -14,6 +14,21 @@ use super::complex_fft::*;
 /// An optimized implementation of the Cooley-Tuckey FFT algorithm, to compute
 /// the Fourier transform of an array with power-of-two length.
 /// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::algorithms::fft::*;
+/// # use feanor_math::algorithms::rings::zn::*;
+/// # use feanor_math::algorithms::fft::cooley_tuckey::*;
+/// // this ring has a 256-th primitive root of unity
+/// let ring = zn_64::Zn::new(257);
+/// let fft_table = FFTTableCooleyTuckey::for_zn(ring, 8);
+/// let mut data = [ring.one()].into_iter().chain((0..255).map(|_| ring.zero())).collect::<Vec<_>>();
+/// fft_table.unordered_fft(&mut data);
+/// assert_el_eq!(&ring, &ring.one(), &data[0]);
+/// assert_el_eq!(&ring, &ring.one(), &data[1]);
+/// ```
+/// 
 pub struct FFTTableCooleyTuckey<R_main, R_twiddle, H> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
@@ -28,6 +43,11 @@ pub struct FFTTableCooleyTuckey<R_main, R_twiddle, H>
     inv_root_of_unity_list: Vec<R_twiddle::Element>
 }
 
+///
+/// Assumes that `index` has only the least significant `bits` bits set.
+/// Then computes the value that results from reversing the least significant `bits`
+/// bits.
+/// 
 pub fn bitreverse(index: usize, bits: usize) -> usize {
     index.reverse_bits().checked_shr(usize::BITS - bits as u32).unwrap_or(0)
 }
@@ -36,6 +56,14 @@ impl<R_main, H> FFTTableCooleyTuckey<R_main, Complex64Base, H>
     where R_main: ?Sized + RingBase,
         H: Homomorphism<Complex64Base, R_main>
 {
+    ///
+    /// Creates an [`FFTTableCooleyTuckey`] for the complex field, using the given homomorphism
+    /// to connect the ring implementation for twiddles with the main ring implementation.
+    /// 
+    /// This function is mainly provided for parity with other rings, since in the complex case
+    /// it currently does not make much sense to use a different homomorphism than the identity.
+    /// Hence, it is simpler to use [`FFTTableCooleyTuckey::for_complex()`].
+    /// 
     pub fn for_complex_with_hom(hom: H, log2_n: usize) -> Self {
         let CC = *hom.domain().get_ring();
         Self::new_with_pows_with_hom(hom, |i| CC.root_of_unity(i, 1 << log2_n), log2_n)
@@ -45,6 +73,9 @@ impl<R_main, H> FFTTableCooleyTuckey<R_main, Complex64Base, H>
 impl<R> FFTTableCooleyTuckey<Complex64Base, Complex64Base, Identity<R>> 
     where R: RingStore<Type = Complex64Base>
 {
+    ///
+    /// Creates an [`FFTTableCooleyTuckey`] for the complex field.
+    /// 
     pub fn for_complex(ring: R, log2_n: usize) -> Self {
         Self::for_complex_with_hom(ring.into_identity(), log2_n)
     }
@@ -54,16 +85,32 @@ impl<R> FFTTableCooleyTuckey<R::Type, R::Type, Identity<R>>
     where R: RingStore,
         R::Type: DivisibilityRing
 {
+    ///
+    /// Creates an [`FFTTableCooleyTuckey`] for the given ring, using the given root of unity
+    /// as base. Do not use this for approximate rings, as computing the powers of `root_of_unity`
+    /// will incur avoidable precision loss.
+    /// 
     pub fn new(ring: R, root_of_unity: El<R>, log2_n: usize) -> Self {
         Self::new_with_hom(ring.into_identity(), root_of_unity, log2_n)
     }
 
+    ///
+    /// Creates an [`FFTTableCooleyTuckey`] for the given ring, using the passed function to
+    /// provide the necessary roots of unity.
+    /// 
+    /// Concretely, `root_of_unity_pow(i)` should return `z^i`, where `z` is a `2^log2_n`-th
+    /// primitive root of unity.
+    /// 
     pub fn new_with_pows<F>(ring: R, root_of_unity_pow: F, log2_n: usize) -> Self 
         where F: FnMut(i64) -> El<R>
     {
         Self::new_with_pows_with_hom(ring.into_identity(), root_of_unity_pow, log2_n)
     }
 
+    ///
+    /// Creates an [`FFTTableCooleyTuckey`] for a prime field, assuming it has a characteristic
+    /// congruent to 1 modulo `2^log2_n`.
+    /// 
     pub fn for_zn(ring: R, log2_n: usize) -> Option<Self>
         where R::Type: ZnRing
     {
@@ -76,6 +123,17 @@ impl<R_main, R_twiddle, H> FFTTableCooleyTuckey<R_main, R_twiddle, H>
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>
 {
+    ///
+    /// Creates an [`FFTTableCooleyTuckey`] for the given rings, using the given root of unity.
+    /// 
+    /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
+    /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
+    /// performed in `S`. This allows both implicit ring conversions, and using patterns like 
+    /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
+    /// 
+    /// Do not use this for approximate rings, as computing the powers of `root_of_unity`
+    /// will incur avoidable precision loss.
+    /// 
     pub fn new_with_hom(hom: H, root_of_unity: R_twiddle::Element, log2_n: usize) -> Self {
         let ring = hom.domain();
         let mut root_of_unity_pow = |i: i64| if i >= 0 {
@@ -102,6 +160,18 @@ impl<R_main, R_twiddle, H> FFTTableCooleyTuckey<R_main, R_twiddle, H>
         }
     }
 
+    ///
+    /// Creates an [`FFTTableCooleyTuckey`] for the given rings, using the given function to create
+    /// the necessary powers of roots of unity. This is the most generic way to create [`FFTTableCooleyTuckey`].
+    /// 
+    /// Concretely, `root_of_unity_pow(i)` should return `z^i`, where `z` is a `2^log2_n`-th
+    /// primitive root of unity.
+    /// 
+    /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
+    /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
+    /// performed in `S`. This allows both implicit ring conversions, and using patterns like 
+    /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
+    /// 
     pub fn new_with_pows_with_hom<F>(hom: H, mut root_of_unity_pow: F, log2_n: usize) -> Self 
         where F: FnMut(i64) -> R_twiddle::Element
     {
@@ -142,6 +212,15 @@ impl<R_main, R_twiddle, H> FFTTableCooleyTuckey<R_main, R_twiddle, H>
         return root_of_unity_list;
     }
 
+    ///
+    /// Creates an [`FFTTableCooleyTuckey`] for the given prime fields, assuming they have
+    /// a characteristic congruent to 1 modulo `2^log2_n`.
+    /// 
+    /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
+    /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
+    /// performed in `S`. This allows both implicit ring conversions, and using patterns like 
+    /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
+    /// 
     pub fn for_zn_with_hom(hom: H, log2_n: usize) -> Option<Self>
         where R_twiddle: ZnRing
     {
