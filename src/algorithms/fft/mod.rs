@@ -3,8 +3,6 @@ use std::ops::Deref;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::vector::*;
-use crate::mempool::*;
-use crate::default_memory_provider;
 
 pub mod cooley_tuckey;
 pub mod bluestein;
@@ -71,7 +69,7 @@ pub trait FFTTable {
     fn unordered_fft_permutation_inv(&self, i: usize) -> usize;
 
     ///
-    /// Computes inplace the Fourier transform of the given `values` over the given `ring`.
+    /// Computes the Fourier transform of the given `values` over the given `ring`.
     /// The output is in standard order, i.e. the `i`-th output element is the evaluation
     /// of the input at `self.root_of_unity()^-i` (note the `-`, which is standard
     /// convention for Fourier transforms).
@@ -84,18 +82,17 @@ pub trait FFTTable {
     /// 
     /// This function panics if `values.len() != self.len()`.
     ///
-    fn fft<V, S, M, H>(&self, mut values: V, memory_provider: &M, hom: &H)
+    fn fft<V, S, H>(&self, mut values: V, hom: &H)
         where S: ?Sized + RingBase, 
             H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: SwappableVectorViewMut<S::Element>,
-            M: MemoryProvider<S::Element>
+            V: SwappableVectorViewMut<S::Element>
     {
-        self.unordered_fft(&mut values, memory_provider, hom);
-        permute::permute_inv(&mut values, |i| self.unordered_fft_permutation(i), &default_memory_provider!());
+        self.unordered_fft(&mut values, hom);
+        permute::permute_inv(&mut values, |i| self.unordered_fft_permutation(i));
     }
         
     ///
-    /// Computes inplace the inverse Fourier transform of the given `values` over the given `ring`.
+    /// Computes the inverse Fourier transform of the given `values` over the given `ring`.
     /// The output is in standard order, i.e. the `i`-th output element is the evaluation
     /// of the input at `self.root_of_unity()^i`, divided by `self.len()`.
     /// 
@@ -107,14 +104,13 @@ pub trait FFTTable {
     /// 
     /// This function panics if `values.len() != self.len()`.
     ///
-    fn inv_fft<V, S, M, H>(&self, mut values: V, memory_provider: &M, hom: &H)
+    fn inv_fft<V, S, H>(&self, mut values: V, hom: &H)
         where S: ?Sized + RingBase, 
             H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: SwappableVectorViewMut<S::Element>,
-            M: MemoryProvider<S::Element>
+            V: SwappableVectorViewMut<S::Element>
     {
-        permute::permute(&mut values, |i| self.unordered_fft_permutation(i), &default_memory_provider!());
-        self.unordered_inv_fft(&mut values, memory_provider, hom);
+        permute::permute(&mut values, |i| self.unordered_fft_permutation(i));
+        self.unordered_inv_fft(&mut values, hom);
     }
 
     ///
@@ -128,23 +124,18 @@ pub trait FFTTable {
     /// Note that the FFT of a sequence `a_0, ..., a_(N - 1)` is defined as `Fa_k = sum_i a_i z^(-ik)`
     /// where `z` is an N-th root of unity.
     /// 
-    /// The given `memory_provider` is used in the case that temporary memory is required, as e.g.
-    /// for [`crate::algorithms::fft::bluestein::FFTTableBluestein`] .
-    /// 
-    fn unordered_fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+    fn unordered_fft<V, S, H>(&self, values: V, hom: &H)
         where S: ?Sized + RingBase, 
             H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: VectorViewMut<S::Element>,
-            M: MemoryProvider<S::Element>;
+            V: VectorViewMut<S::Element>;
     
     ///
     /// Inverse to [`Self::unordered_fft()`], with basically the same contract.
     /// 
-    fn unordered_inv_fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+    fn unordered_inv_fft<V, S, H>(&self, values: V, hom: &H)
         where S: ?Sized + RingBase, 
             H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: VectorViewMut<S::Element>,
-            M: MemoryProvider<S::Element>;
+            V: VectorViewMut<S::Element>;
 }
 
 impl<T> FFTTable for T
@@ -172,39 +163,35 @@ impl<T> FFTTable for T
         self.deref().unordered_fft_permutation_inv(i)
     }
 
-    fn fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+    fn fft<V, S, H>(&self, values: V, hom: &H)
         where S: ?Sized + RingBase, 
             H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: SwappableVectorViewMut<S::Element>,
-            M: MemoryProvider<S::Element>
+            V: SwappableVectorViewMut<S::Element>
     {
-        self.deref().fft(values, memory_provider, hom)
+        self.deref().fft(values, hom)
     }
     
-    fn inv_fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+    fn inv_fft<V, S, H>(&self, values: V, hom: &H)
         where S: ?Sized + RingBase, 
             H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: SwappableVectorViewMut<S::Element>,
-            M: MemoryProvider<S::Element>
+            V: SwappableVectorViewMut<S::Element>
     {
-        self.deref().inv_fft(values, memory_provider, hom)
+        self.deref().inv_fft(values, hom)
     }
 
-    fn unordered_fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+    fn unordered_fft<V, S, H>(&self, values: V, hom: &H)
         where S: ?Sized + RingBase, 
             H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: VectorViewMut<S::Element>,
-            M: MemoryProvider<S::Element>
+            V: VectorViewMut<S::Element>
     {
-        self.deref().unordered_fft(values, memory_provider, hom)
+        self.deref().unordered_fft(values, hom)
     }
         
-    fn unordered_inv_fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+    fn unordered_inv_fft<V, S, H>(&self, values: V, hom: &H)
         where S: ?Sized + RingBase, 
             H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: VectorViewMut<S::Element>,
-            M: MemoryProvider<S::Element>
+            V: VectorViewMut<S::Element>
     {
-        self.deref().unordered_inv_fft(values, memory_provider, hom)
+        self.deref().unordered_inv_fft(values, hom)
     }
 }

@@ -91,8 +91,6 @@ use crate::rings::multivariate::*;
 use crate::algorithms::f4::f4;
 #[cfg(test)]
 use crate::field::FieldStore;
-#[cfg(test)]
-use crate::default_memory_provider;
 
 #[test]
 fn test_resultant() {
@@ -143,7 +141,7 @@ fn test_resultant_polynomial() {
     let actual_lc_inv = QQ.div(&QQ.one(), QQX.lc(&actual).unwrap());
     QQX.inclusion().mul_assign_map(&mut actual, actual_lc_inv);
 
-    let QQYX: MultivariatePolyRingImpl<_, _, _, 2> = MultivariatePolyRingImpl::new(QQ, Lex, default_memory_provider!());
+    let QQYX: MultivariatePolyRingImpl<_, _, 2> = MultivariatePolyRingImpl::new(QQ, Lex);
     let f = QQYX.from_terms([
         (1, Monomial::new([0, 0])),
         (1, Monomial::new([0, 2])),

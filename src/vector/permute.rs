@@ -1,14 +1,23 @@
-use crate::mempool::*;
+use std::alloc::{Allocator, Global};
 
 use super::SwappableVectorViewMut;
 
 ///
 /// Computes `values_new[i] = values[perm(i)]`.
 /// 
-pub fn permute<V, T, F, M: MemoryProvider<bool>>(mut values: V, perm: F, memory_provider: &M)
+pub fn permute<V, T, F>(values: V, perm: F)
     where V: SwappableVectorViewMut<T>, F: Fn(usize) -> usize
 {
-    let mut swapped_indices = memory_provider.get_new_init(values.len(), |_| false);
+    permute_using_allocator(values, perm, Global)
+}
+
+///
+/// Computes `values_new[i] = values[perm(i)]`.
+/// 
+pub fn permute_using_allocator<V, T, F, A: Allocator>(mut values: V, perm: F, allocator: A)
+    where V: SwappableVectorViewMut<T>, F: Fn(usize) -> usize
+{
+    let mut swapped_indices = (0..values.len()).map(|_| false).collect::<Vec<_>>();
     let mut start = 0;
     while start < values.len() {
         let mut current = start;
@@ -28,10 +37,20 @@ pub fn permute<V, T, F, M: MemoryProvider<bool>>(mut values: V, perm: F, memory_
 /// Computes `values_new[perm(i)] = values[i]`.
 /// This is the inverse operation to [`permute()`].
 /// 
-pub fn permute_inv<V, T, F, M: MemoryProvider<bool>>(mut values: V, perm: F, memory_provider: &M)
+pub fn permute_inv<V, T, F>(values: V, perm: F)
     where V: SwappableVectorViewMut<T>, F: Fn(usize) -> usize
 {
-    let mut swapped_indices = memory_provider.get_new_init(values.len(), |_| false);
+    permute_inv_using_allocator(values, perm, Global)
+}
+
+///
+/// Computes `values_new[perm(i)] = values[i]`.
+/// This is the inverse operation to [`permute()`].
+/// 
+pub fn permute_inv_using_allocator<V, T, F, A: Allocator>(mut values: V, perm: F, allocator: A)
+    where V: SwappableVectorViewMut<T>, F: Fn(usize) -> usize
+{
+    let mut swapped_indices = (0..values.len()).map(|_| false).collect::<Vec<_>>();
     let mut start = 0;
     while start < values.len() {
         let mut current = perm(start);
@@ -45,14 +64,11 @@ pub fn permute_inv<V, T, F, M: MemoryProvider<bool>>(mut values: V, perm: F, mem
     }
 }
 
-#[cfg(test)]
-use crate::default_memory_provider;
-
 #[test]
 fn test_permute() {
     let mut values = [0, 1, 2, 3, 4, 5, 6, 7];
     let permutation = [2, 1, 7, 5, 6, 3, 4, 0];
-    permute(&mut values, |i| permutation[i], &default_memory_provider!());
+    permute(&mut values, |i| permutation[i]);
     assert_eq!(values, permutation);
 }
 
@@ -60,6 +76,6 @@ fn test_permute() {
 fn test_permute_inv() {
     let mut values = [2, 1, 7, 5, 6, 3, 4, 0];
     let permutation = [2, 1, 7, 5, 6, 3, 4, 0];
-    permute_inv(&mut values, |i| permutation[i], &default_memory_provider!());
+    permute_inv(&mut values, |i| permutation[i]);
     assert_eq!(values, [0, 1, 2, 3, 4, 5, 6, 7]);
 }

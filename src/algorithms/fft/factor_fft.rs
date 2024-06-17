@@ -1,6 +1,5 @@
 use crate::ring::*;
 use crate::homomorphism::*;
-use crate::mempool::*;
 use crate::algorithms::fft::*;
 use crate::algorithms::fft::complex_fft::*;
 use crate::rings::float_complex::*;
@@ -83,11 +82,11 @@ impl<R, T1, T2> FFTTableGenCooleyTuckey<R, T1, T2>
     fn create_twiddle_factors<F>(mut root_of_unity_pows: F, left_table: &T1, right_table: &T2) -> Vec<El<R>>
         where F: FnMut(i64) -> El<R>
     {
-        AllocatingMemoryProvider.get_new_init(left_table.len() * right_table.len(), |i| {
+        (0..(left_table.len() * right_table.len())).map(|i| {
             let ri = i % right_table.len();
             let li = i / right_table.len();
             return root_of_unity_pows(left_table.unordered_fft_permutation(li) as i64 * ri as i64);
-        })
+        }).collect::<Vec<_>>()
     }
 }
 
@@ -123,34 +122,32 @@ impl<R, T1, T2> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2>
         &self.root_of_unity
     }
 
-    fn unordered_fft<V, S, M, H>(&self, mut values: V, memory_provider: &M, hom: &H)
+    fn unordered_fft<V, S, H>(&self, mut values: V, hom: &H)
         where S: ?Sized + RingBase, 
             H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: VectorViewMut<S::Element>,
-            M: MemoryProvider<S::Element>
+            V: VectorViewMut<S::Element>
     {
         for i in 0..self.right_table.len() {
             let mut v = Subvector::new(&mut values).subvector(i..).stride(self.right_table.len());
-            self.left_table.unordered_fft(&mut v, memory_provider, hom);
+            self.left_table.unordered_fft(&mut v, hom);
         }
         for i in 0..self.len() {
             hom.mul_assign_map_ref(values.at_mut(i), self.inv_twiddle_factors.at(i));
         }
         for i in 0..self.left_table.len() {
             let mut v = Subvector::new(&mut values).subvector((i * self.right_table.len())..((i + 1) * self.right_table.len()));
-            self.right_table.unordered_fft(&mut v, memory_provider, hom);
+            self.right_table.unordered_fft(&mut v, hom);
         }
     }
 
-    fn unordered_inv_fft<V, S, M, H>(&self, mut values: V, memory_provider: &M, hom: &H)
+    fn unordered_inv_fft<V, S, H>(&self, mut values: V, hom: &H)
         where S: ?Sized + RingBase, 
             H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: VectorViewMut<S::Element>,
-            M: MemoryProvider<S::Element>
+            V: VectorViewMut<S::Element>
     {
         for i in 0..self.left_table.len() {
             let mut v = Subvector::new(&mut values).subvector((i * self.right_table.len())..((i + 1) * self.right_table.len()));
-            self.right_table.unordered_inv_fft(&mut v, memory_provider, hom);
+            self.right_table.unordered_inv_fft(&mut v, hom);
         }
         for i in 0..self.len() {
             hom.mul_assign_map_ref(values.at_mut(i), self.twiddle_factors.at(i));
@@ -158,7 +155,7 @@ impl<R, T1, T2> FFTTable for FFTTableGenCooleyTuckey<R, T1, T2>
         }
         for i in 0..self.right_table.len() {
             let mut v = Subvector::new(&mut values).subvector(i..).stride(self.right_table.len());
-            self.left_table.unordered_inv_fft(&mut v, memory_provider, hom);
+            self.left_table.unordered_inv_fft(&mut v, hom);
         }
     }
 
@@ -193,15 +190,15 @@ use crate::algorithms;
 #[cfg(test)]
 use crate::rings::zn::zn_64;
 #[cfg(test)]
-use crate::default_memory_provider;
+use std::alloc::Global;
 
 #[test]
 fn test_fft_basic() {
     let ring = Zn::<97>::RING;
     let z = ring.int_hom().map(39);
     let fft = FFTTableGenCooleyTuckey::new(ring.pow(z, 16), 
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 24), ring.pow(z, 12), 2, 3),
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3),
+        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 24), ring.pow(z, 12), 2, 3, Global),
+        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
     );
     let mut values = [1, 0, 0, 1, 0, 1];
     let expected = [3, 62, 63, 96, 37, 36];
@@ -210,7 +207,7 @@ fn test_fft_basic() {
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
-    fft.unordered_fft(&mut values, &default_memory_provider!(), &ring.identity());
+    fft.unordered_fft(&mut values, &ring.identity());
     assert_eq!(values, permuted_expected);
 }
 
@@ -219,8 +216,8 @@ fn test_fft_long() {
     let ring = Zn::<97>::RING;
     let z = ring.int_hom().map(39);
     let fft = FFTTableGenCooleyTuckey::new(ring.pow(z, 4), 
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 6), ring.pow(z, 3), 8, 5),
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3),
+        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 6), ring.pow(z, 3), 8, 5, Global),
+        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
     );
     let mut values = [1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 2, 2, 0, 2, 0, 1, 2, 3, 4];
     let expected = [26, 0, 75, 47, 41, 31, 28, 62, 39, 93, 53, 27, 0, 54, 74, 61, 65, 81, 63, 38, 53, 94, 89, 91];
@@ -229,7 +226,7 @@ fn test_fft_long() {
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
-    fft.unordered_fft(&mut values, &default_memory_provider!(), &ring.identity());
+    fft.unordered_fft(&mut values, &ring.identity());
     assert_eq!(values, permuted_expected);
 }
 
@@ -240,7 +237,7 @@ fn test_fft_unordered() {
     let fft = FFTTableGenCooleyTuckey::new(
         ring.pow(z, 4),
         cooley_tuckey::FFTTableCooleyTuckey::new(ring, ring.pow(z, 44), 4),
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5),
+        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5, Global),
     );
     const LEN: usize = 16 * 11;
     let mut values = [0; LEN];
@@ -249,17 +246,17 @@ fn test_fft_unordered() {
     }
     let original = values;
 
-    fft.unordered_fft(&mut values, &default_memory_provider!(), &ring.identity());
+    fft.unordered_fft(&mut values, &ring.identity());
 
     let mut ordered_fft = [0; LEN];
     for i in 0..LEN {
         ordered_fft[fft.unordered_fft_permutation(i)] = values[i];
     }
 
-    fft.unordered_inv_fft(&mut values, &default_memory_provider!(), &ring.identity());
+    fft.unordered_inv_fft(&mut values, &ring.identity());
     assert_eq!(values, original);
 
-    fft.inv_fft(&mut ordered_fft, &default_memory_provider!(), &ring.identity());
+    fft.inv_fft(&mut ordered_fft, &ring.identity());
     assert_eq!(ordered_fft, original);
 }
 
@@ -271,7 +268,7 @@ fn test_unordered_fft_permutation_inv() {
     let fft = FFTTableGenCooleyTuckey::new(
         ring.pow(z, 4),
         cooley_tuckey::FFTTableCooleyTuckey::new(ring, ring.pow(z, 44), 4),
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5),
+        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5, Global),
     );
     for i in 0..(16 * 11) {
         assert_eq!(fft.unordered_fft_permutation_inv(fft.unordered_fft_permutation(i)), i);
@@ -284,13 +281,13 @@ fn test_inv_fft() {
     let ring = Zn::<97>::RING;
     let z = ring.int_hom().map(39);
     let fft = FFTTableGenCooleyTuckey::new(ring.pow(z, 16), 
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 24), ring.pow(z, 12), 2, 3),
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3),
+        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 24), ring.pow(z, 12), 2, 3, Global),
+        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
     );
     let mut values = [3, 62, 63, 96, 37, 36];
     let expected = [1, 0, 0, 1, 0, 1];
 
-    fft.inv_fft(&mut values, &default_memory_provider!(), &ring.identity());
+    fft.inv_fft(&mut values, &ring.identity());
     assert_eq!(values, expected);
 }
 
@@ -300,11 +297,11 @@ fn test_approximate_fft() {
     for (p, log2_n) in [(5, 3), (53, 5), (101, 8), (503, 10)] {
         let fft = FFTTableGenCooleyTuckey::new_with_pows(
             |i| CC.root_of_unity(i, (p as i64) << log2_n), 
-            bluestein::FFTTableBluestein::for_complex(CC, p), 
+            bluestein::FFTTableBluestein::for_complex(CC, p, Global), 
             cooley_tuckey::FFTTableCooleyTuckey::for_complex(CC, log2_n)
         );
-        let mut array = default_memory_provider!().get_new_init(p << log2_n, |i| CC.root_of_unity(i as i64, (p as i64) << log2_n));
-        fft.fft(&mut array, &default_memory_provider!(), &CC.identity());
+        let mut array = (0..(p << log2_n)).map(|i| CC.root_of_unity(i as i64, (p as i64) << log2_n)).collect::<Vec<_>>();
+        fft.fft(&mut array, &CC.identity());
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
@@ -322,16 +319,16 @@ fn bench_factor_fft(bencher: &mut test::Bencher) {
     let root_of_unity = algorithms::unity_root::get_prim_root_of_unity(&ring, 2 * 31 * 601).unwrap();
     let fft = FFTTableGenCooleyTuckey::new(
         embed(ring.pow(root_of_unity, 2)),
-        bluestein::FFTTableBluestein::new(fastmul_ring, embed(ring.pow(root_of_unity, 31)), embed(algorithms::unity_root::get_prim_root_of_unity_pow2(&ring, 11).unwrap()), 601, 11),
-        bluestein::FFTTableBluestein::new(fastmul_ring, embed(ring.pow(root_of_unity, 601)), embed(algorithms::unity_root::get_prim_root_of_unity_pow2(&ring, 6).unwrap()), 31, 6),
+        bluestein::FFTTableBluestein::new(fastmul_ring, embed(ring.pow(root_of_unity, 31)), embed(algorithms::unity_root::get_prim_root_of_unity_pow2(&ring, 11).unwrap()), 601, 11, Global),
+        bluestein::FFTTableBluestein::new(fastmul_ring, embed(ring.pow(root_of_unity, 601)), embed(algorithms::unity_root::get_prim_root_of_unity_pow2(&ring, 6).unwrap()), 31, 6, Global),
     );
     let data = (0..(31 * 601)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(31 * 601);
     bencher.iter(|| {
         copy.clear();
         copy.extend(data.iter().map(|x| ring.clone_el(x)));
-        fft.unordered_fft(&mut copy[..], &default_memory_provider!(), &ring.can_hom(&fastmul_ring).unwrap());
-        fft.unordered_inv_fft(&mut copy[..], &default_memory_provider!(), &ring.can_hom(&fastmul_ring).unwrap());
+        fft.unordered_fft(&mut copy[..], &ring.can_hom(&fastmul_ring).unwrap());
+        fft.unordered_inv_fft(&mut copy[..], &ring.can_hom(&fastmul_ring).unwrap());
         assert_el_eq!(&ring, &copy[0], &data[0]);
     });
 }

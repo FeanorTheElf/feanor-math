@@ -1,6 +1,5 @@
 use crate::algorithms::int_factor;
 use crate::algorithms::poly_factor::FactorPolyField;
-use crate::default_memory_provider;
 use crate::primitive_int::StaticRing;
 use crate::rings::extension::RingStore;
 use crate::rings::field::AsField;
@@ -49,7 +48,7 @@ pub fn GF<const DEGREE: usize>(p: u64) -> GaloisField<DEGREE> {
         let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &random_poly);
         assert_el_eq!(&Fp, &Fp.one(), &unit);
         if factorization.len() == 1 && factorization[0].1 == 1 {
-            return FreeAlgebraImpl::new(Fp, std::array::from_fn(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i)))), default_memory_provider!()).as_field().ok().unwrap();
+            return FreeAlgebraImpl::new(Fp, std::array::from_fn(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i))))).as_field().ok().unwrap();
         }
     }
 }
@@ -88,7 +87,7 @@ pub fn GFdyn(power_of_p: u64) -> GaloisFieldDyn {
         let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &random_poly);
         assert_el_eq!(&Fp, &Fp.one(), &unit);
         if factorization.len() == 1 && factorization[0].1 == 1 {
-            return FreeAlgebraImpl::new(Fp, (0..e).map(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i)))).collect::<Vec<_>>().into_boxed_slice(), default_memory_provider!()).as_field().ok().unwrap();
+            return FreeAlgebraImpl::new(Fp, (0..e).map(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i)))).collect::<Vec<_>>().into_boxed_slice()).as_field().ok().unwrap();
         }
     }
 }

@@ -4,14 +4,13 @@ use crate::divisibility::*;
 use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::pid::*;
 use crate::field::Field;
-use crate::default_memory_provider;
-use crate::mempool::{DefaultMemoryProvider, GrowableMemoryProvider};
 use crate::rings::rational::RationalFieldBase;
-use crate::vector::VectorViewMut;
 use crate::ring::*;
 use crate::algorithms;
 use crate::rings::poly::*;
+use crate::vector::{VectorView, VectorViewMut};
 
+use std::alloc::{Allocator, Global};
 use std::cmp::min;
 
 ///
@@ -63,21 +62,21 @@ use std::cmp::min;
 /// assert_el_eq!(&P2, &P2.pow(P2.indeterminate(), 10), &P.can_iso(&P2).unwrap().map(high_power_of_x));
 /// ```
 /// 
-pub struct DensePolyRingBase<R: RingStore, M: GrowableMemoryProvider<El<R>> = DefaultMemoryProvider> {
+pub struct DensePolyRingBase<R: RingStore, A: Allocator + Clone = Global> {
     base_ring: R,
     unknown_name: &'static str,
     zero: El<R>,
-    memory_provider: M
+    element_allocator: A
 }
 
-impl<R: RingStore + Clone, M: GrowableMemoryProvider<El<R>> + Clone> Clone for DensePolyRingBase<R, M> {
+impl<R: RingStore + Clone, A: Allocator + Clone> Clone for DensePolyRingBase<R, A> {
     
     fn clone(&self) -> Self {
         DensePolyRingBase {
             base_ring: <R as Clone>::clone(&self.base_ring), 
             unknown_name: self.unknown_name, 
             zero: self.base_ring.zero() ,
-            memory_provider: self.memory_provider.clone()
+            element_allocator: self.element_allocator.clone()
         }
     }
 }
@@ -86,30 +85,31 @@ impl<R: RingStore + Clone, M: GrowableMemoryProvider<El<R>> + Clone> Clone for D
 /// The univariate polynomial ring `R[X]`, with polynomials being stored as dense vectors of coefficients.
 /// For details, see [`DensePolyRingBase`].
 /// 
-#[allow(type_alias_bounds)]
-pub type DensePolyRing<R: RingStore, M: GrowableMemoryProvider<El<R>> = DefaultMemoryProvider> = RingValue<DensePolyRingBase<R, M>>;
+pub type DensePolyRing<R, A = Global> = RingValue<DensePolyRingBase<R, A>>;
 
 impl<R: RingStore> DensePolyRing<R> {
 
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        Self::from(DensePolyRingBase::new(base_ring, unknown_name, default_memory_provider!()))
+        Self::new_in(base_ring, unknown_name, Global)
     }
 }
 
-impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> DensePolyRingBase<R, M> {
+impl<R: RingStore, A: Allocator + Clone> DensePolyRing<R, A> {
 
-    pub fn new(base_ring: R, unknown_name: &'static str, memory_provider: M) -> Self {
+    pub fn new_in(base_ring: R, unknown_name: &'static str, element_allocator: A) -> Self {
         let zero = base_ring.zero();
-        DensePolyRingBase { base_ring, unknown_name, zero, memory_provider }
+        RingValue::from(DensePolyRingBase {
+            base_ring, 
+            unknown_name, 
+            zero, 
+            element_allocator
+        })
     }
+}
 
-    fn grow(&self, vector: &mut M::Object, size: usize) {
-        if vector.len() < size {
-           self.memory_provider.grow_init(vector, size, |_| self.base_ring.zero());
-        }
-    }
+impl<R: RingStore, A: Allocator + Clone> DensePolyRingBase<R, A> {
 
-    fn poly_div<F>(&self, lhs: &mut M::Object, rhs: &M::Object, mut left_div_lc: F) -> Option<M::Object>
+    fn poly_div<F>(&self, lhs: &mut <Self as RingBase>::Element, rhs: &<Self as RingBase>::Element, mut left_div_lc: F) -> Option<<Self as RingBase>::Element>
         where F: FnMut(El<R>) -> Option<El<R>>
     {
         let lhs_val = std::mem::replace(lhs, self.zero());
@@ -126,18 +126,26 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> DensePolyRingBase<R, M> {
     }
 }
 
-impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingBase<R, M> {
+pub struct DensePolyRingEl<R: RingStore, A: Allocator + Clone = Global> {
+    data: Vec<El<R>, A>
+}
+
+impl<R: RingStore, A: Allocator + Clone> RingBase for DensePolyRingBase<R, A> {
     
-    type Element = M::Object;
+    type Element = DensePolyRingEl<R, A>;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        self.memory_provider.get_new_init(self.degree(val).map(|d| d + 1).unwrap_or(0), |i| self.base_ring.clone_el(&val[i]))
+        let mut data = Vec::with_capacity_in(val.data.len(), self.element_allocator.clone());
+        data.extend((0..val.data.len()).map(|i| (self.base_ring.clone_el(&val.data.at(i)))));
+        DensePolyRingEl { data }
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        self.grow(lhs, rhs.len());
-        for i in 0..rhs.len() {
-            self.base_ring.add_assign_ref(&mut lhs[i], &rhs[i])
+        for i in 0..min(lhs.data.len(), rhs.data.len()) {
+            self.base_ring.add_assign_ref(&mut lhs.data[i], &rhs.data[i]);
+        }
+        for i in min(lhs.data.len(), rhs.data.len())..rhs.data.len() {
+            lhs.data.push(self.base_ring().clone_el(&rhs.data[i]));
         }
     }
 
@@ -146,15 +154,17 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
     }
 
     fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        self.grow(lhs, rhs.len());
-        for i in 0..rhs.len() {
-            self.base_ring.sub_assign_ref(&mut lhs[i], &rhs[i])
+        for i in 0..min(lhs.data.len(), rhs.data.len()) {
+            self.base_ring.sub_assign_ref(&mut lhs.data[i], &rhs.data[i]);
+        }
+        for i in min(lhs.data.len(), rhs.data.len())..rhs.data.len() {
+            lhs.data.push(self.base_ring().negate(self.base_ring().clone_el(&rhs.data[i])));
         }
     }
 
     fn negate_inplace(&self, lhs: &mut Self::Element) {
-        for i in 0..lhs.len() {
-            self.base_ring.negate_inplace(&mut lhs[i]);
+        for i in 0..lhs.data.len() {
+            self.base_ring.negate_inplace(&mut lhs.data[i]);
         }
     }
 
@@ -167,22 +177,26 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
     }
 
     fn zero(&self) -> Self::Element {
-        self.memory_provider.get_new_init(0, |_| self.base_ring.zero())
+        DensePolyRingEl {
+            data: Vec::new_in(self.element_allocator.clone())
+        }
     }
     
     fn from_int(&self, value: i32) -> Self::Element {
-        self.memory_provider.get_new_init(1, |_| self.base_ring.int_hom().map(value))
+        let mut result = self.zero();
+        result.data.push(self.base_ring().get_ring().from_int(value)); 
+        return result;
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-        for i in 0..min(lhs.len(), rhs.len()) {
-            if !self.base_ring.eq_el(&lhs[i], &rhs[i]) {
+        for i in 0..min(lhs.data.len(), rhs.data.len()) {
+            if !self.base_ring.eq_el(&lhs.data[i], &rhs.data[i]) {
                 return false;
             }
         }
-        let longer = if lhs.len() > rhs.len() { lhs } else { rhs };
-        for i in min(lhs.len(), rhs.len())..longer.len() {
-            if !self.base_ring.is_zero(&longer[i]) {
+        let longer = if lhs.data.len() > rhs.data.len() { lhs } else { rhs };
+        for i in min(lhs.data.len(), rhs.data.len())..longer.data.len() {
+            if !self.base_ring.is_zero(&longer.data[i]) {
                 return false;
             }
         }
@@ -209,20 +223,22 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         let lhs_len = self.degree(lhs).map(|i| i + 1).unwrap_or(0);
         let rhs_len = self.degree(rhs).map(|i| i + 1).unwrap_or(0);
-        let mut result = self.memory_provider.get_new_init(lhs_len + rhs_len, |_| self.base_ring.zero());
+        let mut result = Vec::with_capacity_in(lhs_len + rhs_len, self.element_allocator.clone());
+        result.extend((0..(lhs_len + rhs_len)).map(|_| self.base_ring().zero()));
         <_ as ConvMulComputation>::add_assign_conv_mul(
             self.base_ring.get_ring(),
             &mut result[..], 
-            &lhs[0..lhs_len], 
-            &rhs[0..rhs_len], 
-            &self.memory_provider
+            &lhs.data[0..lhs_len], 
+            &rhs.data[0..rhs_len]
         );
-        return result;
+        return DensePolyRingEl {
+            data: result
+        };
     }
 
     fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
-        for i in 0..lhs.len() {
-            self.base_ring().int_hom().mul_assign_map(lhs.at_mut(i), rhs);
+        for i in 0..lhs.data.len() {
+            self.base_ring().int_hom().mul_assign_map(lhs.data.at_mut(i), rhs);
         }
     }
     
@@ -233,8 +249,8 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingBase for DensePolyRingB
     }
 }
 
-impl<R, M> PartialEq for DensePolyRingBase<R, M> 
-    where R: RingStore, M: GrowableMemoryProvider<El<R>>
+impl<R, A> PartialEq for DensePolyRingBase<R, A> 
+    where R: RingStore, A: Allocator + Clone
 {
     fn eq(&self, other: &Self) -> bool {
         self.base_ring.get_ring() == other.base_ring.get_ring()
@@ -247,10 +263,10 @@ impl<R> ImplGenericCanIsoFromToMarker for sparse_poly::SparsePolyRingBase<R>
     where R: RingStore
 {}
 
-impl<R, P, M> CanHomFrom<P> for DensePolyRingBase<R, M> 
-    where R: RingStore, R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanIsoFromToMarker, M: GrowableMemoryProvider<El<R>>
+impl<R, P, A> CanHomFrom<P> for DensePolyRingBase<R, A> 
+    where R: RingStore, R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanIsoFromToMarker, A: Allocator + Clone
 {
-    type Homomorphism = super::generic_impls::Homomorphism<P, DensePolyRingBase<R, M>>;
+    type Homomorphism = super::generic_impls::Homomorphism<P, DensePolyRingBase<R, A>>;
 
     fn has_canonical_hom(&self, from: &P) -> Option<Self::Homomorphism> {
         super::generic_impls::has_canonical_hom(from, self)
@@ -261,44 +277,44 @@ impl<R, P, M> CanHomFrom<P> for DensePolyRingBase<R, M>
     }
 }
 
-impl<R1, M1, R2, M2> CanHomFrom<DensePolyRingBase<R1, M1>> for DensePolyRingBase<R2, M2> 
-    where R1: RingStore, M1: GrowableMemoryProvider<El<R1>>, 
-        R2: RingStore, M2: GrowableMemoryProvider<El<R2>>,
+impl<R1, A1, R2, A2> CanHomFrom<DensePolyRingBase<R1, A1>> for DensePolyRingBase<R2, A2> 
+    where R1: RingStore, A1: Allocator + Clone, 
+        R2: RingStore, A2: Allocator + Clone,
         R2::Type: CanHomFrom<R1::Type>
 {
     type Homomorphism = <R2::Type as CanHomFrom<R1::Type>>::Homomorphism;
 
-    fn has_canonical_hom(&self, from: &DensePolyRingBase<R1, M1>) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &DensePolyRingBase<R1, A1>) -> Option<Self::Homomorphism> {
         self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
     }
 
-    fn map_in_ref(&self, from: &DensePolyRingBase<R1, M1>, el: &M1::Object, hom: &Self::Homomorphism) -> Self::Element {
-        self.memory_provider.get_new_init(el.len(), |i| self.base_ring().get_ring().map_in_ref(from.base_ring().get_ring(), &el[i], hom))
+    fn map_in_ref(&self, from: &DensePolyRingBase<R1, A1>, el: &DensePolyRingEl<R1, A1>, hom: &Self::Homomorphism) -> Self::Element {
+        RingRef::new(self).from_terms((0..el.data.len()).map(|i| (self.base_ring().get_ring().map_in_ref(from.base_ring().get_ring(), &el.data[i], hom), i)))
     }
 
-    fn map_in(&self, from: &DensePolyRingBase<R1, M1>, el: M1::Object, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &DensePolyRingBase<R1, A1>, el: DensePolyRingEl<R1, A1>, hom: &Self::Homomorphism) -> Self::Element {
         self.map_in_ref(from, &el, hom)    
     }
 }
 
-impl<R1, M1, R2, M2> CanIsoFromTo<DensePolyRingBase<R1, M1>> for DensePolyRingBase<R2, M2> 
-    where R1: RingStore, M1: GrowableMemoryProvider<El<R1>>, 
-        R2: RingStore, M2: GrowableMemoryProvider<El<R2>>,
+impl<R1, A1, R2, A2> CanIsoFromTo<DensePolyRingBase<R1, A1>> for DensePolyRingBase<R2, A2> 
+    where R1: RingStore, A1: Allocator + Clone, 
+        R2: RingStore, A2: Allocator + Clone,
         R2::Type: CanIsoFromTo<R1::Type>
 {
     type Isomorphism = <R2::Type as CanIsoFromTo<R1::Type>>::Isomorphism;
 
-    fn has_canonical_iso(&self, from: &DensePolyRingBase<R1, M1>) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, from: &DensePolyRingBase<R1, A1>) -> Option<Self::Isomorphism> {
         self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
     }
 
-    fn map_out(&self, from: &DensePolyRingBase<R1, M1>, el: M2::Object, hom: &Self::Isomorphism) -> M1::Object {
-        from.memory_provider.get_new_init(el.len(), |i| self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(&el[i]), hom))
+    fn map_out(&self, from: &DensePolyRingBase<R1, A1>, el: DensePolyRingEl<R2, A2>, hom: &Self::Isomorphism) -> DensePolyRingEl<R1, A1> {
+        RingRef::new(from).from_terms((0..el.data.len()).map(|i| (self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(&el.data[i]), hom), i)))
     }
 }
 
-impl<R, P, M> CanIsoFromTo<P> for DensePolyRingBase<R, M> 
-    where R: RingStore, R::Type: CanIsoFromTo<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanIsoFromToMarker, M: GrowableMemoryProvider<El<R>>
+impl<R, P, A> CanIsoFromTo<P> for DensePolyRingBase<R, A> 
+    where R: RingStore, R::Type: CanIsoFromTo<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanIsoFromToMarker, A: Allocator + Clone
 {
     type Isomorphism = super::generic_impls::Isomorphism<P, Self>;
 
@@ -311,7 +327,7 @@ impl<R, P, M> CanIsoFromTo<P> for DensePolyRingBase<R, M>
     }
 }
 
-impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingExtension for DensePolyRingBase<R, M> {
+impl<R: RingStore, A: Allocator + Clone> RingExtension for DensePolyRingBase<R, A> {
     
     type BaseRing = R;
 
@@ -320,8 +336,9 @@ impl<R: RingStore, M: GrowableMemoryProvider<El<R>>> RingExtension for DensePoly
     }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
-        let mut value = Some(x);
-        self.memory_provider.get_new_init(1, |_| std::mem::replace(&mut value, None).unwrap())
+        let mut result = self.zero();
+        result.data.push(x);
+        return result;
     }
 }
 
@@ -358,19 +375,21 @@ impl<'a, R> Iterator for TermIterator<'a, R>
     }
 }
 
-impl<R, M: GrowableMemoryProvider<El<R>>> PolyRing for DensePolyRingBase<R, M> 
+impl<R, A: Allocator + Clone> PolyRing for DensePolyRingBase<R, A> 
     where R: RingStore
 {
     type TermsIterator<'a> = TermIterator<'a, R>
         where Self: 'a;
 
     fn indeterminate(&self) -> Self::Element {
-        self.memory_provider.get_new_init(2, |i| if i == 0 { self.base_ring().zero() } else { self.base_ring().one() })
+        let mut result = self.zero();
+        result.data.extend([self.base_ring().zero(), self.base_ring().one()].into_iter());
+        return result;
     }
 
     fn terms<'a>(&'a self, f: &'a Self::Element) -> TermIterator<'a, R> {
         TermIterator {
-            iter: f.iter().enumerate(), 
+            iter: f.data.iter().enumerate(), 
             ring: self.base_ring()
         }
     }
@@ -379,22 +398,24 @@ impl<R, M: GrowableMemoryProvider<El<R>>> PolyRing for DensePolyRingBase<R, M>
         where I: Iterator<Item = (El<Self::BaseRing>, usize)>
     {
         for (c, i) in rhs {
-            self.grow(lhs, i + 1);
-            self.base_ring().add_assign(&mut lhs[i], c);
+            if lhs.data.len() <= i {
+                lhs.data.resize_with(i + 1, || self.base_ring().zero());
+            }
+            self.base_ring().add_assign(&mut lhs.data[i], c);
         }
     }
 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, i: usize) -> &'a El<Self::BaseRing> {
-        if i < f.len() {
-            return &f[i];
+        if i < f.data.len() {
+            return &f.data[i];
         } else {
             return &self.zero;
         }
     }
 
     fn degree(&self, f: &Self::Element) -> Option<usize> {
-        for i in (0..f.len()).rev() {
-            if !self.base_ring().is_zero(&f[i]) {
+        for i in (0..f.data.len()).rev() {
+            if !self.base_ring().is_zero(&f.data[i]) {
                 return Some(i);
             }
         }
@@ -424,17 +445,17 @@ impl<R, M: GrowableMemoryProvider<El<R>>> PolyRing for DensePolyRingBase<R, M>
     }
 }
 
-impl<R, M: GrowableMemoryProvider<El<R>>> Domain for DensePolyRingBase<R, M> 
+impl<R, A: Allocator + Clone> Domain for DensePolyRingBase<R, A> 
     where R: RingStore, R::Type: Domain
 {}
 
-impl<R, M: GrowableMemoryProvider<El<R>>> DivisibilityRing for DensePolyRingBase<R, M> 
+impl<R, A: Allocator + Clone> DivisibilityRing for DensePolyRingBase<R, A> 
     where R: DivisibilityRingStore, R::Type: DivisibilityRing
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if let Some(d) = self.degree(rhs) {
-            let lc = &rhs[d];
-            let mut lhs_copy = self.memory_provider.get_new_init(lhs.len(), |i| self.base_ring.clone_el(&lhs[i]));
+            let lc = &rhs.data[d];
+            let mut lhs_copy = self.clone_el(lhs);
             let quo = self.poly_div(&mut lhs_copy, rhs, |x| self.base_ring().checked_left_div(&x, lc))?;
             if self.is_zero(&lhs_copy) {
                 Some(quo)
@@ -451,51 +472,51 @@ impl<R, M: GrowableMemoryProvider<El<R>>> DivisibilityRing for DensePolyRingBase
 
 trait ImplPrincipalIdealRing: Field {
 
-    fn extended_ideal_gen<P, R, M>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
-        where P: PolyRingStore<Type = DensePolyRingBase<R, M>>,
+    fn extended_ideal_gen<P, R, A>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
+        where P: PolyRingStore<Type = DensePolyRingBase<R, A>>,
             R: RingStore<Type = Self>,
-            M: GrowableMemoryProvider<El<R>>;
+            A: Allocator + Clone;
 
-    fn ideal_gen<P, R, M>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: PolyRingStore<Type = DensePolyRingBase<R, M>>,
+    fn ideal_gen<P, R, A>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+        where P: PolyRingStore<Type = DensePolyRingBase<R, A>>,
             R: RingStore<Type = Self>,
-            M: GrowableMemoryProvider<El<R>>;
+            A: Allocator + Clone;
 }
 
 impl<F: ?Sized + Field> ImplPrincipalIdealRing for F {
 
-    default fn extended_ideal_gen<P, R, M>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
-        where P: PolyRingStore<Type = DensePolyRingBase<R, M>>,
+    default fn extended_ideal_gen<P, R, A>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
+        where P: PolyRingStore<Type = DensePolyRingBase<R, A>>,
             R: RingStore<Type = Self>,
-            M: GrowableMemoryProvider<El<R>>
+            A: Allocator + Clone
     {
         algorithms::eea::eea(poly_ring.clone_el(lhs), poly_ring.clone_el(rhs), poly_ring)
     }
 
-    default fn ideal_gen<P, R, M>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: PolyRingStore<Type = DensePolyRingBase<R, M>>,
+    default fn ideal_gen<P, R, A>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+        where P: PolyRingStore<Type = DensePolyRingBase<R, A>>,
             R: RingStore<Type = Self>,
-            M: GrowableMemoryProvider<El<R>>
+            A: Allocator + Clone
     {
-        <Self as ImplPrincipalIdealRing>::extended_ideal_gen::<P, R, M>(poly_ring, lhs, rhs).2
+        <Self as ImplPrincipalIdealRing>::extended_ideal_gen::<P, R, A>(poly_ring, lhs, rhs).2
     }
 }
 
 impl<I: IntegerRingStore> ImplPrincipalIdealRing for RationalFieldBase<I>
     where I::Type: IntegerRing
 {
-    fn extended_ideal_gen<P, R, M>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
-        where P: PolyRingStore<Type = DensePolyRingBase<R, M>>,
+    fn extended_ideal_gen<P, R, A>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
+        where P: PolyRingStore<Type = DensePolyRingBase<R, A>>,
             R: RingStore<Type = Self>,
-            M: GrowableMemoryProvider<El<R>>
+            A: Allocator + Clone
     {
         algorithms::eea::eea(poly_ring.clone_el(lhs), poly_ring.clone_el(rhs), poly_ring)
     }
 
-    fn ideal_gen<P, R, M>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: PolyRingStore<Type = DensePolyRingBase<R, M>>,
+    fn ideal_gen<P, R, A>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+        where P: PolyRingStore<Type = DensePolyRingBase<R, A>>,
             R: RingStore<Type = Self>,
-            M: GrowableMemoryProvider<El<R>>
+            A: Allocator + Clone
     {
         let QQ = poly_ring.base_ring();
         let ZZX = DensePolyRing::new(QQ.base_ring(), "X");
@@ -507,7 +528,7 @@ impl<I: IntegerRingStore> ImplPrincipalIdealRing for RationalFieldBase<I>
     }
 }
 
-impl<R, M: GrowableMemoryProvider<El<R>>> PrincipalIdealRing for DensePolyRingBase<R, M>
+impl<R, A: Allocator + Clone> PrincipalIdealRing for DensePolyRingBase<R, A>
     where R: RingStore, R::Type: Field
 {
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
@@ -519,11 +540,11 @@ impl<R, M: GrowableMemoryProvider<El<R>>> PrincipalIdealRing for DensePolyRingBa
     }
 }
 
-impl<R, M: GrowableMemoryProvider<El<R>>> EuclideanRing for DensePolyRingBase<R, M> 
+impl<R, A: Allocator + Clone> EuclideanRing for DensePolyRingBase<R, A> 
     where R: RingStore, R::Type: Field
 {
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
-        let lc_inv = self.base_ring.invert(&rhs[self.degree(rhs).unwrap()]).unwrap();
+        let lc_inv = self.base_ring.invert(&rhs.data[self.degree(rhs).unwrap()]).unwrap();
         let quo = self.poly_div(&mut lhs, rhs, |x| Some(self.base_ring().mul_ref_snd(x, &lc_inv))).unwrap();
         return (quo, lhs);
     }

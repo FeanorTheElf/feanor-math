@@ -21,16 +21,10 @@ extern crate rayon;
 extern crate ndarray;
 
 ///
-/// Contains different implementations of [`mempool::MemoryProvider`],
-/// which can be used to tell algorithms and ring implementations how to allocate internally
-/// used memory.
-/// 
-pub mod mempool;
-#[macro_use]
-///
 /// Contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`],
 /// as well as [`ring::CanHomFrom`] and [`ring::CanIsoFromTo`].
 /// 
+#[macro_use]
 pub mod ring;
 ///
 /// Contains the trait [`delegate::DelegateRing`] that simplifies implementing the 

@@ -929,8 +929,6 @@ impl<'a, V, R> super::Matrix<R> for SubmatrixMut<'a, V, R::Element>
 
 #[cfg(test)]
 use std::fmt::Debug;
-#[cfg(test)]
-use crate::mempool::caching::CachedMemoryData;
 
 #[cfg(test)]
 fn assert_submatrix_eq<V: AsPointerToSlice<T>, T: PartialEq + Debug, const N: usize, const M: usize>(expected: [[T; M]; N], actual: &mut SubmatrixMut<V, T>) {
@@ -954,22 +952,6 @@ fn with_testmatrix_vec<F>(f: F)
         vec![11, 12, 13, 14, 15]
     ];
     let matrix = SubmatrixMut::<Vec<_>, _>::new(&mut data[..]);
-    f(matrix)
-}
-
-#[cfg(test)]
-fn with_testmatrix_caching_memprovider_object<F>(f: F)
-    where F: FnOnce(SubmatrixMut<CachedMemoryData<i64>, i64>)
-{
-    use crate::mempool::{caching::CachingMemoryProvider, MemoryProvider};
-
-    let memory_provider = CachingMemoryProvider::new(0);
-    let mut data = vec![
-        memory_provider.get_new_init(5, |i| [1, 2, 3, 4, 5][i]),
-        memory_provider.get_new_init(5, |i| [6, 7, 8, 9, 10][i]),
-        memory_provider.get_new_init(5, |i| [11, 12, 13, 14, 15][i])
-    ];
-    let matrix = SubmatrixMut::<CachedMemoryData<_>, _>::new(&mut data[..]);
     f(matrix)
 }
 
@@ -1045,7 +1027,6 @@ fn test_submatrix_wrapper() {
     with_testmatrix_array(test_submatrix);
     with_testmatrix_linmem(test_submatrix);
     with_testmatrix_ndarray(test_submatrix);
-    with_testmatrix_caching_memprovider_object(test_submatrix)
 }
 
 #[cfg(test)]
@@ -1081,7 +1062,6 @@ fn test_submatrix_mutate_wrapper() {
     with_testmatrix_array(test_submatrix_mutate);
     with_testmatrix_linmem(test_submatrix_mutate);
     with_testmatrix_ndarray(test_submatrix_mutate);
-    with_testmatrix_caching_memprovider_object(test_submatrix_mutate)
 }
 
 #[cfg(test)]
@@ -1149,7 +1129,6 @@ fn test_submatrix_col_iter_wrapper() {
     with_testmatrix_array(test_submatrix_col_iter);
     with_testmatrix_linmem(test_submatrix_col_iter);
     with_testmatrix_ndarray(test_submatrix_col_iter);
-    with_testmatrix_caching_memprovider_object(test_submatrix_col_iter);
 }
 
 #[cfg(test)]
@@ -1212,7 +1191,6 @@ fn test_submatrix_row_iter_wrapper() {
     with_testmatrix_array(test_submatrix_row_iter);
     with_testmatrix_linmem(test_submatrix_row_iter);
     with_testmatrix_ndarray(test_submatrix_row_iter);
-    with_testmatrix_caching_memprovider_object(test_submatrix_row_iter);
 }
 
 #[cfg(test)]
@@ -1247,7 +1225,6 @@ fn test_submatrix_col_at_wrapper() {
     with_testmatrix_array(test_submatrix_col_at);
     with_testmatrix_linmem(test_submatrix_col_at);
     with_testmatrix_ndarray(test_submatrix_col_at);
-    with_testmatrix_caching_memprovider_object(test_submatrix_col_at);
 }
 
 #[cfg(test)]
@@ -1282,5 +1259,4 @@ fn test_submatrix_row_at_wrapper() {
     with_testmatrix_array(test_submatrix_row_at);
     with_testmatrix_linmem(test_submatrix_row_at);
     with_testmatrix_ndarray(test_submatrix_row_at);
-    with_testmatrix_caching_memprovider_object(test_submatrix_row_at);
 }

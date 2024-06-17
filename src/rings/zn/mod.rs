@@ -19,14 +19,6 @@ use crate::rings::finite::FiniteRingStore;
 /// 
 pub mod zn_barett;
 ///
-/// This module contains [`zn_42::Zn`], a heavily optimized implementation of `Z/nZ`
-/// for moduli `n` with at most 41 bits. Note that for most purposes, this should be
-/// replace by the new module [`zn_64::Zn`].
-/// 
-#[deprecated(since = "1.6.1", note = "Please use use `zn_64` instead")]
-#[allow(deprecated)]
-pub mod zn_42;
-///
 /// This module contains [`zn_64::Zn`], the new, heavily optimized implementation of `Z/nZ`
 /// for moduli `n` of size slightly smaller than 64 bits.
 /// 

@@ -1,5 +1,4 @@
 use crate::ring::*;
-use crate::mempool::*;
 use super::karatsuba::*;
 
 ///
@@ -26,7 +25,7 @@ pub trait ConvMulComputation: RingBase {
     /// where `i` runs through `max(0, j - rhs.len() - 1), ..., min(j, lhs.len() - 1)`.
     /// Requires that `dst` is of length at least `lhs.len() + rhs.len() + 1`.
     /// 
-    fn add_assign_conv_mul<M: MemoryProvider<Self::Element>>(&self, dst: &mut [Self::Element], lhs: &[Self::Element], rhs: &[Self::Element], memory_provider: &M);
+    fn add_assign_conv_mul(&self, dst: &mut [Self::Element], lhs: &[Self::Element], rhs: &[Self::Element]);
 }
 
 impl<R: RingBase + ?Sized> ConvMulComputation for R {
@@ -35,9 +34,9 @@ impl<R: RingBase + ?Sized> ConvMulComputation for R {
         0
     }
 
-    fn add_assign_conv_mul<M: MemoryProvider<Self::Element>>(&self, dst: &mut [Self::Element], lhs: &[Self::Element], rhs: &[Self::Element], memory_provider: &M) {
+    fn add_assign_conv_mul(&self, dst: &mut [Self::Element], lhs: &[Self::Element], rhs: &[Self::Element]) {
         // checks are done by karatsuba()
-        karatsuba(self.karatsuba_threshold(), dst, lhs, rhs, RingRef::new(self), memory_provider);
+        karatsuba(self.karatsuba_threshold(), dst, lhs, rhs, RingRef::new(self));
     }
 }
 
@@ -45,8 +44,6 @@ impl<R: RingBase + ?Sized> ConvMulComputation for R {
 use test;
 #[cfg(test)]
 use crate::primitive_int::*;
-#[cfg(test)]
-use crate::default_memory_provider;
 
 #[bench]
 fn bench_naive_mul_1024_bit(bencher: &mut test::Bencher) {
@@ -56,7 +53,7 @@ fn bench_naive_mul_1024_bit(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         c.clear();
         c.resize(64, 0);
-        karatsuba(10, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &default_memory_provider!());
+        karatsuba(10, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING);
         assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
         assert_eq!(c[62], 31 * 31);
     });
@@ -70,7 +67,7 @@ fn bench_karatsuba_mul_1024_bit(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         c.clear();
         c.resize(64, 0);
-        karatsuba(4, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &default_memory_provider!());
+        karatsuba(4, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING);
         assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
         assert_eq!(c[62], 31 * 31);
     });

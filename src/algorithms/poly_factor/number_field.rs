@@ -110,8 +110,6 @@ pub fn factor_over_number_field<P, I>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, u
 }
 
 #[cfg(test)]
-use crate::default_memory_provider;
-#[cfg(test)]
 use crate::integer::BigIntRing;
 #[cfg(test)]
 use crate::rings::extension::extension_impl::FreeAlgebraImpl;
@@ -123,7 +121,7 @@ fn test_factor_number_field() {
 
     // a quadratic field
 
-    let K = FreeAlgebraImpl::new(QQ, [ZZ_to_QQ.map(-1), ZZ_to_QQ.map(-1)], default_memory_provider!()).as_field().ok().unwrap();
+    let K = FreeAlgebraImpl::new(QQ, [ZZ_to_QQ.map(-1), ZZ_to_QQ.map(-1)]).as_field().ok().unwrap();
     let KX = DensePolyRing::new(&K, "X");
     let poly = K.generating_poly(&KX, K.inclusion());
 
@@ -134,7 +132,7 @@ fn test_factor_number_field() {
 
     // the case of a galois field of degree 3
 
-    let K = FreeAlgebraImpl::new(QQ, [ZZ_to_QQ.map(1), ZZ_to_QQ.map(2), ZZ_to_QQ.map(-1)], default_memory_provider!()).as_field().ok().unwrap();
+    let K = FreeAlgebraImpl::new(QQ, [ZZ_to_QQ.map(1), ZZ_to_QQ.map(2), ZZ_to_QQ.map(-1)]).as_field().ok().unwrap();
     let KX = DensePolyRing::new(&K, "X");
     let poly = K.generating_poly(&KX, K.inclusion());
 
@@ -145,7 +143,7 @@ fn test_factor_number_field() {
 
     // the case of a non-galois field (not normal) of degree 3
 
-    let K = FreeAlgebraImpl::new(QQ, [ZZ_to_QQ.map(2), ZZ_to_QQ.map(0), ZZ_to_QQ.map(0)], default_memory_provider!()).as_field().ok().unwrap();
+    let K = FreeAlgebraImpl::new(QQ, [ZZ_to_QQ.map(2), ZZ_to_QQ.map(0), ZZ_to_QQ.map(0)]).as_field().ok().unwrap();
     let KX = DensePolyRing::new(&K, "X");
     let poly = K.generating_poly(&KX, K.inclusion());
     

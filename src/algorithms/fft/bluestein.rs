@@ -1,3 +1,5 @@
+use std::alloc::Allocator;
+use std::alloc::Global;
 use std::ops::DerefMut;
 
 use crate::algorithms::fft::FFTTable;
@@ -5,9 +7,6 @@ use crate::algorithms::unity_root::is_prim_root_of_unity;
 use crate::divisibility::DivisibilityRing;
 use crate::divisibility::DivisibilityRingStore;
 use crate::integer::IntegerRingStore;
-use crate::mempool::*;
-use crate::mempool::MemoryProvider;
-use crate::default_memory_provider;
 use crate::primitive_int::*;
 use crate::ring::*;
 use crate::homomorphism::*;
@@ -20,10 +19,11 @@ use super::complex_fft::*;
 /// Bluestein's FFT algorithm (also known as Chirp-Z-transform) to compute the Fourier
 /// transform of arbitrary length (including prime numbers).
 /// 
-pub struct FFTTableBluestein<R>
-    where R: RingStore
+pub struct FFTTableBluestein<R, A = Global>
+    where R: RingStore, A: Allocator
 {
     m_fft_table: algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey<R>,
+    tmp_mem_allocator: A,
     ///
     /// This is the bitreverse fft of a part of the sequence b_i := z^(i^2) where
     /// z is a 2n-th root of unity.
@@ -39,11 +39,12 @@ pub struct FFTTableBluestein<R>
     n: usize
 }
 
-impl<R> FFTTableBluestein<R> 
+impl<R, A> FFTTableBluestein<R, A> 
     where R: DivisibilityRingStore,
-        R::Type: DivisibilityRing
+        R::Type: DivisibilityRing, 
+        A: Allocator
 {
-    pub fn new(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize) -> Self {
+    pub fn new(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize, tmp_mem_allocator: A) -> Self {
         // we cannot cannot call `new_with_mem_and_pows` because of borrowing conflicts 
 
         // checks on m and root_of_unity_m are done by the FFTTableCooleyTuckey
@@ -57,23 +58,24 @@ impl<R> FFTTableBluestein<R>
         };
         
         let mut b = Self::create_b_array(&ring, root_of_unity_2n_pows, n, 1 << log2_m);
-        let inv_root_of_unity_2n = AllocatingMemoryProvider.get_new_init(n, |i| root_of_unity_2n_pows(-((i * i) as i64)));
+        let inv_root_of_unity_2n = (0..n).map(|i| root_of_unity_2n_pows(-((i * i) as i64))).collect::<Vec<_>>();
         let root_of_unity_n = ring.pow(ring.clone_el(&root_of_unity_2n), 2);
         let m_fft_table = algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey::new(ring, root_of_unity_m, log2_m);
-        m_fft_table.unordered_fft(&mut b[..], &default_memory_provider!(), &m_fft_table.ring().identity());
+        m_fft_table.unordered_fft(&mut b[..], &m_fft_table.ring().identity());
         return FFTTableBluestein { 
             m_fft_table: m_fft_table, 
             b_bitreverse_fft: b, 
             inv_root_of_unity_2n: inv_root_of_unity_2n, 
             root_of_unity_n: root_of_unity_n,
-            n: n
+            n: n,
+            tmp_mem_allocator: tmp_mem_allocator
         };
     }
     
     fn create_b_array<F>(ring: &R, mut root_of_unity_2n_pows: F, n: usize, m: usize) -> Vec<El<R>>
         where F: FnMut(i64) -> El<R>
     {
-        let mut b = AllocatingMemoryProvider.get_new_init(m, |_| ring.zero());
+        let mut b = (0..m).map(|_| ring.zero()).collect::<Vec<_>>();
         b[0] = ring.one();
         for i in 1..n {
             b[i] = root_of_unity_2n_pows((i * i) as i64 % (2 * n) as i64);
@@ -82,7 +84,7 @@ impl<R> FFTTableBluestein<R>
         return b;
     }
 
-    pub fn new_with_pows<F, G>(ring: R, mut root_of_unity_2n_pows: F, root_of_unity_m_pows: G, n: usize, log2_m: usize) -> Self
+    pub fn new_with_pows<F, G>(ring: R, mut root_of_unity_2n_pows: F, root_of_unity_m_pows: G, n: usize, log2_m: usize, tmp_mem_allocator: A) -> Self
         where F: FnMut(i64) -> El<R>,
             G: FnMut(i64) -> El<R>
     {
@@ -91,20 +93,21 @@ impl<R> FFTTableBluestein<R>
         assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity(&ring, &root_of_unity_2n_pows(1), 2 * n));
 
         let mut b = Self::create_b_array(&ring, &mut root_of_unity_2n_pows, n, 1 << log2_m);
-        let inv_root_of_unity_2n = AllocatingMemoryProvider.get_new_init(n, |i| root_of_unity_2n_pows(-((i * i) as i64)));
+        let inv_root_of_unity_2n = (0..n).map(|i| root_of_unity_2n_pows(-((i * i) as i64))).collect::<Vec<_>>();
         let root_of_unity_n = root_of_unity_2n_pows(2);
         let m_fft_table = algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey::new_with_pows(ring, root_of_unity_m_pows, log2_m);
-        m_fft_table.unordered_fft(&mut b[..], &default_memory_provider!(), &m_fft_table.ring().identity());
+        m_fft_table.unordered_fft(&mut b[..], &m_fft_table.ring().identity());
         return FFTTableBluestein { 
             m_fft_table: m_fft_table, 
             b_bitreverse_fft: b, 
             inv_root_of_unity_2n: inv_root_of_unity_2n, 
             root_of_unity_n: root_of_unity_n,
-            n: n
+            n: n,
+            tmp_mem_allocator: tmp_mem_allocator
         };
     }
 
-    pub fn for_zn(ring: R, n: usize) -> Option<Self>
+    pub fn for_zn(ring: R, n: usize, tmp_mem_allocator: A) -> Option<Self>
         where R: ZnRingStore,
             R::Type: ZnRing,
             <R::Type as ZnRing>::IntegerRingBase: CanHomFrom<StaticRingBase<i64>>
@@ -113,16 +116,16 @@ impl<R> FFTTableBluestein<R>
         let log2_m = ZZ.abs_log2_ceil(&(2 * n as i64 + 1)).unwrap();
         let root_of_unity_2n = algorithms::unity_root::get_prim_root_of_unity(&ring, 2 * n)?;
         let root_of_unity_m = algorithms::unity_root::get_prim_root_of_unity_pow2(&ring, log2_m)?;
-        Some(Self::new(ring, root_of_unity_2n, root_of_unity_m, n, log2_m))
+        Some(Self::new(ring, root_of_unity_2n, root_of_unity_m, n, log2_m, tmp_mem_allocator))
     }
 
-    pub fn for_complex(ring: R, n: usize) -> Self
+    pub fn for_complex(ring: R, n: usize, tmp_mem_allocator: A) -> Self
         where R: RingStore<Type = Complex64Base>
     {
         let ZZ = StaticRing::<i64>::RING;
         let CC = Complex64::RING;
         let log2_m = ZZ.abs_log2_ceil(&(2 * n as i64 + 1)).unwrap();
-        Self::new_with_pows(ring, |x| CC.root_of_unity(x, 2 * n as i64), |x| CC.root_of_unity(x, 1 << log2_m), n, log2_m)
+        Self::new_with_pows(ring, |x| CC.root_of_unity(x, 2 * n as i64), |x| CC.root_of_unity(x, 1 << log2_m), n, log2_m, tmp_mem_allocator)
     }
 
     ///
@@ -136,12 +139,11 @@ impl<R> FFTTableBluestein<R>
     /// and compute the convolution efficiently using a power-of-two FFT (e.g. with the Cooley-Tuckey 
     /// algorithm).
     /// 
-    pub fn fft_base<V, W, S, N, H, const INV: bool>(&self, mut values: V, mut buffer: W, memory_provider: &N, hom: &H)
+    pub fn fft_base<V, W, S, H, const INV: bool>(&self, mut values: V, mut buffer: W, hom: &H)
         where V: VectorViewMut<S::Element>, 
             W: VectorViewMut<S::Element>, 
             S: ?Sized + RingBase, 
-            H: Homomorphism<R::Type, S>,
-            N: MemoryProvider<S::Element>
+            H: Homomorphism<R::Type, S>
     {
         assert_eq!(values.len(), self.n);
         assert_eq!(buffer.len(), self.m_fft_table.len());
@@ -164,11 +166,11 @@ impl<R> FFTTableBluestein<R>
         }
 
         // perform convoluted product with b using a power-of-two fft
-        self.m_fft_table.unordered_fft(&mut buffer, memory_provider, hom);
+        self.m_fft_table.unordered_fft(&mut buffer, hom);
         for i in 0..self.m_fft_table.len() {
             hom.mul_assign_map_ref(buffer.at_mut(i), &self.b_bitreverse_fft[i]);
         }
-        self.m_fft_table.unordered_inv_fft(&mut buffer, memory_provider, hom);
+        self.m_fft_table.unordered_inv_fft(&mut buffer, hom);
 
         // write values back, and multiply them with a twiddle factor
         for i in 0..self.n {
@@ -223,42 +225,40 @@ impl<R> FFTTable for FFTTableBluestein<R>
         i
     }
 
-    fn unordered_fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+    fn unordered_fft<V, S, H>(&self, values: V, hom: &H)
         where S: ?Sized + RingBase, 
             H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: VectorViewMut<S::Element>,
-            M: MemoryProvider<S::Element>
+            V: VectorViewMut<S::Element>
     {
-        let mut buffer = memory_provider.get_new_init(self.m_fft_table.len(), |_| hom.codomain().zero());
-        self.fft_base::<_, _, _, _, H, false>(values, buffer.deref_mut(), memory_provider, hom);
+        let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.tmp_mem_allocator.clone());
+        buffer.extend((0..self.m_fft_table.len()).map(|_| hom.codomain().zero()));
+        self.fft_base::<_, _, _, H, false>(values, buffer.deref_mut(), hom);
     }
 
-    fn unordered_inv_fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+    fn unordered_inv_fft<V, S, H>(&self, values: V, hom: &H)
         where S: ?Sized + RingBase, 
             H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: VectorViewMut<S::Element>,
-            M: MemoryProvider<S::Element>
+            V: VectorViewMut<S::Element>
     {
-        let mut buffer = memory_provider.get_new_init(self.m_fft_table.len(), |_| hom.codomain().zero());
-        self.fft_base::<_, _, _, _, H, true>(values, buffer.deref_mut(), memory_provider, hom);
+        let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.tmp_mem_allocator.clone());
+        buffer.extend((0..self.m_fft_table.len()).map(|_| hom.codomain().zero()));
+        self.fft_base::<_, _, _, H, true>(values, buffer.deref_mut(), hom);
     }
 
-    fn fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+    fn fft<V, S, H>(&self, values: V, hom: &H)
         where S: ?Sized + RingBase, 
             H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: crate::vector::SwappableVectorViewMut<S::Element>,
-            M: MemoryProvider<S::Element>
+            V: crate::vector::SwappableVectorViewMut<S::Element>
     {
-        self.unordered_fft(values, memory_provider, hom);
+        self.unordered_fft(values, hom);
     }
 
-    fn inv_fft<V, S, M, H>(&self, values: V, memory_provider: &M, hom: &H)
+    fn inv_fft<V, S, H>(&self, values: V, hom: &H)
         where S: ?Sized + RingBase, 
             H: Homomorphism<<Self::Ring as RingStore>::Type, S>,
-            V: crate::vector::SwappableVectorViewMut<S::Element>,
-            M: MemoryProvider<S::Element>
+            V: crate::vector::SwappableVectorViewMut<S::Element>
     {
-        self.unordered_inv_fft(values, memory_provider, hom);
+        self.unordered_inv_fft(values, hom);
     }
 }
 
@@ -285,10 +285,10 @@ use crate::rings::zn::zn_static::*;
 fn test_fft_base() {
     let ring = Zn::<241>::RING;
     // a 5-th root of unity is 91 
-    let fft = FFTTableBluestein::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4);
+    let fft = FFTTableBluestein::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4, Global);
     let mut values = [1, 3, 2, 0, 7];
     let mut buffer = [0; 16];
-    fft.fft_base::<_, _, _, _, _, false>(&mut values, &mut buffer, &default_memory_provider!(), &ring.identity());
+    fft.fft_base::<_, _, _, _, false>(&mut values, &mut buffer, &ring.identity());
     let expected = [13, 137, 202, 206, 170];
     assert_eq!(expected, values);
 }
@@ -297,12 +297,12 @@ fn test_fft_base() {
 fn test_inv_fft_base() {
     let ring = Zn::<241>::RING;
     // a 5-th root of unity is 91 
-    let fft = FFTTableBluestein::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4);
+    let fft = FFTTableBluestein::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4, Global);
     let values = [1, 3, 2, 0, 7];
     let mut work = values;
     let mut buffer = [0; 16];
-    fft.fft_base::<_, _, _, _, _, false>(&mut work, &mut buffer, &default_memory_provider!(), &ring.identity());
-    fft.fft_base::<_, _, _, _, _, true>(&mut work, &mut buffer, &default_memory_provider!(), &ring.identity());
+    fft.fft_base::<_, _, _, _, false>(&mut work, &mut buffer, &ring.identity());
+    fft.fft_base::<_, _, _, _, true>(&mut work, &mut buffer, &ring.identity());
     assert_eq!(values, work);
 }
 
@@ -310,9 +310,9 @@ fn test_inv_fft_base() {
 fn test_approximate_fft() {
     let CC = Complex64::RING;
     for (p, _log2_m) in [(5, 4), (53, 7), (1009, 11)] {
-        let fft = FFTTableBluestein::for_complex(&CC, p);
-        let mut array = default_memory_provider!().get_new_init(p as usize, |i| CC.root_of_unity(i as i64, p as i64));
-        fft.fft(&mut array, &default_memory_provider!(), &CC.identity());
+        let fft = FFTTableBluestein::for_complex(&CC, p, Global);
+        let mut array = (0..(p as usize)).map(|i| CC.root_of_unity(i as i64, p as i64)).collect::<Vec<_>>();
+        fft.fft(&mut array, &CC.identity());
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));

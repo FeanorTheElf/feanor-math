@@ -4,13 +4,13 @@ use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
 use crate::pid::*;
 use crate::field::Field;
-use crate::mempool::GrowableMemoryProvider;
 use crate::vector::VectorViewMut;
 use crate::ring::*;
 use crate::rings::poly::*;
 use crate::vector::*;
 use crate::vector::sparse::*;
 
+use std::alloc::Allocator;
 use std::cmp::max;
 use std::rc::Rc;
 
@@ -77,20 +77,16 @@ pub type SparsePolyRing<R: RingStore> = RingValue<SparsePolyRingBase<R>>;
 impl<R: RingStore> SparsePolyRing<R> {
 
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        Self::from(SparsePolyRingBase::new(base_ring, unknown_name))
+        let zero = base_ring.zero();
+        Self::from(SparsePolyRingBase { 
+            base_ring: Rc::new(base_ring), 
+            unknown_name: unknown_name, 
+            zero: zero
+        })
     }
 }
 
 impl<R: RingStore> SparsePolyRingBase<R> {
-
-    pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        let zero = base_ring.zero();
-        SparsePolyRingBase { 
-            base_ring: Rc::new(base_ring), 
-            unknown_name: unknown_name, 
-            zero: zero
-        }
-    }
 
     fn degree_truncate(&self, el: &mut <Self as RingBase>::Element) {
         for i in (0..el.len()).rev() {
@@ -259,8 +255,8 @@ impl<R: RingStore> RingExtension for SparsePolyRingBase<R> {
 
 pub trait ImplGenericCanIsoFromToMarker: PolyRing {}
 
-impl<R, M> ImplGenericCanIsoFromToMarker for dense_poly::DensePolyRingBase<R, M> 
-    where R: RingStore, M: GrowableMemoryProvider<El<R>>
+impl<R, A> ImplGenericCanIsoFromToMarker for dense_poly::DensePolyRingBase<R, A> 
+    where R: RingStore, A: Allocator + Clone
 {}
 
 impl<R, P> CanHomFrom<P> for SparsePolyRingBase<R> 

@@ -96,41 +96,6 @@ impl<const N: u64, const IS_FIELD: bool> CanHomFrom<StaticRingBase<i64>> for ZnB
     }
 }
 
-#[allow(deprecated)]
-impl<const N: u64, const IS_FIELD: bool> CanHomFrom<zn_42::ZnBase> for ZnBase<N, IS_FIELD> {
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, from: &zn_42::ZnBase) -> Option<()> {
-        if *from.modulus() == N as i64 {
-            Some(())
-        } else {
-            None
-        }
-    }
-
-    fn map_in(&self, from: &zn_42::ZnBase, el: zn_42::ZnEl, _: &()) -> Self::Element {
-        from.smallest_positive_lift(el) as u64
-    }
-}
-
-#[allow(deprecated)]
-impl<const N: u64, const IS_FIELD: bool> CanIsoFromTo<zn_42::ZnBase> for ZnBase<N, IS_FIELD> {
-    type Isomorphism = ();
-
-    fn has_canonical_iso(&self, from: &zn_42::ZnBase) -> Option<()> {
-        if *from.modulus() == N as i64 {
-            Some(())
-        } else {
-            None
-        }
-    }
-
-    fn map_out(&self, from: &zn_42::ZnBase, el: Self::Element, _: &()) -> zn_42::ZnEl {
-        RingRef::new(from).coerce(&StaticRing::<i128>::RING, el as i128)
-    }
-}
-
-
 impl<const N: u64, const IS_FIELD: bool> CanHomFrom<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD> {
     type Homomorphism = ();
     fn has_canonical_hom(&self, _: &Self) -> Option<()> { Some(()) }

@@ -1,10 +1,10 @@
 use std::cmp::min;
+use std::alloc::Allocator;
 
 use crate::divisibility::*;
 use crate::field::{Field, FieldStore};
 use crate::homomorphism::Homomorphism;
 use crate::integer::{int_cast, BigIntRing, IntegerRing, IntegerRingStore};
-use crate::mempool::MemoryProvider;
 use crate::ordered::*;
 use crate::pid::*;
 use crate::primitive_int::StaticRing;
@@ -315,12 +315,12 @@ impl<I> FactorPolyField for RationalFieldBase<I>
 macro_rules! impl_factor_poly_number_fields {
     ($number_field_type:ty, $($lifetimes:lifetime),*) => {
 
-        impl<$($lifetimes,)* I, V, M> FactorPolyField for $number_field_type
+        impl<$($lifetimes,)* I, V, A> FactorPolyField for $number_field_type
             where I: IntegerRingStore,
                 I::Type: IntegerRing,
                 RationalFieldBase<I>: FactorPolyField,
                 V: VectorView<El<RationalField<I>>>,
-                M: MemoryProvider<El<RationalField<I>>>
+                A: Allocator + Clone
         {
             fn factor_poly<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
                 where P: PolyRingStore,
@@ -331,24 +331,24 @@ macro_rules! impl_factor_poly_number_fields {
             }
         }
 
-        impl<$($lifetimes,)* I, V, M> ExtensionField for $number_field_type
+        impl<$($lifetimes,)* I, V, A> ExtensionField for $number_field_type
             where I: IntegerRingStore,
                 I::Type: IntegerRing,
                 RationalFieldBase<I>: FactorPolyField,
                 V: VectorView<El<RationalField<I>>>,
-                M: MemoryProvider<El<RationalField<I>>>
+                A: Allocator + Clone
         {}
     };
 }
 
 // unfortunately, any blanket impl conflicts with the one for finite fields...
-impl_factor_poly_number_fields!{ AsFieldBase<FreeAlgebraImpl<RationalField<I>, V, M>>, }
-impl_factor_poly_number_fields!{ AsFieldBase<RingRef<'a, FreeAlgebraImplBase<RationalField<I>, V, M>>>, 'a }
-impl_factor_poly_number_fields!{ AsFieldBase<FreeAlgebraImpl<RingRef<'a, RationalFieldBase<I>>, V, M>>, 'a }
-impl_factor_poly_number_fields!{ AsFieldBase<RingRef<'a, FreeAlgebraImplBase<RingRef<'b, RationalFieldBase<I>>, V, M>>>, 'a, 'b }
-impl_factor_poly_number_fields!{ AsFieldBase<&'a FreeAlgebraImpl<RationalField<I>, V, M>>, 'a }
-impl_factor_poly_number_fields!{ AsFieldBase<FreeAlgebraImpl<&'a RationalField<I>, V, M>>, 'a }
-impl_factor_poly_number_fields!{ AsFieldBase<&'a FreeAlgebraImpl<&'b RationalField<I>, V, M>>, 'a, 'b }
+impl_factor_poly_number_fields!{ AsFieldBase<FreeAlgebraImpl<RationalField<I>, V, A>>, }
+impl_factor_poly_number_fields!{ AsFieldBase<RingRef<'a, FreeAlgebraImplBase<RationalField<I>, V, A>>>, 'a }
+impl_factor_poly_number_fields!{ AsFieldBase<FreeAlgebraImpl<RingRef<'a, RationalFieldBase<I>>, V, A>>, 'a }
+impl_factor_poly_number_fields!{ AsFieldBase<RingRef<'a, FreeAlgebraImplBase<RingRef<'b, RationalFieldBase<I>>, V, A>>>, 'a, 'b }
+impl_factor_poly_number_fields!{ AsFieldBase<&'a FreeAlgebraImpl<RationalField<I>, V, A>>, 'a }
+impl_factor_poly_number_fields!{ AsFieldBase<FreeAlgebraImpl<&'a RationalField<I>, V, A>>, 'a }
+impl_factor_poly_number_fields!{ AsFieldBase<&'a FreeAlgebraImpl<&'b RationalField<I>, V, A>>, 'a, 'b }
 
 impl<R> ExtensionField for R
     where R: ?Sized + FiniteRing + Field + FreeAlgebra

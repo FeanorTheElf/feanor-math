@@ -1,3 +1,6 @@
+use std::alloc::Allocator;
+use std::alloc::Global;
+
 use crate::algorithms::conv_mul::ConvMulComputation;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::divisibility::*;
@@ -6,7 +9,6 @@ use crate::impl_wrap_unwrap_isos;
 use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
 use crate::matrix::Matrix;
-use crate::mempool::MemoryProvider;
 use crate::pid::PrincipalIdealRing;
 use crate::rings::field::AsField;
 use crate::rings::field::AsFieldBase;
@@ -19,7 +21,6 @@ use crate::ring::*;
 use crate::algorithms;
 use crate::vector::VectorView;
 use crate::iters::*;
-use crate::mempool::DefaultMemoryProvider;
 
 use super::*;
 
@@ -71,18 +72,18 @@ use super::*;
 /// ```
 /// In fact, this already behaves mostly like general GB-style situations
 /// 
-pub struct FreeAlgebraImplBase<R, V, M>
-    where R: RingStore, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+pub struct FreeAlgebraImplBase<R, V, A = Global>
+    where R: RingStore, V: VectorView<El<R>>, A: Allocator + Clone
 {
     base_ring: R,
     x_pow_rank: V,
-    memory_provider: M
+    element_allocator: A
 }
 
-pub struct FreeAlgebraEl<R, M>
-    where R: RingStore, M: MemoryProvider<El<R>>
+pub struct FreeAlgebraEl<R, A = Global>
+    where R: RingStore, A: Allocator
 {
-    values: M::Object
+    values: Box<[El<R>], A>
 }
 
 /// 
@@ -90,20 +91,28 @@ pub struct FreeAlgebraEl<R, M>
 /// equivalently a quotient of a univariate polynomial ring `R[X]/(f(X))`. For details, see
 /// [`FreeAlgebraImplBase`].
 /// 
-pub type FreeAlgebraImpl<R, V, M = DefaultMemoryProvider> = RingValue<FreeAlgebraImplBase<R, V, M>>;
+pub type FreeAlgebraImpl<R, V, A = Global> = RingValue<FreeAlgebraImplBase<R, V, A>>;
 
-impl<R, V, M> FreeAlgebraImpl<R, V, M>
-    where R: RingStore, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+impl<R, V> FreeAlgebraImpl<R, V>
+    where R: RingStore, V: VectorView<El<R>>
 {
-    pub const fn new(base_ring: R, x_pow_rank: V, memory_provider: M) -> FreeAlgebraImpl<R, V, M> {
+    pub const fn new(base_ring: R, x_pow_rank: V) -> Self {
+        Self::new_in(base_ring, x_pow_rank, Global)
+    }
+}
+
+impl<R, V, A> FreeAlgebraImpl<R, V, A>
+    where R: RingStore, V: VectorView<El<R>>, A: Allocator + Clone
+{
+    pub const fn new_in(base_ring: R, x_pow_rank: V, element_allocator: A) -> Self {
         RingValue::from(FreeAlgebraImplBase {
-            base_ring, x_pow_rank, memory_provider
+            base_ring, x_pow_rank, element_allocator
         })
     }
 }
 
-impl<R, V, M> FreeAlgebraImpl<R, V, M>
-    where R: RingStore, R::Type: FactorPolyField, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+impl<R, V, A> FreeAlgebraImpl<R, V, A>
+    where R: RingStore, R::Type: FactorPolyField, V: VectorView<El<R>>, A: Allocator + Clone
 {
     pub fn as_field(self) -> Result<AsField<Self>, Self> {
         let poly_ring = DensePolyRing::new(self.base_ring(), "X");
@@ -121,33 +130,35 @@ impl<R, V, M> FreeAlgebraImpl<R, V, M>
     }
 }
 
-impl<R, V, M> Clone for FreeAlgebraImplBase<R, V, M>
-    where R: RingStore + Clone, V: VectorView<El<R>> + Clone, M: MemoryProvider<El<R>> + Clone
+impl<R, V, A> Clone for FreeAlgebraImplBase<R, V, A>
+    where R: RingStore + Clone, V: VectorView<El<R>> + Clone, A: Allocator + Clone
 {
     fn clone(&self) -> Self {
         Self {
             base_ring: self.base_ring.clone(),
             x_pow_rank: self.x_pow_rank.clone(),
-            memory_provider: self.memory_provider.clone()
+            element_allocator: self.element_allocator.clone()
         }
     }
 }
 
-impl<R, V, M> PartialEq for FreeAlgebraImplBase<R, V, M>
-    where R: RingStore, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+impl<R, V, A> PartialEq for FreeAlgebraImplBase<R, V, A>
+    where R: RingStore, V: VectorView<El<R>>, A: Allocator + Clone
 {
     fn eq(&self, other: &Self) -> bool {
         self.base_ring.get_ring() == other.base_ring.get_ring() && self.rank() == other.rank() && (0..self.rank()).all(|i| self.base_ring.eq_el(self.x_pow_rank.at(i), other.x_pow_rank.at(i)))
     }
 }
 
-impl<R, V, M> RingBase for FreeAlgebraImplBase<R, V, M>
-    where R: RingStore, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+impl<R, V, A> RingBase for FreeAlgebraImplBase<R, V, A>
+    where R: RingStore, V: VectorView<El<R>>, A: Allocator + Clone
 {
-    type Element = FreeAlgebraEl<R, M>;
+    type Element = FreeAlgebraEl<R, A>;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        FreeAlgebraEl { values: self.memory_provider.get_new_init(self.rank(), |i| self.base_ring.clone_el(val.values.at(i))) }
+        let mut data = Vec::with_capacity_in(self.rank(), self.element_allocator.clone());
+        data.extend((0..self.rank()).map(|i| self.base_ring.clone_el(val.values.at(i))));
+        FreeAlgebraEl { values: data.into_boxed_slice() }
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -177,8 +188,9 @@ impl<R, V, M> RingBase for FreeAlgebraImplBase<R, V, M>
     }
 
     default fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        let mut tmp = self.memory_provider.get_new_init(self.rank() * 2, |_| self.base_ring.zero());
-        <_ as ConvMulComputation>::add_assign_conv_mul(self.base_ring().get_ring(), &mut tmp[..], &lhs.values[..], &rhs.values[..], &self.memory_provider);
+        let mut tmp = Vec::with_capacity_in(self.rank() * 2, self.element_allocator.clone());
+        tmp.extend((0..(self.rank() * 2)).map(|_| self.base_ring.zero()));
+        <_ as ConvMulComputation>::add_assign_conv_mul(self.base_ring().get_ring(), &mut tmp[..], &lhs.values[..], &rhs.values[..]);
         for i in (self.rank()..tmp.len()).rev() {
             for j in 0..self.rank() {
                 let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &tmp[i]);
@@ -240,44 +252,44 @@ impl<R, V, M> RingBase for FreeAlgebraImplBase<R, V, M>
 //     }
 // }
 
-pub struct WRTCanonicalBasisElementCreator<'a, R, V, M>
-    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+pub struct WRTCanonicalBasisElementCreator<'a, R, V, A>
+    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, A: Allocator + Clone
 {
-    base_ring: &'a FreeAlgebraImplBase<R, V, M>
+    base_ring: &'a FreeAlgebraImplBase<R, V, A>
 }
 
-impl<'a, R, V, M> Clone for WRTCanonicalBasisElementCreator<'a, R, V, M>
-    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+impl<'a, R, V, A> Clone for WRTCanonicalBasisElementCreator<'a, R, V, A>
+    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, A: Allocator + Clone
 {
     fn clone(&self) -> Self { *self }
 }
 
-impl<'a, 'b, R, V, M> FnOnce<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator<'a, R, V, M>
-    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+impl<'a, 'b, R, V, A> FnOnce<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator<'a, R, V, A>
+    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, A: Allocator + Clone
 {
-    type Output = El<FreeAlgebraImpl<R, V, M>>;
+    type Output = El<FreeAlgebraImpl<R, V, A>>;
 
     extern "rust-call" fn call_once(mut self, args: (&'b [El<R>], )) -> Self::Output {
         self.call_mut(args)
     }
 }
 
-impl<'a, 'b, R, V, M> FnMut<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator<'a, R, V, M>
-    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+impl<'a, 'b, R, V, A> FnMut<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator<'a, R, V, A>
+    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, A: Allocator + Clone
 {
     extern "rust-call" fn call_mut(&mut self, args: (&'b [El<R>], )) -> Self::Output {
         self.base_ring.from_canonical_basis(args.0.iter().map(|x| self.base_ring.base_ring().clone_el(x)))
     }
 }
 
-impl<'a, R, V, M> Copy for WRTCanonicalBasisElementCreator<'a, R, V, M>
-    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+impl<'a, R, V, A> Copy for WRTCanonicalBasisElementCreator<'a, R, V, A>
+    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, A: Allocator + Clone
 {}
 
-impl<R, V, M> FiniteRing for FreeAlgebraImplBase<R, V, M>
-    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+impl<R, V, A> FiniteRing for FreeAlgebraImplBase<R, V, A>
+    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, A: Allocator + Clone
 {
-    type ElementsIter<'a> = MultiProduct<<R::Type as FiniteRing>::ElementsIter<'a>, WRTCanonicalBasisElementCreator<'a, R, V, M>, RingElementClone<'a, R::Type>, Self::Element>
+    type ElementsIter<'a> = MultiProduct<<R::Type as FiniteRing>::ElementsIter<'a>, WRTCanonicalBasisElementCreator<'a, R, V, A>, RingElementClone<'a, R::Type>, Self::Element>
         where Self: 'a;
 
     fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
@@ -300,8 +312,8 @@ impl<R, V, M> FiniteRing for FreeAlgebraImplBase<R, V, M>
     }
 }
 
-impl<R, V, M> DivisibilityRing for FreeAlgebraImplBase<R, V, M>
-    where R: RingStore, R::Type: PrincipalIdealRing, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+impl<R, V, A> DivisibilityRing for FreeAlgebraImplBase<R, V, A>
+    where R: RingStore, R::Type: PrincipalIdealRing, V: VectorView<El<R>>, A: Allocator + Clone
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let mut mul_matrix = RingRef::new(self).create_multiplication_matrix(rhs);
@@ -315,8 +327,8 @@ impl<R, V, M> DivisibilityRing for FreeAlgebraImplBase<R, V, M>
     }
 }
 
-impl<R, V, M> RingExtension for FreeAlgebraImplBase<R, V, M>
-    where R: RingStore, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+impl<R, V, A> RingExtension for FreeAlgebraImplBase<R, V, A>
+    where R: RingStore, V: VectorView<El<R>>, A: Allocator + Clone
 {
     type BaseRing = R;
 
@@ -326,7 +338,7 @@ impl<R, V, M> RingExtension for FreeAlgebraImplBase<R, V, M>
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
         let mut data = Some(x);
-        FreeAlgebraEl { values: self.memory_provider.get_new_init(self.rank(), |i| if i == 0 { std::mem::replace(&mut data, None).unwrap() } else { self.base_ring.zero() }) }
+        self.from_canonical_basis((0..self.rank()).map(|i| if i == 0 { std::mem::replace(&mut data, None).unwrap() } else { self.base_ring.zero() }))
     }
 
     fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {
@@ -336,25 +348,27 @@ impl<R, V, M> RingExtension for FreeAlgebraImplBase<R, V, M>
     }
 }
 
-impl<R, V, M> FreeAlgebra for FreeAlgebraImplBase<R, V, M>
-    where R: RingStore, V: VectorView<El<R>>, M: MemoryProvider<El<R>>
+impl<R, V, A> FreeAlgebra for FreeAlgebraImplBase<R, V, A>
+    where R: RingStore, V: VectorView<El<R>>, A: Allocator + Clone
 {
     type VectorRepresentation<'a> = RingElVectorViewFn<&'a R, &'a [El<R>], El<R>>
         where Self: 'a;
 
     fn canonical_gen(&self) -> Self::Element {
-        FreeAlgebraEl { values: self.memory_provider.get_new_init(self.rank(), |i| if i == 1 { self.base_ring.one() } else { self.base_ring.zero() }) }
+        self.from_canonical_basis((0..self.rank()).map(|i| if i == 1 { self.base_ring.one() } else { self.base_ring.zero() }))
     }
 
     fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a> {
         (&el.values[..]).as_el_fn(self.base_ring())
     }
 
-    fn from_canonical_basis<W>(&self, mut vec: W) -> Self::Element
+    fn from_canonical_basis<W>(&self, vec: W) -> Self::Element
         where W: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = El<Self::BaseRing>>
     {
         assert_eq!(self.rank(), <_ as ExactSizeIterator>::len(&vec));
-        FreeAlgebraEl { values: self.memory_provider.get_new_init(self.rank(), |_| vec.next().unwrap()) }
+        let mut result = Vec::with_capacity_in(self.rank(), self.element_allocator.clone());
+        result.extend(vec);
+        FreeAlgebraEl { values: result.into_boxed_slice() }
     }
 
     fn rank(&self) -> usize {
@@ -363,27 +377,27 @@ impl<R, V, M> FreeAlgebra for FreeAlgebraImplBase<R, V, M>
 }
 
 impl_wrap_unwrap_homs!{
-    <{R1, V1, M1, R2, V2, M2}> FreeAlgebraImplBase<R1, V1, M1>, FreeAlgebraImplBase<R2, V2, M2>
-        where R1: RingStore, R1::Type: PrincipalIdealRing, V1: VectorView<El<R1>>, M1: MemoryProvider<El<R1>>,
-            R2: RingStore, R2::Type: PrincipalIdealRing, V2: VectorView<El<R2>>, M2: MemoryProvider<El<R2>>,
+    <{R1, V1, A1, R2, V2, A2}> FreeAlgebraImplBase<R1, V1, A1>, FreeAlgebraImplBase<R2, V2, A2>
+        where R1: RingStore, R1::Type: PrincipalIdealRing, V1: VectorView<El<R1>>, A1: Allocator + Clone,
+            R2: RingStore, R2::Type: PrincipalIdealRing, V2: VectorView<El<R2>>, A2: Allocator + Clone,
             R2::Type: CanHomFrom<R1::Type>
 }
 
 impl_wrap_unwrap_isos!{
-    <{R1, V1, M1, R2, V2, M2}> FreeAlgebraImplBase<R1, V1, M1>, FreeAlgebraImplBase<R2, V2, M2>
-        where R1: RingStore, R1::Type: PrincipalIdealRing, V1: VectorView<El<R1>>, M1: MemoryProvider<El<R1>>,
-            R2: RingStore, R2::Type: PrincipalIdealRing, V2: VectorView<El<R2>>, M2: MemoryProvider<El<R2>>,
+    <{R1, V1, A1, R2, V2, A2}> FreeAlgebraImplBase<R1, V1, A1>, FreeAlgebraImplBase<R2, V2, A2>
+        where R1: RingStore, R1::Type: PrincipalIdealRing, V1: VectorView<El<R1>>, A1: Allocator + Clone,
+            R2: RingStore, R2::Type: PrincipalIdealRing, V2: VectorView<El<R2>>, A2: Allocator + Clone,
             R2::Type: CanIsoFromTo<R1::Type>
 }
 
-impl<R1, V1, M1, R2, V2, M2> CanHomFrom<FreeAlgebraImplBase<R1, V1, M1>> for FreeAlgebraImplBase<R2, V2, M2>
-    where R1: RingStore, V1: VectorView<El<R1>>, M1: MemoryProvider<El<R1>>,
-        R2: RingStore, V2: VectorView<El<R2>>, M2: MemoryProvider<El<R2>>,
+impl<R1, V1, A1, R2, V2, A2> CanHomFrom<FreeAlgebraImplBase<R1, V1, A1>> for FreeAlgebraImplBase<R2, V2, A2>
+    where R1: RingStore, V1: VectorView<El<R1>>, A1: Allocator + Clone,
+        R2: RingStore, V2: VectorView<El<R2>>, A2: Allocator + Clone,
         R2::Type: CanHomFrom<R1::Type>
 {
     type Homomorphism = <R2::Type as CanHomFrom<R1::Type>>::Homomorphism;
 
-    fn has_canonical_hom(&self, from: &FreeAlgebraImplBase<R1, V1, M1>) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &FreeAlgebraImplBase<R1, V1, A1>) -> Option<Self::Homomorphism> {
         if self.rank() == from.rank() {
             let hom = self.base_ring.get_ring().has_canonical_hom(from.base_ring.get_ring())?;
             if (0..self.rank()).all(|i| self.base_ring.eq_el(self.x_pow_rank.at(i), &self.base_ring.get_ring().map_in_ref(from.base_ring.get_ring(), from.x_pow_rank.at(i), &hom))) {
@@ -396,19 +410,19 @@ impl<R1, V1, M1, R2, V2, M2> CanHomFrom<FreeAlgebraImplBase<R1, V1, M1>> for Fre
         }
     }
 
-    fn map_in(&self, from: &FreeAlgebraImplBase<R1, V1, M1>, el: <FreeAlgebraImplBase<R1, V1, M1> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        FreeAlgebraEl { values: self.memory_provider.get_new_init(self.rank(), |i| self.base_ring.get_ring().map_in_ref(from.base_ring.get_ring(), &el.values[i], hom)) }
+    fn map_in(&self, from: &FreeAlgebraImplBase<R1, V1, A1>, el: <FreeAlgebraImplBase<R1, V1, A1> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.from_canonical_basis((0..self.rank()).map(|i| self.base_ring.get_ring().map_in_ref(from.base_ring.get_ring(), &el.values[i], hom)))
     }
 }
 
-impl<R1, V1, M1, R2, V2, M2> CanIsoFromTo<FreeAlgebraImplBase<R1, V1, M1>> for FreeAlgebraImplBase<R2, V2, M2>
-    where R1: RingStore, V1: VectorView<El<R1>>, M1: MemoryProvider<El<R1>>,
-        R2: RingStore, V2: VectorView<El<R2>>, M2: MemoryProvider<El<R2>>,
+impl<R1, V1, A1, R2, V2, A2> CanIsoFromTo<FreeAlgebraImplBase<R1, V1, A1>> for FreeAlgebraImplBase<R2, V2, A2>
+    where R1: RingStore, V1: VectorView<El<R1>>, A1: Allocator + Clone,
+        R2: RingStore, V2: VectorView<El<R2>>, A2: Allocator + Clone,
         R2::Type: CanIsoFromTo<R1::Type>
 {
     type Isomorphism = <R2::Type as CanIsoFromTo<R1::Type>>::Isomorphism;
 
-    fn has_canonical_iso(&self, from: &FreeAlgebraImplBase<R1, V1, M1>) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, from: &FreeAlgebraImplBase<R1, V1, A1>) -> Option<Self::Isomorphism> {
         if self.rank() == from.rank() {
             let iso = self.base_ring.get_ring().has_canonical_iso(from.base_ring.get_ring())?;
             if (0..self.rank()).all(|i| from.base_ring.eq_el(&self.base_ring.get_ring().map_out(from.base_ring.get_ring(), self.base_ring.clone_el(self.x_pow_rank.at(i)), &iso), from.x_pow_rank.at(i))) {
@@ -421,24 +435,22 @@ impl<R1, V1, M1, R2, V2, M2> CanIsoFromTo<FreeAlgebraImplBase<R1, V1, M1>> for F
         }
     }
 
-    fn map_out(&self, from: &FreeAlgebraImplBase<R1, V1, M1>, el: <FreeAlgebraImplBase<R2, V2, M2> as RingBase>::Element, iso: &Self::Isomorphism) -> <FreeAlgebraImplBase<R1, V1, M1> as RingBase>::Element {
-        FreeAlgebraEl { values: from.memory_provider.get_new_init(self.rank(), |i| self.base_ring.get_ring().map_out(from.base_ring.get_ring(), self.base_ring.clone_el(&el.values[i]), iso)) }
+    fn map_out(&self, from: &FreeAlgebraImplBase<R1, V1, A1>, el: <FreeAlgebraImplBase<R2, V2, A2> as RingBase>::Element, iso: &Self::Isomorphism) -> <FreeAlgebraImplBase<R1, V1, A1> as RingBase>::Element {
+        from.from_canonical_basis((0..self.rank()).map(|i| self.base_ring.get_ring().map_out(from.base_ring.get_ring(), self.base_ring.clone_el(&el.values[i]), iso)))
     }
 }
 
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
-use crate::default_memory_provider;
-#[cfg(test)]
 use crate::rings::zn::zn_64::Zn;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
 
 #[cfg(test)]
-fn test_ring1_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 2], DefaultMemoryProvider>, Vec<FreeAlgebraEl<StaticRing<i64>, DefaultMemoryProvider>>) {
+fn test_ring1_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 2]>, Vec<FreeAlgebraEl<StaticRing<i64>>>) {
     let ZZ = StaticRing::<i64>::RING;
-    let R = FreeAlgebraImpl::new(ZZ, [1, 1], default_memory_provider!());
+    let R = FreeAlgebraImpl::new(ZZ, [1, 1]);
     let mut elements = Vec::new();
     for a in -3..=3 {
         for b in -3..=3 {
@@ -449,9 +461,9 @@ fn test_ring1_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 2], De
 }
 
 #[cfg(test)]
-fn test_ring2_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 3], DefaultMemoryProvider>, Vec<FreeAlgebraEl<StaticRing<i64>, DefaultMemoryProvider>>) {
+fn test_ring2_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 3]>, Vec<FreeAlgebraEl<StaticRing<i64>>>) {
     let ZZ = StaticRing::<i64>::RING;
-    let R = FreeAlgebraImpl::new(ZZ, [1, -1, 1], default_memory_provider!());
+    let R = FreeAlgebraImpl::new(ZZ, [1, -1, 1]);
     let mut elements = Vec::new();
     for a in [-2, 0, 1, 2] {
         for b in [-2, 0, 2] {
@@ -472,7 +484,7 @@ fn test_ring_axioms() {
 
     let base_ring = zn_static::Fp::<257>::RING;
     let x_pow_rank = vec![base_ring.neg_one(); 64];
-    let ring = FreeAlgebraImpl::new(base_ring, x_pow_rank, default_memory_provider!());
+    let ring = FreeAlgebraImpl::new(base_ring, x_pow_rank);
     let mut rng = oorandom::Rand64::new(0);
     let els = (0..10).map(|_| ring.from_canonical_basis((0..64).map(|_| ring.base_ring().random_element(|| rng.rand_u64()))));
     crate::ring::generic_tests::test_ring_axioms(&ring, els);
@@ -490,7 +502,7 @@ fn test_free_algebra_axioms() {
 fn test_division() {
     let base_ring = Zn::new(4);
     let i = base_ring.int_hom();
-    let ring = FreeAlgebraImpl::new(base_ring, [i.map(-1), i.map(-1)], default_memory_provider!());
+    let ring = FreeAlgebraImpl::new(base_ring, [i.map(-1), i.map(-1)]);
 
     assert_el_eq!(&ring, 
         &ring.from_canonical_basis([i.map(1), i.map(3)].into_iter()), 
@@ -507,7 +519,7 @@ fn test_division() {
 #[test]
 fn test_division_ring_of_integers() {
     let base_ring = StaticRing::<i64>::RING;
-    let ring = FreeAlgebraImpl::new(base_ring, [11, 0], default_memory_provider!());
+    let ring = FreeAlgebraImpl::new(base_ring, [11, 0]);
 
     // the solution to Pell's equation is 10^2 - 3^2 * 11 = 1
     let u = ring.from_canonical_basis([10, 3].into_iter());
@@ -531,7 +543,7 @@ fn test_divisibility_axioms() {
 fn test_cubic_mul() {
     let base_ring = zn_static::Zn::<256>::RING;
     let modulo = base_ring.int_hom();
-    let ring = FreeAlgebraImpl::new(base_ring, [modulo.map(-1), modulo.map(-1), modulo.map(-1)], default_memory_provider!());
+    let ring = FreeAlgebraImpl::new(base_ring, [modulo.map(-1), modulo.map(-1), modulo.map(-1)]);
     let a = ring.from_canonical_basis([modulo.map(0), modulo.map(-1), modulo.map(-1)].into_iter());
     let b = ring.from_canonical_basis([modulo.map(-1), modulo.map(-2), modulo.map(-1)].into_iter());
     assert_el_eq!(&ring, &b, &ring.pow(a, 2));

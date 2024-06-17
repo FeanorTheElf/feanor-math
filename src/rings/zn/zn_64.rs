@@ -365,57 +365,6 @@ impl<I: IntegerRingStore> CanIsoFromTo<zn_barett::ZnBase<I>> for ZnBase
     }
 }
 
-#[allow(deprecated)]
-impl CanHomFrom<zn_42::ZnBase> for ZnBase {
-
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, from: &zn_42::ZnBase) -> Option<Self::Homomorphism> {
-        if *self.modulus() == *from.modulus() {
-            Some(())
-        } else {
-            None
-        }
-    }
-
-    fn map_in(&self, from: &zn_42::ZnBase, el: <zn_42::ZnBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
-        // we usually require much smaller representatives as zn_42 (except for very large moduli), so do not
-        // specialize this
-        self.from_u64_promise_reduced(from.smallest_positive_lift(el) as u64)
-    }
-}
-
-
-#[allow(deprecated)]
-pub enum ToZn42Iso {
-    Trivial, ReduceRequired(<zn_42::ZnBase as CanHomFrom<StaticRingBase<i64>>>::Homomorphism)
-}
-
-#[allow(deprecated)]
-impl CanIsoFromTo<zn_42::ZnBase> for ZnBase {
-
-    type Isomorphism = ToZn42Iso;
-
-    fn has_canonical_iso(&self, from: &zn_42::ZnBase) -> Option<Self::Isomorphism> {
-        if *self.modulus() == *from.modulus() {
-            if from.repr_bound() >= self.repr_bound() {
-                Some(ToZn42Iso::Trivial)
-            } else {
-                Some(ToZn42Iso::ReduceRequired(from.has_canonical_hom(self.integer_ring().get_ring())?))
-            }
-        } else {
-            None
-        }
-    }
-
-    fn map_out(&self, from: &zn_42::ZnBase, el: <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <zn_42::ZnBase as RingBase>::Element {
-        match iso {
-            ToZn42Iso::Trivial => from.from_bounded(el.0),
-            ToZn42Iso::ReduceRequired(reduce_hom) => from.map_in(self.integer_ring().get_ring(), el.0 as i64, reduce_hom)
-        }
-    }
-}
-
 ///
 /// An element of [`ZnBase`] together with extra information that allows for
 /// faster division if this element is the divisor. See also [`PreparedDivisibilityRing`].
@@ -916,18 +865,6 @@ fn test_ring_axioms() {
     for n in LARGE_MODULI {
         let ring = Zn::new(n);
         crate::ring::generic_tests::test_ring_axioms(&ring, elements(&ring));
-    }
-}
-
-#[test]
-#[allow(deprecated)]
-fn test_iso_zn_42() {
-    for n in (2..=17).chain([(1 << 41) - 2, (1 << 41) - 1].into_iter()) {
-        let R1 = Zn::new(n);
-        let R2 = zn_42::Zn::new(n);
-        let elements = (1..42).map(|i| 1 << i).map(|x| R2.coerce(&ZZ, x));
-        crate::ring::generic_tests::test_hom_axioms(&R2, &R1, elements.clone());
-        crate::ring::generic_tests::test_iso_axioms(&R2, &R1, elements);
     }
 }
 

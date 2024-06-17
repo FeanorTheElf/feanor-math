@@ -166,7 +166,7 @@ pub trait MultivariatePolyRing: RingExtension {
     {
         assert!(self.base_ring().get_ring() == hom.codomain().get_ring());
         assert!(from.base_ring().get_ring() == hom.domain().get_ring());
-        RingRef::new(self).from_terms(from.terms(el).map(|(c, m)| (hom.map_ref(c), self.create_monomial((0..m.len()).map(|i| m[i])))))
+        RingRef::new(self).from_terms(from.terms(el).map(|(c, m): (&El<P::BaseRing>, &Monomial<P::MonomialVector>)| (hom.map_ref(c), self.create_monomial((0..m.len()).map(|i| m[i])))))
     }
 
     fn evaluate<R, V, H>(&self, f: &Self::Element, values: V, hom: &H) -> R::Element
@@ -720,8 +720,6 @@ impl MonomialOrder for Lex {
 }
 
 #[cfg(test)]
-use crate::default_memory_provider;
-#[cfg(test)]
 use super::zn::zn_static::Zn;
 
 #[test]
@@ -810,13 +808,13 @@ fn test_dividing_monomials() {
 
 #[test]
 fn test_specialize() {
-    let ring: ordered::MultivariatePolyRingImpl<_, _, _, 1> = ordered::MultivariatePolyRingImpl::new(Zn::<17>::RING, DegRevLex, default_memory_provider!());
+    let ring: ordered::MultivariatePolyRingImpl<_, _, 1> = ordered::MultivariatePolyRingImpl::new(Zn::<17>::RING, DegRevLex);
     let f = ring.from_terms([(1, Monomial::new([2])), (1, Monomial::new([1]))].into_iter());
     let g = ring.from_terms([(1, Monomial::new([2])), (16, Monomial::new([1]))].into_iter());
 
     assert_el_eq!(&ring, &ring.add_ref_snd(ring.mul_ref(&g, &g), &g), &ring.specialize(&f, 0, &g));
 
-    let ring: ordered::MultivariatePolyRingImpl<_, _, _, 2> = ordered::MultivariatePolyRingImpl::new(Zn::<17>::RING, DegRevLex, default_memory_provider!());
+    let ring: ordered::MultivariatePolyRingImpl<_, _, 2> = ordered::MultivariatePolyRingImpl::new(Zn::<17>::RING, DegRevLex);
     let f = ring.from_terms([(1, Monomial::new([2, 0])), (1, Monomial::new([0, 1]))].into_iter());
     let g = ring.from_terms([(1, Monomial::new([0, 2])), (16, Monomial::new([0, 1]))].into_iter());
 
