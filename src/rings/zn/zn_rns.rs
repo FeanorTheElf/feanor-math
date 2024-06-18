@@ -1,7 +1,7 @@
 use std::alloc::Allocator;
 use std::alloc::Global;
 
-use algorithms::matmul::InnerProductComputation;
+use algorithms::matmul::ComputeInnerProduct;
 
 use crate::iters::multi_cartesian_product;
 use crate::iters::MultiProduct;
@@ -476,7 +476,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, A: Allocator + Cl
 
     fn map_out(&self, from: &zn_barett::ZnBase<K>, el: Self::Element, (final_iso, red): &Self::Isomorphism) -> zn_barett::ZnEl<K> {
         let small_integer_ring = self.at(0).integer_ring();
-        let result = <_ as InnerProductComputation>::inner_product_ref_fst(self.total_ring.get_ring(),
+        let result = <_ as ComputeInnerProduct>::inner_product_ref_fst(self.total_ring.get_ring(),
             self.components.iter()
                 .zip(el.data.into_iter())
                 .map(|(R, x): (&C, El<C>)| R.smallest_positive_lift(x))

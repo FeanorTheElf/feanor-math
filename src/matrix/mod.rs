@@ -1,6 +1,5 @@
 use std::fmt::Display;
 
-use crate::homomorphism::Homomorphism;
 use crate::ring::*;
 
 mod submatrix;
@@ -10,52 +9,6 @@ pub use submatrix::*;
 pub use owned::*;
 
 pub mod transform;
-
-#[stability::unstable(feature = "enable")]
-pub fn matmul<V1, V2, R1, R2, S, V, H1, H2>(lhs: Submatrix<V1, R1::Element>, rhs: Submatrix<V2, R2::Element>, mut out: SubmatrixMut<V, S::Element>, hom1: &H1, hom2: &H2)
-    where V: AsPointerToSlice<S::Element>,
-        R1: ?Sized + RingBase,
-        R2: ?Sized + RingBase,
-        S: ?Sized + RingBase,
-        V1: AsPointerToSlice<R1::Element>,
-        V2: AsPointerToSlice<R2::Element>,
-        H1: Homomorphism<R1, S>,
-        H2: Homomorphism<R2, S>
-{
-    assert!(hom1.codomain().get_ring() == hom2.codomain().get_ring());
-    assert_eq!(lhs.col_count(), rhs.row_count());
-    assert_eq!(lhs.row_count(), out.row_count());
-    assert_eq!(rhs.col_count(), out.col_count());
-    let target_ring = hom1.codomain();
-    for i in 0..out.row_count() {
-        for j in 0..out.col_count() {
-            *out.at_mut(i, j) = target_ring.sum((0..lhs.col_count()).map(|k| target_ring.mul(hom1.map_ref(lhs.at(i, k)), hom2.map_ref(rhs.at(k, j)))));
-        }
-    }
-}
-
-#[stability::unstable(feature = "enable")]
-pub fn matmul_fst_transposed<V1, V2, R1, R2, S, V, H1, H2>(lhs_T: Submatrix<V1, R1::Element>, rhs: Submatrix<V2, R2::Element>, mut out: SubmatrixMut<V, S::Element>, hom1: &H1, hom2: &H2)
-    where V: AsPointerToSlice<S::Element>,
-        R1: ?Sized + RingBase,
-        R2: ?Sized + RingBase,
-        S: ?Sized + RingBase,
-        V1: AsPointerToSlice<R1::Element>,
-        V2: AsPointerToSlice<R2::Element>,
-        H1: Homomorphism<R1, S>,
-        H2: Homomorphism<R2, S>
-{
-    assert!(hom1.codomain().get_ring() == hom2.codomain().get_ring());
-    assert_eq!(lhs_T.row_count(), rhs.row_count());
-    assert_eq!(lhs_T.col_count(), out.row_count());
-    assert_eq!(rhs.col_count(), out.col_count());
-    let target_ring = hom1.codomain();
-    for i in 0..out.row_count() {
-        for j in 0..out.col_count() {
-            *out.at_mut(i, j) = target_ring.sum((0..lhs_T.row_count()).map(|k| target_ring.mul(hom1.map_ref(lhs_T.at(k, i)), hom2.map_ref(rhs.at(k, j)))));
-        }
-    }
-}
 
 #[stability::unstable(feature = "enable")]
 pub fn format_matrix<'a, M, R>(row_count: usize, col_count: usize, matrix: M, ring: R) -> impl 'a + Display

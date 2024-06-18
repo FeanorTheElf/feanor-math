@@ -9,7 +9,7 @@ use crate::primitive_int::*;
 use crate::integer::*;
 use crate::pid::*;
 use crate::ring::*;
-use algorithms::matmul::InnerProductComputation;
+use algorithms::matmul::ComputeInnerProduct;
 use crate::homomorphism::*;
 use crate::rings::rust_bigint::*;
 
@@ -137,7 +137,7 @@ impl ZnBase {
     /// 
     /// As opposed to the faster [`ZnBase::bounded_reduce()`], this should work for all
     /// inputs in `u128`. Currently only used by the specialization of
-    /// [`InnerProductComputation::inner_product()`].
+    /// [`ComputeInnerProduct::inner_product()`].
     /// 
     #[inline(never)]
     fn bounded_reduce_larger<const FACTOR: usize>(&self, value: u128) -> u64 {
@@ -279,7 +279,7 @@ impl RingBase for ZnBase {
 
 }
 
-impl InnerProductComputation for ZnBase {
+impl ComputeInnerProduct for ZnBase {
 
     fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, mut els: I) -> Self::Element
     {
@@ -628,7 +628,7 @@ impl HashableElRing for ZnBase {
 /// let fft = CooleyTuckeyFFT::for_zn_with_hom(ring.can_hom(&fastmul_ring).unwrap(), 15).unwrap();
 /// // Note that data uses `ZnBase`
 /// let mut data = (0..(1 << 15)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
-/// fft.unordered_fft(&mut data[..]);
+/// fft.unordered_fft(&mut data[..], ring.get_ring());
 /// ```
 /// 
 #[derive(Clone, Copy)]
@@ -1052,7 +1052,7 @@ fn bench_inner_product(bencher: &mut Bencher) {
     let expected = (0..len).map(|i| Fp.int_hom().map(i * i)).fold(Fp.zero(), |l, r| Fp.add(l, r));
 
     bencher.iter(|| {
-        let actual = <_ as InnerProductComputation>::inner_product_ref(Fp.get_ring(), lhs.iter().zip(rhs.iter()).map(|x| std::hint::black_box(x)));
+        let actual = <_ as ComputeInnerProduct>::inner_product_ref(Fp.get_ring(), lhs.iter().zip(rhs.iter()).map(|x| std::hint::black_box(x)));
         assert_el_eq!(&Fp, &expected, &actual);
     })
 }

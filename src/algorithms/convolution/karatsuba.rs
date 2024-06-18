@@ -1,4 +1,4 @@
-use crate::algorithms::matmul::InnerProductComputation;
+use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::ring::*;
 use crate::seq::*;
 
@@ -15,7 +15,7 @@ pub fn naive_assign_mul<R, V1, V2, V3, const ADD_ASSIGN: bool>(mut dst: V1, lhs:
     for i in 0..(2 * n) {
         let from = max(i as isize - n as isize + 1, 0) as usize;
         let to = min(n, i + 1);
-        let value = <_ as InnerProductComputation>::inner_product_ref(ring.get_ring(), (from..to)
+        let value = <_ as ComputeInnerProduct>::inner_product_ref(ring.get_ring(), (from..to)
             .map(|j| (lhs.at(i - j), rhs.at(j)))
         );
         if ADD_ASSIGN {

@@ -194,7 +194,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         let root_of_unity_n = hom.codomain().pow(hom.map_ref(&root_of_unity_2n), 2);
 
         let m_fft_table_base = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::new(hom.domain(), hom.domain().clone_el(&root_of_unity_m), log2_m);
-        m_fft_table_base.unordered_fft(&mut b[..]);
+        m_fft_table_base.unordered_fft(&mut b[..], hom.domain().get_ring());
 
         // we actually require that this has the same ordering of outputs as `m_fft_table_base`, but since it's Cooley-Tuckey, both are bitreversed
         let m_fft_table = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::new_with_hom(hom.clone(), root_of_unity_m, log2_m);
@@ -255,7 +255,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         let root_of_unity_n = hom.map(root_of_unity_2n_pows(2));
 
         let m_fft_table_base = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::new_with_pows(hom.domain(), &mut root_of_unity_m_pows, log2_m);
-        m_fft_table_base.unordered_fft(&mut b[..]);
+        m_fft_table_base.unordered_fft(&mut b[..], hom.domain().get_ring());
 
         // we actually require that this has the same ordering of outputs as `m_fft_table_base`, but since it's Cooley-Tuckey, both are bitreversed
         let m_fft_table = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::new_with_pows_with_hom(hom.clone(), root_of_unity_m_pows, log2_m);
@@ -331,11 +331,11 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         }
 
         // perform convoluted product with b using a power-of-two fft
-        self.m_fft_table.unordered_fft(&mut buffer);
+        self.m_fft_table.unordered_fft(&mut buffer, self.ring().get_ring());
         for i in 0..self.m_fft_table.len() {
             self.hom.mul_assign_map_ref(buffer.at_mut(i), &self.b_bitreverse_fft[i]);
         }
-        self.m_fft_table.unordered_inv_fft(&mut buffer);
+        self.m_fft_table.unordered_inv_fft(&mut buffer, self.ring().get_ring());
 
         // write values back, and multiply them with a twiddle factor
         for i in 0..self.n {
@@ -351,6 +351,11 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
             }
         }
     }
+
+    fn ring(&self) -> &<H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
+        self.hom.codomain()
+    }
+
 }
 
 impl<R_main, R_twiddle, H, A> PartialEq for BluesteinFFT<R_main, R_twiddle, H, A>
@@ -362,27 +367,22 @@ impl<R_main, R_twiddle, H, A> PartialEq for BluesteinFFT<R_main, R_twiddle, H, A
     fn eq(&self, other: &Self) -> bool {
         self.ring().get_ring() == other.ring().get_ring() &&
             self.n == other.n &&
-            self.ring().eq_el(self.root_of_unity(), other.root_of_unity())
+            self.ring().eq_el(self.root_of_unity(self.ring().get_ring()), other.root_of_unity(self.ring().get_ring()))
     }
 }
 
-impl<R_main, R_twiddle, H, A> FFTAlgorithm for BluesteinFFT<R_main, R_twiddle, H, A>
+impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for BluesteinFFT<R_main, R_twiddle, H, A>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main> + Clone, 
         A: Allocator + Clone
 {
-    type Ring = <H as Homomorphism<R_twiddle, R_main>>::CodomainStore;
-
     fn len(&self) -> usize {
         self.n
     }
 
-    fn ring(&self) -> &Self::Ring {
-        self.hom.codomain()
-    }
-
-    fn root_of_unity(&self) -> &R_main::Element {
+    fn root_of_unity(&self, ring: &R_main) -> &R_main::Element {
+        assert!(ring == self.ring().get_ring(), "unsupported ring");
         &self.root_of_unity_n
     }
 
@@ -394,32 +394,34 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm for BluesteinFFT<R_main, R_twiddle, H
         i
     }
 
-    fn unordered_fft<V>(&self, values: V)
+    fn unordered_fft<V>(&self, values: V, ring: &R_main)
         where V: SwappableVectorViewMut<R_main::Element>
     {
+        assert!(ring == self.ring().get_ring(), "unsupported ring");
         let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.tmp_mem_allocator.clone());
         buffer.extend((0..self.m_fft_table.len()).map(|_| self.hom.codomain().zero()));
         self.fft_base::<_, _, false>(values, &mut buffer[..]);
     }
 
-    fn unordered_inv_fft<V>(&self, values: V)
+    fn unordered_inv_fft<V>(&self, values: V, ring: &R_main)
         where V: SwappableVectorViewMut<R_main::Element>
     {
+        assert!(ring == self.ring().get_ring(), "unsupported ring");
         let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.tmp_mem_allocator.clone());
         buffer.extend((0..self.m_fft_table.len()).map(|_| self.hom.codomain().zero()));
         self.fft_base::<_, _, true>(values, &mut buffer[..]);
     }
 
-    fn fft<V>(&self, values: V)
+    fn fft<V>(&self, values: V, ring: &R_main)
         where V: SwappableVectorViewMut<R_main::Element>
     {
-        self.unordered_fft(values);
+        self.unordered_fft(values, ring);
     }
 
-    fn inv_fft<V>(&self, values: V)
+    fn inv_fft<V>(&self, values: V, ring: &R_main)
         where V: SwappableVectorViewMut<R_main::Element>
     {
-        self.unordered_inv_fft(values);
+        self.unordered_inv_fft(values, ring);
     }
 }
 
@@ -457,6 +459,19 @@ fn test_fft_base() {
 }
 
 #[test]
+fn test_fft_fastmul() {
+    let ring = zn_64::Zn::new(241);
+    let fastmul_ring = zn_64::ZnFastmul::new(ring);
+    let fft = BluesteinFFT::new_with_hom(ring.can_hom(&fastmul_ring).unwrap(), fastmul_ring.int_hom().map(36), fastmul_ring.int_hom().map(111), 5, 4, Global);
+    let mut values: [_; 5] = std::array::from_fn(|i| ring.int_hom().map([1, 3, 2, 0, 7][i]));
+    fft.fft(&mut values, ring.get_ring());
+    let expected: [_; 5] = std::array::from_fn(|i| ring.int_hom().map([13, 137, 202, 206, 170][i]));
+    for i in 0..values.len() {
+        assert_el_eq!(&ring, &expected[i], &values[i]);
+    }
+}
+
+#[test]
 fn test_inv_fft_base() {
     let ring = Zn::<241>::RING;
     // a 5-th root of unity is 91 
@@ -475,7 +490,7 @@ fn test_approximate_fft() {
     for (p, _log2_m) in [(5, 4), (53, 7), (1009, 11)] {
         let fft = BluesteinFFT::for_complex(&CC, p, Global);
         let mut array = (0..(p as usize)).map(|i| CC.root_of_unity(i as i64, p as i64)).collect::<Vec<_>>();
-        fft.fft(&mut array);
+        fft.fft(&mut array, CC.get_ring());
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));

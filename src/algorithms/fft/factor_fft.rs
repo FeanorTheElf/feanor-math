@@ -15,10 +15,8 @@ pub struct CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, T1, T2>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
         H: Homomorphism<R_twiddle, R_main>,
-        T1: FFTAlgorithm,
-        T1::Ring: RingStore<Type = R_main>,
-        T2: FFTAlgorithm,
-        T2::Ring: RingStore<Type = R_main>
+        T1: FFTAlgorithm<R_main>,
+        T2: FFTAlgorithm<R_main>
 {
     twiddle_factors: Vec<R_twiddle::Element>,
     inv_twiddle_factors: Vec<R_twiddle::Element>,
@@ -30,10 +28,8 @@ pub struct CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, T1, T2>
 
 impl<R, T1, T2> CoprimeCooleyTuckeyFFT<R::Type, R::Type, Identity<R>, T1, T2> 
     where R: RingStore,
-        T1: FFTAlgorithm,
-        T1::Ring: RingStore<Type = R::Type>,
-        T2: FFTAlgorithm,
-        T2::Ring: RingStore<Type = R::Type>
+        T1: FFTAlgorithm<R::Type>,
+        T2: FFTAlgorithm<R::Type>
 {
     #[stability::unstable(feature = "enable")]
     pub fn new_with_pows<F>(ring: R, root_of_unity_pows: F, left_table: T1, right_table: T2) -> Self
@@ -52,21 +48,17 @@ impl<R_main, R_twiddle, H, T1, T2> CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
         H: Homomorphism<R_twiddle, R_main>,
-        T1: FFTAlgorithm,
-        T1::Ring: RingStore<Type = R_main>,
-        T2: FFTAlgorithm,
-        T2::Ring: RingStore<Type = R_main>
+        T1: FFTAlgorithm<R_main>,
+        T2: FFTAlgorithm<R_main>
 {
     #[stability::unstable(feature = "enable")]
     pub fn new_with_pows_with_hom<F>(hom: H, mut root_of_unity_pows: F, left_table: T1, right_table: T2) -> Self
         where F: FnMut(i64) -> R_twiddle::Element
     {
-        assert!(left_table.ring().get_ring() == right_table.ring().get_ring());
-        assert!(left_table.ring().get_ring() == hom.codomain().get_ring());
         let ring = hom.codomain();
 
-        assert!(ring.get_ring().is_approximate() || ring.eq_el(&hom.map(root_of_unity_pows(right_table.len() as i64)), left_table.root_of_unity()));
-        assert!(ring.get_ring().is_approximate() || ring.eq_el(&hom.map(root_of_unity_pows(left_table.len() as i64)), right_table.root_of_unity()));
+        assert!(ring.get_ring().is_approximate() || ring.eq_el(&hom.map(root_of_unity_pows(right_table.len() as i64)), left_table.root_of_unity(ring.get_ring())));
+        assert!(ring.get_ring().is_approximate() || ring.eq_el(&hom.map(root_of_unity_pows(left_table.len() as i64)), right_table.root_of_unity(ring.get_ring())));
 
         let root_of_unity = root_of_unity_pows(1);
         let inv_twiddle_factors = Self::create_twiddle_factors(|i| root_of_unity_pows(-i), &left_table, &right_table);
@@ -95,8 +87,6 @@ impl<R_main, R_twiddle, H, T1, T2> CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, 
     #[stability::unstable(feature = "enable")]
     pub fn new_with_hom(hom: H, root_of_unity: R_twiddle::Element, left_table: T1, right_table: T2) -> Self {
         assert!(!hom.domain().get_ring().is_approximate());
-        assert!(left_table.ring().get_ring() == right_table.ring().get_ring());
-        assert!(left_table.ring().get_ring() == hom.codomain().get_ring());
         let ring = hom.codomain();
 
         assert!(!ring.get_ring().is_approximate());
@@ -108,8 +98,8 @@ impl<R_main, R_twiddle, H, T1, T2> CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, 
             hom.domain().pow(hom.domain().clone_el(&root_of_unity), (len as i64 + (i % len as i64)) as usize)
         };
 
-        assert!(ring.eq_el(&hom.map(root_of_unity_pows(right_table.len() as i64)), left_table.root_of_unity()));
-        assert!(ring.eq_el(&hom.map(root_of_unity_pows(left_table.len() as i64)), right_table.root_of_unity()));
+        assert!(ring.eq_el(&hom.map(root_of_unity_pows(right_table.len() as i64)), left_table.root_of_unity(ring.get_ring())));
+        assert!(ring.eq_el(&hom.map(root_of_unity_pows(left_table.len() as i64)), right_table.root_of_unity(ring.get_ring())));
 
         let inv_twiddle_factors = Self::create_twiddle_factors(|i| root_of_unity_pows(-i), &left_table, &right_table);
         let twiddle_factors = Self::create_twiddle_factors(root_of_unity_pows, &left_table, &right_table);
@@ -133,70 +123,67 @@ impl<R_main, R_twiddle, H, T1, T2> CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, 
             return root_of_unity_pows(left_table.unordered_fft_permutation(li) as i64 * ri as i64);
         }).collect::<Vec<_>>()
     }
+    
+    fn ring(&self) -> &<H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
+        self.hom.codomain()
+    }
 }
 
 impl<R_main, R_twiddle, H, T1, T2> PartialEq for CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, T1, T2> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
         H: Homomorphism<R_twiddle, R_main>,
-        T1: FFTAlgorithm + PartialEq,
-        T1::Ring: RingStore<Type = R_main>,
-        T2: FFTAlgorithm + PartialEq,
-        T2::Ring: RingStore<Type = R_main>
+        T1: FFTAlgorithm<R_main> + PartialEq,
+        T2: FFTAlgorithm<R_main> + PartialEq
 {
     fn eq(&self, other: &Self) -> bool {
         self.ring().get_ring() == other.ring().get_ring() &&
             self.left_table == other.left_table &&
             self.right_table == other.right_table &&
-            self.ring().eq_el(self.root_of_unity(), other.root_of_unity())
+            self.ring().eq_el(self.root_of_unity(self.ring().get_ring()), other.root_of_unity(self.ring().get_ring()))
     }
 }
 
-impl<R_main, R_twiddle, H, T1, T2> FFTAlgorithm for CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, T1, T2> 
+impl<R_main, R_twiddle, H, T1, T2> FFTAlgorithm<R_main> for CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, T1, T2> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
         H: Homomorphism<R_twiddle, R_main>,
-        T1: FFTAlgorithm,
-        T1::Ring: RingStore<Type = R_main>,
-        T2: FFTAlgorithm,
-        T2::Ring: RingStore<Type = R_main>
+        T1: FFTAlgorithm<R_main>,
+        T2: FFTAlgorithm<R_main>
 {
-    type Ring = <H as Homomorphism<R_twiddle, R_main>>::CodomainStore;
-
     fn len(&self) -> usize {
         self.left_table.len() * self.right_table.len()
     }
 
-    fn ring(&self) -> &Self::Ring {
-        self.hom.codomain()
-    }
-
-    fn root_of_unity(&self) -> &R_main::Element {
+    fn root_of_unity(&self, ring: &R_main) -> &R_main::Element {
+        assert!(self.ring().get_ring() == ring, "unsupported ring");
         &self.root_of_unity
     }
 
-    fn unordered_fft<V>(&self, mut values: V)
+    fn unordered_fft<V>(&self, mut values: V, ring: &R_main)
         where V: SwappableVectorViewMut<R_main::Element>
     {
+        assert!(self.ring().get_ring() == ring, "unsupported ring");
         for i in 0..self.right_table.len() {
             let mut v = SubvectorView::new(&mut values).restrict(i..).step_by(self.right_table.len());
-            self.left_table.unordered_fft(&mut v);
+            self.left_table.unordered_fft(&mut v, ring);
         }
         for i in 0..self.len() {
             self.hom.mul_assign_map_ref(values.at_mut(i), self.inv_twiddle_factors.at(i));
         }
         for i in 0..self.left_table.len() {
             let mut v = SubvectorView::new(&mut values).restrict((i * self.right_table.len())..((i + 1) * self.right_table.len()));
-            self.right_table.unordered_fft(&mut v);
+            self.right_table.unordered_fft(&mut v, ring);
         }
     }
 
-    fn unordered_inv_fft<V>(&self, mut values: V)
+    fn unordered_inv_fft<V>(&self, mut values: V, ring: &R_main)
         where V: SwappableVectorViewMut<R_main::Element>
     {
+        assert!(self.ring().get_ring() == ring, "unsupported ring");
         for i in 0..self.left_table.len() {
             let mut v = SubvectorView::new(&mut values).restrict((i * self.right_table.len())..((i + 1) * self.right_table.len()));
-            self.right_table.unordered_inv_fft(&mut v);
+            self.right_table.unordered_inv_fft(&mut v, ring);
         }
         for i in 0..self.len() {
             self.hom.mul_assign_map_ref(values.at_mut(i), self.twiddle_factors.at(i));
@@ -204,7 +191,7 @@ impl<R_main, R_twiddle, H, T1, T2> FFTAlgorithm for CoprimeCooleyTuckeyFFT<R_mai
         }
         for i in 0..self.right_table.len() {
             let mut v = SubvectorView::new(&mut values).restrict(i..).step_by(self.right_table.len());
-            self.left_table.unordered_inv_fft(&mut v);
+            self.left_table.unordered_inv_fft(&mut v, ring);
         }
     }
 
@@ -221,10 +208,8 @@ impl<R_main, R_twiddle, H, T1, T2> FFTAlgorithm for CoprimeCooleyTuckeyFFT<R_mai
 
 impl<H, T1, T2> FFTErrorEstimate for CoprimeCooleyTuckeyFFT<Complex64Base, Complex64Base, H, T1, T2> 
     where H: Homomorphism<Complex64Base, Complex64Base>,
-        T1: FFTAlgorithm + FFTErrorEstimate,
-        T1::Ring: RingStore<Type = Complex64Base>,
-        T2: FFTAlgorithm + FFTErrorEstimate,
-        T2::Ring: RingStore<Type = Complex64Base>
+        T1: FFTAlgorithm<Complex64Base> + FFTErrorEstimate,
+        T2: FFTAlgorithm<Complex64Base> + FFTErrorEstimate
 {
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
         let error_after_first_fft = self.left_table.expected_absolute_error(input_bound, input_error);
@@ -258,7 +243,7 @@ fn test_fft_basic() {
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
-    fft.unordered_fft(&mut values);
+    fft.unordered_fft(&mut values, ring.get_ring());
     assert_eq!(values, permuted_expected);
 }
 
@@ -277,7 +262,7 @@ fn test_fft_long() {
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
-    fft.unordered_fft(&mut values);
+    fft.unordered_fft(&mut values, ring.get_ring());
     assert_eq!(values, permuted_expected);
 }
 
@@ -298,17 +283,17 @@ fn test_fft_unordered() {
     }
     let original = values;
 
-    fft.unordered_fft(&mut values);
+    fft.unordered_fft(&mut values, ring.get_ring());
 
     let mut ordered_fft = [0; LEN];
     for i in 0..LEN {
         ordered_fft[fft.unordered_fft_permutation(i)] = values[i];
     }
 
-    fft.unordered_inv_fft(&mut values);
+    fft.unordered_inv_fft(&mut values, ring.get_ring());
     assert_eq!(values, original);
 
-    fft.inv_fft(&mut ordered_fft);
+    fft.inv_fft(&mut ordered_fft, ring.get_ring());
     assert_eq!(ordered_fft, original);
 }
 
@@ -340,7 +325,7 @@ fn test_inv_fft() {
     let mut values = [3, 62, 63, 96, 37, 36];
     let expected = [1, 0, 0, 1, 0, 1];
 
-    fft.inv_fft(&mut values);
+    fft.inv_fft(&mut values, ring.get_ring());
     assert_eq!(values, expected);
 }
 
@@ -355,7 +340,7 @@ fn test_approximate_fft() {
             cooley_tuckey::CooleyTuckeyFFT::for_complex(CC, log2_n)
         );
         let mut array = (0..(p << log2_n)).map(|i| CC.root_of_unity(i as i64, (p as i64) << log2_n)).collect::<Vec<_>>();
-        fft.fft(&mut array);
+        fft.fft(&mut array, CC.get_ring());
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
@@ -382,8 +367,8 @@ fn bench_factor_fft(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         copy.clear();
         copy.extend(data.iter().map(|x| ring.clone_el(x)));
-        fft.unordered_fft(&mut copy[..]);
-        fft.unordered_inv_fft(&mut copy[..]);
+        fft.unordered_fft(&mut copy[..], ring.get_ring());
+        fft.unordered_inv_fft(&mut copy[..], ring.get_ring());
         assert_el_eq!(&ring, &copy[0], &data[0]);
     });
 }

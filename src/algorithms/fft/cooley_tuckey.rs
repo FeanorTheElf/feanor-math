@@ -25,7 +25,7 @@ use super::complex_fft::*;
 /// let ring = zn_64::Zn::new(257);
 /// let fft_table = CooleyTuckeyFFT::for_zn(ring, 8).unwrap();
 /// let mut data = [ring.one()].into_iter().chain((0..255).map(|_| ring.zero())).collect::<Vec<_>>();
-/// fft_table.unordered_fft(&mut data);
+/// fft_table.unordered_fft(&mut data, ring.get_ring());
 /// assert_el_eq!(&ring, &ring.one(), &data[0]);
 /// assert_el_eq!(&ring, &ring.one(), &data[1]);
 /// ```
@@ -249,7 +249,7 @@ impl<R_main, R_twiddle, H> PartialEq for CooleyTuckeyFFT<R_main, R_twiddle, H>
     fn eq(&self, other: &Self) -> bool {
         self.ring().get_ring() == other.ring().get_ring() &&
             self.log2_n == other.log2_n &&
-            self.ring().eq_el(self.root_of_unity(), other.root_of_unity())
+            self.ring().eq_el(self.root_of_unity(self.ring().get_ring()), other.root_of_unity(self.ring().get_ring()))
     }
 }
 
@@ -297,6 +297,10 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>
 {
+    fn ring(&self) -> &<H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
+        self.hom.codomain()
+    }
+
     ///
     /// Optimized implementation of the inplace Cooley-Tuckey FFT algorithm.
     /// Note that setting `INV = true` will perform an inverse fourier transform,
@@ -391,22 +395,17 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
     }
 }
 
-impl<R_main, R_twiddle, H> FFTAlgorithm for CooleyTuckeyFFT<R_main, R_twiddle, H> 
+impl<R_main, R_twiddle, H> FFTAlgorithm<R_main> for CooleyTuckeyFFT<R_main, R_twiddle, H> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>
 {
-    type Ring = <H as Homomorphism<R_twiddle, R_main>>::CodomainStore;
-    
     fn len(&self) -> usize {
         1 << self.log2_n
     }
 
-    fn ring(&self) -> &Self::Ring {
-        self.hom.codomain()
-    }
-
-    fn root_of_unity(&self) -> &R_main::Element {
+    fn root_of_unity(&self, ring: &R_main) -> &R_main::Element {
+        assert!(ring == self.ring().get_ring(), "unsupported ring");
         &self.root_of_unity
     }
 
@@ -418,29 +417,33 @@ impl<R_main, R_twiddle, H> FFTAlgorithm for CooleyTuckeyFFT<R_main, R_twiddle, H
         bitreverse(i, self.log2_n)
     }
 
-    fn fft<V>(&self, mut values: V)
+    fn fft<V>(&self, mut values: V, ring: &R_main)
         where V: SwappableVectorViewMut<R_main::Element>
     {
-        self.unordered_fft(&mut values);
+        assert!(ring == self.ring().get_ring(), "unsupported ring");
+        self.unordered_fft(&mut values, ring);
         self.bitreverse_permute_inplace(&mut values);
     }
 
-    fn inv_fft<V>(&self, mut values: V)
+    fn inv_fft<V>(&self, mut values: V, ring: &R_main)
         where V: SwappableVectorViewMut<R_main::Element>
     {
+        assert!(ring == self.ring().get_ring(), "unsupported ring");
         self.bitreverse_permute_inplace(&mut values);
-        self.unordered_inv_fft(&mut values);
+        self.unordered_inv_fft(&mut values, ring);
     }
 
-    fn unordered_fft<V>(&self, mut values: V)
+    fn unordered_fft<V>(&self, mut values: V, ring: &R_main)
         where V: SwappableVectorViewMut<R_main::Element>
     {
+        assert!(ring == self.ring().get_ring(), "unsupported ring");
         self.unordered_fft_dispatch::<V, false>(&mut values);
     }
     
-    fn unordered_inv_fft<V>(&self, mut values: V)
-    where V: SwappableVectorViewMut<R_main::Element>
+    fn unordered_inv_fft<V>(&self, mut values: V, ring: &R_main)
+        where V: SwappableVectorViewMut<R_main::Element>
     {
+        assert!(ring == self.ring().get_ring(), "unsupported ring");
         self.unordered_fft_dispatch::<V, true>(&mut values);
         let inv = self.hom.domain().invert(&self.hom.domain().int_hom().map(1 << self.log2_n)).unwrap();
         for i in 0..values.len() {
@@ -486,7 +489,7 @@ fn test_bitreverse_fft_inplace_basic() {
         bitreverse_expected[i] = expected[bitreverse(i, 2)];
     }
 
-    fft.unordered_fft(&mut values);
+    fft.unordered_fft(&mut values, ring.get_ring());
     assert_eq!(values, bitreverse_expected);
 }
 
@@ -502,7 +505,7 @@ fn test_bitreverse_fft_inplace_advanced() {
         bitreverse_expected[i] = expected[bitreverse(i, 4)];
     }
 
-    fft.unordered_fft(&mut values);
+    fft.unordered_fft(&mut values, ring.get_ring());
     assert_eq!(values, bitreverse_expected);
 }
 
@@ -512,8 +515,8 @@ fn test_bitreverse_inv_fft_inplace() {
     let fft = CooleyTuckeyFFT::for_zn(&ring, 4).unwrap();
     let values: [u64; 16] = [1, 2, 3, 2, 1, 0, 17 - 1, 17 - 2, 17 - 1, 0, 1, 2, 3, 4, 5, 6];
     let mut work = values;
-    fft.unordered_fft(&mut work);
-    fft.unordered_inv_fft(&mut work);
+    fft.unordered_fft(&mut work, ring.get_ring());
+    fft.unordered_inv_fft(&mut work, ring.get_ring());
     assert_eq!(&work, &values);
 }
 
@@ -534,8 +537,8 @@ fn run_fft_bench_round<R, S, H>(fft: &CooleyTuckeyFFT<S, R, H>, data: &Vec<S::El
 {
     copy.clear();
     copy.extend(data.iter().map(|x| fft.ring().clone_el(x)));
-    fft.unordered_fft(&mut copy[..]);
-    fft.unordered_inv_fft(&mut copy[..]);
+    fft.unordered_fft(&mut copy[..], fft.ring().get_ring());
+    fft.unordered_inv_fft(&mut copy[..], fft.ring().get_ring());
     assert_el_eq!(&fft.ring(), &copy[0], &data[0]);
 }
 
@@ -571,7 +574,7 @@ fn test_approximate_fft() {
     for log2_n in [4, 7, 11, 15] {
         let fft = CooleyTuckeyFFT::new_with_pows(CC, |x| CC.root_of_unity(x, 1 << log2_n), log2_n);
         let mut array = (0..(1 << log2_n)).map(|i|  CC.root_of_unity(i as i64, 1 << log2_n)).collect::<Vec<_>>();
-        fft.fft(&mut array);
+        fft.fft(&mut array, CC.get_ring());
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
@@ -587,9 +590,9 @@ fn test_size_1_fft() {
     let fft = CooleyTuckeyFFT::for_zn(&ring, 0).unwrap();
     let values: [u64; 1] = [3];
     let mut work = values;
-    fft.unordered_fft(&mut work);
+    fft.unordered_fft(&mut work, ring.get_ring());
     assert_eq!(&work, &values);
-    fft.unordered_inv_fft(&mut work);
+    fft.unordered_inv_fft(&mut work, ring.get_ring());
     assert_eq!(&work, &values);
     assert_eq!(0, fft.unordered_fft_permutation(0));
     assert_eq!(0, fft.unordered_fft_permutation_inv(0));

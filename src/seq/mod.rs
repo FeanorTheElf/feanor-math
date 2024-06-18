@@ -226,6 +226,20 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a mut V {
     }
 }
 
+impl<'a, T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for &'a mut V {
+
+    fn at_mut(&mut self, i: usize) -> &mut T {
+        (**self).at_mut(i)
+    }
+}
+
+impl<'a, T: ?Sized, V: ?Sized + SwappableVectorViewMut<T>> SwappableVectorViewMut<T> for &'a mut V {
+
+    fn swap(&mut self, i: usize, j: usize) {
+        (**self).swap(i, j)
+    }
+}
+
 ///
 /// A trait for [`VectorView`]s that allow mutable access to one element at a time.
 /// 
@@ -246,14 +260,6 @@ pub trait VectorViewMut<T: ?Sized>: VectorView<T> {
     }
 }
 
-impl<'a, T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for &'a mut V {
-
-    fn at_mut(&mut self, i: usize) -> &mut T {
-        (**self).at_mut(i)
-    }
-}
-
-
 ///
 /// A trait for [`VectorViewMut`]s that support swapping of two elements.
 /// 
@@ -264,13 +270,6 @@ impl<'a, T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for &'a mut V
 pub trait SwappableVectorViewMut<T: ?Sized>: VectorViewMut<T> {
 
     fn swap(&mut self, i: usize, j: usize);
-}
-
-impl<'a, T: ?Sized, V: ?Sized + SwappableVectorViewMut<T>> SwappableVectorViewMut<T> for &'a mut V {
-
-    fn swap(&mut self, i: usize, j: usize) {
-        (**self).swap(i, j)
-    }
 }
 
 ///

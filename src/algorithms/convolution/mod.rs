@@ -35,14 +35,15 @@ impl<'a, R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> ConvolutionAlgorithm<
 }
 
 #[stability::unstable(feature = "enable")]
-pub struct StandardConvolutionAlgorithm<A: Allocator = Global> {
+#[derive(Clone, Copy)]
+pub struct KaratsubaAlgorithm<A: Allocator = Global> {
     allocator: A
 }
 
 #[stability::unstable(feature = "enable")]
-pub const STANDARD_CONVOLUTION: StandardConvolutionAlgorithm = StandardConvolutionAlgorithm::new(Global);
+pub const STANDARD_CONVOLUTION: KaratsubaAlgorithm = KaratsubaAlgorithm::new(Global);
 
-impl<A: Allocator> StandardConvolutionAlgorithm<A> {
+impl<A: Allocator> KaratsubaAlgorithm<A> {
     
     #[stability::unstable(feature = "enable")]
     pub const fn new(allocator: A) -> Self {
@@ -50,7 +51,7 @@ impl<A: Allocator> StandardConvolutionAlgorithm<A> {
     }
 }
 
-impl<R: ?Sized + RingBase, A: Allocator> ConvolutionAlgorithm<R> for StandardConvolutionAlgorithm<A> {
+impl<R: ?Sized + RingBase, A: Allocator> ConvolutionAlgorithm<R> for KaratsubaAlgorithm<A> {
 
     fn compute_convolution<V1:VectorView<<R as RingBase>::Element>, V2:VectorView<<R as RingBase>::Element>>(&self, lhs: V1, rhs: V2, dst: &mut[<R as RingBase>::Element], ring: &R) {
         karatsuba(ring.karatsuba_threshold(), dst, SubvectorView::new(&lhs), SubvectorView::new(&rhs), RingRef::new(ring), &self.allocator)
@@ -58,16 +59,16 @@ impl<R: ?Sized + RingBase, A: Allocator> ConvolutionAlgorithm<R> for StandardCon
 }
 
 ///
-/// Trait to allow rings to customize the parameters with which [`StandardConvolutionAlgorithm`] will
+/// Trait to allow rings to customize the parameters with which [`KaratsubaAlgorithm`] will
 /// compute convolutions over the ring.
 /// 
 #[stability::unstable(feature = "enable")]
 pub trait KaratsubaHint: RingBase {
 
     ///
-    /// Define a threshold from which on [`StandardConvolutionAlgorithm`] will use the Karatsuba algorithm.
+    /// Define a threshold from which on [`KaratsubaAlgorithm`] will use the Karatsuba algorithm.
     /// 
-    /// Concretely, when this returns `k`, [`StandardConvolutionAlgorithm`] will reduce the 
+    /// Concretely, when this returns `k`, [`KaratsubaAlgorithm`] will reduce the 
     /// convolution down to ones on slices of size `2^k`, and compute their convolution naively. The default
     /// value is `0`, but if the considered rings have fast multiplication (compared to addition), then setting
     /// it higher may result in a performance gain.

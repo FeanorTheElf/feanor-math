@@ -1,11 +1,11 @@
 use std::cmp::min;
 
 use crate::divisibility::DivisibilityRingStore;
-use crate::matrix::matmul;
 use crate::matrix::*;
 use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
 use crate::ring::*;
 use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
+use crate::algorithms::matmul::*;
 
 ///
 /// Transforms `A` into `A'` via transformations `L, R` such that
@@ -140,7 +140,7 @@ pub fn solve_right<R, V1, V2>(mut A: SubmatrixMut<V1, El<R>>, mut rhs: Submatrix
         }
     }
     let mut out = OwnedMatrix::zero(R.row_count(), rhs.col_count(), ring);
-    matmul(R.data(), result.data(), out.data_mut(), &ring.identity(), &ring.identity());
+    STANDARD_MATMUL.matmul(R.data(), result.data(), out.data_mut(), ring.get_ring());
     return Some(out);
 }
 
@@ -180,12 +180,12 @@ fn multiply<'a, R: RingStore, V: AsPointerToSlice<El<R>>, I: IntoIterator<Item =
     let fst = it.next().unwrap();
     let snd = it.next().unwrap();
     let mut new_result = OwnedMatrix::zero(fst.row_count(), snd.col_count(), &ring);
-    matmul(fst, snd, new_result.data_mut(), &ring.identity(), &ring.identity());
+    STANDARD_MATMUL.matmul(fst, snd, new_result.data_mut(), ring.get_ring());
     let mut result = new_result;
 
     for m in it {
         let mut new_result = OwnedMatrix::zero(result.row_count(), m.col_count(), &ring);
-        matmul(result.data(), m, new_result.data_mut(), &ring.identity(), &ring.identity());
+        STANDARD_MATMUL.matmul(result.data(), m, new_result.data_mut(), ring.get_ring());
         result = new_result;
     }
     return result;

@@ -16,6 +16,19 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
         Self { data, col_count }
     }
 
+    #[stability::unstable(feature = "enable")]
+    pub fn from_fn_in<F>(row_count: usize, col_count: usize, mut f: F, allocator: A) -> Self
+        where F: FnMut(usize, usize) -> T
+    {
+        let mut data = Vec::with_capacity_in(row_count * col_count, allocator);
+        for i in 0..row_count {
+            for j in 0..col_count {
+                data.push(f(i, j));
+            }
+        }
+        return Self::new(data, col_count);
+    }
+
     pub fn data<'a>(&'a self) -> Submatrix<'a, AsFirstElement<T>, T> {
         Submatrix::<AsFirstElement<_>, _>::new(&self.data, self.row_count(), self.col_count())
     }

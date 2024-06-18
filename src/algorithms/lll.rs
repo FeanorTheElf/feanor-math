@@ -1,8 +1,8 @@
+use crate::algorithms::matmul::MatmulAlgorithm;
+use crate::algorithms::matmul::STANDARD_MATMUL;
 use crate::field::*;
 use crate::integer::*;
 use crate::homomorphism::*;
-use crate::matrix::matmul;
-use crate::matrix::matmul_fst_transposed;
 use crate::matrix::*;
 use crate::matrix::transform::TransformTarget;
 use crate::primitive_int::*;
@@ -12,6 +12,7 @@ use crate::rings::rational::*;
 use crate::ordered::{OrderedRing, OrderedRingStore};
 use crate::ring::*;
 
+use std::alloc::Allocator;
 use std::cmp::max;
 use std::marker::PhantomData;
 
@@ -216,13 +217,13 @@ fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>)
 /// `I` and `f64` is not implemented with high quality), the vectors in `B'` might be
 /// somewhat longer than explained above.
 /// 
-/// The exact ways of handling this are very likely to change in the future.
-/// 
-pub fn lll_float<I, V1, V2>(ring: I, quadratic_form: Submatrix<V1, El<Real64>>, matrix: SubmatrixMut<V2, El<I>>, delta: f64)
+#[stability::unstable(feature = "enable")]
+pub fn lll_float<I, V1, V2, A>(ring: I, quadratic_form: Submatrix<V1, El<Real64>>, matrix: SubmatrixMut<V2, El<I>>, delta: f64, allocator: A)
     where I: IntegerRingStore,
         I::Type: IntegerRing,
         V1: AsPointerToSlice<El<Real64>>,
-        V2: AsPointerToSlice<El<I>>
+        V2: AsPointerToSlice<El<I>>,
+        A: Allocator
 {
     assert!(delta < 1.);
     assert!(delta > 0.25);
@@ -230,13 +231,19 @@ pub fn lll_float<I, V1, V2>(ring: I, quadratic_form: Submatrix<V1, El<Real64>>, 
     assert_eq!(matrix.col_count(), quadratic_form.col_count());
 
     let lll_reals = Real64::RING;
+    let hom = lll_reals.can_hom(&ring).unwrap();
 
     let n = matrix.col_count();
-    let mut gso: OwnedMatrix<f64> = OwnedMatrix::zero(n, n, &lll_reals);
-    let mut tmp: OwnedMatrix<f64> = OwnedMatrix::zero(n, n, &lll_reals);
-    let hom = lll_reals.can_hom(&ring).unwrap();
-    matmul_fst_transposed(matrix.as_const(), quadratic_form, tmp.data_mut(), &hom, &lll_reals.identity());
-    matmul(tmp.data(), matrix.as_const(), gso.data_mut(), &lll_reals.identity(), &hom);
+    let mut gso: OwnedMatrix<f64, &A> = OwnedMatrix::zero_in(n, n, &lll_reals, &allocator);
+    let mut tmp: OwnedMatrix<f64, &A> = OwnedMatrix::zero_in(n, n, &lll_reals, &allocator);
+    let matrix_RR: OwnedMatrix<f64, &A> = OwnedMatrix::from_fn_in(matrix.row_count(), matrix.col_count(), |i, j| hom.map_ref(matrix.at(i, j)), &allocator);
+    STANDARD_MATMUL.matmul_fst_transposed(matrix_RR.data(), quadratic_form, tmp.data_mut(), lll_reals.get_ring());
+    STANDARD_MATMUL.matmul(tmp.data(), matrix_RR.data(), gso.data_mut(), lll_reals.get_ring());
+
+    // possibly free space early
+    drop(tmp);
+    drop(matrix_RR);
+
     ldl(&lll_reals, gso.data_mut());
     lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut(), TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);
 }
@@ -263,28 +270,32 @@ pub fn lll_float<I, V1, V2>(ring: I, quadratic_form: Submatrix<V1, El<Real64>>, 
 /// the one of [`lll_float()`]. Since it is very unlikely that you need the exact guarantees
 /// of [`lll_exact()`], but just want a "short" matrix, prefer using [`lll_float()`] instead.
 /// 
-/// The exact ways of handling this are very likely to change in the future.
-/// 
-pub fn lll_exact<I, V>(ring: I, mut matrix: SubmatrixMut<V, El<I>>, delta: f64)
+#[stability::unstable(feature = "enable")]
+pub fn lll_exact<I, V, A>(ring: I, mut matrix: SubmatrixMut<V, El<I>>, delta: f64, allocator: A)
     where I: IntegerRingStore,
         I::Type: IntegerRing,
-        V: AsPointerToSlice<El<I>>
+        V: AsPointerToSlice<El<I>>,
+        A: Allocator
 {
     assert!(delta < 1.);
     assert!(delta > 0.25);
-    lll_float(&ring, OwnedMatrix::<f64>::identity(matrix.col_count(), matrix.col_count(), Real64::RING).data(), matrix.reborrow(), delta);
+    lll_float(&ring, OwnedMatrix::<f64>::identity(matrix.col_count(), matrix.col_count(), Real64::RING).data(), matrix.reborrow(), delta, &allocator);
 
     let lll_reals = RationalField::new(BigIntRing::RING);
     let delta_int = ring.from_float_approx(delta * 2f64.powi(20)).unwrap();
     let delta = lll_reals.div(&lll_reals.get_ring().from_integer(delta_int, ring.get_ring()), &lll_reals.get_ring().from_integer(ring.power_of_two(20), ring.get_ring()));
 
     let n = matrix.col_count();
-    let mut gso_data = (0..n).flat_map(|_i| (0..n).map(|_j| lll_reals.zero())).collect::<Vec<_>>();
-    let mut gso = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut gso_data, n, n);
+    let mut gso = OwnedMatrix::zero_in(n, n, &lll_reals, &allocator);
     let hom = lll_reals.inclusion().compose(BigIntRing::RING.can_hom(&ring).unwrap());
-    matmul_fst_transposed(matrix.as_const(), matrix.as_const(), gso.reborrow(), &hom, &hom);
-    ldl(&lll_reals, gso.reborrow());
-    lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso, TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);
+    let matrix_RR: OwnedMatrix<_, &A> = OwnedMatrix::from_fn_in(matrix.row_count(), matrix.col_count(), |i, j| hom.map_ref(matrix.at(i, j)), &allocator);
+    STANDARD_MATMUL.matmul_fst_transposed(matrix_RR.data(), matrix_RR.data(), gso.data_mut(), lll_reals.get_ring());
+
+    // possibly free space early
+    drop(matrix_RR);
+
+    ldl(&lll_reals, gso.data_mut());
+    lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut(), TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);
 }
 
 struct TransformLatticeBasis<'a, R, I, V, H>
@@ -345,6 +356,8 @@ use crate::seq::*;
 use crate::algorithms;
 #[cfg(test)]
 use test::Bencher;
+#[cfg(test)]
+use std::alloc::Global;
 #[cfg(test)]
 use crate::assert_matrix_eq;
 
@@ -459,7 +472,7 @@ fn test_lll_float_2d() {
     ];
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut reduced);
-    lll_float(&ZZ, OwnedMatrix::<_>::identity(2, 2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
+    lll_float(&ZZ, OwnedMatrix::<_>::identity(2, 2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9, Global);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(1, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -471,7 +484,7 @@ fn test_lll_float_2d() {
     ];
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut reduced);
-    lll_float(&ZZ, OwnedMatrix::<_>::identity(2, 2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
+    lll_float(&ZZ, OwnedMatrix::<_>::identity(2, 2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9, Global);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(4, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -496,7 +509,7 @@ fn test_lll_float_3d() {
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 3>, _>::new(&mut reduced);
-    lll_float(&ZZ, OwnedMatrix::<_>::identity(3, 3, Real64::RING).data(), reduced_matrix.reborrow(), 0.999);
+    lll_float(&ZZ, OwnedMatrix::<_>::identity(3, 3, Real64::RING).data(), reduced_matrix.reborrow(), 0.999, Global);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(144 * 144, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -535,7 +548,7 @@ fn bench_lll_float_10d(bencher: &mut Bencher) {
         ];
         let mut reduced = original;
         let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 10>, _>::new(&mut reduced);
-        lll_float(&ZZ, OwnedMatrix::<_>::identity(10, 10, Real64::RING).data(), reduced_matrix.reborrow(), 0.9);
+        lll_float(&ZZ, OwnedMatrix::<_>::identity(10, 10, Real64::RING).data(), reduced_matrix.reborrow(), 0.9, Global);
 
         assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
         assert!(16 * 16 > norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -551,7 +564,7 @@ fn test_lll_exact_2d() {
     ];
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut reduced);
-    lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9);
+    lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9, Global);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(1, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -563,7 +576,7 @@ fn test_lll_exact_2d() {
     ];
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut reduced);
-    lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9);
+    lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9, Global);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(4, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -588,7 +601,7 @@ fn test_lll_exact_3d() {
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 3>, _>::new(&mut reduced);
-    lll_exact(&ZZ, reduced_matrix.reborrow(), 0.999);
+    lll_exact(&ZZ, reduced_matrix.reborrow(), 0.999, Global);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
     assert_eq!(144 * 144, norm_squared(&reduced_matrix.as_const().col_at(0)));
@@ -627,7 +640,7 @@ fn bench_lll_exact_10d(bencher: &mut Bencher) {
         ];
         let mut reduced = original;
         let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 10>, _>::new(&mut reduced);
-        lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9);
+        lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9, Global);
 
         assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
         assert!(16 * 16 > norm_squared(&reduced_matrix.as_const().col_at(0)));
