@@ -11,13 +11,13 @@ use crate::rings::float_complex::*;
 /// transform of an array of length `n1 * n2` given Fourier transforms for length `n1` resp. `n2`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub struct FFTTableGenCooleyTuckey<R_main, R_twiddle, H, T1, T2> 
+pub struct CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, T1, T2> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
         H: Homomorphism<R_twiddle, R_main>,
-        T1: FFTTable,
+        T1: FFTAlgorithm,
         T1::Ring: RingStore<Type = R_main>,
-        T2: FFTTable,
+        T2: FFTAlgorithm,
         T2::Ring: RingStore<Type = R_main>
 {
     twiddle_factors: Vec<R_twiddle::Element>,
@@ -28,11 +28,11 @@ pub struct FFTTableGenCooleyTuckey<R_main, R_twiddle, H, T1, T2>
     hom: H
 }
 
-impl<R, T1, T2> FFTTableGenCooleyTuckey<R::Type, R::Type, Identity<R>, T1, T2> 
+impl<R, T1, T2> CoprimeCooleyTuckeyFFT<R::Type, R::Type, Identity<R>, T1, T2> 
     where R: RingStore,
-        T1: FFTTable,
+        T1: FFTAlgorithm,
         T1::Ring: RingStore<Type = R::Type>,
-        T2: FFTTable,
+        T2: FFTAlgorithm,
         T2::Ring: RingStore<Type = R::Type>
 {
     #[stability::unstable(feature = "enable")]
@@ -48,13 +48,13 @@ impl<R, T1, T2> FFTTableGenCooleyTuckey<R::Type, R::Type, Identity<R>, T1, T2>
     }
 }
 
-impl<R_main, R_twiddle, H, T1, T2> FFTTableGenCooleyTuckey<R_main, R_twiddle, H, T1, T2> 
+impl<R_main, R_twiddle, H, T1, T2> CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, T1, T2> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
         H: Homomorphism<R_twiddle, R_main>,
-        T1: FFTTable,
+        T1: FFTAlgorithm,
         T1::Ring: RingStore<Type = R_main>,
-        T2: FFTTable,
+        T2: FFTAlgorithm,
         T2::Ring: RingStore<Type = R_main>
 {
     #[stability::unstable(feature = "enable")]
@@ -72,7 +72,7 @@ impl<R_main, R_twiddle, H, T1, T2> FFTTableGenCooleyTuckey<R_main, R_twiddle, H,
         let inv_twiddle_factors = Self::create_twiddle_factors(|i| root_of_unity_pows(-i), &left_table, &right_table);
         let twiddle_factors = Self::create_twiddle_factors(root_of_unity_pows, &left_table, &right_table);
 
-        FFTTableGenCooleyTuckey {
+        CoprimeCooleyTuckeyFFT {
             twiddle_factors: twiddle_factors,
             inv_twiddle_factors: inv_twiddle_factors,
             left_table: left_table, 
@@ -114,7 +114,7 @@ impl<R_main, R_twiddle, H, T1, T2> FFTTableGenCooleyTuckey<R_main, R_twiddle, H,
         let inv_twiddle_factors = Self::create_twiddle_factors(|i| root_of_unity_pows(-i), &left_table, &right_table);
         let twiddle_factors = Self::create_twiddle_factors(root_of_unity_pows, &left_table, &right_table);
 
-        FFTTableGenCooleyTuckey {
+        CoprimeCooleyTuckeyFFT {
             twiddle_factors: twiddle_factors,
             inv_twiddle_factors: inv_twiddle_factors,
             left_table: left_table, 
@@ -135,13 +135,13 @@ impl<R_main, R_twiddle, H, T1, T2> FFTTableGenCooleyTuckey<R_main, R_twiddle, H,
     }
 }
 
-impl<R_main, R_twiddle, H, T1, T2> PartialEq for FFTTableGenCooleyTuckey<R_main, R_twiddle, H, T1, T2> 
+impl<R_main, R_twiddle, H, T1, T2> PartialEq for CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, T1, T2> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
         H: Homomorphism<R_twiddle, R_main>,
-        T1: FFTTable + PartialEq,
+        T1: FFTAlgorithm + PartialEq,
         T1::Ring: RingStore<Type = R_main>,
-        T2: FFTTable + PartialEq,
+        T2: FFTAlgorithm + PartialEq,
         T2::Ring: RingStore<Type = R_main>
 {
     fn eq(&self, other: &Self) -> bool {
@@ -152,13 +152,13 @@ impl<R_main, R_twiddle, H, T1, T2> PartialEq for FFTTableGenCooleyTuckey<R_main,
     }
 }
 
-impl<R_main, R_twiddle, H, T1, T2> FFTTable for FFTTableGenCooleyTuckey<R_main, R_twiddle, H, T1, T2> 
+impl<R_main, R_twiddle, H, T1, T2> FFTAlgorithm for CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, T1, T2> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
         H: Homomorphism<R_twiddle, R_main>,
-        T1: FFTTable,
+        T1: FFTAlgorithm,
         T1::Ring: RingStore<Type = R_main>,
-        T2: FFTTable,
+        T2: FFTAlgorithm,
         T2::Ring: RingStore<Type = R_main>
 {
     type Ring = <H as Homomorphism<R_twiddle, R_main>>::CodomainStore;
@@ -219,11 +219,11 @@ impl<R_main, R_twiddle, H, T1, T2> FFTTable for FFTTableGenCooleyTuckey<R_main, 
     }
 }
 
-impl<H, T1, T2> ErrorEstimate for FFTTableGenCooleyTuckey<Complex64Base, Complex64Base, H, T1, T2> 
+impl<H, T1, T2> FFTErrorEstimate for CoprimeCooleyTuckeyFFT<Complex64Base, Complex64Base, H, T1, T2> 
     where H: Homomorphism<Complex64Base, Complex64Base>,
-        T1: FFTTable + ErrorEstimate,
+        T1: FFTAlgorithm + FFTErrorEstimate,
         T1::Ring: RingStore<Type = Complex64Base>,
-        T2: FFTTable + ErrorEstimate,
+        T2: FFTAlgorithm + FFTErrorEstimate,
         T2::Ring: RingStore<Type = Complex64Base>
 {
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
@@ -247,9 +247,9 @@ use std::alloc::Global;
 fn test_fft_basic() {
     let ring = Zn::<97>::RING;
     let z = ring.int_hom().map(39);
-    let fft = FFTTableGenCooleyTuckey::new(ring, ring.pow(z, 16), 
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 24), ring.pow(z, 12), 2, 3, Global),
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
+    let fft = CoprimeCooleyTuckeyFFT::new(ring, ring.pow(z, 16), 
+        bluestein::BluesteinFFT::new(ring, ring.pow(z, 24), ring.pow(z, 12), 2, 3, Global),
+        bluestein::BluesteinFFT::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
     );
     let mut values = [1, 0, 0, 1, 0, 1];
     let expected = [3, 62, 63, 96, 37, 36];
@@ -266,9 +266,9 @@ fn test_fft_basic() {
 fn test_fft_long() {
     let ring = Zn::<97>::RING;
     let z = ring.int_hom().map(39);
-    let fft = FFTTableGenCooleyTuckey::new(ring, ring.pow(z, 4), 
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 6), ring.pow(z, 3), 8, 5, Global),
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
+    let fft = CoprimeCooleyTuckeyFFT::new(ring, ring.pow(z, 4), 
+        bluestein::BluesteinFFT::new(ring, ring.pow(z, 6), ring.pow(z, 3), 8, 5, Global),
+        bluestein::BluesteinFFT::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
     );
     let mut values = [1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 2, 2, 0, 2, 0, 1, 2, 3, 4];
     let expected = [26, 0, 75, 47, 41, 31, 28, 62, 39, 93, 53, 27, 0, 54, 74, 61, 65, 81, 63, 38, 53, 94, 89, 91];
@@ -285,11 +285,11 @@ fn test_fft_long() {
 fn test_fft_unordered() {
     let ring = Zn::<1409>::RING;
     let z = algorithms::unity_root::get_prim_root_of_unity(ring, 64 * 11).unwrap();
-    let fft = FFTTableGenCooleyTuckey::new(
+    let fft = CoprimeCooleyTuckeyFFT::new(
         ring, 
         ring.pow(z, 4),
-        cooley_tuckey::FFTTableCooleyTuckey::new(ring, ring.pow(z, 44), 4),
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5, Global),
+        cooley_tuckey::CooleyTuckeyFFT::new(ring, ring.pow(z, 44), 4),
+        bluestein::BluesteinFFT::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5, Global),
     );
     const LEN: usize = 16 * 11;
     let mut values = [0; LEN];
@@ -317,11 +317,11 @@ fn test_fft_unordered() {
 fn test_unordered_fft_permutation_inv() {
     let ring = Zn::<1409>::RING;
     let z = algorithms::unity_root::get_prim_root_of_unity(ring, 64 * 11).unwrap();
-    let fft = FFTTableGenCooleyTuckey::new(
+    let fft = CoprimeCooleyTuckeyFFT::new(
         ring, 
         ring.pow(z, 4),
-        cooley_tuckey::FFTTableCooleyTuckey::new(ring, ring.pow(z, 44), 4),
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5, Global),
+        cooley_tuckey::CooleyTuckeyFFT::new(ring, ring.pow(z, 44), 4),
+        bluestein::BluesteinFFT::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5, Global),
     );
     for i in 0..(16 * 11) {
         assert_eq!(fft.unordered_fft_permutation_inv(fft.unordered_fft_permutation(i)), i);
@@ -333,9 +333,9 @@ fn test_unordered_fft_permutation_inv() {
 fn test_inv_fft() {
     let ring = Zn::<97>::RING;
     let z = ring.int_hom().map(39);
-    let fft = FFTTableGenCooleyTuckey::new(ring, ring.pow(z, 16), 
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 24), ring.pow(z, 12), 2, 3, Global),
-        bluestein::FFTTableBluestein::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
+    let fft = CoprimeCooleyTuckeyFFT::new(ring, ring.pow(z, 16), 
+        bluestein::BluesteinFFT::new(ring, ring.pow(z, 24), ring.pow(z, 12), 2, 3, Global),
+        bluestein::BluesteinFFT::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
     );
     let mut values = [3, 62, 63, 96, 37, 36];
     let expected = [1, 0, 0, 1, 0, 1];
@@ -348,11 +348,11 @@ fn test_inv_fft() {
 fn test_approximate_fft() {
     let CC = Complex64::RING;
     for (p, log2_n) in [(5, 3), (53, 5), (101, 8), (503, 10)] {
-        let fft = FFTTableGenCooleyTuckey::new_with_pows(
+        let fft = CoprimeCooleyTuckeyFFT::new_with_pows(
             CC,
             |i| CC.root_of_unity(i, (p as i64) << log2_n), 
-            bluestein::FFTTableBluestein::for_complex(CC, p, Global), 
-            cooley_tuckey::FFTTableCooleyTuckey::for_complex(CC, log2_n)
+            bluestein::BluesteinFFT::for_complex(CC, p, Global), 
+            cooley_tuckey::CooleyTuckeyFFT::for_complex(CC, log2_n)
         );
         let mut array = (0..(p << log2_n)).map(|i| CC.root_of_unity(i as i64, (p as i64) << log2_n)).collect::<Vec<_>>();
         fft.fft(&mut array);
@@ -371,11 +371,11 @@ fn bench_factor_fft(bencher: &mut test::Bencher) {
     let fastmul_ring = zn_64::ZnFastmul::new(ring);
     let embedding = ring.can_hom(&fastmul_ring).unwrap();
     let root_of_unity = fastmul_ring.coerce(&ring, algorithms::unity_root::get_prim_root_of_unity(&ring, 2 * 31 * 601).unwrap());
-    let fft = FFTTableGenCooleyTuckey::new_with_hom(
+    let fft = CoprimeCooleyTuckeyFFT::new_with_hom(
         embedding.clone(), 
         fastmul_ring.pow(root_of_unity, 2),
-        bluestein::FFTTableBluestein::new_with_hom(embedding.clone(), fastmul_ring.pow(root_of_unity, 31), algorithms::unity_root::get_prim_root_of_unity_pow2(&fastmul_ring, 11).unwrap(), 601, 11, Global),
-        bluestein::FFTTableBluestein::new_with_hom(embedding, fastmul_ring.pow(root_of_unity, 601), algorithms::unity_root::get_prim_root_of_unity_pow2(&fastmul_ring, 6).unwrap(), 31, 6, Global),
+        bluestein::BluesteinFFT::new_with_hom(embedding.clone(), fastmul_ring.pow(root_of_unity, 31), algorithms::unity_root::get_prim_root_of_unity_pow2(&fastmul_ring, 11).unwrap(), 601, 11, Global),
+        bluestein::BluesteinFFT::new_with_hom(embedding, fastmul_ring.pow(root_of_unity, 601), algorithms::unity_root::get_prim_root_of_unity_pow2(&fastmul_ring, 6).unwrap(), 31, 6, Global),
     );
     let data = (0..(31 * 601)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(31 * 601);

@@ -1,7 +1,7 @@
 use std::alloc::Allocator;
 use std::alloc::Global;
 
-use crate::algorithms::conv_mul::ConvMulComputation;
+use crate::algorithms::convolution::*;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::divisibility::*;
 use crate::impl_wrap_unwrap_homs;
@@ -94,14 +94,15 @@ impl<R, V> FreeAlgebraImpl<R, V>
     where R: RingStore, V: VectorView<El<R>>
 {
     pub const fn new(base_ring: R, x_pow_rank: V) -> Self {
-        Self::new_in(base_ring, x_pow_rank, Global)
+        Self::new_with(base_ring, x_pow_rank, Global)
     }
 }
 
 impl<R, V, A> FreeAlgebraImpl<R, V, A>
     where R: RingStore, V: VectorView<El<R>>, A: Allocator + Clone
 {
-    pub const fn new_in(base_ring: R, x_pow_rank: V, element_allocator: A) -> Self {
+    #[stability::unstable(feature = "enable")]
+    pub const fn new_with(base_ring: R, x_pow_rank: V, element_allocator: A) -> Self {
         RingValue::from(FreeAlgebraImplBase {
             base_ring, x_pow_rank, element_allocator
         })
@@ -187,7 +188,7 @@ impl<R, V, A> RingBase for FreeAlgebraImplBase<R, V, A>
     default fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         let mut tmp = Vec::with_capacity_in(self.rank() * 2, self.element_allocator.clone());
         tmp.extend((0..(self.rank() * 2)).map(|_| self.base_ring.zero()));
-        <_ as ConvMulComputation>::add_assign_conv_mul(self.base_ring().get_ring(), &mut tmp[..], &lhs.values[..], &rhs.values[..]);
+        STANDARD_CONVOLUTION.compute_convolution(&lhs.values[..], &rhs.values[..], &mut tmp[..], self.base_ring().get_ring());
         for i in (self.rank()..tmp.len()).rev() {
             for j in 0..self.rank() {
                 let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &tmp[i]);

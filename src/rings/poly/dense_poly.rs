@@ -1,5 +1,5 @@
-use crate::algorithms::conv_mul::ConvMulComputation;
 use crate::algorithms::eea::poly_pid_fractionfield_gcd;
+use crate::algorithms::convolution::*;
 use crate::divisibility::*;
 use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::pid::*;
@@ -44,7 +44,7 @@ use std::cmp::min;
 /// # use feanor_mempool::*;
 /// let ZZ = StaticRing::<i32>::RING;
 /// // use a mempool allocator from feanor_mempool
-/// let P = DensePolyRing::new_in(ZZ, "X", AllocRc(Rc::<dynsize::DynLayoutMempool>::new(dynsize::DynLayoutMempool::default())));
+/// let P = DensePolyRing::new_with(ZZ, "X", AllocRc(Rc::<dynsize::DynLayoutMempool>::new(dynsize::DynLayoutMempool::default())));
 /// ```
 /// This ring has a [`CanIsoFromTo`] to [`sparse_poly::SparsePolyRingBase`].
 /// ```
@@ -90,13 +90,14 @@ pub type DensePolyRing<R, A = Global> = RingValue<DensePolyRingBase<R, A>>;
 impl<R: RingStore> DensePolyRing<R> {
 
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        Self::new_in(base_ring, unknown_name, Global)
+        Self::new_with(base_ring, unknown_name, Global)
     }
 }
 
 impl<R: RingStore, A: Allocator + Clone> DensePolyRing<R, A> {
 
-    pub fn new_in(base_ring: R, unknown_name: &'static str, element_allocator: A) -> Self {
+    #[stability::unstable(feature = "enable")]
+    pub fn new_with(base_ring: R, unknown_name: &'static str, element_allocator: A) -> Self {
         let zero = base_ring.zero();
         RingValue::from(DensePolyRingBase {
             base_ring, 
@@ -228,11 +229,11 @@ impl<R: RingStore, A: Allocator + Clone> RingBase for DensePolyRingBase<R, A> {
         let rhs_len = self.degree(rhs).map(|i| i + 1).unwrap_or(0);
         let mut result = Vec::with_capacity_in(lhs_len + rhs_len, self.element_allocator.clone());
         result.extend((0..(lhs_len + rhs_len)).map(|_| self.base_ring().zero()));
-        <_ as ConvMulComputation>::add_assign_conv_mul(
-            self.base_ring.get_ring(),
-            &mut result[..], 
+        STANDARD_CONVOLUTION.compute_convolution(
             &lhs.data[0..lhs_len], 
-            &rhs.data[0..rhs_len]
+            &rhs.data[0..rhs_len],
+            &mut result[..], 
+            self.base_ring.get_ring()
         );
         return DensePolyRingEl {
             data: result

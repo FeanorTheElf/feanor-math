@@ -27,7 +27,7 @@ pub mod complex_fft;
 /// In other words, `F` and `G` must have exactly the same output for `unordered_fft`
 /// (and thus `fft`, `inv_fft`, ...) on same inputs.
 /// 
-pub trait FFTTable {
+pub trait FFTAlgorithm {
 
     type Ring: ?Sized + RingStore;
 
@@ -112,10 +112,10 @@ pub trait FFTTable {
         where V: SwappableVectorViewMut<El<Self::Ring>>;
 }
 
-impl<T> FFTTable for T
-    where T: Deref, T::Target: FFTTable
+impl<T> FFTAlgorithm for T
+    where T: Deref, T::Target: FFTAlgorithm
 {
-    type Ring = <T::Target as FFTTable>::Ring;
+    type Ring = <T::Target as FFTAlgorithm>::Ring;
     
     fn len(&self) -> usize {
         self.deref().len()

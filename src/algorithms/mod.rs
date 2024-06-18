@@ -1,5 +1,4 @@
-pub mod karatsuba;
-pub mod conv_mul;
+pub mod convolution;
 pub mod matmul;
 pub mod sqr_mul;
 pub mod eea;

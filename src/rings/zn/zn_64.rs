@@ -625,7 +625,7 @@ impl HashableElRing for ZnBase {
 /// let ring = Zn::new(1073872897);
 /// let fastmul_ring = ZnFastmul::new(ring);
 /// // The values stored by the FFT table are elements of `ZnFastmulBase`
-/// let fft = FFTTableCooleyTuckey::for_zn_with_hom(ring.can_hom(&fastmul_ring).unwrap(), 15).unwrap();
+/// let fft = CooleyTuckeyFFT::for_zn_with_hom(ring.can_hom(&fastmul_ring).unwrap(), 15).unwrap();
 /// // Note that data uses `ZnBase`
 /// let mut data = (0..(1 << 15)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
 /// fft.unordered_fft(&mut data[..]);

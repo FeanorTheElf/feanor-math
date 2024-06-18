@@ -88,7 +88,7 @@ impl<R: RingStore> SparsePolyRing<R> {
 
 impl<R: RingStore> SparsePolyRingBase<R> {
 
-    fn degree_truncate(&self, el: &mut <Self as RingBase>::Element) {
+    fn degree_truncate(&self, el: &mut SparseHashMapVector<Rc<R>>) {
         for i in (0..el.len()).rev() {
             if !self.base_ring.is_zero(&el.at(i)) {
                 el.set_len(i + 1);
@@ -98,7 +98,7 @@ impl<R: RingStore> SparsePolyRingBase<R> {
         el.set_len(0);
     }
 
-    fn poly_div<F>(&self, lhs: &mut SparseHashMapVector<Rc<R>>, rhs: &SparseHashMapVector<Rc<R>>, mut left_div_lc: F) -> Option<SparseHashMapVector<Rc<R>>>
+    fn poly_div<F>(&self, lhs: &mut <Self as RingBase>::Element, rhs: &<Self as RingBase>::Element, mut left_div_lc: F) -> Option<<Self as RingBase>::Element>
         where F: FnMut(El<R>) -> Option<El<R>>
     {
         let lhs_val = std::mem::replace(lhs, self.zero());
@@ -115,20 +115,26 @@ impl<R: RingStore> SparsePolyRingBase<R> {
     }
 }
 
+pub struct SparsePolyRingEl<R: RingStore> {
+    data: SparseHashMapVector<Rc<R>>
+}
+
 impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
     
-    type Element = SparseHashMapVector<Rc<R>>;
+    type Element = SparsePolyRingEl<R>;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        val.clone()
+        SparsePolyRingEl {
+            data: val.data.clone()
+        }
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        lhs.set_len(max(lhs.len(), rhs.len()));
-        for (i, c) in rhs.nontrivial_entries() {
-            self.base_ring.add_assign_ref(lhs.at_mut(i), c);
+        lhs.data.set_len(max(lhs.data.len(), rhs.data.len()));
+        for (i, c) in rhs.data.nontrivial_entries() {
+            self.base_ring.add_assign_ref(lhs.data.at_mut(i), c);
         }
-        self.degree_truncate(lhs);
+        self.degree_truncate(&mut lhs.data);
     }
 
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
@@ -136,15 +142,15 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
     }
 
     fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        lhs.set_len(max(lhs.len(), rhs.len()));
-        for (i, c) in rhs.nontrivial_entries() {
-            self.base_ring.sub_assign_ref(lhs.at_mut(i), c);
+        lhs.data.set_len(max(lhs.data.len(), rhs.data.len()));
+        for (i, c) in rhs.data.nontrivial_entries() {
+            self.base_ring.sub_assign_ref(lhs.data.at_mut(i), c);
         }
-        self.degree_truncate(lhs);
+        self.degree_truncate(&mut lhs.data);
     }
 
     fn negate_inplace(&self, lhs: &mut Self::Element) {
-        lhs.scan(|_, c| self.base_ring.negate_inplace(c));
+        lhs.data.scan(|_, c| self.base_ring.negate_inplace(c));
     }
 
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
@@ -156,7 +162,9 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
     }
 
     fn zero(&self) -> Self::Element {
-        SparseHashMapVector::new(0, self.base_ring.clone())
+        SparsePolyRingEl {
+            data: SparseHashMapVector::new(0, self.base_ring.clone())
+        }
     }
     
     fn from_int(&self, value: i32) -> Self::Element {
@@ -164,16 +172,16 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-        if lhs.len() != rhs.len() {
+        if lhs.data.len() != rhs.data.len() {
             return false;
         }
-        for (i, c) in lhs.nontrivial_entries() {
-            if !self.base_ring.eq_el(rhs.at(i), c) {
+        for (i, c) in lhs.data.nontrivial_entries() {
+            if !self.base_ring.eq_el(rhs.data.at(i), c) {
                 return false;
             }
         }
-        for (i, c) in rhs.nontrivial_entries() {
-            if !self.base_ring.eq_el(lhs.at(i), c) {
+        for (i, c) in rhs.data.nontrivial_entries() {
+            if !self.base_ring.eq_el(lhs.data.at(i), c) {
                 return false;
             }
         }
@@ -198,25 +206,27 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
     }
 
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        if lhs.len() == 0 || rhs.len() == 0 {
+        if lhs.data.len() == 0 || rhs.data.len() == 0 {
             return self.zero();
         }
-        let mut result = SparseHashMapVector::new(lhs.len() + rhs.len() - 1, self.base_ring.clone());
-        for (i, c1) in lhs.nontrivial_entries() {
-            for (j, c2) in rhs.nontrivial_entries() {
+        let mut result = SparseHashMapVector::new(lhs.data.len() + rhs.data.len() - 1, self.base_ring.clone());
+        for (i, c1) in lhs.data.nontrivial_entries() {
+            for (j, c2) in rhs.data.nontrivial_entries() {
                 self.base_ring.add_assign(result.at_mut(i + j), self.base_ring.mul_ref(c1, c2));
             }
         }
         // if the ring is not zero-divisor free
         self.degree_truncate(&mut result);
-        return result;
+        return SparsePolyRingEl {
+            data: result
+        };
     }
 
     fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
         if rhs == 0 {
             *lhs = self.zero();
         } else {
-            lhs.scan(|_, c| self.base_ring.int_hom().mul_assign_map(c, rhs));
+            lhs.data.scan(|_, c| self.base_ring.int_hom().mul_assign_map(c, rhs));
         }
     }
     
@@ -246,8 +256,8 @@ impl<R: RingStore> RingExtension for SparsePolyRingBase<R> {
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
         let mut result = self.zero();
         if !self.base_ring().is_zero(&x) {
-            result.set_len(1);
-            *result.at_mut(0) = x;
+            result.data.set_len(1);
+            *result.data.at_mut(0) = x;
         }
         return result;
     }
@@ -282,12 +292,14 @@ impl<R1, R2> CanHomFrom<SparsePolyRingBase<R1> > for SparsePolyRingBase<R2>
         self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
     }
 
-    fn map_in_ref(&self, from: &SparsePolyRingBase<R1> , el: &SparseHashMapVector<Rc<R1>>, hom: &Self::Homomorphism) -> Self::Element {
-        let mut result = SparseHashMapVector::new(el.len(), self.base_ring.clone());
-        for (j, c) in el.nontrivial_entries() {
+    fn map_in_ref(&self, from: &SparsePolyRingBase<R1> , el: &SparsePolyRingEl<R1>, hom: &Self::Homomorphism) -> Self::Element {
+        let mut result = SparseHashMapVector::new(el.data.len(), self.base_ring.clone());
+        for (j, c) in el.data.nontrivial_entries() {
             *result.at_mut(j) = self.base_ring().get_ring().map_in_ref(from.base_ring().get_ring(), c, hom);
         }
-        return result;
+        return SparsePolyRingEl {
+            data: result
+        };
     }
 
     fn map_in(&self, from: &SparsePolyRingBase<R1>, el: <SparsePolyRingBase<R1> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
@@ -318,12 +330,14 @@ impl<R1, R2> CanIsoFromTo<SparsePolyRingBase<R1>> for SparsePolyRingBase<R2>
         self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
     }
 
-    fn map_out(&self, from: &SparsePolyRingBase<R1>, el: Self::Element, iso: &Self::Isomorphism) -> SparseHashMapVector<Rc<R1>> {
-        let mut result = SparseHashMapVector::new(el.len(), from.base_ring.clone());
-        for (j, c) in el.nontrivial_entries() {
+    fn map_out(&self, from: &SparsePolyRingBase<R1>, el: Self::Element, iso: &Self::Isomorphism) -> SparsePolyRingEl<R1> {
+        let mut result = SparseHashMapVector::new(el.data.len(), from.base_ring.clone());
+        for (j, c) in el.data.nontrivial_entries() {
             *result.at_mut(j) = self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(c), iso);
         }
-        return result;
+        return SparsePolyRingEl {
+            data: result
+        };
     }
 }
 
@@ -355,14 +369,14 @@ impl<R> PolyRing for SparsePolyRingBase<R>
 
     fn indeterminate(&self) -> Self::Element {
         let mut result = self.zero();
-        result.set_len(2);
-        *result.at_mut(1) = self.base_ring.one();
+        result.data.set_len(2);
+        *result.data.at_mut(1) = self.base_ring.one();
         return result;
     }
 
     fn terms<'a>(&'a self, f: &'a Self::Element) -> TermIterator<'a, R> {
         TermIterator {
-            iter: f.nontrivial_entries()
+            iter: f.data.nontrivial_entries()
         }
     }
 
@@ -370,23 +384,23 @@ impl<R> PolyRing for SparsePolyRingBase<R>
         where I: Iterator<Item = (El<Self::BaseRing>, usize)>
     {
         for (c, i) in rhs {
-            lhs.set_len(max(lhs.len(), i + 1));
-            self.base_ring().add_assign(lhs.at_mut(i), c);
+            lhs.data.set_len(max(lhs.data.len(), i + 1));
+            self.base_ring().add_assign(lhs.data.at_mut(i), c);
         }
         // if a previously set entry is then set to zero or adds up to zero, this might be not truncated
-        self.degree_truncate(lhs);
+        self.degree_truncate(&mut lhs.data);
     }
 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, i: usize) -> &'a El<Self::BaseRing> {
-        if i < f.len() {
-            return f.at(i);
+        if i < f.data.len() {
+            return f.data.at(i);
         } else {
             return &self.zero;
         }
     }
 
     fn degree(&self, f: &Self::Element) -> Option<usize> {
-        f.len().checked_sub(1)
+        f.data.len().checked_sub(1)
     }
 
     fn div_rem_monic(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
@@ -405,8 +419,8 @@ impl<R,> DivisibilityRing for SparsePolyRingBase<R>
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if let Some(d) = self.degree(rhs) {
-            let lc = rhs.at(d);
-            let mut lhs_copy = lhs.clone();
+            let lc = rhs.data.at(d);
+            let mut lhs_copy = self.clone_el(&lhs);
             let quo = self.poly_div(&mut lhs_copy, rhs, |x| self.base_ring().checked_left_div(&x, lc))?;
             if self.is_zero(&lhs_copy) {
                 Some(quo)
@@ -433,7 +447,7 @@ impl<R> EuclideanRing for SparsePolyRingBase<R>
     where R: RingStore, R::Type: Field
 {
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
-        let lc_inv = self.base_ring.invert(rhs.at(self.degree(rhs).unwrap())).unwrap();
+        let lc_inv = self.base_ring.invert(rhs.data.at(self.degree(rhs).unwrap())).unwrap();
         let quo = self.poly_div(&mut lhs, rhs, |x| Some(self.base_ring().mul_ref_snd(x, &lc_inv))).unwrap();
         return (quo, lhs);
     }

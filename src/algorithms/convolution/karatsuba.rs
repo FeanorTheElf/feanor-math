@@ -1,7 +1,9 @@
+use crate::algorithms::matmul::InnerProductComputation;
 use crate::ring::*;
 use crate::seq::*;
 
-use std::cmp::{ max, min };
+use std::alloc::Allocator;
+use std::cmp::{max, min};
 
 #[stability::unstable(feature = "enable")]
 pub fn naive_assign_mul<R, V1, V2, V3, const ADD_ASSIGN: bool>(mut dst: V1, lhs: V2, rhs: V3, ring: R) 
@@ -13,8 +15,8 @@ pub fn naive_assign_mul<R, V1, V2, V3, const ADD_ASSIGN: bool>(mut dst: V1, lhs:
     for i in 0..(2 * n) {
         let from = max(i as isize - n as isize + 1, 0) as usize;
         let to = min(n, i + 1);
-        let value = ring.sum((from..to)
-            .map(|j| ring.mul_ref(lhs.at(i - j), rhs.at(j)))
+        let value = <_ as InnerProductComputation>::inner_product_ref(ring.get_ring(), (from..to)
+            .map(|j| (lhs.at(i - j), rhs.at(j)))
         );
         if ADD_ASSIGN {
             ring.add_assign(dst.at_mut(i), value);
@@ -128,7 +130,7 @@ karatsuba_impl!{
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn karatsuba<R, V1, V2>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: V1, rhs: V2, ring: R) 
+pub fn karatsuba<R, V1, V2, A: Allocator>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: V1, rhs: V2, ring: R, allocator: &A) 
     where R: RingStore + Copy, V1: SelfSubvectorView<El<R>> + Copy, V2: SelfSubvectorView<El<R>> + Copy
 {
     if lhs.len() == 0 || rhs.len() == 0 {
@@ -141,7 +143,9 @@ pub fn karatsuba<R, V1, V2>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: 
     assert!(rhs.len() >= n);
     assert!(lhs.len() < 2 * n || rhs.len() < 2 * n);
 
-    let mut memory = (0..karatsuba_mem_size(block_size_log2, threshold_size_log2)).map(|_| ring.zero()).collect::<Vec<_>>();
+    let memory_size = karatsuba_mem_size(block_size_log2, threshold_size_log2);
+    let mut memory = Vec::with_capacity_in(memory_size, allocator);
+    memory.extend((0..memory_size).map(|_| ring.zero()));
     for i in (0..=(lhs.len() - n)).step_by(n) {
         for j in (0..=(rhs.len() - n)).step_by(n) {
             dispatch_karatsuba_impl::<R, _, _, true>(
@@ -205,6 +209,8 @@ fn karatsuba_mem_size(block_size_log2: usize, threshold_size_log2: usize) -> usi
 
 #[cfg(test)]
 use crate::primitive_int::*;
+#[cfg(test)]
+use std::alloc::Global;
 
 #[test]
 fn test_karatsuba_impl() {
@@ -219,12 +225,12 @@ fn test_karatsuba_impl() {
 #[test]
 fn test_karatsuba_mul() {
     let mut c = vec![0, 0, 0, 0];
-    karatsuba(0, &mut c[..], &[-1, 0][..], &[1, 0][..], StaticRing::<i64>::RING);
+    karatsuba(0, &mut c[..], &[-1, 0][..], &[1, 0][..], StaticRing::<i64>::RING, &Global);
     assert_eq!(vec![-1, 0, 0, 0], c);
 
     let a = vec![1, 0, 1, 0, 1, 2, 3];
     let b = vec![3, 4];
     let mut c = vec![0, 0, 0, 0, 0, 0, 0, 0, 0];
-    karatsuba(0, &mut c[..], &a[..], &b[..], StaticRing::<i64>::RING);
+    karatsuba(0, &mut c[..], &a[..], &b[..], StaticRing::<i64>::RING, &Global);
     assert_eq!(vec![3, 4, 3, 4, 3, 10, 17, 12, 0], c);
 }

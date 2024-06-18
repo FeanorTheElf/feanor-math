@@ -21,19 +21,38 @@ use crate::seq::{VectorView, VectorViewMut};
 ///  - Calling multiple times `get_pointer()` on the same reference is valid, and
 ///    all resulting pointers are valid to be dereferenced.
 ///  - In the above situation, we may also keep multiple mutable references that were
-///    obtained by dereferencing the pointers, *as long as they refer to different elements
-///    of the slice*. 
+///    obtained by dereferencing the pointers, *as long as they don't alias, i.e. refer to 
+///    different elements*. 
 ///  - If `Self: Sync` then `T: Send` and the above situation should be valid even if
 ///    the pointers returned by `get_pointer()` are produced and used from different threads. 
 /// 
 pub unsafe trait AsPointerToSlice<T> {
 
+    ///
+    /// Returns a pointer to the first element of multiple, contiguous `T`s.
+    /// 
+    /// # Safety
+    /// 
+    /// Requires that `self_` is a pointer to a valid object of this type. Note that
+    /// it is legal to call this function while there exist mutable references to `T`s
+    /// that were obtained by dereferencing an earlier result of `get_pointer()`. This
+    /// means that in some situations, the passed `self_` may not be dereferenced without
+    /// violating the aliasing rules.
+    /// 
+    /// However, it must be guaranteed that no mutable reference to an part of `self_` that
+    /// is not pointed to by a result of `get_pointer()` exists. Immutable references may exist.
+    /// 
+    /// For additional detail, see the trait-level doc [`AsPointerToSlice`].
+    /// 
     unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T>;
 }
 
 unsafe impl<T> AsPointerToSlice<T> for Vec<T> {
 
     unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> {
+        // Safe, because "This method guarantees that for the purpose of the aliasing model, this 
+        // method does not materialize a reference to the underlying slice" (quote from the doc of 
+        // [`Vec::as_mut_ptr()`])
         unsafe {
             NonNull::new((*self_.as_ptr()).as_mut_ptr()).unwrap()
         }
@@ -150,8 +169,8 @@ pub struct SubmatrixRaw<V, T>
 /// want `SubmatrixRaw` to be usable as an immutable reference, thus it can be
 /// shared between threads, which requires `T: Sync`.
 /// 
-/// This makes implementing [`SubmatrixMut::concurrent_row_iter()`] and [`SubmatrixMut::concurrent_col_iter()`]
-/// slightly more complicated.
+/// This makes implementing [`SubmatrixMut::concurrent_row_iter()`] and 
+/// [`SubmatrixMut::concurrent_col_iter()`] slightly more complicated.
 /// 
 unsafe impl<V, T> Send for SubmatrixRaw<V, T> 
     where V: AsPointerToSlice<T> + Sync, T: Sync
@@ -199,7 +218,6 @@ impl<V, T> SubmatrixRaw<V, T>
             col_count
         }
     }
-
 
     fn restrict_rows(mut self, rows: Range<usize>) -> Self {
         assert!(rows.start <= rows.end);

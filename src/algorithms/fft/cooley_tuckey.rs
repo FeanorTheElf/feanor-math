@@ -23,14 +23,14 @@ use super::complex_fft::*;
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
 /// // this ring has a 256-th primitive root of unity
 /// let ring = zn_64::Zn::new(257);
-/// let fft_table = FFTTableCooleyTuckey::for_zn(ring, 8).unwrap();
+/// let fft_table = CooleyTuckeyFFT::for_zn(ring, 8).unwrap();
 /// let mut data = [ring.one()].into_iter().chain((0..255).map(|_| ring.zero())).collect::<Vec<_>>();
 /// fft_table.unordered_fft(&mut data);
 /// assert_el_eq!(&ring, &ring.one(), &data[0]);
 /// assert_el_eq!(&ring, &ring.one(), &data[1]);
 /// ```
 /// 
-pub struct FFTTableCooleyTuckey<R_main, R_twiddle, H> 
+pub struct CooleyTuckeyFFT<R_main, R_twiddle, H> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
         H: Homomorphism<R_twiddle, R_main>
@@ -53,7 +53,7 @@ pub fn bitreverse(index: usize, bits: usize) -> usize {
     index.reverse_bits().checked_shr(usize::BITS - bits as u32).unwrap_or(0)
 }
 
-impl<R_main, H> FFTTableCooleyTuckey<R_main, Complex64Base, H> 
+impl<R_main, H> CooleyTuckeyFFT<R_main, Complex64Base, H> 
     where R_main: ?Sized + RingBase,
         H: Homomorphism<Complex64Base, R_main>
 {
@@ -71,7 +71,7 @@ impl<R_main, H> FFTTableCooleyTuckey<R_main, Complex64Base, H>
     }
 }
 
-impl<R> FFTTableCooleyTuckey<Complex64Base, Complex64Base, Identity<R>> 
+impl<R> CooleyTuckeyFFT<Complex64Base, Complex64Base, Identity<R>> 
     where R: RingStore<Type = Complex64Base>
 {
     ///
@@ -82,7 +82,7 @@ impl<R> FFTTableCooleyTuckey<Complex64Base, Complex64Base, Identity<R>>
     }
 }
 
-impl<R> FFTTableCooleyTuckey<R::Type, R::Type, Identity<R>> 
+impl<R> CooleyTuckeyFFT<R::Type, R::Type, Identity<R>> 
     where R: RingStore,
         R::Type: DivisibilityRing
 {
@@ -119,7 +119,7 @@ impl<R> FFTTableCooleyTuckey<R::Type, R::Type, Identity<R>>
     }
 }
 
-impl<R_main, R_twiddle, H> FFTTableCooleyTuckey<R_main, R_twiddle, H> 
+impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>
@@ -152,7 +152,7 @@ impl<R_main, R_twiddle, H> FFTTableCooleyTuckey<R_main, R_twiddle, H>
         let root_of_unity_list = Self::create_root_of_unity_list(ring.get_ring(), &mut root_of_unity_pow, log2_n);
         let inv_root_of_unity_list = Self::create_root_of_unity_list(ring.get_ring(), |i| root_of_unity_pow(-i), log2_n);
         let root_of_unity = root_of_unity_pow(1);
-        FFTTableCooleyTuckey {
+        CooleyTuckeyFFT {
             root_of_unity: hom.map(root_of_unity), 
             hom, 
             log2_n, 
@@ -185,7 +185,7 @@ impl<R_main, R_twiddle, H> FFTTableCooleyTuckey<R_main, R_twiddle, H>
         let root_of_unity_list = Self::create_root_of_unity_list(ring.get_ring(), &mut root_of_unity_pow, log2_n);
         let inv_root_of_unity_list = Self::create_root_of_unity_list(ring.get_ring(), |i| root_of_unity_pow(-i), log2_n);
         let root_of_unity = root_of_unity_pow(1);
-        FFTTableCooleyTuckey {
+        CooleyTuckeyFFT {
             root_of_unity: hom.map(root_of_unity), 
             hom, 
             log2_n, 
@@ -241,7 +241,7 @@ impl<R_main, R_twiddle, H> FFTTableCooleyTuckey<R_main, R_twiddle, H>
     }
 }
 
-impl<R_main, R_twiddle, H> PartialEq for FFTTableCooleyTuckey<R_main, R_twiddle, H> 
+impl<R_main, R_twiddle, H> PartialEq for CooleyTuckeyFFT<R_main, R_twiddle, H> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>
@@ -292,7 +292,7 @@ impl<R, S> CooleyTuckeyButterfly<S> for R
     }
 }
 
-impl<R_main, R_twiddle, H> FFTTableCooleyTuckey<R_main, R_twiddle, H> 
+impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>
@@ -391,7 +391,7 @@ impl<R_main, R_twiddle, H> FFTTableCooleyTuckey<R_main, R_twiddle, H>
     }
 }
 
-impl<R_main, R_twiddle, H> FFTTable for FFTTableCooleyTuckey<R_main, R_twiddle, H> 
+impl<R_main, R_twiddle, H> FFTAlgorithm for CooleyTuckeyFFT<R_main, R_twiddle, H> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>
@@ -450,7 +450,7 @@ impl<R_main, R_twiddle, H> FFTTable for FFTTableCooleyTuckey<R_main, R_twiddle, 
     }
 }
 
-impl<H> ErrorEstimate for FFTTableCooleyTuckey<Complex64Base, Complex64Base, H> 
+impl<H> FFTErrorEstimate for CooleyTuckeyFFT<Complex64Base, Complex64Base, H> 
     where H: Homomorphism<Complex64Base, Complex64Base>
 {
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
@@ -478,7 +478,7 @@ use crate::rings::finite::FiniteRingStore;
 fn test_bitreverse_fft_inplace_basic() {
     let ring = Fp::<5>::RING;
     let z = ring.int_hom().map(2);
-    let fft = FFTTableCooleyTuckey::new(ring, ring.div(&1, &z), 2);
+    let fft = CooleyTuckeyFFT::new(ring, ring.div(&1, &z), 2);
     let mut values = [1, 0, 0, 1];
     let expected = [2, 4, 0, 3];
     let mut bitreverse_expected = [0; 4];
@@ -494,7 +494,7 @@ fn test_bitreverse_fft_inplace_basic() {
 fn test_bitreverse_fft_inplace_advanced() {
     let ring = Fp::<17>::RING;
     let z = ring.int_hom().map(3);
-    let fft = FFTTableCooleyTuckey::new(ring, z, 4);
+    let fft = CooleyTuckeyFFT::new(ring, z, 4);
     let mut values = [1, 0, 0, 0, 1, 0, 0, 0, 4, 3, 2, 1, 4, 3, 2, 1];
     let expected = [5, 2, 0, 11, 5, 4, 0, 6, 6, 13, 0, 1, 7, 6, 0, 1];
     let mut bitreverse_expected = [0; 16];
@@ -509,7 +509,7 @@ fn test_bitreverse_fft_inplace_advanced() {
 #[test]
 fn test_bitreverse_inv_fft_inplace() {
     let ring = Fp::<17>::RING;
-    let fft = FFTTableCooleyTuckey::for_zn(&ring, 4).unwrap();
+    let fft = CooleyTuckeyFFT::for_zn(&ring, 4).unwrap();
     let values: [u64; 16] = [1, 2, 3, 2, 1, 0, 17 - 1, 17 - 2, 17 - 1, 0, 1, 2, 3, 4, 5, 6];
     let mut work = values;
     fft.unordered_fft(&mut work);
@@ -520,16 +520,16 @@ fn test_bitreverse_inv_fft_inplace() {
 #[test]
 fn test_for_zn() {
     let ring = Fp::<17>::RING;
-    let fft = FFTTableCooleyTuckey::for_zn(ring, 4).unwrap();
+    let fft = CooleyTuckeyFFT::for_zn(ring, 4).unwrap();
     assert!(ring.is_neg_one(&ring.pow(fft.root_of_unity, 8)));
 
     let ring = Fp::<97>::RING;
-    let fft = FFTTableCooleyTuckey::for_zn(ring, 4).unwrap();
+    let fft = CooleyTuckeyFFT::for_zn(ring, 4).unwrap();
     assert!(ring.is_neg_one(&ring.pow(fft.root_of_unity, 8)));
 }
 
 #[cfg(test)]
-fn run_fft_bench_round<R, S, H>(fft: &FFTTableCooleyTuckey<S, R, H>, data: &Vec<S::Element>, copy: &mut Vec<S::Element>)
+fn run_fft_bench_round<R, S, H>(fft: &CooleyTuckeyFFT<S, R, H>, data: &Vec<S::Element>, copy: &mut Vec<S::Element>)
     where R: ZnRing, S: ZnRing, H: Homomorphism<R, S>
 {
     copy.clear();
@@ -545,7 +545,7 @@ const BENCH_SIZE_LOG2: usize = 13;
 #[bench]
 fn bench_fft(bencher: &mut test::Bencher) {
     let ring = zn_barett::Zn::new(StaticRing::<i128>::RING, 1073872897);
-    let fft = FFTTableCooleyTuckey::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
+    let fft = CooleyTuckeyFFT::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
     let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
     bencher.iter(|| {
@@ -557,7 +557,7 @@ fn bench_fft(bencher: &mut test::Bencher) {
 fn bench_fft_zn64_fastmul(bencher: &mut test::Bencher) {
     let ring = zn_64::Zn::new(1073872897);
     let fastmul_ring = zn_64::ZnFastmul::new(ring);
-    let fft = FFTTableCooleyTuckey::for_zn_with_hom(ring.into_can_hom(fastmul_ring).ok().unwrap(), BENCH_SIZE_LOG2).unwrap();
+    let fft = CooleyTuckeyFFT::for_zn_with_hom(ring.into_can_hom(fastmul_ring).ok().unwrap(), BENCH_SIZE_LOG2).unwrap();
     let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
     bencher.iter(|| {
@@ -569,7 +569,7 @@ fn bench_fft_zn64_fastmul(bencher: &mut test::Bencher) {
 fn test_approximate_fft() {
     let CC = Complex64::RING;
     for log2_n in [4, 7, 11, 15] {
-        let fft = FFTTableCooleyTuckey::new_with_pows(CC, |x| CC.root_of_unity(x, 1 << log2_n), log2_n);
+        let fft = CooleyTuckeyFFT::new_with_pows(CC, |x| CC.root_of_unity(x, 1 << log2_n), log2_n);
         let mut array = (0..(1 << log2_n)).map(|i|  CC.root_of_unity(i as i64, 1 << log2_n)).collect::<Vec<_>>();
         fft.fft(&mut array);
         let err = fft.expected_absolute_error(1., 0.);
@@ -584,7 +584,7 @@ fn test_approximate_fft() {
 #[test]
 fn test_size_1_fft() {
     let ring = Fp::<17>::RING;
-    let fft = FFTTableCooleyTuckey::for_zn(&ring, 0).unwrap();
+    let fft = CooleyTuckeyFFT::for_zn(&ring, 0).unwrap();
     let values: [u64; 1] = [3];
     let mut work = values;
     fft.unordered_fft(&mut work);

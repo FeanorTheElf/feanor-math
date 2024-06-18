@@ -1,7 +1,7 @@
 use std::alloc::Allocator;
 use std::alloc::Global;
 
-use crate::algorithms::fft::FFTTable;
+use crate::algorithms::fft::FFTAlgorithm;
 use crate::algorithms::unity_root::is_prim_root_of_unity;
 use crate::divisibility::DivisibilityRing;
 use crate::divisibility::DivisibilityRingStore;
@@ -18,14 +18,14 @@ use crate::seq::SwappableVectorViewMut;
 /// Bluestein's FFT algorithm (also known as Chirp-Z-transform) to compute the Fourier
 /// transform of arbitrary length (including prime numbers).
 /// 
-pub struct FFTTableBluestein<R_main, R_twiddle, H, A = Global>
+pub struct BluesteinFFT<R_main, R_twiddle, H, A = Global>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main> + Clone, 
         A: Allocator + Clone
 {
     hom: H,
-    m_fft_table: algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey<R_main, R_twiddle, H>,
+    m_fft_table: algorithms::fft::cooley_tuckey::CooleyTuckeyFFT<R_main, R_twiddle, H>,
     tmp_mem_allocator: A,
     ///
     /// This is the bitreverse fft of a part of the sequence b_i := z^(i^2) where
@@ -42,7 +42,7 @@ pub struct FFTTableBluestein<R_main, R_twiddle, H, A = Global>
     n: usize
 }
 
-impl<H, A> FFTTableBluestein<Complex64Base, Complex64Base, H, A>
+impl<H, A> BluesteinFFT<Complex64Base, Complex64Base, H, A>
     where H: Homomorphism<Complex64Base, Complex64Base> + Clone, 
         A: Allocator + Clone
 {
@@ -67,7 +67,7 @@ impl<H, A> FFTTableBluestein<Complex64Base, Complex64Base, H, A>
     }
 }
 
-impl<R, A> FFTTableBluestein<Complex64Base, Complex64Base, Identity<R>, A>
+impl<R, A> BluesteinFFT<Complex64Base, Complex64Base, Identity<R>, A>
     where R: RingStore<Type = Complex64Base> + Clone, 
         A: Allocator + Clone
 {
@@ -84,7 +84,7 @@ impl<R, A> FFTTableBluestein<Complex64Base, Complex64Base, Identity<R>, A>
     }
 }
 
-impl<R, A> FFTTableBluestein<R::Type, R::Type, Identity<R>, A>
+impl<R, A> BluesteinFFT<R::Type, R::Type, Identity<R>, A>
     where R: RingStore + Clone,
         R::Type: DivisibilityRing,
         A: Allocator + Clone
@@ -147,7 +147,7 @@ impl<R, A> FFTTableBluestein<R::Type, R::Type, Identity<R>, A>
     }
 }
 
-impl<R_main, R_twiddle, H, A> FFTTableBluestein<R_main, R_twiddle, H, A>
+impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main> + Clone, 
@@ -193,12 +193,12 @@ impl<R_main, R_twiddle, H, A> FFTTableBluestein<R_main, R_twiddle, H, A>
         let inv_root_of_unity_2n = (0..n).map(|i| root_of_unity_2n_pows(-((i * i) as i64))).collect::<Vec<_>>();
         let root_of_unity_n = hom.codomain().pow(hom.map_ref(&root_of_unity_2n), 2);
 
-        let m_fft_table_base = algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey::new(hom.domain(), hom.domain().clone_el(&root_of_unity_m), log2_m);
+        let m_fft_table_base = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::new(hom.domain(), hom.domain().clone_el(&root_of_unity_m), log2_m);
         m_fft_table_base.unordered_fft(&mut b[..]);
 
         // we actually require that this has the same ordering of outputs as `m_fft_table_base`, but since it's Cooley-Tuckey, both are bitreversed
-        let m_fft_table = algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey::new_with_hom(hom.clone(), root_of_unity_m, log2_m);
-        return FFTTableBluestein { 
+        let m_fft_table = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::new_with_hom(hom.clone(), root_of_unity_m, log2_m);
+        return BluesteinFFT { 
             m_fft_table: m_fft_table, 
             b_bitreverse_fft: b, 
             inv_root_of_unity_2n: inv_root_of_unity_2n, 
@@ -254,12 +254,12 @@ impl<R_main, R_twiddle, H, A> FFTTableBluestein<R_main, R_twiddle, H, A>
         let inv_root_of_unity_2n = (0..n).map(|i| root_of_unity_2n_pows(-((i * i) as i64))).collect::<Vec<_>>();
         let root_of_unity_n = hom.map(root_of_unity_2n_pows(2));
 
-        let m_fft_table_base = algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey::new_with_pows(hom.domain(), &mut root_of_unity_m_pows, log2_m);
+        let m_fft_table_base = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::new_with_pows(hom.domain(), &mut root_of_unity_m_pows, log2_m);
         m_fft_table_base.unordered_fft(&mut b[..]);
 
         // we actually require that this has the same ordering of outputs as `m_fft_table_base`, but since it's Cooley-Tuckey, both are bitreversed
-        let m_fft_table = algorithms::fft::cooley_tuckey::FFTTableCooleyTuckey::new_with_pows_with_hom(hom.clone(), root_of_unity_m_pows, log2_m);
-        return FFTTableBluestein { 
+        let m_fft_table = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::new_with_pows_with_hom(hom.clone(), root_of_unity_m_pows, log2_m);
+        return BluesteinFFT { 
             m_fft_table: m_fft_table, 
             b_bitreverse_fft: b, 
             inv_root_of_unity_2n: inv_root_of_unity_2n, 
@@ -353,7 +353,7 @@ impl<R_main, R_twiddle, H, A> FFTTableBluestein<R_main, R_twiddle, H, A>
     }
 }
 
-impl<R_main, R_twiddle, H, A> PartialEq for FFTTableBluestein<R_main, R_twiddle, H, A>
+impl<R_main, R_twiddle, H, A> PartialEq for BluesteinFFT<R_main, R_twiddle, H, A>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main> + Clone, 
@@ -366,7 +366,7 @@ impl<R_main, R_twiddle, H, A> PartialEq for FFTTableBluestein<R_main, R_twiddle,
     }
 }
 
-impl<R_main, R_twiddle, H, A> FFTTable for FFTTableBluestein<R_main, R_twiddle, H, A>
+impl<R_main, R_twiddle, H, A> FFTAlgorithm for BluesteinFFT<R_main, R_twiddle, H, A>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main> + Clone, 
@@ -423,7 +423,7 @@ impl<R_main, R_twiddle, H, A> FFTTable for FFTTableBluestein<R_main, R_twiddle, 
     }
 }
 
-impl<H, A> ErrorEstimate for FFTTableBluestein<Complex64Base, Complex64Base, H, A>
+impl<H, A> FFTErrorEstimate for BluesteinFFT<Complex64Base, Complex64Base, H, A>
     where H: Homomorphism<Complex64Base, Complex64Base> + Clone, 
         A: Allocator + Clone
 {
@@ -448,7 +448,7 @@ use crate::rings::zn::zn_static::*;
 fn test_fft_base() {
     let ring = Zn::<241>::RING;
     // a 5-th root of unity is 91 
-    let fft = FFTTableBluestein::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4, Global);
+    let fft = BluesteinFFT::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4, Global);
     let mut values = [1, 3, 2, 0, 7];
     let mut buffer = [0; 16];
     fft.fft_base::<_, _, false>(&mut values, &mut buffer);
@@ -460,7 +460,7 @@ fn test_fft_base() {
 fn test_inv_fft_base() {
     let ring = Zn::<241>::RING;
     // a 5-th root of unity is 91 
-    let fft = FFTTableBluestein::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4, Global);
+    let fft = BluesteinFFT::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4, Global);
     let values = [1, 3, 2, 0, 7];
     let mut work = values;
     let mut buffer = [0; 16];
@@ -473,7 +473,7 @@ fn test_inv_fft_base() {
 fn test_approximate_fft() {
     let CC = Complex64::RING;
     for (p, _log2_m) in [(5, 4), (53, 7), (1009, 11)] {
-        let fft = FFTTableBluestein::for_complex(&CC, p, Global);
+        let fft = BluesteinFFT::for_complex(&CC, p, Global);
         let mut array = (0..(p as usize)).map(|i| CC.root_of_unity(i as i64, p as i64)).collect::<Vec<_>>();
         fft.fft(&mut array);
         let err = fft.expected_absolute_error(1., 0.);

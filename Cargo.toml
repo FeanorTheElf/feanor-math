@@ -29,7 +29,6 @@ rayon = { version = "1.8.0", optional = true }
 ndarray = { version = "0.15.6", optional = true }
 
 [features]
-default = ["unstable-enable"]
 generic_tests = []
 unstable-enable = []
 mpir = []

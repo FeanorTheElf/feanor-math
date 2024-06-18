@@ -2,6 +2,7 @@
 ///
 /// The absolute error in the expression `exp(2 * pi * i * (x / y))`.
 /// 
+#[stability::unstable(feature = "enable")]
 pub fn root_of_unity_error() -> f64 {
     6. * f64::EPSILON
 }
@@ -10,7 +11,8 @@ pub fn root_of_unity_error() -> f64 {
 /// Trait for operations that perform float-point computations, and thus must
 /// care about precision. Currently only used for [`crate::algorithms::fft::FFTTable`].
 /// 
-pub trait ErrorEstimate {
+#[stability::unstable(feature = "enable")]
+pub trait FFTErrorEstimate {
 
     ///
     /// This is only true if the table is created with the [`crate::rings::float_complex::Complex64`]-specific creator functions.

@@ -47,7 +47,7 @@ impl<R, O, const N: usize> MultivariatePolyRingImpl<R, O, N>
     /// Creates a new [`MultivariatePolyRingImpl`]
     /// 
     pub fn new(base_ring: R, monomial_order: O) -> Self {
-        Self::new_in(base_ring, monomial_order, Global)
+        Self::new_with(base_ring, monomial_order, Global)
     }
 }
 
@@ -60,7 +60,8 @@ impl<R, O, const N: usize, A> MultivariatePolyRingImpl<R, O, N, A>
     /// Creates a new [`MultivariatePolyRingImpl`], using the given allocator to allocate
     /// space for ring elements.
     /// 
-    pub fn new_in(base_ring: R, monomial_order: O, element_allocator: A) -> Self {
+    #[stability::unstable(feature = "enable")]
+    pub fn new_with(base_ring: R, monomial_order: O, element_allocator: A) -> Self {
         RingValue::from(MultivariatePolyRingImplBase {
             zero: base_ring.zero(),
             base_ring,

@@ -96,7 +96,7 @@ impl<C: ZnRingStore, J: IntegerRingStore> Zn<C, J, Global>
     /// provided, which has to be able to store values of size at least `n^3`.
     /// 
     pub fn new(summands: Vec<C>, large_integers: J) -> Self {
-        Self::new_in(summands, large_integers, Global)
+        Self::new_with(summands, large_integers, Global)
     }
 }
 
@@ -105,7 +105,7 @@ impl<J: IntegerRingStore> Zn<zn_64::Zn, J, Global>
         J::Type: IntegerRing
 {
     pub fn create_from_primes(large_integers: J, primes: Vec<i64>) -> Self {
-        Self::new_in(primes.into_iter().map(|p| zn_64::Zn::new(p as u64)).collect(), large_integers, Global)
+        Self::new_with(primes.into_iter().map(|p| zn_64::Zn::new(p as u64)).collect(), large_integers, Global)
     }
 }
 
@@ -119,7 +119,8 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> Zn<C, J, A>
     /// of the given component rings. Furthermore, the corresponding large integer ring must be
     /// provided, which has to be able to store values of size at least `n^3`.
     /// 
-    pub fn new_in(summands: Vec<C>, large_integers: J, element_allocator: A) -> Self {
+    #[stability::unstable(feature = "enable")]
+    pub fn new_with(summands: Vec<C>, large_integers: J, element_allocator: A) -> Self {
         assert!(summands.len() > 0);
         let total_modulus = large_integers.prod(
             summands.iter().map(|R| R.integer_ring().can_iso(&large_integers).unwrap().map_ref(R.modulus()))

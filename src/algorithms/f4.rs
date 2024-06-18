@@ -486,6 +486,7 @@ impl<const N: u64> GBRingDescriptorRing for zn_static::ZnBase<N, false> {
 /// assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, in_ideal, gb.iter(), order));
 /// ```
 /// 
+#[stability::unstable(feature = "enable")]
 pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_poly_degree_bound: u16) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
