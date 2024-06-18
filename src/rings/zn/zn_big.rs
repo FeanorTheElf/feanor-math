@@ -9,7 +9,6 @@ use crate::ring::*;
 use crate::homomorphism::*;
 use crate::delegate::DelegateRing;
 use crate::rings::zn::*;
-use crate::algorithms;
 
 ///
 /// Ring representing `Z/nZ`, computing the modular reductions
@@ -28,7 +27,7 @@ use crate::algorithms;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_barett::*;
+/// # use feanor_math::rings::zn::zn_big::*;
 /// # use feanor_math::primitive_int::*;
 /// let R = Zn::new(StaticRing::<i64>::RING, 257);
 /// let a = R.int_hom().map(16);
@@ -39,7 +38,7 @@ use crate::algorithms;
 /// ```should_panic
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_barett::*;
+/// # use feanor_math::rings::zn::zn_big::*;
 /// # use feanor_math::primitive_int::*;
 /// let R = Zn::new(StaticRing::<i32>::RING, 2053);
 /// ```
@@ -50,7 +49,7 @@ use crate::algorithms;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_barett::*;
+/// # use feanor_math::rings::zn::zn_big::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::primitive_int::*;
 /// let R = Zn::new(StaticRing::<i16>::RING, 7);
@@ -116,30 +115,6 @@ impl<I: IntegerRingStore> ZnBase<I>
             self.integer_ring.sub_assign_ref(n, &self.modulus);
         }
         assert!(self.integer_ring.is_lt(&n, &self.modulus), "The input is not smaller than {}^2", self.integer_ring.format(&self.modulus));
-    }
-
-    fn from_exact(&self, mut n: El<I>) -> ZnEl<I> {
-        let negative = self.integer_ring.is_neg(&n);
-        n = self.integer_ring.abs(n);
-        assert!(self.integer_ring.is_lt(&n, &self.modulus));
-        if negative {
-            self.negate(ZnEl(n))
-        } else {
-            ZnEl(n)
-        }
-    }
-
-    ///
-    /// Returns either the inverse of x (as Ok()) or a nontrivial
-    /// factor of the modulus (as Err())
-    ///
-    pub fn invert(&self, x: ZnEl<I>) -> Result<ZnEl<I>, El<I>> {
-        let (s, _, d) = algorithms::eea::eea(self.integer_ring().clone_el(&x.0), self.integer_ring().clone_el(self.modulus()), &self.integer_ring);
-        if self.integer_ring.is_neg_one(&d) || self.integer_ring.is_one(&d) {
-            Ok(self.from_exact(s))
-        } else {
-            Err(d)
-        }
     }
 }
 
@@ -501,7 +476,7 @@ fn test_ring_axioms_znbase() {
 }
 
 #[test]
-fn test_canonical_iso_axioms_zn_barett() {
+fn test_canonical_iso_axioms_zn_big() {
     let from = Zn::new(StaticRing::<i128>::RING, 7 * 11);
     let to = Zn::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(7 * 11));
     crate::ring::generic_tests::test_hom_axioms(&from, &to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.int_hom().map(x)));

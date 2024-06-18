@@ -469,7 +469,7 @@ use crate::primitive_int::*;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
 #[cfg(test)]
-use crate::rings::zn::zn_barett;
+use crate::rings::zn::zn_big;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
 #[cfg(test)]
@@ -547,7 +547,7 @@ const BENCH_SIZE_LOG2: usize = 13;
 
 #[bench]
 fn bench_fft(bencher: &mut test::Bencher) {
-    let ring = zn_barett::Zn::new(StaticRing::<i128>::RING, 1073872897);
+    let ring = zn_big::Zn::new(StaticRing::<i128>::RING, 1073872897);
     let fft = CooleyTuckeyFFT::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
     let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);

@@ -161,6 +161,8 @@ pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::Integers>
 
 #[cfg(test)]
 use crate::rings::zn::zn_64::Zn;
+#[cfg(test)]
+use test::Bencher;
 
 #[test]
 fn test_ec_factor() {
@@ -173,20 +175,15 @@ fn test_ec_factor() {
     assert!(actual != 1 && actual != n && n % actual == 0);
 }
 
-#[test]
-#[ignore]
-fn test_perf_ec_factor() {
-    let ZZ = StaticRing::<i64>::RING;
-    let mut n = ZZ.one();
+#[bench]
+fn bench_ec_factor(bencher: &mut Bencher) {
     let bits = 58;
-    ZZ.mul_pow_2(&mut n, bits);
-    ZZ.add_assign(&mut n, ZZ.one());
+    let n = (1 << bits) + 1;
+    let ring = Zn::new((1 << bits) + 1);
 
-    let start = std::time::Instant::now();
-    {
-        let p = lenstra_ec_factor(Zn::new(n as u64));
-        assert!(ZZ.checked_div(&n, &p).is_some());
-    };
-    let end = std::time::Instant::now();
-    println!("Found factor of {} bit number in {} ms", bits, (start - end).as_millis());
+    bencher.iter(|| {
+        let p = lenstra_ec_factor(ring);
+        assert!(n > 0 && n != 1 && n != p);
+        assert!(n % p == 0);
+    });
 }

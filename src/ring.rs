@@ -134,8 +134,8 @@ use crate::algorithms;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::zn::*;
 /// 
-/// let Z7 = zn_barett::Zn::new(StaticRing::<i64>::RING, 7);
-/// let Z11 = zn_barett::Zn::new(StaticRing::<i64>::RING, 11);
+/// let Z7 = zn_big::Zn::new(StaticRing::<i64>::RING, 7);
+/// let Z11 = zn_big::Zn::new(StaticRing::<i64>::RING, 11);
 /// let neg_one = Z7.int_hom().map(-1);
 /// assert!(!Z11.is_neg_one(&neg_one));
 /// ```

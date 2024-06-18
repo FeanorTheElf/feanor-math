@@ -14,7 +14,7 @@ use crate::homomorphism::*;
 use crate::rings::rust_bigint::*;
 
 use super::*;
-use super::zn_barett;
+use super::zn_big;
 
 fn high(x: u128) -> u64 {
     (x >> 64) as u64
@@ -310,12 +310,12 @@ impl ComputeInnerProduct for ZnBase {
 
 impl_eq_based_self_iso!{ ZnBase }
 
-impl<I: IntegerRingStore> CanHomFrom<zn_barett::ZnBase<I>> for ZnBase
+impl<I: IntegerRingStore> CanHomFrom<zn_big::ZnBase<I>> for ZnBase
     where I::Type: IntegerRing
 {
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, from: &zn_barett::ZnBase<I>) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &zn_big::ZnBase<I>) -> Option<Self::Homomorphism> {
         if from.integer_ring().get_ring().representable_bits().is_none() || from.integer_ring().get_ring().representable_bits().unwrap() >= self.integer_ring().abs_log2_ceil(self.modulus()).unwrap() {
             if from.integer_ring().eq_el(from.modulus(), &int_cast(*self.modulus(), from.integer_ring(), self.integer_ring())) {
                 Some(())
@@ -327,17 +327,17 @@ impl<I: IntegerRingStore> CanHomFrom<zn_barett::ZnBase<I>> for ZnBase
         }
     }
 
-    fn map_in(&self, from: &zn_barett::ZnBase<I>, el: <zn_barett::ZnBase<I> as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &zn_big::ZnBase<I>, el: <zn_big::ZnBase<I> as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
         self.from_u64_promise_reduced(int_cast(from.smallest_positive_lift(el), self.integer_ring(), from.integer_ring()) as u64)
     }
 }
 
-impl<I: IntegerRingStore> CanIsoFromTo<zn_barett::ZnBase<I>> for ZnBase
+impl<I: IntegerRingStore> CanIsoFromTo<zn_big::ZnBase<I>> for ZnBase
     where I::Type: IntegerRing
 {
-    type Isomorphism = <zn_barett::ZnBase<I> as CanHomFrom<StaticRingBase<i64>>>::Homomorphism;
+    type Isomorphism = <zn_big::ZnBase<I> as CanHomFrom<StaticRingBase<i64>>>::Homomorphism;
 
-    fn has_canonical_iso(&self, from: &zn_barett::ZnBase<I>) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, from: &zn_big::ZnBase<I>) -> Option<Self::Isomorphism> {
         if from.integer_ring().get_ring().representable_bits().is_none() || from.integer_ring().get_ring().representable_bits().unwrap() >= self.integer_ring().abs_log2_ceil(self.modulus()).unwrap() {
             if from.integer_ring().eq_el(from.modulus(), &int_cast(*self.modulus(), from.integer_ring(), self.integer_ring())) {
                 from.has_canonical_hom(self.integer_ring().get_ring())
@@ -349,7 +349,7 @@ impl<I: IntegerRingStore> CanIsoFromTo<zn_barett::ZnBase<I>> for ZnBase
         }
     }
 
-    fn map_out(&self, from: &zn_barett::ZnBase<I>, el: <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <zn_barett::ZnBase<I> as RingBase>::Element {
+    fn map_out(&self, from: &zn_big::ZnBase<I>, el: <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <zn_big::ZnBase<I> as RingBase>::Element {
         from.map_in(self.integer_ring().get_ring(), el.0 as i64, iso)
     }
 }

@@ -13,11 +13,11 @@ use super::finite::FiniteRing;
 use crate::rings::finite::FiniteRingStore;
 
 ///
-/// This module contains [`zn_barett::Zn`], a general-purpose implementation of
+/// This module contains [`zn_big::Zn`], a general-purpose implementation of
 /// Barett reduction. It is relatively slow when instantiated with small fixed-size
 /// integer type. 
 /// 
-pub mod zn_barett;
+pub mod zn_big;
 ///
 /// This module contains [`zn_64::Zn`], the new, heavily optimized implementation of `Z/nZ`
 /// for moduli `n` of size slightly smaller than 64 bits.
@@ -332,7 +332,7 @@ pub fn choose_zn_impl<I, F, R>(ZZ: I, n: El<I>, f: F) -> R
     if ZZ.abs_highest_set_bit(&n).unwrap_or(0) < 57 {
         f.call(zn_64::Zn::new(StaticRing::<i64>::RING.coerce(&ZZ, n) as u64))
     } else {
-        f.call(zn_barett::Zn::new(BigIntRing::RING, int_cast(n, &BigIntRing::RING, &ZZ)))
+        f.call(zn_big::Zn::new(BigIntRing::RING, int_cast(n, &BigIntRing::RING, &ZZ)))
     }
 }
 
@@ -538,7 +538,7 @@ pub mod generic_tests {
 #[test]
 fn test_reduction_map_large_value() {
     let ring1 = zn_64::Zn::new(1 << 42);
-    let ring2 = zn_barett::Zn::new(BigIntRing::RING, BigIntRing::RING.power_of_two(666));
+    let ring2 = zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.power_of_two(666));
     let reduce = ReductionMap::new(&ring2, ring1).unwrap();
     assert_el_eq!(&ring1, &ring1.zero(), &reduce.map(ring2.pow(ring2.int_hom().map(2), 665)));
 }
@@ -546,12 +546,12 @@ fn test_reduction_map_large_value() {
 #[test]
 fn test_reduction_map() {
     let ring1 = zn_64::Zn::new(257);
-    let ring2 = zn_barett::Zn::new(StaticRing::<i128>::RING, 257 * 7);
+    let ring2 = zn_big::Zn::new(StaticRing::<i128>::RING, 257 * 7);
 
     crate::homomorphism::generic_tests::test_homomorphism_axioms(ReductionMap::new(&ring2, &ring1).unwrap(), ring2.elements().step_by(8));
 
-    let ring1 = zn_barett::Zn::new(StaticRing::<i8>::RING, 3);
-    let ring2 = zn_barett::Zn::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(257 * 3));
+    let ring1 = zn_big::Zn::new(StaticRing::<i8>::RING, 3);
+    let ring2 = zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(257 * 3));
 
     crate::homomorphism::generic_tests::test_homomorphism_axioms(ReductionMap::new(&ring2, &ring1).unwrap(), ring2.elements().step_by(8));
 }

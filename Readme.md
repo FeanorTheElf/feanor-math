@@ -28,7 +28,7 @@ More reasons for this separation are explained further down this page.
 
 The following rings are provided
  - The integer ring `Z`, as a trait `crate::integer::IntegerRing` with implementations for all primitive ints (`i8` to `i128`), an arbitrary-precision implementation `crate::rings::rust_bigint::RustBigintRing`, and an optional implementation using bindings to the heavily optimized library [mpir](https://github.com/wbhart/mpir) (enable with `features=mpir`).
- - The quotient ring `Z/nZ`, as a trait `crate::rings::zn::ZnRing` with four implementations. One where the modulus is small and known at compile-time `crate::rings::zn::zn_static::Zn`, an optimized implementation of Barett-reductions for moduli somewhat smaller than 64 bits `crate::rings::zn::zn_64::Zn`, a generic implementation of Barett-reductions for any modulus and any integer ring (including arbitrary-precision ones) `crate::rings::zn::zn_barett::Zn` and a residue-number-system implementation for highly composite moduli `crate::rings::zn::zn_rns::Zn`.
+ - The quotient ring `Z/nZ`, as a trait `crate::rings::zn::ZnRing` with four implementations. One where the modulus is small and known at compile-time `crate::rings::zn::zn_static::Zn`, an optimized implementation of Barett-reductions for moduli somewhat smaller than 64 bits `crate::rings::zn::zn_64::Zn`, a generic implementation of Barett-reductions for any modulus and any integer ring (including arbitrary-precision ones) `crate::rings::zn::zn_big::Zn` and a residue-number-system implementation for highly composite moduli `crate::rings::zn::zn_rns::Zn`.
  - The polynomial ring `R[X]` over any base ring, as a trait `crate::rings::poly::PolyRing` with two implementations, one for densely filled polynomials `crate::rings::poly::dense_poly::DensePolyRing` and one for sparsely filled polynomials `crate::rings::poly::sparse_poly::SparsePolyRing`.
  - Finite-rank simple and free ring extensions, as a trait `crate::rings::extension::FreeAlgebra`, with an implementation based on polynomial division `crate::rings::extension::FreeAlgebraImpl`. In particular, this includes finite/galois fields and number fields.
  - Multivariate polynomial rings `R[X1, ..., XN]` over any base ring, as the trait `crate::rings::multivariate::MultivariatePolyRing` and one implementation `crate::rings::multivariate::ordered::MultivariatePolyRingImpl` based on a sparse representation using ordered vectors.
@@ -74,7 +74,7 @@ use feanor_math::homomorphism::*;
 use feanor_math::assert_el_eq;
 use feanor_math::ring::*;
 use feanor_math::primitive_int::*;
-use feanor_math::rings::zn::zn_barett::*;
+use feanor_math::rings::zn::zn_big::*;
 use feanor_math::rings::zn::*;
 use feanor_math::rings::finite::*;
 use feanor_math::algorithms;
@@ -112,7 +112,7 @@ use feanor_math::homomorphism::*;
 use feanor_math::ring::*;
 use feanor_math::integer::*;
 use feanor_math::integer::*;
-use feanor_math::rings::zn::zn_barett::*;
+use feanor_math::rings::zn::zn_big::*;
 use feanor_math::rings::zn::*;
 use feanor_math::rings::finite::*;
 use feanor_math::algorithms;

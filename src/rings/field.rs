@@ -384,7 +384,7 @@ macro_rules! impl_wrap_unwrap_isos {
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_barett::Zn;
+use crate::rings::zn::zn_big::Zn;
 #[cfg(test)]
 use crate::primitive_int::*;
 #[cfg(test)]
@@ -405,7 +405,7 @@ fn test_divisibility_axioms() {
 }
 
 #[test]
-fn test_canonical_hom_axioms_zn_barett() {
+fn test_canonical_hom_axioms_zn_big() {
     let R = Zn::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
     crate::ring::generic_tests::test_hom_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());
     crate::ring::generic_tests::test_iso_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());

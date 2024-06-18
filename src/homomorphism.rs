@@ -186,27 +186,27 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_barett;
+/// # use feanor_math::rings::zn::zn_big;
 /// # use feanor_math::rings::zn::zn_rns;
 /// let ZZ = StaticRing::<i128>::RING;
 /// let ZZ_big = BigIntRing::RING;
 /// 
-/// let Zn_barett_i128 = zn_barett::Zn::new(ZZ, 17 * 257);
-/// let Zn_barett_big = zn_barett::Zn::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
+/// let zn_big_i128 = zn_big::Zn::new(ZZ, 17 * 257);
+/// let zn_big_big = zn_big::Zn::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
 /// let Zn_std = zn_64::Zn::new(17 * 257);
 /// let Zn_rns = zn_rns::Zn::create_from_primes(ZZ_big, vec![17, 257]);
 /// 
-/// assert!(Zn_barett_i128.can_iso(&Zn_barett_i128).is_some());
-/// assert!(Zn_barett_i128.can_iso(&Zn_barett_big).is_some());
+/// assert!(zn_big_i128.can_iso(&zn_big_i128).is_some());
+/// assert!(zn_big_i128.can_iso(&zn_big_big).is_some());
 /// 
-/// assert!(Zn_barett_big.can_iso(&Zn_barett_i128).is_some());
-/// assert!(Zn_barett_big.can_iso(&Zn_barett_big).is_some());
+/// assert!(zn_big_big.can_iso(&zn_big_i128).is_some());
+/// assert!(zn_big_big.can_iso(&zn_big_big).is_some());
 /// 
-/// assert!(Zn_std.can_iso(&Zn_barett_i128).is_some());
+/// assert!(Zn_std.can_iso(&zn_big_i128).is_some());
 /// assert!(Zn_std.can_iso(&Zn_std).is_some());
 /// 
-/// assert!(Zn_rns.can_iso(&Zn_barett_i128).is_some());
-/// assert!(Zn_rns.can_iso(&Zn_barett_big).is_some());
+/// assert!(Zn_rns.can_iso(&zn_big_i128).is_some());
+/// assert!(Zn_rns.can_iso(&zn_big_big).is_some());
 /// assert!(Zn_rns.can_iso(&Zn_rns).is_some());
 /// ```
 /// Additionally, there are the projections `Z -> Z/nZ`.
@@ -221,16 +221,16 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// let ZZ = StaticRing::<i128>::RING;
 /// let ZZ_big = BigIntRing::RING;
 /// 
-/// let Zn_barett_i128 = zn_barett::Zn::new(ZZ, 17 * 257);
-/// let Zn_barett_big = zn_barett::Zn::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
+/// let zn_big_i128 = zn_big::Zn::new(ZZ, 17 * 257);
+/// let zn_big_big = zn_big::Zn::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
 /// let Zn_std = zn_64::Zn::new(17 * 257);
 /// let Zn_rns = zn_rns::Zn::create_from_primes(ZZ_big, vec![17, 257]);
 /// 
-/// assert!(Zn_barett_i128.can_hom(&ZZ).is_some());
-/// assert!(Zn_barett_i128.can_hom(&ZZ_big).is_some());
+/// assert!(zn_big_i128.can_hom(&ZZ).is_some());
+/// assert!(zn_big_i128.can_hom(&ZZ_big).is_some());
 /// 
-/// assert!(Zn_barett_big.can_hom(&ZZ).is_some());
-/// assert!(Zn_barett_big.can_hom(&ZZ_big).is_some());
+/// assert!(zn_big_big.can_hom(&ZZ).is_some());
+/// assert!(zn_big_big.can_hom(&ZZ_big).is_some());
 /// 
 /// assert!(Zn_std.can_hom(&ZZ).is_some());
 /// assert!(Zn_std.can_hom(&ZZ_big).is_some());
