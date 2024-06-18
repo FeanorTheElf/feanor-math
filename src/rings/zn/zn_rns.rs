@@ -5,7 +5,7 @@ use algorithms::matmul::InnerProductComputation;
 
 use crate::iters::multi_cartesian_product;
 use crate::iters::MultiProduct;
-use crate::vector::VectorView;
+use crate::seq::VectorView;
 use crate::integer::IntegerRingStore;
 use crate::divisibility::DivisibilityRingStore;
 use crate::rings::zn::*;
@@ -20,7 +20,7 @@ use crate::pid::*;
 /// by implemented without large integers.
 /// 
 /// Note that the component rings `Z/miZ` of this ring can be
-/// accessed via the [`crate::vector::VectorView`]-functions.
+/// accessed via the [`crate::seq::VectorView`]-functions.
 /// 
 /// # Example
 /// ```
@@ -30,7 +30,7 @@ use crate::pid::*;
 /// # use feanor_math::rings::zn::zn_rns::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::integer::*;
-/// # use feanor_math::vector::*;
+/// # use feanor_math::seq::*;
 /// 
 /// let R = Zn::create_from_primes(StaticRing::<i64>::RING, vec![17, 19]);
 /// let x = R.get_ring().from_congruence([R.get_ring().at(0).int_hom().map(1), R.get_ring().at(1).int_hom().map(16)].into_iter());
@@ -684,7 +684,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> PrincipalIdealRi
 {
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         let mut result = (self.zero(), self.zero(), self.zero());
-        for (i, Zn) in self.iter().enumerate() {
+        for (i, Zn) in self.as_iter().enumerate() {
             (result.0.data[i], result.1.data[i], result.2.data[i]) = Zn.extended_ideal_gen(&lhs.data[i], &rhs.data[i]);
         }
         return result;

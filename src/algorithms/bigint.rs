@@ -1,4 +1,4 @@
-use crate::vector::*;
+use crate::seq::*;
 
 use std::cmp::{Ordering, min};
 use std::alloc::Allocator;

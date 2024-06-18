@@ -3,9 +3,11 @@ use std::collections::hash_map;
 use std::collections::hash_map::Entry;
 
 use crate::ring::*;
-use crate::vector::*;
+use crate::seq::*;
 
-pub struct SparseVectorMut<R: RingStore> {
+
+#[stability::unstable(feature = "enable")]
+pub struct SparseHashMapVector<R: RingStore> {
     data: HashMap<usize, El<R>>,
     modify_entry: (usize, El<R>),
     zero: El<R>,
@@ -13,10 +15,11 @@ pub struct SparseVectorMut<R: RingStore> {
     len: usize
 }
 
-impl<R: RingStore> SparseVectorMut<R> {
+impl<R: RingStore> SparseHashMapVector<R> {
 
+    #[stability::unstable(feature = "enable")]
     pub fn new(len: usize, ring: R) -> Self {
-        SparseVectorMut {
+        SparseHashMapVector {
             data: HashMap::new(), 
             modify_entry: (usize::MAX, ring.zero()),
             zero: ring.zero(),
@@ -25,6 +28,7 @@ impl<R: RingStore> SparseVectorMut<R> {
         }
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn set_len(&mut self, new_len: usize) {
         if new_len < self.len() {
             for (i, _) in self.nontrivial_entries() {
@@ -34,6 +38,7 @@ impl<R: RingStore> SparseVectorMut<R> {
         self.len = new_len;
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn scan<F>(&mut self, mut f: F)
         where F: FnMut(usize, &mut El<R>)
     {
@@ -64,10 +69,10 @@ impl<R: RingStore> SparseVectorMut<R> {
     }
 }
 
-impl<R: RingStore + Clone> Clone for SparseVectorMut<R> {
+impl<R: RingStore + Clone> Clone for SparseHashMapVector<R> {
 
     fn clone(&self) -> Self {
-        SparseVectorMut { 
+        SparseHashMapVector { 
             data: self.data.iter().map(|(i, c)| (*i, self.ring.clone_el(c))).collect(), 
             modify_entry: (self.modify_entry.0, self.ring.clone_el(&self.modify_entry.1)), 
             zero: self.ring.clone_el(&self.zero), 
@@ -77,7 +82,7 @@ impl<R: RingStore + Clone> Clone for SparseVectorMut<R> {
     }
 }
 
-impl<R: RingStore> VectorView<El<R>> for SparseVectorMut<R> {
+impl<R: RingStore> VectorView<El<R>> for SparseHashMapVector<R> {
 
     fn at(&self, i: usize) -> &El<R> {
         assert!(i < self.len());
@@ -95,7 +100,8 @@ impl<R: RingStore> VectorView<El<R>> for SparseVectorMut<R> {
     }
 }
 
-pub struct SparseVectorMutIter<'a, R>
+#[stability::unstable(feature = "enable")]
+pub struct SparseHashMapVectorIter<'a, R>
     where R: RingStore
 {
     base: hash_map::Iter<'a, usize, El<R>>,
@@ -103,7 +109,7 @@ pub struct SparseVectorMutIter<'a, R>
     once: Option<&'a El<R>>
 }
 
-impl<'a, R> Iterator for SparseVectorMutIter<'a, R>
+impl<'a, R> Iterator for SparseHashMapVectorIter<'a, R>
     where R: RingStore
 {
     type Item = (usize, &'a El<R>);
@@ -123,13 +129,13 @@ impl<'a, R> Iterator for SparseVectorMutIter<'a, R>
     }
 }
 
-impl<R: RingStore> VectorViewSparse<El<R>> for SparseVectorMut<R> {
+impl<R: RingStore> VectorViewSparse<El<R>> for SparseHashMapVector<R> {
 
-    type Iter<'a> = SparseVectorMutIter<'a, R>
+    type Iter<'a> = SparseHashMapVectorIter<'a, R>
         where Self: 'a;
 
     fn nontrivial_entries<'a>(&'a self) -> Self::Iter<'a> {
-        SparseVectorMutIter {
+        SparseHashMapVectorIter {
             base: self.data.iter(),
             skip: self.modify_entry.0,
             once: if !self.ring.is_zero(&self.modify_entry.1) { Some(&self.modify_entry.1) } else { None }
@@ -137,7 +143,7 @@ impl<R: RingStore> VectorViewSparse<El<R>> for SparseVectorMut<R> {
     }
 }
 
-impl<R: RingStore> VectorViewMut<El<R>> for SparseVectorMut<R> {
+impl<R: RingStore> VectorViewMut<El<R>> for SparseHashMapVector<R> {
 
     fn at_mut(&mut self, i: usize) -> &mut El<R> {
         assert!(i < self.len());
@@ -154,7 +160,7 @@ impl<R: RingStore> VectorViewMut<El<R>> for SparseVectorMut<R> {
 use crate::primitive_int::StaticRing;
 
 #[cfg(test)]
-fn assert_vector_eq<const N: usize>(vec: &SparseVectorMut<StaticRing<i64>>, values: [i64; N]) {
+fn assert_vector_eq<const N: usize>(vec: &SparseHashMapVector<StaticRing<i64>>, values: [i64; N]) {
     assert_eq!(vec.len(), N);
     vec.check_consistency();
     for i in 0..N {
@@ -166,7 +172,7 @@ fn assert_vector_eq<const N: usize>(vec: &SparseVectorMut<StaticRing<i64>>, valu
 #[test]
 fn test_at_mut() {
     let ring = StaticRing::<i64>::RING;
-    let mut vector = SparseVectorMut::new(5, ring);
+    let mut vector = SparseHashMapVector::new(5, ring);
 
     assert_vector_eq(&mut vector, [0, 0, 0, 0, 0]);
     let mut entry = vector.at_mut(1);
@@ -198,7 +204,7 @@ fn test_at_mut() {
 #[test]
 fn test_nontrivial_entries() {
     let ring = StaticRing::<i64>::RING;
-    let mut vector = SparseVectorMut::new(5, ring);
+    let mut vector = SparseHashMapVector::new(5, ring);
     assert_eq!(vector.nontrivial_entries().collect::<HashMap<_, _>>(), [].into_iter().collect());
     *vector.at_mut(1) = 3;
     assert_eq!(vector.nontrivial_entries().collect::<HashMap<_, _>>(), [(1, &3)].into_iter().collect());
@@ -226,7 +232,7 @@ fn test_nontrivial_entries() {
 #[test]
 fn test_scan() {
     let ring = StaticRing::<i64>::RING;
-    let mut vector = SparseVectorMut::new(5, ring);
+    let mut vector = SparseHashMapVector::new(5, ring);
     *vector.at_mut(1) = 2;
     *vector.at_mut(3) = 1;
     *vector.at_mut(4) = 0;

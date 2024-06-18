@@ -9,6 +9,7 @@
 #![feature(new_uninit)]
 #![feature(is_sorted)]
 #![feature(fn_traits)]
+#![feature(iter_advance_by)]
 #![feature(unboxed_closures)]
 
 #![doc = include_str!("../Readme.md")]
@@ -33,13 +34,12 @@ pub mod ring;
 /// 
 pub mod delegate;
 ///
-/// Contains the trait [`vector::VectorView`] for objects that provide access to 
-/// some kind of linear container.
+/// Contains different traits for sequences of elements, namely [`seq::VectorView`] and [`seq::VectorFn`]. 
+/// They all have some functional overlap with [`ExactSizeIterator`], but differ in how they allow
+/// access to the elements of the sequence.
 /// 
-/// This module is currently slightly chaotic, as there is significant functionality overlap
-/// between [`vector::VectorView`], [`vector::vec_fn::VectorFn`] and [`std::iter::Iterator`]
-/// 
-pub mod vector;
+pub mod seq;
+
 ///
 /// Contains the trait [`divisibility::DivisibilityRing`] for rings that provide information
 /// about divisibility of their elements.

@@ -773,7 +773,7 @@ impl CanIsoFromTo<ZnFastmulBase> for ZnBase {
 impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
 
     #[inline(always)]
-    fn butterfly<V: crate::vector::VectorViewMut<Self::Element>, H: Homomorphism<ZnFastmulBase, Self>>(&self, hom: &H, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
+    fn butterfly<V: crate::seq::VectorViewMut<Self::Element>, H: Homomorphism<ZnFastmulBase, Self>>(&self, hom: &H, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
         let mut a = *values.at(i1);
         if a.0 >= self.modulus_times_three {
             a.0 -= self.modulus_times_three;
@@ -790,7 +790,7 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
         *values.at_mut(i2) = self.from_u64_promise_reduced(a.0 + self.modulus_times_three - b.0);
     }
 
-    fn inv_butterfly<V: crate::vector::VectorViewMut<Self::Element>, H: Homomorphism<ZnFastmulBase, Self>>(&self, hom: &H, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
+    fn inv_butterfly<V: crate::seq::VectorViewMut<Self::Element>, H: Homomorphism<ZnFastmulBase, Self>>(&self, hom: &H, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
         let a = *values.at(i1);
         let b = *values.at(i2);
 

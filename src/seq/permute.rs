@@ -19,7 +19,8 @@ pub fn permute<V, T, F>(values: V, perm: F)
 pub fn permute_using_allocator<V, T, F, A: Allocator>(mut values: V, perm: F, allocator: A)
     where V: SwappableVectorViewMut<T>, F: Fn(usize) -> usize
 {
-    let mut swapped_indices = (0..values.len()).map(|_| false).collect::<Vec<_>>();
+    let mut swapped_indices = Vec::with_capacity_in(values.len(), allocator);
+    swapped_indices.extend((0..values.len()).map(|_| false));
     let mut start = 0;
     while start < values.len() {
         let mut current = start;
@@ -54,7 +55,8 @@ pub fn permute_inv<V, T, F>(values: V, perm: F)
 pub fn permute_inv_using_allocator<V, T, F, A: Allocator>(mut values: V, perm: F, allocator: A)
     where V: SwappableVectorViewMut<T>, F: Fn(usize) -> usize
 {
-    let mut swapped_indices = (0..values.len()).map(|_| false).collect::<Vec<_>>();
+    let mut swapped_indices = Vec::with_capacity_in(values.len(), allocator);
+    swapped_indices.extend((0..values.len()).map(|_| false));
     let mut start = 0;
     while start < values.len() {
         let mut current = perm(start);

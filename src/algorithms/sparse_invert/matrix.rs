@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::matrix::format_matrix;
 use crate::ring::*;
-use crate::vector::{VectorView, VectorViewMut};
+use crate::seq::{VectorView, VectorViewMut};
 
 use super::row_echelon::InternalRow;
 

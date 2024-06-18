@@ -5,8 +5,8 @@ use std::ptr::{addr_of_mut, NonNull};
 #[cfg(feature = "ndarray")]
 use ndarray::{ArrayBase, DataMut, Ix2};
 
-use crate::vector::SwappableVectorViewMut;
-use crate::vector::{VectorView, VectorViewMut};
+use crate::seq::SwappableVectorViewMut;
+use crate::seq::{VectorView, VectorViewMut};
 
 ///
 /// Trait for objects that can be considered a contiguous part of memory. In particular,
@@ -1092,8 +1092,8 @@ fn test_submatrix_col_iter<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V,
         let mut col1 = it.next().unwrap();
         let mut col2 = it.next().unwrap();
         assert!(it.next().is_none());
-        assert_eq!(vec![1, 6, 11], col1.iter().map(|x| *x).collect::<Vec<_>>());
-        assert_eq!(vec![2, 7, 12], col2.iter().map(|x| *x).collect::<Vec<_>>());
+        assert_eq!(vec![1, 6, 11], col1.as_iter().map(|x| *x).collect::<Vec<_>>());
+        assert_eq!(vec![2, 7, 12], col2.as_iter().map(|x| *x).collect::<Vec<_>>());
         assert_eq!(vec![1, 6, 11], col1.reborrow().into_iter().map(|x| *x).collect::<Vec<_>>());
         assert_eq!(vec![2, 7, 12], col2.reborrow().into_iter().map(|x| *x).collect::<Vec<_>>());
         *col1.into_iter().skip(1).next().unwrap() += 5;
@@ -1110,7 +1110,7 @@ fn test_submatrix_col_iter<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V,
         let mut it = right.col_iter();
         let mut col = it.next().unwrap();
         assert!(it.next().is_none());
-        assert_eq!(vec![4, 9, 14], col.reborrow().iter().map(|x| *x).collect::<Vec<_>>());
+        assert_eq!(vec![4, 9, 14], col.reborrow().as_iter().map(|x| *x).collect::<Vec<_>>());
         *col.into_iter().next().unwrap() += 3;
     }
     assert_submatrix_eq([
@@ -1198,26 +1198,26 @@ fn test_submatrix_col_at<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i
         [6, 7, 8, 9, 10],
         [11, 12, 13, 14, 15]
     ], &mut matrix);
-    assert_eq!(&[2, 7, 12], &matrix.col_at(1).iter().copied().collect::<Vec<_>>()[..]);
-    assert_eq!(&[2, 7, 12], &matrix.as_const().col_at(1).iter().copied().collect::<Vec<_>>()[..]);
-    assert_eq!(&[5, 10, 15], &matrix.col_at(4).iter().copied().collect::<Vec<_>>()[..]);
-    assert_eq!(&[5, 10, 15], &matrix.as_const().col_at(4).iter().copied().collect::<Vec<_>>()[..]);
+    assert_eq!(&[2, 7, 12], &matrix.col_at(1).as_iter().copied().collect::<Vec<_>>()[..]);
+    assert_eq!(&[2, 7, 12], &matrix.as_const().col_at(1).as_iter().copied().collect::<Vec<_>>()[..]);
+    assert_eq!(&[5, 10, 15], &matrix.col_at(4).as_iter().copied().collect::<Vec<_>>()[..]);
+    assert_eq!(&[5, 10, 15], &matrix.as_const().col_at(4).as_iter().copied().collect::<Vec<_>>()[..]);
 
     {
         let (mut top, mut bottom) = matrix.reborrow().restrict_rows(0..2).split_rows(0..1, 1..2);
-        assert_eq!(&[1], &top.col_mut_at(0).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[1], &top.as_const().col_at(0).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[1], &top.col_at(0).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[5], &top.col_mut_at(4).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[5], &top.as_const().col_at(4).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[5], &top.col_at(4).iter().copied().collect::<Vec<_>>()[..]);
+        assert_eq!(&[1], &top.col_mut_at(0).as_iter().copied().collect::<Vec<_>>()[..]);
+        assert_eq!(&[1], &top.as_const().col_at(0).as_iter().copied().collect::<Vec<_>>()[..]);
+        assert_eq!(&[1], &top.col_at(0).as_iter().copied().collect::<Vec<_>>()[..]);
+        assert_eq!(&[5], &top.col_mut_at(4).as_iter().copied().collect::<Vec<_>>()[..]);
+        assert_eq!(&[5], &top.as_const().col_at(4).as_iter().copied().collect::<Vec<_>>()[..]);
+        assert_eq!(&[5], &top.col_at(4).as_iter().copied().collect::<Vec<_>>()[..]);
 
-        assert_eq!(&[6], &bottom.col_mut_at(0).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[6], &bottom.as_const().col_at(0).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[6], &bottom.col_at(0).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[10], &bottom.col_mut_at(4).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[10], &bottom.as_const().col_at(4).iter().copied().collect::<Vec<_>>()[..]);
-        assert_eq!(&[10], &bottom.col_at(4).iter().copied().collect::<Vec<_>>()[..]);
+        assert_eq!(&[6], &bottom.col_mut_at(0).as_iter().copied().collect::<Vec<_>>()[..]);
+        assert_eq!(&[6], &bottom.as_const().col_at(0).as_iter().copied().collect::<Vec<_>>()[..]);
+        assert_eq!(&[6], &bottom.col_at(0).as_iter().copied().collect::<Vec<_>>()[..]);
+        assert_eq!(&[10], &bottom.col_mut_at(4).as_iter().copied().collect::<Vec<_>>()[..]);
+        assert_eq!(&[10], &bottom.as_const().col_at(4).as_iter().copied().collect::<Vec<_>>()[..]);
+        assert_eq!(&[10], &bottom.col_at(4).as_iter().copied().collect::<Vec<_>>()[..]);
     }
 }
 
@@ -1236,10 +1236,10 @@ fn test_submatrix_row_at<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i
         [6, 7, 8, 9, 10],
         [11, 12, 13, 14, 15]
     ], &mut matrix);
-    assert_eq!(&[2, 7, 12], &matrix.col_at(1).iter().copied().collect::<Vec<_>>()[..]);
-    assert_eq!(&[2, 7, 12], &matrix.as_const().col_at(1).iter().copied().collect::<Vec<_>>()[..]);
-    assert_eq!(&[5, 10, 15], &matrix.col_at(4).iter().copied().collect::<Vec<_>>()[..]);
-    assert_eq!(&[5, 10, 15], &matrix.as_const().col_at(4).iter().copied().collect::<Vec<_>>()[..]);
+    assert_eq!(&[2, 7, 12], &matrix.col_at(1).as_iter().copied().collect::<Vec<_>>()[..]);
+    assert_eq!(&[2, 7, 12], &matrix.as_const().col_at(1).as_iter().copied().collect::<Vec<_>>()[..]);
+    assert_eq!(&[5, 10, 15], &matrix.col_at(4).as_iter().copied().collect::<Vec<_>>()[..]);
+    assert_eq!(&[5, 10, 15], &matrix.as_const().col_at(4).as_iter().copied().collect::<Vec<_>>()[..]);
 
     {
         let (mut left, mut right) = matrix.reborrow().restrict_cols(1..5).split_cols(0..2, 2..4);

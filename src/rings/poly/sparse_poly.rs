@@ -4,11 +4,11 @@ use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
 use crate::pid::*;
 use crate::field::Field;
-use crate::vector::VectorViewMut;
+use crate::seq::VectorViewMut;
 use crate::ring::*;
 use crate::rings::poly::*;
-use crate::vector::*;
-use crate::vector::sparse::*;
+use crate::seq::*;
+use crate::seq::sparse::*;
 
 use std::alloc::Allocator;
 use std::cmp::max;
@@ -98,7 +98,7 @@ impl<R: RingStore> SparsePolyRingBase<R> {
         el.set_len(0);
     }
 
-    fn poly_div<F>(&self, lhs: &mut SparseVectorMut<Rc<R>>, rhs: &SparseVectorMut<Rc<R>>, mut left_div_lc: F) -> Option<SparseVectorMut<Rc<R>>>
+    fn poly_div<F>(&self, lhs: &mut SparseHashMapVector<Rc<R>>, rhs: &SparseHashMapVector<Rc<R>>, mut left_div_lc: F) -> Option<SparseHashMapVector<Rc<R>>>
         where F: FnMut(El<R>) -> Option<El<R>>
     {
         let lhs_val = std::mem::replace(lhs, self.zero());
@@ -117,7 +117,7 @@ impl<R: RingStore> SparsePolyRingBase<R> {
 
 impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
     
-    type Element = SparseVectorMut<Rc<R>>;
+    type Element = SparseHashMapVector<Rc<R>>;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
         val.clone()
@@ -156,7 +156,7 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
     }
 
     fn zero(&self) -> Self::Element {
-        SparseVectorMut::new(0, self.base_ring.clone())
+        SparseHashMapVector::new(0, self.base_ring.clone())
     }
     
     fn from_int(&self, value: i32) -> Self::Element {
@@ -201,7 +201,7 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         if lhs.len() == 0 || rhs.len() == 0 {
             return self.zero();
         }
-        let mut result = SparseVectorMut::new(lhs.len() + rhs.len() - 1, self.base_ring.clone());
+        let mut result = SparseHashMapVector::new(lhs.len() + rhs.len() - 1, self.base_ring.clone());
         for (i, c1) in lhs.nontrivial_entries() {
             for (j, c2) in rhs.nontrivial_entries() {
                 self.base_ring.add_assign(result.at_mut(i + j), self.base_ring.mul_ref(c1, c2));
@@ -282,8 +282,8 @@ impl<R1, R2> CanHomFrom<SparsePolyRingBase<R1> > for SparsePolyRingBase<R2>
         self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
     }
 
-    fn map_in_ref(&self, from: &SparsePolyRingBase<R1> , el: &SparseVectorMut<Rc<R1>>, hom: &Self::Homomorphism) -> Self::Element {
-        let mut result = SparseVectorMut::new(el.len(), self.base_ring.clone());
+    fn map_in_ref(&self, from: &SparsePolyRingBase<R1> , el: &SparseHashMapVector<Rc<R1>>, hom: &Self::Homomorphism) -> Self::Element {
+        let mut result = SparseHashMapVector::new(el.len(), self.base_ring.clone());
         for (j, c) in el.nontrivial_entries() {
             *result.at_mut(j) = self.base_ring().get_ring().map_in_ref(from.base_ring().get_ring(), c, hom);
         }
@@ -318,8 +318,8 @@ impl<R1, R2> CanIsoFromTo<SparsePolyRingBase<R1>> for SparsePolyRingBase<R2>
         self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
     }
 
-    fn map_out(&self, from: &SparsePolyRingBase<R1>, el: Self::Element, iso: &Self::Isomorphism) -> SparseVectorMut<Rc<R1>> {
-        let mut result = SparseVectorMut::new(el.len(), from.base_ring.clone());
+    fn map_out(&self, from: &SparsePolyRingBase<R1>, el: Self::Element, iso: &Self::Isomorphism) -> SparseHashMapVector<Rc<R1>> {
+        let mut result = SparseHashMapVector::new(el.len(), from.base_ring.clone());
         for (j, c) in el.nontrivial_entries() {
             *result.at_mut(j) = self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(c), iso);
         }
@@ -330,7 +330,7 @@ impl<R1, R2> CanIsoFromTo<SparsePolyRingBase<R1>> for SparsePolyRingBase<R2>
 pub struct TermIterator<'a, R>
     where R: RingStore
 {
-    iter: sparse::SparseVectorMutIter<'a, Rc<R>>
+    iter: sparse::SparseHashMapVectorIter<'a, Rc<R>>
 }
 
 impl<'a, R> Iterator for TermIterator<'a, R>

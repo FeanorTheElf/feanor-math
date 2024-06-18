@@ -6,10 +6,12 @@ use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::cmp::{min, max};
 
-use crate::vector::subvector::{Subvector, SelfSubvectorView};
+use subvector::SubvectorView;
+
+use crate::seq::*;
 use crate::ring::*;
 use crate::homomorphism::*;
-use crate::vector::{VectorView, VectorViewMut};
+use crate::seq::{VectorView, VectorViewMut};
 
 ///
 /// Contains [`ordered::MultivariatePolyRingImpl`], an implementation
@@ -384,7 +386,7 @@ impl<V: VectorView<MonomialExponent>> Hash for Monomial<V> {
 
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         state.write_usize(self.exponents.len());
-        for e in self.exponents.iter() {
+        for e in self.exponents.as_iter() {
             state.write_u16(*e);
         }
     }
@@ -401,7 +403,7 @@ impl<V: VectorView<MonomialExponent>> Monomial<V> {
     }
 
     pub fn deg(&self) -> MonomialExponent {
-        self.exponents.iter().sum()
+        self.exponents.as_iter().sum()
     }
 
     pub fn len(&self) -> usize {
@@ -784,12 +786,12 @@ impl MonomialOrder for BlockLexDegRevLex {
 
     fn compare<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering {
         match DegRevLex.compare(
-            &Monomial::new(Subvector::new(&lhs.exponents).subvector(..self.larger_block)), 
-            &Monomial::new(Subvector::new(&rhs.exponents).subvector(..self.larger_block))
+            &Monomial::new(SubvectorView::new(&lhs.exponents).restrict(..self.larger_block)), 
+            &Monomial::new(SubvectorView::new(&rhs.exponents).restrict(..self.larger_block))
         ) {
             Ordering::Equal => DegRevLex.compare(
-                &Monomial::new(Subvector::new(&lhs.exponents).subvector(self.larger_block..)), 
-                &Monomial::new(Subvector::new(&rhs.exponents).subvector(self.larger_block..))
+                &Monomial::new(SubvectorView::new(&lhs.exponents).restrict(self.larger_block..)), 
+                &Monomial::new(SubvectorView::new(&rhs.exponents).restrict(self.larger_block..))
             ),
             ordering => ordering
         }

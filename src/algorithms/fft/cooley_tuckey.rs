@@ -1,9 +1,9 @@
 use crate::algorithms::unity_root::*;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::rings::zn::*;
-use crate::vector::SwappableVectorViewMut;
+use crate::seq::SwappableVectorViewMut;
 use crate::ring::*;
-use crate::vector::VectorViewMut;
+use crate::seq::VectorViewMut;
 use crate::homomorphism::*;
 use crate::algorithms::fft::*;
 use crate::algorithms;

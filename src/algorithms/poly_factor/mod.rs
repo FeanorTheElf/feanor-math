@@ -19,7 +19,7 @@ use crate::algorithms::{self, int_bisect};
 use crate::rings::rational::*;
 use crate::rings::zn::zn_64::*;
 use crate::rings::zn::{choose_zn_impl, ZnOperation, ZnRing, ZnRingStore};
-use crate::vector::VectorView;
+use crate::seq::VectorView;
 use crate::rings::fieldextension::*;
 
 use super::erathostenes;

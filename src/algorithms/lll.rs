@@ -340,7 +340,7 @@ impl<'a, R, I, V, H> TransformTarget<I> for TransformLatticeBasis<'a, R, I, V, H
 }
 
 #[cfg(test)]
-use crate::vector::*;
+use crate::seq::*;
 #[cfg(test)]
 use crate::algorithms;
 #[cfg(test)]

@@ -1,3 +1,4 @@
+use crate::ring::*;
 use crate::algorithms::int_factor;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::primitive_int::StaticRing;
@@ -10,7 +11,6 @@ use crate::rings::zn::zn_64::Zn;
 use crate::rings::zn::ZnRingStore;
 
 use super::extension_impl::FreeAlgebraImpl;
-use super::El;
 
 pub type GaloisField<const DEGREE: usize> = AsField<FreeAlgebraImpl<AsField<Zn>, [El<AsField<Zn>>; DEGREE]>>;
 pub type GaloisFieldDyn = AsField<FreeAlgebraImpl<AsField<Zn>, Box<[El<AsField<Zn>>]>>>;
@@ -19,6 +19,8 @@ pub type GaloisFieldDyn = AsField<FreeAlgebraImpl<AsField<Zn>, Box<[El<AsField<Z
 /// Creates a finite/galois field of degree known at compile time. The
 /// given p must be a prime and will be the characteristic of the returned
 /// field.
+/// 
+/// See also [`GFdyn()`] if the degree of the field is not a compile-time constant.
 /// 
 /// # Example
 /// ```
@@ -57,6 +59,8 @@ pub fn GF<const DEGREE: usize>(p: u64) -> GaloisField<DEGREE> {
 /// Creates a finite/galois field of degree not known at compile time. The
 /// given p must be a prime and will be the characteristic of the returned
 /// field.
+/// 
+/// See also [`GF()`] if the degree of the field is a compile-time constant.
 /// 
 /// # Example
 /// ```

@@ -9,7 +9,6 @@ use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::ring::*;
 use crate::rings::multivariate::*;
 use crate::rings::zn::{ZnRing, zn_64, ZnRingStore, zn_static};
-use crate::vector::*;
 use crate::algorithms;
 
 #[allow(type_alias_bounds)]
@@ -204,7 +203,7 @@ fn reduce_S_matrix<P, O>(ring: P, p: &Coeff<P>, S_polys: &[El<P>], basis: &[El<P
         }
     }
 
-    let entries = gb_sparse_row_echelon::<_, true>(ring.base_ring(), A, 256);
+    let entries = algorithms::sparse_invert::gb_sparse_row_echelon::<_, true>(ring.base_ring(), A, 256);
 
     let mut result = Vec::new();
     for i in 0..entries.len() {
@@ -484,10 +483,9 @@ impl<const N: u64> GBRingDescriptorRing for zn_static::ZnBase<N, false> {
 ///     (1, Monomial::new([0, 1])),
 /// ].into_iter());
 /// 
-/// assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, in_ideal, &gb, order));
+/// assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, in_ideal, gb.iter(), order));
 /// ```
 /// 
-#[stability::unstable(feature = "enable")]
 pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_poly_degree_bound: u16) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
@@ -524,7 +522,7 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
         let mut S_polys = Vec::new();
 
         open.retain(|S_poly| {
-            if S_poly.is_zero(&ring, &ring_info, &basis[..], order) {
+            if S_poly.is_zero(&ring, &ring_info, &basis, order) {
                 false
             } else if S_poly.filter_product_criterion(&ring, &ring_info, &basis[..], order) {
                 product_criterion_skipped += 1;
@@ -549,7 +547,7 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
                 reduce_S_matrix(&ring, &ring_info.extended_ideal_generator, &S_polys, &basis, order)
             } else {
                 let start = std::time::Instant::now();
-                let result = S_polys.into_iter().map(|f| multivariate_division(&ring, f, &basis, order)).filter(|f| !ring.is_zero(f)).collect();
+                let result = S_polys.into_iter().map(|f| multivariate_division(&ring, f, basis.iter(), order)).filter(|f| !ring.is_zero(f)).collect();
                 let end = std::time::Instant::now();
                 if LOG {
                     print!("[{}ms]", (end - start).as_millis());
@@ -616,7 +614,7 @@ pub fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
         polys.sort_by(|l, r| order.compare(ring.lm(l, order).unwrap(), ring.lm(r, order).unwrap()));
         let mut i = 0;
         while i < polys.len() {
-            let reduced = multivariate_division(&ring, ring.clone_el(&polys[i]), (&polys[..i]).chain(&polys[(i + 1)..]), order);
+            let reduced = multivariate_division(&ring, ring.clone_el(&polys[i]), polys[..i].iter().chain(polys[(i + 1)..].iter()), order);
             if !ring.is_zero(&reduced) {
                 if !ring.eq_el(&reduced, &polys[i]) {
                     changed = true;
@@ -642,13 +640,14 @@ pub fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn multivariate_division<P, V, O>(ring: P, mut f: El<P>, set: V, order: O) -> El<P>
+pub fn multivariate_division<'a, P, I, O>(ring: P, mut f: El<P>, set: I, order: O) -> El<P>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: DivisibilityRingStore,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing,
         O: MonomialOrder + Copy,
-        V: VectorView<El<P>>
+        El<P>: 'a,
+        I: Clone + Iterator<Item = &'a El<P>>
 {
     if ring.is_zero(&f) {
         return f;
@@ -659,10 +658,9 @@ pub fn multivariate_division<P, V, O>(ring: P, mut f: El<P>, set: V, order: O) -
     let mut changed = true;
     while changed {
         changed = false;
-        while let Some((quo, g)) = set.iter()
+        while let Some((quo, g)) = set.clone()
             .filter(|g| ring.lm(g, order).unwrap().divides(&f_lm))
-            .filter_map(|g| ring.base_ring().checked_div(&f_lc, ring.coefficient_at(g, ring.lm(g, order).unwrap())).map(|quo| (quo, g)))
-            .next()
+            .filter_map(|g| ring.base_ring().checked_div(&f_lc, ring.coefficient_at(g, ring.lm(g, order).unwrap())).map(|quo| (quo, g))).next()
         {
             changed = true;
             let g_lm = ring.lm(g, order).unwrap();
@@ -690,10 +688,9 @@ use crate::rings::poly::*;
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::wrapper::RingElementWrapper;
+#[cfg(test)]
+use crate::seq::*;
 
-use super::sparse_invert::gb_sparse_row_echelon;
-
-#[ignore]
 #[test]
 fn test_f4_small() {
     let order = DegRevLex;
@@ -724,7 +721,6 @@ fn test_f4_small() {
     assert_el_eq!(&ring, &ring.negate(expected), actual.at(2));
 }
 
-#[ignore]
 #[test]
 fn test_f4_larger() {
     let order = DegRevLex;
@@ -769,10 +765,9 @@ fn test_f4_larger() {
         (9, Monomial::new([0, 0, 0]))
     ].into_iter());
 
-    assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, g1, &actual, order));
+    assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, g1, actual.iter(), order));
 }
 
-#[ignore]
 #[test]
 fn test_f4_larger_elim() {
     let order = BlockLexDegRevLex::new(..1, 1..);
@@ -817,10 +812,9 @@ fn test_f4_larger_elim() {
         (9, Monomial::new([0, 0, 0]))
     ].into_iter());
 
-    assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, g1, &actual, order));
+    assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, g1, actual.iter(), order));
 }
 
-#[ignore]
 #[test]
 fn test_gb_local_ring() {
     let order = DegRevLex;
@@ -834,7 +828,6 @@ fn test_gb_local_ring() {
     assert_el_eq!(&ring, &ring.one(), &gb[0]);
 }
 
-#[ignore]
 #[test]
 fn test_generic_computation() {
     let order = DegRevLex;
@@ -904,7 +897,7 @@ fn test_gb_local_ring_large() {
     println!("Computed GB in {} ms", (end - start).as_millis());
 
     for f in &part_of_result {
-        assert!(ring.is_zero(&multivariate_division(&ring, f.clone().unwrap(), &gb, order)));
+        assert!(ring.is_zero(&multivariate_division(&ring, f.clone().unwrap(), gb.iter(), order)));
     }
 
     assert_eq!(93, gb.len());

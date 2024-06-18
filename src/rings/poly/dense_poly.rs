@@ -8,7 +8,7 @@ use crate::rings::rational::RationalFieldBase;
 use crate::ring::*;
 use crate::algorithms;
 use crate::rings::poly::*;
-use crate::vector::{VectorView, VectorViewMut};
+use crate::seq::{VectorView, VectorViewMut};
 
 use std::alloc::{Allocator, Global};
 use std::cmp::min;

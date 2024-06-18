@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use crate::ring::*;
-use crate::vector::*;
+use crate::seq::*;
 
 pub mod cooley_tuckey;
 pub mod bluestein;

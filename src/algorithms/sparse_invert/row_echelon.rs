@@ -4,7 +4,7 @@ use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::matrix::*;
 use crate::pid::PrincipalIdealRing;
 use crate::ring::*;
-use crate::vector::{SwappableVectorViewMut, VectorView, VectorViewMut};
+use crate::seq::{SwappableVectorViewMut, VectorView, VectorViewMut};
 
 use super::matrix::SparseMatrix;
 
@@ -211,7 +211,7 @@ pub fn preimage_echelon_form_matrix<R, V>(ring: R, echelon_form_matrix: Column<V
         }
     }
 
-    for (i, row) in echelon_form_matrix.iter().enumerate() {
+    for (i, row) in echelon_form_matrix.as_iter().enumerate() {
         perform_inner(ring, i, row, current_row, &echelon_form_matrix, &zero, &mut out);
     }
     out.data.push((usize::MAX, ring.one()));
@@ -287,7 +287,7 @@ mod local {
     use crate::divisibility::*;
     use crate::matrix::ColumnMut;
     use crate::pid::PrincipalIdealRingStore;
-    use crate::vector::{VectorView, VectorViewMut};
+    use crate::seq::{VectorView, VectorViewMut};
 
     use super::*;
             
@@ -389,7 +389,7 @@ mod global {
     use std::sync::atomic::AtomicUsize;
 
     use crate::parallel::potential_parallel_for_each;
-    use crate::vector::VectorViewMut;
+    use crate::seq::VectorViewMut;
 
     #[cfg(feature = "parallel")]
     use rayon::iter::IndexedParallelIterator;

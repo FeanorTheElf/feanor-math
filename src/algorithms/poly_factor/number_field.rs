@@ -12,7 +12,6 @@ use crate::rings::extension::FreeAlgebraStore;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::{PolyRing, PolyRingStore};
 use crate::rings::rational::*;
-use crate::vector::VectorView;
 
 use super::poly_squarefree_part;
 

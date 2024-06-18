@@ -1,9 +1,10 @@
+use subvector::SubvectorView;
+
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::algorithms::fft::*;
 use crate::algorithms::fft::complex_fft::*;
 use crate::rings::float_complex::*;
-use crate::vector::subvector::*;
 
 /// 
 /// A generic variant of the Cooley-Tuckey FFT algorithm that can be used to compute the Fourier
@@ -178,14 +179,14 @@ impl<R_main, R_twiddle, H, T1, T2> FFTTable for FFTTableGenCooleyTuckey<R_main, 
         where V: SwappableVectorViewMut<R_main::Element>
     {
         for i in 0..self.right_table.len() {
-            let mut v = Subvector::new(&mut values).subvector(i..).stride(self.right_table.len());
+            let mut v = SubvectorView::new(&mut values).restrict(i..).step_by(self.right_table.len());
             self.left_table.unordered_fft(&mut v);
         }
         for i in 0..self.len() {
             self.hom.mul_assign_map_ref(values.at_mut(i), self.inv_twiddle_factors.at(i));
         }
         for i in 0..self.left_table.len() {
-            let mut v = Subvector::new(&mut values).subvector((i * self.right_table.len())..((i + 1) * self.right_table.len()));
+            let mut v = SubvectorView::new(&mut values).restrict((i * self.right_table.len())..((i + 1) * self.right_table.len()));
             self.right_table.unordered_fft(&mut v);
         }
     }
@@ -194,7 +195,7 @@ impl<R_main, R_twiddle, H, T1, T2> FFTTable for FFTTableGenCooleyTuckey<R_main, 
         where V: SwappableVectorViewMut<R_main::Element>
     {
         for i in 0..self.left_table.len() {
-            let mut v = Subvector::new(&mut values).subvector((i * self.right_table.len())..((i + 1) * self.right_table.len()));
+            let mut v = SubvectorView::new(&mut values).restrict((i * self.right_table.len())..((i + 1) * self.right_table.len()));
             self.right_table.unordered_inv_fft(&mut v);
         }
         for i in 0..self.len() {
@@ -202,7 +203,7 @@ impl<R_main, R_twiddle, H, T1, T2> FFTTable for FFTTableGenCooleyTuckey<R_main, 
             debug_assert!(self.ring().get_ring().is_approximate() || self.hom.domain().is_one(&self.hom.domain().mul_ref(self.twiddle_factors.at(i), self.inv_twiddle_factors.at(i))));
         }
         for i in 0..self.right_table.len() {
-            let mut v = Subvector::new(&mut values).subvector(i..).stride(self.right_table.len());
+            let mut v = SubvectorView::new(&mut values).restrict(i..).step_by(self.right_table.len());
             self.left_table.unordered_inv_fft(&mut v);
         }
     }

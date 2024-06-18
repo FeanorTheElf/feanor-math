@@ -15,10 +15,9 @@ use crate::delegate::DelegateRing;
 use crate::rings::finite::*;
 use crate::rings::poly::PolyRingStore;
 use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::vector::vec_fn::RingElVectorViewFn;
 use crate::ring::*;
 use crate::algorithms;
-use crate::vector::VectorView;
+use crate::seq::VectorView;
 use crate::iters::*;
 
 use super::*;
@@ -115,7 +114,7 @@ impl<R, V, A> FreeAlgebraImpl<R, V, A>
     pub fn as_field(self) -> Result<AsField<Self>, Self> {
         let poly_ring = DensePolyRing::new(self.base_ring(), "X");
         let f = poly_ring.from_terms(
-            self.get_ring().x_pow_rank.iter().enumerate().map(|(i, c)| (self.base_ring().negate(self.base_ring().clone_el(c)), i))
+            self.get_ring().x_pow_rank.as_iter().enumerate().map(|(i, c)| (self.base_ring().negate(self.base_ring().clone_el(c)), i))
                 .chain([(self.base_ring().one(), self.get_ring().x_pow_rank.len())].into_iter())
         );
         let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
@@ -287,11 +286,11 @@ impl<'a, R, V, A> Copy for WRTCanonicalBasisElementCreator<'a, R, V, A>
 impl<R, V, A> FiniteRing for FreeAlgebraImplBase<R, V, A>
     where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, A: Allocator + Clone
 {
-    type ElementsIter<'a> = MultiProduct<<R::Type as FiniteRing>::ElementsIter<'a>, WRTCanonicalBasisElementCreator<'a, R, V, A>, RingElementClone<'a, R::Type>, Self::Element>
+    type ElementsIter<'a> = MultiProduct<<R::Type as FiniteRing>::ElementsIter<'a>, WRTCanonicalBasisElementCreator<'a, R, V, A>, CloneRingEl<&'a R>, Self::Element>
         where Self: 'a;
 
     fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
-        multi_cartesian_product((0..self.rank()).map(|_| self.base_ring().elements()), WRTCanonicalBasisElementCreator { base_ring: self }, RingElementClone::new(self.base_ring().get_ring()))
+        multi_cartesian_product((0..self.rank()).map(|_| self.base_ring().elements()), WRTCanonicalBasisElementCreator { base_ring: self }, CloneRingEl(self.base_ring()))
     }
 
     fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
@@ -349,7 +348,7 @@ impl<R, V, A> RingExtension for FreeAlgebraImplBase<R, V, A>
 impl<R, V, A> FreeAlgebra for FreeAlgebraImplBase<R, V, A>
     where R: RingStore, V: VectorView<El<R>>, A: Allocator + Clone
 {
-    type VectorRepresentation<'a> = RingElVectorViewFn<&'a R, &'a [El<R>], El<R>>
+    type VectorRepresentation<'a> = CloneElFn<&'a [El<R>], El<R>, CloneRingEl<&'a R>>
         where Self: 'a;
 
     fn canonical_gen(&self) -> Self::Element {
@@ -357,7 +356,7 @@ impl<R, V, A> FreeAlgebra for FreeAlgebraImplBase<R, V, A>
     }
 
     fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a> {
-        (&el.values[..]).as_el_fn(self.base_ring())
+        (&el.values[..]).as_ring_el_fn(self.base_ring())
     }
 
     fn from_canonical_basis<W>(&self, vec: W) -> Self::Element

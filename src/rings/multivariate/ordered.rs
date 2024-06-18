@@ -6,7 +6,7 @@ use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
 use crate::ring::*;
 use crate::homomorphism::*;
-use crate::vector::VectorViewMut;
+use crate::seq::VectorViewMut;
 
 use super::*;
 

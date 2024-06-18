@@ -11,8 +11,8 @@ use crate::ring::*;
 use crate::homomorphism::*;
 use crate::algorithms;
 use crate::rings::zn::*;use crate::rings::float_complex::*;
-use super::complex_fft::*;
-use super::SwappableVectorViewMut;
+use crate::algorithms::fft::complex_fft::*;
+use crate::seq::SwappableVectorViewMut;
 
 ///
 /// Bluestein's FFT algorithm (also known as Chirp-Z-transform) to compute the Fourier

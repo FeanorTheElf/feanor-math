@@ -1,6 +1,5 @@
 use crate::ring::*;
-use crate::vector::*;
-use crate::vector::subvector::*;
+use crate::seq::*;
 
 use std::cmp::{ max, min };
 
@@ -67,9 +66,9 @@ macro_rules! karatsuba_impl {
                         let n: usize = block_size / 2;
 
                         let (lower, rest) = mem.split_at_mut(2 * n);
-                        $prev::<R, &mut [El<R>], V2, V3, false>(block_size_log2 - 1, lower, lhs.subvector(..n), rhs.subvector(..n), rest, ring);
+                        $prev::<R, &mut [El<R>], V2, V3, false>(block_size_log2 - 1, lower, lhs.restrict(..n), rhs.restrict(..n), rest, ring);
                         if ADD_ASSIGN {
-                            slice_add_assign(dst.subvector(..(2 * n)), &lower, ring);
+                            slice_add_assign(dst.restrict(..(2 * n)), &lower, ring);
                         } else {
                             for i in 0..(2 * n) {
                                 *dst.at_mut(i) = ring.clone_el(lower.at(i));
@@ -78,19 +77,19 @@ macro_rules! karatsuba_impl {
                                 *dst.at_mut(i) = ring.zero();
                             }
                         }
-                        slice_sub_assign(dst.subvector(n..(3 * n)), &lower, ring);
+                        slice_sub_assign(dst.restrict(n..(3 * n)), &lower, ring);
                 
                         let upper = lower;
-                        $prev::<R, &mut [El<R>], _, _, false>(block_size_log2 - 1, upper, lhs.subvector(n..(2 * n)), rhs.subvector(n..(2 * n)), rest, ring);
-                        slice_add_assign(dst.subvector((2 * n)..(4 * n)), &upper, ring);
-                        slice_sub_assign(dst.subvector(n..(3 * n)), &upper, ring);
+                        $prev::<R, &mut [El<R>], _, _, false>(block_size_log2 - 1, upper, lhs.restrict(n..(2 * n)), rhs.restrict(n..(2 * n)), rest, ring);
+                        slice_add_assign(dst.restrict((2 * n)..(4 * n)), &upper, ring);
+                        slice_sub_assign(dst.restrict(n..(3 * n)), &upper, ring);
                 
                         let (lhs_combined, rhs_combined) = upper.split_at_mut(n);
                         for i in 0..n {
                             lhs_combined[i] = ring.add_ref(lhs.at(i), lhs.at(i + n));
                             rhs_combined[i] = ring.add_ref(rhs.at(i), rhs.at(i + n));
                         }
-                        $prev::<R, &mut [El<R>], _, _, true>(block_size_log2 - 1, dst.subvector(n..(3 * n)), &lhs_combined[..], &rhs_combined[..], rest, ring);
+                        $prev::<R, &mut [El<R>], _, _, true>(block_size_log2 - 1, dst.restrict(n..(3 * n)), &lhs_combined[..], &rhs_combined[..], rest, ring);
                     }
                 }
             )*
@@ -149,8 +148,8 @@ pub fn karatsuba<R, V1, V2>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: 
                 block_size_log2, 
                 threshold_size_log2,
                 &mut dst[(i + j)..(i + j + 2 * n)], 
-                lhs.subvector(i..(i + n)), 
-                rhs.subvector(j..(j + n)), 
+                lhs.restrict(i..(i + n)), 
+                rhs.restrict(j..(j + n)), 
                 &mut memory[..], 
                 ring
             );
@@ -170,8 +169,8 @@ pub fn karatsuba<R, V1, V2>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: 
                     block_size_log2, 
                     threshold_size_log2,
                     &mut dst[(lhs_rem + j)..(lhs_rem + j + 2 * n)], 
-                    lhs.subvector(lhs_rem..(lhs_rem + n)), 
-                    rhs.subvector(j..(j + n)), 
+                    lhs.restrict(lhs_rem..(lhs_rem + n)), 
+                    rhs.restrict(j..(j + n)), 
                     &mut memory[..], 
                     ring
                 );
@@ -184,8 +183,8 @@ pub fn karatsuba<R, V1, V2>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: 
                     rem_block_size_log2 as usize,
                     threshold_size_log2, 
                     &mut dst[(rhs_rem + i)..(rhs_rem + i + 2 * n)], 
-                    lhs.subvector(i..(i + n)), 
-                    rhs.subvector(rhs_rem..(rhs_rem + n)), 
+                    lhs.restrict(i..(i + n)), 
+                    rhs.restrict(rhs_rem..(rhs_rem + n)), 
                     &mut memory[..], 
                     ring
                 );
