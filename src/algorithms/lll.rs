@@ -452,7 +452,7 @@ fn assert_lattice_isomorphic<V, const N: usize, const M: usize>(lhs: &[DerefArra
     let ZZbig = BigIntRing::RING;
     let mut A: OwnedMatrix<_> = OwnedMatrix::zero(N, M, ZZbig);
     let mut B: OwnedMatrix<_> = OwnedMatrix::zero(N, M, ZZbig);
-    let int_to_ZZbig: CanHom<&RingValue<StaticRingBase<i64>>, &RingValue<crate::rings::rust_bigint::RustBigintRingBase>> = ZZbig.can_hom(&StaticRing::<i64>::RING).unwrap();
+    let int_to_ZZbig: CanHom<&RingValue<StaticRingBase<i64>>, &BigIntRing> = ZZbig.can_hom(&StaticRing::<i64>::RING).unwrap();
     for i in 0..N {
         for j in 0..M {
             *A.at_mut(i, j) = int_to_ZZbig.map(lhs[i][j]);
