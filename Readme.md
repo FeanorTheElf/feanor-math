@@ -9,11 +9,10 @@ From a user's point of view, we thus envision this library to be somewhat closer
 
 ## Current State
 
-The current state is far away from this vision, as only a small set of most important algorithms have been implemented.
-Furthermore, this library should still be considered to be in an alpha phase.
-In particular, I will make changes to interfaces and implementations without warning, although I try to keep core interfaces (basically those in `crate::ring::*`) stable.
+The current state is far away from this vision, as only some of most important algorithms have been implemented.
 Furthermore, there might be bugs, and many implementations are not particularly optimized.
 Nevertheless, I think this library can already be useful, and I regularly use it for various applications, including cryptography.
+Note that I will try to keep the interfaces stable, unless they are marked with `#[stability::unstable]`.
 
 This library uses nightly Rust, ~~and even unstable features like const-generics and specialization~~ - this caused too much of a headache, so I removed those uses again.
 
@@ -33,6 +32,7 @@ The following rings are provided
  - The polynomial ring `R[X]` over any base ring, as a trait `crate::rings::poly::PolyRing` with two implementations, one for densely filled polynomials `crate::rings::poly::dense_poly::DensePolyRing` and one for sparsely filled polynomials `crate::rings::poly::sparse_poly::SparsePolyRing`.
  - Finite-rank simple and free ring extensions, as a trait `crate::rings::extension::FreeAlgebra`, with an implementation based on polynomial division `crate::rings::extension::FreeAlgebraImpl`. In particular, this includes finite/galois fields and number fields.
  - Multivariate polynomial rings `R[X1, ..., XN]` over any base ring, as the trait `crate::rings::multivariate::MultivariatePolyRing` and one implementation `crate::rings::multivariate::ordered::MultivariatePolyRingImpl` based on a sparse representation using ordered vectors.
+ - Combining the above, you can get Galois fields (easily available using `crate::rings::extension::galois_field::GF()`) or arbitrary number fields.
 
 The following algorithms are implemented
  - Fast Fourier transforms, including an optimized implementation of the Cooley-Tuckey algorithm for the power-of-two case, an implementation of the Bluestein algorithm for arbitrary lengths, and a factor FFT implementation (also based on the Cooley-Tuckey algorithm). The Fourier transforms work on all rings that have suitable roots of unity, in particular the complex numbers `C` and suitable finite rings `Fq`.
@@ -53,8 +53,18 @@ Unfortunately, operations with polynomials over infinite rings (integers, ration
  - Comprehensive treatment of matrices and linear algebra. Currently there is only a very minimalistic abstraction of matrices [`crate::matrix::*`] and linear algebra, mainly for internal use.
  - Careful treatment of polynomials over infinite rings, primarily with specialized implementations that prevent coefficient blowup.
  - ~~Lattice reduction and the LLL algorithm. This might also be necessary for above point.~~ Implemented now!
- - More carefully designed memory allocation abstractions (preferably we would use a new crate `memory-provider` or similar).
+ - ~~More carefully designed memory allocation abstractions (preferably we would use a new crate `memory-provider` or similar).~~ Using the Rust `allocator-api` together with [`feanor-mempool`](https://github.com/FeanorTheElf/feanor-mempool) now!
  - More number theory algorithms, e.g. computing Galois groups. I am not yet sure where to draw the line here, as I think high-level number theory algorithms (Elliptic Curves, Class Groups, ...) are out of scope for this project. Technically I would include integer factoring here, but it is too important a primitive for other algorithms.
+
+## SemVer
+
+In version `1.x.x` the library used an inconsistent version scheme.
+This is now fixed, and all versions from `2.x.x` onwards use semantic versioning, as described in the [Cargo book](https://doc.rust-lang.org/cargo/reference/resolver.html#semver-compatibility).
+Note that all items marked with the annotation `#[stability::unstable]` from the rust library [`stability`](https://docs.rs/stability/latest/stability/index.html) are exempt from semantic version.
+In other words, breaking changes in the interface of these structs/traits/functions will only increment the minor version number.
+Note that these are not visible to other crates at all, unless the feature `unstable-enable` is active.
+
+# Examples
 
 ## Using rings
 
@@ -346,9 +356,9 @@ However, I did not have the time so far to thoroughly optimize many of the algor
 
 ## Tipps for achieving optimal performance
 
- - Use `lto = "fat"` in the `Cargo.toml` of your project. This is absolutely vital to enable inlining across crate boundaries, and can have a huge impact if you extensively use rings that have "simple" basic arithmetic - like `zn_42::Zn` or `primitive_int::StaticRing`.
- - Different parts of this library are at different stages of optimization. While I have spent some time on the FFT algorithms, for example integer factorization are currently relatively slow.
- - If you extensively use rings whose elements require dynamic memory allocation, be careful to choose good memory providers. This is currently still WIP. 
+ - Use `lto = "fat"` in the `Cargo.toml` of your project. This is absolutely vital to enable inlining across crate boundaries, and can have a huge impact if you extensively use rings that have "simple" basic arithmetic - like `zn_64::Zn` or `primitive_int::StaticRing`.
+ - Different parts of this library are at different stages of optimization. While I have spent some time on finite fields and the FFT algorithms, for example integer factorization are currently relatively slow.
+ - If you extensively use rings whose elements require dynamic memory allocation, be careful to use a custom allocator, e.g. one from [`feanor-mempool`](https://github.com/FeanorTheElf/feanor-mempool).
  - The default arbitrary-precision integer arithmetic is currently slow. Use the feature "mpir" together with an installation of the [mpir](https://github.com/wbhart/mpir) library if you heavily use arbitrary-precision integers. 
 
 # Design decisions
