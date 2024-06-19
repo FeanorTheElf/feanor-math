@@ -522,13 +522,13 @@ impl PrincipalIdealRing for ZnBase {
 
 impl StrassenHint for ZnBase {
     default fn strassen_threshold(&self) -> usize {
-        3
+        6
     }
 }
 
 impl KaratsubaHint for ZnBase {
     default fn karatsuba_threshold(&self) -> usize {
-        3
+        6
     }
 }
 

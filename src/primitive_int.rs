@@ -11,6 +11,7 @@ use crate::divisibility::*;
 use crate::ordered::OrderedRing;
 use crate::integer::*;
 use crate::algorithms::convolution::KaratsubaHint;
+use crate::algorithms::matmul::StrassenHint;
 
 ///
 /// Trait for `i8` to `i128`.
@@ -330,6 +331,26 @@ impl KaratsubaHint for StaticRingBase<i64> {
 
 impl KaratsubaHint for StaticRingBase<i128> {
     fn karatsuba_threshold(&self) -> usize { 3 }
+}
+
+impl StrassenHint for StaticRingBase<i8> {
+    fn strassen_threshold(&self) -> usize { 6 }
+}
+
+impl StrassenHint for StaticRingBase<i16> {
+    fn strassen_threshold(&self) -> usize { 6 }
+}
+
+impl StrassenHint for StaticRingBase<i32> {
+    fn strassen_threshold(&self) -> usize { 6 }
+}
+
+impl StrassenHint for StaticRingBase<i64> {
+    fn strassen_threshold(&self) -> usize { 6 }
+}
+
+impl StrassenHint for StaticRingBase<i128> {
+    fn strassen_threshold(&self) -> usize { 5 }
 }
 
 ///

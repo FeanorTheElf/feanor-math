@@ -149,7 +149,7 @@ impl<R: ?Sized + RingBase, A: Allocator> MatmulAlgorithm<R> for StrassenAlgorith
             V2: AsPointerToSlice<R::Element>,
             V3: AsPointerToSlice<R::Element>
     {
-        naive_matmul::<_, _, _, _, true, T1, T2, T3>(lhs, rhs, dst, ring)
+        strassen::<_, _, _, _, _, T1, T2, T3>(true, <_ as StrassenHint>::strassen_threshold(ring), lhs, rhs, dst, RingRef::new(ring), &self.allocator)
     }
 
     fn matmul<V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
@@ -163,7 +163,7 @@ impl<R: ?Sized + RingBase, A: Allocator> MatmulAlgorithm<R> for StrassenAlgorith
             V2: AsPointerToSlice<R::Element>,
             V3: AsPointerToSlice<R::Element>
     {
-        naive_matmul::<_, _, _, _, false, T1, T2, T3>(lhs, rhs, dst, ring)
+        strassen::<_, _, _, _, _, T1, T2, T3>(false, <_ as StrassenHint>::strassen_threshold(ring), lhs, rhs, dst, RingRef::new(ring), &self.allocator)
     }
 }
 
@@ -171,29 +171,26 @@ impl<R: ?Sized + RingBase, A: Allocator> MatmulAlgorithm<R> for StrassenAlgorith
 use test;
 #[cfg(test)]
 use crate::primitive_int::*;
-#[cfg(test)]
-use crate::integer::*;
 
 #[cfg(test)]
-const BENCH_SIZE: usize = 64;
+const BENCH_SIZE: usize = 128;
 #[cfg(test)]
 type BenchInt = i64;
 
 #[bench]
 fn bench_naive_matmul(bencher: &mut test::Bencher) {
-    let block_size_log2 = StaticRing::<i64>::RING.abs_log2_ceil(&(BENCH_SIZE as i64)).unwrap();
     let lhs = OwnedMatrix::from_fn_in(BENCH_SIZE, BENCH_SIZE, |i, j| std::hint::black_box(i as BenchInt + j as BenchInt), Global);
     let rhs = OwnedMatrix::from_fn_in(BENCH_SIZE, BENCH_SIZE, |i, j| std::hint::black_box(i as BenchInt + j as BenchInt), Global);
     let mut result: OwnedMatrix<BenchInt> = OwnedMatrix::zero(BENCH_SIZE, BENCH_SIZE, StaticRing::<BenchInt>::RING);
     bencher.iter(|| {
-        dispatch_strassen_impl::<_, _, _, _, false, false, false, false>(
-            block_size_log2, 
+        strassen::<_, _, _, _, _, false, false, false>(
+            false, 
             100, 
             TransposableSubmatrix::from(lhs.data()), 
             TransposableSubmatrix::from(rhs.data()), 
             TransposableSubmatrixMut::from(result.data_mut()), 
-            StaticRing::<BenchInt>::RING.get_ring(), 
-            &mut []
+            StaticRing::<BenchInt>::RING, 
+            &Global
         );
         assert_eq!((BENCH_SIZE * (BENCH_SIZE + 1) * (BENCH_SIZE * 2 + 1) / 6 - BENCH_SIZE * BENCH_SIZE) as BenchInt, *result.at(0, 0));
     });
@@ -202,20 +199,18 @@ fn bench_naive_matmul(bencher: &mut test::Bencher) {
 #[bench]
 fn bench_strassen_matmul(bencher: &mut test::Bencher) {
     let threshold_log_2 = 4;
-    let block_size_log2 = StaticRing::<i64>::RING.abs_log2_ceil(&(BENCH_SIZE as i64)).unwrap();
     let lhs = OwnedMatrix::from_fn_in(BENCH_SIZE, BENCH_SIZE, |i, j| std::hint::black_box(i as BenchInt + j as BenchInt), Global);
     let rhs = OwnedMatrix::from_fn_in(BENCH_SIZE, BENCH_SIZE, |i, j| std::hint::black_box(i as BenchInt + j as BenchInt), Global);
     let mut result: OwnedMatrix<BenchInt> = OwnedMatrix::zero(BENCH_SIZE, BENCH_SIZE, StaticRing::<BenchInt>::RING);
-    let mut memory = (0..strassen_mem_size(false, block_size_log2, threshold_log_2)).map(|_| 0).collect::<Vec<_>>();
     bencher.iter(|| {
-        dispatch_strassen_impl::<_, _, _, _, false, false, false, false>(
-            block_size_log2, 
+        strassen::<_, _, _, _, _, false, false, false>(
+            false, 
             threshold_log_2, 
             TransposableSubmatrix::from(lhs.data()), 
             TransposableSubmatrix::from(rhs.data()), 
             TransposableSubmatrixMut::from(result.data_mut()), 
-            StaticRing::<BenchInt>::RING.get_ring(), 
-            &mut memory
+            StaticRing::<BenchInt>::RING, 
+            &Global
         );
         assert_eq!((BENCH_SIZE * (BENCH_SIZE + 1) * (BENCH_SIZE * 2 + 1) / 6 - BENCH_SIZE * BENCH_SIZE) as BenchInt, *result.at(0, 0));
     });

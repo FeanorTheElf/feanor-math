@@ -8,22 +8,22 @@ use std::ops::Range;
 
 #[stability::unstable(feature = "enable")]
 pub fn naive_matmul<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
-    lhs: TransposableSubmatrix<V1, R::Element, T1>, 
-    rhs: TransposableSubmatrix<V2, R::Element, T2>, 
-    mut dst: TransposableSubmatrixMut<V3, R::Element, T3>, 
-    ring: &R
+    lhs: TransposableSubmatrix<V1, El<R>, T1>, 
+    rhs: TransposableSubmatrix<V2, El<R>, T2>, 
+    mut dst: TransposableSubmatrixMut<V3, El<R>, T3>, 
+    ring: R
 )
-    where R: ?Sized + RingBase, 
-        V1: AsPointerToSlice<R::Element>,
-        V2: AsPointerToSlice<R::Element>,
-        V3: AsPointerToSlice<R::Element>
+    where R: RingStore + Copy, 
+        V1: AsPointerToSlice<El<R>>,
+        V2: AsPointerToSlice<El<R>>,
+        V3: AsPointerToSlice<El<R>>
 {
     assert_eq!(lhs.row_count(), dst.row_count());
     assert_eq!(rhs.col_count(), dst.col_count());
     assert_eq!(lhs.col_count(), rhs.row_count());
     for i in 0..lhs.row_count() {
         for j in 0..rhs.col_count() {
-            let inner_prod = <_ as ComputeInnerProduct>::inner_product_ref(ring, (0..lhs.col_count()).map(|k| (lhs.at(i, k), rhs.at(k, j))));
+            let inner_prod = <_ as ComputeInnerProduct>::inner_product_ref(ring.get_ring(), (0..lhs.col_count()).map(|k| (lhs.at(i, k), rhs.at(k, j))));
             if ADD_ASSIGN {
                 ring.add_assign(dst.at_mut(i, j), inner_prod);
             } else {
@@ -34,17 +34,17 @@ pub fn naive_matmul<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const
 }
 
 fn matrix_add_add_sub<R, V1, V2, V3, V4, const T1: bool, const T2: bool, const T3: bool, const T4: bool>(
-    a: TransposableSubmatrix<V1, R::Element, T1>, 
-    b: TransposableSubmatrix<V2, R::Element, T2>, 
-    c: TransposableSubmatrix<V3, R::Element, T3>, 
-    mut dst: TransposableSubmatrixMut<V4, R::Element, T4>, 
-    ring: &R
+    a: TransposableSubmatrix<V1, El<R>, T1>, 
+    b: TransposableSubmatrix<V2, El<R>, T2>, 
+    c: TransposableSubmatrix<V3, El<R>, T3>, 
+    mut dst: TransposableSubmatrixMut<V4, El<R>, T4>, 
+    ring: R
 )
-    where R: ?Sized + RingBase, 
-        V1: AsPointerToSlice<R::Element>,
-        V2: AsPointerToSlice<R::Element>,
-        V3: AsPointerToSlice<R::Element>,
-        V4: AsPointerToSlice<R::Element>
+    where R: RingStore + Copy, 
+        V1: AsPointerToSlice<El<R>>,
+        V2: AsPointerToSlice<El<R>>,
+        V3: AsPointerToSlice<El<R>>,
+        V4: AsPointerToSlice<El<R>>
 {
     debug_assert_eq!(a.row_count(), b.row_count());
     debug_assert_eq!(a.row_count(), c.row_count());
@@ -61,15 +61,15 @@ fn matrix_add_add_sub<R, V1, V2, V3, V4, const T1: bool, const T2: bool, const T
 }
 
 fn matrix_sub_self_assign_add_sub<R, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
-    a: TransposableSubmatrix<V1, R::Element, T1>, 
-    b: TransposableSubmatrix<V2, R::Element, T2>, 
-    mut dst: TransposableSubmatrixMut<V3, R::Element, T3>, 
-    ring: &R
+    a: TransposableSubmatrix<V1, El<R>, T1>, 
+    b: TransposableSubmatrix<V2, El<R>, T2>, 
+    mut dst: TransposableSubmatrixMut<V3, El<R>, T3>, 
+    ring: R
 )
-    where R: ?Sized + RingBase, 
-        V1: AsPointerToSlice<R::Element>,
-        V2: AsPointerToSlice<R::Element>,
-        V3: AsPointerToSlice<R::Element>
+    where R: RingStore + Copy, 
+        V1: AsPointerToSlice<El<R>>,
+        V2: AsPointerToSlice<El<R>>,
+        V3: AsPointerToSlice<El<R>>
 {
     debug_assert_eq!(a.row_count(), b.row_count());
     debug_assert_eq!(a.row_count(), dst.row_count());
@@ -84,15 +84,15 @@ fn matrix_sub_self_assign_add_sub<R, V1, V2, V3, const T1: bool, const T2: bool,
 }
 
 fn matrix_add_assign_add_sub<R, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
-    a: TransposableSubmatrix<V1, R::Element, T1>, 
-    b: TransposableSubmatrix<V2, R::Element, T2>, 
-    mut dst: TransposableSubmatrixMut<V3, R::Element, T3>, 
-    ring: &R
+    a: TransposableSubmatrix<V1, El<R>, T1>, 
+    b: TransposableSubmatrix<V2, El<R>, T2>, 
+    mut dst: TransposableSubmatrixMut<V3, El<R>, T3>, 
+    ring: R
 )
-    where R: ?Sized + RingBase, 
-        V1: AsPointerToSlice<R::Element>,
-        V2: AsPointerToSlice<R::Element>,
-        V3: AsPointerToSlice<R::Element>
+    where R: RingStore + Copy, 
+        V1: AsPointerToSlice<El<R>>,
+        V2: AsPointerToSlice<El<R>>,
+        V3: AsPointerToSlice<El<R>>
 {
     debug_assert_eq!(a.row_count(), b.row_count());
     debug_assert_eq!(a.row_count(), dst.row_count());
@@ -107,15 +107,15 @@ fn matrix_add_assign_add_sub<R, V1, V2, V3, const T1: bool, const T2: bool, cons
 }
 
 fn matrix_sub<R, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
-    a: TransposableSubmatrix<V1, R::Element, T1>, 
-    b: TransposableSubmatrix<V2, R::Element, T2>, 
-    mut dst: TransposableSubmatrixMut<V3, R::Element, T3>, 
-    ring: &R
+    a: TransposableSubmatrix<V1, El<R>, T1>, 
+    b: TransposableSubmatrix<V2, El<R>, T2>, 
+    mut dst: TransposableSubmatrixMut<V3, El<R>, T3>, 
+    ring: R
 )
-    where R: ?Sized + RingBase, 
-        V1: AsPointerToSlice<R::Element>,
-        V2: AsPointerToSlice<R::Element>,
-        V3: AsPointerToSlice<R::Element>
+    where R: RingStore + Copy, 
+        V1: AsPointerToSlice<El<R>>,
+        V2: AsPointerToSlice<El<R>>,
+        V3: AsPointerToSlice<El<R>>
 {
     debug_assert_eq!(a.row_count(), b.row_count());
     debug_assert_eq!(a.row_count(), dst.row_count());
@@ -130,15 +130,15 @@ fn matrix_sub<R, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
 }
 
 fn matrix_add<R, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
-    a: TransposableSubmatrix<V1, R::Element, T1>, 
-    b: TransposableSubmatrix<V2, R::Element, T2>, 
-    mut dst: TransposableSubmatrixMut<V3, R::Element, T3>, 
-    ring: &R
+    a: TransposableSubmatrix<V1, El<R>, T1>, 
+    b: TransposableSubmatrix<V2, El<R>, T2>, 
+    mut dst: TransposableSubmatrixMut<V3, El<R>, T3>, 
+    ring: R
 )
-    where R: ?Sized + RingBase, 
-        V1: AsPointerToSlice<R::Element>,
-        V2: AsPointerToSlice<R::Element>,
-        V3: AsPointerToSlice<R::Element>
+    where R: RingStore + Copy, 
+        V1: AsPointerToSlice<El<R>>,
+        V2: AsPointerToSlice<El<R>>,
+        V3: AsPointerToSlice<El<R>>
 {
     debug_assert_eq!(a.row_count(), b.row_count());
     debug_assert_eq!(a.row_count(), dst.row_count());
@@ -153,13 +153,13 @@ fn matrix_add<R, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
 }
 
 fn matrix_add_assign<R, V1, V2, const T1: bool, const T2: bool>(
-    val: TransposableSubmatrix<V1, R::Element, T1>, 
-    mut dst: TransposableSubmatrixMut<V2, R::Element, T2>, 
-    ring: &R
+    val: TransposableSubmatrix<V1, El<R>, T1>, 
+    mut dst: TransposableSubmatrixMut<V2, El<R>, T2>, 
+    ring: R
 )
-    where R: ?Sized + RingBase, 
-        V1: AsPointerToSlice<R::Element>,
-        V2: AsPointerToSlice<R::Element>
+    where R: RingStore + Copy, 
+        V1: AsPointerToSlice<El<R>>,
+        V2: AsPointerToSlice<El<R>>
 {
     debug_assert_eq!(val.row_count(), dst.row_count());
     debug_assert_eq!(val.col_count(), dst.col_count());
@@ -172,13 +172,13 @@ fn matrix_add_assign<R, V1, V2, const T1: bool, const T2: bool>(
 }
 
 fn matrix_sub_self_assign<R, V1, V2, const T1: bool, const T2: bool>(
-    val: TransposableSubmatrix<V1, R::Element, T1>, 
-    mut dst: TransposableSubmatrixMut<V2, R::Element, T2>, 
-    ring: &R
+    val: TransposableSubmatrix<V1, El<R>, T1>, 
+    mut dst: TransposableSubmatrixMut<V2, El<R>, T2>, 
+    ring: R
 )
-    where R: ?Sized + RingBase, 
-        V1: AsPointerToSlice<R::Element>,
-        V2: AsPointerToSlice<R::Element>
+    where R: RingStore + Copy, 
+        V1: AsPointerToSlice<El<R>>,
+        V2: AsPointerToSlice<El<R>>
 {
     debug_assert_eq!(val.row_count(), dst.row_count());
     debug_assert_eq!(val.col_count(), dst.col_count());
@@ -213,30 +213,30 @@ macro_rules! strassen_impl {
         pub fn dispatch_strassen_impl<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
             block_size_log2: usize, 
             threshold_size_log2: usize, 
-            lhs: TransposableSubmatrix<V1, R::Element, T1>, 
-            rhs: TransposableSubmatrix<V2, R::Element, T2>, 
-            dst: TransposableSubmatrixMut<V3, R::Element, T3>, 
-            ring: &R, 
-            memory: &mut [R::Element]
+            lhs: TransposableSubmatrix<V1, El<R>, T1>, 
+            rhs: TransposableSubmatrix<V2, El<R>, T2>, 
+            dst: TransposableSubmatrixMut<V3, El<R>, T3>, 
+            ring: R, 
+            memory: &mut [El<R>]
         )
-            where R: ?Sized + RingBase, 
-                V1: AsPointerToSlice<R::Element>,
-                V2: AsPointerToSlice<R::Element>,
-                V3: AsPointerToSlice<R::Element>
+            where R: RingStore + Copy, 
+                V1: AsPointerToSlice<El<R>>,
+                V2: AsPointerToSlice<El<R>>,
+                V3: AsPointerToSlice<El<R>>
         {
             $(
                 fn $fun<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
                     block_size_log2: usize,
-                    lhs: TransposableSubmatrix<V1, R::Element, T1>, 
-                    rhs: TransposableSubmatrix<V2, R::Element, T2>, 
-                    dst: TransposableSubmatrixMut<V3, R::Element, T3>, 
-                    ring: &R, 
-                    memory: &mut [R::Element]
+                    lhs: TransposableSubmatrix<V1, El<R>, T1>, 
+                    rhs: TransposableSubmatrix<V2, El<R>, T2>, 
+                    dst: TransposableSubmatrixMut<V3, El<R>, T3>, 
+                    ring: R, 
+                    memory: &mut [El<R>]
                 )
-                    where R: ?Sized + RingBase, 
-                        V1: AsPointerToSlice<R::Element>,
-                        V2: AsPointerToSlice<R::Element>,
-                        V3: AsPointerToSlice<R::Element>
+                    where R: RingStore + Copy, 
+                        V1: AsPointerToSlice<El<R>>,
+                        V2: AsPointerToSlice<El<R>>,
+                        V3: AsPointerToSlice<El<R>>
                 {
                     const STEPS_LEFT: usize = $num;
                     debug_assert_eq!(lhs.row_count(), 1 << block_size_log2);
@@ -422,16 +422,16 @@ strassen_impl!{
 pub fn strassen<R, V1, V2, V3, A, const T1: bool, const T2: bool, const T3: bool>(
     add_assign: bool,
     threshold_log2: usize,
-    lhs: TransposableSubmatrix<V1, R::Element, T1>, 
-    rhs: TransposableSubmatrix<V2, R::Element, T2>, 
-    mut dst: TransposableSubmatrixMut<V3, R::Element, T3>, 
-    ring: &R, 
+    lhs: TransposableSubmatrix<V1, El<R>, T1>, 
+    rhs: TransposableSubmatrix<V2, El<R>, T2>, 
+    mut dst: TransposableSubmatrixMut<V3, El<R>, T3>, 
+    ring: R, 
     allocator: &A
 )
-    where R: ?Sized + RingBase, 
-        V1: AsPointerToSlice<R::Element>,
-        V2: AsPointerToSlice<R::Element>,
-        V3: AsPointerToSlice<R::Element>,
+    where R: RingStore + Copy, 
+        V1: AsPointerToSlice<El<R>>,
+        V2: AsPointerToSlice<El<R>>,
+        V3: AsPointerToSlice<El<R>>,
         A: Allocator
 {
     assert_eq!(lhs.row_count(), dst.row_count());
@@ -534,7 +534,7 @@ fn test_dispatch_strassen_one_level() {
             TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&a)), 
             TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&b)), 
             TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result)), 
-            StaticRing::<i32>::RING.get_ring(), 
+            StaticRing::<i32>::RING, 
             &mut memory
         );
 
@@ -555,7 +555,7 @@ fn test_dispatch_strassen_one_level() {
             TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&a)), 
             TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&b)), 
             TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result)), 
-            StaticRing::<i32>::RING.get_ring(), 
+            StaticRing::<i32>::RING, 
             &mut memory
         );
 
@@ -579,7 +579,7 @@ fn test_dispatch_strassen_add_assign_one_level() {
             TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&a)), 
             TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&b)), 
             TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result)), 
-            StaticRing::<i32>::RING.get_ring(), 
+            StaticRing::<i32>::RING, 
             &mut memory
         );
 
@@ -600,7 +600,7 @@ fn test_dispatch_strassen_add_assign_one_level() {
             TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&a)), 
             TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&b)), 
             TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result)), 
-            StaticRing::<i32>::RING.get_ring(), 
+            StaticRing::<i32>::RING, 
             &mut memory
         );
 
@@ -613,7 +613,7 @@ fn test_dispatch_strassen_add_assign_one_level() {
 fn test_dispatch_strassen_more_levels() {
     let a = OwnedMatrix::from_fn_in(16, 16, |i, j| (i * j) as i64, Global);
     let b = OwnedMatrix::from_fn_in(16, 16, |i, j| i as i64 - (j as i64) * (j as i64), Global);
-    let mut result: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(16, 16, |i, j| i64::MIN, Global);
+    let mut result: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(16, 16, |_, _| i64::MIN, Global);
     let mut memory = (0..strassen_mem_size(false, 4, 1)).map(|_| i64::MIN).collect::<Vec<_>>();
 
     dispatch_strassen_impl::<_, _, _, _, false, false, false, false>(
@@ -622,7 +622,7 @@ fn test_dispatch_strassen_more_levels() {
         TransposableSubmatrix::from(a.data()), 
         TransposableSubmatrix::from(b.data()), 
         TransposableSubmatrixMut::from(result.data_mut()), 
-        StaticRing::<i64>::RING.get_ring(), 
+        StaticRing::<i64>::RING, 
         &mut memory
     );
 
@@ -631,7 +631,7 @@ fn test_dispatch_strassen_more_levels() {
         TransposableSubmatrix::from(a.data()), 
         TransposableSubmatrix::from(b.data()), 
         TransposableSubmatrixMut::from(expected.data_mut()), 
-        StaticRing::<i64>::RING.get_ring()
+        StaticRing::<i64>::RING
     );
 
     assert_matrix_eq!(&StaticRing::<i64>::RING, &expected, &result);
@@ -651,7 +651,7 @@ fn test_dispatch_strassen_add_assign_more_levels() {
         TransposableSubmatrix::from(a.data()), 
         TransposableSubmatrix::from(b.data()), 
         TransposableSubmatrixMut::from(result.data_mut()), 
-        StaticRing::<i64>::RING.get_ring(), 
+        StaticRing::<i64>::RING, 
         &mut memory
     );
 
@@ -660,7 +660,7 @@ fn test_dispatch_strassen_add_assign_more_levels() {
         TransposableSubmatrix::from(a.data()), 
         TransposableSubmatrix::from(b.data()), 
         TransposableSubmatrixMut::from(expected.data_mut()), 
-        StaticRing::<i64>::RING.get_ring()
+        StaticRing::<i64>::RING
     );
 
     assert_matrix_eq!(&StaticRing::<i64>::RING, &expected, &result);
@@ -671,7 +671,7 @@ fn test_dispatch_strassen_add_assign_more_levels() {
 fn test_strassen_non_power_of_two() {
     let a = OwnedMatrix::from_fn_in(15, 60, |i, j| (i * j) as i64, Global);
     let b = OwnedMatrix::from_fn_in(60, 17, |i, j| i as i64 - (j as i64) * (j as i64), Global);
-    let mut result: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(15, 17, |i, j| 0, Global);
+    let mut result: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(15, 17, |_, _| i64::MIN, Global);
 
     strassen::<_, _, _, _, _, false, false, false>(
         false,
@@ -679,7 +679,7 @@ fn test_strassen_non_power_of_two() {
         TransposableSubmatrix::from(a.data()), 
         TransposableSubmatrix::from(b.data()), 
         TransposableSubmatrixMut::from(result.data_mut()), 
-        StaticRing::<i64>::RING.get_ring(), 
+        StaticRing::<i64>::RING, 
         &Global
     );
 
@@ -688,7 +688,7 @@ fn test_strassen_non_power_of_two() {
         TransposableSubmatrix::from(a.data()), 
         TransposableSubmatrix::from(b.data()), 
         TransposableSubmatrixMut::from(expected.data_mut()), 
-        StaticRing::<i64>::RING.get_ring()
+        StaticRing::<i64>::RING
     );
 
     assert_matrix_eq!(&StaticRing::<i64>::RING, &expected, &result);
@@ -706,7 +706,7 @@ fn test_strassen_non_power_of_two_add_assign() {
         TransposableSubmatrix::from(a.data()), 
         TransposableSubmatrix::from(b.data()), 
         TransposableSubmatrixMut::from(result.data_mut()), 
-        StaticRing::<i64>::RING.get_ring(), 
+        StaticRing::<i64>::RING, 
         &Global
     );
 
@@ -715,7 +715,7 @@ fn test_strassen_non_power_of_two_add_assign() {
         TransposableSubmatrix::from(a.data()), 
         TransposableSubmatrix::from(b.data()), 
         TransposableSubmatrixMut::from(expected.data_mut()), 
-        StaticRing::<i64>::RING.get_ring()
+        StaticRing::<i64>::RING
     );
     
     assert_matrix_eq!(&StaticRing::<i64>::RING, &expected, &result);
