@@ -1,3 +1,5 @@
+use crate::algorithms::convolution::KaratsubaHint;
+use crate::algorithms::matmul::StrassenHint;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::Field;
 use crate::homomorphism::CanHomFrom;
@@ -146,6 +148,22 @@ impl<I> RingBase for RationalFieldBase<I>
 
     fn from_int(&self, value: i32) -> Self::Element {
         (self.integers.get_ring().from_int(value), self.integers.one())
+    }
+}
+
+impl<I: IntegerRingStore> StrassenHint for RationalFieldBase<I>
+    where I::Type: IntegerRing
+{
+    default fn strassen_threshold(&self) -> usize {
+        usize::MAX
+    }
+}
+
+impl<I: IntegerRingStore> KaratsubaHint for RationalFieldBase<I>
+    where I::Type: IntegerRing
+{
+    default fn karatsuba_threshold(&self) -> usize {
+        usize::MAX
     }
 }
 

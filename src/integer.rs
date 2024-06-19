@@ -283,6 +283,10 @@ pub trait IntegerRingStore: RingStore
         return result;
     }
 
+    fn abs_log2_floor(&self, value: &El<Self>) -> Option<usize> {
+        self.abs_highest_set_bit(value)
+    }
+
     fn abs_log2_ceil(&self, value: &El<Self>) -> Option<usize> {
         let highest_bit = self.abs_highest_set_bit(value)?;
         if self.abs_lowest_set_bit(value).unwrap() == highest_bit {

@@ -100,7 +100,7 @@ macro_rules! karatsuba_impl {
             } else {
                 match block_size_log2 - threshold_size_log2 {
                     $(
-                        $num => $fun::<R, &mut [El<R>], _, _, true>(block_size_log2, dst, lhs, rhs, mem, ring),
+                        $num => $fun::<R, &mut [El<R>], _, _, ADD_ASSIGN>(block_size_log2, dst, lhs, rhs, mem, ring),
                     )*
                     _ => panic!()
                 }

@@ -9,7 +9,9 @@ use crate::primitive_int::*;
 use crate::integer::*;
 use crate::pid::*;
 use crate::ring::*;
+use algorithms::convolution::KaratsubaHint;
 use algorithms::matmul::ComputeInnerProduct;
+use algorithms::matmul::StrassenHint;
 use crate::homomorphism::*;
 use crate::rings::rust_bigint::*;
 
@@ -515,6 +517,18 @@ impl PrincipalIdealRing for ZnBase {
         let (s, t, d) = StaticRing::<i64>::RING.extended_ideal_gen(&(lhs.0 as i64), &(rhs.0 as i64));
         let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
+    }
+}
+
+impl StrassenHint for ZnBase {
+    default fn strassen_threshold(&self) -> usize {
+        3
+    }
+}
+
+impl KaratsubaHint for ZnBase {
+    default fn karatsuba_threshold(&self) -> usize {
+        3
     }
 }
 

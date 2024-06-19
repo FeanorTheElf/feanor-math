@@ -1,7 +1,11 @@
-use strassen::naive_matmul;
 
-use crate::matrix::{AsPointerToSlice, TransposableSubmatrix, TransposableSubmatrixMut};
+use strassen::*;
+
+use crate::matrix::*;
 use crate::ring::*;
+
+use std::alloc::Allocator;
+use std::alloc::Global;
 
 pub mod strassen;
 
@@ -88,14 +92,51 @@ pub trait MatmulAlgorithm<R: ?Sized + RingBase> {
     }
 }
 
+///
+/// Trait to allow rings to customize the parameters with which [`StrassenAlgorithm`] will
+/// compute matrix multiplications.
+/// 
 #[stability::unstable(feature = "enable")]
-pub const STANDARD_MATMUL: DirectMatmulAlgorithm = DirectMatmulAlgorithm;
+pub trait StrassenHint: RingBase {
+
+    ///
+    /// Define a threshold from which on [`StrassenAlgorithm`] will use the Strassen algorithm.
+    /// 
+    /// Concretely, when this returns `k`, [`StrassenAlgorithm`] will reduce the 
+    /// matrix multipliction down to `2^k x 2^k` matrices using Strassen's algorithm,
+    /// and then use naive matmul for the rest.
+    /// 
+    /// The value is `0`, but if the considered rings have fast multiplication (compared to addition), 
+    /// then setting this higher may result in a performance gain.
+    /// 
+    fn strassen_threshold(&self) -> usize;
+}
+
+impl<R: RingBase + ?Sized> StrassenHint for R {
+
+    default fn strassen_threshold(&self) -> usize {
+        0
+    }
+}
+
+#[stability::unstable(feature = "enable")]
+pub const STANDARD_MATMUL: StrassenAlgorithm = StrassenAlgorithm::new(Global);
 
 #[stability::unstable(feature = "enable")]
 #[derive(Clone, Copy)]
-pub struct DirectMatmulAlgorithm;
+pub struct StrassenAlgorithm<A: Allocator = Global> {
+    allocator: A
+}
 
-impl<R: ?Sized + RingBase> MatmulAlgorithm<R> for DirectMatmulAlgorithm {
+impl<A: Allocator> StrassenAlgorithm<A> {
+
+    #[stability::unstable(feature = "enable")]
+    pub const fn new(allocator: A) -> Self {
+        Self { allocator }
+    }
+}
+
+impl<R: ?Sized + RingBase, A: Allocator> MatmulAlgorithm<R> for StrassenAlgorithm<A> {
 
     fn add_matmul<V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
         &self,
@@ -124,4 +165,58 @@ impl<R: ?Sized + RingBase> MatmulAlgorithm<R> for DirectMatmulAlgorithm {
     {
         naive_matmul::<_, _, _, _, false, T1, T2, T3>(lhs, rhs, dst, ring)
     }
+}
+
+#[cfg(test)]
+use test;
+#[cfg(test)]
+use crate::primitive_int::*;
+#[cfg(test)]
+use crate::integer::*;
+
+#[cfg(test)]
+const BENCH_SIZE: usize = 64;
+#[cfg(test)]
+type BenchInt = i64;
+
+#[bench]
+fn bench_naive_matmul(bencher: &mut test::Bencher) {
+    let block_size_log2 = StaticRing::<i64>::RING.abs_log2_ceil(&(BENCH_SIZE as i64)).unwrap();
+    let lhs = OwnedMatrix::from_fn_in(BENCH_SIZE, BENCH_SIZE, |i, j| std::hint::black_box(i as BenchInt + j as BenchInt), Global);
+    let rhs = OwnedMatrix::from_fn_in(BENCH_SIZE, BENCH_SIZE, |i, j| std::hint::black_box(i as BenchInt + j as BenchInt), Global);
+    let mut result: OwnedMatrix<BenchInt> = OwnedMatrix::zero(BENCH_SIZE, BENCH_SIZE, StaticRing::<BenchInt>::RING);
+    bencher.iter(|| {
+        dispatch_strassen_impl::<_, _, _, _, false, false, false, false>(
+            block_size_log2, 
+            100, 
+            TransposableSubmatrix::from(lhs.data()), 
+            TransposableSubmatrix::from(rhs.data()), 
+            TransposableSubmatrixMut::from(result.data_mut()), 
+            StaticRing::<BenchInt>::RING.get_ring(), 
+            &mut []
+        );
+        assert_eq!((BENCH_SIZE * (BENCH_SIZE + 1) * (BENCH_SIZE * 2 + 1) / 6 - BENCH_SIZE * BENCH_SIZE) as BenchInt, *result.at(0, 0));
+    });
+}
+
+#[bench]
+fn bench_strassen_matmul(bencher: &mut test::Bencher) {
+    let threshold_log_2 = 4;
+    let block_size_log2 = StaticRing::<i64>::RING.abs_log2_ceil(&(BENCH_SIZE as i64)).unwrap();
+    let lhs = OwnedMatrix::from_fn_in(BENCH_SIZE, BENCH_SIZE, |i, j| std::hint::black_box(i as BenchInt + j as BenchInt), Global);
+    let rhs = OwnedMatrix::from_fn_in(BENCH_SIZE, BENCH_SIZE, |i, j| std::hint::black_box(i as BenchInt + j as BenchInt), Global);
+    let mut result: OwnedMatrix<BenchInt> = OwnedMatrix::zero(BENCH_SIZE, BENCH_SIZE, StaticRing::<BenchInt>::RING);
+    let mut memory = (0..strassen_mem_size(false, block_size_log2, threshold_log_2)).map(|_| 0).collect::<Vec<_>>();
+    bencher.iter(|| {
+        dispatch_strassen_impl::<_, _, _, _, false, false, false, false>(
+            block_size_log2, 
+            threshold_log_2, 
+            TransposableSubmatrix::from(lhs.data()), 
+            TransposableSubmatrix::from(rhs.data()), 
+            TransposableSubmatrixMut::from(result.data_mut()), 
+            StaticRing::<BenchInt>::RING.get_ring(), 
+            &mut memory
+        );
+        assert_eq!((BENCH_SIZE * (BENCH_SIZE + 1) * (BENCH_SIZE * 2 + 1) / 6 - BENCH_SIZE * BENCH_SIZE) as BenchInt, *result.at(0, 0));
+    });
 }
