@@ -2,7 +2,13 @@ use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::matrix::*;
 use crate::ring::*;
 
-fn matmul_naive<R, V1, V2, V3, const ADD_ASSIGN: bool>(lhs: Submatrix<V1, R::Element>, rhs: Submatrix<V2, R::Element>, mut dst: SubmatrixMut<V3, R::Element>, ring: &R)
+#[stability::unstable(feature = "enable")]
+pub fn naive_matmul<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
+    lhs: TransposableSubmatrix<V1, R::Element, T1>, 
+    rhs: TransposableSubmatrix<V2, R::Element, T2>, 
+    mut dst: TransposableSubmatrixMut<V3, R::Element, T3>, 
+    ring: &R
+)
     where R: ?Sized + RingBase, 
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>,
@@ -23,7 +29,13 @@ fn matmul_naive<R, V1, V2, V3, const ADD_ASSIGN: bool>(lhs: Submatrix<V1, R::Ele
     }
 }
 
-fn matrix_add_add_sub<R, V1, V2, V3, V4>(a: Submatrix<V1, R::Element>, b: Submatrix<V2, R::Element>, c: Submatrix<V3, R::Element>, mut dst: SubmatrixMut<V4, R::Element>, ring: &R)
+fn matrix_add_add_sub<R, V1, V2, V3, V4, const T1: bool, const T2: bool, const T3: bool, const T4: bool>(
+    a: TransposableSubmatrix<V1, R::Element, T1>, 
+    b: TransposableSubmatrix<V2, R::Element, T2>, 
+    c: TransposableSubmatrix<V3, R::Element, T3>, 
+    mut dst: TransposableSubmatrixMut<V4, R::Element, T4>, 
+    ring: &R
+)
     where R: ?Sized + RingBase, 
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>,
@@ -44,7 +56,12 @@ fn matrix_add_add_sub<R, V1, V2, V3, V4>(a: Submatrix<V1, R::Element>, b: Submat
     }
 }
 
-fn matrix_sub_self_assign_add_sub<R, V1, V2, V3>(a: Submatrix<V1, R::Element>, b: Submatrix<V2, R::Element>, mut dst: SubmatrixMut<V3, R::Element>, ring: &R)
+fn matrix_sub_self_assign_add_sub<R, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
+    a: TransposableSubmatrix<V1, R::Element, T1>, 
+    b: TransposableSubmatrix<V2, R::Element, T2>, 
+    mut dst: TransposableSubmatrixMut<V3, R::Element, T3>, 
+    ring: &R
+)
     where R: ?Sized + RingBase, 
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>,
@@ -62,7 +79,12 @@ fn matrix_sub_self_assign_add_sub<R, V1, V2, V3>(a: Submatrix<V1, R::Element>, b
     }
 }
 
-fn matrix_add_assign_add_sub<R, V1, V2, V3>(a: Submatrix<V1, R::Element>, b: Submatrix<V2, R::Element>, mut dst: SubmatrixMut<V3, R::Element>, ring: &R)
+fn matrix_add_assign_add_sub<R, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
+    a: TransposableSubmatrix<V1, R::Element, T1>, 
+    b: TransposableSubmatrix<V2, R::Element, T2>, 
+    mut dst: TransposableSubmatrixMut<V3, R::Element, T3>, 
+    ring: &R
+)
     where R: ?Sized + RingBase, 
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>,
@@ -80,7 +102,12 @@ fn matrix_add_assign_add_sub<R, V1, V2, V3>(a: Submatrix<V1, R::Element>, b: Sub
     }
 }
 
-fn matrix_sub<R, V1, V2, V3>(a: Submatrix<V1, R::Element>, b: Submatrix<V2, R::Element>, mut dst: SubmatrixMut<V3, R::Element>, ring: &R)
+fn matrix_sub<R, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
+    a: TransposableSubmatrix<V1, R::Element, T1>, 
+    b: TransposableSubmatrix<V2, R::Element, T2>, 
+    mut dst: TransposableSubmatrixMut<V3, R::Element, T3>, 
+    ring: &R
+)
     where R: ?Sized + RingBase, 
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>,
@@ -98,7 +125,12 @@ fn matrix_sub<R, V1, V2, V3>(a: Submatrix<V1, R::Element>, b: Submatrix<V2, R::E
     }
 }
 
-fn matrix_add<R, V1, V2, V3>(a: Submatrix<V1, R::Element>, b: Submatrix<V2, R::Element>, mut dst: SubmatrixMut<V3, R::Element>, ring: &R)
+fn matrix_add<R, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
+    a: TransposableSubmatrix<V1, R::Element, T1>, 
+    b: TransposableSubmatrix<V2, R::Element, T2>, 
+    mut dst: TransposableSubmatrixMut<V3, R::Element, T3>, 
+    ring: &R
+)
     where R: ?Sized + RingBase, 
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>,
@@ -116,7 +148,11 @@ fn matrix_add<R, V1, V2, V3>(a: Submatrix<V1, R::Element>, b: Submatrix<V2, R::E
     }
 }
 
-fn matrix_add_assign<R, V1, V2>(val: Submatrix<V1, R::Element>, mut dst: SubmatrixMut<V2, R::Element>, ring: &R)
+fn matrix_add_assign<R, V1, V2, const T1: bool, const T2: bool>(
+    val: TransposableSubmatrix<V1, R::Element, T1>, 
+    mut dst: TransposableSubmatrixMut<V2, R::Element, T2>, 
+    ring: &R
+)
     where R: ?Sized + RingBase, 
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>
@@ -131,7 +167,11 @@ fn matrix_add_assign<R, V1, V2>(val: Submatrix<V1, R::Element>, mut dst: Submatr
     }
 }
 
-fn matrix_sub_self_assign<R, V1, V2>(val: Submatrix<V1, R::Element>, mut dst: SubmatrixMut<V2, R::Element>, ring: &R)
+fn matrix_sub_self_assign<R, V1, V2, const T1: bool, const T2: bool>(
+    val: TransposableSubmatrix<V1, R::Element, T1>, 
+    mut dst: TransposableSubmatrixMut<V2, R::Element, T2>, 
+    ring: &R
+)
     where R: ?Sized + RingBase, 
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>
@@ -146,7 +186,8 @@ fn matrix_sub_self_assign<R, V1, V2>(val: Submatrix<V1, R::Element>, mut dst: Su
     }
 }
 
-const fn strassen_mem_size(add_assign: bool, block_size_log2: usize, threshold_size_log2: usize) -> usize {
+#[stability::unstable(feature = "enable")]
+pub const fn strassen_mem_size(add_assign: bool, block_size_log2: usize, threshold_size_log2: usize) -> usize {
     // solve the recurrence
     //   mem(threshold_n) = 0
     //   mem(n) = 3 * (n/2)^2 + mem(n/2)
@@ -162,7 +203,16 @@ const fn strassen_mem_size(add_assign: bool, block_size_log2: usize, threshold_s
     }
 }
 
-fn strassen<R, V1, V2, V3, const ADD_ASSIGN: bool>(block_size_log2: usize, threshold_size_log2: usize, lhs: Submatrix<V1, R::Element>, rhs: Submatrix<V2, R::Element>, dst: SubmatrixMut<V3, R::Element>, ring: &R, memory: &mut [R::Element])
+#[stability::unstable(feature = "enable")]
+pub fn strassen<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
+    block_size_log2: usize, 
+    threshold_size_log2: usize, 
+    lhs: TransposableSubmatrix<V1, R::Element, T1>, 
+    rhs: TransposableSubmatrix<V2, R::Element, T2>, 
+    dst: TransposableSubmatrixMut<V3, R::Element, T3>, 
+    ring: &R, 
+    memory: &mut [R::Element]
+)
     where R: ?Sized + RingBase, 
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>,
@@ -177,7 +227,7 @@ fn strassen<R, V1, V2, V3, const ADD_ASSIGN: bool>(block_size_log2: usize, thres
 
     let steps_left = block_size_log2 - threshold_size_log2;
     if steps_left == 0 {
-        matmul_naive::<_, _, _, _, ADD_ASSIGN>(lhs, rhs, dst, ring);
+        naive_matmul::<_, _, _, _, ADD_ASSIGN, T1, T2, T3>(lhs, rhs, dst, ring);
     } else {
         // we have something similar to the "Winograd form"
         // [ a  b ] [ a' b' ]   [ t + x,      w + v + y ]
@@ -203,23 +253,23 @@ fn strassen<R, V1, V2, V3, const ADD_ASSIGN: bool>(block_size_log2: usize, thres
             let (tmp0, memory) = memory.split_at_mut(n_half * n_half);
 
             // implicitly add x = b c'
-            strassen::<_, _, _, _, true>(block_size_log2 - 1, threshold_size_log2, b_lhs, c_rhs, a_dst.reborrow(), ring, &mut *memory);
+            strassen::<_, _, _, _, true, T1, T2, T3>(block_size_log2 - 1, threshold_size_log2, b_lhs, c_rhs, a_dst.reborrow(), ring, &mut *memory);
 
             // handle t = a a'
-            let mut t = SubmatrixMut::<AsFirstElement<_>, _>::new(tmp0, n_half, n_half);
-            strassen::<_, _, _, _, false>(block_size_log2 - 1, threshold_size_log2, a_lhs, a_rhs, t.reborrow(), ring, &mut *memory);
+            let mut t = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp0, n_half, n_half));
+            strassen::<_, _, _, _, false, T1, T2, false>(block_size_log2 - 1, threshold_size_log2, a_lhs, a_rhs, t.reborrow(), ring, &mut *memory);
             matrix_add_assign(t.as_const(), a_dst.reborrow(), ring);
             
             let (tmp1, memory) = memory.split_at_mut(n_half * n_half);
             let (tmp2, memory) = memory.split_at_mut(n_half * n_half);
 
             // handle w = t + (c + d - a) (a' + d' - b')
-            let mut c_d_neg_a_lhs = SubmatrixMut::<AsFirstElement<_>, _>::new(tmp1, n_half, n_half);
+            let mut c_d_neg_a_lhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp1, n_half, n_half));
             matrix_add_add_sub(c_lhs, d_lhs, a_lhs, c_d_neg_a_lhs.reborrow(), ring);
-            let mut a_d_neg_b_rhs = SubmatrixMut::<AsFirstElement<_>, _>::new(tmp2, n_half, n_half);
+            let mut a_d_neg_b_rhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp2, n_half, n_half));
             matrix_add_add_sub(a_rhs, d_rhs, b_rhs, a_d_neg_b_rhs.reborrow(), ring);
             let mut w = t;
-            strassen::<_, _, _, _, true>(block_size_log2 - 1, threshold_size_log2, c_d_neg_a_lhs.as_const(), a_d_neg_b_rhs.as_const(), w.reborrow(), ring, &mut *memory);
+            strassen::<_, _, _, _, true, false, false, false>(block_size_log2 - 1, threshold_size_log2, c_d_neg_a_lhs.as_const(), a_d_neg_b_rhs.as_const(), w.reborrow(), ring, &mut *memory);
             matrix_add_assign(w.as_const(), b_dst.reborrow(), ring);
             matrix_add_assign(w.as_const(), c_dst.reborrow(), ring);
             matrix_add_assign(w.as_const(), d_dst.reborrow(), ring);
@@ -228,13 +278,13 @@ fn strassen<R, V1, V2, V3, const ADD_ASSIGN: bool>(block_size_log2: usize, thres
             let mut a_b_neg_c_d_lhs = c_d_neg_a_lhs;
             matrix_sub_self_assign(b_lhs, a_b_neg_c_d_lhs.reborrow(), ring);
             // implicitly add y to matrix
-            strassen::<_, _, _, _, true>(block_size_log2 - 1, threshold_size_log2, a_b_neg_c_d_lhs.as_const(), d_rhs, b_dst.reborrow(), ring, &mut *memory);
+            strassen::<_, _, _, _, true, false, T2, T3>(block_size_log2 - 1, threshold_size_log2, a_b_neg_c_d_lhs.as_const(), d_rhs, b_dst.reborrow(), ring, &mut *memory);
 
             // handle z = d (c' + b' - a' - d')
             let mut b_c_neg_a_d_rhs = a_d_neg_b_rhs;
             matrix_sub_self_assign(c_rhs, b_c_neg_a_d_rhs.reborrow(), ring);
             // implicitly add z to matrix
-            strassen::<_, _, _, _, true>(block_size_log2 - 1, threshold_size_log2, d_lhs, b_c_neg_a_d_rhs.as_const(), c_dst.reborrow(), ring, &mut *memory);
+            strassen::<_, _, _, _, true, T1, false, T3>(block_size_log2 - 1, threshold_size_log2, d_lhs, b_c_neg_a_d_rhs.as_const(), c_dst.reborrow(), ring, &mut *memory);
 
             // handle u = (c - a) (b' - d')
             let mut u = w;
@@ -242,7 +292,7 @@ fn strassen<R, V1, V2, V3, const ADD_ASSIGN: bool>(block_size_log2: usize, thres
             matrix_sub(c_lhs, a_lhs, c_neg_a_lhs.reborrow(), ring);
             let mut b_neg_d_rhs = b_c_neg_a_d_rhs;
             matrix_sub(b_rhs, d_rhs, b_neg_d_rhs.reborrow(), ring);
-            strassen::<_, _, _, _, false>(block_size_log2 - 1, threshold_size_log2, c_neg_a_lhs.as_const(), b_neg_d_rhs.as_const(), u.reborrow(), ring, &mut *memory);
+            strassen::<_, _, _, _, false, false, false, false>(block_size_log2 - 1, threshold_size_log2, c_neg_a_lhs.as_const(), b_neg_d_rhs.as_const(), u.reborrow(), ring, &mut *memory);
             matrix_add_assign(u.as_const(), c_dst.reborrow(), ring);
             matrix_add_assign(u.as_const(), d_dst.reborrow(), ring);
             
@@ -252,7 +302,7 @@ fn strassen<R, V1, V2, V3, const ADD_ASSIGN: bool>(block_size_log2: usize, thres
             matrix_add(c_lhs, d_lhs, c_d_lhs.reborrow(), ring);
             let mut b_neg_a_rhs = b_neg_d_rhs;
             matrix_sub(b_rhs, a_rhs, b_neg_a_rhs.reborrow(), ring);
-            strassen::<_, _, _, _, false>(block_size_log2 - 1, threshold_size_log2, c_d_lhs.as_const(), b_neg_a_rhs.as_const(), v.reborrow(), ring, &mut *memory);
+            strassen::<_, _, _, _, false, false, false, false>(block_size_log2 - 1, threshold_size_log2, c_d_lhs.as_const(), b_neg_a_rhs.as_const(), v.reborrow(), ring, &mut *memory);
             matrix_add_assign(v.as_const(), b_dst.reborrow(), ring);
             matrix_add_assign(v.as_const(), d_dst.reborrow(), ring);
 
@@ -265,7 +315,7 @@ fn strassen<R, V1, V2, V3, const ADD_ASSIGN: bool>(block_size_log2: usize, thres
             let mut a_d_neg_b_rhs = c_dst.reborrow();
             matrix_add_add_sub(a_rhs, d_rhs, b_rhs, a_d_neg_b_rhs.reborrow(), ring);
             let mut w_star = b_dst.reborrow();
-            strassen::<_, _, _, _, false>(block_size_log2 - 1, threshold_size_log2, c_d_neg_a_lhs.as_const(), a_d_neg_b_rhs.as_const(), w_star.reborrow(), ring, &mut *memory);
+            strassen::<_, _, _, _, false, T3, T3, T3>(block_size_log2 - 1, threshold_size_log2, c_d_neg_a_lhs.as_const(), a_d_neg_b_rhs.as_const(), w_star.reborrow(), ring, &mut *memory);
 
             // handle v = (c + d) (b' - a')
             let mut v = d_dst.reborrow();
@@ -273,16 +323,16 @@ fn strassen<R, V1, V2, V3, const ADD_ASSIGN: bool>(block_size_log2: usize, thres
             matrix_add(c_lhs, d_lhs, c_d_lhs.reborrow(), ring);
             let mut b_neg_a_rhs = c_dst.reborrow();
             matrix_sub(b_rhs, a_rhs, b_neg_a_rhs.reborrow(), ring);
-            strassen::<_, _, _, _, false>(block_size_log2 - 1, threshold_size_log2, c_d_lhs.as_const(), b_neg_a_rhs.as_const(), v.reborrow(), ring, &mut *memory);
+            strassen::<_, _, _, _, false, T3, T3, T3>(block_size_log2 - 1, threshold_size_log2, c_d_lhs.as_const(), b_neg_a_rhs.as_const(), v.reborrow(), ring, &mut *memory);
 
             // handle u = (c - a) (b' - d'); here we need temporary memory
             let mut u = c_dst.reborrow();
             let (tmp0, memory) = memory.split_at_mut(n_half * n_half);
-            let mut c_neg_a_lhs = SubmatrixMut::<AsFirstElement<_>, _>::new(tmp0, n_half, n_half);
+            let mut c_neg_a_lhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp0, n_half, n_half));
             matrix_sub(c_lhs, a_lhs, c_neg_a_lhs.reborrow(), ring);
             let mut b_neg_d_rhs = a_dst.reborrow();
             matrix_sub(b_rhs, d_rhs, b_neg_d_rhs.reborrow(), ring);
-            strassen::<_, _, _, _, false>(block_size_log2 - 1, threshold_size_log2, c_neg_a_lhs.as_const(), b_neg_d_rhs.as_const(), u.reborrow(), ring, &mut *memory);
+            strassen::<_, _, _, _, false, false, T3, T3>(block_size_log2 - 1, threshold_size_log2, c_neg_a_lhs.as_const(), b_neg_d_rhs.as_const(), u.reborrow(), ring, &mut *memory);
 
             // now perform linear combinations; concretely, transform (w*, u, v) into (w* + v, w* + u, w* + u + v)
             matrix_add_assign(w_star.as_const(), u.reborrow(), ring);
@@ -293,23 +343,23 @@ fn strassen<R, V1, V2, V3, const ADD_ASSIGN: bool>(block_size_log2: usize, thres
             let mut a_b_neg_c_d_lhs = c_neg_a_lhs;
             matrix_sub_self_assign_add_sub(b_lhs, d_lhs, a_b_neg_c_d_lhs.reborrow(), ring);
             // implicitly add y to matrix
-            strassen::<_, _, _, _, true>(block_size_log2 - 1, threshold_size_log2, a_b_neg_c_d_lhs.as_const(), d_rhs, b_dst.reborrow(), ring, &mut *memory);
+            strassen::<_, _, _, _, true, false, T2, T3>(block_size_log2 - 1, threshold_size_log2, a_b_neg_c_d_lhs.as_const(), d_rhs, b_dst.reborrow(), ring, &mut *memory);
 
             // now implicitly handle z = d (c' + b' - a' - d')
             let mut b_c_neg_a_d_rhs = b_neg_d_rhs;
             matrix_add_assign_add_sub(c_rhs, a_rhs, b_c_neg_a_d_rhs.reborrow(), ring);
             // implicitly add z to matrix
-            strassen::<_, _, _, _, true>(block_size_log2 - 1, threshold_size_log2, d_lhs, b_c_neg_a_d_rhs.as_const(), c_dst.reborrow(), ring, &mut *memory);
+            strassen::<_, _, _, _, true, T1, T3, T3>(block_size_log2 - 1, threshold_size_log2, d_lhs, b_c_neg_a_d_rhs.as_const(), c_dst.reborrow(), ring, &mut *memory);
 
             // handle t = a a'
             let mut t = a_dst.reborrow();
-            strassen::<_, _, _, _, false>(block_size_log2 - 1, threshold_size_log2, a_lhs, a_rhs, t.reborrow(), ring, &mut *memory);
+            strassen::<_, _, _, _, false, T1, T2, T3>(block_size_log2 - 1, threshold_size_log2, a_lhs, a_rhs, t.reborrow(), ring, &mut *memory);
             matrix_add_assign(t.as_const(), b_dst.reborrow(), ring);
             matrix_add_assign(t.as_const(), c_dst.reborrow(), ring);
             matrix_add_assign(t.as_const(), d_dst.reborrow(), ring);
 
             // handle x = b c'
-            strassen::<_, _, _, _, true>(block_size_log2 - 1, threshold_size_log2, b_lhs, c_rhs, a_dst.reborrow(), ring, &mut *memory);
+            strassen::<_, _, _, _, true, T1, T2, T3>(block_size_log2 - 1, threshold_size_log2, b_lhs, c_rhs, a_dst.reborrow(), ring, &mut *memory);
         }
     }
 }
@@ -330,7 +380,15 @@ fn test_strassen_one_level() {
         let expected = [DerefArray::from([0, -3]), DerefArray::from([2, -5])];
         let mut memory = [i32::MIN; strassen_mem_size(false, 1, 0)];
 
-        strassen::<_, _, _, _, false>(1, 0, Submatrix::<DerefArray<_, 2>, _>::new(&a), Submatrix::<DerefArray<_, 2>, _>::new(&b), SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result), StaticRing::<i32>::RING.get_ring(), &mut memory);
+        strassen::<_, _, _, _, false, false, false, false>(
+            1, 
+            0, 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&a)), 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&b)), 
+            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result)), 
+            StaticRing::<i32>::RING.get_ring(), 
+            &mut memory
+        );
 
         assert_eq!(expected, result);
         // ensure that all of memory was used, i.e. `strassen_mem_size()` is correct
@@ -343,7 +401,15 @@ fn test_strassen_one_level() {
         let expected = [DerefArray::from([-3, -3]), DerefArray::from([-15, -19])];
         let mut memory = [i32::MIN; strassen_mem_size(false, 1, 0)];
 
-        strassen::<_, _, _, _, false>(1, 0, Submatrix::<DerefArray<_, 2>, _>::new(&a), Submatrix::<DerefArray<_, 2>, _>::new(&b), SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result), StaticRing::<i32>::RING.get_ring(), &mut memory);
+        strassen::<_, _, _, _, false, false, false, false>(
+            1, 
+            0, 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&a)), 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&b)), 
+            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result)), 
+            StaticRing::<i32>::RING.get_ring(), 
+            &mut memory
+        );
 
         assert_eq!(expected, result);
         assert!(memory.iter().all(|x| *x != i32::MIN));
@@ -359,7 +425,15 @@ fn test_strassen_add_assign_one_level() {
         let expected = [DerefArray::from([10, 17]), DerefArray::from([32, 35])];
         let mut memory = [i32::MIN; strassen_mem_size(true, 1, 0)];
 
-        strassen::<_, _, _, _, true>(1, 0, Submatrix::<DerefArray<_, 2>, _>::new(&a), Submatrix::<DerefArray<_, 2>, _>::new(&b), SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result), StaticRing::<i32>::RING.get_ring(), &mut memory);
+        strassen::<_, _, _, _, true, false, false, false>(
+            1, 
+            0, 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&a)), 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&b)), 
+            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result)), 
+            StaticRing::<i32>::RING.get_ring(), 
+            &mut memory
+        );
 
         assert_eq!(expected, result);
         // ensure that all of memory was used, i.e. `strassen_mem_size()` is correct
@@ -372,7 +446,15 @@ fn test_strassen_add_assign_one_level() {
         let expected = [DerefArray::from([97, 97]), DerefArray::from([-15, -19])];
         let mut memory = [i32::MIN; strassen_mem_size(true, 1, 0)];
 
-        strassen::<_, _, _, _, true>(1, 0, Submatrix::<DerefArray<_, 2>, _>::new(&a), Submatrix::<DerefArray<_, 2>, _>::new(&b), SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result), StaticRing::<i32>::RING.get_ring(), &mut memory);
+        strassen::<_, _, _, _, true, false, false, false>(
+            1, 
+            0, 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&a)), 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&b)), 
+            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result)), 
+            StaticRing::<i32>::RING.get_ring(), 
+            &mut memory
+        );
 
         assert_eq!(expected, result);
         assert!(memory.iter().all(|x| *x != i32::MIN));
@@ -386,10 +468,23 @@ fn test_strassen_more_levels() {
     let mut result: OwnedMatrix<i64> = OwnedMatrix::zero(16, 16, StaticRing::<i64>::RING);
     let mut memory = (0..strassen_mem_size(false, 4, 1)).map(|_| i64::MIN).collect::<Vec<_>>();
 
-    strassen::<_, _, _, _, false>(4, 1, a.data(), b.data(), result.data_mut(), StaticRing::<i64>::RING.get_ring(), &mut memory);
+    strassen::<_, _, _, _, false, false, false, false>(
+        4, 
+        1, 
+        TransposableSubmatrix::from(a.data()), 
+        TransposableSubmatrix::from(b.data()), 
+        TransposableSubmatrixMut::from(result.data_mut()), 
+        StaticRing::<i64>::RING.get_ring(), 
+        &mut memory
+    );
 
     let mut expected: OwnedMatrix<i64> = OwnedMatrix::zero(16, 16, StaticRing::<i64>::RING);
-    matmul_naive::<_, _, _, _, false>(a.data(), b.data(), expected.data_mut(), StaticRing::<i64>::RING.get_ring());
+    naive_matmul::<_, _, _, _, false, false, false, false>(
+        TransposableSubmatrix::from(a.data()), 
+        TransposableSubmatrix::from(b.data()), 
+        TransposableSubmatrixMut::from(expected.data_mut()), 
+        StaticRing::<i64>::RING.get_ring()
+    );
 
     assert_matrix_eq!(&StaticRing::<i64>::RING, &expected, &result);
     assert!(memory.iter().all(|x| *x != i64::MIN));
@@ -402,10 +497,23 @@ fn test_strassen_add_assign_more_levels() {
     let mut result: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(16, 16, |i, j| (i as i64) * (i as i64) + j as i64, Global);
     let mut memory = (0..strassen_mem_size(true, 4, 1)).map(|_| i64::MIN).collect::<Vec<_>>();
 
-    strassen::<_, _, _, _, true>(4, 1, a.data(), b.data(), result.data_mut(), StaticRing::<i64>::RING.get_ring(), &mut memory);
+    strassen::<_, _, _, _, true, false, false, false>(
+        4, 
+        1, 
+        TransposableSubmatrix::from(a.data()), 
+        TransposableSubmatrix::from(b.data()), 
+        TransposableSubmatrixMut::from(result.data_mut()), 
+        StaticRing::<i64>::RING.get_ring(), 
+        &mut memory
+    );
 
     let mut expected: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(16, 16, |i, j| (i as i64) * (i as i64) + j as i64, Global);
-    matmul_naive::<_, _, _, _, true>(a.data(), b.data(), expected.data_mut(), StaticRing::<i64>::RING.get_ring());
+    naive_matmul::<_, _, _, _, true, false, false, false>(
+        TransposableSubmatrix::from(a.data()), 
+        TransposableSubmatrix::from(b.data()), 
+        TransposableSubmatrixMut::from(expected.data_mut()), 
+        StaticRing::<i64>::RING.get_ring()
+    );
 
     assert_matrix_eq!(&StaticRing::<i64>::RING, &expected, &result);
     assert!(memory.iter().all(|x| *x != i64::MIN));

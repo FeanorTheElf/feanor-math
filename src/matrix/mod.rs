@@ -3,9 +3,12 @@ use std::fmt::Display;
 use crate::ring::*;
 
 mod submatrix;
+mod transpose;
 mod owned;
 
 pub use submatrix::*;
+#[allow(unused_imports)]
+pub use transpose::*;
 pub use owned::*;
 
 pub mod transform;
@@ -53,7 +56,7 @@ pub fn format_matrix<'a, M, R>(row_count: usize, col_count: usize, matrix: M, ri
 }
 
 pub mod matrix_compare {
-    use super::{owned::OwnedMatrix, AsPointerToSlice, DerefArray, RingBase, Submatrix, SubmatrixMut};
+    use super::*;
 
     pub trait MatrixCompare<T> {
         fn row_count(&self) -> usize;
@@ -86,6 +89,20 @@ pub mod matrix_compare {
 
         fn col_count(&self) -> usize { SubmatrixMut::col_count(self) }
         fn row_count(&self) -> usize { SubmatrixMut::row_count(self) }
+        fn at(&self, i: usize, j: usize) -> &T { self.as_const().into_at(i, j) }
+    }
+
+    impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> MatrixCompare<T> for TransposableSubmatrix<'a, V, T, TRANSPOSED> {
+
+        fn col_count(&self) -> usize { TransposableSubmatrix::col_count(self) }
+        fn row_count(&self) -> usize { TransposableSubmatrix::row_count(self) }
+        fn at(&self, i: usize, j: usize) -> &T { TransposableSubmatrix::at(self, i, j) }
+    }
+
+    impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> MatrixCompare<T> for TransposableSubmatrixMut<'a, V, T, TRANSPOSED> {
+
+        fn col_count(&self) -> usize { TransposableSubmatrixMut::col_count(self) }
+        fn row_count(&self) -> usize { TransposableSubmatrixMut::row_count(self) }
         fn at(&self, i: usize, j: usize) -> &T { self.as_const().into_at(i, j) }
     }
 

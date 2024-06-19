@@ -140,7 +140,7 @@ pub fn solve_right<R, V1, V2>(mut A: SubmatrixMut<V1, El<R>>, mut rhs: Submatrix
         }
     }
     let mut out = OwnedMatrix::zero(R.row_count(), rhs.col_count(), ring);
-    STANDARD_MATMUL.matmul(R.data(), result.data(), out.data_mut(), ring.get_ring());
+    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(R.data()), TransposableSubmatrix::from(result.data()), TransposableSubmatrixMut::from(out.data_mut()), ring.get_ring());
     return Some(out);
 }
 
@@ -180,12 +180,12 @@ fn multiply<'a, R: RingStore, V: AsPointerToSlice<El<R>>, I: IntoIterator<Item =
     let fst = it.next().unwrap();
     let snd = it.next().unwrap();
     let mut new_result = OwnedMatrix::zero(fst.row_count(), snd.col_count(), &ring);
-    STANDARD_MATMUL.matmul(fst, snd, new_result.data_mut(), ring.get_ring());
+    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(fst), TransposableSubmatrix::from(snd), TransposableSubmatrixMut::from(new_result.data_mut()), ring.get_ring());
     let mut result = new_result;
 
     for m in it {
         let mut new_result = OwnedMatrix::zero(result.row_count(), m.col_count(), &ring);
-        STANDARD_MATMUL.matmul(result.data(), m, new_result.data_mut(), ring.get_ring());
+        STANDARD_MATMUL.matmul(TransposableSubmatrix::from(result.data()), TransposableSubmatrix::from(m), TransposableSubmatrixMut::from(new_result.data_mut()), ring.get_ring());
         result = new_result;
     }
     return result;
