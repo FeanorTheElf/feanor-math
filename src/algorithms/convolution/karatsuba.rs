@@ -57,10 +57,10 @@ macro_rules! karatsuba_impl {
                 {
                     const STEPS_LEFT: usize = $num;
                     let block_size: usize = 1 << block_size_log2;
-                    assert_eq!(block_size, lhs.len());
-                    assert_eq!(block_size, rhs.len());
-                    assert_eq!(2 * block_size, dst.len());
-                    assert!(STEPS_LEFT <= block_size_log2);
+                    debug_assert_eq!(block_size, lhs.len());
+                    debug_assert_eq!(block_size, rhs.len());
+                    debug_assert_eq!(2 * block_size, dst.len());
+                    debug_assert!(STEPS_LEFT <= block_size_log2);
                 
                     if STEPS_LEFT == 0 {
                         naive_assign_mul::<R, _, V2, V3, ADD_ASSIGN>(dst, lhs, rhs, ring);

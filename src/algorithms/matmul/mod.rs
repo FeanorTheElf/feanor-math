@@ -1,4 +1,7 @@
-use crate::{matrix::{AsPointerToSlice, Submatrix, SubmatrixMut}, ring::*};
+use crate::matrix::{AsPointerToSlice, Submatrix, SubmatrixMut};
+use crate::ring::*;
+
+pub mod strassen;
 
 ///
 /// Trait to allow rings to provide specialized implementations for inner products, i.e.
@@ -156,7 +159,7 @@ pub struct DirectMatmulAlgorithm;
 
 impl<R: ?Sized + RingBase> MatmulAlgorithm<R> for DirectMatmulAlgorithm {
 
-    fn add_matmul<V1,V2,V3>(&self, lhs: Submatrix<V1, R::Element>, rhs: Submatrix<V2, R::Element>, mut dst: SubmatrixMut<V3, R::Element>, ring: &R)
+    fn add_matmul<V1, V2, V3>(&self, lhs: Submatrix<V1, R::Element>, rhs: Submatrix<V2, R::Element>, mut dst: SubmatrixMut<V3, R::Element>, ring: &R)
         where V1: AsPointerToSlice<R::Element>,
             V2: AsPointerToSlice<R::Element>,
             V3: AsPointerToSlice<R::Element>
@@ -171,7 +174,7 @@ impl<R: ?Sized + RingBase> MatmulAlgorithm<R> for DirectMatmulAlgorithm {
         }
     }
 
-    fn add_matmul_fst_transposed<V1,V2,V3>(&self, lhs_T: Submatrix<V1, R::Element>, rhs: Submatrix<V2, R::Element>, mut dst: SubmatrixMut<V3, R::Element>, ring: &R)
+    fn add_matmul_fst_transposed<V1, V2, V3>(&self, lhs_T: Submatrix<V1, R::Element>, rhs: Submatrix<V2, R::Element>, mut dst: SubmatrixMut<V3, R::Element>, ring: &R)
         where V1: AsPointerToSlice<R::Element>,
             V2: AsPointerToSlice<R::Element>,
             V3: AsPointerToSlice<R::Element>
@@ -186,7 +189,7 @@ impl<R: ?Sized + RingBase> MatmulAlgorithm<R> for DirectMatmulAlgorithm {
         }
     }
     
-    fn add_matmul_snd_transposed<V1,V2,V3>(&self, lhs: Submatrix<V1, R::Element>, rhs_T: Submatrix<V2, R::Element>, mut dst: SubmatrixMut<V3, R::Element>, ring: &R)
+    fn add_matmul_snd_transposed<V1, V2, V3>(&self, lhs: Submatrix<V1, R::Element>, rhs_T: Submatrix<V2, R::Element>, mut dst: SubmatrixMut<V3, R::Element>, ring: &R)
         where V1: AsPointerToSlice<R::Element>,
             V2: AsPointerToSlice<R::Element>,
             V3: AsPointerToSlice<R::Element>

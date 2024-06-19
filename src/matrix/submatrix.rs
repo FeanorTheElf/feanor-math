@@ -65,6 +65,13 @@ pub struct DerefArray<T, const SIZE: usize> {
     pub data: [T; SIZE]
 }
 
+impl<T: std::fmt::Debug, const SIZE: usize> std::fmt::Debug for DerefArray<T, SIZE> {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.data.fmt(f)
+    }
+}
+
 impl<T, const SIZE: usize> From<[T; SIZE]> for DerefArray<T, SIZE> {
 
     fn from(value: [T; SIZE]) -> Self {
