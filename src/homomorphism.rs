@@ -503,13 +503,14 @@ impl<R, S> Homomorphism<S::Type,R::Type> for CanIso<R, S>
 /// assert_el_eq!(&extension, &extension.from_terms([(8, 0), (1, 1)].into_iter()), &f);
 /// ```
 /// 
+#[derive(Copy, Clone)]
 pub struct Inclusion<R>
     where R: RingStore, R::Type: RingExtension
 {
     ring: R
 }
 
-impl<R>  Inclusion<R>
+impl<R> Inclusion<R>
     where R: RingStore, R::Type: RingExtension
 {
     pub fn new(ring: R) -> Self {
@@ -605,7 +606,7 @@ impl<R> IntHom<R>
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Copy, Clone)]
 pub struct Identity<R: RingStore> {
     ring: R
 }

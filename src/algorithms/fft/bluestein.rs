@@ -21,7 +21,7 @@ use crate::seq::SwappableVectorViewMut;
 pub struct BluesteinFFT<R_main, R_twiddle, H, A = Global>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
-        H: Homomorphism<R_twiddle, R_main> + Clone, 
+        H: Homomorphism<R_twiddle, R_main>, 
         A: Allocator + Clone
 {
     hom: H,
@@ -296,7 +296,14 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         let root_of_unity_m = algorithms::unity_root::get_prim_root_of_unity_pow2(hom.domain(), log2_m)?;
         Some(Self::new_with_hom(hom, root_of_unity_2n, root_of_unity_m, n, log2_m, tmp_mem_allocator))
     }
+}
 
+impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
+    where R_main: ?Sized + RingBase,
+        R_twiddle: ?Sized + RingBase + DivisibilityRing,
+        H: Homomorphism<R_twiddle, R_main>, 
+        A: Allocator + Clone
+{
     ///
     /// Computes the FFT of the given values using Bluestein's algorithm, using only the passed
     /// buffer as temporary storage.
@@ -361,7 +368,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
 impl<R_main, R_twiddle, H, A> PartialEq for BluesteinFFT<R_main, R_twiddle, H, A>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
-        H: Homomorphism<R_twiddle, R_main> + Clone, 
+        H: Homomorphism<R_twiddle, R_main>, 
         A: Allocator + Clone
 {
     fn eq(&self, other: &Self) -> bool {
@@ -374,7 +381,7 @@ impl<R_main, R_twiddle, H, A> PartialEq for BluesteinFFT<R_main, R_twiddle, H, A
 impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for BluesteinFFT<R_main, R_twiddle, H, A>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
-        H: Homomorphism<R_twiddle, R_main> + Clone, 
+        H: Homomorphism<R_twiddle, R_main>, 
         A: Allocator + Clone
 {
     fn len(&self) -> usize {
@@ -426,7 +433,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for BluesteinFFT<R_main, R_tw
 }
 
 impl<H, A> FFTErrorEstimate for BluesteinFFT<Complex64Base, Complex64Base, H, A>
-    where H: Homomorphism<Complex64Base, Complex64Base> + Clone, 
+    where H: Homomorphism<Complex64Base, Complex64Base>, 
         A: Allocator + Clone
 {
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
