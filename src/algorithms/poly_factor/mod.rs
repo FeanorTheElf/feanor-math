@@ -211,6 +211,7 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
 /// ].into_iter()), &squarefree_part);
 /// ```
 /// 
+#[stability::unstable(feature = "enable")]
 pub fn poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
     where P: PolyRingStore,
         P::Type: PolyRing + PrincipalIdealRing,

@@ -68,6 +68,7 @@ fn pow_mod_f<P, I>(poly_ring: P, g: El<P>, f: &El<P>, pow: &El<I>, ZZ: I) -> El<
 /// assert!(!FpX.is_unit(&factorization[3])); // factorization[3] is some scalar multiple of (X^3 + 2 X^2 + 1) (X^3 + 2 X + 1)
 /// ```
 /// 
+#[stability::unstable(feature = "enable")]
 pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
@@ -133,7 +134,7 @@ pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>
 /// will do (note that all columns are different, as `1, a, ..., a^(d - 1)` is a basis of FQ
 /// and similarly for b). 
 ///
-#[allow(non_snake_case)]
+#[stability::unstable(feature = "enable")]
 pub fn cantor_zassenhaus<P>(poly_ring: P, f: El<P>, d: usize) -> El<P>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,

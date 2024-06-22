@@ -6,6 +6,7 @@ use crate::seq::{VectorView, VectorViewMut};
 
 use super::row_echelon::InternalRow;
 
+#[stability::unstable(feature = "enable")]
 pub struct SparseMatrix<R>
     where R: ?Sized + RingBase
 {
@@ -18,6 +19,7 @@ pub struct SparseMatrix<R>
 impl<R> SparseMatrix<R>
     where R: ?Sized + RingBase
 {
+    #[stability::unstable(feature = "enable")]
     pub fn new<S>(ring: &S) -> Self
         where S: RingStore<Type = R>
     {
@@ -29,6 +31,7 @@ impl<R> SparseMatrix<R>
         }
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn clone_matrix<S>(&self, ring: S) -> Self
         where S: RingStore<Type = R>
     {
@@ -40,21 +43,25 @@ impl<R> SparseMatrix<R>
         }
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn add_col(&mut self, j: usize) {
         self.col_permutation.insert(j, self.col_count);
         self.col_count += 1;
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn add_cols(&mut self, number: usize) {
         for _ in 0..number {
             self.add_col(self.col_count());
         }
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn add_zero_row(&mut self, i: usize) {
         self.rows.insert(i, Vec::new())
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn add_row<I>(&mut self, i: usize, values: I)
         where I: Iterator<Item = (usize, R::Element)>
     {
@@ -66,6 +73,7 @@ impl<R> SparseMatrix<R>
         self.rows.insert(i, row);
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn set(&mut self, i: usize, j: usize, el: R::Element) -> Option<R::Element> {
         let row = &mut self.rows[i];
         let result = match row.binary_search_by_key(&self.col_permutation[j], |(c, _)| *c) {
@@ -120,14 +128,17 @@ impl<R> SparseMatrix<R>
         return result;
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn col_count(&self) -> usize {
         self.col_count
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn row_count(&self) -> usize {
         self.rows.len()
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn at(&self, i: usize, j: usize) -> &R::Element {
         match self.rows.at(i).binary_search_by_key(&self.col_permutation[j], |(c, _)| *c) {
             Ok(idx) => &self.rows.at(i).at(idx).1,
@@ -135,6 +146,7 @@ impl<R> SparseMatrix<R>
         }
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn format<'a>(&'a self, ring: &'a R) -> impl 'a + Display {
         format_matrix(self.row_count(), self.col_count(), |i, j| self.at(i, j), RingRef::new(ring))
     }

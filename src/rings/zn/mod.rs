@@ -141,6 +141,7 @@ pub mod generic_impls {
     /// 
     /// This will only ever return `None` if one of the integer ring `has_canonical_hom/iso` returns `None`.
     /// 
+    #[stability::unstable(feature = "enable")]
     pub fn has_canonical_hom_from_bigint<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>(from: &I, to: &R, to_large_int_ring: &J, bounded_reduce_bound: Option<&J::Element>) -> Option<BigIntToZnHom<I, J, R>>
         where I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>
     {
@@ -191,6 +192,7 @@ pub mod generic_impls {
     /// decide that we have to perform generic modular reduction (even though `x < n`), and try to map `n` into `Z`. This is never a problem if the primitive
     /// integer rings `StaticRing::<ixx>::RING` are used, or if `B >= 2n`.
     /// 
+    #[stability::unstable(feature = "enable")]
     pub fn map_in_from_bigint<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing, F, G>(from: &I, to: &R, to_large_int_ring: &J, el: I::Element, hom: &BigIntToZnHom<I, J, R>, from_positive_representative_exact: F, from_positive_representative_bounded: G) -> R::Element
         where I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>,
             F: FnOnce(El<R::Integers>) -> R::Element,
@@ -222,6 +224,7 @@ pub mod generic_impls {
     /// Generates a uniformly random element of `Z/nZ` using the randomness of `rng`.
     /// Designed to be used when implementing [`crate::rings::finite::FiniteRing::random_element()`].
     /// 
+    #[stability::unstable(feature = "enable")]
     pub fn random_element<R: ZnRing, G: FnMut() -> u64>(ring: &R, rng: G) -> R::Element {
         ring.map_in(
             ring.integer_ring().get_ring(), 
@@ -234,6 +237,7 @@ pub mod generic_impls {
     /// Computes the checked division in `Z/nZ`. Designed to be used when implementing
     /// [`crate::divisibility::DivisibilityRing::checked_left_div()`].
     /// 
+    #[stability::unstable(feature = "enable")]
     pub fn checked_left_div<R: ZnRingStore>(ring: R, lhs: &El<R>, rhs: &El<R>, modulus: &El<<R::Type as ZnRing>::Integers>) -> Option<El<R>>
         where R::Type: ZnRing
     {

@@ -48,7 +48,7 @@ pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
 ///
 /// Miller-Rabin primality test.
 /// 
-/// If n is a prime, this returns true.
+/// If the characteristic `n` of the given ring is a prime, this returns true.
 /// If n is not a prime, this returns false with probability greater or 
 /// equal than 1 - 4^(-k).
 /// 

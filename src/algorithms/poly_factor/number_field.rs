@@ -67,6 +67,7 @@ fn factor_squarefree_over_number_field<'a, P, I>(KX: &'a P, f: El<P>) -> impl 'a
     unreachable!()
 }
 
+#[stability::unstable(feature = "enable")]
 pub fn factor_over_number_field<P, I>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,

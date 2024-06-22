@@ -246,14 +246,17 @@ pub mod generic_impls {
     use crate::homomorphism::*;
 
     #[allow(type_alias_bounds)]
+    #[stability::unstable(feature = "enable")]
     pub type Homomorphism<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanHomFrom<<P1::BaseRing as RingStore>::Type>>::Homomorphism;
 
+    #[stability::unstable(feature = "enable")]
     pub fn has_canonical_hom<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2) -> Option<Homomorphism<P1, P2>> 
         where <P2::BaseRing as RingStore>::Type: CanHomFrom<<P1::BaseRing as RingStore>::Type>
     {
         to.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn map_in<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P1::Element, hom: &Homomorphism<P1, P2>) -> P2::Element
         where <P2::BaseRing as RingStore>::Type: CanHomFrom<<P1::BaseRing as RingStore>::Type>
     {
@@ -263,8 +266,10 @@ pub mod generic_impls {
     }
 
     #[allow(type_alias_bounds)]
+    #[stability::unstable(feature = "enable")]
     pub type Isomorphism<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanIsoFromTo<<P1::BaseRing as RingStore>::Type>>::Isomorphism;
 
+    #[stability::unstable(feature = "enable")]
     pub fn map_out<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2, el: P2::Element, iso: &Isomorphism<P1, P2>) -> P1::Element
         where <P2::BaseRing as RingStore>::Type: CanIsoFromTo<<P1::BaseRing as RingStore>::Type>
     {
@@ -273,6 +278,7 @@ pub mod generic_impls {
         return result;
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn dbg_poly<P: PolyRing>(ring: &P, el: &P::Element, out: &mut std::fmt::Formatter, unknown_name: &str) -> std::fmt::Result {
         let mut terms = ring.terms(el);
         let print_unknown = |i: usize, out: &mut std::fmt::Formatter| {

@@ -235,15 +235,35 @@ fn sym_tuple(a: usize, b: usize) -> (usize, usize) {
 }
 
 ///
+/// Data associated to a ring that is required when computing Groebner basis.
 /// 
-/// 
-#[stability::unstable(feature = "enable")]
 pub struct RingInfo<R: ?Sized>
     where R: RingBase
 {
-    pub ring: PhantomData<R>,
-    pub extended_ideal_generator: R::Element,
-    pub annihilating_power: Option<usize>
+    ring: PhantomData<R>,
+    extended_ideal_generator: R::Element,
+    annihilating_power: Option<usize>
+}
+
+impl<R: ?Sized + RingBase> RingInfo<R> {
+
+    ///
+    /// Creates a new [`RingInfo`].
+    /// 
+    /// It is currently only valid to create [`RingInfo`]s for discrete valuation rings.
+    /// In this case, `extended_ideal_generator` should be a generator of the maximal ideal
+    /// (or 0 if the ring is a field) and annihilating_power should be the smallest integer
+    /// such that `extended_ideal_generator^annihilating_power == 0`. Obviously, this currently
+    /// only works for finite rings.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    pub fn new(extended_ideal_generator: R::Element, annihilating_power: Option<usize>) -> Self {
+        Self {
+            extended_ideal_generator: extended_ideal_generator,
+            annihilating_power: annihilating_power,
+            ring: PhantomData
+        }
+    }
 }
 
 impl<R: ?Sized + RingBase> RingInfo<R> {
@@ -386,7 +406,6 @@ impl SPoly {
     }
 }
 
-#[stability::unstable(feature = "enable")]
 pub trait GBRingDescriptorRing: Sized + PrincipalIdealRing {
 
     fn create_ring_info(&self) -> RingInfo<Self>;
@@ -435,8 +454,8 @@ impl<const N: u64> GBRingDescriptorRing for zn_static::ZnBase<N, false> {
 
 ///
 /// A simple implementation of the F4 algorithm for computing Groebner basis.
-/// This implementation does currently not include the Buchberger criteria, and thus
-/// cannot compete with highly optimized implementations (Singular, Macaulay2, Magma etc).
+/// This implementation cannot (yet ?) compete with highly optimized implementations 
+/// (Singular, Macaulay2, Magma etc).
 /// 
 /// This algorithm will only consider S-polynomials of degree smaller than the given bound.
 /// Ignoring S-polynomials this way might cause the resulting basis not to be a Groebner basis,
@@ -486,7 +505,6 @@ impl<const N: u64> GBRingDescriptorRing for zn_static::ZnBase<N, false> {
 /// assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, in_ideal, gb.iter(), order));
 /// ```
 /// 
-#[stability::unstable(feature = "enable")]
 pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_poly_degree_bound: u16) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
