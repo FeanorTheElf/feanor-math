@@ -22,7 +22,7 @@ pub type BigIntRingBase = crate::rings::rust_bigint::RustBigintRingBase;
 /// for fast operations with integers.
 /// 
 /// As an additional requirement, the euclidean division (i.e. [`EuclideanRing::euclidean_div_rem()`] and
-/// [`IntegerRing::euclidean_div_pow_2()`]) are expected to round towards zero.
+/// [`IntegerRing::euclidean_div_pow_2()`]) are additionally expected to round towards zero.
 /// 
 pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing {
 
@@ -40,7 +40,7 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing {
     /// 
     /// Note that a high-quality implementation of this function can vastly improve
     /// performance in some cases, e.g. of [`crate::algorithms::int_bisect::root_floor()`] or 
-    /// [`crate::algorithms::lll::lll()`].
+    /// [`crate::algorithms::lll::lll_exact()`].
     /// 
     fn to_float_approx(&self, value: &Self::Element) -> f64;
 
@@ -50,6 +50,8 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing {
     /// the closest integer to the given float, and cannot be used to compute rounding.
     /// It is also implementation-defined when to return `None`, although this is usually
     /// the case on infinity and NaN.
+    /// 
+    /// For information when to use (or not use) this, see its counterpart [`IntegerRing::to_float_approx()`].
     /// 
     fn from_float_approx(&self, value: f64) -> Option<Self::Element>;
 

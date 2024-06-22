@@ -141,7 +141,7 @@ impl<R: DivisibilityRingStore> RingExtension for AsFieldBase<R>
 }
 
 ///
-/// Necessary to potentially implement [`ZnRing`].
+/// Necessary to potentially implement [`crate::rings::zn::ZnRing`].
 /// 
 impl<R: DivisibilityRingStore, S: IntegerRing + ?Sized> CanHomFrom<S> for AsFieldBase<R> 
     where R::Type: DivisibilityRing + CanHomFrom<S>

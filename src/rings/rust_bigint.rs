@@ -6,10 +6,12 @@ use crate::ordered::*;
 use crate::primitive_int::StaticRingBase;
 use crate::ring::*;
 use crate::algorithms;
+use std::alloc::Allocator;
+use std::alloc::Global;
 use std::cmp::Ordering::*;
 
 #[derive(Clone, Debug)]
-pub struct RustBigint(bool, Vec<u64>);
+pub struct RustBigint<A: Allocator = Global>(bool, Vec<u64, A>);
 
 ///
 /// Arbitrary-precision integer implementation.
@@ -18,28 +20,35 @@ pub struct RustBigint(bool, Vec<u64>);
 /// If you need very high performance, consider using [`crate::rings::mpir::MPZ`]
 /// (requires an installation of mpir and activating the feature "mpir").
 /// 
-/// For the difference to [`RustBigintRing`], see the documentation of [`crate::ring::RingStore`].
-/// 
-#[derive(Copy, Clone, PartialEq)]
-pub struct RustBigintRingBase;
+#[derive(Copy, Clone)]
+pub struct RustBigintRingBase<A: Allocator + Clone = Global> {
+    allocator: A
+}
 
 ///
-/// Arbitrary-precision integer implementation.
+/// [`RingStore`] corresponding to [`RustBigintRingBase`].
 /// 
-/// This is a not-too-well optimized implementation, written in pure Rust.
-/// If you need very high performance, consider using [`crate::rings::mpir::MPZ`]
-/// (requires an installation of mpir, and activating the feature "mpir").
-/// 
-pub type RustBigintRing = RingValue<RustBigintRingBase>;
+pub type RustBigintRing<A = Global> = RingValue<RustBigintRingBase<A>>;
+
+impl<A: Allocator + Clone> RustBigintRing<A> {
+    
+    #[stability::unstable(feature = "enable")]
+    pub fn new_with(allocator: A) -> RustBigintRing<A> {
+        Self::from(RustBigintRingBase { allocator })
+    }
+}
 
 impl RustBigintRing {
     
-    pub const RING: RustBigintRing = RingValue::from(RustBigintRingBase);
+    ///
+    /// Default instance of [`RustBigintRing`], the ring of arbitrary-precision integers.
+    /// 
+    pub const RING: RustBigintRing = RingValue::from(RustBigintRingBase { allocator: Global });
 }
 
-impl RustBigintRingBase {
+impl<A: Allocator + Clone> RustBigintRingBase<A> {
 
-    pub fn map_i128(&self, val: &RustBigint) -> Option<i128> {
+    pub fn map_i128(&self, val: &RustBigint<A>) -> Option<i128> {
         match algorithms::bigint::highest_set_block(&val.1) {
             None => Some(0),
             Some(0) if val.0 => Some(-(val.1[0] as i128)),
@@ -57,8 +66,7 @@ impl RustBigintRingBase {
         }
     }
 
-    pub fn parse(&self, string: &str, base: u32) -> Result<RustBigint, ()> {
-        let result = Vec::new();
+    pub fn parse(&self, string: &str, base: u32) -> Result<RustBigint<A>, ()> {
         let (negative, rest) = if string.chars().next() == Some('-') {
             (true, string.split_at(1).1)
         } else if string.chars().next() == Some('+') {
@@ -66,7 +74,7 @@ impl RustBigintRingBase {
         } else {
             (false, string)
         };
-        Ok(RustBigint(negative, algorithms::bigint::from_str_radix(rest, base, result)?))
+        Ok(RustBigint(negative, algorithms::bigint::from_str_radix(rest, base, self.zero().1)?))
     }
 
     pub fn abs_base_u64_repr<'a>(&self, el: &'a RustBigint) -> impl 'a + Iterator<Item = u64> {
@@ -80,12 +88,25 @@ impl RustBigintRingBase {
     }
 }
 
-impl RingBase for RustBigintRingBase {
+impl<A: Allocator + Clone> PartialEq for RustBigintRingBase<A> {
+
+    fn eq(&self, _other: &Self) -> bool {
+        // it is perfectly valid to swap elements between two different `RustBigintRing`s,
+        // even if they have different allocators. Every element keeps track of their allocator 
+        // themselves
+        true
+    }
+}
+
+impl<A: Allocator + Clone> RingBase for RustBigintRingBase<A> {
     
-    type Element = RustBigint;
+    type Element = RustBigint<A>;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        val.clone()
+        // allocate it with our allocator
+        let mut result_data = Vec::with_capacity_in(val.1.len(), self.allocator.clone());
+        result_data.extend(val.1.iter().copied());
+        RustBigint(val.0, result_data)
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -130,24 +151,18 @@ impl RingBase for RustBigintRingBase {
     }
 
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        let result = algorithms::bigint::bigint_mul(&lhs.1, &rhs.1, Vec::new());
+        let result = algorithms::bigint::bigint_mul(&lhs.1, &rhs.1, Vec::new_in(self.allocator.clone()));
         *lhs = RustBigint(lhs.0 ^ rhs.0, result);
     }
 
     fn zero(&self) -> Self::Element {
-        RustBigint(false, Vec::new())
-    }
-
-    fn one(&self) -> Self::Element {
-        RustBigint(false, vec![1])
-    }
-
-    fn neg_one(&self) -> Self::Element {
-        self.negate(self.one())
+        RustBigint(false, Vec::new_in(self.allocator.clone()))
     }
 
     fn from_int(&self, value: i32) -> Self::Element {
-        RustBigint(value < 0, vec![(value as i64).abs() as u64])
+        let mut data = Vec::with_capacity_in(1, self.allocator.clone());
+        data.push((value as i64).abs() as u64);
+        RustBigint(value < 0, data)
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -211,28 +226,33 @@ impl RingBase for RustBigintRingBase {
     }
 }
 
-impl IntCast<RustBigintRingBase> for RustBigintRingBase {
+impl<A1: Allocator + Clone, A2: Allocator + Clone> IntCast<RustBigintRingBase<A2>> for RustBigintRingBase<A1> {
     
-    fn cast(&self, _: &RustBigintRingBase, value: Self::Element) -> Self::Element {
-        value
+    fn cast(&self, _: &RustBigintRingBase<A2>, value: RustBigint<A2>) -> Self::Element {
+        // allocate it with our allocator
+        let mut result_data = Vec::with_capacity_in(value.1.len(), self.allocator.clone());
+        result_data.extend(value.1.iter().copied());
+        RustBigint(value.0, result_data)
     }
 }
 
 macro_rules! specialize_int_cast {
     ($($from:ty),*) => {
         $(
-            impl IntCast<StaticRingBase<$from>> for RustBigintRingBase {
+            impl<A: Allocator + Clone> IntCast<StaticRingBase<$from>> for RustBigintRingBase<A> {
 
-                fn cast(&self, _: &StaticRingBase<$from>, value: $from) -> RustBigint {
+                fn cast(&self, _: &StaticRingBase<$from>, value: $from) -> RustBigint<A> {
                     let negative = value < 0;
                     let value = <_ as Into<i128>>::into(value).checked_abs().map(|x| x as u128).unwrap_or(1 << (u128::BITS - 1));
-                    RustBigint(negative, vec![(value & ((1 << u64::BITS) - 1)) as u64, (value >> u64::BITS) as u64])
+                    let mut result = Vec::with_capacity_in(2, self.allocator.clone());
+                    result.extend([(value & ((1 << u64::BITS) - 1)) as u64, (value >> u64::BITS) as u64].into_iter());
+                    RustBigint(negative, result)
                 }
             }
 
-            impl IntCast<RustBigintRingBase> for StaticRingBase<$from> {
+            impl<A: Allocator + Clone> IntCast<RustBigintRingBase<A>> for StaticRingBase<$from> {
 
-                fn cast(&self, from: &RustBigintRingBase, value: RustBigint) -> $from {
+                fn cast(&self, from: &RustBigintRingBase<A>, value: RustBigint<A>) -> $from {
                     <$from>::try_from(from.map_i128(&value).unwrap()).ok().unwrap()
                 }
             }
@@ -242,9 +262,9 @@ macro_rules! specialize_int_cast {
 
 specialize_int_cast!{ i8, i16, i32, i64, i128 }
 
-impl Domain for RustBigintRingBase {}
+impl<A: Allocator + Clone> Domain for RustBigintRingBase<A> {}
 
-impl OrderedRing for RustBigintRingBase {
+impl<A: Allocator + Clone> OrderedRing for RustBigintRingBase<A> {
 
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
         match (lhs.0, rhs.0) {
@@ -257,7 +277,7 @@ impl OrderedRing for RustBigintRingBase {
     }
 }
 
-impl DivisibilityRing for RustBigintRingBase {
+impl<A: Allocator + Clone> DivisibilityRing for RustBigintRingBase<A> {
     
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(rhs) && self.is_zero(lhs) {
@@ -274,18 +294,18 @@ impl DivisibilityRing for RustBigintRingBase {
     }
 }
 
-impl PrincipalIdealRing for RustBigintRingBase {
+impl<A: Allocator + Clone> PrincipalIdealRing for RustBigintRingBase<A> {
 
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), RustBigintRing::RING)
+        algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), RingRef::new(self))
     }
 }
 
-impl EuclideanRing for RustBigintRingBase {
+impl<A: Allocator + Clone> EuclideanRing for RustBigintRingBase<A> {
 
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
-        let mut quo = RustBigint(false, algorithms::bigint::bigint_div(&mut lhs.1, &rhs.1, Vec::new()));
+        let mut quo = RustBigint(false, algorithms::bigint::bigint_div(&mut lhs.1, &rhs.1, self.zero().1));
         if rhs.0 ^ lhs.0 {// if result of division is zero, `.is_neg(&lhs)` does not work as expected
             self.negate_inplace(&mut quo);
         }
@@ -297,7 +317,7 @@ impl EuclideanRing for RustBigintRingBase {
     }
 }
 
-impl HashableElRing for RustBigintRingBase {
+impl<A: Allocator + Clone> HashableElRing for RustBigintRingBase<A> {
 
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
         let block = algorithms::bigint::highest_set_block(&el.1);
@@ -309,7 +329,7 @@ impl HashableElRing for RustBigintRingBase {
     }
 }
 
-impl IntegerRing for RustBigintRingBase {
+impl<A: Allocator + Clone> IntegerRing for RustBigintRingBase<A> {
 
     fn to_float_approx(&self, value: &Self::Element) -> f64 {
         let sign = if value.0 { -1. } else { 1. };
@@ -329,7 +349,9 @@ impl IntegerRing for RustBigintRingBase {
         let scale = value.log2().ceil() as i32;
         let significant_digits = std::cmp::min(scale, u64::BITS as i32);
         let most_significant_bits = (value / 2f64.powi(scale - significant_digits)) as u64;
-        let mut result = RustBigint(sign, vec![most_significant_bits]);
+        let mut result = self.one();
+        result.1[0] = most_significant_bits;
+        result.0 = sign;
         self.mul_pow_2(&mut result, (scale - significant_digits) as usize);
         return Some(result);
     }
@@ -370,12 +392,14 @@ impl IntegerRing for RustBigintRingBase {
     fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, mut rng: G) -> Self::Element {
         let blocks = log2_bound_exclusive / u64::BITS as usize;
         let in_block = log2_bound_exclusive % u64::BITS as usize;
+        let mut result = Vec::with_capacity_in(blocks + if in_block > 0 { 1 } else { 0 }, self.allocator.clone());
         if in_block == 0 {
-            RustBigint(false, (0..blocks).map(|_| rng()).collect())
+            result.extend((0..blocks).map(|_| rng()));
         } else {
             let last = rng() & 1u64.overflowing_shl(in_block as u32).0.overflowing_sub(1).0;
-            RustBigint(false, (0..blocks).map(|_| rng()).chain(std::iter::once(last)).collect())
+            result.extend((0..blocks).map(|_| rng()).chain(std::iter::once(last)));
         }
+        return RustBigint(false, result);
     }
     
     fn representable_bits(&self) -> Option<usize> {

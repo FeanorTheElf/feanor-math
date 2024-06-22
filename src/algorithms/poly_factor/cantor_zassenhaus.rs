@@ -118,7 +118,7 @@ pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>
 /// in FQ, then this works if exactly one of them maps to zero under the polynomial
 /// `T^((Q - 1)/2) - 1`. Now observe that this is the case if and only if `T(a)` resp.
 /// `T(b)` is a square in FQ. Now apparently, for a polynomial chosen uniformly at random
-/// among all monic polynomials of degree 2d in Fq[X], the values T(a) and T(b) are close
+/// among all monic polynomials of degree 2d in `Fq[X]`, the values `T(a)` and `T(b)` are close
 /// to independent and uniform on FQ, and thus the probability that one is a square and
 /// the other is not is approximately 1/2.
 /// 

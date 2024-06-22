@@ -159,7 +159,7 @@ unsafe impl<'a, T> AsPointerToSlice<T> for AsFirstElement<T> {
 /// let (ref1, ref2) = unsafe { (ptr1.as_mut(), ptr2.as_mut()) };
 /// ```
 /// 
-pub struct SubmatrixRaw<V, T>
+struct SubmatrixRaw<V, T>
     where V: AsPointerToSlice<T>
 {
     entry: PhantomData<*mut T>,
@@ -215,7 +215,7 @@ impl<V, T> SubmatrixRaw<V, T>
     /// give pointers `ptr1` and `ptr2` (via [`AsPointerToSlice::get_pointer()`]), then `ptr1.offset(cols_start + k)` and
     /// `ptr2.offset(cols_start + l)` for `0 <= k, l < col_count` never alias.
     /// 
-    pub unsafe fn new(rows: NonNull<V>, row_count: usize, row_step: isize, cols_start: usize, col_count: usize) -> Self {
+    unsafe fn new(rows: NonNull<V>, row_count: usize, row_step: isize, cols_start: usize, col_count: usize) -> Self {
         Self {
             entry: PhantomData,
             row_count: row_count,
@@ -269,7 +269,7 @@ impl<V, T> SubmatrixRaw<V, T>
     /// Returns a pointer to the `(row, col)`-th entry of the matrix.
     /// Be carefull about aliasing when making this into a reference!
     /// 
-    pub fn entry_at(&self, row: usize, col: usize) -> NonNull<T> {
+    fn entry_at(&self, row: usize, col: usize) -> NonNull<T> {
         assert!(row < self.row_count);
         assert!(col < self.col_count);
         // this is safe since `row < row_count` and we require `rows.offset(row * row_step)` to point

@@ -58,12 +58,12 @@ impl<R_main, H> CooleyTuckeyFFT<R_main, Complex64Base, H>
         H: Homomorphism<Complex64Base, R_main>
 {
     ///
-    /// Creates an [`FFTTableCooleyTuckey`] for the complex field, using the given homomorphism
+    /// Creates an [`CooleyTuckeyFFT`] for the complex field, using the given homomorphism
     /// to connect the ring implementation for twiddles with the main ring implementation.
     /// 
     /// This function is mainly provided for parity with other rings, since in the complex case
     /// it currently does not make much sense to use a different homomorphism than the identity.
-    /// Hence, it is simpler to use [`FFTTableCooleyTuckey::for_complex()`].
+    /// Hence, it is simpler to use [`CooleyTuckeyFFT::for_complex()`].
     /// 
     pub fn for_complex_with_hom(hom: H, log2_n: usize) -> Self {
         let CC = *hom.domain().get_ring();
@@ -75,7 +75,7 @@ impl<R> CooleyTuckeyFFT<Complex64Base, Complex64Base, Identity<R>>
     where R: RingStore<Type = Complex64Base>
 {
     ///
-    /// Creates an [`FFTTableCooleyTuckey`] for the complex field.
+    /// Creates an [`CooleyTuckeyFFT`] for the complex field.
     /// 
     pub fn for_complex(ring: R, log2_n: usize) -> Self {
         Self::for_complex_with_hom(ring.into_identity(), log2_n)
@@ -87,7 +87,7 @@ impl<R> CooleyTuckeyFFT<R::Type, R::Type, Identity<R>>
         R::Type: DivisibilityRing
 {
     ///
-    /// Creates an [`FFTTableCooleyTuckey`] for the given ring, using the given root of unity
+    /// Creates an [`CooleyTuckeyFFT`] for the given ring, using the given root of unity
     /// as base. Do not use this for approximate rings, as computing the powers of `root_of_unity`
     /// will incur avoidable precision loss.
     /// 
@@ -96,7 +96,7 @@ impl<R> CooleyTuckeyFFT<R::Type, R::Type, Identity<R>>
     }
 
     ///
-    /// Creates an [`FFTTableCooleyTuckey`] for the given ring, using the passed function to
+    /// Creates an [`CooleyTuckeyFFT`] for the given ring, using the passed function to
     /// provide the necessary roots of unity.
     /// 
     /// Concretely, `root_of_unity_pow(i)` should return `z^i`, where `z` is a `2^log2_n`-th
@@ -109,7 +109,7 @@ impl<R> CooleyTuckeyFFT<R::Type, R::Type, Identity<R>>
     }
 
     ///
-    /// Creates an [`FFTTableCooleyTuckey`] for a prime field, assuming it has a characteristic
+    /// Creates an [`CooleyTuckeyFFT`] for a prime field, assuming it has a characteristic
     /// congruent to 1 modulo `2^log2_n`.
     /// 
     pub fn for_zn(ring: R, log2_n: usize) -> Option<Self>
@@ -125,7 +125,7 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
         H: Homomorphism<R_twiddle, R_main>
 {
     ///
-    /// Creates an [`FFTTableCooleyTuckey`] for the given rings, using the given root of unity.
+    /// Creates an [`CooleyTuckeyFFT`] for the given rings, using the given root of unity.
     /// 
     /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
     /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
@@ -162,8 +162,8 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
     }
 
     ///
-    /// Creates an [`FFTTableCooleyTuckey`] for the given rings, using the given function to create
-    /// the necessary powers of roots of unity. This is the most generic way to create [`FFTTableCooleyTuckey`].
+    /// Creates an [`CooleyTuckeyFFT`] for the given rings, using the given function to create
+    /// the necessary powers of roots of unity. This is the most generic way to create [`CooleyTuckeyFFT`].
     /// 
     /// Concretely, `root_of_unity_pow(i)` should return `z^i`, where `z` is a `2^log2_n`-th
     /// primitive root of unity.
@@ -214,7 +214,7 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
     }
 
     ///
-    /// Creates an [`FFTTableCooleyTuckey`] for the given prime fields, assuming they have
+    /// Creates an [`CooleyTuckeyFFT`] for the given prime fields, assuming they have
     /// a characteristic congruent to 1 modulo `2^log2_n`.
     /// 
     /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are

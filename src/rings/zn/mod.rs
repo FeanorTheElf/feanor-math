@@ -282,10 +282,9 @@ impl<R: RingStore> ZnRingStore for R
 
 ///
 /// Trait for algorithms that require some implementation of
-/// `Z/nZ`, but do not care which.
+/// `Z/nZ`, but do not care which. 
 /// 
-/// If you want to avoid the boilerplate code to create such an
-/// object, look at the experimental macro [`generate_zn_function`].
+/// See [`choose_zn_impl()`] for details.
 /// 
 pub trait ZnOperation<Result = ()> {
     
@@ -297,8 +296,9 @@ pub trait ZnOperation<Result = ()> {
 /// Calls the given function with some implementation of the ring
 /// `Z/nZ`, chosen depending on `n` to provide best performance.
 /// 
-/// To avoid the boilerplate code that comes with manually implementing
-/// [`ZnOperation`], consider using the experimental macro [`generate_zn_operation`].
+/// It is currently necessary to write all the boilerplate code that
+/// comes with manually implementing [`ZnOperation`]. I experimented with
+/// macros, but currently something simple seems like the best solution.
 /// 
 /// # Example
 /// ```

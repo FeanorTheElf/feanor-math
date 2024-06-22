@@ -8,7 +8,7 @@ pub mod rust_bigint;
 ///
 /// This module contains the trait [`zn::ZnRing`] for all rings that represent a
 /// quotient `Z/nZ` of the integers `Z`. Furthermore, it provides four different
-/// implementions, in [`zn::zn_static`], [`zn::zn_big`], [`zn::zn_42`] and [`zn::zn_rns`].
+/// implementions, in [`zn::zn_static`], [`zn::zn_big`], [`zn::zn_64`] and [`zn::zn_rns`].
 /// 
 pub mod zn;
 

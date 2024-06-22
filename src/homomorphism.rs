@@ -349,8 +349,7 @@ impl<R: ?Sized + CanIsoFromTo<R>> SelfIso for R {}
 /// 
 /// # See also
 /// The "bi-directional" variant [`CanHom`], the basic interfaces [`CanHomFrom`] and
-/// [`CanIsoFromTo`] and the very simplified functions [`RingStore::coerce`], [`RingStore::coerce_ref`]
-/// and [`RingStore::cast`].
+/// [`CanIsoFromTo`] and the very simplified function [`RingStore::coerce`].
 /// 
 pub struct CanHom<R, S>
     where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
@@ -428,8 +427,7 @@ impl<R, S> Homomorphism<R::Type, S::Type> for CanHom<R, S>
 /// 
 /// # See also
 /// The "one-directional" variant [`CanHom`], the basic interfaces [`CanHomFrom`] and
-/// [`CanIsoFromTo`] and the very simplified functions [`RingStore::coerce`], [`RingStore::coerce_ref`]
-/// and [`RingStore::cast`].
+/// [`CanIsoFromTo`] and the very simplified function [`RingStore::coerce()`].
 /// 
 pub struct CanIso<R, S>
     where R: RingStore, S: RingStore, S::Type: CanIsoFromTo<R::Type>

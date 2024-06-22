@@ -90,13 +90,38 @@ impl<R> PrincipalIdealRingStore for R
 /// 
 pub trait EuclideanRing: PrincipalIdealRing {
 
+    ///
+    /// Computes euclidean division with remainder.
+    /// 
+    /// In general, the euclidean division of `lhs` by `rhs` is a tuple `(q, r)` such that
+    /// `lhs = q * rhs + r`, and `r` is "smaller" than "rhs". The notion of smallness is
+    /// given by the smallness of the euclidean degree function [`EuclideanRing::euclidean_deg()`].
+    /// 
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element);
+
+    ///
+    /// Defines how "small" an element is. For details, see [`EuclideanRing`].
+    /// 
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize>;
 
+    ///
+    /// Computes euclidean division without remainder.
+    /// 
+    /// In general, the euclidean division of `lhs` by `rhs` is a tuple `(q, r)` such that
+    /// `lhs = q * rhs + r`, and `r` is "smaller" than "rhs". The notion of smallness is
+    /// given by the smallness of the euclidean degree function [`EuclideanRing::euclidean_deg()`].
+    /// 
     fn euclidean_div(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
         self.euclidean_div_rem(lhs, rhs).0
     }
 
+    ///
+    /// Computes only the remainder of euclidean division.
+    /// 
+    /// In general, the euclidean division of `lhs` by `rhs` is a tuple `(q, r)` such that
+    /// `lhs = q * rhs + r`, and `r` is "smaller" than "rhs". The notion of smallness is
+    /// given by the smallness of the euclidean degree function [`EuclideanRing::euclidean_deg()`].
+    /// 
     fn euclidean_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
         self.euclidean_div_rem(lhs, rhs).1
     }

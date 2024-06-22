@@ -33,19 +33,6 @@ use std::cmp::min;
 /// let binomial_coefficients = P.pow(x_plus_1, 10);
 /// assert_eq!(10 * 9 * 8 * 7 * 6 / 120, *P.coefficient_at(&binomial_coefficients, 5));
 /// ```
-/// To create a ring with a custom allocator, use
-/// ```
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
-/// # use feanor_math::primitive_int::*;
-/// # use std::default::Default;
-/// # use std::rc::Rc;
-/// # use feanor_mempool::*;
-/// let ZZ = StaticRing::<i32>::RING;
-/// // use a mempool allocator from feanor_mempool
-/// let P = DensePolyRing::new_with(ZZ, "X", AllocRc(Rc::<dynsize::DynLayoutMempool>::new(dynsize::DynLayoutMempool::default())));
-/// ```
 /// This ring has a [`CanIsoFromTo`] to [`sparse_poly::SparsePolyRingBase`].
 /// ```
 /// # use feanor_math::assert_el_eq;

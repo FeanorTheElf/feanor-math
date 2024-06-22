@@ -14,6 +14,9 @@ pub trait DivisibilityRing: RingBase {
     /// 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element>;
 
+    ///
+    /// Returns whether the given element is a unit, i.e. has an inverse.
+    /// 
     fn is_unit(&self, x: &Self::Element) -> bool {
         self.checked_left_div(&self.one(), x).is_some()
     }

@@ -506,7 +506,7 @@ impl VectorFn<usize> for Range<usize> {
 /// and will clone the given ring element when called.
 /// 
 /// In order to be compatible with [`crate::iters::multi_cartesian_product()`], it
-/// additionally is also callable with signature (usize, &El<R>) -> El<R>`. In this
+/// additionally is also callable with signature `(usize, &El<R>) -> El<R>`. In this
 /// case, the first parameter is ignored.
 /// 
 #[derive(Copy, Clone)]

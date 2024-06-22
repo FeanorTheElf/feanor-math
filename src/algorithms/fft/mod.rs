@@ -38,24 +38,24 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
     /// of unity can be used equally for computing a Fourier transform, the 
     /// concrete one used determines the order of the output values.
     /// 
-    /// See also [`FFTTable::unordered_fft_permutation`].
+    /// See also [`FFTAlgorithm::unordered_fft_permutation()`].
     /// 
     fn root_of_unity(&self, ring: &R) -> &R::Element;
 
     ///
     /// On input `i`, returns `j` such that `unordered_fft(values)[i]` contains the evaluation
-    /// at `zeta^j` of values. Here `zeta` is the value returned by [`FFTTable::root_of_unity()`]
+    /// at `zeta^j` of values. Here `zeta` is the value returned by [`FFTAlgorithm::root_of_unity()`]
     /// 
     fn unordered_fft_permutation(&self, i: usize) -> usize;
 
     ///
-    /// The inverse of [`FFTTable::unordered_fft_permutation()`], i.e. for all i, have
+    /// The inverse of [`FFTAlgorithm::unordered_fft_permutation()`], i.e. for all i, have
     /// `self.unordered_fft_permutation_inv(self.unordered_fft_permutation(i)) == i`.
     /// 
     fn unordered_fft_permutation_inv(&self, i: usize) -> usize;
 
     ///
-    /// Computes the Fourier transform of the given `values` over the ring [`Self::Ring`].
+    /// Computes the Fourier transform of the given `values` over the specified ring.
     /// The output is in standard order, i.e. the `i`-th output element is the evaluation
     /// of the input at `self.root_of_unity()^-i` (note the `-`, which is standard
     /// convention for Fourier transforms).
@@ -72,7 +72,7 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
     }
         
     ///
-    /// Computes the Fourier transform of the given `values` over the ring [`Self::Ring`].
+    /// Computes the Fourier transform of the given `values` over the specified ring.
     /// The output is in standard order, i.e. the `i`-th output element is the evaluation
     /// of the input at `self.root_of_unity()^i`, divided by `self.len()`.
     /// 
@@ -89,7 +89,7 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
 
     ///
     /// Computes the Fourier transform of the given values, but the output values are arbitrarily permuted
-    /// (in a way compatible with [`FFTTable::unordered_inv_fft()`]).
+    /// (in a way compatible with [`FFTAlgorithm::unordered_inv_fft()`]).
     /// 
     /// Note that the FFT of a sequence `a_0, ..., a_(N - 1)` is defined as `Fa_k = sum_i a_i z^(-ik)`
     /// where `z` is an N-th root of unity.
@@ -98,7 +98,7 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
         where V: SwappableVectorViewMut<R::Element>;
     
     ///
-    /// Inverse to [`Self::unordered_fft()`], with basically the same contract.
+    /// Inverse to [`FFTAlgorithm::unordered_fft()`], with basically the same contract.
     /// 
     fn unordered_inv_fft<V>(&self, values: V, ring: &R)
         where V: SwappableVectorViewMut<R::Element>;

@@ -57,7 +57,7 @@ pub fn poly_div<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_rin
 
 ///
 /// Computes `(q, r, a)` such that `a * lhs = q * rhs + r` and `deg(r) < deg(rhs)`.
-/// The chosen factor `a` is a unit in the base ring and is the smallest possible w.r.t.
+/// The chosen factor `a` is in the base ring and is the smallest possible w.r.t.
 /// divisibility.
 /// 
 pub fn poly_div_domain<P>(ring: P, mut lhs: El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<<P::Type as RingExtension>::BaseRing>)

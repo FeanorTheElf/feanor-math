@@ -42,14 +42,14 @@ use super::*;
 /// 
 /// # A note on division
 /// 
-///  - if the base ring is a field, then F[X] is a PID - we can use XGCD
-///  - if the base ring is Z, then we can consider Z[X]/(f(X)) ⊗ Q and f has the same factorization in Q as
+///  - if the base ring is a field, then `F[X]` is a PID - we can use XGCD
+///  - if the base ring is Z, then we can consider `Z[X]/(f(X)) ⊗ Q` and f has the same factorization in Q as
 ///    in Z (Gauss' lemma)
 ///  - if the base ring is Z/nZ, then it is already quite difficult (GB-like difficulties, see the following).
 ///    We need to use either general linear algebra or GBs (if that is not really the same anyway)
 ///  - if the base ring is a free extension itself, things are again complicated. In general,
 ///    it seems like we cannot avoid Groebner basis here, as even checking whether a polynomial is
-///    in (f(X), g(X, Y), h(X, Y, Z), ...) - i.e. is zero modulo that ideal - requires them;
+///    in `(f(X), g(X, Y), h(X, Y, Z), ...)` - i.e. is zero modulo that ideal - requires them;
 ///    I do not think that I will implement this here - possibly create a trait `IdealMembershipRing`
 ///    and an implementation of general quotient rings
 ///  
@@ -59,7 +59,7 @@ use super::*;
 /// g = 3X + 1
 /// h = 3X^3 - 2X
 /// 
-/// The question is, is h in (f, g) over Z9[X] or equivalently, can we divide h/f in Z9[X]/(g)
+/// The question is, is `h` in `(f, g)` over `Z9[X]` or equivalently, can we divide `h/f` in `Z9[X]/(g)`
 /// 
 /// Note that "euclidean division" can give
 /// ```text

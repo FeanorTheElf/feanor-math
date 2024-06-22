@@ -149,7 +149,8 @@ pub trait PolyRingStore: RingStore
     }
 
     ///
-    /// See [`PolyRing::lc()`].
+    /// Returns a reference to the leading coefficient of the given polynomial, or `None` if the
+    /// polynomial is zero.
     /// 
     fn lc<'a>(&'a self, f: &'a El<Self>) -> Option<&'a El<<Self::Type as RingExtension>::BaseRing>> {
         Some(self.coefficient_at(f, self.degree(f)?))

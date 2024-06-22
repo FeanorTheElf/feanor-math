@@ -1,4 +1,3 @@
-#![allow(soft_unstable)]
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
@@ -23,8 +22,7 @@ extern crate rayon;
 extern crate ndarray;
 
 ///
-/// Contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`],
-/// as well as [`ring::CanHomFrom`] and [`ring::CanIsoFromTo`].
+/// Contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`].
 /// 
 #[macro_use]
 pub mod ring;
@@ -39,7 +37,6 @@ pub mod delegate;
 /// access to the elements of the sequence.
 /// 
 pub mod seq;
-
 ///
 /// Contains the trait [`divisibility::DivisibilityRing`] for rings that provide information
 /// about divisibility of their elements.
@@ -56,8 +53,8 @@ pub mod field;
 /// 
 pub mod pid;
 ///
-/// Contains the trait [`matrix::Matrix`], which is a very minimalistic approach to implement
-/// matrices in this library.
+/// Contains the core of `feanor-math`'s (currently) minimalistic approach to matrices. In particular,
+/// we use [`matrix::Submatrix`] and [`matrix::SubmatrixMut`] for matrices that don't own their data.
 /// 
 pub mod matrix;
 ///

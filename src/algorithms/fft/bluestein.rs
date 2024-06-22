@@ -47,12 +47,12 @@ impl<H, A> BluesteinFFT<Complex64Base, Complex64Base, H, A>
         A: Allocator + Clone
 {
     ///
-    /// Creates an [`FFTTableBluestein`] for the complex field, using the given homomorphism
+    /// Creates an [`BluesteinFFT`] for the complex field, using the given homomorphism
     /// to connect the ring implementation for twiddles with the main ring implementation.
     /// 
     /// This function is mainly provided for parity with other rings, since in the complex case
     /// it currently does not make much sense to use a different homomorphism than the identity.
-    /// Hence, it is simpler to use [`FFTTableBluestein::for_complex()`].
+    /// Hence, it is simpler to use [`BluesteinFFT::for_complex()`].
     /// 
     /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
     /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
@@ -72,7 +72,7 @@ impl<R, A> BluesteinFFT<Complex64Base, Complex64Base, Identity<R>, A>
         A: Allocator + Clone
 {
     ///
-    /// Creates an [`FFTTableBluestein`] for the complex field.
+    /// Creates an [`BluesteinFFT`] for the complex field.
     /// 
     /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
     /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
@@ -90,7 +90,7 @@ impl<R, A> BluesteinFFT<R::Type, R::Type, Identity<R>, A>
         A: Allocator + Clone
 {
     ///
-    /// Creates an [`FFTTableBluestein`] for the given ring, using the given root of unity
+    /// Creates an [`BluesteinFFT`] for the given ring, using the given root of unity
     /// as base.
     /// 
     /// It is necessary that `root_of_unity_2n` is a primitive `2n`-th root of unity, and
@@ -109,7 +109,7 @@ impl<R, A> BluesteinFFT<R::Type, R::Type, Identity<R>, A>
     }
 
     ///
-    /// Creates an [`FFTTableBluestein`] for the given ring, using the passed function to
+    /// Creates an [`BluesteinFFT`] for the given ring, using the passed function to
     /// provide the necessary roots of unity.
     /// 
     /// Concretely, `root_of_unity_2n_pows(i)` should return `z^i`, where `z` is a `2n`-th
@@ -129,7 +129,7 @@ impl<R, A> BluesteinFFT<R::Type, R::Type, Identity<R>, A>
     }
 
     ///
-    /// Creates an [`FFTTableBluestein`] for a prime field, assuming it has suitable roots of
+    /// Creates an [`BluesteinFFT`] for a prime field, assuming it has suitable roots of
     /// unity.
     /// 
     /// Concretely, this requires that the characteristic `p` is congruent to 1 modulo
@@ -154,7 +154,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         A: Allocator + Clone
 {
     ///
-    /// Creates an [`FFTTableBluestein`] for the given rings, using the given root of unity.
+    /// Creates an [`BluesteinFFT`] for the given rings, using the given root of unity.
     /// 
     /// It is necessary that `root_of_unity_2n` is a primitive `2n`-th root of unity, and
     /// `root_of_unity_m` is a `2^log2_m`-th root of unity, where `2^log2_m > 2n`.
@@ -222,8 +222,8 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     }
 
     ///
-    /// Creates an [`FFTTableBluestein`] for the given rings, using the given function to create
-    /// the necessary powers of roots of unity. This is the most generic way to create [`FFTTableBluestein`].
+    /// Creates an [`BluesteinFFT`] for the given rings, using the given function to create
+    /// the necessary powers of roots of unity. This is the most generic way to create [`BluesteinFFT`].
     /// 
     /// Concretely, `root_of_unity_2n_pows(i)` should return `z^i`, where `z` is a `2n`-th
     /// primitive root of unity, and `root_of_unity_m_pows(i)` should return `w^i` where `w`
@@ -271,7 +271,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     }
 
     ///
-    /// Creates an [`FFTTableBluestein`] for the given prime fields, assuming they have suitable
+    /// Creates an [`BluesteinFFT`] for the given prime fields, assuming they have suitable
     /// roots of unity.
     /// 
     /// Concretely, this requires that the characteristic `p` is congruent to 1 modulo
@@ -301,7 +301,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     /// Computes the FFT of the given values using Bluestein's algorithm, using only the passed
     /// buffer as temporary storage.
     /// 
-    /// This will not allocate additional memory, as opposed to [`FFTTableBluestein::fft()`] etc.
+    /// This will not allocate additional memory, as opposed to [`BluesteinFFT::fft()`] etc.
     /// 
     /// Basically, the idea is to write an FFT of any length (e.g. prime length) as a convolution,
     /// and compute the convolution efficiently using a power-of-two FFT (e.g. with the Cooley-Tuckey 
