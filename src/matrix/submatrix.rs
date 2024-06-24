@@ -674,6 +674,11 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         })
     }
 
+    #[stability::unstable(feature = "enable")]
+    pub fn into_at_mut(self, i: usize, j: usize) -> &'a mut T {
+        &mut self.into_row_mut_at(i)[j]
+    }
+
     pub fn at_mut<'b>(&'b mut self, i: usize, j: usize) -> &'b mut T {
         &mut self.row_mut_at(i)[j]
     }
@@ -686,11 +691,16 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         self.as_const().into_row_at(i)
     }
 
-    pub fn row_mut_at<'b>(&'b mut self, i: usize) -> &'b mut [T] {
-        // safe since self is mutably borrowed for 'b
+    #[stability::unstable(feature = "enable")]
+    pub fn into_row_mut_at(self, i: usize) -> &'a mut [T] {
+        // safe since self is exists borrowed for 'a
         unsafe {
             self.raw_data.row_at(i).as_mut()
         }
+    }
+
+    pub fn row_mut_at<'b>(&'b mut self, i: usize) -> &'b mut [T] {
+        self.reborrow().into_row_mut_at(i)
     }
 
     pub fn col_at<'b>(&'b self, j: usize) -> Column<'b, V, T> {

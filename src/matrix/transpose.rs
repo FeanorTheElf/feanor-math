@@ -221,6 +221,15 @@ impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> TransposableSubmatri
     }
 
     #[stability::unstable(feature = "enable")]
+    pub fn into_at_mut(self, i: usize, j: usize) -> &'a mut T {
+        if TRANSPOSED {
+            self.data.into_at_mut(j, i)
+        } else {
+            self.data.into_at_mut(i, j)
+        }
+    }
+
+    #[stability::unstable(feature = "enable")]
     pub fn reborrow<'b>(&'b mut self) -> TransposableSubmatrixMut<'b, V, T, TRANSPOSED> {
         TransposableSubmatrixMut { data: self.data.reborrow() }
     }
