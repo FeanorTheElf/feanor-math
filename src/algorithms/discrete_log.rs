@@ -51,7 +51,10 @@ fn power_p_discrete_log<T, F>(value: T, p_e_base: &T, p: i64, e: usize, op: F, i
     assert!(e > 0);
     assert!(algorithms::miller_rabin::is_prime(ZZ, &p, 8));
 
-    let pow = |x: &T, e: i64| algorithms::sqr_mul::generic_abs_square_and_multiply(x.clone(), &e, ZZ, |a| op(a.clone(), a), |a, b| op(a.clone(), b.clone()), identity.clone());
+    let pow = |x: &T, e: i64| {
+        debug_assert!(e >= 0);
+        algorithms::sqr_mul::generic_abs_square_and_multiply(x.clone(), &e, ZZ, |a| op(a.clone(), a), |a, b| op(a.clone(), b.clone()), identity.clone())
+    };
     let p_base = pow(p_e_base, ZZ.pow(p, e - 1));
     debug_assert_ne!(p_base, identity);
     debug_assert_eq!(pow(&p_base, p), identity);
@@ -60,7 +63,7 @@ fn power_p_discrete_log<T, F>(value: T, p_e_base: &T, p: i64, e: usize, op: F, i
     for i in 0..e {
         let log = baby_giant_step(pow(&current, ZZ.pow(p, e - i - 1)), p_base.clone(), p, &op, identity.clone())?;
         let p_i = ZZ.pow(p, i);
-        let fill = (p - log) * p_i;
+        let fill = (p - log % p) * p_i;
         current = op(current, pow(p_e_base, fill));
         fill_log += fill;
     }
@@ -75,7 +78,10 @@ fn power_p_discrete_log<T, F>(value: T, p_e_base: &T, p: i64, e: usize, op: F, i
 pub fn discrete_log<T, F>(value: T, base: &T, order: i64, op: F, identity: T) -> Option<i64> 
     where F: Fn(T, T) -> T, T: Clone + Hash + Eq + std::fmt::Debug
 {
-    let pow = |x: &T, e: i64| algorithms::sqr_mul::generic_abs_square_and_multiply(x.clone(), &e, ZZ, |a| op(a.clone(), a), |a, b| op(a.clone(), b.clone()), identity.clone());
+    let pow = |x: &T, e: i64| {
+        debug_assert!(e >= 0);
+        algorithms::sqr_mul::generic_abs_square_and_multiply(x.clone(), &e, ZZ, |a| op(a.clone(), a), |a, b| op(a.clone(), b.clone()), identity.clone())
+    };
     debug_assert!(pow(&base, order) == identity);
     let mut current_log = 1;
     let mut current_size = 1;
@@ -135,9 +141,13 @@ fn test_power_p_discrete_log() {
 
 #[test]
 fn test_discrete_log() {
+    // assert_eq!(
+    //     Some(78), 
+    //     discrete_log(78, &1, 132, |a, b| Zn::<132>::RING.add(a, b), 0)
+    // );
     assert_eq!(
-        Some(78), 
-        discrete_log(78, &1, 132, |a, b| Zn::<132>::RING.add(a, b), 0)
+        Some(26),
+        discrete_log(26, &1, 100, |x, y| Zn::<100>::RING.add(x, y), 0)
     );
 }
 
