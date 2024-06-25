@@ -128,7 +128,6 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> Zn<C, J, A>
         let total_ring = zn_big::Zn::new(large_integers, total_modulus);
         let ZZ = total_ring.integer_ring();
         for R in &summands {
-            assert!(R.is_field());
             let R_modulus = R.integer_ring().can_iso(ZZ).unwrap().map_ref(R.modulus());
             assert!(
                 ZZ.is_one(&algorithms::eea::signed_gcd(ZZ.checked_div(total_ring.modulus(), &R_modulus).unwrap(), R_modulus, ZZ)),
@@ -138,10 +137,9 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> Zn<C, J, A>
             assert!(R.integer_ring().get_ring() == summands[0].integer_ring().get_ring());
         }
         let unit_vectors = summands.iter()
-            .map(|R: &C| ZZ.checked_div(total_ring.modulus(), &R.integer_ring().can_iso(ZZ).unwrap().map_ref(R.modulus())).unwrap())
-            .map(|n: El<J>| total_ring.coerce(&ZZ, n))
-            .zip(summands.iter())
-            .map(|(n, R)| total_ring.pow_gen(n, &R.integer_ring().sub_ref_fst(R.modulus(), R.integer_ring().one()), R.integer_ring()))
+            .map(|R: &C| (R, ZZ.checked_div(total_ring.modulus(), &R.integer_ring().can_iso(ZZ).unwrap().map_ref(R.modulus())).unwrap()))
+            .map(|(R, n)| (int_cast(R.any_lift(R.invert(&R.coerce(&ZZ, ZZ.clone_el(&n))).unwrap()), ZZ, R.integer_ring()), n))
+            .map(|(n_mod_inv, n)| total_ring.mul(total_ring.coerce(&ZZ, n_mod_inv), total_ring.coerce(&ZZ, n)))
             .collect();
         RingValue::from(ZnBase {
             components: summands,
@@ -731,7 +729,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> ZnRing for ZnBas
     }
 
     fn is_field(&self) -> bool {
-        self.components.len() == 1
+        self.components.len() == 1 && self.components[0].is_field()
     }
 
     fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element {
@@ -827,8 +825,17 @@ fn test_finite_ring_axioms() {
 }
 
 #[test]
+fn test_not_prime() {
+    let ring = Zn::new(vec![zn_64::Zn::new(15), zn_64::Zn::new(7)], StaticRing::<i64>::RING);
+    let equivalent_ring = zn_big::Zn::new(StaticRing::<i64>::RING, 15 * 7);
+    crate::ring::generic_tests::test_ring_axioms(&ring, ring.elements());
+    crate::divisibility::generic_tests::test_divisibility_axioms(&ring, ring.elements());
+    crate::homomorphism::generic_tests::test_homomorphism_axioms(ring.can_hom(&equivalent_ring).unwrap(), equivalent_ring.elements());
+    crate::homomorphism::generic_tests::test_homomorphism_axioms(ring.can_iso(&equivalent_ring).unwrap(), ring.elements());
+}
+
+#[test]
 #[should_panic]
-fn test_nonprime() {
-    let R = Zn::create_from_primes(StaticRing::<i64>::RING, vec![15, 7]);
-    assert_eq!(7, R.smallest_lift(R.int_hom().map(7)));
+fn test_not_coprime() {
+    Zn::new(vec![zn_64::Zn::new(15), zn_64::Zn::new(35)], StaticRing::<i64>::RING);
 }
