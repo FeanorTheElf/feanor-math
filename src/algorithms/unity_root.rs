@@ -7,7 +7,6 @@ use crate::divisibility::DivisibilityRingStore;
 use crate::integer::IntegerRingStore;
 
 use super::int_factor::factor;
-use super::int_factor::is_prime_power;
 
 #[stability::unstable(feature = "enable")]
 pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usize) -> bool {
@@ -43,8 +42,7 @@ pub fn get_prim_root_of_unity<R>(ring: R, n: usize) -> Option<El<R>>
         R::Type: FiniteRing + Field
 {
     const ZZ: BigIntRing = BigIntRing::RING;
-    let (p, e) = is_prime_power(&ZZ, &ring.size(&ZZ).unwrap()).unwrap();
-    let order = ZZ.mul(ZZ.sub_ref_fst(&p, ZZ.one()), ZZ.pow(p, e - 1));
+    let order = ZZ.sub(ring.size(&ZZ).unwrap(), ZZ.one());
     let power = ZZ.checked_div(&order, &ZZ.coerce(&StaticRing::<i64>::RING, n as i64))?;
     
     let mut rng = oorandom::Rand64::new(ZZ.default_hash(&ring.size(&ZZ).unwrap()) as u128);
@@ -62,8 +60,7 @@ pub fn get_prim_root_of_unity_pow2<R>(ring: R, log2_n: usize) -> Option<El<R>>
         R::Type: FiniteRing + Field
 {
     const ZZ: BigIntRing = BigIntRing::RING;
-    let (p, e) = is_prime_power(&ZZ, &ring.size(&ZZ).unwrap()).unwrap();
-    let order = ZZ.mul(ZZ.sub_ref_fst(&p, ZZ.one()), ZZ.pow(p, e - 1));
+    let order = ZZ.sub(ring.size(&ZZ).unwrap(), ZZ.one());
     let power = ZZ.checked_div(&order, &ZZ.power_of_two(log2_n))?;
     
     let mut rng = oorandom::Rand64::new(ZZ.default_hash(&ring.size(&ZZ).unwrap()) as u128);
@@ -76,9 +73,21 @@ pub fn get_prim_root_of_unity_pow2<R>(ring: R, log2_n: usize) -> Option<El<R>>
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_static::Zn;
+use crate::rings::zn::zn_static::{Zn, Fp};
+#[cfg(test)]
+use crate::algorithms::poly_factor::FactorPolyField;
 #[cfg(test)]
 use crate::homomorphism::*;
+#[cfg(test)]
+use crate::algorithms::cyclotomic::cyclotomic_polynomial;
+#[cfg(test)]
+use crate::rings::poly::dense_poly::DensePolyRing;
+#[cfg(test)]
+use crate::rings::poly::PolyRingStore;
+#[cfg(test)]
+use crate::rings::extension::galois_field::GaloisField;
+#[cfg(test)]
+use crate::rings::extension::galois_field::GF;
 
 #[test]
 fn test_is_prim_root_of_unity() {
@@ -94,4 +103,34 @@ fn test_is_prim_root_of_unity() {
     assert!(!is_prim_root_of_unity(&ring, &ring.int_hom().map(5), 50));
     assert!(is_prim_root_of_unity(&ring, &ring.int_hom().map(6), 10));
     assert!(!is_prim_root_of_unity(&ring, &ring.int_hom().map(6), 50));
+
+    let ring = GF::<2>(23);
+    assert!(is_prim_root_of_unity(&ring, &ring.int_hom().map(-1), 2));
+    assert!(is_prim_root_of_unity(&ring, &ring.int_hom().map(2), 11));
+    let poly_ring = DensePolyRing::new(&ring, "X");
+    let (factorization, _) = <<GaloisField<2> as RingStore>::Type as FactorPolyField>::factor_poly(&poly_ring, &cyclotomic_polynomial(&poly_ring, 16));
+    for (mut factor, _) in factorization {
+        let normalization = poly_ring.base_ring().invert(poly_ring.lc(&factor).unwrap()).unwrap();
+        poly_ring.inclusion().mul_assign_map(&mut factor, normalization);
+        assert!(is_prim_root_of_unity(&ring, poly_ring.coefficient_at(&factor, 0), 16));
+        assert!(is_prim_root_of_unity_pow2(&ring, poly_ring.coefficient_at(&factor, 0), 4));
+    }
+}
+
+#[test]
+fn test_get_prim_root_of_unity() {
+    let ring = Fp::<17>::RING;
+    assert!(is_prim_root_of_unity_pow2(&ring, &get_prim_root_of_unity_pow2(&ring, 4).unwrap(), 4));
+    assert!(get_prim_root_of_unity_pow2(&ring, 5).is_none());
+
+    let ring = Fp::<101>::RING;
+    assert!(is_prim_root_of_unity_pow2(&ring, &get_prim_root_of_unity_pow2(&ring, 2).unwrap(), 2));
+    assert!(is_prim_root_of_unity(&ring, &get_prim_root_of_unity(&ring, 25).unwrap(), 25));
+    assert!(get_prim_root_of_unity_pow2(&ring, 3).is_none());
+    assert!(get_prim_root_of_unity(&ring, 125).is_none());
+    
+    let ring = GF::<2>(23);
+    assert!(is_prim_root_of_unity_pow2(&ring, &get_prim_root_of_unity_pow2(&ring, 4).unwrap(), 4));
+    assert!(get_prim_root_of_unity_pow2(&ring, 5).is_none());
+    assert!(is_prim_root_of_unity(&ring, &get_prim_root_of_unity(&ring, 3).unwrap(), 3));
 }
