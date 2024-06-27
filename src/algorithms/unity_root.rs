@@ -1,11 +1,13 @@
+use crate::field::Field;
+use crate::integer::BigIntRing;
 use crate::ring::*;
-use crate::homomorphism::*;
-use crate::primitive_int::{StaticRing, StaticRingBase};
-use crate::rings::zn::{ZnRing, ZnRingStore};
+use crate::primitive_int::*;
+use crate::rings::finite::*;
 use crate::divisibility::DivisibilityRingStore;
 use crate::integer::IntegerRingStore;
 
 use super::int_factor::factor;
+use super::int_factor::is_prime_power;
 
 #[stability::unstable(feature = "enable")]
 pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usize) -> bool {
@@ -37,14 +39,15 @@ pub fn is_prim_root_of_unity<R: RingStore>(ring: R, el: &El<R>, n: usize) -> boo
 
 #[stability::unstable(feature = "enable")]
 pub fn get_prim_root_of_unity<R>(ring: R, n: usize) -> Option<El<R>>
-    where R: ZnRingStore, R::Type: ZnRing, <R::Type as ZnRing>::IntegerRingBase: CanHomFrom<StaticRingBase<i64>>
+    where R: RingStore, 
+        R::Type: FiniteRing + Field
 {
-    assert!(ring.is_field());
-    let ZZ = ring.integer_ring();
-    let order = ZZ.sub_ref_fst(ring.modulus(), ZZ.one());
+    const ZZ: BigIntRing = BigIntRing::RING;
+    let (p, e) = is_prime_power(&ZZ, &ring.size(&ZZ).unwrap()).unwrap();
+    let order = ZZ.mul(ZZ.sub_ref_fst(&p, ZZ.one()), ZZ.pow(p, e - 1));
     let power = ZZ.checked_div(&order, &ZZ.coerce(&StaticRing::<i64>::RING, n as i64))?;
     
-    let mut rng = oorandom::Rand64::new(ZZ.default_hash(ring.modulus()) as u128);
+    let mut rng = oorandom::Rand64::new(ZZ.default_hash(&ring.size(&ZZ).unwrap()) as u128);
     let mut current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZ);
     while !is_prim_root_of_unity(&ring, &current, n) {
         current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZ);
@@ -55,14 +58,15 @@ pub fn get_prim_root_of_unity<R>(ring: R, n: usize) -> Option<El<R>>
 
 #[stability::unstable(feature = "enable")]
 pub fn get_prim_root_of_unity_pow2<R>(ring: R, log2_n: usize) -> Option<El<R>>
-    where R: ZnRingStore, R::Type: ZnRing, <R::Type as ZnRing>::IntegerRingBase: CanHomFrom<StaticRingBase<i64>>
+    where R: RingStore, 
+        R::Type: FiniteRing + Field
 {
-    assert!(ring.is_field());
-    let ZZ = ring.integer_ring();
-    let order = ZZ.sub_ref_fst(ring.modulus(), ZZ.one());
+    const ZZ: BigIntRing = BigIntRing::RING;
+    let (p, e) = is_prime_power(&ZZ, &ring.size(&ZZ).unwrap()).unwrap();
+    let order = ZZ.mul(ZZ.sub_ref_fst(&p, ZZ.one()), ZZ.pow(p, e - 1));
     let power = ZZ.checked_div(&order, &ZZ.power_of_two(log2_n))?;
     
-    let mut rng = oorandom::Rand64::new(ZZ.default_hash(ring.modulus()) as u128);
+    let mut rng = oorandom::Rand64::new(ZZ.default_hash(&ring.size(&ZZ).unwrap()) as u128);
     let mut current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZ);
     while !is_prim_root_of_unity_pow2(&ring, &current, log2_n) {
         current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZ);
@@ -73,6 +77,8 @@ pub fn get_prim_root_of_unity_pow2<R>(ring: R, log2_n: usize) -> Option<El<R>>
 
 #[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
+#[cfg(test)]
+use crate::homomorphism::*;
 
 #[test]
 fn test_is_prim_root_of_unity() {

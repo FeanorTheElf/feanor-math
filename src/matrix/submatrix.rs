@@ -158,8 +158,9 @@ unsafe impl<'a, T> AsPointerToSlice<T> for AsFirstElement<T> {
 /// // this is UB now!
 /// let (ref1, ref2) = unsafe { (ptr1.as_mut(), ptr2.as_mut()) };
 /// ```
-/// 
-struct SubmatrixRaw<V, T>
+///
+#[stability::unstable(feature = "enable")]
+pub struct SubmatrixRaw<V, T>
     where V: AsPointerToSlice<T>
 {
     entry: PhantomData<*mut T>,
@@ -215,7 +216,8 @@ impl<V, T> SubmatrixRaw<V, T>
     /// give pointers `ptr1` and `ptr2` (via [`AsPointerToSlice::get_pointer()`]), then `ptr1.offset(cols_start + k)` and
     /// `ptr2.offset(cols_start + l)` for `0 <= k, l < col_count` never alias.
     /// 
-    unsafe fn new(rows: NonNull<V>, row_count: usize, row_step: isize, cols_start: usize, col_count: usize) -> Self {
+    #[stability::unstable(feature = "enable")]
+    pub unsafe fn new(rows: NonNull<V>, row_count: usize, row_step: isize, cols_start: usize, col_count: usize) -> Self {
         Self {
             entry: PhantomData,
             row_count: row_count,
@@ -226,7 +228,8 @@ impl<V, T> SubmatrixRaw<V, T>
         }
     }
 
-    fn restrict_rows(mut self, rows: Range<usize>) -> Self {
+    #[stability::unstable(feature = "enable")]
+    pub fn restrict_rows(mut self, rows: Range<usize>) -> Self {
         assert!(rows.start <= rows.end);
         assert!(rows.end <= self.row_count);
         // this is safe since we require (during the constructor) that all pointers `rows.offset(i * row_step)`
@@ -241,7 +244,8 @@ impl<V, T> SubmatrixRaw<V, T>
         self
     }
 
-    fn restrict_cols(mut self, cols: Range<usize>) -> Self {
+    #[stability::unstable(feature = "enable")]
+    pub fn restrict_cols(mut self, cols: Range<usize>) -> Self {
         assert!(cols.end <= self.col_count);
         self.col_count = cols.end - cols.start;
         self.col_start += cols.start;
@@ -252,7 +256,8 @@ impl<V, T> SubmatrixRaw<V, T>
     /// Returns a pointer to the `row`-th row of the matrix.
     /// Be carefull about aliasing when making this into a reference!
     /// 
-    fn row_at(&self, row: usize) -> NonNull<[T]> {
+    #[stability::unstable(feature = "enable")]
+    pub fn row_at(&self, row: usize) -> NonNull<[T]> {
         assert!(row < self.row_count);
         // this is safe since `row < row_count` and we require `rows.offset(row * row_step)` to point
         // to a valid element of `V`
@@ -269,7 +274,8 @@ impl<V, T> SubmatrixRaw<V, T>
     /// Returns a pointer to the `(row, col)`-th entry of the matrix.
     /// Be carefull about aliasing when making this into a reference!
     /// 
-    fn entry_at(&self, row: usize, col: usize) -> NonNull<T> {
+    #[stability::unstable(feature = "enable")]
+    pub fn entry_at(&self, row: usize, col: usize) -> NonNull<T> {
         assert!(row < self.row_count);
         assert!(col < self.col_count);
         // this is safe since `row < row_count` and we require `rows.offset(row * row_step)` to point

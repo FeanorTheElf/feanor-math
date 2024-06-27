@@ -220,11 +220,13 @@ impl<H, T1, T2> FFTErrorEstimate for CoprimeCooleyTuckeyFFT<Complex64Base, Compl
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_static::Zn;
+use crate::rings::zn::zn_static::{Zn, Fp};
 #[cfg(test)]
 use crate::algorithms;
 #[cfg(test)]
 use crate::rings::zn::zn_64;
+#[cfg(test)]
+use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
 use std::alloc::Global;
 
@@ -249,7 +251,7 @@ fn test_fft_basic() {
 
 #[test]
 fn test_fft_long() {
-    let ring = Zn::<97>::RING;
+    let ring = Fp::<97>::RING;
     let z = ring.int_hom().map(39);
     let fft = CoprimeCooleyTuckeyFFT::new(ring, ring.pow(z, 4), 
         bluestein::BluesteinFFT::new(ring, ring.pow(z, 6), ring.pow(z, 3), 8, 5, Global),
@@ -268,7 +270,7 @@ fn test_fft_long() {
 
 #[test]
 fn test_fft_unordered() {
-    let ring = Zn::<1409>::RING;
+    let ring = Fp::<1409>::RING;
     let z = algorithms::unity_root::get_prim_root_of_unity(ring, 64 * 11).unwrap();
     let fft = CoprimeCooleyTuckeyFFT::new(
         ring, 
@@ -300,7 +302,7 @@ fn test_fft_unordered() {
 
 #[test]
 fn test_unordered_fft_permutation_inv() {
-    let ring = Zn::<1409>::RING;
+    let ring = Fp::<1409>::RING;
     let z = algorithms::unity_root::get_prim_root_of_unity(ring, 64 * 11).unwrap();
     let fft = CoprimeCooleyTuckeyFFT::new(
         ring, 
@@ -316,7 +318,7 @@ fn test_unordered_fft_permutation_inv() {
 
 #[test]
 fn test_inv_fft() {
-    let ring = Zn::<97>::RING;
+    let ring = Fp::<97>::RING;
     let z = ring.int_hom().map(39);
     let fft = CoprimeCooleyTuckeyFFT::new(ring, ring.pow(z, 16), 
         bluestein::BluesteinFFT::new(ring, ring.pow(z, 24), ring.pow(z, 12), 2, 3, Global),
@@ -355,12 +357,14 @@ fn bench_factor_fft(bencher: &mut test::Bencher) {
     let ring = zn_64::Zn::new(1602564097);
     let fastmul_ring = zn_64::ZnFastmul::new(ring);
     let embedding = ring.can_hom(&fastmul_ring).unwrap();
-    let root_of_unity = fastmul_ring.coerce(&ring, algorithms::unity_root::get_prim_root_of_unity(&ring, 2 * 31 * 601).unwrap());
+    let ring_as_field = ring.as_field().ok().unwrap();
+    let root_of_unity = fastmul_ring.coerce(&ring, ring_as_field.get_ring().unwrap_element(algorithms::unity_root::get_prim_root_of_unity(&ring_as_field, 2 * 31 * 601).unwrap()));
+    let fastmul_ring_as_field = fastmul_ring.as_field().ok().unwrap();
     let fft = CoprimeCooleyTuckeyFFT::new_with_hom(
         embedding.clone(), 
         fastmul_ring.pow(root_of_unity, 2),
-        bluestein::BluesteinFFT::new_with_hom(embedding.clone(), fastmul_ring.pow(root_of_unity, 31), algorithms::unity_root::get_prim_root_of_unity_pow2(&fastmul_ring, 11).unwrap(), 601, 11, Global),
-        bluestein::BluesteinFFT::new_with_hom(embedding, fastmul_ring.pow(root_of_unity, 601), algorithms::unity_root::get_prim_root_of_unity_pow2(&fastmul_ring, 6).unwrap(), 31, 6, Global),
+        bluestein::BluesteinFFT::new_with_hom(embedding.clone(), fastmul_ring.pow(root_of_unity, 31), fastmul_ring_as_field.get_ring().unwrap_element(algorithms::unity_root::get_prim_root_of_unity_pow2(&fastmul_ring_as_field, 11).unwrap()), 601, 11, Global),
+        bluestein::BluesteinFFT::new_with_hom(embedding, fastmul_ring.pow(root_of_unity, 601), fastmul_ring_as_field.get_ring().unwrap_element(algorithms::unity_root::get_prim_root_of_unity_pow2(&fastmul_ring_as_field, 6).unwrap()), 31, 6, Global),
     );
     let data = (0..(31 * 601)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(31 * 601);

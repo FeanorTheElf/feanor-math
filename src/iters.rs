@@ -1,4 +1,4 @@
-use std::{convert::TryInto, cmp::min};
+use std::{cmp::min, convert::TryInto, iter::FusedIterator};
 
 ///
 /// Clones of the used base iterator must have the same iteration order as the iterator itself
@@ -232,6 +232,7 @@ pub fn multiset_combinations<'a, F, T>(multiset: &'a [usize], size: usize, conve
 }
 
 #[derive(Debug)]
+#[deprecated]
 pub struct Product<I, J>
     where I: Iterator, I::Item: Clone, J: Iterator + Clone
 {
@@ -241,9 +242,11 @@ pub struct Product<I, J>
     j: J
 }
 
+#[allow(deprecated)]
 impl<I, J> Clone for Product<I, J>
     where I: Iterator + Clone, I::Item: Clone, J: Iterator + Clone
 {
+    #[allow(deprecated)]
     fn clone(&self) -> Self {
         Self {
             base_j: self.base_j.clone(),
@@ -254,11 +257,14 @@ impl<I, J> Clone for Product<I, J>
     }
 }
 
+#[allow(deprecated)]
 impl<I, J> Iterator for Product<I, J>
     where I: Iterator, I::Item: Clone, J: Iterator + Clone
 {
+    #[allow(deprecated)]
     type Item = (I::Item, J::Item);
 
+    #[allow(deprecated)]
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(fst) = &self.current_i {
             if let Some(next_j) = self.j.next() {
@@ -275,13 +281,17 @@ impl<I, J> Iterator for Product<I, J>
     }
 }
 
+#[allow(deprecated)]
 impl<I, J> std::iter::FusedIterator for Product<I, J> 
     where I: Iterator, I::Item: Clone, J: Iterator + Clone
 {}
 
+#[allow(deprecated)]
+#[deprecated]
 pub fn cartesian_product<I, J>(mut it1: I, it2: J) -> Product<I, J>
     where I: Iterator, I::Item: Clone, J: Iterator + Clone
 {
+    #[allow(deprecated)]
     Product {
         base_j: it2.clone(),
         current_i: it1.next(),
@@ -349,6 +359,12 @@ impl<I, F, G, T> Iterator for MultiProduct<I, F, G, T>
         return Some(result);
     }
 }
+
+impl<I, F, G, T> FusedIterator for MultiProduct<I, F, G, T>
+    where I: Iterator + Clone, 
+        F: Clone + FnMut(&[I::Item]) -> T,
+        G: Clone + Fn(usize, &I::Item) -> I::Item
+{}
 
 ///
 /// Creates an iterator that computes the cartesian product of the elements
@@ -503,6 +519,7 @@ fn test_powerset() {
     ], basic_powerset(a.iter().copied()).collect::<Vec<_>>());
 }
 
+#[allow(deprecated)]
 #[test]
 fn test_cartesian_product() {
     let a = [1, 2, 3];
@@ -513,6 +530,7 @@ fn test_cartesian_product() {
     assert_eq!((&1, &6), it.next().unwrap());
 }
 
+#[allow(deprecated)]
 #[test]
 fn test_multi_cartesian_product() {
     let a = [0, 1];

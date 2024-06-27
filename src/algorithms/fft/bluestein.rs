@@ -292,8 +292,9 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     {
         let ZZ = StaticRing::<i64>::RING;
         let log2_m = ZZ.abs_log2_ceil(&(2 * n as i64 + 1)).unwrap();
-        let root_of_unity_2n = algorithms::unity_root::get_prim_root_of_unity(hom.domain(), 2 * n)?;
-        let root_of_unity_m = algorithms::unity_root::get_prim_root_of_unity_pow2(hom.domain(), log2_m)?;
+        let ring_as_field = hom.domain().as_field().ok().unwrap();
+        let root_of_unity_2n = ring_as_field.get_ring().unwrap_element(algorithms::unity_root::get_prim_root_of_unity(&ring_as_field, 2 * n)?);
+        let root_of_unity_m = ring_as_field.get_ring().unwrap_element(algorithms::unity_root::get_prim_root_of_unity_pow2(&ring_as_field, log2_m)?);
         Some(Self::new_with_hom(hom, root_of_unity_2n, root_of_unity_m, n, log2_m, tmp_mem_allocator))
     }
 }
