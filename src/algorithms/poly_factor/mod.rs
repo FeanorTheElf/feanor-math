@@ -398,6 +398,7 @@ impl<R> FactorPolyField for R
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self> 
     {
         assert!(!poly_ring.is_zero(poly));
+        let even_char = BigIntRing::RING.is_even(&poly_ring.base_ring().characteristic(&BigIntRing::RING).unwrap());
 
         let mut result = Vec::new();
         let mut unit = poly_ring.base_ring().one();
@@ -436,6 +437,10 @@ impl<R> FactorPolyField for R
                         if !found {
                             result.push((current, 1));
                         }
+                    } else if even_char {
+                        let factor = cantor_zassenhaus::cantor_zassenhaus_even(&poly_ring, poly_ring.clone_el(&current), d);
+                        stack.push(poly_ring.checked_div(&current, &factor).unwrap());
+                        stack.push(factor);
                     } else {
                         let factor = cantor_zassenhaus::cantor_zassenhaus(&poly_ring, poly_ring.clone_el(&current), d);
                         stack.push(poly_ring.checked_div(&current, &factor).unwrap());
