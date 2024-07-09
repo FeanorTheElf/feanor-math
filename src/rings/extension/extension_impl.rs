@@ -140,6 +140,10 @@ impl<R, V, A> Clone for FreeAlgebraImplBase<R, V, A>
     }
 }
 
+impl<R, V, A> Copy for FreeAlgebraImplBase<R, V, A>
+    where R: RingStore + Copy, V: VectorView<El<R>> + Copy, A: Allocator + Copy
+{}
+
 impl<R, V, A> PartialEq for FreeAlgebraImplBase<R, V, A>
     where R: RingStore, V: VectorView<El<R>>, A: Allocator + Clone
 {
@@ -491,9 +495,9 @@ fn test_ring_axioms() {
 #[test]
 fn test_free_algebra_axioms() {
     let (ring, _) = test_ring1_and_elements();
-    generic_test_free_algebra_axioms(ring);
+    super::generic_tests::test_free_algebra_axioms(ring);
     let (ring, _) = test_ring2_and_elements();
-    generic_test_free_algebra_axioms(ring);
+    super::generic_tests::test_free_algebra_axioms(ring);
 }
 
 #[test]

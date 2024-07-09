@@ -29,3 +29,22 @@ pub trait FieldStore: RingStore + EuclideanRingStore
 impl<R> FieldStore for R
     where R: RingStore, R::Type: Field
 {}
+
+#[cfg(any(test, feature = "generic_tests"))]
+pub mod generic_tests {
+    use super::*;
+
+    pub fn test_field_axioms<R, I>(R: R, edge_case_elements: I)
+        where R: FieldStore, R::Type: Field, I: Iterator<Item = El<R>>
+    {
+        let edge_case_elements = edge_case_elements.collect::<Vec<_>>();
+        for (i, a) in edge_case_elements.iter().enumerate() {
+            for (j, b) in edge_case_elements.iter().enumerate() {
+                assert!(i == j || !R.eq_el(&a, &b));
+                if !R.is_zero(&b) {
+                    assert_el_eq!(&R, &a, &R.mul_ref_fst(&b, R.div(&a, &b)));
+                }
+            }
+        }
+    }
+}

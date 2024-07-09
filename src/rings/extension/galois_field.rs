@@ -1,8 +1,9 @@
+use crate::integer::IntegerRingStore;
 use crate::ring::*;
 use crate::algorithms::int_factor;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::primitive_int::StaticRing;
-use crate::rings::extension::RingStore;
+use crate::rings::extension::{Homomorphism, RingStore};
 use crate::rings::field::AsField;
 use crate::rings::finite::FiniteRingStore;
 use crate::rings::poly::dense_poly::DensePolyRing;
@@ -10,6 +11,7 @@ use crate::rings::poly::PolyRingStore;
 use crate::rings::zn::zn_64::Zn;
 use crate::rings::zn::ZnRingStore;
 
+use super::conway::*;
 use super::extension_impl::FreeAlgebraImpl;
 
 pub type GaloisField<const DEGREE: usize> = AsField<FreeAlgebraImpl<AsField<Zn>, [El<AsField<Zn>>; DEGREE]>>;
@@ -40,7 +42,6 @@ pub type GaloisFieldDyn = AsField<FreeAlgebraImpl<AsField<Zn>, Box<[El<AsField<Z
 /// ```
 /// 
 pub fn GF<const DEGREE: usize>(p: u64) -> GaloisField<DEGREE> {
-    assert!(p > 2, "binary galois fields are currently not supported");
     assert!(DEGREE > 1);
     let Fp = Zn::new(p).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(Fp, "X");
@@ -81,7 +82,6 @@ pub fn GF<const DEGREE: usize>(p: u64) -> GaloisField<DEGREE> {
 /// 
 pub fn GFdyn(power_of_p: u64) -> GaloisFieldDyn {
     let (p, e) = int_factor::is_prime_power(&StaticRing::<i64>::RING, &(power_of_p as i64)).unwrap();
-    assert!(p > 2, "binary galois fields are currently not supported");
     assert!(e > 1);
     let Fp = Zn::new(p as u64).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(Fp, "X");
@@ -96,33 +96,78 @@ pub fn GFdyn(power_of_p: u64) -> GaloisFieldDyn {
     }
 }
 
-#[cfg(test)]
-use crate::field::FieldStore;
+///
+/// Creates a finite/galois field, using a generating polynomial from a table of Conway polynomials.
+/// Since Conway polynomials are unique, this is useful for comparison with other Computer Algebra systems
+/// that support Conway polynomials, e.g. SAGE.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::extension::*;
+/// # use feanor_math::rings::finite::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::rings::extension::galois_field::*;
+/// # use feanor_math::rings::poly::dense_poly::DensePolyRing;
+/// # use feanor_math::rings::poly::*;
+/// let F32 = GF_conway(32);
+/// let F2 = F32.base_ring();
+/// let poly_ring = DensePolyRing::new(F2, "x");
+/// let gen_poly = F32.generating_poly(&poly_ring, F2.identity());
+/// // SAGE: GF(32).gen().minpoly() == x^5 + x^2 + 1
+/// assert_el_eq!(&poly_ring, &poly_ring.from_terms([(F2.one(), 0), (F2.one(), 2), (F2.one(), 5)].into_iter()), &gen_poly);
+/// ```
+/// 
+pub fn GF_conway(power_of_p: u64) -> GaloisFieldDyn {
+    if power_of_p % 2 == 0 {
+        let log_q = StaticRing::<i64>::RING.abs_log2_ceil(&(power_of_p as i64)).unwrap();
+        assert!(power_of_p == 1 << log_q);
+        assert!(log_q >= 2);
+        if log_q - 2 >= EVEN_CONWAY_POLYNOMIALS.len() {
+            panic!("{} not in table of Conway polynomials", power_of_p);
+        }
+        let Fp = Zn::new(2).as_field().ok().unwrap();
+        let int_hom = Fp.int_hom();
+        return FreeAlgebraImpl::new(Fp, EVEN_CONWAY_POLYNOMIALS[log_q - 2].iter().take(log_q).map(|c| int_hom.map(*c)).collect::<Vec<_>>().into_boxed_slice()).as_field().ok().unwrap();
+    } else {
+        let (p, e) = int_factor::is_prime_power(&StaticRing::<i64>::RING, &(power_of_p as i64)).unwrap();
+        assert!(e > 1);
+        match ODD_CONWAY_POLYNOMIALS.binary_search_by_key(&power_of_p, |(q, _)| *q) {
+            Ok(idx) => {
+                let Fp = Zn::new(p as u64).as_field().ok().unwrap();
+                let int_hom = Fp.int_hom();
+                return FreeAlgebraImpl::new(Fp, ODD_CONWAY_POLYNOMIALS[idx].1.iter().take(e).map(|c| int_hom.map(*c)).collect::<Vec<_>>().into_boxed_slice()).as_field().ok().unwrap();
+            },
+            Err(_) => panic!("{} not in table of Conway polynomials", power_of_p)
+        }
+    }
+}
 
 #[test]
 fn test_GF() {
     let F27 = GF::<3>(3);
     assert_eq!(27, F27.elements().count());
-    for (i, a) in F27.elements().enumerate() {
-        for (j, b) in F27.elements().enumerate() {
-            assert!(i == j || !F27.eq_el(&a, &b));
-            if !F27.is_zero(&b) {
-                assert_el_eq!(&F27, &a, &F27.mul_ref_fst(&b, F27.div(&a, &b)));
-            }
-        }
-    }
+    crate::field::generic_tests::test_field_axioms(F27, F27.elements());
 }
 
 #[test]
 fn test_GFdyn() {
     let F27 = GFdyn(27);
     assert_eq!(27, F27.elements().count());
-    for (i, a) in F27.elements().enumerate() {
-        for (j, b) in F27.elements().enumerate() {
-            assert!(i == j || !F27.eq_el(&a, &b));
-            if !F27.is_zero(&b) {
-                assert_el_eq!(&F27, &a, &F27.mul_ref_fst(&b, F27.div(&a, &b)));
-            }
-        }
-    }
+    crate::field::generic_tests::test_field_axioms(&F27, F27.elements());
+}
+
+#[test]
+fn test_GFdyn_even() {
+    let F16 = GFdyn(16);
+    assert_eq!(16, F16.elements().count());
+    crate::field::generic_tests::test_field_axioms(&F16, F16.elements());
+}
+
+#[test]
+fn test_GF_conway() {
+    let F16 = GF_conway(16);
+    assert_eq!(16, F16.elements().count());
+    crate::field::generic_tests::test_field_axioms(&F16, F16.elements());
 }
