@@ -84,7 +84,7 @@ impl<R> PrincipalIdealRingStore for R
 /// # use feanor_math::primitive_int::*;
 /// let ring = StaticRing::<i64>::RING;
 /// let (q, r) = ring.euclidean_div_rem(14, &6);
-/// assert_el_eq!(&ring, &14, &ring.add(ring.mul(q, 6), r));
+/// assert_el_eq!(ring, 14, ring.add(ring.mul(q, 6), r));
 /// assert!(ring.euclidean_deg(&r) < ring.euclidean_deg(&6));
 /// ```
 /// 
@@ -161,7 +161,7 @@ pub mod generic_tests {
                 }
                 let (q, r) = ring.euclidean_div_rem(ring.clone_el(a), b);
                 assert!(ring.euclidean_deg(b).is_none() || ring.euclidean_deg(&r).unwrap_or(usize::MAX) < ring.euclidean_deg(b).unwrap());
-                assert_el_eq!(&ring, a, &ring.add(ring.mul(q, ring.clone_el(b)), r));
+                assert_el_eq!(ring, a, ring.add(ring.mul(q, ring.clone_el(b)), r));
             }
         }
     }
@@ -179,7 +179,7 @@ pub mod generic_tests {
                     let g2 = ring.mul_ref(a, c);
                     let (s, t, g) = ring.extended_ideal_gen(&g1, &g2);
                     assert!(ring.checked_div(&g, a).is_some(), "Wrong ideal generator: ({}) contains the ideal I = ({}, {}), but extended_ideal_gen() found a generator I = ({}) that does not satisfy {} | {}", ring.format(a), ring.format(&g1), ring.format(&g2), ring.format(&g), ring.format(a), ring.format(&g));
-                    assert_el_eq!(&ring, &g, &ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2)));
+                    assert_el_eq!(ring, g, ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2)));
                 }
             }
         }
@@ -189,7 +189,7 @@ pub mod generic_tests {
                 let g2 = ring.mul_ref_fst(a, ring.add_ref_fst(b, ring.one()));
                 let (s, t, g) = ring.extended_ideal_gen(&g1, &g2);
                 assert!(ring.checked_div(&g, a).is_some() && ring.checked_div(a, &g).is_some(), "Expected ideals ({}) and I = ({}, {}) to be equal, but extended_ideal_gen() returned generator {} of I", ring.format(a), ring.format(&g1), ring.format(&g2), ring.format(&g));
-                assert_el_eq!(&ring, &g, &ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2)));
+                assert_el_eq!(ring, g, ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2)));
             }
         }
     }

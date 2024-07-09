@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::divisibility::*;
 use crate::ring::*;
 use crate::homomorphism::*;
 
@@ -154,6 +155,37 @@ pub trait PolyRingStore: RingStore
     /// 
     fn lc<'a>(&'a self, f: &'a El<Self>) -> Option<&'a El<<Self::Type as RingExtension>::BaseRing>> {
         Some(self.coefficient_at(f, self.degree(f)?))
+    }
+    
+    ///
+    /// Divides each coefficient of this polynomial by its leading coefficient, thus making it monic.
+    /// 
+    /// Panics if the leading coefficient is not a unit.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::rings::poly::*;
+    /// # use feanor_math::assert_el_eq;
+    /// # use feanor_math::rings::poly::dense_poly::*;
+    /// # use feanor_math::primitive_int::*;
+    /// let P = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    /// let f = P.from_terms([(6, 0), (3, 1)].into_iter());
+    /// assert_el_eq!(P, P.from_terms([(2, 0), (1, 1)].into_iter()), P.normalize(f));
+    /// ```
+    /// 
+    fn normalize(&self, mut f: El<Self>) -> El<Self>
+        where <<Self::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain
+    {
+        if self.is_zero(&f) {
+            return f;
+        } else if let Some(inv_lc) = self.base_ring().invert(self.lc(&f).unwrap()) {
+            self.inclusion().mul_assign_map_ref(&mut f, &inv_lc);
+            return f;
+        } else {
+            let lc = self.lc(&f).unwrap();
+            return self.from_terms(self.terms(&f).map(|(c, i)| (self.base_ring().checked_div(c, &lc).unwrap(), i)));
+        }
     }
 
     ///
@@ -366,7 +398,7 @@ pub mod generic_tests {
                             ring.mul(ring.inclusion().map_ref(b), ring.mul_ref_snd(ring.inclusion().map_ref(c), &x)),
                             ring.mul(ring.inclusion().map_ref(b), ring.mul(ring.inclusion().map_ref(d), ring.pow(ring.clone_el(&x), 2)))
                         ].into_iter());
-                        assert_el_eq!(&ring, &result, &ring.mul(a_bx, c_dx));
+                        assert_el_eq!(ring, result, ring.mul(a_bx, c_dx));
                     }
                 }
             }
@@ -382,8 +414,8 @@ pub mod generic_tests {
                         ring.mul(ring.inclusion().map_ref(c), ring.pow(ring.clone_el(&x), 3))
                     ].into_iter());
                     let actual = ring.from_terms([(ring.base_ring().clone_el(a), 0), (ring.base_ring().clone_el(c), 3), (ring.base_ring().clone_el(b), 1)].into_iter());
-                    assert_el_eq!(&ring, &f, &actual);
-                    assert_el_eq!(&ring, &f, &ring.from_terms(ring.terms(&f).map(|(c, i)| (ring.base_ring().clone_el(c), i))));
+                    assert_el_eq!(ring, f, actual);
+                    assert_el_eq!(ring, f, ring.from_terms(ring.terms(&f).map(|(c, i)| (ring.base_ring().clone_el(c), i))));
                 }
             }
         }

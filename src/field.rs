@@ -42,7 +42,7 @@ pub mod generic_tests {
             for (j, b) in edge_case_elements.iter().enumerate() {
                 assert!(i == j || !R.eq_el(&a, &b));
                 if !R.is_zero(&b) {
-                    assert_el_eq!(&R, &a, &R.mul_ref_fst(&b, R.div(&a, &b)));
+                    assert_el_eq!(R, a, R.mul_ref_fst(&b, R.div(&a, &b)));
                 }
             }
         }

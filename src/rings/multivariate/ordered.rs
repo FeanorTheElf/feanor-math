@@ -610,7 +610,7 @@ fn test_add() {
     ].into_iter());
 
     let actual = ring.add_ref(&lhs, &rhs);
-    assert_el_eq!(&ring, &expected, &actual);
+    assert_el_eq!(ring, expected, actual);
 
     let lhs = ring.from_terms([
         (1, Monomial::new([1, 0, 0])),
@@ -633,7 +633,7 @@ fn test_add() {
     ].into_iter());
 
     let actual = ring.add_ref(&lhs, &rhs);
-    assert_el_eq!(&ring, &expected, &actual);
+    assert_el_eq!(ring, expected, actual);
 }
 
 #[cfg(test)]
@@ -692,18 +692,18 @@ fn test_add_assign_from_terms() {
     assert_eq!(expected.len(), ring.terms(&lhs).count());
     for (e, a) in expected.iter().zip(ring.terms(&lhs)) {
         assert_eq!(e.1, *a.1);
-        assert_el_eq!(ring.base_ring(), &e.0, &a.0);
+        assert_el_eq!(ring.base_ring(), e.0, a.0);
     }
 
     let lhs = ring.from_terms([(1, Monomial::new([0, 0, 0]))].into_iter().filter(|_| std::hint::black_box(true)));
 
-    assert_el_eq!(&ring, &ring.one(), &lhs);
+    assert_el_eq!(ring, ring.one(), lhs);
 
     let value = ring.from_terms((0..100).map(|i| (1, Monomial::new([i, 0, 0]))).chain((0..100).map(|i| (0, Monomial::new([0, i, 0])))).filter(|_| true));
 
     assert_eq!(100, ring.terms(&value).count());
 
-    assert_el_eq!(&ring, &ring.zero(), &ring.from_terms([].into_iter()));
+    assert_el_eq!(ring, ring.zero(), ring.from_terms([].into_iter()));
 }
 
 #[test]

@@ -402,7 +402,7 @@ macro_rules! delegate {
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::assert_el_eq;
 /// 
-/// assert_el_eq!(&StaticRing::<i32>::RING, &3, &3);
+/// assert_el_eq!(StaticRing::<i32>::RING, 3, 3);
 /// // is equivalent to
 /// assert_eq!(3, 3);
 /// ```
@@ -414,15 +414,15 @@ macro_rules! delegate {
 /// # use feanor_math::assert_el_eq;
 /// 
 /// // this does not have an equivalent representation with assert_eq!
-/// assert_el_eq!(&BigIntRing::RING, &BigIntRing::RING.int_hom().map(3), &BigIntRing::RING.int_hom().map(3));
+/// assert_el_eq!(BigIntRing::RING, BigIntRing::RING.int_hom().map(3), BigIntRing::RING.int_hom().map(3));
 /// ```
 /// 
 #[macro_export]
 macro_rules! assert_el_eq {
     ($ring:expr, $lhs:expr, $rhs:expr) => {
-        match ($ring, $lhs, $rhs) {
+        match (&$ring, &$lhs, &$rhs) {
             (ring_val, lhs_val, rhs_val) => {
-                assert!(ring_val.eq_el(lhs_val, rhs_val), "Assertion failed: {} != {}", <_ as $crate::ring::RingStore>::format(ring_val, lhs_val), <_ as $crate::ring::RingStore>::format(ring_val, rhs_val));
+                assert!(<_ as $crate::ring::RingStore>::eq_el(ring_val, lhs_val, rhs_val), "Assertion failed: {} != {}", <_ as $crate::ring::RingStore>::format(ring_val, lhs_val), <_ as $crate::ring::RingStore>::format(ring_val, rhs_val));
             }
         }
     }
@@ -456,9 +456,9 @@ macro_rules! assert_el_eq {
 /// }
 /// 
 /// let ring: RingValue<StaticRingBase<i64>> = StaticRing::<i64>::RING;
-/// assert_el_eq!(&ring, &7, &add_in_ring(ring, 3, 4));
-/// assert_el_eq!(&ring, &7, &add_in_ring(&ring, 3, 4));
-/// assert_el_eq!(&ring, &7, &add_in_ring(Rc::new(ring), 3, 4));
+/// assert_el_eq!(ring, 7, add_in_ring(ring, 3, 4));
+/// assert_el_eq!(ring, 7, add_in_ring(&ring, 3, 4));
+/// assert_el_eq!(ring, 7, add_in_ring(Rc::new(ring), 3, 4));
 /// ```
 /// 
 /// # What does this do?
@@ -1102,8 +1102,8 @@ pub mod generic_tests {
         test_iso_axioms(&ring, &ring, elements.iter().map(|x| ring.clone_el(x)));
 
         for a in &elements {
-            assert_el_eq!(&ring, a, &ring.get_ring().map_in_ref(ring.get_ring(), a, &hom));
-            assert_el_eq!(&ring, a, &ring.get_ring().map_out(ring.get_ring(), ring.clone_el(a), &iso));
+            assert_el_eq!(ring, a, ring.get_ring().map_in_ref(ring.get_ring(), a, &hom));
+            assert_el_eq!(ring, a, ring.get_ring().map_out(ring.get_ring(), ring.clone_el(a), &iso));
         }
     }
 
@@ -1198,7 +1198,7 @@ pub mod generic_tests {
         if ZZbig.is_lt(&char, &ZZbig.power_of_two(31)) {
             let char = int_cast(char, &StaticRing::<i32>::RING, &ZZbig);
 
-            assert_el_eq!(&ring, &ring.zero(), &ring.get_ring().from_int(char));
+            assert_el_eq!(ring, ring.zero(), ring.get_ring().from_int(char));
             
             if char == 0 {
                 for i in 1..(1 << 10) {

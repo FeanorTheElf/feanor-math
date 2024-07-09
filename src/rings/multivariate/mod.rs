@@ -952,11 +952,11 @@ fn test_specialize() {
     let f = ring.from_terms([(1, Monomial::new([2])), (1, Monomial::new([1]))].into_iter());
     let g = ring.from_terms([(1, Monomial::new([2])), (16, Monomial::new([1]))].into_iter());
 
-    assert_el_eq!(&ring, &ring.add_ref_snd(ring.mul_ref(&g, &g), &g), &ring.specialize(&f, 0, &g));
+    assert_el_eq!(ring, ring.add_ref_snd(ring.mul_ref(&g, &g), &g), ring.specialize(&f, 0, &g));
 
     let ring: ordered::MultivariatePolyRingImpl<_, _, 2> = ordered::MultivariatePolyRingImpl::new(Zn::<17>::RING, DegRevLex);
     let f = ring.from_terms([(1, Monomial::new([2, 0])), (1, Monomial::new([0, 1]))].into_iter());
     let g = ring.from_terms([(1, Monomial::new([0, 2])), (16, Monomial::new([0, 1]))].into_iter());
 
-    assert_el_eq!(&ring, &ring.add(ring.mul_ref(&g, &g), ring.indeterminate(1)), &ring.specialize(&f, 0, &g));
+    assert_el_eq!(ring, ring.add(ring.mul_ref(&g, &g), ring.indeterminate(1)), ring.specialize(&f, 0, &g));
 }

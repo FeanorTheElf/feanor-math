@@ -126,9 +126,9 @@ fn test_factor_number_field() {
     let poly = K.generating_poly(&KX, K.inclusion());
 
     let (factorization, unit) = factor_over_number_field(&KX, &poly);
-    assert_el_eq!(&K, &K.one(), &unit);
+    assert_el_eq!(K, K.one(), unit);
     assert_eq!(2, factorization.len());
-    assert_el_eq!(&KX, &poly, &KX.prod(factorization.into_iter().map(|(f, _e)| f)));
+    assert_el_eq!(KX, poly, KX.prod(factorization.into_iter().map(|(f, _e)| f)));
 
     // the case of a galois field of degree 3
 
@@ -137,9 +137,9 @@ fn test_factor_number_field() {
     let poly = K.generating_poly(&KX, K.inclusion());
 
     let (factorization, unit) = factor_over_number_field(&KX, &poly);
-    assert_el_eq!(&K, &K.one(), &unit);
+    assert_el_eq!(K, K.one(), unit);
     assert_eq!(3, factorization.len());
-    assert_el_eq!(&KX, &poly, &KX.prod(factorization.into_iter().map(|(f, _e)| f)));
+    assert_el_eq!(KX, poly, KX.prod(factorization.into_iter().map(|(f, _e)| f)));
 
     // the case of a non-galois field (not normal) of degree 3
 
@@ -148,10 +148,10 @@ fn test_factor_number_field() {
     let poly = K.generating_poly(&KX, K.inclusion());
     
     let (factorization, unit) = factor_over_number_field(&KX, &poly);
-    assert_el_eq!(&K, &K.one(), &unit);
+    assert_el_eq!(K, K.one(), unit);
     assert_eq!(2, factorization.len());
     for (_, e) in &factorization {
         assert_eq!(1, *e);
     }
-    assert_el_eq!(&KX, &poly, &KX.prod(factorization.into_iter().map(|(f, _e)| f)));
+    assert_el_eq!(KX, poly, KX.prod(factorization.into_iter().map(|(f, _e)| f)));
 }

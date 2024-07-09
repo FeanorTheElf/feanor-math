@@ -309,7 +309,7 @@ fn test_ring_axioms() {
     let half = ring.checked_div(&ring.int_hom().map(1), &ring.int_hom().map(2)).unwrap();
     assert!(!ring.is_one(&half));
     assert!(!ring.is_zero(&half));
-    assert_el_eq!(&ring, &ring.one(), &ring.add_ref(&half, &half));
+    assert_el_eq!(ring, ring.one(), ring.add_ref(&half, &half));
     crate::ring::generic_tests::test_ring_axioms(ring, edge_case_elements());
 }
 

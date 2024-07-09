@@ -32,7 +32,7 @@ use crate::algorithms;
 /// 
 /// let poly_ring = SparsePolyRing::new(StaticRing::<i64>::RING, "X");
 /// let cyclo_poly = feanor_math::algorithms::cyclotomic::cyclotomic_polynomial(&poly_ring, 3);
-/// assert_el_eq!(&poly_ring, &poly_ring.from_terms([(1, 0), (1, 1), (1, 2)].into_iter()), &cyclo_poly);
+/// assert_el_eq!(poly_ring, poly_ring.from_terms([(1, 0), (1, 1), (1, 2)].into_iter()), &cyclo_poly);
 /// ```
 /// 
 pub fn cyclotomic_polynomial<P>(P: P, n: usize) -> El<P>

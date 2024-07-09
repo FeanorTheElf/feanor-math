@@ -82,14 +82,14 @@ pub trait FactorPolyField: Field {
     /// if P.eq_el(&f, &factorization[0].0) {
     ///     assert_eq!(1, factorization[0].1);
     ///     assert_eq!(2, factorization[1].1);
-    ///     assert_el_eq!(&P, &g, &factorization[1].0);
+    ///     assert_el_eq!(P, g, factorization[1].0);
     /// } else {
     ///     assert_eq!(2, factorization[0].1);
     ///     assert_eq!(1, factorization[1].1);
-    ///     assert_el_eq!(&P, &g, &factorization[0].0);
-    ///     assert_el_eq!(&P, &f, &factorization[1].0);
+    ///     assert_el_eq!(P, g, factorization[0].0);
+    ///     assert_el_eq!(P, f, factorization[1].0);
     /// }
-    /// assert_el_eq!(&QQ, &ZZ_to_QQ.map(6), &unit);
+    /// assert_el_eq!(QQ, ZZ_to_QQ.map(6), unit);
     /// ```
     /// 
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
@@ -205,7 +205,7 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
 /// // the result is not necessarily monic, so normalize
 /// let normalization_factor = Fp.invert(FpX.lc(&squarefree_part).unwrap()).unwrap();
 /// FpX.inclusion().mul_assign_map(&mut squarefree_part, normalization_factor);
-/// assert_el_eq!(&FpX, &FpX.prod([
+/// assert_el_eq!(FpX, FpX.prod([
 ///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)].into_iter()),
 ///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 1), (Fp.one(), 3)].into_iter())
 /// ].into_iter()), &squarefree_part);
@@ -342,7 +342,7 @@ impl<I> FactorPolyField for RationalFieldBase<I>
             }
         }
         let unit = QQ.clone_el(QQX.coefficient_at(&current, 0));
-        assert_el_eq!(&QQX, &QQX.inclusion().map_ref(&unit), &current);
+        assert_el_eq!(QQX, QQX.inclusion().map_ref(&unit), current);
         return (result, unit);
     }
 }
@@ -457,19 +457,9 @@ impl<R> FactorPolyField for R
 }
 
 #[cfg(test)]
-use crate::rings::zn::{zn_static, zn_64};
+use crate::rings::zn::*;
 #[cfg(test)]
 use test::Bencher;
-
-#[cfg(test)]
-fn normalize_poly<P>(poly_ring: P, poly: &mut El<P>)
-    where P: PolyRingStore,
-        P::Type: PolyRing,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: Field
-{
-    let inv_lc = poly_ring.base_ring().div(&poly_ring.base_ring().one(), poly_ring.lc(poly).unwrap());
-    poly_ring.inclusion().mul_assign_map_ref(poly, &inv_lc);
-}
 
 #[test]
 fn test_factor_int_poly() {
@@ -478,8 +468,8 @@ fn test_factor_int_poly() {
     let g = poly_ring.from_terms([(1, 0), (2, 1), (1, 2), (1, 4)].into_iter());
     let actual = factor_integer_poly(&poly_ring, &poly_ring.mul_ref(&f, &g));
     assert_eq!(2, actual.len());
-    assert_el_eq!(&poly_ring, &f, &actual[0]);
-    assert_el_eq!(&poly_ring, &g, &actual[1]);
+    assert_el_eq!(poly_ring, f, actual[0]);
+    assert_el_eq!(poly_ring, g, actual[1]);
 }
 
 #[test]
@@ -491,11 +481,11 @@ fn test_factor_rational_poly() {
     let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
     let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f), poly_ring.clone_el(&f), poly_ring.clone_el(&g)].into_iter()));
     assert_eq!(2, actual.len());
-    assert_el_eq!(&poly_ring, &f, &actual[0].0);
+    assert_el_eq!(poly_ring, f, actual[0].0);
     assert_eq!(2, actual[0].1);
-    assert_el_eq!(&poly_ring, &g, &actual[1].0);
+    assert_el_eq!(poly_ring, g, actual[1].0);
     assert_eq!(1, actual[1].1);
-    assert_el_eq!(&QQ, &QQ.one(), &unit);
+    assert_el_eq!(QQ, QQ.one(), unit);
 }
 
 #[test]
@@ -508,11 +498,11 @@ fn test_factor_nonmonic_poly() {
     let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f), poly_ring.clone_el(&f), poly_ring.clone_el(&g), poly_ring.int_hom().map(100)].into_iter()));
     assert_eq!(2, actual.len());
 
-    assert_el_eq!(&poly_ring, &g, &actual[0].0);
+    assert_el_eq!(poly_ring, g, actual[0].0);
     assert_eq!(1, actual[0].1);
-    assert_el_eq!(&poly_ring, &f, &actual[1].0);
+    assert_el_eq!(poly_ring, f, actual[1].0);
     assert_eq!(2, actual[1].1);
-    assert_el_eq!(&QQ, &incl.map(100), &unit);
+    assert_el_eq!(QQ, incl.map(100), unit);
 }
 
 #[test]
@@ -524,14 +514,14 @@ fn test_factor_fp() {
     let h = poly_ring.from_terms([(2, 0), (1, 2)].into_iter());
     let fgghhh = poly_ring.prod([&f, &g, &g, &h, &h, &h].iter().map(|poly| poly_ring.clone_el(poly)));
     let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &fgghhh);
-    assert_el_eq!(&Fp, &Fp.one(), &unit);
+    assert_el_eq!(Fp, Fp.one(), unit);
     
     assert_eq!(2, factorization[0].1);
-    assert_el_eq!(&poly_ring, &g, &factorization[0].0);
+    assert_el_eq!(poly_ring, g, factorization[0].0);
     assert_eq!(3, factorization[1].1);
-    assert_el_eq!(&poly_ring, &h, &factorization[1].0);
+    assert_el_eq!(poly_ring, h, factorization[1].0);
     assert_eq!(1, factorization[2].1);
-    assert_el_eq!(&poly_ring, &f, &factorization[2].0);
+    assert_el_eq!(poly_ring, f, factorization[2].0);
 }
 
 #[test]
@@ -553,9 +543,8 @@ fn test_poly_squarefree_part() {
         ring.from_terms([(255, 0), (1, 1)].into_iter()),
         ring.from_terms([(8, 0), (1, 1)].into_iter())
     ].into_iter());
-    let mut squarefree_part = poly_squarefree_part(&ring, a);
-    normalize_poly(&ring, &mut squarefree_part);
-    assert_el_eq!(&ring, &b, &squarefree_part);
+    let squarefree_part = ring.normalize(poly_squarefree_part(&ring, a));
+    assert_el_eq!(ring, b, squarefree_part);
 }
 
 #[test]
@@ -563,9 +552,8 @@ fn test_poly_squarefree_part_multiplicity_p() {
     let ring = DensePolyRing::new(zn_64::Zn::new(5).as_field().ok().unwrap(), "X");
     let f = ring.from_terms([(ring.base_ring().int_hom().map(3), 0), (ring.base_ring().int_hom().map(1), 10)].into_iter());
     let g = ring.from_terms([(ring.base_ring().int_hom().map(3), 0), (ring.base_ring().int_hom().map(1), 2)].into_iter());
-    let mut actual = poly_squarefree_part(&ring, f);
-    normalize_poly(&ring, &mut actual);
-    assert_el_eq!(&ring, &g, &actual);
+    let actual = ring.normalize(poly_squarefree_part(&ring, f));
+    assert_el_eq!(ring, g, actual);
 }
 
 #[bench]
@@ -579,16 +567,16 @@ fn bench_factor_rational_poly(bencher: &mut Bencher) {
     bencher.iter(|| {
         let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f1), poly_ring.clone_el(&f1), poly_ring.clone_el(&f2), poly_ring.clone_el(&f3), poly_ring.int_hom().map(9)].into_iter()));
         assert_eq!(3, actual.len());
-        assert_el_eq!(&QQ, &QQ.int_hom().map(9), &unit);
+        assert_el_eq!(QQ, QQ.int_hom().map(9), unit);
         for (f, e) in actual.iter() {
             if poly_ring.eq_el(f, &f1) {
-                assert_el_eq!(&poly_ring, &f1, f);
+                assert_el_eq!(poly_ring, f1, f);
                 assert_eq!(2, *e);
             } else if poly_ring.eq_el(f, &f2) {
-                assert_el_eq!(&poly_ring, &f2, f);
+                assert_el_eq!(poly_ring, f2, f);
                 assert_eq!(1, *e);
            } else if poly_ring.eq_el(f, &f3) {
-               assert_el_eq!(&poly_ring, &f3, f);
+               assert_el_eq!(poly_ring, f3, f);
                assert_eq!(1, *e);
             } else {
                 panic!("Factorization returned wrong factor {} of ({})^2 * {} * {}", poly_ring.format(f), poly_ring.format(&f1), poly_ring.format(&f2), poly_ring.format(&f3));

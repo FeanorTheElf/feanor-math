@@ -306,5 +306,5 @@ fn test_determinant() {
                    9, 8, 7],
         3
     );
-    assert_el_eq!(&ring, &(7 + 48 - 27), &determinant(A.clone_matrix(&ring).data_mut(), &ring));
+    assert_el_eq!(ring, (7 + 48 - 27), determinant(A.clone_matrix(&ring).data_mut(), &ring));
 }

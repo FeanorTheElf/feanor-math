@@ -57,7 +57,7 @@ pub mod conway;
 ///     if !galois_field.is_zero(&x) {
 ///         galois_field.println(&x);
 ///         let inv_x = galois_field.checked_div(&galois_field.one(), &x).unwrap();
-///         assert_el_eq!(&galois_field, &galois_field.one(), &galois_field.mul(x, inv_x));
+///         assert_el_eq!(galois_field, galois_field.one(), galois_field.mul(x, inv_x));
 ///     }
 /// }
 /// ```
@@ -201,7 +201,7 @@ pub mod generic_tests {
         let xn_original = ring.pow(ring.clone_el(&x), n);
         let xn_vec = ring.wrt_canonical_basis(&xn_original);
         let xn = ring.sum(Iterator::map(0..n, |i| ring.mul(ring.inclusion().map(xn_vec.at(i)), ring.pow(ring.clone_el(&x), i))));
-        assert_el_eq!(&ring, &xn_original, &xn);
+        assert_el_eq!(ring, xn_original, xn);
 
         let x_n_1_vec_expected = (0..n).map_fn(|i| if i > 0 {
             ring.base_ring().add(ring.base_ring().mul(xn_vec.at(n - 1), xn_vec.at(i)), xn_vec.at(i - 1))
@@ -211,7 +211,7 @@ pub mod generic_tests {
         let x_n_1 = ring.pow(ring.clone_el(&x), n + 1);
         let x_n_1_vec_actual = ring.wrt_canonical_basis(&x_n_1);
         for i in 0..n {
-            assert_el_eq!(ring.base_ring(), &x_n_1_vec_expected.at(i), &x_n_1_vec_actual.at(i));
+            assert_el_eq!(ring.base_ring(), x_n_1_vec_expected.at(i), x_n_1_vec_actual.at(i));
         }
 
         // test basis wrt_root_of_unity_basis linearity and compatibility from_root_of_unity_basis/wrt_root_of_unity_basis
@@ -222,15 +222,15 @@ pub mod generic_tests {
                 }
                 let element = ring.from_canonical_basis(Iterator::map(0..n, |k| if k == i { ring.base_ring().one() } else if k == j { ring.base_ring().int_hom().map(2) } else { ring.base_ring().zero() }));
                 let expected = ring.add(ring.pow(ring.clone_el(&x), i), ring.int_hom().mul_map(ring.pow(ring.clone_el(&x), j), 2));
-                assert_el_eq!(&ring, &expected, &element);
+                assert_el_eq!(ring, expected, element);
                 let element_vec = ring.wrt_canonical_basis(&expected);
                 for k in 0..ring.rank() {
                     if k == i {
-                        assert_el_eq!(ring.base_ring(), &ring.base_ring().one(), &element_vec.at(k));
+                        assert_el_eq!(ring.base_ring(), ring.base_ring().one(), element_vec.at(k));
                     } else if k == j {
-                        assert_el_eq!(ring.base_ring(), &ring.base_ring().int_hom().map(2), &element_vec.at(k));
+                        assert_el_eq!(ring.base_ring(), ring.base_ring().int_hom().map(2), element_vec.at(k));
                     } else {
-                        assert_el_eq!(ring.base_ring(), &ring.base_ring().zero(), &element_vec.at(k));
+                        assert_el_eq!(ring.base_ring(), ring.base_ring().zero(), element_vec.at(k));
                     }
                 }
             }

@@ -322,7 +322,7 @@ pub trait ZnOperation<Result = ()> {
 ///             R::Type: ZnRing
 ///     {
 ///         let value = Zn.coerce(Zn.integer_ring(), int_cast(self.int_value, Zn.integer_ring(), &StaticRing::<i64>::RING));
-///         assert_el_eq!(&Zn, &Zn.int_hom().map(-1), &Zn.mul_ref(&value, &value));
+///         assert_el_eq!(Zn, Zn.int_hom().map(-1), Zn.mul_ref(&value, &value));
 ///     } 
 /// }
 /// choose_zn_impl(StaticRing::<i64>::RING, 17, DoStuff { int_value });
@@ -350,7 +350,7 @@ fn test_choose_zn_impl() {
             where R::Type: ZnRing
         {
             let value = Zn.coerce(Zn.integer_ring(), int_cast(self.int_value, Zn.integer_ring(), &StaticRing::<i64>::RING));
-            assert_el_eq!(&Zn, &Zn.int_hom().map(-1), &Zn.mul_ref(&value, &value));
+            assert_el_eq!(Zn, Zn.int_hom().map(-1), Zn.mul_ref(&value, &value));
         } 
     }
     choose_zn_impl(StaticRing::<i64>::RING, 17, DoStuff { int_value });
@@ -432,7 +432,7 @@ impl<R, S> ReductionMap<R, S>
     /// let Z5 = Zn::new(5);
     /// let Z25 = Zn::new(25);
     /// let f = ReductionMap::new(&Z25, &Z5).unwrap();
-    /// assert_el_eq!(&Z25, &Z25.int_hom().map(15), &f.mul_quotient_fraction(Z5.int_hom().map(3)));
+    /// assert_el_eq!(Z25, Z25.int_hom().map(15), f.mul_quotient_fraction(Z5.int_hom().map(3)));
     /// ```
     /// 
     pub fn mul_quotient_fraction(&self, x: El<S>) -> El<R> {
@@ -453,7 +453,7 @@ impl<R, S> ReductionMap<R, S>
     /// let Z5 = Zn::new(5);
     /// let Z25 = Zn::new(25);
     /// let f = ReductionMap::new(&Z25, &Z5).unwrap();
-    /// assert_el_eq!(&Z25, &Z25.int_hom().map(-2), &f.smallest_lift(Z5.int_hom().map(3)));
+    /// assert_el_eq!(Z25, Z25.int_hom().map(-2), f.smallest_lift(Z5.int_hom().map(3)));
     /// ```
     /// 
     pub fn smallest_lift(&self, x: El<S>) -> El<R> {
@@ -544,7 +544,7 @@ fn test_reduction_map_large_value() {
     let ring1 = zn_64::Zn::new(1 << 42);
     let ring2 = zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.power_of_two(666));
     let reduce = ReductionMap::new(&ring2, ring1).unwrap();
-    assert_el_eq!(&ring1, &ring1.zero(), &reduce.map(ring2.pow(ring2.int_hom().map(2), 665)));
+    assert_el_eq!(ring1, ring1.zero(), reduce.map(ring2.pow(ring2.int_hom().map(2), 665)));
 }
 
 #[test]

@@ -307,5 +307,5 @@ fn test_poly_eea() {
     let snd = ring.mul_ref(&g, &expected_gcd);
     let actual_gcd = poly_pid_fractionfield_gcd(&ring, &fst, &snd);
     // we want the gcd to be maximally reduced, so this should do the job
-    assert_el_eq!(&ring, &expected_gcd, &actual_gcd);
+    assert_el_eq!(ring, expected_gcd, actual_gcd);
 }

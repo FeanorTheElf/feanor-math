@@ -101,18 +101,18 @@ fn test_resultant() {
     let f = ZZX.from_terms([(3, 0), (-5, 1), (1, 2)].into_iter());
     let g = ZZX.from_terms([(-5, 0), (2, 1)].into_iter());
 
-    assert_el_eq!(&ZZ, &13, &resultant(&ZZX, ZZX.clone_el(&f), ZZX.clone_el(&g)));
-    assert_el_eq!(&ZZ, &-13, &resultant(&ZZX, g, f));
+    assert_el_eq!(ZZ, 13, resultant(&ZZX, ZZX.clone_el(&f), ZZX.clone_el(&g)));
+    assert_el_eq!(ZZ, -13, resultant(&ZZX, g, f));
 
     // if f and g have common factors, this should be zero
     let f = ZZX.from_terms([(1, 0), (-2, 1), (1, 2)].into_iter());
     let g = ZZX.from_terms([(-1, 0), (1, 2)].into_iter());
-    assert_el_eq!(&ZZ, &0, &resultant(&ZZX, f, g));
+    assert_el_eq!(ZZ, 0, resultant(&ZZX, f, g));
 
     // a slightly larger example
     let f = ZZX.from_terms([(5, 0), (-1, 1), (3, 2), (1, 4)].into_iter());
     let g = ZZX.from_terms([(-1, 0), (-1, 2), (1, 3), (4, 5)].into_iter());
-    assert_el_eq!(&ZZ, &642632, &resultant(&ZZX, f, g));
+    assert_el_eq!(ZZ, 642632, resultant(&ZZX, f, g));
 }
 
 #[test]
@@ -166,5 +166,5 @@ fn test_resultant_polynomial() {
     let expected_lc_inv = QQ.div(&QQ.one(), QQX.lc(&expected).unwrap());
     QQX.inclusion().mul_assign_map(&mut expected, expected_lc_inv);
 
-    assert_el_eq!(&QQX, &expected, &actual);
+    assert_el_eq!(QQX, expected, actual);
 }

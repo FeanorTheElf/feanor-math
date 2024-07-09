@@ -373,6 +373,6 @@ fn bench_factor_fft(bencher: &mut test::Bencher) {
         copy.extend(data.iter().map(|x| ring.clone_el(x)));
         fft.unordered_fft(&mut copy[..], ring.get_ring());
         fft.unordered_inv_fft(&mut copy[..], ring.get_ring());
-        assert_el_eq!(&ring, &copy[0], &data[0]);
+        assert_el_eq!(ring, copy[0], data[0]);
     });
 }

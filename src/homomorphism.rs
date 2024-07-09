@@ -500,7 +500,7 @@ impl<R, S> Homomorphism<S::Type,R::Type> for CanIso<R, S>
 /// let extension = dense_poly::DensePolyRing::new(base, "X");
 /// let hom = extension.inclusion();
 /// let f = extension.add(hom.map(8), extension.indeterminate());
-/// assert_el_eq!(&extension, &extension.from_terms([(8, 0), (1, 1)].into_iter()), &f);
+/// assert_el_eq!(extension, extension.from_terms([(8, 0), (1, 1)].into_iter()), &f);
 /// ```
 /// 
 #[derive(Copy, Clone)]
@@ -561,7 +561,7 @@ impl<R> Homomorphism<<<R::Type as RingExtension>::BaseRing as RingStore>::Type, 
 /// # use feanor_math::rings::zn::*;
 /// let ring = zn_static::F17;
 /// let hom = ring.int_hom();
-/// assert_el_eq!(&ring, &hom.map(1), &hom.map(18));
+/// assert_el_eq!(ring, hom.map(1), hom.map(18));
 /// ```
 /// 
 #[derive(Clone, Copy)]
@@ -842,7 +842,7 @@ impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
 /// impl_eq_based_self_iso!{ MyI32Ring }
 /// 
 /// let ring = RingValue::from(MyI32Ring);
-/// assert_el_eq!(&ring, &ring.int_hom().map(1), &ring.one());
+/// assert_el_eq!(ring, ring.int_hom().map(1), ring.one());
 /// ```
 /// 
 #[macro_export]

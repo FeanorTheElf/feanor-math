@@ -26,8 +26,8 @@ use super::complex_fft::*;
 /// let fft_table = CooleyTuckeyFFT::for_zn(ring, 8).unwrap();
 /// let mut data = [ring.one()].into_iter().chain((0..255).map(|_| ring.zero())).collect::<Vec<_>>();
 /// fft_table.unordered_fft(&mut data, ring.get_ring());
-/// assert_el_eq!(&ring, &ring.one(), &data[0]);
-/// assert_el_eq!(&ring, &ring.one(), &data[1]);
+/// assert_el_eq!(ring, ring.one(), data[0]);
+/// assert_el_eq!(ring, ring.one(), data[1]);
 /// ```
 /// 
 pub struct CooleyTuckeyFFT<R_main, R_twiddle, H> 
@@ -540,7 +540,7 @@ fn run_fft_bench_round<R, S, H>(fft: &CooleyTuckeyFFT<S, R, H>, data: &Vec<S::El
     copy.extend(data.iter().map(|x| fft.ring().clone_el(x)));
     fft.unordered_fft(&mut copy[..], fft.ring().get_ring());
     fft.unordered_inv_fft(&mut copy[..], fft.ring().get_ring());
-    assert_el_eq!(&fft.ring(), &copy[0], &data[0]);
+    assert_el_eq!(fft.ring(), copy[0], data[0]);
 }
 
 #[cfg(test)]
@@ -613,21 +613,21 @@ pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Itera
 
             let mut vector = [ring.clone_el(a), ring.clone_el(b)];
             ring.get_ring().butterfly(&hom, &mut vector, &test_twiddle, 0, 1);
-            assert_el_eq!(&ring, &ring.add_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &vector[0]);
-            assert_el_eq!(&ring, &ring.sub_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &vector[1]);
+            assert_el_eq!(ring, ring.add_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &vector[0]);
+            assert_el_eq!(ring, ring.sub_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &vector[1]);
 
             ring.get_ring().inv_butterfly(&hom, &mut vector, &test_inv_twiddle, 0, 1);
-            assert_el_eq!(&ring, &ring.int_hom().mul_ref_fst_map(a, 2), &vector[0]);
-            assert_el_eq!(&ring, &ring.int_hom().mul_ref_fst_map(b, 2), &vector[1]);
+            assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(a, 2), &vector[0]);
+            assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(b, 2), &vector[1]);
 
             let mut vector = [ring.clone_el(a), ring.clone_el(b)];
             ring.get_ring().butterfly(&hom, &mut vector, &test_twiddle, 1, 0);
-            assert_el_eq!(&ring, &ring.add_ref_fst(b, ring.mul_ref_fst(a, hom.map_ref(test_twiddle))), &vector[1]);
-            assert_el_eq!(&ring, &ring.sub_ref_fst(b, ring.mul_ref_fst(a, hom.map_ref(test_twiddle))), &vector[0]);
+            assert_el_eq!(ring, ring.add_ref_fst(b, ring.mul_ref_fst(a, hom.map_ref(test_twiddle))), &vector[1]);
+            assert_el_eq!(ring, ring.sub_ref_fst(b, ring.mul_ref_fst(a, hom.map_ref(test_twiddle))), &vector[0]);
 
             ring.get_ring().inv_butterfly(&hom, &mut vector, &test_inv_twiddle, 1, 0);
-            assert_el_eq!(&ring, &ring.int_hom().mul_ref_fst_map(a, 2), &vector[0]);
-            assert_el_eq!(&ring, &ring.int_hom().mul_ref_fst_map(b, 2), &vector[1]);
+            assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(a, 2), &vector[0]);
+            assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(b, 2), &vector[1]);
         }
     }
 }

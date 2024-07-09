@@ -653,8 +653,8 @@ fn test_canonical_iso_axioms_i64() {
     crate::ring::generic_tests::test_hom_axioms(StaticRing::<i64>::RING, MPZ::RING, [0, -1, 1, i32::MAX as i64, i32::MIN as i64].into_iter());
     crate::ring::generic_tests::test_iso_axioms(StaticRing::<i64>::RING, MPZ::RING, [0, -1, 1, i32::MIN as i64, i32::MAX as i64].into_iter());
 
-    assert_el_eq!(&MPZ::RING, &MPZ::RING.sub(MPZ::RING.power_of_two(63), MPZ::RING.one()), &MPZ::RING.coerce(&StaticRing::<i64>::RING, i64::MAX));
-    assert_el_eq!(&MPZ::RING, &MPZ::RING.negate(MPZ::RING.power_of_two(63)), &MPZ::RING.coerce(&StaticRing::<i64>::RING, i64::MIN));
+    assert_el_eq!(MPZ::RING, MPZ::RING.sub(MPZ::RING.power_of_two(63), MPZ::RING.one()), &MPZ::RING.coerce(&StaticRing::<i64>::RING, i64::MAX));
+    assert_el_eq!(MPZ::RING, MPZ::RING.negate(MPZ::RING.power_of_two(63)), MPZ::RING.coerce(&StaticRing::<i64>::RING, i64::MIN));
     assert_eq!(i64::MAX, int_cast(MPZ::RING.sub(MPZ::RING.power_of_two(63), MPZ::RING.one()), &StaticRing::<i64>::RING, MPZ::RING));
     assert_eq!(i64::MIN, int_cast(MPZ::RING.negate(MPZ::RING.power_of_two(63)), &StaticRing::<i64>::RING, MPZ::RING));
 }
@@ -664,8 +664,8 @@ fn test_canonical_iso_axioms_i128() {
     crate::ring::generic_tests::test_hom_axioms(StaticRing::<i128>::RING, MPZ::RING, [0, -1, 1, i64::MAX as i128, i64::MIN as i128].into_iter());
     crate::ring::generic_tests::test_iso_axioms(StaticRing::<i128>::RING, MPZ::RING, [0, -1, 1, i64::MIN as i128, i64::MAX as i128].into_iter());
 
-    assert_el_eq!(&MPZ::RING, &MPZ::RING.sub(MPZ::RING.power_of_two(127), MPZ::RING.one()), &MPZ::RING.coerce(&StaticRing::<i128>::RING, i128::MAX));
-    assert_el_eq!(&MPZ::RING, &MPZ::RING.negate(MPZ::RING.power_of_two(127)), &MPZ::RING.coerce(&StaticRing::<i128>::RING, i128::MIN));
+    assert_el_eq!(MPZ::RING, MPZ::RING.sub(MPZ::RING.power_of_two(127), MPZ::RING.one()), &MPZ::RING.coerce(&StaticRing::<i128>::RING, i128::MAX));
+    assert_el_eq!(MPZ::RING, MPZ::RING.negate(MPZ::RING.power_of_two(127)), MPZ::RING.coerce(&StaticRing::<i128>::RING, i128::MIN));
     assert_eq!(i128::MAX, int_cast(MPZ::RING.sub(MPZ::RING.power_of_two(127), MPZ::RING.one()), &StaticRing::<i128>::RING, MPZ::RING));
     assert_eq!(i128::MIN, int_cast(MPZ::RING.negate(MPZ::RING.power_of_two(127)), &StaticRing::<i128>::RING, MPZ::RING));
 }
@@ -736,7 +736,7 @@ fn bench_mul_300_bits(bencher: &mut test::Bencher) {
     let z = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());
     bencher.iter(|| {
         let p = MPZ::RING.mul_ref(&x, &y);
-        assert_el_eq!(&MPZ::RING, &z, &p);
+        assert_el_eq!(MPZ::RING, z, p);
     })
 }
 
@@ -747,6 +747,6 @@ fn bench_div_300_bits(bencher: &mut test::Bencher) {
     let z = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());
     bencher.iter(|| {
         let q = MPZ::RING.euclidean_div(MPZ::RING.clone_el(&z), &y);
-        assert_el_eq!(&MPZ::RING, &x, &q);
+        assert_el_eq!(MPZ::RING, x, q);
     })
 }

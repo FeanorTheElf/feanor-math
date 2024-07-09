@@ -50,7 +50,7 @@ fn mullo(lhs: u64, rhs: u64) -> u64 {
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// let zn = Zn::new(7);
-/// assert_el_eq!(&zn, &zn.one(), &zn.mul(zn.int_hom().map(3), zn.int_hom().map(5)));
+/// assert_el_eq!(zn, zn.one(), zn.mul(zn.int_hom().map(3), zn.int_hom().map(5)));
 /// ```
 /// Too large moduli will give an error.
 /// ```should_panic
@@ -586,7 +586,7 @@ impl ZnRing for ZnBase {
     /// # use feanor_math::ring::*;
     /// # use feanor_math::rings::zn::zn_64::*;
     /// let ring = Zn::new(7);
-    /// assert_el_eq!(&ring, &ring.zero(), &ring.get_ring().from_int_promise_reduced(42));
+    /// assert_el_eq!(ring, ring.zero(), ring.get_ring().from_int_promise_reduced(42));
     /// ```
     /// Larger values lead to a panic in debug mode, and to a logic error in release mode.
     /// ```should_panic
@@ -848,7 +848,7 @@ fn test_complete_reduce() {
 fn test_sum() {
     for n in LARGE_MODULI {
         let Zn = Zn::new(n);
-        assert_el_eq!(&Zn, &Zn.int_hom().map(10001 * 5000), &Zn.sum((0..=10000).map(|x| Zn.int_hom().map(x))));
+        assert_el_eq!(Zn, Zn.int_hom().map(10001 * 5000), Zn.sum((0..=10000).map(|x| Zn.int_hom().map(x))));
     }
 }
 
@@ -928,7 +928,7 @@ fn test_from_int_hom() {
         crate::ring::generic_tests::test_hom_axioms(StaticRing::<i128>::RING, Zn, -8..8);
     }
     let Zn = Zn::new(5);
-    assert_el_eq!(&Zn, &Zn.int_hom().map(3), &Zn.can_hom(&StaticRing::<i64>::RING).unwrap().map(-1596802));
+    assert_el_eq!(Zn, Zn.int_hom().map(3), Zn.can_hom(&StaticRing::<i64>::RING).unwrap().map(-1596802));
 }
 
 #[test]
@@ -1011,7 +1011,7 @@ fn bench_hom_from_i64_large_modulus(bencher: &mut Bencher) {
     let Zn = Zn::new(36028797018963971 /* = 2^55 + 3 */);
     bencher.iter(|| {
         let hom = Zn.can_hom(&StaticRing::<i64>::RING).unwrap();
-        assert_el_eq!(&Zn, &Zn.int_hom().map(-1300), &Zn.sum((0..100).flat_map(|_| (0..=56).map(|k| 1 << k)).map(|x| hom.map(x))))
+        assert_el_eq!(Zn, Zn.int_hom().map(-1300), Zn.sum((0..100).flat_map(|_| (0..=56).map(|k| 1 << k)).map(|x| hom.map(x))))
     });
 }
 
@@ -1021,7 +1021,7 @@ fn bench_hom_from_i64_small_modulus(bencher: &mut Bencher) {
     let Zn = Zn::new(17);
     bencher.iter(|| {
         let hom = Zn.can_hom(&StaticRing::<i64>::RING).unwrap();
-        assert_el_eq!(&Zn, &Zn.int_hom().map(2850 * 5699), &Zn.sum((0..5700).map(|x| hom.map(x))))
+        assert_el_eq!(Zn, Zn.int_hom().map(2850 * 5699), Zn.sum((0..5700).map(|x| hom.map(x))))
     });
 }
 
@@ -1046,7 +1046,7 @@ fn bench_reduction_map_use_case(bencher: &mut Bencher) {
             for y in Zp2.elements() {
                 let (x_low, x_high) = split_quo_rem(x);
                 let (y_low, y_high) = split_quo_rem(y);
-                assert_el_eq!(&Zp2, &Zp2.mul(x, y), &Zp2.add(Zp2.mul(Zp2_mod_p.smallest_lift(x_low), Zp2_mod_p.smallest_lift(y_low)), Zp2_mod_p.mul_quotient_fraction(Zp.add(Zp.mul(x_low, y_high), Zp.mul(x_high, y_low)))));
+                assert_el_eq!(Zp2, Zp2.mul(x, y), &Zp2.add(Zp2.mul(Zp2_mod_p.smallest_lift(x_low), Zp2_mod_p.smallest_lift(y_low)), Zp2_mod_p.mul_quotient_fraction(Zp.add(Zp.mul(x_low, y_high), Zp.mul(x_high, y_low)))));
             }
         }
     });
@@ -1062,6 +1062,6 @@ fn bench_inner_product(bencher: &mut Bencher) {
 
     bencher.iter(|| {
         let actual = <_ as ComputeInnerProduct>::inner_product_ref(Fp.get_ring(), lhs.iter().zip(rhs.iter()).map(|x| std::hint::black_box(x)));
-        assert_el_eq!(&Fp, &expected, &actual);
+        assert_el_eq!(Fp, expected, actual);
     })
 }

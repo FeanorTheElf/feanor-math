@@ -454,7 +454,7 @@ fn test_mul() {
     const ZZ: BigIntRing = BigIntRing::RING;
     let Z257 = Zn::new(ZZ, ZZ.int_hom().map(257));
     let x = Z257.coerce(&ZZ, ZZ.int_hom().map(256));
-    assert_el_eq!(&Z257, &Z257.one(), &Z257.mul_ref(&x, &x));
+    assert_el_eq!(Z257, Z257.one(), Z257.mul_ref(&x, &x));
 }
 
 #[test]
@@ -462,7 +462,7 @@ fn test_project() {
     const ZZ: StaticRing<i64> = StaticRing::RING;
     let Z17 = Zn::new(ZZ, 17);
     for k in 0..289 {
-        assert_el_eq!(&Z17, &Z17.int_hom().map((289 - k) % 17), &Z17.coerce(&ZZ, -k as i64));
+        assert_el_eq!(Z17, Z17.int_hom().map((289 - k) % 17), Z17.coerce(&ZZ, -k as i64));
     }
 }
 
@@ -505,7 +505,7 @@ fn test_zn_map_in_large_int_znbase() {
 #[test]
 fn test_zn_map_in_small_int() {
     let ring = Zn::new(StaticRing::<i64>::RING, 257);
-    assert_el_eq!(&ring, &ring.one(), &ring.coerce(&StaticRing::<i8>::RING, 1));
+    assert_el_eq!(ring, ring.one(), ring.coerce(&StaticRing::<i8>::RING, 1));
 }
 
 #[test]

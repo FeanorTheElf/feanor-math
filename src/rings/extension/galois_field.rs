@@ -49,7 +49,7 @@ pub fn GF<const DEGREE: usize>(p: u64) -> GaloisField<DEGREE> {
     loop {
         let random_poly = poly_ring.from_terms((0..DEGREE).map(|i| (Fp.random_element(|| rng.rand_u64()), i)).chain([(Fp.one(), DEGREE)].into_iter()));
         let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &random_poly);
-        assert_el_eq!(&Fp, &Fp.one(), &unit);
+        assert_el_eq!(Fp, Fp.one(), unit);
         if factorization.len() == 1 && factorization[0].1 == 1 {
             return FreeAlgebraImpl::new(Fp, std::array::from_fn(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i))))).as_field().ok().unwrap();
         }
@@ -89,7 +89,7 @@ pub fn GFdyn(power_of_p: u64) -> GaloisFieldDyn {
     loop {
         let random_poly = poly_ring.from_terms((0..e).map(|i| (Fp.random_element(|| rng.rand_u64()), i)).chain([(Fp.one(), e)].into_iter()));
         let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &random_poly);
-        assert_el_eq!(&Fp, &Fp.one(), &unit);
+        assert_el_eq!(Fp, Fp.one(), unit);
         if factorization.len() == 1 && factorization[0].1 == 1 {
             return FreeAlgebraImpl::new(Fp, (0..e).map(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i)))).collect::<Vec<_>>().into_boxed_slice()).as_field().ok().unwrap();
         }
@@ -116,7 +116,7 @@ pub fn GFdyn(power_of_p: u64) -> GaloisFieldDyn {
 /// let poly_ring = DensePolyRing::new(F2, "x");
 /// let gen_poly = F32.generating_poly(&poly_ring, F2.identity());
 /// // SAGE: GF(32).gen().minpoly() == x^5 + x^2 + 1
-/// assert_el_eq!(&poly_ring, &poly_ring.from_terms([(F2.one(), 0), (F2.one(), 2), (F2.one(), 5)].into_iter()), &gen_poly);
+/// assert_el_eq!(poly_ring, poly_ring.from_terms([(F2.one(), 0), (F2.one(), 2), (F2.one(), 5)].into_iter()), &gen_poly);
 /// ```
 /// 
 pub fn GF_conway(power_of_p: u64) -> GaloisFieldDyn {
@@ -163,6 +163,9 @@ fn test_GFdyn_even() {
     let F16 = GFdyn(16);
     assert_eq!(16, F16.elements().count());
     crate::field::generic_tests::test_field_axioms(&F16, F16.elements());
+    let F32 = GFdyn(32);
+    assert_eq!(32, F32.elements().count());
+    crate::field::generic_tests::test_field_axioms(&F32, F32.elements());
 }
 
 #[test]

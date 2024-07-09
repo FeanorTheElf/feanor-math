@@ -365,11 +365,11 @@ pub mod generic_tests {
                 ring.mul_pow_2(&mut pow_2, i);
                 let mut b = ring.clone_el(a);
                 ring.mul_pow_2(&mut b, i);
-                assert_el_eq!(&ring, &b, &ring.mul(ring.clone_el(a), ring.clone_el(&pow_2)));
+                assert_el_eq!(ring, b, ring.mul(ring.clone_el(a), ring.clone_el(&pow_2)));
                 ring.euclidean_div_pow_2(&mut b, i);
-                assert_el_eq!(&ring, &b, a);
+                assert_el_eq!(ring, b, a);
                 ring.euclidean_div_pow_2(&mut b, i);
-                assert_el_eq!(&ring, &b, &ring.euclidean_div(ring.clone_el(a), &pow_2));
+                assert_el_eq!(ring, b, ring.euclidean_div(ring.clone_el(a), &pow_2));
             }
         }
 
@@ -377,31 +377,31 @@ pub mod generic_tests {
         let d = ring.int_hom().map(8);
         for k in -10..=10 {
             let mut a = ring.int_hom().map(k);
-            assert_el_eq!(&ring, &ring.int_hom().map(k / 8), &ring.euclidean_div(ring.clone_el(&a), &d));
+            assert_el_eq!(ring, ring.int_hom().map(k / 8), ring.euclidean_div(ring.clone_el(&a), &d));
             ring.euclidean_div_pow_2(&mut a, 3);
-            assert_el_eq!(&ring, &ring.int_hom().map(k / 8), &a);
+            assert_el_eq!(ring, ring.int_hom().map(k / 8), a);
         }
         let d = ring.int_hom().map(-8);
         for k in -10..=10 {
             let a = ring.int_hom().map(k);
-            assert_el_eq!(&ring, &ring.int_hom().map(k / -8), &ring.euclidean_div(ring.clone_el(&a), &d));
+            assert_el_eq!(ring, ring.int_hom().map(k / -8), ring.euclidean_div(ring.clone_el(&a), &d));
         }
 
         // test rounded_div
-        assert_el_eq!(&ring, &ring.int_hom().map(2), &ring.rounded_div(ring.int_hom().map(7), &ring.int_hom().map(3)));
-        assert_el_eq!(&ring, &ring.int_hom().map(-2), &ring.rounded_div(ring.int_hom().map(-7), &ring.int_hom().map(3)));
-        assert_el_eq!(&ring, &ring.int_hom().map(-2), &ring.rounded_div(ring.int_hom().map(7), &ring.int_hom().map(-3)));
-        assert_el_eq!(&ring, &ring.int_hom().map(2), &ring.rounded_div(ring.int_hom().map(-7), &ring.int_hom().map(-3)));
+        assert_el_eq!(ring, ring.int_hom().map(2), ring.rounded_div(ring.int_hom().map(7), &ring.int_hom().map(3)));
+        assert_el_eq!(ring, ring.int_hom().map(-2), ring.rounded_div(ring.int_hom().map(-7), &ring.int_hom().map(3)));
+        assert_el_eq!(ring, ring.int_hom().map(-2), ring.rounded_div(ring.int_hom().map(7), &ring.int_hom().map(-3)));
+        assert_el_eq!(ring, ring.int_hom().map(2), ring.rounded_div(ring.int_hom().map(-7), &ring.int_hom().map(-3)));
 
-        assert_el_eq!(&ring, &ring.int_hom().map(3), &ring.rounded_div(ring.int_hom().map(8), &ring.int_hom().map(3)));
-        assert_el_eq!(&ring, &ring.int_hom().map(-3), &ring.rounded_div(ring.int_hom().map(-8), &ring.int_hom().map(3)));
-        assert_el_eq!(&ring, &ring.int_hom().map(-3), &ring.rounded_div(ring.int_hom().map(8), &ring.int_hom().map(-3)));
-        assert_el_eq!(&ring, &ring.int_hom().map(3), &ring.rounded_div(ring.int_hom().map(-8), &ring.int_hom().map(-3)));
+        assert_el_eq!(ring, ring.int_hom().map(3), ring.rounded_div(ring.int_hom().map(8), &ring.int_hom().map(3)));
+        assert_el_eq!(ring, ring.int_hom().map(-3), ring.rounded_div(ring.int_hom().map(-8), &ring.int_hom().map(3)));
+        assert_el_eq!(ring, ring.int_hom().map(-3), ring.rounded_div(ring.int_hom().map(8), &ring.int_hom().map(-3)));
+        assert_el_eq!(ring, ring.int_hom().map(3), ring.rounded_div(ring.int_hom().map(-8), &ring.int_hom().map(-3)));
 
-        assert_el_eq!(&ring, &ring.int_hom().map(4), &ring.rounded_div(ring.int_hom().map(7), &ring.int_hom().map(2)));
-        assert_el_eq!(&ring, &ring.int_hom().map(-4), &ring.rounded_div(ring.int_hom().map(-7), &ring.int_hom().map(2)));
-        assert_el_eq!(&ring, &ring.int_hom().map(-4), &ring.rounded_div(ring.int_hom().map(7), &ring.int_hom().map(-2)));
-        assert_el_eq!(&ring, &ring.int_hom().map(4), &ring.rounded_div(ring.int_hom().map(-7), &ring.int_hom().map(-2)));
+        assert_el_eq!(ring, ring.int_hom().map(4), ring.rounded_div(ring.int_hom().map(7), &ring.int_hom().map(2)));
+        assert_el_eq!(ring, ring.int_hom().map(-4), ring.rounded_div(ring.int_hom().map(-7), &ring.int_hom().map(2)));
+        assert_el_eq!(ring, ring.int_hom().map(-4), ring.rounded_div(ring.int_hom().map(7), &ring.int_hom().map(-2)));
+        assert_el_eq!(ring, ring.int_hom().map(4), ring.rounded_div(ring.int_hom().map(-7), &ring.int_hom().map(-2)));
     }
 }
 
@@ -416,12 +416,12 @@ fn test_int_div_assumption() {
 #[test]
 fn test_rounded_div() {
     let ZZ = StaticRing::<i32>::RING;
-    assert_el_eq!(&ZZ, &3, &ZZ.rounded_div(20, &7));
-    assert_el_eq!(&ZZ, &-3, &ZZ.rounded_div(-20, &7));
-    assert_el_eq!(&ZZ, &-3, &ZZ.rounded_div(20, &-7));
-    assert_el_eq!(&ZZ, &3, &ZZ.rounded_div(-20, &-7));
-    assert_el_eq!(&ZZ, &3, &ZZ.rounded_div(22, &7));
-    assert_el_eq!(&ZZ, &-3, &ZZ.rounded_div(-22, &7));
-    assert_el_eq!(&ZZ, &-3, &ZZ.rounded_div(22, &-7));
-    assert_el_eq!(&ZZ, &3, &ZZ.rounded_div(-22, &-7));
+    assert_el_eq!(ZZ, 3, ZZ.rounded_div(20, &7));
+    assert_el_eq!(ZZ, -3, ZZ.rounded_div(-20, &7));
+    assert_el_eq!(ZZ, -3, ZZ.rounded_div(20, &-7));
+    assert_el_eq!(ZZ, 3, ZZ.rounded_div(-20, &-7));
+    assert_el_eq!(ZZ, 3, ZZ.rounded_div(22, &7));
+    assert_el_eq!(ZZ, -3, ZZ.rounded_div(-22, &7));
+    assert_el_eq!(ZZ, -3, ZZ.rounded_div(22, &-7));
+    assert_el_eq!(ZZ, 3, ZZ.rounded_div(-22, &-7));
 }

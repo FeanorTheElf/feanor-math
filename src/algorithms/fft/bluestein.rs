@@ -475,7 +475,7 @@ fn test_fft_fastmul() {
     fft.fft(&mut values, ring.get_ring());
     let expected: [_; 5] = std::array::from_fn(|i| ring.int_hom().map([13, 137, 202, 206, 170][i]));
     for i in 0..values.len() {
-        assert_el_eq!(&ring, &expected[i], &values[i]);
+        assert_el_eq!(ring, expected[i], values[i]);
     }
 }
 

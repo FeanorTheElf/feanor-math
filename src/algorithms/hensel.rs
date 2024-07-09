@@ -34,8 +34,8 @@ pub fn hensel_lift<P, R, S>(target_ring: &P, source_ring: &R, prime_ring: &S, f:
     let p = prime_ring.base_ring().modulus();
     let (p_source, e) = is_prime_power(ZZ_source, source_ring.base_ring().modulus()).unwrap();
     let (p_target, r) = is_prime_power(ZZ_target, target_ring.base_ring().modulus()).unwrap();
-    assert_el_eq!(ZZ, p, &int_cast(p_source, ZZ, ZZ_source));
-    assert_el_eq!(ZZ, p, &int_cast(ZZ_target.clone_el(&p_target), ZZ, ZZ_target));
+    assert_el_eq!(ZZ, p, int_cast(p_source, ZZ, ZZ_source));
+    assert_el_eq!(ZZ, p, int_cast(ZZ_target.clone_el(&p_target), ZZ, ZZ_target));
 
     assert!(r > e);
     assert!(target_ring.base_ring().is_one(target_ring.lc(f).unwrap()));
@@ -47,7 +47,7 @@ pub fn hensel_lift<P, R, S>(target_ring: &P, source_ring: &R, prime_ring: &S, f:
     let pr_to_pe = ReductionMap::new(target_ring.base_ring(), source_ring.base_ring()).unwrap();
     let pr_to_p = ReductionMap::new(target_ring.base_ring(), prime_ring.base_ring()).unwrap();
 
-    assert_el_eq!(&source_ring, &source_ring.mul_ref(factors.0, factors.1), &source_ring.from_terms(target_ring.terms(f).map(|(c, i)| (pr_to_pe.map_ref(c), i))));
+    assert_el_eq!(source_ring, source_ring.mul_ref(factors.0, factors.1), &source_ring.from_terms(target_ring.terms(f).map(|(c, i)| (pr_to_pe.map_ref(c), i))));
 
     let (g, h) = factors;
     let reduced_g = prime_ring.from_terms(source_ring.terms(g).map(|(c, i)| (pe_to_p.map_ref(c), i)));
@@ -72,7 +72,7 @@ pub fn hensel_lift<P, R, S>(target_ring: &P, source_ring: &R, prime_ring: &S, f:
         debug_assert!(target_ring.degree(&current_g).unwrap() == source_ring.degree(&g).unwrap());
         debug_assert!(target_ring.degree(&current_h).unwrap() == source_ring.degree(&h).unwrap());
     }
-    assert_el_eq!(&target_ring, &f, &target_ring.mul_ref(&current_g, &current_h));
+    assert_el_eq!(target_ring, f, target_ring.mul_ref(&current_g, &current_h));
     return (current_g, current_h);
 }
 
@@ -121,7 +121,7 @@ fn test_lift_factorization() {
 
     let (lifted_g, lifted_h) = hensel_lift(&P, &R, &R, &f, (&g, &h));
 
-    assert_el_eq!(&P, &f, &P.mul_ref(&lifted_g, &lifted_h));
+    assert_el_eq!(P, f, P.mul_ref(&lifted_g, &lifted_h));
 }
 
 #[test]
@@ -141,5 +141,5 @@ fn test_lift_factorization_nonfield_base() {
 
     let (lifted_g, lifted_h) = hensel_lift(&P, &R, &S, &f, (&g, &h));
 
-    assert_el_eq!(&P, &f, &P.mul_ref(&lifted_g, &lifted_h));
+    assert_el_eq!(P, f, P.mul_ref(&lifted_g, &lifted_h));
 }

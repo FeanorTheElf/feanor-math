@@ -37,7 +37,7 @@ use super::*;
 /// // ring of integers in the 6th cyclotomic number field
 /// let ring = FreeAlgebraImpl::new(base_ring, [-1, 1]);
 /// let root_of_unity = ring.canonical_gen();
-/// assert_el_eq!(&ring, &ring.one(), &ring.pow(root_of_unity, 6));
+/// assert_el_eq!(ring, ring.one(), ring.pow(root_of_unity, 6));
 /// ```
 /// 
 /// # A note on division
@@ -119,7 +119,7 @@ impl<R, V, A> FreeAlgebraImpl<R, V, A>
                 .chain([(self.base_ring().one(), self.get_ring().x_pow_rank.len())].into_iter())
         );
         let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
-        assert_el_eq!(self.base_ring(), &self.base_ring().one(), &unit);
+        assert_el_eq!(self.base_ring(), self.base_ring().one(), unit);
         if factorization.len() == 0 || (factorization.len() == 1 && factorization[0].1 == 1) {
             return Ok(RingValue::from(AsFieldBase::promise_is_field(self)));
         } else {
@@ -506,14 +506,14 @@ fn test_division() {
     let i = base_ring.int_hom();
     let ring = FreeAlgebraImpl::new(base_ring, [i.map(-1), i.map(-1)]);
 
-    assert_el_eq!(&ring, 
+    assert_el_eq!(ring, 
         &ring.from_canonical_basis([i.map(1), i.map(3)].into_iter()), 
         &ring.checked_div(&ring.one(), &ring.from_canonical_basis([i.map(2), i.map(3)].into_iter())).unwrap()
     );
 
     let a = ring.from_canonical_basis([i.map(2), i.map(2)].into_iter());
     let b = ring.from_canonical_basis([i.map(0), i.map(2)].into_iter());
-    assert_el_eq!(&ring, &a, &ring.mul(ring.checked_div(&a, &b).unwrap(), b));
+    assert_el_eq!(ring, a, ring.mul(ring.checked_div(&a, &b).unwrap(), b));
 
     assert!(ring.checked_div(&ring.one(), &a).is_none());
 }
@@ -527,8 +527,8 @@ fn test_division_ring_of_integers() {
     let u = ring.from_canonical_basis([10, 3].into_iter());
     let u_inv = ring.from_canonical_basis([10, -3].into_iter());
 
-    assert_el_eq!(&ring, &u_inv, &ring.checked_div(&ring.one(), &u).unwrap());
-    assert_el_eq!(&ring, &ring.pow(u_inv, 3), &ring.checked_div(&ring.one(), &ring.pow(u, 3)).unwrap());
+    assert_el_eq!(ring, u_inv, ring.checked_div(&ring.one(), &u).unwrap());
+    assert_el_eq!(ring, ring.pow(u_inv, 3), &ring.checked_div(&ring.one(), &ring.pow(u, 3)).unwrap());
 
     assert!(ring.checked_div(&ring.from_canonical_basis([2, 0].into_iter()), &ring.from_canonical_basis([3, 0].into_iter())).is_none());
 }
@@ -548,5 +548,5 @@ fn test_cubic_mul() {
     let ring = FreeAlgebraImpl::new(base_ring, [modulo.map(-1), modulo.map(-1), modulo.map(-1)]);
     let a = ring.from_canonical_basis([modulo.map(0), modulo.map(-1), modulo.map(-1)].into_iter());
     let b = ring.from_canonical_basis([modulo.map(-1), modulo.map(-2), modulo.map(-1)].into_iter());
-    assert_el_eq!(&ring, &b, &ring.pow(a, 2));
+    assert_el_eq!(ring, b, ring.pow(a, 2));
 }

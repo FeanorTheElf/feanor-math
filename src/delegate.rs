@@ -60,7 +60,7 @@ use crate::integer::{IntegerRingStore, IntegerRing};
 /// impl_eq_based_self_iso!{ MyI32Ring }
 /// 
 /// let ring = RingValue::from(MyI32Ring);
-/// assert_el_eq!(&ring, &ring.int_hom().map(1), &ring.one());
+/// assert_el_eq!(ring, ring.int_hom().map(1), ring.one());
 /// ```
 /// 
 pub trait DelegateRing: PartialEq {

@@ -211,7 +211,7 @@ impl RingBase for F2Base {
 
 pub const F2: RingValue<F2Base> = RingValue::from(F2Base);
 
-assert_el_eq!(&F2, &F2.int_hom().map(1), &F2.add(F2.one(), F2.zero()));
+assert_el_eq!(F2, F2.int_hom().map(1), F2.add(F2.one(), F2.zero()));
 ```
 
 ## Both together
@@ -330,7 +330,7 @@ let x = vec![0, 1];
 let f = ring.add_ref(&x, &ring.int_hom().map(8));
 let g = ring.add_ref(&x, &ring.int_hom().map(7));
 let h = ring.add(ring.mul_ref(&x, &x), ring.add_ref(&ring.mul_ref(&x, &ring.int_hom().map(-2)), &ring.int_hom().map(5)));
-assert_el_eq!(&ring, &h, &ring.mul(f, g));
+assert_el_eq!(ring, h, ring.mul(f, g));
 ```
 
 ## `RingBase` vs `RingStore`

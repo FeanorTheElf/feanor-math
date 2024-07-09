@@ -365,7 +365,7 @@ impl SPoly {
                 let mut f2_scaled = ring.clone_el(&basis[*j]);
                 ring.mul_monomial(&mut f2_scaled, &f2_factor.1);
                 ring.inclusion().mul_assign_map(&mut f2_scaled, f2_factor.0);
-                assert_el_eq!(&ring, &result, &ring.sub(f1_scaled, f2_scaled));
+                assert_el_eq!(ring, result, ring.sub(f1_scaled, f2_scaled));
             },
             _ => {}
         }
@@ -502,7 +502,7 @@ impl<const N: u64> GBRingDescriptorRing for zn_static::ZnBase<N, false> {
 ///     (1, Monomial::new([0, 1])),
 /// ].into_iter());
 /// 
-/// assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, in_ideal, gb.iter(), order));
+/// assert_el_eq!(ring, ring.zero(), multivariate_division(&ring, in_ideal, gb.iter(), order));
 /// ```
 /// 
 pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_poly_degree_bound: u16) -> Vec<El<P>>
@@ -735,9 +735,9 @@ fn test_f4_small() {
     ].into_iter());
 
     assert_eq!(3, actual.len());
-    assert_el_eq!(&ring, &f2, actual.at(0));
-    assert_el_eq!(&ring, &f1, actual.at(1));
-    assert_el_eq!(&ring, &ring.negate(expected), actual.at(2));
+    assert_el_eq!(ring, f2, actual.at(0));
+    assert_el_eq!(ring, f1, actual.at(1));
+    assert_el_eq!(ring, ring.negate(expected), actual.at(2));
 }
 
 #[test]
@@ -784,7 +784,7 @@ fn test_f4_larger() {
         (9, Monomial::new([0, 0, 0]))
     ].into_iter());
 
-    assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, g1, actual.iter(), order));
+    assert_el_eq!(ring, ring.zero(), multivariate_division(&ring, g1, actual.iter(), order));
 }
 
 #[test]
@@ -831,7 +831,7 @@ fn test_f4_larger_elim() {
         (9, Monomial::new([0, 0, 0]))
     ].into_iter());
 
-    assert_el_eq!(&ring, &ring.zero(), &multivariate_division(&ring, g1, actual.iter(), order));
+    assert_el_eq!(ring, ring.zero(), multivariate_division(&ring, g1, actual.iter(), order));
 }
 
 #[test]
@@ -844,7 +844,7 @@ fn test_gb_local_ring() {
     let gb = f4::<_, _, true>(&ring, vec![f], order, u16::MAX);
 
     assert_eq!(1, gb.len());
-    assert_el_eq!(&ring, &ring.one(), &gb[0]);
+    assert_el_eq!(ring, ring.one(), gb[0]);
 }
 
 #[test]
