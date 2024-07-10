@@ -1,6 +1,5 @@
 use crate::algorithms;
 use crate::divisibility::*;
-use crate::homomorphism::Homomorphism;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
@@ -11,7 +10,7 @@ use crate::rings::zn::ZnRingStore;
 #[allow(type_alias_bounds)]
 type Point<R> = (El<R>, El<R>, El<R>);
 
-fn ec_group_action_proj<R>(Zn: &R, _A: &El<R>, _B: &El<R>, P: Point<R>, Q: &Point<R>) -> Point<R> 
+fn ec_group_add_proj<R>(Zn: &R, _A: &El<R>, _B: &El<R>, P: Point<R>, Q: &Point<R>) -> Point<R> 
     where R: ZnRingStore,
         R::Type: ZnRing
 {
@@ -81,32 +80,44 @@ fn ec_group_double_proj<R>(Zn: &R, A: &El<R>, _B: &El<R>, P: &Point<R>) -> Point
     );
 }
 
-fn ec_mul_abort<R, I>(base: &Point<R>, A: &El<R>, B: &El<R>, power: &El<I>, Zn: &R, ZZ: &I) -> Point<R>
+fn ec_pow_prime_abort<R>(base: &Point<R>, A: &El<R>, B: &El<R>, power: &i128, Zn: &R) -> Result<Point<R>, Point<R>>
     where R: ZnRingStore,
-        R::Type: ZnRing,
-        I: IntegerRingStore,
-        I::Type: IntegerRing
+        R::Type: ZnRing
 {
+    let ZZ = StaticRing::<i128>::RING;
     if ZZ.is_zero(&power) {
-        return (Zn.zero(), Zn.one(), Zn.zero());
+        return Ok((Zn.zero(), Zn.one(), Zn.zero()));
     } else if ZZ.is_one(&power) {
-        return (Zn.clone_el(&base.0), Zn.clone_el(&base.1), Zn.clone_el(&base.2));
+        return Ok((Zn.clone_el(&base.0), Zn.clone_el(&base.1), Zn.clone_el(&base.2)));
     }
 
     let mut result = (Zn.zero(), Zn.one(), Zn.zero());
     for i in (0..=ZZ.abs_highest_set_bit(power).unwrap()).rev() {
         let double_result = ec_group_double_proj(Zn, A, B, &result);
         let new = if ZZ.abs_is_bit_set(power, i) {
-            ec_group_action_proj(Zn, A, B, double_result, &base)
+            ec_group_add_proj(Zn, A, B, double_result, &base)
         } else {
             double_result
         };
         if Zn.is_zero(&new.2) {
-            return result;
+            return Err(result);
         }
         result = new;
     }
-    return result;
+    return Ok(result);
+}
+
+fn ec_pow_abort<R>(base: Point<R>, A: &El<R>, B: &El<R>, power_factorization: &[(i128, usize)], Zn: &R) -> Result<Point<R>, Point<R>>
+    where R: ZnRingStore,
+        R::Type: ZnRing
+{
+    let mut current = base;
+    for (p, e) in power_factorization {
+        for _ in 0..*e {
+            current = ec_pow_prime_abort(&current, A, B, p, Zn)?;
+        }
+    }
+    return Ok(current);
 }
 
 fn is_on_curve<R>(Zn: &R, A: &El<R>, B: &El<R>, P: &Point<R>) -> bool
@@ -126,35 +137,58 @@ fn is_on_curve<R>(Zn: &R, A: &El<R>, B: &El<R>, P: &Point<R>) -> bool
 }
 
 ///
-/// Runtime `L_N(1/2, 1) = exp((1 + o(1)) ln(N)^1/2 lnln(N)^1/2)`
+/// Optimizes the parameters to find a factor of size roughly size; size should be at most sqrt(N)
 /// 
+fn lenstra_ec_factor_base<R>(Zn: R, log2_size: usize, rng: &mut oorandom::Rand64) -> Option<El<<R::Type as ZnRing>::Integers>>
+    where R: ZnRingStore + DivisibilityRingStore + Copy,
+        R::Type: ZnRing + DivisibilityRing
+{
+    let ZZ = BigIntRing::RING;
+    assert!(ZZ.is_leq(&ZZ.power_of_two(log2_size * 2), &Zn.size(&ZZ).unwrap()));
+    let log2_N = ZZ.abs_log2_ceil(&Zn.size(&ZZ).unwrap()).unwrap();
+    let log2_B = (log2_size as f64 * 2f64.ln() * (log2_N as f64 * 2f64.ln()).ln()).sqrt() / 2f64.ln();
+    assert!(log2_B <= i128::MAX as f64);
+
+    let primes = algorithms::erathostenes::enumerate_primes(&StaticRing::<i128>::RING, &(1i128 << (log2_B as u64)));
+    let power_factorization = primes.iter()
+            .map(|p| (*p, log2_B.ceil() as usize / StaticRing::<i128>::RING.abs_log2_ceil(&p).unwrap()))
+            .collect::<Vec<_>>();
+
+    // after this many random curves, we expect to have found a factor with high probability, unless there is no factor of size about `log2_size`
+    for _ in 0..(1i128 << (log2_B as u64)) {
+        let P = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()), Zn.one());
+        let A = Zn.random_element(|| rng.rand_u64());
+        let B = Zn.sub(Zn.mul_ref(&P.1, &P.1), Zn.add(Zn.pow(Zn.clone_el(&P.0), 3), Zn.mul_ref(&A, &P.0)));
+        debug_assert!(is_on_curve(&Zn, &A, &B, &P));
+        let result = ec_pow_abort(P, &A, &B, &power_factorization, &Zn).unwrap_or_else(|point| point);
+        let possible_factor = algorithms::eea::gcd(Zn.smallest_positive_lift(result.2), Zn.integer_ring().clone_el(Zn.modulus()), Zn.integer_ring());
+        if !Zn.integer_ring().is_unit(&possible_factor) {
+            return Some(possible_factor);
+        }
+    }
+    return None;
+}
+
 #[stability::unstable(feature = "enable")]
 pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::Integers>
     where R: ZnRingStore + DivisibilityRingStore,
         R::Type: ZnRing + DivisibilityRing
 {
-    assert!(algorithms::miller_rabin::is_prime_base(&Zn, 6) == false);
+    assert!(algorithms::miller_rabin::is_prime_base(&Zn, 10) == false);
     let ZZ = BigIntRing::RING;
-    assert!(ZZ.is_geq(&int_cast(Zn.integer_ring().clone_el(Zn.modulus()), ZZ, Zn.integer_ring()), &ZZ.int_hom().map(100)));
-    let Nf = Zn.integer_ring().to_float_approx(Zn.modulus());
-    // smoothness bound, choose L_N(1/2, 1/2)
-    let B = (0.5 * Nf.ln().sqrt() * Nf.ln().ln().sqrt()).exp() as usize;
-    let primes = algorithms::erathostenes::enumerate_primes(&StaticRing::<i128>::RING, &(B as i128));
-    let k = ZZ.prod(
-        primes.iter()
-            .map(|p| (Nf.log2() / StaticRing::<i128>::RING.to_float_approx(&p).log2(), p))
-            .map(|(e, p)| ZZ.pow(int_cast(*p, ZZ, StaticRing::<i128>::RING), e as usize + 1))
-    );
+    let log2_N = ZZ.abs_log2_ceil(&Zn.size(&ZZ).unwrap()).unwrap();
     let mut rng = oorandom::Rand64::new(Zn.integer_ring().default_hash(Zn.modulus()) as u128);
+
+    // we first try to find smaller factors
+    for log2_size in (16..(log2_N / 2)).step_by(8) {
+        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_size, &mut rng) {
+            return factor;
+        }
+    }
+    // this is now the general case
     loop {
-        let P = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()), Zn.one());
-        let A = Zn.random_element(|| rng.rand_u64());
-        let B = Zn.sub(Zn.mul_ref(&P.1, &P.1), Zn.add(Zn.pow(Zn.clone_el(&P.0), 3), Zn.mul_ref(&A, &P.0)));
-        debug_assert!(is_on_curve(&Zn, &A, &B, &P));
-        let result = ec_mul_abort(&P, &A, &B, &k, &Zn, &ZZ);
-        let possible_factor = algorithms::eea::gcd(Zn.smallest_positive_lift(result.2), Zn.integer_ring().clone_el(Zn.modulus()), Zn.integer_ring());
-        if !Zn.integer_ring().is_unit(&possible_factor) {
-            return possible_factor;
+        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_N / 2, &mut rng) {
+            return factor;
         }
     }
 }
@@ -162,16 +196,20 @@ pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::Integers>
 #[cfg(test)]
 use crate::rings::zn::zn_64::Zn;
 #[cfg(test)]
+use std::time::Instant;
+#[cfg(test)]
+use crate::rings::zn::zn_big;
+#[cfg(test)]
 use test::Bencher;
 
 #[test]
 fn test_ec_factor() {
     let n = 11 * 17;
-    let actual = lenstra_ec_factor(Zn::new(n as u64));
+    let actual = lenstra_ec_factor(&Zn::new(n as u64));
     assert!(actual != 1 && actual != n && n % actual == 0);
     
     let n = 23 * 59 * 113;
-    let actual = lenstra_ec_factor(Zn::new(n as u64));
+    let actual = lenstra_ec_factor(&Zn::new(n as u64));
     assert!(actual != 1 && actual != n && n % actual == 0);
 }
 
@@ -182,8 +220,20 @@ fn bench_ec_factor(bencher: &mut Bencher) {
     let ring = Zn::new((1 << bits) + 1);
 
     bencher.iter(|| {
-        let p = lenstra_ec_factor(ring);
+        let p = lenstra_ec_factor(&ring);
         assert!(n > 0 && n != 1 && n != p);
         assert!(n % p == 0);
     });
+}
+
+#[test]
+#[ignore]
+fn test_ec_factor_large() {
+    let n: i128 = 127540261 * 71316922984999;
+
+    let begin = Instant::now();
+    let p = StaticRing::<i128>::RING.coerce(&BigIntRing::RING, lenstra_ec_factor(&zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.coerce(&StaticRing::<i128>::RING, n))));
+    let end = Instant::now();
+    println!("Done in {} ms", (end - begin).as_millis());
+    assert!(p == 127540261 || p == 71316922984999);
 }

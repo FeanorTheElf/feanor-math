@@ -47,7 +47,7 @@ extern "C" {
     //
     // It is a very hidden, but important fact that we are allowed
     // to pass the same pointer as multiple arguments, even in and
-    // output parameters. See doc 3.0.0, MPIR Basics > Parameter Conventsion,
+    // output parameters. See doc 3.0.0, MPIR Basics > Parameter Conventions,
     // directly after the source code example (only a half-sentence).
     // 
 
