@@ -7,99 +7,87 @@ use crate::integer::*;
 use crate::rings::zn::ZnRing;
 use crate::rings::zn::ZnRingStore;
 
-#[allow(type_alias_bounds)]
 type Point<R> = (El<R>, El<R>, El<R>);
 
-fn ec_group_add_proj<R>(Zn: &R, _A: &El<R>, _B: &El<R>, P: Point<R>, Q: &Point<R>) -> Point<R> 
+fn square<R>(Zn: &R, x: &El<R>) -> El<R>
+    where R: RingStore
+{
+    let mut result: <<R as RingStore>::Type as RingBase>::Element = Zn.clone_el(&x);
+    Zn.square(&mut result);
+    return result;
+}
+
+fn edcurve_add<R>(Zn: &R, d: &El<R>, P: Point<R>, Q: &Point<R>) -> Point<R> 
     where R: ZnRingStore,
         R::Type: ZnRing
 {
-    if Zn.is_zero(&Q.2) {
-        return P;
-    } else if Zn.is_zero(&P.2) {
-        return (Zn.clone_el(&Q.0), Zn.clone_el(&Q.1), Zn.clone_el(&Q.2));
-    }
+    let (Px, Py, Pz) = P;
+    let (Qx, Qy, Qz) = Q;
 
-    let (P_x, P_y, P_z) = P;
-    let (Q_x, Q_y, Q_z) = Q;
+    let PxQx = Zn.mul_ref(&Px, Qx);
+    let PyQy = Zn.mul_ref(&Py, Qy);
+    let PzQz = Zn.mul_ref_snd(Pz, Qz);
 
-    let u = Zn.sub(Zn.mul_ref(&P_y, &Q_z), Zn.mul_ref(&Q_y, &P_z));
-    let w = Zn.sub(Zn.mul_ref(&P_x, &Q_z), Zn.mul_ref(&Q_x, &P_z));
-    let w_sqr = Zn.mul_ref(&w, &w);
-    let w_cbe = Zn.mul_ref(&w_sqr, &w);
+    let PzQz_sqr = square(Zn, &PzQz);
+    let dPxPyQxQy = Zn.mul_ref_snd(Zn.mul_ref(&PxQx, &PyQy), d);
 
-    let R_x_div_w = Zn.sub(
-        Zn.mul(Zn.mul_ref(&P_z, &Q_z), Zn.mul_ref(&u, &u)),
-        Zn.mul_ref_snd(
-            Zn.add(Zn.mul_ref(&P_x, &Q_z), Zn.mul_ref(&P_z, &Q_x)),
-            &w_sqr, 
-        )
+    let u1 = Zn.add_ref(&PzQz_sqr, &dPxPyQxQy);
+    let u2 = Zn.sub(PzQz_sqr, dPxPyQxQy);
+
+    let result = (
+        Zn.mul_ref_fst(&PzQz, Zn.mul_ref_snd(Zn.add(Zn.mul_ref_snd(Px, Qy), Zn.mul_ref_snd(Py, Qx)), &u2)),
+        Zn.mul(PzQz, Zn.mul_ref_snd(Zn.sub(PyQy, PxQx), &u1)),
+        Zn.mul(u1, u2),
     );
-    return (
-        Zn.mul_ref(&w, &R_x_div_w),
-        Zn.add(
-            Zn.mul(P_y, Zn.mul_ref(&Q_z, &w_cbe)),
-            Zn.mul(u, Zn.sub(
-                R_x_div_w, Zn.mul(P_x, Zn.mul_ref_fst(&Q_z, w_sqr))
-            ))
-        ),
-        Zn.mul(P_z, w_cbe)
-    );
+    debug_assert!(is_on_curve(Zn, d, &result));
+    return result;
 }
 
-fn ec_group_double_proj<R>(Zn: &R, A: &El<R>, _B: &El<R>, P: &Point<R>) -> Point<R>
+fn edcurve_double<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> Point<R> 
     where R: ZnRingStore,
         R::Type: ZnRing
 {
-    let (x, y, z) = P;
+    let (Px, Py, Pz) = P;
 
-    if Zn.is_zero(&z) {
-        return (Zn.zero(), Zn.one(), Zn.zero());
-    }
-    
-    let x_sqr = Zn.mul_ref(&x, &x);
-    let x_sqr_3 = Zn.add(Zn.add_ref(&x_sqr, &x_sqr), x_sqr);
-    let u = Zn.add(x_sqr_3, Zn.mul_ref_fst(&A, Zn.mul_ref(&z, &z)));
-    let w = Zn.mul_ref(&y, &z);
-    let w_sqr = Zn.mul_ref(&w, &w);
-    let w_cbe = Zn.mul_ref(&w_sqr, &w);
+    let PxPy = Zn.mul_ref(&Px, &Py);
+    let Px_sqr = square(Zn, Px);
+    let Py_sqr = square(Zn, Py);
+    let Pz_sqr = square(Zn, Pz);
+    let Pz_pow4 = square(Zn, &Pz_sqr);
+    let d_PxPy_sqr = Zn.mul_ref_snd(Zn.mul_ref(&Px_sqr, &Py_sqr), d);
 
-    let x_w_sqr = Zn.mul_ref(&x, &w_sqr);
-    let R_x_div_w = Zn.sub(
-        Zn.mul_ref_fst(&z, Zn.mul_ref(&u, &u)),
-        Zn.add_ref(&x_w_sqr, &x_w_sqr)
+    let u1 = Zn.add_ref(&Pz_pow4, &d_PxPy_sqr);
+    let u2 = Zn.sub(Pz_pow4, d_PxPy_sqr);
+
+    let result = (
+        Zn.mul_ref_fst(&Pz_sqr, Zn.mul_ref_snd(Zn.add_ref(&PxPy, &PxPy), &u2)),
+        Zn.mul_ref_fst(&Pz_sqr, Zn.mul_ref_snd(Zn.sub(Py_sqr, Px_sqr), &u1)),
+        Zn.mul(u1, u2),
     );
-
-    return (
-        Zn.mul_ref(&w, &R_x_div_w),
-        Zn.add(
-            Zn.mul_ref(y, &w_cbe),
-            Zn.mul(u, Zn.sub(R_x_div_w, x_w_sqr))
-        ),
-        Zn.mul_ref_fst(z, w_cbe)
-    );
+    debug_assert!(is_on_curve(Zn, d, &result));
+    return result;
 }
 
-fn ec_pow_prime_abort<R>(base: &Point<R>, A: &El<R>, B: &El<R>, power: &i128, Zn: &R) -> Result<Point<R>, Point<R>>
+fn ec_pow_prime_abort<R>(base: &Point<R>, d: &El<R>, power: &i128, Zn: &R) -> Result<Point<R>, Point<R>>
     where R: ZnRingStore,
         R::Type: ZnRing
 {
     let ZZ = StaticRing::<i128>::RING;
     if ZZ.is_zero(&power) {
-        return Ok((Zn.zero(), Zn.one(), Zn.zero()));
+        return Ok((Zn.zero(), Zn.one(), Zn.one()));
     } else if ZZ.is_one(&power) {
         return Ok((Zn.clone_el(&base.0), Zn.clone_el(&base.1), Zn.clone_el(&base.2)));
     }
 
-    let mut result = (Zn.zero(), Zn.one(), Zn.zero());
+    let mut result = (Zn.zero(), Zn.one(), Zn.one());
     for i in (0..=ZZ.abs_highest_set_bit(power).unwrap()).rev() {
-        let double_result = ec_group_double_proj(Zn, A, B, &result);
+        let double_result = edcurve_double(Zn, d, &result);
         let new = if ZZ.abs_is_bit_set(power, i) {
-            ec_group_add_proj(Zn, A, B, double_result, &base)
+            edcurve_add(Zn, d, double_result, &base)
         } else {
             double_result
         };
-        if Zn.is_zero(&new.2) {
+        if Zn.is_zero(&new.0) && (!Zn.is_zero(&new.2) || Zn.is_zero(&new.1) ) {
             return Err(result);
         }
         result = new;
@@ -107,31 +95,32 @@ fn ec_pow_prime_abort<R>(base: &Point<R>, A: &El<R>, B: &El<R>, power: &i128, Zn
     return Ok(result);
 }
 
-fn ec_pow_abort<R>(base: Point<R>, A: &El<R>, B: &El<R>, power_factorization: &[(i128, usize)], Zn: &R) -> Result<Point<R>, Point<R>>
+fn ec_pow_abort<R>(base: Point<R>, d: &El<R>, power_factorization: &[(i128, usize)], Zn: &R) -> Result<Point<R>, Point<R>>
     where R: ZnRingStore,
         R::Type: ZnRing
 {
     let mut current = base;
     for (p, e) in power_factorization {
         for _ in 0..*e {
-            current = ec_pow_prime_abort(&current, A, B, p, Zn)?;
+            current = ec_pow_prime_abort(&current, d, p, Zn)?;
         }
     }
     return Ok(current);
 }
 
-fn is_on_curve<R>(Zn: &R, A: &El<R>, B: &El<R>, P: &Point<R>) -> bool
+fn is_on_curve<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> bool
     where R: ZnRingStore,
         R::Type: ZnRing
 {
     let (x, y, z) = &P;
+    let x_sqr = square(Zn, x);
+    let y_sqr = square(Zn, y);
+    let z_sqr = square(Zn, z);
     Zn.eq_el(
-        &Zn.mul_ref_snd(Zn.mul_ref(y, y), &z),
+        &Zn.mul_ref_snd(Zn.add_ref(&x_sqr, &y_sqr), &z_sqr),
         &Zn.add(
-            Zn.pow(Zn.clone_el(x), 3), Zn.mul(
-                Zn.add(Zn.mul_ref(A, x), Zn.mul_ref(B, &z)),
-                Zn.mul_ref(&z, &z)
-            )
+            Zn.mul_ref(&z_sqr, &z_sqr),
+            Zn.mul_ref_fst(d, Zn.mul(x_sqr, y_sqr))
         )
     )
 }
@@ -156,14 +145,16 @@ fn lenstra_ec_factor_base<R>(Zn: R, log2_size: usize, rng: &mut oorandom::Rand64
 
     // after this many random curves, we expect to have found a factor with high probability, unless there is no factor of size about `log2_size`
     for _ in 0..(1i128 << (log2_B as u64)) {
-        let P = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()), Zn.one());
-        let A = Zn.random_element(|| rng.rand_u64());
-        let B = Zn.sub(Zn.mul_ref(&P.1, &P.1), Zn.add(Zn.pow(Zn.clone_el(&P.0), 3), Zn.mul_ref(&A, &P.0)));
-        debug_assert!(is_on_curve(&Zn, &A, &B, &P));
-        let result = ec_pow_abort(P, &A, &B, &power_factorization, &Zn).unwrap_or_else(|point| point);
-        let possible_factor = algorithms::eea::gcd(Zn.smallest_positive_lift(result.2), Zn.integer_ring().clone_el(Zn.modulus()), Zn.integer_ring());
-        if !Zn.integer_ring().is_unit(&possible_factor) {
-            return Some(possible_factor);
+        let (x, y) = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()));
+        let (x_sqr, y_sqr) = (square(&Zn, &x), square(&Zn, &y));
+        if let Some(d) = Zn.checked_div(&Zn.sub(Zn.add_ref(&x_sqr, &y_sqr), Zn.one()), &Zn.mul(x_sqr, y_sqr)) {
+            let P = (x, y, Zn.one());
+            debug_assert!(is_on_curve(&Zn, &d, &P));
+            let result = ec_pow_abort(P, &d, &power_factorization, &Zn).unwrap_or_else(|point| point);
+            let possible_factor = algorithms::eea::gcd(Zn.smallest_positive_lift(result.0), Zn.integer_ring().clone_el(Zn.modulus()), Zn.integer_ring());
+            if !Zn.integer_ring().is_unit(&possible_factor) && !Zn.integer_ring().eq_el(&possible_factor, Zn.modulus()) {
+                return Some(possible_factor);
+            }
         }
     }
     return None;
@@ -176,7 +167,7 @@ pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::Integers>
 {
     assert!(algorithms::miller_rabin::is_prime_base(&Zn, 10) == false);
     let ZZ = BigIntRing::RING;
-    let log2_N = ZZ.abs_log2_ceil(&Zn.size(&ZZ).unwrap()).unwrap();
+    let log2_N = ZZ.abs_log2_floor(&Zn.size(&ZZ).unwrap()).unwrap();
     let mut rng = oorandom::Rand64::new(Zn.integer_ring().default_hash(Zn.modulus()) as u128);
 
     // we first try to find smaller factors
@@ -216,8 +207,8 @@ fn test_ec_factor() {
 #[bench]
 fn bench_ec_factor(bencher: &mut Bencher) {
     let bits = 58;
-    let n = (1 << bits) + 1;
-    let ring = Zn::new((1 << bits) + 1);
+    let n = ((1i64 << bits) + 1) / 5;
+    let ring = Zn::new(n as u64);
 
     bencher.iter(|| {
         let p = lenstra_ec_factor(&ring);
