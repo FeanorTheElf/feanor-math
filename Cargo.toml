@@ -1,6 +1,6 @@
 [package]
 name = "feanor-math"
-version = "2.0.2"
+version = "2.0.3"
 edition = "2021"
 authors = ["Simon Pohmann <simon@pohmann.de>"]
 
@@ -27,12 +27,16 @@ stability = "0.2.0"
 rayon = { version = "1.8.0", optional = true }
 ndarray = { version = "0.15.6", optional = true }
 
+[dev-dependencies]
+feanor-mempool = "2.1.0"
+
 [features]
 generic_tests = []
 unstable-enable = []
 mpir = []
 parallel = ["dep:rayon"]
 ndarray = ["dep:ndarray"]
+unrolled_strassen = []
 
 [profile.profiling]
 inherits = "bench"

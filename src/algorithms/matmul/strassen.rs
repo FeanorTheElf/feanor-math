@@ -206,7 +206,166 @@ pub const fn strassen_mem_size(add_assign: bool, block_size_log2: usize, thresho
     }
 }
 
-macro_rules! strassen_impl {
+macro_rules! strassen_base_algorithm {
+    ($R:expr, $V1:expr, $V2:expr, $V3:expr, $ADD_ASSIGN:expr, $T1:expr, $T2:expr, $T3:expr, $steps_left:expr, $block_size_log2:expr, $lhs:expr, $rhs:expr, $dst:expr, $ring:expr, $memory:expr, $smaller_strassen:ident) => {
+        {
+            let steps_left = $steps_left;
+            let block_size_log2 = $block_size_log2;
+            let lhs = $lhs;
+            let dst = $dst;
+            let rhs = $rhs;
+            let ring = $ring;
+            let memory = $memory;
+
+            debug_assert_eq!(lhs.row_count(), 1 << block_size_log2);
+            debug_assert_eq!(lhs.col_count(), 1 << block_size_log2);
+            debug_assert_eq!(rhs.row_count(), 1 << block_size_log2);
+            debug_assert_eq!(rhs.col_count(), 1 << block_size_log2);
+            debug_assert_eq!(dst.row_count(), 1 << block_size_log2);
+            debug_assert_eq!(dst.col_count(), 1 << block_size_log2);
+
+            if steps_left == 0 {
+                naive_matmul::<_, _, _, _, $ADD_ASSIGN, $T1, $T2, $T3>(lhs, rhs, dst, ring);
+            } else {
+                // we have something similar to the "Winograd form"
+                // [ a  b ] [ a' b' ]   [ t + x,      w + v + y ]
+                // [ c  d ] [ c' d' ] = [ w + u + z,  w + u + v ]
+                // where
+                // t = a a'
+                // u = (c - a) (b' - d')
+                // v = (c + d) (b' - a')
+                // w = t + (c + d - a) (a' + d' - b')
+                // x = b c'
+                // y = (a + b - c - d) d'
+                // z = d (c' + b' - a' - d')
+                let n_half = 1 << (block_size_log2 - 1);
+                let n = 1 << block_size_log2;
+                let (a_lhs, b_lhs, c_lhs, d_lhs) = (lhs.submatrix(0..n_half, 0..n_half), lhs.submatrix(0..n_half, n_half..n), lhs.submatrix(n_half..n, 0..n_half), lhs.submatrix(n_half..n, n_half..n));
+                let (a_rhs, b_rhs, c_rhs, d_rhs) = (rhs.submatrix(0..n_half, 0..n_half), rhs.submatrix(0..n_half, n_half..n), rhs.submatrix(n_half..n, 0..n_half), rhs.submatrix(n_half..n, n_half..n));
+                let (ac_dst, bd_dst) = dst.split_cols(0..n_half, n_half..n);
+                let (mut a_dst, mut c_dst) = ac_dst.split_rows(0..n_half, n_half..n);
+                let (mut b_dst, mut d_dst) = bd_dst.split_rows(0..n_half, n_half..n);
+
+                if ADD_ASSIGN {
+                    // now find space for all temporary values; we won't use dst because we want to add results to dst
+                    let (tmp0, memory) = memory.split_at_mut(n_half * n_half);
+
+                    // implicitly add x = b c'
+                    $smaller_strassen::<_, _, _, _, true, $T1, $T2, $T3>(block_size_log2 - 1, b_lhs, c_rhs, a_dst.reborrow(), ring, &mut *memory, steps_left - 1);
+
+                    // handle t = a a'
+                    let mut t = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp0, n_half, n_half));
+                    $smaller_strassen::<_, _, _, _, false, $T1, $T2, false>(block_size_log2 - 1, a_lhs, a_rhs, t.reborrow(), ring, &mut *memory, steps_left - 1);
+                    matrix_add_assign(t.as_const(), a_dst.reborrow(), ring);
+                    
+                    let (tmp1, memory) = memory.split_at_mut(n_half * n_half);
+                    let (tmp2, memory) = memory.split_at_mut(n_half * n_half);
+
+                    // handle w = t + (c + d - a) (a' + d' - b')
+                    let mut c_d_neg_a_lhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp1, n_half, n_half));
+                    matrix_add_add_sub(c_lhs, d_lhs, a_lhs, c_d_neg_a_lhs.reborrow(), ring);
+                    let mut a_d_neg_b_rhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp2, n_half, n_half));
+                    matrix_add_add_sub(a_rhs, d_rhs, b_rhs, a_d_neg_b_rhs.reborrow(), ring);
+                    let mut w = t;
+                    $smaller_strassen::<_, _, _, _, true, false, false, false>(block_size_log2 - 1, c_d_neg_a_lhs.as_const(), a_d_neg_b_rhs.as_const(), w.reborrow(), ring, &mut *memory, steps_left - 1);
+                    matrix_add_assign(w.as_const(), b_dst.reborrow(), ring);
+                    matrix_add_assign(w.as_const(), c_dst.reborrow(), ring);
+                    matrix_add_assign(w.as_const(), d_dst.reborrow(), ring);
+
+                    // handle y = (a + b - c - d) d'
+                    let mut a_b_neg_c_d_lhs = c_d_neg_a_lhs;
+                    matrix_sub_self_assign(b_lhs, a_b_neg_c_d_lhs.reborrow(), ring);
+                    // implicitly add y to matrix
+                    $smaller_strassen::<_, _, _, _, true, false, $T2, $T3>(block_size_log2 - 1, a_b_neg_c_d_lhs.as_const(), d_rhs, b_dst.reborrow(), ring, &mut *memory, steps_left - 1);
+
+                    // handle z = d (c' + b' - a' - d')
+                    let mut b_c_neg_a_d_rhs = a_d_neg_b_rhs;
+                    matrix_sub_self_assign(c_rhs, b_c_neg_a_d_rhs.reborrow(), ring);
+                    // implicitly add z to matrix
+                    $smaller_strassen::<_, _, _, _, true, $T1, false, $T3>(block_size_log2 - 1, d_lhs, b_c_neg_a_d_rhs.as_const(), c_dst.reborrow(), ring, &mut *memory, steps_left - 1);
+
+                    // handle u = (c - a) (b' - d')
+                    let mut u = w;
+                    let mut c_neg_a_lhs = a_b_neg_c_d_lhs;
+                    matrix_sub(c_lhs, a_lhs, c_neg_a_lhs.reborrow(), ring);
+                    let mut b_neg_d_rhs = b_c_neg_a_d_rhs;
+                    matrix_sub(b_rhs, d_rhs, b_neg_d_rhs.reborrow(), ring);
+                    $smaller_strassen::<_, _, _, _, false, false, false, false>(block_size_log2 - 1, c_neg_a_lhs.as_const(), b_neg_d_rhs.as_const(), u.reborrow(), ring, &mut *memory, steps_left - 1);
+                    matrix_add_assign(u.as_const(), c_dst.reborrow(), ring);
+                    matrix_add_assign(u.as_const(), d_dst.reborrow(), ring);
+                    
+                    // handle v = (c + d) (b' - a')
+                    let mut v = u;
+                    let mut c_d_lhs = c_neg_a_lhs;
+                    matrix_add(c_lhs, d_lhs, c_d_lhs.reborrow(), ring);
+                    let mut b_neg_a_rhs = b_neg_d_rhs;
+                    matrix_sub(b_rhs, a_rhs, b_neg_a_rhs.reborrow(), ring);
+                    $smaller_strassen::<_, _, _, _, false, false, false, false>(block_size_log2 - 1, c_d_lhs.as_const(), b_neg_a_rhs.as_const(), v.reborrow(), ring, &mut *memory, steps_left - 1);
+                    matrix_add_assign(v.as_const(), b_dst.reborrow(), ring);
+                    matrix_add_assign(v.as_const(), d_dst.reborrow(), ring);
+
+                } else {
+                    // same as before, but we require less memory since we can use parts of `dst`
+
+                    // handle w* = (c + d - a) (a' + d' - b')
+                    let mut c_d_neg_a_lhs = a_dst.reborrow();
+                    matrix_add_add_sub(c_lhs, d_lhs, a_lhs, c_d_neg_a_lhs.reborrow(), ring);
+                    let mut a_d_neg_b_rhs = c_dst.reborrow();
+                    matrix_add_add_sub(a_rhs, d_rhs, b_rhs, a_d_neg_b_rhs.reborrow(), ring);
+                    let mut w_star = b_dst.reborrow();
+                    $smaller_strassen::<_, _, _, _, false, $T3, $T3, $T3>(block_size_log2 - 1, c_d_neg_a_lhs.as_const(), a_d_neg_b_rhs.as_const(), w_star.reborrow(), ring, &mut *memory, steps_left - 1);
+
+                    // handle v = (c + d) (b' - a')
+                    let mut v = d_dst.reborrow();
+                    let mut c_d_lhs = a_dst.reborrow();
+                    matrix_add(c_lhs, d_lhs, c_d_lhs.reborrow(), ring);
+                    let mut b_neg_a_rhs = c_dst.reborrow();
+                    matrix_sub(b_rhs, a_rhs, b_neg_a_rhs.reborrow(), ring);
+                    $smaller_strassen::<_, _, _, _, false, $T3, $T3, $T3>(block_size_log2 - 1, c_d_lhs.as_const(), b_neg_a_rhs.as_const(), v.reborrow(), ring, &mut *memory, steps_left - 1);
+
+                    // handle u = (c - a) (b' - d'); here we need temporary memory
+                    let mut u = c_dst.reborrow();
+                    let (tmp0, memory) = memory.split_at_mut(n_half * n_half);
+                    let mut c_neg_a_lhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp0, n_half, n_half));
+                    matrix_sub(c_lhs, a_lhs, c_neg_a_lhs.reborrow(), ring);
+                    let mut b_neg_d_rhs = a_dst.reborrow();
+                    matrix_sub(b_rhs, d_rhs, b_neg_d_rhs.reborrow(), ring);
+                    $smaller_strassen::<_, _, _, _, false, false, $T3, $T3>(block_size_log2 - 1, c_neg_a_lhs.as_const(), b_neg_d_rhs.as_const(), u.reborrow(), ring, &mut *memory, steps_left - 1);
+
+                    // now perform linear combinations; concretely, transform (w*, u, v) into (w* + v, w* + u, w* + u + v)
+                    matrix_add_assign(w_star.as_const(), u.reborrow(), ring);
+                    matrix_add_assign(v.as_const(), w_star.reborrow(), ring);
+                    matrix_add_assign(u.as_const(), v.reborrow(), ring);
+
+                    // now implicitly handle y = (a + b - c - d) d'
+                    let mut a_b_neg_c_d_lhs = c_neg_a_lhs;
+                    matrix_sub_self_assign_add_sub(b_lhs, d_lhs, a_b_neg_c_d_lhs.reborrow(), ring);
+                    // implicitly add y to matrix
+                    $smaller_strassen::<_, _, _, _, true, false, $T2, $T3>(block_size_log2 - 1, a_b_neg_c_d_lhs.as_const(), d_rhs, b_dst.reborrow(), ring, &mut *memory, steps_left - 1);
+
+                    // now implicitly handle z = d (c' + b' - a' - d')
+                    let mut b_c_neg_a_d_rhs = b_neg_d_rhs;
+                    matrix_add_assign_add_sub(c_rhs, a_rhs, b_c_neg_a_d_rhs.reborrow(), ring);
+                    // implicitly add z to matrix
+                    $smaller_strassen::<_, _, _, _, true, $T1, $T3, $T3>(block_size_log2 - 1, d_lhs, b_c_neg_a_d_rhs.as_const(), c_dst.reborrow(), ring, &mut *memory, steps_left - 1);
+
+                    // handle t = a a'
+                    let mut t = a_dst.reborrow();
+                    $smaller_strassen::<_, _, _, _, false, $T1, $T2, $T3>(block_size_log2 - 1, a_lhs, a_rhs, t.reborrow(), ring, &mut *memory, steps_left - 1);
+                    matrix_add_assign(t.as_const(), b_dst.reborrow(), ring);
+                    matrix_add_assign(t.as_const(), c_dst.reborrow(), ring);
+                    matrix_add_assign(t.as_const(), d_dst.reborrow(), ring);
+
+                    // handle x = b c'
+                    $smaller_strassen::<_, _, _, _, true, $T1, $T2, $T3>(block_size_log2 - 1, b_lhs, c_rhs, a_dst.reborrow(), ring, &mut *memory, steps_left - 1);
+                }
+            }
+        }
+    }
+}
+
+#[allow(unused_macros)]
+macro_rules! unrolled_strassen_impl {
     ($( ($num:literal, $fun:ident, $prev:ident) ),*) => {
 
         #[stability::unstable(feature = "enable")]
@@ -231,157 +390,15 @@ macro_rules! strassen_impl {
                     rhs: TransposableSubmatrix<V2, El<R>, T2>, 
                     dst: TransposableSubmatrixMut<V3, El<R>, T3>, 
                     ring: R, 
-                    memory: &mut [El<R>]
+                    memory: &mut [El<R>],
+                    _steps_left: usize
                 )
                     where R: RingStore + Copy, 
                         V1: AsPointerToSlice<El<R>>,
                         V2: AsPointerToSlice<El<R>>,
                         V3: AsPointerToSlice<El<R>>
                 {
-                    const STEPS_LEFT: usize = $num;
-                    debug_assert_eq!(lhs.row_count(), 1 << block_size_log2);
-                    debug_assert_eq!(lhs.col_count(), 1 << block_size_log2);
-                    debug_assert_eq!(rhs.row_count(), 1 << block_size_log2);
-                    debug_assert_eq!(rhs.col_count(), 1 << block_size_log2);
-                    debug_assert_eq!(dst.row_count(), 1 << block_size_log2);
-                    debug_assert_eq!(dst.col_count(), 1 << block_size_log2);
-
-                    if STEPS_LEFT == 0 {
-                        naive_matmul::<_, _, _, _, ADD_ASSIGN, T1, T2, T3>(lhs, rhs, dst, ring);
-                    } else {
-                        // we have something similar to the "Winograd form"
-                        // [ a  b ] [ a' b' ]   [ t + x,      w + v + y ]
-                        // [ c  d ] [ c' d' ] = [ w + u + z,  w + u + v ]
-                        // where
-                        // t = a a'
-                        // u = (c - a) (b' - d')
-                        // v = (c + d) (b' - a')
-                        // w = t + (c + d - a) (a' + d' - b')
-                        // x = b c'
-                        // y = (a + b - c - d) d'
-                        // z = d (c' + b' - a' - d')
-                        let n_half = 1 << (block_size_log2 - 1);
-                        let n = 1 << block_size_log2;
-                        let (a_lhs, b_lhs, c_lhs, d_lhs) = (lhs.submatrix(0..n_half, 0..n_half), lhs.submatrix(0..n_half, n_half..n), lhs.submatrix(n_half..n, 0..n_half), lhs.submatrix(n_half..n, n_half..n));
-                        let (a_rhs, b_rhs, c_rhs, d_rhs) = (rhs.submatrix(0..n_half, 0..n_half), rhs.submatrix(0..n_half, n_half..n), rhs.submatrix(n_half..n, 0..n_half), rhs.submatrix(n_half..n, n_half..n));
-                        let (ac_dst, bd_dst) = dst.split_cols(0..n_half, n_half..n);
-                        let (mut a_dst, mut c_dst) = ac_dst.split_rows(0..n_half, n_half..n);
-                        let (mut b_dst, mut d_dst) = bd_dst.split_rows(0..n_half, n_half..n);
-
-                        if ADD_ASSIGN {
-                            // now find space for all temporary values; we won't use dst because we want to add results to dst
-                            let (tmp0, memory) = memory.split_at_mut(n_half * n_half);
-
-                            // implicitly add x = b c'
-                            $prev::<_, _, _, _, true, T1, T2, T3>(block_size_log2 - 1, b_lhs, c_rhs, a_dst.reborrow(), ring, &mut *memory);
-
-                            // handle t = a a'
-                            let mut t = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp0, n_half, n_half));
-                            $prev::<_, _, _, _, false, T1, T2, false>(block_size_log2 - 1, a_lhs, a_rhs, t.reborrow(), ring, &mut *memory);
-                            matrix_add_assign(t.as_const(), a_dst.reborrow(), ring);
-                            
-                            let (tmp1, memory) = memory.split_at_mut(n_half * n_half);
-                            let (tmp2, memory) = memory.split_at_mut(n_half * n_half);
-
-                            // handle w = t + (c + d - a) (a' + d' - b')
-                            let mut c_d_neg_a_lhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp1, n_half, n_half));
-                            matrix_add_add_sub(c_lhs, d_lhs, a_lhs, c_d_neg_a_lhs.reborrow(), ring);
-                            let mut a_d_neg_b_rhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp2, n_half, n_half));
-                            matrix_add_add_sub(a_rhs, d_rhs, b_rhs, a_d_neg_b_rhs.reborrow(), ring);
-                            let mut w = t;
-                            $prev::<_, _, _, _, true, false, false, false>(block_size_log2 - 1, c_d_neg_a_lhs.as_const(), a_d_neg_b_rhs.as_const(), w.reborrow(), ring, &mut *memory);
-                            matrix_add_assign(w.as_const(), b_dst.reborrow(), ring);
-                            matrix_add_assign(w.as_const(), c_dst.reborrow(), ring);
-                            matrix_add_assign(w.as_const(), d_dst.reborrow(), ring);
-
-                            // handle y = (a + b - c - d) d'
-                            let mut a_b_neg_c_d_lhs = c_d_neg_a_lhs;
-                            matrix_sub_self_assign(b_lhs, a_b_neg_c_d_lhs.reborrow(), ring);
-                            // implicitly add y to matrix
-                            $prev::<_, _, _, _, true, false, T2, T3>(block_size_log2 - 1, a_b_neg_c_d_lhs.as_const(), d_rhs, b_dst.reborrow(), ring, &mut *memory);
-
-                            // handle z = d (c' + b' - a' - d')
-                            let mut b_c_neg_a_d_rhs = a_d_neg_b_rhs;
-                            matrix_sub_self_assign(c_rhs, b_c_neg_a_d_rhs.reborrow(), ring);
-                            // implicitly add z to matrix
-                            $prev::<_, _, _, _, true, T1, false, T3>(block_size_log2 - 1, d_lhs, b_c_neg_a_d_rhs.as_const(), c_dst.reborrow(), ring, &mut *memory);
-
-                            // handle u = (c - a) (b' - d')
-                            let mut u = w;
-                            let mut c_neg_a_lhs = a_b_neg_c_d_lhs;
-                            matrix_sub(c_lhs, a_lhs, c_neg_a_lhs.reborrow(), ring);
-                            let mut b_neg_d_rhs = b_c_neg_a_d_rhs;
-                            matrix_sub(b_rhs, d_rhs, b_neg_d_rhs.reborrow(), ring);
-                            $prev::<_, _, _, _, false, false, false, false>(block_size_log2 - 1, c_neg_a_lhs.as_const(), b_neg_d_rhs.as_const(), u.reborrow(), ring, &mut *memory);
-                            matrix_add_assign(u.as_const(), c_dst.reborrow(), ring);
-                            matrix_add_assign(u.as_const(), d_dst.reborrow(), ring);
-                            
-                            // handle v = (c + d) (b' - a')
-                            let mut v = u;
-                            let mut c_d_lhs = c_neg_a_lhs;
-                            matrix_add(c_lhs, d_lhs, c_d_lhs.reborrow(), ring);
-                            let mut b_neg_a_rhs = b_neg_d_rhs;
-                            matrix_sub(b_rhs, a_rhs, b_neg_a_rhs.reborrow(), ring);
-                            $prev::<_, _, _, _, false, false, false, false>(block_size_log2 - 1, c_d_lhs.as_const(), b_neg_a_rhs.as_const(), v.reborrow(), ring, &mut *memory);
-                            matrix_add_assign(v.as_const(), b_dst.reborrow(), ring);
-                            matrix_add_assign(v.as_const(), d_dst.reborrow(), ring);
-
-                        } else {
-                            // same as before, but we require less memory since we can use parts of `dst`
-
-                            // handle w* = (c + d - a) (a' + d' - b')
-                            let mut c_d_neg_a_lhs = a_dst.reborrow();
-                            matrix_add_add_sub(c_lhs, d_lhs, a_lhs, c_d_neg_a_lhs.reborrow(), ring);
-                            let mut a_d_neg_b_rhs = c_dst.reborrow();
-                            matrix_add_add_sub(a_rhs, d_rhs, b_rhs, a_d_neg_b_rhs.reborrow(), ring);
-                            let mut w_star = b_dst.reborrow();
-                            $prev::<_, _, _, _, false, T3, T3, T3>(block_size_log2 - 1, c_d_neg_a_lhs.as_const(), a_d_neg_b_rhs.as_const(), w_star.reborrow(), ring, &mut *memory);
-
-                            // handle v = (c + d) (b' - a')
-                            let mut v = d_dst.reborrow();
-                            let mut c_d_lhs = a_dst.reborrow();
-                            matrix_add(c_lhs, d_lhs, c_d_lhs.reborrow(), ring);
-                            let mut b_neg_a_rhs = c_dst.reborrow();
-                            matrix_sub(b_rhs, a_rhs, b_neg_a_rhs.reborrow(), ring);
-                            $prev::<_, _, _, _, false, T3, T3, T3>(block_size_log2 - 1, c_d_lhs.as_const(), b_neg_a_rhs.as_const(), v.reborrow(), ring, &mut *memory);
-
-                            // handle u = (c - a) (b' - d'); here we need temporary memory
-                            let mut u = c_dst.reborrow();
-                            let (tmp0, memory) = memory.split_at_mut(n_half * n_half);
-                            let mut c_neg_a_lhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp0, n_half, n_half));
-                            matrix_sub(c_lhs, a_lhs, c_neg_a_lhs.reborrow(), ring);
-                            let mut b_neg_d_rhs = a_dst.reborrow();
-                            matrix_sub(b_rhs, d_rhs, b_neg_d_rhs.reborrow(), ring);
-                            $prev::<_, _, _, _, false, false, T3, T3>(block_size_log2 - 1, c_neg_a_lhs.as_const(), b_neg_d_rhs.as_const(), u.reborrow(), ring, &mut *memory);
-
-                            // now perform linear combinations; concretely, transform (w*, u, v) into (w* + v, w* + u, w* + u + v)
-                            matrix_add_assign(w_star.as_const(), u.reborrow(), ring);
-                            matrix_add_assign(v.as_const(), w_star.reborrow(), ring);
-                            matrix_add_assign(u.as_const(), v.reborrow(), ring);
-
-                            // now implicitly handle y = (a + b - c - d) d'
-                            let mut a_b_neg_c_d_lhs = c_neg_a_lhs;
-                            matrix_sub_self_assign_add_sub(b_lhs, d_lhs, a_b_neg_c_d_lhs.reborrow(), ring);
-                            // implicitly add y to matrix
-                            $prev::<_, _, _, _, true, false, T2, T3>(block_size_log2 - 1, a_b_neg_c_d_lhs.as_const(), d_rhs, b_dst.reborrow(), ring, &mut *memory);
-
-                            // now implicitly handle z = d (c' + b' - a' - d')
-                            let mut b_c_neg_a_d_rhs = b_neg_d_rhs;
-                            matrix_add_assign_add_sub(c_rhs, a_rhs, b_c_neg_a_d_rhs.reborrow(), ring);
-                            // implicitly add z to matrix
-                            $prev::<_, _, _, _, true, T1, T3, T3>(block_size_log2 - 1, d_lhs, b_c_neg_a_d_rhs.as_const(), c_dst.reborrow(), ring, &mut *memory);
-
-                            // handle t = a a'
-                            let mut t = a_dst.reborrow();
-                            $prev::<_, _, _, _, false, T1, T2, T3>(block_size_log2 - 1, a_lhs, a_rhs, t.reborrow(), ring, &mut *memory);
-                            matrix_add_assign(t.as_const(), b_dst.reborrow(), ring);
-                            matrix_add_assign(t.as_const(), c_dst.reborrow(), ring);
-                            matrix_add_assign(t.as_const(), d_dst.reborrow(), ring);
-
-                            // handle x = b c'
-                            $prev::<_, _, _, _, true, T1, T2, T3>(block_size_log2 - 1, b_lhs, c_rhs, a_dst.reborrow(), ring, &mut *memory);
-                        }
-                    }
+                    strassen_base_algorithm!(R, V1, V2, V3, ADD_ASSIGN, T1, T2, T3, $num, block_size_log2, lhs, rhs, dst, ring, memory, $prev)
                 }
             )*
             if block_size_log2 <= threshold_size_log2 {
@@ -389,7 +406,7 @@ macro_rules! strassen_impl {
             } else {
                 match block_size_log2 - threshold_size_log2 {
                     $(
-                        $num => $fun::<_, _, _, _, ADD_ASSIGN, T1, T2, T3>(block_size_log2, lhs, rhs, dst, ring, memory),
+                        $num => $fun::<_, _, _, _, ADD_ASSIGN, T1, T2, T3>(block_size_log2, lhs, rhs, dst, ring, memory, $num),
                     )*
                     _ => panic!()
                 }
@@ -398,7 +415,8 @@ macro_rules! strassen_impl {
     };
 }
 
-strassen_impl!{
+#[cfg(feature = "unrolled_strassen")]
+unrolled_strassen_impl!{
     (0, strassen_impl_0, strassen_impl_0),
     (1, strassen_impl_1, strassen_impl_0),
     (2, strassen_impl_2, strassen_impl_1),
@@ -416,6 +434,48 @@ strassen_impl!{
     (14, strassen_impl_14, strassen_impl_13),
     (15, strassen_impl_15, strassen_impl_14),
     (16, strassen_impl_16, strassen_impl_15)
+}
+
+#[cfg(not(feature = "unrolled_strassen"))]
+#[stability::unstable(feature = "enable")]
+pub fn dispatch_strassen_impl<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
+    block_size_log2: usize, 
+    threshold_size_log2: usize, 
+    lhs: TransposableSubmatrix<V1, El<R>, T1>, 
+    rhs: TransposableSubmatrix<V2, El<R>, T2>, 
+    dst: TransposableSubmatrixMut<V3, El<R>, T3>, 
+    ring: R, 
+    memory: &mut [El<R>]
+)
+    where R: RingStore + Copy, 
+        V1: AsPointerToSlice<El<R>>,
+        V2: AsPointerToSlice<El<R>>,
+        V3: AsPointerToSlice<El<R>>
+{
+    fn strassen_impl<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
+        block_size_log2: usize, 
+        lhs: TransposableSubmatrix<V1, El<R>, T1>, 
+        rhs: TransposableSubmatrix<V2, El<R>, T2>, 
+        dst: TransposableSubmatrixMut<V3, El<R>, T3>, 
+        ring: R, 
+        memory: &mut [El<R>],
+        steps_left: usize
+    )
+        where R: RingStore + Copy, 
+            V1: AsPointerToSlice<El<R>>,
+            V2: AsPointerToSlice<El<R>>,
+            V3: AsPointerToSlice<El<R>>
+    {
+        strassen_base_algorithm!(R, V1, V2, V3, ADD_ASSIGN, T1, T2, T3, steps_left, block_size_log2, lhs, rhs, dst, ring, memory, strassen_impl)
+    }
+
+    if block_size_log2 <= threshold_size_log2 {
+        naive_matmul::<_, _, _, _, ADD_ASSIGN, T1, T2, T3>(lhs, rhs, dst, ring);
+    } else {
+        let steps_left = block_size_log2 - threshold_size_log2;
+        strassen_impl::<_, _, _, _, ADD_ASSIGN, T1, T2, T3>(block_size_log2, lhs, rhs, dst, ring, memory, steps_left)
+        
+    }
 }
 
 #[stability::unstable(feature = "enable")]

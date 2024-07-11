@@ -554,8 +554,8 @@ fn test_reduction_map() {
 
     crate::homomorphism::generic_tests::test_homomorphism_axioms(ReductionMap::new(&ring2, &ring1).unwrap(), ring2.elements().step_by(8));
 
-    let ring1 = zn_big::Zn::new(StaticRing::<i8>::RING, 3);
-    let ring2 = zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(257 * 3));
+    let ring1 = zn_big::Zn::new(StaticRing::<i16>::RING, 3);
+    let ring2 = zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(65537 * 3));
 
-    crate::homomorphism::generic_tests::test_homomorphism_axioms(ReductionMap::new(&ring2, &ring1).unwrap(), ring2.elements().step_by(8));
+    crate::homomorphism::generic_tests::test_homomorphism_axioms(ReductionMap::new(&ring2, &ring1).unwrap(), ring2.elements().step_by(1024));
 }

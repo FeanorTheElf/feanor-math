@@ -220,11 +220,24 @@ fn bench_ec_factor(bencher: &mut Bencher) {
 #[test]
 #[ignore]
 fn test_ec_factor_large() {
-    let n: i128 = 127540261 * 71316922984999;
+    #[cfg(not(feature = "mpir"))]
+    let ZZbig = crate::rings::rust_bigint::RustBigintRing::new_with(feanor_mempool::AllocRc(std::rc::Rc::new(feanor_mempool::dynsize::DynLayoutMempool::<std::alloc::Global>::new(std::ptr::Alignment::of::<u64>()))));
+    #[cfg(feature = "mpir")]
+    let ZZbig = BigIntRing::RING;
+
+    let n: i128 = 1073741827 * 71316922984999;
 
     let begin = Instant::now();
-    let p = StaticRing::<i128>::RING.coerce(&BigIntRing::RING, lenstra_ec_factor(&zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.coerce(&StaticRing::<i128>::RING, n))));
+    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::Zn::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n))));
     let end = Instant::now();
     println!("Done in {} ms", (end - begin).as_millis());
-    assert!(p == 127540261 || p == 71316922984999);
+    assert!(p == 1073741827 || p == 71316922984999);
+
+    let n: i128 = 1152921504606847009 * 2305843009213693967;
+
+    let begin = Instant::now();
+    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::Zn::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n))));
+    let end = Instant::now();
+    println!("Done in {} ms", (end - begin).as_millis());
+    assert!(p == 1152921504606847009 || p == 2305843009213693967);
 }
