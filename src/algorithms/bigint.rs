@@ -404,7 +404,11 @@ pub fn bigint_div<A: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], mut out:
 				}
 				d -= 1;
 			}
-			let quo = division_step_last(lhs, rhs, d, &mut tmp);
+			let quo = if lhs[d] != 0 {
+				division_step_last(lhs, rhs, d, &mut tmp)
+			} else {
+				0
+			};
 			bigint_add(&mut out, &[quo], 0);
 			return out;
 		}
@@ -549,9 +553,17 @@ fn test_div_big() {
     let y = parse("903852718907268716125180964783634518356783568793426834569872365791233387356325");
     let q = parse("643068769934649368349591185247155725");
     let r = parse("265234469040774335115597728873888165088018116561138613092906563355599185141722");
-    let quotient = bigint_div(&mut x, &y, Vec::new());
+    let actual = bigint_div(&mut x, &y, Vec::new());
     assert_eq!(truncate_zeros(r), truncate_zeros(x));
-    assert_eq!(truncate_zeros(q), truncate_zeros(quotient));
+    assert_eq!(truncate_zeros(q), truncate_zeros(actual));
+
+	let mut x = vec![0, 0, 0, 0, 1];
+	let y = parse("170141183460469231731687303715884105727");
+	let q = parse("680564733841876926926749214863536422916");
+	let r = vec![4];
+	let actual = bigint_div(&mut x, &y, Vec::new());
+	assert_eq!(truncate_zeros(r), truncate_zeros(x));
+    assert_eq!(truncate_zeros(q), truncate_zeros(actual));
 }
 
 #[test]

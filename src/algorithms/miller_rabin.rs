@@ -99,6 +99,9 @@ pub fn is_prime_base<R>(Zn: R, k: usize) -> bool
     return true;
 }
 
+#[cfg(test)]
+use crate::rings::rust_bigint::RustBigintRing;
+
 #[test]
 pub fn test_is_prime() {
     assert!(is_prime(StaticRing::<i128>::RING, &2, 5));
@@ -118,4 +121,6 @@ pub fn test_is_prime() {
     assert!(!is_prime(StaticRing::<i128>::RING, &10, 5));
     assert!(!is_prime(StaticRing::<i128>::RING, &22532, 5));
     assert!(!is_prime(StaticRing::<i128>::RING, &347584, 5));
+
+    assert!(is_prime(RustBigintRing::RING, &RustBigintRing::RING.get_ring().parse("170141183460469231731687303715884105727", 10).unwrap(), 10));
 }
