@@ -40,7 +40,7 @@ use super::*;
 /// assert_el_eq!(ring, ring.one(), ring.pow(root_of_unity, 6));
 /// ```
 /// 
-/// # A note on division
+/// # A note on the internals of division
 /// 
 ///  - if the base ring is a field, then `F[X]` is a PID - we can use XGCD
 ///  - if the base ring is Z, then we can consider `Z[X]/(f(X)) ⊗ Q` and f has the same factorization in Q as
@@ -77,6 +77,9 @@ pub struct FreeAlgebraImplBase<R, V, A = Global>
     element_allocator: A
 }
 
+///
+/// Element of a ring of type [`FreeAlgebraImpl`].
+/// 
 pub struct FreeAlgebraEl<R, A = Global>
     where R: RingStore, A: Allocator
 {
@@ -93,6 +96,11 @@ pub type FreeAlgebraImpl<R, V, A = Global> = RingValue<FreeAlgebraImplBase<R, V,
 impl<R, V> FreeAlgebraImpl<R, V>
     where R: RingStore, V: VectorView<El<R>>
 {
+    ///
+    /// Creates a new [`FreeAlgebraImpl`] ring as extension of the given base ring.
+    /// 
+    /// The created ring is `R[X]/(X^l - sum_i x_pow_rank[i] X^i)` where `l = x_pow_rank.len()`.
+    /// 
     pub const fn new(base_ring: R, x_pow_rank: V) -> Self {
         Self::new_with(base_ring, x_pow_rank, Global)
     }
@@ -112,6 +120,11 @@ impl<R, V, A> FreeAlgebraImpl<R, V, A>
 impl<R, V, A> FreeAlgebraImpl<R, V, A>
     where R: RingStore, R::Type: FactorPolyField, V: VectorView<El<R>>, A: Allocator + Clone
 {
+    ///
+    /// If this ring is a field, returns a wrapper around this ring that implements [`crate::field::FieldStore`].
+    /// 
+    /// For details, see [`crate::rings::field::AsField`].
+    /// 
     pub fn as_field(self) -> Result<AsField<Self>, Self> {
         let poly_ring = DensePolyRing::new(self.base_ring(), "X");
         let f = poly_ring.from_terms(
@@ -357,7 +370,11 @@ impl<R, V, A> FreeAlgebra for FreeAlgebraImplBase<R, V, A>
         where Self: 'a;
 
     fn canonical_gen(&self) -> Self::Element {
-        self.from_canonical_basis((0..self.rank()).map(|i| if i == 1 { self.base_ring.one() } else { self.base_ring.zero() }))
+        if self.rank() == 1 {
+            self.from_canonical_basis([self.base_ring.clone_el(self.x_pow_rank.at(0))].into_iter())
+        } else {
+            self.from_canonical_basis((0..self.rank()).map(|i| if i == 1 { self.base_ring.one() } else { self.base_ring.zero() }))
+        }
     }
 
     fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a> {
@@ -445,9 +462,18 @@ impl<R1, V1, A1, R2, V2, A2> CanIsoFromTo<FreeAlgebraImplBase<R1, V1, A1>> for F
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
-use crate::rings::zn::zn_64::Zn;
+use crate::rings::zn::zn_64::{Zn, ZnEl};
+#[cfg(test)]
+use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
+
+#[cfg(test)]
+fn test_ring0_and_elements() -> (FreeAlgebraImpl<Zn, [ZnEl; 1]>, Vec<FreeAlgebraEl<Zn>>) {
+    let R = FreeAlgebraImpl::new(Zn::new(7), [Zn::new(7).neg_one()]);
+    let elements = R.elements().collect();
+    return (R, elements);
+}
 
 #[cfg(test)]
 fn test_ring1_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 2]>, Vec<FreeAlgebraEl<StaticRing<i64>>>) {
@@ -479,6 +505,8 @@ fn test_ring2_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 3]>, V
 
 #[test]
 fn test_ring_axioms() {
+    let (ring, els) = test_ring0_and_elements();
+    crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
     let (ring, els) = test_ring1_and_elements();
     crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
     let (ring, els) = test_ring2_and_elements();
@@ -493,11 +521,24 @@ fn test_ring_axioms() {
 }
 
 #[test]
+fn test_rank_1_ring() {
+    let base_ring = Zn::new(5).as_field().ok().unwrap();
+    let ring = FreeAlgebraImpl::new(base_ring, [base_ring.int_hom().map(1)]).as_field().ok().unwrap();
+    crate::field::generic_tests::test_field_axioms(ring, ring.elements());
+
+    assert_el_eq!(ring, ring.one(), ring.canonical_gen());
+}
+
+#[test]
 fn test_free_algebra_axioms() {
+    let (ring, _) = test_ring0_and_elements();
+    super::generic_tests::test_free_algebra_axioms(ring);
     let (ring, _) = test_ring1_and_elements();
     super::generic_tests::test_free_algebra_axioms(ring);
     let (ring, _) = test_ring2_and_elements();
     super::generic_tests::test_free_algebra_axioms(ring);
+    let ring = FreeAlgebraImpl::new(Zn::new(7), [Zn::new(7).neg_one()]);
+    crate::ring::generic_tests::test_ring_axioms(ring, ring.elements());
 }
 
 #[test]
@@ -535,6 +576,8 @@ fn test_division_ring_of_integers() {
 
 #[test]
 fn test_divisibility_axioms() {
+    let (ring, els) = test_ring0_and_elements();
+    crate::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
     let (ring, els) = test_ring1_and_elements();
     crate::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
     let (ring, els) = test_ring2_and_elements();
@@ -549,4 +592,17 @@ fn test_cubic_mul() {
     let a = ring.from_canonical_basis([modulo.map(0), modulo.map(-1), modulo.map(-1)].into_iter());
     let b = ring.from_canonical_basis([modulo.map(-1), modulo.map(-2), modulo.map(-1)].into_iter());
     assert_el_eq!(ring, b, ring.pow(a, 2));
+}
+
+#[test]
+fn test_as_field() {
+    let base_ring = Zn::new(5).as_field().ok().unwrap();
+    let ring = FreeAlgebraImpl::new(base_ring, [base_ring.int_hom().map(1)]).as_field().ok().unwrap();
+    crate::field::generic_tests::test_field_axioms(ring, ring.elements());
+
+    let base_ring = Zn::new(3).as_field().ok().unwrap();
+    let ring = FreeAlgebraImpl::new(base_ring, [base_ring.int_hom().map(2), base_ring.zero()]).as_field().ok().unwrap();
+    crate::field::generic_tests::test_field_axioms(ring, ring.elements());
+
+    assert!(FreeAlgebraImpl::new(base_ring, [base_ring.int_hom().map(1), base_ring.zero()]).as_field().is_err());
 }

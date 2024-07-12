@@ -42,8 +42,11 @@ pub type GaloisFieldDyn = AsField<FreeAlgebraImpl<AsField<Zn>, Box<[El<AsField<Z
 /// ```
 /// 
 pub fn GF<const DEGREE: usize>(p: u64) -> GaloisField<DEGREE> {
-    assert!(DEGREE > 1);
+    assert!(DEGREE >= 1);
     let Fp = Zn::new(p).as_field().ok().unwrap();
+    if DEGREE == 1 {
+        return FreeAlgebraImpl::new(Fp, std::array::from_fn(|_| Fp.one())).as_field().ok().unwrap();
+    }
     let poly_ring = DensePolyRing::new(Fp, "X");
     let mut rng = oorandom::Rand64::new(p as u128);
     loop {
@@ -82,8 +85,11 @@ pub fn GF<const DEGREE: usize>(p: u64) -> GaloisField<DEGREE> {
 /// 
 pub fn GFdyn(power_of_p: u64) -> GaloisFieldDyn {
     let (p, e) = int_factor::is_prime_power(&StaticRing::<i64>::RING, &(power_of_p as i64)).unwrap();
-    assert!(e > 1);
+    assert!(e >= 1);
     let Fp = Zn::new(p as u64).as_field().ok().unwrap();
+    if e == 1 {
+        return FreeAlgebraImpl::new(Fp, vec![Fp.one()].into_boxed_slice()).as_field().ok().unwrap();
+    }
     let poly_ring = DensePolyRing::new(Fp, "X");
     let mut rng = oorandom::Rand64::new(p as u128);
     loop {
@@ -146,6 +152,10 @@ pub fn GF_conway(power_of_p: u64) -> GaloisFieldDyn {
 
 #[test]
 fn test_GF() {
+    let F7 = GF::<1>(7);
+    assert_eq!(7, F7.elements().count());
+    crate::field::generic_tests::test_field_axioms(F7, F7.elements());
+
     let F27 = GF::<3>(3);
     assert_eq!(27, F27.elements().count());
     crate::field::generic_tests::test_field_axioms(F27, F27.elements());
@@ -153,6 +163,10 @@ fn test_GF() {
 
 #[test]
 fn test_GFdyn() {
+    let F7 = GFdyn(7);
+    assert_eq!(7, F7.elements().count());
+    crate::field::generic_tests::test_field_axioms(&F7, F7.elements());
+
     let F27 = GFdyn(27);
     assert_eq!(27, F27.elements().count());
     crate::field::generic_tests::test_field_axioms(&F27, F27.elements());
