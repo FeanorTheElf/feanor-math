@@ -1,4 +1,3 @@
-
 # feanor-math
 
 This is a library for number theory, written completely in Rust. 
@@ -63,6 +62,12 @@ This is now fixed, and all versions from `2.x.x` onwards use semantic versioning
 Note that all items marked with the annotation `#[stability::unstable]` from the rust library [`stability`](https://docs.rs/stability/latest/stability/index.html) are exempt from semantic version.
 In other words, breaking changes in the interface of these structs/traits/functions will only increment the minor version number.
 Note that these are not visible to other crates at all, unless the feature `unstable-enable` is active.
+
+# Similar Projects
+
+I have recently been notified of [Symbolica](https://symbolica.io/), which takes a similar approach to computer algebra in Rust.
+As opposed to feanor-math which is mainly built for number theory, its main focus are computations with multivariate polynomials (including floating point number), and is in this area more optimized than feanor-math.
+If this suits your use case better, check it out! Personally, I think it is an amazing project as well.
 
 # Examples
 
