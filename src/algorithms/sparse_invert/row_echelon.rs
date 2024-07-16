@@ -531,7 +531,7 @@ pub(super) fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: Su
 
         if EXTENSIVE_LOG {
             println!();
-            println!("{}", as_sparse_matrix_builder(ring, matrix.as_const(), n).format(ring.get_ring()));
+            println!("{}", to_sparse_matrix_builder(ring, matrix.as_const(), n).format(ring.get_ring()));
             println!();
         }
 
@@ -542,7 +542,7 @@ pub(super) fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: Su
 
         if EXTENSIVE_LOG {
             println!();
-            println!("{}", as_sparse_matrix_builder(ring, matrix.as_const(), n).format(ring.get_ring()));
+            println!("{}", to_sparse_matrix_builder(ring, matrix.as_const(), n).format(ring.get_ring()));
             println!();
         }
 
@@ -583,7 +583,7 @@ pub(super) fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: Su
 
             if EXTENSIVE_LOG {
                 println!();
-                println!("{}", as_sparse_matrix_builder(ring, matrix.as_const(), n).format(ring.get_ring()));
+                println!("{}", to_sparse_matrix_builder(ring, matrix.as_const(), n).format(ring.get_ring()));
                 println!();
             }
 
@@ -606,7 +606,7 @@ pub(super) fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: Su
 }
 
 
-fn as_sparse_matrix_builder<R, V>(ring: R, matrix: Submatrix<V, InternalRow<El<R>>>, n: usize) -> SparseMatrix<R::Type>
+fn to_sparse_matrix_builder<R, V>(ring: R, matrix: Submatrix<V, InternalRow<El<R>>>, n: usize) -> SparseMatrix<R::Type>
     where R: RingStore + Copy,
         R::Type: PrincipalIdealRing,
         V: AsPointerToSlice<InternalRow<El<R>>>

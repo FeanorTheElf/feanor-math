@@ -1,6 +1,6 @@
 [package]
 name = "feanor-math"
-version = "2.0.5"
+version = "2.0.6"
 edition = "2021"
 authors = ["Simon Pohmann <simon@pohmann.de>"]
 
@@ -33,14 +33,19 @@ feanor-mempool = "2.1.0"
 [features]
 # Enables the export of "generic tests", functions that test the set of axioms associated with a trait.
 generic_tests = []
+
 # Makes all unstable items visible to outside crates
 unstable-enable = []
+
 # Try to link to the mpir library for arbitrary-precision integers, and make `BigIntRing` refer to it.
 mpir = []
+
 # Enables parallel computation in some underlying algorithms. Currently this applies only to F4.
 parallel = ["dep:rayon"]
+
 # Includes the matrix and tensor library ndarray, together with a (currently minimalistic) interface to matrices in this crate.
 ndarray = ["dep:ndarray"]
+
 # Uses macros to unroll all stages in the Strassen algorithm. Slightly improves performance at the cost of compilation time.
 unrolled_strassen = []
 

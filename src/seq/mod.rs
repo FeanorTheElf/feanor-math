@@ -56,7 +56,9 @@ pub trait VectorView<T: ?Sized> {
     ///
     /// Returns an iterator over all elements in this vector.
     /// 
-    /// NB: Not called `iter()` to prevent name conflicts.
+    /// NB: Not called `iter()` to prevent name conflicts, since many containers (e.g. `Vec<T>`)
+    /// have a function `iter()` and implement [`VectorView`]. As a result, whenever [`VectorView`]
+    /// is in scope, calling any one `iter()` would require fully-qualified call syntax.
     /// 
     fn as_iter<'a>(&'a self) -> VectorFnIter<VectorViewFn<'a, Self, T>, &'a T> {
         VectorFnIter::new(self.as_fn())
@@ -305,7 +307,6 @@ pub trait SwappableVectorViewMut<T: ?Sized>: VectorViewMut<T> {
 /// assert_eq!(10, compute_sum((&[1, 2, 3, 4, 5][..4]).into_fn(|x| *x)));
 /// ```
 /// 
-
 pub trait VectorFn<T> {
 
     fn len(&self) -> usize;
@@ -314,7 +315,7 @@ pub trait VectorFn<T> {
     fn into_iter(self) -> VectorFnIter<Self, T>
         where Self: Sized
     {
-        unimplemented!()
+        VectorFnIter::new(self)
     }
 
     fn iter<'a>(&'a self) -> VectorFnIter<&'a Self, T> {
@@ -556,4 +557,10 @@ impl<'a, R: RingStore> Fn<(usize, &'a El<R>,)> for CloneRingEl<R> {
     extern "rust-call" fn call(&self, args: (usize, &'a El<R>,)) -> Self::Output {
         self.0.clone_el(args.1)
     }
+}
+
+#[test]
+fn test_vector_fn_iter() {
+    let vec = vec![1, 2, 4, 8, 16];
+    assert_eq!(vec, vec.as_fn().into_iter().copied().collect::<Vec<_>>());
 }
