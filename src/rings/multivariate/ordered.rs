@@ -320,42 +320,54 @@ impl<R, O, const N: usize, A> RingBase for MultivariatePolyRingImplBase<R, O, N,
     fn is_commutative(&self) -> bool { self.base_ring.is_commutative() }
     fn is_noetherian(&self) -> bool { self.base_ring.is_commutative() }
 
-    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        let mut print_term = |c: &El<R>, m: &Monomial<[MonomialExponent; N]>, with_plus: bool| {
-            if with_plus {
-                write!(out, " + ")?;
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
+        if value.data.len() == 0 {
+            self.base_ring.get_ring().dbg_within(&self.base_ring.zero(), out, env)?;
+        } else {
+            if env >= EnvBindingStrength::Product {
+                write!(out, "(")?;
             }
-            if !self.base_ring.is_one(c) || self.order.compare(m, &Monomial::new([0; N])) == Ordering::Equal {
-                write!(out, "{}", self.base_ring.format(c))?;
-                if self.order.compare(m, &Monomial::new([0; N])) != Ordering::Equal {
-                    write!(out, " * ")?;
+            
+            let mut print_term = |c: &El<R>, m: &Monomial<[MonomialExponent; N]>, with_plus: bool| {
+                if with_plus {
+                    write!(out, " + ")?;
                 }
-            }
-            let mut needs_space = false;
-            for i in 0..N {
-                if m[i] > 0 {
-                    if needs_space {
+                let is_constant_term = self.order.compare(m, &Monomial::new([0; N])) == Ordering::Equal;
+                if !self.base_ring.is_one(c) || is_constant_term {
+                    self.base_ring.get_ring().dbg_within(c, out, if is_constant_term { EnvBindingStrength::Sum } else { EnvBindingStrength::Product })?;
+                    if self.order.compare(m, &Monomial::new([0; N])) != Ordering::Equal {
                         write!(out, " * ")?;
                     }
-                    write!(out, "X{}", i)?;
-                    needs_space = true;
                 }
-                if m[i] > 1 {
-                    write!(out, "^{}", m[i])?;
+                let mut needs_space = false;
+                for i in 0..N {
+                    if m[i] > 0 {
+                        if needs_space {
+                            write!(out, " * ")?;
+                        }
+                        write!(out, "X{}", i)?;
+                        needs_space = true;
+                    }
+                    if m[i] > 1 {
+                        write!(out, "^{}", m[i])?;
+                    }
                 }
-            }
-            return Ok::<(), std::fmt::Error>(());
-        };
-
-        if value.data.len() == 0 {
-            write!(out, "{}", self.base_ring.format(&self.base_ring.zero()))?;
-        } else {
+                return Ok::<(), std::fmt::Error>(());
+            };
+            
             for i in 0..value.data.len() {
                 print_term(&value.data.at(i).0, &value.data.at(i).1, i != 0)?;
+            }
+            if env >= EnvBindingStrength::Product {
+                write!(out, ")")?;
             }
         }
 
         return Ok(());
+    }
+
+    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        self.dbg_within(value, out, EnvBindingStrength::Weakest)
     }
     
     fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>

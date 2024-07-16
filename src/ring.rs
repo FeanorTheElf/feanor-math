@@ -6,6 +6,12 @@ use crate::primitive_int::StaticRing;
 use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::algorithms;
 
+#[stability::unstable(feature = "enable")]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, PartialOrd, Ord)]
+pub enum EnvBindingStrength {
+    Weakest, Sum, Product, Power, Strongest
+}
+
 ///
 /// Basic trait for objects that have a ring structure. This trait is 
 /// implementor-facing, so designed to be used for implementing new
@@ -175,6 +181,11 @@ pub trait RingBase: PartialEq {
     fn is_approximate(&self) -> bool { false }
 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
+
+    #[allow(private_interfaces)]
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _env: EnvBindingStrength) -> std::fmt::Result {
+        self.dbg(value, out)
+    }
 
     fn square(&self, value: &mut Self::Element) {
         self.mul_assign(value, self.clone_el(value));
@@ -1212,4 +1223,12 @@ pub mod generic_tests {
         }
 
     }
+}
+
+#[test]
+fn test_environment_binding() {
+    assert!(EnvBindingStrength::Strongest > EnvBindingStrength::Power);
+    assert!(EnvBindingStrength::Power > EnvBindingStrength::Product);
+    assert!(EnvBindingStrength::Product > EnvBindingStrength::Sum);
+    assert!(EnvBindingStrength::Sum > EnvBindingStrength::Weakest);
 }

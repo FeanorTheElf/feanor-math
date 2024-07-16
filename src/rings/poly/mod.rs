@@ -311,7 +311,10 @@ pub mod generic_impls {
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn dbg_poly<P: PolyRing>(ring: &P, el: &P::Element, out: &mut std::fmt::Formatter, unknown_name: &str) -> std::fmt::Result {
+    pub fn dbg_poly<P: PolyRing>(ring: &P, el: &P::Element, out: &mut std::fmt::Formatter, unknown_name: &str, env: EnvBindingStrength) -> std::fmt::Result {
+        if env >= EnvBindingStrength::Product {
+            write!(out, "(")?;
+        }
         let mut terms = ring.terms(el);
         let print_unknown = |i: usize, out: &mut std::fmt::Formatter| {
             if i == 0 {
@@ -324,15 +327,18 @@ pub mod generic_impls {
             }
         };
         if let Some((c, i)) = terms.next() {
-            ring.base_ring().get_ring().dbg(c, out)?;
+            ring.base_ring().get_ring().dbg_within(c, out, if i == 0 { EnvBindingStrength::Sum } else { EnvBindingStrength:: Product })?;
             print_unknown(i, out)?;
         } else {
             write!(out, "0")?;
         }
         while let Some((c, i)) = terms.next() {
             write!(out, " + ")?;
-            ring.base_ring().get_ring().dbg(c, out)?;
+            ring.base_ring().get_ring().dbg_within(c, out, if i == 0 { EnvBindingStrength::Sum } else { EnvBindingStrength:: Product })?;
             print_unknown(i, out)?;
+        }
+        if env >= EnvBindingStrength::Product {
+            write!(out, ")")?;
         }
         return Ok(());
     }

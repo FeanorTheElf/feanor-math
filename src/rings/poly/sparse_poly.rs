@@ -197,8 +197,12 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         self.base_ring.is_noetherian()
     }
 
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
+        super::generic_impls::dbg_poly(self, value, out, self.unknown_name, env)
+    }
+
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        super::generic_impls::dbg_poly(self, value, out, self.unknown_name)
+        self.dbg_within(value, out, EnvBindingStrength::Weakest)
     }
 
     fn square(&self, value: &mut Self::Element) {

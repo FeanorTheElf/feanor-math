@@ -203,8 +203,12 @@ impl<R: RingStore, A: Allocator + Clone> RingBase for DensePolyRingBase<R, A> {
         self.base_ring.is_noetherian()
     }
 
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
+        super::generic_impls::dbg_poly(self, value, out, self.unknown_name, env)
+    }
+
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        super::generic_impls::dbg_poly(self, value, out, self.unknown_name)
+        self.dbg_within(value, out, EnvBindingStrength::Weakest)
     }
 
     fn square(&self, value: &mut Self::Element) {
@@ -623,4 +627,22 @@ fn test_canonical_iso_sparse_poly_ring() {
     let poly_ring2 = DensePolyRing::new(zn_64::Zn::new(7), "X");
     crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
     crate::ring::generic_tests::test_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+}
+
+#[test]
+fn test_print() {
+    let base_poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    let poly_ring = DensePolyRing::new(&base_poly_ring, "Y");
+
+    let poly = poly_ring.from_terms([
+        (base_poly_ring.from_terms([(1, 0), (2, 2)].into_iter()), 0),
+        (base_poly_ring.from_terms([(3, 0), (4, 2)].into_iter()), 2)
+    ].into_iter());
+    assert_eq!("1 + 2X^2 + (3 + 4X^2)Y^2", format!("{}", poly_ring.format(&poly)));
+
+    let poly = poly_ring.from_terms([
+        (base_poly_ring.zero(), 0),
+        (base_poly_ring.from_terms([(4, 2)].into_iter()), 2)
+    ].into_iter());
+    assert_eq!("(4X^2)Y^2", format!("{}", poly_ring.format(&poly)));
 }

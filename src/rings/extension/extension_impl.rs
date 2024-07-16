@@ -234,8 +234,12 @@ impl<R, V, A> RingBase for FreeAlgebraImplBase<R, V, A>
     }
     
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        self.dbg_within(value, out, EnvBindingStrength::Weakest)
+    }
+    
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
         let poly_ring = DensePolyRing::new(self.base_ring(), "θ");
-        poly_ring.get_ring().dbg(&RingRef::new(self).poly_repr(&poly_ring, value, &self.base_ring().identity()), out)
+        poly_ring.get_ring().dbg_within(&RingRef::new(self).poly_repr(&poly_ring, value, &self.base_ring().identity()), out, env)
     }
 
     fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
