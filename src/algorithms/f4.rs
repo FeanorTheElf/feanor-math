@@ -513,6 +513,8 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
         O: MonomialOrder + Copy,
         Coeff<P>: Send + Sync
 {
+    assert!(basis.iter().all(|f| !ring.is_zero(f)));
+    
     let ring_info = ring.base_ring().get_ring().create_ring_info();
 
     basis = reduce(&ring, basis, order);

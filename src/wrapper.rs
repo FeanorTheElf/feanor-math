@@ -15,13 +15,24 @@ use crate::ring::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
 /// # use feanor_math::wrapper::*;
 /// # use feanor_math::primitive_int::*;
-/// 
 /// let ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
 /// let x = RingElementWrapper::new(&ring, ring.indeterminate());
 /// println!("The result is: {}", x.clone() + x.clone() * x);
 /// // instead of
 /// let x = ring.indeterminate();
 /// println!("The result is: {}", ring.format(&ring.add(ring.mul(ring.clone_el(&x), ring.clone_el(&x)), ring.clone_el(&x))));
+/// ```
+/// You can also retrieve the wrapped element
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::wrapper::*;
+/// # use feanor_math::primitive_int::*;
+/// let ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let x = RingElementWrapper::new(&ring, ring.indeterminate());
+/// assert_el_eq!(&ring, ring.add(ring.mul(ring.clone_el(&x), ring.clone_el(&x)), ring.clone_el(&x)), (x.clone() + x.clone() * x).unwrap());
 /// ```
 /// 
 pub struct RingElementWrapper<R>
@@ -91,6 +102,24 @@ impl_trait!{ Add, add }
 impl_trait!{ Mul, mul }
 impl_trait!{ Sub, sub }
 
+#[cfg(feature = "elementwrapper-caret-pow")]
+impl<R: RingStore> BitXor<usize> for RingElementWrapper<R> {
+    type Output = RingElementWrapper<R>;
+
+    fn bitxor(self, rhs: usize) -> Self::Output {
+        self.pow(rhs)
+    }
+}
+
+#[cfg(feature = "elementwrapper-caret-pow")]
+impl<'a, R: RingStore + Clone> BitXor<usize> for &'a RingElementWrapper<R> {
+    type Output = RingElementWrapper<R>;
+
+    fn bitxor(self, rhs: usize) -> Self::Output {
+        <RingElementWrapper<_> as Clone>::clone(self).pow(rhs)
+    }
+}
+
 impl<R: RingStore + Copy> Copy for RingElementWrapper<R> 
     where El<R>: Copy
 {}
@@ -140,4 +169,16 @@ impl<R: RingStore> Deref for RingElementWrapper<R> {
     fn deref(&self) -> &Self::Target {
         &self.element
     }
+}
+
+#[cfg(feature = "elementwrapper-caret-pow")]
+#[cfg(test)]
+use crate::primitive_int::StaticRing;
+
+#[cfg(feature = "elementwrapper-caret-pow")]
+#[test]
+fn test_pow_caret() {
+    let ring = StaticRing::<i64>::RING;
+    let a = RingElementWrapper::new(&ring, 3);
+    assert_eq!(a * a * a * a, a^4);
 }
