@@ -97,6 +97,11 @@ impl<R, O, const N: usize, A> MultivariatePolyRingImplBase<R, O, N, A>
                 return false;
             }
         }
+        for i in 0..el.len() {
+            if self.base_ring().is_zero(&el[i].0) {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -157,6 +162,7 @@ impl<R, O, const N: usize, A> MultivariatePolyRingImplBase<R, O, N, A>
             result.push((self.base_ring.clone_el(&lhs.data.at(i).0), lhs.data.at(i).1));
         }
         self.remove_zeros(&mut result);
+        debug_assert!(self.is_valid(&result));
         return MultivariatePolyRingImplEl {
             data: result,
             ordering: PhantomData
@@ -211,6 +217,7 @@ impl<R, O, const N: usize, A> MultivariatePolyRingImplBase<R, O, N, A>
             }
         }
         self.remove_zeros(&mut result);
+        debug_assert!(self.is_valid(&result));
         return MultivariatePolyRingImplEl {
             data: result,
             ordering: PhantomData
@@ -602,7 +609,19 @@ impl<R, O, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplBase
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
-use crate::rings::zn::zn_static;
+use crate::rings::zn::{zn_static, zn_64};
+
+#[test]
+fn test_from_terms() {
+    let ring: MultivariatePolyRingImpl<_, _, 3> = MultivariatePolyRingImpl::new(zn_64::Zn::new(17), Lex);
+    let poly = ring.from_terms([(1, Monomial::new([1, 0, 0])), (0, Monomial::new([0, 1, 0]))].into_iter().map(|(c, m)| (ring.base_ring().int_hom().map(c), m)));
+    assert!(ring.get_ring().is_valid(&poly.data));
+    assert_el_eq!(ring, ring.indeterminate(0), poly);
+
+    let poly = ring.from_terms([(0, Monomial::new([1, 0, 0])), (0, Monomial::new([0, 1, 0]))].into_iter().map(|(c, m)| (ring.base_ring().int_hom().map(c), m)));
+    assert!(ring.get_ring().is_valid(&poly.data));
+    assert_el_eq!(ring, ring.zero(), poly);
+}
 
 #[test]
 fn test_add() {

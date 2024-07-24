@@ -133,7 +133,8 @@ pub struct MultisetCombinations<'a, F, T>
     converter: F,
     superset: &'a [usize],
     current: Option<Box<[usize]>>,
-    last_moved: usize
+    last_moved: usize,
+    first_trailing_empty: usize
 }
 
 impl<'a, F, T> Iterator for MultisetCombinations<'a, F, T>
@@ -148,7 +149,7 @@ impl<'a, F, T> Iterator for MultisetCombinations<'a, F, T>
         let current = &mut self.current.as_mut().unwrap();
         let result = (self.converter)(current);
         let mut removed = 0;
-        let mut found_empty_place = self.last_moved + 1 != self.superset.len();
+        let mut found_empty_place = self.last_moved + 1 < self.first_trailing_empty;
         while !found_empty_place || current[self.last_moved] == 0 {
             found_empty_place |= current[self.last_moved] < self.superset[self.last_moved];
             removed += current[self.last_moved];
@@ -209,6 +210,7 @@ pub fn multiset_combinations<'a, F, T>(multiset: &'a [usize], size: usize, conve
         return MultisetCombinations {
             converter: converter,
             superset: multiset,
+            first_trailing_empty: 0,
             current: None,
             last_moved: 0
         };
@@ -223,9 +225,14 @@ pub fn multiset_combinations<'a, F, T>(multiset: &'a [usize], size: usize, conve
         to_insert -= start[i];
         i += 1;
     }
+    let mut trailing_empty_entries = 0;
+    while trailing_empty_entries < multiset.len() && multiset[multiset.len() - trailing_empty_entries - 1] == 0 {
+        trailing_empty_entries += 1;
+    }
     return MultisetCombinations {
         converter: converter,
         superset: multiset,
+        first_trailing_empty: multiset.len() - trailing_empty_entries,
         current: Some(start),
         last_moved: last_moved
     };
@@ -576,6 +583,36 @@ fn test_multiset_combinations() {
 
     assert_eq!(&([] as [[usize; 1]; 0]), &multiset_combinations(&[0], 1, clone_array::<usize, 1>).collect::<Vec<_>>()[..]);
     assert_eq!(&([[0]] as [[usize; 1]; 1]), &multiset_combinations(&[0], 0, clone_array::<usize, 1>).collect::<Vec<_>>()[..]);
+
+    let a = [0, 2, 0, 1];
+    let mut iter = multiset_combinations(&a, 2, clone_slice);
+    assert_eq!(&[0, 2, 0, 0][..], &*iter.next().unwrap());
+    assert_eq!(&[0, 1, 0, 1][..], &*iter.next().unwrap());
+    assert_eq!(None, iter.next());
+
+    let a = [0, 3, 0, 0, 2, 0];
+    let mut iter = multiset_combinations(&a, 3, clone_slice);
+    assert_eq!(&[0, 3, 0, 0, 0, 0][..], &*iter.next().unwrap());
+    assert_eq!(&[0, 2, 0, 0, 1, 0][..], &*iter.next().unwrap());
+    assert_eq!(&[0, 1, 0, 0, 2, 0][..], &*iter.next().unwrap());
+    assert_eq!(None, iter.next());
+
+    let a = [0, 3, 0, 0, 2, 2, 0];
+    let mut iter = multiset_combinations(&a, 3, clone_slice);
+    assert_eq!(&[0, 3, 0, 0, 0, 0, 0][..], &*iter.next().unwrap());
+    assert_eq!(&[0, 2, 0, 0, 1, 0, 0][..], &*iter.next().unwrap());
+    assert_eq!(&[0, 2, 0, 0, 0, 1, 0][..], &*iter.next().unwrap());
+    assert_eq!(&[0, 1, 0, 0, 2, 0, 0][..], &*iter.next().unwrap());
+    assert_eq!(&[0, 1, 0, 0, 1, 1, 0][..], &*iter.next().unwrap());
+    assert_eq!(&[0, 1, 0, 0, 0, 2, 0][..], &*iter.next().unwrap());
+    assert_eq!(&[0, 0, 0, 0, 2, 1, 0][..], &*iter.next().unwrap());
+    assert_eq!(&[0, 0, 0, 0, 1, 2, 0][..], &*iter.next().unwrap());
+    assert_eq!(None, iter.next());
+
+    let a = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0];
+    let mut iter = multiset_combinations(&a, 10, clone_slice);
+    assert_eq!(&[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0][..], &*iter.next().unwrap());
+    assert_eq!(1000, iter.count());
 }
 
 #[test]
