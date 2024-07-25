@@ -98,6 +98,25 @@ pub trait VectorView<T: ?Sized> {
         CloneElFn::new(self, clone_entry)
     }
 
+    ///
+    /// Creates a new [`VectorView`] whose elements are the results of the given function
+    /// applied to the elements of this vector.
+    /// 
+    /// The most common use case is a projection on contained elements. Since [`VectorView`]s
+    /// provide elements by reference, this is much less powerful than [`Iterator::map()`] or
+    /// [`VectorFn::map_fn()`], since the function cannot return created elements.
+    /// 
+    /// # Example
+    /// ```
+    /// use feanor_math::seq::*;
+    /// fn foo<V: VectorView<i64>>(data: V) {
+    ///     // some logic
+    /// }
+    /// let data = vec![Some(1), Some(2), Some(3)];
+    /// // the `as_ref()` is necessary, since we have to return a reference
+    /// foo(data.map(|x| x.as_ref().unwrap()));
+    /// ```
+    /// 
     fn map<F: for<'a> Fn(&'a T) -> &'a U, U>(self, func: F) -> VectorViewMap<Self, T, U, F>
         where Self: Sized
     {
@@ -180,8 +199,16 @@ fn range_within<R: RangeBounds<usize>>(len: usize, range: R) -> Range<usize> {
 /// 
 pub trait SelfSubvectorView<T: ?Sized>: Sized + VectorView<T> {
 
+    ///
+    /// Returns a [`SelfSubvectorView`] that represents the elements within the given range
+    /// of this vector.
+    /// 
     fn restrict_full(self, range: Range<usize>) -> Self;
 
+    ///
+    /// Returns a [`SelfSubvectorView`] that represents the elements within the given range
+    /// of this vector.
+    /// 
     fn restrict<R: RangeBounds<usize>>(self, range: R) -> Self {
         let range_full = range_within(self.len(), range);
         self.restrict_full(range_full)
@@ -312,18 +339,39 @@ pub trait VectorFn<T> {
     fn len(&self) -> usize;
     fn at(&self, i: usize) -> T;
 
+    ///
+    /// Produces an iterator over the elements of this [`VectorFn`].
+    /// 
+    /// This transfers ownership of the object to the iterator. If this
+    /// is not desired, consider using [`VectorFn::iter()`].
+    /// 
+    /// Note that [`VectorFn`]s do not necessarily implement [`IntoIterator`] and
+    /// instead use this function. The reason for that is twofold:
+    ///  - the only way of making all types implementing [`VectorFn`]s to also implement [`IntoIterator`]
+    ///    would be to define `VectorFn` as a subtrait of `IntoIterator`. However, this conflicts with the
+    ///    decision to have [`VectorFn`] have the element type as generic parameter, since [`IntoIterator`] 
+    ///    uses an associated type.
+    ///  - If the above problem could somehow be circumvented, for types that implement both [`Iterator`]
+    ///    and [`VectorFn`] (like [`Range`]), calling `into_iter()` would then require fully-qualified call
+    ///    syntax, which is very unwieldy.
+    /// 
     fn into_iter(self) -> VectorFnIter<Self, T>
         where Self: Sized
     {
         VectorFnIter::new(self)
     }
 
+    ///
+    /// Produces an iterator over the elements of this [`VectorFn`].
+    /// 
+    /// See also [`VectorFn::into_iter()`] if a transfer of ownership is required.
+    /// 
     fn iter<'a>(&'a self) -> VectorFnIter<&'a Self, T> {
         self.into_iter()
     }
 
     ///
-    /// NB: Named `map_fn` to avoid conflicts with `map`
+    /// NB: Named `map_fn` to avoid conflicts with `map` of [`Iterator`]
     /// 
     fn map_fn<F: Fn(T) -> U, U>(self, func: F) -> VectorFnMap<Self, T, U, F>
         where Self: Sized
@@ -332,7 +380,7 @@ pub trait VectorFn<T> {
     }
 
     ///
-    /// NB: Named `step_by_fn` to avoid conflicts with `map`
+    /// NB: Named `step_by_fn` to avoid conflicts with `step_by` of [`Iterator`]
     /// 
     fn step_by_fn(self, step_by: usize) -> StepByFn<Self, T>
         where Self: Sized
@@ -382,8 +430,16 @@ pub trait VectorFn<T> {
 /// 
 pub trait SelfSubvectorFn<T>: Sized + VectorFn<T> {
 
+    ///
+    /// Returns a [`SelfSubvectorFn`] that represents the elements within the given range
+    /// of this vector.
+    /// 
     fn restrict_full(self, range: Range<usize>) -> Self;
 
+    ///
+    /// Returns a [`SelfSubvectorFn`] that represents the elements within the given range
+    /// of this vector.
+    /// 
     fn restrict<R: RangeBounds<usize>>(self, range: R) -> Self {
         let range_full = range_within(self.len(), range);
         self.restrict_full(range_full)
