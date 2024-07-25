@@ -126,13 +126,14 @@ pub fn interpolate<P, V1, V2, A: Allocator>(poly_ring: P, x: V1, y: V2, allocato
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn interpolate_multivariate<P, V1, V2, A>(poly_ring: P, interpolation_points: V1, mut values: Vec<El<<P::Type as RingExtension>::BaseRing>>, allocator: A) -> Result<El<P>, InterpolationError>
+pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_points: V1, mut values: Vec<El<<P::Type as RingExtension>::BaseRing>, A2>, allocator: A) -> Result<El<P>, InterpolationError>
     where P: RingStore,
         P::Type: MultivariatePolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing,
         V1: VectorFn<V2>,
         V2: VectorFn<El<<P::Type as RingExtension>::BaseRing>>,
-        A: Allocator
+        A: Allocator,
+        A2: Allocator
 {
     let dim_prod = |range: Range<usize>| <_ as RingStore>::prod(&StaticRing::<i64>::RING, range.map(|i| interpolation_points.at(i).len() as i64)) as usize;
     assert_eq!(interpolation_points.len(), poly_ring.indeterminate_len());

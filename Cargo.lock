@@ -47,7 +47,7 @@ checksum = "3dca9240753cf90908d7e4aac30f630662b02aebaa1b58a3cadabdb23385b58b"
 
 [[package]]
 name = "feanor-math"
-version = "2.1.4"
+version = "2.1.5"
 dependencies = [
  "feanor-mempool",
  "libc",

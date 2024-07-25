@@ -21,3 +21,4 @@ pub mod sparse_invert;
 pub mod smith;
 pub mod resultant;
 pub mod interpolate;
+pub mod poly_det;
