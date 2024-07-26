@@ -182,7 +182,6 @@ pub trait RingBase: PartialEq {
 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
 
-    #[allow(private_interfaces)]
     fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _env: EnvBindingStrength) -> std::fmt::Result {
         self.dbg(value, out)
     }
@@ -608,6 +607,25 @@ pub trait RingStore: Sized {
         where I: Iterator<Item = El<Self>>
     {
         self.get_ring().sum(els)
+    }
+
+    #[stability::unstable(feature = "enable")]
+    fn try_sum<I, E>(&self, els: I) -> Result<El<Self>, E>
+        where I: Iterator<Item = Result<El<Self>, E>>
+    {
+        let mut error = None;
+        let result = self.get_ring().sum(els.map_while(|el| match el {
+            Ok(el) => Some(el),
+            Err(err) => {
+                error = Some(err);
+                None
+            }
+        }));
+        if let Some(err) = error {
+            return Err(err);
+        } else {
+            return Ok(result);
+        }
     }
 
     fn prod<I>(&self, els: I) -> El<Self> 

@@ -327,6 +327,25 @@ pub trait MultivariatePolyRingStore: RingStore
         return result;
     }
 
+    #[stability::unstable(feature = "enable")]
+    fn try_from_terms<I, E>(&self, iter: I) -> Result<El<Self>, E>
+        where I: Iterator<Item = Result<(El<<Self::Type as RingExtension>::BaseRing>, Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>), E>>
+    {
+        let mut error = None;
+        let result = self.from_terms(iter.map_while(|el| match el {
+            Ok(term) => Some(term),
+            Err(err) => {
+                error = Some(err);
+                None
+            }
+        }));
+        if let Some(err) = error {
+            return Err(err);
+        } else {
+            return Ok(result);
+        }
+    }
+
     ///
     /// See [`MultivariatePolyRing::lm()`].
     /// 
@@ -856,6 +875,40 @@ impl MonomialOrder for Lex {
             }
         }
         return Ordering::Equal;
+    }
+}
+
+pub mod generic_impls {
+    use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
+    use super::*;
+
+    pub fn checked_left_div<P, O>(ring: P, lhs: &El<P>, rhs: &El<P>, order: O) -> Option<El<P>>
+        where P: RingStore,
+            P::Type: MultivariatePolyRing,
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing,
+            O: MonomialOrder + Clone
+    {
+        assert!(ring.is_commutative());
+        assert!(!ring.is_zero(rhs));
+        let mut current = ring.clone_el(lhs);
+        let (rhs_lc, rhs_lm) = ring.lt(rhs, order.clone()).unwrap();
+        ring.try_from_terms(std::iter::repeat(()).map_while(|()| {
+            if let Some((lhs_lc, lhs_lm)) = ring.lt(&current, order.clone()) {
+                if rhs_lm.divides(&lhs_lm) {
+                    if let Some(lc_quo) = ring.base_ring().checked_div(lhs_lc, rhs_lc) {
+                        let mon_quo = ring.clone_monomial(lhs_lm).div(rhs_lm);
+                        ring.get_ring().add_assign_from_terms(&mut current, ring.terms(rhs).map(|(c, mon)| (ring.base_ring().negate(ring.base_ring().mul_ref(c, &lc_quo)), ring.clone_monomial(mon).mul(&mon_quo))));
+                        return Some(Ok((lc_quo, mon_quo)));
+                    } else {
+                        return Some(Err(()));
+                    }
+                } else {
+                    return Some(Err(()));
+                }
+            } else {
+                None
+            }
+        })).ok()
     }
 }
 

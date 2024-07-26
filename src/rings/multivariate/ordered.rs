@@ -2,6 +2,8 @@ use std::alloc::Allocator;
 use std::alloc::Global;
 use std::marker::PhantomData;
 
+use crate::divisibility::DivisibilityRing;
+use crate::divisibility::DivisibilityRingStore;
 use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
 use crate::ring::*;
@@ -384,6 +386,16 @@ impl<R, O, const N: usize, A> RingBase for MultivariatePolyRingImplBase<R, O, N,
     }
 }
 
+impl<R, O, const N: usize, A> DivisibilityRing for MultivariatePolyRingImplBase<R, O, N, A>
+    where R: RingStore,
+        R::Type: DivisibilityRing,
+        O: MonomialOrder,
+        A: Allocator + Clone
+{
+    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs, self.order.clone())
+    }
+}
 
 impl<R, O, const N: usize, A> RingExtension for MultivariatePolyRingImplBase<R, O, N, A>
     where R: RingStore,
@@ -514,9 +526,10 @@ impl<'a, R, O, const N: usize> Iterator for MultivariatePolyRingBaseTermsIter<'a
     }
 }
 
-impl<R, O, const N: usize> MultivariatePolyRing for MultivariatePolyRingImplBase<R, O, N>
+impl<R, O, const N: usize, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, O, N, A>
     where R: RingStore,
-        O: MonomialOrder
+        O: MonomialOrder,
+        A: Allocator + Clone
 {
     type MonomialVector = [MonomialExponent; N];
     type TermsIterator<'a> = MultivariatePolyRingBaseTermsIter<'a, R, O, N>
@@ -756,4 +769,13 @@ fn test_evaluate() {
     ].into_iter());
     assert_eq!(6, ring.evaluate(&poly, [1, 1, 0], &ring.base_ring().identity()));
     assert_eq!(0, ring.evaluate(&poly, [2, 2, 0], &ring.base_ring().identity()));
+}
+
+#[test]
+fn test_div() {
+    let ring = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, DegRevLex);
+    assert_el_eq!(&ring, &ring.one(), &ring.checked_div(&ring.indeterminate(0), &ring.indeterminate(0)).unwrap());
+    assert_el_eq!(&ring, &ring.indeterminate(0), &ring.checked_div(&ring.pow(ring.indeterminate(0), 2), &ring.indeterminate(0)).unwrap());
+    assert!(&ring.checked_div(&ring.pow(ring.indeterminate(0), 2), &ring.inclusion().mul_map(ring.indeterminate(0), 2)).is_none());
+    crate::divisibility::generic_tests::test_divisibility_axioms(&ring, edge_case_elements(&ring));
 }
