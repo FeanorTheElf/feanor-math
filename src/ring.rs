@@ -1136,6 +1136,28 @@ pub mod generic_tests {
         }
     }
 
+    pub fn test_hash_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
+        where R::Type: HashableElRing
+    {
+        let elements = edge_case_elements.collect::<Vec<_>>();
+
+        // technically not required, but we should test hash inequality and this really should be true
+        assert_ne!(ring.default_hash(&ring.one()), ring.default_hash(&ring.zero()));
+
+        for a in &elements {
+            for b in &elements {
+                assert!(!ring.eq_el(a, b) || ring.default_hash(a) == ring.default_hash(b));
+            }
+        }
+
+        for a in &elements {
+            for b in &elements {
+                let expr = ring.sub(ring.mul_ref_fst(a, ring.add_ref_fst(b, ring.one())), ring.mul_ref(a, b));
+                assert!(ring.default_hash(a) == ring.default_hash(&expr));
+            }
+        }
+    }
+
     pub fn test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
         let elements = edge_case_elements.collect::<Vec<_>>();
         let zero = ring.zero();
@@ -1164,7 +1186,7 @@ pub mod generic_tests {
                     let ba = ring.add_ref(b, a);
                     assert!(ring.eq_el(&ab, &ba), "Additive commutativity failed: {} + {} = {} != {} = {} + {}", ring.format(a), ring.format(b), ring.format(&ab), ring.format(&ba), ring.format(b), ring.format(a));
                 }
-                    
+
                 if ring.is_commutative() {
                     let ab = ring.mul_ref(a, b);
                     let ba = ring.mul_ref(b, a);

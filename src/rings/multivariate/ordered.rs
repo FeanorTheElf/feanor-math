@@ -396,6 +396,22 @@ impl<R, O, const N: usize, A> DivisibilityRing for MultivariatePolyRingImplBase<
     }
 }
 
+impl<R, O, const N: usize, A> HashableElRing for MultivariatePolyRingImplBase<R, O, N, A>
+    where R: RingStore,
+        R::Type: HashableElRing,
+        O: MonomialOrder,
+        A: Allocator + Clone
+{
+    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
+        for (c, m) in &el.data {
+            for i in 0..self.indeterminate_len() {
+                h.write_u16(m[i]);
+            }
+            self.base_ring().get_ring().hash(c, h);
+        }
+    }
+}
+
 impl<R, O, const N: usize, A> RingExtension for MultivariatePolyRingImplBase<R, O, N, A>
     where R: RingStore,
         O: MonomialOrder,
@@ -704,6 +720,12 @@ fn edge_case_elements<'a>(ring: &'a RingValue<MultivariatePolyRingImplBase<Stati
 fn test_ring_axioms() {
     let ring = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, DegRevLex);
     crate::ring::generic_tests::test_ring_axioms(&ring, edge_case_elements(&ring));
+}
+
+#[test]
+fn test_hash_axioms() {
+    let ring = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, DegRevLex);
+    crate::ring::generic_tests::test_hash_axioms(&ring, edge_case_elements(&ring));
 }
 
 #[test]

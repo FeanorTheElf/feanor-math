@@ -649,6 +649,18 @@ impl<'a, 'b, C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> Fn<(usiz
     }
 }
 
+impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> HashableElRing for ZnBase<C, J, A> 
+    where C::Type: ZnRing + CanHomFrom<J::Type> + HashableElRing,
+        J::Type: IntegerRing,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
+{
+    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
+        for (i, el) in (0..self.components.len()).zip(el.data.iter()) {
+            self.components[i].hash(el, h);
+        }
+    }
+}
+
 impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> FiniteRing for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
@@ -749,6 +761,12 @@ const EDGE_CASE_ELEMENTS: [i32; 9] = [0, 1, 7, 9, 62, 8, 10, 11, 12];
 fn test_ring_axioms() {
     let ring = Zn::create_from_primes(StaticRing::<i64>::RING, vec![7, 11]);
     crate::ring::generic_tests::test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.int_hom().map(x)))
+}
+
+#[test]
+fn test_hash_axioms() {
+    let ring = Zn::create_from_primes(StaticRing::<i64>::RING, vec![7, 11]);
+    crate::ring::generic_tests::test_hash_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.int_hom().map(x)))
 }
 
 #[test]

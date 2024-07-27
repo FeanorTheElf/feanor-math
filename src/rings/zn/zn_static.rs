@@ -173,6 +173,13 @@ impl<const N: u64> Iterator for ZnBaseElementsIter<N> {
     }
 }
 
+impl<const N: u64, const IS_FIELD: bool> HashableElRing for ZnBase<N, IS_FIELD> {
+    
+    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
+        h.write_u64(*el);
+    }
+}
+
 impl<const N: u64, const IS_FIELD: bool> FiniteRing for ZnBase<N, IS_FIELD> {
     type ElementsIter<'a> = ZnBaseElementsIter<N>;
 

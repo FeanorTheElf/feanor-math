@@ -869,6 +869,18 @@ fn test_ring_axioms() {
 }
 
 #[test]
+fn test_hash_axioms() {
+    for n in 2..=17 {
+        let ring = Zn::new(n);
+        crate::ring::generic_tests::test_hash_axioms(&ring, (0..=ring.get_ring().repr_bound()).map(|n| ZnEl(n)));
+    }
+    for n in LARGE_MODULI {
+        let ring = Zn::new(n);
+        crate::ring::generic_tests::test_hash_axioms(&ring, elements(&ring));
+    }
+}
+
+#[test]
 fn test_divisibility_axioms() {
     for n in 2..=17 {
         let Zn = Zn::new(n);

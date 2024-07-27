@@ -628,6 +628,11 @@ fn test_ring_axioms() {
 }
 
 #[test]
+fn test_hash_axioms() {
+    crate::ring::generic_tests::test_hash_axioms(MPZ::RING, edge_case_elements());
+}
+
+#[test]
 fn test_divisibility_ring_axioms() {
     crate::divisibility::generic_tests::test_divisibility_axioms(MPZ::RING, edge_case_elements())
 }

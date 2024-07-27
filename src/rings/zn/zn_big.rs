@@ -272,6 +272,14 @@ impl<I: IntegerRingStore> Copy for ZnBase<I>
         I::Type: IntegerRing
 {}
 
+impl<I: IntegerRingStore> HashableElRing for ZnBase<I>
+    where I::Type: IntegerRing
+{
+    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
+        self.integer_ring().hash(&self.smallest_positive_lift(self.clone_el(el)), h)
+    }
+}
+
 impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I> 
     where I::Type: IntegerRing
 {
@@ -519,6 +527,12 @@ fn test_project() {
 fn test_ring_axioms_znbase() {
     let ring = Zn::new(StaticRing::<i64>::RING, 63);
     crate::ring::generic_tests::test_ring_axioms(&ring, ring.elements())
+}
+
+#[test]
+fn test_hash_axioms() {
+    let ring = Zn::new(StaticRing::<i64>::RING, 63);
+    crate::ring::generic_tests::test_hash_axioms(&ring, ring.elements())
 }
 
 #[test]

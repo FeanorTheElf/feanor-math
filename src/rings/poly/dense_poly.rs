@@ -382,6 +382,17 @@ impl<'a, R> Iterator for TermIterator<'a, R>
     }
 }
 
+impl<R, A: Allocator + Clone> HashableElRing for DensePolyRingBase<R, A> 
+    where R: RingStore,
+        R::Type: HashableElRing
+{
+    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
+        for i in 0..self.degree(el).map(|d| d + 1).unwrap_or(0) {
+            self.base_ring().get_ring().hash(self.coefficient_at(el, i), h);
+        }
+    }
+}
+
 impl<R, A: Allocator + Clone> PolyRing for DensePolyRingBase<R, A> 
     where R: RingStore
 {
@@ -593,6 +604,12 @@ fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El
 fn test_ring_axioms() {
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
     crate::ring::generic_tests::test_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
+}
+
+#[test]
+fn test_hash_axioms() {
+    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    crate::ring::generic_tests::test_hash_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
