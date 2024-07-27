@@ -1,6 +1,6 @@
 [package]
 name = "feanor-math"
-version = "2.1.7"
+version = "2.1.8"
 edition = "2021"
 authors = ["Simon Pohmann <simon@pohmann.de>"]
 

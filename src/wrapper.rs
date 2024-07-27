@@ -59,6 +59,14 @@ impl<R: RingStore> RingElementWrapper<R> {
     pub fn unwrap(self) -> El<R> {
         self.element
     }
+
+    pub fn unwrap_ref(&self) -> &El<R> {
+        &self.element
+    }
+
+    pub fn parent(&self) -> &R {
+        &self.ring
+    }
 }
 
 macro_rules! impl_xassign_trait {
