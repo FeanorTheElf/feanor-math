@@ -354,6 +354,17 @@ Say we have a ring type that builds on an underlying ring type, for example a po
 In this case, `PolyRing` implements `RingBase`, but the underlying ring `R` is constrained to be `RingStore`.
 As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` can all be used equivalently, which provides a lot of flexibility, but still works both with expensive-to-clone rings and zero-sized rings.
 
+## Conventions and best practices
+
+ - Many functions that take a ring as parameter currently take `&R` for a generic `RingStore` type `R`.
+   This however is not the best option, instead one should prefer to take the ring by value, i.e. `R`.
+   If the ring has to be copied within the function, it is perfectly fine to require `R: Copy + RingStore`.
+   Since for `R: RingStore` also `&R: RingStore`, this just makes the interface more general.
+ - Rings that wrap a base ring (like `MyRing<BaseRing: RingStore>`) should not impl `Copy`, unless both `BaseRing: Copy` and `El<BaseRing>: Copy`.
+   There are some cases where I have added `#[derive(Copy)]` (namely [`feanor_math::rings::rational::RationalFieldBase`]), which now prevents adding struct members of base ring elements to the ring.
+   In particular, doing that would mean that we cannot impl `Copy` if only the base ring but not its elements are `Copy`, thus breaking backward compatibility.
+   At the next breaking release, this will be changed.  
+
 # Performance
 
 Generally speaking, I want performance to be a high priority in this crate.

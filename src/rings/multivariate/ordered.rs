@@ -2,8 +2,7 @@ use std::alloc::Allocator;
 use std::alloc::Global;
 use std::marker::PhantomData;
 
-use crate::divisibility::DivisibilityRing;
-use crate::divisibility::DivisibilityRingStore;
+use crate::divisibility::*;
 use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
 use crate::ring::*;

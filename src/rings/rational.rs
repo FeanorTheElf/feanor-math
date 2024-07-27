@@ -17,11 +17,36 @@ use crate::ring::*;
 /// since by nature of the rational numbers, both numerator and denominator can increase
 /// dramatically, even when the numbers itself are of moderate size.
 /// 
-#[derive(Debug, Clone, Copy)]
+/// # Example
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::rational::*;
+/// # use feanor_math::homomorphism::Homomorphism;
+/// # use feanor_math::field::FieldStore;
+/// let ZZ = StaticRing::<i64>::RING;
+/// let QQ = RationalField::new(ZZ);
+/// let hom = QQ.can_hom(&ZZ).unwrap();
+/// assert_el_eq!(QQ, QQ.div(&QQ.one(), &hom.map(4)), QQ.pow(QQ.div(&QQ.one(), &hom.map(2)), 2));
+/// ```
+/// 
+#[derive(Debug, Copy)]
 pub struct RationalFieldBase<I: IntegerRingStore>
     where I::Type: IntegerRing
 {
     integers: I
+}
+
+impl<I> Clone for RationalFieldBase<I>
+    where I: IntegerRingStore + Clone,
+        I::Type: IntegerRing
+{
+    fn clone(&self) -> Self {
+        Self {
+            integers: self.integers.clone()
+        }
+    }
 }
 
 ///

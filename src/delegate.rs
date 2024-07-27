@@ -2,6 +2,7 @@ use crate::pid::PrincipalIdealRing;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::divisibility::DivisibilityRing;
+use crate::rings::extension::FreeAlgebra;
 use crate::rings::{zn::ZnRing, finite::FiniteRing};
 use crate::integer::{IntegerRingStore, IntegerRing};
 
@@ -20,7 +21,7 @@ use crate::integer::{IntegerRingStore, IntegerRing};
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
 /// 
-/// #[derive(PartialEq, Clone, Copy)]
+/// #[derive(PartialEq, Clone)]
 /// struct MyI32Ring;
 /// struct MyI32RingEl(i32);
 /// 
@@ -362,3 +363,43 @@ impl<R: DelegateRing + ?Sized> ZnRing for R
     }
 }
 
+impl<R> RingExtension for R 
+    where R: DelegateRing,
+        R::Base: RingExtension
+{
+    type BaseRing = <R::Base as RingExtension>::BaseRing;
+
+    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing {
+        self.get_delegate().base_ring()
+    }
+
+    fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
+        self.rev_delegate(self.get_delegate().from(x))
+    }
+}
+
+impl<R> FreeAlgebra for R 
+    where R: DelegateRing,
+        <R as DelegateRing>::Base: FreeAlgebra
+{
+    type VectorRepresentation<'a> = <<R as DelegateRing>::Base as FreeAlgebra>::VectorRepresentation<'a>
+        where Self: 'a;
+
+    fn canonical_gen(&self) -> Self::Element {
+        self.rev_delegate(self.get_delegate().canonical_gen())
+    }
+
+    fn from_canonical_basis<V>(&self, vec: V) -> Self::Element
+        where V: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = El<Self::BaseRing>>
+    {
+        self.rev_delegate(self.get_delegate().from_canonical_basis(vec.map(|x| x)))
+    }
+
+    fn rank(&self) -> usize {
+        self.get_delegate().rank()
+    }
+
+    fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a> {
+        self.get_delegate().wrt_canonical_basis(self.delegate_ref(el))
+    }
+}

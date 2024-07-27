@@ -117,3 +117,5 @@ pub mod homomorphism;
 /// or [`iters::cartesian_product`].
 /// 
 pub mod iters;
+
+pub mod local;

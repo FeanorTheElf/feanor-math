@@ -4,8 +4,6 @@ use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::Field;
 use crate::integer::IntegerRing;
 use crate::ring::*;
-
-use super::extension::FreeAlgebra;
 use crate::homomorphism::*;
 
 ///
@@ -126,20 +124,6 @@ impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanIsoFromTo<AsFieldBas
     }
 }
 
-impl<R: DivisibilityRingStore> RingExtension for AsFieldBase<R> 
-    where R::Type: DivisibilityRing + RingExtension
-{
-    type BaseRing = <R::Type as RingExtension>::BaseRing;
-
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing {
-        self.get_delegate().base_ring()
-    }
-
-    fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
-        self.rev_delegate(self.get_delegate().from(x))
-    }
-}
-
 ///
 /// Necessary to potentially implement [`crate::rings::zn::ZnRing`].
 /// 
@@ -216,31 +200,6 @@ impl<R: DivisibilityRingStore> Field for AsFieldBase<R>
 {
     fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         FieldEl(self.get_delegate().checked_left_div(&lhs.0, &rhs.0).unwrap())
-    }
-}
-
-impl<R: DivisibilityRingStore> FreeAlgebra for AsFieldBase<R> 
-    where R::Type: DivisibilityRing + FreeAlgebra
-{
-    type VectorRepresentation<'a> = <R::Type as FreeAlgebra>::VectorRepresentation<'a>
-        where Self: 'a;
-
-    fn canonical_gen(&self) -> Self::Element {
-        self.rev_delegate(self.get_delegate().canonical_gen())
-    }
-
-    fn from_canonical_basis<V>(&self, vec: V) -> Self::Element
-        where V: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = El<Self::BaseRing>>
-    {
-        self.rev_delegate(self.get_delegate().from_canonical_basis(vec.map(|x| x)))
-    }
-
-    fn rank(&self) -> usize {
-        self.get_delegate().rank()
-    }
-
-    fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a> {
-        self.get_delegate().wrt_canonical_basis(self.delegate_ref(el))
     }
 }
 
@@ -405,7 +364,7 @@ fn test_divisibility_axioms() {
 }
 
 #[test]
-fn test_canonical_hom_axioms_zn_big() {
+fn test_canonical_hom_axioms_wrap_unwrap() {
     let R = Zn::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
     crate::ring::generic_tests::test_hom_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());
     crate::ring::generic_tests::test_iso_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());

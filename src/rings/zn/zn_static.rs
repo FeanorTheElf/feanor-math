@@ -1,4 +1,5 @@
 use crate::algorithms::eea::*;
+use crate::local::PrincipalLocalRing;
 use crate::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::field::Field;
 use crate::divisibility::*;
@@ -224,6 +225,13 @@ impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD> {
 impl<const N: u64> Domain for ZnBase<N, true> {}
 
 impl<const N: u64> Field for ZnBase<N, true> {}
+
+impl<const N: u64> PrincipalLocalRing for ZnBase<N, true> {
+    
+    fn max_ideal_gen(&self) ->  &Self::Element {
+        &0
+    }
+}
 
 impl<const N: u64, const IS_FIELD: bool> RingValue<ZnBase<N, IS_FIELD>> {
 

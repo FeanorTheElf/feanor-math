@@ -926,11 +926,11 @@ fn test_ring_rc_lifetimes() {
 #[test]
 fn test_internal_wrappings_dont_matter() {
     
-    #[derive(Copy, Clone, PartialEq)]
+    #[derive(Clone, PartialEq)]
     pub struct ABase;
 
     #[allow(unused)]
-    #[derive(Copy, Clone)]
+    #[derive(Clone)]
     pub struct BBase<R: RingStore> {
         base: R
     }
@@ -1079,7 +1079,7 @@ fn test_internal_wrappings_dont_matter() {
     type B<R> = RingValue<BBase<R>>;
 
     let a: A = RingValue { ring: ABase };
-    let b1: B<A> = RingValue { ring: BBase { base: a } };
+    let b1: B<A> = RingValue { ring: BBase { base: a.clone() } };
     let b2: B<&B<A>> = RingValue { ring: BBase { base: &b1 } };
     let b3: B<&A> = RingValue { ring: BBase { base: &a } };
     b1.coerce(&a, 0);

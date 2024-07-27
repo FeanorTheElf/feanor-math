@@ -2,6 +2,8 @@ use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
 use crate::delegate::DelegateRing;
 use crate::divisibility::*;
 use crate::impl_eq_based_self_iso;
+use crate::impl_localpir_wrap_unwrap_homs;
+use crate::impl_localpir_wrap_unwrap_isos;
 use crate::impl_wrap_unwrap_homs;
 use crate::impl_wrap_unwrap_isos;
 use crate::ordered::OrderedRingStore;
@@ -826,6 +828,8 @@ impl<I: ?Sized + IntegerRing> CanHomFrom<I> for ZnFastmulBase
 
 impl_wrap_unwrap_homs!{ ZnBase, ZnBase }
 impl_wrap_unwrap_isos!{ ZnBase, ZnBase }
+impl_localpir_wrap_unwrap_homs!{ ZnBase, ZnBase }
+impl_localpir_wrap_unwrap_isos!{ ZnBase, ZnBase }
 
 #[cfg(test)]
 use test::Bencher;

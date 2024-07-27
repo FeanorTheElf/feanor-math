@@ -802,7 +802,7 @@ impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
 /// 
-/// #[derive(PartialEq, Clone, Copy)]
+/// #[derive(PartialEq, Clone)]
 /// struct MyI32Ring;
 /// 
 /// impl DelegateRing for MyI32Ring {
