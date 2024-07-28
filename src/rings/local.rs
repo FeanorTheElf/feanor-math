@@ -1,9 +1,8 @@
 use crate::algorithms::int_factor::is_prime_power;
 use crate::delegate::DelegateRing;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
-use crate::local::PrincipalLocalRing;
+use crate::local::{PrincipalLocalRing, PrincipalLocalRingStore};
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
-use crate::field::Field;
 use crate::integer::IntegerRing;
 use crate::ring::*;
 use crate::homomorphism::*;
@@ -82,6 +81,17 @@ impl<R> AsLocalPIR<R>
         let (p, _) = is_prime_power(ring.integer_ring(), ring.modulus())?;
         let gen = ring.can_hom(ring.integer_ring()).unwrap().map(p);
         Some(Self::from(AsLocalPIRBase::promise_is_local_pir(ring, gen)))
+    }
+}
+
+impl<R> AsLocalPIR<R> 
+    where R: RingStore, 
+        R::Type: PrincipalLocalRing
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn from_localpir(ring: R) -> Self {
+        let max_ideal_gen = ring.clone_el(ring.max_ideal_gen());
+        Self::from(AsLocalPIRBase::promise_is_local_pir(ring, max_ideal_gen))
     }
 }
 
@@ -229,14 +239,6 @@ impl<R: DivisibilityRingStore> HashableElRing for AsLocalPIRBase<R>
 impl<R: DivisibilityRingStore> Domain for AsLocalPIRBase<R> 
     where R::Type: DivisibilityRing + Domain
 {}
-
-impl<R: DivisibilityRingStore> Field for AsLocalPIRBase<R>
-    where R::Type: DivisibilityRing + Field
-{
-    fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        self.rev_delegate(self.get_delegate().div(self.delegate_ref(lhs), self.delegate_ref(rhs)))
-    }
-}
 
 ///
 /// Implements the isomorphisms `S: CanHomFrom<AsFieldBase<RingStore<Type = R>>>` and 

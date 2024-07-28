@@ -5,8 +5,12 @@ use std::cmp::min;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::field::Field;
 use crate::homomorphism::Homomorphism;
+use crate::local::PrincipalLocalRing;
 use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::ring::*;
+use crate::rings::finite::FiniteRing;
+use crate::rings::local::AsLocalPIRBase;
+use crate::primitive_int::StaticRing;
 use crate::rings::multivariate::*;
 use crate::rings::zn::{ZnRing, zn_64, ZnRingStore, zn_static};
 use crate::algorithms;
@@ -411,17 +415,6 @@ pub trait GBRingDescriptorRing: Sized + PrincipalIdealRing {
     fn create_ring_info(&self) -> RingInfo<Self>;
 }
 
-impl<F: Field> GBRingDescriptorRing for F {
-
-    fn create_ring_info(&self) -> RingInfo<Self> {
-        RingInfo {
-            annihilating_power: None,
-            ring: PhantomData,
-            extended_ideal_generator: self.zero()
-        }
-    }
-}
-
 fn ring_info_local_zn_ring<R>(ring: R) -> Option<RingInfo<R::Type>>
     where R: ZnRingStore,
         R::Type: ZnRing
@@ -438,6 +431,17 @@ fn ring_info_local_zn_ring<R>(ring: R) -> Option<RingInfo<R::Type>>
     });
 }
 
+impl<F: Field> GBRingDescriptorRing for F {
+
+    fn create_ring_info(&self) -> RingInfo<Self> {
+        RingInfo {
+            annihilating_power: None,
+            ring: PhantomData,
+            extended_ideal_generator: self.zero()
+        }
+    }
+}
+
 impl GBRingDescriptorRing for zn_64::ZnBase {
 
     fn create_ring_info(&self) -> RingInfo<Self> {
@@ -449,6 +453,21 @@ impl<const N: u64> GBRingDescriptorRing for zn_static::ZnBase<N, false> {
 
     fn create_ring_info(&self) -> RingInfo<Self> {
         ring_info_local_zn_ring(RingRef::new(self)).expect("Currently GBRingDescriptorRing only works for local rings Z/nZ, i.e. Z/p^eZ with p prime")
+    }
+}
+
+impl<R> GBRingDescriptorRing for AsLocalPIRBase<R>
+    where R: RingStore,
+        R::Type: DivisibilityRing + FiniteRing
+{
+    fn create_ring_info(&self) -> RingInfo<Self> {
+        let max_ideal_gen = self.max_ideal_gen();
+        let annihilating_power = int_bisect::find_root_floor(&StaticRing::<i64>::RING, 0, |x| if *x < 0 || !self.is_zero(&RingRef::new(self).pow(self.clone_el(max_ideal_gen), *x as usize)) { -1 } else { 1 });
+        RingInfo {
+            annihilating_power: Some(annihilating_power as usize),
+            ring: PhantomData,
+            extended_ideal_generator: self.clone_el(max_ideal_gen)
+        }
     }
 }
 
@@ -564,7 +583,7 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
 
         let new_polys: Vec<_> = if S_polys.len() > 0 {
             
-            if S_polys.len() > 20 {
+            if S_polys.len() > 10 {
                 reduce_S_matrix(&ring, &ring_info.extended_ideal_generator, &S_polys, &basis, order)
             } else {
                 let start = std::time::Instant::now();
@@ -706,11 +725,11 @@ use crate::rings::multivariate::ordered::*;
 #[cfg(test)]
 use crate::rings::poly::*;
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
-#[cfg(test)]
 use crate::wrapper::RingElementWrapper;
 #[cfg(test)]
 use crate::seq::*;
+
+use super::int_bisect;
 
 #[test]
 fn test_f4_small() {
@@ -898,17 +917,16 @@ fn test_gb_local_ring_large() {
     let Y9 = RingElementWrapper::new(&ring, ring.indeterminate(9));
     let Y10 = RingElementWrapper::new(&ring, ring.indeterminate(10));
     let Y11 = RingElementWrapper::new(&ring, ring.indeterminate(11));
-    let scalar = |x: i32| RingElementWrapper::new(&ring, ring.int_hom().map(x));
 
     let system = [
-        Y0.clone() * Y1.clone() * Y2.clone() * Y3.clone().pow(2) * Y4.clone().pow(2) + scalar(4) * Y0.clone() * Y1.clone() * Y2.clone() * Y3.clone() * Y4.clone() * Y5.clone() * Y8.clone() + Y0.clone() * Y1.clone() * Y2.clone() * Y5.clone().pow(2) * Y8.clone().pow(2) + Y0.clone() * Y2.clone() * Y3.clone() * Y4.clone() * Y6.clone() + Y0.clone() * Y1.clone() * Y3.clone() * Y4.clone() * Y7.clone() + Y0.clone() * Y2.clone() * Y5.clone() * Y6.clone() * Y8.clone() + Y0.clone() * Y1.clone() * Y5.clone() * Y7.clone() * Y8.clone() + Y0.clone() * Y2.clone() * Y3.clone() * Y5.clone() * Y10.clone() + Y0.clone() * Y1.clone() * Y3.clone() * Y5.clone() * Y11.clone() + Y0.clone() * Y6.clone() * Y7.clone() + Y3.clone() * Y5.clone() * Y9.clone() - scalar(4),
-        scalar(2) * Y0.clone() * Y1.clone() * Y2.clone() * Y3.clone().pow(2) * Y4.clone() * Y5.clone() + scalar(2) * Y0.clone() * Y1.clone() * Y2.clone() * Y3.clone() * Y5.clone().pow(2) * Y8.clone() + Y0.clone() * Y2.clone() * Y3.clone() * Y5.clone() * Y6.clone() + Y0.clone() * Y1.clone() * Y3.clone() * Y5.clone() * Y7.clone() + scalar(8),
-        Y0.clone() * Y1.clone() * Y2.clone() * Y3.clone().pow(2) * Y5.clone().pow(2) - scalar(5)
+        &Y0 * &Y1 * &Y2 * Y3.clone().pow(2) * Y4.clone().pow(2) + 4 * &Y0 * &Y1 * &Y2 * &Y3 * &Y4 * &Y5 * &Y8 + &Y0 * &Y1 * &Y2 * Y5.clone().pow(2) * Y8.clone().pow(2) + &Y0 * &Y2 * &Y3 * &Y4 * &Y6 + &Y0 * &Y1 * &Y3 * &Y4 * &Y7 + &Y0 * &Y2 * &Y5 * &Y6 * &Y8 + &Y0 * &Y1 * &Y5 * &Y7 * &Y8 + &Y0 * &Y2 * &Y3 * &Y5 * &Y10 + &Y0 * &Y1 * &Y3 * &Y5 * &Y11 + &Y0 * &Y6 * &Y7 + &Y3 * &Y5 * &Y9 -  4,
+        2 * &Y0 * &Y1 * &Y2 * Y3.clone().pow(2) * &Y4 * &Y5 + 2 * &Y0 * &Y1 * &Y2 * &Y3 * Y5.clone().pow(2) * &Y8 + &Y0 * &Y2 * &Y3 * &Y5 * &Y6 + &Y0 * &Y1 * &Y3 * &Y5 * &Y7 + 8,
+        &Y0 * &Y1 * &Y2 * Y3.clone().pow(2) * Y5.clone().pow(2) -  5
     ].into_iter().map(|f| f.unwrap()).collect::<Vec<_>>();
 
     let part_of_result = [
-        scalar(4) * Y2.clone().pow(2) * Y6.clone().pow(2) - scalar(4) * Y1.clone().pow(2) * Y7.clone().pow(2),
-        scalar(8) * Y2.clone() * Y6.clone() + scalar(8) * Y1.clone() * Y7.clone()
+        4 * Y2.clone().pow(2) * Y6.clone().pow(2) -  4 * Y1.clone().pow(2) * Y7.clone().pow(2),
+        8 * &Y2 * &Y6 + 8 * &Y1 * Y7.clone()
     ];
 
     let start = std::time::Instant::now();
@@ -939,16 +957,14 @@ fn test_difficult_gb() {
     let X5 = RingElementWrapper::new(&ring, ring.indeterminate(5));
     let X6 = RingElementWrapper::new(&ring, ring.indeterminate(6));
 
-    let i = |x: i64| RingElementWrapper::new(&ring, ring.inclusion().map(ring.base_ring().coerce(&StaticRing::<i64>::RING, x)));
-
     let basis = vec![
-        i(6) + i(2) * X5.clone() + i(2) * X4.clone() + X6.clone() + i(4) * X0.clone() + i(5) * X6.clone() * X5.clone() + X6.clone() * X4.clone() + i(3) * X0.clone() * X4.clone() + i(6) * X0.clone() * X6.clone() + i(2) * X0.clone() * X3.clone() + X0.clone() * X2.clone() + i(4) * X0.clone() * X1.clone() + i(2) * X3.clone() * X4.clone() * X5.clone() + i(4) * X0.clone() * X6.clone() * X5.clone() + i(6) * X0.clone() * X2.clone() * X5.clone() + i(5) * X0.clone() * X6.clone() * X4.clone() + i(2) * X0.clone() * X3.clone() * X4.clone() + i(4) * X0.clone() * X1.clone() * X4.clone() + X0.clone() * X6.clone().pow(2) + i(3) * X0.clone() * X3.clone() * X6.clone() + i(5) * X0.clone() * X2.clone() * X6.clone() + i(2) * X0.clone() * X1.clone() * X6.clone() + X0.clone() * X3.clone().pow(2) + i(2) * X0.clone() * X2.clone() * X3.clone() + i(3) * X0.clone() * X3.clone() * X4.clone() * X5.clone() + i(4) * X0.clone() * X3.clone() * X6.clone() * X5.clone() + i(3) * X0.clone() * X1.clone() * X6.clone() * X5.clone() + i(3) * X0.clone() * X2.clone() * X3.clone() * X5.clone() + i(3) * X0.clone() * X3.clone() * X6.clone() * X4.clone() + i(2) * X0.clone() * X1.clone() * X6.clone() * X4.clone() + i(2) * X0.clone() * X3.clone().pow(2) * X4.clone() + i(2) * X0.clone() * X2.clone() * X3.clone() * X4.clone() + i(3) * X0.clone() * X3.clone().pow(2) * X4.clone() * X5.clone() + i(4) * X0.clone() * X1.clone() * X3.clone() * X4.clone() * X5.clone() + X0.clone() * X3.clone().pow(2) * X4.clone().pow(2),
-        i(5) + i(4) * X0.clone() + i(6) * X4.clone() * X5.clone() + i(3) * X6.clone() * X5.clone() + i(4) * X0.clone() * X4.clone() + i(3) * X0.clone() * X6.clone() + i(6) * X0.clone() * X3.clone() + i(6) * X0.clone() * X2.clone() + i(6) * X6.clone() * X4.clone() * X5.clone() + i(2) * X0.clone() * X4.clone() * X5.clone() + i(4) * X0.clone() * X6.clone() * X5.clone() + i(3) * X0.clone() * X2.clone() * X5.clone() + i(3) * X0.clone() * X6.clone() * X4.clone() + i(5) * X0.clone() * X3.clone() * X4.clone() + i(6) * X0.clone() * X2.clone() * X4.clone() + i(4) * X0.clone() * X6.clone().pow(2) + i(3) * X0.clone() * X3.clone() * X6.clone() + i(3) * X0.clone() * X2.clone() * X6.clone() + i(2) * X0.clone() * X6.clone() * X4.clone() * X5.clone() + i(6) * X0.clone() * X3.clone() * X4.clone() * X5.clone() + i(5) * X0.clone() * X1.clone() * X4.clone() * X5.clone() + i(6) * X0.clone() * X6.clone().pow(2) * X5.clone() + i(2) * X0.clone() * X3.clone() * X6.clone() * X5.clone() + i(2) * X0.clone() * X2.clone() * X6.clone() * X5.clone() + i(6) * X0.clone() * X1.clone() * X6.clone() * X5.clone() + i(6) * X0.clone() * X2.clone() * X3.clone() * X5.clone() + i(6) * X0.clone() * X3.clone() * X4.clone().pow(2) + i(4) * X0.clone() * X6.clone().pow(2) * X4.clone() + i(6) * X0.clone() * X3.clone() * X6.clone() * X4.clone() + i(3) * X0.clone() * X2.clone() * X6.clone() * X4.clone() + i(4) * X0.clone() * X3.clone() * X6.clone() * X4.clone() * X5.clone() + i(5) * X0.clone() * X1.clone() * X6.clone() * X4.clone() * X5.clone() + i(6) * X0.clone() * X3.clone().pow(2) * X4.clone() * X5.clone() + i(5) * X0.clone() * X2.clone() * X3.clone() * X4.clone() * X5.clone() + i(3) * X0.clone() * X3.clone() * X6.clone() * X4.clone().pow(2) + i(6) * X0.clone() * X3.clone().pow(2) * X4.clone().pow(2) * X5.clone(),
-        i(2) + i(2) * X0.clone() + i(4) * X0.clone() * X4.clone() + i(2) * X0.clone() * X6.clone() + i(5) * X0.clone() * X4.clone() * X5.clone() + i(2) * X0.clone() * X6.clone() * X5.clone() + i(4) * X0.clone() * X2.clone() * X5.clone() + i(2) * X0.clone() * X4.clone().pow(2) + i(4) * X0.clone() * X6.clone() * X4.clone() + i(4) * X0.clone() * X6.clone().pow(2) + i(2) * X6.clone() * X4.clone() * X5.clone().pow(2) + i(4) * X0.clone() * X6.clone() * X4.clone() * X5.clone() + X0.clone() * X3.clone() * X4.clone() * X5.clone() + X0.clone() * X2.clone() * X4.clone() * X5.clone() + i(3) * X0.clone() * X6.clone().pow(2) * X5.clone() + i(2) * X0.clone() * X3.clone() * X6.clone() * X5.clone() + i(4) * X0.clone() * X2.clone() * X6.clone() * X5.clone() + i(2) * X0.clone() * X6.clone() * X4.clone().pow(2) + X0.clone() * X6.clone().pow(2) * X4.clone() + i(3) * X0.clone() * X6.clone() * X4.clone() * X5.clone().pow(2) + i(2) * X0.clone() * X6.clone().pow(2) * X5.clone().pow(2) + i(3) * X0.clone() * X2.clone() * X6.clone() * X5.clone().pow(2) + X0.clone() * X3.clone() * X4.clone().pow(2) * X5.clone() + X0.clone() * X6.clone().pow(2) * X4.clone() * X5.clone() + X0.clone() * X3.clone() * X6.clone() * X4.clone() * X5.clone() + i(6) * X0.clone() * X2.clone() * X6.clone() * X4.clone() * X5.clone() + i(4) * X0.clone() * X6.clone().pow(2) * X4.clone().pow(2) + i(6) * X0.clone() * X3.clone() * X6.clone() * X4.clone() * X5.clone().pow(2) + i(4) * X0.clone() * X1.clone() * X6.clone() * X4.clone() * X5.clone().pow(2) + i(4) * X0.clone() * X2.clone() * X3.clone() * X4.clone() * X5.clone().pow(2) + i(6) * X0.clone() * X3.clone() * X6.clone() * X4.clone().pow(2) * X5.clone() + i(2) * X0.clone() * X3.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(2),
-        i(4) + i(5) * X0.clone() * X4.clone() * X5.clone() + i(6) * X0.clone() * X6.clone() * X5.clone() + i(5) * X0.clone() * X4.clone().pow(2) * X5.clone() + i(3) * X0.clone() * X6.clone() * X4.clone() * X5.clone() + i(3) * X0.clone() * X6.clone().pow(2) * X5.clone() + i(6) * X0.clone() * X6.clone() * X4.clone() * X5.clone().pow(2) + i(5) * X0.clone() * X2.clone() * X4.clone() * X5.clone().pow(2) + X0.clone() * X6.clone().pow(2) * X5.clone().pow(2) + i(6) * X0.clone() * X2.clone() * X6.clone() * X5.clone().pow(2) + i(4) * X0.clone() * X6.clone() * X4.clone().pow(2) * X5.clone() + i(2) * X0.clone() * X6.clone().pow(2) * X4.clone() * X5.clone() + i(5) * X0.clone() * X3.clone() * X4.clone().pow(2) * X5.clone().pow(2) + i(3) * X0.clone() * X6.clone().pow(2) * X4.clone() * X5.clone().pow(2) + i(5) * X0.clone() * X3.clone() * X6.clone() * X4.clone() * X5.clone().pow(2) + i(4) * X0.clone() * X2.clone() * X6.clone() * X4.clone() * X5.clone().pow(2) + i(6) * X0.clone() * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone() + i(4) * X0.clone() * X3.clone() * X6.clone() * X4.clone().pow(2) * X5.clone().pow(2),
-        i(4) + i(4) * X0.clone() * X4.clone().pow(2) * X5.clone().pow(2) + X0.clone() * X6.clone() * X4.clone() * X5.clone().pow(2) + X0.clone() * X6.clone().pow(2) * X5.clone().pow(2) + i(5) * X0.clone() * X6.clone() * X4.clone().pow(2) * X5.clone().pow(2) + i(6) * X0.clone() * X6.clone().pow(2) * X4.clone() * X5.clone().pow(2) + i(3) * X0.clone() * X6.clone().pow(2) * X4.clone() * X5.clone().pow(3) + i(4) * X0.clone() * X2.clone() * X6.clone() * X4.clone() * X5.clone().pow(3) + i(6) * X0.clone() * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(2) + i(4) * X0.clone() * X3.clone() * X6.clone() * X4.clone().pow(2) * X5.clone().pow(3),
-        i(5) * X0.clone() * X6.clone() * X4.clone().pow(2) * X5.clone().pow(3) + i(6) * X0.clone() * X6.clone().pow(2) * X4.clone() * X5.clone().pow(3) + i(5) * X0.clone() * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(3),
-        i(2) * X0.clone() * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(4)
+        6 + 2 * &X5 + 2 * &X4 + &X6 + 4 * &X0 + 5 * &X6 * &X5 + &X6 * &X4 + 3 * &X0 * &X4 + 6 * &X0 * &X6 + 2 * &X0 * &X3 + &X0 * &X2 + 4 * &X0 * &X1 + 2 * &X3 * &X4 * &X5 + 4 * &X0 * &X6 * &X5 + 6 * &X0 * &X2 * &X5 + 5 * &X0 * &X6 * &X4 + 2 * &X0 * &X3 * &X4 + 4 * &X0 * &X1 * &X4 + &X0 * X6.clone().pow(2) + 3 * &X0 * &X3 * &X6 + 5 * &X0 * &X2 * &X6 + 2 * &X0 * &X1 * &X6 + &X0 * X3.clone().pow(2) + 2 * &X0 * &X2 * &X3 + 3 * &X0 * &X3 * &X4 * &X5 + 4 * &X0 * &X3 * &X6 * &X5 + 3 * &X0 * &X1 * &X6 * &X5 + 3 * &X0 * &X2 * &X3 * &X5 + 3 * &X0 * &X3 * &X6 * &X4 + 2 * &X0 * &X1 * &X6 * &X4 + 2 * &X0 * X3.clone().pow(2) * &X4 + 2 * &X0 * &X2 * &X3 * &X4 + 3 * &X0 * X3.clone().pow(2) * &X4 * &X5 + 4 * &X0 * &X1 * &X3 * &X4 * &X5 + &X0 * X3.clone().pow(2) * X4.clone().pow(2),
+        5 + 4 * &X0 + 6 * &X4 * &X5 + 3 * &X6 * &X5 + 4 * &X0 * &X4 + 3 * &X0 * &X6 + 6 * &X0 * &X3 + 6 * &X0 * &X2 + 6 * &X6 * &X4 * &X5 + 2 * &X0 * &X4 * &X5 + 4 * &X0 * &X6 * &X5 + 3 * &X0 * &X2 * &X5 + 3 * &X0 * &X6 * &X4 + 5 * &X0 * &X3 * &X4 + 6 * &X0 * &X2 * &X4 + 4 * &X0 * X6.clone().pow(2) + 3 * &X0 * &X3 * &X6 + 3 * &X0 * &X2 * &X6 + 2 * &X0 * &X6 * &X4 * &X5 + 6 * &X0 * &X3 * &X4 * &X5 + 5 * &X0 * &X1 * &X4 * &X5 + 6 * &X0 * X6.clone().pow(2) * &X5 + 2 * &X0 * &X3 * &X6 * &X5 + 2 * &X0 * &X2 * &X6 * &X5 + 6 * &X0 * &X1 * &X6 * &X5 + 6 * &X0 * &X2 * &X3 * &X5 + 6 * &X0 * &X3 * X4.clone().pow(2) + 4 * &X0 * X6.clone().pow(2) * &X4 + 6 * &X0 * &X3 * &X6 * &X4 + 3 * &X0 * &X2 * &X6 * &X4 + 4 * &X0 * &X3 * &X6 * &X4 * &X5 + 5 * &X0 * &X1 * &X6 * &X4 * &X5 + 6 * &X0 * X3.clone().pow(2) * &X4 * &X5 + 5 * &X0 * &X2 * &X3 * &X4 * &X5 + 3 * &X0 * &X3 * &X6 * X4.clone().pow(2) + 6 * &X0 * X3.clone().pow(2) * X4.clone().pow(2) * X5.clone(),
+        2 + 2 * &X0 + 4 * &X0 * &X4 + 2 * &X0 * &X6 + 5 * &X0 * &X4 * &X5 + 2 * &X0 * &X6 * &X5 + 4 * &X0 * &X2 * &X5 + 2 * &X0 * X4.clone().pow(2) + 4 * &X0 * &X6 * &X4 + 4 * &X0 * X6.clone().pow(2) + 2 * &X6 * &X4 * X5.clone().pow(2) + 4 * &X0 * &X6 * &X4 * &X5 + &X0 * &X3 * &X4 * &X5 + &X0 * &X2 * &X4 * &X5 + 3 * &X0 * X6.clone().pow(2) * &X5 + 2 * &X0 * &X3 * &X6 * &X5 + 4 * &X0 * &X2 * &X6 * &X5 + 2 * &X0 * &X6 * X4.clone().pow(2) + &X0 * X6.clone().pow(2) * &X4 + 3 * &X0 * &X6 * &X4 * X5.clone().pow(2) + 2 * &X0 * X6.clone().pow(2) * X5.clone().pow(2) + 3 * &X0 * &X2 * &X6 * X5.clone().pow(2) + &X0 * &X3 * X4.clone().pow(2) * &X5 + &X0 * X6.clone().pow(2) * &X4 * &X5 + &X0 * &X3 * &X6 * &X4 * &X5 + 6 * &X0 * &X2 * &X6 * &X4 * &X5 + 4 * &X0 * X6.clone().pow(2) * X4.clone().pow(2) + 6 * &X0 * &X3 * &X6 * &X4 * X5.clone().pow(2) + 4 * &X0 * &X1 * &X6 * &X4 * X5.clone().pow(2) + 4 * &X0 * &X2 * &X3 * &X4 * X5.clone().pow(2) + 6 * &X0 * &X3 * &X6 * X4.clone().pow(2) * &X5 + 2 * &X0 * X3.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(2),
+        4 + 5 * &X0 * &X4 * &X5 + 6 * &X0 * &X6 * &X5 + 5 * &X0 * X4.clone().pow(2) * &X5 + 3 * &X0 * &X6 * &X4 * &X5 + 3 * &X0 * X6.clone().pow(2) * &X5 + 6 * &X0 * &X6 * &X4 * X5.clone().pow(2) + 5 * &X0 * &X2 * &X4 * X5.clone().pow(2) + &X0 * X6.clone().pow(2) * X5.clone().pow(2) + 6 * &X0 * &X2 * &X6 * X5.clone().pow(2) + 4 * &X0 * &X6 * X4.clone().pow(2) * &X5 + 2 * &X0 * X6.clone().pow(2) * &X4 * &X5 + 5 * &X0 * &X3 * X4.clone().pow(2) * X5.clone().pow(2) + 3 * &X0 * X6.clone().pow(2) * &X4 * X5.clone().pow(2) + 5 * &X0 * &X3 * &X6 * &X4 * X5.clone().pow(2) + 4 * &X0 * &X2 * &X6 * &X4 * X5.clone().pow(2) + 6 * &X0 * X6.clone().pow(2) * X4.clone().pow(2) * &X5 + 4 * &X0 * &X3 * &X6 * X4.clone().pow(2) * X5.clone().pow(2),
+        4 + 4 * &X0 * X4.clone().pow(2) * X5.clone().pow(2) + &X0 * &X6 * &X4 * X5.clone().pow(2) + &X0 * X6.clone().pow(2) * X5.clone().pow(2) + 5 * &X0 * &X6 * X4.clone().pow(2) * X5.clone().pow(2) + 6 * &X0 * X6.clone().pow(2) * &X4 * X5.clone().pow(2) + 3 * &X0 * X6.clone().pow(2) * &X4 * X5.clone().pow(3) + 4 * &X0 * &X2 * &X6 * &X4 * X5.clone().pow(3) + 6 * &X0 * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(2) + 4 * &X0 * &X3 * &X6 * X4.clone().pow(2) * X5.clone().pow(3),
+        5 * &X0 * &X6 * X4.clone().pow(2) * X5.clone().pow(3) + 6 * &X0 * X6.clone().pow(2) * &X4 * X5.clone().pow(3) + 5 * &X0 * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(3),
+        2 * &X0 * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(4)
     ].into_iter().map(|f| f.unwrap()).collect();
 
     let start = std::time::Instant::now();
@@ -958,5 +974,4 @@ fn test_difficult_gb() {
     println!("Computed GB in {} ms", (end - start).as_millis());
 
     assert_eq!(130, gb.len());
-    std::hint::black_box(gb);
 }
