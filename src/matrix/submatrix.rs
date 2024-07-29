@@ -276,8 +276,8 @@ impl<V, T> SubmatrixRaw<V, T>
     /// 
     #[stability::unstable(feature = "enable")]
     pub fn entry_at(&self, row: usize, col: usize) -> NonNull<T> {
-        assert!(row < self.row_count);
-        assert!(col < self.col_count);
+        assert!(row < self.row_count, "Row index {} out of range 0..{}", row, self.row_count);
+        assert!(col < self.col_count, "Col index {} out of range 0..{}", col, self.col_count);
         // this is safe since `row < row_count` and we require `rows.offset(row * row_step)` to point
         // to a valid element of `V`
         let row_ref = unsafe {

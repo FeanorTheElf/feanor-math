@@ -292,13 +292,18 @@ fn make_identity<R, V>(ring: R, mut matrix: SubmatrixMut<V, InternalRow<El<R>>>,
         R: Sync,
         V: AsPointerToSlice<InternalRow<El<R>>>
 {
-    assert_eq!(matrix.row_count(), matrix.col_count() * n);
-    for i in 0..matrix.row_count() {
+    assert!(matrix.row_count() >= matrix.col_count() * n);
+    for i in 0..(matrix.col_count() * n) {
         for j in 0..matrix.col_count() {
             matrix.at_mut(i, j).make_zero(&ring);
             if i / n == j {
                 matrix.at_mut(i, j).data.insert(0, (i % n, ring.one()));
             }
+        }
+    }
+    for i in (matrix.col_count() * n)..matrix.row_count() {
+        for j in 0..matrix.col_count() {
+            matrix.at_mut(i, j).make_zero(&ring);
         }
     }
 }
@@ -569,6 +574,12 @@ mod global {
         // this is necessary, otherwise we might swap back and forth the same rows
         swap_in_row_idxs.sort_unstable();
 
+        if EXTENSIVE_RUNTIME_ASSERTS {
+            for pivot_transform_i in 0..row_block {
+                assert!(transform.at(i + pivot_transform_i, 0).data.iter().all(|(j, _)| *j == usize::MAX || *j < row_block));
+            }
+        }
+
         let new_row_block = row_block + swap_in_row_idxs.len();
         for target_i in 0..swap_in_row_idxs.len() {
             let swap_row_index = swap_in_row_idxs[target_i];
@@ -576,9 +587,13 @@ mod global {
             swap_rows(ring, transform.reborrow(), i + row_block + target_i, i + row_block + swap_row_index, col_block);
         }
 
-        let mut tmp = (0..row_block).map(|i| transform.at(i, 0).clone_row(&ring)).collect::<Vec<_>>();
+        let mut tmp = (0..row_block).map(|target_i| transform.at(i + target_i, 0).clone_row(&ring)).collect::<Vec<_>>();
         mul_assign(ring, transform.as_const().restrict_rows((i + row_block)..(i + new_row_block)).col_at(0), SubmatrixMut::<AsFirstElement<_>, _>::new(&mut tmp, row_block, 1).col_mut_at(0), &mut Vec::new());
         for (target_i, mut transform_row) in (0..swap_in_row_idxs.len()).zip(tmp.into_iter()) {
+            if EXTENSIVE_RUNTIME_ASSERTS {
+                assert!(transform_row.data.iter().all(|(j, _)| *j == usize::MAX || *j < row_block));
+            }
+
             transform_row.data.insert(transform_row.data.len() - 1, (row_block + target_i, ring.one()));
             transform_row.check(&ring);
             *transform.at_mut(i + row_block + target_i, 0) = transform_row;
@@ -631,7 +646,6 @@ impl<'a, R: RingBase + ?Sized, V: AsPointerToSlice<InternalRow<R::Element>>, T: 
 impl<'a, R: DivisibilityRing + ?Sized, V: AsPointerToSlice<InternalRow<R::Element>>,  T: TransformTarget<R>> TransformTarget<R> for TransformCols<'a, R, V, T> {
 
     fn transform(&mut self, ring: &R, k: usize, l: usize, transform: &[<R as RingBase>::Element; 4]) {
-        // println!("({}, {}, [[{}, {}], [{}, {}]]),", k, l, RingRef::new(ring).format(&transform[0]), RingRef::new(ring).format(&transform[1]), RingRef::new(ring).format(&transform[2]), RingRef::new(ring).format(&transform[3]));
         self.pass_on.transform(ring, k, l, transform);
 
         let transform_det = ring.sub(ring.mul_ref(&transform[0], &transform[3]), ring.mul_ref(&transform[1], &transform[2]));
@@ -807,7 +821,7 @@ pub(super) fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: Su
             j += 1;
             row_block = col_block;
 
-            make_identity(ring, transform.reborrow().restrict_rows(i..(i + row_block)), row_block);
+            make_identity(ring, transform.reborrow().restrict_rows(i..row_count), row_block);
 
             if EXTENSIVE_LOG {
                 println!("A");
