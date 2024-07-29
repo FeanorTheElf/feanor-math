@@ -12,7 +12,7 @@ use crate::seq::{SwappableVectorViewMut, VectorView, VectorViewMut};
 
 use super::matrix::SparseMatrix;
 
-pub const EXTENSIVE_RUNTIME_ASSERTS: bool = true;
+pub const EXTENSIVE_RUNTIME_ASSERTS: bool = false;
 pub const EXTENSIVE_LOG: bool = false;
 
 pub struct InternalRow<T> {

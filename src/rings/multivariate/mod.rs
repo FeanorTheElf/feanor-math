@@ -22,22 +22,6 @@ pub mod ordered;
 
 type MonomialExponent = u16;
 
-pub trait TermsIterator<'a, R, V>: Iterator<Item = (&'a R::Element, &'a Monomial<V>)>
-    where R: 'a + ?Sized + RingBase, V: 'a + VectorViewMut<MonomialExponent>, R::Element: 'a
-{
-    fn max_lt<O: MonomialOrder>(self, lt_than: &Monomial<V>, order: O) -> Option<Self::Item>
-        where Self: Sized
-    {
-        self.filter(|(_, mon)| order.compare(mon, lt_than) == Ordering::Less).max_by(|(_, l), (_, r)| order.compare(l, r))
-    }
-
-    fn max_leq<O: MonomialOrder>(self, leq_than: &Monomial<V>, order: O) -> Option<Self::Item>
-        where Self: Sized
-    {
-        self.filter(|(_, mon)| order.compare(mon, leq_than) != Ordering::Greater).max_by(|(_, l), (_, r)| order.compare(l, r))
-    }
-}
-
 ///
 /// Trait for rings that are multivariate polynomial rings in finitely many indeterminates
 /// over a base ring, i.e. `R[X0, X1, X2, ..., XN]`.
@@ -49,7 +33,7 @@ pub trait MultivariatePolyRing: RingExtension {
 
     type MonomialVector: VectorViewMut<MonomialExponent>;
 
-    type TermsIterator<'a>: TermsIterator<'a, <Self::BaseRing as RingStore>::Type, Self::MonomialVector>
+    type TermsIterator<'a>: Iterator<Item = (&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)>
         where Self: 'a;
 
     ///
@@ -146,6 +130,14 @@ pub trait MultivariatePolyRing: RingExtension {
         } else {
             return self.zero();
         }
+    }
+    
+    fn max_term_lt<'a, O: MonomialOrder>(&'a self, f: &'a Self::Element, lt_than: &Monomial<Self::MonomialVector>, order: O) -> Option<(&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)> {
+        self.terms(f).filter(|(_, mon)| order.compare(mon, lt_than) == Ordering::Less).max_by(|(_, l), (_, r)| order.compare(l, r))
+    }
+
+    fn max_term_leq<'a, O: MonomialOrder>(&'a self, f: &'a Self::Element, leq_than: &Monomial<Self::MonomialVector>, order: O) -> Option<(&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)> {
+        self.terms(f).filter(|(_, mon)| order.compare(mon, leq_than) != Ordering::Greater).max_by(|(_, l), (_, r)| order.compare(l, r))
     }
 
     ///

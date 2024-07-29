@@ -323,12 +323,12 @@ impl SPoly {
             let scale = |(c, mon): LT_ref<P>| (ring.base_ring().mul_ref(c, &scaling.0), ring.clone_monomial(mon).mul(&scaling.1));
             let lt_than = lt_than.map(|lt_than| ring.clone_monomial(lt_than).div(&scaling.1));
             let mut current = if let Some(lt_than) = lt_than {
-                ring.terms(poly).max_lt(&lt_than, order)
+                ring.get_ring().max_term_lt(poly, &lt_than, order)
             } else {
                 ring.lt(poly, order)
             }?;
             while ring.base_ring().is_zero(&scale(current).0) {
-                current = ring.terms(poly).max_lt(current.1, order)?;
+                current = ring.get_ring().max_term_lt(poly, current.1, order)?;
             }
             return Some(scale(current))
         }
@@ -361,7 +361,7 @@ impl SPoly {
                 let multiplier = ring.base_ring().pow(ring.base_ring().clone_el(&ring_info.extended_ideal_generator), *k);
                 let (mut lc, mut lm) = ring.lt(&basis[*i], order)?;
                 while ring.base_ring().is_zero(&ring.base_ring().mul_ref(lc, &multiplier)) {
-                    (lc, lm) = ring.terms(&basis[*i]).max_lt(lm, order)?;
+                    (lc, lm) = ring.get_ring().max_term_lt(&basis[*i], lm, order)?;
                 }
                 return Some((ring.base_ring().mul_ref(lc, &multiplier), ring.clone_monomial(lm)));
             }
@@ -597,6 +597,11 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
             Some(s_poly.poly(&ring, &ring_info, basis, order)) 
         };
 
+    let update_degree_bound = |degree_bound: &mut (u16, usize), _filtered_out_degree: bool, _filtered_out_valuation: bool| {
+        degree_bound.0 = min(degree_bound.0 + 5, S_poly_degree_bound);
+        degree_bound.1 += 1;
+    };
+
     let mut chain_criterion_reduced_pairs = Vec::new();
     let mut product_criterion_skipped = 0;
     let mut chain_criterion_skipped = 0;
@@ -666,8 +671,9 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
                 }
                 return basis;
             }
-            degree_bound.0 = min(degree_bound.0 + 5, S_poly_degree_bound);
-            degree_bound.1 += 1;
+
+            update_degree_bound(&mut degree_bound, filtered_out_degree, filtered_out_valuation);
+
             if LOG {
                 print!("{{{:?}}}", degree_bound);
                 std::io::stdout().flush().unwrap();
