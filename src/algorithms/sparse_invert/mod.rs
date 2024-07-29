@@ -170,6 +170,7 @@ fn test_gb_sparse_row_echelon_3x5() {
     matrix.add_row(2, sparsify([6, 0, 1, 0, 1]));
 
     for block_size in 1..10 {
+        println!("BLOCKSIZE {}", block_size);
         let mut actual = SparseMatrix::new(&R);
         actual.add_cols(5);
         for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), block_size) {

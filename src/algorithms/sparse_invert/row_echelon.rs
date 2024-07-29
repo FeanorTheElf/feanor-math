@@ -257,7 +257,6 @@ fn mul_assign<R, V1, V2>(ring: R, lhs: Column<V1, InternalRow<El<R>>>, mut rhs: 
         V2: AsPointerToSlice<InternalRow<El<R>>>
 {
     let n = lhs.len();
-    assert_eq!(rhs.len(), n);
     
     while tmp.len() < n {
         tmp.push(InternalRow::placeholder());
@@ -551,6 +550,40 @@ mod global {
         });
     }
     
+    ///
+    /// Swaps the rows of given indices (relative to the space underneath the pivot matrix) with the rows directly
+    /// following the pivot matrix, such that they will be included in the pivot matrix once we increase `row_block`.
+    /// 
+    /// Furthermore, this updates the `transform` matrix in a corresponding way, such that its uppper part (the `pivot_transform`)
+    /// still contains the correct transformation w.r.t. the original pivot matrix. Its lower part (the `pivot_column_transform` or
+    /// "elimination transform matrix") is left unchanged, but is used to update the upper part correctly.
+    /// 
+    #[inline(never)]
+    pub fn swap_in_rows<R, V1, V2>(ring: R, mut matrix: SubmatrixMut<V1, InternalRow<El<R>>>, mut transform: SubmatrixMut<V2, InternalRow<El<R>>>, i: usize, row_block: usize, col_block: usize, swap_in_row_idxs: &mut [usize])
+        where R: RingStore + Copy + Sync,
+            El<R>: Send + Sync,
+            R::Type: PrincipalIdealRing,
+            V1: Sync + AsPointerToSlice<InternalRow<El<R>>>,
+            V2: Sync + AsPointerToSlice<InternalRow<El<R>>>
+    {
+        // this is necessary, otherwise we might swap back and forth the same rows
+        swap_in_row_idxs.sort_unstable();
+
+        let new_row_block = row_block + swap_in_row_idxs.len();
+        for target_i in 0..swap_in_row_idxs.len() {
+            let swap_row_index = swap_in_row_idxs[target_i];
+            swap_rows(ring, matrix.reborrow(), i + row_block + target_i, i + row_block + swap_row_index, col_block);
+            swap_rows(ring, transform.reborrow(), i + row_block + target_i, i + row_block + swap_row_index, col_block);
+        }
+
+        let mut tmp = (0..row_block).map(|i| transform.at(i, 0).clone_row(&ring)).collect::<Vec<_>>();
+        mul_assign(ring, transform.as_const().restrict_rows((i + row_block)..(i + new_row_block)).col_at(0), SubmatrixMut::<AsFirstElement<_>, _>::new(&mut tmp, row_block, 1).col_mut_at(0), &mut Vec::new());
+        for (target_i, mut transform_row) in (0..swap_in_row_idxs.len()).zip(tmp.into_iter()) {
+            transform_row.data.insert(transform_row.data.len() - 1, (row_block + target_i, ring.one()));
+            transform_row.check(&ring);
+            *transform.at_mut(i + row_block + target_i, 0) = transform_row;
+        }
+    }
 }
 
 struct TransformRows<'a, R: RingBase + ?Sized, V: AsPointerToSlice<InternalRow<R::Element>>> {
@@ -700,13 +733,17 @@ pub(super) fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: Su
 
         let (nonzero_row_count, mut swap_in_rows) = if row_block != col_block {
             // re-echelonization, so we already have a nontrivial pivot_column_transform; update it
-            transform_transform.resize_with(row_block, InternalRow::placeholder);
+
             // transform_transform: the transform made during re-echelonization, that has to be applied to the elimination transform matrix pivot_column_transform
+            transform_transform.resize_with(row_block, InternalRow::placeholder);
             let mut transform_transform = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut transform_transform[..], row_block, 1);
             make_identity(ring, transform_transform.reborrow(), row_block);
 
+            // echelonize the pivot matrix
             let nonzero_row_count = local::row_echelon_optimistic(ring, pivot_matrix.reborrow(), n, TransformCols::new(transform_transform.col_mut_at(0), TransformRows::new(pivot_transform.col_mut_at(0))));
+            // update the elimination trnasform matrix
             global::update_pivot_column_transform_matrix(ring, pivot_column_transform.reborrow(), transform_transform.as_const());
+            // try to complete elimination (wasn't complete previously, since we swapped in elements)
             let swap_in_rows = global::partial_eliminate_rows::<_, _, _, false>(ring, pivot_matrix.as_const(), pivot_column.reborrow(), pivot_column_transform.reborrow(), n);
 
             if EXTENSIVE_LOG {
@@ -748,20 +785,14 @@ pub(super) fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: Su
                 println!("Swap in {:?} row(s)", swap_in_rows);
             }
 
-            // this is necessary, otherwise we might swap back and forth the same rows
-            swap_in_rows.sort_unstable();
+            global::swap_in_rows(ring, matrix.reborrow(), transform.reborrow(), i, row_block, col_block, &mut swap_in_rows);
+            row_block += swap_in_rows.len();
 
-            let new_row_block = row_block + swap_in_rows.len();
-            for target_i in 0..swap_in_rows.len() {
-                let swap_row_index = swap_in_rows[target_i];
-                swap_rows(ring, matrix.reborrow(), i + row_block + target_i, i + row_block + swap_row_index, n);
-                swap_rows(ring, transform.reborrow(), i + row_block + target_i, i + row_block + swap_row_index, n);
-
-                let transform_row = &mut transform.at_mut(i + row_block + target_i, 0).data;
-                transform_row.insert(transform_row.len() - 1, (row_block + target_i, ring.one()));
-                transform.at_mut(i + row_block + target_i, 0).check(&ring);
+            if EXTENSIVE_LOG {
+                println!("T");
+                println!("{}", to_sparse_matrix_builder(ring, transform.as_const().restrict_rows(i..(i + row_block)), row_block).format(ring.get_ring()));
+                println!();
             }
-            row_block = new_row_block;
         } else {
             if EXTENSIVE_LOG {
                 println!("Eliminate column");
