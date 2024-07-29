@@ -337,6 +337,27 @@ fn test_gb_sparse_row_echelon_no_field() {
 }
 
 #[test]
+fn test_pivot_row_transform_update() {
+    let R = Fp::<65537>::RING;
+    let sparsify = |row: [u64; 5]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));
+
+    let mut matrix: SparseMatrix<_> = SparseMatrix::new(&R);
+    matrix.add_cols(5);
+    matrix.add_row(0, sparsify([1, 1, 0, 1, 0]));
+    matrix.add_row(1, sparsify([0, 0, 0, 1, 1]));
+    matrix.add_row(2, sparsify([0, 0, 0, 0, 0]));
+    matrix.add_row(3, sparsify([0, 0, 0, 0, 0]));
+    matrix.add_row(4, sparsify([1, 2, 0, 0, 0]));
+
+    let mut actual = SparseMatrix::new(&R);
+    actual.add_cols(5);
+    for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), 4) {
+        actual.add_row(actual.row_count(), row.into_iter());
+    }
+    assert_is_correct_row_echelon(R, &matrix, &actual);
+}
+
+#[test]
 fn test_bad_swapping_order() {
     let R = Zn::<3>::RING;
     let sparsify = |row: [u64; 10]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));

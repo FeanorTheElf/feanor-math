@@ -7,6 +7,8 @@ use crate::divisibility::*;
 /// 
 pub trait PrincipalIdealRing: DivisibilityRing {
 
+    // TODO: when doing the next breaking change, add a function for the annihilator generator of an element / smallest division result
+
     ///
     /// Computes a Bezout identity for the generator `g` of the ideal `(lhs, rhs)`
     /// as `g = s * lhs + t * rhs`.
@@ -18,6 +20,33 @@ pub trait PrincipalIdealRing: DivisibilityRing {
     /// unique up to multiplication by units.
     /// 
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element);
+
+    ///
+    /// Cancels out the gcd of lhs and rhs.
+    /// 
+    /// More concretely, computes `(a, b, d)` such that `a * d = lhs`, `b * d = rhs` and `a, b` are coprime.
+    /// 
+    /// # Warning
+    /// 
+    /// For backwards compatibility, a default implementation that returns `(lhs.checked_div(gcd(lhs, rhs)), rhs.checked_div(gcd(lhs, rhs)), gcd(lhs, rhs))`
+    /// is provided. This default implementation **is not guaranteed to always work correctly**. In particular, by the contract of 
+    /// [`DivisibilityRing::checked_left_div()`], the returned "quotient" does not have to be minimal w.r.t. divisibility, so it is perfectly
+    /// fine to have `6.checked_div(6) = 3 mod 12`, hence the naive implementation would map `(6, 6) -> (3, 3, 6)` with `3, 3` not coprime.
+    /// The implementation checks this and panics in such cases, so when the function returns successfully, the result is correct.
+    /// 
+    /// Note that it will always be correct for [`Domain`]s and [`crate::local::PrincipalLocalRing`]s. Also, natural implementations of
+    /// [`DivisibilityRing::checked_left_div()`] often make this work out. Nevertheless, if your ring is neither integral nor local, consider
+    /// providing a correct implementation.
+    /// 
+    /// Also, the default implementation will be removed at the next breaking update of feanor-math.
+    /// 
+    fn cancel_common_factors(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        let gcd = self.ideal_gen(lhs, rhs);
+        let fst = self.checked_left_div(lhs, &gcd).unwrap();
+        let snd = self.checked_left_div(rhs, &gcd).unwrap();
+        assert!(self.is_unit(&self.ideal_gen(&fst, &snd)));
+        return (fst, snd, gcd);
+    }
 
     ///
     /// Computes a generator `g` of the ideal `(lhs, rhs) = (g)`, also known as greatest

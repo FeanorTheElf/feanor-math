@@ -13,7 +13,7 @@ use crate::seq::{SwappableVectorViewMut, VectorView, VectorViewMut};
 use super::matrix::SparseMatrix;
 
 pub const EXTENSIVE_RUNTIME_ASSERTS: bool = true;
-pub const EXTENSIVE_LOG: bool = true;
+pub const EXTENSIVE_LOG: bool = false;
 
 pub struct InternalRow<T> {
     pub(super) data: Vec<(usize, T)>
@@ -193,7 +193,7 @@ pub fn linear_combine_rows<'a, R, V>(ring: R, coeffs: &InternalRow<El<R>>, rows:
     return out;
 }
     
-fn sub_assign_mul<R, V>(ring: R, elim_coefficients: &InternalRow<El<R>>, pivot_rows: Column<V, InternalRow<El<R>>>, row: &InternalRow<El<R>>, mut out: InternalRow<El<R>>, tmp: &mut InternalRow<El<R>>) -> InternalRow<El<R>>
+fn add_assign_mul<R, V>(ring: R, elim_coefficients: &InternalRow<El<R>>, pivot_rows: Column<V, InternalRow<El<R>>>, row: &InternalRow<El<R>>, mut out: InternalRow<El<R>>, tmp: &mut InternalRow<El<R>>) -> InternalRow<El<R>>
     where R: RingStore + Copy,
         V: AsPointerToSlice<InternalRow<El<R>>>
 {
@@ -207,7 +207,7 @@ fn sub_assign_mul<R, V>(ring: R, elim_coefficients: &InternalRow<El<R>>, pivot_r
 }
 
 ///
-/// Computes a vector `result` such that `result * echelon_form_matrix = current_row`, if it exists.
+/// Computes a vector `result` such that `result * echelon_form_matrix + current_row = 0`, if it exists.
 /// Note that if the vector does not exist, this function will not throw an error but return a
 /// vector that can be thought of as a "best effort solution". This is important in combination
 /// with the optimistic elimination strategy.
@@ -318,6 +318,7 @@ fn transform_2x2<R>(ring: R, transform: &[El<R>; 4], rows: [&mut InternalRow<El<
 mod local {
     use transform::TransformTarget;
 
+    use crate::algorithms::smith;
     use crate::divisibility::*;
     use crate::matrix::ColumnMut;
     use crate::pid::PrincipalIdealRingStore;
@@ -342,8 +343,7 @@ mod local {
             }
             if let Some(entry) = matrix.at(i).leading_entry_at(pivot_j) {
                 if ring.checked_div(entry, &current).is_none() {
-                    let (s, t, d) = ring.extended_ideal_gen(&current, entry);
-                    let local_transform = [s, t, ring.checked_div(entry, &d).unwrap(), ring.checked_div(&current, &d).unwrap()];
+                    let (local_transform, gcd) = smith::create_elim_matrix_from_bezout_identity(ring, &current, entry);
                     let local_transform_det = ring.sub(ring.mul_ref(&local_transform[0], &local_transform[3]), ring.mul_ref(&local_transform[1], &local_transform[2]));
                     if EXTENSIVE_RUNTIME_ASSERTS {
                         assert!(ring.is_unit(&local_transform_det)); 
@@ -351,7 +351,7 @@ mod local {
                     let (fst_row, snd_row) = matrix.two_entries(pivot_i, i);
                     transform_2x2(ring, &local_transform, [fst_row, snd_row], tmp);
                     row_ops.transform(ring.get_ring(), pivot_i, i, &local_transform);
-                    current = d;
+                    current = gcd;
                 }
             }
         }
@@ -452,7 +452,7 @@ mod global {
             let mut additional_transform = preimage_echelon_form_matrix(ring, pivot_matrix, matrix_row.at(0), std::mem::replace(add_transform_row, InternalRow::placeholder()));
             
             if !additional_transform.is_empty() {
-                *new_row = sub_assign_mul(ring, &additional_transform, pivot_matrix, matrix_row.at(0), std::mem::replace(new_row, InternalRow::placeholder()), tmp);
+                *new_row = add_assign_mul(ring, &additional_transform, pivot_matrix, matrix_row.at(0), std::mem::replace(new_row, InternalRow::placeholder()), tmp);
                 std::mem::swap(matrix_row.at_mut(0), new_row);
             }
             let nonzero_j: usize = matrix_row.at(0).leading_entry().0;
@@ -499,12 +499,14 @@ mod global {
             V1: Sync + AsPointerToSlice<InternalRow<El<R>>>,
             V2: Sync + AsPointerToSlice<InternalRow<El<R>>>
     {
+        debug_assert_eq!(transform_transform.col_count(), 1);
         potential_parallel_for_each(
             pivot_column_transform.concurrent_row_iter(), 
             || (InternalRow::placeholder(), InternalRow::placeholder()), 
             |(tmp0, tmp1), _, row|
         {
-            *tmp0 = linear_combine_rows(ring, &mut row[0], transform_transform.col_at(0), std::mem::replace(tmp0, InternalRow::placeholder()), tmp1);
+            debug_assert_eq!(row.len(), 1);
+            *tmp0 = linear_combine_rows(ring, &row[0], transform_transform.col_at(0), std::mem::replace(tmp0, InternalRow::placeholder()), tmp1);
             std::mem::swap(&mut row[0], tmp0);
         });
     }
@@ -593,15 +595,20 @@ impl<'a, R: RingBase + ?Sized, V: AsPointerToSlice<InternalRow<R::Element>>, T: 
     }
 }
 
-impl<'a, R: RingBase + ?Sized, V: AsPointerToSlice<InternalRow<R::Element>>,  T: TransformTarget<R>> TransformTarget<R> for TransformCols<'a, R, V, T> {
+impl<'a, R: DivisibilityRing + ?Sized, V: AsPointerToSlice<InternalRow<R::Element>>,  T: TransformTarget<R>> TransformTarget<R> for TransformCols<'a, R, V, T> {
 
     fn transform(&mut self, ring: &R, k: usize, l: usize, transform: &[<R as RingBase>::Element; 4]) {
-        println!("[[{}, {}], [{}, {}]]", RingRef::new(ring).format(&transform[0]), RingRef::new(ring).format(&transform[1]), RingRef::new(ring).format(&transform[2]), RingRef::new(ring).format(&transform[3]));
+        // println!("({}, {}, [[{}, {}], [{}, {}]]),", k, l, RingRef::new(ring).format(&transform[0]), RingRef::new(ring).format(&transform[1]), RingRef::new(ring).format(&transform[2]), RingRef::new(ring).format(&transform[3]));
         self.pass_on.transform(ring, k, l, transform);
+
         let transform_det = ring.sub(ring.mul_ref(&transform[0], &transform[3]), ring.mul_ref(&transform[1], &transform[2]));
-        println!("det = {}", RingRef::new(ring).format(&transform_det));
-        assert!(ring.is_one(&transform_det));
-        let inv_transform = [&transform[0], &transform[2], &transform[1], &transform[3]];
+        let transform_det_inv = RingRef::new(ring).invert(&transform_det).unwrap();
+        let inv_transform = [
+            ring.mul_ref(&transform[3], &transform_det_inv), 
+            ring.negate(ring.mul_ref(&transform[1], &transform_det_inv)),
+            ring.negate(ring.mul_ref(&transform[2], &transform_det_inv)), 
+            ring.mul_ref(&transform[0], &transform_det_inv)
+        ];
         let zero = ring.zero();
         for i in 0..self.matrix.len() {
             let row = self.matrix.at_mut(i);
@@ -609,8 +616,8 @@ impl<'a, R: RingBase + ?Sized, V: AsPointerToSlice<InternalRow<R::Element>>,  T:
             let row_l_idx = row.index_of(l);
             let row_k = row_k_idx.ok().map(|idx| &row.data[idx].1);
             let row_l = row_l_idx.ok().map(|idx| &row.data[idx].1);
-            let new_row_k = ring.add(ring.mul_ref(row_k.unwrap_or(&zero), inv_transform[0]), ring.mul_ref(row_l.unwrap_or(&zero), inv_transform[2]));
-            let new_row_l = ring.add(ring.mul_ref(row_k.unwrap_or(&zero), inv_transform[1]), ring.mul_ref(row_l.unwrap_or(&zero), inv_transform[3]));
+            let new_row_k = ring.add(ring.mul_ref(row_k.unwrap_or(&zero), &inv_transform[0]), ring.mul_ref(row_l.unwrap_or(&zero), &inv_transform[2]));
+            let new_row_l = ring.add(ring.mul_ref(row_k.unwrap_or(&zero), &inv_transform[1]), ring.mul_ref(row_l.unwrap_or(&zero), &inv_transform[3]));
             let new_row_k = if ring.is_zero(&new_row_k) { None } else { Some(new_row_k) };
             let new_row_l = if ring.is_zero(&new_row_l) { None } else { Some(new_row_l) };
             row.update_two(k, row_k_idx, new_row_k, l, row_l_idx, new_row_l);
@@ -670,7 +677,7 @@ pub(super) fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: Su
     while i + row_block < matrix.row_count() && j < col_block_count {
 
         if EXTENSIVE_LOG {
-            println!();
+            println!("A");
             println!("{}", to_sparse_matrix_builder(ring, matrix.as_const(), n).format(ring.get_ring()));
             println!();
         }
@@ -693,7 +700,7 @@ pub(super) fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: Su
 
         let (nonzero_row_count, mut swap_in_rows) = if row_block != col_block {
             // re-echelonization, so we already have a nontrivial pivot_column_transform; update it
-            transform_transform.resize_with(row_block, zero_row);
+            transform_transform.resize_with(row_block, InternalRow::placeholder);
             // transform_transform: the transform made during re-echelonization, that has to be applied to the elimination transform matrix pivot_column_transform
             let mut transform_transform = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut transform_transform[..], row_block, 1);
             make_identity(ring, transform_transform.reborrow(), row_block);
@@ -702,24 +709,43 @@ pub(super) fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: Su
             global::update_pivot_column_transform_matrix(ring, pivot_column_transform.reborrow(), transform_transform.as_const());
             let swap_in_rows = global::partial_eliminate_rows::<_, _, _, false>(ring, pivot_matrix.as_const(), pivot_column.reborrow(), pivot_column_transform.reborrow(), n);
 
+            if EXTENSIVE_LOG {
+                println!("TT");
+                println!("{}", to_sparse_matrix_builder(ring, transform_transform.as_const(), row_block).format(ring.get_ring()));
+                println!();
+
+                println!("T");
+                println!("{}", to_sparse_matrix_builder(ring, pivot_transform.as_const(), row_block).format(ring.get_ring()));
+                println!();
+            }
+
             (nonzero_row_count, swap_in_rows)
         } else {
             // pivot_column_transform is zero, so no need to update it
             let nonzero_row_count = local::row_echelon_optimistic(ring, pivot_matrix.reborrow(), n, TransformRows::new(pivot_transform.col_mut_at(0)));
             let swap_in_rows = global::partial_eliminate_rows::<_, _, _, true>(ring, pivot_matrix.as_const(), pivot_column.reborrow(), pivot_column_transform.reborrow(), n);
             
+            if EXTENSIVE_LOG {
+                println!("T");
+                println!("{}", to_sparse_matrix_builder(ring, pivot_transform.as_const(), row_block).format(ring.get_ring()));
+                println!();
+            }
+
             (nonzero_row_count, swap_in_rows)
         };
 
         if EXTENSIVE_LOG {
+            println!("E");
+            println!("{}", to_sparse_matrix_builder(ring, pivot_column_transform.as_const(), row_block).format(ring.get_ring()));
             println!();
+            println!("A");
             println!("{}", to_sparse_matrix_builder(ring, matrix.as_const(), n).format(ring.get_ring()));
             println!();
         }
 
         if swap_in_rows.len() > 0 {
             if EXTENSIVE_LOG {
-                println!("Swap in {} row(s)", swap_in_rows.len());
+                println!("Swap in {:?} row(s)", swap_in_rows);
             }
 
             // this is necessary, otherwise we might swap back and forth the same rows
@@ -731,8 +757,8 @@ pub(super) fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: Su
                 swap_rows(ring, matrix.reborrow(), i + row_block + target_i, i + row_block + swap_row_index, n);
                 swap_rows(ring, transform.reborrow(), i + row_block + target_i, i + row_block + swap_row_index, n);
 
-                transform.at_mut(i + row_block + target_i, 0).make_zero(&ring);
-                transform.at_mut(i + row_block + target_i, 0).data.insert(0, (row_block + target_i, ring.one()));
+                let transform_row = &mut transform.at_mut(i + row_block + target_i, 0).data;
+                transform_row.insert(transform_row.len() - 1, (row_block + target_i, ring.one()));
                 transform.at_mut(i + row_block + target_i, 0).check(&ring);
             }
             row_block = new_row_block;
@@ -753,7 +779,7 @@ pub(super) fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: Su
             make_identity(ring, transform.reborrow().restrict_rows(i..(i + row_block)), row_block);
 
             if EXTENSIVE_LOG {
-                println!();
+                println!("A");
                 println!("{}", to_sparse_matrix_builder(ring, matrix.as_const(), n).format(ring.get_ring()));
                 println!();
             }

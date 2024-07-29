@@ -1,11 +1,32 @@
 use std::cmp::min;
 
-use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::divisibility::DivisibilityRingStore;
 use crate::matrix::*;
 use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
 use crate::ring::*;
 use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::algorithms::matmul::*;
+
+#[stability::unstable(feature = "enable")]
+pub fn create_elim_matrix_from_bezout_identity<R>(ring: R, a: &El<R>, b: &El<R>) -> ([El<R>; 4], El<R>)
+    where R: RingStore + Copy,
+        R::Type: PrincipalIdealRing
+{
+    let (new_a, new_b, gcd) = ring.get_ring().cancel_common_factors(a, b);
+    let (s, t, gcd_new) = ring.extended_ideal_gen(&new_a, &new_b);
+    debug_assert!(ring.is_unit(&gcd_new));
+    
+    let subtract_factor = ring.checked_div(&ring.sub(ring.mul_ref(b, &new_a), ring.mul_ref(a, &new_b)), &gcd).unwrap();
+    // this has unit determinant and will map `(a, b)` to `(d, b * new_a - a * new_b)`; after a subtraction step, we are done
+    let mut result = [s, t, ring.negate(new_b), new_a];
+
+    let sub1 = ring.mul_ref(&result[0], &subtract_factor);
+    ring.sub_assign(&mut result[2], sub1);
+    let sub2 = ring.mul_ref_fst(&result[1], subtract_factor);
+    ring.sub_assign(&mut result[3], sub2);
+    debug_assert!(ring.is_unit(&ring.sub(ring.mul_ref(&result[0], &result[3]), ring.mul_ref(&result[1], &result[2]))));
+    return (result, gcd);
+}
 
 ///
 /// Transforms `A` into `A'` via transformations `L, R` such that
@@ -31,13 +52,12 @@ use crate::algorithms::matmul::*;
 /// in feanor_math).
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn pre_smith<R, TL, TR, V, F>(ring: R, L: &mut TL, R: &mut TR, mut A: SubmatrixMut<V, El<R>>, mut bezout_identity: F)
+pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: SubmatrixMut<V, El<R>>)
     where R: RingStore + Copy,
-        R::Type: DivisibilityRing,
+        R::Type: PrincipalIdealRing,
         TL: TransformTarget<R::Type>,
         TR: TransformTarget<R::Type>,
-        V: AsPointerToSlice<El<R>>,
-        F: FnMut(&El<R>, &El<R>) -> (El<R>, El<R>, El<R>)
+        V: AsPointerToSlice<El<R>>
 {
     // otherwise we might not terminate...
     assert!(ring.is_noetherian());
@@ -56,8 +76,7 @@ pub fn pre_smith<R, TL, TR, V, F>(ring: R, L: &mut TL, R: &mut TR, mut A: Submat
                     TransformRows(A.reborrow(), ring.get_ring()).subtract(ring.get_ring(), k, i, &quo);
                     L.subtract(ring.get_ring(), k, i, &quo);
                 } else {
-                    let (s, t, d) = bezout_identity(A.at(k, k), A.at(i, k));
-                    let transform = [s, t, ring.negate(ring.checked_div(A.at(i, k), &d).unwrap()), ring.checked_div(A.at(k, k), &d).unwrap()];
+                    let (transform, _) = create_elim_matrix_from_bezout_identity(ring, A.at(k, k), A.at(i, k));
                     TransformRows(A.reborrow(), ring.get_ring()).transform(ring.get_ring(), k, i, &transform);
                     L.transform(ring.get_ring(), k, i, &transform);
                 }
@@ -73,8 +92,7 @@ pub fn pre_smith<R, TL, TR, V, F>(ring: R, L: &mut TL, R: &mut TR, mut A: Submat
                     R.subtract(ring.get_ring(), k, j, &quo);
                 } else {
                     changed = true;
-                    let (s, t, d) = bezout_identity(A.at(k, k), A.at(k, j));
-                    let transform = [s, t, ring.negate(ring.checked_div(A.at(k, j), &d).unwrap()), ring.checked_div(A.at(k, k), &d).unwrap()];
+                    let (transform, _) = create_elim_matrix_from_bezout_identity(ring, A.at(k, k), A.at(k, j));
                     TransformCols(A.reborrow(), ring.get_ring()).transform(ring.get_ring(), k, j, &transform);
                     R.transform(ring.get_ring(), k, j, &transform);
                 }
@@ -96,7 +114,7 @@ pub fn determinant<R, V>(mut A: SubmatrixMut<V, El<R>>, ring: R) -> El<R>
     assert_eq!(A.row_count(), A.col_count());
     let mut unit_part_rows = ring.one();
     let mut unit_part_cols = ring.one();
-    pre_smith(ring, &mut DetUnit { current_unit: &mut unit_part_rows }, &mut DetUnit { current_unit: &mut unit_part_cols }, A.reborrow(), |a, b| ring.extended_ideal_gen(a, b));
+    pre_smith(ring, &mut DetUnit { current_unit: &mut unit_part_rows }, &mut DetUnit { current_unit: &mut unit_part_cols }, A.reborrow());
     return ring.prod((0..A.row_count()).map(|i| ring.clone_el(A.at(i, i))).chain([unit_part_rows, unit_part_cols].into_iter()));
 }
 
@@ -116,7 +134,7 @@ pub fn solve_right<R, V1, V2>(mut A: SubmatrixMut<V1, El<R>>, mut rhs: Submatrix
 {
     assert_eq!(A.row_count(), rhs.row_count());
     let mut R: OwnedMatrix<El<R>> = OwnedMatrix::identity(A.col_count(), A.col_count(), ring);
-    pre_smith(ring, &mut TransformRows(rhs.reborrow(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), A.reborrow(), |a, b| ring.extended_ideal_gen(a, b));
+    pre_smith(ring, &mut TransformRows(rhs.reborrow(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), A.reborrow());
 
     // resize rhs
     let mut result: OwnedMatrix<El<R>> = OwnedMatrix::zero(A.col_count(), rhs.col_count(), ring);
@@ -170,15 +188,9 @@ use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
 #[cfg(test)]
-use crate::algorithms::eea::signed_gcd;
-#[cfg(test)]
-use crate::delegate::DelegateRing;
-#[cfg(test)]
 use crate::assert_matrix_eq;
 #[cfg(test)]
-use crate::rings::zn::ZnRing;
-#[cfg(test)]
-use crate::homomorphism::Homomorphism;
+use crate::delegate::DelegateRing;
 
 #[cfg(test)]
 fn multiply<'a, R: RingStore, V: AsPointerToSlice<El<R>>, I: IntoIterator<Item = Submatrix<'a, V, El<R>>>>(matrices: I, ring: R) -> OwnedMatrix<El<R>>
@@ -212,7 +224,7 @@ fn test_smith_integers() {
     let original_A = A.clone_matrix(&ring);
     let mut L: OwnedMatrix<i64> = OwnedMatrix::identity(3, 3, StaticRing::<i64>::RING);
     let mut R: OwnedMatrix<i64> = OwnedMatrix::identity(4, 4, StaticRing::<i64>::RING);
-    pre_smith(ring, &mut TransformRows(L.data_mut(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), A.data_mut(), |a, b| ring.extended_ideal_gen(a, b));
+    pre_smith(ring, &mut TransformRows(L.data_mut(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), A.data_mut());
     
     assert_matrix_eq!(&ring, &[
         [1, 0, 0, 0],
@@ -236,7 +248,7 @@ fn test_smith_zn() {
     let original_A = A.clone_matrix(&ring);
     let mut L: OwnedMatrix<u64> = OwnedMatrix::identity(5, 5, ring);
     let mut R: OwnedMatrix<u64> = OwnedMatrix::identity(4, 4, ring);
-    pre_smith(ring, &mut TransformRows(L.data_mut(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), A.data_mut(), |a, b| ring.extended_ideal_gen(a, b));
+    pre_smith(ring, &mut TransformRows(L.data_mut(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), A.data_mut());
 
     assert_matrix_eq!(&ring, &[
         [8, 0, 0, 0],
@@ -250,15 +262,41 @@ fn test_smith_zn() {
 
 #[test]
 fn test_smith_direct_elim_matrix_fails() {
-    let ring = zn_static::Zn::<12>::RING;
+    #[derive(PartialEq, Copy, Clone)]
+    struct Z12_specialize_bezout_identity;
+
+    impl DelegateRing for Z12_specialize_bezout_identity {
+        type Base = zn_static::ZnBase<12, false>;
+        type Element = El<zn_static::Zn<12>>;
+
+        fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+        fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
+        fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
+        fn get_delegate(&self) -> &Self::Base { zn_static::Zn::<12>::RING.get_ring() }
+        fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
+    }
+
+    impl PrincipalIdealRing for Z12_specialize_bezout_identity {
+        fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+            if self.is_zero(lhs) && self.eq_el(rhs, &self.from_int(6)) {
+                (self.zero(), self.from_int(3), self.from_int(6))
+            } else if self.is_zero(lhs) && self.eq_el(rhs, &self.from_int(3)) {
+                (self.zero(), self.from_int(3), self.from_int(3))
+            } else if RingRef::new(self).is_unit(lhs) {
+                (self.one(), self.zero(), self.clone_el(lhs))
+            } else if RingRef::new(self).is_unit(rhs) {
+                (self.zero(), self.one(), self.clone_el(rhs))
+            } else {
+                panic!("unanticipated call to extended_ideal_gen")
+            }
+        }
+    }
+
+    let ring = RingValue::from(Z12_specialize_bezout_identity);
     let mut matrix = [0, 6];
     let mut L = OwnedMatrix::<_>::identity(2, 2, ring);
     let mut R = OwnedMatrix::<_>::identity(1, 1, ring);
-    pre_smith(ring, &mut TransformRows(L.data_mut(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), SubmatrixMut::<AsFirstElement<_>, _>::new(&mut matrix, 2, 1), |l, r| {
-        assert!(ring.is_zero(l));
-        assert!(ring.eq_el(r, &ring.int_hom().map(6)));
-        (ring.zero(), ring.int_hom().map(3), ring.clone_el(r))
-    });
+    pre_smith(ring, &mut TransformRows(L.data_mut(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), SubmatrixMut::<AsFirstElement<_>, _>::new(&mut matrix, 2, 1));
     assert!(zn_static::Zn::<12>::RING.is_unit(&ring.sub(ring.mul_ref(L.at(0, 0), L.at(1, 1)), ring.mul_ref(L.at(1, 0), L.at(0, 1)))));
     assert!(zn_static::Zn::<12>::RING.is_unit(R.at(0, 0)));
 }
