@@ -1,6 +1,6 @@
 use std::io::Write;
 use std::marker::PhantomData;
-use std::cmp::min;
+use std::cmp::{min, Ordering};
 
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::field::Field;
@@ -155,6 +155,7 @@ fn p_valuation<R>(ring: R, p: &El<R>, mut val: El<R>) -> usize
     return result;
 }
 
+#[inline(never)]
 fn reduce_S_matrix<P, O>(ring: P, p: &Coeff<P>, S_polys: &[El<P>], basis: &[El<P>], order: O) -> Vec<El<P>>
     where P: MultivariatePolyRingStore,
         P::Type: MultivariatePolyRing,
@@ -284,55 +285,18 @@ impl<R: ?Sized + RingBase> RingInfo<R> {
 
 #[derive(PartialEq)]
 enum SPoly {
-    Standard(usize, usize), Nilpotent(usize, usize)
+    Standard(usize, usize), Nilpotent(/* poly index */ usize, /* power-of-p multiplier */ usize)
 }
 
 impl SPoly {
 
-    ///
-    /// The terms are not ordered, and may contain the same monomial multiple times!
-    /// 
-    fn terms<'a, P, O>(&'a self, ring: &'a P, ring_info: &'a RingInfo<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>, basis: &'a [El<P>], order: O) -> Box<dyn 'a + Iterator<Item = (El<<P::Type as RingExtension>::BaseRing>, Mon<P>)>>
-        where P: 'a + MultivariatePolyRingStore,
-            P::Type: MultivariatePolyRing,
-            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
-            O: MonomialOrder + Copy
-    {
-        match self {
-            SPoly::Standard(i, j) => {
-                let (f1_factor, f2_factor, lcm) = lt_lcm(ring, ring.lt(&basis[*i], order).unwrap(), ring.lt(&basis[*j], order).unwrap());
-                return Box::new(ring.terms(&basis[*i])
-                    .map(move |(c, m)| (ring.base_ring().mul_ref(c, &f1_factor.0), ring.clone_monomial(m).mul(&f1_factor.1)))
-                    .chain(
-                        ring.terms(&basis[*j])
-                            .map(move |(c, m)| (ring.base_ring().negate(ring.base_ring().mul_ref(c, &f2_factor.0)), ring.clone_monomial(m).mul(&f2_factor.1))))
-                    .filter(move |(_, m)| *m != lcm.1)
-                    .filter(move |(c, _)| !ring.base_ring().is_zero(c)));
-            },
-            SPoly::Nilpotent(i, k) => {
-                assert!(ring_info.annihilating_power.is_some());
-                let factor = ring.base_ring().pow(ring.base_ring().clone_el(&ring_info.extended_ideal_generator), *k);
-                return Box::new(ring.terms(&basis[*i]).map(move |(c, m)| (ring.base_ring().mul_ref(c, &factor), ring.clone_monomial(m))).filter(move |(c, _)| !ring.base_ring().is_zero(c)));
-            }
-        }
-    }
-    
     fn is_zero<P, O>(&self, ring: &P, ring_info: &RingInfo<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>, basis: &[El<P>], order: O) -> bool
         where P: MultivariatePolyRingStore,
             P::Type: MultivariatePolyRing,
             <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
             O: MonomialOrder + Copy
     {
-        self.terms(ring, ring_info, basis, order).next().is_none()
-    }
-
-    fn expected_max_deg<P, O>(&self, ring: &P, ring_info: &RingInfo<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>, basis: &[El<P>], order: O) -> u16
-        where P: MultivariatePolyRingStore,
-            P::Type: MultivariatePolyRing,
-            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
-            O: MonomialOrder + Copy
-    {
-        self.terms(ring, ring_info, basis, order).map(|(_, m)| m.deg()).max().unwrap()
+        self.expected_lt(ring, ring_info, basis, order).is_none()
     }
 
     fn expected_lm<P, O>(&self, ring: &P, ring_info: &RingInfo<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>, basis: &[El<P>], order: O) -> Monomial<<P::Type as MultivariatePolyRing>::MonomialVector>
@@ -341,7 +305,74 @@ impl SPoly {
             <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
             O: MonomialOrder + Copy
     {
-        self.terms(ring, ring_info, basis, order).max_by(|(_, l), (_, r)| order.compare(l, r)).map(|(_, m)| m).unwrap()
+        self.expected_lt(ring, ring_info, basis, order).unwrap().1
+    }
+
+    fn expected_lt<P, O>(&self, ring: &P, ring_info: &RingInfo<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>, basis: &[El<P>], order: O) -> Option<LT<P>>
+        where P: MultivariatePolyRingStore,
+            P::Type: MultivariatePolyRing,
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
+            O: MonomialOrder + Copy
+    {
+        fn get_scaled_poly_largest_term_lt<P, O>(ring: P, poly: &El<P>, order: O, lt_than: Option<&Mon<P>>, scaling: &LT<P>) -> Option<LT<P>>
+            where P: MultivariatePolyRingStore,
+                P::Type: MultivariatePolyRing,
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
+                O: MonomialOrder + Copy
+        {
+            let scale = |(c, mon): LT_ref<P>| (ring.base_ring().mul_ref(c, &scaling.0), ring.clone_monomial(mon).mul(&scaling.1));
+            let lt_than = lt_than.map(|lt_than| ring.clone_monomial(lt_than).div(&scaling.1));
+            let mut current = if let Some(lt_than) = lt_than {
+                ring.terms(poly).max_lt(&lt_than, order)
+            } else {
+                ring.lt(poly, order)
+            }?;
+            while ring.base_ring().is_zero(&scale(current).0) {
+                current = ring.terms(poly).max_lt(current.1, order)?;
+            }
+            return Some(scale(current))
+        }
+
+        let do_computation = || match self {
+            SPoly::Standard(i, j) => {
+                let (fi_factor, fj_factor, _lcm) = lt_lcm(ring, ring.lt(&basis[*i], order).unwrap(), ring.lt(&basis[*j], order).unwrap());
+
+                let fi_lt = get_scaled_poly_largest_term_lt(&ring, &basis[*i], order, None, &fi_factor).unwrap();
+                let fj_lt = get_scaled_poly_largest_term_lt(&ring, &basis[*j], order, None, &fj_factor).unwrap();
+                assert!(order.compare(&fi_lt.1, &fj_lt.1) == Ordering::Equal);
+                assert!(ring.base_ring().eq_el(&fi_lt.0, &fj_lt.0));
+                
+                let mut current_lm = fi_lt.1;
+                loop {
+                    let fi_candidate = get_scaled_poly_largest_term_lt(&ring, &basis[*i], order, Some(&current_lm), &fi_factor);
+                    let fj_candidate = get_scaled_poly_largest_term_lt(&ring, &basis[*j], order, Some(&current_lm), &fj_factor);
+                    match (fi_candidate, fj_candidate) {
+                        (None, None) => { return None; }
+                        (Some(res), None) => { return Some(res); },
+                        (None, Some(res)) => { return Some((ring.base_ring().negate(res.0), res.1)); },
+                        (Some(fi_candidate), Some(fj_candidate)) if order.compare(&fi_candidate.1, &fj_candidate.1) == Ordering::Less => { return Some((ring.base_ring().negate(fj_candidate.0), fj_candidate.1)); },
+                        (Some(fi_candidate), Some(fj_candidate)) if order.compare(&fi_candidate.1, &fj_candidate.1) == Ordering::Greater => { return Some(fi_candidate); },
+                        (Some(fi_candidate), Some(fj_candidate)) if !ring.base_ring().eq_el(&fi_candidate.0, &fj_candidate.0) => { return Some((ring.base_ring().sub(fi_candidate.0, fj_candidate.0), fi_candidate.1)); },
+                        (Some(fi_candidate), Some(_fj_candidate)) => { current_lm = fi_candidate.1; }
+                    }
+                }
+            },
+            SPoly::Nilpotent(i, k) => {
+                let multiplier = ring.base_ring().pow(ring.base_ring().clone_el(&ring_info.extended_ideal_generator), *k);
+                let (mut lc, mut lm) = ring.lt(&basis[*i], order)?;
+                while ring.base_ring().is_zero(&ring.base_ring().mul_ref(lc, &multiplier)) {
+                    (lc, lm) = ring.terms(&basis[*i]).max_lt(lm, order)?;
+                }
+                return Some((ring.base_ring().mul_ref(lc, &multiplier), ring.clone_monomial(lm)));
+            }
+        };
+        let result = do_computation();
+        assert!(result.is_none() || !ring.base_ring().is_zero(&result.as_ref().unwrap().0));
+        debug_assert!(
+            (result.is_none() && ring.is_zero(&self.poly(ring, ring_info, basis, order))) || 
+            (ring.base_ring().eq_el(&result.as_ref().unwrap().0, ring.lt(&self.poly(ring, ring_info, basis, order), order).unwrap().0) && result.as_ref().unwrap().1 == *ring.lt(&self.poly(ring, ring_info, basis, order), order).unwrap().1)
+        );
+        return result;
     }
 
     fn expected_lc_valuation<P, O>(&self, ring: &P, ring_info: &RingInfo<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>, basis: &[El<P>], order: O) -> usize
@@ -350,7 +381,7 @@ impl SPoly {
             <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
             O: MonomialOrder + Copy
     {
-        self.terms(ring, ring_info, basis, order).max_by(|(_, l), (_, r)| order.compare(l, r)).map(|(c, _)| p_valuation(ring.base_ring(), &ring_info.extended_ideal_generator, c)).unwrap()
+        p_valuation(ring.base_ring(), &ring_info.extended_ideal_generator, self.expected_lt(ring, ring_info, basis, order).unwrap().0)
     }
 
     fn poly<P, O>(&self, ring: &P, ring_info: &RingInfo<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>, basis: &[El<P>], order: O) -> El<P>
@@ -359,7 +390,6 @@ impl SPoly {
             <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
             O: MonomialOrder + Copy
     {
-        let result = ring.from_terms(self.terms(ring, ring_info, basis, order));
         match self {
             SPoly::Standard(i, j) => {
                 let (f1_factor, f2_factor, _) = lt_lcm(&ring, ring.lt(&basis[*i], order).unwrap(), ring.lt(&basis[*j], order).unwrap());
@@ -369,13 +399,25 @@ impl SPoly {
                 let mut f2_scaled = ring.clone_el(&basis[*j]);
                 ring.mul_monomial(&mut f2_scaled, &f2_factor.1);
                 ring.inclusion().mul_assign_map(&mut f2_scaled, f2_factor.0);
-                assert_el_eq!(ring, result, ring.sub(f1_scaled, f2_scaled));
+                return ring.sub(f1_scaled, f2_scaled);
             },
-            _ => {}
+            SPoly::Nilpotent(i, k) => {
+                let mut result = ring.clone_el(&basis[*i]);
+                ring.inclusion().mul_assign_map(&mut result, ring.base_ring().pow(ring.base_ring().clone_el(&ring_info.extended_ideal_generator), *k));
+                return result;
+            }
         }
-        return result;
     }
 
+    ///
+    /// The chain criterion says that an S-poly of `f` and `g` reduces to zero, if there are
+    /// `f0 = f, f1, f2, ..., fk = g` such that the leading terms of each `fi` divide `lcm(lt(f), lt(g))`
+    /// and the S-polys of each pair `(fi, f(i + 1))` have already been considered (and possibly included
+    /// in the basis).
+    /// 
+    /// For efficiency reasons, we only check length-3 chains, i.e. where `k = 2`.
+    /// 
+    #[inline(never)]
     fn filter_chain_criterion<P, O>(&self, ring: &P, ring_info: &RingInfo<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>, basis: &[El<P>], order: O, reduced_pairs: &[(usize, usize)]) -> bool
         where P: MultivariatePolyRingStore,
             P::Type: MultivariatePolyRing,
@@ -393,6 +435,11 @@ impl SPoly {
         }
     }
 
+    ///
+    /// The product criterion says that an S-poly of two polynomials with coprime leading terms always
+    /// reduces to zero.
+    /// 
+    #[inline(never)]
     fn filter_product_criterion<P, O>(&self, ring: &P, _ring_info: &RingInfo<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>, basis: &[El<P>], order: O) -> bool
         where P: MultivariatePolyRingStore,
             P::Type: MultivariatePolyRing,
@@ -476,10 +523,11 @@ impl<R> GBRingDescriptorRing for AsLocalPIRBase<R>
 /// This implementation cannot (yet ?) compete with highly optimized implementations 
 /// (Singular, Macaulay2, Magma etc).
 /// 
-/// This algorithm will only consider S-polynomials of degree smaller than the given bound.
-/// Ignoring S-polynomials this way might cause the resulting basis not to be a Groebner basis,
-/// but can drastically speed up computatations. If you are unsure which bound to use, set
-/// it to `u16::MAX` to get an actual GB.
+/// This algorithm will only consider S-polynomials with leading monomial of degree smaller than 
+/// the given bound.
+/// Ignoring S-polynomials this way might cause the resulting basis not to be a 
+/// Groebner basis, but can drastically speed up computatations. If you are unsure which bound to 
+/// use, set it to `u16::MAX` to get an actual GB.
 /// 
 /// Note that Groebner basis algorithms are still the subject of ongoing research, and
 /// whether the Groebner basis of even a simple example can be efficiently computed is
@@ -538,11 +586,15 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
 
     basis = reduce(&ring, basis, order);
 
-    let select = |s_poly: &SPoly, basis: &[El<P>], degree_bound: (u16, usize)| 
-        if s_poly.expected_max_deg(&ring, &ring_info, basis, order) < degree_bound.0 && s_poly.expected_lc_valuation(&ring, &ring_info, basis, order) <= degree_bound.1 {
-            Some(s_poly.poly(&ring, &ring_info, basis, order))
+    let select = |s_poly: &SPoly, basis: &[El<P>], degree_bound: (u16, usize), filtered_out_degree: &mut bool, filtered_out_valuation: &mut bool| 
+        if s_poly.expected_lm(&ring, &ring_info, basis, order).deg() > degree_bound.0 {
+            *filtered_out_degree |= true;
+            None
+        } else if s_poly.expected_lc_valuation(&ring, &ring_info, basis, order) > degree_bound.1 {
+            *filtered_out_valuation |= true;
+            None
         } else {
-            None 
+            Some(s_poly.poly(&ring, &ring_info, basis, order)) 
         };
 
     let mut chain_criterion_reduced_pairs = Vec::new();
@@ -560,6 +612,8 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
 
         let mut new_reduced_pairs = Vec::new();
         let mut S_polys = Vec::new();
+        let mut filtered_out_degree = false;
+        let mut filtered_out_valuation = false;
 
         open.retain(|S_poly| {
             if S_poly.is_zero(&ring, &ring_info, &basis, order) {
@@ -570,7 +624,7 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
             } else if S_poly.filter_chain_criterion(&ring, &ring_info, &basis[..], order, &chain_criterion_reduced_pairs[..]) {
                 chain_criterion_skipped += 1;
                 false
-            } else if let Some(poly) = select(S_poly, &basis[..], degree_bound) { 
+            } else if let Some(poly) = select(S_poly, &basis[..], degree_bound, &mut filtered_out_degree, &mut filtered_out_valuation) { 
                 S_polys.push(poly);
                 if let SPoly::Standard(i, j) = S_poly {
                     new_reduced_pairs.push((*i, *j));
@@ -724,8 +778,6 @@ pub fn multivariate_division<'a, P, I, O>(ring: P, mut f: El<P>, set: I, order: 
 use crate::rings::multivariate::ordered::*;
 #[cfg(test)]
 use crate::rings::poly::*;
-#[cfg(test)]
-use crate::wrapper::RingElementWrapper;
 #[cfg(test)]
 use crate::seq::*;
 
@@ -900,34 +952,21 @@ fn test_generic_computation() {
 
 #[ignore]
 #[test]
-fn test_gb_local_ring_large() {
+fn test_expensive_gb_1() {
     let order = DegRevLex;
     let base = zn_static::Zn::<16>::RING;
     let ring: MultivariatePolyRingImpl<_, _, 12> = MultivariatePolyRingImpl::new(base, order);
 
-    let Y0 = RingElementWrapper::new(&ring, ring.indeterminate(0));
-    let Y1 = RingElementWrapper::new(&ring, ring.indeterminate(1));
-    let Y2 = RingElementWrapper::new(&ring, ring.indeterminate(2));
-    let Y3 = RingElementWrapper::new(&ring, ring.indeterminate(3));
-    let Y4 = RingElementWrapper::new(&ring, ring.indeterminate(4));
-    let Y5 = RingElementWrapper::new(&ring, ring.indeterminate(5));
-    let Y6 = RingElementWrapper::new(&ring, ring.indeterminate(6));
-    let Y7 = RingElementWrapper::new(&ring, ring.indeterminate(7));
-    let Y8 = RingElementWrapper::new(&ring, ring.indeterminate(8));
-    let Y9 = RingElementWrapper::new(&ring, ring.indeterminate(9));
-    let Y10 = RingElementWrapper::new(&ring, ring.indeterminate(10));
-    let Y11 = RingElementWrapper::new(&ring, ring.indeterminate(11));
+    let system = ring.with_wrapped_indeterminates(|[Y0, Y1, Y2, Y3, Y4, Y5, Y6, Y7, Y8, Y9, Y10, Y11]| [
+        Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y4.pow_ref(2) + 4 * Y0 * Y1 * Y2 * Y3 * Y4 * Y4 * Y8 + Y0 * Y1 * Y2 * Y5.pow_ref(2) * Y8.pow_ref(2) + Y0 * Y2 * Y3 * Y4 * Y6 + Y0 * Y1 * Y3 * Y4 * Y7 + Y0 * Y2 * Y5 * Y6 * Y8 + Y0 * Y1 * Y5 * Y7 * Y8 + Y0 * Y2 * Y3 * Y5 * Y10 + Y0 * Y1 * Y3 * Y5 * Y11 + Y0 * Y6 * Y7 + Y3 * Y5 * Y9 -  4,
+        2 * Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y4 * Y5 + 2 * Y0 * Y1 * Y2 * Y3 * Y5.pow_ref(2) * Y8 + Y0 * Y2 * Y3 * Y5 * Y6 + Y0 * Y1 * Y3 * Y5 * Y7 + 8,
+        Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y5.pow_ref(2) - 5
+    ]);
 
-    let system = [
-        &Y0 * &Y1 * &Y2 * Y3.clone().pow(2) * Y4.clone().pow(2) + 4 * &Y0 * &Y1 * &Y2 * &Y3 * &Y4 * &Y5 * &Y8 + &Y0 * &Y1 * &Y2 * Y5.clone().pow(2) * Y8.clone().pow(2) + &Y0 * &Y2 * &Y3 * &Y4 * &Y6 + &Y0 * &Y1 * &Y3 * &Y4 * &Y7 + &Y0 * &Y2 * &Y5 * &Y6 * &Y8 + &Y0 * &Y1 * &Y5 * &Y7 * &Y8 + &Y0 * &Y2 * &Y3 * &Y5 * &Y10 + &Y0 * &Y1 * &Y3 * &Y5 * &Y11 + &Y0 * &Y6 * &Y7 + &Y3 * &Y5 * &Y9 -  4,
-        2 * &Y0 * &Y1 * &Y2 * Y3.clone().pow(2) * &Y4 * &Y5 + 2 * &Y0 * &Y1 * &Y2 * &Y3 * Y5.clone().pow(2) * &Y8 + &Y0 * &Y2 * &Y3 * &Y5 * &Y6 + &Y0 * &Y1 * &Y3 * &Y5 * &Y7 + 8,
-        &Y0 * &Y1 * &Y2 * Y3.clone().pow(2) * Y5.clone().pow(2) -  5
-    ].into_iter().map(|f| f.unwrap()).collect::<Vec<_>>();
-
-    let part_of_result = [
-        4 * Y2.clone().pow(2) * Y6.clone().pow(2) -  4 * Y1.clone().pow(2) * Y7.clone().pow(2),
-        8 * &Y2 * &Y6 + 8 * &Y1 * Y7.clone()
-    ];
+    let part_of_result = ring.with_wrapped_indeterminates(|[_Y0, Y1, Y2, _Y3, _Y4, _Y5, Y6, Y7, _Y8, _Y9, _Y10, _Y11]| [
+        4 * Y2.pow_ref(2) * Y6.pow_ref(2) -  4 * Y1.pow_ref(2) * Y7.pow_ref(2),
+        8 * Y2 * Y6 + 8 * Y1 * Y7.clone()
+    ]);
 
     let start = std::time::Instant::now();
     let gb = f4::<_, _, true>(&ring, system, order, u16::MAX);
@@ -936,7 +975,7 @@ fn test_gb_local_ring_large() {
     println!("Computed GB in {} ms", (end - start).as_millis());
 
     for f in &part_of_result {
-        assert!(ring.is_zero(&multivariate_division(&ring, f.clone().unwrap(), gb.iter(), order)));
+        assert!(ring.is_zero(&multivariate_division(&ring, ring.clone_el(f), gb.iter(), order)));
     }
 
     assert_eq!(93, gb.len());
@@ -944,28 +983,20 @@ fn test_gb_local_ring_large() {
 
 #[test]
 #[ignore]
-fn test_difficult_gb() {
+fn test_expensive_gb_2() {
     let order = DegRevLex;
     let base = zn_static::Fp::<7>::RING;
     let ring: MultivariatePolyRingImpl<_, _, 7> = MultivariatePolyRingImpl::new(base, order);
 
-    let X0 = RingElementWrapper::new(&ring, ring.indeterminate(0));
-    let X1 = RingElementWrapper::new(&ring, ring.indeterminate(1));
-    let X2 = RingElementWrapper::new(&ring, ring.indeterminate(2));
-    let X3 = RingElementWrapper::new(&ring, ring.indeterminate(3));
-    let X4 = RingElementWrapper::new(&ring, ring.indeterminate(4));
-    let X5 = RingElementWrapper::new(&ring, ring.indeterminate(5));
-    let X6 = RingElementWrapper::new(&ring, ring.indeterminate(6));
-
-    let basis = vec![
-        6 + 2 * &X5 + 2 * &X4 + &X6 + 4 * &X0 + 5 * &X6 * &X5 + &X6 * &X4 + 3 * &X0 * &X4 + 6 * &X0 * &X6 + 2 * &X0 * &X3 + &X0 * &X2 + 4 * &X0 * &X1 + 2 * &X3 * &X4 * &X5 + 4 * &X0 * &X6 * &X5 + 6 * &X0 * &X2 * &X5 + 5 * &X0 * &X6 * &X4 + 2 * &X0 * &X3 * &X4 + 4 * &X0 * &X1 * &X4 + &X0 * X6.clone().pow(2) + 3 * &X0 * &X3 * &X6 + 5 * &X0 * &X2 * &X6 + 2 * &X0 * &X1 * &X6 + &X0 * X3.clone().pow(2) + 2 * &X0 * &X2 * &X3 + 3 * &X0 * &X3 * &X4 * &X5 + 4 * &X0 * &X3 * &X6 * &X5 + 3 * &X0 * &X1 * &X6 * &X5 + 3 * &X0 * &X2 * &X3 * &X5 + 3 * &X0 * &X3 * &X6 * &X4 + 2 * &X0 * &X1 * &X6 * &X4 + 2 * &X0 * X3.clone().pow(2) * &X4 + 2 * &X0 * &X2 * &X3 * &X4 + 3 * &X0 * X3.clone().pow(2) * &X4 * &X5 + 4 * &X0 * &X1 * &X3 * &X4 * &X5 + &X0 * X3.clone().pow(2) * X4.clone().pow(2),
-        5 + 4 * &X0 + 6 * &X4 * &X5 + 3 * &X6 * &X5 + 4 * &X0 * &X4 + 3 * &X0 * &X6 + 6 * &X0 * &X3 + 6 * &X0 * &X2 + 6 * &X6 * &X4 * &X5 + 2 * &X0 * &X4 * &X5 + 4 * &X0 * &X6 * &X5 + 3 * &X0 * &X2 * &X5 + 3 * &X0 * &X6 * &X4 + 5 * &X0 * &X3 * &X4 + 6 * &X0 * &X2 * &X4 + 4 * &X0 * X6.clone().pow(2) + 3 * &X0 * &X3 * &X6 + 3 * &X0 * &X2 * &X6 + 2 * &X0 * &X6 * &X4 * &X5 + 6 * &X0 * &X3 * &X4 * &X5 + 5 * &X0 * &X1 * &X4 * &X5 + 6 * &X0 * X6.clone().pow(2) * &X5 + 2 * &X0 * &X3 * &X6 * &X5 + 2 * &X0 * &X2 * &X6 * &X5 + 6 * &X0 * &X1 * &X6 * &X5 + 6 * &X0 * &X2 * &X3 * &X5 + 6 * &X0 * &X3 * X4.clone().pow(2) + 4 * &X0 * X6.clone().pow(2) * &X4 + 6 * &X0 * &X3 * &X6 * &X4 + 3 * &X0 * &X2 * &X6 * &X4 + 4 * &X0 * &X3 * &X6 * &X4 * &X5 + 5 * &X0 * &X1 * &X6 * &X4 * &X5 + 6 * &X0 * X3.clone().pow(2) * &X4 * &X5 + 5 * &X0 * &X2 * &X3 * &X4 * &X5 + 3 * &X0 * &X3 * &X6 * X4.clone().pow(2) + 6 * &X0 * X3.clone().pow(2) * X4.clone().pow(2) * X5.clone(),
-        2 + 2 * &X0 + 4 * &X0 * &X4 + 2 * &X0 * &X6 + 5 * &X0 * &X4 * &X5 + 2 * &X0 * &X6 * &X5 + 4 * &X0 * &X2 * &X5 + 2 * &X0 * X4.clone().pow(2) + 4 * &X0 * &X6 * &X4 + 4 * &X0 * X6.clone().pow(2) + 2 * &X6 * &X4 * X5.clone().pow(2) + 4 * &X0 * &X6 * &X4 * &X5 + &X0 * &X3 * &X4 * &X5 + &X0 * &X2 * &X4 * &X5 + 3 * &X0 * X6.clone().pow(2) * &X5 + 2 * &X0 * &X3 * &X6 * &X5 + 4 * &X0 * &X2 * &X6 * &X5 + 2 * &X0 * &X6 * X4.clone().pow(2) + &X0 * X6.clone().pow(2) * &X4 + 3 * &X0 * &X6 * &X4 * X5.clone().pow(2) + 2 * &X0 * X6.clone().pow(2) * X5.clone().pow(2) + 3 * &X0 * &X2 * &X6 * X5.clone().pow(2) + &X0 * &X3 * X4.clone().pow(2) * &X5 + &X0 * X6.clone().pow(2) * &X4 * &X5 + &X0 * &X3 * &X6 * &X4 * &X5 + 6 * &X0 * &X2 * &X6 * &X4 * &X5 + 4 * &X0 * X6.clone().pow(2) * X4.clone().pow(2) + 6 * &X0 * &X3 * &X6 * &X4 * X5.clone().pow(2) + 4 * &X0 * &X1 * &X6 * &X4 * X5.clone().pow(2) + 4 * &X0 * &X2 * &X3 * &X4 * X5.clone().pow(2) + 6 * &X0 * &X3 * &X6 * X4.clone().pow(2) * &X5 + 2 * &X0 * X3.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(2),
-        4 + 5 * &X0 * &X4 * &X5 + 6 * &X0 * &X6 * &X5 + 5 * &X0 * X4.clone().pow(2) * &X5 + 3 * &X0 * &X6 * &X4 * &X5 + 3 * &X0 * X6.clone().pow(2) * &X5 + 6 * &X0 * &X6 * &X4 * X5.clone().pow(2) + 5 * &X0 * &X2 * &X4 * X5.clone().pow(2) + &X0 * X6.clone().pow(2) * X5.clone().pow(2) + 6 * &X0 * &X2 * &X6 * X5.clone().pow(2) + 4 * &X0 * &X6 * X4.clone().pow(2) * &X5 + 2 * &X0 * X6.clone().pow(2) * &X4 * &X5 + 5 * &X0 * &X3 * X4.clone().pow(2) * X5.clone().pow(2) + 3 * &X0 * X6.clone().pow(2) * &X4 * X5.clone().pow(2) + 5 * &X0 * &X3 * &X6 * &X4 * X5.clone().pow(2) + 4 * &X0 * &X2 * &X6 * &X4 * X5.clone().pow(2) + 6 * &X0 * X6.clone().pow(2) * X4.clone().pow(2) * &X5 + 4 * &X0 * &X3 * &X6 * X4.clone().pow(2) * X5.clone().pow(2),
-        4 + 4 * &X0 * X4.clone().pow(2) * X5.clone().pow(2) + &X0 * &X6 * &X4 * X5.clone().pow(2) + &X0 * X6.clone().pow(2) * X5.clone().pow(2) + 5 * &X0 * &X6 * X4.clone().pow(2) * X5.clone().pow(2) + 6 * &X0 * X6.clone().pow(2) * &X4 * X5.clone().pow(2) + 3 * &X0 * X6.clone().pow(2) * &X4 * X5.clone().pow(3) + 4 * &X0 * &X2 * &X6 * &X4 * X5.clone().pow(3) + 6 * &X0 * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(2) + 4 * &X0 * &X3 * &X6 * X4.clone().pow(2) * X5.clone().pow(3),
-        5 * &X0 * &X6 * X4.clone().pow(2) * X5.clone().pow(3) + 6 * &X0 * X6.clone().pow(2) * &X4 * X5.clone().pow(3) + 5 * &X0 * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(3),
-        2 * &X0 * X6.clone().pow(2) * X4.clone().pow(2) * X5.clone().pow(4)
-    ].into_iter().map(|f| f.unwrap()).collect();
+    let basis = ring.with_wrapped_indeterminates(|[X0, X1, X2, X3, X4, X5, X6]| [
+        6 + 2 * X5 + 2 * X4 + X6 + 4 * X0 + 5 * X6 * X5 + X6 * X4 + 3 * X0 * X4 + 6 * X0 * X6 + 2 * X0 * X3 + X0 * X2 + 4 * X0 * X1 + 2 * X3 * X4 * X5 + 4 * X0 * X6 * X5 + 6 * X0 * X2 * X5 + 5 * X0 * X6 * X4 + 2 * X0 * X3 * X4 + 4 * X0 * X1 * X4 + X0 * X6.pow_ref(2) + 3 * X0 * X3 * X6 + 5 * X0 * X2 * X6 + 2 * X0 * X1 * X6 + X0 * X3.pow_ref(2) + 2 * X0 * X2 * X3 + 3 * X0 * X3 * X4 * X5 + 4 * X0 * X3 * X6 * X5 + 3 * X0 * X1 * X6 * X5 + 3 * X0 * X2 * X3 * X5 + 3 * X0 * X3 * X6 * X4 + 2 * X0 * X1 * X6 * X4 + 2 * X0 * X3.pow_ref(2) * X4 + 2 * X0 * X2 * X3 * X4 + 3 * X0 * X3.pow_ref(2) * X4 * X5 + 4 * X0 * X1 * X3 * X4 * X5 + X0 * X3.pow_ref(2) * X4.pow_ref(2),
+        5 + 4 * X0 + 6 * X4 * X5 + 3 * X6 * X5 + 4 * X0 * X4 + 3 * X0 * X6 + 6 * X0 * X3 + 6 * X0 * X2 + 6 * X6 * X4 * X5 + 2 * X0 * X4 * X5 + 4 * X0 * X6 * X5 + 3 * X0 * X2 * X5 + 3 * X0 * X6 * X4 + 5 * X0 * X3 * X4 + 6 * X0 * X2 * X4 + 4 * X0 * X6.pow_ref(2) + 3 * X0 * X3 * X6 + 3 * X0 * X2 * X6 + 2 * X0 * X6 * X4 * X5 + 6 * X0 * X3 * X4 * X5 + 5 * X0 * X1 * X4 * X5 + 6 * X0 * X6.pow_ref(2) * X5 + 2 * X0 * X3 * X6 * X5 + 2 * X0 * X2 * X6 * X5 + 6 * X0 * X1 * X6 * X5 + 6 * X0 * X2 * X3 * X5 + 6 * X0 * X3 * X4.pow_ref(2) + 4 * X0 * X6.pow_ref(2) * X4 + 6 * X0 * X3 * X6 * X4 + 3 * X0 * X2 * X6 * X4 + 4 * X0 * X3 * X6 * X4 * X5 + 5 * X0 * X1 * X6 * X4 * X5 + 6 * X0 * X3.pow_ref(2) * X4 * X5 + 5 * X0 * X2 * X3 * X4 * X5 + 3 * X0 * X3 * X6 * X4.pow_ref(2) + 6 * X0 * X3.pow_ref(2) * X4.pow_ref(2) * X5.clone(),
+        2 + 2 * X0 + 4 * X0 * X4 + 2 * X0 * X6 + 5 * X0 * X4 * X5 + 2 * X0 * X6 * X5 + 4 * X0 * X2 * X5 + 2 * X0 * X4.pow_ref(2) + 4 * X0 * X6 * X4 + 4 * X0 * X6.pow_ref(2) + 2 * X6 * X4 * X5.pow_ref(2) + 4 * X0 * X6 * X4 * X5 + X0 * X3 * X4 * X5 + X0 * X2 * X4 * X5 + 3 * X0 * X6.pow_ref(2) * X5 + 2 * X0 * X3 * X6 * X5 + 4 * X0 * X2 * X6 * X5 + 2 * X0 * X6 * X4.pow_ref(2) + X0 * X6.pow_ref(2) * X4 + 3 * X0 * X6 * X4 * X5.pow_ref(2) + 2 * X0 * X6.pow_ref(2) * X5.pow_ref(2) + 3 * X0 * X2 * X6 * X5.pow_ref(2) + X0 * X3 * X4.pow_ref(2) * X5 + X0 * X6.pow_ref(2) * X4 * X5 + X0 * X3 * X6 * X4 * X5 + 6 * X0 * X2 * X6 * X4 * X5 + 4 * X0 * X6.pow_ref(2) * X4.pow_ref(2) + 6 * X0 * X3 * X6 * X4 * X5.pow_ref(2) + 4 * X0 * X1 * X6 * X4 * X5.pow_ref(2) + 4 * X0 * X2 * X3 * X4 * X5.pow_ref(2) + 6 * X0 * X3 * X6 * X4.pow_ref(2) * X5 + 2 * X0 * X3.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(2),
+        4 + 5 * X0 * X4 * X5 + 6 * X0 * X6 * X5 + 5 * X0 * X4.pow_ref(2) * X5 + 3 * X0 * X6 * X4 * X5 + 3 * X0 * X6.pow_ref(2) * X5 + 6 * X0 * X6 * X4 * X5.pow_ref(2) + 5 * X0 * X2 * X4 * X5.pow_ref(2) + X0 * X6.pow_ref(2) * X5.pow_ref(2) + 6 * X0 * X2 * X6 * X5.pow_ref(2) + 4 * X0 * X6 * X4.pow_ref(2) * X5 + 2 * X0 * X6.pow_ref(2) * X4 * X5 + 5 * X0 * X3 * X4.pow_ref(2) * X5.pow_ref(2) + 3 * X0 * X6.pow_ref(2) * X4 * X5.pow_ref(2) + 5 * X0 * X3 * X6 * X4 * X5.pow_ref(2) + 4 * X0 * X2 * X6 * X4 * X5.pow_ref(2) + 6 * X0 * X6.pow_ref(2) * X4.pow_ref(2) * X5 + 4 * X0 * X3 * X6 * X4.pow_ref(2) * X5.pow_ref(2),
+        4 + 4 * X0 * X4.pow_ref(2) * X5.pow_ref(2) + X0 * X6 * X4 * X5.pow_ref(2) + X0 * X6.pow_ref(2) * X5.pow_ref(2) + 5 * X0 * X6 * X4.pow_ref(2) * X5.pow_ref(2) + 6 * X0 * X6.pow_ref(2) * X4 * X5.pow_ref(2) + 3 * X0 * X6.pow_ref(2) * X4 * X5.pow_ref(3) + 4 * X0 * X2 * X6 * X4 * X5.pow_ref(3) + 6 * X0 * X6.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(2) + 4 * X0 * X3 * X6 * X4.pow_ref(2) * X5.pow_ref(3),
+        5 * X0 * X6 * X4.pow_ref(2) * X5.pow_ref(3) + 6 * X0 * X6.pow_ref(2) * X4 * X5.pow_ref(3) + 5 * X0 * X6.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(3),
+        2 * X0 * X6.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(4)
+    ]);
 
     let start = std::time::Instant::now();
     let gb = f4::<_, _, true>(ring, basis, order, u16::MAX);
@@ -974,4 +1005,32 @@ fn test_difficult_gb() {
     println!("Computed GB in {} ms", (end - start).as_millis());
 
     assert_eq!(130, gb.len());
+}
+
+#[test]
+#[ignore]
+fn test_expensive_gb_3_incomplete() {
+    let order = DegRevLex;
+    let base = zn_static::Zn::<32768>::RING;
+    let ring: MultivariatePolyRingImpl<_, _, 14> = MultivariatePolyRingImpl::new(base, order);
+
+    let basis = ring.with_wrapped_indeterminates(|[X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12, X13]| [
+        22528 + 18432 * X3 * X8 * X13,
+        2560 + 10752 * X3 * X8 * X13 + 19200 * X2 * X8 * X13 + 19200 * X3 * X7 * X13,
+        384 + 18304 * X3 * X8 * X13 + 7744 * X2 * X8 * X13 + 1728 * X1 * X8 * X13 + 7744 * X3 * X7 * X13 + 1728 * X3 * X6 * X13,
+        29568 + 14208 * X3 * X8 * X13 + 10368 * X2 * X8 * X13 + 31776 * X1 * X8 * X13 + 10368 * X3 * X7 * X13 + 10880 * X2 * X7 * X13 + 13216 * X1 * X7 * X13 + 31776 * X3 * X6 * X13 + 13216 * X2 * X6 * X13,
+        17920 + 27536 * X12 + 27536 * X2 * X9 * X13 + 20992 * X3 * X8 * X13 + 27504 * X2 * X8 * X13 + 15320 * X1 * X8 * X13 + 27536 * X4 * X7 * X13 + 27504 * X3 * X7 * X13 + 28128 * X2 * X7 * X13 + 1864 * X1 * X7 * X13 + 15320 * X3 * X6 * X13 + 1864 * X2 * X6 * X13 + 27536 * X1 * X6 * X13,
+        11136 + 16608 * X12 + 31242 * X10 + 16608 * X2 * X9 * X13 + 31242 * X0 * X9 * X13 + 17536 * X3 * X8 * X13 + 6400 * X2 * X8 * X13 + 30656 * X1 * X8 * X13 + 16608 * X4 * X7 * X13 + 6400 * X3 * X7 * X13 + 27520 * X2 * X7 * X13 + 960 * X1 * X7 * X13 + 30656 * X3 * X6 * X13 + 960 * X2 * X6 * X13 + 16608 * X1 * X6 * X13 + 31242 * X4 * X5 * X13,
+        1024 + 28816 * X12 + 14470 * X10 + 28816 * X2 * X9 * X13 + 14470 * X0 * X9 * X13 + 5632 * X3 * X8 * X13 + 10416 * X2 * X8 * X13 + 24248 * X1 * X8 * X13 + 4336 * X0 * X8 * X13 + 28816 * X4 * X7 * X13 + 10416 * X3 * X7 * X13 + 27232 * X2 * X7 * X13 + 8296 * X1 * X7 * X13 + 24248 * X3 * X6 * X13 + 8296 * X2 * X6 * X13 + 28816 * X1 * X6 * X13 + 14470 * X4 * X5 * X13 + 4336 * X3 * X5 * X13,
+        21632 + 21064 * X12 + 18806 * X10 + 21064 * X2 * X9 * X13 + 18806 * X0 * X9 * X13 + 8320 * X3 * X8 * X13 + 9848 * X2 * X8 * X13 + 11500 * X1 * X8 * X13 + 4908 * X0 * X8 * X13 + 21064 * X4 * X7 * X13 + 9848 * X3 * X7 * X13 + 28656 * X2 * X7 * X13 + 1124 * X1 * X7 * X13 + 27972 * X0 * X7 * X13 + 11500 * X3 * X6 * X13 + 1124 * X2 * X6 * X13 + 21064 * X1 * X6 * X13 + 18806 * X4 * X5 * X13 + 4908 * X3 * X5 * X13 + 27972 * X2 * X5 * X13,
+        768 + 11720 * X12 + 12877 * X10 + 11720 * X2 * X9 * X13 + 12877 * X0 * X9 * X13 + 12032 * X3 * X8 * X13 + 17912 * X2 * X8 * X13 + 29388 * X1 * X8 * X13 + 30515 * X0  * X8 * X13 + 11720 * X4 * X7 * X13 + 17912 * X3 * X7 * X13 + 22384 * X2 * X7 * X13 + 30916 * X1 * X7 * X13 + 4795 * X0 * X7 * X13 + 29388 * X3 * X6 * X13 + 30916 * X2 * X6 * X13 + 11720 * X1 * X6 * X13 + 32767 * X0 * X6 * X13 + 12877 * X4 * X5 * X13 + 30515 * X3 * X5 * X13 + 4795 * X2 * X5 * X13 + 32767 * X1 * X5 * X13,
+        29440 + 6968 * X12 + 6970 * X11 + 14875 * X10 + 6968 * X2 * X9 * X13 + 6970 * X1 * X9 * X13 + 14875 * X0 * X9 * X13 + 24832 * X3 * X8 * X13 + 25904 * X2 * X8 * X13 + 20792 * X1 * X8 * X13 + 11290 * X0 * X8 * X13 + 6968 * X4 * X7 * X13 + 25904 * X3 * X7 * X13 + 6368 * X2 * X7 * X13 + 6920 * X1 * X7 * X13 + 25786 * X0 * X7 * X13 + 6970 * X4 * X6 * X13 + 20792 * X3 * X6 * X13 + 6920 * X2 * X6 * X13 + 6968 * X1 * X6 * X13 + 25798 * X0 * X6 * X13 + 14875 * X4 * X5 * X13 + 11290 * X3 * X5 * X13 + 25786 * X2 * X5 * X13 + 25798 * X1 * X5 * X13 + 6970 * X0 * X5 * X13,
+    ]);
+
+    let start = std::time::Instant::now();
+    let gb = f4::<_, _, true>(ring, basis, order, 8);
+    let end = std::time::Instant::now();
+
+    println!("Computed incomplete GB in {} ms", (end - start).as_millis());
+    std::hint::black_box(gb);
 }

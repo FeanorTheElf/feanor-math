@@ -16,7 +16,7 @@ use super::int_factor::is_prime_power;
 /// modulo `p^e`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn hensel_lift<P, R, S>(target_ring: &P, source_ring: &R, prime_ring: &S, f: &El<P>, factors: (&El<R>, &El<R>)) -> (El<P>, El<P>)
+pub fn hensel_lift<P, R, S>(target_ring: P, source_ring: R, prime_ring: S, f: &El<P>, factors: (&El<R>, &El<R>)) -> (El<P>, El<P>)
     where P: PolyRingStore, P::Type: PolyRing,
         R: PolyRingStore, R::Type: PolyRing,
         S: PolyRingStore, S::Type: PolyRing + EuclideanRing,

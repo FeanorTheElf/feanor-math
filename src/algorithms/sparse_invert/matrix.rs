@@ -118,11 +118,13 @@ impl<R> SparseMatrix<R>
             for j in 0..global_cols {
                 result[i * global_cols + j].data.sort_by_key(|(j, _)| *j);
                 result[i * global_cols + j].data.push((usize::MAX, ring.zero()));
+                result[i * global_cols + j].check(&RingRef::new(ring));
             }
         }
         for i in row_count..(row_count + n) {
             for j in 0..global_cols {
                 result[i * global_cols + j].make_zero(&RingRef::new(ring));
+                result[i * global_cols + j].check(&RingRef::new(ring));
             }
         }
         return result;

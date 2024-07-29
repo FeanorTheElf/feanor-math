@@ -56,6 +56,15 @@ impl<R: RingStore> RingElementWrapper<R> {
         }
     }
 
+    pub fn pow_ref(&self, power: usize) -> Self
+        where R: Clone
+    {
+        Self {
+            element: self.ring.pow(self.ring.clone_el(&self.element), power),
+            ring: self.ring.clone()
+        }
+    }
+
     pub fn unwrap(self) -> El<R> {
         self.element
     }

@@ -121,11 +121,11 @@ fn assert_left_equivalent<R, V1, V2>(ring: R, original: Submatrix<V1, InternalRo
         }
     }
     if !smith::solve_right::<&R, _, _>(original_transposed.clone_matrix(&ring).data_mut(), actual_transposed.clone_matrix(&ring).data_mut(), &ring).is_some() {
-        // println!("{:?}", original.row_iter().map(|row| row.iter().enumerate().flat_map(move |(j, local_row)| local_row.data.iter().map(move |(k, c)| (j * n + k, format!("{}", ring.format(c))))).collect::<Vec<_>>()).collect::<Vec<_>>());
+        // println!("{:?}", original.row_iter().map(|row| row.iter().enumerate().flat_map(move |(j, local_row)| local_row.data.iter().rev().skip(1).rev().map(move |(k, c)| (j * n + k, format!("{}", ring.format(c))))).collect::<Vec<_>>()).collect::<Vec<_>>());
         panic!();
     }
     if !smith::solve_right::<&R, _, _>(actual_transposed.clone_matrix(&ring).data_mut(), original_transposed.clone_matrix(&ring).data_mut(), &ring).is_some() {
-        // println!("{:?}", original.row_iter().map(|row| row.iter().enumerate().flat_map(move |(j, local_row)| local_row.data.iter().map(move |(k, c)| (j * n + k, format!("{}", ring.format(c))))).collect::<Vec<_>>()).collect::<Vec<_>>());
+        // println!("{:?}", original.row_iter().map(|row| row.iter().enumerate().flat_map(move |(j, local_row)| local_row.data.iter().rev().skip(1).rev().map(move |(k, c)| (j * n + k, format!("{}", ring.format(c))))).collect::<Vec<_>>()).collect::<Vec<_>>());
         panic!();
     }
 }
@@ -237,6 +237,28 @@ fn test_gb_sparse_row_echelon_swap_in_twice() {
     let mut actual = SparseMatrix::new(&R);
     actual.add_cols(3);
     for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), 2) {
+        actual.add_row(actual.row_count(), row.into_iter());
+    }
+    assert_is_correct_row_echelon(R, &matrix, &actual);
+}
+
+#[test]
+fn test_gb_sparse_row_echelon_swap_in_twice_nontrivial_transform() {
+    let R = Zn::<8>::RING;
+    let sparsify = |row: [u64; 5]| row.into_iter().enumerate().filter(|(_, x)| !R.is_zero(&x));
+    
+    let mut matrix: SparseMatrix<_> = SparseMatrix::new(&R);
+    matrix.add_cols(5);
+    matrix.add_row(0, sparsify([2, 0, 0, 1, 1]));
+    matrix.add_row(1, sparsify([0, 0, 0, 2, 0]));
+    matrix.add_row(2, sparsify([0, 0, 0, 3, 0]));
+    matrix.add_row(3, sparsify([2, 0, 0, 4, 1]));
+    matrix.add_row(4, sparsify([1, 2, 2, 5, 0]));
+    matrix.add_row(5, sparsify([1, 4, 3, 6, 0]));
+    
+    let mut actual = SparseMatrix::new(&R);
+    actual.add_cols(5);
+    for row in gb_sparse_row_echelon::<_, false>(&R, matrix.clone_matrix(&R), 3) {
         actual.add_row(actual.row_count(), row.into_iter());
     }
     assert_is_correct_row_echelon(R, &matrix, &actual);

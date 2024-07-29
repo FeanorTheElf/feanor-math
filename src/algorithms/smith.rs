@@ -170,7 +170,15 @@ use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
 #[cfg(test)]
+use crate::algorithms::eea::signed_gcd;
+#[cfg(test)]
+use crate::delegate::DelegateRing;
+#[cfg(test)]
 use crate::assert_matrix_eq;
+#[cfg(test)]
+use crate::rings::zn::ZnRing;
+#[cfg(test)]
+use crate::homomorphism::Homomorphism;
 
 #[cfg(test)]
 fn multiply<'a, R: RingStore, V: AsPointerToSlice<El<R>>, I: IntoIterator<Item = Submatrix<'a, V, El<R>>>>(matrices: I, ring: R) -> OwnedMatrix<El<R>>
@@ -238,6 +246,21 @@ fn test_smith_zn() {
         [0, 0, 0, 0]], &A);
         
     assert_matrix_eq!(&ring, &multiply([L.data(), original_A.data(), R.data()], ring), &A);
+}
+
+#[test]
+fn test_smith_direct_elim_matrix_fails() {
+    let ring = zn_static::Zn::<12>::RING;
+    let mut matrix = [0, 6];
+    let mut L = OwnedMatrix::<_>::identity(2, 2, ring);
+    let mut R = OwnedMatrix::<_>::identity(1, 1, ring);
+    pre_smith(ring, &mut TransformRows(L.data_mut(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), SubmatrixMut::<AsFirstElement<_>, _>::new(&mut matrix, 2, 1), |l, r| {
+        assert!(ring.is_zero(l));
+        assert!(ring.eq_el(r, &ring.int_hom().map(6)));
+        (ring.zero(), ring.int_hom().map(3), ring.clone_el(r))
+    });
+    assert!(zn_static::Zn::<12>::RING.is_unit(&ring.sub(ring.mul_ref(L.at(0, 0), L.at(1, 1)), ring.mul_ref(L.at(1, 0), L.at(0, 1)))));
+    assert!(zn_static::Zn::<12>::RING.is_unit(R.at(0, 0)));
 }
 
 #[test]

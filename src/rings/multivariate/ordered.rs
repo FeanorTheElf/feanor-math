@@ -526,7 +526,8 @@ pub struct MultivariatePolyRingBaseTermsIter<'a, R, O, const N: usize>
         O: MonomialOrder
 {
     base_iter: std::slice::Iter<'a, (El<R>, Monomial<[MonomialExponent; N]>)>,
-    order: PhantomData<O>
+    slice: &'a [(El<R>, Monomial<[MonomialExponent; N]>)],
+    order: O
 }
 
 impl<'a, R, O, const N: usize> Iterator for MultivariatePolyRingBaseTermsIter<'a, R, O, N>
@@ -538,6 +539,41 @@ impl<'a, R, O, const N: usize> Iterator for MultivariatePolyRingBaseTermsIter<'a
     fn next(&mut self) -> Option<Self::Item> {
         let (c, m) = self.base_iter.next()?;
         return Some((c, m));
+    }
+}
+
+impl<'a, R, O, const N: usize> TermsIterator<'a, R::Type, [MonomialExponent; N]> for MultivariatePolyRingBaseTermsIter<'a, R, O, N>
+    where R: RingStore,
+        R::Type: 'a,
+        O: MonomialOrder
+{
+    fn max_lt<O2: MonomialOrder>(self, lt_than: &Monomial<[MonomialExponent; N]>, order: O2) -> Option<Self::Item>
+        where Self: Sized
+    {
+        if order.is_same(self.order.clone()) {
+            match self.slice.binary_search_by(|(_, mon)| self.order.compare(mon, lt_than)) {
+                Ok(0) => None,
+                Ok(i) => Some((&self.slice[i - 1].0, &self.slice[i - 1].1)),
+                Err(0) => None,
+                Err(i) => Some((&self.slice[i - 1].0, &self.slice[i - 1].1))
+            }
+        } else {
+            self.filter(|(_, mon)| order.compare(mon, lt_than) == Ordering::Less).max_by(|(_, l), (_, r)| order.compare(l, r))
+        }
+    }
+    
+    fn max_leq<O2: MonomialOrder>(self, leq_than: &Monomial<[MonomialExponent; N]>, order: O2) -> Option<Self::Item>
+        where Self: Sized
+    {
+        if order.is_same(self.order.clone()) {
+            match self.slice.binary_search_by(|(_, mon)| self.order.compare(mon, leq_than)) {
+                Ok(i) => Some((&self.slice[i].0, &self.slice[i].1)),
+                Err(0) => None,
+                Err(i) => Some((&self.slice[i - 1].0, &self.slice[i - 1].1))
+            }
+        } else {
+            self.filter(|(_, mon)| order.compare(mon, leq_than) != Ordering::Greater).max_by(|(_, l), (_, r)| order.compare(l, r))
+        }
     }
 }
 
@@ -553,10 +589,12 @@ impl<R, O, const N: usize, A> MultivariatePolyRing for MultivariatePolyRingImplB
     fn terms<'a>(&'a self, f: &'a Self::Element) -> Self::TermsIterator<'a> {
         MultivariatePolyRingBaseTermsIter {
             base_iter: (&f.data).into_iter(),
-            order: PhantomData
+            slice: &f.data,
+            order: self.order.clone()
         }
     }
 
+    #[inline(always)]
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, m: &Monomial<Self::MonomialVector>) -> &'a El<Self::BaseRing> {
         match f.data.binary_search_by(|x| self.order.compare(&x.1, m)) {
             Ok(i) => &f.data.at(i).0,
@@ -590,13 +628,18 @@ impl<R, O, const N: usize, A> MultivariatePolyRing for MultivariatePolyRingImplB
     fn lm<'a, O2>(&'a self, f: &'a Self::Element, order: O2) -> Option<&'a Monomial<Self::MonomialVector>>
         where O2: MonomialOrder
     {
-        if f.data.len() == 0 {
-            return None;
-        } else if self.order.is_same(order.clone()) {
-            return Some(&f.data.at(f.data.len() - 1).1);
+        self.lt(f, order).map(|(_, m)| m)
+    }
+
+    fn lt<'a, O2>(&'a self, f: &'a Self::Element, order: O2) -> Option<(&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)>
+        where O2: MonomialOrder
+    {
+        let i = if self.order.is_same(order.clone()) {
+            f.data.len().checked_sub(1)?
         } else {
-            return Some(&f.data.iter().max_by(|(_, ml), (_, mr)| order.compare(ml, mr)).unwrap().1);
-        }
+            f.data.iter().enumerate().max_by(|(_, (_, ml)), (_, (_, mr))| order.compare(ml, mr))?.0
+        };
+        return Some((&f.data.at(i).0, &f.data.at(i).1));
     }
 
     fn create_monomial<I: ExactSizeIterator<Item = MonomialExponent>>(&self, mut exponents: I) -> Monomial<Self::MonomialVector> {
@@ -799,4 +842,62 @@ fn test_div() {
     assert_el_eq!(&ring, &ring.indeterminate(0), &ring.checked_div(&ring.pow(ring.indeterminate(0), 2), &ring.indeterminate(0)).unwrap());
     assert!(&ring.checked_div(&ring.pow(ring.indeterminate(0), 2), &ring.inclusion().mul_map(ring.indeterminate(0), 2)).is_none());
     crate::divisibility::generic_tests::test_divisibility_axioms(&ring, edge_case_elements(&ring));
+}
+
+#[test]
+fn test_term_iter_max_lt() {
+    let ring: MultivariatePolyRingImpl<_, _, 3> = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, Lex);
+
+    let f = ring.from_terms([
+        (1, Monomial::new([0, 0, 1])),
+        (2, Monomial::new([0, 1, 0])),
+        (3, Monomial::new([0, 1, 1])),
+        (4, Monomial::new([1, 0, 0])),
+        (5, Monomial::new([1, 0, 1])),
+        (6, Monomial::new([2, 1, 0]))
+    ].into_iter());
+
+    assert!(ring.terms(&f).max_lt(&Monomial::new([0, 0, 1]), Lex).is_none());
+    assert_eq!(1, *ring.terms(&f).max_lt(&Monomial::new([0, 1, 0]), Lex).unwrap().0);
+    assert_eq!(3, *ring.terms(&f).max_lt(&Monomial::new([0, 1, 2]), Lex).unwrap().0);
+    assert_eq!(3, *ring.terms(&f).max_lt(&Monomial::new([0, 2, 0]), Lex).unwrap().0);
+    assert_eq!(3, *ring.terms(&f).max_lt(&Monomial::new([1, 0, 0]), Lex).unwrap().0);
+    assert_eq!(5, *ring.terms(&f).max_lt(&Monomial::new([2, 1, 0]), Lex).unwrap().0);
+    assert_eq!(5, *ring.terms(&f).max_lt(&Monomial::new([2, 0, 0]), Lex).unwrap().0);
+    assert_eq!(6, *ring.terms(&f).max_lt(&Monomial::new([2, 2, 2]), Lex).unwrap().0);
+
+    assert_eq!(2, *ring.terms(&f).max_leq(&Monomial::new([0, 1, 0]), Lex).unwrap().0);
+    assert_eq!(3, *ring.terms(&f).max_leq(&Monomial::new([0, 1, 2]), Lex).unwrap().0);
+    assert_eq!(3, *ring.terms(&f).max_leq(&Monomial::new([0, 2, 0]), Lex).unwrap().0);
+    assert_eq!(4, *ring.terms(&f).max_leq(&Monomial::new([1, 0, 0]), Lex).unwrap().0);
+    assert_eq!(5, *ring.terms(&f).max_leq(&Monomial::new([2, 0, 0]), Lex).unwrap().0);
+    assert_eq!(6, *ring.terms(&f).max_leq(&Monomial::new([2, 1, 0]), Lex).unwrap().0);
+    assert_eq!(6, *ring.terms(&f).max_leq(&Monomial::new([4, 1, 0]), Lex).unwrap().0);
+
+    // degrevlex ordering:
+    // [0, 0, 1]
+    // [0, 1, 0]
+    // [1, 0, 0]
+    // [0, 1, 1]
+    // [1, 0, 1]
+    // [2, 1, 0]
+
+    assert!(ring.terms(&f).max_lt(&Monomial::new([0, 0, 1]), DegRevLex).is_none());
+    assert_eq!(1, *ring.terms(&f).max_lt(&Monomial::new([0, 1, 0]), DegRevLex).unwrap().0);
+    assert_eq!(5, *ring.terms(&f).max_lt(&Monomial::new([0, 1, 2]), DegRevLex).unwrap().0);
+    assert_eq!(5, *ring.terms(&f).max_lt(&Monomial::new([0, 2, 0]), DegRevLex).unwrap().0);
+    assert_eq!(2, *ring.terms(&f).max_lt(&Monomial::new([1, 0, 0]), DegRevLex).unwrap().0);
+    assert_eq!(5, *ring.terms(&f).max_lt(&Monomial::new([2, 1, 0]), DegRevLex).unwrap().0);
+    assert_eq!(5, *ring.terms(&f).max_lt(&Monomial::new([2, 0, 0]), DegRevLex).unwrap().0);
+    assert_eq!(6, *ring.terms(&f).max_lt(&Monomial::new([0, 0, 4]), DegRevLex).unwrap().0);
+    assert_eq!(6, *ring.terms(&f).max_lt(&Monomial::new([2, 2, 2]), DegRevLex).unwrap().0);
+    
+    assert_eq!(2, *ring.terms(&f).max_leq(&Monomial::new([0, 1, 0]), DegRevLex).unwrap().0);
+    assert_eq!(5, *ring.terms(&f).max_leq(&Monomial::new([0, 1, 2]), DegRevLex).unwrap().0);
+    assert_eq!(5, *ring.terms(&f).max_leq(&Monomial::new([0, 2, 0]), DegRevLex).unwrap().0);
+    assert_eq!(4, *ring.terms(&f).max_leq(&Monomial::new([1, 0, 0]), DegRevLex).unwrap().0);
+    assert_eq!(6, *ring.terms(&f).max_leq(&Monomial::new([2, 1, 0]), DegRevLex).unwrap().0);
+    assert_eq!(5, *ring.terms(&f).max_leq(&Monomial::new([2, 0, 0]), DegRevLex).unwrap().0);
+    assert_eq!(6, *ring.terms(&f).max_leq(&Monomial::new([0, 0, 4]), DegRevLex).unwrap().0);
+    assert_eq!(6, *ring.terms(&f).max_leq(&Monomial::new([2, 2, 2]), DegRevLex).unwrap().0);
 }

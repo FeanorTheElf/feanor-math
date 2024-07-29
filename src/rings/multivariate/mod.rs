@@ -12,6 +12,7 @@ use crate::seq::*;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::seq::{VectorView, VectorViewMut};
+use crate::wrapper::RingElementWrapper;
 
 ///
 /// Contains [`ordered::MultivariatePolyRingImpl`], an implementation
@@ -20,6 +21,22 @@ use crate::seq::{VectorView, VectorViewMut};
 pub mod ordered;
 
 type MonomialExponent = u16;
+
+pub trait TermsIterator<'a, R, V>: Iterator<Item = (&'a R::Element, &'a Monomial<V>)>
+    where R: 'a + ?Sized + RingBase, V: 'a + VectorViewMut<MonomialExponent>, R::Element: 'a
+{
+    fn max_lt<O: MonomialOrder>(self, lt_than: &Monomial<V>, order: O) -> Option<Self::Item>
+        where Self: Sized
+    {
+        self.filter(|(_, mon)| order.compare(mon, lt_than) == Ordering::Less).max_by(|(_, l), (_, r)| order.compare(l, r))
+    }
+
+    fn max_leq<O: MonomialOrder>(self, leq_than: &Monomial<V>, order: O) -> Option<Self::Item>
+        where Self: Sized
+    {
+        self.filter(|(_, mon)| order.compare(mon, leq_than) != Ordering::Greater).max_by(|(_, l), (_, r)| order.compare(l, r))
+    }
+}
 
 ///
 /// Trait for rings that are multivariate polynomial rings in finitely many indeterminates
@@ -32,7 +49,7 @@ pub trait MultivariatePolyRing: RingExtension {
 
     type MonomialVector: VectorViewMut<MonomialExponent>;
 
-    type TermsIterator<'a>: Iterator<Item = (&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)>
+    type TermsIterator<'a>: TermsIterator<'a, <Self::BaseRing as RingStore>::Type, Self::MonomialVector>
         where Self: 'a;
 
     ///
@@ -369,6 +386,16 @@ pub trait MultivariatePolyRingStore: RingStore
     /// 
     fn clone_monomial(&self, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector> {
         self.get_ring().create_monomial((0..m.len()).map(|i| m[i]))
+    }
+    
+    #[stability::unstable(feature = "enable")]
+    fn with_wrapped_indeterminates<'a, F, T, const N: usize>(&'a self, f: F) -> Vec<El<Self>>
+        where F: FnOnce([&RingElementWrapper<&'a Self>; N]) -> T,
+            T: IntoIterator<Item = RingElementWrapper<&'a Self>>
+    {
+        assert_eq!(self.indeterminate_len(), N);
+        let wrapped_indets: [_; N] = std::array::from_fn(|i| RingElementWrapper::new(self, self.indeterminate(i)));
+        f(std::array::from_fn(|i| &wrapped_indets[i])).into_iter().map(|f| f.unwrap()).collect()
     }
 }
 
