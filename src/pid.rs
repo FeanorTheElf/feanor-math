@@ -44,7 +44,7 @@ pub trait PrincipalIdealRing: DivisibilityRing {
         let gcd = self.ideal_gen(lhs, rhs);
         let fst = self.checked_left_div(lhs, &gcd).unwrap();
         let snd = self.checked_left_div(rhs, &gcd).unwrap();
-        assert!(self.is_unit(&self.ideal_gen(&fst, &snd)));
+        assert!(self.is_unit(&self.ideal_gen(&fst, &snd)), "Default implementation for cancel_common_factors() failed for {} and {}; See [`PrincipalIdealRing::cancel_common_factors()`] for an explanation of this error", RingRef::new(self).format(lhs), RingRef::new(self).format(rhs));
         return (fst, snd, gcd);
     }
 

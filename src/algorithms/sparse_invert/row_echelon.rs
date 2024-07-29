@@ -453,6 +453,11 @@ mod global {
             || (InternalRow::placeholder(), InternalRow::placeholder(), InternalRow::placeholder()), 
             |(new_row, add_transform_row, tmp), row_index, (matrix_row, transform_row)|
         {
+            // early exit, improves performance but not necessary for functionality
+            if matrix_row.is_empty() {
+                return;
+            }
+
             let mut additional_transform = preimage_echelon_form_matrix(ring, pivot_matrix, matrix_row.at(0), std::mem::replace(add_transform_row, InternalRow::placeholder()));
             
             if !additional_transform.is_empty() {
@@ -472,6 +477,7 @@ mod global {
             }
             std::mem::swap(add_transform_row, &mut additional_transform);
 
+            // it is actually irrelevant which index ends up in `unreduced_row_index`, so it is fine to use `load()` and `store()` instead of `compare_exchange()`
             if nonzero_j < usize::MAX && unreduced_row_index[nonzero_j].load(std::sync::atomic::Ordering::SeqCst) == usize::MAX {
                 unreduced_row_index[nonzero_j].store(row_index, std::sync::atomic::Ordering::SeqCst);
             }

@@ -107,27 +107,34 @@ impl<R> SparseMatrix<R>
             debug_assert!(self.col_permutation[inverted_permutation[i]] == i);
         }
         let global_cols = (self.col_count - 1) / n + 1;
-        let mut result = (0..(global_cols * (row_count + n))).map(|_| InternalRow::placeholder()).collect::<Vec<_>>();
+        let mut result = (0..(row_count + n)).map(|_| (0..global_cols).map(|_| InternalRow::placeholder()).collect::<Vec<_>>()).collect::<Vec<_>>();
         for (i, row) in self.rows.into_iter().enumerate() {
             for (j, c) in row.into_iter() {
                 if !ring.is_zero(&c) {
                     let col = inverted_permutation[j];
-                    result[i * global_cols + col / n].data.push((col % n, c));
+                    result[i][col / n].data.push((col % n, c));
                 }
             }
             for j in 0..global_cols {
-                result[i * global_cols + j].data.sort_by_key(|(j, _)| *j);
-                result[i * global_cols + j].data.push((usize::MAX, ring.zero()));
-                result[i * global_cols + j].check(&RingRef::new(ring));
+                result[i][j].data.sort_by_key(|(j, _)| *j);
+                result[i][j].data.push((usize::MAX, ring.zero()));
+                result[i][j].check(&RingRef::new(ring));
             }
         }
         for i in row_count..(row_count + n) {
             for j in 0..global_cols {
-                result[i * global_cols + j].make_zero(&RingRef::new(ring));
-                result[i * global_cols + j].check(&RingRef::new(ring));
+                result[i][j].make_zero(&RingRef::new(ring));
+                result[i][j].check(&RingRef::new(ring));
             }
         }
-        return result;
+        // result.sort_unstable_by_key(|row|
+        //     row.iter().enumerate().filter_map(|(j, part_row)| if !part_row.is_empty() {
+        //         Some(-((part_row.leading_entry().0 + j * n) as i64))
+        //     } else {
+        //         None
+        //     }).next().unwrap_or(i64::MAX)
+        // );
+        return result.into_iter().flat_map(|row| row.into_iter()).collect();
     }
 
     #[stability::unstable(feature = "enable")]
