@@ -55,6 +55,7 @@ dependencies = [
  "oorandom",
  "rayon",
  "stability",
+ "xselfref",
 ]
 
 [[package]]
@@ -214,3 +215,9 @@ name = "unicode-ident"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
+
+[[package]]
+name = "xselfref"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c3863b8dec76e20a51d66c24893d65c2ee248cb9df51d6e8e80f4626ecef018"

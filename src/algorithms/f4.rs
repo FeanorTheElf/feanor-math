@@ -564,8 +564,10 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
         };
 
     let update_degree_bound = |degree_bound: &mut (u16, usize), _filtered_out_degree: bool, _filtered_out_valuation: bool| {
-        degree_bound.0 = min(degree_bound.0 + 5, S_poly_degree_bound);
-        degree_bound.1 += 1;
+        degree_bound.0 = min(degree_bound.0 + 1, S_poly_degree_bound);
+        if ring_info.annihilating_power.is_some() && degree_bound.0 % 5 == 0 {
+            degree_bound.1 += 1;
+        }
     };
 
     let mut chain_criterion_reduced_pairs = Vec::new();

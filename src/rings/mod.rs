@@ -79,3 +79,5 @@ pub mod mpir;
 pub mod fieldextension;
 
 pub mod local;
+
+pub mod multivariate_new;
