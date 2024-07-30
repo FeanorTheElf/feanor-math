@@ -27,6 +27,8 @@ stability = "0.2.0"
 rayon = { version = "1.8.0", optional = true }
 ndarray = { version = "0.15.6", optional = true }
 xselfref = "0.1.0"
+append-only-vec = "0.1.5"
+thread_local = "1.1.8"
 
 [dev-dependencies]
 feanor-mempool = "2.1.0"

@@ -11,10 +11,14 @@ use super::*;
 use crate::integer::{IntegerRing, IntegerRingStore};
 
 #[stability::unstable(feature = "enable")]
-pub struct MonomialIdentifier {
-    deg: u16,
-    ordered_identifier: u32,
-    unordered_identifier: u16
+pub enum MonomialIdentifier {
+    Permanent { 
+        deg: u16,
+        index: usize
+    },
+    Temporary {
+        deg: u16
+    }
 }
 
 struct MonomialKey<'ring, 'outer, R, O>
@@ -22,7 +26,7 @@ struct MonomialKey<'ring, 'outer, R, O>
         O: 'outer + MonomialOrder
 {
     monomial_ref: MonomialIdentifier,
-    ring: MultivariatePolyRingImpl<'outer, R, O, &'ring Holder<'outer, MultivariatePolyRingKey<'outer, R, O>>>
+    ring: MultivariatePolyRingImpl<'outer, R, O, &'ring MultivariatePolyRingCore<'ring, 'outer, R, O>>
 }
 
 impl<'outer, 'ring, R, O> PartialOrd for MonomialKey<'ring, 'outer, R, O>
@@ -95,19 +99,24 @@ opaque!{
 }
 
 #[stability::unstable(feature = "enable")]
-pub struct MultivariatePolyRingImpl<'outer, R, O, InternalPtr = Box<Holder<'outer, MultivariatePolyRingKey<'outer, R, O>>>>
-    where InternalPtr:Deref<Target = Holder<'outer, MultivariatePolyRingKey<'outer, R, O>>>,
-        R: 'outer + RingStore,
+pub trait MultivariatePolyRingCoreContainer<'outer, R, O>
+    where R: 'outer + RingStore,
         O: 'outer + MonomialOrder
 {
-    ring_ptr: Pin<InternalPtr>
+    fn with_core<F, T>(&self, f: F) -> T
+        where F: for<'b> FnOnce(&'b MultivariatePolyRingCore<'b, 'outer, R, O>) -> T;
+
+    fn get_core_data<'b>(&'b self) -> &'b MultivariatePolyRingCoreData<R, O>;
 }
 
-impl<'outer, R, O, InternalPtr> MultivariatePolyRingImpl<'outer, R, O, InternalPtr>
-    where InternalPtr:Deref<Target = Holder<'outer, MultivariatePolyRingKey<'outer, R, O>>>,
-        R: 'outer + RingStore,
+impl<'outer, R, O> MultivariatePolyRingCoreContainer<'outer, R, O> for Pin<Box<Holder<'outer, MultivariatePolyRingKey<'outer, R, O>>>>
+    where R: 'outer + RingStore,
         O: 'outer + MonomialOrder
 {
+    fn get_core_data<'b>(&'b self) -> &'b MultivariatePolyRingCoreData<R, O> {
+        self.as_ref().deref_part()
+    }
+
     fn with_core<F, T>(&self, f: F) -> T
         where F: for<'b> FnOnce(&'b MultivariatePolyRingCore<'b, 'outer, R, O>) -> T
     {
@@ -120,28 +129,59 @@ impl<'outer, R, O, InternalPtr> MultivariatePolyRingImpl<'outer, R, O, InternalP
             let converted_ring_ref: &Pin<&'b MultivariatePolyRingCore<'b, 'outer, R, O>> = ring_ref;
             f(converted_ring_ref.get_ref())
         }
-        self.ring_ptr.as_ref().operate_in(|ring| call_f(f, ring))
-    }
-
-    fn order<'b>(&'b self) -> &'b O {
-        self.ring_ptr.as_ref().deref_part().order()
+        self.as_ref().operate_in(|ring| call_f(f, ring))
     }
 }
 
-impl<'outer, R, O, InternalPtr> PartialEq for MultivariatePolyRingImpl<'outer, R, O, InternalPtr>
-    where InternalPtr:Deref<Target = Holder<'outer, MultivariatePolyRingKey<'outer, R, O>>>,
+impl<'ring, 'outer, R, O> MultivariatePolyRingCoreContainer<'outer, R, O> for &'ring MultivariatePolyRingCore<'ring, 'outer, R, O>
+    where R: 'outer + RingStore,
+        O: 'outer + MonomialOrder
+{
+    fn get_core_data<'b>(&'b self) -> &'b MultivariatePolyRingCoreData<R, O> {
+        &self.main_data
+    }
+
+    fn with_core<F, T>(&self, f: F) -> T
+        where F: for<'b> FnOnce(&'b MultivariatePolyRingCore<'b, 'outer, R, O>) -> T
+    {
+        f(self)
+    }
+}
+
+#[stability::unstable(feature = "enable")]
+pub struct MultivariatePolyRingImpl<'outer, R, O, Internal = Pin<Box<Holder<'outer, MultivariatePolyRingKey<'outer, R, O>>>>>
+    where Internal: MultivariatePolyRingCoreContainer<'outer, R, O>,
+        R: 'outer + RingStore,
+        O: 'outer + MonomialOrder
+{
+    core_container: Internal,
+    core: PhantomData<MultivariatePolyRingCore<'outer, 'outer, R, O>>
+}
+
+impl<'outer, R, O, Internal> MultivariatePolyRingImpl<'outer, R, O, Internal>
+    where Internal: MultivariatePolyRingCoreContainer<'outer, R, O>,
+        R: 'outer + RingStore,
+        O: 'outer + MonomialOrder
+{
+    fn order<'b>(&'b self) -> &'b O {
+        self.core_container.get_core_data().order()
+    }
+}
+
+impl<'outer, R, O, Internal> PartialEq for MultivariatePolyRingImpl<'outer, R, O, Internal>
+    where Internal: MultivariatePolyRingCoreContainer<'outer, R, O>,
         R: 'outer + RingStore,
         O: 'outer + MonomialOrder
 {
     fn eq(&self, other: &Self) -> bool {
-        self.with_core(|self_ring| other.with_core(|other_ring|
+        self.core_container.with_core(|self_ring| other.core_container.with_core(|other_ring|
             self_ring.main_data == other_ring.main_data
         ))
     }
 }
 
-impl<'outer, R, O, InternalPtr> RingBase for MultivariatePolyRingImpl<'outer, R, O, InternalPtr>
-    where InternalPtr:Deref<Target = Holder<'outer, MultivariatePolyRingKey<'outer, R, O>>>,
+impl<'outer, R, O, Internal> RingBase for MultivariatePolyRingImpl<'outer, R, O, Internal>
+    where Internal: MultivariatePolyRingCoreContainer<'outer, R, O>,
         R: 'outer + RingStore,
         O: 'outer + MonomialOrder
 {
@@ -234,15 +274,15 @@ impl<'a, R, O> Iterator for TermIterImpl<'a, R, O>
     }
 }
 
-impl<'outer, R, O, InternalPtr> RingExtension for MultivariatePolyRingImpl<'outer, R, O, InternalPtr>
-    where InternalPtr:Deref<Target = Holder<'outer, MultivariatePolyRingKey<'outer, R, O>>>,
+impl<'outer, R, O, Internal> RingExtension for MultivariatePolyRingImpl<'outer, R, O, Internal>
+    where Internal: MultivariatePolyRingCoreContainer<'outer, R, O>,
         R: 'outer + RingStore,
         O: 'outer + MonomialOrder
 {
     type BaseRing = R;
 
     fn base_ring<'b>(&'b self) -> &'b Self::BaseRing {
-        self.ring_ptr.as_ref().deref_part().base_ring()
+        self.core_container.get_core_data().base_ring()
     }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
@@ -250,8 +290,8 @@ impl<'outer, R, O, InternalPtr> RingExtension for MultivariatePolyRingImpl<'oute
     }
 }
 
-impl<'outer, R, O, InternalPtr> MultivariatePolyRing for MultivariatePolyRingImpl<'outer, R, O, InternalPtr>
-    where InternalPtr:Deref<Target = Holder<'outer, MultivariatePolyRingKey<'outer, R, O>>>,
+impl<'outer, R, O, Internal> MultivariatePolyRing for MultivariatePolyRingImpl<'outer, R, O, Internal>
+    where Internal: MultivariatePolyRingCoreContainer<'outer, R, O>,
         R: 'outer + RingStore,
         O: 'outer + MonomialOrder
 {
@@ -260,14 +300,49 @@ impl<'outer, R, O, InternalPtr> MultivariatePolyRing for MultivariatePolyRingImp
         where Self: 'a;
         
     fn variable_count(&self) -> usize {
-        self.ring_ptr.as_ref().deref_part().variable_count()
+        self.core_container.get_core_data().variable_count()
     }
 
     fn create_monomial<I>(&self, exponents: I) -> Self::Monomial
         where I: ExactSizeIterator<Item = usize>
     {
         assert_eq!(exponents.len(), self.variable_count());
-        unimplemented!()
+
+        fn compute_inner<'outer, 'ring, R, O, I>(exponents: I, ring_ptr: &'ring MultivariatePolyRingCore<'ring, 'outer, R, O>) -> MonomialIdentifier
+            where R: 'outer + RingStore,
+                O: 'outer + MonomialOrder,
+                I: ExactSizeIterator<Item = usize>
+        {
+            let tmp_monomial = ring_ptr.main_data.tmp_monomial();
+            let mut deg = 0;
+            for (i, e) in exponents.enumerate() {
+                deg += e as u16;
+                tmp_monomial[i].set(e as u16);
+            }
+            {
+                let monomial_table = ring_ptr.monomial_table.borrow();
+                let entry = monomial_table.get(&MonomialKey {
+                    ring: MultivariatePolyRingImpl { core_container: ring_ptr, core: PhantomData },
+                    monomial_ref: MonomialIdentifier::Temporary { deg: deg }
+                });
+                // do we have the monomial already allocated?
+                if let Some(idx) = entry {
+                    return MonomialIdentifier::Permanent { deg: deg, index: *idx };
+                }
+            }
+            {
+                let mut monomial_table = ring_ptr.monomial_table.borrow_mut();
+                // if not, allocate it!
+                let idx = ring_ptr.main_data.create_monomial(tmp_monomial.iter().map(|e| e.get()));
+                monomial_table.insert(MonomialKey {
+                    ring: MultivariatePolyRingImpl { core_container: ring_ptr, core: PhantomData },
+                    monomial_ref: MonomialIdentifier::Permanent { deg: deg, index: idx  }
+                }, idx);
+                return MonomialIdentifier::Permanent { deg: deg, index: idx };
+            }
+        }
+
+        self.core_container.with_core(|ring_ptr| compute_inner(exponents, ring_ptr))
     }
 
     fn create_term(&self, coeff: El<Self::BaseRing>, monomial: Self::Monomial) -> Self::Element {

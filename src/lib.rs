@@ -12,6 +12,7 @@
 #![feature(iter_advance_by)]
 #![feature(unboxed_closures)]
 #![feature(ptr_alignment_type)]
+#![feature(never_type)]
 
 #![doc = include_str!("../Readme.md")]
 
