@@ -112,9 +112,12 @@ impl<T> InternalRow<T> {
     }
 }
 
-pub fn add_row_local<R, const LHS_FACTOR_ONE: bool>(ring: R, lhs: &InternalRow<El<R>>, rhs: &InternalRow<El<R>>, lhs_factor: &El<R>, rhs_factor: &El<R>, mut out: InternalRow<El<R>>) -> InternalRow<El<R>>
+#[inline(never)]
+pub fn add_row_local<R, const LHS_FACTOR_ONE: bool, const RHS_FACTOR_ONE: bool>(ring: R, lhs: &InternalRow<El<R>>, rhs: &InternalRow<El<R>>, lhs_factor: &El<R>, rhs_factor: &El<R>, mut out: InternalRow<El<R>>) -> InternalRow<El<R>>
     where R: RingStore
 {
+    assert!(!LHS_FACTOR_ONE || ring.is_one(lhs_factor));
+    assert!(!RHS_FACTOR_ONE || ring.is_one(rhs_factor));
     lhs.check(&ring);
     rhs.check(&ring);
     let mut lhs_idx = 0;
@@ -139,15 +142,20 @@ pub fn add_row_local<R, const LHS_FACTOR_ONE: bool>(ring: R, lhs: &InternalRow<E
                 lhs_idx += 1;
             },
             Ordering::Greater => {
-                let rhs_val = ring.mul_ref(&rhs.data[rhs_idx].1, rhs_factor);
-                if !ring.is_zero(&rhs_val) {
+                let rhs_val = if RHS_FACTOR_ONE {
+                    ring.clone_el(&rhs.data[rhs_idx].1)
+                } else {
+                    ring.mul_ref(&rhs.data[rhs_idx].1, rhs_factor)
+                };
+                if RHS_FACTOR_ONE || !ring.is_zero(&rhs_val) {
                     out.data.push((rhs_j, rhs_val));
                 }
                 rhs_idx += 1;
             },
             Ordering::Equal => {
                 let lhs_val = if LHS_FACTOR_ONE { ring.clone_el(&lhs.data[lhs_idx].1) } else { ring.mul_ref(&lhs.data[lhs_idx].1, lhs_factor) };
-                let value = ring.add(lhs_val, ring.mul_ref(&rhs.data[rhs_idx].1, rhs_factor));
+                let rhs_val = if RHS_FACTOR_ONE { ring.clone_el(&rhs.data[rhs_idx].1) } else { ring.mul_ref(&rhs.data[rhs_idx].1, rhs_factor) };
+                let value = ring.add(lhs_val, rhs_val);
                 if !ring.is_zero(&value) {
                     out.data.push((lhs_j, value));
                 }
@@ -186,7 +194,7 @@ pub fn linear_combine_rows<'a, R, V>(ring: R, coeffs: &InternalRow<El<R>>, rows:
 
     let lhs_factor = ring.one();
     for (idx, c) in coeffs.data[1..(coeffs.data.len() - 1)].iter() {
-        *tmp = add_row_local::<_, true>(ring, &out, rows.at(*idx), &lhs_factor, c, std::mem::replace(tmp, InternalRow::placeholder()));
+        *tmp = add_row_local::<_, true, false>(ring, &out, rows.at(*idx), &lhs_factor, c, std::mem::replace(tmp, InternalRow::placeholder()));
         std::mem::swap(&mut out, tmp);
     }
     out.check(&ring);
@@ -200,7 +208,7 @@ fn add_assign_mul<R, V>(ring: R, elim_coefficients: &InternalRow<El<R>>, pivot_r
     elim_coefficients.check(&ring);
     row.check(&ring);
     out = linear_combine_rows(ring, &elim_coefficients, pivot_rows, out, tmp);
-    *tmp = add_row_local::<_, true>(ring, row, &out, &ring.one(), &ring.one(), std::mem::replace(tmp, InternalRow::placeholder()));
+    *tmp = add_row_local::<_, true, true>(ring, row, &out, &ring.one(), &ring.one(), std::mem::replace(tmp, InternalRow::placeholder()));
     std::mem::swap(tmp, &mut out);
     out.check(&ring);
     return out;
@@ -312,8 +320,8 @@ fn transform_2x2<R>(ring: R, transform: &[El<R>; 4], rows: [&mut InternalRow<El<
     where R: RingStore + Copy
 {
     let [lhs, rhs] = rows;
-    let lhs_new = add_row_local::<R, false>(ring, lhs, rhs, &transform[0], &transform[1], std::mem::replace(&mut tmp[0], InternalRow::placeholder()));
-    let rhs_new = add_row_local::<R, false>(ring, lhs, rhs, &transform[2], &transform[3], std::mem::replace(&mut tmp[1], InternalRow::placeholder()));
+    let lhs_new = add_row_local::<R, false, false>(ring, lhs, rhs, &transform[0], &transform[1], std::mem::replace(&mut tmp[0], InternalRow::placeholder()));
+    let rhs_new = add_row_local::<R, false, false>(ring, lhs, rhs, &transform[2], &transform[3], std::mem::replace(&mut tmp[1], InternalRow::placeholder()));
 
     tmp[0] = std::mem::replace(lhs, lhs_new);
     tmp[1] = std::mem::replace(rhs, rhs_new);
@@ -380,7 +388,7 @@ mod local {
                 if let Some(quo) = ring.checked_div(factor, &pivot_entry) {
                     let rhs_factor = ring.negate(quo);
 
-                    let new = add_row_local::<_, true>(ring, &matrix.at(elim_i), &matrix.at(pivot_i), &lhs_factor, &rhs_factor, std::mem::replace(tmp, InternalRow::placeholder()));
+                    let new = add_row_local::<_, true, false>(ring, &matrix.at(elim_i), &matrix.at(pivot_i), &lhs_factor, &rhs_factor, std::mem::replace(tmp, InternalRow::placeholder()));
                     *tmp = std::mem::replace(matrix.at_mut(elim_i), new);
 
                     row_ops.subtract(ring.get_ring(), pivot_i, elim_i, &ring.negate(rhs_factor));
@@ -471,7 +479,7 @@ mod global {
                 std::mem::swap(&mut transform_row[0], &mut additional_transform);
                 transform_row[0].check(&ring);
             } else {
-                *new_row = add_row_local::<_, true>(ring, &additional_transform, transform_row.at(0), &ring.one(), &ring.one(), std::mem::replace(new_row, InternalRow::placeholder()));
+                *new_row = add_row_local::<_, true, true>(ring, &additional_transform, transform_row.at(0), &ring.one(), &ring.one(), std::mem::replace(new_row, InternalRow::placeholder()));
                 std::mem::swap(transform_row.at_mut(0), new_row);
                 transform_row[0].check(&ring);
             }
@@ -530,7 +538,7 @@ mod global {
 
         for col in 0..pivot_rows.col_count() {
             *new_row = linear_combine_rows(ring, &elim_coefficients, pivot_rows.col_at(col), std::mem::replace(new_row, InternalRow::placeholder()), tmp);
-            *tmp = add_row_local::<_, true>(ring, row.at(col), &new_row, &ring.one(), &ring.one(), std::mem::replace(tmp, InternalRow::placeholder()));
+            *tmp = add_row_local::<_, true, true>(ring, row.at(col), &new_row, &ring.one(), &ring.one(), std::mem::replace(tmp, InternalRow::placeholder()));
             std::mem::swap(tmp, row.at_mut(col));
         }
     }

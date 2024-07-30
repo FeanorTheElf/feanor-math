@@ -127,13 +127,14 @@ impl<R> SparseMatrix<R>
                 result[i][j].check(&RingRef::new(ring));
             }
         }
-        // result.sort_unstable_by_key(|row|
-        //     row.iter().enumerate().filter_map(|(j, part_row)| if !part_row.is_empty() {
-        //         Some(-((part_row.leading_entry().0 + j * n) as i64))
-        //     } else {
-        //         None
-        //     }).next().unwrap_or(i64::MAX)
-        // );
+        // sorting might help reduce swaps
+        result.sort_unstable_by_key(|row|
+            row.iter().enumerate().filter_map(|(j, part_row)| if !part_row.is_empty() {
+                Some(part_row.leading_entry().0 + j * n)
+            } else {
+                None
+            }).next().unwrap_or(usize::MAX)
+        );
         return result.into_iter().flat_map(|row| row.into_iter()).collect();
     }
 

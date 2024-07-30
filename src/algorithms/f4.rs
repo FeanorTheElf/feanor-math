@@ -169,6 +169,9 @@ fn reduce_S_matrix<P, O>(ring: P, ring_info: &RingInfo<<<P::Type as RingExtensio
                 }
             }
         }
+        if A.row_count() > 200000 {
+            break;
+        }
     }
 
     let entries = algorithms::sparse_invert::gb_sparse_row_echelon::<_, true>(ring.base_ring(), A, 256);
@@ -603,6 +606,8 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
             }
         });
 
+        S_polys.sort_unstable_by_key(|S_poly| S_poly.expected_lm(&ring, &ring_info, &basis, order).deg());
+
         let mut new_polys: Vec<_> = Vec::new();
         // usually, reduce_S_matrix will consume all S_polys and there will only be one loop execution;
         // however, if there is a danger of not fitting the S matrix into memory, we will split it. Note
@@ -610,7 +615,7 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
         while S_polys.len() > 10 {
             new_polys.extend(reduce_S_matrix(&ring, &ring_info, &mut S_polys, &basis, order));
         }
-        if S_polys.len() > 0 {
+        if S_polys.len() > 0 && new_polys.len() == 0 {
             let start = std::time::Instant::now();
             new_polys.extend(S_polys.into_iter().map(|f| multivariate_division(&ring, f.poly(&ring, &ring_info, &basis, order), basis.iter(), order)).filter(|f| !ring.is_zero(f)));
             let end = std::time::Instant::now();

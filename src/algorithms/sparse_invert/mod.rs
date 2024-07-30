@@ -356,6 +356,7 @@ fn test_pivot_row_transform_update() {
         actual.add_row(actual.row_count(), row.into_iter());
     }
     assert_is_correct_row_echelon(R, &matrix, &actual);
+
 }
 
 #[test]
