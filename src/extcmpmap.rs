@@ -139,3 +139,38 @@ impl<K, V, F> ExtCmpBTreeMap<K, V, F>
         self.perform_map_op_mut(|map| map.insert(Key::from(key), value), cmp)
     }
 }
+
+#[cfg(test)]
+struct FnPtrCompareFnFamily<K> {
+    key: PhantomData<K>
+}
+
+#[cfg(test)]
+impl<K> CompareFnFamily<K> for FnPtrCompareFnFamily<K> {
+
+    type CompareFn<'a> = &'a dyn Fn(&K, &K) -> Ordering
+        where Self: 'a;
+}
+
+#[test]
+fn test_extcmpmap() {
+    fn bitrev_cmp(a: &u64, b: &u64) -> Ordering {
+        a.reverse_bits().cmp(&b.reverse_bits())
+    }
+    let cmp_fn: &dyn Fn(&u64, &u64) -> Ordering = &bitrev_cmp;
+    let mut map: ExtCmpBTreeMap<u64, bool, FnPtrCompareFnFamily<u64>> = ExtCmpBTreeMap::new();
+    map.insert(6, false, cmp_fn);
+    map.insert(3, true, cmp_fn);
+    map.insert(4, false, cmp_fn);
+    map.insert(1, true, cmp_fn);
+    map.insert(2, false, cmp_fn);
+    map.insert(5, true, cmp_fn);
+    assert_eq!(Some(&true), map.get(&1, cmp_fn));
+    assert_eq!(Some(&false), map.get(&2, cmp_fn));
+    assert_eq!(Some(&true), map.get(&3, cmp_fn));
+    assert_eq!(Some(&false), map.get(&4, cmp_fn));
+    assert_eq!(Some(&true), map.get(&5, cmp_fn));
+    assert_eq!(Some(&false), map.get(&6, cmp_fn));
+    assert_eq!(None, map.get(&0, cmp_fn));
+    assert_eq!(None, map.get(&7, cmp_fn));
+}

@@ -80,4 +80,4 @@ pub mod fieldextension;
 
 pub mod local;
 
-mod multivariate_new;
+pub(crate) mod multivariate_new;

@@ -7,8 +7,23 @@ use crate::ring::*;
 #[stability::unstable(feature = "enable")]
 pub trait PrincipalLocalRing: EuclideanRing {
 
+    ///
+    /// Returns a generator `p` or the unique maximal ideal `(p)` of this ring.
+    /// 
+    /// In other words, for each element `x` we have either that `p | x` or `x | 1`. 
+    /// 
     fn max_ideal_gen(&self) -> &Self::Element;
 
+    ///
+    /// Returns the smallest nonnegative integer `e` such that `p^e = 0` where `p` is 
+    /// the generator of the maximal ideal.
+    /// 
+    fn nilpotent_power(&self) -> Option<usize>;
+
+    ///
+    /// Returns the largest nonnegative integer `e` such that `p^e | x` where `p` is 
+    /// the generator of the maximal ideal.
+    /// 
     fn valuation(&self, x: &Self::Element) -> Option<usize> {
         assert!(self.is_noetherian());
         if self.is_zero(x) {
@@ -31,6 +46,7 @@ pub trait PrincipalLocalRingStore: EuclideanRingStore
 {
     delegate!{ PrincipalLocalRing, fn max_ideal_gen(&self) -> &El<Self> }
     delegate!{ PrincipalLocalRing, fn valuation(&self, x: &El<Self>) -> Option<usize> }
+    delegate!{ PrincipalLocalRing, fn nilpotent_power(&self) -> Option<usize> }
 }
 
 impl<R> PrincipalLocalRingStore for R

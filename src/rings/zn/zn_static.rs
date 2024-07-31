@@ -238,6 +238,10 @@ impl<const N: u64> PrincipalLocalRing for ZnBase<N, true> {
     fn max_ideal_gen(&self) ->  &Self::Element {
         &0
     }
+
+    fn nilpotent_power(&self) -> Option<usize> {
+        Some(0)
+    }
 }
 
 impl<const N: u64, const IS_FIELD: bool> RingValue<ZnBase<N, IS_FIELD>> {

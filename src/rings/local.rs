@@ -18,7 +18,8 @@ pub struct AsLocalPIRBase<R: DivisibilityRingStore>
     where R::Type: DivisibilityRing
 {
     base: R,
-    max_ideal_gen: LocalPIREl<R>
+    max_ideal_gen: LocalPIREl<R>,
+    nilpotent_power: Option<usize>
 }
 
 impl<R> Clone for AsLocalPIRBase<R>
@@ -28,7 +29,8 @@ impl<R> Clone for AsLocalPIRBase<R>
     fn clone(&self) -> Self {
         Self {
             base: self.base.clone(),
-            max_ideal_gen: self.clone_el(&self.max_ideal_gen)
+            max_ideal_gen: self.clone_el(&self.max_ideal_gen),
+            nilpotent_power: self.nilpotent_power
         }
     }
 }
@@ -78,9 +80,9 @@ impl<R> AsLocalPIR<R>
 {
     #[stability::unstable(feature = "enable")]
     pub fn from_zn(ring: R) -> Option<Self> {
-        let (p, _) = is_prime_power(ring.integer_ring(), ring.modulus())?;
+        let (p, e) = is_prime_power(ring.integer_ring(), ring.modulus())?;
         let gen = ring.can_hom(ring.integer_ring()).unwrap().map(p);
-        Some(Self::from(AsLocalPIRBase::promise_is_local_pir(ring, gen)))
+        Some(Self::from(AsLocalPIRBase::promise_is_local_pir(ring, gen, Some(e))))
     }
 }
 
@@ -91,7 +93,8 @@ impl<R> AsLocalPIR<R>
     #[stability::unstable(feature = "enable")]
     pub fn from_localpir(ring: R) -> Self {
         let max_ideal_gen = ring.clone_el(ring.max_ideal_gen());
-        Self::from(AsLocalPIRBase::promise_is_local_pir(ring, max_ideal_gen))
+        let nilpotent_power = ring.nilpotent_power();
+        Self::from(AsLocalPIRBase::promise_is_local_pir(ring, max_ideal_gen, nilpotent_power))
     }
 }
 
@@ -99,9 +102,9 @@ impl<R: DivisibilityRingStore> AsLocalPIRBase<R>
     where R::Type: DivisibilityRing
 {
     #[stability::unstable(feature = "enable")]
-    pub fn promise_is_local_pir(base: R, max_ideal_gen: El<R>) -> Self {
+    pub fn promise_is_local_pir(base: R, max_ideal_gen: El<R>, nilpotent_power: Option<usize>) -> Self {
         let max_ideal_gen = LocalPIREl(max_ideal_gen);
-        Self { base, max_ideal_gen }
+        Self { base, max_ideal_gen, nilpotent_power }
     }
 
     #[stability::unstable(feature = "enable")]
@@ -225,6 +228,10 @@ impl<R: DivisibilityRingStore> PrincipalLocalRing for AsLocalPIRBase<R>
 {
     fn max_ideal_gen(&self) ->  &Self::Element {
         &self.max_ideal_gen
+    }
+
+    fn nilpotent_power(&self) -> Option<usize> {
+        self.nilpotent_power
     }
 }
 
