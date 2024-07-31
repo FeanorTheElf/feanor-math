@@ -1,6 +1,7 @@
 use crate::algorithms::int_factor::is_prime_power;
 use crate::delegate::DelegateRing;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
+use crate::field::Field;
 use crate::local::{PrincipalLocalRing, PrincipalLocalRingStore};
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::integer::IntegerRing;
@@ -83,6 +84,17 @@ impl<R> AsLocalPIR<R>
         let (p, e) = is_prime_power(ring.integer_ring(), ring.modulus())?;
         let gen = ring.can_hom(ring.integer_ring()).unwrap().map(p);
         Some(Self::from(AsLocalPIRBase::promise_is_local_pir(ring, gen, Some(e))))
+    }
+}
+
+impl<R> AsLocalPIR<R> 
+    where R: RingStore, 
+        R::Type: Field
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn from_field(ring: R) -> Self {
+        let zero = ring.zero();
+        Self::from(AsLocalPIRBase::promise_is_local_pir(ring, zero, Some(0)))
     }
 }
 

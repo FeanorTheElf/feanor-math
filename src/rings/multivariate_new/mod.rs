@@ -1,7 +1,6 @@
 use crate::extcmpmap::CompareFnFamily;
 use crate::ring::*;
 use crate::wrapper::RingElementWrapper;
-use crate::homomorphism::*;
 
 pub mod multivariate_impl;
 
@@ -345,6 +344,7 @@ pub mod generic_impls {
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
     use super::*;
+    use crate::homomorphism::*;
 
     #[stability::unstable(feature = "enable")]
     pub fn test_poly_ring_axioms<P: RingStore, I: Iterator<Item = PolyCoeff<P>>>(ring: P, interesting_base_ring_elements: I)

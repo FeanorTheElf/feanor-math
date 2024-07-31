@@ -30,7 +30,7 @@ use crate::ring::*;
 /// let QQ = RationalField::new(ZZ);
 /// // due to a suboptimal interface of `RationalField`, it currently doesn't implement `PrincipalLocalRing`;
 /// // Thus we must use a wrapper
-/// let QQ = AsLocalPIR::from(AsLocalPIRBase::promise_is_local_pir(QQ, QQ.zero()));
+/// let QQ = AsLocalPIR::from_field(QQ);
 /// let hom = QQ.can_hom(&ZZ).unwrap();
 /// let (row_idxs, col_idxs) = algorithms::gauss::largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::new(&mut [vec![hom.map(0), hom.map(1)], vec![hom.map(0), hom.map(0)]]), QQ);
 /// let rank = row_idxs.len();

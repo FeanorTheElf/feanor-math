@@ -1,30 +1,34 @@
 use std::cell::{Cell, RefCell};
+use std::num::NonZeroU32;
 
 use append_only_vec::AppendOnlyVec;
 use thread_local::ThreadLocal;
 
+use crate::algorithms::int_bisect;
 use crate::extcmpmap::ExtCmpBTreeMap;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::multivariate_new::*;
 use crate::integer::{IntegerRing, IntegerRingStore};
-use crate::seq::{VectorView, VectorViewMut};
+use crate::seq::{VectorFn, VectorView, VectorViewMut};
 
 type Exponent = u16;
-type OrderIdx = u32;
+type OrderIdx = u64;
+type Index = NonZeroU32;
 
 thread_local!{
-    static BINOMIAL_COEFF_LOOKUP_TABLE: RefCell<Vec<Vec<i64>>> = RefCell::new(Vec::new());
-    static CUM_BINOMIAL_COEFF_LOOKUP_TABLE: RefCell<Vec<Vec<u32>>> = RefCell::new(Vec::new());
+    static BINOMIAL_COEFF_LOOKUP_TABLE: RefCell<Vec<Vec<u64>>> = RefCell::new(Vec::new());
+    static CUM_BINOMIAL_COEFF_LOOKUP_TABLE: RefCell<Vec<Vec<u64>>> = RefCell::new(Vec::new());
 }
 
-fn binomial(n: usize, k: usize) -> i64 {
+fn compute_binomial(n: i64, k: i64) -> i128 {
+    assert!(k <= n);
+    let n = n as i128;
+    let k = k as i128;
+    StaticRing::<i128>::RING.prod((n - k + 1)..(n + 1)) / StaticRing::<i128>::RING.prod(1..(k + 1))
+}
 
-    fn compute_binomial(n: i64, k: i64) -> i64 {
-        assert!(k <= n);
-        StaticRing::<i64>::RING.prod((n - k + 1)..(n + 1)) / StaticRing::<i64>::RING.prod(1..(k + 1))
-    }
-
+fn binomial(n: usize, k: usize) -> u64 {
     assert!(k <= n);
     BINOMIAL_COEFF_LOOKUP_TABLE.with_borrow_mut(|table| {
         if table.len() <= n {
@@ -32,7 +36,7 @@ fn binomial(n: usize, k: usize) -> i64 {
         }
         let table_for_n = &mut table[n];
         while table_for_n.len() <= k {
-            table_for_n.push(compute_binomial(n as i64, table_for_n.len() as i64));
+            table_for_n.push(u64::try_from(compute_binomial(n as i64, table_for_n.len() as i64)).unwrap());
         }
         return table_for_n[k];
     })
@@ -41,14 +45,14 @@ fn binomial(n: usize, k: usize) -> i64 {
 ///
 /// Computes `sum_(0 <= l <= k) binomial(n + l, n)`
 /// 
-fn cum_binomial(n: usize, k: i64) -> u32 {
+fn cum_binomial(n: usize, k: i64) -> u64 {
 
     if k < 0 {
         return 0;
     }
 
-    fn compute_cum_binomial(n: usize, k: usize) -> i64 {
-        StaticRing::<i64>::RING.sum((0..(k + 1)).map(|l| binomial(n + l, n)))
+    fn compute_cum_binomial(n: usize, k: usize) -> u64 {
+        StaticRing::<i64>::RING.sum((0..(k + 1)).map(|l| binomial(n + l, n) as i64)) as u64
     }
 
     CUM_BINOMIAL_COEFF_LOOKUP_TABLE.with_borrow_mut(|table| {
@@ -57,7 +61,7 @@ fn cum_binomial(n: usize, k: i64) -> u32 {
         }
         let table_for_n = &mut table[n];
         while table_for_n.len() <= k as usize {
-            table_for_n.push(u32::try_from(compute_cum_binomial(n, table_for_n.len())).unwrap());
+            table_for_n.push(compute_cum_binomial(n, table_for_n.len()));
         }
         return table_for_n[k as usize];
     })
@@ -66,13 +70,15 @@ fn cum_binomial(n: usize, k: i64) -> u32 {
 ///
 /// Returns the index of the given monomial within the list of all degree-d monomials, ordered by DegRevLex
 /// 
-fn enumeration_index_degrevlex(d: Exponent, mon: &[Exponent]) -> OrderIdx {
-    debug_assert!(d == mon.iter().copied().sum());
+fn enumeration_index_degrevlex<V>(d: Exponent, mon: V) -> u64
+    where V: VectorFn<Exponent>
+{
+    debug_assert!(d == mon.iter().sum());
     let n = mon.len();
     let mut remaining_degree: i64 = d as i64 - 1;
     let mut result = 0;
     for i in 0..(n - 1) {
-        remaining_degree -= mon[n - 1 - i] as i64;
+        remaining_degree -= mon.at(n - 1 - i) as i64;
         result += cum_binomial(n - i - 2, remaining_degree);
     }
     return result;
@@ -80,14 +86,10 @@ fn enumeration_index_degrevlex(d: Exponent, mon: &[Exponent]) -> OrderIdx {
 
 #[stability::unstable(feature = "enable")]
 #[derive(Clone)]
-pub enum MonomialIdentifier {
-    Permanent { 
-        deg: Exponent,
-        index: usize
-    },
-    Temporary {
-        deg: Exponent
-    }
+pub struct MonomialIdentifier {
+    deg: Exponent,
+    order: OrderIdx,
+    index: Option<Index>
 }
 
 #[stability::unstable(feature = "enable")]
@@ -97,6 +99,39 @@ pub struct MultivariatePolyRingEl<R>
     data: Vec<(El<R>, MonomialIdentifier)>
 }
 
+struct CompareMonomialDegRevLexFamily<R: RingStore> {
+    base_ring: PhantomData<R>
+}
+
+impl<R: RingStore> CompareFnFamily<MonomialIdentifier> for CompareMonomialDegRevLexFamily<R> {
+    type CompareFn<'a> = CompareMonomialDegRevLex<'a, R>
+        where Self: 'a;
+}
+
+struct CompareMonomialDegRevLex<'a, R: RingStore> {
+    poly_ring: &'a MultivariatePolyRingImplBase<R>
+}
+
+impl<'a, 'b, R: RingStore> FnOnce<(&'b MonomialIdentifier, &'b MonomialIdentifier)> for CompareMonomialDegRevLex<'a, R> {
+    type Output = Ordering;
+
+    extern "rust-call" fn call_once(self, args: (&'b MonomialIdentifier, &'b MonomialIdentifier)) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, 'b, R: RingStore> FnMut<(&'b MonomialIdentifier, &'b MonomialIdentifier)> for CompareMonomialDegRevLex<'a, R> {
+    extern "rust-call" fn call_mut(&mut self, args: (&'b MonomialIdentifier, &'b MonomialIdentifier)) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, 'b, R: RingStore> Fn<(&'b MonomialIdentifier, &'b MonomialIdentifier)> for CompareMonomialDegRevLex<'a, R> {
+    extern "rust-call" fn call(&self, args: (&'b MonomialIdentifier, &'b MonomialIdentifier)) -> Self::Output {
+        self.poly_ring.compare_degrevlex(args.0, args.1)
+    }
+}
+
 #[stability::unstable(feature = "enable")]
 pub struct MultivariatePolyRingImplBase<R>
     where R: RingStore
@@ -104,9 +139,14 @@ pub struct MultivariatePolyRingImplBase<R>
     base_ring: R,
     variable_count: usize,
     allocated_monomials: AppendOnlyVec<Box<[Exponent]>>,
+    // for each thread, the values of the temporary monomial; these may change and are usually set shortly before
+    // searching monomial_table; after the search, either the existing index is retrieved, or a new monomial allocated,
+    // thus the temporary monomial is not required anymore
     tmp_monomials: ThreadLocal<Box<[Cell<Exponent>]>>,
-    monomial_table: RefCell<ExtCmpBTreeMap<MonomialIdentifier, usize, CompareMonomialFamily<Self, DegRevLex>>>,
-    zero: El<R>
+    // maps monomials to the corresponding indics; usually access with a temporary monomial (one without index)
+    monomial_table: RefCell<ExtCmpBTreeMap<MonomialIdentifier, Index, CompareMonomialDegRevLexFamily<R>>>,
+    zero: El<R>,
+    max_degree_for_orderidx: usize
 }
 
 pub type MultivariatePolyRingImpl<R> = RingValue<MultivariatePolyRingImplBase<R>>;
@@ -116,13 +156,23 @@ impl<R> MultivariatePolyRingImpl<R>
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(base_ring: R, variable_count: usize) -> Self {
+        assert!(variable_count >= 1);
+        let max_degree_for_orderidx = if variable_count == 1 || variable_count == 2 {
+            usize::MAX
+        } else {
+            int_bisect::find_root_floor(StaticRing::<i64>::RING, 0, |d| if compute_binomial(d + variable_count as i64 - 1, variable_count as i64 - 1) < u64::MAX as i128 { -1 } else { 1 }) as usize
+        };
+        let allocated_monomials = AppendOnlyVec::new();
+        // add dummy element so that the index is nonzero
+        allocated_monomials.push(Vec::new().into_boxed_slice());
         Self::from(MultivariatePolyRingImplBase {
             zero: base_ring.zero(),
             base_ring: base_ring,
             variable_count: variable_count,
-            allocated_monomials: AppendOnlyVec::new(),
+            allocated_monomials: allocated_monomials,
             tmp_monomials: ThreadLocal::new(),
             monomial_table: RefCell::new(ExtCmpBTreeMap::new()),
+            max_degree_for_orderidx: max_degree_for_orderidx
         })
     }
 }
@@ -134,16 +184,19 @@ impl<R> MultivariatePolyRingImplBase<R>
         self.tmp_monomials.get_or(|| (0..self.variable_count).map(|_| Cell::new(0)).collect::<Vec<_>>().into_boxed_slice())
     }
 
+    fn compare_degrevlex(&self, lhs: &MonomialIdentifier, rhs: &MonomialIdentifier) -> Ordering {
+        let res = lhs.deg.cmp(&rhs.deg).then_with(|| lhs.order.cmp(&rhs.order));
+        debug_assert!(res == DegRevLex.compare(RingRef::new(self), lhs, rhs));
+        return res;
+    }
+
     fn is_valid(&self, el: &[(El<R>, MonomialIdentifier)]) -> bool {
         for (_, m) in el {
-            if let MonomialIdentifier::Permanent { deg, index } = m {
-                assert_eq!(*deg, self.allocated_monomials[*index].iter().copied().sum::<Exponent>());
-            } else {
-                assert!(false);
-            }
+            assert!(m.index.is_some());
+            assert_eq!(m.deg, self.allocated_monomials[u32::from(m.index.unwrap()) as usize].iter().copied().sum::<Exponent>());
         }
         for i in 1..el.len() {
-            if DegRevLex.compare(RingRef::new(self), &el[i - 1].1, &el[i].1) != Ordering::Less {
+            if self.compare_degrevlex(&el[i - 1].1, &el[i].1) != Ordering::Less {
                 return false;
             }
         }
@@ -160,7 +213,7 @@ impl<R> MultivariatePolyRingImplBase<R>
         for j in 0..el.len() {
             if !self.base_ring.is_zero(&el[j].0) {
                 if i != j {
-                    let tmp = std::mem::replace(el.at_mut(j), (self.base_ring.zero(), MonomialIdentifier::Temporary { deg: 0 }));
+                    let tmp = std::mem::replace(el.at_mut(j), (self.base_ring.zero(), MonomialIdentifier { deg: 0, order: 0, index: None }));
                     *el.at_mut(i) = tmp;
                 }
                 i += 1;
@@ -187,14 +240,14 @@ impl<R> MultivariatePolyRingImplBase<R>
         let mut i_l = 0;
 
         if let Some((c_r, m_r)) = rhs_sorted.next() {
-            while i_l < lhs.data.len() && DegRevLex.compare(RingRef::new(self), &lhs.data.at(i_l).1, &m_r) != Ordering::Greater {
+            while i_l < lhs.data.len() && self.compare_degrevlex(&lhs.data.at(i_l).1, &m_r) != Ordering::Greater {
                 result.push((self.base_ring.clone_el(&lhs.data.at(i_l).0), lhs.data.at(i_l).1.clone()));
                 i_l += 1;
             }
             if result.len() == 0 {
                 result.push((c_r, m_r));
             } else {
-                match DegRevLex.compare(RingRef::new(self), &result.last().unwrap().1, &m_r) {
+                match self.compare_degrevlex(&result.last().unwrap().1, &m_r) {
                     Ordering::Equal => {
                         self.base_ring.add_assign_ref(&mut result.last_mut().unwrap().0, &c_r);
                     },
@@ -206,11 +259,11 @@ impl<R> MultivariatePolyRingImplBase<R>
             }
         }
         while let Some((c_r, m_r)) = rhs_sorted.next() {
-            while i_l < lhs.data.len() && DegRevLex.compare(RingRef::new(self), &lhs.data.at(i_l).1, &m_r) != Ordering::Greater {
+            while i_l < lhs.data.len() && self.compare_degrevlex(&lhs.data.at(i_l).1, &m_r) != Ordering::Greater {
                 result.push((self.base_ring.clone_el(&lhs.data.at(i_l).0), lhs.data.at(i_l).1.clone()));
                 i_l += 1;
             }
-            match DegRevLex.compare(RingRef::new(self), &result.last().unwrap().1, &m_r) {
+            match self.compare_degrevlex(&result.last().unwrap().1, &m_r) {
                 Ordering::Equal => {
                     self.base_ring.add_assign_ref(&mut result.last_mut().unwrap().0, &c_r);
                 },
@@ -230,8 +283,8 @@ impl<R> MultivariatePolyRingImplBase<R>
         };
     }
 
-    fn compare_monomial<'a>(&'a self) -> CompareMonomial<RingRef<'a, Self>, DegRevLex> {
-        CompareMonomial { poly_ring: RingRef::new(self), order: DegRevLex.clone() }
+    fn compare_monomial<'a>(&'a self) -> CompareMonomialDegRevLex<'a, R> {
+        CompareMonomialDegRevLex { poly_ring: self }
     }
 }
 
@@ -327,11 +380,8 @@ impl<R> RingBase for MultivariatePolyRingImplBase<R>
             return false;
         }
         for i in 0..lhs.data.len() {
-            match (&lhs.data.at(i).1, &rhs.data.at(i).1) {
-                (MonomialIdentifier::Permanent { deg: _, index: lhs_i }, MonomialIdentifier::Permanent { deg: _, index: rhs_i }) => if lhs_i != rhs_i || !self.base_ring.eq_el(&lhs.data.at(i).0, &rhs.data.at(i).0) {
-                    return false;
-                },
-                _ => unreachable!()
+            if lhs.data.at(i).1.index != rhs.data.at(i).1.index || !self.base_ring.eq_el(&lhs.data.at(i).0, &rhs.data.at(i).0) {
+                return false;
             }
         }
         return true;
@@ -346,11 +396,7 @@ impl<R> RingBase for MultivariatePolyRingImplBase<R>
         if value.data.len() != 1 {
             return false;
         }
-        if let MonomialIdentifier::Permanent { deg, index: _ } = &value.data[0].1 {
-            return *deg == 0 && self.base_ring().is_one(&value.data[0].0)
-        } else {
-            unreachable!()
-        }
+        value.data[0].1.deg == 0 && self.base_ring().is_one(&value.data[0].0)
     }
 
     fn is_neg_one(&self, value: &Self::Element) -> bool {
@@ -358,11 +404,7 @@ impl<R> RingBase for MultivariatePolyRingImplBase<R>
         if value.data.len() != 1 {
             return false;
         }
-        if let MonomialIdentifier::Permanent { deg, index: _ } = &value.data[0].1 {
-            return *deg == 0 && self.base_ring().is_neg_one(&value.data[0].0)
-        } else {
-            unreachable!()
-        }
+        value.data[0].1.deg == 0 && self.base_ring().is_neg_one(&value.data[0].0)
     }
 
     fn is_commutative(&self) -> bool { self.base_ring().is_commutative() }
@@ -444,20 +486,25 @@ impl<R> MultivariatePolyRing for MultivariatePolyRingImplBase<R>
             deg += e as Exponent;
             tmp_monomial[i].set(e as Exponent);
         }
+        if deg as usize > self.max_degree_for_orderidx {
+            unimplemented!("Currently we only support degrees such that the number of monomials of this degree fits into a u64");
+        }
+        let order_idx = enumeration_index_degrevlex(deg, tmp_monomial.as_fn().map_fn(|e| e.get()));
         {
             let monomial_table = self.monomial_table.borrow();
-            let entry = monomial_table.get(&MonomialIdentifier::Temporary { deg: deg }, self.compare_monomial());
+            let entry = monomial_table.get(&MonomialIdentifier { deg: deg, order: order_idx, index: None }, self.compare_monomial());
             // do we have the monomial already allocated?
             if let Some(idx) = entry {
-                return MonomialIdentifier::Permanent { deg: deg, index: *idx };
+                return MonomialIdentifier { deg: deg, index: Some(*idx), order: order_idx };
             }
         }
         {
             let mut monomial_table = self.monomial_table.borrow_mut();
             // if not, allocate it!
             let idx = self.allocated_monomials.push(tmp_monomial.iter().map(|e| e.get()).collect::<Vec<_>>().into_boxed_slice());
-            monomial_table.insert(MonomialIdentifier::Permanent { deg: deg, index: idx  }, idx, self.compare_monomial());
-            return MonomialIdentifier::Permanent { deg: deg, index: idx };
+            let idx = NonZeroU32::new(u32::try_from(idx).unwrap()).unwrap();
+            monomial_table.insert(MonomialIdentifier { deg: deg, index: Some(idx), order: order_idx }, idx, self.compare_monomial());
+            return MonomialIdentifier { deg: deg, index: Some(idx), order: order_idx };
         }
     }
 
@@ -469,7 +516,7 @@ impl<R> MultivariatePolyRing for MultivariatePolyRingImplBase<R>
         where I: IntoIterator<Item = (El<Self::BaseRing>, Self::Monomial)>
     {
         let mut rhs = rhs.into_iter().collect::<Vec<_>>();
-        rhs.sort_unstable_by(|l, r| DegRevLex.compare(RingRef::new(self), &l.1, &r.1));
+        rhs.sort_unstable_by(|l, r| self.compare_degrevlex(&l.1, &r.1));
         *lhs = self.add_terms(&lhs, rhs.into_iter(), Vec::new());
     }
 
@@ -480,7 +527,7 @@ impl<R> MultivariatePolyRing for MultivariatePolyRingImplBase<R>
     }
 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, m: &Self::Monomial) -> &'a El<Self::BaseRing> {
-        match f.data.binary_search_by(|(_, fm)| DegRevLex.compare(RingRef::new(self), fm, m)) {
+        match f.data.binary_search_by(|(_, fm)| self.compare_degrevlex(fm, m)) {
             Ok(i) => &f.data.at(i).0,
             Err(_) => &self.zero
         }
@@ -488,9 +535,9 @@ impl<R> MultivariatePolyRing for MultivariatePolyRingImplBase<R>
 
     #[inline(always)]
     fn exponent_at(&self, m: &Self::Monomial, var_index: usize) -> usize {
-        match m {
-            MonomialIdentifier::Temporary { deg: _ } => self.tmp_monomial()[var_index].get() as usize,
-            MonomialIdentifier::Permanent { deg: _, index } => self.allocated_monomials[*index][var_index] as usize
+        match m.index {
+            None => self.tmp_monomial()[var_index].get() as usize,
+            Some(index) => self.allocated_monomials[u32::from(index) as usize][var_index] as usize
         }
     }
 
@@ -501,10 +548,7 @@ impl<R> MultivariatePolyRing for MultivariatePolyRingImplBase<R>
     }
 
     fn monomial_deg(&self, mon: &Self::Monomial) -> usize {
-        match mon {
-            MonomialIdentifier::Permanent { deg, index: _ } => *deg as usize,
-            MonomialIdentifier::Temporary { deg } => *deg as usize
-        }
+        mon.deg as usize
     }
 
     fn LT<'a, O: MonomialOrder>(&'a self, f: &'a Self::Element, order: O) -> Option<(&'a El<Self::BaseRing>, &'a Self::Monomial)> {
@@ -517,7 +561,7 @@ impl<R> MultivariatePolyRing for MultivariatePolyRingImplBase<R>
 
     fn largest_term_lt<'a, O: MonomialOrder>(&'a self, f: &'a Self::Element, order: O, lt_than: &Self::Monomial) -> Option<(&'a El<Self::BaseRing>, &'a Self::Monomial)> {
         if order.is_same(&DegRevLex) {
-            match f.data.binary_search_by(|(_, mon)| DegRevLex.compare(RingRef::new(self), mon, lt_than)) {
+            match f.data.binary_search_by(|(_, mon)| self.compare_degrevlex(mon, lt_than)) {
                 Ok(0) => None,
                 Ok(i) => Some((&f.data[i - 1].0, &f.data[i - 1].1)),
                 Err(0) => None,
@@ -535,6 +579,8 @@ use crate::rings::zn::zn_static;
 use crate::rings::zn::zn_static::F17;
 #[cfg(test)]
 use crate::iters::multiset_combinations;
+#[cfg(test)]
+use crate::homomorphism::*;
 
 #[cfg(test)]
 fn ring_and_elements() -> (MultivariatePolyRingImpl<zn_static::Fp<17>>, Vec<MultivariatePolyRingEl<zn_static::Fp<17>>>) {
@@ -590,6 +636,11 @@ fn test_enumeration_index_degrevlex() {
     all_monomials.sort_unstable_by(|l, r| degrevlex_cmp(l, r));
 
     for i in 0..all_monomials.len() {
-        assert_eq!(i as u32, enumeration_index_degrevlex(6, &all_monomials[i][..]));
+        assert_eq!(i as u64, enumeration_index_degrevlex(6, (&all_monomials[i]).into_fn(|x| *x)));
     }
+}
+
+#[test]
+fn test_monomial_small() {
+    assert_eq!(16, std::mem::size_of::<MonomialIdentifier>());
 }

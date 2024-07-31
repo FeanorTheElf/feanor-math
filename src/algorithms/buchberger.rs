@@ -261,7 +261,7 @@ pub fn buchberger<P, O, const LOG: bool>(ring: P, basis: Vec<El<P>>, order: O) -
             let spoly = open.pop().unwrap();
             let mut f = spoly.poly(ring, &basis, order.clone());
             
-            while let Some((reducer, quo_c, quo_m)) = find_reducer(ring, &f, basis.iter(), order.clone()) {
+            while let Some((reducer, quo_c, quo_m)) = find_reducer(ring, &f, reducers.iter(), order.clone()) {
                 ring.get_ring().add_assign_from_terms(&mut f, ring.terms(reducer).map(|(c, m)| (ring.base_ring().negate(ring.base_ring().mul_ref(c, &quo_c)), ring.monomial_mul(ring.clone_monomial(m), &quo_m))));
             }
             if !ring.is_zero(&f) {
@@ -273,6 +273,9 @@ pub fn buchberger<P, O, const LOG: bool>(ring: P, basis: Vec<El<P>>, order: O) -
                 reducers.push(f);
                 sort_reducers(&mut reducers);
             } else {
+                if EXTENSIVE_LOG {
+                    println!("reduced to zero");
+                }
                 if !EXTENSIVE_LOG && LOG {
                     print!(".");
                     std::io::stdout().flush().unwrap();
@@ -282,7 +285,8 @@ pub fn buchberger<P, O, const LOG: bool>(ring: P, basis: Vec<El<P>>, order: O) -
 
         if new_polys.len() == 0 && open.len() == 0 {
             // as opposed to my initial belief, `basis` does not have to be a GB here
-            return reducers;
+            return reduce(ring, reducers, order);
+
         } else if new_polys.len() == 0 {
             current_deg = ring.monomial_deg(&open.last().unwrap().lcm_term(ring, &basis, order.clone()).1);
             if !EXTENSIVE_LOG && LOG {
@@ -305,13 +309,24 @@ pub fn buchberger<P, O, const LOG: bool>(ring: P, basis: Vec<El<P>>, order: O) -
             }
             sort_open(&mut open, &basis);
             if !EXTENSIVE_LOG && LOG {
+                print!("b({})S({})", basis.len(), open.len());
+                std::io::stdout().flush().unwrap();
+            }
+            reducers = reduce(ring, reducers, order);
+            sort_reducers(&mut reducers);
+            if !EXTENSIVE_LOG && LOG {
+                print!("r({})", reducers.len());
+                std::io::stdout().flush().unwrap();
+            }
+        }
+
+        // less S-polys if we restart from scratch with reducers
+        if open.len() > reducers.len() * reducers.len() / 2 + reducers.len() * nilpotent_power.unwrap_or(0) + 1 {
+            if !EXTENSIVE_LOG && LOG {
                 print!("!");
                 std::io::stdout().flush().unwrap();
             }
-            if !EXTENSIVE_LOG && LOG {
-                print!("b({})r({})S({})", basis.len(), reducers.len(), open.len());
-                std::io::stdout().flush().unwrap();
-            }
+            return buchberger::<P, O, LOG>(ring, reducers, order);
         }
     }
 }
@@ -328,20 +343,25 @@ pub fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
     let mut changed = true;
     while changed {
         changed = false;
-        for i in 0..polys.len() {
+        let mut i = 0;
+        while i < polys.len() {
             let last_i = polys.len() - 1;
             polys.swap(i, last_i);
             let (reducers, f) = polys.split_at_mut(last_i);
-            if let Some((reducer, quo_c, quo_m)) = find_reducer(ring, &f[0], reducers.iter(), order.clone()) {
+
+            while let Some((reducer, quo_c, quo_m)) = find_reducer(ring, &f[0], reducers.iter(), order.clone()) {
                 changed = true;
                 ring.get_ring().add_assign_from_terms(&mut f[0], ring.terms(reducer).map(|(c, m)| (ring.base_ring().negate(ring.base_ring().mul_ref(c, &quo_c)), ring.monomial_mul(ring.clone_monomial(m), &quo_m))));
                 if ring.is_zero(&f[0]) {
                     polys.truncate(last_i);
+                    break;
                 }
-                break;
-            } else {
-                // undo swap so that the outer loop still iterates over every poly
+            }
+
+            // undo swap so that the outer loop still iterates over every poly
+            if polys.len() > last_i {
                 polys.swap(i, last_i);
+                i += 1;
             }
         }
     }
