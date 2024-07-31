@@ -23,4 +23,3 @@ pub mod resultant;
 pub mod interpolate;
 pub mod poly_det;
 pub mod gauss;
-pub mod buchberger;
