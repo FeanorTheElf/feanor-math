@@ -80,4 +80,4 @@ pub mod fieldextension;
 
 pub mod local;
 
-pub mod multivariate_new;
+mod multivariate_new;

@@ -1,3 +1,4 @@
+use crate::extcmpmap::CompareFnFamily;
 use crate::ring::*;
 use crate::wrapper::RingElementWrapper;
 use crate::homomorphism::*;
@@ -6,6 +7,7 @@ pub mod multivariate_impl;
 
 use std::any::Any;
 use std::cmp::{max, Ordering};
+use std::marker::PhantomData;
 
 pub type PolyCoeff<P> = El<<<P as RingStore>::Type as RingExtension>::BaseRing>;
 pub type PolyMonomial<P> = <<P as RingStore>::Type as MultivariatePolyRing>::Monomial;
@@ -29,13 +31,23 @@ pub trait MultivariatePolyRing: RingExtension {
     fn create_monomial<I>(&self, exponents: I) -> Self::Monomial
         where I: ExactSizeIterator<Item = usize>;
 
-    fn create_term(&self, coeff: El<Self::BaseRing>, monomial: Self::Monomial) -> Self::Element;
+    fn mul_assign_monomial(&self, f: &mut Self::Element, monomial: Self::Monomial);
 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, m: &Self::Monomial) -> &'a El<Self::BaseRing>;
 
     fn exponent_at(&self, m: &Self::Monomial, var_index: usize) -> usize;
 
     fn terms<'a>(&'a self, f: &'a Self::Element) -> Self::TermIter<'a>;
+
+    fn create_term(&self, coeff: El<Self::BaseRing>, monomial: Self::Monomial) -> Self::Element {
+        let mut result = self.from(coeff);
+        self.mul_assign_monomial(&mut result, monomial);
+        return result;
+    }
+
+    fn LT<'a, O: MonomialOrder>(&'a self, f: &'a Self::Element, order: O) -> Option<(&'a El<Self::BaseRing>, &'a Self::Monomial)> {
+        self.terms(f).max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1))
+    }
 
     fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
         where I: Iterator<Item = (El<Self::BaseRing>, Self::Monomial)>
@@ -44,6 +56,10 @@ pub trait MultivariatePolyRing: RingExtension {
         self.add_assign(lhs, self_ring.sum(
             rhs.map(|(c, m)| self.create_term(c, m))
         ));
+    }
+
+    fn clone_monomial(&self, mon: &Self::Monomial) -> Self::Monomial {
+        self.create_monomial((0..self.variable_count()).map(|i| self.exponent_at(mon, i)))
     }
 
     fn monomial_mul(&self, lhs: Self::Monomial, rhs: &Self::Monomial) -> Self::Monomial {
@@ -91,7 +107,12 @@ pub trait MultivariatePolyRingStore: RingStore
     delegate!{ MultivariatePolyRing, fn monomial_lcm(&self, lhs: PolyMonomial<Self>, rhs: &PolyMonomial<Self>) -> PolyMonomial<Self> }
     delegate!{ MultivariatePolyRing, fn monomial_div(&self, lhs: PolyMonomial<Self>, rhs: &PolyMonomial<Self>) -> Result<PolyMonomial<Self>, PolyMonomial<Self>> }
     delegate!{ MultivariatePolyRing, fn monomial_deg(&self, val: &PolyMonomial<Self>) -> usize }
+    delegate!{ MultivariatePolyRing, fn mul_assign_monomial(&self, f: &mut El<Self>, monomial: PolyMonomial<Self>) -> () }
     
+    fn LT<'a, O: MonomialOrder>(&'a self, f: &'a El<Self>, order: O) -> Option<(&'a PolyCoeff<Self>, &'a PolyMonomial<Self>)> {
+        self.get_ring().LT(f, order)
+    }
+
     fn create_monomial<I>(&self, exponents: I) -> PolyMonomial<Self>
         where I: ExactSizeIterator<Item = usize>
     {
@@ -99,7 +120,7 @@ pub trait MultivariatePolyRingStore: RingStore
     }
 
     fn clone_monomial(&self, mon: &PolyMonomial<Self>) -> PolyMonomial<Self> {
-        self.create_monomial((0..self.variable_count()).map(|i| self.exponent_at(mon, i)))
+        self.get_ring().clone_monomial(mon)
     }
 
     fn coefficient_at<'a>(&'a self, f: &'a El<Self>, m: &PolyMonomial<Self>) -> &'a PolyCoeff<Self> {
@@ -187,6 +208,63 @@ impl MonomialOrder for DegRevLex {
             }
             return Ordering::Equal;
         }
+    }
+}
+
+pub struct CompareMonomialFamily<P, O>
+    where P: ?Sized + MultivariatePolyRing,
+        O: MonomialOrder
+{
+    poly_ring: PhantomData<P>,
+    order: PhantomData<O>
+}
+
+impl<P, O> CompareFnFamily<P::Monomial> for CompareMonomialFamily<P, O>
+    where P: ?Sized + MultivariatePolyRing,
+        O: MonomialOrder
+{
+    type CompareFn<'a> = CompareMonomial<RingRef<'a, P>, O>
+        where Self: 'a;
+}
+
+#[derive(Copy, Clone)]
+pub struct CompareMonomial<P, O>
+    where P: RingStore + Copy,
+        P::Type: MultivariatePolyRing,
+        O: MonomialOrder
+{
+    pub poly_ring: P,
+    pub order: O
+}
+impl<'a, P, O> FnOnce<(&'a PolyMonomial<P>, &'a PolyMonomial<P>)> for CompareMonomial<P, O>
+    where P: RingStore + Copy,
+        P::Type: MultivariatePolyRing,
+        O: MonomialOrder
+{
+    type Output = Ordering;
+    
+    extern "rust-call" fn call_once(self, args: (&'a PolyMonomial<P>, &'a PolyMonomial<P>)) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, P, O> FnMut<(&'a PolyMonomial<P>, &'a PolyMonomial<P>)> for CompareMonomial<P, O>
+    where P: RingStore + Copy,
+        P::Type: MultivariatePolyRing,
+        O: MonomialOrder
+{
+    extern "rust-call" fn call_mut(&mut self, args: (&'a PolyMonomial<P>, &'a PolyMonomial<P>)) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, P, O> Fn<(&'a PolyMonomial<P>, &'a PolyMonomial<P>)> for CompareMonomial<P, O>
+    where P: RingStore + Copy,
+        P::Type: MultivariatePolyRing,
+        O: MonomialOrder
+{
+    extern "rust-call" fn call(&self, args: (&'a PolyMonomial<P>, &'a PolyMonomial<P>)) -> Self::Output {
+        self.order.compare(self.poly_ring, args.0, args.1)
     }
 }
 
