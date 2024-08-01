@@ -1,5 +1,7 @@
 use std::{cell::RefCell, cmp::Ordering, collections::BTreeMap, marker::PhantomData};
 
+use thread_local::ThreadLocal;
+
 pub trait CompareFnFamily<K> {
     type CompareFn<'a>: for<'b> Fn(&'b K, &'b K) -> Ordering
         where Self: 'a;
@@ -25,9 +27,24 @@ impl<'a, K, F> CmpFunction<'a, K, F>
     }
 }
 
-thread_local!{
-    static ENV: RefCell<Vec<*const ()>> = RefCell::new(Vec::new());
+struct PromiseIsSend<T> {
+    promise_is_send_el: T
 }
+
+impl<T> PromiseIsSend<T> {
+
+    unsafe fn new(value: T) -> Self {
+        PromiseIsSend { promise_is_send_el: value }
+    }
+
+    fn get(&self) -> &T {
+        &self.promise_is_send_el
+    }
+}
+
+unsafe impl<T> Send for PromiseIsSend<T> {}
+
+static ENV: ThreadLocal<RefCell<Vec<PromiseIsSend<*const ()>>>> = ThreadLocal::new();
 
 #[repr(transparent)]
 struct Key<K, F>
@@ -58,11 +75,11 @@ impl<K, F> Ord for Key<K, F>
     where F: CompareFnFamily<K>
 {
     fn cmp(&self, other: &Self) -> Ordering {
-        ENV.with_borrow(|env| {
-            let entry = env.last().unwrap();
-            let cmp_fn = unsafe { &*std::mem::transmute::<*const (), *const CmpFunction<K, F>>(*entry) };
-            (cmp_fn.f)(&self.key, &other.key)
-        })
+        let env = ENV.get_or(|| RefCell::new(Vec::new()));
+        let env = env.borrow();
+        let entry = env.last().unwrap();
+        let cmp_fn = unsafe { &*std::mem::transmute::<*const (), *const CmpFunction<K, F>>(*entry.get()) };
+        (cmp_fn.f)(&self.key, &other.key)
     }
 }
 
@@ -105,14 +122,18 @@ impl<K, V, F> ExtCmpBTreeMap<K, V, F>
         where G: FnOnce(&'a BTreeMap<Key<K, F>, V>) -> T
     {
         let cmp_fn = CmpFunction::from(cmp);
-        ENV.with_borrow_mut(|env| {
-            env.push(&cmp_fn as *const CmpFunction<K, F> as *const ());
-        });
+        {
+            let env = ENV.get_or(|| RefCell::new(Vec::new()));
+            let mut env = env.borrow_mut();
+            env.push(unsafe { PromiseIsSend::new(&cmp_fn as *const CmpFunction<K, F> as *const ()) });
+        }
         let result = f(&self.map);
-        ENV.with_borrow_mut(|env| {
+        {
+            let env = ENV.get_or(|| RefCell::new(Vec::new()));
+            let mut env = env.borrow_mut();
             let popped = env.pop();
-            assert!(std::ptr::eq(popped.unwrap(), &cmp_fn as *const CmpFunction<K, F> as *const ()));
-        });
+            assert!(std::ptr::eq(*popped.unwrap().get(), &cmp_fn as *const CmpFunction<K, F> as *const ()));
+        }
         return result;
     }
 
@@ -120,14 +141,18 @@ impl<K, V, F> ExtCmpBTreeMap<K, V, F>
         where G: FnOnce(&'a mut BTreeMap<Key<K, F>, V>) -> T
     {
         let cmp_fn = CmpFunction::from(cmp);
-        ENV.with_borrow_mut(|env| {
-            env.push(&cmp_fn as *const CmpFunction<K, F> as *const ());
-        });
+        {
+            let env = ENV.get_or(|| RefCell::new(Vec::new()));
+            let mut env = env.borrow_mut();
+            env.push(unsafe { PromiseIsSend::new(&cmp_fn as *const CmpFunction<K, F> as *const ()) });
+        }
         let result = f(&mut self.map);
-        ENV.with_borrow_mut(|env| {
+        {
+            let env = ENV.get_or(|| RefCell::new(Vec::new()));
+            let mut env = env.borrow_mut();
             let popped = env.pop();
-            assert!(std::ptr::eq(popped.unwrap(), &cmp_fn as *const CmpFunction<K, F> as *const ()));
-        });
+            assert!(std::ptr::eq(*popped.unwrap().get(), &cmp_fn as *const CmpFunction<K, F> as *const ()));
+        }
         return result;
     }
 

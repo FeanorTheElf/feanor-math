@@ -24,7 +24,6 @@ extern crate rayon;
 #[cfg(feature = "ndarray")]
 extern crate ndarray;
 
-mod extcmpmap;
 ///
 /// Contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`].
 /// 

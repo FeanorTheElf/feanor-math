@@ -1,4 +1,3 @@
-use crate::extcmpmap::CompareFnFamily;
 use crate::ring::*;
 use crate::wrapper::RingElementWrapper;
 
@@ -6,7 +5,6 @@ pub mod multivariate_impl;
 
 use std::any::Any;
 use std::cmp::{max, Ordering};
-use std::marker::PhantomData;
 
 pub type PolyCoeff<P> = El<<<P as RingStore>::Type as RingExtension>::BaseRing>;
 pub type PolyMonomial<P> = <<P as RingStore>::Type as MultivariatePolyRing>::Monomial;
@@ -227,63 +225,6 @@ impl MonomialOrder for DegRevLex {
     }
 }
 
-pub struct CompareMonomialFamily<P, O>
-    where P: ?Sized + MultivariatePolyRing,
-        O: MonomialOrder
-{
-    poly_ring: PhantomData<P>,
-    order: PhantomData<O>
-}
-
-impl<P, O> CompareFnFamily<P::Monomial> for CompareMonomialFamily<P, O>
-    where P: ?Sized + MultivariatePolyRing,
-        O: MonomialOrder
-{
-    type CompareFn<'a> = CompareMonomial<RingRef<'a, P>, O>
-        where Self: 'a;
-}
-
-#[derive(Copy, Clone)]
-pub struct CompareMonomial<P, O>
-    where P: RingStore + Copy,
-        P::Type: MultivariatePolyRing,
-        O: MonomialOrder
-{
-    pub poly_ring: P,
-    pub order: O
-}
-impl<'a, P, O> FnOnce<(&'a PolyMonomial<P>, &'a PolyMonomial<P>)> for CompareMonomial<P, O>
-    where P: RingStore + Copy,
-        P::Type: MultivariatePolyRing,
-        O: MonomialOrder
-{
-    type Output = Ordering;
-    
-    extern "rust-call" fn call_once(self, args: (&'a PolyMonomial<P>, &'a PolyMonomial<P>)) -> Self::Output {
-        self.call(args)
-    }
-}
-
-impl<'a, P, O> FnMut<(&'a PolyMonomial<P>, &'a PolyMonomial<P>)> for CompareMonomial<P, O>
-    where P: RingStore + Copy,
-        P::Type: MultivariatePolyRing,
-        O: MonomialOrder
-{
-    extern "rust-call" fn call_mut(&mut self, args: (&'a PolyMonomial<P>, &'a PolyMonomial<P>)) -> Self::Output {
-        self.call(args)
-    }
-}
-
-impl<'a, P, O> Fn<(&'a PolyMonomial<P>, &'a PolyMonomial<P>)> for CompareMonomial<P, O>
-    where P: RingStore + Copy,
-        P::Type: MultivariatePolyRing,
-        O: MonomialOrder
-{
-    extern "rust-call" fn call(&self, args: (&'a PolyMonomial<P>, &'a PolyMonomial<P>)) -> Self::Output {
-        self.order.compare(self.poly_ring, args.0, args.1)
-    }
-}
-
 #[stability::unstable(feature = "enable")]
 pub mod generic_impls {
     use std::fmt::{Formatter, Result};
@@ -390,6 +331,27 @@ pub mod generic_tests {
             }
         }
 
+        // test add_assign_from_terms
+        for i in 0..n {
+            let xi = ring.create_monomial((0..n).map(|k| if k == i { 1 } else { 0 }));
+            let mut a = ring.create_term(ring.base_ring().int_hom().map(3), ring.create_monomial((0..n).map(|_| 0)));
+            let terms_with_multiples = [
+                (ring.base_ring().one(), ring.clone_monomial(&xi)),
+                (ring.base_ring().one(), ring.clone_monomial(&xi)),
+                (ring.base_ring().one(), ring.create_monomial((0..n).map(|_| 0))),
+                (ring.base_ring().one(), ring.create_monomial((0..n).map(|_| 0))),
+                (ring.base_ring().one(), ring.clone_monomial(&xi)),
+                (ring.base_ring().one(), ring.create_monomial((0..n).map(|_| 0))),
+                (ring.base_ring().one(), ring.clone_monomial(&xi)),
+                (ring.base_ring().one(), ring.create_monomial((0..n).map(|_| 0))),
+            ];
+            ring.get_ring().add_assign_from_terms(&mut a, terms_with_multiples);
+            assert_el_eq!(&ring, ring.from_terms([
+                (ring.base_ring().int_hom().map(7), ring.create_monomial((0..n).map(|_| 0))),
+                (ring.base_ring().int_hom().map(4), xi),
+            ]), a);
+        }
+
         if n >= 2 {
             let one = ring.create_monomial((0..n).map(|_| 0));
             let x0 = ring.create_monomial((0..n).map(|k| if k == 0 { 1 } else { 0 }));
@@ -464,7 +426,7 @@ pub mod generic_tests {
                         assert_el_eq!(ring, h, f);
                     }
                 }
-            }
+            } 
         }
     }
 }
