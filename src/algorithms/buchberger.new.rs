@@ -5,6 +5,7 @@ use crate::pid::PrincipalIdealRingStore;
 use crate::ring::*;
 use crate::rings::multivariate_new::*;
 
+use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::io::Write;
 
@@ -108,8 +109,20 @@ fn find_reducer<'a, P, O, I>(ring: P, f: &El<P>, reducers: I, order: O) -> Optio
     if ring.is_zero(&f) {
         return None;
     }
+    reducer_it(&ring, f, reducers, order).next()
+}
+
+fn reducer_it<'a, 'b, P, O, I>(ring: &'b P, f: &'b El<P>, reducers: I, order: O) -> impl 'b + Iterator<Item = (usize, &'a El<P>, PolyCoeff<P>, PolyMonomial<P>)>
+    where P: 'b + RingStore + Copy,
+        P::Type: MultivariatePolyRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing,
+        O: 'b + MonomialOrder + Copy,
+        I: 'b + Iterator<Item = &'a El<P>>,
+        'a: 'b,
+        El<P>: 'a
+{
     let (f_lc, f_lm) = ring.LT(f, order.clone()).unwrap();
-    reducers.enumerate().filter_map(|(i, reducer)| {
+    reducers.enumerate().filter_map(move |(i, reducer)| {
         let (r_lc, r_lm) = ring.LT(reducer, order.clone()).unwrap();
         if let Ok(quo_m) = ring.monomial_div(ring.clone_monomial(f_lm), r_lm) {
             if let Some(quo_c) = ring.base_ring().checked_div(f_lc, r_lc) {
@@ -117,11 +130,11 @@ fn find_reducer<'a, P, O, I>(ring: P, f: &El<P>, reducers: I, order: O) -> Optio
             }
         }
         return None;
-    }).next()
+    })
 }
 
 #[inline(never)]
-fn filter_spoly<P, O>(ring: P, new_spoly: SPoly, basis: &[El<P>], order: O) -> Option<usize>
+fn filter_gebauer_moeller<P, O>(ring: P, new_spoly: SPoly, basis: &[El<P>], order: O) -> Option<usize>
     where P: RingStore + Copy,
         P::Type: MultivariatePolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalLocalRing,
@@ -139,21 +152,17 @@ fn filter_spoly<P, O>(ring: P, new_spoly: SPoly, basis: &[El<P>], order: O) -> O
                 return Some(usize::MAX);
             }
 
+            // this is basically the chain criterion - we search for `j < k` such that `LT(fj)` divides the lcm term of `S(i, j)`;
+            // we just have to make sure that `j < k` to avoid cancelling ourselves resp. in cycles
             (0..k).filter_map(|j| {
                 if j == i {
                     return None;
                 }
                 let (bj_c, bj_m) = ring.LT(&basis[j], order.clone()).unwrap();
-                let (f_c, f_m) = term_lcm(ring, (bj_c, bj_m), (bk_c, bk_m));
-                let f_c_val = ring.base_ring().valuation(&f_c).unwrap();
+                let bj_c_val = ring.base_ring().valuation(&bj_c).unwrap();
 
-                if j < i && order.eq_mon(ring, &f_m, &S_m) && f_c_val <= S_c_val {
+                if ring.monomial_div(ring.clone_monomial(&S_m), &bj_m).is_ok() && bj_c_val <= S_c_val {
                     return Some(j);
-                }
-                if let Ok(quo) = ring.monomial_div(ring.clone_monomial(&S_m), &f_m) {
-                    if ring.monomial_deg(&quo) > 0 && f_c_val <= S_c_val {
-                        return Some(j);
-                    }
                 }
                 return None;
             }).next()
@@ -185,7 +194,7 @@ fn filter_spoly<P, O>(ring: P, new_spoly: SPoly, basis: &[El<P>], order: O) -> O
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn buchberger<P, O, const LOG: bool>(ring: P, input_basis: Vec<El<P>>, order: O) -> Vec<El<P>>
+pub fn buchberger<P, O, const LOG: bool>(ring: P, basis: Vec<El<P>>, order: O) -> Vec<El<P>>
     where P: RingStore + Copy,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: Sync,
@@ -195,39 +204,66 @@ pub fn buchberger<P, O, const LOG: bool>(ring: P, input_basis: Vec<El<P>>, order
 {
     // this are the basis polynomials we generated; we only append to this, such that the S-polys
     // remain valid
-    let mut input_basis = reduce(&ring, input_basis.into_iter().map(|f| (f, Vec::new())).collect(), order).into_iter().map(|(f, _)| f).collect::<Vec<_>>();
-    debug_assert!(input_basis.iter().all(|f| !ring.is_zero(f)));
+    let mut basis = reduce(&ring, basis, order);
+    assert!(basis.iter().all(|f| !ring.is_zero(f)));
 
     let nilpotent_power = ring.base_ring().nilpotent_power().and_then(|e| if e != 0 { Some(e) } else { None });
 
     if EXTENSIVE_LOG {
-        println!("reduced input basis:");
-        for f in &input_basis {
+        println!("Basis:");
+        for f in &basis {
             ring.println(f);
         }
     }
-    let sort_reducers = |reducers: &mut [(El<P>, Vec<(PolyMonomial<P>, El<P>)>)]| {
-        // I have no idea why, but this order seems to give the best results
-        reducers.sort_by(|(lf, _), (rf, _)| order.compare(ring, &ring.LT(lf, order.clone()).unwrap().1, &ring.LT(rf, order.clone()).unwrap().1).then_with(|| ring.terms(lf).count().cmp(&ring.terms(rf).count())))
-    };
-    // invariant: `(reducers) = (basis)` and there exists a reduction to zero for every `f` in `basis` modulo `reducers`
-    let mut reducers: Vec<(El<P>, Vec<(PolyMonomial<P>, El<P>)>)> = input_basis.iter().map(|f| (ring.clone_el(f), Vec::new())).collect::<Vec<_>>();
-    sort_reducers(&mut reducers);
 
+    let sort_open = |open: &mut [SPoly], basis: &[El<P>]| open.sort_by(|l, r| order.compare(ring, &l.lcm_term(ring, &basis, order.clone()).1, &r.lcm_term(ring, &basis, order.clone()).1).reverse());
+    // the S-polys we have to consider
     let mut open = Vec::new();
-    let mut basis = Vec::new();
-    update_basis(ring, &mut input_basis, &mut basis, &mut open, order.clone(), nilpotent_power, &mut 0);
+    for i in 0..basis.len() {
+        for j in (i + 1)..basis.len() {
+            open.push(SPoly::Standard(i, j));
+        }
+    }
+    if let Some(e) = nilpotent_power {
+        for i in 0..basis.len() {
+            for k in 1..e {
+                open.push(SPoly::Nilpotent(i, k));
+            }
+        }
+    }
+    sort_open(&mut open, &basis);
 
-    let mut current_deg = 0;
-    let mut new_polys = Vec::new();
-    let mut filtered_spolys = 0;
-    let mut changed = false;
-    loop {
+    // this are the polynomials that we use to reduce S-polys; this can be thought of as the reduced basis (but in general it is smaller than reduce(basis))
+    let sort_reducers = |reducers: &mut [(El<P>, Vec<(PolyMonomial<P>, El<P>)>)]| {
+        reducers.sort_by(|(lf, _), (rf, _)| ring.terms(lf).count().cmp(&ring.terms(rf).count()))
+    };
+    let mut reducers = basis.iter().enumerate().map(|(i, f)| (ring.clone_el(f), i, Vec::new())).collect::<Vec<_>>();
+    // sort_reducers(&mut reducers);
 
-        // reduce all known S-polys of minimal lcm degree; in effect, this is the same as the matrix reduction
-        // step during F4
+    let mut current_deg;
+    while open.len() > 0 {
+
+        sort_open(&mut open, &basis);
+        // sort_reducers(&mut reducers);
+
+        // update: either increase degree bound or add new polynomials to basis, and create corresponding S-polys
+        current_deg = ring.monomial_deg(&open.last().unwrap().lcm_term(ring, &basis, order.clone()).1);
+        if !EXTENSIVE_LOG && LOG {
+            print!("{{{}}}", current_deg);
+            std::io::stdout().flush().unwrap();
+        }
+        if !EXTENSIVE_LOG && LOG {
+            print!("b({})S({})", basis.len(), open.len());
+            std::io::stdout().flush().unwrap();
+        }
+        if !EXTENSIVE_LOG && LOG {
+            print!("r({})", reducers.len());
+            std::io::stdout().flush().unwrap();
+        }
+
+        // reduction step
         while let Some(spoly) = open.last() {
-   
+
             if ring.monomial_deg(&spoly.lcm_term(ring, &basis, order.clone()).1) != current_deg {
                 break;
             }
@@ -235,167 +271,133 @@ pub fn buchberger<P, O, const LOG: bool>(ring: P, input_basis: Vec<El<P>>, order
             let spoly = open.pop().unwrap();
             let mut f = spoly.poly(ring, &basis, order.clone());
             
-            reduce_poly(ring, &mut f, &mut reducers, order.clone());
-
+            while let Some((i, _, quo_c, quo_m)) = find_reducer(ring, &f, reducers.iter().map(|(f, _, _)| f), order.clone()) {
+                let prev_lm = ring.clone_monomial(&ring.LT(&f, order.clone()).unwrap().1);
+                let j = match reducers[i].2.binary_search_by(|(mon, _)| order.compare(ring, mon, &quo_m)) {
+                    Ok(j) => j,
+                    Err(j) => {
+                        let mut scaled_reducer = ring.clone_el(&reducers[i].0);
+                        ring.mul_assign_monomial(&mut scaled_reducer, ring.clone_monomial(&quo_m));
+                        reducers[i].2.insert(j, (quo_m, scaled_reducer));
+                        j
+                    }
+                };
+                ring.get_ring().add_assign_from_terms(&mut f, ring.terms(&reducers[i].2[j].1).map(|(c, m)| (ring.base_ring().negate(ring.base_ring().mul_ref(c, &quo_c)), ring.clone_monomial(m))));
+                debug_assert!(ring.is_zero(&f) || order.compare(ring, &ring.LT(&f, order.clone()).unwrap().1, &prev_lm) == Ordering::Less);
+            }
             if !ring.is_zero(&f) {
                 if EXTENSIVE_LOG {
                     println!("F({}) = ", basis.len());
                     ring.println(&f);
-                } else if LOG {
+                }
+                update_basis(ring, f, &mut basis, &mut reducers, &mut open, order, nilpotent_power);
+                sort_open(&mut open, &basis);
+                if !EXTENSIVE_LOG && LOG {
                     print!("s");
                     std::io::stdout().flush().unwrap();
                 }
-
-                new_polys.push(ring.clone_el(&f));
-                reducers.push((f, Vec::new()));
-                sort_reducers(&mut reducers);
             } else {
                 if EXTENSIVE_LOG {
                     println!("reduced to zero");
-                } else if LOG {
+                }
+                if !EXTENSIVE_LOG && LOG {
                     print!("-");
                     std::io::stdout().flush().unwrap();
                 }
             }
         }
-
-        // process the generated new polynomials
-        if new_polys.len() == 0 && open.len() == 0 {
-            if changed {
-                if EXTENSIVE_LOG {
-                    println!("restart");
-                } else if LOG {
-                    print!("!");
-                    std::io::stdout().flush().unwrap();
-                }
-                // this seems necessary, as the invariants for `reducers` don't imply that it already is a GB;
-                // more concretely, reducers contains polys of basis that are reduced with eath other, but the
-                // S-polys between two of them might not have been considered
-                return buchberger::<P, O, LOG>(ring, reducers.into_iter().map(|(f, _)| f).collect(), order);
-            } else {
-                return reducers.into_iter().map(|(f, _)| f).collect();
-            }
-        } else if new_polys.len() == 0 {
-            current_deg = ring.monomial_deg(&open.last().unwrap().lcm_term(ring, &basis, order.clone()).1);
-            if !EXTENSIVE_LOG && LOG {
-                print!("{{{}}}", current_deg);
-                std::io::stdout().flush().unwrap();
-            }
-        } else {
-            changed = true;
-            current_deg = 0;
-            update_basis(ring, &mut new_polys, &mut basis, &mut open, order.clone(), nilpotent_power, &mut filtered_spolys);
-            if !EXTENSIVE_LOG && LOG {
-                print!("b({})S({})f({})", basis.len(), open.len(), filtered_spolys);
-                std::io::stdout().flush().unwrap();
-            }
-            reducers = reduce(ring, reducers, order);
-            sort_reducers(&mut reducers);
-            if !EXTENSIVE_LOG && LOG {
-                print!("r({})", reducers.len());
-                std::io::stdout().flush().unwrap();
-            }
-        }
-
-        // less S-polys if we restart from scratch with reducers
-        if open.len() + filtered_spolys > reducers.len() * reducers.len() / 2 + reducers.len() * nilpotent_power.unwrap_or(0) + 1 {
-            if EXTENSIVE_LOG {
-                println!("restart");
-            } else if LOG {
-                print!("!");
-                std::io::stdout().flush().unwrap();
-            }
-            return buchberger::<P, O, LOG>(ring, reducers.into_iter().map(|(f, _)| f).collect(), order);
-        }
     }
+
+    // as opposed to my initial belief, `basis` does not have to be a GB here
+    return reducers.into_iter().map(|(f, _, _)| f).collect();
 }
 
-fn update_basis<P, O>(ring: P, new_polys: &mut Vec<El<P>>, basis: &mut Vec<El<P>>, open: &mut Vec<SPoly>, order: O, nilpotent_power: Option<usize>, filtered_spolys: &mut usize)
+#[inline(never)]
+#[stability::unstable(feature = "enable")]
+pub fn update_basis<P, O>(ring: P, new_poly: El<P>, basis: &mut Vec<El<P>>, reducers: &mut Vec<(El<P>, usize, Vec<(PolyMonomial<P>, El<P>)>)>, open: &mut Vec<SPoly>, order: O, nilpotent_power: Option<usize>)
     where P: RingStore + Copy,
         P::Type: MultivariatePolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalLocalRing,
         O: MonomialOrder + Copy
 {
-    for new_poly in new_polys.drain(..) {
-        basis.push(new_poly);
-        for i in 0..(basis.len() - 1) {
-            let spoly = SPoly::Standard(i, basis.len() - 1);
-            if filter_spoly(ring, spoly.clone(), &*basis, order.clone()).is_none() {
+    basis.push(ring.clone_el(&new_poly));
+
+    let (f_c, f_m) = ring.LT(&new_poly, order.clone()).unwrap();
+    let f_c_val = ring.base_ring().valuation(f_c).unwrap();
+    let f_m = ring.clone_monomial(f_m);
+
+    let mut self_reduction_spolys = Vec::new();
+    reducers.push((new_poly, basis.len() - 1, Vec::new()));
+    let mut i = reducers.len() - 1;
+    reducers.swap(0, i);
+    i = 1;
+    while i < reducers.len() {
+        let (ri_c, ri_m) = ring.LT(&reducers[i].0, order.clone()).unwrap();
+        if ring.monomial_div(ring.clone_monomial(ri_m), &f_m).is_ok() && ring.base_ring().valuation(ri_c).unwrap() >= f_c_val {
+            self_reduction_spolys.push(SPoly::Standard(reducers[i].1, basis.len() - 1));
+            reducers.swap_remove(i);
+        } else {
+            i += 1;
+        }
+    }
+
+    debug_assert!(reducers.iter().enumerate().all(|(i, f)| reducers.iter().enumerate().all(|(j, g)| i == j || {
+        let (f_lc, f_lm) = ring.LT(&f.0, order.clone()).unwrap();
+        let (g_lc, g_lm) = ring.LT(&g.0, order.clone()).unwrap();
+        ring.monomial_div(ring.clone_monomial(f_lm), g_lm).is_err() || ring.base_ring().checked_div(f_lc, g_lc).is_none()
+    })));
+    
+    for i in 0..(basis.len() - 1) {
+        let spoly = SPoly::Standard(i, basis.len() - 1);
+        if self_reduction_spolys.iter().all(|add_later| *add_later != spoly) && filter_gebauer_moeller(ring, spoly.clone(), &basis, order.clone()).is_none() {
+            open.push(spoly);
+        }
+    }
+    if let Some(e) = nilpotent_power {
+        for k in 1..e {
+            let spoly =  SPoly::Nilpotent(basis.len() - 1, k);
+            if filter_gebauer_moeller(ring, spoly.clone(), &basis, order.clone()).is_none() {
                 open.push(spoly);
-            } else {
-                *filtered_spolys += 1;
-            }
-        }
-        if let Some(e) = nilpotent_power {
-            for k in 1..e {
-                let spoly = SPoly::Nilpotent(basis.len() - 1, k);
-                if filter_spoly(ring, spoly.clone(), &*basis, order.clone()).is_none() {
-                    open.push(spoly);
-                } else {
-                    *filtered_spolys += 1;
-                }
             }
         }
     }
-    open.sort_by_key(|S_poly| -(ring.monomial_deg(&S_poly.lcm_term(ring, &basis, order.clone()).1) as i64));
+    open.extend(self_reduction_spolys);
 }
 
-fn reduce_poly<P, O>(ring: P, to_reduce: &mut El<P>, reducers: &mut [(El<P>, Vec<(PolyMonomial<P>, El<P>)>)], order: O)
+#[inline(never)]
+#[stability::unstable(feature = "enable")]
+pub fn reduce<P, O>(ring: P, mut polys: Vec<El<P>>, order: O) -> Vec<El<P>>
     where P: RingStore + Copy,
         P::Type: MultivariatePolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing,
         O: MonomialOrder + Copy
 {
-    while let Some((i, _, quo_c, quo_m)) = find_reducer(ring, to_reduce, reducers.iter().map(|(f, _)| f), order.clone()) {
-        let prev_lm = ring.clone_monomial(&ring.LT(to_reduce, order.clone()).unwrap().1);
-        let j = match reducers[i].1.binary_search_by(|(mon, _)| order.compare(ring, mon, &quo_m)) {
-            Ok(j) => j,
-            Err(j) => {
-                let mut scaled_reducer = ring.clone_el(&reducers[i].0);
-                ring.mul_assign_monomial(&mut scaled_reducer, ring.clone_monomial(&quo_m));
-                reducers[i].1.insert(j, (ring.clone_monomial(&quo_m), scaled_reducer));
-                j
-            }
-        };
-        debug_assert!(ring.eq_el(&reducers[i].1[j].1, &{
-            let mut reducer = ring.clone_el(&reducers[i].0);
-            ring.mul_assign_monomial(&mut reducer, ring.clone_monomial(&quo_m));
-            reducer
-        }));
-        ring.get_ring().add_assign_from_terms(to_reduce, ring.terms(&reducers[i].1[j].1).map(|(c, m)| (ring.base_ring().negate(ring.base_ring().mul_ref(c, &quo_c)), ring.clone_monomial(m))));
-        debug_assert!(ring.is_zero(&to_reduce) || order.compare(ring, &ring.LT(&to_reduce, order.clone()).unwrap().1, &prev_lm) == std::cmp::Ordering::Less);
-    }
-}
-
-fn reduce<P, O>(ring: P, mut polys: Vec<(El<P>, Vec<(PolyMonomial<P>, El<P>)>)>, order: O) -> Vec<(El<P>, Vec<(PolyMonomial<P>, El<P>)>)>
-    where P: RingStore + Copy,
-        P::Type: MultivariatePolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing,
-        O: MonomialOrder + Copy
-{
+    assert!(polys.iter().all(|f| !ring.is_zero(f)));
     let mut changed = true;
     while changed {
         changed = false;
-        let mut i = 0;
-        while i < polys.len() {
+        for i in 0..polys.len() {
+            if ring.is_zero(&polys[i]) {
+                continue;
+            }
+
             let last_i = polys.len() - 1;
             polys.swap(i, last_i);
-            let (reducers, to_reduce) = polys.split_at_mut(last_i);
-            to_reduce[0].1.clear();
-            let to_reduce = &mut to_reduce[0].0;
+            let (reducers, f) = polys.split_at_mut(last_i);
 
-            reduce_poly(ring, to_reduce, reducers, order.clone());
+            while let Some((_, reducer, quo_c, quo_m)) = find_reducer(ring, &f[0], reducers.iter(), order.clone()) {
+                changed = true;
+                ring.get_ring().add_assign_from_terms(&mut f[0], ring.terms(reducer).map(|(c, m)| (ring.base_ring().negate(ring.base_ring().mul_ref(c, &quo_c)), ring.monomial_mul(ring.clone_monomial(m), &quo_m))));
+                if ring.is_zero(&f[0]) {
+                    break;
+                }
+            }
 
             // undo swap so that the outer loop still iterates over every poly
-            if !ring.is_zero(&to_reduce) {
-                polys.swap(i, last_i);
-                i += 1;
-            } else {
-                polys.pop();
-            }
+            polys.swap(i, last_i);
         }
     }
-    return polys;
+    return polys.into_iter().filter(|f| !ring.is_zero(f)).collect::<Vec<_>>();
 }
 
 #[stability::unstable(feature = "enable")]
@@ -576,6 +578,7 @@ fn test_expensive_gb_1() {
 #[test]
 #[ignore]
 fn test_expensive_gb_2() {
+    // let mempool = feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<(u64, u64)>());
     let base = zn_static::Fp::<7>::RING;
     let ring = MultivariatePolyRingImpl::new(base, 7);
 
@@ -596,62 +599,4 @@ fn test_expensive_gb_2() {
     println!("Computed GB in {} ms", (end - start).as_millis());
 
     assert_eq!(130, gb.len());
-}
-
-#[test]
-#[ignore]
-fn test_groebner_cyclic6() {
-    let base = zn_static::Fp::<65537>::RING;
-    let ring = MultivariatePolyRingImpl::new(base, 6);
-
-    let cyclic6 = ring.with_wrapped_indeterminates(|[x, y, z, t, u, v]| {
-        [x + y + z + t + u + v, x*y + y*z + z*t + t*u + x*v + u*v, x*y*z + y*z*t + z*t*u + x*y*v + x*u*v + t*u*v, x*y*z*t + y*z*t*u + x*y*z*v + x*y*u*v + x*t*u*v + z*t*u*v, x*y*z*t*u + x*y*z*t*v + x*y*z*u*v + x*y*t*u*v + x*z*t*u*v + y*z*t*u*v, x*y*z*t*u*v - 1]
-    });
-
-    let start = std::time::Instant::now();
-    let gb = buchberger::<_, _, true>(&ring, cyclic6, DegRevLex);
-    let end = std::time::Instant::now();
-
-    println!("Computed GB in {} ms", (end - start).as_millis());
-    assert_eq!(45, gb.len());
-
-}
-
-#[test]
-#[ignore]
-fn test_groebner_cyclic7() {
-    let base = zn_static::Fp::<65537>::RING;
-    let ring = MultivariatePolyRingImpl::new(base, 7);
-
-    let cyclic7 = ring.with_wrapped_indeterminates(|[x, y, z, t, u, v, w]| [
-        x + y + z + t + u + v + w, x*y + y*z + z*t + t*u + u*v + x*w + v*w, x*y*z + y*z*t + z*t*u + t*u*v + x*y*w + x*v*w + u*v*w, x*y*z*t + y*z*t*u + z*t*u*v + x*y*z*w + x*y*v*w + x*u*v*w + t*u*v*w, 
-        x*y*z*t*u + y*z*t*u*v + x*y*z*t*w + x*y*z*v*w + x*y*u*v*w + x*t*u*v*w + z*t*u*v*w, x*y*z*t*u*v + x*y*z*t*u*w + x*y*z*t*v*w + x*y*z*u*v*w + x*y*t*u*v*w + x*z*t*u*v*w + y*z*t*u*v*w, x*y*z*t*u*v*w - 1
-    ]);
-
-    let start = std::time::Instant::now();
-    let gb = buchberger::<_, _, true>(&ring, cyclic7, DegRevLex);
-    let end = std::time::Instant::now();
-
-    println!("Computed GB in {} ms", (end - start).as_millis());
-    assert_eq!(209, gb.len());
-}
-
-#[test]
-#[ignore]
-fn test_groebner_cyclic8() {
-    let base = zn_static::Fp::<65537>::RING;
-    let ring = MultivariatePolyRingImpl::new(base, 8);
-
-    let cyclic7 = ring.with_wrapped_indeterminates(|[x, y, z, s, t, u, v, w]| [
-        x + y + z + s + t + u + v + w, x*y + y*z + z*s + s*t + t*u + u*v + x*w + v*w, x*y*z + y*z*s + z*s*t + s*t*u + t*u*v + x*y*w + x*v*w + u*v*w, 
-        x*y*z*s + y*z*s*t + z*s*t*u + s*t*u*v + x*y*z*w + x*y*v*w + x*u*v*w + t*u*v*w, x*y*z*s*t + y*z*s*t*u + z*s*t*u*v + x*y*z*s*w + x*y*z*v*w + x*y*u*v*w + x*t*u*v*w + s*t*u*v*w, x*y*z*s*t*u + y*z*s*t*u*v + x*y*z*s*t*w + x*y*z*s*v*w + x*y*z*u*v*w + x*y*t*u*v*w + x*s*t*u*v*w + z*s*t*u*v*w, 
-        x*y*z*s*t*u*v + x*y*z*s*t*u*w + x*y*z*s*t*v*w + x*y*z*s*u*v*w + x*y*z*t*u*v*w + x*y*s*t*u*v*w + x*z*s*t*u*v*w + y*z*s*t*u*v*w, x*y*z*s*t*u*v*w - 1
-    ]);
-
-    let start = std::time::Instant::now();
-    let gb = buchberger::<_, _, true>(&ring, cyclic7, DegRevLex);
-    let end = std::time::Instant::now();
-
-    println!("Computed GB in {} ms", (end - start).as_millis());
-    assert_eq!(209, gb.len());
 }
