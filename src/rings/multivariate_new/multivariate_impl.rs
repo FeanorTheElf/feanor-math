@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
 use append_only_vec::AppendOnlyVec;
+use atomicbox::AtomicOptionBox;
 use thread_local::ThreadLocal;
 
 use crate::algorithms::int_bisect;
@@ -108,7 +109,7 @@ pub struct MultivariatePolyRingEl<R, A = Global>
 #[stability::unstable(feature = "enable")]
 pub struct MultivariatePolyRingImplBase<R, A = Global>
     where R: RingStore,
-        A: Clone + Allocator
+        A: Clone + Allocator + Send
 {
     base_ring: R,
     variable_count: usize,
@@ -122,7 +123,8 @@ pub struct MultivariatePolyRingImplBase<R, A = Global>
     zero: El<R>,
     max_degree_for_orderidx: usize,
     cum_binomial_lookup_table: Vec<Vec<u64>>,
-    allocator: A
+    allocator: A,
+    tmp_poly: AtomicOptionBox<Vec<(El<R>, MonomialIdentifier)>>
 }
 
 pub type MultivariatePolyRingImpl<R, A = Global> = RingValue<MultivariatePolyRingImplBase<R, A>>;
@@ -138,7 +140,7 @@ impl<R> MultivariatePolyRingImpl<R>
 
 impl<R, A> MultivariatePolyRingImpl<R, A>
     where R: RingStore,
-        A: Clone + Allocator
+        A: Clone + Allocator + Send
 {
     #[stability::unstable(feature = "enable")]
     pub fn new_with(base_ring: R, variable_count: usize, max_supported_deg: Exponent, allocator: A) -> Self {
@@ -164,14 +166,15 @@ impl<R, A> MultivariatePolyRingImpl<R, A>
             monomial_table: RefCell::new(BTreeMap::new()),
             max_degree_for_orderidx: max_degree_for_orderidx,
             cum_binomial_lookup_table: cum_binomial_lookup_table,
-            allocator: allocator
+            tmp_poly: AtomicOptionBox::none(),
+            allocator: allocator,
         })
     }
 }
 
 impl<R, A> MultivariatePolyRingImplBase<R, A>
     where R: RingStore,
-        A: Clone + Allocator
+        A: Clone + Allocator + Send
 {
     fn tmp_monomial(&self) -> &[Cell<u16>] {
         self.tmp_monomials.get_or(|| (0..self.variable_count).map(|_| Cell::new(0)).collect::<Vec<_>>().into_boxed_slice())
@@ -232,7 +235,7 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
         let mut rhs_it = rhs_sorted.peekable();
 
         while let (Some((_, l_m)), Some((_, r_m))) = (lhs_it.peek(), rhs_it.peek()) {
-            result.push(match self.compare_degrevlex(l_m, r_m) {
+            let next_element = match self.compare_degrevlex(l_m, r_m) {
                 Ordering::Equal => {
                     let (l_c, _l_m) = lhs_it.next().unwrap();
                     let (r_c, r_m) = rhs_it.next().unwrap();
@@ -246,7 +249,8 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
                     let (r_c, r_m) = rhs_it.next().unwrap();
                     (r_c, r_m)
                 }
-            });
+            };
+            result.push(next_element);
         }
         result.extend(lhs_it.map(|(c, m)| (self.base_ring().clone_el(c), m.clone())));
         result.extend(rhs_it);
@@ -284,7 +288,7 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
 
 impl<R, A> PartialEq for MultivariatePolyRingImplBase<R, A>
     where R: RingStore,
-        A: Clone + Allocator
+        A: Clone + Allocator + Send
 {
     fn eq(&self, other: &Self) -> bool {
         // it is not sufficient if base_ring and variable_count match (the rings are isomorphic then),
@@ -295,7 +299,7 @@ impl<R, A> PartialEq for MultivariatePolyRingImplBase<R, A>
 
 impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
     where R: RingStore,
-        A: Clone + Allocator
+        A: Clone + Allocator + Send
 {
     type Element = MultivariatePolyRingEl<R, A>;
 
@@ -442,7 +446,7 @@ impl<'a, R> Iterator for TermIterImpl<'a, R>
 
 impl<R, A> RingExtension for MultivariatePolyRingImplBase<R, A>
     where R: RingStore,
-        A: Clone + Allocator
+        A: Clone + Allocator + Send
 {
     type BaseRing = R;
 
@@ -463,7 +467,7 @@ impl<R, A> RingExtension for MultivariatePolyRingImplBase<R, A>
 
 impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
     where R: RingStore,
-        A: Clone + Allocator
+        A: Clone + Allocator + Send
 {
     type Monomial = MonomialIdentifier;
     type TermIter<'a> = TermIterImpl<'a, R>
@@ -493,10 +497,13 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
         mon.clone()
     }
 
-    fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
+    fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, terms: I)
         where I: IntoIterator<Item = (El<Self::BaseRing>, Self::Monomial)>
     {
-        let mut rhs = rhs.into_iter().collect::<Vec<_>>();
+        let terms = terms.into_iter();
+        let mut rhs = self.tmp_poly.swap(None, std::sync::atomic::Ordering::AcqRel).map(|b| *b).unwrap_or(Vec::new());
+        debug_assert!(rhs.len() == 0);
+        rhs.extend(terms);
         rhs.sort_unstable_by(|l, r| self.compare_degrevlex(&l.1, &r.1));
         rhs.dedup_by(|(snd_c, snd_m), (fst_c, fst_m)| {
             if self.compare_degrevlex(&fst_m, &snd_m) == Ordering::Equal {
@@ -506,7 +513,8 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
                 return false;
             }
         });
-        *lhs = self.add_terms(&lhs, rhs.into_iter(), Vec::new_in(self.allocator.clone()));
+        *lhs = self.add_terms(&lhs, rhs.drain(..), Vec::new_in(self.allocator.clone()));
+        self.tmp_poly.swap(Some(Box::new(rhs)), std::sync::atomic::Ordering::AcqRel);
     }
 
     fn mul_assign_monomial(&self, f: &mut Self::Element, monomial: Self::Monomial) {
@@ -550,12 +558,17 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
 
     fn largest_term_lt<'a, O: MonomialOrder>(&'a self, f: &'a Self::Element, order: O, lt_than: &Self::Monomial) -> Option<(&'a El<Self::BaseRing>, &'a Self::Monomial)> {
         if order.is_same(&DegRevLex) {
-            match f.data.binary_search_by(|(_, mon)| self.compare_degrevlex(mon, lt_than)) {
+            let res = match f.data.binary_search_by(|(_, mon)| self.compare_degrevlex(mon, lt_than)) {
                 Ok(0) => None,
                 Ok(i) => Some((&f.data[i - 1].0, &f.data[i - 1].1)),
                 Err(0) => None,
                 Err(i) => Some((&f.data[i - 1].0, &f.data[i - 1].1))
-            }
+            };
+            assert!({
+                let expected = self.terms(f).filter(|(_, m)| order.compare(RingRef::new(self), m, lt_than) == Ordering::Less).max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1));
+                (res.is_none() && expected.is_none()) || std::ptr::eq(res.unwrap().0, expected.unwrap().0)
+            });
+            return res;
         } else {
             self.terms(f).filter(|(_, m)| order.compare(RingRef::new(self), m, lt_than) == Ordering::Less).max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1))
         }

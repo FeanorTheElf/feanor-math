@@ -5,6 +5,7 @@ use crate::pid::PrincipalIdealRingStore;
 use crate::ring::*;
 use crate::rings::multivariate_new::*;
 
+use std::cmp::min;
 use std::fmt::Debug;
 use std::io::Write;
 
@@ -143,6 +144,8 @@ fn filter_spoly<P, O>(ring: P, new_spoly: SPoly, basis: &[El<P>], order: O) -> O
                 if j == i {
                     return None;
                 }
+                // more experiments needed - for some weird reason, replacing "properly divides" with "divides" (assuming
+                // I didn't make a mistake) leads to terrible performance
                 let (bj_c, bj_m) = ring.LT(&basis[j], order.clone()).unwrap();
                 let (f_c, f_m) = term_lcm(ring, (bj_c, bj_m), (bk_c, bk_m));
                 let f_c_val = ring.base_ring().valuation(&f_c).unwrap();
@@ -151,7 +154,7 @@ fn filter_spoly<P, O>(ring: P, new_spoly: SPoly, basis: &[El<P>], order: O) -> O
                     return Some(j);
                 }
                 if let Ok(quo) = ring.monomial_div(ring.clone_monomial(&S_m), &f_m) {
-                    if ring.monomial_deg(&quo) > 0 && f_c_val <= S_c_val {
+                    if f_c_val <= S_c_val && (f_c_val < S_c_val || ring.monomial_deg(&quo) > 0) {
                         return Some(j);
                     }
                 }
@@ -161,21 +164,19 @@ fn filter_spoly<P, O>(ring: P, new_spoly: SPoly, basis: &[El<P>], order: O) -> O
         SPoly::Nilpotent(i, k) => {
             let nilpotent_power = ring.base_ring().nilpotent_power().unwrap();
             let f = &basis[i];
-            let mut last = ring.LT(f, order.clone()).unwrap();
-            let mut current = if let Some(t) = ring.largest_term_lt(f, order.clone(), &last.1) {
-                t
-            } else {
-                return Some(usize::MAX);
-            };
+
+            let mut smallest_elim_coeff_valuation = usize::MAX;
+            let mut current = ring.LT(f, order.clone()).unwrap();
             while ring.base_ring().valuation(&current.0).unwrap() + k >= nilpotent_power {
+                smallest_elim_coeff_valuation = min(smallest_elim_coeff_valuation, ring.base_ring().valuation(&current.0).unwrap());
                 let next = ring.largest_term_lt(f, order.clone(), &current.1);
                 if next.is_none() {
                     return Some(usize::MAX);
                 }
-                last = current;
                 current = next.unwrap();
             }
-            if ring.base_ring().valuation(&last.0).unwrap() + k != nilpotent_power {
+            assert!(smallest_elim_coeff_valuation == usize::MAX || smallest_elim_coeff_valuation + k >= nilpotent_power);
+            if smallest_elim_coeff_valuation == usize::MAX || smallest_elim_coeff_valuation + k > nilpotent_power {
                 return Some(usize::MAX);
             } else {
                 return None;
@@ -199,6 +200,7 @@ pub fn buchberger<P, O, const LOG: bool>(ring: P, input_basis: Vec<El<P>>, order
     debug_assert!(input_basis.iter().all(|f| !ring.is_zero(f)));
 
     let nilpotent_power = ring.base_ring().nilpotent_power().and_then(|e| if e != 0 { Some(e) } else { None });
+    assert!(nilpotent_power.is_none() || ring.base_ring().is_zero(&ring.base_ring().pow(ring.base_ring().clone_el(ring.base_ring().max_ideal_gen()), nilpotent_power.unwrap())));
 
     if EXTENSIVE_LOG {
         println!("reduced input basis:");
@@ -337,7 +339,10 @@ fn update_basis<P, O>(ring: P, new_polys: &mut Vec<El<P>>, basis: &mut Vec<El<P>
             }
         }
     }
-    open.sort_by_key(|S_poly| -(ring.monomial_deg(&S_poly.lcm_term(ring, &basis, order.clone()).1) as i64));
+    open.sort_by_key(|S_poly| {
+        let (lc, lm) = S_poly.lcm_term(ring, &basis, order.clone());
+        (-(ring.base_ring().valuation(&lc).unwrap_or(0) as i64), -(ring.monomial_deg(&lm) as i64))
+    });
 }
 
 fn reduce_poly<P, O>(ring: P, to_reduce: &mut El<P>, reducers: &mut [(El<P>, Vec<(PolyMonomial<P>, El<P>)>)], order: O)
@@ -561,7 +566,7 @@ fn test_expensive_gb_1() {
     ]);
 
     let start = std::time::Instant::now();
-    let gb = buchberger::<_, _, true>(&ring, system, DegRevLex);
+    let gb = buchberger::<_, _, true>(&ring, system.iter().map(|f| ring.clone_el(f)).collect(), DegRevLex);
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());
@@ -570,7 +575,7 @@ fn test_expensive_gb_1() {
         assert!(ring.is_zero(&multivariate_division(&ring, ring.clone_el(f), gb.iter(), DegRevLex)));
     }
 
-    assert_eq!(93, gb.len());
+    assert_eq!(108, gb.len());
 }
 
 #[test]
@@ -653,5 +658,5 @@ fn test_groebner_cyclic8() {
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());
-    assert_eq!(209, gb.len());
+    assert_eq!(372, gb.len());
 }
