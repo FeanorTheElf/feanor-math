@@ -32,7 +32,7 @@ use crate::primitive_int::StaticRing;
 /// # Tracking of Precision
 /// 
 /// More concretely, for each nonzero number `a`, we store its *exponent* `e`
-/// and its *precision* `n` together with the value
+/// and its *precision*/*number of significant digits* `n` together with the value
 /// ```text
 /// sum_(e <= i < e + n) a_i p^i + O(p^(e + n))
 /// ```
@@ -75,14 +75,14 @@ use crate::primitive_int::StaticRing;
 /// that equality in [`PAdicNumbersBase`] is only an approximation.
 /// 
 /// Concretely, we allow comparison of two values `p^e a + O(p^i)` and `p^f b + O(p^j)` if
-/// they there exist `min_precision_for_compare` significant digits that are jointly nonzero
-/// (i.e. digits of `p^k` with `e, f <= k < i, j`) or on `min_significant_digits_for_compare` jointly significant
+/// they there exist `min_significant_digits_for_compare` significant digits that are jointly nonzero
+/// (i.e. digits of `p^k` with `e, f <= k < i, j`) or on `min_absolute_precise_digits_for_compare` jointly significant
 /// digits with nonnegative valuation (i.e. digits of `p^k` with `0 <= k < i, j`).
 /// This corresponds to the two ways of comparing floats, either absolutely (say `|a - b| < small constant`) or relatively
 /// (say `|a - b| < small constant * (|a| + |b|)`).
 /// If this is satisfied, we say the numbers are equal when they agree on all these digits.
 /// 
-/// The values `min_precision_for_compare` and `min_significant_digits_for_compare` both default to 1 and
+/// The values `min_significant_digits_for_compare` and `min_absolute_precise_digits_for_compare` both default to 1 and
 /// are currently not yet configurable.
 /// 
 /// # More examples
@@ -108,7 +108,7 @@ use crate::primitive_int::StaticRing;
 /// // we do some computation, and get a result with a certain precision
 /// let actual_result = some_computation(&QQ5, &five_precise, &five_less_precision);
 /// assert!(QQ5.is_zero(&actual_result));
-/// assert_eq!(5, QQ5.highest_significant_digit(&actual_result));
+/// assert_eq!(5, QQ5.highest_precise_digit(&actual_result));
 /// 
 /// let almost_five = QQ5.add_ref(&five_precise, &QQ5.int_hom().map(5 * 5 * 5 * 5 * 5 * 5));
 /// // note that we have "equality" here
@@ -119,7 +119,8 @@ use crate::primitive_int::StaticRing;
 /// assert!(QQ5.eq_el(&actual_result, &equivalent_result));
 /// // However, equivalent_result has precision set to 6 significant digits now, which can be considered
 /// // "incorrect" since the 6th digit has nothing to do with actual_result
-/// assert_eq!(6, QQ5.highest_significant_digit(&equivalent_result));
+/// assert_eq!(6, QQ5.highest_precise_digit(&equivalent_result));
+/// assert_eq!(1, QQ5.significant_digits(&equivalent_result));
 /// assert!(!QQ5.is_zero(&equivalent_result));
 /// ```
 /// It also shows that equality is not transitive anymore, which definitely should make you worry.
@@ -130,9 +131,9 @@ pub struct PAdicNumbersBase<R>
     where R: RingStore,
         R::Type: ZnRing + PrincipalLocalRing
 {
-    max_precision: usize,
-    min_precision_for_compare: usize,
+    max_significant_digits: usize,
     min_significant_digits_for_compare: usize,
+    min_absolute_precise_digits_for_compare: usize,
     ring: R
 }
 
@@ -145,7 +146,7 @@ pub struct PAdicNumbersEl<R>
     // the number is normalized if `a_exponent in Zp*`
     exponent: i64,
     // this can also be negative if there are no significant digits, but we still know that the value is in `O(p^(exponent + precision))`
-    precision: i64,
+    significant_digits: i64,
     el: El<R>
 }
 
@@ -155,13 +156,13 @@ pub type PAdicNumbers<R = AsLocalPIR<Zn>> = RingValue<PAdicNumbersBase<R>>;
 impl PAdicNumbers {
     
     #[stability::unstable(feature = "enable")]
-    pub fn new(prime: i64, max_precision: usize) -> Self {
+    pub fn new(prime: i64, max_significant_digits: usize) -> Self {
         assert!(is_prime(&StaticRing::<i64>::RING, &prime, 10));
         Self::from(PAdicNumbersBase {
-            min_precision_for_compare: 1,
             min_significant_digits_for_compare: 1,
-            max_precision: max_precision,
-            ring: AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING.pow(prime, max_precision) as u64)).unwrap()
+            min_absolute_precise_digits_for_compare: 1,
+            max_significant_digits: max_significant_digits,
+            ring: AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING.pow(prime, max_significant_digits) as u64)).unwrap()
         })
     }
 
@@ -175,19 +176,19 @@ impl<R> PAdicNumbers<R>
     pub fn new_with(computations_in: R) -> Self {
         let (_p, e) = is_prime_power(computations_in.integer_ring(), computations_in.modulus()).unwrap();
         Self::from(PAdicNumbersBase {
-            min_precision_for_compare: 1,
             min_significant_digits_for_compare: 1,
-            max_precision: e,
+            min_absolute_precise_digits_for_compare: 1,
+            max_significant_digits: e,
             ring: computations_in
         })
     }
 
     ///
-    /// See [`PAdicNumbersBase::precision_estimate()`]
+    /// See [`PAdicNumbersBase::significant_digits()`]
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn precision_estimate(&self, el: &El<Self>) -> u64 {
-        self.get_ring().precision_estimate(el)
+    pub fn significant_digits(&self, el: &El<Self>) -> u64 {
+        self.get_ring().significant_digits(el)
     }
 
     ///
@@ -199,19 +200,19 @@ impl<R> PAdicNumbers<R>
     }
 
     ///
-    /// See [`PAdicNumbersBase::highest_significant_digit()`]
+    /// See [`PAdicNumbersBase::highest_precise_digit()`]
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn highest_significant_digit(&self, el: &El<Self>) -> i64 {
-        self.get_ring().highest_significant_digit(el)
+    pub fn highest_precise_digit(&self, el: &El<Self>) -> i64 {
+        self.get_ring().highest_precise_digit(el)
     }
 
     ///
-    /// See [`PAdicNumbersBase::max_precision()`]
+    /// See [`PAdicNumbersBase::max_significant_digits()`]
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn max_precision(&self) -> u64 {
-        self.get_ring().max_precision() as u64
+    pub fn max_significant_digits(&self) -> u64 {
+        self.get_ring().max_significant_digits() as u64
     }
 }
 
@@ -226,7 +227,7 @@ impl<R> PAdicNumbersBase<R>
         R::Type: ZnRing + PrincipalLocalRing
 {
     ///
-    /// Returns the precision estimate for the current element.
+    /// Returns the precision/number of significiant digits for the current element.
     /// 
     /// In other words, we expect that many leading p-adic coefficients of the element to 
     /// be equal to the ones the "true" result of the computation with p-adic numbers would 
@@ -236,9 +237,9 @@ impl<R> PAdicNumbersBase<R>
     /// [`PAdicNumbersBase`].
     ///  
     #[stability::unstable(feature = "enable")]
-    pub fn precision_estimate(&self, el: &<Self as RingBase>::Element) -> u64 {
+    pub fn significant_digits(&self, el: &<Self as RingBase>::Element) -> u64 {
         debug_assert!(self.ring.is_zero(&el.el) || self.is_normalized(el));
-        el.precision as u64
+        if el.significant_digits < 0 { 0 } else { el.significant_digits as u64 }
     }
 
     ///
@@ -257,32 +258,34 @@ impl<R> PAdicNumbersBase<R>
 
     ///
     /// Returns `i` such that we expect `c p^i` to be the last precise summand in the p-adic
-    /// decomposition. For the problem of determining the actual precision, see [`PAdicNumbersBase::precision_estimate()`].
+    /// decomposition. For the problem of determining the actual precision, see 
+    /// [`PAdicNumbersBase::precision_estimate()`] and the struct-level doc [`PAdicNumbersBase`].
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn highest_significant_digit(&self, el: &<Self as RingBase>::Element) -> i64 {
+    pub fn highest_precise_digit(&self, el: &<Self as RingBase>::Element) -> i64 {
         debug_assert!(self.ring.is_zero(&el.el) || self.is_normalized(el));
-        el.exponent + el.precision - 1
+        el.exponent + el.significant_digits - 1
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn max_precision(&self) -> u64 {
-        self.max_precision as u64
+    pub fn max_significant_digits(&self) -> u64 {
+        self.max_significant_digits as u64
     }
 
     fn denormalize(&self, el: &mut PAdicNumbersEl<R>, target_exp: i64) -> i64 {
         assert!(el.exponent >= target_exp);
         self.ring.mul_assign(&mut el.el, self.ring.pow(self.ring.clone_el(self.ring.max_ideal_gen()), (el.exponent - target_exp) as usize));
-        let new_precision = min(el.precision + el.exponent - target_exp, self.max_precision as i64);
+        let new_precision = min(el.significant_digits + el.exponent - target_exp, self.max_significant_digits as i64);
         el.exponent = target_exp;
-        let precision_change = new_precision - el.precision;
-        el.precision = new_precision;
+        let precision_change = new_precision - el.significant_digits;
+        el.significant_digits = new_precision;
         return precision_change;
     }
 
     fn normalize(&self, el: &mut PAdicNumbersEl<R>) {
         if let Some(valuation) = self.ring.valuation(&el.el) {
-            el.precision = el.precision - valuation as i64;
+            // here new_precision can become negative; works fine nevertheless
+            el.significant_digits = el.significant_digits - valuation as i64;
             el.exponent += valuation as i64;
             el.el = self.ring.checked_div(&el.el, &self.ring.pow(self.ring.clone_el(&self.ring.max_ideal_gen()), valuation)).unwrap();
         } else {
@@ -296,7 +299,7 @@ impl<R> PAdicNumbersBase<R>
 
     fn zero_with_prec(&self, prec: i64) -> PAdicNumbersEl<R> {
         PAdicNumbersEl {
-            precision: prec,
+            significant_digits: prec,
             exponent: i64::MAX - prec,
             el: self.ring.zero()
         }
@@ -308,7 +311,7 @@ impl<R> PAdicNumbersBase<R>
     {
         let from = hom.domain().get_ring();
         if from.is_zero(&value) {
-            return self.zero_with_prec(self.max_precision as i64);
+            return self.zero_with_prec(self.max_significant_digits as i64);
         }
         let result = if from.representable_bits().is_none() || from.representable_bits().unwrap() > self.ring.integer_ring().abs_log2_ceil(self.ring.modulus()).unwrap() {
             let mut exponent = 0;
@@ -316,14 +319,14 @@ impl<R> PAdicNumbersBase<R>
             let p = int_cast(self.ring.smallest_positive_lift(self.ring.clone_el(self.ring.max_ideal_gen())), hom.domain(), self.ring.integer_ring());
             while self.ring.is_zero(&hom.map_ref(&value)) {
                 value = from.checked_left_div(&value, &p_e).unwrap();
-                exponent += self.max_precision;
+                exponent += self.max_significant_digits;
             }
             let valuation = self.ring.valuation(&hom.map_ref(&value)).unwrap();
             value = from.checked_left_div(&value, &hom.domain().pow(p, valuation)).unwrap();
             exponent += valuation;
             PAdicNumbersEl {
                 exponent: exponent as i64,
-                precision: self.max_precision as i64,
+                significant_digits: self.max_significant_digits as i64,
                 el: hom.map(value)
             }
         } else {
@@ -335,7 +338,7 @@ impl<R> PAdicNumbersBase<R>
             }
             PAdicNumbersEl {
                 exponent: exponent as i64,
-                precision: self.max_precision as i64,
+                significant_digits: self.max_significant_digits as i64,
                 el: hom.map(value)
             }
         };
@@ -363,17 +366,17 @@ impl<R> RingBase for PAdicNumbersBase<R>
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
         PAdicNumbersEl {
             exponent: val.exponent,
-            precision: val.precision.clone(),
+            significant_digits: val.significant_digits.clone(),
             el: self.ring.clone_el(&val.el)
         }
     }
 
     fn add_assign(&self, lhs: &mut Self::Element, mut rhs: Self::Element) {
         if self.is_zero(&rhs) {
-            lhs.precision = min(lhs.precision, (rhs.exponent + rhs.precision).checked_sub(lhs.exponent).unwrap_or(i64::MAX));
+            lhs.significant_digits = min(lhs.significant_digits, (rhs.exponent + rhs.significant_digits).checked_sub(lhs.exponent).unwrap_or(i64::MAX));
             return;
         } else if self.is_zero(lhs) {
-            rhs.precision = min(rhs.precision, (lhs.exponent + lhs.precision).checked_sub(rhs.exponent).unwrap_or(i64::MAX));
+            rhs.significant_digits = min(rhs.significant_digits, (lhs.exponent + lhs.significant_digits).checked_sub(rhs.exponent).unwrap_or(i64::MAX));
             *lhs = rhs;
             return;
         }
@@ -382,14 +385,14 @@ impl<R> RingBase for PAdicNumbersBase<R>
         if lhs.exponent > rhs.exponent {
             self.denormalize(lhs, rhs.exponent);
             self.ring.add_assign(&mut lhs.el, rhs.el);
-            lhs.precision = min(lhs.precision, rhs.precision);
+            lhs.significant_digits = min(lhs.significant_digits, rhs.significant_digits);
         } else if rhs.exponent > lhs.exponent {
             self.denormalize(&mut rhs, lhs.exponent);
             self.ring.add_assign(&mut lhs.el, rhs.el);
-            lhs.precision = min(lhs.precision, rhs.precision);
+            lhs.significant_digits = min(lhs.significant_digits, rhs.significant_digits);
         } else {
             self.ring.add_assign(&mut lhs.el, rhs.el);
-            lhs.precision = min(lhs.precision, rhs.precision);
+            lhs.significant_digits = min(lhs.significant_digits, rhs.significant_digits);
             self.normalize(lhs);
         }
         debug_assert!(self.ring.is_zero(&lhs.el) || self.is_normalized(lhs));
@@ -398,8 +401,8 @@ impl<R> RingBase for PAdicNumbersBase<R>
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         debug_assert!(self.ring.is_zero(&lhs.el) || self.is_normalized(lhs));
         debug_assert!(self.ring.is_zero(&rhs.el) || self.is_normalized(&rhs));
-        lhs.precision = min(lhs.precision, rhs.precision);
-        lhs.exponent = min(i64::MAX.saturating_sub(lhs.precision), lhs.exponent.checked_add(rhs.exponent).unwrap_or(i64::MAX));
+        lhs.significant_digits = min(lhs.significant_digits, rhs.significant_digits);
+        lhs.exponent = min(i64::MAX.saturating_sub(lhs.significant_digits), lhs.exponent.checked_add(rhs.exponent).unwrap_or(i64::MAX));
         self.ring.mul_assign(&mut lhs.el, rhs.el);
         debug_assert!(self.ring.is_zero(&lhs.el) || self.is_normalized(lhs));
     }
@@ -413,7 +416,7 @@ impl<R> RingBase for PAdicNumbersBase<R>
     }
 
     fn zero(&self) -> Self::Element {
-        return self.zero_with_prec(self.max_precision as i64);
+        return self.zero_with_prec(self.max_significant_digits as i64);
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -421,12 +424,12 @@ impl<R> RingBase for PAdicNumbersBase<R>
         debug_assert!(self.ring.is_zero(&rhs.el) || self.is_normalized(&rhs));
         if lhs.exponent >= rhs.exponent {
             // compare p-adic coefficients from `rhs.exponent` (inclusive) to `rhs.exponent + precision` (exclusive)
-            let precision = min(rhs.precision, (lhs.precision + lhs.exponent).checked_sub(rhs.exponent).unwrap_or(i64::MAX));
-            assert!(precision >= self.min_precision_for_compare as i64 || precision + rhs.exponent >= self.min_significant_digits_for_compare as i64, "values {} and {} don't have enough precision for a comparison", RingRef::new(self).format(lhs), RingRef::new(self).format(rhs));
-            debug_assert!(precision <= self.max_precision as i64);
-            let lhs_scale = min((self.max_precision as i64 - precision).checked_add(lhs.exponent - rhs.exponent).unwrap_or(i64::MAX), self.max_precision as i64);
+            let precision = min(rhs.significant_digits, (lhs.significant_digits + lhs.exponent).checked_sub(rhs.exponent).unwrap_or(i64::MAX));
+            assert!(precision >= self.min_significant_digits_for_compare as i64 || precision + rhs.exponent >= self.min_absolute_precise_digits_for_compare as i64, "values {} and {} don't have enough precision for a comparison", RingRef::new(self).format(lhs), RingRef::new(self).format(rhs));
+            debug_assert!(precision <= self.max_significant_digits as i64);
+            let lhs_scale = min((self.max_significant_digits as i64 - precision).checked_add(lhs.exponent - rhs.exponent).unwrap_or(i64::MAX), self.max_significant_digits as i64);
             let lhs_denom = self.ring.mul_ref_fst(&lhs.el, self.ring.pow(self.ring.clone_el(self.ring.max_ideal_gen()), lhs_scale as usize));
-            let rhs_denom = self.ring.mul_ref_fst(&rhs.el, self.ring.pow(self.ring.clone_el(self.ring.max_ideal_gen()), (self.max_precision as i64 - precision) as usize));
+            let rhs_denom = self.ring.mul_ref_fst(&rhs.el, self.ring.pow(self.ring.clone_el(self.ring.max_ideal_gen()), (self.max_significant_digits as i64 - precision) as usize));
             return self.ring.eq_el(&lhs_denom, &rhs_denom);
         } else {
             return self.eq_el(rhs, lhs);
@@ -435,8 +438,8 @@ impl<R> RingBase for PAdicNumbersBase<R>
 
     fn is_zero(&self, value: &Self::Element) -> bool {
         debug_assert!(self.ring.is_zero(&value.el) || self.is_normalized(value));
-        assert!(value.precision >= self.min_precision_for_compare as i64 || value.precision + value.exponent >= self.min_significant_digits_for_compare as i64, "values {} doesn't have enough precision for a comparison with zero", RingRef::new(self).format(value));
-        let power = self.max_precision as i64 - value.precision;
+        assert!(value.significant_digits >= self.min_significant_digits_for_compare as i64 || value.significant_digits + value.exponent >= self.min_absolute_precise_digits_for_compare as i64, "values {} doesn't have enough precision for a comparison with zero", RingRef::new(self).format(value));
+        let power = self.max_significant_digits as i64 - value.significant_digits;
         self.ring.is_zero(&self.ring.mul_ref_fst(&value.el, self.ring.pow(self.ring.clone_el(self.ring.max_ideal_gen()), power as usize)))
     }
 
@@ -452,14 +455,14 @@ impl<R> RingBase for PAdicNumbersBase<R>
 
     fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
         if self.is_zero(value) {
-            return write!(out, "O({}^{})", self.ring.format(self.ring.max_ideal_gen()), value.precision + value.exponent);
+            return write!(out, "O({}^{})", self.ring.format(self.ring.max_ideal_gen()), value.significant_digits + value.exponent);
         }
         if env > EnvBindingStrength::Sum {
             write!(out, "(")?;
         }
         write!(out, "{}^{} * ", self.ring.format(self.ring.max_ideal_gen()), value.exponent)?;
         self.ring.get_ring().dbg_within(&value.el, out, EnvBindingStrength::Product)?;
-        write!(out, " + O({}^{})", self.ring.format(self.ring.max_ideal_gen()), value.exponent + value.precision)?;
+        write!(out, " + O({}^{})", self.ring.format(self.ring.max_ideal_gen()), value.exponent + value.significant_digits)?;
         if env > EnvBindingStrength::Sum {
             write!(out, ")")?;
         }
@@ -479,13 +482,13 @@ impl<R> DivisibilityRing for PAdicNumbersBase<R>
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(rhs) && self.is_zero(lhs) {
-            return Some(self.zero_with_prec(min(lhs.precision, rhs.precision)));
+            return Some(self.zero_with_prec(min(lhs.significant_digits, rhs.significant_digits)));
         } else if self.is_zero(rhs) {
             return None;
         }
         assert!(self.is_normalized(rhs));
         return Some(self.mul_ref_fst(lhs, PAdicNumbersEl {
-            precision: rhs.precision.clone(),
+            significant_digits: rhs.significant_digits.clone(),
             exponent: -rhs.exponent,
             el: self.ring.invert(&rhs.el).unwrap()
         }));
@@ -561,37 +564,37 @@ fn test_precision() {
     let a = field.int_hom().map(3);
     let b = field.int_hom().map(9);
     let c = field.int_hom().map(12);
-    assert_eq!(10, field.precision_estimate(&a));
-    assert_eq!(10, field.highest_significant_digit(&a));
-    assert_eq!(10, field.precision_estimate(&b));
-    assert_eq!(11, field.highest_significant_digit(&b));
-    assert_eq!(10, field.precision_estimate(&c));
-    assert_eq!(10, field.highest_significant_digit(&c));
+    assert_eq!(10, field.significant_digits(&a));
+    assert_eq!(10, field.highest_precise_digit(&a));
+    assert_eq!(10, field.significant_digits(&b));
+    assert_eq!(11, field.highest_precise_digit(&b));
+    assert_eq!(10, field.significant_digits(&c));
+    assert_eq!(10, field.highest_precise_digit(&c));
     
     let e = field.sub_ref(&a, &a);
-    assert_eq!(10, field.precision_estimate(&e));
-    assert_eq!(10, field.highest_significant_digit(&e));
+    assert_eq!(10, field.significant_digits(&e));
+    assert_eq!(10, field.highest_precise_digit(&e));
     let z = field.zero();
-    assert_eq!(10, field.precision_estimate(&z));
+    assert_eq!(10, field.significant_digits(&z));
     assert!(field.eq_el(&z, &e));
-    assert_eq!(10, field.precision_estimate(&e));
-    assert_eq!(10, field.highest_significant_digit(&e));
-    assert_eq!(10, field.precision_estimate(&z));
+    assert_eq!(10, field.significant_digits(&e));
+    assert_eq!(10, field.highest_precise_digit(&e));
+    assert_eq!(10, field.significant_digits(&z));
 
-    assert_eq!(10, field.precision_estimate(&field.sub_ref(&b, &a)));
-    assert_eq!(10, field.highest_significant_digit(&field.sub_ref(&b, &a)));
+    assert_eq!(10, field.significant_digits(&field.sub_ref(&b, &a)));
+    assert_eq!(10, field.highest_precise_digit(&field.sub_ref(&b, &a)));
 
     let d = field.sub_ref(&c, &a);
-    assert_eq!(9, field.precision_estimate(&d));
-    assert_eq!(10, field.highest_significant_digit(&d));
+    assert_eq!(9, field.significant_digits(&d));
+    assert_eq!(10, field.highest_precise_digit(&d));
 
     assert!(field.eq_el(&b, &d));
-    assert_eq!(11, field.highest_significant_digit(&b));
-    assert_eq!(10, field.precision_estimate(&b));
+    assert_eq!(11, field.highest_precise_digit(&b));
+    assert_eq!(10, field.significant_digits(&b));
 
     assert!(!field.eq_el(&a, &b));
-    assert_eq!(10, field.precision_estimate(&a));
-    assert_eq!(10, field.highest_significant_digit(&a));
+    assert_eq!(10, field.significant_digits(&a));
+    assert_eq!(10, field.highest_precise_digit(&a));
 }
 
 #[test]
@@ -599,14 +602,38 @@ fn test_approx_eq() {
     let field = PAdicNumbers::new_with(AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING.pow(3, 10) as u64)).unwrap());
     let nine_precise = field.int_hom().map(9);
     let nine_imprecise = field.sub(field.int_hom().map(10), field.one());
-    let almost_zero = field.int_hom().map(StaticRing::<i32>::RING.pow(3, 10));
+    let high_valuation = field.int_hom().map(StaticRing::<i32>::RING.pow(3, 10));
 
-    assert_eq!(8, field.precision_estimate(&nine_imprecise));
-    assert!(!field.is_zero(&almost_zero));
+    assert_eq!(8, field.significant_digits(&nine_imprecise));
+    assert!(!field.is_zero(&high_valuation));
 
     let zero_imprecise = field.sub_ref(&nine_imprecise, &nine_precise);
-    let almost_zero_imprecise = field.add_ref(&zero_imprecise, &almost_zero);
+    let almost_zero_imprecise = field.add_ref(&zero_imprecise, &high_valuation);
     assert!(field.is_zero(&almost_zero_imprecise));
+
+    let almost_three = field.int_hom().map(3 + StaticRing::<i32>::RING.pow(3, 10));
+    let imprecise_three = field.sub(field.int_hom().map(4), field.one());
+    let should_be_zero = field.sub(almost_three, imprecise_three);
+    assert!(field.is_zero(&should_be_zero));
+    assert_eq!(0, field.significant_digits(&should_be_zero));
+
+    let almost_nine = field.int_hom().map(9 + StaticRing::<i32>::RING.pow(3, 11));
+    let should_be_zero = field.sub(almost_nine, nine_imprecise);
+    assert!(field.is_zero(&should_be_zero));
+    assert_eq!(0, field.significant_digits(&should_be_zero));
+}
+
+#[test]
+fn test_add_zero() {
+    let field = PAdicNumbers::new_with(AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING.pow(3, 10) as u64)).unwrap());
+    let zero_high_exp = field.zero();
+    let zero_low_exp = field.sub(field.one(), field.one());
+    let high_valuation = field.int_hom().map(StaticRing::<i32>::RING.pow(3, 10));
+
+    assert!(field.eq_el(&zero_low_exp, &high_valuation));
+    assert!(!field.eq_el(&zero_high_exp, &high_valuation));
+    assert!(field.eq_el(&field.add_ref(&zero_low_exp, &zero_high_exp), &high_valuation));
+    assert!(field.eq_el(&field.add_ref(&zero_high_exp, &zero_low_exp), &high_valuation));
 }
 
 #[test]
