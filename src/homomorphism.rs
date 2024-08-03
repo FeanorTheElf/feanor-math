@@ -364,13 +364,18 @@ impl<R, S> CanHom<R, S>
 {
     pub fn new(from: R, to: S) -> Result<Self, (R, S)> {
         match to.get_ring().has_canonical_hom(from.get_ring()) {
-            Some(data) => Ok(Self { from, to, data }),
+            Some(data) => Ok(Self::from_raw_parts(from, to, data)),
             _ => Err((from, to))
         }
     }
 
     pub fn raw_hom(&self) -> &<S::Type as CanHomFrom<R::Type>>::Homomorphism {
         &self.data
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn from_raw_parts(from: R, to: S, data: <S::Type as CanHomFrom<R::Type>>::Homomorphism) -> Self {
+        Self { from, to, data }
     }
 }
 
@@ -383,6 +388,78 @@ impl<R, S> Clone for CanHom<R, S>
 }
 
 impl<R, S> Homomorphism<R::Type, S::Type> for CanHom<R, S>
+    where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
+{
+    type CodomainStore = S;
+    type DomainStore = R;
+
+    fn map(&self, el: El<R>) -> El<S> {
+        self.to.get_ring().map_in(self.from.get_ring(), el, &self.data)
+    }
+
+    fn map_ref(&self, el: &El<R>) -> El<S> {
+        self.to.get_ring().map_in_ref(self.from.get_ring(), el, &self.data)
+    }
+    
+    fn domain(&self) -> &R {
+        &self.from
+    }
+
+    fn codomain(&self) -> &S {
+        &self.to
+    }
+}
+
+///
+/// A wrapper of [`CanHomFrom::Homomorphism`] that does not own the data associated
+/// with the homomorphism. Use cases are rare, prefer to use [`CanHom`] whenever possible.
+/// 
+/// More concretely, this should only be used when you only have a reference to `<R as CanHomFrom<S>>::Homomorphism`,
+/// but cannot refactor code to wrap that object in a [`CanHom`] instead. The main situation
+/// where this occurs is when implementing [`CanHomFrom`], since a the lifetime of [`CanHom`] is
+/// bound by the lifetime of the domain and codomain rings, but `CanHomFrom::Type` does not allow
+/// this.
+/// 
+#[stability::unstable(feature = "enable")]
+pub struct CanHomRef<'a, R, S>
+    where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
+{
+    from: R,
+    to: S,
+    data: &'a <S::Type as CanHomFrom<R::Type>>::Homomorphism
+}
+
+impl<'a, R, S> CanHomRef<'a, R, S>
+    where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn raw_hom(&self) -> &<S::Type as CanHomFrom<R::Type>>::Homomorphism {
+        &self.data
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn from_raw_parts(from: R, to: S, data: &'a <S::Type as CanHomFrom<R::Type>>::Homomorphism) -> Self {
+        Self { from, to, data }
+    }
+}
+
+impl<'a, R, S> Clone for CanHomRef<'a, R, S>
+    where R: RingStore + Clone, S: RingStore + Clone, S::Type: CanHomFrom<R::Type>
+{
+    fn clone(&self) -> Self {
+        Self::from_raw_parts(self.from.clone(), self.to.clone(), self.data)
+    }
+}
+
+impl<'a, R, S> Copy for CanHomRef<'a, R, S>
+    where R: RingStore + Copy, 
+        S: RingStore + Copy, 
+        S::Type: CanHomFrom<R::Type>,
+        El<R>: Copy,
+        El<S>: Copy
+{}
+
+impl<'a, R, S> Homomorphism<R::Type, S::Type> for CanHomRef<'a, R, S>
     where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
 {
     type CodomainStore = S;
