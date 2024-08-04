@@ -12,42 +12,20 @@ use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::multivariate;
 use crate::rings::multivariate_new::*;
-use crate::integer::{IntegerRing, IntegerRingStore};
+use crate::integer::{binomial, int_cast, BigIntRing, IntegerRing, IntegerRingStore};
 use crate::seq::{VectorFn, VectorView, VectorViewMut};
 use crate::homomorphism::*;
+use crate::ordered::OrderedRingStore;
 
 type Exponent = u16;
 type OrderIdx = u64;
 type Index = NonZeroU32;
 
-static BINOMIAL_COEFF_LOOKUP_TABLE: ThreadLocal<RefCell<Vec<Vec<u64>>>> = ThreadLocal::new();
-
-fn compute_binomial(n: i64, k: i64) -> i128 {
-    assert!(k <= n);
-    let n = n as i128;
-    let k = k as i128;
-    StaticRing::<i128>::RING.prod((n - k + 1)..(n + 1)) / StaticRing::<i128>::RING.prod(1..(k + 1))
-}
-
-fn binomial(n: usize, k: usize) -> u64 {
-    assert!(k <= n);
-    let table = BINOMIAL_COEFF_LOOKUP_TABLE.get_or(|| RefCell::new(Vec::new()));
-    let mut table = table.borrow_mut();
-    if table.len() <= n {
-        table.resize_with(n + 1, || Vec::new());
-    }
-    let table_for_n = &mut table[n];
-    while table_for_n.len() <= k {
-        table_for_n.push(u64::try_from(compute_binomial(n as i64, table_for_n.len() as i64)).unwrap());
-    }
-    return table_for_n[k];
-}
-
 ///
 /// Computes `sum_(0 <= l <= k) binomial(n + l, n)`
 /// 
 fn compute_cum_binomial(n: usize, k: usize) -> u64 {
-    StaticRing::<i64>::RING.sum((0..(k + 1)).map(|l| binomial(n + l, n) as i64)) as u64
+    StaticRing::<i64>::RING.sum((0..(k + 1)).map(|l| binomial((n + l) as i128, &(n as i128), StaticRing::<i128>::RING) as i64)) as u64
 }
 
 ///
@@ -151,12 +129,17 @@ impl<R, A> MultivariatePolyRingImpl<R, A>
         let max_degree_for_orderidx = if variable_count == 1 || variable_count == 2 {
             usize::MAX
         } else {
-            int_bisect::find_root_floor(StaticRing::<i64>::RING, 0, |d| if compute_binomial(d + variable_count as i64 - 1, variable_count as i64 - 1) < u64::MAX as i128 { -1 } else { 1 }) as usize
+            let k = int_cast(variable_count as i64 - 1, BigIntRing::RING, StaticRing::<i64>::RING);
+            // ensure that cum_binomial() always fits within an u64
+            int_bisect::find_root_floor(StaticRing::<i64>::RING, 0, |d| if BigIntRing::RING.is_lt(&BigIntRing::RING.mul(
+                binomial(int_cast(d + variable_count as i64 - 1, BigIntRing::RING, StaticRing::<i64>::RING), &k, BigIntRing::RING),
+                int_cast(*d as i64, BigIntRing::RING, StaticRing::<i64>::RING)
+            ), &BigIntRing::RING.power_of_two(u64::BITS as usize)) { -1 } else { 1 }) as usize
         };
         assert!(max_degree_for_orderidx >= max_supported_deg as usize);
 
         let allocated_monomials = AppendOnlyVec::new();
-        // add dummy element so that the index is nonzero
+        // add dummy element so that the index is nonzero, this allows keeping MonomialIdentifier within 16 bytes
         allocated_monomials.push(Vec::new().into_boxed_slice());
         let cum_binomial_lookup_table = (0..(variable_count - 1)).map(|n| (0..=max_supported_deg).map(|k| compute_cum_binomial(n, k as usize)).collect()).collect();
         Self::from(MultivariatePolyRingImplBase {
@@ -765,4 +748,13 @@ fn test_enumeration_index_degrevlex() {
 #[test]
 fn test_monomial_small() {
     assert_eq!(16, std::mem::size_of::<MonomialIdentifier>());
+}
+
+#[test]
+fn test_new_many_variables() {
+    for m in 1..32 {
+        println!("{}", m);
+        let ring = MultivariatePolyRingImpl::new_with(StaticRing::<i64>::RING, m, 32, Global);
+        assert_eq!(m, ring.variable_count());
+    }
 }

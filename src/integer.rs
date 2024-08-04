@@ -1,5 +1,5 @@
 use crate::algorithms;
-use crate::divisibility::Domain;
+use crate::divisibility::*;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::pid::*;
@@ -259,6 +259,57 @@ pub fn int_cast<T: IntegerRingStore, F: IntegerRingStore>(value: El<F>, to: T, f
 }
 
 ///
+/// Computes the binomial coefficient of `n` and `k`, defined as `n(n - 1)...(n - k + 1)/k!`.
+/// 
+/// The above definition works for any `n` and `k >= 0`. If `k < 0`, we define the binomial coefficient
+/// to be zero. This function will not overflow, if the integer rings supports number up to 
+/// `binomial(n, k) * k`.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::integer::*;
+/// # use feanor_math::iters::*;
+/// # use feanor_math::primitive_int::*;
+/// // the binomial coefficient is equal to the number of combinations of fixed size
+/// assert_eq!(
+///     binomial(10, &3, StaticRing::<i64>::RING) as usize,
+///     multiset_combinations(&[1; 10], 3, |_| ()).count()
+/// );
+/// ```
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn binomial<I>(n: El<I>, k: &El<I>, ring: I) -> El<I>
+    where I: RingStore + Copy,
+        I::Type: IntegerRing
+{
+    if ring.is_neg(&n) {
+        let mut result = binomial(ring.sub(ring.sub_ref_fst(&k, n), ring.one()), k, ring);
+        if !ring.is_even(k) {
+            ring.negate_inplace(&mut result);
+        }
+        return result;
+    } else if ring.is_neg(k) || ring.is_gt(k, &n) {
+        return ring.zero();
+    } else {
+        // this formula works always, and is guaranteed not to overflow if k <= n/2 and `binomial(n, k) * k` 
+        // fits into an integer; thus distinguish this case that k > n/2
+        let n_neg_k = ring.sub_ref(&n, &k);
+        if ring.is_lt(&n_neg_k, k) {
+            return binomial(n, &n_neg_k, ring);
+        }
+        let mut result = ring.one();
+        let mut i = ring.one();
+        while ring.is_leq(&i, &k) {
+            ring.mul_assign(&mut result, ring.sub_ref_snd(ring.add_ref_fst(&n, ring.one()), &i));
+            result = ring.checked_div(&result, &i).unwrap();
+            ring.add_assign(&mut i, ring.one());
+        }
+        return result;
+    }
+}
+
+///
 /// Trait for [`RingStore`]s that store [`IntegerRing`]s. Mainly used
 /// to provide a convenient interface to the `IntegerRing`-functions.
 /// 
@@ -424,4 +475,33 @@ fn test_rounded_div() {
     assert_el_eq!(ZZ, -3, ZZ.rounded_div(-22, &7));
     assert_el_eq!(ZZ, -3, ZZ.rounded_div(22, &-7));
     assert_el_eq!(ZZ, 3, ZZ.rounded_div(-22, &-7));
+}
+
+#[test]
+fn test_binomial() {
+    let ZZ = StaticRing::<i32>::RING;
+    assert_eq!(0, binomial(-4, &-1, ZZ));
+    assert_eq!(1, binomial(-4, &0, ZZ));
+    assert_eq!(-4, binomial(-4, &1, ZZ));
+    assert_eq!(10, binomial(-4, &2, ZZ));
+    assert_eq!(-20, binomial(-4, &3, ZZ));
+    assert_eq!(35, binomial(-4, &4, ZZ));
+    assert_eq!(-56, binomial(-4, &5, ZZ));
+
+    assert_eq!(0, binomial(3, &-1, ZZ));
+    assert_eq!(1, binomial(3, &0, ZZ));
+    assert_eq!(3, binomial(3, &1, ZZ));
+    assert_eq!(3, binomial(3, &2, ZZ));
+    assert_eq!(1, binomial(3, &3, ZZ));
+    assert_eq!(0, binomial(3, &4, ZZ));
+    
+    assert_eq!(0, binomial(8, &-1, ZZ));
+    assert_eq!(1, binomial(8, &0, ZZ));
+    assert_eq!(8, binomial(8, &1, ZZ));
+    assert_eq!(28, binomial(8, &2, ZZ));
+    assert_eq!(56, binomial(8, &3, ZZ));
+    assert_eq!(70, binomial(8, &4, ZZ));
+
+    // a naive computation would overflow
+    assert_eq!(145422675, binomial(30, &14, ZZ));
 }

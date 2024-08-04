@@ -1,10 +1,9 @@
-use std::cmp::min;
 use std::alloc::Allocator;
 
 use crate::divisibility::*;
 use crate::field::{Field, FieldStore};
 use crate::homomorphism::Homomorphism;
-use crate::integer::{int_cast, BigIntRing, IntegerRing, IntegerRingStore};
+use crate::integer::{binomial, int_cast, BigIntRing, IntegerRing, IntegerRingStore};
 use crate::ordered::*;
 use crate::pid::*;
 use crate::primitive_int::StaticRing;
@@ -27,16 +26,6 @@ use super::hensel::hensel_lift_factorization;
 
 pub mod cantor_zassenhaus;
 pub mod number_field;
-
-fn binomial(n: usize, mut k: usize) -> El<BigIntRing> {
-    if k > n {
-        BigIntRing::RING.zero()
-    } else {
-        k = min(k, n - k);
-        let to_ZZbig = BigIntRing::RING.can_hom(&StaticRing::<i64>::RING).unwrap();
-        BigIntRing::RING.checked_div(&BigIntRing::RING.prod(((n - k + 1)..=n).map(|k| to_ZZbig.map(k as i64))), &BigIntRing::RING.prod((1..=k).map(|k| to_ZZbig.map(k as i64)))).unwrap()
-    }
-}
 
 ///
 /// Trait for fields over which we can efficiently factor polynomials.
@@ -277,10 +266,10 @@ fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
                 2
             );
             let bound = ZZbig.add(
-                ZZbig.mul(poly_norm, binomial(d, d / 2)),
+                ZZbig.mul(poly_norm, binomial(int_cast(d as i64, ZZbig, ZZ), &int_cast(d as i64 / 2, ZZbig, ZZ), ZZbig)),
                 ZZbig.mul(
                     int_cast(ZZX.base_ring().clone_el(ZZX.lc(f).unwrap()), ZZbig, ZZX.base_ring()), 
-                    binomial(d, d / 2)
+                    binomial(int_cast(d as i64, ZZbig, ZZ), &int_cast(d as i64 / 2, ZZbig, ZZ), ZZbig)
                 )
             );
             let exponent = ZZbig.abs_log2_ceil(&bound).unwrap() / (ZZ.abs_log2_ceil(&(p + 1)).unwrap() - 1) + 1;
