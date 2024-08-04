@@ -82,4 +82,4 @@ pub mod local;
 
 pub mod padic;
 
-pub(crate) mod multivariate_new;
+pub mod multivariate_new;

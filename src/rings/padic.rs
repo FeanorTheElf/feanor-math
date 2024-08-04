@@ -425,7 +425,7 @@ impl<R> RingBase for PAdicNumbersBase<R>
         if lhs.exponent >= rhs.exponent {
             // compare p-adic coefficients from `rhs.exponent` (inclusive) to `rhs.exponent + precision` (exclusive)
             let precision = min(rhs.significant_digits, (lhs.significant_digits + lhs.exponent).checked_sub(rhs.exponent).unwrap_or(i64::MAX));
-            assert!(precision >= self.min_significant_digits_for_compare as i64 || precision + rhs.exponent >= self.min_absolute_precise_digits_for_compare as i64, "values {} and {} don't have enough precision for a comparison", RingRef::new(self).format(lhs), RingRef::new(self).format(rhs));
+            assert!(precision >= self.min_significant_digits_for_compare as i64 || precision + rhs.exponent >= self.min_absolute_precise_digits_for_compare as i64, "values don't have enough precision for a comparison");
             debug_assert!(precision <= self.max_significant_digits as i64);
             let lhs_scale = min((self.max_significant_digits as i64 - precision).checked_add(lhs.exponent - rhs.exponent).unwrap_or(i64::MAX), self.max_significant_digits as i64);
             let lhs_denom = self.ring.mul_ref_fst(&lhs.el, self.ring.pow(self.ring.clone_el(self.ring.max_ideal_gen()), lhs_scale as usize));
@@ -438,7 +438,7 @@ impl<R> RingBase for PAdicNumbersBase<R>
 
     fn is_zero(&self, value: &Self::Element) -> bool {
         debug_assert!(self.ring.is_zero(&value.el) || self.is_normalized(value));
-        assert!(value.significant_digits >= self.min_significant_digits_for_compare as i64 || value.significant_digits + value.exponent >= self.min_absolute_precise_digits_for_compare as i64, "values {} doesn't have enough precision for a comparison with zero", RingRef::new(self).format(value));
+        assert!(value.significant_digits >= self.min_significant_digits_for_compare as i64 || value.significant_digits + value.exponent >= self.min_absolute_precise_digits_for_compare as i64, "value doesn't have enough precision for a comparison with zero");
         let power = self.max_significant_digits as i64 - value.significant_digits;
         self.ring.is_zero(&self.ring.mul_ref_fst(&value.el, self.ring.pow(self.ring.clone_el(self.ring.max_ideal_gen()), power as usize)))
     }

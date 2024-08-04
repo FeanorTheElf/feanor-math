@@ -107,6 +107,7 @@ pub struct MultivariatePolyRingImplBase<R, A = Global>
     tmp_poly: AtomicOptionBox<Vec<(El<R>, MonomialIdentifier)>>
 }
 
+#[stability::unstable(feature = "enable")]
 pub type MultivariatePolyRingImpl<R, A = Global> = RingValue<MultivariatePolyRingImplBase<R, A>>;
 
 impl<R> MultivariatePolyRingImpl<R>

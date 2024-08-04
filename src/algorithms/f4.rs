@@ -679,10 +679,10 @@ pub fn buchberger<P, O, const LOG: bool>(ring: P, input_basis: Vec<El<P>>, order
 {
     let poly_ring = multivariate_new::multivariate_impl::MultivariatePolyRingImpl::new(ring.base_ring(), ring.indeterminate_len());
     let gb = if order.is_same(DegRevLex) {
-        super::buchberger::buchberger::<_, _, LOG>(&poly_ring, input_basis.iter().map(|f| <_ as multivariate_new::MultivariatePolyRingStore>::from_terms(&poly_ring, ring.terms(f).map(|(c, m)| (
+        super::buchberger::buchberger::<_, _, LOG, _, _>(&poly_ring, input_basis.iter().map(|f| <_ as multivariate_new::MultivariatePolyRingStore>::from_terms(&poly_ring, ring.terms(f).map(|(c, m)| (
             ring.base_ring().clone_el(c),
             <_ as multivariate_new::MultivariatePolyRingStore>::create_monomial(&poly_ring, (0..ring.indeterminate_len()).map(|i| m[i] as usize))
-        )))).collect(), multivariate_new::DegRevLex)
+        )))).collect(), multivariate_new::DegRevLex, default_sort_fn(&poly_ring, multivariate_new::DegRevLex), |_| false)
     } else {
         unimplemented!("currently only Degrevlex is supported, until the new multivariate poly ring impl becomes stable")
     };
@@ -779,6 +779,7 @@ use crate::rings::poly::*;
 #[cfg(test)]
 use crate::seq::*;
 
+use super::buchberger::default_sort_fn;
 use super::int_bisect;
 use super::sparse_invert::matrix::SparseMatrix;
 
