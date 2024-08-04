@@ -11,7 +11,7 @@ use crate::ring::*;
 use crate::rings::finite::FiniteRing;
 use crate::rings::local::AsLocalPIRBase;
 use crate::primitive_int::StaticRing;
-use crate::rings::multivariate::*;
+use crate::rings::{multivariate::*, multivariate_new};
 use crate::rings::zn::{ZnRing, zn_64, ZnRingStore, zn_static};
 use crate::algorithms;
 
@@ -666,6 +666,30 @@ pub fn f4<P, O, const LOG: bool>(ring: P, mut basis: Vec<El<P>>, order: O, S_pol
         println!("Redundant S-pairs: {} (prod), {} (chain)", product_criterion_skipped, chain_criterion_skipped);
     }
     return basis;
+}
+
+#[stability::unstable(feature = "enable")]
+pub fn buchberger<P, O, const LOG: bool>(ring: P, input_basis: Vec<El<P>>, order: O) -> Vec<El<P>>
+    where P: RingStore + Copy,
+        P::Type: MultivariatePolyRing,
+        <P::Type as RingExtension>::BaseRing: Sync,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalLocalRing,
+        O: MonomialOrder + Copy,
+        Coeff<P>: Send + Sync
+{
+    let poly_ring = multivariate_new::multivariate_impl::MultivariatePolyRingImpl::new(ring.base_ring(), ring.indeterminate_len());
+    let gb = if order.is_same(DegRevLex) {
+        super::buchberger::buchberger::<_, _, LOG>(&poly_ring, input_basis.iter().map(|f| <_ as multivariate_new::MultivariatePolyRingStore>::from_terms(&poly_ring, ring.terms(f).map(|(c, m)| (
+            ring.base_ring().clone_el(c),
+            <_ as multivariate_new::MultivariatePolyRingStore>::create_monomial(&poly_ring, (0..ring.indeterminate_len()).map(|i| m[i] as usize))
+        )))).collect(), multivariate_new::DegRevLex)
+    } else {
+        unimplemented!("currently only Degrevlex is supported, until the new multivariate poly ring impl becomes stable")
+    };
+    return gb.iter().map(|f| ring.from_terms(<_ as multivariate_new::MultivariatePolyRingStore>::terms(&poly_ring, f).map(|(c , m)| (
+        ring.base_ring().clone_el(c),
+        ring.get_ring().create_monomial((0..ring.indeterminate_len()).map(|i| <_ as multivariate_new::MultivariatePolyRingStore>::exponent_at(&poly_ring, m, i) as u16))
+    )))).collect();
 }
 
 #[stability::unstable(feature = "enable")]
