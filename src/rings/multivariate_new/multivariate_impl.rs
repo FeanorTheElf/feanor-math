@@ -10,9 +10,11 @@ use thread_local::ThreadLocal;
 use crate::algorithms::int_bisect;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
+use crate::rings::multivariate;
 use crate::rings::multivariate_new::*;
 use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::seq::{VectorFn, VectorView, VectorViewMut};
+use crate::homomorphism::*;
 
 type Exponent = u16;
 type OrderIdx = u64;
@@ -585,14 +587,120 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
     }
 }
 
+impl<P, R, A> CanHomFrom<P> for MultivariatePolyRingImplBase<R, A> 
+    where R: RingStore,
+        A: Clone + Allocator + Send,
+        P: MultivariatePolyRing,
+        R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>
+{
+    type Homomorphism = <R::Type as CanHomFrom<<P::BaseRing as RingStore>::Type>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &P) -> Option<Self::Homomorphism> {
+        if self.variable_count() >= from.variable_count() {
+            self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
+        } else {
+            None
+        }
+    }
+
+    fn map_in(&self, from: &P, el: <P as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in_ref(from, &el, hom)
+    }
+
+    fn map_in_ref(&self, from: &P, el: &<P as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        RingRef::new(self).from_terms(from.terms(el).map(|(c, m)| (
+            self.base_ring().get_ring().map_in_ref(from.base_ring().get_ring(), c, hom),
+            self.create_monomial((0..self.variable_count()).map(|i| if i < from.variable_count() { from.exponent_at(m, i) } else { 0 }))
+        )))
+    }
+}
+
+impl<R2, A2, O2, R, A, const N2: usize> CanHomFrom<multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2>> for MultivariatePolyRingImplBase<R, A> 
+    where R: RingStore,
+        A: Clone + Allocator + Send,
+        R2: RingStore,
+        O2: multivariate::MonomialOrder,
+        A2: Allocator + Clone,
+        R::Type: CanHomFrom<R2::Type>
+{
+    type Homomorphism = <R::Type as CanHomFrom<R2::Type>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2>) -> Option<Self::Homomorphism> {
+        if self.variable_count() >= <_ as multivariate::MultivariatePolyRing>::indeterminate_len(from) {
+            self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
+        } else {
+            None
+        }
+    }
+
+    fn map_in(&self, from: &multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2>, el: <multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in_ref(from, &el, hom)
+    }
+
+    fn map_in_ref(&self, from: &multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2>, el: &<multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        RingRef::new(self).from_terms(<_ as multivariate::MultivariatePolyRing>::terms(from, el).map(|(c, m)| (
+            self.base_ring().get_ring().map_in_ref(from.base_ring().get_ring(), c, hom),
+            self.create_monomial((0..self.variable_count()).map(|i| if i < <_ as multivariate::MultivariatePolyRing>::indeterminate_len(from) { m[i] as usize } else { 0 }))
+        )))
+    }
+}
+
+impl<P, R, A> CanIsoFromTo<P> for MultivariatePolyRingImplBase<R, A> 
+    where R: RingStore,
+        A: Clone + Allocator + Send,
+        P: MultivariatePolyRing,
+        R::Type: CanIsoFromTo<<P::BaseRing as RingStore>::Type>
+{
+    type Isomorphism = <R::Type as CanIsoFromTo<<P::BaseRing as RingStore>::Type>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &P) -> Option<Self::Isomorphism> {
+        if self.variable_count() == from.variable_count() {
+            self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
+        } else {
+            None
+        }
+    }
+
+    fn map_out(&self, from: &P, el: Self::Element, iso: &Self::Isomorphism) -> <P as RingBase>::Element {
+        RingRef::new(from).from_terms(self.terms(&el).map(|(c, m)| (
+            self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(c), iso),
+            from.create_monomial((0..self.variable_count()).map(|i| self.exponent_at(m, i)))
+        )))
+    }
+}
+
+impl<R2, A2, O2, R, A, const N2: usize> CanIsoFromTo<multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2>> for MultivariatePolyRingImplBase<R, A> 
+    where R: RingStore,
+        A: Clone + Allocator + Send,
+        R2: RingStore,
+        O2: multivariate::MonomialOrder,
+        A2: Allocator + Clone,
+        R::Type: CanIsoFromTo<R2::Type>
+{
+    type Isomorphism = <R::Type as CanIsoFromTo<R2::Type>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2>) -> Option<Self::Isomorphism> {
+        if self.variable_count() == <_ as multivariate::MultivariatePolyRing>::indeterminate_len(from) {
+            self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
+        } else {
+            None
+        }
+    }
+
+    fn map_out(&self, from: &multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2>, el: Self::Element, iso: &Self::Isomorphism) -> <multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2> as RingBase>::Element {
+        <_ as multivariate::MultivariatePolyRingStore>::from_terms(&RingRef::new(from), self.terms(&el).map(|(c, m)| (
+            self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(c), iso),
+            <_ as multivariate::MultivariatePolyRing>::create_monomial(from, (0..self.variable_count()).map(|i| self.exponent_at(m, i) as u16))
+        )))
+    }
+}
+
 #[cfg(test)]
 use crate::rings::zn::zn_static;
 #[cfg(test)]
 use crate::rings::zn::zn_static::F17;
 #[cfg(test)]
 use crate::iters::multiset_combinations;
-#[cfg(test)]
-use crate::homomorphism::*;
 
 #[cfg(test)]
 fn ring_and_elements() -> (MultivariatePolyRingImpl<zn_static::Fp<17>>, Vec<MultivariatePolyRingEl<zn_static::Fp<17>>>) {

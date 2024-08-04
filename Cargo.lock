@@ -59,7 +59,7 @@ checksum = "3dca9240753cf90908d7e4aac30f630662b02aebaa1b58a3cadabdb23385b58b"
 
 [[package]]
 name = "feanor-math"
-version = "2.1.11"
+version = "2.1.12"
 dependencies = [
  "append-only-vec",
  "atomicbox",
