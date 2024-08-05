@@ -170,7 +170,7 @@ pub trait MultivariatePolyRing: RingExtension {
         for (_, m) in self.terms(f) {
             for i in 0..self.indeterminate_len() {
                 if m[i] > 0 {
-                    result.insert(i, m[i]);
+                    result.entry(i).and_modify(|v| *v = max(*v, m[i])).or_insert(m[i]);
                 }
             }
         }
@@ -1031,4 +1031,11 @@ fn test_specialize() {
     let g = ring.from_terms([(1, Monomial::new([0, 2])), (16, Monomial::new([0, 1]))].into_iter());
 
     assert_el_eq!(ring, ring.add(ring.mul_ref(&g, &g), ring.indeterminate(1)), ring.specialize(&f, 0, &g));
+}
+
+#[test]
+fn test_appearing_variables() {
+    let ring: ordered::MultivariatePolyRingImpl<_, _, 2> = ordered::MultivariatePolyRingImpl::new(Zn::<17>::RING, DegRevLex);
+    let f = ring.from_terms([(1, Monomial::new([0, 2])), (1, Monomial::new([2, 1]))].into_iter());
+    assert_eq!([(0, 2), (1, 2)].into_iter().collect::<BTreeMap<_, _>>(), ring.appearing_variables(&f));
 }
