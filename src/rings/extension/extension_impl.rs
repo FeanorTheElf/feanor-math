@@ -2,6 +2,7 @@ use std::alloc::Allocator;
 use std::alloc::Global;
 
 use crate::algorithms::convolution::*;
+use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::divisibility::*;
 use crate::impl_wrap_unwrap_homs;
@@ -16,7 +17,6 @@ use crate::rings::finite::*;
 use crate::rings::poly::PolyRingStore;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::ring::*;
-use crate::algorithms;
 use crate::seq::VectorView;
 use crate::iters::*;
 
@@ -332,7 +332,7 @@ impl<R, V, A> FiniteRing for FreeAlgebraImplBase<R, V, A>
 }
 
 impl<R, V, A> DivisibilityRing for FreeAlgebraImplBase<R, V, A>
-    where R: RingStore, R::Type: PrincipalIdealRing, V: VectorView<El<R>>, A: Allocator + Clone
+    where R: RingStore, R::Type: LinSolveRing, V: VectorView<El<R>>, A: Allocator + Clone
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let mut mul_matrix: OwnedMatrix<_> = create_multiplication_matrix(RingRef::new(self), rhs);
@@ -341,8 +341,13 @@ impl<R, V, A> DivisibilityRing for FreeAlgebraImplBase<R, V, A>
         for j in 0..self.rank() {
             *lhs_matrix.at_mut(j, 0) = data.at(j);
         }
-        let solution = algorithms::smith::solve_right(mul_matrix.data_mut(), lhs_matrix.data_mut(), self.base_ring())?;
-        return Some(self.from_canonical_basis((0..self.rank()).map(|i| self.base_ring().clone_el(solution.at(i, 0)))));
+        let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(self.rank(), 1, self.base_ring());
+        let has_sol = self.base_ring().get_ring().solve_right(mul_matrix.data_mut(), lhs_matrix.data_mut(), solution.data_mut(), Global);
+        if has_sol.is_solved() {
+            return Some(self.from_canonical_basis((0..self.rank()).map(|i| self.base_ring().clone_el(solution.at(i, 0)))));
+        } else {
+            return None;
+        }
     }
 }
 

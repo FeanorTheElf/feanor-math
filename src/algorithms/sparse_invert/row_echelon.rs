@@ -330,7 +330,7 @@ fn transform_2x2<R>(ring: R, transform: &[El<R>; 4], rows: [&mut InternalRow<El<
 mod local {
     use transform::TransformTarget;
 
-    use crate::algorithms::smith;
+    use crate::algorithms::linsolve::smith::create_elim_matrix_from_bezout_identity;
     use crate::divisibility::*;
     use crate::matrix::ColumnMut;
     use crate::pid::PrincipalIdealRingStore;
@@ -355,7 +355,7 @@ mod local {
             }
             if let Some(entry) = matrix.at(i).leading_entry_at(pivot_j) {
                 if ring.checked_div(entry, &current).is_none() {
-                    let (local_transform, gcd) = smith::create_elim_matrix_from_bezout_identity(ring, &current, entry);
+                    let (local_transform, gcd) = create_elim_matrix_from_bezout_identity(ring, &current, entry);
                     let local_transform_det = ring.sub(ring.mul_ref(&local_transform[0], &local_transform[3]), ring.mul_ref(&local_transform[1], &local_transform[2]));
                     if EXTENSIVE_RUNTIME_ASSERTS {
                         assert!(ring.is_unit(&local_transform_det)); 

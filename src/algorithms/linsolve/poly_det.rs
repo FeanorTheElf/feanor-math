@@ -19,8 +19,7 @@ use crate::ordered::OrderedRingStore;
 use crate::seq::subvector::SubvectorFn;
 use crate::seq::SelfSubvectorFn;
 use crate::seq::VectorFn;
-
-use super::int_factor;
+use crate::algorithms::int_factor::factor;
 
 fn determinant_poly_matrix_base<P, V, A, I>(A: Submatrix<V, El<P>>, poly_ring: P, allocator: A, total_max_degrees: BTreeMap<usize, u16>, interpolation_points: I) -> El<P>
     where P: RingStore,
@@ -129,7 +128,7 @@ pub fn determinant_poly_matrix<P, V, A>(A: Submatrix<V, El<P>>, poly_ring: P, al
 
     let characteristic = poly_ring.base_ring().characteristic(&BigIntRing::RING).unwrap();
     if !BigIntRing::RING.is_zero(&characteristic) {
-        let characteristic_smallest_factor = int_factor::factor(&BigIntRing::RING, characteristic).into_iter().map(|(p, _)| p).min_by(|l, r| BigIntRing::RING.cmp(l, r)).unwrap();
+        let characteristic_smallest_factor = factor(&BigIntRing::RING, characteristic).into_iter().map(|(p, _)| p).min_by(|l, r| BigIntRing::RING.cmp(l, r)).unwrap();
         if BigIntRing::RING.is_lt(&characteristic_smallest_factor, &int_cast(max_interpolation_point_count, &BigIntRing::RING, &StaticRing::<i64>::RING)) {
             // we need an extension field
             return unimplemented!();

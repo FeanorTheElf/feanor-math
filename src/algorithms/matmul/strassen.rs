@@ -556,6 +556,43 @@ pub fn strassen<R, V1, V2, V3, A, const T1: bool, const T2: bool, const T3: bool
     let mut rhs_included_cols = 0;
     let mut current_block_size_log2 = max_block_size_log2;
     loop {
+        // complete using naive algorithm, this is significantly faster than going down all the block sizes
+        if current_block_size_log2 <= threshold_log2 {
+            if add_assign {
+                naive_matmul::<_, _, _, _, true, T1, T2, T3>(
+                    lhs.submatrix(lhs_included_rows..lhs.row_count(), 0..included_k), 
+                    rhs.submatrix(0..included_k, 0..rhs_included_cols), 
+                    dst.reborrow().submatrix(lhs_included_rows..lhs.row_count(), 0..rhs_included_cols), 
+                    ring
+                );
+                naive_matmul::<_, _, _, _, true, T1, T2, T3>(
+                    lhs.submatrix(0..lhs.row_count(), 0..included_k), 
+                    rhs.submatrix(0..included_k, rhs_included_cols..rhs.col_count()), 
+                    dst.reborrow().submatrix(0..lhs.row_count(), rhs_included_cols..rhs.col_count()), 
+                    ring
+                );
+            } else {
+                naive_matmul::<_, _, _, _, false, T1, T2, T3>(
+                    lhs.submatrix(lhs_included_rows..lhs.row_count(), 0..included_k), 
+                    rhs.submatrix(0..included_k, 0..rhs_included_cols), 
+                    dst.reborrow().submatrix(lhs_included_rows..lhs.row_count(), 0..rhs_included_cols), 
+                    ring
+                );
+                naive_matmul::<_, _, _, _, false, T1, T2, T3>(
+                    lhs.submatrix(0..lhs.row_count(), 0..included_k), 
+                    rhs.submatrix(0..included_k, rhs_included_cols..rhs.col_count()), 
+                    dst.reborrow().submatrix(0..lhs.row_count(), rhs_included_cols..rhs.col_count()), 
+                    ring
+                );
+            }
+            naive_matmul::<_, _, _, _, true, T1, T2, T3>(
+                lhs.submatrix(0..lhs.row_count(), included_k..lhs.col_count()), 
+                rhs.submatrix(included_k..rhs.row_count(), 0..rhs.col_count()), 
+                dst.submatrix(0..lhs.row_count(), 0..rhs.col_count()), 
+                ring
+            );
+            return;
+        }
         let block_size = 1 << current_block_size_log2;
         if included_k + block_size <= lhs.col_count() {
             matmul_part(current_block_size_log2, 0..lhs_included_rows, included_k..(included_k + block_size), 0..rhs_included_cols, true);
