@@ -48,9 +48,6 @@ pub fn solve_right_over_extension<R, V1, V2, V3, A>(ring: R, lhs: SubmatrixMut<V
         }
     }
 
-    println!("{}", format_matrix(expanded_lhs.row_count(), expanded_lhs.col_count(), |i, j| expanded_lhs.at(i, j), ring.base_ring()));
-    println!("{}", format_matrix(expanded_rhs.row_count(), expanded_rhs.col_count(), |i, j| expanded_rhs.at(i, j), ring.base_ring()));
-
     let mut solution = OwnedMatrix::zero_in(lhs.col_count() * ring.rank(), rhs.col_count(), ring.base_ring(), &allocator);
     let sol = ring.base_ring().get_ring().solve_right(expanded_lhs.data_mut(), expanded_rhs.data_mut(), solution.data_mut(), &allocator);
 
