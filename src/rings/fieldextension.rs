@@ -27,7 +27,7 @@ use super::poly::PolyRingStore;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::rings::zn::*;
 /// let Fp = Zn::new(7).as_field().ok().unwrap();
-/// let Fq = GFdyn(49);
+/// let Fq = GFdyn(7, 2);
 /// assert!(Fq.base_ring().get_ring() == Fp.get_ring());
 /// assert!(Fq.is_galois());
 /// ```
@@ -74,8 +74,8 @@ pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField {
     /// # use feanor_math::rings::fieldextension::*;
     /// # use feanor_math::rings::zn::zn_64::*;
     /// # use feanor_math::rings::zn::*;
-    /// assert!(GFdyn(25).has_hom(&GFdyn(125)).is_none());
-    /// assert!(GFdyn(25).has_hom(&GFdyn(625)).is_some());
+    /// assert!(GFdyn(5, 2).has_hom(&GFdyn(5, 3)).is_none());
+    /// assert!(GFdyn(5, 2).has_hom(&GFdyn(5, 4)).is_some());
     /// ```
     /// However be careful, since these homomorphisms do not have to be "canonical"!
     /// ```
@@ -90,9 +90,9 @@ pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField {
     /// # use feanor_math::rings::zn::*;
     /// // we create the field tower F3/F2/F1
     /// let p = 11;
-    /// let F1 = GFdyn(StaticRing::<i64>::RING.pow(p, 2) as u64);
-    /// let F2 = GFdyn(StaticRing::<i64>::RING.pow(p, 4) as u64);
-    /// let F3 = GFdyn(StaticRing::<i64>::RING.pow(p, 8) as u64);
+    /// let F1 = GFdyn(p, 2);
+    /// let F2 = GFdyn(p, 4);
+    /// let F3 = GFdyn(p, 8);
     /// let f = F1.has_hom(&F3).unwrap();
     /// let g = F2.has_hom(&F3).unwrap().compose(F1.has_hom(&F2).unwrap());
     /// assert!(!F3.eq_el(&F3.canonical_gen(), &f.map(F1.canonical_gen())) ||
