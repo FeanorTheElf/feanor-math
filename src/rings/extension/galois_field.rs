@@ -73,7 +73,7 @@ pub fn GF<const DEGREE: usize>(p: u64) -> GaloisField<DEGREE> {
 /// # use feanor_math::rings::finite::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::extension::galois_field::*;
-/// let F25 = GFdyn(5, 2);
+/// let F25 = GFdyn(25);
 /// let generator = F25.canonical_gen();
 /// let norm = F25.mul_ref_fst(&generator, F25.pow(F25.clone_el(&generator), 5));
 /// let inclusion = F25.inclusion();
@@ -83,20 +83,21 @@ pub fn GF<const DEGREE: usize>(p: u64) -> GaloisField<DEGREE> {
 /// }));
 /// ```
 /// 
-pub fn GFdyn(p: i64, degree: usize) -> GaloisFieldDyn {
-    assert!(degree >= 1);
+pub fn GFdyn(power_of_p: u64) -> GaloisFieldDyn {
+    let (p, e) = int_factor::is_prime_power(&StaticRing::<i64>::RING, &(power_of_p as i64)).unwrap();
+    assert!(e >= 1);
     let Fp = Zn::new(p as u64).as_field().ok().unwrap();
-    if degree == 1 {
+    if e == 1 {
         return FreeAlgebraImpl::new(Fp, vec![Fp.one()].into_boxed_slice()).as_field().ok().unwrap();
     }
     let poly_ring = DensePolyRing::new(Fp, "X");
     let mut rng = oorandom::Rand64::new(p as u128);
     loop {
-        let random_poly = poly_ring.from_terms((0..degree).map(|i| (Fp.random_element(|| rng.rand_u64()), i)).chain([(Fp.one(), degree)].into_iter()));
+        let random_poly = poly_ring.from_terms((0..e).map(|i| (Fp.random_element(|| rng.rand_u64()), i)).chain([(Fp.one(), e)].into_iter()));
         let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &random_poly);
         assert_el_eq!(Fp, Fp.one(), unit);
         if factorization.len() == 1 && factorization[0].1 == 1 {
-            return FreeAlgebraImpl::new(Fp, (0..degree).map(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i)))).collect::<Vec<_>>().into_boxed_slice()).as_field().ok().unwrap();
+            return FreeAlgebraImpl::new(Fp, (0..e).map(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i)))).collect::<Vec<_>>().into_boxed_slice()).as_field().ok().unwrap();
         }
     }
 }
@@ -162,21 +163,21 @@ fn test_GF() {
 
 #[test]
 fn test_GFdyn() {
-    let F7 = GFdyn(7, 1);
+    let F7 = GFdyn(7);
     assert_eq!(7, F7.elements().count());
     crate::field::generic_tests::test_field_axioms(&F7, F7.elements());
 
-    let F27 = GFdyn(3, 3);
+    let F27 = GFdyn(27);
     assert_eq!(27, F27.elements().count());
     crate::field::generic_tests::test_field_axioms(&F27, F27.elements());
 }
 
 #[test]
 fn test_GFdyn_even() {
-    let F16 = GFdyn(2, 4);
+    let F16 = GFdyn(16);
     assert_eq!(16, F16.elements().count());
     crate::field::generic_tests::test_field_axioms(&F16, F16.elements());
-    let F32 = GFdyn(2, 5);
+    let F32 = GFdyn(32);
     assert_eq!(32, F32.elements().count());
     crate::field::generic_tests::test_field_axioms(&F32, F32.elements());
 }
