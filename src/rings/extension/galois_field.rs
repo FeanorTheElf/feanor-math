@@ -1,4 +1,6 @@
+use crate::field::Field;
 use crate::integer::IntegerRingStore;
+use crate::pid::EuclideanRing;
 use crate::ring::*;
 use crate::algorithms::int_factor;
 use crate::algorithms::poly_factor::FactorPolyField;
@@ -6,16 +8,37 @@ use crate::primitive_int::StaticRing;
 use crate::rings::extension::{Homomorphism, RingStore};
 use crate::rings::field::AsField;
 use crate::rings::finite::FiniteRingStore;
+use crate::rings::local::{AsLocalPIR, AsLocalPIRBase};
 use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::rings::poly::PolyRingStore;
+use crate::rings::poly::{PolyRing, PolyRingStore};
 use crate::rings::zn::zn_64::Zn;
-use crate::rings::zn::ZnRingStore;
+use crate::rings::zn::{ReductionMap, ZnRing, ZnRingStore};
+use crate::local::PrincipalLocalRingStore;
 
 use super::conway::*;
 use super::extension_impl::FreeAlgebraImpl;
 
 pub type GaloisField<const DEGREE: usize> = AsField<FreeAlgebraImpl<AsField<Zn>, [El<AsField<Zn>>; DEGREE]>>;
 pub type GaloisFieldDyn = AsField<FreeAlgebraImpl<AsField<Zn>, Box<[El<AsField<Zn>>]>>>;
+
+#[stability::unstable(feature = "enable")]
+pub type GaloisRingDyn = AsLocalPIR<FreeAlgebraImpl<AsLocalPIR<Zn>, Box<[El<AsLocalPIR<Zn>>]>>>;
+
+fn random_irreducible_polynomial<P>(poly_ring: P, degree: usize) -> El<P>
+    where P: RingStore,
+        P::Type: PolyRing + EuclideanRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
+{
+    let mut rng = oorandom::Rand64::new(poly_ring.base_ring().integer_ring().default_hash(poly_ring.base_ring().modulus()) as u128);
+    loop {
+        let random_poly = poly_ring.from_terms((0..degree).map(|i| (poly_ring.base_ring().random_element(|| rng.rand_u64()), i)).chain([(poly_ring.base_ring().one(), degree)].into_iter()));
+        let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &random_poly);
+        assert_el_eq!(poly_ring.base_ring(), poly_ring.base_ring().one(), unit);
+        if factorization.len() == 1 && factorization[0].1 == 1 {
+            return random_poly;
+        }
+    }
+}
 
 ///
 /// Creates a finite/galois field of degree known at compile time. The
@@ -48,15 +71,8 @@ pub fn GF<const DEGREE: usize>(p: u64) -> GaloisField<DEGREE> {
         return FreeAlgebraImpl::new(Fp, std::array::from_fn(|_| Fp.one())).as_field().ok().unwrap();
     }
     let poly_ring = DensePolyRing::new(Fp, "X");
-    let mut rng = oorandom::Rand64::new(p as u128);
-    loop {
-        let random_poly = poly_ring.from_terms((0..DEGREE).map(|i| (Fp.random_element(|| rng.rand_u64()), i)).chain([(Fp.one(), DEGREE)].into_iter()));
-        let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &random_poly);
-        assert_el_eq!(Fp, Fp.one(), unit);
-        if factorization.len() == 1 && factorization[0].1 == 1 {
-            return FreeAlgebraImpl::new(Fp, std::array::from_fn(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i))))).as_field().ok().unwrap();
-        }
-    }
+    let random_poly = random_irreducible_polynomial(&poly_ring, DEGREE);
+    return FreeAlgebraImpl::new(Fp, std::array::from_fn(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i))))).as_field().ok().unwrap();
 }
 
 ///
@@ -65,6 +81,9 @@ pub fn GF<const DEGREE: usize>(p: u64) -> GaloisField<DEGREE> {
 /// field.
 /// 
 /// See also [`GF()`] if the degree of the field is a compile-time constant.
+/// 
+/// This is deprecated in favor of [`galois_field_dyn()`], which allows creating
+/// galois fields of size that exceeds `i64`.
 /// 
 /// # Example
 /// ```
@@ -83,23 +102,84 @@ pub fn GF<const DEGREE: usize>(p: u64) -> GaloisField<DEGREE> {
 /// }));
 /// ```
 /// 
+#[deprecated]
 pub fn GFdyn(power_of_p: u64) -> GaloisFieldDyn {
     let (p, e) = int_factor::is_prime_power(&StaticRing::<i64>::RING, &(power_of_p as i64)).unwrap();
-    assert!(e >= 1);
+    return galois_field_dyn(p, e);
+}
+
+///
+/// Creates a finite/galois field of degree not known at compile time. The
+/// given p must be a prime and will be the characteristic of the returned
+/// field.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::extension::*;
+/// # use feanor_math::rings::finite::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::rings::extension::galois_field::*;
+/// let F25 = galois_field_dyn(5, 2);
+/// let generator = F25.canonical_gen();
+/// let norm = F25.mul_ref_fst(&generator, F25.pow(F25.clone_el(&generator), 5));
+/// let inclusion = F25.inclusion();
+/// // the norm must be an element of the prime field
+/// assert!(F25.base_ring().elements().any(|x| {
+///     F25.eq_el(&norm, &inclusion.map(x))
+/// }));
+/// ```
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn galois_field_dyn(p: i64, degree: usize) -> GaloisFieldDyn {
+    assert!(degree >= 1);
     let Fp = Zn::new(p as u64).as_field().ok().unwrap();
-    if e == 1 {
+    if degree == 1 {
         return FreeAlgebraImpl::new(Fp, vec![Fp.one()].into_boxed_slice()).as_field().ok().unwrap();
     }
     let poly_ring = DensePolyRing::new(Fp, "X");
-    let mut rng = oorandom::Rand64::new(p as u128);
-    loop {
-        let random_poly = poly_ring.from_terms((0..e).map(|i| (Fp.random_element(|| rng.rand_u64()), i)).chain([(Fp.one(), e)].into_iter()));
-        let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &random_poly);
-        assert_el_eq!(Fp, Fp.one(), unit);
-        if factorization.len() == 1 && factorization[0].1 == 1 {
-            return FreeAlgebraImpl::new(Fp, (0..e).map(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i)))).collect::<Vec<_>>().into_boxed_slice()).as_field().ok().unwrap();
-        }
+    let random_poly = random_irreducible_polynomial(&poly_ring, degree);
+    return FreeAlgebraImpl::new(Fp, (0..degree).map(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i)))).collect::<Vec<_>>().into_boxed_slice()).as_field().ok().unwrap();
+}
+
+///
+/// Creates the galois ring of given degree and characteristic `p^e`.
+/// 
+/// The galois ring is the generalization of the galois field to an extension of `Z/p^eZ`.
+/// In other words, it is a local ring and free module of given rank over `Z/p^eZ`.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::extension::*;
+/// # use feanor_math::rings::finite::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::extension::galois_field::*;
+/// // sometimes also denoted GR(5^2, 3)
+/// let R = galois_ring_dyn(5, 2, 3);
+/// let generator = R.canonical_gen();
+/// assert_eq!(25, R.characteristic(&StaticRing::<i64>::RING).unwrap());
+/// assert_eq!(25 * 25 * 25, R.size(&StaticRing::<i64>::RING).unwrap());
+/// ```
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn galois_ring_dyn(p: i64, e: usize, degree: usize) -> GaloisRingDyn {
+    assert!(degree >= 1);
+    let Zpe = AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING.pow(p, e) as u64)).unwrap();
+    if degree == 1 {
+        let result = FreeAlgebraImpl::new(Zpe, vec![Zpe.one()].into_boxed_slice());
+        let max_ideal_gen = result.inclusion().map_ref(Zpe.max_ideal_gen());
+        let nilpotent_power = Zpe.nilpotent_power();
+        return AsLocalPIR::from(AsLocalPIRBase::promise_is_local_pir(result, max_ideal_gen, nilpotent_power));
     }
+    let FpX = DensePolyRing::new(Zn::new(p as u64).as_field().ok().unwrap(), "X");
+    let random_poly = random_irreducible_polynomial(&FpX, degree);
+    let red_map = ReductionMap::new(&Zpe, FpX.base_ring()).unwrap();
+    let result = FreeAlgebraImpl::new(Zpe, (0..degree).map(|i| Zpe.negate(red_map.smallest_lift_ref(FpX.coefficient_at(&random_poly, i)))).collect::<Vec<_>>().into_boxed_slice());
+    let max_ideal_gen = result.inclusion().map_ref(Zpe.max_ideal_gen());
+    let nilpotent_power = Zpe.nilpotent_power();
+    return AsLocalPIR::from(AsLocalPIRBase::promise_is_local_pir(result, max_ideal_gen, nilpotent_power));
 }
 
 ///
@@ -162,6 +242,7 @@ fn test_GF() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn test_GFdyn() {
     let F7 = GFdyn(7);
     assert_eq!(7, F7.elements().count());
@@ -173,6 +254,7 @@ fn test_GFdyn() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn test_GFdyn_even() {
     let F16 = GFdyn(16);
     assert_eq!(16, F16.elements().count());
