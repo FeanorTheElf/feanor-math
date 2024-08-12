@@ -6,7 +6,7 @@ use crate::algorithms::int_factor;
 use crate::algorithms::poly_factor::{cantor_zassenhaus, poly_squarefree_part};
 use crate::primitive_int::StaticRing;
 use crate::rings::extension::*;
-use crate::rings::field::AsField;
+use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::finite::FiniteRingStore;
 use crate::rings::local::{AsLocalPIR, AsLocalPIRBase};
 use crate::rings::poly::dense_poly::DensePolyRing;
@@ -155,7 +155,7 @@ pub fn galois_field_dyn(p: i64, degree: usize) -> GaloisFieldDyn {
     let mut coefficients = (0..degree).map(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i)))).collect::<Vec<_>>();
     let nonzero_coeff_count = (0..degree).rev().filter(|i| !Fp.is_zero(&coefficients[*i])).next().unwrap();
     coefficients.truncate(nonzero_coeff_count + 1);
-    return FreeAlgebraImpl::new(Fp, degree, coefficients.into_boxed_slice()).as_field().ok().unwrap();
+    return AsField::from(AsFieldBase::promise_is_field(FreeAlgebraImpl::new(Fp, degree, coefficients.into_boxed_slice())));
 }
 
 ///
@@ -250,7 +250,7 @@ pub fn GF_conway(power_of_p: u64) -> GaloisFieldDyn {
 }
 
 #[cfg(test)]
-use test::Bencher;
+use std::time::Instant;
 
 #[test]
 #[allow(deprecated)]
@@ -294,10 +294,12 @@ fn test_GF_conway() {
     crate::field::generic_tests::test_field_axioms(&F16, F16.elements());
 }
 
-#[bench]
-fn bench_galois_ring_large(bencher: &mut Bencher) {
-    bencher.iter(|| {
-        let ring = galois_ring_dyn(17, 5, 256);
-        std::hint::black_box(ring);
-    })
+#[test]
+#[ignore]
+fn test_galois_ring_large() {
+    let start = Instant::now();
+    let ring = galois_ring_dyn(17, 5, 4096);
+    let end = Instant::now();
+    println!("Computed GR(17, 5, 4096) in {} ms", (end - start).as_millis());
+    std::hint::black_box(ring);
 }

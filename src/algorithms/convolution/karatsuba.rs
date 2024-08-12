@@ -9,12 +9,9 @@ use std::cmp::{max, min};
 pub fn naive_assign_mul<R, V1, V2, V3, const ADD_ASSIGN: bool>(mut dst: V1, lhs: V2, rhs: V3, ring: R) 
     where R: RingStore, V1: VectorViewMut<El<R>>, V2: VectorView<El<R>>, V3: VectorView<El<R>>
 {
-    let n = lhs.len();
-    assert_eq!(n, rhs.len());
-    assert_eq!(2 * n, dst.len());
-    for i in 0..(2 * n) {
-        let from = max(i as isize - n as isize + 1, 0) as usize;
-        let to = min(n, i + 1);
+    for i in 0..(lhs.len() + rhs.len()) {
+        let from = max(i as isize - lhs.len() as isize + 1, 0) as usize;
+        let to = min(rhs.len(), i + 1);
         let value = <_ as ComputeInnerProduct>::inner_product_ref(ring.get_ring(), (from..to)
             .map(|j| (lhs.at(i - j), rhs.at(j)))
         );
@@ -137,6 +134,10 @@ pub fn karatsuba<R, V1, V2, A: Allocator>(threshold_size_log2: usize, dst: &mut 
         return;
     }
     assert!(dst.len() >= rhs.len() + lhs.len());
+    if threshold_size_log2 == usize::MAX || lhs.len() < (1 << threshold_size_log2) || rhs.len() < (1 << threshold_size_log2) {
+        naive_assign_mul::<R, _, _, _, true>(dst, lhs, rhs, ring);
+        return;
+    }
     let block_size_log2 = (usize::BITS - 1 - max(lhs.len().leading_zeros(), rhs.len().leading_zeros())) as usize;
     let n = 1 << block_size_log2;
     assert!(lhs.len() >= n);

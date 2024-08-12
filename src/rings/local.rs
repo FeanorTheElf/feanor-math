@@ -1,4 +1,6 @@
+use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::int_factor::is_prime_power;
+use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::delegate::DelegateRing;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::Field;
@@ -216,6 +218,44 @@ impl<R: DivisibilityRingStore> PrincipalIdealRing for AsLocalPIRBase<R>
         } else {
             (self.one(), self.zero(), self.clone_el(lhs))
         }
+    }
+}
+
+impl<R: DivisibilityRingStore> KaratsubaHint for AsLocalPIRBase<R>
+    where R::Type: DivisibilityRing
+{
+    fn karatsuba_threshold(&self) -> usize {
+        self.get_delegate().karatsuba_threshold()
+    }
+}
+
+impl<R: DivisibilityRingStore> StrassenHint for AsLocalPIRBase<R>
+    where R::Type: DivisibilityRing
+{
+    fn strassen_threshold(&self) -> usize {
+        self.get_delegate().strassen_threshold()
+    }
+}
+
+impl<R: DivisibilityRingStore> ComputeInnerProduct for AsLocalPIRBase<R>
+    where R::Type: DivisibilityRing
+{
+    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
+        self.rev_delegate(self.get_delegate().inner_product(els.map(|(a, b)| (self.delegate(a), self.delegate(b)))))
+    }
+
+    fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
+        where Self::Element: 'a,
+            Self: 'a
+    {
+        self.rev_delegate(self.get_delegate().inner_product_ref(els.map(|(a, b)| (self.delegate_ref(a), self.delegate_ref(b)))))
+    }
+
+    fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
+        where Self::Element: 'a,
+            Self: 'a
+    {
+        self.rev_delegate(self.get_delegate().inner_product_ref_fst(els.map(|(a, b)| (self.delegate_ref(a), self.delegate(b)))))
     }
 }
 
