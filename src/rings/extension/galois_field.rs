@@ -3,7 +3,7 @@ use crate::integer::IntegerRingStore;
 use crate::pid::EuclideanRing;
 use crate::ring::*;
 use crate::algorithms::int_factor;
-use crate::algorithms::poly_factor::FactorPolyField;
+use crate::algorithms::poly_factor::{cantor_zassenhaus, poly_squarefree_part};
 use crate::primitive_int::StaticRing;
 use crate::rings::extension::*;
 use crate::rings::field::AsField;
@@ -16,7 +16,7 @@ use crate::rings::zn::{ReductionMap, ZnRing, ZnRingStore};
 use crate::local::PrincipalLocalRingStore;
 
 use super::conway::*;
-use super::extension_impl::FreeAlgebraImpl;
+use super::impl_short::FreeAlgebraImpl;
 
 pub type GaloisField<const DEGREE: usize> = AsField<FreeAlgebraImpl<AsField<Zn>, [El<AsField<Zn>>; DEGREE]>>;
 pub type GaloisFieldDyn = AsField<FreeAlgebraImpl<AsField<Zn>, Box<[El<AsField<Zn>>]>>>;
@@ -24,19 +24,30 @@ pub type GaloisFieldDyn = AsField<FreeAlgebraImpl<AsField<Zn>, Box<[El<AsField<Z
 #[stability::unstable(feature = "enable")]
 pub type GaloisRingDyn = AsLocalPIR<FreeAlgebraImpl<AsLocalPIR<Zn>, Box<[El<AsLocalPIR<Zn>>]>>>;
 
-fn random_irreducible_polynomial<P>(poly_ring: P, degree: usize) -> El<P>
+fn random_low_body_deg_irreducible_polynomial<P>(poly_ring: P, degree: usize) -> El<P>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
+    let mut body_deg = 1;
     let mut rng = oorandom::Rand64::new(poly_ring.base_ring().integer_ring().default_hash(poly_ring.base_ring().modulus()) as u128);
     loop {
-        let random_poly = poly_ring.from_terms((0..degree).map(|i| (poly_ring.base_ring().random_element(|| rng.rand_u64()), i)).chain([(poly_ring.base_ring().one(), degree)].into_iter()));
-        println!("trying poly");
-        let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &random_poly);
-        assert_el_eq!(poly_ring.base_ring(), poly_ring.base_ring().one(), unit);
-        if factorization.len() == 1 && factorization[0].1 == 1 {
-            return random_poly;
+        for _ in 0..8 {
+            let f_body = (0..body_deg).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())).collect::<Vec<_>>();
+            let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), degree, &f_body);
+            let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
+            let squarefree_part = poly_squarefree_part(&poly_ring, f);
+            if poly_ring.degree(&squarefree_part) != Some(degree) {
+                continue;
+            }
+            let distinct_degree_factorization = cantor_zassenhaus::distinct_degree_factorization_base(&poly_ring, &mod_f_ring);
+            if distinct_degree_factorization.len() <= degree || poly_ring.degree(&distinct_degree_factorization[degree]) != Some(degree) {
+                continue;
+            }
+            return mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
+        }
+        if body_deg < degree {
+            body_deg += 1;
         }
     }
 }
@@ -46,7 +57,8 @@ fn random_irreducible_polynomial<P>(poly_ring: P, degree: usize) -> El<P>
 /// given p must be a prime and will be the characteristic of the returned
 /// field.
 /// 
-/// See also [`GFdyn()`] if the degree of the field is not a compile-time constant.
+/// Prefer [`galois_field_dyn()`], which allows ring degrees only known at runtime and will
+/// usually be much faster, since it can choose a sparse modulus polynomial.
 /// 
 /// # Example
 /// ```
@@ -65,15 +77,16 @@ fn random_irreducible_polynomial<P>(poly_ring: P, degree: usize) -> El<P>
 /// }));
 /// ```
 /// 
+#[deprecated]
 pub fn GF<const DEGREE: usize>(p: u64) -> GaloisField<DEGREE> {
     assert!(DEGREE >= 1);
     let Fp = Zn::new(p).as_field().ok().unwrap();
     if DEGREE == 1 {
-        return FreeAlgebraImpl::new(Fp, std::array::from_fn(|_| Fp.one())).as_field().ok().unwrap();
+        return FreeAlgebraImpl::new(Fp, DEGREE, std::array::from_fn(|_| Fp.one())).as_field().ok().unwrap();
     }
     let poly_ring = DensePolyRing::new(Fp, "X");
-    let random_poly = random_irreducible_polynomial(&poly_ring, DEGREE);
-    return FreeAlgebraImpl::new(Fp, std::array::from_fn(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i))))).as_field().ok().unwrap();
+    let random_poly = random_low_body_deg_irreducible_polynomial(&poly_ring, DEGREE);
+    return FreeAlgebraImpl::new(Fp, DEGREE, std::array::from_fn(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i))))).as_field().ok().unwrap();
 }
 
 ///
@@ -135,11 +148,14 @@ pub fn galois_field_dyn(p: i64, degree: usize) -> GaloisFieldDyn {
     assert!(degree >= 1);
     let Fp = Zn::new(p as u64).as_field().ok().unwrap();
     if degree == 1 {
-        return FreeAlgebraImpl::new(Fp, vec![Fp.one()].into_boxed_slice()).as_field().ok().unwrap();
+        return FreeAlgebraImpl::new(Fp, degree, vec![Fp.one()].into_boxed_slice()).as_field().ok().unwrap();
     }
     let poly_ring = DensePolyRing::new(Fp, "X");
-    let random_poly = random_irreducible_polynomial(&poly_ring, degree);
-    return FreeAlgebraImpl::new(Fp, (0..degree).map(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i)))).collect::<Vec<_>>().into_boxed_slice()).as_field().ok().unwrap();
+    let random_poly = random_low_body_deg_irreducible_polynomial(&poly_ring, degree);
+    let mut coefficients = (0..degree).map(|i| Fp.negate(Fp.clone_el(poly_ring.coefficient_at(&random_poly, i)))).collect::<Vec<_>>();
+    let nonzero_coeff_count = (0..degree).rev().filter(|i| !Fp.is_zero(&coefficients[*i])).next().unwrap();
+    coefficients.truncate(nonzero_coeff_count + 1);
+    return FreeAlgebraImpl::new(Fp, degree, coefficients.into_boxed_slice()).as_field().ok().unwrap();
 }
 
 ///
@@ -168,15 +184,18 @@ pub fn galois_ring_dyn(p: i64, e: usize, degree: usize) -> GaloisRingDyn {
     assert!(degree >= 1);
     let Zpe = AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING.pow(p, e) as u64)).unwrap();
     if degree == 1 {
-        let result = FreeAlgebraImpl::new(Zpe, vec![Zpe.one()].into_boxed_slice());
+        let result = FreeAlgebraImpl::new(Zpe, degree, vec![Zpe.one()].into_boxed_slice());
         let max_ideal_gen = result.inclusion().map_ref(Zpe.max_ideal_gen());
         let nilpotent_power = Zpe.nilpotent_power();
         return AsLocalPIR::from(AsLocalPIRBase::promise_is_local_pir(result, max_ideal_gen, nilpotent_power));
     }
     let FpX = DensePolyRing::new(Zn::new(p as u64).as_field().ok().unwrap(), "X");
-    let random_poly = random_irreducible_polynomial(&FpX, degree);
+    let random_poly = random_low_body_deg_irreducible_polynomial(&FpX, degree);
     let red_map = ReductionMap::new(&Zpe, FpX.base_ring()).unwrap();
-    let result = FreeAlgebraImpl::new(Zpe, (0..degree).map(|i| Zpe.negate(red_map.smallest_lift_ref(FpX.coefficient_at(&random_poly, i)))).collect::<Vec<_>>().into_boxed_slice());
+    let mut coefficients = (0..degree).map(|i| Zpe.negate(red_map.smallest_lift_ref(FpX.coefficient_at(&random_poly, i)))).collect::<Vec<_>>();
+    let nonzero_coeff_count = (0..degree).rev().filter(|i| !Zpe.is_zero(&coefficients[*i])).next().unwrap();
+    coefficients.truncate(nonzero_coeff_count + 1);
+    let result = FreeAlgebraImpl::new(Zpe, degree, coefficients.into_boxed_slice());
     let max_ideal_gen = result.inclusion().map_ref(Zpe.max_ideal_gen());
     let nilpotent_power = Zpe.nilpotent_power();
     return AsLocalPIR::from(AsLocalPIRBase::promise_is_local_pir(result, max_ideal_gen, nilpotent_power));
@@ -215,7 +234,7 @@ pub fn GF_conway(power_of_p: u64) -> GaloisFieldDyn {
         }
         let Fp = Zn::new(2).as_field().ok().unwrap();
         let int_hom = Fp.int_hom();
-        return FreeAlgebraImpl::new(Fp, EVEN_CONWAY_POLYNOMIALS[log_q - 2].iter().take(log_q).map(|c| int_hom.map(*c)).collect::<Vec<_>>().into_boxed_slice()).as_field().ok().unwrap();
+        return FreeAlgebraImpl::new(Fp, log_q, EVEN_CONWAY_POLYNOMIALS[log_q - 2].iter().take(log_q).map(|c| int_hom.map(*c)).collect::<Vec<_>>().into_boxed_slice()).as_field().ok().unwrap();
     } else {
         let (p, e) = int_factor::is_prime_power(&StaticRing::<i64>::RING, &(power_of_p as i64)).unwrap();
         assert!(e > 1);
@@ -223,14 +242,18 @@ pub fn GF_conway(power_of_p: u64) -> GaloisFieldDyn {
             Ok(idx) => {
                 let Fp = Zn::new(p as u64).as_field().ok().unwrap();
                 let int_hom = Fp.int_hom();
-                return FreeAlgebraImpl::new(Fp, ODD_CONWAY_POLYNOMIALS[idx].1.iter().take(e).map(|c| int_hom.map(*c)).collect::<Vec<_>>().into_boxed_slice()).as_field().ok().unwrap();
+                return FreeAlgebraImpl::new(Fp, e, ODD_CONWAY_POLYNOMIALS[idx].1.iter().take(e).map(|c| int_hom.map(*c)).collect::<Vec<_>>().into_boxed_slice()).as_field().ok().unwrap();
             },
             Err(_) => panic!("{} not in table of Conway polynomials", power_of_p)
         }
     }
 }
 
+#[cfg(test)]
+use test::Bencher;
+
 #[test]
+#[allow(deprecated)]
 fn test_GF() {
     let F7 = GF::<1>(7);
     assert_eq!(7, F7.elements().count());
@@ -269,4 +292,12 @@ fn test_GF_conway() {
     let F16 = GF_conway(16);
     assert_eq!(16, F16.elements().count());
     crate::field::generic_tests::test_field_axioms(&F16, F16.elements());
+}
+
+#[bench]
+fn bench_galois_ring_large(bencher: &mut Bencher) {
+    bencher.iter(|| {
+        let ring = galois_ring_dyn(17, 5, 256);
+        std::hint::black_box(ring);
+    })
 }

@@ -549,7 +549,7 @@ fn test_poly_squarefree_part_multiplicity_p() {
 
 #[bench]
 fn bench_factor_random_poly(bencher: &mut Bencher) {
-    let degree = 256;
+    let degree = 128;
     let Fp = zn_64::Zn::new(17).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(Fp, "X");
     let mut rng = oorandom::Rand64::new(1);

@@ -81,13 +81,13 @@ use crate::homomorphism::*;
 #[cfg(test)]
 use crate::algorithms::cyclotomic::cyclotomic_polynomial;
 #[cfg(test)]
+use crate::rings::extension::galois_field::GaloisFieldDyn;
+#[cfg(test)]
 use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::rings::poly::PolyRingStore;
 #[cfg(test)]
-use crate::rings::extension::galois_field::GaloisField;
-#[cfg(test)]
-use crate::rings::extension::galois_field::GF;
+use crate::rings::extension::galois_field::galois_field_dyn;
 
 #[test]
 fn test_is_prim_root_of_unity() {
@@ -104,11 +104,11 @@ fn test_is_prim_root_of_unity() {
     assert!(is_prim_root_of_unity(&ring, &ring.int_hom().map(6), 10));
     assert!(!is_prim_root_of_unity(&ring, &ring.int_hom().map(6), 50));
 
-    let ring = GF::<2>(23);
+    let ring = galois_field_dyn(23, 2);
     assert!(is_prim_root_of_unity(&ring, &ring.int_hom().map(-1), 2));
     assert!(is_prim_root_of_unity(&ring, &ring.int_hom().map(2), 11));
     let poly_ring = DensePolyRing::new(&ring, "X");
-    let (factorization, _) = <<GaloisField<2> as RingStore>::Type as FactorPolyField>::factor_poly(&poly_ring, &cyclotomic_polynomial(&poly_ring, 16));
+    let (factorization, _) = <<GaloisFieldDyn as RingStore>::Type as FactorPolyField>::factor_poly(&poly_ring, &cyclotomic_polynomial(&poly_ring, 16));
     for (mut factor, _) in factorization {
         let normalization = poly_ring.base_ring().invert(poly_ring.lc(&factor).unwrap()).unwrap();
         poly_ring.inclusion().mul_assign_map(&mut factor, normalization);
@@ -129,7 +129,7 @@ fn test_get_prim_root_of_unity() {
     assert!(get_prim_root_of_unity_pow2(&ring, 3).is_none());
     assert!(get_prim_root_of_unity(&ring, 125).is_none());
     
-    let ring = GF::<2>(23);
+    let ring = galois_field_dyn(23, 2);
     assert!(is_prim_root_of_unity_pow2(&ring, &get_prim_root_of_unity_pow2(&ring, 4).unwrap(), 4));
     assert!(get_prim_root_of_unity_pow2(&ring, 5).is_none());
     assert!(is_prim_root_of_unity(&ring, &get_prim_root_of_unity(&ring, 3).unwrap(), 3));

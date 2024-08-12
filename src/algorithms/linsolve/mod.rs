@@ -77,3 +77,19 @@ impl<R, V, A_ring> LinSolveRing for FreeAlgebraImplBase<R, V, A_ring>
         extension::solve_right_over_extension(RingRef::new(self), lhs, rhs, out, allocator)
     }
 }
+
+impl<R, V, A_ring> LinSolveRing for crate::rings::extension::impl_short::FreeAlgebraImplBase<R, V, A_ring>
+    where R: RingStore,
+        R::Type: LinSolveRing,
+        V: VectorView<El<R>>,
+        A_ring: Allocator + Clone
+{
+    fn solve_right<V1, V2, V3, A>(&self, lhs: SubmatrixMut<V1, Self::Element>, rhs: SubmatrixMut<V2, Self::Element>, out: SubmatrixMut<V3, Self::Element>, allocator: A) -> SolveResult
+        where V1: AsPointerToSlice<Self::Element>,
+            V2: AsPointerToSlice<Self::Element>,
+            V3: AsPointerToSlice<Self::Element>,
+            A:  Allocator
+    {
+        extension::solve_right_over_extension(RingRef::new(self), lhs, rhs, out, allocator)
+    }
+}
