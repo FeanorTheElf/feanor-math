@@ -11,7 +11,7 @@ use crate::ring::*;
 use crate::rings::extension::extension_impl::{FreeAlgebraImpl, FreeAlgebraImplBase};
 use crate::rings::extension::FreeAlgebra;
 use crate::rings::field::AsFieldBase;
-use crate::rings::finite::FiniteRing;
+use crate::rings::finite::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::{derive_poly, PolyRing, PolyRingStore};
 use crate::algorithms::{self, int_bisect};
@@ -395,11 +395,13 @@ impl<R> FactorPolyField for R
 
         // we repeatedly remove the square-free part
         while !poly_ring.is_unit(&el) {
+
             let sqrfree_part = poly_squarefree_part(&poly_ring, poly_ring.clone_el(&el));
             assert!(!poly_ring.is_unit(&sqrfree_part));
 
             // factor the square-free part into distinct-degree factors
-            for (d, factor_d) in cantor_zassenhaus::distinct_degree_factorization(&poly_ring, poly_ring.clone_el(&sqrfree_part)).into_iter().enumerate() {
+            let squarefree_factorization = cantor_zassenhaus::distinct_degree_factorization(&poly_ring, poly_ring.clone_el(&sqrfree_part));
+            for (d, factor_d) in squarefree_factorization.into_iter().enumerate() {
                 let mut stack = Vec::new();
                 stack.push(factor_d);
                 
@@ -543,6 +545,20 @@ fn test_poly_squarefree_part_multiplicity_p() {
     let g = ring.from_terms([(ring.base_ring().int_hom().map(3), 0), (ring.base_ring().int_hom().map(1), 2)].into_iter());
     let actual = ring.normalize(poly_squarefree_part(&ring, f));
     assert_el_eq!(ring, g, actual);
+}
+
+#[bench]
+fn bench_factor_random_poly(bencher: &mut Bencher) {
+    let degree = 256;
+    let Fp = zn_64::Zn::new(17).as_field().ok().unwrap();
+    let poly_ring = DensePolyRing::new(Fp, "X");
+    let mut rng = oorandom::Rand64::new(1);
+    let f = poly_ring.from_terms((0..degree).map(|d| (Fp.random_element(|| rng.rand_u64()), d)).chain([(Fp.one(), degree)].into_iter()));
+    bencher.iter(|| {
+        let (factors, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
+        assert_el_eq!(&Fp, unit, Fp.one());
+        assert_el_eq!(poly_ring, &f, poly_ring.prod(factors.into_iter().map(|(g, e)| poly_ring.pow(g, e))));
+    });
 }
 
 #[bench]

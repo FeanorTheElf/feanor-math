@@ -5,7 +5,7 @@ use crate::ring::*;
 use crate::algorithms::int_factor;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::primitive_int::StaticRing;
-use crate::rings::extension::{Homomorphism, RingStore};
+use crate::rings::extension::*;
 use crate::rings::field::AsField;
 use crate::rings::finite::FiniteRingStore;
 use crate::rings::local::{AsLocalPIR, AsLocalPIRBase};
@@ -32,6 +32,7 @@ fn random_irreducible_polynomial<P>(poly_ring: P, degree: usize) -> El<P>
     let mut rng = oorandom::Rand64::new(poly_ring.base_ring().integer_ring().default_hash(poly_ring.base_ring().modulus()) as u128);
     loop {
         let random_poly = poly_ring.from_terms((0..degree).map(|i| (poly_ring.base_ring().random_element(|| rng.rand_u64()), i)).chain([(poly_ring.base_ring().one(), degree)].into_iter()));
+        println!("trying poly");
         let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &random_poly);
         assert_el_eq!(poly_ring.base_ring(), poly_ring.base_ring().one(), unit);
         if factorization.len() == 1 && factorization[0].1 == 1 {
@@ -130,7 +131,6 @@ pub fn GFdyn(power_of_p: u64) -> GaloisFieldDyn {
 /// }));
 /// ```
 /// 
-#[stability::unstable(feature = "enable")]
 pub fn galois_field_dyn(p: i64, degree: usize) -> GaloisFieldDyn {
     assert!(degree >= 1);
     let Fp = Zn::new(p as u64).as_field().ok().unwrap();

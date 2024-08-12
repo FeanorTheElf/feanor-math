@@ -35,6 +35,14 @@ fn invert_many<R>(ring: R, values: &[El<R>], out: &mut [El<R>]) -> Result<(), ()
     return Ok(());
 }
 
+///
+/// Computes `out[i] = prod_(j != i) values[j]`.
+/// 
+/// This algorithm recursively halfes the input, and for simplicity requires thus that the input
+/// has power-of-two length. The time complexity is then `O(n sum_(0 <= i <= log n) T(2^i))`
+/// where `T(d)` is the complexity of multiplying two products of `d` input elements. If the cost
+/// of multiplication is constant, this becomes `O(n log n T)`
+/// 
 #[stability::unstable(feature = "enable")]
 fn product_except_one<V, R>(ring: R, values: V, out: &mut [El<R>])
     where R: RingStore,
