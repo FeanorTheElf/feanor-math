@@ -34,25 +34,23 @@ pub fn distinct_degree_factorization_base<P, R>(poly_ring: P, mod_f_ring: R) -> 
     let q = poly_ring.base_ring().size(&ZZ).unwrap();
     debug_assert!(ZZ.eq_el(&algorithms::int_factor::is_prime_power(&ZZ, &q).unwrap().0, &poly_ring.base_ring().characteristic(&ZZ).unwrap()));
 
-    let mut total_deg = 0;
-    let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
+    let mut f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
 
     let mut result = Vec::new();
     let mut current_deg = 0;
     result.push(poly_ring.one());
     let mut x_power_Q_mod_f = mod_f_ring.canonical_gen();
-    while total_deg < mod_f_ring.rank() {
+    while 2 * current_deg <= poly_ring.degree(&f).unwrap() {
         current_deg += 1;
         x_power_Q_mod_f = mod_f_ring.pow_gen(x_power_Q_mod_f, &q, ZZ);
         let fq_defining_poly_mod_f = poly_ring.sub(mod_f_ring.poly_repr(&poly_ring, &x_power_Q_mod_f, &poly_ring.base_ring().identity()), poly_ring.indeterminate());
-        let mut deg_i_factor = poly_ring.normalize(poly_ring.ideal_gen(&f, &fq_defining_poly_mod_f));
-        for prev_deg in 1..current_deg {
-            if current_deg % prev_deg == 0 {
-                deg_i_factor = poly_ring.checked_div(&deg_i_factor, &result[prev_deg]).unwrap();
-            }
-        }
-        total_deg += poly_ring.degree(&deg_i_factor).unwrap();
+        let deg_i_factor = poly_ring.normalize(poly_ring.ideal_gen(&f, &fq_defining_poly_mod_f));
+        f = poly_ring.checked_div(&f, &deg_i_factor).unwrap();
         result.push(deg_i_factor);
+    }
+    if poly_ring.degree(&f).unwrap() >= result.len() {
+        result.resize_with(poly_ring.degree(&f).unwrap(), || poly_ring.one());
+        result.push(f);
     }
     return result;
 }
@@ -339,15 +337,30 @@ use crate::rings::zn::zn_static::Fp;
 fn test_distinct_degree_factorization() {
     let field = Fp::<2>::RING;
     let ring = DensePolyRing::new(field, "X");
+
+    // one degree 3 factor
+    let a0 = ring.one();
+    let a1 = ring.mul(ring.indeterminate(), ring.from_terms([(1, 0), (1, 1)].into_iter()));
+    let a2 = ring.from_terms([(1, 0), (1, 1), (1, 2)].into_iter());
+    let a3 = ring.from_terms([(1, 0), (1, 1), (1, 3)].into_iter());
+    let a = ring.prod([&a0, &a1, &a2, &a3].into_iter().map(|x| ring.clone_el(x)));
+    let expected = vec![a0, a1, a2, a3];
+    let actual = distinct_degree_factorization(&ring, a);
+    assert_eq!(expected.len(), actual.len());
+    for (f, e) in actual.into_iter().zip(expected.into_iter()) {
+        assert_el_eq!(ring, e, ring.normalize(f));
+    }
+
+    // two degree 3 factors
     let a0 = ring.one();
     let a1 = ring.mul(ring.indeterminate(), ring.from_terms([(1, 0), (1, 1)].into_iter()));
     let a2 = ring.from_terms([(1, 0), (1, 1), (1, 2)].into_iter());
     let a3 = ring.mul(ring.from_terms([(1, 0), (1, 1), (1, 3)].into_iter()), ring.from_terms([(1, 0), (1, 2), (1, 3)].into_iter()));
     let a = ring.prod([&a0, &a1, &a2, &a3].into_iter().map(|x| ring.clone_el(x)));
     let expected = vec![a0, a1, a2, a3];
-    let distinct_degree_factorization = distinct_degree_factorization(&ring, a);
-    assert_eq!(expected.len(), distinct_degree_factorization.len());
-    for (f, e) in distinct_degree_factorization.into_iter().zip(expected.into_iter()) {
+    let actual = distinct_degree_factorization(&ring, a);
+    assert_eq!(expected.len(), actual.len());
+    for (f, e) in actual.into_iter().zip(expected.into_iter()) {
         assert_el_eq!(ring, e, ring.normalize(f));
     }
 }
