@@ -314,12 +314,19 @@ pub trait RingBase: PartialEq {
         where R::Type: IntegerRing
     {
         assert!(!integers.is_neg(power));
-        algorithms::sqr_mul::generic_pow(
+        algorithms::sqr_mul::generic_pow_shortest_chain_table(
             x, 
             power, 
             &integers,
-            &RingRef::new(self).identity()
-        )
+            |a| {
+                let mut a_copy = self.clone_el(a);
+                self.square(&mut a_copy);
+                Ok(a_copy)
+            },
+            |a, b| Ok(self.mul_ref(a, b)),
+            |a| self.clone_el(a),
+            self.one()
+        ).unwrap_or_else(|x| x)
     }
 
     fn sum<I>(&self, els: I) -> Self::Element 

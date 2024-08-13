@@ -1,6 +1,6 @@
 use crate::seq::*;
 
-use std::cmp::{Ordering, min};
+use std::cmp::{Ordering, min, max};
 use std::alloc::Allocator;
 
 type BlockInt = u64;
@@ -26,23 +26,28 @@ fn assign<A: Allocator>(x: &mut Vec<BlockInt, A>, rhs: &[BlockInt]) {
 
 #[stability::unstable(feature = "enable")]
 pub fn bigint_add<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], block_offset: usize) {
+	let prev_len = lhs.len();
 	let mut buffer: bool = false;
 	let mut i = 0;
-	while i < rhs.len() || buffer {
-		let rhs_val = *rhs.get(i).unwrap_or(&0);
-		let j = i + block_offset;
-		expand(lhs, j + 1);
-		let (sum, overflow) = lhs[j].overflowing_add(rhs_val);
-		if buffer {
-			let (carry_sum, carry_overflow) = sum.overflowing_add(1);
-			*lhs.at_mut(j) = carry_sum;
-			buffer = overflow || carry_overflow;
-		} else {
-			*lhs.at_mut(j) = sum;
-			buffer = overflow;
+	if let Some(rhs_d) = highest_set_block(rhs) {
+		while i <= rhs_d || buffer {
+			let rhs_val = *rhs.get(i).unwrap_or(&0);
+			let j = i + block_offset;
+			expand(lhs, j + 1);
+			let (sum, overflow) = lhs[j].overflowing_add(rhs_val);
+			if buffer {
+				let (carry_sum, carry_overflow) = sum.overflowing_add(1);
+				*lhs.at_mut(j) = carry_sum;
+				buffer = overflow || carry_overflow;
+			} else {
+				*lhs.at_mut(j) = sum;
+				buffer = overflow;
+			}
+			i += 1;
 		}
-		i += 1;
 	}
+	let new_highest_set_block = highest_set_block(&lhs);
+	debug_assert!(new_highest_set_block.is_none() || max(prev_len, new_highest_set_block.unwrap() + 1) == lhs.len());
 }
 
 #[stability::unstable(feature = "enable")]
@@ -210,6 +215,7 @@ pub fn bigint_mul<A: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt], mut out: Vec
 			bigint_add(&mut out, val.as_ref(), i);
 		}
 	}
+	debug_assert!(highest_set_block(&out).is_none() || highest_set_block(&out).unwrap() as isize >= out.len() as isize - 2);
 	return out;
 }
 

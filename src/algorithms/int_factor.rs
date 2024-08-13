@@ -62,7 +62,7 @@ pub fn factor<I>(ZZ: &I, mut n: El<I>) -> Vec<(El<I>, usize)>
     where I: IntegerRingStore + OrderedRingStore, 
         I::Type: IntegerRing + OrderedRing + CanIsoFromTo<BigIntRingBase> + CanIsoFromTo<StaticRingBase<i128>>
 {
-    const SMALL_PRIME_BOUND: i32 = 1000;
+    const SMALL_PRIME_BOUND: i32 = 10000;
     let mut result = Vec::new();
 
     // first make it nonnegative

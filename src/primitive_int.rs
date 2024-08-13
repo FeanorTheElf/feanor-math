@@ -8,7 +8,7 @@ use crate::algorithms;
 use crate::homomorphism::*;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::divisibility::*;
-use crate::ordered::OrderedRing;
+use crate::ordered::*;
 use crate::integer::*;
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::StrassenHint;
@@ -309,7 +309,24 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
-    Some(ZZ.zero())
+        Some(ZZ.zero())
+    }
+
+    fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
+        where R::Type: IntegerRing
+    {
+        assert!(!integers.is_neg(power));
+        algorithms::sqr_mul::generic_abs_square_and_multiply(
+            x, 
+            power, 
+            &integers,
+            |mut a| {
+                self.square(&mut a);
+                a
+            },
+            |a, b| self.mul_ref_fst(a, b),
+            self.one()
+        )
     }
 }
 

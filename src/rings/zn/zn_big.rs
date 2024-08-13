@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::divisibility::DivisibilityRing;
 use crate::impl_localpir_wrap_unwrap_homs;
 use crate::impl_localpir_wrap_unwrap_isos;
@@ -123,6 +125,15 @@ impl<I: IntegerRingStore> ZnBase<I>
 
 pub struct ZnEl<I: IntegerRingStore>(/* allow it to grow up to 2 * modulus(), inclusively */ El<I>)
     where I::Type: IntegerRing;
+
+impl<I: IntegerRingStore> Debug for ZnEl<I> 
+    where El<I>: Clone + Debug,
+        I::Type: IntegerRing
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZnEl({:?})", self.0)
+    }
+}
 
 impl<I: IntegerRingStore> Clone for ZnEl<I> 
     where El<I>: Clone,

@@ -1,11 +1,16 @@
 use crate::algorithms;
 use crate::divisibility::*;
+use crate::homomorphism::Homomorphism;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::integer::*;
+use crate::rings::zn::ReductionMap;
 use crate::rings::zn::ZnRing;
 use crate::rings::zn::ZnRingStore;
+use crate::rings::zn::zn_big;
+use crate::algorithms::eea::signed_gcd;
+use crate::algorithms::sqr_mul;
 
 type Point<R> = (El<R>, El<R>, El<R>);
 
@@ -17,6 +22,53 @@ fn square<R>(Zn: &R, x: &El<R>) -> El<R>
     return result;
 }
 
+#[allow(unused)]
+fn point_eq<R>(Zn: &R, P: &Point<R>, Q: &Point<R>) -> bool
+    where R: ZnRingStore,
+        R::Type: ZnRing
+{
+    let factor_quo = if !Zn.is_zero(&Q.0) {
+        if Zn.is_zero(&P.0) { return false; }
+        (&P.0, &Q.0)
+    } else if !Zn.is_zero(&Q.1) {
+        if Zn.is_zero(&P.1) { return false; }
+        (&P.1, &Q.1)
+    } else {
+        assert!(!Zn.is_zero(&Q.2));
+        if Zn.is_zero(&P.2) { return false; }
+        (&P.2, &Q.2)
+    };
+    if !Zn.is_unit(&factor_quo.1) {
+        let factor_of_n = signed_gcd(Zn.integer_ring().clone_el(Zn.modulus()), Zn.smallest_positive_lift(Zn.clone_el(&factor_quo.1)), Zn.integer_ring());
+        let Zn_new = zn_big::Zn::new(BigIntRing::RING, int_cast(Zn.integer_ring().checked_div(Zn.modulus(), &factor_of_n).unwrap(), BigIntRing::RING, Zn.integer_ring()));
+        let red_map = ReductionMap::new(Zn, &Zn_new).unwrap();
+        if (Zn_new.is_zero(&red_map.map_ref(&Q.0)) && Zn_new.is_zero(&red_map.map_ref(&Q.1)) && Zn_new.is_zero(&red_map.map_ref(&Q.2))) || (Zn_new.is_zero(&red_map.map_ref(&P.0)) && Zn_new.is_zero(&red_map.map_ref(&P.1)) && Zn_new.is_zero(&red_map.map_ref(&P.2))) {
+            if (Zn_new.is_zero(&red_map.map_ref(&P.0)) && Zn_new.is_zero(&red_map.map_ref(&P.1)) && Zn_new.is_zero(&red_map.map_ref(&P.2))) != (Zn_new.is_zero(&red_map.map_ref(&Q.0)) && Zn_new.is_zero(&red_map.map_ref(&Q.1)) && Zn_new.is_zero(&red_map.map_ref(&Q.2))) {
+                return false;
+            }
+        } else if !point_eq(&Zn_new, &(red_map.map_ref(&P.0), red_map.map_ref(&P.1), red_map.map_ref(&P.2)), &(red_map.map_ref(&Q.0), red_map.map_ref(&Q.1), red_map.map_ref(&Q.2))) {
+            return false;
+        }
+
+        let Zn_new = zn_big::Zn::new(BigIntRing::RING, int_cast(factor_of_n, BigIntRing::RING, Zn.integer_ring()));
+        let red_map = ReductionMap::new(Zn, &Zn_new).unwrap();
+        if (Zn_new.is_zero(&red_map.map_ref(&Q.0)) && Zn_new.is_zero(&red_map.map_ref(&Q.1)) && Zn_new.is_zero(&red_map.map_ref(&Q.2))) || (Zn_new.is_zero(&red_map.map_ref(&P.0)) && Zn_new.is_zero(&red_map.map_ref(&P.1)) && Zn_new.is_zero(&red_map.map_ref(&P.2))) {
+            if (Zn_new.is_zero(&red_map.map_ref(&P.0)) && Zn_new.is_zero(&red_map.map_ref(&P.1)) && Zn_new.is_zero(&red_map.map_ref(&P.2))) != (Zn_new.is_zero(&red_map.map_ref(&Q.0)) && Zn_new.is_zero(&red_map.map_ref(&Q.1)) && Zn_new.is_zero(&red_map.map_ref(&Q.2))) {
+                return false;
+            }
+        } else if !point_eq(&Zn_new, &(red_map.map_ref(&P.0), red_map.map_ref(&P.1), red_map.map_ref(&P.2)), &(red_map.map_ref(&Q.0), red_map.map_ref(&Q.1), red_map.map_ref(&Q.2))) {
+            return false;
+        }
+        return true;
+    }
+    let factor = Zn.checked_div(&factor_quo.0, &factor_quo.1).unwrap();
+    if !Zn.is_unit(&factor) {
+        return false;
+    }
+    return Zn.eq_el(&P.0, &Zn.mul_ref(&factor, &Q.0)) && Zn.eq_el(&P.1, &Zn.mul_ref(&factor, &Q.1)) && Zn.eq_el(&P.2, &Zn.mul_ref(&factor, &Q.2));
+}
+
+#[inline(never)]
 fn edcurve_add<R>(Zn: &R, d: &El<R>, P: Point<R>, Q: &Point<R>) -> Point<R> 
     where R: ZnRingStore,
         R::Type: ZnRing
@@ -43,6 +95,7 @@ fn edcurve_add<R>(Zn: &R, d: &El<R>, P: Point<R>, Q: &Point<R>) -> Point<R>
     return result;
 }
 
+#[inline(never)]
 fn edcurve_double<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> Point<R> 
     where R: ZnRingStore,
         R::Type: ZnRing
@@ -68,44 +121,22 @@ fn edcurve_double<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> Point<R>
     return result;
 }
 
-fn ec_pow_prime_abort<R>(base: &Point<R>, d: &El<R>, power: &i128, Zn: &R) -> Result<Point<R>, Point<R>>
+fn ec_pow<R>(base: &Point<R>, d: &El<R>, power: &El<BigIntRing>, Zn: &R) -> Point<R>
     where R: ZnRingStore,
         R::Type: ZnRing
 {
-    let ZZ = StaticRing::<i128>::RING;
-    if ZZ.is_zero(&power) {
-        return Ok((Zn.zero(), Zn.one(), Zn.one()));
-    } else if ZZ.is_one(&power) {
-        return Ok((Zn.clone_el(&base.0), Zn.clone_el(&base.1), Zn.clone_el(&base.2)));
-    }
+    let copy_point = |(x, y, z): &Point<R>| (Zn.clone_el(x), Zn.clone_el(y), Zn.clone_el(z));
+    let ZZ = BigIntRing::RING;
 
-    let mut result = (Zn.zero(), Zn.one(), Zn.one());
-    for i in (0..=ZZ.abs_highest_set_bit(power).unwrap()).rev() {
-        let double_result = edcurve_double(Zn, d, &result);
-        let new = if ZZ.abs_is_bit_set(power, i) {
-            edcurve_add(Zn, d, double_result, &base)
-        } else {
-            double_result
-        };
-        if Zn.is_zero(&new.0) && (!Zn.is_zero(&new.2) || Zn.is_zero(&new.1) ) {
-            return Err(result);
-        }
-        result = new;
-    }
-    return Ok(result);
-}
-
-fn ec_pow_abort<R>(base: Point<R>, d: &El<R>, power_factorization: &[(i128, usize)], Zn: &R) -> Result<Point<R>, Point<R>>
-    where R: ZnRingStore,
-        R::Type: ZnRing
-{
-    let mut current = base;
-    for (p, e) in power_factorization {
-        for _ in 0..*e {
-            current = ec_pow_prime_abort(&current, d, p, Zn)?;
-        }
-    }
-    return Ok(current);
+    sqr_mul::generic_pow_shortest_chain_table(
+        copy_point(base), 
+        power, 
+        ZZ, 
+        |P| Ok(edcurve_double(Zn, d, &P)), 
+        |P, Q| Ok(edcurve_add(Zn, d, copy_point(Q), P)), 
+        |P| copy_point(P), 
+        (Zn.zero(), Zn.one(), Zn.one())
+    ).unwrap_or_else(|x| x)
 }
 
 fn is_on_curve<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> bool
@@ -140,8 +171,9 @@ fn lenstra_ec_factor_base<R>(Zn: R, log2_size: usize, rng: &mut oorandom::Rand64
 
     let primes = algorithms::erathostenes::enumerate_primes(&StaticRing::<i128>::RING, &(1i128 << (log2_B as u64)));
     let power_factorization = primes.iter()
-            .map(|p| (*p, log2_B.ceil() as usize / StaticRing::<i128>::RING.abs_log2_ceil(&p).unwrap()))
-            .collect::<Vec<_>>();
+        .map(|p| (*p, log2_B.ceil() as usize / StaticRing::<i128>::RING.abs_log2_ceil(&p).unwrap()))
+        .collect::<Vec<_>>();
+    let power = ZZ.prod(power_factorization.iter().map(|(p, e)| ZZ.pow(ZZ.coerce(&StaticRing::<i128>::RING, *p), *e)));
 
     // after this many random curves, we expect to have found a factor with high probability, unless there is no factor of size about `log2_size`
     for _ in 0..(1i128 << (log2_B as u64)) {
@@ -150,7 +182,7 @@ fn lenstra_ec_factor_base<R>(Zn: R, log2_size: usize, rng: &mut oorandom::Rand64
         if let Some(d) = Zn.checked_div(&Zn.sub(Zn.add_ref(&x_sqr, &y_sqr), Zn.one()), &Zn.mul(x_sqr, y_sqr)) {
             let P = (x, y, Zn.one());
             debug_assert!(is_on_curve(&Zn, &d, &P));
-            let result = ec_pow_abort(P, &d, &power_factorization, &Zn).unwrap_or_else(|point| point);
+            let result = ec_pow(&P, &d, &power, &Zn);
             let possible_factor = algorithms::eea::gcd(Zn.smallest_positive_lift(result.0), Zn.integer_ring().clone_el(Zn.modulus()), Zn.integer_ring());
             if !Zn.integer_ring().is_unit(&possible_factor) && !Zn.integer_ring().eq_el(&possible_factor, Zn.modulus()) {
                 return Some(possible_factor);
@@ -189,17 +221,11 @@ use crate::rings::zn::zn_64::Zn;
 #[cfg(test)]
 use std::time::Instant;
 #[cfg(test)]
-use crate::rings::zn::zn_big;
-#[cfg(test)]
 use test::Bencher;
 
 #[test]
 fn test_ec_factor() {
-    let n = 11 * 17;
-    let actual = lenstra_ec_factor(&Zn::new(n as u64));
-    assert!(actual != 1 && actual != n && n % actual == 0);
-    
-    let n = 23 * 59 * 113;
+    let n = 65537 * 65539;
     let actual = lenstra_ec_factor(&Zn::new(n as u64));
     assert!(actual != 1 && actual != n && n % actual == 0);
 }
@@ -221,7 +247,7 @@ fn bench_ec_factor(bencher: &mut Bencher) {
 #[ignore]
 fn test_ec_factor_large() {
     #[cfg(not(feature = "mpir"))]
-    let ZZbig = crate::rings::rust_bigint::RustBigintRing::new_with(feanor_mempool::AllocRc(std::rc::Rc::new(feanor_mempool::dynsize::DynLayoutMempool::<std::alloc::Global>::new(std::ptr::Alignment::of::<u64>()))));
+    let ZZbig = crate::rings::rust_bigint::RustBigintRing::RING;
     #[cfg(feature = "mpir")]
     let ZZbig = BigIntRing::RING;
 

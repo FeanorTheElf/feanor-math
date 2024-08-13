@@ -195,7 +195,7 @@ impl Zn {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ZnEl(u64);
 
 impl PartialEq for ZnBase {
@@ -276,6 +276,22 @@ impl RingBase for ZnBase {
         return result;
     }
 
+    fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
+        where R::Type: IntegerRing
+    {
+        assert!(!integers.is_neg(power));
+        algorithms::sqr_mul::generic_abs_square_and_multiply(
+            x, 
+            power, 
+            &integers,
+            |mut a| {
+                self.square(&mut a);
+                a
+            },
+            |a, b| self.mul_ref_fst(a, b),
+            self.one()
+        )
+    }
 }
 
 impl ComputeInnerProduct for ZnBase {
@@ -514,6 +530,14 @@ impl PrincipalIdealRing for ZnBase {
         let (s, t, d) = StaticRing::<i64>::RING.extended_ideal_gen(&(lhs.0 as i64), &(rhs.0 as i64));
         let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
+    }
+    
+    fn cancel_common_factors(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        let l = self.smallest_positive_lift(*lhs);
+        let r = self.smallest_positive_lift(*rhs);
+        let d = StaticRing::<i64>::RING.ideal_gen(&l, &r);
+        let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
+        return (quo.map(l / d), quo.map(r / d), quo.map(d));
     }
 }
 
