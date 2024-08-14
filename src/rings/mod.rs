@@ -78,8 +78,14 @@ pub mod mpir;
 /// 
 pub mod fieldextension;
 
+///
+/// This module contains the wrapper [`local::AsLocalPIR`] that wraps a ring to signal that it is a
+/// local principal ideal ring [`crate::rings::local::PrincipalLocalRing`]. 
+/// 
 pub mod local;
 
-pub mod padic;
-
+///
+/// This module contains a new, more general characterisation of multivariate polynomial rings. Currently 
+/// experimental, but it might one day replace the old one in [`multivariate`]. 
+/// 
 pub mod multivariate_new;

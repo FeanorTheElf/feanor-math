@@ -4,6 +4,34 @@ use crate::integer::*;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::*;
 
+///
+/// Uses the square-and-multiply technique to compute the reduction of `power` times `base`
+/// w.r.t. the given operation. The operation must be associative to provide correct results.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::algorithms::sqr_mul::generic_abs_square_and_multiply;
+/// # use feanor_math::primitive_int::*;
+/// let mut mul_count = 0;
+/// let mut square_count = 0;
+/// // using + instead of *, we can build any number from repeated additions of 1
+/// let result = generic_abs_square_and_multiply(
+///     1,
+///     &120481,
+///     StaticRing::<i64>::RING,
+///     |x| {
+///         square_count += 1;
+///         return x + x;
+///     },
+///     |x, y| {
+///         mul_count += 1;
+///         return x + y;
+///     },
+///     0
+/// );
+/// assert_eq!(120481, result);
+/// ```
+/// 
 pub fn generic_abs_square_and_multiply<T, U, F, H, I>(base: U, power: &El<I>, int_ring: I, mut square: F, mut multiply_base: H, identity: T) -> T
     where I: IntegerRingStore,
         I::Type: IntegerRing,
@@ -13,6 +41,12 @@ pub fn generic_abs_square_and_multiply<T, U, F, H, I>(base: U, power: &El<I>, in
     try_generic_abs_square_and_multiply(base, power, int_ring, |a| Ok(square(a)), |a, b| Ok(multiply_base(a, b)), identity).unwrap_or_else(|x| x)
 }
 
+///
+/// Uses the square-and-multiply technique to compute the reduction of `power` times `base`
+/// w.r.t. the given operation. The operation must be associative to provide correct results.
+/// 
+/// This function aborts as soon as any operation returns `Err(_)`.
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn try_generic_abs_square_and_multiply<T, U, F, H, I, E>(base: U, power: &El<I>, int_ring: I, mut square: F, mut multiply_base: H, identity: T) -> Result<T, E>
     where I: IntegerRingStore,
@@ -38,6 +72,9 @@ pub fn try_generic_abs_square_and_multiply<T, U, F, H, I, E>(base: U, power: &El
     return Ok(result);
 }
 
+///
+/// Raises `base` to the `power`-th power.
+/// 
 pub fn generic_pow<H, R, S, I>(base: R::Element, power: &El<I>, int_ring: I, hom: &H) -> S::Element
     where R: ?Sized + RingBase, 
         S: ?Sized + RingBase,
@@ -62,6 +99,15 @@ pub fn generic_pow<H, R, S, I>(base: R::Element, power: &El<I>, int_ring: I, hom
     ).unwrap_or_else(|x| x)
 }
 
+///
+/// Computes the reduction of `power` times `base` w.r.t. the given operation.
+/// The operation must be associative to provide correct results.
+/// 
+/// The used algorithm relies on a decomposition of `power` and a table of small shortest addition 
+/// chains to heuristically reduce the number of operations compared to [`generic_abs_square_and_multiply()`].
+/// Note that this introduces some overhead, so in cases where the operation is very cheap, prefer
+/// [`generic_abs_square_and_multiply()`].
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn generic_pow_shortest_chain_table<T, F, G, H, I, E>(base: T, power: &El<I>, int_ring: I, mut double: G, mut mul: F, mut clone: H, identity: T) -> Result<T, E>
     where I: IntegerRingStore,

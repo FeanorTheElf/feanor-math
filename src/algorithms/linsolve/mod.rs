@@ -6,8 +6,19 @@ use crate::ring::*;
 use crate::rings::extension::extension_impl::FreeAlgebraImplBase;
 use crate::seq::VectorView;
 
+///
+/// Contains the algorithm to compute the "pre-smith" form of a matrix, which
+/// is sufficient for solving linear systems. Works over all principal ideal rings.
+/// 
 pub mod smith;
+///
+/// Contains the algorithm for solving linear systems over free ring extensions.
+/// 
 pub mod extension;
+///
+/// Contains the algorithm for computing a determinant via polynomial interpolation.
+/// Currently experimental.
+/// 
 pub mod poly_det;
 
 #[stability::unstable(feature = "enable")]
@@ -44,6 +55,10 @@ pub trait LinSolveRing: RingBase {
     /// If a solution exists, it will be written to `out`. Otherwise, `out` will have an
     /// unspecified (but valid) value after the function returns. Similarly, `lhs` and `rhs`
     /// will be modified in an unspecified way, but its entries will always be valid ring elements.
+    /// 
+    /// Note that if a solution is found, either [`SolveResult::FoundSomeSolution`] or [`SolveResult::FoundUniqueSolution`]
+    /// are returned. If there are multiple solutions, only former will be returned. However, implementations
+    /// are free to also return [`SolveResult::FoundSomeSolution`] in cases where there is a unique solution.
     /// 
     fn solve_right<V1, V2, V3, A>(&self, lhs: SubmatrixMut<V1, Self::Element>, rhs: SubmatrixMut<V2, Self::Element>, out: SubmatrixMut<V3, Self::Element>, allocator: A) -> SolveResult
         where V1: AsPointerToSlice<Self::Element>,
