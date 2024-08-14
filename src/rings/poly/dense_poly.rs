@@ -4,11 +4,12 @@ use crate::divisibility::*;
 use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::pid::*;
 use crate::field::Field;
+use crate::primitive_int::StaticRing;
 use crate::rings::rational::RationalFieldBase;
 use crate::ring::*;
 use crate::algorithms;
 use crate::rings::poly::*;
-use crate::seq::{VectorView, VectorViewMut};
+use crate::seq::*;
 
 use std::alloc::{Allocator, Global};
 use std::cmp::min;
@@ -241,6 +242,26 @@ impl<R: RingStore, A: Allocator + Clone> RingBase for DensePolyRingBase<R, A> {
         where I::Type: IntegerRing
     {
         self.base_ring().characteristic(ZZ)
+    }
+    
+    fn prod<I>(&self, els: I) -> Self::Element 
+        where I: Iterator<Item = Self::Element>
+    {
+        let mut elements = els.collect::<Vec<_>>();
+        if elements.len() == 0 {
+            return self.one();
+        }
+        elements.sort_unstable_by_key(|f| self.degree(f).unwrap_or(0));
+        // this can make it much faster; in particular, in the (not too uncommon) special case that we compute
+        // the product of degree 1 polynomials, this means we actually make use of karatsuba multiplication
+        for i in 0..StaticRing::<i64>::RING.abs_log2_ceil(&(elements.len() as i64)).unwrap() {
+            let step = 1 << i;
+            for j in (0..(elements.len() - step)).step_by(2 * step) {
+                let (a, b) = (&mut elements[j..(j + step + 1)]).split_at_mut(step);
+                self.mul_assign_ref(&mut a[0], &b[0]);
+            }
+        }
+        return elements.into_iter().next().unwrap();
     }
 }
 
@@ -577,11 +598,17 @@ use crate::rings::zn::*;
 #[cfg(test)]
 use crate::rings::zn::zn_static::{Zn, Fp};
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
-#[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
 #[cfg(test)]
 use super::sparse_poly::SparsePolyRing;
+#[cfg(test)]
+use crate::iters::multiset_combinations;
+#[cfg(test)]
+use crate::rings::extension::galois_field::galois_field_dyn;
+#[cfg(test)]
+use crate::rings::extension::FreeAlgebraStore;
+#[cfg(test)]
+use std::time::Instant;
 
 #[cfg(test)]
 fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El<P>>
@@ -598,6 +625,21 @@ fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El
         poly_ring.from_terms([(base_ring.int_hom().map(-1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
         poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(-1), 1)].into_iter())
     ].into_iter()
+}
+
+#[test]
+fn test_prod() {
+    let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    assert_el_eq!(&poly_ring, poly_ring.one(), poly_ring.prod([].into_iter()));
+
+    let product = poly_ring.prod((0..10).map(|n| poly_ring.add(poly_ring.indeterminate(), poly_ring.inclusion().map(n))));
+    assert_eq!(Some(10), poly_ring.degree(&product));
+    for i in 0..10 {
+        let expected = multiset_combinations(&[1; 10], 10 - i, |indices| {
+            indices.iter().enumerate().filter(|(_, count)| **count > 0).map(|(n, _)| n).product::<usize>()
+        }).sum::<usize>();
+        assert_eq!(expected as i64, *poly_ring.coefficient_at(&product, i));
+    }
 }
 
 #[test]
@@ -662,4 +704,29 @@ fn test_print() {
         (base_poly_ring.from_terms([(4, 2)].into_iter()), 2)
     ].into_iter());
     assert_eq!("(4X^2)Y^2", format!("{}", poly_ring.format(&poly)));
+}
+
+#[test]
+#[ignore]
+fn test_expensive_prod() {
+    let ring = galois_field_dyn(17, 2048);
+    let poly_ring = DensePolyRing::new(&ring, "X");
+    let mut rng = oorandom::Rand64::new(1);
+    let a = ring.random_element(|| rng.rand_u64());
+
+    let start = Instant::now();
+    let product = poly_ring.prod(
+        (0..2048).scan(ring.clone_el(&a), |current, _| {
+            let result = poly_ring.sub(poly_ring.indeterminate(), poly_ring.inclusion().map_ref(&current));
+            *current = ring.pow(std::mem::replace(current, ring.zero()), 17);
+            return Some(result);
+        })
+    );
+    let end = Instant::now();
+
+    println!("Computed product in {} ms", (end - start).as_millis());
+    for i in 0..2048 {
+        let coeff_wrt_basis = ring.wrt_canonical_basis(poly_ring.coefficient_at(&product, i));
+        assert!((1..2028).all(|j| ring.base_ring().is_zero(&coeff_wrt_basis.at(j))));
+    }
 }
