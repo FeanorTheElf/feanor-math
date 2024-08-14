@@ -11,9 +11,11 @@ use crate::primitive_int::*;
 use crate::integer::*;
 use crate::pid::*;
 use crate::ring::*;
+use crate::serialization::SerializableElementRing;
 use algorithms::convolution::KaratsubaHint;
 use algorithms::matmul::ComputeInnerProduct;
-use algorithms::matmul::StrassenHint;
+use algorithms::matmul::StrassenHint;use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
+
 use crate::homomorphism::*;
 use crate::rings::rust_bigint::*;
 
@@ -291,6 +293,21 @@ impl RingBase for ZnBase {
             |a, b| self.mul_ref_fst(a, b),
             self.one()
         )
+    }
+}
+
+impl SerializableElementRing for ZnBase {
+
+    fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
+        where D: Deserializer<'de>
+    {
+        <i64 as Deserialize>::deserialize(deserializer).map(|x| self.from_int_promise_reduced(x))
+    }
+
+    fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        <i64 as Serialize>::serialize(&self.smallest_positive_lift(*el), serializer)
     }
 }
 
@@ -1104,4 +1121,10 @@ fn bench_inner_product(bencher: &mut Bencher) {
         let actual = <_ as ComputeInnerProduct>::inner_product_ref(Fp.get_ring(), lhs.iter().zip(rhs.iter()).map(|x| std::hint::black_box(x)));
         assert_el_eq!(Fp, expected, actual);
     })
+}
+
+#[test]
+fn test_serialize() {
+    let ring = Zn::new(128);
+    crate::serialization::generic_tests::test_serialization(ring, ring.elements())
 }

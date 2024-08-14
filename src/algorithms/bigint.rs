@@ -599,7 +599,7 @@ fn test_bigint_rshift() {
 
     let mut x = from_str_radix("9843a756781b34567f81394", 16, Vec::new()).unwrap();
 	bigint_rshift(&mut x, 1000);
-    assert_eq!(truncate_zeros(x), Vec::new());
+    assert_eq!(truncate_zeros(x), Vec::<u64>::new());
 }
 
 #[test]

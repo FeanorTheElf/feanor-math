@@ -1,3 +1,5 @@
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 use crate::algorithms::eea::*;
 use crate::local::PrincipalLocalRing;
 use crate::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
@@ -7,6 +9,7 @@ use crate::primitive_int::{StaticRing, StaticRingBase};
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::rings::zn::*;
+use crate::serialization::SerializableElementRing;
 
 ///
 /// Ring that implements arithmetic in `Z/nZ` for a small `n` known
@@ -177,6 +180,21 @@ impl<const N: u64, const IS_FIELD: bool> HashableElRing for ZnBase<N, IS_FIELD> 
     
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
         h.write_u64(*el);
+    }
+}
+
+impl<const N: u64, const IS_FIELD: bool> SerializableElementRing for ZnBase<N, IS_FIELD> {
+
+    fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
+        where D: Deserializer<'de>
+    {
+        <i64 as Deserialize>::deserialize(deserializer).map(|x| self.from_int_promise_reduced(x))
+    }
+
+    fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        <i64 as Serialize>::serialize(&self.smallest_positive_lift(*el), serializer)
     }
 }
 

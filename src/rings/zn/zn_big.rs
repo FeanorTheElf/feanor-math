@@ -1,5 +1,7 @@
 use std::fmt::Debug;
 
+use serde::{Deserializer, Serializer}; 
+
 use crate::divisibility::DivisibilityRing;
 use crate::impl_localpir_wrap_unwrap_homs;
 use crate::impl_localpir_wrap_unwrap_isos;
@@ -437,6 +439,22 @@ impl<'a, I> Iterator for ZnBaseElementsIter<'a, I>
     }
 }
 
+impl<I: IntegerRingStore> SerializableElementRing for ZnBase<I>
+    where I::Type: IntegerRing + SerializableElementRing
+{
+    fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
+        where D: Deserializer<'de>
+    {
+        self.integer_ring().get_ring().deserialize(deserializer).map(|x| self.from_int_promise_reduced(x))
+    }
+
+    fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        self.integer_ring().get_ring().serialize(&self.smallest_positive_lift(self.clone_el(el)), serializer)
+    }
+}
+
 impl<I: IntegerRingStore> FiniteRing for ZnBase<I>
     where I::Type: IntegerRing
 {
@@ -516,6 +534,7 @@ impl_localpir_wrap_unwrap_isos!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: IntegerR
 use crate::rings::finite::FiniteRingStore;
 #[cfg(test)]
 use crate::integer::BigIntRing;
+use crate::serialization::SerializableElementRing;
 
 #[test]
 fn test_mul() {
@@ -618,4 +637,10 @@ fn test_finite_field_axioms() {
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(&StaticRing::<i64>::RING, 128));
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(&StaticRing::<i64>::RING, 15));
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(&StaticRing::<i128>::RING, 1 << 32));
+}
+
+#[test]
+fn test_serialize() {
+    let ring = Zn::new(&StaticRing::<i64>::RING, 128);
+    crate::serialization::generic_tests::test_serialization(ring, ring.elements())
 }

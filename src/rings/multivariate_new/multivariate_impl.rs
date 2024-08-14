@@ -34,7 +34,7 @@ fn compute_cum_binomial(n: usize, k: usize) -> u64 {
 fn enumeration_index_degrevlex<V>(d: Exponent, mon: V, cum_binomial_lookup_table: &[Vec<u64>]) -> u64
     where V: VectorFn<Exponent>
 {
-    debug_assert!(d == mon.iter().sum());
+    debug_assert!(d == mon.iter().sum::<Exponent>());
     let n = mon.len();
     let mut remaining_degree: i64 = d as i64 - 1;
     let mut result = 0;

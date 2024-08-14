@@ -1,3 +1,5 @@
+use serde::{Deserializer, Serializer};
+
 use crate::algorithms::eea::poly_pid_fractionfield_gcd;
 use crate::algorithms::convolution::*;
 use crate::divisibility::*;
@@ -10,6 +12,7 @@ use crate::ring::*;
 use crate::algorithms;
 use crate::rings::poly::*;
 use crate::seq::*;
+use crate::serialization::*;
 
 use std::alloc::{Allocator, Global};
 use std::cmp::min;
@@ -414,6 +417,26 @@ impl<R, A: Allocator + Clone> HashableElRing for DensePolyRingBase<R, A>
     }
 }
 
+impl<R, A: Allocator + Clone> SerializableElementRing for DensePolyRingBase<R, A> 
+    where R: RingStore,
+        R::Type: SerializableElementRing
+{
+    fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
+        where D: Deserializer<'de>
+    {
+        let mut data = Vec::new_in(self.element_allocator.clone());
+        deserialize_seq_helper(deserializer, |x| data.push(x), DeserializeWithRing::new(self.base_ring()))?;
+        return Ok(DensePolyRingEl { data });
+    }
+
+    fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let len = self.degree(el).map(|d| d + 1).unwrap_or(0);
+        serialize_seq_helper(serializer, (0..len).map(|i| SerializeWithRing::new(self.coefficient_at(el, i), self.base_ring())))
+    }
+}
+
 impl<R, A: Allocator + Clone> PolyRing for DensePolyRingBase<R, A> 
     where R: RingStore
 {
@@ -729,4 +752,10 @@ fn test_expensive_prod() {
         let coeff_wrt_basis = ring.wrt_canonical_basis(poly_ring.coefficient_at(&product, i));
         assert!((1..2028).all(|j| ring.base_ring().is_zero(&coeff_wrt_basis.at(j))));
     }
+}
+
+#[test]
+fn test_serialize() {
+    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    crate::serialization::generic_tests::test_serialization(&poly_ring, edge_case_elements(&poly_ring));
 }

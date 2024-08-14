@@ -1,3 +1,6 @@
+use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
+
+use crate::algorithms::bigint::highest_set_block;
 use crate::divisibility::DivisibilityRing;
 use crate::divisibility::Domain;
 use crate::pid::*;
@@ -6,6 +9,7 @@ use crate::ordered::*;
 use crate::primitive_int::StaticRingBase;
 use crate::ring::*;
 use crate::algorithms;
+use crate::serialization::SerializableElementRing;
 use std::alloc::Allocator;
 use std::alloc::Global;
 use std::cmp::Ordering::*;
@@ -329,6 +333,31 @@ impl<A: Allocator + Clone> HashableElRing for RustBigintRingBase<A> {
     }
 }
 
+impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
+
+    fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
+        where D: Deserializer<'de>
+    {
+        let (negative, data) = <(bool, &serde_bytes::Bytes) as Deserialize>::deserialize(deserializer)?;
+        let mut result_data = Vec::with_capacity_in(data.len() / size_of::<u64>(), self.allocator.clone());
+        for digit in data.array_chunks() {
+            result_data.push(u64::from_le_bytes(*digit));
+        }
+        return Ok(RustBigint(negative, result_data));
+    }
+
+    fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let len = highest_set_block(&el.1).map(|n| n + 1).unwrap_or(0);
+        let mut data = Vec::with_capacity_in(len * size_of::<u64>(), &self.allocator);
+        for digit in &el.1 {
+            data.extend(digit.to_le_bytes().into_iter());
+        }
+        <(bool, &serde_bytes::Bytes) as Serialize>::serialize(&(el.0, serde_bytes::Bytes::new(&data)), serializer)
+    }
+}
+
 impl<A: Allocator + Clone> IntegerRing for RustBigintRingBase<A> {
 
     fn to_float_approx(&self, value: &Self::Element) -> f64 {
@@ -580,4 +609,9 @@ fn test_canonical_iso_static_int() {
     // for the hom test, we have to be able to multiply elements in `StaticRing::<i128>::RING`, so we cannot test `i128::MAX` or `i128::MIN`
     crate::ring::generic_tests::test_hom_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128].iter().copied());
     crate::ring::generic_tests::test_iso_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128, i128::MAX, i128::MIN].iter().copied());
+}
+
+#[test]
+fn test_serialize() {
+    crate::serialization::generic_tests::test_serialization(ZZ, edge_case_elements())
 }

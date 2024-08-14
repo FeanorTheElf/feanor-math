@@ -3,6 +3,8 @@ use std::ops::{AddAssign, Div, MulAssign, Neg, Rem, Shr, SubAssign};
 use std::marker::PhantomData;
 use std::fmt::Display;
 
+use serde::{de::DeserializeOwned, Deserializer, Serialize, Serializer}; 
+
 use crate::ring::*;
 use crate::algorithms;
 use crate::homomorphism::*;
@@ -12,11 +14,12 @@ use crate::ordered::*;
 use crate::integer::*;
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::StrassenHint;
+use crate::serialization::SerializableElementRing;
 
 ///
 /// Trait for `i8` to `i128`.
 /// 
-pub trait PrimitiveInt: AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Shr<usize, Output = Self> + Eq + Into<Self::Larger> + TryFrom<Self::Larger> + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy + Div<Self, Output = Self> + Rem<Self, Output = Self> + Display {
+pub trait PrimitiveInt: Serialize + DeserializeOwned + AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Shr<usize, Output = Self> + Eq + Into<Self::Larger> + TryFrom<Self::Larger> + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy + Div<Self, Output = Self> + Rem<Self, Output = Self> + Display {
 
     type Larger: PrimitiveInt;
 
@@ -368,6 +371,21 @@ impl StrassenHint for StaticRingBase<i64> {
 
 impl StrassenHint for StaticRingBase<i128> {
     fn strassen_threshold(&self) -> usize { 5 }
+}
+
+impl<T: PrimitiveInt> SerializableElementRing for StaticRingBase<T> {
+
+    fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
+        where D: Deserializer<'de>
+    {
+        T::deserialize(deserializer)
+    }
+
+    fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        T::serialize(el, serializer)
+    }
 }
 
 ///

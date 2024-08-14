@@ -29,9 +29,14 @@ ndarray = { version = "0.15.6", optional = true }
 append-only-vec = "0.1.5"
 thread_local = "1.1.8"
 atomicbox = "0.4.0"
+serde = "1.0.207"
+bytemuck = "1.16.3"
+serde_bytes = "0.11.15"
 
 [dev-dependencies]
 feanor-mempool = "2.1.0"
+serde_assert = "0.8.0"
+serde_json = "1.0.124"
 
 [features]
 # Enables the export of "generic tests", functions that test the set of axioms associated with a trait.
