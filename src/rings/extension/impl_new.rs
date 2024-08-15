@@ -231,7 +231,7 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         let mut tmp = Vec::with_capacity_in(self.rank() * 2, self.element_allocator.clone());
         tmp.extend((0..(2 << self.log2_padded_len)).map(|_| self.base_ring.zero()));
-        STANDARD_CONVOLUTION.compute_convolution(&lhs.values[..], &rhs.values[..], &mut tmp[..], self.base_ring().get_ring());
+        self.convolution.compute_convolution(&lhs.values[..], &rhs.values[..], &mut tmp[..], self.base_ring().get_ring());
         for i in (self.rank()..(2 * self.rank())).rev() {
             for j in 0..self.x_pow_rank.len() {
                 let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &tmp[i]);
