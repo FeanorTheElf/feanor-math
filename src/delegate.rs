@@ -92,6 +92,13 @@ pub trait DelegateRing: PartialEq {
     fn rev_element_cast(&self, el: <Self as RingBase>::Element) -> Self::Element {
         el
     }
+
+    ///
+    /// Necessary in some locations to satisfy the type system
+    /// 
+    fn rev_element_cast_ref<'a>(&self, el: &'a <Self as RingBase>::Element) -> &'a Self::Element {
+        el
+    }
 }
 
 impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
@@ -285,14 +292,14 @@ impl<R: DelegateRing + ?Sized> DivisibilityRing for R
     }
 }
 
-pub struct DelegateZnRingElementsIter<'a, R: ?Sized>
+pub struct DelegateFiniteRingElementsIter<'a, R: ?Sized>
     where R: DelegateRing, R::Base: FiniteRing
 {
     ring: &'a R,
     base: <R::Base as FiniteRing>::ElementsIter<'a>
 }
 
-impl<'a, R: ?Sized> Clone for DelegateZnRingElementsIter<'a, R>
+impl<'a, R: ?Sized> Clone for DelegateFiniteRingElementsIter<'a, R>
     where R: DelegateRing, R::Base: FiniteRing
 {
     fn clone(&self) -> Self {
@@ -300,7 +307,7 @@ impl<'a, R: ?Sized> Clone for DelegateZnRingElementsIter<'a, R>
     }
 }
 
-impl<'a, R: ?Sized> Iterator for DelegateZnRingElementsIter<'a, R>
+impl<'a, R: ?Sized> Iterator for DelegateFiniteRingElementsIter<'a, R>
     where R: DelegateRing, R::Base: FiniteRing
 {
     type Item = <R as RingBase>::Element;
@@ -313,26 +320,61 @@ impl<'a, R: ?Sized> Iterator for DelegateZnRingElementsIter<'a, R>
 impl<R: DelegateRing + ?Sized> FiniteRing for R
     where R::Base: FiniteRing
 {
-    type ElementsIter<'a> = DelegateZnRingElementsIter<'a, R>
+    type ElementsIter<'a> = DelegateFiniteRingElementsIter<'a, R>
         where R: 'a;
 
     fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
-        DelegateZnRingElementsIter {
+        DelegateFiniteRingElementsIter {
             ring: self,
             base: self.get_delegate().elements()
         }
     }
     
-    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <R as RingBase>::Element {
+    default fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <R as RingBase>::Element {
         self.element_cast(self.rev_delegate(self.get_delegate().random_element(rng)))
     }
 
-    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    default fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.get_delegate().size(ZZ)
     }
 }
+
+// unfortunately, the following default impl does not work, since in many cases (e.g. `AsField`)
+// we want to specialize it and relax its constraints (i.e. `R::Base: DivisibilityRing` instead of
+// `PrincipalIdealRing`); this is not supported by specializtion as of currently
+
+// impl<R: DelegateRing + ?Sized> PrincipalIdealRing for R
+//     where R::Base: PrincipalIdealRing
+// {
+//     default fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+//         let (s, t, d) = self.get_delegate().extended_ideal_gen(self.delegate_ref(self.rev_element_cast_ref(lhs)), self.delegate_ref(self.rev_element_cast_ref(rhs)));
+//         return (self.element_cast(self.rev_delegate(s)), self.element_cast(self.rev_delegate(t)), self.element_cast(self.rev_delegate(d)));
+//     }
+
+//     default fn cancel_common_factors(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+//         let (l, r, d) = self.get_delegate().cancel_common_factors(self.delegate_ref(self.rev_element_cast_ref(lhs)), self.delegate_ref(self.rev_element_cast_ref(rhs)));
+//         return (self.element_cast(self.rev_delegate(l)), self.element_cast(self.rev_delegate(r)), self.element_cast(self.rev_delegate(d)));
+//     }
+
+//     default fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+//         self.element_cast(self.rev_delegate(self.get_delegate().ideal_gen(self.delegate_ref(self.rev_element_cast_ref(lhs)), self.delegate_ref(self.rev_element_cast_ref(rhs)))))
+//     }
+
+//     default fn create_left_elimination_matrix(&self, a: &Self::Element, b: &Self::Element) -> ([Self::Element; 4], Self::Element) {
+//         let ([a, b, c, d], x) = self.get_delegate().create_left_elimination_matrix(self.delegate_ref(self.rev_element_cast_ref(a)), self.delegate_ref(self.rev_element_cast_ref(b)));
+//         return (
+//             [
+//                 self.element_cast(self.rev_delegate(a)),
+//                 self.element_cast(self.rev_delegate(b)),
+//                 self.element_cast(self.rev_delegate(c)),
+//                 self.element_cast(self.rev_delegate(d))
+//             ],
+//             self.element_cast(self.rev_delegate(x))
+//         );
+//     }
+// }
 
 impl<R: DelegateRing + ?Sized> ZnRing for R
     where R::Base: ZnRing, 
@@ -342,23 +384,23 @@ impl<R: DelegateRing + ?Sized> ZnRing for R
     type IntegerRingBase = <R::Base as ZnRing>::IntegerRingBase;
     type Integers = <R::Base as ZnRing>::Integers;
 
-    fn integer_ring(&self) -> &Self::Integers {
+    default fn integer_ring(&self) -> &Self::Integers {
         self.get_delegate().integer_ring()
     }
 
-    fn modulus(&self) -> &El<Self::Integers> {
+    default fn modulus(&self) -> &El<Self::Integers> {
         self.get_delegate().modulus()
     }
 
-    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
+    default fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
         self.get_delegate().smallest_positive_lift(self.delegate(self.rev_element_cast(el)))
     }
 
-    fn smallest_lift(&self, el: Self::Element) -> El<Self::Integers> {
+    default fn smallest_lift(&self, el: Self::Element) -> El<Self::Integers> {
         self.get_delegate().smallest_lift(self.delegate(self.rev_element_cast(el)))
     }
 
-    fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element {
+    default fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element {
         self.element_cast(self.rev_delegate(self.get_delegate().from_int_promise_reduced(x)))
     }
 }
@@ -385,21 +427,21 @@ impl<R> FreeAlgebra for R
     type VectorRepresentation<'a> = <<R as DelegateRing>::Base as FreeAlgebra>::VectorRepresentation<'a>
         where Self: 'a;
 
-    fn canonical_gen(&self) -> Self::Element {
+    default fn canonical_gen(&self) -> Self::Element {
         self.rev_delegate(self.get_delegate().canonical_gen())
     }
 
-    fn from_canonical_basis<V>(&self, vec: V) -> Self::Element
+    default fn from_canonical_basis<V>(&self, vec: V) -> Self::Element
         where V: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = El<Self::BaseRing>>
     {
         self.rev_delegate(self.get_delegate().from_canonical_basis(vec.map(|x| x)))
     }
 
-    fn rank(&self) -> usize {
+    default fn rank(&self) -> usize {
         self.get_delegate().rank()
     }
 
-    fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a> {
+    default fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a> {
         self.get_delegate().wrt_canonical_basis(self.delegate_ref(el))
     }
 }

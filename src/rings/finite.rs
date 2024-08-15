@@ -6,7 +6,7 @@ use crate::integer::{IntegerRingStore, IntegerRing};
 /// 
 pub trait FiniteRing: RingBase {
 
-    type ElementsIter<'a>: Clone + Iterator<Item = <Self as RingBase>::Element>
+    type ElementsIter<'a>: Sized + Clone + Iterator<Item = <Self as RingBase>::Element>
         where Self: 'a;
 
     ///

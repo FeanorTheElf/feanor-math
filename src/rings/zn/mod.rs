@@ -34,6 +34,8 @@ pub mod zn_static;
 /// 
 pub mod zn_rns;
 
+pub mod fftconv;
+
 ///
 /// Trait for all rings that represent a quotient of the integers `Z/nZ` for some integer `n`.
 /// 

@@ -151,7 +151,7 @@ impl<R: DivisibilityRingStore> DivisibilityRing for AsFieldBase<R>
     }
 }
 
-impl<R: DivisibilityRingStore> PrincipalIdealRing for AsFieldBase<R> 
+impl<R: RingStore> PrincipalIdealRing for AsFieldBase<R> 
     where R::Type: DivisibilityRing
 {
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {

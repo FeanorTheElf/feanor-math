@@ -1,6 +1,7 @@
 use std::f64::EPSILON;
 use std::f64::consts::PI;
 
+use crate::homomorphism::CanHomFrom;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::Field;
 use crate::integer::{IntegerRingStore, IntegerRing};
@@ -232,6 +233,23 @@ impl RingExtension for Complex64Base {
     fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {
         lhs.0 *= *rhs;
         lhs.1 *= *rhs;
+    }
+}
+
+impl<I: ?Sized + IntegerRing> CanHomFrom<I> for Complex64Base {
+    
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, _from: &I) -> Option<Self::Homomorphism> {
+        Some(())
+    }
+
+    fn map_in(&self, from: &I, el: <I as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in_ref(from, &el, hom)
+    }
+
+    fn map_in_ref(&self, from: &I, el: &<I as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
+        self.from_f64(from.to_float_approx(&el))
     }
 }
 
