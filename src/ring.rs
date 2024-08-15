@@ -840,6 +840,7 @@ pub type El<R> = <<R as RingStore>::Type as RingBase>::Element;
 /// type A = RingValue<ABase>;
 /// ```
 /// 
+#[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct RingValue<R: RingBase> {
     ring: R
@@ -849,6 +850,10 @@ impl<R: RingBase> RingValue<R> {
 
     pub const fn from(value: R) -> Self {
         RingValue { ring: value }
+    }
+
+    pub fn into(self) -> R {
+        self.ring
     }
 }
 

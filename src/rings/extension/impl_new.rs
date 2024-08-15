@@ -167,6 +167,19 @@ impl<R, V, A, C> FreeAlgebraImpl<R, V, A, C>
             base_ring, x_pow_rank, element_allocator, rank, log2_padded_len, convolution
         })
     }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn set_convolution<C_new: ConvolutionAlgorithm<R::Type>>(self, new_convolution: C_new) -> FreeAlgebraImpl<R, V, A, C_new> {
+        let ring = self.into();
+        RingValue::from(FreeAlgebraImplBase {
+            base_ring: ring.base_ring,
+            x_pow_rank: ring.x_pow_rank,
+            element_allocator: ring.element_allocator,
+            log2_padded_len: ring.log2_padded_len,
+            rank: ring.rank,
+            convolution: new_convolution
+        })
+    }
 }
 
 impl<R, V, A, C> PartialEq for FreeAlgebraImplBase<R, V, A, C>
@@ -232,10 +245,41 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
         let mut tmp = Vec::with_capacity_in(self.rank() * 2, self.element_allocator.clone());
         tmp.extend((0..(2 << self.log2_padded_len)).map(|_| self.base_ring.zero()));
         self.convolution.compute_convolution(&lhs.values[..], &rhs.values[..], &mut tmp[..], self.base_ring().get_ring());
-        for i in (self.rank()..(2 * self.rank())).rev() {
-            for j in 0..self.x_pow_rank.len() {
-                let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &tmp[i]);
-                self.base_ring.add_assign(&mut tmp[i - self.rank() + j], add);
+
+        struct ReduceModulo<'a, R>
+            where R: RingStore
+        {
+            rank: usize,
+            base_ring: &'a R,
+            data: &'a mut [El<R>]
+        }
+
+        impl<'a, R> SparseVectorViewOperation<El<R>> for ReduceModulo<'a, R>
+            where R: RingStore
+        {
+            type Output = ();
+        
+            fn execute<V: VectorViewSparse<El<R>>>(self, vector: V) -> Self::Output {
+                for i in (self.rank..(2 * self.rank)).rev() {
+                    for (j, c) in vector.nontrivial_entries() {
+                        let add = self.base_ring.mul_ref(c, &mut self.data[i]);
+                        self.base_ring.add_assign(&mut self.data[i - self.rank + j], add);
+                    }
+                }
+            }
+        }
+
+        let was_sparse = self.x_pow_rank.specialize_sparse(ReduceModulo {
+            rank: self.rank,
+            base_ring: self.base_ring(),
+            data: &mut tmp
+        });
+        if was_sparse.is_err() {
+            for i in (self.rank()..(2 * self.rank())).rev() {
+                for j in 0..self.x_pow_rank.len() {
+                    let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &tmp[i]);
+                    self.base_ring.add_assign(&mut tmp[i - self.rank() + j], add);
+                }
             }
         }
         for i in 0..self.rank() {
@@ -548,6 +592,8 @@ use crate::rings::zn::zn_64::{Zn, ZnEl};
 use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
+#[cfg(test)]
+use sparse::SparseHashMapVector;
 
 #[cfg(test)]
 fn test_ring0_and_elements() -> (FreeAlgebraImpl<Zn, [ZnEl; 1]>, Vec<FreeAlgebraImplEl<Zn>>) {
@@ -599,6 +645,31 @@ fn test_ring3_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 1]>, V
     return (R, elements);
 }
 
+
+#[cfg(test)]
+fn test_ring4_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, SparseHashMapVector<StaticRing<i64>>>, Vec<FreeAlgebraImplEl<StaticRing<i64>>>) {
+    let ZZ = StaticRing::<i64>::RING;
+    // ZZ[X]/(X^3 - X)
+    let mut modulus = SparseHashMapVector::new(3, StaticRing::<i64>::RING);
+    *modulus.at_mut(1) = 1;
+    let R = FreeAlgebraImpl::new(ZZ, 3, modulus);
+    let mut elements = Vec::new();
+    for a in [-2, 0, 1, 2] {
+        for b in [-2, 0, 2] {
+            for c in [-2, 0, 2] {
+                elements.push(R.from_canonical_basis([a, b, c].into_iter()));
+            }
+        }
+    }
+    return (R, elements);
+}
+
+#[test]
+fn test_sparse() {
+    let (ring, _) = test_ring4_and_elements();
+    assert_el_eq!(ring, ring.canonical_gen(), ring.pow(ring.canonical_gen(), 3));
+}
+
 #[test]
 fn test_ring_axioms() {
     let (ring, els) = test_ring0_and_elements();
@@ -608,6 +679,8 @@ fn test_ring_axioms() {
     let (ring, els) = test_ring2_and_elements();
     crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
     let (ring, els) = test_ring3_and_elements();
+    crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
+    let (ring, els) = test_ring4_and_elements();
     crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
 
     let base_ring = zn_static::Fp::<257>::RING;
@@ -636,6 +709,8 @@ fn test_free_algebra_axioms() {
     let (ring, _) = test_ring2_and_elements();
     super::generic_tests::test_free_algebra_axioms(ring);
     let (ring, _) = test_ring3_and_elements();
+    super::generic_tests::test_free_algebra_axioms(ring);
+    let (ring, _) = test_ring4_and_elements();
     super::generic_tests::test_free_algebra_axioms(ring);
 }
 
@@ -679,6 +754,10 @@ fn test_divisibility_axioms() {
     let (ring, els) = test_ring1_and_elements();
     crate::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
     let (ring, els) = test_ring2_and_elements();
+    crate::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
+    let (ring, els) = test_ring3_and_elements();
+    crate::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
+    let (ring, els) = test_ring4_and_elements();
     crate::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
 }
 

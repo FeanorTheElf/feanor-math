@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use super::{SelfSubvectorFn, SelfSubvectorView, SwappableVectorViewMut, VectorFn, VectorView, VectorViewMut};
+use super::{SelfSubvectorFn, SelfSubvectorView, SparseVectorViewOperation, SwappableVectorViewMut, VectorFn, VectorView, VectorViewMut, VectorViewSparse};
 
 pub struct SubvectorView<V: VectorView<T>, T: ?Sized> {
     begin: usize,
@@ -44,6 +44,61 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for SubvectorView<V, T> {
 
     fn len(&self) -> usize {
         self.end - self.begin
+    }
+
+    fn specialize_sparse<Op: SparseVectorViewOperation<T>>(&self, op: Op) -> Result<Op::Output, ()> {
+
+        struct WrapSubvector<T: ?Sized, Op: SparseVectorViewOperation<T>> {
+            op: Op,
+            element: PhantomData<T>,
+            begin: usize,
+            end: usize
+        }
+
+        impl<T: ?Sized, Op: SparseVectorViewOperation<T>> SparseVectorViewOperation<T> for WrapSubvector<T, Op> {
+
+            type Output = Op::Output;
+
+            fn execute<V: VectorViewSparse<T>>(self, vector: V) -> Self::Output {
+                self.op.execute(SubvectorView::new(vector).restrict_full(self.begin..self.end))
+            }
+        }
+
+        self.base.specialize_sparse(WrapSubvector { op: op, element: PhantomData, begin: self.begin, end: self.end })
+    }
+}
+
+pub struct FilterWithinRangeIter<'a, T: ?Sized, I>
+    where T: 'a,
+        I: Iterator<Item = (usize, &'a T)>
+{
+    it: I,
+    begin: usize,
+    end: usize
+}
+
+impl<'a, T: ?Sized, I> Iterator for FilterWithinRangeIter<'a, T, I>
+    where T: 'a,
+        I: Iterator<Item = (usize, &'a T)>
+{
+    type Item = (usize, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.it.by_ref().filter(|(i, _)| *i >= self.begin && *i < self.end).next()
+    }
+}
+
+impl<V: VectorViewSparse<T>, T: ?Sized> VectorViewSparse<T> for SubvectorView<V, T> {
+
+    type Iter<'a> = FilterWithinRangeIter<'a, T, V::Iter<'a>>
+        where Self: 'a, T: 'a;
+
+    fn nontrivial_entries<'a>(&'a self) -> Self::Iter<'a> {
+        FilterWithinRangeIter {
+            it: self.base.nontrivial_entries(),
+            begin: self.begin,
+            end: self.end
+        }
     }
 }
 
@@ -131,6 +186,11 @@ impl<V: VectorFn<T>, T> SelfSubvectorFn<T> for SubvectorFn<V, T> {
     }
 }
 
+#[cfg(test)]
+use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use super::sparse::SparseHashMapVector;
+
 #[test]
 fn test_subvector_ranges() {
     let a = SubvectorView::new([0, 1, 2, 3, 4]);
@@ -185,4 +245,31 @@ fn test_subvector_fn_subvector_oob() {
     let a = SubvectorFn::new([0, 1, 2, 3, 4].into_fn(|x| *x));
     let b = a.restrict(1..4);
     b.restrict(0..4);
+}
+
+#[test]
+fn test_subvector_sparse() {
+    let mut sparse_vector = SparseHashMapVector::new(1000, StaticRing::<i64>::RING);
+    *sparse_vector.at_mut(6) = 6;
+    *sparse_vector.at_mut(20) = 20;
+    *sparse_vector.at_mut(256) = 256;
+    *sparse_vector.at_mut(257) = 257;
+
+    let subvector = SubvectorView::new(sparse_vector).restrict(20..=256);
+
+    struct Verify;
+
+    impl SparseVectorViewOperation<i64> for Verify {
+
+        type Output = ();
+
+        fn execute<V: VectorViewSparse<i64>>(self, vector: V) -> Self::Output {
+            assert!(
+                vec![(20, &20), (256, &256)] == vector.nontrivial_entries().collect::<Vec<_>>() ||
+                vec![(256, &256), (20, &20)] == vector.nontrivial_entries().collect::<Vec<_>>()
+            );
+        }
+    }
+
+    subvector.specialize_sparse(Verify).unwrap();
 }

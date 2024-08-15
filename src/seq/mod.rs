@@ -53,6 +53,11 @@ pub trait VectorView<T: ?Sized> {
     fn len(&self) -> usize;
     fn at(&self, i: usize) -> &T;
 
+    #[stability::unstable(feature = "enable")]
+    fn specialize_sparse<Op: SparseVectorViewOperation<T>>(&self, _op: Op) -> Result<Op::Output, ()> {
+        Err(())
+    }
+
     ///
     /// Returns an iterator over all elements in this vector.
     /// 
@@ -84,7 +89,8 @@ pub trait VectorView<T: ?Sized> {
     /// Converts this vector into a [`VectorFn`] that clones elements on access.
     /// 
     fn as_ring_el_fn<'a, R: RingStore>(&'a self, ring: R) -> CloneElFn<&'a Self, T, CloneRingEl<R>>
-        where T: Sized, R::Type: RingBase<Element = T>
+        where T: Sized, 
+            R::Type: RingBase<Element = T>
     {
         self.into_ring_el_fn(ring)
     }
@@ -131,12 +137,21 @@ pub trait VectorView<T: ?Sized> {
 }
 
 #[stability::unstable(feature = "enable")]
-pub trait VectorViewSparse<T: ?Sized> {
+pub trait VectorViewSparse<T: ?Sized>: VectorView<T> {
 
     type Iter<'a>: Iterator<Item = (usize, &'a T)>
-        where Self: 'a, T: 'a;
+        where Self: 'a, 
+            T: 'a;
 
     fn nontrivial_entries<'a>(&'a self) -> Self::Iter<'a>;
+}
+
+#[stability::unstable(feature = "enable")]
+pub trait SparseVectorViewOperation<T: ?Sized> {
+
+    type Output;
+
+    fn execute<V: VectorViewSparse<T>>(self, vector: V) -> Self::Output;
 }
 
 fn range_within<R: RangeBounds<usize>>(len: usize, range: R) -> Range<usize> {
@@ -224,6 +239,10 @@ impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for Box<V> {
     fn at(&self, i: usize) -> &T {
         (**self).at(i)
     }
+
+    fn specialize_sparse<Op: SparseVectorViewOperation<T>>(&self, op:Op) -> Result<Op::Output, ()> {
+        (**self).specialize_sparse(op)
+    }
 }
 
 impl<T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for Box<V> {
@@ -233,14 +252,37 @@ impl<T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for Box<V> {
     }
 }
 
-impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a V {
 
+impl<T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for Box<V> {
+    
+    type Iter<'b> = V::Iter<'b>
+        where Self: 'b, T: 'b;
+
+    fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> {
+        (**self).nontrivial_entries()
+    }
+}
+
+impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a V {
     fn len(&self) -> usize {
         (**self).len()
     }
 
     fn at(&self, i: usize) -> &T {
         (**self).at(i)
+    }
+
+    fn specialize_sparse<Op: SparseVectorViewOperation<T>>(&self, op:Op) -> Result<Op::Output, ()> {
+        (**self).specialize_sparse(op)
+    }
+}
+
+impl<'a, T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for &'a V {
+    type Iter<'b> = V::Iter<'b>
+        where Self: 'b, T: 'b;
+
+    fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> {
+        (**self).nontrivial_entries()
     }
 }
 
@@ -253,12 +295,26 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a mut V {
     fn at(&self, i: usize) -> &T {
         (**self).at(i)
     }
+
+    fn specialize_sparse<Op: SparseVectorViewOperation<T>>(&self, op:Op) -> Result<Op::Output, ()> {
+        (**self).specialize_sparse(op)
+    }
 }
 
 impl<'a, T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for &'a mut V {
 
     fn at_mut(&mut self, i: usize) -> &mut T {
         (**self).at_mut(i)
+    }
+}
+
+impl<'a, T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for &'a mut V {
+
+    type Iter<'b> = V::Iter<'b>
+        where Self: 'b, T: 'b;
+
+    fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> {
+        (**self).nontrivial_entries()
     }
 }
 
