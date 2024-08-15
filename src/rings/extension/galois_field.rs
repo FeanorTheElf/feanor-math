@@ -16,7 +16,7 @@ use crate::rings::zn::{ReductionMap, ZnRing, ZnRingStore};
 use crate::local::PrincipalLocalRingStore;
 
 use super::conway::*;
-use super::impl_short::FreeAlgebraImpl;
+use super::impl_new::FreeAlgebraImpl;
 
 pub type GaloisField<const DEGREE: usize> = AsField<FreeAlgebraImpl<AsField<Zn>, [El<AsField<Zn>>; DEGREE]>>;
 pub type GaloisFieldDyn = AsField<FreeAlgebraImpl<AsField<Zn>, Box<[El<AsField<Zn>>]>>>;

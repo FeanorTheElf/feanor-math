@@ -1,8 +1,7 @@
 use std::alloc::Allocator;
 use std::alloc::Global;
 
-use crate::algorithms::convolution::ConvolutionAlgorithm;
-use crate::algorithms::convolution::STANDARD_CONVOLUTION;
+use crate::algorithms::convolution::ComputeConvolutionRing;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::divisibility::*;
@@ -43,7 +42,7 @@ use super::Homomorphism;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::extension::*;
 /// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::extension::impl_short::*;
+/// # use feanor_math::rings::extension::impl_new::*;
 /// # use feanor_math::assert_el_eq;
 /// let base_ring = StaticRing::<i64>::RING;
 /// // ring of integers in the 6th cyclotomic number field
@@ -88,7 +87,10 @@ impl<R, V> FreeAlgebraImpl<R, V>
 }
 
 impl<R, V, A> FreeAlgebraImpl<R, V, A>
-    where R: RingStore, R::Type: FactorPolyField, V: VectorView<El<R>>, A: Allocator + Clone
+    where R: RingStore, 
+        R::Type: FactorPolyField, 
+        V: VectorView<El<R>>, 
+        A: Allocator + Clone
 {
     ///
     /// If this ring is a field, returns a wrapper around this ring that implements [`crate::field::FieldStore`].
@@ -113,7 +115,9 @@ impl<R, V, A> FreeAlgebraImpl<R, V, A>
 }
 
 impl<R, V, A> Clone for FreeAlgebraImplBase<R, V, A>
-    where R: RingStore + Clone, V: VectorView<El<R>> + Clone, A: Allocator + Clone
+    where R: RingStore + Clone, 
+        V: VectorView<El<R>> + Clone,
+        A: Allocator + Clone
 {
     fn clone(&self) -> Self {
         Self {
@@ -127,7 +131,10 @@ impl<R, V, A> Clone for FreeAlgebraImplBase<R, V, A>
 }
 
 impl<R, V, A> Copy for FreeAlgebraImplBase<R, V, A>
-    where R: RingStore + Copy, V: VectorView<El<R>> + Copy, A: Allocator + Copy, El<R>: Copy
+    where R: RingStore + Copy, 
+        V: VectorView<El<R>> + Copy, 
+        A: Allocator + Copy, 
+        El<R>: Copy
 {}
 
 #[stability::unstable(feature = "enable")]
@@ -138,7 +145,9 @@ pub struct FreeAlgebraImplEl<R, A = Global>
 }
 
 impl<R, V, A> FreeAlgebraImpl<R, V, A>
-    where R: RingStore, V: VectorView<El<R>>, A: Allocator + Clone
+    where R: RingStore, 
+        V: VectorView<El<R>>, 
+        A: Allocator + Clone
 {
     #[stability::unstable(feature = "enable")]
     pub fn new_with(base_ring: R, rank: usize, x_pow_rank: V, element_allocator: A) -> Self {
@@ -152,7 +161,9 @@ impl<R, V, A> FreeAlgebraImpl<R, V, A>
 }
 
 impl<R, V, A> PartialEq for FreeAlgebraImplBase<R, V, A>
-    where R: RingStore, V: VectorView<El<R>>, A: Allocator + Clone
+    where R: RingStore, 
+        V: VectorView<El<R>>, 
+        A: Allocator + Clone
 {
     fn eq(&self, other: &Self) -> bool {
         self.base_ring().get_ring() == other.base_ring().get_ring() && self.rank() == other.rank() &&
@@ -164,7 +175,9 @@ impl<R, V, A> PartialEq for FreeAlgebraImplBase<R, V, A>
 }
 
 impl<R, V, A> RingBase for FreeAlgebraImplBase<R, V, A>
-    where R: RingStore, V: VectorView<El<R>>, A: Allocator + Clone
+    where R: RingStore, 
+        V: VectorView<El<R>>, 
+        A: Allocator + Clone
 {
     type Element = FreeAlgebraImplEl<R, A>;
     
@@ -207,7 +220,7 @@ impl<R, V, A> RingBase for FreeAlgebraImplBase<R, V, A>
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         let mut tmp = Vec::with_capacity_in(self.rank() * 2, self.element_allocator.clone());
         tmp.extend((0..(2 << self.log2_padded_len)).map(|_| self.base_ring.zero()));
-        STANDARD_CONVOLUTION.compute_convolution(&lhs.values[..], &rhs.values[..], &mut tmp[..], self.base_ring().get_ring());
+        self.base_ring().get_ring().compute_convolution(&lhs.values[..], &rhs.values[..], &mut tmp[..]);
         for i in (self.rank()..(2 * self.rank())).rev() {
             for j in 0..self.x_pow_rank.len() {
                 let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &tmp[i]);
@@ -274,7 +287,9 @@ impl<R, V, A> RingBase for FreeAlgebraImplBase<R, V, A>
 }
 
 impl<R, V, A> RingExtension for FreeAlgebraImplBase<R, V, A>
-    where R: RingStore, V: VectorView<El<R>>, A: Allocator + Clone
+    where R: RingStore, 
+        V: VectorView<El<R>>, 
+        A: Allocator + Clone
 {
     type BaseRing = R;
     
@@ -299,7 +314,10 @@ impl<R, V, A> RingExtension for FreeAlgebraImplBase<R, V, A>
 }
 
 impl<R, V, A> DivisibilityRing for FreeAlgebraImplBase<R, V, A>
-    where R: RingStore, R::Type: LinSolveRing, V: VectorView<El<R>>, A: Allocator + Clone
+    where R: RingStore, 
+        R::Type: LinSolveRing, 
+        V: VectorView<El<R>>, 
+        A: Allocator + Clone
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let mut mul_matrix: OwnedMatrix<_> = create_multiplication_matrix(RingRef::new(self), rhs);
@@ -319,7 +337,9 @@ impl<R, V, A> DivisibilityRing for FreeAlgebraImplBase<R, V, A>
 }
 
 impl<R, V, A> FreeAlgebra for FreeAlgebraImplBase<R, V, A>
-    where R: RingStore, V: VectorView<El<R>>, A: Allocator + Clone
+    where R: RingStore, 
+        V: VectorView<El<R>>, 
+        A: Allocator + Clone
 {
     type VectorRepresentation<'a> = CloneElFn<&'a [El<R>], El<R>, CloneRingEl<&'a R>>
         where Self: 'a;
@@ -353,19 +373,28 @@ impl<R, V, A> FreeAlgebra for FreeAlgebraImplBase<R, V, A>
 
 #[stability::unstable(feature = "enable")]
 pub struct WRTCanonicalBasisElementCreator<'a, R, V, A>
-    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, A: Allocator + Clone
+    where R: RingStore, 
+        R::Type: FiniteRing, 
+        V: VectorView<El<R>>, 
+        A: Allocator + Clone
 {
     base_ring: &'a FreeAlgebraImplBase<R, V, A>
 }
 
 impl<'a, R, V, A> Clone for WRTCanonicalBasisElementCreator<'a, R, V, A>
-    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, A: Allocator + Clone
+    where R: RingStore, 
+        R::Type: FiniteRing, 
+        V: VectorView<El<R>>, 
+        A: Allocator + Clone
 {
     fn clone(&self) -> Self { *self }
 }
 
 impl<'a, 'b, R, V, A> FnOnce<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator<'a, R, V, A>
-    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, A: Allocator + Clone
+    where R: RingStore, 
+        R::Type: FiniteRing, 
+        V: VectorView<El<R>>, 
+        A: Allocator + Clone
 {
     type Output = El<FreeAlgebraImpl<R, V, A>>;
 
@@ -375,7 +404,10 @@ impl<'a, 'b, R, V, A> FnOnce<(&'b [El<R>], )> for WRTCanonicalBasisElementCreato
 }
 
 impl<'a, 'b, R, V, A> FnMut<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator<'a, R, V, A>
-    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, A: Allocator + Clone
+    where R: RingStore, 
+        R::Type: FiniteRing, 
+        V: VectorView<El<R>>, 
+        A: Allocator + Clone
 {
     extern "rust-call" fn call_mut(&mut self, args: (&'b [El<R>], )) -> Self::Output {
         self.base_ring.from_canonical_basis(args.0.iter().map(|x| self.base_ring.base_ring().clone_el(x)))
@@ -383,11 +415,17 @@ impl<'a, 'b, R, V, A> FnMut<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator
 }
 
 impl<'a, R, V, A> Copy for WRTCanonicalBasisElementCreator<'a, R, V, A>
-    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, A: Allocator + Clone
+    where R: RingStore, 
+        R::Type: FiniteRing, 
+        V: VectorView<El<R>>, 
+        A: Allocator + Clone
 {}
 
 impl<R, V, A> FiniteRing for FreeAlgebraImplBase<R, V, A>
-    where R: RingStore, R::Type: FiniteRing, V: VectorView<El<R>>, A: Allocator + Clone
+    where R: RingStore, 
+        R::Type: FiniteRing, 
+        V: VectorView<El<R>>, 
+        A: Allocator + Clone
 {
     type ElementsIter<'a> = MultiProduct<<R::Type as FiniteRing>::ElementsIter<'a>, WRTCanonicalBasisElementCreator<'a, R, V, A>, CloneRingEl<&'a R>, Self::Element>
         where Self: 'a;

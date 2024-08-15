@@ -68,10 +68,11 @@ pub trait MatmulAlgorithm<R: ?Sized + RingBase> {
     /// In this case, the function concretely computes `dst[i, j] += sum_l lhs[i, l] * rhs[l, j]` where
     /// `l` runs from `0` to `k - 1`.
     /// 
-    fn add_matmul<V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(&self, lhs: TransposableSubmatrix<V1, R::Element, T1>, rhs: TransposableSubmatrix<V2, R::Element, T2>, dst: TransposableSubmatrixMut<V3, R::Element, T3>, ring: &R)
+    fn add_matmul<S, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(&self, lhs: TransposableSubmatrix<V1, R::Element, T1>, rhs: TransposableSubmatrix<V2, R::Element, T2>, dst: TransposableSubmatrixMut<V3, R::Element, T3>, ring: S)
         where V1: AsPointerToSlice<R::Element>,
             V2: AsPointerToSlice<R::Element>,
-            V3: AsPointerToSlice<R::Element>;
+            V3: AsPointerToSlice<R::Element>,
+            S: RingStore<Type = R> + Copy;
          
     ///
     /// Computes the matrix product of `lhs` and `rhs`, and stores the result in `dst`.
@@ -80,10 +81,11 @@ pub trait MatmulAlgorithm<R: ?Sized + RingBase> {
     /// In this case, the function concretely computes `dst[i, j] = sum_l lhs[i, l] * rhs[l, j]` where
     /// `l` runs from `0` to `k - 1`.
     ///    
-    fn matmul<V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(&self, lhs: TransposableSubmatrix<V1, R::Element, T1>, rhs: TransposableSubmatrix<V2, R::Element, T2>, mut dst: TransposableSubmatrixMut<V3, R::Element, T3>, ring: &R)
+    fn matmul<S, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(&self, lhs: TransposableSubmatrix<V1, R::Element, T1>, rhs: TransposableSubmatrix<V2, R::Element, T2>, mut dst: TransposableSubmatrixMut<V3, R::Element, T3>, ring: S)
         where V1: AsPointerToSlice<R::Element>,
             V2: AsPointerToSlice<R::Element>,
-            V3: AsPointerToSlice<R::Element>
+            V3: AsPointerToSlice<R::Element>,
+            S: RingStore<Type = R> + Copy
     {
         for i in 0..dst.row_count() {
             for j in 0..dst.col_count() {
@@ -140,32 +142,34 @@ impl<A: Allocator> StrassenAlgorithm<A> {
 
 impl<R: ?Sized + RingBase, A: Allocator> MatmulAlgorithm<R> for StrassenAlgorithm<A> {
 
-    fn add_matmul<V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
+    fn add_matmul<S, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
         &self,
         lhs: TransposableSubmatrix<V1, R::Element, T1>,
         rhs: TransposableSubmatrix<V2, R::Element, T2>,
         dst: TransposableSubmatrixMut<V3, R::Element, T3>,
-        ring: &R
+        ring: S
     )
         where V1: AsPointerToSlice<R::Element>,
             V2: AsPointerToSlice<R::Element>,
-            V3: AsPointerToSlice<R::Element>
+            V3: AsPointerToSlice<R::Element>,
+            S: RingStore<Type = R> + Copy
     {
-        strassen::<_, _, _, _, _, T1, T2, T3>(true, <_ as StrassenHint>::strassen_threshold(ring), lhs, rhs, dst, RingRef::new(ring), &self.allocator)
+        strassen::<_, _, _, _, _, T1, T2, T3>(true, <_ as StrassenHint>::strassen_threshold(ring.get_ring()), lhs, rhs, dst, ring, &self.allocator)
     }
 
-    fn matmul<V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
+    fn matmul<S, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(
         &self,
         lhs: TransposableSubmatrix<V1, R::Element, T1>,
         rhs: TransposableSubmatrix<V2, R::Element, T2>,
         dst: TransposableSubmatrixMut<V3, R::Element, T3>,
-        ring: &R
+        ring: S
     )
         where V1: AsPointerToSlice<R::Element>,
             V2: AsPointerToSlice<R::Element>,
-            V3: AsPointerToSlice<R::Element>
+            V3: AsPointerToSlice<R::Element>,
+            S: RingStore<Type = R> + Copy
     {
-        strassen::<_, _, _, _, _, T1, T2, T3>(false, <_ as StrassenHint>::strassen_threshold(ring), lhs, rhs, dst, RingRef::new(ring), &self.allocator)
+        strassen::<_, _, _, _, _, T1, T2, T3>(false, <_ as StrassenHint>::strassen_threshold(ring.get_ring()), lhs, rhs, dst, ring, &self.allocator)
     }
 }
 

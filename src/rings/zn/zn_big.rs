@@ -297,7 +297,7 @@ impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I>
     where I::Type: IntegerRing
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs, self.modulus())
+        super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs)
     }
 }
 

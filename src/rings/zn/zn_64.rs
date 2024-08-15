@@ -425,9 +425,10 @@ impl PreparedDivisibilityRing for ZnBase {
 impl DivisibilityRing for ZnBase {
 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        self.checked_left_div_prepared(lhs, &self.prepare_divisor(rhs))
-    }
+        super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs)
+    } 
 }
+
 trait ImplGenericIntHomomorphismMarker: IntegerRing + CanIsoFromTo<StaticRingBase<i128>> + CanIsoFromTo<StaticRingBase<i64>> {}
 
 impl ImplGenericIntHomomorphismMarker for RustBigintRingBase {}

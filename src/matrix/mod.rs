@@ -113,6 +113,13 @@ pub mod matrix_compare {
         fn at(&self, i: usize, j: usize) -> &T { OwnedMatrix::at(self, i, j) }
     }
 
+    impl<'a, T, M: MatrixCompare<T>> MatrixCompare<T> for &'a M {
+        
+        fn col_count(&self) -> usize { (**self).col_count() }
+        fn row_count(&self) -> usize { (**self).row_count() }
+        fn at(&self, i: usize, j: usize) -> &T { (**self).at(i, j) }
+    }
+
     pub fn is_matrix_eq<R: ?Sized + RingBase, M1: MatrixCompare<R::Element>, M2: MatrixCompare<R::Element>>(ring: &R, lhs: &M1, rhs: &M2) -> bool {
         if lhs.row_count() != rhs.row_count() || lhs.col_count() != rhs.col_count() {
             return false;
@@ -131,7 +138,7 @@ pub mod matrix_compare {
 #[macro_export]
 macro_rules! assert_matrix_eq {
     ($ring:expr, $lhs:expr, $rhs:expr) => {
-        match ($ring, $lhs, $rhs) {
+        match (&$ring, &$lhs, &$rhs) {
             (ring_val, lhs_val, rhs_val) => {
                 assert!(
                     $crate::matrix::matrix_compare::is_matrix_eq(ring_val.get_ring(), lhs_val, rhs_val), 

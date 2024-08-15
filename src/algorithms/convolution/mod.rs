@@ -1,4 +1,4 @@
-use std::alloc::{Allocator, Global};
+use std::alloc::Global;
 
 use crate::ring::*;
 use crate::seq::subvector::SubvectorView;
@@ -8,10 +8,13 @@ use karatsuba::*;
 pub mod karatsuba;
 
 ///
-/// Trait for objects that can compute a convolution over a fixed ring.
+/// Trait for specializing the algorithm used to compute convolutions for a ring.
+/// This is default-implemented for any ring, using karatsuba's algorithm.
+/// 
+/// For details, see the function [`ConvolutionAlgorithm::compute_convolution()`].
 /// 
 #[stability::unstable(feature = "enable")]
-pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
+pub trait ComputeConvolutionRing: RingBase {
 
     ///
     /// Elementwise adds the convolution of `lhs` and `rhs` to `dst`.
@@ -24,37 +27,17 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// to allow for more efficient implementations, it is instead required that 
     /// `dst.len() >= lhs.len() + rhs.len()`.
     /// 
-    fn compute_convolution<V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: &R);
+    /// # Panics
+    /// 
+    /// If `dst.len() < lhs.len() + rhs.len()`, or the given ring is not supported by the algorithm.
+    /// 
+    fn compute_convolution<V1: VectorView<Self::Element>, V2: VectorView<Self::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [Self::Element]);
 }
 
-impl<'a, R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> ConvolutionAlgorithm<R> for &'a C {
+impl<R: ?Sized + RingBase> ComputeConvolutionRing for R {
 
-    fn compute_convolution<V1:VectorView<R::Element>, V2:VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: &R) {
-        (**self).compute_convolution(lhs, rhs, dst, ring)
-    }
-}
-
-#[stability::unstable(feature = "enable")]
-#[derive(Clone, Copy)]
-pub struct KaratsubaAlgorithm<A: Allocator = Global> {
-    allocator: A
-}
-
-#[stability::unstable(feature = "enable")]
-pub const STANDARD_CONVOLUTION: KaratsubaAlgorithm = KaratsubaAlgorithm::new(Global);
-
-impl<A: Allocator> KaratsubaAlgorithm<A> {
-    
-    #[stability::unstable(feature = "enable")]
-    pub const fn new(allocator: A) -> Self {
-        Self { allocator }
-    }
-}
-
-impl<R: ?Sized + RingBase, A: Allocator> ConvolutionAlgorithm<R> for KaratsubaAlgorithm<A> {
-
-    fn compute_convolution<V1:VectorView<<R as RingBase>::Element>, V2:VectorView<<R as RingBase>::Element>>(&self, lhs: V1, rhs: V2, dst: &mut[<R as RingBase>::Element], ring: &R) {
-        karatsuba(ring.karatsuba_threshold(), dst, SubvectorView::new(&lhs), SubvectorView::new(&rhs), RingRef::new(ring), &self.allocator)
+    default fn compute_convolution<V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element]) {
+        karatsuba(self.karatsuba_threshold(), dst, SubvectorView::new(&lhs), SubvectorView::new(&rhs), RingRef::new(self), &Global)
     }
 }
 

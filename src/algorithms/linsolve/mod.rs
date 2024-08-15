@@ -93,7 +93,7 @@ impl<R, V, A_ring> LinSolveRing for FreeAlgebraImplBase<R, V, A_ring>
     }
 }
 
-impl<R, V, A_ring> LinSolveRing for crate::rings::extension::impl_short::FreeAlgebraImplBase<R, V, A_ring>
+impl<R, V, A_ring> LinSolveRing for crate::rings::extension::impl_new::FreeAlgebraImplBase<R, V, A_ring>
     where R: RingStore,
         R::Type: LinSolveRing,
         V: VectorView<El<R>>,

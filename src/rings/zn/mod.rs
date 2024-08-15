@@ -238,7 +238,7 @@ pub mod generic_impls {
     /// [`crate::divisibility::DivisibilityRing::checked_left_div()`].
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn checked_left_div<R: ZnRingStore>(ring: R, lhs: &El<R>, rhs: &El<R>, modulus: &El<<R::Type as ZnRing>::Integers>) -> Option<El<R>>
+    pub fn checked_left_div<R: ZnRingStore>(ring: R, lhs: &El<R>, rhs: &El<R>) -> Option<El<R>>
         where R::Type: ZnRing
     {
         if ring.is_zero(lhs) {
@@ -247,7 +247,7 @@ pub mod generic_impls {
         let int_ring = ring.integer_ring();
         let lhs_lift = ring.smallest_positive_lift(ring.clone_el(lhs));
         let rhs_lift = ring.smallest_positive_lift(ring.clone_el(rhs));
-        let (s, _, d) = algorithms::eea::signed_eea(int_ring.clone_el(&rhs_lift), int_ring.clone_el(&modulus), int_ring);
+        let (s, _, d) = algorithms::eea::signed_eea(int_ring.clone_el(&rhs_lift), int_ring.clone_el(ring.modulus()), int_ring);
         if let Some(quotient) = int_ring.checked_div(&lhs_lift, &d) {
             Some(ring.mul(ring.coerce(int_ring, quotient), ring.coerce(int_ring, s)))
         } else {
