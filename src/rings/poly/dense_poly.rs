@@ -221,11 +221,10 @@ impl<R: RingStore, A: Allocator + Clone> RingBase for DensePolyRingBase<R, A> {
         let rhs_len = self.degree(rhs).map(|i| i + 1).unwrap_or(0);
         let mut result = Vec::with_capacity_in(lhs_len + rhs_len, self.element_allocator.clone());
         result.extend((0..(lhs_len + rhs_len)).map(|_| self.base_ring().zero()));
-        STANDARD_CONVOLUTION.compute_convolution(
+        self.base_ring().get_ring().compute_convolution(
             &lhs.data[0..lhs_len], 
             &rhs.data[0..rhs_len],
-            &mut result[..], 
-            self.base_ring.get_ring()
+            &mut result[..]
         );
         return DensePolyRingEl {
             data: result
@@ -602,11 +601,11 @@ use crate::rings::finite::FiniteRingStore;
 #[cfg(test)]
 use super::sparse_poly::SparsePolyRing;
 #[cfg(test)]
+use crate::rings::extension::FreeAlgebraStore;
+#[cfg(test)]
 use crate::iters::multiset_combinations;
 #[cfg(test)]
 use crate::rings::extension::galois_field::galois_field_dyn;
-#[cfg(test)]
-use crate::rings::extension::FreeAlgebraStore;
 #[cfg(test)]
 use std::time::Instant;
 

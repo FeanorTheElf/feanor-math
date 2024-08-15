@@ -6,29 +6,8 @@ use crate::divisibility::DivisibilityRingStore;
 use crate::matrix::*;
 use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
 use crate::ring::*;
-use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
+use crate::pid::PrincipalIdealRing;
 use crate::algorithms::matmul::{STANDARD_MATMUL, MatmulAlgorithm};
-
-#[stability::unstable(feature = "enable")]
-pub fn create_elim_matrix_from_bezout_identity<R>(ring: R, a: &El<R>, b: &El<R>) -> ([El<R>; 4], El<R>)
-    where R: RingStore + Copy,
-        R::Type: PrincipalIdealRing
-{
-    let (new_a, new_b, gcd) = ring.get_ring().cancel_common_factors(a, b);
-    let (s, t, gcd_new) = ring.extended_ideal_gen(&new_a, &new_b);
-    debug_assert!(ring.is_unit(&gcd_new));
-    
-    let subtract_factor = ring.checked_div(&ring.sub(ring.mul_ref(b, &new_a), ring.mul_ref(a, &new_b)), &gcd).unwrap();
-    // this has unit determinant and will map `(a, b)` to `(d, b * new_a - a * new_b)`; after a subtraction step, we are done
-    let mut result = [s, t, ring.negate(new_b), new_a];
-
-    let sub1 = ring.mul_ref(&result[0], &subtract_factor);
-    ring.sub_assign(&mut result[2], sub1);
-    let sub2 = ring.mul_ref_fst(&result[1], subtract_factor);
-    ring.sub_assign(&mut result[3], sub2);
-    debug_assert!(ring.is_unit(&ring.sub(ring.mul_ref(&result[0], &result[3]), ring.mul_ref(&result[1], &result[2]))));
-    return (result, gcd);
-}
 
 ///
 /// Transforms `A` into `A'` via transformations `L, R` such that
@@ -78,7 +57,7 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
                     TransformRows(A.reborrow(), ring.get_ring()).subtract(ring.get_ring(), k, i, &quo);
                     L.subtract(ring.get_ring(), k, i, &quo);
                 } else {
-                    let (transform, _) = create_elim_matrix_from_bezout_identity(ring, A.at(k, k), A.at(i, k));
+                    let (transform, _) = ring.get_ring().create_left_elimination_matrix(A.at(k, k), A.at(i, k));
                     TransformRows(A.reborrow(), ring.get_ring()).transform(ring.get_ring(), k, i, &transform);
                     L.transform(ring.get_ring(), k, i, &transform);
                 }
@@ -94,7 +73,7 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
                     R.subtract(ring.get_ring(), k, j, &quo);
                 } else {
                     changed = true;
-                    let (transform, _) = create_elim_matrix_from_bezout_identity(ring, A.at(k, k), A.at(k, j));
+                    let (transform, _) = ring.get_ring().create_left_elimination_matrix(A.at(k, k), A.at(k, j));
                     TransformCols(A.reborrow(), ring.get_ring()).transform(ring.get_ring(), k, j, &transform);
                     R.transform(ring.get_ring(), k, j, &transform);
                 }
@@ -142,7 +121,7 @@ pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(ring: R, mut lhs: Submatrix
             }
         }
     }
-    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(R.data()), TransposableSubmatrix::from(result.data()), TransposableSubmatrixMut::from(out), ring.get_ring());
+    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(R.data()), TransposableSubmatrix::from(result.data()), TransposableSubmatrixMut::from(out), ring);
     return SolveResult::FoundSomeSolution;
 }
 
@@ -202,12 +181,12 @@ fn multiply<'a, R: RingStore, V: AsPointerToSlice<El<R>>, I: IntoIterator<Item =
     let fst = it.next().unwrap();
     let snd = it.next().unwrap();
     let mut new_result = OwnedMatrix::zero(fst.row_count(), snd.col_count(), &ring);
-    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(fst), TransposableSubmatrix::from(snd), TransposableSubmatrixMut::from(new_result.data_mut()), ring.get_ring());
+    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(fst), TransposableSubmatrix::from(snd), TransposableSubmatrixMut::from(new_result.data_mut()), &ring);
     let mut result = new_result;
 
     for m in it {
         let mut new_result = OwnedMatrix::zero(result.row_count(), m.col_count(), &ring);
-        STANDARD_MATMUL.matmul(TransposableSubmatrix::from(result.data()), TransposableSubmatrix::from(m), TransposableSubmatrixMut::from(new_result.data_mut()), ring.get_ring());
+        STANDARD_MATMUL.matmul(TransposableSubmatrix::from(result.data()), TransposableSubmatrix::from(m), TransposableSubmatrixMut::from(new_result.data_mut()), &ring);
         result = new_result;
     }
     return result;

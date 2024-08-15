@@ -1,6 +1,6 @@
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::int_factor::is_prime_power;
-use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
+use crate::algorithms::matmul::*;
 use crate::delegate::DelegateRing;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::Field;
@@ -117,6 +117,7 @@ impl<R: DivisibilityRingStore> AsLocalPIRBase<R>
 {
     #[stability::unstable(feature = "enable")]
     pub fn promise_is_local_pir(base: R, max_ideal_gen: El<R>, nilpotent_power: Option<usize>) -> Self {
+        assert!(base.is_commutative());
         let max_ideal_gen = LocalPIREl(max_ideal_gen);
         Self { base, max_ideal_gen, nilpotent_power }
     }
@@ -213,10 +214,25 @@ impl<R: DivisibilityRingStore> PrincipalIdealRing for AsLocalPIRBase<R>
     where R::Type: DivisibilityRing
 {
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        if self.valuation(lhs).unwrap_or(usize::MAX) >= self.valuation(rhs).unwrap_or(usize::MAX) {
+        if self.checked_left_div(lhs, rhs).is_some() {
             (self.zero(), self.one(), self.clone_el(rhs))
         } else {
             (self.one(), self.zero(), self.clone_el(lhs))
+        }
+    }
+
+    fn create_left_elimination_matrix(&self, a: &Self::Element, b: &Self::Element) -> ([Self::Element; 4], Self::Element) {
+        if let Some(quo) = self.checked_left_div(b, a) {
+            (
+                [self.one(), self.zero(), self.negate(quo), self.one()],
+                self.clone_el(a)
+            )
+        } else {
+            let quo = self.checked_left_div(a, b).unwrap();
+            (
+                [self.zero(), self.one(), self.one(), self.negate(quo)],
+                self.clone_el(b)
+            )
         }
     }
 }
@@ -263,8 +279,8 @@ impl<R: DivisibilityRingStore> EuclideanRing for AsLocalPIRBase<R>
     where R::Type: DivisibilityRing
 {
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
-        if self.valuation(&lhs).unwrap_or(usize::MAX) >= self.valuation(rhs).unwrap_or(usize::MAX) {
-            (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
+        if let Some(quo) = self.checked_left_div(&lhs, rhs) {
+            (quo, self.zero())
         } else {
             (self.zero(), lhs)
         }
@@ -390,6 +406,18 @@ use crate::rings::zn::zn_big::Zn;
 use crate::primitive_int::*;
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
+#[cfg(test)]
+use std::alloc::Global;
+#[cfg(test)]
+use std::time::Instant;
+#[cfg(test)]
+use crate::algorithms::linsolve::LinSolveRing;
+#[cfg(test)]
+use crate::matrix::{OwnedMatrix, TransposableSubmatrix, TransposableSubmatrixMut};
+#[cfg(test)]
+use crate::assert_matrix_eq;
+#[cfg(test)]
+use super::extension::galois_field::galois_ring_dyn;
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {
@@ -418,4 +446,36 @@ fn test_canonical_hom_axioms_wrap_unwrap() {
     let R = AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING, 8)).unwrap();
     crate::ring::generic_tests::test_hom_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());
     crate::ring::generic_tests::test_iso_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());
+}
+
+#[test]
+#[ignore]
+fn test_solve_large_galois_ring() {
+    let ring: AsLocalPIR<_> = galois_ring_dyn(17, 5, 2048);
+    let mut matrix: OwnedMatrix<_> = OwnedMatrix::zero(2, 2, &ring);
+    let mut rng = oorandom::Rand64::new(1);
+
+    *matrix.at_mut(0, 0) = ring.random_element(|| rng.rand_u64());
+    *matrix.at_mut(0, 1) = ring.random_element(|| rng.rand_u64());
+    *matrix.at_mut(1, 1) = ring.random_element(|| rng.rand_u64());
+    assert!(ring.is_unit(&ring.sub_ref(matrix.at(0, 1), matrix.at(1, 1))), "matrix generation failed, pick another seed");
+    *matrix.at_mut(1, 0) = ring.clone_el(matrix.at(0, 0));
+
+    let mut rhs: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
+    *rhs.at_mut(0, 0) = ring.random_element(|| rng.rand_u64());
+    *rhs.at_mut(0, 1) = ring.random_element(|| rng.rand_u64());
+
+    let rhs = rhs;
+    let matrix = matrix;
+    let mut result: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
+
+    let start = Instant::now();
+    ring.get_ring().solve_right(matrix.clone_matrix(&ring).data_mut(), rhs.clone_matrix(&ring).data_mut(), result.data_mut(), Global).assert_solved();
+    let end = Instant::now();
+    println!("Solved over GR(17, 5, 2048) in {} ms", (end - start).as_millis());
+
+    let mut product: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
+    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(matrix.data()), TransposableSubmatrix::from(result.data()), TransposableSubmatrixMut::from(product.data_mut()), &ring);
+
+    assert_matrix_eq!(ring, rhs, product);
 }

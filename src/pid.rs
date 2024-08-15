@@ -49,6 +49,29 @@ pub trait PrincipalIdealRing: DivisibilityRing {
     }
 
     ///
+    /// Creates a matrix `A` of unit determinant such that `A * (a, b)^T = (d, 0)`.
+    /// Returns `(A, d)`.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    fn create_left_elimination_matrix(&self, a: &Self::Element, b: &Self::Element) -> ([Self::Element; 4], Self::Element) {
+        let (new_a, new_b, gcd) = self.cancel_common_factors(a, b);
+        let (s, t, gcd_new) = self.extended_ideal_gen(&new_a, &new_b);
+        debug_assert!(self.is_unit(&gcd_new));
+        
+        let subtract_factor = self.checked_left_div(&self.sub(self.mul_ref(b, &new_a), self.mul_ref(a, &new_b)), &gcd).unwrap();
+        // this has unit determinant and will map `(a, b)` to `(d, b * new_a - a * new_b)`; after a subtraction step, we are done
+        let mut result = [s, t, self.negate(new_b), new_a];
+    
+        let sub1 = self.mul_ref(&result[0], &subtract_factor);
+        self.sub_assign(&mut result[2], sub1);
+        let sub2 = self.mul_ref_fst(&result[1], subtract_factor);
+        self.sub_assign(&mut result[3], sub2);
+        debug_assert!(self.is_unit(&self.sub(self.mul_ref(&result[0], &result[3]), self.mul_ref(&result[1], &result[2]))));
+        return (result, gcd);
+    }
+    
+
+    ///
     /// Computes a generator `g` of the ideal `(lhs, rhs) = (g)`, also known as greatest
     /// common divisor.
     /// 
