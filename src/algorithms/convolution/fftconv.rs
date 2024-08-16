@@ -268,6 +268,7 @@ impl<R, I, A> FFTRNSBasedConvolution<R, I, A>
 
     
     fn convolution_unchecked<'a, V1: VectorFn<El<I>>, V2: VectorFn<El<I>>>(&'a self, input_size_log2: usize, lhs: V1, rhs: V2) -> impl 'a + Iterator<Item = El<I>> {
+        assert!(lhs.len() + rhs.len() <= (1 << self.max_log2_len));
         let rns_ring = self.get_rns_ring(input_size_log2);
         let total_len = lhs.len() + rhs.len();
         let mut result: Vec<R::Element, _> = Vec::with_capacity_in(total_len * rns_ring.len(), &self.convolution.allocator);
