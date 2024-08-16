@@ -9,6 +9,7 @@ use crate::ring::*;
 use crate::homomorphism::*;
 use crate::rings::zn::FromModulusCreateableZnRing;
 use crate::rings::zn::*;
+use super::local::AsLocalPIRBase;
 
 ///
 /// A wrapper around a ring that marks this ring to be a field. In particular,
@@ -142,6 +143,40 @@ impl<R: DivisibilityRingStore, S: IntegerRing + ?Sized> CanHomFrom<S> for AsFiel
 
     fn map_in(&self, from: &S, el: S::Element, hom: &Self::Homomorphism) -> Self::Element {
         FieldEl(<R::Type as CanHomFrom<S>>::map_in(self.get_delegate(), from, el, hom))
+    }
+}
+
+impl<R1, R2> CanHomFrom<AsLocalPIRBase<R1>> for AsFieldBase<R2>
+    where R1: RingStore, R2: RingStore,
+        R2::Type: CanHomFrom<R1::Type>,
+        R1::Type: DivisibilityRing,
+        R2::Type: DivisibilityRing
+{
+    type Homomorphism = <R2::Type as CanHomFrom<R1::Type>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &AsLocalPIRBase<R1>) -> Option<Self::Homomorphism> {
+        self.get_delegate().has_canonical_hom(from.get_delegate())
+    }
+
+    fn map_in(&self, from: &AsLocalPIRBase<R1>, el: <AsLocalPIRBase<R1> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.rev_delegate(self.get_delegate().map_in(from.get_delegate(), from.delegate(el), hom))
+    }
+}
+
+impl<R1, R2> CanIsoFromTo<AsLocalPIRBase<R1>> for AsFieldBase<R2>
+    where R1: RingStore, R2: RingStore,
+        R2::Type: CanIsoFromTo<R1::Type>,
+        R1::Type: DivisibilityRing,
+        R2::Type: DivisibilityRing
+{
+    type Isomorphism = <R2::Type as CanIsoFromTo<R1::Type>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &AsLocalPIRBase<R1>) -> Option<Self::Isomorphism> {
+        self.get_delegate().has_canonical_iso(from.get_delegate())
+    }
+
+    fn map_out(&self, from: &AsLocalPIRBase<R1>, el: Self::Element, iso: &Self::Isomorphism) -> <AsLocalPIRBase<R1> as RingBase>::Element {
+        from.rev_delegate(self.get_delegate().map_out(from.get_delegate(), self.delegate(el), iso))
     }
 }
 
