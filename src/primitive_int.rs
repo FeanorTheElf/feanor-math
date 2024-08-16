@@ -375,6 +375,12 @@ impl StrassenHint for StaticRingBase<i128> {
 /// 
 pub type StaticRing<T> = RingValue<StaticRingBase<T>>;
 
+impl<T: PrimitiveInt> Default for StaticRingBase<T> {
+    fn default() -> Self {
+        StaticRing::RING.into()
+    }
+}
+
 #[test]
 fn test_ixx_bit_op() {
     let ring_i16 = StaticRing::<i16>::RING;

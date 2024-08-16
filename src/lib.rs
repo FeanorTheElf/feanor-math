@@ -3,6 +3,7 @@
 #![allow(private_interfaces)]
 #![allow(private_bounds)]
 
+#![feature(btree_cursors)]
 #![feature(test)]
 #![feature(min_specialization)]
 #![feature(maybe_uninit_slice)]

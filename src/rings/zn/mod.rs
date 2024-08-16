@@ -110,6 +110,13 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
     }
 }
 
+#[stability::unstable(feature = "enable")]
+pub trait FromModulusCreateableZnRing: Sized + ZnRing {
+
+    fn create<F, E>(create_modulus: F) -> Result<Self, E>
+        where F: FnOnce(&Self::IntegerRingBase) -> Result<El<Self::Integers>, E>;
+}
+
 pub mod generic_impls {
     use std::marker::PhantomData;
 

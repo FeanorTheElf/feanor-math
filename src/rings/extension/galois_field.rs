@@ -1,4 +1,4 @@
-use crate::algorithms::convolution::fftconv::FFTBasedConvolutionZn;
+use crate::algorithms::convolution::fftconv::{FFTBasedConvolution, FFTBasedConvolutionZn};
 use crate::field::Field;
 use crate::integer::IntegerRingStore;
 use crate::pid::EuclideanRing;
@@ -52,12 +52,13 @@ fn random_low_body_deg_irreducible_polynomial<P>(poly_ring: P, degree: usize) ->
 {
     let mut body_deg = 1;
     let mut rng = oorandom::Rand64::new(poly_ring.base_ring().integer_ring().default_hash(poly_ring.base_ring().modulus()) as u128);
-    let fft_convolution = FFTBasedConvolutionZn::new_with(Global);
-    if fft_convolution.can_compute(StaticRing::<i64>::RING.abs_log2_ceil(&(degree as i64)).unwrap() + 1, poly_ring.base_ring().get_ring()) {
+    let log2_modulus = poly_ring.base_ring().integer_ring().abs_log2_ceil(poly_ring.base_ring().modulus()).unwrap();
+    let fft_convolution = FFTBasedConvolution::new_with(Global);
+    if fft_convolution.can_compute(StaticRing::<i64>::RING.abs_log2_ceil(&(degree as i64)).unwrap() + 1, log2_modulus) {
         loop {
             for _ in 0..8 {
                 let f_body = (0..body_deg).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())).collect::<Vec<_>>();
-                let mod_f_ring = FreeAlgebraImpl::new_with(poly_ring.base_ring(), degree, &f_body, Global, &fft_convolution);
+                let mod_f_ring = FreeAlgebraImpl::new_with(poly_ring.base_ring(), degree, &f_body, Global, <&FFTBasedConvolutionZn>::from(&fft_convolution));
                 if let Some(result) = test_is_irreducible_base(&poly_ring, mod_f_ring, degree) {
                     return result;
                 }

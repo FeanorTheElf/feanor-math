@@ -357,6 +357,13 @@ impl EuclideanRing for MPZBase {
     }
 }
 
+impl Default for MPZBase {
+    
+    fn default() -> Self {
+        MPZ::RING.into()
+    }
+}
+
 impl Domain for MPZBase {}
 
 impl IntegerRing for MPZBase {

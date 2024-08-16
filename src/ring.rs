@@ -852,6 +852,10 @@ impl<R: RingBase> RingValue<R> {
         RingValue { ring: value }
     }
 
+    pub fn from_ref<'a>(value: &'a R) -> &'a Self {
+        unsafe { std::mem::transmute(value) }
+    }
+
     pub fn into(self) -> R {
         self.ring
     }
@@ -863,6 +867,13 @@ impl<R: RingBase> RingStore for RingValue<R> {
     
     fn get_ring(&self) -> &R {
         &self.ring
+    }
+}
+
+impl<R: RingBase + Default> Default for RingValue<R> {
+    
+    fn default() -> Self {
+        Self::from(R::default())
     }
 }
 
@@ -879,6 +890,7 @@ impl<R: RingBase> RingStore for RingValue<R> {
 /// or [`crate::algorithms::sqr_mul`]). In this case, we only have a reference to a [`crate::ring::RingBase`]
 /// object, but require a [`crate::ring::RingStore`] object to use the algorithm.
 /// 
+#[repr(transparent)]
 pub struct RingRef<'a, R: RingBase + ?Sized> {
     ring: &'a R
 }

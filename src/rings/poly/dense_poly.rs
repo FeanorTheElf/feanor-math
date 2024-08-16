@@ -225,7 +225,7 @@ impl<R: RingStore, A: Allocator + Clone> RingBase for DensePolyRingBase<R, A> {
             &lhs.data[0..lhs_len], 
             &rhs.data[0..rhs_len],
             &mut result[..],
-            self.base_ring().get_ring()
+            self.base_ring()
         );
         return DensePolyRingEl {
             data: result

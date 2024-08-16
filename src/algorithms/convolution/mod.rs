@@ -27,12 +27,12 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// to allow for more efficient implementations, it is instead required that 
     /// `dst.len() >= lhs.len() + rhs.len()`.
     /// 
-    fn compute_convolution<V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: &R);
+    fn compute_convolution<S: RingStore<Type = R>, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S);
 }
 
 impl<'a, R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> ConvolutionAlgorithm<R> for &'a C {
 
-    fn compute_convolution<V1:VectorView<R::Element>, V2:VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: &R) {
+    fn compute_convolution<S: RingStore<Type = R>, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S) {
         (**self).compute_convolution(lhs, rhs, dst, ring)
     }
 }
@@ -56,8 +56,8 @@ impl<A: Allocator> KaratsubaAlgorithm<A> {
 
 impl<R: ?Sized + RingBase, A: Allocator> ConvolutionAlgorithm<R> for KaratsubaAlgorithm<A> {
 
-    fn compute_convolution<V1:VectorView<<R as RingBase>::Element>, V2:VectorView<<R as RingBase>::Element>>(&self, lhs: V1, rhs: V2, dst: &mut[<R as RingBase>::Element], ring: &R) {
-        karatsuba(ring.karatsuba_threshold(), dst, SubvectorView::new(&lhs), SubvectorView::new(&rhs), RingRef::new(ring), &self.allocator)
+    fn compute_convolution<S: RingStore<Type = R>, V1: VectorView<<R as RingBase>::Element>, V2: VectorView<<R as RingBase>::Element>>(&self, lhs: V1, rhs: V2, dst: &mut[<R as RingBase>::Element], ring: S) {
+        karatsuba(ring.get_ring().karatsuba_threshold(), dst, SubvectorView::new(&lhs), SubvectorView::new(&rhs), &ring, &self.allocator)
     }
 }
 

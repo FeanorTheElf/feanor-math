@@ -2,6 +2,7 @@ use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::integer::*;
+use crate::rings::zn::zn_64;
 use crate::rings::zn::ZnOperation;
 use crate::rings::zn::ZnRing;
 use crate::primitive_int::*;
@@ -43,6 +44,97 @@ pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
         let n_copy = ZZ.clone_el(n);
         choose_zn_impl(ZZ, n_copy, CheckIsFieldMillerRabin { probability_param: k })
     }
+}
+
+#[stability::unstable(feature = "enable")]
+pub fn prev_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>) -> Option<El<I>>
+    where I::Type: IntegerRing,
+        zn_64::ZnBase: CanHomFrom<I::Type>
+{
+    assert!(ZZ.is_pos(&n));
+    ZZ.sub_assign(&mut n, ZZ.one());
+    const SMALL_IS_COPRIME_TABLE: [bool; 30] = [
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+    ];
+    let Z30 = zn_64::Zn::new(30);
+    let mut n_mod_30 = Z30.coerce(&ZZ, ZZ.clone_el(&n));
+    let mut diff_to_n = 0;
+    let ZZ_30 = ZZ.int_hom().map(30);
+    while ZZ.is_geq(&n, &ZZ_30) {
+        while !SMALL_IS_COPRIME_TABLE[Z30.smallest_positive_lift(n_mod_30) as usize] {
+            Z30.sub_assign(&mut n_mod_30, Z30.one());
+            diff_to_n += 1;
+        }
+        ZZ.sub_assign(&mut n, ZZ.int_hom().map(diff_to_n));
+        if is_prime(&ZZ, &n, 10) {
+            return Some(n);
+        } else {
+            diff_to_n = 1;
+            Z30.sub_assign(&mut n_mod_30, Z30.one());
+        }
+    }
+    const TABLE: [Option<i32>; 30] = [
+        None,
+        None,
+        Some(2),
+        Some(3),
+        Some(3),
+        Some(5),
+        Some(5),
+        Some(7),
+        Some(7),
+        Some(7),
+        Some(7),
+        Some(11),
+        Some(11),
+        Some(13),
+        Some(13),
+        Some(13),
+        Some(13),
+        Some(17),
+        Some(17),
+        Some(19),
+        Some(19),
+        Some(19),
+        Some(19),
+        Some(23),
+        Some(23),
+        Some(23),
+        Some(23),
+        Some(23),
+        Some(23),
+        Some(29),
+    ];
+    return TABLE[Z30.smallest_positive_lift(n_mod_30) as usize].map(|n| ZZ.int_hom().map(n));
 }
 
 ///
@@ -123,4 +215,27 @@ pub fn test_is_prime() {
     assert!(!is_prime(StaticRing::<i128>::RING, &347584, 5));
 
     assert!(is_prime(RustBigintRing::RING, &RustBigintRing::RING.get_ring().parse("170141183460469231731687303715884105727", 10).unwrap(), 10));
+}
+
+#[test]
+fn test_prev_prime() {
+    assert_eq!(Some(7), prev_prime(StaticRing::<i64>::RING, 11));
+    assert_eq!(Some(7), prev_prime(StaticRing::<i64>::RING, 10));
+    assert_eq!(Some(7), prev_prime(StaticRing::<i64>::RING, 9));
+    assert_eq!(Some(7), prev_prime(StaticRing::<i64>::RING, 8));
+    assert_eq!(Some(5), prev_prime(StaticRing::<i64>::RING, 7));
+    assert_eq!(Some(5), prev_prime(StaticRing::<i64>::RING, 6));
+    assert_eq!(Some(3), prev_prime(StaticRing::<i64>::RING, 5));
+    assert_eq!(Some(3), prev_prime(StaticRing::<i64>::RING, 4));
+    assert_eq!(Some(2), prev_prime(StaticRing::<i64>::RING, 3));
+    assert_eq!(None, prev_prime(StaticRing::<i64>::RING, 2));
+    assert_eq!(None, prev_prime(StaticRing::<i64>::RING, 1));
+
+    let mut last_prime = 29;
+    for i in 30..1000 {
+        assert_eq!(Some(last_prime), prev_prime(StaticRing::<i64>::RING, i));
+        if is_prime(StaticRing::<i64>::RING, &i, 10) {
+            last_prime = i;
+        }
+    }
 }

@@ -46,6 +46,13 @@ impl RustBigintRing {
     pub const RING: RustBigintRing = RingValue::from(RustBigintRingBase { allocator: Global });
 }
 
+impl<A: Allocator + Clone + Default> Default for RustBigintRingBase<A> {
+
+    fn default() -> Self {
+        RustBigintRingBase { allocator: A::default() }
+    }
+}
+
 impl<A: Allocator + Clone> RustBigintRingBase<A> {
 
     pub fn map_i128(&self, val: &RustBigint<A>) -> Option<i128> {
@@ -275,6 +282,10 @@ impl<A: Allocator + Clone> OrderedRing for RustBigintRingBase<A> {
             (false, true) => std::cmp::Ordering::Greater
         }
     }
+
+    fn abs_cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
+        algorithms::bigint::bigint_cmp(&rhs.1, &lhs.1)
+    }
 }
 
 impl<A: Allocator + Clone> DivisibilityRing for RustBigintRingBase<A> {
@@ -426,7 +437,7 @@ fn test_from() {
     assert!(ZZ.eq_el(&RustBigint(false, vec![]), &ZZ.int_hom().map(0)));
     assert!(ZZ.eq_el(&RustBigint(false, vec![2138479]), &ZZ.int_hom().map(2138479)));
     assert!(ZZ.eq_el(&RustBigint(true, vec![2138479]), &ZZ.int_hom().map(-2138479)));
-    // assert!(ZZ.eq(&DefaultBigInt(false, vec![0x38691a350bf12fca, 0x1]), &ZZ.from_z_gen(0x138691a350bf12fca, &i128::RING)));
+    // assert!(ZZ.eq(&RustBigint(false, vec![0x38691a350bf12fca, 0x1]), &ZZ.from_z_gen(0x138691a350bf12fca, &i128::RING)));
 }
 
 #[test]
@@ -436,11 +447,8 @@ fn test_to_i128() {
     assert_eq!(2138479, iso.map(RustBigint(false, vec![2138479])));
     assert_eq!(-2138479, iso.map(RustBigint(true, vec![2138479])));
     assert_eq!(0x138691a350bf12fca, iso.map(RustBigint(false, vec![0x38691a350bf12fca, 0x1])));
-    // assert_eq!(Err(()), DefaultBigInt(false, vec![0x38691a350bf12fca, 0x38691a350bf12fca, 0x1]).to_i128());
     assert_eq!(i128::MAX, iso.map(RustBigint(false, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
     assert_eq!(i128::MIN + 1, iso.map(RustBigint(true, vec![(i128::MAX & ((1 << 64) - 1)) as u64, (i128::MAX >> 64) as u64])));
-    // this is the possibly surprising, exceptional case
-    // assert_eq!(Err(()), DefaultBigInt(true, vec![0, (i128::MAX >> 64) as u64 + 1]).to_i128());
     assert_eq!(i64::MAX as i128 + 1, iso.map(RustBigint(false, vec![i64::MAX as u64 + 1])));
     assert_eq!(u64::MAX as i128, iso.map(RustBigint(false, vec![u64::MAX])));
 }
