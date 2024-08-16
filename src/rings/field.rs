@@ -7,6 +7,8 @@ use crate::field::Field;
 use crate::integer::IntegerRing;
 use crate::ring::*;
 use crate::homomorphism::*;
+use crate::rings::zn::FromModulusCreateableZnRing;
+use crate::rings::zn::*;
 
 ///
 /// A wrapper around a ring that marks this ring to be a field. In particular,
@@ -243,6 +245,16 @@ impl<R: DivisibilityRingStore> StrassenHint for AsFieldBase<R>
     }
 }
 
+impl<R> FromModulusCreateableZnRing for AsFieldBase<RingValue<R>> 
+    where R: DivisibilityRing + ZnRing + FromModulusCreateableZnRing
+{
+    fn create<F, E>(create_modulus: F) -> Result<Self, E>
+        where F:FnOnce(&Self::IntegerRingBase) -> Result<El<Self::Integers>, E> 
+    {
+        <R as FromModulusCreateableZnRing>::create(create_modulus).map(|ring| RingValue::from(ring).as_field().ok().unwrap().into())
+    }
+}
+
 ///
 /// Implements the isomorphisms `S: CanHomFrom<AsFieldBase<RingStore<Type = R>>>` and 
 /// `AsFieldBase<RingStore<Type = S>>: CanHomFrom<R>`.
@@ -386,8 +398,6 @@ macro_rules! impl_wrap_unwrap_isos {
 use crate::rings::zn::zn_big::Zn;
 #[cfg(test)]
 use crate::primitive_int::*;
-#[cfg(test)]
-use crate::rings::zn::*;
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
 

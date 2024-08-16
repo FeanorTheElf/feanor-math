@@ -315,6 +315,16 @@ impl<R: DivisibilityRingStore> Domain for AsLocalPIRBase<R>
     where R::Type: DivisibilityRing + Domain
 {}
 
+impl<R> FromModulusCreateableZnRing for AsLocalPIRBase<RingValue<R>> 
+    where R: DivisibilityRing + ZnRing + FromModulusCreateableZnRing
+{
+    fn create<F, E>(create_modulus: F) -> Result<Self, E>
+        where F:FnOnce(&Self::IntegerRingBase) -> Result<El<Self::Integers>, E> 
+    {
+        <R as FromModulusCreateableZnRing>::create(create_modulus).map(|ring| AsLocalPIR::from_zn(RingValue::from(ring)).unwrap().into())
+    }
+}
+
 ///
 /// Implements the isomorphisms `S: CanHomFrom<AsFieldBase<RingStore<Type = R>>>` and 
 /// `AsFieldBase<RingStore<Type = S>>: CanHomFrom<R>`.
