@@ -17,7 +17,6 @@ use crate::pid::PrincipalIdealRing;
 use crate::primitive_int::StaticRing;
 use crate::rings::field::AsField;
 use crate::rings::field::AsFieldBase;
-use crate::rings::poly::PolyRingStore;
 use crate::rings::finite::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::seq::*;
@@ -104,17 +103,10 @@ impl<R, V, A, C> FreeAlgebraImpl<R, V, A, C>
     /// 
     #[stability::unstable(feature = "enable")]
     pub fn as_field(self) -> Result<AsField<Self>, Self> {
-        let poly_ring = DensePolyRing::new(self.base_ring(), "X");
-        let f = poly_ring.from_terms(
-            self.get_ring().x_pow_rank.as_iter().enumerate().map(|(i, c)| (self.base_ring().negate(self.base_ring().clone_el(c)), i))
-                .chain([(self.base_ring().one(), self.rank())].into_iter())
-        );
-        let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
-        assert_el_eq!(self.base_ring(), self.base_ring().one(), unit);
-        if factorization.len() == 0 || (factorization.len() == 1 && factorization[0].1 == 1) {
-            return Ok(RingValue::from(AsFieldBase::promise_is_field(self)));
-        } else {
+        if let Some(_factor) = <R::Type as FactorPolyField>::find_factor_by_extension(DensePolyRing::new(self.base_ring(), "X"), &self) {
             return Err(self);
+        } else {
+            return Ok(RingValue::from(AsFieldBase::promise_is_field(self)));
         }
     }
 }
