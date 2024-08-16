@@ -128,7 +128,6 @@ impl<R, V, A> FreeAlgebraImpl<R, V, A>
     /// 
     /// For details, see [`crate::rings::field::AsField`].
     /// 
-    #[stability::unstable(feature = "enable")]
     pub fn as_field(self) -> Result<AsField<Self>, Self> {
         if let Some(_factor) = <R::Type as FactorPolyField>::find_factor_by_extension(DensePolyRing::new(self.base_ring(), "X"), &self) {
             return Err(self);
