@@ -5,6 +5,7 @@ use crate::divisibility::DivisibilityRing;
 use crate::rings::extension::FreeAlgebra;
 use crate::rings::{zn::ZnRing, finite::FiniteRing};
 use crate::integer::{IntegerRingStore, IntegerRing};
+use crate::serialization::SerializableElementRing;
 
 ///
 /// Trait to simplify implementing newtype-pattern for rings.
@@ -293,6 +294,22 @@ impl<R: DelegateRing + ?Sized> DivisibilityRing for R
     default fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         self.get_delegate().checked_left_div(self.delegate_ref(lhs), self.delegate_ref(rhs))
             .map(|x| self.rev_delegate(x))
+    }
+}
+
+impl<R: DelegateRing + ?Sized> SerializableElementRing for R
+    where R::Base: DivisibilityRing + SerializableElementRing
+{
+    default fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
+        where S: serde::Serializer
+    {
+        self.get_delegate().serialize(self.delegate_ref(el), serializer)
+    }
+
+    default fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
+        where D: serde::Deserializer<'de>
+    {
+        self.get_delegate().deserialize(deserializer).map(|x| self.rev_delegate(x))
     }
 }
 
