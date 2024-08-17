@@ -162,28 +162,3 @@ fn bench_karatsuba_mul(bencher: &mut test::Bencher) {
         assert_eq!(c[62], 31 * 31);
     });
 }
-
-#[cfg(any(test, feature = "generic_tests"))]
-pub mod generic_tests {
-    use super::*;
-    use std::cmp::{min, max};
-
-    pub fn test_convolution<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
-        let elements = edge_case_elements.collect::<Vec<_>>();
-
-        for other_len in [elements.len() / 3, (elements.len() - 1) / 2 + 1, elements.len() - 1, elements.len()] {
-            let lhs = &elements[..];
-            let rhs = &elements[..other_len];
-            let mut dst = (0..(lhs.len() + rhs.len())).map(|_| ring.zero()).collect::<Vec<_>>();
-            ring.get_ring().compute_convolution(lhs, rhs, &mut dst);
-
-            for i in 0..dst.len() {
-                let mut current = ring.zero();
-                for j in max(0, i as isize + 1 - rhs.len() as isize)..min(lhs.len() as isize, i as isize + 1) {
-                    ring.add_assign(&mut current, ring.mul_ref(&lhs[j as usize], &rhs[(i as isize - j) as usize]));
-                }
-                assert_el_eq!(ring, &dst[i], &current);
-            }
-        }
-    }
-}

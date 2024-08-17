@@ -30,7 +30,7 @@ append-only-vec = "0.1.5"
 thread_local = "1.1.8"
 atomicbox = "0.4.0"
 serde = "1.0.207"
-bytemuck = "1.16.3"
+bytemuck = { version = "1.16.3", optional = true }
 serde_bytes = "0.11.15"
 
 [dev-dependencies]
@@ -39,6 +39,8 @@ serde_assert = "0.8.0"
 serde_json = "1.0.124"
 
 [features]
+default = ["mpir"]
+
 # Enables the export of "generic tests", functions that test the set of axioms associated with a trait.
 generic_tests = []
 
@@ -46,7 +48,7 @@ generic_tests = []
 unstable-enable = []
 
 # Try to link to the mpir library for arbitrary-precision integers, and make `BigIntRing` refer to it.
-mpir = []
+mpir = ["dep:bytemuck"]
 
 # Enables parallel computation in some underlying algorithms. Currently this applies only to F4.
 parallel = ["dep:rayon"]

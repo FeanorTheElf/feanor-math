@@ -1,4 +1,9 @@
 use libc;
+use serde::de::DeserializeSeed;
+use serde::Deserialize;
+use serde::Deserializer;
+use serde::Serialize;
+use serde::Serializer;
 
 use crate::algorithms;
 use crate::pid::*;
@@ -274,6 +279,43 @@ impl OrderedRing for MPZBase {
     fn is_neg(&self, value: &Self::Element) -> bool {
         unsafe {
             mpir_bindings::mpz_is_neg(&value.integer as mpir_bindings::mpz_srcptr)
+        }
+    }
+}
+
+impl SerializableElementRing for MPZBase {
+
+    fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
+        where D: Deserializer<'de>
+    {
+        if deserializer.is_human_readable() {
+            return DeserializeWithRing::new(RustBigintRing::RING).deserialize(deserializer).map(|n| int_cast(n, RingRef::new(self), RustBigintRing::RING));
+        } else {
+            let (negative, data) = <(bool, &serde_bytes::Bytes) as Deserialize>::deserialize(deserializer)?;
+            let result_data = data.array_chunks().map(|chunk| u64::from_le_bytes(*chunk)).collect::<Vec<_>>();
+            let mut result = self.zero();
+            self.from_base_u64_repr(&mut result, &result_data);
+            if negative {
+                self.negate_inplace(&mut result);
+            }
+            return Ok(result);
+        }
+    }
+
+    fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        if serializer.is_human_readable() {
+            <String as Serialize>::serialize(&format!("{}", RingRef::new(self).format(el)), serializer)
+        } else {
+            let len = self.abs_base_u64_repr_len(el);
+            let mut data = Vec::with_capacity(len);
+            data.resize(len, 0u64);
+            self.abs_base_u64_repr(el, &mut data);
+            for digit in &mut data {
+                *digit = digit.to_le();
+            }
+            <(bool, &serde_bytes::Bytes) as Serialize>::serialize(&(self.is_neg(el), serde_bytes::Bytes::new(bytemuck::cast_slice(&data))), serializer)
         }
     }
 }
@@ -595,6 +637,8 @@ specialize_int_cast!{ i8, i16, i32 }
 
 #[cfg(test)]
 use crate::pid::EuclideanRingStore;
+use crate::serialization::DeserializeWithRing;
+use crate::serialization::SerializableElementRing;
 
 #[cfg(test)]
 fn edge_case_elements_bigint() -> impl Iterator<Item = RustBigint> {
@@ -768,4 +812,9 @@ fn bench_div_300_bits(bencher: &mut test::Bencher) {
         let q = MPZ::RING.euclidean_div(MPZ::RING.clone_el(&z), &y);
         assert_el_eq!(MPZ::RING, x, q);
     })
+}
+
+#[test]
+fn test_serialization() {
+    crate::serialization::generic_tests::test_serialization(MPZ::RING, edge_case_elements());
 }

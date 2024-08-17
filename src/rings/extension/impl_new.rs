@@ -1,6 +1,10 @@
 use std::alloc::Allocator;
 use std::alloc::Global;
 
+use serde::de;
+use serde::Deserializer;
+use serde::Serializer;
+
 use crate::algorithms::convolution::ConvolutionAlgorithm;
 use crate::algorithms::convolution::KaratsubaAlgorithm;
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
@@ -24,6 +28,11 @@ use crate::ring::*;
 use crate::integer::IntegerRingStore;
 use crate::rings::extension::create_multiplication_matrix;
 use crate::delegate::DelegateRing;
+use crate::serialization::deserialize_seq_helper;
+use crate::serialization::serialize_seq_helper;
+use crate::serialization::DeserializeWithRing;
+use crate::serialization::SerializableElementRing;
+use crate::serialization::SerializeWithRing;
 
 use super::CanHomFrom;
 use super::CanIsoFromTo;
@@ -199,6 +208,7 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
     type Element = FreeAlgebraImplEl<R, A>;
     
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
+        debug_assert_eq!(1 << self.log2_padded_len, val.values.len());
         let mut result_values = Vec::with_capacity_in(val.values.len(), self.element_allocator.clone());
         result_values.extend(val.values.iter().map(|x| self.base_ring().clone_el(x)));
         return FreeAlgebraImplEl {
@@ -207,34 +217,45 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
+        debug_assert_eq!(1 << self.log2_padded_len, lhs.values.len());
+        debug_assert_eq!(1 << self.log2_padded_len, rhs.values.len());
         for i in 0..self.rank() {
             self.base_ring().add_assign_ref(&mut lhs.values[i], &rhs.values[i]);
         }
     }
 
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
+        debug_assert_eq!(1 << self.log2_padded_len, lhs.values.len());
+        debug_assert_eq!(1 << self.log2_padded_len, rhs.values.len());
         for (i, x) in (0..self.rank()).zip(rhs.values.iter()) {
             self.base_ring().add_assign_ref(&mut lhs.values[i], x);
         }
     }
 
     fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
+        debug_assert_eq!(1 << self.log2_padded_len, lhs.values.len());
+        debug_assert_eq!(1 << self.log2_padded_len, rhs.values.len());
         for i in 0..self.rank() {
             self.base_ring().sub_assign_ref(&mut lhs.values[i], &rhs.values[i]);
         }
     }
 
     fn negate_inplace(&self, lhs: &mut Self::Element) {
+        debug_assert_eq!(1 << self.log2_padded_len, lhs.values.len());
         for i in 0..self.rank() {
             self.base_ring().negate_inplace(&mut lhs.values[i]);
         }
     }
 
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
+        debug_assert_eq!(1 << self.log2_padded_len, lhs.values.len());
+        debug_assert_eq!(1 << self.log2_padded_len, rhs.values.len());
         self.mul_assign_ref(lhs, &rhs)
     }
 
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
+        debug_assert_eq!(1 << self.log2_padded_len, lhs.values.len());
+        debug_assert_eq!(1 << self.log2_padded_len, rhs.values.len());
         let mut tmp = Vec::with_capacity_in(self.rank() * 2, self.element_allocator.clone());
         tmp.extend((0..(2 << self.log2_padded_len)).map(|_| self.base_ring.zero()));
         self.convolution.compute_convolution(&lhs.values[..], &rhs.values[..], &mut tmp[..], self.base_ring());
@@ -285,18 +306,23 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+        debug_assert_eq!(1 << self.log2_padded_len, lhs.values.len());
+        debug_assert_eq!(1 << self.log2_padded_len, rhs.values.len());
         (0..self.rank()).all(|i| self.base_ring().eq_el(&lhs.values[i], &rhs.values[i]))
     }
 
     fn is_zero(&self, value: &Self::Element) -> bool {
+        debug_assert_eq!(1 << self.log2_padded_len, value.values.len());
         (0..self.rank()).all(|i| self.base_ring.is_zero(&value.values[i]))
     }
 
     fn is_one(&self, value: &Self::Element) -> bool {
+        debug_assert_eq!(1 << self.log2_padded_len, value.values.len());
         self.base_ring().is_one(&value.values[0]) && (1..self.rank()).all(|i| self.base_ring.is_zero(&value.values[i]))
     }
 
     fn is_neg_one(&self, value: &Self::Element) -> bool {
+        debug_assert_eq!(1 << self.log2_padded_len, value.values.len());
         self.base_ring().is_neg_one(&value.values[0]) && (1..self.rank()).all(|i| self.base_ring.is_zero(&value.values[i]))
     }
 
@@ -313,15 +339,18 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
     }
 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        debug_assert_eq!(1 << self.log2_padded_len, value.values.len());
         self.dbg_within(value, out, EnvBindingStrength::Weakest)
     }
 
     fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
+        debug_assert_eq!(1 << self.log2_padded_len, value.values.len());
         let poly_ring = DensePolyRing::new(self.base_ring(), "θ");
         poly_ring.get_ring().dbg_within(&RingRef::new(self).poly_repr(&poly_ring, value, &self.base_ring().identity()), out, env)
     }
 
     fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
+        debug_assert_eq!(1 << self.log2_padded_len, lhs.values.len());
         for i in 0..self.rank() {
             self.base_ring().int_hom().mul_assign_map(&mut lhs.values[i], rhs);
         }
@@ -383,6 +412,33 @@ impl<R, V, A, C> DivisibilityRing for FreeAlgebraImplBase<R, V, A, C>
         } else {
             return None;
         }
+    }
+}
+
+impl<R, V, A, C> SerializableElementRing for FreeAlgebraImplBase<R, V, A, C>
+    where R: RingStore, 
+        V: VectorView<El<R>>,
+        A: Allocator + Clone,
+        C: ConvolutionAlgorithm<R::Type>,
+        R::Type: SerializableElementRing
+{
+    fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
+        where D: Deserializer<'de>
+    {
+        let mut data = Vec::with_capacity_in(1 << self.log2_padded_len, self.element_allocator.clone());
+        deserialize_seq_helper(deserializer, |x| data.push(x), DeserializeWithRing::new(self.base_ring()))?;
+        if data.len() != self.rank() {
+            return Err(de::Error::custom(format!("expected {} ring elements but got {}", self.rank(), data.len())));
+        }
+        data.extend((0..((1 << self.log2_padded_len) - self.rank)).map(|_| self.base_ring().zero()));
+        return Ok(FreeAlgebraImplEl { values: data.into_boxed_slice() });
+    }
+
+    fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        debug_assert_eq!(1 << self.log2_padded_len, el.values.len());
+        serialize_seq_helper(serializer, (&el.values[..self.rank()]).iter().map(|c| SerializeWithRing::new(c, self.base_ring())))
     }
 }
 
@@ -638,7 +694,6 @@ fn test_ring3_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 1]>, V
     return (R, elements);
 }
 
-
 #[cfg(test)]
 fn test_ring4_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, SparseHashMapVector<StaticRing<i64>>>, Vec<FreeAlgebraImplEl<StaticRing<i64>>>) {
     let ZZ = StaticRing::<i64>::RING;
@@ -775,4 +830,18 @@ fn test_as_field() {
     crate::field::generic_tests::test_field_axioms(ring, ring.elements());
 
     assert!(FreeAlgebraImpl::new(base_ring, 2, [base_ring.int_hom().map(1)]).as_field().is_err());
+}
+
+#[test]
+fn test_serialization() {
+    let (ring, els) = test_ring0_and_elements();
+    crate::serialization::generic_tests::test_serialization(ring, els.into_iter());
+    let (ring, els) = test_ring1_and_elements();
+    crate::serialization::generic_tests::test_serialization(ring, els.into_iter());
+    let (ring, els) = test_ring2_and_elements();
+    crate::serialization::generic_tests::test_serialization(ring, els.into_iter());
+    let (ring, els) = test_ring3_and_elements();
+    crate::serialization::generic_tests::test_serialization(ring, els.into_iter());
+    let (ring, els) = test_ring4_and_elements();
+    crate::serialization::generic_tests::test_serialization(ring, els.into_iter());
 }

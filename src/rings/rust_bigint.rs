@@ -1,3 +1,4 @@
+use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
 
 use crate::algorithms::bigint::highest_set_block;
@@ -349,23 +350,32 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
         where D: Deserializer<'de>
     {
-        let (negative, data) = <(bool, &serde_bytes::Bytes) as Deserialize>::deserialize(deserializer)?;
-        let mut result_data = Vec::with_capacity_in(data.len() / size_of::<u64>(), self.allocator.clone());
-        for digit in data.array_chunks() {
-            result_data.push(u64::from_le_bytes(*digit));
+        if deserializer.is_human_readable() {
+            let string = <String as Deserialize>::deserialize(deserializer)?;
+            return self.parse(string.as_str(), 10).map_err(|()| de::Error::custom(format!("cannot parse \"{}\" as number", string)));
+        } else {
+            let (negative, data) = <(bool, &serde_bytes::Bytes) as Deserialize>::deserialize(deserializer)?;
+            let mut result_data = Vec::with_capacity_in(data.len() / size_of::<u64>(), self.allocator.clone());
+            for digit in data.array_chunks() {
+                result_data.push(u64::from_le_bytes(*digit));
+            }
+            return Ok(RustBigint(negative, result_data));
         }
-        return Ok(RustBigint(negative, result_data));
     }
 
     fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        let len = highest_set_block(&el.1).map(|n| n + 1).unwrap_or(0);
-        let mut data = Vec::with_capacity_in(len * size_of::<u64>(), &self.allocator);
-        for digit in &el.1 {
-            data.extend(digit.to_le_bytes().into_iter());
+        if serializer.is_human_readable() {
+            <String as Serialize>::serialize(&format!("{}", RingRef::new(self).format(el)), serializer)
+        } else {
+            let len = highest_set_block(&el.1).map(|n| n + 1).unwrap_or(0);
+            let mut data = Vec::with_capacity_in(len * size_of::<u64>(), &self.allocator);
+            for digit in &el.1 {
+                data.extend(digit.to_le_bytes().into_iter());
+            }
+            <(bool, &serde_bytes::Bytes) as Serialize>::serialize(&(el.0, serde_bytes::Bytes::new(&data)), serializer)
         }
-        <(bool, &serde_bytes::Bytes) as Serialize>::serialize(&(el.0, serde_bytes::Bytes::new(&data)), serializer)
     }
 }
 

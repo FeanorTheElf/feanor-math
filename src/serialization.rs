@@ -134,10 +134,20 @@ pub mod generic_tests {
     pub fn test_serialization<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
         where R::Type: SerializableElementRing
     {
-        let serializer = serde_assert::Serializer::builder().build();
-        for x in edge_case_elements {
+        let edge_case_elements = edge_case_elements.collect::<Vec<_>>();
+
+        let serializer = serde_assert::Serializer::builder().is_human_readable(true).build();
+        for x in &edge_case_elements {
             let tokens = ring.get_ring().serialize(&x, &serializer).unwrap();
-            let mut deserializer = serde_assert::Deserializer::builder(tokens).build();
+            let mut deserializer = serde_assert::Deserializer::builder(tokens).is_human_readable(true).build();
+            let result = ring.get_ring().deserialize(&mut deserializer).unwrap();
+            assert_el_eq!(ring, &result, &x);
+        }
+
+        let serializer = serde_assert::Serializer::builder().is_human_readable(false).build();
+        for x in &edge_case_elements {
+            let tokens = ring.get_ring().serialize(&x, &serializer).unwrap();
+            let mut deserializer = serde_assert::Deserializer::builder(tokens).is_human_readable(false).build();
             let result = ring.get_ring().deserialize(&mut deserializer).unwrap();
             assert_el_eq!(ring, &result, &x);
         }
@@ -151,5 +161,5 @@ use crate::integer::{BigIntRing, IntegerRingStore};
 fn test_serialize() {
     let value = BigIntRing::RING.add(BigIntRing::RING.power_of_two(128), BigIntRing::RING.one());
     let json = serde_json::to_string(&SerializeWithRing::new(&value, BigIntRing::RING)).unwrap();
-    assert_eq!("[false,[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0]]", json);
+    assert_eq!("\"340282366920938463463374607431768211457\"", json);
 }
