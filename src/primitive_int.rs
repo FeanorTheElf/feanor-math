@@ -393,6 +393,12 @@ impl<T: PrimitiveInt> SerializableElementRing for StaticRingBase<T> {
 /// 
 pub type StaticRing<T> = RingValue<StaticRingBase<T>>;
 
+impl<T: PrimitiveInt> Default for StaticRingBase<T> {
+    fn default() -> Self {
+        StaticRing::RING.into()
+    }
+}
+
 #[test]
 fn test_ixx_bit_op() {
     let ring_i16 = StaticRing::<i16>::RING;

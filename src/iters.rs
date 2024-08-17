@@ -1,7 +1,8 @@
 use std::{cmp::min, convert::TryInto, iter::FusedIterator};
 
 ///
-/// Clones of the used base iterator must have the same iteration order as the iterator itself
+/// Iterator over all combinations of the given set of the given size.
+/// See also [`combinations()`].
 /// 
 #[derive(Debug, Clone)]
 pub struct IterCombinations<I, F, T> 
@@ -64,7 +65,32 @@ impl<I, F, T> Iterator for IterCombinations<I, F, T>
 impl<I, F, T> std::iter::FusedIterator for IterCombinations<I, F, T> 
     where I: Iterator + Clone, I::Item: Clone, F: FnMut(&[I::Item]) -> T {}
 
-pub fn combinations<I, F, T>(it: I, k: usize, f: F) -> IterCombinations<I, F, T> 
+///
+/// Returns an iterator over all combinations of the elements yielded by the base iterator of size `k`.
+/// 
+/// Since the items yielded by the iterator are collections of dynamic length,
+/// creating them might be quite costly. In many applications, this is not really
+/// required, and so this function accepts a second argument - a converter function -
+/// that is called on each tuple in the cartesian product and its return value
+/// is yielded by the product iterator.
+/// 
+/// Note that clones of the given base iterator must all have the same iteration order.
+/// 
+/// # Example
+/// 
+/// ```
+/// # use feanor_math::iters::combinations;
+/// assert_eq!(
+///     vec![(1, 2), (1, 3), (2, 3)],
+///     combinations(
+///         [1, 2, 3].into_iter(), 
+///         2, 
+///         |a| (a[0], a[1])
+///     ).collect::<Vec<_>>()
+/// );
+/// ```
+/// 
+pub fn combinations<I, F, T>(it: I, k: usize, converter: F) -> IterCombinations<I, F, T> 
     where I: Iterator + Clone, I::Item: Clone, F: FnMut(&[I::Item]) -> T
 {
     let enumerated_it = it.enumerate().peekable();
@@ -78,7 +104,7 @@ pub fn combinations<I, F, T>(it: I, k: usize, f: F) -> IterCombinations<I, F, T>
                 base: enumerated_it,
                 iterators: start_iterators.into_boxed_slice(),
                 done: true,
-                converter: f,
+                converter: converter,
                 buffer: buffer.into_boxed_slice()
             };
         }
@@ -89,7 +115,7 @@ pub fn combinations<I, F, T>(it: I, k: usize, f: F) -> IterCombinations<I, F, T>
         base: enumerated_it,
         iterators: start_iterators.into_boxed_slice(),
         done: false,
-        converter: f,
+        converter: converter,
         buffer: buffer.into_boxed_slice()
     };
 }
@@ -126,6 +152,10 @@ pub fn basic_powerset<I>(it: I) -> impl Iterator<Item = Box<[I::Item]>>
     powerset(it, clone_slice)
 }
 
+///
+/// Iterator over the multiset combinations of a set and a given size.
+/// See also [`multiset_combinations()`].
+/// 
 #[derive(Debug, Clone)]
 pub struct MultisetCombinations<'a, F, T>
     where F: FnMut(&[usize]) -> T
@@ -188,8 +218,9 @@ impl<'a, F, T> std::iter::FusedIterator for MultisetCombinations<'a, F, T>
 /// that is called on each tuple in the cartesian product and its return value
 /// is yielded by the product iterator.
 /// 
-/// # Example
+/// Note that clones of the given base iterator must all have the same iteration order.
 /// 
+/// # Example
 /// ```
 /// # use feanor_math::iters::multiset_combinations;
 /// assert_eq!(
@@ -307,6 +338,10 @@ pub fn cartesian_product<I, J>(mut it1: I, it2: J) -> Product<I, J>
     }
 }
 
+///
+/// Iterator over the elements of the cartesian product of multiple iterators.
+/// See also [`multi_cartesian_product()`].
+/// 
 pub struct MultiProduct<I, F, G, T> 
     where I: Iterator + Clone, 
         F: FnMut(&[I::Item]) -> T,
@@ -384,8 +419,9 @@ impl<I, F, G, T> FusedIterator for MultiProduct<I, F, G, T>
 /// that is called on each tuple in the cartesian product and its return value
 /// is yielded by the product iterator.
 /// 
-/// # Example
+/// Note that clones of the given base iterator must all have the same iteration order.
 /// 
+/// # Example
 /// ```
 /// # use feanor_math::iters::multi_cartesian_product;
 /// assert_eq!(
@@ -468,7 +504,6 @@ impl<I, F, T> std::iter::FusedIterator for CondenseIter<I, F, T>
 /// iterator.
 /// 
 /// # Example
-/// 
 /// ```
 /// # use feanor_math::iters::condense;
 /// let mut accumulator = 0;

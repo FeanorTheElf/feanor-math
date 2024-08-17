@@ -12,6 +12,7 @@ pub trait Field: Domain + EuclideanRing {
 
     fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         assert!(!self.is_zero(rhs));
+        assert!(self.is_commutative());
         return self.checked_left_div(lhs, rhs).unwrap();
     }
 }

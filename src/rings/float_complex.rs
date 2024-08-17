@@ -249,7 +249,7 @@ impl<I: ?Sized + IntegerRing> CanHomFrom<I> for Complex64Base {
     }
 
     fn map_in_ref(&self, from: &I, el: &<I as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
-        self.from_f64(from.to_float_approx(&el))
+        self.from_f64(from.to_float_approx(el))
     }
 }
 

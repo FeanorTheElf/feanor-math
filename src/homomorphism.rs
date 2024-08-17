@@ -78,9 +78,8 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// Trait for rings R that have a canonical homomorphism `S -> R`.
 /// A ring homomorphism is expected to be unital. 
 /// 
-/// This trait is
-/// considered implementor-facing, so it is designed to easily implement
-/// natural maps between rings. When using homomorphisms, consider
+/// This trait is considered implementor-facing, so it is designed to easily 
+/// implement natural maps between rings. When using homomorphisms, consider
 /// using instead [`CanHom`], as it does not require weird syntax like
 /// `R.get_ring().map_in(S.get_ring(), x, &hom)`.
 /// 
@@ -209,6 +208,21 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// assert!(Zn_rns.can_iso(&zn_big_big).is_some());
 /// assert!(Zn_rns.can_iso(&Zn_rns).is_some());
 /// ```
+/// Most notably, reduction homomorphisms are currently not available.
+/// You can use [`crate::rings::zn::ReductionMap`] instead.
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::integer::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::assert_el_eq;
+/// let Z9 = zn_64::Zn::new(9);
+/// let Z3 = zn_64::Zn::new(3);
+/// assert!(Z3.can_hom(&Z9).is_none());
+/// let red_map = ReductionMap::new(&Z9, &Z3).unwrap();
+/// assert_el_eq!(Z3, Z3.one(), red_map.map(Z9.int_hom().map(4)));
+/// ```
 /// Additionally, there are the projections `Z -> Z/nZ`.
 /// They are all implemented, even though [`crate::rings::zn::ZnRing`] currently
 /// only requires the projection from the "associated" integer ring.
@@ -284,8 +298,6 @@ pub trait CanHomFrom<S>: RingBase
 ///
 /// Trait for rings R that have a canonical isomorphism `S -> R`.
 /// A ring homomorphism is expected to be unital.
-/// 
-/// I am currently thinking about removing this trait entirely.
 /// 
 /// # Exact requirements
 /// 

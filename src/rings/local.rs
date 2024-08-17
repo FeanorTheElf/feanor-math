@@ -315,6 +315,50 @@ impl<R: DivisibilityRingStore> Domain for AsLocalPIRBase<R>
     where R::Type: DivisibilityRing + Domain
 {}
 
+impl<R> FromModulusCreateableZnRing for AsLocalPIRBase<RingValue<R>> 
+    where R: DivisibilityRing + ZnRing + FromModulusCreateableZnRing
+{
+    fn create<F, E>(create_modulus: F) -> Result<Self, E>
+        where F:FnOnce(&Self::IntegerRingBase) -> Result<El<Self::Integers>, E> 
+    {
+        <R as FromModulusCreateableZnRing>::create(create_modulus).map(|ring| AsLocalPIR::from_zn(RingValue::from(ring)).unwrap().into())
+    }
+}
+
+impl<R1, R2> CanHomFrom<AsFieldBase<R1>> for AsLocalPIRBase<R2>
+    where R1: RingStore, R2: RingStore,
+        R2::Type: CanHomFrom<R1::Type>,
+        R1::Type: DivisibilityRing,
+        R2::Type: DivisibilityRing
+{
+    type Homomorphism = <R2::Type as CanHomFrom<R1::Type>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &AsFieldBase<R1>) -> Option<Self::Homomorphism> {
+        self.get_delegate().has_canonical_hom(from.get_delegate())
+    }
+
+    fn map_in(&self, from: &AsFieldBase<R1>, el: <AsFieldBase<R1> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.rev_delegate(self.get_delegate().map_in(from.get_delegate(), from.delegate(el), hom))
+    }
+}
+
+impl<R1, R2> CanIsoFromTo<AsFieldBase<R1>> for AsLocalPIRBase<R2>
+    where R1: RingStore, R2: RingStore,
+        R2::Type: CanIsoFromTo<R1::Type>,
+        R1::Type: DivisibilityRing,
+        R2::Type: DivisibilityRing
+{
+    type Isomorphism = <R2::Type as CanIsoFromTo<R1::Type>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &AsFieldBase<R1>) -> Option<Self::Isomorphism> {
+        self.get_delegate().has_canonical_iso(from.get_delegate())
+    }
+
+    fn map_out(&self, from: &AsFieldBase<R1>, el: Self::Element, iso: &Self::Isomorphism) -> <AsFieldBase<R1> as RingBase>::Element {
+        from.rev_delegate(self.get_delegate().map_out(from.get_delegate(), self.delegate(el), iso))
+    }
+}
+
 ///
 /// Implements the isomorphisms `S: CanHomFrom<AsFieldBase<RingStore<Type = R>>>` and 
 /// `AsFieldBase<RingStore<Type = S>>: CanHomFrom<R>`.
@@ -418,6 +462,7 @@ use crate::matrix::{OwnedMatrix, TransposableSubmatrix, TransposableSubmatrixMut
 use crate::assert_matrix_eq;
 #[cfg(test)]
 use super::extension::galois_field::galois_ring_dyn;
+use super::field::AsFieldBase;
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {

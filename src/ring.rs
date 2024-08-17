@@ -6,7 +6,6 @@ use crate::primitive_int::StaticRing;
 use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::algorithms;
 
-#[stability::unstable(feature = "enable")]
 #[derive(PartialEq, Eq, Debug, Clone, Copy, PartialOrd, Ord)]
 pub enum EnvBindingStrength {
     Weakest, Sum, Product, Power, Strongest
@@ -840,6 +839,7 @@ pub type El<R> = <<R as RingStore>::Type as RingBase>::Element;
 /// type A = RingValue<ABase>;
 /// ```
 /// 
+#[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct RingValue<R: RingBase> {
     ring: R
@@ -850,6 +850,14 @@ impl<R: RingBase> RingValue<R> {
     pub const fn from(value: R) -> Self {
         RingValue { ring: value }
     }
+
+    pub fn from_ref<'a>(value: &'a R) -> &'a Self {
+        unsafe { std::mem::transmute(value) }
+    }
+
+    pub fn into(self) -> R {
+        self.ring
+    }
 }
 
 impl<R: RingBase> RingStore for RingValue<R> {
@@ -858,6 +866,13 @@ impl<R: RingBase> RingStore for RingValue<R> {
     
     fn get_ring(&self) -> &R {
         &self.ring
+    }
+}
+
+impl<R: RingBase + Default> Default for RingValue<R> {
+    
+    fn default() -> Self {
+        Self::from(R::default())
     }
 }
 
@@ -874,6 +889,7 @@ impl<R: RingBase> RingStore for RingValue<R> {
 /// or [`crate::algorithms::sqr_mul`]). In this case, we only have a reference to a [`crate::ring::RingBase`]
 /// object, but require a [`crate::ring::RingStore`] object to use the algorithm.
 /// 
+#[repr(transparent)]
 pub struct RingRef<'a, R: RingBase + ?Sized> {
     ring: &'a R
 }

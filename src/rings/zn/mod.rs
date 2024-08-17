@@ -112,6 +112,20 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
     }
 }
 
+///
+/// Trait for implementations of [`ZnRing`] that can be created (possibly with a 
+/// default configuration) from just the integer modulus.
+/// 
+/// I am not yet sure whether to use this trait, or opt for a factory trait (which
+/// would then offer more flexibility).
+/// 
+#[stability::unstable(feature = "enable")]
+pub trait FromModulusCreateableZnRing: Sized + ZnRing {
+
+    fn create<F, E>(create_modulus: F) -> Result<Self, E>
+        where F: FnOnce(&Self::IntegerRingBase) -> Result<El<Self::Integers>, E>;
+}
+
 pub mod generic_impls {
     use std::marker::PhantomData;
 

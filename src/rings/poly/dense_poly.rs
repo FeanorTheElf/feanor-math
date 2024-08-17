@@ -224,10 +224,11 @@ impl<R: RingStore, A: Allocator + Clone> RingBase for DensePolyRingBase<R, A> {
         let rhs_len = self.degree(rhs).map(|i| i + 1).unwrap_or(0);
         let mut result = Vec::with_capacity_in(lhs_len + rhs_len, self.element_allocator.clone());
         result.extend((0..(lhs_len + rhs_len)).map(|_| self.base_ring().zero()));
-        self.base_ring().get_ring().compute_convolution(
+        STANDARD_CONVOLUTION.compute_convolution(
             &lhs.data[0..lhs_len], 
             &rhs.data[0..rhs_len],
-            &mut result[..]
+            &mut result[..],
+            self.base_ring()
         );
         return DensePolyRingEl {
             data: result

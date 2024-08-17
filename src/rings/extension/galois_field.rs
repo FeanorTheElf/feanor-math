@@ -1,10 +1,11 @@
+use crate::algorithms::convolution::fft::{FFTBasedConvolution, FFTBasedConvolutionZn};
 use crate::field::Field;
 use crate::integer::IntegerRingStore;
 use crate::pid::EuclideanRing;
 use crate::ring::*;
 use crate::algorithms::int_factor;
 use crate::algorithms::poly_factor::{cantor_zassenhaus, poly_squarefree_part};
-use crate::primitive_int::StaticRing;
+use crate::primitive_int::*;
 use crate::rings::extension::*;
 use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::finite::FiniteRingStore;
@@ -24,30 +25,60 @@ pub type GaloisFieldDyn = AsField<FreeAlgebraImpl<AsField<Zn>, Box<[El<AsField<Z
 #[stability::unstable(feature = "enable")]
 pub type GaloisRingDyn = AsLocalPIR<FreeAlgebraImpl<AsLocalPIR<Zn>, Box<[El<AsLocalPIR<Zn>>]>>>;
 
+fn test_is_irreducible_base<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Option<El<P>>
+    where P: RingStore,
+        P::Type: PolyRing + EuclideanRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
+        R: RingStore,
+        R::Type: FreeAlgebra,
+        <R::Type as RingExtension>::BaseRing: RingStore<Type = <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+{
+    let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
+    let squarefree_part = poly_squarefree_part(&poly_ring, f);
+    if poly_ring.degree(&squarefree_part) != Some(degree) {
+        return None;
+    }
+    let distinct_degree_factorization = cantor_zassenhaus::distinct_degree_factorization_base(&poly_ring, &mod_f_ring);
+    if distinct_degree_factorization.len() <= degree || poly_ring.degree(&distinct_degree_factorization[degree]) != Some(degree) {
+        return None;
+    }
+    return Some(mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
+}
+
 fn random_low_body_deg_irreducible_polynomial<P>(poly_ring: P, degree: usize) -> El<P>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + CanHomFrom<StaticRingBase<i64>>
 {
     let mut body_deg = 1;
     let mut rng = oorandom::Rand64::new(poly_ring.base_ring().integer_ring().default_hash(poly_ring.base_ring().modulus()) as u128);
-    loop {
-        for _ in 0..8 {
-            let f_body = (0..body_deg).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())).collect::<Vec<_>>();
-            let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), degree, &f_body);
-            let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
-            let squarefree_part = poly_squarefree_part(&poly_ring, f);
-            if poly_ring.degree(&squarefree_part) != Some(degree) {
-                continue;
+    let log2_modulus = poly_ring.base_ring().integer_ring().abs_log2_ceil(poly_ring.base_ring().modulus()).unwrap();
+    let fft_convolution = FFTBasedConvolution::new_with(Global);
+    if fft_convolution.can_compute(StaticRing::<i64>::RING.abs_log2_ceil(&(degree as i64)).unwrap() + 1, log2_modulus) {
+        loop {
+            for _ in 0..8 {
+                let f_body = (0..body_deg).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())).collect::<Vec<_>>();
+                let mod_f_ring = FreeAlgebraImpl::new_with(poly_ring.base_ring(), degree, &f_body, Global, <&FFTBasedConvolutionZn>::from(&fft_convolution));
+                if let Some(result) = test_is_irreducible_base(&poly_ring, mod_f_ring, degree) {
+                    return result;
+                }
             }
-            let distinct_degree_factorization = cantor_zassenhaus::distinct_degree_factorization_base(&poly_ring, &mod_f_ring);
-            if distinct_degree_factorization.len() <= degree || poly_ring.degree(&distinct_degree_factorization[degree]) != Some(degree) {
-                continue;
+            if body_deg < degree {
+                body_deg += 1;
             }
-            return mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
         }
-        if body_deg < degree {
-            body_deg += 1;
+    } else {
+        loop {
+            for _ in 0..8 {
+                let f_body = (0..body_deg).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())).collect::<Vec<_>>();
+                let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), degree, &f_body);
+                if let Some(result) = test_is_irreducible_base(&poly_ring, mod_f_ring, degree) {
+                    return result;
+                }
+            }
+            if body_deg < degree {
+                body_deg += 1;
+            }
         }
     }
 }
@@ -249,6 +280,7 @@ pub fn GF_conway(power_of_p: u64) -> GaloisFieldDyn {
     }
 }
 
+use std::alloc::Global;
 #[cfg(test)]
 use std::time::Instant;
 

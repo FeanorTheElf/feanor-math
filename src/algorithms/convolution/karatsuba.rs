@@ -127,7 +127,7 @@ karatsuba_impl!{
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn karatsuba<R, V1, V2, A: Allocator>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: V1, rhs: V2, ring: R, allocator: A) 
+pub fn karatsuba<R, V1, V2, A: Allocator>(threshold_size_log2: usize, dst: &mut [El<R>], lhs: V1, rhs: V2, ring: R, allocator: &A) 
     where R: RingStore + Copy, V1: SelfSubvectorView<El<R>> + Copy, V2: SelfSubvectorView<El<R>> + Copy
 {
     if lhs.len() == 0 || rhs.len() == 0 {

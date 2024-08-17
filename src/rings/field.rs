@@ -7,6 +7,9 @@ use crate::field::Field;
 use crate::integer::IntegerRing;
 use crate::ring::*;
 use crate::homomorphism::*;
+use crate::rings::zn::FromModulusCreateableZnRing;
+use crate::rings::zn::*;
+use super::local::AsLocalPIRBase;
 
 ///
 /// A wrapper around a ring that marks this ring to be a field. In particular,
@@ -143,6 +146,40 @@ impl<R: DivisibilityRingStore, S: IntegerRing + ?Sized> CanHomFrom<S> for AsFiel
     }
 }
 
+impl<R1, R2> CanHomFrom<AsLocalPIRBase<R1>> for AsFieldBase<R2>
+    where R1: RingStore, R2: RingStore,
+        R2::Type: CanHomFrom<R1::Type>,
+        R1::Type: DivisibilityRing,
+        R2::Type: DivisibilityRing
+{
+    type Homomorphism = <R2::Type as CanHomFrom<R1::Type>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &AsLocalPIRBase<R1>) -> Option<Self::Homomorphism> {
+        self.get_delegate().has_canonical_hom(from.get_delegate())
+    }
+
+    fn map_in(&self, from: &AsLocalPIRBase<R1>, el: <AsLocalPIRBase<R1> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.rev_delegate(self.get_delegate().map_in(from.get_delegate(), from.delegate(el), hom))
+    }
+}
+
+impl<R1, R2> CanIsoFromTo<AsLocalPIRBase<R1>> for AsFieldBase<R2>
+    where R1: RingStore, R2: RingStore,
+        R2::Type: CanIsoFromTo<R1::Type>,
+        R1::Type: DivisibilityRing,
+        R2::Type: DivisibilityRing
+{
+    type Isomorphism = <R2::Type as CanIsoFromTo<R1::Type>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &AsLocalPIRBase<R1>) -> Option<Self::Isomorphism> {
+        self.get_delegate().has_canonical_iso(from.get_delegate())
+    }
+
+    fn map_out(&self, from: &AsLocalPIRBase<R1>, el: Self::Element, iso: &Self::Isomorphism) -> <AsLocalPIRBase<R1> as RingBase>::Element {
+        from.rev_delegate(self.get_delegate().map_out(from.get_delegate(), self.delegate(el), iso))
+    }
+}
+
 impl<R: DivisibilityRingStore> DivisibilityRing for AsFieldBase<R> 
     where R::Type: DivisibilityRing
 {
@@ -240,6 +277,16 @@ impl<R: DivisibilityRingStore> StrassenHint for AsFieldBase<R>
 {
     fn strassen_threshold(&self) -> usize {
         self.get_delegate().strassen_threshold()
+    }
+}
+
+impl<R> FromModulusCreateableZnRing for AsFieldBase<RingValue<R>> 
+    where R: DivisibilityRing + ZnRing + FromModulusCreateableZnRing
+{
+    fn create<F, E>(create_modulus: F) -> Result<Self, E>
+        where F:FnOnce(&Self::IntegerRingBase) -> Result<El<Self::Integers>, E> 
+    {
+        <R as FromModulusCreateableZnRing>::create(create_modulus).map(|ring| RingValue::from(ring).as_field().ok().unwrap().into())
     }
 }
 
@@ -386,8 +433,6 @@ macro_rules! impl_wrap_unwrap_isos {
 use crate::rings::zn::zn_big::Zn;
 #[cfg(test)]
 use crate::primitive_int::*;
-#[cfg(test)]
-use crate::rings::zn::*;
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
 

@@ -21,7 +21,15 @@ pub mod extension;
 /// 
 pub mod poly_det;
 
-#[stability::unstable(feature = "enable")]
+///
+/// Result of trying to solve a linear system.
+/// 
+/// Possible values are:
+///  - [`SolveResult::FoundUniqueSolution`]: The system is guaranteed to have a unique solution.
+///  - [`SolveResult::FoundSomeSolution`]: The system has at least one solution. This is also an allowed
+///    value for systems with a unique solution.
+///  - [`SolveResult::NoSolution`]: The system is unsolvable.
+/// 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SolveResult {
     FoundSomeSolution, FoundUniqueSolution, NoSolution
@@ -29,7 +37,6 @@ pub enum SolveResult {
 
 impl SolveResult {
 
-    #[stability::unstable(feature = "enable")]
     pub fn is_solved(&self) -> bool {
         match self {
             Self::FoundSomeSolution | Self::FoundUniqueSolution => true,
@@ -46,7 +53,6 @@ impl SolveResult {
 ///
 /// Class for rings over which we can solve linear systems.
 /// 
-#[stability::unstable(feature = "enable")]
 pub trait LinSolveRing: RingBase {
 
     ///

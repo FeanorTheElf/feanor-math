@@ -311,6 +311,15 @@ impl SerializableElementRing for ZnBase {
     }
 }
 
+impl FromModulusCreateableZnRing for ZnBase {
+
+    fn create<F, E>(create_modulus: F) -> Result<Self, E>
+        where F: FnOnce(&Self::IntegerRingBase) -> Result<El<Self::Integers>, E>
+    {
+        create_modulus(StaticRing::<i64>::RING.get_ring()).map(|n| Self::new(n as u64))
+    }
+}
+
 impl ComputeInnerProduct for ZnBase {
 
     fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, mut els: I) -> Self::Element
@@ -429,7 +438,8 @@ impl DivisibilityRing for ZnBase {
     } 
 }
 
-trait ImplGenericIntHomomorphismMarker: IntegerRing + CanIsoFromTo<StaticRingBase<i128>> + CanIsoFromTo<StaticRingBase<i64>> {}
+#[stability::unstable(feature = "enable")]
+pub trait ImplGenericIntHomomorphismMarker: IntegerRing {}
 
 impl ImplGenericIntHomomorphismMarker for RustBigintRingBase {}
 
@@ -440,11 +450,11 @@ impl<I: ?Sized + ImplGenericIntHomomorphismMarker> CanHomFrom<I> for ZnBase {
 
     type Homomorphism = super::generic_impls::BigIntToZnHom<I, StaticRingBase<i128>, Self>;
 
-    fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
+    default fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
         super::generic_impls::has_canonical_hom_from_bigint(from, self, StaticRing::<i128>::RING.get_ring(), Some(&(self.repr_bound() as i128 * self.repr_bound() as i128)))
     }
 
-    fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
+    default fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
         super::generic_impls::map_in_from_bigint(from, self, StaticRing::<i128>::RING.get_ring(), el, hom, |n| {
             debug_assert!((n as u64) < self.modulus_u64());
             self.from_u64_promise_reduced(n as u64)

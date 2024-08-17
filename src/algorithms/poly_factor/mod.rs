@@ -20,6 +20,7 @@ use crate::rings::zn::zn_64::*;
 use crate::rings::zn::{choose_zn_impl, ZnOperation, ZnRing, ZnRingStore};
 use crate::seq::VectorView;
 use crate::rings::fieldextension::*;
+use crate::rings::extension::FreeAlgebraStore;
 
 use super::erathostenes;
 use super::hensel::hensel_lift_factorization;
@@ -85,6 +86,30 @@ pub trait FactorPolyField: Field {
         where P: PolyRingStore,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
+
+    ///
+    /// Factors the monic polynomial `f` over `R`, given as an implementation of the ring `R[X]/(f)`.
+    /// 
+    /// If possible, this will use arithmetic in the given ring to compute the factorization, instead
+    /// of using a default implementation of the ring `R[X]/(f)` (if necessary for factoring).
+    /// 
+    fn find_factor_by_extension<P, S>(poly_ring: P, mod_f_ring: S) -> Option<El<P>>
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
+            S: RingStore,
+            S::Type: FreeAlgebra,
+            <S::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
+        let poly = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
+        let (factorization, _unit) = Self::factor_poly(poly_ring, &poly);
+        if factorization.len() > 1 || factorization[0].1 > 1 {
+            return Some(factorization.into_iter().next().unwrap().0);
+        } else {
+            return None;
+        }
+    }
 }
 
 ///
@@ -445,6 +470,37 @@ impl<R> FactorPolyField for R
         debug_assert!(poly_ring.base_ring().is_unit(&unit));
         return (result, unit);
     }
+
+    fn find_factor_by_extension<P, S>(poly_ring: P, mod_f_ring: S) -> Option<El<P>>
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
+            S: RingStore,
+            S::Type: FreeAlgebra,
+            <S::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
+        let sqrfree_part = poly_squarefree_part(&poly_ring, mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
+        if poly_ring.degree(&sqrfree_part).unwrap() != mod_f_ring.rank() {
+            return Some(sqrfree_part);
+        }
+        let partial_factorization = cantor_zassenhaus::distinct_degree_factorization_base(&poly_ring, &mod_f_ring);
+        if partial_factorization.len() > mod_f_ring.rank() && poly_ring.degree(&partial_factorization[mod_f_ring.rank()]).unwrap() == mod_f_ring.rank() {
+            return None;
+        }
+        for (d, f) in partial_factorization.into_iter().enumerate() {
+            if poly_ring.degree(&f).unwrap() > 0 {
+                if poly_ring.degree(&f).unwrap() < mod_f_ring.rank() {
+                    return Some(f);
+                } else if BigIntRing::RING.is_even(&poly_ring.base_ring().characteristic(&BigIntRing::RING).unwrap()) {
+                    return Some(cantor_zassenhaus::cantor_zassenhaus_even_base(&poly_ring, &mod_f_ring, d));
+                } else {
+                    return Some(cantor_zassenhaus::cantor_zassenhaus_base(&poly_ring, &mod_f_ring, d));
+                }
+            }
+        }
+        unreachable!()
+    }
 }
 
 #[cfg(test)]
@@ -545,6 +601,22 @@ fn test_poly_squarefree_part_multiplicity_p() {
     let g = ring.from_terms([(ring.base_ring().int_hom().map(3), 0), (ring.base_ring().int_hom().map(1), 2)].into_iter());
     let actual = ring.normalize(poly_squarefree_part(&ring, f));
     assert_el_eq!(ring, g, actual);
+}
+
+#[test]
+fn test_find_factor_by_extension_finite_field() {
+    let field = Zn::new(2).as_field().ok().unwrap();
+    let poly_ring = DensePolyRing::new(field, "X");
+    assert!(<_ as FactorPolyField>::find_factor_by_extension(&poly_ring, FreeAlgebraImpl::new(field, [field.one(), field.one()])).is_none());
+
+    let poly = poly_ring.mul(
+        poly_ring.from_terms([(field.one(), 0), (field.one(), 1), (field.one(), 3)].into_iter()),
+        poly_ring.from_terms([(field.one(), 0), (field.one(), 2), (field.one(), 3)].into_iter()),
+    );
+    let factor = <_ as FactorPolyField>::find_factor_by_extension(&poly_ring, FreeAlgebraImpl::new(field, [field.one(), field.one(), field.one(), field.one(), field.one(), field.one()])).unwrap();
+    poly_ring.println(&factor);
+    assert_eq!(3, poly_ring.degree(&factor).unwrap());
+    assert!(poly_ring.checked_div(&poly, &factor).is_some());
 }
 
 #[bench]

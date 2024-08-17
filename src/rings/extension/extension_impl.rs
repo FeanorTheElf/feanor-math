@@ -14,7 +14,6 @@ use crate::rings::field::AsField;
 use crate::rings::field::AsFieldBase;
 use crate::delegate::DelegateRing;
 use crate::rings::finite::*;
-use crate::rings::poly::PolyRingStore;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::ring::*;
 use crate::seq::VectorView;
@@ -129,17 +128,10 @@ impl<R, V, A> FreeAlgebraImpl<R, V, A>
     /// For details, see [`crate::rings::field::AsField`].
     /// 
     pub fn as_field(self) -> Result<AsField<Self>, Self> {
-        let poly_ring = DensePolyRing::new(self.base_ring(), "X");
-        let f = poly_ring.from_terms(
-            self.get_ring().x_pow_rank.as_iter().enumerate().map(|(i, c)| (self.base_ring().negate(self.base_ring().clone_el(c)), i))
-                .chain([(self.base_ring().one(), self.get_ring().x_pow_rank.len())].into_iter())
-        );
-        let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
-        assert_el_eq!(self.base_ring(), self.base_ring().one(), unit);
-        if factorization.len() == 0 || (factorization.len() == 1 && factorization[0].1 == 1) {
-            return Ok(RingValue::from(AsFieldBase::promise_is_field(self)));
-        } else {
+        if let Some(_factor) = <R::Type as FactorPolyField>::find_factor_by_extension(DensePolyRing::new(self.base_ring(), "X"), &self) {
             return Err(self);
+        } else {
+            return Ok(RingValue::from(AsFieldBase::promise_is_field(self)));
         }
     }
 }
@@ -208,7 +200,7 @@ impl<R, V, A> RingBase for FreeAlgebraImplBase<R, V, A>
     default fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         let mut tmp = Vec::with_capacity_in(self.rank() * 2, self.element_allocator.clone());
         tmp.extend((0..(self.rank() * 2)).map(|_| self.base_ring.zero()));
-        self.base_ring().get_ring().compute_convolution(&lhs.values[..], &rhs.values[..], &mut tmp[..]);
+        STANDARD_CONVOLUTION.compute_convolution(&lhs.values[..], &rhs.values[..], &mut tmp[..], self.base_ring());
         for i in (self.rank()..tmp.len()).rev() {
             for j in 0..self.rank() {
                 let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &tmp[i]);

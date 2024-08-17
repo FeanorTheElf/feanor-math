@@ -98,6 +98,10 @@ impl<R: RingStore> VectorView<El<R>> for SparseHashMapVector<R> {
     fn len(&self) -> usize {
         self.len
     }
+
+    fn specialize_sparse<Op: SparseVectorViewOperation<El<R>>>(&self, op: Op) -> Result<Op::Output, ()> {
+        Ok(op.execute(self))
+    }
 }
 
 #[stability::unstable(feature = "enable")]

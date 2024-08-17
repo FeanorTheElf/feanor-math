@@ -357,6 +357,13 @@ impl EuclideanRing for MPZBase {
     }
 }
 
+impl Default for MPZBase {
+    
+    fn default() -> Self {
+        MPZ::RING.into()
+    }
+}
+
 impl Domain for MPZBase {}
 
 impl IntegerRing for MPZBase {
@@ -492,6 +499,13 @@ impl IntCast<MPZBase> for RustBigintRingBase {
         } else {
             return result;
         }
+    }
+}
+
+impl IntCast<MPZBase> for MPZBase {
+
+    fn cast(&self, _from: &MPZBase, el: MPZEl) -> MPZEl {
+        el
     }
 }
 

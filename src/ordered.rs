@@ -13,6 +13,10 @@ pub trait OrderedRing: RingBase {
 
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> Ordering;
 
+    fn abs_cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> Ordering {
+        self.cmp(&self.abs(self.clone_el(lhs)), &self.abs(self.clone_el(rhs)))
+    }
+
     fn is_leq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         self.cmp(lhs, rhs) != Ordering::Greater
     }
@@ -54,6 +58,7 @@ pub trait OrderedRingStore: RingStore
     where Self::Type: OrderedRing
 {
     delegate!{ OrderedRing, fn cmp(&self, lhs: &El<Self>, rhs: &El<Self>) -> Ordering }
+    delegate!{ OrderedRing, fn abs_cmp(&self, lhs: &El<Self>, rhs: &El<Self>) -> Ordering }
     delegate!{ OrderedRing, fn is_leq(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
     delegate!{ OrderedRing, fn is_geq(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
     delegate!{ OrderedRing, fn is_lt(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }

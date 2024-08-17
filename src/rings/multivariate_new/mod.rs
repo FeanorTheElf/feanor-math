@@ -6,7 +6,9 @@ pub mod multivariate_impl;
 use std::any::Any;
 use std::cmp::{max, Ordering};
 
+#[stability::unstable(feature = "enable")]
 pub type PolyCoeff<P> = El<<<P as RingStore>::Type as RingExtension>::BaseRing>;
+#[stability::unstable(feature = "enable")]
 pub type PolyMonomial<P> = <<P as RingStore>::Type as MultivariatePolyRing>::Monomial;
 
 ///

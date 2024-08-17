@@ -293,6 +293,18 @@ impl<I: IntegerRingStore> HashableElRing for ZnBase<I>
     }
 }
 
+impl<I: IntegerRingStore + Default> FromModulusCreateableZnRing for ZnBase<I>
+    where I::Type: IntegerRing
+{
+    fn create<F, E>(create_modulus: F) -> Result<Self, E>
+        where F: FnOnce(&Self::IntegerRingBase) -> Result<El<Self::Integers>, E>
+    {
+        let ZZ = I::default();
+        let modulus = create_modulus(ZZ.get_ring())?;
+        Ok(Self::new(ZZ, modulus))
+    }
+}
+
 impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I> 
     where I::Type: IntegerRing
 {
