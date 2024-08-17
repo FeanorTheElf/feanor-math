@@ -14,7 +14,6 @@ use crate::rings::field::AsField;
 use crate::rings::field::AsFieldBase;
 use crate::delegate::DelegateRing;
 use crate::rings::finite::*;
-use crate::rings::poly::PolyRingStore;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::ring::*;
 use crate::seq::VectorView;

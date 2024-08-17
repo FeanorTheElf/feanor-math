@@ -53,6 +53,14 @@ pub trait VectorView<T: ?Sized> {
     fn len(&self) -> usize;
     fn at(&self, i: usize) -> &T;
 
+    ///
+    /// Calls `op` with `self` if this vector view supports sparse access.
+    /// Otherwise, `()` is returned.
+    /// 
+    /// This is basically a workaround that enables users to specialize on
+    /// `V: VectorViewSparse`, even though specialization currently does not support
+    /// this.
+    /// 
     #[stability::unstable(feature = "enable")]
     fn specialize_sparse<Op: SparseVectorViewOperation<T>>(&self, _op: Op) -> Result<Op::Output, ()> {
         Err(())

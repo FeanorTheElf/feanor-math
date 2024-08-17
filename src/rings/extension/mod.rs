@@ -21,6 +21,10 @@ pub mod galois_field;
 /// 
 pub mod conway;
 
+///
+/// Contains [`impl_new::FreeAlgebraImpl`], a more efficient implementation of [`FreeAlgebra`]
+/// based on polynomial division. It is likely to replace [`extension_impl`] at some point.
+/// 
 pub mod impl_new;
 
 ///

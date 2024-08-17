@@ -54,7 +54,6 @@ pub fn try_generic_abs_square_and_multiply<T, U, F, H, I, E>(base: U, power: &El
         F: FnMut(T) -> Result<T, E>, 
         H: FnMut(&U, T) -> Result<T, E>
 {
-    assert!(!int_ring.is_neg(power));
     if int_ring.is_zero(&power) {
         return Ok(identity);
     } else if int_ring.is_one(&power) {

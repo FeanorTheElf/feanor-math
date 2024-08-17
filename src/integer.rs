@@ -230,10 +230,8 @@ impl<I, J> CanIsoFromTo<I> for J
 /// anyway.
 /// 
 /// Now it would be possible to just provide a blanket implementation of
-/// [`CanHomFrom`] and specialize it for all integer rings. However, it turned
-/// out that in all implementations, the homomorphism requires no additional
-/// data and always exists. Hence, it seemed easier to add another, simpler
-/// trait for the same thing.
+/// [`CanHomFrom`] and specialize it for all integer rings. However, specialization
+/// with default types is currently a pain in the ass. Furthermore, this trait is simpler.
 /// 
 pub trait IntCast<F: ?Sized + IntegerRing>: IntegerRing {
 

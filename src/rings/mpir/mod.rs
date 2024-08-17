@@ -502,6 +502,13 @@ impl IntCast<MPZBase> for RustBigintRingBase {
     }
 }
 
+impl IntCast<MPZBase> for MPZBase {
+
+    fn cast(&self, _from: &MPZBase, el: MPZEl) -> MPZEl {
+        el
+    }
+}
+
 impl IntCast<StaticRingBase<i64>> for MPZBase {
 
     fn cast(&self, _: &StaticRingBase<i64>, el: i64) -> Self::Element {

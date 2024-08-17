@@ -56,7 +56,7 @@ impl<R: ?Sized + RingBase> ComputeInnerProduct for R {
 }
 
 ///
-/// Trait for objects that can compute a matrix multiplications over a fixed ring.
+/// Trait for objects that can compute a matrix multiplications over some ring.
 /// 
 #[stability::unstable(feature = "enable")]
 pub trait MatmulAlgorithm<R: ?Sized + RingBase> {

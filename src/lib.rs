@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
-#![allow(private_interfaces)]
-#![allow(private_bounds)]
+// #![allow(private_interfaces)]
+// #![allow(private_bounds)]
 
 #![feature(btree_cursors)]
 #![feature(test)]

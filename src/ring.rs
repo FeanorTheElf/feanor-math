@@ -6,7 +6,6 @@ use crate::primitive_int::StaticRing;
 use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::algorithms;
 
-#[stability::unstable(feature = "enable")]
 #[derive(PartialEq, Eq, Debug, Clone, Copy, PartialOrd, Ord)]
 pub enum EnvBindingStrength {
     Weakest, Sum, Product, Power, Strongest

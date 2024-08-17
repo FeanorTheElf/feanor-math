@@ -1,4 +1,4 @@
-use crate::algorithms::convolution::fftconv::{FFTBasedConvolution, FFTBasedConvolutionZn};
+use crate::algorithms::convolution::fft::{FFTBasedConvolution, FFTBasedConvolutionZn};
 use crate::field::Field;
 use crate::integer::IntegerRingStore;
 use crate::pid::EuclideanRing;

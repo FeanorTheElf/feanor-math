@@ -37,6 +37,7 @@ use super::Homomorphism;
 /// 
 /// This implementation has feature-parity with [`crate::rings::extension::extension_impl::FreeAlgebraImplBase`],
 /// but performs better if "modulus part" `f - X^deg(f)` of `f` only has low-degree monomials.
+/// Furthermore, it uses a specialization if `V` is sparse and supports custom convolution algorithms.
 /// 
 /// # Example
 /// ```
