@@ -32,7 +32,75 @@ pub enum EnvBindingStrength {
 /// to rings. If you want to use rings directly by value, some technical
 /// details make it necessary to use the no-op container [`RingStore`].
 /// For more detail, see the documentation of [`RingStore`].
-///  
+/// 
+/// # A note on equality
+/// 
+/// Generally speaking, the notion of being canonically isomorphic 
+/// (given by [`CanIsoFromTo`] is often more useful for rings than 
+/// equality (defined by [`PartialEq`]).
+/// 
+/// In particular, being canonically isomorphic means that that there
+/// is a bidirectional mapping of elements `a in Ring1 <-> b in Ring2`
+/// such that `a` and `b` behave exactly the same. This mapping is provided
+/// by the functions of [`CanIsoFromTo`]. Note that every ring is supposed
+/// to be canonically isomorphic to itself, via the identiy mapping.
+/// 
+/// The notion of equality is stronger than that. In particular, implementors
+/// of [`PartialEq`] must ensure that if rings `R` and `S` are equal, then
+/// they are canonically isomorphic and the canonical isomorphism is given
+/// by bitwise identity map. In particular, elements of `R` and `S` must have
+/// the same type.
+/// 
+/// Hence, be careful to not mix up elements of different rings, even if they
+/// have the same type. This can easily lead to nasty errors. For example, 
+/// consider the following code
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::zn::*;
+/// let Z7 = zn_big::Zn::new(StaticRing::<i64>::RING, 7);
+/// let Z11 = zn_big::Zn::new(StaticRing::<i64>::RING, 11);
+/// assert!(Z11.get_ring() != Z7.get_ring());
+/// let neg_one = Z7.int_hom().map(-1);
+/// assert!(!Z11.is_neg_one(&neg_one));
+/// ```
+/// It can even make problems if both rings are isomorphic, and might be expected
+/// to be intuitively "the same".
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::multivariate_new::*;
+/// # use feanor_math::rings::multivariate_new::multivariate_impl::*;
+/// let fst = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, 2);
+/// let snd = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, 2);
+/// // we might think they are the same, but they are not!
+/// assert!(fst.get_ring() != snd.get_ring());
+/// // f = X * Y
+/// let f = fst.create_term(1, fst.create_monomial([1, 1].into_iter()));
+/// // g = Y
+/// let g = snd.create_term(1, snd.create_monomial([0, 1].into_iter()));
+/// // thus, we may not swap elements between them (or get a nasty surprise, like `f = g`)
+/// assert!(fst.eq_el(&f, &g));
+/// // note that when debug assertions are enabled, this will panic, since the
+/// // ring will detect that g is not one of its elements; however, the equality
+/// // check will pass in builds without debug assertions.
+/// ```
+/// However, swapping elements between rings is well-defined and correct if they are "equal"
+/// as given by `PartialEq` (not just canonically isomorphic)
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::zn::*;
+/// let Z11_fst = zn_big::Zn::new(StaticRing::<i64>::RING, 7);
+/// let Z11_snd = Z11_fst.clone();
+/// assert!(Z11_fst.get_ring() == Z11_snd.get_ring());
+/// let neg_one = Z11_fst.int_hom().map(-1);
+/// assert!(Z11_fst.is_neg_one(&neg_one));
+/// ```
+/// 
 /// # Example
 /// 
 /// An example implementation of a new, very useless ring type that represents
@@ -110,39 +178,6 @@ pub enum EnvBindingStrength {
 ///     &ring.int_hom().map(6), 
 ///     &ring.mul(ring.int_hom().map(3), ring.int_hom().map(2))
 /// ));
-/// ```
-/// 
-/// # A note on equality
-/// 
-/// Generally speaking, the notion of being canonically isomorphic 
-/// (given by [`CanIsoFromTo`] is often more useful for rings than 
-/// equality (defined by [`PartialEq`]).
-/// 
-/// In particular, being canonically isomorphic means that that there
-/// is a bidirectional mapping of elements `a in Ring1 <-> b in Ring2`
-/// such that `a` and `b` behave exactly the same. This mapping is provided
-/// by the functions of [`CanIsoFromTo`]. Note that every ring is supposed
-/// to be canonically isomorphic to itself, via the identiy mapping.
-/// 
-/// The notion of equality is stronger than that. In particular, implementors
-/// of [`PartialEq`] must ensure that if rings `R` and `S` are equal, then
-/// they are canonically isomorphic and the canonical isomorphism is given
-/// by bitwise identity map. In particular, elements of `R` and `S` must have
-/// the same type.
-/// 
-/// Hence, be careful to not mix up elements of different rings, even if they
-/// have the same type. This can easily lead to nasty errors. For example, 
-/// consider the following code
-/// ```
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::zn::*;
-/// 
-/// let Z7 = zn_big::Zn::new(StaticRing::<i64>::RING, 7);
-/// let Z11 = zn_big::Zn::new(StaticRing::<i64>::RING, 11);
-/// let neg_one = Z7.int_hom().map(-1);
-/// assert!(!Z11.is_neg_one(&neg_one));
 /// ```
 /// 
 pub trait RingBase: PartialEq {

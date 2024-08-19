@@ -24,7 +24,8 @@ pub mod complex_fft;
 ///  - `F.root_of_unity(ring) == G.root_of_unity(ring)` for each supported ring `ring`
 ///  - `F.unordered_fft_permutation(i) == G.unordered_fft_permutation(i)` for all `i`
 /// In other words, `F` and `G` must have exactly the same output for `unordered_fft`
-/// (and thus `fft`, `inv_fft`, ...) on same inputs.
+/// (and thus `fft`, `inv_fft`, ...) on same inputs (w.r.t. equality given by the
+/// base rings, which are equal).
 /// 
 pub trait FFTAlgorithm<R: ?Sized + RingBase> {
 
