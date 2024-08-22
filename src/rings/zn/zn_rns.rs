@@ -365,6 +365,7 @@ impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStor
     }
 
     fn map_in_ref(&self, from: &ZnBase<C2, J2, A2>, el: &ZnEl<C2, A2>, hom: &Self::Homomorphism) -> Self::Element {
+        assert_eq!(from.len(), el.data.len());
         self.from_congruence((0..self.len()).map(|i| 
             self.at(i).get_ring().map_in_ref(from.at(i).get_ring(), el.data.at(i), &hom[i])
         ))
@@ -408,6 +409,7 @@ impl<C1: ZnRingStore, J1: IntegerRingStore, C2: ZnRingStore, J2: IntegerRingStor
     }
 
     fn map_out(&self, from: &ZnBase<C2, J2, A2>, el: ZnEl<C1, A1>, iso: &Self::Isomorphism) -> ZnEl<C2, A2> {
+        assert_eq!(self.len(), el.data.len());
         from.from_congruence((0..from.len()).map(|i|
             self.at(i).get_ring().map_out(from.at(i).get_ring(), self.at(i).clone_el(el.data.at(i)), &iso[i])
         ))
@@ -473,6 +475,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, K: IntegerRingStore, A: Allocator + Cl
     }
 
     fn map_out(&self, from: &zn_big::ZnBase<K>, el: Self::Element, (final_iso, red): &Self::Isomorphism) -> zn_big::ZnEl<K> {
+        assert_eq!(self.len(), el.data.len());
         let small_integer_ring = self.at(0).integer_ring();
         let result = <_ as ComputeInnerProduct>::inner_product_ref_fst(self.total_ring.get_ring(),
             self.components.iter()
