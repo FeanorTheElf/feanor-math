@@ -9,7 +9,6 @@ use crate::algorithms::convolution::ConvolutionAlgorithm;
 use crate::algorithms::convolution::KaratsubaAlgorithm;
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 use crate::algorithms::linsolve::LinSolveRing;
-use crate::algorithms::poly_factor::FactorPolyField;
 use crate::divisibility::*;
 use crate::impl_wrap_unwrap_homs;
 use crate::impl_wrap_unwrap_isos;
@@ -19,8 +18,6 @@ use crate::iters::MultiProduct;
 use crate::matrix::OwnedMatrix;
 use crate::pid::PrincipalIdealRing;
 use crate::primitive_int::StaticRing;
-use crate::rings::field::AsField;
-use crate::rings::field::AsFieldBase;
 use crate::rings::finite::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::seq::*;
@@ -99,28 +96,6 @@ impl<R, V> FreeAlgebraImpl<R, V>
     }
 }
 
-impl<R, V, A, C> FreeAlgebraImpl<R, V, A, C>
-    where R: RingStore, 
-        R::Type: FactorPolyField, 
-        V: VectorView<El<R>>,
-        A: Allocator + Clone,
-        C: ConvolutionAlgorithm<R::Type>
-{
-    ///
-    /// If this ring is a field, returns a wrapper around this ring that implements [`crate::field::FieldStore`].
-    /// 
-    /// For details, see [`crate::rings::field::AsField`].
-    /// 
-    #[stability::unstable(feature = "enable")]
-    pub fn as_field(self) -> Result<AsField<Self>, Self> {
-        if let Some(_factor) = <R::Type as FactorPolyField>::find_factor_by_extension(DensePolyRing::new(self.base_ring(), "X"), &self) {
-            return Err(self);
-        } else {
-            return Ok(RingValue::from(AsFieldBase::promise_is_field(self)));
-        }
-    }
-}
-
 impl<R, V, A, C> Clone for FreeAlgebraImplBase<R, V, A, C>
     where R: RingStore + Clone, 
         V: VectorView<El<R>> + Clone,
@@ -169,18 +144,29 @@ impl<R, V, A, C> FreeAlgebraImpl<R, V, A, C>
             base_ring, x_pow_rank, element_allocator, rank, log2_padded_len, convolution
         })
     }
+}
 
+impl<R, V, A, C> FreeAlgebraImplBase<R, V, A, C>
+    where R: RingStore, 
+        V: VectorView<El<R>>,
+        A: Allocator + Clone,
+        C: ConvolutionAlgorithm<R::Type>
+{
     #[stability::unstable(feature = "enable")]
     pub fn set_convolution<C_new: ConvolutionAlgorithm<R::Type>>(self, new_convolution: C_new) -> FreeAlgebraImpl<R, V, A, C_new> {
-        let ring = self.into();
         RingValue::from(FreeAlgebraImplBase {
-            base_ring: ring.base_ring,
-            x_pow_rank: ring.x_pow_rank,
-            element_allocator: ring.element_allocator,
-            log2_padded_len: ring.log2_padded_len,
-            rank: ring.rank,
+            base_ring: self.base_ring,
+            x_pow_rank: self.x_pow_rank,
+            element_allocator: self.element_allocator,
+            log2_padded_len: self.log2_padded_len,
+            rank: self.rank,
             convolution: new_convolution
         })
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn allocator(&self) -> &A {
+        &self.element_allocator
     }
 }
 
@@ -642,7 +628,7 @@ use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
 #[cfg(test)]
-use sparse::SparseHashMapVector;
+use sparse::SparseMapVector;
 
 #[cfg(test)]
 fn test_ring0_and_elements() -> (FreeAlgebraImpl<Zn, [ZnEl; 1]>, Vec<FreeAlgebraImplEl<Zn>>) {
@@ -695,10 +681,10 @@ fn test_ring3_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 1]>, V
 }
 
 #[cfg(test)]
-fn test_ring4_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, SparseHashMapVector<StaticRing<i64>>>, Vec<FreeAlgebraImplEl<StaticRing<i64>>>) {
+fn test_ring4_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, SparseMapVector<StaticRing<i64>>>, Vec<FreeAlgebraImplEl<StaticRing<i64>>>) {
     let ZZ = StaticRing::<i64>::RING;
     // ZZ[X]/(X^3 - X)
-    let mut modulus = SparseHashMapVector::new(3, StaticRing::<i64>::RING);
+    let mut modulus = SparseMapVector::new(3, StaticRing::<i64>::RING);
     *modulus.at_mut(1) = 1;
     let R = FreeAlgebraImpl::new(ZZ, 3, modulus);
     let mut elements = Vec::new();

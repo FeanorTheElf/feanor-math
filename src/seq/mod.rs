@@ -340,7 +340,7 @@ impl<'a, T: ?Sized, V: ?Sized + SwappableVectorViewMut<T>> SwappableVectorViewMu
 /// this trait only defines functions that give a mutable reference to one element at
 /// a time. In particular, it is intentionally impossible to have a mutable reference
 /// to multiple elements at once. This enables implementations like sparse vectors,
-/// e.g. [`sparse::SparseHashMapVector`].
+/// e.g. [`sparse::SparseMapVector`].
 /// 
 pub trait VectorViewMut<T: ?Sized>: VectorView<T> {
 

@@ -7,7 +7,7 @@ use crate::seq::*;
 
 
 #[stability::unstable(feature = "enable")]
-pub struct SparseHashMapVector<R: RingStore> {
+pub struct SparseMapVector<R: RingStore> {
     data: HashMap<usize, El<R>>,
     modify_entry: (usize, El<R>),
     zero: El<R>,
@@ -15,11 +15,11 @@ pub struct SparseHashMapVector<R: RingStore> {
     len: usize
 }
 
-impl<R: RingStore> SparseHashMapVector<R> {
+impl<R: RingStore> SparseMapVector<R> {
 
     #[stability::unstable(feature = "enable")]
     pub fn new(len: usize, ring: R) -> Self {
-        SparseHashMapVector {
+        SparseMapVector {
             data: HashMap::new(), 
             modify_entry: (usize::MAX, ring.zero()),
             zero: ring.zero(),
@@ -69,10 +69,10 @@ impl<R: RingStore> SparseHashMapVector<R> {
     }
 }
 
-impl<R: RingStore + Clone> Clone for SparseHashMapVector<R> {
+impl<R: RingStore + Clone> Clone for SparseMapVector<R> {
 
     fn clone(&self) -> Self {
-        SparseHashMapVector { 
+        SparseMapVector { 
             data: self.data.iter().map(|(i, c)| (*i, self.ring.clone_el(c))).collect(), 
             modify_entry: (self.modify_entry.0, self.ring.clone_el(&self.modify_entry.1)), 
             zero: self.ring.clone_el(&self.zero), 
@@ -82,7 +82,7 @@ impl<R: RingStore + Clone> Clone for SparseHashMapVector<R> {
     }
 }
 
-impl<R: RingStore> VectorView<El<R>> for SparseHashMapVector<R> {
+impl<R: RingStore> VectorView<El<R>> for SparseMapVector<R> {
 
     fn at(&self, i: usize) -> &El<R> {
         assert!(i < self.len());
@@ -105,7 +105,7 @@ impl<R: RingStore> VectorView<El<R>> for SparseHashMapVector<R> {
 }
 
 #[stability::unstable(feature = "enable")]
-pub struct SparseHashMapVectorIter<'a, R>
+pub struct SparseMapVectorIter<'a, R>
     where R: RingStore
 {
     base: hash_map::Iter<'a, usize, El<R>>,
@@ -113,7 +113,7 @@ pub struct SparseHashMapVectorIter<'a, R>
     once: Option<&'a El<R>>
 }
 
-impl<'a, R> Iterator for SparseHashMapVectorIter<'a, R>
+impl<'a, R> Iterator for SparseMapVectorIter<'a, R>
     where R: RingStore
 {
     type Item = (usize, &'a El<R>);
@@ -133,13 +133,13 @@ impl<'a, R> Iterator for SparseHashMapVectorIter<'a, R>
     }
 }
 
-impl<R: RingStore> VectorViewSparse<El<R>> for SparseHashMapVector<R> {
+impl<R: RingStore> VectorViewSparse<El<R>> for SparseMapVector<R> {
 
-    type Iter<'a> = SparseHashMapVectorIter<'a, R>
+    type Iter<'a> = SparseMapVectorIter<'a, R>
         where Self: 'a;
 
     fn nontrivial_entries<'a>(&'a self) -> Self::Iter<'a> {
-        SparseHashMapVectorIter {
+        SparseMapVectorIter {
             base: self.data.iter(),
             skip: self.modify_entry.0,
             once: if !self.ring.is_zero(&self.modify_entry.1) { Some(&self.modify_entry.1) } else { None }
@@ -147,7 +147,7 @@ impl<R: RingStore> VectorViewSparse<El<R>> for SparseHashMapVector<R> {
     }
 }
 
-impl<R: RingStore> VectorViewMut<El<R>> for SparseHashMapVector<R> {
+impl<R: RingStore> VectorViewMut<El<R>> for SparseMapVector<R> {
 
     fn at_mut(&mut self, i: usize) -> &mut El<R> {
         assert!(i < self.len());
@@ -164,7 +164,7 @@ impl<R: RingStore> VectorViewMut<El<R>> for SparseHashMapVector<R> {
 use crate::primitive_int::StaticRing;
 
 #[cfg(test)]
-fn assert_vector_eq<const N: usize>(vec: &SparseHashMapVector<StaticRing<i64>>, values: [i64; N]) {
+fn assert_vector_eq<const N: usize>(vec: &SparseMapVector<StaticRing<i64>>, values: [i64; N]) {
     assert_eq!(vec.len(), N);
     vec.check_consistency();
     for i in 0..N {
@@ -176,7 +176,7 @@ fn assert_vector_eq<const N: usize>(vec: &SparseHashMapVector<StaticRing<i64>>, 
 #[test]
 fn test_at_mut() {
     let ring = StaticRing::<i64>::RING;
-    let mut vector = SparseHashMapVector::new(5, ring);
+    let mut vector = SparseMapVector::new(5, ring);
 
     assert_vector_eq(&mut vector, [0, 0, 0, 0, 0]);
     let mut entry = vector.at_mut(1);
@@ -208,7 +208,7 @@ fn test_at_mut() {
 #[test]
 fn test_nontrivial_entries() {
     let ring = StaticRing::<i64>::RING;
-    let mut vector = SparseHashMapVector::new(5, ring);
+    let mut vector = SparseMapVector::new(5, ring);
     assert_eq!(vector.nontrivial_entries().collect::<HashMap<_, _>>(), [].into_iter().collect());
     *vector.at_mut(1) = 3;
     assert_eq!(vector.nontrivial_entries().collect::<HashMap<_, _>>(), [(1, &3)].into_iter().collect());
@@ -236,7 +236,7 @@ fn test_nontrivial_entries() {
 #[test]
 fn test_scan() {
     let ring = StaticRing::<i64>::RING;
-    let mut vector = SparseHashMapVector::new(5, ring);
+    let mut vector = SparseMapVector::new(5, ring);
     *vector.at_mut(1) = 2;
     *vector.at_mut(3) = 1;
     *vector.at_mut(4) = 0;

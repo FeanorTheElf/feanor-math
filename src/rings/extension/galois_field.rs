@@ -88,8 +88,8 @@ fn random_low_body_deg_irreducible_polynomial<P>(poly_ring: P, degree: usize) ->
 /// given p must be a prime and will be the characteristic of the returned
 /// field.
 /// 
-/// Prefer [`galois_field_dyn()`], which allows ring degrees only known at runtime and will
-/// usually be much faster, since it can choose a sparse modulus polynomial.
+/// Note that Galois fields are currently reworked, at the next breaking release we might instead
+/// use the implementations form [`super::galois_field_new`].
 /// 
 /// # Example
 /// ```
@@ -127,8 +127,8 @@ pub fn GF<const DEGREE: usize>(p: u64) -> GaloisField<DEGREE> {
 /// 
 /// See also [`GF()`] if the degree of the field is a compile-time constant.
 /// 
-/// This is deprecated in favor of [`galois_field_dyn()`], which allows creating
-/// galois fields of size that exceeds `i64`.
+/// Note that Galois fields are currently reworked, at the next breaking release we might instead
+/// use the implementations from [`super::galois_field_new`].
 /// 
 /// # Example
 /// ```
@@ -157,6 +157,9 @@ pub fn GFdyn(power_of_p: u64) -> GaloisFieldDyn {
 /// Creates a finite/galois field of degree not known at compile time. The
 /// given p must be a prime and will be the characteristic of the returned
 /// field.
+/// 
+/// Note that Galois fields are currently reworked, at the next breaking release we might instead
+/// use the implementations from [`super::galois_field_new`].
 /// 
 /// # Example
 /// ```
@@ -194,6 +197,9 @@ pub fn galois_field_dyn(p: i64, degree: usize) -> GaloisFieldDyn {
 /// 
 /// The galois ring is the generalization of the galois field to an extension of `Z/p^eZ`.
 /// In other words, it is a local ring and free module of given rank over `Z/p^eZ`.
+/// 
+/// Note that Galois fields are currently reworked, at the next breaking release we might instead
+/// use the implementations from [`super::galois_field_new`].
 /// 
 /// # Example
 /// ```
@@ -236,6 +242,9 @@ pub fn galois_ring_dyn(p: i64, e: usize, degree: usize) -> GaloisRingDyn {
 /// Creates a finite/galois field, using a generating polynomial from a table of Conway polynomials.
 /// Since Conway polynomials are unique, this is useful for comparison with other Computer Algebra systems
 /// that support Conway polynomials, e.g. SAGE.
+/// 
+/// Note that Galois fields are currently reworked, at the next breaking release we might instead
+/// use the implementations from [`super::galois_field_new`].
 /// 
 /// # Example
 /// ```

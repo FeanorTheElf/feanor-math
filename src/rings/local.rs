@@ -9,6 +9,7 @@ use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::integer::IntegerRing;
 use crate::ring::*;
 use crate::homomorphism::*;
+use super::field::AsFieldBase;
 use crate::rings::zn::*;
 
 ///
@@ -125,6 +126,11 @@ impl<R: DivisibilityRingStore> AsLocalPIRBase<R>
     #[stability::unstable(feature = "enable")]
     pub fn unwrap_element(&self, el: <Self as RingBase>::Element) -> El<R> {
         el.0
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn unwrap_self(self) -> R {
+        self.base
     }
 }
 
@@ -303,14 +309,6 @@ impl<R: DivisibilityRingStore> PrincipalLocalRing for AsLocalPIRBase<R>
     }
 }
 
-impl<R: DivisibilityRingStore> HashableElRing for AsLocalPIRBase<R> 
-    where R::Type: DivisibilityRing + HashableElRing
-{
-    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
-        self.get_delegate().hash(&el.0, h)
-    }
-}
-
 impl<R: DivisibilityRingStore> Domain for AsLocalPIRBase<R> 
     where R::Type: DivisibilityRing + Domain
 {}
@@ -461,8 +459,7 @@ use crate::matrix::{OwnedMatrix, TransposableSubmatrix, TransposableSubmatrixMut
 #[cfg(test)]
 use crate::assert_matrix_eq;
 #[cfg(test)]
-use super::extension::galois_field::galois_ring_dyn;
-use super::field::AsFieldBase;
+use super::extension::galois_field_new::GaloisField;
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {
@@ -496,7 +493,7 @@ fn test_canonical_hom_axioms_wrap_unwrap() {
 #[test]
 #[ignore]
 fn test_solve_large_galois_ring() {
-    let ring: AsLocalPIR<_> = galois_ring_dyn(17, 5, 2048);
+    let ring: AsLocalPIR<_> = GaloisField::new(17, 2048).get_ring().galois_ring(5);
     let mut matrix: OwnedMatrix<_> = OwnedMatrix::zero(2, 2, &ring);
     let mut rng = oorandom::Rand64::new(1);
 

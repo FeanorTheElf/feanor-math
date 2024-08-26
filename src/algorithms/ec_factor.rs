@@ -231,7 +231,7 @@ fn test_ec_factor() {
 }
 
 #[bench]
-fn bench_ec_factor(bencher: &mut Bencher) {
+fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
     let bits = 58;
     let n = ((1i64 << bits) + 1) / 5;
     let ring = Zn::new(n as u64);

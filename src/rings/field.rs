@@ -70,6 +70,10 @@ impl<R: DivisibilityRingStore> AsFieldBase<R>
     pub fn unwrap_element(&self, el: <Self as RingBase>::Element) -> El<R> {
         el.0
     }
+
+    pub fn unwrap_self(self) -> R {
+        self.base
+    }
 }
 
 impl<R: DivisibilityRingStore> DelegateRing for AsFieldBase<R> 
@@ -219,14 +223,6 @@ impl<R: DivisibilityRingStore> EuclideanRing for AsFieldBase<R>
     fn euclidean_rem(&self, _: Self::Element, rhs: &Self::Element) -> Self::Element {
         assert!(!self.is_zero(rhs));
         self.zero()
-    }
-}
-
-impl<R: DivisibilityRingStore> HashableElRing for AsFieldBase<R> 
-    where R::Type: DivisibilityRing + HashableElRing
-{
-    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
-        self.get_delegate().hash(&el.0, h)
     }
 }
 

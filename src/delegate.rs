@@ -362,6 +362,14 @@ impl<R: DelegateRing + ?Sized> FiniteRing for R
     }
 }
 
+impl<R: DelegateRing + ?Sized> HashableElRing for R 
+    where R::Base: HashableElRing
+{
+    default fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
+        self.get_delegate().hash(self.delegate_ref(el), h)
+    }
+}
+
 // unfortunately, the following default impl does not work, since in many cases (e.g. `AsField`)
 // we want to specialize it and relax its constraints (i.e. `R::Base: DivisibilityRing` instead of
 // `PrincipalIdealRing`); this is not supported by specializtion as of currently

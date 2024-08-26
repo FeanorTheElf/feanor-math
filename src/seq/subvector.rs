@@ -189,7 +189,7 @@ impl<V: VectorFn<T>, T> SelfSubvectorFn<T> for SubvectorFn<V, T> {
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
-use super::sparse::SparseHashMapVector;
+use super::sparse::SparseMapVector;
 
 #[test]
 fn test_subvector_ranges() {
@@ -249,7 +249,7 @@ fn test_subvector_fn_subvector_oob() {
 
 #[test]
 fn test_subvector_sparse() {
-    let mut sparse_vector = SparseHashMapVector::new(1000, StaticRing::<i64>::RING);
+    let mut sparse_vector = SparseMapVector::new(1000, StaticRing::<i64>::RING);
     *sparse_vector.at_mut(6) = 6;
     *sparse_vector.at_mut(20) = 20;
     *sparse_vector.at_mut(256) = 256;

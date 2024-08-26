@@ -763,6 +763,13 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<
     }
 }
 
+impl<'a, R: RingStore + ?Sized> std::fmt::Debug for RingElementDisplayWrapper<'a, R> {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.ring.get_ring().dbg(self.element, f)
+    }
+}
+
 ///
 /// Trait for rings that are an extension ring of a base ring.
 /// This does not have to be a proper extension in the mathematical

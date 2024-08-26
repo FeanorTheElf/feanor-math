@@ -266,24 +266,24 @@ impl<R> ExtensionFieldStore for R
 {}
 
 #[cfg(test)]
-use galois_field::galois_field_dyn;
+use galois_field_new::GaloisField;
 #[cfg(test)]
 use super::finite::FiniteRingStore;
 
 #[test]
 fn test_as_embedding() {
-    let R = galois_field_dyn(5, 3);
-    let S = galois_field_dyn(5, 6);
+    let R = GaloisField::new(5, 3);
+    let S = GaloisField::new(5, 6);
 
     crate::homomorphism::generic_tests::test_homomorphism_axioms(R.has_hom(&S).unwrap(), R.elements());
     
-    let S = galois_field_dyn(5, 4);
+    let S = GaloisField::new(5, 4);
     assert!(R.has_hom(&S).is_none());
 }
 
 #[test]
 fn test_galois_group() {
-    let Fq = galois_field_dyn(3, 5);
+    let Fq = GaloisField::new(3, 5);
 
     let mut galois_group = Fq.galois_group().unwrap();
 

@@ -629,7 +629,7 @@ use crate::rings::extension::FreeAlgebraStore;
 #[cfg(test)]
 use crate::iters::multiset_combinations;
 #[cfg(test)]
-use crate::rings::extension::galois_field::galois_field_dyn;
+use crate::rings::extension::galois_field_new::GaloisField;
 #[cfg(test)]
 use std::time::Instant;
 
@@ -732,7 +732,7 @@ fn test_print() {
 #[test]
 #[ignore]
 fn test_expensive_prod() {
-    let ring = galois_field_dyn(17, 2048);
+    let ring = GaloisField::new(17, 2048);
     let poly_ring = DensePolyRing::new(&ring, "X");
     let mut rng = oorandom::Rand64::new(1);
     let a = ring.random_element(|| rng.rand_u64());

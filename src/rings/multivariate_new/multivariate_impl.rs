@@ -162,6 +162,11 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
     where R: RingStore,
         A: Clone + Allocator + Send
 {
+    #[stability::unstable(feature = "enable")]
+    pub fn allocator(&self) -> &A {
+        &self.allocator
+    }
+    
     fn tmp_monomial(&self) -> &[Cell<u16>] {
         self.tmp_monomials.get_or(|| (0..self.variable_count).map(|_| Cell::new(0)).collect::<Vec<_>>().into_boxed_slice())
     }
@@ -175,7 +180,13 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
     fn is_valid(&self, el: &[(El<R>, MonomialIdentifier)]) -> bool {
         for (_, m) in el {
             assert!(m.index.is_some());
-            assert_eq!(m.deg, self.allocated_monomials[u32::from(m.index.unwrap()) as usize].iter().copied().sum::<Exponent>());
+            assert_eq!(
+                m.deg, 
+                self.allocated_monomials[u32::from(m.index.unwrap()) as usize].iter().copied().sum::<Exponent>(), 
+                "Expected {} = {}; Note that this assert is triggered by a doctest on RingBase on a debug_assertions build; this is expected, since said test demonstrates what not to do", 
+                m.deg, 
+                self.allocated_monomials[u32::from(m.index.unwrap()) as usize].iter().copied().sum::<Exponent>()
+            );
         }
         for i in 1..el.len() {
             if self.compare_degrevlex(&el[i - 1].1, &el[i].1) != Ordering::Less {
