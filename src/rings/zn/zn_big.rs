@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use serde::de;
 use serde::{Deserializer, Serializer}; 
 
 use crate::divisibility::DivisibilityRing;
@@ -457,7 +458,9 @@ impl<I: IntegerRingStore> SerializableElementRing for ZnBase<I>
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
         where D: Deserializer<'de>
     {
-        self.integer_ring().get_ring().deserialize(deserializer).map(|x| self.from_int_promise_reduced(x))
+        self.integer_ring().get_ring().deserialize(deserializer)
+            .and_then(|x| if self.integer_ring().is_neg(&x) || self.integer_ring().is_geq(&x, self.modulus()) { Err(de::Error::custom("ring element value out of bounds for ring Z/nZ")) } else { Ok(x) })
+            .map(|x| self.from_int_promise_reduced(x))
     }
 
     fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>

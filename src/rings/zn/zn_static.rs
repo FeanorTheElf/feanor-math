@@ -1,4 +1,4 @@
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::algorithms::eea::*;
 use crate::local::PrincipalLocalRing;
@@ -188,7 +188,9 @@ impl<const N: u64, const IS_FIELD: bool> SerializableElementRing for ZnBase<N, I
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
         where D: Deserializer<'de>
     {
-        <i64 as Deserialize>::deserialize(deserializer).map(|x| self.from_int_promise_reduced(x))
+        <i64 as Deserialize>::deserialize(deserializer)
+            .and_then(|x| if x < 0 || x >= *self.modulus() { Err(de::Error::custom("ring element value out of bounds for ring Z/nZ")) } else { Ok(x) })
+            .map(|x| self.from_int_promise_reduced(x))
     }
 
     fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>

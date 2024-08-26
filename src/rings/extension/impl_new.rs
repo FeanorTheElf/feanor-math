@@ -414,7 +414,7 @@ impl<R, V, A, C> SerializableElementRing for FreeAlgebraImplBase<R, V, A, C>
         let mut data = Vec::with_capacity_in(1 << self.log2_padded_len, self.element_allocator.clone());
         deserialize_seq_helper(deserializer, |x| data.push(x), DeserializeWithRing::new(self.base_ring()))?;
         if data.len() != self.rank() {
-            return Err(de::Error::custom(format!("expected {} ring elements but got {}", self.rank(), data.len())));
+            return Err(de::Error::invalid_length(data.len(), &format!("a sequence of {} base ring elements", self.rank()).as_str()));
         }
         data.extend((0..((1 << self.log2_padded_len) - self.rank)).map(|_| self.base_ring().zero()));
         return Ok(FreeAlgebraImplEl { values: data.into_boxed_slice() });
