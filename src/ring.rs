@@ -912,13 +912,13 @@ pub type El<R> = <<R as RingStore>::Type as RingBase>::Element;
 /// detail. We cannot implement
 /// ```rust,ignore
 /// impl<R: RingBase> RingStore for R {}
-/// impl<'a, R: RingStore> RingStore for &;a R {}
+/// impl<'a, R: RingStore> RingStore for &'a R {}
 /// ```
 /// since this might cause conflicting implementations.
 /// Instead, we implement
 /// ```rust,ignore
 /// impl<R: RingBase> RingStore for RingValue<R> {}
-/// impl<'a, R: RingStore> RingStore for &;a R {}
+/// impl<'a, R: RingStore> RingStore for &'a R {}
 /// ```
 /// This causes some inconvenience, as now we cannot chain
 /// [`crate::ring::RingStore`] in the case of [`crate::ring::RingValue`].
