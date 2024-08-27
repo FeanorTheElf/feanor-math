@@ -1,4 +1,5 @@
 use crate::field::Field;
+use crate::integer::int_cast;
 use crate::integer::BigIntRing;
 use crate::integer::IntegerRing;
 use crate::ring::*;
@@ -76,7 +77,7 @@ pub fn get_prim_root_of_unity<R>(ring: R, n: usize) -> Option<El<R>>
     where R: RingStore, 
         R::Type: FiniteRing + Field
 {
-    get_prim_root_of_unity_gen(ring, &(n as i64), StaticRing::<i64>::RING)
+    get_prim_root_of_unity_gen(ring, &int_cast(n as i64, BigIntRing::RING, StaticRing::<i64>::RING), BigIntRing::RING)
 }
 
 #[stability::unstable(feature = "enable")]
@@ -156,4 +157,7 @@ fn test_get_prim_root_of_unity() {
     assert!(is_prim_root_of_unity_pow2(&ring, &get_prim_root_of_unity_pow2(&ring, 4).unwrap(), 4));
     assert!(get_prim_root_of_unity_pow2(&ring, 5).is_none());
     assert!(is_prim_root_of_unity(&ring, &get_prim_root_of_unity(&ring, 3).unwrap(), 3));
+
+    let ring = GaloisField::new(17, 16);
+    assert!(is_prim_root_of_unity_pow2(&ring, &get_prim_root_of_unity_pow2(&ring, 4).unwrap(), 4));
 }

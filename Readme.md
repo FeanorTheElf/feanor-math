@@ -26,12 +26,12 @@ More reasons for this separation are explained further down this page.
 ## Features
 
 The following rings are provided
- - The integer ring `Z`, as a trait [`crate::integer::IntegerRing`] with implementations for all primitive ints (`i8` to `i128`), an arbitrary-precision implementation [`crate::rings::rust_bigint::RustBigintRing`], and an optional implementation using bindings to the heavily optimized library [mpir](https://github.com/wbhart/mpir) (enable with `features=mpir`).
- - The quotient ring `Z/nZ`, as a trait [`crate::rings::zn::ZnRing`] with four implementations. One where the modulus is small and known at compile-time [`crate::rings::zn::zn_static::Zn`], an optimized implementation of Barett-reductions for moduli somewhat smaller than 64 bits [`crate::rings::zn::zn_64::Zn`], a generic implementation of Barett-reductions for any modulus and any integer ring (including arbitrary-precision ones) [`crate::rings::zn::zn_big::Zn`] and a residue-number-system implementation for highly composite moduli [`crate::rings::zn::zn_rns::Zn`].
+ - The integer ring `Z`, as a trait [`crate::integer::IntegerRing`] with implementations for all primitive ints (`i8` to `i128`) given by [`crate::primitive_int::StaticRing`], an arbitrary-precision implementation [`crate::rings::rust_bigint::RustBigintRing`], and an optional implementation using bindings to the heavily optimized library [mpir](https://github.com/wbhart/mpir) (enable with `features=mpir`) given by [`crate::rings::mpir::MPZ`].
+ - The quotient ring `Z/nZ`, as a trait [`crate::rings::zn::ZnRing`] with four implementations. One where the modulus is small and known at compile-time [`crate::rings::zn::zn_static::Zn`], an optimized implementation of Barett-reductions for moduli somewhat smaller than 64 bits [`crate::rings::zn::zn_64::Zn`], a generic implementation of Barett-reductions for any modulus and any integer ring (optimized for arbitrary-precision ones) [`crate::rings::zn::zn_big::Zn`] and a residue-number-system implementation for highly composite moduli [`crate::rings::zn::zn_rns::Zn`].
  - The polynomial ring `R[X]` over any base ring, as a trait [`crate::rings::poly::PolyRing`] with two implementations, one for densely filled polynomials [`crate::rings::poly::dense_poly::DensePolyRing`] and one for sparsely filled polynomials [`crate::rings::poly::sparse_poly::SparsePolyRing`].
  - Finite-rank simple and free ring extensions, as a trait [`crate::rings::extension::FreeAlgebra`], with an implementation based on polynomial division [`crate::rings::extension::extension_impl::FreeAlgebraImpl`]. In particular, this includes finite/galois fields and number fields.
  - Multivariate polynomial rings `R[X1, ..., XN]` over any base ring, as the trait [`crate::rings::multivariate::MultivariatePolyRing`] and one implementation [`crate::rings::multivariate::ordered::MultivariatePolyRingImpl`] based on a sparse representation using ordered vectors.
- - Combining the above, you can get Galois fields (easily available using [`crate::rings::extension::galois_field::GF()`]) or arbitrary number fields.
+ - Combining the above, you can get Galois fields (easily available using [`crate::rings::extension::galois_field::galois_field_dyn()`]) or arbitrary number fields.
 
 The following algorithms are implemented
  - Fast Fourier transforms, including an optimized implementation of the Cooley-Tuckey algorithm for the power-of-two case, an implementation of the Bluestein algorithm for arbitrary lengths, and a factor FFT implementation (also based on the Cooley-Tuckey algorithm). The Fourier transforms work on all rings that have suitable roots of unity, in particular the complex numbers `C` and suitable finite rings `Fq`.
@@ -213,6 +213,9 @@ impl RingBase for F2Base {
         write!(out, "{}", *value)
     }
 }
+
+// in a real scenario, we might want to implement more traits like `ZnRing`, `DivisibilityRing`
+// or `Field`; Also it might be useful to provide canonical homomorphisms by implementing `CanHomFrom`
 
 pub const F2: RingValue<F2Base> = RingValue::from(F2Base);
 

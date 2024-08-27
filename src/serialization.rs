@@ -6,16 +6,35 @@ use serde::{Deserializer, Serialize, Serializer};
 
 use crate::ring::*;
 
+///
+/// Trait for rings whose elements can be serialized.
+/// 
+/// Serialization and deserialization mostly follow the principles of the `serde` crate, with
+/// the main difference that ring elements cannot be serialized/deserialized on their own, but
+/// only w.r.t. a specific ring.
+/// 
 #[stability::unstable(feature = "enable")]
 pub trait SerializableElementRing: RingBase {
 
+    ///
+    /// Deserializes an element of this ring from the given deserializer.
+    /// 
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
         where D: Deserializer<'de>;
 
+    ///
+    /// Serializes an element of this ring to the given serializer.
+    /// 
     fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer;
 }
 
+///
+/// Helper function to deserialize a sequence.
+/// 
+/// Note that this should only be used when it is ensured that the data is indeed serialized
+/// as a sequence in the serde data model.
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn deserialize_seq_helper<'de, S, D, C>(deserializer: D, collector: C, base_seed: S) -> Result<(), D::Error>
     where D: Deserializer<'de>,
@@ -52,6 +71,9 @@ pub fn deserialize_seq_helper<'de, S, D, C>(deserializer: D, collector: C, base_
     })
 }
 
+///
+/// Helper function to serialize a sequence.
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn serialize_seq_helper<S, I>(serializer: S, sequence: I) -> Result<S::Ok, S::Error>
     where S: Serializer,
@@ -66,6 +88,10 @@ pub fn serialize_seq_helper<S, I>(serializer: S, sequence: I) -> Result<S::Ok, S
     return seq.end();
 }
 
+///
+/// Wrapper of a ring that implements [`serde::DeserializationSeed`] by trying to deserialize an element
+/// w.r.t. the wrapped ring.
+/// 
 #[stability::unstable(feature = "enable")]
 #[derive(Clone)]
 pub struct DeserializeWithRing<R: RingStore>
@@ -97,6 +123,10 @@ impl<'de, R> DeserializeSeed<'de> for DeserializeWithRing<R>
     }
 }
 
+///
+/// Wraps a ring and a reference to one of its elements. Implements [`serde::Serialize`] and
+/// will serialize the element w.r.t. the ring.
+/// 
 #[stability::unstable(feature = "enable")]
 pub struct SerializeWithRing<'a, R: RingStore>
     where R::Type: SerializableElementRing

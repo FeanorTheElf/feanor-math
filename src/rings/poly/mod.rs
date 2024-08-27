@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::divisibility::*;
 use crate::ring::*;
 use crate::homomorphism::*;
+use crate::wrapper::RingElementWrapper;
 
 ///
 /// Contains [`dense_poly::DensePolyRing`], an implementation of univariate polynomials
@@ -216,6 +217,36 @@ pub trait PolyRingStore: RingStore
             H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
     {
         self.into_lifted_hom(from, hom)
+    }
+
+    ///
+    /// Invokes the function with a wrapped version of the indeterminate of this poly ring.
+    /// Use for convenient creation of polynomials.
+    /// 
+    /// Note however that [`PolyRingStore::from_terms()`] might be more performant.
+    /// 
+    /// # Example
+    /// ```
+    /// use feanor_math::assert_el_eq;
+    /// use feanor_math::ring::*;
+    /// use feanor_math::rings::poly::*;
+    /// use feanor_math::homomorphism::*;
+    /// use feanor_math::rings::zn::zn_64::*;
+    /// use feanor_math::rings::poly::dense_poly::*;
+    /// let base_ring = Zn::new(7);
+    /// let poly_ring = DensePolyRing::new(base_ring, "X");
+    /// let f_version1 = poly_ring.from_terms([(base_ring.int_hom().map(3), 0), (base_ring.int_hom().map(2), 1), (base_ring.one(), 3)].into_iter());
+    /// let f_version2 = poly_ring.with_wrapped_indeterminate(|x| [3 + 2 * x + x.pow_ref(3)]).into_iter().next().unwrap();
+    /// assert_el_eq!(poly_ring, f_version1, f_version2);
+    /// ```
+    /// 
+    #[stability::unstable(feature = "enable")]
+    fn with_wrapped_indeterminate<'a, F, T>(&'a self, f: F) -> Vec<El<Self>>
+        where F: FnOnce(&RingElementWrapper<&'a Self>) -> T,
+            T: IntoIterator<Item = RingElementWrapper<&'a Self>>
+    {
+        let wrapped_indet = RingElementWrapper::new(self, self.indeterminate());
+        f(&wrapped_indet).into_iter().map(|f| f.unwrap()).collect()
     }
 }
 

@@ -6,6 +6,31 @@ use crate::primitive_int::StaticRing;
 use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::algorithms;
 
+///
+/// Describes the context in which to print an algebraic expression.
+/// It is usually used to determine when to use parenthesis during printing.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::poly::dense_poly::*;
+/// struct CustomDisplay<'a>(&'a DensePolyRing<StaticRing<i64>>, &'a El<DensePolyRing<StaticRing<i64>>>, EnvBindingStrength);
+/// impl<'a> std::fmt::Display for CustomDisplay<'a> {
+///     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+///         self.0.get_ring().dbg_within(self.1, formatter, self.2)
+///     }
+/// }
+/// let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let f = poly_ring.add(poly_ring.one(), poly_ring.indeterminate());
+/// assert_eq!("1 + 1X", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Weakest)));
+/// assert_eq!("1 + 1X", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Sum)));
+/// assert_eq!("(1 + 1X)", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Product)));
+/// assert_eq!("(1 + 1X)", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Power)));
+/// assert_eq!("(1 + 1X)", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Strongest)));
+/// ```
+/// 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, PartialOrd, Ord)]
 pub enum EnvBindingStrength {
     Weakest, Sum, Product, Power, Strongest
@@ -214,8 +239,23 @@ pub trait RingBase: PartialEq {
     /// 
     fn is_approximate(&self) -> bool { false }
 
+    ///
+    /// Writes a human-readable representation of `value` to `out`.
+    /// 
+    /// Used by [`RingStore::format()`], [`RingStore::println()`] and the implementations of [`std::fmt::Debug`] 
+    /// and [`std::fmt::Display`] of [`crate::wrapper::RingElementWrapper`].
+    /// 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
 
+    ///
+    /// Writes a human-readable representation of `value` to `out`, taking into account the possible context
+    /// to place parenthesis as needed.
+    /// 
+    /// See also [`RingBase::dbg()`] and [`EnvBindingStrength`].
+    /// 
+    /// Used by [`RingStore::format()`], [`RingStore::println()`] and the implementations of [`std::fmt::Debug`] 
+    /// and [`std::fmt::Display`] of [`crate::wrapper::RingElementWrapper`].
+    /// 
     fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _env: EnvBindingStrength) -> std::fmt::Result {
         self.dbg(value, out)
     }
@@ -363,12 +403,24 @@ pub trait RingBase: PartialEq {
         ).unwrap_or_else(|x| x)
     }
 
+    ///
+    /// Sums the elements given by the iterator.
+    /// 
+    /// The implementation might be as simple as `els.fold(self.zero(), |a, b| self.add(a, b))`, but
+    /// can be more efficient than that in some cases.
+    /// 
     fn sum<I>(&self, els: I) -> Self::Element 
         where I: Iterator<Item = Self::Element>
     {
         els.fold(self.zero(), |a, b| self.add(a, b))
     }
 
+    ///
+    /// Computes the product of the elements given by the iterator.
+    /// 
+    /// The implementation might be as simple as `els.fold(self.one(), |a, b| self.mul(a, b))`, but
+    /// can be more efficient than that in some cases.
+    /// 
     fn prod<I>(&self, els: I) -> Self::Element 
         where I: Iterator<Item = Self::Element>
     {
@@ -751,6 +803,10 @@ impl<R: RingStore> RingExtensionStore for R
     where R::Type: RingExtension
 {}
 
+///
+/// Wrapper around a ring and one of its elements that implements [`std::fmt::Display`]
+/// and will print the element. Used by [`RingStore::format()`].
+/// 
 pub struct RingElementDisplayWrapper<'a, R: RingStore + ?Sized> {
     ring: &'a R,
     element: &'a El<R>

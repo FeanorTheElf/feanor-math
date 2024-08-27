@@ -45,10 +45,16 @@ pub trait MultivariatePolyRing: RingExtension {
         return result;
     }
 
+    ///
+    /// Returns the **L**eading **T**erm of `f`, i.e. the term whose monomial is largest w.r.t. the given order.
+    /// 
     fn LT<'a, O: MonomialOrder>(&'a self, f: &'a Self::Element, order: O) -> Option<(&'a El<Self::BaseRing>, &'a Self::Monomial)> {
         self.terms(f).max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1))
     }
 
+    ///
+    /// Returns the term of `f` whose monomial is largest (w.r.t. the given order) among all monomials smaller than `lt_than`.
+    /// 
     fn largest_term_lt<'a, O: MonomialOrder>(&'a self, f: &'a Self::Element, order: O, lt_than: &Self::Monomial) -> Option<(&'a El<Self::BaseRing>, &'a Self::Monomial)> {
         self.terms(f).filter(|(_, m)| order.compare(RingRef::new(self), m, lt_than) == Ordering::Less).max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1))
     }
@@ -113,10 +119,16 @@ pub trait MultivariatePolyRingStore: RingStore
     delegate!{ MultivariatePolyRing, fn monomial_deg(&self, val: &PolyMonomial<Self>) -> usize }
     delegate!{ MultivariatePolyRing, fn mul_assign_monomial(&self, f: &mut El<Self>, monomial: PolyMonomial<Self>) -> () }
 
+    ///
+    /// Returns the term of `f` whose monomial is largest (w.r.t. the given order) among all monomials smaller than `lt_than`.
+    /// 
     fn largest_term_lt<'a, O: MonomialOrder>(&'a self, f: &'a El<Self>, order: O, lt_than: &PolyMonomial<Self>) -> Option<(&'a PolyCoeff<Self>, &'a PolyMonomial<Self>)> {
         self.get_ring().largest_term_lt(f, order, lt_than)
     }
     
+    ///
+    /// Returns the **L**eading **T**erm of `f`, i.e. the term whose monomial is largest w.r.t. the given order.
+    /// 
     fn LT<'a, O: MonomialOrder>(&'a self, f: &'a El<Self>, order: O) -> Option<(&'a PolyCoeff<Self>, &'a PolyMonomial<Self>)> {
         self.get_ring().LT(f, order)
     }
@@ -148,6 +160,27 @@ pub trait MultivariatePolyRingStore: RingStore
         return result;
     }
     
+    ///
+    /// Invokes the function with a wrapped version of the indeterminates of this poly ring.
+    /// Use for convenient creation of polynomials.
+    /// 
+    /// Note however that [`MultivariatePolyRingStore::from_terms()`] might be more performant.
+    /// 
+    /// # Example
+    /// ```
+    /// use feanor_math::assert_el_eq;
+    /// use feanor_math::homomorphism::*;
+    /// use feanor_math::ring::*;
+    /// use feanor_math::rings::multivariate_new::*;
+    /// use feanor_math::rings::zn::zn_64::*;
+    /// use feanor_math::rings::multivariate_new::multivariate_impl::*;
+    /// let base_ring = Zn::new(7);
+    /// let poly_ring = MultivariatePolyRingImpl::new(base_ring, 3);
+    /// let f_version1 = poly_ring.from_terms([(base_ring.int_hom().map(3), poly_ring.create_monomial([0, 0, 0])), (base_ring.int_hom().map(2), poly_ring.create_monomial([0, 1, 1])), (base_ring.one(), poly_ring.create_monomial([2, 0, 0]))].into_iter());
+    /// let f_version2 = poly_ring.with_wrapped_indeterminates(|[x, y, z]| [3 + 2 * y * z + x.pow_ref(2)]).into_iter().next().unwrap();
+    /// assert_el_eq!(poly_ring, f_version1, f_version2);
+    /// ```
+    /// 
     #[stability::unstable(feature = "enable")]
     fn with_wrapped_indeterminates<'a, F, T, const N: usize>(&'a self, f: F) -> Vec<El<Self>>
         where F: FnOnce([&RingElementWrapper<&'a Self>; N]) -> T,
