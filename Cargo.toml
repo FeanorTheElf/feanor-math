@@ -6,7 +6,7 @@ authors = ["Simon Pohmann <simon@pohmann.de>"]
 
 repository = "https://github.com/FeanorTheElf/feanor-math"
 homepage = "https://github.com/FeanorTheElf/feanor-math"
-keywords = ["math", "mathematics", "primes", "number-theory"]
+keywords = ["math", "mathematics", "primes", "number-theory", "algebra"]
 readme = "Readme.md"
 description = "A library for number theory, providing implementations for the arithmetic in various rings and algorithms working on them."
 license = "MIT"
