@@ -289,7 +289,7 @@ pub fn lll_exact<I, V, A>(ring: I, mut matrix: SubmatrixMut<V, El<I>>, delta: f6
     let mut gso = OwnedMatrix::zero_in(n, n, &lll_reals, &allocator);
     let hom = lll_reals.inclusion().compose(BigIntRing::RING.can_hom(&ring).unwrap());
     let matrix_RR: OwnedMatrix<_, &A> = OwnedMatrix::from_fn_in(matrix.row_count(), matrix.col_count(), |i, j| hom.map_ref(matrix.at(i, j)), &allocator);
-    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(matrix_RR.data()).transpose(), TransposableSubmatrix::from(matrix_RR.data()), TransposableSubmatrixMut::from(gso.data_mut()), lll_reals);
+    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(matrix_RR.data()).transpose(), TransposableSubmatrix::from(matrix_RR.data()), TransposableSubmatrixMut::from(gso.data_mut()), &lll_reals);
 
     // possibly free space early
     drop(matrix_RR);

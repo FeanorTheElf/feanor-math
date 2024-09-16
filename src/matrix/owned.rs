@@ -4,9 +4,49 @@ use self::submatrix::{AsFirstElement, Submatrix, SubmatrixMut};
 
 use super::*;
 
+///
+/// A matrix that owns its elements.
+/// 
+/// To pass it to algorithms, use the `.data()` and `.data_mut()` functions.
+/// 
+/// # Example
+/// ```
+/// #![feature(allocator_api)]
+/// # use std::alloc::*;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::matrix::*;
+/// # use feanor_math::algorithms::linsolve::*;
+/// let mut A = OwnedMatrix::identity(2, 2, StaticRing::<i32>::RING);
+/// let mut B = OwnedMatrix::identity(2, 2, StaticRing::<i32>::RING);
+/// let mut C = OwnedMatrix::identity(2, 2, StaticRing::<i32>::RING);
+/// StaticRing::<i32>::RING.get_ring().solve_right(A.data_mut(), B.data_mut(), C.data_mut(), Global).assert_solved();
+/// ```
+/// 
 pub struct OwnedMatrix<T, A: Allocator = Global> {
     data: Vec<T, A>,
     col_count: usize
+}
+
+impl<T> OwnedMatrix<T> {
+
+    pub fn from_fn<F>(row_count: usize, col_count: usize, f: F) -> Self
+        where F: FnMut(usize, usize) -> T
+    {
+        Self::from_fn_in(row_count, col_count, f, Global)
+    }
+    
+    pub fn zero<R: RingStore>(row_count: usize, col_count: usize, ring: R) -> Self
+        where R::Type: RingBase<Element = T>
+    {
+        Self::zero_in(row_count, col_count, ring, Global)
+    }
+
+    pub fn identity<R: RingStore>(row_count: usize, col_count: usize, ring: R) -> Self
+        where R::Type: RingBase<Element = T>
+    {
+        Self::identity_in(row_count, col_count, ring, Global)
+    }
 }
 
 impl<T, A: Allocator> OwnedMatrix<T, A> {
@@ -103,22 +143,5 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
         where F: FnMut() -> T
     {
         self.data.resize_with(new_count * self.col_count(), new_entries);
-    }
-}
-
-impl<T, A: Allocator + Default> OwnedMatrix<T, A> {
-
-    #[stability::unstable(feature = "enable")]
-    pub fn zero<R: RingStore>(row_count: usize, col_count: usize, ring: R) -> Self
-        where R::Type: RingBase<Element = T>
-    {
-        Self::zero_in(row_count, col_count, ring, A::default())
-    }
-
-    #[stability::unstable(feature = "enable")]
-    pub fn identity<R: RingStore>(row_count: usize, col_count: usize, ring: R) -> Self
-        where R::Type: RingBase<Element = T>
-    {
-        Self::identity_in(row_count, col_count, ring, A::default())
     }
 }

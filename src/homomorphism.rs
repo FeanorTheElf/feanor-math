@@ -193,7 +193,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// let zn_big_i128 = zn_big::Zn::new(ZZ, 17 * 257);
 /// let zn_big_big = zn_big::Zn::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
 /// let Zn_std = zn_64::Zn::new(17 * 257);
-/// let Zn_rns = zn_rns::Zn::create_from_primes(ZZ_big, vec![17, 257]);
+/// let Zn_rns = zn_rns::Zn::create_from_primes(vec![17, 257], ZZ_big);
 /// 
 /// assert!(zn_big_i128.can_iso(&zn_big_i128).is_some());
 /// assert!(zn_big_i128.can_iso(&zn_big_big).is_some());
@@ -238,7 +238,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// let zn_big_i128 = zn_big::Zn::new(ZZ, 17 * 257);
 /// let zn_big_big = zn_big::Zn::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
 /// let Zn_std = zn_64::Zn::new(17 * 257);
-/// let Zn_rns = zn_rns::Zn::create_from_primes(ZZ_big, vec![17, 257]);
+/// let Zn_rns = zn_rns::Zn::create_from_primes(vec![17, 257], ZZ_big);
 /// 
 /// assert!(zn_big_i128.can_hom(&ZZ).is_some());
 /// assert!(zn_big_i128.can_hom(&ZZ_big).is_some());
@@ -592,12 +592,16 @@ impl<R, S> Homomorphism<S::Type,R::Type> for CanIso<R, S>
 /// assert_el_eq!(extension, extension.from_terms([(8, 0), (1, 1)].into_iter()), &f);
 /// ```
 /// 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct Inclusion<R>
     where R: RingStore, R::Type: RingExtension
 {
     ring: R
 }
+
+impl<R: RingStore> Copy for Inclusion<R>
+    where R: Copy, El<R>: Copy, R::Type: RingExtension
+{}
 
 impl<R> Inclusion<R>
     where R: RingStore, R::Type: RingExtension
@@ -653,12 +657,16 @@ impl<R> Homomorphism<<<R::Type as RingExtension>::BaseRing as RingStore>::Type, 
 /// assert_el_eq!(ring, hom.map(1), hom.map(18));
 /// ```
 /// 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct IntHom<R>
     where R: RingStore
 {
     ring: R
 }
+
+impl<R: RingStore> Copy for IntHom<R>
+    where R: Copy, El<R>: Copy
+{}
 
 impl<R> Homomorphism<StaticRingBase<i32>, R::Type> for IntHom<R>
     where R: RingStore
@@ -695,10 +703,14 @@ impl<R> IntHom<R>
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct Identity<R: RingStore> {
     ring: R
 }
+
+impl<R: RingStore> Copy for Identity<R>
+    where R: Copy, El<R>: Copy
+{}
 
 impl<R: RingStore> Identity<R> {
 
@@ -756,7 +768,7 @@ impl<'a, S, R, H> Homomorphism<S, R> for &'a H
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct LambdaHom<R: RingStore, S: RingStore, F>
     where F: Fn(&R, &S, &El<R>) -> El<S>
 {
@@ -764,6 +776,12 @@ pub struct LambdaHom<R: RingStore, S: RingStore, F>
     to: S,
     f: F
 }
+
+impl<R: RingStore, S: RingStore, F> Copy for LambdaHom<R, S, F>
+    where F: Copy + Fn(&R, &S, &El<R>) -> El<S>,
+        R: Copy, El<R>: Copy,
+        S: Copy, El<S>: Copy
+{}
 
 impl<R: RingStore, S: RingStore, F> LambdaHom<R, S, F>
     where F: Fn(&R, &S, &El<R>) -> El<S>

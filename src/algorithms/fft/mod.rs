@@ -65,8 +65,9 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
     /// 
     /// This function panics if `values.len() != self.len()`.
     ///
-    fn fft<V>(&self, mut values: V, ring: &R)
-        where V: SwappableVectorViewMut<R::Element>
+    fn fft<V, S>(&self, mut values: V, ring: S)
+        where V: SwappableVectorViewMut<R::Element>,
+            S: RingStore<Type = R> + Copy
     {
         self.unordered_fft(&mut values, ring);
         permute::permute_inv(&mut values, |i| self.unordered_fft_permutation(i));
@@ -81,8 +82,9 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
     /// 
     /// This function panics if `values.len() != self.len()`.
     ///
-    fn inv_fft<V>(&self, mut values: V, ring: &R)
-        where V: SwappableVectorViewMut<R::Element>
+    fn inv_fft<V, S>(&self, mut values: V, ring: S)
+        where V: SwappableVectorViewMut<R::Element>,
+            S: RingStore<Type = R> + Copy
     {
         permute::permute(&mut values, |i| self.unordered_fft_permutation(i));
         self.unordered_inv_fft(&mut values, ring);
@@ -95,14 +97,16 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
     /// Note that the FFT of a sequence `a_0, ..., a_(N - 1)` is defined as `Fa_k = sum_i a_i z^(-ik)`
     /// where `z` is an N-th root of unity.
     /// 
-    fn unordered_fft<V>(&self, values: V, ring: &R)
-        where V: SwappableVectorViewMut<R::Element>;
+    fn unordered_fft<V, S>(&self, values: V, ring: S)
+        where V: SwappableVectorViewMut<R::Element>,
+            S: RingStore<Type = R> + Copy;
     
     ///
     /// Inverse to [`FFTAlgorithm::unordered_fft()`], with basically the same contract.
     /// 
-    fn unordered_inv_fft<V>(&self, values: V, ring: &R)
-        where V: SwappableVectorViewMut<R::Element>;
+    fn unordered_inv_fft<V, S>(&self, values: V, ring: S)
+        where V: SwappableVectorViewMut<R::Element>,
+           S: RingStore<Type = R> + Copy;
 }
 
 impl<T, R: ?Sized + RingBase> FFTAlgorithm<R> for T
@@ -124,26 +128,30 @@ impl<T, R: ?Sized + RingBase> FFTAlgorithm<R> for T
         self.deref().unordered_fft_permutation_inv(i)
     }
 
-    fn fft<V>(&self, values: V, ring: &R)
-        where V: SwappableVectorViewMut<R::Element>
+    fn fft<V, S>(&self, values: V, ring: S)
+        where V: SwappableVectorViewMut<<R as RingBase>::Element>,
+            S: RingStore<Type = R> + Copy 
     {
         self.deref().fft(values, ring)
     }
 
-    fn inv_fft<V>(&self, values: V, ring: &R)
-        where V: SwappableVectorViewMut<R::Element>
+    fn inv_fft<V, S>(&self, values: V, ring: S)
+        where V: SwappableVectorViewMut<<R as RingBase>::Element>,
+            S: RingStore<Type = R> + Copy 
     {
         self.deref().inv_fft(values, ring)
     }
 
-    fn unordered_fft<V>(&self, values: V, ring: &R)
-        where V: SwappableVectorViewMut<R::Element>
+    fn unordered_fft<V, S>(&self, values: V, ring: S)
+        where V: SwappableVectorViewMut<<R as RingBase>::Element>,
+            S: RingStore<Type = R> + Copy 
     {
         self.deref().unordered_fft(values, ring)
     }
 
-    fn unordered_inv_fft<V>(&self, values: V, ring: &R)
-        where V: SwappableVectorViewMut<R::Element>
+    fn unordered_inv_fft<V, S>(&self, values: V, ring: S)
+        where V: SwappableVectorViewMut<<R as RingBase>::Element>,
+            S: RingStore<Type = R> + Copy 
     {
         self.deref().unordered_inv_fft(values, ring)
     }

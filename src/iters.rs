@@ -269,75 +269,6 @@ pub fn multiset_combinations<'a, F, T>(multiset: &'a [usize], size: usize, conve
     };
 }
 
-#[derive(Debug)]
-#[deprecated]
-pub struct Product<I, J>
-    where I: Iterator, I::Item: Clone, J: Iterator + Clone
-{
-    base_j: J,
-    current_i: Option<I::Item>,
-    i: I,
-    j: J
-}
-
-#[allow(deprecated)]
-impl<I, J> Clone for Product<I, J>
-    where I: Iterator + Clone, I::Item: Clone, J: Iterator + Clone
-{
-    #[allow(deprecated)]
-    fn clone(&self) -> Self {
-        Self {
-            base_j: self.base_j.clone(),
-            current_i: self.current_i.clone(),
-            i: self.i.clone(),
-            j: self.j.clone() 
-        }
-    }
-}
-
-#[allow(deprecated)]
-impl<I, J> Iterator for Product<I, J>
-    where I: Iterator, I::Item: Clone, J: Iterator + Clone
-{
-    #[allow(deprecated)]
-    type Item = (I::Item, J::Item);
-
-    #[allow(deprecated)]
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(fst) = &self.current_i {
-            if let Some(next_j) = self.j.next() {
-                return Some((fst.clone(), next_j));
-            } else if let Some(next_i) = self.i.next() {
-                self.j = self.base_j.clone();
-                self.current_i = Some(next_i.clone());
-                if let Some(next_j) = self.j.next() {
-                    return Some((next_i, next_j));
-                }
-            }
-        }
-        return None;
-    }
-}
-
-#[allow(deprecated)]
-impl<I, J> std::iter::FusedIterator for Product<I, J> 
-    where I: Iterator, I::Item: Clone, J: Iterator + Clone
-{}
-
-#[allow(deprecated)]
-#[deprecated]
-pub fn cartesian_product<I, J>(mut it1: I, it2: J) -> Product<I, J>
-    where I: Iterator, I::Item: Clone, J: Iterator + Clone
-{
-    #[allow(deprecated)]
-    Product {
-        base_j: it2.clone(),
-        current_i: it1.next(),
-        i: it1,
-        j: it2
-    }
-}
-
 ///
 /// Iterator over the elements of the cartesian product of multiple iterators.
 /// See also [`multi_cartesian_product()`].
@@ -559,17 +490,6 @@ fn test_powerset() {
         vec![2, 3].into_boxed_slice(),
         vec![1, 2, 3].into_boxed_slice()
     ], basic_powerset(a.iter().copied()).collect::<Vec<_>>());
-}
-
-#[allow(deprecated)]
-#[test]
-fn test_cartesian_product() {
-    let a = [1, 2, 3];
-    let b = [5, 6];
-    assert_eq!(6, cartesian_product(a.iter(), b.iter()).count());
-    let mut it = cartesian_product(a.iter(), b.iter());
-    it.next();
-    assert_eq!((&1, &6), it.next().unwrap());
 }
 
 #[allow(deprecated)]

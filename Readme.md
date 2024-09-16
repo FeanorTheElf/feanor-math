@@ -17,11 +17,7 @@ This library uses nightly Rust, ~~and even unstable features like const-generics
 
 ## A short introduction
 
-This library is designed by considering rings and their arithmetic as the most fundamental concept.
-This gives rise to the two traits `RingBase` and `RingStore`.
-These two traits mirror a general design strategy in this crate, which is to provide both implementor-facing traits (e.g. `RingBase`) and user-facing traits (e.g. `RingStore`).
-The former try to make it easy to implement a new ring with custom arithmetic, which the latter make it easy to write code that performs arithmetic within a ring.
-More reasons for this separation are explained further down this page.
+TODO
 
 ## Features
 
@@ -359,14 +355,11 @@ As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` ca
 
 ## Conventions and best practices
 
- - Many functions that take a ring as parameter currently take `&R` for a generic `RingStore` type `R`.
-   This however is not the best option, instead one should prefer to take the ring by value, i.e. `R`.
-   If the ring has to be copied within the function, it is perfectly fine to require `R: Copy + RingStore`.
+ - Functions that take a ring as parameter should usually be generic and take `R` where `R: RingStore`.
+   In cases where we would usually take the ring by reference, prefer instead to take `R` by value with `R: RingStore + Copy`.
    Since for `R: RingStore` also `&R: RingStore`, this just makes the interface more general.
  - Rings that wrap a base ring (like `MyRing<BaseRing: RingStore>`) should not impl `Copy`, unless both `BaseRing: Copy` and `El<BaseRing>: Copy`.
-   There are some cases where I have added `#[derive(Copy)]` (namely [`feanor_math::rings::rational::RationalFieldBase`]), which now prevents adding struct members of base ring elements to the ring.
-   In particular, doing that would mean that we cannot impl `Copy` if only the base ring but not its elements are `Copy`, thus breaking backward compatibility.
-   At the next breaking release, this will be changed.  
+   There are some cases where I had previously added `#[derive(Copy)]`, which then made adding struct members of base ring elements to the ring a breaking change.
 
 # Performance
 
@@ -378,50 +371,4 @@ However, I did not have the time so far to thoroughly optimize many of the algor
  - Use `lto = "fat"` in the `Cargo.toml` of your project. This is absolutely vital to enable inlining across crate boundaries, and can have a huge impact if you extensively use rings that have "simple" basic arithmetic - like `zn_64::Zn` or `primitive_int::StaticRing`.
  - Different parts of this library are at different stages of optimization. While I have spent some time on finite fields and the FFT algorithms, for example integer factorization are currently relatively slow.
  - If you extensively use rings whose elements require dynamic memory allocation, be careful to use a custom allocator, e.g. one from [`feanor-mempool`](https://github.com/FeanorTheElf/feanor-mempool).
- - The default arbitrary-precision integer arithmetic is currently slow. Use the feature "mpir" together with an installation of the [mpir](https://github.com/wbhart/mpir) library if you heavily use arbitrary-precision integers. 
-
-# Design decisions
-
-Here I document - mainly for myself - some of the more important design decisions.
-
-## `RingStore`
-
-Already talked about this.
-Mainly, this is the result of the headache I got in the first version of this crate, when trying to map elements from `RingWrapper<Zn<IntRing>>` to `RingWrapper<Zn<&IntRing>>` or similar.
-
-## Elements referencing the ring
-
-It seems to be a reasonably common requirement that elements of a ring may contain references to the ring.
-For example, this is the case if the element uses memory that is managed by a memory pool of the ring.
-In other words, we would define `RingBase` as
-```rust,ignore
-trait RingBase {
-
-    type Element<'a> where Self: 'a;
-
-    ...
-}
-```
-However, this conflicts with another design decision:
-We want to be able to nest rings, and allow the nested rings to be owned (not just borrowed).
-If we allow ring-referential elements, this now prevents us from defining rings that store the nested ring and some of its elements.
-For example, an implementation of Z/qZ might look like
-```rust,ignore
-struct Zn<I: IntegerRingStore> {
-    integer_ring: I,
-    modulus: El<I>
-}
-```
-If `El<I>` may contain a reference to `I`, then this struct is self-referential, causing untold trouble.
-
-Now it seems somewhat more natural to forbid owning nested rings instead of ring-referential elements, but this then severly limits which rings can be returned from functions.
-For example we might want a function to produce Fq with a mempool-based big integer implementation like
-```rust,ignore
-fn galois_field(q: i64, exponent: usize) -> RingExtension<ZnBarett<MempoolBigIntRing>> {
-    ...
-}
-```
-This would be impossible, as well as many other use cases.
-On the other hand, it is simpler to perform runtime checks in case of static lifetime analysis if we want to have ring-referential elements.
-This is maybe slightly unnatural, but very usable.
-And really, if elements need a reference to the ring, they won't be small and the arithmetic cost will greatly exceed the runtime management cost.
+ - The default arbitrary-precision integer arithmetic is somewhat slow. Use the feature "mpir" together with an installation of the [mpir](https://github.com/wbhart/mpir) library if you heavily use arbitrary-precision integers. 

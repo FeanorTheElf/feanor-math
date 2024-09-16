@@ -64,12 +64,12 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// Panics if `dst` is shorter than `lhs.len() + rhs.len() - 1`. May panic if `dst` is shorter
     /// than `lhs.len() + rhs.len()`.
     /// 
-    fn compute_convolution<S: RingStore<Type = R>, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S);
+    fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S);
 }
 
 impl<'a, R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> ConvolutionAlgorithm<R> for &'a C {
 
-    fn compute_convolution<S: RingStore<Type = R>, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S) {
+    fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S) {
         (**self).compute_convolution(lhs, rhs, dst, ring)
     }
 }
@@ -87,7 +87,6 @@ pub struct KaratsubaAlgorithm<A: Allocator = Global> {
 /// Good default algorithm for computing convolutions, using Karatsuba's algorithm
 /// with a threshold defined by [`KaratsubaHint`].
 /// 
-#[stability::unstable(feature = "enable")]
 pub const STANDARD_CONVOLUTION: KaratsubaAlgorithm = KaratsubaAlgorithm::new(Global);
 
 impl<A: Allocator> KaratsubaAlgorithm<A> {

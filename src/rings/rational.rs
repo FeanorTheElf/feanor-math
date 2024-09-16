@@ -31,7 +31,7 @@ use crate::ring::*;
 /// assert_el_eq!(QQ, QQ.div(&QQ.one(), &hom.map(4)), QQ.pow(QQ.div(&QQ.one(), &hom.map(2)), 2));
 /// ```
 /// 
-#[derive(Debug, Copy)]
+#[derive(Debug)]
 pub struct RationalFieldBase<I: IntegerRingStore>
     where I::Type: IntegerRing
 {
@@ -48,6 +48,12 @@ impl<I> Clone for RationalFieldBase<I>
         }
     }
 }
+
+impl<I> Copy for RationalFieldBase<I>
+    where I: IntegerRingStore + Copy,
+        I::Type: IntegerRing,
+        El<I>: Copy
+{}
 
 ///
 /// [`RingStore`] corresponding to [`RationalFieldBase`]

@@ -108,7 +108,7 @@ pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>
     poly_ring.inclusion().mul_assign_map(&mut f, lc_inv);
 
     let f_coeffs = (0..poly_ring.degree(&f).unwrap()).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))).collect::<Vec<_>>();
-    let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), &f_coeffs[..]);
+    let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
 
     let mut result = distinct_degree_factorization_base(&poly_ring, mod_f_ring);
     poly_ring.inclusion().mul_assign_map(&mut result[0], lc);
@@ -188,7 +188,7 @@ pub fn cantor_zassenhaus<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
     poly_ring.inclusion().mul_assign_map(&mut f, lc_inv);
 
     let f_coeffs = (0..poly_ring.degree(&f).unwrap()).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))).collect::<Vec<_>>();
-    let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), &f_coeffs[..]);
+    let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
 
     let result = cantor_zassenhaus_base(&poly_ring, mod_f_ring, d);
     return result;
@@ -269,10 +269,10 @@ pub fn cantor_zassenhaus_even_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) 
     if e % 2 != 0 {
         // adjoin a third root of unity, this will enable use to use the main idea
         // use `promise_as_field()`, since `as_field().unwrap()` can cause infinite generic expansion (always adding a `&`)
-        let new_base_ring = AsField::from(AsFieldBase::promise_is_field(FreeAlgebraImpl::new(Fq, [Fq.neg_one(), Fq.neg_one()])));
+        let new_base_ring = AsField::from(AsFieldBase::promise_is_field(FreeAlgebraImpl::new(Fq, 2, [Fq.neg_one(), Fq.neg_one()])));
         let new_x_pow_rank = mod_f_ring.wrt_canonical_basis(&mod_f_ring.pow(mod_f_ring.canonical_gen(), mod_f_ring.rank())).into_iter().map(|x| new_base_ring.inclusion().map(x)).collect::<Vec<_>>();
         // once we have any kind of tensoring operation, maybe we can find a way to do this that preserves e.g. sparse implementations?
-        let new_mod_f_ring = FreeAlgebraImpl::new(&new_base_ring, &new_x_pow_rank);
+        let new_mod_f_ring = FreeAlgebraImpl::new(&new_base_ring, new_x_pow_rank.len(), &new_x_pow_rank);
         let new_poly_ring = DensePolyRing::new(&new_base_ring, "X");
 
         // it might happen that cantor_zassenhaus gives a nontrivial factor over the extension, but that factor only
@@ -324,7 +324,7 @@ pub fn cantor_zassenhaus_even<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
     poly_ring.inclusion().mul_assign_map(&mut f, lc_inv);
 
     let f_coeffs = (0..poly_ring.degree(&f).unwrap()).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))).collect::<Vec<_>>();
-    let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), &f_coeffs[..]);
+    let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
 
     let result = cantor_zassenhaus_even_base(&poly_ring, &mod_f_ring, d);
     return result;
@@ -396,7 +396,7 @@ fn test_cantor_zassenhaus_even() {
 #[test]
 fn test_cantor_zassenhaus_even_extension_field() {
 
-    let Fq = FreeAlgebraImpl::new(Fp::<2>::RING, [1, 1, 0, 0]).as_field().ok().unwrap();
+    let Fq = FreeAlgebraImpl::new(Fp::<2>::RING, 4, [1, 1, 0, 0]).as_field().ok().unwrap();
     let ring = DensePolyRing::new(&Fq, "X");
 
     // (X^3 + X + 1) (X^3 + X^2 + 1)
@@ -415,7 +415,7 @@ fn test_cantor_zassenhaus_even_extension_field() {
     let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 1));
     assert!(ring.eq_el(&factor, &f1) || ring.eq_el(&factor, &f2) || ring.eq_el(&factor, &f3) || ring.eq_el(&factor, &f4));
 
-    let Fq = FreeAlgebraImpl::new(Fp::<2>::RING, [1, 1, 0]).as_field().ok().unwrap();
+    let Fq = FreeAlgebraImpl::new(Fp::<2>::RING, 3, [1, 1, 0]).as_field().ok().unwrap();
     let ring = DensePolyRing::new(&Fq, "X");
     
     // (X^4 + X + 1) (X^4 + X^3 + 1)

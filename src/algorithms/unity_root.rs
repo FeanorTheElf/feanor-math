@@ -111,7 +111,7 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::rings::poly::PolyRingStore;
 #[cfg(test)]
-use crate::rings::extension::galois_field_new::GaloisField;
+use crate::rings::extension::galois_field::GaloisField;
 
 #[test]
 fn test_is_prim_root_of_unity() {

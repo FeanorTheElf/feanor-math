@@ -6,7 +6,6 @@ use crate::ring::*;
 use crate::seq::*;
 
 
-#[stability::unstable(feature = "enable")]
 pub struct SparseMapVector<R: RingStore> {
     data: HashMap<usize, El<R>>,
     modify_entry: (usize, El<R>),
@@ -17,7 +16,6 @@ pub struct SparseMapVector<R: RingStore> {
 
 impl<R: RingStore> SparseMapVector<R> {
 
-    #[stability::unstable(feature = "enable")]
     pub fn new(len: usize, ring: R) -> Self {
         SparseMapVector {
             data: HashMap::new(), 
@@ -104,7 +102,6 @@ impl<R: RingStore> VectorView<El<R>> for SparseMapVector<R> {
     }
 }
 
-#[stability::unstable(feature = "enable")]
 pub struct SparseMapVectorIter<'a, R>
     where R: RingStore
 {

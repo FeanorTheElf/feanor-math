@@ -22,12 +22,13 @@ use super::poly::PolyRingStore;
 /// ```
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::extension::galois_field::*;
+/// # use feanor_math::delegate::*;
 /// # use feanor_math::rings::fieldextension::*;
 /// # use feanor_math::rings::fieldextension::ExtensionFieldStore;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::rings::zn::*;
-/// let Fp = Zn::new(7).as_field().ok().unwrap();
-/// let Fq = GFdyn(49);
+/// let Fp = Zn::new(7);
+/// let Fq = GaloisField::new(7, 2);
 /// assert!(Fq.base_ring().get_ring() == Fp.get_ring());
 /// assert!(Fq.is_galois());
 /// ```
@@ -74,8 +75,8 @@ pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField {
     /// # use feanor_math::rings::fieldextension::*;
     /// # use feanor_math::rings::zn::zn_64::*;
     /// # use feanor_math::rings::zn::*;
-    /// assert!(GFdyn(25).has_hom(&GFdyn(125)).is_none());
-    /// assert!(GFdyn(25).has_hom(&GFdyn(625)).is_some());
+    /// assert!(GaloisField::new(5, 2).has_hom(&GaloisField::new(5, 3)).is_none());
+    /// assert!(GaloisField::new(5, 2).has_hom(&GaloisField::new(5, 4)).is_some());
     /// ```
     /// However be careful, since these homomorphisms do not have to be "canonical"!
     /// ```
@@ -90,9 +91,9 @@ pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField {
     /// # use feanor_math::rings::zn::*;
     /// // we create the field tower F3/F2/F1
     /// let p = 11;
-    /// let F1 = GFdyn(StaticRing::<i64>::RING.pow(p, 2) as u64);
-    /// let F2 = GFdyn(StaticRing::<i64>::RING.pow(p, 4) as u64);
-    /// let F3 = GFdyn(StaticRing::<i64>::RING.pow(p, 8) as u64);
+    /// let F1 = GaloisField::new(p, 2);
+    /// let F2 = GaloisField::new(p, 4);
+    /// let F3 = GaloisField::new(p, 8);
     /// let f = F1.has_hom(&F3).unwrap();
     /// let g = F2.has_hom(&F3).unwrap().compose(F1.has_hom(&F2).unwrap());
     /// assert!(!F3.eq_el(&F3.canonical_gen(), &f.map(F1.canonical_gen())) ||
@@ -266,7 +267,7 @@ impl<R> ExtensionFieldStore for R
 {}
 
 #[cfg(test)]
-use galois_field_new::GaloisField;
+use galois_field::GaloisField;
 #[cfg(test)]
 use super::finite::FiniteRingStore;
 

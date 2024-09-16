@@ -98,7 +98,8 @@ pub struct MultivariatePolyRingImplBase<R, A = Global>
     // searching monomial_table; after the search, either the existing index is retrieved, or a new monomial allocated,
     // thus the temporary monomial is not required anymore
     tmp_monomials: ThreadLocal<Box<[Cell<Exponent>]>>,
-    // maps monomials to the corresponding indics; usually access with a temporary monomial (one without index)
+    // maps monomials to the corresponding indics; usually access with a temporary monomial (one without index); currently
+    // the only part that is not thread-safe, until I find a nice concurrent append-only map impl
     monomial_table: RefCell<BTreeMap<MonomialIdentifier, Index>>,
     zero: El<R>,
     max_degree_for_orderidx: usize,

@@ -523,7 +523,7 @@ fn test_factor_int_poly() {
 fn test_factor_rational_poly() {
     let QQ = RationalField::new(BigIntRing::RING);
     let incl = QQ.int_hom();
-    let poly_ring = DensePolyRing::new(QQ, "X");
+    let poly_ring = DensePolyRing::new(&QQ, "X");
     let f = poly_ring.from_terms([(incl.map(2), 0), (incl.map(1), 3)].into_iter());
     let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
     let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f), poly_ring.clone_el(&f), poly_ring.clone_el(&g)].into_iter()));
@@ -539,7 +539,7 @@ fn test_factor_rational_poly() {
 fn test_factor_nonmonic_poly() {
     let QQ = RationalField::new(BigIntRing::RING);
     let incl = QQ.int_hom();
-    let poly_ring = DensePolyRing::new(QQ, "X");
+    let poly_ring = DensePolyRing::new(&QQ, "X");
     let f = poly_ring.from_terms([(QQ.div(&incl.map(3), &incl.map(5)), 0), (incl.map(1), 4)].into_iter());
     let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
     let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f), poly_ring.clone_el(&f), poly_ring.clone_el(&g), poly_ring.int_hom().map(100)].into_iter()));
@@ -607,14 +607,13 @@ fn test_poly_squarefree_part_multiplicity_p() {
 fn test_find_factor_by_extension_finite_field() {
     let field = Zn::new(2).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");
-    assert!(<_ as FactorPolyField>::find_factor_by_extension(&poly_ring, FreeAlgebraImpl::new(field, [field.one(), field.one()])).is_none());
+    assert!(<_ as FactorPolyField>::find_factor_by_extension(&poly_ring, FreeAlgebraImpl::new(field, 2, [field.one(), field.one()])).is_none());
 
     let poly = poly_ring.mul(
         poly_ring.from_terms([(field.one(), 0), (field.one(), 1), (field.one(), 3)].into_iter()),
         poly_ring.from_terms([(field.one(), 0), (field.one(), 2), (field.one(), 3)].into_iter()),
     );
-    let factor = <_ as FactorPolyField>::find_factor_by_extension(&poly_ring, FreeAlgebraImpl::new(field, [field.one(), field.one(), field.one(), field.one(), field.one(), field.one()])).unwrap();
-    poly_ring.println(&factor);
+    let factor = <_ as FactorPolyField>::find_factor_by_extension(&poly_ring, FreeAlgebraImpl::new(field, 6, [field.one(), field.one(), field.one(), field.one(), field.one(), field.one()])).unwrap();
     assert_eq!(3, poly_ring.degree(&factor).unwrap());
     assert!(poly_ring.checked_div(&poly, &factor).is_some());
 }
@@ -637,7 +636,7 @@ fn bench_factor_random_poly(bencher: &mut Bencher) {
 fn bench_factor_rational_poly(bencher: &mut Bencher) {
     let QQ = RationalField::new(BigIntRing::RING);
     let incl = QQ.int_hom();
-    let poly_ring = DensePolyRing::new(QQ, "X");
+    let poly_ring = DensePolyRing::new(&QQ, "X");
     let f1 = poly_ring.checked_div(&poly_ring.from_terms([(incl.map(1), 0), (incl.map(1), 2), (incl.map(1), 4), (incl.map(3), 8)].into_iter()), &poly_ring.int_hom().map(3)).unwrap();
     let f2 = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4), (incl.map(1), 5), (incl.map(1), 10)].into_iter());
     let f3 = poly_ring.from_terms([(incl.map(1), 0), (incl.map(1), 1), (incl.map(-2), 5), (incl.map(1), 17)].into_iter());

@@ -459,7 +459,7 @@ use crate::matrix::{OwnedMatrix, TransposableSubmatrix, TransposableSubmatrixMut
 #[cfg(test)]
 use crate::assert_matrix_eq;
 #[cfg(test)]
-use super::extension::galois_field_new::GaloisField;
+use super::extension::galois_field::GaloisField;
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {

@@ -78,12 +78,12 @@ impl<A> FFTBasedConvolution<A>
             rhs_data[i] = hom.map(c);
         }
 
-        fft_table.unordered_fft(&mut lhs_data[..], CC.get_ring());
-        fft_table.unordered_fft(&mut rhs_data[..], CC.get_ring());
+        fft_table.unordered_fft(&mut lhs_data[..], CC);
+        fft_table.unordered_fft(&mut rhs_data[..], CC);
         for i in 0..(1 << log2_size) {
             CC.mul_assign_ref(&mut lhs_data[i], &rhs_data[i]);
         }
-        fft_table.unordered_inv_fft(&mut lhs_data[..], CC.get_ring());
+        fft_table.unordered_inv_fft(&mut lhs_data[..], CC);
 
         let hom = ring.into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
         (0..(lhs.len() + rhs.len())).map(move |i| {

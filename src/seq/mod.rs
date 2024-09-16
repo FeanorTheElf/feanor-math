@@ -61,7 +61,6 @@ pub trait VectorView<T: ?Sized> {
     /// `V: VectorViewSparse`, even though specialization currently does not support
     /// this.
     /// 
-    #[stability::unstable(feature = "enable")]
     fn specialize_sparse<Op: SparseVectorViewOperation<T>>(&self, _op: Op) -> Result<Op::Output, ()> {
         Err(())
     }
@@ -144,17 +143,35 @@ pub trait VectorView<T: ?Sized> {
     }
 }
 
-#[stability::unstable(feature = "enable")]
+///
+/// View on a sequence type that stores its data in a sparse format.
+/// This clearly requires that the underlying type `T` has some notion
+/// of a "zero" element.
+/// 
 pub trait VectorViewSparse<T: ?Sized>: VectorView<T> {
 
     type Iter<'a>: Iterator<Item = (usize, &'a T)>
         where Self: 'a, 
             T: 'a;
 
+    ///
+    /// Returns an iterator over all elements of the sequence with their indices
+    /// that are "nonzero" (`T` must have an appropriate notion of zero).
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::seq::*;
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::seq::sparse::*;
+    /// let mut vector = SparseMapVector::new(10, StaticRing::<i64>::RING);
+    /// *vector.at_mut(2) = 100;
+    /// assert_eq!(vec![(2, 100)], vector.nontrivial_entries().map(|(i, x)| (i, *x)).collect::<Vec<_>>());
+    /// ```
+    /// 
     fn nontrivial_entries<'a>(&'a self) -> Self::Iter<'a>;
 }
 
-#[stability::unstable(feature = "enable")]
 pub trait SparseVectorViewOperation<T: ?Sized> {
 
     type Output;

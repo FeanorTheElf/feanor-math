@@ -1,4 +1,5 @@
 use crate::algorithms;
+use crate::algorithms::convolution::ConvolutionAlgorithm;
 use crate::divisibility::*;
 use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
@@ -269,8 +270,8 @@ impl<R: RingStore> RingExtension for SparsePolyRingBase<R> {
 
 pub trait ImplGenericCanIsoFromToMarker: PolyRing {}
 
-impl<R, A> ImplGenericCanIsoFromToMarker for dense_poly::DensePolyRingBase<R, A> 
-    where R: RingStore, A: Allocator + Clone
+impl<R, A, C> ImplGenericCanIsoFromToMarker for dense_poly::DensePolyRingBase<R, A, C> 
+    where R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>
 {}
 
 impl<R, P> CanHomFrom<P> for SparsePolyRingBase<R> 

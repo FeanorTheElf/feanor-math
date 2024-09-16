@@ -160,10 +160,11 @@ impl<R_main, R_twiddle, H, T1, T2> FFTAlgorithm<R_main> for CoprimeCooleyTuckeyF
         &self.root_of_unity
     }
 
-    fn unordered_fft<V>(&self, mut values: V, ring: &R_main)
-        where V: SwappableVectorViewMut<R_main::Element>
+    fn unordered_fft<V, S>(&self, mut values: V, ring: S)
+        where V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
+            S: RingStore<Type = R_main> + Copy 
     {
-        assert!(self.ring().get_ring() == ring, "unsupported ring");
+        assert!(self.ring().get_ring() == ring.get_ring(), "unsupported ring");
         for i in 0..self.right_table.len() {
             let mut v = SubvectorView::new(&mut values).restrict(i..).step_by(self.right_table.len());
             self.left_table.unordered_fft(&mut v, ring);
@@ -177,10 +178,11 @@ impl<R_main, R_twiddle, H, T1, T2> FFTAlgorithm<R_main> for CoprimeCooleyTuckeyF
         }
     }
 
-    fn unordered_inv_fft<V>(&self, mut values: V, ring: &R_main)
-        where V: SwappableVectorViewMut<R_main::Element>
+    fn unordered_inv_fft<V, S>(&self, mut values: V, ring: S)
+        where V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
+            S: RingStore<Type = R_main> + Copy 
     {
-        assert!(self.ring().get_ring() == ring, "unsupported ring");
+        assert!(self.ring().get_ring() == ring.get_ring(), "unsupported ring");
         for i in 0..self.left_table.len() {
             let mut v = SubvectorView::new(&mut values).restrict((i * self.right_table.len())..((i + 1) * self.right_table.len()));
             self.right_table.unordered_inv_fft(&mut v, ring);
@@ -245,7 +247,7 @@ fn test_fft_basic() {
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
-    fft.unordered_fft(&mut values, ring.get_ring());
+    fft.unordered_fft(&mut values, ring);
     assert_eq!(values, permuted_expected);
 }
 
@@ -264,7 +266,7 @@ fn test_fft_long() {
         permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
     }
 
-    fft.unordered_fft(&mut values, ring.get_ring());
+    fft.unordered_fft(&mut values, ring);
     assert_eq!(values, permuted_expected);
 }
 
@@ -285,17 +287,17 @@ fn test_fft_unordered() {
     }
     let original = values;
 
-    fft.unordered_fft(&mut values, ring.get_ring());
+    fft.unordered_fft(&mut values, ring);
 
     let mut ordered_fft = [0; LEN];
     for i in 0..LEN {
         ordered_fft[fft.unordered_fft_permutation(i)] = values[i];
     }
 
-    fft.unordered_inv_fft(&mut values, ring.get_ring());
+    fft.unordered_inv_fft(&mut values, ring);
     assert_eq!(values, original);
 
-    fft.inv_fft(&mut ordered_fft, ring.get_ring());
+    fft.inv_fft(&mut ordered_fft, ring);
     assert_eq!(ordered_fft, original);
 }
 
@@ -327,7 +329,7 @@ fn test_inv_fft() {
     let mut values = [3, 62, 63, 96, 37, 36];
     let expected = [1, 0, 0, 1, 0, 1];
 
-    fft.inv_fft(&mut values, ring.get_ring());
+    fft.inv_fft(&mut values, ring);
     assert_eq!(values, expected);
 }
 
@@ -342,7 +344,7 @@ fn test_approximate_fft() {
             cooley_tuckey::CooleyTuckeyFFT::for_complex(CC, log2_n)
         );
         let mut array = (0..(p << log2_n)).map(|i| CC.root_of_unity(i as i64, (p as i64) << log2_n)).collect::<Vec<_>>();
-        fft.fft(&mut array, CC.get_ring());
+        fft.fft(&mut array, CC);
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
@@ -371,8 +373,8 @@ fn bench_factor_fft(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         copy.clear();
         copy.extend(data.iter().map(|x| ring.clone_el(x)));
-        fft.unordered_fft(&mut copy[..], ring.get_ring());
-        fft.unordered_inv_fft(&mut copy[..], ring.get_ring());
+        fft.unordered_fft(&mut copy[..], &ring);
+        fft.unordered_inv_fft(&mut copy[..], &ring);
         assert_el_eq!(ring, copy[0], data[0]);
     });
 }

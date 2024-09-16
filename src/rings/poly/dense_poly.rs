@@ -53,21 +53,23 @@ use std::cmp::min;
 /// assert_el_eq!(P2, P2.pow(P2.indeterminate(), 10), &P.can_iso(&P2).unwrap().map(high_power_of_x));
 /// ```
 /// 
-pub struct DensePolyRingBase<R: RingStore, A: Allocator + Clone = Global> {
+pub struct DensePolyRingBase<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> {
     base_ring: R,
     unknown_name: &'static str,
     zero: El<R>,
-    element_allocator: A
+    element_allocator: A,
+    convolution_algorithm: C
 }
 
-impl<R: RingStore + Clone, A: Allocator + Clone> Clone for DensePolyRingBase<R, A> {
+impl<R: RingStore + Clone, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type> + Clone> Clone for DensePolyRingBase<R, A, C> {
     
     fn clone(&self) -> Self {
         DensePolyRingBase {
             base_ring: <R as Clone>::clone(&self.base_ring), 
             unknown_name: self.unknown_name, 
             zero: self.base_ring.zero() ,
-            element_allocator: self.element_allocator.clone()
+            element_allocator: self.element_allocator.clone(),
+            convolution_algorithm: self.convolution_algorithm.clone()
         }
     }
 }
@@ -76,30 +78,31 @@ impl<R: RingStore + Clone, A: Allocator + Clone> Clone for DensePolyRingBase<R, 
 /// The univariate polynomial ring `R[X]`, with polynomials being stored as dense vectors of coefficients.
 /// For details, see [`DensePolyRingBase`].
 /// 
-pub type DensePolyRing<R, A = Global> = RingValue<DensePolyRingBase<R, A>>;
+pub type DensePolyRing<R, A = Global, C = KaratsubaAlgorithm> = RingValue<DensePolyRingBase<R, A, C>>;
 
 impl<R: RingStore> DensePolyRing<R> {
 
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        Self::new_with(base_ring, unknown_name, Global)
+        Self::new_with(base_ring, unknown_name, Global, STANDARD_CONVOLUTION)
     }
 }
 
-impl<R: RingStore, A: Allocator + Clone> DensePolyRing<R, A> {
+impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> DensePolyRing<R, A, C> {
 
     #[stability::unstable(feature = "enable")]
-    pub fn new_with(base_ring: R, unknown_name: &'static str, element_allocator: A) -> Self {
+    pub fn new_with(base_ring: R, unknown_name: &'static str, element_allocator: A, convolution_algorithm: C) -> Self {
         let zero = base_ring.zero();
         RingValue::from(DensePolyRingBase {
             base_ring, 
             unknown_name, 
             zero, 
-            element_allocator
+            element_allocator,
+            convolution_algorithm
         })
     }
 }
 
-impl<R: RingStore, A: Allocator + Clone> DensePolyRingBase<R, A> {
+impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> DensePolyRingBase<R, A, C> {
 
     fn poly_div<F>(&self, lhs: &mut <Self as RingBase>::Element, rhs: &<Self as RingBase>::Element, mut left_div_lc: F) -> Option<<Self as RingBase>::Element>
         where F: FnMut(El<R>) -> Option<El<R>>
@@ -125,7 +128,7 @@ pub struct DensePolyRingEl<R: RingStore, A: Allocator + Clone = Global> {
     data: Vec<El<R>, A>
 }
 
-impl<R: RingStore, A: Allocator + Clone> RingBase for DensePolyRingBase<R, A> {
+impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingBase for DensePolyRingBase<R, A, C> {
     
     type Element = DensePolyRingEl<R, A>;
 
@@ -224,7 +227,7 @@ impl<R: RingStore, A: Allocator + Clone> RingBase for DensePolyRingBase<R, A> {
         let rhs_len = self.degree(rhs).map(|i| i + 1).unwrap_or(0);
         let mut result = Vec::with_capacity_in(lhs_len + rhs_len, self.element_allocator.clone());
         result.extend((0..(lhs_len + rhs_len)).map(|_| self.base_ring().zero()));
-        STANDARD_CONVOLUTION.compute_convolution(
+        self.convolution_algorithm.compute_convolution(
             &lhs.data[0..lhs_len], 
             &rhs.data[0..rhs_len],
             &mut result[..],
@@ -268,8 +271,8 @@ impl<R: RingStore, A: Allocator + Clone> RingBase for DensePolyRingBase<R, A> {
     }
 }
 
-impl<R, A> PartialEq for DensePolyRingBase<R, A> 
-    where R: RingStore, A: Allocator + Clone
+impl<R, A, C> PartialEq for DensePolyRingBase<R, A, C> 
+    where R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>
 {
     fn eq(&self, other: &Self) -> bool {
         self.base_ring.get_ring() == other.base_ring.get_ring()
@@ -291,10 +294,10 @@ impl<R> ImplGenericCanIsoFromToMarker for sparse_poly::SparsePolyRingBase<R>
     where R: RingStore
 {}
 
-impl<R, P, A> CanHomFrom<P> for DensePolyRingBase<R, A> 
-    where R: RingStore, R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanIsoFromToMarker, A: Allocator + Clone
+impl<R, P, A, C> CanHomFrom<P> for DensePolyRingBase<R, A, C> 
+    where R: RingStore, R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanIsoFromToMarker, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>
 {
-    type Homomorphism = super::generic_impls::Homomorphism<P, DensePolyRingBase<R, A>>;
+    type Homomorphism = super::generic_impls::Homomorphism<P, DensePolyRingBase<R, A, C>>;
 
     fn has_canonical_hom(&self, from: &P) -> Option<Self::Homomorphism> {
         super::generic_impls::has_canonical_hom(from, self)
@@ -305,44 +308,44 @@ impl<R, P, A> CanHomFrom<P> for DensePolyRingBase<R, A>
     }
 }
 
-impl<R1, A1, R2, A2> CanHomFrom<DensePolyRingBase<R1, A1>> for DensePolyRingBase<R2, A2> 
-    where R1: RingStore, A1: Allocator + Clone, 
-        R2: RingStore, A2: Allocator + Clone,
+impl<R1, A1, R2, A2, C1, C2> CanHomFrom<DensePolyRingBase<R1, A1, C1>> for DensePolyRingBase<R2, A2, C2> 
+    where R1: RingStore, A1: Allocator + Clone, C1: ConvolutionAlgorithm<R1::Type>,
+        R2: RingStore, A2: Allocator + Clone, C2: ConvolutionAlgorithm<R2::Type>,
         R2::Type: CanHomFrom<R1::Type>
 {
     type Homomorphism = <R2::Type as CanHomFrom<R1::Type>>::Homomorphism;
 
-    fn has_canonical_hom(&self, from: &DensePolyRingBase<R1, A1>) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &DensePolyRingBase<R1, A1, C1>) -> Option<Self::Homomorphism> {
         self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
     }
 
-    fn map_in_ref(&self, from: &DensePolyRingBase<R1, A1>, el: &DensePolyRingEl<R1, A1>, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in_ref(&self, from: &DensePolyRingBase<R1, A1, C1>, el: &DensePolyRingEl<R1, A1>, hom: &Self::Homomorphism) -> Self::Element {
         RingRef::new(self).from_terms((0..el.data.len()).map(|i| (self.base_ring().get_ring().map_in_ref(from.base_ring().get_ring(), &el.data[i], hom), i)))
     }
 
-    fn map_in(&self, from: &DensePolyRingBase<R1, A1>, el: DensePolyRingEl<R1, A1>, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &DensePolyRingBase<R1, A1, C1>, el: DensePolyRingEl<R1, A1>, hom: &Self::Homomorphism) -> Self::Element {
         self.map_in_ref(from, &el, hom)    
     }
 }
 
-impl<R1, A1, R2, A2> CanIsoFromTo<DensePolyRingBase<R1, A1>> for DensePolyRingBase<R2, A2> 
-    where R1: RingStore, A1: Allocator + Clone, 
-        R2: RingStore, A2: Allocator + Clone,
+impl<R1, A1, R2, A2, C1, C2> CanIsoFromTo<DensePolyRingBase<R1, A1, C1>> for DensePolyRingBase<R2, A2, C2> 
+    where R1: RingStore, A1: Allocator + Clone, C1: ConvolutionAlgorithm<R1::Type>, 
+        R2: RingStore, A2: Allocator + Clone, C2: ConvolutionAlgorithm<R2::Type>,
         R2::Type: CanIsoFromTo<R1::Type>
 {
     type Isomorphism = <R2::Type as CanIsoFromTo<R1::Type>>::Isomorphism;
 
-    fn has_canonical_iso(&self, from: &DensePolyRingBase<R1, A1>) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, from: &DensePolyRingBase<R1, A1, C1>) -> Option<Self::Isomorphism> {
         self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
     }
 
-    fn map_out(&self, from: &DensePolyRingBase<R1, A1>, el: DensePolyRingEl<R2, A2>, hom: &Self::Isomorphism) -> DensePolyRingEl<R1, A1> {
+    fn map_out(&self, from: &DensePolyRingBase<R1, A1, C1>, el: DensePolyRingEl<R2, A2>, hom: &Self::Isomorphism) -> DensePolyRingEl<R1, A1> {
         RingRef::new(from).from_terms((0..el.data.len()).map(|i| (self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(&el.data[i]), hom), i)))
     }
 }
 
-impl<R, P, A> CanIsoFromTo<P> for DensePolyRingBase<R, A> 
-    where R: RingStore, R::Type: CanIsoFromTo<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanIsoFromToMarker, A: Allocator + Clone
+impl<R, P, A, C> CanIsoFromTo<P> for DensePolyRingBase<R, A, C> 
+    where R: RingStore, R::Type: CanIsoFromTo<<P::BaseRing as RingStore>::Type>, P: ImplGenericCanIsoFromToMarker, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>
 {
     type Isomorphism = super::generic_impls::Isomorphism<P, Self>;
 
@@ -355,7 +358,7 @@ impl<R, P, A> CanIsoFromTo<P> for DensePolyRingBase<R, A>
     }
 }
 
-impl<R: RingStore, A: Allocator + Clone> RingExtension for DensePolyRingBase<R, A> {
+impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingExtension for DensePolyRingBase<R, A, C> {
     
     type BaseRing = R;
 
@@ -406,7 +409,7 @@ impl<'a, R> Iterator for TermIterator<'a, R>
     }
 }
 
-impl<R, A: Allocator + Clone> HashableElRing for DensePolyRingBase<R, A> 
+impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> HashableElRing for DensePolyRingBase<R, A, C> 
     where R: RingStore,
         R::Type: HashableElRing
 {
@@ -417,7 +420,7 @@ impl<R, A: Allocator + Clone> HashableElRing for DensePolyRingBase<R, A>
     }
 }
 
-impl<R, A: Allocator + Clone> SerializableElementRing for DensePolyRingBase<R, A> 
+impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> SerializableElementRing for DensePolyRingBase<R, A, C> 
     where R: RingStore,
         R::Type: SerializableElementRing
 {
@@ -437,7 +440,7 @@ impl<R, A: Allocator + Clone> SerializableElementRing for DensePolyRingBase<R, A
     }
 }
 
-impl<R, A: Allocator + Clone> PolyRing for DensePolyRingBase<R, A> 
+impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for DensePolyRingBase<R, A, C> 
     where R: RingStore
 {
     type TermsIterator<'a> = TermIterator<'a, R>
@@ -507,12 +510,12 @@ impl<R, A: Allocator + Clone> PolyRing for DensePolyRingBase<R, A>
     }
 }
 
-impl<R, A: Allocator + Clone> Domain for DensePolyRingBase<R, A> 
+impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> Domain for DensePolyRingBase<R, A, C> 
     where R: RingStore, R::Type: Domain
 {}
 
-impl<R, A: Allocator + Clone> DivisibilityRing for DensePolyRingBase<R, A> 
-    where R: DivisibilityRingStore, R::Type: DivisibilityRing
+impl<R, A: Allocator + Clone, C> DivisibilityRing for DensePolyRingBase<R, A, C> 
+    where R: DivisibilityRingStore, R::Type: DivisibilityRing, C: ConvolutionAlgorithm<R::Type>
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if let Some(d) = self.degree(rhs) {
@@ -532,53 +535,62 @@ impl<R, A: Allocator + Clone> DivisibilityRing for DensePolyRingBase<R, A>
     }
 }
 
+///
+/// Workaround to allow specialization on `base_ring() == QQ`.
+/// 
 trait ImplPrincipalIdealRing: Field {
 
-    fn extended_ideal_gen<P, R, A>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
-        where P: PolyRingStore<Type = DensePolyRingBase<R, A>>,
+    fn extended_ideal_gen<P, R, A, C>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
+        where P: PolyRingStore<Type = DensePolyRingBase<R, A, C>>,
             R: RingStore<Type = Self>,
-            A: Allocator + Clone;
+            A: Allocator + Clone, 
+            C: ConvolutionAlgorithm<R::Type>;
 
-    fn ideal_gen<P, R, A>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: PolyRingStore<Type = DensePolyRingBase<R, A>>,
+    fn ideal_gen<P, R, A, C>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+        where P: PolyRingStore<Type = DensePolyRingBase<R, A, C>>,
             R: RingStore<Type = Self>,
-            A: Allocator + Clone;
+            A: Allocator + Clone, 
+            C: ConvolutionAlgorithm<R::Type>;
 }
 
 impl<F: ?Sized + Field> ImplPrincipalIdealRing for F {
 
-    default fn extended_ideal_gen<P, R, A>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
-        where P: PolyRingStore<Type = DensePolyRingBase<R, A>>,
+    default fn extended_ideal_gen<P, R, A, C>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
+        where P: PolyRingStore<Type = DensePolyRingBase<R, A, C>>,
             R: RingStore<Type = Self>,
-            A: Allocator + Clone
+            A: Allocator + Clone, 
+            C: ConvolutionAlgorithm<R::Type>
     {
         algorithms::eea::eea(poly_ring.clone_el(lhs), poly_ring.clone_el(rhs), poly_ring)
     }
 
-    default fn ideal_gen<P, R, A>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: PolyRingStore<Type = DensePolyRingBase<R, A>>,
+    default fn ideal_gen<P, R, A, C>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+        where P: PolyRingStore<Type = DensePolyRingBase<R, A, C>>,
             R: RingStore<Type = Self>,
-            A: Allocator + Clone
+            A: Allocator + Clone, 
+            C: ConvolutionAlgorithm<R::Type>
     {
-        <Self as ImplPrincipalIdealRing>::extended_ideal_gen::<P, R, A>(poly_ring, lhs, rhs).2
+        <Self as ImplPrincipalIdealRing>::extended_ideal_gen::<P, R, A, C>(poly_ring, lhs, rhs).2
     }
 }
 
 impl<I: IntegerRingStore> ImplPrincipalIdealRing for RationalFieldBase<I>
     where I::Type: IntegerRing
 {
-    fn extended_ideal_gen<P, R, A>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
-        where P: PolyRingStore<Type = DensePolyRingBase<R, A>>,
+    fn extended_ideal_gen<P, R, A, C>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
+        where P: PolyRingStore<Type = DensePolyRingBase<R, A, C>>,
             R: RingStore<Type = Self>,
-            A: Allocator + Clone
+            A: Allocator + Clone, 
+            C: ConvolutionAlgorithm<R::Type>
     {
         algorithms::eea::eea(poly_ring.clone_el(lhs), poly_ring.clone_el(rhs), poly_ring)
     }
 
-    fn ideal_gen<P, R, A>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: PolyRingStore<Type = DensePolyRingBase<R, A>>,
+    fn ideal_gen<P, R, A, C>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+        where P: PolyRingStore<Type = DensePolyRingBase<R, A, C>>,
             R: RingStore<Type = Self>,
-            A: Allocator + Clone
+            A: Allocator + Clone, 
+            C: ConvolutionAlgorithm<R::Type>
     {
         let QQ = poly_ring.base_ring();
         let ZZX = DensePolyRing::new(QQ.base_ring(), "X");
@@ -590,8 +602,8 @@ impl<I: IntegerRingStore> ImplPrincipalIdealRing for RationalFieldBase<I>
     }
 }
 
-impl<R, A: Allocator + Clone> PrincipalIdealRing for DensePolyRingBase<R, A>
-    where R: RingStore, R::Type: Field
+impl<R, A: Allocator + Clone, C> PrincipalIdealRing for DensePolyRingBase<R, A, C>
+    where R: RingStore, R::Type: Field, C: ConvolutionAlgorithm<R::Type>
 {
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         <R::Type as ImplPrincipalIdealRing>::extended_ideal_gen(&RingRef::new(self), lhs, rhs)
@@ -602,7 +614,7 @@ impl<R, A: Allocator + Clone> PrincipalIdealRing for DensePolyRingBase<R, A>
     }
 }
 
-impl<R, A: Allocator + Clone> EuclideanRing for DensePolyRingBase<R, A> 
+impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> EuclideanRing for DensePolyRingBase<R, A, C> 
     where R: RingStore, R::Type: Field
 {
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
@@ -629,7 +641,7 @@ use crate::rings::extension::FreeAlgebraStore;
 #[cfg(test)]
 use crate::iters::multiset_combinations;
 #[cfg(test)]
-use crate::rings::extension::galois_field_new::GaloisField;
+use crate::rings::extension::galois_field::GaloisField;
 #[cfg(test)]
 use std::time::Instant;
 

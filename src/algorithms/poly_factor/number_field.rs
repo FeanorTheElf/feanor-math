@@ -121,7 +121,7 @@ fn test_factor_number_field() {
 
     // a quadratic field
 
-    let K = FreeAlgebraImpl::new(QQ, [ZZ_to_QQ.map(-1), ZZ_to_QQ.map(-1)]).as_field().ok().unwrap();
+    let K = FreeAlgebraImpl::new(&QQ, 2, [ZZ_to_QQ.map(-1), ZZ_to_QQ.map(-1)]).as_field().ok().unwrap();
     let KX = DensePolyRing::new(&K, "X");
     let poly = K.generating_poly(&KX, K.inclusion());
 
@@ -132,7 +132,7 @@ fn test_factor_number_field() {
 
     // the case of a galois field of degree 3
 
-    let K = FreeAlgebraImpl::new(QQ, [ZZ_to_QQ.map(1), ZZ_to_QQ.map(2), ZZ_to_QQ.map(-1)]).as_field().ok().unwrap();
+    let K = FreeAlgebraImpl::new(&QQ, 3, [ZZ_to_QQ.map(1), ZZ_to_QQ.map(2), ZZ_to_QQ.map(-1)]).as_field().ok().unwrap();
     let KX = DensePolyRing::new(&K, "X");
     let poly = K.generating_poly(&KX, K.inclusion());
 
@@ -143,7 +143,7 @@ fn test_factor_number_field() {
 
     // the case of a non-galois field (not normal) of degree 3
 
-    let K = FreeAlgebraImpl::new(QQ, [ZZ_to_QQ.map(2), ZZ_to_QQ.map(0), ZZ_to_QQ.map(0)]).as_field().ok().unwrap();
+    let K = FreeAlgebraImpl::new(&QQ, 3, [ZZ_to_QQ.map(2), ZZ_to_QQ.map(0), ZZ_to_QQ.map(0)]).as_field().ok().unwrap();
     let KX = DensePolyRing::new(&K, "X");
     let poly = K.generating_poly(&KX, K.inclusion());
     
