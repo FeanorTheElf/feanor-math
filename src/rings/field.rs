@@ -195,6 +195,10 @@ impl<R: DivisibilityRingStore> DivisibilityRing for AsFieldBase<R>
 impl<R: RingStore> PrincipalIdealRing for AsFieldBase<R> 
     where R::Type: DivisibilityRing
 {
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        self.checked_left_div(lhs, rhs)
+    }
+    
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         if self.is_zero(lhs) {
             (self.zero(), self.one(), self.clone_el(rhs))

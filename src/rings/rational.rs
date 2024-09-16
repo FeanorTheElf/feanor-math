@@ -276,6 +276,13 @@ impl<I> PrincipalIdealRing for RationalFieldBase<I>
     where I: IntegerRingStore,
         I::Type: IntegerRing
 {
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        if self.is_zero(lhs) && self.is_zero(rhs) {
+            return Some(self.one());
+        }
+        self.checked_left_div(lhs, rhs)
+    }
+
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         if self.is_zero(lhs) && self.is_zero(rhs) {
             return (self.zero(), self.zero(), self.zero());

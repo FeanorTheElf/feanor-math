@@ -605,6 +605,10 @@ impl<I: IntegerRingStore> ImplPrincipalIdealRing for RationalFieldBase<I>
 impl<R, A: Allocator + Clone, C> PrincipalIdealRing for DensePolyRingBase<R, A, C>
     where R: RingStore, R::Type: Field, C: ConvolutionAlgorithm<R::Type>
 {
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        unimplemented!()
+    }
+
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         <R::Type as ImplPrincipalIdealRing>::extended_ideal_gen(&RingRef::new(self), lhs, rhs)
     }
@@ -705,6 +709,12 @@ fn test_divisibility_ring_axioms() {
 fn test_euclidean_ring_axioms() {
     let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
     crate::pid::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
+}
+
+#[test]
+fn test_principal_ideal_ring_axioms() {
+    let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]

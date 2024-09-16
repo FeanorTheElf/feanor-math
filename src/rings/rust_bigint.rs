@@ -312,6 +312,13 @@ impl<A: Allocator + Clone> DivisibilityRing for RustBigintRingBase<A> {
 
 impl<A: Allocator + Clone> PrincipalIdealRing for RustBigintRingBase<A> {
 
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        if self.is_zero(lhs) && self.is_zero(rhs) {
+            return Some(self.one());
+        }
+        self.checked_left_div(lhs, rhs)
+    }
+    
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), RingRef::new(self))
     }
@@ -551,6 +558,11 @@ fn test_bigint_divisibility_ring_axioms() {
 #[test]
 fn test_bigint_euclidean_ring_axioms() {
     crate::pid::generic_tests::test_euclidean_ring_axioms(ZZ, edge_case_elements());
+}
+
+#[test]
+fn test_bigint_principal_ideal_ring_axioms() {
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(ZZ, edge_case_elements());
 }
 
 #[test]

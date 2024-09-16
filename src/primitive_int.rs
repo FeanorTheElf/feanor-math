@@ -160,6 +160,13 @@ impl<T: PrimitiveInt> Domain for StaticRingBase<T> {}
 
 impl<T: PrimitiveInt> PrincipalIdealRing for StaticRingBase<T> {
     
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        if self.is_zero(lhs) && self.is_zero(rhs) {
+            return Some(self.one());
+        }
+        self.checked_left_div(lhs, rhs)
+    }
+
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         algorithms::eea::eea(*lhs, *rhs, StaticRing::<T>::RING)
     }
@@ -442,6 +449,15 @@ fn test_euclidean_ring_axioms() {
     crate::pid::generic_tests::test_euclidean_ring_axioms(StaticRing::<i32>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
     crate::pid::generic_tests::test_euclidean_ring_axioms(StaticRing::<i64>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
     crate::pid::generic_tests::test_euclidean_ring_axioms(StaticRing::<i128>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+}
+
+#[test]
+fn test_principal_ideal_ring_ring_axioms() {
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(StaticRing::<i8>::RING, [-2, -1, 0, 1, 2].into_iter());
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(StaticRing::<i16>::RING, [-2, -1, 0, 1, 2, 3, 4].into_iter());
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(StaticRing::<i32>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(StaticRing::<i64>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(StaticRing::<i128>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
 
 }
 

@@ -443,6 +443,10 @@ impl<R,> DivisibilityRing for SparsePolyRingBase<R>
 impl<R> PrincipalIdealRing for SparsePolyRingBase<R>
     where R: RingStore, R::Type: Field
 {
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        unimplemented!()
+    }
+
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), RingRef::new(self))
     }
@@ -531,4 +535,10 @@ fn test_divisibility_ring_axioms() {
 fn test_euclidean_ring_axioms() {
     let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
     crate::pid::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
+}
+
+#[test]
+fn test_principal_ideal_ring_axioms() {
+    let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }

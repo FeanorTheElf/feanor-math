@@ -11,6 +11,7 @@ use crate::ordered::*;
 use super::field::AsFieldBase;
 use super::finite::FiniteRing;
 use crate::rings::finite::FiniteRingStore;
+use crate::pid::*;
 
 ///
 /// This module contains [`zn_big::Zn`], a general-purpose implementation of
@@ -130,7 +131,7 @@ pub mod generic_impls {
     use crate::ring::*;
     use crate::divisibility::DivisibilityRingStore;
     use crate::integer::{IntegerRing, IntegerRingStore};
-    use crate::algorithms;
+    use crate::pid::*;
     use super::{ZnRing, ZnRingStore};
     use crate::homomorphism::*;
 
@@ -261,9 +262,31 @@ pub mod generic_impls {
         let int_ring = ring.integer_ring();
         let lhs_lift = ring.smallest_positive_lift(ring.clone_el(lhs));
         let rhs_lift = ring.smallest_positive_lift(ring.clone_el(rhs));
-        let (s, _, d) = algorithms::eea::signed_eea(int_ring.clone_el(&rhs_lift), int_ring.clone_el(ring.modulus()), int_ring);
+        let (s, _, d) = int_ring.extended_ideal_gen(&rhs_lift, ring.modulus());
         if let Some(quotient) = int_ring.checked_div(&lhs_lift, &d) {
             Some(ring.mul(ring.coerce(int_ring, quotient), ring.coerce(int_ring, s)))
+        } else {
+            None
+        }
+    }
+    
+    #[stability::unstable(feature = "enable")]
+    pub fn checked_div_min<R: ZnRingStore>(ring: R, lhs: &El<R>, rhs: &El<R>) -> Option<El<R>>
+        where R::Type: ZnRing
+    {
+        if ring.is_zero(lhs) && ring.is_zero(rhs) {
+            return Some(ring.one());
+        }
+        assert!(ring.is_noetherian());
+        let int_ring = ring.integer_ring();
+        let mut lhs_lift = ring.smallest_positive_lift(ring.clone_el(lhs));
+        let mut rhs_lift = ring.smallest_positive_lift(ring.clone_el(rhs));
+        let d = int_ring.ideal_gen(&lhs_lift, &rhs_lift);
+        lhs_lift = int_ring.checked_div(&lhs_lift, &d).unwrap();
+        rhs_lift = int_ring.checked_div(&rhs_lift, &d).unwrap();
+        let (s, _, d) = int_ring.extended_ideal_gen(&rhs_lift, ring.modulus());
+        if int_ring.is_unit(&d) {
+            Some(ring.mul(ring.coerce(int_ring, lhs_lift), ring.mul(ring.coerce(int_ring, d), ring.coerce(int_ring, s))))
         } else {
             None
         }

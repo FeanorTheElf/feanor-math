@@ -67,9 +67,35 @@ If this suits your use case better, check it out! Personally, I think it is an a
 
 # Examples
 
+## Linear algebra on finite fields
+
+The simplest way of using `feanor-math` is by running a provided algorithm on a provided ring.
+For example, we can solve a linear system over a finite field as follows:
+```rust
+use feanor_math::homomorphism::*;
+use feanor_math::rings::extension::galois_field::*;
+use feanor_math::assert_el_eq;
+use feanor_math::rings::extension::*;
+use feanor_math::matrix::*;
+use feanor_math::ring::*;
+use feanor_math::primitive_int::*;
+use feanor_math::algorithms::linsolve::*;
+
+let F25 = GaloisField::new(5, 2);
+let ZZ_to_F25 = F25.int_hom();
+let mut lhs = OwnedMatrix::from_fn(2, 2, |i, j| F25.pow(F25.canonical_gen(), i * j));
+let mut rhs = OwnedMatrix::from_fn(2, 1, |i, _j| ZZ_to_F25.map(i as i32));
+let mut result = OwnedMatrix::zero(2, 1, &F25);
+F25.solve_right(lhs.data_mut(), rhs.data_mut(), result.data_mut()).assert_solved();
+println!("Solution is [{}, {}]", F25.format(result.at(0, 0)), F25.format(result.at(1, 0)));
+assert_el_eq!(&F25, F25.zero(), F25.add_ref(result.at(0, 0), result.at(1, 0)));
+```
+
 ## Using rings
 
-As simple example of how to use the library, we implement Fermat primality test here
+This library is not "just" a collection of algorithms on certain rings, but is supposed to be seamlessly extensible.
+In particular, a user should be able to write high-performance algorithms that directly operate on provided rings, or rings that work seamlessly with provided algorithms.
+First, we show demonstrate how one could implement the Fermat primality test.
 ```rust
 use feanor_math::homomorphism::*;
 use feanor_math::assert_el_eq;

@@ -13,6 +13,7 @@ use crate::pid::*;
 use crate::ring::*;
 use crate::serialization::SerializableElementRing;
 use algorithms::convolution::KaratsubaHint;
+use algorithms::eea::signed_gcd;
 use algorithms::matmul::ComputeInnerProduct;
 use algorithms::matmul::StrassenHint;
 use serde::de;
@@ -558,18 +559,14 @@ impl FiniteRing for ZnBase {
 
 impl PrincipalIdealRing for ZnBase {
 
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        generic_impls::checked_div_min(RingRef::new(self), lhs, rhs)
+    }
+
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         let (s, t, d) = StaticRing::<i64>::RING.extended_ideal_gen(&(lhs.0 as i64), &(rhs.0 as i64));
         let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
-    }
-    
-    fn cancel_common_factors(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        let l = self.smallest_positive_lift(*lhs);
-        let r = self.smallest_positive_lift(*rhs);
-        let d = StaticRing::<i64>::RING.ideal_gen(&l, &r);
-        let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
-        return (quo.map(l / d), quo.map(r / d), quo.map(d));
     }
 }
 
@@ -724,6 +721,11 @@ impl PartialEq for ZnFastmulBase {
 }
 
 impl PrincipalIdealRing for ZnFastmulBase {
+
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        let result = self.get_delegate().checked_div_min(self.delegate_ref(lhs), self.delegate_ref(rhs));
+        result.map(|x| self.rev_delegate(x))
+    }
 
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         let (s, t, d) = self.get_delegate().extended_ideal_gen(self.delegate_ref(lhs), self.delegate_ref(rhs));

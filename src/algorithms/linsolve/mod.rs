@@ -1,4 +1,4 @@
-use std::alloc::Allocator;
+use std::alloc::{Allocator, Global};
 
 use crate::matrix::{AsPointerToSlice, SubmatrixMut};
 use crate::pid::PrincipalIdealRing;
@@ -74,6 +74,45 @@ pub trait LinSolveRing: RingBase {
             V3: AsPointerToSlice<Self::Element>,
             A: Allocator;
 }
+
+///
+/// [`RingStore`] corresponding to [`LinSolveRing`].
+/// 
+pub trait LinSolveRingStore: RingStore
+    where Self::Type: LinSolveRing
+{
+    ///
+    /// Solves a linear system `lhs * X = rhs`.
+    /// 
+    /// For details, see [`LinSolveRing::solve_right()`].
+    /// 
+    fn solve_right<V1, V2, V3>(&self, lhs: SubmatrixMut<V1, El<Self>>, rhs: SubmatrixMut<V2, El<Self>>, out: SubmatrixMut<V3, El<Self>>) -> SolveResult
+        where V1: AsPointerToSlice<El<Self>>,
+            V2: AsPointerToSlice<El<Self>>,
+            V3: AsPointerToSlice<El<Self>>
+    {
+        self.get_ring().solve_right(lhs, rhs, out, Global)
+    }
+
+    ///
+    /// Solves a linear system `lhs * X = rhs`.
+    /// 
+    /// For details, see [`LinSolveRing::solve_right()`].
+    /// 
+    #[stability::unstable(feature = "enable")]
+    fn solve_right_with<V1, V2, V3, A>(&self, lhs: SubmatrixMut<V1, El<Self>>, rhs: SubmatrixMut<V2, El<Self>>, out: SubmatrixMut<V3, El<Self>>, allocator: A) -> SolveResult
+        where V1: AsPointerToSlice<El<Self>>,
+            V2: AsPointerToSlice<El<Self>>,
+            V3: AsPointerToSlice<El<Self>>,
+            A: Allocator
+    {
+        self.get_ring().solve_right(lhs, rhs, out, allocator)
+    }
+}
+
+impl<R> LinSolveRingStore for R
+    where R: RingStore, R::Type: LinSolveRing
+{}
 
 impl<R: ?Sized + PrincipalIdealRing> LinSolveRing for R {
 

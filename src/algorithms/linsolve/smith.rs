@@ -2,7 +2,7 @@ use std::alloc::Allocator;
 use std::cmp::min;
 
 use crate::algorithms::linsolve::SolveResult;
-use crate::divisibility::DivisibilityRingStore;
+use crate::divisibility::*;
 use crate::matrix::*;
 use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
 use crate::ring::*;
@@ -57,7 +57,7 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
                     TransformRows(A.reborrow(), ring.get_ring()).subtract(ring.get_ring(), k, i, &quo);
                     L.subtract(ring.get_ring(), k, i, &quo);
                 } else {
-                    let (transform, _) = ring.get_ring().create_left_elimination_matrix(A.at(k, k), A.at(i, k));
+                    let (transform, _) = ring.get_ring().create_elimination_matrix(A.at(k, k), A.at(i, k));
                     TransformRows(A.reborrow(), ring.get_ring()).transform(ring.get_ring(), k, i, &transform);
                     L.transform(ring.get_ring(), k, i, &transform);
                 }
@@ -73,7 +73,7 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
                     R.subtract(ring.get_ring(), k, j, &quo);
                 } else {
                     changed = true;
-                    let (transform, _) = ring.get_ring().create_left_elimination_matrix(A.at(k, k), A.at(k, j));
+                    let (transform, _) = ring.get_ring().create_elimination_matrix(A.at(k, k), A.at(k, j));
                     TransformCols(A.reborrow(), ring.get_ring()).transform(ring.get_ring(), k, j, &transform);
                     R.transform(ring.get_ring(), k, j, &transform);
                 }
@@ -257,6 +257,12 @@ fn test_smith_direct_elim_matrix_fails() {
     }
 
     impl PrincipalIdealRing for Z12_specialize_bezout_identity {
+
+        fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+            // we violate the contract here by just using checked_div
+            self.checked_left_div(lhs, rhs)
+        }
+
         fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
             if self.is_zero(lhs) && self.eq_el(rhs, &self.from_int(6)) {
                 (self.zero(), self.from_int(3), self.from_int(6))

@@ -578,6 +578,10 @@ impl<R, V, A, C> PrincipalIdealRing for GaloisFieldBase<R, V, A, C>
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
 {
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        self.checked_left_div(lhs, rhs)
+    }
+    
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         if self.is_zero(lhs) {
             (self.zero(), self.one(), self.clone_el(rhs))

@@ -354,7 +354,7 @@ mod local {
             }
             if let Some(entry) = matrix.at(i).leading_entry_at(pivot_j) {
                 if ring.checked_div(entry, &current).is_none() {
-                    let (local_transform, gcd) = ring.get_ring().create_left_elimination_matrix(&current, entry);
+                    let (local_transform, gcd) = ring.get_ring().create_elimination_matrix(&current, entry);
                     let local_transform_det = ring.sub(ring.mul_ref(&local_transform[0], &local_transform[3]), ring.mul_ref(&local_transform[1], &local_transform[2]));
                     if EXTENSIVE_RUNTIME_ASSERTS {
                         assert!(ring.is_unit(&local_transform_det)); 

@@ -5,9 +5,26 @@ use crate::divisibility::*;
 /// Trait for rings that are principal ideal rings, i.e. every ideal is generated
 /// by a single element. 
 /// 
+/// A principal ideal ring currently must be commutative, since otherwise we would
+/// have to distinguish left-, right-and two-sided ideals.
+/// 
 pub trait PrincipalIdealRing: DivisibilityRing {
 
-    // TODO: when doing the next breaking change, add a function for the annihilator generator of an element / smallest division result
+    ///
+    /// Similar to [`DivisibilityRing::checked_left_div()`] this computes a "quotient" `q`
+    /// of `lhs` and `rhs`, if it exists. However, we impose the additional constraint
+    /// that this quotient be minimal, i.e. there is no `q'` with `q' | q` properly and
+    /// `q' * rhs = lhs`.
+    /// 
+    /// In domains, this is always satisfied, i.e. this function behaves exactly like
+    /// [`DivisibilityRing::checked_left_div()`]. However, if there are zero-divisors, weird
+    /// things can happen. For example in `Z/6Z`, `checked_div(4, 4)` may return `4`, however
+    /// this is not minimal since `1 | 4` and `1 * 4 = 4`.
+    /// 
+    /// In particular, this function can be used to compute a generator of the annihilator ideal
+    /// of an element `x`, by using it as `checked_div_min(0, x)`.
+    /// 
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element>;
 
     ///
     /// Computes a Bezout identity for the generator `g` of the ideal `(lhs, rhs)`
@@ -22,43 +39,19 @@ pub trait PrincipalIdealRing: DivisibilityRing {
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element);
 
     ///
-    /// Cancels out the gcd of lhs and rhs.
-    /// 
-    /// More concretely, computes `(a, b, d)` such that `a * d = lhs`, `b * d = rhs` and `a, b` are coprime.
-    /// 
-    /// # Warning
-    /// 
-    /// For backwards compatibility, a default implementation that returns `(lhs.checked_div(gcd(lhs, rhs)), rhs.checked_div(gcd(lhs, rhs)), gcd(lhs, rhs))`
-    /// is provided. This default implementation **is not guaranteed to always work correctly**. In particular, by the contract of 
-    /// [`DivisibilityRing::checked_left_div()`], the returned "quotient" does not have to be minimal w.r.t. divisibility, so it is perfectly
-    /// fine to have `6.checked_div(6) = 3 mod 12`, hence the naive implementation would map `(6, 6) -> (3, 3, 6)` with `3, 3` not coprime.
-    /// The implementation checks this and panics in such cases, so when the function returns successfully, the result is correct.
-    /// 
-    /// Note that it will always be correct for [`Domain`]s and [`crate::local::PrincipalLocalRing`]s. Also, natural implementations of
-    /// [`DivisibilityRing::checked_left_div()`] often make this work out. Nevertheless, if your ring is neither integral nor local, consider
-    /// providing a correct implementation.
-    /// 
-    /// Also, the default implementation will be removed at the next breaking update of feanor-math.
-    /// 
-    fn cancel_common_factors(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        let gcd = self.ideal_gen(lhs, rhs);
-        let fst = self.checked_left_div(lhs, &gcd).unwrap();
-        let snd = self.checked_left_div(rhs, &gcd).unwrap();
-        assert!(self.is_unit(&self.ideal_gen(&fst, &snd)), "Default implementation for cancel_common_factors() failed for {} and {}; See [`PrincipalIdealRing::cancel_common_factors()`] for an explanation of this error", RingRef::new(self).format(lhs), RingRef::new(self).format(rhs));
-        return (fst, snd, gcd);
-    }
-
-    ///
     /// Creates a matrix `A` of unit determinant such that `A * (a, b)^T = (d, 0)`.
     /// Returns `(A, d)`.
     /// 
     #[stability::unstable(feature = "enable")]
-    fn create_left_elimination_matrix(&self, a: &Self::Element, b: &Self::Element) -> ([Self::Element; 4], Self::Element) {
-        let (new_a, new_b, gcd) = self.cancel_common_factors(a, b);
+    fn create_elimination_matrix(&self, a: &Self::Element, b: &Self::Element) -> ([Self::Element; 4], Self::Element) {
+        assert!(self.is_commutative());
+        let old_gcd = self.ideal_gen(a, b);
+        let new_a = self.checked_div_min(a, &old_gcd).unwrap();
+        let new_b = self.checked_div_min(b, &old_gcd).unwrap();
         let (s, t, gcd_new) = self.extended_ideal_gen(&new_a, &new_b);
         debug_assert!(self.is_unit(&gcd_new));
         
-        let subtract_factor = self.checked_left_div(&self.sub(self.mul_ref(b, &new_a), self.mul_ref(a, &new_b)), &gcd).unwrap();
+        let subtract_factor = self.checked_left_div(&self.sub(self.mul_ref(b, &new_a), self.mul_ref(a, &new_b)), &gcd_new).unwrap();
         // this has unit determinant and will map `(a, b)` to `(d, b * new_a - a * new_b)`; after a subtraction step, we are done
         let mut result = [s, t, self.negate(new_b), new_a];
     
@@ -67,7 +60,7 @@ pub trait PrincipalIdealRing: DivisibilityRing {
         let sub2 = self.mul_ref_fst(&result[1], subtract_factor);
         self.sub_assign(&mut result[3], sub2);
         debug_assert!(self.is_unit(&self.sub(self.mul_ref(&result[0], &result[3]), self.mul_ref(&result[1], &result[2]))));
-        return (result, gcd);
+        return (result, gcd_new);
     }
     
 
@@ -102,6 +95,7 @@ pub trait PrincipalIdealRing: DivisibilityRing {
 pub trait PrincipalIdealRingStore: RingStore
     where Self::Type: PrincipalIdealRing
 {
+    delegate!{ PrincipalIdealRing, fn checked_div_min(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> }
     delegate!{ PrincipalIdealRing, fn extended_ideal_gen(&self, lhs: &El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>, El<Self>) }
     delegate!{ PrincipalIdealRing, fn ideal_gen(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
     delegate!{ PrincipalIdealRing, fn lcm(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
@@ -224,6 +218,12 @@ pub mod generic_tests {
         assert!(ring.is_commutative());
         assert!(ring.is_noetherian());
         let elements = edge_case_elements.collect::<Vec<_>>();
+
+        for a in &elements {
+            let expected_unit = ring.checked_div_min(a, a).unwrap();
+            assert!(ring.is_unit(&expected_unit), "checked_div_min() returned a non-minimal quotient {} * {} = {}", ring.format(&expected_unit), ring.format(a), ring.format(a));
+        }
+
         for a in &elements {
             for b in &elements {
                 for c in &elements {

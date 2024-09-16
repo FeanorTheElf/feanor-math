@@ -10,7 +10,6 @@ use crate::integer::IntegerRingStore;
 use crate::divisibility::DivisibilityRingStore;
 use crate::rings::zn::*;
 use crate::primitive_int::*;
-use crate::pid::*;
 
 ///
 /// A ring representing `Z/nZ` for composite n by storing the
@@ -696,6 +695,14 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> PrincipalIdealRi
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        let mut data = Vec::with_capacity_in(self.len(), self.element_allocator.clone());
+        for i in 0..self.len() {
+            data.push(self.at(i).checked_div_min(lhs.data.at(i), rhs.data.at(i))?);
+        }
+        return Some(ZnEl { data });
+    }
+
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         let mut result = (self.zero(), self.zero(), self.zero());
         for (i, Zn) in self.as_iter().enumerate() {

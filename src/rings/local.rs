@@ -5,7 +5,7 @@ use crate::delegate::DelegateRing;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::Field;
 use crate::local::{PrincipalLocalRing, PrincipalLocalRingStore};
-use crate::pid::{EuclideanRing, PrincipalIdealRing};
+use crate::pid::*;
 use crate::integer::IntegerRing;
 use crate::ring::*;
 use crate::homomorphism::*;
@@ -219,6 +219,22 @@ impl<R: DivisibilityRingStore> DivisibilityRing for AsLocalPIRBase<R>
 impl<R: DivisibilityRingStore> PrincipalIdealRing for AsLocalPIRBase<R> 
     where R::Type: DivisibilityRing
 {
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        if let Some(e) = self.nilpotent_power {
+            if self.is_zero(lhs) && self.is_zero(rhs) {
+                return Some(self.one());
+            } else if self.is_zero(lhs) {
+                return Some(RingRef::new(self).pow(self.clone_el(self.max_ideal_gen()), e - self.valuation(rhs).unwrap()));
+            } else {
+                // the constraint `rhs * result = lhs` already fixes the evaluation of `result` uniquely
+                return self.checked_left_div(lhs, rhs);
+            }
+        } else {
+            // we are in a domain
+            self.checked_left_div(lhs, rhs)
+        }
+    }
+
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         if self.checked_left_div(lhs, rhs).is_some() {
             (self.zero(), self.one(), self.clone_el(rhs))
@@ -227,7 +243,7 @@ impl<R: DivisibilityRingStore> PrincipalIdealRing for AsLocalPIRBase<R>
         }
     }
 
-    fn create_left_elimination_matrix(&self, a: &Self::Element, b: &Self::Element) -> ([Self::Element; 4], Self::Element) {
+    fn create_elimination_matrix(&self, a: &Self::Element, b: &Self::Element) -> ([Self::Element; 4], Self::Element) {
         if let Some(quo) = self.checked_left_div(b, a) {
             (
                 [self.one(), self.zero(), self.negate(quo), self.one()],
@@ -488,6 +504,15 @@ fn test_canonical_hom_axioms_wrap_unwrap() {
     let R = AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING, 8)).unwrap();
     crate::ring::generic_tests::test_hom_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());
     crate::ring::generic_tests::test_iso_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());
+}
+
+#[test]
+fn test_checked_div_min() {
+    let ring = AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING, 27)).unwrap();
+    assert_el_eq!(&ring, ring.zero(), ring.checked_div_min(&ring.zero(), &ring.one()).unwrap());
+    assert_el_eq!(&ring, ring.int_hom().map(9), ring.checked_div_min(&ring.zero(), &ring.int_hom().map(3)).unwrap());
+    assert_el_eq!(&ring, ring.int_hom().map(3), ring.checked_div_min(&ring.zero(), &ring.int_hom().map(9)).unwrap());
+    assert_el_eq!(&ring, ring.one(), ring.checked_div_min(&ring.zero(), &ring.zero()).unwrap());
 }
 
 #[test]
