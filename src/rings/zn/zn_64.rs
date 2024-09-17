@@ -13,7 +13,6 @@ use crate::pid::*;
 use crate::ring::*;
 use crate::serialization::SerializableElementRing;
 use algorithms::convolution::KaratsubaHint;
-use algorithms::eea::signed_gcd;
 use algorithms::matmul::ComputeInnerProduct;
 use algorithms::matmul::StrassenHint;
 use serde::de;
@@ -266,13 +265,14 @@ impl RingBase for ZnBase {
         self.size(other_ZZ)
     }
     
-    fn sum<I>(&self, mut els: I) -> Self::Element 
-        where I: Iterator<Item = Self::Element>
+    fn sum<I>(&self, els: I) -> Self::Element 
+        where I: IntoIterator<Item = Self::Element>
     {
         let mut result = self.zero();
-        while let Some(ZnEl(start)) = els.next() {
+        let mut els_it = els.into_iter();
+        while let Some(ZnEl(start)) = els_it.next() {
             let mut current = start as u128;
-            for ZnEl(c) in els.by_ref().take(self.repr_bound() as usize / 2 - 1) {
+            for ZnEl(c) in els_it.by_ref().take(self.repr_bound() as usize / 2 - 1) {
                 current += c as u128;
             }
             self.add_assign(&mut result, self.from_u64_promise_reduced(self.bounded_reduce(current)));

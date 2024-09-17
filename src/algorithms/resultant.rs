@@ -84,13 +84,17 @@ use crate::rings::rational::RationalField;
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
 #[cfg(test)]
-use crate::rings::multivariate::ordered::MultivariatePolyRingImpl;
+use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 #[cfg(test)]
 use crate::rings::multivariate::*;
 #[cfg(test)]
-use crate::algorithms::f4::f4;
+use crate::algorithms::buchberger::buchberger_simple;
+#[cfg(test)]
+use crate::rings::local::AsLocalPIR;
 #[cfg(test)]
 use crate::field::FieldStore;
+#[cfg(test)]
+use crate::integer::BigIntRing;
 
 #[test]
 fn test_resultant() {
@@ -117,11 +121,12 @@ fn test_resultant() {
 
 #[test]
 fn test_resultant_polynomial() {
-    let ZZ = StaticRing::<i64>::RING;
-    let QQ = RationalField::new(ZZ);
-    let QQX = DensePolyRing::new(QQ, "X");
-    let QQXY = DensePolyRing::new(QQX.clone(), "Y");
-    let ZZ_to_QQ = QQ.inclusion();
+    let ZZ = BigIntRing::RING;
+    let QQ = AsLocalPIR::from_field(RationalField::new(ZZ));
+    // we eliminate `Y`, so add it as the outer indeterminate
+    let QQX = DensePolyRing::new(&QQ, "X");
+    let QQXY = DensePolyRing::new(&QQX, "Y");
+    let ZZ_to_QQ = QQ.int_hom();
 
     // 1 + X^2 + 2 Y + (1 + X) Y^2
     let f= QQXY.from_terms([
@@ -141,28 +146,14 @@ fn test_resultant_polynomial() {
     let actual_lc_inv = QQ.div(&QQ.one(), QQX.lc(&actual).unwrap());
     QQX.inclusion().mul_assign_map(&mut actual, actual_lc_inv);
 
-    let QQYX: MultivariatePolyRingImpl<_, _, 2> = MultivariatePolyRingImpl::new(QQ, Lex);
-    let f = QQYX.from_terms([
-        (1, Monomial::new([0, 0])),
-        (1, Monomial::new([0, 2])),
-        (2, Monomial::new([1, 0])),
-        (1, Monomial::new([2, 0])),
-        (1, Monomial::new([2, 1]))
-    ].into_iter().map(|(c, m)| (ZZ_to_QQ.map(c), m)));
+    let QQYX = MultivariatePolyRingImpl::new(&QQ, 2);
+    // reverse the order of indeterminates, so that we indeed eliminate `Y`
+    let [f, g] = QQYX.with_wrapped_indeterminates(|[Y, X]| [ 1 + X.pow_ref(2) + 2 * Y + (1 + X) * Y.pow_ref(2), 3 + X + (2 + X) * Y + (1 + X + X.pow_ref(2)) * Y.pow_ref(2) ]);
 
-    let g = QQYX.from_terms([
-        (3, Monomial::new([0, 0])),
-        (1, Monomial::new([0, 1])),
-        (2, Monomial::new([1, 0])),
-        (1, Monomial::new([1, 1])),
-        (1, Monomial::new([2, 0])),
-        (1, Monomial::new([2, 1])),
-        (1, Monomial::new([2, 2]))
-    ].into_iter().map(|(c, m)| (ZZ_to_QQ.map(c), m)));
-
-    let expected = f4::<_, _, false>(&QQYX, vec![f, g], Lex, u16::MAX).into_iter().filter(|poly| QQYX.appearing_variables(&poly).len() == 1).collect::<Vec<_>>();
+    let gb = buchberger_simple::<_, _, false>(&QQYX, vec![f, g], Lex);
+    let expected = gb.into_iter().filter(|poly| QQYX.appearing_variables(&poly).len() == 1).collect::<Vec<_>>();
     assert!(expected.len() == 1);
-    let mut expected = QQX.from_terms(QQYX.terms(&expected[0]).map(|(c, m)| (*c, m[1] as usize)));
+    let mut expected = QQX.from_terms(QQYX.terms(&expected[0]).map(|(c, m)| (c.clone(), QQYX.exponent_at(m, 1))));
     let expected_lc_inv = QQ.div(&QQ.one(), QQX.lc(&expected).unwrap());
     QQX.inclusion().mul_assign_map(&mut expected, expected_lc_inv);
 

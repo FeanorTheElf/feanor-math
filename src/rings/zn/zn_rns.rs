@@ -183,11 +183,11 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> ZnBase<C, J, A>
     /// ring `Z/nZ` that is congruent to `ai` modulo `mi`. The "opposite" function is [`ZnBase::get_congruence()`].
     /// 
     pub fn from_congruence<I>(&self, el: I) -> ZnEl<C, A>
-        where I: ExactSizeIterator<Item = El<C>>
+        where I: IntoIterator<Item = El<C>>
     {
-        assert_eq!(self.components.len(), el.len());
         let mut data = Vec::with_capacity_in(self.len(), self.element_allocator.clone());
         data.extend(el);
+        assert_eq!(self.len(), data.len());
         ZnEl { data }
     }
 

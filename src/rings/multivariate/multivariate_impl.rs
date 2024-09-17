@@ -10,8 +10,7 @@ use thread_local::ThreadLocal;
 use crate::algorithms::int_bisect;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
-use crate::rings::multivariate;
-use crate::rings::multivariate_new::*;
+use crate::rings::multivariate::*;
 use crate::integer::{binomial, int_cast, BigIntRing, IntegerRing, IntegerRingStore};
 use crate::seq::{VectorFn, VectorView, VectorViewMut};
 use crate::homomorphism::*;
@@ -48,7 +47,6 @@ fn enumeration_index_degrevlex<V>(d: Exponent, mon: V, cum_binomial_lookup_table
     return result;
 }
 
-#[stability::unstable(feature = "enable")]
 #[derive(Clone)]
 pub struct MonomialIdentifier {
     deg: Exponent,
@@ -78,7 +76,6 @@ impl PartialOrd for MonomialIdentifier {
     }
 }
 
-#[stability::unstable(feature = "enable")]
 pub struct MultivariatePolyRingEl<R, A = Global>
     where R: RingStore,
         A: Allocator + Clone
@@ -86,7 +83,6 @@ pub struct MultivariatePolyRingEl<R, A = Global>
     data: Vec<(El<R>, MonomialIdentifier), A>
 }
 
-#[stability::unstable(feature = "enable")]
 pub struct MultivariatePolyRingImplBase<R, A = Global>
     where R: RingStore,
         A: Clone + Allocator + Send
@@ -108,13 +104,14 @@ pub struct MultivariatePolyRingImplBase<R, A = Global>
     tmp_poly: AtomicOptionBox<Vec<(El<R>, MonomialIdentifier)>>
 }
 
-#[stability::unstable(feature = "enable")]
+///
+/// [`RingStore`] corresponding to [`MultivariatePolyRingImplBase`]
+/// 
 pub type MultivariatePolyRingImpl<R, A = Global> = RingValue<MultivariatePolyRingImplBase<R, A>>;
 
 impl<R> MultivariatePolyRingImpl<R>
     where R: RingStore
 {
-    #[stability::unstable(feature = "enable")]
     pub fn new(base_ring: R, variable_count: usize) -> Self {
         Self::new_with(base_ring, variable_count, 64, Global)
     }
@@ -425,7 +422,6 @@ impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
     }
 }
 
-#[stability::unstable(feature = "enable")]
 pub struct TermIterImpl<'a, R>
     where R: RingStore
 {
@@ -611,36 +607,6 @@ impl<P, R, A> CanHomFrom<P> for MultivariatePolyRingImplBase<R, A>
     }
 }
 
-impl<R2, A2, O2, R, A, const N2: usize> CanHomFrom<multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2>> for MultivariatePolyRingImplBase<R, A> 
-    where R: RingStore,
-        A: Clone + Allocator + Send,
-        R2: RingStore,
-        O2: multivariate::MonomialOrder,
-        A2: Allocator + Clone,
-        R::Type: CanHomFrom<R2::Type>
-{
-    type Homomorphism = <R::Type as CanHomFrom<R2::Type>>::Homomorphism;
-
-    fn has_canonical_hom(&self, from: &multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2>) -> Option<Self::Homomorphism> {
-        if self.variable_count() >= <_ as multivariate::MultivariatePolyRing>::indeterminate_len(from) {
-            self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
-        } else {
-            None
-        }
-    }
-
-    fn map_in(&self, from: &multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2>, el: <multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in_ref(from, &el, hom)
-    }
-
-    fn map_in_ref(&self, from: &multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2>, el: &<multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        RingRef::new(self).from_terms(<_ as multivariate::MultivariatePolyRing>::terms(from, el).map(|(c, m)| (
-            self.base_ring().get_ring().map_in_ref(from.base_ring().get_ring(), c, hom),
-            self.create_monomial((0..self.variable_count()).map(|i| if i < <_ as multivariate::MultivariatePolyRing>::indeterminate_len(from) { m[i] as usize } else { 0 }))
-        )))
-    }
-}
-
 impl<P, R, A> CanIsoFromTo<P> for MultivariatePolyRingImplBase<R, A> 
     where R: RingStore,
         A: Clone + Allocator + Send,
@@ -661,32 +627,6 @@ impl<P, R, A> CanIsoFromTo<P> for MultivariatePolyRingImplBase<R, A>
         RingRef::new(from).from_terms(self.terms(&el).map(|(c, m)| (
             self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(c), iso),
             from.create_monomial((0..self.variable_count()).map(|i| self.exponent_at(m, i)))
-        )))
-    }
-}
-
-impl<R2, A2, O2, R, A, const N2: usize> CanIsoFromTo<multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2>> for MultivariatePolyRingImplBase<R, A> 
-    where R: RingStore,
-        A: Clone + Allocator + Send,
-        R2: RingStore,
-        O2: multivariate::MonomialOrder,
-        A2: Allocator + Clone,
-        R::Type: CanIsoFromTo<R2::Type>
-{
-    type Isomorphism = <R::Type as CanIsoFromTo<R2::Type>>::Isomorphism;
-
-    fn has_canonical_iso(&self, from: &multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2>) -> Option<Self::Isomorphism> {
-        if self.variable_count() == <_ as multivariate::MultivariatePolyRing>::indeterminate_len(from) {
-            self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
-        } else {
-            None
-        }
-    }
-
-    fn map_out(&self, from: &multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2>, el: Self::Element, iso: &Self::Isomorphism) -> <multivariate::ordered::MultivariatePolyRingImplBase<R2, O2, N2, A2> as RingBase>::Element {
-        <_ as multivariate::MultivariatePolyRingStore>::from_terms(&RingRef::new(from), self.terms(&el).map(|(c, m)| (
-            self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(c), iso),
-            <_ as multivariate::MultivariatePolyRing>::create_monomial(from, (0..self.variable_count()).map(|i| self.exponent_at(m, i) as u16))
         )))
     }
 }
@@ -723,7 +663,7 @@ fn test_ring_axioms() {
 #[test]
 fn test_multivariate_axioms() {
     let (ring, _els) = ring_and_elements();
-    crate::rings::multivariate_new::generic_tests::test_poly_ring_axioms(&ring, [F17.one(), F17.zero(), F17.int_hom().map(2), F17.neg_one()].into_iter());
+    crate::rings::multivariate::generic_tests::test_poly_ring_axioms(&ring, [F17.one(), F17.zero(), F17.int_hom().map(2), F17.neg_one()].into_iter());
 }
 
 #[test]

@@ -1,194 +1,166 @@
-use std::any::Any;
-use std::collections::BTreeMap;
-use std::hash::Hash;
-use std::ops::{Index, RangeTo, RangeFrom};
-use std::cmp::Ordering;
-use std::fmt::Debug;
-use std::cmp::{min, max};
-
-use subvector::SubvectorView;
-
-use crate::seq::*;
+use crate::homomorphism::Homomorphism;
 use crate::ring::*;
-use crate::homomorphism::*;
-use crate::seq::{VectorView, VectorViewMut};
+use crate::seq::VectorFn;
 use crate::wrapper::RingElementWrapper;
 
-///
-/// Contains [`ordered::MultivariatePolyRingImpl`], an implementation
-/// of multivariate polynomials using a sparse representation.
-/// 
-pub mod ordered;
+pub mod multivariate_impl;
 
-type MonomialExponent = u16;
+use std::any::Any;
+use std::cmp::{max, Ordering};
+
+pub type PolyCoeff<P> = El<<<P as RingStore>::Type as RingExtension>::BaseRing>;
+
+pub type PolyMonomial<P> = <<P as RingStore>::Type as MultivariatePolyRing>::Monomial;
 
 ///
-/// Trait for rings that are multivariate polynomial rings in finitely many indeterminates
-/// over a base ring, i.e. `R[X0, X1, X2, ..., XN]`.
-/// 
-/// Currently, the only implementation of such rings is [`ordered::MultivariatePolyRingImpl`],
-/// which is stores all monomials in an ordered vector.
+/// Trait for multivariate polynomial rings.
 /// 
 pub trait MultivariatePolyRing: RingExtension {
 
-    type MonomialVector: VectorViewMut<MonomialExponent>;
-
-    type TermsIterator<'a>: Iterator<Item = (&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)>
+    type Monomial;
+    type TermIter<'a>: Iterator<Item = (&'a El<Self::BaseRing>, &'a Self::Monomial)>
         where Self: 'a;
 
     ///
-    /// Returns the number of indeterminates, i.e. the transcendence degree
-    /// of this ring over its base ring.
+    /// Returns the number of variables of this polynomial ring, i.e. the transcendence degree
+    /// of the base ring.
     /// 
-    fn indeterminate_len(&self) -> usize;
+    fn variable_count(&self) -> usize;
 
     ///
-    /// Returns the i-th indeterminate/variable/unknown as a ring element
+    /// Creates a monomial with the given exponents.
     /// 
-    fn indeterminate(&self, i: usize) -> Self::Element;
-    
-    ///
-    /// Returns the given monomial as a ring element
-    /// 
-    fn monomial(&self, m: &Monomial<Self::MonomialVector>) -> Self::Element {
-        RingRef::new(self).prod((0..m.len()).flat_map(|i| std::iter::repeat_with(move || self.indeterminate(i)).take(m[i] as usize)))
-    }
+    fn create_monomial<I>(&self, exponents: I) -> Self::Monomial
+        where I: IntoIterator<Item = usize>,
+            I::IntoIter: ExactSizeIterator;
 
     ///
-    /// Returns all terms of the given polynomial. A term is a product
-    /// `c * m` with a nonzero coefficient `c` (i.e. element of the base ring)
-    /// and a monomial `m`.
+    /// Multiplies the given polynomial with the given monomial.
     /// 
-    fn terms<'a>(&'a self, f: &'a Self::Element) -> Self::TermsIterator<'a>;
+    fn mul_assign_monomial(&self, f: &mut Self::Element, monomial: Self::Monomial);
 
     ///
-    /// Multiplies the given polynomial with a monomial.
+    /// Returns the coefficient corresponding to the given monomial in the given polynomial.
+    /// If the polynomial does not contain a term with that monomial, zero is returned.
     /// 
-    fn mul_monomial(&self, el: &mut Self::Element, m: &Monomial<Self::MonomialVector>);
-    
-    ///
-    /// Add-assigns to the given polynomial the polynomial implicitly given by the
-    /// iterator over terms.
-    /// 
-    fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
-        where I: Iterator<Item = (El<Self::BaseRing>, Monomial<Self::MonomialVector>)>
-    {
-        let self_ring = RingRef::new(self);
-        self.add_assign(lhs, self_ring.sum(
-            rhs.map(|(c, m)| self.mul(self.from(c), self.monomial(&m)))
-        ));
-    }
+    fn coefficient_at<'a>(&'a self, f: &'a Self::Element, m: &Self::Monomial) -> &'a El<Self::BaseRing>;
 
     ///
-    /// Returns the coefficient of the polynomial of the given monomial. If
-    /// the monomial does not appear in the polynomial, this returns zero.
+    /// Returns the power of the `var_index`-th variable in the given monomial.
+    /// In other words, this maps `X1^i1 ... Xm^im` to `i(var_index)`.
     /// 
-    fn coefficient_at<'a>(&'a self, f: &'a Self::Element, m: &Monomial<Self::MonomialVector>) -> &'a El<Self::BaseRing>;
+    fn exponent_at(&self, m: &Self::Monomial, var_index: usize) -> usize;
 
     ///
-    /// Returns the leading monomial of the given polynomial.
+    /// Returns an iterator over all nonzero terms of the given polynomial.
     /// 
-    /// The leading monomial is the monomial with nonzero coefficient that is
-    /// largest w.r.t. the given monomial ordering.
-    /// 
-    fn lm<'a, O>(&'a self, f: &'a Self::Element, order: O) -> Option<&'a Monomial<Self::MonomialVector>>
-        where O: MonomialOrder;
+    fn terms<'a>(&'a self, f: &'a Self::Element) -> Self::TermIter<'a>;
 
     ///
-    /// Returns the leading term of the given polynomial.
+    /// Creates a new single-term polynomial.
     /// 
-    /// The leading term is the term with nonzero coefficient whose monomial is
-    /// largest w.r.t. the given monomial ordering.
-    /// 
-    fn lt<'a, O>(&'a self, f: &'a Self::Element, order: O) -> Option<(&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)>
-        where O: MonomialOrder
-    {
-        let lm = self.lm(f, order)?;
-        return Some((self.coefficient_at(f, lm), lm));
-    }
-
-    ///
-    /// Replaces the given indeterminate in the given polynomial by the value `val`.
-    /// The implementation is optimized using the facts that only one indeterminate is
-    /// replaced, and the new value is in the same ring (it can be a polynomial however).
-    /// 
-    fn specialize(&self, f: &Self::Element, var: usize, val: &Self::Element) -> Self::Element {
-        let mut parts = Vec::new();
-        for (c, m) in self.terms(f) {
-            while m[var] as usize >= parts.len() {
-                parts.push(self.zero());
-            }
-            let new_m = self.create_monomial((0..m.len()).map(|i| if i == var { 0 } else { m[i] }));
-            self.add_assign_from_terms(&mut parts[m[var] as usize], Some((self.base_ring().clone_el(c), new_m)).into_iter());
-        }
-        if let Some(mut current) = parts.pop() {
-            while let Some(new) = parts.pop() {
-                self.mul_assign_ref(&mut current, val);
-                self.add_assign(&mut current, new);
-            }
-            return current;
-        } else {
-            return self.zero();
-        }
-    }
-    
-    fn max_term_lt<'a, O: MonomialOrder>(&'a self, f: &'a Self::Element, lt_than: &Monomial<Self::MonomialVector>, order: O) -> Option<(&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)> {
-        self.terms(f).filter(|(_, mon)| order.compare(mon, lt_than) == Ordering::Less).max_by(|(_, l), (_, r)| order.compare(l, r))
-    }
-
-    fn max_term_leq<'a, O: MonomialOrder>(&'a self, f: &'a Self::Element, leq_than: &Monomial<Self::MonomialVector>, order: O) -> Option<(&'a El<Self::BaseRing>, &'a Monomial<Self::MonomialVector>)> {
-        self.terms(f).filter(|(_, mon)| order.compare(mon, leq_than) != Ordering::Greater).max_by(|(_, l), (_, r)| order.compare(l, r))
-    }
-
-    ///
-    /// Creates the monomial where each indeterminate is taken to the given power.
-    /// 
-    /// The powers `exponents` must be exactly of length [`MultivariatePolyRing::indeterminate_len()`].
-    /// 
-    fn create_monomial<I: ExactSizeIterator<Item = MonomialExponent>>(&self, exponents: I) -> Monomial<Self::MonomialVector>;
-
-    ///
-    /// Returns all variables appearing in the given polynomial, together
-    /// with their respective degrees.
-    /// 
-    /// # Example
-    /// ```
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::rings::multivariate::*;
-    /// # use feanor_math::primitive_int::*;
-    /// # use std::collections::BTreeMap;
-    /// let ring = ordered::MultivariatePolyRingImpl::<_, _, 3>::new(StaticRing::<i32>::RING, DegRevLex);
-    /// let x = ring.indeterminate(0);
-    /// let y = ring.indeterminate(1);
-    /// let z = ring.indeterminate(2);
-    /// let poly = ring.add(x, ring.pow(z, 2));
-    /// assert_eq!([(0, 1), (2, 2)].into_iter().collect::<BTreeMap<_, _>>(), ring.appearing_variables(&poly));
-    /// ```
-    /// 
-    fn appearing_variables(&self, f: &Self::Element) -> BTreeMap<usize, MonomialExponent> {
-        let mut result = BTreeMap::new();
-        for (_, m) in self.terms(f) {
-            for i in 0..self.indeterminate_len() {
-                if m[i] > 0 {
-                    result.entry(i).and_modify(|v| *v = max(*v, m[i])).or_insert(m[i]);
-                }
-            }
-        }
+    fn create_term(&self, coeff: El<Self::BaseRing>, monomial: Self::Monomial) -> Self::Element {
+        let mut result = self.from(coeff);
+        self.mul_assign_monomial(&mut result, monomial);
         return result;
     }
 
     ///
-    /// Computes the polynomial that results from applying `hom` to each coefficient of the input
-    /// polynomial. This is used to implement [`MultivariatePolyRingStore::lifted_hom()`] and
-    /// [`CoefficientHom`].
+    /// Returns the **L**eading **T**erm of `f`, i.e. the term whose monomial is largest w.r.t. the given order.
     /// 
-    fn map_terms<P, H>(&self, from: &P, el: &P::Element, hom: &H) -> Self::Element
-        where P: ?Sized + MultivariatePolyRing,
-            H: Homomorphism<<P::BaseRing as RingStore>::Type, <Self::BaseRing as RingStore>::Type>
+    fn LT<'a, O: MonomialOrder>(&'a self, f: &'a Self::Element, order: O) -> Option<(&'a El<Self::BaseRing>, &'a Self::Monomial)> {
+        self.terms(f).max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1))
+    }
+
+    ///
+    /// Returns the term of `f` whose monomial is largest (w.r.t. the given order) among all monomials smaller than `lt_than`.
+    /// 
+    fn largest_term_lt<'a, O: MonomialOrder>(&'a self, f: &'a Self::Element, order: O, lt_than: &Self::Monomial) -> Option<(&'a El<Self::BaseRing>, &'a Self::Monomial)> {
+        self.terms(f).filter(|(_, m)| order.compare(RingRef::new(self), m, lt_than) == Ordering::Less).max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1))
+    }
+
+    fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
+        where I: IntoIterator<Item = (El<Self::BaseRing>, Self::Monomial)>
     {
-        assert!(self.base_ring().get_ring() == hom.codomain().get_ring());
-        assert!(from.base_ring().get_ring() == hom.domain().get_ring());
-        RingRef::new(self).from_terms(from.terms(el).map(|(c, m): (&El<P::BaseRing>, &Monomial<P::MonomialVector>)| (hom.map_ref(c), self.create_monomial((0..m.len()).map(|i| m[i])))))
+        let self_ring = RingRef::new(self);
+        self.add_assign(lhs, self_ring.sum(
+            rhs.into_iter().map(|(c, m)| self.create_term(c, m))
+        ));
+    }
+
+    fn clone_monomial(&self, mon: &Self::Monomial) -> Self::Monomial {
+        self.create_monomial((0..self.variable_count()).map(|i| self.exponent_at(mon, i)))
+    }
+
+    ///
+    /// Returns a list of all variables appearing in the given polynomial.
+    /// Associated with each variable is the highest degree in which it
+    /// appears in some term.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::rings::multivariate::*;
+    /// # use feanor_math::rings::multivariate::multivariate_impl::*;
+    /// let poly_ring = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, 2);
+    /// let [f, g] = poly_ring.with_wrapped_indeterminates(|[X, Y]| [1 + X + X.pow_ref(2) * Y, X.pow_ref(3)]);
+    /// assert_eq!(vec![(0, 2), (1, 1)], poly_ring.appearing_variables(&f));
+    /// assert_eq!(vec![(0, 3)], poly_ring.appearing_variables(&g));
+    /// ```
+    /// 
+    fn appearing_variables(&self, f: &Self::Element) -> Vec<(usize, usize)> {
+        let mut result = (0..self.variable_count()).map(|_| 0).collect::<Vec<_>>();
+        for (_, m) in self.terms(f) {
+            for i in 0..self.variable_count() {
+                result[i] = max(result[i], self.exponent_at(m, i));
+            }
+        }
+        return result.into_iter().enumerate().filter(|(_, e)| *e > 0).collect();
+    }
+
+    ///
+    /// Multiplies two monomials.
+    /// 
+    fn monomial_mul(&self, lhs: Self::Monomial, rhs: &Self::Monomial) -> Self::Monomial {
+        self.create_monomial((0..self.variable_count()).map(|i| self.exponent_at(&lhs, i) + self.exponent_at(rhs, i)))
+    }
+
+    ///
+    /// Returns the degree of a monomial, i.e. the sum of the exponents of all variables.
+    /// 
+    fn monomial_deg(&self, mon: &Self::Monomial) -> usize {
+        (0..self.variable_count()).map(|i| self.exponent_at(mon, i)).sum()
+    }
+
+    ///
+    /// Returns the least common multiple of two monomials.
+    /// 
+    fn monomial_lcm(&self, lhs: Self::Monomial, rhs: &Self::Monomial) -> Self::Monomial {
+        self.create_monomial((0..self.variable_count()).map(|i| max(self.exponent_at(&lhs, i), self.exponent_at(rhs, i))))
+    }
+
+    ///
+    /// Computes the quotient of two monomials.
+    /// 
+    /// If `lhs` does not divide `rhs`, this returns `Result::Err` with the monomial
+    /// `lhs / gcd(rhs, lhs)`.
+    /// 
+    fn monomial_div(&self, lhs: Self::Monomial, rhs: &Self::Monomial) -> Result<Self::Monomial, Self::Monomial> {
+        let mut failed = false;
+        let result = self.create_monomial((0..self.variable_count()).map(|i| {
+            if let Some(res) = self.exponent_at(&lhs, i).checked_sub(self.exponent_at(rhs, i)) {
+                res
+            } else {
+                failed = true;
+                0
+            }
+        }));
+        if failed {
+            Err(result)
+        } else {
+            Ok(result)
+        }
     }
 
     ///
@@ -198,669 +170,231 @@ pub trait MultivariatePolyRing: RingExtension {
     /// ```
     /// # use feanor_math::ring::*;
     /// # use feanor_math::rings::multivariate::*;
-    /// # use feanor_math::primitive_int::*;
-    /// # use std::collections::BTreeMap;
-    /// let ring = ordered::MultivariatePolyRingImpl::<_, _, 3>::new(StaticRing::<i32>::RING, DegRevLex);
-    /// let x = ring.indeterminate(0);
-    /// let y = ring.indeterminate(1);
-    /// let poly = ring.add(x, ring.pow(y, 2));
-    /// assert_eq!(5, ring.evaluate(&poly, [1, 2, 0], &StaticRing::<i32>::RING.identity()));
+    /// # use feanor_math::rings::multivariate::multivariate_impl::*;
+    /// # use feanor_math::primitive_int::*; 
+    /// # use feanor_math::seq::*; 
+    /// let poly_ring = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, 2);
+    /// let [f] = poly_ring.with_wrapped_indeterminates(|[X, Y]| [1 + X + X.pow_ref(2) * Y]);
+    /// assert_eq!(1 + 5 + 5 * 5 * 8, poly_ring.evaluate(&f, [5, 8].into_ring_el_fn(StaticRing::<i64>::RING), &poly_ring.base_ring().identity()));
     /// ```
     /// 
-    fn evaluate<R, V, H>(&self, f: &Self::Element, values: V, hom: &H) -> R::Element
+    fn evaluate<R, V, H>(&self, f: &Self::Element, value: V, hom: &H) -> R::Element
         where R: ?Sized + RingBase,
             H: Homomorphism<<Self::BaseRing as RingStore>::Type, R>,
-            V: VectorView<R::Element>;
-}
-
-///
-/// The homomorphism `R[X1, ..., Xm] -> S[X1, ..., Xm]` induced by a homomorphism `R -> S`.
-/// In terms of category theory, this is the pushout morphism of `R -> R[X1, ..., Xm]` and `R -> S`.
-/// 
-pub struct CoefficientHom<PFrom, PTo, H>
-    where PFrom: MultivariatePolyRingStore,
-        PTo: MultivariatePolyRingStore,
-        PFrom::Type: MultivariatePolyRing,
-        PTo::Type: MultivariatePolyRing,
-        H: Homomorphism<<<PFrom::Type as RingExtension>::BaseRing as RingStore>::Type, <<PTo::Type as RingExtension>::BaseRing as RingStore>::Type>
-{
-    from: PFrom,
-    to: PTo,
-    hom: H
-}
-
-impl<PFrom, PTo, H> Homomorphism<PFrom::Type, PTo::Type> for CoefficientHom<PFrom, PTo, H>
-    where PFrom: MultivariatePolyRingStore,
-        PTo: MultivariatePolyRingStore,
-        PFrom::Type: MultivariatePolyRing,
-        PTo::Type: MultivariatePolyRing,
-        H: Homomorphism<<<PFrom::Type as RingExtension>::BaseRing as RingStore>::Type, <<PTo::Type as RingExtension>::BaseRing as RingStore>::Type>
-{
-    type DomainStore = PFrom;
-    type CodomainStore = PTo;
-
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
-        &self.to
-    }
-
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
-        &self.from
-    }
-
-    fn map(&self, x: <PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element {
-        self.map_ref(&x)
-    }
-
-    fn map_ref(&self, x: &<PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element {
-        self.to.get_ring().map_terms(self.from.get_ring(), x, &self.hom)
+            V: VectorFn<R::Element>
+    {
+        assert_eq!(self.variable_count(), value.len());
+        assert!(hom.domain().get_ring() == self.base_ring().get_ring());
+        hom.codomain().sum(self.terms(f).map(|(c, m)| hom.mul_map(
+            hom.codomain().prod((0..self.variable_count()).map(|i| hom.codomain().pow(value.at(i), self.exponent_at(m, i)))),
+            hom.domain().clone_el(c)
+        )))
     }
 }
 
 ///
-/// The [`RingStore`] corresponding to [`MultivariatePolyRing`].
+/// [`RingStore`] for [`MultivariatePolyRing`]
 /// 
 pub trait MultivariatePolyRingStore: RingStore
     where Self::Type: MultivariatePolyRing
 {
-    delegate!{ MultivariatePolyRing, fn indeterminate_len(&self) -> usize }
-    delegate!{ MultivariatePolyRing, fn indeterminate(&self, i: usize) -> El<Self> }
-    delegate!{ MultivariatePolyRing, fn monomial(&self, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> El<Self> }
-    delegate!{ MultivariatePolyRing, fn mul_monomial(&self, el: &mut El<Self>, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> () }
-    delegate!{ MultivariatePolyRing, fn specialize(&self, f: &El<Self>, var: usize, val: &El<Self>) -> El<Self> }
-    delegate!{ MultivariatePolyRing, fn appearing_variables(&self, f: &El<Self>) -> BTreeMap<usize, MonomialExponent> }
+    delegate!{ MultivariatePolyRing, fn variable_count(&self) -> usize }
+    delegate!{ MultivariatePolyRing, fn create_term(&self, coeff: PolyCoeff<Self>, monomial: PolyMonomial<Self>) -> El<Self> }
+    delegate!{ MultivariatePolyRing, fn exponent_at(&self, m: &PolyMonomial<Self>, var_index: usize) -> usize }
+    delegate!{ MultivariatePolyRing, fn monomial_mul(&self, lhs: PolyMonomial<Self>, rhs: &PolyMonomial<Self>) -> PolyMonomial<Self> }
+    delegate!{ MultivariatePolyRing, fn monomial_lcm(&self, lhs: PolyMonomial<Self>, rhs: &PolyMonomial<Self>) -> PolyMonomial<Self> }
+    delegate!{ MultivariatePolyRing, fn monomial_div(&self, lhs: PolyMonomial<Self>, rhs: &PolyMonomial<Self>) -> Result<PolyMonomial<Self>, PolyMonomial<Self>> }
+    delegate!{ MultivariatePolyRing, fn monomial_deg(&self, val: &PolyMonomial<Self>) -> usize }
+    delegate!{ MultivariatePolyRing, fn mul_assign_monomial(&self, f: &mut El<Self>, monomial: PolyMonomial<Self>) -> () }
+    delegate!{ MultivariatePolyRing, fn appearing_variables(&self, f: &El<Self>) -> Vec<(usize, usize)> }
 
     ///
-    /// See [`MultivariatePolyRing::coefficient_at()`].
+    /// Returns the term of `f` whose monomial is largest (w.r.t. the given order) among all monomials smaller than `lt_than`.
     /// 
-    fn coefficient_at<'a>(&'a self, f: &'a El<Self>, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> &'a El<<Self::Type as RingExtension>::BaseRing> {
+    fn largest_term_lt<'a, O: MonomialOrder>(&'a self, f: &'a El<Self>, order: O, lt_than: &PolyMonomial<Self>) -> Option<(&'a PolyCoeff<Self>, &'a PolyMonomial<Self>)> {
+        self.get_ring().largest_term_lt(f, order, lt_than)
+    }
+    
+    ///
+    /// Returns the **L**eading **T**erm of `f`, i.e. the term whose monomial is largest w.r.t. the given order.
+    /// 
+    fn LT<'a, O: MonomialOrder>(&'a self, f: &'a El<Self>, order: O) -> Option<(&'a PolyCoeff<Self>, &'a PolyMonomial<Self>)> {
+        self.get_ring().LT(f, order)
+    }
+
+    ///
+    /// Creates a new monomial with given exponents.
+    /// 
+    /// For details, see [`MultivariatePolyRing::create_monomial()`].
+    /// 
+    fn create_monomial<I>(&self, exponents: I) -> PolyMonomial<Self>
+        where I: IntoIterator<Item = usize>,
+            I::IntoIter: ExactSizeIterator
+    {
+        self.get_ring().create_monomial(exponents)
+    }
+
+    fn clone_monomial(&self, mon: &PolyMonomial<Self>) -> PolyMonomial<Self> {
+        self.get_ring().clone_monomial(mon)
+    }
+
+    ///
+    /// Returns the coefficient of a polynomial corresponding to a monomial.
+    /// 
+    /// For details, see [`MultivariatePolyRing::coefficient_at()`].
+    /// 
+    fn coefficient_at<'a>(&'a self, f: &'a El<Self>, m: &PolyMonomial<Self>) -> &'a PolyCoeff<Self> {
         self.get_ring().coefficient_at(f, m)
     }
 
     ///
-    /// See [`MultivariatePolyRing::terms()`].
+    /// Returns an iterator over all nonzero terms of the polynomial.
     /// 
-    fn terms<'a>(&'a self, f: &'a El<Self>) -> <Self::Type as MultivariatePolyRing>::TermsIterator<'a> {
+    /// For details, see [`MultivariatePolyRing::terms()`].
+    /// 
+    fn terms<'a>(&'a self, f: &'a El<Self>) -> <Self::Type as MultivariatePolyRing>::TermIter<'a> {
         self.get_ring().terms(f)
     }
 
     ///
-    /// See [`MultivariatePolyRing::evaluate()`].
+    /// Creates a new polynomial by summing up all the given terms.
     /// 
-    fn evaluate<R, V, H>(&self, f: &El<Self>, values: V, hom: &H) -> R::Element
-        where R: ?Sized + RingBase,
-            H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, R>,
-            V: VectorView<R::Element>
-    {
-        self.get_ring().evaluate(f, values, hom)
-    }
-
-    ///
-    /// Computes the homomorphism `R[X1, ..., Xm] -> S[X1, ..., Xm]` induced by `R -> S`.
-    /// In category-theoretical terms, this is the pushout morphism.
-    /// 
-    fn into_lifted_hom<P, H>(self, from: P, hom: H) -> CoefficientHom<P, Self, H>
-        where P: MultivariatePolyRingStore,
-            P::Type: MultivariatePolyRing,
-            H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
-    {
-        CoefficientHom {
-            from: from,
-            to: self,
-            hom: hom
-        }
-    }
-
-    ///
-    /// Computes the homomorphism `R[X1, ..., Xm] -> S[X1, ..., Xm]` induced by `R -> S`.
-    /// In category-theoretical terms, this is the pushout morphism.
-    /// 
-    fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
-        where P: MultivariatePolyRingStore,
-            P::Type: MultivariatePolyRing,
-            H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
-    {
-        self.into_lifted_hom(from, hom)
-    }
-
-    ///
-    /// Creates a multivariate polynomial from the given terms.
-    /// 
-    /// The iterator may yield the same monomial multiple times, in this case the
-    /// corresponding coefficients are summed up.
-    /// 
-    fn from_terms<I>(&self, iter: I) -> El<Self>
-        where I: Iterator<Item = (El<<Self::Type as RingExtension>::BaseRing>, Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>)>
+    fn from_terms<I>(&self, terms: I) -> El<Self>
+        where I: IntoIterator<Item = (PolyCoeff<Self>, PolyMonomial<Self>)>
     {
         let mut result = self.zero();
-        self.get_ring().add_assign_from_terms(&mut result, iter);
+        self.get_ring().add_assign_from_terms(&mut result, terms);
         return result;
     }
 
-    #[stability::unstable(feature = "enable")]
-    fn try_from_terms<I, E>(&self, iter: I) -> Result<El<Self>, E>
-        where I: Iterator<Item = Result<(El<<Self::Type as RingExtension>::BaseRing>, Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>), E>>
-    {
-        let mut error = None;
-        let result = self.from_terms(iter.map_while(|el| match el {
-            Ok(term) => Some(term),
-            Err(err) => {
-                error = Some(err);
-                None
-            }
-        }));
-        if let Some(err) = error {
-            return Err(err);
-        } else {
-            return Ok(result);
-        }
-    }
-
     ///
-    /// See [`MultivariatePolyRing::lm()`].
+    /// Evaluates the polynomial at the given values.
     /// 
-    fn lm<'a, O>(&'a self, f: &'a El<Self>, order: O) -> Option<&'a Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>>
-        where O: MonomialOrder
+    /// For details, see [`MultivariatePolyRing::evaluate()`].
+    /// 
+    fn evaluate<R, V, H>(&self, f: &El<Self>, value: V, hom: &H) -> R::Element
+        where R: ?Sized + RingBase,
+            H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, R>,
+            V: VectorFn<R::Element>
     {
-        self.get_ring().lm(f, order)
-    }
-
-    ///
-    /// See [`MultivariatePolyRing::lt()`].
-    /// 
-    fn lt<'a, O>(&'a self, f: &'a El<Self>, order: O) -> Option<(&'a El<<Self::Type as RingExtension>::BaseRing>, &'a Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>)>
-        where O: MonomialOrder
-    {
-        self.get_ring().lt(f, order)
-    }
-
-    ///
-    /// Copies the given monomial.
-    /// 
-    fn clone_monomial(&self, m: &Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector>) -> Monomial<<Self::Type as MultivariatePolyRing>::MonomialVector> {
-        self.get_ring().create_monomial((0..m.len()).map(|i| m[i]))
+        self.get_ring().evaluate(f, value, hom)
     }
     
+    ///
+    /// Invokes the function with a wrapped version of the indeterminates of this poly ring.
+    /// Use for convenient creation of polynomials.
+    /// 
+    /// Note however that [`MultivariatePolyRingStore::from_terms()`] might be more performant.
+    /// 
+    /// # Example
+    /// ```
+    /// use feanor_math::assert_el_eq;
+    /// use feanor_math::homomorphism::*;
+    /// use feanor_math::ring::*;
+    /// use feanor_math::rings::multivariate::*;
+    /// use feanor_math::rings::zn::zn_64::*;
+    /// use feanor_math::rings::multivariate::multivariate_impl::*;
+    /// let base_ring = Zn::new(7);
+    /// let poly_ring = MultivariatePolyRingImpl::new(base_ring, 3);
+    /// let f_version1 = poly_ring.from_terms([(base_ring.int_hom().map(3), poly_ring.create_monomial([0, 0, 0])), (base_ring.int_hom().map(2), poly_ring.create_monomial([0, 1, 1])), (base_ring.one(), poly_ring.create_monomial([2, 0, 0]))].into_iter());
+    /// let f_version2 = poly_ring.with_wrapped_indeterminates_dyn(|[x, y, z]| [3 + 2 * y * z + x.pow_ref(2)]).into_iter().next().unwrap();
+    /// let [f_version3] = poly_ring.with_wrapped_indeterminates(|[x, y, z]| [3 + 2 * y * z + x.pow_ref(2)]);
+    /// assert_el_eq!(poly_ring, f_version1, f_version2);
+    /// ```
+    /// 
     #[stability::unstable(feature = "enable")]
-    fn with_wrapped_indeterminates<'a, F, T, const N: usize>(&'a self, f: F) -> Vec<El<Self>>
+    fn with_wrapped_indeterminates_dyn<'a, F, T, const N: usize>(&'a self, f: F) -> Vec<El<Self>>
         where F: FnOnce([&RingElementWrapper<&'a Self>; N]) -> T,
             T: IntoIterator<Item = RingElementWrapper<&'a Self>>
     {
-        assert_eq!(self.indeterminate_len(), N);
-        let wrapped_indets: [_; N] = std::array::from_fn(|i| RingElementWrapper::new(self, self.indeterminate(i)));
+        assert_eq!(self.variable_count(), N);
+        let wrapped_indets: [_; N] = std::array::from_fn(|i| RingElementWrapper::new(self, self.create_term(self.base_ring().one(), self.create_monomial((0..N).map(|j| if i == j { 1 } else { 0 })))));
         f(std::array::from_fn(|i| &wrapped_indets[i])).into_iter().map(|f| f.unwrap()).collect()
     }
+
+    ///
+    /// Same as [`MultivariatePolyRingStore::with_wrapped_indeterminates_dyn()`], but returns result
+    /// as an array to allow pattern matching.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    fn with_wrapped_indeterminates<'a, F, const N: usize, const M: usize>(&'a self, f: F) -> [El<Self>; M]
+        where F: FnOnce([&RingElementWrapper<&'a Self>; N]) -> [RingElementWrapper<&'a Self>; M]
+    {
+        assert_eq!(self.variable_count(), N);
+        let wrapped_indets: [_; N] = std::array::from_fn(|i| RingElementWrapper::new(self, self.create_term(self.base_ring().one(), self.create_monomial((0..N).map(|j| if i == j { 1 } else { 0 })))));
+        let mut result_it = f(std::array::from_fn(|i| &wrapped_indets[i])).into_iter().map(|f| f.unwrap());
+        let result = std::array::from_fn(|_| result_it.next().unwrap());
+        debug_assert!(result_it.next().is_none());
+        return result;
+    }
 }
 
-impl<R> MultivariatePolyRingStore for R
-    where R: RingStore,
-        R::Type: MultivariatePolyRing
-{}
-
-static ZERO: MonomialExponent = 0;
+impl<P> MultivariatePolyRingStore for P
+    where P: RingStore,
+        P::Type: MultivariatePolyRing {}
 
 ///
-/// A monomial, i.e. a power-product of indeterminates.
+/// Trait for monomial orders, i.e. orderings on the monomials `X1^i1 ... Xm^im` of a multivariate
+/// polynomial ring that are compatible with multiplication. These are also sometimes called term
+/// orders.
 /// 
-/// From a low-level point of view, this is just a wrapper around some
-/// short sequence of nonnegative numbers. Note that monomials for the
-/// same multivariate polynomial ring should always contain all variables,
-/// i.e. contain (possibly trailing) zeros for variables that do not occur
-/// in the monomial.
+/// To be precise, a total order on monomials is a monomial order, if for all `u, v, w` with `u <= v`
+/// also `uw <= vw`.
 /// 
-#[derive(Copy, Clone)]
-#[repr(transparent)]
-pub struct Monomial<V: VectorView<MonomialExponent>> {
-    exponents: V
-}
+pub trait MonomialOrder: Clone {
 
-impl<V: VectorView<MonomialExponent>> PartialEq<Monomial<V>> for Monomial<V> {
+    fn compare<P>(&self, ring: P, lhs: &PolyMonomial<P>, rhs: &PolyMonomial<P>) -> Ordering
+        where P: RingStore,
+            P::Type: MultivariatePolyRing;
 
-    fn eq(&self, other: &Monomial<V>) -> bool {
-        self.exponents.len() == other.exponents.len() && (0..self.exponents.len()).all(|i| self.exponents.at(i) == other.exponents.at(i))
-    }
-}
-
-impl<V: VectorView<MonomialExponent>> Hash for Monomial<V> {
-
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        state.write_usize(self.exponents.len());
-        for e in self.exponents.as_iter() {
-            state.write_u16(*e);
-        }
-    }
-}
-
-impl<V: VectorView<MonomialExponent>> Monomial<V> {
-
-    pub fn from_vector_ref<'a>(vector: &'a V) -> &'a Self {
-        unsafe { std::mem::transmute(vector) }
-    }
-    
-    pub fn new(exponents: V) -> Self {
-        Self { exponents }
+    fn eq_mon<P>(&self, ring: P, lhs: &PolyMonomial<P>, rhs: &PolyMonomial<P>) -> bool
+        where P: RingStore,
+            P::Type: MultivariatePolyRing
+    {
+        self.compare(ring, lhs, rhs) == Ordering::Equal
     }
 
-    pub fn deg(&self) -> MonomialExponent {
-        self.exponents.as_iter().sum()
-    }
-
-    pub fn len(&self) -> usize {
-        self.exponents.len()
-    }
-
-    pub fn unwrap(self) -> V {
-        self.exponents
-    }
-
-    pub fn divides(&self, rhs: &Self) -> bool {
-        assert_eq!(self.exponents.len(), rhs.exponents.len());
-        (0..self.exponents.len()).all(|i| *self.exponents.at(i) <= *rhs.exponents.at(i))
-    }
-
-    pub fn is_coprime(&self, rhs: &Self) -> bool {
-        assert_eq!(self.exponents.len(), rhs.exponents.len());
-        (0..self.exponents.len()).all(|i| *self.exponents.at(i) == 0 || *rhs.exponents.at(i) == 0)
-    }
-}
-
-impl<V: VectorViewMut<MonomialExponent>> Monomial<V> {
-
-    ///
-    /// Computes the gcd of two monomials.
-    /// 
-    pub fn gcd(mut self, rhs: &Self) -> Self {
-        self.gcd_assign(rhs);
-        self
-    }
-
-    ///
-    /// Computes the lcm of two monomials.
-    /// 
-    pub fn lcm(mut self, rhs: &Self) -> Self {
-        self.lcm_assign(rhs);
-        self
-    }
-
-    ///
-    /// Computes the product of two monomials.
-    /// 
-    pub fn mul(mut self, rhs: &Self) -> Self {
-        self.mul_assign(rhs);
-        self
-    }
-
-    ///
-    /// Computes the quotient of two monomials. This will panic if the quotient
-    /// is not a monomial, i.e. contains indeterminates raised to negative powers.
-    /// 
-    pub fn div(mut self, rhs: &Self) -> Self {
-        self.div_assign(rhs);
-        self
-    }
-
-    ///
-    /// Computes the gcd of two monomials.
-    /// 
-    pub fn gcd_assign(&mut self, rhs: &Self) {
-        assert_eq!(self.len(), rhs.len());
-        for i in 0..self.len() {
-            *self.exponents.at_mut(i) = min(*self.exponents.at(i), *rhs.exponents.at(i));
-        }
-    }
-
-    ///
-    /// Computes the lcm of two monomials.
-    /// 
-    pub fn lcm_assign(&mut self, rhs: &Self) {
-        assert_eq!(self.len(), rhs.len());
-        for i in 0..self.len() {
-            *self.exponents.at_mut(i) = max(*self.exponents.at(i), *rhs.exponents.at(i));
-        }
-    }
-
-    ///
-    /// Computes the product of two monomials.
-    /// 
-    pub fn mul_assign(&mut self, rhs: &Self) {
-        assert_eq!(self.len(), rhs.len());
-        for i in 0..self.len() {
-            *self.exponents.at_mut(i) = *self.exponents.at(i) + *rhs.exponents.at(i);
-        }
-    }
-
-    ///
-    /// Computes the quotient of two monomials. This will panic if the quotient
-    /// is not a monomial, i.e. contains indeterminates raised to negative powers.
-    /// 
-    pub fn div_assign(&mut self, rhs: &Self) {
-        assert_eq!(self.len(), rhs.len());
-        for i in 0..self.len() {
-            assert!(*self.exponents.at(i) >= *rhs.exponents.at(i));
-            *self.exponents.at_mut(i) = *self.exponents.at(i) - *rhs.exponents.at(i);
-        }
-    }
-}
-
-impl<V: VectorViewMut<MonomialExponent> + Clone> Monomial<V> {
-
-    ///
-    /// Returns all monomials that divide this one, i.e. all sequences
-    /// of same length such that `result[i] <= self[i]`. These monomials
-    /// are given in an order that respects divisibility, i.e a monomial
-    /// `m` is given before `t` if `m | t` and `m != t`.
-    /// 
-    pub fn dividing_monomials(self) -> DividingMonomialIter<V> {
-        let mut start = self.clone();
-        for i in 0..self.len() {
-            *start.exponents.at_mut(i) = 0;
-        }
-        DividingMonomialIter { monomial: self, current: Some(start) }
-    }
-
-    ///
-    /// Returns the monomial `m / xi` and `i`, where `xi` is any variable
-    /// occurring in `m`. If the monomial is `1`, this returns None.
-    /// 
-    /// Often used for recursive traversal of many monomials.
-    /// 
-    /// ```
-    /// # use feanor_math::rings::multivariate::*;
-    /// let m = Monomial::new([0, 1, 0]);
-    /// assert_eq!((Monomial::new([0, 0, 0]), 1), m.div_variable().unwrap());
-    /// ```
-    /// 
-    pub fn div_variable(mut self) -> Option<(Monomial<V>, usize)> {
-        let i = (0..self.len()).filter(|i| self[*i] > 0).next()?;
-        *self.exponents.at_mut(i) -= 1;
-        return Some((self, i));
-    }
-}
-
-///
-/// Iterator over all monomials that divide a fixed monomial.
-/// Returned by [`Monomial::dividing_monomials()`].
-/// 
-pub struct DividingMonomialIter<V: VectorViewMut<MonomialExponent>> {
-    monomial: Monomial<V>,
-    current: Option<Monomial<V>>
-}
-
-impl<V: VectorViewMut<MonomialExponent> + Clone> Iterator for DividingMonomialIter<V> {
-
-    type Item = Monomial<V>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(current) = &mut self.current {
-            let result = current.clone();
-            let mut refill = 0;
-            for i in 0..self.monomial.len() {
-                if refill > 0 && current[i] < self.monomial[i] {
-                    refill -= 1;
-                    *current.exponents.at_mut(i) += 1;
-                    let mut j = 0;
-                    while refill > 0 {
-                        *current.exponents.at_mut(j) = min(refill, self.monomial[j]);
-                        refill -= current[j];
-                        j += 1;
-                    }
-                    return Some(result);
-                } else {
-                    refill += current[i];
-                    *current.exponents.at_mut(i) = 0;
-                }
-            }
-            refill += current[self.monomial.len() - 1];
-            *current.exponents.at_mut(self.monomial.len() - 1) = 0;
-
-            // we did all combinations with the current number of elements, so increase element number by one
-            refill += 1;
-            let mut j = 0;
-
-            while refill > 0 && j < self.monomial.len() {
-                *current.exponents.at_mut(j) = min(refill, self.monomial[j]);
-                refill -= current[j];
-                j += 1;
-            }
-            if j == self.monomial.len() && refill != 0 {
-                self.current = None;
-            }
-            return Some(result);
-        } else {
-            return None;
-        }
-    }
-}
-
-impl<V: VectorView<MonomialExponent>> Debug for Monomial<V> {
-
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.exponents.len() == 0 {
-            return write!(f, "()");
-        }
-        write!(f, "(")?;
-        for i in 0..(self.exponents.len() - 1) {
-            write!(f, "{}, ", self.exponents.at(i))?;
-        }
-        write!(f, "{})", self.exponents.at(self.exponents.len() - 1))
-    }
-}
-
-impl<V: VectorView<MonomialExponent>> Index<usize> for Monomial<V> {
-
-    type Output = MonomialExponent;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        if index >= self.exponents.len() {
-            &ZERO
-        } else {
-            self.exponents.at(index)
-        }
-    }
-}
-
-///
-/// Trait for term orders, that is an ordering on all monomials with
-/// a fixed number of variables subject to the constraints
-///  - `mp < np` whenever `m < n`
-///  - `m <= mp`
-/// for all monomials `m, n, p`.
-/// 
-/// Monomial/Term orders are particularly important in the context of
-/// Groebner basis (see e.g. [`crate::algorithms::f4::f4()`]).
-/// 
-pub trait MonomialOrder: Clone + Sized + 'static {
-
-    ///
-    /// Returns whether this monomial order is graded or degree-compatible.
-    /// 
-    /// A degree-compatible monomial order is one where `m < m'` for all
-    /// `m, m'` with `deg(m) < deg(m')`. Such monomial orders often behave better
-    /// in various situations, including Groebner basis computations.
-    /// 
-    fn is_graded(&self) -> bool;
-
-    ///
-    /// Compares to monomials according to this monomial order.
-    /// 
-    fn compare<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering;
-
-    ///
-    /// Checks whether two monomial orders are the same.
-    /// 
-    fn is_same<O: MonomialOrder>(&self, other: O) -> bool {
+    fn is_same<O>(&self, rhs: &O) -> bool
+        where O: MonomialOrder
+    {
+        assert!(self.as_any().is_some());
         assert!(std::mem::size_of::<Self>() == 0);
-        match (&other as &dyn Any).downcast_ref::<Self>() {
-            Some(_) => true,
-            None => false
+        if let Some(rhs_as_any) = rhs.as_any() {
+            self.as_any().unwrap().type_id() == rhs_as_any.type_id()
+        } else {
+            false
         }
     }
+
+    fn as_any(&self) -> Option<&dyn Any>;
 }
 
-///
-/// A monomial together with a monomial order. This means two `FixedOrderMonomial`s
-/// can be compared without additional data, which makes them useful, e.g. as keys
-/// in a [`std::collections::BTreeMap`].
-/// 
-#[derive(Clone, Copy)]
-pub struct FixedOrderMonomial<V, O>
-    where V: VectorView<MonomialExponent>, O: MonomialOrder
-{
-    m: Monomial<V>,
-    order: O
-}
+pub trait GradedMonomialOrder: MonomialOrder {}
 
-impl<V, O> FixedOrderMonomial<V, O>
-    where V: VectorView<MonomialExponent>, O: MonomialOrder
-{
-    ///
-    /// Creates a new [`FixedOrderMonomial`] from the given monomial and order.
-    /// 
-    pub fn new(m: Monomial<V>, order: O) -> Self {
-        Self { m, order }
-    }
-
-    ///
-    /// Extracts the monomial without the order.
-    /// 
-    pub fn into(self) -> Monomial<V> {
-        self.m
-    }
-
-    ///
-    /// Returns the order.
-    /// 
-    pub fn order(&self) -> &O {
-        &self.order
-    }
-}
-
-impl<V, O> PartialEq for FixedOrderMonomial<V, O>
-    where V: VectorView<MonomialExponent>, O: MonomialOrder
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == Ordering::Equal
-    }
-}
-
-impl<V, O> Eq for FixedOrderMonomial<V, O>
-    where V: VectorView<MonomialExponent>, O: MonomialOrder
-{}
-
-impl<V, O> PartialOrd for FixedOrderMonomial<V, O>
-    where V: VectorView<MonomialExponent>, O: MonomialOrder
-{
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<V, O> Ord for FixedOrderMonomial<V, O>
-    where V: VectorView<MonomialExponent>, O: MonomialOrder
-{
-    fn cmp(&self, other: &Self) -> Ordering {
-        assert!(self.order().is_same(other.order().clone()));
-        self.order.compare(&self.m, &other.m)
-    }
-}
-
-///
-/// Graded reverse lexicographic order.
-/// 
-/// It is defined by first comparing the degree of monomials, and
-/// in case of equality, reverse the result of a lexicographic comparison,
-/// using reversed variable order.
-/// 
-/// # Example
-/// 
-/// The smallest example where this differs from the graded lexicographic order
-/// is as follows.
-/// ```
-/// # use feanor_math::rings::multivariate::*;
-/// 
-/// let a = Monomial::new([1, 0, 1]);
-/// let b = Monomial::new([0, 2, 0]);
-/// assert_eq!(std::cmp::Ordering::Less, DegRevLex.compare(&a, &b));
-/// assert_eq!(std::cmp::Ordering::Greater, Lex.compare(&a, &b));
-/// ```
-/// 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct DegRevLex;
 
-///
-/// Block-wise graded reverse lexicographic order.
-/// 
-/// This order is defined by first comparing the monomials induced by the
-/// first variables via degrevlex, and in the case of equality compare the
-/// monomials induced by the rest of the variables. Its main use is the fact
-/// that it can serve as an elimination order.
-/// 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct BlockLexDegRevLex {
-    larger_block: usize
-}
-
-impl BlockLexDegRevLex {
-
-    ///
-    /// Creates a new [`BlockLexDegRevLex`], that orders monomials according to the
-    /// exponents of indeterminates in `larger_block`, and only in case of a tie refers
-    /// to the remaining indeterminates in `smaller_block`.
-    /// 
-    /// It is required that `larger_block.end == smaller_block.start`.
-    /// 
-    pub fn new(larger_block: RangeTo<usize>, smaller_block: RangeFrom<usize>) -> Self {
-        assert_eq!(larger_block.end, smaller_block.start);
-        Self {
-            larger_block: larger_block.end
-        }
-    }
-}
-
-impl MonomialOrder for BlockLexDegRevLex {
-
-    fn is_graded(&self) -> bool {
-        false
-    }
-
-    fn compare<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering {
-        match DegRevLex.compare(
-            &Monomial::new(SubvectorView::new(&lhs.exponents).restrict(..self.larger_block)), 
-            &Monomial::new(SubvectorView::new(&rhs.exponents).restrict(..self.larger_block))
-        ) {
-            Ordering::Equal => DegRevLex.compare(
-                &Monomial::new(SubvectorView::new(&lhs.exponents).restrict(self.larger_block..)), 
-                &Monomial::new(SubvectorView::new(&rhs.exponents).restrict(self.larger_block..))
-            ),
-            ordering => ordering
-        }
-    }
-
-    fn is_same<O: ?Sized + MonomialOrder>(&self, other: O) -> bool {
-        match (&other as &dyn Any).downcast_ref::<Self>() {
-            Some(other) => self.larger_block == other.larger_block,
-            None => false
-        }
-    }
-}
-
 impl MonomialOrder for DegRevLex {
 
-    fn is_graded(&self) -> bool {
-        true
+    fn as_any(&self) -> Option<&dyn Any> {
+        Some(self as &dyn Any)
     }
 
-    fn compare<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering {
-        let lhs_deg = lhs.deg();
-        let rhs_deg = rhs.deg();
+    fn compare<P>(&self, ring: P, lhs: &PolyMonomial<P>, rhs: &PolyMonomial<P>) -> Ordering
+        where P:RingStore,
+            P::Type:MultivariatePolyRing
+    {
+        let lhs_deg = ring.monomial_deg(lhs);
+        let rhs_deg = ring.monomial_deg(rhs);
         if lhs_deg < rhs_deg {
             return Ordering::Less;
         } else if lhs_deg > rhs_deg {
             return Ordering::Greater;
         } else {
-            for i in (0..max(lhs.len(), rhs.len())).rev() {
-                if lhs[i] > rhs[i] {
+            for i in (0..ring.variable_count()).rev() {
+                if ring.exponent_at(lhs, i) > ring.exponent_at(rhs, i) {
                     return Ordering::Less
-                } else if lhs[i] < rhs[i] {
+                } else if ring.exponent_at(lhs, i) < ring.exponent_at(rhs, i) {
                     return Ordering::Greater;
                 }
             }
@@ -869,28 +403,26 @@ impl MonomialOrder for DegRevLex {
     }
 }
 
-///
-/// Standard lexicographic order of monomials.
-/// 
-/// To compare two monomials lexicographically, just compare the exponents
-/// of one indeterminate after the other, and return the first comparison result
-/// that is not "equal". 
-/// 
+impl GradedMonomialOrder for DegRevLex {}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Lex;
 
 impl MonomialOrder for Lex {
 
-    fn is_graded(&self) -> bool {
-        false
+    fn as_any(&self) -> Option<&dyn Any> {
+        Some(self as &dyn Any)
     }
 
-    fn compare<V: VectorView<MonomialExponent>>(&self, lhs: &Monomial<V>, rhs: &Monomial<V>) -> Ordering {
-        for i in 0..max(lhs.len(), rhs.len()) {
-            if lhs[i] < rhs[i] {
-                return Ordering::Less;
-            } else if lhs[i] > rhs[i] {
-                return Ordering::Greater;
+    fn compare<P>(&self, ring: P, lhs: &PolyMonomial<P>, rhs: &PolyMonomial<P>) -> Ordering
+        where P:RingStore,
+            P::Type:MultivariatePolyRing
+    {
+        for i in 0..ring.variable_count() {
+            match ring.exponent_at(lhs, i).cmp(&ring.exponent_at(rhs, i)) {
+                Ordering::Less => { return Ordering::Less; },
+                Ordering::Greater => { return Ordering::Greater; },
+                Ordering::Equal => {}
             }
         }
         return Ordering::Equal;
@@ -898,144 +430,226 @@ impl MonomialOrder for Lex {
 }
 
 pub mod generic_impls {
-    use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
+    use std::fmt::{Formatter, Result};
     use super::*;
 
-    pub fn checked_left_div<P, O>(ring: P, lhs: &El<P>, rhs: &El<P>, order: O) -> Option<El<P>>
+    #[stability::unstable(feature = "enable")]
+    pub fn print<P>(ring: P, poly: &El<P>, out: &mut Formatter, env: EnvBindingStrength) -> Result
         where P: RingStore,
-            P::Type: MultivariatePolyRing,
-            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing,
-            O: MonomialOrder + Clone
+            P::Type: MultivariatePolyRing
     {
-        assert!(ring.is_commutative());
-        assert!(!ring.is_zero(rhs));
-        let mut current = ring.clone_el(lhs);
-        let (rhs_lc, rhs_lm) = ring.lt(rhs, order.clone()).unwrap();
-        ring.try_from_terms(std::iter::repeat(()).map_while(|()| {
-            if let Some((lhs_lc, lhs_lm)) = ring.lt(&current, order.clone()) {
-                if rhs_lm.divides(&lhs_lm) {
-                    if let Some(lc_quo) = ring.base_ring().checked_div(lhs_lc, rhs_lc) {
-                        let mon_quo = ring.clone_monomial(lhs_lm).div(rhs_lm);
-                        ring.get_ring().add_assign_from_terms(&mut current, ring.terms(rhs).map(|(c, mon)| (ring.base_ring().negate(ring.base_ring().mul_ref(c, &lc_quo)), ring.clone_monomial(mon).mul(&mon_quo))));
-                        return Some(Ok((lc_quo, mon_quo)));
-                    } else {
-                        return Some(Err(()));
-                    }
-                } else {
-                    return Some(Err(()));
-                }
-            } else {
-                None
+        if ring.is_zero(poly) {
+            ring.base_ring().get_ring().dbg_within(&ring.base_ring().zero(), out, env)?;
+        } else {
+            if env >= EnvBindingStrength::Product {
+                write!(out, "(")?;
             }
-        })).ok()
+            
+            let mut print_term = |c: &PolyCoeff<P>, m: &PolyMonomial<P>, with_plus: bool| {
+                if with_plus {
+                    write!(out, " + ")?;
+                }
+                let is_constant_term = ring.monomial_deg(m) == 0;
+                if !ring.base_ring().is_one(c) || is_constant_term {
+                    ring.base_ring().get_ring().dbg_within(c, out, if is_constant_term { EnvBindingStrength::Sum } else { EnvBindingStrength::Product })?;
+                    if !is_constant_term {
+                        write!(out, " * ")?;
+                    }
+                }
+                let mut needs_space = false;
+                for i in 0..ring.variable_count() {
+                    if ring.exponent_at(m, i) > 0 {
+                        if needs_space {
+                            write!(out, " * ")?;
+                        }
+                        write!(out, "X{}", i)?;
+                        needs_space = true;
+                    }
+                    if ring.exponent_at(m, i) > 1 {
+                        write!(out, "^{}", ring.exponent_at(m, i))?;
+                    }
+                }
+                return Ok::<(), std::fmt::Error>(());
+            };
+            
+            for (i, (c, m)) in ring.terms(poly).enumerate() {
+                print_term(c, m, i != 0)?;
+            }
+            if env >= EnvBindingStrength::Product {
+                write!(out, ")")?;
+            }
+        }
+
+        return Ok(());
     }
 }
 
-#[cfg(test)]
-use super::zn::zn_static::Zn;
+#[cfg(any(test, feature = "generic_tests"))]
+pub mod generic_tests {
+    use super::*;
+    use crate::seq::*;
 
-#[test]
-fn test_lex() {
-    let mut monomials: Vec<Monomial<[u16; 3]>> = vec![
-        Monomial::new([0, 0, 0]),
-        Monomial::new([0, 0, 1]),
-        Monomial::new([0, 0, 2]),
-        Monomial::new([0, 1, 0]),
-        Monomial::new([0, 1, 1]),
-        Monomial::new([0, 2, 0]),
-        Monomial::new([1, 0, 0]),
-        Monomial::new([1, 0, 1]),
-        Monomial::new([1, 1, 0]),
-        Monomial::new([2, 0, 0])
-    ];
-    monomials.sort_by(|l, r| Lex.compare(l, r).reverse());
-    assert_eq!(vec![
-        Monomial::new([2, 0, 0]),
-        Monomial::new([1, 1, 0]),
-        Monomial::new([1, 0, 1]),
-        Monomial::new([1, 0, 0]),
-        Monomial::new([0, 2, 0]),
-        Monomial::new([0, 1, 1]),
-        Monomial::new([0, 1, 0]),
-        Monomial::new([0, 0, 2]),
-        Monomial::new([0, 0, 1]),
-        Monomial::new([0, 0, 0])
-    ], monomials);
-}
+    #[stability::unstable(feature = "enable")]
+    pub fn test_poly_ring_axioms<P: RingStore, I: Iterator<Item = PolyCoeff<P>>>(ring: P, interesting_base_ring_elements: I)
+        where P::Type: MultivariatePolyRing
+    {
+        let elements = interesting_base_ring_elements.collect::<Vec<_>>();
+        let n = ring.variable_count();
+        let base_ring = ring.base_ring();
 
-#[test]
-fn test_degrevlex() {
-    let mut monomials: Vec<Monomial<[u16; 3]>> = vec![
-        Monomial::new([0, 0, 0]),
-        Monomial::new([0, 0, 1]),
-        Monomial::new([0, 0, 2]),
-        Monomial::new([0, 1, 0]),
-        Monomial::new([0, 1, 1]),
-        Monomial::new([0, 2, 0]),
-        Monomial::new([1, 0, 0]),
-        Monomial::new([1, 0, 1]),
-        Monomial::new([1, 1, 0]),
-        Monomial::new([2, 0, 0])
-    ];
-    monomials.sort_by(|l, r| DegRevLex.compare(l, r).reverse());
-    assert_eq!(vec![
-        Monomial::new([2, 0, 0]),
-        Monomial::new([1, 1, 0]),
-        Monomial::new([0, 2, 0]),
-        Monomial::new([1, 0, 1]),
-        Monomial::new([0, 1, 1]),
-        Monomial::new([0, 0, 2]),
-        Monomial::new([1, 0, 0]),
-        Monomial::new([0, 1, 0]),
-        Monomial::new([0, 0, 1]),
-        Monomial::new([0, 0, 0])
-    ], monomials);
-}
+        // test multiplication of variables
+        for i in 0..n {
+            for j in 0..n {
+                let xi = ring.create_term(base_ring.one(), ring.create_monomial((0..n).map(|k| if k == i { 1 } else { 0 })));
+                let xj = ring.create_term(base_ring.one(), ring.create_monomial((0..n).map(|k| if k == j { 1 } else { 0 })));
+                let xixj = ring.create_term(base_ring.one(), ring.create_monomial((0..n).map(|k| if k == i && k == j { 2 } else if k == j || k == i { 1 } else { 0 })));
+                assert_el_eq!(ring, xixj, ring.mul(xi, xj));
+            }
+        }
 
-#[test]
-fn test_dividing_monomials() {
-    let m = Monomial::new([2, 1, 3]);
-    assert_eq!(vec![
-        Monomial::new([0, 0, 0]), Monomial::new([1, 0, 0]), Monomial::new([0, 1, 0]), Monomial::new([0, 0, 1]),
-        Monomial::new([2, 0, 0]), Monomial::new([1, 1, 0]), Monomial::new([1, 0, 1]), Monomial::new([0, 1, 1]), Monomial::new([0, 0, 2]),
-        Monomial::new([2, 1, 0]), Monomial::new([2, 0, 1]), Monomial::new([1, 1, 1]), Monomial::new([1, 0, 2]), Monomial::new([0, 1, 2]), Monomial::new([0, 0, 3]),
-        Monomial::new([2, 1, 1]), Monomial::new([2, 0, 2]), Monomial::new([1, 1, 2]), Monomial::new([1, 0, 3]), Monomial::new([0, 1, 3]),
-        Monomial::new([2, 1, 2]), Monomial::new([2, 0, 3]), Monomial::new([1, 1, 3]), 
-        Monomial::new([2, 1, 3])
-    ], m.dividing_monomials().collect::<Vec<_>>());
-    
-    let m = Monomial::new([2, 2, 5]);
-    assert_eq!(vec![
-        Monomial::new([0, 0, 0]), Monomial::new([1, 0, 0]), Monomial::new([0, 1, 0]), Monomial::new([0, 0, 1]),
-        Monomial::new([2, 0, 0]), Monomial::new([1, 1, 0]), Monomial::new([0, 2, 0]), Monomial::new([1, 0, 1]), Monomial::new([0, 1, 1]), Monomial::new([0, 0, 2]),
-        Monomial::new([2, 1, 0]), Monomial::new([1, 2, 0]), Monomial::new([2, 0, 1]), Monomial::new([1, 1, 1]), Monomial::new([0, 2, 1]), Monomial::new([1, 0, 2]), Monomial::new([0, 1, 2]), Monomial::new([0, 0, 3])
-    ], m.dividing_monomials().take(18).collect::<Vec<_>>());
+        // test monomial operations
+        for i in 0..n {
+            for j in 0..n {
+                let xi = ring.create_monomial((0..n).map(|k| if k == i { 1 } else { 0 }));
+                let xj = ring.create_monomial((0..n).map(|k| if k == j { 1 } else { 0 }));
+                let xixj_lcm = ring.create_monomial((0..n).map(|k| if k == j || k == i { 1 } else { 0 }));
+                assert_el_eq!(ring, ring.create_term(base_ring.one(), xixj_lcm), ring.create_term(base_ring.one(), ring.monomial_lcm(xi, &xj)));
+            }
+        }
 
-    let m = Monomial::new([1, 0, 2]);
-    assert_eq!(vec![
-        Monomial::new([0, 0, 0]), Monomial::new([1, 0, 0]), Monomial::new([0, 0, 1]),
-        Monomial::new([1, 0, 1]), Monomial::new([0, 0, 2]), Monomial::new([1, 0, 2]),
-    ], m.dividing_monomials().collect::<Vec<_>>());
-}
+        // all monomials should be different
+        for i in 0..n {
+            for j in 0..n {
+                let xi = ring.create_term(base_ring.one(), ring.create_monomial((0..n).map(|k| if k == i { 1 } else { 0 })));
+                let xj = ring.create_term(base_ring.one(), ring.create_monomial((0..n).map(|k| if k == j { 1 } else { 0 })));
+                assert!((i == j) == ring.eq_el(&xi, &xj));
+            }
+        }
 
-#[test]
-fn test_specialize() {
-    let ring: ordered::MultivariatePolyRingImpl<_, _, 1> = ordered::MultivariatePolyRingImpl::new(Zn::<17>::RING, DegRevLex);
-    let f = ring.from_terms([(1, Monomial::new([2])), (1, Monomial::new([1]))].into_iter());
-    let g = ring.from_terms([(1, Monomial::new([2])), (16, Monomial::new([1]))].into_iter());
+        // monomials shouldn't be zero divisors
+        for i in 0..n {
+            for a in &elements {
+                let xi = ring.create_term(base_ring.one(), ring.create_monomial((0..n).map(|k| if k == i { 1 } else { 0 })));
+                assert!(base_ring.is_zero(a) == ring.is_zero(&ring.inclusion().mul_ref_map(&xi, a)));
+            }
+        }
 
-    assert_el_eq!(ring, ring.add_ref_snd(ring.mul_ref(&g, &g), &g), ring.specialize(&f, 0, &g));
+        // test add_assign_from_terms
+        for i in 0..n {
+            let xi = ring.create_monomial((0..n).map(|k| if k == i { 1 } else { 0 }));
+            let mut a = ring.create_term(base_ring.int_hom().map(3), ring.create_monomial((0..n).map(|_| 0)));
+            let terms_with_multiples = [
+                (base_ring.one(), ring.clone_monomial(&xi)),
+                (base_ring.one(), ring.clone_monomial(&xi)),
+                (base_ring.one(), ring.create_monomial((0..n).map(|_| 0))),
+                (base_ring.one(), ring.create_monomial((0..n).map(|_| 0))),
+                (base_ring.one(), ring.clone_monomial(&xi)),
+                (base_ring.one(), ring.create_monomial((0..n).map(|_| 0))),
+                (base_ring.one(), ring.clone_monomial(&xi)),
+                (base_ring.one(), ring.create_monomial((0..n).map(|_| 0))),
+            ];
+            ring.get_ring().add_assign_from_terms(&mut a, terms_with_multiples);
+            assert_el_eq!(&ring, ring.from_terms([
+                (base_ring.int_hom().map(7), ring.create_monomial((0..n).map(|_| 0))),
+                (base_ring.int_hom().map(4), xi),
+            ]), a);
+        }
 
-    let ring: ordered::MultivariatePolyRingImpl<_, _, 2> = ordered::MultivariatePolyRingImpl::new(Zn::<17>::RING, DegRevLex);
-    let f = ring.from_terms([(1, Monomial::new([2, 0])), (1, Monomial::new([0, 1]))].into_iter());
-    let g = ring.from_terms([(1, Monomial::new([0, 2])), (16, Monomial::new([0, 1]))].into_iter());
+        if n >= 2 {
+            let one = ring.create_monomial((0..n).map(|_| 0));
+            let x0 = ring.create_monomial((0..n).map(|k| if k == 0 { 1 } else { 0 }));
+            let x1 = ring.create_monomial((0..n).map(|k| if k == 1 { 1 } else { 0 }));
+            let x0_v = ring.create_term(base_ring.one(), ring.clone_monomial(&x0));
+            let x1_v = ring.create_term(base_ring.one(), ring.clone_monomial(&x1));
+            let x0_2 = ring.create_monomial((0..n).map(|k| if k == 0 { 2 } else { 0 }));
+            let x0_3 = ring.create_monomial((0..n).map(|k| if k == 0 { 3 } else { 0 }));
+            let x0_4 = ring.create_monomial((0..n).map(|k| if k == 0 { 4 } else { 0 }));
+            let x0x1 = ring.create_monomial((0..n).map(|k| if k == 0 || k == 1 { 1 } else { 0 }));
+            let x0_3x1 = ring.create_monomial((0..n).map(|k| if k == 0 { 3 } else if k == 1 { 1 } else { 0 }));
+            let x1_2 = ring.create_monomial((0..n).map(|k| if k == 1 { 2 } else { 0 }));
 
-    assert_el_eq!(ring, ring.add(ring.mul_ref(&g, &g), ring.indeterminate(1)), ring.specialize(&f, 0, &g));
-}
+            // test product
+            for a in &elements {
+                for b in &elements {
+                    for c in &elements {
+                        let f = ring.add(ring.inclusion().mul_ref_map(&x0_v, a), ring.inclusion().mul_ref_map(&x1_v, b));
+                        let g = ring.add(ring.inclusion().mul_ref_map(&x0_v, c), ring.clone_el(&x1_v));
+                        let h = ring.from_terms([
+                            (base_ring.mul_ref(a, c), ring.clone_monomial(&x0_2)),
+                            (base_ring.add_ref_snd(base_ring.mul_ref(b, c), a), ring.clone_monomial(&x0x1)),
+                            (base_ring.clone_el(b), ring.clone_monomial(&x1_2)),
+                        ].into_iter());
+                        assert_el_eq!(ring, h, ring.mul(f, g));
+                    }
+                }
+            }
 
-#[test]
-fn test_appearing_variables() {
-    let ring: ordered::MultivariatePolyRingImpl<_, _, 2> = ordered::MultivariatePolyRingImpl::new(Zn::<17>::RING, DegRevLex);
-    let f = ring.from_terms([(1, Monomial::new([0, 2])), (1, Monomial::new([2, 1]))].into_iter());
-    assert_eq!([(0, 2), (1, 2)].into_iter().collect::<BTreeMap<_, _>>(), ring.appearing_variables(&f));
+            // test sum
+            for a in &elements {
+                for b in &elements {
+                    for c in &elements {
+                        let f = ring.from_terms([
+                            (base_ring.clone_el(a), ring.clone_monomial(&one)),
+                            (base_ring.clone_el(c), ring.clone_monomial(&x0_2)),
+                            (base_ring.one(), ring.clone_monomial(&x0x1))
+                        ]);
+                        let g = ring.from_terms([
+                            (base_ring.clone_el(b), ring.clone_monomial(&x0)),
+                            (base_ring.one(), ring.clone_monomial(&x0_2)),
+                        ]);
+                        let h = ring.from_terms([
+                            (base_ring.clone_el(a), ring.clone_monomial(&one)),
+                            (base_ring.clone_el(b), ring.clone_monomial(&x0)),
+                            (base_ring.add_ref_fst(c, base_ring.one()), ring.clone_monomial(&x0_2)),
+                            (base_ring.one(), ring.clone_monomial(&x0x1))
+                        ]);
+                        assert_el_eq!(ring, h, ring.add(f, g));
+                    }
+                }
+            }
+
+            // test mul_assign_monomial
+            for a in &elements {
+                for b in &elements {
+                    for c in &elements {
+                        let mut f = ring.from_terms([
+                            (base_ring.clone_el(a), ring.clone_monomial(&one)),
+                            (base_ring.clone_el(b), ring.clone_monomial(&x0)),
+                            (base_ring.clone_el(c), ring.clone_monomial(&x0_2)),
+                            (base_ring.one(), ring.clone_monomial(&x0x1))
+                        ]);
+                        let h = ring.from_terms([
+                            (base_ring.clone_el(a), ring.clone_monomial(&x0_2)),
+                            (base_ring.clone_el(b), ring.clone_monomial(&x0_3)),
+                            (base_ring.clone_el(c), ring.clone_monomial(&x0_4)),
+                            (base_ring.one(), ring.clone_monomial(&x0_3x1))
+                        ]);
+                        let m = ring.clone_monomial(&x0_2);
+                        ring.mul_assign_monomial(&mut f, m);
+                        assert_el_eq!(ring, h, f);
+                    }
+                }
+            }
+
+            // test evaluate
+            for a in &elements {
+                for b in &elements {
+                    let f = ring.from_terms([
+                        (base_ring.int_hom().map(3), ring.clone_monomial(&one)),
+                        (base_ring.int_hom().map(10), ring.clone_monomial(&x0)),
+                        (base_ring.neg_one(), ring.clone_monomial(&x0_2)),
+                        (base_ring.one(), ring.clone_monomial(&x0x1))
+                    ]);
+                    let expected = base_ring.sum([
+                        base_ring.int_hom().map(3),
+                        base_ring.int_hom().mul_ref_map(a, &10),
+                        base_ring.negate(base_ring.pow(base_ring.clone_el(a), 2)),
+                        base_ring.mul_ref(a, b)
+                    ]);
+                    let values = [base_ring.clone_el(a), base_ring.clone_el(b)].into_iter().chain((0..(ring.variable_count() - 2)).map(|_| base_ring.zero())).collect::<Vec<_>>();
+                    assert_el_eq!(&base_ring, &expected, &ring.evaluate(&f, values.as_ring_el_fn(base_ring), &base_ring.identity()));
+                }
+            }
+        }
+    }
 }

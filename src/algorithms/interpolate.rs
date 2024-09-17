@@ -144,8 +144,8 @@ pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_po
         A2: Allocator
 {
     let dim_prod = |range: Range<usize>| <_ as RingStore>::prod(&StaticRing::<i64>::RING, range.map(|i| interpolation_points.at(i).len() as i64)) as usize;
-    assert_eq!(interpolation_points.len(), poly_ring.indeterminate_len());
-    let n = poly_ring.indeterminate_len();
+    assert_eq!(interpolation_points.len(), poly_ring.variable_count());
+    let n = poly_ring.variable_count();
     assert_eq!(values.len(), dim_prod(0..n));
 
     let uni_poly_ring = DensePolyRing::new_with(poly_ring.base_ring(), "X", &allocator, STANDARD_CONVOLUTION);
@@ -166,7 +166,7 @@ pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_po
         }
     }
     return Ok(poly_ring.from_terms(
-        multi_cartesian_product((0..n).map(|i| 0..interpolation_points.at(i).len()), |idxs| poly_ring.get_ring().create_monomial(idxs.iter().map(|e| *e as u16)), |_, x| *x)
+        multi_cartesian_product((0..n).map(|i| 0..interpolation_points.at(i).len()), |idxs| poly_ring.get_ring().create_monomial(idxs.iter().map(|e| *e)), |_, x| *x)
             .zip(values.into_iter())
             .map(|(m, c)| (c, m))
     ));
@@ -179,7 +179,7 @@ use crate::rings::zn::zn_64::Zn;
 #[cfg(test)]
 use std::alloc::Global;
 #[cfg(test)]
-use ordered::MultivariatePolyRingImpl;
+use multivariate_impl::MultivariatePolyRingImpl;
 
 use super::convolution::STANDARD_CONVOLUTION;
 
@@ -264,7 +264,7 @@ fn test_interpolate() {
 #[test]
 fn test_interpolate_multivariate() {
     let ring = Zn::new(25);
-    let poly_ring: MultivariatePolyRingImpl<_, _, 2> = MultivariatePolyRingImpl::new(ring, DegRevLex);
+    let poly_ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(ring, 2);
 
     let interpolation_points = (0..2).map_fn(|_| (0..5).map_fn(|x| ring.int_hom().map(x as i32)));
     let values = (0..25).map(|x| ring.int_hom().map(x & 1)).collect::<Vec<_>>();
@@ -274,11 +274,11 @@ fn test_interpolate_multivariate() {
         for y in 0..5 {
             println!("{}, {}", x, y);
             let expected = (x * 5 + y) & 1;
-            assert_el_eq!(ring, ring.int_hom().map(expected), poly_ring.evaluate(&poly, &[ring.int_hom().map(x), ring.int_hom().map(y)], &ring.identity()));
+            assert_el_eq!(ring, ring.int_hom().map(expected), poly_ring.evaluate(&poly, [ring.int_hom().map(x), ring.int_hom().map(y)].into_ring_el_fn(&ring), &ring.identity()));
         }
     }
 
-    let poly_ring: MultivariatePolyRingImpl<_, _, 3> = MultivariatePolyRingImpl::new(ring, DegRevLex);
+    let poly_ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(ring, 3);
 
     let interpolation_points = (0..3).map_fn(|i| (0..(i + 2)).map_fn(|x| ring.int_hom().map(x as i32)));
     let values = (0..24).map(|x| ring.int_hom().map(x / 2)).collect::<Vec<_>>();
@@ -288,7 +288,7 @@ fn test_interpolate_multivariate() {
         for y in 0..3 {
             for z in 0..4 {
                 let expected = (x * 12 + y * 4 + z) / 2;
-                assert_el_eq!(ring, ring.int_hom().map(expected), poly_ring.evaluate(&poly, &[ring.int_hom().map(x), ring.int_hom().map(y), ring.int_hom().map(z)], &ring.identity()));
+                assert_el_eq!(ring, ring.int_hom().map(expected), poly_ring.evaluate(&poly, [ring.int_hom().map(x), ring.int_hom().map(y), ring.int_hom().map(z)].into_ring_el_fn(&ring), &ring.identity()));
             }
         }
     }

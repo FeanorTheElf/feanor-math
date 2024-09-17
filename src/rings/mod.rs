@@ -83,9 +83,3 @@ pub mod fieldextension;
 /// local principal ideal ring [`crate::rings::local::PrincipalLocalRing`]. 
 /// 
 pub mod local;
-
-///
-/// This module contains a new, more general characterisation of multivariate polynomial rings. Currently 
-/// experimental, but it might one day replace the old one in [`multivariate`]. 
-/// 
-pub mod multivariate_new;

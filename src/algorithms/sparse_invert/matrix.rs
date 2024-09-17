@@ -63,9 +63,9 @@ impl<R> SparseMatrix<R>
 
     #[stability::unstable(feature = "enable")]
     pub fn add_row<I>(&mut self, i: usize, values: I)
-        where I: Iterator<Item = (usize, R::Element)>
+        where I: IntoIterator<Item = (usize, R::Element)>
     {
-        let mut row = values
+        let mut row = values.into_iter()
             .map(|(j, x)| (self.col_permutation[j], x))
             .collect::<Vec<_>>();
         row.sort_by_key(|(j, _)| *j);

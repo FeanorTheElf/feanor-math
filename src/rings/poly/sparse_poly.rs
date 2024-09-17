@@ -386,7 +386,7 @@ impl<R> PolyRing for SparsePolyRingBase<R>
     }
 
     fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
-        where I: Iterator<Item = (El<Self::BaseRing>, usize)>
+        where I: IntoIterator<Item = (El<Self::BaseRing>, usize)>
     {
         for (c, i) in rhs {
             lhs.data.set_len(max(lhs.data.len(), i + 1));

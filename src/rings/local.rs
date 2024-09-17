@@ -339,6 +339,10 @@ impl<R> FromModulusCreateableZnRing for AsLocalPIRBase<RingValue<R>>
     }
 }
 
+impl<R: DivisibilityRingStore> Field for AsLocalPIRBase<R> 
+    where R::Type: DivisibilityRing + Field
+{}
+
 impl<R1, R2> CanHomFrom<AsFieldBase<R1>> for AsLocalPIRBase<R2>
     where R1: RingStore, R2: RingStore,
         R2::Type: CanHomFrom<R1::Type>,

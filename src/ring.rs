@@ -96,8 +96,8 @@ pub enum EnvBindingStrength {
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::multivariate_new::*;
-/// # use feanor_math::rings::multivariate_new::multivariate_impl::*;
+/// # use feanor_math::rings::multivariate::*;
+/// # use feanor_math::rings::multivariate::multivariate_impl::*;
 /// let fst = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, 2);
 /// let snd = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, 2);
 /// // we might think they are the same, but they are not!
@@ -410,9 +410,9 @@ pub trait RingBase: PartialEq {
     /// can be more efficient than that in some cases.
     /// 
     fn sum<I>(&self, els: I) -> Self::Element 
-        where I: Iterator<Item = Self::Element>
+        where I: IntoIterator<Item = Self::Element>
     {
-        els.fold(self.zero(), |a, b| self.add(a, b))
+        els.into_iter().fold(self.zero(), |a, b| self.add(a, b))
     }
 
     ///
@@ -422,9 +422,9 @@ pub trait RingBase: PartialEq {
     /// can be more efficient than that in some cases.
     /// 
     fn prod<I>(&self, els: I) -> Self::Element 
-        where I: Iterator<Item = Self::Element>
+        where I: IntoIterator<Item = Self::Element>
     {
-        els.fold(self.one(), |a, b| self.mul(a, b))
+        els.into_iter().fold(self.one(), |a, b| self.mul(a, b))
     }
     
     ///
@@ -697,17 +697,17 @@ pub trait RingStore: Sized {
     }
 
     fn sum<I>(&self, els: I) -> El<Self> 
-        where I: Iterator<Item = El<Self>>
+        where I: IntoIterator<Item = El<Self>>
     {
         self.get_ring().sum(els)
     }
 
     #[stability::unstable(feature = "enable")]
     fn try_sum<I, E>(&self, els: I) -> Result<El<Self>, E>
-        where I: Iterator<Item = Result<El<Self>, E>>
+        where I: IntoIterator<Item = Result<El<Self>, E>>
     {
         let mut error = None;
-        let result = self.get_ring().sum(els.map_while(|el| match el {
+        let result = self.get_ring().sum(els.into_iter().map_while(|el| match el {
             Ok(el) => Some(el),
             Err(err) => {
                 error = Some(err);
@@ -722,7 +722,7 @@ pub trait RingStore: Sized {
     }
 
     fn prod<I>(&self, els: I) -> El<Self> 
-        where I: Iterator<Item = El<Self>>
+        where I: IntoIterator<Item = El<Self>>
     {
         self.get_ring().prod(els)
     }

@@ -251,9 +251,9 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
     }
     
     fn prod<I>(&self, els: I) -> Self::Element 
-        where I: Iterator<Item = Self::Element>
+        where I: IntoIterator<Item = Self::Element>
     {
-        let mut elements = els.collect::<Vec<_>>();
+        let mut elements = els.into_iter().collect::<Vec<_>>();
         if elements.len() == 0 {
             return self.one();
         }
@@ -460,7 +460,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
     }
 
     fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
-        where I: Iterator<Item = (El<Self::BaseRing>, usize)>
+        where I: IntoIterator<Item = (El<Self::BaseRing>, usize)>
     {
         for (c, i) in rhs {
             if lhs.data.len() <= i {

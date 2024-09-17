@@ -42,11 +42,11 @@ pub trait PolyRing: RingExtension {
     /// Adds the given terms to the given polynomial.
     /// 
     fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
-        where I: Iterator<Item = (El<Self::BaseRing>, usize)>
+        where I: IntoIterator<Item = (El<Self::BaseRing>, usize)>
     {
         let self_ring = RingRef::new(self);
         self.add_assign(lhs, self_ring.sum(
-            rhs.map(|(c, i)| self.mul(self.from(c), self_ring.pow(self.indeterminate(), i)))
+            rhs.into_iter().map(|(c, i)| self.mul(self.from(c), self_ring.pow(self.indeterminate(), i)))
         ));
     }
 
@@ -143,7 +143,7 @@ pub trait PolyRingStore: RingStore
     /// the corresponding coefficients will be summed up.
     /// 
     fn from_terms<I>(&self, iter: I) -> El<Self>
-        where I: Iterator<Item = (El<<Self::Type as RingExtension>::BaseRing>, usize)>,
+        where I: IntoIterator<Item = (El<<Self::Type as RingExtension>::BaseRing>, usize)>,
     {
         let mut result = self.zero();
         self.get_ring().add_assign_from_terms(&mut result, iter);
@@ -236,12 +236,12 @@ pub trait PolyRingStore: RingStore
     /// let base_ring = Zn::new(7);
     /// let poly_ring = DensePolyRing::new(base_ring, "X");
     /// let f_version1 = poly_ring.from_terms([(base_ring.int_hom().map(3), 0), (base_ring.int_hom().map(2), 1), (base_ring.one(), 3)].into_iter());
-    /// let f_version2 = poly_ring.with_wrapped_indeterminate(|x| [3 + 2 * x + x.pow_ref(3)]).into_iter().next().unwrap();
+    /// let f_version2 = poly_ring.with_wrapped_indeterminate_dyn(|x| [3 + 2 * x + x.pow_ref(3)]).into_iter().next().unwrap();
     /// assert_el_eq!(poly_ring, f_version1, f_version2);
     /// ```
     /// 
     #[stability::unstable(feature = "enable")]
-    fn with_wrapped_indeterminate<'a, F, T>(&'a self, f: F) -> Vec<El<Self>>
+    fn with_wrapped_indeterminate_dyn<'a, F, T>(&'a self, f: F) -> Vec<El<Self>>
         where F: FnOnce(&RingElementWrapper<&'a Self>) -> T,
             T: IntoIterator<Item = RingElementWrapper<&'a Self>>
     {

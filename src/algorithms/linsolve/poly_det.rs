@@ -12,6 +12,7 @@ use crate::matrix::AsPointerToSlice;
 use crate::matrix::OwnedMatrix;
 use crate::matrix::Submatrix;
 use crate::pid::*;
+use crate::seq::VectorView;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::multivariate::*;
@@ -21,7 +22,7 @@ use crate::seq::SelfSubvectorFn;
 use crate::seq::VectorFn;
 use crate::algorithms::int_factor::factor;
 
-fn determinant_poly_matrix_base<P, V, A, I>(A: Submatrix<V, El<P>>, poly_ring: P, allocator: A, total_max_degrees: BTreeMap<usize, u16>, interpolation_points: I) -> El<P>
+fn determinant_poly_matrix_base<P, V, A, I>(A: Submatrix<V, El<P>>, poly_ring: P, allocator: A, total_max_degrees: BTreeMap<usize, usize>, interpolation_points: I) -> El<P>
     where P: RingStore,
         P::Type: MultivariatePolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
@@ -41,7 +42,7 @@ fn determinant_poly_matrix_base<P, V, A, I>(A: Submatrix<V, El<P>>, poly_ring: P
     for _ in multi_cartesian_product((0..total_max_degrees.len()).map(|i| interpolation_points.iter().take(interpolation_grid_dims[i] as usize)), |assignment| {
         for i in 0..n {
             for j in 0..n {
-                *evaluated_matrix.at_mut(i, j) = poly_ring.evaluate(A.at(i, j), assignment, &R.identity());
+                *evaluated_matrix.at_mut(i, j) = poly_ring.evaluate(A.at(i, j), assignment.into_ring_el_fn(R), &R.identity());
             }
         }
         determinants.push(algorithms::smith::determinant(evaluated_matrix.data_mut(), R));
@@ -107,10 +108,10 @@ pub fn determinant_poly_matrix<P, V, A>(A: Submatrix<V, El<P>>, poly_ring: P, al
 {
     assert_eq!(A.row_count(), A.col_count());
     let n = A.row_count();
-    let mut total_degs = (0..poly_ring.indeterminate_len()).map(|var| (var, 0)).collect::<BTreeMap<_, _>>();
+    let mut total_degs = (0..poly_ring.variable_count()).map(|var| (var, 0)).collect::<BTreeMap<_, _>>();
 
     for i in 0..n {
-        let mut max_degs = (0..poly_ring.indeterminate_len()).map(|var| (var, 0)).collect::<BTreeMap<_, _>>();
+        let mut max_degs = (0..poly_ring.variable_count()).map(|var| (var, 0)).collect::<BTreeMap<_, _>>();
         for j in 0..n {
             for (var, exp) in poly_ring.appearing_variables(A.at(i, j)) {
                 let old = max_degs.insert(var, max(max_degs[&var], exp));
@@ -143,63 +144,59 @@ pub fn determinant_poly_matrix<P, V, A>(A: Submatrix<V, El<P>>, poly_ring: P, al
 #[cfg(test)]
 use std::alloc::Global;
 #[cfg(test)]
-use crate::rings::multivariate::ordered::MultivariatePolyRingImpl;
-#[cfg(test)]
-use crate::wrapper::RingElementWrapper;
+use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 
 #[test]
 fn test_determinant_poly_matrix() {
-    let poly_ring: MultivariatePolyRingImpl<_, _, 3> = MultivariatePolyRingImpl::new(StaticRing::<i128>::RING, DegRevLex);
-    let x0 = RingElementWrapper::new(&poly_ring, poly_ring.indeterminate(0));
-    let x1 = RingElementWrapper::new(&poly_ring, poly_ring.indeterminate(1));
-    let x2 = RingElementWrapper::new(&poly_ring, poly_ring.indeterminate(2));
+    let poly_ring: MultivariatePolyRingImpl<_, _> = MultivariatePolyRingImpl::new(StaticRing::<i128>::RING, 3);
 
     let det2 = |A: Submatrix<_, _>| poly_ring.sub(poly_ring.mul_ref(A.at(0, 0), A.at(1, 1)), poly_ring.mul_ref(A.at(0, 1), A.at(1, 0)));
     let det3 = |A: Submatrix<_, _>| poly_ring.sum([
         poly_ring.mul_ref_fst(A.at(0, 0), det2(A.submatrix(1..3, 1..3))),
-        poly_ring.negate(poly_ring.mul_ref_fst(A.at(1, 0), det2(OwnedMatrix::from_fn_in(2, 2, |i, j| if i == 0 { poly_ring.clone_el(A.at(0, j + 1)) } else { poly_ring.clone_el(A.at(2, j + 1)) }, Global).data()))),
+        poly_ring.negate(poly_ring.mul_ref_fst(A.at(1, 0), det2(Submatrix::<Vec<_>, _>::new(&(0..2).map(|i| (0..2).map(|j| if i == 0 { poly_ring.clone_el(A.at(0, j + 1)) } else { poly_ring.clone_el(A.at(2, j + 1)) }).collect::<Vec<_>>()).collect::<Vec<_>>())))),
         poly_ring.mul_ref_fst(A.at(2, 0), det2(A.submatrix(0..2, 1..3)))
     ].into_iter());
     let det4 = |A: Submatrix<_, _>| poly_ring.sum([
         poly_ring.mul_ref_fst(A.at(0, 0), det3(A.submatrix(1..4, 1..4))),
-        poly_ring.negate(poly_ring.mul_ref_fst(A.at(1, 0), det3(OwnedMatrix::from_fn_in(3, 3, |i, j| if i == 0 { poly_ring.clone_el(A.at(0, j + 1)) } else { poly_ring.clone_el(A.at(i + 1, j + 1)) }, Global).data()))),
-        poly_ring.mul_ref_fst(A.at(2, 0), det3(OwnedMatrix::from_fn_in(3, 3, |i, j| if i == 2 { poly_ring.clone_el(A.at(3, j + 1)) } else { poly_ring.clone_el(A.at(i, j + 1)) }, Global).data())),
+        poly_ring.negate(poly_ring.mul_ref_fst(A.at(1, 0), det3(Submatrix::<Vec<_>, _>::new(&(0..3).map(|i| (0..3).map(|j| if i == 0 { poly_ring.clone_el(A.at(0, j + 1)) } else { poly_ring.clone_el(A.at(i + 1, j + 1)) }).collect::<Vec<_>>()).collect::<Vec<_>>())))),
+        poly_ring.mul_ref_fst(A.at(2, 0), det3(Submatrix::<Vec<_>, _>::new(&(0..3).map(|i| (0..3).map(|j| if i == 2 { poly_ring.clone_el(A.at(3, j + 1)) } else { poly_ring.clone_el(A.at(i, j + 1)) }).collect::<Vec<_>>()).collect::<Vec<_>>()))),
         poly_ring.negate(poly_ring.mul_ref_fst(A.at(3, 0), det3(A.submatrix(0..3, 1..4))))
     ].into_iter());
 
     let matrix = [
-        [x0.clone(), x1.clone()],
-        [x2.clone(), x0.clone()]
+        poly_ring.with_wrapped_indeterminates_dyn(|[x0, x1, _]| [x0.clone(), x1.clone()]),
+        poly_ring.with_wrapped_indeterminates_dyn(|[x0, _, x2]| [x2.clone(), x0.clone()])
     ];
-    let matrix_unwrapped = OwnedMatrix::from_fn_in(2, 2, |i, j| matrix[i][j].clone().unwrap(), Global);
-    assert_el_eq!(&poly_ring, (&x0 * &x0 - &x1 * &x2).unwrap(), determinant_poly_matrix(matrix_unwrapped.data(), &poly_ring, Global));
-    assert_el_eq!(&poly_ring, (&x0 * &x0 - &x1 * &x2).unwrap(), naive_det(matrix_unwrapped.data(), &poly_ring, Global));
+    let matrix = Submatrix::<Vec<_>, _>::new(&matrix[..]);
+    let expected = poly_ring.with_wrapped_indeterminates(|[x0, x1, x2]| [x0 * x0 - x1 * x2]).into_iter().next().unwrap();
+    assert_el_eq!(&poly_ring, &expected, naive_det(matrix, &poly_ring, Global));
+    assert_el_eq!(&poly_ring, &expected, determinant_poly_matrix(matrix, &poly_ring, Global));
 
     let matrix = [
-        [x0.clone(), x1.clone(), x2.clone()],
-        [x2.clone(), x0.clone(), x1.clone()],
-        [x1.clone(), x2.clone(), x0.clone()]
+        poly_ring.with_wrapped_indeterminates_dyn(|[x0, x1, x2]| [x0.clone(), x1.clone(), x2.clone()]),
+        poly_ring.with_wrapped_indeterminates_dyn(|[x0, x1, x2]| [x2.clone(), x0.clone(), x1.clone()]),
+        poly_ring.with_wrapped_indeterminates_dyn(|[x0, x1, x2]| [x1.clone(), x2.clone(), x0.clone()])
     ];
-    let matrix_unwrapped = OwnedMatrix::from_fn_in(3, 3, |i, j| matrix[i][j].clone().unwrap(), Global);
-    assert_el_eq!(&poly_ring, det3(matrix_unwrapped.data()), determinant_poly_matrix(matrix_unwrapped.data(), &poly_ring, Global));
-    assert_el_eq!(&poly_ring, det3(matrix_unwrapped.data()), naive_det(matrix_unwrapped.data(), &poly_ring, Global));
+    let matrix = Submatrix::<Vec<_>, _>::new(&matrix[..]);
+    assert_el_eq!(&poly_ring, det3(matrix), determinant_poly_matrix(matrix, &poly_ring, Global));
+    assert_el_eq!(&poly_ring, det3(matrix), naive_det(matrix, &poly_ring, Global));
 
     let matrix = [
-        [x0.clone(), x1.clone(), x2.clone()],
-        [x0.clone(), x1.clone(), x2.clone()],
-        [x0.clone(), x1.clone(), x2.clone()]
+        poly_ring.with_wrapped_indeterminates_dyn(|[x0, x1, x2]| [x0.clone(), x1.clone(), x2.clone()]),
+        poly_ring.with_wrapped_indeterminates_dyn(|[x0, x1, x2]| [x0.clone(), x1.clone(), x2.clone()]),
+        poly_ring.with_wrapped_indeterminates_dyn(|[x0, x1, x2]| [x0.clone(), x1.clone(), x2.clone()])
     ];
-    let matrix_unwrapped = OwnedMatrix::from_fn_in(3, 3, |i, j| matrix[i][j].clone().unwrap(), Global);
-    assert_el_eq!(&poly_ring, &poly_ring.zero(), determinant_poly_matrix(matrix_unwrapped.data(), &poly_ring, Global));
-    assert_el_eq!(&poly_ring, &poly_ring.zero(), naive_det(matrix_unwrapped.data(), &poly_ring, Global));
+    let matrix = Submatrix::<Vec<_>, _>::new(&matrix[..]);
+    assert_el_eq!(&poly_ring, &poly_ring.zero(), determinant_poly_matrix(matrix, &poly_ring, Global));
+    assert_el_eq!(&poly_ring, &poly_ring.zero(), naive_det(matrix, &poly_ring, Global));
 
     let matrix = [
-        [x0.clone(),                    &x0 + &x1,                      &x0 + &x1 + &x2,                x0.clone().pow(2)],
-        [&x0 * &x1,                     &x0 * &x2,                      &x1 * &x2,                      x1.clone().pow(2)],
-        [&x1 * 2,                       x2.clone(),                     &x0 + 1,                        x2.clone().pow(2)],
-        [x0.clone().pow(2) - &x1, x1.clone().pow(2) - &x2, x2.clone().pow(2) - &x0, x0.clone()]
+        poly_ring.with_wrapped_indeterminates_dyn(|[x0, x1, x2]| [x0.clone(),             x0 + x1,                x0 + x1 + x2,           x0.clone().pow(2)]),
+        poly_ring.with_wrapped_indeterminates_dyn(|[x0, x1, x2]| [x0 * x1,                x0 * x2,                x1 * x2,                x1.clone().pow(2)]),
+        poly_ring.with_wrapped_indeterminates_dyn(|[x0, x1, x2]| [x1 * 2,                 x2.clone(),             x0 + 1,                 x2.clone().pow(2)]),
+        poly_ring.with_wrapped_indeterminates_dyn(|[x0, x1, x2]| [x0.clone().pow(2) - x1, x1.clone().pow(2) - x2, x2.clone().pow(2) - x0, x0.clone()])
     ];
-    let matrix_unwrapped = OwnedMatrix::from_fn_in(4, 4, |i, j| matrix[i][j].clone().unwrap(), Global);
-    assert_el_eq!(&poly_ring, det4(matrix_unwrapped.data()), determinant_poly_matrix(matrix_unwrapped.data(), &poly_ring, Global));
-    assert_el_eq!(&poly_ring, det4(matrix_unwrapped.data()), naive_det(matrix_unwrapped.data(), &poly_ring, Global));
+    let matrix = Submatrix::<Vec<_>, _>::new(&matrix[..]);
+    assert_el_eq!(&poly_ring, det4(matrix), determinant_poly_matrix(matrix, &poly_ring, Global));
+    assert_el_eq!(&poly_ring, det4(matrix), naive_det(matrix, &poly_ring, Global));
 }

@@ -3,7 +3,7 @@ use crate::homomorphism::Homomorphism;
 use crate::local::{PrincipalLocalRing, PrincipalLocalRingStore};
 use crate::pid::PrincipalIdealRingStore;
 use crate::ring::*;
-use crate::rings::multivariate_new::*;
+use crate::rings::multivariate::*;
 
 use std::cmp::min;
 use std::fmt::Debug;
@@ -438,14 +438,31 @@ pub fn multivariate_division<'a, P, O, I>(ring: P, mut f: El<P>, reducers: I, or
     return f;
 }
 
+#[stability::unstable(feature = "enable")]
+pub fn buchberger_simple<P, O, const LOG: bool>(ring: P, input_basis: Vec<El<P>>, order: O) -> Vec<El<P>>
+    where P: RingStore + Copy,
+        P::Type: MultivariatePolyRing,
+        <P::Type as RingExtension>::BaseRing: Sync,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalLocalRing,
+        O: MonomialOrder + Copy,
+        PolyCoeff<P>: Send + Sync
+{
+    buchberger::<_, _, LOG, _, _>(ring, input_basis, order, default_sort_fn(ring, order), |_| false)
+}
+
+
 #[cfg(test)]
-use crate::rings::multivariate_new::multivariate_impl::MultivariatePolyRingImpl;
+use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 #[cfg(test)]
 use crate::rings::poly::{dense_poly, PolyRingStore};
 #[cfg(test)]
 use crate::rings::zn::zn_static;
 #[cfg(test)]
 use crate::rings::local::AsLocalPIR;
+#[cfg(test)]
+use crate::integer::BigIntRing;
+#[cfg(test)]
+use crate::rings::rational::RationalField;
 
 #[test]
 fn test_buchberger_small() {
@@ -560,12 +577,32 @@ fn test_gb_local_ring() {
     let f = ring.from_terms([(base.int_hom().map(4), ring.create_monomial([1])), (base.one(), ring.create_monomial([0]))].into_iter());
     let gb = buchberger::<_, _, true, _, _>(&ring, vec![f], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
 
-    for g in &gb {
-        ring.println(g);
-    }
-
     assert_eq!(1, gb.len());
     assert_el_eq!(ring, ring.one(), gb[0]);
+}
+
+#[test]
+fn test_gb_lex() {
+    let ZZ = BigIntRing::RING;
+    let QQ = AsLocalPIR::from_field(RationalField::new(ZZ));
+    let QQYX = MultivariatePolyRingImpl::new(&QQ, 2);
+    let [f, g] = QQYX.with_wrapped_indeterminates(|[Y, X]| [ 1 + X.pow_ref(2) + 2 * Y + (1 + X) * Y.pow_ref(2), 3 + X + (2 + X) * Y + (1 + X + X.pow_ref(2)) * Y.pow_ref(2) ]);
+    let expected = QQYX.with_wrapped_indeterminates(|[Y, X]| [ 
+        X.pow_ref(8) + 2 * X.pow_ref(7) + 3 * X.pow_ref(6) - 5 * X.pow_ref(5) - 10 * X.pow_ref(4) - 7 * X.pow_ref(3) + 8 * X.pow_ref(2) + 8 * X + 4,
+        2 * Y + X.pow_ref(6) + 3 * X.pow_ref(5) + 6 * X.pow_ref(4) + X.pow_ref(3) - 7 * X.pow_ref(2) - 12 * X - 2, 
+    ]);
+
+    let mut gb = buchberger_simple::<_, _, true>(&QQYX, vec![f, g], Lex);
+
+    assert_eq!(2, gb.len());
+    gb.sort_unstable_by_key(|f| QQYX.appearing_variables(f).len());
+    for (mut f, mut e) in gb.into_iter().zip(expected.into_iter()) {
+        let f_lc_inv = QQ.invert(QQYX.LT(&f, Lex).unwrap().0).unwrap();
+        QQYX.inclusion().mul_assign_map(&mut f, f_lc_inv);
+        let e_lc_inv = QQ.invert(QQYX.LT(&e, Lex).unwrap().0).unwrap();
+        QQYX.inclusion().mul_assign_map(&mut e, e_lc_inv);
+        assert_el_eq!(QQYX, e, f);
+    }
 }
 
 #[ignore]
@@ -604,7 +641,7 @@ fn test_expensive_gb_2() {
     let base = zn_static::Fp::<7>::RING;
     let ring = MultivariatePolyRingImpl::new(base, 7);
 
-    let basis = ring.with_wrapped_indeterminates(|[X0, X1, X2, X3, X4, X5, X6]| [
+    let basis = ring.with_wrapped_indeterminates_dyn(|[X0, X1, X2, X3, X4, X5, X6]| [
         6 + 2 * X5 + 2 * X4 + X6 + 4 * X0 + 5 * X6 * X5 + X6 * X4 + 3 * X0 * X4 + 6 * X0 * X6 + 2 * X0 * X3 + X0 * X2 + 4 * X0 * X1 + 2 * X3 * X4 * X5 + 4 * X0 * X6 * X5 + 6 * X0 * X2 * X5 + 5 * X0 * X6 * X4 + 2 * X0 * X3 * X4 + 4 * X0 * X1 * X4 + X0 * X6.pow_ref(2) + 3 * X0 * X3 * X6 + 5 * X0 * X2 * X6 + 2 * X0 * X1 * X6 + X0 * X3.pow_ref(2) + 2 * X0 * X2 * X3 + 3 * X0 * X3 * X4 * X5 + 4 * X0 * X3 * X6 * X5 + 3 * X0 * X1 * X6 * X5 + 3 * X0 * X2 * X3 * X5 + 3 * X0 * X3 * X6 * X4 + 2 * X0 * X1 * X6 * X4 + 2 * X0 * X3.pow_ref(2) * X4 + 2 * X0 * X2 * X3 * X4 + 3 * X0 * X3.pow_ref(2) * X4 * X5 + 4 * X0 * X1 * X3 * X4 * X5 + X0 * X3.pow_ref(2) * X4.pow_ref(2),
         5 + 4 * X0 + 6 * X4 * X5 + 3 * X6 * X5 + 4 * X0 * X4 + 3 * X0 * X6 + 6 * X0 * X3 + 6 * X0 * X2 + 6 * X6 * X4 * X5 + 2 * X0 * X4 * X5 + 4 * X0 * X6 * X5 + 3 * X0 * X2 * X5 + 3 * X0 * X6 * X4 + 5 * X0 * X3 * X4 + 6 * X0 * X2 * X4 + 4 * X0 * X6.pow_ref(2) + 3 * X0 * X3 * X6 + 3 * X0 * X2 * X6 + 2 * X0 * X6 * X4 * X5 + 6 * X0 * X3 * X4 * X5 + 5 * X0 * X1 * X4 * X5 + 6 * X0 * X6.pow_ref(2) * X5 + 2 * X0 * X3 * X6 * X5 + 2 * X0 * X2 * X6 * X5 + 6 * X0 * X1 * X6 * X5 + 6 * X0 * X2 * X3 * X5 + 6 * X0 * X3 * X4.pow_ref(2) + 4 * X0 * X6.pow_ref(2) * X4 + 6 * X0 * X3 * X6 * X4 + 3 * X0 * X2 * X6 * X4 + 4 * X0 * X3 * X6 * X4 * X5 + 5 * X0 * X1 * X6 * X4 * X5 + 6 * X0 * X3.pow_ref(2) * X4 * X5 + 5 * X0 * X2 * X3 * X4 * X5 + 3 * X0 * X3 * X6 * X4.pow_ref(2) + 6 * X0 * X3.pow_ref(2) * X4.pow_ref(2) * X5.clone(),
         2 + 2 * X0 + 4 * X0 * X4 + 2 * X0 * X6 + 5 * X0 * X4 * X5 + 2 * X0 * X6 * X5 + 4 * X0 * X2 * X5 + 2 * X0 * X4.pow_ref(2) + 4 * X0 * X6 * X4 + 4 * X0 * X6.pow_ref(2) + 2 * X6 * X4 * X5.pow_ref(2) + 4 * X0 * X6 * X4 * X5 + X0 * X3 * X4 * X5 + X0 * X2 * X4 * X5 + 3 * X0 * X6.pow_ref(2) * X5 + 2 * X0 * X3 * X6 * X5 + 4 * X0 * X2 * X6 * X5 + 2 * X0 * X6 * X4.pow_ref(2) + X0 * X6.pow_ref(2) * X4 + 3 * X0 * X6 * X4 * X5.pow_ref(2) + 2 * X0 * X6.pow_ref(2) * X5.pow_ref(2) + 3 * X0 * X2 * X6 * X5.pow_ref(2) + X0 * X3 * X4.pow_ref(2) * X5 + X0 * X6.pow_ref(2) * X4 * X5 + X0 * X3 * X6 * X4 * X5 + 6 * X0 * X2 * X6 * X4 * X5 + 4 * X0 * X6.pow_ref(2) * X4.pow_ref(2) + 6 * X0 * X3 * X6 * X4 * X5.pow_ref(2) + 4 * X0 * X1 * X6 * X4 * X5.pow_ref(2) + 4 * X0 * X2 * X3 * X4 * X5.pow_ref(2) + 6 * X0 * X3 * X6 * X4.pow_ref(2) * X5 + 2 * X0 * X3.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(2),
@@ -629,7 +666,7 @@ fn test_groebner_cyclic6() {
     let base = zn_static::Fp::<65537>::RING;
     let ring = MultivariatePolyRingImpl::new(base, 6);
 
-    let cyclic6 = ring.with_wrapped_indeterminates(|[x, y, z, t, u, v]| {
+    let cyclic6 = ring.with_wrapped_indeterminates_dyn(|[x, y, z, t, u, v]| {
         [x + y + z + t + u + v, x*y + y*z + z*t + t*u + x*v + u*v, x*y*z + y*z*t + z*t*u + x*y*v + x*u*v + t*u*v, x*y*z*t + y*z*t*u + x*y*z*v + x*y*u*v + x*t*u*v + z*t*u*v, x*y*z*t*u + x*y*z*t*v + x*y*z*u*v + x*y*t*u*v + x*z*t*u*v + y*z*t*u*v, x*y*z*t*u*v - 1]
     });
 
@@ -648,7 +685,7 @@ fn test_groebner_cyclic7() {
     let base = zn_static::Fp::<65537>::RING;
     let ring = MultivariatePolyRingImpl::new(base, 7);
 
-    let cyclic7 = ring.with_wrapped_indeterminates(|[x, y, z, t, u, v, w]| [
+    let cyclic7 = ring.with_wrapped_indeterminates_dyn(|[x, y, z, t, u, v, w]| [
         x + y + z + t + u + v + w, x*y + y*z + z*t + t*u + u*v + x*w + v*w, x*y*z + y*z*t + z*t*u + t*u*v + x*y*w + x*v*w + u*v*w, x*y*z*t + y*z*t*u + z*t*u*v + x*y*z*w + x*y*v*w + x*u*v*w + t*u*v*w, 
         x*y*z*t*u + y*z*t*u*v + x*y*z*t*w + x*y*z*v*w + x*y*u*v*w + x*t*u*v*w + z*t*u*v*w, x*y*z*t*u*v + x*y*z*t*u*w + x*y*z*t*v*w + x*y*z*u*v*w + x*y*t*u*v*w + x*z*t*u*v*w + y*z*t*u*v*w, x*y*z*t*u*v*w - 1
     ]);
@@ -667,7 +704,7 @@ fn test_groebner_cyclic8() {
     let base = zn_static::Fp::<65537>::RING;
     let ring = MultivariatePolyRingImpl::new(base, 8);
 
-    let cyclic7 = ring.with_wrapped_indeterminates(|[x, y, z, s, t, u, v, w]| [
+    let cyclic7 = ring.with_wrapped_indeterminates_dyn(|[x, y, z, s, t, u, v, w]| [
         x + y + z + s + t + u + v + w, x*y + y*z + z*s + s*t + t*u + u*v + x*w + v*w, x*y*z + y*z*s + z*s*t + s*t*u + t*u*v + x*y*w + x*v*w + u*v*w, 
         x*y*z*s + y*z*s*t + z*s*t*u + s*t*u*v + x*y*z*w + x*y*v*w + x*u*v*w + t*u*v*w, x*y*z*s*t + y*z*s*t*u + z*s*t*u*v + x*y*z*s*w + x*y*z*v*w + x*y*u*v*w + x*t*u*v*w + s*t*u*v*w, x*y*z*s*t*u + y*z*s*t*u*v + x*y*z*s*t*w + x*y*z*s*v*w + x*y*z*u*v*w + x*y*t*u*v*w + x*s*t*u*v*w + z*s*t*u*v*w, 
         x*y*z*s*t*u*v + x*y*z*s*t*u*w + x*y*z*s*t*v*w + x*y*z*s*u*v*w + x*y*z*t*u*v*w + x*y*s*t*u*v*w + x*z*s*t*u*v*w + y*z*s*t*u*v*w, x*y*z*s*t*u*v*w - 1
