@@ -369,8 +369,42 @@ pub trait MonomialOrder: Clone {
     fn as_any(&self) -> Option<&dyn Any>;
 }
 
+///
+/// Trait for [`MonomialOrder`]s that are graded, i.e. for `v, w` with `deg(v) < deg(w)`
+/// they always satisfy `v < w`.
+/// 
 pub trait GradedMonomialOrder: MonomialOrder {}
 
+///
+/// The graded reverse lexicographic order. This is the most important monomial order, since
+/// computing a Groebner basis w.r.t. this order is usually more efficient than for other orders.
+/// Also sometimes referred to as "grevlex".
+/// 
+/// Concretely, this is the ordering of monomials we get by first comparing monomial degrees, and
+/// in case of a tie reverse the outcome of a lexicographic comparison, using a reversed order
+/// of variables.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::multivariate::*;
+/// # use feanor_math::rings::multivariate::multivariate_impl::*;
+/// # use feanor_math::primitive_int::*; 
+/// # use std::cmp::Ordering;
+/// let poly_ring = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, 3);
+/// let monomials_descending = [
+///     [2, 0, 0], // x1^2
+///     [1, 1, 0], // x1 x2
+///     [0, 2, 0], // x2^2
+///     [1, 0, 1], // x1 x3
+///     [0, 1, 1], // x2 x3
+///     [0, 0, 2], // x3^2
+/// ].into_iter().map(|m| poly_ring.create_monomial(m)).collect::<Vec<_>>();
+/// for i in 1..6 {
+///     assert!(DegRevLex.compare(&poly_ring, &monomials_descending[i - 1], &monomials_descending[i]) == Ordering::Greater);
+/// }
+/// ```
+/// 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct DegRevLex;
 
@@ -381,7 +415,7 @@ impl MonomialOrder for DegRevLex {
     }
 
     fn compare<P>(&self, ring: P, lhs: &PolyMonomial<P>, rhs: &PolyMonomial<P>) -> Ordering
-        where P:RingStore,
+        where P: RingStore,
             P::Type:MultivariatePolyRing
     {
         let lhs_deg = ring.monomial_deg(lhs);
