@@ -31,8 +31,9 @@ impl<I> ZnOperation<El<I>> for ECFactorInt<I>
     }
 }
 
-pub fn is_prime_power<I: IntegerRingStore>(ZZ: &I, n: &El<I>) -> Option<(El<I>, usize)>
-    where I::Type: IntegerRing
+pub fn is_prime_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
+    where I: IntegerRingStore + Copy,
+        I::Type: IntegerRing
 {
     if algorithms::miller_rabin::is_prime(ZZ, n, 10) {
         return Some((ZZ.clone_el(n), 1));
@@ -45,8 +46,9 @@ pub fn is_prime_power<I: IntegerRingStore>(ZZ: &I, n: &El<I>) -> Option<(El<I>, 
     }
 }
 
-fn is_power<I: IntegerRingStore>(ZZ: &I, n: &El<I>) -> Option<(El<I>, usize)>
-    where I::Type: IntegerRing
+fn is_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
+    where I: IntegerRingStore + Copy,
+        I::Type: IntegerRing
 {
     assert!(!ZZ.is_zero(n));
     for i in (2..=ZZ.abs_log2_ceil(n).unwrap()).rev() {
@@ -58,8 +60,8 @@ fn is_power<I: IntegerRingStore>(ZZ: &I, n: &El<I>) -> Option<(El<I>, usize)>
     return None;
 }
 
-pub fn factor<I>(ZZ: &I, mut n: El<I>) -> Vec<(El<I>, usize)> 
-    where I: IntegerRingStore + OrderedRingStore, 
+pub fn factor<I>(ZZ: I, mut n: El<I>) -> Vec<(El<I>, usize)> 
+    where I: IntegerRingStore + OrderedRingStore + Copy, 
         I::Type: IntegerRing + OrderedRing + CanIsoFromTo<BigIntRingBase> + CanIsoFromTo<StaticRingBase<i128>>
 {
     const SMALL_PRIME_BOUND: i32 = 10000;
@@ -107,7 +109,7 @@ pub fn factor<I>(ZZ: &I, mut n: El<I>) -> Vec<(El<I>, usize)>
     }
 
     // then check for powers, as EC factor fails for those
-    if let Some((m, k)) = is_power(&ZZ, &n) {
+    if let Some((m, k)) = is_power(ZZ, &n) {
         let mut power_factors = factor(ZZ, m);
         for (_, multiplicity) in &mut power_factors {
             *multiplicity *= k;

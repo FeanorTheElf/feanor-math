@@ -980,12 +980,11 @@ impl<R: RingBase + Default> Default for RingValue<R> {
 /// 
 /// # Why do we need this in addition to [`crate::ring::RingValue`]?
 /// 
-/// The role of `RingRef` is much more niche than the role of [`crate::ring::RingValue`].
-/// However, it might happen that we want to implement [`crate::ring::RingBase`]-functions (or traits on the
-/// same level, e.g. [`crate::ring::CanHomFrom`], [`crate::divisibility::DivisibilityRing`]),
-/// and use more high-level techniques for that (e.g. complex algorithms, for example [`crate::algorithms::eea`]
-/// or [`crate::algorithms::sqr_mul`]). In this case, we only have a reference to a [`crate::ring::RingBase`]
-/// object, but require a [`crate::ring::RingStore`] object to use the algorithm.
+/// Before [`RingStore::from_ref()`] was added, this was important to
+/// allow using a reference to a [`RingBase`] as [`RingStore`]. Since then,
+/// it indeed has only a marginal importance, but note that it is currently
+/// the only way of working with unsized rings (an admittedly pretty exotic
+/// case).
 /// 
 #[repr(transparent)]
 pub struct RingRef<'a, R: RingBase + ?Sized> {

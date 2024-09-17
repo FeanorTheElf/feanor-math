@@ -67,10 +67,6 @@ impl InternalMonomialIdentifier {
     fn wrap(self) -> MonomialIdentifier {
         MonomialIdentifier { data: self }
     }
-
-    fn wrap_ref<'a>(&'a self) -> &'a MonomialIdentifier {
-        unsafe { std::mem::transmute(self) }
-    }
 }
 
 impl PartialEq for InternalMonomialIdentifier {
@@ -196,7 +192,7 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
 
     fn compare_degrevlex(&self, lhs: &InternalMonomialIdentifier, rhs: &InternalMonomialIdentifier) -> Ordering {
         let res = lhs.deg.cmp(&rhs.deg).then_with(|| lhs.order.cmp(&rhs.order));
-        debug_assert!(res == DegRevLex.compare(RingRef::new(self), lhs.wrap_ref(), rhs.wrap_ref()));
+        debug_assert!(res == DegRevLex.compare(RingRef::new(self), &lhs.clone().wrap(), &rhs.clone().wrap()));
         return res;
     }
 

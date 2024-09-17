@@ -12,8 +12,14 @@ pub mod multivariate_impl;
 use std::any::Any;
 use std::cmp::{max, Ordering};
 
+///
+/// Type of coefficients of multivariate polynomials of the given ring.
+/// 
 pub type PolyCoeff<P> = El<<<P as RingStore>::Type as RingExtension>::BaseRing>;
 
+///
+/// Type of monomials of multivariate polynomials of the given ring.
+/// 
 pub type PolyMonomial<P> = <<P as RingStore>::Type as MultivariatePolyRing>::Monomial;
 
 ///

@@ -16,6 +16,7 @@ use std::alloc::Allocator;
 use std::cmp::max;
 use std::marker::PhantomData;
 
+#[stability::unstable(feature = "enable")]
 pub trait LLLRealField<I>: OrderedRing + Field
     where I: ?Sized + IntegerRing
 {

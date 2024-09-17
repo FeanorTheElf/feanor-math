@@ -80,10 +80,10 @@ pub fn hensel_lift<P, R, S>(target_ring: P, source_ring: R, prime_ring: S, f: &E
 /// Like [`hensel_lift()`] but for an arbitrary number of factors.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn hensel_lift_factorization<P, R, S>(target_ring: &P, source_ring: &R, prime_ring: &S, f: &El<P>, factors: &[El<R>]) -> Vec<El<P>>
-    where P: PolyRingStore, P::Type: PolyRing,
-        R: PolyRingStore, R::Type: PolyRing,
-        S: PolyRingStore, S::Type: PolyRing + EuclideanRing,
+pub fn hensel_lift_factorization<P, R, S>(target_ring: P, source_ring: R, prime_ring: S, f: &El<P>, factors: &[El<R>]) -> Vec<El<P>>
+    where P: PolyRingStore + Copy, P::Type: PolyRing,
+        R: PolyRingStore + Copy, R::Type: PolyRing,
+        S: PolyRingStore + Copy, S::Type: PolyRing + EuclideanRing,
         <<P as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
         <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
         <<R as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,

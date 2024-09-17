@@ -46,6 +46,9 @@ pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
     }
 }
 
+///
+/// Returns the largest prime smaller than the given integer.
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn prev_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>) -> Option<El<I>>
     where I::Type: IntegerRing,
