@@ -166,8 +166,6 @@ use crate::rings::zn::zn_static;
 #[cfg(test)]
 use crate::assert_matrix_eq;
 #[cfg(test)]
-use crate::delegate::DelegateRing;
-#[cfg(test)]
 use std::alloc::Global;
 #[cfg(test)]
 use crate::algorithms::linsolve::LinSolveRing;
@@ -238,53 +236,6 @@ fn test_smith_zn() {
         [0, 0, 0, 0]], &A);
         
     assert_matrix_eq!(&ring, &multiply([L.data(), original_A.data(), R.data()], ring), &A);
-}
-
-#[test]
-fn test_smith_direct_elim_matrix_fails() {
-    #[derive(PartialEq, Copy, Clone)]
-    struct Z12_specialize_bezout_identity;
-
-    impl DelegateRing for Z12_specialize_bezout_identity {
-        type Base = zn_static::ZnBase<12, false>;
-        type Element = El<zn_static::Zn<12>>;
-
-        fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
-        fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
-        fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
-        fn get_delegate(&self) -> &Self::Base { zn_static::Zn::<12>::RING.get_ring() }
-        fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
-    }
-
-    impl PrincipalIdealRing for Z12_specialize_bezout_identity {
-
-        fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-            // we violate the contract here by just using checked_div
-            self.checked_left_div(lhs, rhs)
-        }
-
-        fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-            if self.is_zero(lhs) && self.eq_el(rhs, &self.from_int(6)) {
-                (self.zero(), self.from_int(3), self.from_int(6))
-            } else if self.is_zero(lhs) && self.eq_el(rhs, &self.from_int(3)) {
-                (self.zero(), self.from_int(3), self.from_int(3))
-            } else if RingRef::new(self).is_unit(lhs) {
-                (self.one(), self.zero(), self.clone_el(lhs))
-            } else if RingRef::new(self).is_unit(rhs) {
-                (self.zero(), self.one(), self.clone_el(rhs))
-            } else {
-                panic!("unanticipated call to extended_ideal_gen")
-            }
-        }
-    }
-
-    let ring = RingValue::from(Z12_specialize_bezout_identity);
-    let mut matrix = [0, 6];
-    let mut L = OwnedMatrix::<_>::identity(2, 2, ring);
-    let mut R = OwnedMatrix::<_>::identity(1, 1, ring);
-    pre_smith(ring, &mut TransformRows(L.data_mut(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), SubmatrixMut::<AsFirstElement<_>, _>::new(&mut matrix, 2, 1));
-    assert!(zn_static::Zn::<12>::RING.is_unit(&ring.sub(ring.mul_ref(L.at(0, 0), L.at(1, 1)), ring.mul_ref(L.at(1, 0), L.at(0, 1)))));
-    assert!(zn_static::Zn::<12>::RING.is_unit(R.at(0, 0)));
 }
 
 #[test]

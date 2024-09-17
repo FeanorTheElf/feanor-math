@@ -606,7 +606,18 @@ impl<R, A: Allocator + Clone, C> PrincipalIdealRing for DensePolyRingBase<R, A, 
     where R: RingStore, R::Type: Field, C: ConvolutionAlgorithm<R::Type>
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        unimplemented!()
+        // base ring is a field, so everything is fine
+        if self.is_zero(rhs) && self.is_zero(lhs) {
+            return Some(self.one());
+        } else if self.is_zero(rhs) {
+            return None;
+        }
+        let (quo, rem) = self.euclidean_div_rem(self.clone_el(lhs), rhs);
+        if self.is_zero(&rem) {
+            return Some(quo);
+        } else {
+            return None;
+        }
     }
 
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
