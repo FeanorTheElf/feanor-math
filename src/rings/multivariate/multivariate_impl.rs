@@ -47,14 +47,33 @@ fn enumeration_index_degrevlex<V>(d: Exponent, mon: V, cum_binomial_lookup_table
     return result;
 }
 
-#[derive(Clone)]
+///
+/// Stores a reference to a monomial w.r.t. a given [`MultivariatePolyRingImplBase`].
+/// 
+#[repr(transparent)]
 pub struct MonomialIdentifier {
+    data: InternalMonomialIdentifier
+}
+
+#[derive(Clone)]
+struct InternalMonomialIdentifier {
     deg: Exponent,
     order: OrderIdx,
     index: Option<Index>
 }
 
-impl PartialEq for MonomialIdentifier {
+impl InternalMonomialIdentifier {
+
+    fn wrap(self) -> MonomialIdentifier {
+        MonomialIdentifier { data: self }
+    }
+
+    fn wrap_ref<'a>(&'a self) -> &'a MonomialIdentifier {
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+impl PartialEq for InternalMonomialIdentifier {
     fn eq(&self, other: &Self) -> bool {
         let res = self.deg == other.deg && self.order == other.order;
         debug_assert!(self.index.is_none() || other.index.is_none() || res == (self.index == other.index));
@@ -62,20 +81,23 @@ impl PartialEq for MonomialIdentifier {
     }
 }
 
-impl Eq for MonomialIdentifier {}
+impl Eq for InternalMonomialIdentifier {}
 
-impl Ord for MonomialIdentifier {
+impl Ord for InternalMonomialIdentifier {
     fn cmp(&self, other: &Self) -> Ordering {
         self.deg.cmp(&other.deg).then_with(|| self.order.cmp(&other.order))
     }
 }
 
-impl PartialOrd for MonomialIdentifier {
+impl PartialOrd for InternalMonomialIdentifier {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
+///
+/// An element of [`MultivariatePolyRingImpl`].
+/// 
 pub struct MultivariatePolyRingEl<R, A = Global>
     where R: RingStore,
         A: Allocator + Clone
@@ -83,6 +105,9 @@ pub struct MultivariatePolyRingEl<R, A = Global>
     data: Vec<(El<R>, MonomialIdentifier), A>
 }
 
+///
+/// Implementation of multivariate polynomial rings.
+/// 
 pub struct MultivariatePolyRingImplBase<R, A = Global>
     where R: RingStore,
         A: Clone + Allocator + Send
@@ -96,7 +121,7 @@ pub struct MultivariatePolyRingImplBase<R, A = Global>
     tmp_monomials: ThreadLocal<Box<[Cell<Exponent>]>>,
     // maps monomials to the corresponding indics; usually access with a temporary monomial (one without index); currently
     // the only part that is not thread-safe, until I find a nice concurrent append-only map impl
-    monomial_table: RefCell<BTreeMap<MonomialIdentifier, Index>>,
+    monomial_table: RefCell<BTreeMap<InternalMonomialIdentifier, Index>>,
     zero: El<R>,
     max_degree_for_orderidx: usize,
     cum_binomial_lookup_table: Vec<Vec<u64>>,
@@ -135,7 +160,7 @@ impl<R, A> MultivariatePolyRingImpl<R, A>
                 int_cast(*d as i64, BigIntRing::RING, StaticRing::<i64>::RING)
             ), &BigIntRing::RING.power_of_two(u64::BITS as usize)) { -1 } else { 1 }) as usize
         };
-        assert!(max_degree_for_orderidx >= max_supported_deg as usize);
+        assert!(max_degree_for_orderidx >= max_supported_deg as usize, "currently only degrees are supported for which the total number of this-degree monomials fits in a u64");
 
         let allocated_monomials = AppendOnlyVec::new();
         // add dummy element so that the index is nonzero, this allows keeping MonomialIdentifier within 16 bytes
@@ -169,25 +194,25 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
         self.tmp_monomials.get_or(|| (0..self.variable_count).map(|_| Cell::new(0)).collect::<Vec<_>>().into_boxed_slice())
     }
 
-    fn compare_degrevlex(&self, lhs: &MonomialIdentifier, rhs: &MonomialIdentifier) -> Ordering {
+    fn compare_degrevlex(&self, lhs: &InternalMonomialIdentifier, rhs: &InternalMonomialIdentifier) -> Ordering {
         let res = lhs.deg.cmp(&rhs.deg).then_with(|| lhs.order.cmp(&rhs.order));
-        debug_assert!(res == DegRevLex.compare(RingRef::new(self), lhs, rhs));
+        debug_assert!(res == DegRevLex.compare(RingRef::new(self), lhs.wrap_ref(), rhs.wrap_ref()));
         return res;
     }
 
     fn is_valid(&self, el: &[(El<R>, MonomialIdentifier)]) -> bool {
         for (_, m) in el {
-            assert!(m.index.is_some());
+            assert!(m.data.index.is_some());
             assert_eq!(
-                m.deg, 
-                self.allocated_monomials[u32::from(m.index.unwrap()) as usize].iter().copied().sum::<Exponent>(), 
+                m.data.deg, 
+                self.allocated_monomials[u32::from(m.data.index.unwrap()) as usize].iter().copied().sum::<Exponent>(), 
                 "Expected {} = {}; Note that this assert is triggered by a doctest on RingBase on a debug_assertions build; this is expected, since said test demonstrates what not to do", 
-                m.deg, 
-                self.allocated_monomials[u32::from(m.index.unwrap()) as usize].iter().copied().sum::<Exponent>()
+                m.data.deg, 
+                self.allocated_monomials[u32::from(m.data.index.unwrap()) as usize].iter().copied().sum::<Exponent>()
             );
         }
         for i in 1..el.len() {
-            if self.compare_degrevlex(&el[i - 1].1, &el[i].1) != Ordering::Less {
+            if self.compare_degrevlex(&el[i - 1].1.data, &el[i].1.data) != Ordering::Less {
                 return false;
             }
         }
@@ -204,7 +229,7 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
         for j in 0..el.len() {
             if !self.base_ring.is_zero(&el[j].0) {
                 if i != j {
-                    let tmp = std::mem::replace(el.at_mut(j), (self.base_ring.zero(), MonomialIdentifier { deg: 0, order: 0, index: None }));
+                    let tmp = std::mem::replace(el.at_mut(j), (self.base_ring.zero(), InternalMonomialIdentifier { deg: 0, order: 0, index: None }.wrap()));
                     *el.at_mut(i) = tmp;
                 }
                 i += 1;
@@ -230,7 +255,7 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
         let mut rhs_it = rhs_sorted.peekable();
 
         while let (Some((_, l_m)), Some((_, r_m))) = (lhs_it.peek(), rhs_it.peek()) {
-            let next_element = match self.compare_degrevlex(l_m, r_m) {
+            let next_element = match self.compare_degrevlex(&l_m.data, &r_m.data) {
                 Ordering::Equal => {
                     let (l_c, _l_m) = lhs_it.next().unwrap();
                     let (r_c, r_m) = rhs_it.next().unwrap();
@@ -238,7 +263,7 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
                 },
                 Ordering::Less => {
                     let (l_c, l_m) = lhs_it.next().unwrap();
-                    (self.base_ring().clone_el(l_c), l_m.clone())
+                    (self.base_ring().clone_el(l_c), l_m.data.clone().wrap())
                 },
                 Ordering::Greater => {
                     let (r_c, r_m) = rhs_it.next().unwrap();
@@ -247,7 +272,7 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
             };
             result.push(next_element);
         }
-        result.extend(lhs_it.map(|(c, m)| (self.base_ring().clone_el(c), m.clone())));
+        result.extend(lhs_it.map(|(c, m)| (self.base_ring().clone_el(c), m.data.clone().wrap())));
         result.extend(rhs_it);
         self.remove_zeros(&mut result);
         debug_assert!(self.is_valid(&result));
@@ -259,15 +284,15 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
     fn allocate_tmp_monomial(&self, deg: u16) -> MonomialIdentifier {
         let tmp_monomial = self.tmp_monomial();
         if deg as usize > self.max_degree_for_orderidx {
-            unimplemented!("Currently we only support degrees such that the number of monomials of this degree fits into a u64");
+            unimplemented!("currently only degrees are supported for which the total number of this-degree monomials fits in a u64");
         }
         let order_idx = enumeration_index_degrevlex(deg, tmp_monomial.as_fn().map_fn(|e| e.get()), &self.cum_binomial_lookup_table);
         {
             let monomial_table = self.monomial_table.borrow();
-            let entry = monomial_table.get(&MonomialIdentifier { deg: deg, order: order_idx, index: None });
+            let entry = monomial_table.get(&InternalMonomialIdentifier { deg: deg, order: order_idx, index: None });
             // do we have the monomial already allocated?
             if let Some(idx) = entry {
-                return MonomialIdentifier { deg: deg, index: Some(*idx), order: order_idx };
+                return InternalMonomialIdentifier { deg: deg, index: Some(*idx), order: order_idx }.wrap();
             }
         }
         {
@@ -275,8 +300,8 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
             // if not, allocate it!
             let idx = self.allocated_monomials.push(tmp_monomial.iter().map(|e| e.get()).collect::<Vec<_>>().into_boxed_slice());
             let idx = NonZeroU32::new(u32::try_from(idx).unwrap()).unwrap();
-            monomial_table.insert(MonomialIdentifier { deg: deg, order: order_idx, index: Some(idx) }, idx);
-            return MonomialIdentifier { deg: deg, index: Some(idx), order: order_idx };
+            monomial_table.insert(InternalMonomialIdentifier { deg: deg, order: order_idx, index: Some(idx) }, idx);
+            return InternalMonomialIdentifier { deg: deg, index: Some(idx), order: order_idx }.wrap();
         }
     }
 }
@@ -308,7 +333,7 @@ impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
 
     fn add_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         debug_assert!(self.is_valid(&rhs.data));
-        self.add_terms(lhs, rhs.data.iter().map(|(c, m)| (self.base_ring().clone_el(c), m.clone())), Vec::new_in(self.allocator.clone()))
+        self.add_terms(lhs, rhs.data.iter().map(|(c, m)| (self.base_ring().clone_el(c), m.data.clone().wrap())), Vec::new_in(self.allocator.clone()))
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -322,7 +347,7 @@ impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
 
     fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         debug_assert!(self.is_valid(&rhs.data));
-        *lhs = self.add_terms(&lhs, rhs.data.iter().map(|(c, m)| (self.base_ring().negate(self.base_ring.clone_el(c)), m.clone())), Vec::new_in(self.allocator.clone()));
+        *lhs = self.add_terms(&lhs, rhs.data.iter().map(|(c, m)| (self.base_ring().negate(self.base_ring.clone_el(c)), m.data.clone().wrap())), Vec::new_in(self.allocator.clone()));
     }
     
     fn negate_inplace(&self, lhs: &mut Self::Element) {
@@ -344,7 +369,7 @@ impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
         let mut tmp = Vec::new_in(self.allocator.clone());
         if lhs.data.len() > rhs.data.len() {
             rhs.data.iter().fold(self.zero(), |mut current, (r_c, r_m)| {
-                let mut new = self.add_terms(&current, lhs.data.iter().map(|(c, m)| (self.base_ring().mul_ref(c, r_c), self.monomial_mul(m.clone(), r_m))), std::mem::replace(&mut tmp, Vec::new_in(self.allocator.clone())));
+                let mut new = self.add_terms(&current, lhs.data.iter().map(|(c, m)| (self.base_ring().mul_ref(c, r_c), self.monomial_mul(m.data.clone().wrap(), r_m))), std::mem::replace(&mut tmp, Vec::new_in(self.allocator.clone())));
                 std::mem::swap(&mut new, &mut current);
                 std::mem::swap(&mut new.data, &mut tmp);
                 current
@@ -352,7 +377,7 @@ impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
         } else {
             // we duplicate it to work better with noncommutative rings (not that this is currently of relevance...)
             lhs.data.iter().fold(self.zero(), |mut current, (l_c, l_m)| {
-                let mut new = self.add_terms(&current, rhs.data.iter().map(|(c, m)| (self.base_ring().mul_ref(l_c, c), self.monomial_mul(m.clone(), l_m))), std::mem::replace(&mut tmp, Vec::new_in(self.allocator.clone())));
+                let mut new = self.add_terms(&current, rhs.data.iter().map(|(c, m)| (self.base_ring().mul_ref(l_c, c), self.monomial_mul(m.data.clone().wrap(), l_m))), std::mem::replace(&mut tmp, Vec::new_in(self.allocator.clone())));
                 std::mem::swap(&mut new, &mut current);
                 std::mem::swap(&mut new.data, &mut tmp);
                 current
@@ -377,7 +402,7 @@ impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
             return false;
         }
         for i in 0..lhs.data.len() {
-            if lhs.data.at(i).1.index != rhs.data.at(i).1.index || !self.base_ring.eq_el(&lhs.data.at(i).0, &rhs.data.at(i).0) {
+            if lhs.data.at(i).1.data.index != rhs.data.at(i).1.data.index || !self.base_ring.eq_el(&lhs.data.at(i).0, &rhs.data.at(i).0) {
                 return false;
             }
         }
@@ -393,7 +418,7 @@ impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
         if value.data.len() != 1 {
             return false;
         }
-        value.data[0].1.deg == 0 && self.base_ring().is_one(&value.data[0].0)
+        value.data[0].1.data.deg == 0 && self.base_ring().is_one(&value.data[0].0)
     }
 
     fn is_neg_one(&self, value: &Self::Element) -> bool {
@@ -401,7 +426,7 @@ impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
         if value.data.len() != 1 {
             return false;
         }
-        value.data[0].1.deg == 0 && self.base_ring().is_neg_one(&value.data[0].0)
+        value.data[0].1.data.deg == 0 && self.base_ring().is_neg_one(&value.data[0].0)
     }
 
     fn is_commutative(&self) -> bool { self.base_ring().is_commutative() }
@@ -488,7 +513,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
     }
 
     fn clone_monomial(&self, mon: &Self::Monomial) -> Self::Monomial {
-        mon.clone()
+        mon.data.clone().wrap()
     }
 
     fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, terms: I)
@@ -497,10 +522,10 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
         let terms = terms.into_iter();
         let mut rhs = self.tmp_poly.swap(None, std::sync::atomic::Ordering::AcqRel).map(|b| *b).unwrap_or(Vec::new());
         debug_assert!(rhs.len() == 0);
-        rhs.extend(terms);
-        rhs.sort_unstable_by(|l, r| self.compare_degrevlex(&l.1, &r.1));
+        rhs.extend(terms.into_iter());
+        rhs.sort_unstable_by(|l, r| self.compare_degrevlex(&l.1.data, &r.1.data));
         rhs.dedup_by(|(snd_c, snd_m), (fst_c, fst_m)| {
-            if self.compare_degrevlex(&fst_m, &snd_m) == Ordering::Equal {
+            if self.compare_degrevlex(&fst_m.data, &snd_m.data) == Ordering::Equal {
                 self.base_ring().add_assign_ref(fst_c, snd_c);
                 return true;
             } else {
@@ -513,12 +538,12 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
 
     fn mul_assign_monomial(&self, f: &mut Self::Element, monomial: Self::Monomial) {
         for (_, m) in &mut f.data {
-            *m = self.monomial_mul(m.clone(), &monomial);
+            *m = self.monomial_mul(m.data.clone().wrap(), &monomial);
         }
     }
 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, m: &Self::Monomial) -> &'a El<Self::BaseRing> {
-        match f.data.binary_search_by(|(_, fm)| self.compare_degrevlex(fm, m)) {
+        match f.data.binary_search_by(|(_, fm)| self.compare_degrevlex(&fm.data, &m.data)) {
             Ok(i) => &f.data.at(i).0,
             Err(_) => &self.zero
         }
@@ -526,7 +551,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
 
     #[inline(always)]
     fn exponent_at(&self, m: &Self::Monomial, var_index: usize) -> usize {
-        match m.index {
+        match m.data.index {
             None => self.tmp_monomial()[var_index].get() as usize,
             Some(index) => self.allocated_monomials[u32::from(index) as usize][var_index] as usize
         }
@@ -539,7 +564,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
     }
 
     fn monomial_deg(&self, mon: &Self::Monomial) -> usize {
-        mon.deg as usize
+        mon.data.deg as usize
     }
 
     fn LT<'a, O: MonomialOrder>(&'a self, f: &'a Self::Element, order: O) -> Option<(&'a El<Self::BaseRing>, &'a Self::Monomial)> {
@@ -552,7 +577,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
 
     fn largest_term_lt<'a, O: MonomialOrder>(&'a self, f: &'a Self::Element, order: O, lt_than: &Self::Monomial) -> Option<(&'a El<Self::BaseRing>, &'a Self::Monomial)> {
         if order.is_same(&DegRevLex) {
-            let res = match f.data.binary_search_by(|(_, mon)| self.compare_degrevlex(mon, lt_than)) {
+            let res = match f.data.binary_search_by(|(_, mon)| self.compare_degrevlex(&mon.data, &lt_than.data)) {
                 Ok(0) => None,
                 Ok(i) => Some((&f.data[i - 1].0, &f.data[i - 1].1)),
                 Err(0) => None,
@@ -569,13 +594,34 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
     }
 
     fn monomial_mul(&self, lhs: Self::Monomial, rhs: &Self::Monomial) -> Self::Monomial {
-        let l_i = u32::from(lhs.index.unwrap()) as usize;
-        let r_i = u32::from(rhs.index.unwrap()) as usize;
+        let l_i = u32::from(lhs.data.index.unwrap()) as usize;
+        let r_i = u32::from(rhs.data.index.unwrap()) as usize;
         let tmp_monomial = self.tmp_monomial();
         for i in 0..self.variable_count {
             tmp_monomial[i].set(self.allocated_monomials[l_i][i] + self.allocated_monomials[r_i][i]);
         }
-        return self.allocate_tmp_monomial(lhs.deg + rhs.deg);
+        return self.allocate_tmp_monomial(lhs.data.deg + rhs.data.deg);
+    }
+
+    fn evaluate<S, V, H>(&self, f: &Self::Element, values: V, hom: &H) -> S::Element
+        where S: ?Sized + RingBase,
+            H: Homomorphism<<Self::BaseRing as RingStore>::Type, S>,
+            V: VectorFn<S::Element>
+    {
+        assert!(hom.domain().get_ring() == self.base_ring().get_ring());
+        assert_eq!(values.len(), self.variable_count());
+        let new_ring = MultivariatePolyRingImpl::new(hom.codomain(), self.variable_count());
+        let mut result = new_ring.from_terms(self.terms(f).map(|(c, m)| (hom.map_ref(c), new_ring.create_monomial((0..self.variable_count()).map(|i| self.exponent_at(m, i))))));
+        for i in 0..self.variable_count() {
+            result = new_ring.specialize(&result, i, &new_ring.inclusion().map(values.at(i)));
+        }
+        debug_assert!(result.data.len() <= 1);
+        if result.data.len() == 0 {
+            return hom.codomain().zero();
+        } else {
+            debug_assert!(result.data[0].1.data.deg == 0);
+            return result.data.into_iter().next().unwrap().0;
+        }
     }
 }
 
@@ -706,7 +752,6 @@ fn test_monomial_small() {
 #[test]
 fn test_new_many_variables() {
     for m in 1..32 {
-        println!("{}", m);
         let ring = MultivariatePolyRingImpl::new_with(StaticRing::<i64>::RING, m, 32, Global);
         assert_eq!(m, ring.variable_count());
     }

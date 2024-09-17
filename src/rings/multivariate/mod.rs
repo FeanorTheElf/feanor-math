@@ -3,6 +3,10 @@ use crate::ring::*;
 use crate::seq::VectorFn;
 use crate::wrapper::RingElementWrapper;
 
+///
+/// Contains an implementation [`multivariate_impl::MultivariatePolyImpl`] of a multivariate polynomial
+/// ring.
+/// 
 pub mod multivariate_impl;
 
 use std::any::Any;
@@ -190,6 +194,38 @@ pub trait MultivariatePolyRing: RingExtension {
             hom.domain().clone_el(c)
         )))
     }
+
+    ///
+    /// Replaces the given indeterminate in the given polynomial by the value `val`.
+    /// 
+    /// Conceptually, this is similar to [`MultivariatePolyRing::evaluate()`], but less general,
+    /// which can allow a faster implementation sometimes. In particular, this only replaces a single
+    /// indeterminate, and does not change the ring.
+    /// 
+    fn specialize(&self, f: &Self::Element, var: usize, val: &Self::Element) -> Self::Element {
+        assert!(var < self.variable_count());
+        let mut parts = Vec::new();
+        for (c, m) in self.terms(f) {
+            while self.exponent_at(m, var) as usize >= parts.len() {
+                parts.push(Vec::new());
+            }
+            let new_m = self.create_monomial((0..self.variable_count()).map(|i| if i == var { 0 } else { self.exponent_at(m, i) }));
+            parts[self.exponent_at(m, var)].push((self.base_ring().clone_el(c), new_m));
+        }
+        if let Some(first) = parts.pop() {
+            let mut current = self.zero();
+            self.add_assign_from_terms(&mut current, first);
+            while let Some(new) = parts.pop() {
+                let mut next = self.zero();
+                self.add_assign_from_terms(&mut next, new);
+                self.mul_assign_ref(&mut current, val);
+                self.add_assign(&mut current, next);
+            }
+            return current;
+        } else {
+            return self.zero();
+        }
+    }
 }
 
 ///
@@ -207,6 +243,7 @@ pub trait MultivariatePolyRingStore: RingStore
     delegate!{ MultivariatePolyRing, fn monomial_deg(&self, val: &PolyMonomial<Self>) -> usize }
     delegate!{ MultivariatePolyRing, fn mul_assign_monomial(&self, f: &mut El<Self>, monomial: PolyMonomial<Self>) -> () }
     delegate!{ MultivariatePolyRing, fn appearing_variables(&self, f: &El<Self>) -> Vec<(usize, usize)> }
+    delegate!{ MultivariatePolyRing, fn specialize(&self, f: &El<Self>, var: usize, val: &El<Self>) -> El<Self> }
 
     ///
     /// Returns the term of `f` whose monomial is largest (w.r.t. the given order) among all monomials smaller than `lt_than`.
@@ -347,6 +384,12 @@ pub trait MonomialOrder: Clone {
         where P: RingStore,
             P::Type: MultivariatePolyRing;
 
+    ///
+    /// Checks whether two monomials are equal.
+    /// 
+    /// This may be faster than [`MonomialOrder::compare()`], but clearly must have
+    /// a compatible behavior.
+    /// 
     fn eq_mon<P>(&self, ring: P, lhs: &PolyMonomial<P>, rhs: &PolyMonomial<P>) -> bool
         where P: RingStore,
             P::Type: MultivariatePolyRing
@@ -354,6 +397,13 @@ pub trait MonomialOrder: Clone {
         self.compare(ring, lhs, rhs) == Ordering::Equal
     }
 
+    ///
+    /// Whether this order is the same as the given other order, i.e. [`MonomialOrder::compare()`]
+    /// gives the same output on all inputs.
+    /// 
+    /// Many monomial orders are likely to be implemented as zero-sized types with only a single
+    /// instance. In this case, the default implementation is sufficient.
+    /// 
     fn is_same<O>(&self, rhs: &O) -> bool
         where O: MonomialOrder
     {
@@ -366,6 +416,10 @@ pub trait MonomialOrder: Clone {
         }
     }
 
+    ///
+    /// Upcasts this reference to `&dyn Any`, which is sometimes required to compare monomial order
+    /// objects of different types.
+    /// 
     fn as_any(&self) -> Option<&dyn Any>;
 }
 
@@ -439,6 +493,9 @@ impl MonomialOrder for DegRevLex {
 
 impl GradedMonomialOrder for DegRevLex {}
 
+///
+/// Lexicographic ordering of monomials.
+/// 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Lex;
 
