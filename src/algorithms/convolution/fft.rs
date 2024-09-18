@@ -94,6 +94,17 @@ impl<A> FFTBasedConvolution<A>
     }
 }
 
+impl<A> Clone for FFTBasedConvolution<A>
+    where A: Allocator + Clone
+{
+    fn clone(&self) -> Self {
+        Self {
+            allocator: self.allocator.clone(),
+            fft_tables: self.fft_tables.clone()
+        }
+    }
+}
+
 impl<A> From<FFTBasedConvolutionZn<A>> for FFTBasedConvolution<A>
     where A: Allocator
 {
@@ -130,6 +141,14 @@ impl<'a, A> From<&'a FFTBasedConvolution<A>> for &'a FFTBasedConvolutionZn<A>
 #[repr(transparent)]
 pub struct FFTBasedConvolutionZn<A = Global> {
     base: FFTBasedConvolution<A>
+}
+
+impl<A> Clone for FFTBasedConvolutionZn<A>
+    where A: Allocator + Clone
+{
+    fn clone(&self) -> Self {
+        Self { base: self.base.clone() }
+    }
 }
 
 impl<R, A> ConvolutionAlgorithm<R> for FFTBasedConvolutionZn<A>
@@ -287,6 +306,23 @@ impl<R, I, A> FFTRNSBasedConvolution<R, I, A>
     }
 }
 
+impl<R, I, A> Clone for FFTRNSBasedConvolution<R, I, A>
+    where I: RingStore + Clone,
+        I::Type: IntegerRing,
+        R: ZnRing + CanHomFrom<I::Type> + CanHomFrom<StaticRingBase<i64>> + FromModulusCreateableZnRing + Clone,
+        zn_64::ZnBase: CanHomFrom<I::Type>,
+        A: Allocator + Clone
+{
+    fn clone(&self) -> Self {
+        Self {
+            convolution: self.convolution.clone(),
+            integer_ring: self.integer_ring.clone(),
+            max_log2_len: self.max_log2_len,
+            rns_rings: self.rns_rings.clone()
+        }
+    }
+}
+
 impl<I2, R, I, A> ConvolutionAlgorithm<I2> for FFTRNSBasedConvolution<R, I, A>
     where I2: ?Sized + IntegerRing,
         I: RingStore + Clone,
@@ -369,6 +405,18 @@ impl<'a, R, I, A> From<&'a FFTRNSBasedConvolution<R, I, A>> for &'a FFTRNSBasedC
 {
     fn from(value: &'a FFTRNSBasedConvolution<R, I, A>) -> Self {
         unsafe { std::mem::transmute(value) }
+    }
+}
+
+impl<R, I, A> Clone for FFTRNSBasedConvolutionZn<R, I, A>
+    where I: RingStore + Clone,
+        I::Type: IntegerRing,
+        R: ZnRing + CanHomFrom<I::Type> + CanHomFrom<StaticRingBase<i64>> + FromModulusCreateableZnRing + Clone,
+        zn_64::ZnBase: CanHomFrom<I::Type>,
+        A: Allocator + Clone
+{
+    fn clone(&self) -> Self {
+        Self { base: self.base.clone() }
     }
 }
 

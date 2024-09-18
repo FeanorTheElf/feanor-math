@@ -254,6 +254,22 @@ impl<R_main, R_twiddle, H> PartialEq for CooleyTuckeyFFT<R_main, R_twiddle, H>
     }
 }
 
+impl<R_main, R_twiddle, H> Clone for CooleyTuckeyFFT<R_main, R_twiddle, H> 
+    where R_main: ?Sized + RingBase,
+        R_twiddle: ?Sized + RingBase + DivisibilityRing,
+        H: Homomorphism<R_twiddle, R_main> + Clone
+{
+    fn clone(&self) -> Self {
+        Self {
+            hom: self.hom.clone(),
+            inv_root_of_unity_list: self.inv_root_of_unity_list.iter().map(|x| self.hom.domain().clone_el(x)).collect(),
+            root_of_unity: self.hom.codomain().clone_el(&self.root_of_unity),
+            log2_n: self.log2_n,
+            root_of_unity_list: self.root_of_unity_list.iter().map(|x| self.hom.domain().clone_el(x)).collect()
+        }
+    }
+}
+
 ///
 /// A helper trait that defines the Cooley-Tuckey butterfly operation.
 /// It is default-implemented for all rings, but for increase FFT performance, some rings
