@@ -99,13 +99,6 @@ impl<R> AsLocalPIR<R>
         let zero = ring.zero();
         Self::from(AsLocalPIRBase::promise_is_local_pir(ring, zero, Some(0)))
     }
-
-    #[stability::unstable(feature = "enable")]
-    pub fn from_as_field(ring: AsField<R>) -> Self {
-        let ring = ring.into().unwrap_self();
-        let zero = ring.zero();
-        Self::from(AsLocalPIRBase::promise_is_local_pir(ring, zero, Some(0)))
-    }
 }
 
 impl<R> AsLocalPIR<R> 
@@ -147,6 +140,13 @@ impl<R: DivisibilityRingStore> AsLocalPIRBase<R>
         } else {
             return Err(self);
         }
+    }
+    
+    #[stability::unstable(feature = "enable")]
+    pub fn from_as_field(ring: AsField<R>) -> Self {
+        let ring = ring.into().unwrap_self();
+        let zero = ring.zero();
+        Self::from(AsLocalPIRBase::promise_is_local_pir(ring, zero, Some(0)))
     }
 }
 
