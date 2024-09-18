@@ -9,7 +9,7 @@ use crate::pid::*;
 use crate::integer::IntegerRing;
 use crate::ring::*;
 use crate::homomorphism::*;
-use super::field::AsFieldBase;
+use super::field::{AsField, AsFieldBase};
 use crate::rings::zn::*;
 
 ///
@@ -99,6 +99,13 @@ impl<R> AsLocalPIR<R>
         let zero = ring.zero();
         Self::from(AsLocalPIRBase::promise_is_local_pir(ring, zero, Some(0)))
     }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn from_as_field(ring: AsField<R>) -> Self {
+        let ring = ring.into().unwrap_self();
+        let zero = ring.zero();
+        Self::from(AsLocalPIRBase::promise_is_local_pir(ring, zero, Some(0)))
+    }
 }
 
 impl<R> AsLocalPIR<R> 
@@ -131,6 +138,15 @@ impl<R: DivisibilityRingStore> AsLocalPIRBase<R>
     #[stability::unstable(feature = "enable")]
     pub fn unwrap_self(self) -> R {
         self.base
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn as_field(self) -> Result<AsField<R>, Self> {
+        if self.is_zero(self.max_ideal_gen()) {
+            return Ok(AsField::from(AsFieldBase::promise_is_field(self.unwrap_self())));
+        } else {
+            return Err(self);
+        }
     }
 }
 
