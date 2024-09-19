@@ -144,8 +144,8 @@ pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_po
         A2: Allocator
 {
     let dim_prod = |range: Range<usize>| <_ as RingStore>::prod(&StaticRing::<i64>::RING, range.map(|i| interpolation_points.at(i).len() as i64)) as usize;
-    assert_eq!(interpolation_points.len(), poly_ring.variable_count());
-    let n = poly_ring.variable_count();
+    assert_eq!(interpolation_points.len(), poly_ring.indeterminate_count());
+    let n = poly_ring.indeterminate_count();
     assert_eq!(values.len(), dim_prod(0..n));
 
     let uni_poly_ring = DensePolyRing::new_with(poly_ring.base_ring(), "X", &allocator, STANDARD_CONVOLUTION);

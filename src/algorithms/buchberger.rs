@@ -545,7 +545,7 @@ fn test_generic_computation() {
     let ring = MultivariatePolyRingImpl::new(base, 6);
     let poly_ring = dense_poly::DensePolyRing::new(&ring, "X");
 
-    let var_i = |i: usize| ring.create_term(base.one(), ring.create_monomial((0..ring.variable_count()).map(|j| if i == j { 1 } else { 0 })));
+    let var_i = |i: usize| ring.create_term(base.one(), ring.create_monomial((0..ring.indeterminate_count()).map(|j| if i == j { 1 } else { 0 })));
     let X1 = poly_ring.mul(
         poly_ring.from_terms([(var_i(0), 0), (ring.one(), 1)].into_iter()),
         poly_ring.from_terms([(var_i(1), 0), (ring.one(), 1)].into_iter())
@@ -595,7 +595,7 @@ fn test_gb_lex() {
     let mut gb = buchberger_simple::<_, _, true>(&QQYX, vec![f, g], Lex);
 
     assert_eq!(2, gb.len());
-    gb.sort_unstable_by_key(|f| QQYX.appearing_variables(f).len());
+    gb.sort_unstable_by_key(|f| QQYX.appearing_indeterminates(f).len());
     for (mut f, mut e) in gb.into_iter().zip(expected.into_iter()) {
         let f_lc_inv = QQ.invert(QQYX.LT(&f, Lex).unwrap().0).unwrap();
         QQYX.inclusion().mul_assign_map(&mut f, f_lc_inv);

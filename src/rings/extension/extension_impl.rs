@@ -431,7 +431,7 @@ impl<R, V, A, C> FreeAlgebra for FreeAlgebraImplBase<R, V, A, C>
 
     fn canonical_gen(&self) -> Self::Element {
         if self.rank() == 1 {
-            self.from_canonical_basis([self.base_ring.clone_el(self.x_pow_rank.at(0))].into_iter())
+            self.from_canonical_basis([self.base_ring.clone_el(self.x_pow_rank.at(0))])
         } else {
             self.from_canonical_basis((0..self.rank()).map(|i| if i == 1 { self.base_ring.one() } else { self.base_ring.zero() }))
         }
@@ -442,12 +442,16 @@ impl<R, V, A, C> FreeAlgebra for FreeAlgebraImplBase<R, V, A, C>
     }
 
     fn from_canonical_basis<W>(&self, vec: W) -> Self::Element
-        where W: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = El<Self::BaseRing>>
+        where W: IntoIterator<Item = El<Self::BaseRing>>,
+            W::IntoIter: DoubleEndedIterator
     {
-        assert_eq!(self.rank(), <_ as ExactSizeIterator>::len(&vec));
+        let mut given_len = 0;
+        let mut vec_it = vec.into_iter().inspect(|_| given_len += 1);
         let mut result = Vec::with_capacity_in(1 << self.log2_padded_len, self.element_allocator.clone());
-        result.extend(vec);
+        result.extend(vec_it.by_ref());
         result.extend((0..((1 << self.log2_padded_len) - self.rank())).map(|_| self.base_ring().zero()));
+        assert!(vec_it.next().is_none());
+        assert_eq!(given_len, self.rank());
         FreeAlgebraImplEl { values: result.into_boxed_slice() }
     }
 
@@ -635,7 +639,7 @@ fn test_ring1_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 2]>, V
     let mut elements = Vec::new();
     for a in -3..=3 {
         for b in -3..=3 {
-            elements.push(R.from_canonical_basis([a, b].into_iter()));
+            elements.push(R.from_canonical_basis([a, b]));
         }
     }
     return (R, elements);
@@ -649,7 +653,7 @@ fn test_ring2_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 3]>, V
     for a in [-2, 0, 1, 2] {
         for b in [-2, 0, 2] {
             for c in [-2, 0, 2] {
-                elements.push(R.from_canonical_basis([a, b, c].into_iter()));
+                elements.push(R.from_canonical_basis([a, b, c]));
             }
         }
     }
@@ -664,7 +668,7 @@ fn test_ring3_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 1]>, V
     for a in [-2, 0, 1, 2] {
         for b in [-2, 0, 2] {
             for c in [-2, 0, 2] {
-                elements.push(R.from_canonical_basis([a, b, c].into_iter()));
+                elements.push(R.from_canonical_basis([a, b, c]));
             }
         }
     }
@@ -682,7 +686,7 @@ fn test_ring4_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, SparseMapVec
     for a in [-2, 0, 1, 2] {
         for b in [-2, 0, 2] {
             for c in [-2, 0, 2] {
-                elements.push(R.from_canonical_basis([a, b, c].into_iter()));
+                elements.push(R.from_canonical_basis([a, b, c]));
             }
         }
     }
@@ -746,12 +750,12 @@ fn test_division() {
     let ring = FreeAlgebraImpl::new(base_ring, 2, [i.map(-1), i.map(-1)]);
 
     assert_el_eq!(ring, 
-        &ring.from_canonical_basis([i.map(1), i.map(3)].into_iter()), 
-        &ring.checked_div(&ring.one(), &ring.from_canonical_basis([i.map(2), i.map(3)].into_iter())).unwrap()
+        &ring.from_canonical_basis([i.map(1), i.map(3)]), 
+        &ring.checked_div(&ring.one(), &ring.from_canonical_basis([i.map(2), i.map(3)])).unwrap()
     );
 
-    let a = ring.from_canonical_basis([i.map(2), i.map(2)].into_iter());
-    let b = ring.from_canonical_basis([i.map(0), i.map(2)].into_iter());
+    let a = ring.from_canonical_basis([i.map(2), i.map(2)]);
+    let b = ring.from_canonical_basis([i.map(0), i.map(2)]);
     assert_el_eq!(ring, a, ring.mul(ring.checked_div(&a, &b).unwrap(), b));
 
     assert!(ring.checked_div(&ring.one(), &a).is_none());
@@ -763,13 +767,13 @@ fn test_division_ring_of_integers() {
     let ring = FreeAlgebraImpl::new(base_ring, 2, [11, 0]);
 
     // the solution to Pell's equation is 10^2 - 3^2 * 11 = 1
-    let u = ring.from_canonical_basis([10, 3].into_iter());
-    let u_inv = ring.from_canonical_basis([10, -3].into_iter());
+    let u = ring.from_canonical_basis([10, 3]);
+    let u_inv = ring.from_canonical_basis([10, -3]);
 
     assert_el_eq!(ring, u_inv, ring.checked_div(&ring.one(), &u).unwrap());
     assert_el_eq!(ring, ring.pow(u_inv, 3), &ring.checked_div(&ring.one(), &ring.pow(u, 3)).unwrap());
 
-    assert!(ring.checked_div(&ring.from_canonical_basis([2, 0].into_iter()), &ring.from_canonical_basis([3, 0].into_iter())).is_none());
+    assert!(ring.checked_div(&ring.from_canonical_basis([2, 0]), &ring.from_canonical_basis([3, 0])).is_none());
 }
 
 #[test]
@@ -791,8 +795,8 @@ fn test_cubic_mul() {
     let base_ring = zn_static::Zn::<256>::RING;
     let modulo = base_ring.int_hom();
     let ring = FreeAlgebraImpl::new(base_ring, 3, [modulo.map(-1), modulo.map(-1), modulo.map(-1)]);
-    let a = ring.from_canonical_basis([modulo.map(0), modulo.map(-1), modulo.map(-1)].into_iter());
-    let b = ring.from_canonical_basis([modulo.map(-1), modulo.map(-2), modulo.map(-1)].into_iter());
+    let a = ring.from_canonical_basis([modulo.map(0), modulo.map(-1), modulo.map(-1)]);
+    let b = ring.from_canonical_basis([modulo.map(-1), modulo.map(-2), modulo.map(-1)]);
     assert_el_eq!(ring, b, ring.pow(a, 2));
 }
 
@@ -821,4 +825,11 @@ fn test_serialization() {
     crate::serialization::generic_tests::test_serialization(ring, els.into_iter());
     let (ring, els) = test_ring4_and_elements();
     crate::serialization::generic_tests::test_serialization(ring, els.into_iter());
+}
+
+#[test]
+#[should_panic]
+fn test_from_canonical_basis_enforce_len() {
+    let (ring, _) = test_ring1_and_elements();
+    ring.from_canonical_basis([0, 1, 2]);
 }

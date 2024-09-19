@@ -8,11 +8,43 @@ pub trait DivisibilityRing: RingBase {
 
     ///
     /// Checks whether there is an element `x` such that `rhs * x = lhs`, and
-    /// returns it if it exists. Note that this does not have to be unique, if
-    /// rhs is a left zero-divisor. In particular, this function will return any
-    /// element in the ring if `lhs = rhs = 0`.
+    /// returns it if it exists. 
+    /// 
+    /// Note that this does not have to be unique, if rhs is a left zero-divisor. 
+    /// In particular, this function will return any element in the ring if `lhs = rhs = 0`.
+    /// In rings with many zero-divisors, this can sometimes lead to unintuitive behavior.
+    /// See also [`crate::pid::PrincipalIdealRing::checked_div_min()`] for a function that,
+    /// if available, might sometimes behave more intuitively.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::divisibility::*;
+    /// let ZZ = StaticRing::<i64>::RING;
+    /// assert_eq!(Some(3), ZZ.checked_left_div(&6, &2));
+    /// assert_eq!(None, ZZ.checked_left_div(&6, &4));
+    /// ```
+    /// In rings that have zero-divisors, there are usually multiple possible results.
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::divisibility::*;
+    /// # use feanor_math::rings::zn::zn_64::*;
+    /// let ring = Zn::new(6);
+    /// let four_over_four = ring.checked_left_div(&ring.int_hom().map(4), &ring.int_hom().map(4)).unwrap();
+    /// assert!(ring.eq_el(&four_over_four, &ring.int_hom().map(1)) || ring.eq_el(&four_over_four, &ring.int_hom().map(4)));
+    /// // note that the output 4 might be unexpected, since it is a zero-divisor itself!
+    /// ```
     /// 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element>;
+
+    ///
+    /// Same as [`DivisibilityRing::checked_left_div()`], but requires a commutative ring.
+    /// 
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        assert!(self.is_commutative());
+        self.checked_left_div(lhs, rhs)
+    }
 
     ///
     /// Returns whether the given element is a unit, i.e. has an inverse.
@@ -60,11 +92,7 @@ pub trait DivisibilityRingStore: RingStore
 {
     delegate!{ DivisibilityRing, fn checked_left_div(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> }
     delegate!{ DivisibilityRing, fn is_unit(&self, x: &El<Self>) -> bool }
-
-    fn checked_div(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> {
-        assert!(self.is_commutative());
-        self.checked_left_div(lhs, rhs)
-    }
+    delegate!{ DivisibilityRing, fn checked_div(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> }
 
     fn invert(&self, el: &El<Self>) -> Option<El<Self>> {
         self.checked_div(&self.one(), el)

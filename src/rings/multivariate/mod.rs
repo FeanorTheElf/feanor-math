@@ -35,7 +35,7 @@ pub trait MultivariatePolyRing: RingExtension {
     /// Returns the number of variables of this polynomial ring, i.e. the transcendence degree
     /// of the base ring.
     /// 
-    fn variable_count(&self) -> usize;
+    fn indeterminate_count(&self) -> usize;
 
     ///
     /// Creates a monomial with the given exponents.
@@ -99,7 +99,7 @@ pub trait MultivariatePolyRing: RingExtension {
     }
 
     fn clone_monomial(&self, mon: &Self::Monomial) -> Self::Monomial {
-        self.create_monomial((0..self.variable_count()).map(|i| self.exponent_at(mon, i)))
+        self.create_monomial((0..self.indeterminate_count()).map(|i| self.exponent_at(mon, i)))
     }
 
     ///
@@ -115,14 +115,14 @@ pub trait MultivariatePolyRing: RingExtension {
     /// # use feanor_math::rings::multivariate::multivariate_impl::*;
     /// let poly_ring = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, 2);
     /// let [f, g] = poly_ring.with_wrapped_indeterminates(|[X, Y]| [1 + X + X.pow_ref(2) * Y, X.pow_ref(3)]);
-    /// assert_eq!(vec![(0, 2), (1, 1)], poly_ring.appearing_variables(&f));
-    /// assert_eq!(vec![(0, 3)], poly_ring.appearing_variables(&g));
+    /// assert_eq!(vec![(0, 2), (1, 1)], poly_ring.appearing_indeterminates(&f));
+    /// assert_eq!(vec![(0, 3)], poly_ring.appearing_indeterminates(&g));
     /// ```
     /// 
-    fn appearing_variables(&self, f: &Self::Element) -> Vec<(usize, usize)> {
-        let mut result = (0..self.variable_count()).map(|_| 0).collect::<Vec<_>>();
+    fn appearing_indeterminates(&self, f: &Self::Element) -> Vec<(usize, usize)> {
+        let mut result = (0..self.indeterminate_count()).map(|_| 0).collect::<Vec<_>>();
         for (_, m) in self.terms(f) {
-            for i in 0..self.variable_count() {
+            for i in 0..self.indeterminate_count() {
                 result[i] = max(result[i], self.exponent_at(m, i));
             }
         }
@@ -133,21 +133,21 @@ pub trait MultivariatePolyRing: RingExtension {
     /// Multiplies two monomials.
     /// 
     fn monomial_mul(&self, lhs: Self::Monomial, rhs: &Self::Monomial) -> Self::Monomial {
-        self.create_monomial((0..self.variable_count()).map(|i| self.exponent_at(&lhs, i) + self.exponent_at(rhs, i)))
+        self.create_monomial((0..self.indeterminate_count()).map(|i| self.exponent_at(&lhs, i) + self.exponent_at(rhs, i)))
     }
 
     ///
     /// Returns the degree of a monomial, i.e. the sum of the exponents of all variables.
     /// 
     fn monomial_deg(&self, mon: &Self::Monomial) -> usize {
-        (0..self.variable_count()).map(|i| self.exponent_at(mon, i)).sum()
+        (0..self.indeterminate_count()).map(|i| self.exponent_at(mon, i)).sum()
     }
 
     ///
     /// Returns the least common multiple of two monomials.
     /// 
     fn monomial_lcm(&self, lhs: Self::Monomial, rhs: &Self::Monomial) -> Self::Monomial {
-        self.create_monomial((0..self.variable_count()).map(|i| max(self.exponent_at(&lhs, i), self.exponent_at(rhs, i))))
+        self.create_monomial((0..self.indeterminate_count()).map(|i| max(self.exponent_at(&lhs, i), self.exponent_at(rhs, i))))
     }
 
     ///
@@ -158,7 +158,7 @@ pub trait MultivariatePolyRing: RingExtension {
     /// 
     fn monomial_div(&self, lhs: Self::Monomial, rhs: &Self::Monomial) -> Result<Self::Monomial, Self::Monomial> {
         let mut failed = false;
-        let result = self.create_monomial((0..self.variable_count()).map(|i| {
+        let result = self.create_monomial((0..self.indeterminate_count()).map(|i| {
             if let Some(res) = self.exponent_at(&lhs, i).checked_sub(self.exponent_at(rhs, i)) {
                 res
             } else {
@@ -193,10 +193,10 @@ pub trait MultivariatePolyRing: RingExtension {
             H: Homomorphism<<Self::BaseRing as RingStore>::Type, R>,
             V: VectorFn<R::Element>
     {
-        assert_eq!(self.variable_count(), value.len());
+        assert_eq!(self.indeterminate_count(), value.len());
         assert!(hom.domain().get_ring() == self.base_ring().get_ring());
         hom.codomain().sum(self.terms(f).map(|(c, m)| hom.mul_map(
-            hom.codomain().prod((0..self.variable_count()).map(|i| hom.codomain().pow(value.at(i), self.exponent_at(m, i)))),
+            hom.codomain().prod((0..self.indeterminate_count()).map(|i| hom.codomain().pow(value.at(i), self.exponent_at(m, i)))),
             hom.domain().clone_el(c)
         )))
     }
@@ -209,13 +209,13 @@ pub trait MultivariatePolyRing: RingExtension {
     /// indeterminate, and does not change the ring.
     /// 
     fn specialize(&self, f: &Self::Element, var: usize, val: &Self::Element) -> Self::Element {
-        assert!(var < self.variable_count());
+        assert!(var < self.indeterminate_count());
         let mut parts = Vec::new();
         for (c, m) in self.terms(f) {
             while self.exponent_at(m, var) as usize >= parts.len() {
                 parts.push(Vec::new());
             }
-            let new_m = self.create_monomial((0..self.variable_count()).map(|i| if i == var { 0 } else { self.exponent_at(m, i) }));
+            let new_m = self.create_monomial((0..self.indeterminate_count()).map(|i| if i == var { 0 } else { self.exponent_at(m, i) }));
             parts[self.exponent_at(m, var)].push((self.base_ring().clone_el(c), new_m));
         }
         if let Some(first) = parts.pop() {
@@ -240,7 +240,7 @@ pub trait MultivariatePolyRing: RingExtension {
 pub trait MultivariatePolyRingStore: RingStore
     where Self::Type: MultivariatePolyRing
 {
-    delegate!{ MultivariatePolyRing, fn variable_count(&self) -> usize }
+    delegate!{ MultivariatePolyRing, fn indeterminate_count(&self) -> usize }
     delegate!{ MultivariatePolyRing, fn create_term(&self, coeff: PolyCoeff<Self>, monomial: PolyMonomial<Self>) -> El<Self> }
     delegate!{ MultivariatePolyRing, fn exponent_at(&self, m: &PolyMonomial<Self>, var_index: usize) -> usize }
     delegate!{ MultivariatePolyRing, fn monomial_mul(&self, lhs: PolyMonomial<Self>, rhs: &PolyMonomial<Self>) -> PolyMonomial<Self> }
@@ -248,7 +248,7 @@ pub trait MultivariatePolyRingStore: RingStore
     delegate!{ MultivariatePolyRing, fn monomial_div(&self, lhs: PolyMonomial<Self>, rhs: &PolyMonomial<Self>) -> Result<PolyMonomial<Self>, PolyMonomial<Self>> }
     delegate!{ MultivariatePolyRing, fn monomial_deg(&self, val: &PolyMonomial<Self>) -> usize }
     delegate!{ MultivariatePolyRing, fn mul_assign_monomial(&self, f: &mut El<Self>, monomial: PolyMonomial<Self>) -> () }
-    delegate!{ MultivariatePolyRing, fn appearing_variables(&self, f: &El<Self>) -> Vec<(usize, usize)> }
+    delegate!{ MultivariatePolyRing, fn appearing_indeterminates(&self, f: &El<Self>) -> Vec<(usize, usize)> }
     delegate!{ MultivariatePolyRing, fn specialize(&self, f: &El<Self>, var: usize, val: &El<Self>) -> El<Self> }
 
     ///
@@ -350,7 +350,7 @@ pub trait MultivariatePolyRingStore: RingStore
         where F: FnOnce([&RingElementWrapper<&'a Self>; N]) -> T,
             T: IntoIterator<Item = RingElementWrapper<&'a Self>>
     {
-        assert_eq!(self.variable_count(), N);
+        assert_eq!(self.indeterminate_count(), N);
         let wrapped_indets: [_; N] = std::array::from_fn(|i| RingElementWrapper::new(self, self.create_term(self.base_ring().one(), self.create_monomial((0..N).map(|j| if i == j { 1 } else { 0 })))));
         f(std::array::from_fn(|i| &wrapped_indets[i])).into_iter().map(|f| f.unwrap()).collect()
     }
@@ -363,7 +363,7 @@ pub trait MultivariatePolyRingStore: RingStore
     fn with_wrapped_indeterminates<'a, F, const N: usize, const M: usize>(&'a self, f: F) -> [El<Self>; M]
         where F: FnOnce([&RingElementWrapper<&'a Self>; N]) -> [RingElementWrapper<&'a Self>; M]
     {
-        assert_eq!(self.variable_count(), N);
+        assert_eq!(self.indeterminate_count(), N);
         let wrapped_indets: [_; N] = std::array::from_fn(|i| RingElementWrapper::new(self, self.create_term(self.base_ring().one(), self.create_monomial((0..N).map(|j| if i == j { 1 } else { 0 })))));
         let mut result_it = f(std::array::from_fn(|i| &wrapped_indets[i])).into_iter().map(|f| f.unwrap());
         let result = std::array::from_fn(|_| result_it.next().unwrap());
@@ -485,7 +485,7 @@ impl MonomialOrder for DegRevLex {
         } else if lhs_deg > rhs_deg {
             return Ordering::Greater;
         } else {
-            for i in (0..ring.variable_count()).rev() {
+            for i in (0..ring.indeterminate_count()).rev() {
                 if ring.exponent_at(lhs, i) > ring.exponent_at(rhs, i) {
                     return Ordering::Less
                 } else if ring.exponent_at(lhs, i) < ring.exponent_at(rhs, i) {
@@ -515,7 +515,7 @@ impl MonomialOrder for Lex {
         where P:RingStore,
             P::Type:MultivariatePolyRing
     {
-        for i in 0..ring.variable_count() {
+        for i in 0..ring.indeterminate_count() {
             match ring.exponent_at(lhs, i).cmp(&ring.exponent_at(rhs, i)) {
                 Ordering::Less => { return Ordering::Less; },
                 Ordering::Greater => { return Ordering::Greater; },
@@ -554,7 +554,7 @@ pub mod generic_impls {
                     }
                 }
                 let mut needs_space = false;
-                for i in 0..ring.variable_count() {
+                for i in 0..ring.indeterminate_count() {
                     if ring.exponent_at(m, i) > 0 {
                         if needs_space {
                             write!(out, " * ")?;
@@ -591,7 +591,7 @@ pub mod generic_tests {
         where P::Type: MultivariatePolyRing
     {
         let elements = interesting_base_ring_elements.collect::<Vec<_>>();
-        let n = ring.variable_count();
+        let n = ring.indeterminate_count();
         let base_ring = ring.base_ring();
 
         // test multiplication of variables
@@ -743,7 +743,7 @@ pub mod generic_tests {
                         base_ring.negate(base_ring.pow(base_ring.clone_el(a), 2)),
                         base_ring.mul_ref(a, b)
                     ]);
-                    let values = [base_ring.clone_el(a), base_ring.clone_el(b)].into_iter().chain((0..(ring.variable_count() - 2)).map(|_| base_ring.zero())).collect::<Vec<_>>();
+                    let values = [base_ring.clone_el(a), base_ring.clone_el(b)].into_iter().chain((0..(ring.indeterminate_count() - 2)).map(|_| base_ring.zero())).collect::<Vec<_>>();
                     assert_el_eq!(&base_ring, &expected, &ring.evaluate(&f, values.as_ring_el_fn(base_ring), &base_ring.identity()));
                 }
             }

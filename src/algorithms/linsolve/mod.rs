@@ -46,7 +46,6 @@ impl SolveResult {
         }
     }
     
-    #[stability::unstable(feature = "enable")]
     pub fn assert_solved(&self) {
         assert!(self.is_solved());
     }

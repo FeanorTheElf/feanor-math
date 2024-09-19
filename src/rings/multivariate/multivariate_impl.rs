@@ -488,7 +488,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
     type TermIter<'a> = TermIterImpl<'a, R>
         where Self: 'a;
         
-    fn variable_count(&self) -> usize {
+    fn indeterminate_count(&self) -> usize {
         self.variable_count
     }
 
@@ -497,7 +497,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
             I::IntoIter: ExactSizeIterator
     {
         let exponents = exponents.into_iter();
-        assert_eq!(exponents.len(), self.variable_count());
+        assert_eq!(exponents.len(), self.indeterminate_count());
 
         let tmp_monomial = self.tmp_monomial();
         let mut deg = 0;
@@ -605,10 +605,10 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
             V: VectorFn<S::Element>
     {
         assert!(hom.domain().get_ring() == self.base_ring().get_ring());
-        assert_eq!(values.len(), self.variable_count());
-        let new_ring = MultivariatePolyRingImpl::new(hom.codomain(), self.variable_count());
-        let mut result = new_ring.from_terms(self.terms(f).map(|(c, m)| (hom.map_ref(c), new_ring.create_monomial((0..self.variable_count()).map(|i| self.exponent_at(m, i))))));
-        for i in 0..self.variable_count() {
+        assert_eq!(values.len(), self.indeterminate_count());
+        let new_ring = MultivariatePolyRingImpl::new(hom.codomain(), self.indeterminate_count());
+        let mut result = new_ring.from_terms(self.terms(f).map(|(c, m)| (hom.map_ref(c), new_ring.create_monomial((0..self.indeterminate_count()).map(|i| self.exponent_at(m, i))))));
+        for i in 0..self.indeterminate_count() {
             result = new_ring.specialize(&result, i, &new_ring.inclusion().map(values.at(i)));
         }
         debug_assert!(result.data.len() <= 1);
@@ -630,7 +630,7 @@ impl<P, R, A> CanHomFrom<P> for MultivariatePolyRingImplBase<R, A>
     type Homomorphism = <R::Type as CanHomFrom<<P::BaseRing as RingStore>::Type>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &P) -> Option<Self::Homomorphism> {
-        if self.variable_count() >= from.variable_count() {
+        if self.indeterminate_count() >= from.indeterminate_count() {
             self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
         } else {
             None
@@ -644,7 +644,7 @@ impl<P, R, A> CanHomFrom<P> for MultivariatePolyRingImplBase<R, A>
     fn map_in_ref(&self, from: &P, el: &<P as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         RingRef::new(self).from_terms(from.terms(el).map(|(c, m)| (
             self.base_ring().get_ring().map_in_ref(from.base_ring().get_ring(), c, hom),
-            self.create_monomial((0..self.variable_count()).map(|i| if i < from.variable_count() { from.exponent_at(m, i) } else { 0 }))
+            self.create_monomial((0..self.indeterminate_count()).map(|i| if i < from.indeterminate_count() { from.exponent_at(m, i) } else { 0 }))
         )))
     }
 }
@@ -658,7 +658,7 @@ impl<P, R, A> CanIsoFromTo<P> for MultivariatePolyRingImplBase<R, A>
     type Isomorphism = <R::Type as CanIsoFromTo<<P::BaseRing as RingStore>::Type>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &P) -> Option<Self::Isomorphism> {
-        if self.variable_count() == from.variable_count() {
+        if self.indeterminate_count() == from.indeterminate_count() {
             self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
         } else {
             None
@@ -668,7 +668,7 @@ impl<P, R, A> CanIsoFromTo<P> for MultivariatePolyRingImplBase<R, A>
     fn map_out(&self, from: &P, el: Self::Element, iso: &Self::Isomorphism) -> <P as RingBase>::Element {
         RingRef::new(from).from_terms(self.terms(&el).map(|(c, m)| (
             self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(c), iso),
-            from.create_monomial((0..self.variable_count()).map(|i| self.exponent_at(m, i)))
+            from.create_monomial((0..self.indeterminate_count()).map(|i| self.exponent_at(m, i)))
         )))
     }
 }
@@ -749,6 +749,6 @@ fn test_monomial_small() {
 fn test_new_many_variables() {
     for m in 1..32 {
         let ring = MultivariatePolyRingImpl::new_with(StaticRing::<i64>::RING, m, 32, Global);
-        assert_eq!(m, ring.variable_count());
+        assert_eq!(m, ring.indeterminate_count());
     }
 }

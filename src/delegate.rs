@@ -461,9 +461,10 @@ impl<R> FreeAlgebra for R
     }
 
     default fn from_canonical_basis<V>(&self, vec: V) -> Self::Element
-        where V: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = El<Self::BaseRing>>
+        where V: IntoIterator<Item = El<Self::BaseRing>>,
+            V::IntoIter: DoubleEndedIterator
     {
-        self.rev_delegate(self.get_delegate().from_canonical_basis(vec.map(|x| x)))
+        self.rev_delegate(self.get_delegate().from_canonical_basis(vec.into_iter().map(|x| x)))
     }
 
     default fn rank(&self) -> usize {

@@ -114,15 +114,18 @@ pub trait FreeAlgebra: RingExtension {
     /// In this sense, this is the opposite function to [`FreeAlgebra::wrt_canonical_basis()`].
     /// 
     fn from_canonical_basis<V>(&self, vec: V) -> Self::Element
-        where V: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = El<Self::BaseRing>>
+        where V: IntoIterator<Item = El<Self::BaseRing>>,
+            V::IntoIter: DoubleEndedIterator
     {
-        assert_eq!(vec.len(), self.rank());
+        let mut given_len = 0;
         let x = self.canonical_gen();
         let mut result = self.zero();
-        for c in vec.rev() {
+        for c in vec.into_iter().rev() {
             self.mul_assign_ref(&mut result, &x);
             self.add_assign(&mut result, self.from(c));
+            given_len += 1;
         }
+        assert_eq!(given_len, self.rank());
         return result;
     }
 }
@@ -144,7 +147,8 @@ pub trait FreeAlgebraStore: RingStore
     /// See [`FreeAlgebra::from_canonical_basis()`].
     /// 
     fn from_canonical_basis<V>(&self, vec: V) -> El<Self>
-        where V: ExactSizeIterator + DoubleEndedIterator + Iterator<Item = El<<Self::Type as RingExtension>::BaseRing>>
+        where V: IntoIterator<Item = El<<Self::Type as RingExtension>::BaseRing>>,
+            V::IntoIter: DoubleEndedIterator
     {
         self.get_ring().from_canonical_basis(vec)
     }
@@ -256,7 +260,7 @@ pub mod generic_tests {
                 if i == j {
                     continue;
                 }
-                let element = ring.from_canonical_basis(Iterator::map(0..n, |k| if k == i { ring.base_ring().one() } else if k == j { ring.base_ring().int_hom().map(2) } else { ring.base_ring().zero() }));
+                let element = ring.from_canonical_basis((0..n).map(|k| if k == i { ring.base_ring().one() } else if k == j { ring.base_ring().int_hom().map(2) } else { ring.base_ring().zero() }));
                 let expected = ring.add(ring.pow(ring.clone_el(&x), i), ring.int_hom().mul_map(ring.pow(ring.clone_el(&x), j), 2));
                 assert_el_eq!(ring, expected, element);
                 let element_vec = ring.wrt_canonical_basis(&expected);

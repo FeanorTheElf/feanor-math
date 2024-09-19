@@ -151,7 +151,7 @@ fn test_resultant_polynomial() {
     let [f, g] = QQYX.with_wrapped_indeterminates(|[Y, X]| [ 1 + X.pow_ref(2) + 2 * Y + (1 + X) * Y.pow_ref(2), 3 + X + (2 + X) * Y + (1 + X + X.pow_ref(2)) * Y.pow_ref(2) ]);
 
     let gb = buchberger_simple::<_, _, false>(&QQYX, vec![f, g], Lex);
-    let expected = gb.into_iter().filter(|poly| QQYX.appearing_variables(&poly).len() == 1).collect::<Vec<_>>();
+    let expected = gb.into_iter().filter(|poly| QQYX.appearing_indeterminates(&poly).len() == 1).collect::<Vec<_>>();
     assert!(expected.len() == 1);
     let mut expected = QQX.from_terms(QQYX.terms(&expected[0]).map(|(c, m)| (c.clone(), QQYX.exponent_at(m, 1))));
     let expected_lc_inv = QQ.div(&QQ.one(), QQX.lc(&expected).unwrap());

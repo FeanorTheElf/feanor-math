@@ -108,12 +108,12 @@ pub fn determinant_poly_matrix<P, V, A>(A: Submatrix<V, El<P>>, poly_ring: P, al
 {
     assert_eq!(A.row_count(), A.col_count());
     let n = A.row_count();
-    let mut total_degs = (0..poly_ring.variable_count()).map(|var| (var, 0)).collect::<BTreeMap<_, _>>();
+    let mut total_degs = (0..poly_ring.indeterminate_count()).map(|var| (var, 0)).collect::<BTreeMap<_, _>>();
 
     for i in 0..n {
-        let mut max_degs = (0..poly_ring.variable_count()).map(|var| (var, 0)).collect::<BTreeMap<_, _>>();
+        let mut max_degs = (0..poly_ring.indeterminate_count()).map(|var| (var, 0)).collect::<BTreeMap<_, _>>();
         for j in 0..n {
-            for (var, exp) in poly_ring.appearing_variables(A.at(i, j)) {
+            for (var, exp) in poly_ring.appearing_indeterminates(A.at(i, j)) {
                 let old = max_degs.insert(var, max(max_degs[&var], exp));
                 debug_assert!(old.is_some());
             }

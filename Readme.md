@@ -39,7 +39,7 @@ The following algorithms are implemented
  - Basic linear algebra over principal ideal rings.
  - Miller-Rabin test to check primality of integers.
  - A baby-step-giant-step and factorization-based algorithm to compute arbitrary discrete logarithms.
- - Faugere's F4 to compute Gröbner basis.
+ - Buchberger's algorithm (F4-style) to compute Gröbner basis.
 
 Unfortunately, operations with polynomials over infinite rings (integers, rationals, number fields) are currently very slow, since efficient implementation require a lot of care to prevent coefficient blowup, which I did not have time or need to invest.
 
@@ -253,6 +253,7 @@ For example, a simple polynomial ring implementation could look like this.
 ```rust
 use feanor_math::assert_el_eq;
 use feanor_math::ring::*;
+use feanor_math::rings::zn::zn_64::Zn;
 use feanor_math::integer::*;
 use feanor_math::homomorphism::*;
 use feanor_math::rings::zn::*;
@@ -352,11 +353,11 @@ impl<R: RingStore> RingBase for MyPolyRing<R> {
 // in a real implementation, we definitely should implement also `feanor_math::rings::poly::PolyRing`, and
 // possibly other traits (`CanHomFrom<other polynomial rings>`, `RingExtension`, `DivisibilityRing`, `EuclideanRing`)
 
-let base = zn_static::F17;
+let base = Zn::new(17);
 // we do not use the `RingBase`-implementor directly, but wrap it in a `RingStore`;
 // note that here, this is not strictly necessary, but still recommended
 let ring = RingValue::from(MyPolyRing { base_ring: base });
-let x = vec![0, 1];
+let x = vec![base.zero(), base.one()];
 let f = ring.add_ref(&x, &ring.int_hom().map(8));
 let g = ring.add_ref(&x, &ring.int_hom().map(7));
 let h = ring.add(ring.mul_ref(&x, &x), ring.add_ref(&ring.mul_ref(&x, &ring.int_hom().map(-2)), &ring.int_hom().map(5)));
@@ -386,6 +387,9 @@ As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` ca
    Since for `R: RingStore` also `&R: RingStore`, this just makes the interface more general.
  - Rings that wrap a base ring (like `MyRing<BaseRing: RingStore>`) should not impl `Copy`, unless both `BaseRing: Copy` and `El<BaseRing>: Copy`.
    There are some cases where I had previously added `#[derive(Copy)]`, which then made adding struct members of base ring elements to the ring a breaking change.
+ - Equality (via `PartialEq`) of rings implies that they are "the same" and their elements can be used interchangeably without conversion.
+   Being (canonically) isomorphic (via [`crate::homomorphism::CanIsoFromTo`]) implies that two rings are "the same", but their elements might use different internal
+   format. Using the functions [`crate::homomorphism::CanIsoFromTo`], they can be converted between both rings. For more info, see also [`crate::ring::RingBase`].
 
 # Performance
 
@@ -395,6 +399,7 @@ However, I did not have the time so far to thoroughly optimize many of the algor
 ## Tipps for achieving optimal performance
 
  - Use `lto = "fat"` in the `Cargo.toml` of your project. This is absolutely vital to enable inlining across crate boundaries, and can have a huge impact if you extensively use rings that have "simple" basic arithmetic - like `zn_64::Zn` or `primitive_int::StaticRing`.
- - Different parts of this library are at different stages of optimization. While I have spent some time on finite fields and the FFT algorithms, for example integer factorization are currently relatively slow.
+ - Different parts of this library are at different stages of optimization. While I have spent some time on finite fields and the FFT algorithms, for example working over rationals is currently somewhat slow.
  - If you extensively use rings whose elements require dynamic memory allocation, be careful to use a custom allocator, e.g. one from [`feanor-mempool`](https://github.com/FeanorTheElf/feanor-mempool).
  - The default arbitrary-precision integer arithmetic is somewhat slow. Use the feature "mpir" together with an installation of the [mpir](https://github.com/wbhart/mpir) library if you heavily use arbitrary-precision integers. 
+ - Write your code so that it is easy to replace ring types and other generic parameters! `feanor-math` often provides different implementations of the same thing, but with different performance characteristics (e.g. `SparsePolyRing` vs `DensePolyRing`, `KaratsubaAlgorithm` vs `FFTBasedConvolution` and so on). If your code makes it easy to replace one with the other, you can just experiment which version gives the best performance. `feanor-math` supports that by exposing basically all interfaces through traits.

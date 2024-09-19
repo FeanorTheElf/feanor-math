@@ -81,7 +81,7 @@ fn test_solve() {
     let base_ring = zn_static::Zn::<15>::RING;
     // Z_15[X]/(X^3 + X^2 + 1);  X^3 + X^2 + 1 = (X + 2)(X + 2X + 2) mod 3, but it is irreducible mod 5
     let ring = FreeAlgebraImpl::new(base_ring, 3, [14, 0, 14]);
-    let el = |coeffs: [u64; 3]| ring.from_canonical_basis(coeffs.into_iter());
+    let el = |coeffs: [u64; 3]| ring.from_canonical_basis(coeffs);
 
     let data_A = [
         DerefArray::from([ el([1, 0, 0]), el([0, 0, 0]) ]),
