@@ -5,12 +5,36 @@ use crate::homomorphism::*;
 use crate::pid::*;
 use crate::ordered::*;
 
+///
+/// Type alias for the current default used big integer ring implementation.
+/// 
+/// The type this points to may change when features or other compilation parameters
+/// change.
+///
 #[cfg(feature = "mpir")]
 pub type BigIntRing = crate::rings::mpir::MPZ;
+///
+/// Type alias for the current default used big integer ring implementation.
+/// 
+/// The type this points to may change when features or other compilation parameters
+/// change.
+/// 
 #[cfg(not(feature = "mpir"))]
 pub type BigIntRing = crate::rings::rust_bigint::RustBigintRing;
+///
+/// Type alias for the current default used big integer ring implementation.
+/// 
+/// The type this points to may change when features or other compilation parameters
+/// change.
+/// 
 #[cfg(feature = "mpir")]
 pub type BigIntRingBase = crate::rings::mpir::MPZBase;
+///
+/// Type alias for the current default used big integer ring implementation.
+/// 
+/// The type this points to may change when features or other compilation parameters
+/// change.
+/// 
 #[cfg(not(feature = "mpir"))]
 pub type BigIntRingBase = crate::rings::rust_bigint::RustBigintRingBase;
 

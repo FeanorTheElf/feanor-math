@@ -63,12 +63,13 @@ pub mod multivariate;
 pub mod rational;
 
 ///
-/// This module contains the ring [`MPZ`] that represents the integers `Z` and uses the heavily
+/// This module contains the ring [`mpir::MPZ`] that represents the integers `Z` and uses the heavily
 /// optimized arbitrary-precision integer library mpir as implementation.
 /// 
 /// Note that to use it, you have to activate the feature "mpir" and provide the compiler with
 /// the location of the mpir library file - e.g. by setting `RUSTFLAGS="-L /location/to/mpir/dir"`.
 /// 
+#[doc(cfg(feature = "mpir"))]
 #[cfg(feature = "mpir")]
 pub mod mpir;
 
@@ -80,6 +81,6 @@ pub mod fieldextension;
 
 ///
 /// This module contains the wrapper [`local::AsLocalPIR`] that wraps a ring to signal that it is a
-/// local principal ideal ring [`crate::rings::local::PrincipalLocalRing`]. 
+/// local principal ideal ring [`crate::local::PrincipalLocalRing`]. 
 /// 
 pub mod local;

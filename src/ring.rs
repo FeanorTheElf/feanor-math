@@ -980,7 +980,7 @@ impl<R: RingBase + Default> Default for RingValue<R> {
 /// 
 /// # Why do we need this in addition to [`crate::ring::RingValue`]?
 /// 
-/// Before [`RingStore::from_ref()`] was added, this was important to
+/// Before [`RingValue::from_ref()`] was added, this was important to
 /// allow using a reference to a [`RingBase`] as [`RingStore`]. Since then,
 /// it indeed has only a marginal importance, but note that it is currently
 /// the only way of working with unsized rings (an admittedly pretty exotic

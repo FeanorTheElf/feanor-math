@@ -65,9 +65,9 @@ impl<T> InternalRow<T> {
     ///
     /// Creates a new, defined (i.e. no UB) but invalid value for an InternalRow.
     /// This can be used to temporarily fill a variable, or initialize (e.g. via
-    /// [`make_zero()`]). This function will never allocate memory.
+    /// [`InternalRow::make_zero()`]). This function will never allocate memory.
     /// 
-    pub const fn placeholder() -> InternalRow<T> {
+    pub fn placeholder() -> InternalRow<T> {
         InternalRow { data: Vec::new() }
     }
 
@@ -601,7 +601,7 @@ mod global {
         }
 
         let mut tmp = (0..row_block).map(|target_i| transform.at(i + target_i, 0).clone_row(&ring)).collect::<Vec<_>>();
-        mul_assign(ring, transform.as_const().restrict_rows((i + row_block)..(i + new_row_block)).col_at(0), SubmatrixMut::<AsFirstElement<_>, _>::new(&mut tmp, row_block, 1).col_mut_at(0), &mut Vec::new());
+        mul_assign(ring, transform.as_const().restrict_rows((i + row_block)..(i + new_row_block)).col_at(0), SubmatrixMut::<AsFirstElement<_>, _>::from_1d(&mut tmp, row_block, 1).col_mut_at(0), &mut Vec::new());
         for (target_i, mut transform_row) in (0..swap_in_row_idxs.len()).zip(tmp.into_iter()) {
             if EXTENSIVE_RUNTIME_ASSERTS {
                 assert!(transform_row.data.iter().all(|(j, _)| *j == usize::MAX || *j < row_block));
@@ -729,7 +729,7 @@ pub(super) fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: Su
 
     let mut transform = (0..row_count).map(|_| zero_row()).collect::<Vec<_>>();
     // Note that the internal rows of transform are not of length n, but of length row_block
-    let mut transform = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut transform[..], row_count, 1);
+    let mut transform = SubmatrixMut::<AsFirstElement<_>, _>::from_1d(&mut transform[..], row_count, 1);
     make_identity(ring, transform.reborrow().restrict_rows(i..(i + row_block)), row_block);
 
     let mut transform_transform = Vec::new();
@@ -763,7 +763,7 @@ pub(super) fn blocked_row_echelon<R, V, const LOG: bool>(ring: R, mut matrix: Su
 
             // transform_transform: the transform made during re-echelonization, that has to be applied to the elimination transform matrix pivot_column_transform
             transform_transform.resize_with(row_block, InternalRow::placeholder);
-            let mut transform_transform = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut transform_transform[..], row_block, 1);
+            let mut transform_transform = SubmatrixMut::<AsFirstElement<_>, _>::from_1d(&mut transform_transform[..], row_block, 1);
             make_identity(ring, transform_transform.reborrow(), row_block);
 
             // echelonize the pivot matrix

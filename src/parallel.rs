@@ -1,7 +1,7 @@
 
 #[stability::unstable(feature = "enable")]
 #[cfg(feature = "parallel")]
-pub fn potential_parallel_for_each<D, T, F, G, S>(data: D, init_thread: G, body: F)
+pub(crate) fn potential_parallel_for_each<D, T, F, G, S>(data: D, init_thread: G, body: F)
     where F: Fn(&mut S, usize, T) + Send + Sync,
         G: Fn() -> S + Send + Sync,
         T: Send,
@@ -13,7 +13,7 @@ pub fn potential_parallel_for_each<D, T, F, G, S>(data: D, init_thread: G, body:
 
 #[stability::unstable(feature = "enable")]
 #[cfg(not(feature = "parallel"))]
-pub fn potential_parallel_for_each<D, T, F, G, S>(data: D, init_thread: G, body: F)
+pub(crate) fn potential_parallel_for_each<D, T, F, G, S>(data: D, init_thread: G, body: F)
     where F: Fn(&mut S, usize, T) + Send + Sync,
         G: Fn() -> S + Send + Sync,
         D: IntoIterator<Item = T>

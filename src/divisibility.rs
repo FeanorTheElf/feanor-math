@@ -29,6 +29,7 @@ pub trait DivisibilityRing: RingBase {
     /// ```
     /// # use feanor_math::ring::*;
     /// # use feanor_math::divisibility::*;
+    /// # use feanor_math::homomorphism::*;
     /// # use feanor_math::rings::zn::zn_64::*;
     /// let ring = Zn::new(6);
     /// let four_over_four = ring.checked_left_div(&ring.int_hom().map(4), &ring.int_hom().map(4)).unwrap();

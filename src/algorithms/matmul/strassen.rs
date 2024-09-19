@@ -254,7 +254,7 @@ macro_rules! strassen_base_algorithm {
                     $smaller_strassen::<_, _, _, _, true, $T1, $T2, $T3>(block_size_log2 - 1, b_lhs, c_rhs, a_dst.reborrow(), ring, &mut *memory, steps_left - 1);
 
                     // handle t = a a'
-                    let mut t = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp0, n_half, n_half));
+                    let mut t = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::from_1d(tmp0, n_half, n_half));
                     $smaller_strassen::<_, _, _, _, false, $T1, $T2, false>(block_size_log2 - 1, a_lhs, a_rhs, t.reborrow(), ring, &mut *memory, steps_left - 1);
                     matrix_add_assign(t.as_const(), a_dst.reborrow(), ring);
                     
@@ -262,9 +262,9 @@ macro_rules! strassen_base_algorithm {
                     let (tmp2, memory) = memory.split_at_mut(n_half * n_half);
 
                     // handle w = t + (c + d - a) (a' + d' - b')
-                    let mut c_d_neg_a_lhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp1, n_half, n_half));
+                    let mut c_d_neg_a_lhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::from_1d(tmp1, n_half, n_half));
                     matrix_add_add_sub(c_lhs, d_lhs, a_lhs, c_d_neg_a_lhs.reborrow(), ring);
-                    let mut a_d_neg_b_rhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp2, n_half, n_half));
+                    let mut a_d_neg_b_rhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::from_1d(tmp2, n_half, n_half));
                     matrix_add_add_sub(a_rhs, d_rhs, b_rhs, a_d_neg_b_rhs.reborrow(), ring);
                     let mut w = t;
                     $smaller_strassen::<_, _, _, _, true, false, false, false>(block_size_log2 - 1, c_d_neg_a_lhs.as_const(), a_d_neg_b_rhs.as_const(), w.reborrow(), ring, &mut *memory, steps_left - 1);
@@ -326,7 +326,7 @@ macro_rules! strassen_base_algorithm {
                     // handle u = (c - a) (b' - d'); here we need temporary memory
                     let mut u = c_dst.reborrow();
                     let (tmp0, memory) = memory.split_at_mut(n_half * n_half);
-                    let mut c_neg_a_lhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::new(tmp0, n_half, n_half));
+                    let mut c_neg_a_lhs = TransposableSubmatrixMut::from(SubmatrixMut::<AsFirstElement<_>, _>::from_1d(tmp0, n_half, n_half));
                     matrix_sub(c_lhs, a_lhs, c_neg_a_lhs.reborrow(), ring);
                     let mut b_neg_d_rhs = a_dst.reborrow();
                     matrix_sub(b_rhs, d_rhs, b_neg_d_rhs.reborrow(), ring);
@@ -634,9 +634,9 @@ fn test_dispatch_strassen_one_level() {
         dispatch_strassen_impl::<_, _, _, _, false, false, false, false>(
             1, 
             0, 
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&a)), 
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&b)), 
-            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result)), 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&a)), 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&b)), 
+            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut result)), 
             StaticRing::<i32>::RING, 
             &mut memory
         );
@@ -655,9 +655,9 @@ fn test_dispatch_strassen_one_level() {
         dispatch_strassen_impl::<_, _, _, _, false, false, false, false>(
             1, 
             0, 
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&a)), 
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&b)), 
-            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result)), 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&a)), 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&b)), 
+            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut result)), 
             StaticRing::<i32>::RING, 
             &mut memory
         );
@@ -679,9 +679,9 @@ fn test_dispatch_strassen_add_assign_one_level() {
         dispatch_strassen_impl::<_, _, _, _, true, false, false, false>(
             1, 
             0, 
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&a)), 
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&b)), 
-            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result)), 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&a)), 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&b)), 
+            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut result)), 
             StaticRing::<i32>::RING, 
             &mut memory
         );
@@ -700,9 +700,9 @@ fn test_dispatch_strassen_add_assign_one_level() {
         dispatch_strassen_impl::<_, _, _, _, true, false, false, false>(
             1, 
             0, 
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&a)), 
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::new(&b)), 
-            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut result)), 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&a)), 
+            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&b)), 
+            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut result)), 
             StaticRing::<i32>::RING, 
             &mut memory
         );

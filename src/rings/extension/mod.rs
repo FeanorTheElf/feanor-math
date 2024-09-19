@@ -227,7 +227,6 @@ impl<R: RingStore> FreeAlgebraStore for R
     where R::Type: FreeAlgebra
 {}
 
-
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
     use super::*;

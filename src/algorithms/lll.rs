@@ -402,7 +402,7 @@ fn test_ldl() {
         DerefArray::from([2, 5, 0]),
         DerefArray::from([1, 0, 7])
     ];
-    let mut matrix = SubmatrixMut::<DerefArray<_, 3>, _>::new(&mut data);
+    let mut matrix = SubmatrixMut::<DerefArray<_, 3>, _>::from_2d(&mut data);
     let mut expected = in_QQ![
         [1, 2, 1],
         [0, 1, -2],
@@ -430,7 +430,7 @@ fn test_swap_gso_cols() {
         [0, 3/2, 11/40],
         [0,   0,     1]
     ];
-    let matrix_view = SubmatrixMut::<DerefArray<_, 3>, _>::new(&mut matrix);
+    let matrix_view = SubmatrixMut::<DerefArray<_, 3>, _>::from_2d(&mut matrix);
 
     swap_gso_cols(&QQ, matrix_view, 0, 1);
 
@@ -472,7 +472,7 @@ fn test_lll_float_2d() {
         DerefArray::from([11, 20])
     ];
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
     lll_float(&ZZ, OwnedMatrix::<_>::identity(2, 2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9, Global);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
@@ -484,7 +484,7 @@ fn test_lll_float_2d() {
         DerefArray::from([27, 22])
     ];
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
     lll_float(&ZZ, OwnedMatrix::<_>::identity(2, 2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9, Global);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
@@ -509,7 +509,7 @@ fn test_lll_float_3d() {
     ];
 
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 3>, _>::new(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 3>, _>::from_2d(&mut reduced);
     lll_float(&ZZ, OwnedMatrix::<_>::identity(3, 3, Real64::RING).data(), reduced_matrix.reborrow(), 0.999, Global);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
@@ -548,7 +548,7 @@ fn bench_lll_float_10d(bencher: &mut Bencher) {
             DerefArray::from([ 3433883, 14315221, 24549008,  6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304])
         ];
         let mut reduced = original;
-        let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 10>, _>::new(&mut reduced);
+        let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 10>, _>::from_2d(&mut reduced);
         lll_float(&ZZ, OwnedMatrix::<_>::identity(10, 10, Real64::RING).data(), reduced_matrix.reborrow(), 0.9, Global);
 
         assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
@@ -564,7 +564,7 @@ fn test_lll_exact_2d() {
         DerefArray::from([11, 20])
     ];
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
     lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9, Global);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
@@ -576,7 +576,7 @@ fn test_lll_exact_2d() {
         DerefArray::from([27, 22])
     ];
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::new(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
     lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9, Global);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
@@ -601,7 +601,7 @@ fn test_lll_exact_3d() {
     ];
 
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 3>, _>::new(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 3>, _>::from_2d(&mut reduced);
     lll_exact(&ZZ, reduced_matrix.reborrow(), 0.999, Global);
 
     assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
@@ -640,7 +640,7 @@ fn bench_lll_exact_10d(bencher: &mut Bencher) {
             DerefArray::from([ 3433883, 14315221, 24549008,  6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304])
         ];
         let mut reduced = original;
-        let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 10>, _>::new(&mut reduced);
+        let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 10>, _>::from_2d(&mut reduced);
         lll_exact(&ZZ, reduced_matrix.reborrow(), 0.9, Global);
 
         assert_lattice_isomorphic(&original, &reduced_matrix.as_const());

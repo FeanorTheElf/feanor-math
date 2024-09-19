@@ -246,9 +246,6 @@ fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
 #[test]
 #[ignore]
 fn test_ec_factor_large() {
-    #[cfg(not(feature = "mpir"))]
-    let ZZbig = crate::rings::rust_bigint::RustBigintRing::RING;
-    #[cfg(feature = "mpir")]
     let ZZbig = BigIntRing::RING;
 
     let n: i128 = 1073741827 * 71316922984999;

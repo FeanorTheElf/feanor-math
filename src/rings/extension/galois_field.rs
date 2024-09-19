@@ -188,7 +188,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
 /// 
 /// There exists a finite field with `q` elements if and only if `q = p^e` is a prime power. In these cases,
 /// this struct provides an implementation of arithmetic in these fields. Note that since those fields are always finite-degree
-/// extensions of `Z/pZ`, they can also be used by creating a suitable instance of [`super::impl_new::FreeAlgebraImpl`]. In fact,
+/// extensions of `Z/pZ`, they can also be used by creating a suitable instance of [`super::extension_impl::FreeAlgebraImpl`]. In fact,
 /// this is the way the old implementation of galois fields (in [`super::galois_field`]) was designed. However, providing a new
 /// type can provide both ergonomic and performance benefits.
 /// 
@@ -208,7 +208,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
 /// ```
 /// More configurations are possible using [`GaloisField::new_with()`] or [`GaloisField::create()`].
 /// 
-/// We also support conversion to and from a plain [`super::impl_new::FreeAlgebraImpl`] representation.
+/// We also support conversion to and from a plain [`super::extension_impl::FreeAlgebraImpl`] representation.
 /// ```
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::extension::*;

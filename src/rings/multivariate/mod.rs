@@ -4,7 +4,7 @@ use crate::seq::VectorFn;
 use crate::wrapper::RingElementWrapper;
 
 ///
-/// Contains an implementation [`multivariate_impl::MultivariatePolyImpl`] of a multivariate polynomial
+/// Contains an implementation [`multivariate_impl::MultivariatePolyRingImpl`] of a multivariate polynomial
 /// ring.
 /// 
 pub mod multivariate_impl;

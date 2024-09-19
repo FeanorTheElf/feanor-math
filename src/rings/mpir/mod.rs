@@ -344,6 +344,13 @@ impl PrincipalIdealRing for MPZBase {
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), MPZ::RING)
     }
+
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        if self.is_zero(lhs) && self.is_zero(rhs) {
+            return Some(self.one());
+        }
+        self.checked_left_div(lhs, rhs)
+    }
 }
 
 impl EuclideanRing for MPZBase {

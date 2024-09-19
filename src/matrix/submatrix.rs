@@ -135,7 +135,7 @@ unsafe impl<'a, T> AsPointerToSlice<T> for AsFirstElement<T> {
 /// all. I mainly made it public to allow doctests.
 /// 
 /// More concretely, when having a 2d-structure, given by a sequence of `V`s, we
-/// can consider a square sub-block. This is encapsulated by SubmatrixRaw.
+/// can consider a rectangular sub-block. This is encapsulated by SubmatrixRaw.
 /// 
 /// # Safety
 /// 
@@ -291,7 +291,7 @@ impl<V, T> SubmatrixRaw<V, T>
 }
 
 ///
-/// An immutable view on a column of a matrix. 
+/// An immutable view on a column of a matrix [`Submatrix`]. 
 /// 
 pub struct Column<'a, V, T>
     where V: AsPointerToSlice<T>
@@ -352,7 +352,7 @@ impl<'a, V, T> VectorView<T> for Column<'a, V, T>
 
 ///
 ///
-/// A mutable view on a column of a matrix. 
+/// A mutable view on a column of a matrix [`SubmatrixMut`]. 
 /// 
 /// Clearly must not be Copy/Clone.
 /// 
@@ -490,6 +490,12 @@ impl<'a, V, T> SwappableVectorViewMut<T> for ColumnMut<'a, V, T>
     }
 }
 
+///
+/// Immutable view on a matrix that stores elements of type `T`.
+/// 
+/// This view is designed to work with various underlying representations
+/// of the matrix, as described by [`AsPointerToSlice`].
+/// 
 pub struct Submatrix<'a, V, T>
     where V: 'a + AsPointerToSlice<T>
 {
@@ -604,6 +610,12 @@ impl<'a, V, T> Copy for Submatrix<'a, V, T>
     where V: 'a + AsPointerToSlice<T>
 {}
 
+///
+/// Mutable view on a matrix that stores elements of type `T`.
+/// 
+/// This view is designed to work with various underlying representations
+/// of the matrix, as described by [`AsPointerToSlice`].
+/// 
 pub struct SubmatrixMut<'a, V, T>
     where V: 'a + AsPointerToSlice<T>
 {
@@ -680,7 +692,6 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         })
     }
 
-    #[stability::unstable(feature = "enable")]
     pub fn into_at_mut(self, i: usize, j: usize) -> &'a mut T {
         &mut self.into_row_mut_at(i)[j]
     }
@@ -697,7 +708,6 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         self.as_const().into_row_at(i)
     }
 
-    #[stability::unstable(feature = "enable")]
     pub fn into_row_mut_at(self, i: usize) -> &'a mut [T] {
         // safe since self is exists borrowed for 'a
         unsafe {
@@ -752,17 +762,17 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         T: Send
 {
     #[cfg(not(feature = "parallel"))]
-    pub fn concurrent_row_iter(self) -> impl 'a + ExactSizeIterator<Item = &'a mut [T]> {
+    pub(crate) fn concurrent_row_iter(self) -> impl 'a + ExactSizeIterator<Item = &'a mut [T]> {
         self.row_iter()
     }
 
     #[cfg(not(feature = "parallel"))]
-    pub fn concurrent_col_iter(self) -> impl 'a + ExactSizeIterator<Item = ColumnMut<'a, V, T>> {
+    pub(crate) fn concurrent_col_iter(self) -> impl 'a + ExactSizeIterator<Item = ColumnMut<'a, V, T>> {
         self.col_iter()
     }
     
     #[cfg(feature = "parallel")]
-    pub fn concurrent_row_iter(self) -> impl 'a + rayon::iter::IndexedParallelIterator<Item = &'a mut [T]> {
+    pub(crate) fn concurrent_row_iter(self) -> impl 'a + rayon::iter::IndexedParallelIterator<Item = &'a mut [T]> {
         
         struct AccessIthRow<'a, V, T>
             where V: Sync + AsPointerToSlice<T>, T: 'a + Send
@@ -814,7 +824,7 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
     }
 
     #[cfg(feature = "parallel")]
-    pub fn concurrent_col_iter(self) -> impl 'a + rayon::iter::IndexedParallelIterator<Item = ColumnMut<'a, V, T>> {
+    pub(crate) fn concurrent_col_iter(self) -> impl 'a + rayon::iter::IndexedParallelIterator<Item = ColumnMut<'a, V, T>> {
         
         struct AccessIthCol<'a, V, T>
             where V: Sync + AsPointerToSlice<T>, T: 'a + Send
@@ -874,12 +884,13 @@ impl<'a, V, T> Submatrix<'a, V, T>
         T: Sync
 {
     #[cfg(not(feature = "parallel"))]
-    pub fn concurrent_row_iter(self) -> impl 'a + ExactSizeIterator<Item = &'a [T]> {
+    #[allow(unused)]
+    pub(crate) fn concurrent_row_iter(self) -> impl 'a + ExactSizeIterator<Item = &'a [T]> {
         self.row_iter()
     }
     
     #[cfg(feature = "parallel")]
-    pub fn concurrent_row_iter(self) -> impl 'a + rayon::iter::IndexedParallelIterator<Item = &'a [T]> {
+    pub(crate) fn concurrent_row_iter(self) -> impl 'a + rayon::iter::IndexedParallelIterator<Item = &'a [T]> {
         rayon::iter::ParallelIterator::map(
             rayon::iter::IntoParallelIterator::into_par_iter(0..self.row_count()),
             move |i| unsafe { self.raw_data.row_at(i).as_ref() }
@@ -889,7 +900,12 @@ impl<'a, V, T> Submatrix<'a, V, T>
 
 impl<'a, T> SubmatrixMut<'a, AsFirstElement<T>, T> {
 
-    pub fn new(data: &'a mut [T], row_count: usize, col_count: usize) -> Self {
+    ///
+    /// Creates a view on the given data slice, interpreting it as a matrix of given shape.
+    /// Assumes row-major order, i.e. contigous subslices of `data` will be the rows of the
+    /// resulting matrix.
+    /// 
+    pub fn from_1d(data: &'a mut [T], row_count: usize, col_count: usize) -> Self {
         assert_eq!(row_count * col_count, data.len());
         unsafe {
             Self {
@@ -899,6 +915,7 @@ impl<'a, T> SubmatrixMut<'a, AsFirstElement<T>, T> {
         }
     }
 
+    #[doc(cfg(feature = "ndarray"))]
     #[cfg(feature = "ndarray")]
     pub fn from_ndarray<S>(data: &'a mut ArrayBase<S, Ix2>) -> Self
         where S: DataMut<Elem = T>
@@ -911,7 +928,11 @@ impl<'a, T> SubmatrixMut<'a, AsFirstElement<T>, T> {
 
 impl<'a, V: AsPointerToSlice<T> + Deref<Target = [T]>, T> SubmatrixMut<'a, V, T> {
 
-    pub fn new(data: &'a mut [V]) -> Self {
+    ///
+    /// Interprets the given slice of slices as a matrix, by using the elements
+    /// of the outer slice as the rows of the matrix.
+    /// 
+    pub fn from_2d(data: &'a mut [V]) -> Self {
         assert!(data.len() > 0);
         let row_count = data.len();
         let col_count = data[0].len();
@@ -929,7 +950,12 @@ impl<'a, V: AsPointerToSlice<T> + Deref<Target = [T]>, T> SubmatrixMut<'a, V, T>
 
 impl<'a, T> Submatrix<'a, AsFirstElement<T>, T> {
 
-    pub fn new(data: &'a [T], row_count: usize, col_count: usize) -> Self {
+    ///
+    /// Creates a view on the given data slice, interpreting it as a matrix of given shape.
+    /// Assumes row-major order, i.e. contigous subslices of `data` will be the rows of the
+    /// resulting matrix.
+    /// 
+    pub fn from_1d(data: &'a [T], row_count: usize, col_count: usize) -> Self {
         assert_eq!(row_count * col_count, data.len());
         unsafe {
             Self {
@@ -939,6 +965,7 @@ impl<'a, T> Submatrix<'a, AsFirstElement<T>, T> {
         }
     }
 
+    #[doc(cfg(feature = "ndarray"))]
     #[cfg(feature = "ndarray")]
     pub fn from_ndarray<S>(data: &'a ArrayBase<S, Ix2>) -> Self
         where S: DataMut<Elem = T>
@@ -950,7 +977,11 @@ impl<'a, T> Submatrix<'a, AsFirstElement<T>, T> {
 
 impl<'a, V: AsPointerToSlice<T> + Deref<Target = [T]>, T> Submatrix<'a, V, T> {
 
-    pub fn new(data: &'a [V]) -> Self {
+    ///
+    /// Interprets the given slice of slices as a matrix, by using the elements
+    /// of the outer slice as the rows of the matrix.
+    /// 
+    pub fn from_2d(data: &'a [V]) -> Self {
         assert!(data.len() > 0);
         let row_count = data.len();
         let col_count = data[0].len();
@@ -990,7 +1021,7 @@ fn with_testmatrix_vec<F>(f: F)
         vec![6, 7, 8, 9, 10],
         vec![11, 12, 13, 14, 15]
     ];
-    let matrix = SubmatrixMut::<Vec<_>, _>::new(&mut data[..]);
+    let matrix = SubmatrixMut::<Vec<_>, _>::from_2d(&mut data[..]);
     f(matrix)
 }
 
@@ -1003,7 +1034,7 @@ fn with_testmatrix_array<F>(f: F)
         DerefArray::from([6, 7, 8, 9, 10]),
         DerefArray::from([11, 12, 13, 14, 15])
     ];
-    let matrix = SubmatrixMut::<DerefArray<_, 5>, _>::new(&mut data[..]);
+    let matrix = SubmatrixMut::<DerefArray<_, 5>, _>::from_2d(&mut data[..]);
     f(matrix)
 }
 
@@ -1016,7 +1047,7 @@ fn with_testmatrix_linmem<F>(f: F)
         6, 7, 8, 9, 10,
         11, 12, 13, 14, 15
     ];
-    let matrix = SubmatrixMut::<AsFirstElement<_>, _>::new(&mut data[..], 3, 5);
+    let matrix = SubmatrixMut::<AsFirstElement<_>, _>::from_1d(&mut data[..], 3, 5);
     f(matrix)
 }
 

@@ -70,13 +70,13 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
     }
 
     pub fn data<'a>(&'a self) -> Submatrix<'a, AsFirstElement<T>, T> {
-        Submatrix::<AsFirstElement<_>, _>::new(&self.data, self.row_count(), self.col_count())
+        Submatrix::<AsFirstElement<_>, _>::from_1d(&self.data, self.row_count(), self.col_count())
     }
 
     pub fn data_mut<'a>(&'a mut self) -> SubmatrixMut<'a, AsFirstElement<T>, T> {
         let row_count = self.row_count();
         let col_count = self.col_count();
-        SubmatrixMut::<AsFirstElement<_>, _>::new(&mut self.data, row_count, col_count)
+        SubmatrixMut::<AsFirstElement<_>, _>::from_1d(&mut self.data, row_count, col_count)
     }
 
     pub fn at(&self, i: usize, j: usize) -> &T {
