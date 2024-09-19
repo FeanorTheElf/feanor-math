@@ -144,6 +144,20 @@ pub mod matrix_compare {
     }
 }
 
+///
+/// Variant of `assert_eq!` for matrices elements, i.e. assert that two ring matrices are equal.
+/// Frequently used in tests.
+/// 
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::matrix::*;
+/// # use feanor_math::assert_matrix_eq;
+/// let lhs = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+/// let rhs = OwnedMatrix::zero(3, 3, StaticRing::<i64>::RING);
+/// assert_matrix_eq!(StaticRing::<i64>::RING, lhs, rhs);
+///  ```
+/// 
 #[macro_export]
 macro_rules! assert_matrix_eq {
     ($ring:expr, $lhs:expr, $rhs:expr) => {

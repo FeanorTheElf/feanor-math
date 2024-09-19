@@ -496,7 +496,7 @@ macro_rules! delegate {
 }
 
 ///
-/// Equivalent to `assert_eq!` to assert that two ring elements are equal.
+/// Variant of `assert_eq!` for ring elements, i.e. assert that two ring elements are equal.
 /// Frequently used in tests
 /// 
 /// # Example
@@ -515,7 +515,6 @@ macro_rules! delegate {
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::assert_el_eq;
-/// 
 /// // this does not have an equivalent representation with assert_eq!
 /// assert_el_eq!(BigIntRing::RING, BigIntRing::RING.int_hom().map(3), BigIntRing::RING.int_hom().map(3));
 /// ```
