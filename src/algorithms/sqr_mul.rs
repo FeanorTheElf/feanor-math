@@ -1,5 +1,4 @@
 use crate::ring::*;
-use crate::homomorphism::*;
 use crate::integer::*;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::*;
@@ -69,33 +68,6 @@ pub fn try_generic_abs_square_and_multiply<T, U, F, H, I, E>(base: U, power: &El
         }
     }
     return Ok(result);
-}
-
-///
-/// Raises `base` to the `power`-th power.
-/// 
-pub fn generic_pow<H, R, S, I>(base: R::Element, power: &El<I>, int_ring: I, hom: &H) -> S::Element
-    where R: ?Sized + RingBase, 
-        S: ?Sized + RingBase,
-        H: Homomorphism<R, S>,
-        I: IntegerRingStore,
-        I::Type: IntegerRing
-{
-    let ring = hom.codomain();
-    try_generic_abs_square_and_multiply(
-        base, 
-        power, 
-        int_ring, 
-        |mut x| {
-            ring.square(&mut x);
-            Ok(x)
-        }, 
-        |x, mut y| { 
-            hom.mul_assign_map_ref(&mut y, x);
-            Ok(y)
-        }, 
-        ring.one()
-    ).unwrap_or_else(|x| x)
 }
 
 ///
@@ -271,6 +243,8 @@ const SHORTEST_ADDITION_CHAINS: [(usize, usize); 65] = [
 use test::Bencher;
 #[cfg(test)]
 use crate::rings::zn::zn_64;
+#[cfg(test)]
+use crate::homomorphism::*;
 
 #[test]
 fn test_generic_abs_square_and_multiply() {

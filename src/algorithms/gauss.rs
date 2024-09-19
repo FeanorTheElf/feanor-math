@@ -32,7 +32,7 @@ use crate::ring::*;
 /// // Thus we must use a wrapper
 /// let QQ = AsLocalPIR::from_field(QQ);
 /// let hom = QQ.can_hom(&ZZ).unwrap();
-/// let (row_idxs, col_idxs) = algorithms::gauss::largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::new(&mut [vec![hom.map(0), hom.map(1)], vec![hom.map(0), hom.map(0)]]), QQ);
+/// let (row_idxs, col_idxs) = algorithms::gauss::largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut [vec![hom.map(0), hom.map(1)], vec![hom.map(0), hom.map(0)]]), QQ);
 /// let rank = row_idxs.len();
 /// assert_eq!(rank, col_idxs.len());
 /// assert_eq!(vec![0], row_idxs);
