@@ -55,9 +55,18 @@ pub fn format_matrix<'a, M, R>(row_count: usize, col_count: usize, matrix: M, ri
     DisplayWrapper { matrix, ring, col_count, row_count }
 }
 
+///
+/// Defines a very general way of comparing anything that can be interpreted as a
+/// matrix in [`matrix_compare::MatrixCompare`]. Used solely in [`crate::assert_matrix_eq`],
+/// with tests being the primary use case.
+/// 
 pub mod matrix_compare {
     use super::*;
 
+    ///
+    /// Used by [`crate::assert_matrix_eq`] to compare objects that are matrices in a
+    /// very general sense.
+    /// 
     pub trait MatrixCompare<T> {
         fn row_count(&self) -> usize;
         fn col_count(&self) -> usize;

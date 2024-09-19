@@ -59,6 +59,12 @@ unsafe impl<T> AsPointerToSlice<T> for Vec<T> {
     }
 }
 
+///
+/// Newtype for `[T; SIZE]` that implements `Deref<Target = [T]>` so that it can be used
+/// to store columns and access them through [`Submatrix`].
+/// 
+/// This is necessary, since [`Submatrix::from_2d`] requires that `V: Deref<Target = [T]>`.
+/// 
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct DerefArray<T, const SIZE: usize> {
@@ -428,6 +434,10 @@ impl<'a, V, T> VectorView<T> for ColumnMut<'a, V, T>
     }
 }
 
+///
+/// Iterator over mutable references to the entries of a column
+/// of a matrix [`SubmatrixMut`].
+/// 
 pub struct ColumnMutIter<'a, V, T> 
     where V: AsPointerToSlice<T>
 {
