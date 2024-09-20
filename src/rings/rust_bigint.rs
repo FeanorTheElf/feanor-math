@@ -236,6 +236,8 @@ impl<A: Allocator + Clone> RingBase for RustBigintRingBase<A> {
     {
         Some(other_ZZ.zero())
     }
+    
+    fn is_approximate(&self) -> bool { false }
 }
 
 impl<A1: Allocator + Clone, A2: Allocator + Clone> IntCast<RustBigintRingBase<A2>> for RustBigintRingBase<A1> {

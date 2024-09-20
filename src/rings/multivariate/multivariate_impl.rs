@@ -212,15 +212,20 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
                 return false;
             }
         }
-        for i in 0..el.len() {
-            if self.base_ring().is_zero(&el[i].0) {
-                return false;
+        if !self.base_ring().get_ring().is_approximate() {
+            for i in 0..el.len() {
+                if self.base_ring().is_zero(&el[i].0) {
+                    return false;
+                }
             }
         }
         return true;
     }
 
     fn remove_zeros(&self, el: &mut Vec<(El<R>, MonomialIdentifier), A>) {
+        if self.base_ring().get_ring().is_approximate() {
+            return;
+        }
         let mut i = 0;
         for j in 0..el.len() {
             if !self.base_ring.is_zero(&el[j].0) {
@@ -441,6 +446,10 @@ impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
     {
         self.base_ring().characteristic(ZZ)
     }
+
+    fn is_approximate(&self) -> bool {
+        self.base_ring().get_ring().is_approximate()
+    }
 }
 
 pub struct TermIterImpl<'a, R>
@@ -470,7 +479,7 @@ impl<R, A> RingExtension for MultivariatePolyRingImplBase<R, A>
     }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
-        if self.base_ring().is_zero(&x) {
+        if !self.base_ring().get_ring().is_approximate() && self.base_ring().is_zero(&x) {
             return self.zero();
         } else {
             let mut data = Vec::with_capacity_in(1, self.allocator.clone());
@@ -679,6 +688,8 @@ use crate::rings::zn::zn_static;
 use crate::rings::zn::zn_static::F17;
 #[cfg(test)]
 use crate::iters::multiset_combinations;
+#[cfg(test)]
+use crate::rings::float_real::Real64;
 
 #[cfg(test)]
 fn ring_and_elements() -> (MultivariatePolyRingImpl<zn_static::Fp<17>>, Vec<MultivariatePolyRingEl<zn_static::Fp<17>>>) {
@@ -751,4 +762,13 @@ fn test_new_many_variables() {
         let ring = MultivariatePolyRingImpl::new_with(StaticRing::<i64>::RING, m, 32, Global);
         assert_eq!(m, ring.indeterminate_count());
     }
+}
+
+#[test]
+fn test_evaluate_approximate_ring() {
+    let ring = MultivariatePolyRingImpl::new(Real64::RING, 2);
+    let [f] = ring.with_wrapped_indeterminates(|[X, Y]| [X * X * Y - Y * Y]);
+    let x = 0.47312;
+    let y = -1.43877;
+    assert!(Real64::RING.abs((x * x * y - y * y) - ring.evaluate(&f, [x, y].into_fn(|x| *x), &Real64::RING.identity())) <= 0.000000001);
 }

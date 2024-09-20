@@ -237,7 +237,7 @@ pub trait RingBase: PartialEq {
     /// Currently, the only way how approximate rings are used is a complex-valued
     /// fast Fourier transform, via [`crate::rings::float_complex::Complex64`].
     /// 
-    fn is_approximate(&self) -> bool { false }
+    fn is_approximate(&self) -> bool;
 
     ///
     /// Writes a human-readable representation of `value` to `out`.
@@ -1104,6 +1104,8 @@ fn test_internal_wrappings_dont_matter() {
         {
             Some(ZZ.zero())
         }
+
+        fn is_approximate(&self) -> bool { false }
     }
 
     impl_eq_based_self_iso!{ ABase }
@@ -1151,6 +1153,8 @@ fn test_internal_wrappings_dont_matter() {
         {
             Some(ZZ.zero())
         }
+
+        fn is_approximate(&self) -> bool { false }
     }
 
     impl<R: RingStore> CanHomFrom<ABase> for BBase<R> {

@@ -297,6 +297,8 @@ impl RingBase for ZnBase {
             self.one()
         )
     }
+
+    fn is_approximate(&self) -> bool { false }
 }
 
 impl SerializableElementRing for ZnBase {

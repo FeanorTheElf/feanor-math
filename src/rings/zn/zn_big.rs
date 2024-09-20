@@ -263,6 +263,8 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
     {
         self.size(ZZ)
     }
+    
+    fn is_approximate(&self) -> bool { false }
 }
 
 impl<I: IntegerRingStore> Clone for ZnBase<I> 

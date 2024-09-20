@@ -240,6 +240,10 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
     {
         self.base_ring().characteristic(ZZ)
     }
+    
+    fn is_approximate(&self) -> bool {
+        self.base_ring().get_ring().is_approximate()
+    }
 }
 
 impl<R> PartialEq for SparsePolyRingBase<R> 

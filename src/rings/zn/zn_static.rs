@@ -86,6 +86,8 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD> {
     {
         self.size(ZZ)
     }
+    
+    fn is_approximate(&self) -> bool { false }
 }
 
 impl<const N: u64, const IS_FIELD: bool> CanHomFrom<StaticRingBase<i64>> for ZnBase<N, IS_FIELD> {

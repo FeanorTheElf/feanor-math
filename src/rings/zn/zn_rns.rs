@@ -322,6 +322,8 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> RingBase for ZnB
     {
         self.size(ZZ)
     }
+    
+    fn is_approximate(&self) -> bool { false }
 }
 
 impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> Clone for ZnBase<C, J, A> 

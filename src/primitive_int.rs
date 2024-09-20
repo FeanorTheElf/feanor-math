@@ -338,6 +338,8 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
             self.one()
         )
     }
+    
+    fn is_approximate(&self) -> bool { false }
 }
 
 impl KaratsubaHint for StaticRingBase<i8> {

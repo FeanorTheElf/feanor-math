@@ -223,8 +223,8 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
     }
 
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        let lhs_len = self.degree(lhs).map(|i| i + 1).unwrap_or(0);
-        let rhs_len = self.degree(rhs).map(|i| i + 1).unwrap_or(0);
+        let lhs_len = if self.base_ring().get_ring().is_approximate() { lhs.data.len() } else { self.degree(lhs).map(|i| i + 1).unwrap_or(0) };
+        let rhs_len = if self.base_ring().get_ring().is_approximate() { rhs.data.len() } else { self.degree(rhs).map(|i| i + 1).unwrap_or(0) };
         let mut result = Vec::with_capacity_in(lhs_len + rhs_len, self.element_allocator.clone());
         result.extend((0..(lhs_len + rhs_len)).map(|_| self.base_ring().zero()));
         self.convolution_algorithm.compute_convolution(
@@ -268,6 +268,10 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
             }
         }
         return elements.into_iter().next().unwrap();
+    }
+
+    fn is_approximate(&self) -> bool {
+        self.base_ring().get_ring().is_approximate()
     }
 }
 
@@ -497,10 +501,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
         where S: ?Sized + RingBase,
             H: Homomorphism<R::Type, S>
     {
-        if self.is_zero(f) {
-            return hom.codomain().zero();
-        }
-        let d = self.degree(f).unwrap();
+        let d = if self.base_ring().get_ring().is_approximate() { f.data.len().saturating_sub(1) } else { self.degree(f).unwrap_or(0) };
         let mut current = hom.map_ref(self.coefficient_at(f, d));
         for i in (0..d).rev() {
             hom.codomain().mul_assign_ref(&mut current, value);
@@ -659,6 +660,10 @@ use crate::iters::multiset_combinations;
 use crate::rings::extension::galois_field::GaloisField;
 #[cfg(test)]
 use std::time::Instant;
+#[cfg(test)]
+use crate::rings::float_real::Real64;
+#[cfg(test)]
+use crate::ordered::OrderedRingStore;
 
 #[cfg(test)]
 fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El<P>>
@@ -791,4 +796,12 @@ fn test_expensive_prod() {
 fn test_serialize() {
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
     crate::serialization::generic_tests::test_serialization(&poly_ring, edge_case_elements(&poly_ring));
+}
+
+#[test]
+fn test_evaluate_approximate_ring() {
+    let ring = DensePolyRing::new(Real64::RING, "X");
+    let [f] = ring.with_wrapped_indeterminate(|X| [X * X * X - X + 1]);
+    let x = 0.47312;
+    assert!(Real64::RING.abs((x * x * x - x + 1.) - ring.evaluate(&f, &x, &Real64::RING.identity())) <= 0.000000001);
 }

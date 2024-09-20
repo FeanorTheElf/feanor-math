@@ -248,6 +248,15 @@ pub trait PolyRingStore: RingStore
         let wrapped_indet = RingElementWrapper::new(self, self.indeterminate());
         f(&wrapped_indet).into_iter().map(|f| f.unwrap()).collect()
     }
+
+    #[stability::unstable(feature = "enable")]
+    fn with_wrapped_indeterminate<'a, F, const M: usize>(&'a self, f: F) -> [El<Self>; M]
+        where F: FnOnce(&RingElementWrapper<&'a Self>) -> [RingElementWrapper<&'a Self>; M]
+    {
+        let wrapped_indet = RingElementWrapper::new(self, self.indeterminate());
+        let mut result_it = f(&wrapped_indet).into_iter();
+        return std::array::from_fn(|_| result_it.next().unwrap().unwrap());
+    }
 }
 
 pub struct CoefficientHom<PFrom, PTo, H>

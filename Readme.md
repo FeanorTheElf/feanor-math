@@ -230,6 +230,7 @@ impl RingBase for F2Base {
 
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
+    fn is_approximate(&self) -> bool { false }
 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         write!(out, "{}", *value)
@@ -333,6 +334,10 @@ impl<R: RingStore> RingBase for MyPolyRing<R> {
     fn is_noetherian(&self) -> bool {
         // by Hilbert's basis theorem
         self.base_ring.is_noetherian()
+    }
+
+    fn is_approximate(&self) -> bool {
+        self.base_ring.get_ring().is_approximate()
     }
 
     fn dbg(&self, val: &Self::Element, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
