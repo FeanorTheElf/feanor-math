@@ -405,7 +405,7 @@ impl<'a, R> Iterator for TermIterator<'a, R>
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((i, c)) = self.iter.next() {
-            if !self.ring.is_zero(c) {
+            if self.ring.get_ring().is_approximate() || !self.ring.is_zero(c) {
                 return Some((c, i));
             }
         }

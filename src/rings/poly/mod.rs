@@ -36,6 +36,9 @@ pub trait PolyRing: RingExtension {
     ///
     /// Returns all the nonzero terms of the given polynomial.
     /// 
+    /// If the base ring is only approximate, it is valid to return "zero" terms,
+    /// whatever that actually means.
+    /// 
     fn terms<'a>(&'a self, f: &'a Self::Element) -> Self::TermsIterator<'a>;
     
     ///
