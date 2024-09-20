@@ -169,8 +169,16 @@ impl RingBase for Complex64Base {
 
     fn is_approximate(&self) -> bool { true }
 
-    fn dbg<'a>(&self, Complex64El(re, im): &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        write!(out, "{} + {}i", re, im)
+    fn dbg_within<'a>(&self, Complex64El(re, im): &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
+        if env >= EnvBindingStrength::Product {
+            write!(out, "({} + {}i)", re, im)
+        } else {
+            write!(out, "{} + {}i", re, im)
+        }
+    }
+
+    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        self.dbg_within(value, out, EnvBindingStrength::Weakest)
     }
     
     fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
