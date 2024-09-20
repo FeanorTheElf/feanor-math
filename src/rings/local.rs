@@ -97,7 +97,7 @@ impl<R> AsLocalPIR<R>
     #[stability::unstable(feature = "enable")]
     pub fn from_field(ring: R) -> Self {
         let zero = ring.zero();
-        Self::from(AsLocalPIRBase::promise_is_local_pir(ring, zero, Some(0)))
+        Self::from(AsLocalPIRBase::promise_is_local_pir(ring, zero, Some(1)))
     }
 }
 
@@ -121,7 +121,7 @@ impl<R> AsLocalPIR<R>
     pub fn from_as_field(ring: AsField<R>) -> Self {
         let ring = ring.into().unwrap_self();
         let zero = ring.zero();
-        Self::from(AsLocalPIRBase::promise_is_local_pir(ring, zero, Some(0)))
+        Self::from(AsLocalPIRBase::promise_is_local_pir(ring, zero, Some(1)))
     }
 }
 

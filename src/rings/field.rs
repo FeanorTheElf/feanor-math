@@ -2,6 +2,7 @@ use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::delegate::DelegateRing;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
+use crate::local::PrincipalLocalRing;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::Field;
 use crate::integer::IntegerRing;
@@ -15,13 +16,28 @@ use super::local::AsLocalPIRBase;
 /// A wrapper around a ring that marks this ring to be a field. In particular,
 /// the functions provided by [`DivisibilityRing`] will be used to provide
 /// field-like division for the wrapped ring.
-/// 
-#[derive(Clone, Copy)]
+///
 pub struct AsFieldBase<R: DivisibilityRingStore> 
     where R::Type: DivisibilityRing
 {
-    base: R
+    base: R,
+    zero: FieldEl<R>
 }
+
+impl<R> Clone for AsFieldBase<R>
+    where R: DivisibilityRingStore + Clone,
+        R::Type: DivisibilityRing
+{
+    fn clone(&self) -> Self {
+        Self { zero: FieldEl(self.base.zero()), base: self.base.clone() }
+    }
+}
+
+impl<R> Copy for AsFieldBase<R>
+    where R: DivisibilityRingStore + Copy,
+        R::Type: DivisibilityRing,
+        El<R>: Copy
+{}
 
 impl<R> PartialEq for AsFieldBase<R>
     where R: DivisibilityRingStore,
@@ -64,7 +80,7 @@ impl<R: DivisibilityRingStore> AsFieldBase<R>
     /// by the caller.
     /// 
     pub fn promise_is_field(base: R) -> Self {
-        Self { base }
+        Self { zero: FieldEl(base.zero()), base }
     }
 
     pub fn unwrap_element(&self, el: <Self as RingBase>::Element) -> El<R> {
@@ -204,6 +220,26 @@ impl<R: RingStore> PrincipalIdealRing for AsFieldBase<R>
             (self.zero(), self.one(), self.clone_el(rhs))
         } else {
             (self.one(), self.zero(), self.clone_el(lhs))
+        }
+    }
+}
+
+impl<R: DivisibilityRingStore> PrincipalLocalRing for AsFieldBase<R> 
+    where R::Type: DivisibilityRing
+{
+    fn max_ideal_gen(&self) ->  &Self::Element {
+        &self.zero
+    }
+
+    fn nilpotent_power(&self) -> Option<usize> {
+        Some(1)
+    }
+
+    fn valuation(&self, x: &Self::Element) -> Option<usize> {
+        if self.is_zero(x) {
+            return None;
+        } else {
+            return Some(0);
         }
     }
 }
