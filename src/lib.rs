@@ -7,8 +7,6 @@
 #![feature(min_specialization)]
 #![feature(maybe_uninit_slice)]
 #![feature(allocator_api)]
-#![feature(new_uninit)]
-#![feature(is_sorted)]
 #![feature(fn_traits)]
 #![feature(iter_advance_by)]
 #![feature(unboxed_closures)]

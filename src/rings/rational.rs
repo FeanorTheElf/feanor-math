@@ -2,7 +2,7 @@ use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::StrassenHint;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::Field;
-use crate::homomorphism::CanHomFrom;
+use crate::homomorphism::{CanHomFrom, CanIsoFromTo};
 use crate::integer::{int_cast, IntegerRing, IntegerRingStore};
 use crate::ordered::{OrderedRing, OrderedRingStore};
 use crate::algorithms;
@@ -273,6 +273,23 @@ impl<I, J> CanHomFrom<RationalFieldBase<J>> for RationalFieldBase<I>
 
     fn map_in(&self, from: &RationalFieldBase<J>, el: <RationalFieldBase<J> as RingBase>::Element, (): &Self::Homomorphism) -> Self::Element {
         RationalFieldEl(int_cast(el.0, self.base_ring(), from.base_ring()), int_cast(el.1, self.base_ring(), from.base_ring()))
+    }
+}
+
+impl<I, J> CanIsoFromTo<RationalFieldBase<J>> for RationalFieldBase<I>
+    where I: IntegerRingStore,
+        I::Type: IntegerRing,
+        J: IntegerRingStore,
+        J::Type: IntegerRing
+{
+    type Isomorphism = ();
+
+    fn has_canonical_iso(&self, _from: &RationalFieldBase<J>) -> Option<Self::Isomorphism> {
+        Some(())
+    }
+
+    fn map_out(&self, from: &RationalFieldBase<J>, el: Self::Element, (): &Self::Homomorphism) -> <RationalFieldBase<J> as RingBase>::Element {
+        RationalFieldEl(int_cast(el.0, from.base_ring(), self.base_ring()), int_cast(el.1, from.base_ring(), self.base_ring()))
     }
 }
 

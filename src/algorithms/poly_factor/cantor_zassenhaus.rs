@@ -1,3 +1,6 @@
+use std::alloc::Global;
+
+use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 use crate::{algorithms, MAX_PROBABILISTIC_REPETITIONS};
 use crate::algorithms::unity_root::get_prim_root_of_unity;
 use crate::divisibility::DivisibilityRingStore;
@@ -172,10 +175,10 @@ pub fn cantor_zassenhaus_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) -> El
 /// in FQ, then this works if exactly one of them maps to zero under the polynomial
 /// `T^((Q - 1)/2) - 1`. Now observe that this is the case if and only if `T(a)` resp.
 /// `T(b)` is a square in FQ. Now apparently, for a polynomial chosen uniformly at random
-/// among all monic polynomials of degree d in `Fq[X]`, the values `T(a)` and `T(b)` are close
-/// to independent and uniform on FQ, and thus the probability that one is a square and
-/// the other is not is approximately 1/2.
-/// 
+/// among all monic polynomials of very large degree in `Fq[X]`, the values `T(a)` and `T(b)` are 
+/// independent and uniform on FQ, and thus the probability that one is a square and the
+/// other is not is approximately 1/2. This also does not change if we replace the polynomia
+/// `T` of very large degree with `T mod f`, i.e. with a random polynomial of degree `d - 1`.
 ///
 #[stability::unstable(feature = "enable")]
 pub fn cantor_zassenhaus<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
@@ -212,22 +215,22 @@ fn cantor_zassenhaus_even_base_with_root_of_unity<P, R>(poly_ring: P, mod_f_ring
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     let ZZ = BigIntRing::RING;
-    let Fq = poly_ring.base_ring();
+    let Fq: &_ = poly_ring.base_ring();
     let q = Fq.size(&ZZ).unwrap();
     let e = ZZ.abs_log2_ceil(&q).unwrap();
     assert_el_eq!(ZZ, ZZ.power_of_two(e), q);
 
     let mut rng = oorandom::Rand64::new((ZZ.default_hash(&q) as u128) | ((seed as u128) << u64::BITS));
     let zeta3 = get_prim_root_of_unity(&Fq, 3).unwrap();
-    let exp = if d % 2 == 0 {
-        ZZ.checked_div(&ZZ.sub(ZZ.power_of_two(d), ZZ.one()), &ZZ.int_hom().map(3)).unwrap()
+    let exp = if (d * e) % 2 == 0 {
+        ZZ.checked_div(&ZZ.sub(ZZ.power_of_two(d * e), ZZ.one()), &ZZ.int_hom().map(3)).unwrap()
     } else {
-        ZZ.checked_div(&ZZ.sub(ZZ.power_of_two(2 * d), ZZ.one()), &ZZ.int_hom().map(3)).unwrap()
+        ZZ.checked_div(&ZZ.sub(ZZ.power_of_two(2 * d * e), ZZ.one()), &ZZ.int_hom().map(3)).unwrap()
     };
     let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
     
-    // as in the standard case, we consider a random polynomial `T` and use the factorization `T^(2^d') - T = T (T^e + 1) (T^e + zeta) (T^e + zeta^2)`;
-    // here `d'` is either `d` or `2d`, and `e = (2^d' - 1) / 3`
+    // as in the standard case, we consider a random polynomial `T` and use the factorization `T^(q^d') - T = T (T^e + 1) (T^e + zeta) (T^e + zeta^2)`;
+    // here `d'` is either `d` or `2d`, and `e = (q^d' - 1) / 3`
     
     for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
         let T = mod_f_ring.from_canonical_basis((0..mod_f_ring.rank()).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())));
@@ -271,10 +274,10 @@ pub fn cantor_zassenhaus_even_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) 
     if e % 2 != 0 {
         // adjoin a third root of unity, this will enable use to use the main idea
         // use `promise_as_field()`, since `as_field().unwrap()` can cause infinite generic expansion (always adding a `&`)
-        let new_base_ring = AsField::from(AsFieldBase::promise_is_field(FreeAlgebraImpl::new(Fq, 2, [Fq.neg_one(), Fq.neg_one()])));
+        let new_base_ring = AsField::from(AsFieldBase::promise_is_field(FreeAlgebraImpl::new_with(Fq, 2, [Fq.neg_one(), Fq.neg_one()], "ζ", Global, STANDARD_CONVOLUTION)));
         let new_x_pow_rank = mod_f_ring.wrt_canonical_basis(&mod_f_ring.pow(mod_f_ring.canonical_gen(), mod_f_ring.rank())).into_iter().map(|x| new_base_ring.inclusion().map(x)).collect::<Vec<_>>();
         // once we have any kind of tensoring operation, maybe we can find a way to do this that preserves e.g. sparse implementations?
-        let new_mod_f_ring = FreeAlgebraImpl::new(&new_base_ring, new_x_pow_rank.len(), &new_x_pow_rank);
+        let new_mod_f_ring = FreeAlgebraImpl::new_with(&new_base_ring, new_x_pow_rank.len(), &new_x_pow_rank, "x", Global, STANDARD_CONVOLUTION);
         let new_poly_ring = DensePolyRing::new(&new_base_ring, "X");
 
         // it might happen that cantor_zassenhaus gives a nontrivial factor over the extension, but that factor only
@@ -326,7 +329,7 @@ pub fn cantor_zassenhaus_even<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
     poly_ring.inclusion().mul_assign_map(&mut f, lc_inv);
 
     let f_coeffs = (0..poly_ring.degree(&f).unwrap()).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))).collect::<Vec<_>>();
-    let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
+    let mod_f_ring = FreeAlgebraImpl::new_with(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs, "x", Global, STANDARD_CONVOLUTION);
 
     let result = cantor_zassenhaus_even_base(&poly_ring, &mod_f_ring, d);
     return result;

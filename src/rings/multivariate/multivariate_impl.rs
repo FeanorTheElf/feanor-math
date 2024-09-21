@@ -162,7 +162,7 @@ impl<R, A> MultivariatePolyRingImpl<R, A>
         // add dummy element so that the index is nonzero, this allows keeping MonomialIdentifier within 16 bytes
         allocated_monomials.push(Vec::new().into_boxed_slice());
         let cum_binomial_lookup_table = (0..(variable_count - 1)).map(|n| (0..=max_supported_deg).map(|k| compute_cum_binomial(n, k as usize)).collect()).collect();
-        Self::from(MultivariatePolyRingImplBase {
+        RingValue::from(MultivariatePolyRingImplBase {
             zero: base_ring.zero(),
             base_ring: base_ring,
             variable_count: variable_count,

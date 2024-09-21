@@ -265,7 +265,7 @@ impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for Box<V> {
         (**self).at(i)
     }
 
-    fn specialize_sparse<Op: SparseVectorViewOperation<T>>(&self, op:Op) -> Result<Op::Output, ()> {
+    fn specialize_sparse<Op: SparseVectorViewOperation<T>>(&self, op: Op) -> Result<Op::Output, ()> {
         (**self).specialize_sparse(op)
     }
 }

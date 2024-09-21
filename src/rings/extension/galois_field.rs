@@ -39,7 +39,6 @@ use crate::rings::zn::*;
 use crate::ring::*;
 use crate::rings::extension::*;
 use crate::integer::*;
-use crate::MAX_PROBABILISTIC_REPETITIONS;
 
 fn filter_irreducible<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Option<El<P>>
     where P: RingStore,
