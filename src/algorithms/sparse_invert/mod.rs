@@ -1,6 +1,9 @@
+use std::alloc::Global;
+
 use matrix::SparseMatrix;
 use row_echelon::InternalRow;
 
+use crate::algorithms::linsolve::smith;
 use crate::matrix::{OwnedMatrix, AsFirstElement, AsPointerToSlice, Submatrix, SubmatrixMut};
 use crate::pid::PrincipalIdealRing;
 use crate::ring::*;
@@ -24,11 +27,11 @@ mod row_echelon;
 /// This is demonstrated by the following example.
 /// ```
 /// # use feanor_math::ring::*;
-/// # use feanor_math::algorithms::smith::solve_right;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::matrix::*;
+/// # use crate::feanor_math::algorithms::linsolve::LinSolveRingStore;
 /// let ring = Zn::new(18);
 /// let modulo = ring.int_hom();
 /// let mut A_transposed: OwnedMatrix<ZnEl> = OwnedMatrix::zero(5, 4, ring);
@@ -54,8 +57,9 @@ mod row_echelon;
 /// // this shows that in fact, A and B are equivalent up to row operations!
 /// // In other words, there are S, T such that STA = SB = A, which implies that
 /// // det(S) det(T) = 1, so both S and T have unit determinant
-/// assert!(solve_right(A_transposed.clone_matrix(&ring).data_mut(), B_transposed.clone_matrix(&ring).data_mut(), &ring).is_some());
-/// assert!(solve_right(B_transposed.clone_matrix(&ring).data_mut(), A_transposed.clone_matrix(&ring).data_mut(), &ring).is_some());
+/// let mut sol = OwnedMatrix::zero(4, 4, ring);
+/// assert!(ring.solve_right(A_transposed.clone_matrix(&ring).data_mut(), B_transposed.clone_matrix(&ring).data_mut(), sol.data_mut()).is_solved());
+/// assert!(ring.solve_right(B_transposed.clone_matrix(&ring).data_mut(), A_transposed.clone_matrix(&ring).data_mut(), sol.data_mut()).is_solved());
 /// ```
 /// 
 #[inline(never)]
@@ -103,8 +107,6 @@ fn assert_left_equivalent<R, V1, V2>(ring: R, original: Submatrix<V1, InternalRo
         V1: AsPointerToSlice<InternalRow<El<R>>>,
         V2: AsPointerToSlice<InternalRow<El<R>>>
 {
-    use crate::algorithms::smith;
-
     assert_eq!(original.row_count(), new.row_count());
     assert_eq!(original.col_count(), new.col_count());
 
@@ -120,11 +122,12 @@ fn assert_left_equivalent<R, V1, V2>(ring: R, original: Submatrix<V1, InternalRo
             }
         }
     }
-    if !smith::solve_right::<&R, _, _>(original_transposed.clone_matrix(&ring).data_mut(), actual_transposed.clone_matrix(&ring).data_mut(), &ring).is_some() {
+    let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(original.row_count(), original.row_count(), &ring);
+    if !smith::solve_right_using_pre_smith(&ring, original_transposed.clone_matrix(&ring).data_mut(), actual_transposed.clone_matrix(&ring).data_mut(), solution.data_mut(), Global).is_solved() {
         // println!("{:?}", original.row_iter().map(|row| row.iter().enumerate().flat_map(move |(j, local_row)| local_row.data.iter().rev().skip(1).rev().map(move |(k, c)| (j * n + k, format!("{}", ring.format(c))))).collect::<Vec<_>>()).collect::<Vec<_>>());
         panic!();
     }
-    if !smith::solve_right::<&R, _, _>(actual_transposed.clone_matrix(&ring).data_mut(), original_transposed.clone_matrix(&ring).data_mut(), &ring).is_some() {
+    if !smith::solve_right_using_pre_smith(&ring, actual_transposed.clone_matrix(&ring).data_mut(), original_transposed.clone_matrix(&ring).data_mut(), solution.data_mut(), Global).is_solved() {
         // println!("{:?}", original.row_iter().map(|row| row.iter().enumerate().flat_map(move |(j, local_row)| local_row.data.iter().rev().skip(1).rev().map(move |(k, c)| (j * n + k, format!("{}", ring.format(c))))).collect::<Vec<_>>()).collect::<Vec<_>>());
         panic!();
     }
@@ -134,8 +137,6 @@ fn assert_is_correct_row_echelon<R>(ring: R, original: &SparseMatrix<R::Type>, r
     where R: RingStore,
         R::Type: PrincipalIdealRing
 {
-    use crate::algorithms::smith;
-
     let n = original.row_count();
     let m = original.col_count();
     assert_eq!(n, row_echelon_form.row_count());
@@ -151,8 +152,9 @@ fn assert_is_correct_row_echelon<R>(ring: R, original: &SparseMatrix<R::Type>, r
             *actual_transposed.at_mut(j, i) = ring.clone_el(row_echelon_form.at(i, j));
         }
     }
-    assert!(smith::solve_right::<&R, _, _>(original_transposed.clone_matrix(&ring).data_mut(), actual_transposed.clone_matrix(&ring).data_mut(), &ring).is_some());
-    assert!(smith::solve_right::<&R, _, _>(actual_transposed.clone_matrix(&ring).data_mut(), original_transposed.clone_matrix(&ring).data_mut(), &ring).is_some());
+    let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(n, n, &ring);
+    assert!(smith::solve_right_using_pre_smith(&ring, original_transposed.clone_matrix(&ring).data_mut(), actual_transposed.clone_matrix(&ring).data_mut(), solution.data_mut(), Global).is_solved());
+    assert!(smith::solve_right_using_pre_smith(&ring, actual_transposed.clone_matrix(&ring).data_mut(), original_transposed.clone_matrix(&ring).data_mut(), solution.data_mut(), Global).is_solved());
 }
 
 #[cfg(test)]

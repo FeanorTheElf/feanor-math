@@ -66,6 +66,7 @@ pub struct FreeAlgebraImplBase<R, V, A = Global, C = KaratsubaAlgorithm>
     element_allocator: A,
     log2_padded_len: usize,
     rank: usize,
+    gen_name: &'static str,
     convolution: C
 }
 
@@ -85,7 +86,7 @@ impl<R, V> FreeAlgebraImpl<R, V>
     /// The created ring is `R[X]/(X^rank - sum_i x_pow_rank[i] X^i)`.
     /// 
     pub fn new(base_ring: R, rank: usize, x_pow_rank: V) -> Self {
-        Self::new_with(base_ring, rank, x_pow_rank, Global, STANDARD_CONVOLUTION)
+        Self::new_with(base_ring, rank, x_pow_rank, "θ", Global, STANDARD_CONVOLUTION)
     }
 }
 
@@ -102,7 +103,8 @@ impl<R, V, A, C> Clone for FreeAlgebraImplBase<R, V, A, C>
             element_allocator: self.element_allocator.clone(),
             log2_padded_len: self.log2_padded_len,
             rank: self.rank,
-            convolution: self.convolution.clone()
+            convolution: self.convolution.clone(),
+            gen_name: self.gen_name
         }
     }
 }
@@ -128,12 +130,12 @@ impl<R, V, A, C> FreeAlgebraImpl<R, V, A, C>
         C: ConvolutionAlgorithm<R::Type>
 {
     #[stability::unstable(feature = "enable")]
-    pub fn new_with(base_ring: R, rank: usize, x_pow_rank: V, element_allocator: A, convolution: C) -> Self {
+    pub fn new_with(base_ring: R, rank: usize, x_pow_rank: V, gen_name: &'static str, element_allocator: A, convolution: C) -> Self {
         assert!(rank >= 1);
         assert!(x_pow_rank.len() <= rank);
         let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&(rank as i64)).unwrap();
         RingValue::from(FreeAlgebraImplBase {
-            base_ring, x_pow_rank, element_allocator, rank, log2_padded_len, convolution
+            base_ring, gen_name, x_pow_rank, element_allocator, rank, log2_padded_len, convolution
         })
     }
 }
@@ -152,7 +154,8 @@ impl<R, V, A, C> FreeAlgebraImplBase<R, V, A, C>
             element_allocator: self.element_allocator,
             log2_padded_len: self.log2_padded_len,
             rank: self.rank,
-            convolution: new_convolution
+            convolution: new_convolution,
+            gen_name: self.gen_name
         })
     }
 
@@ -323,7 +326,7 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
 
     fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
         debug_assert_eq!(1 << self.log2_padded_len, value.values.len());
-        let poly_ring = DensePolyRing::new(self.base_ring(), "θ");
+        let poly_ring = DensePolyRing::new(self.base_ring(), self.gen_name);
         poly_ring.get_ring().dbg_within(&RingRef::new(self).poly_repr(&poly_ring, value, &self.base_ring().identity()), out, env)
     }
 
@@ -724,7 +727,7 @@ fn test_ring_axioms() {
 fn test_rank_1_ring() {
     let base_ring = Zn::new(5).as_field().ok().unwrap();
     let ring = FreeAlgebraImpl::new(base_ring, 1, [base_ring.int_hom().map(1)]).as_field().ok().unwrap();
-    crate::field::generic_tests::test_field_axioms(ring, ring.elements());
+    crate::field::generic_tests::test_field_axioms(&ring, ring.elements());
 
     assert_el_eq!(ring, ring.one(), ring.canonical_gen());
 }
@@ -804,11 +807,11 @@ fn test_cubic_mul() {
 fn test_as_field() {
     let base_ring = Zn::new(5).as_field().ok().unwrap();
     let ring = FreeAlgebraImpl::new(base_ring, 1, [base_ring.int_hom().map(1)]).as_field().ok().unwrap();
-    crate::field::generic_tests::test_field_axioms(ring, ring.elements());
+    crate::field::generic_tests::test_field_axioms(&ring, ring.elements());
 
     let base_ring = Zn::new(3).as_field().ok().unwrap();
     let ring = FreeAlgebraImpl::new(base_ring, 2, [base_ring.int_hom().map(2)]).as_field().ok().unwrap();
-    crate::field::generic_tests::test_field_axioms(ring, ring.elements());
+    crate::field::generic_tests::test_field_axioms(&ring, ring.elements());
 
     assert!(FreeAlgebraImpl::new(base_ring, 2, [base_ring.int_hom().map(1)]).as_field().is_err());
 }

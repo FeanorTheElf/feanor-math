@@ -12,6 +12,7 @@ use crate::rings::extension::FreeAlgebraStore;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::{PolyRing, PolyRingStore};
 use crate::rings::rational::*;
+use crate::rings::zn::zn_64;
 
 use super::poly_squarefree_part;
 
@@ -22,7 +23,8 @@ fn factor_squarefree_over_number_field<'a, P, I>(KX: &'a P, f: El<P>) -> impl 'a
         I: IntegerRingStore,
         I::Type: IntegerRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra,
-        <<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>
+        <<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        zn_64::ZnBase: CanHomFrom<I::Type>
 {
     let K = KX.base_ring();
     let QQ = K.base_ring();
@@ -74,7 +76,8 @@ pub fn factor_over_number_field<P, I>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, u
         I: IntegerRingStore,
         I::Type: IntegerRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra,
-        <<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>
+        <<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        zn_64::ZnBase: CanHomFrom<I::Type>
 {
     let KX = &poly_ring;
     let K = KX.base_ring();

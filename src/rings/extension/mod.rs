@@ -1,3 +1,5 @@
+use crate::algorithms::linsolve::LinSolveRing;
+use crate::algorithms::linsolve::LinSolveRingStore;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::divisibility::DivisibilityRing;
 use crate::field::Field;
@@ -127,6 +129,35 @@ pub trait FreeAlgebra: RingExtension {
         }
         assert_eq!(given_len, self.rank());
         return result;
+    }
+
+    fn charpoly<P, H>(&self, el: &Self::Element, poly_ring: P, hom: &H) -> El<P>
+        where P: RingStore,
+            P::Type: PolyRing,
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
+            H: Homomorphism<<Self::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+    {
+        assert!(!self.is_zero(el));
+        let base_ring = hom.codomain();
+        let mut lhs = OwnedMatrix::zero(self.rank(), self.rank(), base_ring);
+        let mut current = self.one();
+        for j in 0..self.rank() {
+            let wrt_basis = self.wrt_canonical_basis(&current);
+            for i in 0..self.rank() {
+                *lhs.at_mut(i, j) = hom.map(wrt_basis.at(i));
+            }
+            drop(wrt_basis);
+            self.mul_assign_ref(&mut current, el);
+        }
+        let mut rhs = OwnedMatrix::zero(self.rank(), 1, base_ring);
+        let wrt_basis = self.wrt_canonical_basis(&current);
+        for i in 0..self.rank() {
+            *rhs.at_mut(i, 0) = base_ring.negate(hom.map(wrt_basis.at(i)));
+        }
+        let mut sol = OwnedMatrix::zero(self.rank(), 1, base_ring);
+        base_ring.solve_right(lhs.data_mut(), rhs.data_mut(), sol.data_mut()).assert_solved();
+
+        return poly_ring.from_terms((0..self.rank()).map(|i| (base_ring.clone_el(sol.at(i, 0)), i)).chain([(base_ring.one(), self.rank())].into_iter()));
     }
 }
 
@@ -275,4 +306,26 @@ pub mod generic_tests {
             }
         }
     }
+}
+
+#[cfg(test)]
+use std::alloc::Global;
+#[cfg(test)]
+use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use extension_impl::FreeAlgebraImpl;
+
+#[test]
+fn test_charpoly() {
+    let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2, 0, 0]);
+    let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+
+    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 2]);
+    assert_el_eq!(&poly_ring, &expected, &ring.get_ring().charpoly(&ring.canonical_gen(), &poly_ring, &ring.base_ring().identity()));
+
+    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 4]);
+    assert_el_eq!(&poly_ring, &expected, &ring.get_ring().charpoly(&ring.pow(ring.canonical_gen(), 2), &poly_ring, &ring.base_ring().identity()));
+
+    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 6 * X - 6]);
+    assert_el_eq!(&poly_ring, &expected, &ring.get_ring().charpoly(&ring.add(ring.canonical_gen(), ring.pow(ring.canonical_gen(), 2)), &poly_ring, &ring.base_ring().identity()));
 }

@@ -34,7 +34,7 @@ impl<I, J> LLLRealField<J> for RationalFieldBase<I>
     }
 
     fn round_to_integer(&self, x: &Self::Element, ZZ: &J) -> J::Element {
-        int_cast(self.base_ring().rounded_div(self.base_ring().clone_el(&x.0), &x.1), RingRef::new(ZZ), self.base_ring())
+        int_cast(self.base_ring().rounded_div(self.base_ring().clone_el(self.num(x)), self.den(x)), RingRef::new(ZZ), self.base_ring())
     }
 }
 
@@ -354,8 +354,6 @@ impl<'a, R, I, V, H> TransformTarget<I> for TransformLatticeBasis<'a, R, I, V, H
 #[cfg(test)]
 use crate::seq::*;
 #[cfg(test)]
-use crate::algorithms;
-#[cfg(test)]
 use test::Bencher;
 #[cfg(test)]
 use std::alloc::Global;
@@ -448,6 +446,8 @@ fn norm_squared<V>(col: &Column<V, i64>) -> i64
 fn assert_lattice_isomorphic<V, const N: usize, const M: usize>(lhs: &[DerefArray<i64, M>; N], rhs: &Submatrix<V, i64>)
     where V: AsPointerToSlice<i64>
 {
+    use crate::algorithms::linsolve::smith;
+
     assert_eq!(rhs.row_count(), N);
     assert_eq!(rhs.col_count(), M);
     let ZZbig = BigIntRing::RING;
@@ -460,8 +460,9 @@ fn assert_lattice_isomorphic<V, const N: usize, const M: usize>(lhs: &[DerefArra
             *B.at_mut(i, j) = int_to_ZZbig.map(*rhs.at(i, j));
         }
     }
-    assert!(algorithms::smith::solve_right(A.clone_matrix(&ZZbig).data_mut(), B.clone_matrix(&ZZbig).data_mut(), &ZZbig).is_some());
-    assert!(algorithms::smith::solve_right(B.clone_matrix(&ZZbig).data_mut(), A.clone_matrix(&ZZbig).data_mut(), &ZZbig).is_some());
+    let mut U: OwnedMatrix<_> = OwnedMatrix::zero(N, M, ZZbig);
+    assert!(smith::solve_right_using_pre_smith(&ZZbig, A.clone_matrix(&ZZbig).data_mut(), B.clone_matrix(&ZZbig).data_mut(), U.data_mut(), Global).is_solved());
+    assert!(smith::solve_right_using_pre_smith(&ZZbig, B.clone_matrix(&ZZbig).data_mut(), A.clone_matrix(&ZZbig).data_mut(), U.data_mut(), Global).is_solved());
 }
 
 #[test]

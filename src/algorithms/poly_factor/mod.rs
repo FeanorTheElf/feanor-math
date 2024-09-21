@@ -2,7 +2,7 @@ use std::alloc::Allocator;
 
 use crate::divisibility::*;
 use crate::field::{Field, FieldStore};
-use crate::homomorphism::Homomorphism;
+use crate::homomorphism::{CanHomFrom, Homomorphism};
 use crate::integer::{binomial, int_cast, BigIntRing, IntegerRing, IntegerRingStore};
 use crate::ordered::*;
 use crate::pid::*;
@@ -256,22 +256,21 @@ pub fn poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
 fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
     where P: PolyRingStore,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
+        ZnBase: CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
-    let ZZ = StaticRing::<i64>::RING;
     let d = ZZX.degree(f).unwrap();
     assert!(ZZX.base_ring().is_one(ZZX.lc(f).unwrap()));
 
     // Cantor-Zassenhaus does not directly work for p = 2, so skip the first prime
-    for p in erathostenes::enumerate_primes(&ZZ, &1000).into_iter().skip(1) {
+    for p in erathostenes::enumerate_primes(&StaticRing::<i64>::RING, &1000).into_iter().skip(1) {
 
         // check whether `f mod p` is also square-free, there are only finitely many primes
         // where this would not be the case
         let Fp = Zn::new(p as u64).as_field().ok().unwrap();
-        let mod_p = Fp.can_hom(&ZZ).unwrap();
-        let reduce = |x: El<<P::Type as RingExtension>::BaseRing>| mod_p.map(int_cast(x, &ZZ, ZZX.base_ring()));
+        let mod_p = Fp.can_hom(ZZX.base_ring()).unwrap();
         let FpX = DensePolyRing::new(Fp, "X");
-        let f_mod_p = FpX.from_terms(ZZX.terms(&f).map(|(c, i)| (reduce(ZZX.base_ring().clone_el(c)), i)));
+        let f_mod_p = FpX.from_terms(ZZX.terms(&f).map(|(c, i)| (mod_p.map(ZZX.base_ring().clone_el(c)), i)));
         let mut squarefree_part = poly_squarefree_part(&FpX, FpX.clone_el(&f_mod_p));
         let lc_inv = Fp.div(&Fp.one(), FpX.lc(&squarefree_part).unwrap());
         FpX.inclusion().mul_assign_map(&mut squarefree_part, lc_inv);
@@ -281,6 +280,7 @@ fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
             // we found a prime such that f remains square-free mod p;
             // now we can use the factorization of `f mod p` to derive a factorization of f
             let ZZbig = BigIntRing::RING;
+            let ZZ = StaticRing::<i64>::RING;
 
             // we use Theorem 3.5.1 from "A course in computational algebraic number theory", Cohen
             let poly_norm = int_bisect::root_floor(
@@ -309,7 +309,9 @@ fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
 }
 
 impl<I> FactorPolyField for RationalFieldBase<I>
-    where I: IntegerRingStore, I::Type: IntegerRing
+    where I: IntegerRingStore,
+        I::Type: IntegerRing,
+        ZnBase: CanHomFrom<I::Type>
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: PolyRingStore,
@@ -332,12 +334,12 @@ impl<I> FactorPolyField for RationalFieldBase<I>
             // this will make the polynomial integral
             let mut den_lcm = ZZ.one();
             for (c, _) in QQX.terms(&squarefree_part) {
-                den_lcm = algorithms::eea::signed_lcm(den_lcm, ZZ.clone_el(&c.1), ZZ);
+                den_lcm = algorithms::eea::signed_lcm(den_lcm, ZZ.clone_el(QQ.get_ring().den(c)), ZZ);
             }
             let poly_d = QQX.degree(&squarefree_part).unwrap();
             let ZZX = DensePolyRing::new(ZZ, "X");
             let integral_poly = ZZX.from_terms(QQX.terms(&squarefree_part).map(|(c, i)|
-                (ZZ.checked_div(&ZZ.mul_ref_fst(&c.0, ZZ.pow(ZZ.clone_el(&den_lcm), poly_d - i)), &c.1).unwrap(), i)
+                (ZZ.checked_div(&ZZ.mul_ref_fst(QQ.get_ring().num(c), ZZ.pow(ZZ.clone_el(&den_lcm), poly_d - i)), QQ.get_ring().den(c)).unwrap(), i)
             ));
             for factor in factor_integer_poly(&ZZX, &integral_poly) {
                 let factor_d = ZZX.degree(&factor).unwrap();
@@ -369,7 +371,8 @@ macro_rules! impl_factor_poly_number_fields {
                 I::Type: IntegerRing,
                 RationalFieldBase<I>: FactorPolyField,
                 V: VectorView<El<RationalField<I>>>,
-                A: Allocator + Clone
+                A: Allocator + Clone,
+                crate::rings::zn::zn_64::ZnBase: CanHomFrom<I::Type>
         {
             fn factor_poly<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
                 where P: PolyRingStore,
@@ -385,7 +388,8 @@ macro_rules! impl_factor_poly_number_fields {
                 I::Type: IntegerRing,
                 RationalFieldBase<I>: FactorPolyField,
                 V: VectorView<El<RationalField<I>>>,
-                A: Allocator + Clone
+                A: Allocator + Clone,
+                crate::rings::zn::zn_64::ZnBase: CanHomFrom<I::Type>
         {}
     };
 }

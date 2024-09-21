@@ -60,6 +60,26 @@ impl<I> Copy for RationalFieldBase<I>
 /// 
 pub type RationalField<I> = RingValue<RationalFieldBase<I>>;
 
+pub struct RationalFieldEl<I>(El<I>, El<I>)
+    where I: IntegerRingStore,
+        I::Type: IntegerRing;
+
+impl<I> Clone for RationalFieldEl<I>
+    where I: IntegerRingStore,
+        I::Type: IntegerRing,
+        El<I>: Clone
+{
+    fn clone(&self) -> Self {
+        RationalFieldEl(self.0.clone(), self.1.clone())
+    }
+}
+
+impl<I> Copy for RationalFieldEl<I>
+    where I: IntegerRingStore,
+        I::Type: IntegerRing,
+        El<I>: Copy
+{}
+
 impl<I> PartialEq for RationalFieldBase<I>
     where I: IntegerRingStore,
         I::Type: IntegerRing
@@ -69,12 +89,33 @@ impl<I> PartialEq for RationalFieldBase<I>
     }
 }
 
+impl<I> RationalFieldBase<I>
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
+{
+    pub fn num<'a>(&'a self, el: &'a <Self as RingBase>::Element) -> &'a El<I> {
+        &el.0
+    }
+
+    pub fn den<'a>(&'a self, el: &'a <Self as RingBase>::Element) -> &'a El<I> {
+        &el.1
+    }
+}
+
 impl<I> RationalField<I>
     where I: IntegerRingStore,
         I::Type: IntegerRing
 {
     pub const fn new(integers: I) -> Self {
         RingValue::from(RationalFieldBase { integers })
+    }
+
+    pub fn num<'a>(&'a self, el: &'a El<Self>) -> &'a El<I> {
+        self.get_ring().num(el)
+    }
+
+    pub fn den<'a>(&'a self, el: &'a El<Self>) -> &'a El<I> {
+        self.get_ring().den(el)
     }
 }
 
@@ -100,7 +141,7 @@ impl<I> RingBase for RationalFieldBase<I>
     where I: IntegerRingStore,
         I::Type: IntegerRing
 {
-    type Element = (El<I>, El<I>);
+    type Element = RationalFieldEl<I>;
 
     fn add_assign(&self, lhs: &mut Self::Element, mut rhs: Self::Element) {
         self.integers.mul_assign_ref(&mut lhs.0, &rhs.1);
@@ -111,7 +152,7 @@ impl<I> RingBase for RationalFieldBase<I>
     }
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        (self.integers.clone_el(&val.0), self.integers.clone_el(&val.1))
+        RationalFieldEl(self.integers.clone_el(&val.0), self.integers.clone_el(&val.1))
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -178,7 +219,7 @@ impl<I> RingBase for RationalFieldBase<I>
     }
 
     fn from_int(&self, value: i32) -> Self::Element {
-        (self.integers.get_ring().from_int(value), self.integers.one())
+        RationalFieldEl(self.integers.get_ring().from_int(value), self.integers.one())
     }
 }
 
@@ -209,7 +250,7 @@ impl<I> RingExtension for RationalFieldBase<I>
     }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
-        (x, self.integers.one())
+        RationalFieldEl(x, self.integers.one())
     }
 
     fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {
@@ -231,7 +272,7 @@ impl<I, J> CanHomFrom<RationalFieldBase<J>> for RationalFieldBase<I>
     }
 
     fn map_in(&self, from: &RationalFieldBase<J>, el: <RationalFieldBase<J> as RingBase>::Element, (): &Self::Homomorphism) -> Self::Element {
-        (int_cast(el.0, self.base_ring(), from.base_ring()), int_cast(el.1, self.base_ring(), from.base_ring()))
+        RationalFieldEl(int_cast(el.0, self.base_ring(), from.base_ring()), int_cast(el.1, self.base_ring(), from.base_ring()))
     }
 }
 
@@ -247,7 +288,7 @@ impl<I, J> CanHomFrom<J> for RationalFieldBase<I>
     }
 
     fn map_in(&self, from: &J, el: <J as RingBase>::Element, (): &Self::Homomorphism) -> Self::Element {
-        (int_cast(el, self.base_ring(), &RingRef::new(from)), self.integers.one())
+        RationalFieldEl(int_cast(el, self.base_ring(), &RingRef::new(from)), self.integers.one())
     }
 }
 

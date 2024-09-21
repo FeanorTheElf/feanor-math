@@ -192,6 +192,6 @@ impl<I> CanHomFrom<RationalFieldBase<I>> for Real64Base
     }
 
     fn map_in_ref(&self, from: &RationalFieldBase<I>, el: &El<RationalField<I>>, _hom: &Self::Homomorphism) -> Self::Element {
-        from.base_ring().to_float_approx(&el.0) / from.base_ring().to_float_approx(&el.1)
+        from.base_ring().to_float_approx(from.num(el)) / from.base_ring().to_float_approx(from.den(el))
     }
 }

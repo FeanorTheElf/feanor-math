@@ -155,8 +155,8 @@ pub enum EnvBindingStrength {
 ///     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { **lhs == **rhs }
 /// 
 ///     fn is_commutative(&self) -> bool { true }
-/// 
 ///     fn is_noetherian(&self) -> bool { true }
+///     fn is_approximate(&self) -> bool { false }
 /// 
 ///     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
 ///         write!(out, "{}", **value)

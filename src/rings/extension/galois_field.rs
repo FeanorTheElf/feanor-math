@@ -82,7 +82,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
                 *f_body.at_mut(i) = poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(c));
             }
         }
-        return FreeAlgebraImpl::new_with(Fp, degree, f_body, Global, &convolution);
+        return FreeAlgebraImpl::new_with(Fp, degree, f_body, "θ", Global, &convolution);
     };
 
     if degree > 3 {
@@ -343,7 +343,7 @@ impl<R, A, C> GaloisField<R, SparseMapVector<R>, A, C>
             }
         }
         return RingValue::from(GaloisFieldBase { 
-            base: FreeAlgebraImpl::new_with(base_ring, degree, modulus_vec, allocator, convolution_algorithm)
+            base: FreeAlgebraImpl::new_with(base_ring, degree, modulus_vec, "θ", allocator, convolution_algorithm)
         });
     }
 
@@ -366,7 +366,7 @@ impl<R, A, C> GaloisField<R, SparseMapVector<R>, A, C>
             }
         }
         return RingValue::from(GaloisFieldBase { 
-            base: FreeAlgebraImpl::new_with(base_ring, degree, modulus_vec, allocator, convolution_algorithm)
+            base: FreeAlgebraImpl::new_with(base_ring, degree, modulus_vec, "θ", allocator, convolution_algorithm)
         });
     }
 }
@@ -433,6 +433,7 @@ impl<R, V, A, C> GaloisFieldBase<R, V, A, C>
             new_base_ring,
             self.rank(),
             modulus_vec,
+            "θ",
             allocator,
             convolution_algorithm
         );

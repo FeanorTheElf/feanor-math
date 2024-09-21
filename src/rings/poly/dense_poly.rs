@@ -596,9 +596,9 @@ impl<I: IntegerRingStore> ImplPrincipalIdealRing for RationalFieldBase<I>
         let QQ = poly_ring.base_ring();
         let ZZX = DensePolyRing::new(QQ.base_ring(), "X");
         let lhs_factor = poly_ring.terms(lhs).map(|(c, _)| c).fold(QQ.one(), |x, y| QQ.lcm(&x, y));
-        let lhs = ZZX.from_terms(poly_ring.terms(lhs).map(|(c, d)| (QQ.mul_ref(c, &lhs_factor).0, d)));
+        let lhs = ZZX.from_terms(poly_ring.terms(lhs).map(|(c, d)| (QQ.base_ring().clone_el(QQ.get_ring().num(&QQ.mul_ref(c, &lhs_factor))), d)));
         let rhs_factor = poly_ring.terms(rhs).map(|(c, _)| c).fold(QQ.one(), |x, y| QQ.lcm(&x, y));
-        let rhs = ZZX.from_terms(poly_ring.terms(rhs).map(|(c, d)| (QQ.mul_ref(c, &rhs_factor).0, d)));
+        let rhs = ZZX.from_terms(poly_ring.terms(rhs).map(|(c, d)| (QQ.base_ring().clone_el(QQ.get_ring().num(&QQ.mul_ref(c, &rhs_factor))), d)));
         return poly_ring.lifted_hom(&ZZX, QQ.inclusion()).map(poly_pid_fractionfield_gcd(&ZZX, &lhs, &rhs));
     }
 }

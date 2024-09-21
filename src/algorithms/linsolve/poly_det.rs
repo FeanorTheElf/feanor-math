@@ -1,9 +1,10 @@
 use std::alloc::Allocator;
 use std::collections::BTreeMap;
 use std::cmp::max;
+use std::alloc::Global;
 
-use crate::algorithms;
 use crate::algorithms::interpolate::interpolate_multivariate;
+use crate::algorithms::linsolve::smith;
 use crate::homomorphism::Homomorphism;
 use crate::integer::int_cast;
 use crate::integer::BigIntRing;
@@ -45,7 +46,7 @@ fn determinant_poly_matrix_base<P, V, A, I>(A: Submatrix<V, El<P>>, poly_ring: P
                 *evaluated_matrix.at_mut(i, j) = poly_ring.evaluate(A.at(i, j), assignment.into_ring_el_fn(R), &R.identity());
             }
         }
-        determinants.push(algorithms::smith::determinant(evaluated_matrix.data_mut(), R));
+        determinants.push(smith::determinant_using_pre_smith(R, evaluated_matrix.data_mut(), Global));
     }, |_, x| R.clone_el(x)) {}
 
     let result = interpolate_multivariate(
@@ -141,8 +142,6 @@ pub fn determinant_poly_matrix<P, V, A>(A: Submatrix<V, El<P>>, poly_ring: P, al
     }
 }
 
-#[cfg(test)]
-use std::alloc::Global;
 #[cfg(test)]
 use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 
