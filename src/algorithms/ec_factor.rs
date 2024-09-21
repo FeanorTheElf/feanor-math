@@ -209,15 +209,17 @@ pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::Integers>
         }
     }
     // this is now the general case
-    loop {
+    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
         if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_N / 2, &mut rng) {
             return factor;
         }
     }
+    unreachable!()
 }
 
 #[cfg(test)]
 use crate::rings::zn::zn_64::Zn;
+use crate::MAX_PROBABILISTIC_REPETITIONS;
 #[cfg(test)]
 use std::time::Instant;
 #[cfg(test)]

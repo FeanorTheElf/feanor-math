@@ -27,6 +27,8 @@ extern crate rayon;
 #[cfg(feature = "ndarray")]
 extern crate ndarray;
 
+const MAX_PROBABILISTIC_REPETITIONS: usize = 30;
+
 ///
 /// Contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`].
 /// 

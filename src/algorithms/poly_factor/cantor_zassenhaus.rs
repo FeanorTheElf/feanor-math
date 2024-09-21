@@ -1,4 +1,4 @@
-use crate::algorithms;
+use crate::{algorithms, MAX_PROBABILISTIC_REPETITIONS};
 use crate::algorithms::unity_root::get_prim_root_of_unity;
 use crate::divisibility::DivisibilityRingStore;
 use crate::pid::*;
@@ -139,7 +139,7 @@ pub fn cantor_zassenhaus_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) -> El
     let exp = ZZ.half_exact(ZZ.sub(ZZ.pow(q, d), ZZ.one()));
     let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
 
-    loop {
+    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
         let T = mod_f_ring.from_canonical_basis((0..mod_f_ring.rank()).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())));
         let G = mod_f_ring.sub(mod_f_ring.pow_gen(T, &exp, ZZ), mod_f_ring.one());
         let g = poly_ring.ideal_gen(&f, &mod_f_ring.poly_repr(&poly_ring, &G, &poly_ring.base_ring().identity()));
@@ -147,6 +147,7 @@ pub fn cantor_zassenhaus_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) -> El
             return g;
         }
     }
+    unreachable!()
 }
 
 ///
@@ -228,7 +229,7 @@ fn cantor_zassenhaus_even_base_with_root_of_unity<P, R>(poly_ring: P, mod_f_ring
     // as in the standard case, we consider a random polynomial `T` and use the factorization `T^(2^d') - T = T (T^e + 1) (T^e + zeta) (T^e + zeta^2)`;
     // here `d'` is either `d` or `2d`, and `e = (2^d' - 1) / 3`
     
-    loop {
+    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
         let T = mod_f_ring.from_canonical_basis((0..mod_f_ring.rank()).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())));
         let T_pow_exp = mod_f_ring.pow_gen(T, &exp, ZZ);
         let T_pow_exp_poly = mod_f_ring.poly_repr(&poly_ring, &T_pow_exp, &Fq.identity());
@@ -241,6 +242,7 @@ fn cantor_zassenhaus_even_base_with_root_of_unity<P, R>(poly_ring: P, mod_f_ring
             return g;
         }
     }
+    unreachable!()
 }
 
 ///
