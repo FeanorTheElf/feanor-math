@@ -258,11 +258,13 @@ fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
         ZnBase: CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
+    println!("Factoring {}", ZZX.format(f));
     let d = ZZX.degree(f).unwrap();
     assert!(ZZX.base_ring().is_one(ZZX.lc(f).unwrap()));
 
     // Cantor-Zassenhaus does not directly work for p = 2, so skip the first prime
     for p in erathostenes::enumerate_primes(&StaticRing::<i64>::RING, &1000).into_iter().skip(1) {
+        println!("Trying to factor by considering mod {}", p);
 
         // check whether `f mod p` is also square-free, there are only finitely many primes
         // where this would not be the case
@@ -517,6 +519,13 @@ fn test_factor_rational_poly() {
     assert_el_eq!(poly_ring, g, actual[1].0);
     assert_eq!(1, actual[1].1);
     assert_el_eq!(QQ, QQ.one(), unit);
+
+    let f = poly_ring.from_terms([(incl.map(3), 0), (incl.map(1), 1)]);
+    let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
+    assert_eq!(1, actual.len());
+    assert_eq!(1, actual[0].1);
+    assert_el_eq!(QQ, QQ.one(), unit);
+    assert_el_eq!(&poly_ring, f, &actual[0].0);
 }
 
 #[test]
