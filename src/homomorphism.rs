@@ -789,6 +789,11 @@ impl<R: RingStore, S: RingStore, F> LambdaHom<R, S, F>
     pub fn new(from: R, to: S, f: F) -> Self {
         Self { from, to, f }
     }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn into_domain_codomain(self) -> (R, S) {
+        (self.from, self.to)
+    }
 }
 
 impl<R: RingStore, S: RingStore, F> Homomorphism<R::Type, S::Type> for LambdaHom<R, S, F>
