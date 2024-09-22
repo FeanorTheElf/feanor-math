@@ -319,6 +319,7 @@ impl<I> FactorPolyField for RationalFieldBase<I>
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
+        println!("Factoring {}", poly_ring.format(poly));
         assert!(!poly_ring.is_zero(poly));
         let QQX = &poly_ring;
         let QQ = QQX.base_ring();
