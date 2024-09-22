@@ -245,7 +245,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
 /// ```
 /// 
 #[repr(transparent)]
-pub struct GaloisFieldBase<R = Zn, V = SparseMapVector<R>, A = Global, C = KaratsubaAlgorithm>
+pub struct GaloisFieldBase<R = AsField<Zn>, V = SparseMapVector<R>, A = Global, C = KaratsubaAlgorithm>
     where R: RingStore,
         R::Type: ZnRing,
         V: VectorView<El<R>>,
@@ -260,7 +260,7 @@ pub struct GaloisFieldBase<R = Zn, V = SparseMapVector<R>, A = Global, C = Karat
 /// 
 /// This is the [`RingStore`] corresponding to [`GaloisFieldBase`]. For more details, see [`GaloisFieldBase`].
 /// 
-pub type GaloisField<R = Zn, V = SparseMapVector<R>, A = Global, C = KaratsubaAlgorithm> = RingValue<GaloisFieldBase<R, V, A, C>>;
+pub type GaloisField<R = AsField<Zn>, V = SparseMapVector<R>, A = Global, C = KaratsubaAlgorithm> = RingValue<GaloisFieldBase<R, V, A, C>>;
 
 impl GaloisField {
 
@@ -288,7 +288,7 @@ impl GaloisField {
     /// ```
     /// 
     pub fn new(p: i64, degree: usize) -> Self {
-        Self::new_with(Zn::new(p as u64), degree, Global, STANDARD_CONVOLUTION)
+        Self::new_with(Zn::new(p as u64).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION)
     }
 }
 
@@ -371,8 +371,8 @@ impl<R, A, C> GaloisField<R, SparseMapVector<R>, A, C>
     }
 }
 
-impl<V, A> GaloisFieldBase<Zn, V, A, KaratsubaAlgorithm>
-    where V: VectorView<El<Zn>>,
+impl<V, A> GaloisFieldBase<AsField<Zn>, V, A, KaratsubaAlgorithm>
+    where V: VectorView<El<AsField<Zn>>>,
         A: Allocator + Clone
 {
     ///

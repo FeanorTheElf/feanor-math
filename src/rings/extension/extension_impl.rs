@@ -163,6 +163,21 @@ impl<R, V, A, C> FreeAlgebraImplBase<R, V, A, C>
     pub fn allocator(&self) -> &A {
         &self.element_allocator
     }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn gen_name(&self) -> &'static str {
+        self.gen_name
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn x_pow_rank(&self) -> &V {
+        &self.x_pow_rank
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn convolution(&self) -> &C {
+        &self.convolution
+    }
 }
 
 impl<R, V, A, C> PartialEq for FreeAlgebraImplBase<R, V, A, C>
@@ -252,9 +267,10 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
         impl<'a, R> SparseVectorViewOperation<El<R>> for ReduceModulo<'a, R>
             where R: RingStore
         {
-            type Output = ();
+            type Output<'b> = ()
+                where Self: 'b;
         
-            fn execute<V: VectorViewSparse<El<R>>>(self, vector: V) -> Self::Output {
+            fn execute<'b, V: 'b + VectorViewSparse<El<R>>>(self, vector: V) -> () {
                 for i in (self.rank..(2 * self.rank)).rev() {
                     for (j, c) in vector.nontrivial_entries() {
                         let add = self.base_ring.mul_ref(c, &mut self.data[i]);

@@ -46,7 +46,7 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for SubvectorView<V, T> {
         self.end - self.begin
     }
 
-    fn specialize_sparse<Op: SparseVectorViewOperation<T>>(&self, op: Op) -> Result<Op::Output, ()> {
+    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
 
         struct WrapSubvector<T: ?Sized, Op: SparseVectorViewOperation<T>> {
             op: Op,
@@ -57,9 +57,12 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for SubvectorView<V, T> {
 
         impl<T: ?Sized, Op: SparseVectorViewOperation<T>> SparseVectorViewOperation<T> for WrapSubvector<T, Op> {
 
-            type Output = Op::Output;
+            type Output<'a> = Op::Output<'a>
+                where Self: 'a;
 
-            fn execute<V: VectorViewSparse<T>>(self, vector: V) -> Self::Output {
+            fn execute<'a, V: 'a + VectorViewSparse<T> + Clone>(self, vector: V) -> Self::Output<'a>
+                where Self: 'a
+            {
                 self.op.execute(SubvectorView::new(vector).restrict_full(self.begin..self.end))
             }
         }
@@ -261,9 +264,9 @@ fn test_subvector_sparse() {
 
     impl SparseVectorViewOperation<i64> for Verify {
 
-        type Output = ();
+        type Output<'a> = ();
 
-        fn execute<V: VectorViewSparse<i64>>(self, vector: V) -> Self::Output {
+        fn execute<'a, V: 'a + VectorViewSparse<i64>>(self, vector: V) -> Self::Output<'a> {
             assert!(
                 vec![(20, &20), (256, &256)] == vector.nontrivial_entries().collect::<Vec<_>>() ||
                 vec![(256, &256), (20, &20)] == vector.nontrivial_entries().collect::<Vec<_>>()

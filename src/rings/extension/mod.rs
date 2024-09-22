@@ -309,8 +309,6 @@ pub mod generic_tests {
 }
 
 #[cfg(test)]
-use std::alloc::Global;
-#[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use extension_impl::FreeAlgebraImpl;

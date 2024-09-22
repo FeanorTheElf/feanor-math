@@ -1,16 +1,13 @@
-use std::alloc::Allocator;
-
 use crate::divisibility::*;
 use crate::field::{Field, FieldStore};
-use crate::homomorphism::{CanHomFrom, Homomorphism};
+use crate::homomorphism::{CanHomFrom, CanIsoFromTo, Homomorphism};
 use crate::integer::{binomial, int_cast, BigIntRing, IntegerRing, IntegerRingStore};
 use crate::ordered::*;
 use crate::pid::*;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
-use crate::rings::extension::extension_impl::{FreeAlgebraImpl, FreeAlgebraImplBase};
 use crate::rings::extension::FreeAlgebra;
-use crate::rings::field::AsFieldBase;
+use crate::rings::field::*;
 use crate::rings::finite::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::{derive_poly, PolyRing, PolyRingStore};
@@ -18,15 +15,17 @@ use crate::algorithms::{self, int_bisect};
 use crate::rings::rational::*;
 use crate::rings::zn::zn_64::*;
 use crate::rings::zn::{choose_zn_impl, ZnOperation, ZnRing, ZnRingStore};
-use crate::seq::VectorView;
-use crate::rings::fieldextension::*;
 use crate::rings::extension::FreeAlgebraStore;
+use crate::specialization::{FiniteFieldOperation, SpecializeToFiniteField};
+
+use crate::rings::zn::*;
+use extension::factor_over_extension;
 
 use super::erathostenes;
 use super::hensel::hensel_lift_factorization;
 
 pub mod cantor_zassenhaus;
-pub mod number_field;
+pub mod extension;
 
 ///
 /// Trait for fields over which we can efficiently factor polynomials.
@@ -123,7 +122,7 @@ struct FactorizeMonicIntegerPolynomialUsingHenselLifting<'a, P, R>
         R: PolyRingStore,
         R::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
-        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: Field + ZnRing
+        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyField + ZnRing
 {
     FpX: R,
     ZZX: P,
@@ -138,7 +137,7 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
         R: PolyRingStore,
         R::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
-        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: Field + ZnRing
+        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyField + ZnRing
 {
     fn call<S: ZnRingStore>(self, Zpe: S) -> Vec<El<P>>
         where S::Type: ZnRing
@@ -363,64 +362,36 @@ impl<I> FactorPolyField for RationalFieldBase<I>
     }
 }
 
-macro_rules! impl_factor_poly_number_fields {
-    ($number_field_type:ty, $($lifetimes:lifetime),*) => {
-
-        impl<$($lifetimes,)* I, V, A> FactorPolyField for $number_field_type
-            where I: IntegerRingStore,
-                I::Type: IntegerRing,
-                RationalFieldBase<I>: FactorPolyField,
-                V: VectorView<El<RationalField<I>>>,
-                A: Allocator + Clone,
-                crate::rings::zn::zn_64::ZnBase: CanHomFrom<I::Type>
-        {
-            fn factor_poly<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-                where P: PolyRingStore,
-                    P::Type: PolyRing + EuclideanRing,
-                    <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-            {
-                number_field::factor_over_number_field(poly_ring, f)
-            }
-        }
-
-        impl<$($lifetimes,)* I, V, A> ExtensionField for $number_field_type
-            where I: IntegerRingStore,
-                I::Type: IntegerRing,
-                RationalFieldBase<I>: FactorPolyField,
-                V: VectorView<El<RationalField<I>>>,
-                A: Allocator + Clone,
-                crate::rings::zn::zn_64::ZnBase: CanHomFrom<I::Type>
-        {}
-    };
+struct FactorPolyFiniteField<'a, P>
+    where P: ?Sized + PolyRing + EuclideanRing,
+        <P::BaseRing as RingStore>::Type: Field
+{
+    poly_ring: &'a P,
+    poly: P::Element
 }
 
-// unfortunately, any blanket impl conflicts with the one for finite fields...
-impl_factor_poly_number_fields!{ AsFieldBase<FreeAlgebraImpl<RationalField<I>, V, A>>, }
-impl_factor_poly_number_fields!{ AsFieldBase<RingRef<'a, FreeAlgebraImplBase<RationalField<I>, V, A>>>, 'a }
-impl_factor_poly_number_fields!{ AsFieldBase<FreeAlgebraImpl<RingRef<'a, RationalFieldBase<I>>, V, A>>, 'a }
-impl_factor_poly_number_fields!{ AsFieldBase<RingRef<'a, FreeAlgebraImplBase<RingRef<'b, RationalFieldBase<I>>, V, A>>>, 'a, 'b }
-impl_factor_poly_number_fields!{ AsFieldBase<&'a FreeAlgebraImpl<RationalField<I>, V, A>>, 'a }
-impl_factor_poly_number_fields!{ AsFieldBase<FreeAlgebraImpl<&'a RationalField<I>, V, A>>, 'a }
-impl_factor_poly_number_fields!{ AsFieldBase<&'a FreeAlgebraImpl<&'b RationalField<I>, V, A>>, 'a, 'b }
-
-impl<R> ExtensionField for R
-    where R: ?Sized + FiniteRing + Field + FreeAlgebra
-{}
-
-impl<R> FactorPolyField for R
-    where R: ?Sized + FiniteRing + Field
+impl<'a, P> FiniteFieldOperation<<P::BaseRing as RingStore>::Type> for FactorPolyFiniteField<'a, P>
+    where P: ?Sized + PolyRing + EuclideanRing,
+        <P::BaseRing as RingStore>::Type: Field
 {
-    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: PolyRingStore,
-            P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self> 
+    type Output<'d> = (Vec<(P::Element, usize)>, El<P::BaseRing>)
+        where Self: 'd;
+
+    fn execute<'d, F>(self, field: F) -> Self::Output<'d>
+        where Self: 'd,
+            F: 'd + RingStore,
+            F::Type: FiniteRing + Field + CanIsoFromTo<<P::BaseRing as RingStore>::Type>
     {
-        assert!(!poly_ring.is_zero(poly));
+        let poly_ring = DensePolyRing::new(&field, "X");
+        let base_iso = field.can_iso(self.poly_ring.base_ring()).unwrap();
+        let iso = poly_ring.lifted_hom(RingRef::new(self.poly_ring), base_iso.inv());
+        let poly = iso.map(self.poly);
+        assert!(!poly_ring.is_zero(&poly));
         let even_char = BigIntRing::RING.is_even(&poly_ring.base_ring().characteristic(&BigIntRing::RING).unwrap());
 
         let mut result = Vec::new();
         let mut unit = poly_ring.base_ring().one();
-        let mut el = poly_ring.clone_el(poly);
+        let mut el = poly_ring.clone_el(&poly);
 
         // we repeatedly remove the square-free part
         while !poly_ring.is_unit(&el) {
@@ -472,45 +443,54 @@ impl<R> FactorPolyField for R
         }
         poly_ring.base_ring().mul_assign_ref(&mut unit, poly_ring.coefficient_at(&el, 0));
         debug_assert!(poly_ring.base_ring().is_unit(&unit));
-        return (result, unit);
+        let map_back = RingRef::new(self.poly_ring).into_lifted_hom(&poly_ring, &base_iso);
+        return (result.into_iter().map(|(f, e)| (map_back.map(f), e)).collect::<Vec<_>>(), base_iso.map(unit));
     }
+}
 
-    fn find_factor_by_extension<P, S>(poly_ring: P, mod_f_ring: S) -> Option<El<P>>
+impl<R> FactorPolyField for R
+    where R: FreeAlgebra + Field + SpecializeToFiniteField,
+        <R::BaseRing as RingStore>::Type: FactorPolyField
+{
+    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: PolyRingStore,
             P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
-            S: RingStore,
-            S::Type: FreeAlgebra,
-            <S::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
-        let sqrfree_part = poly_squarefree_part(&poly_ring, mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
-        if poly_ring.degree(&sqrfree_part).unwrap() != mod_f_ring.rank() {
-            return Some(sqrfree_part);
+        if let Ok(result) = <Self as SpecializeToFiniteField>::specialize_finite_field(poly_ring.base_ring().get_ring(), FactorPolyFiniteField { poly_ring: poly_ring.get_ring(), poly: poly_ring.clone_el(poly) }) {
+            return result;
+        } else {
+            return factor_over_extension(poly_ring, poly);
         }
-        let partial_factorization = cantor_zassenhaus::distinct_degree_factorization_base(&poly_ring, &mod_f_ring);
-        if partial_factorization.len() > mod_f_ring.rank() && poly_ring.degree(&partial_factorization[mod_f_ring.rank()]).unwrap() == mod_f_ring.rank() {
-            return None;
-        }
-        for (d, f) in partial_factorization.into_iter().enumerate() {
-            if poly_ring.degree(&f).unwrap() > 0 {
-                if poly_ring.degree(&f).unwrap() < mod_f_ring.rank() {
-                    return Some(f);
-                } else if BigIntRing::RING.is_even(&poly_ring.base_ring().characteristic(&BigIntRing::RING).unwrap()) {
-                    return Some(cantor_zassenhaus::cantor_zassenhaus_even_base(&poly_ring, &mod_f_ring, d));
-                } else {
-                    return Some(cantor_zassenhaus::cantor_zassenhaus_base(&poly_ring, &mod_f_ring, d));
-                }
-            }
-        }
-        unreachable!()
+    }
+}
+
+impl FactorPolyField for AsFieldBase<Zn> {
+
+    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        (FactorPolyFiniteField { poly_ring: poly_ring.get_ring(), poly: poly_ring.clone_el(poly) }).execute(poly_ring.base_ring())
+    }
+}
+
+impl<const N: u64> FactorPolyField for zn_static::ZnBase<N, true> {
+
+    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        (FactorPolyFiniteField { poly_ring: poly_ring.get_ring(), poly: poly_ring.clone_el(poly) }).execute(poly_ring.base_ring())
     }
 }
 
 #[cfg(test)]
-use crate::rings::zn::*;
-#[cfg(test)]
 use test::Bencher;
+#[cfg(test)]
+use crate::rings::extension::extension_impl::*;
 
 #[test]
 fn test_factor_int_poly() {

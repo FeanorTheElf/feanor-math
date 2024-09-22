@@ -61,7 +61,7 @@ pub trait VectorView<T: ?Sized> {
     /// `V: VectorViewSparse`, even though specialization currently does not support
     /// this.
     /// 
-    fn specialize_sparse<Op: SparseVectorViewOperation<T>>(&self, _op: Op) -> Result<Op::Output, ()> {
+    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, _op: Op) -> Result<Op::Output<'a>, ()> {
         Err(())
     }
 
@@ -174,9 +174,11 @@ pub trait VectorViewSparse<T: ?Sized>: VectorView<T> {
 
 pub trait SparseVectorViewOperation<T: ?Sized> {
 
-    type Output;
+    type Output<'a>
+        where Self: 'a;
 
-    fn execute<V: VectorViewSparse<T>>(self, vector: V) -> Self::Output;
+    fn execute<'a, V: 'a + VectorViewSparse<T> + Clone>(self, vector: V) -> Self::Output<'a>
+        where Self: 'a;
 }
 
 fn range_within<R: RangeBounds<usize>>(len: usize, range: R) -> Range<usize> {
@@ -265,7 +267,7 @@ impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for Box<V> {
         (**self).at(i)
     }
 
-    fn specialize_sparse<Op: SparseVectorViewOperation<T>>(&self, op: Op) -> Result<Op::Output, ()> {
+    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
         (**self).specialize_sparse(op)
     }
 }
@@ -297,7 +299,7 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a V {
         (**self).at(i)
     }
 
-    fn specialize_sparse<Op: SparseVectorViewOperation<T>>(&self, op:Op) -> Result<Op::Output, ()> {
+    fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Result<Op::Output<'b>, ()> {
         (**self).specialize_sparse(op)
     }
 }
@@ -321,7 +323,7 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a mut V {
         (**self).at(i)
     }
 
-    fn specialize_sparse<Op: SparseVectorViewOperation<T>>(&self, op:Op) -> Result<Op::Output, ()> {
+    fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Result<Op::Output<'b>, ()> {
         (**self).specialize_sparse(op)
     }
 }

@@ -4,6 +4,7 @@ use crate::homomorphism::{Homomorphism, Identity};
 use crate::ring::*;
 use crate::rings::extension::*;
 use crate::rings::poly::derive_poly;
+use crate::specialization::SpecializeToFiniteField;
 
 use super::poly::dense_poly::DensePolyRing;
 use super::poly::PolyRingStore;
@@ -27,14 +28,14 @@ use super::poly::PolyRingStore;
 /// # use feanor_math::rings::fieldextension::ExtensionFieldStore;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::rings::zn::*;
-/// let Fp = Zn::new(7);
+/// let Fp = Zn::new(7).as_field().ok().unwrap();
 /// let Fq = GaloisField::new(7, 2);
 /// assert!(Fq.base_ring().get_ring() == Fp.get_ring());
 /// assert!(Fq.is_galois());
 /// ```
 /// 
 #[stability::unstable(feature = "enable")]
-pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField {
+pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField + SpecializeToFiniteField {
 
     ///
     /// Checks whether this field extension is galois, i.e. normal and separable.
@@ -152,6 +153,10 @@ pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField {
         }
     }
 }
+
+impl<R> ExtensionField for R
+    where R: Field + FreeAlgebra + FactorPolyField + SpecializeToFiniteField
+{}
 
 #[stability::unstable(feature = "enable")]
 pub struct GaloisAutomorphism<F: RingStore>
