@@ -1,6 +1,6 @@
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
-use crate::compute_locally::InterpolationBaseRing;
+use crate::compute_locally::{InterpolationBaseRing, InterpolationBaseRingStore};
 use crate::delegate::DelegateRing;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::local::PrincipalLocalRing;
@@ -246,7 +246,7 @@ impl<R: DivisibilityRingStore> PrincipalLocalRing for AsFieldBase<R>
 }
 
 impl<R> InterpolationBaseRing for AsFieldBase<R>
-    where R: RingStore,
+    where R: InterpolationBaseRingStore,
         R::Type: InterpolationBaseRing
 {
     type ExtendedRingBase<'a> = <R::Type as InterpolationBaseRing>::ExtendedRingBase<'a>

@@ -53,7 +53,7 @@ use std::cmp::min;
 /// assert_el_eq!(P2, P2.pow(P2.indeterminate(), 10), &P.can_iso(&P2).unwrap().map(high_power_of_x));
 /// ```
 /// 
-pub struct DensePolyRingBase<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> {
+pub struct DensePolyRingBase<R: RingStore, A: Allocator + Clone = Global, C: ConvolutionAlgorithm<R::Type> = KaratsubaAlgorithm<Global>> {
     base_ring: R,
     unknown_name: &'static str,
     zero: El<R>,
@@ -513,8 +513,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
 
 impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> ComputeLocallyRing for DensePolyRingBase<R, A, C> 
     where R: RingStore,
-        R::Type: InterpolationBaseRing,
-        for<'ring> <R::Type as InterpolationBaseRing>::ExtendedRing<'ring>: Clone
+        R::Type: InterpolationBaseRing
 {
     type LocalRing<'ring> = <R::Type as InterpolationBaseRing>::ExtendedRing<'ring>
         where Self: 'ring;

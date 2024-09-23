@@ -126,13 +126,20 @@ pub trait FromModulusCreateableZnRing: Sized + ZnRing {
 }
 
 pub mod generic_impls {
+    use std::alloc::Global;
     use std::marker::PhantomData;
 
+    use crate::algorithms::convolution::STANDARD_CONVOLUTION;
+    use crate::algorithms::int_bisect;
+    use crate::field::Field;
+    use crate::ordered::*;
+    use crate::primitive_int::{StaticRing, StaticRingBase};
     use crate::ring::*;
     use crate::divisibility::DivisibilityRingStore;
     use crate::integer::{IntegerRing, IntegerRingStore};
     use crate::pid::*;
-    use super::{ZnRing, ZnRingStore};
+    use crate::rings::extension::galois_field::GaloisField;
+    use super::{int_cast, BigIntRing, ZnRing, ZnRingStore};
     use crate::homomorphism::*;
 
     ///
@@ -290,6 +297,23 @@ pub mod generic_impls {
         } else {
             None
         }
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn interpolation_ring<R: ZnRingStore>(ring: R, count: usize) -> GaloisField<R>
+        where R: Clone,
+            R::Type: ZnRing + Field + CanHomFrom<StaticRingBase<i64>>
+    {
+        let ZZbig = BigIntRing::RING;
+        let modulus = int_cast(ring.integer_ring().clone_el(ring.modulus()), ZZbig, ring.integer_ring());
+        let count = int_cast(count as i64, ZZbig, StaticRing::<i64>::RING);
+        let degree = int_bisect::find_root_floor(StaticRing::<i64>::RING, 1, |d| if *d > 0 && ZZbig.is_gt(&ZZbig.pow(ZZbig.clone_el(&modulus), *d as usize), &count) {
+            1
+        } else {
+            -1
+        }) + 1;
+        assert!(degree >= 1);
+        return GaloisField::new_with(ring, degree as usize, Global, STANDARD_CONVOLUTION);
     }
 }
 

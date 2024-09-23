@@ -9,6 +9,7 @@ use crate::algorithms::convolution::ConvolutionAlgorithm;
 use crate::algorithms::convolution::KaratsubaAlgorithm;
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 use crate::algorithms::linsolve::LinSolveRing;
+use crate::compute_locally::InterpolationBaseRing;
 use crate::divisibility::*;
 use crate::impl_wrap_unwrap_homs;
 use crate::impl_wrap_unwrap_isos;
@@ -18,6 +19,8 @@ use crate::iters::MultiProduct;
 use crate::matrix::OwnedMatrix;
 use crate::pid::PrincipalIdealRing;
 use crate::primitive_int::StaticRing;
+use crate::rings::field::AsField;
+use crate::rings::field::AsFieldBase;
 use crate::rings::finite::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::seq::*;
@@ -25,11 +28,8 @@ use crate::ring::*;
 use crate::integer::IntegerRingStore;
 use crate::rings::extension::create_multiplication_matrix;
 use crate::delegate::DelegateRing;
-use crate::serialization::deserialize_seq_helper;
-use crate::serialization::serialize_seq_helper;
-use crate::serialization::DeserializeWithRing;
-use crate::serialization::SerializableElementRing;
-use crate::serialization::SerializeWithRing;
+use crate::serialization::*;
+use sparse::SparseMapVector;
 
 use super::CanHomFrom;
 use super::CanIsoFromTo;
@@ -486,6 +486,36 @@ impl<R, V, A, C> FreeAlgebra for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
+impl<R, V, A, C> InterpolationBaseRing for AsFieldBase<FreeAlgebraImpl<R, V, A, C>>
+    where R: RingStore + Clone, 
+        R::Type: LinSolveRing,
+        V: VectorView<El<R>>,
+        A: Allocator + Clone,
+        C: ConvolutionAlgorithm<R::Type>
+{
+    type ExtendedRingBase<'a> = AsFieldBase<FreeAlgebraImpl<&'a R, SparseMapVector<&'a R>, A, KaratsubaAlgorithm<Global>>>
+        where Self: 'a;
+
+    type ExtendedRing<'a> = AsField<FreeAlgebraImpl<&'a R, SparseMapVector<&'a R>, A, KaratsubaAlgorithm<Global>>>
+        where Self: 'a;
+
+    fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
+        where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
+    {
+        unimplemented!()
+    }
+
+    fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
+        where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
+    {
+        unimplemented!()
+    }
+
+    fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
+        unimplemented!()
+    }
+}
+
 pub struct WRTCanonicalBasisElementCreator<'a, R, V, A, C>
     where R: RingStore, 
         R::Type: FiniteRing, 
@@ -648,8 +678,6 @@ use crate::rings::zn::zn_64::{Zn, ZnEl};
 use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
-#[cfg(test)]
-use sparse::SparseMapVector;
 
 #[cfg(test)]
 fn test_ring0_and_elements() -> (FreeAlgebraImpl<Zn, [ZnEl; 1]>, Vec<FreeAlgebraImplEl<Zn>>) {

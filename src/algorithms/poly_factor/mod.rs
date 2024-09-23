@@ -1,8 +1,8 @@
+use crate::compute_locally::InterpolationBaseRing;
 use crate::divisibility::*;
 use crate::field::{Field, FieldStore};
 use crate::homomorphism::{CanHomFrom, CanIsoFromTo, Homomorphism};
-use crate::integer::{binomial, int_cast, BigIntRing, IntegerRing, IntegerRingStore};
-use crate::ordered::*;
+use crate::integer::{BigIntRing, IntegerRing, IntegerRingStore};
 use crate::pid::*;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
@@ -11,21 +11,19 @@ use crate::rings::field::*;
 use crate::rings::finite::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::{derive_poly, PolyRing, PolyRingStore};
-use crate::algorithms::{self, int_bisect};
 use crate::rings::rational::*;
 use crate::rings::zn::zn_64::*;
-use crate::rings::zn::{choose_zn_impl, ZnOperation, ZnRing, ZnRingStore};
 use crate::rings::extension::FreeAlgebraStore;
+use crate::algorithms::eea::signed_lcm;
 use crate::specialization::{FiniteFieldOperation, SpecializeToFiniteField};
-
+use crate::algorithms::poly_factor::integer::factor_integer_poly;
 use crate::rings::zn::*;
-use extension::factor_over_extension;
 
-use super::erathostenes;
-use super::hensel::hensel_lift_factorization;
+use extension::factor_over_extension;
 
 pub mod cantor_zassenhaus;
 pub mod extension;
+pub mod integer;
 
 ///
 /// Trait for fields over which we can efficiently factor polynomials.
@@ -112,85 +110,6 @@ pub trait FactorPolyField: Field {
 }
 
 ///
-/// Local struct that implements [`ZnOperation`] to factor a polynomial over the integers,
-/// by factoring it over `Fp`, lifting the factorization to `Z/p^eZ` and then extracting
-/// integral factors. Used only in [`factor_integer_poly()`].
-/// 
-struct FactorizeMonicIntegerPolynomialUsingHenselLifting<'a, P, R>
-    where P: PolyRingStore,
-        P::Type: PolyRing + DivisibilityRing,
-        R: PolyRingStore,
-        R::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
-        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyField + ZnRing
-{
-    FpX: R,
-    ZZX: P,
-    poly_mod_p: El<R>,
-    poly: &'a El<P>,
-    bound: El<BigIntRing>
-}
-
-impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingHenselLifting<'a, P, R>
-    where P: PolyRingStore,
-        P::Type: PolyRing + DivisibilityRing,
-        R: PolyRingStore,
-        R::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
-        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyField + ZnRing
-{
-    fn call<S: ZnRingStore>(self, Zpe: S) -> Vec<El<P>>
-        where S::Type: ZnRing
-    {
-        let ZZ = Zpe.integer_ring();
-        let bound = int_cast(self.bound, ZZ, &BigIntRing::RING);
-        let mod_pe = Zpe.can_hom(ZZ).unwrap();
-        let reduce = |x: El<<P::Type as RingExtension>::BaseRing>| mod_pe.map(int_cast(x, ZZ, self.ZZX.base_ring()));
-        let ZpeX = DensePolyRing::new(&Zpe, "X");
-        let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&self.FpX, &self.poly_mod_p);
-        debug_assert!(self.FpX.base_ring().is_one(&unit));
-        debug_assert!(factorization.iter().all(|(_, e)| *e == 1));
-        debug_assert!(factorization.iter().map(|(f, _)| self.FpX.degree(f).unwrap()).sum::<usize>() == self.ZZX.degree(&self.poly).unwrap());
-        
-        let lifted_factorization = hensel_lift_factorization(
-            &ZpeX, 
-            &self.FpX, 
-            &self.FpX, 
-            &ZpeX.from_terms(self.ZZX.terms(self.poly).map(|(c, i)| (reduce(self.ZZX.base_ring().clone_el(c)), i))), 
-            &factorization.into_iter().map(|(f, _)| f).collect::<Vec<_>>()
-        );
-
-        let mut current = self.ZZX.clone_el(self.poly);
-        let mut ungrouped_factors = (0..lifted_factorization.len()).collect::<Vec<_>>();
-        let mut result = Vec::new();
-        while !self.ZZX.is_unit(&current) {
-
-            // Here we use the naive approach to group the factors in the p-adic numbers such that the product of each group
-            // is integral - just try all combinations. It might be worth using LLL for this instead (as soon as LLL is implemented
-            // in this library).
-            let (factor, new_poly, factor_group) = crate::iters::basic_powerset(ungrouped_factors.iter().copied())
-                // skip the empty set
-                .skip(1)
-                // compute the product of a subset of factors
-                .map(|slice| (ZpeX.prod(slice.iter().copied().map(|i| ZpeX.clone_el(&lifted_factorization[i]))), slice))
-                // if this is not bounded by `bound`, there is no chance it gives a factor over ZZ
-                .filter(|(f, _)| ZpeX.terms(f).all(|(c, _)| ZZ.is_lt(&ZZ.abs(Zpe.smallest_lift(Zpe.clone_el(c))), &bound)))
-                // lift it to ZZ
-                .map(|(f, slice)| (self.ZZX.from_terms(ZpeX.terms(&f).map(|(c, i)| (int_cast(Zpe.smallest_lift(Zpe.clone_el(c)), self.ZZX.base_ring(), ZZ), i))), slice))
-                // check if it is indeed a factor
-                .filter_map(|(f, slice)| self.ZZX.checked_div(&current, &f).map(|quo| (f, quo, slice)))
-                .next().unwrap();
-
-            ungrouped_factors.retain(|j| !factor_group.contains(j));
-            current = new_poly;
-            result.push(factor);
-        }
-        assert!(self.ZZX.is_one(&current));
-        return result;
-    }
-}
-
-///
 /// Computes the square-free part of a polynomial `f`, i.e. the greatest (w.r.t.
 /// divisibility) polynomial `g | f` that is square-free.
 /// 
@@ -248,65 +167,6 @@ pub fn poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
     }
 }
 
-///
-/// The given polynomial must be square-free, monic and should have integral
-/// coefficients. In this case, all factors are also monic integral polynomials.
-/// 
-fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
-    where P: PolyRingStore,
-        P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
-        ZnBase: CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
-{
-    let d = ZZX.degree(f).unwrap();
-    assert!(ZZX.base_ring().is_one(ZZX.lc(f).unwrap()));
-
-    // Cantor-Zassenhaus does not directly work for p = 2, so skip the first prime
-    for p in erathostenes::enumerate_primes(&StaticRing::<i64>::RING, &1000).into_iter().skip(1) {
-
-        // check whether `f mod p` is also square-free, there are only finitely many primes
-        // where this would not be the case
-        let Fp = Zn::new(p as u64).as_field().ok().unwrap();
-        let mod_p = Fp.can_hom(ZZX.base_ring()).unwrap();
-        let FpX = DensePolyRing::new(Fp, "X");
-        let f_mod_p = FpX.from_terms(ZZX.terms(&f).map(|(c, i)| (mod_p.map(ZZX.base_ring().clone_el(c)), i)));
-        let mut squarefree_part = poly_squarefree_part(&FpX, FpX.clone_el(&f_mod_p));
-        let lc_inv = Fp.div(&Fp.one(), FpX.lc(&squarefree_part).unwrap());
-        FpX.inclusion().mul_assign_map(&mut squarefree_part, lc_inv);
-
-        if FpX.eq_el(&squarefree_part, &f_mod_p) {
-
-            // we found a prime such that f remains square-free mod p;
-            // now we can use the factorization of `f mod p` to derive a factorization of f
-            let ZZbig = BigIntRing::RING;
-            let ZZ = StaticRing::<i64>::RING;
-
-            // we use Theorem 3.5.1 from "A course in computational algebraic number theory", Cohen
-            let poly_norm = int_bisect::root_floor(
-                &ZZbig, 
-                <_ as RingStore>::sum(&ZZbig, ZZX.terms(f)
-                    .map(|(c, _)| ZZbig.pow(int_cast(ZZX.base_ring().clone_el(c), &ZZbig, ZZX.base_ring()), 2))
-                ), 
-                2
-            );
-            let bound = ZZbig.add(
-                ZZbig.mul(poly_norm, binomial(int_cast(d as i64, ZZbig, ZZ), &int_cast(d as i64 / 2, ZZbig, ZZ), ZZbig)),
-                ZZbig.mul(
-                    int_cast(ZZX.base_ring().clone_el(ZZX.lc(f).unwrap()), ZZbig, ZZX.base_ring()), 
-                    binomial(int_cast(d as i64, ZZbig, ZZ), &int_cast(d as i64 / 2, ZZbig, ZZ), ZZbig)
-                )
-            );
-            let exponent = ZZbig.abs_log2_ceil(&bound).unwrap() / (ZZ.abs_log2_ceil(&(p + 1)).unwrap() - 1) + 1;
-            let modulus = ZZbig.pow(int_cast(p, &ZZbig, &ZZ), exponent);
-
-            return choose_zn_impl(ZZbig, modulus, FactorizeMonicIntegerPolynomialUsingHenselLifting {
-                poly: f, ZZX: ZZX, poly_mod_p: f_mod_p, FpX: FpX, bound
-            });
-        }
-    }
-    unreachable!()
-}
-
 impl<I> FactorPolyField for RationalFieldBase<I>
     where I: IntegerRingStore,
         I::Type: IntegerRing,
@@ -333,7 +193,7 @@ impl<I> FactorPolyField for RationalFieldBase<I>
             // this will make the polynomial integral
             let mut den_lcm = ZZ.one();
             for (c, _) in QQX.terms(&squarefree_part) {
-                den_lcm = algorithms::eea::signed_lcm(den_lcm, ZZ.clone_el(QQ.get_ring().den(c)), ZZ);
+                den_lcm = signed_lcm(den_lcm, ZZ.clone_el(QQ.get_ring().den(c)), ZZ);
             }
             let poly_d = QQX.degree(&squarefree_part).unwrap();
             let ZZX = DensePolyRing::new(ZZ, "X");
@@ -450,7 +310,8 @@ impl<'a, P> FiniteFieldOperation<<P::BaseRing as RingStore>::Type> for FactorPol
 
 impl<R> FactorPolyField for R
     where R: FreeAlgebra + Field + SpecializeToFiniteField,
-        <R::BaseRing as RingStore>::Type: FactorPolyField
+        <R::BaseRing as RingStore>::Type: FactorPolyField + InterpolationBaseRing,
+        for<'b> <<R::BaseRing as RingStore>::Type as InterpolationBaseRing>::ExtendedRingBase<'b>: Domain + PrincipalIdealRing
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: PolyRingStore,
@@ -491,17 +352,6 @@ impl<const N: u64> FactorPolyField for zn_static::ZnBase<N, true> {
 use test::Bencher;
 #[cfg(test)]
 use crate::rings::extension::extension_impl::*;
-
-#[test]
-fn test_factor_int_poly() {
-    let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
-    let f = poly_ring.from_terms([(2, 0), (1, 3)].into_iter());
-    let g = poly_ring.from_terms([(1, 0), (2, 1), (1, 2), (1, 4)].into_iter());
-    let actual = factor_integer_poly(&poly_ring, &poly_ring.mul_ref(&f, &g));
-    assert_eq!(2, actual.len());
-    assert_el_eq!(poly_ring, f, actual[0]);
-    assert_el_eq!(poly_ring, g, actual[1]);
-}
 
 #[test]
 fn test_factor_rational_poly() {

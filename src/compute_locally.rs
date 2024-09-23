@@ -1,15 +1,21 @@
 
-use crate::divisibility::DivisibilityRing;
+use crate::divisibility::{DivisibilityRing, Domain};
 use crate::homomorphism::*;
+use crate::pid::PrincipalIdealRing;
 use crate::ring::*;
 
 #[stability::unstable(feature = "enable")]
 pub trait InterpolationBaseRing: DivisibilityRing {
 
-    type ExtendedRingBase<'a>: ?Sized + DivisibilityRing
+    ///
+    /// Unfortunately, there is currently a compiler bug (https://github.com/rust-lang/rust/issues/100013) that
+    /// causes a problem when using `for<'a> SomeRing::ExtendedRingBase<'a>: PrincipalIdealRing + Domain`, thus
+    /// we have to currently restrict it here.
+    /// 
+    type ExtendedRingBase<'a>: ?Sized + DivisibilityRing + PrincipalIdealRing + Domain
         where Self: 'a;
 
-    type ExtendedRing<'a>: RingStore<Type = Self::ExtendedRingBase<'a>>
+    type ExtendedRing<'a>: RingStore<Type = Self::ExtendedRingBase<'a>> + Clone
         where Self: 'a;
 
     fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
@@ -26,6 +32,15 @@ pub trait InterpolationBaseRing: DivisibilityRing {
     /// 
     fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>);
 }
+
+#[stability::unstable(feature = "enable")]
+pub trait InterpolationBaseRingStore: RingStore
+    where Self::Type: InterpolationBaseRing
+{}
+
+impl<R> InterpolationBaseRingStore for R
+    where R: RingStore, R::Type: InterpolationBaseRing
+{}
 
 #[stability::unstable(feature = "enable")]
 pub struct ToExtRingMap<'a, R>
@@ -77,7 +92,7 @@ pub trait ComputeLocallyRing: RingBase {
     /// to allow it to reference both the ring itself and the current `LocalComputationData`.
     /// However, when doing this, I ran into the compiler bug (https://github.com/rust-lang/rust/issues/100013).
     /// 
-    type LocalRingBase<'ring>: ?Sized + RingBase
+    type LocalRingBase<'ring>: ?Sized + PrincipalIdealRing + Domain
         where Self: 'ring;
 
     type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>

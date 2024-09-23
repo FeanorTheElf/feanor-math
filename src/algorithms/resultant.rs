@@ -54,6 +54,9 @@ pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type a
 
     while ring.degree(&f).unwrap_or(0) >= 1 {
 
+        let balance_factor = ring.get_ring().balance_element(&mut f);
+        base_ring.mul_assign(&mut scale_num, base_ring.pow(balance_factor, ring.degree(&g).unwrap()));
+
         // use here that `res(f, g) = a^(-deg(f)) lc(f)^(deg(g) - deg(ag - fh)) res(f, ag - fh)` if `deg(fh) <= deg(g)`
         let deg_g = ring.degree(&g).unwrap();
         let (_q, r, a) = algorithms::poly_div::poly_div_domain(ring, g, &f);
@@ -81,11 +84,10 @@ pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type a
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn resultant_local<P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
-    where P: PolyRingStore + Copy,
+pub fn resultant_local<'a, P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
+    where P: 'a + PolyRingStore + Copy,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ComputeLocallyRing,
-        for<'a> <<<P::Type as RingExtension>::BaseRing as RingStore>::Type as ComputeLocallyRing>::LocalRingBase<'a>: PrincipalIdealRing + Domain
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ComputeLocallyRing
 {
     let base_ring = ring.base_ring();
     if ring.is_zero(&f) || ring.is_zero(&g) {
@@ -94,7 +96,6 @@ pub fn resultant_local<P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as RingExt
     let max_norm = ring.terms(&f).map(|(c, _)| base_ring.get_ring().pseudo_norm(c)).max_by(f64::total_cmp).unwrap().powi(ring.degree(&g).unwrap() as i32) *
         ring.terms(&g).map(|(c, _)| base_ring.get_ring().pseudo_norm(c)).max_by(f64::total_cmp).unwrap().powi(ring.degree(&f).unwrap() as i32);
     let work_locally = base_ring.get_ring().local_computation(max_norm);
-    println!("computing locally at {} points", base_ring.get_ring().local_ring_count(&work_locally));
     let mut resultants = Vec::new();
     for i in 0..base_ring.get_ring().local_ring_count(&work_locally) {
         let embedding = ToLocalRingMap::new(base_ring.get_ring(), &work_locally, i);
@@ -102,9 +103,7 @@ pub fn resultant_local<P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as RingExt
         let poly_ring_embedding = new_poly_ring.lifted_hom(ring, &embedding);
         let local_f = poly_ring_embedding.map_ref(&f);
         let local_g = poly_ring_embedding.map_ref(&g);
-        println!("found partial polys {} and {}", new_poly_ring.format(&local_f), new_poly_ring.format(&local_g));
         resultants.push(resultant_global(&new_poly_ring, local_f, local_g));
-        println!("found partial resultant {}", embedding.codomain().format(resultants.last().unwrap()));
     }
     return base_ring.get_ring().lift(&work_locally, &resultants);
 }
@@ -125,8 +124,6 @@ use crate::rings::local::AsLocalPIR;
 use crate::field::FieldStore;
 #[cfg(test)]
 use crate::integer::BigIntRing;
-#[cfg(test)]
-use std::sync::Arc;
 
 #[test]
 fn test_resultant() {
@@ -154,9 +151,9 @@ fn test_resultant() {
 #[test]
 fn test_resultant_polynomial() {
     let ZZ = BigIntRing::RING;
-    let QQ = Arc::new(AsLocalPIR::from_field(RationalField::new(ZZ)));
+    let QQ = AsLocalPIR::from_field(RationalField::new(ZZ));
     // we eliminate `Y`, so add it as the outer indeterminate
-    let QQX = DensePolyRing::new(QQ.clone(), "X");
+    let QQX = DensePolyRing::new(&QQ, "X");
     let QQXY = DensePolyRing::new(&QQX, "Y");
     let ZZ_to_QQ = QQ.int_hom();
 

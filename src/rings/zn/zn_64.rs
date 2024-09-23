@@ -1,4 +1,5 @@
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
+use crate::compute_locally::InterpolationBaseRing;
 use crate::delegate::DelegateRing;
 use crate::divisibility::*;
 use crate::impl_eq_based_self_iso;
@@ -10,11 +11,15 @@ use crate::ordered::OrderedRingStore;
 use crate::primitive_int::*;
 use crate::integer::*;
 use crate::pid::*;
+use crate::rings::extension::FreeAlgebraStore;
 use crate::ring::*;
+use crate::rings::extension::galois_field::GaloisField;
+use crate::seq::*;
+use crate::rings::extension::galois_field::GaloisFieldBase;
 use crate::serialization::SerializableElementRing;
-use algorithms::convolution::KaratsubaHint;
-use algorithms::matmul::ComputeInnerProduct;
-use algorithms::matmul::StrassenHint;
+use crate::algorithms::convolution::KaratsubaHint;
+use crate::algorithms::matmul::ComputeInnerProduct;
+use crate::algorithms::matmul::StrassenHint;
 use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
 
@@ -327,6 +332,38 @@ impl FromModulusCreateableZnRing for ZnBase {
     }
 }
 
+impl InterpolationBaseRing for AsFieldBase<Zn> {
+
+    type ExtendedRingBase<'a> = GaloisFieldBase<RingRef<'a, Self>>
+        where Self: 'a;
+
+    type ExtendedRing<'a> = GaloisField<RingRef<'a, Self>>
+        where Self: 'a;
+
+    fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
+        where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
+    {
+        let wrt_basis = ext_ring.wrt_canonical_basis(&el);
+        if wrt_basis.iter().skip(1).all(|x| self.is_zero(&x)) {
+            return Some(wrt_basis.at(0));
+        } else {
+            return None;
+        }
+    }
+
+    fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
+        where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
+    {
+        ext_ring.inclusion().map(el)
+    }
+
+    fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
+        let ring = generic_impls::interpolation_ring(RingRef::new(self), count);
+        let points = ring.elements().take(count).collect();
+        return (ring, points);
+    }
+}
+
 impl ComputeInnerProduct for ZnBase {
 
     fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, mut els: I) -> Self::Element
@@ -353,6 +390,18 @@ impl ComputeInnerProduct for ZnBase {
         }
 
         self.sum((0..).map(|_| body(self, &mut els)).take_while(|x| x.is_some()).map(|x| x.unwrap()))
+    }
+
+    fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
+        where Self::Element: 'a
+    {
+        self.inner_product(els.map(|(l, r)| (self.clone_el(l), r)))
+    }
+
+    fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
+        where Self::Element: 'a
+    {
+        self.inner_product_ref_fst(els.map(|(l, r)| (l, self.clone_el(r))))
     }
 }
 

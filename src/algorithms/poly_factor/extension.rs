@@ -1,5 +1,6 @@
 use crate::algorithms;
 use crate::algorithms::poly_factor::FactorPolyField;
+use crate::compute_locally::InterpolationBaseRing;
 use crate::divisibility::*;
 use crate::field::*;
 use crate::homomorphism::*;
@@ -15,11 +16,11 @@ use crate::integer::BigIntRing;
 
 use super::poly_squarefree_part;
 
-fn factor_squarefree_over_extension<'a, P>(LX: &'a P, f: El<P>) -> impl 'a + Iterator<Item = El<P>>
+fn factor_squarefree_over_extension<P>(LX: P, f: El<P>) -> Vec<El<P>>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra,
-        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyField,
+        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyField + InterpolationBaseRing
 {
     let L = LX.base_ring();
     let K = L.base_ring();
@@ -40,7 +41,7 @@ fn factor_squarefree_over_extension<'a, P>(LX: &'a P, f: El<P>) -> impl 'a + Ite
         );
         let gen_poly = L.generating_poly(&KXY, KX.inclusion());
     
-        algorithms::resultant::resultant_global(&KXY, f_over_KY, gen_poly)
+        return algorithms::resultant::resultant_local::<&DensePolyRing<_>>(&KXY, f_over_KY, gen_poly);
     };
 
     let characteristic = K.characteristic(&BigIntRing::RING).unwrap();
@@ -58,13 +59,13 @@ fn factor_squarefree_over_extension<'a, P>(LX: &'a P, f: El<P>) -> impl 'a + Ite
         if KX.degree(&squarefree_part).unwrap() == degree {
             let lin_transform_rev = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0), (L.one(), 1)].into_iter());
             let (factorization, _unit) = <_ as FactorPolyField>::factor_poly(&KX, &squarefree_part);
-            return factorization.into_iter().map(move |(factor, e)| {
+            return factorization.into_iter().map(|(factor, e)| {
                 assert!(e == 1);
                 let mut f_factor = LX.extended_ideal_gen(&f_transformed, &LX.lifted_hom(&KX, L.inclusion()).map(factor)).2;
                 let lc_inv = L.div(&L.one(), LX.lc(&f_factor).unwrap());
                 LX.inclusion().mul_assign_map(&mut f_factor, lc_inv);
                 return LX.evaluate(&f_factor, &lin_transform_rev, &LX.inclusion());
-            });
+            }).collect();
         }
     }
     unreachable!()
@@ -75,7 +76,7 @@ pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra,
-        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyField,
+        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyField + InterpolationBaseRing
 {
     let KX = &poly_ring;
     let K = KX.base_ring();

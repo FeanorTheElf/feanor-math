@@ -3,18 +3,22 @@ use std::fmt::Debug;
 use serde::de;
 use serde::{Deserializer, Serializer}; 
 
+use crate::compute_locally::InterpolationBaseRing;
 use crate::divisibility::DivisibilityRing;
 use crate::impl_localpir_wrap_unwrap_homs;
 use crate::impl_localpir_wrap_unwrap_isos;
 use crate::impl_wrap_unwrap_homs;
 use crate::impl_wrap_unwrap_isos;
+use crate::rings::extension::FreeAlgebraStore;
 use crate::pid::*;
 use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
 use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 use crate::homomorphism::*;
+use crate::seq::*;
 use crate::delegate::DelegateRing;
+use crate::rings::extension::galois_field::{GaloisField, GaloisFieldBase};
 use crate::rings::zn::*;
 
 ///
@@ -282,6 +286,38 @@ impl<I: IntegerRingStore> Clone for ZnBase<I>
     }
 }
 
+impl<I: IntegerRingStore> InterpolationBaseRing for AsFieldBase<Zn<I>>
+    where I::Type: IntegerRing
+{
+    type ExtendedRingBase<'a> = GaloisFieldBase<RingRef<'a, Self>>
+        where Self: 'a;
+
+    type ExtendedRing<'a> = GaloisField<RingRef<'a, Self>>
+        where Self: 'a;
+
+    fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
+        where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
+    {
+        let wrt_basis = ext_ring.wrt_canonical_basis(&el);
+        if wrt_basis.iter().skip(1).all(|x| self.is_zero(&x)) {
+            return Some(wrt_basis.at(0));
+        } else {
+            return None;
+        }
+    }
+
+    fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
+        where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
+    {
+        ext_ring.inclusion().map(el)
+    }
+
+    fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
+        let ring = generic_impls::interpolation_ring(RingRef::new(self), count);
+        let points = ring.elements().take(count).collect();
+        return (ring, points);
+    }
+}
 impl<I: IntegerRingStore> Copy for ZnBase<I> 
     where I: Copy,
         El<I>: Copy,
