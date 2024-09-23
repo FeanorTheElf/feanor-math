@@ -1,11 +1,12 @@
 use crate::algorithms::convolution::KaratsubaHint;
+use crate::algorithms::eea::{signed_gcd, signed_lcm};
 use crate::algorithms::matmul::StrassenHint;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::Field;
 use crate::homomorphism::{CanHomFrom, CanIsoFromTo};
 use crate::integer::{int_cast, IntegerRing, IntegerRingStore};
 use crate::ordered::{OrderedRing, OrderedRingStore};
-use crate::algorithms;
+use crate::{algorithms, impl_interpolation_base_ring_char_zero};
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::ring::*;
 
@@ -144,11 +145,15 @@ impl<I> RingBase for RationalFieldBase<I>
     type Element = RationalFieldEl<I>;
 
     fn add_assign(&self, lhs: &mut Self::Element, mut rhs: Self::Element) {
-        self.integers.mul_assign_ref(&mut lhs.0, &rhs.1);
-        self.integers.mul_assign_ref(&mut rhs.0, &lhs.1);
-        self.integers.mul_assign(&mut lhs.1, rhs.1);
-        self.integers.add_assign(&mut lhs.0, rhs.0);
-        self.reduce((&mut lhs.0, &mut lhs.1));
+        if self.integers.is_one(&lhs.1) && self.integers.is_one(&rhs.1) {
+            self.integers.add_assign(&mut lhs.0, rhs.0);
+        } else {
+            self.integers.mul_assign_ref(&mut lhs.0, &rhs.1);
+            self.integers.mul_assign_ref(&mut rhs.0, &lhs.1);
+            self.integers.mul_assign(&mut lhs.1, rhs.1);
+            self.integers.add_assign(&mut lhs.0, rhs.0);
+            self.reduce((&mut lhs.0, &mut lhs.1));
+        }
     }
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
@@ -156,10 +161,14 @@ impl<I> RingBase for RationalFieldBase<I>
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        self.integers.mul_assign_ref(&mut lhs.0, &rhs.1);
-        self.integers.add_assign(&mut lhs.0, self.integers.mul_ref(&lhs.1, &rhs.0));
-        self.integers.mul_assign_ref(&mut lhs.1, &rhs.1);
-        self.reduce((&mut lhs.0, &mut lhs.1));
+        if self.integers.is_one(&lhs.1) && self.integers.is_one(&rhs.1) {
+            self.integers.add_assign_ref(&mut lhs.0, &rhs.0);
+        } else {
+            self.integers.mul_assign_ref(&mut lhs.0, &rhs.1);
+            self.integers.add_assign(&mut lhs.0, self.integers.mul_ref(&lhs.1, &rhs.0));
+            self.integers.mul_assign_ref(&mut lhs.1, &rhs.1);
+            self.reduce((&mut lhs.0, &mut lhs.1));
+        }
     }
 
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -328,7 +337,19 @@ impl<I> DivisibilityRing for RationalFieldBase<I>
     fn is_unit(&self, x: &Self::Element) -> bool {
         !self.is_zero(x)
     }
+
+    fn balance_factor<'a, J>(&self, elements: J) -> Self::Element
+        where J: Iterator<Item = &'a Self::Element>,
+            Self:'a
+    {
+        let (num, den) = elements.fold(
+            (self.integers.zero(), self.integers.one()), 
+            |x, y| (signed_gcd(x.0, self.base_ring().clone_el(self.num(y)), self.base_ring()), signed_lcm(x.1, self.base_ring().clone_el(self.den(y)), self.base_ring())));
+        return RationalFieldEl(num, den);
+    }
 }
+
+impl_interpolation_base_ring_char_zero!{ <{I}> InterpolationBaseRing for RationalFieldBase<I> where I: IntegerRingStore, I::Type: IntegerRing }
 
 impl<I> PrincipalIdealRing for RationalFieldBase<I>
     where I: IntegerRingStore,

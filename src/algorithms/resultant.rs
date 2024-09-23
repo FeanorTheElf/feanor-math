@@ -1,8 +1,12 @@
+
+use crate::compute_locally::{ComputeLocallyRing, ToLocalRingMap};
 use crate::divisibility::{DivisibilityRingStore, Domain};
 use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::rings::poly::*;
 use crate::algorithms;
+use crate::homomorphism::*;
 use crate::ring::*;
+use crate::rings::poly::dense_poly::DensePolyRing;
 
 ///
 /// Computes the resultant of `f` and `g` over the base ring.
@@ -27,11 +31,11 @@ use crate::ring::*;
 /// // f = X^2 - 2X + 1
 /// let f = ZZX.from_terms([(2, 0), (-3, 1), (1, 2)].into_iter());
 /// // the discrimiant is the resultant of f and f'
-/// let discriminant = resultant(&ZZX, ZZX.clone_el(&f), derive_poly(&ZZX, &f));
+/// let discriminant = resultant_global(&ZZX, ZZX.clone_el(&f), derive_poly(&ZZX, &f));
 /// assert_eq!(9 - 8, discriminant);
 /// ```
 /// 
-pub fn resultant<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
+pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
     where P: PolyRingStore + Copy,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Domain + PrincipalIdealRing
@@ -49,6 +53,7 @@ pub fn resultant<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type as RingE
     }
 
     while ring.degree(&f).unwrap_or(0) >= 1 {
+
         // use here that `res(f, g) = a^(-deg(f)) lc(f)^(deg(g) - deg(ag - fh)) res(f, ag - fh)` if `deg(fh) <= deg(g)`
         let deg_g = ring.degree(&g).unwrap();
         let (_q, r, a) = algorithms::poly_div::poly_div_domain(ring, g, &f);
@@ -75,14 +80,39 @@ pub fn resultant<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type as RingE
     }
 }
 
-#[cfg(test)]
-use self::dense_poly::DensePolyRing;
+#[stability::unstable(feature = "enable")]
+pub fn resultant_local<P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
+    where P: PolyRingStore + Copy,
+        P::Type: PolyRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ComputeLocallyRing,
+        for<'a> <<<P::Type as RingExtension>::BaseRing as RingStore>::Type as ComputeLocallyRing>::LocalRingBase<'a>: PrincipalIdealRing + Domain
+{
+    let base_ring = ring.base_ring();
+    if ring.is_zero(&f) || ring.is_zero(&g) {
+        return base_ring.zero();
+    }
+    let max_norm = ring.terms(&f).map(|(c, _)| base_ring.get_ring().pseudo_norm(c)).max_by(f64::total_cmp).unwrap().powi(ring.degree(&g).unwrap() as i32) *
+        ring.terms(&g).map(|(c, _)| base_ring.get_ring().pseudo_norm(c)).max_by(f64::total_cmp).unwrap().powi(ring.degree(&f).unwrap() as i32);
+    let work_locally = base_ring.get_ring().local_computation(max_norm);
+    println!("computing locally at {} points", base_ring.get_ring().local_ring_count(&work_locally));
+    let mut resultants = Vec::new();
+    for i in 0..base_ring.get_ring().local_ring_count(&work_locally) {
+        let embedding = ToLocalRingMap::new(base_ring.get_ring(), &work_locally, i);
+        let new_poly_ring = DensePolyRing::new(embedding.codomain(), "X");
+        let poly_ring_embedding = new_poly_ring.lifted_hom(ring, &embedding);
+        let local_f = poly_ring_embedding.map_ref(&f);
+        let local_g = poly_ring_embedding.map_ref(&g);
+        println!("found partial polys {} and {}", new_poly_ring.format(&local_f), new_poly_ring.format(&local_g));
+        resultants.push(resultant_global(&new_poly_ring, local_f, local_g));
+        println!("found partial resultant {}", embedding.codomain().format(resultants.last().unwrap()));
+    }
+    return base_ring.get_ring().lift(&work_locally, &resultants);
+}
+
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::rings::rational::RationalField;
-#[cfg(test)]
-use crate::homomorphism::Homomorphism;
 #[cfg(test)]
 use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 #[cfg(test)]
@@ -95,6 +125,8 @@ use crate::rings::local::AsLocalPIR;
 use crate::field::FieldStore;
 #[cfg(test)]
 use crate::integer::BigIntRing;
+#[cfg(test)]
+use std::sync::Arc;
 
 #[test]
 fn test_resultant() {
@@ -105,26 +137,26 @@ fn test_resultant() {
     let f = ZZX.from_terms([(3, 0), (-5, 1), (1, 2)].into_iter());
     let g = ZZX.from_terms([(-5, 0), (2, 1)].into_iter());
 
-    assert_el_eq!(ZZ, 13, resultant(&ZZX, ZZX.clone_el(&f), ZZX.clone_el(&g)));
-    assert_el_eq!(ZZ, -13, resultant(&ZZX, g, f));
+    assert_el_eq!(ZZ, 13, resultant_global(&ZZX, ZZX.clone_el(&f), ZZX.clone_el(&g)));
+    assert_el_eq!(ZZ, -13, resultant_global(&ZZX, g, f));
 
     // if f and g have common factors, this should be zero
     let f = ZZX.from_terms([(1, 0), (-2, 1), (1, 2)].into_iter());
     let g = ZZX.from_terms([(-1, 0), (1, 2)].into_iter());
-    assert_el_eq!(ZZ, 0, resultant(&ZZX, f, g));
+    assert_el_eq!(ZZ, 0, resultant_global(&ZZX, f, g));
 
     // a slightly larger example
     let f = ZZX.from_terms([(5, 0), (-1, 1), (3, 2), (1, 4)].into_iter());
     let g = ZZX.from_terms([(-1, 0), (-1, 2), (1, 3), (4, 5)].into_iter());
-    assert_el_eq!(ZZ, 642632, resultant(&ZZX, f, g));
+    assert_el_eq!(ZZ, 642632, resultant_global(&ZZX, f, g));
 }
 
 #[test]
 fn test_resultant_polynomial() {
     let ZZ = BigIntRing::RING;
-    let QQ = AsLocalPIR::from_field(RationalField::new(ZZ));
+    let QQ = Arc::new(AsLocalPIR::from_field(RationalField::new(ZZ)));
     // we eliminate `Y`, so add it as the outer indeterminate
-    let QQX = DensePolyRing::new(&QQ, "X");
+    let QQX = DensePolyRing::new(QQ.clone(), "X");
     let QQXY = DensePolyRing::new(&QQX, "Y");
     let ZZ_to_QQ = QQ.int_hom();
 
@@ -142,7 +174,10 @@ fn test_resultant_polynomial() {
         (vec![(1, 0), (1, 1), (1, 2)], 2)
     ].into_iter().map(|(v, i)| (QQX.from_terms(v.into_iter().map(|(c, j)| (ZZ_to_QQ.map(c), j))), i)));
 
-    let mut actual = resultant(&QQXY, QQXY.clone_el(&f), QQXY.clone_el(&g));
+    let mut actual = resultant_global(&QQXY, QQXY.clone_el(&f), QQXY.clone_el(&g));
+    let actual_local = resultant_local(&QQXY, QQXY.clone_el(&f), QQXY.clone_el(&g));
+    assert_el_eq!(&QQX, &actual, &actual_local);
+
     let actual_lc_inv = QQ.div(&QQ.one(), QQX.lc(&actual).unwrap());
     QQX.inclusion().mul_assign_map(&mut actual, actual_lc_inv);
 

@@ -272,7 +272,6 @@ fn test_interpolate_multivariate() {
 
     for x in 0..5 {
         for y in 0..5 {
-            println!("{}, {}", x, y);
             let expected = (x * 5 + y) & 1;
             assert_el_eq!(ring, ring.int_hom().map(expected), poly_ring.evaluate(&poly, [ring.int_hom().map(x), ring.int_hom().map(y)].into_ring_el_fn(&ring), &ring.identity()));
         }

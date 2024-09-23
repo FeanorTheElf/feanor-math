@@ -30,7 +30,7 @@ fn factor_squarefree_over_extension<'a, P>(LX: &'a P, f: El<P>) -> impl 'a + Ite
     // Y will take the role of the ring generator `theta` and `X` remains the indeterminate
     let KXY = DensePolyRing::new(KX.clone(), "Y");
 
-    let N = |f: El<P>| {
+    let Norm = |f: El<P>| {
         let f_over_KY = <_ as RingStore>::sum(&KXY,
             LX.terms(&f).map(|(c, i)| {
                 let mut result = L.poly_repr(&KXY, c, KX.inclusion());
@@ -40,23 +40,20 @@ fn factor_squarefree_over_extension<'a, P>(LX: &'a P, f: El<P>) -> impl 'a + Ite
         );
         let gen_poly = L.generating_poly(&KXY, KX.inclusion());
     
-        algorithms::resultant::resultant(&KXY, f_over_KY, gen_poly)
+        algorithms::resultant::resultant_global(&KXY, f_over_KY, gen_poly)
     };
 
     let characteristic = K.characteristic(&BigIntRing::RING).unwrap();
 
     for k in 0.. {
-        println!("Trying {}", k);
         // TODO: change `k` to random for a certain set, and make a fixed characteristic assertion
         assert!(BigIntRing::RING.is_zero(&characteristic) || BigIntRing::RING.is_lt(&BigIntRing::RING.int_hom().map(k), &characteristic));
         let lin_transform = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(k)), 0), (L.one(), 1)].into_iter());
         let f_transformed = LX.evaluate(&f, &lin_transform, &LX.inclusion());
-        let norm_f_transformed = N(LX.clone_el(&f_transformed));
-        let degree = KX.degree(&norm_f_transformed).unwrap();
 
-        println!("Computing square-free part");
+        let norm_f_transformed = Norm(LX.clone_el(&f_transformed));
+        let degree = KX.degree(&norm_f_transformed).unwrap();
         let squarefree_part = poly_squarefree_part(&KX, norm_f_transformed);
-        println!("done");
 
         if KX.degree(&squarefree_part).unwrap() == degree {
             let lin_transform_rev = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0), (L.one(), 1)].into_iter());
@@ -97,9 +94,7 @@ pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>
     let mut result: Vec<(El<P>, usize)> = Vec::new();
     let mut current = KX.clone_el(f);
     while !KX.is_unit(&current) {
-        println!("Extracting square-free part");
         let mut squarefree_part = poly_squarefree_part(KX, KX.clone_el(&current));
-        println!("done");
         let lc_inv = K.div(&K.one(), KX.lc(&squarefree_part).unwrap());
         KX.inclusion().mul_assign_map(&mut squarefree_part, lc_inv);
         current = KX.checked_div(&current, &squarefree_part).unwrap();

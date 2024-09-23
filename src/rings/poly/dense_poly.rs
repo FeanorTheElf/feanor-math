@@ -1,13 +1,13 @@
 use serde::{Deserializer, Serializer};
 
-use crate::algorithms::eea::poly_pid_fractionfield_gcd;
 use crate::algorithms::convolution::*;
+use crate::algorithms::interpolate::interpolate;
+use crate::compute_locally::{ComputeLocallyRing, InterpolationBaseRing, ToExtRingMap};
 use crate::divisibility::*;
 use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::pid::*;
 use crate::field::Field;
 use crate::primitive_int::StaticRing;
-use crate::rings::rational::RationalFieldBase;
 use crate::ring::*;
 use crate::algorithms;
 use crate::rings::poly::*;
@@ -511,6 +511,62 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
     }
 }
 
+impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> ComputeLocallyRing for DensePolyRingBase<R, A, C> 
+    where R: RingStore,
+        R::Type: InterpolationBaseRing,
+        for<'ring> <R::Type as InterpolationBaseRing>::ExtendedRing<'ring>: Clone
+{
+    type LocalRing<'ring> = <R::Type as InterpolationBaseRing>::ExtendedRing<'ring>
+        where Self: 'ring;
+
+    type LocalRingBase<'ring> = <R::Type as InterpolationBaseRing>::ExtendedRingBase<'ring>
+        where Self: 'ring;
+
+    type LocalComputationData<'ring> = (ToExtRingMap<'ring, R::Type>, Vec<El<<R::Type as InterpolationBaseRing>::ExtendedRing<'ring>>>)
+        where Self: 'ring;
+
+    fn pseudo_norm(&self, el: &Self::Element) -> f64 {
+        if let Some(d) = self.degree(el) {
+            return (d as f64).exp();
+        } else {
+            return 0.;
+        }
+    }
+
+    fn local_computation<'ring>(&'ring self, uniquely_representable_norm: f64) -> Self::LocalComputationData<'ring> {
+        let required_points = uniquely_representable_norm.ln().ceil() as usize + 1;
+        ToExtRingMap::for_interpolation(self.base_ring().get_ring(), required_points)
+    }
+
+    fn local_ring_count<'ring>(&self, data: &Self::LocalComputationData<'ring>) -> usize 
+        where Self: 'ring
+    {
+        data.1.len()
+    }
+
+    fn local_ring_at<'ring>(&self, data: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
+        where Self: 'ring
+    {
+        assert!(i < self.local_ring_count(data));
+        data.0.codomain().clone()
+    }
+        
+    fn reduce<'ring>(&self, data: &Self::LocalComputationData<'ring>, el: &Self::Element) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
+        where Self: 'ring
+    {
+        return data.1.iter().map(|x| self.evaluate(el, x, &data.0)).collect::<Vec<_>>();
+    }
+        
+    fn lift<'ring>(&self, data: &Self::LocalComputationData<'ring>, els: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
+        where Self: 'ring
+    {
+        let base_ring = RingRef::new(data.0.codomain().get_ring());
+        let new_ring = DensePolyRing::new(base_ring, self.unknown_name);
+        let result_in_extension = interpolate(&new_ring, (&data.1).into_ring_el_fn(data.0.codomain()), els.into_ring_el_fn(data.0.codomain()), &self.element_allocator).unwrap();
+        return RingRef::new(self).from_terms(new_ring.terms(&result_in_extension).map(|(c, i)| (data.0.as_base_ring_el(base_ring.clone_el(c)), i)));
+    }
+}
+
 impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> Domain for DensePolyRingBase<R, A, C> 
     where R: RingStore, R::Type: Domain
 {}
@@ -520,13 +576,18 @@ impl<R, A: Allocator + Clone, C> DivisibilityRing for DensePolyRingBase<R, A, C>
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if let Some(d) = self.degree(rhs) {
-            let lc = &rhs.data[d];
-            let mut lhs_copy = self.clone_el(lhs);
-            let quo = self.poly_div(&mut lhs_copy, rhs, |x| self.base_ring().checked_left_div(&x, lc))?;
-            if self.is_zero(&lhs_copy) {
-                Some(quo)
+            if d == 0 {
+                let rhs = self.coefficient_at(rhs, 0);
+                return RingRef::new(self).try_from_terms(self.terms(lhs).map(|(c, i)| (self.base_ring().checked_left_div(c, rhs).map(|c| (c, i)).ok_or(())))).ok();
             } else {
-                None
+                let lc = &rhs.data[d];
+                let mut lhs_copy = self.clone_el(lhs);
+                let quo = self.poly_div(&mut lhs_copy, rhs, |x| self.base_ring().checked_left_div(&x, lc))?;
+                if self.is_zero(&lhs_copy) {
+                    Some(quo)
+                } else {
+                    None
+                }
             }
         } else if self.is_zero(lhs) {
             Some(self.zero())
@@ -534,72 +595,12 @@ impl<R, A: Allocator + Clone, C> DivisibilityRing for DensePolyRingBase<R, A, C>
             None
         }
     }
-}
 
-///
-/// Workaround to allow specialization on `base_ring() == QQ`.
-/// 
-trait ImplPrincipalIdealRing: Field {
-
-    fn extended_ideal_gen<P, R, A, C>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
-        where P: PolyRingStore<Type = DensePolyRingBase<R, A, C>>,
-            R: RingStore<Type = Self>,
-            A: Allocator + Clone, 
-            C: ConvolutionAlgorithm<R::Type>;
-
-    fn ideal_gen<P, R, A, C>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: PolyRingStore<Type = DensePolyRingBase<R, A, C>>,
-            R: RingStore<Type = Self>,
-            A: Allocator + Clone, 
-            C: ConvolutionAlgorithm<R::Type>;
-}
-
-impl<F: ?Sized + Field> ImplPrincipalIdealRing for F {
-
-    default fn extended_ideal_gen<P, R, A, C>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
-        where P: PolyRingStore<Type = DensePolyRingBase<R, A, C>>,
-            R: RingStore<Type = Self>,
-            A: Allocator + Clone, 
-            C: ConvolutionAlgorithm<R::Type>
+    fn balance_factor<'a, I>(&self, elements: I) -> Self::Element
+        where I: Iterator<Item =  &'a Self::Element>,
+            Self: 'a
     {
-        algorithms::eea::eea(poly_ring.clone_el(lhs), poly_ring.clone_el(rhs), poly_ring)
-    }
-
-    default fn ideal_gen<P, R, A, C>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: PolyRingStore<Type = DensePolyRingBase<R, A, C>>,
-            R: RingStore<Type = Self>,
-            A: Allocator + Clone, 
-            C: ConvolutionAlgorithm<R::Type>
-    {
-        <Self as ImplPrincipalIdealRing>::extended_ideal_gen::<P, R, A, C>(poly_ring, lhs, rhs).2
-    }
-}
-
-impl<I: IntegerRingStore> ImplPrincipalIdealRing for RationalFieldBase<I>
-    where I::Type: IntegerRing
-{
-    fn extended_ideal_gen<P, R, A, C>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<P>)
-        where P: PolyRingStore<Type = DensePolyRingBase<R, A, C>>,
-            R: RingStore<Type = Self>,
-            A: Allocator + Clone, 
-            C: ConvolutionAlgorithm<R::Type>
-    {
-        algorithms::eea::eea(poly_ring.clone_el(lhs), poly_ring.clone_el(rhs), poly_ring)
-    }
-
-    fn ideal_gen<P, R, A, C>(poly_ring: &P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: PolyRingStore<Type = DensePolyRingBase<R, A, C>>,
-            R: RingStore<Type = Self>,
-            A: Allocator + Clone, 
-            C: ConvolutionAlgorithm<R::Type>
-    {
-        let QQ = poly_ring.base_ring();
-        let ZZX = DensePolyRing::new(QQ.base_ring(), "X");
-        let lhs_factor = poly_ring.terms(lhs).map(|(c, _)| c).fold(QQ.one(), |x, y| QQ.lcm(&x, y));
-        let lhs = ZZX.from_terms(poly_ring.terms(lhs).map(|(c, d)| (QQ.base_ring().clone_el(QQ.get_ring().num(&QQ.mul_ref(c, &lhs_factor))), d)));
-        let rhs_factor = poly_ring.terms(rhs).map(|(c, _)| c).fold(QQ.one(), |x, y| QQ.lcm(&x, y));
-        let rhs = ZZX.from_terms(poly_ring.terms(rhs).map(|(c, d)| (QQ.base_ring().clone_el(QQ.get_ring().num(&QQ.mul_ref(c, &rhs_factor))), d)));
-        return poly_ring.lifted_hom(&ZZX, QQ.inclusion()).map(poly_pid_fractionfield_gcd(&ZZX, &lhs, &rhs));
+        RingRef::new(self).inclusion().map(self.base_ring().get_ring().balance_factor(elements.flat_map(|f| self.terms(f).map(|(c, _)| c))))
     }
 }
 
@@ -622,11 +623,7 @@ impl<R, A: Allocator + Clone, C> PrincipalIdealRing for DensePolyRingBase<R, A, 
     }
 
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        <R::Type as ImplPrincipalIdealRing>::extended_ideal_gen(&RingRef::new(self), lhs, rhs)
-    }
-
-    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        <R::Type as ImplPrincipalIdealRing>::ideal_gen(&RingRef::new(self), lhs, rhs)
+        algorithms::eea::polynomial_eea_global(self.clone_el(lhs), self.clone_el(rhs), &RingRef::new(self))
     }
 }
 

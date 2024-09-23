@@ -45,10 +45,10 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
     /// or `Integers: RingStore<Type: IntegerRing>`
     /// 
     type IntegerRingBase: IntegerRing + ?Sized;
-    type Integers: RingStore<Type = Self::IntegerRingBase>;
+    type IntegerRing: RingStore<Type = Self::IntegerRingBase>;
 
-    fn integer_ring(&self) -> &Self::Integers;
-    fn modulus(&self) -> &El<Self::Integers>;
+    fn integer_ring(&self) -> &Self::IntegerRing;
+    fn modulus(&self) -> &El<Self::IntegerRing>;
 
     ///
     /// Computes the smallest positive lift for some `x` in `Z/nZ`, i.e. the smallest positive integer `m` such that
@@ -57,15 +57,15 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
     /// This will be one of `0, 1, ..., n - 1`. If an integer in `-(n - 1)/2, ..., -1, 0, 1, ..., (n - 1)/2` (for odd `n`)
     /// is needed instead, use [`ZnRing::smallest_lift()`].
     /// 
-    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers>;
+    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::IntegerRing>;
 
     ///
     /// Computes any lift for some `x` in `Z/nZ`, i.e. the some integer `m` such that `m = x mod n`.
     /// 
     /// The only requirement is that `m` is a valid element of the integer ring, in particular that
-    /// it fits within the required amount of bits, if `Self::Integers` is a fixed-size integer ring.
+    /// it fits within the required amount of bits, if [`ZnRing::IntegerRing`] is a fixed-size integer ring.
     /// 
-    fn any_lift(&self, el: Self::Element) -> El<Self::Integers> {
+    fn any_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
         self.smallest_positive_lift(el)
     }
 
@@ -83,7 +83,7 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
     /// of the ring (i.e. operations involving it may not follow the ring axioms).
     /// Implementors are strongly encouraged to check the element during debug builds. 
     /// 
-    fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element;
+    fn from_int_promise_reduced(&self, x: El<Self::IntegerRing>) -> Self::Element;
 
     ///
     /// Computes the smallest lift for some `x` in `Z/nZ`, i.e. the smallest integer `m` such that
@@ -92,7 +92,7 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
     /// This will be one of `-(n - 1)/2, ..., -1, 0, 1, ..., (n - 1)/2` (for odd `n`). If an integer 
     /// in `0, 1, ..., n - 1` is needed instead, use [`ZnRing::smallest_positive_lift()`].
     /// 
-    fn smallest_lift(&self, el: Self::Element) -> El<Self::Integers> {
+    fn smallest_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
         let result = self.smallest_positive_lift(el);
         let mut mod_half = self.integer_ring().clone_el(self.modulus());
         self.integer_ring().euclidean_div_pow_2(&mut mod_half, 1);
@@ -122,7 +122,7 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
 pub trait FromModulusCreateableZnRing: Sized + ZnRing {
 
     fn create<F, E>(create_modulus: F) -> Result<Self, E>
-        where F: FnOnce(&Self::IntegerRingBase) -> Result<El<Self::Integers>, E>;
+        where F: FnOnce(&Self::IntegerRingBase) -> Result<El<Self::IntegerRing>, E>;
 }
 
 pub mod generic_impls {
@@ -210,7 +210,7 @@ pub mod generic_impls {
     #[stability::unstable(feature = "enable")]
     pub fn map_in_from_bigint<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing, F, G>(from: &I, to: &R, to_large_int_ring: &J, el: I::Element, hom: &BigIntToZnHom<I, J, R>, from_positive_representative_exact: F, from_positive_representative_bounded: G) -> R::Element
         where I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>,
-            F: FnOnce(El<R::Integers>) -> R::Element,
+            F: FnOnce(El<R::IntegerRing>) -> R::Element,
             G: FnOnce(J::Element) -> R::Element
     {
         let (neg, n) = if from.is_neg(&el) {
@@ -299,11 +299,11 @@ pub mod generic_impls {
 pub trait ZnRingStore: FiniteRingStore
     where Self::Type: ZnRing
 {    
-    delegate!{ ZnRing, fn integer_ring(&self) -> &<Self::Type as ZnRing>::Integers }
-    delegate!{ ZnRing, fn modulus(&self) -> &El<<Self::Type as ZnRing>::Integers> }
-    delegate!{ ZnRing, fn smallest_positive_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::Integers> }
-    delegate!{ ZnRing, fn smallest_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::Integers> }
-    delegate!{ ZnRing, fn any_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::Integers> }
+    delegate!{ ZnRing, fn integer_ring(&self) -> &<Self::Type as ZnRing>::IntegerRing }
+    delegate!{ ZnRing, fn modulus(&self) -> &El<<Self::Type as ZnRing>::IntegerRing> }
+    delegate!{ ZnRing, fn smallest_positive_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::IntegerRing> }
+    delegate!{ ZnRing, fn smallest_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::IntegerRing> }
+    delegate!{ ZnRing, fn any_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::IntegerRing> }
     delegate!{ ZnRing, fn is_field(&self) -> bool }
 
     fn as_field(self) -> Result<RingValue<AsFieldBase<Self>>, Self> 
@@ -421,7 +421,7 @@ pub struct ReductionMap<R, S>
     from: R,
     to: S,
     fraction_of_quotients: El<R>,
-    to_modulus: El<<R::Type as ZnRing>::Integers>,
+    to_modulus: El<<R::Type as ZnRing>::IntegerRing>,
     to_from_int: <S::Type as CanHomFrom<<S::Type as ZnRing>::IntegerRingBase>>::Homomorphism,
     from_from_int: <R::Type as CanHomFrom<<R::Type as ZnRing>::IntegerRingBase>>::Homomorphism,
     map_forward_requirement: ReductionMapRequirements

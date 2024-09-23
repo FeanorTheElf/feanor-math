@@ -1,6 +1,7 @@
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::*;
+use crate::compute_locally::InterpolationBaseRing;
 use crate::delegate::DelegateRing;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::Field;
@@ -354,7 +355,7 @@ impl<R> FromModulusCreateableZnRing for AsLocalPIRBase<RingValue<R>>
     where R: DivisibilityRing + ZnRing + FromModulusCreateableZnRing
 {
     fn create<F, E>(create_modulus: F) -> Result<Self, E>
-        where F:FnOnce(&Self::IntegerRingBase) -> Result<El<Self::Integers>, E> 
+        where F:FnOnce(&Self::IntegerRingBase) -> Result<El<Self::IntegerRing>, E> 
     {
         <R as FromModulusCreateableZnRing>::create(create_modulus).map(|ring| AsLocalPIR::from_zn(RingValue::from(ring)).unwrap().into())
     }
@@ -363,6 +364,33 @@ impl<R> FromModulusCreateableZnRing for AsLocalPIRBase<RingValue<R>>
 impl<R: DivisibilityRingStore> Field for AsLocalPIRBase<R> 
     where R::Type: DivisibilityRing + Field
 {}
+
+impl<R> InterpolationBaseRing for AsLocalPIRBase<R>
+    where R: RingStore,
+        R::Type: InterpolationBaseRing
+{
+    type ExtendedRingBase<'a> = <R::Type as InterpolationBaseRing>::ExtendedRingBase<'a>
+        where Self: 'a;
+
+    type ExtendedRing<'a> = <R::Type as InterpolationBaseRing>::ExtendedRing<'a>
+        where Self: 'a;
+
+    fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
+        where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
+    {
+        self.get_delegate().in_base(ext_ring, el).map(|x| self.rev_delegate(x))
+    }
+
+    fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
+        where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
+    {
+        self.get_delegate().in_extension(ext_ring, self.delegate(el))
+    }
+
+    fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
+        self.get_delegate().interpolation_points(count)
+    }
+}
 
 impl<R1, R2> CanHomFrom<AsFieldBase<R1>> for AsLocalPIRBase<R2>
     where R1: RingStore, R2: RingStore,

@@ -88,6 +88,17 @@ pub trait PolyRing: RingExtension {
         assert!(from.base_ring().get_ring() == hom.domain().get_ring());
         RingRef::new(self).from_terms(from.terms(el).map(|(c, i)| (hom.map_ref(c), i)))
     }
+    
+    #[stability::unstable(feature = "enable")]
+    fn balance_element(&self, f: &mut Self::Element) -> El<Self::BaseRing>
+        where <Self::BaseRing as RingStore>::Type: DivisibilityRing
+    {
+        let balance_factor = self.base_ring().get_ring().balance_factor(self.terms(f).map(|(c, _)| c));
+        if !self.base_ring().is_one(&balance_factor) {
+            *f = RingRef::new(self).from_terms(self.terms(f).map(|(c, i)| (self.base_ring().checked_div(c, &balance_factor).unwrap(), i)));
+        }
+        return balance_factor;
+    }
 
     ///
     /// Evaluates the given polynomial at the given values.
@@ -153,6 +164,22 @@ pub trait PolyRingStore: RingStore
         return result;
     }
 
+    fn try_from_terms<E, I>(&self, iter: I) -> Result<El<Self>, E>
+        where I: IntoIterator<Item = Result<(El<<Self::Type as RingExtension>::BaseRing>, usize), E>>,
+    {
+        let mut result = self.zero();
+        let mut error = None;
+        self.get_ring().add_assign_from_terms(&mut result, iter.into_iter().map(|t| match t {
+            Ok(t) => Some(t),
+            Err(e) => { error = Some(e); None }
+        }).take_while(|t| t.is_some()).map(|t| t.unwrap()));
+        if let Some(e) = error {
+            return Err(e);
+        } else {
+            return Ok(result);
+        }
+    }
+
     ///
     /// Returns a reference to the leading coefficient of the given polynomial, or `None` if the
     /// polynomial is zero.
@@ -184,7 +211,7 @@ pub trait PolyRingStore: RingStore
         if self.is_zero(&f) {
             return f;
         } else if let Some(inv_lc) = self.base_ring().invert(self.lc(&f).unwrap()) {
-            self.inclusion().mul_assign_map_ref(&mut f, &inv_lc);
+            self.inclusion().mul_assign_ref_map(&mut f, &inv_lc);
             return f;
         } else {
             let lc = self.lc(&f).unwrap();
@@ -221,7 +248,7 @@ pub trait PolyRingStore: RingStore
     {
         self.into_lifted_hom(from, hom)
     }
-
+    
     ///
     /// Invokes the function with a wrapped version of the indeterminate of this poly ring.
     /// Use for convenient creation of polynomials.

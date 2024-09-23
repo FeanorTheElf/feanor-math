@@ -44,7 +44,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
         self.codomain().mul_assign(lhs, self.map(rhs))
     }
 
-    fn mul_assign_map_ref(&self, lhs: &mut Codomain::Element, rhs: &Domain::Element) {
+    fn mul_assign_ref_map(&self, lhs: &mut Codomain::Element, rhs: &Domain::Element) {
         self.codomain().mul_assign(lhs, self.map_ref(rhs))
     }
 
@@ -58,7 +58,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
     }
 
     fn mul_ref_snd_map(&self, mut lhs: Codomain::Element, rhs: &Domain::Element) -> Codomain::Element {
-        self.mul_assign_map_ref(&mut lhs, rhs);
+        self.mul_assign_ref_map(&mut lhs, rhs);
         lhs
     }
 
@@ -633,12 +633,12 @@ impl<R> Homomorphism<<<R::Type as RingExtension>::BaseRing as RingStore>::Type, 
         self.ring.get_ring().from_ref(x)
     }
 
-    fn mul_assign_map_ref(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: &<<<R::Type as RingExtension>::BaseRing as RingStore>::Type as RingBase>::Element) {
+    fn mul_assign_ref_map(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: &<<<R::Type as RingExtension>::BaseRing as RingStore>::Type as RingBase>::Element) {
         self.ring.get_ring().mul_assign_base(lhs, rhs)
     }
 
     fn mul_assign_map(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: <<<R::Type as RingExtension>::BaseRing as RingStore>::Type as RingBase>::Element) {
-        self.mul_assign_map_ref(lhs, &rhs)
+        self.mul_assign_ref_map(lhs, &rhs)
     }
 }
 
@@ -690,7 +690,7 @@ impl<R> Homomorphism<StaticRingBase<i32>, R::Type> for IntHom<R>
         self.ring.get_ring().mul_assign_int(lhs, rhs)
     }
 
-    fn mul_assign_map_ref(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: &<StaticRingBase<i32> as RingBase>::Element) {
+    fn mul_assign_ref_map(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: &<StaticRingBase<i32> as RingBase>::Element) {
         self.mul_assign_map(lhs, *rhs)
     }
 }
@@ -763,8 +763,8 @@ impl<'a, S, R, H> Homomorphism<S, R> for &'a H
         (*self).mul_assign_map(lhs, rhs)
     }
 
-    fn mul_assign_map_ref(&self, lhs: &mut <R as RingBase>::Element, rhs: &<S as RingBase>::Element) {
-        (*self).mul_assign_map_ref(lhs, rhs)
+    fn mul_assign_ref_map(&self, lhs: &mut <R as RingBase>::Element, rhs: &<S as RingBase>::Element) {
+        (*self).mul_assign_ref_map(lhs, rhs)
     }
 }
 
@@ -889,7 +889,7 @@ impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
         self.g.mul_assign_map(lhs, self.f.map(rhs))
     }
 
-    fn mul_assign_map_ref(&self, lhs: &mut <T as RingBase>::Element, rhs: &<R as RingBase>::Element) {
+    fn mul_assign_ref_map(&self, lhs: &mut <T as RingBase>::Element, rhs: &<R as RingBase>::Element) {
         self.g.mul_assign_map(lhs, self.f.map_ref(rhs))
     }
 }
@@ -1028,8 +1028,8 @@ pub mod generic_tests {
                     let map_a = hom.map_ref(a);
                     let prod_map = hom.map(from.mul_ref(a, b));
                     let mut mul_assign = to.clone_el(&map_a);
-                    hom.mul_assign_map_ref( &mut mul_assign, b);
-                    assert!(to.eq_el(&mul_assign, &prod_map), "mul_assign_map_ref() failed: hom({} * {}) = {} != {} = mul_map_in(hom({}), {})", from.format(a), from.format(b), to.format(&prod_map), to.format(&mul_assign), to.format(&map_a), from.format(b));
+                    hom.mul_assign_ref_map( &mut mul_assign, b);
+                    assert!(to.eq_el(&mul_assign, &prod_map), "mul_assign_ref_map() failed: hom({} * {}) = {} != {} = mul_map_in(hom({}), {})", from.format(a), from.format(b), to.format(&prod_map), to.format(&mul_assign), to.format(&map_a), from.format(b));
                 }
             }
         }

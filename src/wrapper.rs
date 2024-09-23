@@ -174,7 +174,7 @@ macro_rules! impl_trait_int {
             type Output = RingElementWrapper<R>;
 
             fn $fn_name(self, rhs: RingElementWrapper<R>) -> Self::Output {
-                RingElementWrapper { element: rhs.ring.$fn_name(rhs.element, rhs.ring.int_hom().map(self)), ring: rhs.ring }
+                RingElementWrapper { element: rhs.ring.$fn_name(rhs.ring.int_hom().map(self), rhs.element), ring: rhs.ring }
             }
         }
 
@@ -190,7 +190,7 @@ macro_rules! impl_trait_int {
             type Output = RingElementWrapper<R>;
 
             fn $fn_name(self, rhs: &'a RingElementWrapper<R>) -> Self::Output {
-                RingElementWrapper { element: rhs.ring.$fn_name(rhs.ring.clone_el(&rhs.element), rhs.ring.int_hom().map(self)), ring: rhs.ring.clone() }
+                RingElementWrapper { element: rhs.ring.$fn_name(rhs.ring.int_hom().map(self), rhs.ring.clone_el(&rhs.element)), ring: rhs.ring.clone() }
             }
         }
     };

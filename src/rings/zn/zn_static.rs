@@ -230,17 +230,17 @@ impl<const N: u64, const IS_FIELD: bool> FiniteRing for ZnBase<N, IS_FIELD> {
 
 impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD> {
     type IntegerRingBase = StaticRingBase<i64>;
-    type Integers = RingValue<StaticRingBase<i64>>;
+    type IntegerRing = RingValue<StaticRingBase<i64>>;
 
-    fn integer_ring(&self) -> &Self::Integers {
+    fn integer_ring(&self) -> &Self::IntegerRing {
         &StaticRing::<i64>::RING
     }
 
-    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
+    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
         el as i64
     }
 
-    fn modulus(&self) -> &El<Self::Integers> {
+    fn modulus(&self) -> &El<Self::IntegerRing> {
         &(N as i64)
     }
 
@@ -248,7 +248,7 @@ impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD> {
         is_prime(N)
     }
 
-    fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element {
+    fn from_int_promise_reduced(&self, x: El<Self::IntegerRing>) -> Self::Element {
         debug_assert!(x >= 0);
         debug_assert!((x as u64) < N);
         x as u64

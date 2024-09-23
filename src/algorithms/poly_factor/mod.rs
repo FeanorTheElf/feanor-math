@@ -258,13 +258,11 @@ fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
         ZnBase: CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
-    println!("Factoring {}", ZZX.format(f));
     let d = ZZX.degree(f).unwrap();
     assert!(ZZX.base_ring().is_one(ZZX.lc(f).unwrap()));
 
     // Cantor-Zassenhaus does not directly work for p = 2, so skip the first prime
     for p in erathostenes::enumerate_primes(&StaticRing::<i64>::RING, &1000).into_iter().skip(1) {
-        println!("Trying to factor by considering mod {}", p);
 
         // check whether `f mod p` is also square-free, there are only finitely many primes
         // where this would not be the case
@@ -319,7 +317,6 @@ impl<I> FactorPolyField for RationalFieldBase<I>
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        println!("Factoring {}", poly_ring.format(poly));
         assert!(!poly_ring.is_zero(poly));
         let QQX = &poly_ring;
         let QQ = QQX.base_ring();
@@ -414,7 +411,7 @@ impl<'a, P> FiniteFieldOperation<<P::BaseRing as RingStore>::Type> for FactorPol
                     let lc = poly_ring.lc(&current).unwrap();
                     poly_ring.base_ring().mul_assign_ref(&mut unit, lc);
                     let lc_inv = poly_ring.base_ring().div(&poly_ring.base_ring().one(), lc);
-                    poly_ring.inclusion().mul_assign_map_ref(&mut current, &lc_inv);
+                    poly_ring.inclusion().mul_assign_ref_map(&mut current, &lc_inv);
 
                     if poly_ring.is_one(&current) {
                         continue;
@@ -525,8 +522,15 @@ fn test_factor_rational_poly() {
     let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
     assert_eq!(1, actual.len());
     assert_eq!(1, actual[0].1);
-    assert_el_eq!(QQ, QQ.one(), unit);
     assert_el_eq!(&poly_ring, f, &actual[0].0);
+    assert_el_eq!(QQ, QQ.one(), unit);
+
+    let [mut f] = poly_ring.with_wrapped_indeterminate(|X| [16 - 32 * X + 104 * X.pow_ref(2) - 8 * 11 * X.pow_ref(3) + 121 * X.pow_ref(4)]);
+    poly_ring.inclusion().mul_assign_map(&mut f, QQ.div(&QQ.one(), &QQ.int_hom().map(121)));
+    let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
+    assert_eq!(1, actual.len());
+    assert_eq!(2, actual[0].1);
+    assert_el_eq!(QQ, QQ.one(), unit);
 }
 
 #[test]
@@ -586,6 +590,16 @@ fn test_poly_squarefree_part() {
     ].into_iter());
     let squarefree_part = ring.normalize(poly_squarefree_part(&ring, a));
     assert_el_eq!(ring, b, squarefree_part);
+
+    let QQ = RationalField::new(BigIntRing::RING);
+    let poly_ring = DensePolyRing::new(&QQ, "X");
+    let [mut f] = poly_ring.with_wrapped_indeterminate(|X| [16 - 32 * X + 104 * X.pow_ref(2) - 8 * 11 * X.pow_ref(3) + 121 * X.pow_ref(4)]);
+    poly_ring.inclusion().mul_assign_map(&mut f, QQ.div(&QQ.one(), &QQ.int_hom().map(121)));
+    let actual = poly_squarefree_part(&poly_ring, poly_ring.clone_el(&f));
+    poly_ring.println(&f);
+    poly_ring.println(&derive_poly(&poly_ring, &f));
+    poly_ring.println(&poly_ring.ideal_gen(&f, &derive_poly(&poly_ring, &f)));
+    assert_eq!(2, poly_ring.degree(&actual).unwrap());
 }
 
 #[test]

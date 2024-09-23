@@ -321,7 +321,7 @@ impl SerializableElementRing for ZnBase {
 impl FromModulusCreateableZnRing for ZnBase {
 
     fn create<F, E>(create_modulus: F) -> Result<Self, E>
-        where F: FnOnce(&Self::IntegerRingBase) -> Result<El<Self::Integers>, E>
+        where F: FnOnce(&Self::IntegerRingBase) -> Result<El<Self::IntegerRing>, E>
     {
         create_modulus(StaticRing::<i64>::RING.get_ring()).map(|n| Self::new(n as u64))
     }
@@ -587,17 +587,17 @@ impl KaratsubaHint for ZnBase {
 impl ZnRing for ZnBase {
 
     type IntegerRingBase = StaticRingBase<i64>;
-    type Integers = StaticRing<i64>;
+    type IntegerRing = StaticRing<i64>;
 
-    fn integer_ring(&self) -> &Self::Integers {
+    fn integer_ring(&self) -> &Self::IntegerRing {
         &StaticRing::<i64>::RING
     }
 
-    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
+    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
         self.complete_reduce(el.0) as i64
     }
 
-    fn smallest_lift(&self, ZnEl(mut value_u64): Self::Element) -> El<Self::Integers> {
+    fn smallest_lift(&self, ZnEl(mut value_u64): Self::Element) -> El<Self::IntegerRing> {
         debug_assert!(value_u64 <= self.repr_bound());
         // value is in [0, 6 * self.modulus]
         if value_u64 >= 3 * self.modulus_u64() {
@@ -621,11 +621,11 @@ impl ZnRing for ZnBase {
         return value_i64;
     }
 
-    fn modulus(&self) -> &El<Self::Integers> {
+    fn modulus(&self) -> &El<Self::IntegerRing> {
         &self.modulus
     }
 
-    fn any_lift(&self, el: Self::Element) -> El<Self::Integers> {
+    fn any_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
         el.0 as i64
     }
 
@@ -655,7 +655,7 @@ impl ZnRing for ZnBase {
     /// ring.get_ring().from_int_promise_reduced(43);
     /// ```
     /// 
-    fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element {
+    fn from_int_promise_reduced(&self, x: El<Self::IntegerRing>) -> Self::Element {
         debug_assert!(self.repr_bound() == 6 * self.modulus_u64());
         debug_assert!(x >= 0);
         debug_assert!(x as u64 <= self.repr_bound());
@@ -850,7 +850,7 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
             a.0 -= self.modulus_times_three;
         }
         let mut b = *values.at(i2);
-        hom.mul_assign_map_ref(&mut b, twiddle);
+        hom.mul_assign_ref_map(&mut b, twiddle);
 
         // this is implied by `bounded_reduce`, check anyway
         debug_assert!(a.0 <= self.modulus_times_three);
@@ -868,7 +868,7 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
         *values.at_mut(i1) = self.add(a, b);
         // this works, as mul_assign_map_in_ref() works with values up to 6 * self.modulus
         *values.at_mut(i2) = self.from_u64_promise_reduced(a.0 + self.modulus_times_three - b.0);
-        hom.mul_assign_map_ref(values.at_mut(i2), twiddle);
+        hom.mul_assign_ref_map(values.at_mut(i2), twiddle);
     }
 }
 

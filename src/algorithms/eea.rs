@@ -1,11 +1,11 @@
-use crate::divisibility::Domain;
+use crate::field::Field;
+use crate::homomorphism::Homomorphism;
 use crate::pid::*;
 use crate::divisibility::*;
 use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::ordered::{OrderedRingStore, OrderedRing};
 use crate::ring::*;
-use crate::rings::poly::{PolyRing, PolyRingStore};
-use crate::algorithms::poly_div::poly_div_domain;
+use crate::rings::poly::*;
 
 use std::mem::swap;
 use std::cmp::Ordering;
@@ -98,43 +98,41 @@ pub fn signed_eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
     }
 }
 
-///
-/// Similar to [`gcd()`] for polynomial rings over PIDs. In contrast to [`gcd()`], this
-/// function computes the gcd of a polynomial with coefficients in a PID over the fraction
-/// field, which can be much faster than the complete gcd.
-/// 
-/// More concretely, this computes the greatest common divisor `d in R[X]` in the
-/// polynomial ring over the field of fractions `Frac(R)[X]`. In particular, a Bezout identity
-/// `s * fst + t * snd = d` does not have to exist, but it always exists a scaled Bezout
-/// identity `s * fst + t * snd = u * d` for a (possibly large) unit `u` in `R`.
-/// 
-/// Furthermore, the result gcd will be primitive.
-/// 
-pub fn poly_pid_fractionfield_gcd<P>(ring: P, fst: &El<P>, snd: &El<P>) -> El<P>
-    where P: PolyRingStore + Copy,
-        P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Domain + PrincipalIdealRing
+#[stability::unstable(feature = "enable")]
+pub fn polynomial_eea_global<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>) 
+    where R: RingStore,
+        R::Type: PolyRing + EuclideanRing,
+        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: Field
 {
-    if ring.is_zero(&fst) {
-        return ring.clone_el(snd);
-    } else if ring.is_zero(&snd) {
-        return ring.clone_el(fst);
-    }
+    let (mut a, mut b) = (ring.clone_el(&fst), ring.clone_el(&snd));
 
-    let reduce = |x: &El<P>| {
-        let content = ring.terms(&x).map(|(c, _)| c).fold(ring.base_ring().zero(), |x, y| ring.base_ring().ideal_gen(&x, y));
-        return ring.from_terms(ring.terms(&x).map(|(c, d)| (ring.base_ring().checked_div(c, &content).unwrap(), d)));
-    };
+    let a_balance_factor = ring.get_ring().balance_element(&mut a);
+    let b_balance_factor = ring.get_ring().balance_element(&mut b);
 
-    let mut a = reduce(fst);
-    let mut b = reduce(snd);
+    let (mut sa, mut ta) = (ring.inclusion().map(ring.base_ring().invert(&a_balance_factor).unwrap()), ring.zero());
+    let (mut sb, mut tb) = (ring.zero(), ring.inclusion().map(ring.base_ring().invert(&b_balance_factor).unwrap()));
 
     while !ring.is_zero(&b) {
-        let (_quo, rem, _scaling_factor) = poly_div_domain(ring, a, &b);
-        a = reduce(&rem);
+        let balance_factor = ring.get_ring().balance_element(&mut b);
+        let inv_balance_factor = ring.base_ring().invert(&balance_factor).unwrap();
+        ring.inclusion().mul_assign_ref_map(&mut tb, &inv_balance_factor);
+        ring.inclusion().mul_assign_ref_map(&mut sb, &inv_balance_factor);
+
+        let scale_factor = ring.base_ring().pow(ring.base_ring().clone_el(ring.lc(&b).unwrap()), ring.degree(&b).unwrap());
+        ring.inclusion().mul_assign_ref_map(&mut a, &scale_factor);
+        ring.inclusion().mul_assign_ref_map(&mut ta, &scale_factor);
+        ring.inclusion().mul_assign_ref_map(&mut sa, &scale_factor);
+
+        let (quo, rem) = ring.euclidean_div_rem(a, &b);
+        ta = ring.sub(ta, ring.mul_ref(&quo, &tb));
+        sa = ring.sub(sa, ring.mul_ref(&quo, &sb));
+        a = rem;
+        
         swap(&mut a, &mut b);
+        swap(&mut sa, &mut sb);
+        swap(&mut ta, &mut tb);
     }
-    return a;
+    return (sa, ta, a);
 }
 
 /// 
@@ -240,6 +238,10 @@ pub fn inv_crt<I>(a: El<I>, b: El<I>, p: &El<I>, q: &El<I>, ZZ: I) -> El<I>
 use crate::primitive_int::*;
 #[cfg(test)]
 use crate::rings::poly::dense_poly::DensePolyRing;
+#[cfg(test)]
+use crate::integer::BigIntRing;
+#[cfg(test)]
+use crate::rings::rational::RationalField;
 
 #[test]
 fn test_gcd() {
@@ -297,15 +299,15 @@ fn test_signed_lcm() {
 }
 
 #[test]
-fn test_poly_eea() {
-    let ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
-    let expected_gcd = ring.from_terms([(7, 0), (1, 3)].into_iter());
-    let f = ring.from_terms([(3, 0), (-1, 2), (4, 3), (1, 5)].into_iter());
-    let g = ring.from_terms([(7, 0), (14, 1), (35, 2), (-14, 4)].into_iter());
+fn test_polynomial_eea_global() {
+    let ring = DensePolyRing::new(RationalField::new(BigIntRing::RING), "X");
+    let [f, g, expected_gcd] = ring.with_wrapped_indeterminate(|X| [
+        (X.pow_ref(2) + 1) * (X.pow_ref(3) + 2),
+        (X.pow_ref(2) + 1) * (2 * X + 1),
+        X.pow_ref(2) + 1
+    ]);
 
-    let fst = ring.mul_ref(&f, &expected_gcd);
-    let snd = ring.mul_ref(&g, &expected_gcd);
-    let actual_gcd = poly_pid_fractionfield_gcd(&ring, &fst, &snd);
-    // we want the gcd to be maximally reduced, so this should do the job
-    assert_el_eq!(ring, expected_gcd, actual_gcd);
+    let (s, t, actual_gcd) = polynomial_eea_global(ring.clone_el(&f), ring.clone_el(&g), &ring);
+    assert_el_eq!(ring, &expected_gcd, actual_gcd);
+    assert_el_eq!(ring, &expected_gcd, ring.add(ring.mul_ref(&s, &f), ring.mul_ref(&t, &g)));
 }

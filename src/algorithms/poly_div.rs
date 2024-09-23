@@ -45,7 +45,7 @@ pub fn poly_div<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_rin
                 rhs_ring.terms(rhs)
                     .map(|(c, j)| {
                         let mut subtract = lhs_ring.base_ring().clone_el(&quo);
-                        hom.mul_assign_map_ref(&mut subtract, c);
+                        hom.mul_assign_ref_map(&mut subtract, c);
                         return (lhs_ring.base_ring().negate(subtract), i + j);
                     })
             );

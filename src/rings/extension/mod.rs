@@ -139,7 +139,7 @@ pub trait FreeAlgebra: RingExtension {
     {
         assert!(!self.is_zero(el));
         let base_ring = hom.codomain();
-        let mut lhs = OwnedMatrix::zero(self.rank(), self.rank(), base_ring);
+        let mut lhs = OwnedMatrix::zero(self.rank(), self.rank(), &base_ring);
         let mut current = self.one();
         for j in 0..self.rank() {
             let wrt_basis = self.wrt_canonical_basis(&current);
@@ -149,12 +149,12 @@ pub trait FreeAlgebra: RingExtension {
             drop(wrt_basis);
             self.mul_assign_ref(&mut current, el);
         }
-        let mut rhs = OwnedMatrix::zero(self.rank(), 1, base_ring);
+        let mut rhs = OwnedMatrix::zero(self.rank(), 1, &base_ring);
         let wrt_basis = self.wrt_canonical_basis(&current);
         for i in 0..self.rank() {
             *rhs.at_mut(i, 0) = base_ring.negate(hom.map(wrt_basis.at(i)));
         }
-        let mut sol = OwnedMatrix::zero(self.rank(), 1, base_ring);
+        let mut sol = OwnedMatrix::zero(self.rank(), 1, &base_ring);
         base_ring.solve_right(lhs.data_mut(), rhs.data_mut(), sol.data_mut()).assert_solved();
 
         return poly_ring.from_terms((0..self.rank()).map(|i| (base_ring.clone_el(sol.at(i, 0)), i)).chain([(base_ring.one(), self.rank())].into_iter()));

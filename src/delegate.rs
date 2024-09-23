@@ -411,25 +411,25 @@ impl<R: DelegateRing + ?Sized> ZnRing for R
         R: CanHomFrom<<R::Base as ZnRing>::IntegerRingBase>
 {
     type IntegerRingBase = <R::Base as ZnRing>::IntegerRingBase;
-    type Integers = <R::Base as ZnRing>::Integers;
+    type IntegerRing = <R::Base as ZnRing>::IntegerRing;
 
-    default fn integer_ring(&self) -> &Self::Integers {
+    default fn integer_ring(&self) -> &Self::IntegerRing {
         self.get_delegate().integer_ring()
     }
 
-    default fn modulus(&self) -> &El<Self::Integers> {
+    default fn modulus(&self) -> &El<Self::IntegerRing> {
         self.get_delegate().modulus()
     }
 
-    default fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
+    default fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
         self.get_delegate().smallest_positive_lift(self.delegate(self.rev_element_cast(el)))
     }
 
-    default fn smallest_lift(&self, el: Self::Element) -> El<Self::Integers> {
+    default fn smallest_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
         self.get_delegate().smallest_lift(self.delegate(self.rev_element_cast(el)))
     }
 
-    default fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element {
+    default fn from_int_promise_reduced(&self, x: El<Self::IntegerRing>) -> Self::Element {
         self.element_cast(self.rev_delegate(self.get_delegate().from_int_promise_reduced(x)))
     }
 }

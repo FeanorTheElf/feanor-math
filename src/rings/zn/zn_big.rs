@@ -300,7 +300,7 @@ impl<I: IntegerRingStore + Default> FromModulusCreateableZnRing for ZnBase<I>
     where I::Type: IntegerRing
 {
     fn create<F, E>(create_modulus: F) -> Result<Self, E>
-        where F: FnOnce(&Self::IntegerRingBase) -> Result<El<Self::Integers>, E>
+        where F: FnOnce(&Self::IntegerRingBase) -> Result<El<Self::IntegerRing>, E>
     {
         let ZZ = I::default();
         let modulus = create_modulus(ZZ.get_ring())?;
@@ -518,17 +518,17 @@ impl<I: IntegerRingStore> ZnRing for ZnBase<I>
     where I::Type: IntegerRing
 {
     type IntegerRingBase = I::Type;
-    type Integers = I;
+    type IntegerRing = I;
 
-    fn integer_ring(&self) -> &Self::Integers {
+    fn integer_ring(&self) -> &Self::IntegerRing {
         &self.integer_ring
     }
 
-    fn modulus(&self) -> &El<Self::Integers> {
+    fn modulus(&self) -> &El<Self::IntegerRing> {
         &self.modulus
     }
 
-    fn smallest_positive_lift(&self, mut el: Self::Element) -> El<Self::Integers> {
+    fn smallest_positive_lift(&self, mut el: Self::Element) -> El<Self::IntegerRing> {
         if self.integer_ring.eq_el(&el.0, &self.twice_modulus) {
             return self.integer_ring.zero();
         }
@@ -539,7 +539,7 @@ impl<I: IntegerRingStore> ZnRing for ZnBase<I>
         return el.0;
     }
 
-    fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element {
+    fn from_int_promise_reduced(&self, x: El<Self::IntegerRing>) -> Self::Element {
         debug_assert!(!self.integer_ring().is_neg(&x));
         debug_assert!(self.integer_ring().is_lt(&x, self.modulus()));
         ZnEl(x)

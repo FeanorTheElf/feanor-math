@@ -4,10 +4,10 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::algorithms::bigint::highest_set_block;
 use crate::divisibility::DivisibilityRing;
 use crate::divisibility::Domain;
-use crate::pid::*;
+use crate::{impl_interpolation_base_ring_char_zero, pid::*};
 use crate::integer::*;
 use crate::ordered::*;
-use crate::primitive_int::StaticRingBase;
+use crate::primitive_int::*;
 use crate::ring::*;
 use crate::algorithms;
 use crate::serialization::SerializableElementRing;
@@ -388,6 +388,8 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
     }
 }
 
+impl_interpolation_base_ring_char_zero!{ <{A}> InterpolationBaseRing for RustBigintRingBase<A> where A: Allocator + Clone }
+
 impl<A: Allocator + Clone> IntegerRing for RustBigintRingBase<A> {
 
     fn to_float_approx(&self, value: &Self::Element) -> f64 {
@@ -466,8 +468,6 @@ impl<A: Allocator + Clone> IntegerRing for RustBigintRingBase<A> {
     }
 }
 
-#[cfg(test)]
-use crate::primitive_int::*;
 #[cfg(test)]
 use crate::homomorphism::*;
 

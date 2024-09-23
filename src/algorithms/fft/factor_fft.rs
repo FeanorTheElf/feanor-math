@@ -124,7 +124,7 @@ impl<R_main, R_twiddle, H, T1, T2> CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, 
         }).collect::<Vec<_>>()
     }
     
-    fn ring(&self) -> &<H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
+    fn ring<'a>(&'a self) -> &'a <H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
         self.hom.codomain()
     }
 }
@@ -170,7 +170,7 @@ impl<R_main, R_twiddle, H, T1, T2> FFTAlgorithm<R_main> for CoprimeCooleyTuckeyF
             self.left_table.unordered_fft(&mut v, ring);
         }
         for i in 0..self.len() {
-            self.hom.mul_assign_map_ref(values.at_mut(i), self.inv_twiddle_factors.at(i));
+            self.hom.mul_assign_ref_map(values.at_mut(i), self.inv_twiddle_factors.at(i));
         }
         for i in 0..self.left_table.len() {
             let mut v = SubvectorView::new(&mut values).restrict((i * self.right_table.len())..((i + 1) * self.right_table.len()));
@@ -188,7 +188,7 @@ impl<R_main, R_twiddle, H, T1, T2> FFTAlgorithm<R_main> for CoprimeCooleyTuckeyF
             self.right_table.unordered_inv_fft(&mut v, ring);
         }
         for i in 0..self.len() {
-            self.hom.mul_assign_map_ref(values.at_mut(i), self.twiddle_factors.at(i));
+            self.hom.mul_assign_ref_map(values.at_mut(i), self.twiddle_factors.at(i));
             debug_assert!(self.ring().get_ring().is_approximate() || self.hom.domain().is_one(&self.hom.domain().mul_ref(self.twiddle_factors.at(i), self.inv_twiddle_factors.at(i))));
         }
         for i in 0..self.right_table.len() {

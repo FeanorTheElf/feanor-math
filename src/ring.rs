@@ -796,6 +796,7 @@ pub trait RingExtensionStore: RingStore
     fn inclusion<'a>(&'a self) -> Inclusion<&'a Self> {
         self.into_inclusion()
     }
+
 }
 
 impl<R: RingStore> RingExtensionStore for R
@@ -862,6 +863,7 @@ pub trait RingExtension: RingBase {
     fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {
         self.mul_assign(lhs, self.from_ref(rhs));
     }
+
 }
 
 ///
@@ -1003,6 +1005,10 @@ impl<'a, R: RingBase + ?Sized> RingRef<'a, R> {
 
     pub const fn new(value: &'a R) -> Self {
         RingRef { ring: value }
+    }
+
+    pub fn into(self) -> &'a R {
+        self.ring
     }
 }
 

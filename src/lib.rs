@@ -135,3 +135,5 @@ pub mod serialization;
 /// Contains a workaround for specialization.
 /// 
 pub mod specialization;
+
+pub mod compute_locally;

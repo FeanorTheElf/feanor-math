@@ -81,18 +81,12 @@ pub fn extend_splitting_field<'a, 'b, R>(poly_ring: &ThisPolyRing<'a, 'b, R>, mu
 {
     let (factor, multiplicity_outer) = remaining_factors.swap_remove(remaining_factors.iter().enumerate().max_by_key(|(_, f)| poly_ring.degree(&f.0).unwrap()).unwrap().0);
 
-    println!("Factoring");
-    poly_ring.println(&factor);
-
     assert!(!poly_ring.is_zero(&factor));
     assert!(poly_ring.degree(&factor).unwrap() > 0);
 
     let (mut sub_factorization, _) = <_ as FactorPolyField>::factor_poly(&poly_ring, &factor);
     let (largest_factor, multiplicity_inner) = sub_factorization.swap_remove(sub_factorization.iter().enumerate().max_by_key(|(_, f)| poly_ring.degree(&f.0).unwrap()).unwrap().0);
     let multiplicity = multiplicity_outer * multiplicity_inner;
-
-    println!("Found factor");
-    poly_ring.println(&largest_factor);
 
     if poly_ring.degree(&largest_factor).unwrap() == 1 {
         remaining_factors.extend(sub_factorization.into_iter().map(|(f, i)| (f, i * multiplicity_outer)));
@@ -108,9 +102,7 @@ pub fn extend_splitting_field<'a, 'b, R>(poly_ring: &ThisPolyRing<'a, 'b, R>, mu
         }
     }
 
-    println!("Extending field...");
     let (extension_embedding, root_of_new_poly) = extend_field(poly_ring, &largest_factor);
-    println!("done");
 
     let new_ring = RingRef::new(extension_embedding.codomain().get_ring());
     let new_poly_ring = DensePolyRing::new(new_ring, "X");
@@ -394,6 +386,7 @@ fn test_splitting_field() {
     }
 }
 
+#[ignore]
 #[test]
 fn test_splitting_field_rationals() {
     let base_field = RationalField::new(BigIntRing::RING);

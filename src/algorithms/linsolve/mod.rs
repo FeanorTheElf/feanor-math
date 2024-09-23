@@ -1,5 +1,6 @@
 use std::alloc::{Allocator, Global};
 
+use crate::divisibility::DivisibilityRing;
 use crate::matrix::{AsPointerToSlice, SubmatrixMut};
 use crate::pid::PrincipalIdealRing;
 use crate::ring::*;
@@ -17,11 +18,6 @@ pub mod smith;
 /// Contains the algorithm for solving linear systems over free ring extensions.
 /// 
 pub mod extension;
-///
-/// Contains the algorithm for computing a determinant via polynomial interpolation.
-/// Currently experimental.
-/// 
-pub mod poly_det;
 
 ///
 /// Result of trying to solve a linear system.
@@ -54,7 +50,7 @@ impl SolveResult {
 ///
 /// Class for rings over which we can solve linear systems.
 /// 
-pub trait LinSolveRing: RingBase {
+pub trait LinSolveRing: DivisibilityRing {
 
     ///
     /// Tries to find a matrix `X` such that `lhs * X = rhs`.

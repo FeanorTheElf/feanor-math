@@ -720,17 +720,17 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> ZnRing for ZnBas
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     type IntegerRingBase = J::Type;
-    type Integers = J;
+    type IntegerRing = J;
 
-    fn integer_ring(&self) -> &Self::Integers {
+    fn integer_ring(&self) -> &Self::IntegerRing {
         self.total_ring.integer_ring()
     }
 
-    fn modulus(&self) -> &El<Self::Integers> {
+    fn modulus(&self) -> &El<Self::IntegerRing> {
         self.total_ring.modulus()
     }
 
-    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::Integers> {
+    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
         self.total_ring.smallest_positive_lift(
             <Self as CanIsoFromTo<zn_big::ZnBase<J>>>::map_out(
                 self, 
@@ -741,7 +741,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> ZnRing for ZnBas
         )
     }
 
-    fn smallest_lift(&self, el: Self::Element) -> El<Self::Integers> {
+    fn smallest_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
         self.total_ring.smallest_lift(
             <Self as CanIsoFromTo<zn_big::ZnBase<J>>>::map_out(
                 self, 
@@ -756,7 +756,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> ZnRing for ZnBas
         self.components.len() == 1 && self.components[0].is_field()
     }
 
-    fn from_int_promise_reduced(&self, x: El<Self::Integers>) -> Self::Element {
+    fn from_int_promise_reduced(&self, x: El<Self::IntegerRing>) -> Self::Element {
         debug_assert!(!self.integer_ring().is_neg(&x));
         debug_assert!(self.integer_ring().is_lt(&x, self.modulus()));
         RingRef::new(self).can_hom(self.integer_ring()).unwrap().map(x)

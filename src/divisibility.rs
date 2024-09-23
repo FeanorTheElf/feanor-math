@@ -53,6 +53,24 @@ pub trait DivisibilityRing: RingBase {
     fn is_unit(&self, x: &Self::Element) -> bool {
         self.checked_left_div(&self.one(), x).is_some()
     }
+
+    ///
+    /// Function that computes a "balancing" factor of a sequence of ring elements.
+    /// The only use of the balancing factor is to increase performance, in particular,
+    /// dividing all elements in the sequence by this factor should make them 
+    /// "smaller" resp. cheaper to process.
+    /// 
+    /// Standard cases are reducing fractions (where the sequence would be exactly two
+    /// elements), or polynomials over fields (where we often want to scale the polynomial
+    /// to make all denominators 1).
+    /// 
+    #[stability::unstable(feature = "enable")]
+    fn balance_factor<'a, I>(&self, _elements: I) -> Self::Element
+        where I: Iterator<Item = &'a Self::Element>,
+            Self: 'a
+    {
+        self.one()
+    }
 }
 
 ///

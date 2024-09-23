@@ -263,7 +263,6 @@ fn test_generic_pow_shortest_chain_table() {
 #[test]
 fn test_shortest_addition_chain_table() {
     for i in 0..SHORTEST_ADDITION_CHAINS.len() {
-        println!("{}", i);
         assert_eq!(i, SHORTEST_ADDITION_CHAINS[i].0 + SHORTEST_ADDITION_CHAINS[i].1);
     }
 }

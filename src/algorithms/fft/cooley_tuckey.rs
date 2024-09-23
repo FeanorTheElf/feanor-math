@@ -152,6 +152,7 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
         let root_of_unity_list = Self::create_root_of_unity_list(ring.get_ring(), &mut root_of_unity_pow, log2_n);
         let inv_root_of_unity_list = Self::create_root_of_unity_list(ring.get_ring(), |i| root_of_unity_pow(-i), log2_n);
         let root_of_unity = root_of_unity_pow(1);
+
         CooleyTuckeyFFT {
             root_of_unity: hom.map(root_of_unity), 
             hom, 
@@ -185,6 +186,7 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
         let root_of_unity_list = Self::create_root_of_unity_list(ring.get_ring(), &mut root_of_unity_pow, log2_n);
         let inv_root_of_unity_list = Self::create_root_of_unity_list(ring.get_ring(), |i| root_of_unity_pow(-i), log2_n);
         let root_of_unity = root_of_unity_pow(1);
+        
         CooleyTuckeyFFT {
             root_of_unity: hom.map(root_of_unity), 
             hom, 
@@ -227,6 +229,7 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
     {
         let ring_as_field = hom.domain().as_field().ok().unwrap();
         let root_of_unity = ring_as_field.get_ring().unwrap_element(algorithms::unity_root::get_prim_root_of_unity_pow2(&ring_as_field, log2_n)?);
+        drop(ring_as_field);
         Some(Self::new_with_hom(hom, root_of_unity, log2_n))
     }
 
@@ -294,7 +297,7 @@ impl<R, S> CooleyTuckeyButterfly<S> for R
 {
     #[inline(always)]
     default fn butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: &H, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
-        hom.mul_assign_map_ref(values.at_mut(i2), twiddle);
+        hom.mul_assign_ref_map(values.at_mut(i2), twiddle);
         let new_a = self.add_ref(values.at(i1), values.at(i2));
         let a = std::mem::replace(values.at_mut(i1), new_a);
         self.sub_self_assign(values.at_mut(i2), a);
@@ -305,7 +308,7 @@ impl<R, S> CooleyTuckeyButterfly<S> for R
         let new_a = self.add_ref(values.at(i1), values.at(i2));
         let a = std::mem::replace(values.at_mut(i1), new_a);
         self.sub_self_assign(values.at_mut(i2), a);
-        hom.mul_assign_map_ref(values.at_mut(i2), twiddle);
+        hom.mul_assign_ref_map(values.at_mut(i2), twiddle);
     }
 }
 
@@ -314,7 +317,7 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>
 {
-    fn ring(&self) -> &<H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
+    fn ring<'a>(&'a self) -> &'a <H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
         self.hom.codomain()
     }
 
@@ -468,7 +471,7 @@ impl<R_main, R_twiddle, H> FFTAlgorithm<R_main> for CooleyTuckeyFFT<R_main, R_tw
         self.unordered_fft_dispatch::<V, true>(&mut values);
         let inv = self.hom.domain().invert(&self.hom.domain().int_hom().map(1 << self.log2_n)).unwrap();
         for i in 0..values.len() {
-            self.hom.mul_assign_map_ref(values.at_mut(i), &inv);
+            self.hom.mul_assign_ref_map(values.at_mut(i), &inv);
 
         }
     }
@@ -558,8 +561,8 @@ fn run_fft_bench_round<R, S, H>(fft: &CooleyTuckeyFFT<S, R, H>, data: &Vec<S::El
 {
     copy.clear();
     copy.extend(data.iter().map(|x| fft.ring().clone_el(x)));
-    fft.unordered_fft(&mut copy[..], fft.ring());
-    fft.unordered_inv_fft(&mut copy[..], fft.ring());
+    fft.unordered_fft(&mut copy[..], &fft.ring());
+    fft.unordered_inv_fft(&mut copy[..], &fft.ring());
     assert_el_eq!(fft.ring(), copy[0], data[0]);
 }
 
