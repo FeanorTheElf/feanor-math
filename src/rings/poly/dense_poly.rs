@@ -622,7 +622,7 @@ impl<R, A: Allocator + Clone, C> PrincipalIdealRing for DensePolyRingBase<R, A, 
     }
 
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        algorithms::eea::polynomial_eea_global(self.clone_el(lhs), self.clone_el(rhs), &RingRef::new(self))
+        algorithms::eea::poly::poly_eea_global(self.clone_el(lhs), self.clone_el(rhs), &RingRef::new(self))
     }
 }
 

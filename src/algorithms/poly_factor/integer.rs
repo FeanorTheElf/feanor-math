@@ -53,7 +53,8 @@ pub fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
             let ZZbig = BigIntRing::RING;
             let ZZ = StaticRing::<i64>::RING;
 
-            // we use Theorem 3.5.1 from "A course in computational algebraic number theory", Cohen
+            // we use Theorem 3.5.1 from "A course in computational algebraic number theory", Cohen,
+            // or equivalently Ex. 20 from Chapter 4.6.2 in Knuth's Art
             let poly_norm = int_bisect::root_floor(
                 &ZZbig, 
                 <_ as RingStore>::sum(&ZZbig, ZZX.terms(f)

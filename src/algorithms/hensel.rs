@@ -20,11 +20,8 @@ pub fn hensel_lift<P, R, S>(target_ring: P, source_ring: R, prime_ring: S, f: &E
     where P: PolyRingStore, P::Type: PolyRing,
         R: PolyRingStore, R::Type: PolyRing,
         S: PolyRingStore, S::Type: PolyRing + EuclideanRing,
-        <<P as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
         <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
-        <<R as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
         <<<R as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
-        <<S as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
         <<<S as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
     let ZZ = prime_ring.base_ring().integer_ring();
@@ -84,11 +81,8 @@ pub fn hensel_lift_factorization<P, R, S>(target_ring: P, source_ring: R, prime_
     where P: PolyRingStore + Copy, P::Type: PolyRing,
         R: PolyRingStore + Copy, R::Type: PolyRing,
         S: PolyRingStore + Copy, S::Type: PolyRing + EuclideanRing,
-        <<P as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
         <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
-        <<R as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
         <<<R as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
-        <<S as RingStore>::Type as RingExtension>::BaseRing: ZnRingStore,
         <<<S as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
     if factors.len() == 1 {

@@ -171,7 +171,7 @@ impl<R> FactorPolyField for R
     where R: FreeAlgebra + Field + SpecializeToFiniteField,
         <R::BaseRing as RingStore>::Type: FactorPolyField + InterpolationBaseRing
 {
-    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
+    default fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: PolyRingStore,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>

@@ -7,12 +7,14 @@ use crate::homomorphism::*;
 use crate::ordered::OrderedRingStore;
 use crate::pid::EuclideanRing;
 use crate::pid::PrincipalIdealRingStore;
+use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::extension::FreeAlgebra;
 use crate::rings::extension::FreeAlgebraStore;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::{PolyRing, PolyRingStore};
-use crate::integer::BigIntRing;
+use crate::integer::*;
+use crate::MAX_PROBABILISTIC_REPETITIONS;
 
 use super::poly_squarefree_part;
 
@@ -44,11 +46,31 @@ fn factor_squarefree_over_extension<P>(LX: P, f: El<P>) -> Vec<El<P>>
         return algorithms::resultant::resultant_local::<&DensePolyRing<_>>(&KXY, f_over_KY, gen_poly);
     };
 
-    let characteristic = K.characteristic(&BigIntRing::RING).unwrap();
+    // we want to find `k` such that `N(f(X + k theta))` remains square-free, where `theta` generates `L`;
+    // there are only finitely many `k` that don't work, by the following idea:
+    // Write `f = f1 ... fr` for the factorization of `f`, where `r <= d`. Then `N(f(X + k theta))` is not
+    // square-free, iff there exist `i != j` and `sigma` such that `fi(X + k theta) = sigma(fj(X + k theta)) = sigma(fj)(X + k sigma(theta))`.
+    // Now note that for given `i, j, sigma`, `fi(X + k theta) = sigma(fj)(X + k sigma(theta))` for at most one `k`, as otherwise
+    // `fi(a (k1 - k2) theta) sigma(theta)) = sigma(fj)(a (k1 - k2) sigma(theta))` for all `a in Z` (evaluation is ring hom).
+    //
+    // Now note that `fi(X) - sigma(fj(X))` is a linear combination of `X^m` and `sigma(X^m)`, i.e. of `deg(fi) + deg(fj) <= d`
+    // basic functions. The vectors `(a1 theta)^m, ..., (al theta)^m` for `m <= deg(fi)` and `sigma(a1 theta)^m, ..., sigma(al theta)^m`
+    // for `m <= deg(fj)` are all linearly independent (assuming `a1, ..., al` distinct and `l >= deg(fi) + deg(fj) + 2`), 
+    // thus `char(K) >= d + 2` (or `char(K) = 0`) implies that `fi = fj = 0`, a contradiction.
+    //
+    // Thus we find that there are at most `d(d + 1)/2 * [L : K]` many `k` such that `N(f(X + k theta))` is not squarefree.
+    // This would even work if `k` is not an integer, but any element of `K`. Note that we still require `char(K) >= d + 2` for
+    // the previous paragraph to work.
 
-    for k in 0.. {
-        // TODO: change `k` to random for a certain set, and make a fixed characteristic assertion
-        assert!(BigIntRing::RING.is_zero(&characteristic) || BigIntRing::RING.is_lt(&BigIntRing::RING.int_hom().map(k), &characteristic));
+    let ZZbig = BigIntRing::RING;
+    let characteristic = K.characteristic(&ZZbig).unwrap();
+    let bound = LX.degree(&f).unwrap() * LX.degree(&f).unwrap() * L.rank();
+    assert!(ZZbig.is_zero(&characteristic) || ZZbig.is_geq(&characteristic, &int_cast(bound as i64, ZZbig, StaticRing::<i64>::RING)));
+
+    let mut rng = oorandom::Rand64::new(1);
+
+    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+        let k = StaticRing::<i32>::RING.get_uniformly_random(&(bound as i32), || rng.rand_u64());
         let lin_transform = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(k)), 0), (L.one(), 1)].into_iter());
         let f_transformed = LX.evaluate(&f, &lin_transform, &LX.inclusion());
 
