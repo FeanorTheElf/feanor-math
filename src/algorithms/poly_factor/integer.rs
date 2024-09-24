@@ -8,9 +8,11 @@ use crate::homomorphism::*;
 use crate::primitive_int::*;
 use crate::divisibility::*;
 use crate::field::*;
+use crate::rings::rational::RationalFieldBase;
 use crate::rings::zn::*;
 use crate::rings::zn::zn_64::*;
 use crate::ordered::*;
+use crate::algorithms::eea::signed_lcm;
 use crate::pid::EuclideanRing;
 
 use crate::algorithms::hensel::hensel_lift_factorization;
@@ -154,6 +156,62 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
         assert!(self.ZZX.is_one(&current));
         return result;
     }
+}
+
+///
+/// Factors a polynomial with coefficients in the field of rational numbers.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn factor_rational_poly<'a, P, I>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
+    where P: PolyRingStore,
+        P::Type: PolyRing + EuclideanRing,
+        <P::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Type: IntegerRing,
+        ZnBase: CanHomFrom<I::Type>
+{
+    assert!(!poly_ring.is_zero(poly));
+    let QQX = &poly_ring;
+    let QQ = QQX.base_ring();
+    let ZZ = QQ.base_ring();
+    let mut result = Vec::new();
+    let mut current = QQX.clone_el(poly);
+    while !QQX.is_unit(&current) {
+        let mut squarefree_part = poly_squarefree_part(&poly_ring, QQX.clone_el(&current));
+        let lc_inv = QQ.div(&QQ.one(), &QQX.lc(&squarefree_part).unwrap());
+        QQX.inclusion().mul_assign_map(&mut squarefree_part, lc_inv);
+        current = QQX.checked_div(&current, &squarefree_part).unwrap();
+
+        // we switch from `f(X)` to `c^d f(X/c)`, where c is the lcm of all denominators;
+        // this will make the polynomial integral
+        let mut den_lcm = ZZ.one();
+        for (c, _) in QQX.terms(&squarefree_part) {
+            den_lcm = signed_lcm(den_lcm, ZZ.clone_el(QQ.get_ring().den(c)), ZZ);
+        }
+        let poly_d = QQX.degree(&squarefree_part).unwrap();
+        let ZZX = DensePolyRing::new(ZZ, "X");
+        let integral_poly = ZZX.from_terms(QQX.terms(&squarefree_part).map(|(c, i)|
+            (ZZ.checked_div(&ZZ.mul_ref_fst(QQ.get_ring().num(c), ZZ.pow(ZZ.clone_el(&den_lcm), poly_d - i)), QQ.get_ring().den(c)).unwrap(), i)
+        ));
+        for factor in factor_integer_poly(&ZZX, &integral_poly) {
+            let factor_d = ZZX.degree(&factor).unwrap();
+            let inclusion = QQ.inclusion();
+
+            // go back from `c^d f(X/c)` to `f(X)` - as the degrees of the factors must add up to the total degree,
+            // we can do this individually for each factor
+            let factor_rational = QQX.from_terms(ZZX.terms(&factor).map(|(c, i)| 
+                (QQ.div(&inclusion.map_ref(c), &QQ.pow(inclusion.map_ref(&den_lcm), factor_d - i)), i)
+            ));
+            if let Some((i, _)) = result.iter().enumerate().filter(|(_, (f, _))| QQX.eq_el(f, &factor_rational)).next() {
+                result[i].1 += 1;
+            } else {
+                result.push((factor_rational, 1));
+            }
+        }
+    }
+    let unit = QQ.clone_el(QQX.coefficient_at(&current, 0));
+    assert_el_eq!(QQX, QQX.inclusion().map_ref(&unit), current);
+    return (result, unit);
 }
 
 #[test]

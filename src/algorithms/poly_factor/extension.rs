@@ -71,6 +71,10 @@ fn factor_squarefree_over_extension<P>(LX: P, f: El<P>) -> Vec<El<P>>
     unreachable!()
 }
 
+///
+/// Factors a polynomial with coefficients in a field `K` that is a simple, finite-degree
+/// field extension of a base field that supports polynomial factorization. 
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: PolyRingStore,

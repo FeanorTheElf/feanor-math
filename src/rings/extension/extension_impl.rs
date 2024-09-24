@@ -9,10 +9,12 @@ use crate::algorithms::convolution::ConvolutionAlgorithm;
 use crate::algorithms::convolution::KaratsubaAlgorithm;
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 use crate::algorithms::linsolve::LinSolveRing;
+use crate::algorithms::poly_factor::FactorPolyField;
 use crate::compute_locally::InterpolationBaseRing;
 use crate::divisibility::*;
 use crate::impl_wrap_unwrap_homs;
 use crate::impl_wrap_unwrap_isos;
+use crate::integer::BigIntRing;
 use crate::integer::IntegerRing;
 use crate::iters::multi_cartesian_product;
 use crate::iters::MultiProduct;
@@ -488,31 +490,45 @@ impl<R, V, A, C> FreeAlgebra for FreeAlgebraImplBase<R, V, A, C>
 
 impl<R, V, A, C> InterpolationBaseRing for AsFieldBase<FreeAlgebraImpl<R, V, A, C>>
     where R: RingStore + Clone, 
-        R::Type: LinSolveRing,
+        R::Type: LinSolveRing + FactorPolyField,
         V: VectorView<El<R>>,
         A: Allocator + Clone,
         C: ConvolutionAlgorithm<R::Type>
 {
-    type ExtendedRingBase<'a> = AsFieldBase<FreeAlgebraImpl<&'a R, SparseMapVector<&'a R>, A, KaratsubaAlgorithm<Global>>>
+    type ExtendedRingBase<'a> = AsFieldBase<FreeAlgebraImpl<RingRef<'a, Self>, SparseMapVector<RingRef<'a, Self>>, A, KaratsubaAlgorithm<Global>>>
         where Self: 'a;
 
-    type ExtendedRing<'a> = AsField<FreeAlgebraImpl<&'a R, SparseMapVector<&'a R>, A, KaratsubaAlgorithm<Global>>>
+    type ExtendedRing<'a> = AsField<FreeAlgebraImpl<RingRef<'a, Self>, SparseMapVector<RingRef<'a, Self>>, A, KaratsubaAlgorithm<Global>>>
         where Self: 'a;
 
     fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
         where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
     {
-        unimplemented!()
+        let wrt_basis = ext_ring.wrt_canonical_basis(&el);
+        if wrt_basis.iter().skip(1).all(|x| self.is_zero(&x)) {
+            return Some(wrt_basis.at(0));
+        } else {
+            return None;
+        }
     }
 
     fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
         where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
     {
-        unimplemented!()
+        ext_ring.inclusion().map(el)
     }
 
     fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
-        unimplemented!()
+        let ZZbig = BigIntRing::RING;
+        let characteristic = self.base_ring().characteristic(&ZZbig).unwrap();
+        if ZZbig.is_zero(&characteristic) {
+            let modulus = SparseMapVector::new(0, RingRef::new(self));
+            let field = AsField::from(AsFieldBase::promise_is_field(FreeAlgebraImpl::new_with(RingRef::new(self), 1, modulus, "X", self.get_delegate().element_allocator.clone(), STANDARD_CONVOLUTION)));
+            let points = (0..count).map(|n| field.int_hom().map(n as i32)).collect();
+            return (field, points);
+        } else {
+            unimplemented!()
+        }
     }
 }
 
