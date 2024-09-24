@@ -1,14 +1,13 @@
 use crate::compute_locally::InterpolationBaseRing;
-use crate::divisibility::*;
-use crate::field::{Field, FieldStore};
+use crate::field::*;
 use crate::homomorphism::*;
 use crate::integer::*;
+use crate::perfect::PerfectField;
 use crate::pid::*;
-use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::extension::FreeAlgebra;
 use crate::rings::field::*;
-use crate::rings::poly::{derive_poly, PolyRing, PolyRingStore};
+use crate::rings::poly::*;
 use crate::rings::rational::*;
 use crate::rings::zn::zn_64::*;
 use crate::rings::extension::FreeAlgebraStore;
@@ -108,68 +107,9 @@ pub trait FactorPolyField: Field {
     }
 }
 
-///
-/// Computes the square-free part of a polynomial `f`, i.e. the greatest (w.r.t.
-/// divisibility) polynomial `g | f` that is square-free.
-/// 
-/// # Example
-/// ```
-/// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
-/// # use feanor_math::rings::rational::*;
-/// # use feanor_math::divisibility::*;
-/// # use feanor_math::homomorphism::Homomorphism;
-/// # use feanor_math::algorithms::poly_factor::poly_squarefree_part;
-/// let Fp = Zn::new(3).as_field().ok().unwrap();
-/// let FpX = DensePolyRing::new(Fp, "X");
-/// // f = (X^2 + 1)^2 (X^3 + 2 X + 1)
-/// let f = FpX.prod([
-///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)].into_iter()),
-///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)].into_iter()),
-///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 1), (Fp.one(), 3)].into_iter())
-/// ].into_iter());
-/// let mut squarefree_part = poly_squarefree_part(&FpX, f);
-/// // the result is not necessarily monic, so normalize
-/// let normalization_factor = Fp.invert(FpX.lc(&squarefree_part).unwrap()).unwrap();
-/// FpX.inclusion().mul_assign_map(&mut squarefree_part, normalization_factor);
-/// assert_el_eq!(FpX, FpX.prod([
-///     FpX.from_terms([(Fp.one(), 0), (Fp.one(), 2)].into_iter()),
-///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 1), (Fp.one(), 3)].into_iter())
-/// ].into_iter()), &squarefree_part);
-/// ```
-/// 
-#[stability::unstable(feature = "enable")]
-pub fn poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
-    where P: PolyRingStore,
-        P::Type: PolyRing + PrincipalIdealRing,
-        <P::Type as RingExtension>::BaseRing: FieldStore,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field
-{
-    assert!(!poly_ring.is_zero(&poly));
-    let derivate = derive_poly(&poly_ring, &poly);
-    if poly_ring.is_zero(&derivate) {
-        let p = poly_ring.base_ring().characteristic(&StaticRing::<i64>::RING).unwrap() as usize;
-        if poly_ring.terms(&poly).all(|(_, i)| i == 0) {
-            return poly;
-        } else {
-            assert!(p > 0);
-        }
-        let base_poly = poly_ring.from_terms(poly_ring.terms(&poly).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i / p)));
-        return poly_squarefree_part(poly_ring, base_poly);
-    } else {
-        let square_part = poly_ring.ideal_gen(&poly, &derivate);
-        return poly_ring.checked_div(&poly, &square_part).unwrap();
-    }
-}
-
-
 impl<R> FactorPolyField for R
-    where R: FreeAlgebra + Field + SpecializeToFiniteField,
-        <R::BaseRing as RingStore>::Type: FactorPolyField + InterpolationBaseRing
+    where R: FreeAlgebra + Field + SpecializeToFiniteField + SpecializeToFiniteRing + PerfectField,
+        <R::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing
 {
     default fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: PolyRingStore,
@@ -230,6 +170,8 @@ use crate::integer::BigIntRing;
 use crate::rings::finite::*;
 #[cfg(test)]
 use crate::rings::poly::dense_poly::DensePolyRing;
+#[cfg(test)]
+use crate::divisibility::*;
 
 #[test]
 fn test_factor_rational_poly() {
@@ -295,48 +237,6 @@ fn test_factor_fp() {
     assert_el_eq!(poly_ring, h, factorization[1].0);
     assert_eq!(1, factorization[2].1);
     assert_el_eq!(poly_ring, f, factorization[2].0);
-}
-
-#[test]
-fn test_poly_squarefree_part() {
-    let ring = DensePolyRing::new(zn_static::Fp::<257>::RING, "X");
-    let a = ring.prod([
-        ring.from_terms([(4, 0), (1, 1)].into_iter()),
-        ring.from_terms([(6, 0), (1, 1)].into_iter()),
-        ring.from_terms([(6, 0), (1, 1)].into_iter()),
-        ring.from_terms([(255, 0), (1, 1)].into_iter()),
-        ring.from_terms([(255, 0), (1, 1)].into_iter()),
-        ring.from_terms([(8, 0), (1, 1)].into_iter()),
-        ring.from_terms([(8, 0), (1, 1)].into_iter()),
-        ring.from_terms([(8, 0), (1, 1)].into_iter())
-    ].into_iter());
-    let b = ring.prod([
-        ring.from_terms([(4, 0), (1, 1)].into_iter()),
-        ring.from_terms([(6, 0), (1, 1)].into_iter()),
-        ring.from_terms([(255, 0), (1, 1)].into_iter()),
-        ring.from_terms([(8, 0), (1, 1)].into_iter())
-    ].into_iter());
-    let squarefree_part = ring.normalize(poly_squarefree_part(&ring, a));
-    assert_el_eq!(ring, b, squarefree_part);
-
-    let QQ = RationalField::new(BigIntRing::RING);
-    let poly_ring = DensePolyRing::new(&QQ, "X");
-    let [mut f] = poly_ring.with_wrapped_indeterminate(|X| [16 - 32 * X + 104 * X.pow_ref(2) - 8 * 11 * X.pow_ref(3) + 121 * X.pow_ref(4)]);
-    poly_ring.inclusion().mul_assign_map(&mut f, QQ.div(&QQ.one(), &QQ.int_hom().map(121)));
-    let actual = poly_squarefree_part(&poly_ring, poly_ring.clone_el(&f));
-    poly_ring.println(&f);
-    poly_ring.println(&derive_poly(&poly_ring, &f));
-    poly_ring.println(&poly_ring.ideal_gen(&f, &derive_poly(&poly_ring, &f)));
-    assert_eq!(2, poly_ring.degree(&actual).unwrap());
-}
-
-#[test]
-fn test_poly_squarefree_part_multiplicity_p() {
-    let ring = DensePolyRing::new(zn_64::Zn::new(5).as_field().ok().unwrap(), "X");
-    let f = ring.from_terms([(ring.base_ring().int_hom().map(3), 0), (ring.base_ring().int_hom().map(1), 10)].into_iter());
-    let g = ring.from_terms([(ring.base_ring().int_hom().map(3), 0), (ring.base_ring().int_hom().map(1), 2)].into_iter());
-    let actual = ring.normalize(poly_squarefree_part(&ring, f));
-    assert_el_eq!(ring, g, actual);
 }
 
 #[test]

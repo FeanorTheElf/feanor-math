@@ -6,6 +6,7 @@ use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::field::Field;
 use crate::integer::*;
+use crate::perfect::PerfectField;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::rings::extension::extension_impl::*;
@@ -33,7 +34,7 @@ pub trait FiniteRingOperation<OriginalField>
 
     fn execute<'a, F>(self, field: F) -> Self::Output<'a>
         where F: 'a + RingStore,
-            F::Type: FiniteRing + DivisibilityRing + LinSolveRing + CanIsoFromTo<OriginalField>;
+            F::Type: FiniteRing + DivisibilityRing + LinSolveRing + CanIsoFromTo<OriginalField> + SpecializeToFiniteRing;
 }
 
 ///
@@ -43,7 +44,7 @@ pub trait FiniteRingOperation<OriginalField>
 /// This is such a terrible hack, and so difficult to use, that it will probably be unstable forever.
 /// 
 #[stability::unstable(feature = "enable")]
-pub trait SpecializeToFiniteRing: SelfIso + RingBase + DivisibilityRing {
+pub trait SpecializeToFiniteRing: RingBase + DivisibilityRing {
 
     fn specialize_finite_ring<'a, O: FiniteRingOperation<Self>>(&'a self, op: O) -> Result<O::Output<'a>, ()>;
 }
@@ -60,7 +61,7 @@ impl<I> SpecializeToFiniteRing for RationalFieldBase<I>
 impl<R, V, A, C> SpecializeToFiniteRing for FreeAlgebraImplBase<R, V, A, C>
     where R: RingStore,
         V: VectorView<El<R>>,
-        R::Type: LinSolveRing + SelfIso + SpecializeToFiniteRing,
+        R::Type: LinSolveRing + SpecializeToFiniteRing,
         A: Allocator + Clone,
         C: ConvolutionAlgorithm<R::Type>
 {
@@ -69,7 +70,7 @@ impl<R, V, A, C> SpecializeToFiniteRing for FreeAlgebraImplBase<R, V, A, C>
         struct WrapBaseRing<'a, R, V, A, C, O>
             where R: RingStore,
                 V: VectorView<El<R>>,
-                R::Type: LinSolveRing + SelfIso + SpecializeToFiniteRing,
+                R::Type: LinSolveRing + SpecializeToFiniteRing,
                 A: Allocator + Clone,
                 C: ConvolutionAlgorithm<R::Type>,
                 O: FiniteRingOperation<FreeAlgebraImplBase<R, V, A, C>>
@@ -81,7 +82,7 @@ impl<R, V, A, C> SpecializeToFiniteRing for FreeAlgebraImplBase<R, V, A, C>
         impl<'a, R, V, A, C, O> FiniteRingOperation<R::Type> for WrapBaseRing<'a, R, V, A, C, O>
             where R: RingStore,
                 V: VectorView<El<R>>,
-                R::Type: LinSolveRing + SelfIso + SpecializeToFiniteRing,
+                R::Type: LinSolveRing + SpecializeToFiniteRing,
                 A: Allocator + Clone,
                 C: ConvolutionAlgorithm<R::Type>,
                 O: FiniteRingOperation<FreeAlgebraImplBase<R, V, A, C>>
@@ -92,7 +93,7 @@ impl<R, V, A, C> SpecializeToFiniteRing for FreeAlgebraImplBase<R, V, A, C>
             fn execute<'b, F>(self, ring: F) -> Self::Output<'b>
                 where Self: 'b,
                     F: 'b + RingStore,
-                    F::Type: FiniteRing + DivisibilityRing + LinSolveRing + CanIsoFromTo<R::Type>
+                    F::Type: FiniteRing + DivisibilityRing + LinSolveRing + CanIsoFromTo<R::Type> + SpecializeToFiniteRing
             {
                 let iso = ring.can_iso(self.ring.base_ring()).unwrap();
                 let x_pow_rank = self.ring.x_pow_rank().as_iter().map(|a| iso.inv().map_ref(a)).collect::<Vec<_>>();
@@ -114,7 +115,7 @@ impl<R, V, A, C> SpecializeToFiniteRing for FreeAlgebraImplBase<R, V, A, C>
 
 impl<R, V, A, C> SpecializeToFiniteRing for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing + SelfIso,
+        R::Type: ZnRing + Field + SelfIso,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone,
@@ -150,9 +151,9 @@ impl<R> SpecializeToFiniteRing for AsFieldBase<R>
             fn execute<'a, F>(self, field: F) -> Self::Output<'a>
                 where Self: 'a,
                     F: 'a + RingStore,
-                    F::Type: FiniteRing + DivisibilityRing + CanIsoFromTo<R::Type>
+                    F::Type: FiniteRing + DivisibilityRing + CanIsoFromTo<R::Type> + SpecializeToFiniteRing
             {
-                self.op.execute(AsField::from(AsFieldBase::promise_is_field(field)))
+                self.op.execute(AsField::from(AsFieldBase::promise_is_perfect_field(field)))
             }
         }
 
@@ -162,6 +163,14 @@ impl<R> SpecializeToFiniteRing for AsFieldBase<R>
 
 impl SpecializeToFiniteRing for zn_64::ZnBase {
 
+    fn specialize_finite_ring<'a, O: FiniteRingOperation<Self>>(&'a self, op: O) -> Result<O::Output<'a>, ()> {
+        Ok(op.execute(RingRef::new(self)))
+    }
+}
+
+impl<I: IntegerRingStore> SpecializeToFiniteRing for zn_big::ZnBase<I>
+    where I::Type: IntegerRing
+{
     fn specialize_finite_ring<'a, O: FiniteRingOperation<Self>>(&'a self, op: O) -> Result<O::Output<'a>, ()> {
         Ok(op.execute(RingRef::new(self)))
     }
@@ -188,7 +197,7 @@ pub trait FiniteFieldOperation<OriginalField>
 
     fn execute<'a, F>(self, field: F) -> Self::Output<'a>
         where F: 'a + RingStore,
-            F::Type: FiniteRing + Field + LinSolveRing + CanIsoFromTo<OriginalField>;
+            F::Type: FiniteRing + Field + LinSolveRing + PerfectField + CanIsoFromTo<OriginalField> + SpecializeToFiniteField;
 }
 
 ///
@@ -198,7 +207,7 @@ pub trait FiniteFieldOperation<OriginalField>
 /// This is such a terrible hack, and so difficult to use, that it will probably be unstable forever.
 /// 
 #[stability::unstable(feature = "enable")]
-pub trait SpecializeToFiniteField: SelfIso + RingBase + DivisibilityRing {
+pub trait SpecializeToFiniteField: RingBase + DivisibilityRing {
 
     fn specialize_finite_field<'a, O: FiniteFieldOperation<Self>>(&'a self, op: O) -> Result<O::Output<'a>, ()>;
 }
@@ -237,9 +246,9 @@ impl<R> SpecializeToFiniteField for AsFieldBase<R>
             fn execute<'a, F>(self, field: F) -> Self::Output<'a>
                 where Self: 'a,
                     F: 'a + RingStore,
-                    F::Type: FiniteRing + DivisibilityRing + CanIsoFromTo<R::Type>
+                    F::Type: FiniteRing + DivisibilityRing + CanIsoFromTo<R::Type> + SpecializeToFiniteRing
             {
-                self.op.execute(AsField::from(AsFieldBase::promise_is_field(field)))
+                self.op.execute(AsField::from(AsFieldBase::promise_is_perfect_field(field)))
             }
         }
 
@@ -250,7 +259,7 @@ impl<R> SpecializeToFiniteField for AsFieldBase<R>
 impl<R, V, A, C> SpecializeToFiniteField for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
         V: VectorView<El<R>>,
-        R::Type: LinSolveRing + SelfIso + ZnRing,
+        R::Type: SelfIso + LinSolveRing + ZnRing + Field,
         A: Allocator + Clone,
         C: ConvolutionAlgorithm<R::Type>
 {

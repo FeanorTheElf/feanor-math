@@ -523,7 +523,7 @@ impl<R, V, A, C> InterpolationBaseRing for AsFieldBase<FreeAlgebraImpl<R, V, A, 
         let characteristic = self.base_ring().characteristic(&ZZbig).unwrap();
         if ZZbig.is_zero(&characteristic) {
             let modulus = SparseMapVector::new(0, RingRef::new(self));
-            let field = AsField::from(AsFieldBase::promise_is_field(FreeAlgebraImpl::new_with(RingRef::new(self), 1, modulus, "X", self.get_delegate().element_allocator.clone(), STANDARD_CONVOLUTION)));
+            let field = AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with(RingRef::new(self), 1, modulus, "X", self.get_delegate().element_allocator.clone(), STANDARD_CONVOLUTION)));
             let points = (0..count).map(|n| field.int_hom().map(n as i32)).collect();
             return (field, points);
         } else {

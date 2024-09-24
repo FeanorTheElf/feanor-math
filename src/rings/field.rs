@@ -4,6 +4,7 @@ use crate::compute_locally::{InterpolationBaseRing, InterpolationBaseRingStore};
 use crate::delegate::DelegateRing;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::local::PrincipalLocalRing;
+use crate::perfect::PerfectField;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::Field;
 use crate::integer::IntegerRing;
@@ -11,10 +12,11 @@ use crate::ring::*;
 use crate::homomorphism::*;
 use crate::rings::zn::FromModulusCreateableZnRing;
 use crate::rings::zn::*;
+use crate::specialization::SpecializeToFiniteRing;
 use super::local::AsLocalPIRBase;
 
 ///
-/// A wrapper around a ring that marks this ring to be a field. In particular,
+/// A wrapper around a ring that marks this ring to be a perfect field. In particular,
 /// the functions provided by [`DivisibilityRing`] will be used to provide
 /// field-like division for the wrapped ring.
 ///
@@ -24,6 +26,11 @@ pub struct AsFieldBase<R: DivisibilityRingStore>
     base: R,
     zero: FieldEl<R>
 }
+
+impl<R> PerfectField for AsFieldBase<R>
+    where R: RingStore,
+        R::Type: DivisibilityRing + SpecializeToFiniteRing
+{}
 
 impl<R> Clone for AsFieldBase<R>
     where R: DivisibilityRingStore + Clone,
@@ -80,7 +87,7 @@ impl<R: DivisibilityRingStore> AsFieldBase<R>
     /// it with rings that are fields. This cannot be checked in here, so must be checked
     /// by the caller.
     /// 
-    pub fn promise_is_field(base: R) -> Self {
+    pub fn promise_is_perfect_field(base: R) -> Self {
         Self { zero: FieldEl(base.zero()), base }
     }
 

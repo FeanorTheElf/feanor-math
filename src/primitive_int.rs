@@ -140,7 +140,7 @@ impl<T: 'static + PrimitiveInt> PreparedDivisibilityRing for StaticRingBase<T> {
             let mut prod = <T as Into<T::Larger>>::into(*lhs);
             prod *=  <T as Into<T::Larger>>::into(rhs.1);
             let mut result = <T as TryFrom<T::Larger>>::try_from(prod >> (T::bits() - 1)).ok().unwrap();
-            let remainder = lhs.overflowing_sub(result.overflowing_mul(rhs.0));
+            let remainder = T::overflowing_sub(*lhs, T::overflowing_mul(result, rhs.0));
             if remainder == T::from(0) {
                 Some(result)
             } else if remainder == rhs.0 {

@@ -48,6 +48,14 @@ pub trait OrderedRing: RingBase {
             value
         }
     }
+
+    fn max<'a>(&self, fst: &'a Self::Element, snd: &'a Self::Element) -> &'a Self::Element {
+        if self.is_geq(fst, snd) {
+            return fst;
+        } else {
+            return snd;
+        }
+    }
 }
 
 ///
@@ -66,6 +74,10 @@ pub trait OrderedRingStore: RingStore
     delegate!{ OrderedRing, fn is_neg(&self, value: &El<Self>) -> bool }
     delegate!{ OrderedRing, fn is_pos(&self, value: &El<Self>) -> bool }
     delegate!{ OrderedRing, fn abs(&self, value: El<Self>) -> El<Self> }
+    
+    fn max<'a>(&self, fst: &'a El<Self>, snd: &'a El<Self>) -> &'a El<Self> {
+        self.get_ring().max(fst, snd)
+    }
 }
 
 impl<R: ?Sized> OrderedRingStore for R

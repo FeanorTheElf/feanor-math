@@ -3,6 +3,7 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use crate::algorithms::eea::*;
 use crate::compute_locally::InterpolationBaseRing;
 use crate::local::PrincipalLocalRing;
+use crate::perfect::PerfectField;
 use crate::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::field::Field;
 use crate::divisibility::*;
@@ -292,6 +293,8 @@ impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD> {
 }
 
 impl<const N: u64> Domain for ZnBase<N, true> {}
+
+impl<const N: u64> PerfectField for ZnBase<N, true> {}
 
 impl<const N: u64> Field for ZnBase<N, true> {}
 

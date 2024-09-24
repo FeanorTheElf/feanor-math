@@ -38,7 +38,6 @@ pub fn hensel_lift<P, R, S>(target_ring: P, source_ring: R, prime_ring: S, f: &E
     assert!(target_ring.base_ring().is_one(target_ring.lc(f).unwrap()));
     assert!(source_ring.base_ring().is_one(source_ring.lc(factors.0).unwrap()));
     assert!(source_ring.base_ring().is_one(source_ring.lc(factors.1).unwrap()));
-    
 
     let pe_to_p = ReductionMap::new(source_ring.base_ring(), prime_ring.base_ring()).unwrap();
     let pr_to_pe = ReductionMap::new(target_ring.base_ring(), source_ring.base_ring()).unwrap();

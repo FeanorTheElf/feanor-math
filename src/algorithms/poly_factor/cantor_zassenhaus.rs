@@ -274,7 +274,7 @@ pub fn cantor_zassenhaus_even_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) 
     if e % 2 != 0 {
         // adjoin a third root of unity, this will enable use to use the main idea
         // use `promise_as_field()`, since `as_field().unwrap()` can cause infinite generic expansion (always adding a `&`)
-        let new_base_ring = AsField::from(AsFieldBase::promise_is_field(FreeAlgebraImpl::new_with(Fq, 2, [Fq.neg_one(), Fq.neg_one()], "ζ", Global, STANDARD_CONVOLUTION)));
+        let new_base_ring = AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with(Fq, 2, [Fq.neg_one(), Fq.neg_one()], "ζ", Global, STANDARD_CONVOLUTION)));
         let new_x_pow_rank = mod_f_ring.wrt_canonical_basis(&mod_f_ring.pow(mod_f_ring.canonical_gen(), mod_f_ring.rank())).into_iter().map(|x| new_base_ring.inclusion().map(x)).collect::<Vec<_>>();
         // once we have any kind of tensoring operation, maybe we can find a way to do this that preserves e.g. sparse implementations?
         let new_mod_f_ring = FreeAlgebraImpl::new_with(&new_base_ring, new_x_pow_rank.len(), &new_x_pow_rank, "x", Global, STANDARD_CONVOLUTION);

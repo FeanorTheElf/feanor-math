@@ -9,6 +9,7 @@ use crate::algorithms::convolution::ConvolutionAlgorithm;
 use crate::algorithms::convolution::KaratsubaAlgorithm;
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
+use crate::algorithms::poly_squarefree::poly_squarefree_part_global;
 use crate::algorithms::eea::signed_gcd;
 use crate::algorithms::int_factor::factor;
 use crate::algorithms::int_factor::is_prime_power;
@@ -18,13 +19,13 @@ use crate::algorithms::unity_root::*;
 use crate::delegate::DelegateRing;
 use crate::divisibility::DivisibilityRingStore;
 use crate::divisibility::Domain;
+use crate::perfect::PerfectField;
 use crate::pid::PrincipalIdealRing;
 use crate::rings::extension::extension_impl::FreeAlgebraImpl;
 use crate::rings::finite::*;
 use crate::algorithms::convolution::fft::FFTBasedConvolution;
 use crate::algorithms::convolution::fft::FFTBasedConvolutionZn;
 use crate::algorithms::poly_factor::cantor_zassenhaus;
-use crate::algorithms::poly_factor::poly_squarefree_part;
 use crate::field::Field;
 use crate::pid::EuclideanRing;
 use crate::primitive_int::StaticRing;
@@ -43,13 +44,13 @@ use crate::integer::*;
 fn filter_irreducible<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Option<El<P>>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + PerfectField,
         R: RingStore,
         R::Type: FreeAlgebra,
         <R::Type as RingExtension>::BaseRing: RingStore<Type = <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
     let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
-    let squarefree_part = poly_squarefree_part(&poly_ring, f);
+    let squarefree_part = poly_squarefree_part_global(&poly_ring, f);
     if poly_ring.degree(&squarefree_part) != Some(degree) {
         return None;
     }
@@ -71,7 +72,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <P::Type as RingExtension>::BaseRing: Copy,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + CanHomFrom<StaticRingBase<i64>>,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + PerfectField + CanHomFrom<StaticRingBase<i64>>,
         C: ConvolutionAlgorithm<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
     let Fp = *poly_ring.base_ring();
@@ -162,7 +163,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <P::Type as RingExtension>::BaseRing: Copy,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + CanHomFrom<StaticRingBase<i64>>
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + PerfectField + CanHomFrom<StaticRingBase<i64>>
 {
     let log2_modulus = poly_ring.base_ring().integer_ring().abs_log2_ceil(poly_ring.base_ring().modulus()).unwrap();
     let fft_convolution = FFTBasedConvolution::new_with(Global);
@@ -247,7 +248,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
 #[repr(transparent)]
 pub struct GaloisFieldBase<R = AsField<Zn>, V = SparseMapVector<R>, A = Global, C = KaratsubaAlgorithm>
     where R: RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
@@ -294,7 +295,7 @@ impl GaloisField {
 
 impl<R, A, C> GaloisField<R, SparseMapVector<R>, A, C>
     where R: RingStore + Clone,
-        R::Type: ZnRing + CanHomFrom<StaticRingBase<i64>>,
+        R::Type: ZnRing + Field + PerfectField + CanHomFrom<StaticRingBase<i64>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
 {
@@ -330,20 +331,19 @@ impl<R, A, C> GaloisField<R, SparseMapVector<R>, A, C>
     /// ```
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn new_with(base_ring: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self {
+    pub fn new_with(base_field: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self {
         assert!(degree >= 1);
-        let as_field = (&base_ring).as_field().ok().unwrap();
-        let poly_ring = DensePolyRing::new(&as_field, "X");
+        let poly_ring = DensePolyRing::new(&base_field, "X");
         let mut rng = oorandom::Rand64::new(poly_ring.base_ring().integer_ring().default_hash(poly_ring.base_ring().modulus()) as u128);
         let modulus = find_small_irreducible_poly(&poly_ring, degree, &mut rng);
-        let mut modulus_vec = SparseMapVector::new(degree, base_ring.clone());
+        let mut modulus_vec = SparseMapVector::new(degree, base_field.clone());
         for (c, i) in poly_ring.terms(&modulus) {
             if i != degree {
-                *modulus_vec.at_mut(i) = base_ring.negate(as_field.get_ring().unwrap_element(as_field.clone_el(c)));
+                *modulus_vec.at_mut(i) = base_field.negate(base_field.clone_el(c));
             }
         }
         return RingValue::from(GaloisFieldBase { 
-            base: FreeAlgebraImpl::new_with(base_ring, degree, modulus_vec, "θ", allocator, convolution_algorithm)
+            base: FreeAlgebraImpl::new_with(base_field, degree, modulus_vec, "θ", allocator, convolution_algorithm)
         });
     }
 
@@ -394,7 +394,7 @@ impl<V, A> GaloisFieldBase<AsField<Zn>, V, A, KaratsubaAlgorithm>
 
 impl<R, V, A, C> GaloisFieldBase<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
@@ -444,7 +444,7 @@ impl<R, V, A, C> GaloisFieldBase<R, V, A, C>
 
     #[stability::unstable(feature = "enable")]
     pub fn unwrap_self(self) -> AsField<FreeAlgebraImpl<R, V, A, C>> {
-        AsField::from(AsFieldBase::promise_is_field(self.base))
+        AsField::from(AsFieldBase::promise_is_perfect_field(self.base))
     }
     
     #[stability::unstable(feature = "enable")]
@@ -455,7 +455,7 @@ impl<R, V, A, C> GaloisFieldBase<R, V, A, C>
 
 impl<R, V, A, C> GaloisField<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
@@ -477,7 +477,7 @@ impl<R, V, A, C> GaloisField<R, V, A, C>
 
 impl<R, V, A, C> Clone for GaloisFieldBase<R, V, A, C>
     where R: Clone + RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: Clone + VectorView<El<R>>,
         C: Clone + ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
@@ -491,7 +491,7 @@ impl<R, V, A, C> Clone for GaloisFieldBase<R, V, A, C>
 
 impl<R, V, A, C> Copy for GaloisFieldBase<R, V, A, C>
     where R: Copy + RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: Copy + VectorView<El<R>>,
         C: Copy + ConvolutionAlgorithm<R::Type>,
         A: Copy + Allocator,
@@ -500,7 +500,7 @@ impl<R, V, A, C> Copy for GaloisFieldBase<R, V, A, C>
 
 impl<R, V, A, C> PartialEq for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
@@ -512,7 +512,7 @@ impl<R, V, A, C> PartialEq for GaloisFieldBase<R, V, A, C>
 
 impl<R, V, A, C> DelegateRing for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
@@ -532,7 +532,7 @@ impl<R, V, A, C> DelegateRing for GaloisFieldBase<R, V, A, C>
 
 impl<R, V, A, C> Domain for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
@@ -540,7 +540,15 @@ impl<R, V, A, C> Domain for GaloisFieldBase<R, V, A, C>
 
 impl<R, V, A, C> Field for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
+        V: VectorView<El<R>>,
+        C: ConvolutionAlgorithm<R::Type>,
+        A: Allocator + Clone
+{}
+
+impl<R, V, A, C> PerfectField for GaloisFieldBase<R, V, A, C>
+    where R: RingStore,
+        R::Type: SelfIso + ZnRing + Field,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
@@ -548,7 +556,7 @@ impl<R, V, A, C> Field for GaloisFieldBase<R, V, A, C>
 
 impl<R, V, A, C> EuclideanRing for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
@@ -574,7 +582,7 @@ impl<R, V, A, C> EuclideanRing for GaloisFieldBase<R, V, A, C>
 
 impl<R, V, A, C> PrincipalIdealRing for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
@@ -594,7 +602,7 @@ impl<R, V, A, C> PrincipalIdealRing for GaloisFieldBase<R, V, A, C>
 
 impl<R, V, A, C> KaratsubaHint for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
@@ -606,7 +614,7 @@ impl<R, V, A, C> KaratsubaHint for GaloisFieldBase<R, V, A, C>
 
 impl<R, V, A, C> ComputeInnerProduct for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
@@ -632,7 +640,7 @@ impl<R, V, A, C> ComputeInnerProduct for GaloisFieldBase<R, V, A, C>
 
 impl<R, V, A, C> StrassenHint for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
@@ -644,7 +652,7 @@ impl<R, V, A, C> StrassenHint for GaloisFieldBase<R, V, A, C>
 
 impl<R, V, A, C, S> CanHomFrom<S> for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone,
@@ -670,7 +678,7 @@ impl<R, V, A, C, R2, V2, A2, C2> CanHomFrom<GaloisFieldBase<R2, V2, A2, C2>> for
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone,
         R2: RingStore,
-        R2::Type: ZnRing,
+        R2::Type: ZnRing + Field,
         V2: VectorView<El<R2>>,
         C2: ConvolutionAlgorithm<R2::Type>,
         A2: Allocator + Clone
@@ -688,7 +696,7 @@ impl<R, V, A, C, R2, V2, A2, C2> CanHomFrom<GaloisFieldBase<R2, V2, A2, C2>> for
 
 impl<R, V, A, C, S> CanIsoFromTo<S> for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing,
+        R::Type: ZnRing + Field,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone,
@@ -714,7 +722,7 @@ impl<R, V, A, C, R2, V2, A2, C2> CanIsoFromTo<GaloisFieldBase<R2, V2, A2, C2>> f
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone,
         R2: RingStore,
-        R2::Type: ZnRing,
+        R2::Type: ZnRing + Field,
         V2: VectorView<El<R2>>,
         C2: ConvolutionAlgorithm<R2::Type>,
         A2: Allocator + Clone

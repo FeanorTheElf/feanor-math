@@ -6,6 +6,7 @@ use crate::field::Field;
 use crate::homomorphism::{CanHomFrom, CanIsoFromTo};
 use crate::integer::{int_cast, IntegerRing, IntegerRingStore};
 use crate::ordered::{OrderedRing, OrderedRingStore};
+use crate::perfect::PerfectField;
 use crate::{algorithms, impl_interpolation_base_ring_char_zero};
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::ring::*;
@@ -389,6 +390,11 @@ impl<I> EuclideanRing for RationalFieldBase<I>
 
 impl<I> Domain for RationalFieldBase<I>
     where I: IntegerRingStore,
+        I::Type: IntegerRing
+{}
+
+impl<I> PerfectField for RationalFieldBase<I>
+    where I: RingStore,
         I::Type: IntegerRing
 {}
 

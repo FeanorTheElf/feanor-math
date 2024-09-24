@@ -133,6 +133,7 @@ pub mod generic_impls {
     use crate::algorithms::int_bisect;
     use crate::field::Field;
     use crate::ordered::*;
+    use crate::perfect::PerfectField;
     use crate::primitive_int::{StaticRing, StaticRingBase};
     use crate::ring::*;
     use crate::divisibility::DivisibilityRingStore;
@@ -302,7 +303,7 @@ pub mod generic_impls {
     #[stability::unstable(feature = "enable")]
     pub fn interpolation_ring<R: ZnRingStore>(ring: R, count: usize) -> GaloisField<R>
         where R: Clone,
-            R::Type: ZnRing + Field + CanHomFrom<StaticRingBase<i64>>
+            R::Type: ZnRing + Field + PerfectField + CanHomFrom<StaticRingBase<i64>>
     {
         let ZZbig = BigIntRing::RING;
         let modulus = int_cast(ring.integer_ring().clone_el(ring.modulus()), ZZbig, ring.integer_ring());
@@ -334,7 +335,7 @@ pub trait ZnRingStore: FiniteRingStore
         where Self: Sized
     {
         if self.is_field() {
-            Ok(RingValue::from(AsFieldBase::promise_is_field(self)))
+            Ok(RingValue::from(AsFieldBase::promise_is_perfect_field(self)))
         } else {
             Err(self)
         }

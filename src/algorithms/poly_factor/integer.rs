@@ -1,3 +1,6 @@
+use std::cmp::max;
+
+use crate::algorithms::poly_squarefree::poly_squarefree_part_global;
 use crate::algorithms::int_bisect;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::algorithms::erathostenes::enumerate_primes;
@@ -16,8 +19,45 @@ use crate::algorithms::eea::signed_lcm;
 use crate::pid::EuclideanRing;
 
 use crate::algorithms::hensel::hensel_lift_factorization;
-use super::poly_squarefree_part;
 use super::FactorPolyField;
+
+///
+/// Computes a bound on the largest coefficient of any factor of `c f`.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn max_coeff_of_factor<P>(ZZX: P, f: &El<P>, c: &El<<P::Type as RingExtension>::BaseRing>) -> El<BigIntRing>
+    where P: PolyRingStore,
+        P::Type: PolyRing + DivisibilityRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
+{
+    let ZZbig = BigIntRing::RING;
+    let ZZ = StaticRing::<i64>::RING;
+
+    if ZZX.is_zero(f) {
+        return ZZbig.zero();
+    }
+
+    let d = ZZX.degree(f).unwrap();
+
+    // we use Theorem 3.5.1 from "A course in computational algebraic number theory", Cohen,
+    // or equivalently Ex. 20 from Chapter 4.6.2 in Knuth's Art
+    let c = int_cast(ZZX.base_ring().clone_el(c), ZZbig, ZZX.base_ring());
+    let poly_norm = ZZbig.mul_ref_snd(ZZbig.add(int_bisect::root_floor(
+        &ZZbig, 
+        <_ as RingStore>::sum(&ZZbig, ZZX.terms(f)
+            .map(|(c, _)| ZZbig.pow(int_cast(ZZX.base_ring().clone_el(c), &ZZbig, ZZX.base_ring()), 2))
+        ), 
+        2
+    ), ZZbig.one()), &c);
+    let bound = ZZbig.add(
+        ZZbig.mul(poly_norm, binomial(int_cast(d as i64, ZZbig, ZZ), &int_cast(d as i64 / 2, ZZbig, ZZ), ZZbig)),
+        ZZbig.mul(
+            ZZbig.mul_ref_snd(int_cast(ZZX.base_ring().clone_el(ZZX.lc(f).unwrap()), ZZbig, ZZX.base_ring()), &c), 
+            binomial(int_cast(d as i64, ZZbig, ZZ), &int_cast(d as i64 / 2, ZZbig, ZZ), ZZbig)
+        )
+    );
+    return bound;
+}
 
 ///
 /// The given polynomial must be square-free, monic and should have integral
@@ -30,7 +70,6 @@ pub fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
         ZnBase: CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
-    let d = ZZX.degree(f).unwrap();
     assert!(ZZX.base_ring().is_one(ZZX.lc(f).unwrap()));
 
     // Cantor-Zassenhaus does not directly work for p = 2, so skip the first prime
@@ -42,7 +81,7 @@ pub fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
         let mod_p = Fp.can_hom(ZZX.base_ring()).unwrap();
         let FpX = DensePolyRing::new(Fp, "X");
         let f_mod_p = FpX.from_terms(ZZX.terms(&f).map(|(c, i)| (mod_p.map(ZZX.base_ring().clone_el(c)), i)));
-        let mut squarefree_part = poly_squarefree_part(&FpX, FpX.clone_el(&f_mod_p));
+        let mut squarefree_part = poly_squarefree_part_global(&FpX, FpX.clone_el(&f_mod_p));
         let lc_inv = Fp.div(&Fp.one(), FpX.lc(&squarefree_part).unwrap());
         FpX.inclusion().mul_assign_map(&mut squarefree_part, lc_inv);
 
@@ -50,26 +89,11 @@ pub fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
 
             // we found a prime such that f remains square-free mod p;
             // now we can use the factorization of `f mod p` to derive a factorization of f
+
             let ZZbig = BigIntRing::RING;
             let ZZ = StaticRing::<i64>::RING;
-
-            // we use Theorem 3.5.1 from "A course in computational algebraic number theory", Cohen,
-            // or equivalently Ex. 20 from Chapter 4.6.2 in Knuth's Art
-            let poly_norm = int_bisect::root_floor(
-                &ZZbig, 
-                <_ as RingStore>::sum(&ZZbig, ZZX.terms(f)
-                    .map(|(c, _)| ZZbig.pow(int_cast(ZZX.base_ring().clone_el(c), &ZZbig, ZZX.base_ring()), 2))
-                ), 
-                2
-            );
-            let bound = ZZbig.add(
-                ZZbig.mul(poly_norm, binomial(int_cast(d as i64, ZZbig, ZZ), &int_cast(d as i64 / 2, ZZbig, ZZ), ZZbig)),
-                ZZbig.mul(
-                    int_cast(ZZX.base_ring().clone_el(ZZX.lc(f).unwrap()), ZZbig, ZZX.base_ring()), 
-                    binomial(int_cast(d as i64, ZZbig, ZZ), &int_cast(d as i64 / 2, ZZbig, ZZ), ZZbig)
-                )
-            );
-            let exponent = ZZbig.abs_log2_ceil(&bound).unwrap() / (ZZ.abs_log2_ceil(&(p + 1)).unwrap() - 1) + 1;
+            let bound = max_coeff_of_factor(ZZX, f, &ZZX.base_ring().one());
+            let exponent = max(2, ZZbig.abs_log2_ceil(&bound).unwrap() / ZZ.abs_log2_floor(&p).unwrap() + 1);
             let modulus = ZZbig.pow(int_cast(p, &ZZbig, &ZZ), exponent);
 
             return choose_zn_impl(ZZbig, modulus, FactorizeMonicIntegerPolynomialUsingHenselLifting {
@@ -178,7 +202,7 @@ pub fn factor_rational_poly<'a, P, I>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>
     let mut result = Vec::new();
     let mut current = QQX.clone_el(poly);
     while !QQX.is_unit(&current) {
-        let mut squarefree_part = poly_squarefree_part(&poly_ring, QQX.clone_el(&current));
+        let mut squarefree_part = poly_squarefree_part_global(&poly_ring, QQX.clone_el(&current));
         let lc_inv = QQ.div(&QQ.one(), &QQX.lc(&squarefree_part).unwrap());
         QQX.inclusion().mul_assign_map(&mut squarefree_part, lc_inv);
         current = QQX.checked_div(&current, &squarefree_part).unwrap();

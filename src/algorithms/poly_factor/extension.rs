@@ -1,10 +1,12 @@
 use crate::algorithms;
+use crate::algorithms::poly_squarefree::poly_squarefree_part_global;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::compute_locally::InterpolationBaseRing;
 use crate::divisibility::*;
 use crate::field::*;
 use crate::homomorphism::*;
 use crate::ordered::OrderedRingStore;
+use crate::perfect::PerfectField;
 use crate::pid::EuclideanRing;
 use crate::pid::PrincipalIdealRingStore;
 use crate::primitive_int::StaticRing;
@@ -16,13 +18,11 @@ use crate::rings::poly::{PolyRing, PolyRingStore};
 use crate::integer::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 
-use super::poly_squarefree_part;
-
 fn factor_squarefree_over_extension<P>(LX: P, f: El<P>) -> Vec<El<P>>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra,
-        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyField + InterpolationBaseRing
+        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing
 {
     let L = LX.base_ring();
     let K = L.base_ring();
@@ -64,6 +64,7 @@ fn factor_squarefree_over_extension<P>(LX: P, f: El<P>) -> Vec<El<P>>
 
     let ZZbig = BigIntRing::RING;
     let characteristic = K.characteristic(&ZZbig).unwrap();
+    // choose bound about twice as large as necessary, so the probability of succeeding is almost 1/2
     let bound = LX.degree(&f).unwrap() * LX.degree(&f).unwrap() * L.rank();
     assert!(ZZbig.is_zero(&characteristic) || ZZbig.is_geq(&characteristic, &int_cast(bound as i64, ZZbig, StaticRing::<i64>::RING)));
 
@@ -76,7 +77,7 @@ fn factor_squarefree_over_extension<P>(LX: P, f: El<P>) -> Vec<El<P>>
 
         let norm_f_transformed = Norm(LX.clone_el(&f_transformed));
         let degree = KX.degree(&norm_f_transformed).unwrap();
-        let squarefree_part = poly_squarefree_part(&KX, norm_f_transformed);
+        let squarefree_part = poly_squarefree_part_global(&KX, norm_f_transformed);
 
         if KX.degree(&squarefree_part).unwrap() == degree {
             let lin_transform_rev = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0), (L.one(), 1)].into_iter());
@@ -101,8 +102,8 @@ fn factor_squarefree_over_extension<P>(LX: P, f: El<P>) -> Vec<El<P>>
 pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra,
-        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyField + InterpolationBaseRing
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra + Field + PerfectField + SpecializeToFiniteField + SpecializeToFiniteRing,
+        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing
 {
     let KX = &poly_ring;
     let K = KX.base_ring();
@@ -121,7 +122,7 @@ pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>
     let mut result: Vec<(El<P>, usize)> = Vec::new();
     let mut current = KX.clone_el(f);
     while !KX.is_unit(&current) {
-        let mut squarefree_part = poly_squarefree_part(KX, KX.clone_el(&current));
+        let mut squarefree_part = poly_squarefree_part_global(KX, KX.clone_el(&current));
         let lc_inv = K.div(&K.one(), KX.lc(&squarefree_part).unwrap());
         KX.inclusion().mul_assign_map(&mut squarefree_part, lc_inv);
         current = KX.checked_div(&current, &squarefree_part).unwrap();
@@ -141,6 +142,9 @@ pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>
 use crate::rings::extension::extension_impl::FreeAlgebraImpl;
 #[cfg(test)]
 use crate::rings::rational::RationalField;
+
+use super::SpecializeToFiniteField;
+use super::SpecializeToFiniteRing;
 
 #[test]
 fn test_factor_number_field() {

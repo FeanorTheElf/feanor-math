@@ -4,6 +4,7 @@ use crate::algorithms::poly_factor::FactorPolyField;
 use crate::divisibility::DivisibilityRing;
 use crate::field::Field;
 use crate::matrix::OwnedMatrix;
+use crate::perfect::PerfectField;
 use crate::ring::*;
 use crate::seq::*;
 use crate::homomorphism::*;
@@ -207,12 +208,12 @@ pub trait FreeAlgebraStore: RingStore
     /// 
     fn as_field(self) -> Result<AsField<Self>, Self>
         where Self::Type: DivisibilityRing, 
-            <<Self::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FactorPolyField
+            <<Self::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + Field + FactorPolyField
     {
         if let Some(_factor) = <_ as FactorPolyField>::find_factor_by_extension(DensePolyRing::new(self.base_ring(), "X"), &self) {
             return Err(self);
         } else {
-            return Ok(RingValue::from(AsFieldBase::promise_is_field(self)));
+            return Ok(RingValue::from(AsFieldBase::promise_is_perfect_field(self)));
         }
     }
 

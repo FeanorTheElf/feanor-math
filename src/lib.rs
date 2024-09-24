@@ -137,3 +137,5 @@ pub mod serialization;
 pub mod specialization;
 
 pub mod compute_locally;
+
+pub mod perfect;

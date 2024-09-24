@@ -1,17 +1,17 @@
+
+use crate::algorithms::poly_squarefree::poly_squarefree_part_global;
 use crate::divisibility::*;
 use crate::field::{Field, FieldStore};
 use crate::homomorphism::*;
 use crate::integer::*;
+use crate::perfect::PerfectField;
 use crate::pid::*;
 use crate::ring::*;
 use crate::rings::finite::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::*;
 use crate::specialization::*;
-use super::poly_squarefree_part;
 use super::cantor_zassenhaus;
-
-use super::SelfIso;
 
 ///
 /// Factors a polynomial with coefficients in a finite field.
@@ -20,7 +20,7 @@ use super::SelfIso;
 pub fn factor_over_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + PerfectField + SelfIso + SpecializeToFiniteField
 {
     FactorPolyFiniteField { poly_ring: poly_ring.get_ring(), poly: poly_ring.clone_el(f) }.execute(poly_ring.base_ring())
 }
@@ -56,7 +56,7 @@ impl<'a, P> FiniteFieldOperation<<P::BaseRing as RingStore>::Type> for FactorPol
     fn execute<'d, F>(self, field: F) -> Self::Output<'d>
         where Self: 'd,
             F: 'd + RingStore,
-            F::Type: FiniteRing + Field + CanIsoFromTo<<P::BaseRing as RingStore>::Type>
+            F::Type: FiniteRing + Field + CanIsoFromTo<<P::BaseRing as RingStore>::Type> + PerfectField
     {
         let poly_ring = DensePolyRing::new(&field, "X");
         let base_iso = field.can_iso(self.poly_ring.base_ring()).unwrap();
@@ -72,7 +72,7 @@ impl<'a, P> FiniteFieldOperation<<P::BaseRing as RingStore>::Type> for FactorPol
         // we repeatedly remove the square-free part
         while !poly_ring.is_unit(&el) {
 
-            let sqrfree_part = poly_squarefree_part(&poly_ring, poly_ring.clone_el(&el));
+            let sqrfree_part = poly_squarefree_part_global(&poly_ring, poly_ring.clone_el(&el));
             assert!(!poly_ring.is_unit(&sqrfree_part));
 
             // factor the square-free part into distinct-degree factors

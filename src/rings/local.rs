@@ -145,15 +145,6 @@ impl<R: DivisibilityRingStore> AsLocalPIRBase<R>
     pub fn unwrap_self(self) -> R {
         self.base
     }
-
-    #[stability::unstable(feature = "enable")]
-    pub fn as_field(self) -> Result<AsField<R>, Self> {
-        if self.is_zero(self.max_ideal_gen()) {
-            return Ok(AsField::from(AsFieldBase::promise_is_field(self.unwrap_self())));
-        } else {
-            return Err(self);
-        }
-    }
 }
 
 impl<R: DivisibilityRingStore> DelegateRing for AsLocalPIRBase<R> 
