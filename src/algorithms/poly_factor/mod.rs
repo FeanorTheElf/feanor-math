@@ -12,7 +12,7 @@ use crate::rings::zn::zn_64::*;
 use crate::rings::extension::FreeAlgebraStore;
 use crate::specialization::*;
 use finite_field::{factor_if_finite_field, factor_over_finite_field};
-use integer::factor_rational_poly;
+use integer::factor_rational_poly_local;
 use crate::rings::zn::*;
 
 use extension::factor_over_extension;
@@ -26,7 +26,7 @@ pub mod finite_field;
 /// Trait for fields over which we can efficiently factor polynomials.
 /// For details, see the only associated function [`FactorPolyField::factor_poly()`].
 /// 
-pub trait FactorPolyField: Field {
+pub trait FactorPolyField: PolySquarefreePartField {
 
     ///
     /// Factors a univariate polynomial with coefficients in this field into its irreducible factors.
@@ -146,7 +146,7 @@ impl<const N: u64> FactorPolyField for zn_static::ZnBase<N, true> {
 
 impl<I> FactorPolyField for RationalFieldBase<I>
     where I: IntegerRingStore,
-        I::Type: IntegerRing,
+        I::Type: IntegerRing + InterpolationBaseRing,
         ZnBase: CanHomFrom<I::Type>
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
@@ -154,7 +154,7 @@ impl<I> FactorPolyField for RationalFieldBase<I>
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        factor_rational_poly(poly_ring, poly)
+        factor_rational_poly_local(poly_ring, poly)
     }
 }
 
@@ -172,6 +172,8 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::divisibility::*;
 #[cfg(test)]
 use crate::rings::extension::galois_field::GaloisField;
+
+use super::poly_squarefree::PolySquarefreePartField;
 
 #[test]
 fn test_factor_rational_poly() {
@@ -264,6 +266,31 @@ fn random_test_factor_poly_galois_field() {
         let f1 = ring.from_terms((0..8).map(|i| (Fq.random_element(|| rng.rand_u64()), i)));
         let f2 = ring.from_terms((0..10).map(|i| (Fq.random_element(|| rng.rand_u64()), i)));
         let f3 = ring.from_terms((0..10).map(|i| (Fq.random_element(|| rng.rand_u64()), i)));
+        let f = ring.mul_ref_fst(&f1, ring.mul_ref(&f2, &f3));
+
+        let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&ring, &f);
+
+        let product = ring.inclusion().mul_map(ring.prod(factorization.iter().map(|(g, e)| ring.pow(ring.clone_el(g), *e))), unit);
+        assert_el_eq!(&ring, &f, &product);
+        assert!(factorization.iter().map(|(_, e)| *e).sum::<usize>() >= 3);
+        for (g, _) in &factorization {
+            assert!(ring.checked_div(&f1, g).is_some() || ring.checked_div(&f2, g).is_some() || ring.checked_div(&f3, g).is_some());
+        }
+    }
+}
+
+#[test]
+fn random_test_factor_rational_poly() {
+    let mut rng = oorandom::Rand64::new(1);
+    let ZZbig = BigIntRing::RING;
+    let QQ = RationalField::new(ZZbig);
+    let ring = DensePolyRing::new(&QQ, "X");
+    let coeff_bound = ZZbig.int_hom().map(10);
+
+    for _ in 0..20 {
+        let f1 = ring.from_terms((0..8).map(|i| (QQ.inclusion().map(ZZbig.get_uniformly_random(&coeff_bound, || rng.rand_u64())), i)));
+        let f2 = ring.from_terms((0..10).map(|i| (QQ.inclusion().map(ZZbig.get_uniformly_random(&coeff_bound, || rng.rand_u64())), i)));
+        let f3 = ring.from_terms((0..10).map(|i| (QQ.inclusion().map(ZZbig.get_uniformly_random(&coeff_bound, || rng.rand_u64())), i)));
         let f = ring.mul_ref_fst(&f1, ring.mul_ref(&f2, &f3));
 
         let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&ring, &f);

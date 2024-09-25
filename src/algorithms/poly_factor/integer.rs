@@ -1,7 +1,10 @@
 use std::cmp::max;
 
-use crate::algorithms::poly_squarefree::poly_squarefree_part_global;
+use crate::algorithms::eea::poly::make_primitive;
+use crate::algorithms::poly_squarefree::integer::integer_poly_squarefree_part_local;
 use crate::algorithms::int_bisect;
+use crate::algorithms::poly_squarefree::PolySquarefreePartField;
+use crate::compute_locally::InterpolationBaseRing;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::algorithms::erathostenes::enumerate_primes;
 use crate::ring::*;
@@ -10,7 +13,6 @@ use crate::rings::poly::*;
 use crate::homomorphism::*;
 use crate::primitive_int::*;
 use crate::divisibility::*;
-use crate::field::*;
 use crate::rings::rational::RationalFieldBase;
 use crate::rings::zn::*;
 use crate::rings::zn::zn_64::*;
@@ -59,18 +61,25 @@ pub fn max_coeff_of_factor<P>(ZZX: P, f: &El<P>, c: &El<<P::Type as RingExtensio
     return bound;
 }
 
-///
-/// The given polynomial must be square-free, monic and should have integral
-/// coefficients. In this case, all factors are also monic integral polynomials.
-/// 
-#[stability::unstable(feature = "enable")]
-pub fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
-    where P: PolyRingStore,
+fn factor_squarefree_primitive_integer_poly_local<P>(ZZX: P, f: &El<P>) -> Vec<El<P>>
+    where P: PolyRingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
         ZnBase: CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
-    assert!(ZZX.base_ring().is_one(ZZX.lc(f).unwrap()));
+    // we have to switch to `c^(d - 1) f(X/c)` to make `f` monic
+    let ZZ = ZZX.base_ring();
+    let scale = ZZ.clone_el(ZZX.lc(&f).unwrap());
+    let deg_f = ZZX.degree(f).unwrap();
+    let f = ZZX.from_terms(ZZX.terms(f).map(|(c, i)| if i == deg_f {
+        (ZZ.one(), i)
+    } else {
+        (ZZ.mul_ref_fst(c, ZZ.pow(ZZ.clone_el(&scale), deg_f - i - 1)), i)
+    }));
+
+    let undo_scale = |g: &El<P>| make_primitive(ZZX, ZZX.from_terms(ZZX.terms(g).map(
+        |(c, i)| (ZZ.mul_ref_fst(c, ZZ.pow(ZZ.clone_el(&scale), i)), i))
+    ));
 
     // very small primes have a lower probability of working
     for p in enumerate_primes(&StaticRing::<i64>::RING, &1000).into_iter().skip(100) {
@@ -81,7 +90,7 @@ pub fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
         let mod_p = Fp.can_hom(ZZX.base_ring()).unwrap();
         let FpX = DensePolyRing::new(Fp, "X");
         let f_mod_p = FpX.from_terms(ZZX.terms(&f).map(|(c, i)| (mod_p.map(ZZX.base_ring().clone_el(c)), i)));
-        let squarefree_part = poly_squarefree_part_global(&FpX, FpX.clone_el(&f_mod_p));
+        let squarefree_part = <_ as PolySquarefreePartField>::squarefree_part(&FpX, &f_mod_p);
 
         if FpX.eq_el(&squarefree_part, &f_mod_p) {
 
@@ -90,16 +99,49 @@ pub fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
 
             let ZZbig = BigIntRing::RING;
             let ZZ = StaticRing::<i64>::RING;
-            let bound = max_coeff_of_factor(ZZX, f, &ZZX.base_ring().one());
+            let bound = max_coeff_of_factor(ZZX, &f, &ZZX.base_ring().one());
             let exponent = max(2, ZZbig.abs_log2_ceil(&bound).unwrap() / ZZ.abs_log2_floor(&p).unwrap() + 1);
             let modulus = ZZbig.pow(int_cast(p, &ZZbig, &ZZ), exponent);
 
             return choose_zn_impl(ZZbig, modulus, FactorizeMonicIntegerPolynomialUsingHenselLifting {
-                poly: f, ZZX: ZZX, poly_mod_p: f_mod_p, FpX: FpX, bound
-            });
+                poly: &f, ZZX: ZZX, poly_mod_p: f_mod_p, FpX: FpX, bound
+            }).into_iter().map(|g| undo_scale(&g)).collect();
         }
     }
     unreachable!()
+}
+
+///
+/// Factors the given polynomial over the integers.
+/// 
+/// Its factors are returned as primitive polynomials, thus their
+/// product is `f` only up to multiplication by a nonzero integer. 
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn factor_integer_poly_local<P>(ZZX: P, f: El<P>) -> Vec<(El<P>, usize)>
+    where P: PolyRingStore + Copy,
+        P::Type: PolyRing + DivisibilityRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing + InterpolationBaseRing,
+        ZnBase: CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+{
+    assert!(!ZZX.is_zero(&f));
+    let mut current = make_primitive(ZZX, f);
+    let mut result = Vec::new();
+
+    while ZZX.degree(&current).unwrap() > 0 {
+        let squarefree_part = integer_poly_squarefree_part_local(ZZX, &current);
+        current = ZZX.checked_div(&current, &squarefree_part).unwrap();
+
+        if result.len() == 0 {
+            result.extend(factor_squarefree_primitive_integer_poly_local(ZZX, &squarefree_part).into_iter().map(|factor| (factor, 1)));
+        } else {
+            for factor in factor_squarefree_primitive_integer_poly_local(ZZX, &squarefree_part) {
+                let idx = result.iter().enumerate().filter(|(_, f)| ZZX.eq_el(&f.0, &factor)).next().unwrap().0;
+                result[idx].1 += 1;
+            }
+        }
+    }
+    return result;
 }
 
 ///
@@ -136,6 +178,7 @@ impl<'a, P, R> ZnOperation for FactorizeMonicIntegerPolynomialUsingHenselLifting
     fn call<'b, S>(self, Zpe: S) -> Vec<El<P>>
         where S: 'b + ZnRingStore, S::Type: ZnRing
     {
+        assert!(self.ZZX.base_ring().is_one(self.ZZX.lc(self.poly).unwrap()));
         let ZZ = Zpe.integer_ring();
         let bound = int_cast(self.bound, ZZ, &BigIntRing::RING);
         let mod_pe = Zpe.can_hom(ZZ).unwrap();
@@ -184,67 +227,58 @@ impl<'a, P, R> ZnOperation for FactorizeMonicIntegerPolynomialUsingHenselLifting
     }
 }
 
-///
-/// Factors a polynomial with coefficients in the field of rational numbers.
-/// 
 #[stability::unstable(feature = "enable")]
-pub fn factor_rational_poly<'a, P, I>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
+pub fn factor_rational_poly_local<'a, P, I>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
         <P::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
-        I::Type: IntegerRing,
+        I::Type: IntegerRing + InterpolationBaseRing,
         ZnBase: CanHomFrom<I::Type>
 {
     assert!(!poly_ring.is_zero(poly));
     let QQX = &poly_ring;
     let QQ = QQX.base_ring();
     let ZZ = QQ.base_ring();
-    let mut result = Vec::new();
-    let mut current = QQX.clone_el(poly);
-    while !QQX.is_unit(&current) {
-        let squarefree_part = poly_squarefree_part_global(&poly_ring, QQX.clone_el(&current));
-        current = QQX.checked_div(&current, &squarefree_part).unwrap();
 
-        // we switch from `f(X)` to `c^d f(X/c)`, where c is the lcm of all denominators;
-        // this will make the polynomial integral
-        let mut den_lcm = ZZ.one();
-        for (c, _) in QQX.terms(&squarefree_part) {
-            den_lcm = signed_lcm(den_lcm, ZZ.clone_el(QQ.get_ring().den(c)), ZZ);
-        }
-        let poly_d = QQX.degree(&squarefree_part).unwrap();
-        let ZZX = DensePolyRing::new(ZZ, "X");
-        let integral_poly = ZZX.from_terms(QQX.terms(&squarefree_part).map(|(c, i)|
-            (ZZ.checked_div(&ZZ.mul_ref_fst(QQ.get_ring().num(c), ZZ.pow(ZZ.clone_el(&den_lcm), poly_d - i)), QQ.get_ring().den(c)).unwrap(), i)
-        ));
-        for factor in factor_integer_poly(&ZZX, &integral_poly) {
-            let factor_d = ZZX.degree(&factor).unwrap();
-            let inclusion = QQ.inclusion();
+    let den_lcm = QQX.terms(poly).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+    
+    let ZZX = DensePolyRing::new(ZZ, "X");
+    let f = ZZX.from_terms(QQX.terms(poly).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
+    let factorization = factor_integer_poly_local(&ZZX, f);
+    let ZZX_to_QQX = QQX.lifted_hom(&ZZX, QQ.inclusion());
 
-            // go back from `c^d f(X/c)` to `f(X)` - as the degrees of the factors must add up to the total degree,
-            // we can do this individually for each factor
-            let factor_rational = QQX.from_terms(ZZX.terms(&factor).map(|(c, i)| 
-                (QQ.div(&inclusion.map_ref(c), &QQ.pow(inclusion.map_ref(&den_lcm), factor_d - i)), i)
-            ));
-            if let Some((i, _)) = result.iter().enumerate().filter(|(_, (f, _))| QQX.eq_el(f, &factor_rational)).next() {
-                result[i].1 += 1;
-            } else {
-                result.push((factor_rational, 1));
-            }
-        }
-    }
-    let unit = QQ.clone_el(QQX.coefficient_at(&current, 0));
-    assert_el_eq!(QQX, QQX.inclusion().map_ref(&unit), current);
-    return (result, unit);
+    return (
+        factorization.into_iter().map(|(f, e)| (QQX.normalize(ZZX_to_QQX.map(f)), e)).collect(),
+        QQ.clone_el(QQX.lc(poly).unwrap())
+    );
 }
 
 #[test]
 fn test_factor_int_poly() {
-    let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
-    let f = poly_ring.from_terms([(2, 0), (1, 3)].into_iter());
-    let g = poly_ring.from_terms([(1, 0), (2, 1), (1, 2), (1, 4)].into_iter());
-    let actual = factor_integer_poly(&poly_ring, &poly_ring.mul_ref(&f, &g));
+    let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1, X + 1]);
+    let input = ZZX.mul_ref(&f, &g);
+    let actual = factor_integer_poly_local(&ZZX, input);
     assert_eq!(2, actual.len());
-    assert_el_eq!(poly_ring, f, actual[0]);
-    assert_el_eq!(poly_ring, g, actual[1]);
+    for (factor, e) in &actual {
+        assert_eq!(1, *e);
+        assert!(ZZX.eq_el(&f, factor) || ZZX.eq_el(&g, factor), "Got unexpected factor {}", ZZX.format(&factor));
+    }
+
+    let [f, g] = ZZX.with_wrapped_indeterminate(|X| [5 * X.pow_ref(2) + 1, 3 * X.pow_ref(2) + 2]);
+    let input = ZZX.mul_ref(&f, &g);
+    let actual = factor_integer_poly_local(&ZZX, input);
+    assert_eq!(2, actual.len());
+    for (factor, e) in &actual {
+        assert_eq!(1, *e);
+        assert!(ZZX.eq_el(&f, factor) || ZZX.eq_el(&g, factor), "Got unexpected factor {}", ZZX.format(&factor));
+    }
+
+    let [f] = ZZX.with_wrapped_indeterminate(|X| [5 * X.pow_ref(2) + 1]);
+    let input = ZZX.mul_ref(&f, &f);
+    let actual = factor_integer_poly_local(&ZZX, input);
+    assert_eq!(1, actual.len());
+    assert_eq!(2, actual[0].1);
+    assert_el_eq!(&ZZX, &f, &actual[0].0);
 }

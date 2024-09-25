@@ -31,7 +31,7 @@ pub fn factor_over_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usiz
     // we repeatedly remove the square-free part
     while !poly_ring.is_unit(&el) {
 
-        let sqrfree_part = finite_field_poly_squarefree_part(&poly_ring, poly_ring.clone_el(&el));
+        let sqrfree_part = finite_field_poly_squarefree_part(&poly_ring, &el);
         assert!(!poly_ring.is_unit(&sqrfree_part));
 
         // factor the square-free part into distinct-degree factors

@@ -1,6 +1,6 @@
 use crate::algorithms;
-use crate::algorithms::poly_squarefree::poly_squarefree_part_global;
 use crate::algorithms::poly_factor::FactorPolyField;
+use crate::algorithms::poly_squarefree::PolySquarefreePartField;
 use crate::compute_locally::InterpolationBaseRing;
 use crate::divisibility::*;
 use crate::field::*;
@@ -17,7 +17,18 @@ use crate::rings::poly::{PolyRing, PolyRingStore};
 use crate::integer::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 
-fn factor_squarefree_over_extension<P>(LX: P, f: El<P>) -> Vec<El<P>>
+#[stability::unstable(feature = "enable")]
+pub struct ProbablyNotSquarefree;
+
+///
+/// Factors a polynomial with coefficients in a field `K` that is a simple, finite-degree
+/// field extension of a base field that supports polynomial factorization. 
+/// 
+/// If the given polynomial is square-free, this will succeed, except with probability
+/// `2^-attempts`. If it is not square-free, this will always fail (i.e. return `Err`). 
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn factor_squarefree_over_extension<P>(LX: P, f: &El<P>, attempts: usize) -> Result<Vec<El<P>>, ProbablyNotSquarefree>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra,
@@ -26,7 +37,7 @@ fn factor_squarefree_over_extension<P>(LX: P, f: El<P>) -> Vec<El<P>>
     let L = LX.base_ring();
     let K = L.base_ring();
 
-    assert!(LX.base_ring().is_one(LX.lc(&f).unwrap()));
+    assert!(LX.base_ring().is_one(LX.lc(f).unwrap()));
 
     let KX = DensePolyRing::new(K, "X");
     // Y will take the role of the ring generator `theta` and `X` remains the indeterminate
@@ -64,31 +75,31 @@ fn factor_squarefree_over_extension<P>(LX: P, f: El<P>) -> Vec<El<P>>
     let ZZbig = BigIntRing::RING;
     let characteristic = K.characteristic(&ZZbig).unwrap();
     // choose bound about twice as large as necessary, so the probability of succeeding is almost 1/2
-    let bound = LX.degree(&f).unwrap() * LX.degree(&f).unwrap() * L.rank();
+    let bound = LX.degree(f).unwrap() * LX.degree(f).unwrap() * L.rank();
     assert!(ZZbig.is_zero(&characteristic) || ZZbig.is_geq(&characteristic, &int_cast(bound as i64, ZZbig, StaticRing::<i64>::RING)));
 
     let mut rng = oorandom::Rand64::new(1);
 
-    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+    for _ in 0..attempts {
         let k = StaticRing::<i32>::RING.get_uniformly_random(&(bound as i32), || rng.rand_u64());
         let lin_transform = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(k)), 0), (L.one(), 1)].into_iter());
-        let f_transformed = LX.evaluate(&f, &lin_transform, &LX.inclusion());
+        let f_transformed = LX.evaluate(f, &lin_transform, &LX.inclusion());
 
         let norm_f_transformed = Norm(LX.clone_el(&f_transformed));
         let degree = KX.degree(&norm_f_transformed).unwrap();
-        let squarefree_part = poly_squarefree_part_global(&KX, norm_f_transformed);
+        let squarefree_part = <_ as PolySquarefreePartField>::squarefree_part(&KX, &norm_f_transformed);
 
         if KX.degree(&squarefree_part).unwrap() == degree {
             let lin_transform_rev = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0), (L.one(), 1)].into_iter());
             let (factorization, _unit) = <_ as FactorPolyField>::factor_poly(&KX, &squarefree_part);
-            return factorization.into_iter().map(|(factor, e)| {
+            return Ok(factorization.into_iter().map(|(factor, e)| {
                 assert!(e == 1);
                 let f_factor = LX.normalize(LX.extended_ideal_gen(&f_transformed, &LX.lifted_hom(&KX, L.inclusion()).map(factor)).2);
                 return LX.evaluate(&f_factor, &lin_transform_rev, &LX.inclusion());
-            }).collect();
+            }).collect());
         }
     }
-    unreachable!()
+    return Err(ProbablyNotSquarefree);
 }
 
 ///
@@ -99,7 +110,7 @@ fn factor_squarefree_over_extension<P>(LX: P, f: El<P>) -> Vec<El<P>>
 pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra + Field + PerfectField + SpecializeToFiniteField,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra + Field + PerfectField + SpecializeToFiniteField + PolySquarefreePartField,
         <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing + SpecializeToFiniteField
 {
     let KX = &poly_ring;
@@ -119,10 +130,10 @@ pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>
     let mut result: Vec<(El<P>, usize)> = Vec::new();
     let mut current = KX.clone_el(f);
     while !KX.is_unit(&current) {
-        let squarefree_part = poly_squarefree_part_global(KX, KX.clone_el(&current));
+        let squarefree_part = <_ as PolySquarefreePartField>::squarefree_part(KX, &current);
         current = KX.checked_div(&current, &squarefree_part).unwrap();
 
-        for factor in factor_squarefree_over_extension(KX, squarefree_part) {
+        for factor in factor_squarefree_over_extension(KX, &squarefree_part, MAX_PROBABILISTIC_REPETITIONS).ok().unwrap() {
             if let Some((i, _)) = result.iter().enumerate().filter(|(_, f)| KX.eq_el(&f.0, &factor)).next() {
                 result[i].1 += 1;
             } else {

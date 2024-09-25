@@ -49,7 +49,7 @@ fn filter_irreducible<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Optio
         <R::Type as RingExtension>::BaseRing: RingStore<Type = <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
     let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
-    let squarefree_part = finite_field_poly_squarefree_part(&poly_ring, f);
+    let squarefree_part = finite_field_poly_squarefree_part(&poly_ring, &f);
     if poly_ring.degree(&squarefree_part) != Some(degree) {
         return None;
     }

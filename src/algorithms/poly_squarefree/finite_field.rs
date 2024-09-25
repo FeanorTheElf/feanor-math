@@ -21,30 +21,30 @@ use crate::specialization::SpecializeToFiniteField;
 /// is unique.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn finite_field_poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
+pub fn finite_field_poly_squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
     where P: PolyRingStore,
         P::Type: PolyRing + PrincipalIdealRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
 {
     assert!(!poly_ring.is_zero(&poly));
-    if poly_ring.degree(&poly).unwrap() == 0 {
+    if poly_ring.degree(poly).unwrap() == 0 {
         return poly_ring.one();
     }
-    let derivate = derive_poly(&poly_ring, &poly);
+    let derivate = derive_poly(&poly_ring, poly);
     if poly_ring.is_zero(&derivate) {
         let q = poly_ring.base_ring().size(&BigIntRing::RING).unwrap();
         let (p, e) = is_prime_power(BigIntRing::RING, &q).unwrap();
         let p = int_cast(p, StaticRing::<i64>::RING, BigIntRing::RING) as usize;
         assert!(p > 0);
         let undo_frobenius = Frobenius::new(poly_ring.base_ring(), e - 1);
-        let base_poly = poly_ring.from_terms(poly_ring.terms(&poly).map(|(c, i)| {
+        let base_poly = poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| {
             debug_assert!(i % p == 0);
             (undo_frobenius.map_ref(c), i / p)
         }));
-        return finite_field_poly_squarefree_part(poly_ring, base_poly);
+        return finite_field_poly_squarefree_part(poly_ring, &base_poly);
     } else {
-        let square_part = poly_ring.ideal_gen(&poly, &derivate);
-        let result = poly_ring.checked_div(&poly, &square_part).unwrap();
+        let square_part = poly_ring.ideal_gen(poly, &derivate);
+        let result = poly_ring.checked_div(poly, &square_part).unwrap();
         return poly_ring.normalize(result);
     }
 }
@@ -87,7 +87,7 @@ impl<'a, P> FiniteFieldOperation<<P::BaseRing as RingStore>::Type> for FiniteFie
         let iso = (&poly_ring).into_lifted_hom(RingRef::new(self.poly_ring), base_iso.inv());
         let poly = iso.map_ref(self.poly);
 
-        let result = finite_field_poly_squarefree_part(&poly_ring, poly);
+        let result = finite_field_poly_squarefree_part(&poly_ring, &poly);
 
         let map_back = RingRef::new(self.poly_ring).into_lifted_hom(&poly_ring, &base_iso);
         return map_back.map(result);

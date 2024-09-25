@@ -90,7 +90,7 @@ impl<'a, P, Q> ZnOperation for IntegerPolynomialGCDUsingHenselLifting<'a, P, Q>
 
         let leading_coeff_mod_pe = reduce_pe(&self.leading_coeff);
         let scaled_d_lifted = self.ZZX.from_terms(ZpeX.terms(&d_lifted).map(|(c, i)| (int_cast(Zpe.smallest_lift(Zpe.mul_ref(c, &leading_coeff_mod_pe)), ZZ, Zpe.integer_ring()), i)));
-        let d = make_primitive(scaled_d_lifted, &self.ZZX);
+        let d = make_primitive(&self.ZZX, scaled_d_lifted);
 
         if self.ZZX.checked_div(&self.f, &d).is_some() {
             return Some(d);
@@ -155,7 +155,8 @@ pub fn poly_eea_global<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<
     return (sa, ta, a);
 }
 
-fn make_primitive<R>(f: El<R>, ZZX: R) -> El<R>
+#[stability::unstable(feature = "enable")]
+pub fn make_primitive<R>(ZZX: R, f: El<R>) -> El<R>
     where R: RingStore,
         R::Type: PolyRing,
         <<R::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
@@ -193,8 +194,8 @@ pub fn integer_poly_gcd_local<R>(mut fst: El<R>, mut snd: El<R>, ZZX: R) -> El<R
         std::mem::swap(&mut fst, &mut snd);
     }
 
-    let f = make_primitive(fst, &ZZX);
-    let g = make_primitive(snd, &ZZX);
+    let f = make_primitive(&ZZX, fst);
+    let g = make_primitive(&ZZX, snd);
     let leading_coeff = ZZ.ideal_gen(ZZX.lc(&f).unwrap(), ZZX.lc(&g).unwrap());
 
     let ZZbig = BigIntRing::RING;

@@ -4,6 +4,8 @@ use std::cmp::max;
 use zn_64::Zn;
 use zn_64::ZnBase;
 
+use crate::algorithms::eea::poly::make_primitive;
+use crate::algorithms::eea::signed_lcm;
 use crate::algorithms::erathostenes::enumerate_primes;
 use crate::algorithms::hensel::hensel_lift_factorization;
 use crate::algorithms::int_bisect;
@@ -23,6 +25,7 @@ use crate::ring::*;
 use crate::integer::*;
 use crate::pid::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
+use crate::rings::rational::RationalFieldBase;
 use crate::rings::zn::*;
 use crate::seq::VectorView;
 use crate::specialization::*;
@@ -89,7 +92,7 @@ impl<'a, P, Q> ZnOperation for IntegerPolyPowerDecompositionUsingHenselLifting<'
         let ZZX_to_FpX = self.FpX.lifted_hom(&self.ZZX, &ZZ_to_Fp);
 
         let f_mod_p = self.FpX.normalize(ZZX_to_FpX.map_ref(&self.f));
-        let power_decomposition = poly_power_decomposition_global(&self.FpX, self.FpX.clone_el(&f_mod_p));
+        let power_decomposition = poly_power_decomposition_global(&self.FpX, &f_mod_p);
         let factors = power_decomposition.iter().map(|(f, k)| self.FpX.pow(self.FpX.clone_el(f), *k)).collect::<Vec<_>>();
 
         let ZpeX = DensePolyRing::new(&Zpe, "X");
@@ -106,7 +109,6 @@ impl<'a, P, Q> ZnOperation for IntegerPolyPowerDecompositionUsingHenselLifting<'
             &f_mod_pe,
             &factors
         );
-
 
         let mut result = Vec::new();
         for (i, mut factor) in lifted_factors.into_iter().enumerate() {
@@ -129,16 +131,6 @@ impl<'a, P, Q> ZnOperation for IntegerPolyPowerDecompositionUsingHenselLifting<'
     }
 }
 
-
-fn make_primitive<R>(ZZX: R, f: El<R>) -> El<R>
-    where R: RingStore,
-        R::Type: PolyRing,
-        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
-{
-    let content = ZZX.terms(&f).map(|(c, _)| c).fold(ZZX.base_ring().zero(), |a, b| ZZX.base_ring().ideal_gen(&a, b));
-    return ZZX.from_terms(ZZX.terms(&f).map(|(c, i)| (ZZX.base_ring().checked_div(c, &content).unwrap(), i)));
-}
-
 ///
 /// Computes the square-free part of a polynomial `f` over the integers, 
 /// i.e. the greatest (w.r.t. divisibility) polynomial `g | f` that is square-free, 
@@ -149,13 +141,13 @@ fn make_primitive<R>(ZZX: R, f: El<R>) -> El<R>
 /// primes. This is usually much faster than working over `Z` or `Q`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn int_poly_squarefree_part_local<P>(ZZX: P, mut f: El<P>) -> El<P>
+pub fn integer_poly_squarefree_part_local<P>(ZZX: P, f: &El<P>) -> El<P>
     where P: PolyRingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing + InterpolationBaseRing,
         ZnBase: CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
-    f = make_primitive(ZZX, f);
+    let f = make_primitive(ZZX, ZZX.clone_el(f));
 
     // very small primes have a lower probability of working (we require that no two coprime irreducible factors of `f`
     // are the same modulo `p`, and no irreducible factor of `f` contains a square modulo `p`)
@@ -177,8 +169,40 @@ pub fn int_poly_squarefree_part_local<P>(ZZX: P, mut f: El<P>) -> El<P>
     unreachable!()
 }
 
+///
+/// Computes the square-free part of a polynomial `f` over the rational numbers, 
+/// i.e. the greatest (w.r.t. divisibility) polynomial `g | f` that is square-free, 
+/// up to multiplication by nonzero integers.
+/// 
+/// The returned polynomial is always monic, and with this restriction, it
+/// is unique. This function does the computations locally, i.e. modulo suitable
+/// primes. This is usually much faster than working over `Z` or `Q`.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn rational_poly_squarefree_part_local<P, I>(QQX: P, f: &El<P>) -> El<P>
+    where P: PolyRingStore + Copy,
+        P::Type: PolyRing + DivisibilityRing,
+        <P::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Type: IntegerRing + InterpolationBaseRing,
+        ZnBase: CanHomFrom<I::Type>
+{
+    assert!(!QQX.is_zero(f));
+    let QQ = QQX.base_ring();
+    let ZZ = QQ.base_ring();
+
+    let den_lcm = QQX.terms(f).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+    
+    let ZZX = DensePolyRing::new(ZZ, "X");
+    let f = ZZX.from_terms(QQX.terms(f).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
+    let squarefree_part = integer_poly_squarefree_part_local(&ZZX, &f);
+    let ZZX_to_QQX = QQX.lifted_hom(&ZZX, QQ.inclusion());
+
+    return QQX.normalize(ZZX_to_QQX.map(squarefree_part));
+}
+
 #[test]
-fn test_int_poly_squarefree_part_global() {
+fn test_integer_poly_squarefree_part_local() {
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(&ZZ, "X");
 
@@ -189,7 +213,7 @@ fn test_int_poly_squarefree_part_global() {
     ]);
 
     let input = ZZX.prod([ZZX.clone_el(&f), ZZX.clone_el(&f), ZZX.clone_el(&g), ZZX.clone_el(&h), ZZX.clone_el(&h), ZZX.clone_el(&h), ZZX.clone_el(&h)]);
-    let actual = int_poly_squarefree_part_local(&ZZX, input);
+    let actual = integer_poly_squarefree_part_local(&ZZX, &input);
     let expected = ZZX.prod([f, g, h]);
     assert_el_eq!(&ZZX, expected, actual);
 
@@ -200,7 +224,7 @@ fn test_int_poly_squarefree_part_global() {
     ]);
 
     let input = ZZX.prod([ZZX.clone_el(&f), ZZX.clone_el(&f), ZZX.clone_el(&g), ZZX.clone_el(&h), ZZX.clone_el(&h), ZZX.clone_el(&h), ZZX.clone_el(&h), ZZX.int_hom().map(30)]);
-    let actual = int_poly_squarefree_part_local(&ZZX, input);
+    let actual = integer_poly_squarefree_part_local(&ZZX, &input);
     let expected = make_primitive(&ZZX, ZZX.prod([f, g, h]));
     assert_el_eq!(&ZZX, expected, actual);
 }
