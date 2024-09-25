@@ -42,11 +42,7 @@ pub fn factor_over_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usiz
             
             // and finally extract each individual factor
             while let Some(mut current) = stack.pop() {
-                // normalize current
-                let lc = poly_ring.lc(&current).unwrap();
-                poly_ring.base_ring().mul_assign_ref(&mut unit, lc);
-                let lc_inv = poly_ring.base_ring().div(&poly_ring.base_ring().one(), lc);
-                poly_ring.inclusion().mul_assign_ref_map(&mut current, &lc_inv);
+                current = poly_ring.normalize(current);
 
                 if poly_ring.is_one(&current) {
                     continue;

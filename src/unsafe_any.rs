@@ -1,5 +1,13 @@
 use std::{alloc::{Allocator, Global, Layout}, ptr::NonNull};
 
+///
+/// Like [`Box`] but not generic in the type it stores.
+/// This type has to be provided when creating or accessing the container.
+/// If there is a mismatch between the provided types, it causes UB.
+/// 
+/// I mainly use this in specific circumstances as a workaround for
+/// specializing associated types.
+/// 
 pub struct UnsafeAny {
     data: Option<NonNull<[u8]>>,
     deleter: unsafe fn(NonNull<[u8]>)

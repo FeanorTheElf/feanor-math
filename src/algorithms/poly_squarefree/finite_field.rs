@@ -13,6 +13,13 @@ use crate::homomorphism::*;
 use crate::specialization::FiniteFieldOperation;
 use crate::specialization::SpecializeToFiniteField;
 
+///
+/// Computes the square-free part of a polynomial `f`, i.e. the greatest (w.r.t.
+/// divisibility) polynomial `g | f` that is square-free.
+/// 
+/// The returned polynomial is always monic, and with this restriction, it
+/// is unique.
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn finite_field_poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
     where P: PolyRingStore,
@@ -37,13 +44,15 @@ pub fn finite_field_poly_squarefree_part<P>(poly_ring: P, poly: El<P>) -> El<P>
         return finite_field_poly_squarefree_part(poly_ring, base_poly);
     } else {
         let square_part = poly_ring.ideal_gen(&poly, &derivate);
-        let mut result = poly_ring.checked_div(&poly, &square_part).unwrap();
-        let lc_inv = poly_ring.base_ring().invert(poly_ring.lc(&result).unwrap()).unwrap();
-        poly_ring.inclusion().mul_assign_map(&mut result, lc_inv);
-        return result;
+        let result = poly_ring.checked_div(&poly, &square_part).unwrap();
+        return poly_ring.normalize(result);
     }
 }
 
+///
+/// If the given polynomial ring is over a finite field, returns the result of [`finite_field_poly_squarefree_part()`].
+/// Otherwise, `None` is returned.
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn poly_squarefree_part_if_finite_field<P>(poly_ring: P, poly: &El<P>) -> Option<El<P>>
     where P: PolyRingStore,

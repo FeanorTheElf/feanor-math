@@ -20,7 +20,6 @@ use crate::rings::rational::RationalFieldBase;
 use crate::rings::zn::choose_zn_impl;
 use crate::rings::zn::zn_64::{Zn, ZnBase};
 use crate::rings::zn::*;
-use crate::field::FieldStore;
 
 use super::lcm;
 
@@ -40,7 +39,7 @@ struct IntegerPolynomialGCDUsingHenselLifting<'a, P, Q>
     leading_coeff: &'a El<<P::Type as RingExtension>::BaseRing>
 }
 
-impl<'a, P, Q> ZnOperation<Option<El<P>>> for IntegerPolynomialGCDUsingHenselLifting<'a, P, Q>
+impl<'a, P, Q> ZnOperation for IntegerPolynomialGCDUsingHenselLifting<'a, P, Q>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
@@ -48,8 +47,11 @@ impl<'a, P, Q> ZnOperation<Option<El<P>>> for IntegerPolynomialGCDUsingHenselLif
         Q::Type: PolyRing + EuclideanRing,
         <<Q::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
-    fn call<R: ZnRingStore>(self, Zpe: R) -> Option<El<P>>
-        where R::Type: ZnRing
+    type Output<'b> = Option<El<P>>
+        where Self: 'b;
+
+    fn call<'b, R>(self, Zpe: R) -> Option<El<P>>
+        where R: 'b + ZnRingStore, R::Type: ZnRing
     {
         let Fp = self.FpX.base_ring();
         let ZZ = self.ZZX.base_ring();
@@ -98,6 +100,14 @@ impl<'a, P, Q> ZnOperation<Option<El<P>>> for IntegerPolynomialGCDUsingHenselLif
     }
 }
 
+///
+/// Computes the greatest common divisor of two polynomials over a field, together with
+/// a Bezout identity.
+/// 
+/// The result of this function is equal to [`crate::algorithms::eea::eaa()`], but it may
+/// be faster since it tries to mitigate polynomial coefficient growth in the case of infinite
+/// fields.
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn poly_eea_global<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>) 
     where R: RingStore,
@@ -154,6 +164,14 @@ fn make_primitive<R>(f: El<R>, ZZX: R) -> El<R>
     return ZZX.from_terms(ZZX.terms(&f).map(|(c, i)| (ZZX.base_ring().checked_div(c, &content).unwrap(), i)));
 }
 
+///
+/// Computes the greatest common divisor of two polynomials over the integers,
+/// up to multiplication with nonzero integers.
+/// 
+/// The returned polynomial is always primitive, and with this restriction, it
+/// is unique. Computations are performed locally, i.e. modulo a prime, which 
+/// is usually much faster than working direction over `Z` or `Q`.
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn integer_poly_gcd_local<R>(mut fst: El<R>, mut snd: El<R>, ZZX: R) -> El<R>
     where R: RingStore,
@@ -210,6 +228,13 @@ pub fn integer_poly_gcd_local<R>(mut fst: El<R>, mut snd: El<R>, ZZX: R) -> El<R
     unreachable!()
 }
 
+///
+/// Computes the greatest common divisor of two rational polynomials.
+/// 
+/// The returned polynomial is always monic, and with this restriction, it
+/// is unique. As opposed to [`poly_eea_global()`], computations are performed
+/// locally, i.e. modulo a prime, which is usually much faster.
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn rational_poly_gcd_local<R, I>(fst: El<R>, snd: El<R>, QQX: R) -> El<R>
     where R: RingStore,
@@ -233,16 +258,18 @@ pub fn rational_poly_gcd_local<R, I>(fst: El<R>, snd: El<R>, QQX: R) -> El<R>
     let ZZX = DensePolyRing::new(ZZ, "X");
     let f = ZZX.from_terms(QQX.terms(&fst).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(QQ.get_ring().num(c), &fst_den_lcm), QQ.get_ring().den(c)).unwrap(), i)));
     let g = ZZX.from_terms(QQX.terms(&snd).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(QQ.get_ring().num(c), &snd_den_lcm), QQ.get_ring().den(c)).unwrap(), i)));
-    let d = integer_poly_gcd_local(f, g, &ZZX);
-    let d_lc = QQ.inclusion().map_ref(ZZX.lc(&d).unwrap());
+    let d_over_ZZ = integer_poly_gcd_local(f, g, &ZZX);
+    let d = QQX.lifted_hom(&ZZX, QQ.inclusion()).map(d_over_ZZ);
 
-    return QQX.from_terms(ZZX.terms(&d).map(|(c, i)| (QQ.div(&QQ.inclusion().map_ref(c), &d_lc), i)));
+    return QQX.normalize(d);
 }
 
 #[cfg(test)]
 use crate::integer::BigIntRing;
 #[cfg(test)]
 use crate::rings::rational::RationalField;
+#[cfg(test)]
+use crate::RANDOM_TEST_INSTANCE_COUNT;
 
 #[test]
 fn test_polynomial_eea_global() {
@@ -282,14 +309,14 @@ fn test_polynomial_eea_local() {
 }
 
 #[test]
-fn test_int_poly_gcd_random() {
+fn random_test_rational_poly_gcd_local() {
     let mut rng = oorandom::Rand64::new(1);
     let ZZbig = BigIntRing::RING;
     let QQ = RationalField::new(ZZbig);
     let ring = DensePolyRing::new(&QQ, "X");
     let coeff_bound = ZZbig.int_hom().map(10);
 
-    for _ in 0..20 {
+    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
         let d = ring.from_terms((0..10).map(|i| (QQ.inclusion().map(ZZbig.get_uniformly_random(&coeff_bound, || rng.rand_u64())), i)));
         let f = ring.mul_ref_snd(ring.from_terms((0..10).map(|i| (QQ.inclusion().map(ZZbig.get_uniformly_random(&coeff_bound, || rng.rand_u64())), i))), &d);
         let g = ring.mul_ref_snd(ring.from_terms((0..10).map(|i| (QQ.inclusion().map(ZZbig.get_uniformly_random(&coeff_bound, || rng.rand_u64())), i))), &d);

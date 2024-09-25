@@ -27,6 +27,9 @@ extern crate ndarray;
 
 const MAX_PROBABILISTIC_REPETITIONS: usize = 30;
 
+#[cfg(test)]
+const RANDOM_TEST_INSTANCE_COUNT: usize = 20;
+
 mod unsafe_any;
 
 ///

@@ -20,12 +20,15 @@ struct ECFactorInt<I>
     result_ring: I
 }
 
-impl<I> ZnOperation<El<I>> for ECFactorInt<I>
+impl<I> ZnOperation for ECFactorInt<I>
     where I: IntegerRingStore,
         I::Type: IntegerRing
 {
-    fn call<R: ZnRingStore>(self, ring: R) -> El<I>
-        where R::Type: ZnRing
+    type Output<'a> = El<I>
+        where Self: 'a;
+
+    fn call<'a, R>(self, ring: R) -> El<I>
+        where R: 'a + ZnRingStore, R::Type: ZnRing
     {
         int_cast(lenstra_ec_factor(&ring), self.result_ring, ring.integer_ring())
     }

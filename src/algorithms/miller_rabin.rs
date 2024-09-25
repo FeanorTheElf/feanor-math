@@ -15,10 +15,13 @@ struct CheckIsFieldMillerRabin {
     probability_param: usize
 }
 
-impl ZnOperation<bool> for CheckIsFieldMillerRabin {
+impl ZnOperation for CheckIsFieldMillerRabin {
 
-    fn call<R: ZnRingStore>(self, ring: R) -> bool
-        where R::Type: ZnRing
+    type Output<'a> = bool
+        where Self: 'a;
+
+    fn call<'a, R>(self, ring: R) -> bool
+        where R: 'a + ZnRingStore, R::Type: ZnRing
     {
         is_prime_base(ring, self.probability_param)
     }

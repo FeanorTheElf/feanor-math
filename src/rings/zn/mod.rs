@@ -352,10 +352,13 @@ impl<R: RingStore> ZnRingStore for R
 /// 
 /// See [`choose_zn_impl()`] for details.
 /// 
-pub trait ZnOperation<Result = ()> {
+pub trait ZnOperation {
     
-    fn call<R: ZnRingStore>(self, ring: R) -> Result
-        where R::Type: ZnRing;
+    type Output<'a>
+        where Self: 'a;
+
+    fn call<'a, R>(self, ring: R) -> Self::Output<'a>
+        where R: 'a + ZnRingStore, R::Type: ZnRing;
 }
 
 ///
@@ -390,10 +393,10 @@ pub trait ZnOperation<Result = ()> {
 /// choose_zn_impl(StaticRing::<i64>::RING, 17, DoStuff { int_value });
 /// ```
 /// 
-pub fn choose_zn_impl<I, F, R>(ZZ: I, n: El<I>, f: F) -> R
-    where I: IntegerRingStore,
+pub fn choose_zn_impl<'a, I, F>(ZZ: I, n: El<I>, f: F) -> F::Output<'a>
+    where I: 'a + IntegerRingStore,
         I::Type: IntegerRing,
-        F: ZnOperation<R>
+        F: ZnOperation
 {
     if ZZ.abs_highest_set_bit(&n).unwrap_or(0) < 57 {
         f.call(zn_64::Zn::new(StaticRing::<i64>::RING.coerce(&ZZ, n) as u64))
@@ -407,9 +410,13 @@ fn test_choose_zn_impl() {
     let int_value = 4;
     // work in Z/17Z without explicitly choosing an implementation
     struct DoStuff { int_value: i64 }
-    impl ZnOperation<()> for DoStuff {
-        fn call<R: ZnRingStore>(self, Zn: R)
-            where R::Type: ZnRing
+    impl ZnOperation for DoStuff {
+
+        type Output<'a> = ()
+            where Self: 'a;
+
+        fn call<'a, R>(self, Zn: R)
+            where R: 'a + ZnRingStore, R::Type: ZnRing
         {
             let value = Zn.coerce(Zn.integer_ring(), int_cast(self.int_value, Zn.integer_ring(), &StaticRing::<i64>::RING));
             assert_el_eq!(Zn, Zn.int_hom().map(-1), Zn.mul_ref(&value, &value));

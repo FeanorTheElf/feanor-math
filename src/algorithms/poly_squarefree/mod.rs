@@ -1,74 +1,15 @@
 use finite_field::poly_squarefree_part_if_finite_field;
 
-use crate::algorithms::hensel::hensel_lift_factorization;
-use crate::field::Field;
-use crate::homomorphism::CanHomFrom;
-use crate::homomorphism::Homomorphism;
 use crate::divisibility::*;
-use crate::integer::IntegerRing;
 use crate::field::*;
-use crate::primitive_int::StaticRing;
 use crate::rings::poly::*;
 use crate::ring::*;
-use crate::integer::*;
 use crate::pid::*;
-use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::rings::zn::*;
 use crate::field::FieldStore;
 use crate::specialization::*;
 
 pub mod finite_field;
-
-struct IntegerPolyPowerDecompositionUsingHenselLifting<'a, P, Q>
-    where P: RingStore + Copy,
-        P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
-        Q: RingStore,
-        Q::Type: PolyRing,
-        <<Q::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
-{
-    ZZX: P,
-    FpX: Q,
-    f: &'a El<P>
-}
-
-impl<'a, P, Q> ZnOperation<Vec<El<P>>> for IntegerPolyPowerDecompositionUsingHenselLifting<'a, P, Q>
-    where P: RingStore + Copy,
-        P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
-        Q: RingStore,
-        Q::Type: PolyRing + EuclideanRing,
-        <<Q::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + PerfectField + CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> + SpecializeToFiniteField
-{
-    fn call<R: ZnRingStore>(self, Zpe: R) -> Vec<El<P>>
-        where R::Type: ZnRing
-    {
-        let Fp = self.FpX.base_ring();
-        let ZZ = self.ZZX.base_ring();
-        let ZZ_to_Fp = Fp.can_hom(ZZ).unwrap();
-        let ZZX_to_FpX = self.FpX.lifted_hom(&self.ZZX, &ZZ_to_Fp);
-
-        let f_mod_p = ZZX_to_FpX.map_ref(&self.f);
-        let power_decomposition = poly_power_decomposition_global(&self.FpX, self.FpX.clone_el(&f_mod_p));
-        let factors = power_decomposition.iter().map(|(f, k)| self.FpX.pow(self.FpX.clone_el(f), *k)).collect::<Vec<_>>();
-
-        let ZpeX = DensePolyRing::new(&Zpe, "X");
-        let ZZ_to_Zpe = Zpe.can_hom(Zpe.integer_ring()).unwrap();
-        let reduce_pe = |c: &El<<P::Type as RingExtension>::BaseRing>| ZZ_to_Zpe.map(int_cast(ZZ.clone_el(c), Zpe.integer_ring(), ZZ));
-        let f_mod_pe = ZpeX.from_terms(self.ZZX.terms(&self.f).map(|(c, i)| (reduce_pe(c), i)));
-
-        let lifted_factors = hensel_lift_factorization(
-            &ZpeX,
-            &self.FpX,
-            &self.FpX,
-            &f_mod_pe,
-            &factors
-        );
-
-        
-        unimplemented!()
-    }
-}
+pub mod integer;
 
 ///
 /// Returns a list of `(fi, ki)` such that the `fi` are monic, square-free and pairwise coprime, and
@@ -82,42 +23,22 @@ pub fn poly_power_decomposition_global<P>(poly_ring: P, poly: El<P>) -> Vec<(El<
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + SpecializeToFiniteField
 {
     assert!(!poly_ring.is_zero(&poly));
-    let derivate = derive_poly(&poly_ring, &poly);
-    if poly_ring.is_zero(&derivate) {
-        let p = poly_ring.base_ring().characteristic(&StaticRing::<i64>::RING).unwrap() as usize;
-        if poly_ring.degree(&poly).unwrap() == 0 {
-            return Vec::new();
-        } else {
-            assert!(p > 0);
-        }
-        let base_poly = poly_ring.from_terms(poly_ring.terms(&poly).map(|(c, i)| {
-            debug_assert!(i % p == 0);
-            (poly_ring.base_ring().clone_el(c), i / p)
-        }));
-        let result: Vec<(El<P>, usize)> = poly_power_decomposition_global(poly_ring, base_poly).into_iter()
-            .map(|(f, k)| (f, k * p))
-            .collect();
-        
-        debug_assert!(poly_ring.eq_el(&poly_squarefree_part_global(&poly_ring, poly), &poly_ring.prod(result.iter().map(|(f, _k)| poly_ring.clone_el(f)))));
-        return result;
+    let squarefree_part = poly_squarefree_part_global(poly_ring, poly_ring.clone_el(&poly));
+    if poly_ring.degree(&squarefree_part).unwrap() == poly_ring.degree(&poly).unwrap() {
+        return vec![(squarefree_part, 1)];
     } else {
-        let square_part = poly_ring.ideal_gen(&poly, &derivate);
-        let mut result = poly_power_decomposition_global(poly_ring, square_part);
-        let mut power_part = poly_ring.one();
+        let square_part = poly_ring.checked_div(&poly, &squarefree_part).unwrap();
+        let square_part_decomposition = poly_power_decomposition_global(poly_ring, square_part);
+        let mut result = square_part_decomposition;
         let mut degree = 0;
-        for (f, k) in &mut result {
+        for (g, k) in &mut result {
             *k += 1;
-            degree += poly_ring.degree(f).unwrap() * *k;
-            poly_ring.mul_assign(&mut power_part, poly_ring.pow(poly_ring.clone_el(f), *k));
+            degree += poly_ring.degree(g).unwrap() * *k;
         }
-        if degree < poly_ring.degree(&poly).unwrap() {
-            let mut new_part = poly_ring.checked_div(&poly, &power_part).unwrap();
-            let lc_inv = poly_ring.base_ring().invert(poly_ring.lc(&new_part).unwrap()).unwrap();
-            poly_ring.inclusion().mul_assign_map(&mut new_part, lc_inv);
-            result.push((new_part, 1));
+        if degree != poly_ring.degree(&poly).unwrap() {
+            let remaining_part = poly_ring.checked_div(&poly, &poly_ring.prod(result.iter().map(|(g, e)| poly_ring.pow(poly_ring.clone_el(g), *e)))).unwrap();
+            result.push((poly_ring.normalize(remaining_part), 1));
         }
-
-        debug_assert!(poly_ring.eq_el(&poly_squarefree_part_global(&poly_ring, poly), &poly_ring.prod(result.iter().map(|(f, _k)| poly_ring.clone_el(f)))));
         return result;
     }
 }
@@ -125,6 +46,9 @@ pub fn poly_power_decomposition_global<P>(poly_ring: P, poly: El<P>) -> Vec<(El<
 ///
 /// Computes the square-free part of a polynomial `f`, i.e. the greatest (w.r.t.
 /// divisibility) polynomial `g | f` that is square-free.
+/// 
+/// The returned polynomial is always monic, and with this restriction, it
+/// is unique.
 /// 
 /// # Example
 /// ```
@@ -165,21 +89,25 @@ pub fn poly_squarefree_part_global<P>(poly_ring: P, poly: El<P>) -> El<P>
         unimplemented!("infinite field with positive characteristic are currently not supported")
     } else {
         let square_part = poly_ring.ideal_gen(&poly, &derivate);
-        let mut result = poly_ring.checked_div(&poly, &square_part).unwrap();
-        let lc_inv = poly_ring.base_ring().invert(poly_ring.lc(&result).unwrap()).unwrap();
-        poly_ring.inclusion().mul_assign_map(&mut result, lc_inv);
-        return result;
+        let result = poly_ring.checked_div(&poly, &square_part).unwrap();
+        return poly_ring.normalize(result);
     }
 }
 
+#[cfg(test)]
+use crate::homomorphism::*;
 #[cfg(test)]
 use crate::integer::BigIntRing;
 #[cfg(test)]
 use crate::rings::extension::galois_field::*;
 #[cfg(test)]
-use crate::rings::extension::*;
+use crate::rings::poly::dense_poly::*;
 #[cfg(test)]
 use crate::rings::rational::RationalField;
+#[cfg(test)]
+use crate::rings::extension::FreeAlgebraStore;
+#[cfg(test)]
+use crate::rings::zn::*;
 
 #[test]
 fn test_poly_squarefree_part_global() {
@@ -217,24 +145,6 @@ fn test_poly_squarefree_part_global() {
 }
 
 #[test]
-fn test_poly_squarefree_part_global_multiplicity_p() {
-    let ring = DensePolyRing::new(zn_64::Zn::new(5).as_field().ok().unwrap(), "X");
-    let [f] = ring.with_wrapped_indeterminate(|X| [3 + X.pow_ref(10)]);
-    let [g] = ring.with_wrapped_indeterminate(|X| [3 + X.pow_ref(2)]);
-    let actual = poly_squarefree_part_global(&ring, f);
-    assert_el_eq!(ring, g, actual);
-}
-
-#[test]
-fn test_poly_squarefree_part_global_galois_field() {
-    let ring = DensePolyRing::new(GaloisField::new(2, 3), "X");
-    let f = ring.from_terms([(ring.base_ring().pow(ring.base_ring().canonical_gen(), 2), 0), (ring.base_ring().one(), 2)]);
-    let g = ring.from_terms([(ring.base_ring().canonical_gen(), 0), (ring.base_ring().one(), 1)]);
-    let actual = poly_squarefree_part_global(&ring, f);
-    assert_el_eq!(ring, g, actual);
-}
-
-#[test]
 fn test_poly_power_decomposition_global() {
     let ring = DensePolyRing::new(zn_static::Fp::<257>::RING, "X");
     let [f1, f2, f4] = ring.with_wrapped_indeterminate(|X| [
@@ -257,4 +167,22 @@ fn test_poly_power_decomposition_global() {
             _ => unreachable!()
         }
     }
+}
+
+#[test]
+fn test_poly_squarefree_part_global_multiplicity_p() {
+    let ring = DensePolyRing::new(zn_64::Zn::new(5).as_field().ok().unwrap(), "X");
+    let [f] = ring.with_wrapped_indeterminate(|X| [3 + X.pow_ref(10)]);
+    let [g] = ring.with_wrapped_indeterminate(|X| [3 + X.pow_ref(2)]);
+    let actual = poly_squarefree_part_global(&ring, f);
+    assert_el_eq!(ring, g, actual);
+}
+
+#[test]
+fn test_poly_squarefree_part_global_galois_field() {
+    let ring = DensePolyRing::new(GaloisField::new(2, 3), "X");
+    let f = ring.from_terms([(ring.base_ring().pow(ring.base_ring().canonical_gen(), 2), 0), (ring.base_ring().one(), 2)]);
+    let g = ring.from_terms([(ring.base_ring().canonical_gen(), 0), (ring.base_ring().one(), 1)]);
+    let actual = poly_squarefree_part_global(&ring, f);
+    assert_el_eq!(ring, g, actual);
 }

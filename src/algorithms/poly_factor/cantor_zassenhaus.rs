@@ -107,8 +107,7 @@ pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>
         <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
 {
     let lc = poly_ring.base_ring().clone_el(poly_ring.lc(&f).unwrap());
-    let lc_inv = poly_ring.base_ring().invert(&lc).unwrap();
-    poly_ring.inclusion().mul_assign_map(&mut f, lc_inv);
+    f = poly_ring.normalize(f);
 
     let f_coeffs = (0..poly_ring.degree(&f).unwrap()).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))).collect::<Vec<_>>();
     let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
@@ -187,9 +186,7 @@ pub fn cantor_zassenhaus<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
         <<P as RingStore>::Type as RingExtension>::BaseRing: FiniteRingStore + FieldStore,
         <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
 {
-    let lc = poly_ring.base_ring().clone_el(poly_ring.lc(&f).unwrap());
-    let lc_inv = poly_ring.base_ring().invert(&lc).unwrap();
-    poly_ring.inclusion().mul_assign_map(&mut f, lc_inv);
+    f = poly_ring.normalize(f);
 
     let f_coeffs = (0..poly_ring.degree(&f).unwrap()).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))).collect::<Vec<_>>();
     let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
@@ -324,9 +321,7 @@ pub fn cantor_zassenhaus_even<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
         <<P as RingStore>::Type as RingExtension>::BaseRing: FiniteRingStore + FieldStore,
         <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
 {
-    let lc = poly_ring.base_ring().clone_el(poly_ring.lc(&f).unwrap());
-    let lc_inv = poly_ring.base_ring().invert(&lc).unwrap();
-    poly_ring.inclusion().mul_assign_map(&mut f, lc_inv);
+    f = poly_ring.normalize(f);
 
     let f_coeffs = (0..poly_ring.degree(&f).unwrap()).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))).collect::<Vec<_>>();
     let mod_f_ring = FreeAlgebraImpl::new_with(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs, "x", Global, STANDARD_CONVOLUTION);

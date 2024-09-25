@@ -121,8 +121,6 @@ use crate::algorithms::buchberger::buchberger_simple;
 #[cfg(test)]
 use crate::rings::local::AsLocalPIR;
 #[cfg(test)]
-use crate::field::FieldStore;
-#[cfg(test)]
 use crate::integer::BigIntRing;
 
 #[test]
@@ -171,12 +169,9 @@ fn test_resultant_polynomial() {
         (vec![(1, 0), (1, 1), (1, 2)], 2)
     ].into_iter().map(|(v, i)| (QQX.from_terms(v.into_iter().map(|(c, j)| (ZZ_to_QQ.map(c), j))), i)));
 
-    let mut actual = resultant_global(&QQXY, QQXY.clone_el(&f), QQXY.clone_el(&g));
+    let actual = QQX.normalize(resultant_global(&QQXY, QQXY.clone_el(&f), QQXY.clone_el(&g)));
     let actual_local = resultant_local(&QQXY, QQXY.clone_el(&f), QQXY.clone_el(&g));
     assert_el_eq!(&QQX, &actual, &actual_local);
-
-    let actual_lc_inv = QQ.div(&QQ.one(), QQX.lc(&actual).unwrap());
-    QQX.inclusion().mul_assign_map(&mut actual, actual_lc_inv);
 
     let QQYX = MultivariatePolyRingImpl::new(&QQ, 2);
     // reverse the order of indeterminates, so that we indeed eliminate `Y`
@@ -185,9 +180,7 @@ fn test_resultant_polynomial() {
     let gb = buchberger_simple::<_, _, false>(&QQYX, vec![f, g], Lex);
     let expected = gb.into_iter().filter(|poly| QQYX.appearing_indeterminates(&poly).len() == 1).collect::<Vec<_>>();
     assert!(expected.len() == 1);
-    let mut expected = QQX.from_terms(QQYX.terms(&expected[0]).map(|(c, m)| (c.clone(), QQYX.exponent_at(m, 1))));
-    let expected_lc_inv = QQ.div(&QQ.one(), QQX.lc(&expected).unwrap());
-    QQX.inclusion().mul_assign_map(&mut expected, expected_lc_inv);
+    let expected = QQX.normalize(QQX.from_terms(QQYX.terms(&expected[0]).map(|(c, m)| (c.clone(), QQYX.exponent_at(m, 1)))));
 
     assert_el_eq!(QQX, expected, actual);
 }

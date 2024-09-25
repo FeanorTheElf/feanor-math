@@ -83,9 +83,7 @@ fn factor_squarefree_over_extension<P>(LX: P, f: El<P>) -> Vec<El<P>>
             let (factorization, _unit) = <_ as FactorPolyField>::factor_poly(&KX, &squarefree_part);
             return factorization.into_iter().map(|(factor, e)| {
                 assert!(e == 1);
-                let mut f_factor = LX.extended_ideal_gen(&f_transformed, &LX.lifted_hom(&KX, L.inclusion()).map(factor)).2;
-                let lc_inv = L.div(&L.one(), LX.lc(&f_factor).unwrap());
-                LX.inclusion().mul_assign_map(&mut f_factor, lc_inv);
+                let f_factor = LX.normalize(LX.extended_ideal_gen(&f_transformed, &LX.lifted_hom(&KX, L.inclusion()).map(factor)).2);
                 return LX.evaluate(&f_factor, &lin_transform_rev, &LX.inclusion());
             }).collect();
         }
@@ -121,9 +119,7 @@ pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>
     let mut result: Vec<(El<P>, usize)> = Vec::new();
     let mut current = KX.clone_el(f);
     while !KX.is_unit(&current) {
-        let mut squarefree_part = poly_squarefree_part_global(KX, KX.clone_el(&current));
-        let lc_inv = K.div(&K.one(), KX.lc(&squarefree_part).unwrap());
-        KX.inclusion().mul_assign_map(&mut squarefree_part, lc_inv);
+        let squarefree_part = poly_squarefree_part_global(KX, KX.clone_el(&current));
         current = KX.checked_div(&current, &squarefree_part).unwrap();
 
         for factor in factor_squarefree_over_extension(KX, squarefree_part) {

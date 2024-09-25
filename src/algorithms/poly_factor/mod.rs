@@ -29,9 +29,8 @@ pub mod finite_field;
 pub trait FactorPolyField: Field {
 
     ///
-    /// Factors a univariate polynomial with coefficients in this ring into its irreducible factors.
-    /// This requires that this ring is a UFD, otherwise a unique factorization does not exist in 
-    /// the corresponding polynomial ring.
+    /// Factors a univariate polynomial with coefficients in this field into its irreducible factors.
+    /// 
     /// All factors must be monic and but may be returned in any order (with multiplicities). The
     /// unit `poly / prod_i factor[i]^multiplicity[i]` (which is a unit in the base ring) is returned
     /// as second tuple element.
@@ -171,6 +170,8 @@ use crate::rings::finite::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::divisibility::*;
+#[cfg(test)]
+use crate::rings::extension::galois_field::GaloisField;
 
 #[test]
 fn test_factor_rational_poly() {
@@ -251,6 +252,29 @@ fn test_find_factor_by_extension_finite_field() {
     let factor = <_ as FactorPolyField>::find_factor_by_extension(&poly_ring, FreeAlgebraImpl::new(field, 6, [field.one(), field.one(), field.one(), field.one(), field.one(), field.one()])).unwrap();
     assert_eq!(3, poly_ring.degree(&factor).unwrap());
     assert!(poly_ring.checked_div(&poly, &factor).is_some());
+}
+
+#[test]
+fn random_test_factor_poly_galois_field() {
+    let mut rng = oorandom::Rand64::new(1);
+    let Fq = GaloisField::new(17, 5);
+    let ring = DensePolyRing::new(&Fq, "X");
+
+    for _ in 0..20 {
+        let f1 = ring.from_terms((0..8).map(|i| (Fq.random_element(|| rng.rand_u64()), i)));
+        let f2 = ring.from_terms((0..10).map(|i| (Fq.random_element(|| rng.rand_u64()), i)));
+        let f3 = ring.from_terms((0..10).map(|i| (Fq.random_element(|| rng.rand_u64()), i)));
+        let f = ring.mul_ref_fst(&f1, ring.mul_ref(&f2, &f3));
+
+        let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&ring, &f);
+
+        let product = ring.inclusion().mul_map(ring.prod(factorization.iter().map(|(g, e)| ring.pow(ring.clone_el(g), *e))), unit);
+        assert_el_eq!(&ring, &f, &product);
+        assert!(factorization.iter().map(|(_, e)| *e).sum::<usize>() >= 3);
+        for (g, _) in &factorization {
+            assert!(ring.checked_div(&f1, g).is_some() || ring.checked_div(&f2, g).is_some() || ring.checked_div(&f3, g).is_some());
+        }
+    }
 }
 
 #[bench]

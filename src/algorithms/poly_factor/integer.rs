@@ -72,8 +72,8 @@ pub fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
 {
     assert!(ZZX.base_ring().is_one(ZZX.lc(f).unwrap()));
 
-    // Cantor-Zassenhaus does not directly work for p = 2, so skip the first prime
-    for p in enumerate_primes(&StaticRing::<i64>::RING, &1000).into_iter().skip(1) {
+    // very small primes have a lower probability of working
+    for p in enumerate_primes(&StaticRing::<i64>::RING, &1000).into_iter().skip(100) {
 
         // check whether `f mod p` is also square-free, there are only finitely many primes
         // where this would not be the case
@@ -81,9 +81,7 @@ pub fn factor_integer_poly<'a, P>(ZZX: &'a P, f: &El<P>) -> Vec<El<P>>
         let mod_p = Fp.can_hom(ZZX.base_ring()).unwrap();
         let FpX = DensePolyRing::new(Fp, "X");
         let f_mod_p = FpX.from_terms(ZZX.terms(&f).map(|(c, i)| (mod_p.map(ZZX.base_ring().clone_el(c)), i)));
-        let mut squarefree_part = poly_squarefree_part_global(&FpX, FpX.clone_el(&f_mod_p));
-        let lc_inv = Fp.div(&Fp.one(), FpX.lc(&squarefree_part).unwrap());
-        FpX.inclusion().mul_assign_map(&mut squarefree_part, lc_inv);
+        let squarefree_part = poly_squarefree_part_global(&FpX, FpX.clone_el(&f_mod_p));
 
         if FpX.eq_el(&squarefree_part, &f_mod_p) {
 
@@ -124,7 +122,7 @@ struct FactorizeMonicIntegerPolynomialUsingHenselLifting<'a, P, R>
     bound: El<BigIntRing>
 }
 
-impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingHenselLifting<'a, P, R>
+impl<'a, P, R> ZnOperation for FactorizeMonicIntegerPolynomialUsingHenselLifting<'a, P, R>
     where P: PolyRingStore,
         P::Type: PolyRing + DivisibilityRing,
         R: PolyRingStore,
@@ -132,8 +130,11 @@ impl<'a, P, R> ZnOperation<Vec<El<P>>> for FactorizeMonicIntegerPolynomialUsingH
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
         <<R::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyField + ZnRing
 {
-    fn call<S: ZnRingStore>(self, Zpe: S) -> Vec<El<P>>
-        where S::Type: ZnRing
+    type Output<'b> = Vec<El<P>>
+        where Self: 'b;
+
+    fn call<'b, S>(self, Zpe: S) -> Vec<El<P>>
+        where S: 'b + ZnRingStore, S::Type: ZnRing
     {
         let ZZ = Zpe.integer_ring();
         let bound = int_cast(self.bound, ZZ, &BigIntRing::RING);
@@ -202,9 +203,7 @@ pub fn factor_rational_poly<'a, P, I>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>
     let mut result = Vec::new();
     let mut current = QQX.clone_el(poly);
     while !QQX.is_unit(&current) {
-        let mut squarefree_part = poly_squarefree_part_global(&poly_ring, QQX.clone_el(&current));
-        let lc_inv = QQ.div(&QQ.one(), &QQX.lc(&squarefree_part).unwrap());
-        QQX.inclusion().mul_assign_map(&mut squarefree_part, lc_inv);
+        let squarefree_part = poly_squarefree_part_global(&poly_ring, QQX.clone_el(&current));
         current = QQX.checked_div(&current, &squarefree_part).unwrap();
 
         // we switch from `f(X)` to `c^d f(X/c)`, where c is the lcm of all denominators;
