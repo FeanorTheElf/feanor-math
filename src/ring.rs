@@ -566,12 +566,12 @@ macro_rules! assert_el_eq {
 /// # What does this do?
 /// 
 /// We need a framework that allows nesting rings, e.g. to provide a polynomial ring
-/// over a finite field - say `PolyRing<FiniteField>`. However, the simplest
+/// over a finite field - say `PolyRing<FiniteRing + Field>`. However, the simplest
 /// implementation
 /// ```rust,ignore
 /// struct PolyRing<BaseRing: Ring> { /* omitted */ }
 /// ```
-/// would have the effect that `PolyRing<FiniteField>` and `PolyRing<&FiniteField>`
+/// would have the effect that `PolyRing<FiniteRing + Field>` and `PolyRing<&FiniteRing + Field>`
 /// are entirely different types. While implementing relationships between them
 /// is possible, the approach does not scale well when we consider many rings and
 /// multiple layers of nesting.

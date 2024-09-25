@@ -1,5 +1,5 @@
 use crate::algorithms::poly_factor::FactorPolyField;
-use crate::field::{Field, FieldStore};
+use crate::field::{Field, FieldStore, PerfectField};
 use crate::homomorphism::{Homomorphism, Identity};
 use crate::ring::*;
 use crate::rings::extension::*;
@@ -35,7 +35,7 @@ use super::poly::PolyRingStore;
 /// ```
 /// 
 #[stability::unstable(feature = "enable")]
-pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField + SpecializeToFiniteField {
+pub trait SeparableFieldExtension: Field + FreeAlgebra + FactorPolyField + SpecializeToFiniteField + PerfectField {
 
     ///
     /// Checks whether this field extension is galois, i.e. normal and separable.
@@ -105,7 +105,7 @@ pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField + SpecializeToFi
     fn into_hom<F, T, H>(self_: F, target: T, base_ring_hom: H) -> Result<ExtensionFieldEmbedding<F, T, H>, (F, T)>
         where T: RingStore,
             F: RingStore<Type = Self>,
-            T::Type: ExtensionField,
+            T::Type: SeparableFieldExtension,
             H: Homomorphism<<<Self as RingExtension>::BaseRing as RingStore>::Type, <<T::Type as RingExtension>::BaseRing as RingStore>::Type>
     {
         let K = &target;
@@ -154,20 +154,20 @@ pub trait ExtensionField: Field + FreeAlgebra + FactorPolyField + SpecializeToFi
     }
 }
 
-impl<R> ExtensionField for R
-    where R: Field + FreeAlgebra + FactorPolyField + SpecializeToFiniteField
+impl<R> SeparableFieldExtension for R
+    where R: Field + FreeAlgebra + FactorPolyField + SpecializeToFiniteField + PerfectField
 {}
 
 #[stability::unstable(feature = "enable")]
 pub struct GaloisAutomorphism<F: RingStore>
-    where F::Type: ExtensionField
+    where F::Type: SeparableFieldExtension
 {
     ring: F,
     map_generator_to: El<F>
 }
 
 impl<F: RingStore> GaloisAutomorphism<F>
-    where F::Type: ExtensionField
+    where F::Type: SeparableFieldExtension
 {
     #[stability::unstable(feature = "enable")]
     pub fn get_map<'a>(&'a self) -> ExtensionFieldEmbedding<&'a F, &'a F, Identity<&'a <F::Type as RingExtension>::BaseRing>> {
@@ -198,7 +198,7 @@ impl<F: RingStore> GaloisAutomorphism<F>
 
 #[stability::unstable(feature = "enable")]
 pub struct ExtensionFieldEmbedding<F: RingStore, T: RingStore, H>
-    where F::Type: ExtensionField, T::Type: ExtensionField,
+    where F::Type: SeparableFieldExtension, T::Type: SeparableFieldExtension,
         H: Homomorphism<<<F::Type as RingExtension>::BaseRing as RingStore>::Type, <<T::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
     from: F,
@@ -208,7 +208,7 @@ pub struct ExtensionFieldEmbedding<F: RingStore, T: RingStore, H>
 }
 
 impl<F: RingStore, T: RingStore, H> Homomorphism<F::Type, T::Type> for ExtensionFieldEmbedding<F, T, H>
-    where F::Type: ExtensionField, T::Type: ExtensionField,
+    where F::Type: SeparableFieldExtension, T::Type: SeparableFieldExtension,
         H: Homomorphism<<<F::Type as RingExtension>::BaseRing as RingStore>::Type, <<T::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
     type DomainStore = F;
@@ -234,20 +234,20 @@ impl<F: RingStore, T: RingStore, H> Homomorphism<F::Type, T::Type> for Extension
 }
 
 #[stability::unstable(feature = "enable")]
-pub trait ExtensionFieldStore: FieldStore + FreeAlgebraStore
-    where Self::Type: ExtensionField
+pub trait SeparableFieldExtensionStore: FieldStore + FreeAlgebraStore
+    where Self::Type: SeparableFieldExtension
 {
-    delegate!{ ExtensionField, fn is_galois(&self) -> bool }
+    delegate!{ SeparableFieldExtension, fn is_galois(&self) -> bool }
 
     ///
     /// See [`ExtensionField::into_hom()`].
     /// 
     fn into_hom<T, H>(self, target: T, base_ring_hom: H) -> Result<ExtensionFieldEmbedding<Self, T, H>, (Self, T)>
         where T: RingStore,
-            T::Type: ExtensionField,
+            T::Type: SeparableFieldExtension,
             H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, <<T::Type as RingExtension>::BaseRing as RingStore>::Type>
     {
-        <Self::Type as ExtensionField>::into_hom(self, target, base_ring_hom)
+        <Self::Type as SeparableFieldExtension>::into_hom(self, target, base_ring_hom)
     }
 
     ///
@@ -255,7 +255,7 @@ pub trait ExtensionFieldStore: FieldStore + FreeAlgebraStore
     /// 
     fn has_hom<'a, T>(&'a self, target: &'a T) -> Option<ExtensionFieldEmbedding<&'a Self, &'a T, Identity<&'a <Self::Type as RingExtension>::BaseRing>>>
         where T: RingStore,
-            T::Type: ExtensionField,
+            T::Type: SeparableFieldExtension,
             <T::Type as RingExtension>::BaseRing: RingStore<Type = <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
     {
         assert!(self.base_ring().get_ring() == target.base_ring().get_ring());
@@ -263,12 +263,12 @@ pub trait ExtensionFieldStore: FieldStore + FreeAlgebraStore
     }
 
     fn galois_group<'a>(&'a self) -> Option<Vec<GaloisAutomorphism<&'a Self>>> {
-        <Self::Type as ExtensionField>::galois_group(self)
+        <Self::Type as SeparableFieldExtension>::galois_group(self)
     }
 }
 
-impl<R> ExtensionFieldStore for R
-    where R: RingStore, R::Type: ExtensionField
+impl<R> SeparableFieldExtensionStore for R
+    where R: RingStore, R::Type: SeparableFieldExtension
 {}
 
 #[cfg(test)]

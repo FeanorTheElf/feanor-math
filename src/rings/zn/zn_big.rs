@@ -20,6 +20,7 @@ use crate::seq::*;
 use crate::delegate::DelegateRing;
 use crate::rings::extension::galois_field::{GaloisField, GaloisFieldBase};
 use crate::rings::zn::*;
+use crate::serialization::SerializableElementRing;
 
 ///
 /// Ring representing `Z/nZ`, computing the modular reductions
@@ -588,10 +589,7 @@ impl_localpir_wrap_unwrap_homs!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: IntegerR
 impl_localpir_wrap_unwrap_isos!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: IntegerRingStore, I::Type: IntegerRing, J: IntegerRingStore, J::Type: IntegerRing }
 
 #[cfg(test)]
-use crate::rings::finite::FiniteRingStore;
-#[cfg(test)]
 use crate::integer::BigIntRing;
-use crate::serialization::SerializableElementRing;
 
 #[test]
 fn test_mul() {

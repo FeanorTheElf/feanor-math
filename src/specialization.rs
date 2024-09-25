@@ -5,8 +5,8 @@ use crate::algorithms::convolution::ConvolutionAlgorithm;
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::field::Field;
+use crate::field::PerfectField;
 use crate::integer::*;
-use crate::perfect::PerfectField;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::rings::extension::extension_impl::*;
@@ -115,7 +115,7 @@ impl<R, V, A, C> SpecializeToFiniteRing for FreeAlgebraImplBase<R, V, A, C>
 
 impl<R, V, A, C> SpecializeToFiniteRing for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
-        R::Type: ZnRing + Field + SelfIso,
+        R::Type: ZnRing + FiniteRing + Field + SelfIso,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone,
@@ -197,7 +197,7 @@ pub trait FiniteFieldOperation<OriginalField>
 
     fn execute<'a, F>(self, field: F) -> Self::Output<'a>
         where F: 'a + RingStore,
-            F::Type: FiniteRing + Field + LinSolveRing + PerfectField + CanIsoFromTo<OriginalField> + SpecializeToFiniteField;
+            F::Type: FiniteRing + Field + PerfectField + LinSolveRing + CanIsoFromTo<OriginalField> + SpecializeToFiniteField;
 }
 
 ///
@@ -259,7 +259,7 @@ impl<R> SpecializeToFiniteField for AsFieldBase<R>
 impl<R, V, A, C> SpecializeToFiniteField for GaloisFieldBase<R, V, A, C>
     where R: RingStore,
         V: VectorView<El<R>>,
-        R::Type: SelfIso + LinSolveRing + ZnRing + Field,
+        R::Type: SelfIso + LinSolveRing + ZnRing + FiniteRing + Field,
         A: Allocator + Clone,
         C: ConvolutionAlgorithm<R::Type>
 {

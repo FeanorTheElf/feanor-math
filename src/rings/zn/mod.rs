@@ -131,10 +131,10 @@ pub mod generic_impls {
 
     use crate::algorithms::convolution::STANDARD_CONVOLUTION;
     use crate::algorithms::int_bisect;
-    use crate::field::Field;
     use crate::ordered::*;
-    use crate::perfect::PerfectField;
     use crate::primitive_int::{StaticRing, StaticRingBase};
+    use crate::field::*;
+    use crate::rings::finite::*;
     use crate::ring::*;
     use crate::divisibility::DivisibilityRingStore;
     use crate::integer::{IntegerRing, IntegerRingStore};
@@ -303,7 +303,7 @@ pub mod generic_impls {
     #[stability::unstable(feature = "enable")]
     pub fn interpolation_ring<R: ZnRingStore>(ring: R, count: usize) -> GaloisField<R>
         where R: Clone,
-            R::Type: ZnRing + Field + PerfectField + CanHomFrom<StaticRingBase<i64>>
+            R::Type: ZnRing + FiniteRing + Field + CanHomFrom<StaticRingBase<i64>>
     {
         let ZZbig = BigIntRing::RING;
         let modulus = int_cast(ring.integer_ring().clone_el(ring.modulus()), ZZbig, ring.integer_ring());

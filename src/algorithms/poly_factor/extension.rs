@@ -6,7 +6,6 @@ use crate::divisibility::*;
 use crate::field::*;
 use crate::homomorphism::*;
 use crate::ordered::OrderedRingStore;
-use crate::perfect::PerfectField;
 use crate::pid::EuclideanRing;
 use crate::pid::PrincipalIdealRingStore;
 use crate::primitive_int::StaticRing;
@@ -22,7 +21,7 @@ fn factor_squarefree_over_extension<P>(LX: P, f: El<P>) -> Vec<El<P>>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra,
-        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing
+        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing + SpecializeToFiniteField
 {
     let L = LX.base_ring();
     let K = L.base_ring();
@@ -102,8 +101,8 @@ fn factor_squarefree_over_extension<P>(LX: P, f: El<P>) -> Vec<El<P>>
 pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra + Field + PerfectField + SpecializeToFiniteField + SpecializeToFiniteRing,
-        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra + Field + PerfectField + SpecializeToFiniteField,
+        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing + SpecializeToFiniteField
 {
     let KX = &poly_ring;
     let K = KX.base_ring();
@@ -144,7 +143,6 @@ use crate::rings::extension::extension_impl::FreeAlgebraImpl;
 use crate::rings::rational::RationalField;
 
 use super::SpecializeToFiniteField;
-use super::SpecializeToFiniteRing;
 
 #[test]
 fn test_factor_number_field() {

@@ -2,7 +2,6 @@ use crate::compute_locally::InterpolationBaseRing;
 use crate::field::*;
 use crate::homomorphism::*;
 use crate::integer::*;
-use crate::perfect::PerfectField;
 use crate::pid::*;
 use crate::ring::*;
 use crate::rings::extension::FreeAlgebra;
@@ -108,8 +107,8 @@ pub trait FactorPolyField: Field {
 }
 
 impl<R> FactorPolyField for R
-    where R: FreeAlgebra + Field + SpecializeToFiniteField + SpecializeToFiniteRing + PerfectField,
-        <R::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing
+    where R: FreeAlgebra + Field + SpecializeToFiniteField + SpecializeToFiniteRing + PerfectField + SpecializeToFiniteField,
+        <R::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing + SpecializeToFiniteField
 {
     default fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: PolyRingStore,

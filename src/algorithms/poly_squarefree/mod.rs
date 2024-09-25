@@ -1,10 +1,12 @@
+use finite_field::poly_squarefree_part_if_finite_field;
+
 use crate::algorithms::hensel::hensel_lift_factorization;
 use crate::field::Field;
 use crate::homomorphism::CanHomFrom;
 use crate::homomorphism::Homomorphism;
 use crate::divisibility::*;
 use crate::integer::IntegerRing;
-use crate::perfect::PerfectField;
+use crate::field::*;
 use crate::primitive_int::StaticRing;
 use crate::rings::poly::*;
 use crate::ring::*;
@@ -13,6 +15,9 @@ use crate::pid::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::zn::*;
 use crate::field::FieldStore;
+use crate::specialization::*;
+
+pub mod finite_field;
 
 struct IntegerPolyPowerDecompositionUsingHenselLifting<'a, P, Q>
     where P: RingStore + Copy,
@@ -33,7 +38,7 @@ impl<'a, P, Q> ZnOperation<Vec<El<P>>> for IntegerPolyPowerDecompositionUsingHen
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
         Q: RingStore,
         Q::Type: PolyRing + EuclideanRing,
-        <<Q::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + PerfectField + CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+        <<Q::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + PerfectField + CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> + SpecializeToFiniteField
 {
     fn call<R: ZnRingStore>(self, Zpe: R) -> Vec<El<P>>
         where R::Type: ZnRing
@@ -74,7 +79,7 @@ pub fn poly_power_decomposition_global<P>(poly_ring: P, poly: El<P>) -> Vec<(El<
     where P: PolyRingStore + Copy,
         P::Type: PolyRing + PrincipalIdealRing,
         <P::Type as RingExtension>::BaseRing: FieldStore,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + SpecializeToFiniteField
 {
     assert!(!poly_ring.is_zero(&poly));
     let derivate = derive_poly(&poly_ring, &poly);
@@ -99,14 +104,18 @@ pub fn poly_power_decomposition_global<P>(poly_ring: P, poly: El<P>) -> Vec<(El<
         let square_part = poly_ring.ideal_gen(&poly, &derivate);
         let mut result = poly_power_decomposition_global(poly_ring, square_part);
         let mut power_part = poly_ring.one();
+        let mut degree = 0;
         for (f, k) in &mut result {
             *k += 1;
+            degree += poly_ring.degree(f).unwrap() * *k;
             poly_ring.mul_assign(&mut power_part, poly_ring.pow(poly_ring.clone_el(f), *k));
         }
-        let mut new_part = poly_ring.checked_div(&poly, &power_part).unwrap();
-        let lc_inv = poly_ring.base_ring().invert(poly_ring.lc(&new_part).unwrap()).unwrap();
-        poly_ring.inclusion().mul_assign_map(&mut new_part, lc_inv);
-        result.push((new_part, 1));
+        if degree < poly_ring.degree(&poly).unwrap() {
+            let mut new_part = poly_ring.checked_div(&poly, &power_part).unwrap();
+            let lc_inv = poly_ring.base_ring().invert(poly_ring.lc(&new_part).unwrap()).unwrap();
+            poly_ring.inclusion().mul_assign_map(&mut new_part, lc_inv);
+            result.push((new_part, 1));
+        }
 
         debug_assert!(poly_ring.eq_el(&poly_squarefree_part_global(&poly_ring, poly), &poly_ring.prod(result.iter().map(|(f, _k)| poly_ring.clone_el(f)))));
         return result;
@@ -140,25 +149,20 @@ pub fn poly_power_decomposition_global<P>(poly_ring: P, poly: El<P>) -> Vec<(El<
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn poly_squarefree_part_global<P>(poly_ring: P, poly: El<P>) -> El<P>
-    where P: PolyRingStore,
+    where P: PolyRingStore + Copy,
         P::Type: PolyRing + PrincipalIdealRing,
-        <P::Type as RingExtension>::BaseRing: FieldStore,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + SpecializeToFiniteField
 {
     assert!(!poly_ring.is_zero(&poly));
+    if let Some(result) = poly_squarefree_part_if_finite_field(poly_ring, &poly) {
+        return result;
+    }
     let derivate = derive_poly(&poly_ring, &poly);
+    if poly_ring.degree(&poly).unwrap() == 0 {
+        return poly_ring.one();
+    }
     if poly_ring.is_zero(&derivate) {
-        let p = poly_ring.base_ring().characteristic(&StaticRing::<i64>::RING).unwrap() as usize;
-        if poly_ring.degree(&poly).unwrap() == 0 {
-            return poly_ring.one();
-        } else {
-            assert!(p > 0);
-        }
-        let base_poly = poly_ring.from_terms(poly_ring.terms(&poly).map(|(c, i)| {
-            debug_assert!(i % p == 0);
-            (poly_ring.base_ring().clone_el(c), i / p)
-        }));
-        return poly_squarefree_part_global(poly_ring, base_poly);
+        unimplemented!("infinite field with positive characteristic are currently not supported")
     } else {
         let square_part = poly_ring.ideal_gen(&poly, &derivate);
         let mut result = poly_ring.checked_div(&poly, &square_part).unwrap();

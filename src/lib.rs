@@ -27,6 +27,8 @@ extern crate ndarray;
 
 const MAX_PROBABILISTIC_REPETITIONS: usize = 30;
 
+mod unsafe_any;
+
 ///
 /// Contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`].
 /// 
@@ -137,5 +139,3 @@ pub mod serialization;
 pub mod specialization;
 
 pub mod compute_locally;
-
-pub mod perfect;

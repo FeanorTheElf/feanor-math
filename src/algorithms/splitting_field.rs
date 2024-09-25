@@ -2,11 +2,10 @@ use std::alloc::*;
 
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 use crate::compute_locally::InterpolationBaseRing;
-use crate::field::*;
 use crate::homomorphism::*;
 use crate::matrix::OwnedMatrix;
 use crate::ordered::OrderedRingStore;
-use crate::perfect::PerfectField;
+use crate::field::*;
 use crate::pid::EuclideanRing;
 use crate::pid::PrincipalIdealRing;
 use crate::primitive_int::StaticRing;
