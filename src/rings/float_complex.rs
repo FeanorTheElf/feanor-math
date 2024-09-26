@@ -10,6 +10,7 @@ use crate::ring::*;
 use crate::divisibility::{DivisibilityRing, Domain};
 
 use super::float_real::Real64;
+use super::rational::RationalFieldBase;
 
 ///
 /// An approximate implementation of the complex numbers `C`, using 64 bit floating
@@ -262,6 +263,25 @@ impl<I: ?Sized + IntegerRing> CanHomFrom<I> for Complex64Base {
 
     fn map_in_ref(&self, from: &I, el: &<I as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
         self.from_f64(from.to_float_approx(el))
+    }
+}
+
+impl<I> CanHomFrom<RationalFieldBase<I>> for Complex64Base
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
+{    
+    type Homomorphism = <Self as CanHomFrom<I::Type>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &RationalFieldBase<I>) -> Option<Self::Homomorphism> {
+        self.has_canonical_hom(from.base_ring().get_ring())
+    }
+
+    fn map_in(&self, from: &RationalFieldBase<I>, el: <RationalFieldBase<I> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in_ref(from, &el, hom)
+    }
+
+    fn map_in_ref(&self, from: &RationalFieldBase<I>, el: &<RationalFieldBase<I> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.div(&self.map_in_ref(from.base_ring().get_ring(), from.num(el), hom), &self.map_in_ref(from.base_ring().get_ring(), from.den(el), hom))
     }
 }
 

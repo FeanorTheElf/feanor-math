@@ -56,14 +56,19 @@ pub fn splitting_field<'a, P>(poly_ring: &'a P, poly: &El<P>) -> (
     let new_poly_ring = DensePolyRing::new(RingRef::new(trivial_extension.get_ring()), "X");
     let hom = new_poly_ring.lifted_hom(poly_ring, trivial_extension.inclusion());
     let squarefree_poly = <_ as PolySquarefreePartField>::squarefree_part(poly_ring, &poly);
-    return extend_splitting_field(&new_poly_ring, vec![hom.map(squarefree_poly)], Vec::new());
+    let (result, roots, _) = extend_splitting_field(&new_poly_ring, vec![hom.map(squarefree_poly)], Vec::new(), Vec::new());
+    return (result, roots);
 }
 
 type ThisPolyRing<'a, 'b, R> = DensePolyRing<RingRef<'b, AsFieldBase<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>>;
 
+///
+/// We currently assume that all elements in `remaining_squarefree_factors` are squarefree!
+/// 
 #[stability::unstable(feature = "enable")]
-pub fn extend_splitting_field<'a, 'b, R>(poly_ring: &ThisPolyRing<'a, 'b, R>, mut remaining_squarefree_factors: Vec<El<ThisPolyRing<'a, 'b, R>>>, mut list_of_roots: Vec<El<RingRef<'b, AsFieldBase<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>>>) -> (
+pub fn extend_splitting_field<'a, 'b, R>(poly_ring: &ThisPolyRing<'a, 'b, R>, mut remaining_squarefree_factors: Vec<El<ThisPolyRing<'a, 'b, R>>>, mut list_of_roots: Vec<El<RingRef<'b, AsFieldBase<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>>>, map_elements: Vec<El<RingRef<'b, AsFieldBase<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>>>) -> (
     AsField<FreeAlgebraImpl<&'a R, Vec<El<R>>>>,
+    Vec<El<AsField<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>>,
     Vec<El<AsField<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>>
 )
     where R: RingStore,
@@ -93,9 +98,9 @@ pub fn extend_splitting_field<'a, 'b, R>(poly_ring: &ThisPolyRing<'a, 'b, R>, mu
         if remaining_squarefree_factors.len() == 0 {
             let result = poly_ring.base_ring().get_ring().get_delegate();
             let clone_of_result = FreeAlgebraImpl::new(*result.base_ring(), result.rank(), result.x_pow_rank().as_iter().map(|a| result.base_ring().clone_el(a)).collect::<Vec<_>>());
-            return (AsField::from(AsFieldBase::promise_is_perfect_field(clone_of_result)), list_of_roots);
+            return (AsField::from(AsFieldBase::promise_is_perfect_field(clone_of_result)), list_of_roots, map_elements);
         } else {
-            return extend_splitting_field(poly_ring, remaining_squarefree_factors, list_of_roots);
+            return extend_splitting_field(poly_ring, remaining_squarefree_factors, list_of_roots, map_elements);
         }
     }
 
@@ -112,12 +117,13 @@ pub fn extend_splitting_field<'a, 'b, R>(poly_ring: &ThisPolyRing<'a, 'b, R>, mu
     new_factorization.push(new_poly_ring.checked_div(&lifted_hom.map(largest_factor), &new_poly_ring.from_terms([(new_ring.negate(new_ring.clone_el(&root_of_new_poly)), 0), (new_ring.one(), 1)])).unwrap());
 
     let new_list_of_roots = list_of_roots.into_iter().map(|a| extension_embedding.map(a)).chain([root_of_new_poly].into_iter()).collect::<Vec<_>>();
+    let mapped_elements = map_elements.into_iter().map(|a| extension_embedding.map(a)).collect::<Vec<_>>();
 
     if new_factorization.len() == 0 {
-        return (extension_embedding.into_domain_codomain().1, new_list_of_roots);
+        return (extension_embedding.into_domain_codomain().1, new_list_of_roots, mapped_elements);
     }
 
-    return extend_splitting_field(&new_poly_ring, new_factorization, new_list_of_roots);
+    return extend_splitting_field(&new_poly_ring, new_factorization, new_list_of_roots, mapped_elements);
 }
 
 struct FiniteFieldCase<'a, 'b, 'c, R>
@@ -422,9 +428,12 @@ fn test_extend_splitting_field_numerfield() {
     let poly_ring = DensePolyRing::new(RingRef::new(QQi.get_ring()), "X");
     let [f] = poly_ring.with_wrapped_indeterminate(|X| [11 - 2 * X + X.pow_ref(2)]);
     
-    let (extension, roots) = extend_splitting_field(&poly_ring, vec![f], Vec::new());
+    let (extension, roots, mapped_generators) = extend_splitting_field(&poly_ring, vec![f], Vec::new(), vec![QQi.canonical_gen()]);
     assert_eq!(4, extension.rank());
     assert_eq!(2, roots.len());
+
+    let i = mapped_generators.into_iter().next().unwrap();
+    assert_el_eq!(&extension, extension.neg_one(), extension.pow(i, 2));
 
     let new_poly_ring = DensePolyRing::new(&extension, "X");
     let [new_f] = new_poly_ring.with_wrapped_indeterminate(|X| [11 - 2 * X + X.pow_ref(2)]);
