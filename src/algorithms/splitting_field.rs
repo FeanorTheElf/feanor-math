@@ -257,11 +257,7 @@ pub fn extend_field<'a, 'b, 'c, R>(poly_ring: &'c ThisPolyRing<'a, 'b, R>, irred
     
         let mut sol = OwnedMatrix::zero(total_rank, 3, base_ring);
 
-        println!("Solving linear system");
-        let start = Instant::now();
         let has_sol = base_ring.solve_right(lhs.data_mut(), rhs.data_mut(), sol.data_mut()).is_solved();
-        let end = Instant::now();
-        println!("Done in {}", (end - start).as_millis());
 
         if has_sol {
     
