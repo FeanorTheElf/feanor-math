@@ -102,7 +102,7 @@ fn factor_squarefree_primitive_integer_poly_local<P>(ZZX: P, f: &El<P>) -> Vec<E
             let bound = max_coeff_of_factor(ZZX, &f, &ZZX.base_ring().one());
             let exponent = max(2, ZZbig.abs_log2_ceil(&bound).unwrap() / ZZ.abs_log2_floor(&p).unwrap() + 1);
             let modulus = ZZbig.pow(int_cast(p, &ZZbig, &ZZ), exponent);
-
+            
             return choose_zn_impl(ZZbig, modulus, FactorizeMonicIntegerPolynomialUsingHenselLifting {
                 poly: &f, ZZX: ZZX, poly_mod_p: f_mod_p, FpX: FpX, bound
             }).into_iter().map(|g| undo_scale(&g)).collect();

@@ -1,4 +1,5 @@
 use std::alloc::*;
+use std::time::Instant;
 
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 use crate::compute_locally::InterpolationBaseRing;
@@ -249,7 +250,14 @@ pub fn extend_field<'a, 'b, 'c, R>(poly_ring: &'c ThisPolyRing<'a, 'b, R>, irred
         *rhs.at_mut(ring.rank(), 2) = base_ring.one();
     
         let mut sol = OwnedMatrix::zero(total_rank, 3, base_ring);
-        if base_ring.solve_right(lhs.data_mut(), rhs.data_mut(), sol.data_mut()).is_solved() {
+
+        println!("Solving linear system");
+        let start = Instant::now();
+        let has_sol = base_ring.solve_right(lhs.data_mut(), rhs.data_mut(), sol.data_mut()).is_solved();
+        let end = Instant::now();
+        println!("Done in {}", (end - start).as_millis());
+
+        if has_sol {
     
             let solution_modulus = (0..total_rank).map(|i| base_ring.clone_el(sol.at(i, 0))).collect::<Vec<_>>();
             let potential_result = FreeAlgebraImpl::new(*base_ring, total_rank, solution_modulus);
@@ -382,16 +390,63 @@ fn test_splitting_field() {
     }
 }
 
-#[ignore]
 #[test]
 fn test_splitting_field_rationals() {
     let base_field = RationalField::new(BigIntRing::RING);
     let poly_ring = DensePolyRing::new(&base_field, "X");
-    let [f] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(6) + 10]);
+    let [f] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(4) + 10]);
 
     let (extension, roots) = splitting_field(&poly_ring, &f);
-    assert_eq!(12, extension.rank());
-    assert_eq!(6, roots.len());
+    assert_eq!(8, extension.rank());
+    assert_eq!(4, roots.len());
+
+    for x in &roots {
+        assert_el_eq!(&extension, extension.zero(), poly_ring.evaluate(&f, x, &extension.inclusion()));
+    }
+
+    let [f] = poly_ring.with_wrapped_indeterminate(|X| [11 - 2 * X + X.pow_ref(2)]);
+    
+    let (extension, roots) = splitting_field(&poly_ring, &f);
+    assert_eq!(2, extension.rank());
+    assert_eq!(2, roots.len());
+
+    for x in &roots {
+        assert_el_eq!(&extension, extension.zero(), poly_ring.evaluate(&f, x, &extension.inclusion()));
+    }
+}
+
+#[test]
+fn test_extend_splitting_field_numerfield() {
+    let QQ = RationalField::new(BigIntRing::RING);
+    let QQi = FreeAlgebraImpl::new_with(&QQ, 2, vec![QQ.neg_one()], "i", Global, STANDARD_CONVOLUTION).as_field().ok().unwrap();
+    let poly_ring = DensePolyRing::new(RingRef::new(QQi.get_ring()), "X");
+    let [f] = poly_ring.with_wrapped_indeterminate(|X| [11 - 2 * X + X.pow_ref(2)]);
+    
+    let (extension, roots) = extend_splitting_field(&poly_ring, vec![f], Vec::new());
+    assert_eq!(4, extension.rank());
+    assert_eq!(2, roots.len());
+
+    let new_poly_ring = DensePolyRing::new(&extension, "X");
+    let [new_f] = new_poly_ring.with_wrapped_indeterminate(|X| [11 - 2 * X + X.pow_ref(2)]);
+    for x in &roots {
+        assert_el_eq!(&extension, extension.zero(), new_poly_ring.evaluate(&new_f, x, &extension.identity()));
+    }
+}
+
+#[ignore]
+#[test]
+fn test_splitting_field_rationals_large() {
+    let base_field = RationalField::new(BigIntRing::RING);
+    let poly_ring = DensePolyRing::new(&base_field, "X");
+    let [f] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(10) + 10]);
+
+    let start = Instant::now();
+    let (extension, roots) = splitting_field(&poly_ring, &f);
+    let end = Instant::now();
+    println!("Found splitting field in {} ms", (end - start).as_millis());
+
+    assert_eq!(40, extension.rank());
+    assert_eq!(10, roots.len());
 
     for x in &roots {
         assert_el_eq!(&extension, extension.zero(), poly_ring.evaluate(&f, x, &extension.inclusion()));

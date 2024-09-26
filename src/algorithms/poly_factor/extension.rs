@@ -92,6 +92,7 @@ pub fn factor_squarefree_over_extension<P>(LX: P, f: &El<P>, attempts: usize) ->
         if KX.degree(&squarefree_part).unwrap() == degree {
             let lin_transform_rev = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0), (L.one(), 1)].into_iter());
             let (factorization, _unit) = <_ as FactorPolyField>::factor_poly(&KX, &squarefree_part);
+            
             return Ok(factorization.into_iter().map(|(factor, e)| {
                 assert!(e == 1);
                 let f_factor = LX.normalize(LX.extended_ideal_gen(&f_transformed, &LX.lifted_hom(&KX, L.inclusion()).map(factor)).2);

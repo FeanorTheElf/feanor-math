@@ -163,6 +163,7 @@ pub fn integer_poly_squarefree_part_local<P>(ZZX: P, f: &El<P>) -> El<P>
         let modulus = ZZbig.pow(int_cast(p, &ZZbig, &ZZ), exponent);
 
         if let Some(result) = choose_zn_impl(ZZbig, modulus, IntegerPolyPowerDecompositionUsingHenselLifting { ZZX: &ZZX, FpX: &FpX, f: &f }) {
+            
             return ZZX.prod(result.into_iter().map(|(f, _)| f));
         }
     }
