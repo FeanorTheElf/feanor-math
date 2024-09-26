@@ -459,7 +459,12 @@ impl<R, V, A, C> FreeAlgebra for FreeAlgebraImplBase<R, V, A, C>
 
     fn canonical_gen(&self) -> Self::Element {
         if self.rank() == 1 {
-            self.from_canonical_basis([self.base_ring.clone_el(self.x_pow_rank.at(0))])
+            if self.x_pow_rank.len() == 1 {
+                self.from_canonical_basis([self.base_ring.clone_el(self.x_pow_rank.at(0))])
+            } else {
+                assert!(self.x_pow_rank.len() == 0);
+                self.zero()
+            }
         } else {
             self.from_canonical_basis((0..self.rank()).map(|i| if i == 1 { self.base_ring.one() } else { self.base_ring.zero() }))
         }
@@ -522,7 +527,8 @@ impl<R, V, A, C> InterpolationBaseRing for AsFieldBase<FreeAlgebraImpl<R, V, A, 
         let ZZbig = BigIntRing::RING;
         let characteristic = self.base_ring().characteristic(&ZZbig).unwrap();
         if ZZbig.is_zero(&characteristic) {
-            let modulus = SparseMapVector::new(0, RingRef::new(self));
+            let mut modulus = SparseMapVector::new(1, RingRef::new(self));
+            *modulus.at_mut(0) = self.one();
             let field = AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with(RingRef::new(self), 1, modulus, "X", self.get_delegate().element_allocator.clone(), STANDARD_CONVOLUTION)));
             let points = (0..count).map(|n| field.int_hom().map(n as i32)).collect();
             return (field, points);
@@ -694,6 +700,10 @@ use crate::rings::zn::zn_64::{Zn, ZnEl};
 use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
+#[cfg(test)]
+use crate::compute_locally::ToExtRingMap;
+#[cfg(test)]
+use crate::rings::rational::RationalField;
 
 #[cfg(test)]
 fn test_ring0_and_elements() -> (FreeAlgebraImpl<Zn, [ZnEl; 1]>, Vec<FreeAlgebraImplEl<Zn>>) {
@@ -902,4 +912,14 @@ fn test_serialization() {
 fn test_from_canonical_basis_enforce_len() {
     let (ring, _) = test_ring1_and_elements();
     ring.from_canonical_basis([0, 1, 2]);
+}
+
+#[test]
+fn test_interpolation_base_ring() {
+    let base_ring = RationalField::new(StaticRing::<i64>::RING);
+    let ring = FreeAlgebraImpl::new(base_ring, 3, [base_ring.neg_one(), base_ring.neg_one()]).as_field().ok().unwrap();
+    let (ext_map, points) = ToExtRingMap::for_interpolation(ring.get_ring(), 3);
+    for _ in points {
+        assert_el_eq!(&ring, ring.invert(&ring.canonical_gen()).unwrap(), ext_map.as_base_ring_el(ext_map.codomain().invert(&ext_map.map(ring.canonical_gen())).unwrap()));
+    }
 }
