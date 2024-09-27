@@ -53,14 +53,14 @@ impl<J> LLLRealField<J> for Real64Base
 fn size_reduce<R, I, V, T>(ring: R, int_ring: I, mut target: SubmatrixMut<V, El<R>>, target_j: usize, matrix: Submatrix<V, El<R>>, col_ops: &mut T)
     where R: RingStore,
         R::Type: LLLRealField<I::Type>,
-        I: IntegerRingStore,
+        I: IntegerRingStore + Copy,
         I::Type: IntegerRing,
         V: AsPointerToSlice<El<R>>,
         T: TransformTarget<I::Type>
 {
     for j in (0..matrix.col_count()).rev() {
         let factor = ring.get_ring().round_to_integer(target.as_const().at(j, 0), int_ring.get_ring());
-        col_ops.subtract(int_ring.get_ring(), j, target_j, &factor);
+        col_ops.subtract(int_ring, j, target_j, &factor);
         let factor = ring.get_ring().from_integer(factor, int_ring.get_ring());
         ring.sub_assign_ref(target.at_mut(j, 0), &factor);
         for k in 0..j {
@@ -156,7 +156,7 @@ fn lll_base<R, I, V, T>(ring: R, int_ring: I, mut gso: SubmatrixMut<V, El<R>>, m
             ),
             gso.as_const().at(i + 1, i + 1)
         ) {
-            col_ops.swap(int_ring.get_ring(), i, i + 1);
+            col_ops.swap(int_ring, i, i + 1);
             swap_gso_cols(ring, gso.reborrow(), i, i + 1);
             i = max(i, 1) - 1;
         } else {
@@ -316,8 +316,8 @@ impl<'a, R, I, V, H> TransformTarget<I> for TransformLatticeBasis<'a, R, I, V, H
         H: Homomorphism<I, R>,
         V: AsPointerToSlice<R::Element>
 {
-    fn transform(&mut self, ring: &I, i: usize, j: usize, transform: &[I::Element; 4]) {
-        assert!(ring == self.hom.domain().get_ring());
+    fn transform<S: Copy + RingStore<Type = I>>(&mut self, ring: S, i: usize, j: usize, transform: &[I::Element; 4]) {
+        assert!(ring.get_ring() == self.hom.domain().get_ring());
         assert!(i != j);
         let ring = self.hom.codomain();
         for k in 0..self.basis.row_count() {
@@ -328,8 +328,8 @@ impl<'a, R, I, V, H> TransformTarget<I> for TransformLatticeBasis<'a, R, I, V, H
         }
     }
 
-    fn subtract(&mut self, ring: &I, src: usize, dst: usize, factor: &I::Element) {
-        assert!(ring == self.hom.domain().get_ring());
+    fn subtract<S: Copy + RingStore<Type = I>>(&mut self, ring: S, src: usize, dst: usize, factor: &I::Element) {
+        assert!(ring.get_ring() == self.hom.domain().get_ring());
         assert!(src != dst);
         let ring = self.hom.codomain();
         for k in 0..self.basis.row_count() {
@@ -338,8 +338,8 @@ impl<'a, R, I, V, H> TransformTarget<I> for TransformLatticeBasis<'a, R, I, V, H
         }
     }
 
-    fn swap(&mut self, ring: &I, i: usize, j: usize) {
-        assert!(ring == self.hom.domain().get_ring());
+    fn swap<S: Copy + RingStore<Type = I>>(&mut self, ring: S, i: usize, j: usize) {
+        assert!(ring.get_ring() == self.hom.domain().get_ring());
         if i == j {
             return;
         }

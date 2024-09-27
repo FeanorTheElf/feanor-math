@@ -17,7 +17,14 @@ This library uses nightly Rust, ~~and even unstable features like const-generics
 
 ## A short introduction
 
-TODO
+The project started with the idea that algorithmic number theory usually focuses on the rings it works with.
+Hence, it makes sense to start with a trait `Ring`, and then create a hierarch of subtraits for additional properties (say `Domain`, `Field` or `EuclideanRing`).
+Algorithms working on rings can then state clearly what properties of the underlying ring they require, and be generic in the rings they work with.
+Furthermore, rings that build on other rings (e.g. polynomial rings or algebraic extensions) can declare their own properties (i.e. implement the traits) depending on the properties of the base ring.
+In practice, once we heavily follow this approach, we soon run into limitations of the type system (borrowing vs owning base rings, conflicting blanket impls, lack of specialization, ...).
+To mitigate this, instead of a single trait `Ring` I have introduced two traits `RingBase` and `RingStore`, as explained below.
+Furthermore, blanket implementations are used sparingly, only when they can actually cover a very large class of rings.
+In the end, though not perfect, this turns out to work quite well.
 
 ## Features
 
@@ -36,7 +43,7 @@ The following algorithms are implemented
  - Factoring polynomials over the rationals/integers (using Hensel lifting) and over number fields.
  - Lenstra's Elliptic Curve algorithm to factor integers (currently very slow).
  - LLL algorithm for lattice reduction.
- - Basic linear algebra over principal ideal rings.
+ - Basic linear algebra over various rings, including finite integral extensions of principal ideal rings.
  - Miller-Rabin test to check primality of integers.
  - A baby-step-giant-step and factorization-based algorithm to compute arbitrary discrete logarithms.
  - Buchberger's algorithm (F4-style) to compute Gröbner basis.
@@ -45,8 +52,9 @@ Unfortunately, operations with polynomials over infinite rings (integers, ration
 
 ### Most important missing features
 
- - Comprehensive treatment of matrices and linear algebra. Currently there is only a very minimalistic abstraction of matrices [`crate::matrix`] and linear algebra, mainly for internal use.
- - Careful treatment of polynomials over infinite rings, primarily with specialized implementations that prevent coefficient blowup.
+ - Comprehensive treatment of matrices and linear algebra. Currently there is only a very minimalistic abstraction of matrices [`crate::matrix`] and linear algebra, mainly for internal use. This is partly implemented, as we at least have [`crate::algorithms::linsolve::LinSolveRing`] for solving linear systems.
+ - Careful treatment of polynomials over infinite rings, primarily with specialized implementations that prevent coefficient growth. This is currently WIP, as in some places, local computations with polynomials over `Q` already are used. For number fields however, this is not the case at all.
+ - Implementation of algebraic closures.
  - ~~Lattice reduction and the LLL algorithm. This might also be necessary for above point.~~ Implemented now!
  - ~~More carefully designed memory allocation abstractions (preferably we would use a new crate `memory-provider` or similar).~~ Using the Rust `allocator-api` together with [`feanor-mempool`](https://github.com/FeanorTheElf/feanor-mempool) now!
  - More number theory algorithms, e.g. computing Galois groups. I am not yet sure where to draw the line here, as I think high-level number theory algorithms (Elliptic Curves, Class Groups, ...) are out of scope for this project. Technically I would include integer factoring here, but it is too important a primitive for other algorithms.
@@ -435,7 +443,7 @@ As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` ca
  - Functions that take a ring as parameter should usually be generic and take `R` where `R: RingStore`.
    In cases where we would usually take the ring by reference, prefer instead to take `R` by value with `R: RingStore + Copy`.
    Since for `R: RingStore` also `&R: RingStore`, this just makes the interface more general.
- - Rings that wrap a base ring (like `MyRing<BaseRing: RingStore>`) should not impl `Copy`, unless both `BaseRing: Copy` and `El<BaseRing>: Copy`.
+ - Rings that wrap a base ring (like `MyRing<BaseRing: RingStore>`) should not implement `Copy`, unless both `BaseRing: Copy` and `El<BaseRing>: Copy`.
    There are some cases where I had previously added `#[derive(Copy)]`, which then made adding struct members of base ring elements to the ring a breaking change.
  - Equality (via `PartialEq`) of rings implies that they are "the same" and their elements can be used interchangeably without conversion.
    Being (canonically) isomorphic (via [`crate::homomorphism::CanIsoFromTo`]) implies that two rings are "the same", but their elements might use different internal

@@ -80,7 +80,7 @@ pub fn gb_sparse_row_echelon<R, const LOG: bool>(ring: R, matrix: SparseMatrix<R
     let col_count = matrix.col_count();
     let n = block_size;
     let global_col_count = (col_count - 1) / n + 1;
-    let mut matrix = matrix.into_internal_matrix(n, ring.get_ring());
+    let mut matrix = matrix.into_internal_matrix(n, ring);
     let mut matrix = SubmatrixMut::<AsFirstElement<_>, _>::from_1d(&mut matrix[..], row_count + n, global_col_count);
     row_echelon::blocked_row_echelon::<_, _, LOG>(ring, matrix.reborrow(), n);
 

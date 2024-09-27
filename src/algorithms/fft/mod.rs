@@ -41,7 +41,8 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
     /// 
     /// See also [`FFTAlgorithm::unordered_fft_permutation()`].
     /// 
-    fn root_of_unity(&self, ring: &R) -> &R::Element;
+    fn root_of_unity<S>(&self, ring: S) -> &R::Element
+        where S: RingStore<Type = R> + Copy;
 
     ///
     /// On input `i`, returns `j` such that `unordered_fft(values)[i]` contains the evaluation
@@ -116,7 +117,9 @@ impl<T, R: ?Sized + RingBase> FFTAlgorithm<R> for T
         self.deref().len()
     }
 
-    fn root_of_unity(&self, ring: &R) -> &R::Element {
+    fn root_of_unity<S>(&self, ring: S) -> &R::Element
+        where S: RingStore<Type = R> + Copy
+    {
         self.deref().root_of_unity(ring)
     }
 

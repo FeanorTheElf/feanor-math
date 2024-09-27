@@ -737,7 +737,7 @@ pub mod generic_tests {
                         (base_ring.neg_one(), ring.clone_monomial(&x0_2)),
                         (base_ring.one(), ring.clone_monomial(&x0x1))
                     ]);
-                    let expected = base_ring.sum([
+                    let expected = <_ as RingStore>::sum(base_ring, [
                         base_ring.int_hom().map(3),
                         base_ring.int_hom().mul_ref_map(a, &10),
                         base_ring.negate(base_ring.pow(base_ring.clone_el(a), 2)),

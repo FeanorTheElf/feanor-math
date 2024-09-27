@@ -53,7 +53,7 @@ impl<T> InternalRow<T> {
         self.index_of(local_j).ok().map(|idx| &self.data[idx].1)
     }
 
-    pub fn clone_row<R>(&self, ring: &R) -> Self
+    pub fn clone_row<R>(&self, ring: R) -> Self
         where R: RingStore,
             R::Type: RingBase<Element = T>
     {
@@ -71,7 +71,7 @@ impl<T> InternalRow<T> {
         InternalRow { data: Vec::new() }
     }
 
-    pub fn make_zero<R>(&mut self, ring: &R)
+    pub fn make_zero<R>(&mut self, ring: R)
         where R: RingStore,
             R::Type: RingBase<Element = T>
     {
@@ -79,7 +79,7 @@ impl<T> InternalRow<T> {
         self.data.push((usize::MAX, ring.zero()));
     }
 
-    pub fn check<R>(&self, ring: &R)
+    pub fn check<R>(&self, ring: R)
         where R: RingStore,
             R::Type: RingBase<Element = T>
     {
@@ -361,7 +361,7 @@ mod local {
                     }
                     let (fst_row, snd_row) = matrix.two_entries(pivot_i, i);
                     transform_2x2(ring, &local_transform, [fst_row, snd_row], tmp);
-                    row_ops.transform(ring.get_ring(), pivot_i, i, &local_transform);
+                    row_ops.transform(ring, pivot_i, i, &local_transform);
                     current = gcd;
                 }
             }
@@ -390,7 +390,7 @@ mod local {
                     let new = add_row_local::<_, true, false>(ring, &matrix.at(elim_i), &matrix.at(pivot_i), &lhs_factor, &rhs_factor, std::mem::replace(tmp, InternalRow::placeholder()));
                     *tmp = std::mem::replace(matrix.at_mut(elim_i), new);
 
-                    row_ops.subtract(ring.get_ring(), pivot_i, elim_i, &ring.negate(rhs_factor));
+                    row_ops.subtract(ring, pivot_i, elim_i, &ring.negate(rhs_factor));
                 } else {
                     assert!(elim_i < pivot_i);
                 }
@@ -633,9 +633,9 @@ impl<'a, R: RingBase + ?Sized, V: AsPointerToSlice<InternalRow<R::Element>>> Tra
 
 impl<'a, R: RingBase + ?Sized, V: AsPointerToSlice<InternalRow<R::Element>>> TransformTarget<R> for TransformRows<'a, R, V> {
 
-    fn transform(&mut self, ring: &R, i: usize, j: usize, transform: &[<R as RingBase>::Element; 4]) {
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize, transform: &[<R as RingBase>::Element; 4]) {
         let (fst, snd) = self.matrix.two_entries(i, j);
-        transform_2x2(RingRef::new(ring), transform, [fst, snd], &mut self.tmp)
+        transform_2x2(ring, transform, [fst, snd], &mut self.tmp)
     }
 }
 
@@ -658,11 +658,11 @@ impl<'a, R: RingBase + ?Sized, V: AsPointerToSlice<InternalRow<R::Element>>, T: 
 
 impl<'a, R: DivisibilityRing + ?Sized, V: AsPointerToSlice<InternalRow<R::Element>>,  T: TransformTarget<R>> TransformTarget<R> for TransformCols<'a, R, V, T> {
 
-    fn transform(&mut self, ring: &R, k: usize, l: usize, transform: &[<R as RingBase>::Element; 4]) {
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, k: usize, l: usize, transform: &[<R as RingBase>::Element; 4]) {
         self.pass_on.transform(ring, k, l, transform);
 
         let transform_det = ring.sub(ring.mul_ref(&transform[0], &transform[3]), ring.mul_ref(&transform[1], &transform[2]));
-        let transform_det_inv = RingRef::new(ring).invert(&transform_det).unwrap();
+        let transform_det_inv = ring.invert(&transform_det).unwrap();
         let inv_transform = [
             ring.mul_ref(&transform[3], &transform_det_inv), 
             ring.negate(ring.mul_ref(&transform[1], &transform_det_inv)),
@@ -681,7 +681,7 @@ impl<'a, R: DivisibilityRing + ?Sized, V: AsPointerToSlice<InternalRow<R::Elemen
             let new_row_k = if ring.is_zero(&new_row_k) { None } else { Some(new_row_k) };
             let new_row_l = if ring.is_zero(&new_row_l) { None } else { Some(new_row_l) };
             row.update_two(k, row_k_idx, new_row_k, l, row_l_idx, new_row_l);
-            row.check(&RingRef::new(ring));
+            row.check(ring);
         }
     }
 }

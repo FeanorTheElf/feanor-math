@@ -57,8 +57,8 @@ impl<R_main, R_twiddle, H, T1, T2> CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, 
     {
         let ring = hom.codomain();
 
-        assert!(ring.get_ring().is_approximate() || ring.eq_el(&hom.map(root_of_unity_pows(right_table.len() as i64)), left_table.root_of_unity(ring.get_ring())));
-        assert!(ring.get_ring().is_approximate() || ring.eq_el(&hom.map(root_of_unity_pows(left_table.len() as i64)), right_table.root_of_unity(ring.get_ring())));
+        assert!(ring.get_ring().is_approximate() || ring.eq_el(&hom.map(root_of_unity_pows(right_table.len() as i64)), left_table.root_of_unity(ring)));
+        assert!(ring.get_ring().is_approximate() || ring.eq_el(&hom.map(root_of_unity_pows(left_table.len() as i64)), right_table.root_of_unity(ring)));
 
         let root_of_unity = root_of_unity_pows(1);
         let inv_twiddle_factors = Self::create_twiddle_factors(|i| root_of_unity_pows(-i), &left_table, &right_table);
@@ -98,8 +98,8 @@ impl<R_main, R_twiddle, H, T1, T2> CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, 
             hom.domain().pow(hom.domain().clone_el(&root_of_unity), (len as i64 + (i % len as i64)) as usize)
         };
 
-        assert!(ring.eq_el(&hom.map(root_of_unity_pows(right_table.len() as i64)), left_table.root_of_unity(ring.get_ring())));
-        assert!(ring.eq_el(&hom.map(root_of_unity_pows(left_table.len() as i64)), right_table.root_of_unity(ring.get_ring())));
+        assert!(ring.eq_el(&hom.map(root_of_unity_pows(right_table.len() as i64)), left_table.root_of_unity(ring)));
+        assert!(ring.eq_el(&hom.map(root_of_unity_pows(left_table.len() as i64)), right_table.root_of_unity(ring)));
 
         let inv_twiddle_factors = Self::create_twiddle_factors(|i| root_of_unity_pows(-i), &left_table, &right_table);
         let twiddle_factors = Self::create_twiddle_factors(root_of_unity_pows, &left_table, &right_table);
@@ -140,7 +140,7 @@ impl<R_main, R_twiddle, H, T1, T2> PartialEq for CoprimeCooleyTuckeyFFT<R_main, 
         self.ring().get_ring() == other.ring().get_ring() &&
             self.left_table == other.left_table &&
             self.right_table == other.right_table &&
-            self.ring().eq_el(self.root_of_unity(self.ring().get_ring()), other.root_of_unity(self.ring().get_ring()))
+            self.ring().eq_el(self.root_of_unity(self.ring()), other.root_of_unity(self.ring()))
     }
 }
 
@@ -155,8 +155,8 @@ impl<R_main, R_twiddle, H, T1, T2> FFTAlgorithm<R_main> for CoprimeCooleyTuckeyF
         self.left_table.len() * self.right_table.len()
     }
 
-    fn root_of_unity(&self, ring: &R_main) -> &R_main::Element {
-        assert!(self.ring().get_ring() == ring, "unsupported ring");
+    fn root_of_unity<S: RingStore<Type = R_main> + Copy>(&self, ring: S) -> &R_main::Element {
+        assert!(self.ring().get_ring() == ring.get_ring(), "unsupported ring");
         &self.root_of_unity
     }
 

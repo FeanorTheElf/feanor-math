@@ -378,7 +378,7 @@ impl<R_main, R_twiddle, H, A> PartialEq for BluesteinFFT<R_main, R_twiddle, H, A
     fn eq(&self, other: &Self) -> bool {
         self.ring().get_ring() == other.ring().get_ring() &&
             self.n == other.n &&
-            self.ring().eq_el(self.root_of_unity(self.ring().get_ring()), other.root_of_unity(self.ring().get_ring()))
+            self.ring().eq_el(self.root_of_unity(self.ring()), other.root_of_unity(self.ring()))
     }
 }
 
@@ -392,8 +392,8 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for BluesteinFFT<R_main, R_tw
         self.n
     }
 
-    fn root_of_unity(&self, ring: &R_main) -> &R_main::Element {
-        assert!(ring == self.ring().get_ring(), "unsupported ring");
+    fn root_of_unity<S: RingStore<Type = R_main> + Copy>(&self, ring: S) -> &R_main::Element {
+        assert!(self.ring().get_ring() == ring.get_ring(), "unsupported ring");
         &self.root_of_unity_n
     }
 

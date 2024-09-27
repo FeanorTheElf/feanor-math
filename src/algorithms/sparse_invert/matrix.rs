@@ -96,7 +96,7 @@ impl<R> SparseMatrix<R>
         return true;
     }
 
-    pub(super) fn into_internal_matrix(self, n: usize, ring: &R) -> Vec<InternalRow<R::Element>> {
+    pub(super) fn into_internal_matrix<S: Copy + RingStore<Type = R>>(self, n: usize, ring: S) -> Vec<InternalRow<R::Element>> {
         let row_count = self.row_count();
         let mut inverted_permutation = (0..self.col_permutation.len()).collect::<Vec<_>>();
         for (i, j) in self.col_permutation.iter().enumerate() {
@@ -118,13 +118,13 @@ impl<R> SparseMatrix<R>
             for j in 0..global_cols {
                 result[i][j].data.sort_by_key(|(j, _)| *j);
                 result[i][j].data.push((usize::MAX, ring.zero()));
-                result[i][j].check(&RingRef::new(ring));
+                result[i][j].check(ring);
             }
         }
         for i in row_count..(row_count + n) {
             for j in 0..global_cols {
-                result[i][j].make_zero(&RingRef::new(ring));
-                result[i][j].check(&RingRef::new(ring));
+                result[i][j].make_zero(ring);
+                result[i][j].check(ring);
             }
         }
         // sorting might help reduce swaps

@@ -38,7 +38,7 @@ pub trait TransformTarget<R>
     /// ```
     /// where `transform = [A, B, C, D]`.
     /// 
-    fn transform(&mut self, ring: &R, i: usize, j: usize, transform: &[R::Element; 4]);
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize, transform: &[R::Element; 4]);
 
     ///
     /// The transformation corresponding to subtracting `factor` times the `src`-th row
@@ -49,7 +49,7 @@ pub trait TransformTarget<R>
     ///  - `-factor` if `k == dst, l == src`
     ///  - `0` otherwise
     /// 
-    fn subtract(&mut self, ring: &R, src: usize, dst: usize, factor: &R::Element) {
+    fn subtract<S: Copy + RingStore<Type = R>>(&mut self, ring: S, src: usize, dst: usize, factor: &R::Element) {
         self.transform(ring, src, dst, &[ring.one(), ring.zero(), ring.negate(ring.clone_el(factor)), ring.one()])
     }
 
@@ -63,7 +63,7 @@ pub trait TransformTarget<R>
     ///  - `1` if `k == j, l == i`
     ///  - `0` otherwise
     /// 
-    fn swap(&mut self, ring: &R, i: usize, j: usize) {
+    fn swap<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize) {
         self.transform(ring, i, j, &[ring.zero(), ring.one(), ring.one(), ring.zero()])
     }
 }
@@ -85,7 +85,7 @@ pub struct TransformCols<'a, V, R>(pub SubmatrixMut<'a, V, R::Element>, pub &'a 
 impl<'a, V, R> TransformTarget<R> for TransformRows<'a, V, R>
     where V: AsPointerToSlice<R::Element>, R: ?Sized + RingBase
 {
-    fn transform(&mut self, ring: &R, i: usize, j: usize, transform: &[<R as RingBase>::Element; 4]) {
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize, transform: &[<R as RingBase>::Element; 4]) {
         let A = &mut self.0;
         for l in 0..A.col_count() {
             let (new_i, new_j) = (
@@ -97,7 +97,7 @@ impl<'a, V, R> TransformTarget<R> for TransformRows<'a, V, R>
         }
     }
 
-    fn subtract(&mut self, ring: &R, src: usize, dst: usize, factor: &<R as RingBase>::Element) {
+    fn subtract<S: Copy + RingStore<Type = R>>(&mut self, ring: S, src: usize, dst: usize, factor: &<R as RingBase>::Element) {
         let A = &mut self.0;
         for j in 0..A.col_count() {
             let to_sub = ring.mul_ref(factor, A.at(src, j));
@@ -109,7 +109,7 @@ impl<'a, V, R> TransformTarget<R> for TransformRows<'a, V, R>
 impl<'a, V, R> TransformTarget<R> for TransformCols<'a, V, R>
     where V: AsPointerToSlice<R::Element>, R: ?Sized + RingBase
 {
-    fn transform(&mut self, ring: &R, i: usize, j: usize, transform: &[<R as RingBase>::Element; 4]) {
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize, transform: &[<R as RingBase>::Element; 4]) {
         let A = &mut self.0;
         for l in 0..A.row_count() {
             let (new_i, new_j) = (
@@ -121,7 +121,7 @@ impl<'a, V, R> TransformTarget<R> for TransformCols<'a, V, R>
         }
     }
 
-    fn subtract(&mut self, ring: &R, src: usize, dst: usize, factor: &<R as RingBase>::Element) {
+    fn subtract<S: Copy + RingStore<Type = R>>(&mut self, ring: S, src: usize, dst: usize, factor: &<R as RingBase>::Element) {
         let A = &mut self.0;
         for i in 0..A.row_count() {
             let to_sub = ring.mul_ref(factor, A.at(i, src));

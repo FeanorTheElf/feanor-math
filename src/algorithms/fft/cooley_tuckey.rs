@@ -253,7 +253,7 @@ impl<R_main, R_twiddle, H> PartialEq for CooleyTuckeyFFT<R_main, R_twiddle, H>
     fn eq(&self, other: &Self) -> bool {
         self.ring().get_ring() == other.ring().get_ring() &&
             self.log2_n == other.log2_n &&
-            self.ring().eq_el(self.root_of_unity(self.ring().get_ring()), other.root_of_unity(self.ring().get_ring()))
+            self.ring().eq_el(self.root_of_unity(self.ring()), other.root_of_unity(self.ring()))
     }
 }
 
@@ -284,19 +284,19 @@ pub trait CooleyTuckeyButterfly<S>: RingBase
     ///
     /// Should compute `(values[i1], values[i2]) := (values[i1] + twiddle * values[i2], values[i1] - twiddle * values[i2])`
     /// 
-    fn butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: &H, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
+    fn butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: H, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
 
     ///
     /// Should compute `(values[i1], values[i2]) := (values[i1] + values[i2], (values[i1] - values[i2]) * twiddle)`
     /// 
-    fn inv_butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: &H, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
+    fn inv_butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: H, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
 }
 
 impl<R, S> CooleyTuckeyButterfly<S> for R
     where S: ?Sized + RingBase, R: ?Sized + RingBase
 {
     #[inline(always)]
-    default fn butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: &H, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
+    default fn butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: H, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
         hom.mul_assign_ref_map(values.at_mut(i2), twiddle);
         let new_a = self.add_ref(values.at(i1), values.at(i2));
         let a = std::mem::replace(values.at_mut(i1), new_a);
@@ -304,7 +304,7 @@ impl<R, S> CooleyTuckeyButterfly<S> for R
     }
 
     #[inline(always)]
-    default fn inv_butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: &H, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
+    default fn inv_butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: H, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
         let new_a = self.add_ref(values.at(i1), values.at(i2));
         let a = std::mem::replace(values.at_mut(i1), new_a);
         self.sub_self_assign(values.at_mut(i2), a);
@@ -424,8 +424,8 @@ impl<R_main, R_twiddle, H> FFTAlgorithm<R_main> for CooleyTuckeyFFT<R_main, R_tw
         1 << self.log2_n
     }
 
-    fn root_of_unity(&self, ring: &R_main) -> &R_main::Element {
-        assert!(ring == self.ring().get_ring(), "unsupported ring");
+    fn root_of_unity<S: Copy + RingStore<Type = R_main>>(&self, ring: S) -> &R_main::Element {
+        assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         &self.root_of_unity
     }
 

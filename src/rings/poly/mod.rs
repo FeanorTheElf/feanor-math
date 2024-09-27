@@ -80,7 +80,7 @@ pub trait PolyRing: RingExtension {
     /// 
     fn div_rem_monic(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element);
     
-    fn map_terms<P, H>(&self, from: &P, el: &P::Element, hom: &H) -> Self::Element
+    fn map_terms<P, H>(&self, from: &P, el: &P::Element, hom: H) -> Self::Element
         where P: ?Sized + PolyRing,
             H: Homomorphism<<P::BaseRing as RingStore>::Type, <Self::BaseRing as RingStore>::Type>
     {

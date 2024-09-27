@@ -44,7 +44,7 @@ fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
     let mut points_in_base_ring = Vec::new();
     for x in &points {
         points_in_base_ring.push(ext_ring_hom.as_base_ring_el(ext_ring_hom.codomain().clone_el(x)));
-        let y = poly_ring.evaluate(f, points_in_base_ring.last().unwrap(), &poly_ring.base_ring().identity());
+        let y = poly_ring.evaluate(f, Option::unwrap(points_in_base_ring.last()), &poly_ring.base_ring().identity());
         let value = int_bisect::root_floor(poly_ring.base_ring(), poly_ring.base_ring().clone_el(&y), k);
         if !poly_ring.base_ring().eq_el(&poly_ring.base_ring().pow(poly_ring.base_ring().clone_el(&value), k), &y) {
             return None;

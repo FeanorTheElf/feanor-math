@@ -16,7 +16,7 @@ use crate::rings::poly::*;
 /// division always works. If this is not the case, look also at [`poly_div_domain()`], which
 /// implicitly performs the polynomial division over the field of fractions.
 /// 
-pub fn poly_div<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_ring: S, mut left_div_lc: F, hom: &H) -> Result<(El<P>, El<P>), E>
+pub fn poly_div<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_ring: S, mut left_div_lc: F, hom: H) -> Result<(El<P>, El<P>), E>
     where S: PolyRingStore,
         S::Type: PolyRing,
         P: PolyRingStore,

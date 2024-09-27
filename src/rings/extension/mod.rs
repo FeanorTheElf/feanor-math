@@ -131,7 +131,7 @@ pub trait FreeAlgebra: RingExtension {
         return result;
     }
 
-    fn charpoly<P, H>(&self, el: &Self::Element, poly_ring: P, hom: &H) -> El<P>
+    fn charpoly<P, H>(&self, el: &Self::Element, poly_ring: P, hom: H) -> El<P>
         where P: RingStore,
             P::Type: PolyRing,
             <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
@@ -155,7 +155,7 @@ pub trait FreeAlgebra: RingExtension {
             *rhs.at_mut(i, 0) = base_ring.negate(hom.map(wrt_basis.at(i)));
         }
         let mut sol = OwnedMatrix::zero(self.rank(), 1, &base_ring);
-        base_ring.solve_right(lhs.data_mut(), rhs.data_mut(), sol.data_mut()).assert_solved();
+        <_ as LinSolveRingStore>::solve_right(base_ring, lhs.data_mut(), rhs.data_mut(), sol.data_mut()).assert_solved();
 
         return poly_ring.from_terms((0..self.rank()).map(|i| (base_ring.clone_el(sol.at(i, 0)), i)).chain([(base_ring.one(), self.rank())].into_iter()));
     }

@@ -54,12 +54,12 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
                 if ring.is_zero(A.at(i, k)) {
                     continue;
                 } else if let Some(quo) = ring.checked_div(A.at(i, k), A.at(k, k)) {
-                    TransformRows(A.reborrow(), ring.get_ring()).subtract(ring.get_ring(), k, i, &quo);
-                    L.subtract(ring.get_ring(), k, i, &quo);
+                    TransformRows(A.reborrow(), ring.get_ring()).subtract(ring, k, i, &quo);
+                    L.subtract(ring, k, i, &quo);
                 } else {
                     let (transform, _) = ring.get_ring().create_elimination_matrix(A.at(k, k), A.at(i, k));
-                    TransformRows(A.reborrow(), ring.get_ring()).transform(ring.get_ring(), k, i, &transform);
-                    L.transform(ring.get_ring(), k, i, &transform);
+                    TransformRows(A.reborrow(), ring.get_ring()).transform(ring, k, i, &transform);
+                    L.transform(ring, k, i, &transform);
                 }
             }
             
@@ -69,13 +69,13 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
                     continue;
                 } else if let Some(quo) = ring.checked_div(A.at(k, j), A.at(k, k)) {
                     changed = true;
-                    TransformCols(A.reborrow(), ring.get_ring()).subtract(ring.get_ring(), k, j, &quo);
-                    R.subtract(ring.get_ring(), k, j, &quo);
+                    TransformCols(A.reborrow(), ring.get_ring()).subtract(ring, k, j, &quo);
+                    R.subtract(ring, k, j, &quo);
                 } else {
                     changed = true;
                     let (transform, _) = ring.get_ring().create_elimination_matrix(A.at(k, k), A.at(k, j));
-                    TransformCols(A.reborrow(), ring.get_ring()).transform(ring.get_ring(), k, j, &transform);
-                    R.transform(ring.get_ring(), k, j, &transform);
+                    TransformCols(A.reborrow(), ring.get_ring()).transform(ring, k, j, &transform);
+                    R.transform(ring, k, j, &transform);
                 }
             }
         }
@@ -146,15 +146,15 @@ struct DetUnit<'a, R: ?Sized + RingBase> {
 impl<'a, R> TransformTarget<R> for DetUnit<'a, R>
     where R: ?Sized + RingBase
 {
-    fn subtract(&mut self, _ring: &R, _src: usize, _dst: usize, _factor: &<R as RingBase>::Element) {
+    fn subtract<S: Copy + RingStore<Type = R>>(&mut self, _ring: S, _src: usize, _dst: usize, _factor: &<R as RingBase>::Element) {
         // determinant does not change
     }
 
-    fn swap(&mut self, ring: &R, _i: usize, _j: usize) {
+    fn swap<S: Copy + RingStore<Type = R>>(&mut self, ring: S, _i: usize, _j: usize) {
         ring.negate_inplace(&mut self.current_unit)
     }
 
-    fn transform(&mut self, ring: &R, _i: usize, _j: usize, transform: &[<R as RingBase>::Element; 4]) {
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, _i: usize, _j: usize, transform: &[<R as RingBase>::Element; 4]) {
         ring.mul_assign(&mut self.current_unit, ring.sub(ring.mul_ref(&transform[0], &transform[3]), ring.mul_ref(&transform[1], &transform[2])));
     }
 }
