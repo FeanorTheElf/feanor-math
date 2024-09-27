@@ -12,8 +12,10 @@ use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::compute_locally::InterpolationBaseRing;
 use crate::divisibility::*;
-use crate::impl_wrap_unwrap_homs;
-use crate::impl_wrap_unwrap_isos;
+use crate::impl_localpir_wrap_unwrap_homs;
+use crate::impl_localpir_wrap_unwrap_isos;
+use crate::impl_field_wrap_unwrap_homs;
+use crate::impl_field_wrap_unwrap_isos;
 use crate::integer::BigIntRing;
 use crate::integer::IntegerRing;
 use crate::iters::multi_cartesian_product;
@@ -622,14 +624,28 @@ impl<R, V, A, C> FiniteRing for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
-impl_wrap_unwrap_homs!{
+impl_field_wrap_unwrap_homs!{
     <{R1, V1, A1, C1, R2, V2, A2, C2}> FreeAlgebraImplBase<R1, V1, A1, C1>, FreeAlgebraImplBase<R2, V2, A2, C2>
         where R1: RingStore, R1::Type: PrincipalIdealRing, V1: VectorView<El<R1>>, A1: Allocator + Clone, C1: ConvolutionAlgorithm<R1::Type>,
             R2: RingStore, R2::Type: PrincipalIdealRing, V2: VectorView<El<R2>>, A2: Allocator + Clone, C2: ConvolutionAlgorithm<R2::Type>,
             R2::Type: CanHomFrom<R1::Type>
 }
 
-impl_wrap_unwrap_isos!{
+impl_field_wrap_unwrap_isos!{
+    <{R1, V1, A1, C1, R2, V2, A2, C2}> FreeAlgebraImplBase<R1, V1, A1, C1>, FreeAlgebraImplBase<R2, V2, A2, C2>
+        where R1: RingStore, R1::Type: PrincipalIdealRing, V1: VectorView<El<R1>>, A1: Allocator + Clone, C1: ConvolutionAlgorithm<R1::Type>,
+            R2: RingStore, R2::Type: PrincipalIdealRing, V2: VectorView<El<R2>>, A2: Allocator + Clone, C2: ConvolutionAlgorithm<R2::Type>,
+            R2::Type: CanIsoFromTo<R1::Type>
+}
+
+impl_localpir_wrap_unwrap_homs!{
+    <{R1, V1, A1, C1, R2, V2, A2, C2}> FreeAlgebraImplBase<R1, V1, A1, C1>, FreeAlgebraImplBase<R2, V2, A2, C2>
+        where R1: RingStore, R1::Type: PrincipalIdealRing, V1: VectorView<El<R1>>, A1: Allocator + Clone, C1: ConvolutionAlgorithm<R1::Type>,
+            R2: RingStore, R2::Type: PrincipalIdealRing, V2: VectorView<El<R2>>, A2: Allocator + Clone, C2: ConvolutionAlgorithm<R2::Type>,
+            R2::Type: CanHomFrom<R1::Type>
+}
+
+impl_localpir_wrap_unwrap_isos!{
     <{R1, V1, A1, C1, R2, V2, A2, C2}> FreeAlgebraImplBase<R1, V1, A1, C1>, FreeAlgebraImplBase<R2, V2, A2, C2>
         where R1: RingStore, R1::Type: PrincipalIdealRing, V1: VectorView<El<R1>>, A1: Allocator + Clone, C1: ConvolutionAlgorithm<R1::Type>,
             R2: RingStore, R2::Type: PrincipalIdealRing, V2: VectorView<El<R2>>, A2: Allocator + Clone, C2: ConvolutionAlgorithm<R2::Type>,

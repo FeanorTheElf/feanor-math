@@ -239,7 +239,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
 /// let raw_F25: FreeAlgebraImpl<_, _> = FreeAlgebraImpl::new(base_ring, 2, [base_ring.int_hom().map(2)]);
 /// let asfield_F25 = raw_F25.clone().as_field().ok().unwrap();
 /// // alternatively, you can ensure yourself that the ring is a field and use `promise_is_field` to avoid the check at runtime; be careful when doing this!
-/// let asfield_F25 = AsField::from(AsFieldBase::promise_is_field(raw_F25));
+/// let asfield_F25 = AsField::from(AsFieldBase::promise_is_field(raw_F25).ok().unwrap());
 /// let F25 = GaloisField::create(asfield_F25);
 /// assert!(F25.can_iso(&raw_F25).is_some());
 /// ```

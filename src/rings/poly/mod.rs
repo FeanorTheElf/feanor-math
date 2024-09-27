@@ -114,7 +114,7 @@ pub trait PolyRing: RingExtension {
     /// assert_eq!(12, ring.evaluate(&poly, &3, &StaticRing::<i32>::RING.identity()));
     /// ```
     /// 
-    fn evaluate<R, H>(&self, f: &Self::Element, value: &R::Element, hom: &H) -> R::Element
+    fn evaluate<R, H>(&self, f: &Self::Element, value: &R::Element, hom: H) -> R::Element
         where R: ?Sized + RingBase,
             H: Homomorphism<<Self::BaseRing as RingStore>::Type, R>
     {
@@ -222,7 +222,7 @@ pub trait PolyRingStore: RingStore
     ///
     /// See [`PolyRing::evaluate()`].
     /// 
-    fn evaluate<R, H>(&self, f: &El<Self>, value: &R::Element, hom: &H) -> R::Element
+    fn evaluate<R, H>(&self, f: &El<Self>, value: &R::Element, hom: H) -> R::Element
         where R: ?Sized + RingBase,
             H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, R>
     {

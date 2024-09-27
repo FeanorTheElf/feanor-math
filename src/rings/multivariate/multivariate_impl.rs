@@ -608,7 +608,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
         return self.allocate_tmp_monomial(lhs.data.deg + rhs.data.deg);
     }
 
-    fn evaluate<S, V, H>(&self, f: &Self::Element, values: V, hom: &H) -> S::Element
+    fn evaluate<S, V, H>(&self, f: &Self::Element, values: V, hom: H) -> S::Element
         where S: ?Sized + RingBase,
             H: Homomorphism<<Self::BaseRing as RingStore>::Type, S>,
             V: VectorFn<S::Element>

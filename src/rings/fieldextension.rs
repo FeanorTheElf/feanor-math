@@ -24,8 +24,7 @@ use super::poly::PolyRingStore;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::extension::galois_field::*;
 /// # use feanor_math::delegate::*;
-/// # use feanor_math::rings::fieldextension::*;
-/// # use feanor_math::rings::fieldextension::ExtensionFieldStore;
+/// # use feanor_math::rings::fieldextension::SeparableFieldExtensionStore;;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::rings::zn::*;
 /// let Fp = Zn::new(7).as_field().ok().unwrap();
@@ -73,7 +72,7 @@ pub trait SeparableFieldExtension: Field + FreeAlgebra + FactorPolyField + Speci
     /// ```
     /// # use feanor_math::ring::*;
     /// # use feanor_math::rings::extension::galois_field::*;
-    /// # use feanor_math::rings::fieldextension::*;
+    /// # use feanor_math::rings::fieldextension::SeparableFieldExtensionStore;
     /// # use feanor_math::rings::zn::zn_64::*;
     /// # use feanor_math::rings::zn::*;
     /// assert!(GaloisField::new(5, 2).has_hom(&GaloisField::new(5, 3)).is_none());
@@ -83,8 +82,7 @@ pub trait SeparableFieldExtension: Field + FreeAlgebra + FactorPolyField + Speci
     /// ```
     /// # use feanor_math::ring::*;
     /// # use feanor_math::rings::extension::galois_field::*;
-    /// # use feanor_math::rings::fieldextension::*;
-    /// # use feanor_math::rings::fieldextension::ExtensionFieldStore;
+    /// # use feanor_math::rings::fieldextension::SeparableFieldExtensionStore;
     /// # use feanor_math::rings::zn::zn_64::*;
     /// # use feanor_math::homomorphism::*;
     /// # use feanor_math::rings::extension::*;

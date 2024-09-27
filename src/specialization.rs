@@ -33,7 +33,8 @@ pub trait FiniteRingOperation<OriginalField>
         where Self: 'a;
 
     fn execute<'a, F>(self, field: F) -> Self::Output<'a>
-        where F: 'a + RingStore,
+        where Self: 'a,
+            F: 'a + RingStore,
             F::Type: FiniteRing + DivisibilityRing + LinSolveRing + CanIsoFromTo<OriginalField> + SpecializeToFiniteRing;
 }
 
@@ -47,6 +48,18 @@ pub trait FiniteRingOperation<OriginalField>
 pub trait SpecializeToFiniteRing: RingBase + DivisibilityRing {
 
     fn specialize_finite_ring<'a, O: FiniteRingOperation<Self>>(&'a self, op: O) -> Result<O::Output<'a>, ()>;
+
+    fn is_finite_ring(&self) -> bool {
+        struct NoOperation;
+        impl<R: ?Sized + RingBase> FiniteRingOperation<R> for NoOperation {
+            type Output<'a> = () where Self: 'a;
+            fn execute<'a, F>(self, _: F) -> Self::Output<'a>
+                where F: 'a + RingStore,
+                    F::Type: FiniteRing + DivisibilityRing + LinSolveRing + CanIsoFromTo<R> + SpecializeToFiniteRing
+            {}
+        }
+        return self.specialize_finite_ring(NoOperation).is_ok();
+    }
 }
 
 impl<I> SpecializeToFiniteRing for RationalFieldBase<I>
@@ -196,7 +209,8 @@ pub trait FiniteFieldOperation<OriginalField>
         where Self: 'a;
 
     fn execute<'a, F>(self, field: F) -> Self::Output<'a>
-        where F: 'a + RingStore,
+        where Self: 'a,
+            F: 'a + RingStore,
             F::Type: FiniteRing + Field + PerfectField + LinSolveRing + CanIsoFromTo<OriginalField> + SpecializeToFiniteField;
 }
 

@@ -900,9 +900,43 @@ impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
 /// 
 /// Note that this does not support generic types, as for those, it is
 /// usually better to implement
-/// ```rust,ignore
-/// RingConstructor<R>: CanIsoFromTo<RingConstructor<S>>
-///     where R: CanIsoFromTo<S>
+/// ```rust
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::delegate::*;
+/// // define `RingConstructor<R: RingStore>`
+/// # struct RingConstructor<R: RingStore>(R);
+/// # impl<R: RingStore> DelegateRing for RingConstructor<R> {
+/// #     type Element = El<R>;
+/// #     type Base = R::Type;
+/// #     fn get_delegate(&self) -> &Self::Base { self.0.get_ring() }
+/// #     fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
+/// #     fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
+/// #     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+/// #     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
+/// # }
+/// # impl<R: RingStore> PartialEq for RingConstructor<R> {
+/// #     fn eq(&self, other: &Self) -> bool {
+/// #         self.0.get_ring() == other.0.get_ring()
+/// #     }
+/// # }
+/// impl<R, S> CanHomFrom<RingConstructor<S>> for RingConstructor<R>
+///     where R: RingStore, S: RingStore, R::Type: CanHomFrom<S::Type>
+/// {
+///     type Homomorphism = <R::Type as CanHomFrom<S::Type>>::Homomorphism;
+/// 
+///     fn has_canonical_hom(&self, from: &RingConstructor<S>) -> Option<<R::Type as CanHomFrom<S::Type>>::Homomorphism> {
+///         // delegate to base ring of type `R::Type`
+/// #       self.get_delegate().has_canonical_hom(from.get_delegate())
+///     }
+/// 
+///     fn map_in(&self, from: &RingConstructor<S>, el: <RingConstructor<S> as RingBase>::Element, hom: &Self::Homomorphism) -> <Self as RingBase>::Element {
+///         // delegate to base ring of type `R::Type`
+/// #       self.get_delegate().map_in(from.get_delegate(), el, hom)
+///     }
+/// }
+/// 
+/// // and same for CanIsoFromTo
 /// ```
 /// or something similar.
 /// 

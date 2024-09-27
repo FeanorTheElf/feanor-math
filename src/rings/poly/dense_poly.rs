@@ -497,7 +497,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
         return (quo, lhs);
     }
 
-    fn evaluate<S, H>(&self, f: &Self::Element, value: &S::Element, hom: &H) -> S::Element
+    fn evaluate<S, H>(&self, f: &Self::Element, value: &S::Element, hom: H) -> S::Element
         where S: ?Sized + RingBase,
             H: Homomorphism<R::Type, S>
     {

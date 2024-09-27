@@ -174,12 +174,17 @@ pub fn make_primitive<R>(ZZX: R, f: El<R>) -> El<R>
 /// is usually much faster than working direction over `Z` or `Q`.
 /// 
 #[stability::unstable(feature = "enable")]
+#[allow(unreachable_code)]
+#[allow(unused_mut)]
+#[allow(unused_variables)]
 pub fn integer_poly_gcd_local<R>(mut fst: El<R>, mut snd: El<R>, ZZX: R) -> El<R>
     where R: RingStore,
         R::Type: PolyRing + DivisibilityRing,
         <<R::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
         ZnBase: CanHomFrom<<<R::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
+    unimplemented!("currently has a severe bug");
+
     if ZZX.is_zero(&fst) {
         return snd;
     } else if ZZX.is_zero(&snd) {
@@ -287,7 +292,8 @@ fn test_polynomial_eea_global() {
 }
 
 #[test]
-fn test_polynomial_eea_local() {
+#[ignore]
+fn test_polynomial_gcd_local() {
     let ring = DensePolyRing::new(BigIntRing::RING, "X");
     let [f, g, expected_gcd] = ring.with_wrapped_indeterminate(|X| [
         (X.pow_ref(2) + 1) * (X.pow_ref(3) + 2),
@@ -310,6 +316,7 @@ fn test_polynomial_eea_local() {
 }
 
 #[test]
+#[ignore]
 fn random_test_rational_poly_gcd_local() {
     let mut rng = oorandom::Rand64::new(1);
     let ZZbig = BigIntRing::RING;

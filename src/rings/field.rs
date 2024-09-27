@@ -13,6 +13,7 @@ use crate::rings::zn::FromModulusCreateableZnRing;
 use crate::rings::zn::*;
 use crate::specialization::SpecializeToFiniteRing;
 use super::local::AsLocalPIRBase;
+use crate::primitive_int::*;
 
 ///
 /// A wrapper around a ring that marks this ring to be a perfect field. In particular,
@@ -82,20 +83,64 @@ impl<R: DivisibilityRingStore> AsFieldBase<R>
     where R::Type: DivisibilityRing
 {
     ///
+    /// Assumes that the given ring is a perfect field, and wraps it in [`AsFieldBase`].
+    /// 
+    /// This function is not really unsafe, but users should be careful to only use
+    /// it with rings that are perfect fields. This cannot be checked in here, so must 
+    /// be checked by the caller.
+    /// 
+    pub fn promise_is_perfect_field(base: R) -> Self {
+        Self { zero: FieldEl(base.zero()), base }
+    }
+
+    ///
+    /// Assumes that the given ring is a field and checks whether it is perfect. If this is the case,
+    /// the function wraps it in [`AsFieldBase`]. 
+    ///
     /// This function is not really unsafe, but users should be careful to only use
     /// it with rings that are fields. This cannot be checked in here, so must be checked
     /// by the caller.
     /// 
-    pub fn promise_is_perfect_field(base: R) -> Self {
-        Self { zero: FieldEl(base.zero()), base }
+    /// Note that this function does check that the passed field is perfect. However,
+    /// that check is too conservative, and might fail on some perfect fields.
+    /// If you are sure that the field is also perfect, consider using [`AsFieldBase::promise_is_perfect_field()`]
+    /// instead.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    pub fn promise_is_field(base: R) -> Result<Self, R>
+        where R::Type: SpecializeToFiniteRing
+    {
+        let characteristic = base.characteristic(&StaticRing::<i64>::RING);
+        if characteristic.is_some() && characteristic.unwrap() == 0 {
+            return Ok(Self::promise_is_perfect_field(base));
+        } else if base.get_ring().is_finite_ring() {
+            return Ok(Self::promise_is_perfect_field(base));
+        } else {
+            return Err(base);
+        }
     }
 
     pub fn unwrap_element(&self, el: <Self as RingBase>::Element) -> El<R> {
         el.0
     }
 
+    ///
+    /// Removes the wrapper, returning the underlying base field.
+    /// 
     pub fn unwrap_self(self) -> R {
         self.base
+    }
+}
+
+impl<R: DivisibilityRingStore> AsFieldBase<R> 
+    where R::Type: PerfectField
+{
+    ///
+    /// Creates a new [`AsFieldBase`] from a ring that is already known to be a
+    /// perfect field.
+    /// 
+    pub fn from_field(base: R) -> Self {
+        Self::promise_is_perfect_field(base)
     }
 }
 
@@ -377,7 +422,7 @@ impl<R> FromModulusCreateableZnRing for AsFieldBase<RingValue<R>>
 /// # use feanor_math::rings::field::*;
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::{impl_eq_based_self_iso, impl_wrap_unwrap_homs, impl_wrap_unwrap_isos};
+/// # use feanor_math::{impl_eq_based_self_iso, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 /// // A no-op wrapper around Zn
 /// #[derive(Copy, Clone)]
 /// struct MyPossibleField {
@@ -406,13 +451,13 @@ impl<R> FromModulusCreateableZnRing for AsFieldBase<RingValue<R>>
 ///     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
 /// }
 /// 
-/// impl_wrap_unwrap_homs!{ MyPossibleField, MyPossibleField }
+/// impl_field_wrap_unwrap_homs!{ MyPossibleField, MyPossibleField }
 /// 
 /// // there is also a generic verision, which looks like
-/// impl_wrap_unwrap_isos!{ <{ /* type params here */ }> MyPossibleField, MyPossibleField where /* constraints here */ }
+/// impl_field_wrap_unwrap_isos!{ <{ /* type params here */ }> MyPossibleField, MyPossibleField where /* constraints here */ }
 /// 
 /// let R = RingValue::from(MyPossibleField { base_zn: Zn::new(5) });
-/// let R_field = RingValue::from(AsFieldBase::promise_is_field(R));
+/// let R_field = RingValue::from(AsFieldBase::promise_is_perfect_field(R));
 /// let _ = R.can_hom(&R_field).unwrap();
 /// let _ = R_field.can_hom(&R).unwrap();
 /// let _ = R.can_iso(&R_field).unwrap();
@@ -420,7 +465,7 @@ impl<R> FromModulusCreateableZnRing for AsFieldBase<RingValue<R>>
 /// ```
 /// 
 #[macro_export]
-macro_rules! impl_wrap_unwrap_homs {
+macro_rules! impl_field_wrap_unwrap_homs {
     (<{$($gen_args:tt)*}> $self_type_from:ty, $self_type_to:ty where $($constraints:tt)*) => {
         
         impl<AsFieldRingStore, $($gen_args)*> CanHomFrom<$self_type_from> for $crate::rings::field::AsFieldBase<AsFieldRingStore>
@@ -452,7 +497,7 @@ macro_rules! impl_wrap_unwrap_homs {
         }
     };
     ($self_type_from:ty, $self_type_to:ty) => {
-        impl_wrap_unwrap_homs!{ <{}> $self_type_from, $self_type_to where }
+        impl_field_wrap_unwrap_homs!{ <{}> $self_type_from, $self_type_to where }
     };
 }
 
@@ -460,10 +505,10 @@ macro_rules! impl_wrap_unwrap_homs {
 /// Implements the isomorphisms `S: CanIsoFromTo<AsFieldBase<RingStore<Type = R>>>` and `AsFieldBase<RingStore<Type = S>>: CanIsoFromTo<R>`.
 /// 
 /// This has to be a macro, as a blanket implementation would unfortunately cause conflicting impls.
-/// For an example and more detailed explanation, see [`impl_wrap_unwrap_homs!`]; 
+/// For an example and more detailed explanation, see [`impl_field_wrap_unwrap_homs!`]; 
 /// 
 #[macro_export]
-macro_rules! impl_wrap_unwrap_isos {
+macro_rules! impl_field_wrap_unwrap_isos {
     (<{$($gen_args:tt)*}> $self_type_from:ty, $self_type_to:ty where $($constraints:tt)*) => {
         
         impl<AsFieldRingStore, $($gen_args)*> CanIsoFromTo<$self_type_from> for $crate::rings::field::AsFieldBase<AsFieldRingStore>
@@ -495,14 +540,12 @@ macro_rules! impl_wrap_unwrap_isos {
         }
     };
     ($self_type_from:ty, $self_type_to:ty) => {
-        impl_wrap_unwrap_isos!{ <{}> $self_type_from, $self_type_to where }
+        impl_field_wrap_unwrap_isos!{ <{}> $self_type_from, $self_type_to where }
     };
 }
 
 #[cfg(test)]
 use crate::rings::zn::zn_big::Zn;
-#[cfg(test)]
-use crate::primitive_int::*;
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
 

@@ -1,5 +1,4 @@
 use std::alloc::*;
-use std::time::Instant;
 
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 use crate::compute_locally::InterpolationBaseRing;
@@ -294,6 +293,8 @@ use crate::rings::zn::zn_64::*;
 use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
 use crate::rings::rational::*;
+#[cfg(test)]
+use std::time::Instant;
 
 #[test]
 fn test_extend_field() {

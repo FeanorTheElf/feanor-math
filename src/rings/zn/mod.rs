@@ -358,7 +358,7 @@ pub trait ZnOperation {
         where Self: 'a;
 
     fn call<'a, R>(self, ring: R) -> Self::Output<'a>
-        where R: 'a + ZnRingStore, R::Type: ZnRing;
+        where Self: 'a, R: 'a + ZnRingStore, R::Type: ZnRing;
 }
 
 ///
@@ -382,8 +382,12 @@ pub trait ZnOperation {
 /// // work in Z/17Z without explicitly choosing an implementation
 /// struct DoStuff { int_value: i64 }
 /// impl ZnOperation for DoStuff {
-///     fn call<R>(self, Zn: R) -> ()
-///         where R: RingStore,
+///     type Output<'a> = ()
+///         where Self: 'a;
+/// 
+///     fn call<'a, R>(self, Zn: R) -> ()
+///         where Self: 'a,
+///             R: 'a + RingStore,
 ///             R::Type: ZnRing
 ///     {
 ///         let value = Zn.coerce(Zn.integer_ring(), int_cast(self.int_value, Zn.integer_ring(), &StaticRing::<i64>::RING));

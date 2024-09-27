@@ -19,10 +19,8 @@ use crate::specialization::*;
 pub mod finite_field;
 pub mod integer;
 
-
 ///
-/// Trait for fields over which we can efficiently compute the
-/// square-free part of a polynomial.
+/// Trait for fields over which we can efficiently compute the square-free part of a polynomial.
 /// 
 pub trait PolySquarefreePartField: Field {
 
@@ -41,12 +39,58 @@ impl<R> PolySquarefreePartField for R
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
+        // TODO: Find a good way to do this over number fields efficiently, i.e. locally
         poly_squarefree_part_global(&poly_ring, poly)
     }
 }
 
+///
+/// Unfortunately, `AsFieldBase<R> where R: RingStore<Type = zn_64::ZnBase>` leads to
+/// a conflicting impl with the one for field extensions 
+///
 impl PolySquarefreePartField for AsFieldBase<zn_64::Zn> {
 
+    fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        poly_squarefree_part_global(&poly_ring, poly)
+    }
+}
+
+impl<'a> PolySquarefreePartField for AsFieldBase<RingRef<'a, zn_64::ZnBase>> {
+
+    fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        poly_squarefree_part_global(&poly_ring, poly)
+    }
+}
+
+///
+/// Unfortunately, `AsFieldBase<R> where R: RingStore<Type = zn_big::ZnBase<I>>` leads to
+/// a conflicting impl with the one for field extensions 
+///
+impl<I> PolySquarefreePartField for AsFieldBase<zn_big::Zn<I>>
+where I: IntegerRingStore,
+    I::Type: IntegerRing
+{
+fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
+    where P: PolyRingStore,
+        P::Type: PolyRing + EuclideanRing,
+        <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+{
+    poly_squarefree_part_global(&poly_ring, poly)
+}
+}
+
+impl<'a, I> PolySquarefreePartField for AsFieldBase<RingRef<'a, zn_big::ZnBase<I>>>
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
+{
     fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
         where P: PolyRingStore,
             P::Type: PolyRing + EuclideanRing,
@@ -131,12 +175,12 @@ pub fn poly_power_decomposition_global<P>(poly_ring: P, poly: &El<P>) -> Vec<(El
 /// # use feanor_math::rings::rational::*;
 /// # use feanor_math::divisibility::*;
 /// # use feanor_math::homomorphism::Homomorphism;
-/// # use feanor_math::algorithms::poly_factor::poly_squarefree_part;
+/// # use feanor_math::algorithms::poly_squarefree::poly_squarefree_part_global;
 /// let Fp = Zn::new(3).as_field().ok().unwrap();
 /// let FpX = DensePolyRing::new(Fp, "X");
 /// // f = (X^2 + 1)^2 (X^3 + 2 X + 1)
 /// let [f] = FpX.with_wrapped_indeterminate(|X| [(X.pow_ref(2) + 1).pow(2) * (X.pow_ref(3) + 2 * X + 1)]);
-/// let squarefree_part = poly_squarefree_part(&FpX, f);
+/// let squarefree_part = poly_squarefree_part_global(&FpX, &f);
 /// let [expected] = FpX.with_wrapped_indeterminate(|X| [(X.pow_ref(2) + 1) * (X.pow_ref(3) + 2 * X + 1)]);
 /// assert_el_eq!(FpX, &expected, &squarefree_part);
 /// ```

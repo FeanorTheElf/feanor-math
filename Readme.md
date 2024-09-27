@@ -91,6 +91,51 @@ println!("Solution is [{}, {}]", F25.format(result.at(0, 0)), F25.format(result.
 assert_el_eq!(&F25, F25.zero(), F25.add_ref(result.at(0, 0), result.at(1, 0)));
 ```
 
+## Solving polynomial equations over Zn
+
+Another example of the above type is solving of equations over supported fields.
+Note that this code currently requires unstable features, i.e. activating the feature `unstable-enable`.
+```rust
+use feanor_math::homomorphism::*;
+use feanor_math::rings::zn::*;
+use feanor_math::rings::zn::zn_64::*;
+use feanor_math::assert_el_eq;
+use feanor_math::ring::*;
+use feanor_math::field::*;
+use feanor_math::primitive_int::*;
+use feanor_math::algorithms::buchberger::*;
+use feanor_math::rings::multivariate::*;
+use feanor_math::rings::multivariate::multivariate_impl::*;
+use feanor_math::algorithms::poly_factor::*;
+use feanor_math::rings::poly::dense_poly::*;
+use feanor_math::seq::*;
+use feanor_math::pid::*;
+use feanor_math::rings::poly::*;
+
+let F7 = Zn::new(7).as_field().ok().unwrap();
+let F7XY = MultivariatePolyRingImpl::new(&F7, 2);
+let F7T = DensePolyRing::new(&F7, "T");
+let [f1, f2] = F7XY.with_wrapped_indeterminates(|[X, Y]| [X * X * Y - 1, X * Y - 2]);
+let groebner_basis_degrevlex = buchberger_simple::<_, _, false>(&F7XY, vec![F7XY.clone_el(&f1), F7XY.clone_el(&f2)], DegRevLex);
+assert!(groebner_basis_degrevlex.iter().any(|f| F7XY.monomial_deg(F7XY.LT(f, DegRevLex).unwrap().1) > 0), "system has no solution");
+let mut groebner_basis_lex = buchberger_simple::<_, _, false>(&F7XY, groebner_basis_degrevlex, Lex);
+
+// sort descending by leading terms, which means we get [f1(X, Y), ..., fr(X, Y), g(Y)]
+// we can now solve by choosing `y` as a root of `g` and `x` as a joint root of `fi(X, y)`
+groebner_basis_lex.sort_unstable_by(|f, g| Lex.compare(&F7XY, F7XY.LT(f, Lex).unwrap().1, F7XY.LT(g, Lex).unwrap().1).reverse());
+let poly_in_y = F7XY.evaluate(&groebner_basis_lex.pop().unwrap(), [F7T.zero(), F7T.indeterminate()].as_ring_el_fn(&F7T), F7T.inclusion());
+let (poly_in_y_factorization, _) = <_ as FactorPolyField>::factor_poly(&F7T, &poly_in_y);
+let y = poly_in_y_factorization.into_iter().filter_map(|(f, _)| if F7T.degree(&f).unwrap() != 1 { None } else { Some(F7.negate(F7.div(F7T.coefficient_at(&f, 0), F7T.coefficient_at(&f, 1)))) }).next().unwrap();
+let poly_in_x = groebner_basis_lex.into_iter().fold(F7T.zero(), |f, g| F7T.ideal_gen(&f, &F7XY.evaluate(&g, [F7T.indeterminate(), F7T.inclusion().map(y)].as_ring_el_fn(&F7T), F7T.inclusion())));
+let (poly_in_x_factorization, _) = <_ as FactorPolyField>::factor_poly(&F7T, &poly_in_x);
+let x = poly_in_x_factorization.into_iter().filter_map(|(f, _)| if F7T.degree(&f).unwrap() != 1 { None } else { Some(F7.negate(F7.div(F7T.coefficient_at(&f, 0), F7T.coefficient_at(&f, 1)))) }).next().unwrap();
+
+assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f1, [x, y].as_ring_el_fn(F7), F7.identity()));
+assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f2, [x, y].as_ring_el_fn(F7), F7.identity()));
+```
+Generally speaking, this also works over the rationals.
+However, currently some places still use algorithms that are not well-suited for rationals or number fields, which means that performance in these cases is quite poor at the moment.
+
 ## Using rings
 
 This library is not "just" a collection of algorithms on certain rings, but is supposed to be seamlessly extensible.

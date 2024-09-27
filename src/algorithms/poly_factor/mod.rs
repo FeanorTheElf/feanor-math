@@ -122,8 +122,53 @@ impl<R> FactorPolyField for R
     }
 }
 
+///
+/// Unfortunately, `AsFieldBase<R> where R: RingStore<Type = zn_64::ZnBase>` leads to
+/// a conflicting impl with the one for field extensions 
+///
 impl FactorPolyField for AsFieldBase<Zn> {
 
+    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        factor_over_finite_field(poly_ring, poly)
+    }
+}
+
+impl<'a> FactorPolyField for AsFieldBase<RingRef<'a, ZnBase>> {
+
+    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        factor_over_finite_field(poly_ring, poly)
+    }
+}
+
+///
+/// Unfortunately, `AsFieldBase<R> where R: RingStore<Type = zn_big::ZnBase<I>>` leads to
+/// a conflicting impl with the one for field extensions 
+///
+impl<I> FactorPolyField for AsFieldBase<zn_big::Zn<I>>
+where I: IntegerRingStore,
+    I::Type: IntegerRing
+{
+    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        factor_over_finite_field(poly_ring, poly)
+    }
+}
+
+impl<'a, I> FactorPolyField for AsFieldBase<RingRef<'a, zn_big::ZnBase<I>>>
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
+{
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: PolyRingStore,
             P::Type: PolyRing + EuclideanRing,

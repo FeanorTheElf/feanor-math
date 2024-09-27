@@ -188,7 +188,7 @@ pub trait MultivariatePolyRing: RingExtension {
     /// assert_eq!(1 + 5 + 5 * 5 * 8, poly_ring.evaluate(&f, [5, 8].into_ring_el_fn(StaticRing::<i64>::RING), &poly_ring.base_ring().identity()));
     /// ```
     /// 
-    fn evaluate<R, V, H>(&self, f: &Self::Element, value: V, hom: &H) -> R::Element
+    fn evaluate<R, V, H>(&self, f: &Self::Element, value: V, hom: H) -> R::Element
         where R: ?Sized + RingBase,
             H: Homomorphism<<Self::BaseRing as RingStore>::Type, R>,
             V: VectorFn<R::Element>
@@ -315,7 +315,7 @@ pub trait MultivariatePolyRingStore: RingStore
     /// 
     /// For details, see [`MultivariatePolyRing::evaluate()`].
     /// 
-    fn evaluate<R, V, H>(&self, f: &El<Self>, value: V, hom: &H) -> R::Element
+    fn evaluate<R, V, H>(&self, f: &El<Self>, value: V, hom: H) -> R::Element
         where R: ?Sized + RingBase,
             H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, R>,
             V: VectorFn<R::Element>
