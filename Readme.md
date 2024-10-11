@@ -448,6 +448,10 @@ As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` ca
  - Equality (via `PartialEq`) of rings implies that they are "the same" and their elements can be used interchangeably without conversion.
    Being (canonically) isomorphic (via [`crate::homomorphism::CanIsoFromTo`]) implies that two rings are "the same", but their elements might use different internal
    format. Using the functions [`crate::homomorphism::CanIsoFromTo`], they can be converted between both rings. For more info, see also [`crate::ring::RingBase`].
+ - Algorithms are exposed in one of three ways: As global function, as subtrait of [`crate::ring::RingBase`] or as their own trait, generic in some ring type `R: RingBase`.
+   The first should be seen as the default, while the second way can be used if the implementation of the algorithm depends heavily on the ring in question (e.g. factoring polynomials, see [`crate::algorithms::poly_factor::FactorPolyField`]).
+   Furthermore, in some situations, one might want algorithms to store data between multiple executions, and/or make higher-level algorithms (or rings) configurable with a concrete implementation of a used sub-algorithm (strategy pattern).
+   In these cases, it makes sense to define a new trait for objects representing an implementation of the algorithm (e.g. computing convolutions, see [`crate::algorithms::convolution::ConvolutionAlgorithm`]).
 
 # Performance
 

@@ -869,3 +869,9 @@ fn test_not_prime() {
 fn test_not_coprime() {
     Zn::new(vec![zn_64::Zn::new(15), zn_64::Zn::new(35)], StaticRing::<i64>::RING);
 }
+
+#[test]
+fn test_format() {
+    let ring = Zn::new([72057594035352641, 72057594035418113, 72057594036334721, 72057594036945793, ].iter().map(|p| zn_64::Zn::new(*p)).collect(), BigIntRing::RING);
+    assert_eq!("1", format!("{}", ring.format(&ring.int_hom().map(1))));
+}

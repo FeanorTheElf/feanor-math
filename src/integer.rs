@@ -274,6 +274,27 @@ impl<F: ?Sized + IntegerRing, T: ?Sized + IntegerRing> IntCast<F> for T {
     }
 }
 
+///
+/// Conversion of elements between two rings representing the integers `ZZ`.
+/// 
+/// The underlying conversion functionality is the same as provided by [`IntCast`], and
+/// indirectly also by [`CanHomFrom`] and [`CanIsoFromTo`].
+/// 
+/// # Example
+/// 
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::integer::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::assert_el_eq;
+/// let ZZi64 = StaticRing::<i64>::RING;
+/// let ZZbig = BigIntRing::RING;
+/// let ZZi8 = StaticRing::<i8>::RING;
+/// assert_eq!(7, int_cast(7, ZZi64, ZZi8));
+/// assert_eq!(65536, int_cast(ZZbig.power_of_two(16), ZZi64, ZZbig));
+/// assert_el_eq!(ZZbig, ZZbig.power_of_two(16), int_cast(65536, ZZbig, ZZi64));
+///  ```
+/// 
 pub fn int_cast<T: IntegerRingStore, F: IntegerRingStore>(value: El<F>, to: T, from: F) -> El<T>
     where T::Type: IntegerRing, F::Type: IntegerRing
 {

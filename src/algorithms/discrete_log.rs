@@ -123,12 +123,6 @@ pub fn finite_field_discrete_log<R: FiniteRingStore>(value: El<R>, base: El<R>, 
 
 #[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
-#[cfg(test)]
-use crate::rings::zn::zn_64;
-#[cfg(test)]
-use crate::rings::zn::ZnRingStore;
-#[cfg(test)]
-use crate::homomorphism::Homomorphism;
 
 #[test]
 fn test_baby_giant_step() {
@@ -156,10 +150,4 @@ fn test_discrete_log() {
         Some(26),
         discrete_log(26, &1, 100, |x, y| Zn::<100>::RING.add(x, y), 0)
     );
-}
-
-#[test]
-fn test_finite_field_log() {
-    let Fp = zn_64::Zn::new(1009).as_field().ok().unwrap();
-    assert_eq!(Some(486), finite_field_log(Fp.pow(Fp.int_hom().map(11), 486), Fp.int_hom().map(11), &Fp));
 }

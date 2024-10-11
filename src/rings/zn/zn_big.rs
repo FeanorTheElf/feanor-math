@@ -260,7 +260,16 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
     fn is_noetherian(&self) -> bool { true }
 
     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        self.integer_ring.get_ring().dbg(&value.0, out)
+        if self.integer_ring.is_geq(&value.0, &self.modulus) {
+            let reduced_value = self.integer_ring.sub_ref(&value.0, &self.modulus);
+            if self.integer_ring.eq_el(&reduced_value, &self.modulus) {
+                self.integer_ring.get_ring().dbg(&self.integer_ring.zero(), out)
+            } else {
+                self.integer_ring.get_ring().dbg(&reduced_value, out)
+            }
+        } else {
+            self.integer_ring.get_ring().dbg(&value.0, out)
+        }
     }
     
     fn characteristic<J: IntegerRingStore>(&self, ZZ: &J) -> Option<El<J>>
@@ -590,6 +599,8 @@ impl_localpir_wrap_unwrap_isos!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: IntegerR
 
 #[cfg(test)]
 use crate::integer::BigIntRing;
+#[cfg(test)]
+use crate::rings::rust_bigint::*;
 
 #[test]
 fn test_mul() {
@@ -698,4 +709,19 @@ fn test_finite_field_axioms() {
 fn test_serialize() {
     let ring = Zn::new(&StaticRing::<i64>::RING, 128);
     crate::serialization::generic_tests::test_serialization(ring, ring.elements())
+}
+#[test]
+fn test_unreduced() {
+    let ZZbig = RustBigintRing::RING;
+    let ring = Zn::new(ZZbig, ZZbig.prod([72057594035352641, 72057594035418113, 72057594036334721, 72057594036945793, ].iter().map(|p| int_cast(*p, ZZbig, StaticRing::<i64>::RING))));
+    let value = ZZbig.get_ring().parse("26959946664284515451292772736873168147996033528710027874998326058050", 10).unwrap();
+
+    let x: ZnEl<RustBigintRing> = ZnEl(value);
+    // this means this is a valid representative, although it is > ring.modulus()
+    assert!(ZZbig.is_lt(&x.0, &ring.get_ring().twice_modulus));
+
+    assert!(ring.is_one(&x));
+    assert!(ring.is_one(&ring.mul_ref(&x, &x)));
+    assert!(ring.eq_el(&x, &ring.mul_ref(&x, &x)));
+    assert_eq!("1", format!("{}", ring.format(&x)));
 }
