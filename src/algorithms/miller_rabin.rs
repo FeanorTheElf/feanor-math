@@ -89,23 +89,24 @@ fn search_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>, delta: i64) -> Option<
     where I::Type: IntegerRing,
         zn_64::ZnBase: CanHomFrom<I::Type>
 {
-    assert!(delta as i128 * 30 <= i64::MAX as i128);
-    assert!(delta as i128 * 30 >= i64::MIN as i128);
     assert!(ZZ.is_pos(&n));
-    let Z30 = zn_64::Zn::new(30);
-    let mut n_mod_30 = Z30.coerce(&ZZ, ZZ.clone_el(&n));
+
+    let m = SMALL_IS_COPRIME_TABLE.len();
+    let Zm = zn_64::Zn::new(m as u64);
+    let mut n_mod_m = Zm.coerce(&ZZ, ZZ.clone_el(&n));
     let mut diff_to_n = 0;
-    let Zi64_to_Z30 = Z30.can_hom::<StaticRing<i64>>(&StaticRing::<i64>::RING).unwrap();
+    let Zi64_to_Zm = Zm.can_hom::<StaticRing<i64>>(&StaticRing::<i64>::RING).unwrap();
     let Zi64_to_ZZ = ZZ.can_hom(&StaticRing::<i64>::RING).unwrap();
     debug_assert!(ZZ.is_one(&signed_gcd(ZZ.clone_el(&n), Zi64_to_ZZ.map(delta), &ZZ)));
-    let Z30_delta = Zi64_to_Z30.map(delta);
+    let Zm_delta = Zi64_to_Zm.map(delta);
+    let ZZ_m = Zi64_to_ZZ.map(m as i64);
 
-    // we continue the main loop until we reach `n <= 5`; at this point, the main loop is not correct
-    // anymore, since being in `Z/30Z \ Z/30Z*` does not imply not being a prime anymore
-    let mut remaining_steps = if ZZ.is_leq(&n, &ZZ.int_hom().map(5)) {
+    // we continue the main loop until we reach `n <= m`; at this point, the main loop is not correct
+    // anymore, since being in `Z/mZ \ Z/mZ*` does not imply nonprimality anymore
+    let mut remaining_steps = if ZZ.is_leq(&n, &ZZ_m) {
         0
     } else if delta < 0 {
-        let max_steps = ZZ.ceil_div(ZZ.sub_ref(&n, &Zi64_to_ZZ.map(5)), &Zi64_to_ZZ.map(-delta));
+        let max_steps = ZZ.ceil_div(ZZ.sub_ref(&n, &Zi64_to_ZZ.map(m as i64)), &Zi64_to_ZZ.map(-delta));
         if ZZ.is_lt(&max_steps, &Zi64_to_ZZ.map(i64::MAX)) {
             int_cast(max_steps, StaticRing::<i64>::RING, &ZZ)
         } else {
@@ -116,9 +117,9 @@ fn search_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>, delta: i64) -> Option<
     };
 
     while remaining_steps != 0 {
-        while !SMALL_IS_COPRIME_TABLE[Z30.smallest_positive_lift(n_mod_30) as usize] && remaining_steps != 0 {
+        while !SMALL_IS_COPRIME_TABLE[Zm.smallest_positive_lift(n_mod_m) as usize] && remaining_steps != 0 {
             diff_to_n += delta;
-            Z30.add_assign(&mut n_mod_30, Z30_delta);
+            Zm.add_assign(&mut n_mod_m, Zm_delta);
             remaining_steps -= 1;
         }
         ZZ.add_assign(&mut n, Zi64_to_ZZ.map(diff_to_n));
@@ -129,12 +130,12 @@ fn search_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>, delta: i64) -> Option<
             return Some(n);
         } else {
             diff_to_n = delta;
-            Z30.add_assign(&mut n_mod_30, Z30_delta);
+            Zm.add_assign(&mut n_mod_m, Zm_delta);
             remaining_steps -= 1;
         }
     }
     let mut n = int_cast(n, StaticRing::<i64>::RING, &ZZ);
-    assert!(n <= 5);
+    assert!(n <= m as i64);
     while n > 0 {
         if is_prime(&StaticRing::<i64>::RING, &n, DEFAULT_PROBABILISTIC_REPETITIONS) {
             return Some(Zi64_to_ZZ.map(n));
@@ -164,13 +165,13 @@ pub fn prev_prime<I: IntegerRingStore>(ZZ: I, n: El<I>) -> Option<El<I>>
 /// Returns the smallest prime larger than the given integer.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn next_prime<I: IntegerRingStore>(ZZ: I, n: El<I>) -> Option<El<I>>
+pub fn next_prime<I: IntegerRingStore>(ZZ: I, n: El<I>) -> El<I>
     where I::Type: IntegerRing,
         zn_64::ZnBase: CanHomFrom<I::Type>
 {
     assert!(ZZ.is_pos(&n));
     let n_plus_one = ZZ.add(n, ZZ.one());
-    search_prime(ZZ, n_plus_one, 1)
+    search_prime(ZZ, n_plus_one, 1).unwrap()
 }
 
 ///
@@ -280,13 +281,12 @@ fn test_prev_prime() {
 fn test_next_prime() {
     let mut last_prime = 1009;
     for i in (2..1000).rev() {
-        println!("{}", i);
-        assert_eq!(Some(last_prime), next_prime(StaticRing::<i64>::RING, i));
+        assert_eq!(last_prime, next_prime(StaticRing::<i64>::RING, i));
         if is_prime(StaticRing::<i64>::RING, &i, DEFAULT_PROBABILISTIC_REPETITIONS) {
             last_prime = i;
         }
     }
-    assert_eq!(Some(2), next_prime(StaticRing::<i64>::RING, 1));
+    assert_eq!(2, next_prime(StaticRing::<i64>::RING, 1));
 }
 
 #[test]
