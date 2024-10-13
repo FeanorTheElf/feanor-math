@@ -1,3 +1,4 @@
+use crate::algorithms::eea::signed_gcd;
 use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 use crate::homomorphism::*;
@@ -8,6 +9,7 @@ use crate::rings::zn::ZnRing;
 use crate::primitive_int::*;
 use crate::rings::zn::ZnRingStore;
 use crate::rings::zn::choose_zn_impl;
+use crate::DEFAULT_PROBABILISTIC_REPETITIONS;
 
 use oorandom;
 
@@ -33,6 +35,7 @@ impl ZnOperation for CheckIsFieldMillerRabin {
 /// If n is a prime, this returns true.
 /// If n is not a prime, this returns false with probability greater or 
 /// equal than 1 - 4^(-k).
+/// For very small primes, a lookup table may be used.
 /// 
 /// For details, see [`is_prime_base()`]
 /// 
@@ -49,98 +52,125 @@ pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
     }
 }
 
+const SMALL_IS_COPRIME_TABLE: [bool; 30] = [
+    false,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    false,
+    false,
+    true,
+    false,
+    true,
+    false,
+    false,
+    false,
+    true,
+    false,
+    true,
+    false,
+    false,
+    false,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true
+];
+
+fn search_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>, delta: i64) -> Option<El<I>>
+    where I::Type: IntegerRing,
+        zn_64::ZnBase: CanHomFrom<I::Type>
+{
+    assert!(delta as i128 * 30 <= i64::MAX as i128);
+    assert!(delta as i128 * 30 >= i64::MIN as i128);
+    assert!(ZZ.is_pos(&n));
+    let Z30 = zn_64::Zn::new(30);
+    let mut n_mod_30 = Z30.coerce(&ZZ, ZZ.clone_el(&n));
+    let mut diff_to_n = 0;
+    let Zi64_to_Z30 = Z30.can_hom::<StaticRing<i64>>(&StaticRing::<i64>::RING).unwrap();
+    let Zi64_to_ZZ = ZZ.can_hom(&StaticRing::<i64>::RING).unwrap();
+    debug_assert!(ZZ.is_one(&signed_gcd(ZZ.clone_el(&n), Zi64_to_ZZ.map(delta), &ZZ)));
+    let Z30_delta = Zi64_to_Z30.map(delta);
+
+    // we continue the main loop until we reach `n <= 5`; at this point, the main loop is not correct
+    // anymore, since being in `Z/30Z \ Z/30Z*` does not imply not being a prime anymore
+    let mut remaining_steps = if ZZ.is_leq(&n, &ZZ.int_hom().map(5)) {
+        0
+    } else if delta < 0 {
+        let max_steps = ZZ.ceil_div(ZZ.sub_ref(&n, &Zi64_to_ZZ.map(5)), &Zi64_to_ZZ.map(-delta));
+        if ZZ.is_lt(&max_steps, &Zi64_to_ZZ.map(i64::MAX)) {
+            int_cast(max_steps, StaticRing::<i64>::RING, &ZZ)
+        } else {
+            i64::MAX
+        }
+    } else {
+        i64::MAX
+    };
+
+    while remaining_steps != 0 {
+        while !SMALL_IS_COPRIME_TABLE[Z30.smallest_positive_lift(n_mod_30) as usize] && remaining_steps != 0 {
+            diff_to_n += delta;
+            Z30.add_assign(&mut n_mod_30, Z30_delta);
+            remaining_steps -= 1;
+        }
+        ZZ.add_assign(&mut n, Zi64_to_ZZ.map(diff_to_n));
+        if remaining_steps == 0 {
+            break;
+        }
+        if is_prime(&ZZ, &n, DEFAULT_PROBABILISTIC_REPETITIONS) {
+            return Some(n);
+        } else {
+            diff_to_n = delta;
+            Z30.add_assign(&mut n_mod_30, Z30_delta);
+            remaining_steps -= 1;
+        }
+    }
+    let mut n = int_cast(n, StaticRing::<i64>::RING, &ZZ);
+    assert!(n <= 5);
+    while n > 0 {
+        if is_prime(&StaticRing::<i64>::RING, &n, DEFAULT_PROBABILISTIC_REPETITIONS) {
+            return Some(Zi64_to_ZZ.map(n));
+        }
+        n += delta;
+    }
+    return None;
+}
+
 ///
 /// Returns the largest prime smaller than the given integer.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn prev_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>) -> Option<El<I>>
+pub fn prev_prime<I: IntegerRingStore>(ZZ: I, n: El<I>) -> Option<El<I>>
     where I::Type: IntegerRing,
         zn_64::ZnBase: CanHomFrom<I::Type>
 {
     assert!(ZZ.is_pos(&n));
-    ZZ.sub_assign(&mut n, ZZ.one());
-    const SMALL_IS_COPRIME_TABLE: [bool; 30] = [
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        true,
-        false,
-        true,
-        false,
-        false,
-        false,
-        true,
-        false,
-        true,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true
-    ];
-    let Z30 = zn_64::Zn::new(30);
-    let mut n_mod_30 = Z30.coerce(&ZZ, ZZ.clone_el(&n));
-    let mut diff_to_n = 0;
-    let ZZ_30 = ZZ.int_hom().map(30);
-    while ZZ.is_geq(&n, &ZZ_30) {
-        while !SMALL_IS_COPRIME_TABLE[Z30.smallest_positive_lift(n_mod_30) as usize] {
-            Z30.sub_assign(&mut n_mod_30, Z30.one());
-            diff_to_n += 1;
-        }
-        ZZ.sub_assign(&mut n, ZZ.int_hom().map(diff_to_n));
-        if is_prime(&ZZ, &n, 10) {
-            return Some(n);
-        } else {
-            diff_to_n = 1;
-            Z30.sub_assign(&mut n_mod_30, Z30.one());
-        }
+    if ZZ.is_one(&n) {
+        return None;
     }
-    const TABLE: [Option<i32>; 30] = [
-        None,
-        None,
-        Some(2),
-        Some(3),
-        Some(3),
-        Some(5),
-        Some(5),
-        Some(7),
-        Some(7),
-        Some(7),
-        Some(7),
-        Some(11),
-        Some(11),
-        Some(13),
-        Some(13),
-        Some(13),
-        Some(13),
-        Some(17),
-        Some(17),
-        Some(19),
-        Some(19),
-        Some(19),
-        Some(19),
-        Some(23),
-        Some(23),
-        Some(23),
-        Some(23),
-        Some(23),
-        Some(23),
-        Some(29),
-    ];
-    return TABLE[Z30.smallest_positive_lift(n_mod_30) as usize].map(|n| ZZ.int_hom().map(n));
+    let n_minus_one = ZZ.sub(n, ZZ.one());
+    search_prime(ZZ, n_minus_one, -1)
+}
+
+///
+/// Returns the smallest prime larger than the given integer.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn next_prime<I: IntegerRingStore>(ZZ: I, n: El<I>) -> Option<El<I>>
+    where I::Type: IntegerRing,
+        zn_64::ZnBase: CanHomFrom<I::Type>
+{
+    assert!(ZZ.is_pos(&n));
+    let n_plus_one = ZZ.add(n, ZZ.one());
+    search_prime(ZZ, n_plus_one, 1)
 }
 
 ///
@@ -237,11 +267,39 @@ fn test_prev_prime() {
     assert_eq!(None, prev_prime(StaticRing::<i64>::RING, 2));
     assert_eq!(None, prev_prime(StaticRing::<i64>::RING, 1));
 
-    let mut last_prime = 29;
-    for i in 30..1000 {
+    let mut last_prime = 11;
+    for i in 12..1000 {
         assert_eq!(Some(last_prime), prev_prime(StaticRing::<i64>::RING, i));
-        if is_prime(StaticRing::<i64>::RING, &i, 10) {
+        if is_prime(StaticRing::<i64>::RING, &i, DEFAULT_PROBABILISTIC_REPETITIONS) {
             last_prime = i;
         }
     }
+}
+
+#[test]
+fn test_next_prime() {
+    let mut last_prime = 1009;
+    for i in (2..1000).rev() {
+        println!("{}", i);
+        assert_eq!(Some(last_prime), next_prime(StaticRing::<i64>::RING, i));
+        if is_prime(StaticRing::<i64>::RING, &i, DEFAULT_PROBABILISTIC_REPETITIONS) {
+            last_prime = i;
+        }
+    }
+    assert_eq!(Some(2), next_prime(StaticRing::<i64>::RING, 1));
+}
+
+#[test]
+fn test_search_prime() {
+    assert_eq!(None, search_prime(StaticRing::<i64>::RING, 1, -2));
+    for (p, n) in [(3, 3), (5, 5), (7, 7), (7, 9), (11, 11)] {
+        assert_eq!(Some(p), search_prime(StaticRing::<i64>::RING, n, -2));
+    }
+
+    assert_eq!(None, search_prime(StaticRing::<i64>::RING, 1, -3));
+    assert_eq!(None, search_prime(StaticRing::<i64>::RING, 4, -3));
+    for (p, n) in [(2, 2), (5, 5), (7, 7), (5, 8), (7, 10), (11, 11), (13, 13), (11, 14), (13, 16), (17, 17)] {
+        assert_eq!(Some(p), search_prime(StaticRing::<i64>::RING, n, -3));
+    }
+    assert_eq!(Some(359), search_prime(StaticRing::<i64>::RING, 380, -3));
 }

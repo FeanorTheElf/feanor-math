@@ -5,6 +5,7 @@ use crate::algorithms;
 use crate::rings::finite::FiniteRing;
 use crate::rings::finite::FiniteRingStore;
 use crate::wrapper::RingElementWrapper;
+use crate::DEFAULT_PROBABILISTIC_REPETITIONS;
 
 use std::hash::Hash;
 use std::collections::HashMap;
@@ -50,7 +51,7 @@ fn power_p_discrete_log<T, F>(value: T, p_e_base: &T, p: i64, e: usize, op: F, i
     where F: Fn(T, T) -> T, T: Clone + Hash + Eq + std::fmt::Debug
 {
     assert!(e > 0);
-    assert!(algorithms::miller_rabin::is_prime(ZZ, &p, 8));
+    assert!(algorithms::miller_rabin::is_prime(ZZ, &p, DEFAULT_PROBABILISTIC_REPETITIONS));
 
     let pow = |x: &T, e: i64| {
         debug_assert!(e >= 0);

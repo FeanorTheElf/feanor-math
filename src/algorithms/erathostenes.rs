@@ -32,6 +32,8 @@ pub fn enumerate_primes<I>(ZZ: I, B: &El<I>) -> Vec<El<I>>
 
 #[cfg(test)]
 use crate::algorithms;
+#[cfg(test)]
+use crate::DEFAULT_PROBABILISTIC_REPETITIONS;
 
 #[test]
 fn test_enumerate_primes() {
@@ -44,6 +46,6 @@ fn test_enumerate_primes() {
 #[test]
 fn test_enumerate_primes_large() {
     for p in enumerate_primes(&StaticRing::<i64>::RING, &100000) {
-        assert!(algorithms::miller_rabin::is_prime(&StaticRing::<i64>::RING, &p, 10));
+        assert!(algorithms::miller_rabin::is_prime(&StaticRing::<i64>::RING, &p, DEFAULT_PROBABILISTIC_REPETITIONS));
     }
 }

@@ -12,6 +12,7 @@ use crate::rings::zn::choose_zn_impl;
 use crate::rings::zn::ZnOperation;
 use crate::rings::zn::ZnRing;
 use crate::rings::zn::ZnRingStore;
+use crate::DEFAULT_PROBABILISTIC_REPETITIONS;
 
 struct ECFactorInt<I>
     where I: IntegerRingStore,
@@ -38,11 +39,11 @@ pub fn is_prime_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
     where I: IntegerRingStore + Copy,
         I::Type: IntegerRing
 {
-    if algorithms::miller_rabin::is_prime(ZZ, n, 10) {
+    if algorithms::miller_rabin::is_prime(ZZ, n, DEFAULT_PROBABILISTIC_REPETITIONS) {
         return Some((ZZ.clone_el(n), 1));
     }
     let (p, e) = is_power(ZZ, n)?;
-    if algorithms::miller_rabin::is_prime(ZZ, &p, 10) {
+    if algorithms::miller_rabin::is_prime(ZZ, &p, DEFAULT_PROBABILISTIC_REPETITIONS) {
         return Some((p, e));
     } else {
         return None;
@@ -85,7 +86,7 @@ pub fn factor<I>(ZZ: I, mut n: El<I>) -> Vec<(El<I>, usize)>
     // check if we are done
     if ZZ.is_one(&n) {
         return result;
-    } else if algorithms::miller_rabin::is_prime(ZZ, &n, 8) {
+    } else if algorithms::miller_rabin::is_prime(ZZ, &n, DEFAULT_PROBABILISTIC_REPETITIONS) {
         result.push((n, 1));
         return result;
     }
@@ -106,7 +107,7 @@ pub fn factor<I>(ZZ: I, mut n: El<I>) -> Vec<(El<I>, usize)>
     // check again if we are done
     if ZZ.is_one(&n) {
         return result;
-    } else if algorithms::miller_rabin::is_prime(ZZ, &n, 8) {
+    } else if algorithms::miller_rabin::is_prime(ZZ, &n, DEFAULT_PROBABILISTIC_REPETITIONS) {
         result.push((n, 1));
         return result;
     }

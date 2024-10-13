@@ -192,6 +192,62 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing {
     }
 
     ///
+    /// Computes the division `lhs / rhs`, rounding towards `+ infinity`.
+    /// 
+    /// In particular, if `rhs` is positive, this gives the smallest
+    /// integer `quo` such that `quo * rhs >= lhs`. On the other hand, if
+    /// `rhs` is negative, this computes the largest integer `quo` such that
+    /// `quo * rhs <= lhs`.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::integer::*;
+    /// # use feanor_math::ring::*;
+    /// assert_eq!(3, StaticRing::<i32>::RING.ceil_div(7, &3));
+    /// assert_eq!(-2, StaticRing::<i32>::RING.ceil_div(-7, &3));
+    /// assert_eq!(-2, StaticRing::<i32>::RING.ceil_div(7, &-3));
+    /// assert_eq!(3, StaticRing::<i32>::RING.ceil_div(-7, &-3));
+    /// ```
+    /// 
+    fn ceil_div(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
+        assert!(!self.is_zero(rhs));
+        if self.is_zero(&lhs) {
+            return self.zero();
+        }
+        let one = self.one();
+        return match (self.is_pos(&lhs), self.is_pos(rhs)) {
+            (true, true) => self.add(self.euclidean_div(self.sub_ref_snd(lhs, &one), rhs), one),
+            (false, true) => self.euclidean_div(lhs, rhs),
+            (true, false) => self.euclidean_div(lhs, rhs),
+            (false, false) => self.add(self.euclidean_div(self.add_ref_snd(lhs, &one), rhs), one)
+        };
+    }
+
+    ///
+    /// Computes the division `lhs / rhs`, rounding towards `- infinity`.
+    /// 
+    /// In particular, if `rhs` is positive, this gives the largest
+    /// integer `quo` such that `quo * rhs <= lhs`. On the other hand, if
+    /// `rhs` is negative, this computes the smallest integer `quo` such that
+    /// `quo * rhs >= lhs`.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::integer::*;
+    /// # use feanor_math::ring::*;
+    /// assert_eq!(2, StaticRing::<i32>::RING.floor_div(7, &3));
+    /// assert_eq!(-3, StaticRing::<i32>::RING.floor_div(-7, &3));
+    /// assert_eq!(-3, StaticRing::<i32>::RING.floor_div(7, &-3));
+    /// assert_eq!(2, StaticRing::<i32>::RING.floor_div(-7, &-3));
+    /// ```
+    /// 
+    fn floor_div(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
+        self.negate(self.ceil_div(self.negate(lhs), rhs))
+    }
+
+    ///
     /// Returns the value `2^power` in this integer ring.
     /// 
     fn power_of_two(&self, power: usize) -> Self::Element {
@@ -368,6 +424,8 @@ pub trait IntegerRingStore: RingStore
     delegate!{ IntegerRing, fn mul_pow_2(&self, value: &mut El<Self>, power: usize) -> () }
     delegate!{ IntegerRing, fn power_of_two(&self, power: usize) -> El<Self> }
     delegate!{ IntegerRing, fn rounded_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ IntegerRing, fn floor_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ IntegerRing, fn ceil_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
 
     fn get_uniformly_random<G: FnMut() -> u64>(&self, bound_exclusive: &El<Self>, mut rng: G) -> El<Self> {
         assert!(self.is_gt(bound_exclusive, &self.zero()));
@@ -547,4 +605,21 @@ fn test_binomial() {
 
     // a naive computation would overflow
     assert_eq!(145422675, binomial(30, &14, ZZ));
+}
+
+#[test]
+fn test_ceil_floor_div() {
+    let ZZ = StaticRing::<i32>::RING;
+    for rhs in [-10, -3, -2, -1, 1, 2, 3, 10] {
+        for lhs in [-10, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 10] {
+            println!("{}, {}", lhs, rhs);
+            let result = ZZ.ceil_div(lhs, &rhs);
+            assert_eq!(i32::div_ceil(lhs, rhs), result);
+            assert_eq!((lhs as f64 / rhs as f64).ceil() as i32, result);
+
+            let result = ZZ.floor_div(lhs, &rhs);
+            assert_eq!(i32::div_floor(lhs, rhs), result);
+            assert_eq!((lhs as f64 / rhs as f64).floor() as i32, result);
+        }
+    }
 }

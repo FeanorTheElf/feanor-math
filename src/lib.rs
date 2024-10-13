@@ -14,6 +14,7 @@
 #![feature(never_type)]
 #![feature(array_chunks)]
 #![feature(doc_cfg)]
+#![feature(int_roundings)]
 
 #![doc = include_str!("../Readme.md")]
 
@@ -26,6 +27,7 @@ extern crate rayon;
 extern crate ndarray;
 
 const MAX_PROBABILISTIC_REPETITIONS: usize = 30;
+const DEFAULT_PROBABILISTIC_REPETITIONS: usize = 30;
 
 #[cfg(test)]
 const RANDOM_TEST_INSTANCE_COUNT: usize = 20;
