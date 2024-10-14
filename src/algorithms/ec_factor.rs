@@ -159,7 +159,8 @@ fn is_on_curve<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> bool
 ///
 /// Optimizes the parameters to find a factor of size roughly size; size should be at most sqrt(N)
 /// 
-fn lenstra_ec_factor_base<R>(Zn: R, log2_size: usize, rng: &mut oorandom::Rand64) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
+#[stability::unstable(feature = "enable")]
+pub fn lenstra_ec_factor_base<R>(Zn: R, log2_size: usize, rng: &mut oorandom::Rand64) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
     where R: ZnRingStore + DivisibilityRingStore + Copy,
         R::Type: ZnRing + DivisibilityRing
 {
