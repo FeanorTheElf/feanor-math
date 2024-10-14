@@ -160,9 +160,10 @@ fn is_on_curve<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> bool
 /// Optimizes the parameters to find a factor of size roughly size; size should be at most sqrt(N)
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn lenstra_ec_factor_base<R>(Zn: R, log2_size: usize, rng: &mut oorandom::Rand64) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
+pub fn lenstra_ec_factor_base<R, F>(Zn: R, log2_size: usize, rng: F) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
     where R: ZnRingStore + DivisibilityRingStore + Copy,
-        R::Type: ZnRing + DivisibilityRing
+        R::Type: ZnRing + DivisibilityRing,
+        F: FnMut() -> u64
 {
     let ZZ = BigIntRing::RING;
     assert!(ZZ.is_leq(&ZZ.power_of_two(log2_size * 2), &Zn.size(&ZZ).unwrap()));
@@ -178,7 +179,7 @@ pub fn lenstra_ec_factor_base<R>(Zn: R, log2_size: usize, rng: &mut oorandom::Ra
 
     // after this many random curves, we expect to have found a factor with high probability, unless there is no factor of size about `log2_size`
     for _ in 0..(1i128 << (log2_B as u64)) {
-        let (x, y) = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()));
+        let (x, y) = (Zn.random_element(|| rng()), Zn.random_element(|| rng()));
         let (x_sqr, y_sqr) = (square(&Zn, &x), square(&Zn, &y));
         if let Some(d) = Zn.checked_div(&Zn.sub(Zn.add_ref(&x_sqr, &y_sqr), Zn.one()), &Zn.mul(x_sqr, y_sqr)) {
             let P = (x, y, Zn.one());
