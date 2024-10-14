@@ -11,6 +11,9 @@ use crate::rings::zn::ZnRingStore;
 use crate::rings::zn::zn_big;
 use crate::algorithms::eea::signed_gcd;
 use crate::algorithms::sqr_mul;
+use crate::MAX_PROBABILISTIC_REPETITIONS;
+use std::sync::Mutex;
+use super::int_factor::is_prime_power;
 
 type Point<R> = (El<R>, El<R>, El<R>);
 
@@ -156,11 +159,12 @@ fn is_on_curve<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> bool
     )
 }
 
+static POW_COST_CONSTANT: Mutex<f64> = Mutex::new(0.001);
+
 ///
 /// Optimizes the parameters to find a factor of size roughly size; size should be at most sqrt(N)
 /// 
-#[stability::unstable(feature = "enable")]
-pub fn lenstra_ec_factor_base<R, F>(Zn: R, log2_size: usize, mut rng: F) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
+fn lenstra_ec_factor_base<R, F>(Zn: R, log2_size: usize, mut rng: F) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
     where R: ZnRingStore + DivisibilityRingStore + Copy,
         R::Type: ZnRing + DivisibilityRing,
         F: FnMut() -> u64
@@ -168,7 +172,17 @@ pub fn lenstra_ec_factor_base<R, F>(Zn: R, log2_size: usize, mut rng: F) -> Opti
     let ZZ = BigIntRing::RING;
     assert!(ZZ.is_leq(&ZZ.power_of_two(log2_size * 2), &Zn.size(&ZZ).unwrap()));
     let log2_N = ZZ.abs_log2_ceil(&Zn.size(&ZZ).unwrap()).unwrap();
-    let log2_B = (log2_size as f64 * 2f64.ln() * (log2_N as f64 * 2f64.ln()).ln()).sqrt() / 2f64.ln();
+    // Let `p` be a factor of `n` of size roughly `2^log2_size`; Then for a random elliptic curve `E`,
+    // the subgroup `#E(Fp)` is of size roughly `2^log2_size` as well. Assuming that `#E(Fp)` is uniformly
+    // random among integers of size roughly `2^log2_size`, the probability of it being `B`-smooth is
+    // approximately `exp(-log2_size/log(B)(log2_size - log(B)))`.
+    // The cost of an attempt is about `exp(c) B^2` for a constant `c`; optimizing this leads very roughly to
+    // `log(B) = sqrt(2log(p)loglog(p)) / 2 - c`
+    let pow_cost_constant = *POW_COST_CONSTANT.lock().unwrap();
+    let log2_B = f64::max(
+        (log2_size as f64 * 2f64.ln() * (log2_N as f64 * 2f64.ln()).ln()).sqrt() / 2f64.ln() - pow_cost_constant,
+        1.1
+    );
     assert!(log2_B <= i128::MAX as f64);
 
     let primes = algorithms::erathostenes::enumerate_primes(&StaticRing::<i128>::RING, &(1i128 << (log2_B as u64)));
@@ -194,12 +208,42 @@ pub fn lenstra_ec_factor_base<R, F>(Zn: R, log2_size: usize, mut rng: F) -> Opti
     return None;
 }
 
+///
+/// Given `Z/nZ`, tries to find a factor of `n` of size at most `2^min_factor_bound_log2`.
+/// If such a factor exists, the function is likely to successfully find it.
+/// Otherwise, it is likely to return `None`.
+/// 
+/// Note that the returned value can be any nontrivial factor of `n`, and does not have to
+/// be bounded by `2^min_factor_bound_log2`. The function is more likely to find small factors,
+/// but can, in rare cases, find other factors as well.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn lenstra_ec_factor_small<R>(Zn: R, min_factor_bound_log2: usize) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
+    where R: ZnRingStore + DivisibilityRingStore,
+        R::Type: ZnRing + DivisibilityRing
+{
+    assert!(algorithms::miller_rabin::is_prime_base(&Zn, 10) == false);
+    assert!(is_prime_power(Zn.integer_ring(), Zn.modulus()).is_none());
+    let mut rng = oorandom::Rand64::new(Zn.integer_ring().default_hash(Zn.modulus()) as u128);
+
+    for log2_size in (16..min_factor_bound_log2).step_by(8) {
+        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_size, || rng.rand_u64()) {
+            return Some(factor);
+        }
+    }
+    if let Some(factor) = lenstra_ec_factor_base(&Zn, min_factor_bound_log2, || rng.rand_u64()) {
+        return Some(factor);
+    }
+    return None
+}
+
 #[stability::unstable(feature = "enable")]
 pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::IntegerRing>
     where R: ZnRingStore + DivisibilityRingStore,
         R::Type: ZnRing + DivisibilityRing
 {
     assert!(algorithms::miller_rabin::is_prime_base(&Zn, 10) == false);
+    assert!(is_prime_power(Zn.integer_ring(), Zn.modulus()).is_none());
     let ZZ = BigIntRing::RING;
     let log2_N = ZZ.abs_log2_floor(&Zn.size(&ZZ).unwrap()).unwrap();
     let mut rng = oorandom::Rand64::new(Zn.integer_ring().default_hash(Zn.modulus()) as u128);
@@ -221,11 +265,13 @@ pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::IntegerRing>
 
 #[cfg(test)]
 use crate::rings::zn::zn_64::Zn;
-use crate::MAX_PROBABILISTIC_REPETITIONS;
 #[cfg(test)]
 use std::time::Instant;
 #[cfg(test)]
 use test::Bencher;
+#[cfg(test)]
+use crate::rings::rust_bigint::*;
+
 
 #[test]
 fn test_ec_factor() {
@@ -267,4 +313,70 @@ fn test_ec_factor_large() {
     let end = Instant::now();
     println!("Done in {} ms", (end - begin).as_millis());
     assert!(p == 1152921504606847009 || p == 2305843009213693967);
+}
+
+#[test]
+#[ignore]
+fn test_compute_partial_factorization() {
+    let ZZbig = BigIntRing::RING;
+    let n = int_cast(
+        RustBigintRing::RING.get_ring().parse("5164499756173817179311838344006023748659411585658447025661318713081295244033682389259290706560275662871806343945494986751", 10).unwrap(),
+        ZZbig, 
+        RustBigintRing::RING
+    );
+
+    let Zn = zn_big::Zn::new(ZZbig, ZZbig.clone_el(&n));
+    let begin = Instant::now();
+    let factor = lenstra_ec_factor_small(&Zn, 50).unwrap();
+    let end = Instant::now();
+    println!("Done in {} ms", (end - begin).as_millis());
+    ZZbig.println(&factor);
+    assert!(!ZZbig.is_one(&factor));
+    assert!(!ZZbig.eq_el(&factor, &n));
+    assert!(ZZbig.checked_div(&n, &factor).is_some());
+}
+
+#[test]
+#[ignore]
+fn compute_pow_cost_constant() {
+
+    let ZZbig = BigIntRing::RING;
+    let numbers = [
+        "1361129471486705654538186634514608948031",
+        "2417851639291930512195989",
+        "38685626287342718438869859",
+        "3173430276552448135921987",
+        "2077841252587301024826991"
+    ].into_iter()
+        .map(|n| int_cast(RustBigintRing::RING.get_ring().parse(n, 10).unwrap(), ZZbig, RustBigintRing::RING))
+        .collect::<Vec<_>>();
+
+    let measure_time = |constant: f64| {
+        let mut total_time = 0;
+        for delta in -2..=2 {
+            for n in &numbers {
+                *POW_COST_CONSTANT.lock().unwrap() = constant + delta as f64 * 0.001;
+                let Zn = zn_big::Zn::new(ZZbig, ZZbig.clone_el(&n));
+                let start = Instant::now();
+                let factor = lenstra_ec_factor(Zn);
+                std::hint::black_box(factor);
+                let end = Instant::now();
+                total_time += (end - start).as_millis();
+            }
+        }
+        return total_time;
+    };
+
+    let measure_derivate = |x: f64| {
+        let y0 = measure_time(x - 0.01);
+        let y1 = measure_time(x + 0.01);
+        return (y1 - y0) as f64 * 100.;
+    };
+
+    let mut x = 0.1;
+    for _ in 0..20 {
+        let time = measure_time(x);
+        x = x - time as f64 / measure_derivate(x) as f64;
+        println!("{}, {}", x, time);
+    }
 }
