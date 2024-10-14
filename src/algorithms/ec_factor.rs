@@ -160,7 +160,7 @@ fn is_on_curve<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> bool
 /// Optimizes the parameters to find a factor of size roughly size; size should be at most sqrt(N)
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn lenstra_ec_factor_base<R, F>(Zn: R, log2_size: usize, rng: F) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
+pub fn lenstra_ec_factor_base<R, F>(Zn: R, log2_size: usize, mut rng: F) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
     where R: ZnRingStore + DivisibilityRingStore + Copy,
         R::Type: ZnRing + DivisibilityRing,
         F: FnMut() -> u64
@@ -206,13 +206,13 @@ pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::IntegerRing>
 
     // we first try to find smaller factors
     for log2_size in (16..(log2_N / 2)).step_by(8) {
-        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_size, &mut rng) {
+        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_size, || rng.rand_u64()) {
             return factor;
         }
     }
     // this is now the general case
     for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
-        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_N / 2, &mut rng) {
+        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_N / 2, || rng.rand_u64()) {
             return factor;
         }
     }
