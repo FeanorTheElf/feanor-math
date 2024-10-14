@@ -130,10 +130,6 @@ pub mod rings;
 /// 
 pub mod wrapper;
 ///
-/// Contains functions to conditionally enable parallel execution of some algorithms.
-/// 
-pub mod parallel;
-///
 /// Contains the trait [`homomorphism::Homomorphism`], [`homomorphism::CanHomFrom`] and
 /// others that are the foundation of the homomorphism framework, that enables mapping
 /// elements between different rings.

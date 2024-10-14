@@ -124,9 +124,9 @@ let F7 = Zn::new(7).as_field().ok().unwrap();
 let F7XY = MultivariatePolyRingImpl::new(&F7, 2);
 let F7T = DensePolyRing::new(&F7, "T");
 let [f1, f2] = F7XY.with_wrapped_indeterminates(|[X, Y]| [X * X * Y - 1, X * Y - 2]);
-let groebner_basis_degrevlex = buchberger_simple::<_, _, false>(&F7XY, vec![F7XY.clone_el(&f1), F7XY.clone_el(&f2)], DegRevLex);
+let groebner_basis_degrevlex = buchberger_simple(&F7XY, vec![F7XY.clone_el(&f1), F7XY.clone_el(&f2)], DegRevLex);
 assert!(groebner_basis_degrevlex.iter().any(|f| F7XY.monomial_deg(F7XY.LT(f, DegRevLex).unwrap().1) > 0), "system has no solution");
-let mut groebner_basis_lex = buchberger_simple::<_, _, false>(&F7XY, groebner_basis_degrevlex, Lex);
+let mut groebner_basis_lex = buchberger_simple(&F7XY, groebner_basis_degrevlex, Lex);
 
 // sort descending by leading terms, which means we get [f1(X, Y), ..., fr(X, Y), g(Y)]
 // we can now solve by choosing `y` as a root of `g` and `x` as a joint root of `fi(X, y)`

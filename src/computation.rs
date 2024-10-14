@@ -2,12 +2,73 @@ use std::{fmt::Arguments, io::Write};
 
 use crate::unstable_sealed::UnstableSealed;
 
-pub trait ComputationController: Clone + UnstableSealed {
+///
+/// Provides an idiomatic way to convert a `Result<T, !>` into `T`, via
+/// ```
+/// # #![feature(never_type)]
+/// # use feanor_math::computation::*;
+/// fn some_computation() -> Result<&'static str, !> { Ok("this computation does not fail") }
+/// println!("{}", some_computation().unwrap_or_else(no_error));
+/// ```
+/// 
+pub fn no_error<T>(error: !) -> T {
+    error
+}
+
+///
+/// Trait for objects that observe a potentially long-running computation.
+/// 
+/// This is currently unstable-sealed, since I expect significant additional functionality,
+/// potentially including
+///  - Early aborts, timeouts
+///  - Multithreading
+///  - Logging
+///  - ...
+/// 
+/// As a user, this trait should currently be used by passing either [`LogProgress`]
+/// or [`DontObserve`] to algorithms.
+///  
+pub trait ComputationController: Clone + UnstableSealed + Send + Sync {
+
+    type Abort: Send;
+
+    ///
+    /// Called by algorithms in (more or less) regular time intervals, can provide
+    /// e.g. early aborts or tracking progress.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    fn checkpoint(&self, _description: Arguments) -> Result<(), Self::Abort> { 
+        Ok(())
+    }
 
     #[stability::unstable(feature = "enable")]
-    fn log(&self, _args: Arguments) {
-        unimplemented!("this function is not supposed to have a default impl; unfortunately, we can only apply #[unstable] to functions with default impl")
+    fn log(&self, _description: Arguments) {}
+
+    ///
+    /// Inspired by Rayon, and behaves the same.
+    /// Concretely, this function runs both closures, possibly in parallel, and
+    /// returns their results.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    fn join<A, B, RA, RB>(&self, oper_a: A, oper_b: B) -> (RA, RB)
+        where
+            A: FnOnce() -> RA + Send,
+            B: FnOnce() -> RB + Send,
+            RA: Send,
+            RB: Send
+    {
+        (oper_a(), oper_b())
     }
+}
+
+#[macro_export]
+macro_rules! checkpoint {
+    ($controller:expr) => {
+        ($controller).checkpoint(std::format_args!(""))?
+    };
+    ($controller:expr, $($args:tt)*) => {
+        ($controller).checkpoint(std::format_args!($($args)*))?
+    };
 }
 
 #[macro_export]
@@ -30,13 +91,18 @@ impl UnstableSealed for LogProgress {}
 
 impl ComputationController for LogProgress {
 
-    fn log(&self, args: Arguments) {
-        print!("{}", args);
+    type Abort = !;
+
+    fn log(&self, description: Arguments) {
+        print!("{}", description);
         std::io::stdout().flush().unwrap();
     }
-}
 
-pub struct NoOpWrite;
+    fn checkpoint(&self, description: Arguments) -> Result<(), Self::Abort> {
+        self.log(description);
+        Ok(())
+    }
+}
 
 #[derive(Clone)]
 pub struct DontObserve;
@@ -45,5 +111,5 @@ impl UnstableSealed for DontObserve {}
 
 impl ComputationController for DontObserve {
 
-    fn log(&self, _args: Arguments) {}
+    type Abort = !;
 }

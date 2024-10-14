@@ -19,7 +19,7 @@ use crate::serialization::SerializableElementRing;
 ///
 /// Trait for `i8` to `i128`.
 /// 
-pub trait PrimitiveInt: Serialize + DeserializeOwned + AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Shr<usize, Output = Self> + Eq + Into<Self::Larger> + TryFrom<Self::Larger> + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy + Div<Self, Output = Self> + Rem<Self, Output = Self> + Display {
+pub trait PrimitiveInt: Send + Sync + Serialize + DeserializeOwned + AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Shr<usize, Output = Self> + Eq + Into<Self::Larger> + TryFrom<Self::Larger> + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy + Div<Self, Output = Self> + Rem<Self, Output = Self> + Display {
 
     type Larger: PrimitiveInt;
 
