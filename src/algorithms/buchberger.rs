@@ -1,3 +1,4 @@
+use crate::computation::*;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::homomorphism::Homomorphism;
 use crate::local::{PrincipalLocalRing, PrincipalLocalRingStore};
@@ -7,7 +8,6 @@ use crate::rings::multivariate::*;
 
 use std::cmp::min;
 use std::fmt::Debug;
-use std::io::Write;
 
 const EXTENSIVE_LOG: bool = false;
 
@@ -203,13 +203,14 @@ pub fn default_sort_fn<P, O>(ring: P, order: O) -> impl FnMut(&mut [SPoly], &[El
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn buchberger<P, O, const LOG: bool, SortFn, AbortFn>(ring: P, input_basis: Vec<El<P>>, order: O, mut sort_spolys: SortFn, mut abort_early_if: AbortFn) -> Vec<El<P>>
+pub fn buchberger<P, O, Controller, SortFn, AbortFn>(ring: P, input_basis: Vec<El<P>>, order: O, mut sort_spolys: SortFn, mut abort_early_if: AbortFn, controller: Controller) -> Vec<El<P>>
     where P: RingStore + Copy,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: Sync,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalLocalRing,
         O: MonomialOrder + Copy,
         PolyCoeff<P>: Send + Sync,
+        Controller: ComputationController,
         SortFn: FnMut(&mut [SPoly], &[El<P>]),
         AbortFn: FnMut(&[(El<P>, Vec<(PolyMonomial<P>, El<P>)>)]) -> bool
 {
@@ -262,9 +263,8 @@ pub fn buchberger<P, O, const LOG: bool, SortFn, AbortFn>(ring: P, input_basis: 
                 if EXTENSIVE_LOG {
                     println!("F({}) = ", basis.len());
                     ring.println(&f);
-                } else if LOG {
-                    print!("s");
-                    std::io::stdout().flush().unwrap();
+                } else {
+                    log_progress!(controller, "s");
                 }
 
                 new_polys.push(ring.clone_el(&f));
@@ -273,9 +273,8 @@ pub fn buchberger<P, O, const LOG: bool, SortFn, AbortFn>(ring: P, input_basis: 
             } else {
                 if EXTENSIVE_LOG {
                     println!("reduced to zero");
-                } else if LOG {
-                    print!("-");
-                    std::io::stdout().flush().unwrap();
+                } else {
+                    log_progress!(controller, "-");
                 }
             }
         }
@@ -285,36 +284,32 @@ pub fn buchberger<P, O, const LOG: bool, SortFn, AbortFn>(ring: P, input_basis: 
             if changed {
                 if EXTENSIVE_LOG {
                     println!("restart");
-                } else if LOG {
-                    print!("!");
-                    std::io::stdout().flush().unwrap();
+                } else {
+                    log_progress!(controller, "!");
                 }
                 // this seems necessary, as the invariants for `reducers` don't imply that it already is a GB;
                 // more concretely, reducers contains polys of basis that are reduced with eath other, but the
                 // S-polys between two of them might not have been considered
-                return buchberger::<P, O, LOG, _, _>(ring, reducers.into_iter().map(|(f, _)| f).collect(), order, sort_spolys, abort_early_if);
+                return buchberger::<P, O, _, _, _>(ring, reducers.into_iter().map(|(f, _)| f).collect(), order, sort_spolys, abort_early_if, controller);
             } else {
                 return reducers.into_iter().map(|(f, _)| f).collect();
             }
         } else if new_polys.len() == 0 {
             current_deg = ring.monomial_deg(&open.last().unwrap().lcm_term(ring, &basis, order.clone()).1);
-            if !EXTENSIVE_LOG && LOG {
-                print!("{{{}}}", current_deg);
-                std::io::stdout().flush().unwrap();
+            if !EXTENSIVE_LOG {
+                log_progress!(controller, "{{{}}}", current_deg);
             }
         } else {
             changed = true;
             current_deg = 0;
             update_basis(ring, &mut new_polys, &mut basis, &mut open, order.clone(), nilpotent_power, &mut filtered_spolys, &mut sort_spolys);
-            if !EXTENSIVE_LOG && LOG {
-                print!("b({})S({})f({})", basis.len(), open.len(), filtered_spolys);
-                std::io::stdout().flush().unwrap();
+            if !EXTENSIVE_LOG {
+                log_progress!(controller, "b({})S({})f({})", basis.len(), open.len(), filtered_spolys);
             }
             reducers = reduce(ring, reducers, order);
             sort_reducers(&mut reducers);
-            if !EXTENSIVE_LOG && LOG {
-                print!("r({})", reducers.len());
-                std::io::stdout().flush().unwrap();
+            if !EXTENSIVE_LOG {
+                log_progress!(controller, "r({})", reducers.len());
             }
             if abort_early_if(&reducers) {
                 return reducers.into_iter().map(|(f, _)| f).collect();
@@ -325,11 +320,10 @@ pub fn buchberger<P, O, const LOG: bool, SortFn, AbortFn>(ring: P, input_basis: 
         if open.len() + filtered_spolys > reducers.len() * reducers.len() / 2 + reducers.len() * nilpotent_power.unwrap_or(0) + 1 {
             if EXTENSIVE_LOG {
                 println!("restart");
-            } else if LOG {
-                print!("!");
-                std::io::stdout().flush().unwrap();
+            } else {
+                log_progress!(controller, "!");
             }
-            return buchberger::<P, O, LOG, _, _>(ring, reducers.into_iter().map(|(f, _)| f).collect(), order, sort_spolys, abort_early_if);
+            return buchberger::<P, O, _, _, _>(ring, reducers.into_iter().map(|(f, _)| f).collect(), order, sort_spolys, abort_early_if, controller);
         }
     }
 }
@@ -439,7 +433,7 @@ pub fn multivariate_division<'a, P, O, I>(ring: P, mut f: El<P>, reducers: I, or
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn buchberger_simple<P, O, const LOG: bool>(ring: P, input_basis: Vec<El<P>>, order: O) -> Vec<El<P>>
+pub fn buchberger_simple<P, O>(ring: P, input_basis: Vec<El<P>>, order: O) -> Vec<El<P>>
     where P: RingStore + Copy,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: Sync,
@@ -447,7 +441,7 @@ pub fn buchberger_simple<P, O, const LOG: bool>(ring: P, input_basis: Vec<El<P>>
         O: MonomialOrder + Copy,
         PolyCoeff<P>: Send + Sync
 {
-    buchberger::<_, _, LOG, _, _>(ring, input_basis, order, default_sort_fn(ring, order), |_| false)
+    buchberger::<_, _, _, _, _>(ring, input_basis, order, default_sort_fn(ring, order), |_| false, DontObserve)
 }
 
 
@@ -479,7 +473,7 @@ fn test_buchberger_small() {
         (15, ring.create_monomial([0, 0]))
     ].into_iter());
 
-    let actual = buchberger::<_, _, true, _, _>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
+    let actual = buchberger(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, LogProgress);
 
     let expected = ring.from_terms([
         (16, ring.create_monomial([0, 3])),
@@ -517,7 +511,7 @@ fn test_buchberger_larger() {
         (7, ring.create_monomial([0, 0, 0]))
     ].into_iter());
 
-    let actual = buchberger::<_, _, true, _, _>(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
+    let actual = buchberger(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, LogProgress);
 
     let g1 = ring.from_terms([
         (1, ring.create_monomial([0, 4, 0])),
@@ -561,7 +555,7 @@ fn test_generic_computation() {
     ];
 
     let start = std::time::Instant::now();
-    let gb1 = buchberger::<_, _, true, _, _>(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
+    let gb1 = buchberger(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, LogProgress);
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());
@@ -575,7 +569,7 @@ fn test_gb_local_ring() {
     let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 1);
     
     let f = ring.from_terms([(base.int_hom().map(4), ring.create_monomial([1])), (base.one(), ring.create_monomial([0]))].into_iter());
-    let gb = buchberger::<_, _, true, _, _>(&ring, vec![f], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
+    let gb = buchberger(&ring, vec![f], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, LogProgress);
 
     assert_eq!(1, gb.len());
     assert_el_eq!(ring, ring.one(), gb[0]);
@@ -592,7 +586,7 @@ fn test_gb_lex() {
         2 * Y + X.pow_ref(6) + 3 * X.pow_ref(5) + 6 * X.pow_ref(4) + X.pow_ref(3) - 7 * X.pow_ref(2) - 12 * X - 2, 
     ]);
 
-    let mut gb = buchberger_simple::<_, _, true>(&QQYX, vec![f, g], Lex);
+    let mut gb = buchberger_simple(&QQYX, vec![f, g], Lex);
 
     assert_eq!(2, gb.len());
     gb.sort_unstable_by_key(|f| QQYX.appearing_indeterminates(f).len());
@@ -623,7 +617,7 @@ fn test_expensive_gb_1() {
     ]);
 
     let start = std::time::Instant::now();
-    let gb = buchberger::<_, _, true, _, _>(&ring, system.iter().map(|f| ring.clone_el(f)).collect(), DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
+    let gb = buchberger(&ring, system.iter().map(|f| ring.clone_el(f)).collect(), DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, LogProgress);
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());
@@ -652,7 +646,7 @@ fn test_expensive_gb_2() {
     ]);
 
     let start = std::time::Instant::now();
-    let gb = buchberger::<_, _, true, _, _>(&ring, basis, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
+    let gb = buchberger(&ring, basis, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, LogProgress);
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());
@@ -671,7 +665,7 @@ fn test_groebner_cyclic6() {
     });
 
     let start = std::time::Instant::now();
-    let gb = buchberger::<_, _, true, _, _>(&ring, cyclic6, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
+    let gb = buchberger(&ring, cyclic6, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, LogProgress);
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());
@@ -691,7 +685,7 @@ fn test_groebner_cyclic7() {
     ]);
 
     let start = std::time::Instant::now();
-    let gb = buchberger::<_, _, true, _, _>(&ring, cyclic7, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
+    let gb = buchberger(&ring, cyclic7, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, LogProgress);
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());
@@ -711,7 +705,7 @@ fn test_groebner_cyclic8() {
     ]);
 
     let start = std::time::Instant::now();
-    let gb = buchberger::<_, _, true, _, _>(&ring, cyclic7, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
+    let gb = buchberger(&ring, cyclic7, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, LogProgress);
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());

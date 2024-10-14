@@ -177,7 +177,7 @@ fn test_resultant_polynomial() {
     // reverse the order of indeterminates, so that we indeed eliminate `Y`
     let [f, g] = QQYX.with_wrapped_indeterminates(|[Y, X]| [ 1 + X.pow_ref(2) + 2 * Y + (1 + X) * Y.pow_ref(2), 3 + X + (2 + X) * Y + (1 + X + X.pow_ref(2)) * Y.pow_ref(2) ]);
 
-    let gb = buchberger_simple::<_, _, false>(&QQYX, vec![f, g], Lex);
+    let gb = buchberger_simple::<_, _>(&QQYX, vec![f, g], Lex);
     let expected = gb.into_iter().filter(|poly| QQYX.appearing_indeterminates(&poly).len() == 1).collect::<Vec<_>>();
     assert!(expected.len() == 1);
     let expected = QQX.normalize(QQX.from_terms(QQYX.terms(&expected[0]).map(|(c, m)| (c.clone(), QQYX.exponent_at(m, 1)))));

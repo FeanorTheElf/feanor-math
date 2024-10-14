@@ -32,8 +32,24 @@ const DEFAULT_PROBABILISTIC_REPETITIONS: usize = 30;
 #[cfg(test)]
 const RANDOM_TEST_INSTANCE_COUNT: usize = 20;
 
+///
+/// Marks a trait as "sealed" on stable. In other words, using this trait
+/// as supertrait for another trait within `feanor-math` means that implementing
+/// the subtrait for new types is unstable, and only available when `unstable-enable`
+/// is active.
+/// 
+#[stability::unstable(feature = "enable")]
+pub mod unstable_sealed {
+    pub trait UnstableSealed {}
+}
+
 mod unsafe_any;
 
+///
+/// Contains [`computation::ComputationController`] to observe long-running computations.
+/// 
+#[macro_use]
+pub mod computation;
 ///
 /// Contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`].
 /// 
