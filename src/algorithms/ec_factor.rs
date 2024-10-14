@@ -12,7 +12,6 @@ use crate::rings::zn::zn_big;
 use crate::algorithms::eea::signed_gcd;
 use crate::algorithms::sqr_mul;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
-use std::sync::Mutex;
 use super::int_factor::is_prime_power;
 
 type Point<R> = (El<R>, El<R>, El<R>);
@@ -159,30 +158,50 @@ fn is_on_curve<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> bool
     )
 }
 
-static POW_COST_CONSTANT: Mutex<f64> = Mutex::new(0.001);
+const POW_COST_CONSTANT: f64 = 0.1;
 
 ///
-/// Optimizes the parameters to find a factor of size roughly size; size should be at most sqrt(N)
+/// returns `(ln_B, ln_attempts)`
 /// 
-fn lenstra_ec_factor_base<R, F>(Zn: R, log2_size: usize, mut rng: F) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
+fn optimize_parameters(ln_p: f64, ln_n: f64) -> (f64, f64) {
+    let pow_cost_constant = POW_COST_CONSTANT;
+    let ln_cost_per_attempt = |ln_B: f64| ln_B + ln_B.ln() + pow_cost_constant * ln_n.ln();
+    let ln_cost_per_attempt_diff = |ln_B: f64| 1. + 1./ln_B;
+    let ln_attempts = |ln_B: f64| {
+        let u = ln_p / ln_B;
+        u * (1. + 2f64.ln()) * u.ln() - u
+    };
+    let ln_attempts_diff = |ln_B: f64| {
+        let u = ln_p / ln_B;
+        let u_diff = -ln_p / (ln_B * ln_B);
+        u_diff * (1. + 2f64.ln()) * u.ln() + u * (1. + 2f64.ln()) * u_diff/u - u_diff
+    };
+    let f = |ln_B: f64| ln_cost_per_attempt(ln_B) - ln_attempts(ln_B);
+    let f_diff = |ln_B: f64| ln_cost_per_attempt_diff(ln_B) - ln_attempts_diff(ln_B);
+
+    let mut ln_B = (ln_p * ln_p.ln()).sqrt();
+    for _ in 0..10 {
+        ln_B = ln_B - f(ln_B) / f_diff(ln_B);
+    }
+    return (ln_B, ln_attempts(ln_B));
+}
+
+///
+/// Optimizes the parameters to find a factor of size roughly `p`; `p` should be at most sqrt(n)
+/// 
+fn lenstra_ec_factor_base<R, F>(Zn: R, log2_p: usize, mut rng: F) -> Option<(El<<R::Type as ZnRing>::IntegerRing>, f64)>
     where R: ZnRingStore + DivisibilityRingStore + Copy,
         R::Type: ZnRing + DivisibilityRing,
         F: FnMut() -> u64
 {
     let ZZ = BigIntRing::RING;
-    assert!(ZZ.is_leq(&ZZ.power_of_two(log2_size * 2), &Zn.size(&ZZ).unwrap()));
-    let log2_N = ZZ.abs_log2_ceil(&Zn.size(&ZZ).unwrap()).unwrap();
-    // Let `p` be a factor of `n` of size roughly `2^log2_size`; Then for a random elliptic curve `E`,
-    // the subgroup `#E(Fp)` is of size roughly `2^log2_size` as well. Assuming that `#E(Fp)` is uniformly
-    // random among integers of size roughly `2^log2_size`, the probability of it being `B`-smooth is
-    // approximately `exp(-log2_size/log(B)(log2_size - log(B)))`.
-    // The cost of an attempt is about `exp(c) B^2` for a constant `c`; optimizing this leads very roughly to
-    // `log(B) = sqrt(2log(p)loglog(p)) / 2 - c`
-    let pow_cost_constant = *POW_COST_CONSTANT.lock().unwrap();
-    let log2_B = f64::max(
-        (log2_size as f64 * 2f64.ln() * (log2_N as f64 * 2f64.ln()).ln()).sqrt() / 2f64.ln() - pow_cost_constant,
-        1.1
-    );
+    assert!(ZZ.is_leq(&ZZ.power_of_two(log2_p * 2), &Zn.size(&ZZ).unwrap()));
+    let log2_n = ZZ.abs_log2_ceil(&Zn.size(&ZZ).unwrap()).unwrap();
+    let ln_p = log2_p as f64 * 2f64.ln();
+    let (ln_B, ln_attempts) = optimize_parameters(ln_p, log2_n as f64 * 2f64.ln());
+    // after this many random curves, we expect to have found a factor with high probability, unless there is no factor of size about `log2_size`
+    let attempts = ln_attempts.exp() as u128;
+    let log2_B = ln_B / 2f64.ln();
     assert!(log2_B <= i128::MAX as f64);
 
     let primes = algorithms::erathostenes::enumerate_primes(&StaticRing::<i128>::RING, &(1i128 << (log2_B as u64)));
@@ -191,8 +210,7 @@ fn lenstra_ec_factor_base<R, F>(Zn: R, log2_size: usize, mut rng: F) -> Option<E
         .collect::<Vec<_>>();
     let power = ZZ.prod(power_factorization.iter().map(|(p, e)| ZZ.pow(ZZ.coerce(&StaticRing::<i128>::RING, *p), *e)));
 
-    // after this many random curves, we expect to have found a factor with high probability, unless there is no factor of size about `log2_size`
-    for _ in 0..(1i128 << (log2_B as u64)) {
+    for i in 0..attempts {
         let (x, y) = (Zn.random_element(|| rng()), Zn.random_element(|| rng()));
         let (x_sqr, y_sqr) = (square(&Zn, &x), square(&Zn, &y));
         if let Some(d) = Zn.checked_div(&Zn.sub(Zn.add_ref(&x_sqr, &y_sqr), Zn.one()), &Zn.mul(x_sqr, y_sqr)) {
@@ -201,7 +219,7 @@ fn lenstra_ec_factor_base<R, F>(Zn: R, log2_size: usize, mut rng: F) -> Option<E
             let result = ec_pow(&P, &d, &power, &Zn);
             let possible_factor = algorithms::eea::gcd(Zn.smallest_positive_lift(result.0), Zn.integer_ring().clone_el(Zn.modulus()), Zn.integer_ring());
             if !Zn.integer_ring().is_unit(&possible_factor) && !Zn.integer_ring().eq_el(&possible_factor, Zn.modulus()) {
-                return Some(possible_factor);
+                return Some((possible_factor, i as f64 / attempts as f64));
             }
         }
     }
@@ -210,15 +228,15 @@ fn lenstra_ec_factor_base<R, F>(Zn: R, log2_size: usize, mut rng: F) -> Option<E
 
 ///
 /// Given `Z/nZ`, tries to find a factor of `n` of size at most `2^min_factor_bound_log2`.
-/// If such a factor exists, the function is likely to successfully find it.
-/// Otherwise, it is likely to return `None`.
+/// If such a factor exists, the function is likely to successfully find it (with probability
+/// `1 - c^repetitions`, for a constant `0 < c < 1`). Otherwise, it is likely to return `None`.
 /// 
 /// Note that the returned value can be any nontrivial factor of `n`, and does not have to
 /// be bounded by `2^min_factor_bound_log2`. The function is more likely to find small factors,
 /// but can, in rare cases, find other factors as well.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn lenstra_ec_factor_small<R>(Zn: R, min_factor_bound_log2: usize) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
+pub fn lenstra_ec_factor_small<R>(Zn: R, min_factor_bound_log2: usize, repetitions: usize) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
     where R: ZnRingStore + DivisibilityRingStore,
         R::Type: ZnRing + DivisibilityRing
 {
@@ -227,12 +245,14 @@ pub fn lenstra_ec_factor_small<R>(Zn: R, min_factor_bound_log2: usize) -> Option
     let mut rng = oorandom::Rand64::new(Zn.integer_ring().default_hash(Zn.modulus()) as u128);
 
     for log2_size in (16..min_factor_bound_log2).step_by(8) {
-        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_size, || rng.rand_u64()) {
+        if let Some((factor, _)) = lenstra_ec_factor_base(&Zn, log2_size, || rng.rand_u64()) {
             return Some(factor);
         }
     }
-    if let Some(factor) = lenstra_ec_factor_base(&Zn, min_factor_bound_log2, || rng.rand_u64()) {
-        return Some(factor);
+    for _ in 0..repetitions {
+        if let Some((factor, _)) = lenstra_ec_factor_base(&Zn, min_factor_bound_log2, || rng.rand_u64()) {
+            return Some(factor);
+        }
     }
     return None
 }
@@ -250,13 +270,13 @@ pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::IntegerRing>
 
     // we first try to find smaller factors
     for log2_size in (16..(log2_N / 2)).step_by(8) {
-        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_size, || rng.rand_u64()) {
+        if let Some((factor, _)) = lenstra_ec_factor_base(&Zn, log2_size, || rng.rand_u64()) {
             return factor;
         }
     }
     // this is now the general case
     for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
-        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_N / 2, || rng.rand_u64()) {
+        if let Some((factor, _)) = lenstra_ec_factor_base(&Zn, log2_N / 2, || rng.rand_u64()) {
             return factor;
         }
     }
@@ -327,56 +347,11 @@ fn test_compute_partial_factorization() {
 
     let Zn = zn_big::Zn::new(ZZbig, ZZbig.clone_el(&n));
     let begin = Instant::now();
-    let factor = lenstra_ec_factor_small(&Zn, 50).unwrap();
+    let factor = lenstra_ec_factor_small(&Zn, 50, 1).unwrap();
     let end = Instant::now();
     println!("Done in {} ms", (end - begin).as_millis());
     ZZbig.println(&factor);
     assert!(!ZZbig.is_one(&factor));
     assert!(!ZZbig.eq_el(&factor, &n));
     assert!(ZZbig.checked_div(&n, &factor).is_some());
-}
-
-#[test]
-#[ignore]
-fn compute_pow_cost_constant() {
-
-    let ZZbig = BigIntRing::RING;
-    let numbers = [
-        "1361129471486705654538186634514608948031",
-        "2417851639291930512195989",
-        "38685626287342718438869859",
-        "3173430276552448135921987",
-        "2077841252587301024826991"
-    ].into_iter()
-        .map(|n| int_cast(RustBigintRing::RING.get_ring().parse(n, 10).unwrap(), ZZbig, RustBigintRing::RING))
-        .collect::<Vec<_>>();
-
-    let measure_time = |constant: f64| {
-        let mut total_time = 0;
-        for delta in -2..=2 {
-            for n in &numbers {
-                *POW_COST_CONSTANT.lock().unwrap() = constant + delta as f64 * 0.001;
-                let Zn = zn_big::Zn::new(ZZbig, ZZbig.clone_el(&n));
-                let start = Instant::now();
-                let factor = lenstra_ec_factor(Zn);
-                std::hint::black_box(factor);
-                let end = Instant::now();
-                total_time += (end - start).as_millis();
-            }
-        }
-        return total_time;
-    };
-
-    let measure_derivate = |x: f64| {
-        let y0 = measure_time(x - 0.01);
-        let y1 = measure_time(x + 0.01);
-        return (y1 - y0) as f64 * 100.;
-    };
-
-    let mut x = 0.1;
-    for _ in 0..20 {
-        let time = measure_time(x);
-        x = x - time as f64 / measure_derivate(x) as f64;
-        println!("{}, {}", x, time);
-    }
 }
