@@ -162,8 +162,8 @@ pub enum EnvBindingStrength {
 ///         write!(out, "{}", **value)
 ///     }
 /// 
-///     fn characteristic<I>(&self, ZZ: I) -> Option<El<I>>
-///         where I: IntegerRingStore + Copy, I::Type: IntegerRing
+///     fn characteristic<I>(&self, ZZ: &I) -> Option<El<I>>
+///         where I: IntegerRingStore, I::Type: IntegerRing
 ///     {
 ///         Some(ZZ.zero())
 ///     }
@@ -449,7 +449,7 @@ pub trait RingBase: PartialEq {
     /// assert_eq!(Some(i16::MAX), zn_64::Zn::new(i16::MAX as u64).characteristic(&ZZ));
     /// ```
     /// 
-    fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing;
 }
 
@@ -766,7 +766,7 @@ pub trait RingStore: Sized {
         println!("{}", self.format(value));
     }
     
-    fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.get_ring().characteristic(ZZ)
@@ -1105,7 +1105,7 @@ fn test_internal_wrappings_dont_matter() {
             Ok(())
         }
 
-        fn characteristic<I: IntegerRingStore>(&self, ZZ: I) -> Option<El<I>>
+        fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
                 where I::Type: IntegerRing
         {
             Some(ZZ.zero())
@@ -1154,7 +1154,7 @@ fn test_internal_wrappings_dont_matter() {
             Ok(())
         }
         
-        fn characteristic<I: IntegerRingStore>(&self, ZZ: I) -> Option<El<I>>
+        fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
                 where I::Type: IntegerRing
         {
             Some(ZZ.zero())

@@ -15,6 +15,7 @@ use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::finite::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::{PolyRing, PolyRingStore};
+use crate::specialization::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::integer::*;
 use crate::divisibility::*;

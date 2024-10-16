@@ -4,7 +4,6 @@ use integer::rational_poly_squarefree_part_local;
 use crate::compute_locally::InterpolationBaseRing;
 use crate::divisibility::*;
 use crate::field::*;
-use crate::rings::finite_field::FiniteFieldSpecializable;
 use crate::rings::zn::*;
 use crate::integer::*;
 use crate::rings::extension::FreeAlgebra;
@@ -15,6 +14,7 @@ use crate::homomorphism::*;
 use crate::pid::*;
 use crate::field::FieldStore;
 use crate::rings::rational::RationalFieldBase;
+use crate::specialization::*;
 
 pub mod finite_field;
 pub mod integer;
@@ -22,7 +22,7 @@ pub mod integer;
 ///
 /// Trait for fields over which we can efficiently compute the square-free part of a polynomial.
 /// 
-pub trait PolySquarefreePartField: Field + FiniteFieldSpecializable {
+pub trait PolySquarefreePartField: Field {
 
     fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
         where P: PolyRingStore,
@@ -31,8 +31,8 @@ pub trait PolySquarefreePartField: Field + FiniteFieldSpecializable {
 }
 
 impl<R> PolySquarefreePartField for R
-    where R: FreeAlgebra + Field + PerfectField + FiniteFieldSpecializable,
-        <R::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing 
+    where R: FreeAlgebra + Field + SpecializeToFiniteField + SpecializeToFiniteRing + PerfectField + SpecializeToFiniteField,
+        <R::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing + SpecializeToFiniteField
 {
     default fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
         where P: PolyRingStore,
@@ -134,7 +134,7 @@ pub fn poly_power_decomposition_global<P>(poly_ring: P, poly: &El<P>) -> Vec<(El
     where P: PolyRingStore + Copy,
         P::Type: PolyRing + PrincipalIdealRing,
         <P::Type as RingExtension>::BaseRing: FieldStore,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FiniteFieldSpecializable
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + SpecializeToFiniteField
 {
     assert!(!poly_ring.is_zero(&poly));
     let squarefree_part = poly_squarefree_part_global(poly_ring, poly);
@@ -189,7 +189,7 @@ pub fn poly_power_decomposition_global<P>(poly_ring: P, poly: &El<P>) -> Vec<(El
 pub fn poly_squarefree_part_global<P>(poly_ring: P, poly: &El<P>) -> El<P>
     where P: PolyRingStore + Copy,
         P::Type: PolyRing + PrincipalIdealRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FiniteFieldSpecializable
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + SpecializeToFiniteField
 {
     assert!(!poly_ring.is_zero(&poly));
     if let Some(result) = poly_squarefree_part_if_finite_field(poly_ring, poly) {

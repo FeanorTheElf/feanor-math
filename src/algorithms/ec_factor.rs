@@ -203,7 +203,7 @@ fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, mut rng: F, co
     let (ln_B, ln_attempts) = optimize_parameters(ln_p, log2_n as f64 * 2f64.ln());
     // after this many random curves, we expect to have found a factor with high probability, unless there is no factor of size about `log2_size`
     let attempts = ln_attempts.exp() as u128;
-    log_progress!(controller, "s({})c({})", log2_p, attempts);
+    log_progress!(controller, "{}", attempts);
 
     let log2_B = ln_B / 2f64.ln();
     assert!(log2_B <= i128::MAX as f64);
@@ -226,7 +226,7 @@ fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, mut rng: F, co
                 return Ok(Some(possible_factor));
             }
         }
-        log_progress!(controller, "-");
+        log_progress!(controller, ".");
         checkpoint!(controller);
     }
     return Ok(None);
@@ -245,8 +245,7 @@ fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, mut rng: F, co
 /// 
 /// If the passed computation controller accepts the log, it will receive the following symbols:
 ///  - `c(m)` means that `m` random curves will be tried using the current parameters
-///  - `s(m)` means that the current parameters are optimized to find a factor having `m` bits
-///  - `-` means an elliptic curve was tried and did not yield a factor of `n`
+///  - `.` means an elliptic curve was tried and did not yield a factor of `n`
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn lenstra_ec_factor_small<R, Controller>(Zn: R, min_factor_bound_log2: usize, repetitions: usize, controller: Controller) -> Result<Option<El<<R::Type as ZnRing>::IntegerRing>>, Controller::Abort>
@@ -271,11 +270,6 @@ pub fn lenstra_ec_factor_small<R, Controller>(Zn: R, min_factor_bound_log2: usiz
     return Ok(None);
 }
 
-///
-/// Finds a factor of the given integer, using Lenstra's Elliptic Curve factorization algorithm.
-/// 
-/// See also [`lenstra_ec_factor_small()`] which explicitly only tries to find small factors.
-/// 
 #[stability::unstable(feature = "enable")]
 pub fn lenstra_ec_factor<R, Controller>(Zn: R, controller: Controller) -> Result<El<<R::Type as ZnRing>::IntegerRing>, Controller::Abort>
     where R: ZnRingStore + DivisibilityRingStore,
@@ -285,18 +279,18 @@ pub fn lenstra_ec_factor<R, Controller>(Zn: R, controller: Controller) -> Result
     assert!(algorithms::miller_rabin::is_prime_base(&Zn, 10) == false);
     assert!(is_prime_power(Zn.integer_ring(), Zn.modulus()).is_none());
     let ZZ = BigIntRing::RING;
-    let log2_n = ZZ.abs_log2_floor(&Zn.size(&ZZ).unwrap()).unwrap();
+    let log2_N = ZZ.abs_log2_floor(&Zn.size(&ZZ).unwrap()).unwrap();
     let mut rng = oorandom::Rand64::new(Zn.integer_ring().default_hash(Zn.modulus()) as u128);
 
     // we first try to find smaller factors
-    for log2_size in (16..(log2_n / 2)).step_by(8) {
+    for log2_size in (16..(log2_N / 2)).step_by(8) {
         if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_size, || rng.rand_u64(), controller.clone())? {
             return Ok(factor);
         }
     }
     // this is now the general case
     for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
-        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_n / 2, || rng.rand_u64(), controller.clone())? {
+        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_N / 2, || rng.rand_u64(), controller.clone())? {
             return Ok(factor);
         }
     }
@@ -343,7 +337,7 @@ fn test_ec_factor_large() {
     let n: i128 = 1073741827 * 71316922984999;
 
     let begin = Instant::now();
-    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::Zn::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n)), LogProgress).unwrap());
+    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::Zn::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n)), LogProgress).unwrap_or_else(no_error));
     let end = Instant::now();
     println!("Done in {} ms", (end - begin).as_millis());
     assert!(p == 1073741827 || p == 71316922984999);
@@ -351,7 +345,7 @@ fn test_ec_factor_large() {
     let n: i128 = 1152921504606847009 * 2305843009213693967;
 
     let begin = Instant::now();
-    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::Zn::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n)), LogProgress).unwrap());
+    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::Zn::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n)), LogProgress).unwrap_or_else(no_error));
     let end = Instant::now();
     println!("Done in {} ms", (end - begin).as_millis());
     assert!(p == 1152921504606847009 || p == 2305843009213693967);

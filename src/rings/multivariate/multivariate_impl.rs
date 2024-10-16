@@ -441,7 +441,7 @@ impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
         super::generic_impls::print(RingRef::new(self), value, out, env)
     }
 
-    fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
          where I::Type: IntegerRing 
     {
         self.base_ring().characteristic(ZZ)

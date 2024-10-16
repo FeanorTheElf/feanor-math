@@ -26,8 +26,6 @@ use crate::primitive_int::StaticRing;
 use crate::rings::field::AsField;
 use crate::rings::field::AsFieldBase;
 use crate::rings::finite::*;
-use crate::rings::finite_field::AsFiniteField;
-use crate::rings::finite_field::FiniteFieldSpecializable;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::seq::*;
 use crate::ring::*;
@@ -359,7 +357,7 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
         }
     }
 
-    fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.base_ring().characteristic(ZZ)
@@ -391,18 +389,6 @@ impl<R, V, A, C> RingExtension for FreeAlgebraImplBase<R, V, A, C>
         for i in 0..self.rank() {
             self.base_ring().mul_assign_ref(&mut lhs.values[i], rhs);
         }
-    }
-}
-
-impl<S, R, V, A, C> FiniteFieldSpecializable for AsFieldBase<S>
-    where R: RingStore, 
-        V: VectorView<El<R>>,
-        A: Allocator + Clone,
-        C: ConvolutionAlgorithm<R::Type>,
-        S: RingStore<Type = FreeAlgebraImplBase<R, V, A, C>>
-{
-    fn as_finite_field<Q: RingStore<Type = Self>>(self_store: Q) -> Result<AsFiniteField<Q>, Q> {
-        
     }
 }
 
@@ -622,10 +608,10 @@ impl<R, V, A, C> FiniteRing for FreeAlgebraImplBase<R, V, A, C>
         multi_cartesian_product((0..self.rank()).map(|_| self.base_ring().elements()), WRTCanonicalBasisElementCreator { base_ring: self }, CloneRingEl(self.base_ring()))
     }
 
-    fn size<I: IntegerRingStore>(&self, ZZ: I) -> Option<El<I>>
+    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
-        let base_ring_size = self.base_ring().size(&ZZ)?;
+        let base_ring_size = self.base_ring().size(ZZ)?;
         if ZZ.get_ring().representable_bits().is_none() || ZZ.abs_log2_ceil(&base_ring_size).unwrap() * self.rank() < ZZ.get_ring().representable_bits().unwrap() {
             Some(ZZ.pow(base_ring_size, self.rank()))
         } else {

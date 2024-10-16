@@ -272,7 +272,7 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
         }
     }
     
-    fn characteristic<J: IntegerRingStore + Copy>(&self, ZZ: J) -> Option<El<J>>
+    fn characteristic<J: IntegerRingStore>(&self, ZZ: &J) -> Option<El<J>>
         where J::Type: IntegerRing
     {
         self.size(ZZ)
@@ -535,7 +535,7 @@ impl<I: IntegerRingStore> FiniteRing for ZnBase<I>
         generic_impls::random_element(self, rng)
     }
     
-    fn size<J: IntegerRingStore>(&self, ZZ: J) -> Option<El<J>>
+    fn size<J: IntegerRingStore>(&self, ZZ: &J) -> Option<El<J>>
         where J::Type: IntegerRing
     {
         if ZZ.get_ring().representable_bits().is_none() || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits() {

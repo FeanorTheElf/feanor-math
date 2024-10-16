@@ -1,3 +1,4 @@
+use crate::algorithms;
 use crate::divisibility::*;
 use crate::ring::*;
 use crate::homomorphism::*;
@@ -320,7 +321,12 @@ pub trait IntCast<F: ?Sized + IntegerRing>: IntegerRing {
 impl<F: ?Sized + IntegerRing, T: ?Sized + IntegerRing> IntCast<F> for T {
 
     default fn cast(&self, from: &F, value: F::Element) -> Self::Element {
-        LargeIntHom::new(RingRef::new(from), RingRef::new(self)).map(value)
+        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(self.one(), &value, RingRef::new(from), |a| self.add_ref(&a, &a), |a, b| self.add_ref_fst(a, b), self.zero());
+        if from.is_neg(&value) {
+            return self.negate(result);
+        } else {
+            return result;
+        }
     }
 }
 

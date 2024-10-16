@@ -1,7 +1,5 @@
 use std::marker::PhantomData;
 
-use crate::algorithms::sqr_mul::generic_mul_int;
-use crate::integer::*;
 use crate::ring::*;
 use crate::primitive_int::{StaticRingBase, StaticRing};
 
@@ -705,80 +703,6 @@ impl<R> IntHom<R>
     }
 }
 
-///
-/// The ring homomorphism `Z -> R` that exists for any ring `R`.
-/// 
-/// # Example
-/// ```
-/// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::zn::*;
-/// let ring = zn_static::F17;
-/// let hom = ring.int_hom();
-/// assert_el_eq!(ring, hom.map(1), hom.map(18));
-/// ```
-/// 
-#[derive(Clone)]
-pub struct LargeIntHom<I, R>
-    where I: RingStore,
-        I::Type: IntegerRing,
-        R: RingStore
-{
-    int_ring: I,
-    ring: R
-}
-
-impl<I, R> Copy for LargeIntHom<I, R>
-    where I: RingStore,
-        I::Type: IntegerRing,
-        R: RingStore,
-        I: Copy,
-        R: Copy,
-        El<I>: Copy,
-        El<R>: Copy
-{}
-
-impl<I, R> Homomorphism<I::Type, R::Type> for LargeIntHom<I, R>
-    where I: RingStore,
-        I::Type: IntegerRing,
-        R: RingStore,
-{
-    type CodomainStore = R;
-    type DomainStore = I;
-
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
-        &self.int_ring
-    }
-
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
-        &self.ring
-    }
-
-    fn map(&self, x: El<I>) -> <R::Type as RingBase>::Element {
-        generic_mul_int(self.codomain().zero(), &x, self.domain(), |a, b| self.codomain().add(a, b), |a| self.codomain().int_hom().map(a), |a|self.codomain().int_hom().mul_map(a, 1 << 16))
-    }
-
-    fn mul_assign_map(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: El<I>) {
-        *lhs = generic_mul_int(self.codomain().zero(), &rhs, self.domain(), |a, b| self.codomain().add(a, b), |a| self.codomain().int_hom().mul_ref_map(lhs, &a), |a| self.codomain().int_hom().mul_map(a, 1 << 16));
-    }
-
-    fn mul_assign_ref_map(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: &El<I>) {
-        self.mul_assign_map(lhs, self.int_ring.clone_el(rhs))
-    }
-}
-
-impl<I, R> LargeIntHom<I, R>
-    where I: RingStore,
-        I::Type: IntegerRing,
-        R: RingStore,
-{
-    pub fn new(int_ring: I, ring: R) -> Self {
-        Self { int_ring, ring }
-    }
-}
-
 #[derive(Clone)]
 pub struct Identity<R: RingStore> {
     ring: R
@@ -1143,44 +1067,5 @@ pub mod generic_tests {
                 }
             }
         }
-    }
-}
-
-#[cfg(test)]
-use crate::rings::poly::dense_poly::DensePolyRing;
-#[cfg(test)]
-use crate::rings::zn::zn_64;
-
-#[test]
-fn test_large_int_hom() {
-    let from = BigIntRing::RING;
-    let to = DensePolyRing::new(from, "X");
-
-    let int_hom = LargeIntHom::new(from, &to);
-    let inclusion = to.inclusion();
-
-    for x in 0..100 {
-        let n = from.power_of_two(x);
-        assert_el_eq!(&to, inclusion.map_ref(&n), int_hom.map_ref(&n));
-        assert_el_eq!(&to, to.mul(inclusion.map_ref(&n), to.int_hom().map(2387)), int_hom.mul_ref_map(&to.int_hom().map(2387), &n));
-
-        let n = from.negate(n);
-        assert_el_eq!(&to, inclusion.map_ref(&n), int_hom.map_ref(&n));
-        assert_el_eq!(&to, to.mul(inclusion.map_ref(&n), to.int_hom().map(2387)), int_hom.mul_ref_map(&to.int_hom().map(2387), &n));
-    }
-
-    let to = zn_64::Zn::new(742156452);
-
-    let int_hom = LargeIntHom::new(from, &to);
-    let hom = to.can_hom(&from).unwrap();
-
-    for x in 0..100 {
-        let n = from.power_of_two(x);
-        assert_el_eq!(&to, hom.map_ref(&n), int_hom.map_ref(&n));
-        assert_el_eq!(&to, to.mul(hom.map_ref(&n), to.int_hom().map(2387)), int_hom.mul_ref_map(&to.int_hom().map(2387), &n));
-
-        let n = from.negate(n);
-        assert_el_eq!(&to, hom.map_ref(&n), int_hom.map_ref(&n));
-        assert_el_eq!(&to, to.mul(hom.map_ref(&n), to.int_hom().map(2387)), int_hom.mul_ref_map(&to.int_hom().map(2387), &n));
     }
 }

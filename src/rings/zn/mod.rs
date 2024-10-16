@@ -8,7 +8,6 @@ use crate::algorithms;
 use crate::integer::*;
 use crate::homomorphism::*;
 use crate::ordered::*;
-use super::field::AsField;
 use super::field::AsFieldBase;
 use super::finite::FiniteRing;
 use crate::rings::finite::FiniteRingStore;
@@ -105,16 +104,10 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
     }
 
     ///
-    /// If this ring is a field, marks it thus (by wrapping it in [`crate::rings::field::AsField`]).
-    /// Otherwise, `Err` is returned.
+    /// Returns whether this ring is a field, i.e. whether `n` is prime.
     /// 
-    fn as_field<R: RingStore<Type = Self>>(self_store: R) -> Result<AsField<R>, R> {
-        if algorithms::miller_rabin::is_prime_base(&self_store, 10) {
-            Ok(RingValue::from(AsFieldBase::promise_is_perfect_field(self_store)))
-        } else {
-            Err(self_store)
-        }
-        
+    fn is_field(&self) -> bool {
+        algorithms::miller_rabin::is_prime_base(RingRef::new(self), 10)
     }
 }
 
@@ -336,11 +329,16 @@ pub trait ZnRingStore: FiniteRingStore
     delegate!{ ZnRing, fn smallest_positive_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::IntegerRing> }
     delegate!{ ZnRing, fn smallest_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::IntegerRing> }
     delegate!{ ZnRing, fn any_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::IntegerRing> }
+    delegate!{ ZnRing, fn is_field(&self) -> bool }
 
     fn as_field(self) -> Result<RingValue<AsFieldBase<Self>>, Self> 
         where Self: Sized
     {
-        <Self::Type as ZnRing>::as_field(self)
+        if self.is_field() {
+            Ok(RingValue::from(AsFieldBase::promise_is_perfect_field(self)))
+        } else {
+            Err(self)
+        }
     }
 }
 
@@ -587,7 +585,7 @@ pub mod generic_tests {
         let n = R.modulus();
 
         assert!(R.is_zero(&R.coerce(ZZ, ZZ.clone_el(n))));
-        assert!((&R).as_field().is_ok() == algorithms::miller_rabin::is_prime(ZZ, n, 10));
+        assert!(R.is_field() == algorithms::miller_rabin::is_prime(ZZ, n, 10));
 
         let mut k = ZZ.one();
         while ZZ.is_lt(&k, &n) {

@@ -231,7 +231,7 @@ impl<A: Allocator + Clone> RingBase for RustBigintRingBase<A> {
         return Ok(());
     }
 
-    fn characteristic<I: IntegerRingStore>(&self, other_ZZ: I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore>(&self, other_ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         Some(other_ZZ.zero())

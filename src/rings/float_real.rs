@@ -104,7 +104,7 @@ impl RingBase for Real64Base {
         write!(out, "{}", x)
     }
     
-    fn characteristic<I: IntegerRingStore>(&self, ZZ: I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         Some(ZZ.zero())

@@ -40,41 +40,6 @@ pub fn generic_abs_square_and_multiply<T, U, F, H, I>(base: U, power: &El<I>, in
     try_generic_abs_square_and_multiply(base, power, int_ring, |a| Ok(square(a)), |a, b| Ok(multiply_base(a, b)), identity).unwrap_or_else(|x| x)
 }
 
-#[stability::unstable(feature = "enable")]
-pub fn generic_mul_int<I, T, F, G, H>(zero: T, integer: &El<I>, int_ring: I, mut add: F, mut mul_base_i32: G, mut mul_2_pow_16: H) -> T
-    where I: IntegerRingStore,
-        I::Type: IntegerRing,
-        F: FnMut(T, T) -> T,
-        G: FnMut(i32) -> T,
-        H: FnMut(T) -> T
-{
-    if int_ring.is_zero(&integer) {
-        return zero;
-    }
-
-    const STEP_SIZE: usize = 16;
-    let highest_block = int_ring.abs_highest_set_bit(integer).unwrap() / STEP_SIZE;
-    let mut result = zero;
-    let mut remaining_power = int_ring.clone_el(integer);
-
-    for i in (1..=highest_block).rev() {
-        let mut quo = int_ring.clone_el(&remaining_power);
-        int_ring.euclidean_div_pow_2(&mut quo, STEP_SIZE * i);
-        let mut subtract = int_ring.clone_el(&quo);
-        int_ring.mul_pow_2(&mut subtract, STEP_SIZE * i);
-        let rem = int_ring.sub(remaining_power, subtract);
-        remaining_power = rem;
-        let quo = int_cast(quo, StaticRing::<i32>::RING, &int_ring);
-
-        result = add(result, mul_base_i32(quo));
-        result = mul_2_pow_16(result);
-    }
-    let quo = int_cast(remaining_power, StaticRing::<i32>::RING, &int_ring);
-    result = add(result, mul_base_i32(quo));
-
-    return result;
-}
-
 ///
 /// Uses the square-and-multiply technique to compute the reduction of `power` times `base`
 /// w.r.t. the given operation. The operation must be associative to provide correct results.
@@ -277,11 +242,9 @@ const SHORTEST_ADDITION_CHAINS: [(usize, usize); 65] = [
 #[cfg(test)]
 use test::Bencher;
 #[cfg(test)]
-use crate::rings::rust_bigint::*;
-#[cfg(test)]
 use crate::rings::zn::zn_64;
 #[cfg(test)]
-use crate::homomorphism::Homomorphism;
+use crate::homomorphism::*;
 
 #[test]
 fn test_generic_abs_square_and_multiply() {
@@ -302,15 +265,6 @@ fn test_shortest_addition_chain_table() {
     for i in 0..SHORTEST_ADDITION_CHAINS.len() {
         assert_eq!(i, SHORTEST_ADDITION_CHAINS[i].0 + SHORTEST_ADDITION_CHAINS[i].1);
     }
-}
-
-#[test]
-fn test_generic_mul_int() {
-    let ring = zn_64::Zn::new(423957342);
-    let ZZ = RustBigintRing::RING;
-    let n = ZZ.get_ring().parse("9423847598137340587134967432968543986709456345387569827602934874209780917598274609874536", 10).unwrap();
-    let x = ring.int_hom().map(74372);
-    assert_el_eq!(ring, ring.mul(ring.int_hom().map(241437242), x), generic_mul_int(ring.zero(), &n, ZZ, |a, b| ring.add(a, b), |a| ring.int_hom().mul_map(x, a), |a| ring.int_hom().mul_map(a, 1 << 16)));
 }
 
 #[bench]

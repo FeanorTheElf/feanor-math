@@ -281,7 +281,7 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
         self.rev_delegate(self.get_delegate().pow_gen(self.delegate(x), power, integers))
     }
 
-    default fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+    default fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.get_delegate().characteristic(ZZ)
@@ -320,17 +320,6 @@ pub struct DelegateFiniteRingElementsIter<'a, R: ?Sized>
     base: <R::Base as FiniteRing>::ElementsIter<'a>
 }
 
-impl<'a, R: ?Sized> DelegateFiniteRingElementsIter<'a, R>
-    where R: DelegateRing, R::Base: FiniteRing
-{
-    pub fn new(ring: &'a R) -> Self {
-        Self {
-            base: ring.get_delegate().elements(),
-            ring: ring
-        }
-    }
-}
-
 impl<'a, R: ?Sized> Clone for DelegateFiniteRingElementsIter<'a, R>
     where R: DelegateRing, R::Base: FiniteRing
 {
@@ -346,6 +335,30 @@ impl<'a, R: ?Sized> Iterator for DelegateFiniteRingElementsIter<'a, R>
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base.next().map(|x| self.ring.rev_delegate(x))
+    }
+}
+
+impl<R: DelegateRing + ?Sized> FiniteRing for R
+    where R::Base: FiniteRing
+{
+    type ElementsIter<'a> = DelegateFiniteRingElementsIter<'a, R>
+        where R: 'a;
+
+    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
+        DelegateFiniteRingElementsIter {
+            ring: self,
+            base: self.get_delegate().elements()
+        }
+    }
+    
+    default fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <R as RingBase>::Element {
+        self.element_cast(self.rev_delegate(self.get_delegate().random_element(rng)))
+    }
+
+    default fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        self.get_delegate().size(ZZ)
     }
 }
 
@@ -394,7 +407,7 @@ impl<R: DelegateRing + ?Sized> HashableElRing for R
 
 impl<R: DelegateRing + ?Sized> ZnRing for R
     where R::Base: ZnRing, 
-        Self: PrincipalIdealRing + FiniteRing,
+        Self: PrincipalIdealRing,
         R: CanHomFrom<<R::Base as ZnRing>::IntegerRingBase>
 {
     type IntegerRingBase = <R::Base as ZnRing>::IntegerRingBase;

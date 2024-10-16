@@ -16,7 +16,6 @@ use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::algorithms::matmul::StrassenHint;
 use crate::algorithms::unity_root::*;
-use crate::delegate::DelegateFiniteRingElementsIter;
 use crate::delegate::DelegateRing;
 use crate::divisibility::DivisibilityRingStore;
 use crate::divisibility::Domain;
@@ -32,8 +31,6 @@ use crate::primitive_int::StaticRing;
 use crate::primitive_int::StaticRingBase;
 use crate::rings::field::AsField;
 use crate::rings::field::AsFieldBase;
-use crate::rings::finite_field::AsFiniteField;
-use crate::rings::finite_field::FiniteFieldSpecializable;
 use crate::rings::local::AsLocalPIR;
 use crate::rings::local::AsLocalPIRBase;
 use crate::rings::poly::dense_poly::DensePolyRing;
@@ -529,43 +526,6 @@ impl<R, V, A, C> DelegateRing for GaloisFieldBase<R, V, A, C>
 
     fn get_delegate(&self) -> &Self::Base {
         self.base.get_ring()
-    }
-}
-
-impl<R, V, A, C> FiniteFieldSpecializable for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
-{
-    fn as_finite_field<S: RingStore<Type = Self>>(self_store: S) -> Result<AsFiniteField<S>, S> {
-        Ok(AsFiniteField::from_galois_field(self_store))
-    }
-}
-
-impl<R, V, A, C> FiniteRing for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
-{
-    type ElementsIter<'a> = DelegateFiniteRingElementsIter<'a, GaloisFieldBase<R, V, A, C>>
-        where Self: 'a;
-
-    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
-        DelegateFiniteRingElementsIter::new(self)
-    }
-    
-    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element {
-        self.element_cast(self.rev_delegate(self.get_delegate().random_element(rng)))
-    }
-
-    fn size<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
-        where I::Type: IntegerRing
-    {
-        self.get_delegate().size(ZZ)
     }
 }
 
