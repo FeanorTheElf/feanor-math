@@ -698,6 +698,55 @@ impl<'a, R: RingStore> Fn<(usize, &'a El<R>,)> for CloneRingEl<R> {
     }
 }
 
+#[derive(Copy, Clone)]
+pub struct CloneClonable;
+
+impl<'a, T: Clone> FnOnce<(&'a T,)> for CloneClonable {
+
+    type Output = T;
+
+    extern "rust-call" fn call_once(self, args: (&'a T,)) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, T: Clone> FnMut<(&'a T,)> for CloneClonable {
+
+    extern "rust-call" fn call_mut(&mut self, args: (&'a T,)) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, T: Clone> Fn<(&'a T,)> for CloneClonable {
+
+    extern "rust-call" fn call(&self, args: (&'a T,)) -> Self::Output {
+        args.0.clone()
+    }
+}
+
+impl<'a, T: Clone> FnOnce<(usize, &'a T,)> for CloneClonable {
+
+    type Output = T;
+
+    extern "rust-call" fn call_once(self, args: (usize, &'a T,)) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, T: Clone> FnMut<(usize, &'a T,)> for CloneClonable {
+
+    extern "rust-call" fn call_mut(&mut self, args: (usize, &'a T,)) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, T: Clone> Fn<(usize, &'a T,)> for CloneClonable {
+
+    extern "rust-call" fn call(&self, args: (usize, &'a T,)) -> Self::Output {
+        self.call((args.1, ))
+    }
+}
+
 #[test]
 fn test_vector_fn_iter() {
     let vec = vec![1, 2, 4, 8, 16];

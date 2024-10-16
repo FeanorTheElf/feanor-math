@@ -244,7 +244,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
         }
     }
     
-    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.base_ring().characteristic(ZZ)
@@ -288,10 +288,14 @@ impl<R, A, C> PartialEq for DensePolyRingBase<R, A, C>
 /// default implementation of the potential isomorphism `P <-> DensePolyRing` when
 /// applicable.
 /// 
-/// This is currently necessary, since we want to provide a specialized implementation
+/// This is necessary, since we want to provide a specialized implementation
 /// of `DensePolyRingBase<R1, A1>: CanHomFrom<DensePolyRingBase<R2, A2>>`, but we cannot
 /// currently specialize on types that still have generic parameters.
 /// 
+/// You should never have to interact with this trait, except possibly to implement it
+/// for a custom polynomial ring type.
+/// 
+#[stability::unstable(feature = "enable")]
 pub trait ImplGenericCanIsoFromToMarker: PolyRing {}
 
 impl<R> ImplGenericCanIsoFromToMarker for sparse_poly::SparsePolyRingBase<R> 
@@ -323,12 +327,12 @@ impl<R1, A1, R2, A2, C1, C2> CanHomFrom<DensePolyRingBase<R1, A1, C1>> for Dense
         self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
     }
 
-    fn map_in_ref(&self, from: &DensePolyRingBase<R1, A1, C1>, el: &DensePolyRingEl<R1, A1>, hom: &Self::Homomorphism) -> Self::Element {
-        RingRef::new(self).from_terms((0..el.data.len()).map(|i| (self.base_ring().get_ring().map_in_ref(from.base_ring().get_ring(), &el.data[i], hom), i)))
-    }
-
     fn map_in(&self, from: &DensePolyRingBase<R1, A1, C1>, el: DensePolyRingEl<R1, A1>, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in_ref(from, &el, hom)    
+        let mut result_data = Vec::with_capacity_in(el.data.len(), self.element_allocator.clone());
+        result_data.extend(el.data.into_iter().map(|c| self.base_ring().get_ring().map_in(from.base_ring().get_ring(), c, hom)));
+        DensePolyRingEl {
+            data: result_data
+        }
     }
 }
 
@@ -343,8 +347,12 @@ impl<R1, A1, R2, A2, C1, C2> CanIsoFromTo<DensePolyRingBase<R1, A1, C1>> for Den
         self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
     }
 
-    fn map_out(&self, from: &DensePolyRingBase<R1, A1, C1>, el: DensePolyRingEl<R2, A2>, hom: &Self::Isomorphism) -> DensePolyRingEl<R1, A1> {
-        RingRef::new(from).from_terms((0..el.data.len()).map(|i| (self.base_ring().get_ring().map_out(from.base_ring().get_ring(), self.base_ring().clone_el(&el.data[i]), hom), i)))
+    fn map_out(&self, from: &DensePolyRingBase<R1, A1, C1>, el: DensePolyRingEl<R2, A2>, iso: &Self::Isomorphism) -> DensePolyRingEl<R1, A1> {
+        let mut result_data = Vec::with_capacity_in(el.data.len(), from.element_allocator.clone());
+        result_data.extend(el.data.into_iter().map(|c| self.base_ring().get_ring().map_out(from.base_ring().get_ring(), c, iso)));
+        DensePolyRingEl {
+            data: result_data
+        }
     }
 }
 

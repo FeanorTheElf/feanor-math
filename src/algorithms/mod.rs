@@ -21,5 +21,5 @@ pub mod resultant;
 pub mod interpolate;
 pub mod gauss;
 pub mod buchberger;
-pub mod splitting_field;
 pub mod poly_squarefree;
+// pub mod splitting_field;

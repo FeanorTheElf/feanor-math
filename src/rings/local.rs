@@ -2,15 +2,16 @@ use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::*;
 use crate::compute_locally::InterpolationBaseRing;
-use crate::delegate::DelegateRing;
+use crate::delegate::{DelegateFiniteRingElementsIter, DelegateRing};
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::Field;
 use crate::local::{PrincipalLocalRing, PrincipalLocalRingStore};
 use crate::pid::*;
-use crate::integer::IntegerRing;
+use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::ring::*;
 use crate::homomorphism::*;
 use super::field::{AsField, AsFieldBase};
+use super::finite::FiniteRing;
 use crate::rings::zn::*;
 
 ///
@@ -18,7 +19,6 @@ use crate::rings::zn::*;
 /// 
 /// The design is analogous to [`crate::rings::field::AsFieldBase`].
 /// 
-#[stability::unstable(feature = "enable")]
 pub struct AsLocalPIRBase<R: DivisibilityRingStore> 
     where R::Type: DivisibilityRing
 {
@@ -58,10 +58,8 @@ impl<R> PartialEq for AsLocalPIRBase<R>
 ///
 /// [`RingStore`] for [`AsLocalPIRBase`].
 /// 
-#[stability::unstable(feature = "enable")]
 pub type AsLocalPIR<R> = RingValue<AsLocalPIRBase<R>>;
 
-#[stability::unstable(feature = "enable")]
 pub struct LocalPIREl<R: DivisibilityRingStore>(El<R>)
     where R::Type: DivisibilityRing;
 
@@ -83,7 +81,6 @@ impl<R> AsLocalPIR<R>
     where R: RingStore, 
         R::Type: ZnRing
 {
-    #[stability::unstable(feature = "enable")]
     pub fn from_zn(ring: R) -> Option<Self> {
         let (p, e) = is_prime_power(ring.integer_ring(), ring.modulus())?;
         let gen = ring.can_hom(ring.integer_ring()).unwrap().map(p);
@@ -95,7 +92,6 @@ impl<R> AsLocalPIR<R>
     where R: RingStore, 
         R::Type: Field
 {
-    #[stability::unstable(feature = "enable")]
     pub fn from_field(ring: R) -> Self {
         let zero = ring.zero();
         Self::from(AsLocalPIRBase::promise_is_local_pir(ring, zero, Some(1)))
@@ -106,7 +102,6 @@ impl<R> AsLocalPIR<R>
     where R: RingStore, 
         R::Type: PrincipalLocalRing
 {
-    #[stability::unstable(feature = "enable")]
     pub fn from_localpir(ring: R) -> Self {
         let max_ideal_gen = ring.clone_el(ring.max_ideal_gen());
         let nilpotent_power = ring.nilpotent_power();
@@ -118,7 +113,6 @@ impl<R> AsLocalPIR<R>
     where R: RingStore, 
         R::Type: DivisibilityRing
 {
-    #[stability::unstable(feature = "enable")]
     pub fn from_as_field(ring: AsField<R>) -> Self {
         let ring = ring.into().unwrap_self();
         let zero = ring.zero();
@@ -129,19 +123,16 @@ impl<R> AsLocalPIR<R>
 impl<R: DivisibilityRingStore> AsLocalPIRBase<R> 
     where R::Type: DivisibilityRing
 {
-    #[stability::unstable(feature = "enable")]
     pub fn promise_is_local_pir(base: R, max_ideal_gen: El<R>, nilpotent_power: Option<usize>) -> Self {
         assert!(base.is_commutative());
         let max_ideal_gen = LocalPIREl(max_ideal_gen);
         Self { base, max_ideal_gen, nilpotent_power }
     }
 
-    #[stability::unstable(feature = "enable")]
     pub fn unwrap_element(&self, el: <Self as RingBase>::Element) -> El<R> {
         el.0
     }
 
-    #[stability::unstable(feature = "enable")]
     pub fn unwrap_self(self) -> R {
         self.base
     }
@@ -342,6 +333,27 @@ impl<R: DivisibilityRingStore> Domain for AsLocalPIRBase<R>
     where R::Type: DivisibilityRing + Domain
 {}
 
+impl<R: DivisibilityRingStore> FiniteRing for AsLocalPIRBase<R>
+    where R::Type: DivisibilityRing + FiniteRing
+{
+    type ElementsIter<'a> = DelegateFiniteRingElementsIter<'a, AsLocalPIRBase<R>>
+        where R: 'a;
+
+    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
+        DelegateFiniteRingElementsIter::new(self)
+    }
+    
+    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element {
+        self.element_cast(self.rev_delegate(self.get_delegate().random_element(rng)))
+    }
+
+    fn size<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        self.get_delegate().size(ZZ)
+    }
+}
+
 impl<R> FromModulusCreateableZnRing for AsLocalPIRBase<RingValue<R>> 
     where R: DivisibilityRing + ZnRing + FromModulusCreateableZnRing
 {
@@ -421,7 +433,7 @@ impl<R1, R2> CanIsoFromTo<AsFieldBase<R1>> for AsLocalPIRBase<R2>
 /// Implements the isomorphisms `S: CanHomFrom<AsFieldBase<RingStore<Type = R>>>` and 
 /// `AsFieldBase<RingStore<Type = S>>: CanHomFrom<R>`.
 /// 
-/// For details, see [`crate::impl_wrap_unwrap_homs!`]
+/// For details, see [`crate::impl_field_wrap_unwrap_homs!`]
 /// 
 #[macro_export]
 macro_rules! impl_localpir_wrap_unwrap_homs {
@@ -463,7 +475,7 @@ macro_rules! impl_localpir_wrap_unwrap_homs {
 ///
 /// Implements the isomorphisms `S: CanIsoFromTo<AsLocalPIRBase<RingStore<Type = R>>>` and `AsLocalPIRBase<RingStore<Type = S>>: CanIsoFromTo<R>`.
 /// 
-/// For details, see [`crate::impl_wrap_unwrap_isos!`]
+/// For details, see [`crate::impl_field_wrap_unwrap_homs!`]
 /// 
 #[macro_export]
 macro_rules! impl_localpir_wrap_unwrap_isos {

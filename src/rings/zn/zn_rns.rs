@@ -317,7 +317,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> RingBase for ZnB
         self.total_ring.get_ring().dbg(&RingRef::new(self).can_iso(&self.total_ring).unwrap().map_ref(value), out)
     }
     
-    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.size(ZZ)
@@ -681,7 +681,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> FiniteRing for Z
         self.from_congruence((0..self.len()).map(|i| self.at(i).random_element(&mut rng)))
     }
 
-    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    fn size<I: IntegerRingStore>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         if ZZ.get_ring().representable_bits().is_none() || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits() {
@@ -752,8 +752,12 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> ZnRing for ZnBas
         )
     }
 
-    fn is_field(&self) -> bool {
-        self.components.len() == 1 && self.components[0].is_field()
+    fn as_field<R: RingStore<Type = Self>>(self_store: R) -> Result<AsField<R>, R> {
+        if self_store.get_ring().components.len() == 1 && (&self_store.get_ring().components[0]).as_field().is_ok() {
+            Ok(AsField::from(AsFieldBase::promise_is_perfect_field(self_store)))
+        } else {
+            Err(self_store)
+        }
     }
 
     fn from_int_promise_reduced(&self, x: El<Self::IntegerRing>) -> Self::Element {

@@ -1,19 +1,18 @@
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::compute_locally::{InterpolationBaseRing, InterpolationBaseRingStore};
-use crate::delegate::DelegateRing;
+use crate::delegate::{DelegateFiniteRingElementsIter, DelegateRing};
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::local::PrincipalLocalRing;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::*;
-use crate::integer::IntegerRing;
+use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::rings::zn::FromModulusCreateableZnRing;
 use crate::rings::zn::*;
-use crate::specialization::SpecializeToFiniteRing;
+use super::finite::FiniteRing;
 use super::local::AsLocalPIRBase;
-use crate::primitive_int::*;
 
 ///
 /// A wrapper around a ring that marks this ring to be a perfect field. In particular,
@@ -29,7 +28,7 @@ pub struct AsFieldBase<R: DivisibilityRingStore>
 
 impl<R> PerfectField for AsFieldBase<R>
     where R: RingStore,
-        R::Type: DivisibilityRing + SpecializeToFiniteRing
+        R::Type: DivisibilityRing
 {}
 
 impl<R> Clone for AsFieldBase<R>
@@ -91,33 +90,6 @@ impl<R: DivisibilityRingStore> AsFieldBase<R>
     /// 
     pub fn promise_is_perfect_field(base: R) -> Self {
         Self { zero: FieldEl(base.zero()), base }
-    }
-
-    ///
-    /// Assumes that the given ring is a field and checks whether it is perfect. If this is the case,
-    /// the function wraps it in [`AsFieldBase`]. 
-    ///
-    /// This function is not really unsafe, but users should be careful to only use
-    /// it with rings that are fields. This cannot be checked in here, so must be checked
-    /// by the caller.
-    /// 
-    /// Note that this function does check that the passed field is perfect. However,
-    /// that check is too conservative, and might fail on some perfect fields.
-    /// If you are sure that the field is also perfect, consider using [`AsFieldBase::promise_is_perfect_field()`]
-    /// instead.
-    /// 
-    #[stability::unstable(feature = "enable")]
-    pub fn promise_is_field(base: R) -> Result<Self, R>
-        where R::Type: SpecializeToFiniteRing
-    {
-        let characteristic = base.characteristic(&StaticRing::<i64>::RING);
-        if characteristic.is_some() && characteristic.unwrap() == 0 {
-            return Ok(Self::promise_is_perfect_field(base));
-        } else if base.get_ring().is_finite_ring() {
-            return Ok(Self::promise_is_perfect_field(base));
-        } else {
-            return Err(base);
-        }
     }
 
     pub fn unwrap_element(&self, el: <Self as RingBase>::Element) -> El<R> {
@@ -395,6 +367,27 @@ impl<R: DivisibilityRingStore> StrassenHint for AsFieldBase<R>
     }
 }
 
+impl<R: DivisibilityRingStore> FiniteRing for AsFieldBase<R>
+    where R::Type: DivisibilityRing + FiniteRing
+{
+    type ElementsIter<'a> = DelegateFiniteRingElementsIter<'a, AsFieldBase<R>>
+        where R: 'a;
+
+    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
+        DelegateFiniteRingElementsIter::new(self)
+    }
+    
+    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element {
+        self.element_cast(self.rev_delegate(self.get_delegate().random_element(rng)))
+    }
+
+    fn size<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+        where I::Type: IntegerRing
+    {
+        self.get_delegate().size(ZZ)
+    }
+}
+
 impl<R> FromModulusCreateableZnRing for AsFieldBase<RingValue<R>> 
     where R: DivisibilityRing + ZnRing + FromModulusCreateableZnRing
 {
@@ -436,7 +429,7 @@ impl<R> FromModulusCreateableZnRing for AsFieldBase<RingValue<R>>
 ///     }
 /// }
 /// 
-/// // impl_wrap_unwrap_homs! relies on the homs/isos of the wrapped ring, so provide those
+/// // impl_field_wrap_unwrap_homs! relies on the homs/isos of the wrapped ring, so provide those
 /// impl_eq_based_self_iso!{ MyPossibleField }
 /// 
 /// impl DelegateRing for MyPossibleField {

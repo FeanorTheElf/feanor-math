@@ -28,7 +28,6 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::rational::RationalFieldBase;
 use crate::rings::zn::*;
 use crate::seq::VectorView;
-use crate::specialization::*;
 
 use super::poly_power_decomposition_global;
 
@@ -78,7 +77,7 @@ impl<'a, P, Q> ZnOperation for IntegerPolyPowerDecompositionUsingHenselLifting<'
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing + InterpolationBaseRing,
         Q: RingStore,
         Q::Type: PolyRing + EuclideanRing,
-        <<Q::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + PerfectField + CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> + SpecializeToFiniteField
+        <<Q::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + PerfectField + CanHomFrom<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
     type Output<'b> = Option<Vec<(El<P>, usize)>>
         where Self: 'b;

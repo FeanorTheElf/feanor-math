@@ -1,4 +1,4 @@
-use std::{fmt::Arguments, io::Write};
+use std::{fmt::Arguments, io::Write, time::{Duration, Instant}};
 
 use crate::unstable_sealed::UnstableSealed;
 
@@ -112,4 +112,32 @@ impl UnstableSealed for DontObserve {}
 impl ComputationController for DontObserve {
 
     type Abort = !;
+}
+
+#[derive(Clone)]
+pub struct Timeout(Instant);
+
+#[derive(Debug)]
+pub struct TimeoutError;
+
+impl Timeout {
+
+    pub fn timeout_in(duration: Duration) -> Self {
+        Self(Instant::now() + duration)
+    }
+}
+
+impl UnstableSealed for Timeout {}
+
+impl ComputationController for Timeout {
+
+    type Abort = TimeoutError;
+
+    fn checkpoint(&self, _description: Arguments) -> Result<(), Self::Abort> {
+        if Instant::now() > self.0 {
+            return Err(TimeoutError);
+        } else {
+            return Ok(());
+        }
+    }
 }

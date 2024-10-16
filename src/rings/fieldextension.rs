@@ -4,7 +4,6 @@ use crate::homomorphism::{Homomorphism, Identity};
 use crate::ring::*;
 use crate::rings::extension::*;
 use crate::rings::poly::derive_poly;
-use crate::specialization::SpecializeToFiniteField;
 
 use super::poly::dense_poly::DensePolyRing;
 use super::poly::PolyRingStore;
@@ -153,7 +152,7 @@ pub trait SeparableFieldExtension: Field + FreeAlgebra + FactorPolyField + Speci
 }
 
 impl<R> SeparableFieldExtension for R
-    where R: Field + FreeAlgebra + FactorPolyField + SpecializeToFiniteField + PerfectField
+    where R: Field + FreeAlgebra + FactorPolyField + PerfectField
 {}
 
 #[stability::unstable(feature = "enable")]

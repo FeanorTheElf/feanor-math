@@ -7,9 +7,9 @@ use crate::integer::*;
 use crate::pid::*;
 use crate::ring::*;
 use crate::rings::finite::*;
+use crate::rings::finite_field::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::*;
-use crate::specialization::*;
 use super::cantor_zassenhaus;
 
 ///
@@ -85,39 +85,20 @@ pub fn factor_over_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usiz
 pub fn factor_if_finite_field<P>(poly_ring: P, f: &El<P>) -> Option<(Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + SpecializeToFiniteField
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FiniteFieldSpecializable
 {
-    poly_ring.base_ring().get_ring().specialize_finite_field(FactorPolyFiniteField { poly_ring: poly_ring.get_ring(), poly: poly_ring.clone_el(f) }).ok()
-}
+    if let Ok(field) = poly_ring.base_ring().as_finite_field() {
 
-struct FactorPolyFiniteField<'a, P>
-    where P: ?Sized + PolyRing + EuclideanRing,
-        <P::BaseRing as RingStore>::Type: Field
-{
-    poly_ring: &'a P,
-    poly: P::Element
-}
+        let new_poly_ring = DensePolyRing::new(&field, "X");
+        let base_iso = field.can_iso(poly_ring.base_ring()).unwrap();
+        let iso = new_poly_ring.lifted_hom(&poly_ring, base_iso.inv());
+        let poly = iso.map(f);
 
-impl<'a, P> FiniteFieldOperation<<P::BaseRing as RingStore>::Type> for FactorPolyFiniteField<'a, P>
-    where P: ?Sized + PolyRing + EuclideanRing,
-        <P::BaseRing as RingStore>::Type: Field
-{
-    type Output<'d> = (Vec<(P::Element, usize)>, El<P::BaseRing>)
-        where Self: 'd;
+        let (result, unit) = factor_over_finite_field(&new_poly_ring, &poly);
 
-    fn execute<'d, F>(self, field: F) -> Self::Output<'d>
-        where Self: 'd,
-            F: 'd + RingStore,
-            F::Type: FiniteRing + Field + CanIsoFromTo<<P::BaseRing as RingStore>::Type> + PerfectField + SpecializeToFiniteField
-    {
-        let poly_ring = DensePolyRing::new(&field, "X");
-        let base_iso = field.can_iso(self.poly_ring.base_ring()).unwrap();
-        let iso = poly_ring.lifted_hom(RingRef::new(self.poly_ring), base_iso.inv());
-        let poly = iso.map(self.poly);
-
-        let (result, unit) = factor_over_finite_field(&poly_ring, &poly);
-
-        let map_back = RingRef::new(self.poly_ring).into_lifted_hom(&poly_ring, &base_iso);
-        return (result.into_iter().map(|(f, e)| (map_back.map(f), e)).collect::<Vec<_>>(), base_iso.map(unit));
+        let map_back = poly_ring.into_lifted_hom(&new_poly_ring, &base_iso);
+        return Some((result.into_iter().map(|(f, e)| (map_back.map(f), e)).collect::<Vec<_>>(), base_iso.map(unit)));
+    } else {
+        return None;
     }
 }

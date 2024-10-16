@@ -32,7 +32,7 @@ pub fn factor_squarefree_over_extension<P>(LX: P, f: &El<P>, attempts: usize) ->
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra,
-        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing + SpecializeToFiniteField
+        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing
 {
     let L = LX.base_ring();
     let K = L.base_ring();
@@ -111,8 +111,8 @@ pub fn factor_squarefree_over_extension<P>(LX: P, f: &El<P>, attempts: usize) ->
 pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra + Field + PerfectField + SpecializeToFiniteField + PolySquarefreePartField,
-        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing + SpecializeToFiniteField
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra + Field + PerfectField + PolySquarefreePartField,
+        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing
 {
     let KX = &poly_ring;
     let K = KX.base_ring();
@@ -149,8 +149,6 @@ pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>
 use crate::rings::extension::extension_impl::FreeAlgebraImpl;
 #[cfg(test)]
 use crate::rings::rational::RationalField;
-
-use super::SpecializeToFiniteField;
 
 #[test]
 fn test_factor_number_field() {

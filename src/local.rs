@@ -17,7 +17,6 @@ use crate::ring::*;
 /// that satisfies `val(xy) = val(x) + val(y)`, `val(x + y) >= min(val(x), val(y))` and if `val(x) >= val(y)`
 /// then `y | x`. This can be accessed using [`PrincipalLocalRing::valuation()`].
 /// 
-#[stability::unstable(feature = "enable")]
 pub trait PrincipalLocalRing: EuclideanRing {
 
     ///

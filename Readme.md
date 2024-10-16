@@ -275,8 +275,8 @@ impl RingBase for F2Base {
         *lhs == *rhs
     }
 
-    fn characteristic<I>(&self, ZZ: &I) -> Option<El<I>>
-        where I: IntegerRingStore, I::Type: IntegerRing
+    fn characteristic<I>(&self, ZZ: I) -> Option<El<I>>
+        where I: IntegerRingStore + Copy, I::Type: IntegerRing
     {
         Some(ZZ.int_hom().map(2))
     }
@@ -401,8 +401,8 @@ impl<R: RingStore> RingBase for MyPolyRing<R> {
         write!(f, "{} * X^{}", self.base_ring.format(val.last().unwrap()), val.len() - 1)
     }
 
-    fn characteristic<I>(&self, ZZ: &I) -> Option<El<I>>
-        where I: IntegerRingStore, I::Type: IntegerRing
+    fn characteristic<I>(&self, ZZ: I) -> Option<El<I>>
+        where I: IntegerRingStore + Copy, I::Type: IntegerRing
     {
         self.base_ring.get_ring().characteristic(ZZ)
     }

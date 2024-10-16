@@ -85,7 +85,7 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD> {
         write!(out, "{}", *value)
     }
     
-    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.size(ZZ)
@@ -221,7 +221,7 @@ impl<const N: u64, const IS_FIELD: bool> FiniteRing for ZnBase<N, IS_FIELD> {
         generic_impls::random_element(self, rng)
     }
 
-    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    fn size<I: IntegerRingStore>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         if ZZ.get_ring().representable_bits().is_none() || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits() {
@@ -280,8 +280,12 @@ impl<const N: u64, const IS_FIELD: bool> ZnRing for ZnBase<N, IS_FIELD> {
         &(N as i64)
     }
 
-    fn is_field(&self) -> bool {
-        is_prime(N)
+    fn as_field<R: RingStore<Type = Self>>(self_store: R) -> Result<AsField<R>, R> {
+        if is_prime(N) {
+            Ok(AsField::from(AsFieldBase::promise_is_perfect_field(self_store)))
+        } else {
+            Err(self_store)
+        }
     }
 
     fn from_int_promise_reduced(&self, x: El<Self::IntegerRing>) -> Self::Element {

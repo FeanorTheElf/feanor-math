@@ -213,7 +213,7 @@ impl<I> RingBase for RationalFieldBase<I>
         true
     }
 
-    fn characteristic<J: IntegerRingStore>(&self, ZZ: &J) -> Option<El<J>>
+    fn characteristic<J: IntegerRingStore>(&self, ZZ: J) -> Option<El<J>>
         where J::Type: IntegerRing
     {
         Some(ZZ.zero())

@@ -235,7 +235,7 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         }
     }
     
-    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.base_ring().characteristic(ZZ)
@@ -272,6 +272,19 @@ impl<R: RingStore> RingExtension for SparsePolyRingBase<R> {
     }
 }
 
+///
+/// Marker trait to signal that for this polynomial ring `P`, we want to use the
+/// default implementation of the potential isomorphism `P <-> SparsePolyRing` when
+/// applicable.
+/// 
+/// This is necessary, since we want to provide a specialized implementation
+/// of `DensePolyRingBase<R1, A1>: CanHomFrom<DensePolyRingBase<R2, A2>>`, but we cannot
+/// currently specialize on types that still have generic parameters.
+/// 
+/// You should never have to interact with this trait, except possibly to implement it
+/// for a custom polynomial ring type.
+/// 
+#[stability::unstable(feature = "enable")]
 pub trait ImplGenericCanIsoFromToMarker: PolyRing {}
 
 impl<R, A, C> ImplGenericCanIsoFromToMarker for dense_poly::DensePolyRingBase<R, A, C> 

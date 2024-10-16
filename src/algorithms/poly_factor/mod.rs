@@ -6,11 +6,11 @@ use crate::pid::*;
 use crate::ring::*;
 use crate::rings::extension::FreeAlgebra;
 use crate::rings::field::*;
+use crate::rings::finite_field::FiniteFieldSpecializable;
 use crate::rings::poly::*;
 use crate::rings::rational::*;
 use crate::rings::zn::zn_64::*;
 use crate::rings::extension::FreeAlgebraStore;
-use crate::specialization::*;
 use finite_field::{factor_if_finite_field, factor_over_finite_field};
 use integer::factor_rational_poly_local;
 use crate::rings::zn::*;
@@ -106,8 +106,8 @@ pub trait FactorPolyField: PolySquarefreePartField {
 }
 
 impl<R> FactorPolyField for R
-    where R: FreeAlgebra + Field + SpecializeToFiniteField + SpecializeToFiniteRing + PerfectField + SpecializeToFiniteField,
-        <R::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing + SpecializeToFiniteField
+    where R: FreeAlgebra + Field + FiniteFieldSpecializable + PerfectField,
+        <R::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing
 {
     default fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: PolyRingStore,
