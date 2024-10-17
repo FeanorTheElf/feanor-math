@@ -4,7 +4,7 @@ use crate::homomorphism::{Homomorphism, Identity};
 use crate::ring::*;
 use crate::rings::extension::*;
 use crate::rings::poly::derive_poly;
-use crate::specialization::SpecializeToFiniteField;
+use crate::specialization::FiniteRingSpecializable;
 
 use super::poly::dense_poly::DensePolyRing;
 use super::poly::PolyRingStore;
@@ -34,7 +34,7 @@ use super::poly::PolyRingStore;
 /// ```
 /// 
 #[stability::unstable(feature = "enable")]
-pub trait SeparableFieldExtension: Field + FreeAlgebra + FactorPolyField + SpecializeToFiniteField + PerfectField {
+pub trait SeparableFieldExtension: Field + FreeAlgebra + FactorPolyField + FiniteRingSpecializable + PerfectField {
 
     ///
     /// Checks whether this field extension is galois, i.e. normal and separable.
@@ -153,7 +153,7 @@ pub trait SeparableFieldExtension: Field + FreeAlgebra + FactorPolyField + Speci
 }
 
 impl<R> SeparableFieldExtension for R
-    where R: Field + FreeAlgebra + FactorPolyField + SpecializeToFiniteField + PerfectField
+    where R: Field + FreeAlgebra + FactorPolyField + FiniteRingSpecializable + PerfectField
 {}
 
 #[stability::unstable(feature = "enable")]

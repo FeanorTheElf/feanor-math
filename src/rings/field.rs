@@ -11,7 +11,7 @@ use crate::ring::*;
 use crate::homomorphism::*;
 use crate::rings::zn::FromModulusCreateableZnRing;
 use crate::rings::zn::*;
-use crate::specialization::SpecializeToFiniteRing;
+use crate::specialization::FiniteRingSpecializable;
 use super::local::AsLocalPIRBase;
 use crate::primitive_int::*;
 
@@ -29,7 +29,7 @@ pub struct AsFieldBase<R: DivisibilityRingStore>
 
 impl<R> PerfectField for AsFieldBase<R>
     where R: RingStore,
-        R::Type: DivisibilityRing + SpecializeToFiniteRing
+        R::Type: DivisibilityRing
 {}
 
 impl<R> Clone for AsFieldBase<R>
@@ -108,12 +108,12 @@ impl<R: DivisibilityRingStore> AsFieldBase<R>
     /// 
     #[stability::unstable(feature = "enable")]
     pub fn promise_is_field(base: R) -> Result<Self, R>
-        where R::Type: SpecializeToFiniteRing
+        where R::Type: FiniteRingSpecializable
     {
         let characteristic = base.characteristic(&StaticRing::<i64>::RING);
         if characteristic.is_some() && characteristic.unwrap() == 0 {
             return Ok(Self::promise_is_perfect_field(base));
-        } else if base.get_ring().is_finite_ring() {
+        } else if <R::Type as FiniteRingSpecializable>::is_finite_ring() {
             return Ok(Self::promise_is_perfect_field(base));
         } else {
             return Err(base);

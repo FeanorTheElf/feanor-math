@@ -2,12 +2,10 @@
 use crate::algorithms::poly_squarefree::finite_field::finite_field_poly_squarefree_part;
 use crate::divisibility::*;
 use crate::field::*;
-use crate::homomorphism::*;
 use crate::integer::*;
 use crate::pid::*;
 use crate::ring::*;
 use crate::rings::finite::*;
-use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::*;
 use crate::specialization::*;
 use super::cantor_zassenhaus;
@@ -85,9 +83,9 @@ pub fn factor_over_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usiz
 pub fn factor_if_finite_field<P>(poly_ring: P, f: &El<P>) -> Option<(Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)>
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + SpecializeToFiniteField
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FiniteRingSpecializable
 {
-    poly_ring.base_ring().get_ring().specialize_finite_field(FactorPolyFiniteField { poly_ring: poly_ring.get_ring(), poly: poly_ring.clone_el(f) }).ok()
+    <<<P::Type as RingExtension>::BaseRing as RingStore>::Type as FiniteRingSpecializable>::specialize(FactorPolyFiniteField { poly_ring: poly_ring.get_ring(), poly: poly_ring.clone_el(f) }).ok()
 }
 
 struct FactorPolyFiniteField<'a, P>
@@ -98,26 +96,15 @@ struct FactorPolyFiniteField<'a, P>
     poly: P::Element
 }
 
-impl<'a, P> FiniteFieldOperation<<P::BaseRing as RingStore>::Type> for FactorPolyFiniteField<'a, P>
+impl<'a, P> FiniteRingOperation<<P::BaseRing as RingStore>::Type> for FactorPolyFiniteField<'a, P>
     where P: ?Sized + PolyRing + EuclideanRing,
         <P::BaseRing as RingStore>::Type: Field
 {
-    type Output<'d> = (Vec<(P::Element, usize)>, El<P::BaseRing>)
-        where Self: 'd;
+    type Output = (Vec<(P::Element, usize)>, El<P::BaseRing>);
 
-    fn execute<'d, F>(self, field: F) -> Self::Output<'d>
-        where Self: 'd,
-            F: 'd + RingStore,
-            F::Type: FiniteRing + Field + CanIsoFromTo<<P::BaseRing as RingStore>::Type> + PerfectField + SpecializeToFiniteField
+    fn execute(self) -> Self::Output
+        where <P::BaseRing as RingStore>::Type: FiniteRing
     {
-        let poly_ring = DensePolyRing::new(&field, "X");
-        let base_iso = field.can_iso(self.poly_ring.base_ring()).unwrap();
-        let iso = poly_ring.lifted_hom(RingRef::new(self.poly_ring), base_iso.inv());
-        let poly = iso.map(self.poly);
-
-        let (result, unit) = factor_over_finite_field(&poly_ring, &poly);
-
-        let map_back = RingRef::new(self.poly_ring).into_lifted_hom(&poly_ring, &base_iso);
-        return (result.into_iter().map(|(f, e)| (map_back.map(f), e)).collect::<Vec<_>>(), base_iso.map(unit));
+        factor_over_finite_field(RingRef::new(self.poly_ring), &self.poly)
     }
 }

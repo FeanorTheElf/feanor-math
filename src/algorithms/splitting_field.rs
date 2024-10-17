@@ -48,7 +48,7 @@ pub fn splitting_field<'a, P>(poly_ring: &'a P, poly: &El<P>) -> (
 )
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + InterpolationBaseRing + LinSolveRing + FactorPolyField + SpecializeToFiniteRing + SpecializeToFiniteField,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + InterpolationBaseRing + LinSolveRing + FactorPolyField + FiniteRingSpecializable,
         for<'c> <<<P::Type as RingExtension>::BaseRing as RingStore>::Type as InterpolationBaseRing>::ExtendedRingBase<'c>: Domain + PrincipalIdealRing
 {
     let trivial_extension = AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new(poly_ring.base_ring(), 1, vec![poly_ring.base_ring().one()])));
@@ -71,7 +71,7 @@ pub fn extend_splitting_field<'a, 'b, R>(poly_ring: &ThisPolyRing<'a, 'b, R>, mu
     Vec<El<AsField<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>>
 )
     where R: RingStore,
-        R::Type: PerfectField + InterpolationBaseRing + LinSolveRing + FactorPolyField + SpecializeToFiniteField + SpecializeToFiniteRing,
+        R::Type: PerfectField + InterpolationBaseRing + LinSolveRing + FactorPolyField + FiniteRingSpecializable,
         for<'c> <R::Type as InterpolationBaseRing>::ExtendedRingBase<'c>: Domain + PrincipalIdealRing
 {
     let factor = remaining_squarefree_factors.swap_remove(remaining_squarefree_factors.iter().enumerate().max_by_key(|(_, f)| poly_ring.degree(f).unwrap()).unwrap().0);
@@ -134,22 +134,19 @@ struct FiniteFieldCase<'a, 'b, 'c, R>
     extension_ring: &'c AsField<FreeAlgebraImpl<RingRef<'b, AsFieldBase<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>, Vec<El<AsField<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>>>>
 }
 
-impl<'a, 'b, 'c, R> FiniteFieldOperation<AsFieldBase<FreeAlgebraImpl<RingRef<'b, AsFieldBase<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>, Vec<El<AsField<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>>>>> for FiniteFieldCase<'a, 'b, 'c, R>
+impl<'a, 'b, 'c, R> FiniteRingOperation<AsFieldBase<FreeAlgebraImpl<RingRef<'b, AsFieldBase<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>, Vec<El<AsField<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>>>>> for FiniteFieldCase<'a, 'b, 'c, R>
     where R: RingStore,
         R::Type: PerfectField,
         'a: 'b,
         'b: 'c
 {
-    type Output<'d> = El<AsField<FreeAlgebraImpl<RingRef<'b, AsFieldBase<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>, Vec<El<AsField<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>>>>>
-        where Self: 'd;
+    type Output = El<AsField<FreeAlgebraImpl<RingRef<'b, AsFieldBase<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>, Vec<El<AsField<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>>>>>;
 
-    fn execute<'d, F>(self, field: F) -> Self::Output<'d>
-        where Self: 'd,
-            F: 'd + RingStore,
-            F::Type: FiniteRing + Field + LinSolveRing + CanIsoFromTo<AsFieldBase<FreeAlgebraImpl<RingRef<'b, AsFieldBase<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>, Vec<El<AsField<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>>>>>
+    fn execute(self) -> Self::Output
+        where AsFieldBase<FreeAlgebraImpl<RingRef<'b, AsFieldBase<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>, Vec<El<AsField<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>>>>: FiniteRing
     {
-        let unit_group_order = BigIntRing::RING.sub(field.size(&BigIntRing::RING).unwrap(), BigIntRing::RING.one());
-        return field.can_iso(self.extension_ring).unwrap().map(get_prim_root_of_unity_gen(&field, &unit_group_order, BigIntRing::RING).unwrap());
+        let unit_group_order = BigIntRing::RING.sub(self.extension_ring.size(&BigIntRing::RING).unwrap(), BigIntRing::RING.one());
+        get_prim_root_of_unity_gen(&self.extension_ring, &unit_group_order, BigIntRing::RING).unwrap()
     }
 }
 
@@ -169,7 +166,7 @@ pub fn extend_field<'a, 'b, 'c, R>(poly_ring: &'c ThisPolyRing<'a, 'b, R>, irred
     El<AsField<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>
 )
     where R: RingStore,
-        R::Type: PerfectField + LinSolveRing + FactorPolyField + SpecializeToFiniteRing + SpecializeToFiniteField,
+        R::Type: PerfectField + LinSolveRing + FactorPolyField + FiniteRingSpecializable,
         'a: 'b,
         'b: 'c
 {
@@ -215,7 +212,9 @@ pub fn extend_field<'a, 'b, 'c, R>(poly_ring: &'c ThisPolyRing<'a, 'b, R>, irred
     let mut solution = None;
     for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
 
-        let potential_primitive_element = if let Ok(finite_field_result) = extension_ring.get_ring().specialize_finite_field(FiniteFieldCase { extension_ring: &extension_ring }) {
+        let finite_field_case = <AsFieldBase::<FreeAlgebraImpl<RingRef<'b, AsFieldBase<FreeAlgebraImpl<&'a R, Vec<El<R>>>>>, _>> as FiniteRingSpecializable>::specialize(FiniteFieldCase { extension_ring: &extension_ring });
+
+        let potential_primitive_element = if let Ok(finite_field_result) = finite_field_case {
             finite_field_result
         } else if !BigIntRing::RING.is_zero(&characteristic) && BigIntRing::RING.is_lt(&characteristic, &int_cast(size_of_A as i64, BigIntRing::RING, StaticRing::<i64>::RING)) {
             panic!("The case that 2 * [extension_ring : base_ring] > char(base_ring) for an infinite field base_ring is currently not supported")

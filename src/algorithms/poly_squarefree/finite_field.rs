@@ -1,5 +1,3 @@
-use dense_poly::DensePolyRing;
-
 use crate::algorithms::int_factor::is_prime_power;
 use crate::integer::*;
 use crate::primitive_int::StaticRing;
@@ -10,8 +8,9 @@ use crate::rings::poly::*;
 use crate::pid::*;
 use crate::divisibility::*;
 use crate::homomorphism::*;
-use crate::specialization::FiniteFieldOperation;
-use crate::specialization::SpecializeToFiniteField;
+
+use super::FiniteRingOperation;
+use super::FiniteRingSpecializable;
 
 ///
 /// Computes the square-free part of a polynomial `f`, i.e. the greatest (w.r.t.
@@ -57,39 +56,28 @@ pub fn finite_field_poly_squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
 pub fn poly_squarefree_part_if_finite_field<P>(poly_ring: P, poly: &El<P>) -> Option<El<P>>
     where P: PolyRingStore,
         P::Type: PolyRing + PrincipalIdealRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + SpecializeToFiniteField
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FiniteRingSpecializable
 {
-    poly_ring.base_ring().get_ring().specialize_finite_field(FiniteFieldPolySquarefreePart { poly_ring: poly_ring.get_ring(), poly: poly }).ok()
+    <<<P::Type as RingExtension>::BaseRing as RingStore>::Type as FiniteRingSpecializable>::specialize(FiniteFieldPolySquarefreePart { poly_ring: poly_ring.get_ring(), poly: poly }).ok()
 }
 
 struct FiniteFieldPolySquarefreePart<'a, P>
     where P: ?Sized + PolyRing + PrincipalIdealRing,
-        <P::BaseRing as RingStore>::Type: PerfectField + SpecializeToFiniteField
+        <P::BaseRing as RingStore>::Type: PerfectField + FiniteRingSpecializable
 {
     poly_ring: &'a P,
     poly: &'a P::Element
 }
 
-impl<'a, P> FiniteFieldOperation<<P::BaseRing as RingStore>::Type> for FiniteFieldPolySquarefreePart<'a, P>
+impl<'a, P> FiniteRingOperation<<P::BaseRing as RingStore>::Type> for FiniteFieldPolySquarefreePart<'a, P>
     where P: ?Sized + PolyRing + PrincipalIdealRing,
-        <P::BaseRing as RingStore>::Type: PerfectField + SpecializeToFiniteField
+        <P::BaseRing as RingStore>::Type: PerfectField + FiniteRingSpecializable
 {
-    type Output<'d> = P::Element
-        where Self: 'd;
+    type Output = P::Element;
 
-    fn execute<'d, F>(self, field: F) -> Self::Output<'d>
-        where Self: 'd,
-            F: 'd + RingStore,
-            F::Type: FiniteRing + Field + CanIsoFromTo<<P::BaseRing as RingStore>::Type> + PerfectField + SpecializeToFiniteField
+    fn execute(self) -> Self::Output
+        where <P::BaseRing as RingStore>::Type: FiniteRing
     {
-        let poly_ring = DensePolyRing::new(&field, "X");
-        let base_iso = field.can_iso(self.poly_ring.base_ring()).unwrap();
-        let iso = (&poly_ring).into_lifted_hom(RingRef::new(self.poly_ring), base_iso.inv());
-        let poly = iso.map_ref(self.poly);
-
-        let result = finite_field_poly_squarefree_part(&poly_ring, &poly);
-
-        let map_back = RingRef::new(self.poly_ring).into_lifted_hom(&poly_ring, &base_iso);
-        return map_back.map(result);
+        finite_field_poly_squarefree_part(RingRef::new(self.poly_ring), &self.poly)
     }
 }

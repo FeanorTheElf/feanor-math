@@ -106,8 +106,8 @@ pub trait FactorPolyField: PolySquarefreePartField {
 }
 
 impl<R> FactorPolyField for R
-    where R: FreeAlgebra + Field + SpecializeToFiniteField + SpecializeToFiniteRing + PerfectField + SpecializeToFiniteField,
-        <R::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing + SpecializeToFiniteField
+    where R: FreeAlgebra + PerfectField + FiniteRingSpecializable,
+        <R::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable
 {
     default fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: PolyRingStore,
