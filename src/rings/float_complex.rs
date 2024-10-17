@@ -182,7 +182,7 @@ impl RingBase for Complex64Base {
         self.dbg_within(value, out, EnvBindingStrength::Weakest)
     }
     
-    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         Some(ZZ.zero())

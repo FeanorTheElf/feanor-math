@@ -264,7 +264,7 @@ impl RingBase for ZnBase {
         write!(out, "{}", self.complete_reduce(value.0))
     }
     
-    fn characteristic<I: IntegerRingStore>(&self, other_ZZ: &I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.size(other_ZZ)
@@ -597,7 +597,7 @@ impl FiniteRing for ZnBase {
         super::generic_impls::random_element(self, rng)
     }
 
-    fn size<I: IntegerRingStore>(&self, other_ZZ: &I) -> Option<El<I>>
+    fn size<I: IntegerRingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         if other_ZZ.get_ring().representable_bits().is_none() || self.integer_ring().abs_log2_ceil(&(self.modulus() + 1)) <= other_ZZ.get_ring().representable_bits() {

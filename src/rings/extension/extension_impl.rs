@@ -357,7 +357,7 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
         }
     }
 
-    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.base_ring().characteristic(ZZ)
@@ -608,7 +608,7 @@ impl<R, V, A, C> FiniteRing for FreeAlgebraImplBase<R, V, A, C>
         multi_cartesian_product((0..self.rank()).map(|_| self.base_ring().elements()), WRTCanonicalBasisElementCreator { base_ring: self }, CloneRingEl(self.base_ring()))
     }
 
-    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    fn size<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         let base_ring_size = self.base_ring().size(ZZ)?;

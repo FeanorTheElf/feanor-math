@@ -31,7 +31,7 @@ pub trait FiniteRing: RingBase {
     /// Returns the number of elements in this ring, if it fits within
     /// the given integer ring.
     /// 
-    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    fn size<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing;
 }
 
@@ -58,7 +58,7 @@ pub trait FiniteRingStore: RingStore
     ///
     /// See [`FiniteRing::size()`].
     /// 
-    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    fn size<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.get_ring().size(ZZ)

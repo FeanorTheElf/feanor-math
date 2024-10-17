@@ -251,7 +251,7 @@ impl RingBase for MPZBase {
         RustBigintRing::RING.get_ring().dbg(&self.map_out(RustBigintRing::RING.get_ring(), self.clone_el(value), &()), out)
     }
     
-    fn characteristic<I: IntegerRingStore>(&self, other_ZZ: &I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         Some(other_ZZ.zero())

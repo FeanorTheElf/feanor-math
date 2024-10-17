@@ -317,7 +317,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> RingBase for ZnB
         self.total_ring.get_ring().dbg(&RingRef::new(self).can_iso(&self.total_ring).unwrap().map_ref(value), out)
     }
     
-    fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.size(ZZ)
@@ -681,7 +681,7 @@ impl<C: ZnRingStore, J: IntegerRingStore, A: Allocator + Clone> FiniteRing for Z
         self.from_congruence((0..self.len()).map(|i| self.at(i).random_element(&mut rng)))
     }
 
-    fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    fn size<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         if ZZ.get_ring().representable_bits().is_none() || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits() {

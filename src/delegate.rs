@@ -281,7 +281,7 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
         self.rev_delegate(self.get_delegate().pow_gen(self.delegate(x), power, integers))
     }
 
-    default fn characteristic<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    default fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.get_delegate().characteristic(ZZ)
@@ -355,7 +355,7 @@ impl<R: DelegateRing + ?Sized> FiniteRing for R
         self.element_cast(self.rev_delegate(self.get_delegate().random_element(rng)))
     }
 
-    default fn size<I: IntegerRingStore>(&self, ZZ: &I) -> Option<El<I>>
+    default fn size<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.get_delegate().size(ZZ)
