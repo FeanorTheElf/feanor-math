@@ -16,6 +16,7 @@ use super::poly_factor::FactorPolyField;
 pub mod hensel;
 pub mod squarefree_part;
 pub mod gcd;
+pub mod factor;
 
 ///
 /// Trait for rings that support lifting local factorizations of polynomials to the ring.

@@ -116,6 +116,9 @@ fn poly_gcd_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F) -> O
 /// 
 /// More precisely, computes some `d in R[X]` of maximal degree with the property that there exists 
 /// `a in R \ {0}` such that `d | af, ag`.
+/// 
+/// The result can be assumed to be "balanced", according to the contract of [`DivisibilityRing::balance_factor()`]
+/// of the underlying ring.
 ///
 #[stability::unstable(feature = "enable")]
 pub fn poly_gcd_monic_local<'a, P>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El<P>) -> El<P>
@@ -161,6 +164,9 @@ pub fn poly_gcd_monic_local<'a, P>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El
 /// 
 /// More precisely, computes some `d in R[X]` of maximal degree with the property that there exists 
 /// `a in R \ {0}` such that `d | af, ag`.
+/// 
+/// The result can be assumed to be "balanced", according to the contract of [`DivisibilityRing::balance_factor()`]
+/// of the underlying ring.
 ///
 #[stability::unstable(feature = "enable")]
 pub fn poly_gcd_local< P>(poly_ring: P, f: &El<P>, g: &El<P>) -> El<P>
@@ -184,8 +190,6 @@ pub fn poly_gcd_local< P>(poly_ring: P, f: &El<P>, g: &El<P>) -> El<P>
 
 #[cfg(test)]
 use crate::integer::*;
-#[cfg(test)]
-use super::make_primitive;
 
 #[test]
 fn test_poly_gcd_local() {
@@ -199,29 +203,28 @@ fn test_poly_gcd_local() {
         X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1
     ]);
     let poly = |powers: [usize; 5], scale: i32| poly_ring.int_hom().mul_map(poly_ring.prod(powers.iter().zip(irred_polys.iter()).map(|(e, f)| poly_ring.pow(poly_ring.clone_el(f), *e))), scale);
-    let prim_poly = |f| make_primitive(&poly_ring, &f).0;
 
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 0, 0, 0], 1),
-        prim_poly(poly_gcd_local(&poly_ring, &poly([1, 0, 1, 0, 0], 1), &poly([1, 0, 0, 1, 0], 2)))
+        poly_gcd_local(&poly_ring, &poly([1, 0, 1, 0, 0], 1), &poly([1, 0, 0, 1, 0], 2))
     );
     
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 1, 0, 1], 1),
-        prim_poly(poly_gcd_local(&poly_ring, &poly([1, 1, 1, 0, 1], 20), &poly([1, 0, 1, 1, 1], 12)))
+        poly_gcd_local(&poly_ring, &poly([1, 1, 1, 0, 1], 20), &poly([1, 0, 1, 1, 1], 12))
     );
 
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 2, 0, 1], 1),
-        prim_poly(poly_gcd_local(&poly_ring, &poly([1, 1, 3, 0, 1], 20), &poly([3, 0, 2, 0, 3], 12)))
+        poly_gcd_local(&poly_ring, &poly([1, 1, 3, 0, 1], 20), &poly([3, 0, 2, 0, 3], 12))
     );
 
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 0, 5, 0], 1),
-        prim_poly(poly_gcd_local(&poly_ring, &poly([2, 1, 3, 5, 1], 20), &poly([1, 0, 0, 7, 0], 12)))
+        poly_gcd_local(&poly_ring, &poly([2, 1, 3, 5, 1], 20), &poly([1, 0, 0, 7, 0], 12))
     );
 }
