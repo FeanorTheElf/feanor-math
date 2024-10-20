@@ -36,10 +36,11 @@ fn poly_gcd_monic_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F
 
     let ring = poly_ring.base_ring().get_ring();
     let scale_to_ring_factor = ring.factor_scaling();
-    let bound = ring.factor_coeff_bound(poly_ring.terms(f).map(|(c, _)| ring.pseudo_norm(c).abs().powi(2)).sum::<f64>().sqrt(), poly_ring.degree(f).unwrap()) * ring.pseudo_norm(&scale_to_ring_factor);
+    let poly_l2_pseudo_norm_ln = poly_ring.terms(f).map(|(c, _)| ring.ln_pseudo_norm(c).abs()).max_by(f64::total_cmp).unwrap() + (poly_ring.degree(f).unwrap() as f64).ln();
+    let ln_bound = ring.ln_factor_coeff_bound(poly_l2_pseudo_norm_ln, poly_ring.degree(f).unwrap()) + ring.ln_pseudo_norm(&scale_to_ring_factor);
 
     let prime = ring.random_maximal_ideal(rng);
-    let e = ring.required_power(&prime, bound);
+    let e = ring.required_power(&prime, ln_bound);
     let reduction_map = IntermediateReductionMap::new(ring, &prime, e, 1);
 
     let prime_field = ring.local_field_at(&prime);
@@ -190,6 +191,10 @@ pub fn poly_gcd_local< P>(poly_ring: P, f: &El<P>, g: &El<P>) -> El<P>
 
 #[cfg(test)]
 use crate::integer::*;
+#[cfg(test)]
+use crate::RANDOM_TEST_INSTANCE_COUNT;
+#[cfg(test)]
+use crate::algorithms::poly_factor::make_primitive;
 
 #[test]
 fn test_poly_gcd_local() {
@@ -227,4 +232,25 @@ fn test_poly_gcd_local() {
         poly([1, 0, 0, 5, 0], 1),
         poly_gcd_local(&poly_ring, &poly([2, 1, 3, 5, 1], 20), &poly([1, 0, 0, 7, 0], 12))
     );
+}
+
+#[test]
+fn random_test_poly_gcd_local() {
+    let ring = BigIntRing::RING;
+    let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
+    let mut rng = oorandom::Rand64::new(1);
+    let bound = ring.int_hom().map(10000);
+    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
+        let f = poly_ring.from_terms((0..=20).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let g = poly_ring.from_terms((0..=20).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let h = poly_ring.from_terms((0..=10).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        println!("Testing gcd on ({}) * ({}) and ({}) * ({})", poly_ring.format(&f), poly_ring.format(&h), poly_ring.format(&g), poly_ring.format(&h));
+        let lhs = poly_ring.mul_ref(&f, &h);
+        let rhs = poly_ring.mul_ref(&g, &h);
+        let gcd = make_primitive(&poly_ring, poly_gcd_local(&poly_ring, &lhs, &rhs));
+
+        assert!(poly_ring.checked_div(&lhs, &gcd).is_some());
+        assert!(poly_ring.checked_div(&rhs, &gcd).is_some());
+        assert!(poly_ring.checked_div(&gcd, &make_primitive(&poly_ring, h)).is_some());
+    }
 }

@@ -78,18 +78,18 @@ pub trait FactorPolyLocallyDomain: Domain + DivisibilityRing {
     type MaximalIdeal<'ring>
         where Self: 'ring;
 
-    fn pseudo_norm(&self, el: &Self::Element) -> f64;
+    fn ln_pseudo_norm(&self, el: &Self::Element) -> f64;
 
     ///
-    /// Returns some `B > 0` such that for all monic polynomials `f` over this ring with
-    /// `| f |_2 <= poly_l2_pseudo_norm` and `deg(f) <= poly_deg` and any monic factor `g`
+    /// Returns `ln(B)` for some `B > 0` such that for all monic polynomials `f` over this ring with
+    /// `| f |_2 <= exp(ln_poly_l2_pseudo_norm)` and `deg(f) <= poly_deg` and any monic factor `g`
     /// of `f`, we have `| g |_∞ <= B`.
     /// 
     /// Here `| . |_2` resp. `| . |_∞` refer to the "pseudo norms" on polynomials that we get
     /// when taking pseudo norms coefficient-wise, and then taking the `l2`-resp. `l∞`-norm
     /// of the resulting vectors. 
     /// 
-    fn factor_coeff_bound(&self, poly_l2_pseudo_norm: f64, poly_deg: usize) -> f64;
+    fn ln_factor_coeff_bound(&self, ln_poly_l2_pseudo_norm: f64, poly_deg: usize) -> f64;
 
     ///
     /// Computes a nonzero element `a` with the property that whenever `f in R[X]` is a monic polynomial
@@ -102,7 +102,7 @@ pub trait FactorPolyLocallyDomain: Domain + DivisibilityRing {
     fn factor_scaling(&self) -> Self::Element;
 
     ///
-    /// Given `B`, returns an integer `e > 0` such that the restriction of the reduction map
+    /// Given `ln(B)`, returns an integer `e > 0` such that the restriction of the reduction map
     /// ```text
     ///   { x in R | |x| <= B }  ->  R / p^e
     /// ```
@@ -111,7 +111,8 @@ pub trait FactorPolyLocallyDomain: Domain + DivisibilityRing {
     /// In other words, two elements of norm bounded by the given value should also be different
     /// modulo `p^e`.
     /// 
-    fn required_power<'ring>(&self, p: &Self::MaximalIdeal<'ring>, uniquely_representable_norm: f64) -> usize;
+    fn required_power<'ring>(&self, p: &Self::MaximalIdeal<'ring>, ln_uniquely_representable_norm: f64) -> usize
+        where Self: 'ring;
 
     ///
     /// Returns an ideal sampled at random from the interval of all supported maximal ideals.
@@ -122,19 +123,22 @@ pub trait FactorPolyLocallyDomain: Domain + DivisibilityRing {
     ///
     /// Returns a generator of the given maximal ideal
     /// 
-    fn maximal_ideal_gen<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> Self::Element;
+    fn maximal_ideal_gen<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> Self::Element
+        where Self: 'ring;
 
     ///
     /// Returns `R / p`.
     /// 
     /// This will always be a field, since `p` is a maximal ideal.
     /// 
-    fn local_field_at<'ring>(&'ring self, p: &Self::MaximalIdeal<'ring>) -> Self::LocalField<'ring>;
+    fn local_field_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> Self::LocalField<'ring>
+        where Self: 'ring;
     
     ///
     /// Returns `R / p^e`.
     /// 
-    fn local_ring_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>, e: usize) -> Self::LocalRing<'ring>;
+    fn local_ring_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>, e: usize) -> Self::LocalRing<'ring>
+        where Self: 'ring;
 
     ///
     /// Computes the reduction map
@@ -142,7 +146,8 @@ pub trait FactorPolyLocallyDomain: Domain + DivisibilityRing {
     ///   R -> R / p^e
     /// ```
     /// 
-    fn reduce_full<'ring>(&self, p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>;
+    fn reduce_full<'ring>(&self, p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>
+        where Self: 'ring;
 
     ///
     /// Computes the reduction map
@@ -151,14 +156,16 @@ pub trait FactorPolyLocallyDomain: Domain + DivisibilityRing {
     /// ```
     /// where `e1 >= e2`.
     /// 
-    fn reduce_partial<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>;
+    fn reduce_partial<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+        where Self: 'ring;
 
     ///
     /// Computes any element `y` in `R / p^to_e` such that `y = x mod p^from_e`.
     /// In particular, `y` does not have to be "short" in any sense, but any lift
     /// is a valid result.
     /// 
-    fn lift_partial<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>;
+    fn lift_partial<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+        where Self: 'ring;
 
     ///
     /// Computes "the" shortest element `y in `R` such that `y = x mod p^from_e`.
@@ -168,7 +175,8 @@ pub trait FactorPolyLocallyDomain: Domain + DivisibilityRing {
     ///   |y| = min { |z| | z = x mod p^from_e }
     /// ```
     /// 
-    fn lift_full<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element;
+    fn lift_full<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
+        where Self: 'ring;
 }
 
 #[stability::unstable(feature = "enable")]
@@ -277,23 +285,30 @@ impl FactorPolyLocallyDomain for BigIntRingBase {
     type LocalField<'ring> = AsField<zn_64::Zn>;
     type MaximalIdeal<'ring> = i64;
 
-    fn pseudo_norm(&self, el: &Self::Element) -> f64 {
-        self.to_float_approx(el).abs()
+    fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
+        if self.is_zero(el) {
+            1.
+        } else {
+            BigIntRing::RING.abs_log2_ceil(el).unwrap() as f64 * 2f64.ln()
+        }
     }
 
-    fn factor_coeff_bound(&self, poly_l2_pseudo_norm: f64, poly_deg: usize) -> f64 {
+    fn ln_factor_coeff_bound(&self, ln_poly_l2_pseudo_norm: f64, poly_deg: usize) -> f64 {
         let ZZbig = BigIntRing::RING;
         let d = poly_deg as i32;
         // we use Theorem 3.5.1 from "A course in computational algebraic number theory", Cohen,
         // or equivalently Ex. 20 from Chapter 4.6.2 in Knuth's Art
-        return poly_l2_pseudo_norm * ZZbig.to_float_approx(&binomial(ZZbig.int_hom().map(d), &ZZbig.int_hom().map(d / 2), ZZbig));
+        let result = ln_poly_l2_pseudo_norm + (ZZbig.abs_log2_ceil(&binomial(ZZbig.int_hom().map(d), &ZZbig.int_hom().map(d / 2), ZZbig)).unwrap() as f64 * 2f64.ln());
+        return result;
     }
 
     fn factor_scaling(&self) -> Self::Element {
         self.one()
     }
 
-    fn lift_full<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element {
+    fn lift_full<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
+        where Self: 'ring
+    {
         from.0.smallest_lift(x)
     }
 
@@ -303,7 +318,9 @@ impl FactorPolyLocallyDomain for BigIntRingBase {
         return hom.map(from.0.any_lift(x));
     }
 
-    fn local_field_at<'ring>(&'ring self, p: &Self::MaximalIdeal<'ring>) -> Self::LocalField<'ring> {
+    fn local_field_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> Self::LocalField<'ring>
+        where Self: 'ring
+    {
         zn_64::Zn::new(*p as u64).as_field().ok().unwrap()
     }
 
@@ -329,14 +346,18 @@ impl FactorPolyLocallyDomain for BigIntRingBase {
         return hom.map(from.0.smallest_lift(x));
     }
 
-    fn maximal_ideal_gen<'ring>(&self, p: &i64) -> Self::Element {
+    fn maximal_ideal_gen<'ring>(&self, p: &i64) -> Self::Element
+        where Self: 'ring
+    {
         int_cast(*p, RingRef::new(self), StaticRing::<i64>::RING)
     }
 
-    fn required_power<'ring>(&self, p: &Self::MaximalIdeal<'ring>, uniquely_representable_norm: f64) -> usize {
-        assert!(uniquely_representable_norm.is_finite());
+    fn required_power<'ring>(&self, p: &Self::MaximalIdeal<'ring>, ln_uniquely_representable_norm: f64) -> usize
+        where Self: 'ring
+    {
+        assert!(ln_uniquely_representable_norm.is_finite());
         // the two is required to distinguish +/-
-        ((2. * uniquely_representable_norm).ln() / (*p as f64).ln()).ceil() as usize
+        ((1. + ln_uniquely_representable_norm) / (*p as f64).ln()).ceil() as usize
     }
 }
 
