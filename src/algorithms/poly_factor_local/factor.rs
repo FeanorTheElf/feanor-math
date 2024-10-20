@@ -67,7 +67,7 @@ fn factor_poly_monic_local<P>(poly_ring: P, f: &El<P>) -> Vec<(El<P>, usize)>
                 continue 'try_random_prime;
             }
         }
-        debug_assert!(poly_ring.eq_el(&f, &poly_ring.prod(result.iter().map(|(f, k)| poly_ring.pow(poly_ring.clone_el(f), *k)))));
+        debug_assert!(poly_ring.eq_el(&f, &poly_ring.prod(result.iter().map(|(factor, k)| poly_ring.pow(poly_ring.clone_el(factor), *k)))));
         result.sort_unstable_by_key(|(_, k)| *k);
         return result;
     }
@@ -143,8 +143,15 @@ fn test_factor_poly_local() {
     let expected = [(poly_ring.clone_el(&f1), 1), (poly_ring.clone_el(&f2), 1), (poly_ring.clone_el(&f4), 2), (poly_ring.clone_el(&f3), 3)];
     let actual = factor_poly_local(&poly_ring, &multiply_out(&expected));
     assert_eq(&expected, actual);
-    
-    let expected = [(poly_ring.clone_el(&f1), 2), (poly_ring.clone_el(&f3), 2), (poly_ring.clone_el(&f4), 4), (poly_ring.clone_el(&f2), 5)];
+
+    // this is a tricky case, since for every prime `p`, at least one `fi` splits - however they are all irreducible over ZZ
+    let [f1, f2, f3] = poly_ring.with_wrapped_indeterminate(|X| [
+        X.pow_ref(2) + 1,
+        X.pow_ref(2) + 2,
+        X.pow_ref(2) - 2
+    ]);
+
+    let expected = [(poly_ring.clone_el(&f1), 1), (poly_ring.clone_el(&f2), 1), (poly_ring.clone_el(&f3), 1)];
     let actual = factor_poly_local(&poly_ring, &multiply_out(&expected));
     assert_eq(&expected, actual);
 }

@@ -295,6 +295,13 @@ impl<R: DelegateRing + ?Sized> DivisibilityRing for R
         self.get_delegate().checked_left_div(self.delegate_ref(lhs), self.delegate_ref(rhs))
             .map(|x| self.rev_delegate(x))
     }
+
+    default fn balance_factor<'a, I>(&self, elements: I) -> Self::Element
+        where I: Iterator<Item = &'a Self::Element>,
+            Self: 'a
+    {
+        self.rev_delegate(self.get_delegate().balance_factor(elements.map(|x| self.delegate_ref(x))))
+    }
 }
 
 impl<R: DelegateRing + ?Sized> SerializableElementRing for R

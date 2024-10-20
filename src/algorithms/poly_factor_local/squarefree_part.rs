@@ -77,7 +77,7 @@ pub fn poly_power_decomposition_monic_local<P>(poly_ring: P, f: &El<P>) -> Vec<(
                 continue 'try_random_prime;
             }
         }
-        debug_assert!(poly_ring.eq_el(&f, &poly_ring.prod(result.iter().map(|(f, k)| poly_ring.pow(poly_ring.clone_el(f), *k)))));
+        debug_assert!(poly_ring.eq_el(&f, &poly_ring.prod(result.iter().map(|(factor, k)| poly_ring.pow(poly_ring.clone_el(factor), *k)))));
         result.sort_unstable_by_key(|(_, k)| *k);
         return result;
     }

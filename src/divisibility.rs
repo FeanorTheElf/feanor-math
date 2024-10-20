@@ -64,7 +64,6 @@ pub trait DivisibilityRing: RingBase {
     /// elements), or polynomials over fields (where we often want to scale the polynomial
     /// to make all denominators 1).
     /// 
-    #[stability::unstable(feature = "enable")]
     fn balance_factor<'a, I>(&self, _elements: I) -> Self::Element
         where I: Iterator<Item = &'a Self::Element>,
             Self: 'a
