@@ -1,6 +1,5 @@
 use crate::algorithms;
 use crate::algorithms::poly_factor::FactorPolyField;
-use crate::algorithms::poly_squarefree::PolySquarefreePartField;
 use crate::compute_locally::InterpolationBaseRing;
 use crate::divisibility::*;
 use crate::field::*;
@@ -16,6 +15,9 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::{PolyRing, PolyRingStore};
 use crate::integer::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
+
+use super::poly_squarefree_part_global;
+use super::FiniteRingSpecializable;
 
 #[stability::unstable(feature = "enable")]
 pub struct ProbablyNotSquarefree;
@@ -87,7 +89,7 @@ pub fn factor_squarefree_over_extension<P>(LX: P, f: &El<P>, attempts: usize) ->
 
         let norm_f_transformed = Norm(LX.clone_el(&f_transformed));
         let degree = KX.degree(&norm_f_transformed).unwrap();
-        let squarefree_part = <_ as PolySquarefreePartField>::squarefree_part(&KX, &norm_f_transformed);
+        let squarefree_part = <_ as FactorPolyField>::squarefree_part(&KX, &norm_f_transformed);
 
         if KX.degree(&squarefree_part).unwrap() == degree {
             let lin_transform_rev = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0), (L.one(), 1)].into_iter());
@@ -111,7 +113,7 @@ pub fn factor_squarefree_over_extension<P>(LX: P, f: &El<P>, attempts: usize) ->
 pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra + PerfectField + FiniteRingSpecializable + PolySquarefreePartField,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra + PerfectField + FiniteRingSpecializable,
         <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable
 {
     let KX = &poly_ring;
@@ -131,7 +133,7 @@ pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>
     let mut result: Vec<(El<P>, usize)> = Vec::new();
     let mut current = KX.clone_el(f);
     while !KX.is_unit(&current) {
-        let squarefree_part = <_ as PolySquarefreePartField>::squarefree_part(KX, &current);
+        let squarefree_part = poly_squarefree_part_global(KX, &current);
         current = KX.checked_div(&current, &squarefree_part).unwrap();
 
         for factor in factor_squarefree_over_extension(KX, &squarefree_part, MAX_PROBABILISTIC_REPETITIONS).ok().unwrap() {
@@ -149,8 +151,6 @@ pub fn factor_over_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>
 use crate::rings::extension::extension_impl::FreeAlgebraImpl;
 #[cfg(test)]
 use crate::rings::rational::RationalField;
-
-use super::FiniteRingSpecializable;
 
 #[test]
 fn test_factor_number_field() {
@@ -192,4 +192,57 @@ fn test_factor_number_field() {
         assert_eq!(1, *e);
     }
     assert_el_eq!(KX, poly, KX.prod(factorization.into_iter().map(|(f, _e)| f)));
+}
+
+#[cfg(test)]
+use crate::rings::zn::*;
+
+#[test]
+fn test_poly_squarefree_part_global() {
+    let ring = DensePolyRing::new(zn_static::Fp::<257>::RING, "X");
+    let poly = ring.prod([
+        ring.from_terms([(4, 0), (1, 1)].into_iter()),
+        ring.from_terms([(6, 0), (1, 1)].into_iter()),
+        ring.from_terms([(6, 0), (1, 1)].into_iter()),
+        ring.from_terms([(255, 0), (1, 1)].into_iter()),
+        ring.from_terms([(255, 0), (1, 1)].into_iter()),
+        ring.from_terms([(8, 0), (1, 1)].into_iter()),
+        ring.from_terms([(8, 0), (1, 1)].into_iter()),
+        ring.from_terms([(8, 0), (1, 1)].into_iter())
+    ].into_iter());
+    let expected = ring.prod([
+        ring.from_terms([(4, 0), (1, 1)].into_iter()),
+        ring.from_terms([(6, 0), (1, 1)].into_iter()),
+        ring.from_terms([(255, 0), (1, 1)].into_iter()),
+        ring.from_terms([(8, 0), (1, 1)].into_iter())
+    ].into_iter());
+    let actual = poly_squarefree_part_global(&ring, &poly);
+    assert_el_eq!(ring, expected, actual);
+
+    let QQ = RationalField::new(BigIntRing::RING);
+    let poly_ring = DensePolyRing::new(&QQ, "X");
+    let [mut f, mut expected] = poly_ring.with_wrapped_indeterminate(|X| [
+        16 - 32 * X + 104 * X.pow_ref(2) - 8 * 11 * X.pow_ref(3) + 121 * X.pow_ref(4),
+        4 - 4 * X + 11 * X.pow_ref(2)
+    ]);
+    poly_ring.inclusion().mul_assign_map(&mut f, QQ.div(&QQ.one(), &QQ.int_hom().map(121)));
+    poly_ring.inclusion().mul_assign_map(&mut expected, QQ.div(&QQ.one(), &QQ.int_hom().map(11)));
+
+    let actual = poly_squarefree_part_global(&poly_ring, &f);
+    assert_el_eq!(poly_ring, expected, actual);
+}
+
+#[test]
+fn test_find_factor_by_extension_finite_field() {
+    let field = zn_64::Zn::new(2).as_field().ok().unwrap();
+    let poly_ring = DensePolyRing::new(field, "X");
+    assert!(<_ as FactorPolyField>::find_factor_by_extension(&poly_ring, FreeAlgebraImpl::new(field, 2, [field.one(), field.one()])).is_none());
+
+    let poly = poly_ring.mul(
+        poly_ring.from_terms([(field.one(), 0), (field.one(), 1), (field.one(), 3)].into_iter()),
+        poly_ring.from_terms([(field.one(), 0), (field.one(), 2), (field.one(), 3)].into_iter()),
+    );
+    let factor = <_ as FactorPolyField>::find_factor_by_extension(&poly_ring, FreeAlgebraImpl::new(field, 6, [field.one(), field.one(), field.one(), field.one(), field.one(), field.one()])).unwrap();
+    assert_eq!(3, poly_ring.degree(&factor).unwrap());
+    assert!(poly_ring.checked_div(&poly, &factor).is_some());
 }

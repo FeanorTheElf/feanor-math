@@ -940,6 +940,36 @@ impl_field_wrap_unwrap_isos!{ ZnBase, ZnBase }
 impl_localpir_wrap_unwrap_homs!{ ZnBase, ZnBase }
 impl_localpir_wrap_unwrap_isos!{ ZnBase, ZnBase }
 
+impl<I> CanHomFrom<zn_big::ZnBase<I>> for AsFieldBase<Zn>
+    where I: RingStore,
+        I::Type: IntegerRing
+{
+    type Homomorphism = <ZnBase as CanHomFrom<zn_big::ZnBase<I>>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &zn_big::ZnBase<I>) -> Option<Self::Homomorphism> {
+        self.get_delegate().has_canonical_hom(from)
+    }
+
+    fn map_in(&self, from: &zn_big::ZnBase<I>, el: <zn_big::ZnBase<I> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.rev_delegate(self.get_delegate().map_in(from, el, hom))
+    }
+}
+
+impl<I> CanIsoFromTo<zn_big::ZnBase<I>> for AsFieldBase<Zn>
+    where I: RingStore,
+        I::Type: IntegerRing
+{
+    type Isomorphism = <ZnBase as CanIsoFromTo<zn_big::ZnBase<I>>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &zn_big::ZnBase<I>) -> Option<Self::Isomorphism> {
+        self.get_delegate().has_canonical_iso(from)
+    }
+
+    fn map_out(&self, from: &zn_big::ZnBase<I>, el: Self::Element, hom: &Self::Isomorphism) -> <zn_big::ZnBase<I> as RingBase>::Element {
+        self.get_delegate().map_out(from, self.delegate(el), hom)
+    }
+}
+
 #[cfg(test)]
 use test::Bencher;
 

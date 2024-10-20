@@ -6,8 +6,6 @@ use crate::ring::*;
 use std::mem::swap;
 use std::cmp::Ordering;
 
-pub mod poly;
-
 ///
 /// For a, b computes s, t, d such that `s*a + t*b == d` is a greatest 
 /// common divisor of a and b. d is only unique up to units, and s, t 

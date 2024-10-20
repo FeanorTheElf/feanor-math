@@ -9,12 +9,12 @@ use crate::algorithms::convolution::ConvolutionAlgorithm;
 use crate::algorithms::convolution::KaratsubaAlgorithm;
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
-use crate::algorithms::poly_squarefree::finite_field::finite_field_poly_squarefree_part;
 use crate::algorithms::eea::signed_gcd;
 use crate::algorithms::int_factor::factor;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::algorithms::matmul::StrassenHint;
+use crate::algorithms::poly_factor::finite_field::poly_squarefree_part_finite_field;
 use crate::algorithms::unity_root::*;
 use crate::delegate::DelegateRing;
 use crate::divisibility::DivisibilityRingStore;
@@ -49,7 +49,7 @@ fn filter_irreducible<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Optio
         <R::Type as RingExtension>::BaseRing: RingStore<Type = <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
     let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
-    let squarefree_part = finite_field_poly_squarefree_part(&poly_ring, &f);
+    let squarefree_part = poly_squarefree_part_finite_field(&poly_ring, &f);
     if poly_ring.degree(&squarefree_part) != Some(degree) {
         return None;
     }

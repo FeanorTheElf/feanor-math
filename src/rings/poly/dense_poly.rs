@@ -2,7 +2,7 @@ use serde::{Deserializer, Serializer};
 
 use crate::algorithms::convolution::*;
 use crate::algorithms::interpolate::interpolate;
-use crate::compute_locally::{ComputeLocallyRing, InterpolationBaseRing, ToExtRingMap};
+use crate::compute_locally::{EvaluatePolyLocallyRing, InterpolationBaseRing, ToExtRingMap};
 use crate::divisibility::*;
 use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::pid::*;
@@ -511,7 +511,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
     }
 }
 
-impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> ComputeLocallyRing for DensePolyRingBase<R, A, C> 
+impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> EvaluatePolyLocallyRing for DensePolyRingBase<R, A, C> 
     where R: RingStore,
         R::Type: InterpolationBaseRing
 {
@@ -556,7 +556,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> ComputeLocallyRi
         return data.1.iter().map(|x| self.evaluate(el, x, &data.0)).collect::<Vec<_>>();
     }
         
-    fn lift<'ring>(&self, data: &Self::LocalComputationData<'ring>, els: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
+    fn lift_combine<'ring>(&self, data: &Self::LocalComputationData<'ring>, els: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
         where Self: 'ring
     {
         let base_ring = RingRef::new(data.0.codomain().get_ring());
@@ -622,7 +622,7 @@ impl<R, A: Allocator + Clone, C> PrincipalIdealRing for DensePolyRingBase<R, A, 
     }
 
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        algorithms::eea::poly::poly_eea_global(self.clone_el(lhs), self.clone_el(rhs), &RingRef::new(self))
+        algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), &RingRef::new(self))
     }
 }
 

@@ -1,5 +1,5 @@
 
-use crate::compute_locally::{ComputeLocallyRing, ToLocalRingMap};
+use crate::compute_locally::{EvaluatePolyLocallyRing, ToLocalRingMap};
 use crate::divisibility::{DivisibilityRingStore, Domain};
 use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::rings::poly::*;
@@ -87,7 +87,7 @@ pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type a
 pub fn resultant_local<'a, P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
     where P: 'a + PolyRingStore + Copy,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ComputeLocallyRing
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: EvaluatePolyLocallyRing
 {
     let base_ring = ring.base_ring();
     if ring.is_zero(&f) || ring.is_zero(&g) {
@@ -105,7 +105,7 @@ pub fn resultant_local<'a, P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as Rin
         let local_g = poly_ring_embedding.map_ref(&g);
         resultants.push(resultant_global(&new_poly_ring, local_f, local_g));
     }
-    return base_ring.get_ring().lift(&work_locally, &resultants);
+    return base_ring.get_ring().lift_combine(&work_locally, &resultants);
 }
 
 #[cfg(test)]

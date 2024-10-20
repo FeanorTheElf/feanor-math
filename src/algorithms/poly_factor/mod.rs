@@ -6,16 +6,17 @@ use crate::pid::*;
 use crate::ring::*;
 use crate::rings::extension::FreeAlgebra;
 use crate::rings::field::*;
+use crate::divisibility::*;
 use crate::rings::poly::*;
 use crate::rings::rational::*;
 use crate::rings::zn::zn_64::*;
 use crate::rings::extension::FreeAlgebraStore;
 use crate::specialization::*;
-use finite_field::{factor_if_finite_field, factor_over_finite_field};
-use integer::factor_rational_poly_local;
 use crate::rings::zn::*;
 
 use extension::factor_over_extension;
+use finite_field::*;
+use integer::*;
 
 pub mod cantor_zassenhaus;
 pub mod extension;
@@ -26,7 +27,12 @@ pub mod finite_field;
 /// Trait for fields over which we can efficiently factor polynomials.
 /// For details, see the only associated function [`FactorPolyField::factor_poly()`].
 /// 
-pub trait FactorPolyField: PolySquarefreePartField {
+pub trait FactorPolyField: Field {
+
+    fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
 
     ///
     /// Factors a univariate polynomial with coefficients in this field into its irreducible factors.
@@ -114,11 +120,20 @@ impl<R> FactorPolyField for R
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        if let Some(result) = factor_if_finite_field(&poly_ring, poly) {
+        if let Some(result) = poly_factor_if_finite_field(&poly_ring, poly) {
             return result;
         } else {
             return factor_over_extension(poly_ring, poly);
         }
+    }
+    
+    default fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        // TODO: Find a good way to do this over number fields efficiently, i.e. locally
+        poly_squarefree_part_global(&poly_ring, poly)
     }
 }
 
@@ -133,18 +148,34 @@ impl FactorPolyField for AsFieldBase<Zn> {
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        factor_over_finite_field(poly_ring, poly)
+        poly_factor_finite_field(poly_ring, poly)
+    }
+    
+    fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        poly_squarefree_part_finite_field(&poly_ring, poly)
     }
 }
 
 impl<'a> FactorPolyField for AsFieldBase<RingRef<'a, ZnBase>> {
+
+    fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        poly_squarefree_part_finite_field(&poly_ring, poly)
+    }
 
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: PolyRingStore,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        factor_over_finite_field(poly_ring, poly)
+        poly_factor_finite_field(poly_ring, poly)
     }
 }
 
@@ -161,7 +192,15 @@ where I: IntegerRingStore,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        factor_over_finite_field(poly_ring, poly)
+        poly_factor_finite_field(poly_ring, poly)
+    }
+
+    fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        poly_squarefree_part_finite_field(&poly_ring, poly)
     }
 }
 
@@ -174,7 +213,15 @@ impl<'a, I> FactorPolyField for AsFieldBase<RingRef<'a, zn_big::ZnBase<I>>>
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        factor_over_finite_field(poly_ring, poly)
+        poly_factor_finite_field(poly_ring, poly)
+    }
+
+    fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        poly_squarefree_part_finite_field(&poly_ring, poly)
     }
 }
 
@@ -185,7 +232,15 @@ impl<const N: u64> FactorPolyField for zn_static::ZnBase<N, true> {
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        factor_over_finite_field(poly_ring, poly)
+        poly_factor_finite_field(poly_ring, poly)
+    }
+
+    fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        poly_squarefree_part_finite_field(&poly_ring, poly)
     }
 }
 
@@ -199,14 +254,83 @@ impl<I> FactorPolyField for RationalFieldBase<I>
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        factor_rational_poly_local(poly_ring, poly)
+        poly_factor_rational(poly_ring, poly)
+    }
+
+    fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        poly_squarefree_part_rational(&poly_ring, poly)
+    }
+}
+
+#[stability::unstable(feature = "enable")]
+pub fn make_primitive<R>(ZZX: R, f: El<R>) -> El<R>
+    where R: RingStore,
+        R::Type: PolyRing,
+        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
+{
+    let content = ZZX.terms(&f).map(|(c, _)| c).fold(ZZX.base_ring().zero(), |a, b| ZZX.base_ring().ideal_gen(&a, b));
+    return ZZX.from_terms(ZZX.terms(&f).map(|(c, i)| (ZZX.base_ring().checked_div(c, &content).unwrap(), i)));
+}
+
+///
+/// Computes the square-free part of a polynomial `f`, i.e. the greatest (w.r.t.
+/// divisibility) polynomial `g | f` that is square-free.
+/// 
+/// The returned polynomial is always monic, and with this restriction, it
+/// is unique.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::rings::rational::*;
+/// # use feanor_math::divisibility::*;
+/// # use feanor_math::homomorphism::Homomorphism;
+/// # use feanor_math::algorithms::poly_factor::poly_squarefree_part_global;
+/// let Fp = Zn::new(3).as_field().ok().unwrap();
+/// let FpX = DensePolyRing::new(Fp, "X");
+/// // f = (X^2 + 1)^2 (X^3 + 2 X + 1)
+/// let [f] = FpX.with_wrapped_indeterminate(|X| [(X.pow_ref(2) + 1).pow(2) * (X.pow_ref(3) + 2 * X + 1)]);
+/// let squarefree_part = poly_squarefree_part_global(&FpX, &f);
+/// let [expected] = FpX.with_wrapped_indeterminate(|X| [(X.pow_ref(2) + 1) * (X.pow_ref(3) + 2 * X + 1)]);
+/// assert_el_eq!(FpX, &expected, &squarefree_part);
+/// ```
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn poly_squarefree_part_global<P>(poly_ring: P, poly: &El<P>) -> El<P>
+    where P: PolyRingStore + Copy,
+        P::Type: PolyRing + PrincipalIdealRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + FiniteRingSpecializable
+{
+    assert!(!poly_ring.is_zero(&poly));
+    if let Some(result) = poly_squarefree_part_if_finite_field(poly_ring, poly) {
+        return result;
+    }
+    let derivate = derive_poly(&poly_ring, poly);
+    if poly_ring.degree(&poly).unwrap() == 0 {
+        return poly_ring.one();
+    }
+    if poly_ring.is_zero(&derivate) {
+        unimplemented!("infinite field with positive characteristic are currently not supported")
+    } else {
+        let square_part = poly_ring.ideal_gen(poly, &derivate);
+        let result = poly_ring.checked_div(&poly, &square_part).unwrap();
+        return poly_ring.normalize(result);
     }
 }
 
 #[cfg(test)]
 use test::Bencher;
 #[cfg(test)]
-use crate::rings::extension::extension_impl::*;
+use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[cfg(test)]
 use crate::integer::BigIntRing;
 #[cfg(test)]
@@ -214,11 +338,7 @@ use crate::rings::finite::*;
 #[cfg(test)]
 use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
-use crate::divisibility::*;
-#[cfg(test)]
 use crate::rings::extension::galois_field::GaloisField;
-
-use super::poly_squarefree::PolySquarefreePartField;
 
 #[test]
 fn test_factor_rational_poly() {
@@ -287,27 +407,12 @@ fn test_factor_fp() {
 }
 
 #[test]
-fn test_find_factor_by_extension_finite_field() {
-    let field = Zn::new(2).as_field().ok().unwrap();
-    let poly_ring = DensePolyRing::new(field, "X");
-    assert!(<_ as FactorPolyField>::find_factor_by_extension(&poly_ring, FreeAlgebraImpl::new(field, 2, [field.one(), field.one()])).is_none());
-
-    let poly = poly_ring.mul(
-        poly_ring.from_terms([(field.one(), 0), (field.one(), 1), (field.one(), 3)].into_iter()),
-        poly_ring.from_terms([(field.one(), 0), (field.one(), 2), (field.one(), 3)].into_iter()),
-    );
-    let factor = <_ as FactorPolyField>::find_factor_by_extension(&poly_ring, FreeAlgebraImpl::new(field, 6, [field.one(), field.one(), field.one(), field.one(), field.one(), field.one()])).unwrap();
-    assert_eq!(3, poly_ring.degree(&factor).unwrap());
-    assert!(poly_ring.checked_div(&poly, &factor).is_some());
-}
-
-#[test]
 fn random_test_factor_poly_galois_field() {
     let mut rng = oorandom::Rand64::new(1);
     let Fq = GaloisField::new(17, 5);
     let ring = DensePolyRing::new(&Fq, "X");
 
-    for _ in 0..20 {
+    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
         let f1 = ring.from_terms((0..8).map(|i| (Fq.random_element(|| rng.rand_u64()), i)));
         let f2 = ring.from_terms((0..10).map(|i| (Fq.random_element(|| rng.rand_u64()), i)));
         let f3 = ring.from_terms((0..10).map(|i| (Fq.random_element(|| rng.rand_u64()), i)));
@@ -332,7 +437,7 @@ fn random_test_factor_rational_poly() {
     let ring = DensePolyRing::new(&QQ, "X");
     let coeff_bound = ZZbig.int_hom().map(10);
 
-    for _ in 0..20 {
+    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
         let f1 = ring.from_terms((0..8).map(|i| (QQ.inclusion().map(ZZbig.get_uniformly_random(&coeff_bound, || rng.rand_u64())), i)));
         let f2 = ring.from_terms((0..10).map(|i| (QQ.inclusion().map(ZZbig.get_uniformly_random(&coeff_bound, || rng.rand_u64())), i)));
         let f3 = ring.from_terms((0..10).map(|i| (QQ.inclusion().map(ZZbig.get_uniformly_random(&coeff_bound, || rng.rand_u64())), i)));

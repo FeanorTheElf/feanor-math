@@ -8,9 +8,8 @@ use crate::ring::*;
 pub trait InterpolationBaseRing: DivisibilityRing {
 
     ///
-    /// Unfortunately, there is currently a compiler bug (https://github.com/rust-lang/rust/issues/100013) that
-    /// causes a problem when using `for<'a> SomeRing::ExtendedRingBase<'a>: PrincipalIdealRing + Domain`, thus
-    /// we have to currently restrict it here.
+    /// Restricting this here to be `DivisibilityRing + PrincipalIdealRing + Domain`
+    /// is necessary, because of a compiler bug, see also [`crate::compute_locally::ComputeLocallyRing`]
     /// 
     type ExtendedRingBase<'a>: ?Sized + DivisibilityRing + PrincipalIdealRing + Domain
         where Self: 'a;
@@ -84,13 +83,46 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
     }
 }
 
+///
+/// Trait for rings that support performing computations locally.
+/// 
+/// More concretely, a ring `R` implementing this trait should be endowed with a
+/// "pseudo norm"
+/// ```text
+///   |.|: R  ->  [0, ∞)
+/// ```
+/// i.e. a symmetric, sub-additive, sub-multiplicative map.
+/// Furthermore, for any bound `b`, the ring should be able to provide prime ideals
+/// `p1, ..., pk` together with the rings `Ri = R / pi`, such that the restricted
+/// reduction map
+/// ```text
+///   { x in R | |x| <= b }  ->  R1 x ... x Rk
+/// ```
+/// is injective.
+/// This means that a computation can be performed in the simpler ring `R1 x ... x Rk`,
+/// and - assuming the result is of pseudo-norm `<= b`, mapped back to `R`.
+/// 
+/// The standard use case is the evaluation of a multivariate polynomial `f(X1, ..., Xm)`
+/// over this ring. The trait is designed to enable the following approach:
+///  - Given ring elements `a1, ..., am`, compute an upper bound `B` on `|f(a1, ..., am)|`.
+///    The values `|ai|` are given by [`EvaluatePolyLocallyRing::pseudo_norm()`].
+///  - Get a sufficient number of prime ideals, using [`EvaluatePolyLocallyRing::local_computation()`] 
+///  - Compute `f(a1 mod pi, ..., am mod pi) mod pi` for each prime `pi` within the ring given by 
+///    [`EvaluatePolyLocallyRing::local_ring_at()`]. The reductions `ai mod pj` are given by
+///    [`EvaluatePolyLocallyRing::reduce()`].
+///  - Recombine the results to an element of `R` by using [`EvaluatePolyLocallyRing::lift_combine()`].
+/// 
 #[stability::unstable(feature = "enable")]
-pub trait ComputeLocallyRing: RingBase {
+pub trait EvaluatePolyLocallyRing: RingBase {
     
     ///
     /// The proper way would be to define this with two lifetime parameters `'ring` and `'data`,
     /// to allow it to reference both the ring itself and the current `LocalComputationData`.
     /// However, when doing this, I ran into the compiler bug (https://github.com/rust-lang/rust/issues/100013).
+    /// 
+    /// This is also the reason why we restrict this type here to be [`PrincipalIdealRing`], because
+    /// unfortunately, the a constraint `for<'a> SomeRing::LocalRingBase<'a>: PrincipalIdealRing` triggers
+    /// the bug in nontrivial settings.
     /// 
     type LocalRingBase<'ring>: ?Sized + PrincipalIdealRing + Domain
         where Self: 'ring;
@@ -101,26 +133,56 @@ pub trait ComputeLocallyRing: RingBase {
     type LocalComputationData<'ring>
         where Self: 'ring;
 
+    ///
+    /// Computes the pseudo norm of a ring element.
+    /// 
+    /// This function should be
+    ///  - symmetric, i.e. `|-x| = |x|`,
+    ///  - sub-additive, i.e. `|x + y| <= |x| + |y|`
+    ///  - sub-multiplicative, i.e. `|xy| <= |x| |y|`
+    /// 
     fn pseudo_norm(&self, el: &Self::Element) -> f64;
 
-    fn local_computation<'ring>(&'ring self, uniquely_representable_norm: f64) -> Self::LocalComputationData<'ring>;
+    ///
+    /// Sets up the context for a new polynomial evaluation, whose output
+    /// should have pseudo norm less than the given bound.
+    /// 
+    fn local_computation<'ring>(&'ring self, pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring>;
 
-    fn local_ring_count<'ring>(&self, data: &Self::LocalComputationData<'ring>) -> usize
+    ///
+    /// Returns the number `k` of local rings that are required
+    /// to get the correct result of the given computation.
+    /// 
+    fn local_ring_count<'ring>(&self, computation: &Self::LocalComputationData<'ring>) -> usize
         where Self: 'ring;
 
-    fn local_ring_at<'ring>(&self, data: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
+    ///
+    /// Returns the `i`-th local ring belonging to the given computation.
+    /// 
+    fn local_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
         where Self: 'ring;
 
-    fn reduce<'ring>(&self, data: &Self::LocalComputationData<'ring>, el: &Self::Element) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
+    ///
+    /// Computes the map `R -> R1 x ... x Rk`, i.e. maps the given element into each of
+    /// the local rings.
+    /// 
+    fn reduce<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &Self::Element) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
         where Self: 'ring;
 
-    fn lift<'ring>(&self, data: &Self::LocalComputationData<'ring>, el: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
+    ///
+    /// Computes a preimage under the map `R -> R1 x ... x Rk`, i.e. a ring element `x` that reduces
+    /// to each of the given local rings under the map [`EvaluatePolyLocallyRing::reduce()`].
+    /// 
+    /// The result should have pseudo-norm bounded by the bound given when the computation
+    /// was initialized, via [`EvaluatePolyLocallyRing::local_computation()`].
+    /// 
+    fn lift_combine<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
         where Self: 'ring;
 }
 
 #[stability::unstable(feature = "enable")]
 pub struct ToLocalRingMap<'ring, 'data, R>
-    where R: 'ring + ?Sized + ComputeLocallyRing, 'ring: 'data
+    where R: 'ring + ?Sized + EvaluatePolyLocallyRing, 'ring: 'data
 {
     ring: RingRef<'data, R>,
     data: &'data R::LocalComputationData<'ring>,
@@ -129,7 +191,7 @@ pub struct ToLocalRingMap<'ring, 'data, R>
 }
 
 impl<'ring, 'data, R> ToLocalRingMap<'ring, 'data, R>
-    where R: 'ring +?Sized + ComputeLocallyRing, 'ring: 'data
+    where R: 'ring +?Sized + EvaluatePolyLocallyRing, 'ring: 'data
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: &'data R, data: &'data R::LocalComputationData<'ring>, index: usize) -> Self {
@@ -138,7 +200,7 @@ impl<'ring, 'data, R> ToLocalRingMap<'ring, 'data, R>
 }
 
 impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for ToLocalRingMap<'ring, 'data, R>
-    where R: 'ring +?Sized + ComputeLocallyRing, 'ring: 'data
+    where R: 'ring +?Sized + EvaluatePolyLocallyRing, 'ring: 'data
 {
     type CodomainStore = R::LocalRing<'ring>;
     type DomainStore = RingRef<'data, R>;

@@ -26,9 +26,8 @@ use crate::delegate::DelegateRing;
 
 use super::linsolve::LinSolveRing;
 use super::poly_factor::extension::factor_squarefree_over_extension;
-use super::poly_factor::finite_field::factor_if_finite_field;
+use super::poly_factor::finite_field::poly_factor_if_finite_field;
 use super::poly_factor::FactorPolyField;
-use super::poly_squarefree::PolySquarefreePartField;
 use super::unity_root::get_prim_root_of_unity_gen;
 
 ///
@@ -54,7 +53,7 @@ pub fn splitting_field<'a, P>(poly_ring: &'a P, poly: &El<P>) -> (
     let trivial_extension = AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new(poly_ring.base_ring(), 1, vec![poly_ring.base_ring().one()])));
     let new_poly_ring = DensePolyRing::new(RingRef::new(trivial_extension.get_ring()), "X");
     let hom = new_poly_ring.lifted_hom(poly_ring, trivial_extension.inclusion());
-    let squarefree_poly = <_ as PolySquarefreePartField>::squarefree_part(poly_ring, &poly);
+    let squarefree_poly = <_ as FactorPolyField>::squarefree_part(poly_ring, &poly);
     let (result, roots, _) = extend_splitting_field(&new_poly_ring, vec![hom.map(squarefree_poly)], Vec::new(), Vec::new());
     return (result, roots);
 }
@@ -82,7 +81,7 @@ pub fn extend_splitting_field<'a, 'b, R>(poly_ring: &ThisPolyRing<'a, 'b, R>, mu
     // don't use `<_ as FactorPolyField>::factor_poly()` here, as we know that the poly is square-free, thus
     // `factor_squarefree_over_extension` can be much faster than general factoring (there currently is no
     // local `squarefree_part()` function for non-PIDs)
-    let mut sub_factorization = if let Some(factorization) = factor_if_finite_field(&poly_ring, &factor) {
+    let mut sub_factorization = if let Some(factorization) = poly_factor_if_finite_field(&poly_ring, &factor) {
         factorization.0.into_iter().map(|(f, _)| f).collect::<Vec<_>>()
     } else {
         factor_squarefree_over_extension(&poly_ring, &factor, MAX_PROBABILISTIC_REPETITIONS).ok().unwrap()
