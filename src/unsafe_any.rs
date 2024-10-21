@@ -26,7 +26,7 @@ impl UnsafeAny {
         UnsafeAny { data: None, deleter: delete::<()> }
     }
     
-    pub fn from<T>(value: T) -> UnsafeAny {
+    pub unsafe fn from<T>(value: T) -> UnsafeAny {
         unsafe { 
             let memory = Global.allocate_zeroed(Layout::for_value(&value)).unwrap();
             assert_eq!(std::mem::size_of::<T>(), memory.len());

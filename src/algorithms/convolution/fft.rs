@@ -176,6 +176,10 @@ impl<R, A> ConvolutionAlgorithm<R> for FFTBasedConvolutionZn<A>
             ring.add_assign(&mut dst[i], hom.map(c));
         }
     }
+
+    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool {
+        true
+    }
 }
 
 impl<I, A> ConvolutionAlgorithm<I> for FFTBasedConvolution<A>
@@ -202,6 +206,10 @@ impl<I, A> ConvolutionAlgorithm<I> for FFTBasedConvolution<A>
         ).enumerate() {
             ring.add_assign(&mut dst[i], c);
         }
+    }
+
+    fn supports_ring<S: RingStore<Type = I> + Copy>(&self, _ring: S) -> bool {
+        true
     }
 }
 
@@ -284,7 +292,6 @@ impl<R, I, A> FFTRNSBasedConvolution<R, I, A>
         drop(rns_rings);
         return Ref::map(self.rns_rings.borrow(), |rns_rings| rns_rings.lower_bound(Bound::Included(&min_log2_rns_ring_modulus)).next().unwrap().1);
     }
-
     
     fn convolution_unchecked<'a, V1: VectorFn<El<I>>, V2: VectorFn<El<I>>>(&'a self, input_size_log2: usize, lhs: V1, rhs: V2) -> impl 'a + Iterator<Item = El<I>> {
         assert!(lhs.len() + rhs.len() <= (1 << self.max_log2_len));
@@ -345,6 +352,10 @@ impl<I2, R, I, A> ConvolutionAlgorithm<I2> for FFTRNSBasedConvolution<R, I, A>
         ).enumerate() {
             ring.add_assign(&mut dst[i], int_cast(c, &ring, &self.integer_ring));
         }
+    }
+
+    fn supports_ring<S: RingStore<Type = I2> + Copy>(&self, _ring: S) -> bool {
+        true
     }
 }
 
@@ -442,6 +453,10 @@ impl<R2, R, I, A> ConvolutionAlgorithm<R2> for FFTRNSBasedConvolutionZn<R, I, A>
         ).enumerate() {
             ring.add_assign(&mut dst[i], hom.map(c));
         }
+    }
+
+    fn supports_ring<S: RingStore<Type = R2> + Copy>(&self, _ring: S) -> bool {
+        true
     }
 }
 

@@ -31,7 +31,7 @@ impl<I> ZnOperation for ECFactorInt<I>
         where Self: 'a;
 
     fn call<'a, R>(self, ring: R) -> El<I>
-        where R: 'a + ZnRingStore, R::Type: ZnRing
+        where Self: 'a, R: 'a + ZnRingStore + Send + Sync, R::Type: ZnRing, El<R>: Send
     {
         int_cast(lenstra_ec_factor(&ring, DontObserve).unwrap_or_else(no_error), self.result_ring, ring.integer_ring())
     }

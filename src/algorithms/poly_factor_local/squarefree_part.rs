@@ -28,12 +28,12 @@ pub fn poly_power_decomposition_monic_local<P>(poly_ring: P, f: &El<P>) -> Vec<(
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyLocallyDomain
 {
-    assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
+    assert!(poly_ring.base_ring().is_one(poly_ring.lc(&f).unwrap()));
     let ring = poly_ring.base_ring().get_ring();
     let mut rng = oorandom::Rand64::new(1);
     let scale_to_ring_factor = ring.factor_scaling();
-    let poly_l2_pseudo_norm_ln = poly_ring.terms(f).map(|(c, _)| ring.ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap() + (poly_ring.degree(f).unwrap() as f64).ln();
-    let ln_bound = ring.ln_factor_coeff_bound(poly_l2_pseudo_norm_ln, poly_ring.degree(f).unwrap()) + ring.ln_pseudo_norm(&scale_to_ring_factor);
+    let poly_l2_pseudo_norm_ln = poly_ring.terms(&f).map(|(c, _)| ring.ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap() + (poly_ring.degree(&f).unwrap() as f64).ln();
+    let ln_bound = ring.ln_factor_coeff_bound(poly_l2_pseudo_norm_ln, poly_ring.degree(&f).unwrap()) + ring.ln_pseudo_norm(&scale_to_ring_factor);
 
     'try_random_prime: for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
         let prime = ring.random_maximal_ideal(|| rng.rand_u64());
@@ -45,7 +45,7 @@ pub fn poly_power_decomposition_monic_local<P>(poly_ring: P, f: &El<P>) -> Vec<(
         let prime_ring = reduction_map.codomain();
         let iso = prime_field.can_iso(&prime_ring).unwrap();
 
-        let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (iso.inv().map(ring.reduce_full(&prime, (&prime_ring, 1), ring.clone_el(c))), i)));
+        let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (iso.inv().map(ring.reduce_full(&prime, (&prime_ring, 1), ring.clone_el(c))), i)));
         let mut powers = Vec::new();
         let mut factors = Vec::new();
         for (f, k) in poly_power_decomposition_global(&prime_field_poly_ring, &prime_field_f) {
@@ -55,7 +55,7 @@ pub fn poly_power_decomposition_monic_local<P>(poly_ring: P, f: &El<P>) -> Vec<(
     
         let target_poly_ring = DensePolyRing::new(reduction_map.domain(), "X");
         let target_ring_scale_to_ring_factor = ring.reduce_full(&prime, (reduction_map.domain(), reduction_map.from_e()), poly_ring.base_ring().clone_el(&scale_to_ring_factor));
-        let local_ring_f = target_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (ring.reduce_full(&prime, (reduction_map.domain(), reduction_map.from_e()), poly_ring.base_ring().clone_el(c)), i)));
+        let local_ring_f = target_poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (ring.reduce_full(&prime, (reduction_map.domain(), reduction_map.from_e()), poly_ring.base_ring().clone_el(c)), i)));
         
         let mut lifted_factorization = Vec::new();
         for (factor, k) in hensel_lift_factorization(&reduction_map, &target_poly_ring, &prime_field_poly_ring, &local_ring_f, &factors[..]).into_iter().zip(powers.iter()) {
@@ -73,7 +73,7 @@ pub fn poly_power_decomposition_monic_local<P>(poly_ring: P, f: &El<P>) -> Vec<(
         let mut result = Vec::new();
         for (k, factor) in powers.into_iter().zip(lifted_factorization.into_iter()) {
             if let Some(root_of_factor) = poly_root(poly_ring, &factor, k) {
-                result.push((balance_poly(poly_ring, &root_of_factor).0, k));
+                result.push((balance_poly(poly_ring, root_of_factor).0, k));
             } else {
                 continue 'try_random_prime;
             }
@@ -93,20 +93,21 @@ pub fn poly_power_decomposition_monic_local<P>(poly_ring: P, f: &El<P>) -> Vec<(
 /// of the underlying ring.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn poly_power_decomposition_local<P>(poly_ring: P, f: &El<P>) -> Vec<(El<P>, usize)>
+pub fn poly_power_decomposition_local<P>(poly_ring: P, f: El<P>) -> Vec<(El<P>, usize)>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyLocallyDomain + DivisibilityRing
 {
-    assert!(!poly_ring.is_zero(f));
-    let lcf = poly_ring.lc(f).unwrap();
-    let f_monic = evaluate_aX(poly_ring, f, lcf);
+    assert!(!poly_ring.is_zero(&f));
+    let f = balance_poly(poly_ring, f).0;
+    let lcf = poly_ring.lc(&f).unwrap();
+    let f_monic = evaluate_aX(poly_ring, &f, lcf);
     let power_decomposition = poly_power_decomposition_monic_local(poly_ring, &f_monic);
     let result = power_decomposition.into_iter().map(|(fi, i)| {
-        (balance_poly(poly_ring, &unevaluate_aX(poly_ring, &fi, &lcf)).0, i)
+        (balance_poly(poly_ring, unevaluate_aX(poly_ring, &fi, &lcf)).0, i)
     }).collect::<Vec<_>>();
-    debug_assert!(poly_ring.checked_div(&poly_ring.prod(result.iter().map(|(fi, i)| poly_ring.pow(poly_ring.clone_el(fi), *i))), f).is_some());
-    debug_assert_eq!(poly_ring.degree(f).unwrap(), result.iter().map(|(fi, i)| *i * poly_ring.degree(fi).unwrap()).sum::<usize>());
+    debug_assert!(poly_ring.checked_div(&poly_ring.prod(result.iter().map(|(fi, i)| poly_ring.pow(poly_ring.clone_el(fi), *i))), &f).is_some());
+    debug_assert_eq!(poly_ring.degree(&f).unwrap(), result.iter().map(|(fi, i)| *i * poly_ring.degree(fi).unwrap()).sum::<usize>());
     return result;
 }
 
@@ -120,13 +121,13 @@ pub fn poly_power_decomposition_local<P>(poly_ring: P, f: &El<P>) -> Vec<(El<P>,
 /// of the underlying ring.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn poly_squarefree_part_local<P>(poly_ring: P, f: &El<P>) -> El<P>
+pub fn poly_squarefree_part_local<P>(poly_ring: P, f: El<P>) -> El<P>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyLocallyDomain + DivisibilityRing
 {
-    assert!(!poly_ring.is_zero(f));
-    balance_poly(poly_ring, &poly_ring.prod(poly_power_decomposition_local(poly_ring, f).into_iter().map(|(fi, _i)| fi))).0
+    assert!(!poly_ring.is_zero(&f));
+    balance_poly(poly_ring, poly_ring.prod(poly_power_decomposition_local(poly_ring, f).into_iter().map(|(fi, _i)| fi))).0
 }
 
 #[cfg(test)]

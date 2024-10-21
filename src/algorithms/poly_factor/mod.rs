@@ -469,29 +469,29 @@ fn bench_factor_random_poly(bencher: &mut Bencher) {
 }
 
 #[bench]
-fn bench_factor_rational_poly(bencher: &mut Bencher) {
+fn bench_factor_rational_poly_old(bencher: &mut Bencher) {
     let QQ = RationalField::new(BigIntRing::RING);
     let incl = QQ.int_hom();
     let poly_ring = DensePolyRing::new(&QQ, "X");
-    let f1 = poly_ring.checked_div(&poly_ring.from_terms([(incl.map(1), 0), (incl.map(1), 2), (incl.map(1), 4), (incl.map(3), 8)].into_iter()), &poly_ring.int_hom().map(3)).unwrap();
+    let f1 = poly_ring.from_terms([(incl.map(1), 0), (incl.map(1), 2), (incl.map(3), 4), (incl.map(1), 8)].into_iter());
     let f2 = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4), (incl.map(1), 5), (incl.map(1), 10)].into_iter());
     let f3 = poly_ring.from_terms([(incl.map(1), 0), (incl.map(1), 1), (incl.map(-2), 5), (incl.map(1), 17)].into_iter());
     bencher.iter(|| {
         let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f1), poly_ring.clone_el(&f1), poly_ring.clone_el(&f2), poly_ring.clone_el(&f3), poly_ring.int_hom().map(9)].into_iter()));
         assert_eq!(3, actual.len());
         assert_el_eq!(QQ, QQ.int_hom().map(9), unit);
-        for (f, e) in actual.iter() {
-            if poly_ring.eq_el(f, &f1) {
+        for (f, e) in actual.into_iter() {
+            if poly_ring.eq_el(&f, &f1) {
                 assert_el_eq!(poly_ring, f1, f);
-                assert_eq!(2, *e);
-            } else if poly_ring.eq_el(f, &f2) {
+                assert_eq!(2, e);
+            } else if poly_ring.eq_el(&f, &f2) {
                 assert_el_eq!(poly_ring, f2, f);
-                assert_eq!(1, *e);
-           } else if poly_ring.eq_el(f, &f3) {
+                assert_eq!(1, e);
+           } else if poly_ring.eq_el(&f, &f3) {
                assert_el_eq!(poly_ring, f3, f);
-               assert_eq!(1, *e);
+               assert_eq!(1, e);
             } else {
-                panic!("Factorization returned wrong factor {} of ({})^2 * {} * {}", poly_ring.format(f), poly_ring.format(&f1), poly_ring.format(&f2), poly_ring.format(&f3));
+                panic!("Factorization returned wrong factor {} of ({})^2 * ({}) * ({})", poly_ring.format(&f), poly_ring.format(&f1), poly_ring.format(&f2), poly_ring.format(&f3));
             }
         }
     });

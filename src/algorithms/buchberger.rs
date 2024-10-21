@@ -216,9 +216,9 @@ pub fn default_sort_fn<P, O>(ring: P, order: O) -> impl FnMut(&mut [SPoly], &[El
 ///   can return `true` to abort the GB computation, yielding the current basis. In this case, the basis will in general not be a GB,
 ///   but can still be useful (e.g. `abort_early_if` might decide that a GB up to a fixed degree is sufficient).
 /// 
-/// # Explanation of log
+/// # Explanation of logging output
 /// 
-/// If the passed computation controller accepts the log, it will receive the following symbols:
+/// If the passed computation controller accepts the logging, it will receive the following symbols:
 ///  - `-` means an S-polynomial was reduced to zero
 ///  - `s` means an S-polynomial reduced to a nonzero value and will be added to the basis at the next opportunity
 ///  - `b(n)` means that the list of all generated basis polynomials has length `n`

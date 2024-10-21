@@ -79,7 +79,7 @@ fn poly_gcd_monic_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F
     {
         return None;
     } else {
-        return Some(balance_poly(poly_ring, &result).0);
+        return Some(balance_poly(poly_ring, result).0);
     }
 }
 
@@ -91,24 +91,28 @@ fn poly_gcd_monic_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F
 /// More precisely, computes some `d in R[X]` of maximal degree with the property that there exists 
 /// `a in R \ {0}` such that `d | af, ag`.
 ///
-fn poly_gcd_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F) -> Option<El<P>>
+fn poly_gcd_coprime_local<P, F>(poly_ring: P, f: El<P>, g: El<P>, rng: F) -> Option<El<P>>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyLocallyDomain,
         F: FnMut() -> u64
 {
-    if poly_ring.is_zero(f) {
-        return Some(poly_ring.clone_el(g));
-    } else if poly_ring.is_zero(g) {
-        return Some(poly_ring.clone_el(f));
+    if poly_ring.is_zero(&f) {
+        return Some(poly_ring.clone_el(&g));
+    } else if poly_ring.is_zero(&g) {
+        return Some(poly_ring.clone_el(&f));
     }
+    let f = balance_poly(poly_ring, f).0;
+    let g = balance_poly(poly_ring, g).0;
+    let lcf = poly_ring.base_ring().clone_el(poly_ring.lc(&f).unwrap());
+    let lcg = poly_ring.base_ring().clone_el(poly_ring.lc(&g).unwrap());
     let ring = poly_ring.base_ring();
-    let a = ring.mul_ref(poly_ring.lc(f).unwrap(), poly_ring.lc(g).unwrap());
-    let f_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_ref_map(f, poly_ring.lc(g).unwrap()), &a);
-    let g_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_ref_map(g, poly_ring.lc(f).unwrap()), &a);
+    let a = ring.mul_ref(&lcf, &lcg);
+    let f_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_map(f, lcg), &a);
+    let g_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_map(g, lcf), &a);
     let d_monic = poly_gcd_monic_coprime_local(poly_ring, &f_monic, &g_monic, rng)?;
 
-    return Some(balance_poly(poly_ring, &unevaluate_aX(poly_ring, &d_monic, &a)).0);
+    return Some(balance_poly(poly_ring, unevaluate_aX(poly_ring, &d_monic, &a)).0);
 }
 
 ///
@@ -148,7 +152,7 @@ pub fn poly_gcd_monic_local<'a, P>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El
             return d;
         }
         for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
-            if let Some(di) = poly_gcd_coprime_local(poly_ring, &squarefree_part_i, &g, || rng.rand_u64()) {
+            if let Some(di) = poly_gcd_coprime_local(poly_ring, poly_ring.clone_el(&squarefree_part_i), poly_ring.clone_el(&g), || rng.rand_u64()) {
                 g = poly_ring.checked_div(&g, &di).unwrap();
                 poly_ring.mul_assign(&mut d, di);
                 continue 'extract_part_i;
@@ -156,7 +160,7 @@ pub fn poly_gcd_monic_local<'a, P>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El
         }
         unreachable!()
     }
-    return balance_poly(poly_ring, &d).0;
+    return balance_poly(poly_ring, d).0;
 }
 
 ///
@@ -170,23 +174,27 @@ pub fn poly_gcd_monic_local<'a, P>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El
 /// of the underlying ring.
 ///
 #[stability::unstable(feature = "enable")]
-pub fn poly_gcd_local< P>(poly_ring: P, f: &El<P>, g: &El<P>) -> El<P>
+pub fn poly_gcd_local< P>(poly_ring: P, f: El<P>, g: El<P>) -> El<P>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyLocallyDomain
 {
-    if poly_ring.is_zero(f) {
-        return poly_ring.clone_el(g);
-    } else if poly_ring.is_zero(g) {
-        return poly_ring.clone_el(f);
+    if poly_ring.is_zero(&f) {
+        return poly_ring.clone_el(&g);
+    } else if poly_ring.is_zero(&g) {
+        return poly_ring.clone_el(&f);
     }
+    let f = balance_poly(poly_ring, f).0;
+    let g = balance_poly(poly_ring, g).0;
+    let lcf = poly_ring.base_ring().clone_el(poly_ring.lc(&f).unwrap());
+    let lcg = poly_ring.base_ring().clone_el(poly_ring.lc(&g).unwrap());
     let ring = poly_ring.base_ring();
-    let a = ring.mul_ref(poly_ring.lc(f).unwrap(), poly_ring.lc(g).unwrap());
-    let f_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_ref_map(f, poly_ring.lc(g).unwrap()), &a);
-    let g_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_ref_map(g, poly_ring.lc(f).unwrap()), &a);
+    let a = ring.mul_ref(&lcf, &lcg);
+    let f_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_map(f, lcg), &a);
+    let g_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_map(g, lcf), &a);
     let d_monic = poly_gcd_monic_local(poly_ring, &f_monic, &g_monic);
 
-    return balance_poly(poly_ring, &unevaluate_aX(poly_ring, &d_monic, &a)).0;
+    return balance_poly(poly_ring, unevaluate_aX(poly_ring, &d_monic, &a)).0;
 }
 
 #[cfg(test)]
@@ -212,25 +220,25 @@ fn test_poly_gcd_local() {
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 0, 0, 0], 1),
-        poly_gcd_local(&poly_ring, &poly([1, 0, 1, 0, 0], 1), &poly([1, 0, 0, 1, 0], 2))
+        poly_gcd_local(&poly_ring, poly([1, 0, 1, 0, 0], 1), poly([1, 0, 0, 1, 0], 2))
     );
     
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 1, 0, 1], 1),
-        poly_gcd_local(&poly_ring, &poly([1, 1, 1, 0, 1], 20), &poly([1, 0, 1, 1, 1], 12))
+        poly_gcd_local(&poly_ring, poly([1, 1, 1, 0, 1], 20), poly([1, 0, 1, 1, 1], 12))
     );
 
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 2, 0, 1], 1),
-        poly_gcd_local(&poly_ring, &poly([1, 1, 3, 0, 1], 20), &poly([3, 0, 2, 0, 3], 12))
+        poly_gcd_local(&poly_ring, poly([1, 1, 3, 0, 1], 20), poly([3, 0, 2, 0, 3], 12))
     );
 
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 0, 5, 0], 1),
-        poly_gcd_local(&poly_ring, &poly([2, 1, 3, 5, 1], 20), &poly([1, 0, 0, 7, 0], 12))
+        poly_gcd_local(&poly_ring, poly([2, 1, 3, 5, 1], 20), poly([1, 0, 0, 7, 0], 12))
     );
 }
 
@@ -247,7 +255,7 @@ fn random_test_poly_gcd_local() {
         println!("Testing gcd on ({}) * ({}) and ({}) * ({})", poly_ring.format(&f), poly_ring.format(&h), poly_ring.format(&g), poly_ring.format(&h));
         let lhs = poly_ring.mul_ref(&f, &h);
         let rhs = poly_ring.mul_ref(&g, &h);
-        let gcd = make_primitive(&poly_ring, poly_gcd_local(&poly_ring, &lhs, &rhs));
+        let gcd = make_primitive(&poly_ring, poly_gcd_local(&poly_ring, poly_ring.clone_el(&lhs), poly_ring.clone_el(&rhs)));
 
         assert!(poly_ring.checked_div(&lhs, &gcd).is_some());
         assert!(poly_ring.checked_div(&rhs, &gcd).is_some());

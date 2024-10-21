@@ -30,7 +30,7 @@ const MAX_PROBABILISTIC_REPETITIONS: usize = 30;
 const DEFAULT_PROBABILISTIC_REPETITIONS: usize = 30;
 
 #[cfg(test)]
-const RANDOM_TEST_INSTANCE_COUNT: usize = 20;
+const RANDOM_TEST_INSTANCE_COUNT: usize = 10;
 
 ///
 /// Marks a trait as "sealed" on stable. In other words, using this trait

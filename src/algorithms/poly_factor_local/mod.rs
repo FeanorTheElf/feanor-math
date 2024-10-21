@@ -423,17 +423,17 @@ pub fn make_primitive<P>(poly_ring: P, f: &El<P>) -> (El<P>, El<<P::Type as Ring
 /// all coefficients of `f`. The definition of the balance factor is completely up to the
 /// underlying ring, see [`DivisibilityRing::balance_factor()`].
 /// 
-fn balance_poly<P>(poly_ring: P, f: &El<P>) -> (El<P>, El<<P::Type as RingExtension>::BaseRing>)
+fn balance_poly<P>(poly_ring: P, f: El<P>) -> (El<P>, El<<P::Type as RingExtension>::BaseRing>)
     where P: RingStore,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain
 {
-    if poly_ring.is_zero(f) {
+    if poly_ring.is_zero(&f) {
         return (poly_ring.zero(), poly_ring.base_ring().one());
     }
     let ring = poly_ring.base_ring();
-    let factor = ring.get_ring().balance_factor(poly_ring.terms(f).map(|(c, _)| c));
-    let result = poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (ring.checked_div(c, &factor).unwrap(), i)));
+    let factor = ring.get_ring().balance_factor(poly_ring.terms(&f).map(|(c, _)| c));
+    let result = poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (ring.checked_div(c, &factor).unwrap(), i)));
     return (result, factor);
 }
 
@@ -484,6 +484,10 @@ pub fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
 
 #[cfg(test)]
 use crate::rings::poly::dense_poly::*;
+#[cfg(test)]
+use factor::factor_poly_local;
+#[cfg(test)]
+use test::Bencher;
 
 #[test]
 fn test_poly_root() {
@@ -498,4 +502,32 @@ fn test_poly_root() {
     for k in 1..5 {
         assert_el_eq!(&poly_ring, &f, poly_root(&poly_ring, &poly_ring.pow(poly_ring.clone_el(&f), k), k).unwrap());
     }
+}
+
+#[bench]
+fn bench_factor_rational_poly_new(bencher: &mut Bencher) {
+    let ZZ = BigIntRing::RING;
+    let incl = ZZ.int_hom();
+    let poly_ring = DensePolyRing::new(&ZZ, "X");
+    let f1 = poly_ring.from_terms([(incl.map(1), 0), (incl.map(1), 2), (incl.map(3), 4), (incl.map(1), 8)].into_iter());
+    let f2 = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4), (incl.map(1), 5), (incl.map(1), 10)].into_iter());
+    let f3 = poly_ring.from_terms([(incl.map(1), 0), (incl.map(1), 1), (incl.map(-2), 5), (incl.map(1), 17)].into_iter());
+    bencher.iter(|| {
+        let actual = factor_poly_local(&poly_ring, poly_ring.prod([poly_ring.clone_el(&f1), poly_ring.clone_el(&f1), poly_ring.clone_el(&f2), poly_ring.clone_el(&f3), poly_ring.int_hom().map(9)].into_iter()));
+        assert_eq!(3, actual.len());
+        for (f, e) in actual.into_iter() {
+            if poly_ring.eq_el(&f, &f1) {
+                assert_el_eq!(poly_ring, f1, f);
+                assert_eq!(2, e);
+            } else if poly_ring.eq_el(&f, &f2) {
+                assert_el_eq!(poly_ring, f2, f);
+                assert_eq!(1, e);
+           } else if poly_ring.eq_el(&f, &f3) {
+               assert_el_eq!(poly_ring, f3, f);
+               assert_eq!(1, e);
+            } else {
+                panic!("Factorization returned wrong factor {} of ({})^2 * ({}) * ({})", poly_ring.format(&f), poly_ring.format(&f1), poly_ring.format(&f2), poly_ring.format(&f3));
+            }
+        }
+    });
 }

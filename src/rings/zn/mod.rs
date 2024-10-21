@@ -358,7 +358,7 @@ pub trait ZnOperation {
         where Self: 'a;
 
     fn call<'a, R>(self, ring: R) -> Self::Output<'a>
-        where Self: 'a, R: 'a + ZnRingStore, R::Type: ZnRing;
+        where Self: 'a, R: 'a + ZnRingStore + Send + Sync, R::Type: ZnRing, El<R>: Send;
 }
 
 ///

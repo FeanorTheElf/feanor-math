@@ -30,7 +30,7 @@ fn combine_local_factors_local<'ring, 'a, R, P, Q>(ring: &R, scale_to_ring_facto
     debug_assert!(local_factors.iter().all(|local_factor| local_poly_ring.base_ring().is_one(local_poly_ring.lc(local_factor).unwrap())));
 
     let local_ring_scale_to_ring_factor = ring.reduce_full(&maximal_ideal, (local_poly_ring.base_ring(), local_e), poly_ring.base_ring().clone_el(&scale_to_ring_factor));
-    let lift_full = |factor| balance_poly(poly_ring, &poly_ring.from_terms(local_poly_ring.terms(&factor).map(|(c, i)| (ring.lift_full(maximal_ideal, (local_poly_ring.base_ring(), local_e), local_poly_ring.base_ring().clone_el(c)), i)))).0;
+    let lift_full = |factor| balance_poly(poly_ring, poly_ring.from_terms(local_poly_ring.terms(&factor).map(|(c, i)| (ring.lift_full(maximal_ideal, (local_poly_ring.base_ring(), local_e), local_poly_ring.base_ring().clone_el(c)), i)))).0;
 
     let mut ungrouped_factors = (0..local_factors.len()).collect::<Vec<_>>();
     let mut current = poly_ring.inclusion().mul_ref_map(f, scale_to_ring_factor);
@@ -114,33 +114,33 @@ fn factor_poly_squarefree_monic_local<P>(poly_ring: P, f: &El<P>) -> Vec<El<P>>
 /// of the underlying ring.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn factor_poly_local<P>(poly_ring: P, f: &El<P>) -> Vec<(El<P>, usize)>
+pub fn factor_poly_local<P>(poly_ring: P, f: El<P>) -> Vec<(El<P>, usize)>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyLocallyDomain + DivisibilityRing
 {
-    assert!(!poly_ring.is_zero(f));
-    let power_decomposition = poly_power_decomposition_local(poly_ring, f);
+    assert!(!poly_ring.is_zero(&f));
+    let power_decomposition = poly_power_decomposition_local(poly_ring, poly_ring.clone_el(&f));
     let mut result = Vec::new();
-    let mut current = poly_ring.clone_el(f);
+    let mut current = poly_ring.clone_el(&f);
     for (factor, _k) in power_decomposition {
         let lc_factor = poly_ring.lc(&factor).unwrap();
         let factor_monic = evaluate_aX(poly_ring, &factor, lc_factor);
         let factorization = factor_poly_squarefree_monic_local(poly_ring, &factor_monic);
         for irred_factor in factorization.into_iter().map(|fi| {
-            balance_poly(poly_ring, &unevaluate_aX(poly_ring, &fi, &lc_factor)).0
+            balance_poly(poly_ring, unevaluate_aX(poly_ring, &fi, &lc_factor)).0
         }) {
             let irred_factor_lc = poly_ring.lc(&irred_factor).unwrap();
             let mut power = 0;
             while let Some(quo) = poly_ring.checked_div(&poly_ring.inclusion().mul_ref_map(&current, &poly_ring.base_ring().pow(poly_ring.base_ring().clone_el(&irred_factor_lc), poly_ring.degree(&f).unwrap())), &irred_factor) {
-                current = balance_poly(poly_ring, &quo).0;
+                current = balance_poly(poly_ring, quo).0;
                 power += 1;
             }
             assert!(power >= 1);
             result.push((irred_factor, power));
         }
     }
-    debug_assert_eq!(poly_ring.degree(f).unwrap(), result.iter().map(|(fi, i)| *i * poly_ring.degree(fi).unwrap()).sum::<usize>());
+    debug_assert_eq!(poly_ring.degree(&f).unwrap(), result.iter().map(|(fi, i)| *i * poly_ring.degree(fi).unwrap()).sum::<usize>());
     return result;
 }
 
@@ -177,19 +177,19 @@ fn test_factor_poly_local() {
     };
     
     let expected = [(poly_ring.clone_el(&f1), 1)];
-    let actual = factor_poly_local(&poly_ring, &multiply_out(&expected));
+    let actual = factor_poly_local(&poly_ring, multiply_out(&expected));
     assert_eq(&expected, actual);
 
     let expected = [(poly_ring.clone_el(&f3), 3), (poly_ring.clone_el(&f4), 3)];
-    let actual = factor_poly_local(&poly_ring, &multiply_out(&expected));
+    let actual = factor_poly_local(&poly_ring, multiply_out(&expected));
     assert_eq(&expected, actual);
 
     let expected = [(poly_ring.clone_el(&f2), 2), (poly_ring.clone_el(&f3), 3), (poly_ring.clone_el(&f4), 3)];
-    let actual = factor_poly_local(&poly_ring, &multiply_out(&expected));
+    let actual = factor_poly_local(&poly_ring, multiply_out(&expected));
     assert_eq(&expected, actual);
     
     let expected = [(poly_ring.clone_el(&f1), 1), (poly_ring.clone_el(&f2), 1), (poly_ring.clone_el(&f4), 2), (poly_ring.clone_el(&f3), 3)];
-    let actual = factor_poly_local(&poly_ring, &multiply_out(&expected));
+    let actual = factor_poly_local(&poly_ring, multiply_out(&expected));
     assert_eq(&expected, actual);
 
     // this is a tricky case, since for every prime `p`, at least one `fi` splits - however they are all irreducible over ZZ
@@ -200,15 +200,15 @@ fn test_factor_poly_local() {
     ]);
 
     let expected = [(poly_ring.clone_el(&f1), 1), (poly_ring.clone_el(&f2), 1), (poly_ring.clone_el(&f3), 1)];
-    let actual = factor_poly_local(&poly_ring, &multiply_out(&expected));
+    let actual = factor_poly_local(&poly_ring, multiply_out(&expected));
     assert_eq(&expected, actual);
 
     let expected = [(poly_ring.clone_el(&f1), 2), (poly_ring.clone_el(&f2), 1), (poly_ring.clone_el(&f3), 1)];
-    let actual = factor_poly_local(&poly_ring, &multiply_out(&expected));
+    let actual = factor_poly_local(&poly_ring, multiply_out(&expected));
     assert_eq(&expected, actual);
 
     let expected = [(poly_ring.clone_el(&f1), 2), (poly_ring.clone_el(&f2), 2), (poly_ring.clone_el(&f3), 2)];
-    let actual = factor_poly_local(&poly_ring, &multiply_out(&expected));
+    let actual = factor_poly_local(&poly_ring, multiply_out(&expected));
     assert_eq(&expected, actual);
 }
 
@@ -223,7 +223,7 @@ fn random_test_factor_poly_local() {
         let g = poly_ring.from_terms((0..=10).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
         println!("Testing factorization on ({}) * ({})^2", poly_ring.format(&f), poly_ring.format(&g));
         let product = poly_ring.mul_ref_fst(&f, poly_ring.mul_ref(&g, &g));
-        let factorization = factor_poly_local(&poly_ring, &product);
+        let factorization = factor_poly_local(&poly_ring, poly_ring.clone_el(&product));
         assert!(factorization.len() >= 2);
         assert!(factorization.iter().any(|(_, k)| *k >= 2));
         for (factor, _) in &factorization {

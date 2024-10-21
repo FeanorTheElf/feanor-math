@@ -65,12 +65,18 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// than `lhs.len() + rhs.len()`.
     /// 
     fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S);
+
+    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, ring: S) -> bool;
 }
 
 impl<'a, R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> ConvolutionAlgorithm<R> for &'a C {
 
     fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S) {
         (**self).compute_convolution(lhs, rhs, dst, ring)
+    }
+
+    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, ring: S) -> bool {
+        (**self).supports_ring(ring)
     }
 }
 
@@ -101,6 +107,10 @@ impl<R: ?Sized + RingBase, A: Allocator> ConvolutionAlgorithm<R> for KaratsubaAl
 
     fn compute_convolution<S: RingStore<Type = R>, V1: VectorView<<R as RingBase>::Element>, V2: VectorView<<R as RingBase>::Element>>(&self, lhs: V1, rhs: V2, dst: &mut[<R as RingBase>::Element], ring: S) {
         karatsuba(ring.get_ring().karatsuba_threshold(), dst, SubvectorView::new(&lhs), SubvectorView::new(&rhs), &ring, &self.allocator)
+    }
+
+    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool {
+        true
     }
 }
 

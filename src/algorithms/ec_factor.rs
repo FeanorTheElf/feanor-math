@@ -1,3 +1,5 @@
+use std::cmp::min;
+
 use crate::algorithms;
 use crate::computation::*;
 use crate::divisibility::*;
@@ -6,10 +8,8 @@ use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::integer::*;
-use crate::rings::zn::ReductionMap;
-use crate::rings::zn::ZnRing;
-use crate::rings::zn::ZnRingStore;
-use crate::rings::zn::zn_big;
+use crate::rings::zn::*;
+use crate::pid::PrincipalIdealRingStore;
 use crate::algorithms::eea::signed_gcd;
 use crate::algorithms::sqr_mul;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
@@ -190,10 +190,11 @@ fn optimize_parameters(ln_p: f64, ln_n: f64) -> (f64, f64) {
 ///
 /// Optimizes the parameters to find a factor of size roughly `p`; `p` should be at most sqrt(n)
 /// 
-fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, mut rng: F, controller: Controller) -> Result<Option<El<<R::Type as ZnRing>::IntegerRing>>, Controller::Abort>
-    where R: ZnRingStore + DivisibilityRingStore + Copy,
+fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, rng: F, controller: Controller) -> Result<Option<El<<R::Type as ZnRing>::IntegerRing>>, Controller::Abort>
+    where R: ZnRingStore + DivisibilityRingStore + Copy + Send,
+        El<R>: Send,
         R::Type: ZnRing + DivisibilityRing,
-        F: FnMut() -> u64,
+        F: FnMut() -> u64 + Send,
         Controller: ComputationController
 {
     let ZZ = BigIntRing::RING;
@@ -214,22 +215,48 @@ fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, mut rng: F, co
         .collect::<Vec<_>>();
     let power = ZZ.prod(power_factorization.iter().map(|(p, e)| ZZ.pow(ZZ.coerce(&StaticRing::<i128>::RING, *p), *e)));
 
-    for _ in 0..attempts {
-        let (x, y) = (Zn.random_element(|| rng()), Zn.random_element(|| rng()));
-        let (x_sqr, y_sqr) = (square(&Zn, &x), square(&Zn, &y));
-        if let Some(d) = Zn.checked_div(&Zn.sub(Zn.add_ref(&x_sqr, &y_sqr), Zn.one()), &Zn.mul(x_sqr, y_sqr)) {
-            let P = (x, y, Zn.one());
-            debug_assert!(is_on_curve(&Zn, &d, &P));
-            let result = ec_pow(&P, &d, &power, &Zn);
-            let possible_factor = algorithms::eea::gcd(Zn.smallest_positive_lift(result.0), Zn.integer_ring().clone_el(Zn.modulus()), Zn.integer_ring());
-            if !Zn.integer_ring().is_unit(&possible_factor) && !Zn.integer_ring().eq_el(&possible_factor, Zn.modulus()) {
-                return Ok(Some(possible_factor));
-            }
+    let computation = ShortCircuitingComputation::new();
+
+    fn try_curve_concurrent<R, F, Controller>(handle: ShortCircuitingComputationHandle<El<R>, Controller>, Zn: R, mut rng: F, remaining_attempts: u128, power: &El<BigIntRing>)
+        where R: ZnRingStore + DivisibilityRingStore + Copy + Send,
+            El<R>: Send,
+            R::Type: ZnRing + DivisibilityRing,
+            F: FnMut() -> u64 + Send,
+            Controller: ComputationController
+    {
+        const CURVES_PER_TASK: u128 = 64;
+        if remaining_attempts == 0 {
+            return;
         }
-        log_progress!(controller, ".");
-        checkpoint!(controller);
+        let points = (0..CURVES_PER_TASK).map(|_| (Zn.random_element(|| rng()), Zn.random_element(|| rng()))).collect::<Vec<_>>();
+        handle.join(move |handle| {
+            for (x, y) in points {
+                let (x_sqr, y_sqr) = (square(&Zn, &x), square(&Zn, &y));
+                if let Some(d) = Zn.checked_div(&Zn.sub(Zn.add_ref(&x_sqr, &y_sqr), Zn.one()), &Zn.mul(x_sqr, y_sqr)) {
+                    let P = (x, y, Zn.one());
+                    debug_assert!(is_on_curve(&Zn, &d, &P));
+                    let result = ec_pow(&P, &d, &power, &Zn).0;
+                    if !Zn.is_unit(&result) && !Zn.is_zero(&result) {
+                        return Ok(Some(result));
+                    }
+                }
+                log_progress!(handle, ".");
+                checkpoint!(handle);
+            }
+            return Ok(None);
+        }, move |handle| {
+            try_curve_concurrent(handle, Zn, rng, remaining_attempts - min(CURVES_PER_TASK, remaining_attempts), power);
+            return Ok(None);
+        });
     }
-    return Ok(None);
+
+    try_curve_concurrent(computation.handle(controller), Zn, rng, attempts, &power);
+
+    if let Some(result) = computation.finish()? {
+        return Ok(Some(Zn.integer_ring().ideal_gen(&Zn.smallest_positive_lift(result), Zn.modulus())));
+    } else {
+        return Ok(None);
+    }
 }
 
 ///
@@ -241,15 +268,16 @@ fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, mut rng: F, co
 /// be bounded by `2^min_factor_bound_log2`. The function is more likely to find small factors,
 /// but can, in rare cases, find other factors as well.
 /// 
-/// # Explanation of log
+/// # Explanation of logging output
 /// 
-/// If the passed computation controller accepts the log, it will receive the following symbols:
+/// If the passed computation controller accepts logging, it will receive the following symbols:
 ///  - `c(m)` means that `m` random curves will be tried using the current parameters
 ///  - `.` means an elliptic curve was tried and did not yield a factor of `n`
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn lenstra_ec_factor_small<R, Controller>(Zn: R, min_factor_bound_log2: usize, repetitions: usize, controller: Controller) -> Result<Option<El<<R::Type as ZnRing>::IntegerRing>>, Controller::Abort>
-    where R: ZnRingStore + DivisibilityRingStore,
+    where R: ZnRingStore + DivisibilityRingStore + Copy + Send,
+        El<R>: Send,
         R::Type: ZnRing + DivisibilityRing,
         Controller: ComputationController
 {
@@ -258,12 +286,12 @@ pub fn lenstra_ec_factor_small<R, Controller>(Zn: R, min_factor_bound_log2: usiz
     let mut rng = oorandom::Rand64::new(Zn.integer_ring().default_hash(Zn.modulus()) as u128);
 
     for log2_size in (16..min_factor_bound_log2).step_by(8) {
-        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_size, || rng.rand_u64(), controller.clone())? {
+        if let Some(factor) = lenstra_ec_factor_base(Zn, log2_size, || rng.rand_u64(), controller.clone())? {
             return Ok(Some(factor));
         }
     }
     for _ in 0..repetitions {
-        if let Some(factor) = lenstra_ec_factor_base(&Zn, min_factor_bound_log2, || rng.rand_u64(), controller.clone())? {
+        if let Some(factor) = lenstra_ec_factor_base(Zn, min_factor_bound_log2, || rng.rand_u64(), controller.clone())? {
             return Ok(Some(factor));
         }
     }
@@ -272,7 +300,8 @@ pub fn lenstra_ec_factor_small<R, Controller>(Zn: R, min_factor_bound_log2: usiz
 
 #[stability::unstable(feature = "enable")]
 pub fn lenstra_ec_factor<R, Controller>(Zn: R, controller: Controller) -> Result<El<<R::Type as ZnRing>::IntegerRing>, Controller::Abort>
-    where R: ZnRingStore + DivisibilityRingStore,
+    where R: ZnRingStore + DivisibilityRingStore + Copy + Send,
+        El<R>: Send,
         R::Type: ZnRing + DivisibilityRing,
         Controller: ComputationController
 {
@@ -284,13 +313,13 @@ pub fn lenstra_ec_factor<R, Controller>(Zn: R, controller: Controller) -> Result
 
     // we first try to find smaller factors
     for log2_size in (16..(log2_N / 2)).step_by(8) {
-        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_size, || rng.rand_u64(), controller.clone())? {
+        if let Some(factor) = lenstra_ec_factor_base(Zn, log2_size, || rng.rand_u64(), controller.clone())? {
             return Ok(factor);
         }
     }
     // this is now the general case
     for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
-        if let Some(factor) = lenstra_ec_factor_base(&Zn, log2_N / 2, || rng.rand_u64(), controller.clone())? {
+        if let Some(factor) = lenstra_ec_factor_base(Zn, log2_N / 2, || rng.rand_u64(), controller.clone())? {
             return Ok(factor);
         }
     }
@@ -333,11 +362,15 @@ fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
 #[ignore]
 fn test_ec_factor_large() {
     let ZZbig = BigIntRing::RING;
+    #[cfg(not(feature = "parallel"))]
+    let controller = LogProgress;
+    #[cfg(feature = "parallel")]
+    let controller = RunMultithreadedLogProgress;
 
     let n: i128 = 1073741827 * 71316922984999;
 
     let begin = Instant::now();
-    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::Zn::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n)), LogProgress).unwrap_or_else(no_error));
+    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::Zn::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n)), controller.clone()).unwrap_or_else(no_error));
     let end = Instant::now();
     println!("Done in {} ms", (end - begin).as_millis());
     assert!(p == 1073741827 || p == 71316922984999);
@@ -345,7 +378,7 @@ fn test_ec_factor_large() {
     let n: i128 = 1152921504606847009 * 2305843009213693967;
 
     let begin = Instant::now();
-    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::Zn::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n)), LogProgress).unwrap_or_else(no_error));
+    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::Zn::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n)), controller).unwrap_or_else(no_error));
     let end = Instant::now();
     println!("Done in {} ms", (end - begin).as_millis());
     assert!(p == 1152921504606847009 || p == 2305843009213693967);
