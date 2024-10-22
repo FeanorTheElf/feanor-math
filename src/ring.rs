@@ -90,28 +90,10 @@ pub enum EnvBindingStrength {
 /// let neg_one = Z7.int_hom().map(-1);
 /// assert!(!Z11.is_neg_one(&neg_one));
 /// ```
-/// It can even make problems if both rings are isomorphic, and might be expected
-/// to be intuitively "the same".
-/// ```
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::multivariate::*;
-/// # use feanor_math::rings::multivariate::multivariate_impl::*;
-/// let fst = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, 2);
-/// let snd = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, 2);
-/// // we might think they are the same, but they are not!
-/// assert!(fst.get_ring() != snd.get_ring());
-/// // f = X * Y
-/// let f = fst.create_term(1, fst.create_monomial([1, 1].into_iter()));
-/// // g = Y
-/// let g = snd.create_term(1, snd.create_monomial([0, 1].into_iter()));
-/// // thus, we may not swap elements between them (or get a nasty surprise, like `f = g`)
-/// assert!(fst.eq_el(&f, &g));
-/// // note that when debug assertions are enabled, this will panic, since the
-/// // ring will detect that g is not one of its elements; however, the equality
-/// // check will pass in builds without debug assertions.
-/// ```
+/// It is even allowed that both rings are isomorphic, and might be expected
+/// to be intuitively "the same", but still they are considered unequal, and
+/// swapping elements leads to incorrect results.
+/// 
 /// However, swapping elements between rings is well-defined and correct if they are "equal"
 /// as given by `PartialEq` (not just canonically isomorphic)
 /// ```

@@ -62,6 +62,20 @@ pub trait MultivariatePolyRing: RingExtension {
     fn exponent_at(&self, m: &Self::Monomial, var_index: usize) -> usize;
 
     ///
+    /// Writes the powers of each variable in the given monomial into the given 
+    /// output slice. 
+    /// 
+    /// This is equivalent to performing `out[i] = self.exponent_at(m, i)` for
+    /// every `i` in `0..self.indeterminate_count()`.
+    /// 
+    fn exponents(&self, m: &Self::Monomial, out: &mut [usize]) {
+        assert_eq!(out.len(), self.indeterminate_count());
+        for i in 0..self.indeterminate_count() {
+            out[i] = self.exponent_at(m, i)
+        }
+    }
+
+    ///
     /// Returns an iterator over all nonzero terms of the given polynomial.
     /// 
     fn terms<'a>(&'a self, f: &'a Self::Element) -> Self::TermIter<'a>;
@@ -243,6 +257,7 @@ pub trait MultivariatePolyRingStore: RingStore
     delegate!{ MultivariatePolyRing, fn indeterminate_count(&self) -> usize }
     delegate!{ MultivariatePolyRing, fn create_term(&self, coeff: PolyCoeff<Self>, monomial: PolyMonomial<Self>) -> El<Self> }
     delegate!{ MultivariatePolyRing, fn exponent_at(&self, m: &PolyMonomial<Self>, var_index: usize) -> usize }
+    delegate!{ MultivariatePolyRing, fn exponents(&self, m: &PolyMonomial<Self>, out: &mut [usize]) -> () }
     delegate!{ MultivariatePolyRing, fn monomial_mul(&self, lhs: PolyMonomial<Self>, rhs: &PolyMonomial<Self>) -> PolyMonomial<Self> }
     delegate!{ MultivariatePolyRing, fn monomial_lcm(&self, lhs: PolyMonomial<Self>, rhs: &PolyMonomial<Self>) -> PolyMonomial<Self> }
     delegate!{ MultivariatePolyRing, fn monomial_div(&self, lhs: PolyMonomial<Self>, rhs: &PolyMonomial<Self>) -> Result<PolyMonomial<Self>, PolyMonomial<Self>> }
@@ -250,6 +265,12 @@ pub trait MultivariatePolyRingStore: RingStore
     delegate!{ MultivariatePolyRing, fn mul_assign_monomial(&self, f: &mut El<Self>, monomial: PolyMonomial<Self>) -> () }
     delegate!{ MultivariatePolyRing, fn appearing_indeterminates(&self, f: &El<Self>) -> Vec<(usize, usize)> }
     delegate!{ MultivariatePolyRing, fn specialize(&self, f: &El<Self>, var: usize, val: &El<Self>) -> El<Self> }
+
+    fn expand_exponents(&self, m: &PolyMonomial<Self>) -> Vec<usize> {
+        let mut result = (0..self.indeterminate_count()).map(|_| 0).collect::<Vec<_>>();
+        self.exponents(m, &mut result);
+        return result;
+    }
 
     ///
     /// Returns the term of `f` whose monomial is largest (w.r.t. the given order) among all monomials smaller than `lt_than`.

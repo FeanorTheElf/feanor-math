@@ -1,4 +1,4 @@
-use std::cmp::min;
+use std::sync::atomic::AtomicU64;
 
 use crate::algorithms;
 use crate::computation::*;
@@ -12,6 +12,7 @@ use crate::rings::zn::*;
 use crate::pid::PrincipalIdealRingStore;
 use crate::algorithms::eea::signed_gcd;
 use crate::algorithms::sqr_mul;
+use crate::seq::VectorFn;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 use super::int_factor::is_prime_power;
 
@@ -190,8 +191,8 @@ fn optimize_parameters(ln_p: f64, ln_n: f64) -> (f64, f64) {
 ///
 /// Optimizes the parameters to find a factor of size roughly `p`; `p` should be at most sqrt(n)
 /// 
-fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, rng: F, controller: Controller) -> Result<Option<El<<R::Type as ZnRing>::IntegerRing>>, Controller::Abort>
-    where R: ZnRingStore + DivisibilityRingStore + Copy + Send,
+fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, mut rng: F, controller: Controller) -> Result<Option<El<<R::Type as ZnRing>::IntegerRing>>, Controller::Abort>
+    where R: ZnRingStore + DivisibilityRingStore + Copy + Send + Sync,
         El<R>: Send,
         R::Type: ZnRing + DivisibilityRing,
         F: FnMut() -> u64 + Send,
@@ -203,7 +204,7 @@ fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, rng: F, contro
     let ln_p = log2_p as f64 * 2f64.ln();
     let (ln_B, ln_attempts) = optimize_parameters(ln_p, log2_n as f64 * 2f64.ln());
     // after this many random curves, we expect to have found a factor with high probability, unless there is no factor of size about `log2_size`
-    let attempts = ln_attempts.exp() as u128;
+    let attempts = ln_attempts.exp() as usize;
     log_progress!(controller, "{}", attempts);
 
     let log2_B = ln_B / 2f64.ln();
@@ -214,43 +215,30 @@ fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, rng: F, contro
         .map(|p| (*p, log2_B.ceil() as usize / StaticRing::<i128>::RING.abs_log2_ceil(&p).unwrap()))
         .collect::<Vec<_>>();
     let power = ZZ.prod(power_factorization.iter().map(|(p, e)| ZZ.pow(ZZ.coerce(&StaticRing::<i128>::RING, *p), *e)));
+    let power_ref = &power;
 
     let computation = ShortCircuitingComputation::new();
 
-    fn try_curve_concurrent<R, F, Controller>(handle: ShortCircuitingComputationHandle<El<R>, Controller>, Zn: R, mut rng: F, remaining_attempts: u128, power: &El<BigIntRing>)
-        where R: ZnRingStore + DivisibilityRingStore + Copy + Send,
-            El<R>: Send,
-            R::Type: ZnRing + DivisibilityRing,
-            F: FnMut() -> u64 + Send,
-            Controller: ComputationController
-    {
-        const CURVES_PER_TASK: u128 = 64;
-        if remaining_attempts == 0 {
-            return;
-        }
-        let points = (0..CURVES_PER_TASK).map(|_| (Zn.random_element(|| rng()), Zn.random_element(|| rng()))).collect::<Vec<_>>();
-        handle.join(move |handle| {
-            for (x, y) in points {
-                let (x_sqr, y_sqr) = (square(&Zn, &x), square(&Zn, &y));
-                if let Some(d) = Zn.checked_div(&Zn.sub(Zn.add_ref(&x_sqr, &y_sqr), Zn.one()), &Zn.mul(x_sqr, y_sqr)) {
-                    let P = (x, y, Zn.one());
-                    debug_assert!(is_on_curve(&Zn, &d, &P));
-                    let result = ec_pow(&P, &d, &power, &Zn).0;
-                    if !Zn.is_unit(&result) && !Zn.is_zero(&result) {
-                        return Ok(Some(result));
-                    }
-                }
-                log_progress!(handle, ".");
-                checkpoint!(handle);
-            }
-            return Ok(None);
-        }, move |handle| {
-            try_curve_concurrent(handle, Zn, rng, remaining_attempts - min(CURVES_PER_TASK, remaining_attempts), power);
-            return Ok(None);
-        });
-    }
+    let base_rng_value = rng();
+    let rng_seed = AtomicU64::new(1);
+    let rng_seed_ref = &rng_seed;
 
-    try_curve_concurrent(computation.handle(controller), Zn, rng, attempts, &power);
+    computation.handle(controller).join_many((0..attempts).map_fn(move |_| move |handle: ShortCircuitingComputationHandle<_, _>| {
+        let mut rng = oorandom::Rand64::new(((rng_seed_ref.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u128) << 64) | base_rng_value as u128);
+        let (x, y) = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()));
+        let (x_sqr, y_sqr) = (square(&Zn, &x), square(&Zn, &y));
+        if let Some(d) = Zn.checked_div(&Zn.sub(Zn.add_ref(&x_sqr, &y_sqr), Zn.one()), &Zn.mul(x_sqr, y_sqr)) {
+            let P = (x, y, Zn.one());
+            debug_assert!(is_on_curve(&Zn, &d, &P));
+            let result = ec_pow(&P, &d, power_ref, &Zn).0;
+            if !Zn.is_unit(&result) && !Zn.is_zero(&result) {
+                return Ok(Some(result));
+            }
+        }
+        log_progress!(handle, ".");
+        checkpoint!(handle);
+        return Ok(None);
+    }));
 
     if let Some(result) = computation.finish()? {
         return Ok(Some(Zn.integer_ring().ideal_gen(&Zn.smallest_positive_lift(result), Zn.modulus())));
@@ -276,7 +264,7 @@ fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, rng: F, contro
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn lenstra_ec_factor_small<R, Controller>(Zn: R, min_factor_bound_log2: usize, repetitions: usize, controller: Controller) -> Result<Option<El<<R::Type as ZnRing>::IntegerRing>>, Controller::Abort>
-    where R: ZnRingStore + DivisibilityRingStore + Copy + Send,
+    where R: ZnRingStore + DivisibilityRingStore + Copy + Send + Sync,
         El<R>: Send,
         R::Type: ZnRing + DivisibilityRing,
         Controller: ComputationController
@@ -300,7 +288,7 @@ pub fn lenstra_ec_factor_small<R, Controller>(Zn: R, min_factor_bound_log2: usiz
 
 #[stability::unstable(feature = "enable")]
 pub fn lenstra_ec_factor<R, Controller>(Zn: R, controller: Controller) -> Result<El<<R::Type as ZnRing>::IntegerRing>, Controller::Abort>
-    where R: ZnRingStore + DivisibilityRingStore + Copy + Send,
+    where R: ZnRingStore + DivisibilityRingStore + Copy + Send + Sync,
         El<R>: Send,
         R::Type: ZnRing + DivisibilityRing,
         Controller: ComputationController

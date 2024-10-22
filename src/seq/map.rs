@@ -88,7 +88,7 @@ impl<V: SwappableVectorViewMut<T>, T: ?Sized, U: ?Sized, F_const: for<'a> Fn(&'a
 pub struct VectorFnMap<V: VectorFn<T>, T, U, F: Fn(T) -> U> {
     base: V,
     mapping_fn: F,
-    elements: PhantomData<(*const T, *const U)>
+    elements: PhantomData<(fn(T), fn() -> U)>
 }
 
 impl<V: Clone + VectorFn<T>, T, U, F: Clone + Fn(T) -> U> Clone for VectorFnMap<V, T, U, F> {

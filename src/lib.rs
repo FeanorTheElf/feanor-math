@@ -9,6 +9,7 @@
 #![feature(allocator_api)]
 #![feature(fn_traits)]
 #![feature(iter_advance_by)]
+#![feature(mapped_lock_guards)]
 #![feature(unboxed_closures)]
 #![feature(ptr_alignment_type)]
 #![feature(never_type)]

@@ -36,6 +36,9 @@ pub mod fft;
 ///             }
 ///         }
 ///     }
+///     fn supports_ring<S: RingStore<Type = R>>(&self, _: S) -> bool
+///         where S: Copy
+///     { true }
 /// }
 /// let lhs = [1, 2, 3, 4, 5];
 /// let rhs = [2, 3, 4, 5, 6];

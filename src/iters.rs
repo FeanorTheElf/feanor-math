@@ -220,6 +220,9 @@ impl<'a, F, T> std::iter::FusedIterator for MultisetCombinations<'a, F, T>
 /// 
 /// Note that clones of the given base iterator must all have the same iteration order.
 /// 
+/// This iterator returns its elements in descending lexicographic order, so the first
+/// yielded element is the largest one w.r.t. lexicographic order.
+/// 
 /// # Example
 /// ```
 /// # use feanor_math::iters::multiset_combinations;
@@ -227,6 +230,17 @@ impl<'a, F, T> std::iter::FusedIterator for MultisetCombinations<'a, F, T>
 ///     vec![(1, 1, 0), (1, 0, 1), (0, 2, 0), (0, 1, 1), (0, 0, 2)],
 ///     multiset_combinations(
 ///         &[1, 2, 3], 
+///         2, 
+///         |a| (a[0], a[1], a[2])
+///     ).collect::<Vec<_>>()
+/// );
+/// ```
+/// ```
+/// # use feanor_math::iters::multiset_combinations;
+/// assert_eq!(
+///     vec![(2, 0, 0), (1, 1, 0), (1, 0, 1), (0, 2, 0), (0, 1, 1), (0, 0, 2)],
+///     multiset_combinations(
+///         &[2, 2, 2], 
 ///         2, 
 ///         |a| (a[0], a[1], a[2])
 ///     ).collect::<Vec<_>>()

@@ -2,7 +2,7 @@ use std::{fmt::Arguments, io::Write, sync::atomic::{AtomicBool, Ordering}};
 
 use atomicbox::AtomicOptionBox;
 
-use crate::unstable_sealed::UnstableSealed;
+use crate::{seq::VectorFn, unstable_sealed::UnstableSealed};
 
 ///
 /// Provides an idiomatic way to convert a `Result<T, !>` into `T`, via
@@ -103,6 +103,18 @@ pub struct ShortCircuitingComputationHandle<'a, T, Controller>
     executor: &'a ShortCircuitingComputation<T, Controller>
 }
 
+impl<'a, T, Controller> Clone for ShortCircuitingComputationHandle<'a, T, Controller>
+    where T: Send,
+        Controller: ComputationController
+{
+    fn clone(&self) -> Self {
+        Self {
+            controller: self.controller.clone(),
+            executor: self.executor
+        }
+    }
+}
+
 impl<'a, T, Controller> ShortCircuitingComputationHandle<'a, T, Controller>
     where T: Send,
         Controller: ComputationController
@@ -126,6 +138,46 @@ impl<'a, T, Controller> ShortCircuitingComputationHandle<'a, T, Controller>
     #[stability::unstable(feature = "enable")]
     pub fn log(&self, description: Arguments) {
         self.controller.log(description)
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn join_many<V, F>(self, operations: V)
+        where V: VectorFn<F> + Sync,
+            F: FnOnce(Self) -> Result<Option<T>, ShortCircuitingComputationAbort<Controller::Abort>>
+    {
+        fn join_many_internal<'a, T, V, F, Controller>(controller: Controller, executor: &'a ShortCircuitingComputation<T, Controller>, tasks: &V, from: usize, to: usize, batch_tasks: usize)
+            where T: Send,
+                Controller: ComputationController,
+                V: VectorFn<F> + Sync,
+                F: FnOnce(ShortCircuitingComputationHandle<'a, T, Controller>) -> Result<Option<T>, ShortCircuitingComputationAbort<Controller::Abort>>
+        {
+            if executor.finished.load(Ordering::Relaxed) {
+                return;
+            } else if from == to {
+                return;
+            } else if from + batch_tasks >= to {
+                for i in from..to {
+                    match tasks.at(i)(ShortCircuitingComputationHandle {
+                        controller: controller.clone(),
+                        executor: executor
+                    }) {
+                        Ok(Some(result)) => {
+                            executor.finished.store(true, Ordering::Relaxed);
+                            executor.result.store(Some(Box::new(result)), Ordering::AcqRel);
+                        },
+                        Err(ShortCircuitingComputationAbort::Abort(abort)) => {
+                            executor.finished.store(true, Ordering::Relaxed);
+                            executor.abort.store(Some(Box::new(abort)), Ordering::AcqRel);
+                        },
+                        Err(ShortCircuitingComputationAbort::Finished) | Ok(None) => {}
+                    }
+                }
+            } else {
+                let mid = (from + to) / 2;
+                controller.join(move |controller| join_many_internal(controller, executor, tasks, from, mid, batch_tasks), move |controller| join_many_internal(controller, executor, tasks, mid, to, batch_tasks));
+            }
+        }
+        join_many_internal(self.controller, self.executor, &operations, 0, operations.len(), 1)
     }
 
     #[stability::unstable(feature = "enable")]
