@@ -72,6 +72,22 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, ring: S) -> bool;
 }
 
+#[stability::unstable(feature = "enable")]
+pub trait PreparedConvolutionAlgorithm<R: ?Sized + RingBase>: ConvolutionAlgorithm<R> {
+
+    type PreparedConvolutionOperand;
+
+    fn prepare_convolution_operand<S: RingStore<Type = R> + Copy, V: VectorView<R::Element>>(&self, val: V, ring: S) -> Self::PreparedConvolutionOperand;
+
+    fn compute_convolution_lhs_prepared<S: RingStore<Type = R> + Copy, V: VectorView<R::Element>>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: V, dst: &mut [R::Element], ring: S);
+    fn compute_convolution_prepared<S: RingStore<Type = R> + Copy>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: &Self::PreparedConvolutionOperand, dst: &mut [R::Element], ring: S);
+
+    fn compute_convolution_rhs_prepared<S: RingStore<Type = R> + Copy, V: VectorView<R::Element>>(&self, lhs: V, rhs: &Self::PreparedConvolutionOperand, dst: &mut [R::Element], ring: S) {
+        assert!(ring.is_commutative());
+        self.compute_convolution_lhs_prepared(rhs, lhs, dst, ring);
+    }
+}
+
 impl<'a, R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> ConvolutionAlgorithm<R> for &'a C {
 
     fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S) {

@@ -20,6 +20,8 @@ pub mod factor;
 
 ///
 /// Trait for rings that support lifting local factorizations of polynomials to the ring.
+/// For infinite fields, this is the most important approach to computing gcd's or factorizations
+/// of polynomials.
 /// 
 /// The general philosophy is similar to [`crate::compute_locally::EvaluatePolyLocallyRing`].
 /// However, when working with factorizations, it is usually better to compute modulo a power
@@ -40,7 +42,7 @@ pub mod factor;
 /// is injective.
 /// This means that a (possibly partial) factorization in the simpler ring `R / p^e`,
 /// can be uniquely mapped back into `R` - assuming all coefficients of the actual factors 
-/// have pseudo-norm at most `b`. 
+/// have pseudo-norm at most `b` and lie within the ring `R`. 
 /// 
 /// Because of this, it must be possible to give a bound on the `l∞`-pseudo norm of any monic factor 
 /// of a monic polynomial `f`, in terms of the `l2`-pseudo norm of `f` and `deg(f)`.
@@ -50,6 +52,34 @@ pub mod factor;
 /// [`FactorPolyLocallyDomain::factor_scaling()`], such that for each factor `g` of `f` over
 /// the field of fractions, we have that `ag` has coefficients in the ring. In many cases (including
 /// if the ring is a UFD, by Gauss' lemma), `a` can be chosen as `1`.
+/// 
+/// # Mathematical examples
+/// 
+/// There are three main classes of rings that this trait is designed for
+///  - The integers `ZZ`. By Gauss' lemma, we know that any factor of an integral polynomial
+///    is again integral, and we can bound its size (using the absolute value `|.|` of the real
+///    numbers) in terms of size and degree of the original polynomial. 
+///    This motivates the main algorithm for factoring over `Z`: Reduce modulo a prime
+///    `p`, lift the factorization to `p^e` for a large enough `p`, and (more or less) read of
+///    the factors over `Z`.
+///  - Multivariate polynomial rings `R[X1, ..., Xm]` where `R` is a finite field (or another ring
+///    where we can efficiently compute polynomial factorizations, e.g. another [`FactorPolyLocallyDomain`]).
+///    For simplicity, let's focus on the finite field case, i.e. `R = k`. Then we can take a maximal
+///    ideal `m` of `k[X1, ..., Xm]`, and reduce a polynomial `f in k[X1, ..., Xm][Y]` modulo `m`, compute
+///    its factorization there (i.e. over `k`), lift it to `k[X1, ..., Xm]/m^e` and (more or less) read
+///    of the factors over `R[X1, ..., Xm]`.
+///  - Orders in algebraic number fields. This case is somewhat more complicated, since (in general) we
+///    don't have a UFD anymore. Concretely, the factors of a polynomial with coefficients in an order `R`
+///    don't necessarily have coefficients in `R`. Example: `X^2 - sqrt(3) X - 1` over `Z[sqrt(3), sqrt(7)]`
+///    has the factor `X - (sqrt(3) + sqrt(7)) / 2`.
+///    However, it turns out that if the original polynomial is monic, then its factors have coefficients in
+///    the maximal order `O` of `R ⊗ QQ`. In particular, if we scale the factor by `[R : O] | disc(R)`, then
+///    we do end up with coefficients in `R`. This is why I allow for the function
+///    [`FactorPolyLocallyDomain::factor_scaling()`].
+///    Furthermore, the "pseudo-norm" here should be the canonical norm.
+/// 
+/// I cannot think of any other good examples (these were the ones I had in mind when writing this trait), but 
+/// who knows, maybe there are other rings that satisfy this and which we can thus do polynomial factorization in!
 /// 
 #[stability::unstable(feature = "enable")]
 pub trait FactorPolyLocallyDomain: Domain + DivisibilityRing {
