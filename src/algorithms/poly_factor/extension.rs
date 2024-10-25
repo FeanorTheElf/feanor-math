@@ -42,7 +42,7 @@ pub fn factor_squarefree_over_extension<P>(LX: P, f: &El<P>, attempts: usize) ->
     assert!(LX.base_ring().is_one(LX.lc(f).unwrap()));
 
     let KX = DensePolyRing::new(K, "X");
-    // Y will take the role of the ring generator `theta` and `X` remains the indeterminate
+    // Y will take the role of the ring generator `theta`, and `X` remains the indeterminate
     let KXY = DensePolyRing::new(KX.clone(), "Y");
 
     let Norm = |f: El<P>| {

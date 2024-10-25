@@ -198,6 +198,8 @@ fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, mut rng: F, co
         F: FnMut() -> u64 + Send,
         Controller: ComputationController
 {
+    start_computation!(controller, "ec_factor({}, {})", Zn.integer_ring().abs_log2_ceil(Zn.modulus()).unwrap(), log2_p);
+
     let ZZ = BigIntRing::RING;
     assert!(ZZ.is_leq(&ZZ.power_of_two(log2_p * 2), &Zn.size(&ZZ).unwrap()));
     let log2_n = ZZ.abs_log2_ceil(&Zn.size(&ZZ).unwrap()).unwrap();
@@ -223,7 +225,7 @@ fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, mut rng: F, co
     let rng_seed = AtomicU64::new(1);
     let rng_seed_ref = &rng_seed;
 
-    computation.handle(controller).join_many((0..attempts).map_fn(move |_| move |handle: ShortCircuitingComputationHandle<_, _>| {
+    computation.handle(controller.clone()).join_many((0..attempts).map_fn(move |_| move |handle: ShortCircuitingComputationHandle<_, _>| {
         let mut rng = oorandom::Rand64::new(((rng_seed_ref.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u128) << 64) | base_rng_value as u128);
         let (x, y) = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()));
         let (x_sqr, y_sqr) = (square(&Zn, &x), square(&Zn, &y));
@@ -241,8 +243,10 @@ fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, mut rng: F, co
     }));
 
     if let Some(result) = computation.finish()? {
+        finish_computation!(controller);
         return Ok(Some(Zn.integer_ring().ideal_gen(&Zn.smallest_positive_lift(result), Zn.modulus())));
     } else {
+        finish_computation!(controller, "(no_factor)");
         return Ok(None);
     }
 }

@@ -16,6 +16,13 @@ use std::alloc::Allocator;
 use std::cmp::max;
 use std::marker::PhantomData;
 
+///
+/// Trait for (possibly approximations to) the real numbers that are used to keep
+/// an estimate of the size and orthogonality of vectors during executions of LLL.
+/// 
+/// Errors caused by approximation might reduce the quality of the LLL-reduced basis,
+/// but won't give any other correctness errors.
+/// 
 #[stability::unstable(feature = "enable")]
 pub trait LLLRealField<I>: OrderedRing + Field
     where I: ?Sized + IntegerRing

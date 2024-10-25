@@ -1,8 +1,10 @@
 use std::convert::identity;
 
-use crate::algorithms::poly_factor_local::balance_poly;
-use crate::algorithms::poly_factor_local::hensel::hensel_lift_factorization;
+use crate::algorithms::poly_local::balance_poly;
+use crate::algorithms::poly_local::hensel::hensel_lift_factorization;
 use crate::algorithms::poly_factor::FactorPolyField;
+use crate::algorithms::poly_local::IdealDisplayWrapper;
+use crate::computation::*;
 use crate::iters::clone_slice;
 use crate::iters::powerset;
 use crate::ring::*;
@@ -15,10 +17,10 @@ use crate::MAX_PROBABILISTIC_REPETITIONS;
 use super::evaluate_aX;
 use super::squarefree_part::poly_power_decomposition_local;
 use super::unevaluate_aX;
-use super::{FactorPolyLocallyDomain, IntermediateReductionMap};
+use super::{PolyGCDLocallyDomain, IntermediateReductionMap};
 
 fn combine_local_factors_local<'ring, 'a, R, P, Q>(ring: &R, scale_to_ring_factor: &R::Element, maximal_ideal: &R::MaximalIdeal<'ring>, poly_ring: P, f: &El<P>, local_poly_ring: Q, local_e: usize, local_factors: Vec<El<Q>>) -> Vec<El<P>>
-    where R: ?Sized + FactorPolyLocallyDomain,
+    where R: ?Sized + PolyGCDLocallyDomain,
         P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <P::Type as RingExtension>::BaseRing: RingStore<Type = R>,
@@ -60,73 +62,112 @@ fn combine_local_factors_local<'ring, 'a, R, P, Q>(ring: &R, scale_to_ring_facto
 }
 
 ///
-/// Given squarefree and monic `f in R[X]`, computes irreducible polynomials `fi in R[X]` (irreducible both over `R` and
-/// `Frac(R)`) such that `af = f1 ... fr` for some `a in R \ {0}`.
+/// Factors the given polynomial modulo `p^e` and searches for the smallest groups of factors whose product
+/// lifts and gives a factor of `f` globally. If all factors of `f` are shortest lifts of polynomials modulo `p^e`,
+/// this means that the result is the factorization of `f`.
 /// 
-fn factor_poly_squarefree_monic_local<P>(poly_ring: P, f: &El<P>) -> Vec<El<P>>
-    where P: RingStore + Copy,
+/// For smaller `e`, this might still compute a nontrivial, partial factorization. However, clearly, it might
+/// return non-irreducible factors of `f`.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::MaximalIdeal<'ring>, e: usize, f: &El<P>, controller: Controller) -> Option<Vec<El<P>>>
+    where R: ?Sized + PolyGCDLocallyDomain,
+        P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyLocallyDomain
+        <P::Type as RingExtension>::BaseRing: RingStore<Type = R>,
+        Controller: ComputationController
 {
-    assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
-    let mut rng = oorandom::Rand64::new(1);
     let ring = poly_ring.base_ring().get_ring();
     let scale_to_ring_factor = ring.factor_scaling();
-    let poly_l2_pseudo_norm_ln = poly_ring.terms(f).map(|(c, _)| ring.ln_pseudo_norm(c).abs()).max_by(f64::total_cmp).unwrap() + (poly_ring.degree(f).unwrap() as f64).ln();
-    let ln_bound = ring.ln_factor_coeff_bound(poly_l2_pseudo_norm_ln, poly_ring.degree(f).unwrap()) + ring.ln_pseudo_norm(&scale_to_ring_factor);
 
-    'try_random_prime: for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
-        let prime = ring.random_maximal_ideal(|| rng.rand_u64());
-        let e = ring.required_power(&prime, ln_bound);
-        let reduction_map = IntermediateReductionMap::new(ring, &prime, e, 1);
+    log_progress!(controller, "mod({}^{})", IdealDisplayWrapper::new(ring, &prime), e);
 
-        let prime_field = ring.local_field_at(&prime);
-        let prime_field_poly_ring = DensePolyRing::new(&prime_field, "X");
-        let prime_ring = reduction_map.codomain();
-        let iso = prime_field.can_iso(&prime_ring).unwrap();
+    let reduction_map = IntermediateReductionMap::new(ring, &prime, e, 1);
 
-        let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (iso.inv().map(ring.reduce_full(&prime, (&prime_ring, 1), ring.clone_el(c))), i)));
-        let mut factors = Vec::new();
-        for (f, k) in <_ as FactorPolyField>::factor_poly(&prime_field_poly_ring, &prime_field_f).0 {
-            if k > 1 {
-                continue 'try_random_prime;
-            }
-            factors.push(f);
+    let prime_field = ring.local_field_at(&prime);
+    let prime_field_poly_ring = DensePolyRing::new(&prime_field, "X");
+    let prime_ring = reduction_map.codomain();
+    let iso = prime_field.can_iso(&prime_ring).unwrap();
+
+    let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (iso.inv().map(ring.reduce_full(&prime, (&prime_ring, 1), ring.clone_el(c))), i)));
+    let mut factors = Vec::new();
+    for (f, k) in <_ as FactorPolyField>::factor_poly(&prime_field_poly_ring, &prime_field_f).0 {
+        if k > 1 {
+            log_progress!(controller, "(not_squarefree)");
+            return None;
         }
+        factors.push(f);
+    }
+
+    let target_poly_ring = DensePolyRing::new(reduction_map.domain(), "X");
+    let local_ring_f = target_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (ring.reduce_full(&prime, (reduction_map.domain(), reduction_map.from_e()), poly_ring.base_ring().clone_el(c)), i)));
     
-        let target_poly_ring = DensePolyRing::new(reduction_map.domain(), "X");
-        let local_ring_f = target_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (ring.reduce_full(&prime, (reduction_map.domain(), reduction_map.from_e()), poly_ring.base_ring().clone_el(c)), i)));
+    let local_ring_factorization = hensel_lift_factorization(&reduction_map, &target_poly_ring, &prime_field_poly_ring, &local_ring_f, &factors[..], controller.clone());
+    
+    finish_computation!(controller);
+    return Some(combine_local_factors_local(ring, &scale_to_ring_factor, &prime, poly_ring, f, &target_poly_ring, reduction_map.from_e(), local_ring_factorization));
+}
+
+///
+/// Given squarefree and monic `f in R[X]`, computes polynomials `fi in R[X]` such that 
+/// `af = f1 ... fr` for some `a in R \ {0}`. We hope that `f1, ..., fr` are irreducible, and
+/// they are guaranteed to be for a large enough `prime_exponent_factor`.
+/// 
+/// Concretely, this function proceeds by factoring `f` modulo `p^e` for a random prime `p` and
+/// some `e = e_heuristic * prime_exponent_factor` for some `e_heuristic` that is chosen
+/// depending on `f`. Then the factors in this factorization are combined such that they lift to `R`.
+/// 
+fn heuristic_factor_poly_squarefree_monic_local<P, Controller>(poly_ring: P, f: &El<P>, prime_exponent_factor: f64, controller: Controller) -> Vec<El<P>>
+    where P: RingStore + Copy,
+        P::Type: PolyRing + DivisibilityRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain,
+        Controller: ComputationController
+{
+    assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
+    assert!(prime_exponent_factor >= 1.);
+
+    log_progress!(controller, "heuristic_factor_monic(deg = {})", poly_ring.degree(f).unwrap());
+
+    let mut rng = oorandom::Rand64::new(1);
+    let ring = poly_ring.base_ring().get_ring();
+
+    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+        let prime = ring.random_maximal_ideal(|| rng.rand_u64());
+        let heuristic_e = ring.heuristic_exponent(&prime, poly_ring, f);
+        assert!(heuristic_e >= 1);
+        let e = (heuristic_e as f64 * prime_exponent_factor).floor() as usize;
         
-        let local_ring_factorization = hensel_lift_factorization(&reduction_map, &target_poly_ring, &prime_field_poly_ring, &local_ring_f, &factors[..]);
-        return combine_local_factors_local(ring, &scale_to_ring_factor, &prime, poly_ring, f, &target_poly_ring, reduction_map.from_e(), local_ring_factorization);
+        if let Some(result) = factor_and_lift_mod_pe(poly_ring, &prime, e, f, controller.clone()) {
+            return result;
+        }
     }
     unreachable!()
 }
 
 ///
-/// Computes the factorization of a polynomial `f in R[X]` over `Frac(R)` locally, without ever
-/// explicitly working in `Frac(R)`.
+/// Given `f in R[X]`, computes polynomials `fi in R[X]` such that `af = f1 ... fr` for 
+/// some `a in R \ {0}`. We hope that `f1, ..., fr` are irreducible, and they are
+/// guaranteed to be for a large enough `prime_exponent_factor`.
 /// 
-/// In other words, returns tuples `(fi, ei)` where the `fi` are irreducible polynomials, both over
-/// `R` and over `Frac(R)`, such that there exists `a in R \ {0}` with `af = f1^e1 ... fr^er`.
-/// 
-/// The results can all be assumed to be "balanced", according to the contract of [`DivisibilityRing::balance_factor()`]
-/// of the underlying ring.
+/// Concretely, this function proceeds by factoring `f` modulo `p^e` for a random prime `p` and
+/// some `e = e_heuristic * prime_exponent_factor` for some `e_heuristic` that is chosen
+/// depending on `f`. Then the factors in this factorization are combined such that they lift to `R`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn factor_poly_local<P>(poly_ring: P, f: El<P>) -> Vec<(El<P>, usize)>
+pub fn heuristic_factor_poly_local<P, Controller>(poly_ring: P, f: El<P>, prime_exponent_factor: f64, controller: Controller) -> Vec<(El<P>, usize)>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FactorPolyLocallyDomain + DivisibilityRing
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain + DivisibilityRing,
+        Controller: ComputationController
 {
     assert!(!poly_ring.is_zero(&f));
-    let power_decomposition = poly_power_decomposition_local(poly_ring, poly_ring.clone_el(&f));
+    let power_decomposition = poly_power_decomposition_local(poly_ring, poly_ring.clone_el(&f), controller.clone());
     let mut result = Vec::new();
     let mut current = poly_ring.clone_el(&f);
     for (factor, _k) in power_decomposition {
         let lc_factor = poly_ring.lc(&factor).unwrap();
         let factor_monic = evaluate_aX(poly_ring, &factor, lc_factor);
-        let factorization = factor_poly_squarefree_monic_local(poly_ring, &factor_monic);
+        let factorization = heuristic_factor_poly_squarefree_monic_local(poly_ring, &factor_monic, prime_exponent_factor, controller.clone());
         for irred_factor in factorization.into_iter().map(|fi| {
             balance_poly(poly_ring, unevaluate_aX(poly_ring, &fi, &lc_factor)).0
         }) {
@@ -151,7 +192,7 @@ use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[cfg(test)]
 use crate::algorithms::poly_div::poly_div_domain;
 #[cfg(test)]
-use crate::algorithms::poly_factor_local::make_primitive;
+use crate::algorithms::poly_local::make_primitive;
 
 #[test]
 fn test_factor_poly_local() {
@@ -177,19 +218,19 @@ fn test_factor_poly_local() {
     };
     
     let expected = [(poly_ring.clone_el(&f1), 1)];
-    let actual = factor_poly_local(&poly_ring, multiply_out(&expected));
+    let actual = heuristic_factor_poly_local(&poly_ring, multiply_out(&expected), 1., LogProgress);
     assert_eq(&expected, actual);
 
     let expected = [(poly_ring.clone_el(&f3), 3), (poly_ring.clone_el(&f4), 3)];
-    let actual = factor_poly_local(&poly_ring, multiply_out(&expected));
+    let actual = heuristic_factor_poly_local(&poly_ring, multiply_out(&expected), 1., LogProgress);
     assert_eq(&expected, actual);
 
     let expected = [(poly_ring.clone_el(&f2), 2), (poly_ring.clone_el(&f3), 3), (poly_ring.clone_el(&f4), 3)];
-    let actual = factor_poly_local(&poly_ring, multiply_out(&expected));
+    let actual = heuristic_factor_poly_local(&poly_ring, multiply_out(&expected), 1., LogProgress);
     assert_eq(&expected, actual);
     
     let expected = [(poly_ring.clone_el(&f1), 1), (poly_ring.clone_el(&f2), 1), (poly_ring.clone_el(&f4), 2), (poly_ring.clone_el(&f3), 3)];
-    let actual = factor_poly_local(&poly_ring, multiply_out(&expected));
+    let actual = heuristic_factor_poly_local(&poly_ring, multiply_out(&expected), 1., LogProgress);
     assert_eq(&expected, actual);
 
     // this is a tricky case, since for every prime `p`, at least one `fi` splits - however they are all irreducible over ZZ
@@ -200,15 +241,15 @@ fn test_factor_poly_local() {
     ]);
 
     let expected = [(poly_ring.clone_el(&f1), 1), (poly_ring.clone_el(&f2), 1), (poly_ring.clone_el(&f3), 1)];
-    let actual = factor_poly_local(&poly_ring, multiply_out(&expected));
+    let actual = heuristic_factor_poly_local(&poly_ring, multiply_out(&expected), 1., LogProgress);
     assert_eq(&expected, actual);
 
     let expected = [(poly_ring.clone_el(&f1), 2), (poly_ring.clone_el(&f2), 1), (poly_ring.clone_el(&f3), 1)];
-    let actual = factor_poly_local(&poly_ring, multiply_out(&expected));
+    let actual = heuristic_factor_poly_local(&poly_ring, multiply_out(&expected), 1., LogProgress);
     assert_eq(&expected, actual);
 
     let expected = [(poly_ring.clone_el(&f1), 2), (poly_ring.clone_el(&f2), 2), (poly_ring.clone_el(&f3), 2)];
-    let actual = factor_poly_local(&poly_ring, multiply_out(&expected));
+    let actual = heuristic_factor_poly_local(&poly_ring, multiply_out(&expected), 1., LogProgress);
     assert_eq(&expected, actual);
 }
 
@@ -219,11 +260,10 @@ fn random_test_factor_poly_local() {
     let mut rng = oorandom::Rand64::new(1);
     let bound = ring.int_hom().map(10000);
     for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
-        let f = poly_ring.from_terms((0..=20).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-        let g = poly_ring.from_terms((0..=10).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-        println!("Testing factorization on ({}) * ({})^2", poly_ring.format(&f), poly_ring.format(&g));
+        let f = poly_ring.from_terms((0..=10).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let g = poly_ring.from_terms((0..=5).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
         let product = poly_ring.mul_ref_fst(&f, poly_ring.mul_ref(&g, &g));
-        let factorization = factor_poly_local(&poly_ring, poly_ring.clone_el(&product));
+        let factorization = heuristic_factor_poly_local(&poly_ring, poly_ring.clone_el(&product), 5., LogProgress);
         assert!(factorization.len() >= 2);
         assert!(factorization.iter().any(|(_, k)| *k >= 2));
         for (factor, _) in &factorization {

@@ -1,10 +1,11 @@
+use crate::computation::ComputationController;
 use crate::pid::*;
 use crate::ring::*;
 use crate::divisibility::*;
 use crate::rings::poly::*;
 use crate::homomorphism::*;
 use crate::seq::*;
-use super::{FactorPolyLocallyDomain, IntermediateReductionMap};
+use super::{PolyGCDLocallyDomain, IntermediateReductionMap};
 
 ///
 /// Given a monic polynomial `f` modulo `p^r` and a factorization `f = gh mod p^e`
@@ -13,18 +14,20 @@ use super::{FactorPolyLocallyDomain, IntermediateReductionMap};
 /// modulo `p^e`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn hensel_lift<'ring, 'b, R, P1, P2>(
+pub fn hensel_lift<'ring, 'b, R, P1, P2, Controller>(
     reduction_map: &IntermediateReductionMap<'ring, 'b, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
-    factors: (&El<P2>, &El<P2>)
+    factors: (&El<P2>, &El<P2>),
+    controller: Controller
 ) -> (El<P1>, El<P1>)
-    where R: ?Sized + FactorPolyLocallyDomain,
+    where R: ?Sized + PolyGCDLocallyDomain,
         P1: RingStore, P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
         P2: RingStore, P2::Type: PolyRing + PrincipalIdealRing,
-        <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>
+        <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>,
+        Controller: ComputationController
 {
     assert!(target_poly_ring.base_ring().is_one(target_poly_ring.lc(f).unwrap()));
     assert!(base_poly_ring.base_ring().is_one(base_poly_ring.lc(factors.0).unwrap()));
@@ -53,6 +56,7 @@ pub fn hensel_lift<'ring, 'b, R, P1, P2>(
 
     let P = target_poly_ring;
     for _ in reduction_map.to_e()..reduction_map.from_e() {
+        log_progress!(controller, ".");
         let delta = P.sub_ref_fst(f, P.mul_ref(&current_g, &current_h));
         let mut delta_g = P.mul_ref(&lifted_t, &delta);
         let mut delta_h = P.mul_ref(&lifted_s, &delta);
@@ -71,19 +75,21 @@ pub fn hensel_lift<'ring, 'b, R, P1, P2>(
 /// Like [`hensel_lift()`] but for an arbitrary number of factors.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn hensel_lift_factorization<'ring, 'b, R, P1, P2, V>(
+pub fn hensel_lift_factorization<'ring, 'b, R, P1, P2, V, Controller>(
     reduction_map: &IntermediateReductionMap<'ring, 'b, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
-    factors: V
+    factors: V,
+    controller: Controller
 ) -> Vec<El<P1>>
-    where R: ?Sized + FactorPolyLocallyDomain,
+    where R: ?Sized + PolyGCDLocallyDomain,
         P1: RingStore + Copy, P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
         P2: RingStore + Copy, P2::Type: PolyRing + PrincipalIdealRing,
         <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>,
-        V: SelfSubvectorView<El<P2>>
+        V: SelfSubvectorView<El<P2>>,
+        Controller: ComputationController
 {
     assert!(target_poly_ring.base_ring().is_one(target_poly_ring.lc(f).unwrap()));
     assert!(factors.as_iter().all(|f| base_poly_ring.base_ring().is_one(base_poly_ring.lc(f).unwrap())));
@@ -93,8 +99,8 @@ pub fn hensel_lift_factorization<'ring, 'b, R, P1, P2, V>(
         return vec![target_poly_ring.clone_el(f)];
     }
     let (g, h) = (factors.at(0), base_poly_ring.prod(factors.as_iter().skip(1).map(|h| base_poly_ring.clone_el(h))));
-    let (g_lifted, h_lifted) = hensel_lift(reduction_map, target_poly_ring, base_poly_ring, &f, (g, &h));
-    let mut result = hensel_lift_factorization(reduction_map, target_poly_ring, base_poly_ring, &h_lifted, factors.restrict(1..));
+    let (g_lifted, h_lifted) = hensel_lift(reduction_map, target_poly_ring, base_poly_ring, &f, (g, &h), controller.clone());
+    let mut result = hensel_lift_factorization(reduction_map, target_poly_ring, base_poly_ring, &h_lifted, factors.restrict(1..), controller);
     result.insert(0, g_lifted);
     return result;
 }

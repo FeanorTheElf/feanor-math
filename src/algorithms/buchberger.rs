@@ -260,6 +260,8 @@ pub fn buchberger<P, O, Controller, SortFn, AbortFn>(ring: P, input_basis: Vec<E
         SortFn: FnMut(&mut [SPoly], &[El<P>]),
         AbortFn: FnMut(&[(El<P>, ExpandedMonomial)]) -> bool
 {
+    start_computation!(controller, "buchberger({})", input_basis.len());
+
     // this are the basis polynomials we generated; we only append to this, such that the S-polys remain valid
     let input_basis = inter_reduce(&ring, input_basis.into_iter().map(|f| augment_lm(ring, f, order)).collect(), order).into_iter().map(|(f, _)| f).collect::<Vec<_>>();
     debug_assert!(input_basis.iter().all(|f| !ring.is_zero(f)));
@@ -326,6 +328,7 @@ pub fn buchberger<P, O, Controller, SortFn, AbortFn>(ring: P, input_basis: Vec<E
                 // S-polys between two of them might not have been considered
                 return buchberger::<P, O, _, _, _>(ring, reducers.into_iter().map(|(f, _)| f).collect(), order, sort_spolys, abort_early_if, controller);
             } else {
+                finish_computation!(controller);
                 return Ok(reducers.into_iter().map(|(f, _)| f).collect());
             }
         } else if new_polys.len() == 0 {
@@ -342,6 +345,7 @@ pub fn buchberger<P, O, Controller, SortFn, AbortFn>(ring: P, input_basis: Vec<E
             sort_reducers(&mut reducers);
             log_progress!(controller, "r({})", reducers.len());
             if abort_early_if(&reducers) {
+                finish_computation!(controller, "(early_abort)");
                 return Ok(reducers.into_iter().map(|(f, _)| f).collect());
             }
         }

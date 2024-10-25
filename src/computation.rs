@@ -42,6 +42,16 @@ pub trait ComputationController: Clone + UnstableSealed {
     fn checkpoint(&self, _description: Arguments) -> Result<(), Self::Abort> { 
         Ok(())
     }
+    
+    #[stability::unstable(feature = "enable")]
+    fn finish(&self, description: Arguments) {
+        self.log(description)
+    }
+
+    #[stability::unstable(feature = "enable")]
+    fn start(&self, description: Arguments) {
+        self.log(description)
+    }
 
     #[stability::unstable(feature = "enable")]
     fn log(&self, _description: Arguments) {}
@@ -277,6 +287,23 @@ macro_rules! log_progress {
     };
 }
 
+#[macro_export]
+macro_rules! finish_computation {
+    ($controller:expr, $($args:tt)*) => {
+        ($controller).finish(std::format_args!($($args)*))
+    };
+    ($controller:expr) => {
+        ($controller).finish(std::format_args!(""))
+    };
+}
+
+#[macro_export]
+macro_rules! start_computation {
+    ($controller:expr, $($args:tt)*) => {
+        ($controller).start(std::format_args!($($args)*))
+    };
+}
+
 #[derive(Clone, Copy)]
 pub struct LogProgress;
 
@@ -289,6 +316,10 @@ impl ComputationController for LogProgress {
     fn log(&self, description: Arguments) {
         print!("{}", description);
         std::io::stdout().flush().unwrap();
+    }
+
+    fn finish(&self, description: Arguments) {
+        println!("{}", description);
     }
 
     fn checkpoint(&self, description: Arguments) -> Result<(), Self::Abort> {
