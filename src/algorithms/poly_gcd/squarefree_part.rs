@@ -1,21 +1,15 @@
 use dense_poly::DensePolyRing;
 
-use crate::algorithms::poly_factor::integer::poly_power_decomposition_global;
-use crate::algorithms::poly_local::hensel::hensel_lift_factorization;
-use crate::algorithms::poly_local::poly_root;
-use crate::algorithms::poly_local::IntermediateReductionMap;
+use crate::algorithms::poly_gcd::*;
+use crate::algorithms::poly_gcd::local::*;
+use crate::algorithms::poly_gcd::hensel::*;
 use crate::computation::*;
-use crate::homomorphism::*;
-use crate::ring::*;
-use crate::rings::poly::*;
-use crate::divisibility::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 
 use super::balance_poly;
 use super::evaluate_aX;
 use super::unevaluate_aX;
-use super::IdealDisplayWrapper;
-use super::PolyGCDLocallyDomain;
+use super::PolyGCDRing;
 use super::INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT;
 
 ///
@@ -58,7 +52,7 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, f: &El<
         let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (iso.inv().map(ring.reduce_full(&prime, (&prime_ring, 1), ring.clone_el(c))), i)));
         let mut powers = Vec::new();
         let mut factors = Vec::new();
-        for (f, k) in poly_power_decomposition_global(&prime_field_poly_ring, &prime_field_f) {
+        for (f, k) in <_ as PolyGCDRing>::power_decomposition(&prime_field_poly_ring, &prime_field_f) {
             powers.push(k);
             factors.push(prime_field_poly_ring.pow(f, k));
         }
@@ -148,8 +142,6 @@ pub fn poly_squarefree_part_local<P, Controller>(poly_ring: P, f: El<P>, control
     balance_poly(poly_ring, poly_ring.prod(poly_power_decomposition_local(poly_ring, f, controller).into_iter().map(|(fi, _i)| fi))).0
 }
 
-#[cfg(test)]
-use crate::integer::*;
 #[cfg(test)]
 use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[cfg(test)]

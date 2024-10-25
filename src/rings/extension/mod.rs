@@ -209,7 +209,8 @@ pub trait FreeAlgebraStore: RingStore
         where Self::Type: DivisibilityRing, 
             <<Self::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + Field + FactorPolyField
     {
-        if let Some(_factor) = <_ as FactorPolyField>::find_factor_by_extension(DensePolyRing::new(self.base_ring(), "X"), &self) {
+        let poly_ring = DensePolyRing::new(self.base_ring(), "X");
+        if <_ as FactorPolyField>::factor_poly(&poly_ring, &self.generating_poly(&poly_ring, self.base_ring().identity())).0.len() > 1 {
             return Err(self);
         } else {
             return Ok(RingValue::from(AsFieldBase::promise_is_perfect_field(self)));

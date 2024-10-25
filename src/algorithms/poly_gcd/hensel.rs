@@ -5,7 +5,7 @@ use crate::divisibility::*;
 use crate::rings::poly::*;
 use crate::homomorphism::*;
 use crate::seq::*;
-use super::{PolyGCDLocallyDomain, IntermediateReductionMap};
+use crate::algorithms::poly_gcd::local::*;
 
 ///
 /// Given a monic polynomial `f` modulo `p^r` and a factorization `f = gh mod p^e`

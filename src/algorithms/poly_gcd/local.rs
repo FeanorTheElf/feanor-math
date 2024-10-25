@@ -1,10 +1,8 @@
 use std::fmt::Display;
 
 use crate::divisibility::*;
-use crate::field::PerfectField;
 use crate::homomorphism::*;
 use crate::integer::*;
-use crate::pid::*;
 use crate::primitive_int::*;
 use crate::ring::*;
 use crate::rings::field::*;
@@ -12,15 +10,10 @@ use crate::rings::poly::*;
 use crate::rings::zn::*;
 use crate::rings::zn::zn_big;
 
-use super::miller_rabin::next_prime;
-use super::poly_factor::FactorPolyField;
+use crate::algorithms::miller_rabin::next_prime;
+use crate::algorithms::poly_factor::FactorPolyField;
 
-pub mod hensel;
-pub mod squarefree_part;
-pub mod gcd;
-pub mod heuristic_factor;
-
-const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
+use super::PolyGCDRing;
 
 ///
 /// Trait for rings that support lifting local partial factorizations of polynomials to the ring.
@@ -108,7 +101,7 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing {
     /// which in turn is required since the straightforward bound `for<'a> AsFieldBase<Self::LocalRing<'a>>: FactorPolyField`
     /// is bugged, see also [`crate::compute_locally::ComputeLocallyRing`].
     /// 
-    type LocalFieldBase<'ring>: CanIsoFromTo<Self::LocalRingBase<'ring>> + FactorPolyField + PerfectField
+    type LocalFieldBase<'ring>: CanIsoFromTo<Self::LocalRingBase<'ring>> + PolyGCDRing + FactorPolyField
         where Self: 'ring;
 
     type LocalField<'ring>: RingStore<Type = Self::LocalFieldBase<'ring>>
@@ -197,7 +190,15 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing {
     fn lift_full<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
         where Self: 'ring;
 
-    fn dbg_maximal_ideal<'ring>(&self, p: &Self::MaximalIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result;
+    fn dbg_maximal_ideal<'ring>(&self, p: &Self::MaximalIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
+        where Self: 'ring;
+}
+
+#[stability::unstable(feature = "enable")]
+pub trait IntegerPolyGCDRing: PolyGCDLocallyDomain + IntegerRing {
+
+    fn maximal_ideal_gen<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> i64
+        where Self: 'ring;
 }
 
 #[stability::unstable(feature = "enable")]
@@ -322,13 +323,18 @@ impl<'ring, 'data, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalRingBase<'ri
     }
 }
 
-impl PolyGCDLocallyDomain for BigIntRingBase {
+impl<I: IntegerRing> PolyGCDLocallyDomain for I {
 
-    type LocalRing<'ring> = zn_big::Zn<BigIntRing>;
-    type LocalRingBase<'ring> = zn_big::ZnBase<BigIntRing>;
-    type LocalFieldBase<'ring> = AsFieldBase<zn_64::Zn>;
-    type LocalField<'ring> = AsField<zn_64::Zn>;
-    type MaximalIdeal<'ring> = i64;
+    type LocalRing<'ring> = zn_big::Zn<BigIntRing>
+        where Self: 'ring;
+    type LocalRingBase<'ring> = zn_big::ZnBase<BigIntRing>
+        where Self: 'ring;
+    type LocalFieldBase<'ring> = AsFieldBase<zn_64::Zn>
+        where Self: 'ring;
+    type LocalField<'ring> = AsField<zn_64::Zn>
+        where Self: 'ring;
+    type MaximalIdeal<'ring> = i64
+        where Self: 'ring;
 
     fn factor_scaling(&self) -> Self::Element {
         self.one()
@@ -337,10 +343,12 @@ impl PolyGCDLocallyDomain for BigIntRingBase {
     fn lift_full<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
         where Self: 'ring
     {
-        from.0.smallest_lift(x)
+        int_cast(from.0.smallest_lift(x), RingRef::new(self), BigIntRing::RING)
     }
 
-    fn lift_partial<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>> {
+    fn lift_partial<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+        where Self: 'ring
+    {
         assert!(from.1 <= to.1);
         let hom = to.0.can_hom(to.0.integer_ring()).unwrap();
         return hom.map(from.0.any_lift(x));
@@ -352,23 +360,30 @@ impl PolyGCDLocallyDomain for BigIntRingBase {
         zn_64::Zn::new(*p as u64).as_field().ok().unwrap()
     }
 
-    fn local_ring_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>, e: usize) -> Self::LocalRing<'ring> {
+    fn local_ring_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>, e: usize) -> Self::LocalRing<'ring>
+        where Self: 'ring
+    {
         zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.pow(int_cast(*p, BigIntRing::RING, StaticRing::<i64>::RING), e))
     }
 
     fn random_maximal_ideal<'ring, F>(&'ring self, rng: F) -> Self::MaximalIdeal<'ring>
         where F: FnMut() -> u64
     {
-        let lower_bound = StaticRing::<i64>::RING.get_ring().get_uniformly_random_bits(32, rng);
+        let lower_bound = StaticRing::<i64>::RING.get_ring().get_uniformly_random_bits(24, rng);
         return next_prime(StaticRing::<i64>::RING, lower_bound);
     }
 
-    fn reduce_full<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>> {
-        let hom = to.0.can_hom(to.0.integer_ring()).unwrap();
+    fn reduce_full<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>
+        where Self: 'ring
+    {
+        let self_ref = RingRef::new(self);
+        let hom = to.0.can_hom(&self_ref).unwrap();
         return hom.map(x);
     }
 
-    fn reduce_partial<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>> {
+    fn reduce_partial<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+        where Self: 'ring
+    {
         assert!(from.1 >= to.1);
         let hom = to.0.can_hom(to.0.integer_ring()).unwrap();
         return hom.map(from.0.smallest_lift(x));
@@ -380,151 +395,23 @@ impl PolyGCDLocallyDomain for BigIntRingBase {
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
             Self: 'ring
     {
-        let log2_largest_exponent = poly_ring.terms(poly).map(|(c, _)| BigIntRing::RING.abs_log2_ceil(c).unwrap() as f64).max_by(f64::total_cmp).unwrap();
+        let log2_largest_exponent = poly_ring.terms(poly).map(|(c, _)| RingRef::new(self).abs_log2_ceil(c).unwrap() as f64).max_by(f64::total_cmp).unwrap();
         // this is in no way a rigorous bound, but equals the worst-case bound at least asymptotically (up to constants)
         return ((log2_largest_exponent + poly_ring.degree(poly).unwrap() as f64) / (*p as f64).log2() / /* just some factor that seemed good when playing around */ 4.).ceil() as usize + 1;
     }
     
-    fn dbg_maximal_ideal<'ring>(&self, p: &Self::MaximalIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn dbg_maximal_ideal<'ring>(&self, p: &Self::MaximalIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
+        where Self: 'ring
+    {
         write!(out, "{}", p)
     }
 }
 
-///
-/// Computes the map
-/// ```text
-///   R[X] -> R[X],  f(X) -> a^(deg(f) - 1) f(X / a)
-/// ```
-/// that can be used to make polynomials over a domain monic (when setting `a = lc(f)`).
-/// 
-fn evaluate_aX<P>(poly_ring: P, f: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>) -> El<P>
-    where P: RingStore,
-        P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain
-{
-    if poly_ring.is_zero(f) {
-        return poly_ring.zero();
-    }
-    let ring = poly_ring.base_ring();
-    let d = poly_ring.degree(&f).unwrap();
-    let result = poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| if i == d { (ring.checked_div(c, a).unwrap(), d) } else { (ring.mul_ref_fst(c, ring.pow(ring.clone_el(a), d - i - 1)), i) }));
-    return result;
-}
+impl<I: IntegerRing> IntegerPolyGCDRing for I {
 
-///
-/// Computes the inverse to [`evaluate_aX()`].
-/// 
-fn unevaluate_aX<P>(poly_ring: P, g: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>) -> El<P>
-    where P: RingStore,
-        P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain
-{
-    if poly_ring.is_zero(g) {
-        return poly_ring.zero();
-    }
-    let ring = poly_ring.base_ring();
-    let d = poly_ring.degree(&g).unwrap();
-    let result = poly_ring.from_terms(poly_ring.terms(g).map(|(c, i)| if i == d { (ring.clone_el(a), d) } else { (ring.checked_div(c, &ring.pow(ring.clone_el(a), d - i - 1)).unwrap(), i) }));
-    return result;
-}
-
-///
-/// Given a polynomial `f` over a PID, returns `(f/cont(f), cont(f))`, where `cont(f)`
-/// is the content of `f`, i.e. the gcd of all coefficients of `f`.
-/// 
-#[stability::unstable(feature = "enable")]
-pub fn make_primitive<P>(poly_ring: P, f: &El<P>) -> (El<P>, El<<P::Type as RingExtension>::BaseRing>)
-    where P: RingStore,
-        P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing + Domain
-{
-    if poly_ring.is_zero(f) {
-        return (poly_ring.zero(), poly_ring.base_ring().one());
-    }
-    let ring = poly_ring.base_ring();
-    let content = poly_ring.terms(f).map(|(c, _)| c).fold(ring.zero(), |a, b| ring.ideal_gen(&a, b));
-    let result = poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (ring.checked_div(c, &content).unwrap(), i)));
-    return (result, content);
-}
-
-///
-/// A weaker version of [`make_primitive()`] that just divides out the "balance factor" of
-/// all coefficients of `f`. The definition of the balance factor is completely up to the
-/// underlying ring, see [`DivisibilityRing::balance_factor()`].
-/// 
-fn balance_poly<P>(poly_ring: P, f: El<P>) -> (El<P>, El<<P::Type as RingExtension>::BaseRing>)
-    where P: RingStore,
-        P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain
-{
-    if poly_ring.is_zero(&f) {
-        return (poly_ring.zero(), poly_ring.base_ring().one());
-    }
-    let ring = poly_ring.base_ring();
-    let factor = ring.get_ring().balance_factor(poly_ring.terms(&f).map(|(c, _)| c));
-    let result = poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (ring.checked_div(c, &factor).unwrap(), i)));
-    return (result, factor);
-}
-
-///
-/// Checks whether there exists a polynomial `g` such that `g^k = f`, and if yes,
-/// returns `g`.
-/// 
-/// # Example
-/// ```
-/// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::algorithms::poly_local::*;
-/// let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
-/// let [f, f_sqrt] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 2 * X + 1, X + 1]);
-/// assert_el_eq!(&poly_ring, f_sqrt, poly_root(&poly_ring, &f, 2).unwrap());
-/// ```
-/// 
-#[stability::unstable(feature = "enable")]
-pub fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
-    where P: RingStore,
-        P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain
-{
-    assert!(poly_ring.degree(&f).unwrap() % k == 0);
-    let d = poly_ring.degree(&f).unwrap() / k;
-    let ring = poly_ring.base_ring();
-    let k_in_ring = ring.int_hom().map(k as i32);
-
-    let mut result_reversed = Vec::new();
-    result_reversed.push(ring.one());
-    for i in 1..=d {
-        let g = poly_ring.pow(poly_ring.from_terms((0..i).map(|j| (ring.clone_el(&result_reversed[j]), j))), k);
-        let partition_sum = poly_ring.coefficient_at(&g, i);
-        let next_coeff = ring.checked_div(&ring.sub_ref(poly_ring.coefficient_at(&f, k * d - i), partition_sum), &k_in_ring)?;
-        result_reversed.push(next_coeff);
-    }
-
-    let result = poly_ring.from_terms(result_reversed.into_iter().enumerate().map(|(i, c)| (c, d - i)));
-    if poly_ring.eq_el(&f, &poly_ring.pow(poly_ring.clone_el(&result), k)) {
-        return Some(result);
-    } else {
-        return None;
-    }
-}
-
-#[cfg(test)]
-use crate::rings::poly::dense_poly::*;
-
-#[test]
-fn test_poly_root() {
-    let ring = BigIntRing::RING;
-    let poly_ring = DensePolyRing::new(ring, "X");
-    let [f] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(7) + X.pow_ref(6) + X.pow_ref(5) + X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1]);
-    for k in 1..5 {
-        assert_el_eq!(&poly_ring, &f, poly_root(&poly_ring, &poly_ring.pow(poly_ring.clone_el(&f), k), k).unwrap());
-    }
-
-    let [f] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(5) + 2 * X.pow_ref(4) + 3 * X.pow_ref(3) + 4 * X.pow_ref(2) + 5 * X + 6]);
-    for k in 1..5 {
-        assert_el_eq!(&poly_ring, &f, poly_root(&poly_ring, &poly_ring.pow(poly_ring.clone_el(&f), k), k).unwrap());
+    fn maximal_ideal_gen<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> i64
+        where Self: 'ring
+    {
+        *p
     }
 }

@@ -1,22 +1,14 @@
 use dense_poly::DensePolyRing;
+use squarefree_part::poly_power_decomposition_monic_local;
 
-use crate::algorithms::poly_local::balance_poly;
-use crate::algorithms::poly_local::hensel::hensel_lift;
-use crate::algorithms::poly_local::squarefree_part::poly_power_decomposition_monic_local;
-use crate::algorithms::poly_local::IdealDisplayWrapper;
-use crate::algorithms::poly_local::IntermediateReductionMap;
-use crate::algorithms::poly_local::INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT;
+use crate::algorithms::poly_gcd::*;
+use crate::algorithms::poly_gcd::local::*;
+use crate::algorithms::poly_gcd::hensel::*;
 use crate::computation::*;
-use crate::homomorphism::*;
-use crate::ring::*;
-use crate::rings::poly::*;
-use crate::pid::*;
-use crate::divisibility::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 
 use super::evaluate_aX;
 use super::unevaluate_aX;
-use super::PolyGCDLocallyDomain;
 
 const HOPE_FOR_SQUAREFREE_TRIES: usize = 3;
 
@@ -219,11 +211,9 @@ pub fn poly_gcd_local<P, Controller>(poly_ring: P, f: El<P>, g: El<P>, controlle
 }
 
 #[cfg(test)]
-use crate::integer::*;
-#[cfg(test)]
 use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[cfg(test)]
-use crate::algorithms::poly_factor::make_primitive;
+use crate::algorithms::poly_gcd::make_primitive;
 
 #[test]
 fn test_poly_gcd_local() {
@@ -276,11 +266,11 @@ fn random_test_poly_gcd_local() {
         // println!("Testing gcd on ({}) * ({}) and ({}) * ({})", poly_ring.format(&f), poly_ring.format(&h), poly_ring.format(&g), poly_ring.format(&h));
         let lhs = poly_ring.mul_ref(&f, &h);
         let rhs = poly_ring.mul_ref(&g, &h);
-        let gcd = make_primitive(&poly_ring, poly_gcd_local(&poly_ring, poly_ring.clone_el(&lhs), poly_ring.clone_el(&rhs), LogProgress));
+        let gcd = make_primitive(&poly_ring, &poly_gcd_local(&poly_ring, poly_ring.clone_el(&lhs), poly_ring.clone_el(&rhs), LogProgress)).0;
         // println!("Result {}", poly_ring.format(&gcd));
 
         assert!(poly_ring.checked_div(&lhs, &gcd).is_some());
         assert!(poly_ring.checked_div(&rhs, &gcd).is_some());
-        assert!(poly_ring.checked_div(&gcd, &make_primitive(&poly_ring, h)).is_some());
+        assert!(poly_ring.checked_div(&gcd, &make_primitive(&poly_ring, &h).0).is_some());
     }
 }

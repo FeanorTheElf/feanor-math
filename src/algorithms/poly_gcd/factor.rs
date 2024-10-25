@@ -1,23 +1,14 @@
 use std::convert::identity;
 
-use crate::algorithms::poly_local::balance_poly;
-use crate::algorithms::poly_local::hensel::hensel_lift_factorization;
+use crate::algorithms::poly_gcd::*;
+use crate::algorithms::poly_gcd::local::*;
+use crate::algorithms::poly_gcd::hensel::*;
+use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::poly_factor::FactorPolyField;
-use crate::algorithms::poly_local::IdealDisplayWrapper;
 use crate::computation::*;
 use crate::iters::clone_slice;
 use crate::iters::powerset;
-use crate::ring::*;
-use crate::rings::poly::*;
-use crate::homomorphism::*;
-use crate::rings::poly::dense_poly::*;
-use crate::divisibility::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
-
-use super::evaluate_aX;
-use super::squarefree_part::poly_power_decomposition_local;
-use super::unevaluate_aX;
-use super::{PolyGCDLocallyDomain, IntermediateReductionMap};
 
 fn combine_local_factors_local<'ring, 'a, R, P, Q>(ring: &R, scale_to_ring_factor: &R::Element, maximal_ideal: &R::MaximalIdeal<'ring>, poly_ring: P, f: &El<P>, local_poly_ring: Q, local_e: usize, local_factors: Vec<El<Q>>) -> Vec<El<P>>
     where R: ?Sized + PolyGCDLocallyDomain,
@@ -185,17 +176,99 @@ pub fn heuristic_factor_poly_local<P, Controller>(poly_ring: P, f: El<P>, prime_
     return result;
 }
 
-#[cfg(test)]
-use crate::integer::*;
+fn ln_factor_max_coeff<P>(ZZX: P, f: &El<P>) -> f64
+    where P: PolyRingStore,
+        P::Type: PolyRing + DivisibilityRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
+{
+    assert!(!ZZX.is_zero(f));
+    let ZZ = ZZX.base_ring();
+    let d = ZZX.degree(f).unwrap();
+
+    // we use Theorem 3.5.1 from "A course in computational algebraic number theory", Cohen,
+    // or equivalently Ex. 20 from Chapter 4.6.2 in Knuth's Art
+    let log2_poly_norm = ZZX.terms(f).map(|(c, _)| ZZ.abs_log2_ceil(c).unwrap()).max().unwrap() as f64 + (d as f64).log2();
+    return (log2_poly_norm + d as f64) * 2f64.ln();
+}
+
+fn factor_squarefree_monic_integer_poly_local<'a, P, Controller>(ZZX: P, f: &El<P>, controller: Controller) -> Vec<El<P>>
+    where P: 'a + PolyRingStore + Copy,
+        P::Type: PolyRing + DivisibilityRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerPolyGCDRing,
+        Controller: ComputationController
+{
+    let ZZ = ZZX.base_ring();
+    assert!(ZZ.is_one(ZZX.lc(f).unwrap()));
+    let mut rng = oorandom::Rand64::new(1);
+    let bound = ln_factor_max_coeff(ZZX, f);
+
+    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+
+        let prime = ZZ.get_ring().random_maximal_ideal(|| rng.rand_u64());
+        let prime_i64 = ZZ.get_ring().maximal_ideal_gen(&prime);
+        let e = (bound / (prime_i64 as f64).ln()).ceil() as usize + 1;
+        if let Some(result) = factor_and_lift_mod_pe(ZZX, &prime, e, f, controller.clone()) {
+            return result;
+        }
+    }
+    unreachable!()
+}
+
+///
+/// Factors the given polynomial over the integers.
+/// 
+/// Its factors are returned as primitive polynomials, thus their
+/// product is `f` only up to multiplication by a nonzero integer. 
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn poly_factor_integer<'a, P, Controller>(ZZX: P, f: El<P>, controller: Controller) -> Vec<(El<P>, usize)>
+    where P: 'a + PolyRingStore + Copy,
+        P::Type: PolyRing + DivisibilityRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerPolyGCDRing,
+        Controller: ComputationController
+{
+    assert!(!ZZX.is_zero(&f));
+    let power_decomposition = poly_power_decomposition_local(ZZX, ZZX.clone_el(&f), controller.clone());
+
+    start_computation!(controller, "factor_int_poly");
+
+    let mut result = Vec::new();
+    let mut current = ZZX.clone_el(&f);
+    for (factor, _k) in power_decomposition {
+        log_progress!(controller, "d({})", ZZX.degree(&factor).unwrap());
+        let lc_factor = ZZX.lc(&factor).unwrap();
+        let factor_monic = evaluate_aX(ZZX, &factor, lc_factor);
+        let factorization = factor_squarefree_monic_integer_poly_local(&ZZX, &factor_monic, controller.clone());
+        for irred_factor in factorization.into_iter().map(|fi| {
+            balance_poly(ZZX, unevaluate_aX(ZZX, &fi, &lc_factor)).0
+        }) {
+            let irred_factor_lc = ZZX.lc(&irred_factor).unwrap();
+            let mut power = 0;
+            while let Some(quo) = ZZX.checked_div(&ZZX.inclusion().mul_ref_map(&current, &ZZX.base_ring().pow(ZZX.base_ring().clone_el(&irred_factor_lc), ZZX.degree(&f).unwrap())), &irred_factor) {
+                current = balance_poly(ZZX, quo).0;
+                power += 1;
+            }
+            assert!(power >= 1);
+            result.push((irred_factor, power));
+        }
+    }
+    debug_assert_eq!(ZZX.degree(&f).unwrap(), result.iter().map(|(fi, i)| *i * ZZX.degree(fi).unwrap()).sum::<usize>());
+
+    finish_computation!(controller);
+    return result;
+}
+
 #[cfg(test)]
 use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[cfg(test)]
+use crate::primitive_int::*;
+#[cfg(test)]
 use crate::algorithms::poly_div::poly_div_domain;
 #[cfg(test)]
-use crate::algorithms::poly_local::make_primitive;
+use crate::algorithms::poly_gcd::make_primitive;
 
 #[test]
-fn test_factor_poly_local() {
+fn test_heuristic_factor_poly_local() {
     let ring = BigIntRing::RING;
     let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
     let [f1, f2, f3, f4] = poly_ring.with_wrapped_indeterminate(|X| [
@@ -253,8 +326,38 @@ fn test_factor_poly_local() {
     assert_eq(&expected, actual);
 }
 
+
 #[test]
-fn random_test_factor_poly_local() {
+fn test_factor_int_poly() {
+    let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1, X + 1]);
+    let input = ZZX.mul_ref(&f, &g);
+    let actual = poly_factor_integer(&ZZX, input, LogProgress);
+    assert_eq!(2, actual.len());
+    for (factor, e) in &actual {
+        assert_eq!(1, *e);
+        assert!(ZZX.eq_el(&f, factor) || ZZX.eq_el(&g, factor), "Got unexpected factor {}", ZZX.format(&factor));
+    }
+
+    let [f, g] = ZZX.with_wrapped_indeterminate(|X| [5 * X.pow_ref(2) + 1, 3 * X.pow_ref(2) + 2]);
+    let input = ZZX.mul_ref(&f, &g);
+    let actual = poly_factor_integer(&ZZX, input, LogProgress);
+    assert_eq!(2, actual.len());
+    for (factor, e) in &actual {
+        assert_eq!(1, *e);
+        assert!(ZZX.eq_el(&f, factor) || ZZX.eq_el(&g, factor), "Got unexpected factor {}", ZZX.format(&factor));
+    }
+
+    let [f] = ZZX.with_wrapped_indeterminate(|X| [5 * X.pow_ref(2) + 1]);
+    let input = ZZX.mul_ref(&f, &f);
+    let actual = poly_factor_integer(&ZZX, input, LogProgress);
+    assert_eq!(1, actual.len());
+    assert_eq!(2, actual[0].1);
+    assert_el_eq!(&ZZX, &f, &actual[0].0);
+}
+
+#[test]
+fn random_test_heuristic_factor_poly_local() {
     let ring = BigIntRing::RING;
     let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
     let mut rng = oorandom::Rand64::new(1);

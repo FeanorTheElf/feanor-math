@@ -77,7 +77,7 @@ pub mod mpir;
 /// This module contains the trait [`fieldextension::ExtensionField`] that defines operations related to
 /// Galois-theory in a field extension `L/K`.
 /// 
-pub mod fieldextension;
+// pub mod fieldextension;
 
 ///
 /// This module contains the wrapper [`local::AsLocalPIR`] that wraps a ring to signal that it is a

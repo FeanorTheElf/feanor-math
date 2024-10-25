@@ -25,7 +25,7 @@ use crate::algorithms::linsolve::LinSolveRingStore;
 use crate::delegate::DelegateRing;
 
 use super::linsolve::LinSolveRing;
-use super::poly_factor::extension::factor_squarefree_over_extension;
+use super::poly_factor::extension::poly_factor_squarefree_extension;
 use super::poly_factor::finite_field::poly_factor_if_finite_field;
 use super::poly_factor::FactorPolyField;
 use super::unity_root::get_prim_root_of_unity_gen;
@@ -79,12 +79,12 @@ pub fn extend_splitting_field<'a, 'b, R>(poly_ring: &ThisPolyRing<'a, 'b, R>, mu
     assert!(poly_ring.degree(&factor).unwrap() > 0);
 
     // don't use `<_ as FactorPolyField>::factor_poly()` here, as we know that the poly is square-free, thus
-    // `factor_squarefree_over_extension` can be much faster than general factoring (there currently is no
+    // `poly_factor_squarefree_extension` can be much faster than general factoring (there currently is no
     // local `squarefree_part()` function for non-PIDs)
     let mut sub_factorization = if let Some(factorization) = poly_factor_if_finite_field(&poly_ring, &factor) {
         factorization.0.into_iter().map(|(f, _)| f).collect::<Vec<_>>()
     } else {
-        factor_squarefree_over_extension(&poly_ring, &factor, MAX_PROBABILISTIC_REPETITIONS).ok().unwrap()
+        poly_factor_squarefree_extension(&poly_ring, &factor, MAX_PROBABILISTIC_REPETITIONS).ok().unwrap()
     };
     let largest_factor = sub_factorization.swap_remove(sub_factorization.iter().enumerate().max_by_key(|(_, f)| poly_ring.degree(f).unwrap()).unwrap().0);
 

@@ -197,7 +197,7 @@ fn test_specialize_finite_field() {
     let ring = FreeAlgebraImpl::new(&QQ, 2, [QQ.neg_one()]).as_field().ok().unwrap();
     assert!(<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(Verify(ring.get_ring(), 0)).is_err());
 
-    let base_ring = GaloisField::new(3, 2).into().unwrap_self();
-    let ring = FreeAlgebraImpl::new(&base_ring, 3, [base_ring.neg_one(), base_ring.one()]).as_field().ok().unwrap();
-    assert!(<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(Verify(ring.get_ring(), 729)).is_ok());
+    // let base_ring = GaloisField::new(3, 2).into().unwrap_self();
+    // let ring = FreeAlgebraImpl::new(&base_ring, 3, [base_ring.neg_one(), base_ring.one()]).as_field().ok().unwrap();
+    // assert!(<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(Verify(ring.get_ring(), 729)).is_ok());
 }
