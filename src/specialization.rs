@@ -2,11 +2,10 @@ use std::alloc::Allocator;
 use std::marker::PhantomData;
 
 use crate::algorithms::convolution::ConvolutionAlgorithm;
-use crate::algorithms::linsolve::LinSolveRing;
 use crate::field::Field;
 use crate::integer::*;
 use crate::ring::*;
-use crate::homomorphism::*;
+use crate::rings::extension::*;
 use crate::rings::extension::extension_impl::*;
 use crate::rings::extension::galois_field::*;
 use crate::rings::field::*;
@@ -103,12 +102,10 @@ impl<R> FiniteRingSpecializable for AsFieldBase<R>
     }
 }
 
-impl<R, V, A, C> FiniteRingSpecializable for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        V: VectorView<El<R>>,
-        R::Type: SelfIso + LinSolveRing + ZnRing + FiniteRing + Field,
-        A: Allocator + Clone,
-        C: ConvolutionAlgorithm<R::Type>
+impl<Impl> FiniteRingSpecializable for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
         Ok(op.execute())
@@ -161,7 +158,7 @@ impl<const N: u64> FiniteRingSpecializable for zn_static::ZnBase<N, true> {
 }
 
 #[cfg(test)]
-use crate::rings::extension::*;
+use crate::homomorphism::*;
 
 #[test]
 fn test_specialize_finite_field() {

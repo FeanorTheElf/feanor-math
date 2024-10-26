@@ -13,9 +13,8 @@ use crate::integer::*;
 use crate::pid::*;
 use crate::rings::extension::FreeAlgebraStore;
 use crate::ring::*;
-use crate::rings::extension::galois_field::GaloisField;
+use crate::rings::extension::galois_field::*;
 use crate::seq::*;
-use crate::rings::extension::galois_field::GaloisFieldBase;
 use crate::serialization::SerializableElementRing;
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::ComputeInnerProduct;
@@ -334,10 +333,10 @@ impl FromModulusCreateableZnRing for ZnBase {
 
 impl InterpolationBaseRing for AsFieldBase<Zn> {
 
-    type ExtendedRingBase<'a> = GaloisFieldBase<RingRef<'a, Self>>
+    type ExtendedRingBase<'a> = GaloisFieldBaseOver<RingRef<'a, Self>>
         where Self: 'a;
 
-    type ExtendedRing<'a> = GaloisField<RingRef<'a, Self>>
+    type ExtendedRing<'a> = GaloisFieldOver<RingRef<'a, Self>>
         where Self: 'a;
 
     fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>

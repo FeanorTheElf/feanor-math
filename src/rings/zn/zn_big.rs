@@ -18,7 +18,7 @@ use crate::ring::*;
 use crate::homomorphism::*;
 use crate::seq::*;
 use crate::delegate::DelegateRing;
-use crate::rings::extension::galois_field::{GaloisField, GaloisFieldBase};
+use crate::rings::extension::galois_field::*;
 use crate::rings::zn::*;
 use crate::serialization::SerializableElementRing;
 
@@ -299,10 +299,10 @@ impl<I: IntegerRingStore> Clone for ZnBase<I>
 impl<I: IntegerRingStore> InterpolationBaseRing for AsFieldBase<Zn<I>>
     where I::Type: IntegerRing
 {
-    type ExtendedRingBase<'a> = GaloisFieldBase<RingRef<'a, Self>>
+    type ExtendedRingBase<'a> = GaloisFieldBaseOver<RingRef<'a, Self>>
         where Self: 'a;
 
-    type ExtendedRing<'a> = GaloisField<RingRef<'a, Self>>
+    type ExtendedRing<'a> = GaloisFieldOver<RingRef<'a, Self>>
         where Self: 'a;
 
     fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>

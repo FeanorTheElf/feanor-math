@@ -5,7 +5,7 @@ use std::fmt::Display;
 
 use serde::{de::DeserializeOwned, Deserializer, Serialize, Serializer}; 
 
-use crate::{impl_interpolation_base_ring_char_zero, ring::*};
+use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ, ring::*};
 use crate::algorithms;
 use crate::homomorphism::*;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
@@ -200,6 +200,8 @@ impl<T: PrimitiveInt> OrderedRing for StaticRingBase<T> {
 }
 
 impl_interpolation_base_ring_char_zero!{ <{T}> InterpolationBaseRing for StaticRingBase<T> where T: PrimitiveInt }
+
+impl_poly_gcd_locally_for_ZZ!{ <{T}> IntegerPolyGCDRing for StaticRingBase<T> where T: PrimitiveInt }
 
 impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
 

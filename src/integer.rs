@@ -1,4 +1,5 @@
 use crate::algorithms;
+use crate::algorithms::poly_gcd::local::IntegerPolyGCDRing;
 use crate::divisibility::*;
 use crate::ring::*;
 use crate::homomorphism::*;
@@ -48,7 +49,7 @@ pub type BigIntRingBase = crate::rings::rust_bigint::RustBigintRingBase;
 /// As an additional requirement, the euclidean division (i.e. [`EuclideanRing::euclidean_div_rem()`] and
 /// [`IntegerRing::euclidean_div_pow_2()`]) are additionally expected to round towards zero.
 /// 
-pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing {
+pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + IntegerPolyGCDRing {
 
     ///
     /// Computes a float value that is supposed to be close to value.

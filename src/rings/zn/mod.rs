@@ -139,7 +139,7 @@ pub mod generic_impls {
     use crate::divisibility::DivisibilityRingStore;
     use crate::integer::{IntegerRing, IntegerRingStore};
     use crate::pid::*;
-    use crate::rings::extension::galois_field::GaloisField;
+    use crate::rings::extension::galois_field::{GaloisField, GaloisFieldOver};
     use super::{int_cast, BigIntRing, ZnRing, ZnRingStore};
     use crate::homomorphism::*;
 
@@ -301,7 +301,7 @@ pub mod generic_impls {
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn interpolation_ring<R: ZnRingStore>(ring: R, count: usize) -> GaloisField<R>
+    pub fn interpolation_ring<R: ZnRingStore>(ring: R, count: usize) -> GaloisFieldOver<R>
         where R: Clone,
             R::Type: ZnRing + FiniteRing + Field + CanHomFrom<StaticRingBase<i64>>
     {

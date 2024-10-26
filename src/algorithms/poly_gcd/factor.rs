@@ -194,7 +194,7 @@ fn ln_factor_max_coeff<P>(ZZX: P, f: &El<P>) -> f64
 fn factor_squarefree_monic_integer_poly_local<'a, P, Controller>(ZZX: P, f: &El<P>, controller: Controller) -> Vec<El<P>>
     where P: 'a + PolyRingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerPolyGCDRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
         Controller: ComputationController
 {
     let ZZ = ZZX.base_ring();
@@ -224,7 +224,7 @@ fn factor_squarefree_monic_integer_poly_local<'a, P, Controller>(ZZX: P, f: &El<
 pub fn poly_factor_integer<'a, P, Controller>(ZZX: P, f: El<P>, controller: Controller) -> Vec<(El<P>, usize)>
     where P: 'a + PolyRingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerPolyGCDRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
         Controller: ComputationController
 {
     assert!(!ZZX.is_zero(&f));

@@ -170,7 +170,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
         find_small_irreducible_poly_base(
             &poly_ring,
             degree,
-            FFTBasedConvolutionZn::from(fft_convolution),
+            <FFTBasedConvolutionZn as From<_>>::from(fft_convolution),
             rng
         )
     } else {
@@ -244,23 +244,42 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
 /// assert!(F25.can_iso(&raw_F25).is_some());
 /// ```
 /// 
+/// # Choice of blanket implementations of [`CanHomFrom`]
+/// 
+/// As opposed to the more generic [`DelegateRing`]s, here I chose a "ping-pong" way
+/// of implementing [`CanHomFrom`] and [`CanIsoFromTo`] for [`GaloisFieldBase`] that is
+/// very powerful when we use the standard `Impl = AsField<FreeAlgebraImpl<_, _, _, _>>`.
+/// In particular, we implement `GaloisFieldBase<Impl>: CanHomFrom<S>` for all `S` with 
+/// `Impl: CanHomFrom<S>`. It is great that we can provide such a large class of blanket impls,
+/// however this impl will then conflict with (almost) all other impls - which is the reason
+/// why we don't do it e.g. for [`AsFieldBase`].
+/// 
+/// Instead, we complement it with just the impls `FreeAlgebraImplBase<_, _, _, _>: CanHomFrom<GaloisFieldBase<_>>`
+/// and `AsFieldBase<FreeAlgebraImpl<_, _, _, _>>: CanHomFrom<GaloisFieldBase<_>>`. This means
+/// that if `Impl = AsFieldBase<FreeAlgebraImpl<_, _, _, _>>`, together with the blanket implementation,
+/// it gives the very much desired self-isomorphism `GaloisFieldBase<_>: CanHomFrom<GaloisFieldBase<_>>`.
+/// The only downside of this approach is that `GaloisFieldBase` does not have a canonical self-isomorphism
+/// anymore if a nonstandard `Impl` is chosen - which I believe will be very rarely the case in practice.
+/// 
 #[repr(transparent)]
-pub struct GaloisFieldBase<R = AsField<Zn>, V = SparseMapVector<R>, A = Global, C = KaratsubaAlgorithm>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+pub struct GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
-    base: FreeAlgebraImpl<R, V, A, C>
+    base: Impl
 }
+
+pub type DefaultGaloisFieldImpl = AsField<FreeAlgebraImpl<AsField<Zn>, SparseMapVector<AsField<Zn>>, Global, KaratsubaAlgorithm>>;
 
 ///
 /// Implementation of finite/galois fields.
 /// 
 /// This is the [`RingStore`] corresponding to [`GaloisFieldBase`]. For more details, see [`GaloisFieldBase`].
 /// 
-pub type GaloisField<R = AsField<Zn>, V = SparseMapVector<R>, A = Global, C = KaratsubaAlgorithm> = RingValue<GaloisFieldBase<R, V, A, C>>;
+pub type GaloisField<Impl = DefaultGaloisFieldImpl> = RingValue<GaloisFieldBase<Impl>>;
+pub type GaloisFieldOver<R, A = Global, C = KaratsubaAlgorithm> = RingValue<GaloisFieldBaseOver<R, A, C>>;
+pub type GaloisFieldBaseOver<R, A = Global, C = KaratsubaAlgorithm> = GaloisFieldBase<AsField<FreeAlgebraImpl<R, SparseMapVector<R>, A, C>>>;
 
 impl GaloisField {
 
@@ -292,7 +311,7 @@ impl GaloisField {
     }
 }
 
-impl<R, A, C> GaloisField<R, SparseMapVector<R>, A, C>
+impl<R, A, C> GaloisFieldOver<R, A, C>
     where R: RingStore + Clone,
         R::Type: ZnRing + FiniteRing + Field + CanHomFrom<StaticRingBase<i64>>,
         C: ConvolutionAlgorithm<R::Type>,
@@ -342,7 +361,7 @@ impl<R, A, C> GaloisField<R, SparseMapVector<R>, A, C>
             }
         }
         return RingValue::from(GaloisFieldBase { 
-            base: FreeAlgebraImpl::new_with(base_field, degree, modulus_vec, "θ", allocator, convolution_algorithm)
+            base: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with(base_field, degree, modulus_vec, "θ", allocator, convolution_algorithm)))
         });
     }
 
@@ -365,14 +384,13 @@ impl<R, A, C> GaloisField<R, SparseMapVector<R>, A, C>
             }
         }
         return RingValue::from(GaloisFieldBase { 
-            base: FreeAlgebraImpl::new_with(base_ring, degree, modulus_vec, "θ", allocator, convolution_algorithm)
+            base: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with(base_ring, degree, modulus_vec, "θ", allocator, convolution_algorithm)))
         });
     }
 }
 
-impl<V, A> GaloisFieldBase<AsField<Zn>, V, A, KaratsubaAlgorithm>
-    where V: VectorView<El<AsField<Zn>>>,
-        A: Allocator + Clone
+impl<A> GaloisFieldBase<AsField<FreeAlgebraImpl<AsField<Zn>, SparseMapVector<AsField<Zn>>, A, KaratsubaAlgorithm>>>
+    where A: Allocator + Clone
 {
     ///
     /// Creates the galois ring `GR(p, e, degree)`, mirroring the structure of this galois field.
@@ -387,18 +405,15 @@ impl<V, A> GaloisFieldBase<AsField<Zn>, V, A, KaratsubaAlgorithm>
     /// 
     #[stability::unstable(feature = "enable")]
     pub fn galois_ring(&self, e: usize) -> AsLocalPIR<FreeAlgebraImpl<Zn, SparseMapVector<Zn>, A, KaratsubaAlgorithm>> {
-        self.galois_ring_with(Zn::new(StaticRing::<i64>::RING.pow(*self.base_ring().modulus(), e) as u64), self.base.get_ring().allocator().clone(), STANDARD_CONVOLUTION)
+        self.galois_ring_with(Zn::new(StaticRing::<i64>::RING.pow(*self.base_ring().modulus(), e) as u64), self.base.get_ring().get_delegate().allocator().clone(), STANDARD_CONVOLUTION)
     }
 }
 
-impl<R, V, A, C> GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+impl<Impl> GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
-    ///
     /// 
     /// Creates the galois ring `GR(p, e, degree)`, mirroring the structure of this galois field.
     /// 
@@ -413,7 +428,7 @@ impl<R, V, A, C> GaloisFieldBase<R, V, A, C>
     #[stability::unstable(feature = "enable")]
     pub fn galois_ring_with<S, A2, C2>(&self, new_base_ring: S, allocator: A2, convolution_algorithm: C2) -> AsLocalPIR<FreeAlgebraImpl<S, SparseMapVector<S>, A2, C2>>
         where S: RingStore + Clone,
-            S::Type: ZnRing + CanHomFrom<<R::Type as ZnRing>::IntegerRingBase>,
+            S::Type: ZnRing + CanHomFrom<<<<Impl::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::IntegerRingBase>,
             C2: ConvolutionAlgorithm<S::Type>,
             A2: Allocator + Clone
     {
@@ -442,22 +457,15 @@ impl<R, V, A, C> GaloisFieldBase<R, V, A, C>
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn unwrap_self(self) -> AsField<FreeAlgebraImpl<R, V, A, C>> {
-        AsField::from(AsFieldBase::promise_is_perfect_field(self.base))
-    }
-    
-    #[stability::unstable(feature = "enable")]
-    pub fn allocator(&self) -> &A {
-        self.base.get_ring().allocator()
+    pub fn unwrap_self(self) -> Impl {
+        self.base
     }
 }
 
-impl<R, V, A, C> GaloisField<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+impl<Impl> GaloisField<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
     ///
     /// Most generic function to create a finite/galois field.
@@ -467,19 +475,17 @@ impl<R, V, A, C> GaloisField<R, V, A, C>
     /// is impossible, unless [`AsFieldBase::promise_is_field()`] is used.
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn create(base: AsField<FreeAlgebraImpl<R, V, A, C>>) -> Self {
+    pub fn create(base: Impl) -> Self {
         RingValue::from(GaloisFieldBase {
-            base: base.into().unwrap_self()
+            base: base
         })
     }
 }
 
-impl<R, V, A, C> Clone for GaloisFieldBase<R, V, A, C>
-    where R: Clone + RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: Clone + VectorView<El<R>>,
-        C: Clone + ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+impl<Impl> Clone for GaloisFieldBase<Impl>
+    where Impl: RingStore + Clone,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
     fn clone(&self) -> Self {
         Self {
@@ -488,36 +494,30 @@ impl<R, V, A, C> Clone for GaloisFieldBase<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> Copy for GaloisFieldBase<R, V, A, C>
-    where R: Copy + RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: Copy + VectorView<El<R>>,
-        C: Copy + ConvolutionAlgorithm<R::Type>,
-        A: Copy + Allocator,
-        El<R>: Copy
+impl<Impl> Copy for GaloisFieldBase<Impl> 
+    where Impl: RingStore + Copy,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
+        El<Impl>: Copy
 {}
 
-impl<R, V, A, C> PartialEq for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+impl<Impl> PartialEq for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
     fn eq(&self, other: &Self) -> bool {
         self.base.get_ring() == other.base.get_ring()
     }
 }
 
-impl<R, V, A, C> DelegateRing for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+impl<Impl> DelegateRing for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
-    type Base = FreeAlgebraImplBase<R, V, A, C>;
-    type Element = El<FreeAlgebraImpl<R, V, A, C>>;
+    type Base = Impl::Type;
+    type Element = El<Impl>;
 
     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
     fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
@@ -529,36 +529,28 @@ impl<R, V, A, C> DelegateRing for GaloisFieldBase<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> Domain for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+impl<Impl> Domain for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {}
 
-impl<R, V, A, C> Field for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+impl<Impl> Field for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {}
 
-impl<R, V, A, C> PerfectField for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+impl<Impl> PerfectField for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {}
 
-impl<R, V, A, C> EuclideanRing for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+impl<Impl> EuclideanRing for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
@@ -579,12 +571,10 @@ impl<R, V, A, C> EuclideanRing for GaloisFieldBase<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> PrincipalIdealRing for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+impl<Impl> PrincipalIdealRing for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         self.checked_left_div(lhs, rhs)
@@ -599,24 +589,20 @@ impl<R, V, A, C> PrincipalIdealRing for GaloisFieldBase<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> KaratsubaHint for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+impl<Impl> KaratsubaHint for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
     fn karatsuba_threshold(&self) -> usize {
         self.get_delegate().karatsuba_threshold()
     }
 }
 
-impl<R, V, A, C> ComputeInnerProduct for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+impl<Impl> ComputeInnerProduct for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
     fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
         self.rev_delegate(self.get_delegate().inner_product(els.map(|(a, b)| (self.delegate(a), self.delegate(b)))))
@@ -637,28 +623,26 @@ impl<R, V, A, C> ComputeInnerProduct for GaloisFieldBase<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> StrassenHint for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+impl<Impl> StrassenHint for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
     fn strassen_threshold(&self) -> usize {
         self.get_delegate().strassen_threshold()
     }
 }
 
-impl<R, V, A, C, S> CanHomFrom<S> for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone,
-        S: ?Sized + RingBase,
-        FreeAlgebraImplBase<R, V, A, C>: CanHomFrom<S>
+///
+/// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
+/// 
+impl<Impl, S> CanHomFrom<S> for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing + CanHomFrom<S>,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
+        S: ?Sized + RingBase
 {
-    type Homomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanHomFrom<S>>::Homomorphism;
+    type Homomorphism = <Impl::Type as CanHomFrom<S>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism> {
         self.base.get_ring().has_canonical_hom(from)
@@ -669,40 +653,65 @@ impl<R, V, A, C, S> CanHomFrom<S> for GaloisFieldBase<R, V, A, C>
     }
 }
 
-
-impl<R, V, A, C, R2, V2, A2, C2> CanHomFrom<GaloisFieldBase<R2, V2, A2, C2>> for FreeAlgebraImplBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + CanHomFrom<R2::Type>,
+///
+/// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
+/// 
+impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>> for FreeAlgebraImplBase<R, V, A, C>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
+        R: RingStore,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone,
-        R2: RingStore,
-        R2::Type: ZnRing + FiniteRing + Field,
-        V2: VectorView<El<R2>>,
-        C2: ConvolutionAlgorithm<R2::Type>,
-        A2: Allocator + Clone
+        FreeAlgebraImplBase<R, V, A, C>: CanHomFrom<Impl::Type>
 {
-    type Homomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanHomFrom<FreeAlgebraImplBase<R2, V2, A2, C2>>>::Homomorphism;
+    type Homomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanHomFrom<Impl::Type>>::Homomorphism;
 
-    fn has_canonical_hom(&self, from: &GaloisFieldBase<R2, V2, A2, C2>) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &GaloisFieldBase<Impl>) -> Option<Self::Homomorphism> {
         self.has_canonical_hom(from.base.get_ring())
     }
 
-    fn map_in(&self, from: &GaloisFieldBase<R2, V2, A2, C2>, el: <GaloisFieldBase<R2, V2, A2, C2> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &GaloisFieldBase<Impl>, el: <GaloisFieldBase<Impl> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         self.map_in(from.base.get_ring(), el, hom)
     }
 }
 
-impl<R, V, A, C, S> CanIsoFromTo<S> for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
+///
+/// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
+/// 
+impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>> for AsFieldBase<FreeAlgebraImpl<R, V, A, C>>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
+        R: RingStore,
+        R::Type: LinSolveRing,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone,
-        S: ?Sized + RingBase,
-        FreeAlgebraImplBase<R, V, A, C>: CanIsoFromTo<S>
+        FreeAlgebraImplBase<R, V, A, C>: CanHomFrom<Impl::Type>
 {
-    type Isomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanIsoFromTo<S>>::Isomorphism;
+    type Homomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanHomFrom<Impl::Type>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &GaloisFieldBase<Impl>) -> Option<Self::Homomorphism> {
+        self.get_delegate().has_canonical_hom(from.base.get_ring())
+    }
+
+    fn map_in(&self, from: &GaloisFieldBase<Impl>, el: <GaloisFieldBase<Impl> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.rev_delegate(self.get_delegate().map_in(from.base.get_ring(), el, hom))
+    }
+}
+
+///
+/// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
+/// 
+impl<Impl, S> CanIsoFromTo<S> for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing + CanIsoFromTo<S>,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
+        S: ?Sized + RingBase
+{
+    type Isomorphism = <Impl::Type as CanIsoFromTo<S>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &S) -> Option<Self::Isomorphism> {
         self.base.get_ring().has_canonical_iso(from)
@@ -713,32 +722,98 @@ impl<R, V, A, C, S> CanIsoFromTo<S> for GaloisFieldBase<R, V, A, C>
     }
 }
 
-
-impl<R, V, A, C, R2, V2, A2, C2> CanIsoFromTo<GaloisFieldBase<R2, V2, A2, C2>> for FreeAlgebraImplBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + CanIsoFromTo<R2::Type>,
+///
+/// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
+/// 
+impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for FreeAlgebraImplBase<R, V, A, C>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
+        R: RingStore,
         V: VectorView<El<R>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone,
-        R2: RingStore,
-        R2::Type: ZnRing + FiniteRing + Field,
-        V2: VectorView<El<R2>>,
-        C2: ConvolutionAlgorithm<R2::Type>,
-        A2: Allocator + Clone
+        FreeAlgebraImplBase<R, V, A, C>: CanIsoFromTo<Impl::Type>
 {
-    type Isomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanIsoFromTo<FreeAlgebraImplBase<R2, V2, A2, C2>>>::Isomorphism;
+    type Isomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanIsoFromTo<Impl::Type>>::Isomorphism;
 
-    fn has_canonical_iso(&self, from: &GaloisFieldBase<R2, V2, A2, C2>) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, from: &GaloisFieldBase<Impl>) -> Option<Self::Isomorphism> {
         self.has_canonical_iso(from.base.get_ring())
     }
     
-    fn map_out(&self, from: &GaloisFieldBase<R2, V2, A2, C2>, el: Self::Element, iso: &Self::Isomorphism) -> <GaloisFieldBase<R2, V2, A2, C2> as RingBase>::Element {
+    fn map_out(&self, from: &GaloisFieldBase<Impl>, el: Self::Element, iso: &Self::Isomorphism) -> <GaloisFieldBase<Impl> as RingBase>::Element {
         self.map_out(from.base.get_ring(), el, iso)
+    }
+}
+
+///
+/// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
+/// 
+impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for AsFieldBase<FreeAlgebraImpl<R, V, A, C>>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
+        R: RingStore,
+        R::Type: LinSolveRing,
+        V: VectorView<El<R>>,
+        C: ConvolutionAlgorithm<R::Type>,
+        A: Allocator + Clone,
+        FreeAlgebraImplBase<R, V, A, C>: CanIsoFromTo<Impl::Type>
+{
+    type Isomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanIsoFromTo<Impl::Type>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &GaloisFieldBase<Impl>) -> Option<Self::Isomorphism> {
+        self.get_delegate().has_canonical_iso(from.base.get_ring())
+    }
+    
+    fn map_out(&self, from: &GaloisFieldBase<Impl>, el: Self::Element, iso: &Self::Isomorphism) -> <GaloisFieldBase<Impl> as RingBase>::Element {
+        self.get_delegate().map_out(from.base.get_ring(), self.delegate(el), iso)
     }
 }
 
 #[cfg(test)]
 use test::Bencher;
+
+#[test]
+fn test_can_hom_from() {
+    #[allow(unused)]
+    fn assert_impl_CanHomFrom<From, To>()
+        where To: ?Sized + CanHomFrom<From>, From: ?Sized + RingBase 
+    {}
+    
+    #[allow(unused)]
+    fn FreeAlgebraImpl_wrap_unwrap_homs<R, V, A, C>()
+        where R: RingStore,
+            R::Type: SelfIso + LinSolveRing,
+            V: VectorView<El<R>>,
+            A: Allocator + Clone,
+            C: ConvolutionAlgorithm<R::Type>
+    {
+        assert_impl_CanHomFrom::<FreeAlgebraImplBase<R, V, A, C>, AsFieldBase<FreeAlgebraImpl<R, V, A, C>>>();
+    }
+
+    #[allow(unused)]
+    fn FreeAlgebraImpl_from_GaloisField<R, V, A, C>()
+        where R: RingStore,
+            R::Type: SelfIso + LinSolveRing + FiniteRing + Field + ZnRing,
+            V: VectorView<El<R>>,
+            A: Allocator + Clone,
+            C: ConvolutionAlgorithm<R::Type>
+    {
+        assert_impl_CanHomFrom::<GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, A, C>>>, AsFieldBase<FreeAlgebraImpl<R, V, A, C>>>();
+    }
+
+    #[allow(unused)]
+    fn GaloisField_from_GaloisField<R, V, A, C>()
+        where R: RingStore,
+            R::Type: SelfIso + LinSolveRing + FiniteRing + Field + ZnRing,
+            V: VectorView<El<R>>,
+            A: Allocator + Clone,
+            C: ConvolutionAlgorithm<R::Type>
+    {
+        assert_impl_CanHomFrom::<GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, A, C>>>, GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, A, C>>>>();
+    }
+}
 
 #[test]
 fn test_galois_field() {

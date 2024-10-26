@@ -1,6 +1,5 @@
 
 use crate::algorithms::poly_gcd::factor::poly_factor_integer;
-use crate::algorithms::poly_gcd::local::IntegerPolyGCDRing;
 use crate::computation::DontObserve;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::ring::*;
@@ -12,13 +11,15 @@ use crate::rings::zn::zn_64::*;
 use crate::algorithms::eea::signed_lcm;
 use crate::pid::EuclideanRing;
 
+use super::IntegerRing;
+
 #[stability::unstable(feature = "enable")]
 pub fn poly_factor_rational<'a, P, I>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
         <P::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
-        I::Type: IntegerPolyGCDRing,
+        I::Type: IntegerRing,
         ZnBase: CanHomFrom<I::Type>
 {
     assert!(!poly_ring.is_zero(poly));

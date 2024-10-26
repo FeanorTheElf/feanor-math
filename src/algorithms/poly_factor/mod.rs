@@ -16,7 +16,6 @@ use extension::poly_factor_extension;
 use finite::*;
 use rational::*;
 
-use super::poly_gcd::local::IntegerPolyGCDRing;
 use super::poly_gcd::PolyGCDRing;
 
 pub mod cantor_zassenhaus;
@@ -168,8 +167,8 @@ impl<const N: u64> FactorPolyField for zn_static::ZnBase<N, true> {
 }
 
 impl<I> FactorPolyField for RationalFieldBase<I>
-    where I: IntegerRingStore,
-        I::Type: IntegerPolyGCDRing,
+    where I: RingStore,
+        I::Type: IntegerRing,
         ZnBase: CanHomFrom<I::Type>
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)

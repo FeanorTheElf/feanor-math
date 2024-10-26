@@ -2,15 +2,9 @@ use std::fmt::Display;
 
 use crate::divisibility::*;
 use crate::homomorphism::*;
-use crate::integer::*;
-use crate::primitive_int::*;
 use crate::ring::*;
-use crate::rings::field::*;
 use crate::rings::poly::*;
-use crate::rings::zn::*;
-use crate::rings::zn::zn_big;
 
-use crate::algorithms::miller_rabin::next_prime;
 use crate::algorithms::poly_factor::FactorPolyField;
 
 use super::PolyGCDRing;
@@ -195,7 +189,7 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing {
 }
 
 #[stability::unstable(feature = "enable")]
-pub trait IntegerPolyGCDRing: PolyGCDLocallyDomain + IntegerRing {
+pub trait IntegerPolyGCDRing: PolyGCDLocallyDomain {
 
     fn maximal_ideal_gen<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> i64
         where Self: 'ring;
@@ -323,95 +317,117 @@ impl<'ring, 'data, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalRingBase<'ri
     }
 }
 
-impl<I: IntegerRing> PolyGCDLocallyDomain for I {
+#[macro_export]
+macro_rules! impl_poly_gcd_locally_for_ZZ {
+    (<{$($gen_args:tt)*}> IntegerPolyGCDRing for $int_ring_type:ty where $($constraints:tt)*) => {
 
-    type LocalRing<'ring> = zn_big::Zn<BigIntRing>
-        where Self: 'ring;
-    type LocalRingBase<'ring> = zn_big::ZnBase<BigIntRing>
-        where Self: 'ring;
-    type LocalFieldBase<'ring> = AsFieldBase<zn_64::Zn>
-        where Self: 'ring;
-    type LocalField<'ring> = AsField<zn_64::Zn>
-        where Self: 'ring;
-    type MaximalIdeal<'ring> = i64
-        where Self: 'ring;
+        impl<$($gen_args)*> $crate::algorithms::poly_gcd::local::PolyGCDLocallyDomain for $int_ring_type
+            where $($constraints)*
+        {
+            type LocalRing<'ring> = $crate::rings::zn::zn_big::Zn<BigIntRing>
+                where Self: 'ring;
+            type LocalRingBase<'ring> = $crate::rings::zn::zn_big::ZnBase<BigIntRing>
+                where Self: 'ring;
+            type LocalFieldBase<'ring> = $crate::rings::field::AsFieldBase<$crate::rings::zn::zn_64::Zn>
+                where Self: 'ring;
+            type LocalField<'ring> = $crate::rings::field::AsField<$crate::rings::zn::zn_64::Zn>
+                where Self: 'ring;
+            type MaximalIdeal<'ring> = i64
+                where Self: 'ring;
+        
+            fn factor_scaling(&self) -> Self::Element {
+                self.one()
+            }
+        
+            fn lift_full<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
+                where Self: 'ring
+            {
+                use $crate::rings::zn::*;
 
-    fn factor_scaling(&self) -> Self::Element {
-        self.one()
-    }
+                int_cast(from.0.smallest_lift(x), RingRef::new(self), BigIntRing::RING)
+            }
+        
+            fn lift_partial<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+                where Self: 'ring
+            {
+                use $crate::rings::zn::*;
+                use $crate::homomorphism::*;
 
-    fn lift_full<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
-        where Self: 'ring
-    {
-        int_cast(from.0.smallest_lift(x), RingRef::new(self), BigIntRing::RING)
-    }
+                assert!(from.1 <= to.1);
+                let hom = to.0.can_hom(to.0.integer_ring()).unwrap();
+                return hom.map(from.0.any_lift(x));
+            }
+        
+            fn local_field_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> Self::LocalField<'ring>
+                where Self: 'ring
+            {
+                use $crate::rings::zn::*;
 
-    fn lift_partial<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
-        where Self: 'ring
-    {
-        assert!(from.1 <= to.1);
-        let hom = to.0.can_hom(to.0.integer_ring()).unwrap();
-        return hom.map(from.0.any_lift(x));
-    }
+                $crate::rings::zn::zn_64::Zn::new(*p as u64).as_field().ok().unwrap()
+            }
+        
+            fn local_ring_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>, e: usize) -> Self::LocalRing<'ring>
+                where Self: 'ring
+            {
+                $crate::rings::zn::zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.pow(int_cast(*p, BigIntRing::RING, StaticRing::<i64>::RING), e))
+            }
+        
+            fn random_maximal_ideal<'ring, F>(&'ring self, rng: F) -> Self::MaximalIdeal<'ring>
+                where F: FnMut() -> u64
+            {
+                let lower_bound = StaticRing::<i64>::RING.get_ring().get_uniformly_random_bits(24, rng);
+                return $crate::algorithms::miller_rabin::next_prime(StaticRing::<i64>::RING, lower_bound);
+            }
+        
+            fn reduce_full<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>
+                where Self: 'ring
+            {
+                use $crate::homomorphism::*;
 
-    fn local_field_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> Self::LocalField<'ring>
-        where Self: 'ring
-    {
-        zn_64::Zn::new(*p as u64).as_field().ok().unwrap()
-    }
+                let self_ref = RingRef::new(self);
+                let hom = to.0.can_hom(&self_ref).unwrap();
+                return hom.map(x);
+            }
+        
+            fn reduce_partial<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+                where Self: 'ring
+            {
+                use $crate::rings::zn::*;
+                use $crate::homomorphism::*;
 
-    fn local_ring_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>, e: usize) -> Self::LocalRing<'ring>
-        where Self: 'ring
-    {
-        zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.pow(int_cast(*p, BigIntRing::RING, StaticRing::<i64>::RING), e))
-    }
+                assert!(from.1 >= to.1);
+                let hom = to.0.can_hom(to.0.integer_ring()).unwrap();
+                return hom.map(from.0.smallest_lift(x));
+            }
+        
+            fn heuristic_exponent<'ring, P>(&self, p: &i64, poly_ring: P, poly: &El<P>) -> usize
+                where P: RingStore + Copy,
+                    P::Type: $crate::rings::poly::PolyRing,
+                    <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
+                    Self: 'ring
+            {
+                use $crate::rings::poly::*;
 
-    fn random_maximal_ideal<'ring, F>(&'ring self, rng: F) -> Self::MaximalIdeal<'ring>
-        where F: FnMut() -> u64
-    {
-        let lower_bound = StaticRing::<i64>::RING.get_ring().get_uniformly_random_bits(24, rng);
-        return next_prime(StaticRing::<i64>::RING, lower_bound);
-    }
+                let log2_largest_exponent = poly_ring.terms(poly).map(|(c, _)| RingRef::new(self).abs_log2_ceil(c).unwrap() as f64).max_by(f64::total_cmp).unwrap();
+                // this is in no way a rigorous bound, but equals the worst-case bound at least asymptotically (up to constants)
+                return ((log2_largest_exponent + poly_ring.degree(poly).unwrap() as f64) / (*p as f64).log2() / /* just some factor that seemed good when playing around */ 4.).ceil() as usize + 1;
+            }
+            
+            fn dbg_maximal_ideal<'ring>(&self, p: &Self::MaximalIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
+                where Self: 'ring
+            {
+                write!(out, "{}", p)
+            }
+        }
 
-    fn reduce_full<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>
-        where Self: 'ring
-    {
-        let self_ref = RingRef::new(self);
-        let hom = to.0.can_hom(&self_ref).unwrap();
-        return hom.map(x);
-    }
-
-    fn reduce_partial<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
-        where Self: 'ring
-    {
-        assert!(from.1 >= to.1);
-        let hom = to.0.can_hom(to.0.integer_ring()).unwrap();
-        return hom.map(from.0.smallest_lift(x));
-    }
-
-    fn heuristic_exponent<'ring, P>(&self, p: &i64, poly_ring: P, poly: &El<P>) -> usize
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
-            Self: 'ring
-    {
-        let log2_largest_exponent = poly_ring.terms(poly).map(|(c, _)| RingRef::new(self).abs_log2_ceil(c).unwrap() as f64).max_by(f64::total_cmp).unwrap();
-        // this is in no way a rigorous bound, but equals the worst-case bound at least asymptotically (up to constants)
-        return ((log2_largest_exponent + poly_ring.degree(poly).unwrap() as f64) / (*p as f64).log2() / /* just some factor that seemed good when playing around */ 4.).ceil() as usize + 1;
-    }
-    
-    fn dbg_maximal_ideal<'ring>(&self, p: &Self::MaximalIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
-        where Self: 'ring
-    {
-        write!(out, "{}", p)
-    }
-}
-
-impl<I: IntegerRing> IntegerPolyGCDRing for I {
-
-    fn maximal_ideal_gen<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> i64
-        where Self: 'ring
-    {
-        *p
-    }
+        impl<$($gen_args)*> $crate::algorithms::poly_gcd::local::IntegerPolyGCDRing for $int_ring_type
+            where $($constraints)*
+        {
+            fn maximal_ideal_gen<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> i64
+                where Self: 'ring
+            {
+                *p
+            }
+        }
+    };
 }

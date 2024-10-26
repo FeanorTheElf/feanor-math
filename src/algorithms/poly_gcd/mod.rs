@@ -1,6 +1,5 @@
 use gcd::poly_gcd_local;
 use global::poly_power_decomposition_finite_field;
-use local::IntegerPolyGCDRing;
 use squarefree_part::poly_power_decomposition_local;
 
 use crate::algorithms::eea::signed_lcm;
@@ -222,7 +221,7 @@ impl<R> PolyGCDRing for R
 
 impl<I> PolyGCDRing for RationalFieldBase<I>
     where I: RingStore,
-        I::Type: IntegerPolyGCDRing
+        I::Type: IntegerRing
 {
     fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
         where P: RingStore + Copy,

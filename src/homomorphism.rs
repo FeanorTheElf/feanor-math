@@ -83,6 +83,14 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// using instead [`CanHom`], as it does not require weird syntax like
 /// `R.get_ring().map_in(S.get_ring(), x, &hom)`.
 /// 
+/// **Warning** Because of type-system limitations (see below), this trait
+/// is not implemented in all cases where it makes sense, in particular when
+/// type parameters are involved. Thus, you should always consider this trait
+/// to be for convenience only. A truly generic algorithm should, if possible,
+/// not constrain input ring types using `CanHomFrom`, but instead take an 
+/// additional object of generic type bounded by [`Homomorphism`] that provides
+/// the required homomorphism.
+/// 
 /// # Exact requirements
 /// 
 /// Which homomorphisms are considered canonical is up to implementors,
@@ -298,6 +306,14 @@ pub trait CanHomFrom<S>: RingBase
 ///
 /// Trait for rings R that have a canonical isomorphism `S -> R`.
 /// A ring homomorphism is expected to be unital.
+/// 
+/// **Warning** Because of type-system limitations (see [`CanHomFrom`]), this trait
+/// is not implemented in all cases where it makes sense, in particular when
+/// type parameters are involved. Thus, you should always consider this trait
+/// to be for convenience only. A truly generic algorithm should, if possible,
+/// not constrain input ring types using `CanHomFrom`, but instead take an 
+/// additional object of generic type bounded by [`Homomorphism`] that provides
+/// the required homomorphism.
 /// 
 /// # Exact requirements
 /// 
