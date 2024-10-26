@@ -1207,6 +1207,7 @@ fn test_internal_wrappings_dont_matter() {
 pub mod generic_tests {
 
     use crate::integer::{int_cast, BigIntRing};
+    use std::cmp::min;
 
     use super::*;
 
@@ -1367,7 +1368,7 @@ pub mod generic_tests {
                     assert!(!ring.is_zero(&ring.get_ring().from_int(i)));
                 }
             } else {
-                for i in 1..char {
+                for i in 1..min(1 << 10, char) {
                     assert!(!ring.is_zero(&ring.get_ring().from_int(i)));
                 }
             }

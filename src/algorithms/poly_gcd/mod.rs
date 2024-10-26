@@ -1,20 +1,19 @@
-use std::alloc::Allocator;
-
+use gcd::poly_gcd_local;
 use global::poly_power_decomposition_finite_field;
+use local::IntegerPolyGCDRing;
+use squarefree_part::poly_power_decomposition_local;
 
+use crate::algorithms::eea::signed_lcm;
+use crate::computation::DontObserve;
 use crate::divisibility::*;
 use crate::homomorphism::*;
 use crate::integer::*;
 use crate::pid::*;
-use crate::rings::extension::galois_field::GaloisFieldBase;
-use crate::seq::*;
-use crate::algorithms::convolution::*;
+use crate::rings::rational::RationalFieldBase;
 use crate::ring::*;
 use crate::rings::poly::dense_poly::*;
-use crate::rings::field::AsFieldBase;
 use crate::rings::poly::*;
 use crate::rings::finite::*;
-use crate::rings::zn::*;
 use crate::field::*;
 
 use super::eea::gcd;
@@ -30,6 +29,13 @@ const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
 
 pub trait PolyGCDRing {
 
+    ///
+    /// Computes the square-free part of a polynomial `f`, which is the largest-degree squarefree
+    /// polynomial `d` such that `d | a f` for some non-zero-divisor `a` of this ring.
+    /// 
+    /// This value is unique up to multiplication by units. If the base ring is a field,
+    /// we impose the additional constraint that it be monic, which makes it unique.
+    /// 
     fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
         where P: RingStore + Copy,
             P::Type: PolyRing,
@@ -38,11 +44,27 @@ pub trait PolyGCDRing {
         poly_ring.prod(Self::power_decomposition(poly_ring, poly).into_iter().map(|(f, _)| f))
     }
 
+    ///
+    /// Compute square-free polynomials `f1, f2, ...` such that `a f = f1 f2^2 f3^3 ...`
+    /// for some non-zero-divisor `a` of this ring. They are returned as tuples `(fi, i)`
+    /// where `deg(fi) > 0`.
+    /// 
+    /// These values are unique up to multiplication by units. If the base ring is a field,
+    /// we impose the additional constraint that all `fi` be monic, which makes them unique.
+    /// 
     fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
         where P: RingStore + Copy,
             P::Type: PolyRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
     
+    ///
+    /// Computes the greatest common divisor of two polynomials `f, g` over the fraction field,
+    /// which is the largest-degree polynomial `d` such that `d | a f, a g` for some non-zero-divisor
+    /// `a` of this ring.
+    /// 
+    /// This value is unique up to multiplication by units. If the base ring is a field,
+    /// we impose the additional constraint that it be monic, which makes it unique.
+    /// 
     fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
         where P: RingStore + Copy,
             P::Type: PolyRing,
@@ -170,71 +192,8 @@ pub fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
     }
 }
 
-///
-/// Unfortunately, `AsFieldBase<R> where R: RingStore<Type = zn_64::ZnBase>` leads to
-/// a conflicting impl with the one for field extensions 
-///
-impl PolyGCDRing for AsFieldBase<zn_64::Zn> {
-
-    fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        let new_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
-        let new_poly = new_poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        poly_power_decomposition_finite_field(&new_poly_ring, &new_poly).into_iter().map(|(f, k)| 
-            (poly_ring.from_terms(new_poly_ring.terms(&f).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i))), k)
-        ).collect()
-    }
-    
-    fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        let new_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
-        let new_lhs = new_poly_ring.from_terms(poly_ring.terms(lhs).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        let new_rhs = new_poly_ring.from_terms(poly_ring.terms(rhs).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        let new_gcd = gcd(new_lhs, new_rhs, &new_poly_ring);
-        poly_ring.from_terms(new_poly_ring.terms(&new_gcd).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)))
-    }
-}
-
-impl<'a> PolyGCDRing for AsFieldBase<RingRef<'a, zn_64::ZnBase>> {
-
-    fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        let new_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
-        let new_poly = new_poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        poly_power_decomposition_finite_field(&new_poly_ring, &new_poly).into_iter().map(|(f, k)| 
-            (poly_ring.from_terms(new_poly_ring.terms(&f).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i))), k)
-        ).collect()
-    }
-    
-    fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        let new_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
-        let new_lhs = new_poly_ring.from_terms(poly_ring.terms(lhs).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        let new_rhs = new_poly_ring.from_terms(poly_ring.terms(rhs).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        let new_gcd = gcd(new_lhs, new_rhs, &new_poly_ring);
-        poly_ring.from_terms(new_poly_ring.terms(&new_gcd).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)))
-    }
-}
-
-///
-/// Unfortunately, `AsFieldBase<R> where R: RingStore<Type = zn_big::ZnBase<I>>` leads to
-/// a conflicting impl with the one for field extensions 
-///
-impl<I> PolyGCDRing for AsFieldBase<zn_big::Zn<I>>
-where I: IntegerRingStore,
-    I::Type: IntegerRing
+impl<R> PolyGCDRing for R
+    where R: FiniteRing + Field
 {
     fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
         where P: RingStore + Copy,
@@ -261,20 +220,28 @@ where I: IntegerRingStore,
     }
 }
 
-impl<'a, I> PolyGCDRing for AsFieldBase<RingRef<'a, zn_big::ZnBase<I>>>
-    where I: IntegerRingStore,
-        I::Type: IntegerRing
+impl<I> PolyGCDRing for RationalFieldBase<I>
+    where I: RingStore,
+        I::Type: IntegerPolyGCDRing
 {
     fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
         where P: RingStore + Copy,
             P::Type: PolyRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        let new_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
-        let new_poly = new_poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        poly_power_decomposition_finite_field(&new_poly_ring, &new_poly).into_iter().map(|(f, k)| 
-            (poly_ring.from_terms(new_poly_ring.terms(&f).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i))), k)
-        ).collect()
+        assert!(!poly_ring.is_zero(poly));
+        let QQX = &poly_ring;
+        let QQ = QQX.base_ring();
+        let ZZ = QQ.base_ring();
+    
+        let den_lcm = QQX.terms(poly).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+        
+        let ZZX = DensePolyRing::new(ZZ, "X");
+        let f = ZZX.from_terms(QQX.terms(poly).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
+        let power_decomp = poly_power_decomposition_local(&ZZX, f, DontObserve);
+        let ZZX_to_QQX = QQX.lifted_hom(&ZZX, QQ.inclusion());
+    
+        return power_decomp.into_iter().map(|(f, k)| (QQX.normalize(ZZX_to_QQX.map(f)), k)).collect();
     }
     
     fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
@@ -282,70 +249,25 @@ impl<'a, I> PolyGCDRing for AsFieldBase<RingRef<'a, zn_big::ZnBase<I>>>
             P::Type: PolyRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        let new_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
-        let new_lhs = new_poly_ring.from_terms(poly_ring.terms(lhs).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        let new_rhs = new_poly_ring.from_terms(poly_ring.terms(rhs).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        let new_gcd = gcd(new_lhs, new_rhs, &new_poly_ring);
-        poly_ring.from_terms(new_poly_ring.terms(&new_gcd).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)))
-    }
-}
-
-impl<const N: u64> PolyGCDRing for zn_static::ZnBase<N, true> {
-
-    fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        let new_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
-        let new_poly = new_poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        poly_power_decomposition_finite_field(&new_poly_ring, &new_poly).into_iter().map(|(f, k)| 
-            (poly_ring.from_terms(new_poly_ring.terms(&f).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i))), k)
-        ).collect()
-    }
+        if poly_ring.is_zero(lhs) {
+            return poly_ring.clone_el(rhs);
+        } else if poly_ring.is_zero(rhs) {
+            return poly_ring.clone_el(lhs);
+        }
+        let QQX = &poly_ring;
+        let QQ = QQX.base_ring();
+        let ZZ = QQ.base_ring();
     
-    fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        let new_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
-        let new_lhs = new_poly_ring.from_terms(poly_ring.terms(lhs).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        let new_rhs = new_poly_ring.from_terms(poly_ring.terms(rhs).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        let new_gcd = gcd(new_lhs, new_rhs, &new_poly_ring);
-        poly_ring.from_terms(new_poly_ring.terms(&new_gcd).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)))
-    }
-}
-
-impl<R, V, A, C> PolyGCDRing for GaloisFieldBase<R, V, A, C>
-    where R: RingStore,
-        R::Type: ZnRing + FiniteRing + Field,
-        V: VectorView<El<R>>,
-        C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
-{
-    fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        let new_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
-        let new_poly = new_poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        poly_power_decomposition_finite_field(&new_poly_ring, &new_poly).into_iter().map(|(f, k)| 
-            (poly_ring.from_terms(new_poly_ring.terms(&f).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i))), k)
-        ).collect()
-    }
+        let den_lcm_lhs = QQX.terms(lhs).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+        let den_lcm_rhs = QQX.terms(rhs).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+        
+        let ZZX = DensePolyRing::new(ZZ, "X");
+        let lhs = ZZX.from_terms(QQX.terms(lhs).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm_lhs, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
+        let rhs = ZZX.from_terms(QQX.terms(rhs).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm_rhs, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
+        let result = poly_gcd_local(&ZZX, lhs, rhs, DontObserve);
+        let ZZX_to_QQX = QQX.lifted_hom(&ZZX, QQ.inclusion());
     
-    fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        let new_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
-        let new_lhs = new_poly_ring.from_terms(poly_ring.terms(lhs).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        let new_rhs = new_poly_ring.from_terms(poly_ring.terms(rhs).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        let new_gcd = gcd(new_lhs, new_rhs, &new_poly_ring);
-        poly_ring.from_terms(new_poly_ring.terms(&new_gcd).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)))
+        return QQX.normalize(ZZX_to_QQX.map(result));
     }
 }
 
