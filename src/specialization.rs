@@ -4,6 +4,8 @@ use std::marker::PhantomData;
 use crate::algorithms::convolution::ConvolutionAlgorithm;
 use crate::field::Field;
 use crate::integer::*;
+use crate::primitive_int::PrimitiveInt;
+use crate::primitive_int::StaticRingBase;
 use crate::ring::*;
 use crate::rings::extension::*;
 use crate::rings::extension::extension_impl::*;
@@ -11,6 +13,7 @@ use crate::rings::extension::galois_field::*;
 use crate::rings::field::*;
 use crate::rings::finite::*;
 use crate::rings::rational::*;
+use crate::rings::rust_bigint::RustBigintRingBase;
 use crate::seq::*;
 use crate::rings::zn::*;
 use crate::divisibility::*;
@@ -64,6 +67,22 @@ impl<I> FiniteRingSpecializable for zn_big::ZnBase<I>
 {
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
         Ok(op.execute())
+    }
+}
+
+impl<A> FiniteRingSpecializable for RustBigintRingBase<A>
+    where A: Allocator + Clone
+{
+    fn specialize<O: FiniteRingOperation<Self>>(_op: O) -> Result<O::Output, ()> {
+        Err(())
+    }
+}
+
+impl<T> FiniteRingSpecializable for StaticRingBase<T>
+    where T: PrimitiveInt
+{
+    fn specialize<O: FiniteRingOperation<Self>>(_op: O) -> Result<O::Output, ()> {
+        Err(())
     }
 }
 

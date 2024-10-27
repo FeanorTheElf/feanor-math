@@ -2,7 +2,6 @@ use crate::algorithms;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::PolyGCDRing;
 use crate::compute_locally::InterpolationBaseRing;
-use crate::divisibility::*;
 use crate::field::*;
 use crate::homomorphism::*;
 use crate::ordered::OrderedRingStore;
@@ -130,18 +129,14 @@ pub fn poly_factor_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>
 
     assert!(!KX.is_zero(f));
     let mut result: Vec<(El<P>, usize)> = Vec::new();
-    let mut current = KX.clone_el(f);
-    while !KX.is_unit(&current) {
-        let squarefree_part = <_ as PolyGCDRing>::squarefree_part(KX, &current);
-        current = KX.checked_div(&current, &squarefree_part).unwrap();
-
-        for factor in poly_factor_squarefree_extension(KX, &squarefree_part, MAX_PROBABILISTIC_REPETITIONS).ok().unwrap() {
+    for (non_irred_factor, k) in <_ as PolyGCDRing>::power_decomposition(KX, f) {
+        for factor in poly_factor_squarefree_extension(KX, &non_irred_factor, MAX_PROBABILISTIC_REPETITIONS).ok().unwrap() {
             if let Some((i, _)) = result.iter().enumerate().filter(|(_, f)| KX.eq_el(&f.0, &factor)).next() {
-                result[i].1 += 1;
+                result[i].1 += k;
             } else {
-                result.push((factor, 1));
+                result.push((factor, k));
             }
         }
     }
-    return (result, K.clone_el(KX.coefficient_at(&current, 0)));
+    return (result, K.clone_el(KX.coefficient_at(f, 0)));
 }

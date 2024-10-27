@@ -15,11 +15,11 @@ use std::cmp::Ordering;
 /// 
 /// The given ring must be euclidean.
 /// 
-pub fn eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>) 
+pub fn eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>, El<R>) 
     where R: EuclideanRingStore,
         R::Type: EuclideanRing
 {
-    let (mut a, mut b) = (fst, snd);
+    let (mut a, mut b) = (a, b);
 
     let (mut sa, mut ta) = (ring.one(), ring.zero());
     let (mut sb, mut tb) = (ring.zero(), ring.one());
@@ -31,7 +31,7 @@ pub fn eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
 
         let (quo, rem) = ring.euclidean_div_rem(a, &b);
         ta = ring.sub(ta, ring.mul_ref(&quo, &tb));
-        sa = ring.sub(sa, ring.mul_ref(&quo, &sb));
+        sa = ring.sub(sa, ring.mul_ref_snd(quo, &sb));
         a = rem;
 
         swap(&mut a, &mut b);
@@ -39,6 +39,31 @@ pub fn eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
         swap(&mut ta, &mut tb);
     }
     return (sa, ta, a);
+}
+
+///
+/// Computes the gcd `d` of `a` and `b`, together with "half a Bezout identity", i.e.
+/// some `s` such that `s * a = d mod b`.
+/// 
+/// For details, see [`eea()`].
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn half_eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>) 
+    where R: EuclideanRingStore,
+        R::Type: EuclideanRing
+{
+    let (mut a, mut b) = (a, b);
+    let (mut s, mut t) = (ring.one(), ring.zero());
+
+    // invariant: `s * a == a mod b` and `t * a == b mod b`
+    while !ring.is_zero(&a) {
+        let (q, r) = ring.euclidean_div_rem(a, &b);
+        a = r;
+        ring.sub_assign(&mut s, ring.mul_ref_snd(q, &t));
+        swap(&mut a, &mut b);
+        swap(&mut s, &mut t);
+    }
+    return (s, a);
 }
 
 /// 

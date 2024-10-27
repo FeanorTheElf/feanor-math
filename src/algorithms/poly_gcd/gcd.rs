@@ -34,10 +34,9 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(g).unwrap()));
 
     let ring = poly_ring.base_ring().get_ring();
-    let scale_to_ring_factor = ring.factor_scaling();
 
     let prime = ring.random_maximal_ideal(rng);
-    let heuristic_e = ring.heuristic_exponent(&prime, poly_ring, f);
+    let heuristic_e = ring.heuristic_exponent(&prime, poly_ring.degree(f).unwrap(), poly_ring.terms(f).map(|(c, _)| c));
     assert!(heuristic_e >= 1);
     let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt as i32)).floor() as usize;
 
@@ -49,7 +48,7 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
     let prime_field_poly_ring = DensePolyRing::new(&prime_field, "X");
     let prime_ring = reduction_map.codomain();
     let iso = prime_field.can_iso(&prime_ring).unwrap();
-    let reduce_prime_field = |h| prime_field_poly_ring.from_terms(poly_ring.terms(h).map(|(c, i)| (iso.inv().map(ring.reduce_full(&prime, (&prime_ring, 1), ring.clone_el(c))), i)));
+    let reduce_prime_field = |h| prime_field_poly_ring.from_terms(poly_ring.terms(h).map(|(c, i)| (iso.inv().map(ring.reduce_ring_el(&prime, (&prime_ring, 1), ring.clone_el(c))), i)));
 
     let prime_field_f = reduce_prime_field(f);
     let prime_field_g = reduce_prime_field(g);
@@ -69,18 +68,13 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
         return None;
     };
     let target_poly_ring = DensePolyRing::new(reduction_map.domain(), "X");
-    let reduced_poly = target_poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| (ring.reduce_full(&prime, (reduction_map.domain(), reduction_map.from_e()), ring.clone_el(c)), i)));
+    let reduced_poly = target_poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| (ring.reduce_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), ring.clone_el(c)), i)));
 
     let (lifted_d, _lifted_other_factor) = hensel_lift(&reduction_map, &target_poly_ring, &prime_field_poly_ring, &reduced_poly, (&factor1, &factor2), controller.clone());
-    let target_ring_scale_to_ring_factor = ring.reduce_full(&prime, (reduction_map.domain(), reduction_map.from_e()), poly_ring.base_ring().clone_el(&scale_to_ring_factor));
+    let result = poly_ring.from_terms(target_poly_ring.terms(&lifted_d).map(|(c, i)| (ring.reconstruct_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), reduction_map.domain().clone_el(c)), i)));
 
-    let result = poly_ring.from_terms(target_poly_ring.terms(&lifted_d).map(|(c, i)| (
-        ring.lift_full(&prime, (reduction_map.domain(), reduction_map.from_e()), reduction_map.domain().mul_ref(c, &target_ring_scale_to_ring_factor)), 
-        i
-    )));
-
-    if poly_ring.checked_div(&poly_ring.inclusion().mul_ref_map(&f, &scale_to_ring_factor), &result).is_none() || 
-        poly_ring.checked_div(&poly_ring.inclusion().mul_ref_map(&g, &scale_to_ring_factor), &result).is_none()
+    if poly_ring.checked_div(&f, &result).is_none() || 
+        poly_ring.checked_div(&g, &result).is_none()
     {
         log_progress!(controller, "(no_divisor)");
         return None;

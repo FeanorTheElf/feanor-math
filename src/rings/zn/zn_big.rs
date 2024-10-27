@@ -5,7 +5,7 @@ use serde::{Deserializer, Serializer};
 
 use crate::compute_locally::InterpolationBaseRing;
 use crate::divisibility::DivisibilityRing;
-use crate::impl_localpir_wrap_unwrap_homs;
+use crate::{impl_localpir_wrap_unwrap_homs, impl_poly_gcd_ring_for_finite_ring};
 use crate::impl_localpir_wrap_unwrap_isos;
 use crate::impl_field_wrap_unwrap_homs;
 use crate::impl_field_wrap_unwrap_isos;
@@ -591,6 +591,10 @@ impl<I: IntegerRingStore> ZnRing for ZnBase<I>
         ZnEl(x)
     }
 }
+
+impl_poly_gcd_ring_for_finite_ring!{ <{I}> PolyGCDRing for AsFieldBase<Zn<I>> where I: IntegerRingStore, I::Type: IntegerRing }
+impl_poly_gcd_ring_for_finite_ring!{ <{'a, I}> PolyGCDRing for AsFieldBase<&'a Zn<I>> where I: IntegerRingStore, I::Type: IntegerRing}
+impl_poly_gcd_ring_for_finite_ring!{ <{'a, I}> PolyGCDRing for AsFieldBase<RingRef<'a, ZnBase<I>>> where I: IntegerRingStore, I::Type: IntegerRing }
 
 impl_field_wrap_unwrap_homs!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: IntegerRingStore, I::Type: IntegerRing, J: IntegerRingStore, J::Type: IntegerRing }
 impl_field_wrap_unwrap_isos!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: IntegerRingStore, I::Type: IntegerRing, J: IntegerRingStore, J::Type: IntegerRing }

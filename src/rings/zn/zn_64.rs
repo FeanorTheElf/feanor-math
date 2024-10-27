@@ -7,6 +7,7 @@ use crate::impl_localpir_wrap_unwrap_homs;
 use crate::impl_localpir_wrap_unwrap_isos;
 use crate::impl_field_wrap_unwrap_homs;
 use crate::impl_field_wrap_unwrap_isos;
+use crate::impl_poly_gcd_ring_for_finite_ring;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::*;
 use crate::integer::*;
@@ -933,6 +934,10 @@ impl<I: ?Sized + IntegerRing> CanHomFrom<I> for ZnFastmulBase
         self.rev_delegate(self.base.get_ring().map_in(from, el, hom))
     }
 }
+
+impl_poly_gcd_ring_for_finite_ring!{ PolyGCDRing for AsFieldBase<Zn> }
+impl_poly_gcd_ring_for_finite_ring!{ <{'a}> PolyGCDRing for AsFieldBase<&'a Zn> where }
+impl_poly_gcd_ring_for_finite_ring!{ <{'a}> PolyGCDRing for AsFieldBase<RingRef<'a, ZnBase>> where }
 
 impl_field_wrap_unwrap_homs!{ ZnBase, ZnBase }
 impl_field_wrap_unwrap_isos!{ ZnBase, ZnBase }

@@ -845,7 +845,6 @@ pub trait RingExtension: RingBase {
     fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {
         self.mul_assign(lhs, self.from_ref(rhs));
     }
-
 }
 
 ///

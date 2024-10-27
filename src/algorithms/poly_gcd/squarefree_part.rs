@@ -9,7 +9,6 @@ use crate::MAX_PROBABILISTIC_REPETITIONS;
 use super::balance_poly;
 use super::evaluate_aX;
 use super::unevaluate_aX;
-use super::PolyGCDRing;
 use super::INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT;
 
 ///
@@ -32,11 +31,10 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, f: &El<
 
     let ring = poly_ring.base_ring().get_ring();
     let mut rng = oorandom::Rand64::new(1);
-    let scale_to_ring_factor = ring.factor_scaling();
 
     'try_random_prime: for current_attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
         let prime = ring.random_maximal_ideal(|| rng.rand_u64());
-        let heuristic_e = ring.heuristic_exponent(&prime, poly_ring, f);
+        let heuristic_e = ring.heuristic_exponent(&prime, poly_ring.degree(f).unwrap(), poly_ring.terms(f).map(|(c, _)| c));
         assert!(heuristic_e >= 1);
         let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt as i32)).floor() as usize;
 
@@ -49,29 +47,20 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, f: &El<
         let prime_ring = reduction_map.codomain();
         let iso = prime_field.can_iso(&prime_ring).unwrap();
 
-        let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (iso.inv().map(ring.reduce_full(&prime, (&prime_ring, 1), ring.clone_el(c))), i)));
+        let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (iso.inv().map(ring.reduce_ring_el(&prime, (&prime_ring, 1), ring.clone_el(c))), i)));
         let mut powers = Vec::new();
         let mut factors = Vec::new();
-        for (f, k) in <_ as PolyGCDRing>::power_decomposition(&prime_field_poly_ring, &prime_field_f) {
+        for (f, k) in poly_power_decomposition_finite_field(&prime_field_poly_ring, &prime_field_f) {
             powers.push(k);
             factors.push(prime_field_poly_ring.pow(f, k));
         }
     
         let target_poly_ring = DensePolyRing::new(reduction_map.domain(), "X");
-        let target_ring_scale_to_ring_factor = ring.reduce_full(&prime, (reduction_map.domain(), reduction_map.from_e()), poly_ring.base_ring().clone_el(&scale_to_ring_factor));
-        let local_ring_f = target_poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (ring.reduce_full(&prime, (reduction_map.domain(), reduction_map.from_e()), poly_ring.base_ring().clone_el(c)), i)));
+        let local_ring_f = target_poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (ring.reduce_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), poly_ring.base_ring().clone_el(c)), i)));
         
         let mut lifted_factorization = Vec::new();
-        for (factor, k) in hensel_lift_factorization(&reduction_map, &target_poly_ring, &prime_field_poly_ring, &local_ring_f, &factors[..], controller.clone()).into_iter().zip(powers.iter()) {
-            lifted_factorization.push(poly_ring.from_terms(target_poly_ring.terms(&factor).map(|(c, i)| (
-                ring.mul(
-                    // to map the factor into the ring, it would be sufficient to multiply by `scale_to_ring_factor`;
-                    // however, in order to take the root later, we need it to be a perfect `i`-th power, thus `scale_to_ring_factor^i`
-                    ring.lift_full(&prime, (reduction_map.domain(), reduction_map.from_e()), reduction_map.domain().mul_ref(c, &target_ring_scale_to_ring_factor)), 
-                    poly_ring.base_ring().pow(ring.clone_el(&scale_to_ring_factor), k - 1)
-                ),
-                i
-            ))));
+        for (factor, _k) in hensel_lift_factorization(&reduction_map, &target_poly_ring, &prime_field_poly_ring, &local_ring_f, &factors[..], controller.clone()).into_iter().zip(powers.iter()) {
+            lifted_factorization.push(poly_ring.from_terms(target_poly_ring.terms(&factor).map(|(c, i)| (ring.reconstruct_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), reduction_map.domain().clone_el(c)), i))));
         }
     
         let mut result = Vec::new();
@@ -79,12 +68,14 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, f: &El<
             if let Some(root_of_factor) = poly_root(poly_ring, &factor, k) {
                 result.push((balance_poly(poly_ring, root_of_factor).0, k));
             } else {
-                log_progress!(controller, "(fake_power)");
+                log_progress!(controller, "(not_perfect_power)");
                 continue 'try_random_prime;
             }
         }
+        // at first, I thought this could not happen, but actually it can. If we do a faulty lift, it might after all still turn out to be a perfect power;
+        // the alternative to this check here would be to check previously if all "factors" really divide f
         if !poly_ring.eq_el(&f, &poly_ring.prod(result.iter().map(|(factor, k)| poly_ring.pow(poly_ring.clone_el(factor), *k)))) {
-            log_progress!(controller, "(lifting_failed)");
+            log_progress!(controller, "(no_divisor)");
             continue 'try_random_prime;
         }
         result.sort_unstable_by_key(|(_, k)| *k);

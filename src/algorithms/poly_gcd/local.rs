@@ -1,13 +1,14 @@
 use std::fmt::Display;
 
+use crate::algorithms::linsolve::LinSolveRing;
 use crate::divisibility::*;
 use crate::homomorphism::*;
 use crate::ring::*;
-use crate::rings::poly::*;
 
-use crate::algorithms::poly_factor::FactorPolyField;
+use crate::specialization::FiniteRingSpecializable;
 
-use super::PolyGCDRing;
+use super::Field;
+use super::FiniteRing;
 
 ///
 /// Trait for rings that support lifting local partial factorizations of polynomials to the ring.
@@ -18,36 +19,14 @@ use super::PolyGCDRing;
 /// `p^e` of a maximal ideal `p` and use Hensel lifting. `EvaluatePolyLocallyRing` on the other
 /// hand is designed to allow computations modulo multiple different maximal ideals.
 /// 
-/// More concretely, a ring `R` implementing this trait should be endowed with a "pseudo norm"
-/// ```text
-///   |.|: R  ->  [0, ∞)
-/// ```
-/// i.e. a symmetric, sub-additive, sub-multiplicative map.
-/// Furthermore, for any bound `B` and any maximal ideal `p`, there should be a positive integer
-/// `e` such that the restriction of the reduction map
-/// ```text
-///   { x in R | |x| <= B }  ->  R / p^e
-/// ```
-/// is injective.
-/// This means that a (possibly partial) factorization in the simpler ring `R / p^e`,
-/// can be uniquely mapped back into `R` - assuming all coefficients of the actual factors 
-/// have pseudo-norm at most `b` and lie within the ring `R`. 
+/// I am currently not yet completely sure what the exact requirements of this trait would be,
+/// but conceptually, we want that for a random maximal ideal `m`, the quotient `R / m` should be
+/// finite, and there should be a power `e` such that we can derive the factorization of some polynomial
+/// over `R` from the factorization over `R / m^e`. Note that we don't assume that this `e` can be
+/// computed, except possibly in special cases (like the integers).
 /// 
-/// Because of this, it must be possible to give a bound on the `l∞`-pseudo norm of any monic factor 
-/// of a monic polynomial `f`. Previously I thought it would be nice to be able to explicitly compute
-/// this bound, but actually this is hard in some cases, and also in many cases, much smaller bounds
-/// are sufficient in practice - hence taking the "worst-case" bound gives very poor performance. 
-/// Thus the idea is to use progressively higher bounds, corresponding to progressively larger exponents `e`.
-/// 
-/// Unfortunately, this makes this trait mostly unsuitable to compute factorizations.
-/// In particular, by choosing larger `e`, we are able to find all factors eventually, but
-/// we can never know when we are done. More concretely, assuming the factorization of `h` mod `p^e`
-/// gives some irreducible factors `f1, ..., fk` such that `f = f1 ... fk` lifts to a factor of `h`.
-/// Then, it might be the case that `f` is irreducible over `R`, but it might also be that a larger
-/// power of `p^e` will give us a more fine-grained factor, say `f' = f1 ... fl` with `l < k`.
-/// Without an explicit irreducibility check (over `R`), we cannot distinguish these cases, and
-/// if we don't have an upper bound on `e`, we never know if we still have to consider factorizations
-/// modulo larger powers of `p`.
+/// Note also that I want this to work even when going to algebraic extensions or even the algebraic
+/// closure. This however seems to follow naturally in most cases.
 /// 
 /// # Mathematical examples
 /// 
@@ -70,21 +49,21 @@ use super::PolyGCDRing;
 ///    has the factor `X - (sqrt(3) + sqrt(7)) / 2`.
 ///    However, it turns out that if the original polynomial is monic, then its factors have coefficients in
 ///    the maximal order `O` of `R ⊗ QQ`. In particular, if we scale the factor by `[R : O] | disc(R)`, then
-///    we do end up with coefficients in `R`. This is why we allow for the function
-///    [`PolyGCDLocallyDomain::factor_scaling()`].
-///    Furthermore, the "pseudo-norm" here should be the canonical norm.
+///    we do end up with coefficients in `R`. Unfortunately, the discriminant can become really huge, which
+///    is why in the literature, rational reconstruction is used, to elements from `R / p^e` to "small" fractions
+///    in `Frac(R)`.
 /// 
 /// I cannot think of any other good examples (these were the ones I had in mind when writing this trait), but 
 /// who knows, maybe there are other rings that satisfy this and which we can thus do polynomial factorization in!
 /// 
 #[stability::unstable(feature = "enable")]
-pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing {
+pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializable {
 
     ///
     /// The proper way would be to define this with two lifetime parameters `'ring` and `'data`,
     /// see also [`crate::compute_locally::ComputeLocallyRing`]
     /// 
-    type LocalRingBase<'ring>: DivisibilityRing
+    type LocalRingBase<'ring>: LinSolveRing
         where Self: 'ring;
 
     type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
@@ -95,7 +74,11 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing {
     /// which in turn is required since the straightforward bound `for<'a> AsFieldBase<Self::LocalRing<'a>>: FactorPolyField`
     /// is bugged, see also [`crate::compute_locally::ComputeLocallyRing`].
     /// 
-    type LocalFieldBase<'ring>: CanIsoFromTo<Self::LocalRingBase<'ring>> + PolyGCDRing + FactorPolyField
+    /// Note that restricting this to `PolyGCDLocallyDomain` is necessary to close the loop and provide a blanket implementation
+    /// for all algebraic extensions of a `PolyGCDLocallyDomain`. The properties of `PolyGCDLocallyDomain` are actually never used
+    /// for this ring, since things should always boil down to the finite case, where `PolyGCDRing` can be implemented globally.
+    /// 
+    type LocalFieldBase<'ring>: CanIsoFromTo<Self::LocalRingBase<'ring>> + FiniteRing + Field
         where Self: 'ring;
 
     type LocalField<'ring>: RingStore<Type = Self::LocalFieldBase<'ring>>
@@ -105,25 +88,15 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing {
         where Self: 'ring;
 
     ///
-    /// Computes a nonzero element `a` with the property that whenever `f in R[X]` is a monic polynomial
-    /// over this ring `R`, with a factor `g` over `Frac(R)` the fraction field of this ring, we
-    /// have `ag in R[X]`.
-    /// 
-    /// If this ring is a UFD, this `a` can always be chosen as `1` by Gauss' lemma. Otherwise,
-    /// this factor "measures" the "extend of failure" of Gauss' lemma.
-    /// 
-    fn factor_scaling(&self) -> Self::Element;
-
-    ///
-    /// Returns an exponent `e` such that we hope that the factors of `poly` can already be read of
+    /// Returns an exponent `e` such that we hope that the factors of a polynomial of given degree, 
+    /// involving the given coefficient can already be read of (via [`PolyGCDLocallyDomain::reconstruct_ring_el()`]) 
     /// their reductions modulo `p^e`. Note that this is just a heuristic, and if it does not work,
     /// the implementation will gradually try larger `e`. Thus, even if this function returns constant
     /// 1, correctness will not be affected, but giving a good guess can improve performance
     /// 
-    fn heuristic_exponent<'ring, P>(&self, _maximal_ideal: &Self::MaximalIdeal<'ring>, _poly_ring: P, _poly: &El<P>) -> usize
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
+    fn heuristic_exponent<'ring, 'a, I>(&self, _maximal_ideal: &Self::MaximalIdeal<'ring>, _poly_deg: usize, _coefficients: I) -> usize
+        where I: Iterator<Item = &'a Self::Element>,
+            Self: 'a,
             Self: 'ring;
 
     ///
@@ -152,7 +125,7 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing {
     ///   R -> R / p^e
     /// ```
     /// 
-    fn reduce_full<'ring>(&self, p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>
+    fn reduce_ring_el<'ring>(&self, p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>
         where Self: 'ring;
 
     ///
@@ -174,14 +147,11 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing {
         where Self: 'ring;
 
     ///
-    /// Computes "the" shortest element `y in `R` such that `y = x mod p^from_e`.
-    /// The computed `y` does not necessarily have to be unique, but must be among the
-    /// set of shortest ones, i.e.
-    /// ```text
-    ///   |y| = min { |z| | z = x mod p^from_e }
-    /// ```
+    /// Computes a "small" element `x in R` such that `x mod p^e` is equal to the given value.
+    /// In cases where the factors of polynomials in `R[X]` do not necessarily have coefficients
+    /// in `R`, this function might have to do rational reconstruction. 
     /// 
-    fn lift_full<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
+    fn reconstruct_ring_el<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
         where Self: 'ring;
 
     fn dbg_maximal_ideal<'ring>(&self, p: &Self::MaximalIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
@@ -253,7 +223,7 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for ReductionMap<
     }
 
     fn map(&self, x: <R as RingBase>::Element) -> <R::LocalRingBase<'ring> as RingBase>::Element {
-        self.ring.get_ring().reduce_full(self.p, (&self.to.0, self.to.1), x)
+        self.ring.get_ring().reduce_ring_el(self.p, (&self.to.0, self.to.1), x)
     }
 }
 
@@ -335,11 +305,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
             type MaximalIdeal<'ring> = i64
                 where Self: 'ring;
         
-            fn factor_scaling(&self) -> Self::Element {
-                self.one()
-            }
-        
-            fn lift_full<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
+            fn reconstruct_ring_el<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
                 where Self: 'ring
             {
                 use $crate::rings::zn::*;
@@ -379,7 +345,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 return $crate::algorithms::miller_rabin::next_prime(StaticRing::<i64>::RING, lower_bound);
             }
         
-            fn reduce_full<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>
+            fn reduce_ring_el<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>
                 where Self: 'ring
             {
                 use $crate::homomorphism::*;
@@ -400,23 +366,20 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 return hom.map(from.0.smallest_lift(x));
             }
         
-            fn heuristic_exponent<'ring, P>(&self, p: &i64, poly_ring: P, poly: &El<P>) -> usize
-                where P: RingStore + Copy,
-                    P::Type: $crate::rings::poly::PolyRing,
-                    <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
+            fn heuristic_exponent<'ring, 'a, I>(&self, p: &i64, poly_deg: usize, coefficients: I) -> usize
+                where I: Iterator<Item = &'a Self::Element>,
+                    Self: 'a,
                     Self: 'ring
             {
-                use $crate::rings::poly::*;
-
-                let log2_largest_exponent = poly_ring.terms(poly).map(|(c, _)| RingRef::new(self).abs_log2_ceil(c).unwrap() as f64).max_by(f64::total_cmp).unwrap();
+                let log2_largest_exponent = coefficients.map(|c| RingRef::new(self).abs_log2_ceil(c).unwrap() as f64).max_by(f64::total_cmp).unwrap();
                 // this is in no way a rigorous bound, but equals the worst-case bound at least asymptotically (up to constants)
-                return ((log2_largest_exponent + poly_ring.degree(poly).unwrap() as f64) / (*p as f64).log2() / /* just some factor that seemed good when playing around */ 4.).ceil() as usize + 1;
+                return ((log2_largest_exponent + poly_deg as f64) / (*p as f64).log2() / /* just some factor that seemed good when playing around */ 4.).ceil() as usize + 1;
             }
             
             fn dbg_maximal_ideal<'ring>(&self, p: &Self::MaximalIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
                 where Self: 'ring
             {
-                write!(out, "{}", p)
+                write!(out, "({})", p)
             }
         }
 

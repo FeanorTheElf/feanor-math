@@ -1,22 +1,20 @@
-use crate::compute_locally::InterpolationBaseRing;
 use crate::field::*;
 use crate::homomorphism::*;
 use crate::integer::*;
 use crate::pid::*;
 use crate::ring::*;
+use crate::rings::extension::galois_field::GaloisFieldBase;
 use crate::rings::extension::FreeAlgebra;
 use crate::rings::field::*;
+use crate::rings::finite::FiniteRing;
 use crate::rings::poly::*;
 use crate::rings::rational::*;
 use crate::rings::zn::zn_64::*;
 use crate::specialization::*;
 use crate::rings::zn::*;
 
-use extension::poly_factor_extension;
 use finite::*;
 use rational::*;
-
-use super::poly_gcd::PolyGCDRing;
 
 pub mod cantor_zassenhaus;
 pub mod extension;
@@ -82,22 +80,6 @@ pub trait FactorPolyField: Field {
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
 }
 
-impl<R> FactorPolyField for R
-    where R: FreeAlgebra + PerfectField + FiniteRingSpecializable + PolyGCDRing,
-        <R::BaseRing as RingStore>::Type: PerfectField + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + PolyGCDRing
-{
-    default fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: PolyRingStore,
-            P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        if let Some(result) = poly_factor_if_finite_field(&poly_ring, poly) {
-            return result;
-        } else {
-            return poly_factor_extension(poly_ring, poly);
-        }
-    }
-}
 
 ///
 /// Unfortunately, `AsFieldBase<R> where R: RingStore<Type = zn_64::ZnBase>` leads to
@@ -130,8 +112,8 @@ impl<'a> FactorPolyField for AsFieldBase<RingRef<'a, ZnBase>> {
 /// a conflicting impl with the one for field extensions 
 ///
 impl<I> FactorPolyField for AsFieldBase<zn_big::Zn<I>>
-where I: IntegerRingStore,
-    I::Type: IntegerRing
+    where I: IntegerRingStore,
+        I::Type: IntegerRing
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: PolyRingStore,
@@ -177,5 +159,19 @@ impl<I> FactorPolyField for RationalFieldBase<I>
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
         poly_factor_rational(poly_ring, poly)
+    }
+}
+
+impl<Impl> FactorPolyField for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
+{
+    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
+        where P: PolyRingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        poly_factor_finite_field(poly_ring, poly)
     }
 }

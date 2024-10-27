@@ -1,5 +1,6 @@
 use gcd::poly_gcd_local;
 use global::poly_power_decomposition_finite_field;
+use local::PolyGCDLocallyDomain;
 use squarefree_part::poly_power_decomposition_local;
 
 use crate::algorithms::eea::signed_lcm;
@@ -8,12 +9,15 @@ use crate::divisibility::*;
 use crate::homomorphism::*;
 use crate::integer::*;
 use crate::pid::*;
+use crate::rings::field::*;
 use crate::rings::rational::RationalFieldBase;
 use crate::ring::*;
+use crate::delegate::DelegateRing;
 use crate::rings::poly::dense_poly::*;
 use crate::rings::poly::*;
 use crate::rings::finite::*;
 use crate::field::*;
+use crate::specialization::FiniteRingOperation;
 
 use super::eea::gcd;
 
@@ -37,7 +41,7 @@ pub trait PolyGCDRing {
     /// 
     fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
         where P: RingStore + Copy,
-            P::Type: PolyRing,
+            P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
         poly_ring.prod(Self::power_decomposition(poly_ring, poly).into_iter().map(|(f, _)| f))
@@ -53,7 +57,7 @@ pub trait PolyGCDRing {
     /// 
     fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
         where P: RingStore + Copy,
-            P::Type: PolyRing,
+            P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
     
     ///
@@ -66,7 +70,7 @@ pub trait PolyGCDRing {
     /// 
     fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
         where P: RingStore + Copy,
-            P::Type: PolyRing,
+            P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
 }
 
@@ -191,31 +195,170 @@ pub fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
     }
 }
 
+#[macro_export]
+macro_rules! impl_poly_gcd_ring_for_finite_ring {
+    (<{$($gen_args:tt)*}> PolyGCDRing for $finite_ring:ty where $($constraints:tt)*) => {
+        
+        ///
+        /// We need this implementation such that the blanket implementation of [`PolyGCDDomain`] and
+        /// kicks in for finite field extensions. This is somewhat unfortunate, since these functions are 
+        /// actually supposed to never be called (despite the fact that technically, finite fields satisfy 
+        /// the axioms of [`PolyGCDLocallyDomain`], taking only ever the maximal ideal `(0)`).
+        /// 
+        #[allow(unused)]
+        impl<$($gen_args)*> $crate::algorithms::poly_gcd::local::PolyGCDLocallyDomain for $finite_ring
+            where $($constraints)*
+        {
+            type LocalRingBase<'ring> = Self
+                where Self: 'ring;
+        
+            type LocalRing<'ring> = RingRef<'ring, Self>
+                where Self: 'ring;
+            
+            type LocalFieldBase<'ring> = Self
+                where Self: 'ring;
+        
+            type LocalField<'ring> = RingRef<'ring, Self>
+                where Self: 'ring;
+        
+            type MaximalIdeal<'ring> = RingRef<'ring, Self>
+                where Self: 'ring;
+        
+            // use "complicated" generic parameter names, to prevent collisions with macro callee
+            fn heuristic_exponent<'ring, 'element, IteratorType>(&self, _maximal_ideal: &Self::MaximalIdeal<'ring>, _poly_deg: usize, _coefficients: IteratorType) -> usize
+                where IteratorType: Iterator<Item = &'element Self::Element>,
+                    Self: 'element,
+                    Self: 'ring
+            {
+                unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+            }
+        
+            // use "complicated" generic parameter names, to prevent collisions with macro callee
+            fn random_maximal_ideal<'ring, RandomNumberFunction>(&'ring self, rng: RandomNumberFunction) -> Self::MaximalIdeal<'ring>
+                where RandomNumberFunction: FnMut() -> u64
+            {
+                unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+            }
+        
+            fn local_field_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> Self::LocalField<'ring>
+                where Self: 'ring
+            {
+                unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+            }
+            
+            fn local_ring_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>, e: usize) -> Self::LocalRing<'ring>
+                where Self: 'ring
+            {
+                unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+            }
+        
+            fn reduce_ring_el<'ring>(&self, p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>
+                where Self: 'ring
+            {
+                unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+            }
+        
+            fn reduce_partial<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+                where Self: 'ring
+            {
+                unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+            }
+        
+            fn lift_partial<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+                where Self: 'ring
+            {
+                unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+            }
+        
+            fn reconstruct_ring_el<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
+                where Self: 'ring
+            {
+                unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+            }
+        
+            fn dbg_maximal_ideal<'ring>(&self, p: &Self::MaximalIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
+                where Self: 'ring
+            {
+                unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+            }
+        }
+    };
+    (PolyGCDRing for $finite_ring:ty) => {
+        impl_poly_gcd_ring_for_finite_ring!{ <{}> PolyGCDRing for $finite_ring where }
+    }
+}
+
 impl<R> PolyGCDRing for R
-    where R: FiniteRing + Field
+    where R: PolyGCDLocallyDomain
 {
-    fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
+    default fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
         where P: RingStore + Copy,
-            P::Type: PolyRing,
+            P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        let new_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
-        let new_poly = new_poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        poly_power_decomposition_finite_field(&new_poly_ring, &new_poly).into_iter().map(|(f, k)| 
-            (poly_ring.from_terms(new_poly_ring.terms(&f).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i))), k)
-        ).collect()
+        struct PowerDecompositionIfFiniteField<'a, P>(P, &'a El<P>)
+            where P: RingStore + Copy,
+                P::Type: PolyRing,
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing;
+
+        impl<'a, P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PowerDecompositionIfFiniteField<'a, P>
+            where P: RingStore + Copy,
+                P::Type: PolyRing,
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing
+        {
+            type Output = Vec<(El<P>, usize)>;
+
+            fn execute(self) -> Vec<(El<P>, usize)>
+                where <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing
+            {
+                let new_poly_ring = DensePolyRing::new(AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())), "X");
+                let new_poly = new_poly_ring.from_terms(self.0.terms(&self.1).map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(self.0.base_ring().clone_el(c)), i)));
+                poly_power_decomposition_finite_field(&new_poly_ring, &new_poly).into_iter().map(|(f, k)| 
+                    (self.0.from_terms(new_poly_ring.terms(&f).map(|(c, i)| (new_poly_ring.base_ring().get_ring().unwrap_element(new_poly_ring.base_ring().clone_el(c)), i))), k)
+                ).collect()
+            }
+        }
+
+        if let Ok(result) = R::specialize(PowerDecompositionIfFiniteField(poly_ring, poly)) {
+            return result;
+        } else {
+            poly_power_decomposition_local(poly_ring, poly_ring.clone_el(poly), DontObserve)
+        }
     }
     
-    fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+    default fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
         where P: RingStore + Copy,
-            P::Type: PolyRing,
+            P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        let new_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
-        let new_lhs = new_poly_ring.from_terms(poly_ring.terms(lhs).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        let new_rhs = new_poly_ring.from_terms(poly_ring.terms(rhs).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-        let new_gcd = gcd(new_lhs, new_rhs, &new_poly_ring);
-        poly_ring.from_terms(new_poly_ring.terms(&new_gcd).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)))
+        struct PolyGCDIfFiniteField<'a, P>(P, &'a El<P>, &'a El<P>)
+            where P: RingStore + Copy,
+                P::Type: PolyRing,
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing;
+
+        impl<'a, P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PolyGCDIfFiniteField<'a, P>
+            where P: RingStore + Copy,
+                P::Type: PolyRing,
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing
+        {
+            type Output = El<P>;
+
+            fn execute(self) -> El<P>
+                where <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing
+            {
+                let new_poly_ring = DensePolyRing::new(AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())), "X");
+                let new_lhs = new_poly_ring.from_terms(self.0.terms(&self.1).map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(self.0.base_ring().clone_el(c)), i)));
+                let new_rhs = new_poly_ring.from_terms(self.0.terms(&self.2).map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(self.0.base_ring().clone_el(c)), i)));
+                let result = gcd(new_lhs, new_rhs, &new_poly_ring);
+                return self.0.from_terms(new_poly_ring.terms(&result).map(|(c, i)| (new_poly_ring.base_ring().get_ring().unwrap_element(new_poly_ring.base_ring().clone_el(c)), i)));
+            }
+        }
+
+        if let Ok(result) = R::specialize(PolyGCDIfFiniteField(poly_ring, lhs, rhs)) {
+            return result;
+        } else {
+            poly_gcd_local(poly_ring, poly_ring.clone_el(lhs), poly_ring.clone_el(rhs), DontObserve)
+        }
     }
 }
 

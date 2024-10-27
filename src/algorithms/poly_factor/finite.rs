@@ -1,3 +1,4 @@
+use crate::algorithms::poly_gcd::global::poly_squarefree_part_finite_field;
 use crate::algorithms::poly_gcd::PolyGCDRing;
 use crate::divisibility::*;
 use crate::field::*;
@@ -16,7 +17,7 @@ use super::cantor_zassenhaus;
 pub fn poly_factor_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: PolyRingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + PolyGCDRing
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
 {
     assert!(!poly_ring.is_zero(&f));
     let even_char = BigIntRing::RING.is_even(&poly_ring.base_ring().characteristic(&BigIntRing::RING).unwrap());
@@ -28,7 +29,7 @@ pub fn poly_factor_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usiz
     // we repeatedly remove the square-free part
     while !poly_ring.is_unit(&el) {
 
-        let sqrfree_part = <_ as PolyGCDRing>::squarefree_part(&poly_ring, &el);
+        let sqrfree_part = poly_squarefree_part_finite_field(&poly_ring, &el);
         assert!(!poly_ring.is_unit(&sqrfree_part));
 
         // factor the square-free part into distinct-degree factors

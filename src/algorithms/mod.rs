@@ -18,6 +18,7 @@ pub mod poly_factor;
 pub mod discrete_log;
 pub mod linsolve;
 pub mod resultant;
+pub mod rational_reconstruction;
 pub mod interpolate;
 pub mod gauss;
 pub mod buchberger;

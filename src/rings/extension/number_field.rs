@@ -3,6 +3,7 @@ use std::alloc::Allocator;
 use std::alloc::Global;
 
 use extension_impl::FreeAlgebraImplBase;
+use sparse::SparseMapVector;
 
 use crate::algorithms::convolution::ConvolutionAlgorithm;
 use crate::algorithms::convolution::KaratsubaAlgorithm;
@@ -15,21 +16,35 @@ use crate::pid::EuclideanRing;
 use crate::pid::PrincipalIdealRing;
 use crate::ring::*;
 use crate::rings::field::AsField;
+use crate::rings::finite::FiniteRing;
 use crate::rings::poly::*;
 use crate::rings::rational::*;
 use crate::divisibility::*;
 use crate::rings::extension::*;
+use crate::rings::zn::zn_64;
+use crate::rings::zn::zn_big;
 use super::extension_impl::FreeAlgebraImpl;
 use super::Field;
 use super::FreeAlgebra;
 
 #[stability::unstable(feature = "enable")]
-pub trait NumberFieldOrQQ: RingBase {}
+pub trait NumberFieldOrQQ: RingBase {
+
+    type QuotientRing<'ring>: FiniteRing + LinSolveRing
+        where Self: 'ring;
+    type QuotientField<'ring>: FiniteRing + Field + CanIsoFromTo<Self::QuotientRing<'ring>>
+        where Self: 'ring;
+}
 
 impl<I> NumberFieldOrQQ for RationalFieldBase<I>
     where I: RingStore,
         I::Type: IntegerRing
-{}
+{
+    type QuotientField<'ring> = AsFieldBase<zn_64::Zn>
+        where Self: 'ring;
+    type QuotientRing<'ring> = zn_big::ZnBase<I>
+        where Self: 'ring;
+}
 
 ///
 /// 
@@ -39,6 +54,7 @@ impl<I> NumberFieldOrQQ for RationalFieldBase<I>
 /// the description there.
 /// 
 #[stability::unstable(feature = "enable")]
+#[repr(transparent)]
 pub struct NumberFieldBase<Impl>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
@@ -51,12 +67,6 @@ pub struct NumberFieldBase<Impl>
 pub type DefaultNumberFieldImpl = AsField<FreeAlgebraImpl<RationalField<BigIntRing>, Vec<El<RationalField<BigIntRing>>>, Global, KaratsubaAlgorithm>>;
 #[stability::unstable(feature = "enable")]
 pub type NumberField<Impl = DefaultNumberFieldImpl> = RingValue<NumberFieldBase<Impl>>;
-
-#[stability::unstable(feature = "enable")]
-pub struct NumberFieldEl<Impl>(El<Impl>)
-    where Impl: RingStore,
-        Impl::Type: Field + FreeAlgebra,
-        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: NumberFieldOrQQ;
 
 impl<Impl> NumberField<Impl>
     where Impl: RingStore,
@@ -85,10 +95,21 @@ impl NumberField {
 }
 
 impl<Impl> NumberFieldOrQQ for NumberFieldBase<Impl> 
-    where Impl: RingStore + Clone,
+    where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
         <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: NumberFieldOrQQ
-{}
+{
+    type QuotientField<'ring> = AsFieldBase<FreeAlgebraImpl<
+            RingValue<<<<Impl::Type as RingExtension>::BaseRing as RingStore>::Type as NumberFieldOrQQ>::QuotientField<'ring>>, 
+            SparseMapVector<RingValue<<<<Impl::Type as RingExtension>::BaseRing as RingStore>::Type as NumberFieldOrQQ>::QuotientField<'ring>>>
+    >>
+        where Self: 'ring;
+    type QuotientRing<'ring> = FreeAlgebraImplBase<
+        RingValue<<<<Impl::Type as RingExtension>::BaseRing as RingStore>::Type as NumberFieldOrQQ>::QuotientRing<'ring>>, 
+        SparseMapVector<RingValue<<<<Impl::Type as RingExtension>::BaseRing as RingStore>::Type as NumberFieldOrQQ>::QuotientRing<'ring>>>
+    >
+        where Self: 'ring;
+}
 
 impl<Impl> Clone for NumberFieldBase<Impl> 
     where Impl: RingStore + Clone,
@@ -123,16 +144,16 @@ impl<Impl> DelegateRing for NumberFieldBase<Impl>
         <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: NumberFieldOrQQ
 {
     type Base = Impl::Type;
-    type Element = NumberFieldEl<Impl>;
+    type Element = El<Impl>;
 
     fn get_delegate(&self) -> &Self::Base {
         self.base.get_ring()
     }
 
-    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el.0 }
-    fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { &mut el.0 }
-    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { &el.0 }
-    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { NumberFieldEl(el) }
+    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+    fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
+    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
+    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
 }
 
 impl<Impl> PrincipalIdealRing for NumberFieldBase<Impl>
@@ -339,5 +360,141 @@ impl<Impl, R, A, V, C> CanIsoFromTo<NumberFieldBase<Impl>> for AsFieldBase<FreeA
 
     fn map_out(&self, from: &NumberFieldBase<Impl>, el: <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <NumberFieldBase<Impl> as RingBase>::Element {
         from.rev_delegate(self.get_delegate().map_out(from.base.get_ring(), self.delegate(el), iso))
+    }
+}
+
+mod number_field_as_order {
+
+    use crate::{algorithms::poly_gcd::local::PolyGCDLocallyDomain, specialization::{FiniteRingOperation, FiniteRingSpecializable}};
+
+    use super::*;
+
+    struct NumberFieldPolyGCDLocallyDomain<Impl>
+        where Impl: RingStore,
+            Impl::Type: Field + FreeAlgebra,
+            <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: NumberFieldOrQQ
+    {
+        base: NumberField<Impl>
+    }
+    
+    impl<Impl> PartialEq for NumberFieldPolyGCDLocallyDomain<Impl> 
+        where Impl: RingStore,
+            Impl::Type: Field + FreeAlgebra,
+            <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: NumberFieldOrQQ
+    {
+        fn eq(&self, other: &Self) -> bool {
+            self.base.get_ring() == other.base.get_ring()
+        }
+    }
+
+    impl<Impl> DelegateRing for NumberFieldPolyGCDLocallyDomain<Impl> 
+        where Impl: RingStore,
+            Impl::Type: Field + FreeAlgebra,
+            <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: NumberFieldOrQQ
+    {
+        type Base = NumberFieldBase<Impl>;
+        type Element = El<NumberField<Impl>>;
+
+        fn get_delegate(&self) -> &Self::Base {
+            self.base.get_ring()
+        }
+
+        fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+        fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
+        fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
+        fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
+    }
+
+    impl<Impl> Domain for NumberFieldPolyGCDLocallyDomain<Impl> 
+        where Impl: RingStore,
+            Impl::Type: Field + FreeAlgebra,
+            <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: NumberFieldOrQQ
+    {}
+
+    impl<Impl> FiniteRingSpecializable for NumberFieldPolyGCDLocallyDomain<Impl> 
+        where Impl: RingStore,
+            Impl::Type: Field + FreeAlgebra,
+            <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: NumberFieldOrQQ
+    {
+        fn specialize<O: FiniteRingOperation<Self>>(_op: O) -> Result<O::Output, ()> {
+            Err(())
+        }
+    }
+    
+    impl<Impl> PolyGCDLocallyDomain for NumberFieldPolyGCDLocallyDomain<Impl> 
+        where Impl: RingStore,
+            Impl::Type: Field + FreeAlgebra,
+            <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: NumberFieldOrQQ
+    {
+        type LocalRingBase<'ring> = <NumberFieldBase<Impl> as NumberFieldOrQQ>::QuotientRing<'ring>
+            where Self: 'ring;
+
+        type LocalRing<'ring> = RingValue<<NumberFieldBase<Impl> as NumberFieldOrQQ>::QuotientRing<'ring>>
+            where Self: 'ring;
+
+        type LocalFieldBase<'ring> = <NumberFieldBase<Impl> as NumberFieldOrQQ>::QuotientField<'ring>
+            where Self: 'ring;
+
+        type LocalField<'ring> = RingValue<<NumberFieldBase<Impl> as NumberFieldOrQQ>::QuotientField<'ring>>
+            where Self: 'ring;
+
+        type MaximalIdeal<'ring> = i64
+            where Self: 'ring;
+
+        fn heuristic_exponent<'ring, 'a, I>(&self, _maximal_ideal: &Self::MaximalIdeal<'ring>, _poly_deg: usize, _coefficients: I) -> usize
+            where I: Iterator<Item = &'a Self::Element>,
+                Self: 'a,
+                Self: 'ring
+        {
+            unimplemented!()
+        }
+
+        fn random_maximal_ideal<'ring, F>(&'ring self, rng: F) -> Self::MaximalIdeal<'ring>
+            where F: FnMut() -> u64
+        {
+            unimplemented!()
+        }
+
+        fn local_field_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> Self::LocalField<'ring>
+            where Self: 'ring
+        {
+            unimplemented!()
+        }
+
+        fn local_ring_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>, e: usize) -> Self::LocalRing<'ring>
+            where Self: 'ring
+        {
+            unimplemented!()
+        }
+
+        fn reduce_ring_el<'ring>(&self, p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>
+            where Self: 'ring
+        {
+            unimplemented!()
+        }
+
+        fn reduce_partial<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+            where Self: 'ring
+        {
+            unimplemented!()
+        }
+
+        fn lift_partial<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+            where Self: 'ring
+        {
+            unimplemented!()
+        }
+
+        fn reconstruct_ring_el<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
+            where Self: 'ring
+        {
+            unimplemented!()
+        }
+
+        fn dbg_maximal_ideal<'ring>(&self, p: &Self::MaximalIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
+            where Self: 'ring
+        {
+            unimplemented!()
+        }
     }
 }

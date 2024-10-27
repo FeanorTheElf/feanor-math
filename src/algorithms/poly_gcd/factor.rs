@@ -1,16 +1,16 @@
 use std::convert::identity;
 
+use crate::algorithms::poly_factor::finite::poly_factor_finite_field;
 use crate::algorithms::poly_gcd::*;
 use crate::algorithms::poly_gcd::local::*;
 use crate::algorithms::poly_gcd::hensel::*;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
-use crate::algorithms::poly_factor::FactorPolyField;
 use crate::computation::*;
 use crate::iters::clone_slice;
 use crate::iters::powerset;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 
-fn combine_local_factors_local<'ring, 'a, R, P, Q>(ring: &R, scale_to_ring_factor: &R::Element, maximal_ideal: &R::MaximalIdeal<'ring>, poly_ring: P, f: &El<P>, local_poly_ring: Q, local_e: usize, local_factors: Vec<El<Q>>) -> Vec<El<P>>
+fn combine_local_factors_local<'ring, 'a, R, P, Q>(ring: &R, maximal_ideal: &R::MaximalIdeal<'ring>, poly_ring: P, f: &El<P>, local_poly_ring: Q, local_e: usize, local_factors: Vec<El<Q>>) -> Vec<El<P>>
     where R: ?Sized + PolyGCDLocallyDomain,
         P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
@@ -22,11 +22,10 @@ fn combine_local_factors_local<'ring, 'a, R, P, Q>(ring: &R, scale_to_ring_facto
     debug_assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
     debug_assert!(local_factors.iter().all(|local_factor| local_poly_ring.base_ring().is_one(local_poly_ring.lc(local_factor).unwrap())));
 
-    let local_ring_scale_to_ring_factor = ring.reduce_full(&maximal_ideal, (local_poly_ring.base_ring(), local_e), poly_ring.base_ring().clone_el(&scale_to_ring_factor));
-    let lift_full = |factor| balance_poly(poly_ring, poly_ring.from_terms(local_poly_ring.terms(&factor).map(|(c, i)| (ring.lift_full(maximal_ideal, (local_poly_ring.base_ring(), local_e), local_poly_ring.base_ring().clone_el(c)), i)))).0;
+    let reconstruct_ring_el = |factor| balance_poly(poly_ring, poly_ring.from_terms(local_poly_ring.terms(&factor).map(|(c, i)| (ring.reconstruct_ring_el(maximal_ideal, (local_poly_ring.base_ring(), local_e), local_poly_ring.base_ring().clone_el(c)), i)))).0;
 
     let mut ungrouped_factors = (0..local_factors.len()).collect::<Vec<_>>();
-    let mut current = poly_ring.inclusion().mul_ref_map(f, scale_to_ring_factor);
+    let mut current = poly_ring.clone_el(f);
     let mut result = Vec::new();
     while ungrouped_factors.len() > 0 {
         // Here we use the naive approach to group the factors such that the product of each group
@@ -37,15 +36,14 @@ fn combine_local_factors_local<'ring, 'a, R, P, Q>(ring: &R, scale_to_ring_facto
                 return None;
             }
             let factor = local_poly_ring.prod(indices.iter().copied().map(|i| local_poly_ring.clone_el(&local_factors[i])));
-            let liftable_factor = local_poly_ring.inclusion().mul_ref_snd_map(factor, &local_ring_scale_to_ring_factor);
-            let lifted_factor = lift_full(liftable_factor);
+            let lifted_factor = reconstruct_ring_el(factor);
             if let Some(quo) = poly_ring.checked_div(&current, &lifted_factor) {
                 return Some((lifted_factor, quo, clone_slice(indices)));
             } else {
                 return None;
             }
         }).filter_map(identity).next().unwrap();
-        current = poly_ring.inclusion().mul_ref_snd_map(new, scale_to_ring_factor);
+        current = new;
         result.push(factor);
         ungrouped_factors.retain(|j| !factor_group.contains(j));
     }
@@ -69,7 +67,6 @@ pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::
         Controller: ComputationController
 {
     let ring = poly_ring.base_ring().get_ring();
-    let scale_to_ring_factor = ring.factor_scaling();
 
     log_progress!(controller, "mod({}^{})", IdealDisplayWrapper::new(ring, &prime), e);
 
@@ -80,9 +77,9 @@ pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::
     let prime_ring = reduction_map.codomain();
     let iso = prime_field.can_iso(&prime_ring).unwrap();
 
-    let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (iso.inv().map(ring.reduce_full(&prime, (&prime_ring, 1), ring.clone_el(c))), i)));
+    let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (iso.inv().map(ring.reduce_ring_el(&prime, (&prime_ring, 1), ring.clone_el(c))), i)));
     let mut factors = Vec::new();
-    for (f, k) in <_ as FactorPolyField>::factor_poly(&prime_field_poly_ring, &prime_field_f).0 {
+    for (f, k) in poly_factor_finite_field(&prime_field_poly_ring, &prime_field_f).0 {
         if k > 1 {
             log_progress!(controller, "(not_squarefree)");
             return None;
@@ -91,12 +88,12 @@ pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::
     }
 
     let target_poly_ring = DensePolyRing::new(reduction_map.domain(), "X");
-    let local_ring_f = target_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (ring.reduce_full(&prime, (reduction_map.domain(), reduction_map.from_e()), poly_ring.base_ring().clone_el(c)), i)));
+    let local_ring_f = target_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (ring.reduce_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), poly_ring.base_ring().clone_el(c)), i)));
     
     let local_ring_factorization = hensel_lift_factorization(&reduction_map, &target_poly_ring, &prime_field_poly_ring, &local_ring_f, &factors[..], controller.clone());
     
     finish_computation!(controller);
-    return Some(combine_local_factors_local(ring, &scale_to_ring_factor, &prime, poly_ring, f, &target_poly_ring, reduction_map.from_e(), local_ring_factorization));
+    return Some(combine_local_factors_local(ring, &prime, poly_ring, f, &target_poly_ring, reduction_map.from_e(), local_ring_factorization));
 }
 
 ///
@@ -124,7 +121,7 @@ fn heuristic_factor_poly_squarefree_monic_local<P, Controller>(poly_ring: P, f: 
 
     for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
         let prime = ring.random_maximal_ideal(|| rng.rand_u64());
-        let heuristic_e = ring.heuristic_exponent(&prime, poly_ring, f);
+        let heuristic_e = ring.heuristic_exponent(&prime, poly_ring.degree(f).unwrap(), poly_ring.terms(f).map(|(c, _)| c));
         assert!(heuristic_e >= 1);
         let e = (heuristic_e as f64 * prime_exponent_factor).floor() as usize;
         
