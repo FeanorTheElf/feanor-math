@@ -322,6 +322,82 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
     }
 
     ///
+    /// Almost computes the FFT, but skips the first butterfly level.
+    /// 
+    /// This is designed for use by Bluestein's FFT, since it knows that
+    /// half the input is zero, which means that the first butterfly is trivial.
+    /// 
+    /// It also does not include division by `n` in the inverse case.
+    /// 
+    pub(super) fn unordered_fft_skip_first_butterfly<V, const INV: bool>(&self, values: &mut V)
+        where V: VectorViewMut<R_main::Element> 
+    {
+        assert!(values.len() == (1 << self.log2_n));
+
+        let hom = &self.hom;
+        let R = hom.codomain();
+
+        for step in 1..self.log2_n {
+
+            let (log2_m, log2_group_size_half) = if !INV {
+                (self.log2_n - step - 1, step)  
+            } else {
+                (step - 1, self.log2_n - step)
+            };
+            let group_size_half = 1 << log2_group_size_half;
+            let m = 1 << log2_m;
+            let two_m = 2 << log2_m;
+            const UNROLL_COUNT: usize = 4;
+
+
+            if group_size_half < UNROLL_COUNT {
+
+                for k in 0..m {
+                    let mut root_of_unity_index = (1 << self.log2_n) - 2 * group_size_half;
+                    let mut index1 = k;
+        
+                    for _ in 0..group_size_half {
+        
+                        if !INV {
+                            let current_twiddle = &self.inv_root_of_unity_list[root_of_unity_index];
+                            R.get_ring().butterfly(hom, values, current_twiddle, index1, index1 + m);
+                        } else {
+                            let current_twiddle = &self.root_of_unity_list[root_of_unity_index];
+                            R.get_ring().inv_butterfly(hom, values, current_twiddle, index1, index1 + m);
+                        }
+                        root_of_unity_index += 1;
+                        index1 += two_m;
+        
+                    }
+                }
+
+            } else {
+
+                for k in 0..m {
+                    let mut root_of_unity_index = (1 << self.log2_n) - 2 * group_size_half;
+                    let mut index1 = k;
+        
+                    for _ in (0..group_size_half).step_by(UNROLL_COUNT) {
+                        for _ in 0..UNROLL_COUNT {
+        
+                            if !INV {
+                                let current_twiddle = &self.inv_root_of_unity_list[root_of_unity_index];
+                                R.get_ring().butterfly(hom, values, current_twiddle, index1, index1 + m);
+                            } else {
+                                let current_twiddle = &self.root_of_unity_list[root_of_unity_index];
+                                R.get_ring().inv_butterfly(hom, values, current_twiddle, index1, index1 + m);
+                            }
+                            root_of_unity_index += 1;
+                            index1 += two_m;
+        
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    ///
     /// Optimized implementation of the inplace Cooley-Tuckey FFT algorithm.
     /// Note that setting `INV = true` will perform an inverse fourier transform,
     /// except that the division by `n` is not included.
@@ -472,7 +548,6 @@ impl<R_main, R_twiddle, H> FFTAlgorithm<R_main> for CooleyTuckeyFFT<R_main, R_tw
         let inv = self.hom.domain().invert(&self.hom.domain().int_hom().map(1 << self.log2_n)).unwrap();
         for i in 0..values.len() {
             self.hom.mul_assign_ref_map(values.at_mut(i), &inv);
-
         }
     }
 }

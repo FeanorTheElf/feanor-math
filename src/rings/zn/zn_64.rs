@@ -494,7 +494,6 @@ impl DivisibilityRing for ZnBase {
     } 
 }
 
-#[stability::unstable(feature = "enable")]
 pub trait ImplGenericIntHomomorphismMarker: IntegerRing {}
 
 impl ImplGenericIntHomomorphismMarker for RustBigintRingBase {}

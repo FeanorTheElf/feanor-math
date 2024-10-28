@@ -1,12 +1,19 @@
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::eea::{signed_gcd, signed_lcm};
 use crate::algorithms::matmul::StrassenHint;
+use crate::algorithms::poly_gcd::PolyGCDRing;
+use crate::algorithms::poly_gcd::gcd::poly_gcd_local;
+use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::*;
-use crate::homomorphism::{CanHomFrom, CanIsoFromTo};
+use crate::homomorphism::*;
+use crate::computation::DontObserve;
 use crate::integer::{int_cast, IntegerRing, IntegerRingStore};
 use crate::ordered::{OrderedRing, OrderedRingStore};
-use crate::{algorithms, impl_interpolation_base_ring_char_zero};
+use crate::rings::poly::dense_poly::DensePolyRing;
+use crate::rings::poly::*;
+use crate::algorithms;
+use crate::impl_interpolation_base_ring_char_zero;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::ring::*;
 
@@ -412,10 +419,63 @@ impl<I> OrderedRing for RationalFieldBase<I>
     }
 }
 
+impl<I> PolyGCDRing for RationalFieldBase<I>
+    where I: RingStore,
+        I::Type: IntegerRing
+{
+    fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
+        where P: RingStore + Copy,
+            P::Type: PolyRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        assert!(!poly_ring.is_zero(poly));
+        let QQX = &poly_ring;
+        let QQ = QQX.base_ring();
+        let ZZ = QQ.base_ring();
+    
+        let den_lcm = QQX.terms(poly).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+        
+        let ZZX = DensePolyRing::new(ZZ, "X");
+        let f = ZZX.from_terms(QQX.terms(poly).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
+        let power_decomp = poly_power_decomposition_local(&ZZX, f, DontObserve);
+        let ZZX_to_QQX = QQX.lifted_hom(&ZZX, QQ.inclusion());
+    
+        return power_decomp.into_iter().map(|(f, k)| (QQX.normalize(ZZX_to_QQX.map(f)), k)).collect();
+    }
+    
+    fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+        where P: RingStore + Copy,
+            P::Type: PolyRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        if poly_ring.is_zero(lhs) {
+            return poly_ring.clone_el(rhs);
+        } else if poly_ring.is_zero(rhs) {
+            return poly_ring.clone_el(lhs);
+        }
+        let QQX = &poly_ring;
+        let QQ = QQX.base_ring();
+        let ZZ = QQ.base_ring();
+    
+        let den_lcm_lhs = QQX.terms(lhs).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+        let den_lcm_rhs = QQX.terms(rhs).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+        
+        let ZZX = DensePolyRing::new(ZZ, "X");
+        let lhs = ZZX.from_terms(QQX.terms(lhs).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm_lhs, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
+        let rhs = ZZX.from_terms(QQX.terms(rhs).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm_rhs, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
+        let result = poly_gcd_local(&ZZX, lhs, rhs, DontObserve);
+        let ZZX_to_QQX = QQX.lifted_hom(&ZZX, QQ.inclusion());
+    
+        return QQX.normalize(ZZX_to_QQX.map(result));
+    }
+}
+
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
+
+use super::poly::PolyRing;
 
 #[cfg(test)]
 fn edge_case_elements() -> impl Iterator<Item = El<RationalField<StaticRing<i64>>>> {

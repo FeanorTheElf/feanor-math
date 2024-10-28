@@ -5,10 +5,8 @@ use std::alloc::Global;
 use extension_impl::FreeAlgebraImplBase;
 use sparse::SparseMapVector;
 
-use crate::algorithms::convolution::ConvolutionAlgorithm;
-use crate::algorithms::convolution::KaratsubaAlgorithm;
-use crate::algorithms::convolution::KaratsubaHint;
-use crate::algorithms::convolution::STANDARD_CONVOLUTION;
+use crate::algorithms::convolution::*;
+use crate::algorithms::poly_gcd::*;
 use crate::algorithms::matmul::StrassenHint;
 use crate::delegate::DelegateRing;
 use crate::integer::*;
@@ -23,6 +21,7 @@ use crate::divisibility::*;
 use crate::rings::extension::*;
 use crate::rings::zn::zn_64;
 use crate::rings::zn::zn_big;
+
 use super::extension_impl::FreeAlgebraImpl;
 use super::Field;
 use super::FreeAlgebra;
@@ -363,6 +362,19 @@ impl<Impl, R, A, V, C> CanIsoFromTo<NumberFieldBase<Impl>> for AsFieldBase<FreeA
     }
 }
 
+///
+/// Basically, we want to implement [`PolyGCDLocallyDomain`] for orders in number fields.
+/// However, as specified currently, this not possible, since we need to perform rational
+/// reconstruction when lifting elements - and thus don't get values in the order anymore.
+/// 
+/// Instead, we want to implement [`PolyGCDLocallyDomain`] for the number field itself. This
+/// works, but it seems not to be a good idea to expose this interface, since we usually get
+/// much better results, if we run the local algorithms on polynomials that first have been
+/// scaled into an order (even if the result is not in the order anymore).
+/// 
+/// The solution is now to implement [`PolyGCDLocallyDomain`] for a newtype, and call it from
+/// the [`PolyGCDRing`] implementation for number fields.
+/// 
 mod number_field_as_order {
 
     use crate::{algorithms::poly_gcd::local::PolyGCDLocallyDomain, specialization::{FiniteRingOperation, FiniteRingSpecializable}};

@@ -34,14 +34,14 @@ The following rings are provided
  - The polynomial ring `R[X]` over any base ring, as a trait [`crate::rings::poly::PolyRing`] with two implementations, one for densely filled polynomials [`crate::rings::poly::dense_poly::DensePolyRing`] and one for sparsely filled polynomials [`crate::rings::poly::sparse_poly::SparsePolyRing`].
  - Finite-rank simple and free ring extensions, as a trait [`crate::rings::extension::FreeAlgebra`], with an implementation based on polynomial division [`crate::rings::extension::extension_impl::FreeAlgebraImpl`]. In particular, this includes finite/galois fields and number fields.
  - Multivariate polynomial rings `R[X1, ..., XN]` over any base ring, as the trait [`crate::rings::multivariate::MultivariatePolyRing`] and one implementation [`crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl`] based on a sparse representation using ordered vectors.
- - Combining the above, you can get Galois fields (easily available using [`crate::rings::extension::galois_field::GaloisField`]) or arbitrary number fields.
+ - Combining the above, you can get Galois fields (easily available using [`crate::rings::extension::galois_field::GaloisField`]) or arbitrary number fields (they also have the wrapper type [`crate::rings::extension::number_field::NumberField`] for a more convenient interface).
 
 The following algorithms are implemented
  - Fast Fourier transforms, including an optimized implementation of the Cooley-Tuckey algorithm for the power-of-two case, an implementation of the Bluestein algorithm for arbitrary lengths, and a factor FFT implementation (also based on the Cooley-Tuckey algorithm). The Fourier transforms work on all rings that have suitable roots of unity, in particular the complex numbers `C` and suitable finite rings `Fq`.
  - An optimized variant of the Karatsuba algorithm for fast convolution.
  - An implementation of the Cantor-Zassenhaus algorithm to factor polynomials over finite fields.
  - Factoring polynomials over the rationals/integers (using Hensel lifting) and over number fields.
- - Lenstra's Elliptic Curve algorithm to factor integers (currently very slow).
+ - Lenstra's Elliptic Curve algorithm to factor integers.
  - LLL algorithm for lattice reduction.
  - Basic linear algebra over various rings, including finite integral extensions of principal ideal rings.
  - Miller-Rabin test to check primality of integers.
@@ -52,8 +52,8 @@ Unfortunately, operations with polynomials over infinite rings (integers, ration
 
 ### Most important missing features
 
- - Comprehensive treatment of matrices and linear algebra. Currently there is only a very minimalistic abstraction of matrices [`crate::matrix`] and linear algebra, mainly for internal use. This is partly implemented, as we at least have [`crate::algorithms::linsolve::LinSolveRing`] for solving linear systems.
- - Careful treatment of polynomials over infinite rings, primarily with specialized implementations that prevent coefficient growth. This is currently WIP, as in some places, local computations with polynomials over `Q` already are used. For number fields however, this is not the case at all.
+ - Comprehensive treatment of matrices and linear algebra. Currently there is only a very minimalistic abstraction of matrices [`crate::matrix`] and linear algebra, mainly for internal use. This is currently WIP and partly implemented, as we at least have [`crate::algorithms::linsolve::LinSolveRing`] for solving linear systems and [`crate::matrix::Submatrix`] as abstraction of view on matrices.
+ - Careful treatment of polynomials over infinite rings, primarily with specialized implementations that prevent coefficient growth. This is currently WIP, as in some places, local computations with polynomials over `Q` already are used.
  - Implementation of algebraic closures.
  - ~~Lattice reduction and the LLL algorithm. This might also be necessary for above point.~~ Implemented now!
  - ~~More carefully designed memory allocation abstractions (preferably we would use a new crate `memory-provider` or similar).~~ Using the Rust `allocator-api` together with [`feanor-mempool`](https://github.com/FeanorTheElf/feanor-mempool) now!
@@ -70,8 +70,9 @@ Note that these are not visible to other crates at all, unless the feature `unst
 # Similar Projects
 
 I have recently been notified of [Symbolica](https://symbolica.io/), which takes a similar approach to computer algebra in Rust.
-As opposed to feanor-math which is mainly built for number theory, its main focus are computations with multivariate polynomials (including floating point number), and is in this area more optimized than feanor-math.
-If this suits your use case better, check it out! Personally, I think it is an amazing project as well.
+As opposed to `feanor-math` which is mainly built for number theory, its main focus are computations with multivariate polynomials (including floating point number), and in this area, Symbolica does perform better than `feanor-math`.
+If this suits your use case better, check it out!
+Personally, I think it is an amazing project as well.
 
 # Examples
 

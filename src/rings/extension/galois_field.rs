@@ -20,6 +20,7 @@ use crate::delegate::DelegateRing;
 use crate::divisibility::DivisibilityRingStore;
 use crate::divisibility::Domain;
 use crate::field::*;
+use crate::impl_poly_gcd_ring_for_finite_ring;
 use crate::pid::PrincipalIdealRing;
 use crate::rings::extension::extension_impl::FreeAlgebraImpl;
 use crate::rings::finite::*;
@@ -527,6 +528,11 @@ impl<Impl> DelegateRing for GaloisFieldBase<Impl>
     fn get_delegate(&self) -> &Self::Base {
         self.base.get_ring()
     }
+}
+
+impl_poly_gcd_ring_for_finite_ring!{ <{Impl}> PolyGCDRing for GaloisFieldBase<Impl> where Impl: RingStore,
+    Impl::Type: Field + FreeAlgebra + FiniteRing + CanIsoFromTo<GaloisFieldBase<Impl>>,
+    <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 }
 
 impl<Impl> Domain for GaloisFieldBase<Impl>

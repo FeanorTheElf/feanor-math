@@ -3,14 +3,12 @@ use global::poly_power_decomposition_finite_field;
 use local::PolyGCDLocallyDomain;
 use squarefree_part::poly_power_decomposition_local;
 
-use crate::algorithms::eea::signed_lcm;
 use crate::computation::DontObserve;
 use crate::divisibility::*;
 use crate::homomorphism::*;
 use crate::integer::*;
 use crate::pid::*;
 use crate::rings::field::*;
-use crate::rings::rational::RationalFieldBase;
 use crate::ring::*;
 use crate::delegate::DelegateRing;
 use crate::rings::poly::dense_poly::*;
@@ -362,57 +360,6 @@ impl<R> PolyGCDRing for R
     }
 }
 
-impl<I> PolyGCDRing for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
-{
-    fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        assert!(!poly_ring.is_zero(poly));
-        let QQX = &poly_ring;
-        let QQ = QQX.base_ring();
-        let ZZ = QQ.base_ring();
-    
-        let den_lcm = QQX.terms(poly).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
-        
-        let ZZX = DensePolyRing::new(ZZ, "X");
-        let f = ZZX.from_terms(QQX.terms(poly).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
-        let power_decomp = poly_power_decomposition_local(&ZZX, f, DontObserve);
-        let ZZX_to_QQX = QQX.lifted_hom(&ZZX, QQ.inclusion());
-    
-        return power_decomp.into_iter().map(|(f, k)| (QQX.normalize(ZZX_to_QQX.map(f)), k)).collect();
-    }
-    
-    fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        if poly_ring.is_zero(lhs) {
-            return poly_ring.clone_el(rhs);
-        } else if poly_ring.is_zero(rhs) {
-            return poly_ring.clone_el(lhs);
-        }
-        let QQX = &poly_ring;
-        let QQ = QQX.base_ring();
-        let ZZ = QQ.base_ring();
-    
-        let den_lcm_lhs = QQX.terms(lhs).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
-        let den_lcm_rhs = QQX.terms(rhs).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
-        
-        let ZZX = DensePolyRing::new(ZZ, "X");
-        let lhs = ZZX.from_terms(QQX.terms(lhs).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm_lhs, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
-        let rhs = ZZX.from_terms(QQX.terms(rhs).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm_rhs, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
-        let result = poly_gcd_local(&ZZX, lhs, rhs, DontObserve);
-        let ZZX_to_QQX = QQX.lifted_hom(&ZZX, QQ.inclusion());
-    
-        return QQX.normalize(ZZX_to_QQX.map(result));
-    }
-}
-
 #[test]
 fn test_poly_root() {
     let ring = BigIntRing::RING;
@@ -426,4 +373,27 @@ fn test_poly_root() {
     for k in 1..5 {
         assert_el_eq!(&poly_ring, &f, poly_root(&poly_ring, &poly_ring.pow(poly_ring.clone_el(&f), k), k).unwrap());
     }
+}
+
+#[cfg(test)]
+use crate::rings::extension::galois_field::GaloisField;
+#[cfg(test)]
+use crate::rings::zn::zn_64;
+#[cfg(test)]
+use crate::rings::zn::ZnRingStore;
+
+#[test]
+fn test_poly_gcd_galois_field() {
+    let field = GaloisField::new(5, 3);
+    let poly_ring = DensePolyRing::new(&field, "X");
+    let [f, g, f_g_gcd] = poly_ring.with_wrapped_indeterminate(|X| [(X.pow_ref(2) + 2) * (X.pow_ref(5) + 1), (X.pow_ref(2) + 2) * (X + 1) * (X + 2), (X.pow_ref(2) + 2) * (X + 1)]);
+    assert_el_eq!(&poly_ring, &f_g_gcd, <_ as PolyGCDRing>::gcd(&poly_ring, &f, &g));
+}
+
+#[test]
+fn test_poly_gcd_prime_field() {
+    let field = zn_64::Zn::new(5).as_field().ok().unwrap();
+    let poly_ring = DensePolyRing::new(&field, "X");
+    let [f, g, f_g_gcd] = poly_ring.with_wrapped_indeterminate(|X| [(X.pow_ref(2) + 2) * (X.pow_ref(5) + 1), (X.pow_ref(2) + 2) * (X + 1) * (X + 2), (X.pow_ref(2) + 2) * (X + 1)]);
+    assert_el_eq!(&poly_ring, &f_g_gcd, <_ as PolyGCDRing>::gcd(&poly_ring, &f, &g));
 }

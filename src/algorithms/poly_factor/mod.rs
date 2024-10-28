@@ -80,7 +80,6 @@ pub trait FactorPolyField: Field {
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
 }
 
-
 ///
 /// Unfortunately, `AsFieldBase<R> where R: RingStore<Type = zn_64::ZnBase>` leads to
 /// a conflicting impl with the one for field extensions 
@@ -174,4 +173,73 @@ impl<Impl> FactorPolyField for GaloisFieldBase<Impl>
     {
         poly_factor_finite_field(poly_ring, poly)
     }
+}
+
+#[cfg(test)]
+use dense_poly::DensePolyRing;
+
+#[test]
+fn test_factor_rational_poly() {
+    let QQ = RationalField::new(BigIntRing::RING);
+    let incl = QQ.int_hom();
+    let poly_ring = DensePolyRing::new(&QQ, "X");
+    let f = poly_ring.from_terms([(incl.map(2), 0), (incl.map(1), 3)].into_iter());
+    let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
+    let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f), poly_ring.clone_el(&f), poly_ring.clone_el(&g)].into_iter()));
+    assert_eq!(2, actual.len());
+    assert_el_eq!(poly_ring, f, actual[0].0);
+    assert_eq!(2, actual[0].1);
+    assert_el_eq!(poly_ring, g, actual[1].0);
+    assert_eq!(1, actual[1].1);
+    assert_el_eq!(QQ, QQ.one(), unit);
+
+    let f = poly_ring.from_terms([(incl.map(3), 0), (incl.map(1), 1)]);
+    let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
+    assert_eq!(1, actual.len());
+    assert_eq!(1, actual[0].1);
+    assert_el_eq!(&poly_ring, f, &actual[0].0);
+    assert_el_eq!(QQ, QQ.one(), unit);
+
+    let [mut f] = poly_ring.with_wrapped_indeterminate(|X| [16 - 32 * X + 104 * X.pow_ref(2) - 8 * 11 * X.pow_ref(3) + 121 * X.pow_ref(4)]);
+    poly_ring.inclusion().mul_assign_map(&mut f, QQ.div(&QQ.one(), &QQ.int_hom().map(121)));
+    let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
+    assert_eq!(1, actual.len());
+    assert_eq!(2, actual[0].1);
+    assert_el_eq!(QQ, QQ.one(), unit);
+}
+
+#[test]
+fn test_factor_nonmonic_poly() {
+    let QQ = RationalField::new(BigIntRing::RING);
+    let incl = QQ.int_hom();
+    let poly_ring = DensePolyRing::new(&QQ, "X");
+    let f = poly_ring.from_terms([(QQ.div(&incl.map(3), &incl.map(5)), 0), (incl.map(1), 4)].into_iter());
+    let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
+    let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &poly_ring.prod([poly_ring.clone_el(&f), poly_ring.clone_el(&f), poly_ring.clone_el(&g), poly_ring.int_hom().map(100)].into_iter()));
+    assert_eq!(2, actual.len());
+
+    assert_el_eq!(poly_ring, g, actual[0].0);
+    assert_eq!(1, actual[0].1);
+    assert_el_eq!(poly_ring, f, actual[1].0);
+    assert_eq!(2, actual[1].1);
+    assert_el_eq!(QQ, incl.map(100), unit);
+}
+
+#[test]
+fn test_factor_fp() {
+    let Fp = zn_static::Fp::<5>::RING;
+    let poly_ring = DensePolyRing::new(Fp, "X");
+    let f = poly_ring.from_terms([(1, 0), (2, 1), (1, 3)].into_iter());
+    let g = poly_ring.from_terms([(1, 0), (1, 1)].into_iter());
+    let h = poly_ring.from_terms([(2, 0), (1, 2)].into_iter());
+    let fgghhh = poly_ring.prod([&f, &g, &g, &h, &h, &h].iter().map(|poly| poly_ring.clone_el(poly)));
+    let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &fgghhh);
+    assert_el_eq!(Fp, Fp.one(), unit);
+    
+    assert_eq!(2, factorization[0].1);
+    assert_el_eq!(poly_ring, g, factorization[0].0);
+    assert_eq!(3, factorization[1].1);
+    assert_el_eq!(poly_ring, h, factorization[1].0);
+    assert_eq!(1, factorization[2].1);
+    assert_el_eq!(poly_ring, f, factorization[2].0);
 }
