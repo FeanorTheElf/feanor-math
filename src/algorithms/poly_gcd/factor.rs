@@ -2,7 +2,7 @@ use std::convert::identity;
 
 use crate::algorithms::poly_factor::finite::poly_factor_finite_field;
 use crate::algorithms::poly_gcd::*;
-use crate::algorithms::poly_gcd::local::*;
+use crate::algorithms::poly_gcd::gcd_locally::*;
 use crate::algorithms::poly_gcd::hensel::*;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::computation::*;

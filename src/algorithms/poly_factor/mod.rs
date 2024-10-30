@@ -3,15 +3,11 @@ use crate::homomorphism::*;
 use crate::integer::*;
 use crate::pid::*;
 use crate::ring::*;
-use crate::rings::extension::galois_field::GaloisFieldBase;
-use crate::rings::extension::FreeAlgebra;
-use crate::rings::field::*;
 use crate::rings::finite::FiniteRing;
 use crate::rings::poly::*;
 use crate::rings::rational::*;
 use crate::rings::zn::zn_64::*;
 use crate::specialization::*;
-use crate::rings::zn::*;
 
 use finite::*;
 use rational::*;
@@ -78,66 +74,20 @@ pub trait FactorPolyField: Field {
         where P: PolyRingStore,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
-}
 
-///
-/// Unfortunately, `AsFieldBase<R> where R: RingStore<Type = zn_64::ZnBase>` leads to
-/// a conflicting impl with the one for field extensions 
-///
-impl FactorPolyField for AsFieldBase<Zn> {
-
-    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
+    fn is_irred<P>(poly_ring: P, poly: &El<P>) -> bool
         where P: PolyRingStore,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        poly_factor_finite_field(poly_ring, poly)
+        let factorization = Self::factor_poly(poly_ring, poly).0;
+        return factorization.len() == 1 && factorization[0].1 == 1;
     }
 }
 
-impl<'a> FactorPolyField for AsFieldBase<RingRef<'a, ZnBase>> {
-
-    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: PolyRingStore,
-            P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        poly_factor_finite_field(poly_ring, poly)
-    }
-}
-
-///
-/// Unfortunately, `AsFieldBase<R> where R: RingStore<Type = zn_big::ZnBase<I>>` leads to
-/// a conflicting impl with the one for field extensions 
-///
-impl<I> FactorPolyField for AsFieldBase<zn_big::Zn<I>>
-    where I: IntegerRingStore,
-        I::Type: IntegerRing
+impl<R> FactorPolyField for R
+    where R: FiniteRing + Field
 {
-    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: PolyRingStore,
-            P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        poly_factor_finite_field(poly_ring, poly)
-    }
-}
-
-impl<'a, I> FactorPolyField for AsFieldBase<RingRef<'a, zn_big::ZnBase<I>>>
-    where I: IntegerRingStore,
-        I::Type: IntegerRing
-{
-    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: PolyRingStore,
-            P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        poly_factor_finite_field(poly_ring, poly)
-    }
-}
-
-impl<const N: u64> FactorPolyField for zn_static::ZnBase<N, true> {
-
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: PolyRingStore,
             P::Type: PolyRing + EuclideanRing,
@@ -161,22 +111,10 @@ impl<I> FactorPolyField for RationalFieldBase<I>
     }
 }
 
-impl<Impl> FactorPolyField for GaloisFieldBase<Impl>
-    where Impl: RingStore,
-        Impl::Type: Field + FreeAlgebra + FiniteRing,
-        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
-{
-    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: PolyRingStore,
-            P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        poly_factor_finite_field(poly_ring, poly)
-    }
-}
-
 #[cfg(test)]
-use dense_poly::DensePolyRing;
+use crate::rings::poly::dense_poly::DensePolyRing;
+#[cfg(test)]
+use crate::rings::zn::*;
 
 #[test]
 fn test_factor_rational_poly() {

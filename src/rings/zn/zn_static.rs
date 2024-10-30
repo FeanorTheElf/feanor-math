@@ -3,7 +3,7 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use crate::algorithms::eea::*;
 use crate::compute_locally::InterpolationBaseRing;
 use crate::local::PrincipalLocalRing;
-use crate::{field::*, impl_poly_gcd_ring_for_finite_ring};
+use crate::field::*;
 use crate::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::divisibility::*;
 use crate::primitive_int::{StaticRing, StaticRingBase};
@@ -327,8 +327,6 @@ pub type Zn<const N: u64> = RingValue<ZnBase<N, false>>;
 /// 
 #[stability::unstable(feature = "enable")]
 pub type Fp<const P: u64> = RingValue<ZnBase<P, true>>;
-
-impl_poly_gcd_ring_for_finite_ring!{ <{const N: u64}> PolyGCDRing for ZnBase<N, true> where }
 
 #[test]
 fn test_is_prime() {

@@ -1,5 +1,5 @@
 use crate::algorithms;
-use crate::algorithms::poly_gcd::local::IntegerPolyGCDRing;
+use crate::algorithms::poly_gcd::gcd_locally::IntegerPolyGCDRing;
 use crate::divisibility::*;
 use crate::ring::*;
 use crate::homomorphism::*;

@@ -5,6 +5,7 @@ use crate::divisibility::*;
 use crate::homomorphism::*;
 use crate::ring::*;
 
+use crate::rings::zn::ZnRing;
 use crate::specialization::FiniteRingSpecializable;
 
 use super::Field;
@@ -158,8 +159,20 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
         where Self: 'ring;
 }
 
+///
+/// Subtrait of [`PolyGCDLocallyDomain`] that restricts the local rings to be [`ZnRing`],
+/// which is sometimes necessary when implementing some base cases.
+/// 
 #[stability::unstable(feature = "enable")]
 pub trait IntegerPolyGCDRing: PolyGCDLocallyDomain {
+
+    type LocalRingAsZnBase<'ring>: CanIsoFromTo<Self::LocalRingBase<'ring>> + ZnRing
+        where Self: 'ring;
+
+    type LocalRingAsZn<'ring>: RingStore<Type = Self::LocalRingAsZnBase<'ring>>
+        where Self: 'ring;
+
+    fn local_ring_as_zn<'a, 'ring>(&self, local_field: &'a Self::LocalRing<'ring>) -> &'a Self::LocalRingAsZn<'ring>;
 
     fn maximal_ideal_gen<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> i64
         where Self: 'ring;
@@ -291,7 +304,7 @@ impl<'ring, 'data, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalRingBase<'ri
 macro_rules! impl_poly_gcd_locally_for_ZZ {
     (<{$($gen_args:tt)*}> IntegerPolyGCDRing for $int_ring_type:ty where $($constraints:tt)*) => {
 
-        impl<$($gen_args)*> $crate::algorithms::poly_gcd::local::PolyGCDLocallyDomain for $int_ring_type
+        impl<$($gen_args)*> $crate::algorithms::poly_gcd::gcd_locally::PolyGCDLocallyDomain for $int_ring_type
             where $($constraints)*
         {
             type LocalRing<'ring> = $crate::rings::zn::zn_big::Zn<BigIntRing>
@@ -383,9 +396,21 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
             }
         }
 
-        impl<$($gen_args)*> $crate::algorithms::poly_gcd::local::IntegerPolyGCDRing for $int_ring_type
+        impl<$($gen_args)*> $crate::algorithms::poly_gcd::gcd_locally::IntegerPolyGCDRing for $int_ring_type
             where $($constraints)*
         {
+            type LocalRingAsZnBase<'ring> = Self::LocalRingBase<'ring>
+                where Self: 'ring;
+
+            type LocalRingAsZn<'ring> = Self::LocalRing<'ring>
+                where Self: 'ring;
+
+            fn local_ring_as_zn<'a, 'ring>(&self, local_field: &'a Self::LocalRing<'ring>) -> &'a Self::LocalRingAsZn<'ring>
+                where Self: 'ring
+            {
+                local_field
+            }
+
             fn maximal_ideal_gen<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> i64
                 where Self: 'ring
             {
@@ -393,4 +418,87 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
             }
         }
     };
+}
+
+///
+/// We cannot provide a blanket impl of [`super::PolyGCDRing`] for finite fields, since it would
+/// conflict with the one for all rings that impl [`PolyGCDLocallyDomain`]. Thus, we implement
+/// [`PolyGCDLocallyDomain`] for all finite fields, and reuse the blanket impl.
+/// 
+/// Note that while technically, finite fields are always [`PolyGCDLocallyDomain`] - where the
+/// local rings are all equal to itself - we still panic in the implementations. In particular,
+/// giving a working implementation would be "correct", but this implementation should never be
+/// called anyway, since we specialize on finite fields previously anyway.
+/// 
+#[allow(unused)]
+impl<R> PolyGCDLocallyDomain for R
+    where R: FiniteRing + Field + FiniteRingSpecializable + SelfIso
+{
+    type LocalRingBase<'ring> = Self
+        where Self: 'ring;
+    type LocalRing<'ring> = RingRef<'ring, Self>
+        where Self: 'ring;
+                
+    type LocalFieldBase<'ring> = Self
+        where Self: 'ring;
+    type LocalField<'ring> = RingRef<'ring, Self>
+        where Self: 'ring;
+    type MaximalIdeal<'ring> = RingRef<'ring, Self>
+        where Self: 'ring;
+        
+    fn heuristic_exponent<'ring, 'element, IteratorType>(&self, _maximal_ideal: &Self::MaximalIdeal<'ring>, _poly_deg: usize, _coefficients: IteratorType) -> usize
+        where IteratorType: Iterator<Item = &'element Self::Element>,
+            Self: 'element,
+            Self: 'ring
+    {
+        unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+    }
+
+    fn random_maximal_ideal<'ring, RandomNumberFunction>(&'ring self, rng: RandomNumberFunction) -> Self::MaximalIdeal<'ring>
+        where RandomNumberFunction: FnMut() -> u64
+    {
+        unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+    }
+
+    fn local_field_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> Self::LocalField<'ring>
+        where Self: 'ring
+    {
+        unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+    }
+                
+    fn local_ring_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>, e: usize) -> Self::LocalRing<'ring>
+        where Self: 'ring
+    {
+        unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+    }
+
+    fn reduce_ring_el<'ring>(&self, p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>
+        where Self: 'ring
+    {
+        unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+    }
+
+    fn reduce_partial<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+        where Self: 'ring
+    {
+        unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+    }
+
+    fn lift_partial<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+        where Self: 'ring
+    {
+        unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+    }
+
+    fn reconstruct_ring_el<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
+        where Self: 'ring
+    {
+        unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+    }
+    
+    fn dbg_maximal_ideal<'ring>(&self, p: &Self::MaximalIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
+        where Self: 'ring
+    {
+        unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+    }
 }

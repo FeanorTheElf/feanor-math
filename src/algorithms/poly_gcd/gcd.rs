@@ -2,7 +2,7 @@ use dense_poly::DensePolyRing;
 use squarefree_part::poly_power_decomposition_monic_local;
 
 use crate::algorithms::poly_gcd::*;
-use crate::algorithms::poly_gcd::local::*;
+use crate::algorithms::poly_gcd::gcd_locally::*;
 use crate::algorithms::poly_gcd::hensel::*;
 use crate::computation::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
