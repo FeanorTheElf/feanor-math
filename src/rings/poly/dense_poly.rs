@@ -1,10 +1,12 @@
 use serde::{Deserializer, Serializer};
+use test::Bencher;
 
 use crate::algorithms::convolution::*;
+use crate::algorithms::cyclotomic::cyclotomic_polynomial;
 use crate::algorithms::interpolate::interpolate;
 use crate::compute_locally::{EvaluatePolyLocallyRing, InterpolationBaseRing, ToExtRingMap};
 use crate::divisibility::*;
-use crate::integer::{IntegerRing, IntegerRingStore};
+use crate::integer::{BigIntRing, IntegerRing, IntegerRingStore};
 use crate::pid::*;
 use crate::field::Field;
 use crate::primitive_int::StaticRing;
@@ -482,6 +484,10 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
         }
     }
 
+    fn mul_assign_monomial(&self, lhs: &mut Self::Element, rhs_power: usize) {
+        lhs.data.splice(0..0, (0..rhs_power).map(|_| self.base_ring().zero()));
+    }
+
     fn degree(&self, f: &Self::Element) -> Option<usize> {
         for i in (0..f.data.len()).rev() {
             if !self.base_ring().is_zero(&f.data[i]) {
@@ -800,4 +806,22 @@ fn test_evaluate_approximate_ring() {
     let [f] = ring.with_wrapped_indeterminate(|X| [X * X * X - X + 1]);
     let x = 0.47312;
     assert!(Real64::RING.abs((x * x * x - x + 1.) - ring.evaluate(&f, &x, &Real64::RING.identity())) <= 0.000000001);
+}
+
+#[bench]
+fn bench_div_rem_monic(bencher: &mut Bencher) {
+    let ZZ = BigIntRing::RING;
+    let ring = DensePolyRing::new(ZZ, "X");
+    let phi_n = 30 * 40;
+    let n = 31 * 41;
+    let cyclotomic_poly = cyclotomic_polynomial(&ring, n);
+    assert!(ring.degree(&cyclotomic_poly).unwrap() == phi_n);
+    bencher.iter(|| {
+        let mut current = ring.pow(ring.indeterminate(), phi_n - 1);
+        for _ in phi_n..=n {
+            ring.mul_assign_monomial(&mut current, 1);
+            current = ring.div_rem_monic(current, &cyclotomic_poly).1;
+        }
+        assert_el_eq!(&ring, &ring.one(), &current);
+    });
 }
