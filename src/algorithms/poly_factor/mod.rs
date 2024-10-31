@@ -2,6 +2,7 @@ use crate::field::*;
 use crate::homomorphism::*;
 use crate::integer::*;
 use crate::pid::*;
+use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::finite::FiniteRing;
 use crate::rings::poly::*;
@@ -71,16 +72,21 @@ pub trait FactorPolyField: Field {
     /// ```
     /// 
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: PolyRingStore,
+        where P: PolyRingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
 
     fn is_irred<P>(poly_ring: P, poly: &El<P>) -> bool
-        where P: PolyRingStore,
+        where P: PolyRingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
         let factorization = Self::factor_poly(poly_ring, poly).0;
+        print!("{} factors as ", poly_ring.format(poly));
+        for (f, e) in &factorization {
+            print!("({})^{} ", poly_ring.format(f), e);
+        }
+        println!(" modulo {}", poly_ring.characteristic(StaticRing::<i64>::RING).unwrap());
         return factorization.len() == 1 && factorization[0].1 == 1;
     }
 }

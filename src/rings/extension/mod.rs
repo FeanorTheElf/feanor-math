@@ -68,7 +68,6 @@ pub mod conway;
 /// # use feanor_math::algorithms::convolution::*;
 /// # use feanor_math::field::FieldStore;
 /// # use feanor_math::divisibility::*;
-/// # use feanor_math::rings::fieldextension::SeparableFieldExtensionStore;
 /// # use feanor_math::rings::finite::*;
 /// // we have to decide for an implementation of the prime field
 /// let prime_field = zn_static::Fp::<3>::RING;
@@ -87,8 +86,6 @@ pub mod conway;
 /// let galois_field_2 = galois_field::GaloisField::new_with(prime_field, 3, Global, STANDARD_CONVOLUTION);
 /// // note that the generating polynomial might be different, so it is not necessarily the "same" ring
 /// assert!(galois_field_2.can_iso(&galois_field).is_none());
-/// // however we can still find isomorphisms
-/// let hom = <_ as SeparableFieldExtensionStore>::has_hom(&galois_field_2, &galois_field).unwrap();
 /// ```
 ///
 pub trait FreeAlgebra: RingExtension {

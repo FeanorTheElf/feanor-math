@@ -102,10 +102,12 @@ impl<I> RationalFieldBase<I>
         I::Type: IntegerRing
 {
     pub fn num<'a>(&'a self, el: &'a <Self as RingBase>::Element) -> &'a El<I> {
+        debug_assert!(self.base_ring().is_one(&signed_gcd(self.base_ring().clone_el(&el.1), self.base_ring().clone_el(&el.0), self.base_ring())));
         &el.0
     }
 
     pub fn den<'a>(&'a self, el: &'a <Self as RingBase>::Element) -> &'a El<I> {
+        debug_assert!(self.base_ring().is_one(&signed_gcd(self.base_ring().clone_el(&el.1), self.base_ring().clone_el(&el.0), self.base_ring())));
         &el.1
     }
 }
