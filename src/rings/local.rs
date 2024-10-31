@@ -2,7 +2,7 @@ use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::*;
 use crate::compute_locally::InterpolationBaseRing;
-use crate::delegate::DelegateRing;
+use crate::delegate::*;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::Field;
 use crate::local::{PrincipalLocalRing, PrincipalLocalRingStore};
@@ -173,6 +173,10 @@ impl<R: DivisibilityRingStore> DelegateRing for AsLocalPIRBase<R>
         LocalPIREl(el)
     }
 }
+
+impl<R: DivisibilityRingStore> DelegateRingImplFiniteRing for AsLocalPIRBase<R> 
+    where R::Type: DivisibilityRing
+{}
 
 impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanHomFrom<AsLocalPIRBase<S>> for AsLocalPIRBase<R> 
     where R::Type: DivisibilityRing + CanHomFrom<S::Type>,

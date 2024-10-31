@@ -17,6 +17,7 @@ use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::algorithms::matmul::StrassenHint;
 use crate::algorithms::unity_root::*;
 use crate::delegate::DelegateRing;
+use crate::delegate::DelegateRingImplFiniteRing;
 use crate::divisibility::DivisibilityRingStore;
 use crate::divisibility::Domain;
 use crate::field::*;
@@ -528,6 +529,12 @@ impl<Impl> DelegateRing for GaloisFieldBase<Impl>
         self.base.get_ring()
     }
 }
+
+impl<Impl> DelegateRingImplFiniteRing for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
+{}
 
 impl<Impl> Domain for GaloisFieldBase<Impl>
     where Impl: RingStore,

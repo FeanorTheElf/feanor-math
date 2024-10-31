@@ -1,3 +1,4 @@
+use crate::pid::EuclideanRing;
 use crate::pid::PrincipalIdealRing;
 use crate::ring::*;
 use crate::homomorphism::*;
@@ -345,7 +346,9 @@ impl<'a, R: ?Sized> Iterator for DelegateFiniteRingElementsIter<'a, R>
     }
 }
 
-impl<R: DelegateRing + ?Sized> FiniteRing for R
+pub trait DelegateRingImplFiniteRing: DelegateRing {}
+
+impl<R: DelegateRingImplFiniteRing + ?Sized> FiniteRing for R
     where R::Base: FiniteRing
 {
     type ElementsIter<'a> = DelegateFiniteRingElementsIter<'a, R>
@@ -377,42 +380,47 @@ impl<R: DelegateRing + ?Sized> HashableElRing for R
     }
 }
 
-// unfortunately, the following default impl does not work, since in many cases (e.g. `AsField`)
-// we want to specialize it and relax its constraints (i.e. `R::Base: DivisibilityRing` instead of
-// `PrincipalIdealRing`); this is not supported by specializtion as of currently
+pub trait DelegateRingImplEuclideanRing: DelegateRing {}
 
-// impl<R: DelegateRing + ?Sized> PrincipalIdealRing for R
-//     where R::Base: PrincipalIdealRing
-// {
-//     default fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-//         let (s, t, d) = self.get_delegate().extended_ideal_gen(self.delegate_ref(self.rev_element_cast_ref(lhs)), self.delegate_ref(self.rev_element_cast_ref(rhs)));
-//         return (self.element_cast(self.rev_delegate(s)), self.element_cast(self.rev_delegate(t)), self.element_cast(self.rev_delegate(d)));
-//     }
+impl<R: DelegateRingImplEuclideanRing + ?Sized> PrincipalIdealRing for R
+    where R::Base: PrincipalIdealRing
+{
+    default fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        self.get_delegate().checked_div_min(self.delegate_ref(lhs), self.delegate_ref(rhs)).map(|res| self.rev_delegate(res))
+    }
 
-//     default fn cancel_common_factors(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-//         let (l, r, d) = self.get_delegate().cancel_common_factors(self.delegate_ref(self.rev_element_cast_ref(lhs)), self.delegate_ref(self.rev_element_cast_ref(rhs)));
-//         return (self.element_cast(self.rev_delegate(l)), self.element_cast(self.rev_delegate(r)), self.element_cast(self.rev_delegate(d)));
-//     }
+    default fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        let (s, t, d) = self.get_delegate().extended_ideal_gen(self.delegate_ref(self.rev_element_cast_ref(lhs)), self.delegate_ref(self.rev_element_cast_ref(rhs)));
+        return (self.element_cast(self.rev_delegate(s)), self.element_cast(self.rev_delegate(t)), self.element_cast(self.rev_delegate(d)));
+    }
 
-//     default fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-//         self.element_cast(self.rev_delegate(self.get_delegate().ideal_gen(self.delegate_ref(self.rev_element_cast_ref(lhs)), self.delegate_ref(self.rev_element_cast_ref(rhs)))))
-//     }
+    default fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+        self.element_cast(self.rev_delegate(self.get_delegate().ideal_gen(self.delegate_ref(self.rev_element_cast_ref(lhs)), self.delegate_ref(self.rev_element_cast_ref(rhs)))))
+    }
+}
 
-//     default fn create_left_elimination_matrix(&self, a: &Self::Element, b: &Self::Element) -> ([Self::Element; 4], Self::Element) {
-//         let ([a, b, c, d], x) = self.get_delegate().create_left_elimination_matrix(self.delegate_ref(self.rev_element_cast_ref(a)), self.delegate_ref(self.rev_element_cast_ref(b)));
-//         return (
-//             [
-//                 self.element_cast(self.rev_delegate(a)),
-//                 self.element_cast(self.rev_delegate(b)),
-//                 self.element_cast(self.rev_delegate(c)),
-//                 self.element_cast(self.rev_delegate(d))
-//             ],
-//             self.element_cast(self.rev_delegate(x))
-//         );
-//     }
-// }
+impl<R: DelegateRingImplEuclideanRing + ?Sized> EuclideanRing for R
+    where R::Base: EuclideanRing
+{
+    default fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+        let (q, r) = self.get_delegate().euclidean_div_rem(self.delegate(lhs), self.delegate_ref(rhs));
+        return (self.rev_delegate(q), self.rev_delegate(r));
+    }
 
-impl<R: DelegateRing + ?Sized> ZnRing for R
+    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
+        self.get_delegate().euclidean_deg(self.delegate_ref(val))
+    }
+
+    fn euclidean_div(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
+        self.rev_delegate(self.get_delegate().euclidean_div(self.delegate(lhs), self.delegate_ref(rhs)))
+    }
+
+    fn euclidean_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
+        self.rev_delegate(self.get_delegate().euclidean_rem(self.delegate(lhs), self.delegate_ref(rhs)))
+    }
+}
+
+impl<R: DelegateRingImplFiniteRing + ?Sized> ZnRing for R
     where R::Base: ZnRing, 
         Self: PrincipalIdealRing,
         R: CanHomFrom<<R::Base as ZnRing>::IntegerRingBase>

@@ -11,6 +11,7 @@ use crate::pid::PrincipalIdealRing;
 use crate::ring::*;
 use crate::seq::*;
 use crate::homomorphism::*;
+use crate::wrapper::RingElementWrapper;
 use super::field::AsField;
 use super::field::AsFieldBase;
 use super::poly::dense_poly::DensePolyRing;
@@ -310,6 +311,15 @@ pub trait FreeAlgebraStore: RingStore
             H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
     {
         self.get_ring().charpoly(el, poly_ring, hom)
+    }
+
+    #[stability::unstable(feature = "enable")]
+    fn with_wrapped_generator<'a, F, const M: usize>(&'a self, f: F) -> [El<Self>; M]
+        where F: FnOnce(&RingElementWrapper<&'a Self>) -> [RingElementWrapper<&'a Self>; M]
+    {
+        let wrapped_indet = RingElementWrapper::new(self, self.canonical_gen());
+        let mut result_it = f(&wrapped_indet).into_iter();
+        return std::array::from_fn(|_| result_it.next().unwrap().unwrap());
     }
 }
 

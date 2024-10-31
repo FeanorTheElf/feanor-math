@@ -18,6 +18,10 @@ pub fn rational_reconstruction<R>(Zn: R, x: El<R>) -> (El<<R::Type as ZnRing>::I
     where R: RingStore,
         R::Type: ZnRing
 {
+    if Zn.is_zero(&x) {
+        return (Zn.integer_ring().zero(), Zn.integer_ring().one());
+    }
+
     let ZZ = Zn.integer_ring();
     let mut a = ZZ.clone_el(Zn.modulus());
     let mut s = ZZ.zero();
@@ -31,6 +35,7 @@ pub fn rational_reconstruction<R>(Zn: R, x: El<R>) -> (El<<R::Type as ZnRing>::I
     while !ZZ.is_zero(&b) {
         let (q, r) = ZZ.euclidean_div_rem(ZZ.clone_el(&a), &b);
         if ZZ.is_gt(&q, &current_max.0) {
+            debug_assert!(!ZZ.is_zero(&t));
             current_max = (ZZ.clone_el(&q), ZZ.clone_el(&b), ZZ.clone_el(&t));
         }
 

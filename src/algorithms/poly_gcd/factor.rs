@@ -114,7 +114,7 @@ fn heuristic_factor_poly_squarefree_monic_local<P, Controller>(poly_ring: P, f: 
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
     assert!(prime_exponent_factor >= 1.);
 
-    log_progress!(controller, "heuristic_factor_monic(deg = {})", poly_ring.degree(f).unwrap());
+    log_progress!(controller, "heuristic_factor_monic({})", poly_ring.degree(f).unwrap());
 
     let mut rng = oorandom::Rand64::new(1);
     let ring = poly_ring.base_ring().get_ring();

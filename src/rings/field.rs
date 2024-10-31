@@ -1,7 +1,7 @@
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::compute_locally::{InterpolationBaseRing, InterpolationBaseRingStore};
-use crate::delegate::DelegateRing;
+use crate::delegate::*;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::local::PrincipalLocalRing;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
@@ -170,6 +170,10 @@ impl<R: DivisibilityRingStore> DelegateRing for AsFieldBase<R>
         FieldEl(el)
     }
 }
+
+impl<R: DivisibilityRingStore> DelegateRingImplFiniteRing for AsFieldBase<R> 
+    where R::Type: DivisibilityRing
+{}
 
 impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanHomFrom<AsFieldBase<S>> for AsFieldBase<R> 
     where R::Type: DivisibilityRing + CanHomFrom<S::Type>,

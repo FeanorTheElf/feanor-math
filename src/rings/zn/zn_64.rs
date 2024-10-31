@@ -1,6 +1,7 @@
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
 use crate::compute_locally::InterpolationBaseRing;
 use crate::delegate::DelegateRing;
+use crate::delegate::DelegateRingImplFiniteRing;
 use crate::divisibility::*;
 use crate::impl_eq_based_self_iso;
 use crate::impl_localpir_wrap_unwrap_homs;
@@ -23,7 +24,6 @@ use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
 
 use crate::homomorphism::*;
-use crate::rings::rust_bigint::*;
 
 use super::*;
 use super::zn_big;
@@ -493,14 +493,7 @@ impl DivisibilityRing for ZnBase {
     } 
 }
 
-pub trait ImplGenericIntHomomorphismMarker: IntegerRing {}
-
-impl ImplGenericIntHomomorphismMarker for RustBigintRingBase {}
-
-#[cfg(feature = "mpir")]
-impl ImplGenericIntHomomorphismMarker for crate::rings::mpir::MPZBase {}
-
-impl<I: ?Sized + ImplGenericIntHomomorphismMarker> CanHomFrom<I> for ZnBase {
+impl<I: ?Sized + IntegerRing> CanHomFrom<I> for ZnBase {
 
     type Homomorphism = super::generic_impls::BigIntToZnHom<I, StaticRingBase<i128>, Self>;
 
@@ -524,21 +517,14 @@ macro_rules! impl_static_int_to_zn {
         $(
             impl CanHomFrom<StaticRingBase<$int>> for ZnBase {
             
-                type Homomorphism = (/* bound for direct reduction */ $int, /* bound for bounded reduction */ $int);
-            
-                fn has_canonical_hom(&self, _from: &StaticRingBase<$int>) -> Option<Self::Homomorphism> {
-                    let bounded_reduce_bound = self.repr_bound() as i128 * self.repr_bound() as i128;
-                    Some((self.repr_bound() as $int, if bounded_reduce_bound > $int::MAX as i128 { $int::MAX } else { bounded_reduce_bound as $int }))
-                }
-            
-                fn map_in(&self, _from: &StaticRingBase<$int>, el: $int, hom: &($int, $int)) -> Self::Element {
-                    if el.abs() <= hom.0 {
+                fn map_in(&self, _from: &StaticRingBase<$int>, el: $int, _hom: &Self::Homomorphism) -> Self::Element {
+                    if el.abs() as u128 <= self.modulus_u64() as u128 {
                         if el < 0 {
                             self.negate(self.from_u64_promise_reduced(el.unsigned_abs() as u64))
                         } else {
                             self.from_u64_promise_reduced(el as u64)
                         }
-                    } else if el.abs() <= hom.1 {
+                    } else if el.abs() as u128 <= self.repr_bound() as u128 {
                         if el < 0 {
                             self.negate(self.from_u64_promise_reduced(self.bounded_reduce(el.unsigned_abs() as u128)))
                         } else {
@@ -826,6 +812,8 @@ impl DelegateRing for ZnFastmulBase {
         return result;
     }
 }
+
+impl DelegateRingImplFiniteRing for ZnFastmulBase {}
 
 impl CanHomFrom<ZnBase> for ZnFastmulBase {
 

@@ -34,6 +34,26 @@ const DEFAULT_PROBABILISTIC_REPETITIONS: usize = 30;
 const RANDOM_TEST_INSTANCE_COUNT: usize = 10;
 
 ///
+/// A trait that is implemented for no type at all, which allows me to mark certain
+/// blanket implementations as "this is never valid".
+/// 
+/// Please don't implement this trait for any type.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::Never;
+/// pub struct MyStruct {}
+/// 
+/// // Assume `MyStruct` could be `Clone`, but I explicitly want to not make it `Clone`,
+/// // e.g. because I expect that it might not be `Clone` in the future. Instead of having
+/// // to remember this, or write some doc, I can now write
+/// impl Clone for MyStruct
+///     where MyStruct: Never {}
+/// ```
+/// 
+pub unsafe trait Never {}
+
+///
 /// Marks a trait as "sealed" on stable. In other words, using this trait
 /// as supertrait for another trait within `feanor-math` means that implementing
 /// the subtrait for new types is unstable, and only available when `unstable-enable`

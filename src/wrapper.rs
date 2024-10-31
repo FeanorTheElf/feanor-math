@@ -2,6 +2,7 @@ use std::{ops::*, hash::Hash, fmt::{Display, Debug}};
 
 use crate::homomorphism::*;
 use crate::ring::*;
+use crate::field::*;
 
 ///
 /// Stores a ring element together with its ring, so that ring operations do
@@ -147,6 +148,46 @@ impl_trait!{ Add, add, add_ref_fst, add_ref_snd, add_ref }
 impl_trait!{ Mul, mul, mul_ref_fst, mul_ref_snd, mul_ref }
 impl_trait!{ Sub, sub, sub_ref_fst, sub_ref_snd, sub_ref }
 
+impl<R: RingStore> Div<RingElementWrapper<R>> for RingElementWrapper<R>
+    where R::Type: Field
+{
+    type Output = Self;
+
+    fn div(self, rhs: RingElementWrapper<R>) -> Self::Output {
+        RingElementWrapper { element: self.ring.div(&self.element, &rhs.element), ring: self.ring }
+    }
+}
+
+impl<'a, 'b, R: RingStore + Clone> Div<&'a RingElementWrapper<R>> for &'b RingElementWrapper<R>
+    where R::Type: Field
+{
+    type Output = RingElementWrapper<R>;
+
+    fn div(self, rhs: &'a RingElementWrapper<R>) -> Self::Output {
+        RingElementWrapper { element: self.ring.div(&self.element, &rhs.element), ring: self.ring.clone() }
+    }
+}
+
+impl<'a, R: RingStore + Clone> Div<RingElementWrapper<R>> for &'a RingElementWrapper<R>
+    where R::Type: Field
+{
+    type Output = RingElementWrapper<R>;
+
+    fn div(self, rhs: RingElementWrapper<R>) -> Self::Output {
+        RingElementWrapper { element: self.ring.div(&self.element, &rhs.element), ring: rhs.ring }
+    }
+}
+
+impl<'a, R: RingStore + Clone> Div<&'a RingElementWrapper<R>> for RingElementWrapper<R>
+    where R::Type: Field
+{
+    type Output = RingElementWrapper<R>;
+
+    fn div(self, rhs: &'a RingElementWrapper<R>) -> Self::Output {
+        RingElementWrapper { element: rhs.ring.div(&self.element, &rhs.element), ring: self.ring }
+    }
+}
+
 macro_rules! impl_xassign_trait_int {
     ($trait_name:ident, $fn_name:ident) => {
         
@@ -202,6 +243,46 @@ impl_xassign_trait_int!{ SubAssign, sub_assign }
 impl_trait_int!{ Add, add }
 impl_trait_int!{ Mul, mul }
 impl_trait_int!{ Sub, sub }
+
+impl<R: RingStore> Div<i32> for RingElementWrapper<R>
+    where R::Type: Field
+{
+    type Output = Self;
+
+    fn div(self, rhs: i32) -> Self::Output {
+        RingElementWrapper { element: self.ring.div(&self.element, &self.ring.int_hom().map(rhs)), ring: self.ring }
+    }
+}
+
+impl<R: RingStore> Div<RingElementWrapper<R>> for i32
+    where R::Type: Field
+{
+    type Output = RingElementWrapper<R>;
+
+    fn div(self, rhs: RingElementWrapper<R>) -> Self::Output {
+        RingElementWrapper { element: rhs.ring.div(&rhs.ring.int_hom().map(self), &rhs.element), ring: rhs.ring }
+    }
+}
+
+impl<'a, R: RingStore + Clone> Div<i32> for &'a RingElementWrapper<R>
+    where R::Type: Field
+{
+    type Output = RingElementWrapper<R>;
+
+    fn div(self, rhs: i32) -> Self::Output {
+        RingElementWrapper { element: self.ring.div(&self.element, &self.ring.int_hom().map(rhs)), ring: self.ring.clone() }
+    }
+}
+
+impl<'a, R: RingStore + Clone> Div<&'a RingElementWrapper<R>> for i32
+    where R::Type: Field
+{
+    type Output = RingElementWrapper<R>;
+
+    fn div(self, rhs: &'a RingElementWrapper<R>) -> Self::Output {
+        RingElementWrapper { element: rhs.ring.div(&rhs.ring.int_hom().map(self), &rhs.element), ring: rhs.ring.clone() }
+    }
+}
 
 #[cfg(feature = "elementwrapper-caret-pow")]
 impl<R: RingStore> BitXor<usize> for RingElementWrapper<R> {

@@ -90,12 +90,24 @@ use feanor_math::ring::*;
 use feanor_math::primitive_int::*;
 use feanor_math::algorithms::linsolve::*;
 
+// create the field F25 and the embedding ZZ -> F25
 let F25 = GaloisField::new(5, 2);
 let ZZ_to_F25 = F25.int_hom();
+
+// we create matrices [ 1  1 ] and [ 0 ]
+//                    [ 1  θ ]     [ 1 ]
+// θ is chosen as the "canonical generator" of F25
 let mut lhs = OwnedMatrix::from_fn(2, 2, |i, j| F25.pow(F25.canonical_gen(), i * j));
 let mut rhs = OwnedMatrix::from_fn(2, 1, |i, _j| ZZ_to_F25.map(i as i32));
+
+// solve the linear system
 let mut result = OwnedMatrix::zero(2, 1, &F25);
 F25.solve_right(lhs.data_mut(), rhs.data_mut(), result.data_mut()).assert_solved();
+
+// verify the first row of the equation; note that we cannot use arithmetic operators + or *,
+// since addition resp. multiplication are always relative to a ring, and a ring element does
+// not generally know which ring it belongs to (if you want to store ring elements together with
+// a reference to the ring, see `RingElementWrapper`)
 println!("Solution is [{}, {}]", F25.format(result.at(0, 0)), F25.format(result.at(1, 0)));
 assert_el_eq!(&F25, F25.zero(), F25.add_ref(result.at(0, 0), result.at(1, 0)));
 ```
@@ -121,24 +133,38 @@ use feanor_math::seq::*;
 use feanor_math::pid::*;
 use feanor_math::rings::poly::*;
 
+// first, we create multiple rings: the prime field F7, the bivariate polynomial ring F7[X, Y] and the univariate 
+//                                  polynomial ring F7[T]
 let F7 = Zn::new(7).as_field().ok().unwrap();
 let F7XY = MultivariatePolyRingImpl::new(&F7, 2);
 let F7T = DensePolyRing::new(&F7, "T");
+
+// we create elements of the ring; the easiest way is to use `with_wrapped_indeterminates()`, which temporarily
+// wraps the generators with a `RingElementWrapper`, thus allowing us to use + and * for arithmetic operations.
 let [f1, f2] = F7XY.with_wrapped_indeterminates(|[X, Y]| [X * X * Y - 1, X * Y - 2]);
+
+// now compute a groebner basis
 let groebner_basis_degrevlex = buchberger_simple(&F7XY, vec![F7XY.clone_el(&f1), F7XY.clone_el(&f2)], DegRevLex);
-assert!(groebner_basis_degrevlex.iter().any(|f| F7XY.monomial_deg(F7XY.LT(f, DegRevLex).unwrap().1) > 0), "system has no solution");
+// if the groebner basis contains a unit, the system is unsolvable
+assert!(groebner_basis_degrevlex.iter().any(|f| F7XY.is_unit(f)), "system has no solution");
+// now compute a lex-groebner basis; note that it still makes sense to do this on top of the degrevlex groebner
+// basis, as it will drastically speed up the computation
 let mut groebner_basis_lex = buchberger_simple(&F7XY, groebner_basis_degrevlex, Lex);
 
-// sort descending by leading terms, which means we get [f1(X, Y), ..., fr(X, Y), g(Y)]
-// we can now solve by choosing `y` as a root of `g` and `x` as a joint root of `fi(X, y)`
+// sort descending by leading terms, which means the system will have the shape [f1(X, Y), ..., fr(X, Y), g(Y)]
 groebner_basis_lex.sort_unstable_by(|f, g| Lex.compare(&F7XY, F7XY.LT(f, Lex).unwrap().1, F7XY.LT(g, Lex).unwrap().1).reverse());
+
+// we can now solve by choosing `y` as a root of `g` and `x` as a joint root of `fi(X, y)`, i.e. the `fi` with `y` "plugged in"
 let poly_in_y = F7XY.evaluate(&groebner_basis_lex.pop().unwrap(), [F7T.zero(), F7T.indeterminate()].as_ring_el_fn(&F7T), F7T.inclusion());
 let (poly_in_y_factorization, _) = <_ as FactorPolyField>::factor_poly(&F7T, &poly_in_y);
 let y = poly_in_y_factorization.into_iter().filter_map(|(f, _)| if F7T.degree(&f).unwrap() != 1 { None } else { Some(F7.negate(F7.div(F7T.coefficient_at(&f, 0), F7T.coefficient_at(&f, 1)))) }).next().unwrap();
+
+// we found `y`! now plug in `y` into the `fi(X, Y)`, take their gcd (as univariate polynomials in `X`), and find a root `x`
 let poly_in_x = groebner_basis_lex.into_iter().fold(F7T.zero(), |f, g| F7T.ideal_gen(&f, &F7XY.evaluate(&g, [F7T.indeterminate(), F7T.inclusion().map(y)].as_ring_el_fn(&F7T), F7T.inclusion())));
 let (poly_in_x_factorization, _) = <_ as FactorPolyField>::factor_poly(&F7T, &poly_in_x);
 let x = poly_in_x_factorization.into_iter().filter_map(|(f, _)| if F7T.degree(&f).unwrap() != 1 { None } else { Some(F7.negate(F7.div(F7T.coefficient_at(&f, 0), F7T.coefficient_at(&f, 1)))) }).next().unwrap();
 
+// check the solution
 assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f1, [x, y].as_ring_el_fn(F7), F7.identity()));
 assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f2, [x, y].as_ring_el_fn(F7), F7.identity()));
 ```
@@ -246,6 +272,8 @@ use feanor_math::ring::*;
 #[derive(PartialEq)]
 struct F2Base;
 
+// this is a minimal implementation of `RingBase`. Note that `RingBase` contains many more
+// functions with default implementations, that can be overwritten to provide better performance
 impl RingBase for F2Base {
    
     type Element = u8;
@@ -292,7 +320,9 @@ impl RingBase for F2Base {
 }
 
 // in a real scenario, we might want to implement more traits like `ZnRing`, `DivisibilityRing`
-// or `Field`; Also it might be useful to provide canonical homomorphisms by implementing `CanHomFrom`
+// or `Field`; Also it might be useful to provide canonical homomorphisms by implementing `CanHomFrom`,
+// in particular the self-isomorphisms `F2Base: CanHomFrom<F2Base>` and `F2Base: CanIsoFromTo<F2Base>` 
+// might come in useful
 
 pub const F2: RingValue<F2Base> = RingValue::from(F2Base);
 
@@ -314,18 +344,24 @@ use feanor_math::homomorphism::*;
 use feanor_math::rings::zn::*;
 use std::cmp::{min, max};
 
-pub struct MyPolyRing<R: RingStore> {
+pub struct MyPolyRingBase<R: RingStore> {
     base_ring: R
 }
 
-impl<R: RingStore> PartialEq for MyPolyRing<R> {
+// We give the actual implementation some name postfixed by `Base`, and
+// then define a type alias to the simplest `RingStore` wrapping the implementation.
+// This is a pattern that is often used throughout the library, since it means that
+// users don't always have to mention the `RingValue` when they use the ring.
+pub type MyPolyRing<R> = RingValue<MyPolyRingBase<R>>;
+
+impl<R: RingStore> PartialEq for MyPolyRingBase<R> {
 
     fn eq(&self, other: &Self) -> bool {
         self.base_ring.get_ring() == other.base_ring.get_ring()
     }
 }
 
-impl<R: RingStore> RingBase for MyPolyRing<R> {
+impl<R: RingStore> RingBase for MyPolyRingBase<R> {
 
     // in a real implementation, we might want to wrap this in a newtype, to avoid
     // exposing the vector interface (although exposing that interface might be intended - 
@@ -414,8 +450,9 @@ impl<R: RingStore> RingBase for MyPolyRing<R> {
 
 let base = Zn::new(17);
 // we do not use the `RingBase`-implementor directly, but wrap it in a `RingStore`;
-// note that here, this is not strictly necessary, but still recommended
-let ring = RingValue::from(MyPolyRing { base_ring: base });
+// while it is possible to use "raw" `RingBase`s, it is usually recommended to use them
+// through `RingStore`s instead, since `RingStore` provides a slightly higher-level interface
+let ring = MyPolyRing::from(MyPolyRingBase { base_ring: base });
 let x = vec![base.zero(), base.one()];
 let f = ring.add_ref(&x, &ring.int_hom().map(8));
 let g = ring.add_ref(&x, &ring.int_hom().map(7));

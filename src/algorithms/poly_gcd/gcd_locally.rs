@@ -384,7 +384,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                     Self: 'a,
                     Self: 'ring
             {
-                let log2_largest_exponent = coefficients.map(|c| RingRef::new(self).abs_log2_ceil(c).unwrap() as f64).max_by(f64::total_cmp).unwrap();
+                let log2_largest_exponent = coefficients.map(|c| RingRef::new(self).abs_log2_ceil(c).unwrap_or(0) as f64).max_by(f64::total_cmp).unwrap_or(0.);
                 // this is in no way a rigorous bound, but equals the worst-case bound at least asymptotically (up to constants)
                 return ((log2_largest_exponent + poly_deg as f64) / (*p as f64).log2() / /* just some factor that seemed good when playing around */ 4.).ceil() as usize + 1;
             }

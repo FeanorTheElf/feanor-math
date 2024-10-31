@@ -71,6 +71,7 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
     let reduced_poly = target_poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| (ring.reduce_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), ring.clone_el(c)), i)));
 
     let (lifted_d, _lifted_other_factor) = hensel_lift(&reduction_map, &target_poly_ring, &prime_field_poly_ring, &reduced_poly, (&factor1, &factor2), controller.clone());
+
     let result = poly_ring.from_terms(target_poly_ring.terms(&lifted_d).map(|(c, i)| (ring.reconstruct_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), reduction_map.domain().clone_el(c)), i)));
 
     if poly_ring.checked_div(&f, &result).is_none() || 

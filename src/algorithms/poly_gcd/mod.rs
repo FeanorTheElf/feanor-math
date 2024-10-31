@@ -195,7 +195,7 @@ pub fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
 
 
 impl<R> PolyGCDRing for R
-    where R: PolyGCDLocallyDomain
+    where R: ?Sized + PolyGCDLocallyDomain
 {
     default fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
         where P: RingStore + Copy,
