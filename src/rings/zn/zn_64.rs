@@ -786,7 +786,7 @@ impl_eq_based_self_iso!{ ZnFastmulBase }
 #[derive(Clone, Copy)]
 pub struct ZnFastmulEl {
     el: ZnEl,
-    value_invmod_shifted: u128
+    value_invmod_shifted: u64
 }
 
 impl DelegateRing for ZnFastmulBase {
@@ -814,7 +814,7 @@ impl DelegateRing for ZnFastmulBase {
         assert!(el.el.0 <= self.base.get_ring().repr_bound());
         el.el.0 = self.base.get_ring().complete_reduce(el.el.0);
         let value = el.el.0;
-        el.value_invmod_shifted = ((value as u128) << 64) / self.base.get_ring().modulus_u64() as u128;
+        el.value_invmod_shifted = (((value as u128) << 64) / self.base.get_ring().modulus_u64() as u128) as u64;
     }
 
     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element {
@@ -866,7 +866,7 @@ impl CanHomFrom<ZnFastmulBase> for ZnBase {
         debug_assert!(lhs.0 <= self.repr_bound());
         let lhs_original = lhs.0;
         let product = mullo(lhs.0, rhs.el.0);
-        let approx_quotient = mullo(lhs.0, high(rhs.value_invmod_shifted)).wrapping_add(mulhi(lhs.0, low(rhs.value_invmod_shifted)));
+        let approx_quotient = mulhi(lhs.0, rhs.value_invmod_shifted);
         lhs.0 = product.wrapping_sub(mullo(approx_quotient, self.modulus_u64()));
         debug_assert!(lhs.0 < self.modulus_times_three);
         debug_assert!((lhs_original as u128 * rhs.el.0 as u128 - lhs.0 as u128) % (self.modulus_u64() as u128) == 0);
@@ -901,11 +901,6 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
         let mut b = *values.at(i2);
         hom.mul_assign_ref_map(&mut b, twiddle);
 
-        // this is implied by `bounded_reduce`, check anyway
-        debug_assert!(a.0 <= self.modulus_times_three);
-        debug_assert!(b.0 < self.modulus_times_three);
-        debug_assert!(self.repr_bound() >= self.modulus_u64() * 6);
-
         *values.at_mut(i1) = self.from_u64_promise_reduced(a.0 + b.0);
         *values.at_mut(i2) = self.from_u64_promise_reduced(a.0 + self.modulus_times_three - b.0);
     }
@@ -915,8 +910,7 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
         let b = *values.at(i2);
 
         *values.at_mut(i1) = self.add(a, b);
-        // this works, as mul_assign_map_in_ref() works with values up to 6 * self.modulus
-        *values.at_mut(i2) = self.from_u64_promise_reduced(a.0 + self.modulus_times_three - b.0);
+        *values.at_mut(i2) = self.sub(a, b);
         hom.mul_assign_ref_map(values.at_mut(i2), twiddle);
     }
 }

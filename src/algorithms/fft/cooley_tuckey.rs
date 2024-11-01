@@ -408,6 +408,10 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
     /// Note that setting `INV = true` will perform an inverse fourier transform,
     /// except that the division by `n` is not included.
     /// 
+    /// I added #[inline(never)] to make profiling this easy, it does not have
+    /// any noticable impact on performance.
+    /// 
+    #[inline(never)]
     fn unordered_fft_dispatch<V, const INV: bool>(&self, values: &mut V)
         where V: VectorViewMut<R_main::Element> 
     {
@@ -648,7 +652,7 @@ fn run_fft_bench_round<R, S, H>(fft: &CooleyTuckeyFFT<S, R, H>, data: &Vec<S::El
 }
 
 #[cfg(test)]
-const BENCH_SIZE_LOG2: usize = 13;
+const BENCH_SIZE_LOG2: usize = 16;
 
 #[bench]
 fn bench_fft_zn_big(bencher: &mut test::Bencher) {
@@ -673,7 +677,7 @@ fn bench_fft_zn_64(bencher: &mut test::Bencher) {
 }
 
 #[bench]
-fn bench_fft_zn64_fastmul(bencher: &mut test::Bencher) {
+fn bench_fft_zn_64_fastmul(bencher: &mut test::Bencher) {
     let ring = zn_64::Zn::new(1073872897);
     let fastmul_ring = zn_64::ZnFastmul::new(ring).unwrap();
     let fft = CooleyTuckeyFFT::for_zn_with_hom(ring.into_can_hom(fastmul_ring).ok().unwrap(), BENCH_SIZE_LOG2).unwrap();
