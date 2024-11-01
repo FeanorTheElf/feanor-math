@@ -120,8 +120,7 @@ impl ZnBase {
     }
 
     ///
-    /// If input is bounded by `self.repr_bound() * self.repr_bound()`, then the output
-    /// is `< 3 * modulus` and congruent to the input.
+    /// Reduces from `[0, self.repr_bound() * self.repr_bound()]` to `[0, 3 * self.modulus()[`.
     /// 
     fn bounded_reduce(&self, value: u128) -> u64 {
         debug_assert!(value <= self.repr_bound() as u128 * self.repr_bound() as u128);
@@ -139,11 +138,10 @@ impl ZnBase {
     }
 
     ///
-    /// If input is bounded by `FACTOR * self.repr_bound() * self.repr_bound()`, then the 
-    /// output that is `< 3 * modulus` and congruent to the input.
+    /// Reduces from `[0, FACTOR * self.repr_bound() * self.repr_bound()]` to `[0, 3 * self.modulus()]`.
     /// 
-    /// As opposed to the faster [`ZnBase::bounded_reduce()`], this should work for all
-    /// inputs in `u128`. Currently only used by the specialization of
+    /// As opposed to the faster [`ZnBase::bounded_reduce()`], this should work for all inputs in `u128`
+    /// (assuming configured with the right value of `FACTOR`). Currently only used by the specialization of 
     /// [`ComputeInnerProduct::inner_product()`].
     /// 
     #[inline(never)]
@@ -159,21 +157,36 @@ impl ZnBase {
         return self.bounded_reduce(value - (approx_quotient * self.modulus as u128));
     }
 
+    ///
+    /// Reduces from `[0, 2 * self.repr_bound()]` to `[0, 3 * self.modulus()]`
+    /// 
     fn potential_reduce(&self, mut value: u64) -> u64 {
+        debug_assert!(value as u128 <= 2 * self.repr_bound() as u128);
         if value >= self.repr_bound() {
             value -= self.repr_bound();
         }
         if value >= self.modulus_times_three {
             value -= self.modulus_times_three;
         }
+        debug_assert!(value <= self.modulus_times_three);
         return value;
     }
 
+    ///
+    /// Creates a `ZnEl` from an integer that is already sufficiently reduced,
+    /// i.e. within `[0, self.repr_bound()]`.
+    /// 
+    /// The reducedness of the input is only checked when debug assertions are
+    /// enabled.
+    /// 
     fn from_u64_promise_reduced(&self, value: u64) -> ZnEl {
         debug_assert!(value <= self.repr_bound());
         ZnEl(value)
     }
 
+    ///
+    /// Reduces from `[0, self.repr_bound()]` to `[0, self.modulus()[`
+    /// 
     fn complete_reduce(&self, mut value: u64) -> u64 {
         debug_assert!(value <= self.repr_bound());
         if value >= 4 * self.modulus_u64() {
@@ -204,7 +217,7 @@ impl Zn {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct ZnEl(u64);
+pub struct ZnEl(/* a representative within `[0, ring.repr_bound()]` */ u64);
 
 impl PartialEq for ZnBase {
     fn eq(&self, other: &Self) -> bool {
@@ -722,7 +735,7 @@ impl HashableElRing for ZnBase {
 /// # use feanor_math::algorithms::fft::*;
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
 /// let ring = Zn::new(1073872897);
-/// let fastmul_ring = ZnFastmul::new(ring);
+/// let fastmul_ring = ZnFastmul::new(ring).unwrap();
 /// // The values stored by the FFT table are elements of `ZnFastmulBase`
 /// let fft = CooleyTuckeyFFT::for_zn_with_hom(ring.can_hom(&fastmul_ring).unwrap(), 15).unwrap();
 /// // Note that data uses `ZnBase`
@@ -736,15 +749,15 @@ pub struct ZnFastmulBase {
 }
 
 ///
-/// An implementation of `Z/nZ` for `n` that have at most 41 bits that is optimized for multiplication with elements
+/// An implementation of `Z/nZ` for `n` that is optimized to provide fast multiplication with elements
 /// of [`Zn`]. For details, see [`ZnFastmulBase`].
 /// 
 pub type ZnFastmul = RingValue<ZnFastmulBase>;
 
 impl ZnFastmul {
 
-    pub fn new(base: Zn) -> Self {
-        RingValue::from(ZnFastmulBase { base })
+    pub fn new(base: Zn) -> Option<Self> {
+        Some(RingValue::from(ZnFastmulBase { base }))
     }
 }
 
@@ -799,6 +812,7 @@ impl DelegateRing for ZnFastmulBase {
 
     fn postprocess_delegate_mut(&self, el: &mut Self::Element) {
         assert!(el.el.0 <= self.base.get_ring().repr_bound());
+        el.el.0 = self.base.get_ring().complete_reduce(el.el.0);
         let value = el.el.0;
         el.value_invmod_shifted = ((value as u128) << 64) / self.base.get_ring().modulus_u64() as u128;
     }
@@ -1039,12 +1053,12 @@ fn test_principal_ideal_ring_axioms() {
 fn test_hom_from_fastmul() {
     for n in 2..=17 {
         let Zn = Zn::new(n);
-        let Zn_fastmul = ZnFastmul::new(Zn);
+        let Zn_fastmul = ZnFastmul::new(Zn).unwrap();
         crate::ring::generic_tests::test_hom_axioms(Zn_fastmul, Zn, Zn.elements().map(|x| Zn_fastmul.coerce(&Zn, x)));
     }
     for n in [(1 << 41) - 1, (1 << 42) - 1, (1 << 58) - 1, (1 << 58) + 1, (3 << 57) - 1, (3 << 57) + 1] {
         let Zn = Zn::new(n);
-        let Zn_fastmul = ZnFastmul::new(Zn);
+        let Zn_fastmul = ZnFastmul::new(Zn).unwrap();
         crate::ring::generic_tests::test_hom_axioms(Zn_fastmul, Zn, elements(&Zn).map(|x| Zn_fastmul.coerce(&Zn, x)));
     }
 }

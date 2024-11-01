@@ -21,10 +21,13 @@ use super::FiniteRing;
 /// hand is designed to allow computations modulo multiple different maximal ideals.
 /// 
 /// I am currently not yet completely sure what the exact requirements of this trait would be,
-/// but conceptually, we want that for a random maximal ideal `m`, the quotient `R / m` should be
+/// but conceptually, we want that for a suitable, random ideal `a`, the quotient `R / a` should be
 /// finite, and there should be a power `e` such that we can derive the factorization of some polynomial
-/// over `R` from the factorization over `R / m^e`. Note that we don't assume that this `e` can be
-/// computed, except possibly in special cases (like the integers).
+/// over `R` from the factorization over `R / a^e`. Note that we don't assume that this `e` can be
+/// computed, except possibly in special cases (like the integers). Also, we cannot always assume
+/// that `a` is a maximal ideal (unfortunately - it was a nasty surprise when I realized this after
+/// the making the first implementation run), however we can choose it such that we know its decomposition
+/// into maximal ideals `a = m1 ∩ ... ∩ mr`.
 /// 
 /// Note also that I want this to work even when going to algebraic extensions or even the algebraic
 /// closure. This however seems to follow naturally in most cases.
@@ -44,9 +47,11 @@ use super::FiniteRing;
 ///    ideal `m` of `k[X1, ..., Xm]`, and reduce a polynomial `f in k[X1, ..., Xm][Y]` modulo `m`, compute
 ///    its factorization there (i.e. over `k`), lift it to `k[X1, ..., Xm]/m^e` and (more or less) read
 ///    of the factors over `R[X1, ..., Xm]`.
-///  - Orders in algebraic number fields. This case is somewhat more complicated, since (in general) we
-///    don't have a UFD anymore. Concretely, the factors of a polynomial with coefficients in an order `R`
-///    don't necessarily have coefficients in `R`. Example: `X^2 - sqrt(3) X - 1` over `Z[sqrt(3), sqrt(7)]`
+///  - Orders in algebraic number fields. This case is much more complicated, since (in general) we
+///    don't have a UFD anymore. In particular, this is the case where we cannot generally choose `a = m` to be
+///    a maximal ideal, and also need rational reconstruction when lifting the factorization back to the number
+///    field. More concretely, the factors of a polynomial with coefficients in an order `R` don't necessarily 
+///    have coefficients in `R`. Example: `X^2 - sqrt(3) X - 1` over `Z[sqrt(3), sqrt(7)]`
 ///    has the factor `X - (sqrt(3) + sqrt(7)) / 2`.
 ///    However, it turns out that if the original polynomial is monic, then its factors have coefficients in
 ///    the maximal order `O` of `R ⊗ QQ`. In particular, if we scale the factor by `[R : O] | disc(R)`, then
@@ -55,7 +60,7 @@ use super::FiniteRing;
 ///    in `Frac(R)`.
 /// 
 /// I cannot think of any other good examples (these were the ones I had in mind when writing this trait), but 
-/// who knows, maybe there are other rings that satisfy this and which we can thus do polynomial factorization in!
+/// who knows, maybe there are other rings that satisfy this and which we can thus do polynomial factorization in.
 /// 
 #[stability::unstable(feature = "enable")]
 pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializable {

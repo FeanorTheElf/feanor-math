@@ -329,6 +329,12 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
     /// 
     /// It also does not include division by `n` in the inverse case.
     /// 
+    /// Note however that I had some weird performance results when actually
+    /// using this during the bluestein transform. More concretely, local
+    /// microbenchmarks were faster, but there was a significant slowdown
+    /// when using it "in practice" in my HE library.
+    /// 
+    #[allow(unused)]
     pub(super) fn unordered_fft_skip_first_butterfly<V, const INV: bool>(&self, values: &mut V)
         where V: VectorViewMut<R_main::Element> 
     {
@@ -645,8 +651,19 @@ fn run_fft_bench_round<R, S, H>(fft: &CooleyTuckeyFFT<S, R, H>, data: &Vec<S::El
 const BENCH_SIZE_LOG2: usize = 13;
 
 #[bench]
-fn bench_fft(bencher: &mut test::Bencher) {
+fn bench_fft_zn_big(bencher: &mut test::Bencher) {
     let ring = zn_big::Zn::new(StaticRing::<i128>::RING, 1073872897);
+    let fft = CooleyTuckeyFFT::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
+    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
+    let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
+    bencher.iter(|| {
+        run_fft_bench_round(&fft, &data, &mut copy)
+    });
+}
+
+#[bench]
+fn bench_fft_zn_64(bencher: &mut test::Bencher) {
+    let ring = zn_64::Zn::new(1073872897);
     let fft = CooleyTuckeyFFT::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
     let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
@@ -658,7 +675,7 @@ fn bench_fft(bencher: &mut test::Bencher) {
 #[bench]
 fn bench_fft_zn64_fastmul(bencher: &mut test::Bencher) {
     let ring = zn_64::Zn::new(1073872897);
-    let fastmul_ring = zn_64::ZnFastmul::new(ring);
+    let fastmul_ring = zn_64::ZnFastmul::new(ring).unwrap();
     let fft = CooleyTuckeyFFT::for_zn_with_hom(ring.into_can_hom(fastmul_ring).ok().unwrap(), BENCH_SIZE_LOG2).unwrap();
     let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);

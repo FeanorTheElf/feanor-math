@@ -354,10 +354,15 @@ fn test_approximate_fft() {
     }
 }
 
+#[cfg(test)]
+const BENCH_N1: usize = 31;
+#[cfg(test)]
+const BENCH_N2: usize = 601;
+
 #[bench]
 fn bench_factor_fft(bencher: &mut test::Bencher) {
     let ring = zn_64::Zn::new(1602564097);
-    let fastmul_ring = zn_64::ZnFastmul::new(ring);
+    let fastmul_ring = zn_64::ZnFastmul::new(ring).unwrap();
     let embedding = ring.can_hom(&fastmul_ring).unwrap();
     let ring_as_field = ring.as_field().ok().unwrap();
     let root_of_unity = fastmul_ring.coerce(&ring, ring_as_field.get_ring().unwrap_element(algorithms::unity_root::get_prim_root_of_unity(&ring_as_field, 2 * 31 * 601).unwrap()));
@@ -365,11 +370,11 @@ fn bench_factor_fft(bencher: &mut test::Bencher) {
     let fft = CoprimeCooleyTuckeyFFT::new_with_hom(
         embedding.clone(), 
         fastmul_ring.pow(root_of_unity, 2),
-        bluestein::BluesteinFFT::new_with_hom(embedding.clone(), fastmul_ring.pow(root_of_unity, 31), fastmul_ring_as_field.get_ring().unwrap_element(algorithms::unity_root::get_prim_root_of_unity_pow2(&fastmul_ring_as_field, 11).unwrap()), 601, 11, Global),
-        bluestein::BluesteinFFT::new_with_hom(embedding, fastmul_ring.pow(root_of_unity, 601), fastmul_ring_as_field.get_ring().unwrap_element(algorithms::unity_root::get_prim_root_of_unity_pow2(&fastmul_ring_as_field, 6).unwrap()), 31, 6, Global),
+        bluestein::BluesteinFFT::new_with_hom(embedding.clone(), fastmul_ring.pow(root_of_unity, BENCH_N1), fastmul_ring_as_field.get_ring().unwrap_element(algorithms::unity_root::get_prim_root_of_unity_pow2(&fastmul_ring_as_field, 11).unwrap()), BENCH_N2, 11, Global),
+        bluestein::BluesteinFFT::new_with_hom(embedding, fastmul_ring.pow(root_of_unity, BENCH_N2), fastmul_ring_as_field.get_ring().unwrap_element(algorithms::unity_root::get_prim_root_of_unity_pow2(&fastmul_ring_as_field, 6).unwrap()), BENCH_N1, 6, Global),
     );
-    let data = (0..(31 * 601)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
-    let mut copy = Vec::with_capacity(31 * 601);
+    let data = (0..(BENCH_N1 * BENCH_N2)).map(|i| ring.int_hom().map(i as i32)).collect::<Vec<_>>();
+    let mut copy = Vec::with_capacity(BENCH_N1 * BENCH_N2);
     bencher.iter(|| {
         copy.clear();
         copy.extend(data.iter().map(|x| ring.clone_el(x)));

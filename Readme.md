@@ -130,6 +130,7 @@ use feanor_math::rings::multivariate::multivariate_impl::*;
 use feanor_math::algorithms::poly_factor::*;
 use feanor_math::rings::poly::dense_poly::*;
 use feanor_math::seq::*;
+use feanor_math::divisibility::*;
 use feanor_math::pid::*;
 use feanor_math::rings::poly::*;
 
@@ -146,7 +147,7 @@ let [f1, f2] = F7XY.with_wrapped_indeterminates(|[X, Y]| [X * X * Y - 1, X * Y -
 // now compute a groebner basis
 let groebner_basis_degrevlex = buchberger_simple(&F7XY, vec![F7XY.clone_el(&f1), F7XY.clone_el(&f2)], DegRevLex);
 // if the groebner basis contains a unit, the system is unsolvable
-assert!(groebner_basis_degrevlex.iter().any(|f| F7XY.is_unit(f)), "system has no solution");
+assert!(groebner_basis_degrevlex.iter().all(|f| F7XY.appearing_indeterminates(f).len() > 0), "system has no solution");
 // now compute a lex-groebner basis; note that it still makes sense to do this on top of the degrevlex groebner
 // basis, as it will drastically speed up the computation
 let mut groebner_basis_lex = buchberger_simple(&F7XY, groebner_basis_degrevlex, Lex);

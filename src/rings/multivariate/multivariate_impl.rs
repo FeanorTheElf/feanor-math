@@ -9,7 +9,7 @@ use crate::iters::multiset_combinations;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::multivariate::*;
-use crate::integer::{binomial, int_cast, BigIntRing, IntegerRing, IntegerRingStore};
+use crate::integer::*;
 use crate::seq::{VectorFn, VectorView};
 use crate::homomorphism::*;
 use crate::ordered::OrderedRingStore;
@@ -18,7 +18,7 @@ type Exponent = u16;
 type OrderIdx = u64;
 
 ///
-/// Computes `sum_(0 <= l <= k) binomial(n + l, n)`
+/// Computes the "cumulative binomial function" `sum_(0 <= l <= k) binomial(n + l, n)`
 /// 
 fn compute_cum_binomial(n: usize, k: usize) -> u64 {
     StaticRing::<i64>::RING.sum((0..(k + 1)).map(|l| binomial((n + l) as i128, &(n as i128), StaticRing::<i128>::RING) as i64)) as u64
@@ -832,6 +832,8 @@ use crate::rings::zn::zn_static;
 #[cfg(test)]
 use crate::rings::zn::zn_static::F17;
 #[cfg(test)]
+use crate::rings::zn::*;
+#[cfg(test)]
 use crate::rings::float_real::Real64;
 
 #[cfg(test)]
@@ -954,4 +956,13 @@ fn test_evaluate_approximate_ring() {
     let x = 0.47312;
     let y = -1.43877;
     assert!(Real64::RING.abs((x * x * y - y * y) - ring.evaluate(&f, [x, y].into_fn(|x| *x), &Real64::RING.identity())) <= 0.000000001);
+}
+
+#[test]
+fn test_appearing_indeterminates() {
+    let F7 = zn_64::Zn::new(7).as_field().ok().unwrap();
+    let F7XY = MultivariatePolyRingImpl::new(&F7, 2);
+    let [f, g] = F7XY.with_wrapped_indeterminates(|[X, Y]| [5 + 4 * X, 6 + 2 * Y]);
+    assert_eq!(vec![(0, 1)], F7XY.appearing_indeterminates(&f));
+    assert_eq!(vec![(1, 1)], F7XY.appearing_indeterminates(&g));
 }

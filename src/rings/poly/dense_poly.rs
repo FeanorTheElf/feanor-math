@@ -1,12 +1,10 @@
 use serde::{Deserializer, Serializer};
-use test::Bencher;
 
 use crate::algorithms::convolution::*;
-use crate::algorithms::cyclotomic::cyclotomic_polynomial;
 use crate::algorithms::interpolate::interpolate;
 use crate::compute_locally::{EvaluatePolyLocallyRing, InterpolationBaseRing, ToExtRingMap};
 use crate::divisibility::*;
-use crate::integer::{BigIntRing, IntegerRing, IntegerRingStore};
+use crate::integer::*;
 use crate::pid::*;
 use crate::field::Field;
 use crate::primitive_int::StaticRing;
@@ -666,6 +664,10 @@ use std::time::Instant;
 use crate::rings::float_real::Real64;
 #[cfg(test)]
 use crate::ordered::OrderedRingStore;
+#[cfg(test)]
+use test::Bencher;
+#[cfg(test)]
+use crate::algorithms::cyclotomic::cyclotomic_polynomial;
 
 #[cfg(test)]
 fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El<P>>
