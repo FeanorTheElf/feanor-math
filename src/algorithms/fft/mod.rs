@@ -110,8 +110,10 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
            S: RingStore<Type = R> + Copy;
 }
 
-impl<T, R: ?Sized + RingBase> FFTAlgorithm<R> for T
-    where T: Deref, T::Target: FFTAlgorithm<R>
+impl<T, R> FFTAlgorithm<R> for T
+    where R: ?Sized + RingBase,
+        T: Deref, 
+        T::Target: FFTAlgorithm<R>
 {
     fn len(&self) -> usize {
         self.deref().len()

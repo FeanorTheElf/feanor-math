@@ -6,6 +6,7 @@ use crate::ring::*;
 
 use std::alloc::Allocator;
 use std::alloc::Global;
+use std::ops::Deref;
 
 pub mod strassen;
 
@@ -93,6 +94,30 @@ pub trait MatmulAlgorithm<R: ?Sized + RingBase> {
             }
         }
         self.add_matmul(lhs, rhs, dst, ring);
+    }
+}
+
+impl<R, T> MatmulAlgorithm<R> for T
+    where R: ?Sized + RingBase,
+        T: Deref,
+        T::Target: MatmulAlgorithm<R>
+{
+    fn add_matmul<S, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(&self, lhs: TransposableSubmatrix<V1, R::Element, T1>, rhs: TransposableSubmatrix<V2, R::Element, T2>, dst: TransposableSubmatrixMut<V3, R::Element, T3>, ring: S)
+        where V1: AsPointerToSlice<R::Element>,
+            V2: AsPointerToSlice<R::Element>,
+            V3: AsPointerToSlice<R::Element>,
+            S: RingStore<Type = R> + Copy
+    {
+        (**self).add_matmul(lhs, rhs, dst, ring)
+    }
+
+    fn matmul<S, V1, V2, V3, const T1: bool, const T2: bool, const T3: bool>(&self, lhs: TransposableSubmatrix<V1, R::Element, T1>, rhs: TransposableSubmatrix<V2, R::Element, T2>, dst: TransposableSubmatrixMut<V3, R::Element, T3>, ring: S)
+        where V1: AsPointerToSlice<R::Element>,
+            V2: AsPointerToSlice<R::Element>,
+            V3: AsPointerToSlice<R::Element>,
+            S: RingStore<Type = R> + Copy
+    {
+        (**self).matmul(lhs, rhs, dst, ring)
     }
 }
 

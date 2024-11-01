@@ -1,4 +1,5 @@
 use std::alloc::{Allocator, Global};
+use std::ops::Deref;
 
 use crate::ring::*;
 use crate::seq::subvector::SubvectorView;
@@ -88,8 +89,11 @@ pub trait PreparedConvolutionAlgorithm<R: ?Sized + RingBase>: ConvolutionAlgorit
     }
 }
 
-impl<'a, R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> ConvolutionAlgorithm<R> for &'a C {
-
+impl<'a, R, C> ConvolutionAlgorithm<R> for C
+    where R: ?Sized + RingBase,
+        C: Deref,
+        C::Target: ConvolutionAlgorithm<R>
+{
     fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S) {
         (**self).compute_convolution(lhs, rhs, dst, ring)
     }
