@@ -652,7 +652,7 @@ fn run_fft_bench_round<R, S, H>(fft: &CooleyTuckeyFFT<S, R, H>, data: &Vec<S::El
 }
 
 #[cfg(test)]
-const BENCH_SIZE_LOG2: usize = 16;
+const BENCH_SIZE_LOG2: usize = 13;
 
 #[bench]
 fn bench_fft_zn_big(bencher: &mut test::Bencher) {
