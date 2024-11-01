@@ -324,8 +324,6 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     {
         assert_eq!(values.len(), self.n);
         assert_eq!(buffer.len(), self.m_fft_table.len());
-        assert!(self.n * 2 <= self.m_fft_table.len());
-        let m_half = self.m_fft_table.len() / 2;
 
         let ring = self.hom.codomain();
 
@@ -338,37 +336,30 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
             };
             *buffer.at_mut(i) = ring.clone_el(value);
             self.hom.mul_assign_ref_map(buffer.at_mut(i), &self.inv_root_of_unity_2n[i]);
-
-            // repeat the buffer, since this replaces the first butterfly (which we skip in the Cooley-Tuckey FFT)
-            *buffer.at_mut(i + m_half) = ring.clone_el(buffer.at(i));
+        }
+        for i in self.n..self.m_fft_table.len() {
+            *buffer.at_mut(i) = ring.zero();
         }
 
         // perform convoluted product with b using a power-of-two fft
-        self.m_fft_table.unordered_fft_skip_first_butterfly::<_, false>(&mut buffer);
+        self.m_fft_table.unordered_fft(&mut buffer, &self.ring());
         for i in 0..self.m_fft_table.len() {
             self.hom.mul_assign_ref_map(buffer.at_mut(i), &self.b_bitreverse_fft[i]);
         }
-        self.m_fft_table.unordered_fft_skip_first_butterfly::<_, true>(&mut buffer);
+        self.m_fft_table.unordered_inv_fft(&mut buffer, &self.ring());
 
         // write values back, and multiply them with a twiddle factor
         for i in 0..self.n {
-            // sum pairs of elements in the buffer, since this replaces the last butterfly
-            *values.at_mut(i) = ring.add_ref(buffer.at(i), buffer.at(i + m_half));
+            *values.at_mut(i) = std::mem::replace(buffer.at_mut(i), ring.zero());
             self.hom.mul_assign_ref_map(values.at_mut(i), &self.inv_root_of_unity_2n[i]);
         }
 
-        // divide either by `m` (normal case, this was skipped in inv_fft) or by `nm` (inverse case)
-        let inv_scale = if INV {
-            self.hom.domain().mul(
-                self.hom.domain().int_hom().map(self.n as i32),
-                self.hom.domain().int_hom().map(self.m_fft_table.len() as i32)
-            )
-        } else {
-            self.hom.domain().int_hom().map(self.m_fft_table.len() as i32)
-        };
-        let scale = self.hom.domain().invert(&inv_scale).unwrap();
-        for i in 0..values.len() {
-            self.hom.mul_assign_ref_map(values.at_mut(i), &scale);
+        if INV {
+            // finally, scale by 1/n
+            let scale = self.hom.map(self.hom.domain().checked_div(&self.hom.domain().one(), &self.hom.domain().int_hom().map(self.n as i32)).unwrap());
+            for i in 0..values.len() {
+                ring.mul_assign_ref(values.at_mut(i), &scale);
+            }
         }
     }
 
@@ -419,7 +410,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for BluesteinFFT<R_main, R_tw
             S: RingStore<Type = R_main> + Copy 
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
-        let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), &self.tmp_mem_allocator);
+        let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.tmp_mem_allocator.clone());
         buffer.extend((0..self.m_fft_table.len()).map(|_| self.hom.codomain().zero()));
         self.fft_base::<_, _, false>(values, &mut buffer[..]);
     }
@@ -429,7 +420,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for BluesteinFFT<R_main, R_tw
             S: RingStore<Type = R_main> + Copy 
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
-        let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), &self.tmp_mem_allocator);
+        let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.tmp_mem_allocator.clone());
         buffer.extend((0..self.m_fft_table.len()).map(|_| self.hom.codomain().zero()));
         self.fft_base::<_, _, true>(values, &mut buffer[..]);
     }
@@ -502,12 +493,9 @@ fn test_inv_fft_base() {
     let fft = BluesteinFFT::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4, Global);
     let values = [1, 3, 2, 0, 7];
     let mut work = values;
-
     let mut buffer = [0; 16];
     fft.fft_base::<_, _, false>(&mut work, &mut buffer);
-    let mut buffer = [0; 16];
     fft.fft_base::<_, _, true>(&mut work, &mut buffer);
-
     assert_eq!(values, work);
 }
 
