@@ -1,15 +1,30 @@
 
+use crate::algorithms::miller_rabin::prev_prime;
 use crate::divisibility::{DivisibilityRing, Domain};
 use crate::homomorphism::*;
+use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::pid::PrincipalIdealRing;
+use crate::primitive_int::StaticRing;
 use crate::ring::*;
+use crate::rings::field::{AsField, AsFieldBase};
+use crate::rings::zn::{zn_64, zn_rns, ZnRingStore};
+use crate::seq::VectorView;
 
+///
+/// Trait for rings that can be temporarily replaced by an extension when we need more points,
+/// e.g. for interpolation.
+/// 
+/// Note that a trivial implementation is possible for every ring of characteristic 0, since
+/// these already have infinitely many points whose pairwise differences are non-zero-divisors. 
+/// Such an implementation can be added to new types using the macro [`impl_interpolation_base_ring_char_zero!`].
+/// 
 #[stability::unstable(feature = "enable")]
 pub trait InterpolationBaseRing: DivisibilityRing {
 
     ///
     /// Restricting this here to be `DivisibilityRing + PrincipalIdealRing + Domain`
-    /// is necessary, because of a compiler bug, see also [`crate::compute_locally::ComputeLocallyRing`]
+    /// is necessary, because of a compiler bug, see also
+    /// [`crate::compute_locally::EvaluatePolyLocallyRing::LocalRingBase`]
     /// 
     type ExtendedRingBase<'a>: ?Sized + DivisibilityRing + PrincipalIdealRing + Domain
         where Self: 'a;
@@ -32,6 +47,9 @@ pub trait InterpolationBaseRing: DivisibilityRing {
     fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>);
 }
 
+///
+/// [`RingStore`] for [`InterpolationBaseRing`].
+/// 
 #[stability::unstable(feature = "enable")]
 pub trait InterpolationBaseRingStore: RingStore
     where Self::Type: InterpolationBaseRing
@@ -41,6 +59,10 @@ impl<R> InterpolationBaseRingStore for R
     where R: RingStore, R::Type: InterpolationBaseRing
 {}
 
+///
+/// The inclusion map `R -> S` for a ring `R` and one of its extensions `S`
+/// as given by [`InterpolationBaseRing`].
+/// 
 #[stability::unstable(feature = "enable")]
 pub struct ToExtRingMap<'a, R>
     where R: ?Sized + InterpolationBaseRing
@@ -84,7 +106,8 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
 }
 
 ///
-/// Trait for rings that support performing computations locally.
+/// Trait for rings that support performing computations locally. Locally here refers
+/// not to its localization, but to quotients by primes ideals.
 /// 
 /// More concretely, a ring `R` implementing this trait should be endowed with a
 /// "pseudo norm"
@@ -118,7 +141,7 @@ pub trait EvaluatePolyLocallyRing: RingBase {
     ///
     /// The proper way would be to define this with two lifetime parameters `'ring` and `'data`,
     /// to allow it to reference both the ring itself and the current `LocalComputationData`.
-    /// However, when doing this, I ran into the compiler bug (https://github.com/rust-lang/rust/issues/100013).
+    /// However, when doing this, I ran into the compiler bug [https://github.com/rust-lang/rust/issues/100013].
     /// 
     /// This is also the reason why we restrict this type here to be [`PrincipalIdealRing`], because
     /// unfortunately, the a constraint `for<'a> SomeRing::LocalRingBase<'a>: PrincipalIdealRing` triggers
@@ -134,20 +157,21 @@ pub trait EvaluatePolyLocallyRing: RingBase {
         where Self: 'ring;
 
     ///
-    /// Computes the pseudo norm of a ring element.
+    /// Computes (an upper bound of) the natural logarithm of the pseudo norm of a ring element.
     /// 
-    /// This function should be
+    /// The pseudo norm should be
     ///  - symmetric, i.e. `|-x| = |x|`,
     ///  - sub-additive, i.e. `|x + y| <= |x| + |y|`
     ///  - sub-multiplicative, i.e. `|xy| <= |x| |y|`
+    /// and this function should give `ln|x|`
     /// 
-    fn pseudo_norm(&self, el: &Self::Element) -> f64;
+    fn ln_pseudo_norm(&self, el: &Self::Element) -> f64;
 
     ///
     /// Sets up the context for a new polynomial evaluation, whose output
     /// should have pseudo norm less than the given bound.
     /// 
-    fn local_computation<'ring>(&'ring self, pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring>;
+    fn local_computation<'ring>(&'ring self, ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring>;
 
     ///
     /// Returns the number `k` of local rings that are required
@@ -180,6 +204,69 @@ pub trait EvaluatePolyLocallyRing: RingBase {
         where Self: 'ring;
 }
 
+impl<I> EvaluatePolyLocallyRing for I
+    where I: IntegerRing
+{
+    type LocalComputationData<'ring> = zn_rns::Zn<AsField<zn_64::Zn>, RingRef<'ring, Self>>
+        where Self: 'ring;
+
+    type LocalRing<'ring> = AsField<zn_64::Zn>
+        where Self: 'ring;
+
+    type LocalRingBase<'ring> = AsFieldBase<zn_64::Zn>
+        where Self: 'ring;
+
+    fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
+        RingRef::new(self).abs_log2_ceil(el).unwrap_or(0) as f64 * 2f64.ln()
+    }
+
+    fn local_computation<'ring>(&'ring self, ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
+        let mut primes = Vec::new();
+        let mut ln_current = 0.;
+        let mut current_value = (1 << 62) / 9;
+        while ln_current < ln_pseudo_norm_bound + 1. {
+            current_value = prev_prime(StaticRing::<i64>::RING, current_value).unwrap();
+            if current_value < (1 << 32) {
+                panic!("not enough primes");
+            }
+            primes.push(current_value);
+            ln_current += (current_value as f64).ln();
+        }
+        return zn_rns::Zn::new(
+            primes.into_iter().map(|p| AsField::from(AsFieldBase::promise_is_perfect_field(zn_64::Zn::new(p as u64)))).collect(),
+            RingRef::new(self)
+        );
+    }
+
+    fn local_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
+        where Self: 'ring
+    {
+        computation.at(i).clone()
+    }
+
+    fn local_ring_count<'ring>(&self, computation: &Self::LocalComputationData<'ring>) -> usize
+        where Self: 'ring
+    {
+        computation.len()
+    }
+
+    fn reduce<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &Self::Element) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
+        where Self: 'ring
+    {
+        computation.get_congruence(&computation.coerce(RingValue::from_ref(self), self.clone_el(el))).as_iter().map(|x| *x).collect()
+    }
+
+    fn lift_combine<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
+        where Self: 'ring
+    {
+        computation.smallest_lift(computation.from_congruence(el.iter().copied()))
+    }
+}
+
+///
+/// The map `R -> R/p` for a ring `R` and one of its local quotients `R/p` as
+/// given by [`EvaluatePolyLocallyRing`].
+/// 
 #[stability::unstable(feature = "enable")]
 pub struct ToLocalRingMap<'ring, 'data, R>
     where R: 'ring + ?Sized + EvaluatePolyLocallyRing, 'ring: 'data

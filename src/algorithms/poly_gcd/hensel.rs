@@ -46,7 +46,7 @@ pub fn hensel_lift<'ring, 'b, R, P1, P2, Controller>(
     base_poly_ring.inclusion().mul_assign_map(&mut t, d_inv);
 
     let lift = |f| {
-        target_poly_ring.from_terms(base_poly_ring.terms(f).map(|(c, i)| (reduction_map.parent_ring().get_ring().lift_partial(reduction_map.maximal_ideal(), (reduction_map.codomain(), reduction_map.to_e()), (reduction_map.domain(), reduction_map.from_e()), prime_ring_iso.map_ref(c)), i)))
+        target_poly_ring.from_terms(base_poly_ring.terms(f).map(|(c, i)| (reduction_map.parent_ring().get_ring().lift_partial(reduction_map.maximal_ideal(), (reduction_map.codomain(), reduction_map.to_e()), (reduction_map.domain(), reduction_map.from_e()), reduction_map.max_ideal_idx(), prime_ring_iso.map_ref(c)), i)))
     };
 
     let lifted_s = lift(&s);

@@ -33,21 +33,22 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, f: &El<
     let mut rng = oorandom::Rand64::new(1);
 
     'try_random_prime: for current_attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
-        let prime = ring.random_maximal_ideal(|| rng.rand_u64());
+        let prime = ring.random_suitable_ideal(|| rng.rand_u64());
+        assert_eq!(1, ring.maximal_ideal_factor_count(&prime));
         let heuristic_e = ring.heuristic_exponent(&prime, poly_ring.degree(f).unwrap(), poly_ring.terms(f).map(|(c, _)| c));
         assert!(heuristic_e >= 1);
         let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt as i32)).floor() as usize;
 
         log_progress!(controller, "mod({}^{})", IdealDisplayWrapper::new(ring, &prime), e);
         
-        let reduction_map = IntermediateReductionMap::new(ring, &prime, e, 1);
+        let reduction_map = IntermediateReductionMap::new(ring, &prime, e, 1, 0);
 
-        let prime_field = ring.local_field_at(&prime);
+        let prime_field = ring.local_field_at(&prime, 0);
         let prime_field_poly_ring = DensePolyRing::new(&prime_field, "X");
         let prime_ring = reduction_map.codomain();
         let iso = prime_field.can_iso(&prime_ring).unwrap();
 
-        let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (iso.inv().map(ring.reduce_ring_el(&prime, (&prime_ring, 1), ring.clone_el(c))), i)));
+        let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (iso.inv().map(ring.reduce_ring_el(&prime, (&prime_ring, 1), 0, ring.clone_el(c))), i)));
         let mut powers = Vec::new();
         let mut factors = Vec::new();
         for (f, k) in poly_power_decomposition_finite_field(&prime_field_poly_ring, &prime_field_f) {
@@ -56,11 +57,11 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, f: &El<
         }
     
         let target_poly_ring = DensePolyRing::new(reduction_map.domain(), "X");
-        let local_ring_f = target_poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (ring.reduce_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), poly_ring.base_ring().clone_el(c)), i)));
+        let local_ring_f = target_poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (ring.reduce_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), 0, poly_ring.base_ring().clone_el(c)), i)));
         
         let mut lifted_factorization = Vec::new();
         for (factor, _k) in hensel_lift_factorization(&reduction_map, &target_poly_ring, &prime_field_poly_ring, &local_ring_f, &factors[..], controller.clone()).into_iter().zip(powers.iter()) {
-            lifted_factorization.push(poly_ring.from_terms(target_poly_ring.terms(&factor).map(|(c, i)| (ring.reconstruct_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), reduction_map.domain().clone_el(c)), i))));
+            lifted_factorization.push(poly_ring.from_terms(target_poly_ring.terms(&factor).map(|(c, i)| (ring.reconstruct_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), std::slice::from_ref(c)), i))));
         }
     
         let mut result = Vec::new();

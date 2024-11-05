@@ -528,16 +528,16 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> EvaluatePolyLoca
     type LocalComputationData<'ring> = (ToExtRingMap<'ring, R::Type>, Vec<El<<R::Type as InterpolationBaseRing>::ExtendedRing<'ring>>>)
         where Self: 'ring;
 
-    fn pseudo_norm(&self, el: &Self::Element) -> f64 {
+    fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
         if let Some(d) = self.degree(el) {
-            return (d as f64).exp();
+            return d as f64;
         } else {
             return 0.;
         }
     }
 
-    fn local_computation<'ring>(&'ring self, uniquely_representable_norm: f64) -> Self::LocalComputationData<'ring> {
-        let required_points = uniquely_representable_norm.ln().ceil() as usize + 1;
+    fn local_computation<'ring>(&'ring self, ln_pseudo_norm: f64) -> Self::LocalComputationData<'ring> {
+        let required_points = ln_pseudo_norm.ceil() as usize + 1;
         ToExtRingMap::for_interpolation(self.base_ring().get_ring(), required_points)
     }
 

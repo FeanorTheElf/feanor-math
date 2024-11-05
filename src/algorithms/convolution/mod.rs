@@ -73,19 +73,51 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, ring: S) -> bool;
 }
 
+///
+/// Trait for convolution algorithms that can "prepare" one (or both) operands in advance
+/// by computing additional data, and then use this data to perform the actual convolution
+/// more efficiently.
+/// 
 #[stability::unstable(feature = "enable")]
 pub trait PreparedConvolutionAlgorithm<R: ?Sized + RingBase>: ConvolutionAlgorithm<R> {
 
     type PreparedConvolutionOperand;
 
-    fn prepare_convolution_operand<S: RingStore<Type = R> + Copy, V: VectorView<R::Element>>(&self, val: V, ring: S) -> Self::PreparedConvolutionOperand;
+    fn prepare_convolution_operand<S, V>(&self, val: V, ring: S) -> Self::PreparedConvolutionOperand
+        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>;
 
-    fn compute_convolution_lhs_prepared<S: RingStore<Type = R> + Copy, V: VectorView<R::Element>>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: V, dst: &mut [R::Element], ring: S);
-    fn compute_convolution_prepared<S: RingStore<Type = R> + Copy>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: &Self::PreparedConvolutionOperand, dst: &mut [R::Element], ring: S);
+    fn compute_convolution_lhs_prepared<S, V>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: V, dst: &mut [R::Element], ring: S)
+        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>;
 
-    fn compute_convolution_rhs_prepared<S: RingStore<Type = R> + Copy, V: VectorView<R::Element>>(&self, lhs: V, rhs: &Self::PreparedConvolutionOperand, dst: &mut [R::Element], ring: S) {
+    fn compute_convolution_prepared<S>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: &Self::PreparedConvolutionOperand, dst: &mut [R::Element], ring: S)
+        where S: RingStore<Type = R> + Copy;
+
+    fn compute_convolution_rhs_prepared<S, V>(&self, lhs: V, rhs: &Self::PreparedConvolutionOperand, dst: &mut [R::Element], ring: S)
+        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
+    {
         assert!(ring.is_commutative());
         self.compute_convolution_lhs_prepared(rhs, lhs, dst, ring);
+    }
+
+    fn compute_convolution_inner_product_lhs_prepared<'a, S, I, V>(&self, values: I, dst: &mut [R::Element], ring: S) 
+        where S: RingStore<Type = R> + Copy, 
+            I: Iterator<Item = (&'a Self::PreparedConvolutionOperand, V)>,
+            V: VectorView<R::Element>,
+            Self::PreparedConvolutionOperand: 'a
+    {
+        for (lhs, rhs) in values {
+            self.compute_convolution_lhs_prepared(lhs, rhs, dst, ring)
+        }
+    }
+
+    fn compute_convolution_inner_product_prepared<'a, S, I>(&self, values: I, dst: &mut [R::Element], ring: S) 
+        where S: RingStore<Type = R> + Copy, 
+            I: Iterator<Item = (&'a Self::PreparedConvolutionOperand, &'a Self::PreparedConvolutionOperand)>,
+            Self::PreparedConvolutionOperand: 'a
+    {
+        for (lhs, rhs) in values {
+            self.compute_convolution_prepared(lhs, rhs, dst, ring)
+        }
     }
 }
 

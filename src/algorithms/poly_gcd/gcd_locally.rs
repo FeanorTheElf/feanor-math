@@ -12,21 +12,24 @@ use super::Field;
 use super::FiniteRing;
 
 ///
-/// Trait for rings that support lifting local partial factorizations of polynomials to the ring.
-/// For infinite fields, this is the most important approach to computing gcd's.
+/// Trait for rings that support lifting partial factorizations of polynomials modulo a prime
+/// to the ring. For infinite fields, this is the most important approach to computing gcd's,
+/// and also factorizations (with some caveats...).
 /// 
 /// The general philosophy is similar to [`crate::compute_locally::EvaluatePolyLocallyRing`].
-/// However, when working with factorizations, it is usually better to compute modulo a power
-/// `p^e` of a maximal ideal `p` and use Hensel lifting. `EvaluatePolyLocallyRing` on the other
-/// hand is designed to allow computations modulo multiple different maximal ideals.
+/// However, when working with factorizations, it is usually better to compute modulo the factorization
+/// modulo an ideal `I`, and use Hensel lifting to derive the factorization modulo `I^e`.
+/// `EvaluatePolyLocallyRing` on the other hand is designed to allow computations modulo multiple different 
+/// maximal ideals.
 /// 
 /// I am currently not yet completely sure what the exact requirements of this trait would be,
-/// but conceptually, we want that for a suitable, random ideal `a`, the quotient `R / a` should be
+/// but conceptually, we want that for a random ideal `I` taken from some set of ideals (e.g. maximal
+/// ideals, prime ideals, ... depending on the context), the quotient `R / I` should be
 /// finite, and there should be a power `e` such that we can derive the factorization of some polynomial
-/// over `R` from the factorization over `R / a^e`. Note that we don't assume that this `e` can be
+/// over `R` from the factorization over `R / I^e`. Note that we don't assume that this `e` can be
 /// computed, except possibly in special cases (like the integers). Also, we cannot always assume
-/// that `a` is a maximal ideal (unfortunately - it was a nasty surprise when I realized this after
-/// the making the first implementation run), however we can choose it such that we know its decomposition
+/// that `I` is a maximal ideal (unfortunately - it was a nasty surprise when I realized this after
+/// running my first implementation), however I believe we can choose it such that we know its decomposition
 /// into maximal ideals `a = m1 ∩ ... ∩ mr`.
 /// 
 /// Note also that I want this to work even when going to algebraic extensions or even the algebraic
@@ -46,7 +49,9 @@ use super::FiniteRing;
 ///    For simplicity, let's focus on the finite field case, i.e. `R = k`. Then we can take a maximal
 ///    ideal `m` of `k[X1, ..., Xm]`, and reduce a polynomial `f in k[X1, ..., Xm][Y]` modulo `m`, compute
 ///    its factorization there (i.e. over `k`), lift it to `k[X1, ..., Xm]/m^e` and (more or less) read
-///    of the factors over `R[X1, ..., Xm]`.
+///    of the factors over `R[X1, ..., Xm]`. Note that if the base ring is not a field, the ideals will
+///    only be prime and not maximal. Also, the polynomial coefficients of the result might only live in
+///    the fraction field of `R`, similar to the algebraic number field case.
 ///  - Orders in algebraic number fields. This case is much more complicated, since (in general) we
 ///    don't have a UFD anymore. In particular, this is the case where we cannot generally choose `a = m` to be
 ///    a maximal ideal, and also need rational reconstruction when lifting the factorization back to the number
@@ -67,7 +72,7 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
 
     ///
     /// The proper way would be to define this with two lifetime parameters `'ring` and `'data`,
-    /// see also [`crate::compute_locally::ComputeLocallyRing`]
+    /// see also [`crate::compute_locally::EvaluatePolyLocallyRing::LocalRingBase`]
     /// 
     type LocalRingBase<'ring>: LinSolveRing
         where Self: 'ring;
@@ -78,11 +83,7 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
     ///
     /// Again, this is required to restrict `AsFieldBase<Self::LocalRing<'ring>>: FactorPolyField`,
     /// which in turn is required since the straightforward bound `for<'a> AsFieldBase<Self::LocalRing<'a>>: FactorPolyField`
-    /// is bugged, see also [`crate::compute_locally::ComputeLocallyRing`].
-    /// 
-    /// Note that restricting this to `PolyGCDLocallyDomain` is necessary to close the loop and provide a blanket implementation
-    /// for all algebraic extensions of a `PolyGCDLocallyDomain`. The properties of `PolyGCDLocallyDomain` are actually never used
-    /// for this ring, since things should always boil down to the finite case, where `PolyGCDRing` can be implemented globally.
+    /// is bugged, see also [`crate::compute_locally::EvaluatePolyLocallyRing::LocalRingBase`].
     /// 
     type LocalFieldBase<'ring>: CanIsoFromTo<Self::LocalRingBase<'ring>> + FiniteRing + Field
         where Self: 'ring;
@@ -90,77 +91,82 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
     type LocalField<'ring>: RingStore<Type = Self::LocalFieldBase<'ring>>
         where Self: 'ring;
 
-    type MaximalIdeal<'ring>
+    type SuitableIdeal<'ring>
         where Self: 'ring;
 
     ///
     /// Returns an exponent `e` such that we hope that the factors of a polynomial of given degree, 
     /// involving the given coefficient can already be read of (via [`PolyGCDLocallyDomain::reconstruct_ring_el()`]) 
-    /// their reductions modulo `p^e`. Note that this is just a heuristic, and if it does not work,
+    /// their reductions modulo `I^e`. Note that this is just a heuristic, and if it does not work,
     /// the implementation will gradually try larger `e`. Thus, even if this function returns constant
     /// 1, correctness will not be affected, but giving a good guess can improve performance
     /// 
-    fn heuristic_exponent<'ring, 'a, I>(&self, _maximal_ideal: &Self::MaximalIdeal<'ring>, _poly_deg: usize, _coefficients: I) -> usize
+    fn heuristic_exponent<'ring, 'a, I>(&self, _ideal: &Self::SuitableIdeal<'ring>, _poly_deg: usize, _coefficients: I) -> usize
         where I: Iterator<Item = &'a Self::Element>,
             Self: 'a,
             Self: 'ring;
 
     ///
-    /// Returns an ideal sampled at random from the interval of all supported maximal ideals.
+    /// Returns an ideal sampled at random from the interval of all supported ideals.
     /// 
-    fn random_maximal_ideal<'ring, F>(&'ring self, rng: F) -> Self::MaximalIdeal<'ring>
+    fn random_suitable_ideal<'ring, F>(&'ring self, rng: F) -> Self::SuitableIdeal<'ring>
         where F: FnMut() -> u64;
 
+    fn maximal_ideal_factor_count<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>) -> usize
+        where Self: 'ring;
+
     ///
-    /// Returns `R / p`.
+    /// Returns `R / mi`, where `mi` is the `i`-th maximal ideal over `I`.
     /// 
-    /// This will always be a field, since `p` is a maximal ideal.
+    /// This will always be a field, since `mi` is a maximal ideal.
     /// 
-    fn local_field_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> Self::LocalField<'ring>
+    fn local_field_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
         where Self: 'ring;
     
     ///
-    /// Returns `R / p^e`.
+    /// Returns `R / mi^e`, where `mi` is the `i`-th maximal ideal over `I`.
     /// 
-    fn local_ring_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>, e: usize) -> Self::LocalRing<'ring>
+    fn local_ring_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>
         where Self: 'ring;
 
     ///
     /// Computes the reduction map
     /// ```text
-    ///   R -> R / p^e
+    ///   R -> R / mi^e
     /// ```
+    /// where `mi` is the `i`-th maximal ideal over `I`.
     /// 
-    fn reduce_ring_el<'ring>(&self, p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>
+    fn reduce_ring_el<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), max_ideal_idx: usize, x: Self::Element) -> El<Self::LocalRing<'ring>>
         where Self: 'ring;
 
     ///
     /// Computes the reduction map
     /// ```text
-    ///   R / p^e1 -> R / p^e2
+    ///   R / mi^e1 -> R / mi^e2
     /// ```
-    /// where `e1 >= e2`.
+    /// where `e1 >= e2` and `mi` is the `i`-th maximal ideal over `I`.
     /// 
-    fn reduce_partial<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+    fn reduce_partial<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), max_ideal_idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
         where Self: 'ring;
 
     ///
-    /// Computes any element `y` in `R / p^to_e` such that `y = x mod p^from_e`.
+    /// Computes any element `y` in `R / mi^to_e` such that `y = x mod mi^from_e`.
     /// In particular, `y` does not have to be "short" in any sense, but any lift
     /// is a valid result.
     /// 
-    fn lift_partial<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+    fn lift_partial<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), max_ideal_idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
         where Self: 'ring;
 
     ///
-    /// Computes a "small" element `x in R` such that `x mod p^e` is equal to the given value.
+    /// Computes a "small" element `x in R` such that `x mod mi^e` is equal to the given value,
+    /// for every maximal ideal `mi` over `I`.
     /// In cases where the factors of polynomials in `R[X]` do not necessarily have coefficients
     /// in `R`, this function might have to do rational reconstruction. 
     /// 
-    fn reconstruct_ring_el<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
+    fn reconstruct_ring_el<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: &[El<Self::LocalRing<'ring>>]) -> Self::Element
         where Self: 'ring;
 
-    fn dbg_maximal_ideal<'ring>(&self, p: &Self::MaximalIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
+    fn dbg_ideal<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
         where Self: 'ring;
 }
 
@@ -179,20 +185,20 @@ pub trait IntegerPolyGCDRing: PolyGCDLocallyDomain {
 
     fn local_ring_as_zn<'a, 'ring>(&self, local_field: &'a Self::LocalRing<'ring>) -> &'a Self::LocalRingAsZn<'ring>;
 
-    fn maximal_ideal_gen<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> i64
+    fn maximal_ideal_gen<'ring>(&self, p: &Self::SuitableIdeal<'ring>) -> i64
         where Self: 'ring;
 }
 
 #[stability::unstable(feature = "enable")]
 pub struct IdealDisplayWrapper<'a, 'ring, R: 'ring + ?Sized + PolyGCDLocallyDomain> {
     ring: &'a R,
-    ideal: &'a R::MaximalIdeal<'ring>
+    ideal: &'a R::SuitableIdeal<'ring>
 }
 
 impl<'a, 'ring, R: 'ring + ?Sized + PolyGCDLocallyDomain> IdealDisplayWrapper<'a, 'ring, R> {
 
     #[stability::unstable(feature = "enable")]
-    pub fn new(ring: &'a R, ideal: &'a R::MaximalIdeal<'ring>) -> Self {
+    pub fn new(ring: &'a R, ideal: &'a R::SuitableIdeal<'ring>) -> Self {
         Self {
             ring: ring, 
             ideal: ideal
@@ -203,7 +209,7 @@ impl<'a, 'ring, R: 'ring + ?Sized + PolyGCDLocallyDomain> IdealDisplayWrapper<'a
 impl<'a, 'ring, R: 'ring + ?Sized + PolyGCDLocallyDomain> Display for IdealDisplayWrapper<'a, 'ring, R> {
 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.ring.dbg_maximal_ideal(self.ideal, f)
+        self.ring.dbg_ideal(self.ideal, f)
     }
 }
 
@@ -212,17 +218,18 @@ pub struct ReductionMap<'ring, 'data, R>
     where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
     ring: RingRef<'data, R>,
-    p: &'data R::MaximalIdeal<'ring>,
-    to: (R::LocalRing<'ring>, usize)
+    p: &'data R::SuitableIdeal<'ring>,
+    to: (R::LocalRing<'ring>, usize),
+    max_ideal_idx: usize
 }
 
 impl<'ring, 'data, R> ReductionMap<'ring, 'data, R>
     where R: 'ring +?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
     #[stability::unstable(feature = "enable")]
-    pub fn new(ring: &'data R, p: &'data R::MaximalIdeal<'ring>, power: usize) -> Self {
+    pub fn new(ring: &'data R, p: &'data R::SuitableIdeal<'ring>, max_ideal_idx: usize, power: usize) -> Self {
         assert!(power >= 1);
-        Self { ring: RingRef::new(ring), p: p, to: (ring.local_ring_at(p, power), power) }
+        Self { ring: RingRef::new(ring), p: p, to: (ring.local_ring_at(p, power, max_ideal_idx), power), max_ideal_idx: max_ideal_idx }
     }
 }
 
@@ -241,7 +248,7 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for ReductionMap<
     }
 
     fn map(&self, x: <R as RingBase>::Element) -> <R::LocalRingBase<'ring> as RingBase>::Element {
-        self.ring.get_ring().reduce_ring_el(self.p, (&self.to.0, self.to.1), x)
+        self.ring.get_ring().reduce_ring_el(self.p, (&self.to.0, self.to.1), self.max_ideal_idx, x)
     }
 }
 
@@ -250,19 +257,20 @@ pub struct IntermediateReductionMap<'ring, 'data, R>
     where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
     ring: RingRef<'data, R>,
-    p: &'data R::MaximalIdeal<'ring>,
+    p: &'data R::SuitableIdeal<'ring>,
     from: (R::LocalRing<'ring>, usize),
-    to: (R::LocalRing<'ring>, usize)
+    to: (R::LocalRing<'ring>, usize),
+    max_ideal_idx: usize
 }
 
 impl<'ring, 'data, R> IntermediateReductionMap<'ring, 'data, R>
     where R: 'ring +?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
     #[stability::unstable(feature = "enable")]
-    pub fn new(ring: &'data R, p: &'data R::MaximalIdeal<'ring>, from: usize, to: usize) -> Self {
+    pub fn new(ring: &'data R, p: &'data R::SuitableIdeal<'ring>, from: usize, to: usize, max_ideal_idx: usize) -> Self {
         assert!(from >= to);
         assert!(to >= 1);
-        Self { ring: RingRef::new(ring), p: p, from: (ring.local_ring_at(p, from), from), to: (ring.local_ring_at(p, to), to) }
+        Self { ring: RingRef::new(ring), p: p, from: (ring.local_ring_at(p, from, max_ideal_idx), from), to: (ring.local_ring_at(p, to, max_ideal_idx), to), max_ideal_idx: max_ideal_idx }
     }
 
     #[stability::unstable(feature = "enable")]
@@ -281,8 +289,13 @@ impl<'ring, 'data, R> IntermediateReductionMap<'ring, 'data, R>
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn maximal_ideal<'a>(&'a self) -> &'a R::MaximalIdeal<'ring> {
+    pub fn maximal_ideal<'a>(&'a self) -> &'a R::SuitableIdeal<'ring> {
         &self.p
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn max_ideal_idx(&self) -> usize {
+        self.max_ideal_idx
     }
 }
 
@@ -301,7 +314,7 @@ impl<'ring, 'data, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalRingBase<'ri
     }
 
     fn map(&self, x: <R::LocalRingBase<'ring> as RingBase>::Element) -> <R::LocalRingBase<'ring> as RingBase>::Element {
-        self.ring.get_ring().reduce_partial(self.p, (&self.from.0, self.from.1), (&self.to.0, self.to.1), x)
+        self.ring.get_ring().reduce_partial(self.p, (&self.from.0, self.from.1), (&self.to.0, self.to.1), self.max_ideal_idx, x)
     }
 }
 
@@ -320,65 +333,76 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 where Self: 'ring;
             type LocalField<'ring> = $crate::rings::field::AsField<$crate::rings::zn::zn_64::Zn>
                 where Self: 'ring;
-            type MaximalIdeal<'ring> = i64
+            type SuitableIdeal<'ring> = i64
                 where Self: 'ring;
         
-            fn reconstruct_ring_el<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
+            fn reconstruct_ring_el<'ring>(&self, _p: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: &[El<Self::LocalRing<'ring>>]) -> Self::Element
                 where Self: 'ring
             {
                 use $crate::rings::zn::*;
+                assert_eq!(1, x.len());
+                int_cast(from.0.smallest_lift(from.0.clone_el(&x[0])), RingRef::new(self), BigIntRing::RING)
+            }
 
-                int_cast(from.0.smallest_lift(x), RingRef::new(self), BigIntRing::RING)
+            fn maximal_ideal_factor_count<'ring>(&self, _p: &Self::SuitableIdeal<'ring>) -> usize
+                where Self: 'ring
+            {
+                1
             }
         
-            fn lift_partial<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+            fn lift_partial<'ring>(&self, _p: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), max_ideal_idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
                 where Self: 'ring
             {
                 use $crate::rings::zn::*;
                 use $crate::homomorphism::*;
 
+                assert_eq!(0, max_ideal_idx);
                 assert!(from.1 <= to.1);
                 let hom = to.0.can_hom(to.0.integer_ring()).unwrap();
                 return hom.map(from.0.any_lift(x));
             }
         
-            fn local_field_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> Self::LocalField<'ring>
+            fn local_field_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
                 where Self: 'ring
             {
                 use $crate::rings::zn::*;
 
+                assert_eq!(0, max_ideal_idx);
                 $crate::rings::zn::zn_64::Zn::new(*p as u64).as_field().ok().unwrap()
             }
         
-            fn local_ring_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>, e: usize) -> Self::LocalRing<'ring>
+            fn local_ring_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>
                 where Self: 'ring
             {
+                assert_eq!(0, max_ideal_idx);
                 $crate::rings::zn::zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.pow(int_cast(*p, BigIntRing::RING, StaticRing::<i64>::RING), e))
             }
         
-            fn random_maximal_ideal<'ring, F>(&'ring self, rng: F) -> Self::MaximalIdeal<'ring>
+            fn random_suitable_ideal<'ring, F>(&'ring self, rng: F) -> Self::SuitableIdeal<'ring>
                 where F: FnMut() -> u64
             {
                 let lower_bound = StaticRing::<i64>::RING.get_ring().get_uniformly_random_bits(24, rng);
                 return $crate::algorithms::miller_rabin::next_prime(StaticRing::<i64>::RING, lower_bound);
             }
         
-            fn reduce_ring_el<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>
+            fn reduce_ring_el<'ring>(&self, _p: &Self::SuitableIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), max_ideal_idx: usize, x: Self::Element) -> El<Self::LocalRing<'ring>>
                 where Self: 'ring
             {
                 use $crate::homomorphism::*;
 
+                assert_eq!(0, max_ideal_idx);
                 let self_ref = RingRef::new(self);
                 let hom = to.0.can_hom(&self_ref).unwrap();
                 return hom.map(x);
             }
         
-            fn reduce_partial<'ring>(&self, _p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+            fn reduce_partial<'ring>(&self, _p: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), max_ideal_idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
                 where Self: 'ring
             {
                 use $crate::rings::zn::*;
                 use $crate::homomorphism::*;
 
+                assert_eq!(0, max_ideal_idx);
                 assert!(from.1 >= to.1);
                 let hom = to.0.can_hom(to.0.integer_ring()).unwrap();
                 return hom.map(from.0.smallest_lift(x));
@@ -394,7 +418,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 return ((log2_max_coeff as f64 + poly_deg as f64) / (*p as f64).log2() / /* just some factor that seemed good when playing around */ 4.).ceil() as usize + 1;
             }
             
-            fn dbg_maximal_ideal<'ring>(&self, p: &Self::MaximalIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
+            fn dbg_ideal<'ring>(&self, p: &Self::SuitableIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
                 where Self: 'ring
             {
                 write!(out, "({})", p)
@@ -416,7 +440,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 local_field
             }
 
-            fn maximal_ideal_gen<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> i64
+            fn maximal_ideal_gen<'ring>(&self, p: &Self::SuitableIdeal<'ring>) -> i64
                 where Self: 'ring
             {
                 *p
@@ -448,10 +472,10 @@ impl<R> PolyGCDLocallyDomain for R
         where Self: 'ring;
     type LocalField<'ring> = RingRef<'ring, Self>
         where Self: 'ring;
-    type MaximalIdeal<'ring> = RingRef<'ring, Self>
+    type SuitableIdeal<'ring> = RingRef<'ring, Self>
         where Self: 'ring;
         
-    fn heuristic_exponent<'ring, 'element, IteratorType>(&self, _maximal_ideal: &Self::MaximalIdeal<'ring>, _poly_deg: usize, _coefficients: IteratorType) -> usize
+    fn heuristic_exponent<'ring, 'element, IteratorType>(&self, _maximal_ideal: &Self::SuitableIdeal<'ring>, _poly_deg: usize, _coefficients: IteratorType) -> usize
         where IteratorType: Iterator<Item = &'element Self::Element>,
             Self: 'element,
             Self: 'ring
@@ -459,49 +483,53 @@ impl<R> PolyGCDLocallyDomain for R
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
     }
 
-    fn random_maximal_ideal<'ring, RandomNumberFunction>(&'ring self, rng: RandomNumberFunction) -> Self::MaximalIdeal<'ring>
+    fn maximal_ideal_factor_count<'ring>(&self,ideal: &Self::SuitableIdeal<'ring>) -> usize where Self:'ring {
+        unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+    }
+
+    fn random_suitable_ideal<'ring, RandomNumberFunction>(&'ring self, rng: RandomNumberFunction) -> Self::SuitableIdeal<'ring>
         where RandomNumberFunction: FnMut() -> u64
     {
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
     }
 
-    fn local_field_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>) -> Self::LocalField<'ring>
+    fn local_field_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
         where Self: 'ring
     {
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
     }
                 
-    fn local_ring_at<'ring>(&self, p: &Self::MaximalIdeal<'ring>, e: usize) -> Self::LocalRing<'ring>
+    fn local_ring_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>
         where Self: 'ring
     {
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
     }
 
-    fn reduce_ring_el<'ring>(&self, p: &Self::MaximalIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), x: Self::Element) -> El<Self::LocalRing<'ring>>
+    fn reduce_ring_el<'ring>(&self, p: &Self::SuitableIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), max_ideal_idx: usize, x: Self::Element) -> El<Self::LocalRing<'ring>>
         where Self: 'ring
     {
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
     }
 
-    fn reduce_partial<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+    fn reduce_partial<'ring>(&self, p: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), max_ideal_idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
         where Self: 'ring
     {
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
     }
 
-    fn lift_partial<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+    fn lift_partial<'ring>(&self, p: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), max_ideal_idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
         where Self: 'ring
     {
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
     }
 
-    fn reconstruct_ring_el<'ring>(&self, p: &Self::MaximalIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: El<Self::LocalRing<'ring>>) -> Self::Element
+    fn reconstruct_ring_el<'ring>(&self, p: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: &[El<Self::LocalRing<'ring>>]) -> Self::Element
         where Self: 'ring
     {
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
     }
     
-    fn dbg_maximal_ideal<'ring>(&self, p: &Self::MaximalIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
+    fn dbg_ideal<'ring>(&self, p: &Self::SuitableIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
         where Self: 'ring
     {
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")

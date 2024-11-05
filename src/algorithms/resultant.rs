@@ -41,14 +41,16 @@ pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type a
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Domain + PrincipalIdealRing
 {
     let base_ring = ring.base_ring();
+    if ring.is_zero(&g) || ring.is_zero(&f) {
+        return base_ring.zero();
+    }
     let mut scale_den = base_ring.one();
     let mut scale_num = base_ring.one();
 
-    if ring.is_zero(&g) || ring.degree(&g).unwrap() < ring.degree(&f).unwrap_or(0) {
-        if ring.is_zero(&f) {
-            return base_ring.zero();
+    if ring.degree(&g).unwrap() < ring.degree(&f).unwrap() {
+        if (ring.degree(&g).unwrap() + ring.degree(&f).unwrap()) % 2 != 0 {
+            base_ring.negate_inplace(&mut scale_num);
         }
-        base_ring.negate_inplace(&mut scale_num);
         std::mem::swap(&mut f, &mut g);
     }
 
@@ -93,9 +95,9 @@ pub fn resultant_local<'a, P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as Rin
     if ring.is_zero(&f) || ring.is_zero(&g) {
         return base_ring.zero();
     }
-    let max_norm = ring.terms(&f).map(|(c, _)| base_ring.get_ring().pseudo_norm(c)).max_by(f64::total_cmp).unwrap().powi(ring.degree(&g).unwrap() as i32) *
-        ring.terms(&g).map(|(c, _)| base_ring.get_ring().pseudo_norm(c)).max_by(f64::total_cmp).unwrap().powi(ring.degree(&f).unwrap() as i32);
-    let work_locally = base_ring.get_ring().local_computation(max_norm);
+    let ln_max_norm = ring.terms(&f).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap() * ring.degree(&g).unwrap() as f64 +
+        ring.terms(&g).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap() * ring.degree(&f).unwrap() as f64;
+    let work_locally = base_ring.get_ring().local_computation(ln_max_norm);
     let mut resultants = Vec::new();
     for i in 0..base_ring.get_ring().local_ring_count(&work_locally) {
         let embedding = ToLocalRingMap::new(base_ring.get_ring(), &work_locally, i);
@@ -147,7 +149,7 @@ fn test_resultant() {
 }
 
 #[test]
-fn test_resultant_polynomial() {
+fn test_resultant_local_polynomial() {
     let ZZ = BigIntRing::RING;
     let QQ = AsLocalPIR::from_field(RationalField::new(ZZ));
     // we eliminate `Y`, so add it as the outer indeterminate
@@ -183,4 +185,16 @@ fn test_resultant_polynomial() {
     let expected = QQX.normalize(QQX.from_terms(QQYX.terms(&expected[0]).map(|(c, m)| (c.clone(), QQYX.exponent_at(m, 1)))));
 
     assert_el_eq!(QQX, expected, actual);
+}
+
+#[test]
+fn test_resultant_local_integer() {
+    let ZZ = BigIntRing::RING;
+    let ZZX = DensePolyRing::new(ZZ, "X");
+
+    let [f, g] = ZZX.with_wrapped_indeterminate(|X| [
+        X.pow_ref(32) + 1,
+        X.pow_ref(2) - X - 1
+    ]);
+    assert_el_eq!(ZZ, ZZ.int_hom().map(4870849), resultant_local(&ZZX, f, g));
 }

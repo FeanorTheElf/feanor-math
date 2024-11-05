@@ -425,7 +425,7 @@ impl<R1, R2> CanIsoFromTo<AsFieldBase<R1>> for AsLocalPIRBase<R2>
 /// Implements the isomorphisms `S: CanHomFrom<AsFieldBase<RingStore<Type = R>>>` and 
 /// `AsFieldBase<RingStore<Type = S>>: CanHomFrom<R>`.
 /// 
-/// For details, see [`crate::impl_wrap_unwrap_homs!`]
+/// For details, see [`crate::impl_field_wrap_unwrap_homs!`]
 /// 
 #[macro_export]
 macro_rules! impl_localpir_wrap_unwrap_homs {
@@ -467,7 +467,7 @@ macro_rules! impl_localpir_wrap_unwrap_homs {
 ///
 /// Implements the isomorphisms `S: CanIsoFromTo<AsLocalPIRBase<RingStore<Type = R>>>` and `AsLocalPIRBase<RingStore<Type = S>>: CanIsoFromTo<R>`.
 /// 
-/// For details, see [`crate::impl_wrap_unwrap_isos!`]
+/// For details, see [`crate::impl_field_wrap_unwrap_isos!`]
 /// 
 #[macro_export]
 macro_rules! impl_localpir_wrap_unwrap_isos {
