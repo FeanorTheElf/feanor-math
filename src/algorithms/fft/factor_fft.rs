@@ -166,7 +166,7 @@ impl<R_main, R_twiddle, H, T1, T2> FFTAlgorithm<R_main> for CoprimeCooleyTuckeyF
     {
         assert!(self.ring().get_ring() == ring.get_ring(), "unsupported ring");
         for i in 0..self.right_table.len() {
-            let mut v = SubvectorView::new(&mut values).restrict(i..).step_by(self.right_table.len());
+            let mut v = SubvectorView::new(&mut values).restrict(i..).step_by_view(self.right_table.len());
             self.left_table.unordered_fft(&mut v, ring);
         }
         for i in 0..self.len() {
@@ -192,7 +192,7 @@ impl<R_main, R_twiddle, H, T1, T2> FFTAlgorithm<R_main> for CoprimeCooleyTuckeyF
             debug_assert!(self.ring().get_ring().is_approximate() || self.hom.domain().is_one(&self.hom.domain().mul_ref(self.twiddle_factors.at(i), self.inv_twiddle_factors.at(i))));
         }
         for i in 0..self.right_table.len() {
-            let mut v = SubvectorView::new(&mut values).restrict(i..).step_by(self.right_table.len());
+            let mut v = SubvectorView::new(&mut values).restrict(i..).step_by_view(self.right_table.len());
             self.left_table.unordered_inv_fft(&mut v, ring);
         }
     }

@@ -112,12 +112,12 @@ impl<V: VectorFn<T>, T> VectorFn<T> for StepByFn<V, T> {
 fn test_step_by() {
     let vec = [0, 1, 2, 3, 4, 5, 6, 7];
     let zero: [i32; 0] = [];
-    assert_eq!(0, zero.step_by(1).len());
-    assert_eq!(4, vec.step_by(2).len());
-    assert_eq!(3, vec.step_by(3).len());
-    assert_eq!(6, *vec.step_by(2).at(3));
-    assert_eq!(0, *vec.step_by(3).at(0));
-    assert_eq!(3, *vec.step_by(3).at(1));
+    assert_eq!(0, zero.step_by_view(1).len());
+    assert_eq!(4, vec.step_by_view(2).len());
+    assert_eq!(3, vec.step_by_view(3).len());
+    assert_eq!(6, *vec.step_by_view(2).at(3));
+    assert_eq!(0, *vec.step_by_view(3).at(0));
+    assert_eq!(3, *vec.step_by_view(3).at(1));
 }
 
 #[test]

@@ -8,6 +8,7 @@ use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local
 use crate::computation::*;
 use crate::iters::clone_slice;
 use crate::iters::powerset;
+use crate::seq::VectorView;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 
 fn combine_local_factors_local<'ring, 'a, R, P, Q>(ring: &R, maximal_ideal: &R::SuitableIdeal<'ring>, poly_ring: P, f: &El<P>, local_poly_ring: Q, local_e: usize, local_factors: Vec<El<Q>>) -> Vec<El<P>>
@@ -22,7 +23,7 @@ fn combine_local_factors_local<'ring, 'a, R, P, Q>(ring: &R, maximal_ideal: &R::
     debug_assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
     debug_assert!(local_factors.iter().all(|local_factor| local_poly_ring.base_ring().is_one(local_poly_ring.lc(local_factor).unwrap())));
 
-    let reconstruct_ring_el = |factor| balance_poly(poly_ring, poly_ring.from_terms(local_poly_ring.terms(&factor).map(|(c, i)| (ring.reconstruct_ring_el(maximal_ideal, (local_poly_ring.base_ring(), local_e), std::slice::from_ref(c)), i)))).0;
+    let reconstruct_ring_el = |factor| balance_poly(poly_ring, poly_ring.from_terms(local_poly_ring.terms(&factor).map(|(c, i)| (ring.reconstruct_ring_el(maximal_ideal, std::slice::from_ref(*local_poly_ring.base_ring()).as_fn(), local_e, std::slice::from_ref(c).as_fn()), i)))).0;
 
     let mut ungrouped_factors = (0..local_factors.len()).collect::<Vec<_>>();
     let mut current = poly_ring.clone_el(f);
@@ -66,35 +67,36 @@ pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::
         <P::Type as RingExtension>::BaseRing: RingStore<Type = R>,
         Controller: ComputationController
 {
-    let ring = poly_ring.base_ring().get_ring();
-    assert_eq!(1, ring.maximal_ideal_factor_count(&prime));
+    unimplemented!()
+    // let ring = poly_ring.base_ring().get_ring();
+    // assert_eq!(1, ring.maximal_ideal_factor_count(&prime));
 
-    log_progress!(controller, "mod({}^{})", IdealDisplayWrapper::new(ring, &prime), e);
+    // log_progress!(controller, "mod({}^{})", IdealDisplayWrapper::new(ring, &prime), e);
 
-    let reduction_map = IntermediateReductionMap::new(ring, &prime, e, 1, 0);
+    // let reduction_map = IntermediateReductionMap::new(ring, &prime, e, 1, 0);
 
-    let prime_field = ring.local_field_at(&prime, 0);
-    let prime_field_poly_ring = DensePolyRing::new(&prime_field, "X");
-    let prime_ring = reduction_map.codomain();
-    let iso = prime_field.can_iso(&prime_ring).unwrap();
+    // let prime_field = ring.local_field_at(&prime, 0);
+    // let prime_field_poly_ring = DensePolyRing::new(&prime_field, "X");
+    // let prime_ring = reduction_map.codomain();
+    // let iso = prime_field.can_iso(&prime_ring).unwrap();
 
-    let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (iso.inv().map(ring.reduce_ring_el(&prime, (&prime_ring, 1), 0, ring.clone_el(c))), i)));
-    let mut factors = Vec::new();
-    for (f, k) in poly_factor_finite_field(&prime_field_poly_ring, &prime_field_f).0 {
-        if k > 1 {
-            log_progress!(controller, "(not_squarefree)");
-            return None;
-        }
-        factors.push(f);
-    }
+    // let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (iso.inv().map(ring.reduce_ring_el(&prime, (&prime_ring, 1), 0, ring.clone_el(c))), i)));
+    // let mut factors = Vec::new();
+    // for (f, k) in poly_factor_finite_field(&prime_field_poly_ring, &prime_field_f).0 {
+    //     if k > 1 {
+    //         log_progress!(controller, "(not_squarefree)");
+    //         return None;
+    //     }
+    //     factors.push(f);
+    // }
 
-    let target_poly_ring = DensePolyRing::new(reduction_map.domain(), "X");
-    let local_ring_f = target_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (ring.reduce_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), 0, poly_ring.base_ring().clone_el(c)), i)));
+    // let target_poly_ring = DensePolyRing::new(reduction_map.domain(), "X");
+    // let local_ring_f = target_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (ring.reduce_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), 0, poly_ring.base_ring().clone_el(c)), i)));
     
-    let local_ring_factorization = hensel_lift_factorization(&reduction_map, &target_poly_ring, &prime_field_poly_ring, &local_ring_f, &factors[..], controller.clone());
+    // let local_ring_factorization = hensel_lift_factorization(&reduction_map, &target_poly_ring, &prime_field_poly_ring, &local_ring_f, &factors[..], controller.clone());
     
-    finish_computation!(controller);
-    return Some(combine_local_factors_local(ring, &prime, poly_ring, f, &target_poly_ring, reduction_map.from_e(), local_ring_factorization));
+    // finish_computation!(controller);
+    // return Some(combine_local_factors_local(ring, &prime, poly_ring, f, &target_poly_ring, reduction_map.from_e(), local_ring_factorization));
 }
 
 ///

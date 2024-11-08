@@ -34,7 +34,7 @@ pub fn poly_power_decomposition_finite_field<P>(poly_ring: P, poly: &El<P>) -> V
         }
         if degree != poly_ring.degree(&poly).unwrap() {
             let remaining_part = poly_ring.checked_div(&poly, &poly_ring.prod(result.iter().map(|(g, e)| poly_ring.pow(poly_ring.clone_el(g), *e)))).unwrap();
-            result.push((poly_ring.normalize(remaining_part), 1));
+            result.insert(0, (poly_ring.normalize(remaining_part), 1));
         }
         return result;
     }

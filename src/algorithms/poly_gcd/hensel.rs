@@ -14,8 +14,8 @@ use crate::algorithms::poly_gcd::gcd_locally::*;
 /// modulo `p^e`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn hensel_lift<'ring, 'b, R, P1, P2, Controller>(
-    reduction_map: &IntermediateReductionMap<'ring, 'b, R>, 
+pub fn hensel_lift<'ring, 'data, 'local, R, P1, P2, Controller>(
+    reduction_map: &IntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
@@ -46,7 +46,7 @@ pub fn hensel_lift<'ring, 'b, R, P1, P2, Controller>(
     base_poly_ring.inclusion().mul_assign_map(&mut t, d_inv);
 
     let lift = |f| {
-        target_poly_ring.from_terms(base_poly_ring.terms(f).map(|(c, i)| (reduction_map.parent_ring().get_ring().lift_partial(reduction_map.maximal_ideal(), (reduction_map.codomain(), reduction_map.to_e()), (reduction_map.domain(), reduction_map.from_e()), reduction_map.max_ideal_idx(), prime_ring_iso.map_ref(c)), i)))
+        target_poly_ring.from_terms(base_poly_ring.terms(f).map(|(c, i)| (reduction_map.parent_ring().get_ring().lift_partial(reduction_map.ideal(), (reduction_map.codomain(), reduction_map.to_e()), (reduction_map.domain(), reduction_map.from_e()), reduction_map.max_ideal_idx(), prime_ring_iso.map_ref(c)), i)))
     };
 
     let lifted_s = lift(&s);
@@ -75,8 +75,8 @@ pub fn hensel_lift<'ring, 'b, R, P1, P2, Controller>(
 /// Like [`hensel_lift()`] but for an arbitrary number of factors.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn hensel_lift_factorization<'ring, 'b, R, P1, P2, V, Controller>(
-    reduction_map: &IntermediateReductionMap<'ring, 'b, R>, 
+pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V, Controller>(
+    reduction_map: &IntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 

@@ -130,13 +130,19 @@ pub trait VectorView<T: ?Sized> {
     /// foo(data.map(|x| x.as_ref().unwrap()));
     /// ```
     /// 
-    fn map<F: for<'a> Fn(&'a T) -> &'a U, U>(self, func: F) -> VectorViewMap<Self, T, U, F>
+    /// Called `map_view()` to prevent name conflicts with `Iterator::map()`.
+    /// 
+    fn map_view<F: for<'a> Fn(&'a T) -> &'a U, U>(self, func: F) -> VectorViewMap<Self, T, U, F>
         where Self: Sized
     {
         VectorViewMap::new(self, func)
     }
 
-    fn step_by(self, step_by: usize) -> StepBy<Self, T>
+    ///
+    /// 
+    /// Called `step_by_view()` to prevent name conflicts with `Iterator::step_by()`.
+    /// 
+    fn step_by_view(self, step_by: usize) -> StepBy<Self, T>
         where Self: Sized
     {
         StepBy::new(self, step_by)

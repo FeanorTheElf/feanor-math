@@ -4,12 +4,124 @@ use crate::algorithms::poly_gcd::*;
 use crate::algorithms::poly_gcd::gcd_locally::*;
 use crate::algorithms::poly_gcd::hensel::*;
 use crate::computation::*;
+use crate::seq::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 
 use super::balance_poly;
 use super::evaluate_aX;
 use super::unevaluate_aX;
 use super::INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT;
+
+///
+/// For the power-decomposition `f = f1^e1 ... fr^er`, stores a tuple (ei, deg(fi))
+/// 
+#[derive(PartialEq, Eq)]
+struct Signature {
+    perfect_power: usize,
+    degree: usize
+}
+
+///
+/// We use the notation
+///  - `R` is the main ring
+///  - `F` is `R/m` where `m` is a maximal ideal containing the currently considered ideal `I`
+///  - `S` is `R/m^e`
+/// 
+fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P>(
+    reduction: &'local ReductionContext<'ring, 'data, R>, 
+    RX: P, 
+    poly: &El<P>, 
+    signature: &[Signature], 
+    local_poly_rings: &[DensePolyRing<&'local R::LocalRing<'ring>>], 
+    local_power_decompositions: &[Vec<El<DensePolyRing<&'local R::LocalRing<'ring>>>>]
+) -> Option<Vec<(El<P>, usize)>>
+    where R: ?Sized + PolyGCDLocallyDomain,
+        P: RingStore + Copy,
+        P::Type: PolyRing,
+        <P::Type as RingExtension>::BaseRing: RingStore<Type = R>
+{
+    assert_eq!(reduction.len(), local_power_decompositions.len());
+    assert_eq!(reduction.len(), local_poly_rings.len());
+
+    let mut result = Vec::new();
+    for (k, sig) in signature.iter().enumerate() {
+        let power_factor = RX.from_terms((0..=(sig.degree * sig.perfect_power)).map(|i| (
+            reduction.reconstruct_ring_el((0..reduction.len()).map_fn(|j| local_poly_rings[j].coefficient_at(&local_power_decompositions[j][k], i))),
+            i
+        )));
+        if let Some(root_of_factor) = poly_root(RX, &power_factor, sig.perfect_power) {
+            result.push((balance_poly(RX, root_of_factor).0, sig.perfect_power));
+        } else {
+            return None;
+        }
+    }
+    // at first, I thought this could not happen, but actually it can. If we do a faulty lift, the polynomials might after all still 
+    // turn out to be perfect powers; the alternative to this check here would be to check previously if all "factors" really divide f
+    if !RX.eq_el(&poly, &RX.prod(result.iter().map(|(f, k)| RX.pow(RX.clone_el(f), *k)))) {
+        return None;
+    }
+    return Some(result);
+}
+
+///
+/// We use the notation
+///  - `R` is the main ring
+///  - `F` is `R/m` where `m` is a maximal ideal containing the currently considered ideal `I`
+///  - `S` is `R/m^e`
+/// 
+fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2>(
+    RX: P1, 
+    f: &El<P1>, 
+    S_to_F: &IntermediateReductionMap<'ring, 'data, 'local, R>, 
+    SX: P2
+) -> Option<(Vec<Signature>, Vec<El<P2>>)>
+    where R: ?Sized + PolyGCDLocallyDomain,
+        P1: RingStore + Copy,
+        P1::Type: PolyRing,
+        <P1::Type as RingExtension>::BaseRing: RingStore<Type = R>,
+        P2: RingStore + Copy,
+        P2::Type: PolyRing<BaseRing = &'local R::LocalRing<'ring>>,
+        R::LocalRing<'ring>: 'local
+{
+    assert!(SX.base_ring().get_ring() == S_to_F.domain().get_ring());
+    let R = RX.base_ring().get_ring();
+    let F = R.local_field_at(S_to_F.ideal(), S_to_F.max_ideal_idx());
+    let FX = DensePolyRing::new(&F, "X");
+    let iso = F.can_iso(S_to_F.codomain()).unwrap();
+
+    let f_mod_m = FX.from_terms(RX.terms(f).map(|(c, i)| (
+        iso.inv().map(R.reduce_ring_el(S_to_F.ideal(), (S_to_F.codomain(), 1), S_to_F.max_ideal_idx(), R.clone_el(c))),
+        i
+    )));
+    let f_mod_me = SX.from_terms(RX.terms(f).map(|(c, i)| (
+        R.reduce_ring_el(S_to_F.ideal(), (S_to_F.domain(), S_to_F.from_e()), S_to_F.max_ideal_idx(), R.clone_el(c)),
+        i
+    )));
+
+    let mut power_decomposition_mod_m = Vec::new();
+    let mut signature = Vec::new();
+    for (f, k) in poly_power_decomposition_finite_field(&FX, &f_mod_m).into_iter() {
+        signature.push(Signature {
+            perfect_power: k,
+            degree: FX.degree(&f).unwrap()
+        });
+        power_decomposition_mod_m.push(FX.pow(f, k));
+    }
+
+    let power_decomposition_mod_me = hensel_lift_factorization(
+        S_to_F,
+        SX,
+        &FX,
+        &f_mod_me,
+        &power_decomposition_mod_m[..],
+        DontObserve
+    );
+
+    return Some((
+        signature,
+        power_decomposition_mod_me
+    ));
+}
 
 ///
 /// For a polynomial `f in R[X]`, computes squarefree polynomials `fi` such that `a f = f1 f2^2 f3^3 ...`
@@ -19,70 +131,58 @@ use super::INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT;
 /// of the underlying ring.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, f: &El<P>, controller: Controller) -> Vec<(El<P>, usize)>
+pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> Vec<(El<P>, usize)>
     where P: RingStore + Copy,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain,
         Controller: ComputationController
 {
-    assert!(poly_ring.base_ring().is_one(poly_ring.lc(&f).unwrap()));
+    assert!(poly_ring.base_ring().is_one(poly_ring.lc(poly).unwrap()));
 
-    start_computation!(controller, "power_decomp_local({})", poly_ring.degree(f).unwrap());
+    start_computation!(controller, "power_decomp_local({})", poly_ring.degree(poly).unwrap());
 
     let ring = poly_ring.base_ring().get_ring();
     let mut rng = oorandom::Rand64::new(1);
 
-    'try_random_prime: for current_attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
-        let prime = ring.random_suitable_ideal(|| rng.rand_u64());
-        assert_eq!(1, ring.maximal_ideal_factor_count(&prime));
-        let heuristic_e = ring.heuristic_exponent(&prime, poly_ring.degree(f).unwrap(), poly_ring.terms(f).map(|(c, _)| c));
+    'try_random_ideal: for current_attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
+
+        let ideal = ring.random_suitable_ideal(|| rng.rand_u64());
+        let heuristic_e = ring.heuristic_exponent(&ideal, poly_ring.degree(poly).unwrap(), poly_ring.terms(poly).map(|(c, _)| c));
         assert!(heuristic_e >= 1);
         let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt as i32)).floor() as usize;
+        let reduction = ReductionContext::new(ring, &ideal, e);
 
-        log_progress!(controller, "mod({}^{})", IdealDisplayWrapper::new(ring, &prime), e);
-        
-        let reduction_map = IntermediateReductionMap::new(ring, &prime, e, 1, 0);
+        log_progress!(controller, "mod({}^{})c({})", IdealDisplayWrapper::new(ring, &ideal), e, reduction.len());
 
-        let prime_field = ring.local_field_at(&prime, 0);
-        let prime_field_poly_ring = DensePolyRing::new(&prime_field, "X");
-        let prime_ring = reduction_map.codomain();
-        let iso = prime_field.can_iso(&prime_ring).unwrap();
+        let mut signature: Option<Vec<_>> = None;
+        let mut poly_rings_mod_me = Vec::new();
+        let mut power_decompositions_mod_me = Vec::new();
 
-        let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (iso.inv().map(ring.reduce_ring_el(&prime, (&prime_ring, 1), 0, ring.clone_el(c))), i)));
-        let mut powers = Vec::new();
-        let mut factors = Vec::new();
-        for (f, k) in poly_power_decomposition_finite_field(&prime_field_poly_ring, &prime_field_f) {
-            powers.push(k);
-            factors.push(prime_field_poly_ring.pow(f, k));
-        }
-    
-        let target_poly_ring = DensePolyRing::new(reduction_map.domain(), "X");
-        let local_ring_f = target_poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (ring.reduce_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), 0, poly_ring.base_ring().clone_el(c)), i)));
-        
-        let mut lifted_factorization = Vec::new();
-        for (factor, _k) in hensel_lift_factorization(&reduction_map, &target_poly_ring, &prime_field_poly_ring, &local_ring_f, &factors[..], controller.clone()).into_iter().zip(powers.iter()) {
-            lifted_factorization.push(poly_ring.from_terms(target_poly_ring.terms(&factor).map(|(c, i)| (ring.reconstruct_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), std::slice::from_ref(c)), i))));
-        }
-    
-        let mut result = Vec::new();
-        for (k, factor) in powers.into_iter().zip(lifted_factorization.into_iter()) {
-            if let Some(root_of_factor) = poly_root(poly_ring, &factor, k) {
-                result.push((balance_poly(poly_ring, root_of_factor).0, k));
-            } else {
-                log_progress!(controller, "(not_perfect_power)");
-                continue 'try_random_prime;
+        for idx in 0..reduction.len() {
+            let SX = DensePolyRing::new(*reduction.intermediate_ring_to_field_reduction(idx).domain(), "X");
+            match compute_local_power_decomposition(poly_ring, poly, &reduction.intermediate_ring_to_field_reduction(idx), &SX) {
+                None => {
+                    // `compute_local_power_decomposition()` currently cannot fail
+                    unreachable!();
+                    // continue 'try_random_ideal;
+                },
+                Some((new_signature, local_power_decomposition)) => if signature.is_some() && &signature.as_ref().unwrap()[..] != &new_signature[..] {
+                    log_progress!(controller, "(signature_mismatch)");
+                    continue 'try_random_ideal;
+                } else {
+                    signature = Some(new_signature);
+                    power_decompositions_mod_me.push(local_power_decomposition);
+                    poly_rings_mod_me.push(SX);
+                }
             }
         }
-        // at first, I thought this could not happen, but actually it can. If we do a faulty lift, it might after all still turn out to be a perfect power;
-        // the alternative to this check here would be to check previously if all "factors" really divide f
-        if !poly_ring.eq_el(&f, &poly_ring.prod(result.iter().map(|(factor, k)| poly_ring.pow(poly_ring.clone_el(factor), *k)))) {
-            log_progress!(controller, "(no_divisor)");
-            continue 'try_random_prime;
-        }
-        result.sort_unstable_by_key(|(_, k)| *k);
 
-        finish_computation!(controller);
-        return result;
+        if let Some(result) = power_decomposition_from_local_power_decomposition(&reduction, poly_ring, poly, &signature.as_ref().unwrap()[..], &poly_rings_mod_me[..], &power_decompositions_mod_me[..]) {
+            finish_computation!(controller);
+            return result;
+        } else {
+            log_progress!(controller, "(invalid_lift)");
+        }
     }
     unreachable!()
 }

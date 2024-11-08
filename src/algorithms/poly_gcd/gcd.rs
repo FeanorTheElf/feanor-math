@@ -5,6 +5,7 @@ use crate::algorithms::poly_gcd::*;
 use crate::algorithms::poly_gcd::gcd_locally::*;
 use crate::algorithms::poly_gcd::hensel::*;
 use crate::computation::*;
+use crate::seq::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 
 use super::evaluate_aX;
@@ -13,10 +14,21 @@ use super::unevaluate_aX;
 const HOPE_FOR_SQUAREFREE_TRIES: usize = 3;
 
 ///
+/// Describes the relationship of `f, g, gcd(f, g)` modulo a single maximal ideal
+/// 
+#[derive(PartialEq, Eq)]
+struct Signature {
+    /// the degree of `gcd(f, g) mod m`
+    gcd_deg: usize,
+    /// whether `f/d` is coprime to `d`, where `d = gcd(f, g) mod m`
+    coprime_to_f_over_d: bool
+}
+
+///
 /// Tries to compute the gcd of monic polynomials `f, g in R[X]` over `Frac(R)` locally, without ever
 /// explicitly working in `Frac(R)`. This function will fail in two cases
 ///  - both `d, f/d` and `d, g/d` are not coprime
-///  - the gcd of `f, g` cannot be read of from its reduction modulo `p^e`, where `e` is (as usual)
+///  - the gcd of `f, g` cannot be reconstructed from its reduction modulo `p^e`, where `e` is (as usual)
 ///    the result of the "heuristic exponent", scaled exponentially by the current attempt
 /// If neither is the case, this function is likely to succeed
 /// 
@@ -35,45 +47,57 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
 
     let ring = poly_ring.base_ring().get_ring();
 
-    let prime = ring.random_suitable_ideal(rng);
-    assert_eq!(1, ring.maximal_ideal_factor_count(&prime));
-    let heuristic_e = ring.heuristic_exponent(&prime, poly_ring.degree(f).unwrap(), poly_ring.terms(f).map(|(c, _)| c));
+    let ideal = ring.random_suitable_ideal(rng);
+    let heuristic_e = ring.heuristic_exponent(&ideal, poly_ring.degree(f).unwrap(), poly_ring.terms(f).map(|(c, _)| c));
     assert!(heuristic_e >= 1);
     let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt as i32)).floor() as usize;
+    let reduction = ReductionContext::new(ring, &ideal, e);
 
-    log_progress!(controller, "mod({}^{})", IdealDisplayWrapper::new(ring, &prime), e);
+    log_progress!(controller, "mod({}^{})c({})", IdealDisplayWrapper::new(ring, &ideal), e, reduction.len());
 
-    let reduction_map = IntermediateReductionMap::new(ring, &prime, e, 1, 0);
+    let mut signature: Option<Signature> = None;
+    let mut poly_rings_mod_me = Vec::new();
+    let mut gcds_mod_me = Vec::new();
 
-    let prime_field = ring.local_field_at(&prime, 0);
-    let prime_field_poly_ring = DensePolyRing::new(&prime_field, "X");
-    let prime_ring = reduction_map.codomain();
-    let iso = prime_field.can_iso(&prime_ring).unwrap();
-    let reduce_prime_field = |h| prime_field_poly_ring.from_terms(poly_ring.terms(h).map(|(c, i)| (iso.inv().map(ring.reduce_ring_el(&prime, (&prime_ring, 1), 0, ring.clone_el(c))), i)));
+    for idx in 0..reduction.len() {
+        let S_to_F = reduction.intermediate_ring_to_field_reduction(idx);
+        let F = ring.local_field_at(S_to_F.ideal(), S_to_F.max_ideal_idx());
+        let F_iso = F.can_iso(*S_to_F.codomain()).unwrap();
+        let R_to_F = F_iso.inv().compose(reduction.main_ring_to_field_reduction(idx));
+        let FX = DensePolyRing::new(&F, "X");
+        let RX_to_FX = FX.lifted_hom(poly_ring, &R_to_F);
+        let d = FX.normalize(FX.ideal_gen(&RX_to_FX.map_ref(f), &RX_to_FX.map_ref(g)));
 
-    let prime_field_f = reduce_prime_field(f);
-    let prime_field_g = reduce_prime_field(g);
-    let mut prime_field_d = prime_field_poly_ring.ideal_gen(&prime_field_f, &prime_field_g);
-    prime_field_d = prime_field_poly_ring.normalize(prime_field_d);
+        let f_over_d = FX.checked_div(&RX_to_FX.map_ref(f), &d).unwrap();
+        let g_over_d = FX.checked_div(&RX_to_FX.map_ref(g), &d).unwrap();
+        let deg_d = FX.degree(&d).unwrap();
+        let (poly, factor1, factor2, new_signature) = if FX.is_unit(&FX.ideal_gen(&d, &f_over_d)) {
+            (f, d, f_over_d, Signature { gcd_deg: deg_d, coprime_to_f_over_d: true })
+        } else if FX.is_unit(&FX.ideal_gen(&d, &g_over_d)) {
+            (g, d, g_over_d, Signature { gcd_deg: deg_d, coprime_to_f_over_d: false })
+        } else {
+            log_progress!(controller, "(not_coprime)");
+            return None;
+        };
+        if signature.is_some() && signature.as_ref().unwrap() != &new_signature {
+            log_progress!(controller, "(signature_mismatch)");
+            return None;
+        }
+        signature = Some(new_signature);
 
-    log_progress!(controller, "d({})", prime_field_poly_ring.degree(&prime_field_d).unwrap());
+        let SX = DensePolyRing::new(*S_to_F.domain(), "X");
+        let RX_to_SX = SX.lifted_hom(poly_ring, reduction.main_ring_to_intermediate_ring_reduction(idx));
+        let (d, _) = hensel_lift(&S_to_F, &SX, &FX, &RX_to_SX.map_ref(poly), (&factor1, &factor2), controller.clone());
 
-    let prime_field_f_over_d = prime_field_poly_ring.checked_div(&prime_field_f, &prime_field_d).unwrap();
-    let prime_field_g_over_d = prime_field_poly_ring.checked_div(&prime_field_g, &prime_field_d).unwrap();
-    let (poly, factor1, factor2) = if prime_field_poly_ring.is_unit(&prime_field_poly_ring.ideal_gen(&prime_field_d, &prime_field_f_over_d)) {
-        (f, prime_field_d, prime_field_f_over_d)
-    } else if prime_field_poly_ring.is_unit(&prime_field_poly_ring.ideal_gen(&prime_field_d, &prime_field_g_over_d)) {
-        (g, prime_field_d, prime_field_g_over_d)
-    } else {
-        log_progress!(controller, "(not_coprime)");
-        return None;
-    };
-    let target_poly_ring = DensePolyRing::new(reduction_map.domain(), "X");
-    let reduced_poly = target_poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| (ring.reduce_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), 0, ring.clone_el(c)), i)));
+        poly_rings_mod_me.push(SX);
+        gcds_mod_me.push(d);
+    }
 
-    let (lifted_d, _lifted_other_factor) = hensel_lift(&reduction_map, &target_poly_ring, &prime_field_poly_ring, &reduced_poly, (&factor1, &factor2), controller.clone());
-
-    let result = poly_ring.from_terms(target_poly_ring.terms(&lifted_d).map(|(c, i)| (ring.reconstruct_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), std::slice::from_ref(c)), i)));
+    let signature = signature.unwrap();
+    let result = poly_ring.from_terms((0..=signature.gcd_deg).map(|i| (
+        reduction.reconstruct_ring_el((0..reduction.len()).map_fn(|j| poly_rings_mod_me[j].coefficient_at(&gcds_mod_me[j], i))),
+        i
+    )));
 
     if poly_ring.checked_div(&f, &result).is_none() || 
         poly_ring.checked_div(&g, &result).is_none()

@@ -6,6 +6,8 @@ use crate::homomorphism::*;
 use crate::ring::*;
 
 use crate::rings::zn::ZnRing;
+use crate::seq::VectorFn;
+use crate::seq::VectorView;
 use crate::specialization::FiniteRingSpecializable;
 
 use super::Field;
@@ -163,8 +165,13 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
     /// In cases where the factors of polynomials in `R[X]` do not necessarily have coefficients
     /// in `R`, this function might have to do rational reconstruction. 
     /// 
-    fn reconstruct_ring_el<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: &[El<Self::LocalRing<'ring>>]) -> Self::Element
-        where Self: 'ring;
+    fn reconstruct_ring_el<'local, 'element, 'ring, V1, V2>(&self, ideal: &Self::SuitableIdeal<'ring>, from: V1, e: usize, x: V2) -> Self::Element
+        where Self: 'ring, 
+            V1: VectorFn<&'local Self::LocalRing<'ring>>,
+            V2: VectorFn<&'element El<Self::LocalRing<'ring>>>,
+            Self::LocalRing<'ring>: 'local,
+            El<Self::LocalRing<'ring>>: 'element,
+            'ring: 'local + 'element;
 
     fn dbg_ideal<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
         where Self: 'ring;
@@ -214,29 +221,19 @@ impl<'a, 'ring, R: 'ring + ?Sized + PolyGCDLocallyDomain> Display for IdealDispl
 }
 
 #[stability::unstable(feature = "enable")]
-pub struct ReductionMap<'ring, 'data, R>
+pub struct ReductionMap<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
     ring: RingRef<'data, R>,
-    p: &'data R::SuitableIdeal<'ring>,
-    to: (R::LocalRing<'ring>, usize),
+    ideal: &'data R::SuitableIdeal<'ring>,
+    to: (&'local R::LocalRing<'ring>, usize),
     max_ideal_idx: usize
 }
 
-impl<'ring, 'data, R> ReductionMap<'ring, 'data, R>
+impl<'ring, 'data, 'local, R> Homomorphism<R, R::LocalRingBase<'ring>> for ReductionMap<'ring, 'data, 'local, R>
     where R: 'ring +?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
-    #[stability::unstable(feature = "enable")]
-    pub fn new(ring: &'data R, p: &'data R::SuitableIdeal<'ring>, max_ideal_idx: usize, power: usize) -> Self {
-        assert!(power >= 1);
-        Self { ring: RingRef::new(ring), p: p, to: (ring.local_ring_at(p, power, max_ideal_idx), power), max_ideal_idx: max_ideal_idx }
-    }
-}
-
-impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for ReductionMap<'ring, 'data, R>
-    where R: 'ring +?Sized + PolyGCDLocallyDomain, 'ring: 'data
-{
-    type CodomainStore = R::LocalRing<'ring>;
+    type CodomainStore = &'local R::LocalRing<'ring>;
     type DomainStore = RingRef<'data, R>;
 
     fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
@@ -248,31 +245,24 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for ReductionMap<
     }
 
     fn map(&self, x: <R as RingBase>::Element) -> <R::LocalRingBase<'ring> as RingBase>::Element {
-        self.ring.get_ring().reduce_ring_el(self.p, (&self.to.0, self.to.1), self.max_ideal_idx, x)
+        self.ring.get_ring().reduce_ring_el(self.ideal, (&self.to.0, self.to.1), self.max_ideal_idx, x)
     }
 }
 
 #[stability::unstable(feature = "enable")]
-pub struct IntermediateReductionMap<'ring, 'data, R>
+pub struct IntermediateReductionMap<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
     ring: RingRef<'data, R>,
-    p: &'data R::SuitableIdeal<'ring>,
-    from: (R::LocalRing<'ring>, usize),
-    to: (R::LocalRing<'ring>, usize),
+    ideal: &'data R::SuitableIdeal<'ring>,
+    from: (&'local R::LocalRing<'ring>, usize),
+    to: (&'local R::LocalRing<'ring>, usize),
     max_ideal_idx: usize
 }
 
-impl<'ring, 'data, R> IntermediateReductionMap<'ring, 'data, R>
-    where R: 'ring +?Sized + PolyGCDLocallyDomain, 'ring: 'data
+impl<'ring, 'data, 'local, R> IntermediateReductionMap<'ring, 'data, 'local, R>
+    where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
-    #[stability::unstable(feature = "enable")]
-    pub fn new(ring: &'data R, p: &'data R::SuitableIdeal<'ring>, from: usize, to: usize, max_ideal_idx: usize) -> Self {
-        assert!(from >= to);
-        assert!(to >= 1);
-        Self { ring: RingRef::new(ring), p: p, from: (ring.local_ring_at(p, from, max_ideal_idx), from), to: (ring.local_ring_at(p, to, max_ideal_idx), to), max_ideal_idx: max_ideal_idx }
-    }
-
     #[stability::unstable(feature = "enable")]
     pub fn parent_ring<'a>(&'a self) -> RingRef<'a, R> {
         RingRef::new(self.ring.get_ring())
@@ -289,8 +279,8 @@ impl<'ring, 'data, R> IntermediateReductionMap<'ring, 'data, R>
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn maximal_ideal<'a>(&'a self) -> &'a R::SuitableIdeal<'ring> {
-        &self.p
+    pub fn ideal<'a>(&'a self) -> &'a R::SuitableIdeal<'ring> {
+        &self.ideal
     }
 
     #[stability::unstable(feature = "enable")]
@@ -299,11 +289,11 @@ impl<'ring, 'data, R> IntermediateReductionMap<'ring, 'data, R>
     }
 }
 
-impl<'ring, 'data, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalRingBase<'ring>> for IntermediateReductionMap<'ring, 'data, R>
-    where R: 'ring +?Sized + PolyGCDLocallyDomain, 'ring: 'data
+impl<'ring, 'data, 'local, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalRingBase<'ring>> for IntermediateReductionMap<'ring, 'data, 'local, R>
+    where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
-    type CodomainStore = R::LocalRing<'ring>;
-    type DomainStore = R::LocalRing<'ring>;
+    type CodomainStore = &'local R::LocalRing<'ring>;
+    type DomainStore = &'local R::LocalRing<'ring>;
 
     fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
         &self.to.0
@@ -314,7 +304,91 @@ impl<'ring, 'data, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalRingBase<'ri
     }
 
     fn map(&self, x: <R::LocalRingBase<'ring> as RingBase>::Element) -> <R::LocalRingBase<'ring> as RingBase>::Element {
-        self.ring.get_ring().reduce_partial(self.p, (&self.from.0, self.from.1), (&self.to.0, self.to.1), self.max_ideal_idx, x)
+        self.ring.get_ring().reduce_partial(self.ideal, (&self.from.0, self.from.1), (&self.to.0, self.to.1), self.max_ideal_idx, x)
+    }
+}
+
+#[stability::unstable(feature = "enable")]
+pub struct ReductionContext<'ring, 'data, R>
+    where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
+{
+    ring: RingRef<'data, R>,
+    ideal: &'data R::SuitableIdeal<'ring>,
+    from_e: usize,
+    from: Vec<R::LocalRing<'ring>>,
+    to: Vec<R::LocalRing<'ring>>,
+    to_as_field: Vec<R::LocalField<'ring>>
+}
+
+impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
+    where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(ring: &'data R, ideal: &'data R::SuitableIdeal<'ring>, e: usize) -> Self {
+        assert!(e >= 1);
+        let maximal_ideal_factor_count = ring.maximal_ideal_factor_count(ideal);
+        Self {
+            ring: RingRef::new(ring), 
+            ideal: ideal, 
+            from_e: e,
+            from: (0..maximal_ideal_factor_count).map(|idx| ring.local_ring_at(ideal, e, idx)).collect::<Vec<_>>(), 
+            to: (0..maximal_ideal_factor_count).map(|idx| ring.local_ring_at(ideal, 1, idx)).collect::<Vec<_>>(), 
+            to_as_field: (0..maximal_ideal_factor_count).map(|idx| ring.local_field_at(ideal, idx)).collect::<Vec<_>>(), 
+        }
+    }
+    
+    #[stability::unstable(feature = "enable")]
+    pub fn main_ring_to_field_reduction<'local>(&'local self, max_ideal_idx: usize) -> ReductionMap<'ring, 'data, 'local, R> {
+        ReductionMap {
+            ideal: self.ideal,
+            ring: self.ring,
+            to: (self.to.at(max_ideal_idx), 1),
+            max_ideal_idx: max_ideal_idx
+        }
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn main_ring_to_intermediate_ring_reduction<'local>(&'local self, max_ideal_idx: usize) -> ReductionMap<'ring, 'data, 'local, R> {
+        ReductionMap {
+            ideal: self.ideal,
+            ring: self.ring,
+            to: (self.from.at(max_ideal_idx), self.from_e),
+            max_ideal_idx: max_ideal_idx
+        }
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn intermediate_ring_to_field_reduction<'local>(&'local self, max_ideal_idx: usize) -> IntermediateReductionMap<'ring, 'data, 'local, R> {
+        IntermediateReductionMap {
+            from: (&self.from[max_ideal_idx], self.from_e),
+            to: (&self.to[max_ideal_idx], 1),
+            max_ideal_idx: max_ideal_idx,
+            ring: self.ring,
+            ideal: self.ideal
+        }
+    }
+
+
+    #[stability::unstable(feature = "enable")]
+    pub fn len(&self) -> usize {
+        self.from.len()
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn reconstruct_ring_el<'local, V>(&self, els: V) -> R::Element
+        where V: VectorFn<&'local El<R::LocalRing<'ring>>>,
+            El<R::LocalRing<'ring>>: 'local,
+            'ring: 'local
+    {
+        fn do_reconstruction<'ring, 'local, R, V>(ring: &R, ideal: &R::SuitableIdeal<'ring>, local_rings: &[R::LocalRing<'ring>], e: usize, els: V) -> R::Element
+            where R: 'ring + ?Sized + PolyGCDLocallyDomain,
+                V: VectorFn<&'local El<R::LocalRing<'ring>>>,
+                El<R::LocalRing<'ring>>: 'local,
+                'ring: 'local
+        {
+            ring.reconstruct_ring_el(ideal, local_rings.as_fn(), e, els)
+        }
+        do_reconstruction(self.ring.get_ring(), self.ideal, &self.from[..], self.from_e, els)
     }
 }
 
@@ -336,12 +410,17 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
             type SuitableIdeal<'ring> = i64
                 where Self: 'ring;
         
-            fn reconstruct_ring_el<'ring>(&self, _p: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: &[El<Self::LocalRing<'ring>>]) -> Self::Element
-                where Self: 'ring
+            fn reconstruct_ring_el<'local, 'element, 'ring, V1, V2>(&self, _p: &Self::SuitableIdeal<'ring>, from: V1, _e: usize, x: V2) -> Self::Element
+                where Self: 'ring,
+                    V1: $crate::seq::VectorFn<&'local Self::LocalRing<'ring>>,
+                    V2: $crate::seq::VectorFn<&'element El<Self::LocalRing<'ring>>>
             {
                 use $crate::rings::zn::*;
+                #[allow(unused)]
+                use $crate::seq::*;
+                assert_eq!(1, from.len());
                 assert_eq!(1, x.len());
-                int_cast(from.0.smallest_lift(from.0.clone_el(&x[0])), RingRef::new(self), BigIntRing::RING)
+                int_cast(from.at(0).smallest_lift(from.at(0).clone_el(x.at(0))), RingRef::new(self), BigIntRing::RING)
             }
 
             fn maximal_ideal_factor_count<'ring>(&self, _p: &Self::SuitableIdeal<'ring>) -> usize
@@ -523,8 +602,13 @@ impl<R> PolyGCDLocallyDomain for R
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
     }
 
-    fn reconstruct_ring_el<'ring>(&self, p: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), x: &[El<Self::LocalRing<'ring>>]) -> Self::Element
-        where Self: 'ring
+    fn reconstruct_ring_el<'local, 'element, 'ring, V1, V2>(&self, p: &Self::SuitableIdeal<'ring>, from: V1, e: usize, x: V2) -> Self::Element
+        where Self: 'ring, 
+            V1: VectorFn<&'local Self::LocalRing<'ring>>,
+            V2: VectorFn<&'element El<Self::LocalRing<'ring>>>,
+            'ring: 'local + 'element,
+            Self::LocalRing<'ring>: 'local,
+            El<Self::LocalRing<'ring>>: 'element
     {
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
     }
