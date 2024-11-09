@@ -38,13 +38,28 @@ fn invert_many<R>(ring: R, values: &[El<R>], out: &mut [El<R>]) -> Result<(), ()
 ///
 /// Computes `out[i] = prod_(j != i) values[j]`.
 /// 
-/// This algorithm recursively halfes the input, and for simplicity requires thus that the input
-/// has power-of-two length. The time complexity is then `O(n sum_(0 <= i <= log n) T(2^i))`
+/// This algorithm recursively halfes the input, and thus it implicitly pads the input to the
+/// next power-of-two. The time complexity is then `O(n sum_(0 <= i <= log n) T(2^i))`
 /// where `T(d)` is the complexity of multiplying two products of `d` input elements. If the cost
-/// of multiplication is constant, this becomes `O(n log n T)`
+/// of multiplication is constant, this becomes `O(n log n T)`.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::algorithms::interpolate::*;
+/// # use feanor_math::seq::*;
+/// let ring = StaticRing::<i64>::RING;
+/// let mut result = [0; 6];
+/// product_except_one(ring, (1..7).map_fn(|x| x as i64), &mut result);
+/// let factorial_6 = 6 * 5 * 4 * 3 * 2 * 1;
+/// // `product_except_one()` computes exactly these values, but without using any divisions
+/// let expected = [factorial_6 / 1, factorial_6 / 2, factorial_6 / 3, factorial_6 / 4, factorial_6 / 5, factorial_6 / 6];
+/// assert_eq!(expected, result);
+/// ```
 /// 
 #[stability::unstable(feature = "enable")]
-fn product_except_one<V, R>(ring: R, values: V, out: &mut [El<R>])
+pub fn product_except_one<V, R>(ring: R, values: V, out: &mut [El<R>])
     where R: RingStore,
         V: VectorFn<El<R>>
 {

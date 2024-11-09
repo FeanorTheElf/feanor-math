@@ -32,7 +32,7 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P
     RX: P, 
     poly: &El<P>, 
     signature: &[Signature], 
-    local_poly_rings: &[DensePolyRing<&'local R::LocalRing<'ring>>], 
+    SXs: &[DensePolyRing<&'local R::LocalRing<'ring>>], 
     local_power_decompositions: &[Vec<El<DensePolyRing<&'local R::LocalRing<'ring>>>>]
 ) -> Option<Vec<(El<P>, usize)>>
     where R: ?Sized + PolyGCDLocallyDomain,
@@ -41,12 +41,12 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P
         <P::Type as RingExtension>::BaseRing: RingStore<Type = R>
 {
     assert_eq!(reduction.len(), local_power_decompositions.len());
-    assert_eq!(reduction.len(), local_poly_rings.len());
+    assert_eq!(reduction.len(), SXs.len());
 
     let mut result = Vec::new();
     for (k, sig) in signature.iter().enumerate() {
         let power_factor = RX.from_terms((0..=(sig.degree * sig.perfect_power)).map(|i| (
-            reduction.reconstruct_ring_el((0..reduction.len()).map_fn(|j| local_poly_rings[j].coefficient_at(&local_power_decompositions[j][k], i))),
+            reduction.reconstruct_ring_el((0..reduction.len()).map_fn(|j| SXs[j].coefficient_at(&local_power_decompositions[j][k], i))),
             i
         )));
         if let Some(root_of_factor) = poly_root(RX, &power_factor, sig.perfect_power) {

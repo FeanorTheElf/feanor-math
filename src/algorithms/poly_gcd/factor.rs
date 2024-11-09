@@ -11,22 +11,23 @@ use crate::iters::powerset;
 use crate::seq::VectorView;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 
-fn combine_local_factors_local<'ring, 'a, R, P, Q>(ring: &R, maximal_ideal: &R::SuitableIdeal<'ring>, poly_ring: P, f: &El<P>, local_poly_ring: Q, local_e: usize, local_factors: Vec<El<Q>>) -> Vec<El<P>>
+fn combine_local_factors_local<'ring, 'data, 'local, R, P1, P2>(reduction: &'local ReductionContext<'ring, 'data, R>, poly_ring: P1, poly: &El<P1>, local_poly_ring: P2, local_e: usize, local_factors: Vec<El<P2>>) -> Vec<El<P1>>
     where R: ?Sized + PolyGCDLocallyDomain,
-        P: RingStore + Copy,
-        P::Type: PolyRing + DivisibilityRing,
-        <P::Type as RingExtension>::BaseRing: RingStore<Type = R>,
-        Q: RingStore + Copy,
-        Q::Type: PolyRing<BaseRing = &'a R::LocalRing<'ring>> + DivisibilityRing,
-        R::LocalRing<'ring>: 'a
+        P1: RingStore + Copy,
+        P1::Type: PolyRing + DivisibilityRing,
+        <P1::Type as RingExtension>::BaseRing: RingStore<Type = R>,
+        P2: RingStore + Copy,
+        P2::Type: PolyRing<BaseRing = &'local R::LocalRing<'ring>> + DivisibilityRing,
+        R::LocalRing<'ring>: 'local
 {
-    debug_assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
+    debug_assert!(poly_ring.base_ring().is_one(poly_ring.lc(poly).unwrap()));
     debug_assert!(local_factors.iter().all(|local_factor| local_poly_ring.base_ring().is_one(local_poly_ring.lc(local_factor).unwrap())));
 
-    let reconstruct_ring_el = |factor| balance_poly(poly_ring, poly_ring.from_terms(local_poly_ring.terms(&factor).map(|(c, i)| (ring.reconstruct_ring_el(maximal_ideal, std::slice::from_ref(*local_poly_ring.base_ring()).as_fn(), local_e, std::slice::from_ref(c).as_fn()), i)))).0;
+    let ring = poly_ring.base_ring().get_ring();
+    let reconstruct_ring_el = |factor| balance_poly(poly_ring, poly_ring.from_terms(local_poly_ring.terms(&factor).map(|(c, i)| (ring.reconstruct_ring_el(reduction.ideal(), std::slice::from_ref(*local_poly_ring.base_ring()).as_fn(), local_e, std::slice::from_ref(c).as_fn()), i)))).0;
 
     let mut ungrouped_factors = (0..local_factors.len()).collect::<Vec<_>>();
-    let mut current = poly_ring.clone_el(f);
+    let mut current = poly_ring.clone_el(poly);
     let mut result = Vec::new();
     while ungrouped_factors.len() > 0 {
         // Here we use the naive approach to group the factors such that the product of each group
@@ -60,43 +61,41 @@ fn combine_local_factors_local<'ring, 'a, R, P, Q>(ring: &R, maximal_ideal: &R::
 /// return non-irreducible factors of `f`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::SuitableIdeal<'ring>, e: usize, f: &El<P>, controller: Controller) -> Option<Vec<El<P>>>
+pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::SuitableIdeal<'ring>, e: usize, poly: &El<P>, controller: Controller) -> Option<Vec<El<P>>>
     where R: ?Sized + PolyGCDLocallyDomain,
         P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <P::Type as RingExtension>::BaseRing: RingStore<Type = R>,
         Controller: ComputationController
 {
-    unimplemented!()
-    // let ring = poly_ring.base_ring().get_ring();
-    // assert_eq!(1, ring.maximal_ideal_factor_count(&prime));
+    let ring = poly_ring.base_ring().get_ring();
+    assert_eq!(1, ring.maximal_ideal_factor_count(&prime), "currently only maximal ideals are supported, got {}", IdealDisplayWrapper::new(ring, prime));
 
-    // log_progress!(controller, "mod({}^{})", IdealDisplayWrapper::new(ring, &prime), e);
+    log_progress!(controller, "mod({}^{})", IdealDisplayWrapper::new(ring, &prime), e);
 
-    // let reduction_map = IntermediateReductionMap::new(ring, &prime, e, 1, 0);
+    let reduction = ReductionContext::new(ring, prime, e);
+    let red_map = reduction.intermediate_ring_to_field_reduction(0);
 
-    // let prime_field = ring.local_field_at(&prime, 0);
-    // let prime_field_poly_ring = DensePolyRing::new(&prime_field, "X");
-    // let prime_ring = reduction_map.codomain();
-    // let iso = prime_field.can_iso(&prime_ring).unwrap();
+    let F = ring.local_field_at(&prime, 0);
+    let FX = DensePolyRing::new(&F, "X");
+    let iso = F.can_iso(*red_map.codomain()).unwrap();
+    let R_to_F = iso.inv().compose(reduction.main_ring_to_field_reduction(0));
 
-    // let prime_field_f = prime_field_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (iso.inv().map(ring.reduce_ring_el(&prime, (&prime_ring, 1), 0, ring.clone_el(c))), i)));
-    // let mut factors = Vec::new();
-    // for (f, k) in poly_factor_finite_field(&prime_field_poly_ring, &prime_field_f).0 {
-    //     if k > 1 {
-    //         log_progress!(controller, "(not_squarefree)");
-    //         return None;
-    //     }
-    //     factors.push(f);
-    // }
+    let poly_mod_m = FX.lifted_hom(poly_ring, R_to_F).map_ref(poly);
+    let mut factors = Vec::new();
+    for (f, k) in poly_factor_finite_field(&FX, &poly_mod_m).0 {
+        if k > 1 {
+            log_progress!(controller, "(not_squarefree)");
+            return None;
+        }
+        factors.push(f);
+    }
 
-    // let target_poly_ring = DensePolyRing::new(reduction_map.domain(), "X");
-    // let local_ring_f = target_poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| (ring.reduce_ring_el(&prime, (reduction_map.domain(), reduction_map.from_e()), 0, poly_ring.base_ring().clone_el(c)), i)));
-    
-    // let local_ring_factorization = hensel_lift_factorization(&reduction_map, &target_poly_ring, &prime_field_poly_ring, &local_ring_f, &factors[..], controller.clone());
-    
-    // finish_computation!(controller);
-    // return Some(combine_local_factors_local(ring, &prime, poly_ring, f, &target_poly_ring, reduction_map.from_e(), local_ring_factorization));
+    let SX = DensePolyRing::new(*red_map.domain(), "X");
+    let poly_mod_me = SX.lifted_hom(poly_ring, reduction.main_ring_to_intermediate_ring_reduction(0)).map_ref(poly);
+    let factorization_mod_me = hensel_lift_factorization(&red_map, &SX, &FX, &poly_mod_me, &factors[..], controller.clone());
+    finish_computation!(controller);
+    return Some(combine_local_factors_local(&reduction, poly_ring, poly, &SX, e, factorization_mod_me));
 }
 
 ///
@@ -207,7 +206,7 @@ fn factor_squarefree_monic_integer_poly_local<'a, P, Controller>(ZZX: P, f: &El<
 
         let prime = ZZ.get_ring().random_suitable_ideal(|| rng.rand_u64());
         assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&prime));
-        let prime_i64 = ZZ.get_ring().maximal_ideal_gen(&prime);
+        let prime_i64 = ZZ.get_ring().principal_ideal_generator(&prime);
         let e = (bound / (prime_i64 as f64).ln()).ceil() as usize + 1;
         if let Some(result) = factor_and_lift_mod_pe(ZZX, &prime, e, f, controller.clone()) {
             return result;

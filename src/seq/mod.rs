@@ -119,6 +119,8 @@ pub trait VectorView<T: ?Sized> {
     /// provide elements by reference, this is much less powerful than [`Iterator::map()`] or
     /// [`VectorFn::map_fn()`], since the function cannot return created elements.
     /// 
+    /// Called `map_view()` to prevent name conflicts with `Iterator::map()`.
+    /// 
     /// # Example
     /// ```
     /// use feanor_math::seq::*;
@@ -127,10 +129,8 @@ pub trait VectorView<T: ?Sized> {
     /// }
     /// let data = vec![Some(1), Some(2), Some(3)];
     /// // the `as_ref()` is necessary, since we have to return a reference
-    /// foo(data.map(|x| x.as_ref().unwrap()));
+    /// foo(data.map_view(|x| x.as_ref().unwrap()));
     /// ```
-    /// 
-    /// Called `map_view()` to prevent name conflicts with `Iterator::map()`.
     /// 
     fn map_view<F: for<'a> Fn(&'a T) -> &'a U, U>(self, func: F) -> VectorViewMap<Self, T, U, F>
         where Self: Sized

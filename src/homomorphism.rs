@@ -563,6 +563,10 @@ impl<R, S> CanIso<R, S>
         }
     }
 
+    pub fn into_inv(self) -> CanHom<R, S> {
+        CanHom::new(self.from, self.to).unwrap_or_else(|_| unreachable!())
+    }
+
     pub fn inv<'a>(&'a self) -> CanHom<&'a R, &'a S> {
         CanHom::new(&self.from, &self.to).unwrap_or_else(|_| unreachable!())
     }

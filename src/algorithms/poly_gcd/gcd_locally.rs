@@ -3,11 +3,11 @@ use std::fmt::Display;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::divisibility::*;
 use crate::homomorphism::*;
+use crate::primitive_int::StaticRing;
+use crate::integer::*;
 use crate::ring::*;
-
-use crate::rings::zn::ZnRing;
-use crate::seq::VectorFn;
-use crate::seq::VectorView;
+use crate::rings::zn::*;
+use crate::seq::*;
 use crate::specialization::FiniteRingSpecializable;
 
 use super::Field;
@@ -82,11 +82,6 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
     type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
         where Self: 'ring;
     
-    ///
-    /// Again, this is required to restrict `AsFieldBase<Self::LocalRing<'ring>>: FactorPolyField`,
-    /// which in turn is required since the straightforward bound `for<'a> AsFieldBase<Self::LocalRing<'a>>: FactorPolyField`
-    /// is bugged, see also [`crate::compute_locally::EvaluatePolyLocallyRing::LocalRingBase`].
-    /// 
     type LocalFieldBase<'ring>: CanIsoFromTo<Self::LocalRingBase<'ring>> + FiniteRing + Field
         where Self: 'ring;
 
@@ -179,11 +174,15 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
 
 ///
 /// Subtrait of [`PolyGCDLocallyDomain`] that restricts the local rings to be [`ZnRing`],
-/// which is sometimes necessary when implementing some base cases.
+/// which is necessary when implementing some base cases.
 /// 
 #[stability::unstable(feature = "enable")]
 pub trait IntegerPolyGCDRing: PolyGCDLocallyDomain {
 
+    ///
+    /// It would be much preferrable if we could restrict associated types from supertraits,
+    /// this is just a workaround (and an ugly one at that)
+    /// 
     type LocalRingAsZnBase<'ring>: CanIsoFromTo<Self::LocalRingBase<'ring>> + ZnRing
         where Self: 'ring;
 
@@ -192,8 +191,14 @@ pub trait IntegerPolyGCDRing: PolyGCDLocallyDomain {
 
     fn local_ring_as_zn<'a, 'ring>(&self, local_field: &'a Self::LocalRing<'ring>) -> &'a Self::LocalRingAsZn<'ring>;
 
-    fn maximal_ideal_gen<'ring>(&self, p: &Self::SuitableIdeal<'ring>) -> i64
-        where Self: 'ring;
+    fn principal_ideal_generator<'ring>(&self, p: &Self::SuitableIdeal<'ring>) -> i64
+        where Self: 'ring
+    {
+        assert_eq!(1, self.maximal_ideal_factor_count(p));
+        let Fp = self.local_ring_at(p, 1, 0);
+        let Fp = self.local_ring_as_zn(&Fp);
+        return int_cast(Fp.integer_ring().clone_el(Fp.modulus()), StaticRing::<i64>::RING, Fp.integer_ring());
+    }
 }
 
 #[stability::unstable(feature = "enable")]
@@ -230,6 +235,21 @@ pub struct ReductionMap<'ring, 'data, 'local, R>
     max_ideal_idx: usize
 }
 
+impl<'ring, 'data, 'local, R> ReductionMap<'ring, 'data, 'local, R>
+    where R: 'ring +?Sized + PolyGCDLocallyDomain, 'ring: 'data
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(ring: &'data R, ideal: &'data R::SuitableIdeal<'ring>, to: &'local R::LocalRing<'ring>, to_e: usize, max_ideal_idx: usize) -> Self {
+        assert!(to.get_ring() == ring.local_ring_at(ideal, to_e, max_ideal_idx).get_ring());
+        Self {
+            ring: RingRef::new(ring),
+            ideal: ideal,
+            to: (to, to_e),
+            max_ideal_idx: max_ideal_idx
+        }
+    }
+}
+
 impl<'ring, 'data, 'local, R> Homomorphism<R, R::LocalRingBase<'ring>> for ReductionMap<'ring, 'data, 'local, R>
     where R: 'ring +?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
@@ -263,6 +283,19 @@ pub struct IntermediateReductionMap<'ring, 'data, 'local, R>
 impl<'ring, 'data, 'local, R> IntermediateReductionMap<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
+    #[stability::unstable(feature = "enable")]
+    pub fn new(ring: &'data R, ideal: &'data R::SuitableIdeal<'ring>, from: &'local R::LocalRing<'ring>, from_e: usize, to: &'local R::LocalRing<'ring>, to_e: usize, max_ideal_idx: usize) -> Self {
+        assert!(ring.local_ring_at(ideal, from_e, max_ideal_idx).get_ring() == from.get_ring());
+        assert!(ring.local_ring_at(ideal, to_e, max_ideal_idx).get_ring() == to.get_ring());
+        Self {
+            ring: RingRef::new(ring),
+            ideal: ideal,
+            from: (from, from_e),
+            to: (to, to_e),
+            max_ideal_idx: max_ideal_idx
+        }
+    }
+
     #[stability::unstable(feature = "enable")]
     pub fn parent_ring<'a>(&'a self) -> RingRef<'a, R> {
         RingRef::new(self.ring.get_ring())
@@ -316,8 +349,7 @@ pub struct ReductionContext<'ring, 'data, R>
     ideal: &'data R::SuitableIdeal<'ring>,
     from_e: usize,
     from: Vec<R::LocalRing<'ring>>,
-    to: Vec<R::LocalRing<'ring>>,
-    to_as_field: Vec<R::LocalField<'ring>>
+    to: Vec<R::LocalRing<'ring>>
 }
 
 impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
@@ -332,11 +364,15 @@ impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
             ideal: ideal, 
             from_e: e,
             from: (0..maximal_ideal_factor_count).map(|idx| ring.local_ring_at(ideal, e, idx)).collect::<Vec<_>>(), 
-            to: (0..maximal_ideal_factor_count).map(|idx| ring.local_ring_at(ideal, 1, idx)).collect::<Vec<_>>(), 
-            to_as_field: (0..maximal_ideal_factor_count).map(|idx| ring.local_field_at(ideal, idx)).collect::<Vec<_>>(), 
+            to: (0..maximal_ideal_factor_count).map(|idx| ring.local_ring_at(ideal, 1, idx)).collect::<Vec<_>>(),
         }
     }
     
+    #[stability::unstable(feature = "enable")]
+    pub fn ideal(&self) -> &'data R::SuitableIdeal<'ring> {
+        self.ideal
+    }
+
     #[stability::unstable(feature = "enable")]
     pub fn main_ring_to_field_reduction<'local>(&'local self, max_ideal_idx: usize) -> ReductionMap<'ring, 'data, 'local, R> {
         ReductionMap {
@@ -517,12 +553,6 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 where Self: 'ring
             {
                 local_field
-            }
-
-            fn maximal_ideal_gen<'ring>(&self, p: &Self::SuitableIdeal<'ring>) -> i64
-                where Self: 'ring
-            {
-                *p
             }
         }
     };
