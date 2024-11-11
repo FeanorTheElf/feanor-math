@@ -414,11 +414,11 @@ impl<R, V, A, C> DivisibilityRing for FreeAlgebraImplBase<R, V, A, C>
         }
     }
 
-    fn balance_factor<'a, I>(&self, elements: I) -> Self::Element
+    fn balance_factor<'a, I>(&self, elements: I) -> Option<Self::Element>
         where I: Iterator<Item = &'a Self::Element>, 
             Self: 'a
     {
-        RingRef::new(self).inclusion().map(self.base_ring().get_ring().balance_factor(elements.flat_map(|x| x.values.iter())))
+        self.base_ring().get_ring().balance_factor(elements.flat_map(|x| x.values.iter())).map(|c| RingRef::new(self).inclusion().map(c))
     }
 }
 

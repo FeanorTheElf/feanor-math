@@ -312,11 +312,11 @@ impl<A: Allocator + Clone> DivisibilityRing for RustBigintRingBase<A> {
         }
     }
 
-    fn balance_factor<'a, I>(&self, elements: I) -> Self::Element
+    fn balance_factor<'a, I>(&self, elements: I) -> Option<Self::Element>
         where I: Iterator<Item = &'a Self::Element>,
             Self: 'a
     {
-        elements.fold(self.zero(), |a, b| self.ideal_gen(&a, b))
+        Some(elements.fold(self.zero(), |a, b| self.ideal_gen(&a, b)))
     }
 }
 

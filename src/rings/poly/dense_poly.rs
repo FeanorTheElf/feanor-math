@@ -2,6 +2,8 @@ use serde::{Deserializer, Serializer};
 
 use crate::algorithms::convolution::*;
 use crate::algorithms::interpolate::interpolate;
+use crate::algorithms::poly_div::{poly_div_rem, poly_rem};
+use crate::computation::no_error;
 use crate::compute_locally::{EvaluatePolyLocallyRing, InterpolationBaseRing, ToExtRingMap};
 use crate::divisibility::*;
 use crate::integer::*;
@@ -99,25 +101,6 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> Dense
             element_allocator,
             convolution_algorithm
         })
-    }
-}
-
-impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> DensePolyRingBase<R, A, C> {
-
-    fn poly_div<F>(&self, lhs: &mut <Self as RingBase>::Element, rhs: &<Self as RingBase>::Element, mut left_div_lc: F) -> Option<<Self as RingBase>::Element>
-        where F: FnMut(El<R>) -> Option<El<R>>
-    {
-        let lhs_val = std::mem::replace(lhs, self.zero());
-        let (quo, rem) = algorithms::poly_div::poly_div(
-            lhs_val, 
-            rhs, 
-            RingRef::new(self), 
-            RingRef::new(self), 
-            |x| left_div_lc(self.base_ring().clone_el(x)).ok_or(()),
-            &self.base_ring().identity()
-        ).ok()?;
-        *lhs = rem;
-        return Some(quo);
     }
 }
 
@@ -495,10 +478,10 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
         return None;
     }
 
-    fn div_rem_monic(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+    fn div_rem_monic(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(self.base_ring().is_one(self.coefficient_at(rhs, self.degree(rhs).unwrap())));
-        let quo = self.poly_div(&mut lhs, rhs, |x| Some(x)).unwrap();
-        return (quo, lhs);
+        let (quo, rem) = poly_div_rem(lhs, rhs, RingRef::new(self), RingRef::new(self), |x| Ok(self.base_ring().clone_el(x)), self.base_ring().identity()).unwrap_or_else(no_error);
+        return (quo, rem);
     }
 
     fn evaluate<S, H>(&self, f: &Self::Element, value: &S::Element, hom: H) -> S::Element
@@ -584,9 +567,8 @@ impl<R, A: Allocator + Clone, C> DivisibilityRing for DensePolyRingBase<R, A, C>
                 return RingRef::new(self).try_from_terms(self.terms(lhs).map(|(c, i)| (self.base_ring().checked_left_div(c, rhs).map(|c| (c, i)).ok_or(())))).ok();
             } else {
                 let lc = &rhs.data[d];
-                let mut lhs_copy = self.clone_el(lhs);
-                let quo = self.poly_div(&mut lhs_copy, rhs, |x| self.base_ring().checked_left_div(&x, lc))?;
-                if self.is_zero(&lhs_copy) {
+                let (quo, rem) = poly_div_rem(self.clone_el(lhs), rhs, RingRef::new(self), RingRef::new(self), |x| self.base_ring().checked_left_div(&x, lc).ok_or(()), self.base_ring().identity()).ok()?;
+                if self.is_zero(&rem) {
                     Some(quo)
                 } else {
                     None
@@ -599,11 +581,34 @@ impl<R, A: Allocator + Clone, C> DivisibilityRing for DensePolyRingBase<R, A, C>
         }
     }
 
-    fn balance_factor<'a, I>(&self, elements: I) -> Self::Element
+    fn divides_left(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+        if let Some(d) = self.degree(rhs) {
+            if d == 0 {
+                true
+            } else {
+                let lc = &rhs.data[d];
+                if let Ok(rem) = poly_rem(self.clone_el(lhs), rhs, RingRef::new(self), RingRef::new(self), |x| self.base_ring().checked_left_div(&x, lc).ok_or(()), self.base_ring().identity()) {
+                    if self.is_zero(&rem) {
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+        } else if self.is_zero(lhs) {
+            true
+        } else {
+            false
+        }
+    }
+
+    fn balance_factor<'a, I>(&self, elements: I) -> Option<Self::Element>
         where I: Iterator<Item =  &'a Self::Element>,
             Self: 'a
     {
-        RingRef::new(self).inclusion().map(self.base_ring().get_ring().balance_factor(elements.flat_map(|f| self.terms(f).map(|(c, _)| c))))
+        self.base_ring().get_ring().balance_factor(elements.flat_map(|f| self.terms(f).map(|(c, _)| c))).map(|c| RingRef::new(self).inclusion().map(c))
     }
 }
 
@@ -633,10 +638,10 @@ impl<R, A: Allocator + Clone, C> PrincipalIdealRing for DensePolyRingBase<R, A, 
 impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> EuclideanRing for DensePolyRingBase<R, A, C> 
     where R: RingStore, R::Type: Field
 {
-    fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         let lc_inv = self.base_ring.invert(&rhs.data[self.degree(rhs).unwrap()]).unwrap();
-        let quo = self.poly_div(&mut lhs, rhs, |x| Some(self.base_ring().mul_ref_snd(x, &lc_inv))).unwrap();
-        return (quo, lhs);
+        let (quo, rem) = poly_div_rem(lhs, rhs, RingRef::new(self), RingRef::new(self), |x| Ok(self.base_ring().mul_ref(&x, &lc_inv)), self.base_ring().identity()).unwrap_or_else(no_error);
+        return (quo, rem);
     }
 
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {

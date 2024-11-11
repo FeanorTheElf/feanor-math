@@ -40,6 +40,32 @@ pub trait DivisibilityRing: RingBase {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element>;
 
     ///
+    /// Returns whether there is an element `x` such that `rhs * x = lhs`.
+    /// If you need such an element, consider using [`DivisibilityRing::checked_left_div()`].
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::divisibility::*;
+    /// let ZZ = StaticRing::<i64>::RING;
+    /// assert_eq!(true, ZZ.divides_left(&6, &2));
+    /// assert_eq!(false, ZZ.divides_left(&6, &4));
+    /// ```
+    /// 
+    fn divides_left(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+        self.checked_left_div(lhs, rhs).is_some()
+    }
+
+    ///
+    /// Same as [`DivisibilityRing::divides_left()`], but requires a commutative ring.
+    /// 
+    fn divides(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+        assert!(self.is_commutative());
+        self.divides_left(lhs, rhs)
+    }
+
+    ///
     /// Same as [`DivisibilityRing::checked_left_div()`], but requires a commutative ring.
     /// 
     fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
@@ -64,11 +90,14 @@ pub trait DivisibilityRing: RingBase {
     /// elements), or polynomials over fields (where we often want to scale the polynomial
     /// to make all denominators 1).
     /// 
-    fn balance_factor<'a, I>(&self, _elements: I) -> Self::Element
+    /// If balancing does not make sense (as in the case of finite fields) or is not
+    /// supported by the implementation, it is valid to return `None`.
+    /// 
+    fn balance_factor<'a, I>(&self, _elements: I) -> Option<Self::Element>
         where I: Iterator<Item = &'a Self::Element>,
             Self: 'a
     {
-        self.one()
+        None
     }
 }
 
@@ -109,8 +138,10 @@ pub trait DivisibilityRingStore: RingStore
     where Self::Type: DivisibilityRing
 {
     delegate!{ DivisibilityRing, fn checked_left_div(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> }
+    delegate!{ DivisibilityRing, fn divides_left(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
     delegate!{ DivisibilityRing, fn is_unit(&self, x: &El<Self>) -> bool }
     delegate!{ DivisibilityRing, fn checked_div(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> }
+    delegate!{ DivisibilityRing, fn divides(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
 
     fn invert(&self, el: &El<Self>) -> Option<El<Self>> {
         self.checked_div(&self.one(), el)

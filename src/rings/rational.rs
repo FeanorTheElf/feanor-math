@@ -347,14 +347,14 @@ impl<I> DivisibilityRing for RationalFieldBase<I>
         !self.is_zero(x)
     }
 
-    fn balance_factor<'a, J>(&self, elements: J) -> Self::Element
+    fn balance_factor<'a, J>(&self, elements: J) -> Option<Self::Element>
         where J: Iterator<Item = &'a Self::Element>,
             Self:'a
     {
         let (num, den) = elements.fold(
             (self.integers.zero(), self.integers.one()), 
             |x, y| (signed_gcd(x.0, self.base_ring().clone_el(self.num(y)), self.base_ring()), signed_lcm(x.1, self.base_ring().clone_el(self.den(y)), self.base_ring())));
-        return RationalFieldEl(num, den);
+        return Some(RationalFieldEl(num, den));
     }
 }
 

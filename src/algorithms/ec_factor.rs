@@ -394,5 +394,5 @@ fn test_compute_partial_factorization() {
     ZZbig.println(&factor);
     assert!(!ZZbig.is_one(&factor));
     assert!(!ZZbig.eq_el(&factor, &n));
-    assert!(ZZbig.checked_div(&n, &factor).is_some());
+    assert!(ZZbig.divides(&n, &factor));
 }

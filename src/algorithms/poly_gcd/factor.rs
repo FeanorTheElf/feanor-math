@@ -24,7 +24,11 @@ fn combine_local_factors_local<'ring, 'data, 'local, R, P1, P2>(reduction: &'loc
     debug_assert!(local_factors.iter().all(|local_factor| local_poly_ring.base_ring().is_one(local_poly_ring.lc(local_factor).unwrap())));
 
     let ring = poly_ring.base_ring().get_ring();
-    let reconstruct_ring_el = |factor| balance_poly(poly_ring, poly_ring.from_terms(local_poly_ring.terms(&factor).map(|(c, i)| (ring.reconstruct_ring_el(reduction.ideal(), std::slice::from_ref(*local_poly_ring.base_ring()).as_fn(), local_e, std::slice::from_ref(c).as_fn()), i)))).0;
+    let reconstruct_poly = |factor| {
+        let mut result = poly_ring.from_terms(local_poly_ring.terms(&factor).map(|(c, i)| (ring.reconstruct_ring_el(reduction.ideal(), std::slice::from_ref(*local_poly_ring.base_ring()).as_fn(), local_e, std::slice::from_ref(c).as_fn()), i)));
+        poly_ring.balance_poly(&mut result);
+        return result;
+    };
 
     let mut ungrouped_factors = (0..local_factors.len()).collect::<Vec<_>>();
     let mut current = poly_ring.clone_el(poly);
@@ -38,7 +42,7 @@ fn combine_local_factors_local<'ring, 'data, 'local, R, P1, P2>(reduction: &'loc
                 return None;
             }
             let factor = local_poly_ring.prod(indices.iter().copied().map(|i| local_poly_ring.clone_el(&local_factors[i])));
-            let lifted_factor = reconstruct_ring_el(factor);
+            let lifted_factor = reconstruct_poly(factor);
             if let Some(quo) = poly_ring.checked_div(&current, &lifted_factor) {
                 return Some((lifted_factor, quo, clone_slice(indices)));
             } else {
@@ -159,14 +163,13 @@ pub fn heuristic_factor_poly_local<P, Controller>(poly_ring: P, f: El<P>, prime_
         let lc_factor = poly_ring.lc(&factor).unwrap();
         let factor_monic = evaluate_aX(poly_ring, &factor, lc_factor);
         let factorization = heuristic_factor_poly_squarefree_monic_local(poly_ring, &factor_monic, prime_exponent_factor, controller.clone());
-        for irred_factor in factorization.into_iter().map(|fi| {
-            balance_poly(poly_ring, unevaluate_aX(poly_ring, &fi, &lc_factor)).0
-        }) {
+        for irred_factor in factorization.into_iter().map(|fi| unevaluate_aX(poly_ring, &fi, &lc_factor)) {
             let irred_factor_lc = poly_ring.lc(&irred_factor).unwrap();
             let mut power = 0;
             while let Some(quo) = poly_ring.checked_div(&poly_ring.inclusion().mul_ref_map(&current, &poly_ring.base_ring().pow(poly_ring.base_ring().clone_el(&irred_factor_lc), poly_ring.degree(&f).unwrap())), &irred_factor) {
-                current = balance_poly(poly_ring, quo).0;
+                current = quo;
                 power += 1;
+                poly_ring.balance_poly(&mut current);
             }
             assert!(power >= 1);
             result.push((irred_factor, power));
@@ -240,13 +243,12 @@ pub fn poly_factor_integer<'a, P, Controller>(ZZX: P, f: El<P>, controller: Cont
         let lc_factor = ZZX.lc(&factor).unwrap();
         let factor_monic = evaluate_aX(ZZX, &factor, lc_factor);
         let factorization = factor_squarefree_monic_integer_poly_local(&ZZX, &factor_monic, controller.clone());
-        for irred_factor in factorization.into_iter().map(|fi| {
-            balance_poly(ZZX, unevaluate_aX(ZZX, &fi, &lc_factor)).0
-        }) {
+        for irred_factor in factorization.into_iter().map(|fi| unevaluate_aX(ZZX, &fi, &lc_factor)) {
             let irred_factor_lc = ZZX.lc(&irred_factor).unwrap();
             let mut power = 0;
             while let Some(quo) = ZZX.checked_div(&ZZX.inclusion().mul_ref_map(&current, &ZZX.base_ring().pow(ZZX.base_ring().clone_el(&irred_factor_lc), ZZX.degree(&f).unwrap())), &irred_factor) {
-                current = balance_poly(ZZX, quo).0;
+                current = quo;
+                ZZX.balance_poly(&mut current);
                 power += 1;
             }
             assert!(power >= 1);
@@ -264,7 +266,7 @@ use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[cfg(test)]
 use crate::primitive_int::*;
 #[cfg(test)]
-use crate::algorithms::poly_div::poly_div_domain;
+use crate::algorithms::poly_div::poly_div_rem_domain;
 #[cfg(test)]
 use crate::algorithms::poly_gcd::make_primitive;
 
@@ -371,8 +373,8 @@ fn random_test_heuristic_factor_poly_local() {
         assert!(factorization.len() >= 2);
         assert!(factorization.iter().any(|(_, k)| *k >= 2));
         for (factor, _) in &factorization {
-            let (_, rem1, _) = poly_div_domain(&poly_ring, poly_ring.clone_el(&f), factor);
-            let (_, rem2, _) = poly_div_domain(&poly_ring, poly_ring.clone_el(&g), factor);
+            let (_, rem1, _) = poly_div_rem_domain(&poly_ring, poly_ring.clone_el(&f), factor);
+            let (_, rem2, _) = poly_div_rem_domain(&poly_ring, poly_ring.clone_el(&g), factor);
             assert!(poly_ring.is_zero(&rem1) || poly_ring.is_zero(&rem2));
         }
         assert_el_eq!(

@@ -528,9 +528,11 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                     Self: 'a,
                     Self: 'ring
             {
+                const HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR: f64 = 0.25;
+
                 let log2_max_coeff = coefficients.map(|c| RingRef::new(self).abs_log2_ceil(c).unwrap_or(0)).max().unwrap_or(0);
                 // this is in no way a rigorous bound, but equals the worst-case bound at least asymptotically (up to constants)
-                return ((log2_max_coeff as f64 + poly_deg as f64) / (*p as f64).log2() / /* just some factor that seemed good when playing around */ 4.).ceil() as usize + 1;
+                return ((log2_max_coeff as f64 + poly_deg as f64) / (*p as f64).log2() * HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR).ceil() as usize + 1;
             }
             
             fn dbg_ideal<'ring>(&self, p: &Self::SuitableIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result

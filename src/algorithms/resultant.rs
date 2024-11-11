@@ -56,12 +56,14 @@ pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type a
 
     while ring.degree(&f).unwrap_or(0) >= 1 {
 
-        let balance_factor = ring.get_ring().balance_element(&mut f);
-        base_ring.mul_assign(&mut scale_num, base_ring.pow(balance_factor, ring.degree(&g).unwrap()));
+        let balance_factor = ring.get_ring().balance_poly(&mut f);
+        if let Some(balance_factor) = balance_factor {
+            base_ring.mul_assign(&mut scale_num, base_ring.pow(balance_factor, ring.degree(&g).unwrap()));
+        }
 
         // use here that `res(f, g) = a^(-deg(f)) lc(f)^(deg(g) - deg(ag - fh)) res(f, ag - fh)` if `deg(fh) <= deg(g)`
         let deg_g = ring.degree(&g).unwrap();
-        let (_q, r, a) = algorithms::poly_div::poly_div_domain(ring, g, &f);
+        let (_q, r, a) = algorithms::poly_div::poly_div_rem_domain(ring, g, &f);
         let deg_r = ring.degree(&r).unwrap_or(0);
 
         // adjust the scaling factor - we cancel out gcd's to prevent excessive number growth

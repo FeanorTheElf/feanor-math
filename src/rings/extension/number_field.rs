@@ -147,7 +147,6 @@ impl<Impl, I> Clone for NumberFieldBase<Impl, I>
     fn clone(&self) -> Self {
         Self {
             base: self.base.clone(),
-            
         }
     }
 }
@@ -493,12 +492,15 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
             Self: 'b,
             Self: 'ring
     {
+        const HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR: f64 = 0.25;
+
         let QQ = self.base.base_ring();
         let ZZ = QQ.base_ring();
         // to give any mathematically justifiable value, we would probably have to consider the canonical norm;
         // I don't want to deal with this here, so let's just use the coefficient norm instead...
         let log2_max_coeff = coefficients.map(|c| self.base.wrt_canonical_basis(c).iter().map(|c| ZZ.abs_log2_ceil(QQ.get_ring().num(&c)).unwrap_or(0)).max().unwrap()).max().unwrap_or(0);
-        return ((log2_max_coeff as f64 + poly_deg as f64 + (self.rank() as f64).log2()) / (ZZ.get_ring().principal_ideal_generator(&ideal.prime) as f64).log2()).ceil() as usize + 1;
+        let log2_p = (ZZ.get_ring().principal_ideal_generator(&ideal.prime) as f64).log2();
+        return ((log2_max_coeff as f64 + poly_deg as f64 + (self.rank() as f64).log2()) / log2_p * HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR).ceil() as usize + 1;
     }
 
     fn random_suitable_ideal<'ring, F>(&'ring self, mut rng: F) -> Self::SuitableIdeal<'ring>
@@ -684,6 +686,9 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
     }
 }
 
+#[cfg(test)]
+use crate::RANDOM_TEST_INSTANCE_COUNT;
+
 #[test]
 fn test_poly_gcd_number_field() {
     let QQ = RationalField::new(BigIntRing::RING);
@@ -719,4 +724,33 @@ fn test_poly_gcd_number_field() {
     ]);
     let actual = <_ as PolyGCDRing>::gcd(&KY, &g, &h);
     assert_el_eq!(&KY, &expected, &actual);
+}
+
+#[test]
+fn random_test_poly_gcd_number_field() {
+    let QQ = RationalField::new(BigIntRing::RING);
+    let QQX = DensePolyRing::new(&QQ, "X");
+    let mut rng = oorandom::Rand64::new(1);
+    let bound = QQ.base_ring().int_hom().map(1000);
+    let rank = 6;
+
+    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
+        let genpoly = QQX.from_terms((0..rank).map(|i| (QQ.inclusion().map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64())), i)).chain([(QQ.one(), rank)].into_iter()));
+        let K = NumberField::new(&QQX, &genpoly);
+        let KY = DensePolyRing::new(&K, "Y");
+
+        let mut random_element_K = || K.from_canonical_basis((0..6).map(|_| QQ.inclusion().map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64()))));
+        let f = KY.from_terms((0..=5).map(|i| (random_element_K(), i)));
+        let g = KY.from_terms((0..=5).map(|i| (random_element_K(), i)));
+        let h = KY.from_terms((0..=4).map(|i| (random_element_K(), i)));
+        // println!("Testing gcd on ({}) * ({}) and ({}) * ({})", poly_ring.format(&f), poly_ring.format(&h), poly_ring.format(&g), poly_ring.format(&h));
+        let lhs = KY.mul_ref(&f, &h);
+        let rhs = KY.mul_ref(&g, &h);
+        let gcd = <_ as PolyGCDRing>::gcd(&KY, &lhs, &rhs);
+        // println!("Result {}", poly_ring.format(&gcd));
+
+        assert!(KY.divides(&lhs, &gcd));
+        assert!(KY.divides(&rhs, &gcd));
+        assert!(KY.divides(&gcd, &h));
+    }
 }

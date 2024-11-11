@@ -90,11 +90,11 @@ pub trait PolyRing: RingExtension {
     }
     
     #[stability::unstable(feature = "enable")]
-    fn balance_element(&self, f: &mut Self::Element) -> El<Self::BaseRing>
+    fn balance_poly(&self, f: &mut Self::Element) -> Option<El<Self::BaseRing>>
         where <Self::BaseRing as RingStore>::Type: DivisibilityRing
     {
         let balance_factor = self.base_ring().get_ring().balance_factor(self.terms(f).map(|(c, _)| c));
-        if !self.base_ring().is_one(&balance_factor) {
+        if let Some(balance_factor) = &balance_factor {
             *f = RingRef::new(self).from_terms(self.terms(f).map(|(c, i)| (self.base_ring().checked_div(c, &balance_factor).unwrap(), i)));
         }
         return balance_factor;
@@ -279,13 +279,19 @@ pub trait PolyRingStore: RingStore
         f(&wrapped_indet).into_iter().map(|f| f.unwrap()).collect()
     }
 
-    #[stability::unstable(feature = "enable")]
     fn with_wrapped_indeterminate<'a, F, const M: usize>(&'a self, f: F) -> [El<Self>; M]
         where F: FnOnce(&RingElementWrapper<&'a Self>) -> [RingElementWrapper<&'a Self>; M]
     {
         let wrapped_indet = RingElementWrapper::new(self, self.indeterminate());
         let mut result_it = f(&wrapped_indet).into_iter();
         return std::array::from_fn(|_| result_it.next().unwrap().unwrap());
+    }
+    
+    #[stability::unstable(feature = "enable")]
+    fn balance_poly(&self, f: &mut El<Self>) -> Option<El<<Self::Type as RingExtension>::BaseRing>>
+        where <<Self::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing
+    {
+        self.get_ring().balance_poly(f)
     }
 }
 

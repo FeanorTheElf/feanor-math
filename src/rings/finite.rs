@@ -185,7 +185,7 @@ pub mod generic_tests {
         let ZZ = BigIntRing::RING;
         let size = ring.size(&ZZ).unwrap();
         let char = ring.characteristic(&ZZ).unwrap();
-        assert!(ZZ.checked_div(&size, &char).is_some());
+        assert!(ZZ.divides(&size, &char));
 
         if ZZ.is_geq(&size, &ZZ.power_of_two(7)) {
             assert_eq!(None, ring.size(&StaticRing::<i8>::RING));

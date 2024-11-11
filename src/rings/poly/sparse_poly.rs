@@ -103,7 +103,7 @@ impl<R: RingStore> SparsePolyRingBase<R> {
         where F: FnMut(El<R>) -> Option<El<R>>
     {
         let lhs_val = std::mem::replace(lhs, self.zero());
-        let (quo, rem) = algorithms::poly_div::poly_div(
+        let (quo, rem) = algorithms::poly_div::poly_div_rem(
             lhs_val, 
             rhs, 
             RingRef::new(self), 

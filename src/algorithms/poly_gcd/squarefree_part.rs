@@ -7,7 +7,6 @@ use crate::computation::*;
 use crate::seq::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 
-use super::balance_poly;
 use super::evaluate_aX;
 use super::unevaluate_aX;
 use super::INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT;
@@ -49,8 +48,9 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P
             reduction.reconstruct_ring_el((0..reduction.len()).map_fn(|j| SXs[j].coefficient_at(&local_power_decompositions[j][k], i))),
             i
         )));
-        if let Some(root_of_factor) = poly_root(RX, &power_factor, sig.perfect_power) {
-            result.push((balance_poly(RX, root_of_factor).0, sig.perfect_power));
+        if let Some(mut root_of_factor) = poly_root(RX, &power_factor, sig.perfect_power) {
+            RX.balance_poly(&mut root_of_factor);
+            result.push((root_of_factor, sig.perfect_power));
         } else {
             return None;
         }
@@ -195,19 +195,21 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &
 /// of the underlying ring.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn poly_power_decomposition_local<P, Controller>(poly_ring: P, f: El<P>, controller: Controller) -> Vec<(El<P>, usize)>
+pub fn poly_power_decomposition_local<P, Controller>(poly_ring: P, mut f: El<P>, controller: Controller) -> Vec<(El<P>, usize)>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain + DivisibilityRing,
         Controller: ComputationController
 {
     assert!(!poly_ring.is_zero(&f));
-    let f = balance_poly(poly_ring, f).0;
+    poly_ring.balance_poly(&mut f);
     let lcf = poly_ring.lc(&f).unwrap();
     let f_monic = evaluate_aX(poly_ring, &f, lcf);
     let power_decomposition = poly_power_decomposition_monic_local(poly_ring, &f_monic, controller);
     let result = power_decomposition.into_iter().map(|(fi, i)| {
-        (balance_poly(poly_ring, unevaluate_aX(poly_ring, &fi, &lcf)).0, i)
+        let mut result = unevaluate_aX(poly_ring, &fi, &lcf);
+        poly_ring.balance_poly(&mut result);
+        return (result, i);
     }).collect::<Vec<_>>();
     debug_assert!(poly_ring.checked_div(&poly_ring.prod(result.iter().map(|(fi, i)| poly_ring.pow(poly_ring.clone_el(fi), *i))), &f).is_some());
     debug_assert_eq!(poly_ring.degree(&f).unwrap(), result.iter().map(|(fi, i)| *i * poly_ring.degree(fi).unwrap()).sum::<usize>());
@@ -231,7 +233,9 @@ pub fn poly_squarefree_part_local<P, Controller>(poly_ring: P, f: El<P>, control
         Controller: ComputationController
 {
     assert!(!poly_ring.is_zero(&f));
-    balance_poly(poly_ring, poly_ring.prod(poly_power_decomposition_local(poly_ring, f, controller).into_iter().map(|(fi, _i)| fi))).0
+    let mut result = poly_ring.prod(poly_power_decomposition_local(poly_ring, f, controller).into_iter().map(|(fi, _i)| fi));
+    poly_ring.balance_poly(&mut result);
+    return result;
 }
 
 #[cfg(test)]
@@ -299,7 +303,7 @@ fn random_test_poly_power_decomposition_local() {
         }
 
         assert_el_eq!(&poly_ring, &poly, poly_ring.prod(power_decomp.iter().map(|(poly, k)| poly_ring.pow(poly_ring.clone_el(poly), *k))));
-        assert!(poly_ring.checked_div(&poly_ring.prod(power_decomp.iter().filter(|(_, k)| k % 5 == 0).map(|(poly, k)| poly_ring.pow(poly_ring.clone_el(poly), k / 5))), &make_primitive(&poly_ring, &h).0).is_some());
-        assert!(poly_ring.checked_div(&poly_ring.prod(power_decomp.iter().filter(|(_, k)| k % 2 == 0).map(|(poly, k)| poly_ring.pow(poly_ring.clone_el(poly), k / 2))), &make_primitive(&poly_ring, &g).0).is_some());
+        assert!(poly_ring.divides(&poly_ring.prod(power_decomp.iter().filter(|(_, k)| k % 5 == 0).map(|(poly, k)| poly_ring.pow(poly_ring.clone_el(poly), k / 5))), &make_primitive(&poly_ring, &h).0));
+        assert!(poly_ring.divides(&poly_ring.prod(power_decomp.iter().filter(|(_, k)| k % 2 == 0).map(|(poly, k)| poly_ring.pow(poly_ring.clone_el(poly), k / 2))), &make_primitive(&poly_ring, &g).0));
     }
 }

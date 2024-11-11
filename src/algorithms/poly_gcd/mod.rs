@@ -130,25 +130,6 @@ pub fn make_primitive<P>(poly_ring: P, f: &El<P>) -> (El<P>, El<<P::Type as Ring
 }
 
 ///
-/// A weaker version of [`make_primitive()`] that just divides out the "balance factor" of
-/// all coefficients of `f`. The definition of the balance factor is completely up to the
-/// underlying ring, see [`DivisibilityRing::balance_factor()`].
-/// 
-fn balance_poly<P>(poly_ring: P, f: El<P>) -> (El<P>, El<<P::Type as RingExtension>::BaseRing>)
-    where P: RingStore,
-        P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain
-{
-    if poly_ring.is_zero(&f) {
-        return (poly_ring.zero(), poly_ring.base_ring().one());
-    }
-    let ring = poly_ring.base_ring();
-    let factor = ring.get_ring().balance_factor(poly_ring.terms(&f).map(|(c, _)| c));
-    let result = poly_ring.from_terms(poly_ring.terms(&f).map(|(c, i)| (ring.checked_div(c, &factor).unwrap(), i)));
-    return (result, factor);
-}
-
-///
 /// Checks whether there exists a polynomial `g` such that `g^k = f`, and if yes,
 /// returns `g`.
 /// 

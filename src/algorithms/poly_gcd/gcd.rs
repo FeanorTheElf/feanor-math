@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use dense_poly::DensePolyRing;
 use squarefree_part::poly_power_decomposition_monic_local;
 
@@ -59,15 +61,30 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
     let mut poly_rings_mod_me = Vec::new();
     let mut gcds_mod_me = Vec::new();
 
+    let mut setup_time = 0;
+    let mut local_gcd_time = 0;
+    let mut hensel_lift_time = 0;
+    let mut prepare_lift_time = 0;
+    let complete_start = Instant::now();
+
     for idx in 0..reduction.len() {
+
+        let start = Instant::now();
         let S_to_F = reduction.intermediate_ring_to_field_reduction(idx);
         let F = ring.local_field_at(S_to_F.ideal(), S_to_F.max_ideal_idx());
         let F_iso = F.can_iso(*S_to_F.codomain()).unwrap();
         let R_to_F = F_iso.inv().compose(reduction.main_ring_to_field_reduction(idx));
         let FX = DensePolyRing::new(&F, "X");
         let RX_to_FX = FX.lifted_hom(poly_ring, &R_to_F);
-        let d = FX.normalize(FX.ideal_gen(&RX_to_FX.map_ref(f), &RX_to_FX.map_ref(g)));
+        let end = Instant::now();
+        setup_time += (end - start).as_millis();
 
+        let start = Instant::now();
+        let d = FX.normalize(FX.ideal_gen(&RX_to_FX.map_ref(f), &RX_to_FX.map_ref(g)));
+        let end = Instant::now();
+        local_gcd_time += (end - start).as_millis();
+
+        let start = Instant::now();
         let f_over_d = FX.checked_div(&RX_to_FX.map_ref(f), &d).unwrap();
         let g_over_d = FX.checked_div(&RX_to_FX.map_ref(g), &d).unwrap();
         let deg_d = FX.degree(&d).unwrap();
@@ -84,28 +101,43 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
             return None;
         }
         signature = Some(new_signature);
-
         let SX = DensePolyRing::new(*S_to_F.domain(), "X");
         let RX_to_SX = SX.lifted_hom(poly_ring, reduction.main_ring_to_intermediate_ring_reduction(idx));
+        let end = Instant::now();
+        prepare_lift_time += (end - start).as_millis();
+
+        let start = Instant::now();
         let (d, _) = hensel_lift(&S_to_F, &SX, &FX, &RX_to_SX.map_ref(poly), (&factor1, &factor2), controller.clone());
+        let end = Instant::now();
+        hensel_lift_time += (end - start).as_millis();
 
         poly_rings_mod_me.push(SX);
         gcds_mod_me.push(d);
     }
 
+    let start = Instant::now();
     let signature = signature.unwrap();
-    let result = poly_ring.from_terms((0..=signature.gcd_deg).map(|i| (
+    let mut result = poly_ring.from_terms((0..=signature.gcd_deg).map(|i| (
         reduction.reconstruct_ring_el((0..reduction.len()).map_fn(|j| poly_rings_mod_me[j].coefficient_at(&gcds_mod_me[j], i))),
         i
     )));
+    let end = Instant::now();
+    let reconstruct_time = (end - start).as_millis();
 
-    if poly_ring.checked_div(&f, &result).is_none() || 
-        poly_ring.checked_div(&g, &result).is_none()
-    {
+    let start = Instant::now();
+    let divides_f_and_g = poly_ring.divides(&f, &result) && poly_ring.divides(&g, &result);
+    let end = Instant::now();
+    let test_division_time = (end - start).as_millis();
+    if !divides_f_and_g {
+        let complete_end = Instant::now();
+        log_progress!(controller, "time(setup: {} ms, localgcd: {} ms, preparelift: {} ms, hensel: {} ms, reconstruct: {} ms, test: {} ms, all: {} ms)", setup_time, local_gcd_time, prepare_lift_time, hensel_lift_time, reconstruct_time, test_division_time, (complete_end - complete_start).as_millis());
         log_progress!(controller, "(no_divisor)");
         return None;
     } else {
-        return Some(balance_poly(poly_ring, result).0);
+        let complete_end = Instant::now();
+        log_progress!(controller, "time(setup: {} ms, localgcd: {} ms, preparelift: {} ms, hensel: {} ms, reconstruct: {} ms, test: {} ms, all: {} ms)", setup_time, local_gcd_time, prepare_lift_time, hensel_lift_time, reconstruct_time, test_division_time, (complete_end - complete_start).as_millis());
+        poly_ring.balance_poly(&mut result);
+        return Some(result);
     }
 }
 
@@ -117,7 +149,7 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
 /// More precisely, computes some `d in R[X]` of maximal degree with the property that there exists 
 /// `a in R \ {0}` such that `d | af, ag`.
 ///
-fn poly_gcd_coprime_local<P, F, Controller>(poly_ring: P, f: El<P>, g: El<P>, rng: F, attempt: usize, controller: Controller) -> Option<El<P>>
+fn poly_gcd_coprime_local<P, F, Controller>(poly_ring: P, mut f: El<P>, mut g: El<P>, rng: F, attempt: usize, controller: Controller) -> Option<El<P>>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain,
@@ -129,17 +161,20 @@ fn poly_gcd_coprime_local<P, F, Controller>(poly_ring: P, f: El<P>, g: El<P>, rn
     } else if poly_ring.is_zero(&g) {
         return Some(poly_ring.clone_el(&f));
     }
-    let f = balance_poly(poly_ring, f).0;
-    let g = balance_poly(poly_ring, g).0;
+    poly_ring.balance_poly(&mut f);
+    poly_ring.balance_poly(&mut g);
     let lcf = poly_ring.base_ring().clone_el(poly_ring.lc(&f).unwrap());
     let lcg = poly_ring.base_ring().clone_el(poly_ring.lc(&g).unwrap());
     let ring = poly_ring.base_ring();
     let a = ring.mul_ref(&lcf, &lcg);
     let f_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_map(f, lcg), &a);
     let g_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_map(g, lcf), &a);
+
     let d_monic = poly_gcd_monic_coprime_local(poly_ring, &f_monic, &g_monic, rng, attempt, controller)?;
 
-    return Some(balance_poly(poly_ring, unevaluate_aX(poly_ring, &d_monic, &a)).0);
+    let mut result = unevaluate_aX(poly_ring, &d_monic, &a);
+    poly_ring.balance_poly(&mut result);
+    return Some(result);
 }
 
 ///
@@ -167,6 +202,7 @@ pub fn poly_gcd_monic_local<'a, P, Controller>(poly_ring: P, mut f: &'a El<P>, m
     let mut rng = oorandom::Rand64::new(1);
     for attempt in 0..HOPE_FOR_SQUAREFREE_TRIES {
         if let Some(result) = poly_gcd_monic_coprime_local(poly_ring, f, g, || rng.rand_u64(), attempt, controller.clone()) {
+            finish_computation!(controller);
             return result;
         }
     }
@@ -176,10 +212,10 @@ pub fn poly_gcd_monic_local<'a, P, Controller>(poly_ring: P, mut f: &'a El<P>, m
     let f_power_decomposition = poly_power_decomposition_monic_local(poly_ring, f, controller.clone());
     let mut g = poly_ring.clone_el(g);
     let mut d = poly_ring.one();
+
     'extract_part_i: for i in 1.. {
         let squarefree_part_i = poly_ring.prod(f_power_decomposition.iter().filter(|(_, j)| *j >= i).map(|(fj, _)| poly_ring.clone_el(fj)));
         if poly_ring.is_one(&squarefree_part_i) {
-
             finish_computation!(controller);
             return d;
         }
@@ -206,7 +242,7 @@ pub fn poly_gcd_monic_local<'a, P, Controller>(poly_ring: P, mut f: &'a El<P>, m
 /// of the underlying ring.
 ///
 #[stability::unstable(feature = "enable")]
-pub fn poly_gcd_local<P, Controller>(poly_ring: P, f: El<P>, g: El<P>, controller: Controller) -> El<P>
+pub fn poly_gcd_local<P, Controller>(poly_ring: P, mut f: El<P>, mut g: El<P>, controller: Controller) -> El<P>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain,
@@ -217,17 +253,20 @@ pub fn poly_gcd_local<P, Controller>(poly_ring: P, f: El<P>, g: El<P>, controlle
     } else if poly_ring.is_zero(&g) {
         return poly_ring.clone_el(&f);
     }
-    let f = balance_poly(poly_ring, f).0;
-    let g = balance_poly(poly_ring, g).0;
+    poly_ring.balance_poly(&mut f);
+    poly_ring.balance_poly(&mut g);
     let lcf = poly_ring.base_ring().clone_el(poly_ring.lc(&f).unwrap());
     let lcg = poly_ring.base_ring().clone_el(poly_ring.lc(&g).unwrap());
     let ring = poly_ring.base_ring();
     let a = ring.mul_ref(&lcf, &lcg);
     let f_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_map(f, lcg), &a);
     let g_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_map(g, lcf), &a);
+
     let d_monic = poly_gcd_monic_local(poly_ring, &f_monic, &g_monic, controller);
 
-    return balance_poly(poly_ring, unevaluate_aX(poly_ring, &d_monic, &a)).0;
+    let mut result = unevaluate_aX(poly_ring, &d_monic, &a);
+    poly_ring.balance_poly(&mut result);
+    return result;
 }
 
 #[cfg(test)]
@@ -289,8 +328,8 @@ fn random_test_poly_gcd_local() {
         let gcd = make_primitive(&poly_ring, &poly_gcd_local(&poly_ring, poly_ring.clone_el(&lhs), poly_ring.clone_el(&rhs), LogProgress)).0;
         // println!("Result {}", poly_ring.format(&gcd));
 
-        assert!(poly_ring.checked_div(&lhs, &gcd).is_some());
-        assert!(poly_ring.checked_div(&rhs, &gcd).is_some());
-        assert!(poly_ring.checked_div(&gcd, &make_primitive(&poly_ring, &h).0).is_some());
+        assert!(poly_ring.divides(&lhs, &gcd));
+        assert!(poly_ring.divides(&rhs, &gcd));
+        assert!(poly_ring.divides(&gcd, &make_primitive(&poly_ring, &h).0));
     }
 }
