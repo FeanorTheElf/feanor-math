@@ -2,7 +2,7 @@ use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::compute_locally::{InterpolationBaseRing, InterpolationBaseRingStore};
 use crate::delegate::*;
-use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
+use crate::divisibility::*;
 use crate::local::PrincipalLocalRing;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::*;
@@ -20,7 +20,7 @@ use crate::primitive_int::*;
 /// the functions provided by [`DivisibilityRing`] will be used to provide
 /// field-like division for the wrapped ring.
 ///
-pub struct AsFieldBase<R: DivisibilityRingStore> 
+pub struct AsFieldBase<R: RingStore> 
     where R::Type: DivisibilityRing
 {
     base: R,
@@ -33,7 +33,7 @@ impl<R> PerfectField for AsFieldBase<R>
 {}
 
 impl<R> Clone for AsFieldBase<R>
-    where R: DivisibilityRingStore + Clone,
+    where R: RingStore + Clone,
         R::Type: DivisibilityRing
 {
     fn clone(&self) -> Self {
@@ -42,13 +42,13 @@ impl<R> Clone for AsFieldBase<R>
 }
 
 impl<R> Copy for AsFieldBase<R>
-    where R: DivisibilityRingStore + Copy,
+    where R: RingStore + Copy,
         R::Type: DivisibilityRing,
         El<R>: Copy
 {}
 
 impl<R> PartialEq for AsFieldBase<R>
-    where R: DivisibilityRingStore,
+    where R: RingStore,
         R::Type: DivisibilityRing
 {
     fn eq(&self, other: &Self) -> bool {
@@ -60,12 +60,12 @@ impl<R> PartialEq for AsFieldBase<R>
 /// [`RingStore`] for [`AsFieldBase`].
 /// 
 #[allow(type_alias_bounds)]
-pub type AsField<R: DivisibilityRingStore> = RingValue<AsFieldBase<R>>;
+pub type AsField<R: RingStore> = RingValue<AsFieldBase<R>>;
 
-pub struct FieldEl<R: DivisibilityRingStore>(El<R>)
+pub struct FieldEl<R: RingStore>(El<R>)
     where R::Type: DivisibilityRing;
 
-impl<R: DivisibilityRingStore> Clone for FieldEl<R> 
+impl<R: RingStore> Clone for FieldEl<R> 
     where El<R>: Clone,
         R::Type: DivisibilityRing
 {
@@ -74,12 +74,12 @@ impl<R: DivisibilityRingStore> Clone for FieldEl<R>
     }
 }
 
-impl<R: DivisibilityRingStore> Copy for FieldEl<R> 
+impl<R: RingStore> Copy for FieldEl<R> 
     where El<R>: Copy,
         R::Type: DivisibilityRing
 {}
 
-impl<R: DivisibilityRingStore> AsFieldBase<R> 
+impl<R: RingStore> AsFieldBase<R> 
     where R::Type: DivisibilityRing
 {
     ///
@@ -132,7 +132,7 @@ impl<R: DivisibilityRingStore> AsFieldBase<R>
     }
 }
 
-impl<R: DivisibilityRingStore> AsFieldBase<R> 
+impl<R: RingStore> AsFieldBase<R> 
     where R::Type: PerfectField
 {
     ///
@@ -144,7 +144,7 @@ impl<R: DivisibilityRingStore> AsFieldBase<R>
     }
 }
 
-impl<R: DivisibilityRingStore> DelegateRing for AsFieldBase<R> 
+impl<R: RingStore> DelegateRing for AsFieldBase<R> 
     where R::Type: DivisibilityRing
 {
     type Element = FieldEl<R>;
@@ -171,11 +171,11 @@ impl<R: DivisibilityRingStore> DelegateRing for AsFieldBase<R>
     }
 }
 
-impl<R: DivisibilityRingStore> DelegateRingImplFiniteRing for AsFieldBase<R> 
+impl<R: RingStore> DelegateRingImplFiniteRing for AsFieldBase<R> 
     where R::Type: DivisibilityRing
 {}
 
-impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanHomFrom<AsFieldBase<S>> for AsFieldBase<R> 
+impl<R: RingStore, S: RingStore> CanHomFrom<AsFieldBase<S>> for AsFieldBase<R> 
     where R::Type: DivisibilityRing + CanHomFrom<S::Type>,
         S::Type: DivisibilityRing
 {
@@ -190,7 +190,7 @@ impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanHomFrom<AsFieldBase<
     }
 }
 
-impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanIsoFromTo<AsFieldBase<S>> for AsFieldBase<R> 
+impl<R: RingStore, S: RingStore> CanIsoFromTo<AsFieldBase<S>> for AsFieldBase<R> 
     where R::Type: DivisibilityRing + CanIsoFromTo<S::Type>,
         S::Type: DivisibilityRing
 {
@@ -208,7 +208,7 @@ impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanIsoFromTo<AsFieldBas
 ///
 /// Necessary to potentially implement [`crate::rings::zn::ZnRing`].
 /// 
-impl<R: DivisibilityRingStore, S: IntegerRing + ?Sized> CanHomFrom<S> for AsFieldBase<R> 
+impl<R: RingStore, S: IntegerRing + ?Sized> CanHomFrom<S> for AsFieldBase<R> 
     where R::Type: DivisibilityRing + CanHomFrom<S>
 {
     type Homomorphism = <R::Type as CanHomFrom<S>>::Homomorphism;
@@ -256,7 +256,7 @@ impl<R1, R2> CanIsoFromTo<AsLocalPIRBase<R1>> for AsFieldBase<R2>
     }
 }
 
-impl<R: DivisibilityRingStore> DivisibilityRing for AsFieldBase<R> 
+impl<R: RingStore> DivisibilityRing for AsFieldBase<R> 
     where R::Type: DivisibilityRing
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
@@ -280,7 +280,7 @@ impl<R: RingStore> PrincipalIdealRing for AsFieldBase<R>
     }
 }
 
-impl<R: DivisibilityRingStore> PrincipalLocalRing for AsFieldBase<R> 
+impl<R: RingStore> PrincipalLocalRing for AsFieldBase<R> 
     where R::Type: DivisibilityRing
 {
     fn max_ideal_gen(&self) ->  &Self::Element {
@@ -327,7 +327,7 @@ impl<R> InterpolationBaseRing for AsFieldBase<R>
     }
 }
 
-impl<R: DivisibilityRingStore> EuclideanRing for AsFieldBase<R> 
+impl<R: RingStore> EuclideanRing for AsFieldBase<R> 
     where R::Type: DivisibilityRing
 {
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
@@ -349,11 +349,11 @@ impl<R: DivisibilityRingStore> EuclideanRing for AsFieldBase<R>
     }
 }
 
-impl<R: DivisibilityRingStore> Domain for AsFieldBase<R> 
+impl<R: RingStore> Domain for AsFieldBase<R> 
     where R::Type: DivisibilityRing
 {}
 
-impl<R: DivisibilityRingStore> Field for AsFieldBase<R>
+impl<R: RingStore> Field for AsFieldBase<R>
     where R::Type: DivisibilityRing
 {
     fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
@@ -361,7 +361,7 @@ impl<R: DivisibilityRingStore> Field for AsFieldBase<R>
     }
 }
 
-impl<R: DivisibilityRingStore> KaratsubaHint for AsFieldBase<R>
+impl<R: RingStore> KaratsubaHint for AsFieldBase<R>
     where R::Type: DivisibilityRing
 {
     fn karatsuba_threshold(&self) -> usize {
@@ -369,7 +369,7 @@ impl<R: DivisibilityRingStore> KaratsubaHint for AsFieldBase<R>
     }
 }
 
-impl<R: DivisibilityRingStore> ComputeInnerProduct for AsFieldBase<R>
+impl<R: RingStore> ComputeInnerProduct for AsFieldBase<R>
     where R::Type: DivisibilityRing
 {
     fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
@@ -391,7 +391,7 @@ impl<R: DivisibilityRingStore> ComputeInnerProduct for AsFieldBase<R>
     }
 }
 
-impl<R: DivisibilityRingStore> StrassenHint for AsFieldBase<R>
+impl<R: RingStore> StrassenHint for AsFieldBase<R>
     where R::Type: DivisibilityRing
 {
     fn strassen_threshold(&self) -> usize {

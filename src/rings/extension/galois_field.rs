@@ -15,6 +15,7 @@ use crate::algorithms::int_factor::factor;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::algorithms::matmul::StrassenHint;
+use crate::algorithms::poly_gcd::PolyGCDRing;
 use crate::algorithms::unity_root::*;
 use crate::delegate::DelegateRing;
 use crate::delegate::DelegateRingImplFiniteRing;
@@ -40,6 +41,7 @@ use crate::rings::zn::*;
 use crate::ring::*;
 use crate::rings::extension::*;
 use crate::integer::*;
+use crate::specialization::FiniteRingSpecializable;
 
 fn filter_irreducible<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Option<El<P>>
     where P: RingStore,
@@ -72,7 +74,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <P::Type as RingExtension>::BaseRing: Copy,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + FiniteRing + Field + CanHomFrom<StaticRingBase<i64>>,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + FiniteRingSpecializable + SelfIso + CanHomFrom<StaticRingBase<i64>>,
         C: ConvolutionAlgorithm<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
     let Fp = *poly_ring.base_ring();
@@ -163,8 +165,10 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <P::Type as RingExtension>::BaseRing: Copy,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + FiniteRing + Field + CanHomFrom<StaticRingBase<i64>>
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + FiniteRingSpecializable + SelfIso + CanHomFrom<StaticRingBase<i64>>
 {
+    static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDRing);
+    
     let log2_modulus = poly_ring.base_ring().integer_ring().abs_log2_ceil(poly_ring.base_ring().modulus()).unwrap();
     let fft_convolution = FFTBasedConvolution::new_with(Global);
     if fft_convolution.can_compute(StaticRing::<i64>::RING.abs_log2_ceil(&(degree as i64)).unwrap() + 1, log2_modulus) {
@@ -314,7 +318,7 @@ impl GaloisField {
 
 impl<R, A, C> GaloisFieldOver<R, A, C>
     where R: RingStore + Clone,
-        R::Type: ZnRing + FiniteRing + Field + CanHomFrom<StaticRingBase<i64>>,
+        R::Type: ZnRing + Field + FiniteRingSpecializable + SelfIso + CanHomFrom<StaticRingBase<i64>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
 {
@@ -372,7 +376,7 @@ impl<R, A, C> GaloisFieldOver<R, A, C>
     /// recursive call adds a reference `&` to `R`.
     /// 
     fn new_internal(base_ring: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self
-        where R: Copy, R::Type: Field
+        where R: Copy, R::Type: Field + FiniteRing + FiniteRingSpecializable + SelfIso
     {
         assert!(degree >= 1);
         let poly_ring = DensePolyRing::new(base_ring.clone(), "X");

@@ -49,7 +49,7 @@ pub fn poly_power_decomposition_finite_field<P>(poly_ring: P, poly: &El<P>) -> V
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn poly_squarefree_part_finite_field<P>(poly_ring: P, poly: &El<P>) -> El<P>
-    where P: PolyRingStore,
+    where P: RingStore,
         P::Type: PolyRing + PrincipalIdealRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
 {

@@ -17,28 +17,31 @@ use crate::rings::zn::ZnRingStore;
 use crate::DEFAULT_PROBABILISTIC_REPETITIONS;
 
 struct ECFactorInt<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing 
 {
     result_ring: I
 }
 
 impl<I> ZnOperation for ECFactorInt<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     type Output<'a> = El<I>
         where Self: 'a;
 
     fn call<'a, R>(self, ring: R) -> El<I>
-        where Self: 'a, R: 'a + ZnRingStore + Send + Sync, R::Type: ZnRing, El<R>: Send
+        where Self: 'a, 
+            R: 'a + RingStore + Send + Sync, 
+            R::Type: ZnRing, 
+            El<R>: Send
     {
         int_cast(lenstra_ec_factor(&ring, DontObserve).unwrap_or_else(no_error), self.result_ring, ring.integer_ring())
     }
 }
 
 pub fn is_prime_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
-    where I: IntegerRingStore + Copy,
+    where I: RingStore + Copy,
         I::Type: IntegerRing
 {
     if algorithms::miller_rabin::is_prime(ZZ, n, DEFAULT_PROBABILISTIC_REPETITIONS) {
@@ -53,7 +56,7 @@ pub fn is_prime_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
 }
 
 fn is_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
-    where I: IntegerRingStore + Copy,
+    where I: RingStore + Copy,
         I::Type: IntegerRing
 {
     assert!(!ZZ.is_zero(n));
@@ -67,7 +70,7 @@ fn is_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
 }
 
 pub fn factor<I>(ZZ: I, mut n: El<I>) -> Vec<(El<I>, usize)> 
-    where I: IntegerRingStore + OrderedRingStore + Copy, 
+    where I: RingStore + Copy, 
         I::Type: IntegerRing + OrderedRing + CanIsoFromTo<BigIntRingBase> + CanIsoFromTo<StaticRingBase<i128>>
 {
     const SMALL_PRIME_BOUND: i32 = 10000;

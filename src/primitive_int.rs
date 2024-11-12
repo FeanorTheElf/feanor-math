@@ -323,17 +323,17 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
     
-    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
         write!(out, "{}", *value)
     }
     
-    fn characteristic<I: IntegerRingStore>(&self, ZZ: I) -> Option<El<I>>
+    fn characteristic<I: RingStore>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         Some(ZZ.zero())
     }
 
-    fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
+    fn pow_gen<R: RingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
         where R::Type: IntegerRing
     {
         assert!(!integers.is_neg(power));

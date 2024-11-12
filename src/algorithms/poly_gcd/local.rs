@@ -76,13 +76,13 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
     /// The proper way would be to define this with two lifetime parameters `'ring` and `'data`,
     /// see also [`crate::compute_locally::EvaluatePolyLocallyRing::LocalRingBase`]
     /// 
-    type LocalRingBase<'ring>: LinSolveRing
+    type LocalRingBase<'ring>: ?Sized + LinSolveRing
         where Self: 'ring;
 
     type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
         where Self: 'ring;
     
-    type LocalFieldBase<'ring>: CanIsoFromTo<Self::LocalRingBase<'ring>> + FiniteRing + Field
+    type LocalFieldBase<'ring>: ?Sized + CanIsoFromTo<Self::LocalRingBase<'ring>> + FiniteRing + Field + SelfIso + FiniteRingSpecializable
         where Self: 'ring;
 
     type LocalField<'ring>: RingStore<Type = Self::LocalFieldBase<'ring>>
@@ -183,7 +183,7 @@ pub trait IntegerPolyGCDRing: PolyGCDLocallyDomain {
     /// It would be much preferrable if we could restrict associated types from supertraits,
     /// this is just a workaround (and an ugly one at that)
     /// 
-    type LocalRingAsZnBase<'ring>: CanIsoFromTo<Self::LocalRingBase<'ring>> + ZnRing
+    type LocalRingAsZnBase<'ring>: ?Sized + CanIsoFromTo<Self::LocalRingBase<'ring>> + ZnRing
         where Self: 'ring;
 
     type LocalRingAsZn<'ring>: RingStore<Type = Self::LocalRingAsZnBase<'ring>>
@@ -432,7 +432,7 @@ impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
 macro_rules! impl_poly_gcd_locally_for_ZZ {
     (<{$($gen_args:tt)*}> IntegerPolyGCDRing for $int_ring_type:ty where $($constraints:tt)*) => {
 
-        impl<$($gen_args)*> $crate::algorithms::poly_gcd::gcd_locally::PolyGCDLocallyDomain for $int_ring_type
+        impl<$($gen_args)*> $crate::algorithms::poly_gcd::local::PolyGCDLocallyDomain for $int_ring_type
             where $($constraints)*
         {
             type LocalRing<'ring> = $crate::rings::zn::zn_big::Zn<BigIntRing>
@@ -542,7 +542,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
             }
         }
 
-        impl<$($gen_args)*> $crate::algorithms::poly_gcd::gcd_locally::IntegerPolyGCDRing for $int_ring_type
+        impl<$($gen_args)*> $crate::algorithms::poly_gcd::local::IntegerPolyGCDRing for $int_ring_type
             where $($constraints)*
         {
             type LocalRingAsZnBase<'ring> = Self::LocalRingBase<'ring>
@@ -572,7 +572,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
 /// 
 #[allow(unused)]
 impl<R> PolyGCDLocallyDomain for R
-    where R: FiniteRing + Field + FiniteRingSpecializable + SelfIso
+    where R: ?Sized + FiniteRing + Field + FiniteRingSpecializable + SelfIso
 {
     type LocalRingBase<'ring> = Self
         where Self: 'ring;

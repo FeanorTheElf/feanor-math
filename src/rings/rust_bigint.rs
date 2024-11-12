@@ -201,7 +201,7 @@ impl<A: Allocator + Clone> RingBase for RustBigintRingBase<A> {
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
     
-    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
         ///
         /// 10 to this power fits still in a u64
         /// 

@@ -25,7 +25,7 @@ use oorandom;
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn distinct_degree_factorization_base<P, R>(poly_ring: P, mod_f_ring: R) -> Vec<El<P>>
-    where P: PolyRingStore,
+    where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         R: RingStore,
         R::Type: FreeAlgebra,
@@ -101,9 +101,9 @@ pub fn distinct_degree_factorization_base<P, R>(poly_ring: P, mod_f_ring: R) -> 
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>>
-    where P: PolyRingStore,
+    where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P as RingStore>::Type as RingExtension>::BaseRing: FieldStore + FiniteRingStore,
+        <<P as RingStore>::Type as RingExtension>::BaseRing: FieldStore + RingStore,
         <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
 {
     let lc = poly_ring.base_ring().clone_el(poly_ring.lc(&f).unwrap());
@@ -123,7 +123,7 @@ pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn cantor_zassenhaus_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) -> El<P>
-    where P: PolyRingStore,
+    where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         R: RingStore,
         R::Type: FreeAlgebra,
@@ -181,9 +181,9 @@ pub fn cantor_zassenhaus_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) -> El
 ///
 #[stability::unstable(feature = "enable")]
 pub fn cantor_zassenhaus<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
-    where P: PolyRingStore,
+    where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P as RingStore>::Type as RingExtension>::BaseRing: FiniteRingStore + FieldStore,
+        <<P as RingStore>::Type as RingExtension>::BaseRing: RingStore + FieldStore,
         <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
 {
     f = poly_ring.normalize(f);
@@ -203,7 +203,7 @@ pub fn cantor_zassenhaus<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
 /// a seed.
 /// 
 fn cantor_zassenhaus_even_base_with_root_of_unity<P, R>(poly_ring: P, mod_f_ring: R, d: usize, seed: u64) -> El<P>
-    where P: PolyRingStore,
+    where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         R: RingStore,
         R::Type: FreeAlgebra,
@@ -251,12 +251,12 @@ fn cantor_zassenhaus_even_base_with_root_of_unity<P, R>(poly_ring: P, mod_f_ring
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn cantor_zassenhaus_even_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) -> El<P>
-    where P: PolyRingStore,
+    where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         R: RingStore,
         R::Type: FreeAlgebra,
         <<R as RingStore>::Type as RingExtension>::BaseRing: RingStore<Type = <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type>,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso + FiniteRingSpecializable
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     let ZZ = BigIntRing::RING;
@@ -316,10 +316,10 @@ pub fn cantor_zassenhaus_even_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) 
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn cantor_zassenhaus_even<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
-    where P: PolyRingStore,
+    where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P as RingStore>::Type as RingExtension>::BaseRing: FiniteRingStore + FieldStore,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
+        <<P as RingStore>::Type as RingExtension>::BaseRing: RingStore + FieldStore,
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso + FiniteRingSpecializable
 {
     f = poly_ring.normalize(f);
 
@@ -332,6 +332,8 @@ pub fn cantor_zassenhaus_even<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
 
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
+
+use super::{FiniteRingSpecializable, SelfIso};
 
 #[test]
 fn test_distinct_degree_factorization() {

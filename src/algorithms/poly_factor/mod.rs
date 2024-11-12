@@ -2,7 +2,6 @@ use crate::field::*;
 use crate::homomorphism::*;
 use crate::integer::*;
 use crate::pid::*;
-use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::finite::FiniteRing;
 use crate::rings::poly::*;
@@ -22,7 +21,7 @@ pub mod finite;
 /// Trait for fields over which we can efficiently factor polynomials.
 /// For details, see the only associated function [`FactorPolyField::factor_poly()`].
 /// 
-pub trait FactorPolyField: Field {
+pub trait FactorPolyField: Field + PolyGCDRing {
 
     ///
     /// Factors a univariate polynomial with coefficients in this field into its irreducible factors.
@@ -72,30 +71,25 @@ pub trait FactorPolyField: Field {
     /// ```
     /// 
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: PolyRingStore + Copy,
+        where P: RingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
 
     fn is_irred<P>(poly_ring: P, poly: &El<P>) -> bool
-        where P: PolyRingStore + Copy,
+        where P: RingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
         let factorization = Self::factor_poly(poly_ring, poly).0;
-        print!("{} factors as ", poly_ring.format(poly));
-        for (f, e) in &factorization {
-            print!("({})^{} ", poly_ring.format(f), e);
-        }
-        println!(" modulo {}", poly_ring.characteristic(StaticRing::<i64>::RING).unwrap());
         return factorization.len() == 1 && factorization[0].1 == 1;
     }
 }
 
 impl<R> FactorPolyField for R
-    where R: FiniteRing + Field
+    where R: FiniteRing + Field + FiniteRingSpecializable + SelfIso
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: PolyRingStore,
+        where P: RingStore,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
@@ -109,7 +103,7 @@ impl<I> FactorPolyField for RationalFieldBase<I>
         ZnBase: CanHomFrom<I::Type>
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: PolyRingStore,
+        where P: RingStore,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
@@ -121,6 +115,8 @@ impl<I> FactorPolyField for RationalFieldBase<I>
 use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::rings::zn::*;
+
+use super::poly_gcd::PolyGCDRing;
 
 #[test]
 fn test_factor_rational_poly() {

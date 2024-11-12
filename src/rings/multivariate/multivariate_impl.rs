@@ -662,7 +662,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
         }
     }
 
-    fn exponents(&self, m: &Self::Monomial, out: &mut [usize]) {
+    fn expand_monomial_to(&self, m: &Self::Monomial, out: &mut [usize]) {
         nth_monomial_degrevlex(self.variable_count, m.data.deg, m.data.order, &self.cum_binomial_lookup_table, |i, x| out[i] = x as usize);
     }
 

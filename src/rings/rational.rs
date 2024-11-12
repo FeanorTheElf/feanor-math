@@ -8,7 +8,7 @@ use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::*;
 use crate::homomorphism::*;
 use crate::computation::DontObserve;
-use crate::integer::{int_cast, IntegerRing, IntegerRingStore};
+use crate::integer::*;
 use crate::ordered::{OrderedRing, OrderedRingStore};
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::*;
@@ -40,14 +40,14 @@ use crate::ring::*;
 /// ```
 /// 
 #[derive(Debug)]
-pub struct RationalFieldBase<I: IntegerRingStore>
+pub struct RationalFieldBase<I: RingStore>
     where I::Type: IntegerRing
 {
     integers: I
 }
 
 impl<I> Clone for RationalFieldBase<I>
-    where I: IntegerRingStore + Clone,
+    where I: RingStore + Clone,
         I::Type: IntegerRing
 {
     fn clone(&self) -> Self {
@@ -58,7 +58,7 @@ impl<I> Clone for RationalFieldBase<I>
 }
 
 impl<I> Copy for RationalFieldBase<I>
-    where I: IntegerRingStore + Copy,
+    where I: RingStore + Copy,
         I::Type: IntegerRing,
         El<I>: Copy
 {}
@@ -69,11 +69,11 @@ impl<I> Copy for RationalFieldBase<I>
 pub type RationalField<I> = RingValue<RationalFieldBase<I>>;
 
 pub struct RationalFieldEl<I>(El<I>, El<I>)
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing;
 
 impl<I> Clone for RationalFieldEl<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing,
         El<I>: Clone
 {
@@ -83,13 +83,13 @@ impl<I> Clone for RationalFieldEl<I>
 }
 
 impl<I> Copy for RationalFieldEl<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing,
         El<I>: Copy
 {}
 
 impl<I> PartialEq for RationalFieldBase<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     fn eq(&self, other: &Self) -> bool {
@@ -98,7 +98,7 @@ impl<I> PartialEq for RationalFieldBase<I>
 }
 
 impl<I> RationalFieldBase<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     pub fn num<'a>(&'a self, el: &'a <Self as RingBase>::Element) -> &'a El<I> {
@@ -113,7 +113,7 @@ impl<I> RationalFieldBase<I>
 }
 
 impl<I> RationalField<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     pub const fn new(integers: I) -> Self {
@@ -130,7 +130,7 @@ impl<I> RationalField<I>
 }
 
 impl<I> RationalFieldBase<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     fn reduce(&self, value: (&mut El<I>, &mut El<I>)) {
@@ -148,7 +148,7 @@ impl<I> RationalFieldBase<I>
 }
 
 impl<I> RingBase for RationalFieldBase<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     type Element = RationalFieldEl<I>;
@@ -222,17 +222,21 @@ impl<I> RingBase for RationalFieldBase<I>
         true
     }
 
-    fn characteristic<J: IntegerRingStore + Copy>(&self, ZZ: J) -> Option<El<J>>
+    fn characteristic<J: RingStore + Copy>(&self, ZZ: J) -> Option<El<J>>
         where J::Type: IntegerRing
     {
         Some(ZZ.zero())
     }
 
-    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
         if self.base_ring().is_one(&value.1) {
             write!(out, "{}", self.integers.format(&value.0))
         } else {
-            write!(out, "{}/{}", self.integers.format(&value.0), self.integers.format(&value.1))
+            if env > EnvBindingStrength::Product {
+                write!(out, "({}/{})", self.integers.format(&value.0), self.integers.format(&value.1))
+            } else {
+                write!(out, "{}/{}", self.integers.format(&value.0), self.integers.format(&value.1))
+            }
         }
     }
 
@@ -241,7 +245,7 @@ impl<I> RingBase for RationalFieldBase<I>
     }
 }
 
-impl<I: IntegerRingStore> StrassenHint for RationalFieldBase<I>
+impl<I: RingStore> StrassenHint for RationalFieldBase<I>
     where I::Type: IntegerRing
 {
     default fn strassen_threshold(&self) -> usize {
@@ -249,7 +253,7 @@ impl<I: IntegerRingStore> StrassenHint for RationalFieldBase<I>
     }
 }
 
-impl<I: IntegerRingStore> KaratsubaHint for RationalFieldBase<I>
+impl<I: RingStore> KaratsubaHint for RationalFieldBase<I>
     where I::Type: IntegerRing
 {
     default fn karatsuba_threshold(&self) -> usize {
@@ -258,7 +262,7 @@ impl<I: IntegerRingStore> KaratsubaHint for RationalFieldBase<I>
 }
 
 impl<I> RingExtension for RationalFieldBase<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     type BaseRing = I;
@@ -278,9 +282,9 @@ impl<I> RingExtension for RationalFieldBase<I>
 }
 
 impl<I, J> CanHomFrom<RationalFieldBase<J>> for RationalFieldBase<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing,
-        J: IntegerRingStore,
+        J: RingStore,
         J::Type: IntegerRing
 {
     type Homomorphism = ();
@@ -295,9 +299,9 @@ impl<I, J> CanHomFrom<RationalFieldBase<J>> for RationalFieldBase<I>
 }
 
 impl<I, J> CanIsoFromTo<RationalFieldBase<J>> for RationalFieldBase<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing,
-        J: IntegerRingStore,
+        J: RingStore,
         J::Type: IntegerRing
 {
     type Isomorphism = ();
@@ -312,7 +316,7 @@ impl<I, J> CanIsoFromTo<RationalFieldBase<J>> for RationalFieldBase<I>
 }
 
 impl<I, J> CanHomFrom<J> for RationalFieldBase<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing,
         J: IntegerRing
 {
@@ -328,7 +332,7 @@ impl<I, J> CanHomFrom<J> for RationalFieldBase<I>
 }
 
 impl<I> DivisibilityRing for RationalFieldBase<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
@@ -358,10 +362,10 @@ impl<I> DivisibilityRing for RationalFieldBase<I>
     }
 }
 
-impl_interpolation_base_ring_char_zero!{ <{I}> InterpolationBaseRing for RationalFieldBase<I> where I: IntegerRingStore, I::Type: IntegerRing }
+impl_interpolation_base_ring_char_zero!{ <{I}> InterpolationBaseRing for RationalFieldBase<I> where I: RingStore, I::Type: IntegerRing }
 
 impl<I> PrincipalIdealRing for RationalFieldBase<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
@@ -383,7 +387,7 @@ impl<I> PrincipalIdealRing for RationalFieldBase<I>
 }
 
 impl<I> EuclideanRing for RationalFieldBase<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
@@ -397,7 +401,7 @@ impl<I> EuclideanRing for RationalFieldBase<I>
 }
 
 impl<I> Domain for RationalFieldBase<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {}
 
@@ -407,12 +411,12 @@ impl<I> PerfectField for RationalFieldBase<I>
 {}
 
 impl<I> Field for RationalFieldBase<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {}
 
 impl<I> OrderedRing for RationalFieldBase<I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {

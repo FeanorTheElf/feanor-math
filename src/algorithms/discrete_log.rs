@@ -110,7 +110,7 @@ pub fn discrete_log<T, F>(value: T, base: &T, order: i64, op: F, identity: T) ->
     return Some(current_log);
 }
 
-pub fn finite_field_discrete_log<R: FiniteRingStore>(value: El<R>, base: El<R>, Fq: R) -> Option<i64>
+pub fn finite_field_discrete_log<R: RingStore>(value: El<R>, base: El<R>, Fq: R) -> Option<i64>
     where R::Type: FiniteRing + Field + HashableElRing
 {
     discrete_log(

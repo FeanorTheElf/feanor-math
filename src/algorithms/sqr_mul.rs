@@ -32,7 +32,7 @@ use crate::primitive_int::*;
 /// ```
 /// 
 pub fn generic_abs_square_and_multiply<T, U, F, H, I>(base: U, power: &El<I>, int_ring: I, mut square: F, mut multiply_base: H, identity: T) -> T
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing,
         F: FnMut(T) -> T, 
         H: FnMut(&U, T) -> T
@@ -48,7 +48,7 @@ pub fn generic_abs_square_and_multiply<T, U, F, H, I>(base: U, power: &El<I>, in
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn try_generic_abs_square_and_multiply<T, U, F, H, I, E>(base: U, power: &El<I>, int_ring: I, mut square: F, mut multiply_base: H, identity: T) -> Result<T, E>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing,
         F: FnMut(T) -> Result<T, E>, 
         H: FnMut(&U, T) -> Result<T, E>
@@ -81,7 +81,7 @@ pub fn try_generic_abs_square_and_multiply<T, U, F, H, I, E>(base: U, power: &El
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn generic_pow_shortest_chain_table<T, F, G, H, I, E>(base: T, power: &El<I>, int_ring: I, mut double: G, mut mul: F, mut clone: H, identity: T) -> Result<T, E>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing,
         F: FnMut(&T, &T) -> Result<T, E>, 
         G: FnMut(&T) -> Result<T, E>, 

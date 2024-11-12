@@ -3,7 +3,7 @@ use std::alloc::Global;
 
 use extension_impl::FreeAlgebraImplBase;
 use gcd::poly_gcd_local;
-use gcd_locally::*;
+use local::*;
 use hensel::hensel_lift_factorization;
 use sparse::SparseMapVector;
 use squarefree_part::poly_power_decomposition_local;
@@ -283,7 +283,7 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
         I::Type: IntegerRing
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: PolyRingStore + Copy,
+        where P: RingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {

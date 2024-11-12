@@ -29,7 +29,7 @@ pub struct ProbablyNotSquarefree;
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn poly_factor_squarefree_extension<P>(LX: P, f: &El<P>, attempts: usize) -> Result<Vec<El<P>>, ProbablyNotSquarefree>
-    where P: PolyRingStore,
+    where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra + PolyGCDRing,
         <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + PolyGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable
@@ -109,7 +109,7 @@ pub fn poly_factor_squarefree_extension<P>(LX: P, f: &El<P>, attempts: usize) ->
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn poly_factor_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
-    where P: PolyRingStore,
+    where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra + PerfectField + FiniteRingSpecializable + PolyGCDRing,
         <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + PolyGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable

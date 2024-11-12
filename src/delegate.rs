@@ -490,3 +490,81 @@ impl<R> FreeAlgebra for R
         self.get_delegate().wrt_canonical_basis(self.delegate_ref(el))
     }
 }
+
+#[stability::unstable(feature = "enable")]
+pub struct WrapHom<'a, R>
+    where R: DelegateRing
+{
+    to: RingRef<'a, R>,
+    from: RingRef<'a, R::Base>
+}
+
+impl<'a, R> WrapHom<'a, R>
+    where R: DelegateRing
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(ring: &'a R) -> Self {
+        Self {
+            to: RingRef::new(ring),
+            from: RingRef::new(ring.get_delegate())
+        }
+    }
+}
+
+impl<'a, R> Homomorphism<<R as DelegateRing>::Base, R> for WrapHom<'a, R>
+    where R: DelegateRing
+{
+    type DomainStore = RingRef<'a, <R as DelegateRing>::Base>;
+    type CodomainStore = RingRef<'a, R>;
+
+    fn domain<'b>(&'b self) -> &'b Self::DomainStore {
+        &self.from
+    }
+
+    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
+        &self.to
+    }
+
+    fn map(&self, x: <<R as DelegateRing>::Base as RingBase>::Element) -> <R as RingBase>::Element {
+        self.to.get_ring().element_cast(self.to.get_ring().rev_delegate(x))
+    }
+}
+
+#[stability::unstable(feature = "enable")]
+pub struct UnwrapHom<'a, R>
+    where R: DelegateRing
+{
+    from: RingRef<'a, R>,
+    to: RingRef<'a, R::Base>
+}
+
+impl<'a, R> UnwrapHom<'a, R>
+    where R: DelegateRing
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(ring: &'a R) -> Self {
+        Self {
+            from: RingRef::new(ring),
+            to: RingRef::new(ring.get_delegate())
+        }
+    }
+}
+
+impl<'a, R> Homomorphism<R, <R as DelegateRing>::Base> for UnwrapHom<'a, R>
+    where R: DelegateRing
+{
+    type DomainStore = RingRef<'a, R>;
+    type CodomainStore = RingRef<'a, <R as DelegateRing>::Base>;
+
+    fn domain<'b>(&'b self) -> &'b Self::DomainStore {
+        &self.from
+    }
+
+    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
+        &self.to
+    }
+
+    fn map(&self, x: <R as RingBase>::Element) -> <<R as DelegateRing>::Base as RingBase>::Element {
+        self.from.get_ring().delegate(self.from.get_ring().rev_element_cast(x))
+    }
+}

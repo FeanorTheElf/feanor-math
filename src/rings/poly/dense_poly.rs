@@ -3,6 +3,7 @@ use serde::{Deserializer, Serializer};
 use crate::algorithms::convolution::*;
 use crate::algorithms::interpolate::interpolate;
 use crate::algorithms::poly_div::{poly_div_rem, poly_rem};
+use crate::algorithms::poly_gcd::PolyGCDRing;
 use crate::computation::no_error;
 use crate::compute_locally::{EvaluatePolyLocallyRing, InterpolationBaseRing, ToExtRingMap};
 use crate::divisibility::*;
@@ -612,8 +613,8 @@ impl<R, A: Allocator + Clone, C> DivisibilityRing for DensePolyRingBase<R, A, C>
     }
 }
 
-impl<R, A: Allocator + Clone, C> PrincipalIdealRing for DensePolyRingBase<R, A, C>
-    where R: RingStore, R::Type: Field, C: ConvolutionAlgorithm<R::Type>
+impl<R, A, C> PrincipalIdealRing for DensePolyRingBase<R, A, C>
+    where A: Allocator + Clone, R: RingStore, R::Type: Field + PolyGCDRing, C: ConvolutionAlgorithm<R::Type>
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         // base ring is a field, so everything is fine
@@ -635,8 +636,8 @@ impl<R, A: Allocator + Clone, C> PrincipalIdealRing for DensePolyRingBase<R, A, 
     }
 }
 
-impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> EuclideanRing for DensePolyRingBase<R, A, C> 
-    where R: RingStore, R::Type: Field
+impl<R, A, C> EuclideanRing for DensePolyRingBase<R, A, C> 
+    where A: Allocator + Clone, R: RingStore, R::Type: Field + PolyGCDRing, C: ConvolutionAlgorithm<R::Type>
 {
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         let lc_inv = self.base_ring.invert(&rhs.data[self.degree(rhs).unwrap()]).unwrap();

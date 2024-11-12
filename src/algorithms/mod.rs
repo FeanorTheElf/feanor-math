@@ -13,7 +13,6 @@ pub mod int_factor;
 pub mod lll;
 pub mod cyclotomic;
 pub mod poly_div;
-pub mod hensel;
 pub mod poly_factor;
 pub mod discrete_log;
 pub mod linsolve;

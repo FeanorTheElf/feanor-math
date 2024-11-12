@@ -3,7 +3,7 @@ use std::ops::Deref;
 use crate::homomorphism::*;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
-use crate::integer::{IntegerRingStore, IntegerRing};
+use crate::integer::*;
 use crate::algorithms;
 
 ///
@@ -145,7 +145,7 @@ pub enum EnvBindingStrength {
 ///     }
 /// 
 ///     fn characteristic<I>(&self, ZZ: I) -> Option<El<I>>
-///         where I: IntegerRingStore + Copy, I::Type: IntegerRing
+///         where I: RingStore + Copy, I::Type: IntegerRing
 ///     {
 ///         Some(ZZ.zero())
 ///     }
@@ -227,7 +227,9 @@ pub trait RingBase: PartialEq {
     /// Used by [`RingStore::format()`], [`RingStore::println()`] and the implementations of [`std::fmt::Debug`] 
     /// and [`std::fmt::Display`] of [`crate::wrapper::RingElementWrapper`].
     /// 
-    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
+    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        self.dbg_within(value, out, EnvBindingStrength::Weakest)
+    }
 
     ///
     /// Writes a human-readable representation of `value` to `out`, taking into account the possible context
@@ -238,9 +240,7 @@ pub trait RingBase: PartialEq {
     /// Used by [`RingStore::format()`], [`RingStore::println()`] and the implementations of [`std::fmt::Debug`] 
     /// and [`std::fmt::Display`] of [`crate::wrapper::RingElementWrapper`].
     /// 
-    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _env: EnvBindingStrength) -> std::fmt::Result {
-        self.dbg(value, out)
-    }
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _env: EnvBindingStrength) -> std::fmt::Result;
 
     fn square(&self, value: &mut Self::Element) {
         self.mul_assign(value, self.clone_el(value));
@@ -366,7 +366,7 @@ pub trait RingBase: PartialEq {
     /// 
     /// This may panic if `power` is negative.
     /// 
-    fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
+    fn pow_gen<R: RingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
         where R::Type: IntegerRing
     {
         assert!(!integers.is_neg(power));
@@ -431,7 +431,7 @@ pub trait RingBase: PartialEq {
     /// assert_eq!(Some(i16::MAX), zn_64::Zn::new(i16::MAX as u64).characteristic(&ZZ));
     /// ```
     /// 
-    fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+    fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing;
 }
 
@@ -721,7 +721,7 @@ pub trait RingStore: Sized {
         self.pow_gen(x, &(power as i64), StaticRing::<i64>::RING)
     }
 
-    fn pow_gen<R: IntegerRingStore>(&self, x: El<Self>, power: &El<R>, integers: R) -> El<Self> 
+    fn pow_gen<R: RingStore>(&self, x: El<Self>, power: &El<R>, integers: R) -> El<Self> 
         where R::Type: IntegerRing
     {
         self.get_ring().pow_gen(x, power, integers)
@@ -748,7 +748,7 @@ pub trait RingStore: Sized {
         println!("{}", self.format(value));
     }
     
-    fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+    fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.get_ring().characteristic(ZZ)
@@ -1082,11 +1082,11 @@ fn test_internal_wrappings_dont_matter() {
             *lhs *= rhs;
         }
 
-        fn dbg<'a>(&self, _: &Self::Element, _: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        fn dbg_within<'a>(&self, _: &Self::Element, _: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
             Ok(())
         }
 
-        fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+        fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
                 where I::Type: IntegerRing
         {
             Some(ZZ.zero())
@@ -1131,11 +1131,11 @@ fn test_internal_wrappings_dont_matter() {
             *lhs *= rhs;
         }
 
-        fn dbg<'a>(&self, _: &Self::Element, _: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        fn dbg_within<'a>(&self, _: &Self::Element, _: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
             Ok(())
         }
         
-        fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+        fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
                 where I::Type: IntegerRing
         {
             Some(ZZ.zero())

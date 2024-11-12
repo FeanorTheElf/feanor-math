@@ -28,15 +28,14 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 /// use feanor_math::algorithms::resultant::*;
 /// let ZZ = StaticRing::<i64>::RING;
 /// let ZZX = DensePolyRing::new(ZZ, "X");
-/// // f = X^2 - 2X + 1
-/// let f = ZZX.from_terms([(2, 0), (-3, 1), (1, 2)].into_iter());
+/// let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X + 1]);
 /// // the discrimiant is the resultant of f and f'
 /// let discriminant = resultant_global(&ZZX, ZZX.clone_el(&f), derive_poly(&ZZX, &f));
 /// assert_eq!(9 - 8, discriminant);
 /// ```
 /// 
 pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
-    where P: PolyRingStore + Copy,
+    where P: RingStore + Copy,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Domain + PrincipalIdealRing
 {
@@ -89,7 +88,7 @@ pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type a
 
 #[stability::unstable(feature = "enable")]
 pub fn resultant_local<'a, P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
-    where P: 'a + PolyRingStore + Copy,
+    where P: 'a + RingStore + Copy,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: EvaluatePolyLocallyRing
 {
@@ -115,7 +114,7 @@ pub fn resultant_local<'a, P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as Rin
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
-use crate::rings::rational::RationalField;
+use crate::rings::rational::*;
 #[cfg(test)]
 use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 #[cfg(test)]
@@ -123,9 +122,9 @@ use crate::rings::multivariate::*;
 #[cfg(test)]
 use crate::algorithms::buchberger::buchberger_simple;
 #[cfg(test)]
-use crate::rings::local::AsLocalPIR;
-#[cfg(test)]
 use crate::integer::BigIntRing;
+#[cfg(test)]
+use crate::algorithms::poly_gcd::PolyGCDRing;
 
 #[test]
 fn test_resultant() {
@@ -153,7 +152,8 @@ fn test_resultant() {
 #[test]
 fn test_resultant_local_polynomial() {
     let ZZ = BigIntRing::RING;
-    let QQ = AsLocalPIR::from_field(RationalField::new(ZZ));
+    let QQ = RationalField::new(ZZ);
+    static_assert_impls!(RationalFieldBase<BigIntRing>: PolyGCDRing);
     // we eliminate `Y`, so add it as the outer indeterminate
     let QQX = DensePolyRing::new(&QQ, "X");
     let QQXY = DensePolyRing::new(&QQX, "Y");

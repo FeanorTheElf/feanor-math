@@ -7,6 +7,7 @@ use crate::homomorphism::Homomorphism;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
+use crate::rings::finite::*;
 use crate::integer::*;
 use crate::rings::zn::*;
 use crate::pid::PrincipalIdealRingStore;
@@ -28,7 +29,7 @@ fn square<R>(Zn: &R, x: &El<R>) -> El<R>
 
 #[allow(unused)]
 fn point_eq<R>(Zn: &R, P: &Point<R>, Q: &Point<R>) -> bool
-    where R: ZnRingStore,
+    where R: RingStore,
         R::Type: ZnRing
 {
     let factor_quo = if !Zn.is_zero(&Q.0) {
@@ -74,7 +75,7 @@ fn point_eq<R>(Zn: &R, P: &Point<R>, Q: &Point<R>) -> bool
 
 #[inline(never)]
 fn edcurve_add<R>(Zn: &R, d: &El<R>, P: Point<R>, Q: &Point<R>) -> Point<R> 
-    where R: ZnRingStore,
+    where R: RingStore,
         R::Type: ZnRing
 {
     let (Px, Py, Pz) = P;
@@ -101,7 +102,7 @@ fn edcurve_add<R>(Zn: &R, d: &El<R>, P: Point<R>, Q: &Point<R>) -> Point<R>
 
 #[inline(never)]
 fn edcurve_double<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> Point<R> 
-    where R: ZnRingStore,
+    where R: RingStore,
         R::Type: ZnRing
 {
     let (Px, Py, Pz) = P;
@@ -126,7 +127,7 @@ fn edcurve_double<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> Point<R>
 }
 
 fn ec_pow<R>(base: &Point<R>, d: &El<R>, power: &El<BigIntRing>, Zn: &R) -> Point<R>
-    where R: ZnRingStore,
+    where R: RingStore,
         R::Type: ZnRing
 {
     let copy_point = |(x, y, z): &Point<R>| (Zn.clone_el(x), Zn.clone_el(y), Zn.clone_el(z));
@@ -144,7 +145,7 @@ fn ec_pow<R>(base: &Point<R>, d: &El<R>, power: &El<BigIntRing>, Zn: &R) -> Poin
 }
 
 fn is_on_curve<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> bool
-    where R: ZnRingStore,
+    where R: RingStore,
         R::Type: ZnRing
 {
     let (x, y, z) = &P;
@@ -192,7 +193,7 @@ fn optimize_parameters(ln_p: f64, ln_n: f64) -> (f64, f64) {
 /// Optimizes the parameters to find a factor of size roughly `p`; `p` should be at most sqrt(n)
 /// 
 fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, mut rng: F, controller: Controller) -> Result<Option<El<<R::Type as ZnRing>::IntegerRing>>, Controller::Abort>
-    where R: ZnRingStore + DivisibilityRingStore + Copy + Send + Sync,
+    where R: RingStore + Copy + Send + Sync,
         El<R>: Send,
         R::Type: ZnRing + DivisibilityRing,
         F: FnMut() -> u64 + Send,

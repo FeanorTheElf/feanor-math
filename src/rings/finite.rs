@@ -176,10 +176,10 @@ pub mod generic_tests {
     use crate::ordered::OrderedRingStore;
     use crate::primitive_int::StaticRing;
 
-    use super::{FiniteRing, FiniteRingStore};
+    use super::{FiniteRing, FiniteRingStore, RingStore};
 
     pub fn test_finite_ring_axioms<R>(ring: &R)
-        where R: FiniteRingStore,
+        where R: RingStore,
             R::Type: FiniteRing
     {
         let ZZ = BigIntRing::RING;

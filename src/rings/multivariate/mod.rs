@@ -68,7 +68,7 @@ pub trait MultivariatePolyRing: RingExtension {
     /// This is equivalent to performing `out[i] = self.exponent_at(m, i)` for
     /// every `i` in `0..self.indeterminate_count()`.
     /// 
-    fn exponents(&self, m: &Self::Monomial, out: &mut [usize]) {
+    fn expand_monomial_to(&self, m: &Self::Monomial, out: &mut [usize]) {
         assert_eq!(out.len(), self.indeterminate_count());
         for i in 0..self.indeterminate_count() {
             out[i] = self.exponent_at(m, i)
@@ -110,6 +110,20 @@ pub trait MultivariatePolyRing: RingExtension {
         self.add_assign(lhs, self_ring.sum(
             rhs.into_iter().map(|(c, m)| self.create_term(c, m))
         ));
+    }
+
+    fn map_terms<P, H>(&self, from: &P, el: &P::Element, hom: H) -> Self::Element
+        where P: ?Sized + MultivariatePolyRing,
+            H: Homomorphism<<P::BaseRing as RingStore>::Type, <Self::BaseRing as RingStore>::Type>
+    {
+        assert!(self.base_ring().get_ring() == hom.codomain().get_ring());
+        assert!(from.base_ring().get_ring() == hom.domain().get_ring());
+        assert_eq!(self.indeterminate_count(), from.indeterminate_count());
+        let mut exponents_storage = (0..self.indeterminate_count()).map(|_| 0).collect::<Vec<_>>();
+        return RingRef::new(self).from_terms(from.terms(el).map(|(c, m)| {
+            from.expand_monomial_to(m, &mut exponents_storage);
+            (hom.map_ref(c), self.create_monomial(exponents_storage.iter().copied()))
+        }));
     }
 
     fn clone_monomial(&self, mon: &Self::Monomial) -> Self::Monomial {
@@ -257,7 +271,7 @@ pub trait MultivariatePolyRingStore: RingStore
     delegate!{ MultivariatePolyRing, fn indeterminate_count(&self) -> usize }
     delegate!{ MultivariatePolyRing, fn create_term(&self, coeff: PolyCoeff<Self>, monomial: PolyMonomial<Self>) -> El<Self> }
     delegate!{ MultivariatePolyRing, fn exponent_at(&self, m: &PolyMonomial<Self>, var_index: usize) -> usize }
-    delegate!{ MultivariatePolyRing, fn exponents(&self, m: &PolyMonomial<Self>, out: &mut [usize]) -> () }
+    delegate!{ MultivariatePolyRing, fn expand_monomial_to(&self, m: &PolyMonomial<Self>, out: &mut [usize]) -> () }
     delegate!{ MultivariatePolyRing, fn monomial_mul(&self, lhs: PolyMonomial<Self>, rhs: &PolyMonomial<Self>) -> PolyMonomial<Self> }
     delegate!{ MultivariatePolyRing, fn monomial_lcm(&self, lhs: PolyMonomial<Self>, rhs: &PolyMonomial<Self>) -> PolyMonomial<Self> }
     delegate!{ MultivariatePolyRing, fn monomial_div(&self, lhs: PolyMonomial<Self>, rhs: &PolyMonomial<Self>) -> Result<PolyMonomial<Self>, PolyMonomial<Self>> }
@@ -266,9 +280,9 @@ pub trait MultivariatePolyRingStore: RingStore
     delegate!{ MultivariatePolyRing, fn appearing_indeterminates(&self, f: &El<Self>) -> Vec<(usize, usize)> }
     delegate!{ MultivariatePolyRing, fn specialize(&self, f: &El<Self>, var: usize, val: &El<Self>) -> El<Self> }
 
-    fn expand_exponents(&self, m: &PolyMonomial<Self>) -> Vec<usize> {
+    fn expand_monomial(&self, m: &PolyMonomial<Self>) -> Vec<usize> {
         let mut result = (0..self.indeterminate_count()).map(|_| 0).collect::<Vec<_>>();
-        self.exponents(m, &mut result);
+        self.expand_monomial_to(m, &mut result);
         return result;
     }
 
@@ -344,6 +358,26 @@ pub trait MultivariatePolyRingStore: RingStore
         self.get_ring().evaluate(f, value, hom)
     }
     
+    fn into_lifted_hom<P, H>(self, from: P, hom: H) -> CoefficientHom<P, Self, H>
+        where P: RingStore,
+            P::Type: MultivariatePolyRing,
+            H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
+    {
+        CoefficientHom {
+            from: from,
+            to: self,
+            hom: hom
+        }
+    }
+
+    fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
+        where P: RingStore,
+            P::Type: MultivariatePolyRing,
+            H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
+    {
+        self.into_lifted_hom(from, hom)
+    }
+
     ///
     /// Invokes the function with a wrapped version of the indeterminates of this poly ring.
     /// Use for convenient creation of polynomials.
@@ -544,6 +578,45 @@ impl MonomialOrder for Lex {
             }
         }
         return Ordering::Equal;
+    }
+}
+
+pub struct CoefficientHom<PFrom, PTo, H>
+    where PFrom: RingStore,
+        PTo: RingStore,
+        PFrom::Type: MultivariatePolyRing,
+        PTo::Type: MultivariatePolyRing,
+        H: Homomorphism<<<PFrom::Type as RingExtension>::BaseRing as RingStore>::Type, <<PTo::Type as RingExtension>::BaseRing as RingStore>::Type>
+{
+    from: PFrom,
+    to: PTo,
+    hom: H
+}
+
+impl<PFrom, PTo, H> Homomorphism<PFrom::Type, PTo::Type> for CoefficientHom<PFrom, PTo, H>
+    where PFrom: RingStore,
+        PTo: RingStore,
+        PFrom::Type: MultivariatePolyRing,
+        PTo::Type: MultivariatePolyRing,
+        H: Homomorphism<<<PFrom::Type as RingExtension>::BaseRing as RingStore>::Type, <<PTo::Type as RingExtension>::BaseRing as RingStore>::Type>
+{
+    type DomainStore = PFrom;
+    type CodomainStore = PTo;
+
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
+        &self.to
+    }
+
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
+        &self.from
+    }
+
+    fn map(&self, x: <PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element {
+        self.map_ref(&x)
+    }
+
+    fn map_ref(&self, x: &<PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element {
+        self.to.get_ring().map_terms(self.from.get_ring(), x, &self.hom)
     }
 }
 

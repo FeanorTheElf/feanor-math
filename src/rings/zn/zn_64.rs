@@ -272,11 +272,11 @@ impl RingBase for ZnBase {
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
 
-    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
         write!(out, "{}", self.complete_reduce(value.0))
     }
     
-    fn characteristic<I: IntegerRingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>
+    fn characteristic<I: RingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.size(other_ZZ)
@@ -298,7 +298,7 @@ impl RingBase for ZnBase {
         return result;
     }
 
-    fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
+    fn pow_gen<R: RingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element 
         where R::Type: IntegerRing
     {
         assert!(!integers.is_neg(power));
@@ -419,7 +419,7 @@ impl ComputeInnerProduct for ZnBase {
 
 impl_eq_based_self_iso!{ ZnBase }
 
-impl<I: IntegerRingStore> CanHomFrom<zn_big::ZnBase<I>> for ZnBase
+impl<I: RingStore> CanHomFrom<zn_big::ZnBase<I>> for ZnBase
     where I::Type: IntegerRing
 {
     type Homomorphism = ();
@@ -441,7 +441,7 @@ impl<I: IntegerRingStore> CanHomFrom<zn_big::ZnBase<I>> for ZnBase
     }
 }
 
-impl<I: IntegerRingStore> CanIsoFromTo<zn_big::ZnBase<I>> for ZnBase
+impl<I: RingStore> CanIsoFromTo<zn_big::ZnBase<I>> for ZnBase
     where I::Type: IntegerRing
 {
     type Isomorphism = <zn_big::ZnBase<I> as CanHomFrom<StaticRingBase<i64>>>::Homomorphism;
@@ -594,7 +594,7 @@ impl FiniteRing for ZnBase {
         super::generic_impls::random_element(self, rng)
     }
 
-    fn size<I: IntegerRingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>
+    fn size<I: RingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         if other_ZZ.get_ring().representable_bits().is_none() || self.integer_ring().abs_log2_ceil(&(self.modulus() + 1)) <= other_ZZ.get_ring().representable_bits() {

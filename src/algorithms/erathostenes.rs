@@ -23,7 +23,7 @@ pub fn erathostenes(B: u64) -> Vec<u64> {
 
 #[stability::unstable(feature = "enable")]
 pub fn enumerate_primes<I>(ZZ: I, B: &El<I>) -> Vec<El<I>> 
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     let bound = int_cast(ZZ.clone_el(B), StaticRing::<i128>::RING, &ZZ) as u64;

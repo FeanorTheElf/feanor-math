@@ -1,5 +1,5 @@
 use crate::pid::*;
-use crate::integer::{IntegerRingStore, IntegerRing};
+use crate::integer::*;
 use crate::ordered::{OrderedRingStore, OrderedRing};
 use crate::ring::*;
 
@@ -16,7 +16,7 @@ use std::cmp::Ordering;
 /// The given ring must be euclidean.
 /// 
 pub fn eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>, El<R>) 
-    where R: EuclideanRingStore,
+    where R: RingStore,
         R::Type: EuclideanRing
 {
     let (mut a, mut b) = (a, b);
@@ -49,7 +49,7 @@ pub fn eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn half_eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>) 
-    where R: EuclideanRingStore,
+    where R: RingStore,
         R::Type: EuclideanRing
 {
     let (mut a, mut b) = (a, b);
@@ -96,7 +96,7 @@ pub fn half_eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>)
 /// `signed_eea(0, 0) == (0, 0, 0)`
 /// 
 pub fn signed_eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
-    where R: EuclideanRingStore + OrderedRingStore,
+    where R: RingStore,
         R::Type: EuclideanRing + OrderedRing
 {
     if ring.is_zero(&fst) {
@@ -130,7 +130,7 @@ pub fn signed_eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
 /// [`signed_gcd()`] gives more guarantees.
 /// 
 pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
-    where R: EuclideanRingStore,
+    where R: RingStore,
         R::Type: EuclideanRing
 {
     let (_, _, d) = eea(a, b, ring);
@@ -151,7 +151,7 @@ pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
 /// ```
 /// 
 pub fn signed_gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
-    where R: EuclideanRingStore + OrderedRingStore,
+    where R: RingStore,
         R::Type: EuclideanRing + OrderedRing
 {
     let (_, _, d) = signed_eea(a, b, ring);
@@ -171,7 +171,7 @@ pub fn signed_gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
 /// ```
 /// 
 pub fn signed_lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
-    where R: EuclideanRingStore + OrderedRingStore,
+    where R: RingStore,
         R::Type: EuclideanRing + OrderedRing
 {
     if ring.is_zero(&fst) || ring.is_zero(&snd) {
@@ -189,7 +189,7 @@ pub fn signed_lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
 /// [`signed_lcm()`] gives more guarantees.
 /// 
 pub fn lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
-    where R: EuclideanRingStore,
+    where R: RingStore,
         R::Type: EuclideanRing
 {
     if ring.is_zero(&fst) || ring.is_zero(&snd) {
@@ -203,7 +203,8 @@ pub fn lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
 /// Computes x such that `x = a mod p` and `x = b mod q`. Requires that p and q are coprime.
 /// 
 pub fn inv_crt<I>(a: El<I>, b: El<I>, p: &El<I>, q: &El<I>, ZZ: I) -> El<I>
-    where I: IntegerRingStore, I::Type: IntegerRing
+    where I: RingStore, 
+        I::Type: IntegerRing
 {
     let (s, t, d) = signed_eea(ZZ.clone_el(p), ZZ.clone_el(q), &ZZ);
     assert!(ZZ.is_one(&d) || ZZ.is_neg_one(&d));

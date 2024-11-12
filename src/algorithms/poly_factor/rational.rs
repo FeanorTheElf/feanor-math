@@ -15,7 +15,7 @@ use super::IntegerRing;
 
 #[stability::unstable(feature = "enable")]
 pub fn poly_factor_rational<'a, P, I>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
-    where P: PolyRingStore,
+    where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <P::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,

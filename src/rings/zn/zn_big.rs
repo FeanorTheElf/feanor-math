@@ -11,8 +11,7 @@ use crate::impl_field_wrap_unwrap_homs;
 use crate::impl_field_wrap_unwrap_isos;
 use crate::rings::extension::FreeAlgebraStore;
 use crate::pid::*;
-use crate::integer::IntegerRing;
-use crate::integer::IntegerRingStore;
+use crate::integer::*;
 use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 use crate::homomorphism::*;
@@ -69,7 +68,7 @@ use crate::serialization::SerializableElementRing;
 /// assert!(R.eq_el(&R.int_hom().map(120493), &R.coerce(&S, S.int_hom().map(120493))));
 /// ```
 ///
-pub struct ZnBase<I: IntegerRingStore> 
+pub struct ZnBase<I: RingStore> 
     where I::Type: IntegerRing
 {
     integer_ring: I,
@@ -85,7 +84,7 @@ pub struct ZnBase<I: IntegerRingStore>
 /// 
 pub type Zn<I> = RingValue<ZnBase<I>>;
 
-impl<I: IntegerRingStore> Zn<I>
+impl<I: RingStore> Zn<I>
     where I::Type: IntegerRing
 {
     pub fn new(integer_ring: I, modulus: El<I>) -> Self {
@@ -93,7 +92,7 @@ impl<I: IntegerRingStore> Zn<I>
     }
 }
 
-impl<I: IntegerRingStore> ZnBase<I> 
+impl<I: RingStore> ZnBase<I> 
     where I::Type: IntegerRing
 {
     pub fn new(integer_ring: I, modulus: El<I>) -> Self {
@@ -131,10 +130,10 @@ impl<I: IntegerRingStore> ZnBase<I>
     }
 }
 
-pub struct ZnEl<I: IntegerRingStore>(/* allow it to grow up to 2 * modulus(), inclusively */ El<I>)
+pub struct ZnEl<I: RingStore>(/* allow it to grow up to 2 * modulus(), inclusively */ El<I>)
     where I::Type: IntegerRing;
 
-impl<I: IntegerRingStore> Debug for ZnEl<I> 
+impl<I: RingStore> Debug for ZnEl<I> 
     where El<I>: Clone + Debug,
         I::Type: IntegerRing
 {
@@ -143,7 +142,7 @@ impl<I: IntegerRingStore> Debug for ZnEl<I>
     }
 }
 
-impl<I: IntegerRingStore> Clone for ZnEl<I> 
+impl<I: RingStore> Clone for ZnEl<I> 
     where El<I>: Clone,
         I::Type: IntegerRing
 {
@@ -152,12 +151,12 @@ impl<I: IntegerRingStore> Clone for ZnEl<I>
     }
 }
 
-impl<I: IntegerRingStore> Copy for ZnEl<I>
+impl<I: RingStore> Copy for ZnEl<I>
     where El<I>: Copy,
         I::Type: IntegerRing
 {}
 
-impl<I: IntegerRingStore> RingBase for ZnBase<I> 
+impl<I: RingStore> RingBase for ZnBase<I> 
     where I::Type: IntegerRing
 {
     type Element = ZnEl<I>;
@@ -259,7 +258,7 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
 
-    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
         if self.integer_ring.is_geq(&value.0, &self.modulus) {
             let reduced_value = self.integer_ring.sub_ref(&value.0, &self.modulus);
             if self.integer_ring.eq_el(&reduced_value, &self.modulus) {
@@ -272,7 +271,7 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
         }
     }
     
-    fn characteristic<J: IntegerRingStore + Copy>(&self, ZZ: J) -> Option<El<J>>
+    fn characteristic<J: RingStore + Copy>(&self, ZZ: J) -> Option<El<J>>
         where J::Type: IntegerRing
     {
         self.size(ZZ)
@@ -281,7 +280,7 @@ impl<I: IntegerRingStore> RingBase for ZnBase<I>
     fn is_approximate(&self) -> bool { false }
 }
 
-impl<I: IntegerRingStore> Clone for ZnBase<I> 
+impl<I: RingStore> Clone for ZnBase<I> 
     where I: Clone,
         I::Type: IntegerRing
 {
@@ -296,7 +295,7 @@ impl<I: IntegerRingStore> Clone for ZnBase<I>
     }
 }
 
-impl<I: IntegerRingStore> InterpolationBaseRing for AsFieldBase<Zn<I>>
+impl<I: RingStore> InterpolationBaseRing for AsFieldBase<Zn<I>>
     where I::Type: IntegerRing
 {
     type ExtendedRingBase<'a> = GaloisFieldBaseOver<RingRef<'a, Self>>
@@ -328,13 +327,13 @@ impl<I: IntegerRingStore> InterpolationBaseRing for AsFieldBase<Zn<I>>
         return (ring, points);
     }
 }
-impl<I: IntegerRingStore> Copy for ZnBase<I> 
+impl<I: RingStore> Copy for ZnBase<I> 
     where I: Copy,
         El<I>: Copy,
         I::Type: IntegerRing
 {}
 
-impl<I: IntegerRingStore> HashableElRing for ZnBase<I>
+impl<I: RingStore> HashableElRing for ZnBase<I>
     where I::Type: IntegerRing
 {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
@@ -342,7 +341,7 @@ impl<I: IntegerRingStore> HashableElRing for ZnBase<I>
     }
 }
 
-impl<I: IntegerRingStore + Default> FromModulusCreateableZnRing for ZnBase<I>
+impl<I: RingStore + Default> FromModulusCreateableZnRing for ZnBase<I>
     where I::Type: IntegerRing
 {
     fn create<F, E>(create_modulus: F) -> Result<Self, E>
@@ -354,7 +353,7 @@ impl<I: IntegerRingStore + Default> FromModulusCreateableZnRing for ZnBase<I>
     }
 }
 
-impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I> 
+impl<I: RingStore> DivisibilityRing for ZnBase<I> 
     where I::Type: IntegerRing
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
@@ -362,7 +361,7 @@ impl<I: IntegerRingStore> DivisibilityRing for ZnBase<I>
     }
 }
 
-impl<I: IntegerRingStore, J: IntegerRingStore> CanHomFrom<ZnBase<J>> for ZnBase<I> 
+impl<I: RingStore, J: RingStore> CanHomFrom<ZnBase<J>> for ZnBase<I> 
     where I::Type: IntegerRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing
 {
@@ -385,7 +384,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanHomFrom<ZnBase<J>> for ZnBase<
     }
 }
 
-impl<I: IntegerRingStore> CanHomFrom<zn_64::ZnBase> for ZnBase<I>
+impl<I: RingStore> CanHomFrom<zn_64::ZnBase> for ZnBase<I>
     where I::Type: IntegerRing
 {
     type Homomorphism = <zn_64::ZnBase as CanIsoFromTo<ZnBase<I>>>::Isomorphism;
@@ -399,7 +398,7 @@ impl<I: IntegerRingStore> CanHomFrom<zn_64::ZnBase> for ZnBase<I>
     }
 }
 
-impl<I: IntegerRingStore> CanIsoFromTo<zn_64::ZnBase> for ZnBase<I>
+impl<I: RingStore> CanIsoFromTo<zn_64::ZnBase> for ZnBase<I>
     where I::Type: IntegerRing
 {
     type Isomorphism = <zn_64::ZnBase as CanHomFrom<ZnBase<I>>>::Homomorphism;
@@ -413,7 +412,7 @@ impl<I: IntegerRingStore> CanIsoFromTo<zn_64::ZnBase> for ZnBase<I>
     }
 }
 
-impl<I: IntegerRingStore> PartialEq for ZnBase<I>
+impl<I: RingStore> PartialEq for ZnBase<I>
     where I::Type: IntegerRing
 {
     fn eq(&self, other: &Self) -> bool {
@@ -421,7 +420,7 @@ impl<I: IntegerRingStore> PartialEq for ZnBase<I>
     }
 }
 
-impl<I: IntegerRingStore, J: IntegerRingStore> CanIsoFromTo<ZnBase<J>> for ZnBase<I>
+impl<I: RingStore, J: RingStore> CanIsoFromTo<ZnBase<J>> for ZnBase<I>
     where I::Type: IntegerRing + CanIsoFromTo<J::Type>,
         J::Type: IntegerRing
 {
@@ -444,7 +443,7 @@ impl<I: IntegerRingStore, J: IntegerRingStore> CanIsoFromTo<ZnBase<J>> for ZnBas
     }
 }
 
-impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanHomFrom<J> for ZnBase<I>
+impl<I: RingStore, J: IntegerRing + ?Sized> CanHomFrom<J> for ZnBase<I>
     where I::Type: IntegerRing, 
         J: CanIsoFromTo<I::Type>
 {
@@ -467,7 +466,7 @@ impl<I: IntegerRingStore, J: IntegerRing + ?Sized> CanHomFrom<J> for ZnBase<I>
 }
 
 pub struct ZnBaseElementsIter<'a, I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     ring: &'a ZnBase<I>,
@@ -475,7 +474,7 @@ pub struct ZnBaseElementsIter<'a, I>
 }
 
 impl<'a, I> Clone for ZnBaseElementsIter<'a, I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     fn clone(&self) -> Self {
@@ -484,7 +483,7 @@ impl<'a, I> Clone for ZnBaseElementsIter<'a, I>
 }
 
 impl<'a, I> Iterator for ZnBaseElementsIter<'a, I>
-    where I: IntegerRingStore,
+    where I: RingStore,
         I::Type: IntegerRing
 {
     type Item = ZnEl<I>;
@@ -500,7 +499,7 @@ impl<'a, I> Iterator for ZnBaseElementsIter<'a, I>
     }
 }
 
-impl<I: IntegerRingStore> SerializableElementRing for ZnBase<I>
+impl<I: RingStore> SerializableElementRing for ZnBase<I>
     where I::Type: IntegerRing + SerializableElementRing
 {
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
@@ -518,7 +517,7 @@ impl<I: IntegerRingStore> SerializableElementRing for ZnBase<I>
     }
 }
 
-impl<I: IntegerRingStore> FiniteRing for ZnBase<I>
+impl<I: RingStore> FiniteRing for ZnBase<I>
     where I::Type: IntegerRing
 {
     type ElementsIter<'a> = ZnBaseElementsIter<'a, I>
@@ -535,7 +534,7 @@ impl<I: IntegerRingStore> FiniteRing for ZnBase<I>
         generic_impls::random_element(self, rng)
     }
     
-    fn size<J: IntegerRingStore + Copy>(&self, ZZ: J) -> Option<El<J>>
+    fn size<J: RingStore + Copy>(&self, ZZ: J) -> Option<El<J>>
         where J::Type: IntegerRing
     {
         if ZZ.get_ring().representable_bits().is_none() || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits() {
@@ -546,7 +545,7 @@ impl<I: IntegerRingStore> FiniteRing for ZnBase<I>
     }
 }
 
-impl<I: IntegerRingStore> PrincipalIdealRing for ZnBase<I>
+impl<I: RingStore> PrincipalIdealRing for ZnBase<I>
     where I::Type: IntegerRing
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
@@ -560,7 +559,7 @@ impl<I: IntegerRingStore> PrincipalIdealRing for ZnBase<I>
     }
 }
 
-impl<I: IntegerRingStore> ZnRing for ZnBase<I>
+impl<I: RingStore> ZnRing for ZnBase<I>
     where I::Type: IntegerRing
 {
     type IntegerRingBase = I::Type;
@@ -592,10 +591,10 @@ impl<I: IntegerRingStore> ZnRing for ZnBase<I>
     }
 }
 
-impl_field_wrap_unwrap_homs!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: IntegerRingStore, I::Type: IntegerRing, J: IntegerRingStore, J::Type: IntegerRing }
-impl_field_wrap_unwrap_isos!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: IntegerRingStore, I::Type: IntegerRing, J: IntegerRingStore, J::Type: IntegerRing }
-impl_localpir_wrap_unwrap_homs!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: IntegerRingStore, I::Type: IntegerRing, J: IntegerRingStore, J::Type: IntegerRing }
-impl_localpir_wrap_unwrap_isos!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: IntegerRingStore, I::Type: IntegerRing, J: IntegerRingStore, J::Type: IntegerRing }
+impl_field_wrap_unwrap_homs!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
+impl_field_wrap_unwrap_isos!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
+impl_localpir_wrap_unwrap_homs!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
+impl_localpir_wrap_unwrap_isos!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
 
 #[cfg(test)]
 use crate::integer::BigIntRing;

@@ -2,7 +2,7 @@ use std::convert::identity;
 
 use crate::algorithms::poly_factor::finite::poly_factor_finite_field;
 use crate::algorithms::poly_gcd::*;
-use crate::algorithms::poly_gcd::gcd_locally::*;
+use crate::algorithms::poly_gcd::local::*;
 use crate::algorithms::poly_gcd::hensel::*;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::computation::*;
@@ -180,7 +180,7 @@ pub fn heuristic_factor_poly_local<P, Controller>(poly_ring: P, f: El<P>, prime_
 }
 
 fn ln_factor_max_coeff<P>(ZZX: P, f: &El<P>) -> f64
-    where P: PolyRingStore,
+    where P: RingStore,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
 {
@@ -195,7 +195,7 @@ fn ln_factor_max_coeff<P>(ZZX: P, f: &El<P>) -> f64
 }
 
 fn factor_squarefree_monic_integer_poly_local<'a, P, Controller>(ZZX: P, f: &El<P>, controller: Controller) -> Vec<El<P>>
-    where P: 'a + PolyRingStore + Copy,
+    where P: 'a + RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
         Controller: ComputationController
@@ -234,7 +234,7 @@ pub fn poly_factor_integer<'a, P, Controller>(ZZX: P, f: El<P>, controller: Cont
     assert!(!ZZX.is_zero(&f));
     let power_decomposition = poly_power_decomposition_local(ZZX, ZZX.clone_el(&f), controller.clone());
 
-    start_computation!(controller, "factor_int_poly");
+    start_computation!(controller, "factor_int_poly()");
 
     let mut result = Vec::new();
     let mut current = ZZX.clone_el(&f);
@@ -246,6 +246,7 @@ pub fn poly_factor_integer<'a, P, Controller>(ZZX: P, f: El<P>, controller: Cont
         for irred_factor in factorization.into_iter().map(|fi| unevaluate_aX(ZZX, &fi, &lc_factor)) {
             let irred_factor_lc = ZZX.lc(&irred_factor).unwrap();
             let mut power = 0;
+            let irred_factor = make_primitive(ZZX, &irred_factor).0;
             while let Some(quo) = ZZX.checked_div(&ZZX.inclusion().mul_ref_map(&current, &ZZX.base_ring().pow(ZZX.base_ring().clone_el(&irred_factor_lc), ZZX.degree(&f).unwrap())), &irred_factor) {
                 current = quo;
                 ZZX.balance_poly(&mut current);

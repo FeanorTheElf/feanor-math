@@ -194,7 +194,7 @@ pub mod generic_tests {
     use super::*;
     use crate::ring::El;
 
-    pub fn test_euclidean_ring_axioms<R: EuclideanRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) 
+    pub fn test_euclidean_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) 
         where R::Type: EuclideanRing
     {
         assert!(ring.is_commutative());
@@ -212,7 +212,7 @@ pub mod generic_tests {
         }
     }
 
-    pub fn test_principal_ideal_ring_axioms<R: PrincipalIdealRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
+    pub fn test_principal_ideal_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
         where R::Type: PrincipalIdealRing
     {
         assert!(ring.is_commutative());

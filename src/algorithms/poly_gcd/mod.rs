@@ -1,6 +1,6 @@
 use gcd::poly_gcd_local;
 use global::poly_power_decomposition_finite_field;
-use gcd_locally::PolyGCDLocallyDomain;
+use local::PolyGCDLocallyDomain;
 use squarefree_part::poly_power_decomposition_local;
 
 use crate::computation::DontObserve;
@@ -16,11 +16,12 @@ use crate::rings::poly::*;
 use crate::rings::finite::*;
 use crate::field::*;
 use crate::specialization::FiniteRingOperation;
+use crate::specialization::FiniteRingSpecializable;
 
 use super::eea::gcd;
 
 pub mod global;
-pub mod gcd_locally;
+pub mod local;
 pub mod hensel;
 pub mod squarefree_part;
 pub mod gcd;
@@ -176,7 +177,7 @@ pub fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
 
 
 impl<R> PolyGCDRing for R
-    where R: ?Sized + PolyGCDLocallyDomain
+    where R: ?Sized + PolyGCDLocallyDomain + SelfIso
 {
     default fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
         where P: RingStore + Copy,
@@ -186,18 +187,21 @@ impl<R> PolyGCDRing for R
         struct PowerDecompositionIfFiniteField<'a, P>(P, &'a El<P>)
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing;
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso + FiniteRingSpecializable;
 
         impl<'a, P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PowerDecompositionIfFiniteField<'a, P>
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso + FiniteRingSpecializable
         {
             type Output = Vec<(El<P>, usize)>;
 
             fn execute(self) -> Vec<(El<P>, usize)>
                 where <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing
             {
+                static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: SelfIso);
+                static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRingSpecializable);
+
                 let new_poly_ring = DensePolyRing::new(AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())), "X");
                 let new_poly = new_poly_ring.from_terms(self.0.terms(&self.1).map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(self.0.base_ring().clone_el(c)), i)));
                 poly_power_decomposition_finite_field(&new_poly_ring, &new_poly).into_iter().map(|(f, k)| 
@@ -221,18 +225,21 @@ impl<R> PolyGCDRing for R
         struct PolyGCDIfFiniteField<'a, P>(P, &'a El<P>, &'a El<P>)
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing;
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso + FiniteRingSpecializable;
 
         impl<'a, P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PolyGCDIfFiniteField<'a, P>
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso + FiniteRingSpecializable
         {
             type Output = El<P>;
 
             fn execute(self) -> El<P>
                 where <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing
             {
+                static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: SelfIso);
+                static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRingSpecializable);
+                
                 let new_poly_ring = DensePolyRing::new(AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())), "X");
                 let new_lhs = new_poly_ring.from_terms(self.0.terms(&self.1).map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(self.0.base_ring().clone_el(c)), i)));
                 let new_rhs = new_poly_ring.from_terms(self.0.terms(&self.2).map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(self.0.base_ring().clone_el(c)), i)));

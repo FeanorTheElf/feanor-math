@@ -81,11 +81,11 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD> {
 
     fn is_noetherian(&self) -> bool { true }
 
-    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
         write!(out, "{}", *value)
     }
     
-    fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+    fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         self.size(ZZ)
@@ -221,7 +221,7 @@ impl<const N: u64, const IS_FIELD: bool> FiniteRing for ZnBase<N, IS_FIELD> {
         generic_impls::random_element(self, rng)
     }
 
-    fn size<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+    fn size<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
         if ZZ.get_ring().representable_bits().is_none() || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits() {

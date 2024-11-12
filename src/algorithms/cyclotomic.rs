@@ -36,7 +36,8 @@ use crate::algorithms;
 /// ```
 /// 
 pub fn cyclotomic_polynomial<P>(P: P, n: usize) -> El<P>
-    where P: PolyRingStore, P::Type: PolyRing + DivisibilityRing
+    where P: RingStore, 
+        P::Type: PolyRing + DivisibilityRing
 {
     let mut current = P.sub(P.indeterminate(), P.one());
     let ZZ = StaticRing::<i128>::RING;

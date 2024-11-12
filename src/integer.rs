@@ -1,5 +1,5 @@
 use crate::algorithms;
-use crate::algorithms::poly_gcd::gcd_locally::IntegerPolyGCDRing;
+use crate::algorithms::poly_gcd::local::IntegerPolyGCDRing;
 use crate::divisibility::*;
 use crate::ring::*;
 use crate::homomorphism::*;
@@ -352,7 +352,7 @@ impl<F: ?Sized + IntegerRing, T: ?Sized + IntegerRing> IntCast<F> for T {
 /// assert_el_eq!(ZZbig, ZZbig.power_of_two(16), int_cast(65536, ZZbig, ZZi64));
 ///  ```
 /// 
-pub fn int_cast<T: IntegerRingStore, F: IntegerRingStore>(value: El<F>, to: T, from: F) -> El<T>
+pub fn int_cast<T: RingStore, F: RingStore>(value: El<F>, to: T, from: F) -> El<T>
     where T::Type: IntegerRing, F::Type: IntegerRing
 {
     <T::Type as IntCast<F::Type>>::cast(to.get_ring(), from.get_ring(), value)
@@ -480,7 +480,7 @@ pub mod generic_tests {
     use crate::ring::El;
     use super::*;
         
-    pub fn test_integer_get_uniformly_random<R: IntegerRingStore>(ring: R) 
+    pub fn test_integer_get_uniformly_random<R: RingStore>(ring: R) 
         where R::Type: IntegerRing
     {
         for b in [15, 16] {

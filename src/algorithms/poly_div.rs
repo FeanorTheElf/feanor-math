@@ -22,7 +22,6 @@ pub fn poly_div_rem<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs
         S::Type: PolyRing,
         P: PolyRingStore,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing,
         H: Homomorphism<<<S::Type as RingExtension>::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>,
         F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>
 {

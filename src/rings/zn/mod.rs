@@ -134,14 +134,11 @@ pub mod generic_impls {
     use crate::ordered::*;
     use crate::primitive_int::{StaticRing, StaticRingBase};
     use crate::field::*;
-    use crate::rings::finite::*;
-    use crate::ring::*;
+    use crate::rings::zn::*;
     use crate::divisibility::DivisibilityRingStore;
     use crate::integer::{IntegerRing, IntegerRingStore};
-    use crate::pid::*;
     use crate::rings::extension::galois_field::{GaloisField, GaloisFieldOver};
-    use super::{int_cast, BigIntRing, ZnRing, ZnRingStore};
-    use crate::homomorphism::*;
+    use crate::specialization::FiniteRingSpecializable;
 
     ///
     /// A generic `ZZ -> Z/nZ` homomorphism. Optimized for the case that values of `ZZ` can be very
@@ -303,7 +300,7 @@ pub mod generic_impls {
     #[stability::unstable(feature = "enable")]
     pub fn interpolation_ring<R: ZnRingStore>(ring: R, count: usize) -> GaloisFieldOver<R>
         where R: Clone,
-            R::Type: ZnRing + FiniteRing + Field + CanHomFrom<StaticRingBase<i64>>
+            R::Type: ZnRing + Field + FiniteRingSpecializable + SelfIso + CanHomFrom<StaticRingBase<i64>>
     {
         let ZZbig = BigIntRing::RING;
         let modulus = int_cast(ring.integer_ring().clone_el(ring.modulus()), ZZbig, ring.integer_ring());
@@ -358,7 +355,10 @@ pub trait ZnOperation {
         where Self: 'a;
 
     fn call<'a, R>(self, ring: R) -> Self::Output<'a>
-        where Self: 'a, R: 'a + ZnRingStore + Send + Sync, R::Type: ZnRing, El<R>: Send;
+        where Self: 'a, 
+            R: 'a + RingStore + Send + Sync, 
+            R::Type: ZnRing, 
+            El<R>: Send;
 }
 
 ///
@@ -398,7 +398,7 @@ pub trait ZnOperation {
 /// ```
 /// 
 pub fn choose_zn_impl<'a, I, F>(ZZ: I, n: El<I>, f: F) -> F::Output<'a>
-    where I: 'a + IntegerRingStore,
+    where I: 'a + RingStore,
         I::Type: IntegerRing,
         F: ZnOperation
 {
@@ -420,7 +420,7 @@ fn test_choose_zn_impl() {
             where Self: 'a;
 
         fn call<'a, R>(self, Zn: R)
-            where R: 'a + ZnRingStore, R::Type: ZnRing
+            where R: 'a + RingStore, R::Type: ZnRing
         {
             let value = Zn.coerce(Zn.integer_ring(), int_cast(self.int_value, Zn.integer_ring(), &StaticRing::<i64>::RING));
             assert_el_eq!(Zn, Zn.int_hom().map(-1), Zn.mul_ref(&value, &value));
@@ -449,9 +449,9 @@ enum ReductionMapRequirements {
 /// other).
 /// 
 pub struct ReductionMap<R, S>
-    where R: ZnRingStore,
+    where R: RingStore,
         R::Type: ZnRing,
-        S: ZnRingStore,
+        S: RingStore,
         S::Type: ZnRing
 {
     from: R,
@@ -464,9 +464,9 @@ pub struct ReductionMap<R, S>
 }
 
 impl<R, S> ReductionMap<R, S>
-    where R: ZnRingStore,
+    where R: RingStore,
         R::Type: ZnRing,
-        S: ZnRingStore,
+        S: RingStore,
         S::Type: ZnRing
 {
     pub fn new(from: R, to: S) -> Option<Self> {
@@ -546,9 +546,9 @@ impl<R, S> ReductionMap<R, S>
 }
 
 impl<R, S> Homomorphism<R::Type, S::Type> for ReductionMap<R, S>
-    where R: ZnRingStore,
+    where R: RingStore,
         R::Type: ZnRing,
-        S: ZnRingStore,
+        S: RingStore,
         S::Type: ZnRing
 {
     type CodomainStore = S;
@@ -577,7 +577,7 @@ pub mod generic_tests {
     use super::*;
     use crate::primitive_int::{StaticRingBase, StaticRing};
 
-    pub fn test_zn_axioms<R: ZnRingStore>(R: R)
+    pub fn test_zn_axioms<R: RingStore>(R: R)
         where R::Type: ZnRing,
             <R::Type as ZnRing>::IntegerRingBase: CanIsoFromTo<StaticRingBase<i128>> + CanIsoFromTo<StaticRingBase<i32>>
     {
@@ -602,7 +602,7 @@ pub mod generic_tests {
         }
     }
 
-    pub fn test_map_in_large_int<R: ZnRingStore>(R: R)
+    pub fn test_map_in_large_int<R: RingStore>(R: R)
         where <R as RingStore>::Type: ZnRing + CanHomFrom<BigIntRingBase>
     {
         let ZZ_big = BigIntRing::RING;

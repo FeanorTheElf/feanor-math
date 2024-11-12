@@ -230,7 +230,7 @@ pub trait PolyRingStore: RingStore
     }
 
     fn into_lifted_hom<P, H>(self, from: P, hom: H) -> CoefficientHom<P, Self, H>
-        where P: PolyRingStore,
+        where P: RingStore,
             P::Type: PolyRing,
             H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
     {
@@ -242,7 +242,7 @@ pub trait PolyRingStore: RingStore
     }
 
     fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
-        where P: PolyRingStore,
+        where P: RingStore,
             P::Type: PolyRing,
             H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
     {
@@ -296,8 +296,8 @@ pub trait PolyRingStore: RingStore
 }
 
 pub struct CoefficientHom<PFrom, PTo, H>
-    where PFrom: PolyRingStore,
-        PTo: PolyRingStore,
+    where PFrom: RingStore,
+        PTo: RingStore,
         PFrom::Type: PolyRing,
         PTo::Type: PolyRing,
         H: Homomorphism<<<PFrom::Type as RingExtension>::BaseRing as RingStore>::Type, <<PTo::Type as RingExtension>::BaseRing as RingStore>::Type>
@@ -308,8 +308,8 @@ pub struct CoefficientHom<PFrom, PTo, H>
 }
 
 impl<PFrom, PTo, H> Homomorphism<PFrom::Type, PTo::Type> for CoefficientHom<PFrom, PTo, H>
-    where PFrom: PolyRingStore,
-        PTo: PolyRingStore,
+    where PFrom: RingStore,
+        PTo: RingStore,
         PFrom::Type: PolyRing,
         PTo::Type: PolyRing,
         H: Homomorphism<<<PFrom::Type as RingExtension>::BaseRing as RingStore>::Type, <<PTo::Type as RingExtension>::BaseRing as RingStore>::Type>

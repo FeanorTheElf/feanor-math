@@ -33,6 +33,15 @@ const DEFAULT_PROBABILISTIC_REPETITIONS: usize = 30;
 #[cfg(test)]
 const RANDOM_TEST_INSTANCE_COUNT: usize = 10;
 
+macro_rules! static_assert_impls {
+    ($type:ty: $trait:tt) => {
+        {
+            fn assert_impls<T>() where T: ?Sized + $trait {}
+            assert_impls::<$type>();
+        }
+    };
+}
+
 ///
 /// Marks a trait as "sealed" on stable. In other words, using this trait
 /// as supertrait for another trait within `feanor-math` means that implementing

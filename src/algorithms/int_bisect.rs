@@ -10,7 +10,7 @@ use crate::ordered::*;
 /// the function finds `floor(x)` for some root `x` of `f` between `left` and `right`.
 /// 
 pub fn bisect_floor<R, F>(ZZ: R, left: El<R>, right: El<R>, mut func: F) -> El<R>
-    where R: IntegerRingStore, R::Type: IntegerRing, F: FnMut(&El<R>) -> El<R>
+    where R: RingStore, R::Type: IntegerRing, F: FnMut(&El<R>) -> El<R>
 {
     assert!(ZZ.is_lt(&left, &right));
     let mut l = left;
@@ -42,7 +42,7 @@ pub fn bisect_floor<R, F>(ZZ: R, left: El<R>, right: El<R>, mut func: F) -> El<R
 /// the function finds `floor(x)` for some root `x` of `f`.
 /// 
 pub fn find_root_floor<R, F>(ZZ: R, approx: El<R>, mut func: F) -> El<R>
-    where R: IntegerRingStore, R::Type: IntegerRing, F: FnMut(&El<R>) -> El<R>
+    where R: RingStore, R::Type: IntegerRing, F: FnMut(&El<R>) -> El<R>
 {
     let mut left = ZZ.clone_el(&approx);
     let mut step = ZZ.one();
@@ -90,7 +90,7 @@ pub fn find_root_floor<R, F>(ZZ: R, approx: El<R>, mut func: F) -> El<R>
 /// ```
 /// 
 pub fn root_floor<R>(ZZ: R, n: El<R>, root: usize) -> El<R>
-    where R: IntegerRingStore, R::Type: IntegerRing
+    where R: RingStore, R::Type: IntegerRing
 {
     assert!(root > 0);
     if root == 1 {

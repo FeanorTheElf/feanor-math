@@ -323,7 +323,7 @@ impl<R: RingStore> PartialEq for RingElementWrapper<R> {
 
 impl<R: RingStore> Eq for RingElementWrapper<R> {}
 
-impl<R: RingStore + HashableElRingStore> Hash for RingElementWrapper<R> 
+impl<R: RingStore> Hash for RingElementWrapper<R> 
     where R::Type: HashableElRing
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {

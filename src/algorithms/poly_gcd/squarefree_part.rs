@@ -1,7 +1,7 @@
 use dense_poly::DensePolyRing;
 
 use crate::algorithms::poly_gcd::*;
-use crate::algorithms::poly_gcd::gcd_locally::*;
+use crate::algorithms::poly_gcd::local::*;
 use crate::algorithms::poly_gcd::hensel::*;
 use crate::computation::*;
 use crate::seq::*;
@@ -56,7 +56,8 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P
         }
     }
     // at first, I thought this could not happen, but actually it can. If we do a faulty lift, the polynomials might after all still 
-    // turn out to be perfect powers; the alternative to this check here would be to check previously if all "factors" really divide f
+    // turn out to be perfect powers; the alternative to this check here would be to check previously if all "factors" really divide f;
+    // I believe this is faster
     if !RX.eq_el(&poly, &RX.prod(result.iter().map(|(f, k)| RX.pow(RX.clone_el(f), *k)))) {
         return None;
     }

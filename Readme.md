@@ -306,7 +306,7 @@ impl RingBase for F2Base {
     }
 
     fn characteristic<I>(&self, ZZ: I) -> Option<El<I>>
-        where I: IntegerRingStore + Copy, I::Type: IntegerRing
+        where I: RingStore + Copy, I::Type: IntegerRing
     {
         Some(ZZ.int_hom().map(2))
     }
@@ -440,7 +440,7 @@ impl<R: RingStore> RingBase for MyPolyRingBase<R> {
     }
 
     fn characteristic<I>(&self, ZZ: I) -> Option<El<I>>
-        where I: IntegerRingStore + Copy, I::Type: IntegerRing
+        where I: RingStore + Copy, I::Type: IntegerRing
     {
         self.base_ring.get_ring().characteristic(ZZ)
     }
