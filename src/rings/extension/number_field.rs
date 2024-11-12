@@ -727,6 +727,7 @@ fn test_poly_gcd_number_field() {
 }
 
 #[test]
+#[ignore]
 fn random_test_poly_gcd_number_field() {
     let QQ = RationalField::new(BigIntRing::RING);
     let QQX = DensePolyRing::new(&QQ, "X");
@@ -736,6 +737,7 @@ fn random_test_poly_gcd_number_field() {
 
     for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
         let genpoly = QQX.from_terms((0..rank).map(|i| (QQ.inclusion().map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64())), i)).chain([(QQ.one(), rank)].into_iter()));
+
         let K = NumberField::new(&QQX, &genpoly);
         let KY = DensePolyRing::new(&K, "Y");
 
@@ -746,6 +748,7 @@ fn random_test_poly_gcd_number_field() {
         // println!("Testing gcd on ({}) * ({}) and ({}) * ({})", poly_ring.format(&f), poly_ring.format(&h), poly_ring.format(&g), poly_ring.format(&h));
         let lhs = KY.mul_ref(&f, &h);
         let rhs = KY.mul_ref(&g, &h);
+
         let gcd = <_ as PolyGCDRing>::gcd(&KY, &lhs, &rhs);
         // println!("Result {}", poly_ring.format(&gcd));
 

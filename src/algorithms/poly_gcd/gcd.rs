@@ -107,7 +107,7 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
         prepare_lift_time += (end - start).as_millis();
 
         let start = Instant::now();
-        let (d, _) = hensel_lift(&S_to_F, &SX, &FX, &RX_to_SX.map_ref(poly), (&factor1, &factor2), controller.clone());
+        let (d, _) = hensel_lift_quadratic(&S_to_F, &SX, &FX, &RX_to_SX.map_ref(poly), (&factor1, &factor2), controller.clone());
         let end = Instant::now();
         hensel_lift_time += (end - start).as_millis();
 
