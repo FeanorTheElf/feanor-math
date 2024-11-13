@@ -31,7 +31,7 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 /// let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X + 1]);
 /// // the discrimiant is the resultant of f and f'
 /// let discriminant = resultant_global(&ZZX, ZZX.clone_el(&f), derive_poly(&ZZX, &f));
-/// assert_eq!(9 - 8, discriminant);
+/// assert_eq!(0, discriminant);
 /// ```
 /// 
 pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
@@ -86,6 +86,37 @@ pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type a
     }
 }
 
+///
+/// Computes the resultant of `f` and `g` over the base ring.
+/// 
+/// The resultant is the determinant of the linear map
+/// ```text
+/// R[X]_deg(g)  x  R[X]_deg(f)  ->  R[X]_deg(fg),
+///      a       ,       b       ->    af + bg
+/// ```
+/// where `R[X]_d` refers to the vector space of polynomials in `R[X]` of degree
+/// less than `d`.
+/// 
+/// As opposed to [`resultant_global()`], this function does so by first
+/// computing the resultant modulo multiple prime ideals, and then reconstructing
+/// the full resultant from this. For infinite rings, this is usually much faster.
+/// 
+/// # Example
+/// ```
+/// use feanor_math::assert_el_eq;
+/// use feanor_math::ring::*;
+/// use feanor_math::integer::*;
+/// use feanor_math::rings::poly::dense_poly::DensePolyRing;
+/// use feanor_math::rings::poly::*;
+/// use feanor_math::algorithms::resultant::*;
+/// let ZZ = BigIntRing::RING;
+/// let ZZX = DensePolyRing::new(ZZ, "X");
+/// let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X + 1]);
+/// // the discrimiant is the resultant of f and f'
+/// let discriminant = resultant_local(&ZZX, ZZX.clone_el(&f), derive_poly(&ZZX, &f));
+/// assert_el_eq!(ZZ, ZZ.zero(), discriminant);
+/// ```
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn resultant_local<'a, P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
     where P: 'a + RingStore + Copy,
@@ -184,7 +215,7 @@ fn test_resultant_local_polynomial() {
     let gb = buchberger_simple::<_, _>(&QQYX, vec![f, g], Lex);
     let expected = gb.into_iter().filter(|poly| QQYX.appearing_indeterminates(&poly).len() == 1).collect::<Vec<_>>();
     assert!(expected.len() == 1);
-    let expected = QQX.normalize(QQX.from_terms(QQYX.terms(&expected[0]).map(|(c, m)| (c.clone(), QQYX.exponent_at(m, 1)))));
+    let expected = QQX.normalize(QQX.from_terms(QQYX.terms(&expected[0]).map(|(c, m)| (QQ.clone_el(c), QQYX.exponent_at(m, 1)))));
 
     assert_el_eq!(QQX, expected, actual);
 }

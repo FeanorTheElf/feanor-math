@@ -1,20 +1,17 @@
 use libc;
 use serde::de::DeserializeSeed;
-use serde::Deserialize;
-use serde::Deserializer;
-use serde::Serialize;
-use serde::Serializer;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::impl_poly_gcd_locally_for_ZZ;
 use crate::algorithms;
 use crate::pid::*;
-use crate::ordered::OrderedRing;
-use crate::ordered::OrderedRingStore;
-use crate::primitive_int::StaticRing;
-use crate::primitive_int::StaticRingBase;
+use crate::ordered::*;
+use crate::primitive_int::*;
 use crate::divisibility::*;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::integer::*;
+use crate::specialization::*;
 use crate::rings::rust_bigint::*;
 
 mod mpir_bindings;
@@ -42,6 +39,17 @@ impl MPZEl {
         }
     }
 }
+
+///
+/// Except for random number generation (which we do in Rust), GMP/MPIR
+/// is thread-safe (Section 3.7 of the manual)
+/// 
+unsafe impl Send for MPZEl {}
+///
+/// Except for random number generation (which we do in Rust), GMP/MPIR
+/// is thread-safe (Section 3.7 of the manual)
+/// 
+unsafe impl Sync for MPZEl {}
 
 impl Drop for MPZEl {
 
@@ -247,7 +255,11 @@ impl RingBase for MPZBase {
         true
     }
 
-    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+    fn is_approximate(&self) -> bool {
+        false
+    }
+
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _env: EnvBindingStrength) -> std::fmt::Result {
         RustBigintRing::RING.get_ring().dbg(&self.map_out(RustBigintRing::RING.get_ring(), self.clone_el(value), &()), out)
     }
     
@@ -338,11 +350,11 @@ impl DivisibilityRing for MPZBase {
         }
     }
 
-    fn balance_factor<'a, I>(&self, elements: I) -> Self::Element
+    fn balance_factor<'a, I>(&self, elements: I) -> Option<Self::Element>
         where I: Iterator<Item = &'a Self::Element>,
             Self: 'a
     {
-        elements.fold(self.zero(), |a, b| self.ideal_gen(&a, b))
+        Some(elements.fold(self.zero(), |a, b| self.ideal_gen(&a, b)))
     }
 }
 
@@ -520,6 +532,15 @@ impl IntegerRing for MPZBase {
 
     fn representable_bits(&self) -> Option<usize> {
         None
+    }
+}
+
+impl_poly_gcd_locally_for_ZZ!{ IntegerPolyGCDRing for MPZBase }
+
+impl FiniteRingSpecializable for MPZBase {
+    
+    fn specialize<O: FiniteRingOperation<Self>>(_op: O) -> Result<O::Output, ()> {
+        Err(())
     }
 }
 

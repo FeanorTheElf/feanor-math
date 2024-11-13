@@ -1,14 +1,14 @@
 use std::alloc::Allocator;
 use std::alloc::Global;
 
-use algorithms::matmul::ComputeInnerProduct;
-
+use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::iters::multi_cartesian_product;
 use crate::iters::MultiProduct;
 use crate::seq::VectorView;
 use crate::integer::*;
 use crate::divisibility::DivisibilityRingStore;
 use crate::rings::zn::*;
+use crate::specialization::*;
 use crate::primitive_int::*;
 
 ///
@@ -662,6 +662,16 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> HashableElRing for ZnBase
         for (i, el) in (0..self.components.len()).zip(el.data.iter()) {
             self.components[i].hash(el, h);
         }
+    }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Clone> FiniteRingSpecializable for ZnBase<C, J, A> 
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
+        J::Type: IntegerRing,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
+{
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
+        Ok(op.execute())
     }
 }
 

@@ -2,25 +2,22 @@ use std::alloc::Allocator;
 use std::marker::PhantomData;
 
 use crate::algorithms::convolution::ConvolutionAlgorithm;
-use crate::field::Field;
 use crate::integer::*;
 use crate::primitive_int::PrimitiveInt;
 use crate::primitive_int::StaticRingBase;
 use crate::ring::*;
-use crate::rings::extension::*;
 use crate::rings::extension::extension_impl::*;
-use crate::rings::extension::galois_field::*;
-use crate::rings::field::*;
 use crate::rings::finite::*;
 use crate::rings::rational::*;
 use crate::rings::rust_bigint::RustBigintRingBase;
 use crate::seq::*;
 use crate::rings::zn::*;
-use crate::divisibility::*;
 
 ///
 /// Operation on a ring `R` that only makes sense if `R` implements
 /// the trait [`crate::rings::finite::FiniteRing`].
+/// 
+/// Used through the trait [`FiniteRingSpecializable`].
 /// 
 #[stability::unstable(feature = "enable")]
 pub trait FiniteRingOperation<R>
@@ -28,6 +25,9 @@ pub trait FiniteRingOperation<R>
 {    
     type Output;
 
+    ///
+    /// Runs the operations, with the additional assumption that `R: FiniteRing`.
+    /// 
     fn execute(self) -> Self::Output
         where R: FiniteRing;
 }
@@ -35,6 +35,8 @@ pub trait FiniteRingOperation<R>
 ///
 /// Trait for ring types that can check (at compile time) whether they implement
 /// [`crate::rings::finite::FiniteRing`].
+/// 
+/// This serves as a workaround while specialization is not properly supported. 
 /// 
 #[stability::unstable(feature = "enable")]
 pub trait FiniteRingSpecializable: RingBase {
@@ -61,15 +63,6 @@ impl<I> FiniteRingSpecializable for RationalFieldBase<I>
     }
 }
 
-impl<I> FiniteRingSpecializable for zn_big::ZnBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
-{
-    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
-        Ok(op.execute())
-    }
-}
-
 impl<A> FiniteRingSpecializable for RustBigintRingBase<A>
     where A: Allocator + Clone
 {
@@ -87,45 +80,6 @@ impl<T> FiniteRingSpecializable for StaticRingBase<T>
 }
 
 impl FiniteRingSpecializable for zn_64::ZnBase {
-    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
-        Ok(op.execute())
-    }
-}
-
-impl<R> FiniteRingSpecializable for AsFieldBase<R>
-    where R: RingStore,
-        R::Type: FiniteRingSpecializable + DivisibilityRing
-{
-    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
-        struct OpWrapper<R, O>
-            where R: RingStore,
-                R::Type: FiniteRingSpecializable + DivisibilityRing,
-                O: FiniteRingOperation<AsFieldBase<R>>
-        {
-            operation: O,
-            ring: PhantomData<R>
-        }
-
-        impl<R, O> FiniteRingOperation<R::Type> for OpWrapper<R, O>
-            where R: RingStore,
-                R::Type: FiniteRingSpecializable + DivisibilityRing,
-                O: FiniteRingOperation<AsFieldBase<R>>
-        {
-            type Output = O::Output;
-            fn execute(self) -> Self::Output where R::Type:FiniteRing {
-                self.operation.execute()
-            }
-        }
-
-        <R::Type as FiniteRingSpecializable>::specialize(OpWrapper { operation: op, ring: PhantomData })
-    }
-}
-
-impl<Impl> FiniteRingSpecializable for GaloisFieldBase<Impl>
-    where Impl: RingStore,
-        Impl::Type: Field + FreeAlgebra + FiniteRing,
-        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
-{
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
         Ok(op.execute())
     }
@@ -169,15 +123,14 @@ impl<R, V, A, C> FiniteRingSpecializable for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
-impl<const N: u64> FiniteRingSpecializable for zn_static::ZnBase<N, true> {
-
-    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
-        Ok(op.execute())
-    }
-}
-
 #[cfg(test)]
 use crate::homomorphism::*;
+#[cfg(test)]
+use crate::rings::field::*;
+#[cfg(test)]
+use crate::rings::extension::galois_field::*;
+#[cfg(test)]
+use crate::rings::extension::*;
 
 #[test]
 fn test_specialize_finite_field() {
@@ -213,7 +166,7 @@ fn test_specialize_finite_field() {
     let ring = FreeAlgebraImpl::new(&QQ, 2, [QQ.neg_one()]).as_field().ok().unwrap();
     assert!(<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(Verify(ring.get_ring(), 0)).is_err());
 
-    // let base_ring = GaloisField::new(3, 2).into().unwrap_self();
-    // let ring = FreeAlgebraImpl::new(&base_ring, 3, [base_ring.neg_one(), base_ring.one()]).as_field().ok().unwrap();
-    // assert!(<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(Verify(ring.get_ring(), 729)).is_ok());
+    let base_ring = GaloisField::new(3, 2).into().unwrap_self();
+    let ring = FreeAlgebraImpl::new(&base_ring, 3, [base_ring.neg_one(), base_ring.one()]).as_field().ok().unwrap();
+    assert!(<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(Verify(ring.get_ring(), 729)).is_ok());
 }

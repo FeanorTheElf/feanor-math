@@ -315,7 +315,7 @@ impl RingBase for F2Base {
     fn is_noetherian(&self) -> bool { true }
     fn is_approximate(&self) -> bool { false }
 
-    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
         write!(out, "{}", *value)
     }
 }
@@ -431,8 +431,9 @@ impl<R: RingStore> RingBase for MyPolyRingBase<R> {
         self.base_ring.get_ring().is_approximate()
     }
 
-    fn dbg(&self, val: &Self::Element, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        // this is just for demonstration purposes - note that this prints zero coefficients
+    fn dbg_within(&self, val: &Self::Element, f: &mut std::fmt::Formatter, env: EnvBindingStrength) -> Result<(), std::fmt::Error> {
+        // this is just for demonstration purposes - note that this prints zero coefficients, and
+        // does not print parenthesis even when `env > EnvBindingStrength::Sum`
         for i in 0..(val.len() - 1) {
             write!(f, "{} * X^{} + ", self.base_ring.format(&val[i]), i)?;
         }

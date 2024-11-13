@@ -5,12 +5,17 @@ use crate::field::*;
 use crate::homomorphism::Homomorphism;
 use crate::ring::*;
 use crate::integer::{BigIntRing, IntegerRing, IntegerRingStore};
+use crate::specialization::FiniteRingSpecializable;
 use crate::unsafe_any::UnsafeAny;
 
 ///
 /// Trait for rings that are finite.
 /// 
-pub trait FiniteRing: RingBase {
+/// Currently [`FiniteRing`] is a subtrait of the unstable trait [`FiniteRingSpecializable`],
+/// so it is at the moment impossible to implement [`FiniteRing`] for a custom ring type
+/// without enabling unstable features. Sorry.
+/// 
+pub trait FiniteRing: RingBase + FiniteRingSpecializable {
 
     type ElementsIter<'a>: Sized + Clone + Iterator<Item = <Self as RingBase>::Element>
         where Self: 'a;

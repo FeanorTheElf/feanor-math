@@ -1,5 +1,4 @@
 use crate::computation::ComputationController;
-use crate::computation::DontObserve;
 use crate::pid::*;
 use crate::ring::*;
 use crate::divisibility::*;
@@ -8,14 +7,14 @@ use crate::homomorphism::*;
 use crate::seq::*;
 use crate::algorithms::poly_gcd::local::*;
 
-use super::BigIntRing;
-use super::DensePolyRing;
-
 ///
 /// Given a monic polynomial `f` modulo `p^r` and a factorization `f = gh mod p^e`
 /// into monic and coprime polynomials `g, h` modulo `p^e`, `r > e`, computes a factorization
 /// `f = g' h'` with `g', h'` monic polynomials modulo `p^r` that reduce to `g, h`
 /// modulo `p^e`.
+/// 
+/// This uses linear Hensel lifting, thus will be slower than [`hensel_lift_quadratic()`]
+/// if `r >> e`.
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2, Controller>(
@@ -81,8 +80,10 @@ pub fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2, Controller>(
 ///
 /// Given a monic polynomial `f` modulo `p^r` and a factorization `f = gh mod p^e`
 /// into monic and coprime polynomials `g, h` modulo `p^e`, `r > e`, computes a factorization
-/// `f = g' h'` with `g', h'` monic polynomials modulo `p^r` that reduce to `g, h`
-/// modulo `p^e`.
+/// `f = g' h'` with `g', h'` monic polynomials modulo `p^r` that reduce to `g, h` modulo `p^e`.
+/// 
+/// This uses quadratic Hensel lifting, thus will be faster than [`hensel_lift_linear()`]
+/// if `r >> e`.
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
@@ -194,6 +195,13 @@ pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V, Controller>
     result.insert(0, g_lifted);
     return result;
 }
+
+#[cfg(test)]
+use crate::computation::DontObserve;
+#[cfg(test)]
+use super::BigIntRing;
+#[cfg(test)]
+use super::DensePolyRing;
 
 #[test]
 fn test_hensel_lift() {

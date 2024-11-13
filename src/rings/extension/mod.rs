@@ -210,6 +210,9 @@ pub trait FreeAlgebra: RingExtension {
     }
 }
 
+///
+/// [`RingStore`] for [`FreeAlgebra`].
+/// 
 pub trait FreeAlgebraStore: RingStore
     where Self::Type: FreeAlgebra
 {

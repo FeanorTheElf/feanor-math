@@ -14,8 +14,7 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::{PolyRing, PolyRingStore};
 use crate::integer::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
-
-use super::FiniteRingSpecializable;
+use crate::specialization::FiniteRingSpecializable;
 
 #[stability::unstable(feature = "enable")]
 pub struct ProbablyNotSquarefree;

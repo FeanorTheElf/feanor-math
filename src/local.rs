@@ -53,6 +53,9 @@ pub trait PrincipalLocalRing: EuclideanRing {
     }
 }
 
+///
+/// [`RingStore`] for [`PrincipalLocalRing`]
+/// 
 #[stability::unstable(feature = "enable")]
 pub trait PrincipalLocalRingStore: EuclideanRingStore
     where Self::Type: PrincipalLocalRing

@@ -138,7 +138,6 @@ pub mod generic_impls {
     use crate::divisibility::DivisibilityRingStore;
     use crate::integer::{IntegerRing, IntegerRingStore};
     use crate::rings::extension::galois_field::{GaloisField, GaloisFieldOver};
-    use crate::specialization::FiniteRingSpecializable;
 
     ///
     /// A generic `ZZ -> Z/nZ` homomorphism. Optimized for the case that values of `ZZ` can be very
@@ -300,7 +299,7 @@ pub mod generic_impls {
     #[stability::unstable(feature = "enable")]
     pub fn interpolation_ring<R: ZnRingStore>(ring: R, count: usize) -> GaloisFieldOver<R>
         where R: Clone,
-            R::Type: ZnRing + Field + FiniteRingSpecializable + SelfIso + CanHomFrom<StaticRingBase<i64>>
+            R::Type: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>
     {
         let ZZbig = BigIntRing::RING;
         let modulus = int_cast(ring.integer_ring().clone_el(ring.modulus()), ZZbig, ring.integer_ring());

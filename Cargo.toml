@@ -60,10 +60,6 @@ ndarray = ["dep:ndarray"]
 # Uses macros to unroll all stages in the Strassen algorithm. Slightly improves performance at the cost of compilation time.
 unrolled_strassen = []
 
-# Use the symbol ^ for exponentiation of `RingElementWrapper`. Note that this is an abuse of the Rust operator conventions, and in particular
-# the binding strength of ^ is not correct. This is also why this is feature-gated and not enabled by default
-elementwrapper-caret-pow = []
-
 [profile.profiling]
 inherits = "bench"
 debug = true

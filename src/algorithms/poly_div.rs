@@ -14,7 +14,7 @@ use crate::rings::poly::*;
 /// base ring by the leading coefficient of `rhs`. If the base ring is a field, this can
 /// just be standard division. In other cases, this depends on the exact situation you are
 /// in - e.g. `rhs` might be monic or in in a specific context, it might be guaranteed that the 
-/// division always works. If this is not the case, look also at [`poly_div_domain()`], which
+/// division always works. If this is not the case, look also at [`poly_div_rem_domain()`], which
 /// implicitly performs the polynomial division over the field of fractions.
 /// 
 pub fn poly_div_rem<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_ring: S, mut left_div_lc: F, hom: H) -> Result<(El<P>, El<P>), E>
@@ -115,6 +115,7 @@ pub fn poly_rem<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_rin
 /// The chosen factor `a` is in the base ring and is the smallest possible w.r.t.
 /// divisibility.
 /// 
+#[stability::unstable(feature = "enable")]
 pub fn poly_div_rem_domain<P>(ring: P, mut lhs: El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<<P::Type as RingExtension>::BaseRing>)
     where P: PolyRingStore,
         P::Type: PolyRing,

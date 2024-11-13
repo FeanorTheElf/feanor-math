@@ -11,6 +11,7 @@ use crate::impl_field_wrap_unwrap_homs;
 use crate::impl_field_wrap_unwrap_isos;
 use crate::rings::extension::FreeAlgebraStore;
 use crate::pid::*;
+use crate::specialization::*;
 use crate::integer::*;
 use crate::ordered::OrderedRingStore;
 use crate::ring::*;
@@ -556,6 +557,15 @@ impl<I: RingStore> PrincipalIdealRing for ZnBase<I>
         let (s, t, d) = self.integer_ring().extended_ideal_gen(&lhs.0, &rhs.0);
         let quo = RingRef::new(self).into_can_hom(self.integer_ring()).ok().unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
+    }
+}
+
+impl<I> FiniteRingSpecializable for ZnBase<I>
+    where I: RingStore,
+        I::Type: IntegerRing
+{
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
+        Ok(op.execute())
     }
 }
 

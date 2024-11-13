@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::pid::EuclideanRing;
 use crate::pid::PrincipalIdealRing;
 use crate::ring::*;
@@ -7,6 +9,7 @@ use crate::rings::extension::FreeAlgebra;
 use crate::rings::{zn::ZnRing, finite::FiniteRing};
 use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::serialization::SerializableElementRing;
+use crate::specialization::*;
 
 ///
 /// Trait to simplify implementing newtype-pattern for rings.
@@ -346,6 +349,13 @@ impl<'a, R: ?Sized> Iterator for DelegateFiniteRingElementsIter<'a, R>
     }
 }
 
+///
+/// Marks a [`DelegateRing`] `R` to be considered in the blanket implementation
+/// `R: FiniteRing where R::Base: FiniteRing`.
+/// 
+/// We don't want to implement `R: FiniteRing` for any `DelegateRing` `R`, since
+/// some ring newtypes want to have control of when the ring is [`FiniteRing`].
+/// 
 pub trait DelegateRingImplFiniteRing: DelegateRing {}
 
 impl<R: DelegateRingImplFiniteRing + ?Sized> FiniteRing for R
@@ -380,6 +390,14 @@ impl<R: DelegateRing + ?Sized> HashableElRing for R
     }
 }
 
+///
+/// Marks a [`DelegateRing`] `R` to be considered in the blanket implementation
+/// `R: EuclideanRing where R::Base: EuclideanRing` and 
+/// `R: PrincipalIdealRing where R::Base: PrincipalIdealRing`.
+/// 
+/// We don't want to implement `R: EuclideanRing` for any `DelegateRing` `R`, since
+/// some ring newtypes want to have control of when the ring is [`EuclideanRing`].
+/// 
 pub trait DelegateRingImplEuclideanRing: DelegateRing {}
 
 impl<R: DelegateRingImplEuclideanRing + ?Sized> PrincipalIdealRing for R
@@ -417,6 +435,35 @@ impl<R: DelegateRingImplEuclideanRing + ?Sized> EuclideanRing for R
 
     fn euclidean_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
         self.rev_delegate(self.get_delegate().euclidean_rem(self.delegate(lhs), self.delegate_ref(rhs)))
+    }
+}
+
+impl<R> FiniteRingSpecializable for R
+    where R: DelegateRingImplFiniteRing + ?Sized,
+        R::Base: FiniteRingSpecializable
+{
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
+        struct OpWrapper<R, O>
+            where R: DelegateRingImplFiniteRing + ?Sized,
+                R::Base: FiniteRingSpecializable,
+                O: FiniteRingOperation<R>
+        {
+            operation: O,
+            ring: PhantomData<Box<R>>
+        }
+
+        impl<R, O> FiniteRingOperation<R::Base> for OpWrapper<R, O>
+            where R: DelegateRingImplFiniteRing + ?Sized,
+                R::Base: FiniteRingSpecializable,
+                O: FiniteRingOperation<R>
+        {
+            type Output = O::Output;
+            fn execute(self) -> Self::Output where R::Base: FiniteRing {
+                self.operation.execute()
+            }
+        }
+
+        <R::Base as FiniteRingSpecializable>::specialize(OpWrapper { operation: op, ring: PhantomData })
     }
 }
 

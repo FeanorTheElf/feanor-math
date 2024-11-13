@@ -1,7 +1,8 @@
 use std::alloc::Global;
 
+use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
-use crate::{algorithms, MAX_PROBABILISTIC_REPETITIONS};
+use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::algorithms::unity_root::get_prim_root_of_unity;
 use crate::divisibility::DivisibilityRingStore;
 use crate::pid::*;
@@ -13,7 +14,7 @@ use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::poly::{PolyRing, PolyRingStore};
 use crate::rings::extension::{FreeAlgebra, FreeAlgebraStore};
 use crate::rings::finite::{FiniteRing, FiniteRingStore};
-use crate::homomorphism::Homomorphism;
+use crate::homomorphism::*;
 use crate::seq::VectorFn;
 use crate::rings::poly::dense_poly::DensePolyRing;
 
@@ -35,7 +36,7 @@ pub fn distinct_degree_factorization_base<P, R>(poly_ring: P, mod_f_ring: R) -> 
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     let ZZ = BigIntRing::RING;
     let q = poly_ring.base_ring().size(&ZZ).unwrap();
-    debug_assert!(ZZ.eq_el(&algorithms::int_factor::is_prime_power(&ZZ, &q).unwrap().0, &poly_ring.base_ring().characteristic(&ZZ).unwrap()));
+    debug_assert!(ZZ.eq_el(&is_prime_power(&ZZ, &q).unwrap().0, &poly_ring.base_ring().characteristic(&ZZ).unwrap()));
 
     let mut f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
 
@@ -133,7 +134,7 @@ pub fn cantor_zassenhaus_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) -> El
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     let ZZ = BigIntRing::RING;
     let q = poly_ring.base_ring().size(&ZZ).unwrap();
-    debug_assert!(ZZ.eq_el(&algorithms::int_factor::is_prime_power(&ZZ, &q).unwrap().0, &poly_ring.base_ring().characteristic(&ZZ).unwrap()));
+    debug_assert!(ZZ.eq_el(&is_prime_power(&ZZ, &q).unwrap().0, &poly_ring.base_ring().characteristic(&ZZ).unwrap()));
     assert!(ZZ.is_odd(&q));
     assert!(mod_f_ring.rank() % d == 0);
     assert!(mod_f_ring.rank() > d);
@@ -256,7 +257,7 @@ pub fn cantor_zassenhaus_even_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) 
         R: RingStore,
         R::Type: FreeAlgebra,
         <<R as RingStore>::Type as RingExtension>::BaseRing: RingStore<Type = <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type>,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso + FiniteRingSpecializable
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     let ZZ = BigIntRing::RING;
@@ -319,7 +320,7 @@ pub fn cantor_zassenhaus_even<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P as RingStore>::Type as RingExtension>::BaseRing: RingStore + FieldStore,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso + FiniteRingSpecializable
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso
 {
     f = poly_ring.normalize(f);
 
@@ -332,8 +333,6 @@ pub fn cantor_zassenhaus_even<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
 
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
-
-use super::{FiniteRingSpecializable, SelfIso};
 
 #[test]
 fn test_distinct_degree_factorization() {

@@ -140,7 +140,7 @@ pub enum EnvBindingStrength {
 ///     fn is_noetherian(&self) -> bool { true }
 ///     fn is_approximate(&self) -> bool { false }
 /// 
-///     fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+///     fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
 ///         write!(out, "{}", **value)
 ///     }
 /// 

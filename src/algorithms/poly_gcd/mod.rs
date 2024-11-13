@@ -16,7 +16,6 @@ use crate::rings::poly::*;
 use crate::rings::finite::*;
 use crate::field::*;
 use crate::specialization::FiniteRingOperation;
-use crate::specialization::FiniteRingSpecializable;
 
 use super::eea::gcd;
 
@@ -29,7 +28,42 @@ pub mod factor;
 
 const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
 
-pub trait PolyGCDRing {
+///
+/// Trait for domain `R` for which there is an efficient way of computing the gcd
+/// of univariate polynomials over `Frac(R)`. 
+/// 
+/// However, computations in `Frac(R)` are avoided by most implementations due to 
+/// performance reasons, and both inputs and outputs are polynomials over `R`. Despite 
+/// this, the gcd is the gcd over `Frac(R)` and not `R` (the gcd over `R` is often not 
+/// even defined, since `R` does not have to be UFD).
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::algorithms::poly_gcd::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::primitive_int::*;
+/// let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let [f, g, expected] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X + 1, X.pow_ref(2) - 1, X - 1]);
+/// assert_el_eq!(&ZZX, expected, <_ as PolyGCDRing>::gcd(&ZZX, &f, &g));
+/// ```
+/// 
+/// # Implementation notes
+/// 
+/// Efficient implementations for polynomial gcds are often quite complicated, since the standard
+/// euclidean algorithm is only efficient over finite fields, where no coefficient explosion happens.
+/// The general idea for other rings/fields is to reduce it to the finite case, by considering the
+/// situation modulo a finite-index ideal. The requirements for this approach are defined by the
+/// trait [`PolyGCDLocallyDomain`], and there is a blanket impl `R: PolyGCDRing where R: PolyGCDLocallyDomain`.
+/// 
+/// Note that this blanket impl used [`crate::specialization::FiniteRingSpecializable`] to use the standard 
+/// algorithm whenever the corresponding ring is actually finite. In other words, despite the fact that the blanket 
+/// implementation for `PolyGCDLocallyDomain`s also applies to finite fields, the local implementation is not 
+/// actually used in these cases.
+/// 
+pub trait PolyGCDRing: Domain {
 
     ///
     /// Computes the square-free part of a polynomial `f`, which is the largest-degree squarefree
@@ -37,6 +71,19 @@ pub trait PolyGCDRing {
     /// 
     /// This value is unique up to multiplication by units. If the base ring is a field,
     /// we impose the additional constraint that it be monic, which makes it unique.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::assert_el_eq;
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::algorithms::poly_gcd::*;
+    /// # use feanor_math::rings::poly::*;
+    /// # use feanor_math::rings::poly::dense_poly::*;
+    /// # use feanor_math::primitive_int::*;
+    /// let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    /// let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 1]);
+    /// assert_el_eq!(&ZZX, &f, <_ as PolyGCDRing>::squarefree_part(&ZZX, &ZZX.mul_ref(&f, &f)));
+    /// ```
     /// 
     fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
         where P: RingStore + Copy,
@@ -66,6 +113,24 @@ pub trait PolyGCDRing {
     /// 
     /// This value is unique up to multiplication by units. If the base ring is a field,
     /// we impose the additional constraint that it be monic, which makes it unique.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::assert_el_eq;
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::algorithms::poly_gcd::*;
+    /// # use feanor_math::rings::poly::*;
+    /// # use feanor_math::rings::poly::dense_poly::*;
+    /// # use feanor_math::primitive_int::*;
+    /// let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    /// let [f, g, expected] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X + 1, 2 * X.pow_ref(2) - 2, X - 1]);
+    /// // note that `expected` is not the gcd over `ZZ[X]` (which would be `2 X - 2`), but `X - 1`, i.e. the (monic) gcd over `QQ[X]`
+    /// assert_el_eq!(&ZZX, expected, <_ as PolyGCDRing>::gcd(&ZZX, &f, &g));
+    /// 
+    /// // of course, the result does not have to be monic
+    /// let [f, g, expected] = ZZX.with_wrapped_indeterminate(|X| [4 * X.pow_ref(2) - 1, 4 * X.pow_ref(2) - 4 * X + 1, - 2 * X + 1]);
+    /// assert_el_eq!(&ZZX, expected, <_ as PolyGCDRing>::gcd(&ZZX, &f, &g));
+    /// ```
     /// 
     fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
         where P: RingStore + Copy,
@@ -187,12 +252,12 @@ impl<R> PolyGCDRing for R
         struct PowerDecompositionIfFiniteField<'a, P>(P, &'a El<P>)
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso + FiniteRingSpecializable;
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso;
 
         impl<'a, P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PowerDecompositionIfFiniteField<'a, P>
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso + FiniteRingSpecializable
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso
         {
             type Output = Vec<(El<P>, usize)>;
 
@@ -200,7 +265,6 @@ impl<R> PolyGCDRing for R
                 where <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing
             {
                 static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: SelfIso);
-                static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRingSpecializable);
 
                 let new_poly_ring = DensePolyRing::new(AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())), "X");
                 let new_poly = new_poly_ring.from_terms(self.0.terms(&self.1).map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(self.0.base_ring().clone_el(c)), i)));
@@ -225,12 +289,12 @@ impl<R> PolyGCDRing for R
         struct PolyGCDIfFiniteField<'a, P>(P, &'a El<P>, &'a El<P>)
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso + FiniteRingSpecializable;
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso;
 
         impl<'a, P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PolyGCDIfFiniteField<'a, P>
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso + FiniteRingSpecializable
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso
         {
             type Output = El<P>;
 
@@ -238,7 +302,6 @@ impl<R> PolyGCDRing for R
                 where <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing
             {
                 static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: SelfIso);
-                static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRingSpecializable);
                 
                 let new_poly_ring = DensePolyRing::new(AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())), "X");
                 let new_lhs = new_poly_ring.from_terms(self.0.terms(&self.1).map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(self.0.base_ring().clone_el(c)), i)));

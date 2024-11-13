@@ -13,6 +13,18 @@ use crate::ordered::OrderedRingStore;
 /// `|a| b > sqrt(3)/3`), no further guarantees on the result are given, in
 /// particular, `(a, b) = (x, 1)` would be a valid result.
 /// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::divisibility::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::algorithms::rational_reconstruction::*;
+/// let ring = Zn::new(100000000);
+/// assert_eq!((3, 7), rational_reconstruction(&ring, ring.checked_div(&ring.int_hom().map(3), &ring.int_hom().map(7)).unwrap()));
+///  ```
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn rational_reconstruction<R>(Zn: R, x: El<R>) -> (El<<R::Type as ZnRing>::IntegerRing>, El<<R::Type as ZnRing>::IntegerRing>)
     where R: RingStore,

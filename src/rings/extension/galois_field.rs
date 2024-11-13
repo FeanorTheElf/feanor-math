@@ -41,7 +41,6 @@ use crate::rings::zn::*;
 use crate::ring::*;
 use crate::rings::extension::*;
 use crate::integer::*;
-use crate::specialization::FiniteRingSpecializable;
 
 fn filter_irreducible<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Option<El<P>>
     where P: RingStore,
@@ -74,7 +73,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <P::Type as RingExtension>::BaseRing: Copy,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + FiniteRingSpecializable + SelfIso + CanHomFrom<StaticRingBase<i64>>,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
         C: ConvolutionAlgorithm<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
     let Fp = *poly_ring.base_ring();
@@ -165,7 +164,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <P::Type as RingExtension>::BaseRing: Copy,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + FiniteRingSpecializable + SelfIso + CanHomFrom<StaticRingBase<i64>>
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>
 {
     static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDRing);
     
@@ -318,7 +317,7 @@ impl GaloisField {
 
 impl<R, A, C> GaloisFieldOver<R, A, C>
     where R: RingStore + Clone,
-        R::Type: ZnRing + Field + FiniteRingSpecializable + SelfIso + CanHomFrom<StaticRingBase<i64>>,
+        R::Type: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone
 {
@@ -376,7 +375,7 @@ impl<R, A, C> GaloisFieldOver<R, A, C>
     /// recursive call adds a reference `&` to `R`.
     /// 
     fn new_internal(base_ring: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self
-        where R: Copy, R::Type: Field + FiniteRing + FiniteRingSpecializable + SelfIso
+        where R: Copy
     {
         assert!(degree >= 1);
         let poly_ring = DensePolyRing::new(base_ring.clone(), "X");

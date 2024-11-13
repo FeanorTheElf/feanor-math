@@ -7,7 +7,6 @@ use crate::rings::finite::FiniteRing;
 use crate::rings::poly::*;
 use crate::rings::rational::*;
 use crate::rings::zn::zn_64::*;
-use crate::specialization::*;
 
 use finite::*;
 use rational::*;
@@ -86,7 +85,7 @@ pub trait FactorPolyField: Field + PolyGCDRing {
 }
 
 impl<R> FactorPolyField for R
-    where R: FiniteRing + Field + FiniteRingSpecializable + SelfIso
+    where R: FiniteRing + Field + SelfIso
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: RingStore,

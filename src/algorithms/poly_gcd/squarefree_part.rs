@@ -21,6 +21,9 @@ struct Signature {
 }
 
 ///
+/// Lifts the power decomposition modulo `I^e` to a potential power decomposition in the ring `R`.
+/// If this indeed gives the correct power decomposition, it is returned, otherwise `None` is returned.
+/// 
 /// We use the notation
 ///  - `R` is the main ring
 ///  - `F` is `R/m` where `m` is a maximal ideal containing the currently considered ideal `I`
@@ -65,6 +68,9 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P
 }
 
 ///
+/// Computes the power decomposition modulo `m` and lifts it to `m^e`, for the given maximal ideal `m`
+/// as specified by `S_to_F`.
+/// 
 /// We use the notation
 ///  - `R` is the main ring
 ///  - `F` is `R/m` where `m` is a maximal ideal containing the currently considered ideal `I`
@@ -125,7 +131,7 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2>(
 }
 
 ///
-/// For a polynomial `f in R[X]`, computes squarefree polynomials `fi` such that `a f = f1 f2^2 f3^3 ...`
+/// For a monic polynomial `f in R[X]`, computes squarefree polynomials `fi` such that `a f = f1 f2^2 f3^3 ...`
 /// for some nonzero element `a in R \ {0}`. These polynomials are returned as tuples `(fi, i)` with `fi != 0`.
 /// 
 /// The results can all be assumed to be "balanced", according to the contract of [`DivisibilityRing::balance_factor()`]
@@ -163,9 +169,7 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &
             let SX = DensePolyRing::new(*reduction.intermediate_ring_to_field_reduction(idx).domain(), "X");
             match compute_local_power_decomposition(poly_ring, poly, &reduction.intermediate_ring_to_field_reduction(idx), &SX) {
                 None => {
-                    // `compute_local_power_decomposition()` currently cannot fail
-                    unreachable!();
-                    // continue 'try_random_ideal;
+                    unreachable!("`compute_local_power_decomposition()` currently cannot fail");
                 },
                 Some((new_signature, local_power_decomposition)) => if signature.is_some() && &signature.as_ref().unwrap()[..] != &new_signature[..] {
                     log_progress!(controller, "(signature_mismatch)");

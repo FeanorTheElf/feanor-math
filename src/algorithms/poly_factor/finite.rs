@@ -18,7 +18,7 @@ use super::cantor_zassenhaus;
 pub fn poly_factor_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso + FiniteRingSpecializable
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso
 {
     assert!(!poly_ring.is_zero(&f));
     let even_char = BigIntRing::RING.is_even(&poly_ring.base_ring().characteristic(&BigIntRing::RING).unwrap());

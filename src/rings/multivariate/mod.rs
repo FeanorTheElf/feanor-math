@@ -40,6 +40,21 @@ pub trait MultivariatePolyRing: RingExtension {
     ///
     /// Creates a monomial with the given exponents.
     /// 
+    /// Note that when building a polynomial, the most convenient method is usually
+    /// to use [`MultivariatePolyRingStore::with_wrapped_indeterminates()`].
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::rings::multivariate::*;
+    /// # use feanor_math::rings::multivariate::multivariate_impl::*;
+    /// let poly_ring = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, 3);
+    /// let x_as_monomial = poly_ring.create_monomial([1, 0, 0]);
+    /// let x_as_poly = poly_ring.create_term(1, x_as_monomial);
+    /// assert_eq!("X0", format!("{}", poly_ring.format(&x_as_poly)));
+    /// ```
+    /// 
     fn create_monomial<I>(&self, exponents: I) -> Self::Monomial
         where I: IntoIterator<Item = usize>,
             I::IntoIter: ExactSizeIterator;
@@ -112,6 +127,10 @@ pub trait MultivariatePolyRing: RingExtension {
         ));
     }
 
+    ///
+    /// Applies the given homomorphism `R -> S` to each coefficient of the given polynomial
+    /// in `R[X1, ..., Xm]` to produce a monomial in `S[X1, ..., Xm]`.
+    /// 
     fn map_terms<P, H>(&self, from: &P, el: &P::Element, hom: H) -> Self::Element
         where P: ?Sized + MultivariatePolyRing,
             H: Homomorphism<<P::BaseRing as RingStore>::Type, <Self::BaseRing as RingStore>::Type>
@@ -358,6 +377,10 @@ pub trait MultivariatePolyRingStore: RingStore
         self.get_ring().evaluate(f, value, hom)
     }
     
+    ///
+    /// Returns the homomorphism `R[X1, ..., Xm] -> S[X1, ..., Xm]` that is induced by
+    /// applying the given homomorphism `R -> S` coefficient-wise.
+    /// 
     fn into_lifted_hom<P, H>(self, from: P, hom: H) -> CoefficientHom<P, Self, H>
         where P: RingStore,
             P::Type: MultivariatePolyRing,
@@ -370,6 +393,13 @@ pub trait MultivariatePolyRingStore: RingStore
         }
     }
 
+    ///
+    /// Returns the homomorphism `R[X1, ..., Xm] -> S[X1, ..., Xm]` that is induced by
+    /// applying the given homomorphism `R -> S` coefficient-wise.
+    /// 
+    /// If the ownership of this ring should be transferred to the homomorphism, consider
+    /// using [`MultivariatePolyRing::into_lifted_hom()`].
+    /// 
     fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
         where P: RingStore,
             P::Type: MultivariatePolyRing,
@@ -413,6 +443,22 @@ pub trait MultivariatePolyRingStore: RingStore
     ///
     /// Same as [`MultivariatePolyRingStore::with_wrapped_indeterminates_dyn()`], but returns result
     /// as an array to allow pattern matching.
+    /// 
+    /// # Example
+    /// ```
+    /// use feanor_math::assert_el_eq;
+    /// use feanor_math::homomorphism::*;
+    /// use feanor_math::ring::*;
+    /// use feanor_math::rings::multivariate::*;
+    /// use feanor_math::rings::zn::zn_64::*;
+    /// use feanor_math::rings::multivariate::multivariate_impl::*;
+    /// let base_ring = Zn::new(7);
+    /// let poly_ring = MultivariatePolyRingImpl::new(base_ring, 3);
+    /// let f_version1 = poly_ring.from_terms([(base_ring.int_hom().map(3), poly_ring.create_monomial([0, 0, 0])), (base_ring.int_hom().map(2), poly_ring.create_monomial([0, 1, 1])), (base_ring.one(), poly_ring.create_monomial([2, 0, 0]))].into_iter());
+    /// let f_version2 = poly_ring.with_wrapped_indeterminates_dyn(|[x, y, z]| [3 + 2 * y * z + x.pow_ref(2)]).into_iter().next().unwrap();
+    /// let [f_version3] = poly_ring.with_wrapped_indeterminates(|[x, y, z]| [3 + 2 * y * z + x.pow_ref(2)]);
+    /// assert_el_eq!(poly_ring, f_version1, f_version2);
+    /// ```
     /// 
     #[stability::unstable(feature = "enable")]
     fn with_wrapped_indeterminates<'a, F, const N: usize, const M: usize>(&'a self, f: F) -> [El<Self>; M]

@@ -6,6 +6,10 @@ use crate::primitive_int::StaticRing;
 use std::alloc::Allocator;
 use std::ops::Range;
 
+///
+/// Computes `dst = lhs * rhs` if `ADD_ASSIGN = false` and `dst += lhs * rhs` if `ADD_ASSIGN = true`,
+/// using the standard cubic formula for matrix multiplication.
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn naive_matmul<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
     lhs: TransposableSubmatrix<V1, El<R>, T1>, 
@@ -190,6 +194,10 @@ fn matrix_sub_self_assign<R, V1, V2, const T1: bool, const T2: bool>(
     }
 }
 
+///
+/// Returns the amount of additional memory required by [`dispatch_strassen_impl()`],
+/// as the count of ring elements that can be stored.
+/// 
 #[stability::unstable(feature = "enable")]
 pub const fn strassen_mem_size(add_assign: bool, block_size_log2: usize, threshold_size_log2: usize) -> usize {
     // solve the recurrence
@@ -368,6 +376,14 @@ macro_rules! strassen_base_algorithm {
 macro_rules! unrolled_strassen_impl {
     ($( ($num:literal, $fun:ident, $prev:ident) ),*) => {
 
+        ///
+        /// Computes `dst = lhs * rhs` if `ADD_ASSIGN = false` and `dst += lhs * rhs` if `ADD_ASSIGN = true`,
+        /// using Strassen's algorithm.
+        /// 
+        /// The mutable slice `memory` must be of length at least [`strassen_mem_size()`], and will be used
+        /// as temporary memory during the computation. In particular, its content may be arbitrarily changed
+        /// (it will be in a safe, but unspecified state at the end).
+        /// 
         #[stability::unstable(feature = "enable")]
         pub fn dispatch_strassen_impl<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
             block_size_log2: usize, 
@@ -436,6 +452,14 @@ unrolled_strassen_impl!{
     (16, strassen_impl_16, strassen_impl_15)
 }
 
+///
+/// Computes `dst = lhs * rhs` if `ADD_ASSIGN = false` and `dst += lhs * rhs` if `ADD_ASSIGN = true`,
+/// using Strassen's algorithm.
+/// 
+/// The mutable slice `memory` must be of length at least [`strassen_mem_size()`], and will be used
+/// as temporary memory during the computation. In particular, its content may be arbitrarily changed
+/// (it will be in a safe, but unspecified state at the end).
+/// 
 #[cfg(not(feature = "unrolled_strassen"))]
 #[stability::unstable(feature = "enable")]
 pub fn dispatch_strassen_impl<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
@@ -484,6 +508,12 @@ pub fn dispatch_strassen_impl<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: b
     }
 }
 
+///
+/// Computes `dst = lhs * rhs` if `ADD_ASSIGN = false` and `dst += lhs * rhs` if `ADD_ASSIGN = true`,
+/// using Strassen's algorithm.
+/// 
+/// Uses the given allocator to allocate temporary memory.
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn strassen<R, V1, V2, V3, A, const T1: bool, const T2: bool, const T3: bool>(
     add_assign: bool,

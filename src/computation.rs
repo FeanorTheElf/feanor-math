@@ -18,7 +18,11 @@ pub fn no_error<T>(error: !) -> T {
 }
 
 ///
-/// Trait for objects that observe a potentially long-running computation.
+/// Trait for objects that observe and control a potentially long-running computation.
+/// 
+/// The idea is that this trait defines multiple functions that can be called during an
+/// algorithm, and provide certain functionality. This way, each algorithm can decide which
+/// functionality is relevant and how it is used.
 /// 
 /// This is currently unstable-sealed, since I expect significant additional functionality,
 /// potentially including
@@ -29,6 +33,36 @@ pub fn no_error<T>(error: !) -> T {
 /// 
 /// As a user, this trait should currently be used by passing either [`LogProgress`]
 /// or [`DontObserve`] to algorithms.
+/// 
+/// # Example
+/// 
+/// Which features of a [`ComputationController`] an algorithm supports is completely up
+/// to the algorithm. Elliptic Curve factorization currently supports logging, abortion
+/// and multithreading.
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::algorithms::ec_factor::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::computation::*;
+/// let ring = zn_64::Zn::new(8591966237);
+/// // factors 8591966237 while printing progress
+/// let factor = lenstra_ec_factor(ring, LogProgress).unwrap_or_else(no_error);
+/// assert!(8591966237 % factor == 0);
+/// // factor it again, but don't print progress
+/// let factor = lenstra_ec_factor(ring, DontObserve).unwrap_or_else(no_error);
+/// assert!(8591966237 % factor == 0);
+/// ```
+/// If the multithreading with rayon is enabled, we can also do
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::algorithms::ec_factor::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::computation::*;
+/// # let ring = zn_64::Zn::new(8591966237);
+/// // factors 8591966237 using multiple threads
+/// let factor = lenstra_ec_factor(ring, RunMultithreadedLogProgress).unwrap_or_else(no_error);
+/// assert!(8591966237 % factor == 0);
+/// ```
 ///  
 pub trait ComputationController: Clone + UnstableSealed {
 
@@ -43,6 +77,9 @@ pub trait ComputationController: Clone + UnstableSealed {
         Ok(())
     }
     
+    ///
+    /// 
+    /// 
     #[stability::unstable(feature = "enable")]
     fn finish(&self, description: Arguments) {
         self.log(description)
@@ -61,10 +98,6 @@ pub trait ComputationController: Clone + UnstableSealed {
     /// Concretely, this function runs both closures, possibly in parallel, and
     /// returns their results.
     /// 
-    /// As a convention, if the executor wants to run one of the tasks on
-    /// the main thread, it is recommended to choose the second one. Conversely,
-    /// if a client intends to call join multiple times to "spawn" more tasks, it
-    /// is recommended to again do so in the second task.
     /// 
     #[stability::unstable(feature = "enable")]
     fn join<A, B, RA, RB>(self, oper_a: A, oper_b: B) -> (RA, RB)

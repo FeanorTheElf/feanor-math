@@ -109,8 +109,7 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
 /// Trait for rings that support performing computations locally. Locally here refers
 /// not to its localization, but to quotients by primes ideals.
 /// 
-/// More concretely, a ring `R` implementing this trait should be endowed with a
-/// "pseudo norm"
+/// More concretely, a ring `R` implementing this trait should be endowed with a "pseudo norm"
 /// ```text
 ///   |.|: R  ->  [0, ∞)
 /// ```
@@ -141,7 +140,8 @@ pub trait EvaluatePolyLocallyRing: RingBase {
     ///
     /// The proper way would be to define this with two lifetime parameters `'ring` and `'data`,
     /// to allow it to reference both the ring itself and the current `LocalComputationData`.
-    /// However, when doing this, I ran into the compiler bug [https://github.com/rust-lang/rust/issues/100013].
+    /// However, when doing this, I ran into the compiler bug
+    /// [https://github.com/rust-lang/rust/issues/100013](https://github.com/rust-lang/rust/issues/100013).
     /// 
     /// This is also the reason why we restrict this type here to be [`PrincipalIdealRing`], because
     /// unfortunately, the a constraint `for<'a> SomeRing::LocalRingBase<'a>: PrincipalIdealRing` triggers

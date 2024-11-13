@@ -284,24 +284,6 @@ impl<'a, R: RingStore + Clone> Div<&'a RingElementWrapper<R>> for i32
     }
 }
 
-#[cfg(feature = "elementwrapper-caret-pow")]
-impl<R: RingStore> BitXor<usize> for RingElementWrapper<R> {
-    type Output = RingElementWrapper<R>;
-
-    fn bitxor(self, rhs: usize) -> Self::Output {
-        self.pow(rhs)
-    }
-}
-
-#[cfg(feature = "elementwrapper-caret-pow")]
-impl<'a, R: RingStore + Clone> BitXor<usize> for &'a RingElementWrapper<R> {
-    type Output = RingElementWrapper<R>;
-
-    fn bitxor(self, rhs: usize) -> Self::Output {
-        <RingElementWrapper<_> as Clone>::clone(self).pow(rhs)
-    }
-}
-
 impl<R: RingStore + Copy> Copy for RingElementWrapper<R> 
     where El<R>: Copy
 {}
@@ -353,21 +335,10 @@ impl<R: RingStore> Deref for RingElementWrapper<R> {
     }
 }
 
-#[cfg(feature = "elementwrapper-caret-pow")]
-#[cfg(test)]
-use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
 #[cfg(test)]
 use crate::rings::zn::zn_64;
-
-#[cfg(feature = "elementwrapper-caret-pow")]
-#[test]
-fn test_pow_caret() {
-    let ring = StaticRing::<i64>::RING;
-    let a = RingElementWrapper::new(&ring, 3);
-    assert_eq!(a * a * a * a, a^4);
-}
 
 #[test]
 fn test_arithmetic_expression() {

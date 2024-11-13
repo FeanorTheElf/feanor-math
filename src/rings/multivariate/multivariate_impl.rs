@@ -160,6 +160,9 @@ pub type MultivariatePolyRingImpl<R, A = Global> = RingValue<MultivariatePolyRin
 impl<R> MultivariatePolyRingImpl<R>
     where R: RingStore
 {
+    ///
+    /// Creates a new instance of the ring `base_ring[X0, ..., Xn]` where `n = variable_count - 1`.
+    /// 
     pub fn new(base_ring: R, variable_count: usize) -> Self {
         Self::new_with(base_ring, variable_count, 64, (6, 8), Global)
     }
@@ -169,6 +172,17 @@ impl<R, A> MultivariatePolyRingImpl<R, A>
     where R: RingStore,
         A: Clone + Allocator + Send
 {
+    ///
+    /// Creates a new instance of the ring `base_ring[X0, ..., Xn]` where `n = variable_count - 1`.
+    /// 
+    /// The can represent all monomials up to the given degree, and will panic should an operation
+    /// produce a monomial that exceeds this degree. 
+    /// 
+    /// Furthermore, `max_multiplication_table = (d1, d2)` configures for which monomials a multiplication 
+    /// table is precomputed. In particular, a multiplication table is precomputed for all products where
+    /// one summand has degree `<= d2` and the other summand has degree `<= d1`. Note that `d1 <= d2` is
+    /// required.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn new_with(base_ring: R, variable_count: usize, max_supported_deg: Exponent, max_multiplication_table: (Exponent, Exponent), allocator: A) -> Self {
         assert!(variable_count >= 1);

@@ -14,6 +14,7 @@ use crate::rings::extension::FreeAlgebraStore;
 use crate::rings::extension::galois_field::*;
 use crate::rings::zn::*;
 use crate::serialization::SerializableElementRing;
+use crate::specialization::*;
 
 ///
 /// Ring that implements arithmetic in `Z/nZ` for a small `n` known
@@ -261,6 +262,13 @@ impl<const N: u64> InterpolationBaseRing for ZnBase<N, true> {
         let ring = generic_impls::interpolation_ring(RingRef::new(self), count);
         let points = ring.elements().take(count).collect();
         return (ring, points);
+    }
+}
+
+impl<const N: u64, const IS_FIELD: bool> FiniteRingSpecializable for zn_static::ZnBase<N, IS_FIELD> {
+
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
+        Ok(op.execute())
     }
 }
 

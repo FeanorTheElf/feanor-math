@@ -178,6 +178,11 @@ pub trait VectorViewSparse<T: ?Sized>: VectorView<T> {
     fn nontrivial_entries<'a>(&'a self) -> Self::Iter<'a>;
 }
 
+///
+/// Operation that operates on a [`VectorViewSparse`].
+/// 
+/// Used as a workaround for specialization, together with [`VectorView::specialize_sparse()`].
+/// 
 pub trait SparseVectorViewOperation<T: ?Sized> {
 
     type Output<'a>

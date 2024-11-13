@@ -37,6 +37,49 @@ use super::FreeAlgebra;
 ///
 /// An algebraic number field, i.e. a finite rank field extension of the rationals.
 /// 
+/// # Example
+/// 
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::extension::*;
+/// # use feanor_math::rings::extension::number_field::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::rings::rational::*;
+/// # use feanor_math::integer::*;
+/// let QQ = RationalField::new(BigIntRing::RING);
+/// let QQX = DensePolyRing::new(&QQ, "X");
+/// let [gen_poly] = QQX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
+/// // the Gaussian numbers `QQ[i]`
+/// let QQi = NumberField::new(&QQX, &gen_poly);
+/// let i = QQi.canonical_gen();
+/// assert_el_eq!(&QQi, QQi.neg_one(), QQi.pow(i, 2));
+/// ```
+/// So far, we could have done the same with just [`FreeAlgebraImpl`], which indeed
+/// is used as the default implementation of the arithmetic. However, [`NumberField`]
+/// provides additional functionality, that is not available for general extensions.
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::extension::*;
+/// # use feanor_math::rings::extension::number_field::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::rings::rational::*;
+/// # use feanor_math::algorithms::poly_factor::*;
+/// # use feanor_math::integer::*;
+/// # let QQ = RationalField::new(BigIntRing::RING);
+/// # let QQX = DensePolyRing::new(&QQ, "X");
+/// # let [gen_poly] = QQX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
+/// # let QQi = NumberField::new(&QQX, &gen_poly);
+/// # let i = QQi.canonical_gen();
+/// let QQiX = DensePolyRing::new(&QQi, "X");
+/// let [f] = QQiX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 4]);
+/// let (factorization, _) = <_ as FactorPolyField>::factor_poly(&QQiX, &f);
+/// assert_eq!(2, factorization.len());
+/// ```
+/// 
 /// # Why not relative number fields?
 /// 
 /// Same as [`crate::rings::extension::galois_field::GaloisFieldBase`], this type represents

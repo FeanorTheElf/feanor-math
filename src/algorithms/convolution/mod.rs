@@ -70,6 +70,14 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// 
     fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S);
 
+    ///
+    /// Returns whether this convolution algorithm supports computations of 
+    /// the given ring.
+    /// 
+    /// Note that most algorithms will support all rings of type `R`. However in some cases,
+    /// e.g. for finite fields, required data might only be precomputed for some moduli,
+    /// and thus only these will be supported.
+    /// 
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, ring: S) -> bool;
 }
 

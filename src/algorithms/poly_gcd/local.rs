@@ -82,7 +82,7 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
     type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
         where Self: 'ring;
     
-    type LocalFieldBase<'ring>: ?Sized + CanIsoFromTo<Self::LocalRingBase<'ring>> + FiniteRing + Field + SelfIso + FiniteRingSpecializable
+    type LocalFieldBase<'ring>: ?Sized + CanIsoFromTo<Self::LocalRingBase<'ring>> + FiniteRing + Field + SelfIso
         where Self: 'ring;
 
     type LocalField<'ring>: RingStore<Type = Self::LocalFieldBase<'ring>>
@@ -225,6 +225,10 @@ impl<'a, 'ring, R: 'ring + ?Sized + PolyGCDLocallyDomain> Display for IdealDispl
     }
 }
 
+///
+/// The map `R -> R/m^e`, where `m` is a maximal ideal factor of the ideal `I`,
+/// as specified by [`PolyGCDLocallyDomain`].
+/// 
 #[stability::unstable(feature = "enable")]
 pub struct ReductionMap<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
@@ -269,6 +273,10 @@ impl<'ring, 'data, 'local, R> Homomorphism<R, R::LocalRingBase<'ring>> for Reduc
     }
 }
 
+///
+/// The map `R/m^r -> R/m^e`, where `r > e` and `m` is a maximal ideal factor of the 
+/// ideal `I`, as specified by [`PolyGCDLocallyDomain`].
+/// 
 #[stability::unstable(feature = "enable")]
 pub struct IntermediateReductionMap<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
@@ -341,6 +349,14 @@ impl<'ring, 'data, 'local, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalRing
     }
 }
 
+///
+/// The sequence of maps `R  ->  R/m1^e x ... x R/mr^e  ->  R/m1 x ... x R/mr`, where
+/// `m1, ..., mr` are the maximal ideals containing `I`, as specified by [`PolyGCDLocallyDomain`].
+/// 
+/// This sequence of maps is very relevant when using the compute-mod-p-and-lift approach
+/// for polynomial operations over infinite rings (e.g. `QQ`). This is also the primary use case
+/// for [`ReductionContext`].
+///
 #[stability::unstable(feature = "enable")]
 pub struct ReductionContext<'ring, 'data, R>
     where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
@@ -430,6 +446,9 @@ impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
 
 #[macro_export]
 macro_rules! impl_poly_gcd_locally_for_ZZ {
+    (IntegerPolyGCDRing for $int_ring_type:ty) => {
+        impl_poly_gcd_locally_for_ZZ!{ <{}> IntegerPolyGCDRing for $int_ring_type where }
+    };
     (<{$($gen_args:tt)*}> IntegerPolyGCDRing for $int_ring_type:ty where $($constraints:tt)*) => {
 
         impl<$($gen_args)*> $crate::algorithms::poly_gcd::local::PolyGCDLocallyDomain for $int_ring_type
@@ -572,7 +591,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
 /// 
 #[allow(unused)]
 impl<R> PolyGCDLocallyDomain for R
-    where R: ?Sized + FiniteRing + Field + FiniteRingSpecializable + SelfIso
+    where R: ?Sized + FiniteRing + Field + SelfIso
 {
     type LocalRingBase<'ring> = Self
         where Self: 'ring;
