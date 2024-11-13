@@ -398,7 +398,7 @@ pub trait MultivariatePolyRingStore: RingStore
     /// applying the given homomorphism `R -> S` coefficient-wise.
     /// 
     /// If the ownership of this ring should be transferred to the homomorphism, consider
-    /// using [`MultivariatePolyRing::into_lifted_hom()`].
+    /// using [`MultivariatePolyRingStore::into_lifted_hom()`].
     /// 
     fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
         where P: RingStore,
