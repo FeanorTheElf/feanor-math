@@ -1,5 +1,5 @@
 use gcd::poly_gcd_local;
-use global::poly_power_decomposition_finite_field;
+use finite::poly_power_decomposition_finite_field;
 use local::PolyGCDLocallyDomain;
 use squarefree_part::poly_power_decomposition_local;
 
@@ -19,7 +19,7 @@ use crate::specialization::FiniteRingOperation;
 
 use super::eea::gcd;
 
-pub mod global;
+pub mod finite;
 pub mod local;
 pub mod hensel;
 pub mod squarefree_part;
@@ -30,11 +30,12 @@ const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
 
 ///
 /// Trait for domain `R` for which there is an efficient way of computing the gcd
-/// of univariate polynomials over `Frac(R)`. 
+/// of univariate polynomials over `TFrac(R)`, where `TFrac(R)` is the total ring
+/// of fractions. 
 /// 
-/// However, computations in `Frac(R)` are avoided by most implementations due to 
+/// However, computations in `TFrac(R)` are avoided by most implementations due to 
 /// performance reasons, and both inputs and outputs are polynomials over `R`. Despite 
-/// this, the gcd is the gcd over `Frac(R)` and not `R` (the gcd over `R` is often not 
+/// this, the gcd is the gcd over `TFrac(R)` and not `R` (the gcd over `R` is often not 
 /// even defined, since `R` does not have to be UFD).
 /// 
 /// # Example
@@ -63,7 +64,7 @@ const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
 /// implementation for `PolyGCDLocallyDomain`s also applies to finite fields, the local implementation is not 
 /// actually used in these cases.
 /// 
-pub trait PolyGCDRing: Domain {
+pub trait PolyGCDRing {
 
     ///
     /// Computes the square-free part of a polynomial `f`, which is the largest-degree squarefree

@@ -169,8 +169,7 @@ let x = poly_in_x_factorization.into_iter().filter_map(|(f, _)| if F7T.degree(&f
 assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f1, [x, y].as_ring_el_fn(F7), F7.identity()));
 assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f2, [x, y].as_ring_el_fn(F7), F7.identity()));
 ```
-Generally speaking, this also works over the rationals.
-However, currently some places still use algorithms that are not well-suited for rationals or number fields, which means that performance in these cases is quite poor at the moment.
+A similar approach also works over the rationals.
 
 ## Using rings
 

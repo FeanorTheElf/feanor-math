@@ -10,7 +10,7 @@ use crate::algorithms::convolution::KaratsubaAlgorithm;
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 use crate::algorithms::eea::signed_gcd;
-use crate::algorithms::poly_gcd::global::poly_squarefree_part_finite_field;
+use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
 use crate::algorithms::int_factor::factor;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::ComputeInnerProduct;

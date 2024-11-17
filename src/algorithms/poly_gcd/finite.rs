@@ -8,6 +8,7 @@ use crate::divisibility::*;
 use crate::homomorphism::*;
 use crate::integer::*;
 use crate::rings::finite::*;
+use crate::rings::zn::ZnRing;
 
 ///
 /// Returns a list of `(fi, ki)` such that the `fi` are monic, square-free and pairwise coprime, and
@@ -74,4 +75,13 @@ pub fn poly_squarefree_part_finite_field<P>(poly_ring: P, poly: &El<P>) -> El<P>
         let result = poly_ring.checked_div(poly, &square_part).unwrap();
         return poly_ring.normalize(result);
     }
+}
+
+#[stability::unstable(feature = "enable")]
+pub fn poly_gcd_finite_reduced<P>(poly_ring: P, lhs: El<P>, rhs: El<P>) -> El<P>
+    where P: RingStore,
+        P::Type: PolyRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + DivisibilityRing
+{
+    unimplemented!()
 }

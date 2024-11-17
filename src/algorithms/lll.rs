@@ -248,10 +248,6 @@ pub fn lll_float<I, V1, V2, A>(ring: I, quadratic_form: Submatrix<V1, El<Real64>
     STANDARD_MATMUL.matmul(TransposableSubmatrix::from(matrix_RR.data()).transpose(), TransposableSubmatrix::from(quadratic_form), TransposableSubmatrixMut::from(tmp.data_mut()), lll_reals);
     STANDARD_MATMUL.matmul(TransposableSubmatrix::from(tmp.data()), TransposableSubmatrix::from(matrix_RR.data()), TransposableSubmatrixMut::from(gso.data_mut()), lll_reals);
 
-    // possibly free space early
-    drop(tmp);
-    drop(matrix_RR);
-
     ldl(&lll_reals, gso.data_mut());
     lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut(), TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);
 }
@@ -298,9 +294,6 @@ pub fn lll_exact<I, V, A>(ring: I, mut matrix: SubmatrixMut<V, El<I>>, delta: f6
     let hom = lll_reals.inclusion().compose(BigIntRing::RING.can_hom(&ring).unwrap());
     let matrix_RR: OwnedMatrix<_, &A> = OwnedMatrix::from_fn_in(matrix.row_count(), matrix.col_count(), |i, j| hom.map_ref(matrix.at(i, j)), &allocator);
     STANDARD_MATMUL.matmul(TransposableSubmatrix::from(matrix_RR.data()).transpose(), TransposableSubmatrix::from(matrix_RR.data()), TransposableSubmatrixMut::from(gso.data_mut()), &lll_reals);
-
-    // possibly free space early
-    drop(matrix_RR);
 
     ldl(&lll_reals, gso.data_mut());
     lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut(), TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);

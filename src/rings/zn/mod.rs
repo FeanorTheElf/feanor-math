@@ -283,16 +283,13 @@ pub mod generic_impls {
         }
         assert!(ring.is_noetherian());
         let int_ring = ring.integer_ring();
-        let mut lhs_lift = ring.smallest_positive_lift(ring.clone_el(lhs));
-        let mut rhs_lift = ring.smallest_positive_lift(ring.clone_el(rhs));
-        let d = int_ring.ideal_gen(&lhs_lift, &rhs_lift);
-        lhs_lift = int_ring.checked_div(&lhs_lift, &d).unwrap();
-        rhs_lift = int_ring.checked_div(&rhs_lift, &d).unwrap();
-        let (s, _, d) = int_ring.extended_ideal_gen(&rhs_lift, ring.modulus());
-        if int_ring.is_unit(&d) {
-            Some(ring.mul(ring.coerce(int_ring, lhs_lift), ring.mul(ring.coerce(int_ring, d), ring.coerce(int_ring, s))))
+        let rhs_ann = int_ring.checked_div(ring.modulus(), &int_ring.ideal_gen(ring.modulus(), &ring.smallest_positive_lift(ring.clone_el(rhs)))).unwrap();
+        let some_sol = ring.smallest_positive_lift(ring.checked_div(lhs, rhs)?);
+        let minimal_solution = int_ring.euclidean_rem(some_sol, &rhs_ann);
+        if int_ring.is_zero(&minimal_solution) {
+            return Some(ring.coerce(&int_ring, rhs_ann));
         } else {
-            None
+            return Some(ring.coerce(&int_ring, minimal_solution));
         }
     }
 

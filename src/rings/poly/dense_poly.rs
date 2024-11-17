@@ -634,6 +634,10 @@ impl<R, A, C> PrincipalIdealRing for DensePolyRingBase<R, A, C>
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
         algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), &RingRef::new(self))
     }
+
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+        <_ as PolyGCDRing>::gcd(RingRef::new(self), lhs, rhs)
+    }
 }
 
 impl<R, A, C> EuclideanRing for DensePolyRingBase<R, A, C> 

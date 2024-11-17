@@ -1,4 +1,4 @@
-use crate::algorithms::poly_gcd::global::poly_squarefree_part_finite_field;
+use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
 use crate::algorithms::poly_gcd::PolyGCDRing;
 use crate::divisibility::*;
 use crate::field::*;

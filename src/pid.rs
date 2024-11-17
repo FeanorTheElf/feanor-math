@@ -27,6 +27,27 @@ pub trait PrincipalIdealRing: DivisibilityRing {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element>;
 
     ///
+    /// Returns the (w.r.t. divisibility) smallest element `x` such that `x * val = 0`.
+    /// 
+    /// If the ring is a domain, this returns `0` for all ring elements except zero (for
+    /// which it returns any unit).
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::assert_el_eq;
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::pid::*;
+    /// # use feanor_math::homomorphism::*;
+    /// # use feanor_math::rings::zn::zn_64::*;
+    /// let Z6 = Zn::new(6);
+    /// assert_el_eq!(Z6, Z6.int_hom().map(3), Z6.annihilator(&Z6.int_hom().map(2)));
+    /// ```
+    /// 
+    fn annihilator(&self, val: &Self::Element) -> Self::Element {
+        self.checked_div_min(&self.zero(), val).unwrap()
+    }
+
+    ///
     /// Computes a Bezout identity for the generator `g` of the ideal `(lhs, rhs)`
     /// as `g = s * lhs + t * rhs`.
     /// 
@@ -98,6 +119,7 @@ pub trait PrincipalIdealRingStore: RingStore
     delegate!{ PrincipalIdealRing, fn checked_div_min(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> }
     delegate!{ PrincipalIdealRing, fn extended_ideal_gen(&self, lhs: &El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>, El<Self>) }
     delegate!{ PrincipalIdealRing, fn ideal_gen(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ PrincipalIdealRing, fn annihilator(&self, val: &El<Self>) -> El<Self> }
     delegate!{ PrincipalIdealRing, fn lcm(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
 
     ///
@@ -192,7 +214,7 @@ impl<R> EuclideanRingStore for R
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
     use super::*;
-    use crate::ring::El;
+    use crate::{algorithms::int_factor::factor, homomorphism::Homomorphism, integer::{int_cast, BigIntRing, IntegerRingStore}, ordered::OrderedRingStore, primitive_int::StaticRing, ring::El};
 
     pub fn test_euclidean_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) 
         where R::Type: EuclideanRing
@@ -243,6 +265,16 @@ pub mod generic_tests {
                 assert!(ring.checked_div(&g, a).is_some() && ring.checked_div(a, &g).is_some(), "Expected ideals ({}) and I = ({}, {}) to be equal, but extended_ideal_gen() returned generator {} of I", ring.format(a), ring.format(&g1), ring.format(&g2), ring.format(&g));
                 assert_el_eq!(ring, g, ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2)));
             }
+        }
+
+        let ZZbig = BigIntRing::RING;
+        let char = ring.characteristic(ZZbig).unwrap();
+        if !ZZbig.is_zero(&char) && ZZbig.is_leq(&char, &ZZbig.power_of_two(30)) {
+            let p = factor(ZZbig, ZZbig.clone_el(&char)).into_iter().next().unwrap().0;
+            let expected = ring.int_hom().map(int_cast(ZZbig.checked_div(&char, &p).unwrap(), StaticRing::<i32>::RING, ZZbig));
+            let ann_p = ring.annihilator(&ring.int_hom().map(int_cast(p, StaticRing::<i32>::RING, ZZbig)));
+            assert!(ring.checked_div(&ann_p, &expected).is_some());
+            assert!(ring.checked_div(&expected, &ann_p).is_some());
         }
     }
 }

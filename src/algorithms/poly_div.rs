@@ -4,6 +4,7 @@ use crate::divisibility::Domain;
 use crate::pid::*;
 use crate::ring::*;
 use crate::homomorphism::*;
+use crate::rings::finite::FiniteRing;
 use crate::rings::poly::*;
 
 ///
@@ -18,9 +19,9 @@ use crate::rings::poly::*;
 /// implicitly performs the polynomial division over the field of fractions.
 /// 
 pub fn poly_div_rem<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_ring: S, mut left_div_lc: F, hom: H) -> Result<(El<P>, El<P>), E>
-    where S: PolyRingStore,
+    where S: RingStore,
         S::Type: PolyRing,
-        P: PolyRingStore,
+        P: RingStore,
         P::Type: PolyRing,
         H: Homomorphism<<<S::Type as RingExtension>::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>,
         F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>
@@ -72,9 +73,9 @@ pub fn poly_div_rem<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn poly_rem<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_ring: S, mut left_div_lc: F, hom: H) -> Result<El<P>, E>
-    where S: PolyRingStore,
+    where S: RingStore,
         S::Type: PolyRing,
-        P: PolyRingStore,
+        P: RingStore,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing,
         H: Homomorphism<<<S::Type as RingExtension>::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>,
@@ -117,7 +118,7 @@ pub fn poly_rem<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_rin
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn poly_div_rem_domain<P>(ring: P, mut lhs: El<P>, rhs: &El<P>) -> (El<P>, El<P>, El<<P::Type as RingExtension>::BaseRing>)
-    where P: PolyRingStore,
+    where P: RingStore,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Domain + PrincipalIdealRing
 {
@@ -147,4 +148,129 @@ pub fn poly_div_rem_domain<P>(ring: P, mut lhs: El<P>, rhs: &El<P>) -> (El<P>, E
         terms.push((factor, lhs_deg - d));
     }
     return (ring.from_terms(terms.into_iter()), lhs, current_scale);
+}
+
+#[stability::unstable(feature = "enable")]
+pub enum PolyDivRemReducedError<R>
+    where R: ?Sized + RingBase
+{
+    NotReduced(R::Element),
+    NotDivisibleByContent(R::Element)
+}
+
+///
+/// Given polynomials `f, g` over a finite and reduced ring `R`, tries to compute the
+/// polynomial division of `f` by `g`, i.e. values `q, r in R[X]` with `f = q g + r`
+/// and `deg(r) < deg(g)`.
+/// 
+/// As opposed to the case when `R` is a field, it is possible that this fails if `cont(g)`
+/// does not divide `cont(f)`. Hence, the possible results of this function are
+///  - success, i.e. `q, r` such that `f = q g + r` and `deg(r) < deg(g)`
+///  - [`PolyDivRemReducedError::NotDivisibleByContent`] with the content `c in R`, if `c` does not divide `cont(f)`
+///  - [`PolyDivRemReducedError::NotReduced`] with a nilpotent element `x != 0` if `x^2 = 0`, which means that 
+///    the ring is not reduced
+/// 
+/// Since a finite reduced ring is always a product of finite fields, one could (in theory)
+/// compute the polynomial division in each field and reconstruct the result. However, this
+/// function finds the result without computing the ring factors, which can be very difficult
+/// in some situations (e.g. it might require factoring the modulus `n`).
+/// 
+/// Note that sometimes, even if `R` is not reduced, or `cont(g)` does not divide `cont(f)`, there
+/// might still exist suitable `q, r`. In these cases, it is unspecified whether the function aborts
+/// or returns suitable `q, r`.
+/// 
+/// # Why reduced?
+/// 
+/// Polynomial division as above makes sense over finite reduced rings (since they are always
+/// a product of finite fields), but cannot be properly defined over unreduced rings anymore.
+/// The reason is that the divisors of some polynomial `f` don't need to have degree `<= deg(f)`,
+/// e.g.
+/// ```text
+///   1 = (5 X^2 + 5 X + 1) (-5 X^2 - 5 X + 1) mod 5^2
+/// ```
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn poly_div_rem_finite_reduced<P>(ring: P, mut lhs: El<P>, rhs: &El<P>) -> Result<(El<P>, El<P>), PolyDivRemReducedError<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>>
+    where P: RingStore,
+        P::Type: PolyRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + PrincipalIdealRing
+{
+    assert!(!ring.is_zero(rhs));
+    let rhs_deg = ring.degree(rhs).unwrap();
+    let mut result = ring.zero();
+    while ring.degree(&lhs).is_some() && ring.degree(&lhs).unwrap() >= rhs_deg {
+        let lhs_deg = ring.degree(&lhs).unwrap();
+        let lcf = ring.lc(&lhs).unwrap();
+        let mut h = ring.zero();
+        let mut annihilator = ring.base_ring().one();
+        let mut i: i64 = rhs_deg as i64;
+        let mut d = ring.base_ring().zero();
+        while ring.base_ring().checked_div(lcf, &d).is_none() {
+            if i == -1 {
+                return Err(PolyDivRemReducedError::NotDivisibleByContent(d));
+            }
+            let (s, t, new_d) = ring.base_ring().extended_ideal_gen(&d, &ring.base_ring().mul_ref(&annihilator, ring.coefficient_at(&rhs, i as usize)));
+            ring.inclusion().mul_assign_map(&mut h, s);
+            ring.add_assign(&mut h, ring.from_terms([(ring.base_ring().mul_ref(&annihilator, &t), lhs_deg - i as usize)]));
+            annihilator = ring.base_ring().annihilator(&new_d);
+            d = new_d;
+            i = i - 1;
+            if !ring.base_ring().is_unit(&ring.base_ring().ideal_gen(&annihilator, &d)) {
+                let nilpotent = ring.base_ring().annihilator(&ring.base_ring().ideal_gen(&annihilator, &d));
+                debug_assert!(!ring.base_ring().is_zero(&nilpotent));
+                debug_assert!(ring.base_ring().is_zero(&ring.base_ring().mul_ref(&nilpotent, &nilpotent)));
+                return Err(PolyDivRemReducedError::NotReduced(nilpotent));
+            }
+        }
+        ring.sub_assign(&mut lhs, ring.mul_ref(&h, rhs));
+        ring.add_assign(&mut result, h);
+    }
+    return Ok((result, lhs));
+}
+
+#[cfg(test)]
+use crate::rings::zn::zn_64::*;
+#[cfg(test)]
+use dense_poly::DensePolyRing;
+
+#[test]
+fn test_poly_div_rem_finite_reduced() {
+    let base_ring = Zn::new(5 * 7 * 11);
+    let ring = DensePolyRing::new(base_ring, "X");
+
+    let [f, g, _q, _r] = ring.with_wrapped_indeterminate(|X| [
+        X.pow_ref(2),
+        X.pow_ref(2) * 5 + X * 7 + 11,
+        X * (-77) + 108,
+        91 * X - 33
+    ]);
+    let (q, r) = poly_div_rem_finite_reduced(&ring, ring.clone_el(&f), &g).ok().unwrap();
+    assert_eq!(1, ring.degree(&r).unwrap());
+    assert_el_eq!(&ring, &f, ring.add(ring.mul(q, g), r));
+
+    let [f, g] = ring.with_wrapped_indeterminate(|X| [
+        5 * X.pow_ref(2),
+        X * 5 * 11 + X * 7 * 11,
+    ]);
+    if let Err(PolyDivRemReducedError::NotDivisibleByContent(content)) = poly_div_rem_finite_reduced(&ring, f, &g) {
+        assert!(base_ring.checked_div(&content, &base_ring.int_hom().map(11)).is_some());
+        assert!(base_ring.checked_div(&base_ring.int_hom().map(11), &content).is_some());
+    } else {
+        assert!(false);
+    }
+
+    let base_ring = Zn::new(5 * 5 * 11);
+    let ring = DensePolyRing::new(base_ring, "X");
+
+    // note that `11 = (1 - 5 X - 5 X^2)(1 + 55 X + 55 X^2) mod 5^2 * 11`
+    let [g] = ring.with_wrapped_indeterminate(|X| [
+        1 - 5 * X - 5 * X.pow_ref(2)
+    ]);
+    let f = ring.from_terms([(base_ring.int_hom().map(11), 2)]);
+    if let Err(PolyDivRemReducedError::NotReduced(nilpotent)) = poly_div_rem_finite_reduced(&ring, ring.clone_el(&f), &g) {
+        assert!(!base_ring.is_zero(&nilpotent));
+        assert!(base_ring.is_zero(&base_ring.pow(nilpotent, 2)));
+    } else {
+        assert!(false);
+    }
 }
