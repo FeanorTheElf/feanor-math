@@ -86,6 +86,8 @@ pub trait DivisibilityRing: RingBase {
     /// dividing all elements in the sequence by this factor should make them 
     /// "smaller" resp. cheaper to process.
     /// 
+    /// Note that the balancing factor must always be a non-zero divisor.
+    /// 
     /// Standard cases are reducing fractions (where the sequence would be exactly two
     /// elements), or polynomials over fields (where we often want to scale the polynomial
     /// to make all denominators 1).

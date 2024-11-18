@@ -617,7 +617,6 @@ fn test_ceil_floor_div() {
     let ZZ = StaticRing::<i32>::RING;
     for rhs in [-10, -3, -2, -1, 1, 2, 3, 10] {
         for lhs in [-10, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 10] {
-            println!("{}, {}", lhs, rhs);
             let result = ZZ.ceil_div(lhs, &rhs);
             assert_eq!(i32::div_ceil(lhs, rhs), result);
             assert_eq!((lhs as f64 / rhs as f64).ceil() as i32, result);

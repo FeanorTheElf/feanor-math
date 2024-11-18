@@ -9,7 +9,11 @@ use crate::rings::poly::*;
 
 ///
 /// Computes the polynomial division of `lhs` by `rhs`, i.e. `lhs = q * rhs + r` with
-/// `deg(r) < deg(rhs)`. 
+/// `deg(r) < deg(rhs)`.
+/// 
+/// Note that this function does not compute the proper polynomial division if the leading
+/// coefficient of `rhs` is a zero-divisor in the ring. See [`poly_div_rem_finite_reduced()`]
+/// for details.
 /// 
 /// This requires a function `left_div_lc` that computes the division of an element of the 
 /// base ring by the leading coefficient of `rhs`. If the base ring is a field, this can
@@ -18,41 +22,35 @@ use crate::rings::poly::*;
 /// division always works. If this is not the case, look also at [`poly_div_rem_domain()`], which
 /// implicitly performs the polynomial division over the field of fractions.
 /// 
-pub fn poly_div_rem<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_ring: S, mut left_div_lc: F, hom: H) -> Result<(El<P>, El<P>), E>
-    where S: RingStore,
-        S::Type: PolyRing,
-        P: RingStore,
+#[stability::unstable(feature = "enable")]
+pub fn poly_div_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left_div_lc: F) -> Result<(El<P>, El<P>), E>
+    where P: RingStore,
         P::Type: PolyRing,
-        H: Homomorphism<<<S::Type as RingExtension>::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>,
         F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>
 {
-    assert!(rhs_ring.degree(rhs).is_some());
-    assert!(lhs_ring.base_ring().get_ring() == hom.codomain().get_ring());
-    assert!(rhs_ring.base_ring().get_ring() == hom.domain().get_ring());
+    assert!(poly_ring.degree(rhs).is_some());
 
-    let rhs_deg = rhs_ring.degree(rhs).unwrap();
-    if lhs_ring.degree(&lhs).is_none() {
-        return Ok((lhs_ring.zero(), lhs));
+    let rhs_deg = poly_ring.degree(rhs).unwrap();
+    if poly_ring.degree(&lhs).is_none() {
+        return Ok((poly_ring.zero(), lhs));
     }
-    let lhs_deg = lhs_ring.degree(&lhs).unwrap();
+    let lhs_deg = poly_ring.degree(&lhs).unwrap();
     if lhs_deg < rhs_deg {
-        return Ok((lhs_ring.zero(), lhs));
+        return Ok((poly_ring.zero(), lhs));
     }
-    let mut result = lhs_ring.zero();
+    let mut result = poly_ring.zero();
     for i in (0..(lhs_deg + 1 - rhs_deg)).rev() {
-        let quo = left_div_lc(lhs_ring.coefficient_at(&lhs, i +  rhs_deg))?;
-        if !lhs_ring.base_ring().is_zero(&quo) {
-            lhs_ring.get_ring().add_assign_from_terms(
+        let quo = left_div_lc(poly_ring.coefficient_at(&lhs, i +  rhs_deg))?;
+        if !poly_ring.base_ring().is_zero(&quo) {
+            poly_ring.get_ring().add_assign_from_terms(
                 &mut lhs, 
-                rhs_ring.terms(rhs)
+                poly_ring.terms(rhs)
                     .map(|(c, j)| {
-                        let mut subtract = lhs_ring.base_ring().clone_el(&quo);
-                        hom.mul_assign_ref_map(&mut subtract, c);
-                        return (lhs_ring.base_ring().negate(subtract), i + j);
+                        (poly_ring.base_ring().negate(poly_ring.base_ring().mul_ref(&quo, c)), i + j)
                     })
             );
         }
-        lhs_ring.get_ring().add_assign_from_terms(&mut result, std::iter::once((quo, i)));
+        poly_ring.get_ring().add_assign_from_terms(&mut result, std::iter::once((quo, i)));
     }
     return Ok((result, lhs));
 }
@@ -64,6 +62,10 @@ pub fn poly_div_rem<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs
 /// 
 /// Since we don't have to compute `q`, this might be faster than [`poly_div_rem()`].
 /// 
+/// Note that this function does not compute the proper polynomial division if the leading
+/// coefficient of `rhs` is a zero-divisor in the ring. See [`poly_div_rem_finite_reduced()`]
+/// for details.
+/// 
 /// This requires a function `left_div_lc` that computes the division of an element of the 
 /// base ring by the leading coefficient of `rhs`. If the base ring is a field, this can
 /// just be standard division. In other cases, this depends on the exact situation you are
@@ -72,41 +74,34 @@ pub fn poly_div_rem<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs
 /// implicitly performs the polynomial division over the field of fractions.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn poly_rem<P, S, F, E, H>(mut lhs: El<P>, rhs: &El<S>, lhs_ring: P, rhs_ring: S, mut left_div_lc: F, hom: H) -> Result<El<P>, E>
-    where S: RingStore,
-        S::Type: PolyRing,
-        P: RingStore,
+pub fn poly_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left_div_lc: F) -> Result<El<P>, E>
+    where P: RingStore,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing,
-        H: Homomorphism<<<S::Type as RingExtension>::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>,
         F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>
 {
-    assert!(rhs_ring.degree(rhs).is_some());
-    assert!(lhs_ring.base_ring().get_ring() == hom.codomain().get_ring());
-    assert!(rhs_ring.base_ring().get_ring() == hom.domain().get_ring());
+    assert!(poly_ring.degree(rhs).is_some());
 
-    let rhs_deg = rhs_ring.degree(rhs).unwrap();
-    if lhs_ring.degree(&lhs).is_none() {
-        return Ok(lhs_ring.zero());
+    let rhs_deg = poly_ring.degree(rhs).unwrap();
+    if poly_ring.degree(&lhs).is_none() {
+        return Ok(poly_ring.zero());
     }
-    let lhs_deg = lhs_ring.degree(&lhs).unwrap();
+    let lhs_deg = poly_ring.degree(&lhs).unwrap();
     if lhs_deg < rhs_deg {
-        return Ok(lhs_ring.zero());
+        return Ok(poly_ring.zero());
     }
     for i in (0..(lhs_deg + 1 - rhs_deg)).rev() {
-        let quo = left_div_lc(lhs_ring.coefficient_at(&lhs, i +  rhs_deg))?;
-        if !lhs_ring.base_ring().is_zero(&quo) {
-            lhs_ring.get_ring().add_assign_from_terms(
+        let quo = left_div_lc(poly_ring.coefficient_at(&lhs, i +  rhs_deg))?;
+        if !poly_ring.base_ring().is_zero(&quo) {
+            poly_ring.get_ring().add_assign_from_terms(
                 &mut lhs, 
-                rhs_ring.terms(rhs)
+                poly_ring.terms(rhs)
                     .map(|(c, j)| {
-                        let mut subtract = lhs_ring.base_ring().clone_el(&quo);
-                        hom.mul_assign_ref_map(&mut subtract, c);
-                        return (lhs_ring.base_ring().negate(subtract), i + j);
+                        (poly_ring.base_ring().negate(poly_ring.base_ring().mul_ref(&quo, c)), i + j)
                     })
             );
         }
-        lhs_ring.balance_poly(&mut lhs);
+        poly_ring.balance_poly(&mut lhs);
     }
     return Ok(lhs);
 }
@@ -150,6 +145,9 @@ pub fn poly_div_rem_domain<P>(ring: P, mut lhs: El<P>, rhs: &El<P>) -> (El<P>, E
     return (ring.from_terms(terms.into_iter()), lhs, current_scale);
 }
 
+///
+/// Possible errors that might be returned by [`poly_div_rem_finite_reduced()`].
+/// 
 #[stability::unstable(feature = "enable")]
 pub enum PolyDivRemReducedError<R>
     where R: ?Sized + RingBase
@@ -173,7 +171,9 @@ pub enum PolyDivRemReducedError<R>
 /// Since a finite reduced ring is always a product of finite fields, one could (in theory)
 /// compute the polynomial division in each field and reconstruct the result. However, this
 /// function finds the result without computing the ring factors, which can be very difficult
-/// in some situations (e.g. it might require factoring the modulus `n`).
+/// in some situations (e.g. it might require factoring the modulus `n`). Note however that
+/// this function does not necessarily give the same result as the div-in-field-and-reconstruct
+/// approach. See "lack of uniqueness" later.
 /// 
 /// Note that sometimes, even if `R` is not reduced, or `cont(g)` does not divide `cont(f)`, there
 /// might still exist suitable `q, r`. In these cases, it is unspecified whether the function aborts
@@ -189,13 +189,43 @@ pub enum PolyDivRemReducedError<R>
 ///   1 = (5 X^2 + 5 X + 1) (-5 X^2 - 5 X + 1) mod 5^2
 /// ```
 /// 
+/// # Lack of Uniqueness
+/// 
+/// The result of this function does not have to be unique.
+/// Consider for example
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::algorithms::poly_div::*;
+/// let Z6 = Zn::new(6);
+/// let Z6X = DensePolyRing::new(Z6, "X");
+/// let [g, q1, q2, r1, r2] = Z6X.with_wrapped_indeterminate(|X| [
+///     X.pow_ref(2) * 2 + 1,
+///     X.clone(),
+///     4 * X,
+///     X + 1,
+///     4 * X + 1
+/// ]);
+/// assert_el_eq!(&Z6X, Z6X.add_ref(&Z6X.mul_ref(&g, &q1), &r1), Z6X.add_ref(&Z6X.mul_ref(&g, &q2), &r2));
+/// ```
+/// In particular, `g | f` does not not imply that the remainder of the division of `f` by `g` is `0`.
+/// Clearly `g` must divide the remainder `r`, but if the ring is not a domain, `g` might divide polynomials
+/// of smaller degree. Hence, use [`poly_checked_div_finite_reduced()`] to check for divisibility.
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn poly_div_rem_finite_reduced<P>(ring: P, mut lhs: El<P>, rhs: &El<P>) -> Result<(El<P>, El<P>), PolyDivRemReducedError<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>>
     where P: RingStore,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + PrincipalIdealRing
 {
-    assert!(!ring.is_zero(rhs));
+    if ring.is_zero(rhs) && ring.is_zero(&lhs) {
+        return Ok((ring.zero(), ring.zero()));
+    } else if ring.is_zero(rhs) {
+        return Err(PolyDivRemReducedError::NotDivisibleByContent(ring.base_ring().zero()));
+    }
     let rhs_deg = ring.degree(rhs).unwrap();
     let mut result = ring.zero();
     while ring.degree(&lhs).is_some() && ring.degree(&lhs).unwrap() >= rhs_deg {
@@ -226,6 +256,37 @@ pub fn poly_div_rem_finite_reduced<P>(ring: P, mut lhs: El<P>, rhs: &El<P>) -> R
         ring.add_assign(&mut result, h);
     }
     return Ok((result, lhs));
+}
+
+///
+/// Checks whether `rhs | lhs` and returns a quotient if one exists, assuming that
+/// the base ring is reduced. If it is not, the function may fail with a nilpotent
+/// element of the base ring.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn poly_checked_div_finite_reduced<P>(ring: P, mut lhs: El<P>, mut rhs: El<P>) -> Result<Option<El<P>>, El<<P::Type as RingExtension>::BaseRing>>
+    where P: RingStore + Copy,
+        P::Type: PolyRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + PrincipalIdealRing
+{
+    let mut result = ring.zero();
+    while !ring.is_zero(&lhs) {
+        match poly_div_rem_finite_reduced(ring, lhs, &rhs) {
+            Ok((q, r)) => {
+                ring.add_assign(&mut result, q);
+                lhs = r;
+            },
+            Err(PolyDivRemReducedError::NotReduced(nilpotent)) => {
+                return Err(nilpotent);
+            },
+            Err(PolyDivRemReducedError::NotDivisibleByContent(_)) => {
+                return Ok(None);
+            }
+        }
+        let annihilate_lc = ring.base_ring().annihilator(ring.lc(&rhs).unwrap());
+        ring.inclusion().mul_assign_map(&mut rhs, annihilate_lc);
+    }
+    return Ok(Some(result));
 }
 
 #[cfg(test)]

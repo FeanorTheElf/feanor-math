@@ -628,3 +628,17 @@ fn test_reduction_map() {
 
     crate::homomorphism::generic_tests::test_homomorphism_axioms(ReductionMap::new(&ring2, &ring1).unwrap(), ring2.elements().step_by(1024));
 }
+
+#[test]
+fn test_generic_impl_checked_div_min() {
+    let ring = zn_64::Zn::new(5 * 7 * 11 * 13);
+    let actual = ring.annihilator(&ring.int_hom().map(1001));
+    let expected = ring.int_hom().map(5);
+    assert!(ring.checked_div(&expected, &actual).is_some());
+    assert!(ring.checked_div(&actual, &expected).is_some());
+
+    let actual = ring.annihilator(&ring.zero());
+    let expected = ring.one();
+    assert!(ring.checked_div(&expected, &actual).is_some());
+    assert!(ring.checked_div(&actual, &expected).is_some());
+}

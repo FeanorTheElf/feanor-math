@@ -105,12 +105,10 @@ impl<R: RingStore> SparsePolyRingBase<R> {
     {
         let lhs_val = std::mem::replace(lhs, self.zero());
         let (quo, rem) = algorithms::poly_div::poly_div_rem(
+            RingRef::new(self), 
             lhs_val, 
             rhs, 
-            RingRef::new(self), 
-            RingRef::new(self), 
-            |x| left_div_lc(self.base_ring().clone_el(x)).ok_or(()),
-            &self.base_ring().identity()
+            |x| left_div_lc(self.base_ring().clone_el(x)).ok_or(())
         ).ok()?;
         *lhs = rem;
         return Some(quo);
@@ -425,7 +423,8 @@ impl<R> Domain for SparsePolyRingBase<R>
 {}
 
 impl<R,> DivisibilityRing for SparsePolyRingBase<R> 
-    where R: DivisibilityRingStore, R::Type: DivisibilityRing
+    where R: RingStore, 
+        R::Type: DivisibilityRing + Domain
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if let Some(d) = self.degree(rhs) {
@@ -547,7 +546,7 @@ fn test_canonical_iso_dense_poly_ring() {
 
 #[test]
 fn test_divisibility_ring_axioms() {
-    let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
+    let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
     crate::divisibility::generic_tests::test_divisibility_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 

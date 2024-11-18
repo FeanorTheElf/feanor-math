@@ -5,7 +5,8 @@ use crate::primitive_int::{StaticRingBase, StaticRing};
 
 ///
 /// The user-facing trait for ring homomorphisms, i.e. maps `R -> S`
-/// between rings that respect the ring structure.
+/// between rings that respect the ring structure. Since all considered
+/// rings are unital, ring homomorphisms also must be unital.
 /// 
 /// Objects are expected to know their domain and codomain rings and
 /// can thus make sense without an implicit ambient ring (unlike e.g.
@@ -1061,6 +1062,9 @@ pub mod generic_tests {
         let from = hom.domain();
         let to = hom.codomain();
         let elements = edge_case_elements.collect::<Vec<_>>();
+
+        assert!(to.is_zero(&hom.map(from.zero())));
+        assert!(to.is_one(&hom.map(from.one())));
 
         for a in &elements {
             for b in &elements {

@@ -268,7 +268,11 @@ impl<R: RingStore> PrincipalIdealRing for AsFieldBase<R>
     where R::Type: DivisibilityRing
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        self.checked_left_div(lhs, rhs)
+        if self.is_zero(lhs) && self.is_zero(rhs) {
+            Some(self.one())
+        } else {
+            self.checked_left_div(lhs, rhs)
+        }
     }
     
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
@@ -570,4 +574,17 @@ fn test_canonical_hom_axioms_wrap_unwrap() {
     let R = Zn::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
     crate::ring::generic_tests::test_hom_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());
     crate::ring::generic_tests::test_iso_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());
+}
+
+#[test]
+fn test_principal_ideal_ring_axioms() {
+    let R = Zn::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
+    crate::pid::generic_tests::test_euclidean_ring_axioms(&R, R.elements());
+}
+
+#[test]
+fn test_field_axioms() {
+    let R = Zn::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
+    crate::field::generic_tests::test_field_axioms(&R, R.elements());
 }

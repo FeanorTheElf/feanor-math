@@ -807,6 +807,21 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
 
 #[cfg(test)]
 use crate::RANDOM_TEST_INSTANCE_COUNT;
+#[cfg(test)]
+use crate::iters::multi_cartesian_product;
+
+#[test]
+fn test_principal_ideal_ring_axioms() {
+    let ZZ = BigIntRing::RING;
+    let ZZX = DensePolyRing::new(ZZ, "X");
+
+    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
+    let K = NumberField::new(&ZZX, &f);
+
+    let elements = multi_cartesian_product([(-4..4), (-2..2)].into_iter(), |slice| K.from_canonical_basis(slice.iter().map(|x| K.base_ring().int_hom().map(*x))), |_, x| *x).collect::<Vec<_>>();
+
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&K, elements.iter().map(|x| K.clone_el(x)));
+}
 
 #[test]
 fn test_adjoin_root() {

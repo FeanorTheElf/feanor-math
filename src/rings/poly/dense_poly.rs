@@ -481,7 +481,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
 
     fn div_rem_monic(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(self.base_ring().is_one(self.coefficient_at(rhs, self.degree(rhs).unwrap())));
-        let (quo, rem) = poly_div_rem(lhs, rhs, RingRef::new(self), RingRef::new(self), |x| Ok(self.base_ring().clone_el(x)), self.base_ring().identity()).unwrap_or_else(no_error);
+        let (quo, rem) = poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().clone_el(x))).unwrap_or_else(no_error);
         return (quo, rem);
     }
 
@@ -559,7 +559,9 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> Domain for Dense
 {}
 
 impl<R, A: Allocator + Clone, C> DivisibilityRing for DensePolyRingBase<R, A, C> 
-    where R: DivisibilityRingStore, R::Type: DivisibilityRing, C: ConvolutionAlgorithm<R::Type>
+    where R: RingStore, 
+        R::Type: DivisibilityRing + Domain, 
+        C: ConvolutionAlgorithm<R::Type>
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if let Some(d) = self.degree(rhs) {
@@ -568,7 +570,7 @@ impl<R, A: Allocator + Clone, C> DivisibilityRing for DensePolyRingBase<R, A, C>
                 return RingRef::new(self).try_from_terms(self.terms(lhs).map(|(c, i)| (self.base_ring().checked_left_div(c, rhs).map(|c| (c, i)).ok_or(())))).ok();
             } else {
                 let lc = &rhs.data[d];
-                let (quo, rem) = poly_div_rem(self.clone_el(lhs), rhs, RingRef::new(self), RingRef::new(self), |x| self.base_ring().checked_left_div(&x, lc).ok_or(()), self.base_ring().identity()).ok()?;
+                let (quo, rem) = poly_div_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| self.base_ring().checked_left_div(&x, lc).ok_or(())).ok()?;
                 if self.is_zero(&rem) {
                     Some(quo)
                 } else {
@@ -588,7 +590,7 @@ impl<R, A: Allocator + Clone, C> DivisibilityRing for DensePolyRingBase<R, A, C>
                 true
             } else {
                 let lc = &rhs.data[d];
-                if let Ok(rem) = poly_rem(self.clone_el(lhs), rhs, RingRef::new(self), RingRef::new(self), |x| self.base_ring().checked_left_div(&x, lc).ok_or(()), self.base_ring().identity()) {
+                if let Ok(rem) = poly_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| self.base_ring().checked_left_div(&x, lc).ok_or(())) {
                     if self.is_zero(&rem) {
                         true
                     } else {
@@ -645,7 +647,7 @@ impl<R, A, C> EuclideanRing for DensePolyRingBase<R, A, C>
 {
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         let lc_inv = self.base_ring.invert(&rhs.data[self.degree(rhs).unwrap()]).unwrap();
-        let (quo, rem) = poly_div_rem(lhs, rhs, RingRef::new(self), RingRef::new(self), |x| Ok(self.base_ring().mul_ref(&x, &lc_inv)), self.base_ring().identity()).unwrap_or_else(no_error);
+        let (quo, rem) = poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().mul_ref(&x, &lc_inv))).unwrap_or_else(no_error);
         return (quo, rem);
     }
 
@@ -731,7 +733,7 @@ fn test_poly_ring_axioms() {
 
 #[test]
 fn test_divisibility_ring_axioms() {
-    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
     crate::divisibility::generic_tests::test_divisibility_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 

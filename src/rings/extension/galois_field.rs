@@ -587,7 +587,11 @@ impl<Impl> PrincipalIdealRing for GaloisFieldBase<Impl>
         <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        self.checked_left_div(lhs, rhs)
+        if self.is_zero(lhs) && self.is_zero(rhs) {
+            Some(self.one())
+        } else {
+            self.checked_left_div(lhs, rhs)
+        }
     }
     
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
@@ -832,6 +836,13 @@ fn test_galois_field() {
     crate::ring::generic_tests::test_ring_axioms(&field, field.elements());
     crate::ring::generic_tests::test_self_iso(&field, field.elements());
     crate::field::generic_tests::test_field_axioms(&field, field.elements());
+}
+
+#[test]
+fn test_principal_ideal_ring_axioms() {
+    let field = GaloisField::new(3, 2);
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&field, field.elements());
+    crate::pid::generic_tests::test_euclidean_ring_axioms(&field, field.elements());
 }
 
 #[test]

@@ -17,7 +17,7 @@ fn combine_local_factors_local<'ring, 'data, 'local, R, P1, P2>(reduction: &'loc
         P1::Type: PolyRing + DivisibilityRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R>,
         P2: RingStore + Copy,
-        P2::Type: PolyRing<BaseRing = &'local R::LocalRing<'ring>> + DivisibilityRing,
+        P2::Type: PolyRing<BaseRing = &'local R::LocalRing<'ring>>,
         R::LocalRing<'ring>: 'local
 {
     debug_assert!(poly_ring.base_ring().is_one(poly_ring.lc(poly).unwrap()));

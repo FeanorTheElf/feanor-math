@@ -89,6 +89,15 @@ pub trait PolyRing: RingExtension {
         RingRef::new(self).from_terms(from.terms(el).map(|(c, i)| (hom.map_ref(c), i)))
     }
     
+    ///
+    /// Possibly divides all coefficients of the polynomial by a common factor,
+    /// in order to make them "smaller". 
+    /// 
+    /// In cases where we mainly care about polynomials up to scaling by non-zero 
+    /// divisors of the base ring, balancing intermediate polynomials can improve performance.
+    /// 
+    /// For more details on balancing, see [`DivisibilityRing::balance_factor()`].
+    /// 
     #[stability::unstable(feature = "enable")]
     fn balance_poly(&self, f: &mut Self::Element) -> Option<El<Self::BaseRing>>
         where <Self::BaseRing as RingStore>::Type: DivisibilityRing

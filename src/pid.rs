@@ -241,6 +241,11 @@ pub mod generic_tests {
         assert!(ring.is_noetherian());
         let elements = edge_case_elements.collect::<Vec<_>>();
 
+        let expected_unit = ring.checked_div_min(&ring.zero(), &ring.zero()).unwrap();
+        assert!(ring.is_unit(&expected_unit), "checked_div_min() returned a non-minimal quotient {} * {} = {}", ring.format(&expected_unit), ring.format(&ring.zero()), ring.format(&ring.zero()));
+        let expected_zero = ring.checked_div_min(&ring.zero(), &ring.one()).unwrap();
+        assert!(ring.is_zero(&expected_zero), "checked_div_min() returned a wrong quotient {} * {} = {}", ring.format(&expected_zero), ring.format(&ring.one()), ring.format(&ring.zero()));
+
         for a in &elements {
             let expected_unit = ring.checked_div_min(a, a).unwrap();
             assert!(ring.is_unit(&expected_unit), "checked_div_min() returned a non-minimal quotient {} * {} = {}", ring.format(&expected_unit), ring.format(a), ring.format(a));
