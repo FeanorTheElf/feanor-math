@@ -19,7 +19,53 @@ use crate::primitive_int::*;
 /// A wrapper around a ring that marks this ring to be a perfect field. In particular,
 /// the functions provided by [`DivisibilityRing`] will be used to provide
 /// field-like division for the wrapped ring.
-///
+/// 
+/// # Example
+/// 
+/// A common case where you might encounter [`AsFieldBase`] is when working with rings
+/// which might or might not be a field depending on data only known at runtime. One
+/// example are implementations of [`ZnRing`] with modulus chosen at runtime.
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::field::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_64::*;
+/// // 7 is a prime, so this is a field - but must be checked at runtime
+/// let Fp_as_ring = Zn::new(7);
+/// // we use `ZnRing::as_field()` to make this a field
+/// let Fp_as_field: AsField<Zn> = Fp_as_ring.as_field().ok().unwrap();
+/// // in many cases (like here) we can use canonical isomorphisms to map elements
+/// let iso = Fp_as_field.can_iso(&Fp_as_ring).unwrap();
+/// assert_el_eq!(&Fp_as_ring, Fp_as_ring.one(), iso.map(Fp_as_field.one()));
+/// ```
+/// Since the canonical isomorphisms are not given by blanket implementations
+/// (unfortunately there are some conflicts...), they are often not available in
+/// generic contexts. In this case, the currently best solution is to directly
+/// use the functions given by [`DelegateRing`], e.g.
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::field::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_64::*;
+/// fn work_in_Fp<R>(ring: R)
+///     where R: RingStore,
+///         R::Type: ZnRing
+/// {
+///     use crate::feanor_math::delegate::DelegateRing;
+/// 
+///     let R_as_field = (&ring).as_field().ok().unwrap();
+///     let x = ring.one();
+///     // since `DelegateRing` does not have a corresponding `RingStore`, the access
+///     // through `get_ring()` is necessary
+///     let x_mapped = R_as_field.get_ring().rev_delegate(x);
+///     let x_mapped_back = R_as_field.get_ring().delegate(x_mapped);
+/// }
+/// ```
+/// 
 pub struct AsFieldBase<R: RingStore> 
     where R::Type: DivisibilityRing
 {
