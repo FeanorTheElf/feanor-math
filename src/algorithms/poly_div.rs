@@ -228,6 +228,7 @@ pub fn poly_div_rem_finite_reduced<P>(ring: P, mut lhs: El<P>, rhs: &El<P>) -> R
     }
     let rhs_deg = ring.degree(rhs).unwrap();
     let mut result = ring.zero();
+    let zero = ring.base_ring().zero();
     while ring.degree(&lhs).is_some() && ring.degree(&lhs).unwrap() >= rhs_deg {
         let lhs_deg = ring.degree(&lhs).unwrap();
         let lcf = ring.lc(&lhs).unwrap();
@@ -236,6 +237,7 @@ pub fn poly_div_rem_finite_reduced<P>(ring: P, mut lhs: El<P>, rhs: &El<P>) -> R
         let mut i: i64 = rhs_deg as i64;
         let mut d = ring.base_ring().zero();
         while ring.base_ring().checked_div(lcf, &d).is_none() {
+            debug_assert!(ring.base_ring().eq_el(ring.lc(&ring.mul_ref(&h, rhs)).unwrap_or(&zero), &d));
             if i == -1 {
                 return Err(PolyDivRemReducedError::NotDivisibleByContent(d));
             }
@@ -251,9 +253,13 @@ pub fn poly_div_rem_finite_reduced<P>(ring: P, mut lhs: El<P>, rhs: &El<P>) -> R
                 debug_assert!(ring.base_ring().is_zero(&ring.base_ring().mul_ref(&nilpotent, &nilpotent)));
                 return Err(PolyDivRemReducedError::NotReduced(nilpotent));
             }
+            debug_assert!(ring.base_ring().eq_el(ring.lc(&ring.mul_ref(&h, rhs)).unwrap_or(&zero), &d));
         }
+        let scale = ring.base_ring().checked_div(lcf, &d).unwrap();
+        ring.inclusion().mul_assign_map(&mut h, scale);
         ring.sub_assign(&mut lhs, ring.mul_ref(&h, rhs));
         ring.add_assign(&mut result, h);
+        debug_assert!(ring.degree(&lhs).map(|d| d + 1).unwrap_or(0) <= lhs_deg);
     }
     return Ok((result, lhs));
 }
@@ -291,6 +297,12 @@ pub fn poly_checked_div_finite_reduced<P>(ring: P, mut lhs: El<P>, mut rhs: El<P
 
 #[cfg(test)]
 use crate::rings::zn::zn_64::*;
+#[cfg(test)]
+use crate::rings::zn::*;
+#[cfg(test)]
+use crate::integer::*;
+#[cfg(test)]
+use crate::primitive_int::*;
 #[cfg(test)]
 use dense_poly::DensePolyRing;
 
@@ -334,4 +346,17 @@ fn test_poly_div_rem_finite_reduced() {
     } else {
         assert!(false);
     }
+}
+
+#[test]
+fn test_poly_div_rem_finite_reduced_nonmonic() {
+    let base_ring = zn_big::Zn::new(BigIntRing::RING, int_cast(8589934594, BigIntRing::RING, StaticRing::<i64>::RING));
+    let poly_ring = DensePolyRing::new(&base_ring, "X");
+    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [
+        1431655767 + -1431655765 * X,
+        -2 + X + X.pow_ref(2)
+    ]);
+    let (q, r) = poly_div_rem_finite_reduced(&poly_ring, poly_ring.clone_el(&g), &f).ok().unwrap();
+    assert_eq!(0, poly_ring.degree(&r).unwrap_or(0));
+    assert_el_eq!(&poly_ring, &g, poly_ring.add(poly_ring.mul_ref(&q, &f), r));
 }
