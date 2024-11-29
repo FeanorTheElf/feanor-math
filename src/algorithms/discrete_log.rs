@@ -4,6 +4,7 @@ use crate::ring::*;
 use crate::algorithms;
 use crate::rings::finite::FiniteRing;
 use crate::rings::finite::FiniteRingStore;
+use crate::rings::zn::ZnRing;
 use crate::wrapper::RingElementWrapper;
 use crate::DEFAULT_PROBABILISTIC_REPETITIONS;
 
@@ -91,8 +92,8 @@ fn pohlig_hellmann_power_p<T, F>(value: T, p_e_base: &T, p: i64, e: usize, op: F
     debug_assert!(algorithms::miller_rabin::is_prime(ZZ, &p, DEFAULT_PROBABILISTIC_REPETITIONS));
 
     let p_base = pow(p_e_base, ZZ.pow(p, e - 1), &op, identity.clone());
-    debug_assert_ne!(p_base, identity);
-    debug_assert_eq!(pow(&p_base, p, &op, identity.clone()), identity);
+    debug_assert!(p_base != identity);
+    debug_assert!(pow(&p_base, p, &op, identity.clone()) == identity);
     let mut fill_log = 0;
     let mut current = value;
     for i in 0..e {
@@ -187,7 +188,7 @@ pub fn discrete_log<T, F>(value: T, base: &T, order: i64, op: F, identity: T) ->
 /// of a finite field `Fq`.
 /// 
 pub fn multiplicative_order<R: RingStore>(x: El<R>, Fq: R) -> i64
-    where R::Type: FiniteRing + Field + HashableElRing
+    where R::Type: ZnRing + Field + HashableElRing
 {
     order(
         &RingElementWrapper::new(&Fq, x),
@@ -202,7 +203,7 @@ pub fn multiplicative_order<R: RingStore>(x: El<R>, Fq: R) -> i64
 /// group `Fq*` of a finite field `Fq`.
 /// 
 pub fn finite_field_discrete_log<R: RingStore>(value: El<R>, base: El<R>, Fq: R) -> Option<i64>
-    where R::Type: FiniteRing + Field + HashableElRing
+    where R::Type: ZnRing + Field + HashableElRing
 {
     discrete_log(
         RingElementWrapper::new(&Fq, value), 
