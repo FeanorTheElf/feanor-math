@@ -162,13 +162,13 @@ pub fn cantor_zassenhaus_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) -> El
 /// 
 /// The algorithm relies on the fact that for some monic polynomial T over Fq have
 /// ```text
-/// T^Q - T = T (T^((Q - 1)/2) + 1) (T^((Q - 1)/2) - 1)
+///   T^Q - T = T (T^((Q - 1)/2) + 1) (T^((Q - 1)/2) - 1)
 /// ```
 /// where `Q = q^d`. Furthermore, the three factors are pairwise coprime.
 /// Since `X^Q - X` divides `T^Q - T`, and f is squarefree (so divides `X^Q - X`), 
 /// we see that `f` also divides `T^Q - T` and so
 /// ```text
-/// f = gcd(T, f) gcd((T^((Q - 1)/2) + 1, f) gcd(T^((Q - 1)/2) - 1, f)
+///   f = gcd(T, f) gcd((T^((Q - 1)/2) + 1, f) gcd(T^((Q - 1)/2) - 1, f)
 /// ```
 /// The idea is now to choose a random T and check whether `gcd(T^((Q - 1)/2) - 1, f)`
 /// gives a nontrivial factor of f. When f has two irreducible factors, with roots a, b

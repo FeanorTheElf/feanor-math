@@ -232,7 +232,7 @@ pub trait MultivariatePolyRing: RingExtension {
     /// # use feanor_math::seq::*; 
     /// let poly_ring = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, 2);
     /// let [f] = poly_ring.with_wrapped_indeterminates(|[X, Y]| [1 + X + X.pow_ref(2) * Y]);
-    /// assert_eq!(1 + 5 + 5 * 5 * 8, poly_ring.evaluate(&f, [5, 8].into_ring_el_fn(StaticRing::<i64>::RING), &poly_ring.base_ring().identity()));
+    /// assert_eq!(1 + 5 + 5 * 5 * 8, poly_ring.evaluate(&f, [5, 8].clone_ring_els(StaticRing::<i64>::RING), &poly_ring.base_ring().identity()));
     /// ```
     /// 
     fn evaluate<R, V, H>(&self, f: &Self::Element, value: V, hom: H) -> R::Element
@@ -884,7 +884,7 @@ pub mod generic_tests {
                         base_ring.mul_ref(a, b)
                     ]);
                     let values = [base_ring.clone_el(a), base_ring.clone_el(b)].into_iter().chain((0..(ring.indeterminate_count() - 2)).map(|_| base_ring.zero())).collect::<Vec<_>>();
-                    assert_el_eq!(&base_ring, &expected, &ring.evaluate(&f, values.as_ring_el_fn(base_ring), &base_ring.identity()));
+                    assert_el_eq!(&base_ring, &expected, &ring.evaluate(&f, values.into_clone_ring_els(base_ring), &base_ring.identity()));
                 }
             }
         }

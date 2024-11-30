@@ -46,7 +46,7 @@ fn point_eq<R>(Zn: &R, P: &Point<R>, Q: &Point<R>) -> bool
     if !Zn.is_unit(&factor_quo.1) {
         let factor_of_n = signed_gcd(Zn.integer_ring().clone_el(Zn.modulus()), Zn.smallest_positive_lift(Zn.clone_el(&factor_quo.1)), Zn.integer_ring());
         let Zn_new = zn_big::Zn::new(BigIntRing::RING, int_cast(Zn.integer_ring().checked_div(Zn.modulus(), &factor_of_n).unwrap(), BigIntRing::RING, Zn.integer_ring()));
-        let red_map = ReductionMap::new(Zn, &Zn_new).unwrap();
+        let red_map = ZnReductionMap::new(Zn, &Zn_new).unwrap();
         if (Zn_new.is_zero(&red_map.map_ref(&Q.0)) && Zn_new.is_zero(&red_map.map_ref(&Q.1)) && Zn_new.is_zero(&red_map.map_ref(&Q.2))) || (Zn_new.is_zero(&red_map.map_ref(&P.0)) && Zn_new.is_zero(&red_map.map_ref(&P.1)) && Zn_new.is_zero(&red_map.map_ref(&P.2))) {
             if (Zn_new.is_zero(&red_map.map_ref(&P.0)) && Zn_new.is_zero(&red_map.map_ref(&P.1)) && Zn_new.is_zero(&red_map.map_ref(&P.2))) != (Zn_new.is_zero(&red_map.map_ref(&Q.0)) && Zn_new.is_zero(&red_map.map_ref(&Q.1)) && Zn_new.is_zero(&red_map.map_ref(&Q.2))) {
                 return false;
@@ -56,7 +56,7 @@ fn point_eq<R>(Zn: &R, P: &Point<R>, Q: &Point<R>) -> bool
         }
 
         let Zn_new = zn_big::Zn::new(BigIntRing::RING, int_cast(factor_of_n, BigIntRing::RING, Zn.integer_ring()));
-        let red_map = ReductionMap::new(Zn, &Zn_new).unwrap();
+        let red_map = ZnReductionMap::new(Zn, &Zn_new).unwrap();
         if (Zn_new.is_zero(&red_map.map_ref(&Q.0)) && Zn_new.is_zero(&red_map.map_ref(&Q.1)) && Zn_new.is_zero(&red_map.map_ref(&Q.2))) || (Zn_new.is_zero(&red_map.map_ref(&P.0)) && Zn_new.is_zero(&red_map.map_ref(&P.1)) && Zn_new.is_zero(&red_map.map_ref(&P.2))) {
             if (Zn_new.is_zero(&red_map.map_ref(&P.0)) && Zn_new.is_zero(&red_map.map_ref(&P.1)) && Zn_new.is_zero(&red_map.map_ref(&P.2))) != (Zn_new.is_zero(&red_map.map_ref(&Q.0)) && Zn_new.is_zero(&red_map.map_ref(&Q.1)) && Zn_new.is_zero(&red_map.map_ref(&Q.2))) {
                 return false;

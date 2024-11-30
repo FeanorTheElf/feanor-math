@@ -1205,7 +1205,7 @@ fn bench_reduction_map_use_case(bencher: &mut Bencher) {
     let p = 17;
     let Zp2 = Zn::new(p * p);
     let Zp = Zn::new(p);
-    let Zp2_mod_p = ReductionMap::new(&Zp2, &Zp).unwrap();
+    let Zp2_mod_p = ZnReductionMap::new(&Zp2, &Zp).unwrap();
     let Zp2_p = Zp2.prepare_divisor(&Zp2.int_hom().map(p as i32));
 
     let split_quo_rem = |x: El<Zn>| {

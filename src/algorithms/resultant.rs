@@ -1,5 +1,5 @@
 
-use crate::compute_locally::{EvaluatePolyLocallyRing, ToLocalRingMap};
+use crate::compute_locally::{EvaluatePolyLocallyRing, EvaluatePolyLocallyReductionMap};
 use crate::divisibility::{DivisibilityRingStore, Domain};
 use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::rings::poly::*;
@@ -13,8 +13,8 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 /// 
 /// The resultant is the determinant of the linear map
 /// ```text
-/// R[X]_deg(g)  x  R[X]_deg(f)  ->  R[X]_deg(fg),
-///      a       ,       b       ->    af + bg
+///   R[X]_deg(g)  x  R[X]_deg(f)  ->  R[X]_deg(fg),
+///        a       ,       b       ->    af + bg
 /// ```
 /// where `R[X]_d` refers to the vector space of polynomials in `R[X]` of degree
 /// less than `d`.
@@ -91,8 +91,8 @@ pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type a
 /// 
 /// The resultant is the determinant of the linear map
 /// ```text
-/// R[X]_deg(g)  x  R[X]_deg(f)  ->  R[X]_deg(fg),
-///      a       ,       b       ->    af + bg
+///   R[X]_deg(g)  x  R[X]_deg(f)  ->  R[X]_deg(fg),
+///        a       ,       b       ->    af + bg
 /// ```
 /// where `R[X]_d` refers to the vector space of polynomials in `R[X]` of degree
 /// less than `d`.
@@ -132,7 +132,7 @@ pub fn resultant_local<'a, P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as Rin
     let work_locally = base_ring.get_ring().local_computation(ln_max_norm);
     let mut resultants = Vec::new();
     for i in 0..base_ring.get_ring().local_ring_count(&work_locally) {
-        let embedding = ToLocalRingMap::new(base_ring.get_ring(), &work_locally, i);
+        let embedding = EvaluatePolyLocallyReductionMap::new(base_ring.get_ring(), &work_locally, i);
         let new_poly_ring = DensePolyRing::new(embedding.codomain(), "X");
         let poly_ring_embedding = new_poly_ring.lifted_hom(ring, &embedding);
         let local_f = poly_ring_embedding.map_ref(&f);
@@ -155,7 +155,7 @@ use crate::algorithms::buchberger::buchberger_simple;
 #[cfg(test)]
 use crate::integer::BigIntRing;
 #[cfg(test)]
-use crate::algorithms::poly_gcd::PolyGCDRing;
+use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 
 #[test]
 fn test_resultant() {
@@ -184,7 +184,7 @@ fn test_resultant() {
 fn test_resultant_local_polynomial() {
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
-    static_assert_impls!(RationalFieldBase<BigIntRing>: PolyGCDRing);
+    static_assert_impls!(RationalFieldBase<BigIntRing>: PolyTFracGCDRing);
     // we eliminate `Y`, so add it as the outer indeterminate
     let QQX = DensePolyRing::new(&QQ, "X");
     let QQXY = DensePolyRing::new(&QQX, "Y");

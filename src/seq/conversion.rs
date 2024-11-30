@@ -94,7 +94,7 @@ impl<V: VectorFn<T>, T> ExactSizeIterator for VectorFnIter<V, T> {
 
 ///
 /// A [`VectorFn`] that produces its elements by cloning the elements of an underlying [`VectorView`].
-/// Produced by the functions [`VectorView::into_fn()`] and [`VectorView::into_ring_el_fn()`].
+/// Produced by the functions [`VectorView::clone_els()`] and [`VectorView::clone_ring_els()`].
 /// 
 pub struct CloneElFn<V: VectorView<T>, T, F: Fn(&T) -> T> {
     content: V,
@@ -119,8 +119,9 @@ impl<V: VectorView<T>, T, F: Fn(&T) -> T> CloneElFn<V, T, F> {
 
     ///
     /// Creates a new [`CloneElFn`].
-    /// In most circumstances, it is easier to instead use the functions [`VectorView::into_fn()`] 
-    /// and [`VectorView::into_ring_el_fn()`] to produce a [`CloneElFn`].
+    /// 
+    /// In most circumstances, it is easier to instead use the functions [`VectorView::clone_els()`] 
+    /// and [`VectorView::clone_ring_els()`] to produce a [`CloneElFn`].
     /// 
     pub fn new(content: V, clone_el: F) -> Self {
         Self {

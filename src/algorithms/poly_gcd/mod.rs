@@ -48,7 +48,7 @@ const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
 /// # use feanor_math::primitive_int::*;
 /// let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
 /// let [f, g, expected] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X + 1, X.pow_ref(2) - 1, X - 1]);
-/// assert_el_eq!(&ZZX, expected, <_ as PolyGCDRing>::gcd(&ZZX, &f, &g));
+/// assert_el_eq!(&ZZX, expected, <_ as PolyTFracGCDRing>::gcd(&ZZX, &f, &g));
 /// ```
 /// 
 /// # Implementation notes
@@ -57,14 +57,14 @@ const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
 /// euclidean algorithm is only efficient over finite fields, where no coefficient explosion happens.
 /// The general idea for other rings/fields is to reduce it to the finite case, by considering the
 /// situation modulo a finite-index ideal. The requirements for this approach are defined by the
-/// trait [`PolyGCDLocallyDomain`], and there is a blanket impl `R: PolyGCDRing where R: PolyGCDLocallyDomain`.
+/// trait [`PolyGCDLocallyDomain`], and there is a blanket impl `R: PolyTFracGCDRing where R: PolyGCDLocallyDomain`.
 /// 
 /// Note that this blanket impl used [`crate::specialization::FiniteRingSpecializable`] to use the standard 
 /// algorithm whenever the corresponding ring is actually finite. In other words, despite the fact that the blanket 
 /// implementation for `PolyGCDLocallyDomain`s also applies to finite fields, the local implementation is not 
 /// actually used in these cases.
 /// 
-pub trait PolyGCDRing {
+pub trait PolyTFracGCDRing {
 
     ///
     /// Computes the square-free part of a polynomial `f`, which is the largest-degree squarefree
@@ -83,7 +83,7 @@ pub trait PolyGCDRing {
     /// # use feanor_math::primitive_int::*;
     /// let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
     /// let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 1]);
-    /// assert_el_eq!(&ZZX, &f, <_ as PolyGCDRing>::squarefree_part(&ZZX, &ZZX.mul_ref(&f, &f)));
+    /// assert_el_eq!(&ZZX, &f, <_ as PolyTFracGCDRing>::squarefree_part(&ZZX, &ZZX.mul_ref(&f, &f)));
     /// ```
     /// 
     fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
@@ -126,11 +126,11 @@ pub trait PolyGCDRing {
     /// let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
     /// let [f, g, expected] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X + 1, 2 * X.pow_ref(2) - 2, X - 1]);
     /// // note that `expected` is not the gcd over `ZZ[X]` (which would be `2 X - 2`), but `X - 1`, i.e. the (monic) gcd over `QQ[X]`
-    /// assert_el_eq!(&ZZX, expected, <_ as PolyGCDRing>::gcd(&ZZX, &f, &g));
+    /// assert_el_eq!(&ZZX, expected, <_ as PolyTFracGCDRing>::gcd(&ZZX, &f, &g));
     /// 
     /// // of course, the result does not have to be monic
     /// let [f, g, expected] = ZZX.with_wrapped_indeterminate(|X| [4 * X.pow_ref(2) - 1, 4 * X.pow_ref(2) - 4 * X + 1, - 2 * X + 1]);
-    /// assert_el_eq!(&ZZX, expected, <_ as PolyGCDRing>::gcd(&ZZX, &f, &g));
+    /// assert_el_eq!(&ZZX, expected, <_ as PolyTFracGCDRing>::gcd(&ZZX, &f, &g));
     /// ```
     /// 
     fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
@@ -242,7 +242,7 @@ pub fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
 }
 
 
-impl<R> PolyGCDRing for R
+impl<R> PolyTFracGCDRing for R
     where R: ?Sized + PolyGCDLocallyDomain + SelfIso
 {
     default fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
@@ -347,7 +347,7 @@ fn test_poly_gcd_galois_field() {
     let field = GaloisField::new(5, 3);
     let poly_ring = DensePolyRing::new(&field, "X");
     let [f, g, f_g_gcd] = poly_ring.with_wrapped_indeterminate(|X| [(X.pow_ref(2) + 2) * (X.pow_ref(5) + 1), (X.pow_ref(2) + 2) * (X + 1) * (X + 2), (X.pow_ref(2) + 2) * (X + 1)]);
-    assert_el_eq!(&poly_ring, &f_g_gcd, <_ as PolyGCDRing>::gcd(&poly_ring, &f, &g));
+    assert_el_eq!(&poly_ring, &f_g_gcd, <_ as PolyTFracGCDRing>::gcd(&poly_ring, &f, &g));
 }
 
 #[test]
@@ -355,5 +355,5 @@ fn test_poly_gcd_prime_field() {
     let field = zn_64::Zn::new(5).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(&field, "X");
     let [f, g, f_g_gcd] = poly_ring.with_wrapped_indeterminate(|X| [(X.pow_ref(2) + 2) * (X.pow_ref(5) + 1), (X.pow_ref(2) + 2) * (X + 1) * (X + 2), (X.pow_ref(2) + 2) * (X + 1)]);
-    assert_el_eq!(&poly_ring, &f_g_gcd, <_ as PolyGCDRing>::gcd(&poly_ring, &f, &g));
+    assert_el_eq!(&poly_ring, &f_g_gcd, <_ as PolyTFracGCDRing>::gcd(&poly_ring, &f, &g));
 }

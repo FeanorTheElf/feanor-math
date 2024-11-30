@@ -79,7 +79,7 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P
 fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2>(
     RX: P1, 
     f: &El<P1>, 
-    S_to_F: &IntermediateReductionMap<'ring, 'data, 'local, R>, 
+    S_to_F: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
     SX: P2
 ) -> Option<(Vec<Signature>, Vec<El<P2>>)>
     where R: ?Sized + PolyGCDLocallyDomain,

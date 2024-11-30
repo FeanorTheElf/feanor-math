@@ -433,9 +433,9 @@ enum ReductionMapRequirements {
 
 ///
 /// The homomorphism `Z/nZ -> Z/mZ` that exists whenever `m | n`. In
-/// addition to the map, this also provides a function [`ReductionMap::smallest_lift()`]
+/// addition to the map, this also provides a function [`ZnReductionMap::smallest_lift()`]
 /// that computes the "smallest" preimage under the map, and a function
-/// [`ReductionMap::mul_quotient_fraction()`], that computes the multiplication
+/// [`ZnReductionMap::mul_quotient_fraction()`], that computes the multiplication
 /// with `n/m` while also changing from `Z/mZ` to `Z/nZ`. This is very
 /// useful in many number theoretic applications, where one often has to switch
 /// between `Z/nZ` and `Z/mZ`.
@@ -444,7 +444,7 @@ enum ReductionMapRequirements {
 /// [`CanHomFrom`]-homomorphisms when the moduli are different (but divide each
 /// other).
 /// 
-pub struct ReductionMap<R, S>
+pub struct ZnReductionMap<R, S>
     where R: RingStore,
         R::Type: ZnRing,
         S: RingStore,
@@ -459,7 +459,7 @@ pub struct ReductionMap<R, S>
     map_forward_requirement: ReductionMapRequirements
 }
 
-impl<R, S> ReductionMap<R, S>
+impl<R, S> ZnReductionMap<R, S>
     where R: RingStore,
         R::Type: ZnRing,
         S: RingStore,
@@ -500,7 +500,7 @@ impl<R, S> ReductionMap<R, S>
     /// # use feanor_math::rings::zn::zn_64::*;
     /// let Z5 = Zn::new(5);
     /// let Z25 = Zn::new(25);
-    /// let f = ReductionMap::new(&Z25, &Z5).unwrap();
+    /// let f = ZnReductionMap::new(&Z25, &Z5).unwrap();
     /// assert_el_eq!(Z25, Z25.int_hom().map(15), f.mul_quotient_fraction(Z5.int_hom().map(3)));
     /// ```
     /// 
@@ -521,7 +521,7 @@ impl<R, S> ReductionMap<R, S>
     /// # use feanor_math::rings::zn::zn_64::*;
     /// let Z5 = Zn::new(5);
     /// let Z25 = Zn::new(25);
-    /// let f = ReductionMap::new(&Z25, &Z5).unwrap();
+    /// let f = ZnReductionMap::new(&Z25, &Z5).unwrap();
     /// assert_el_eq!(Z25, Z25.int_hom().map(-2), f.smallest_lift(Z5.int_hom().map(3)));
     /// ```
     /// 
@@ -541,7 +541,7 @@ impl<R, S> ReductionMap<R, S>
     }
 }
 
-impl<R, S> Homomorphism<R::Type, S::Type> for ReductionMap<R, S>
+impl<R, S> Homomorphism<R::Type, S::Type> for ZnReductionMap<R, S>
     where R: RingStore,
         R::Type: ZnRing,
         S: RingStore,
@@ -612,7 +612,7 @@ pub mod generic_tests {
 fn test_reduction_map_large_value() {
     let ring1 = zn_64::Zn::new(1 << 42);
     let ring2 = zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.power_of_two(666));
-    let reduce = ReductionMap::new(&ring2, ring1).unwrap();
+    let reduce = ZnReductionMap::new(&ring2, ring1).unwrap();
     assert_el_eq!(ring1, ring1.zero(), reduce.map(ring2.pow(ring2.int_hom().map(2), 665)));
 }
 
@@ -621,12 +621,12 @@ fn test_reduction_map() {
     let ring1 = zn_64::Zn::new(257);
     let ring2 = zn_big::Zn::new(StaticRing::<i128>::RING, 257 * 7);
 
-    crate::homomorphism::generic_tests::test_homomorphism_axioms(ReductionMap::new(&ring2, &ring1).unwrap(), ring2.elements().step_by(8));
+    crate::homomorphism::generic_tests::test_homomorphism_axioms(ZnReductionMap::new(&ring2, &ring1).unwrap(), ring2.elements().step_by(8));
 
     let ring1 = zn_big::Zn::new(StaticRing::<i16>::RING, 3);
     let ring2 = zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(65537 * 3));
 
-    crate::homomorphism::generic_tests::test_homomorphism_axioms(ReductionMap::new(&ring2, &ring1).unwrap(), ring2.elements().step_by(1024));
+    crate::homomorphism::generic_tests::test_homomorphism_axioms(ZnReductionMap::new(&ring2, &ring1).unwrap(), ring2.elements().step_by(1024));
 }
 
 #[test]

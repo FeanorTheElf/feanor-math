@@ -18,7 +18,7 @@ use crate::algorithms::poly_gcd::local::*;
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2, Controller>(
-    reduction_map: &IntermediateReductionMap<'ring, 'data, 'local, R>, 
+    reduction_map: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
@@ -87,7 +87,7 @@ pub fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2, Controller>(
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
-    reduction_map: &IntermediateReductionMap<'ring, 'data, 'local, R>, 
+    reduction_map: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
@@ -167,7 +167,7 @@ pub fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V, Controller>(
-    reduction_map: &IntermediateReductionMap<'ring, 'data, 'local, R>, 
+    reduction_map: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
@@ -210,7 +210,7 @@ fn test_hensel_lift() {
     let Zp = ZZ.get_ring().local_ring_at(&prime, 1, 0);
     let Fp = ZZ.get_ring().local_field_at(&prime, 0);
     let Zpe = ZZ.get_ring().local_ring_at(&prime, 6, 0);
-    let Zpe_to_Zp = IntermediateReductionMap::new(ZZ.get_ring(), &prime, &Zpe, 6, &Zp, 1, 0);
+    let Zpe_to_Zp = PolyGCDLocallyIntermediateReductionMap::new(ZZ.get_ring(), &prime, &Zpe, 6, &Zp, 1, 0);
     let ZpeX = DensePolyRing::new(&Zpe, "X");
     let FpX = DensePolyRing::new(&Fp, "X");
     let ZpeX_to_ZpX = FpX.lifted_hom(&ZpeX, Fp.can_hom(&Zp).unwrap().compose(&Zpe_to_Zp));

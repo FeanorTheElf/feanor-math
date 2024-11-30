@@ -18,6 +18,10 @@ use super::FiniteRing;
 /// to the ring. For infinite fields, this is the most important approach to computing gcd's,
 /// and also factorizations (with some caveats...).
 /// 
+/// Note that here (and in `feanor-math` generally), the term "local" is used to refer to algorithms
+/// that work modulo prime ideals (or their powers), which is different from the mathematical concept
+/// of localization.
+/// 
 /// The general philosophy is similar to [`crate::compute_locally::EvaluatePolyLocallyRing`].
 /// However, when working with factorizations, it is usually better to compute modulo the factorization
 /// modulo an ideal `I`, and use Hensel lifting to derive the factorization modulo `I^e`.
@@ -230,7 +234,7 @@ impl<'a, 'ring, R: 'ring + ?Sized + PolyGCDLocallyDomain> Display for IdealDispl
 /// as specified by [`PolyGCDLocallyDomain`].
 /// 
 #[stability::unstable(feature = "enable")]
-pub struct ReductionMap<'ring, 'data, 'local, R>
+pub struct PolyGCDLocallyReductionMap<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
     ring: RingRef<'data, R>,
@@ -239,7 +243,7 @@ pub struct ReductionMap<'ring, 'data, 'local, R>
     max_ideal_idx: usize
 }
 
-impl<'ring, 'data, 'local, R> ReductionMap<'ring, 'data, 'local, R>
+impl<'ring, 'data, 'local, R> PolyGCDLocallyReductionMap<'ring, 'data, 'local, R>
     where R: 'ring +?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
     #[stability::unstable(feature = "enable")]
@@ -254,7 +258,7 @@ impl<'ring, 'data, 'local, R> ReductionMap<'ring, 'data, 'local, R>
     }
 }
 
-impl<'ring, 'data, 'local, R> Homomorphism<R, R::LocalRingBase<'ring>> for ReductionMap<'ring, 'data, 'local, R>
+impl<'ring, 'data, 'local, R> Homomorphism<R, R::LocalRingBase<'ring>> for PolyGCDLocallyReductionMap<'ring, 'data, 'local, R>
     where R: 'ring +?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
     type CodomainStore = &'local R::LocalRing<'ring>;
@@ -278,7 +282,7 @@ impl<'ring, 'data, 'local, R> Homomorphism<R, R::LocalRingBase<'ring>> for Reduc
 /// ideal `I`, as specified by [`PolyGCDLocallyDomain`].
 /// 
 #[stability::unstable(feature = "enable")]
-pub struct IntermediateReductionMap<'ring, 'data, 'local, R>
+pub struct PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
     ring: RingRef<'data, R>,
@@ -288,7 +292,7 @@ pub struct IntermediateReductionMap<'ring, 'data, 'local, R>
     max_ideal_idx: usize
 }
 
-impl<'ring, 'data, 'local, R> IntermediateReductionMap<'ring, 'data, 'local, R>
+impl<'ring, 'data, 'local, R> PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
     #[stability::unstable(feature = "enable")]
@@ -330,7 +334,7 @@ impl<'ring, 'data, 'local, R> IntermediateReductionMap<'ring, 'data, 'local, R>
     }
 }
 
-impl<'ring, 'data, 'local, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalRingBase<'ring>> for IntermediateReductionMap<'ring, 'data, 'local, R>
+impl<'ring, 'data, 'local, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalRingBase<'ring>> for PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyGCDLocallyDomain, 'ring: 'data
 {
     type CodomainStore = &'local R::LocalRing<'ring>;
@@ -390,8 +394,8 @@ impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn main_ring_to_field_reduction<'local>(&'local self, max_ideal_idx: usize) -> ReductionMap<'ring, 'data, 'local, R> {
-        ReductionMap {
+    pub fn main_ring_to_field_reduction<'local>(&'local self, max_ideal_idx: usize) -> PolyGCDLocallyReductionMap<'ring, 'data, 'local, R> {
+        PolyGCDLocallyReductionMap {
             ideal: self.ideal,
             ring: self.ring,
             to: (self.to.at(max_ideal_idx), 1),
@@ -400,8 +404,8 @@ impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn main_ring_to_intermediate_ring_reduction<'local>(&'local self, max_ideal_idx: usize) -> ReductionMap<'ring, 'data, 'local, R> {
-        ReductionMap {
+    pub fn main_ring_to_intermediate_ring_reduction<'local>(&'local self, max_ideal_idx: usize) -> PolyGCDLocallyReductionMap<'ring, 'data, 'local, R> {
+        PolyGCDLocallyReductionMap {
             ideal: self.ideal,
             ring: self.ring,
             to: (self.from.at(max_ideal_idx), self.from_e),
@@ -410,8 +414,8 @@ impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn intermediate_ring_to_field_reduction<'local>(&'local self, max_ideal_idx: usize) -> IntermediateReductionMap<'ring, 'data, 'local, R> {
-        IntermediateReductionMap {
+    pub fn intermediate_ring_to_field_reduction<'local>(&'local self, max_ideal_idx: usize) -> PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R> {
+        PolyGCDLocallyIntermediateReductionMap {
             from: (&self.from[max_ideal_idx], self.from_e),
             to: (&self.to[max_ideal_idx], 1),
             max_ideal_idx: max_ideal_idx,
@@ -580,7 +584,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
 }
 
 ///
-/// We cannot provide a blanket impl of [`super::PolyGCDRing`] for finite fields, since it would
+/// We cannot provide a blanket impl of [`super::PolyTFracGCDRing`] for finite fields, since it would
 /// conflict with the one for all rings that impl [`PolyGCDLocallyDomain`]. Thus, we implement
 /// [`PolyGCDLocallyDomain`] for all finite fields, and reuse the blanket impl.
 /// 

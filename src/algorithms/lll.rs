@@ -84,13 +84,13 @@ fn size_reduce<R, I, V, T>(ring: R, int_ring: I, mut target: SubmatrixMut<V, El<
 /// and the corresponding `b'` values are the ones after swapping, then we find
 /// then this gives
 /// ```text
-/// b'_i = b_(i + 1)
-/// b'_(i + 1) = b_i
+///   b'_i = b_(i + 1)
+///   b'_(i + 1) = b_i
 /// 
-/// b'_i* = b_(i + 1)* + mu b_i*
-/// b'_(i + 1) = (1 - gamma^2 mu^2) b_i* - mu * gamma^2 b_(i + 1)*
+///   b'_i* = b_(i + 1)* + mu b_i*
+///   b'_(i + 1) = (1 - gamma^2 mu^2) b_i* - mu * gamma^2 b_(i + 1)*
 ///     where gamma^2 = |b_i*|^2 / |b'_i*|^2
-/// mu' = gamma^2 mu
+///   mu' = gamma^2 mu
 /// ```
 /// 
 fn swap_gso_cols<R, V>(ring: R, mut gso: SubmatrixMut<V, El<R>>, i: usize, j: usize)

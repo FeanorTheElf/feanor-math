@@ -270,7 +270,7 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
         return MonomialIdentifier {
             data: InternalMonomialIdentifier {
                 deg: res_deg,
-                order: enumeration_index_degrevlex(res_deg, (&*lhs_mon).into_fn(|x| *x), &self.cum_binomial_lookup_table)
+                order: enumeration_index_degrevlex(res_deg, (&*lhs_mon).clone_els_by(|x| *x), &self.cum_binomial_lookup_table)
             }
         }
     }
@@ -591,7 +591,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
         return MonomialIdentifier {
             data: InternalMonomialIdentifier {
                 deg: deg,
-                order: enumeration_index_degrevlex(deg, (&*tmp_monomial).into_fn(|x| *x), &self.cum_binomial_lookup_table)
+                order: enumeration_index_degrevlex(deg, (&*tmp_monomial).clone_els_by(|x| *x), &self.cum_binomial_lookup_table)
             }
         }
     }
@@ -637,7 +637,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
                 MonomialIdentifier {
                     data: InternalMonomialIdentifier {
                         deg: res_deg,
-                        order: enumeration_index_degrevlex(res_deg, (&*lhs_mon).into_fn(|x| *x), &self.cum_binomial_lookup_table)
+                        order: enumeration_index_degrevlex(res_deg, (&*lhs_mon).clone_els_by(|x| *x), &self.cum_binomial_lookup_table)
                     }
                 }
             };
@@ -883,17 +883,17 @@ fn test_enumeration_index_degrevlex() {
 
     let cum_binomial_lookup_table = (0..4).map(|n| (0..7).map(|k| compute_cum_binomial(n, k)).collect::<Vec<_>>()).collect::<Vec<_>>();
 
-    assert_eq!(0, enumeration_index_degrevlex(0, [0, 0, 0, 0].into_fn(|x| *x), &cum_binomial_lookup_table));
+    assert_eq!(0, enumeration_index_degrevlex(0, [0, 0, 0, 0].clone_els_by(|x| *x), &cum_binomial_lookup_table));
     let mut check = [0, 0, 0, 0];
     nth_monomial_degrevlex(4, 0, 0, &cum_binomial_lookup_table, |i, x| check[i] = x);
     assert_eq!(&[0, 0, 0, 0], &check);
 
-    assert_eq!(0, enumeration_index_degrevlex(1, [0, 0, 0, 1].into_fn(|x| *x), &cum_binomial_lookup_table));
+    assert_eq!(0, enumeration_index_degrevlex(1, [0, 0, 0, 1].clone_els_by(|x| *x), &cum_binomial_lookup_table));
     let mut check = [0, 0, 0, 0];
     nth_monomial_degrevlex(4, 1, 0, &cum_binomial_lookup_table, |i, x| check[i] = x);
     assert_eq!(&[0, 0, 0, 1], &check);
 
-    assert_eq!(3, enumeration_index_degrevlex(1, [1, 0, 0, 0].into_fn(|x| *x), &cum_binomial_lookup_table));
+    assert_eq!(3, enumeration_index_degrevlex(1, [1, 0, 0, 0].clone_els_by(|x| *x), &cum_binomial_lookup_table));
     let mut check = [0, 0, 0, 0];
     nth_monomial_degrevlex(4, 1, 3, &cum_binomial_lookup_table, |i, x| check[i] = x);
     assert_eq!(&[1, 0, 0, 0], &check);
@@ -921,7 +921,7 @@ fn test_enumeration_index_degrevlex() {
     assert!(all_monomials.is_sorted_by(|l, r| degrevlex_cmp(l, r) == Ordering::Less));
 
     for i in 0..all_monomials.len() {
-        assert_eq!(i as u64, enumeration_index_degrevlex(6, (&all_monomials[i]).into_fn(|x| *x), &cum_binomial_lookup_table));
+        assert_eq!(i as u64, enumeration_index_degrevlex(6, (&all_monomials[i]).clone_els_by(|x| *x), &cum_binomial_lookup_table));
         let mut check = [0, 0, 0, 0];
         nth_monomial_degrevlex(4, 6, i as u64, &cum_binomial_lookup_table, |i, x| check[i] = x);
         assert_eq!(&all_monomials[i], &check);
@@ -969,7 +969,7 @@ fn test_evaluate_approximate_ring() {
     let [f] = ring.with_wrapped_indeterminates(|[X, Y]| [X * X * Y - Y * Y]);
     let x = 0.47312;
     let y = -1.43877;
-    assert!(Real64::RING.abs((x * x * y - y * y) - ring.evaluate(&f, [x, y].into_fn(|x| *x), &Real64::RING.identity())) <= 0.000000001);
+    assert!(Real64::RING.abs((x * x * y - y * y) - ring.evaluate(&f, [x, y].clone_els_by(|x| *x), &Real64::RING.identity())) <= 0.000000001);
 }
 
 #[test]

@@ -84,31 +84,80 @@ pub trait VectorView<T: ?Sized> {
     }
 
     ///
-    /// Converts this vector into a [`VectorFn`] that clones elements on access.
+    /// Moves this vector into a [`VectorFn`] that clones ring elements on access using
+    /// the given ring.
     /// 
-    fn into_ring_el_fn<R: RingStore>(self, ring: R) -> CloneElFn<Self, T, CloneRingEl<R>>
+    fn into_clone_ring_els<R: RingStore>(self, ring: R) -> CloneElFn<Self, T, CloneRingEl<R>>
         where Self: Sized, T: Sized, R::Type: RingBase<Element = T>
     {
-        self.into_fn(CloneRingEl(ring))
+        self.into_clone_els_by(CloneRingEl(ring))
     }
 
     ///
-    /// Converts this vector into a [`VectorFn`] that clones elements on access.
+    /// Converts this vector into a [`VectorFn`] that clones ring elements on access using
+    /// the given ring.
     /// 
-    fn as_ring_el_fn<'a, R: RingStore>(&'a self, ring: R) -> CloneElFn<&'a Self, T, CloneRingEl<R>>
+    fn clone_ring_els<'a, R: RingStore>(&'a self, ring: R) -> CloneElFn<&'a Self, T, CloneRingEl<R>>
         where T: Sized, 
             R::Type: RingBase<Element = T>
     {
-        self.into_ring_el_fn(ring)
+        self.into_clone_ring_els(ring)
+    }
+
+    ///
+    /// Moves this vector into a [`VectorFn`] that clones elements on access using
+    /// the given function.
+    /// 
+    fn into_clone_els_by<F>(self, clone_entry: F) -> CloneElFn<Self, T, F>
+        where Self: Sized, T: Sized, F: Fn(&T) -> T
+    {
+        CloneElFn::new(self, clone_entry)
+    }
+
+    ///
+    /// Converts this vector into a [`VectorFn`] that clones elements on access using
+    /// the given function.
+    /// 
+    fn clone_els_by<'a, F>(&'a self, clone_entry: F) -> CloneElFn<&'a Self, T, F>
+        where T: Sized, F: Fn(&T) -> T
+    {
+        self.into_clone_els_by(clone_entry)
+    }
+
+    ///
+    /// Moves this vector into a [`VectorFn`] that clones elements on access.
+    /// 
+    fn into_clone_els(self) -> CloneElFn<Self, T, CloneValue>
+        where Self: Sized, T: Sized + Clone,
+    {
+        CloneElFn::new(self, CloneValue)
     }
 
     ///
     /// Converts this vector into a [`VectorFn`] that clones elements on access.
     /// 
-    fn into_fn<F>(self, clone_entry: F) -> CloneElFn<Self, T, F>
-        where Self: Sized, T: Sized, F: Fn(&T) -> T
+    fn clone_els<'a>(&'a self) -> CloneElFn<&'a Self, T, CloneValue>
+        where T: Sized + Clone,
     {
-        CloneElFn::new(self, clone_entry)
+        self.into_clone_els()
+    }
+
+    ///
+    /// Moves this vector into a [`VectorFn`] that copies elements on access.
+    /// 
+    fn into_copy_els(self) -> CloneElFn<Self, T, CloneValue>
+        where Self: Sized, T: Sized + Copy,
+    {
+        CloneElFn::new(self, CloneValue)
+    }
+
+    ///
+    /// Converts this vector into a [`VectorFn`] that copies elements on access.
+    /// 
+    fn copy_els<'a>(&'a self) -> CloneElFn<&'a Self, T, CloneValue>
+        where T: Sized + Copy,
+    {
+        self.into_copy_els()
     }
 
     ///
@@ -119,7 +168,7 @@ pub trait VectorView<T: ?Sized> {
     /// provide elements by reference, this is much less powerful than [`Iterator::map()`] or
     /// [`VectorFn::map_fn()`], since the function cannot return created elements.
     /// 
-    /// Called `map_view()` to prevent name conflicts with `Iterator::map()`.
+    /// Called `map_view()` to prevent name conflicts with [`Iterator::map()`].
     /// 
     /// # Example
     /// ```
@@ -140,7 +189,7 @@ pub trait VectorView<T: ?Sized> {
 
     ///
     /// 
-    /// Called `step_by_view()` to prevent name conflicts with `Iterator::step_by()`.
+    /// Called `step_by_view()` to prevent name conflicts with [`Iterator::step_by()`].
     /// 
     fn step_by_view(self, step_by: usize) -> StepBy<Self, T>
         where Self: Sized
@@ -423,9 +472,9 @@ pub trait SwappableVectorViewMut<T: ?Sized>: VectorViewMut<T> {
 ///     return result;
 /// }
 /// assert_eq!(10, compute_sum(1..5));
-/// assert_eq!(10, compute_sum([1, 2, 3, 4].into_fn(|x| *x)));
-/// assert_eq!(10, compute_sum(vec![1, 2, 3, 4].into_fn(|x| *x)));
-/// assert_eq!(10, compute_sum((&[1, 2, 3, 4, 5][..4]).into_fn(|x| *x)));
+/// assert_eq!(10, compute_sum([1, 2, 3, 4].copy_els()));
+/// assert_eq!(10, compute_sum(vec![1, 2, 3, 4].copy_els()));
+/// assert_eq!(10, compute_sum((&[1, 2, 3, 4, 5][..4]).copy_els()));
 /// ```
 /// 
 pub trait VectorFn<T> {
@@ -502,7 +551,7 @@ pub trait VectorFn<T> {
 /// As opposed to [`VectorView`], there are no implementations of [`VectorFn`] for standard
 /// containers like `Vec<T>`, `&[T]` etc. This is because it is not directly clear whether elements
 /// should be cloned on access, or whether a `VectorFn<&T>` is desired. Instead, use the appropriate
-/// functions [`VectorView::as_fn()`] or [`VectorView::into_fn()`] to create a [`VectorFn`].
+/// functions [`VectorView::as_fn()`] or [`VectorView::clone_els()`] to create a [`VectorFn`].
 /// An exception is made for `Range<usize>`, which directly implements `VectorFn`. This allows
 /// for yet another way of creating arbitrary `VectorFn`s by using `(0..len).map_fn(|i| ...)`.
 /// 
@@ -517,9 +566,9 @@ pub trait VectorFn<T> {
 ///         vec.at(0) + compute_sum_recursive(vec.restrict(1..))
 ///     }
 /// }
-/// assert_eq!(10, compute_sum_recursive(SubvectorFn::new([1, 2, 3, 4].into_fn(|x| *x))));
-/// assert_eq!(10, compute_sum_recursive(SubvectorFn::new(vec![1, 2, 3, 4].into_fn(|x| *x))));
-/// assert_eq!(10, compute_sum_recursive(SubvectorFn::new((&[1, 2, 3, 4, 5][..4]).into_fn(|x| *x))));
+/// assert_eq!(10, compute_sum_recursive(SubvectorFn::new([1, 2, 3, 4].copy_els())));
+/// assert_eq!(10, compute_sum_recursive(SubvectorFn::new(vec![1, 2, 3, 4].copy_els())));
+/// assert_eq!(10, compute_sum_recursive(SubvectorFn::new((&[1, 2, 3, 4, 5][..4]).copy_els())));
 /// ```
 /// 
 pub trait SelfSubvectorFn<T>: Sized + VectorFn<T> {
@@ -706,6 +755,35 @@ impl<'a, R: RingStore> Fn<(usize, &'a El<R>,)> for CloneRingEl<R> {
 
     extern "rust-call" fn call(&self, args: (usize, &'a El<R>,)) -> Self::Output {
         self.0.clone_el(args.1)
+    }
+}
+
+///
+/// Callable struct that wraps [`Clone::clone()`].
+/// 
+#[derive(Copy, Clone)]
+pub struct CloneValue;
+
+impl<'a, T: Clone> FnOnce<(&'a T,)> for CloneValue {
+
+    type Output = T;
+
+    extern "rust-call" fn call_once(self, args: (&'a T,)) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, T: Clone> FnMut<(&'a T,)> for CloneValue {
+
+    extern "rust-call" fn call_mut(&mut self, args: (&'a T,)) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, T: Clone> Fn<(&'a T,)> for CloneValue {
+
+    extern "rust-call" fn call(&self, args: (&'a T,)) -> Self::Output {
+        args.0.clone()
     }
 }
 

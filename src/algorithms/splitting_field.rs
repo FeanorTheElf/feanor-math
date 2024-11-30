@@ -20,7 +20,7 @@ use crate::seq::*;
 use crate::ring::*;
 use crate::algorithms::linsolve::*;
 use super::poly_factor::FactorPolyField;
-use super::poly_gcd::PolyGCDRing;
+use super::poly_gcd::PolyTFracGCDRing;
 
 #[stability::unstable(feature = "enable")]
 pub struct NumberFieldHom<R1, Impl1, I1, R2, Impl2, I2>
@@ -121,7 +121,7 @@ pub fn extend_number_field_promise_is_irreducible<P>(poly_ring: P, irred_poly: &
         <P::Type as RingExtension>::BaseRing: Clone + RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>
 {
     static_assert_impls!(NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>: FactorPolyField);
-    static_assert_impls!(NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>: PolyGCDRing);
+    static_assert_impls!(NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>: PolyTFracGCDRing);
 
     assert!(!poly_ring.is_zero(&irred_poly));
     assert!(poly_ring.degree(&irred_poly).unwrap() > 1);

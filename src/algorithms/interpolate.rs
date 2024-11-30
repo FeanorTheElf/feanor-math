@@ -103,6 +103,45 @@ pub enum InterpolationError {
 
 ///
 /// Uses Lagrange interpolation to compute the interpolation polynomial of the given values.
+/// Concretely, this is the univariate polynomial `f` of degree `< x.len()` such that `f(x[i]) = y[i]`
+/// for all `i`.
+/// 
+/// If no such polynomial exists (this is only possible if the base ring is not a field), an 
+/// error is returned.
+/// 
+/// # Example
+/// ```
+/// # #![feature(allocator_api)]
+/// # use std::alloc::Global;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::seq::*;
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::algorithms::interpolate::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::poly::dense_poly::*;
+/// let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let [expected] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
+/// let actual = interpolate(&ZZX, [1, 2, 6].copy_els(), [2, 5, 37].copy_els(), Global).unwrap();
+/// assert_el_eq!(&ZZX, expected, actual);
+/// ```
+/// In some cases the interpolation polynomial does not exist.
+/// ```
+/// # #![feature(allocator_api)]
+/// # use std::alloc::Global;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::Homomorphism;
+/// # use feanor_math::seq::*;
+/// # use feanor_math::algorithms::interpolate::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::poly::dense_poly::*;
+/// let ZnX = DensePolyRing::new(Zn::new(25), "X");
+/// let ZZ_to_Zn = ZnX.base_ring().int_hom();
+/// // since `1 = 6 mod 5`, the values of any polynomial at 1 resp. 6 must be the same modulo 5
+/// let actual = interpolate(&ZnX, [ZZ_to_Zn.map(1), ZZ_to_Zn.map(6)].copy_els(), [ZZ_to_Zn.map(1), ZZ_to_Zn.map(2)].copy_els(), Global);
+/// assert!(actual.is_err());
+/// ```
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn interpolate<P, V1, V2, A: Allocator>(poly_ring: P, x: V1, y: V2, allocator: A) -> Result<El<P>, InterpolationError>
@@ -122,7 +161,7 @@ pub fn interpolate<P, V1, V2, A: Allocator>(poly_ring: P, x: V1, y: V2, allocato
     denoms.extend((0..x.len()).map(|i| poly_ring.evaluate(&nums[i], &x.at(i), &R.identity())));
     let mut factors = Vec::with_capacity_in(x.len(), &allocator);
     factors.resize_with(x.len(), || R.zero());
-    product_except_one(R, (&denoms[..]).into_ring_el_fn(R), &mut factors);
+    product_except_one(R, (&denoms[..]).into_clone_ring_els(R), &mut factors);
     let denominator = R.mul_ref(&factors[0], &denoms[0]);
     for i in 0..x.len() {
         R.mul_assign(&mut factors[i], y.at(i));
@@ -173,7 +212,7 @@ pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_po
         for outer_block_index in 0..outer_block_count {
             for inner_block_index in 0..leading_dim {
                 let block_start = inner_block_index + outer_block_index * outer_block_size;
-                let poly = interpolate(&uni_poly_ring, interpolation_points.at(i), (&values[..]).into_ring_el_fn(poly_ring.base_ring()).restrict(block_start..(block_start + outer_block_size + 1 - leading_dim)).step_by_fn(leading_dim), &allocator)?;
+                let poly = interpolate(&uni_poly_ring, interpolation_points.at(i), (&values[..]).into_clone_ring_els(poly_ring.base_ring()).restrict(block_start..(block_start + outer_block_size + 1 - leading_dim)).step_by_fn(leading_dim), &allocator)?;
                 for j in 0..len {
                     values[block_start + leading_dim * j] = poly_ring.base_ring().clone_el(uni_poly_ring.coefficient_at(&poly, j));
                 }
@@ -213,7 +252,7 @@ fn test_product_except_one() {
         2 * 3 * 5 * 7 * 11 * 13 * 19,
         2 * 3 * 5 * 7 * 11 * 13 * 17
     ];
-    product_except_one(&ring, (&data[..]).into_fn(|x| *x), &mut actual);
+    product_except_one(&ring, (&data[..]).clone_els_by(|x| *x), &mut actual);
     assert_eq!(expected, actual);
 
     let data = [2, 3, 5, 7, 11, 13, 17];
@@ -227,7 +266,7 @@ fn test_product_except_one() {
         2 * 3 * 5 * 7 * 11 * 17,
         2 * 3 * 5 * 7 * 11 * 13
     ];
-    product_except_one(&ring, (&data[..]).into_fn(|x| *x), &mut actual);
+    product_except_one(&ring, (&data[..]).clone_els_by(|x| *x), &mut actual);
     assert_eq!(expected, actual);
 
     let data = [2, 3, 5, 7, 11, 13];
@@ -240,7 +279,7 @@ fn test_product_except_one() {
         2 * 3 * 5 * 7 * 13,
         2 * 3 * 5 * 7 * 11
     ];
-    product_except_one(&ring, (&data[..]).into_fn(|x| *x), &mut actual);
+    product_except_one(&ring, (&data[..]).clone_els_by(|x| *x), &mut actual);
     assert_eq!(expected, actual);
 }
 
@@ -288,7 +327,7 @@ fn test_interpolate_multivariate() {
     for x in 0..5 {
         for y in 0..5 {
             let expected = (x * 5 + y) & 1;
-            assert_el_eq!(ring, ring.int_hom().map(expected), poly_ring.evaluate(&poly, [ring.int_hom().map(x), ring.int_hom().map(y)].into_ring_el_fn(&ring), &ring.identity()));
+            assert_el_eq!(ring, ring.int_hom().map(expected), poly_ring.evaluate(&poly, [ring.int_hom().map(x), ring.int_hom().map(y)].into_clone_ring_els(&ring), &ring.identity()));
         }
     }
 
@@ -302,7 +341,7 @@ fn test_interpolate_multivariate() {
         for y in 0..3 {
             for z in 0..4 {
                 let expected = (x * 12 + y * 4 + z) / 2;
-                assert_el_eq!(ring, ring.int_hom().map(expected), poly_ring.evaluate(&poly, [ring.int_hom().map(x), ring.int_hom().map(y), ring.int_hom().map(z)].into_ring_el_fn(&ring), &ring.identity()));
+                assert_el_eq!(ring, ring.int_hom().map(expected), poly_ring.evaluate(&poly, [ring.int_hom().map(x), ring.int_hom().map(y), ring.int_hom().map(z)].into_clone_ring_els(&ring), &ring.identity()));
             }
         }
     }

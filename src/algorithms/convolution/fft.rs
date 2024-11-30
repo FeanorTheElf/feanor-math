@@ -200,8 +200,8 @@ impl<I, A> ConvolutionAlgorithm<I> for FFTBasedConvolution<A>
             ring.format(largest_element.unwrap())
         );
         for (i, c) in self.convolution_unchecked(
-            lhs.into_ring_el_fn(&ring), 
-            rhs.into_ring_el_fn(&ring), 
+            lhs.into_clone_ring_els(&ring), 
+            rhs.into_clone_ring_els(&ring), 
             &ring
         ).enumerate() {
             ring.add_assign(&mut dst[i], c);
@@ -347,8 +347,8 @@ impl<I2, R, I, A> ConvolutionAlgorithm<I2> for FFTRNSBasedConvolution<R, I, A>
         
         for (i, c) in self.convolution_unchecked(
             input_size_log2,
-            lhs.into_ring_el_fn(&ring).map_fn(|x| int_cast(x, &self.integer_ring, &ring)), 
-            rhs.into_ring_el_fn(&ring).map_fn(|x| int_cast(x, &self.integer_ring, &ring))
+            lhs.into_clone_ring_els(&ring).map_fn(|x| int_cast(x, &self.integer_ring, &ring)), 
+            rhs.into_clone_ring_els(&ring).map_fn(|x| int_cast(x, &self.integer_ring, &ring))
         ).enumerate() {
             ring.add_assign(&mut dst[i], int_cast(c, &ring, &self.integer_ring));
         }

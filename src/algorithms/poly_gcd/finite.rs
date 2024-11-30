@@ -81,6 +81,9 @@ pub fn poly_squarefree_part_finite_field<P>(poly_ring: P, poly: &El<P>) -> El<P>
 ///
 /// Computes the gcd of two polynomials over a finite and reduced ring.
 /// 
+/// This is well-defined, since a finite reduced ring is always a product of
+/// finite fields.
+/// 
 /// If the ring is not reduced, this function may fail and return `Err(nil)`, where
 /// `nil` is a nilpotent element of the ring. However, as long as the gcd of `lhs` and
 /// `rhs` exists, this function may alternatively return it, even in cases where the ring is 

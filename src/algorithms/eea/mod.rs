@@ -144,10 +144,10 @@ pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
 /// However, this function guarantees the following behavior w.r.t different signs:
 /// 
 /// ```text
-/// a < 0 => gcd(a, b) < 0
-/// a > 0 => gcd(a, b) > 0
-/// sign of b is irrelevant
-/// gcd(0, 0) = 0
+///   a < 0 => gcd(a, b) < 0
+///   a > 0 => gcd(a, b) > 0
+///   sign of b is irrelevant
+///   gcd(0, 0) = 0
 /// ```
 /// 
 pub fn signed_gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
@@ -165,9 +165,9 @@ pub fn signed_gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
 /// The general lcm is only unique up to multiplication by units. For `signed_lcm`,
 /// the following behavior is guaranteed:
 /// ```text
-/// b > 0 => lcm(a, b) >= 0
-/// b < 0 => lcm(a, b) <= 0
-/// lcm(0, b) = lcm(a, 0) = lcm(0, 0) = 0
+///   b > 0 => lcm(a, b) >= 0
+///   b < 0 => lcm(a, b) <= 0
+///   lcm(0, b) = lcm(a, 0) = lcm(0, 0) = 0
 /// ```
 /// 
 pub fn signed_lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>

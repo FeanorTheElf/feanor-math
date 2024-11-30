@@ -156,18 +156,18 @@ let mut groebner_basis_lex = buchberger_simple(&F7XY, groebner_basis_degrevlex, 
 groebner_basis_lex.sort_unstable_by(|f, g| Lex.compare(&F7XY, F7XY.LT(f, Lex).unwrap().1, F7XY.LT(g, Lex).unwrap().1).reverse());
 
 // we can now solve by choosing `y` as a root of `g` and `x` as a joint root of `fi(X, y)`, i.e. the `fi` with `y` "plugged in"
-let poly_in_y = F7XY.evaluate(&groebner_basis_lex.pop().unwrap(), [F7T.zero(), F7T.indeterminate()].as_ring_el_fn(&F7T), F7T.inclusion());
+let poly_in_y = F7XY.evaluate(&groebner_basis_lex.pop().unwrap(), [F7T.zero(), F7T.indeterminate()].clone_ring_els(&F7T), F7T.inclusion());
 let (poly_in_y_factorization, _) = <_ as FactorPolyField>::factor_poly(&F7T, &poly_in_y);
 let y = poly_in_y_factorization.into_iter().filter_map(|(f, _)| if F7T.degree(&f).unwrap() != 1 { None } else { Some(F7.negate(F7.div(F7T.coefficient_at(&f, 0), F7T.coefficient_at(&f, 1)))) }).next().unwrap();
 
 // we found `y`! now plug in `y` into the `fi(X, Y)`, take their gcd (as univariate polynomials in `X`), and find a root `x`
-let poly_in_x = groebner_basis_lex.into_iter().fold(F7T.zero(), |f, g| F7T.ideal_gen(&f, &F7XY.evaluate(&g, [F7T.indeterminate(), F7T.inclusion().map(y)].as_ring_el_fn(&F7T), F7T.inclusion())));
+let poly_in_x = groebner_basis_lex.into_iter().fold(F7T.zero(), |f, g| F7T.ideal_gen(&f, &F7XY.evaluate(&g, [F7T.indeterminate(), F7T.inclusion().map(y)].clone_ring_els(&F7T), F7T.inclusion())));
 let (poly_in_x_factorization, _) = <_ as FactorPolyField>::factor_poly(&F7T, &poly_in_x);
 let x = poly_in_x_factorization.into_iter().filter_map(|(f, _)| if F7T.degree(&f).unwrap() != 1 { None } else { Some(F7.negate(F7.div(F7T.coefficient_at(&f, 0), F7T.coefficient_at(&f, 1)))) }).next().unwrap();
 
 // check the solution
-assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f1, [x, y].as_ring_el_fn(F7), F7.identity()));
-assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f2, [x, y].as_ring_el_fn(F7), F7.identity()));
+assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f1, [x, y].clone_ring_els(F7), F7.identity()));
+assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f2, [x, y].clone_ring_els(F7), F7.identity()));
 ```
 A similar approach also works over the rationals.
 

@@ -15,7 +15,7 @@ use crate::algorithms::int_factor::factor;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::algorithms::matmul::StrassenHint;
-use crate::algorithms::poly_gcd::PolyGCDRing;
+use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::unity_root::*;
 use crate::delegate::DelegateRing;
 use crate::delegate::DelegateRingImplFiniteRing;
@@ -166,7 +166,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
         <P::Type as RingExtension>::BaseRing: Copy,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>
 {
-    static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDRing);
+    static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyTFracGCDRing);
     
     let log2_modulus = poly_ring.base_ring().integer_ring().abs_log2_ceil(poly_ring.base_ring().modulus()).unwrap();
     let fft_convolution = FFTBasedConvolution::new_with(Global);
@@ -282,7 +282,17 @@ pub type DefaultGaloisFieldImpl = AsField<FreeAlgebraImpl<AsField<Zn>, SparseMap
 /// This is the [`RingStore`] corresponding to [`GaloisFieldBase`]. For more details, see [`GaloisFieldBase`].
 /// 
 pub type GaloisField<Impl = DefaultGaloisFieldImpl> = RingValue<GaloisFieldBase<Impl>>;
+
+///
+/// Type alias for the most common instantiation of [`GaloisField`], which
+/// uses [`FreeAlgebraImpl`] to compute ring arithmetic.
+/// 
 pub type GaloisFieldOver<R, A = Global, C = KaratsubaAlgorithm> = RingValue<GaloisFieldBaseOver<R, A, C>>;
+
+///
+/// Type alias for the most common instantiation of [`GaloisFieldBase`], which
+/// uses [`FreeAlgebraImpl`] to compute ring arithmetic.
+/// 
 pub type GaloisFieldBaseOver<R, A = Global, C = KaratsubaAlgorithm> = GaloisFieldBase<AsField<FreeAlgebraImpl<R, SparseMapVector<R>, A, C>>>;
 
 impl GaloisField {
@@ -291,7 +301,7 @@ impl GaloisField {
     /// Creates a new instance of the finite/galois field `GF(p^degree)`.
     /// 
     /// If you need more options for configuration, consider using [`GaloisField::new_with()`] or
-    /// [`GaloisField::create()`].
+    /// the most general [`GaloisField::create()`].
     /// 
     /// # Example
     /// ```

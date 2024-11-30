@@ -1,6 +1,6 @@
 use crate::algorithms;
 use crate::algorithms::convolution::ConvolutionAlgorithm;
-use crate::algorithms::poly_gcd::PolyGCDRing;
+use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::divisibility::*;
 use crate::integer::IntegerRing;
 use crate::integer::IntegerRingStore;
@@ -445,7 +445,7 @@ impl<R,> DivisibilityRing for SparsePolyRingBase<R>
 }
 
 impl<R> PrincipalIdealRing for SparsePolyRingBase<R>
-    where R: RingStore, R::Type: Field + PolyGCDRing
+    where R: RingStore, R::Type: Field + PolyTFracGCDRing
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         // base ring is a field, so everything is fine
@@ -467,12 +467,12 @@ impl<R> PrincipalIdealRing for SparsePolyRingBase<R>
     }
     
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        <_ as PolyGCDRing>::gcd(RingRef::new(self), lhs, rhs)
+        <_ as PolyTFracGCDRing>::gcd(RingRef::new(self), lhs, rhs)
     }
 }
 
 impl<R> EuclideanRing for SparsePolyRingBase<R> 
-    where R: RingStore, R::Type: Field + PolyGCDRing
+    where R: RingStore, R::Type: Field + PolyTFracGCDRing
 {
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         let lc_inv = self.base_ring.invert(rhs.data.at(self.degree(rhs).unwrap())).unwrap();

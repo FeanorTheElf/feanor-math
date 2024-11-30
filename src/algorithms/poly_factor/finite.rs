@@ -1,5 +1,5 @@
 use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
-use crate::algorithms::poly_gcd::PolyGCDRing;
+use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::divisibility::*;
 use crate::field::*;
 use crate::integer::*;
@@ -84,7 +84,7 @@ pub fn poly_factor_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usiz
 pub fn poly_factor_if_finite_field<P>(poly_ring: P, f: &El<P>) -> Option<(Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FiniteRingSpecializable + PolyGCDRing + SelfIso
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FiniteRingSpecializable + PolyTFracGCDRing + SelfIso
 {
     <<<P::Type as RingExtension>::BaseRing as RingStore>::Type as FiniteRingSpecializable>::specialize(FactorPolyFiniteField { poly_ring: poly_ring.get_ring(), poly: poly_ring.clone_el(f) }).ok()
 }
@@ -99,7 +99,7 @@ struct FactorPolyFiniteField<'a, P>
 
 impl<'a, P> FiniteRingOperation<<P::BaseRing as RingStore>::Type> for FactorPolyFiniteField<'a, P>
     where P: ?Sized + PolyRing + EuclideanRing,
-        <P::BaseRing as RingStore>::Type: Field + PolyGCDRing + SelfIso + FiniteRingSpecializable
+        <P::BaseRing as RingStore>::Type: Field + PolyTFracGCDRing + SelfIso + FiniteRingSpecializable
 {
     type Output = (Vec<(P::Element, usize)>, El<P::BaseRing>);
 

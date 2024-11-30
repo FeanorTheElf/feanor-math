@@ -106,8 +106,11 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
 }
 
 ///
-/// Trait for rings that support performing computations locally. Locally here refers
-/// not to its localization, but to quotients by primes ideals.
+/// Trait for rings that support performing computations locally. 
+/// 
+/// Note that here (and in `feanor-math` generally), the term "local" is used to refer to algorithms
+/// that work modulo prime ideals (or their powers), which is different from the mathematical concept
+/// of localization.
 /// 
 /// More concretely, a ring `R` implementing this trait should be endowed with a "pseudo norm"
 /// ```text
@@ -144,8 +147,8 @@ pub trait EvaluatePolyLocallyRing: RingBase {
     /// [https://github.com/rust-lang/rust/issues/100013](https://github.com/rust-lang/rust/issues/100013).
     /// 
     /// This is also the reason why we restrict this type here to be [`PrincipalIdealRing`], because
-    /// unfortunately, the a constraint `for<'a> SomeRing::LocalRingBase<'a>: PrincipalIdealRing` triggers
-    /// the bug in nontrivial settings.
+    /// unfortunately, the a constraint `for<'a> SomeRing::LocalRingBase<'a>: PrincipalIdealRing` again
+    /// triggers the bug in some settings.
     /// 
     type LocalRingBase<'ring>: ?Sized + PrincipalIdealRing + Domain
         where Self: 'ring;
@@ -268,7 +271,7 @@ impl<I> EvaluatePolyLocallyRing for I
 /// given by [`EvaluatePolyLocallyRing`].
 /// 
 #[stability::unstable(feature = "enable")]
-pub struct ToLocalRingMap<'ring, 'data, R>
+pub struct EvaluatePolyLocallyReductionMap<'ring, 'data, R>
     where R: 'ring + ?Sized + EvaluatePolyLocallyRing, 'ring: 'data
 {
     ring: RingRef<'data, R>,
@@ -277,7 +280,7 @@ pub struct ToLocalRingMap<'ring, 'data, R>
     index: usize
 }
 
-impl<'ring, 'data, R> ToLocalRingMap<'ring, 'data, R>
+impl<'ring, 'data, R> EvaluatePolyLocallyReductionMap<'ring, 'data, R>
     where R: 'ring +?Sized + EvaluatePolyLocallyRing, 'ring: 'data
 {
     #[stability::unstable(feature = "enable")]
@@ -286,7 +289,7 @@ impl<'ring, 'data, R> ToLocalRingMap<'ring, 'data, R>
     }
 }
 
-impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for ToLocalRingMap<'ring, 'data, R>
+impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for EvaluatePolyLocallyReductionMap<'ring, 'data, R>
     where R: 'ring +?Sized + EvaluatePolyLocallyRing, 'ring: 'data
 {
     type CodomainStore = R::LocalRing<'ring>;

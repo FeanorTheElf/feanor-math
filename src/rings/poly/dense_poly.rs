@@ -3,7 +3,7 @@ use serde::{Deserializer, Serializer};
 use crate::algorithms::convolution::*;
 use crate::algorithms::interpolate::interpolate;
 use crate::algorithms::poly_div::{poly_div_rem, poly_rem};
-use crate::algorithms::poly_gcd::PolyGCDRing;
+use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::computation::no_error;
 use crate::compute_locally::{EvaluatePolyLocallyRing, InterpolationBaseRing, ToExtRingMap};
 use crate::divisibility::*;
@@ -549,7 +549,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> EvaluatePolyLoca
     {
         let base_ring = RingRef::new(data.0.codomain().get_ring());
         let new_ring = DensePolyRing::new(base_ring, self.unknown_name);
-        let result_in_extension = interpolate(&new_ring, (&data.1).into_ring_el_fn(data.0.codomain()), els.into_ring_el_fn(data.0.codomain()), &self.element_allocator).unwrap();
+        let result_in_extension = interpolate(&new_ring, (&data.1).into_clone_ring_els(data.0.codomain()), els.into_clone_ring_els(data.0.codomain()), &self.element_allocator).unwrap();
         return RingRef::new(self).from_terms(new_ring.terms(&result_in_extension).map(|(c, i)| (data.0.as_base_ring_el(base_ring.clone_el(c)), i)));
     }
 }
@@ -616,7 +616,7 @@ impl<R, A: Allocator + Clone, C> DivisibilityRing for DensePolyRingBase<R, A, C>
 }
 
 impl<R, A, C> PrincipalIdealRing for DensePolyRingBase<R, A, C>
-    where A: Allocator + Clone, R: RingStore, R::Type: Field + PolyGCDRing, C: ConvolutionAlgorithm<R::Type>
+    where A: Allocator + Clone, R: RingStore, R::Type: Field + PolyTFracGCDRing, C: ConvolutionAlgorithm<R::Type>
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         // base ring is a field, so everything is fine
@@ -638,12 +638,12 @@ impl<R, A, C> PrincipalIdealRing for DensePolyRingBase<R, A, C>
     }
 
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        <_ as PolyGCDRing>::gcd(RingRef::new(self), lhs, rhs)
+        <_ as PolyTFracGCDRing>::gcd(RingRef::new(self), lhs, rhs)
     }
 }
 
 impl<R, A, C> EuclideanRing for DensePolyRingBase<R, A, C> 
-    where A: Allocator + Clone, R: RingStore, R::Type: Field + PolyGCDRing, C: ConvolutionAlgorithm<R::Type>
+    where A: Allocator + Clone, R: RingStore, R::Type: Field + PolyTFracGCDRing, C: ConvolutionAlgorithm<R::Type>
 {
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         let lc_inv = self.base_ring.invert(&rhs.data[self.degree(rhs).unwrap()]).unwrap();

@@ -1,7 +1,7 @@
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::eea::{signed_gcd, signed_lcm};
 use crate::algorithms::matmul::StrassenHint;
-use crate::algorithms::poly_gcd::PolyGCDRing;
+use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::poly_gcd::gcd::poly_gcd_local;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
@@ -36,7 +36,23 @@ use crate::ring::*;
 /// let ZZ = StaticRing::<i64>::RING;
 /// let QQ = RationalField::new(ZZ);
 /// let hom = QQ.can_hom(&ZZ).unwrap();
-/// assert_el_eq!(QQ, QQ.div(&QQ.one(), &hom.map(4)), QQ.pow(QQ.div(&QQ.one(), &hom.map(2)), 2));
+/// let one_half = QQ.div(&QQ.one(), &hom.map(2));
+/// assert_el_eq!(QQ, QQ.div(&QQ.one(), &hom.map(4)), QQ.pow(one_half, 2));
+/// ```
+/// You can also retrieve numerator and denominator.
+/// ```
+/// # use feanor_math::assert_el_eq;
+/// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::rational::*;
+/// # use feanor_math::homomorphism::Homomorphism;
+/// # use feanor_math::field::FieldStore;
+/// # let ZZ = StaticRing::<i64>::RING;
+/// # let QQ = RationalField::new(ZZ);
+/// # let hom = QQ.can_hom(&ZZ).unwrap();
+/// # let one_half = QQ.div(&QQ.one(), &hom.map(2));
+/// assert_el_eq!(ZZ, ZZ.int_hom().map(1), QQ.num(&one_half));
+/// assert_el_eq!(ZZ, ZZ.int_hom().map(2), QQ.den(&one_half));
 /// ```
 /// 
 #[derive(Debug)]
@@ -101,11 +117,43 @@ impl<I> RationalFieldBase<I>
     where I: RingStore,
         I::Type: IntegerRing
 {
+    ///
+    /// The numerator of the fully reduced fraction.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::assert_el_eq;
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::rings::rational::*;
+    /// # use feanor_math::homomorphism::Homomorphism;
+    /// # use feanor_math::field::FieldStore;
+    /// # let ZZ = StaticRing::<i64>::RING;
+    /// # let QQ = RationalField::new(ZZ);
+    /// assert_el_eq!(ZZ, 2, QQ.num(&QQ.div(&QQ.inclusion().map(6), &QQ.inclusion().map(3))));
+    /// ```
+    /// 
     pub fn num<'a>(&'a self, el: &'a <Self as RingBase>::Element) -> &'a El<I> {
         debug_assert!(self.base_ring().is_one(&signed_gcd(self.base_ring().clone_el(&el.1), self.base_ring().clone_el(&el.0), self.base_ring())));
         &el.0
     }
 
+    ///
+    /// The denominator of the fully reduced fraction.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::assert_el_eq;
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::rings::rational::*;
+    /// # use feanor_math::homomorphism::Homomorphism;
+    /// # use feanor_math::field::FieldStore;
+    /// # let ZZ = StaticRing::<i64>::RING;
+    /// # let QQ = RationalField::new(ZZ);
+    /// assert_el_eq!(ZZ, 3, QQ.den(&QQ.div(&QQ.inclusion().map(3), &QQ.inclusion().map(9))));
+    /// ```
+    /// 
     pub fn den<'a>(&'a self, el: &'a <Self as RingBase>::Element) -> &'a El<I> {
         debug_assert!(self.base_ring().is_one(&signed_gcd(self.base_ring().clone_el(&el.1), self.base_ring().clone_el(&el.0), self.base_ring())));
         &el.1
@@ -120,10 +168,16 @@ impl<I> RationalField<I>
         RingValue::from(RationalFieldBase { integers })
     }
 
+    ///
+    /// See [`RationalFieldBase::num()`].
+    /// 
     pub fn num<'a>(&'a self, el: &'a El<Self>) -> &'a El<I> {
         self.get_ring().num(el)
     }
 
+    ///
+    /// See [`RationalFieldBase::den()`].
+    /// 
     pub fn den<'a>(&'a self, el: &'a El<Self>) -> &'a El<I> {
         self.get_ring().den(el)
     }
@@ -425,7 +479,7 @@ impl<I> OrderedRing for RationalFieldBase<I>
     }
 }
 
-impl<I> PolyGCDRing for RationalFieldBase<I>
+impl<I> PolyTFracGCDRing for RationalFieldBase<I>
     where I: RingStore,
         I::Type: IntegerRing
 {

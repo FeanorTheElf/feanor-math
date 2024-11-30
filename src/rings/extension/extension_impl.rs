@@ -472,7 +472,7 @@ impl<R, V, A, C> FreeAlgebra for FreeAlgebraImplBase<R, V, A, C>
     }
 
     fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a> {
-        (&el.values[..self.rank]).as_ring_el_fn(self.base_ring())
+        (&el.values[..self.rank]).clone_ring_els(self.base_ring())
     }
 
     fn from_canonical_basis<W>(&self, vec: W) -> Self::Element

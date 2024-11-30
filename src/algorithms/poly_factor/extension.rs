@@ -1,6 +1,6 @@
 use crate::algorithms;
 use crate::algorithms::poly_factor::FactorPolyField;
-use crate::algorithms::poly_gcd::PolyGCDRing;
+use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::compute_locally::InterpolationBaseRing;
 use crate::field::*;
 use crate::homomorphism::*;
@@ -30,8 +30,8 @@ pub struct ProbablyNotSquarefree;
 pub fn poly_factor_squarefree_extension<P>(LX: P, f: &El<P>, attempts: usize) -> Result<Vec<El<P>>, ProbablyNotSquarefree>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra + PolyGCDRing,
-        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + PolyGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra + PolyTFracGCDRing,
+        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable
 {
     let L = LX.base_ring();
     let K = L.base_ring();
@@ -86,7 +86,7 @@ pub fn poly_factor_squarefree_extension<P>(LX: P, f: &El<P>, attempts: usize) ->
 
         let norm_f_transformed = Norm(LX.clone_el(&f_transformed));
         let degree = KX.degree(&norm_f_transformed).unwrap();
-        let squarefree_part = <_ as PolyGCDRing>::squarefree_part(&KX, &norm_f_transformed);
+        let squarefree_part = <_ as PolyTFracGCDRing>::squarefree_part(&KX, &norm_f_transformed);
 
         if KX.degree(&squarefree_part).unwrap() == degree {
             let lin_transform_rev = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0), (L.one(), 1)].into_iter());
@@ -94,7 +94,7 @@ pub fn poly_factor_squarefree_extension<P>(LX: P, f: &El<P>, attempts: usize) ->
             
             return Ok(factorization.into_iter().map(|(factor, e)| {
                 assert!(e == 1);
-                let f_factor = LX.normalize(<_ as PolyGCDRing>::gcd(&LX, &f_transformed, &LX.lifted_hom(&KX, L.inclusion()).map(factor)));
+                let f_factor = LX.normalize(<_ as PolyTFracGCDRing>::gcd(&LX, &f_transformed, &LX.lifted_hom(&KX, L.inclusion()).map(factor)));
                 return LX.evaluate(&f_factor, &lin_transform_rev, &LX.inclusion());
             }).collect());
         }
@@ -110,8 +110,8 @@ pub fn poly_factor_squarefree_extension<P>(LX: P, f: &El<P>, attempts: usize) ->
 pub fn poly_factor_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra + PerfectField + FiniteRingSpecializable + PolyGCDRing,
-        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + PolyGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra + PerfectField + FiniteRingSpecializable + PolyTFracGCDRing,
+        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable
 {
     let KX = &poly_ring;
     let K = KX.base_ring();
@@ -128,7 +128,7 @@ pub fn poly_factor_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>
 
     assert!(!KX.is_zero(f));
     let mut result: Vec<(El<P>, usize)> = Vec::new();
-    for (non_irred_factor, k) in <_ as PolyGCDRing>::power_decomposition(KX, f) {
+    for (non_irred_factor, k) in <_ as PolyTFracGCDRing>::power_decomposition(KX, f) {
         for factor in poly_factor_squarefree_extension(KX, &non_irred_factor, MAX_PROBABILISTIC_REPETITIONS).ok().unwrap() {
             if let Some((i, _)) = result.iter().enumerate().filter(|(_, f)| KX.eq_el(&f.0, &factor)).next() {
                 result[i].1 += k;

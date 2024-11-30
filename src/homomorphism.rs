@@ -100,11 +100,11 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// `R1, ..., Rn` resp. `R1', ..., Rm'` such that there are canonical
 /// homomorphisms
 /// ```text
-/// S -> R1 -> R2 -> ... -> Rn -> R
+///   S -> R1 -> R2 -> ... -> Rn -> R
 /// ```
 /// and
 /// ```text
-/// S -> R1' -> R2' -> ... -> Rm' -> R
+///   S -> R1' -> R2' -> ... -> Rm' -> R
 /// ```
 /// then both homomorphism chains should yield same results on same
 /// inputs.
@@ -218,7 +218,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// assert!(Zn_rns.can_iso(&Zn_rns).is_some());
 /// ```
 /// Most notably, reduction homomorphisms are currently not available.
-/// You can use [`crate::rings::zn::ReductionMap`] instead.
+/// You can use [`crate::rings::zn::ZnReductionMap`] instead.
 /// ```
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
@@ -229,8 +229,8 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// let Z9 = zn_64::Zn::new(9);
 /// let Z3 = zn_64::Zn::new(3);
 /// assert!(Z3.can_hom(&Z9).is_none());
-/// let red_map = ReductionMap::new(&Z9, &Z3).unwrap();
-/// assert_el_eq!(Z3, Z3.one(), red_map.map(Z9.int_hom().map(4)));
+/// let mod_3 = ZnReductionMap::new(&Z9, &Z3).unwrap();
+/// assert_el_eq!(Z3, Z3.one(), mod_3.map(Z9.int_hom().map(4)));
 /// ```
 /// Additionally, there are the projections `Z -> Z/nZ`.
 /// They are all implemented, even though [`crate::rings::zn::ZnRing`] currently
@@ -326,11 +326,11 @@ pub trait CanHomFrom<S>: RingBase
 /// `R1, ..., Rn` resp. `R1', ..., Rm'` such that there are canonical
 /// homomorphisms `->` or isomorphisms `<~>` connecting them - e.g. like
 /// ```text
-/// S -> R1 -> R2 <~> R3 <~> R4 -> ... -> Rn -> R
+///   S -> R1 -> R2 <~> R3 <~> R4 -> ... -> Rn -> R
 /// ```
 /// and
 /// ```text
-/// S <~> R1' -> R2' -> ... -> Rm' -> R
+///   S <~> R1' -> R2' -> ... -> Rm' -> R
 /// ```
 /// then both chains should yield same results on same inputs.
 /// 

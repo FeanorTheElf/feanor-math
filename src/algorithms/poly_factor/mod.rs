@@ -20,7 +20,7 @@ pub mod finite;
 /// Trait for fields over which we can efficiently factor polynomials.
 /// For details, see the only associated function [`FactorPolyField::factor_poly()`].
 /// 
-pub trait FactorPolyField: Field + PolyGCDRing {
+pub trait FactorPolyField: Field + PolyTFracGCDRing {
 
     ///
     /// Factors a univariate polynomial with coefficients in this field into its irreducible factors.
@@ -115,7 +115,7 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::rings::zn::*;
 
-use super::poly_gcd::PolyGCDRing;
+use super::poly_gcd::PolyTFracGCDRing;
 
 #[test]
 fn test_factor_rational_poly() {

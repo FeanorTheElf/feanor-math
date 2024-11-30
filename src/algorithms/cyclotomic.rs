@@ -11,7 +11,7 @@ use crate::algorithms;
 /// coefficients whose roots are the primitive `n`-th roots of unity.
 /// In other words, we find
 /// ```text
-/// cyclotomic_polynomial(n) = prod_{i in (Z/nZ)*} X - exp(2 pi i / n)
+///   cyclotomic_polynomial(n) = prod_(i in (Z/nZ)*) X - exp(2 pi i / n)
 /// ```
 /// 
 /// # Performance

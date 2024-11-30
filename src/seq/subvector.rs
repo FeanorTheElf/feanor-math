@@ -224,7 +224,7 @@ fn test_subvector_subvector_oob() {
 
 #[test]
 fn test_subvector_fn_ranges() {
-    let a = SubvectorFn::new([0, 1, 2, 3, 4].into_fn(|x| *x));
+    let a = SubvectorFn::new([0, 1, 2, 3, 4].clone_els_by(|x| *x));
     assert_eq!(3, a.restrict(0..3).len());
     assert_eq!(3, a.restrict(0..=2).len());
     assert_eq!(5, a.restrict(0..).len());
@@ -234,7 +234,7 @@ fn test_subvector_fn_ranges() {
 
 #[test]
 fn test_subvector_fn_subvector() {
-    let a = SubvectorFn::new([0, 1, 2, 3, 4].into_fn(|x| *x));
+    let a = SubvectorFn::new([0, 1, 2, 3, 4].clone_els_by(|x| *x));
     let b = a.restrict(1..4);
     assert_eq!(3, b.len());
     assert_eq!(1, b.at(0));
@@ -245,7 +245,7 @@ fn test_subvector_fn_subvector() {
 #[test]
 #[should_panic]
 fn test_subvector_fn_subvector_oob() {
-    let a = SubvectorFn::new([0, 1, 2, 3, 4].into_fn(|x| *x));
+    let a = SubvectorFn::new([0, 1, 2, 3, 4].clone_els_by(|x| *x));
     let b = a.restrict(1..4);
     b.restrict(0..4);
 }

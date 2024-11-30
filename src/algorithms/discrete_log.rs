@@ -2,7 +2,6 @@ use crate::field::Field;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::algorithms;
-use crate::rings::finite::FiniteRing;
 use crate::rings::finite::FiniteRingStore;
 use crate::rings::zn::ZnRing;
 use crate::wrapper::RingElementWrapper;

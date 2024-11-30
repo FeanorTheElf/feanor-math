@@ -356,7 +356,7 @@ impl<Impl, I> Domain for NumberFieldBase<Impl, I>
         I::Type: IntegerRing
 {}
 
-impl<Impl, I> PolyGCDRing for NumberFieldBase<Impl, I>
+impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
         <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
@@ -556,8 +556,8 @@ impl<'ring, I> NumberRingIdeal<'ring, I>
         let ZpeX = DensePolyRing::new(ZZ.get_ring().local_ring_at(&self.prime, e, 0), "X");
         let Zpe = ZpeX.base_ring();
         let FpX = &self.FpX;
-        let Zpe_to_Fp = IntermediateReductionMap::new(ZZ.get_ring(), &self.prime, Zpe, e, &self.Fp_as_ring, 1, 0);
-        let ZZ_to_Zpe = ReductionMap::new(ZZ.get_ring(), &self.prime, &Zpe, e, 0);
+        let Zpe_to_Fp = PolyGCDLocallyIntermediateReductionMap::new(ZZ.get_ring(), &self.prime, Zpe, e, &self.Fp_as_ring, 1, 0);
+        let ZZ_to_Zpe = PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &self.prime, &Zpe, e, 0);
 
         let factors = hensel_lift_factorization(
             &Zpe_to_Fp,
@@ -641,7 +641,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
             let Fp_as_ring = ZZ.get_ring().local_ring_at(&p, 1, 0);
             let FpX = DensePolyRing::new(ZZ.get_ring().local_field_at(&p, 0), "X");
             let Fp = FpX.base_ring();
-            let ZZ_to_Fp = Fp.can_hom(&Fp_as_ring).unwrap().compose(ReductionMap::new(ZZ.get_ring(), &p, &Fp_as_ring, 1, 0));
+            let ZZ_to_Fp = Fp.can_hom(&Fp_as_ring).unwrap().compose(PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &p, &Fp_as_ring, 1, 0));
 
             let gen_poly_mod_p = FpX.from_terms(ZZX.terms(&gen_poly).map(|(c, i)| (ZZ_to_Fp.map_ref(c), i)));
             let (factorization, _) = poly_factor_finite_field(&FpX, &gen_poly_mod_p);
@@ -713,7 +713,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
             assert!(ZZ.is_one(QQ.get_ring().den(&x)));
             ZZ.clone_el(QQ.get_ring().num(&x))
         });
-        let ZZ_to_Zpe = ReductionMap::new(ZZ.get_ring(), &ideal.prime, to.0.base_ring(), to.1, 0);
+        let ZZ_to_Zpe = PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &ideal.prime, to.0.base_ring(), to.1, 0);
 
         ZZX.evaluate(
             &self.base.poly_repr(ZZX, &x, partial_QQ_to_ZZ), 
@@ -755,7 +755,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
         let Zpe = from.at(0).base_ring();
         assert!(from.iter().all(|ring| ring.base_ring().get_ring() == Zpe.get_ring()));
         let ZpeX = DensePolyRing::new(Zpe, "X");
-        let ZZ_to_Zpe = ReductionMap::new(ZZ.get_ring(), &ideal.prime, Zpe, e, 0);
+        let ZZ_to_Zpe = PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &ideal.prime, Zpe, e, 0);
 
         // compute data necessary for inverse CRT
         let mut unit_vectors = (0..self.maximal_ideal_factor_count(ideal)).map(|_| ZpeX.zero()).collect::<Vec<_>>();
@@ -848,7 +848,7 @@ fn test_poly_gcd_number_field() {
         (Y.pow_ref(4) + 2) * (Y.pow_ref(2) + 1),
         Y - i
     ]);
-    assert_el_eq!(&KY, &expected, <_ as PolyGCDRing>::gcd(&KY, &g, &h));
+    assert_el_eq!(&KY, &expected, <_ as PolyTFracGCDRing>::gcd(&KY, &g, &h));
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 20 * X.pow_ref(2) + 16]);
     let K = NumberField::new(&ZZX, &f);
@@ -866,7 +866,7 @@ fn test_poly_gcd_number_field() {
         Y.pow_ref(2) + &sqrt7 * Y + 1,
         Y - (sqrt3 - sqrt7) * half
     ]);
-    let actual = <_ as PolyGCDRing>::gcd(&KY, &g, &h);
+    let actual = <_ as PolyTFracGCDRing>::gcd(&KY, &g, &h);
     assert_el_eq!(&KY, &expected, &actual);
 }
 
@@ -894,7 +894,7 @@ fn random_test_poly_gcd_number_field() {
         let lhs = KY.mul_ref(&f, &h);
         let rhs = KY.mul_ref(&g, &h);
 
-        let gcd = <_ as PolyGCDRing>::gcd(&KY, &lhs, &rhs);
+        let gcd = <_ as PolyTFracGCDRing>::gcd(&KY, &lhs, &rhs);
         // println!("Result {}", poly_ring.format(&gcd));
 
         assert!(KY.divides(&lhs, &gcd));

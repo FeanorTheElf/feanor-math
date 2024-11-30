@@ -21,7 +21,7 @@ use super::rational::{RationalField, RationalFieldBase};
 /// a mathematically precise approach, we cannot provide any function related to equality.
 /// In particular, `Real64Base.eq_el(a, b)` is not supported, and will panic. 
 /// Hence, this ring has only limited use within this crate, and is currently only used for
-/// floating-point FFTs. 
+/// floating-point FFTs and some approximate computations in the LLL algorithm. 
 /// 
 #[derive(Clone, Copy, PartialEq)]
 pub struct Real64Base;

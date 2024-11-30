@@ -122,8 +122,8 @@ fn test_step_by() {
 
 #[test]
 fn test_step_by_fn() {
-    let vec = [0, 1, 2, 3, 4, 5, 6, 7].into_fn(|x| *x);
-    let zero: CloneElFn<[i32; 0], _, _> = [].into_fn(|x| *x);
+    let vec = [0, 1, 2, 3, 4, 5, 6, 7].into_copy_els();
+    let zero: CloneElFn<[i32; 0], _, _> = [].into_copy_els();
     assert_eq!(0, zero.step_by_fn(1).len());
     assert_eq!(4, vec.step_by_fn(2).len());
     assert_eq!(3, vec.step_by_fn(3).len());
