@@ -261,7 +261,7 @@ This function now works with any ring that implements `IntegerRing`, a subtrait 
 
 ## Implementing rings
 
-To implement a custom ring, just create a struct and add an `impl RingBase` and an `impl CanIsoFromTo<Self>` - that's it!
+To implement a custom ring, just create a struct and add an `impl RingBase` - that's it!
 Assuming we want to provide our own implementation of the finite binary field F2, we could do it as follows.
 ```rust
 use feanor_math::homomorphism::*;
@@ -322,7 +322,7 @@ impl RingBase for F2Base {
 // in a real scenario, we might want to implement more traits like `ZnRing`, `DivisibilityRing`
 // or `Field`; Also it might be useful to provide canonical homomorphisms by implementing `CanHomFrom`,
 // in particular the self-isomorphisms `F2Base: CanHomFrom<F2Base>` and `F2Base: CanIsoFromTo<F2Base>` 
-// might come in useful
+// might be useful
 
 pub const F2: RingValue<F2Base> = RingValue::from(F2Base);
 
