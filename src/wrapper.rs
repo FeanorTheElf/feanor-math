@@ -46,10 +46,19 @@ pub struct RingElementWrapper<R>
 
 impl<R: RingStore> RingElementWrapper<R> {
 
+    ///
+    /// Creates a new [`RingElementWrapper`] wrapping the given element of the given ring.
+    /// 
     pub const fn new(ring: R, element: El<R>) -> Self {
         Self { ring, element }
     }
 
+    ///
+    /// Raises the stored element to the given power.
+    /// 
+    /// Consider using [`RingElementWrapper::pow_ref()`] if you don't want to 
+    /// move the element.
+    /// 
     pub fn pow(self, power: usize) -> Self {
         Self {
             element: self.ring.pow(self.element, power),
@@ -57,6 +66,9 @@ impl<R: RingStore> RingElementWrapper<R> {
         }
     }
 
+    ///
+    /// Raises the stored element to the given power.
+    /// 
     pub fn pow_ref(&self, power: usize) -> Self
         where R: Clone
     {
@@ -66,14 +78,23 @@ impl<R: RingStore> RingElementWrapper<R> {
         }
     }
 
+    ///
+    /// Returns the stored element.
+    /// 
     pub fn unwrap(self) -> El<R> {
         self.element
     }
 
+    ///
+    /// Returns the stored element as reference.
+    /// 
     pub fn unwrap_ref(&self) -> &El<R> {
         &self.element
     }
 
+    ///
+    /// Returns a reference to the ring that this element belongs to.
+    /// 
     pub fn parent(&self) -> &R {
         &self.ring
     }

@@ -211,6 +211,7 @@ impl<R> EuclideanRingStore for R
     where R: RingStore, R::Type: EuclideanRing
 {}
 
+#[allow(missing_docs)]
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
     use super::*;

@@ -320,6 +320,12 @@ impl<I, J> CanIsoFromTo<I> for J
 /// 
 pub trait IntCast<F: ?Sized + IntegerRing>: IntegerRing {
 
+    ///
+    /// Maps the given integer into this ring.
+    /// 
+    /// For the difference to [`RingStore::coerce()`] or [`RingStore::can_hom()`],
+    /// see the documentation of [`IntCast`].
+    /// 
     fn cast(&self, from: &F, value: F::Element) -> Self::Element;
 }
 
@@ -432,6 +438,12 @@ pub trait IntegerRingStore: RingStore
     delegate!{ IntegerRing, fn floor_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
     delegate!{ IntegerRing, fn ceil_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
 
+    ///
+    /// Using the randomness of the given rng, samples a uniformly random integer
+    /// from the set `{ 0, 1, ..., bound_exclusive - 1 }`.
+    /// 
+    /// Uses rejection sampling on top of [`IntegerRing::get_uniformly_random_bits()`].
+    /// 
     fn get_uniformly_random<G: FnMut() -> u64>(&self, bound_exclusive: &El<Self>, mut rng: G) -> El<Self> {
         assert!(self.is_gt(bound_exclusive, &self.zero()));
         let log2_ceil_bound = self.abs_highest_set_bit(bound_exclusive).unwrap() + 1;
@@ -442,10 +454,18 @@ pub trait IntegerRingStore: RingStore
         return result;
     }
 
+    ///
+    /// Computes `floor(log2(abs(value)))`, and returns `None` if the argument is 0.
+    /// 
+    /// This is equivalent to [`IntegerRingStore::abs_highest_set_bit`].
+    /// 
     fn abs_log2_floor(&self, value: &El<Self>) -> Option<usize> {
         self.abs_highest_set_bit(value)
     }
 
+    ///
+    /// Computes `ceil(log2(abs(value)))`, and returns `None` if the argument is 0.
+    /// 
     fn abs_log2_ceil(&self, value: &El<Self>) -> Option<usize> {
         let highest_bit = self.abs_highest_set_bit(value)?;
         if self.abs_lowest_set_bit(value).unwrap() == highest_bit {
@@ -455,14 +475,23 @@ pub trait IntegerRingStore: RingStore
         }
     }
 
+    ///
+    /// Returns true if the given integer is divisible by 2.
+    /// 
     fn is_even(&self, value: &El<Self>) -> bool {
         !self.abs_is_bit_set(value, 0)
     }
 
+    ///
+    /// Returns true if the given integer is not divisible by 2.
+    /// 
     fn is_odd(&self, value: &El<Self>) -> bool {
         !self.is_even(value)
     }
 
+    ///
+    /// Assumes the given integer is even, and computes its quotient by 2.
+    /// 
     fn half_exact(&self, mut value: El<Self>) -> El<Self> {
         assert!(self.is_even(&value));
         self.euclidean_div_pow_2(&mut value, 1);
@@ -478,6 +507,7 @@ impl<R> IntegerRingStore for R
 #[cfg(test)]
 use crate::primitive_int::*;
 
+#[allow(missing_docs)]
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
 

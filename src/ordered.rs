@@ -11,36 +11,65 @@ use std::cmp::*;
 /// 
 pub trait OrderedRing: RingBase {
 
+    ///
+    /// Returns whether `lhs` is [`Ordering::Less`], [`Ordering::Equal`] or [`Ordering::Greater`]
+    /// than `rhs`.
+    /// 
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> Ordering;
 
+    ///
+    /// Returns whether `abs(lhs)` is [`Ordering::Less`], [`Ordering::Equal`] or [`Ordering::Greater`]
+    /// than `abs(rhs)`.
+    /// 
     fn abs_cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> Ordering {
         self.cmp(&self.abs(self.clone_el(lhs)), &self.abs(self.clone_el(rhs)))
     }
 
+    ///
+    /// Returns whether `lhs <= rhs`.
+    /// 
     fn is_leq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         self.cmp(lhs, rhs) != Ordering::Greater
     }
     
+    ///
+    /// Returns whether `lhs >= rhs`.
+    /// 
     fn is_geq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         self.cmp(lhs, rhs) != Ordering::Less
     }
 
+    ///
+    /// Returns whether `lhs < rhs`.
+    /// 
     fn is_lt(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         self.cmp(lhs, rhs) == Ordering::Less
     }
     
+    ///
+    /// Returns whether `lhs > rhs`.
+    /// 
     fn is_gt(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         self.cmp(lhs, rhs) == Ordering::Greater
     }
 
+    ///
+    /// Returns whether `value < 0`.
+    /// 
     fn is_neg(&self, value: &Self::Element) -> bool {
         self.is_lt(value, &self.zero())
     }
 
+    ///
+    /// Returns whether `value > 0`.
+    /// 
     fn is_pos(&self, value: &Self::Element) -> bool {
         self.is_gt(value, &self.zero())
     }
 
+    ///
+    /// Returns the absolute value of `value`, i.e. `value` if `value >= 0` and `-value` otherwise.
+    /// 
     fn abs(&self, value: Self::Element) -> Self::Element {
         if self.is_neg(&value) {
             self.negate(value)
@@ -49,6 +78,9 @@ pub trait OrderedRing: RingBase {
         }
     }
 
+    ///
+    /// Returns the larger one of `fst` and `snd`.
+    /// 
     fn max<'a>(&self, fst: &'a Self::Element, snd: &'a Self::Element) -> &'a Self::Element {
         if self.is_geq(fst, snd) {
             return fst;
@@ -75,6 +107,9 @@ pub trait OrderedRingStore: RingStore
     delegate!{ OrderedRing, fn is_pos(&self, value: &El<Self>) -> bool }
     delegate!{ OrderedRing, fn abs(&self, value: El<Self>) -> El<Self> }
     
+    ///
+    /// See [`OrderedRing::max()`].
+    /// 
     fn max<'a>(&self, fst: &'a El<Self>, snd: &'a El<Self>) -> &'a El<Self> {
         self.get_ring().max(fst, snd)
     }

@@ -16,6 +16,26 @@ use std::alloc::Allocator;
 use std::alloc::Global;
 use std::cmp::Ordering::*;
 
+///
+/// An element of the integer ring implementation [`RustBigintRing`].
+/// 
+/// An object of this struct does represent an arbitrary-precision integer,
+/// but it follows the general approach of `feanor-math` to expose its actual
+/// behavior through the ring, and not through the elements. For example, to
+/// add integers, use
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::integer::*;
+/// # use feanor_math::rings::rust_bigint::*;
+/// const ZZ: RustBigintRing = RustBigintRing::RING;
+/// let a: RustBigint = ZZ.add(ZZ.power_of_two(50), ZZ.power_of_two(100));
+/// assert_eq!("1267650600228230527396610048000", format!("{}", ZZ.format(&a)));
+/// ```
+/// and not
+/// ```compile_fail
+/// assert_eq!("1267650600228230527396610048000", format!("{}", RustBigint::from(2).pow(100) + RustBigint::from(2).pow(50)));
+/// ```
+/// 
 #[derive(Clone, Debug)]
 pub struct RustBigint<A: Allocator = Global>(bool, Vec<u64, A>);
 
@@ -26,7 +46,7 @@ pub struct RustBigint<A: Allocator = Global>(bool, Vec<u64, A>);
 /// If you need very high performance, consider using [`crate::rings::mpir::MPZ`]
 /// (requires an installation of mpir and activating the feature "mpir").
 /// 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct RustBigintRingBase<A: Allocator + Clone = Global> {
     allocator: A
 }
@@ -187,15 +207,15 @@ impl<A: Allocator + Clone> RingBase for RustBigintRingBase<A> {
     }
 
     fn is_zero(&self, value: &Self::Element) -> bool {
-        algorithms::bigint::highest_set_block(&value.1).is_none()
+        highest_set_block(&value.1).is_none()
     }
 
     fn is_one(&self, value: &Self::Element) -> bool {
-        value.0 == false && algorithms::bigint::highest_set_block(&value.1) == Some(0) && value.1[0] == 1
+        value.0 == false && highest_set_block(&value.1) == Some(0) && value.1[0] == 1
     }
 
     fn is_neg_one(&self, value: &Self::Element) -> bool {
-        value.0 == true && algorithms::bigint::highest_set_block(&value.1) == Some(0) && value.1[0] == 1
+        value.0 == true && highest_set_block(&value.1) == Some(0) && value.1[0] == 1
     }
 
     fn is_commutative(&self) -> bool { true }
@@ -213,7 +233,7 @@ impl<A: Allocator + Clone> RingBase for RustBigintRingBase<A> {
         }
         let mut copy = value.clone();
         let mut remainders: Vec<u64> = Vec::with_capacity(
-            (algorithms::bigint::highest_set_block(&value.1).unwrap_or(0) + 1) * u64::BITS as usize / 3
+            (highest_set_block(&value.1).unwrap_or(0) + 1) * u64::BITS as usize / 3
         );
         while !self.is_zero(&copy) {
             let rem = algorithms::bigint::bigint_div_small(&mut copy.1, BIG_POWER_TEN);

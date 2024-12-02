@@ -2,6 +2,17 @@
 #![allow(non_camel_case_types)]
 #![allow(rustdoc::private_intra_doc_links)]
 
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_results
+)]
+
 #![feature(btree_cursors)]
 #![feature(test)]
 #![feature(min_specialization)]
@@ -19,13 +30,8 @@
 
 #![doc = include_str!("../Readme.md")]
 
+#[cfg(test)]
 extern crate test;
-extern crate libc;
-extern crate oorandom;
-#[cfg(feature = "parallel")]
-extern crate rayon;
-#[cfg(feature = "ndarray")]
-extern crate ndarray;
 
 const MAX_PROBABILISTIC_REPETITIONS: usize = 30;
 const DEFAULT_PROBABILISTIC_REPETITIONS: usize = 30;

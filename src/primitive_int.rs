@@ -21,10 +21,25 @@ use crate::serialization::SerializableElementRing;
 /// 
 pub trait PrimitiveInt: Send + Sync + Serialize + DeserializeOwned + AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Shr<usize, Output = Self> + Eq + Into<Self::Larger> + TryFrom<Self::Larger> + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy + Div<Self, Output = Self> + Rem<Self, Output = Self> + Display {
 
+    ///
+    /// The primitive integer that is "twice as large" as this one.
+    /// The only exception is `i128`, for which there is no larger primitive integer.
+    /// 
     type Larger: PrimitiveInt;
 
+    ///
+    /// Returns the number of bits of this integer type.
+    /// 
     fn bits() -> usize;
+
+    ///
+    /// The functions [`i8::overflowing_mul()`] to [`i128::overflowing_mul()`].
+    /// 
     fn overflowing_mul(self, rhs: Self) -> Self;
+    
+    ///
+    /// The functions [`i8::overflowing_sub()`] to [`i128::overflowing_sub()`].
+    /// 
     fn overflowing_sub(self, rhs: Self) -> Self;
 }
 
@@ -122,7 +137,7 @@ impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
 /// An element of [`StaticRing`] together with extra information that allows for
 /// faster division if this element is the divisor. See also [`PreparedDivisibilityRing`].
 /// 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct PrimitiveIntPreparedDivisor<T: PrimitiveInt>(T, T);
 
 impl<T: 'static + PrimitiveInt> PreparedDivisibilityRing for StaticRingBase<T> {
@@ -250,7 +265,7 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
         assert!(log2_bound_exclusive <= T::bits() - 1);
         RingRef::new(self).coerce::<StaticRing<i128>>(
             &StaticRing::<i128>::RING, 
-            ((((rng() as u128) << u64::BITS as u32) | (rng() as u128)) & ((1 << log2_bound_exclusive) - 1)) as i128
+            ((((rng() as u128) << u64::BITS) | (rng() as u128)) & ((1 << log2_bound_exclusive) - 1)) as i128
         )
     }
 
@@ -271,6 +286,7 @@ impl<T: PrimitiveInt> HashableElRing for StaticRingBase<T> {
 /// 
 /// For the difference to [`StaticRing`], see the documentation of [`crate::ring::RingStore`].
 /// 
+#[derive(Debug)]
 pub struct StaticRingBase<T> {
     element: PhantomData<T>
 }
@@ -282,6 +298,10 @@ impl<T> PartialEq for StaticRingBase<T> {
 }
 
 impl<T: PrimitiveInt> RingValue<StaticRingBase<T>> {
+
+    ///
+    /// The singleton ring instance of [`StaticRing`].
+    /// 
     pub const RING: StaticRing<T> = RingValue::from(StaticRingBase { element: PhantomData });
 }
 

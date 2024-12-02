@@ -33,7 +33,32 @@ use crate::algorithms;
 /// 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, PartialOrd, Ord)]
 pub enum EnvBindingStrength {
-    Weakest, Sum, Product, Power, Strongest
+    /// 
+    /// The weakest possible binding strength, i.e. never add parenthesis.
+    /// 
+    Weakest,
+    /// 
+    /// Binding strength of addition (and subtraction), i.e. only add parenthesis
+    /// if the expression includes an operation that binds weaker than `+` (I cannot
+    /// think of any example, this seems to be a rare situation).
+    /// 
+    Sum, 
+    /// 
+    /// Binding strength of multiplication (and division), i.e. only add parenthesis if 
+    /// the expression includes an operation that binds weaker than `*` (Standard example 
+    /// would be `+`).
+    /// 
+    Product, 
+    /// 
+    /// Binding strength of powering, i.e. only add parenthesis if the expression
+    /// includes an operation that binds weaker than exponentiation (Standard examples would 
+    /// be `+` or `*`).
+    /// 
+    Power, 
+    ///
+    /// The strongest possible binding strength, i.e. always add parenthesis.
+    /// 
+    Strongest
 }
 
 ///
@@ -187,9 +212,13 @@ pub enum EnvBindingStrength {
 /// ));
 /// ```
 /// 
+#[allow(missing_docs)]
 pub trait RingBase: PartialEq {
 
-    type Element;
+    ///
+    /// Type of elements of the ring
+    /// 
+    type Element: Sized;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element;
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.add_assign(lhs, self.clone_el(rhs)) }
@@ -206,7 +235,21 @@ pub trait RingBase: PartialEq {
     fn is_zero(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.zero()) }
     fn is_one(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.one()) }
     fn is_neg_one(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.neg_one()) }
+
+    ///
+    /// Returns whether the ring is commutative, i.e. `a * b = b * a` for all elements `a, b`.
+    /// Note that addition is assumed to be always commutative.
+    /// 
     fn is_commutative(&self) -> bool;
+
+    ///
+    /// Returns whether the ring is noetherian, i.e. every ideal is finitely generated.
+    /// 
+    /// Rings for which this is not the case are a exceptional situation in computer
+    /// algebra, since they are usually "very large" and hard to work with. Examples for
+    /// non-noetherian rings could be the polynomial ring in infinitely many variables
+    /// `Z[X1, X2, X3, ...]` or the ring of algebraic integers.
+    /// 
     fn is_noetherian(&self) -> bool;
 
     ///
@@ -567,8 +610,14 @@ macro_rules! assert_el_eq {
 /// 
 pub trait RingStore: Sized {
     
+    ///
+    /// The type of the stored ring.
+    /// 
     type Type: RingBase + ?Sized;
 
+    ///
+    /// Returns a reference to the stored ring.
+    /// 
     fn get_ring<'a>(&'a self) -> &'a Self::Type;
 
     delegate!{ RingBase, fn clone_el(&self, val: &El<Self>) -> El<Self> }
@@ -605,6 +654,14 @@ pub trait RingStore: Sized {
     delegate!{ RingBase, fn mul(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
     delegate!{ RingBase, fn square(&self, value: &mut El<Self>) -> () }
 
+    ///
+    /// Tries to map the given element into this ring.
+    ///
+    /// This will internally construct a homomorphism between the rings, using
+    /// [`CanHomFrom`]. Note that if you want to map many elements between the
+    /// same rings, it may be faster to construct the homomorphism only once using
+    /// [`RingStore::can_hom()`].
+    /// 
     fn coerce<S>(&self, from: &S, el: El<S>) -> El<Self>
         where S: RingStore, Self::Type: CanHomFrom<S::Type> 
     {
@@ -677,12 +734,34 @@ pub trait RingStore: Sized {
         self.into_int_hom()
     }
 
+    ///
+    /// Computes the sum of all elements returned by the iterator.
+    /// 
+    /// This is equivalent to
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::assert_el_eq;
+    /// fn sum<R, I>(ring: R, els: I) -> El<R>
+    ///     where R: RingStore,
+    ///         I: IntoIterator<Item = El<R>>
+    /// {
+    ///     els.into_iter().fold(ring.zero(), |a, b| ring.add(a, b))
+    /// }
+    /// # assert_el_eq!(StaticRing::<i64>::RING, StaticRing::<i64>::RING.sum([1, 2, 5]), sum(StaticRing::<i64>::RING, [1, 2, 5]))
+    /// ```
+    /// but may be faster.
+    /// 
     fn sum<I>(&self, els: I) -> El<Self> 
         where I: IntoIterator<Item = El<Self>>
     {
         self.get_ring().sum(els)
     }
 
+    ///
+    /// Equivalent of [`RingStore::sum()`] if the producer of the ring elements
+    /// can fail, in which case summation is aborted and the error returned.
+    /// 
     #[stability::unstable(feature = "enable")]
     fn try_sum<I, E>(&self, els: I) -> Result<El<Self>, E>
         where I: IntoIterator<Item = Result<El<Self>, E>>
@@ -702,12 +781,33 @@ pub trait RingStore: Sized {
         }
     }
 
+    ///
+    /// Computes the product of all elements returned by the iterator.
+    /// 
+    /// This is equivalent to
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::assert_el_eq;
+    /// fn prod<R, I>(ring: R, els: I) -> El<R>
+    ///     where R: RingStore,
+    ///         I: IntoIterator<Item = El<R>>
+    /// {
+    ///     els.into_iter().fold(ring.one(), |a, b| ring.mul(a, b))
+    /// }
+    /// # assert_el_eq!(StaticRing::<i64>::RING, StaticRing::<i64>::RING.prod([1, 2, 5]), prod(StaticRing::<i64>::RING, [1, 2, 5]))
+    /// ```
+    /// but may be faster.
+    /// 
     fn prod<I>(&self, els: I) -> El<Self> 
         where I: IntoIterator<Item = El<Self>>
     {
         self.get_ring().prod(els)
     }
 
+    ///
+    /// Raises the given element to the given power.
+    /// 
     fn pow(&self, mut x: El<Self>, power: usize) -> El<Self> {
         // special cases to increase performance
         if power == 0 {
@@ -721,6 +821,13 @@ pub trait RingStore: Sized {
         self.pow_gen(x, &(power as i64), StaticRing::<i64>::RING)
     }
 
+    ///
+    /// Raises the given element to the given power, which should be a positive integer
+    /// belonging to an arbitrary [`IntegerRing`]. 
+    /// 
+    /// This can in particular be used to compute exponentiation when the exponent does
+    /// not fit in a `usize`.
+    /// 
     fn pow_gen<R: RingStore>(&self, x: El<Self>, power: &El<R>, integers: R) -> El<Self> 
         where R::Type: IntegerRing
     {
@@ -744,10 +851,16 @@ pub trait RingStore: Sized {
         RingElementDisplayWrapper { ring: self, element: value }
     }
 
+    ///
+    /// Prints the given element. Use for quick & dirty debugging.
+    /// 
     fn println(&self, value: &El<Self>) {
         println!("{}", self.format(value));
     }
     
+    ///
+    /// See [`RingBase::characteristic()`].
+    /// 
     fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
@@ -761,9 +874,7 @@ pub trait RingStore: Sized {
 pub trait RingExtensionStore: RingStore
     where Self::Type: RingExtension
 {
-    fn base_ring<'a>(&'a self) -> &'a <Self::Type as RingExtension>::BaseRing {
-        self.get_ring().base_ring()
-    }
+    delegate!{ RingExtension, fn base_ring(&self) -> &<Self::Type as RingExtension>::BaseRing }
 
     ///
     /// Returns the inclusion map of the base ring `R -> self`.
@@ -828,11 +939,32 @@ impl<'a, R: RingStore + ?Sized> std::fmt::Debug for RingElementDisplayWrapper<'a
 /// 
 pub trait RingExtension: RingBase {
     
+    ///
+    /// Type of the base ring;
+    /// 
+    /// This is bounded by [`RingStore`] to encourage implementations of [`RingExtension`]
+    /// to store their base ring as a [`RingStore`] ([`RingStore`] is designed exactly for
+    /// this use case). Additionally, it makes using the base ring easier.
+    /// 
     type BaseRing: RingStore;
 
+    ///
+    /// Returns a reference to the base ring.
+    /// 
     fn base_ring<'a>(&'a self) -> &'a Self::BaseRing;
+
+    ///
+    /// Maps an element of the base ring into this ring.
+    /// 
+    /// This should realize an injective ring homomorphism.
+    /// Instead of calling it directly, consider using it through
+    /// [`RingExtensionStore::inclusion()`].
+    /// 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element;
     
+    ///
+    /// Maps an element of the base ring (given as reference) into this ring.
+    /// 
     fn from_ref(&self, x: &El<Self::BaseRing>) -> Self::Element {
         self.from(self.base_ring().get_ring().clone_el(x))
     }
@@ -853,6 +985,9 @@ pub trait RingExtension: RingBase {
 /// 
 pub trait HashableElRing: RingBase {
 
+    ///
+    /// Hashes the given ring element.
+    /// 
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H);
 }
 
@@ -862,10 +997,18 @@ pub trait HashableElRing: RingBase {
 pub trait HashableElRingStore: RingStore
     where Self::Type: HashableElRing
 {
+    ///
+    /// See [`HashableElRing::hash()`].
+    /// 
     fn hash<H: std::hash::Hasher>(&self, el: &El<Self>, h: &mut H) {
         self.get_ring().hash(el, h)
     }
 
+    ///
+    /// Computes a hash of the given element using some default hasher.
+    /// 
+    /// This may not be the same in different versions of `feanor-math`.
+    /// 
     fn default_hash(&self, el: &El<Self>) -> u64 {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         self.hash(el, &mut hasher);
@@ -920,21 +1063,37 @@ pub type El<R> = <<R as RingStore>::Type as RingBase>::Element;
 /// ```
 /// 
 #[repr(transparent)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct RingValue<R: RingBase> {
     ring: R
 }
 
 impl<R: RingBase> RingValue<R> {
 
+    ///
+    /// Wraps the given [`RingBase`] in a [`RingValue`].
+    /// 
+    /// This is a dedicated function instead of an implementation
+    /// of [`std::convert::From`] so that we can declare it `const`.
+    /// 
     pub const fn from(value: R) -> Self {
         RingValue { ring: value }
     }
 
+    ///
+    /// Creates a reference to a [`RingValue`] from a reference
+    /// to the [`RingBase`].
+    /// 
     pub fn from_ref<'a>(value: &'a R) -> &'a Self {
         unsafe { std::mem::transmute(value) }
     }
 
+    ///
+    /// Unwraps the [`RingBase`].
+    /// 
+    /// The more common case would be to get a reference, which can
+    /// be done with [`RingStore::get_ring()`].
+    /// 
     pub fn into(self) -> R {
         self.ring
     }
@@ -969,6 +1128,7 @@ impl<R: RingBase + Default> Default for RingValue<R> {
 /// case).
 /// 
 #[repr(transparent)]
+#[derive(Debug)]
 pub struct RingRef<'a, R: RingBase + ?Sized> {
     ring: &'a R
 }
@@ -984,10 +1144,20 @@ impl<'a, R: RingBase + ?Sized> Copy for RingRef<'a, R> {}
 
 impl<'a, R: RingBase + ?Sized> RingRef<'a, R> {
 
+    ///
+    /// Creates a new [`RingRef`] from a reference to a [`RingBase`].
+    /// 
     pub const fn new(value: &'a R) -> Self {
         RingRef { ring: value }
     }
 
+    ///
+    /// Returns the stored reference to the [`RingBase`].
+    /// 
+    /// This is almost the same as [`RingStore::get_ring()`], except for
+    /// that the lifetime of the returned reference is not bounded to the
+    /// lifetime of the [`RingRef`].
+    /// 
     pub fn into(self) -> &'a R {
         self.ring
     }
@@ -1192,16 +1362,15 @@ fn test_internal_wrappings_dont_matter() {
     let b1: B<A> = RingValue { ring: BBase { base: a.clone() } };
     let b2: B<&B<A>> = RingValue { ring: BBase { base: &b1 } };
     let b3: B<&A> = RingValue { ring: BBase { base: &a } };
-    b1.coerce(&a, 0);
-    b2.coerce(&a, 0);
-    b2.coerce(&b1, 0);
-    b2.coerce(&b3, 0);
-    (&b2).coerce(&b3, 0);
-    (&b2).coerce(&&&b3, 0);
+    _ = b1.coerce(&a, 0);
+    _ = b2.coerce(&a, 0);
+    _ = b2.coerce(&b1, 0);
+    _ = b2.coerce(&b3, 0);
+    _ = (&b2).coerce(&b3, 0);
+    _ = (&b2).coerce(&&&b3, 0);
 }
 
-
-
+#[allow(missing_docs)]
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
 

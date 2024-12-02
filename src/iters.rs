@@ -37,21 +37,21 @@ impl<I, F, T> Iterator for IterCombinations<I, F, T>
                 index + 1 < *next_index
             };
             if can_forward {
-                it.next().unwrap();
+                _ = it.next().unwrap();
                 self.buffer[i] = it.peek().unwrap().1.clone();
                 return Some(result);
             } else {
                 // reset and continue with next iterator
                 *it = self.base.clone();
                 for _ in 0..i {
-                    it.next();
+                    _ = it.next();
                 }
                 let (_, x) = it.peek().unwrap();
                 self.buffer[i] = x.clone();
             }
         }
         if let Some(last_it) = self.iterators.last_mut() {
-            last_it.next();
+            _ = last_it.next();
             if let Some(x) = last_it.peek() {
                 *self.buffer.last_mut().unwrap() = x.1.clone();
             } else {
@@ -62,7 +62,7 @@ impl<I, F, T> Iterator for IterCombinations<I, F, T>
     }
 }
 
-impl<I, F, T> std::iter::FusedIterator for IterCombinations<I, F, T> 
+impl<I, F, T> FusedIterator for IterCombinations<I, F, T> 
     where I: Iterator + Clone, I::Item: Clone, F: FnMut(&[I::Item]) -> T {}
 
 ///
@@ -120,6 +120,9 @@ pub fn combinations<I, F, T>(it: I, k: usize, converter: F) -> IterCombinations<
     };
 }
 
+///
+/// Clones every element of the given slice and returns an owned pointer to the copy.
+/// 
 pub fn clone_slice<T>(slice: &[T]) -> Box<[T]> 
     where T: Clone
 {
@@ -127,18 +130,34 @@ pub fn clone_slice<T>(slice: &[T]) -> Box<[T]>
     return vec.into_boxed_slice();
 }
 
+///
+/// Clones every element of the given array.
+/// 
 pub fn clone_array<T, const N: usize>(slice: &[T]) -> [T; N] 
     where T: Copy
 {
     slice.try_into().unwrap()
 }
 
+///
+/// Returns an iterator over all size-`k` subsets of the
+/// elements returned by the given iterator.
+/// 
+/// This is a special version of [`combinations()`], which
+/// accepts a converter function and thus can avoid cloning
+/// each subset.
+/// 
 pub fn basic_combinations<I>(it: I, k: usize) -> impl Iterator<Item = Box<[I::Item]>>
     where I: Iterator + Clone, I::Item: Clone, 
 {
     combinations(it, k, clone_slice)
 }
 
+///
+/// Calls the given `converter` function once for each subset of the elements
+/// returned by the given iterator, and returns an iterator over the
+/// outputs of the `converter` function.
+/// 
 pub fn powerset<I, F, T>(it: I, converter: F) -> impl Iterator<Item = T>
     where I: Iterator + Clone, I::Item: Clone, F: Clone + FnMut(&[I::Item]) -> T
 {
@@ -146,6 +165,14 @@ pub fn powerset<I, F, T>(it: I, converter: F) -> impl Iterator<Item = T>
     (0..=len).flat_map(move |i| combinations(it.clone(), i, converter.clone()))
 }
 
+///
+/// Returns an iterator over all subsets of the
+/// elements returned by the given iterator.
+/// 
+/// This is a special version of [`powerset()`], which
+/// accepts a converter function and thus can avoid cloning
+/// each subset.
+/// 
 pub fn basic_powerset<I>(it: I) -> impl Iterator<Item = Box<[I::Item]>>
     where I: Iterator + Clone, I::Item: Clone
 {
@@ -206,7 +233,7 @@ impl<'a, F, T> Iterator for MultisetCombinations<'a, F, T>
     }
 }
 
-impl<'a, F, T> std::iter::FusedIterator for MultisetCombinations<'a, F, T>
+impl<'a, F, T> FusedIterator for MultisetCombinations<'a, F, T>
     where F: FnMut(&[usize]) -> T {}
 
 ///
@@ -287,6 +314,7 @@ pub fn multiset_combinations<'a, F, T>(multiset: &'a [usize], size: usize, conve
 /// Iterator over the elements of the cartesian product of multiple iterators.
 /// See also [`multi_cartesian_product()`].
 /// 
+#[derive(Debug)]
 pub struct MultiProduct<I, F, G, T> 
     where I: Iterator + Clone, 
         F: FnMut(&[I::Item]) -> T,
@@ -412,6 +440,13 @@ pub fn multi_cartesian_product<J, F, G, T>(iters: J, converter: F, clone_el: G) 
     };
 }
 
+///
+/// An iterator that "condenses" a given iterator, i.e. combines a variable number
+/// of base iterator elements into a single element.
+/// 
+/// Use through the function [`condense()`].
+/// 
+#[derive(Debug)]
 pub struct CondenseIter<I, F, T>
     where I: Iterator, F: FnMut(I::Item) -> Option<T>
 {
@@ -434,8 +469,8 @@ impl<I, F, T> Iterator for CondenseIter<I, F, T>
     }
 }
 
-impl<I, F, T> std::iter::FusedIterator for CondenseIter<I, F, T>
-    where I: std::iter::FusedIterator, F: FnMut(I::Item) -> Option<T>
+impl<I, F, T> FusedIterator for CondenseIter<I, F, T>
+    where I: FusedIterator, F: FnMut(I::Item) -> Option<T>
 {}
 
 ///
@@ -531,6 +566,7 @@ fn test_multi_cartesian_product() {
     assert_eq!(expected, it.collect::<Vec<_>>());
 }
 
+#[allow(trivial_casts)]
 #[test]
 fn test_multiset_combinations() {
     let a = [1, 2, 3, 1];
