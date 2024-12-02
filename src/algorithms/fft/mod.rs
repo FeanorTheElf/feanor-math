@@ -46,7 +46,27 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
 
     ///
     /// On input `i`, returns `j` such that `unordered_fft(values)[i]` contains the evaluation
-    /// at `zeta^j` of values. Here `zeta` is the value returned by [`FFTAlgorithm::root_of_unity()`]
+    /// at `zeta^(-j)` of values (note the `-`, which is standard convention for Fourier transforms).
+    /// Here `zeta` is the value returned by [`FFTAlgorithm::root_of_unity()`].
+    /// 
+    /// # Example
+    /// ```text
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::rings::zn::*;
+    /// # use feanor_math::rings::zn::zn_64::*;
+    /// # use feanor_math::algorithms::*;
+    /// # use feanor_math::field::*;
+    /// # use feanor_math::algorithms::fft::*;
+    /// let ring = Zn::new(17);
+    /// let fft = cooley_tuckey::CooleyTuckeyFFT::for_zn(&ring, 3);
+    /// let (zero, one) = (ring.zero(), ring.one());
+    /// let mut values = [zero, one, one, zero, zero, zero, zero, zero];
+    /// fft.unordered_fft(&mut values, &ring);
+    /// for i in 0..8 {
+    ///     let evaluation_at = ring.pow(ring.invert(fft.root_of_unity()).unwrap(), fft.unordered_fft_permutation(i));
+    ///     assert_el_eq!(ring, ring.add(evaluation_at, ring.pow(evaluation_at, 2)), &values[i]);
+    /// }
+    /// ```
     /// 
     fn unordered_fft_permutation(&self, i: usize) -> usize;
 
@@ -59,7 +79,7 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
     ///
     /// Computes the Fourier transform of the given `values` over the specified ring.
     /// The output is in standard order, i.e. the `i`-th output element is the evaluation
-    /// of the input at `self.root_of_unity()^-i` (note the `-`, which is standard
+    /// of the input at `self.root_of_unity()^(-i)` (note the `-`, which is standard
     /// convention for Fourier transforms).
     /// 
     /// # Panics

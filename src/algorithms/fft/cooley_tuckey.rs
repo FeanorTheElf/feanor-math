@@ -619,6 +619,20 @@ fn test_bitreverse_fft_inplace_advanced() {
 }
 
 #[test]
+fn test_unordered_fft_permutation() {
+    let ring = Fp::<17>::RING;
+    let fft = CooleyTuckeyFFT::for_zn(&ring, 4).unwrap();
+    let mut values = [0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    let mut expected = [0; 16];
+    for i in 0..16 {
+        let power_of_zeta = ring.pow(*fft.root_of_unity(&ring), 16 - fft.unordered_fft_permutation(i));
+        expected[i] = ring.add(power_of_zeta, ring.pow(power_of_zeta, 4));
+    }
+    fft.unordered_fft(&mut values, ring);
+    assert_eq!(expected, values);
+}
+
+#[test]
 fn test_bitreverse_inv_fft_inplace() {
     let ring = Fp::<17>::RING;
     let fft = CooleyTuckeyFFT::for_zn(&ring, 4).unwrap();

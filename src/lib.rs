@@ -164,5 +164,12 @@ pub mod serialization;
 /// Contains a workaround for specialization.
 /// 
 pub mod specialization;
-
+///
+/// Contains the trait [`compute_locally::EvaluatePolyLocallyRing`] and related traits for computing
+/// the evaluation of a polynomial over a ring via its evaluations modulo different prime ideals.
+/// 
+/// Note that here (and in `feanor-math` generally), the term "local" is used to refer to algorithms
+/// that work modulo prime ideals (or their powers), which is different from the mathematical concept
+/// of localization.
+/// 
 pub mod compute_locally;
