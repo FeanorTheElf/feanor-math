@@ -2,8 +2,7 @@ use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
 
 use crate::algorithms::bigint::highest_set_block;
-use crate::divisibility::DivisibilityRing;
-use crate::divisibility::Domain;
+use crate::divisibility::{DivisibilityRing, Domain};
 use crate::pid::*;
 use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ};
 use crate::integer::*;
@@ -14,7 +13,7 @@ use crate::algorithms;
 use crate::serialization::SerializableElementRing;
 use std::alloc::Allocator;
 use std::alloc::Global;
-use std::cmp::Ordering::*;
+use std::cmp::Ordering::{self, *};
 
 ///
 /// An element of the integer ring implementation [`RustBigintRing`].
@@ -82,7 +81,7 @@ impl<A: Allocator + Clone + Default> Default for RustBigintRingBase<A> {
 impl<A: Allocator + Clone> RustBigintRingBase<A> {
 
     pub fn map_i128(&self, val: &RustBigint<A>) -> Option<i128> {
-        match algorithms::bigint::highest_set_block(&val.1) {
+        match highest_set_block(&val.1) {
             None => Some(0),
             Some(0) if val.0 => Some(-(val.1[0] as i128)),
             Some(0) if !val.0 => Some(val.1[0] as i128),
@@ -301,17 +300,17 @@ impl<A: Allocator + Clone> Domain for RustBigintRingBase<A> {}
 
 impl<A: Allocator + Clone> OrderedRing for RustBigintRingBase<A> {
 
-    fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
+    fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> Ordering {
         match (lhs.0, rhs.0) {
             (true, true) => algorithms::bigint::bigint_cmp(&rhs.1, &lhs.1),
             (false, false) => algorithms::bigint::bigint_cmp(&lhs.1, &rhs.1),
-            (_, _) if self.is_zero(lhs) && self.is_zero(rhs) => std::cmp::Ordering::Equal,
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater
+            (_, _) if self.is_zero(lhs) && self.is_zero(rhs) => Equal,
+            (true, false) => Less,
+            (false, true) => Greater
         }
     }
 
-    fn abs_cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
+    fn abs_cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> Ordering {
         algorithms::bigint::bigint_cmp(&rhs.1, &lhs.1)
     }
 }
@@ -373,7 +372,7 @@ impl<A: Allocator + Clone> EuclideanRing for RustBigintRingBase<A> {
 impl<A: Allocator + Clone> HashableElRing for RustBigintRingBase<A> {
 
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
-        let block = algorithms::bigint::highest_set_block(&el.1);
+        let block = highest_set_block(&el.1);
         if let Some(b) = block {
             for i in 0..=b {
                 h.write_u64(el.1[i])
@@ -424,7 +423,7 @@ impl<A: Allocator + Clone> IntegerRing for RustBigintRingBase<A> {
 
     fn to_float_approx(&self, value: &Self::Element) -> f64 {
         let sign = if value.0 { -1. } else { 1. };
-        match algorithms::bigint::highest_set_block(&value.1) {
+        match highest_set_block(&value.1) {
             None => 0.,
             Some(0) => value.1[0] as f64 * sign,
             Some(d) => (value.1[d] as f64 * 2f64.powi(d as i32 * u64::BITS as i32) + value.1[d - 1] as f64 * 2f64.powi((d - 1) as i32 * u64::BITS as i32)) * sign
@@ -468,7 +467,7 @@ impl<A: Allocator + Clone> IntegerRing for RustBigintRingBase<A> {
     }
 
     fn abs_highest_set_bit(&self, value: &Self::Element) -> Option<usize> {
-        let block = algorithms::bigint::highest_set_block(&value.1)?;
+        let block = highest_set_block(&value.1)?;
         Some(block * u64::BITS as usize + u64::BITS as usize - value.1[block].leading_zeros() as usize - 1)
     }
 

@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use crate::ring::*;
@@ -388,6 +389,14 @@ pub struct CanHom<R, S>
     data: <S::Type as CanHomFrom<R::Type>>::Homomorphism
 }
 
+impl<R, S> Debug for CanHom<R, S>
+    where R: RingStore + Debug, S: RingStore + Debug, S::Type: CanHomFrom<R::Type>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CanHom({:?}, {:?})", self.from, self.to)
+    }
+}
+
 impl<R, S> CanHom<R, S>
     where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
 {
@@ -543,6 +552,14 @@ pub struct CanIso<R, S>
     data: <S::Type as CanIsoFromTo<R::Type>>::Isomorphism
 }
 
+impl<R, S> Debug for CanIso<R, S>
+    where R: RingStore + Debug, S: RingStore + Debug, S::Type: CanIsoFromTo<R::Type>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CanIso({:?}, {:?})", self.from, self.to)
+    }
+}
+
 impl<R, S> Clone for CanIso<R, S>
     where R: RingStore + Clone, S: RingStore + Clone, S::Type: CanIsoFromTo<R::Type>
 {
@@ -613,7 +630,7 @@ impl<R, S> Homomorphism<S::Type,R::Type> for CanIso<R, S>
 /// assert_el_eq!(extension, extension.from_terms([(8, 0), (1, 1)].into_iter()), &f);
 /// ```
 /// 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Inclusion<R>
     where R: RingStore, R::Type: RingExtension
 {

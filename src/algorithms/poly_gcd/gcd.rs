@@ -136,7 +136,7 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
     } else {
         let complete_end = Instant::now();
         log_progress!(controller, "time(setup: {} ms, localgcd: {} ms, preparelift: {} ms, hensel: {} ms, reconstruct: {} ms, test: {} ms, all: {} ms)", setup_time, local_gcd_time, prepare_lift_time, hensel_lift_time, reconstruct_time, test_division_time, (complete_end - complete_start).as_millis());
-        poly_ring.balance_poly(&mut result);
+        _ = poly_ring.balance_poly(&mut result);
         return Some(result);
     }
 }
@@ -161,8 +161,8 @@ fn poly_gcd_coprime_local<P, F, Controller>(poly_ring: P, mut f: El<P>, mut g: E
     } else if poly_ring.is_zero(&g) {
         return Some(poly_ring.clone_el(&f));
     }
-    poly_ring.balance_poly(&mut f);
-    poly_ring.balance_poly(&mut g);
+    _ = poly_ring.balance_poly(&mut f);
+    _ = poly_ring.balance_poly(&mut g);
     let lcf = poly_ring.base_ring().clone_el(poly_ring.lc(&f).unwrap());
     let lcg = poly_ring.base_ring().clone_el(poly_ring.lc(&g).unwrap());
     let ring = poly_ring.base_ring();
@@ -173,7 +173,7 @@ fn poly_gcd_coprime_local<P, F, Controller>(poly_ring: P, mut f: El<P>, mut g: E
     let d_monic = poly_gcd_monic_coprime_local(poly_ring, &f_monic, &g_monic, rng, attempt, controller)?;
 
     let mut result = unevaluate_aX(poly_ring, &d_monic, &a);
-    poly_ring.balance_poly(&mut result);
+    _ = poly_ring.balance_poly(&mut result);
     return Some(result);
 }
 
@@ -253,8 +253,8 @@ pub fn poly_gcd_local<P, Controller>(poly_ring: P, mut f: El<P>, mut g: El<P>, c
     } else if poly_ring.is_zero(&g) {
         return poly_ring.clone_el(&f);
     }
-    poly_ring.balance_poly(&mut f);
-    poly_ring.balance_poly(&mut g);
+    _ = poly_ring.balance_poly(&mut f);
+    _ = poly_ring.balance_poly(&mut g);
     let lcf = poly_ring.base_ring().clone_el(poly_ring.lc(&f).unwrap());
     let lcg = poly_ring.base_ring().clone_el(poly_ring.lc(&g).unwrap());
     let ring = poly_ring.base_ring();
@@ -265,7 +265,7 @@ pub fn poly_gcd_local<P, Controller>(poly_ring: P, mut f: El<P>, mut g: El<P>, c
     let d_monic = poly_gcd_monic_local(poly_ring, &f_monic, &g_monic, controller);
 
     let mut result = unevaluate_aX(poly_ring, &d_monic, &a);
-    poly_ring.balance_poly(&mut result);
+    _ = poly_ring.balance_poly(&mut result);
     return result;
 }
 

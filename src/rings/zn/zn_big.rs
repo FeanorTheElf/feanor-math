@@ -107,7 +107,7 @@ impl<I: RingStore> ZnBase<I>
         let inverse_modulus = integer_ring.euclidean_div(mod_square_bound, &modulus);
 
         // check that this expression does not overflow
-        integer_ring.mul_ref_snd(integer_ring.pow(integer_ring.clone_el(&modulus), 2), &inverse_modulus);
+        _ = integer_ring.mul_ref_snd(integer_ring.pow(integer_ring.clone_el(&modulus), 2), &inverse_modulus);
 
         return ZnBase {
             twice_modulus: integer_ring.add_ref(&modulus, &modulus),
@@ -358,7 +358,7 @@ impl<I: RingStore> DivisibilityRing for ZnBase<I>
     where I::Type: IntegerRing
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs)
+        generic_impls::checked_left_div(RingRef::new(self), lhs, rhs)
     }
 }
 

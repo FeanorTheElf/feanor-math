@@ -101,7 +101,7 @@ pub fn poly_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left_div
                     })
             );
         }
-        poly_ring.balance_poly(&mut lhs);
+        _ = poly_ring.balance_poly(&mut lhs);
     }
     return Ok(lhs);
 }

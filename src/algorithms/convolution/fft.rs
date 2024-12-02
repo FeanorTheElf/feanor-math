@@ -287,7 +287,7 @@ impl<R, I, A> FFTRNSBasedConvolution<R, I, A>
         let mut rns_rings = self.rns_rings.borrow_mut();
         if rns_rings.lower_bound(Bound::Included(&min_log2_rns_ring_modulus)).next().is_none() {
             let (supported_int_log2, rns_ring) = self.create_rns_ring(min_log2_rns_ring_modulus);
-            rns_rings.insert(supported_int_log2, rns_ring);
+            _ = rns_rings.insert(supported_int_log2, rns_ring);
         }
         drop(rns_rings);
         return Ref::map(self.rns_rings.borrow(), |rns_rings| rns_rings.lower_bound(Bound::Included(&min_log2_rns_ring_modulus)).next().unwrap().1);

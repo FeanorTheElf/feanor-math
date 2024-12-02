@@ -51,7 +51,7 @@ pub fn baby_giant_step<T, F>(value: T, base: &T, base_order_bound: i64, op: F, i
     let giant_step = pow(base, n, &op, identity.clone());
     let mut current = giant_step.clone();
     for j in 1..=n {
-        giant_steps.insert(current.clone(), j);
+        _ = giant_steps.insert(current.clone(), j);
         current = op(current, &giant_step);
     }
     current = value;

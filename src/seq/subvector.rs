@@ -219,7 +219,7 @@ fn test_subvector_subvector() {
 fn test_subvector_subvector_oob() {
     let a = SubvectorView::new([0, 1, 2, 3, 4]);
     let b = a.restrict(1..4);
-    b.restrict(0..4);
+    _ = b.restrict(0..4);
 }
 
 #[test]
@@ -247,7 +247,7 @@ fn test_subvector_fn_subvector() {
 fn test_subvector_fn_subvector_oob() {
     let a = SubvectorFn::new([0, 1, 2, 3, 4].clone_els_by(|x| *x));
     let b = a.restrict(1..4);
-    b.restrict(0..4);
+    _ = b.restrict(0..4);
 }
 
 #[test]

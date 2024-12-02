@@ -52,7 +52,7 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P
             i
         )));
         if let Some(mut root_of_factor) = poly_root(RX, &power_factor, sig.perfect_power) {
-            RX.balance_poly(&mut root_of_factor);
+            _ = RX.balance_poly(&mut root_of_factor);
             result.push((root_of_factor, sig.perfect_power));
         } else {
             return None;
@@ -207,13 +207,13 @@ pub fn poly_power_decomposition_local<P, Controller>(poly_ring: P, mut f: El<P>,
         Controller: ComputationController
 {
     assert!(!poly_ring.is_zero(&f));
-    poly_ring.balance_poly(&mut f);
+    _ = poly_ring.balance_poly(&mut f);
     let lcf = poly_ring.lc(&f).unwrap();
     let f_monic = evaluate_aX(poly_ring, &f, lcf);
     let power_decomposition = poly_power_decomposition_monic_local(poly_ring, &f_monic, controller);
     let result = power_decomposition.into_iter().map(|(fi, i)| {
         let mut result = unevaluate_aX(poly_ring, &fi, &lcf);
-        poly_ring.balance_poly(&mut result);
+        _ = poly_ring.balance_poly(&mut result);
         return (result, i);
     }).collect::<Vec<_>>();
     debug_assert!(poly_ring.checked_div(&poly_ring.prod(result.iter().map(|(fi, i)| poly_ring.pow(poly_ring.clone_el(fi), *i))), &f).is_some());
@@ -239,7 +239,7 @@ pub fn poly_squarefree_part_local<P, Controller>(poly_ring: P, f: El<P>, control
 {
     assert!(!poly_ring.is_zero(&f));
     let mut result = poly_ring.prod(poly_power_decomposition_local(poly_ring, f, controller).into_iter().map(|(fi, _i)| fi));
-    poly_ring.balance_poly(&mut result);
+    _ = poly_ring.balance_poly(&mut result);
     return result;
 }
 

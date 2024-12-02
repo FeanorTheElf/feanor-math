@@ -308,7 +308,7 @@ pub fn buchberger<P, O, Controller, SortFn, AbortFn>(ring: P, input_basis: Vec<E
 
             if !ring.is_zero(&f) {
                 log_progress!(handle, "s");
-                new_polys_ref.push(augment_lm(ring, f, order));
+                _ = new_polys_ref.push(augment_lm(ring, f, order));
             } else {
                 log_progress!(handle, "-");
             }
@@ -317,9 +317,9 @@ pub fn buchberger<P, O, Controller, SortFn, AbortFn>(ring: P, input_basis: Vec<E
             return Ok(None);
         }));
 
-        open.drain(spolys_to_reduce_index..);
+        drop(open.drain(spolys_to_reduce_index..));
         let new_polys = new_polys.into_vec();
-        computation.finish()?;
+        _ = computation.finish()?;
 
         // process the generated new polynomials
         if new_polys.len() == 0 && open.len() == 0 {
@@ -448,7 +448,7 @@ fn inter_reduce<P, O>(ring: P, mut polys: Vec<(El<P>, ExpandedMonomial)>, order:
                 polys.swap(i, last_i);
                 i += 1;
             } else {
-                polys.pop();
+                _ = polys.pop().unwrap();
             }
         }
     }

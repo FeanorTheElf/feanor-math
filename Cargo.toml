@@ -51,7 +51,7 @@ unstable-enable = []
 # Try to link to the mpir library for arbitrary-precision integers, and make `BigIntRing` refer to it.
 mpir = ["dep:bytemuck"]
 
-# Enables parallel computation in some underlying algorithms. Currently this applies only to F4.
+# Enables parallel computation in some underlying algorithms. Currently this applies only to F4 and ECM.
 parallel = ["dep:rayon"]
 
 # Includes the matrix and tensor library ndarray, together with a (currently minimalistic) interface to matrices in this crate.

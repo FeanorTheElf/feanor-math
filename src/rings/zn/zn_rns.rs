@@ -877,7 +877,7 @@ fn test_not_prime() {
 #[test]
 #[should_panic]
 fn test_not_coprime() {
-    Zn::new(vec![zn_64::Zn::new(15), zn_64::Zn::new(35)], StaticRing::<i64>::RING);
+    _ = Zn::new(vec![zn_64::Zn::new(15), zn_64::Zn::new(35)], StaticRing::<i64>::RING);
 }
 
 #[test]

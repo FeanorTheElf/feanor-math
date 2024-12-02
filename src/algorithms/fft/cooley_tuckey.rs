@@ -6,7 +6,6 @@ use crate::ring::*;
 use crate::seq::VectorViewMut;
 use crate::homomorphism::*;
 use crate::algorithms::fft::*;
-use crate::algorithms;
 use crate::rings::float_complex::*;
 use super::complex_fft::*;
 
@@ -30,6 +29,7 @@ use super::complex_fft::*;
 /// assert_el_eq!(ring, ring.one(), data[1]);
 /// ```
 /// 
+#[derive(Debug)]
 pub struct CooleyTuckeyFFT<R_main, R_twiddle, H> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
@@ -228,7 +228,7 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
         where R_twiddle: ZnRing
     {
         let ring_as_field = hom.domain().as_field().ok().unwrap();
-        let root_of_unity = ring_as_field.get_ring().unwrap_element(algorithms::unity_root::get_prim_root_of_unity_pow2(&ring_as_field, log2_n)?);
+        let root_of_unity = ring_as_field.get_ring().unwrap_element(get_prim_root_of_unity_pow2(&ring_as_field, log2_n)?);
         drop(ring_as_field);
         Some(Self::new_with_hom(hom, root_of_unity, log2_n))
     }

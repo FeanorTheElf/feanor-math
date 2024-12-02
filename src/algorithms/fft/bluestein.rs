@@ -18,6 +18,7 @@ use crate::seq::SwappableVectorViewMut;
 /// Bluestein's FFT algorithm (also known as Chirp-Z-transform) to compute the Fourier
 /// transform of arbitrary length (including prime numbers).
 /// 
+#[derive(Debug)]
 pub struct BluesteinFFT<R_main, R_twiddle, H, A = Global>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
@@ -504,7 +505,7 @@ fn test_approximate_fft() {
     let CC = Complex64::RING;
     for (p, _log2_m) in [(5, 4), (53, 7), (1009, 11)] {
         let fft = BluesteinFFT::for_complex(&CC, p, Global);
-        let mut array = (0..(p as usize)).map(|i| CC.root_of_unity(i as i64, p as i64)).collect::<Vec<_>>();
+        let mut array = (0..p).map(|i| CC.root_of_unity(i as i64, p as i64)).collect::<Vec<_>>();
         fft.fft(&mut array, CC);
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));

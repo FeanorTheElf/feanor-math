@@ -3,14 +3,12 @@
 #![allow(rustdoc::private_intra_doc_links)]
 
 #![warn(
-    missing_debug_implementations,
-    missing_docs,
-    trivial_casts,
-    trivial_numeric_casts,
+    // missing_debug_implementations,
     unused_extern_crates,
     unused_import_braces,
-    unused_qualifications,
-    unused_results
+    // unused_qualifications,
+    unused_results,
+    // missing_docs
 )]
 
 #![feature(btree_cursors)]

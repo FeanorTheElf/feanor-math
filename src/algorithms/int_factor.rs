@@ -142,24 +142,24 @@ pub fn factor<I>(ZZ: I, mut n: El<I>) -> Vec<(El<I>, usize)>
         match (iter1.peek(), iter2.peek()) {
             (Some((p1, m1)), Some((p2, m2))) if ZZ.eq_el(p1, p2) => {
                 result.push((ZZ.clone_el(p1), m1 + m2));
-                iter1.next();
-                iter2.next();
+                _ = iter1.next().unwrap();
+                _ = iter2.next().unwrap();
             },
             (Some((p1, m1)), Some((p2, _m2))) if ZZ.is_lt(p1, p2) => {
                 result.push((ZZ.clone_el(p1), *m1));
-                iter1.next();
+                _ = iter1.next().unwrap();
             },
             (Some((_p1, _m1)), Some((p2, m2))) => {
                 result.push((ZZ.clone_el(p2), *m2));
-                iter2.next();
+                _ = iter2.next().unwrap();
             },
             (Some((p1, m1)), None) => {
                 result.push((ZZ.clone_el(p1), *m1));
-                iter1.next();
+                _ = iter1.next().unwrap();
             },
             (None, Some((p2, m2))) => {
                 result.push((ZZ.clone_el(p2), *m2));
-                iter2.next();
+                _ = iter2.next().unwrap();
             },
             (None, None) => {
                 return result;

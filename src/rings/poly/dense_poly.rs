@@ -467,7 +467,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
     }
 
     fn mul_assign_monomial(&self, lhs: &mut Self::Element, rhs_power: usize) {
-        lhs.data.splice(0..0, (0..rhs_power).map(|_| self.base_ring().zero()));
+        _ = lhs.data.splice(0..0, (0..rhs_power).map(|_| self.base_ring().zero()));
     }
 
     fn degree(&self, f: &Self::Element) -> Option<usize> {

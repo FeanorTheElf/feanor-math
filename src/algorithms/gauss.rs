@@ -126,9 +126,9 @@ pub fn largest_nonzero_minor<R, V>(A: SubmatrixMut<V, El<R>>, ring: R) -> (Vec<u
             k += 1;
         }
         let mut row_result = row_perm;
-        row_result.drain(k..);
+        _ = row_result.drain(k..);
         let mut col_result = col_perm;
-        col_result.drain(k..);
+        _ = col_result.drain(k..);
         row_result.sort_unstable();
         col_result.sort_unstable();
         return (row_result, col_result);

@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use super::*;
 
+#[derive(Debug)]
 pub struct StepBy<V: VectorView<T>, T: ?Sized> {
     base: V,
     step_by: usize,
@@ -62,6 +63,7 @@ impl<V: SwappableVectorViewMut<T>, T: ?Sized> SwappableVectorViewMut<T> for Step
     }
 }
 
+#[derive(Debug)]
 pub struct StepByFn<V: VectorFn<T>, T> {
     base: V,
     step_by: usize,

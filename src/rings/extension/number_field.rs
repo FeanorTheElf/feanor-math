@@ -677,7 +677,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
                 *x_pow_rank.at_mut(i) = Fp.negate(Fp.clone_el(c));
             }
         }
-        x_pow_rank.at_mut(0);
+        _ = x_pow_rank.at_mut(0);
         return AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new(Fp, FpX.degree(irred_poly).unwrap(), x_pow_rank)));
     }
 
@@ -698,7 +698,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
                 *x_pow_rank.at_mut(i) = Zpe.negate(Zpe.clone_el(c));
             }
         }
-        x_pow_rank.at_mut(0);
+        _ = x_pow_rank.at_mut(0);
         return FreeAlgebraImpl::new(ZZ.get_ring().local_ring_at(&ideal.prime, e, 0), degree, x_pow_rank);
     }
 

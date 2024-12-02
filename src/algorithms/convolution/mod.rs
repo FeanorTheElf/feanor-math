@@ -147,7 +147,7 @@ impl<'a, R, C> ConvolutionAlgorithm<R> for C
 /// Implementation of convolutions that uses Karatsuba's algorithm
 /// with a threshold defined by [`KaratsubaHint`].
 /// 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct KaratsubaAlgorithm<A: Allocator = Global> {
     allocator: A
 }

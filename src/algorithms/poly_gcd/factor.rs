@@ -26,7 +26,7 @@ fn combine_local_factors_local<'ring, 'data, 'local, R, P1, P2>(reduction: &'loc
     let ring = poly_ring.base_ring().get_ring();
     let reconstruct_poly = |factor| {
         let mut result = poly_ring.from_terms(local_poly_ring.terms(&factor).map(|(c, i)| (ring.reconstruct_ring_el(reduction.ideal(), std::slice::from_ref(*local_poly_ring.base_ring()).as_fn(), local_e, std::slice::from_ref(c).as_fn()), i)));
-        poly_ring.balance_poly(&mut result);
+        _ = poly_ring.balance_poly(&mut result);
         return result;
     };
 
@@ -169,7 +169,7 @@ pub fn heuristic_factor_poly_local<P, Controller>(poly_ring: P, f: El<P>, prime_
             while let Some(quo) = poly_ring.checked_div(&poly_ring.inclusion().mul_ref_map(&current, &poly_ring.base_ring().pow(poly_ring.base_ring().clone_el(&irred_factor_lc), poly_ring.degree(&f).unwrap())), &irred_factor) {
                 current = quo;
                 power += 1;
-                poly_ring.balance_poly(&mut current);
+                _ = poly_ring.balance_poly(&mut current);
             }
             assert!(power >= 1);
             result.push((irred_factor, power));
@@ -249,7 +249,7 @@ pub fn poly_factor_integer<'a, P, Controller>(ZZX: P, f: El<P>, controller: Cont
             let irred_factor = make_primitive(ZZX, &irred_factor).0;
             while let Some(quo) = ZZX.checked_div(&ZZX.inclusion().mul_ref_map(&current, &ZZX.base_ring().pow(ZZX.base_ring().clone_el(&irred_factor_lc), ZZX.degree(&f).unwrap())), &irred_factor) {
                 current = quo;
-                ZZX.balance_poly(&mut current);
+                _ = ZZX.balance_poly(&mut current);
                 power += 1;
             }
             assert!(power >= 1);
@@ -274,7 +274,7 @@ use crate::algorithms::poly_gcd::make_primitive;
 #[test]
 fn test_heuristic_factor_poly_local() {
     let ring = BigIntRing::RING;
-    let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
+    let poly_ring = DensePolyRing::new(ring, "X");
     let [f1, f2, f3, f4] = poly_ring.with_wrapped_indeterminate(|X| [
         X - 1,
         X + 1,
@@ -363,7 +363,7 @@ fn test_factor_int_poly() {
 #[test]
 fn random_test_heuristic_factor_poly_local() {
     let ring = BigIntRing::RING;
-    let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
+    let poly_ring = DensePolyRing::new(ring, "X");
     let mut rng = oorandom::Rand64::new(1);
     let bound = ring.int_hom().map(10000);
     for _ in 0..RANDOM_TEST_INSTANCE_COUNT {

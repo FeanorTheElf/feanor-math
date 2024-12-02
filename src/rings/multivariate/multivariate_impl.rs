@@ -196,7 +196,7 @@ impl<R, A> MultivariatePolyRingImpl<R, A>
             // ensure that cum_binomial() always fits within an u64
             int_bisect::find_root_floor(StaticRing::<i64>::RING, 0, |d| if BigIntRing::RING.is_lt(&BigIntRing::RING.mul(
                 binomial(int_cast(d + variable_count as i64 - 1, BigIntRing::RING, StaticRing::<i64>::RING), &k, BigIntRing::RING),
-                int_cast(*d as i64, BigIntRing::RING, StaticRing::<i64>::RING)
+                int_cast(*d, BigIntRing::RING, StaticRing::<i64>::RING)
             ), &BigIntRing::RING.power_of_two(u64::BITS as usize)) { -1 } else { 1 }) as usize
         };
         assert!(max_degree_for_orderidx >= max_supported_deg as usize, "currently only degrees are supported for which the total number of this-degree monomials fits in a u64");
@@ -617,7 +617,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
             }
         });
         *lhs = self.add_terms(&lhs, rhs.drain(..), Vec::new_in(self.allocator.clone()));
-        self.tmp_poly.swap(Some(Box::new(rhs)), std::sync::atomic::Ordering::AcqRel);
+        _ = self.tmp_poly.swap(Some(Box::new(rhs)), std::sync::atomic::Ordering::AcqRel);
     }
 
     fn mul_assign_monomial(&self, f: &mut Self::Element, rhs: Self::Monomial) {
@@ -952,7 +952,7 @@ fn test_create_multiplication_table() {
 
 #[test]
 fn test_monomial_small() {
-    assert_eq!(16, std::mem::size_of::<MonomialIdentifier>());
+    assert_eq!(16, size_of::<MonomialIdentifier>());
 }
 
 #[test]

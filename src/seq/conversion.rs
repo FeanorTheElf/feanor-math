@@ -6,6 +6,7 @@ use super::*;
 /// Iterator over the elements of a [`VectorFn`].
 /// Produced by the function [`VectorFn::iter()`] and [`VectorFn::into_iter()`].
 /// 
+#[derive(Debug)]
 pub struct VectorFnIter<V: VectorFn<T>, T> {
     content: V,
     begin: usize,
@@ -52,7 +53,7 @@ impl<V: VectorFn<T>, T> Iterator for VectorFnIter<V, T> {
         }
     }
 
-    fn advance_by(&mut self, n: usize) -> Result<(), std::num::NonZero<usize>> {
+    fn advance_by(&mut self, n: usize) -> Result<(), NonZero<usize>> {
         if self.begin + n <= self.end {
             self.begin += n;
             return Ok(());
@@ -96,6 +97,7 @@ impl<V: VectorFn<T>, T> ExactSizeIterator for VectorFnIter<V, T> {
 /// A [`VectorFn`] that produces its elements by cloning the elements of an underlying [`VectorView`].
 /// Produced by the functions [`VectorView::clone_els()`] and [`VectorView::clone_ring_els()`].
 /// 
+#[derive(Debug)]
 pub struct CloneElFn<V: VectorView<T>, T, F: Fn(&T) -> T> {
     content: V,
     clone_el: F,
@@ -159,6 +161,7 @@ impl<V: VectorView<T>, T, F: Fn(&T) -> T> VectorFn<T> for CloneElFn<V, T, F> {
 /// just the same references that would be returned through [`VectorFn::at()`].
 /// Produced by the function [`VectorView::as_fn()`].
 /// 
+#[derive(Debug)]
 pub struct VectorViewFn<'a, V: ?Sized + VectorView<T>, T: ?Sized> {
     content: &'a V,
     element: PhantomData<T>

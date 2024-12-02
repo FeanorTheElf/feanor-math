@@ -443,7 +443,7 @@ pub fn transpose_indeterminates<P1, P2, H>(from: P1, to: P2, base_hom: H) -> imp
             for (c, j) in from.base_ring().terms(f) {
                 match result_terms.entry(j) {
                     std::collections::hash_map::Entry::Occupied(mut e) => { e.get_mut().push((base_hom.map_ref(c), i)); },
-                    std::collections::hash_map::Entry::Vacant(e) => { e.insert(vec![(base_hom.map_ref(c), i)]); }
+                    std::collections::hash_map::Entry::Vacant(e) => { _ = e.insert(vec![(base_hom.map_ref(c), i)]); }
                 }
             }
         }

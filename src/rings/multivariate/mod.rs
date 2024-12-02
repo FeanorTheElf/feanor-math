@@ -259,7 +259,7 @@ pub trait MultivariatePolyRing: RingExtension {
         assert!(var < self.indeterminate_count());
         let mut parts = Vec::new();
         for (c, m) in self.terms(f) {
-            while self.exponent_at(m, var) as usize >= parts.len() {
+            while self.exponent_at(m, var) >= parts.len() {
                 parts.push(Vec::new());
             }
             let new_m = self.create_monomial((0..self.indeterminate_count()).map(|i| if i == var { 0 } else { self.exponent_at(m, i) }));

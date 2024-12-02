@@ -137,7 +137,7 @@ pub fn bigint_sub_self<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt
 	let mut buffer: bool = false;
 	let mut i = 0;
 	while i <= rhs_high {
-		let (difference, overflow) = rhs[i as usize].overflowing_sub(lhs[i as usize]);
+		let (difference, overflow) = rhs[i].overflowing_sub(lhs[i]);
 		if buffer {
 			let (carry_difference, carry_overflow) = difference.overflowing_sub(1);
 			lhs[i] = carry_difference;
@@ -468,7 +468,7 @@ pub fn from_str_radix<A: Allocator>(string: &str, base: u32, out: Vec<BlockInt, 
 	// really smaller than 2^64
 	let chunk_size = ((BLOCK_BITS - 1) as f32 / (base as f32).log2()).floor() as usize;
 	let it = <str as AsRef<[u8]>>::as_ref(string)
-		.rchunks(chunk_size as usize)
+		.rchunks(chunk_size)
 		.rev()
 		.map(std::str::from_utf8)
 		.map(|chunk| chunk.map_err(|_| ()))
@@ -586,7 +586,7 @@ fn test_div_last_block_overflow() {
 fn test_div_small() {
     let mut x = parse("891023591340178345678931246518793456983745682137459364598623489512389745698237456890239238476873429872346579");
     let q = parse("255380794307875708133829534685810678413226048190730686328066348384175908769916152734376393945793473738133");
-    bigint_div_small(&mut x, 3489);
+    _ = bigint_div_small(&mut x, 3489);
     assert_eq!(truncate_zeros(q), truncate_zeros(x));
 }
 

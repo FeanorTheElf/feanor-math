@@ -12,10 +12,11 @@ use crate::integer::*;
 use crate::ordered::{OrderedRing, OrderedRingStore};
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::*;
-use crate::algorithms;
 use crate::impl_interpolation_base_ring_char_zero;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::ring::*;
+
+use std::fmt::Debug;
 
 ///
 /// An implementation of the rational number `Q`, based on representing them
@@ -87,6 +88,16 @@ pub type RationalField<I> = RingValue<RationalFieldBase<I>>;
 pub struct RationalFieldEl<I>(El<I>, El<I>)
     where I: RingStore,
         I::Type: IntegerRing;
+
+impl<I> Debug for RationalFieldEl<I>
+    where I: RingStore,
+        I::Type: IntegerRing,
+        El<I>: Debug
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RationalFieldEl({:?}, {:?})", &self.0, &self.1)
+    }
+}
 
 impl<I> Clone for RationalFieldEl<I>
     where I: RingStore,
@@ -189,7 +200,7 @@ impl<I> RationalFieldBase<I>
 {
     fn reduce(&self, value: (&mut El<I>, &mut El<I>)) {
         // take the denominator first, as in this case gcd will have the same sign, and the final denominator will be positive
-        let gcd = algorithms::eea::signed_gcd(self.integers.clone_el(&*value.1), self.integers.clone_el(&*value.0), &self.integers);
+        let gcd = signed_gcd(self.integers.clone_el(&*value.1), self.integers.clone_el(&*value.0), &self.integers);
         *value.0 = self.integers.checked_div(&*value.0, &gcd).unwrap();
         *value.1 = self.integers.checked_div(&*value.1, &gcd).unwrap();
     }

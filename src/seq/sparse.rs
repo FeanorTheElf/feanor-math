@@ -5,7 +5,6 @@ use std::collections::hash_map::Entry;
 use crate::ring::*;
 use crate::seq::*;
 
-
 pub struct SparseMapVector<R: RingStore> {
     data: HashMap<usize, El<R>>,
     modify_entry: (usize, El<R>),
@@ -57,8 +56,8 @@ impl<R: RingStore> SparseMapVector<R> {
             let (index, value) = std::mem::replace(&mut self.modify_entry, new_modify_entry);
             match self.data.entry(index) {
                 Entry::Occupied(mut e) if !self.ring.is_zero(&value) => { *e.get_mut() = value; },
-                Entry::Occupied(e) => { e.remove(); },
-                Entry::Vacant(e) if !self.ring.is_zero(&value) => { e.insert(value); },
+                Entry::Occupied(e) => { _ = e.remove(); },
+                Entry::Vacant(e) if !self.ring.is_zero(&value) => { _ = e.insert(value); },
                 Entry::Vacant(_) => {}
             };
         } else {

@@ -926,7 +926,7 @@ fn test_serialization() {
 #[should_panic]
 fn test_from_canonical_basis_enforce_len() {
     let (ring, _) = test_ring1_and_elements();
-    ring.from_canonical_basis([0, 1, 2]);
+    _ = ring.from_canonical_basis([0, 1, 2]);
 }
 
 #[test]
