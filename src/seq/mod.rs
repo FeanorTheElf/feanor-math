@@ -232,6 +232,9 @@ pub trait VectorViewSparse<T: ?Sized>: VectorView<T> {
 /// 
 /// Used as a workaround for specialization, together with [`VectorView::specialize_sparse()`].
 /// 
+/// TODO: on next breaking update (unfortunate that I missed 3.0.0), replace this by
+/// the more powerful workaround technique as used for finite rings in [`crate::specialization`].
+/// 
 pub trait SparseVectorViewOperation<T: ?Sized> {
 
     type Output<'a>

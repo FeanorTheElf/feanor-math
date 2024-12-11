@@ -302,14 +302,6 @@ impl<R1, R2> CanIsoFromTo<AsLocalPIRBase<R1>> for AsFieldBase<R2>
     }
 }
 
-impl<R: RingStore> DivisibilityRing for AsFieldBase<R> 
-    where R::Type: DivisibilityRing
-{
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        self.get_delegate().checked_left_div(&lhs.0, &rhs.0).map(FieldEl)
-    }
-}
-
 impl<R: RingStore> PrincipalIdealRing for AsFieldBase<R> 
     where R::Type: DivisibilityRing
 {

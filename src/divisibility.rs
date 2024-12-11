@@ -1,3 +1,6 @@
+
+use std::fmt::Debug;
+
 use crate::ring::*;
 
 ///
@@ -5,6 +8,15 @@ use crate::ring::*;
 /// whether for `x, y` there is `k` such that `x = ky`.
 /// 
 pub trait DivisibilityRing: RingBase {
+
+    ///
+    /// Additional data associated to a fixed ring element that can be used
+    /// to speed up division by this ring element. 
+    /// 
+    /// See also [`DivisibilityRing::prepare_divisor()`].
+    /// 
+    #[stability::unstable(feature = "enable")]
+    type PreparedDivisorData = ();
 
     ///
     /// Checks whether there is an element `x` such that `rhs * x = lhs`, and
@@ -101,28 +113,152 @@ pub trait DivisibilityRing: RingBase {
     {
         None
     }
+
+    ///
+    /// "Prepares" an element of this ring for division.
+    /// 
+    /// The returned [`DivisibilityRing::PreparedDivisor`] can then be used in calls
+    /// to [`DivisibilityRing::checked_left_div_prepared()`] and other "prepared" division
+    /// functions, which can be faster than for an "unprepared" element.
+    /// 
+    /// See also [`DivisibilityRing::prepare_divisor()`].
+    /// 
+    /// # Caveat
+    /// 
+    /// Previously, this was its own trait, but that caused problems, since using this properly 
+    /// would require fully-fledged specialization. Hence, we now inlude it in [`DivisibilityRing`]
+    /// but provide defaults for all `*_prepared()` functions. 
+    /// 
+    /// This is not perfect, and in particular, if you specialize [`DivisibilityRing::PreparedDivisorData`]
+    /// and not [`DivisibilityRing::prepare_divisor()`], this will currently not cause a compile error, but 
+    /// panic at runtime when calling [`DivisibilityRing::prepare_divisor()`] (unfortunately). However,
+    /// it seems like the most usable solution, and does not require unsafe code.
+    /// 
+    /// TODO: at the next breaking release, remove default implementation of `prepare_divisor()`.
+    /// 
+    /// # Example
+    /// 
+    /// Assume we want to go through all positive integers `<= 1000` that are divisible by `257`. The naive 
+    /// way would be the following
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::divisibility::*;
+    /// # use feanor_math::primitive_int::*;
+    /// let ring = StaticRing::<i128>::RING;
+    /// for integer in 0..1000 {
+    ///     if ring.divides(&integer, &257) {
+    ///         assert!(integer == 0 || integer == 257 || integer == 514 || integer == 771);
+    ///     }
+    /// }
+    /// ```
+    /// It can be faster to instead prepare the divisor `257` once and use this "prepared" divisor for
+    /// all checks (of course, it will be much faster to iterate over `(0..10000).step_by(257)`, but
+    /// for the sake of this example, let's use individual divisibility checks).
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::divisibility::*;
+    /// # use feanor_math::primitive_int::*;
+    /// # let ring = StaticRing::<i128>::RING;
+    /// let prepared_257 = ring.get_ring().prepare_divisor(257);
+    /// for integer in 0..1000 {
+    ///     if ring.get_ring().divides_left_prepared(&integer, &prepared_257) {
+    ///         assert!(integer == 0 || integer == 257 || integer == 514 || integer == 771);
+    ///     }
+    /// }
+    /// ```
+    /// 
+    #[stability::unstable(feature = "enable")]
+    fn prepare_divisor(&self, x: Self::Element) -> PreparedDivisor<Self> {
+        struct ProduceUnitType;
+        trait ProduceValue<T> {
+            fn produce() -> T;
+        }
+        impl<T> ProduceValue<T> for ProduceUnitType {
+            default fn produce() -> T {
+                panic!("if you specialize DivisibilityRing::PreparedDivisorData, you must also specialize DivisibilityRing::prepare_divisor()")
+            }
+        }
+        impl ProduceValue<()> for ProduceUnitType {
+            fn produce() -> () {}
+        }
+        PreparedDivisor {
+            element: x,
+            data: <ProduceUnitType as ProduceValue<Self::PreparedDivisorData>>::produce()
+        }
+    }
+
+    ///
+    /// Same as [`DivisibilityRing::checked_left_div()`] but for a prepared divisor.
+    /// 
+    /// See also [`DivisibilityRing::prepare_divisor()`].
+    /// 
+    #[stability::unstable(feature = "enable")]
+    fn checked_left_div_prepared(&self, lhs: &Self::Element, rhs: &PreparedDivisor<Self>) -> Option<Self::Element> {
+        self.checked_left_div(lhs, &rhs.element)
+    }
+
+    ///
+    /// Same as [`DivisibilityRing::divides_left()`] but for a prepared divisor.
+    /// 
+    /// See also [`DivisibilityRing::prepare_divisor()`].
+    /// 
+    #[stability::unstable(feature = "enable")]
+    fn divides_left_prepared(&self, lhs: &Self::Element, rhs: &PreparedDivisor<Self>) -> bool {
+        self.divides_left(lhs, &rhs.element)
+    }
+
+    ///
+    /// Same as [`DivisibilityRing::is_unit()`] but for a prepared divisor.
+    /// 
+    /// See also [`DivisibilityRing::prepare_divisor()`].
+    /// 
+    #[stability::unstable(feature = "enable")]
+    fn is_unit_prepared(&self, x: &PreparedDivisor<Self>) -> bool {
+        self.is_unit(&x.element)
+    }
 }
 
 ///
-/// Trait for rings that support "preparing" division by `x`, i.e. compute some
-/// additional data for `x` that can later be used to speed up division by `x`.
+/// Struct for ring elements that are stored with associated data to
+/// enable faster divisions.
 /// 
-/// The semantics are the same as for [`DivisibilityRing`], just the performance 
-/// behavior is different.
+/// For details, see [`DivisibilityRing::prepare_divisor()`].
 /// 
-#[stability::unstable(feature = "enable")]
-pub trait PreparedDivisibilityRing: DivisibilityRing {
+pub struct PreparedDivisor<R>
+    where R: ?Sized + RingBase + DivisibilityRing
+{
+    pub element: R::Element,
+    pub data: R::PreparedDivisorData
+}
 
-    type PreparedDivisor;
-
-    fn prepare_divisor(&self, x: &Self::Element) -> Self::PreparedDivisor;
-
-    fn checked_left_div_prepared(&self, lhs: &Self::Element, rhs: &Self::PreparedDivisor) -> Option<Self::Element>;
-
-    fn is_unit_prepared(&self, x: &Self::PreparedDivisor) -> bool {
-        self.checked_left_div_prepared(&self.one(), x).is_some()
+impl<R> Debug for PreparedDivisor<R>
+    where R: ?Sized + RingBase + DivisibilityRing,
+        R::Element: Debug,
+        R::PreparedDivisorData: Debug
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PreparedDivisor {{ element: {:?}, data: {:?} }}", &self.element, &self.data)
     }
 }
+
+impl<R> Clone for PreparedDivisor<R>
+    where R: ?Sized + RingBase + DivisibilityRing,
+        R::Element: Clone,
+        R::PreparedDivisorData: Clone
+{
+    fn clone(&self) -> Self {
+        Self {
+            element: self.element.clone(),
+            data: self.data.clone()
+        }
+    }
+}
+
+impl<R> Copy for PreparedDivisor<R>
+    where R: ?Sized + RingBase + DivisibilityRing,
+        R::Element: Copy,
+        R::PreparedDivisorData: Copy
+{}
 
 ///
 /// Trait for rings that are integral, i.e. have no zero divisors.
@@ -152,32 +288,6 @@ pub trait DivisibilityRingStore: RingStore
 
 impl<R> DivisibilityRingStore for R
     where R: RingStore, R::Type: DivisibilityRing
-{}
-
-///
-/// Trait for [`RingStore`]s that store [`PreparedDivisibilityRing`]s. Mainly used
-/// to provide a convenient interface to the `PreparedDivisibilityRing`-functions.
-/// 
-#[stability::unstable(feature = "enable")]
-pub trait PreparedDivisibilityRingStore: RingStore
-    where Self::Type: PreparedDivisibilityRing
-{
-    delegate!{ PreparedDivisibilityRing, fn prepare_divisor(&self, x: &El<Self>) -> <Self::Type as PreparedDivisibilityRing>::PreparedDivisor }
-    delegate!{ PreparedDivisibilityRing, fn checked_left_div_prepared(&self, lhs: &El<Self>, rhs: &<Self::Type as PreparedDivisibilityRing>::PreparedDivisor) -> Option<El<Self>> }
-    delegate!{ PreparedDivisibilityRing, fn is_unit_prepared(&self, x: &<Self::Type as PreparedDivisibilityRing>::PreparedDivisor) -> bool }
-
-    fn checked_div_prepared(&self, lhs: &El<Self>, rhs: &<Self::Type as PreparedDivisibilityRing>::PreparedDivisor) -> Option<El<Self>> {
-        assert!(self.is_commutative());
-        self.checked_left_div_prepared(lhs, rhs)
-    }
-
-    fn invert_prepared(&self, el: &<Self::Type as PreparedDivisibilityRing>::PreparedDivisor) -> Option<El<Self>> {
-        self.checked_div_prepared(&self.one(), el)
-    }
-}
-
-impl<R> PreparedDivisibilityRingStore for R
-    where R: RingStore, R::Type: PreparedDivisibilityRing
 {}
 
 #[cfg(any(test, feature = "generic_tests"))]
@@ -211,6 +321,31 @@ pub mod generic_tests {
                     assert!(inv.is_some(), "Unit check failed: is_unit({}) is true but checked_div({}, {}) is None", ring.format(a), ring.format(&ring.one()), ring.format(&a));
                     let prod = ring.mul_ref(a, inv.as_ref().unwrap());
                     assert!(ring.eq_el(&ring.one(), &prod), "Division failed: {} != {} * {} but checked_div({}, {}) = {}", ring.format(&ring.one()), ring.format(a), ring.format(inv.as_ref().unwrap()), ring.format(&ring.one()), ring.format(a), ring.format(c.as_ref().unwrap()));
+                }
+            }
+        }
+
+        for a in &elements {
+            let a_prepared_divisor = ring.get_ring().prepare_divisor(ring.clone_el(a));
+            for b in &elements {
+                let ab = ring.mul(ring.clone_el(a), ring.clone_el(b));
+                let c = ring.get_ring().checked_left_div_prepared(&ab, &a_prepared_divisor);
+                assert!(c.is_some(), "Divisibility existence failed for prepared divisor: there should exist b = {} such that {} = b * {}, but none was found", ring.format(b), ring.format(&ab), ring.format(&a));
+                assert!(ring.eq_el(&ab, &ring.mul_ref_snd(ring.clone_el(a), c.as_ref().unwrap())), "Division failed: {} * {} != {} but {} = checked_div({}, {})", ring.format(a), ring.format(c.as_ref().unwrap()), ring.format(&ab), ring.format(c.as_ref().unwrap()), ring.format(&ab), ring.format(&a));
+
+                if !ring.get_ring().is_unit_prepared(&a_prepared_divisor) {
+                    let ab_plus_one = ring.add(ring.clone_el(&ab), ring.one());
+                    let c = ring.get_ring().checked_left_div_prepared(&ab_plus_one, &a_prepared_divisor);
+                    assert!(c.is_none(), "Unit check failed for prepared divisor: is_unit({}) is false but checked_div({}, {}) = {}", ring.format(a), ring.format(&ab_plus_one), ring.format(a), ring.format(c.as_ref().unwrap()));
+
+                    let ab_minus_one = ring.sub(ring.clone_el(&ab), ring.one());
+                    let c = ring.get_ring().checked_left_div_prepared(&ab_minus_one, &a_prepared_divisor);
+                    assert!(c.is_none(), "Unit check failed for prepared divisor: is_unit({}) is false but checked_div({}, {}) = {}", ring.format(a), ring.format(&ab_minus_one), ring.format(a), ring.format(c.as_ref().unwrap()));
+                } else {
+                    let inv = ring.get_ring().checked_left_div_prepared(&ring.one(), &a_prepared_divisor);
+                    assert!(inv.is_some(), "Unit check failed for prepared divisor: is_unit({}) is true but checked_div({}, {}) is None", ring.format(a), ring.format(&ring.one()), ring.format(&a));
+                    let prod = ring.mul_ref(a, inv.as_ref().unwrap());
+                    assert!(ring.eq_el(&ring.one(), &prod), "Division failed for prepared divisor: {} != {} * {} but checked_div({}, {}) = {}", ring.format(&ring.one()), ring.format(a), ring.format(inv.as_ref().unwrap()), ring.format(&ring.one()), ring.format(a), ring.format(c.as_ref().unwrap()));
                 }
             }
         }

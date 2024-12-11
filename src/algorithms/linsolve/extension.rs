@@ -43,7 +43,7 @@ pub fn solve_right_over_extension<R, V1, V2, V3, A>(ring: R, lhs: SubmatrixMut<V
         for j in 0..rhs.col_count() {
             let value_wrt_basis = ring.wrt_canonical_basis(rhs.at(i, j));
             for k in 0..ring.rank() {
-                *expanded_rhs.at_mut(i * ring.rank() + k, j * ring.rank()) = value_wrt_basis.at(k);
+                *expanded_rhs.at_mut(i * ring.rank() + k, j) = value_wrt_basis.at(k);
             }
         }
     }
@@ -115,4 +115,24 @@ fn test_solve() {
     let mut B = OwnedMatrix::from_fn_in(3, 1, |i, j| ring.clone_el(&data_B[i][j]), Global);
     let mut sol: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
     assert!(!solve_right_over_extension(&ring, A.data_mut(), B.data_mut(), sol.data_mut(), Global).is_solved());
+}
+
+#[test]
+fn test_invert() {
+    let base_ring = zn_static::Zn::<15>::RING;
+    // Z_15[X]/(X^3 + X^2 + 1);  X^3 + X^2 + 1 = (X + 2)(X + 2X + 2) mod 3, but it is irreducible mod 5
+    let ring = FreeAlgebraImpl::new(base_ring, 3, [14, 0, 14]);
+
+    let matrix = OwnedMatrix::from_fn(2, 2, |i, j| if i == 0 || j == 0 {
+        ring.one()
+    } else {
+        ring.sub(ring.canonical_gen(), ring.one())
+    });
+    let mut inverse = OwnedMatrix::zero(2, 2, &ring);
+    solve_right_over_extension(&ring, matrix.clone_matrix(&ring).data_mut(), OwnedMatrix::identity(2, 2, &ring).data_mut(), inverse.data_mut(), Global).assert_solved();
+
+    let mut result = OwnedMatrix::zero(2, 2, &ring);
+    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(matrix.data()), TransposableSubmatrix::from(inverse.data()), TransposableSubmatrixMut::from(result.data_mut()), &ring);
+
+    assert_matrix_eq!(&ring, OwnedMatrix::identity(2, 2, &ring), result);
 }

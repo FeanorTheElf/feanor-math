@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 
+use crate::divisibility::PreparedDivisor;
 use crate::pid::EuclideanRing;
 use crate::pid::PrincipalIdealRing;
 use crate::ring::*;
@@ -295,6 +296,8 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
 impl<R: DelegateRing + ?Sized> DivisibilityRing for R
     where R::Base: DivisibilityRing
 {
+    type PreparedDivisorData = PreparedDivisor<R::Base>;
+
     default fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         self.get_delegate().checked_left_div(self.delegate_ref(lhs), self.delegate_ref(rhs))
             .map(|x| self.rev_delegate(x))
@@ -305,6 +308,23 @@ impl<R: DelegateRing + ?Sized> DivisibilityRing for R
             Self: 'a
     {
         self.get_delegate().balance_factor(elements.map(|x| self.delegate_ref(x))).map(|c| self.rev_delegate(c))
+    }
+
+    fn prepare_divisor(&self, x: Self::Element) -> PreparedDivisor<Self> {
+        let prepared = self.get_delegate().prepare_divisor(self.delegate(x));
+        PreparedDivisor {
+            element: self.rev_delegate(self.get_delegate().clone_el(&prepared.element)),
+            data: prepared
+        }
+    }
+
+    default fn checked_left_div_prepared(&self, lhs: &Self::Element, rhs: &PreparedDivisor<Self>) -> Option<Self::Element> {
+        self.get_delegate().checked_left_div_prepared(self.delegate_ref(lhs), &rhs.data)
+            .map(|res| self.rev_delegate(res))
+    }
+
+    default fn divides_left_prepared(&self, lhs: &Self::Element, rhs: &PreparedDivisor<Self>) -> bool {
+        self.checked_left_div_prepared(lhs, rhs).is_some()
     }
 }
 

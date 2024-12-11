@@ -11,6 +11,7 @@
     // missing_docs
 )]
 
+#![feature(associated_type_defaults)]
 #![feature(btree_cursors)]
 #![feature(test)]
 #![feature(min_specialization)]

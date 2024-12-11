@@ -19,7 +19,7 @@ use crate::serialization::SerializableElementRing;
 ///
 /// Trait for `i8` to `i128`.
 /// 
-pub trait PrimitiveInt: Send + Sync + Serialize + DeserializeOwned + AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Shr<usize, Output = Self> + Eq + Into<Self::Larger> + TryFrom<Self::Larger> + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy + Div<Self, Output = Self> + Rem<Self, Output = Self> + Display {
+pub trait PrimitiveInt: 'static + Send + Sync + Serialize + DeserializeOwned + AddAssign + SubAssign + MulAssign + Neg<Output = Self> + Shr<usize, Output = Self> + Eq + Into<Self::Larger> + TryFrom<Self::Larger> + From<i8> + TryFrom<i32> + TryFrom<i128> + Into<i128> + Copy + Div<Self, Output = Self> + Rem<Self, Output = Self> + Display {
 
     ///
     /// The primitive integer that is "twice as large" as this one.
@@ -111,6 +111,8 @@ specialize_int_cast!{
 
 impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
     
+    type PreparedDivisorData = PrimitiveIntPreparedDivisorData<T>;
+
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(lhs) && self.is_zero(rhs) {
             return Some(self.zero());
@@ -131,44 +133,47 @@ impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
     {
         Some(elements.fold(self.zero(), |a, b| self.ideal_gen(&a, b)))
     }
-}
 
-///
-/// An element of [`StaticRing`] together with extra information that allows for
-/// faster division if this element is the divisor. See also [`PreparedDivisibilityRing`].
-/// 
-#[derive(Clone, Copy, Debug)]
-pub struct PrimitiveIntPreparedDivisor<T: PrimitiveInt>(T, T);
-
-impl<T: 'static + PrimitiveInt> PreparedDivisibilityRing for StaticRingBase<T> {
-
-    type PreparedDivisor = PrimitiveIntPreparedDivisor<T>;
-    
-    fn prepare_divisor(&self, x: &Self::Element) -> Self::PreparedDivisor {
-        assert!(TypeId::of::<T>() != TypeId::of::<i128>());
-        match <T as Into<i128>>::into(*x) {
-            0 => PrimitiveIntPreparedDivisor(*x, T::from(0)),
-            1 => PrimitiveIntPreparedDivisor(*x, T::try_from((1i128 << (T::bits() - 1)) - 1).ok().unwrap()),
-            -1 => PrimitiveIntPreparedDivisor(*x, T::try_from((-1i128 << (T::bits() - 1)) + 1).ok().unwrap()),
-            val => PrimitiveIntPreparedDivisor(*x, <T as TryFrom<i128>>::try_from((1i128 << (T::bits() - 1)) / val).ok().unwrap())
+    fn prepare_divisor(&self, x: Self::Element) -> PreparedDivisor<Self> {
+        // currently prepared division is not implemented for i128, as using Barett-reduction here
+        // requires 256-bit arithmetic, and I saw no need to make that effort
+        if TypeId::of::<T>() == TypeId::of::<i128>() {
+            return PreparedDivisor {
+                element: x,
+                data: PrimitiveIntPreparedDivisorData(T::from(0))
+            };
         }
+        let data = match <T as Into<i128>>::into(x) {
+            0 => PrimitiveIntPreparedDivisorData(T::from(0)),
+            1 => PrimitiveIntPreparedDivisorData(T::try_from((1i128 << (T::bits() - 1)) - 1).ok().unwrap()),
+            -1 => PrimitiveIntPreparedDivisorData(T::try_from((-1i128 << (T::bits() - 1)) + 1).ok().unwrap()),
+            val => PrimitiveIntPreparedDivisorData(<T as TryFrom<i128>>::try_from((1i128 << (T::bits() - 1)) / val).ok().unwrap())
+        };
+        return PreparedDivisor {
+            element: x,
+            data: data
+        };
     }
-
-    fn checked_left_div_prepared(&self, lhs: &Self::Element, rhs: &Self::PreparedDivisor) -> Option<Self::Element> {
-        assert!(TypeId::of::<T>() != TypeId::of::<i128>());
-        if rhs.0 == T::from(0) {
+    
+    fn checked_left_div_prepared(&self, lhs: &Self::Element, rhs: &PreparedDivisor<Self>) -> Option<Self::Element> {
+        // currently prepared division is not implemented for i128, as using Barett-reduction here
+        // requires 256-bit arithmetic, and I saw no need to make that effort
+        if TypeId::of::<T>() == TypeId::of::<i128>() {
+            return self.checked_left_div(lhs, &rhs.element);
+        }
+        if rhs.element == T::from(0) {
             if *lhs == T::from(0) { Some(T::from(0)) } else { None }
         } else {
             let mut prod = <T as Into<T::Larger>>::into(*lhs);
-            prod *=  <T as Into<T::Larger>>::into(rhs.1);
+            prod *=  <T as Into<T::Larger>>::into(rhs.data.0);
             let mut result = <T as TryFrom<T::Larger>>::try_from(prod >> (T::bits() - 1)).ok().unwrap();
-            let remainder = T::overflowing_sub(*lhs, T::overflowing_mul(result, rhs.0));
+            let remainder = T::overflowing_sub(*lhs, T::overflowing_mul(result, rhs.element));
             if remainder == T::from(0) {
                 Some(result)
-            } else if remainder == rhs.0 {
+            } else if remainder == rhs.element {
                 result += T::from(1);
                 Some(result)
-            } else if -remainder == rhs.0 {
+            } else if -remainder == rhs.element {
                 result -= T::from(1);
                 Some(result)
             } else {
@@ -176,7 +181,19 @@ impl<T: 'static + PrimitiveInt> PreparedDivisibilityRing for StaticRingBase<T> {
             }
         }
     }
+
+    fn divides_left_prepared(&self, lhs: &Self::Element, rhs: &PreparedDivisor<Self>) -> bool {
+        self.checked_left_div_prepared(lhs, rhs).is_some()
+    }
 }
+
+///
+/// Data associated to an element of [`StaticRing`] that allows for faster division. 
+/// 
+/// See also [`DivisibilityRing::prepare_divisor()`].
+/// 
+#[derive(Clone, Copy, Debug)]
+pub struct PrimitiveIntPreparedDivisorData<T: PrimitiveInt>(T);
 
 impl<T: PrimitiveInt> Domain for StaticRingBase<T> {}
 
@@ -508,20 +525,20 @@ fn test_lowest_set_bit() {
 fn test_prepared_div() {
     type PrimInt = i8;
     for x in PrimInt::MIN..PrimInt::MAX {
-        let div_x = StaticRing::<PrimInt>::RING.prepare_divisor(&x);
+        let div_x = StaticRing::<PrimInt>::RING.get_ring().prepare_divisor(x);
         for y in PrimInt::MIN..PrimInt::MAX {
             if x == 0 {
                 if y == 0 {
-                    assert!(StaticRing::<PrimInt>::RING.checked_div_prepared(&y, &div_x).is_some());
+                    assert!(StaticRing::<PrimInt>::RING.get_ring().checked_left_div_prepared(&y, &div_x).is_some());
                 } else {
-                    assert!(StaticRing::<PrimInt>::RING.checked_div_prepared(&y, &div_x).is_none());
+                    assert!(StaticRing::<PrimInt>::RING.get_ring().checked_left_div_prepared(&y, &div_x).is_none());
                 }
             } else if y == PrimInt::MIN && x == -1 {
                 // this cannot be evaluated without overflow
             } else if y % x == 0 {
-                assert_eq!(y / x, StaticRing::<PrimInt>::RING.checked_div_prepared(&y, &div_x).unwrap());
+                assert_eq!(y / x, StaticRing::<PrimInt>::RING.get_ring().checked_left_div_prepared(&y, &div_x).unwrap());
             } else {
-                assert!(StaticRing::<PrimInt>::RING.checked_div_prepared(&y, &div_x).is_none());
+                assert!(StaticRing::<PrimInt>::RING.get_ring().checked_left_div_prepared(&y, &div_x).is_none());
             }
         }
     }

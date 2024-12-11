@@ -567,6 +567,21 @@ impl<Impl> PerfectField for GaloisFieldBase<Impl>
         <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {}
 
+// impl<Impl> LinSolveRing for GaloisFieldBase<Impl>
+//     where Impl: RingStore,
+//         Impl::Type: Field + FreeAlgebra + FiniteRing,
+//         <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
+// {
+//     fn solve_right<V1, V2, V3, A>(&self, lhs: crate::matrix::SubmatrixMut<V1, Self::Element>, rhs: crate::matrix::SubmatrixMut<V2, Self::Element>, out: crate::matrix::SubmatrixMut<V3, Self::Element>, allocator: A) -> crate::algorithms::linsolve::SolveResult
+//         where V1: crate::matrix::AsPointerToSlice<Self::Element>,
+//             V2: crate::matrix::AsPointerToSlice<Self::Element>,
+//             V3: crate::matrix::AsPointerToSlice<Self::Element>,
+//             A: Allocator
+//     {
+//         unimplemented!()
+//     }
+// }
+
 impl<Impl> EuclideanRing for GaloisFieldBase<Impl>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra + FiniteRing,

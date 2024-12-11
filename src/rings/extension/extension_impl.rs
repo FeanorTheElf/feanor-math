@@ -391,6 +391,18 @@ impl<R, V, A, C> RingExtension for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
+///
+/// It seems like a good idea to also implement [`DivisibilityRing::prepare_divisor()`]
+/// and the prepared division functions here. However, currently the interface of
+/// [`LinSolveRing`] does not support this. I am not yet sure what is the best approach
+/// here, but it seems unlikely that this can be done properly without a breaking release
+///  - Either change [`LinSolveRing`] to support "factorizations" of matrices, or rather
+///    the equivalent to "prepared divisors" of matrices
+///  - Implement [`DivisibilityRing::prepare_divisor()`] only for `R::Type: [`PrincipalIdealRing`]`,
+///    which however requires specialization or a specialization workaround
+/// 
+/// TODO: Decide and implement on the next breaking release
+/// 
 impl<R, V, A, C> DivisibilityRing for FreeAlgebraImplBase<R, V, A, C>
     where R: RingStore, 
         R::Type: LinSolveRing,

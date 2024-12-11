@@ -98,7 +98,6 @@ impl<GuardType: ?Sized> UnsafeAnyFrobeniusDataGuarded<GuardType> {
         }
     }
     
-    
     #[stability::unstable(feature = "enable")]
     pub unsafe fn get<'a, T>(&'a self) -> &'a T {
         self.content.get()
