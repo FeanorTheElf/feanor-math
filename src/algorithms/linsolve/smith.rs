@@ -2,8 +2,6 @@ use std::alloc::Allocator;
 use std::cmp::min;
 use std::ptr::Alignment;
 use std::rc::Rc;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
@@ -90,7 +88,7 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(ring: R, mut lhs: SubmatrixMut<V1, El<R>>, mut rhs: SubmatrixMut<V2, El<R>>, out: SubmatrixMut<V3, El<R>>, allocator: A) -> SolveResult
+pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(ring: R, mut lhs: SubmatrixMut<V1, El<R>>, mut rhs: SubmatrixMut<V2, El<R>>, mut out: SubmatrixMut<V3, El<R>>, allocator: A) -> SolveResult
     where R: RingStore + Copy,
         R::Type: PrincipalIdealRing,
         V1: AsPointerToSlice<El<R>>, V2: AsPointerToSlice<El<R>>, V3: AsPointerToSlice<El<R>>,
@@ -100,10 +98,9 @@ pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(ring: R, mut lhs: Submatrix
     assert_eq!(lhs.col_count(), out.row_count());
     assert_eq!(rhs.col_count(), out.col_count());
 
-    let mut R: OwnedMatrix<El<R>, &A> = OwnedMatrix::identity_in(lhs.col_count(), lhs.col_count(), ring, &allocator);
-    pre_smith(ring, &mut TransformRows(rhs.reborrow(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), lhs.reborrow());
+    let mut R = TransformList::new(lhs.col_count());
+    pre_smith(ring, &mut TransformRows(rhs.reborrow(), ring.get_ring()), &mut R, lhs.reborrow());
 
-    let mut result = OwnedMatrix::zero_in(lhs.col_count(), rhs.col_count(), ring, &allocator);
     for i in out.row_count()..rhs.row_count() {
         for j in 0..rhs.col_count() {
             if !ring.is_zero(rhs.at(i, j)) {
@@ -111,25 +108,21 @@ pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(ring: R, mut lhs: Submatrix
             }
         }
     }
-    for i in 0..min(result.row_count(), rhs.row_count()) {
-        for j in 0..rhs.col_count() {
-            *result.at_mut(i, j) = ring.clone_el(rhs.at(i, j));
-        }
-    }
+    // the value of out[lhs.row_count().., ..] is irrelevant, since lhs
+    // is zero in these places anyway. Thus we just leave it unchanged
 
-    let zero = ring.zero();
     for i in 0..min(lhs.row_count(), lhs.col_count()) {
-        let pivot = if i < lhs.col_count() { lhs.at(i, i) } else { &zero };
+        let pivot = lhs.at(i, i);
         for j in 0..rhs.col_count() {
             if let Some(quo) = ring.checked_left_div(rhs.at(i, j), pivot) {
-                *result.at_mut(i, j) = quo;
+                *out.at_mut(i, j) = quo;
             } else {
                 return SolveResult::NoSolution;
             }
         }
     }
 
-    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(R.data()), TransposableSubmatrix::from(result.data()), TransposableSubmatrixMut::from(out), ring);
+    R.replay_transposed(ring, TransformRows(out, ring.get_ring()));
     return SolveResult::FoundSomeSolution;
 }
 
@@ -145,7 +138,7 @@ pub fn determinant_using_pre_smith<R, V, A>(ring: R, mut matrix: SubmatrixMut<V,
     let mut unit_part_cols = ring.one();
     pre_smith(ring, &mut DetUnit { current_unit: &mut unit_part_rows }, &mut DetUnit { current_unit: &mut unit_part_cols }, matrix.reborrow());
     return ring.prod((0..matrix.row_count()).map(|i| ring.clone_el(matrix.at(i, i))).chain([unit_part_rows, unit_part_cols].into_iter()));
-    }
+}
 
 struct DetUnit<'a, R: ?Sized + RingBase> {
     current_unit: &'a mut R::Element
@@ -191,6 +184,7 @@ use crate::algorithms::matmul::ComputeInnerProduct;
 use std::alloc::Global;
 #[cfg(test)]
 use test::Bencher;
+use transform::TransformList;
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
 #[cfg(test)]
@@ -340,10 +334,10 @@ fn test_determinant() {
 #[test]
 #[ignore]
 fn time_solve_right_using_pre_smith_galois_field() {
-    let n = 50;
+    let n = 100;
     let base_field = Zn::new(257).as_field().ok().unwrap();
     let allocator = feanor_mempool::AllocRc(Rc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>())));
-    let field = GaloisField::create(FreeAlgebraImpl::new_with(base_field, 5, [base_field.int_hom().map(3), base_field.int_hom().map(-4)], "x", allocator, STANDARD_CONVOLUTION).as_field().ok().unwrap());
+    let field = GaloisField::new_with(base_field, 21, allocator, STANDARD_CONVOLUTION);
     let matrix = OwnedMatrix::from_fn(n, n, |i, j| field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j));
     
     let mut inv = OwnedMatrix::zero(n, n, &field);
@@ -359,10 +353,10 @@ fn time_solve_right_using_pre_smith_galois_field() {
 #[test]
 #[ignore]
 fn time_solve_right_using_extension() {
-    let n = 50;
+    let n = 100;
     let base_field = Zn::new(257).as_field().ok().unwrap();
     let allocator = feanor_mempool::AllocRc(Rc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>())));
-    let field = GaloisField::create(FreeAlgebraImpl::new_with(base_field, 5, [base_field.int_hom().map(3), base_field.int_hom().map(-4)], "x", allocator, STANDARD_CONVOLUTION).as_field().ok().unwrap());
+    let field = GaloisField::new_with(base_field, 21, allocator, STANDARD_CONVOLUTION);
     let matrix = OwnedMatrix::from_fn(n, n, |i, j| field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j));
     
     let mut inv = OwnedMatrix::zero(n, n, &field);
