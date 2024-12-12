@@ -1,18 +1,11 @@
 use std::alloc::Allocator;
 use std::cmp::min;
-use std::ptr::Alignment;
-use std::rc::Rc;
-use std::time::Instant;
-
-use crate::algorithms::convolution::STANDARD_CONVOLUTION;
-use crate::algorithms::linsolve::extension::solve_right_over_extension;
 use crate::algorithms::linsolve::SolveResult;
 use crate::divisibility::*;
 use crate::matrix::*;
 use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
 use crate::ring::*;
 use crate::pid::PrincipalIdealRing;
-use crate::algorithms::matmul::{STANDARD_MATMUL, MatmulAlgorithm};
 
 ///
 /// Transforms `A` into `A'` via transformations `L, R` such that
@@ -88,7 +81,7 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(ring: R, mut lhs: SubmatrixMut<V1, El<R>>, mut rhs: SubmatrixMut<V2, El<R>>, mut out: SubmatrixMut<V3, El<R>>, allocator: A) -> SolveResult
+pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(ring: R, mut lhs: SubmatrixMut<V1, El<R>>, mut rhs: SubmatrixMut<V2, El<R>>, mut out: SubmatrixMut<V3, El<R>>, _allocator: A) -> SolveResult
     where R: RingStore + Copy,
         R::Type: PrincipalIdealRing,
         V1: AsPointerToSlice<El<R>>, V2: AsPointerToSlice<El<R>>, V3: AsPointerToSlice<El<R>>,
@@ -189,6 +182,18 @@ use transform::TransformList;
 use crate::homomorphism::Homomorphism;
 #[cfg(test)]
 use crate::algorithms::linsolve::LinSolveRing;
+#[cfg(test)]
+use std::ptr::Alignment;
+#[cfg(test)]
+use std::rc::Rc;
+#[cfg(test)]
+use std::time::Instant;
+#[cfg(test)]
+use crate::algorithms::convolution::STANDARD_CONVOLUTION;
+#[cfg(test)]
+use crate::algorithms::linsolve::extension::solve_right_over_extension;
+#[cfg(test)]
+use crate::algorithms::matmul::*;
 
 #[cfg(test)]
 fn multiply<'a, R: RingStore, V: AsPointerToSlice<El<R>>, I: IntoIterator<Item = Submatrix<'a, V, El<R>>>>(matrices: I, ring: R) -> OwnedMatrix<El<R>>

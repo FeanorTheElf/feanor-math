@@ -1,5 +1,3 @@
-use std::sync::atomic::Ordering;
-
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
 use crate::compute_locally::InterpolationBaseRing;
 use crate::delegate::DelegateRing;
