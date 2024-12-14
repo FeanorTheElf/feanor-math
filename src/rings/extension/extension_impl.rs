@@ -11,8 +11,9 @@ use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::hensel::local_zn_ring_bezout_identity;
 use crate::compute_locally::InterpolationBaseRing;
 use crate::divisibility::*;
-use crate::local::PrincipalLocalRing;
+use crate::local::{PrincipalLocalRing, PrincipalLocalRingStore};
 use crate::rings::poly::PolyRingStore;
+use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::{impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 use crate::integer::*;
 use crate::iters::multi_cartesian_product;
@@ -30,7 +31,7 @@ use crate::rings::extension::create_multiplication_matrix;
 use crate::delegate::DelegateRing;
 use crate::homomorphism::*;
 use crate::serialization::*;
-use sparse::SparseMapVector;
+use crate::seq::sparse::SparseMapVector;
 
 use super::FreeAlgebra;
 use super::FreeAlgebraStore;
@@ -444,16 +445,39 @@ pub fn invert_faster_over_local_zn<R, V, A, C>(ring: RingRef<FreeAlgebraImplBase
 {
     let poly_ring = DensePolyRing::new(ring.base_ring(), "X");
     let mut el_as_poly = ring.poly_repr(&poly_ring, el, ring.base_ring().identity());
+    let modulus = ring.generating_poly(&poly_ring, ring.base_ring().identity());
     if let Some(lc_inv) = ring.base_ring().invert(poly_ring.lc(&el_as_poly)?) {
         poly_ring.inclusion().mul_assign_ref_map(&mut el_as_poly, &lc_inv);
-        let (s, _t) = local_zn_ring_bezout_identity(&poly_ring, &el_as_poly, &ring.generating_poly(&poly_ring, ring.base_ring().identity()))?;
+        let (result, _) = local_zn_ring_bezout_identity(&poly_ring, &el_as_poly, &modulus)?;
         return Some(ring.inclusion().mul_map(
-            ring.from_canonical_basis((0..ring.rank()).map(|i| ring.base_ring().clone_el(poly_ring.coefficient_at(&s, i)))),
+            ring.from_canonical_basis((0..ring.rank()).map(|i| ring.base_ring().clone_el(poly_ring.coefficient_at(&result, i)))),
             lc_inv
         ));
-    } else {
-        return ring.checked_left_div(&ring.one(), el);
     }
+    if ring.wrt_canonical_basis(el).iter().all(|x| ring.base_ring().divides(&x, ring.base_ring().max_ideal_gen())) {
+        return None;
+    }
+    let mut rng = oorandom::Rand64::new(1);
+
+    // TODO: this is actually not correct, since it will give a wrong result if every `randomization` is not a unit but `el` is;
+    // the probability that this happens is usually very small, but not necessarily (e.g. ring is a product of many `Z/2Z`)
+    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+        let randomization = ring.from_canonical_basis((0..(ring.rank() - 1)).map(|_| ring.base_ring().random_element(|| rng.rand_u64())).chain([ring.base_ring().one()].into_iter()));
+        let mut randomized_el_poly = ring.poly_repr(&poly_ring, &ring.mul_ref(&randomization, el), ring.base_ring().identity());
+        if let Some(lc_inv) = ring.base_ring().invert(poly_ring.lc(&randomized_el_poly)?) {
+            poly_ring.inclusion().mul_assign_ref_map(&mut randomized_el_poly, &lc_inv);
+            if let Some((result, _)) = local_zn_ring_bezout_identity(&poly_ring, &randomized_el_poly, &modulus) {
+                return Some(ring.mul(
+                    ring.inclusion().mul_map(
+                        ring.from_canonical_basis((0..ring.rank()).map(|i| ring.base_ring().clone_el(poly_ring.coefficient_at(&result, i)))),
+                        lc_inv
+                    ),
+                    randomization
+                ));
+            }
+        }
+    }
+    return None;
 }
 
 impl<R, V, A, C> SerializableElementRing for FreeAlgebraImplBase<R, V, A, C>
@@ -988,6 +1012,12 @@ fn test_invert_special_case() {
     assert_el_eq!(&ring, ring.one(), ring.mul(invert_faster_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a));
 
     let a = ring.from_canonical_basis(array([1, 3, 0, 0]));
+    assert_el_eq!(&ring, ring.one(), ring.mul(invert_faster_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a));
+
+    let a = ring.from_canonical_basis(array([1, 2, 3, 0]));
+    assert_el_eq!(&ring, ring.one(), ring.mul(invert_faster_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a));
+
+    let a = ring.from_canonical_basis(array([3, 2, 9, 0]));
     assert_el_eq!(&ring, ring.one(), ring.mul(invert_faster_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a));
 
     let a = ring.from_canonical_basis(array([3, 1, 0, 0]));
