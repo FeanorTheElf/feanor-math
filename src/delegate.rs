@@ -19,7 +19,22 @@ use crate::specialization::*;
 /// instead of `RingBase`, and just provide how to map elements in the new
 /// ring to the wrapped ring and vice versa.
 /// 
+/// # Conditional Implementations
+/// 
+/// Some special ring traits (e.g. [`DivisibilityRing`]) are immediately implemented 
+/// for `R: DelegateRing` as soon as `R::Base: SpecialRingTrait`. However, this 
+/// of course prevents any implementation fo [`DelegateRing`] to provide a custom 
+/// implementation (except for specialization in some cases), due to conflicting 
+/// trait impls. Hence, for other traits, we use marker traits to mark an implementation 
+/// `R` of [`DelegateRing`] to also automatically implement a special ring trait as soon 
+/// as `R::Base: SpecialRingTrait`. These cases are currently
+///  - [`DelegateRingImplFiniteRing`] for automatic implementations of [`FiniteRing`] and
+///    [`FiniteRingSpecializable`].
+///  - [`DelegateRingImplEuclideanRing`] for automatic implementations of [`PrincipalIdealRing`]
+///    and [`EuclideanRing`]
+/// 
 /// # Example
+/// 
 /// ```
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
@@ -68,6 +83,169 @@ use crate::specialization::*;
 /// 
 /// let ring = RingValue::from(MyI32Ring);
 /// assert_el_eq!(ring, ring.int_hom().map(1), ring.one());
+/// ```
+/// An example when special ring traits are automatically implemented is 
+/// given by the following.
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::delegate::*;
+/// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
+/// 
+/// struct BoringRingWrapper<R>(R);
+/// 
+/// impl<R> PartialEq for BoringRingWrapper<R>
+///     where R: RingStore
+/// {
+///     fn eq(&self, other: &Self) -> bool {
+///         self.0.get_ring() == other.0.get_ring()
+///     }
+/// }
+/// 
+/// impl<R> DelegateRing for BoringRingWrapper<R>
+///     where R: RingStore
+/// {
+///     type Base = R::Type;
+///     type Element = El<R>;
+/// 
+///     fn get_delegate(&self) -> &Self::Base {
+///         self.0.get_ring()
+///     }
+/// 
+///     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+///     fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
+///     fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
+///     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
+/// }
+/// ```
+/// [`DivisibilityRing`] is automatically implemented (but can be specialized):
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::divisibility::*;
+/// # use feanor_math::delegate::*;
+/// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
+/// #
+/// # struct BoringRingWrapper<R>(R);
+/// # 
+/// # impl<R> PartialEq for BoringRingWrapper<R>
+/// #     where R: RingStore
+/// # {
+/// #     fn eq(&self, other: &Self) -> bool {
+/// #         self.0.get_ring() == other.0.get_ring()
+/// #     }
+/// # }
+/// # 
+/// # impl<R> DelegateRing for BoringRingWrapper<R>
+/// #     where R: RingStore
+/// # {
+/// #     type Base = R::Type;
+/// #     type Element = El<R>;
+/// # 
+/// #     fn get_delegate(&self) -> &Self::Base {
+/// #         self.0.get_ring()
+/// #     }
+/// # 
+/// #     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+/// #     fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
+/// #     fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
+/// #     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
+/// # }
+/// fn divide_in_wrapped_ring<R>(base_ring: R)
+///     where R: RingStore,
+///         R::Type: DivisibilityRing
+/// {
+///     let wrapped_ring = BoringRingWrapper(base_ring);
+///     assert!(wrapped_ring.checked_div(&wrapped_ring.one(), &wrapped_ring.one()).is_some());
+/// }
+/// ```
+/// [`FiniteRing`] for example is not automatically implemented:
+/// ```compile_fail
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::rings::finite::*;
+/// # use feanor_math::integer::*;
+/// # use feanor_math::delegate::*;
+/// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
+/// #
+/// # impl<R> PartialEq for BoringRingWrapper<R>
+/// #     where R: RingStore
+/// # {
+/// #     fn eq(&self, other: &Self) -> bool {
+/// #         self.0.get_ring() == other.0.get_ring()
+/// #     }
+/// # }
+/// #
+/// # struct BoringRingWrapper<R>(R);
+/// # 
+/// # impl<R> DelegateRing for BoringRingWrapper<R>
+/// #     where R: RingStore
+/// # {
+/// #     type Base = R::Type;
+/// #     type Element = El<R>;
+/// # 
+/// #     fn get_delegate(&self) -> &Self::Base {
+/// #         self.0.get_ring()
+/// #     }
+/// # 
+/// #     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+/// #     fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
+/// #     fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
+/// #     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
+/// # }
+/// fn size_of_wrapped_ring<R>(base_ring: R)
+///     where R: RingStore,
+///         R::Type: FiniteRing
+/// {
+///     let wrapped_ring = BoringRingWrapper(base_ring);
+///     assert!(wrapped_ring.size(BigIntRing::RING).is_some());
+/// }
+/// ```
+/// But we can add a delegate-implementation of [`FiniteRing`] by adding the marker trait [`DelegateRingImplFiniteRing`]:
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::rings::finite::*;
+/// # use feanor_math::integer::*;
+/// # use feanor_math::delegate::*;
+/// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
+/// #
+/// # impl<R> PartialEq for BoringRingWrapper<R>
+/// #     where R: RingStore
+/// # {
+/// #     fn eq(&self, other: &Self) -> bool {
+/// #         self.0.get_ring() == other.0.get_ring()
+/// #     }
+/// # }
+/// # 
+/// # struct BoringRingWrapper<R>(R);
+/// # 
+/// # impl<R> DelegateRing for BoringRingWrapper<R>
+/// #     where R: RingStore
+/// # {
+/// #     type Base = R::Type;
+/// #     type Element = El<R>;
+/// # 
+/// #     fn get_delegate(&self) -> &Self::Base {
+/// #         self.0.get_ring()
+/// #     }
+/// # 
+/// #     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+/// #     fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
+/// #     fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
+/// #     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
+/// # }
+/// impl<R> DelegateRingImplFiniteRing for BoringRingWrapper<R>
+///     where R: RingStore
+/// {}
+/// 
+/// fn size_of_wrapped_ring<R>(base_ring: R)
+///     where R: RingStore,
+///         R::Type: FiniteRing
+/// {
+///     let wrapped_ring = BoringRingWrapper(base_ring);
+///     assert!(wrapped_ring.size(BigIntRing::RING).is_some());
+/// }
 /// ```
 /// 
 pub trait DelegateRing: PartialEq {

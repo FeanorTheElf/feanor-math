@@ -5,26 +5,23 @@ use serde::de;
 use serde::Deserializer;
 use serde::Serializer;
 
-use crate::algorithms::convolution::ConvolutionAlgorithm;
-use crate::algorithms::convolution::KaratsubaAlgorithm;
-use crate::algorithms::convolution::STANDARD_CONVOLUTION;
+use crate::algorithms::convolution::*;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::poly_factor::FactorPolyField;
+use crate::algorithms::poly_gcd::hensel::local_zn_ring_bezout_identity;
 use crate::compute_locally::InterpolationBaseRing;
 use crate::divisibility::*;
-use crate::impl_localpir_wrap_unwrap_homs;
-use crate::impl_localpir_wrap_unwrap_isos;
-use crate::impl_field_wrap_unwrap_homs;
-use crate::impl_field_wrap_unwrap_isos;
-use crate::integer::BigIntRing;
-use crate::integer::IntegerRing;
+use crate::rings::poly::PolyRingStore;
+use crate::{impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
+use crate::integer::*;
 use crate::iters::multi_cartesian_product;
 use crate::iters::MultiProduct;
 use crate::matrix::OwnedMatrix;
 use crate::primitive_int::StaticRing;
-use crate::rings::field::AsField;
-use crate::rings::field::AsFieldBase;
+use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::finite::*;
+use crate::rings::zn::*;
+use crate::rings::local::{AsLocalPIR, AsLocalPIRBase};
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::seq::*;
 use crate::ring::*;
@@ -431,6 +428,34 @@ impl<R, V, A, C> DivisibilityRing for FreeAlgebraImplBase<R, V, A, C>
             Self: 'a
     {
         self.base_ring().get_ring().balance_factor(elements.flat_map(|x| x.values.iter())).map(|c| RingRef::new(self).inclusion().map(c))
+    }
+
+    default fn invert(&self, el: &Self::Element) -> Option<Self::Element> {
+        self.checked_left_div(&self.one(), el)
+    }
+}
+
+///
+/// I agree that this is quite half-hearted for the moment.
+/// 
+/// TODO: When I find the time, I will try to design a more generally applicable
+/// fast special case implementation.
+/// 
+impl<V, A, C> DivisibilityRing for FreeAlgebraImplBase<AsLocalPIR<zn_64::Zn>, V, A, C>
+    where V: VectorView<El<AsLocalPIR<zn_64::Zn>>>,
+        A: Allocator + Clone,
+        C: ConvolutionAlgorithm<AsLocalPIRBase<zn_64::Zn>>
+{
+    fn invert(&self, el: &Self::Element) -> Option<Self::Element> {
+        let poly_ring = DensePolyRing::new(self.base_ring(), "X");
+        let mut el_as_poly = RingRef::new(self).poly_repr(&poly_ring, el, self.base_ring().identity());
+        if let Some(lc_inv) = self.base_ring().invert(poly_ring.lc(&el_as_poly)?) {
+            poly_ring.inclusion().mul_assign_map(&mut el_as_poly, lc_inv);
+            let (s, _) = local_zn_ring_bezout_identity(&poly_ring, &el_as_poly, &RingRef::new(self).generating_poly(&poly_ring, self.base_ring().identity()))?;
+            return Some(self.from_canonical_basis((0..self.rank()).map(|i| self.base_ring().clone_el(poly_ring.coefficient_at(&s, i)))));
+        } else {
+            return self.checked_left_div(&self.one(), el);
+        }
     }
 }
 
@@ -949,4 +974,23 @@ fn test_interpolation_base_ring() {
     for _ in points {
         assert_el_eq!(&ring, ring.invert(&ring.canonical_gen()).unwrap(), ext_map.as_base_ring_el(ext_map.codomain().invert(&ext_map.map(ring.canonical_gen())).unwrap()));
     }
+}
+
+#[test]
+fn test_invert_special_case() {
+    let base_ring = AsLocalPIR::from_zn(zn_64::Zn::new(27)).unwrap();
+    let array = |data: [i32; 4]| std::array::from_fn::<_, 4, _>(|i| base_ring.int_hom().map(data[i]));
+    let ring = FreeAlgebraImpl::new(base_ring, 4, array([1, 0, 0, 1]));
+
+    let a = ring.from_canonical_basis(array([1, 0, 0, 0]));
+    assert_el_eq!(&ring, ring.one(), ring.mul(ring.invert(&a).unwrap(), a));
+
+    let a = ring.from_canonical_basis(array([1, 1, 0, 1]));
+    assert_el_eq!(&ring, ring.one(), ring.mul(ring.invert(&a).unwrap(), a));
+
+    let a = ring.from_canonical_basis(array([1, 3, 0, 0]));
+    assert_el_eq!(&ring, ring.one(), ring.mul(ring.invert(&a).unwrap(), a));
+
+    let a = ring.from_canonical_basis(array([3, 1, 0, 0]));
+    assert_el_eq!(&ring, ring.one(), ring.mul(ring.invert(&a).unwrap(), a));
 }

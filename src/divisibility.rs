@@ -216,6 +216,15 @@ pub trait DivisibilityRing: RingBase {
     fn is_unit_prepared(&self, x: &PreparedDivisor<Self>) -> bool {
         self.is_unit(&x.element)
     }
+
+    ///
+    /// If the given element is a unit, returns its inverse, otherwise `None`.
+    /// 
+    /// This is equivalent (but possibly faster) than `ring.checked_div(ring.one(), el)`.
+    /// 
+    fn invert(&self, el: &Self::Element) -> Option<Self::Element> {
+        self.checked_div(&self.one(), el)
+    }
 }
 
 ///
@@ -280,10 +289,8 @@ pub trait DivisibilityRingStore: RingStore
     delegate!{ DivisibilityRing, fn is_unit(&self, x: &El<Self>) -> bool }
     delegate!{ DivisibilityRing, fn checked_div(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> }
     delegate!{ DivisibilityRing, fn divides(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
+    delegate!{ DivisibilityRing, fn invert(&self, lhs: &El<Self>) -> Option<El<Self>> }
 
-    fn invert(&self, el: &El<Self>) -> Option<El<Self>> {
-        self.checked_div(&self.one(), el)
-    }
 }
 
 impl<R> DivisibilityRingStore for R

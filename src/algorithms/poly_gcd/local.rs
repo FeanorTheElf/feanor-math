@@ -1,8 +1,13 @@
 use std::fmt::Display;
 
 use crate::algorithms::linsolve::LinSolveRing;
+use crate::algorithms::miller_rabin::is_prime;
+use crate::computation::no_error;
+use crate::delegate::DelegateRing;
+use crate::delegate::DelegateRingImplFiniteRing;
 use crate::divisibility::*;
 use crate::homomorphism::*;
+use crate::local::PrincipalLocalRing;
 use crate::primitive_int::StaticRing;
 use crate::integer::*;
 use crate::ring::*;
@@ -10,6 +15,8 @@ use crate::rings::zn::*;
 use crate::seq::*;
 use crate::specialization::FiniteRingSpecializable;
 
+use super::AsField;
+use super::AsFieldBase;
 use super::Field;
 use super::FiniteRing;
 
@@ -448,6 +455,9 @@ impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
     }
 }
 
+#[stability::unstable(feature = "enable")]
+pub const INTRING_HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR: f64 = 0.25;
+
 #[macro_export]
 macro_rules! impl_poly_gcd_locally_for_ZZ {
     (IntegerPolyGCDRing for $int_ring_type:ty) => {
@@ -551,11 +561,9 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                     Self: 'a,
                     Self: 'ring
             {
-                const HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR: f64 = 0.25;
-
                 let log2_max_coeff = coefficients.map(|c| RingRef::new(self).abs_log2_ceil(c).unwrap_or(0)).max().unwrap_or(0);
                 // this is in no way a rigorous bound, but equals the worst-case bound at least asymptotically (up to constants)
-                return ((log2_max_coeff as f64 + poly_deg as f64) / (*p as f64).log2() * HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR).ceil() as usize + 1;
+                return ((log2_max_coeff as f64 + poly_deg as f64) / (*p as f64).log2() * $crate::algorithms::poly_gcd::local::INTRING_HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR).ceil() as usize + 1;
             }
             
             fn dbg_ideal<'ring>(&self, p: &Self::SuitableIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
@@ -672,5 +680,174 @@ impl<R> PolyGCDLocallyDomain for R
         where Self: 'ring
     {
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
+    }
+}
+
+#[stability::unstable(feature = "enable")]
+pub struct IntegersWithLocalZnQuotient<'a, R>
+    where R: Sized + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
+{
+    integers: &'a R::IntegerRing,
+    prime: El<R::IntegerRing>
+}
+
+impl<'a, R> IntegersWithLocalZnQuotient<'a, R>
+    where R: Sized + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing,
+        AsFieldBase<RingValue<R>>: CanIsoFromTo<R> + SelfIso
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(integers: &'a R::IntegerRing, prime: El<R::IntegerRing>) -> Self {
+        assert!(is_prime(integers, &prime, 10));
+        return Self { integers, prime };
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn reduction_context<'b>(&'b self, from_e: usize, to_e: usize) -> ReductionContext<'b, 'b, Self> {
+        ReductionContext {
+            ring: RingRef::new(self),
+            ideal: &self.prime,
+            from_e: from_e,
+            from: vec![self.local_ring_at(&self.prime, from_e, 0)], 
+            to: vec![self.local_ring_at(&self.prime, to_e, 0)], 
+        }
+    }
+}
+
+impl<'a, R> PartialEq for IntegersWithLocalZnQuotient<'a, R>
+    where R: ?Sized + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.integers.get_ring() == other.integers.get_ring()
+    }
+}
+
+impl<'a, R> DelegateRing for IntegersWithLocalZnQuotient<'a, R>
+    where R: Sized + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
+{
+    type Base = <R as ZnRing>::IntegerRingBase;
+    type Element = El<<R as ZnRing>::IntegerRing>;
+
+    fn get_delegate(&self) -> &Self::Base {
+        self.integers.get_ring()
+    }
+
+    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+    fn delegate_mut<'b>(&self, el: &'b mut Self::Element) -> &'b mut <Self::Base as RingBase>::Element { el }
+    fn delegate_ref<'b>(&self, el: &'b Self::Element) -> &'b <Self::Base as RingBase>::Element { el }
+    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
+}
+
+impl<'a, R> Domain for IntegersWithLocalZnQuotient<'a, R>
+    where R: Sized + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing
+{}
+
+impl<'a, R> DelegateRingImplFiniteRing for IntegersWithLocalZnQuotient<'a, R>
+    where R: Sized + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing
+{}
+
+impl<'a, R> PolyGCDLocallyDomain for IntegersWithLocalZnQuotient<'a, R>
+    where R: Sized + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing,
+        AsFieldBase<RingValue<R>>: CanIsoFromTo<R> + SelfIso
+{
+    type LocalRingBase<'ring> = R
+        where Self: 'ring;
+
+    type LocalRing<'ring> = RingValue<R>
+        where Self: 'ring;
+    
+    type LocalFieldBase<'ring> = AsFieldBase<RingValue<R>>
+        where Self: 'ring;
+
+    type LocalField<'ring> = AsField<RingValue<R>>
+        where Self: 'ring;
+
+    type SuitableIdeal<'ring> = Self::Element
+        where Self: 'ring;
+
+    fn heuristic_exponent<'ring, 'el, I>(&self, ideal: &Self::SuitableIdeal<'ring>, poly_deg: usize, coefficients: I) -> usize
+        where I: Iterator<Item = &'el Self::Element>,
+            Self: 'el + 'ring
+    {
+        let log2_max_coeff = coefficients.map(|c| self.integers.abs_log2_ceil(c).unwrap_or(0)).max().unwrap_or(0);
+        // this is in no way a rigorous bound, but equals the worst-case bound at least asymptotically (up to constants)
+        return ((log2_max_coeff as f64 + poly_deg as f64) / self.integers.abs_log2_floor(ideal).unwrap_or(1) as f64 * crate::algorithms::poly_gcd::local::INTRING_HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR).ceil() as usize + 1;
+    }
+
+    fn random_suitable_ideal<'ring, F>(&'ring self, _rng: F) -> Self::SuitableIdeal<'ring>
+        where F: FnMut() -> u64
+    {
+        self.integers.clone_el(&self.prime)
+    }
+
+    fn maximal_ideal_factor_count<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>) -> usize
+        where Self: 'ring
+    {
+        debug_assert!(self.integers.eq_el(ideal, &self.prime));
+        1
+    }
+
+    fn local_field_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
+        where Self: 'ring
+    {
+        assert_eq!(0, max_ideal_idx);
+        self.local_ring_at(ideal, 1, 0).as_field().ok().unwrap()
+    }
+    
+    fn local_ring_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>
+        where Self: 'ring
+    {
+        assert_eq!(0, max_ideal_idx);
+        assert!(self.integers.eq_el(ideal, &self.prime));
+        RingValue::from(R::create(|ZZ| Ok(RingRef::new(ZZ).pow(int_cast(self.integers.clone_el(&self.prime), RingRef::new(ZZ), &self.integers), e))).unwrap_or_else(no_error))
+    }
+
+    fn reduce_ring_el<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), max_ideal_idx: usize, x: Self::Element) -> El<Self::LocalRing<'ring>>
+        where Self: 'ring
+    {
+        debug_assert_eq!(0, max_ideal_idx);
+        debug_assert!(self.integers.eq_el(ideal, &self.prime));
+        debug_assert!(self.integers.eq_el(&self.integers.pow(self.integers.clone_el(&self.prime), to.1), to.0.modulus()));
+        to.0.coerce(&self.integers, x)
+    }
+
+    fn reduce_partial<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), max_ideal_idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+        where Self: 'ring
+    {
+        debug_assert_eq!(0, max_ideal_idx);
+        debug_assert!(self.integers.eq_el(ideal, &self.prime));
+        debug_assert!(self.integers.eq_el(&self.integers.pow(self.integers.clone_el(&self.prime), to.1), to.0.modulus()));
+        debug_assert!(self.integers.eq_el(&self.integers.pow(self.integers.clone_el(&self.prime), from.1), from.0.modulus()));
+        to.0.coerce(&self.integers, from.0.smallest_positive_lift(x))
+    }
+
+    fn lift_partial<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), max_ideal_idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+        where Self: 'ring
+    {
+        debug_assert_eq!(0, max_ideal_idx);
+        debug_assert!(self.integers.eq_el(ideal, &self.prime));
+        debug_assert!(self.integers.eq_el(&self.integers.pow(self.integers.clone_el(&self.prime), to.1), to.0.modulus()));
+        debug_assert!(self.integers.eq_el(&self.integers.pow(self.integers.clone_el(&self.prime), from.1), from.0.modulus()));
+        to.0.coerce(&self.integers, from.0.smallest_positive_lift(x))
+    }
+
+    fn reconstruct_ring_el<'local, 'element, 'ring, V1, V2>(&self, ideal: &Self::SuitableIdeal<'ring>, from: V1, e: usize, x: V2) -> Self::Element
+        where Self: 'ring, 
+            V1: VectorFn<&'local Self::LocalRing<'ring>>,
+            V2: VectorFn<&'element El<Self::LocalRing<'ring>>>,
+            Self::LocalRing<'ring>: 'local,
+            El<Self::LocalRing<'ring>>: 'element,
+            'ring: 'local + 'element
+    {
+        assert_eq!(1, x.len());
+        assert_eq!(1, from.len());
+        debug_assert!(self.integers.eq_el(ideal, &self.prime));
+        debug_assert!(self.integers.eq_el(&self.integers.pow(self.integers.clone_el(&self.prime), e), from.at(0).modulus()));
+        from.at(0).smallest_lift(from.at(0).clone_el(x.at(0)))
+    }
+
+    fn dbg_ideal<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
+        where Self: 'ring
+    {
+        self.dbg(ideal, out)
     }
 }

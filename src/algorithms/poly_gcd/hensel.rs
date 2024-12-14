@@ -1,11 +1,19 @@
+use crate::algorithms::int_factor::is_prime_power;
 use crate::computation::ComputationController;
+use crate::local::PrincipalLocalRing;
 use crate::pid::*;
 use crate::ring::*;
 use crate::divisibility::*;
 use crate::rings::poly::*;
 use crate::homomorphism::*;
+use crate::rings::zn::FromModulusCreateableZnRing;
+use crate::rings::zn::*;
 use crate::seq::*;
 use crate::algorithms::poly_gcd::local::*;
+
+use crate::computation::DontObserve;
+use super::DensePolyRing;
+use super::AsFieldBase;
 
 ///
 /// Given a monic polynomial `f` modulo `p^r` and a factorization `f = gh mod p^e`
@@ -16,6 +24,7 @@ use crate::algorithms::poly_gcd::local::*;
 /// This uses linear Hensel lifting, thus will be slower than [`hensel_lift_quadratic()`]
 /// if `r >> e`.
 /// 
+#[cfg(test)]
 fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2, Controller>(
     reduction_map: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
@@ -226,6 +235,79 @@ pub fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Co
 }
 
 ///
+/// Computes a "Bezout identity" `sf + tg = 1` in the ring `Z/p^eZ` for a
+/// prime `p` and an exponent `e`, for monic "coprime" polynomials `f, g`.
+/// If `f` and `g` are not "coprime", `None` is returned.
+/// 
+/// Note that `(Z/p^eZ)[X]` is not a gcd domain, thus the notion of "Bezout identity"
+/// and "coprime" must be taken with a grain of salt. What we mean is that the polynomials
+/// `f mod p` and `g mod p` are coprime over `Fp`, in which case this function find
+/// polynomial `s, t` over `Z/p^eZ` of degree `deg(s) < deg(g)` and `deg(t) < deg(f)`
+/// such that `sf + tg = 1`.
+/// 
+/// # Example
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::local::*;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::algorithms::poly_gcd::hensel::*;
+/// # use feanor_math::assert_el_eq;
+/// let ring = AsLocalPIR::from_zn(Zn::new(81)).unwrap();
+/// let poly_ring = DensePolyRing::new(&ring, "X");
+/// let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 1, X.pow_ref(2) + X + 2]);
+/// let (s, t) = local_zn_ring_bezout_identity(&poly_ring, &f, &g).unwrap();
+/// assert_el_eq!(&poly_ring, poly_ring.one(), poly_ring.add(poly_ring.mul_ref(&f, &s), poly_ring.mul_ref(&g, &t)));
+/// ```
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> Option<(El<P>, El<P>)>
+    where P: RingStore,
+        P::Type: PolyRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing,
+        AsFieldBase<RingValue<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>>: CanIsoFromTo<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> + SelfIso
+{
+    if poly_ring.is_zero(f) {
+        if poly_ring.is_one(g) {
+            return Some((poly_ring.zero(), poly_ring.one()));
+        } else {
+            return None;
+        }
+    } else if poly_ring.is_zero(g) {
+        if poly_ring.is_one(f) {
+            return Some((poly_ring.one(), poly_ring.zero()));
+        } else {
+            return None;
+        }
+    }
+    let Zpe = poly_ring.base_ring();
+    let ZZ = Zpe.integer_ring();
+    let (p, e) = is_prime_power(ZZ, Zpe.modulus()).unwrap();
+    let wrapped_ring: IntegersWithLocalZnQuotient<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> = IntegersWithLocalZnQuotient::new(ZZ, p);
+    let reduction_context = wrapped_ring.reduction_context(e, 1);
+
+    let Zpe_to_Zp = reduction_context.intermediate_ring_to_field_reduction(0);
+    let Fp = wrapped_ring.local_field_at(Zpe_to_Zp.ideal(), 0);
+    let Zp = Zpe_to_Zp.codomain();
+    let FpX = DensePolyRing::new(&Fp, "X");
+    let Zpe_to_Fp = Fp.can_hom(&Zp).unwrap().compose(&Zpe_to_Zp);
+    let ZpeX_to_FpX = FpX.lifted_hom(&poly_ring, &Zpe_to_Fp);
+
+    let (mut s_base, mut t_base, d_base) = FpX.extended_ideal_gen(&ZpeX_to_FpX.map_ref(f), &ZpeX_to_FpX.map_ref(g));
+    if FpX.degree(&d_base).unwrap() > 0 {
+        return None;
+    }
+    let scale = Fp.invert(FpX.coefficient_at(&d_base, 0)).unwrap();
+    FpX.inclusion().mul_assign_ref_map(&mut s_base, &scale);
+    FpX.inclusion().mul_assign_ref_map(&mut t_base, &scale);
+    let (s, t) = hensel_lift_bezout_identity_quadratic(&Zpe_to_Zp, &poly_ring, &FpX, f, g, (&s_base, &t_base), DontObserve);
+
+    return Some((s, t));
+}
+
+///
 /// Like [`hensel_lift()`] but for an arbitrary number of factors.
 /// 
 #[stability::unstable(feature = "enable")]
@@ -260,11 +342,7 @@ pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V, Controller>
 }
 
 #[cfg(test)]
-use crate::computation::DontObserve;
-#[cfg(test)]
 use super::BigIntRing;
-#[cfg(test)]
-use super::DensePolyRing;
 
 #[test]
 fn test_hensel_lift() {
