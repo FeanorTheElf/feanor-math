@@ -222,7 +222,6 @@ pub fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Co
         // lift the bezout identity
         // the formula is `s' = s(2 - (sg + th))`, `t' = t(2 - (sg + th))`
         let bezout_value = P.add(P.mul_ref(&current_s, f), P.mul_ref(&current_t, g));
-        P.println(&bezout_value);
         P.mul_assign(&mut current_s, P.sub_ref_snd(P.int_hom().map(2), &bezout_value));
         P.mul_assign(&mut current_t, P.sub_ref_snd(P.int_hom().map(2), &bezout_value));
         current_s = P.div_rem_monic(current_s, g).1;

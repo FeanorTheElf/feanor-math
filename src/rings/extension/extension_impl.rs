@@ -445,9 +445,12 @@ pub fn invert_faster_over_local_zn<R, V, A, C>(ring: RingRef<FreeAlgebraImplBase
     let poly_ring = DensePolyRing::new(ring.base_ring(), "X");
     let mut el_as_poly = ring.poly_repr(&poly_ring, el, ring.base_ring().identity());
     if let Some(lc_inv) = ring.base_ring().invert(poly_ring.lc(&el_as_poly)?) {
-        poly_ring.inclusion().mul_assign_map(&mut el_as_poly, lc_inv);
-        let (s, _) = local_zn_ring_bezout_identity(&poly_ring, &el_as_poly, &ring.generating_poly(&poly_ring, ring.base_ring().identity()))?;
-        return Some(ring.from_canonical_basis((0..ring.rank()).map(|i| ring.base_ring().clone_el(poly_ring.coefficient_at(&s, i)))));
+        poly_ring.inclusion().mul_assign_ref_map(&mut el_as_poly, &lc_inv);
+        let (s, _t) = local_zn_ring_bezout_identity(&poly_ring, &el_as_poly, &ring.generating_poly(&poly_ring, ring.base_ring().identity()))?;
+        return Some(ring.inclusion().mul_map(
+            ring.from_canonical_basis((0..ring.rank()).map(|i| ring.base_ring().clone_el(poly_ring.coefficient_at(&s, i)))),
+            lc_inv
+        ));
     } else {
         return ring.checked_left_div(&ring.one(), el);
     }
@@ -988,5 +991,12 @@ fn test_invert_special_case() {
     assert_el_eq!(&ring, ring.one(), ring.mul(invert_faster_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a));
 
     let a = ring.from_canonical_basis(array([3, 1, 0, 0]));
+    assert_el_eq!(&ring, ring.one(), ring.mul(invert_faster_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a));
+
+    let base_ring = zn_64::Zn::new(257).as_field().ok().unwrap();
+    let array = |data: [i32; 2]| std::array::from_fn::<_, 2, _>(|i| base_ring.int_hom().map(data[i]));
+    let ring = FreeAlgebraImpl::new(base_ring, 2, array([1, 0]));
+
+    let a = ring.from_canonical_basis(array([-1, 2]));
     assert_el_eq!(&ring, ring.one(), ring.mul(invert_faster_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a));
 }
