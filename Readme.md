@@ -482,6 +482,7 @@ As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` ca
  - Functions that take a ring as parameter should usually be generic and take `R` where `R: RingStore`.
    In cases where we would usually take the ring by reference, prefer instead to take `R` by value with `R: RingStore + Copy`.
    Since for `R: RingStore` also `&R: RingStore`, this just makes the interface more general.
+   The main exception for this rule is if you want to use dynamic dispatch (or for some other reason avoid generic parameters), in which case you should take `&R` where `R` is some fixed type with `R: RingBase`.
  - Rings that wrap a base ring (like `MyRing<BaseRing: RingStore>`) should not implement `Copy`, unless both `BaseRing: Copy` and `El<BaseRing>: Copy`.
    There are some cases where I had previously added `#[derive(Copy)]`, which then made adding struct members of base ring elements to the ring a breaking change.
  - Equality (via `PartialEq`) of rings implies that they are "the same" and their elements can be used interchangeably without conversion.

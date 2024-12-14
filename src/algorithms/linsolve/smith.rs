@@ -358,7 +358,7 @@ fn time_solve_right_using_pre_smith_galois_field() {
 #[test]
 #[ignore]
 fn time_solve_right_using_extension() {
-    let n = 100;
+    let n = 126;
     let base_field = Zn::new(257).as_field().ok().unwrap();
     let allocator = feanor_mempool::AllocRc(Rc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>())));
     let field = GaloisField::new_with(base_field, 21, allocator, STANDARD_CONVOLUTION);

@@ -41,7 +41,9 @@ fn invert_many<R>(ring: R, values: &[El<R>], out: &mut [El<R>]) -> Result<(), ()
 /// This algorithm recursively halfes the input, and thus it implicitly pads the input to the
 /// next power-of-two. The time complexity is then `O(n sum_(0 <= i <= log n) T(2^i))`
 /// where `T(d)` is the complexity of multiplying two products of `d` input elements. If the cost
-/// of multiplication is constant, this becomes `O(n log n T)`.
+/// of multiplication is constant, this becomes `O(n log n T)`. In the other common case, where
+/// the input elements are degree-1 polynomials, this becomes `O(n sum_(0 <= i <= log n) 2^(i c)) = O(n^(c + 1))`
+/// where `c` is the multiplication exponent, e.g. `c = 1.58...` for Karatsuba multiplication.
 /// 
 /// # Example
 /// ```
@@ -108,6 +110,8 @@ pub enum InterpolationError {
 /// 
 /// If no such polynomial exists (this is only possible if the base ring is not a field), an 
 /// error is returned.
+/// 
+/// The complexity is `O(n T(n))` where `T(n)` is the cost of multiplying two degree-`n` polynomials.
 /// 
 /// # Example
 /// ```
