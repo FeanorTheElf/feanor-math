@@ -75,7 +75,7 @@ pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::
     let ring = poly_ring.base_ring().get_ring();
     assert_eq!(1, ring.maximal_ideal_factor_count(&prime), "currently only maximal ideals are supported, got {}", IdealDisplayWrapper::new(ring, prime));
 
-    log_progress!(controller, "mod({}^{})", IdealDisplayWrapper::new(ring, &prime), e);
+    log_progress!(controller, "(mod={}^{})", IdealDisplayWrapper::new(ring, &prime), e);
 
     let reduction = ReductionContext::new(ring, prime, e);
     let red_map = reduction.intermediate_ring_to_field_reduction(0);
@@ -98,7 +98,6 @@ pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::
     let SX = DensePolyRing::new(*red_map.domain(), "X");
     let poly_mod_me = SX.lifted_hom(poly_ring, reduction.main_ring_to_intermediate_ring_reduction(0)).map_ref(poly);
     let factorization_mod_me = hensel_lift_factorization(&red_map, &SX, &FX, &poly_mod_me, &factors[..], controller.clone());
-    finish_computation!(controller);
     return Some(combine_local_factors_local(&reduction, poly_ring, poly, &SX, e, factorization_mod_me));
 }
 
@@ -120,23 +119,23 @@ fn heuristic_factor_poly_squarefree_monic_local<P, Controller>(poly_ring: P, f: 
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
     assert!(prime_exponent_factor >= 1.);
 
-    log_progress!(controller, "heuristic_factor_monic({})", poly_ring.degree(f).unwrap());
-
-    let mut rng = oorandom::Rand64::new(1);
-    let ring = poly_ring.base_ring().get_ring();
-
-    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
-        let prime = ring.random_suitable_ideal(|| rng.rand_u64());
-        assert_eq!(1, ring.maximal_ideal_factor_count(&prime));
-        let heuristic_e = ring.heuristic_exponent(&prime, poly_ring.degree(f).unwrap(), poly_ring.terms(f).map(|(c, _)| c));
-        assert!(heuristic_e >= 1);
-        let e = (heuristic_e as f64 * prime_exponent_factor).floor() as usize;
-        
-        if let Some(result) = factor_and_lift_mod_pe(poly_ring, &prime, e, f, controller.clone()) {
-            return result;
+    controller.run_computation(format_args!("heuristic_factor_monic(deg={})", poly_ring.degree(f).unwrap()), |controller| {
+        let mut rng = oorandom::Rand64::new(1);
+        let ring = poly_ring.base_ring().get_ring();
+    
+        for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+            let prime = ring.random_suitable_ideal(|| rng.rand_u64());
+            assert_eq!(1, ring.maximal_ideal_factor_count(&prime));
+            let heuristic_e = ring.heuristic_exponent(&prime, poly_ring.degree(f).unwrap(), poly_ring.terms(f).map(|(c, _)| c));
+            assert!(heuristic_e >= 1);
+            let e = (heuristic_e as f64 * prime_exponent_factor).floor() as usize;
+            
+            if let Some(result) = factor_and_lift_mod_pe(poly_ring, &prime, e, f, controller.clone()) {
+                return result;
+            }
         }
-    }
-    unreachable!()
+        unreachable!()
+    })
 }
 
 ///
@@ -234,32 +233,31 @@ pub fn poly_factor_integer<'a, P, Controller>(ZZX: P, f: El<P>, controller: Cont
     assert!(!ZZX.is_zero(&f));
     let power_decomposition = poly_power_decomposition_local(ZZX, ZZX.clone_el(&f), controller.clone());
 
-    start_computation!(controller, "factor_int_poly()");
+    controller.run_computation(format_args!("factor_int_poly()"), |controller| {
 
-    let mut result = Vec::new();
-    let mut current = ZZX.clone_el(&f);
-    for (factor, _k) in power_decomposition {
-        log_progress!(controller, "d({})", ZZX.degree(&factor).unwrap());
-        let lc_factor = ZZX.lc(&factor).unwrap();
-        let factor_monic = evaluate_aX(ZZX, &factor, lc_factor);
-        let factorization = factor_squarefree_monic_integer_poly_local(&ZZX, &factor_monic, controller.clone());
-        for irred_factor in factorization.into_iter().map(|fi| unevaluate_aX(ZZX, &fi, &lc_factor)) {
-            let irred_factor_lc = ZZX.lc(&irred_factor).unwrap();
-            let mut power = 0;
-            let irred_factor = make_primitive(ZZX, &irred_factor).0;
-            while let Some(quo) = ZZX.checked_div(&ZZX.inclusion().mul_ref_map(&current, &ZZX.base_ring().pow(ZZX.base_ring().clone_el(&irred_factor_lc), ZZX.degree(&f).unwrap())), &irred_factor) {
-                current = quo;
-                _ = ZZX.balance_poly(&mut current);
-                power += 1;
+        let mut result = Vec::new();
+        let mut current = ZZX.clone_el(&f);
+        for (factor, _k) in power_decomposition {
+            log_progress!(controller, "(deg={})", ZZX.degree(&factor).unwrap());
+            let lc_factor = ZZX.lc(&factor).unwrap();
+            let factor_monic = evaluate_aX(ZZX, &factor, lc_factor);
+            let factorization = factor_squarefree_monic_integer_poly_local(&ZZX, &factor_monic, controller.clone());
+            for irred_factor in factorization.into_iter().map(|fi| unevaluate_aX(ZZX, &fi, &lc_factor)) {
+                let irred_factor_lc = ZZX.lc(&irred_factor).unwrap();
+                let mut power = 0;
+                let irred_factor = make_primitive(ZZX, &irred_factor).0;
+                while let Some(quo) = ZZX.checked_div(&ZZX.inclusion().mul_ref_map(&current, &ZZX.base_ring().pow(ZZX.base_ring().clone_el(&irred_factor_lc), ZZX.degree(&f).unwrap())), &irred_factor) {
+                    current = quo;
+                    _ = ZZX.balance_poly(&mut current);
+                    power += 1;
+                }
+                assert!(power >= 1);
+                result.push((irred_factor, power));
             }
-            assert!(power >= 1);
-            result.push((irred_factor, power));
         }
-    }
-    debug_assert_eq!(ZZX.degree(&f).unwrap(), result.iter().map(|(fi, i)| *i * ZZX.degree(fi).unwrap()).sum::<usize>());
-
-    finish_computation!(controller);
-    return result;
+        debug_assert_eq!(ZZX.degree(&f).unwrap(), result.iter().map(|(fi, i)| *i * ZZX.degree(fi).unwrap()).sum::<usize>());
+        return result;
+    })
 }
 
 #[cfg(test)]

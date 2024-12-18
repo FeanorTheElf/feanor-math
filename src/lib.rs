@@ -48,13 +48,17 @@ macro_rules! static_assert_impls {
 }
 
 ///
-/// Marks a trait as "sealed" on stable. In other words, using this trait
-/// as supertrait for another trait within `feanor-math` means that implementing
-/// the subtrait for new types is unstable, and only available when `unstable-enable`
-/// is active.
+/// Contains [`unstable_sealed::UnstableSealed`] to mark a trait "sealed" on stable.
 /// 
 #[stability::unstable(feature = "enable")]
 pub mod unstable_sealed {
+
+    ///
+    /// Marks a trait as "sealed" on stable. In other words, using this trait
+    /// as supertrait for another trait within `feanor-math` means that implementing
+    /// the subtrait for new types is unstable, and only available when `unstable-enable`
+    /// is active.
+    /// 
     pub trait UnstableSealed {}
 }
 

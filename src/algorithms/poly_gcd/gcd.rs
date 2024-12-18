@@ -197,38 +197,37 @@ pub fn poly_gcd_monic_local<'a, P, Controller>(poly_ring: P, mut f: &'a El<P>, m
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(g).unwrap()));
 
-    start_computation!(controller, "gcd_local({}, {})", poly_ring.degree(f).unwrap(), poly_ring.degree(g).unwrap());
+    controller.run_computation(format_args!("gcd_local(deg(l)={}, deg(r)={})", poly_ring.degree(f).unwrap(), poly_ring.degree(g).unwrap()), |controller| {
 
-    let mut rng = oorandom::Rand64::new(1);
-    for attempt in 0..HOPE_FOR_SQUAREFREE_TRIES {
-        if let Some(result) = poly_gcd_monic_coprime_local(poly_ring, f, g, || rng.rand_u64(), attempt, controller.clone()) {
-            finish_computation!(controller);
-            return result;
-        }
-    }
-    if poly_ring.degree(g).unwrap_or(0) <= poly_ring.degree(f).unwrap_or(0) {
-        std::mem::swap(&mut f, &mut g);
-    }
-    let f_power_decomposition = poly_power_decomposition_monic_local(poly_ring, f, controller.clone());
-    let mut g = poly_ring.clone_el(g);
-    let mut d = poly_ring.one();
-
-    'extract_part_i: for i in 1.. {
-        let squarefree_part_i = poly_ring.prod(f_power_decomposition.iter().filter(|(_, j)| *j >= i).map(|(fj, _)| poly_ring.clone_el(fj)));
-        if poly_ring.is_one(&squarefree_part_i) {
-            finish_computation!(controller);
-            return d;
-        }
-        for attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
-            if let Some(di) = poly_gcd_coprime_local(poly_ring, poly_ring.clone_el(&squarefree_part_i), poly_ring.clone_el(&g), || rng.rand_u64(), attempt, controller.clone()) {
-                g = poly_ring.checked_div(&g, &di).unwrap();
-                poly_ring.mul_assign(&mut d, di);
-                continue 'extract_part_i;
+        let mut rng = oorandom::Rand64::new(1);
+        for attempt in 0..HOPE_FOR_SQUAREFREE_TRIES {
+            if let Some(result) = poly_gcd_monic_coprime_local(poly_ring, f, g, || rng.rand_u64(), attempt, controller.clone()) {
+                return result;
             }
         }
+        if poly_ring.degree(g).unwrap_or(0) <= poly_ring.degree(f).unwrap_or(0) {
+            std::mem::swap(&mut f, &mut g);
+        }
+        let f_power_decomposition = poly_power_decomposition_monic_local(poly_ring, f, controller.clone());
+        let mut g = poly_ring.clone_el(g);
+        let mut d = poly_ring.one();
+
+        'extract_part_i: for i in 1.. {
+            let squarefree_part_i = poly_ring.prod(f_power_decomposition.iter().filter(|(_, j)| *j >= i).map(|(fj, _)| poly_ring.clone_el(fj)));
+            if poly_ring.is_one(&squarefree_part_i) {
+                return d;
+            }
+            for attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
+                if let Some(di) = poly_gcd_coprime_local(poly_ring, poly_ring.clone_el(&squarefree_part_i), poly_ring.clone_el(&g), || rng.rand_u64(), attempt, controller.clone()) {
+                    g = poly_ring.checked_div(&g, &di).unwrap();
+                    poly_ring.mul_assign(&mut d, di);
+                    continue 'extract_part_i;
+                }
+            }
+            unreachable!()
+        }
         unreachable!()
-    }
-    unreachable!()
+    })
 }
 
 ///

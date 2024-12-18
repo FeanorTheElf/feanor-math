@@ -34,6 +34,10 @@ pub fn no_error<T>(error: !) -> T {
 /// As a user, this trait should currently be used by passing either [`LogProgress`]
 /// or [`DontObserve`] to algorithms.
 /// 
+/// Also, note that all `description` parameters passed to computation controller
+/// functions are only for logging/debugging purposes only. There is no specified format,
+/// nor any stability guarantees on those messages.
+/// 
 /// # Example
 /// 
 /// Which features of a [`ComputationController`] an algorithm supports is completely up
@@ -63,7 +67,7 @@ pub fn no_error<T>(error: !) -> T {
 /// let factor = lenstra_ec_factor(ring, RunMultithreadedLogProgress).unwrap_or_else(no_error);
 /// assert!(8591966237 % factor == 0);
 /// ```
-///  
+///
 pub trait ComputationController: Clone + UnstableSealed {
 
     type Abort: Send;
@@ -78,16 +82,20 @@ pub trait ComputationController: Clone + UnstableSealed {
     }
     
     ///
+    /// Runs the given closure with a clone of this iterator, possibly adding a log
+    /// message before and/or after the computation starts/finishes.
     /// 
+    /// I am currently not completely sure what the right behavior is when this
+    /// function is called multiple times (possibly nested) for clones of the current
+    /// controller. We should certainly support nesting of computations, but what should
+    /// happen in multithreaded scenarios, if we have clones of controllers, or multiple
+    /// different controllers?
     /// 
     #[stability::unstable(feature = "enable")]
-    fn finish(&self, description: Arguments) {
-        self.log(description)
-    }
-
-    #[stability::unstable(feature = "enable")]
-    fn start(&self, description: Arguments) {
-        self.log(description)
+    fn run_computation<F, T>(self, _description: Arguments, computation: F) -> T
+        where F: FnOnce(Self) -> T
+    {
+        computation(self)
     }
 
     #[stability::unstable(feature = "enable")]
@@ -320,23 +328,6 @@ macro_rules! log_progress {
     };
 }
 
-#[macro_export]
-macro_rules! finish_computation {
-    ($controller:expr, $($args:tt)*) => {
-        ($controller).finish(std::format_args!($($args)*))
-    };
-    ($controller:expr) => {
-        ($controller).finish(std::format_args!(""))
-    };
-}
-
-#[macro_export]
-macro_rules! start_computation {
-    ($controller:expr, $($args:tt)*) => {
-        ($controller).start(std::format_args!($($args)*))
-    };
-}
-
 #[derive(Clone, Copy)]
 pub struct LogProgress;
 
@@ -346,15 +337,23 @@ impl ComputationController for LogProgress {
 
     type Abort = !;
 
+    #[stability::unstable(feature = "enable")]
     fn log(&self, description: Arguments) {
         print!("{}", description);
         std::io::stdout().flush().unwrap();
     }
 
-    fn finish(&self, description: Arguments) {
-        println!("{}", description);
+    #[stability::unstable(feature = "enable")]
+    fn run_computation<F, T>(self, description: Arguments, computation: F) -> T
+        where F: FnOnce(Self) -> T
+    {
+        self.log(description);
+        let result = computation(self);
+        self.log(format_args!("\n"));
+        return result;
     }
 
+    #[stability::unstable(feature = "enable")]
     fn checkpoint(&self, description: Arguments) -> Result<(), Self::Abort> {
         self.log(description);
         Ok(())
@@ -400,10 +399,12 @@ mod parallel_controller {
         }
     
         #[stability::unstable(feature = "enable")]
-        fn log(&self, description: Arguments) {
-            self.rest.log(description)
+        fn run_computation<F, T>(self, description: Arguments, computation: F) -> T
+            where F: FnOnce(Self) -> T
+        {
+            self.rest.run_computation(description, |rest| computation(ExecuteMultithreaded { rest }))
         }
-    
+
         #[stability::unstable(feature = "enable")]
         fn join<A, B, RA, RB>(self, oper_a: A, oper_b: B) -> (RA, RB)
             where

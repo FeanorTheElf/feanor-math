@@ -262,102 +262,102 @@ pub fn buchberger<P, O, Controller, SortFn, AbortFn>(ring: P, input_basis: Vec<E
         SortFn: FnMut(&mut [SPoly], &[El<P>]),
         AbortFn: FnMut(&[(El<P>, ExpandedMonomial)]) -> bool
 {
-    start_computation!(controller, "buchberger({})", input_basis.len());
+    controller.run_computation(format_args!("buchberger(len={}, vars={})", input_basis.len(), ring.indeterminate_count()), |controller| {
 
-    // this are the basis polynomials we generated; we only append to this, such that the S-polys remain valid
-    let input_basis = inter_reduce(&ring, input_basis.into_iter().map(|f| augment_lm(ring, f, order)).collect(), order).into_iter().map(|(f, _)| f).collect::<Vec<_>>();
-    debug_assert!(input_basis.iter().all(|f| !ring.is_zero(f)));
+        // this are the basis polynomials we generated; we only append to this, such that the S-polys remain valid
+        let input_basis = inter_reduce(&ring, input_basis.into_iter().map(|f| augment_lm(ring, f, order)).collect(), order).into_iter().map(|(f, _)| f).collect::<Vec<_>>();
+        debug_assert!(input_basis.iter().all(|f| !ring.is_zero(f)));
 
-    let nilpotent_power = ring.base_ring().nilpotent_power().and_then(|e| if e != 0 { Some(e) } else { None });
-    assert!(nilpotent_power.is_none() || ring.base_ring().is_zero(&ring.base_ring().pow(ring.base_ring().clone_el(ring.base_ring().max_ideal_gen()), nilpotent_power.unwrap())));
+        let nilpotent_power = ring.base_ring().nilpotent_power().and_then(|e| if e != 0 { Some(e) } else { None });
+        assert!(nilpotent_power.is_none() || ring.base_ring().is_zero(&ring.base_ring().pow(ring.base_ring().clone_el(ring.base_ring().max_ideal_gen()), nilpotent_power.unwrap())));
 
-    let sort_reducers = |reducers: &mut [(El<P>, ExpandedMonomial)]| {
-        // I have no idea why, but this order seems to give the best results
-        reducers.sort_by(|(lf, _), (rf, _)| order.compare(ring, &ring.LT(lf, order).unwrap().1, &ring.LT(rf, order).unwrap().1).then_with(|| ring.terms(lf).count().cmp(&ring.terms(rf).count())))
-    };
+        let sort_reducers = |reducers: &mut [(El<P>, ExpandedMonomial)]| {
+            // I have no idea why, but this order seems to give the best results
+            reducers.sort_by(|(lf, _), (rf, _)| order.compare(ring, &ring.LT(lf, order).unwrap().1, &ring.LT(rf, order).unwrap().1).then_with(|| ring.terms(lf).count().cmp(&ring.terms(rf).count())))
+        };
 
-    // invariant: `(reducers) = (basis)` and there exists a reduction to zero for every `f` in `basis` modulo `reducers`;
-    // reducers are always stored with an expanded version of their leading monomial, in order to simplify divisibility checks
-    let mut reducers: Vec<(El<P>, ExpandedMonomial)> = input_basis.iter().map(|f| augment_lm(ring, ring.clone_el(f), order)).collect::<Vec<_>>();
-    sort_reducers(&mut reducers);
+        // invariant: `(reducers) = (basis)` and there exists a reduction to zero for every `f` in `basis` modulo `reducers`;
+        // reducers are always stored with an expanded version of their leading monomial, in order to simplify divisibility checks
+        let mut reducers: Vec<(El<P>, ExpandedMonomial)> = input_basis.iter().map(|f| augment_lm(ring, ring.clone_el(f), order)).collect::<Vec<_>>();
+        sort_reducers(&mut reducers);
 
-    let mut open = Vec::new();
-    let mut basis = Vec::new();
-    update_basis(ring, input_basis.into_iter(), &mut basis, &mut open, order, nilpotent_power, &mut 0, &mut sort_spolys);
+        let mut open = Vec::new();
+        let mut basis = Vec::new();
+        update_basis(ring, input_basis.into_iter(), &mut basis, &mut open, order, nilpotent_power, &mut 0, &mut sort_spolys);
 
-    let mut current_deg = 0;
-    let mut filtered_spolys = 0;
-    let mut changed = false;
-    loop {
+        let mut current_deg = 0;
+        let mut filtered_spolys = 0;
+        let mut changed = false;
+        loop {
 
-        // reduce all known S-polys of minimal lcm degree; in effect, this is the same as 
-        // the matrix reduction step during F4
-        let spolys_to_reduce_index = open.iter().enumerate().rev().filter(|(_, spoly)| ring.monomial_deg(&spoly.lcm_term(ring, &basis, order).1) > current_deg).next().map(|(i, _)| i + 1).unwrap_or(0);
-        let spolys_to_reduce = &open[spolys_to_reduce_index..];
+            // reduce all known S-polys of minimal lcm degree; in effect, this is the same as 
+            // the matrix reduction step during F4
+            let spolys_to_reduce_index = open.iter().enumerate().rev().filter(|(_, spoly)| ring.monomial_deg(&spoly.lcm_term(ring, &basis, order).1) > current_deg).next().map(|(i, _)| i + 1).unwrap_or(0);
+            let spolys_to_reduce = &open[spolys_to_reduce_index..];
 
-        let computation = ShortCircuitingComputation::new();
-        let new_polys = AppendOnlyVec::new();
-        let new_polys_ref = &new_polys;
-        let basis_ref = &basis;
-        let reducers_ref = &reducers;
+            let computation = ShortCircuitingComputation::new();
+            let new_polys = AppendOnlyVec::new();
+            let new_polys_ref = &new_polys;
+            let basis_ref = &basis;
+            let reducers_ref = &reducers;
 
-        computation.handle(controller.clone()).join_many(spolys_to_reduce.as_fn().map_fn(move |spoly| move |handle: ShortCircuitingComputationHandle<(), _>| {
-            let mut f = spoly.poly(ring, basis_ref, order);
-            
-            reduce_poly(ring, &mut f, || reducers_ref.iter().chain(new_polys_ref.iter()).map(|(f, lmf)| (f, lmf)), order);
+            computation.handle(controller.clone()).join_many(spolys_to_reduce.as_fn().map_fn(move |spoly| move |handle: ShortCircuitingComputationHandle<(), _>| {
+                let mut f = spoly.poly(ring, basis_ref, order);
+                
+                reduce_poly(ring, &mut f, || reducers_ref.iter().chain(new_polys_ref.iter()).map(|(f, lmf)| (f, lmf)), order);
 
-            if !ring.is_zero(&f) {
-                log_progress!(handle, "s");
-                _ = new_polys_ref.push(augment_lm(ring, f, order));
+                if !ring.is_zero(&f) {
+                    log_progress!(handle, "s");
+                    _ = new_polys_ref.push(augment_lm(ring, f, order));
+                } else {
+                    log_progress!(handle, "-");
+                }
+
+                checkpoint!(handle);
+                return Ok(None);
+            }));
+
+            drop(open.drain(spolys_to_reduce_index..));
+            let new_polys = new_polys.into_vec();
+            _ = computation.finish()?;
+
+            // process the generated new polynomials
+            if new_polys.len() == 0 && open.len() == 0 {
+                if changed {
+                    log_progress!(controller, "!");
+                    // this seems necessary, as the invariants for `reducers` don't imply that it already is a GB;
+                    // more concretely, reducers contains polys of basis that are reduced with eath other, but the
+                    // S-polys between two of them might not have been considered
+                    return buchberger::<P, O, _, _, _>(ring, reducers.into_iter().map(|(f, _)| f).collect(), order, sort_spolys, abort_early_if, controller);
+                } else {
+                    return Ok(reducers.into_iter().map(|(f, _)| f).collect());
+                }
+            } else if new_polys.len() == 0 {
+                current_deg = ring.monomial_deg(&open.last().unwrap().lcm_term(ring, &basis, order).1);
+                log_progress!(controller, "{{{}}}", current_deg);
             } else {
-                log_progress!(handle, "-");
+                changed = true;
+                current_deg = 0;
+                update_basis(ring, new_polys.iter().map(|(f, _)| ring.clone_el(f)), &mut basis, &mut open, order, nilpotent_power, &mut filtered_spolys, &mut sort_spolys);
+                log_progress!(controller, "b({})S({})f({})", basis.len(), open.len(), filtered_spolys);
+
+                reducers.extend(new_polys.into_iter());
+                reducers = inter_reduce(ring, reducers, order);
+                sort_reducers(&mut reducers);
+                log_progress!(controller, "r({})", reducers.len());
+                if abort_early_if(&reducers) {
+                    log_progress!(controller, "(early_abort)");
+                    return Ok(reducers.into_iter().map(|(f, _)| f).collect());
+                }
             }
 
-            checkpoint!(handle);
-            return Ok(None);
-        }));
-
-        drop(open.drain(spolys_to_reduce_index..));
-        let new_polys = new_polys.into_vec();
-        _ = computation.finish()?;
-
-        // process the generated new polynomials
-        if new_polys.len() == 0 && open.len() == 0 {
-            if changed {
+            // less S-polys if we restart from scratch with reducers
+            if open.len() + filtered_spolys > reducers.len() * reducers.len() / 2 + reducers.len() * nilpotent_power.unwrap_or(0) + 1 {
                 log_progress!(controller, "!");
-                // this seems necessary, as the invariants for `reducers` don't imply that it already is a GB;
-                // more concretely, reducers contains polys of basis that are reduced with eath other, but the
-                // S-polys between two of them might not have been considered
                 return buchberger::<P, O, _, _, _>(ring, reducers.into_iter().map(|(f, _)| f).collect(), order, sort_spolys, abort_early_if, controller);
-            } else {
-                finish_computation!(controller);
-                return Ok(reducers.into_iter().map(|(f, _)| f).collect());
-            }
-        } else if new_polys.len() == 0 {
-            current_deg = ring.monomial_deg(&open.last().unwrap().lcm_term(ring, &basis, order).1);
-            log_progress!(controller, "{{{}}}", current_deg);
-        } else {
-            changed = true;
-            current_deg = 0;
-            update_basis(ring, new_polys.iter().map(|(f, _)| ring.clone_el(f)), &mut basis, &mut open, order, nilpotent_power, &mut filtered_spolys, &mut sort_spolys);
-            log_progress!(controller, "b({})S({})f({})", basis.len(), open.len(), filtered_spolys);
-
-            reducers.extend(new_polys.into_iter());
-            reducers = inter_reduce(ring, reducers, order);
-            sort_reducers(&mut reducers);
-            log_progress!(controller, "r({})", reducers.len());
-            if abort_early_if(&reducers) {
-                finish_computation!(controller, "(early_abort)");
-                return Ok(reducers.into_iter().map(|(f, _)| f).collect());
             }
         }
-
-        // less S-polys if we restart from scratch with reducers
-        if open.len() + filtered_spolys > reducers.len() * reducers.len() / 2 + reducers.len() * nilpotent_power.unwrap_or(0) + 1 {
-            log_progress!(controller, "!");
-            return buchberger::<P, O, _, _, _>(ring, reducers.into_iter().map(|(f, _)| f).collect(), order, sort_spolys, abort_early_if, controller);
-        }
-    }
+    })
 }
 
 fn update_basis<I, P, O, SortFn>(ring: P, new_polys: I, basis: &mut Vec<El<P>>, open: &mut Vec<SPoly>, order: O, nilpotent_power: Option<usize>, filtered_spolys: &mut usize, sort_spolys: &mut SortFn)

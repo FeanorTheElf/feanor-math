@@ -146,50 +146,50 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &
 {
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(poly).unwrap()));
 
-    start_computation!(controller, "power_decomp_local({})", poly_ring.degree(poly).unwrap());
+    controller.run_computation(format_args!("power_decomp_local(deg={})", poly_ring.degree(poly).unwrap()), |controller| {
 
-    let ring = poly_ring.base_ring().get_ring();
-    let mut rng = oorandom::Rand64::new(1);
+        let ring = poly_ring.base_ring().get_ring();
+        let mut rng = oorandom::Rand64::new(1);
 
-    'try_random_ideal: for current_attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
+        'try_random_ideal: for current_attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
 
-        let ideal = ring.random_suitable_ideal(|| rng.rand_u64());
-        let heuristic_e = ring.heuristic_exponent(&ideal, poly_ring.degree(poly).unwrap(), poly_ring.terms(poly).map(|(c, _)| c));
-        assert!(heuristic_e >= 1);
-        let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt as i32)).floor() as usize;
-        let reduction = ReductionContext::new(ring, &ideal, e);
+            let ideal = ring.random_suitable_ideal(|| rng.rand_u64());
+            let heuristic_e = ring.heuristic_exponent(&ideal, poly_ring.degree(poly).unwrap(), poly_ring.terms(poly).map(|(c, _)| c));
+            assert!(heuristic_e >= 1);
+            let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt as i32)).floor() as usize;
+            let reduction = ReductionContext::new(ring, &ideal, e);
 
-        log_progress!(controller, "mod({}^{})c({})", IdealDisplayWrapper::new(ring, &ideal), e, reduction.len());
+            log_progress!(controller, "mod({}^{})c({})", IdealDisplayWrapper::new(ring, &ideal), e, reduction.len());
 
-        let mut signature: Option<Vec<_>> = None;
-        let mut poly_rings_mod_me = Vec::new();
-        let mut power_decompositions_mod_me = Vec::new();
+            let mut signature: Option<Vec<_>> = None;
+            let mut poly_rings_mod_me = Vec::new();
+            let mut power_decompositions_mod_me = Vec::new();
 
-        for idx in 0..reduction.len() {
-            let SX = DensePolyRing::new(*reduction.intermediate_ring_to_field_reduction(idx).domain(), "X");
-            match compute_local_power_decomposition(poly_ring, poly, &reduction.intermediate_ring_to_field_reduction(idx), &SX) {
-                None => {
-                    unreachable!("`compute_local_power_decomposition()` currently cannot fail");
-                },
-                Some((new_signature, local_power_decomposition)) => if signature.is_some() && &signature.as_ref().unwrap()[..] != &new_signature[..] {
-                    log_progress!(controller, "(signature_mismatch)");
-                    continue 'try_random_ideal;
-                } else {
-                    signature = Some(new_signature);
-                    power_decompositions_mod_me.push(local_power_decomposition);
-                    poly_rings_mod_me.push(SX);
+            for idx in 0..reduction.len() {
+                let SX = DensePolyRing::new(*reduction.intermediate_ring_to_field_reduction(idx).domain(), "X");
+                match compute_local_power_decomposition(poly_ring, poly, &reduction.intermediate_ring_to_field_reduction(idx), &SX) {
+                    None => {
+                        unreachable!("`compute_local_power_decomposition()` currently cannot fail");
+                    },
+                    Some((new_signature, local_power_decomposition)) => if signature.is_some() && &signature.as_ref().unwrap()[..] != &new_signature[..] {
+                        log_progress!(controller, "(signature_mismatch)");
+                        continue 'try_random_ideal;
+                    } else {
+                        signature = Some(new_signature);
+                        power_decompositions_mod_me.push(local_power_decomposition);
+                        poly_rings_mod_me.push(SX);
+                    }
                 }
             }
-        }
 
-        if let Some(result) = power_decomposition_from_local_power_decomposition(&reduction, poly_ring, poly, &signature.as_ref().unwrap()[..], &poly_rings_mod_me[..], &power_decompositions_mod_me[..]) {
-            finish_computation!(controller);
-            return result;
-        } else {
-            log_progress!(controller, "(invalid_lift)");
+            if let Some(result) = power_decomposition_from_local_power_decomposition(&reduction, poly_ring, poly, &signature.as_ref().unwrap()[..], &poly_rings_mod_me[..], &power_decompositions_mod_me[..]) {
+                return result;
+            } else {
+                log_progress!(controller, "(invalid_lift)");
+            }
         }
-    }
-    unreachable!()
+        unreachable!()
+    })
 }
 
 ///

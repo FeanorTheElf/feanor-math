@@ -32,6 +32,23 @@ fn slice_add_assign<R, V1, V2>(mut dst: V1, src: V2, ring: R)
     }
 }
 
+fn slice_assign<R, V1, V2>(mut dst: V1, src: V2, ring: R) 
+    where R: RingStore, V1: VectorViewMut<El<R>>, V2: VectorView<El<R>> 
+{
+    assert_eq!(dst.len(), src.len());
+    for i in 0..dst.len() {
+        *dst.at_mut(i) = ring.clone_el(src.at(i));
+    }
+}
+
+fn slice_zero<R, V1>(mut dst: V1, ring: R) 
+    where R: RingStore, V1: VectorViewMut<El<R>>
+{
+    for i in 0..dst.len() {
+        *dst.at_mut(i) = ring.zero();
+    }
+}
+
 fn slice_sub_assign<R, V1, V2>(mut dst: V1, src: V2, ring: R) 
     where R: RingStore, V1: VectorViewMut<El<R>>, V2: VectorView<El<R>>
 {
@@ -69,12 +86,8 @@ macro_rules! karatsuba_impl {
                         if ADD_ASSIGN {
                             slice_add_assign(dst.restrict(..(2 * n)), &lower, ring);
                         } else {
-                            for i in 0..(2 * n) {
-                                *dst.at_mut(i) = ring.clone_el(lower.at(i));
-                            }
-                            for i in (2 * n)..(4 * n) {
-                                *dst.at_mut(i) = ring.zero();
-                            }
+                            slice_assign(dst.restrict(..(2 * n)), &lower, ring);
+                            slice_zero(dst.restrict((2 * n)..), ring);
                         }
                         slice_sub_assign(dst.restrict(n..(3 * n)), &lower, ring);
                 
