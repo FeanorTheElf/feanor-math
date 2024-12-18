@@ -1,8 +1,10 @@
 use std::alloc::Global;
+use std::cmp::min;
 
 use crate::algorithms::linsolve::smith::determinant_using_pre_smith;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::linsolve::LinSolveRingStore;
+use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::divisibility::DivisibilityRing;
 use crate::matrix::OwnedMatrix;
@@ -135,33 +137,24 @@ pub trait FreeAlgebra: RingExtension {
         return result;
     }
 
+    ///
+    /// Like [`FreeAlgebra::from_canonical_basis()`], this computes the sum `sum_i vec[i] * x^i` where `x` is the
+    /// canonical generator given by [`FreeAlgebra::canonical_gen()`]. Unlike [`FreeAlgebra::from_canonical_basis()`],
+    /// `vec` can return any number elements.
+    /// 
+    fn from_canonical_basis_extended<V>(&self, vec: V) -> Self::Element
+        where V: IntoIterator<Item = El<Self::BaseRing>>
+    {
+        default_implementations::from_canonical_basis_extended(self, vec)
+    }
+
     fn charpoly<P, H>(&self, el: &Self::Element, poly_ring: P, hom: H) -> El<P>
         where P: RingStore,
             P::Type: PolyRing,
             <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
             H: Homomorphism<<Self::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
     {
-        assert!(!self.is_zero(el));
-        let base_ring = hom.codomain();
-        let mut lhs = OwnedMatrix::zero(self.rank(), self.rank(), &base_ring);
-        let mut current = self.one();
-        for j in 0..self.rank() {
-            let wrt_basis = self.wrt_canonical_basis(&current);
-            for i in 0..self.rank() {
-                *lhs.at_mut(i, j) = hom.map(wrt_basis.at(i));
-            }
-            drop(wrt_basis);
-            self.mul_assign_ref(&mut current, el);
-        }
-        let mut rhs = OwnedMatrix::zero(self.rank(), 1, &base_ring);
-        let wrt_basis = self.wrt_canonical_basis(&current);
-        for i in 0..self.rank() {
-            *rhs.at_mut(i, 0) = base_ring.negate(hom.map(wrt_basis.at(i)));
-        }
-        let mut sol = OwnedMatrix::zero(self.rank(), 1, &base_ring);
-        <_ as LinSolveRingStore>::solve_right(base_ring, lhs.data_mut(), rhs.data_mut(), sol.data_mut()).assert_solved();
-
-        return poly_ring.from_terms((0..self.rank()).map(|i| (base_ring.clone_el(sol.at(i, 0)), i)).chain([(base_ring.one(), self.rank())].into_iter()));
+        default_implementations::charpoly(self, el, poly_ring, hom)
     }
 
     ///
@@ -197,16 +190,7 @@ pub trait FreeAlgebra: RingExtension {
     fn discriminant(&self) -> El<Self::BaseRing>
         where <Self::BaseRing as RingStore>::Type: PrincipalIdealRing
     {
-        let mut current = self.one();
-        let generator = self.canonical_gen();
-        let traces = (0..(2 * self.rank())).map(|_| {
-            let result = self.trace(self.clone_el(&current));
-            self.mul_assign_ref(&mut current, &generator);
-            return result;
-        }).collect::<Vec<_>>();
-        let mut matrix = OwnedMatrix::from_fn(self.rank(), self.rank(), |i, j| self.base_ring().clone_el(&traces[i + j]));
-        let result = determinant_using_pre_smith(self.base_ring(), matrix.data_mut(), Global);
-        return result;
+        default_implementations::discriminant(self)
     }
 }
 
@@ -235,6 +219,15 @@ pub trait FreeAlgebraStore: RingStore
             V::IntoIter: DoubleEndedIterator
     {
         self.get_ring().from_canonical_basis(vec)
+    }
+
+    ///
+    /// See [`FreeAlgebra::from_canonical_basis_extended()`].
+    ///
+    fn from_canonical_basis_extended<V>(&self, vec: V) -> El<Self>
+        where V: IntoIterator<Item = El<<Self::Type as RingExtension>::BaseRing>>
+    {
+        self.get_ring().from_canonical_basis_extended(vec)
     }
 
     ///
@@ -320,6 +313,93 @@ pub trait FreeAlgebraStore: RingStore
         let wrapped_indet = RingElementWrapper::new(self, self.canonical_gen());
         let mut result_it = f(&wrapped_indet).into_iter();
         return std::array::from_fn(|_| result_it.next().unwrap().unwrap());
+    }
+}
+
+///
+/// We define the default implementations here and not directly in the trait
+/// to facilitate testing of default implementations, even if the used ring
+/// implementation overrides the default implementation.
+/// 
+mod default_implementations {
+    use super::*;
+
+    ///
+    /// Default impl for [`FreeAlgebra::from_canonical_basis_extended()`]
+    /// 
+    pub(super) fn from_canonical_basis_extended<R, V>(ring: &R, vec: V) -> R::Element
+        where R: ?Sized + FreeAlgebra,
+            V: IntoIterator<Item = El<<R as RingExtension>::BaseRing>>
+    {
+        let mut data = vec.into_iter().collect::<Vec<_>>();
+        let power_of_canonical_gen = ring.mul(
+            ring.from_canonical_basis((1..ring.rank()).map(|_| ring.base_ring().zero()).chain([ring.base_ring().one()].into_iter())),
+            ring.canonical_gen()
+        );
+        let mut current_power = ring.one();
+        return <_ as ComputeInnerProduct>::inner_product(ring, (0..).map_while(|_| {
+            if data.len() == 0 {
+                return None;
+            }
+            let taken_elements = min(data.len(), ring.rank());
+            let chunk = data.drain(..taken_elements).chain((taken_elements..ring.rank()).map(|_| ring.base_ring().zero()));
+            let current = ring.from_canonical_basis(chunk);
+            let result = (current, ring.clone_el(&current_power));
+            ring.mul_assign_ref(&mut current_power, &power_of_canonical_gen);
+            return Some(result);
+        }));
+    }
+
+    ///
+    /// Default impl for [`FreeAlgebra::charpoly()`]
+    /// 
+    pub(super) fn charpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<P>
+        where R: ?Sized + FreeAlgebra,
+            P: RingStore,
+            P::Type: PolyRing,
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
+            H: Homomorphism<<R::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+    {
+        assert!(!ring.is_zero(el));
+        let base_ring = hom.codomain();
+        let mut lhs = OwnedMatrix::zero(ring.rank(), ring.rank(), &base_ring);
+        let mut current = ring.one();
+        for j in 0..ring.rank() {
+            let wrt_basis = ring.wrt_canonical_basis(&current);
+            for i in 0..ring.rank() {
+                *lhs.at_mut(i, j) = hom.map(wrt_basis.at(i));
+            }
+            drop(wrt_basis);
+            ring.mul_assign_ref(&mut current, el);
+        }
+        let mut rhs = OwnedMatrix::zero(ring.rank(), 1, &base_ring);
+        let wrt_basis = ring.wrt_canonical_basis(&current);
+        for i in 0..ring.rank() {
+            *rhs.at_mut(i, 0) = base_ring.negate(hom.map(wrt_basis.at(i)));
+        }
+        let mut sol = OwnedMatrix::zero(ring.rank(), 1, &base_ring);
+        <_ as LinSolveRingStore>::solve_right(base_ring, lhs.data_mut(), rhs.data_mut(), sol.data_mut()).assert_solved();
+
+        return poly_ring.from_terms((0..ring.rank()).map(|i| (base_ring.clone_el(sol.at(i, 0)), i)).chain([(base_ring.one(), ring.rank())].into_iter()));
+    }
+    
+    ///
+    /// Default impl for [`FreeAlgebra::discriminant()`]
+    /// 
+    pub(super) fn discriminant<R>(ring: &R) -> El<R::BaseRing>
+        where R: ?Sized + FreeAlgebra,
+            <R::BaseRing as RingStore>::Type: PrincipalIdealRing
+    {
+        let mut current = ring.one();
+        let generator = ring.canonical_gen();
+        let traces = (0..(2 * ring.rank())).map(|_| {
+            let result = ring.trace(ring.clone_el(&current));
+            ring.mul_assign_ref(&mut current, &generator);
+            return result;
+        }).collect::<Vec<_>>();
+        let mut matrix = OwnedMatrix::from_fn(ring.rank(), ring.rank(), |i, j| ring.base_ring().clone_el(&traces[i + j]));
+        let result = determinant_using_pre_smith(ring.base_ring(), matrix.data_mut(), Global);
+        return result;
     }
 }
 
@@ -409,13 +489,13 @@ fn test_charpoly() {
     let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
 
     let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 2]);
-    assert_el_eq!(&poly_ring, &expected, &ring.charpoly(&ring.canonical_gen(), &poly_ring, &ring.base_ring().identity()));
+    assert_el_eq!(&poly_ring, &expected, default_implementations::charpoly(ring.get_ring(), &ring.canonical_gen(), &poly_ring, &ring.base_ring().identity()));
 
     let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 4]);
-    assert_el_eq!(&poly_ring, &expected, &ring.charpoly(&ring.pow(ring.canonical_gen(), 2), &poly_ring, &ring.base_ring().identity()));
+    assert_el_eq!(&poly_ring, &expected, default_implementations::charpoly(ring.get_ring(), &ring.pow(ring.canonical_gen(), 2), &poly_ring, &ring.base_ring().identity()));
 
     let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 6 * X - 6]);
-    assert_el_eq!(&poly_ring, &expected, &ring.charpoly(&ring.add(ring.canonical_gen(), ring.pow(ring.canonical_gen(), 2)), &poly_ring, &ring.base_ring().identity()));
+    assert_el_eq!(&poly_ring, &expected, default_implementations::charpoly(ring.get_ring(), &ring.add(ring.canonical_gen(), ring.pow(ring.canonical_gen(), 2)), &poly_ring, &ring.base_ring().identity()));
 }
 
 #[test]
@@ -433,17 +513,25 @@ fn test_trace() {
 #[test]
 fn test_discriminant() {
     let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2, 0, 0]);
-    assert_eq!(-108, ring.discriminant());
+    assert_eq!(-108, default_implementations::discriminant(ring.get_ring()));
 
     let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2, 1, 0]);
-    assert_eq!(-104, ring.discriminant());
+    assert_eq!(-104, default_implementations::discriminant(ring.get_ring()));
     
     let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [3, 0, 0]);
-    assert_eq!(-243, ring.discriminant());
+    assert_eq!(-243, default_implementations::discriminant(ring.get_ring()));
 
     let base_ring = DensePolyRing::new(RationalField::new(StaticRing::<i64>::RING), "X");
     let [f] = base_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) + 1]);
     let ring = FreeAlgebraImpl::new(&base_ring, 2, [f, base_ring.zero()]);
     let [expected] = base_ring.with_wrapped_indeterminate(|X| [4 * X.pow_ref(3) + 4]);
-    assert_el_eq!(&base_ring, expected, ring.discriminant());
+    assert_el_eq!(&base_ring, expected, default_implementations::discriminant(ring.get_ring()));
+}
+
+#[test]
+fn test_from_canonical_basis_extended() {
+    let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2]);
+    let actual = default_implementations::from_canonical_basis_extended(ring.get_ring(), [1, 2, 3, 4, 5, 6, 7]);
+    let expected = ring.from_canonical_basis([37, 12, 15]);
+    assert_el_eq!(&ring, expected, actual);
 }
