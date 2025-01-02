@@ -774,7 +774,17 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
     {
         assert!(hom.domain().get_ring() == self.base_ring().get_ring());
         assert_eq!(values.len(), self.indeterminate_count());
-        let new_ring = MultivariatePolyRingImpl::new(hom.codomain(), self.indeterminate_count());
+        let new_ring = RingValue::from(MultivariatePolyRingImplBase {
+            zero: hom.codomain().zero(),
+            base_ring: hom.codomain(),
+            variable_count: self.variable_count,
+            max_supported_deg: self.max_supported_deg,
+            monomial_multiplication_table: self.monomial_multiplication_table.clone(),
+            tmp_monomials: ThreadLocal::new(),
+            cum_binomial_lookup_table: self.cum_binomial_lookup_table.clone(),
+            tmp_poly: AtomicOptionBox::new(None),
+            allocator: self.allocator.clone()
+        });
         let mut result = new_ring.from_terms(self.terms(f).map(|(c, m)| (hom.map_ref(c), new_ring.create_monomial((0..self.indeterminate_count()).map(|i| self.exponent_at(m, i))))));
         for i in 0..self.indeterminate_count() {
             result = new_ring.specialize(&result, i, &new_ring.inclusion().map(values.at(i)));
@@ -970,6 +980,13 @@ fn test_evaluate_approximate_ring() {
     let x = 0.47312;
     let y = -1.43877;
     assert!(Real64::RING.abs((x * x * y - y * y) - ring.evaluate(&f, [x, y].clone_els_by(|x| *x), &Real64::RING.identity())) <= 0.000000001);
+}
+
+#[test]
+fn test_evaluate_many_variables() {
+    let ring = MultivariatePolyRingImpl::new_with(StaticRing::<i64>::RING, 20, 16, (4, 6), Global);
+    let [f] = ring.with_wrapped_indeterminates(|X: [_; 20]| [X[0] + X[5] + X[19]]);
+    assert_eq!(1 + 6 + 20, ring.evaluate(&f, (1..21).map_fn(|x| x as i64), StaticRing::<i64>::RING.identity()));
 }
 
 #[test]

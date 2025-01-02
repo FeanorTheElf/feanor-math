@@ -692,6 +692,15 @@ impl<T, const N: usize> SwappableVectorViewMut<T> for [T; N] {
     }
 }
 
+///
+/// # Why no impl for `Range<i64>` etc?
+/// 
+/// It is a common pattern to write `(0..n).map_fn(|x| ...)` to create general
+/// [`VectorFn`]s. If we provide impls for multiple [`Range`]s, then in this
+/// case however, explicit type arguments will be necessary. Instead, if you
+/// require a [`VectorFn`] over another numerical type `T`, consider using
+/// `((start as usize)..(end as usize)).map_fn(|x| x as T)`.
+/// 
 impl VectorFn<usize> for Range<usize> {
 
     fn at(&self, i: usize) -> usize {

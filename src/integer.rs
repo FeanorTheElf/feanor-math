@@ -56,7 +56,8 @@ pub type BigIntRingBase = crate::rings::rust_bigint::RustBigintRingBase;
 pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + IntegerPolyGCDRing {
 
     ///
-    /// Computes a float value that is supposed to be close to value.
+    /// Computes a float value that is "close" to the given integer.
+    /// 
     /// However, no guarantees are made on how close it must be, in particular,
     /// this function may also always return `0.` (this is just an example - 
     /// it's not a good idea).
@@ -70,6 +71,25 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + I
     /// Note that a high-quality implementation of this function can vastly improve
     /// performance in some cases, e.g. of [`crate::algorithms::int_bisect::root_floor()`] or 
     /// [`crate::algorithms::lll::lll_exact()`].
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::integer::*;
+    /// let ZZ = BigIntRing::RING;
+    /// let x = ZZ.power_of_two(1023);
+    /// assert!(ZZ.to_float_approx(&x) > 2f64.powi(1023) * 0.99999);
+    /// assert!(ZZ.to_float_approx(&x) < 2f64.powi(1023) * 1.000001);
+    /// ```
+    /// If the value is too large for the exponent of a `f64`, infinity is returned.
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::integer::*;
+    /// let ZZ = BigIntRing::RING;
+    /// let x = ZZ.power_of_two(1024);
+    /// assert!(ZZ.to_float_approx(&x).is_infinite());
+    /// ```
     /// 
     fn to_float_approx(&self, value: &Self::Element) -> f64;
 

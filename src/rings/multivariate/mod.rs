@@ -38,6 +38,14 @@ pub trait MultivariatePolyRing: RingExtension {
     fn indeterminate_count(&self) -> usize;
 
     ///
+    /// Returns the monomial `Xi`, where `Xi` is the `i`-th generator of this ring.
+    /// 
+    fn indeterminate(&self, i: usize) -> Self::Monomial {
+        assert!(i < self.indeterminate_count());
+        self.create_monomial((0..self.indeterminate_count()).map(|j| if i == j { 1 } else { 0 }))
+    }
+
+    ///
     /// Creates a monomial with the given exponents.
     /// 
     /// Note that when building a polynomial, the most convenient method is usually
@@ -288,6 +296,7 @@ pub trait MultivariatePolyRingStore: RingStore
     where Self::Type: MultivariatePolyRing
 {
     delegate!{ MultivariatePolyRing, fn indeterminate_count(&self) -> usize }
+    delegate!{ MultivariatePolyRing, fn indeterminate(&self, i: usize) -> <Self::Type as MultivariatePolyRing>::Monomial }
     delegate!{ MultivariatePolyRing, fn create_term(&self, coeff: PolyCoeff<Self>, monomial: PolyMonomial<Self>) -> El<Self> }
     delegate!{ MultivariatePolyRing, fn exponent_at(&self, m: &PolyMonomial<Self>, var_index: usize) -> usize }
     delegate!{ MultivariatePolyRing, fn expand_monomial_to(&self, m: &PolyMonomial<Self>, out: &mut [usize]) -> () }
@@ -436,7 +445,7 @@ pub trait MultivariatePolyRingStore: RingStore
             T: IntoIterator<Item = RingElementWrapper<&'a Self>>
     {
         assert_eq!(self.indeterminate_count(), N);
-        let wrapped_indets: [_; N] = std::array::from_fn(|i| RingElementWrapper::new(self, self.create_term(self.base_ring().one(), self.create_monomial((0..N).map(|j| if i == j { 1 } else { 0 })))));
+        let wrapped_indets: [_; N] = std::array::from_fn(|i| RingElementWrapper::new(self, self.create_term(self.base_ring().one(), self.indeterminate(i))));
         f(std::array::from_fn(|i| &wrapped_indets[i])).into_iter().map(|f| f.unwrap()).collect()
     }
 
@@ -465,7 +474,7 @@ pub trait MultivariatePolyRingStore: RingStore
         where F: FnOnce([&RingElementWrapper<&'a Self>; N]) -> [RingElementWrapper<&'a Self>; M]
     {
         assert_eq!(self.indeterminate_count(), N);
-        let wrapped_indets: [_; N] = std::array::from_fn(|i| RingElementWrapper::new(self, self.create_term(self.base_ring().one(), self.create_monomial((0..N).map(|j| if i == j { 1 } else { 0 })))));
+        let wrapped_indets: [_; N] = std::array::from_fn(|i| RingElementWrapper::new(self, self.create_term(self.base_ring().one(), self.indeterminate(i))));
         let mut result_it = f(std::array::from_fn(|i| &wrapped_indets[i])).into_iter().map(|f| f.unwrap());
         let result = std::array::from_fn(|_| result_it.next().unwrap());
         debug_assert!(result_it.next().is_none());
@@ -737,8 +746,8 @@ pub mod generic_tests {
         // test multiplication of variables
         for i in 0..n {
             for j in 0..n {
-                let xi = ring.create_term(base_ring.one(), ring.create_monomial((0..n).map(|k| if k == i { 1 } else { 0 })));
-                let xj = ring.create_term(base_ring.one(), ring.create_monomial((0..n).map(|k| if k == j { 1 } else { 0 })));
+                let xi = ring.create_term(base_ring.one(), ring.indeterminate(i));
+                let xj = ring.create_term(base_ring.one(), ring.indeterminate(j));
                 let xixj = ring.create_term(base_ring.one(), ring.create_monomial((0..n).map(|k| if k == i && k == j { 2 } else if k == j || k == i { 1 } else { 0 })));
                 assert_el_eq!(ring, xixj, ring.mul(xi, xj));
             }
@@ -747,8 +756,8 @@ pub mod generic_tests {
         // test monomial operations
         for i in 0..n {
             for j in 0..n {
-                let xi = ring.create_monomial((0..n).map(|k| if k == i { 1 } else { 0 }));
-                let xj = ring.create_monomial((0..n).map(|k| if k == j { 1 } else { 0 }));
+                let xi = ring.indeterminate(i);
+                let xj = ring.indeterminate(j);
                 let xixj_lcm = ring.create_monomial((0..n).map(|k| if k == j || k == i { 1 } else { 0 }));
                 assert_el_eq!(ring, ring.create_term(base_ring.one(), xixj_lcm), ring.create_term(base_ring.one(), ring.monomial_lcm(xi, &xj)));
             }
@@ -766,14 +775,14 @@ pub mod generic_tests {
         // monomials shouldn't be zero divisors
         for i in 0..n {
             for a in &elements {
-                let xi = ring.create_term(base_ring.one(), ring.create_monomial((0..n).map(|k| if k == i { 1 } else { 0 })));
+                let xi = ring.create_term(base_ring.one(), ring.indeterminate(i));
                 assert!(base_ring.is_zero(a) == ring.is_zero(&ring.inclusion().mul_ref_map(&xi, a)));
             }
         }
 
         // test add_assign_from_terms
         for i in 0..n {
-            let xi = ring.create_monomial((0..n).map(|k| if k == i { 1 } else { 0 }));
+            let xi = ring.indeterminate(i);
             let mut a = ring.create_term(base_ring.int_hom().map(3), ring.create_monomial((0..n).map(|_| 0)));
             let terms_with_multiples = [
                 (base_ring.one(), ring.clone_monomial(&xi)),
@@ -794,8 +803,8 @@ pub mod generic_tests {
 
         if n >= 2 {
             let one = ring.create_monomial((0..n).map(|_| 0));
-            let x0 = ring.create_monomial((0..n).map(|k| if k == 0 { 1 } else { 0 }));
-            let x1 = ring.create_monomial((0..n).map(|k| if k == 1 { 1 } else { 0 }));
+            let x0 = ring.indeterminate(0);
+            let x1 = ring.indeterminate(1);
             let x0_v = ring.create_term(base_ring.one(), ring.clone_monomial(&x0));
             let x1_v = ring.create_term(base_ring.one(), ring.clone_monomial(&x1));
             let x0_2 = ring.create_monomial((0..n).map(|k| if k == 0 { 2 } else { 0 }));
