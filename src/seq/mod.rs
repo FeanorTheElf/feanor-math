@@ -54,6 +54,19 @@ pub trait VectorView<T: ?Sized> {
     fn at(&self, i: usize) -> &T;
 
     ///
+    /// Returns a refernce to the `i`-th entry of the vector view, causing
+    /// UB if `i >= self.len()`.
+    /// 
+    /// # Safety
+    /// 
+    /// Same as for [`slice::get_unchecked()`]. More concretely, calling this method with an out-of-bounds index 
+    /// is undefined behavior even if the resulting reference is not used.
+    /// 
+    unsafe fn at_unchecked<'a>(&self, i: usize) -> &T {
+        self.at(i)
+    }
+
+    ///
     /// Calls `op` with `self` if this vector view supports sparse access.
     /// Otherwise, `()` is returned.
     /// 
@@ -330,6 +343,10 @@ impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for Box<V> {
         (**self).at(i)
     }
 
+    unsafe fn at_unchecked(&self, i: usize) -> &T {
+        (**self).at_unchecked(i)
+    }
+
     fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
         (**self).specialize_sparse(op)
     }
@@ -340,8 +357,11 @@ impl<T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for Box<V> {
     fn at_mut(&mut self, i: usize) -> &mut T {
         (**self).at_mut(i)
     }
-}
 
+    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
+        (**self).at_unchecked_mut(i)
+    }
+}
 
 impl<T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for Box<V> {
     
@@ -360,6 +380,10 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a V {
 
     fn at(&self, i: usize) -> &T {
         (**self).at(i)
+    }
+
+    unsafe fn at_unchecked(&self, i: usize) -> &T {
+        (**self).at_unchecked(i)
     }
 
     fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Result<Op::Output<'b>, ()> {
@@ -386,6 +410,10 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a mut V {
         (**self).at(i)
     }
 
+    unsafe fn at_unchecked(&self, i: usize) -> &T {
+        (**self).at_unchecked(i)
+    }
+
     fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Result<Op::Output<'b>, ()> {
         (**self).specialize_sparse(op)
     }
@@ -395,6 +423,10 @@ impl<'a, T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for &'a mut V
 
     fn at_mut(&mut self, i: usize) -> &mut T {
         (**self).at_mut(i)
+    }
+
+    unsafe fn at_unchecked_mut(&mut self, i: usize) -> &mut T {
+        (**self).at_unchecked_mut(i)
     }
 }
 
@@ -432,6 +464,19 @@ pub trait VectorViewMut<T: ?Sized>: VectorView<T> {
         where Self: Sized
     {
         VectorViewMapMut::new(self, (map_const, map_mut))
+    }
+
+    ///
+    /// Returns a refernce to the `i`-th entry of the vector view, causing
+    /// UB if `i >= self.len()`.
+    /// 
+    /// # Safety
+    /// 
+    /// Same as for [`slice::get_unchecked_mut()`]. More concretely, calling this method with an out-of-bounds index 
+    /// is undefined behavior even if the resulting reference is not used.
+    /// 
+    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
+        self.at_mut(i)
     }
 }
 
@@ -612,6 +657,10 @@ impl<T> VectorView<T> for [T] {
     fn at(&self, i: usize) -> &T {
         &self[i]
     }
+
+    unsafe fn at_unchecked(&self, i: usize) -> &T {
+        self.get_unchecked(i)
+    }
 }
 
 impl<'a, T> SelfSubvectorView<T> for &'a [T] {
@@ -633,6 +682,10 @@ impl<T> VectorViewMut<T> for [T] {
     fn at_mut(&mut self, i: usize) -> &mut T {
         &mut self[i]
     }
+
+    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
+        self.get_unchecked_mut(i)
+    }
 }
 
 impl<T> SwappableVectorViewMut<T> for [T] {
@@ -651,12 +704,20 @@ impl<T> VectorView<T> for Vec<T> {
     fn at(&self, i: usize) -> &T {
         &self[i]
     }
+
+    unsafe fn at_unchecked(&self, i: usize) -> &T {
+        self.get_unchecked(i)
+    }
 }
 
 impl<T> VectorViewMut<T> for Vec<T> {
 
     fn at_mut(&mut self, i: usize) -> &mut T {
         &mut self[i]
+    }
+
+    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
+        self.get_unchecked_mut(i)
     }
 }
 
@@ -676,12 +737,20 @@ impl<T, const N: usize> VectorView<T> for [T; N] {
     fn at(&self, i: usize) -> &T {
         &self[i]
     }
+
+    unsafe fn at_unchecked(&self, i: usize) -> &T {
+        self.get_unchecked(i)
+    }
 }
 
 impl<T, const N: usize> VectorViewMut<T> for [T; N] {
 
     fn at_mut(&mut self, i: usize) -> &mut T {
         &mut self[i]
+    }
+
+    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
+        self.get_unchecked_mut(i)
     }
 }
 
