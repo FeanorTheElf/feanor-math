@@ -143,6 +143,55 @@ impl<'a, R, C> ConvolutionAlgorithm<R> for C
     }
 }
 
+impl<'a, R, C> PreparedConvolutionAlgorithm<R> for C
+    where R: ?Sized + RingBase,
+        C: Deref,
+        C::Target: PreparedConvolutionAlgorithm<R>
+{
+    type PreparedConvolutionOperand = <C::Target as PreparedConvolutionAlgorithm<R>>::PreparedConvolutionOperand;
+
+    fn prepare_convolution_operand<S, V>(&self, val: V, ring: S) -> Self::PreparedConvolutionOperand
+        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
+    {
+        (**self).prepare_convolution_operand(val, ring)
+    }
+
+    fn compute_convolution_lhs_prepared<S, V>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: V, dst: &mut [R::Element], ring: S)
+        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
+    {
+        (**self).compute_convolution_lhs_prepared(lhs, rhs, dst, ring)
+    }
+
+    fn compute_convolution_prepared<S>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: &Self::PreparedConvolutionOperand, dst: &mut [R::Element], ring: S)
+        where S: RingStore<Type = R> + Copy
+    {
+        (**self).compute_convolution_prepared(lhs, rhs, dst, ring)
+    }
+
+    fn compute_convolution_rhs_prepared<S, V>(&self, lhs: V, rhs: &Self::PreparedConvolutionOperand, dst: &mut [R::Element], ring: S)
+        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
+    {
+        (**self).compute_convolution_rhs_prepared(lhs, rhs, dst, ring)
+    }
+
+    fn compute_convolution_inner_product_lhs_prepared<'b, S, I, V>(&self, values: I, dst: &mut [R::Element], ring: S) 
+        where S: RingStore<Type = R> + Copy, 
+            I: Iterator<Item = (&'b Self::PreparedConvolutionOperand, V)>,
+            V: VectorView<R::Element>,
+            Self::PreparedConvolutionOperand: 'b
+    {
+        (**self).compute_convolution_inner_product_lhs_prepared(values, dst, ring)
+    }
+
+    fn compute_convolution_inner_product_prepared<'b, S, I>(&self, values: I, dst: &mut [R::Element], ring: S) 
+        where S: RingStore<Type = R> + Copy, 
+            I: Iterator<Item = (&'b Self::PreparedConvolutionOperand, &'b Self::PreparedConvolutionOperand)>,
+            Self::PreparedConvolutionOperand: 'b
+    {
+        (**self).compute_convolution_inner_product_prepared(values, dst, ring)
+    }
+}
+
 ///
 /// Implementation of convolutions that uses Karatsuba's algorithm
 /// with a threshold defined by [`KaratsubaHint`].
