@@ -89,6 +89,51 @@ pub fn serialize_seq_helper<S, I>(serializer: S, sequence: I) -> Result<S::Ok, S
 }
 
 ///
+/// Helper function to serialize a newtype-struct.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn serialize_newtype_struct_helper<S, T>(serializer: S, name: &'static str, to_serialize: &T) -> Result<S::Ok, S::Error>
+    where S: Serializer,
+        T: ?Sized + Serialize
+{
+    serializer.serialize_newtype_struct(name, to_serialize)
+}
+
+///
+/// Helper function to deserialize a newtype-struct.
+/// 
+/// Note that this should only be used when it is ensured that the data is indeed serialized
+/// as a newtype-struct in the serde data model.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn deserialize_newtype_struct_helper<'de, S, D>(deserializer: D, name: &'static str, seed: S) -> Result<S::Value, D::Error>
+    where D: Deserializer<'de>,
+        S: DeserializeSeed<'de>
+{
+    struct NewtypeStructVisitor<'de, S: DeserializeSeed<'de>> {
+        seed: S,
+        name: &'static str,
+        deserializer: PhantomData<&'de ()>
+    }
+
+    impl<'de, S: DeserializeSeed<'de>> Visitor<'de> for NewtypeStructVisitor<'de, S> {
+        type Value = S::Value;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(formatter, "a newtype struct named {}", self.name)
+        }
+
+        fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            where D: Deserializer<'de>
+        {
+            self.seed.deserialize(deserializer)
+        }
+    }
+
+    return deserializer.deserialize_newtype_struct(name, NewtypeStructVisitor { seed: seed, name: name, deserializer: PhantomData });
+}
+
+///
 /// Wrapper of a ring that implements [`serde::DeserializationSeed`] by trying to deserialize an element
 /// w.r.t. the wrapped ring.
 /// 
@@ -151,6 +196,37 @@ impl<'a, R: RingStore> Serialize for SerializeWithRing<'a, R>
         where S: Serializer
     {
         self.ring.get_ring().serialize(self.el, serializer)
+    }
+}
+
+///
+/// Wraps a ring and a one of its elements. Implements [`serde::Serialize`] and
+/// will serialize the element w.r.t. the ring.
+/// 
+#[stability::unstable(feature = "enable")]
+pub struct SerializeOwnedWithRing<R: RingStore>
+    where R::Type: SerializableElementRing
+{
+    ring: R,
+    el: El<R>
+}
+
+impl<R: RingStore> SerializeOwnedWithRing<R>
+    where R::Type: SerializableElementRing
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(el: El<R>, ring: R) -> Self {
+        Self { el, ring }
+    }
+}
+
+impl<R: RingStore> Serialize for SerializeOwnedWithRing<R>
+    where R::Type: SerializableElementRing
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        self.ring.get_ring().serialize(&self.el, serializer)
     }
 }
 

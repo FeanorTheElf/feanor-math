@@ -1,6 +1,9 @@
 use std::alloc::Allocator;
 use std::alloc::Global;
 
+use serde::de;
+use serde::de::Visitor;
+
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::iters::multi_cartesian_product;
 use crate::iters::MultiProduct;
@@ -8,6 +11,10 @@ use crate::seq::VectorView;
 use crate::integer::*;
 use crate::divisibility::DivisibilityRingStore;
 use crate::rings::zn::*;
+use crate::serialization::serialize_seq_helper;
+use crate::serialization::DeserializeWithRing;
+use crate::serialization::SerializableElementRing;
+use crate::serialization::SerializeWithRing;
 use crate::specialization::*;
 use crate::primitive_int::*;
 
@@ -773,6 +780,69 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> ZnRing for ZnBase<C, J, A
     }
 }
 
+impl<C: RingStore, J: RingStore, A: Allocator + Clone> SerializableElementRing for ZnBase<C, J, A> 
+    where C::Type: ZnRing + CanHomFrom<J::Type> + SerializableElementRing,
+        J::Type: IntegerRing + SerializableElementRing,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
+{
+    fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
+        where S: serde::Serializer
+    {
+        if serializer.is_human_readable() {
+            self.total_ring.get_ring().serialize(
+                &RingRef::new(self).can_iso(&self.total_ring).unwrap().map_ref(el),
+                serializer
+            )
+        } else {
+            serialize_seq_helper(serializer, self.get_congruence(el).as_iter().zip(self.as_iter()).map(|(x, ring)| SerializeWithRing::new(x, ring)))
+        }
+    }
+
+    fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
+        where D: serde::Deserializer<'de>
+    {
+        if deserializer.is_human_readable() {
+            Ok(RingRef::new(self).can_hom(&self.total_ring).unwrap().map(
+                self.total_ring.get_ring().deserialize(deserializer)?
+            ))
+        } else {
+            struct SeqVisitor<'a, C, A>
+                where C: RingStore, C::Type: ZnRing + SerializableElementRing, A: Allocator
+            {
+                rings: &'a [C],
+                allocator: A
+            }
+        
+            impl<'a, 'de, C, A> Visitor<'de> for SeqVisitor<'a, C, A>
+                where C: RingStore, C::Type: ZnRing + SerializableElementRing, A: Allocator
+            {
+                type Value = Vec<El<C>, A>;
+        
+                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    write!(formatter, "a sequence of {} finite ring elements", self.rings.len())
+                }
+        
+                fn visit_seq<S>(self, mut seq: S) -> Result<Self::Value, S::Error>
+                    where S: serde::de::SeqAccess<'de>
+                {
+                    let mut result = Vec::with_capacity_in(self.rings.len(), self.allocator);
+                    for (i, ring) in self.rings.iter().enumerate() {
+                        let el = seq.next_element_seed(DeserializeWithRing::new(ring))?;
+                        if let Some(el) = el {
+                            result.push(el);
+                        } else {
+                            return Err(de::Error::invalid_length(i, &format!("a sequence of {} base ring elements", self.rings.len()).as_str()));
+                        }
+                    }
+                    return Ok(result);
+                }
+            }
+        
+            return deserializer.deserialize_seq(SeqVisitor { rings: &self.components, allocator: self.element_allocator.clone() }).map(|data| ZnEl { data });
+        }
+    }
+}
+
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 
@@ -872,6 +942,12 @@ fn test_not_prime() {
     crate::divisibility::generic_tests::test_divisibility_axioms(&ring, ring.elements());
     crate::homomorphism::generic_tests::test_homomorphism_axioms(ring.can_hom(&equivalent_ring).unwrap(), equivalent_ring.elements());
     crate::homomorphism::generic_tests::test_homomorphism_axioms(ring.can_iso(&equivalent_ring).unwrap(), ring.elements());
+}
+
+#[test]
+fn test_serialization() {
+    let ring = Zn::create_from_primes(vec![3, 5, 7], StaticRing::<i64>::RING);
+    crate::serialization::generic_tests::test_serialization(&ring, ring.elements());
 }
 
 #[test]

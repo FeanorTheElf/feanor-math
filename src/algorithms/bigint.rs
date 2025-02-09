@@ -1,5 +1,9 @@
+use serde::de::{self, DeserializeSeed, Visitor};
+use serde::Deserializer;
+
 use crate::seq::*;
 
+use core::fmt;
 use std::cmp::{Ordering, min, max};
 use std::alloc::Allocator;
 
@@ -476,6 +480,92 @@ pub fn from_str_radix<A: Allocator>(string: &str, base: u32, out: Vec<BlockInt, 
 			u64::from_str_radix(n, base).map_err(|_| ()))
 		);
 	return from_radix::<A, _, ()>(it, (base as u64).pow(chunk_size as u32), out);
+}
+
+///
+/// Deserializes a 2-element tuple, consisting of a sign bit and a list of bytes
+/// in little endian order to represent a number.
+/// The list of bytes is converted into a `T` by the given closure, and the resulting
+/// tuple is returned.
+/// 
+/// The main difference between using this function and `<(bool, &serde_bytes::Bytes)>::deserialize`
+/// is that this function can accept a byte array with a shorter lifetime.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn deserialize_bigint_from_bytes<'de, D, F, T>(deserializer: D, from_bytes: F) -> Result<(bool, T), D::Error>
+	where D: Deserializer<'de>,
+		F: FnOnce(&[u8]) -> T
+{
+	struct ResultVisitor<F, T>
+		where F: FnOnce(&[u8]) -> T
+	{
+		from_bytes: F
+	}
+	impl<'de, F, T> Visitor<'de> for ResultVisitor<F, T>
+		where F: FnOnce(&[u8]) -> T
+	{
+		type Value = (bool, T);
+
+		fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+			write!(f, "a sign bit as `bool` and a list of bytes in little endian order")
+		}
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where A: serde::de::SeqAccess<'de>
+        {
+			let is_negative = seq.next_element()?;
+			if is_negative.is_none() {
+				return Err(de::Error::invalid_length(0, &"expected a sign bit as `bool`" as &'static dyn de::Expected));
+			}
+			let is_negative: bool = is_negative.unwrap();
+
+			struct BytesVisitor<F, T>
+				where F: FnOnce(&[u8]) -> T
+			{
+				from_bytes: F
+			}
+			impl<'de, F, T> Visitor<'de> for BytesVisitor<F, T>
+				where F: FnOnce(&[u8]) -> T
+			{
+				type Value = T;
+
+				fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+					write!(f, "a list of bytes in little endian order")
+				}
+
+				fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+					where E: de::Error,
+				{
+					Ok((self.from_bytes)(v))
+				}
+			}
+			struct DeserializeBytes<F, T>
+				where F: FnOnce(&[u8]) -> T
+			{
+				from_bytes: F
+			}
+			impl<'de, F, T> DeserializeSeed<'de> for DeserializeBytes<F, T>
+				where F: FnOnce(&[u8]) -> T
+			{
+				type Value = T;
+
+				fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+					where D: Deserializer<'de>
+				{
+					deserializer.deserialize_bytes(BytesVisitor { from_bytes: self.from_bytes })
+				}
+			}
+
+			let data = seq.next_element_seed(DeserializeBytes { from_bytes: self.from_bytes })?;
+			if data.is_none() {
+				return Err(de::Error::invalid_length(1, &"expected a representation of the number as list of little endian bytes" as &'static dyn de::Expected));
+			}
+			let data: T = data.unwrap();
+
+            return Ok((is_negative, data));
+        }
+	}
+	return deserializer.deserialize_tuple(2, ResultVisitor { from_bytes: from_bytes });
 }
 
 #[cfg(test)]

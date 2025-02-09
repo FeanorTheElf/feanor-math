@@ -1,7 +1,8 @@
 use serde::de;
-use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
+use serde::ser::SerializeTuple;
+use serde::{Deserializer, Serializer}; 
 
-use crate::algorithms::bigint::highest_set_block;
+use crate::algorithms::bigint::{deserialize_bigint_from_bytes, highest_set_block};
 use crate::divisibility::{DivisibilityRing, Domain};
 use crate::pid::*;
 use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ};
@@ -10,10 +11,11 @@ use crate::ordered::*;
 use crate::primitive_int::*;
 use crate::ring::*;
 use crate::algorithms;
-use crate::serialization::SerializableElementRing;
+use crate::serialization::{deserialize_newtype_struct_helper, serialize_newtype_struct_helper, SerializableElementRing};
 use std::alloc::Allocator;
 use std::alloc::Global;
 use std::cmp::Ordering::{self, *};
+use std::marker::PhantomData;
 
 ///
 /// An element of the integer ring implementation [`RustBigintRing`].
@@ -387,15 +389,22 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
         where D: Deserializer<'de>
     {
         if deserializer.is_human_readable() {
-            let string = <String as Deserialize>::deserialize(deserializer)?;
+            // this makes an unnecessary temporary allocation, but then the cost is probably negligible compared
+            // to the parsing of a string as a number
+            let string = deserialize_newtype_struct_helper(deserializer, "BigInt", PhantomData::<String>)?;
             return self.parse(string.as_str(), 10).map_err(|()| de::Error::custom(format!("cannot parse \"{}\" as number", string)));
         } else {
-            let (negative, data) = <(bool, &serde_bytes::Bytes) as Deserialize>::deserialize(deserializer)?;
-            let mut result_data = Vec::with_capacity_in(data.len() / size_of::<u64>(), self.allocator.clone());
-            for digit in data.array_chunks() {
-                result_data.push(u64::from_le_bytes(*digit));
-            }
-            return Ok(RustBigint(negative, result_data));
+            let (negative, data) = deserialize_bigint_from_bytes(deserializer, |data| {
+                let mut result_data = Vec::with_capacity_in((data.len() - 1) / size_of::<u64>() + 1, self.allocator.clone());
+                let mut it = data.array_chunks();
+                while let Some(digit) = it.next() {
+                    result_data.push(u64::from_le_bytes(*digit));
+                }
+                let last = it.remainder();
+                result_data.push(u64::from_le_bytes(std::array::from_fn(|i| if i >= last.len() { 0 } else { last[i] })));
+                return result_data;
+            })?;
+            return Ok(RustBigint(negative, data));
         }
     }
 
@@ -403,14 +412,17 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
         where S: Serializer
     {
         if serializer.is_human_readable() {
-            <String as Serialize>::serialize(&format!("{}", RingRef::new(self).format(el)), serializer)
+            serialize_newtype_struct_helper(serializer, "BigInt", format!("{}", RingRef::new(self).format(el)).as_str())
         } else {
             let len = highest_set_block(&el.1).map(|n| n + 1).unwrap_or(0);
             let mut data = Vec::with_capacity_in(len * size_of::<u64>(), &self.allocator);
             for digit in &el.1 {
                 data.extend(digit.to_le_bytes().into_iter());
             }
-            <(bool, &serde_bytes::Bytes) as Serialize>::serialize(&(el.0, serde_bytes::Bytes::new(&data)), serializer)
+            let mut seq = serializer.serialize_tuple(2)?;
+            seq.serialize_element(&self.is_neg(el))?;
+            seq.serialize_element(serde_bytes::Bytes::new(&data[..]))?;
+            return seq.end();
         }
     }
 }

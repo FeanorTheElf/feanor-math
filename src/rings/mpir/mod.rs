@@ -1,6 +1,7 @@
 use libc;
 use serde::de::DeserializeSeed;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::ser::SerializeTuple;
+use serde::{Deserializer, Serializer};
 
 use crate::impl_poly_gcd_locally_for_ZZ;
 use crate::algorithms;
@@ -13,6 +14,8 @@ use crate::homomorphism::*;
 use crate::integer::*;
 use crate::specialization::*;
 use crate::rings::rust_bigint::*;
+use crate::algorithms::bigint::deserialize_bigint_from_bytes;
+use crate::serialization::*;
 
 mod mpir_bindings;
 
@@ -79,6 +82,34 @@ impl MPZ {
 
 impl MPZBase {
 
+    ///
+    /// Interprets the bytes in `input` as little endian bytes and returns the
+    /// nonnegative integer represented by them. 
+    /// 
+    pub fn from_le_bytes(&self, dst: &mut MPZEl, input: &[u8]) {
+        unsafe {
+            assert_eq!(std::mem::size_of::<mpir_bindings::mpir_ui>(), std::mem::size_of::<u64>());
+            if input.len() == 0 {
+                mpir_bindings::__gmpz_set_ui(&mut dst.integer as mpir_bindings::mpz_ptr, 0);
+                return;
+            }
+            assert!(input.len() > 0);
+            mpir_bindings::__gmpz_import(
+                &mut dst.integer as mpir_bindings::mpz_ptr, 
+                input.len(), 
+                -1i32, // least significant digit first
+                1 as libc::size_t,
+                -1, // little endian 
+                0, 
+                input.as_ptr() as *const libc::c_void
+            );
+        }
+    }
+
+    ///
+    /// Interprets the `u64` as digits w.r.t. base `2^64` (with least-significant digit first)
+    /// and returns the nonnegative integer represented by them. 
+    /// 
     pub fn from_base_u64_repr(&self, dst: &mut MPZEl, input: &[u64]) {
         unsafe {
             assert_eq!(std::mem::size_of::<mpir_bindings::mpir_ui>(), std::mem::size_of::<u64>());
@@ -90,11 +121,11 @@ impl MPZBase {
             mpir_bindings::__gmpz_import(
                 &mut dst.integer as mpir_bindings::mpz_ptr, 
                 input.len(), 
-                -1i32,
+                -1i32, // least significant digit first
                 (u64::BITS / 8) as libc::size_t,
+                0, // native endianess 
                 0, 
-                0, 
-                (input.as_ptr() as *const mpir_bindings::mpir_ui) as *const libc::c_void
+                input.as_ptr() as *const libc::c_void
             );
         }
     }
@@ -103,21 +134,59 @@ impl MPZBase {
         self.abs_highest_set_bit(src).map(|n| (n / u64::BITS as usize) + 1).unwrap_or(0)
     }
 
+    ///
+    /// Inverse to [`MPZBase::from_base_u64_repr()`].
+    /// 
     pub fn abs_base_u64_repr(&self, src: &MPZEl, out: &mut [u64]) {
         unsafe {
             if self.abs_base_u64_repr_len(src) > 0 {
                 assert!(out.len() >= self.abs_base_u64_repr_len(src));
                 let mut size = 0;
         
-                mpir_bindings::__gmpz_export(
-                    (out.as_mut_ptr() as *mut mpir_bindings::mpir_ui) as *mut libc::c_void,
+                let result_ptr = mpir_bindings::__gmpz_export(
+                    out.as_mut_ptr() as *mut libc::c_void,
                     &mut size,
-                    -1,
+                    -1, // least significant digit first
                     (u64::BITS / 8) as libc::size_t,
-                    0,
+                    0, // native endianess 
                     0,
                     &src.integer as mpir_bindings::mpz_srcptr
                 );
+                assert_eq!(result_ptr as *const libc::c_void, out.as_ptr() as *const libc::c_void);
+                for i in size..out.len() {
+                    out[i] = 0;
+                }
+            } else {
+                for i in 0..out.len() {
+                    out[i] = 0;
+                }
+            }
+        }
+    }
+
+    pub fn to_le_bytes_len(&self, src: &MPZEl) -> usize {
+        self.abs_highest_set_bit(src).map(|n| (n / u8::BITS as usize) + 1).unwrap_or(0)
+    }
+
+    ///
+    /// Inverse to [`MPZBase::from_le_bytes()`].
+    /// 
+    pub fn to_le_bytes(&self, src: &MPZEl, out: &mut [u8]) {
+        unsafe {
+            if self.to_le_bytes_len(src) > 0 {
+                assert!(out.len() >= self.to_le_bytes_len(src));
+                let mut size = 0;
+        
+                let result_ptr = mpir_bindings::__gmpz_export(
+                    out.as_mut_ptr() as *mut libc::c_void,
+                    &mut size,
+                    -1, // least significant digit first
+                    1 as libc::size_t,
+                    -1, // little endian
+                    0,
+                    &src.integer as mpir_bindings::mpz_srcptr
+                );
+                assert_eq!(result_ptr as *const libc::c_void, out.as_ptr() as *const libc::c_void);
                 for i in size..out.len() {
                     out[i] = 0;
                 }
@@ -303,10 +372,11 @@ impl SerializableElementRing for MPZBase {
         if deserializer.is_human_readable() {
             return DeserializeWithRing::new(RustBigintRing::RING).deserialize(deserializer).map(|n| int_cast(n, RingRef::new(self), RustBigintRing::RING));
         } else {
-            let (negative, data) = <(bool, &serde_bytes::Bytes) as Deserialize>::deserialize(deserializer)?;
-            let result_data = data.array_chunks().map(|chunk| u64::from_le_bytes(*chunk)).collect::<Vec<_>>();
-            let mut result = self.zero();
-            self.from_base_u64_repr(&mut result, &result_data);
+            let (negative, mut result) = deserialize_bigint_from_bytes(deserializer, |data| {
+                let mut result = self.zero();
+                self.from_le_bytes(&mut result, data);
+                return result;
+            })?;
             if negative {
                 self.negate_inplace(&mut result);
             }
@@ -318,16 +388,16 @@ impl SerializableElementRing for MPZBase {
         where S: Serializer
     {
         if serializer.is_human_readable() {
-            <String as Serialize>::serialize(&format!("{}", RingRef::new(self).format(el)), serializer)
+            serialize_newtype_struct_helper(serializer, "BigInt", format!("{}", RingRef::new(self).format(el)).as_str())
         } else {
-            let len = self.abs_base_u64_repr_len(el);
+            let len = self.to_le_bytes_len(el);
             let mut data = Vec::with_capacity(len);
-            data.resize(len, 0u64);
-            self.abs_base_u64_repr(el, &mut data);
-            for digit in &mut data {
-                *digit = digit.to_le();
-            }
-            <(bool, &serde_bytes::Bytes) as Serialize>::serialize(&(self.is_neg(el), serde_bytes::Bytes::new(bytemuck::cast_slice(&data))), serializer)
+            data.resize(len, 0u8);
+            self.to_le_bytes(el, &mut data);
+            let mut seq = serializer.serialize_tuple(2)?;
+            seq.serialize_element(&self.is_neg(el))?;
+            seq.serialize_element(serde_bytes::Bytes::new(&data[..]))?;
+            return seq.end();
         }
     }
 }
