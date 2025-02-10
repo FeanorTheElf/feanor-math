@@ -1,8 +1,9 @@
 use std::marker::PhantomData;
 
-use serde::de::{DeserializeSeed, Visitor};
-use serde::ser::SerializeSeq;
+use serde::de::{DeserializeSeed, SeqAccess, Visitor};
 use serde::{Deserializer, Serialize, Serializer};
+
+use crate::seq::VectorFn;
 
 use crate::ring::*;
 
@@ -29,108 +30,199 @@ pub trait SerializableElementRing: RingBase {
         where S: Serializer;
 }
 
-///
-/// Helper function to deserialize a sequence.
-/// 
-/// Note that this should only be used when it is ensured that the data is indeed serialized
-/// as a sequence in the serde data model.
-/// 
 #[stability::unstable(feature = "enable")]
-pub fn deserialize_seq_helper<'de, S, D, C>(deserializer: D, collector: C, base_seed: S) -> Result<(), D::Error>
-    where D: Deserializer<'de>,
-        C: FnMut(S::Value),
-        S: Clone + DeserializeSeed<'de>
+pub struct SerializableSeq<V, T>
+    where V: VectorFn<T>
 {
-    struct SeqVisitor<'de, S: Clone + DeserializeSeed<'de>, C: FnMut(S::Value)> {
-        base_seed: S,
-        collector: C,
-        deserializer: PhantomData<&'de ()>
+    element: PhantomData<T>,
+    data: V
+}
+
+impl<V, T> SerializableSeq<V, T>
+    where V: VectorFn<T>
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(data: V) -> Self {
+        Self { element: PhantomData, data: data }
     }
+}
 
-    impl<'de, S: Clone + DeserializeSeed<'de>, C: FnMut(S::Value)> Visitor<'de> for SeqVisitor<'de, S, C> {
-        type Value = ();
+impl<V, T> Serialize for SerializableSeq<V, T>
+    where V: VectorFn<T>, T: Serialize
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: serde::Serializer
+    {
+        serializer.collect_seq(self.data.iter())
+    }
+}
 
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            write!(formatter, "a sequence")
+#[stability::unstable(feature = "enable")]
+pub struct DeserializeSeedSeq<'de, V, S, T, C>
+    where V: Iterator<Item = S>,
+        S: DeserializeSeed<'de>,
+        C: FnMut(T, S::Value) -> T
+{
+    deserializer: PhantomData<&'de ()>,
+    element_seed: PhantomData<S>,
+    seeds: V,
+    initial: T,
+    collector: C
+}
+
+impl<'de, V, S, T, C> DeserializeSeedSeq<'de, V, S, T, C>
+    where V: Iterator<Item = S>,
+        S: DeserializeSeed<'de>,
+        C: FnMut(T, S::Value) -> T
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(seeds: V, initial: T, collector: C) -> Self {
+        Self {
+            deserializer: PhantomData,
+            element_seed: PhantomData,
+            seeds: seeds,
+            initial: initial,
+            collector: collector
+        }
+    }
+}
+
+impl<'de, V, S, T, C> DeserializeSeed<'de> for DeserializeSeedSeq<'de, V, S, T, C>
+    where V: Iterator<Item = S>, 
+        S: DeserializeSeed<'de>,
+        C: FnMut(T, S::Value) -> T
+{
+    type Value = T;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where D: serde::Deserializer<'de>
+    {
+        struct ResultVisitor<'de, V, S, T, C>
+            where V: Iterator<Item = S>,
+                S: DeserializeSeed<'de>,
+                C: FnMut(T, S::Value) -> T
+        {
+            deserializer: PhantomData<&'de ()>,
+            element_seed: PhantomData<S>,
+            seeds: V,
+            initial: T,
+            collector: C
         }
 
-        fn visit_seq<A>(mut self, mut seq: A) -> Result<Self::Value, A::Error>
-            where A: serde::de::SeqAccess<'de>
+        impl<'de, V, S, T, C> Visitor<'de> for ResultVisitor<'de, V, S, T, C>
+            where V: Iterator<Item = S>,
+                S: DeserializeSeed<'de>,
+                C: FnMut(T, S::Value) -> T
         {
-            while let Some(el) = seq.next_element_seed(self.base_seed.clone())? {
-                (self.collector)(el);
+            type Value = T;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "a sequence of elements")
             }
-            return Ok(());
-        }
-    }
 
-    deserializer.deserialize_seq(SeqVisitor {
-        deserializer: PhantomData,
-        base_seed: base_seed,
-        collector: collector
-    })
-}
-
-///
-/// Helper function to serialize a sequence.
-/// 
-#[stability::unstable(feature = "enable")]
-pub fn serialize_seq_helper<S, I>(serializer: S, sequence: I) -> Result<S::Ok, S::Error>
-    where S: Serializer,
-        I: Iterator,
-        I::Item: Serialize
-{
-    let size_hint = sequence.size_hint();
-    let mut seq = serializer.serialize_seq(if size_hint.1.is_some() && size_hint.1.unwrap() == size_hint.0 { Some(size_hint.0) } else { None })?;
-    for x in sequence {
-        seq.serialize_element(&x)?;
-    }
-    return seq.end();
-}
-
-///
-/// Helper function to serialize a newtype-struct.
-/// 
-#[stability::unstable(feature = "enable")]
-pub fn serialize_newtype_struct_helper<S, T>(serializer: S, name: &'static str, to_serialize: &T) -> Result<S::Ok, S::Error>
-    where S: Serializer,
-        T: ?Sized + Serialize
-{
-    serializer.serialize_newtype_struct(name, to_serialize)
-}
-
-///
-/// Helper function to deserialize a newtype-struct.
-/// 
-/// Note that this should only be used when it is ensured that the data is indeed serialized
-/// as a newtype-struct in the serde data model.
-/// 
-#[stability::unstable(feature = "enable")]
-pub fn deserialize_newtype_struct_helper<'de, S, D>(deserializer: D, name: &'static str, seed: S) -> Result<S::Value, D::Error>
-    where D: Deserializer<'de>,
-        S: DeserializeSeed<'de>
-{
-    struct NewtypeStructVisitor<'de, S: DeserializeSeed<'de>> {
-        seed: S,
-        name: &'static str,
-        deserializer: PhantomData<&'de ()>
-    }
-
-    impl<'de, S: DeserializeSeed<'de>> Visitor<'de> for NewtypeStructVisitor<'de, S> {
-        type Value = S::Value;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            write!(formatter, "a newtype struct named {}", self.name)
+            fn visit_seq<B>(mut self, mut seq: B) -> Result<Self::Value, B::Error>
+                where B: SeqAccess<'de>
+            {
+                let mut result = self.initial;
+                for current in 0..usize::MAX {
+                    if let Some(seed) = self.seeds.next() {
+                        let el = seq.next_element_seed(seed)?;
+                        if let Some(el) = el {
+                            result = (self.collector)(result, el);
+                        }
+                    } else {
+                        return Err(<B::Error as serde::de::Error>::invalid_length(current + 1, &format!("a sequence of at most {} elements", current).as_str()));
+                    }
+                }
+                return Ok(result);
+            }
         }
 
-        fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-            where D: Deserializer<'de>
-        {
-            self.seed.deserialize(deserializer)
-        }
+        return deserializer.deserialize_seq(ResultVisitor {
+            deserializer: PhantomData,
+            element_seed: PhantomData,
+            collector: self.collector,
+            initial: self.initial,
+            seeds: self.seeds
+        });
     }
+}
 
-    return deserializer.deserialize_newtype_struct(name, NewtypeStructVisitor { seed: seed, name: name, deserializer: PhantomData });
+#[stability::unstable(feature = "enable")]
+pub struct SerializableNewtype<T>
+    where T: Serialize
+{
+    name: &'static str,
+    data: T 
+}
+
+impl<T> SerializableNewtype<T>
+    where T: Serialize
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(name: &'static str, data: T) -> Self {
+        Self { name, data }
+    }
+}
+
+impl<T> Serialize for SerializableNewtype<T>
+    where T: Serialize
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        serializer.serialize_newtype_struct(self.name, &self.data)
+    }
+}
+
+#[stability::unstable(feature = "enable")]
+pub struct DeserializeNewtype<'de, S>
+    where S: DeserializeSeed<'de>
+{
+    deserializer: PhantomData<&'de ()>,
+    name: &'static str,
+    seed: S
+}
+
+impl<'de, S> DeserializeNewtype<'de, S>
+    where S: DeserializeSeed<'de>
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(name: &'static str, seed: S) -> Self {
+        Self { deserializer: PhantomData, name, seed }
+    }
+}
+
+impl<'de, S> DeserializeSeed<'de> for DeserializeNewtype<'de, S>
+    where S: DeserializeSeed<'de>
+{
+    type Value = S::Value;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where D: Deserializer<'de>
+    {
+        struct NewtypeStructVisitor<'de, S: DeserializeSeed<'de>> {
+            seed: S,
+            name: &'static str,
+            deserializer: PhantomData<&'de ()>
+        }
+    
+        impl<'de, S: DeserializeSeed<'de>> Visitor<'de> for NewtypeStructVisitor<'de, S> {
+            type Value = S::Value;
+    
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(formatter, "a newtype struct named {}", self.name)
+            }
+    
+            fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+                where D: Deserializer<'de>
+            {
+                self.seed.deserialize(deserializer)
+            }
+        }
+    
+        return deserializer.deserialize_newtype_struct(self.name, NewtypeStructVisitor { seed: self.seed, name: self.name, deserializer: PhantomData });
+    }
 }
 
 ///

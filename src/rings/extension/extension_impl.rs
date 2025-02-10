@@ -1,8 +1,9 @@
 use std::alloc::Allocator;
 use std::alloc::Global;
 
-use serde::de;
+use serde::de::DeserializeSeed;
 use serde::Deserializer;
+use serde::Serialize;
 use serde::Serializer;
 
 use crate::algorithms::convolution::*;
@@ -439,20 +440,20 @@ impl<R, V, A, C> SerializableElementRing for FreeAlgebraImplBase<R, V, A, C>
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
         where D: Deserializer<'de>
     {
-        let mut data = Vec::with_capacity_in(1 << self.log2_padded_len, self.element_allocator.clone());
-        deserialize_seq_helper(deserializer, |x| data.push(x), DeserializeWithRing::new(self.base_ring()))?;
-        if data.len() != self.rank() {
-            return Err(de::Error::invalid_length(data.len(), &format!("a sequence of {} base ring elements", self.rank()).as_str()));
-        }
-        data.extend((0..((1 << self.log2_padded_len) - self.rank)).map(|_| self.base_ring().zero()));
-        return Ok(FreeAlgebraImplEl { values: data.into_boxed_slice() });
+        DeserializeNewtype::new("ExtensionRingEl", DeserializeSeedSeq::new(
+            std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(self.rank()),
+            Vec::with_capacity_in(1 << self.log2_padded_len, self.element_allocator.clone()),
+            |mut current, next| { current.push(next); current }
+        )).deserialize(deserializer).map(|values| FreeAlgebraImplEl { values: values.into_boxed_slice() })
     }
 
     fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
         debug_assert_eq!(1 << self.log2_padded_len, el.values.len());
-        serialize_seq_helper(serializer, (&el.values[..self.rank()]).iter().map(|c| SerializeWithRing::new(c, self.base_ring())))
+        SerializableNewtype::new("ExtensionRingEl", SerializableSeq::new(
+            (0..self.rank()).map_fn(|i| SerializeWithRing::new(&el.values[i], self.base_ring()))
+        )).serialize(serializer)
     }
 }
 

@@ -1,4 +1,5 @@
-use serde::{Deserializer, Serializer};
+use serde::de::DeserializeSeed;
+use serde::{Deserializer, Serialize, Serializer};
 
 use crate::algorithms::convolution::*;
 use crate::algorithms::interpolate::interpolate;
@@ -415,16 +416,21 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> SerializableElem
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
         where D: Deserializer<'de>
     {
-        let mut data = Vec::new_in(self.element_allocator.clone());
-        deserialize_seq_helper(deserializer, |x| data.push(x), DeserializeWithRing::new(self.base_ring()))?;
-        return Ok(DensePolyRingEl { data });
+        DeserializeNewtype::new("DensePoly", DeserializeSeedSeq::new(
+            std::iter::repeat(DeserializeWithRing::new(self.base_ring())),
+            Vec::new_in(self.element_allocator.clone()),
+            |mut current, next| { current.push(next); current }
+        )).deserialize(deserializer).map(|data| DensePolyRingEl { data })
     }
 
     fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
         let len = self.degree(el).map(|d| d + 1).unwrap_or(0);
-        serialize_seq_helper(serializer, (0..len).map(|i| SerializeWithRing::new(self.coefficient_at(el, i), self.base_ring())))
+        SerializableNewtype::new(
+            "DensePoly", 
+            SerializableSeq::new((0..len).map_fn(|i| SerializeWithRing::new(self.coefficient_at(el, i), self.base_ring())))
+        ).serialize(serializer)
     }
 }
 

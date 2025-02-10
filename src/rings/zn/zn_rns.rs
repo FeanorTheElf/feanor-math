@@ -1,20 +1,18 @@
-use std::alloc::Allocator;
-use std::alloc::Global;
+use std::alloc::{Allocator, Global};
 
-use serde::de;
-use serde::de::Visitor;
+use serde::Serialize;
+use serde::de::DeserializeSeed;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::iters::multi_cartesian_product;
 use crate::iters::MultiProduct;
-use crate::seq::VectorView;
+use crate::seq::{VectorView, VectorFn};
 use crate::integer::*;
 use crate::divisibility::DivisibilityRingStore;
 use crate::rings::zn::*;
-use crate::serialization::serialize_seq_helper;
-use crate::serialization::DeserializeWithRing;
-use crate::serialization::SerializableElementRing;
-use crate::serialization::SerializeWithRing;
+use crate::serialization::DeserializeSeedSeq;
+use crate::serialization::SerializableSeq;
+use crate::serialization::{DeserializeWithRing, SerializableElementRing, SerializeWithRing};
 use crate::specialization::*;
 use crate::primitive_int::*;
 
@@ -794,7 +792,8 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> SerializableElementRing f
                 serializer
             )
         } else {
-            serialize_seq_helper(serializer, self.get_congruence(el).as_iter().zip(self.as_iter()).map(|(x, ring)| SerializeWithRing::new(x, ring)))
+            let el_congruence = self.get_congruence(el);
+            SerializableSeq::new((0..self.len()).map_fn(|i| SerializeWithRing::new(el_congruence.at(i), self.at(i)))).serialize(serializer)
         }
     }
 
@@ -806,39 +805,13 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> SerializableElementRing f
                 self.total_ring.get_ring().deserialize(deserializer)?
             ))
         } else {
-            struct SeqVisitor<'a, C, A>
-                where C: RingStore, C::Type: ZnRing + SerializableElementRing, A: Allocator
-            {
-                rings: &'a [C],
-                allocator: A
-            }
-        
-            impl<'a, 'de, C, A> Visitor<'de> for SeqVisitor<'a, C, A>
-                where C: RingStore, C::Type: ZnRing + SerializableElementRing, A: Allocator
-            {
-                type Value = Vec<El<C>, A>;
-        
-                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                    write!(formatter, "a sequence of {} finite ring elements", self.rings.len())
-                }
-        
-                fn visit_seq<S>(self, mut seq: S) -> Result<Self::Value, S::Error>
-                    where S: serde::de::SeqAccess<'de>
-                {
-                    let mut result = Vec::with_capacity_in(self.rings.len(), self.allocator);
-                    for (i, ring) in self.rings.iter().enumerate() {
-                        let el = seq.next_element_seed(DeserializeWithRing::new(ring))?;
-                        if let Some(el) = el {
-                            result.push(el);
-                        } else {
-                            return Err(de::Error::invalid_length(i, &format!("a sequence of {} base ring elements", self.rings.len()).as_str()));
-                        }
-                    }
-                    return Ok(result);
-                }
-            }
-        
-            return deserializer.deserialize_seq(SeqVisitor { rings: &self.components, allocator: self.element_allocator.clone() }).map(|data| ZnEl { data });
+            DeserializeSeedSeq::new(
+                self.as_iter().map(|ring| DeserializeWithRing::new(ring)), 
+                Vec::with_capacity_in(self.len(), self.element_allocator.clone()), 
+                |mut current, next| { current.push(next); current }
+            ).deserialize(deserializer).map(|result| ZnEl {
+                data: result
+            })
         }
     }
 }

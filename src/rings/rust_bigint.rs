@@ -1,6 +1,6 @@
-use serde::de;
+use serde::de::{self, DeserializeSeed};
 use serde::ser::SerializeTuple;
-use serde::{Deserializer, Serializer}; 
+use serde::{Deserializer, Serialize, Serializer}; 
 
 use crate::algorithms::bigint::{deserialize_bigint_from_bytes, highest_set_block};
 use crate::divisibility::{DivisibilityRing, Domain};
@@ -11,7 +11,7 @@ use crate::ordered::*;
 use crate::primitive_int::*;
 use crate::ring::*;
 use crate::algorithms;
-use crate::serialization::{deserialize_newtype_struct_helper, serialize_newtype_struct_helper, SerializableElementRing};
+use crate::serialization::{DeserializeNewtype, SerializableElementRing, SerializableNewtype};
 use std::alloc::Allocator;
 use std::alloc::Global;
 use std::cmp::Ordering::{self, *};
@@ -391,7 +391,7 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
         if deserializer.is_human_readable() {
             // this makes an unnecessary temporary allocation, but then the cost is probably negligible compared
             // to the parsing of a string as a number
-            let string = deserialize_newtype_struct_helper(deserializer, "BigInt", PhantomData::<String>)?;
+            let string = DeserializeNewtype::new("BigInt", PhantomData::<String>).deserialize(deserializer)?;
             return self.parse(string.as_str(), 10).map_err(|()| de::Error::custom(format!("cannot parse \"{}\" as number", string)));
         } else {
             let (negative, data) = deserialize_bigint_from_bytes(deserializer, |data| {
@@ -412,7 +412,7 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
         where S: Serializer
     {
         if serializer.is_human_readable() {
-            serialize_newtype_struct_helper(serializer, "BigInt", format!("{}", RingRef::new(self).format(el)).as_str())
+            SerializableNewtype::new("BigInt", format!("{}", RingRef::new(self).format(el)).as_str()).serialize(serializer)
         } else {
             let len = highest_set_block(&el.1).map(|n| n + 1).unwrap_or(0);
             let mut data = Vec::with_capacity_in(len * size_of::<u64>(), &self.allocator);
