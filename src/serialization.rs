@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use serde::de::{DeserializeSeed, SeqAccess, Visitor};
+use serde::de::{DeserializeSeed, IgnoredAny, SeqAccess, Visitor};
 use serde::{Deserializer, Serialize, Serializer};
 
 use crate::seq::VectorFn;
@@ -30,6 +30,13 @@ pub trait SerializableElementRing: RingBase {
         where S: Serializer;
 }
 
+
+///
+/// Wraps a [`VectorFn`] whose elements are [`Serialize`]able, and
+/// allows to serialize all elements as a sequence.
+/// 
+/// To deserialize, consider using [`DeserializeSeedSeq`].
+/// 
 #[stability::unstable(feature = "enable")]
 pub struct SerializableSeq<V, T>
     where V: VectorFn<T>
@@ -57,6 +64,12 @@ impl<V, T> Serialize for SerializableSeq<V, T>
     }
 }
 
+///
+/// A [`DeserializeSeed`] that deserializes a sequence by deserializing
+/// every element according to some derived [`DeserializeSeed`]. The resulting
+/// elements are collected using a custom reducer function, akin to 
+/// [`Iterator::fold()`].
+/// 
 #[stability::unstable(feature = "enable")]
 pub struct DeserializeSeedSeq<'de, V, S, T, C>
     where V: Iterator<Item = S>,
@@ -129,12 +142,18 @@ impl<'de, V, S, T, C> DeserializeSeed<'de> for DeserializeSeedSeq<'de, V, S, T, 
                         let el = seq.next_element_seed(seed)?;
                         if let Some(el) = el {
                             result = (self.collector)(result, el);
+                        } else {
+                            return Ok(result);
                         }
                     } else {
-                        return Err(<B::Error as serde::de::Error>::invalid_length(current + 1, &format!("a sequence of at most {} elements", current).as_str()));
+                        if let Some(_) = seq.next_element::<IgnoredAny>()? {
+                            return Err(<B::Error as serde::de::Error>::invalid_length(current + 1, &format!("a sequence of at most {} elements", current).as_str()));
+                        } else {
+                            return Ok(result);
+                        }
                     }
                 }
-                return Ok(result);
+                unreachable!()
             }
         }
 
@@ -176,7 +195,7 @@ impl<T> Serialize for SerializableNewtype<T>
 }
 
 #[stability::unstable(feature = "enable")]
-pub struct DeserializeNewtype<'de, S>
+pub struct DeserializeSeedNewtype<'de, S>
     where S: DeserializeSeed<'de>
 {
     deserializer: PhantomData<&'de ()>,
@@ -184,7 +203,7 @@ pub struct DeserializeNewtype<'de, S>
     seed: S
 }
 
-impl<'de, S> DeserializeNewtype<'de, S>
+impl<'de, S> DeserializeSeedNewtype<'de, S>
     where S: DeserializeSeed<'de>
 {
     #[stability::unstable(feature = "enable")]
@@ -193,7 +212,7 @@ impl<'de, S> DeserializeNewtype<'de, S>
     }
 }
 
-impl<'de, S> DeserializeSeed<'de> for DeserializeNewtype<'de, S>
+impl<'de, S> DeserializeSeed<'de> for DeserializeSeedNewtype<'de, S>
     where S: DeserializeSeed<'de>
 {
     type Value = S::Value;

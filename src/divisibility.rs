@@ -121,7 +121,7 @@ pub trait DivisibilityRing: RingBase {
     /// to [`DivisibilityRing::checked_left_div_prepared()`] and other "prepared" division
     /// functions, which can be faster than for an "unprepared" element.
     /// 
-    /// See also [`DivisibilityRing::prepare_divisor()`].
+    /// See also [`DivisibilityRingBase::prepare_divisor()`].
     /// 
     /// # Caveat
     /// 

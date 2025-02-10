@@ -1,7 +1,7 @@
 use libc;
 use serde::de::DeserializeSeed;
 use serde::ser::SerializeTuple;
-use serde::{Deserializer, Serializer};
+use serde::{Deserializer, Serializer, Serialize};
 
 use crate::impl_poly_gcd_locally_for_ZZ;
 use crate::algorithms;
@@ -388,7 +388,7 @@ impl SerializableElementRing for MPZBase {
         where S: Serializer
     {
         if serializer.is_human_readable() {
-            serialize_newtype_struct_helper(serializer, "BigInt", format!("{}", RingRef::new(self).format(el)).as_str())
+            SerializableNewtype::new("BigInt", format!("{}", RingRef::new(self).format(el)).as_str()).serialize(serializer)
         } else {
             let len = self.to_le_bytes_len(el);
             let mut data = Vec::with_capacity(len);

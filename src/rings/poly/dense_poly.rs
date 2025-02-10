@@ -416,7 +416,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> SerializableElem
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
         where D: Deserializer<'de>
     {
-        DeserializeNewtype::new("DensePoly", DeserializeSeedSeq::new(
+        DeserializeSeedNewtype::new("DensePoly", DeserializeSeedSeq::new(
             std::iter::repeat(DeserializeWithRing::new(self.base_ring())),
             Vec::new_in(self.element_allocator.clone()),
             |mut current, next| { current.push(next); current }

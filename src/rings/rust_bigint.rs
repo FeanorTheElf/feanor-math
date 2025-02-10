@@ -11,7 +11,7 @@ use crate::ordered::*;
 use crate::primitive_int::*;
 use crate::ring::*;
 use crate::algorithms;
-use crate::serialization::{DeserializeNewtype, SerializableElementRing, SerializableNewtype};
+use crate::serialization::{DeserializeSeedNewtype, SerializableElementRing, SerializableNewtype};
 use std::alloc::Allocator;
 use std::alloc::Global;
 use std::cmp::Ordering::{self, *};
@@ -391,7 +391,7 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
         if deserializer.is_human_readable() {
             // this makes an unnecessary temporary allocation, but then the cost is probably negligible compared
             // to the parsing of a string as a number
-            let string = DeserializeNewtype::new("BigInt", PhantomData::<String>).deserialize(deserializer)?;
+            let string = DeserializeSeedNewtype::new("BigInt", PhantomData::<String>).deserialize(deserializer)?;
             return self.parse(string.as_str(), 10).map_err(|()| de::Error::custom(format!("cannot parse \"{}\" as number", string)));
         } else {
             let (negative, data) = deserialize_bigint_from_bytes(deserializer, |data| {

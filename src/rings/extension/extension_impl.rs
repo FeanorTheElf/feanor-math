@@ -440,11 +440,14 @@ impl<R, V, A, C> SerializableElementRing for FreeAlgebraImplBase<R, V, A, C>
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
         where D: Deserializer<'de>
     {
-        DeserializeNewtype::new("ExtensionRingEl", DeserializeSeedSeq::new(
+        DeserializeSeedNewtype::new("ExtensionRingEl", DeserializeSeedSeq::new(
             std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(self.rank()),
             Vec::with_capacity_in(1 << self.log2_padded_len, self.element_allocator.clone()),
             |mut current, next| { current.push(next); current }
-        )).deserialize(deserializer).map(|values| FreeAlgebraImplEl { values: values.into_boxed_slice() })
+        )).deserialize(deserializer).map(|mut values| {
+            values.resize_with(1 << self.log2_padded_len, || self.base_ring().zero());
+            FreeAlgebraImplEl { values: values.into_boxed_slice() }
+        })
     }
 
     fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>

@@ -10,7 +10,9 @@ use crate::seq::{VectorView, VectorFn};
 use crate::integer::*;
 use crate::divisibility::DivisibilityRingStore;
 use crate::rings::zn::*;
+use crate::serialization::DeserializeSeedNewtype;
 use crate::serialization::DeserializeSeedSeq;
+use crate::serialization::SerializableNewtype;
 use crate::serialization::SerializableSeq;
 use crate::serialization::{DeserializeWithRing, SerializableElementRing, SerializeWithRing};
 use crate::specialization::*;
@@ -793,7 +795,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> SerializableElementRing f
             )
         } else {
             let el_congruence = self.get_congruence(el);
-            SerializableSeq::new((0..self.len()).map_fn(|i| SerializeWithRing::new(el_congruence.at(i), self.at(i)))).serialize(serializer)
+            SerializableNewtype::new("RNSZnEl", SerializableSeq::new((0..self.len()).map_fn(|i| SerializeWithRing::new(el_congruence.at(i), self.at(i))))).serialize(serializer)
         }
     }
 
@@ -805,11 +807,11 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> SerializableElementRing f
                 self.total_ring.get_ring().deserialize(deserializer)?
             ))
         } else {
-            DeserializeSeedSeq::new(
+            DeserializeSeedNewtype::new("RNSZnEl", DeserializeSeedSeq::new(
                 self.as_iter().map(|ring| DeserializeWithRing::new(ring)), 
                 Vec::with_capacity_in(self.len(), self.element_allocator.clone()), 
                 |mut current, next| { current.push(next); current }
-            ).deserialize(deserializer).map(|result| ZnEl {
+            )).deserialize(deserializer).map(|result| ZnEl {
                 data: result
             })
         }
