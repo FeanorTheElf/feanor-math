@@ -8,7 +8,7 @@ use crate::ordered::OrderedRingStore;
 ///
 /// Returns two integers `(a, b)` with `b > 0` such that `a/b = x mod n`.
 /// 
-/// If there exist |a| b < sqrt(n)/3` with `a/b = x mod n`, these will be
+/// If there exist `|a| b < sqrt(n)/3` with `a/b = x mod n`, these will be
 /// returned. Otherwise (i.e. if every `a, b` with `a/b = x mod n` satisfies
 /// `|a| b > sqrt(3)/3`), no further guarantees on the result are given, in
 /// particular, `(a, b) = (x, 1)` would be a valid result.

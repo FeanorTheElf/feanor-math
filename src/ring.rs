@@ -6,6 +6,8 @@ use crate::primitive_int::StaticRing;
 use crate::integer::*;
 use crate::algorithms;
 
+use serde::{Serialize, Deserialize};
+
 ///
 /// Describes the context in which to print an algebraic expression.
 /// It is usually used to determine when to use parenthesis during printing.
@@ -1063,7 +1065,7 @@ pub type El<R> = <<R as RingStore>::Type as RingBase>::Element;
 /// ```
 /// 
 #[repr(transparent)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct RingValue<R: RingBase> {
     ring: R
 }
