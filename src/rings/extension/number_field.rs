@@ -10,7 +10,7 @@ use squarefree_part::poly_power_decomposition_local;
 
 use crate::algorithms::interpolate::product_except_one;
 use crate::algorithms::poly_factor::finite::poly_factor_finite_field;
-use crate::algorithms::rational_reconstruction::rational_reconstruction;
+use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
 use crate::computation::*;
 use crate::delegate::DelegateRingImplEuclideanRing;
 use crate::specialization::*;
@@ -791,7 +791,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
         let Zpe_as_zn = ZZ.get_ring().local_ring_as_zn(&Zpe);
         let Zpe_to_as_zn = Zpe_as_zn.can_hom(Zpe).unwrap();
         let result = self.from_canonical_basis((0..self.rank()).map(|i| {
-            let (num, den) = rational_reconstruction(Zpe_as_zn, Zpe_to_as_zn.map_ref(ZpeX.coefficient_at(&combined, i)));
+            let (num, den) = balanced_rational_reconstruction(Zpe_as_zn, Zpe_to_as_zn.map_ref(ZpeX.coefficient_at(&combined, i)));
             return QQ.div(&QQ.inclusion().map(int_cast(num, ZZ, Zpe_as_zn.integer_ring())), &QQ.inclusion().map(int_cast(den, ZZ, Zpe_as_zn.integer_ring())));
         }));
         return result;
