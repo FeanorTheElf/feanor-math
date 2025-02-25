@@ -105,7 +105,7 @@ impl<GuardType: ?Sized> UnsafeAnyFrobeniusDataGuarded<GuardType> {
 }
 
 #[stability::unstable(feature = "enable")]
-pub trait FiniteField: Field + FiniteRing {
+pub trait ComputeFrobeniusRing: Field + FiniteRing {
     
     type FrobeniusData;
 
@@ -114,7 +114,7 @@ pub trait FiniteField: Field + FiniteRing {
     fn apply_frobenius(&self, _frobenius_data: &Self::FrobeniusData, exponent_of_p: usize, x: Self::Element) -> Self::Element;
 }
 
-impl<R> FiniteField for R
+impl<R> ComputeFrobeniusRing for R
     where R: ?Sized + Field + FiniteRing
 {
     type FrobeniusData = UnsafeAnyFrobeniusDataGuarded<R>;
@@ -124,9 +124,12 @@ impl<R> FiniteField for R
     }
 
     default fn apply_frobenius(&self, _frobenius_data: &Self::FrobeniusData, exponent_of_p: usize, x: Self::Element) -> Self::Element {
-        let q = self.size(&BigIntRing::RING).unwrap();
-        let (p, e) = is_prime_power(BigIntRing::RING, &q).unwrap();
-        return RingRef::new(self).pow_gen(x, &BigIntRing::RING.pow(p, exponent_of_p % e), BigIntRing::RING);
+        if exponent_of_p == 0 {
+            return x
+        } else {
+            let (p, e) = is_prime_power(BigIntRing::RING, &self.size(&BigIntRing::RING).unwrap()).unwrap();
+            return RingRef::new(self).pow_gen(x, &BigIntRing::RING.pow(p, exponent_of_p % e), BigIntRing::RING);
+        }
     }
 }
 
@@ -136,7 +139,7 @@ pub struct Frobenius<R>
         R::Type: FiniteRing + Field
 {
     field: R,
-    data: <R::Type as FiniteField>::FrobeniusData,
+    data: <R::Type as ComputeFrobeniusRing>::FrobeniusData,
     exponent_of_p: usize
 }
 
@@ -146,6 +149,8 @@ impl<R> Frobenius<R>
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(field: R, exponent_of_p: usize) -> Self {
+        let (_p, field_dimension) = is_prime_power(BigIntRing::RING, &field.size(BigIntRing::RING).unwrap()).unwrap();
+        let exponent_of_p = exponent_of_p % field_dimension;
         let (data, exponent_of_p2) = field.get_ring().create_frobenius(exponent_of_p);
         assert_eq!(exponent_of_p, exponent_of_p2);
         return Self { field: field, data: data, exponent_of_p: exponent_of_p };

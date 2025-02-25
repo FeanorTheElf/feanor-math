@@ -65,7 +65,7 @@ impl<R, A> NTTConvolution<R, A>
         }
     }
 
-    fn compute_convolution_base(&self, mut lhs: PreparedConvolutionOperand<R, A>, rhs: &PreparedConvolutionOperand<R, A>, out: &mut [El<R>]) {
+    fn compute_convolution_impl(&self, mut lhs: PreparedConvolutionOperand<R, A>, rhs: &PreparedConvolutionOperand<R, A>, out: &mut [El<R>]) {
         let log2_n = ZZ.abs_log2_ceil(&(lhs.data.len() as i64)).unwrap();
         assert_eq!(lhs.data.len(), 1 << log2_n);
         assert_eq!(rhs.data.len(), 1 << log2_n);
@@ -107,7 +107,7 @@ impl<R, A> NTTConvolution<R, A>
         };
     }
     
-    fn prepare_convolution_base<V: VectorView<El<R>>>(&self, val: V, log2_n: usize) -> PreparedConvolutionOperand<R, A> {
+    fn prepare_convolution_impl<V: VectorView<El<R>>>(&self, val: V, log2_n: usize) -> PreparedConvolutionOperand<R, A> {
         let mut result = Vec::with_capacity_in(1 << log2_n, self.allocator.clone());
         result.extend(val.as_iter().map(|x| self.ring.clone_el(x)));
         result.resize_with(1 << log2_n, || self.ring.zero());
@@ -132,9 +132,9 @@ impl<R, A> ConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
     fn compute_convolution<S: RingStore<Type = R::Type> + Copy, V1: VectorView<<R::Type as RingBase>::Element>, V2: VectorView<<R::Type as RingBase>::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [El<R>], ring: S) {
         assert!(self.supports_ring(&ring));
         let log2_n = ZZ.abs_log2_ceil(&((lhs.len() + rhs.len()) as i64)).unwrap();
-        let lhs_prep = self.prepare_convolution_base(lhs, log2_n);
-        let rhs_prep = self.prepare_convolution_base(rhs, log2_n);
-        self.compute_convolution_base(lhs_prep, &rhs_prep, dst);
+        let lhs_prep = self.prepare_convolution_impl(lhs, log2_n);
+        let rhs_prep = self.prepare_convolution_impl(rhs, log2_n);
+        self.compute_convolution_impl(lhs_prep, &rhs_prep, dst);
     }
 }
 
@@ -151,28 +151,30 @@ impl<R, A> PreparedConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
         assert!(ring.get_ring() == self.ring.get_ring());
         let log2_n_in = ZZ.abs_log2_ceil(&(val.len() as i64)).unwrap();
         let log2_n_out = log2_n_in + 1;
-        return self.prepare_convolution_base(val, log2_n_out);
+        return self.prepare_convolution_impl(val, log2_n_out);
     }
 
     fn compute_convolution_lhs_prepared<S: RingStore<Type = R::Type> + Copy, V: VectorView<El<R>>>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: V, dst: &mut [El<R>], ring: S) {
+        assert!(ring.is_commutative());
         assert!(ring.get_ring() == self.ring.get_ring());
         let log2_lhs = ZZ.abs_log2_ceil(&(lhs.data.len() as i64)).unwrap();
         assert_eq!(lhs.data.len(), 1 << log2_lhs);
         let log2_n = ZZ.abs_log2_ceil(&((lhs.len + rhs.len()) as i64)).unwrap().max(log2_lhs);
         assert!(log2_lhs <= log2_n);
-        self.compute_convolution_prepared(lhs, &self.prepare_convolution_base(rhs, log2_n), dst, ring);
+        self.compute_convolution_prepared(lhs, &self.prepare_convolution_impl(rhs, log2_n), dst, ring);
     }
 
     fn compute_convolution_prepared<S: RingStore<Type = R::Type> + Copy>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: &Self::PreparedConvolutionOperand, dst: &mut [El<R>], ring: S) {
+        assert!(ring.is_commutative());
         assert!(ring.get_ring() == self.ring.get_ring());
         let log2_lhs = ZZ.abs_log2_ceil(&(lhs.data.len() as i64)).unwrap();
         assert_eq!(1 << log2_lhs, lhs.data.len());
         let log2_rhs = ZZ.abs_log2_ceil(&(rhs.data.len() as i64)).unwrap();
         assert_eq!(1 << log2_rhs, rhs.data.len());
         match log2_lhs.cmp(&log2_rhs) {
-            std::cmp::Ordering::Equal => self.compute_convolution_base(self.clone_prepared_operand(lhs), rhs, dst),
-            std::cmp::Ordering::Greater => self.compute_convolution_base(PreparedConvolutionOperand { data: self.un_and_redo_fft(&rhs.data, log2_lhs), len: rhs.len }, lhs, dst),
-            std::cmp::Ordering::Less => self.compute_convolution_base(PreparedConvolutionOperand { data: self.un_and_redo_fft(&lhs.data, log2_rhs), len: lhs.len }, rhs, dst)
+            std::cmp::Ordering::Equal => self.compute_convolution_impl(self.clone_prepared_operand(lhs), rhs, dst),
+            std::cmp::Ordering::Greater => self.compute_convolution_impl(PreparedConvolutionOperand { data: self.un_and_redo_fft(&rhs.data, log2_lhs), len: rhs.len }, lhs, dst),
+            std::cmp::Ordering::Less => self.compute_convolution_impl(PreparedConvolutionOperand { data: self.un_and_redo_fft(&lhs.data, log2_rhs), len: lhs.len }, rhs, dst)
         }
     }
 

@@ -125,7 +125,6 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
             }
         }
         small_d = degree as i64 / large_d;
-        println!("large_d = {}", large_d);
         if large_d != 1 {
             let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
             // careful here to not get an infinite generic argument recursion
@@ -153,7 +152,6 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
 
     // fallback, just generate a random irreducible polynomial
     loop {
-        println!("Fallback");
         let f = poly_ring.from_terms((0..degree).map(|i| (Fp.random_element(|| rng.rand_u64()), i)).chain([(Fp.one(), degree)].into_iter()));
         if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
             return result;
@@ -171,7 +169,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
     
     let log2_modulus = poly_ring.base_ring().integer_ring().abs_log2_ceil(poly_ring.base_ring().modulus()).unwrap();
     let fft_convolution = FFTConvolution::new_with(Global);
-    if fft_convolution.can_compute(StaticRing::<i64>::RING.abs_log2_ceil(&(degree as i64)).unwrap() + 1, log2_modulus) {
+    if fft_convolution.has_sufficient_precision(StaticRing::<i64>::RING.abs_log2_ceil(&(degree as i64)).unwrap() + 1, log2_modulus) {
         find_small_irreducible_poly_base(
             &poly_ring,
             degree,

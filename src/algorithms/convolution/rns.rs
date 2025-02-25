@@ -134,6 +134,13 @@ impl<'a, I, C, A, CreateC> From<&'a RNSConvolution<I, C, A, CreateC>> for &'a RN
     }
 }
 
+impl CreateNTTConvolution<Global> {
+    #[stability::unstable(feature = "enable")]
+    pub fn new() -> Self {
+        Self { allocator: Global }
+    }
+}
+
 impl<A> FnOnce<(Zn,)> for CreateNTTConvolution<A>
     where A: Allocator + Clone
 {

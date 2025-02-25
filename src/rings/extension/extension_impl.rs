@@ -6,6 +6,8 @@ use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
 
+use crate::algorithms::convolution::fft::FFTConvolutionZn;
+use crate::algorithms::sqr_mul::generic_pow_shortest_chain_table;
 use crate::algorithms::convolution::*;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::poly_factor::FactorPolyField;
@@ -15,6 +17,7 @@ use crate::{impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos, impl
 use crate::integer::*;
 use crate::iters::multi_cartesian_product;
 use crate::iters::MultiProduct;
+use crate::ordered::OrderedRingStore;
 use crate::matrix::OwnedMatrix;
 use crate::primitive_int::StaticRing;
 use crate::rings::field::{AsField, AsFieldBase};
@@ -173,6 +176,46 @@ impl<R, V, A, C> FreeAlgebraImplBase<R, V, A, C>
     pub fn convolution(&self) -> &C {
         &self.convolution
     }
+
+    fn reduce_mod_poly(&self, data: &mut [El<R>]) {
+        struct ReduceModulo<'a, R>
+            where R: RingStore
+        {
+            rank: usize,
+            base_ring: &'a R,
+            data: &'a mut [El<R>]
+        }
+
+        impl<'a, R> SparseVectorViewOperation<El<R>> for ReduceModulo<'a, R>
+            where R: RingStore
+        {
+            type Output<'b> = ()
+                where Self: 'b;
+        
+            fn execute<'b, V: 'b + VectorViewSparse<El<R>>>(self, vector: V) -> () {
+                for i in (self.rank..(2 * self.rank)).rev() {
+                    for (j, c) in vector.nontrivial_entries() {
+                        let add = self.base_ring.mul_ref(c, &mut self.data[i]);
+                        self.base_ring.add_assign(&mut self.data[i - self.rank + j], add);
+                    }
+                }
+            }
+        }
+
+        let was_sparse = self.x_pow_rank.specialize_sparse(ReduceModulo {
+            rank: self.rank,
+            base_ring: self.base_ring(),
+            data: data
+        });
+        if was_sparse.is_err() {
+            for i in (self.rank()..(2 * self.rank())).rev() {
+                for j in 0..self.x_pow_rank.len() {
+                    let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &data[i]);
+                    self.base_ring.add_assign(&mut data[i - self.rank() + j], add);
+                }
+            }
+        }
+    }
 }
 
 impl<R, V, A, C> PartialEq for FreeAlgebraImplBase<R, V, A, C>
@@ -250,44 +293,7 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
         let mut tmp = Vec::with_capacity_in(self.rank() * 2, self.element_allocator.clone());
         tmp.extend((0..(2 << self.log2_padded_len)).map(|_| self.base_ring.zero()));
         self.convolution.compute_convolution(&lhs.values[..], &rhs.values[..], &mut tmp[..], self.base_ring());
-
-        struct ReduceModulo<'a, R>
-            where R: RingStore
-        {
-            rank: usize,
-            base_ring: &'a R,
-            data: &'a mut [El<R>]
-        }
-
-        impl<'a, R> SparseVectorViewOperation<El<R>> for ReduceModulo<'a, R>
-            where R: RingStore
-        {
-            type Output<'b> = ()
-                where Self: 'b;
-        
-            fn execute<'b, V: 'b + VectorViewSparse<El<R>>>(self, vector: V) -> () {
-                for i in (self.rank..(2 * self.rank)).rev() {
-                    for (j, c) in vector.nontrivial_entries() {
-                        let add = self.base_ring.mul_ref(c, &mut self.data[i]);
-                        self.base_ring.add_assign(&mut self.data[i - self.rank + j], add);
-                    }
-                }
-            }
-        }
-
-        let was_sparse = self.x_pow_rank.specialize_sparse(ReduceModulo {
-            rank: self.rank,
-            base_ring: self.base_ring(),
-            data: &mut tmp
-        });
-        if was_sparse.is_err() {
-            for i in (self.rank()..(2 * self.rank())).rev() {
-                for j in 0..self.x_pow_rank.len() {
-                    let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &tmp[i]);
-                    self.base_ring.add_assign(&mut tmp[i - self.rank() + j], add);
-                }
-            }
-        }
+        self.reduce_mod_poly(&mut tmp);
         for i in 0..self.rank() {
             lhs.values[i] = std::mem::replace(&mut tmp[i], self.base_ring.zero());
         }
