@@ -1,5 +1,4 @@
-use std::alloc::Allocator;
-use std::alloc::Global;
+use std::alloc::{Allocator, Global};
 
 use extension_impl::FreeAlgebraImplBase;
 use sparse::SparseMapVector;
@@ -25,8 +24,7 @@ use crate::field::*;
 use crate::pid::PrincipalIdealRing;
 use crate::rings::extension::extension_impl::FreeAlgebraImpl;
 use crate::rings::finite::*;
-use crate::algorithms::convolution::fft::FFTBasedConvolution;
-use crate::algorithms::convolution::fft::FFTBasedConvolutionZn;
+use crate::algorithms::convolution::fft::*;
 use crate::algorithms::poly_factor::cantor_zassenhaus;
 use crate::pid::EuclideanRing;
 use crate::primitive_int::StaticRing;
@@ -91,6 +89,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
 
         // first try trinomials, they seem to have a good chance of being irreducible
         for _ in 0..16 {
+            println!("Try trinomial");
             let i = (StaticRing::<i64>::RING.get_uniformly_random(&(degree as i64 - 1), || rng.rand_u64()) + 1) as usize;
             let a = Fp.random_element(|| rng.rand_u64());
             let b = Fp.random_element(|| rng.rand_u64());
@@ -126,6 +125,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
             }
         }
         small_d = degree as i64 / large_d;
+        println!("large_d = {}", large_d);
         if large_d != 1 {
             let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
             // careful here to not get an infinite generic argument recursion
@@ -153,6 +153,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
 
     // fallback, just generate a random irreducible polynomial
     loop {
+        println!("Fallback");
         let f = poly_ring.from_terms((0..degree).map(|i| (Fp.random_element(|| rng.rand_u64()), i)).chain([(Fp.one(), degree)].into_iter()));
         if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
             return result;
@@ -169,12 +170,12 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
     static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyTFracGCDRing);
     
     let log2_modulus = poly_ring.base_ring().integer_ring().abs_log2_ceil(poly_ring.base_ring().modulus()).unwrap();
-    let fft_convolution = FFTBasedConvolution::new_with(Global);
+    let fft_convolution = FFTConvolution::new_with(Global);
     if fft_convolution.can_compute(StaticRing::<i64>::RING.abs_log2_ceil(&(degree as i64)).unwrap() + 1, log2_modulus) {
         find_small_irreducible_poly_base(
             &poly_ring,
             degree,
-            <FFTBasedConvolutionZn as From<_>>::from(fft_convolution),
+            <FFTConvolutionZn as From<_>>::from(fft_convolution),
             rng
         )
     } else {
@@ -812,6 +813,8 @@ impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for AsFieldBase<FreeA
 
 #[cfg(test)]
 use test::Bencher;
+#[cfg(test)]
+use std::time::Instant;
 
 #[test]
 fn test_can_hom_from() {
@@ -922,4 +925,14 @@ fn bench_create_galois_ring_2_14_96(bencher: &mut Bencher) {
         let ring = field.get_ring().galois_ring(14);
         assert_eq!(96, ring.rank());
     });
+}
+
+#[test]
+#[ignore]
+fn test_galois_field_huge() {
+    let start = Instant::now();
+    let field = GaloisField::new(17, 2048);
+    _ = std::hint::black_box(field);
+    let end = Instant::now();
+    println!("Created GF(17^2048) in {} ms", (end - start).as_millis());
 }

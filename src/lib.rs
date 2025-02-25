@@ -63,6 +63,7 @@ pub mod unstable_sealed {
 }
 
 mod unsafe_any;
+mod lazy;
 
 ///
 /// Contains [`computation::ComputationController`] to observe long-running computations.

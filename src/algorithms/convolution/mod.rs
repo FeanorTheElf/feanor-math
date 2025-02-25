@@ -13,9 +13,13 @@ use karatsuba::*;
 pub mod karatsuba;
 
 ///
-/// Contains multiple implementations of computing convolutions using complex FFTs.
+/// Contains an implementation of computing convolutions using complex FFTs.
 /// 
 pub mod fft;
+
+pub mod ntt;
+
+pub mod rns;
 
 ///
 /// Trait for objects that can compute a convolution over some ring.
@@ -111,6 +115,8 @@ pub trait PreparedConvolutionAlgorithm<R: ?Sized + RingBase>: ConvolutionAlgorit
         where S: RingStore<Type = R> + Copy, 
             I: Iterator<Item = (&'a Self::PreparedConvolutionOperand, V)>,
             V: VectorView<R::Element>,
+            Self: 'a,
+            R: 'a,
             Self::PreparedConvolutionOperand: 'a
     {
         for (lhs, rhs) in values {
@@ -121,7 +127,9 @@ pub trait PreparedConvolutionAlgorithm<R: ?Sized + RingBase>: ConvolutionAlgorit
     fn compute_convolution_inner_product_prepared<'a, S, I>(&self, values: I, dst: &mut [R::Element], ring: S) 
         where S: RingStore<Type = R> + Copy, 
             I: Iterator<Item = (&'a Self::PreparedConvolutionOperand, &'a Self::PreparedConvolutionOperand)>,
-            Self::PreparedConvolutionOperand: 'a
+            Self::PreparedConvolutionOperand: 'a,
+            Self: 'a,
+            R: 'a,
     {
         for (lhs, rhs) in values {
             self.compute_convolution_prepared(lhs, rhs, dst, ring)
@@ -178,6 +186,8 @@ impl<'a, R, C> PreparedConvolutionAlgorithm<R> for C
         where S: RingStore<Type = R> + Copy, 
             I: Iterator<Item = (&'b Self::PreparedConvolutionOperand, V)>,
             V: VectorView<R::Element>,
+            Self: 'b,
+            R: 'b,
             Self::PreparedConvolutionOperand: 'b
     {
         (**self).compute_convolution_inner_product_lhs_prepared(values, dst, ring)
@@ -186,6 +196,8 @@ impl<'a, R, C> PreparedConvolutionAlgorithm<R> for C
     fn compute_convolution_inner_product_prepared<'b, S, I>(&self, values: I, dst: &mut [R::Element], ring: S) 
         where S: RingStore<Type = R> + Copy, 
             I: Iterator<Item = (&'b Self::PreparedConvolutionOperand, &'b Self::PreparedConvolutionOperand)>,
+            Self: 'b,
+            R: 'b,
             Self::PreparedConvolutionOperand: 'b
     {
         (**self).compute_convolution_inner_product_prepared(values, dst, ring)
@@ -282,4 +294,129 @@ fn bench_karatsuba_mul(bencher: &mut test::Bencher) {
         assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
         assert_eq!(c[62], 31 * 31);
     });
+}
+
+
+#[allow(missing_docs)]
+#[cfg(any(test, feature = "generic_tests"))]
+pub mod generic_tests {
+    use std::cmp::min;
+    use crate::homomorphism::*;
+    use crate::ring::*;
+    use super::*;
+
+    pub fn test_convolution<C, R>(convolution: C, ring: R, scale: El<R>)
+        where C: ConvolutionAlgorithm<R::Type>,
+            R: RingStore
+    {
+        for lhs_len in [2, 3, 4, 15] {
+            for rhs_len in [2, 3, 4, 15, 31, 32, 33] {
+                let lhs = (0..lhs_len).map(|i| ring.mul_ref_snd(ring.int_hom().map(i), &scale)).collect::<Vec<_>>();
+                let rhs = (0..rhs_len).map(|i| ring.mul_ref_snd(ring.int_hom().map(i), &scale)).collect::<Vec<_>>();
+                let expected = (0..(lhs_len + rhs_len)).map(|i| if i < lhs_len + rhs_len {
+                    min(i, lhs_len - 1) * (min(i, lhs_len - 1) + 1) * (3 * i - 2 * min(i, lhs_len - 1) - 1) / 6 - 
+                    (i - 1 - min(i, rhs_len - 1)) * (i - min(i, rhs_len - 1)) * (i + 2 * min(i, rhs_len - 1) + 1) / 6
+                } else {
+                    0
+                }).map(|x| ring.mul(ring.int_hom().map(x), ring.pow(ring.clone_el(&scale), 2))).collect::<Vec<_>>();
+    
+                let mut actual = Vec::new();
+                actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
+                convolution.compute_convolution(&lhs, &rhs, &mut actual, &ring);
+                for i in 0..(lhs_len + rhs_len) {
+                    assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
+                }
+
+                let expected = (0..(lhs_len + rhs_len)).map(|i| if i < lhs_len + rhs_len {
+                    i * i +
+                    min(i, lhs_len - 1) * (min(i, lhs_len - 1) + 1) * (3 * i - 2 * min(i, lhs_len - 1) - 1) / 6 - 
+                    (i - 1 - min(i, rhs_len - 1)) * (i - min(i, rhs_len - 1)) * (i + 2 * min(i, rhs_len - 1) + 1) / 6
+                } else {
+                    0
+                }).map(|x| ring.mul(ring.int_hom().map(x), ring.pow(ring.clone_el(&scale), 2))).collect::<Vec<_>>();
+    
+                let mut actual = Vec::new();
+                actual.extend((0..(lhs_len + rhs_len)).map(|i| ring.mul(ring.int_hom().map(i * i), ring.pow(ring.clone_el(&scale), 2))));
+                convolution.compute_convolution(&lhs, &rhs, &mut actual, &ring);
+                for i in 0..(lhs_len + rhs_len) {
+                    assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
+                }
+            }
+        }
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn test_prepared_convolution<C, R>(convolution: C, ring: R, scale: El<R>)
+        where C: PreparedConvolutionAlgorithm<R::Type>,
+            R: RingStore
+    {
+        for lhs_len in [2, 3, 4, 15] {
+            for rhs_len in [2, 3, 4, 15, 31, 32, 33] {
+                let lhs = (0..lhs_len).map(|i| ring.mul_ref_snd(ring.int_hom().map(i), &scale)).collect::<Vec<_>>();
+                let rhs = (0..rhs_len).map(|i| ring.mul_ref_snd(ring.int_hom().map(i), &scale)).collect::<Vec<_>>();
+                let expected = (0..(lhs_len + rhs_len)).map(|i| if i < lhs_len + rhs_len {
+                    min(i, lhs_len - 1) * (min(i, lhs_len - 1) + 1) * (3 * i - 2 * min(i, lhs_len - 1) - 1) / 6 - 
+                    (i - 1 - min(i, rhs_len - 1)) * (i - min(i, rhs_len - 1)) * (i + 2 * min(i, rhs_len - 1) + 1) / 6
+                } else {
+                    0
+                }).map(|x| ring.mul(ring.int_hom().map(x), ring.pow(ring.clone_el(&scale), 2))).collect::<Vec<_>>();
+    
+                let mut actual = Vec::new();
+                actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
+                convolution.compute_convolution_prepared(
+                    &convolution.prepare_convolution_operand(&lhs, &ring),
+                    &convolution.prepare_convolution_operand(&rhs, &ring),
+                    &mut actual, 
+                    &ring
+                );
+                for i in 0..(lhs_len + rhs_len) {
+                    assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
+                }
+
+                let mut actual = Vec::new();
+                actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
+                convolution.compute_convolution_lhs_prepared(
+                    &convolution.prepare_convolution_operand(&lhs, &ring),
+                    &rhs,
+                    &mut actual, 
+                    &ring
+                );
+                for i in 0..(lhs_len + rhs_len) {
+                    assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
+                }
+
+                let mut actual = Vec::new();
+                actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
+                let data = [
+                    (convolution.prepare_convolution_operand(&lhs, &ring), convolution.prepare_convolution_operand(&rhs, &ring)),
+                    (convolution.prepare_convolution_operand(&[ring.one()], &ring), convolution.prepare_convolution_operand(&[ring.one()], &ring))
+                ];
+                convolution.compute_convolution_inner_product_prepared(
+                    data.iter().map(|(l, r)| (l, r)),
+                    &mut actual, 
+                    &ring
+                );
+                assert_el_eq!(&ring, ring.add_ref_fst(&expected[0], ring.one()), &actual[0]);
+                for i in 1..(lhs_len + rhs_len) {
+                    assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
+                }
+
+                let mut actual = Vec::new();
+                actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
+                let data = [
+                    (convolution.prepare_convolution_operand(&lhs, &ring), rhs),
+                    (convolution.prepare_convolution_operand(&[ring.one()], &ring), vec![ring.one()])
+                ];
+                convolution.compute_convolution_inner_product_lhs_prepared(
+                    data.iter().map(|(l, r)| (l, r)),
+                    &mut actual, 
+                    &ring
+                );
+                assert_el_eq!(&ring, ring.add_ref_fst(&expected[0], ring.one()), &actual[0]);
+                for i in 1..(lhs_len + rhs_len) {
+                    assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
+                }
+            }
+        }
+    }
 }
