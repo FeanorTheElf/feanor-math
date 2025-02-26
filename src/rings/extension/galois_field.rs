@@ -855,6 +855,12 @@ fn test_can_hom_from() {
 
 #[test]
 fn test_galois_field() {
+    let field = GaloisField::new(3, 1);
+    assert_eq!(3, field.elements().count());
+    crate::ring::generic_tests::test_ring_axioms(&field, field.elements());
+    crate::ring::generic_tests::test_self_iso(&field, field.elements());
+    crate::field::generic_tests::test_field_axioms(&field, field.elements());
+
     let field = GaloisField::new(3, 2);
     assert_eq!(9, field.elements().count());
     crate::ring::generic_tests::test_ring_axioms(&field, field.elements());
