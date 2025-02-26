@@ -1,5 +1,6 @@
 use std::alloc::{Allocator, Global};
 use std::cmp::{min, max};
+use std::marker::PhantomData;
 
 use crate::algorithms::miller_rabin::is_prime;
 use crate::homomorphism::*;
@@ -13,7 +14,7 @@ use crate::divisibility::*;
 use crate::seq::*;
 
 use super::ntt::NTTConvolution;
-use super::{ConvolutionAlgorithm, PreparedConvolutionAlgorithm};
+use super::{ConvolutionAlgorithm, PreparedConvolutionAlgorithm, PreparedConvolutionOperation};
 
 ///
 /// A [`ConvolutionAlgorithm`] that computes convolutions by computing them modulo a
@@ -499,6 +500,46 @@ impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolution<I, C, A, Cr
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool {
         true
     }
+
+    fn specialize_prepared_convolution<F>(function: F) -> Result<F::Output, F>
+        where F: PreparedConvolutionOperation<Self, R>
+    {
+        struct CallFunction<F, R, I, C, A, CreateC>
+            where I: RingStore + Clone,
+                I::Type: IntegerRing,
+                C: ConvolutionAlgorithm<ZnBase>,
+                A: Allocator + Clone,
+                CreateC: Fn(Zn) -> C,
+                R: ?Sized + IntegerRing,
+                F: PreparedConvolutionOperation<RNSConvolution<I, C, A, CreateC>, R>
+        {
+            ring: PhantomData<Box<R>>,
+            convolution: PhantomData<RNSConvolution<I, C, A, CreateC>>,
+            function: F
+        }
+        impl<F, R, I, C, A, CreateC> PreparedConvolutionOperation<C, ZnBase> for CallFunction<F, R, I, C, A, CreateC>
+            where I: RingStore + Clone,
+                I::Type: IntegerRing,
+                C: ConvolutionAlgorithm<ZnBase>,
+                A: Allocator + Clone,
+                CreateC: Fn(Zn) -> C,
+                R: ?Sized + IntegerRing,
+                F: PreparedConvolutionOperation<RNSConvolution<I, C, A, CreateC>, R>
+        {
+            type Output = F::Output;
+
+            fn execute(self) -> Self::Output
+                where C: PreparedConvolutionAlgorithm<ZnBase>
+            {
+                self.function.execute()
+            }
+        }
+        return <C as ConvolutionAlgorithm<ZnBase>>::specialize_prepared_convolution::<CallFunction<F, R, I, C, A, CreateC>>(CallFunction {
+            function: function,
+            ring: PhantomData,
+            convolution: PhantomData
+        }).map_err(|f| f.function);
+    }
 }
 
 impl<R, I, C, A, CreateC> PreparedConvolutionAlgorithm<R> for RNSConvolution<I, C, A, CreateC>
@@ -606,6 +647,46 @@ impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolutionZn<I, C, A, 
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool {
         true
     }
+
+    fn specialize_prepared_convolution<F>(function: F) -> Result<F::Output, F>
+        where F: PreparedConvolutionOperation<Self, R>
+    {
+        struct CallFunction<F, R, I, C, A, CreateC>
+            where I: RingStore + Clone,
+                I::Type: IntegerRing,
+                C: ConvolutionAlgorithm<ZnBase>,
+                A: Allocator + Clone,
+                CreateC: Fn(Zn) -> C,
+                R: ?Sized + ZnRing + CanHomFrom<I::Type>,
+                F: PreparedConvolutionOperation<RNSConvolutionZn<I, C, A, CreateC>, R>
+        {
+            ring: PhantomData<Box<R>>,
+            convolution: PhantomData<RNSConvolution<I, C, A, CreateC>>,
+            function: F
+        }
+        impl<F, R, I, C, A, CreateC> PreparedConvolutionOperation<C, ZnBase> for CallFunction<F, R, I, C, A, CreateC>
+            where I: RingStore + Clone,
+                I::Type: IntegerRing,
+                C: ConvolutionAlgorithm<ZnBase>,
+                A: Allocator + Clone,
+                CreateC: Fn(Zn) -> C,
+                R: ?Sized + ZnRing + CanHomFrom<I::Type>,
+                F: PreparedConvolutionOperation<RNSConvolutionZn<I, C, A, CreateC>, R>
+        {
+            type Output = F::Output;
+
+            fn execute(self) -> Self::Output
+                where C: PreparedConvolutionAlgorithm<ZnBase>
+            {
+                self.function.execute()
+            }
+        }
+        return <C as ConvolutionAlgorithm<ZnBase>>::specialize_prepared_convolution::<CallFunction<F, R, I, C, A, CreateC>>(CallFunction {
+            function: function,
+            ring: PhantomData,
+            convolution: PhantomData
+        }).map_err(|f| f.function);
+    }
 }
 
 impl<R, I, C, A, CreateC> PreparedConvolutionAlgorithm<R> for RNSConvolutionZn<I, C, A, CreateC>
@@ -705,4 +786,19 @@ fn test_convolution_zn() {
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
     super::generic_tests::test_prepared_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
+}
+
+#[test]
+fn test_specialize_prepared() {
+    let ring = Zn::new((1 << 57) + 1);
+    let convolution = RNSConvolutionZn::from(RNSConvolution::new(7));
+
+    struct CheckIsPrepared(RNSConvolutionZn, Zn);
+    impl PreparedConvolutionOperation<RNSConvolutionZn, ZnBase> for CheckIsPrepared {
+        type Output = ();
+        fn execute(self) -> Self::Output {
+            super::generic_tests::test_prepared_convolution(&self.0, &self.1, self.1.int_hom().map(1 << 30));
+        }
+    }
+    assert!(RNSConvolutionZn::specialize_prepared_convolution(CheckIsPrepared(convolution, ring)).is_ok());
 }

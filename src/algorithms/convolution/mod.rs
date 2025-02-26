@@ -1,4 +1,5 @@
 use std::alloc::{Allocator, Global};
+use std::marker::PhantomData;
 use std::ops::Deref;
 
 use crate::ring::*;
@@ -83,6 +84,32 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// and thus only these will be supported.
     /// 
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, ring: S) -> bool;
+
+    ///
+    /// If this convolution implements [`PreparedConvolutionAlgorithm`], then
+    /// the given function is called and its result is returned. Otherwise,
+    /// `Err` is returned.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    fn specialize_prepared_convolution<F>(function: F) -> Result<F::Output, F>
+        where F: PreparedConvolutionOperation<Self, R>
+    {
+        Err(function)
+    }
+}
+
+///
+/// Operation that only makes sense when `C` implements [`PreparedConvolutionAlgorithm`].
+/// Used together with [`ConvolutionAlgorithm::specialize_prepared_convolution()`] as
+/// a workaround for specialization.
+/// 
+#[stability::unstable(feature = "enable")]
+pub trait PreparedConvolutionOperation<C: ?Sized, R: ?Sized + RingBase> {
+
+    type Output;
+
+    fn execute(self) -> Self::Output
+        where C: PreparedConvolutionAlgorithm<R>;
 }
 
 ///
@@ -148,6 +175,40 @@ impl<'a, R, C> ConvolutionAlgorithm<R> for C
 
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, ring: S) -> bool {
         (**self).supports_ring(ring)
+    }
+
+    fn specialize_prepared_convolution<F>(function: F) -> Result<F::Output, F>
+        where F: PreparedConvolutionOperation<Self, R>
+    {
+        struct CallFunction<F, C, R>
+            where R: ?Sized + RingBase,
+                C: Deref,
+                C::Target: ConvolutionAlgorithm<R>,
+                F: PreparedConvolutionOperation<C, R>
+        {
+            convolution: PhantomData<Box<C>>,
+            ring: PhantomData<Box<R>>,
+            function: F
+        }
+        impl<F, C, R> PreparedConvolutionOperation<C::Target, R> for CallFunction<F, C, R>
+            where R: ?Sized + RingBase,
+                C: Deref,
+                C::Target: ConvolutionAlgorithm<R>,
+                F: PreparedConvolutionOperation<C, R>
+        {
+            type Output = F::Output;
+
+            fn execute(self) -> Self::Output
+                where C::Target:PreparedConvolutionAlgorithm<R>
+            {
+                self.function.execute()
+            }
+        }
+        return <C::Target as ConvolutionAlgorithm<R>>::specialize_prepared_convolution::<CallFunction<F, C, R>>(CallFunction {
+            function: function,
+            ring: PhantomData,
+            convolution: PhantomData
+        }).map_err(|f| f.function);
     }
 }
 

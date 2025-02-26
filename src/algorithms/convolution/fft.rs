@@ -14,7 +14,7 @@ use crate::homomorphism::*;
 use crate::rings::float_complex::*;
 use crate::rings::zn::*;
 
-use super::{ConvolutionAlgorithm, PreparedConvolutionAlgorithm};
+use super::{ConvolutionAlgorithm, PreparedConvolutionAlgorithm, PreparedConvolutionOperation};
 
 const ZZ: StaticRing<i64> = StaticRing::RING;
 const CC: Complex64 = Complex64::RING;
@@ -31,7 +31,6 @@ pub struct PreparedConvolutionOperand<R, A = Global>
         A: Allocator + Clone
 {
     ring: PhantomData<Box<R>>,
-    log2_data_size: usize,
     original_data: Vec<f64, A>,
     fft_data: Vec<El<Complex64>, A>
 }
@@ -172,6 +171,12 @@ impl<R, A> ConvolutionAlgorithm<R> for FFTConvolutionZn<A>
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool {
         true
     }
+
+    fn specialize_prepared_convolution<F>(function: F) -> Result<F::Output, F>
+        where F: PreparedConvolutionOperation<Self, R>
+    {
+        Ok(function.execute())
+    }
 }
 
 impl<I, A> ConvolutionAlgorithm<I> for FFTConvolution<A>
@@ -193,6 +198,12 @@ impl<I, A> ConvolutionAlgorithm<I> for FFTConvolution<A>
     fn supports_ring<S: RingStore<Type = I> + Copy>(&self, _ring: S) -> bool {
         true
     }
+
+    fn specialize_prepared_convolution<F>(function: F) -> Result<F::Output, F>
+        where F: PreparedConvolutionOperation<Self, I>
+    {
+        Ok(function.execute())
+    }
 }
 
 impl<I, A> PreparedConvolutionAlgorithm<I> for FFTConvolution<A>
@@ -208,10 +219,9 @@ impl<I, A> PreparedConvolutionAlgorithm<I> for FFTConvolution<A>
         let log2_n_out = log2_n_in + 1;
         let mut original_data = Vec::new_in(self.allocator.clone());
         original_data.extend(val.clone_ring_els(&ring).iter().map(|x| int_cast(x, ZZ, &ring) as f64));
-        let (log2_data_size, fft_data) = self.prepare_convolution_impl(original_data.copy_els(), log2_n_out, None);
+        let (_log2_data_size, fft_data) = self.prepare_convolution_impl(original_data.copy_els(), log2_n_out, None);
         return PreparedConvolutionOperand {
             fft_data: fft_data,
-            log2_data_size: log2_data_size,
             original_data: original_data,
             ring: PhantomData
         };
@@ -279,10 +289,9 @@ impl<R, A> PreparedConvolutionAlgorithm<R> for FFTConvolutionZn<A>
         let log2_n_out = log2_n_in + 1;
         let mut original_data = Vec::new_in(self.base.allocator.clone());
         original_data.extend(val.clone_ring_els(&ring).iter().map(|x| int_cast(ring.smallest_lift(x), ZZ, ring.integer_ring()) as f64));
-        let (log2_data_size, fft_data) = self.base.prepare_convolution_impl(original_data.copy_els(), log2_n_out, Some(log2_data_size));
+        let (_log2_data_size, fft_data) = self.base.prepare_convolution_impl(original_data.copy_els(), log2_n_out, Some(log2_data_size));
         return PreparedConvolutionOperand {
             fft_data: fft_data,
-            log2_data_size: log2_data_size,
             original_data: original_data,
             ring: PhantomData
         };

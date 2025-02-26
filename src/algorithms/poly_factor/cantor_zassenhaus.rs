@@ -21,8 +21,42 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use oorandom;
 
 ///
-/// As [`distinct_degree_factorization()`], but takes `f` in the form of the ring `R[X]/(f)`, which is the internal
-/// representation that is used to actually compute the factorization.
+/// Takes a squarefree polynomial `f` in the form of the ring `R[X]/(f)` and
+/// returns whether `f` is irreducible over the base ring `R`.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn squarefree_is_irreducible_base<P, R>(poly_ring: P, mod_f_ring: R) -> bool
+    where P: RingStore,
+        P::Type: PolyRing + EuclideanRing,
+        R: RingStore,
+        R::Type: FreeAlgebra,
+        <<R as RingStore>::Type as RingExtension>::BaseRing: RingStore<Type = <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type>,
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
+{
+    assert!(mod_f_ring.rank() > 1);
+    assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
+    let ZZ = BigIntRing::RING;
+    let q = poly_ring.base_ring().size(&ZZ).unwrap();
+    debug_assert!(ZZ.eq_el(&is_prime_power(&ZZ, &q).unwrap().0, &poly_ring.base_ring().characteristic(&ZZ).unwrap()));
+    let d = mod_f_ring.rank();
+
+    // we build the polynomial `g = prod_(2i <= d) (X^(p^i) - X)`; if `g mod f` is coprime
+    // to `f` then `f` must be irreducible
+    let mut g_mod_f = mod_f_ring.one();
+    let mut x_power_Q_mod_f = mod_f_ring.canonical_gen();
+    let mut current_deg = 0;
+    while 2 * current_deg < d {
+        current_deg += 1;
+        x_power_Q_mod_f = mod_f_ring.pow_gen(x_power_Q_mod_f, &q, ZZ);
+        debug_assert!(current_deg < d);
+        mod_f_ring.mul_assign(&mut g_mod_f, mod_f_ring.sub_ref_fst(&x_power_Q_mod_f, mod_f_ring.canonical_gen()));
+    }
+    return poly_ring.is_unit(&poly_ring.ideal_gen(&mod_f_ring.poly_repr(&poly_ring, &g_mod_f, poly_ring.base_ring().identity()), &mod_f_ring.generating_poly(&poly_ring, poly_ring.base_ring().identity())));
+}
+
+///
+/// As [`distinct_degree_factorization()`], but takes `f` in the form of the ring `R[X]/(f)`, 
+/// which is the internal representation that is used to actually compute the factorization.
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn distinct_degree_factorization_base<P, R>(poly_ring: P, mod_f_ring: R) -> Vec<El<P>>
@@ -33,6 +67,7 @@ pub fn distinct_degree_factorization_base<P, R>(poly_ring: P, mod_f_ring: R) -> 
         <<R as RingStore>::Type as RingExtension>::BaseRing: RingStore<Type = <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type>,
         <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
 {
+    assert!(mod_f_ring.rank() > 1);
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     let ZZ = BigIntRing::RING;
     let q = poly_ring.base_ring().size(&ZZ).unwrap();
@@ -364,6 +399,19 @@ fn test_distinct_degree_factorization() {
     for (f, e) in actual.into_iter().zip(expected.into_iter()) {
         assert_el_eq!(ring, e, ring.normalize(f));
     }
+}
+
+#[test]
+fn test_is_irreducible() {
+    let field = Fp::<3>::RING;
+    let ring = DensePolyRing::new(field, "X");
+
+    let [f1, f2, f3, f4] = ring.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 1, X.pow_ref(2) + 1, X.pow_ref(4) + X.pow_ref(2) + 1, X.pow_ref(4) + X + 2]);
+    let create_extension_ring = |f| FreeAlgebraImpl::new(field, ring.degree(f).unwrap(), (0..ring.degree(f).unwrap()).map(|i| field.negate(*ring.coefficient_at(f, i))).collect::<Vec<_>>());
+    assert_eq!(false, squarefree_is_irreducible_base(&ring, create_extension_ring(&f1)));
+    assert_eq!(true, squarefree_is_irreducible_base(&ring, create_extension_ring(&f2)));
+    assert_eq!(false, squarefree_is_irreducible_base(&ring, create_extension_ring(&f3)));
+    assert_eq!(true, squarefree_is_irreducible_base(&ring, create_extension_ring(&f4)));
 }
 
 #[test]

@@ -847,10 +847,36 @@ pub trait RingStore: Sized {
     /// # use feanor_math::integer::*;
     /// let ring = BigIntRing::RING;
     /// let element = ring.int_hom().map(3);
-    /// println!("{}", ring.format(&element));
+    /// assert_eq!("3", format!("{}", ring.format(&element)));
     /// 
     fn format<'a>(&'a self, value: &'a El<Self>) -> RingElementDisplayWrapper<'a, Self> {
-        RingElementDisplayWrapper { ring: self, element: value }
+        self.format_within(value, EnvBindingStrength::Weakest)
+    }
+
+    ///
+    /// Returns an object that represents the given ring element and implements
+    /// [`std::fmt::Display`], to use as formatting parameter. As opposed to
+    /// [`RingStore::format()`], this function takes an additional argument to
+    /// specify the context the result is printed in, which is used to determine
+    /// whether to put the value in parenthesis or not.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::homomorphism::*;
+    /// # use feanor_math::integer::*;
+    /// # use feanor_math::rings::poly::dense_poly::*;
+    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::rings::poly::*;
+    /// let ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    /// let [f, g] = ring.with_wrapped_indeterminate(|X| [X, X + 1]);
+    /// assert_eq!("X", format!("{}", ring.format_within(&f, EnvBindingStrength::Sum)));
+    /// assert_eq!("X", format!("{}", ring.format_within(&f, EnvBindingStrength::Product)));
+    /// assert_eq!("X + 1", format!("{}", ring.format_within(&g, EnvBindingStrength::Sum)));
+    /// assert_eq!("(X + 1)", format!("{}", ring.format_within(&g, EnvBindingStrength::Product)));
+    /// 
+    fn format_within<'a>(&'a self, value: &'a El<Self>, within: EnvBindingStrength) -> RingElementDisplayWrapper<'a, Self> {
+        RingElementDisplayWrapper { ring: self, element: value, within: within }
     }
 
     ///
@@ -904,20 +930,21 @@ impl<R: RingStore> RingExtensionStore for R
 /// 
 pub struct RingElementDisplayWrapper<'a, R: RingStore + ?Sized> {
     ring: &'a R,
-    element: &'a El<R>
+    element: &'a El<R>,
+    within: EnvBindingStrength
 }
 
 impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<'a, R> {
 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.ring.get_ring().dbg(self.element, f)
+        self.ring.get_ring().dbg_within(self.element, f, self.within)
     }
 }
 
 impl<'a, R: RingStore + ?Sized> std::fmt::Debug for RingElementDisplayWrapper<'a, R> {
 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.ring.get_ring().dbg(self.element, f)
+        self.ring.get_ring().dbg_within(self.element, f, self.within)
     }
 }
 
@@ -1448,16 +1475,16 @@ pub mod generic_tests {
         // check self-subtraction
         for a in &elements {
             let a_minus_a = ring.sub(ring.clone_el(a), ring.clone_el(a));
-            assert!(ring.eq_el(&zero, &a_minus_a), "Additive inverse failed: {} - {} = {} != {}", ring.format(a), ring.format(a), ring.format(&a_minus_a), ring.format(&zero));
+            assert!(ring.eq_el(&zero, &a_minus_a), "Additive inverse failed: {} - {} = {} != {}", ring.format_within(a, EnvBindingStrength::Sum), ring.format_within(a, EnvBindingStrength::Product), ring.format(&a_minus_a), ring.format(&zero));
         }
 
         // check identity elements
         for a in &elements {
             let a_plus_zero = ring.add(ring.clone_el(a), ring.clone_el(&zero));
-            assert!(ring.eq_el(a, &a_plus_zero), "Additive neutral element failed: {} + {} = {} != {}", ring.format(a), ring.format(&zero), ring.format(&a_plus_zero), ring.format(a));
+            assert!(ring.eq_el(a, &a_plus_zero), "Additive neutral element failed: {} + {} = {} != {}", ring.format_within(a, EnvBindingStrength::Sum), ring.format(&zero), ring.format(&a_plus_zero), ring.format(a));
             
             let a_times_one = ring.mul(ring.clone_el(a), ring.clone_el(&one));
-            assert!(ring.eq_el(a, &a_times_one), "Multiplicative neutral element failed: {} * {} = {} != {}", ring.format(a), ring.format(&one), ring.format(&a_times_one), ring.format(a));
+            assert!(ring.eq_el(a, &a_times_one), "Multiplicative neutral element failed: {} * {} = {} != {}", ring.format_within(a, EnvBindingStrength::Product), ring.format(&one), ring.format(&a_times_one), ring.format(a));
         }
 
         // check commutativity
@@ -1466,13 +1493,13 @@ pub mod generic_tests {
                 {
                     let ab = ring.add_ref(a, b);
                     let ba = ring.add_ref(b, a);
-                    assert!(ring.eq_el(&ab, &ba), "Additive commutativity failed: {} + {} = {} != {} = {} + {}", ring.format(a), ring.format(b), ring.format(&ab), ring.format(&ba), ring.format(b), ring.format(a));
+                    assert!(ring.eq_el(&ab, &ba), "Additive commutativity failed: {} + {} = {} != {} = {} + {}", ring.format_within(a, EnvBindingStrength::Sum), ring.format_within(b, EnvBindingStrength::Sum), ring.format(&ab), ring.format(&ba), ring.format_within(b, EnvBindingStrength::Sum), ring.format_within(a, EnvBindingStrength::Sum));
                 }
 
                 if ring.is_commutative() {
                     let ab = ring.mul_ref(a, b);
                     let ba = ring.mul_ref(b, a);
-                    assert!(ring.eq_el(&ab, &ba), "Multiplicative commutativity failed: {} * {} = {} != {} = {} * {}", ring.format(a), ring.format(b), ring.format(&ab), ring.format(&ba), ring.format(b), ring.format(a));
+                    assert!(ring.eq_el(&ab, &ba), "Multiplicative commutativity failed: {} * {} = {} != {} = {} * {}", ring.format_within(a, EnvBindingStrength::Product), ring.format_within(b, EnvBindingStrength::Product), ring.format(&ab), ring.format(&ba), ring.format_within(b, EnvBindingStrength::Product), ring.format_within(a, EnvBindingStrength::Product));
                 }
             }
         }
@@ -1484,12 +1511,12 @@ pub mod generic_tests {
                     {
                         let ab_c = ring.add_ref_snd(ring.add_ref(a, b), c);
                         let a_bc = ring.add_ref_fst(c, ring.add_ref(b, a));
-                        assert!(ring.eq_el(&ab_c, &a_bc), "Additive associativity failed: ({} + {}) + {} = {} != {} = {} + ({} + {})", ring.format(a), ring.format(b), ring.format(c), ring.format(&ab_c), ring.format(&a_bc), ring.format(a), ring.format(b), ring.format(c));
+                        assert!(ring.eq_el(&ab_c, &a_bc), "Additive associativity failed: ({} + {}) + {} = {} != {} = {} + ({} + {})", ring.format_within(a, EnvBindingStrength::Sum), ring.format_within(b, EnvBindingStrength::Sum), ring.format_within(c, EnvBindingStrength::Sum), ring.format(&ab_c), ring.format(&a_bc), ring.format_within(a, EnvBindingStrength::Sum), ring.format_within(b, EnvBindingStrength::Sum), ring.format_within(c, EnvBindingStrength::Sum));
                     }
                     {
                         let ab_c = ring.mul_ref_snd(ring.mul_ref(a, b), c);
                         let a_bc = ring.mul_ref_fst(c, ring.mul_ref(b, a));
-                        assert!(ring.eq_el(&ab_c, &a_bc), "Multiplicative associativity failed: ({} * {}) * {} = {} != {} = {} * ({} * {})", ring.format(a), ring.format(b), ring.format(c), ring.format(&ab_c), ring.format(&a_bc), ring.format(a), ring.format(b), ring.format(c));
+                        assert!(ring.eq_el(&ab_c, &a_bc), "Multiplicative associativity failed: ({} * {}) * {} = {} != {} = {} * ({} * {})", ring.format_within(a, EnvBindingStrength::Sum), ring.format_within(b, EnvBindingStrength::Sum), ring.format_within(c, EnvBindingStrength::Sum), ring.format(&ab_c), ring.format(&a_bc), ring.format_within(a, EnvBindingStrength::Sum), ring.format_within(b, EnvBindingStrength::Sum), ring.format_within(c, EnvBindingStrength::Sum));
                     }
                 }
             }
@@ -1501,11 +1528,21 @@ pub mod generic_tests {
                 for c in &elements {
                     let ab_c = ring.mul_ref_snd(ring.add_ref(a, b), c);
                     let ac_bc = ring.add(ring.mul_ref(a, c), ring.mul_ref(b, c));
-                    assert!(ring.eq_el(&ab_c, &ac_bc), "Distributivity failed: ({} + {}) * {} = {} != {} = {} * {} + {} * {}", ring.format(a), ring.format(b), ring.format(c), ring.format(&ab_c), ring.format(&ac_bc), ring.format(a), ring.format(c), ring.format(b), ring.format(c));
+                    assert!(ring.eq_el(&ab_c, &ac_bc), "Distributivity failed: ({} + {}) * {} = {} != {} = {} * {} + {} * {}", ring.format_within(a, EnvBindingStrength::Product), ring.format_within(b, EnvBindingStrength::Sum), ring.format_within(c, EnvBindingStrength::Sum), ring.format(&ab_c), ring.format(&ac_bc), ring.format_within(a, EnvBindingStrength::Product), ring.format_within(c, EnvBindingStrength::Product), ring.format_within(b, EnvBindingStrength::Product), ring.format_within(c, EnvBindingStrength::Product));
 
                     let a_bc = ring.mul_ref_fst(a, ring.add_ref(b, c));
                     let ab_ac = ring.add(ring.mul_ref(a, b), ring.mul_ref(a, c));
-                    assert!(ring.eq_el(&a_bc, &ab_ac), "Distributivity failed: {} * ({} + {}) = {} != {} = {} * {} + {} * {}", ring.format(a), ring.format(b), ring.format(c), ring.format(&a_bc), ring.format(&ab_ac), ring.format(a), ring.format(b), ring.format(a), ring.format(c));                }
+                    assert!(ring.eq_el(&a_bc, &ab_ac), "Distributivity failed: {} * ({} + {}) = {} != {} = {} * {} + {} * {}", ring.format_within(a, EnvBindingStrength::Product), ring.format_within(b, EnvBindingStrength::Sum), ring.format_within(c, EnvBindingStrength::Sum), ring.format(&a_bc), ring.format(&ab_ac), ring.format_within(a, EnvBindingStrength::Product), ring.format_within(b, EnvBindingStrength::Product), ring.format_within(a, EnvBindingStrength::Product), ring.format_within(c, EnvBindingStrength::Product));
+                }
+            }
+        }
+
+        // check powering
+        for a in &elements {
+            for n in [0, 1, 2, 3, 7, 8] {
+                let expected = (0..n).map(|_| a).fold(ring.one(), |x, y| ring.mul_ref_snd(x, y));
+                let actual = ring.pow(ring.clone_el(a), n);
+                assert!(ring.eq_el(&expected, &actual), "Powering failed: {} * ... * {} = {} != {} = {}^{}", ring.format_within(a, EnvBindingStrength::Product), ring.format_within(a, EnvBindingStrength::Product), ring.format(&expected), ring.format(&actual), ring.format_within(a, EnvBindingStrength::Power), n);
             }
         }
 

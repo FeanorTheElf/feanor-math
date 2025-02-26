@@ -6,8 +6,6 @@ use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
 
-use crate::algorithms::convolution::fft::FFTConvolutionZn;
-use crate::algorithms::sqr_mul::generic_pow_shortest_chain_table;
 use crate::algorithms::convolution::*;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::poly_factor::FactorPolyField;
@@ -17,7 +15,6 @@ use crate::{impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos, impl
 use crate::integer::*;
 use crate::iters::multi_cartesian_product;
 use crate::iters::MultiProduct;
-use crate::ordered::OrderedRingStore;
 use crate::matrix::OwnedMatrix;
 use crate::primitive_int::StaticRing;
 use crate::rings::field::{AsField, AsFieldBase};
@@ -290,8 +287,8 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         debug_assert_eq!(1 << self.log2_padded_len, lhs.values.len());
         debug_assert_eq!(1 << self.log2_padded_len, rhs.values.len());
-        let mut tmp = Vec::with_capacity_in(self.rank() * 2, self.element_allocator.clone());
-        tmp.extend((0..(2 << self.log2_padded_len)).map(|_| self.base_ring.zero()));
+        let mut tmp = Vec::with_capacity_in(2 << self.log2_padded_len, self.element_allocator.clone());
+        tmp.resize_with(2 << self.log2_padded_len, || self.base_ring.zero());
         self.convolution.compute_convolution(&lhs.values[..], &rhs.values[..], &mut tmp[..], self.base_ring());
         self.reduce_mod_poly(&mut tmp);
         for i in 0..self.rank() {
@@ -358,6 +355,47 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
         where I::Type: IntegerRing
     {
         self.base_ring().characteristic(ZZ)
+    }
+
+    fn square(&self, value: &mut Self::Element) {
+        struct SquareIfPreparable<'a, R, V, A, C>
+            where R: RingStore, 
+                V: VectorView<El<R>>,
+                A: Allocator + Clone,
+                C: ConvolutionAlgorithm<R::Type>
+        {
+            x: El<FreeAlgebraImpl<R, V, A, C>>,
+            ring: &'a FreeAlgebraImplBase<R, V, A, C>
+        }
+        impl<'a, R, V, A, C> PreparedConvolutionOperation<C, R::Type> for SquareIfPreparable<'a, R, V, A, C>
+            where R: RingStore, 
+                V: VectorView<El<R>>,
+                A: Allocator + Clone,
+                C: ConvolutionAlgorithm<R::Type>
+        {
+            type Output = El<FreeAlgebraImpl<R, V, A, C>>;
+
+            fn execute(mut self) -> Self::Output
+                where C:PreparedConvolutionAlgorithm<R::Type>
+            {
+                let mut tmp = Vec::with_capacity_in(2 << self.ring.log2_padded_len, self.ring.element_allocator.clone());
+                tmp.resize_with(2 << self.ring.log2_padded_len, || self.ring.base_ring().zero());
+                let x_prepared = self.ring.convolution.prepare_convolution_operand(&self.x.values[..], self.ring.base_ring());
+                self.ring.convolution.compute_convolution_prepared(&x_prepared, &x_prepared, &mut tmp, self.ring.base_ring());
+                self.ring.reduce_mod_poly(&mut tmp);
+                for i in 0..self.ring.rank() {
+                    self.x.values[i] = std::mem::replace(&mut tmp[i], self.ring.base_ring().zero());
+                }
+                return self.x;
+            }
+        }
+        match <C as ConvolutionAlgorithm<R::Type>>::specialize_prepared_convolution(SquareIfPreparable {
+            x: std::mem::replace(value, FreeAlgebraImplEl { values: Vec::new_in(self.element_allocator.clone()).into_boxed_slice() }),
+            ring: self
+        }) {
+            Ok(result) => *value = result,
+            Err(function) => *value = self.mul_ref(&function.x, &function.x)
+        }
     }
 }
 
@@ -736,6 +774,8 @@ use crate::rings::zn::zn_static;
 use crate::compute_locally::ToExtRingMap;
 #[cfg(test)]
 use crate::rings::rational::RationalField;
+#[cfg(test)]
+use crate::algorithms::convolution::fft::FFTConvolution;
 
 #[cfg(test)]
 fn test_ring0_and_elements() -> (FreeAlgebraImpl<Zn, [ZnEl; 1]>, Vec<FreeAlgebraImplEl<Zn>>) {
@@ -822,6 +862,10 @@ fn test_ring_axioms() {
     let (ring, els) = test_ring3_and_elements();
     crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
     let (ring, els) = test_ring4_and_elements();
+    crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
+    
+    let (ring, els) = test_ring2_and_elements();
+    let ring = ring.into().set_convolution(FFTConvolution::new_with(Global));
     crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
 
     let base_ring = zn_static::Fp::<257>::RING;

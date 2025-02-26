@@ -53,8 +53,7 @@ fn filter_irreducible<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Optio
     if poly_ring.degree(&squarefree_part) != Some(degree) {
         return None;
     }
-    let distinct_degree_factorization = cantor_zassenhaus::distinct_degree_factorization_base(&poly_ring, &mod_f_ring);
-    if distinct_degree_factorization.len() <= degree || poly_ring.degree(&distinct_degree_factorization[degree]) != Some(degree) {
+    if !cantor_zassenhaus::squarefree_is_irreducible_base(&poly_ring, &mod_f_ring) {
         return None;
     }
     return Some(mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
@@ -89,7 +88,6 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
 
         // first try trinomials, they seem to have a good chance of being irreducible
         for _ in 0..16 {
-            println!("Try trinomial");
             let i = (StaticRing::<i64>::RING.get_uniformly_random(&(degree as i64 - 1), || rng.rand_u64()) + 1) as usize;
             let a = Fp.random_element(|| rng.rand_u64());
             let b = Fp.random_element(|| rng.rand_u64());

@@ -10,7 +10,7 @@ use crate::rings::zn::*;
 use crate::integer::*;
 use crate::seq::VectorView;
 
-use super::{ConvolutionAlgorithm, PreparedConvolutionAlgorithm};
+use super::{ConvolutionAlgorithm, PreparedConvolutionAlgorithm, PreparedConvolutionOperation};
 
 ///
 /// Computes the convolution over a finite field that has suitable roots of unity
@@ -135,6 +135,12 @@ impl<R, A> ConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
         let lhs_prep = self.prepare_convolution_impl(lhs, log2_n);
         let rhs_prep = self.prepare_convolution_impl(rhs, log2_n);
         self.compute_convolution_impl(lhs_prep, &rhs_prep, dst);
+    }
+
+    fn specialize_prepared_convolution<F>(function: F) -> Result<F::Output, F>
+        where F: PreparedConvolutionOperation<Self, R::Type>
+    {
+        Ok(function.execute())
     }
 }
 
