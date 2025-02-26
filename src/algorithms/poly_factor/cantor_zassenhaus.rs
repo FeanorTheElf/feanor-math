@@ -76,7 +76,7 @@ pub fn distinct_degree_factorization_base<P, R>(poly_ring: P, mod_f_ring: R) -> 
 
     let mut f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
     if mod_f_ring.rank() == 1 {
-        return vec![f];
+        return vec![poly_ring.one(), f];
     }
 
     let mut result = Vec::new();

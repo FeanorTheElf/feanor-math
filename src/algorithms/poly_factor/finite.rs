@@ -34,8 +34,8 @@ pub fn poly_factor_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usiz
         assert!(!poly_ring.is_unit(&sqrfree_part));
 
         // factor the square-free part into distinct-degree factors
-        let squarefree_factorization = cantor_zassenhaus::distinct_degree_factorization(&poly_ring, poly_ring.clone_el(&sqrfree_part));
-        for (d, factor_d) in squarefree_factorization.into_iter().enumerate() {
+        let distinct_degree_factors = cantor_zassenhaus::distinct_degree_factorization(&poly_ring, poly_ring.clone_el(&sqrfree_part));
+        for (d, factor_d) in distinct_degree_factors.into_iter().enumerate() {
             let mut stack = Vec::new();
             stack.push(factor_d);
             
