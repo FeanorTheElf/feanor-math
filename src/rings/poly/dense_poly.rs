@@ -788,7 +788,7 @@ fn test_print() {
         (base_poly_ring.zero(), 0),
         (base_poly_ring.from_terms([(4, 2)].into_iter()), 2)
     ].into_iter());
-    assert_eq!("(4X^2)Y^2", format!("{}", poly_ring.format(&poly)));
+    assert_eq!("4X^2Y^2", format!("{}", poly_ring.format(&poly)));
 }
 
 #[test]
