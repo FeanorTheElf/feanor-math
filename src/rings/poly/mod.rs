@@ -1,6 +1,11 @@
 use std::collections::HashMap;
+use std::fmt::Display;
+use std::fmt::Formatter;
+
+use dense_poly::DensePolyRing;
 
 use crate::divisibility::*;
+use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::wrapper::RingElementWrapper;
@@ -397,10 +402,19 @@ pub mod generic_impls {
 
     #[stability::unstable(feature = "enable")]
     pub fn dbg_poly<P: PolyRing>(ring: &P, el: &P::Element, out: &mut std::fmt::Formatter, unknown_name: &str, env: EnvBindingStrength) -> std::fmt::Result {
-        if env >= EnvBindingStrength::Product {
+        let mut terms = ring.terms(el).fuse();
+        let first_term = terms.next();
+        if first_term.is_none() {
+            return ring.base_ring().get_ring().dbg_within(&ring.base_ring().zero(), out, env);
+        }
+        let second_term = terms.next();
+        let use_parenthesis = (env > EnvBindingStrength::Sum && second_term.is_some()) || 
+            (env > EnvBindingStrength::Product && !(ring.base_ring().is_one(&first_term.as_ref().unwrap().0) && first_term.as_ref().unwrap().1 == 1)) ||
+            env == EnvBindingStrength::Strongest;
+        let mut terms = first_term.into_iter().chain(second_term.into_iter()).chain(terms);
+        if use_parenthesis {
             write!(out, "(")?;
         }
-        let mut terms = ring.terms(el);
         let print_unknown = |i: usize, out: &mut std::fmt::Formatter| {
             if i == 0 {
                 // print nothing
@@ -412,17 +426,21 @@ pub mod generic_impls {
             }
         };
         if let Some((c, i)) = terms.next() {
-            ring.base_ring().get_ring().dbg_within(c, out, if i == 0 { EnvBindingStrength::Sum } else { EnvBindingStrength:: Product })?;
+            if !ring.base_ring().is_one(c) || i == 0 {
+                ring.base_ring().get_ring().dbg_within(c, out, if i == 0 { EnvBindingStrength::Sum } else { EnvBindingStrength:: Product })?;
+            }
             print_unknown(i, out)?;
         } else {
             write!(out, "0")?;
         }
         while let Some((c, i)) = terms.next() {
             write!(out, " + ")?;
-            ring.base_ring().get_ring().dbg_within(c, out, if i == 0 { EnvBindingStrength::Sum } else { EnvBindingStrength:: Product })?;
+            if !ring.base_ring().is_one(c) || i == 0 {
+                ring.base_ring().get_ring().dbg_within(c, out, if i == 0 { EnvBindingStrength::Sum } else { EnvBindingStrength:: Product })?;
+            }
             print_unknown(i, out)?;
         }
-        if env >= EnvBindingStrength::Product {
+        if use_parenthesis {
             write!(out, ")")?;
         }
         return Ok(());
@@ -545,4 +563,37 @@ pub mod generic_tests {
             )
         }
     }
+}
+
+#[test]
+fn test_dbg_poly() {
+    let ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    let [f1, f2, f3, f4] = ring.with_wrapped_indeterminate(|X| [X.clone(), X + 1, 2 * X + 1, 2 * X]);
+
+    fn to_str(ring: &DensePolyRing<StaticRing<i64>>, f: &El<DensePolyRing<StaticRing<i64>>>, env: EnvBindingStrength) -> String {
+        struct DisplayEl<'a> {
+            ring: &'a DensePolyRing<StaticRing<i64>>,
+            f:  &'a El<DensePolyRing<StaticRing<i64>>>,
+            env: EnvBindingStrength
+        }
+        impl<'a> Display for DisplayEl<'a> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                generic_impls::dbg_poly(self.ring.get_ring(), self.f, f, "X", self.env)
+            }
+        }
+        return format!("{}", DisplayEl { ring, f, env });
+    }
+
+    assert_eq!("X", to_str(&ring, &f1, EnvBindingStrength::Sum));
+    assert_eq!("X", to_str(&ring, &f1, EnvBindingStrength::Product));
+    assert_eq!("X", to_str(&ring, &f1, EnvBindingStrength::Power));
+    assert_eq!("1 + X", to_str(&ring, &f2, EnvBindingStrength::Sum));
+    assert_eq!("(1 + X)", to_str(&ring, &f2, EnvBindingStrength::Product));
+    assert_eq!("(1 + X)", to_str(&ring, &f2, EnvBindingStrength::Power));
+    assert_eq!("1 + 2X", to_str(&ring, &f3, EnvBindingStrength::Sum));
+    assert_eq!("(1 + 2X)", to_str(&ring, &f3, EnvBindingStrength::Product));
+    assert_eq!("(1 + 2X)", to_str(&ring, &f3, EnvBindingStrength::Power));
+    assert_eq!("2X", to_str(&ring, &f4, EnvBindingStrength::Sum));
+    assert_eq!("2X", to_str(&ring, &f4, EnvBindingStrength::Product));
+    assert_eq!("(2X)", to_str(&ring, &f4, EnvBindingStrength::Power));
 }
