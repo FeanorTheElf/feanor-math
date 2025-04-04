@@ -403,7 +403,9 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> HashableElRing f
         R::Type: HashableElRing
 {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
-        for i in 0..self.degree(el).map(|d| d + 1).unwrap_or(0) {
+        let len = self.degree(el).map(|d| d + 1).unwrap_or(0);
+        h.write_length_prefix(len);
+        for i in 0..len {
             self.base_ring().get_ring().hash(self.coefficient_at(el, i), h);
         }
     }

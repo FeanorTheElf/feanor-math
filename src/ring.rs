@@ -869,7 +869,7 @@ pub trait RingStore: Sized {
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::rings::poly::*;
     /// let ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
-    /// let [f, g] = ring.with_wrapped_indeterminate(|X| [X, X + 1]);
+    /// let [f, g] = ring.with_wrapped_indeterminate(|X| [X.clone(), X + 1]);
     /// assert_eq!("X", format!("{}", ring.format_within(&f, EnvBindingStrength::Sum)));
     /// assert_eq!("X", format!("{}", ring.format_within(&f, EnvBindingStrength::Product)));
     /// assert_eq!("X + 1", format!("{}", ring.format_within(&g, EnvBindingStrength::Sum)));

@@ -549,6 +549,27 @@ impl<R, V, A, C> FreeAlgebra for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
+impl<R, V, A, C> HashableElRing for FreeAlgebraImplBase<R, V, A, C>
+    where R: RingStore, 
+        R::Type: HashableElRing,
+        V: VectorView<El<R>>,
+        A: Allocator + Clone,
+        C: ConvolutionAlgorithm<R::Type>
+{
+    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
+        // this looks very simple, but I believe this is also the right implementation;
+        // in particular, we assume that elements whose hashes are compared (e.g. because
+        // they are in the same hashtable) belong to the same ring - after all, this is
+        // also how we implement equality and all other operations. Hence, it does not
+        // make sense to hash ring-specific info (like the rank). Additionally, hashes
+        // in Rust are assumed to have no prefix-collisions, thus we don't need to insert
+        // separators between elements, compare in particular [`Hash::hash_slice()`].
+        for x in &el.values[..self.rank()] {
+            self.base_ring().get_ring().hash(x, h)
+        }
+    }
+}
+
 impl<R, V, A, C> InterpolationBaseRing for AsFieldBase<FreeAlgebraImpl<R, V, A, C>>
     where R: RingStore + Clone, 
         R::Type: LinSolveRing + FactorPolyField,
