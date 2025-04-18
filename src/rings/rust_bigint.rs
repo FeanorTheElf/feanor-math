@@ -438,7 +438,7 @@ impl<A: Allocator + Clone> IntegerRing for RustBigintRingBase<A> {
         match highest_set_block(&value.1) {
             None => 0.,
             Some(0) => value.1[0] as f64 * sign,
-            Some(d) => (value.1[d] as f64 * 2f64.powi((d * u64::BITS).try_into().unwrap()) + value.1[d - 1] as f64 * 2f64.powi(((d - 1) * u64::BITS).try_into().unwrap())) * sign
+            Some(d) => (value.1[d] as f64 * 2f64.powi((d * u64::BITS as usize).try_into().unwrap()) + value.1[d - 1] as f64 * 2f64.powi(((d - 1) * u64::BITS as usize).try_into().unwrap())) * sign
         }
     }
 
@@ -448,7 +448,7 @@ impl<A: Allocator + Clone> IntegerRing for RustBigintRingBase<A> {
         }
         let sign = value < 0.;
         value = value.abs();
-        let scale: i32 = value.log2().ceil().try_into().unwrap();
+        let scale: i32 = (value.log2().ceil() as i64).try_into().unwrap();
         let significant_digits = std::cmp::min(scale, u64::BITS.try_into().unwrap());
         let most_significant_bits = (value / 2f64.powi(scale - significant_digits)) as u64;
         let mut result = self.one();

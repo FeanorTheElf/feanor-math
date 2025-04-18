@@ -1,11 +1,6 @@
 use std::collections::HashMap;
-use std::fmt::Display;
-use std::fmt::Formatter;
-
-use dense_poly::DensePolyRing;
 
 use crate::divisibility::*;
-use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::wrapper::RingElementWrapper;
@@ -572,6 +567,13 @@ pub mod generic_tests {
         }
     }
 }
+
+#[cfg(test)]
+use std::fmt::{Display, Formatter};
+#[cfg(test)]
+use dense_poly::DensePolyRing;
+#[cfg(test)]
+use crate::primitive_int::StaticRing;
 
 #[test]
 fn test_dbg_poly() {
