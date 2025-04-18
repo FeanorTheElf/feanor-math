@@ -98,6 +98,18 @@ impl<R: RingStore> RingElementWrapper<R> {
     pub fn parent(&self) -> &R {
         &self.ring
     }
+
+    pub fn is_zero(&self) -> bool {
+        self.parent().is_zero(self.unwrap_ref())
+    }
+
+    pub fn is_one(&self) -> bool {
+        self.parent().is_one(self.unwrap_ref())
+    }
+    
+    pub fn is_neg_one(&self) -> bool {
+        self.parent().is_neg_one(self.unwrap_ref())
+    }
 }
 
 macro_rules! impl_xassign_trait {
@@ -325,6 +337,25 @@ impl<R: RingStore> PartialEq for RingElementWrapper<R> {
 }
 
 impl<R: RingStore> Eq for RingElementWrapper<R> {}
+
+impl<R: RingStore> PartialEq<i32> for RingElementWrapper<R> {
+
+    fn eq(&self, other: &i32) -> bool {
+        match *other {
+            0 => self.is_zero(),
+            1 => self.is_one(),
+            -1 => self.is_neg_one(),
+            x => self.parent().eq_el(self.unwrap_ref(), &self.parent().int_hom().map(x))
+        }
+    }
+}
+
+impl<R: RingStore> PartialEq<RingElementWrapper<R>> for i32 {
+
+    fn eq(&self, other: &RingElementWrapper<R>) -> bool {
+        other == self
+    }
+}
 
 impl<R: RingStore> Hash for RingElementWrapper<R> 
     where R::Type: HashableElRing

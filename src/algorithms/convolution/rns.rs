@@ -486,7 +486,6 @@ impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolution<I, C, A, Cr
     fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<<R as RingBase>::Element>, V2: VectorView<<R as RingBase>::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [<R as RingBase>::Element], ring: S) {
         assert!(dst.len() >= lhs.len() + rhs.len() - 1);
         let log2_input_size = lhs.as_iter().chain(rhs.as_iter()).map(|x| ring.abs_log2_ceil(x).unwrap_or(0)).max().unwrap_or(0);
-        println!("{}", log2_input_size);
         let hom = ring.can_hom(&self.integer_ring).unwrap();
         return self.compute_convolution_impl(
             log2_input_size,
