@@ -206,7 +206,7 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
             let m = 1 << s;
             let log2_group_size = log2_n - s;
             for i_bitreverse in (0..(1 << log2_group_size)).step_by(2) {
-                let current_twiddle = root_of_unity_pow(m * bitreverse(i_bitreverse, log2_group_size) as i64);
+                let current_twiddle = root_of_unity_pow(m * TryInto::<i64>::try_into(bitreverse(i_bitreverse, log2_group_size)).unwrap());
                 root_of_unity_list[index] = current_twiddle;
                 index += 1;
             }
@@ -707,7 +707,7 @@ fn test_approximate_fft() {
     let CC = Complex64::RING;
     for log2_n in [4, 7, 11, 15] {
         let fft = CooleyTuckeyFFT::new_with_pows(CC, |x| CC.root_of_unity(x, 1 << log2_n), log2_n);
-        let mut array = (0..(1 << log2_n)).map(|i|  CC.root_of_unity(i as i64, 1 << log2_n)).collect::<Vec<_>>();
+        let mut array = (0..(1 << log2_n)).map(|i|  CC.root_of_unity(i.try_into().unwrap(), 1 << log2_n)).collect::<Vec<_>>();
         fft.fft(&mut array, CC);
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));

@@ -234,7 +234,7 @@ pub fn poly_div_rem_finite_reduced<P>(ring: P, mut lhs: El<P>, rhs: &El<P>) -> R
         let lcf = ring.lc(&lhs).unwrap();
         let mut h = ring.zero();
         let mut annihilator = ring.base_ring().one();
-        let mut i: i64 = rhs_deg as i64;
+        let mut i: i64 = rhs_deg.try_into().unwrap();
         let mut d = ring.base_ring().zero();
         while ring.base_ring().checked_div(lcf, &d).is_none() {
             debug_assert!(ring.base_ring().eq_el(ring.lc(&ring.mul_ref(&h, rhs)).unwrap_or(&zero), &d));

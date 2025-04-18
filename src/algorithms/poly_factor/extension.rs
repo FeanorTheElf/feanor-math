@@ -75,12 +75,12 @@ pub fn poly_factor_squarefree_extension<P>(LX: P, f: &El<P>, attempts: usize) ->
     let characteristic = K.characteristic(&ZZbig).unwrap();
     // choose bound about twice as large as necessary, so the probability of succeeding is almost 1/2
     let bound = LX.degree(f).unwrap() * LX.degree(f).unwrap() * L.rank();
-    assert!(ZZbig.is_zero(&characteristic) || ZZbig.is_geq(&characteristic, &int_cast(bound as i64, ZZbig, StaticRing::<i64>::RING)));
+    assert!(ZZbig.is_zero(&characteristic) || ZZbig.is_geq(&characteristic, &int_cast(bound.try_into().unwrap(), ZZbig, StaticRing::<i64>::RING)));
 
     let mut rng = oorandom::Rand64::new(1);
 
     for _ in 0..attempts {
-        let k = StaticRing::<i32>::RING.get_uniformly_random(&(bound as i32), || rng.rand_u64());
+        let k = StaticRing::<i32>::RING.get_uniformly_random(&bound.try_into().unwrap(), || rng.rand_u64());
         let lin_transform = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(k)), 0), (L.one(), 1)].into_iter());
         let f_transformed = LX.evaluate(f, &lin_transform, &LX.inclusion());
 

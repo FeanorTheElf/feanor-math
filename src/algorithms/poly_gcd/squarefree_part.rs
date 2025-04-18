@@ -156,7 +156,7 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &
             let ideal = ring.random_suitable_ideal(|| rng.rand_u64());
             let heuristic_e = ring.heuristic_exponent(&ideal, poly_ring.degree(poly).unwrap(), poly_ring.terms(poly).map(|(c, _)| c));
             assert!(heuristic_e >= 1);
-            let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt as i32)).floor() as usize;
+            let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt.try_into().unwrap())).floor() as usize;
             let reduction = ReductionContext::new(ring, &ideal, e);
 
             log_progress!(controller, "mod({}^{})c({})", IdealDisplayWrapper::new(ring, &ideal), e, reduction.len());

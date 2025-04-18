@@ -91,18 +91,19 @@ impl ZnBase {
         assert!(modulus <= ((1 << 62) / 9));
         // we want representatives to grow up to 6 * modulus
         assert!(modulus as u128 * 6 <= u64::MAX as u128);
-        let inv_modulus = ZZbig.euclidean_div(ZZbig.power_of_two(128), &ZZbig.coerce(&ZZ, modulus as i64));
+        let modulus_i64: i64 = modulus.try_into().unwrap();
+        let inv_modulus = ZZbig.euclidean_div(ZZbig.power_of_two(128), &ZZbig.coerce(&ZZ, modulus_i64));
         // we need the product `inv_modulus * (6 * modulus)^2` to fit into 192 bit, should be implied by `modulus < ((1 << 62) / 9)`
-        debug_assert!(ZZbig.is_lt(&ZZbig.mul_ref_fst(&inv_modulus, ZZbig.pow(ZZbig.int_hom().mul_map(ZZbig.coerce(&ZZ, modulus as i64), 6), 2)), &ZZbig.power_of_two(192)));
+        debug_assert!(ZZbig.is_lt(&ZZbig.mul_ref_fst(&inv_modulus, ZZbig.pow(ZZbig.int_hom().mul_map(ZZbig.coerce(&ZZ, modulus_i64), 6), 2)), &ZZbig.power_of_two(192)));
         let inv_modulus = if ZZbig.eq_el(&inv_modulus, &ZZbig.power_of_two(127)) {
             1u128 << 127
         } else {
             int_cast(inv_modulus, &StaticRing::<i128>::RING, &ZZbig) as u128
         };
         Self {
-            modulus: modulus as i64,
+            modulus: modulus_i64,
             inv_modulus: inv_modulus,
-            modulus_half: (modulus as i64 - 1) / 2 + 1,
+            modulus_half: (modulus_i64 - 1) / 2 + 1,
             modulus_times_three: modulus * 3
         }
     }
@@ -459,7 +460,7 @@ impl<I: RingStore> CanIsoFromTo<zn_big::ZnBase<I>> for ZnBase
     }
 
     fn map_out(&self, from: &zn_big::ZnBase<I>, el: <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <zn_big::ZnBase<I> as RingBase>::Element {
-        from.map_in(self.integer_ring().get_ring(), el.0 as i64, iso)
+        from.map_in(self.integer_ring().get_ring(), el.0.try_into().unwrap(), iso)
     }
 }
 
@@ -616,7 +617,7 @@ impl PrincipalIdealRing for ZnBase {
     }
 
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        let (s, t, d) = StaticRing::<i64>::RING.extended_ideal_gen(&(lhs.0 as i64), &(rhs.0 as i64));
+        let (s, t, d) = StaticRing::<i64>::RING.extended_ideal_gen(&lhs.0.try_into().unwrap(), &rhs.0.try_into().unwrap());
         let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
     }

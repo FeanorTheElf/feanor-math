@@ -57,8 +57,8 @@ impl<R_main, R_twiddle, H, T1, T2> CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, 
     {
         let ring = hom.codomain();
 
-        assert!(ring.get_ring().is_approximate() || ring.eq_el(&hom.map(root_of_unity_pows(right_table.len() as i64)), left_table.root_of_unity(ring)));
-        assert!(ring.get_ring().is_approximate() || ring.eq_el(&hom.map(root_of_unity_pows(left_table.len() as i64)), right_table.root_of_unity(ring)));
+        assert!(ring.get_ring().is_approximate() || ring.eq_el(&hom.map(root_of_unity_pows(right_table.len().try_into().unwrap())), left_table.root_of_unity(ring)));
+        assert!(ring.get_ring().is_approximate() || ring.eq_el(&hom.map(root_of_unity_pows(left_table.len().try_into().unwrap())), right_table.root_of_unity(ring)));
 
         let root_of_unity = root_of_unity_pows(1);
         let inv_twiddle_factors = Self::create_twiddle_factors(|i| root_of_unity_pows(-i), &left_table, &right_table);
@@ -95,11 +95,12 @@ impl<R_main, R_twiddle, H, T1, T2> CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, 
         let root_of_unity_pows = |i: i64| if i >= 0 {
             hom.domain().pow(hom.domain().clone_el(&root_of_unity), i as usize)
         } else {
-            hom.domain().pow(hom.domain().clone_el(&root_of_unity), (len as i64 + (i % len as i64)) as usize)
+            let len_i64: i64 = len.try_into().unwrap();
+            hom.domain().pow(hom.domain().clone_el(&root_of_unity), (len_i64 + (i % len_i64)) as usize)
         };
 
-        assert!(ring.eq_el(&hom.map(root_of_unity_pows(right_table.len() as i64)), left_table.root_of_unity(ring)));
-        assert!(ring.eq_el(&hom.map(root_of_unity_pows(left_table.len() as i64)), right_table.root_of_unity(ring)));
+        assert!(ring.eq_el(&hom.map(root_of_unity_pows(right_table.len().try_into().unwrap())), left_table.root_of_unity(ring)));
+        assert!(ring.eq_el(&hom.map(root_of_unity_pows(left_table.len().try_into().unwrap())), right_table.root_of_unity(ring)));
 
         let inv_twiddle_factors = Self::create_twiddle_factors(|i| root_of_unity_pows(-i), &left_table, &right_table);
         let twiddle_factors = Self::create_twiddle_factors(root_of_unity_pows, &left_table, &right_table);
@@ -118,9 +119,9 @@ impl<R_main, R_twiddle, H, T1, T2> CoprimeCooleyTuckeyFFT<R_main, R_twiddle, H, 
         where F: FnMut(i64) -> R_twiddle::Element
     {
         (0..(left_table.len() * right_table.len())).map(|i| {
-            let ri = i % right_table.len();
+            let ri: i64 = (i % right_table.len()).try_into().unwrap();
             let li = i / right_table.len();
-            return root_of_unity_pows(left_table.unordered_fft_permutation(li) as i64 * ri as i64);
+            return root_of_unity_pows(TryInto::<i64>::try_into(left_table.unordered_fft_permutation(li)).unwrap() * ri);
         }).collect::<Vec<_>>()
     }
     
@@ -339,11 +340,11 @@ fn test_approximate_fft() {
     for (p, log2_n) in [(5, 3), (53, 5), (101, 8), (503, 10)] {
         let fft = CoprimeCooleyTuckeyFFT::new_with_pows(
             CC,
-            |i| CC.root_of_unity(i, (p as i64) << log2_n), 
+            |i| CC.root_of_unity(i, TryInto::<i64>::try_into(p).unwrap() << log2_n), 
             bluestein::BluesteinFFT::for_complex(CC, p, Global), 
             cooley_tuckey::CooleyTuckeyFFT::for_complex(CC, log2_n)
         );
-        let mut array = (0..(p << log2_n)).map(|i| CC.root_of_unity(i as i64, (p as i64) << log2_n)).collect::<Vec<_>>();
+        let mut array = (0..(p << log2_n)).map(|i| CC.root_of_unity(i.try_into().unwrap(), TryInto::<i64>::try_into(p).unwrap() << log2_n)).collect::<Vec<_>>();
         fft.fft(&mut array, CC);
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));

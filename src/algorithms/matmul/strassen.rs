@@ -537,9 +537,9 @@ pub fn strassen<R, V1, V2, V3, A, const T1: bool, const T2: bool, const T3: bool
     const ZZ: StaticRing<i64> = StaticRing::<i64>::RING;
 
     let max_block_size_log2 = [
-        ZZ.abs_log2_floor(&(lhs.row_count() as i64)),
-        ZZ.abs_log2_floor(&(lhs.col_count() as i64)),
-        ZZ.abs_log2_floor(&(rhs.col_count() as i64))
+        ZZ.abs_log2_floor(&lhs.row_count().try_into().unwrap()),
+        ZZ.abs_log2_floor(&lhs.col_count().try_into().unwrap()),
+        ZZ.abs_log2_floor(&rhs.col_count().try_into().unwrap())
     ].into_iter().min().unwrap();
     if max_block_size_log2.is_none() {
         // some matrix dimension is 0

@@ -67,7 +67,7 @@ pub fn product_except_one<V, R>(ring: R, values: V, out: &mut [El<R>])
 {
     assert_eq!(values.len(), out.len());
     let n = values.len();
-    let log2_n = StaticRing::<i64>::RING.abs_log2_ceil(&(n as i64)).unwrap();
+    let log2_n = StaticRing::<i64>::RING.abs_log2_ceil(&n.try_into().unwrap()).unwrap();
     assert!(n <= (1 << log2_n));
     if n % 2 == 0 {
         for i in 0..n {
@@ -201,7 +201,7 @@ pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_po
         A: Allocator,
         A2: Allocator
 {
-    let dim_prod = |range: Range<usize>| <_ as RingStore>::prod(&StaticRing::<i64>::RING, range.map(|i| interpolation_points.at(i).len() as i64)) as usize;
+    let dim_prod = |range: Range<usize>| <_ as RingStore>::prod(&StaticRing::<i64>::RING, range.map(|i| interpolation_points.at(i).len().try_into().unwrap())) as usize;
     assert_eq!(interpolation_points.len(), poly_ring.indeterminate_count());
     let n = poly_ring.indeterminate_count();
     assert_eq!(values.len(), dim_prod(0..n));
@@ -304,7 +304,7 @@ fn test_interpolate() {
     let ring = StaticRing::<i64>::RING;
     let poly_ring = DensePolyRing::new(ring, "X");
     let poly = poly_ring.from_terms([(3, 0), (1, 1), (-1, 3), (2, 4), (1, 5)].into_iter());
-    let actual = interpolate(&poly_ring, (0..6).map_fn(|x| x as i64), (0..6).map_fn(|x| poly_ring.evaluate(&poly, &(x as i64), &ring.identity())), Global).unwrap();
+    let actual = interpolate(&poly_ring, (0..6).map_fn(|x| x.try_into().unwrap()), (0..6).map_fn(|x| poly_ring.evaluate(&poly, &x.try_into().unwrap(), &ring.identity())), Global).unwrap();
     assert_el_eq!(&poly_ring, &poly, &actual);
 
     let ring = Zn::new(25);

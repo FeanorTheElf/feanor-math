@@ -222,7 +222,7 @@ pub fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
     assert!(poly_ring.degree(&f).unwrap() % k == 0);
     let d = poly_ring.degree(&f).unwrap() / k;
     let ring = poly_ring.base_ring();
-    let k_in_ring = ring.int_hom().map(k as i32);
+    let k_in_ring = ring.int_hom().map(k.try_into().unwrap());
 
     let mut result_reversed = Vec::new();
     result_reversed.push(ring.one());

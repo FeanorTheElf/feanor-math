@@ -195,7 +195,7 @@ impl<A: Allocator + Clone> RingBase for RustBigintRingBase<A> {
 
     fn from_int(&self, value: i32) -> Self::Element {
         let mut data = Vec::with_capacity_in(1, self.allocator.clone());
-        data.push((value as i64).abs() as u64);
+        data.push(value.unsigned_abs() as u64);
         RustBigint(value < 0, data)
     }
 
@@ -438,7 +438,7 @@ impl<A: Allocator + Clone> IntegerRing for RustBigintRingBase<A> {
         match highest_set_block(&value.1) {
             None => 0.,
             Some(0) => value.1[0] as f64 * sign,
-            Some(d) => (value.1[d] as f64 * 2f64.powi(d as i32 * u64::BITS as i32) + value.1[d - 1] as f64 * 2f64.powi((d - 1) as i32 * u64::BITS as i32)) * sign
+            Some(d) => (value.1[d] as f64 * 2f64.powi((d * u64::BITS).try_into().unwrap()) + value.1[d - 1] as f64 * 2f64.powi(((d - 1) * u64::BITS).try_into().unwrap())) * sign
         }
     }
 
@@ -448,8 +448,8 @@ impl<A: Allocator + Clone> IntegerRing for RustBigintRingBase<A> {
         }
         let sign = value < 0.;
         value = value.abs();
-        let scale = value.log2().ceil() as i32;
-        let significant_digits = std::cmp::min(scale, u64::BITS as i32);
+        let scale: i32 = value.log2().ceil().try_into().unwrap();
+        let significant_digits = std::cmp::min(scale, u64::BITS.try_into().unwrap());
         let most_significant_bits = (value / 2f64.powi(scale - significant_digits)) as u64;
         let mut result = self.one();
         result.1[0] = most_significant_bits;

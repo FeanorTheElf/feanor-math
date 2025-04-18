@@ -724,7 +724,7 @@ macro_rules! specialize_int_cast {
             impl IntCast<StaticRingBase<$from>> for MPZBase {
 
                 fn cast(&self, _: &StaticRingBase<$from>, el: $from) -> MPZEl {
-                    int_cast(el as i64, &RingRef::new(self), StaticRing::<i64>::RING)
+                    int_cast(el.try_into().unwrap(), &RingRef::new(self), StaticRing::<i64>::RING)
                 }
             }
 

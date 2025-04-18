@@ -135,10 +135,10 @@ pub fn determinant_poly_matrix<P, V, A>(A: Submatrix<V, El<P>>, poly_ring: P, al
             // we need an extension field
             return unimplemented!();
         } else {
-            return determinant_poly_matrix_base(A, &poly_ring, allocator, total_degs, (0..(max_interpolation_point_count as usize)).map_fn(|x| poly_ring.base_ring().int_hom().map(x as i32)));
+            return determinant_poly_matrix_base(A, &poly_ring, allocator, total_degs, (0..(max_interpolation_point_count as usize)).map_fn(|x| poly_ring.base_ring().int_hom().map(x.try_into().unwrap())));
         }
     } else {
-        return determinant_poly_matrix_base(A, &poly_ring, allocator, total_degs, (0..(max_interpolation_point_count as usize)).map_fn(|x| poly_ring.base_ring().int_hom().map(x as i32)));
+        return determinant_poly_matrix_base(A, &poly_ring, allocator, total_degs, (0..(max_interpolation_point_count as usize)).map_fn(|x| poly_ring.base_ring().int_hom().map(x.try_into().unwrap())));
     }
 }
 

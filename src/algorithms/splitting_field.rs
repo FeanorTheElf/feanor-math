@@ -157,7 +157,7 @@ pub fn extend_number_field_promise_is_irreducible<P>(poly_ring: P, irred_poly: &
     //  - I believe the degree `[L : QQ]` is such a bound (in the Galois case it is, at least)
 
     // take `A` twice as large, so that we find a good element with probability >= 1/2
-    let size_of_A = (2 * total_rank) as i32;
+    let size_of_A: i32 = (2 * total_rank).try_into().unwrap();
 
     let mut rng = oorandom::Rand64::new(1);
 

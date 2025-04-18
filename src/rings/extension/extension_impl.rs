@@ -128,7 +128,7 @@ impl<R, V, A, C> FreeAlgebraImpl<R, V, A, C>
     pub fn new_with(base_ring: R, rank: usize, x_pow_rank: V, gen_name: &'static str, element_allocator: A, convolution: C) -> Self {
         assert!(rank >= 1);
         assert!(x_pow_rank.len() <= rank);
-        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&(rank as i64)).unwrap();
+        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
         RingValue::from(FreeAlgebraImplBase {
             base_ring, gen_name, x_pow_rank, element_allocator, rank, log2_padded_len, convolution
         })
@@ -607,7 +607,7 @@ impl<R, V, A, C> InterpolationBaseRing for AsFieldBase<FreeAlgebraImpl<R, V, A, 
             let mut modulus = SparseMapVector::new(1, RingRef::new(self));
             *modulus.at_mut(0) = self.one();
             let field = AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with(RingRef::new(self), 1, modulus, "X", self.get_delegate().element_allocator.clone(), STANDARD_CONVOLUTION)));
-            let points = (0..count).map(|n| field.int_hom().map(n as i32)).collect();
+            let points = (0..count).map(|n| field.int_hom().map(n.try_into().unwrap())).collect();
             return (field, points);
         } else {
             unimplemented!()

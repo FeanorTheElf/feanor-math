@@ -21,7 +21,7 @@ pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usi
 
 #[stability::unstable(feature = "enable")]
 pub fn is_root_of_unity<R: RingStore>(ring: R, el: &El<R>, n: usize) -> bool {
-    is_root_of_unity_gen(ring, el, &(n as i64), StaticRing::<i64>::RING)
+    is_root_of_unity_gen(ring, el, &n.try_into().unwrap(), StaticRing::<i64>::RING)
 }
 
 #[stability::unstable(feature = "enable")]
@@ -34,7 +34,7 @@ pub fn is_root_of_unity_gen<R: RingStore, I: RingStore>(ring: R, el: &El<R>, n: 
 
 #[stability::unstable(feature = "enable")]
 pub fn is_prim_root_of_unity<R: RingStore>(ring: R, el: &El<R>, n: usize) -> bool {
-    is_prim_root_of_unity_gen(ring, el, &(n as i64), StaticRing::<i64>::RING)
+    is_prim_root_of_unity_gen(ring, el, &n.try_into().unwrap(), StaticRing::<i64>::RING)
 }
 
 #[stability::unstable(feature = "enable")]
@@ -77,7 +77,7 @@ pub fn get_prim_root_of_unity<R>(ring: R, n: usize) -> Option<El<R>>
     where R: RingStore, 
         R::Type: FiniteRing + Field
 {
-    get_prim_root_of_unity_gen(ring, &int_cast(n as i64, BigIntRing::RING, StaticRing::<i64>::RING), BigIntRing::RING)
+    get_prim_root_of_unity_gen(ring, &int_cast(n.try_into().unwrap(), BigIntRing::RING, StaticRing::<i64>::RING), BigIntRing::RING)
 }
 
 #[stability::unstable(feature = "enable")]

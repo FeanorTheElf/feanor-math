@@ -63,7 +63,7 @@ pub fn invert_over_local_zn<S>(ring: S, el: &El<S>) -> Option<El<S>>
 
     let mut nilpotent_correction = ring.negate(ring.mul_ref_snd(nilpotent_part, &inverse));
     let mut result = inverse;
-    for _ in 0..StaticRing::<i64>::RING.abs_log2_ceil(&(base_ring.nilpotent_power().unwrap_or(1) as i64)).unwrap() {
+    for _ in 0..StaticRing::<i64>::RING.abs_log2_ceil(&base_ring.nilpotent_power().unwrap_or(1).try_into().unwrap()).unwrap() {
         ring.mul_assign(&mut result, ring.add_ref_snd(ring.one(), &nilpotent_correction));
         ring.square(&mut nilpotent_correction);
     }

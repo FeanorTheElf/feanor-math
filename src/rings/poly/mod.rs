@@ -352,13 +352,21 @@ impl<R: RingStore> PolyRingStore for R
     where R::Type: PolyRing
 {}
 
+///
+/// Computes the formal derivative of a polynomial.
+/// 
+/// The formal derivative is the linear map defined by
+/// ```text
+///   X^k  ->  k * X^(k - 1)
+/// ```
+/// 
 pub fn derive_poly<P>(poly_ring: P, poly: &El<P>) -> El<P>
     where P: PolyRingStore,
         P::Type: PolyRing
 {
     poly_ring.from_terms(poly_ring.terms(poly)
         .filter(|(_, i)| *i > 0)
-        .map(|(c, i)| (poly_ring.base_ring().int_hom().mul_ref_fst_map(c, i as i32), i - 1))
+        .map(|(c, i)| (poly_ring.base_ring().int_hom().mul_ref_fst_map(c, i.try_into().unwrap()), i - 1))
     )
 }
 

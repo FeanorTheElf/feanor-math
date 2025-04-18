@@ -245,7 +245,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
         elements.sort_unstable_by_key(|f| self.degree(f).unwrap_or(0));
         // this can make it much faster; in particular, in the (not too uncommon) special case that we compute
         // the product of degree 1 polynomials, this means we actually make use of karatsuba multiplication
-        for i in 0..StaticRing::<i64>::RING.abs_log2_ceil(&(elements.len() as i64)).unwrap() {
+        for i in 0..StaticRing::<i64>::RING.abs_log2_ceil(&elements.len().try_into().unwrap()).unwrap() {
             let step = 1 << i;
             for j in (0..(elements.len() - step)).step_by(2 * step) {
                 let (a, b) = (&mut elements[j..(j + step + 1)]).split_at_mut(step);

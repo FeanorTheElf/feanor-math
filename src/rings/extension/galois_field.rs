@@ -88,7 +88,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
 
         // first try trinomials, they seem to have a good chance of being irreducible
         for _ in 0..16 {
-            let i = (StaticRing::<i64>::RING.get_uniformly_random(&(degree as i64 - 1), || rng.rand_u64()) + 1) as usize;
+            let i = (StaticRing::<i64>::RING.get_uniformly_random(&(TryInto::<i64>::try_into(degree).unwrap() - 1), || rng.rand_u64()) + 1) as usize;
             let a = Fp.random_element(|| rng.rand_u64());
             let b = Fp.random_element(|| rng.rand_u64());
             let f = poly_ring.from_terms([(a, 0), (b, i), (Fp.one(), degree)].into_iter());
@@ -105,15 +105,15 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
         let p = Fp.size(&ZZbig).unwrap();
         let mut small_d = 1;
         let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
-        let mut large_d = int_cast(signed_gcd(Fq_star_order, int_cast(degree as i64 / small_d, ZZbig, StaticRing::<i64>::RING), ZZbig), ZZ, ZZbig);
+        let mut large_d = int_cast(signed_gcd(Fq_star_order, int_cast(TryInto::<i64>::try_into(degree).unwrap() / small_d, ZZbig, StaticRing::<i64>::RING), ZZbig), ZZ, ZZbig);
         let mut increased_small_d = true;
         while increased_small_d {
             increased_small_d = false;
             // use a greedy approach, just add a factor to small_d if it makes large_d larger
-            for (k, _) in factor(&ZZ, degree as i64 / small_d) {
+            for (k, _) in factor(&ZZ, TryInto::<i64>::try_into(degree).unwrap() / small_d) {
                 let new_small_d = small_d * k;
                 let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), new_small_d as usize), ZZbig.one());
-                let new_large_d = int_cast(signed_gcd(Fq_star_order, int_cast(degree as i64 / new_small_d, ZZbig, StaticRing::<i64>::RING), ZZbig), ZZ, ZZbig);
+                let new_large_d = int_cast(signed_gcd(Fq_star_order, int_cast(TryInto::<i64>::try_into(degree).unwrap() / new_small_d, ZZbig, StaticRing::<i64>::RING), ZZbig), ZZ, ZZbig);
                 if new_large_d > large_d {
                     small_d = new_small_d;
                     large_d = new_large_d;
@@ -122,7 +122,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
                 }
             }
         }
-        small_d = degree as i64 / large_d;
+        small_d = TryInto::<i64>::try_into(degree).unwrap() / large_d;
         if large_d != 1 {
             let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
             // careful here to not get an infinite generic argument recursion
@@ -167,7 +167,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
     
     let log2_modulus = poly_ring.base_ring().integer_ring().abs_log2_ceil(poly_ring.base_ring().modulus()).unwrap();
     let fft_convolution = FFTConvolution::new_with(Global);
-    if fft_convolution.has_sufficient_precision(StaticRing::<i64>::RING.abs_log2_ceil(&(degree as i64)).unwrap() + 1, log2_modulus) {
+    if fft_convolution.has_sufficient_precision(StaticRing::<i64>::RING.abs_log2_ceil(&degree.try_into().unwrap()).unwrap() + 1, log2_modulus) {
         find_small_irreducible_poly_base(
             &poly_ring,
             degree,

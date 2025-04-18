@@ -99,14 +99,14 @@ fn search_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>, delta: i64) -> Option<
     let Zi64_to_ZZ = ZZ.can_hom(&StaticRing::<i64>::RING).unwrap();
     debug_assert!(ZZ.is_one(&signed_gcd(ZZ.clone_el(&n), Zi64_to_ZZ.map(delta), &ZZ)));
     let Zm_delta = Zi64_to_Zm.map(delta);
-    let ZZ_m = Zi64_to_ZZ.map(m as i64);
+    let ZZ_m = Zi64_to_ZZ.map(m.try_into().unwrap());
 
     // we continue the main loop until we reach `n <= m`; at this point, the main loop is not correct
     // anymore, since being in `Z/mZ \ Z/mZ*` does not imply nonprimality anymore
     let mut remaining_steps = if ZZ.is_leq(&n, &ZZ_m) {
         0
     } else if delta < 0 {
-        let max_steps = ZZ.ceil_div(ZZ.sub_ref(&n, &Zi64_to_ZZ.map(m as i64)), &Zi64_to_ZZ.map(-delta));
+        let max_steps = ZZ.ceil_div(ZZ.sub_ref(&n, &Zi64_to_ZZ.map(m.try_into().unwrap())), &Zi64_to_ZZ.map(-delta));
         if ZZ.is_lt(&max_steps, &Zi64_to_ZZ.map(i64::MAX)) {
             int_cast(max_steps, StaticRing::<i64>::RING, &ZZ)
         } else {
@@ -135,7 +135,7 @@ fn search_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>, delta: i64) -> Option<
         }
     }
     let mut n = int_cast(n, StaticRing::<i64>::RING, &ZZ);
-    assert!(n <= m as i64);
+    assert!(n <= m.try_into().unwrap());
     while n > 0 {
         if is_prime(&StaticRing::<i64>::RING, &n, DEFAULT_PROBABILISTIC_REPETITIONS) {
             return Some(Zi64_to_ZZ.map(n));

@@ -266,8 +266,8 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
 
     fn compute_required_width(&self, input_size_log2: usize, lhs_len: usize, rhs_len: usize, inner_prod_len: usize) -> usize {
         let log2_output_size = input_size_log2 * 2 + 
-            StaticRing::<i64>::RING.abs_log2_ceil(&(min(lhs_len, rhs_len) as i64)).unwrap_or(0) +
-            StaticRing::<i64>::RING.abs_log2_ceil(&(inner_prod_len as i64)).unwrap_or(0) +
+            StaticRing::<i64>::RING.abs_log2_ceil(&min(lhs_len, rhs_len).try_into().unwrap()).unwrap_or(0) +
+            StaticRing::<i64>::RING.abs_log2_ceil(&inner_prod_len.try_into().unwrap()).unwrap_or(0) +
             1;
         let mut width = (log2_output_size - 1) / 57 + 1;
         while log2_output_size > self.integer_ring.abs_log2_floor(self.get_rns_ring(width).modulus()).unwrap() {

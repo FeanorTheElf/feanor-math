@@ -66,7 +66,7 @@ impl<R, A> NTTConvolution<R, A>
     }
 
     fn compute_convolution_impl(&self, mut lhs: PreparedConvolutionOperand<R, A>, rhs: &PreparedConvolutionOperand<R, A>, out: &mut [El<R>]) {
-        let log2_n = ZZ.abs_log2_ceil(&(lhs.data.len() as i64)).unwrap();
+        let log2_n = ZZ.abs_log2_ceil(&lhs.data.len().try_into().unwrap()).unwrap();
         assert_eq!(lhs.data.len(), 1 << log2_n);
         assert_eq!(rhs.data.len(), 1 << log2_n);
         assert!(lhs.len + rhs.len <= 1 << log2_n);
@@ -81,7 +81,7 @@ impl<R, A> NTTConvolution<R, A>
     }
 
     fn un_and_redo_fft(&self, input: &[El<R>], log2_n: usize) -> Vec<El<R>, A> {
-        let log2_in_len = ZZ.abs_log2_ceil(&(input.len() as i64)).unwrap();
+        let log2_in_len = ZZ.abs_log2_ceil(&input.len().try_into().unwrap()).unwrap();
         assert_eq!(input.len(), 1 << log2_in_len);
         assert!(log2_in_len < log2_n);
 
@@ -131,7 +131,7 @@ impl<R, A> ConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
 
     fn compute_convolution<S: RingStore<Type = R::Type> + Copy, V1: VectorView<<R::Type as RingBase>::Element>, V2: VectorView<<R::Type as RingBase>::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [El<R>], ring: S) {
         assert!(self.supports_ring(&ring));
-        let log2_n = ZZ.abs_log2_ceil(&((lhs.len() + rhs.len()) as i64)).unwrap();
+        let log2_n = ZZ.abs_log2_ceil(&(lhs.len() + rhs.len()).try_into().unwrap()).unwrap();
         let lhs_prep = self.prepare_convolution_impl(lhs, log2_n);
         let rhs_prep = self.prepare_convolution_impl(rhs, log2_n);
         self.compute_convolution_impl(lhs_prep, &rhs_prep, dst);
@@ -155,7 +155,7 @@ impl<R, A> PreparedConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
 
     fn prepare_convolution_operand<S: RingStore<Type = R::Type> + Copy, V: VectorView<El<R>>>(&self, val: V, ring: S) -> Self::PreparedConvolutionOperand {
         assert!(ring.get_ring() == self.ring.get_ring());
-        let log2_n_in = ZZ.abs_log2_ceil(&(val.len() as i64)).unwrap();
+        let log2_n_in = ZZ.abs_log2_ceil(&val.len().try_into().unwrap()).unwrap();
         let log2_n_out = log2_n_in + 1;
         return self.prepare_convolution_impl(val, log2_n_out);
     }
@@ -163,9 +163,9 @@ impl<R, A> PreparedConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
     fn compute_convolution_lhs_prepared<S: RingStore<Type = R::Type> + Copy, V: VectorView<El<R>>>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: V, dst: &mut [El<R>], ring: S) {
         assert!(ring.is_commutative());
         assert!(ring.get_ring() == self.ring.get_ring());
-        let log2_lhs = ZZ.abs_log2_ceil(&(lhs.data.len() as i64)).unwrap();
+        let log2_lhs = ZZ.abs_log2_ceil(&lhs.data.len().try_into().unwrap()).unwrap();
         assert_eq!(lhs.data.len(), 1 << log2_lhs);
-        let log2_n = ZZ.abs_log2_ceil(&((lhs.len + rhs.len()) as i64)).unwrap().max(log2_lhs);
+        let log2_n = ZZ.abs_log2_ceil(&(lhs.len + rhs.len()).try_into().unwrap()).unwrap().max(log2_lhs);
         assert!(log2_lhs <= log2_n);
         self.compute_convolution_prepared(lhs, &self.prepare_convolution_impl(rhs, log2_n), dst, ring);
     }
@@ -173,9 +173,9 @@ impl<R, A> PreparedConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
     fn compute_convolution_prepared<S: RingStore<Type = R::Type> + Copy>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: &Self::PreparedConvolutionOperand, dst: &mut [El<R>], ring: S) {
         assert!(ring.is_commutative());
         assert!(ring.get_ring() == self.ring.get_ring());
-        let log2_lhs = ZZ.abs_log2_ceil(&(lhs.data.len() as i64)).unwrap();
+        let log2_lhs = ZZ.abs_log2_ceil(&lhs.data.len().try_into().unwrap()).unwrap();
         assert_eq!(1 << log2_lhs, lhs.data.len());
-        let log2_rhs = ZZ.abs_log2_ceil(&(rhs.data.len() as i64)).unwrap();
+        let log2_rhs = ZZ.abs_log2_ceil(&rhs.data.len().try_into().unwrap()).unwrap();
         assert_eq!(1 << log2_rhs, rhs.data.len());
         match log2_lhs.cmp(&log2_rhs) {
             std::cmp::Ordering::Equal => self.compute_convolution_impl(self.clone_prepared_operand(lhs), rhs, dst),
@@ -197,14 +197,14 @@ impl<R, A> PreparedConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
             return;
         }
         let expected_len = values_it.peek().unwrap().0.data.len().max(values_it.peek().unwrap().1.data.len());
-        let mut current_log2_len = ZZ.abs_log2_ceil(&(expected_len as i64)).unwrap();
+        let mut current_log2_len = ZZ.abs_log2_ceil(&expected_len.try_into().unwrap()).unwrap();
         assert_eq!(expected_len, 1 << current_log2_len);
         let mut tmp = Vec::with_capacity_in(1 << current_log2_len, self.allocator.clone());
         tmp.resize_with(1 << current_log2_len, || ring.zero());
         for (lhs, rhs) in values_it {
             assert!(dst.len() >= lhs.len + rhs.len);
-            let lhs_log2_len = ZZ.abs_log2_ceil(&(lhs.data.len() as i64)).unwrap();
-            let rhs_log2_len = ZZ.abs_log2_ceil(&(rhs.data.len() as i64)).unwrap();
+            let lhs_log2_len = ZZ.abs_log2_ceil(&lhs.data.len().try_into().unwrap()).unwrap();
+            let rhs_log2_len = ZZ.abs_log2_ceil(&rhs.data.len().try_into().unwrap()).unwrap();
             let new_log2_len = current_log2_len.max(lhs_log2_len).max(rhs_log2_len);
             
             if current_log2_len < new_log2_len {

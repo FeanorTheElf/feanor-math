@@ -820,7 +820,7 @@ pub trait RingStore: Sized {
             self.square(&mut x);
             return x;
         }
-        self.pow_gen(x, &(power as i64), StaticRing::<i64>::RING)
+        self.pow_gen(x, &power.try_into().unwrap(), StaticRing::<i64>::RING)
     }
 
     ///

@@ -71,7 +71,7 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD> {
     }
 
     fn from_int(&self, value: i32) -> Self::Element {
-        RingRef::new(self).coerce(&StaticRing::<i64>::RING, value as i64)
+        RingRef::new(self).coerce(&StaticRing::<i64>::RING, value.into())
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -125,7 +125,7 @@ impl<const N: u64, const IS_FIELD: bool> CanIsoFromTo<ZnBase<N, IS_FIELD>> for Z
 impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnBase<N, IS_FIELD> {
 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        let (s, _, d) = signed_eea(*rhs as i64, N as i64, StaticRing::<i64>::RING);
+        let (s, _, d) = signed_eea((*rhs).try_into().unwrap(), N as i64, StaticRing::<i64>::RING);
         let mut rhs_inv = ((s % (N as i64)) + (N as i64)) as u64;
         if rhs_inv >= N {
             rhs_inv -= N;
@@ -145,7 +145,7 @@ impl<const N: u64, const IS_FIELD: bool> PrincipalIdealRing for ZnBase<N, IS_FIE
     }
 
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        let (s, t, d) = StaticRing::<i64>::RING.extended_ideal_gen(&(*lhs as i64), &(*rhs as i64));
+        let (s, t, d) = StaticRing::<i64>::RING.extended_ideal_gen(&(*lhs).try_into().unwrap(), &(*rhs).try_into().unwrap());
         let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
     }

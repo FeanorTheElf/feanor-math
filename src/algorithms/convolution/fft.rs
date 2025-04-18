@@ -53,12 +53,12 @@ impl<A> FFTConvolution<A>
     #[stability::unstable(feature = "enable")]
     pub fn has_sufficient_precision(&self, log2_len: usize, log2_input_size: usize) -> bool {
         let fft_table = self.get_fft_table(log2_len);
-        let input_size = 2f64.powi(log2_input_size as i32);
+        let input_size = 2f64.powi(log2_input_size.try_into().unwrap());
         fft_table.expected_absolute_error(input_size * input_size, input_size * input_size * f64::EPSILON + fft_table.expected_absolute_error(input_size, 0.)) < 0.5
     }
 
     fn compute_convolution_impl(&self, mut lhs: Vec<El<Complex64>, A>, rhs: &[El<Complex64>], target_len: usize) -> impl Iterator<Item = i64> {
-        let log2_n = ZZ.abs_log2_ceil(&(lhs.len() as i64)).unwrap();
+        let log2_n = ZZ.abs_log2_ceil(&lhs.len().try_into().unwrap()).unwrap();
         assert_eq!(lhs.len(), 1 << log2_n);
         assert_eq!(rhs.len(), 1 << log2_n);
 
@@ -159,7 +159,7 @@ impl<R, A> ConvolutionAlgorithm<R> for FFTConvolutionZn<A>
             return;
         }
         let log2_data_size = ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap();
-        let log2_n = ZZ.abs_log2_ceil(&((lhs.len() + rhs.len()) as i64)).unwrap();
+        let log2_n = ZZ.abs_log2_ceil(&(lhs.len() + rhs.len()).try_into().unwrap()).unwrap();
         let lhs_prep = self.base.prepare_convolution_impl(lhs.clone_ring_els(&ring).map_fn(|x| int_cast(ring.smallest_lift(x), ZZ, ring.integer_ring()) as f64), log2_n, Some(log2_data_size)).1;
         let rhs_prep = self.base.prepare_convolution_impl(rhs.clone_ring_els(&ring).map_fn(|x| int_cast(ring.smallest_lift(x), ZZ, ring.integer_ring()) as f64), log2_n, Some(log2_data_size)).1;
         let hom = ring.can_hom(&ZZ).unwrap();
@@ -187,7 +187,7 @@ impl<I, A> ConvolutionAlgorithm<I> for FFTConvolution<A>
         if lhs.len() == 0 || rhs.len() == 0 {
             return;
         }
-        let log2_n = ZZ.abs_log2_ceil(&((lhs.len() + rhs.len()) as i64)).unwrap();
+        let log2_n = ZZ.abs_log2_ceil(&(lhs.len() + rhs.len()).try_into().unwrap()).unwrap();
         let lhs_prep = self.prepare_convolution_impl(lhs.clone_ring_els(&ring).map_fn(|x| int_cast(x, ZZ, &ring) as f64), log2_n, None).1;
         let rhs_prep = self.prepare_convolution_impl(rhs.clone_ring_els(&ring).map_fn(|x| int_cast(x, ZZ, &ring) as f64), log2_n, None).1;
         for (i, x) in self.compute_convolution_impl(lhs_prep, &rhs_prep, lhs.len() + rhs.len() - 1).enumerate() {
@@ -215,7 +215,7 @@ impl<I, A> PreparedConvolutionAlgorithm<I> for FFTConvolution<A>
     fn prepare_convolution_operand<S, V>(&self, val: V, ring: S) -> Self::PreparedConvolutionOperand
         where S: RingStore<Type = I> + Copy, V: VectorView<I::Element>
     {
-        let log2_n_in = ZZ.abs_log2_ceil(&(val.len() as i64)).unwrap();
+        let log2_n_in = ZZ.abs_log2_ceil(&val.len().try_into().unwrap()).unwrap();
         let log2_n_out = log2_n_in + 1;
         let mut original_data = Vec::new_in(self.allocator.clone());
         original_data.extend(val.clone_ring_els(&ring).iter().map(|x| int_cast(x, ZZ, &ring) as f64));
@@ -231,10 +231,10 @@ impl<I, A> PreparedConvolutionAlgorithm<I> for FFTConvolution<A>
         where S: RingStore<Type = I> + Copy, V: VectorView<I::Element>
     {
         assert!(ring.is_commutative());
-        let log2_lhs = ZZ.abs_log2_ceil(&(lhs.fft_data.len() as i64)).unwrap();
+        let log2_lhs = ZZ.abs_log2_ceil(&lhs.fft_data.len().try_into().unwrap()).unwrap();
         assert_eq!(lhs.fft_data.len(), 1 << log2_lhs);
         let target_len = lhs.original_data.len() + rhs.len() - 1;
-        let log2_target_len = ZZ.abs_log2_ceil(&(target_len as i64)).unwrap().max(log2_lhs);
+        let log2_target_len = ZZ.abs_log2_ceil(&target_len.try_into().unwrap()).unwrap().max(log2_lhs);
         let els = if log2_target_len > log2_lhs {
             assert!(target_len <= 1 << log2_target_len);
             let lhs_prep = self.prepare_convolution_impl(lhs.original_data.copy_els(), log2_target_len, None).1;
@@ -258,9 +258,9 @@ impl<I, A> PreparedConvolutionAlgorithm<I> for FFTConvolution<A>
         where S: RingStore<Type = I> + Copy
     {
         assert!(ring.is_commutative());
-        let log2_lhs = ZZ.abs_log2_ceil(&(lhs.fft_data.len() as i64)).unwrap();
+        let log2_lhs = ZZ.abs_log2_ceil(&lhs.fft_data.len().try_into().unwrap()).unwrap();
         assert_eq!(1 << log2_lhs, lhs.fft_data.len());
-        let log2_rhs = ZZ.abs_log2_ceil(&(rhs.fft_data.len() as i64)).unwrap();
+        let log2_rhs = ZZ.abs_log2_ceil(&rhs.fft_data.len().try_into().unwrap()).unwrap();
         assert_eq!(1 << log2_rhs, rhs.fft_data.len());
         let target_len = lhs.original_data.len() + rhs.original_data.len() - 1;
         assert!(target_len <= 1 << log2_lhs || target_len <= 1 << log2_rhs);
@@ -285,7 +285,7 @@ impl<R, A> PreparedConvolutionAlgorithm<R> for FFTConvolutionZn<A>
         where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
     {
         let log2_data_size = ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap();
-        let log2_n_in = ZZ.abs_log2_ceil(&(val.len() as i64)).unwrap();
+        let log2_n_in = ZZ.abs_log2_ceil(&val.len().try_into().unwrap()).unwrap();
         let log2_n_out = log2_n_in + 1;
         let mut original_data = Vec::new_in(self.base.allocator.clone());
         original_data.extend(val.clone_ring_els(&ring).iter().map(|x| int_cast(ring.smallest_lift(x), ZZ, ring.integer_ring()) as f64));
@@ -302,10 +302,10 @@ impl<R, A> PreparedConvolutionAlgorithm<R> for FFTConvolutionZn<A>
     {
         assert!(ring.is_commutative());
         let log2_data_size = ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap();
-        let log2_lhs = ZZ.abs_log2_ceil(&(lhs.fft_data.len() as i64)).unwrap();
+        let log2_lhs = ZZ.abs_log2_ceil(&lhs.fft_data.len().try_into().unwrap()).unwrap();
         assert_eq!(lhs.fft_data.len(), 1 << log2_lhs);
         let target_len = lhs.original_data.len() + rhs.len() - 1;
-        let log2_target_len = ZZ.abs_log2_ceil(&(target_len as i64)).unwrap().max(log2_lhs);
+        let log2_target_len = ZZ.abs_log2_ceil(&target_len.try_into().unwrap()).unwrap().max(log2_lhs);
         let els = if log2_target_len > log2_lhs {
             assert!(target_len <= 1 << log2_target_len);
             let lhs_prep = self.base.prepare_convolution_impl(lhs.original_data.copy_els(), log2_target_len, Some(log2_data_size)).1;
@@ -331,9 +331,9 @@ impl<R, A> PreparedConvolutionAlgorithm<R> for FFTConvolutionZn<A>
     {
         assert!(ring.is_commutative());
         let log2_data_size = ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap();
-        let log2_lhs = ZZ.abs_log2_ceil(&(lhs.fft_data.len() as i64)).unwrap();
+        let log2_lhs = ZZ.abs_log2_ceil(&lhs.fft_data.len().try_into().unwrap()).unwrap();
         assert_eq!(1 << log2_lhs, lhs.fft_data.len());
-        let log2_rhs = ZZ.abs_log2_ceil(&(rhs.fft_data.len() as i64)).unwrap();
+        let log2_rhs = ZZ.abs_log2_ceil(&rhs.fft_data.len().try_into().unwrap()).unwrap();
         assert_eq!(1 << log2_rhs, rhs.fft_data.len());
         let target_len = lhs.original_data.len() + rhs.original_data.len() - 1;
         assert!(target_len <= 1 << log2_lhs || target_len <= 1 << log2_rhs);

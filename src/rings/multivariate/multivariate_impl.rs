@@ -21,7 +21,7 @@ type OrderIdx = u64;
 /// Computes the "cumulative binomial function" `sum_(0 <= l <= k) binomial(n + l, n)`
 /// 
 fn compute_cum_binomial(n: usize, k: usize) -> u64 {
-    StaticRing::<i64>::RING.sum((0..(k + 1)).map(|l| binomial((n + l) as i128, &(n as i128), StaticRing::<i128>::RING) as i64)) as u64
+    StaticRing::<i64>::RING.sum((0..(k + 1)).map(|l| binomial((n + l) as i128, &(n as i128), StaticRing::<i128>::RING).try_into().unwrap())) as u64
 }
 
 ///
@@ -32,10 +32,10 @@ fn enumeration_index_degrevlex<V>(d: Exponent, mon: V, cum_binomial_lookup_table
 {
     debug_assert!(d == mon.iter().sum::<Exponent>());
     let n = mon.len();
-    let mut remaining_degree_minus_one: i64 = d as i64 - 1;
+    let mut remaining_degree_minus_one: i64 = TryInto::<i64>::try_into(d).unwrap() - 1;
     let mut result = 0;
     for i in 0..(n - 1) {
-        remaining_degree_minus_one -= mon.at(n - 1 - i) as i64;
+        remaining_degree_minus_one -= TryInto::<i64>::try_into(mon.at(n - 1 - i)).unwrap();
         if remaining_degree_minus_one < 0 {
             return result;
         }
@@ -192,10 +192,10 @@ impl<R, A> MultivariatePolyRingImpl<R, A>
         let max_degree_for_orderidx = if variable_count == 1 || variable_count == 2 {
             usize::MAX
         } else {
-            let k = int_cast(variable_count as i64 - 1, BigIntRing::RING, StaticRing::<i64>::RING);
+            let k = int_cast(TryInto::<i64>::try_into(variable_count).unwrap() - 1, BigIntRing::RING, StaticRing::<i64>::RING);
             // ensure that cum_binomial() always fits within an u64
             int_bisect::find_root_floor(StaticRing::<i64>::RING, 0, |d| if BigIntRing::RING.is_lt(&BigIntRing::RING.mul(
-                binomial(int_cast(d + variable_count as i64 - 1, BigIntRing::RING, StaticRing::<i64>::RING), &k, BigIntRing::RING),
+                binomial(int_cast(d + TryInto::<i64>::try_into(variable_count).unwrap() - 1, BigIntRing::RING, StaticRing::<i64>::RING), &k, BigIntRing::RING),
                 int_cast(*d, BigIntRing::RING, StaticRing::<i64>::RING)
             ), &BigIntRing::RING.power_of_two(u64::BITS as usize)) { -1 } else { 1 }) as usize
         };

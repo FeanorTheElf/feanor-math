@@ -63,8 +63,9 @@ impl<H, A> BluesteinFFT<Complex64Base, Complex64Base, H, A>
     pub fn for_complex_with_hom(hom: H, n: usize, tmp_mem_allocator: A) -> Self{
         let ZZ = StaticRing::<i64>::RING;
         let CC = Complex64::RING;
-        let log2_m = ZZ.abs_log2_ceil(&(2 * n as i64 + 1)).unwrap();
-        Self::new_with_pows_with_hom(hom, |x| CC.root_of_unity(x, 2 * n as i64), |x| CC.root_of_unity(x, 1 << log2_m), n, log2_m, tmp_mem_allocator)
+        let n_i64: i64 = n.try_into().unwrap();
+        let log2_m = ZZ.abs_log2_ceil(&(2 * n_i64 + 1)).unwrap();
+        Self::new_with_pows_with_hom(hom, |x| CC.root_of_unity(x, 2 * n_i64), |x| CC.root_of_unity(x, 1 << log2_m), n, log2_m, tmp_mem_allocator)
     }
 }
 
@@ -191,7 +192,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         };
         
         let mut b = Self::create_b_array(hom.domain().get_ring(), root_of_unity_2n_pows, n, 1 << log2_m);
-        let inv_root_of_unity_2n = (0..n).map(|i| root_of_unity_2n_pows(-((i * i) as i64))).collect::<Vec<_>>();
+        let inv_root_of_unity_2n = (0..n).map(|i| root_of_unity_2n_pows(-TryInto::<i64>::try_into(i * i).unwrap())).collect::<Vec<_>>();
         let root_of_unity_n = hom.codomain().pow(hom.map_ref(&root_of_unity_2n), 2);
 
         let m_fft_table_base = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::new(hom.domain(), hom.domain().clone_el(&root_of_unity_m), log2_m);
@@ -217,7 +218,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         let mut b = (0..m).map(|_| ring.zero()).collect::<Vec<_>>();
         b[0] = ring.one();
         for i in 1..n {
-            b[i] = root_of_unity_2n_pows((i * i) as i64 % (2 * n) as i64);
+            b[i] = root_of_unity_2n_pows(TryInto::<i64>::try_into((i * i) % (2 * n)).unwrap());
             b[m - i] = ring.clone_el(&b[i]);
         }
         return b;
@@ -253,7 +254,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         assert!(hom.codomain().get_ring().is_approximate() || is_prim_root_of_unity(hom.codomain(), &hom.map(root_of_unity_m_pows(1)), 1 << log2_m));
 
         let mut b = Self::create_b_array(hom.domain().get_ring(), &mut root_of_unity_2n_pows, n, 1 << log2_m);
-        let inv_root_of_unity_2n = (0..n).map(|i| root_of_unity_2n_pows(-((i * i) as i64))).collect::<Vec<_>>();
+        let inv_root_of_unity_2n = (0..n).map(|i| root_of_unity_2n_pows(-TryInto::<i64>::try_into(i * i).unwrap())).collect::<Vec<_>>();
         let root_of_unity_n = hom.map(root_of_unity_2n_pows(2));
 
         let m_fft_table_base = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::new_with_pows(hom.domain(), &mut root_of_unity_m_pows, log2_m);
@@ -293,8 +294,9 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     pub fn for_zn_with_hom(hom: H, n: usize, tmp_mem_allocator: A) -> Option<Self>
         where R_twiddle: ZnRing
     {
+        let n_i64: i64 = n.try_into().unwrap();
         let ZZ = StaticRing::<i64>::RING;
-        let log2_m = ZZ.abs_log2_ceil(&(2 * n as i64 + 1)).unwrap();
+        let log2_m = ZZ.abs_log2_ceil(&(2 * n_i64 + 1)).unwrap();
         let ring_as_field = hom.domain().as_field().ok().unwrap();
         let root_of_unity_2n = ring_as_field.get_ring().unwrap_element(algorithms::unity_root::get_prim_root_of_unity(&ring_as_field, 2 * n)?);
         let root_of_unity_m = ring_as_field.get_ring().unwrap_element(algorithms::unity_root::get_prim_root_of_unity_pow2(&ring_as_field, log2_m)?);
@@ -357,7 +359,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
 
         if INV {
             // finally, scale by 1/n
-            let scale = self.hom.map(self.hom.domain().checked_div(&self.hom.domain().one(), &self.hom.domain().int_hom().map(self.n as i32)).unwrap());
+            let scale = self.hom.map(self.hom.domain().checked_div(&self.hom.domain().one(), &self.hom.domain().int_hom().map(self.n.try_into().unwrap())).unwrap());
             for i in 0..values.len() {
                 ring.mul_assign_ref(values.at_mut(i), &scale);
             }
@@ -505,7 +507,7 @@ fn test_approximate_fft() {
     let CC = Complex64::RING;
     for (p, _log2_m) in [(5, 4), (53, 7), (1009, 11)] {
         let fft = BluesteinFFT::for_complex(&CC, p, Global);
-        let mut array = (0..p).map(|i| CC.root_of_unity(i as i64, p as i64)).collect::<Vec<_>>();
+        let mut array = (0..p).map(|i| CC.root_of_unity(i.try_into().unwrap(), p.try_into().unwrap())).collect::<Vec<_>>();
         fft.fft(&mut array, CC);
         let err = fft.expected_absolute_error(1., 0.);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));

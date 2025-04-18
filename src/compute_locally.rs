@@ -337,7 +337,7 @@ macro_rules! impl_interpolation_base_ring_char_zero {
                 let ZZbig = $crate::integer::BigIntRing::RING;
                 assert!(ZZbig.is_zero(&self.characteristic(&ZZbig).unwrap()));
                 let ring = $crate::ring::RingRef::new(self);
-                (ring, (0..count).map(|n| <_ as $crate::homomorphism::Homomorphism<_, _>>::map(&ring.int_hom(), n as i32)).collect())
+                (ring, (0..count).map(|n| <_ as $crate::homomorphism::Homomorphism<_, _>>::map(&ring.int_hom(), n.try_into().unwrap())).collect())
             }
         }
     };

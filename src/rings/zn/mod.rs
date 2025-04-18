@@ -300,7 +300,7 @@ pub mod generic_impls {
     {
         let ZZbig = BigIntRing::RING;
         let modulus = int_cast(ring.integer_ring().clone_el(ring.modulus()), ZZbig, ring.integer_ring());
-        let count = int_cast(count as i64, ZZbig, StaticRing::<i64>::RING);
+        let count = int_cast(count.try_into().unwrap(), ZZbig, StaticRing::<i64>::RING);
         let degree = int_bisect::find_root_floor(StaticRing::<i64>::RING, 1, |d| if *d > 0 && ZZbig.is_gt(&ZZbig.pow(ZZbig.clone_el(&modulus), *d as usize), &count) {
             1
         } else {
