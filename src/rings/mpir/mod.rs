@@ -67,6 +67,8 @@ impl Drop for MPZEl {
 /// Arbitrary-precision integer ring, implemented by binding to the well-known
 /// and heavily optimized library mpir (fork of gmp).
 /// 
+/// TODO: Remove `Copy` at next breaking release.
+/// 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MPZBase;
 
