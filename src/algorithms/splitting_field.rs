@@ -22,6 +22,11 @@ use crate::algorithms::linsolve::*;
 use super::poly_factor::FactorPolyField;
 use super::poly_gcd::PolyTFracGCDRing;
 
+///
+/// A ring homomorphism between two number fields, `K -> L`.
+/// 
+/// This is returned by [`extend_number_field()`].
+/// 
 #[stability::unstable(feature = "enable")]
 pub struct NumberFieldHom<R1, Impl1, I1, R2, Impl2, I2>
     where R1: RingStore<Type = NumberFieldBase<Impl1, I1>>,
@@ -42,6 +47,41 @@ pub struct NumberFieldHom<R1, Impl1, I1, R2, Impl2, I2>
     from_int: PhantomData<I1>,
     to_int: PhantomData<I2>,
     generator_image: El<NumberField<Impl2, I2>>,
+}
+
+impl<R1, Impl1, I1, R2, Impl2, I2> NumberFieldHom<R1, Impl1, I1, R2, Impl2, I2>
+    where R1: RingStore<Type = NumberFieldBase<Impl1, I1>>,
+        Impl1: RingStore,
+        Impl1::Type: Field + FreeAlgebra,
+        <Impl1::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I1>>,
+        I1: RingStore,
+        I1::Type: IntegerRing,
+        R2: RingStore<Type = NumberFieldBase<Impl2, I2>>,
+        Impl2: RingStore,
+        Impl2::Type: Field + FreeAlgebra,
+        <Impl2::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I2>>,
+        I2: RingStore,
+        I2::Type: IntegerRing
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(from: R1, to: R2, image_of_R1_gen: El<R2>) -> Self {
+        Self {
+            from: from,
+            to: to,
+            from_int: PhantomData,
+            to_int: PhantomData,
+            generator_image: image_of_R1_gen
+        }
+    }
+
+    ///
+    /// Consumes this object, producing the domain ring store, the codomain ring store
+    /// and the image of the canonical generator of the domain number field.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    pub fn destruct(self) -> (R1, R2, El<NumberField<Impl2, I2>>) {
+        (self.from, self.to, self.generator_image)
+    }
 }
 
 impl<R1, Impl1, I1, R2, Impl2, I2> Homomorphism<NumberFieldBase<Impl1, I1>, NumberFieldBase<Impl2, I2>> for NumberFieldHom<R1, Impl1, I1, R2, Impl2, I2>
@@ -84,9 +124,16 @@ impl<R1, Impl1, I1, R2, Impl2, I2> Homomorphism<NumberFieldBase<Impl1, I1>, Numb
 }
 
 ///
-/// Constructs the field `F[X]/(f(X))` that is isomorphic to `(F[X]/(g(X))[Y]/(h(Y))`
-/// where `F[X]/(g(X))` is the base ring of `poly_ring` and `h` is the given irreducible
-/// polynomial over `F[X]/(g(X))`. 
+/// Given a number field `K` and an irreducible polynomial `f`, computes a representation of
+/// the number field `L = K[X]/(f)`. The result is returned by the inclusion `K -> L` and 
+/// the element that corresponds to the coset of `X`, i.e. a root of `f` in `L`. Note that the 
+/// canonical generator of `L` does not have to be a root of `f` (this might even be impossible,
+/// e.g. if `f in ZZ[X]` but `K != QQ`).
+/// 
+/// The number field `K` is taken to be the base ring of the given polynomial ring.
+/// 
+/// As opposed to [`extend_number_field_promise_is_irreducible()`], this checks that `f` is 
+/// indeed irreducible.
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn extend_number_field<P>(poly_ring: P, irred_poly: &El<P>) -> (
@@ -110,6 +157,11 @@ pub fn extend_number_field<P>(poly_ring: P, irred_poly: &El<P>) -> (
 /// the element that corresponds to the coset of `X`, i.e. a root of `f` in `L`. Note that the 
 /// canonical generator of `L` does not have to be a root of `f` (this might even be impossible,
 /// e.g. if `f in ZZ[X]` but `K != QQ`).
+/// 
+/// The number field `K` is taken to be the base ring of the given polynomial ring.
+/// 
+/// This function assumes that the given polynomial is irreducible. If it is not, the results
+/// may be nonsensical (but of course not UB).
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn extend_number_field_promise_is_irreducible<P>(poly_ring: P, irred_poly: &El<P>) -> (

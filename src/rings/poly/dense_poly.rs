@@ -106,6 +106,15 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> Dense
     }
 }
 
+
+impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> DensePolyRingBase<R, A, C> {
+    
+    #[stability::unstable(feature = "enable")]
+    pub fn into_base_ring(self) -> R {
+        self.base_ring
+    }
+}
+
 ///
 /// An element of [`DensePolyRing`].
 /// 
