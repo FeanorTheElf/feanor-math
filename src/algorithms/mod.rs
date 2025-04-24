@@ -25,3 +25,4 @@ pub mod poly_gcd;
 pub mod splitting_field;
 pub mod extension_invert;
 pub mod galois;
+pub mod newton;

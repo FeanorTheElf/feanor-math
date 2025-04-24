@@ -13,6 +13,7 @@ use crate::algorithms::poly_factor::finite::poly_factor_finite_field;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
 use crate::computation::*;
 use crate::delegate::DelegateRingImplEuclideanRing;
+use crate::rings::float_complex::Complex64;
 use crate::specialization::*;
 use crate::algorithms::convolution::*;
 use crate::algorithms::eea::signed_lcm;
@@ -146,6 +147,23 @@ pub struct NumberFieldBase<Impl, I>
     base: Impl
 }
 
+///
+/// An embedding of a number field `K` into the complex numbers `CC`, represented
+/// approximately via floating point numbers.
+/// 
+#[stability::unstable(feature = "enable")]
+pub struct ComplexEmbedding<K, Impl, I>
+    where K: RingStore<Type = NumberFieldBase<Impl, I>>,
+        Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra,
+        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Type: IntegerRing
+{
+    from: K,
+    image_of_generator_power: El<Complex64>
+}
+
 #[stability::unstable(feature = "enable")]
 pub type DefaultNumberFieldImpl = AsField<FreeAlgebraImpl<RationalField<BigIntRing>, Vec<El<RationalField<BigIntRing>>>, Global, KaratsubaAlgorithm>>;
 #[stability::unstable(feature = "enable")]
@@ -253,6 +271,11 @@ impl<Impl, I> NumberField<Impl, I>
         RingValue::from(NumberFieldBase {
             base: implementation,
         })
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn choose_complex_embedding(self) -> ComplexEmbedding<Self, Impl, I> {
+        unimplemented!()
     }
 }
 

@@ -680,7 +680,7 @@ fn test_get_uniformly_random() {
     let ring = ZZ;
     let bound = RustBigintRing::RING.get_ring().parse("11000000000000000", 16).unwrap();
     let block_bound = RustBigintRing::RING.get_ring().parse("10000000000000000", 16).unwrap();
-    let mut rng = oorandom::Rand64::new(0);
+    let mut rng = oorandom::Rand64::new(1);
     let elements: Vec<_> = (0..1000).map(|_| ring.get_uniformly_random(&bound, || rng.rand_u64())).collect();
     assert!(elements.iter().any(|x| ring.is_lt(x, &block_bound)));
     assert!(elements.iter().any(|x| ring.is_gt(x, &block_bound)));

@@ -539,7 +539,7 @@ pub mod generic_tests {
     {
         for b in [15, 16] {
             let bound = ring.int_hom().map(b);
-            let mut rng = oorandom::Rand64::new(0);
+            let mut rng = oorandom::Rand64::new(1);
             let elements: Vec<El<R>> = (0..1000).map(|_| ring.get_uniformly_random(&bound, || rng.rand_u64())).collect();
             for i in 0..b {
                 assert!(elements.iter().any(|x| ring.eq_el(x, &ring.int_hom().map(i))))

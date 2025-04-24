@@ -892,7 +892,7 @@ fn test_ring_axioms() {
     let base_ring = zn_static::Fp::<257>::RING;
     let x_pow_rank = vec![base_ring.neg_one(); 64];
     let ring = FreeAlgebraImpl::new(base_ring, 64, x_pow_rank);
-    let mut rng = oorandom::Rand64::new(0);
+    let mut rng = oorandom::Rand64::new(1);
     let els = (0..10).map(|_| ring.from_canonical_basis((0..64).map(|_| ring.base_ring().random_element(|| rng.rand_u64()))));
     crate::ring::generic_tests::test_ring_axioms(&ring, els);
 }
