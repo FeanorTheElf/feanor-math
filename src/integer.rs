@@ -439,6 +439,23 @@ pub fn binomial<I>(n: El<I>, k: &El<I>, ring: I) -> El<I>
     }
 }
 
+#[stability::unstable(feature = "enable")]
+pub fn factorial<I>(n: &El<I>, ring: I) -> El<I>
+    where I: RingStore + Copy,
+        I::Type: IntegerRing
+{
+    let mut current = ring.zero();
+    let one = ring.one();
+    return ring.prod((0..).map_while(|_| {
+        if ring.is_lt(&current, &n) {
+            ring.add_assign_ref(&mut current, &one);
+            return Some(ring.clone_el(&current));
+        } else {
+            return None;
+        }
+    }));
+}
+
 ///
 /// Trait for [`RingStore`]s that store [`IntegerRing`]s. Mainly used
 /// to provide a convenient interface to the `IntegerRing`-functions.
@@ -660,6 +677,16 @@ fn test_binomial() {
 
     // a naive computation would overflow
     assert_eq!(145422675, binomial(30, &14, ZZ));
+}
+
+#[test]
+fn test_factorial() {
+    let ZZ = StaticRing::<i32>::RING;
+    assert_eq!(1, factorial(&0, ZZ));
+    assert_eq!(1, factorial(&1, ZZ));
+    assert_eq!(2, factorial(&2, ZZ));
+    assert_eq!(6, factorial(&3, ZZ));
+    assert_eq!(24, factorial(&4, ZZ));
 }
 
 #[test]

@@ -2,8 +2,7 @@ use std::alloc::Global;
 use std::cmp::min;
 
 use crate::algorithms::linsolve::smith::determinant_using_pre_smith;
-use crate::algorithms::linsolve::LinSolveRing;
-use crate::algorithms::linsolve::LinSolveRingStore;
+use crate::algorithms::linsolve::{LinSolveRing, LinSolveRingStore};
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::divisibility::DivisibilityRing;
@@ -14,9 +13,9 @@ use crate::ring::*;
 use crate::seq::*;
 use crate::homomorphism::*;
 use crate::wrapper::RingElementWrapper;
-use super::field::AsField;
-use super::field::AsFieldBase;
+use super::field::{AsField, AsFieldBase};
 use super::poly::dense_poly::DensePolyRing;
+use crate::primitive_int::StaticRing;
 use super::poly::{PolyRingStore, PolyRing};
 
 ///
@@ -148,6 +147,13 @@ pub trait FreeAlgebra: RingExtension {
         default_implementations::from_canonical_basis_extended(self, vec)
     }
 
+    ///
+    /// Computes the characteristic polynomial of the given element.
+    /// 
+    /// The characteristic polynomial is `det(XI - B)`, where `B` is the
+    /// matrix representation of the given element `b`, or equivalently the
+    /// matrix representation of the multiplication-by-`b` map `R^n -> R^n`.
+    /// 
     fn charpoly<P, H>(&self, el: &Self::Element, poly_ring: P, hom: H) -> El<P>
         where P: RingStore,
             P::Type: PolyRing,
@@ -156,6 +162,29 @@ pub trait FreeAlgebra: RingExtension {
     {
         default_implementations::charpoly(self, el, poly_ring, hom)
     }
+    
+    ///
+    /// Computes the (or a) minimal polynomial of the given element.
+    /// 
+    /// The minimal polynomial is the monic polynomial of minimal degree that
+    /// has the given value as a root. Its degree is always at least 1 and at
+    /// most [`FreeAlgebra::rank()`]. If the base ring is a principal ideal domain, 
+    /// then the minimal polynomial is unique. 
+    /// 
+    /// Note that the existence of the minimal polynomial is a consequence of the
+    /// Cayley-Hamilton theorem, i.e. `det(XI - A)(A) = 0` for a square matrix over
+    /// any ring `R`. In particular, representing element of the ring `R[a]` a matrices
+    /// over `R`, we find that `det(XI - B)(b) = 0` for any element `b`, thus `b` must
+    /// be the root of a monic polynomial of degree `<= n`.
+    /// 
+    fn minpoly<P, H>(&self, el: &Self::Element, poly_ring: P, hom: H) -> El<P>
+        where P: RingStore,
+            P::Type: PolyRing,
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
+            H: Homomorphism<<Self::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+    {
+        default_implementations::minpoly(self, el, poly_ring, hom)
+    }
 
     ///
     /// Computes the trace of an element `a` in this ring extension, which is defined as the
@@ -163,7 +192,8 @@ pub trait FreeAlgebra: RingExtension {
     /// 
     /// In nice extensions, the trace has many characterizations. For example, in a Galois
     /// field extension, it is the sum of `sigma(a)` as `sigma` runs through the Galois group 
-    /// of the extension.
+    /// of the extension. It is also equal to +/- the second largest coefficient of the
+    /// characteristic polynomial of the element.
     /// 
     fn trace(&self, el: Self::Element) -> El<Self::BaseRing> {
         let mut current = el;
@@ -322,6 +352,10 @@ pub trait FreeAlgebraStore: RingStore
 /// implementation overrides the default implementation.
 /// 
 mod default_implementations {
+    use crate::algorithms::int_bisect::bisect_floor;
+    use crate::algorithms::linsolve::SolveResult;
+    use crate::divisibility::*;
+
     use super::*;
 
     ///
@@ -349,11 +383,20 @@ mod default_implementations {
             return Some(result);
         }));
     }
-
-    ///
-    /// Default impl for [`FreeAlgebra::charpoly()`]
-    /// 
+    
     pub(super) fn charpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<P>
+        where R: ?Sized + FreeAlgebra,
+            P: RingStore,
+            P::Type: PolyRing,
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
+            H: Homomorphism<<R::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+    {
+        let minpoly = minpoly(ring, el, &poly_ring, hom);
+        let power = StaticRing::<i64>::RING.checked_div(&(ring.rank() as i64), &(poly_ring.degree(&minpoly).unwrap() as i64)).unwrap() as usize;
+        return poly_ring.pow(minpoly, power);
+    }
+ 
+    pub(super) fn minpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<P>
         where R: ?Sized + FreeAlgebra,
             P: RingStore,
             P::Type: PolyRing,
@@ -362,25 +405,43 @@ mod default_implementations {
     {
         assert!(!ring.is_zero(el));
         let base_ring = hom.codomain();
-        let mut lhs = OwnedMatrix::zero(ring.rank(), ring.rank(), &base_ring);
-        let mut current = ring.one();
-        for j in 0..ring.rank() {
+
+        let mut result = None;
+        _ = bisect_floor(StaticRing::<i64>::RING, 1, ring.rank() as i64, |d| {
+            let d = *d as usize;
+            let mut lhs = OwnedMatrix::zero(ring.rank(), d, &base_ring);
+            let mut current = ring.one();
+            for j in 0..d {
+                let wrt_basis = ring.wrt_canonical_basis(&current);
+                for i in 0..ring.rank() {
+                    *lhs.at_mut(i, j) = hom.map(wrt_basis.at(i));
+                }
+                drop(wrt_basis);
+                ring.mul_assign_ref(&mut current, el);
+            }
+            let mut rhs = OwnedMatrix::zero(ring.rank(), 1, &base_ring);
             let wrt_basis = ring.wrt_canonical_basis(&current);
             for i in 0..ring.rank() {
-                *lhs.at_mut(i, j) = hom.map(wrt_basis.at(i));
+                *rhs.at_mut(i, 0) = base_ring.negate(hom.map(wrt_basis.at(i)));
             }
-            drop(wrt_basis);
-            ring.mul_assign_ref(&mut current, el);
-        }
-        let mut rhs = OwnedMatrix::zero(ring.rank(), 1, &base_ring);
-        let wrt_basis = ring.wrt_canonical_basis(&current);
-        for i in 0..ring.rank() {
-            *rhs.at_mut(i, 0) = base_ring.negate(hom.map(wrt_basis.at(i)));
-        }
-        let mut sol = OwnedMatrix::zero(ring.rank(), 1, &base_ring);
-        <_ as LinSolveRingStore>::solve_right(base_ring, lhs.data_mut(), rhs.data_mut(), sol.data_mut()).assert_solved();
+            let mut sol = OwnedMatrix::zero(d, 1, &base_ring);
+            let sol_poly = |sol: &OwnedMatrix<El<<P::Type as RingExtension>::BaseRing>>| poly_ring.from_terms((0..d).map(|i| (base_ring.clone_el(sol.at(i, 0)), i)).chain([(base_ring.one(), d)].into_iter()));
+            match <_ as LinSolveRingStore>::solve_right(base_ring, lhs.data_mut(), rhs.data_mut(), sol.data_mut()) {
+                SolveResult::NoSolution => {
+                    -1
+                },
+                SolveResult::FoundUniqueSolution => {
+                    result = Some(sol_poly(&sol));
+                    0
+                },
+                SolveResult::FoundSomeSolution => {
+                    result = Some(sol_poly(&sol));
+                    1
+                }
+            }
+        });
 
-        return poly_ring.from_terms((0..ring.rank()).map(|i| (base_ring.clone_el(sol.at(i, 0)), i)).chain([(base_ring.one(), ring.rank())].into_iter()));
+        return result.unwrap();
     }
     
     ///
@@ -477,15 +538,13 @@ pub mod generic_tests {
 }
 
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
-#[cfg(test)]
 use extension_impl::FreeAlgebraImpl;
 #[cfg(test)]
 use crate::rings::rational::RationalField;
 
 #[test]
 fn test_charpoly() {
-    let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2, 0, 0]);
+    let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2]);
     let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
 
     let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 2]);
@@ -496,6 +555,30 @@ fn test_charpoly() {
 
     let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 6 * X - 6]);
     assert_el_eq!(&poly_ring, &expected, default_implementations::charpoly(ring.get_ring(), &ring.add(ring.canonical_gen(), ring.pow(ring.canonical_gen(), 2)), &poly_ring, &ring.base_ring().identity()));
+    
+    let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 4, [2]);
+    let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+
+    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2]);
+    assert_el_eq!(&poly_ring, &expected, default_implementations::charpoly(ring.get_ring(), &ring.canonical_gen(), &poly_ring, &ring.base_ring().identity()));
+    
+    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 4 * X.pow_ref(2) + 4]);
+    assert_el_eq!(&poly_ring, &expected, default_implementations::charpoly(ring.get_ring(), &ring.pow(ring.canonical_gen(), 2), &poly_ring, &ring.base_ring().identity()));
+}
+
+#[test]
+fn test_minpoly() {
+    let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 6, [2]);
+    let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+
+    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(6) - 2]);
+    assert_el_eq!(&poly_ring, &expected, default_implementations::minpoly(ring.get_ring(), &ring.canonical_gen(), &poly_ring, &ring.base_ring().identity()));
+
+    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 2]);
+    assert_el_eq!(&poly_ring, &expected, default_implementations::minpoly(ring.get_ring(), &ring.pow(ring.canonical_gen(), 2), &poly_ring, &ring.base_ring().identity()));
+
+    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X - 1]);
+    assert_el_eq!(&poly_ring, &expected, default_implementations::minpoly(ring.get_ring(), &ring.add(ring.one(), ring.pow(ring.canonical_gen(), 3)), &poly_ring, &ring.base_ring().identity()));
 }
 
 #[test]

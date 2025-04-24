@@ -8,6 +8,7 @@ use crate::field::FieldStore;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::integer::*;
 use crate::ring::*;
+use crate::primitive_int::StaticRing;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::rings::float_complex::Complex64;
 use crate::rings::poly::*;
@@ -75,6 +76,7 @@ pub fn find_approximate_complex_root<P>(poly_ring: P, el: &El<P>) -> (El<Complex
     assert!(approx_radius <= 1.);
     assert!(approx_radius >= 0.);
 
+    // to describe how the polynomial behaves close to the root, use taylor series expansion
     let mut higher_derivates_at_point = Vec::new();
     let mut current = derive_poly(&poly_ring, &derivate);
     while !poly_ring.is_zero(&current) {
@@ -85,7 +87,9 @@ pub fn find_approximate_complex_root<P>(poly_ring: P, el: &El<P>) -> (El<Complex
     // this should be bounded by something sufficiently smaller than |f'(result)|, to guarantee that the
     // root is indeed within this area 
     let assume_radius = approx_radius * ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR;
-    let max_change = higher_derivates_at_point.iter().enumerate().map(|(i, c)| c * assume_radius.powi(i as i32 + 2)).sum::<f64>();
+    let max_change = higher_derivates_at_point.iter().enumerate()
+        .map(|(i, c)| c * assume_radius.powi(i as i32 + 2) / factorial(&(i as i64 + 2), StaticRing::<i64>::RING) as f64)
+        .sum::<f64>();
     assert!(max_change <= CC.abs(eval_f_prime(result)) * (ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR - 1.0) / ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR);
 
     return (result, assume_radius);
@@ -97,8 +101,6 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::algorithms::cyclotomic::cyclotomic_polynomial;
 #[cfg(test)]
 use std::f64::consts::PI;
-#[cfg(test)]
-use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::algorithms::eea::signed_gcd;
 

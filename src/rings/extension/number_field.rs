@@ -9,11 +9,12 @@ use sparse::SparseMapVector;
 use squarefree_part::poly_power_decomposition_local;
 
 use crate::algorithms::interpolate::product_except_one;
+use crate::algorithms::newton;
+use crate::rings::extension::number_field::newton::find_approximate_complex_root;
 use crate::algorithms::poly_factor::finite::poly_factor_finite_field;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
 use crate::computation::*;
 use crate::delegate::DelegateRingImplEuclideanRing;
-use crate::rings::float_complex::Complex64;
 use crate::specialization::*;
 use crate::algorithms::convolution::*;
 use crate::algorithms::eea::signed_lcm;
@@ -30,6 +31,7 @@ use crate::rings::zn::ZnRingStore;
 use crate::rings::rational::*;
 use crate::divisibility::*;
 use crate::rings::extension::*;
+use crate::rings::float_complex::{Complex64Base, Complex64};
 
 use super::extension_impl::FreeAlgebraImpl;
 use super::Field;
@@ -161,7 +163,67 @@ pub struct ComplexEmbedding<K, Impl, I>
         I::Type: IntegerRing
 {
     from: K,
-    image_of_generator_power: El<Complex64>
+    image_of_generator: El<Complex64>,
+    absolute_error_image_of_generator: f64
+}
+
+impl<K, Impl, I> ComplexEmbedding<K, Impl, I>
+    where K: RingStore<Type = NumberFieldBase<Impl, I>>,
+        Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra,
+        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Type: IntegerRing
+{
+    fn absolute_error_bound_at(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> f64 {
+        unimplemented!();
+        let CC = Complex64::RING;
+        let ZZ = self.from.base_ring().base_ring();
+        let ZZX = DensePolyRing::new(ZZ, "X");
+        let hom = CC.can_hom(ZZ).unwrap();
+        let gen_poly = self.from.get_ring().generating_poly_as_int(&ZZX);
+        let mut taylor_coefficients = Vec::new();
+        let mut current = gen_poly;
+        while !ZZX.is_zero(&current) {
+            taylor_coefficients.push(ZZX.evaluate(&current, &self.image_of_generator, &hom));
+            current = derive_poly(&ZZX, &current);
+        }
+        let mut error = 0.0;
+        for c in taylor_coefficients.iter().rev() {
+            error = CC.abs(*c) + error * self.absolute_error_image_of_generator;
+        }
+        return error;
+    }
+}
+
+impl<K, Impl, I> Homomorphism<NumberFieldBase<Impl, I>, Complex64Base> for ComplexEmbedding<K, Impl, I>
+    where K: RingStore<Type = NumberFieldBase<Impl, I>>,
+        Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra,
+        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Type: IntegerRing
+{
+    type DomainStore = K;
+    type CodomainStore = Complex64;
+
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
+        &Complex64::RING
+    }
+
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
+        &self.from
+    }
+
+    fn map_ref(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> <Complex64Base as RingBase>::Element {
+        let poly_ring = DensePolyRing::new(*self.codomain(), "X");
+        let hom = self.codomain().can_hom(self.from.base_ring()).unwrap();
+        return poly_ring.evaluate(&self.from.poly_repr(&poly_ring, &x, &hom), &self.image_of_generator, self.codomain().identity());
+    }
+
+    fn map(&self, x: <NumberFieldBase<Impl, I> as RingBase>::Element) -> <Complex64Base as RingBase>::Element {
+        self.map_ref(&x)
+    }
 }
 
 #[stability::unstable(feature = "enable")]
@@ -275,7 +337,29 @@ impl<Impl, I> NumberField<Impl, I>
 
     #[stability::unstable(feature = "enable")]
     pub fn choose_complex_embedding(self) -> ComplexEmbedding<Self, Impl, I> {
-        unimplemented!()
+        let ZZ = self.base_ring().base_ring();
+        let poly_ring = DensePolyRing::new(ZZ, "X");
+        let poly = self.get_ring().generating_poly_as_int(&poly_ring);
+        let (root, error) = find_approximate_complex_root(&poly_ring, &poly);
+        return ComplexEmbedding {
+            from: self,
+            image_of_generator: root,
+            absolute_error_image_of_generator: error
+        };
+    }
+}
+
+impl<Impl, I> NumberFieldBase<Impl, I>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra,
+        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Type: IntegerRing
+{
+    fn generating_poly_as_int<'a>(&self, ZZX: &DensePolyRing<&'a I>) -> El<DensePolyRing<&'a I>> {
+        let ZZ = *ZZX.base_ring();
+        let assume_in_ZZ = LambdaHom::new(self.base_ring(), ZZ, |from, to, x| to.checked_div(from.get_ring().num(x), from.get_ring().den(x)).unwrap());
+        return self.base.generating_poly(ZZX, &assume_in_ZZ);
     }
 }
 
