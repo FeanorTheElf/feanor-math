@@ -8,7 +8,6 @@ use crate::field::FieldStore;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::integer::*;
 use crate::ring::*;
-use crate::primitive_int::StaticRing;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::rings::float_complex::Complex64;
 use crate::rings::poly::*;
@@ -76,19 +75,23 @@ pub fn find_approximate_complex_root<P>(poly_ring: P, el: &El<P>) -> (El<Complex
     assert!(approx_radius <= 1.);
     assert!(approx_radius >= 0.);
 
-    // to describe how the polynomial behaves close to the root, use taylor series expansion
-    let mut higher_derivates_at_point = Vec::new();
-    let mut current = derive_poly(&poly_ring, &derivate);
-    while !poly_ring.is_zero(&current) {
-        higher_derivates_at_point.push(CC.abs(poly_ring.evaluate(&current, &result, &hom)));
-        current = derive_poly(&poly_ring, &current);
-    }
     // the question is: how much can the first derivative change within assume_radius to result?
     // this should be bounded by something sufficiently smaller than |f'(result)|, to guarantee that the
     // root is indeed within this area 
     let assume_radius = approx_radius * ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR;
-    let max_change = higher_derivates_at_point.iter().enumerate()
-        .map(|(i, c)| c * assume_radius.powi(i as i32 + 2) / factorial(&(i as i64 + 2), StaticRing::<i64>::RING) as f64)
+    let mut current_factorial = 1.0;
+    // we bound `|f'(x + delta) - f'(x)|` via the taylor series of `f'`
+    let mut abs_taylor_series_coeffs = Vec::new();
+    let mut current = derive_poly(&poly_ring, &derivate);
+    while !poly_ring.is_zero(&current) {
+        abs_taylor_series_coeffs.push(CC.abs(poly_ring.evaluate(&current, &result, &hom)));
+        current = derive_poly(&poly_ring, &current);
+    }
+    let max_change = abs_taylor_series_coeffs.iter().enumerate()
+        .map(|(i, c)| {
+            current_factorial *= (i + 1) as f64;
+            c * assume_radius.powi(i as i32 + 1) / current_factorial
+        })
         .sum::<f64>();
     assert!(max_change <= CC.abs(eval_f_prime(result)) * (ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR - 1.0) / ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR);
 
@@ -103,6 +106,8 @@ use crate::algorithms::cyclotomic::cyclotomic_polynomial;
 use std::f64::consts::PI;
 #[cfg(test)]
 use crate::algorithms::eea::signed_gcd;
+#[cfg(test)]
+use crate::primitive_int::StaticRing;
 
 #[test]
 fn test_newton() {

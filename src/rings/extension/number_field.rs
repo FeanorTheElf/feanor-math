@@ -10,6 +10,8 @@ use squarefree_part::poly_power_decomposition_local;
 
 use crate::algorithms::interpolate::product_except_one;
 use crate::algorithms::newton;
+use crate::algorithms::poly_factor::extension::poly_factor_extension;
+use crate::algorithms::poly_gcd::factor::factor_and_lift_mod_pe;
 use crate::rings::extension::number_field::newton::find_approximate_complex_root;
 use crate::algorithms::poly_factor::finite::poly_factor_finite_field;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
@@ -18,7 +20,6 @@ use crate::delegate::DelegateRingImplEuclideanRing;
 use crate::specialization::*;
 use crate::algorithms::convolution::*;
 use crate::algorithms::eea::signed_lcm;
-use crate::algorithms::poly_factor::extension::poly_factor_extension;
 use crate::algorithms::poly_gcd::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::delegate::DelegateRing;
@@ -36,6 +37,9 @@ use crate::rings::float_complex::{Complex64Base, Complex64};
 use super::extension_impl::FreeAlgebraImpl;
 use super::Field;
 use super::FreeAlgebra;
+
+const TRY_FIND_INERT_PRIME_ATTEMPTS: usize = 10;
+const TRY_FACTOR_DIRECTLY_ATTEMPTS: usize = 5;
 
 ///
 /// An algebraic number field, i.e. a finite rank field extension of the rationals.
@@ -175,23 +179,30 @@ impl<K, Impl, I> ComplexEmbedding<K, Impl, I>
         I: RingStore,
         I::Type: IntegerRing
 {
-    fn absolute_error_bound_at(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> f64 {
-        unimplemented!();
+    ///
+    /// Returns `epsilon > 0` such that when evaluating this homomorphism
+    /// at point `x`, the given result is at most `epsilon` from the actual
+    /// result (i.e. the result when computed with infinite precision).
+    /// 
+    #[stability::unstable(feature = "enable")]
+    pub fn absolute_error_bound_at(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> f64 {
+        // we estimate the error |f(x + delta) - f(x)| via the taylor series
         let CC = Complex64::RING;
-        let ZZ = self.from.base_ring().base_ring();
-        let ZZX = DensePolyRing::new(ZZ, "X");
-        let hom = CC.can_hom(ZZ).unwrap();
-        let gen_poly = self.from.get_ring().generating_poly_as_int(&ZZX);
+        let QQ = self.from.base_ring();
+        let QQX = DensePolyRing::new(QQ, "X");
+        let hom = CC.can_hom(QQ).unwrap();
+        // taylor series expansion of f at image_of_generator, skipping the first (i.e. constant) coefficient
         let mut taylor_coefficients = Vec::new();
-        let mut current = gen_poly;
-        while !ZZX.is_zero(&current) {
-            taylor_coefficients.push(ZZX.evaluate(&current, &self.image_of_generator, &hom));
-            current = derive_poly(&ZZX, &current);
+        let mut current = derive_poly(&QQX, &self.from.poly_repr(&QQX, x, QQ.identity()));
+        while !QQX.is_zero(&current) {
+            taylor_coefficients.push(CC.abs(QQX.evaluate(&current, &self.image_of_generator, &hom)));
+            current = derive_poly(&QQX, &current);
         }
         let mut error = 0.0;
         for c in taylor_coefficients.iter().rev() {
-            error = CC.abs(*c) + error * self.absolute_error_image_of_generator;
+            error = *c + error * self.absolute_error_image_of_generator;
         }
+        error = error * self.absolute_error_image_of_generator;
         return error;
     }
 }
@@ -481,7 +492,7 @@ impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
         let lhs_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, lhs);
         let rhs_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, rhs);
 
-        let result = poly_gcd_local(&order_poly_ring, order_poly_ring.clone_el(&lhs_order), order_poly_ring.clone_el(&rhs_order), LogProgress);
+        let result = poly_gcd_local(&order_poly_ring, order_poly_ring.clone_el(&lhs_order), order_poly_ring.clone_el(&rhs_order), DontObserve);
 
         return self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &result);
     }
@@ -495,10 +506,71 @@ impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
         let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
         let poly_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, poly);
 
-        let result = poly_power_decomposition_local(&order_poly_ring, poly_order, LogProgress);
+        let result = poly_power_decomposition_local(&order_poly_ring, poly_order, DontObserve);
 
         return result.into_iter().map(|(f, k)| (self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), k)).collect();
     }
+}
+
+///
+/// Tries to factor the polynomial directly, by first finding an inert prime `p`, so that
+/// the number ring modulo `p` becomes a finite field. Then we factor the polynomial over
+/// the finite field, and hensel-lift it to a factorization in the order. This can fail
+/// if we don't find an inert prime - note that they don't have to exist. Note also that the
+/// returned factorization may be only a partial factorization.
+/// 
+/// # Inert primes don't have to exist
+/// 
+/// E.g. `X^4 - 10 X^2 + 1` is reducible modulo every prime. In fact, it is a theorem that
+/// there exists inert primes if and only if the Galois group of the extension is cyclic.
+/// 
+fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> Option<Vec<(El<P>, usize)>>
+    where Impl: 'a + RingStore,
+        Impl::Type: Field + FreeAlgebra,
+        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        I: 'a + RingStore,
+        I::Type: IntegerRing,
+        P: RingStore + Copy,
+        P::Type: PolyRing + DivisibilityRing,
+        <P::Type as RingExtension>::BaseRing: RingStore<Type = NumberFieldByOrder<'a, Impl, I>>,
+        Controller: ComputationController
+{
+    controller.run_computation(format_args!("try_direct_factor(deg = {})", poly_ring.degree(poly).unwrap()), |controller| {
+        let mut rng = oorandom::Rand64::new(1);
+        let self_ = poly_ring.base_ring();
+
+        // first, we try to find an inert prime `p` and lift a factorization modulo `p` to the ring
+        'try_factor_directly: for _ in 0..TRY_FACTOR_DIRECTLY_ATTEMPTS {
+            let mut inert_prime = None;
+            for _ in 0..(TRY_FIND_INERT_PRIME_ATTEMPTS * self_.rank()) {
+                let p = self_.get_ring().random_suitable_ideal(|| rng.rand_u64());
+                if p.minpoly_factors_mod_p.len() == 1 {
+                    inert_prime = Some(p);
+                    break;
+                }
+            }
+            if let Some(p) = inert_prime {
+                log_progress!(controller, "(inert_prime={})", IdealDisplayWrapper::new(self_.base_ring().base_ring().get_ring(), &p.prime));
+                let lc_poly = self_.clone_el(poly_ring.lc(poly).unwrap());
+                let monic_poly = evaluate_aX(poly_ring, poly, &lc_poly);
+                let e = 2 * self_.get_ring().heuristic_exponent(&p, poly_ring.degree(&monic_poly).unwrap(), poly_ring.terms(&monic_poly).map(|(c, _)| c));
+                if let Some(potential_factorization) = factor_and_lift_mod_pe(poly_ring, &p, e, &monic_poly, controller.clone()) {
+                    if potential_factorization.len() > 1 {
+                        debug_assert!(poly_ring.eq_el(&monic_poly, &poly_ring.normalize(poly_ring.prod(potential_factorization.iter().map(|f| poly_ring.clone_el(f))))));
+                        let result: Vec<_> = potential_factorization.into_iter().map(|f| (unevaluate_aX(poly_ring, &f, &lc_poly), 1)).collect();
+                        debug_assert!(poly_ring.eq_el(&poly_ring.normalize(poly_ring.clone_el(poly)), &poly_ring.normalize(poly_ring.prod(result.iter().map(|(f, e)| poly_ring.pow(poly_ring.clone_el(f), *e))))));
+                        return Some(result);
+                    }
+                } else {
+                    // not squarefree
+                    return Some(poly_power_decomposition_local(poly_ring, poly_ring.clone_el(poly), controller));
+                }
+            } else {
+                break 'try_factor_directly;
+            }
+        }
+        return None;
+    })
 }
 
 impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
@@ -513,15 +585,31 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        let self_ = NumberFieldByOrder { base: RingRef::new(poly_ring.base_ring().get_ring()) };
-        let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
-        let poly_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, poly);
+        let controller = LOG_PROGRESS;
+        controller.run_computation(format_args!("factor_numberfield(pdeg = {}, fdeg = {})", poly_ring.degree(poly).unwrap(), poly_ring.base_ring().rank()), |controller| {
+            let self_ = NumberFieldByOrder { base: RingRef::new(poly_ring.base_ring().get_ring()) };
+            let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
 
-        let mut result = Vec::new();
-        for (irred_factor, e) in poly_factor_extension(&poly_ring, &self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &poly_order)).0 {
-            result.push((irred_factor, e));
-        }
-        return (result, self_.clone_el(poly_ring.lc(poly).unwrap()));
+            let mut to_factor = vec![(poly_ring.clone_el(poly), 1)];
+            let mut result = Vec::new();
+            while let Some((current, e_base)) = to_factor.pop() {
+                if poly_ring.degree(&current).unwrap() == 1 {
+                    result.push((poly_ring.normalize(current), 1));
+                } else {
+                    let poly_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, &current);
+
+                    // try the direct factorization
+                    if let Some(partial_factorization) = heuristic_factor_poly_directly_in_order(&order_poly_ring, &poly_order, controller.clone()) {
+                        log_progress!(controller, "(partial_factor)");
+                        to_factor.extend(partial_factorization.into_iter().map(|(f, e)| (self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), e * e_base)));
+                    } else {
+                        log_progress!(controller, "(fallback)");
+                        result.extend(poly_factor_extension(&poly_ring, &current).0.into_iter().map(|(f, e)| (f, e * e_base)));
+                    }
+                }
+            }
+            return (result, poly_ring.base_ring().clone_el(poly_ring.lc(poly).unwrap()));
+        })
     }
 }
 
@@ -548,6 +636,10 @@ impl<'a, Impl, I> NumberFieldByOrder<'a, Impl, I>
         I: RingStore,
         I::Type: IntegerRing
 {
+    ///
+    /// Multiplies the given polynomial with the lcm of the denominators of all coefficients,
+    /// and returns the polynomial as element of the current order.
+    /// 
     fn scale_poly_to_order<'ring, P1, P2>(&self, from: P1, to: P2, poly: &El<P1>) -> El<P2>
         where P1: RingStore,
             P1::Type: PolyRing,

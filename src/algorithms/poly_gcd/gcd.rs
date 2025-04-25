@@ -55,7 +55,7 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
     let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt.try_into().unwrap())).floor() as usize;
     let reduction = ReductionContext::new(ring, &ideal, e);
 
-    log_progress!(controller, "mod({}^{})c({})", IdealDisplayWrapper::new(ring, &ideal), e, reduction.len());
+    log_progress!(controller, "(mod={}^{})(parts={})", IdealDisplayWrapper::new(ring, &ideal), e, reduction.len());
 
     let mut signature: Option<Signature> = None;
     let mut poly_rings_mod_me = Vec::new();
@@ -130,12 +130,12 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
     let test_division_time = (end - start).as_millis();
     if !divides_f_and_g {
         let complete_end = Instant::now();
-        log_progress!(controller, "time(setup: {} ms, localgcd: {} ms, preparelift: {} ms, hensel: {} ms, reconstruct: {} ms, test: {} ms, all: {} ms)", setup_time, local_gcd_time, prepare_lift_time, hensel_lift_time, reconstruct_time, test_division_time, (complete_end - complete_start).as_millis());
+        log_progress!(controller, "(setup: {} ms, localgcd: {} ms, preparelift: {} ms, hensel: {} ms, reconstruct: {} ms, test: {} ms, all: {} ms)", setup_time, local_gcd_time, prepare_lift_time, hensel_lift_time, reconstruct_time, test_division_time, (complete_end - complete_start).as_millis());
         log_progress!(controller, "(no_divisor)");
         return None;
     } else {
         let complete_end = Instant::now();
-        log_progress!(controller, "time(setup: {} ms, localgcd: {} ms, preparelift: {} ms, hensel: {} ms, reconstruct: {} ms, test: {} ms, all: {} ms)", setup_time, local_gcd_time, prepare_lift_time, hensel_lift_time, reconstruct_time, test_division_time, (complete_end - complete_start).as_millis());
+        log_progress!(controller, "(setup: {} ms, localgcd: {} ms, preparelift: {} ms, hensel: {} ms, reconstruct: {} ms, test: {} ms, all: {} ms)", setup_time, local_gcd_time, prepare_lift_time, hensel_lift_time, reconstruct_time, test_division_time, (complete_end - complete_start).as_millis());
         _ = poly_ring.balance_poly(&mut result);
         return Some(result);
     }
@@ -289,25 +289,25 @@ fn test_poly_gcd_local() {
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 0, 0, 0], 1),
-        poly_gcd_local(&poly_ring, poly([1, 0, 1, 0, 0], 1), poly([1, 0, 0, 1, 0], 2), LogProgress)
+        poly_gcd_local(&poly_ring, poly([1, 0, 1, 0, 0], 1), poly([1, 0, 0, 1, 0], 2), LOG_PROGRESS)
     );
     
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 1, 0, 1], 1),
-        poly_gcd_local(&poly_ring, poly([1, 1, 1, 0, 1], 20), poly([1, 0, 1, 1, 1], 12), LogProgress)
+        poly_gcd_local(&poly_ring, poly([1, 1, 1, 0, 1], 20), poly([1, 0, 1, 1, 1], 12), LOG_PROGRESS)
     );
 
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 2, 0, 1], 1),
-        poly_gcd_local(&poly_ring, poly([1, 1, 3, 0, 1], 20), poly([3, 0, 2, 0, 3], 12), LogProgress)
+        poly_gcd_local(&poly_ring, poly([1, 1, 3, 0, 1], 20), poly([3, 0, 2, 0, 3], 12), LOG_PROGRESS)
     );
 
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 0, 5, 0], 1),
-        poly_gcd_local(&poly_ring, poly([2, 1, 3, 5, 1], 20), poly([1, 0, 0, 7, 0], 12), LogProgress)
+        poly_gcd_local(&poly_ring, poly([2, 1, 3, 5, 1], 20), poly([1, 0, 0, 7, 0], 12), LOG_PROGRESS)
     );
 }
 
@@ -324,7 +324,7 @@ fn random_test_poly_gcd_local() {
         // println!("Testing gcd on ({}) * ({}) and ({}) * ({})", poly_ring.format(&f), poly_ring.format(&h), poly_ring.format(&g), poly_ring.format(&h));
         let lhs = poly_ring.mul_ref(&f, &h);
         let rhs = poly_ring.mul_ref(&g, &h);
-        let gcd = make_primitive(&poly_ring, &poly_gcd_local(&poly_ring, poly_ring.clone_el(&lhs), poly_ring.clone_el(&rhs), LogProgress)).0;
+        let gcd = make_primitive(&poly_ring, &poly_gcd_local(&poly_ring, poly_ring.clone_el(&lhs), poly_ring.clone_el(&rhs), LOG_PROGRESS)).0;
         // println!("Result {}", poly_ring.format(&gcd));
 
         assert!(poly_ring.divides(&lhs, &gcd));

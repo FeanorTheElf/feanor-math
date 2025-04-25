@@ -175,8 +175,7 @@ pub fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
 /// for `e < r`, this computes a Bezout identity `s' f + t' g = 1` with `s', t'` polynomials modulo 
 /// `p^r` that reduce to `s, t` modulo `p^e`.
 /// 
-#[stability::unstable(feature = "enable")]
-pub fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
+fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
     reduction_map: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
@@ -307,6 +306,37 @@ pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> O
 }
 
 ///
+/// Given a monic polynomial `f` modulo `p^r` and a factorization of `f mod p^e` into monic and
+/// pairwise coprime factors (with `e < r`), computes a monic lift of each factor, such that their
+/// product is `f mod p^r`.
+/// 
+fn hensel_lift_factorization_internal<'ring, 'data, 'local, R, P1, P2, V, Controller>(
+    reduction_map: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
+    target_poly_ring: P1, 
+    base_poly_ring: P2, 
+    f: &El<P1>, 
+    factors: V,
+    controller: Controller
+) -> Vec<El<P1>>
+    where R: ?Sized + PolyGCDLocallyDomain,
+        P1: RingStore + Copy, P1::Type: PolyRing,
+        <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
+        P2: RingStore + Copy, P2::Type: PolyRing + PrincipalIdealRing,
+        <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>,
+        V: SelfSubvectorView<El<P2>>,
+        Controller: ComputationController
+{
+    if factors.len() == 1 {
+        return vec![target_poly_ring.clone_el(f)];
+    }
+    let (g, h) = (factors.at(0), base_poly_ring.prod(factors.as_iter().skip(1).map(|h| base_poly_ring.clone_el(h))));
+    let (g_lifted, h_lifted) = hensel_lift_quadratic(reduction_map, target_poly_ring, base_poly_ring, &f, (g, &h), controller.clone());
+    let mut result = hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, &h_lifted, factors.restrict(1..), controller);
+    result.insert(0, g_lifted);
+    return result;
+}
+
+///
 /// Like [`hensel_lift()`] but for an arbitrary number of factors.
 /// 
 #[stability::unstable(feature = "enable")]
@@ -330,13 +360,7 @@ pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V, Controller>
     assert!(factors.as_iter().all(|f| base_poly_ring.base_ring().is_one(base_poly_ring.lc(f).unwrap())));
     assert!(target_poly_ring.base_ring().get_ring() == reduction_map.domain().get_ring());
 
-    if factors.len() == 1 {
-        return vec![target_poly_ring.clone_el(f)];
-    }
-    let (g, h) = (factors.at(0), base_poly_ring.prod(factors.as_iter().skip(1).map(|h| base_poly_ring.clone_el(h))));
-    let (g_lifted, h_lifted) = hensel_lift_quadratic(reduction_map, target_poly_ring, base_poly_ring, &f, (g, &h), controller.clone());
-    let mut result = hensel_lift_factorization(reduction_map, target_poly_ring, base_poly_ring, &h_lifted, factors.restrict(1..), controller);
-    result.insert(0, g_lifted);
+    let result = controller.run_computation(format_args!("hensel_lift(deg = {})", target_poly_ring.degree(f).unwrap()), |controller| hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, f, factors, controller));
     return result;
 }
 

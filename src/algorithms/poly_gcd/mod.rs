@@ -146,7 +146,8 @@ pub trait PolyTFracGCDRing {
 /// ```
 /// that can be used to make polynomials over a domain monic (when setting `a = lc(f)`).
 /// 
-fn evaluate_aX<P>(poly_ring: P, f: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>) -> El<P>
+#[stability::unstable(feature = "enable")]
+pub fn evaluate_aX<P>(poly_ring: P, f: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>) -> El<P>
     where P: RingStore,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain
@@ -163,7 +164,8 @@ fn evaluate_aX<P>(poly_ring: P, f: &El<P>, a: &El<<P::Type as RingExtension>::Ba
 ///
 /// Computes the inverse to [`evaluate_aX()`].
 /// 
-fn unevaluate_aX<P>(poly_ring: P, g: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>) -> El<P>
+#[stability::unstable(feature = "enable")]
+pub fn unevaluate_aX<P>(poly_ring: P, g: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>) -> El<P>
     where P: RingStore,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain
@@ -173,7 +175,7 @@ fn unevaluate_aX<P>(poly_ring: P, g: &El<P>, a: &El<<P::Type as RingExtension>::
     }
     let ring = poly_ring.base_ring();
     let d = poly_ring.degree(&g).unwrap();
-    let result = poly_ring.from_terms(poly_ring.terms(g).map(|(c, i)| if i == d { (ring.clone_el(a), d) } else { (ring.checked_div(c, &ring.pow(ring.clone_el(a), d - i - 1)).unwrap(), i) }));
+    let result = poly_ring.from_terms(poly_ring.terms(g).map(|(c, i)| if i == d { (ring.mul_ref(c, a), d) } else { (ring.checked_div(c, &ring.pow(ring.clone_el(a), d - i - 1)).unwrap(), i) }));
     return result;
 }
 

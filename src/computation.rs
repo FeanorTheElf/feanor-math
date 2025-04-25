@@ -329,7 +329,11 @@ macro_rules! log_progress {
 }
 
 #[derive(Clone, Copy)]
-pub struct LogProgress;
+pub struct LogProgress {
+    inner_comp: bool
+}
+
+pub const LOG_PROGRESS: LogProgress = LogProgress { inner_comp: false };
 
 impl UnstableSealed for LogProgress {}
 
@@ -348,8 +352,12 @@ impl ComputationController for LogProgress {
         where F: FnOnce(Self) -> T
     {
         self.log(description);
-        let result = computation(self);
-        self.log(format_args!("\n"));
+        let result = computation(Self { inner_comp: true });
+        if self.inner_comp {
+            self.log(format_args!("done."));
+        } else {
+            self.log(format_args!("done.\n"));
+        }
         return result;
     }
 
@@ -421,7 +429,7 @@ mod parallel_controller {
 
     #[stability::unstable(feature = "enable")]
     #[allow(non_upper_case_globals)]
-    pub static RunMultithreadedLogProgress: ExecuteMultithreaded<LogProgress> = ExecuteMultithreaded { rest: LogProgress };
+    pub static RunMultithreadedLogProgress: ExecuteMultithreaded<LogProgress> = ExecuteMultithreaded { rest: LOG_PROGRESS };
     #[stability::unstable(feature = "enable")]
     #[allow(non_upper_case_globals)]
     pub static RunMultithreaded: ExecuteMultithreaded<DontObserve> = ExecuteMultithreaded { rest: DontObserve };

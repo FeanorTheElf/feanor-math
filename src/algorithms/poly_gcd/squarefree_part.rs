@@ -76,11 +76,12 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P
 ///  - `F` is `R/m` where `m` is a maximal ideal containing the currently considered ideal `I`
 ///  - `S` is `R/m^e`
 /// 
-fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2>(
+fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2, Controller>(
     RX: P1, 
     f: &El<P1>, 
     S_to_F: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
-    SX: P2
+    SX: P2,
+    controller: Controller
 ) -> Option<(Vec<Signature>, Vec<El<P2>>)>
     where R: ?Sized + PolyGCDLocallyDomain,
         P1: RingStore + Copy,
@@ -88,7 +89,8 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2>(
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R>,
         P2: RingStore + Copy,
         P2::Type: PolyRing<BaseRing = &'local R::LocalRing<'ring>>,
-        R::LocalRing<'ring>: 'local
+        R::LocalRing<'ring>: 'local,
+        Controller: ComputationController
 {
     assert!(SX.base_ring().get_ring() == S_to_F.domain().get_ring());
     let R = RX.base_ring().get_ring();
@@ -121,7 +123,7 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2>(
         &FX,
         &f_mod_me,
         &power_decomposition_mod_m[..],
-        DontObserve
+        controller
     );
 
     return Some((
@@ -159,7 +161,7 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &
             let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt.try_into().unwrap())).floor() as usize;
             let reduction = ReductionContext::new(ring, &ideal, e);
 
-            log_progress!(controller, "mod({}^{})c({})", IdealDisplayWrapper::new(ring, &ideal), e, reduction.len());
+            log_progress!(controller, "(mod={}^{})(parts={})", IdealDisplayWrapper::new(ring, &ideal), e, reduction.len());
 
             let mut signature: Option<Vec<_>> = None;
             let mut poly_rings_mod_me = Vec::new();
@@ -167,7 +169,7 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &
 
             for idx in 0..reduction.len() {
                 let SX = DensePolyRing::new(*reduction.intermediate_ring_to_field_reduction(idx).domain(), "X");
-                match compute_local_power_decomposition(poly_ring, poly, &reduction.intermediate_ring_to_field_reduction(idx), &SX) {
+                match compute_local_power_decomposition(poly_ring, poly, &reduction.intermediate_ring_to_field_reduction(idx), &SX, controller.clone()) {
                     None => {
                         unreachable!("`compute_local_power_decomposition()` currently cannot fail");
                     },
@@ -270,23 +272,23 @@ fn test_squarefree_part_local() {
     };
 
     let expected = [(poly_ring.clone_el(&f1), 1)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LogProgress);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
     assert_eq(&expected, &actual);
 
     let expected = [(poly_ring.mul_ref(&f3, &f4), 3)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LogProgress);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
     assert_eq(&expected, &actual);
 
     let expected = [(poly_ring.clone_el(&f2), 2), (poly_ring.mul_ref(&f3, &f4), 3)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LogProgress);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
     assert_eq(&expected, &actual);
     
     let expected = [(poly_ring.mul_ref(&f1, &f2), 1), (poly_ring.clone_el(&f4), 2), (poly_ring.clone_el(&f3), 3)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LogProgress);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
     assert_eq(&expected, &actual);
     
     let expected = [(poly_ring.mul_ref(&f1, &f2), 2), (poly_ring.clone_el(&f4), 4), (poly_ring.clone_el(&f3), 6)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LogProgress);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
     assert_eq(&expected, &actual);
 }
 
@@ -303,7 +305,7 @@ fn random_test_poly_power_decomposition_local() {
         let h = poly_ring.from_terms((0..=2).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
         let poly = make_primitive(&poly_ring, &poly_ring.prod([&f, &g, &g, &h, &h, &h, &h, &h].into_iter().map(|poly| poly_ring.clone_el(poly)))).0;
         
-        let mut power_decomp = poly_power_decomposition_local(&poly_ring, poly_ring.clone_el(&poly), LogProgress);
+        let mut power_decomp = poly_power_decomposition_local(&poly_ring, poly_ring.clone_el(&poly), LOG_PROGRESS);
         for (f, _k) in &mut power_decomp {
             *f = make_primitive(&poly_ring, &f).0;
         }

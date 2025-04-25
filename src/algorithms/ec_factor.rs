@@ -326,15 +326,12 @@ use std::time::Instant;
 #[cfg(test)]
 use test::Bencher;
 #[cfg(test)]
-use crate::computation::LogProgress;
-#[cfg(test)]
 use crate::rings::rust_bigint::*;
-
 
 #[test]
 fn test_ec_factor() {
     let n = 65537 * 65539;
-    let actual = lenstra_ec_factor(&Zn::new(n as u64), LogProgress).unwrap_or_else(no_error);
+    let actual = lenstra_ec_factor(&Zn::new(n as u64), LOG_PROGRESS).unwrap_or_else(no_error);
     assert!(actual != 1 && actual != n && n % actual == 0);
 }
 
@@ -345,7 +342,7 @@ fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
     let ring = Zn::new(n as u64);
 
     bencher.iter(|| {
-        let p = lenstra_ec_factor(&ring, LogProgress).unwrap_or_else(no_error);
+        let p = lenstra_ec_factor(&ring, LOG_PROGRESS).unwrap_or_else(no_error);
         assert!(n > 0 && n != 1 && n != p);
         assert!(n % p == 0);
     });
@@ -356,7 +353,7 @@ fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
 fn test_ec_factor_large() {
     let ZZbig = BigIntRing::RING;
     #[cfg(not(feature = "parallel"))]
-    let controller = LogProgress;
+    let controller = LOG_PROGRESS;
     #[cfg(feature = "parallel")]
     let controller = RunMultithreadedLogProgress;
 
@@ -389,7 +386,7 @@ fn test_compute_partial_factorization() {
 
     let Zn = zn_big::Zn::new(ZZbig, ZZbig.clone_el(&n));
     let begin = Instant::now();
-    let factor = lenstra_ec_factor_small(&Zn, 50, 1, LogProgress).unwrap_or_else(no_error).unwrap();
+    let factor = lenstra_ec_factor_small(&Zn, 50, 1, LOG_PROGRESS).unwrap_or_else(no_error).unwrap();
     let end = Instant::now();
     println!("Done in {} ms", (end - begin).as_millis());
     ZZbig.println(&factor);
