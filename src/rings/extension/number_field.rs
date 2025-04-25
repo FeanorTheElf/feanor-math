@@ -535,7 +535,7 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I, Controller>(poly_ring
         <P::Type as RingExtension>::BaseRing: RingStore<Type = NumberFieldByOrder<'a, Impl, I>>,
         Controller: ComputationController
 {
-    controller.run_computation(format_args!("try_direct_factor(deg = {})", poly_ring.degree(poly).unwrap()), |controller| {
+    controller.run_computation(format_args!("factor_direct(deg={}, extdeg={})", poly_ring.degree(poly).unwrap(), poly_ring.base_ring().rank()), |controller| {
         let mut rng = oorandom::Rand64::new(1);
         let self_ = poly_ring.base_ring();
 
@@ -556,6 +556,7 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I, Controller>(poly_ring
                 let e = 2 * self_.get_ring().heuristic_exponent(&p, poly_ring.degree(&monic_poly).unwrap(), poly_ring.terms(&monic_poly).map(|(c, _)| c));
                 if let Some(potential_factorization) = factor_and_lift_mod_pe(poly_ring, &p, e, &monic_poly, controller.clone()) {
                     if potential_factorization.len() > 1 {
+                        log_progress!(controller, "(partial_success)");
                         debug_assert!(poly_ring.eq_el(&monic_poly, &poly_ring.normalize(poly_ring.prod(potential_factorization.iter().map(|f| poly_ring.clone_el(f))))));
                         let result: Vec<_> = potential_factorization.into_iter().map(|f| (unevaluate_aX(poly_ring, &f, &lc_poly), 1)).collect();
                         debug_assert!(poly_ring.eq_el(&poly_ring.normalize(poly_ring.clone_el(poly)), &poly_ring.normalize(poly_ring.prod(result.iter().map(|(f, e)| poly_ring.pow(poly_ring.clone_el(f), *e))))));
@@ -563,12 +564,14 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I, Controller>(poly_ring
                     }
                 } else {
                     // not squarefree
+                    log_progress!(controller, "(partial_success)");
                     return Some(poly_power_decomposition_local(poly_ring, poly_ring.clone_el(poly), controller));
                 }
             } else {
                 break 'try_factor_directly;
             }
         }
+        log_progress!(controller, "(fail)");
         return None;
     })
 }
@@ -586,30 +589,25 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
         let controller = LOG_PROGRESS;
-        controller.run_computation(format_args!("factor_numberfield(pdeg = {}, fdeg = {})", poly_ring.degree(poly).unwrap(), poly_ring.base_ring().rank()), |controller| {
-            let self_ = NumberFieldByOrder { base: RingRef::new(poly_ring.base_ring().get_ring()) };
-            let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
+        let self_ = NumberFieldByOrder { base: RingRef::new(poly_ring.base_ring().get_ring()) };
+        let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
 
-            let mut to_factor = vec![(poly_ring.clone_el(poly), 1)];
-            let mut result = Vec::new();
-            while let Some((current, e_base)) = to_factor.pop() {
-                if poly_ring.degree(&current).unwrap() == 1 {
-                    result.push((poly_ring.normalize(current), 1));
+        let mut to_factor = vec![(poly_ring.clone_el(poly), 1)];
+        let mut result = Vec::new();
+        while let Some((current, e_base)) = to_factor.pop() {
+            if poly_ring.degree(&current).unwrap() == 1 {
+                result.push((poly_ring.normalize(current), 1));
+            } else {
+                let poly_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, &current);
+                // try the direct factorization
+                if let Some(partial_factorization) = heuristic_factor_poly_directly_in_order(&order_poly_ring, &poly_order, controller.clone()) {
+                    to_factor.extend(partial_factorization.into_iter().map(|(f, e)| (self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), e * e_base)));
                 } else {
-                    let poly_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, &current);
-
-                    // try the direct factorization
-                    if let Some(partial_factorization) = heuristic_factor_poly_directly_in_order(&order_poly_ring, &poly_order, controller.clone()) {
-                        log_progress!(controller, "(partial_factor)");
-                        to_factor.extend(partial_factorization.into_iter().map(|(f, e)| (self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), e * e_base)));
-                    } else {
-                        log_progress!(controller, "(fallback)");
-                        result.extend(poly_factor_extension(&poly_ring, &current).0.into_iter().map(|(f, e)| (f, e * e_base)));
-                    }
+                    result.extend(poly_factor_extension(&poly_ring, &current, controller.clone()).0.into_iter().map(|(f, e)| (f, e * e_base)));
                 }
             }
-            return (result, poly_ring.base_ring().clone_el(poly_ring.lc(poly).unwrap()));
-        })
+        }
+        return (result, poly_ring.base_ring().clone_el(poly_ring.lc(poly).unwrap()));
     }
 }
 

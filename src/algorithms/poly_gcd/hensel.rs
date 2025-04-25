@@ -360,7 +360,7 @@ pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V, Controller>
     assert!(factors.as_iter().all(|f| base_poly_ring.base_ring().is_one(base_poly_ring.lc(f).unwrap())));
     assert!(target_poly_ring.base_ring().get_ring() == reduction_map.domain().get_ring());
 
-    let result = controller.run_computation(format_args!("hensel_lift(deg = {})", target_poly_ring.degree(f).unwrap()), |controller| hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, f, factors, controller));
+    let result = controller.run_computation(format_args!("hensel_lift(deg={}, to={})", target_poly_ring.degree(f).unwrap(), reduction_map.from_e()), |controller| hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, f, factors, controller));
     return result;
 }
 

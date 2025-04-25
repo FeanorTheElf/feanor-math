@@ -197,7 +197,7 @@ pub fn poly_gcd_monic_local<'a, P, Controller>(poly_ring: P, mut f: &'a El<P>, m
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(g).unwrap()));
 
-    controller.run_computation(format_args!("gcd_local(deg(l)={}, deg(r)={})", poly_ring.degree(f).unwrap(), poly_ring.degree(g).unwrap()), |controller| {
+    controller.run_computation(format_args!("gcd_local(deg_l={}, deg_r={})", poly_ring.degree(f).unwrap(), poly_ring.degree(g).unwrap()), |controller| {
 
         let mut rng = oorandom::Rand64::new(1);
         for attempt in 0..HOPE_FOR_SQUAREFREE_TRIES {
