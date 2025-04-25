@@ -1,5 +1,6 @@
 
-use std::fmt::Debug;use std::hash::Hash;
+use std::fmt::Debug;
+use std::hash::Hash;
 
 use crate::computation::no_error;
 use crate::homomorphism::*;
@@ -13,6 +14,7 @@ use crate::rings::poly::*;
 use crate::integer::*;
 use crate::rings::rational::*;
 use crate::ring::*;
+use crate::seq::VectorFn;
 use super::poly_factor::FactorPolyField;
 use super::splitting_field::extend_number_field_promise_is_irreducible;
 use super::splitting_field::NumberFieldHom;
@@ -85,7 +87,7 @@ pub struct GaloisAutomorphism<K, Impl, I>
         I::Type: IntegerRing
 {
     field: K,
-    image_of_canonical_gen: El<K>
+    image_of_canonical_gen_powers: Vec<El<K>>
 }
 
 impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
@@ -97,16 +99,27 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
         I::Type: IntegerRing
 {
     ///
+    /// Creates a new Galois automorphism, mapping the canonical generator
+    /// of field to the given element.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    pub fn new(field: K, image_of_canonical_gen: El<K>) -> Self {
+        let poly_ring = DensePolyRing::new(field.base_ring(), "X");
+        assert!(field.is_zero(&poly_ring.evaluate(&field.generating_poly(&poly_ring, field.base_ring().identity()), &image_of_canonical_gen, field.inclusion())));
+        return Self {
+            image_of_canonical_gen_powers: (0..field.rank()).map(|i| field.pow(field.clone_el(&image_of_canonical_gen), i)).collect(),
+            field: field
+        };
+    }
+
+    ///
     /// Returns the galois automorphism `x -> self(first(x))`
     /// 
     #[stability::unstable(feature = "enable")]
     pub fn compose_gal(self, first: &Self) -> Self {
         assert!(self.field.get_ring() == first.field.get_ring());
-        let new_image = self.map_ref(&first.image_of_canonical_gen);
-        Self {
-            field: self.field,
-            image_of_canonical_gen: new_image
-        }
+        let new_image = self.map_ref(&self.image_of_canonical_gen_powers[1]);
+        return Self::new(self.field, new_image);
     }
     
     ///
@@ -118,7 +131,7 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
         let field = self.field;
         let poly_ring = DensePolyRing::new(field.base_ring(), "X");
         let new_image = generic_pow_shortest_chain_table(
-            self.image_of_canonical_gen, 
+            field.clone_el(&self.image_of_canonical_gen_powers[0]), 
             &(k as i64), 
             StaticRing::<i64>::RING, 
             |x| Ok(poly_ring.evaluate(&field.poly_repr(&poly_ring, x, field.base_ring().identity()), x, field.inclusion())), 
@@ -126,10 +139,7 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
             |x| field.clone_el(x), 
             field.canonical_gen()
         ).unwrap_or_else(no_error);
-        return Self {
-            field: field,
-            image_of_canonical_gen: new_image
-        };
+        return Self::new(field, new_image);
     }
 
     ///
@@ -137,7 +147,7 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
     /// 
     #[stability::unstable(feature = "enable")]
     pub fn is_identity(&self) -> bool {
-        self.field.eq_el(&self.image_of_canonical_gen, &self.field.canonical_gen())
+        self.field.eq_el(&self.image_of_canonical_gen_powers[1], &self.field.canonical_gen())
     }
 
     ///
@@ -170,9 +180,9 @@ impl<K, Impl, I> Homomorphism<NumberFieldBase<Impl, I>, NumberFieldBase<Impl, I>
     }
 
     fn map_ref(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> <NumberFieldBase<Impl, I> as RingBase>::Element {
-        let poly_ring = DensePolyRing::new(self.field.base_ring(), "X");
-        let x_repr = self.field.poly_repr(&poly_ring, x, poly_ring.base_ring().identity());
-        return poly_ring.evaluate(&x_repr, &self.image_of_canonical_gen, self.field.inclusion());
+        let coeffs_wrt_basis = self.field.wrt_canonical_basis(x);
+        let hom = self.field.inclusion();
+        return self.field.sum(self.image_of_canonical_gen_powers.iter().zip(coeffs_wrt_basis.iter()).map(|(x, y)| hom.mul_ref_map(x, &y)));
     }
 
     fn map(&self, x: <NumberFieldBase<Impl, I> as RingBase>::Element) -> <NumberFieldBase<Impl, I> as RingBase>::Element {
@@ -189,7 +199,7 @@ impl<K, Impl, I> Debug for GaloisAutomorphism<K, Impl, I>
         I::Type: IntegerRing
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "GaloisAutomorphism({} -> {})", self.field.format(&self.field.canonical_gen()), self.field.format(&self.image_of_canonical_gen))
+        write!(f, "GaloisAutomorphism({} -> {})", self.field.format(&self.field.canonical_gen()), self.field.format(&self.image_of_canonical_gen_powers[1]))
     }
 }
 
@@ -204,7 +214,7 @@ impl<K, Impl, I> Clone for GaloisAutomorphism<K, Impl, I>
     fn clone(&self) -> Self {
         Self {
             field: self.field.clone(),
-            image_of_canonical_gen: self.field.clone_el(&self.image_of_canonical_gen)
+            image_of_canonical_gen_powers: self.image_of_canonical_gen_powers.iter().map(|x| self.field.clone_el(x)).collect()
         }
     }
 }
@@ -219,7 +229,7 @@ impl<K, Impl, I> PartialEq for GaloisAutomorphism<K, Impl, I>
 {
     fn eq(&self, other: &Self) -> bool {
         assert!(self.field.get_ring() == other.field.get_ring());
-        self.field.eq_el(&self.image_of_canonical_gen, &other.image_of_canonical_gen)
+        self.field.eq_el(&self.image_of_canonical_gen_powers[1], &other.image_of_canonical_gen_powers[1])
     }
 }
 
@@ -241,7 +251,7 @@ impl<K, Impl, I> Hash for GaloisAutomorphism<K, Impl, I>
         I::Type: IntegerRing
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.field.hash(&self.image_of_canonical_gen, state)
+        self.field.hash(&self.image_of_canonical_gen_powers[1], state)
     }
 }
 
@@ -260,15 +270,43 @@ pub fn compute_galois_group<K>(field: K) -> Result<
     match compute_galois_closure(field.clone()) {
         Ok(embedding) => Err(embedding),
         Err(conjugates) => {
-            let mut result: Vec<_> = conjugates.into_iter().map(|x| GaloisAutomorphism {
-                field: field.clone(),
-                image_of_canonical_gen: x
-            }).collect();
+            let mut result: Vec<_> = conjugates.into_iter().map(|x| GaloisAutomorphism::new(field.clone(), x)).collect();
             let id_idx = result.iter().enumerate().filter(|(_, g)| g.is_identity()).next().unwrap().0;
             result.swap(0, id_idx);
             return Ok(result);
         }
     }
+}
+
+///
+/// Finds the Galois automorphism that will become complex conjugation under
+/// the given embedding `K -> C`.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn find_complex_conjugation<'a, K1, K2, K3>(field: K1, complex_embedding: &ComplexEmbedding<K2, DefaultNumberFieldImpl, BigIntRing>, galois_group: &'a [GaloisAutomorphism<K3, DefaultNumberFieldImpl, BigIntRing>]) -> &'a GaloisAutomorphism<K3, DefaultNumberFieldImpl, BigIntRing>
+    where K1: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>,
+        K2: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>,
+        K3: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>,
+{
+    assert!(complex_embedding.domain().get_ring() == field.get_ring());
+    assert!(galois_group.iter().all(|g| g.domain().get_ring() == field.get_ring()));
+    assert_eq!(field.rank(), galois_group.len());
+
+    let CC = complex_embedding.codomain();
+    let target = CC.conjugate(complex_embedding.map(field.canonical_gen()));
+    let mut result = None;
+    for g in galois_group {
+        let conj = g.map(field.canonical_gen());
+        let image = complex_embedding.map_ref(&conj);
+        let dist = CC.abs(CC.sub(target, image));
+        let error = complex_embedding.absolute_error_bound_at(&conj);
+        if dist <= error {
+            assert!(result.is_none(), "not enough precision to separate all complex roots");
+            result = Some(g);
+        }
+    }
+
+    return result.unwrap();
 }
 
 fn compute_galois_closure_impl_step(
@@ -384,4 +422,24 @@ fn test_compute_galois_group() {
     assert!(g2.clone().pow(2).is_identity());
     assert_eq!(g2.clone().compose_gal(&g1).compose_gal(&g2), g1.clone().invert());
 
+}
+
+#[test]
+fn test_complex_conjugation() {
+    let ZZ = BigIntRing::RING;
+    let ZZX = DensePolyRing::new(&ZZ, "X");
+    
+    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
+    let number_field = NumberField::new(&ZZX, &f);
+    let galois_group = compute_galois_group(&number_field).ok().unwrap();
+    let complex_embedding = number_field.choose_complex_embedding();
+    let conjugation = find_complex_conjugation(&number_field, &complex_embedding, &galois_group);
+    assert_el_eq!(&number_field, number_field.negate(number_field.canonical_gen()), conjugation.map(number_field.canonical_gen()));
+    
+    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1]);
+    let number_field = NumberField::new(&ZZX, &f);
+    let galois_group = compute_galois_group(&number_field).ok().unwrap();
+    let complex_embedding = number_field.choose_complex_embedding();
+    let conjugation = find_complex_conjugation(&number_field, &complex_embedding, &galois_group);
+    assert_el_eq!(&number_field, number_field.invert(&number_field.canonical_gen()).unwrap(), conjugation.map(number_field.canonical_gen()));
 }

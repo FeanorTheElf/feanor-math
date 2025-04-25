@@ -347,7 +347,20 @@ impl<Impl, I> NumberField<Impl, I>
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn choose_complex_embedding(self) -> ComplexEmbedding<Self, Impl, I> {
+    pub fn into_choose_complex_embedding(self) -> ComplexEmbedding<Self, Impl, I> {
+        let ZZ = self.base_ring().base_ring();
+        let poly_ring = DensePolyRing::new(ZZ, "X");
+        let poly = self.get_ring().generating_poly_as_int(&poly_ring);
+        let (root, error) = find_approximate_complex_root(&poly_ring, &poly);
+        return ComplexEmbedding {
+            from: self,
+            image_of_generator: root,
+            absolute_error_image_of_generator: error
+        };
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn choose_complex_embedding<'a>(&'a self) -> ComplexEmbedding<&'a Self, Impl, I> {
         let ZZ = self.base_ring().base_ring();
         let poly_ring = DensePolyRing::new(ZZ, "X");
         let poly = self.get_ring().generating_poly_as_int(&poly_ring);
