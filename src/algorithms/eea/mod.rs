@@ -7,13 +7,17 @@ use std::mem::swap;
 use std::cmp::Ordering;
 
 ///
-/// For a, b computes s, t, d such that `s*a + t*b == d` is a greatest 
-/// common divisor of a and b. d is only unique up to units, and s, t 
-/// are not unique at all. No guarantees are given on which
-/// of these solutions is returned. For integers, see signed_eea 
-/// which gives more guarantees.
+/// For `a, b` computes `s, t, d` such that `s*a + t*b == d` is a greatest 
+/// common divisor of `a` and `b`. 
 /// 
-/// The given ring must be euclidean.
+/// The gcd `d` is only unique up to units, and `s, t` are not unique at all.
+/// No guarantees are given on which of these solutions is returned. For integers, 
+/// see [`signed_eea()`] which gives more guarantees.
+/// 
+/// Note that this function always uses the euclidean algorithm to compute these values.
+/// In most cases, it is instead recommended to use [`PrincipalIdealRing::extended_ideal_gen()`], 
+/// which uses a ring-specific algorithm to compute the Bezout identity (which will of
+/// course be [`eea()`] in some cases).
 /// 
 pub fn eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>, El<R>) 
     where R: RingStore,
@@ -121,10 +125,14 @@ pub fn signed_eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
 
 /// 
 /// Finds a greatest common divisor of a and b.
-/// 
+///  
 /// The gcd of two elements `a, b` in a euclidean ring is the (w.r.t divisibility) greatest
 /// element that divides both elements, i.e. the greatest element (w.r.t. divisibility) `g` such 
 /// that `g | a, b`.
+/// 
+/// Note that this function always uses the euclidean algorithm to compute the gcd. In most
+/// cases, it is instead recommended to use [`PrincipalIdealRing::ideal_gen()`], which uses
+/// a ring-specific algorithm to compute the gcd (which will of course be [`gcd()`] in some cases).
 /// 
 /// In general, the gcd is only unique up to multiplication by units. For integers, the function
 /// [`signed_gcd()`] gives more guarantees.

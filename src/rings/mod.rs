@@ -78,3 +78,9 @@ pub mod mpir;
 /// local principal ideal ring [`crate::local::PrincipalLocalRing`]. 
 /// 
 pub mod local;
+
+///
+/// This module contains the trait [`fraction::FractionField`] for rings that are the field of fractions
+/// of an underlying domain.
+/// 
+pub mod fraction;

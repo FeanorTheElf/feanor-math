@@ -310,6 +310,16 @@ impl<I> RingBase for RationalFieldBase<I>
     }
 }
 
+impl<I: RingStore> HashableElRing for RationalFieldBase<I>
+    where I::Type: IntegerRing + HashableElRing
+{
+    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
+        let gcd = signed_gcd(self.integers.clone_el(&el.1), self.integers.clone_el(&el.0), &self.integers);
+        self.integers.get_ring().hash(&self.integers.checked_div(&el.0, &gcd).unwrap(), h);
+        self.integers.get_ring().hash(&self.integers.checked_div(&el.1, &gcd).unwrap(), h);
+    }
+}
+
 impl<I: RingStore> StrassenHint for RationalFieldBase<I>
     where I::Type: IntegerRing
 {
@@ -480,6 +490,15 @@ impl<I> Field for RationalFieldBase<I>
         I::Type: IntegerRing
 {}
 
+impl<I> FractionField for RationalFieldBase<I>
+    where I: RingStore,
+        I::Type: IntegerRing
+{
+    fn as_fraction(&self, el: Self::Element) -> (El<Self::BaseRing>, El<Self::BaseRing>) {
+        (el.0, el.1)
+    }
+}
+
 impl<I> OrderedRing for RationalFieldBase<I>
     where I: RingStore,
         I::Type: IntegerRing
@@ -546,6 +565,7 @@ use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
 
+use super::fraction::FractionField;
 use super::poly::PolyRing;
 
 #[cfg(test)]

@@ -131,7 +131,7 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
         let field = self.field;
         let poly_ring = DensePolyRing::new(field.base_ring(), "X");
         let new_image = generic_pow_shortest_chain_table(
-            field.clone_el(&self.image_of_canonical_gen_powers[0]), 
+            field.clone_el(&self.image_of_canonical_gen_powers[1]), 
             &(k as i64), 
             StaticRing::<i64>::RING, 
             |x| Ok(poly_ring.evaluate(&field.poly_repr(&poly_ring, x, field.base_ring().identity()), x, field.inclusion())), 
