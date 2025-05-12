@@ -454,8 +454,8 @@ impl<Impl, I> FiniteRingSpecializable for NumberFieldBase<Impl, I>
         I: RingStore,
         I::Type: IntegerRing
 {
-    fn specialize<O: FiniteRingOperation<Self>>(_op: O) -> Result<O::Output, ()> {
-        Err(())
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
+        op.fallback()
     }
 }
 
@@ -626,7 +626,9 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
 /// We don't want to expose the interface of [`PolyGCDLocallyDomain`] for number
 /// fields generally, thus use a private newtype.
 /// 
-/// TODO: Make this a proper, exposed type `NumberFieldOrder`.
+/// Note that this does not actually represent the order, since during
+/// `reconstruct_ring_el()` we might reconstruct an element outside of the
+/// order. Hence, it should remain private.
 /// 
 struct NumberFieldByOrder<'a, Impl, I>
     where Impl: RingStore,
@@ -704,8 +706,8 @@ impl<'a, Impl, I> FiniteRingSpecializable for NumberFieldByOrder<'a, Impl, I>
         I: RingStore,
         I::Type: IntegerRing
 {
-    fn specialize<O: FiniteRingOperation<Self>>(_op: O) -> Result<O::Output, ()> {
-        Err(())
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
+        op.fallback()
     }
 }
 

@@ -677,8 +677,8 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> FiniteRingSpecializable f
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
-    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
-        Ok(op.execute())
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
+        op.execute()
     }
 }
 

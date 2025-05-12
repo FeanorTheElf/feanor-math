@@ -267,8 +267,8 @@ impl<const N: u64> InterpolationBaseRing for ZnBase<N, true> {
 
 impl<const N: u64, const IS_FIELD: bool> FiniteRingSpecializable for ZnBase<N, IS_FIELD> {
 
-    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
-        Ok(op.execute())
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
+        op.execute()
     }
 }
 

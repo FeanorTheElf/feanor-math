@@ -1,5 +1,4 @@
 use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
-use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::divisibility::*;
 use crate::field::*;
 use crate::integer::*;
@@ -8,7 +7,6 @@ use crate::ring::*;
 use crate::rings::finite::*;
 use crate::rings::poly::*;
 use crate::homomorphism::SelfIso;
-use crate::specialization::*;
 use super::cantor_zassenhaus;
 
 ///
@@ -74,38 +72,4 @@ pub fn poly_factor_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usiz
     poly_ring.base_ring().mul_assign_ref(&mut unit, poly_ring.coefficient_at(&el, 0));
     debug_assert!(poly_ring.base_ring().is_unit(&unit));
     return (result, unit);
-}
-
-///
-/// Factors the given polynomial, if the base field is a finite field.
-/// Otherwise, `None` is returned.
-/// 
-#[stability::unstable(feature = "enable")]
-pub fn poly_factor_if_finite_field<P>(poly_ring: P, f: &El<P>) -> Option<(Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)>
-    where P: RingStore,
-        P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FiniteRingSpecializable + PolyTFracGCDRing + SelfIso
-{
-    <<<P::Type as RingExtension>::BaseRing as RingStore>::Type as FiniteRingSpecializable>::specialize(FactorPolyFiniteField { poly_ring: poly_ring.get_ring(), poly: poly_ring.clone_el(f) }).ok()
-}
-
-struct FactorPolyFiniteField<'a, P>
-    where P: ?Sized + PolyRing + EuclideanRing,
-        <P::BaseRing as RingStore>::Type: Field
-{
-    poly_ring: &'a P,
-    poly: P::Element
-}
-
-impl<'a, P> FiniteRingOperation<<P::BaseRing as RingStore>::Type> for FactorPolyFiniteField<'a, P>
-    where P: ?Sized + PolyRing + EuclideanRing,
-        <P::BaseRing as RingStore>::Type: Field + PolyTFracGCDRing + SelfIso + FiniteRingSpecializable
-{
-    type Output = (Vec<(P::Element, usize)>, El<P::BaseRing>);
-
-    fn execute(self) -> Self::Output
-        where <P::BaseRing as RingStore>::Type: FiniteRing
-    {
-        poly_factor_finite_field(RingRef::new(self.poly_ring), &self.poly)
-    }
 }

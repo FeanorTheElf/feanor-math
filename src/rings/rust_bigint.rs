@@ -12,9 +12,12 @@ use crate::primitive_int::*;
 use crate::ring::*;
 use crate::algorithms;
 use crate::serialization::{DeserializeSeedNewtype, SerializableElementRing, SerializableNewtype};
+use crate::specialization::*;
+
 use std::alloc::Allocator;
 use std::alloc::Global;
-use std::cmp::Ordering::{self, *};
+use std::cmp::Ordering::*;
+use std::cmp::Ordering;
 use std::marker::PhantomData;
 
 ///
@@ -430,6 +433,14 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
 impl_interpolation_base_ring_char_zero!{ <{A}> InterpolationBaseRing for RustBigintRingBase<A> where A: Allocator + Clone }
 
 impl_poly_gcd_locally_for_ZZ!{ <{A}> IntegerPolyGCDRing for RustBigintRingBase<A> where A: Allocator + Clone }
+
+impl<A> FiniteRingSpecializable for RustBigintRingBase<A>
+    where A: Allocator + Clone
+{
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
+        op.fallback()
+    }
+}
 
 impl<A: Allocator + Clone> IntegerRing for RustBigintRingBase<A> {
 

@@ -24,7 +24,7 @@ pub trait InterpolationBaseRing: DivisibilityRing {
     ///
     /// Restricting this here to be `DivisibilityRing + PrincipalIdealRing + Domain`
     /// is necessary, because of a compiler bug, see also
-    /// [`crate::reduce_lift::poly_eval::EvaluatePolyLocallyRing::LocalRingBase`]
+    /// [`crate::reduce_lift::poly_eval::EvalPolyLocallyRing::LocalRingBase`]
     /// 
     type ExtendedRingBase<'a>: ?Sized + DivisibilityRing + PrincipalIdealRing + Domain
         where Self: 'a;
@@ -130,15 +130,29 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
 /// The standard use case is the evaluation of a multivariate polynomial `f(X1, ..., Xm)`
 /// over this ring. The trait is designed to enable the following approach:
 ///  - Given ring elements `a1, ..., am`, compute an upper bound `B` on `|f(a1, ..., am)|`.
-///    The values `|ai|` are given by [`EvaluatePolyLocallyRing::pseudo_norm()`].
-///  - Get a sufficient number of prime ideals, using [`EvaluatePolyLocallyRing::local_computation()`] 
+///    The values `|ai|` are given by [`EvalPolyLocallyRing::pseudo_norm()`].
+///  - Get a sufficient number of prime ideals, using [`EvalPolyLocallyRing::local_computation()`] 
 ///  - Compute `f(a1 mod pi, ..., am mod pi) mod pi` for each prime `pi` within the ring given by 
-///    [`EvaluatePolyLocallyRing::local_ring_at()`]. The reductions `ai mod pj` are given by
-///    [`EvaluatePolyLocallyRing::reduce()`].
-///  - Recombine the results to an element of `R` by using [`EvaluatePolyLocallyRing::lift_combine()`].
+///    [`EvalPolyLocallyRing::local_ring_at()`]. The reductions `ai mod pj` are given by
+///    [`EvalPolyLocallyRing::reduce()`].
+///  - Recombine the results to an element of `R` by using [`EvalPolyLocallyRing::lift_combine()`].
+/// 
+/// # Relationship with [`crate::reduce_lift::poly_factor_gcd::PolyGCDLocallyDomain`]
+/// 
+/// There are generally two ways of computing something via a reduce-modulo-primes-then-lift
+/// approach. Either one can take many different prime ideals, or one can take a large power
+/// of a single/a small amount of prime ideals.
+/// 
+/// This trait is for the former approach, which is especially suitable when the computation to
+/// perform can be written as a polynomial evaluation. In particular, this applicable to determinants,
+/// resultant, and (with some caveats) solving linear systems.
+/// 
+/// On the other hand, when factoring polynomials or computing their gcds, it is common to instead
+/// rely on Hensel lifting to compute the result modulo a large power of a single prime, or very
+/// few primes. This approach is formalized by [`crate::reduce_lift::poly_factor_gcd::PolyGCDLocallyDomain`].
 /// 
 #[stability::unstable(feature = "enable")]
-pub trait EvaluatePolyLocallyRing: RingBase {
+pub trait EvalPolyLocallyRing: RingBase {
     
     ///
     /// The proper way would be to define this with two lifetime parameters `'ring` and `'data`,
@@ -156,6 +170,10 @@ pub trait EvaluatePolyLocallyRing: RingBase {
     type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
         where Self: 'ring;
 
+    ///
+    /// A collection of prime ideals of the ring, and additionally any data required to reconstruct
+    /// a small ring element from its projections onto each prime ideal.
+    /// 
     type LocalComputationData<'ring>
         where Self: 'ring;
 
@@ -198,16 +216,16 @@ pub trait EvaluatePolyLocallyRing: RingBase {
 
     ///
     /// Computes a preimage under the map `R -> R1 x ... x Rk`, i.e. a ring element `x` that reduces
-    /// to each of the given local rings under the map [`EvaluatePolyLocallyRing::reduce()`].
+    /// to each of the given local rings under the map [`EvalPolyLocallyRing::reduce()`].
     /// 
     /// The result should have pseudo-norm bounded by the bound given when the computation
-    /// was initialized, via [`EvaluatePolyLocallyRing::local_computation()`].
+    /// was initialized, via [`EvalPolyLocallyRing::local_computation()`].
     /// 
     fn lift_combine<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
         where Self: 'ring;
 }
 
-impl<I> EvaluatePolyLocallyRing for I
+impl<I> EvalPolyLocallyRing for I
     where I: IntegerRing
 {
     type LocalComputationData<'ring> = zn_rns::Zn<AsField<zn_64::Zn>, RingRef<'ring, Self>>
@@ -268,11 +286,11 @@ impl<I> EvaluatePolyLocallyRing for I
 
 ///
 /// The map `R -> R/p` for a ring `R` and one of its local quotients `R/p` as
-/// given by [`EvaluatePolyLocallyRing`].
+/// given by [`EvalPolyLocallyRing`].
 /// 
 #[stability::unstable(feature = "enable")]
 pub struct EvaluatePolyLocallyReductionMap<'ring, 'data, R>
-    where R: 'ring + ?Sized + EvaluatePolyLocallyRing, 'ring: 'data
+    where R: 'ring + ?Sized + EvalPolyLocallyRing, 'ring: 'data
 {
     ring: RingRef<'data, R>,
     data: &'data R::LocalComputationData<'ring>,
@@ -281,7 +299,7 @@ pub struct EvaluatePolyLocallyReductionMap<'ring, 'data, R>
 }
 
 impl<'ring, 'data, R> EvaluatePolyLocallyReductionMap<'ring, 'data, R>
-    where R: 'ring +?Sized + EvaluatePolyLocallyRing, 'ring: 'data
+    where R: 'ring +?Sized + EvalPolyLocallyRing, 'ring: 'data
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: &'data R, data: &'data R::LocalComputationData<'ring>, index: usize) -> Self {
@@ -290,7 +308,7 @@ impl<'ring, 'data, R> EvaluatePolyLocallyReductionMap<'ring, 'data, R>
 }
 
 impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for EvaluatePolyLocallyReductionMap<'ring, 'data, R>
-    where R: 'ring +?Sized + EvaluatePolyLocallyRing, 'ring: 'data
+    where R: 'ring +?Sized + EvalPolyLocallyRing, 'ring: 'data
 {
     type CodomainStore = R::LocalRing<'ring>;
     type DomainStore = RingRef<'data, R>;

@@ -14,6 +14,7 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::*;
 use crate::impl_interpolation_base_ring_char_zero;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
+use crate::specialization::*;
 use crate::ring::*;
 
 use std::fmt::Debug;
@@ -489,6 +490,15 @@ impl<I> Field for RationalFieldBase<I>
     where I: RingStore,
         I::Type: IntegerRing
 {}
+
+impl<I> FiniteRingSpecializable for RationalFieldBase<I>
+    where I: RingStore,
+        I::Type: IntegerRing
+{
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
+        op.fallback()
+    }
+}
 
 impl<I> FractionField for RationalFieldBase<I>
     where I: RingStore,

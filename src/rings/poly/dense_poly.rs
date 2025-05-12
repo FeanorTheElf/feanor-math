@@ -6,7 +6,7 @@ use crate::algorithms::interpolate::interpolate;
 use crate::algorithms::poly_div::{poly_div_rem, poly_rem};
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::computation::no_error;
-use crate::reduce_lift::poly_eval::{EvaluatePolyLocallyRing, InterpolationBaseRing, ToExtRingMap};
+use crate::reduce_lift::poly_eval::{EvalPolyLocallyRing, InterpolationBaseRing, ToExtRingMap};
 use crate::divisibility::*;
 use crate::integer::*;
 use crate::pid::*;
@@ -516,7 +516,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
     }
 }
 
-impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> EvaluatePolyLocallyRing for DensePolyRingBase<R, A, C> 
+impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> EvalPolyLocallyRing for DensePolyRingBase<R, A, C> 
     where R: RingStore,
         R::Type: InterpolationBaseRing
 {

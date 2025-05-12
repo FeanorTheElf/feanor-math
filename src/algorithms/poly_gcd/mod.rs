@@ -250,15 +250,15 @@ impl<R> PolyTFracGCDRing for R
             P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        struct PowerDecompositionIfFiniteField<'a, P>(P, &'a El<P>)
+        struct PowerDecompositionOperation<'a, P>(P, &'a El<P>)
             where P: RingStore + Copy,
                 P::Type: PolyRing,
                 <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso;
 
-        impl<'a, P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PowerDecompositionIfFiniteField<'a, P>
+        impl<'a, P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PowerDecompositionOperation<'a, P>
             where P: RingStore + Copy,
-                P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso
+                P::Type: PolyRing + DivisibilityRing,
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain + DivisibilityRing + SelfIso
         {
             type Output = Vec<(El<P>, usize)>;
 
@@ -273,13 +273,13 @@ impl<R> PolyTFracGCDRing for R
                     (self.0.from_terms(new_poly_ring.terms(&f).map(|(c, i)| (new_poly_ring.base_ring().get_ring().unwrap_element(new_poly_ring.base_ring().clone_el(c)), i))), k)
                 ).collect()
             }
+            fn fallback(self) -> Self::Output {
+                let poly_ring = self.0;
+                poly_power_decomposition_local(poly_ring, poly_ring.clone_el(self.1), DontObserve)
+            }
         }
 
-        if let Ok(result) = R::specialize(PowerDecompositionIfFiniteField(poly_ring, poly)) {
-            return result;
-        } else {
-            poly_power_decomposition_local(poly_ring, poly_ring.clone_el(poly), DontObserve)
-        }
+        R::specialize(PowerDecompositionOperation(poly_ring, poly))
     }
     
     default fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
@@ -287,15 +287,15 @@ impl<R> PolyTFracGCDRing for R
             P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        struct PolyGCDIfFiniteField<'a, P>(P, &'a El<P>, &'a El<P>)
+        struct PolyGCDOperation<'a, P>(P, &'a El<P>, &'a El<P>)
             where P: RingStore + Copy,
                 P::Type: PolyRing,
                 <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso;
 
-        impl<'a, P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PolyGCDIfFiniteField<'a, P>
+        impl<'a, P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PolyGCDOperation<'a, P>
             where P: RingStore + Copy,
-                P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso
+                P::Type: PolyRing + DivisibilityRing,
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain + DivisibilityRing + SelfIso
         {
             type Output = El<P>;
 
@@ -310,13 +310,13 @@ impl<R> PolyTFracGCDRing for R
                 let result = gcd(new_lhs, new_rhs, &new_poly_ring);
                 return self.0.from_terms(new_poly_ring.terms(&result).map(|(c, i)| (new_poly_ring.base_ring().get_ring().unwrap_element(new_poly_ring.base_ring().clone_el(c)), i)));
             }
+            fn fallback(self) -> Self::Output {
+                let poly_ring = self.0;
+                poly_gcd_local(poly_ring, poly_ring.clone_el(self.1), poly_ring.clone_el(self.2), DontObserve)
+            }
         }
 
-        if let Ok(result) = R::specialize(PolyGCDIfFiniteField(poly_ring, lhs, rhs)) {
-            return result;
-        } else {
-            poly_gcd_local(poly_ring, poly_ring.clone_el(lhs), poly_ring.clone_el(rhs), DontObserve)
-        }
+        R::specialize(PolyGCDOperation(poly_ring, lhs, rhs))
     }
 }
 

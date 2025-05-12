@@ -640,7 +640,7 @@ impl<R> FiniteRingSpecializable for R
     where R: DelegateRingImplFiniteRing + ?Sized,
         R::Base: FiniteRingSpecializable
 {
-    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
         struct OpWrapper<R, O>
             where R: DelegateRingImplFiniteRing + ?Sized,
                 R::Base: FiniteRingSpecializable,
@@ -658,6 +658,9 @@ impl<R> FiniteRingSpecializable for R
             type Output = O::Output;
             fn execute(self) -> Self::Output where R::Base: FiniteRing {
                 self.operation.execute()
+            }
+            fn fallback(self) -> Self::Output {
+                self.operation.fallback()
             }
         }
 

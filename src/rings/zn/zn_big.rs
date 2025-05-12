@@ -564,8 +564,8 @@ impl<I> FiniteRingSpecializable for ZnBase<I>
     where I: RingStore,
         I::Type: IntegerRing
 {
-    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> Result<O::Output, ()> {
-        Ok(op.execute())
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
+        op.execute()
     }
 }
 

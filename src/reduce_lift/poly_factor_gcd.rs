@@ -29,16 +29,17 @@ use crate::rings::finite::FiniteRing;
 /// that work modulo prime ideals (or their powers), which is different from the mathematical concept
 /// of localization.
 /// 
-/// The general philosophy is similar to [`crate::reduce_lift::poly_eval::EvaluatePolyLocallyRing`].
+/// The general philosophy is similar to [`crate::reduce_lift::poly_eval::EvalPolyLocallyRing`].
 /// However, when working with factorizations, it is usually better to compute modulo the factorization
 /// modulo an ideal `I`, and use Hensel lifting to derive the factorization modulo `I^e`.
-/// `EvaluatePolyLocallyRing` on the other hand is designed to allow computations modulo multiple different 
+/// `EvalPolyLocallyRing` on the other hand is designed to allow computations modulo multiple different 
 /// maximal ideals.
 /// 
 /// I am currently not yet completely sure what the exact requirements of this trait would be,
 /// but conceptually, we want that for a random ideal `I` taken from some set of ideals (e.g. maximal
-/// ideals, prime ideals, ... depending on the context), the quotient `R / I` should be
-/// finite, and there should be a power `e` such that we can derive the factorization of some polynomial
+/// ideals, prime ideals, ... depending on the context), the quotient `R / I` should be "nice",
+/// so that we can compute the desired factorization (or gcd etc.) over `R / I`.
+/// Furthermore there should be a power `e` such that we can derive the factorization (or gcd etc.)
 /// over `R` from the factorization over `R / I^e`. Note that we don't assume that this `e` can be
 /// computed, except possibly in special cases (like the integers). Also, we cannot always assume
 /// that `I` is a maximal ideal (unfortunately - it was a nasty surprise when I realized this after
@@ -85,7 +86,7 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
 
     ///
     /// The proper way would be to define this with two lifetime parameters `'ring` and `'data`,
-    /// see also [`crate::reduce_lift::poly_eval::EvaluatePolyLocallyRing::LocalRingBase`]
+    /// see also [`crate::reduce_lift::poly_eval::EvalPolyLocallyRing::LocalRingBase`]
     /// 
     type LocalRingBase<'ring>: ?Sized + LinSolveRing
         where Self: 'ring;
@@ -99,6 +100,10 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
     type LocalField<'ring>: RingStore<Type = Self::LocalFieldBase<'ring>>
         where Self: 'ring;
 
+    ///
+    /// An ideal of the ring for which we know a decomposition into maximal ideals, and
+    /// can use Hensel lifting to lift values to higher powers of this ideal.
+    /// 
     type SuitableIdeal<'ring>
         where Self: 'ring;
 
@@ -120,6 +125,9 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
     fn random_suitable_ideal<'ring, F>(&'ring self, rng: F) -> Self::SuitableIdeal<'ring>
         where F: FnMut() -> u64;
 
+    ///
+    /// Returns the number of maximal ideals in the primary decomposition of `ideal`.
+    /// 
     fn maximal_ideal_factor_count<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>) -> usize
         where Self: 'ring;
 

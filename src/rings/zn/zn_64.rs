@@ -3,11 +3,7 @@ use crate::reduce_lift::poly_eval::InterpolationBaseRing;
 use crate::delegate::DelegateRing;
 use crate::delegate::DelegateRingImplFiniteRing;
 use crate::divisibility::*;
-use crate::impl_eq_based_self_iso;
-use crate::impl_localpir_wrap_unwrap_homs;
-use crate::impl_localpir_wrap_unwrap_isos;
-use crate::impl_field_wrap_unwrap_homs;
-use crate::impl_field_wrap_unwrap_isos;
+use crate::{impl_eq_based_self_iso, impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::*;
 use crate::integer::*;
@@ -20,6 +16,7 @@ use crate::serialization::SerializableElementRing;
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::algorithms::matmul::StrassenHint;
+use crate::specialization::*;
 use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
 
@@ -581,6 +578,12 @@ impl<'a> Iterator for ZnBaseElementsIter<'a> {
         } else {
             return None;
         }
+    }
+}
+
+impl FiniteRingSpecializable for ZnBase {
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
+        op.execute()
     }
 }
 

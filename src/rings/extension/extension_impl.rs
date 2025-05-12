@@ -1,5 +1,5 @@
-use std::alloc::Allocator;
-use std::alloc::Global;
+use std::alloc::{Allocator, Global};
+use std::marker::PhantomData;
 
 use serde::de::DeserializeSeed;
 use serde::Deserializer;
@@ -19,6 +19,7 @@ use crate::matrix::OwnedMatrix;
 use crate::primitive_int::StaticRing;
 use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::finite::*;
+use crate::specialization::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::seq::*;
 use crate::ring::*;
@@ -668,6 +669,47 @@ impl<'a, R, V, A, C> Copy for WRTCanonicalBasisElementCreator<'a, R, V, A, C>
         A: Allocator + Clone,
         C: ConvolutionAlgorithm<R::Type>
 {}
+
+impl<R, V, A, C> FiniteRingSpecializable for FreeAlgebraImplBase<R, V, A, C>
+    where R: RingStore,
+        R::Type: FiniteRingSpecializable, 
+        V: VectorView<El<R>>,
+        A: Allocator + Clone,
+        C: ConvolutionAlgorithm<R::Type>
+{
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
+        struct OpWrapper<R, V, A, C, O>
+            where R: RingStore,
+                R::Type: FiniteRingSpecializable, 
+                V: VectorView<El<R>>,
+                A: Allocator + Clone,
+                C: ConvolutionAlgorithm<R::Type>,
+                O: FiniteRingOperation<FreeAlgebraImplBase<R, V, A, C>>
+        {
+            operation: O,
+            ring: PhantomData<FreeAlgebraImpl<R, V, A, C>>
+        }
+
+        impl<R, V, A, C, O> FiniteRingOperation<R::Type> for OpWrapper<R, V, A, C, O>
+            where R: RingStore,
+                R::Type: FiniteRingSpecializable, 
+                V: VectorView<El<R>>,
+                A: Allocator + Clone,
+                C: ConvolutionAlgorithm<R::Type>,
+                O: FiniteRingOperation<FreeAlgebraImplBase<R, V, A, C>>
+        {
+            type Output = O::Output;
+            fn execute(self) -> Self::Output where R::Type:FiniteRing {
+                self.operation.execute()
+            }
+            fn fallback(self) -> Self::Output {
+                self.operation.fallback()
+            }
+        }
+
+        <R::Type as FiniteRingSpecializable>::specialize(OpWrapper { operation: op, ring: PhantomData })
+    }
+}
 
 impl<R, V, A, C> FiniteRing for FreeAlgebraImplBase<R, V, A, C>
     where R: RingStore, 

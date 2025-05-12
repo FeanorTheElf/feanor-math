@@ -29,9 +29,10 @@ pub mod extension_impl;
 ///
 pub mod galois_field;
 
+///
+/// Contains [`number_field::NumberField`], an implementation of number fields.
+/// 
 pub mod number_field;
-
-pub mod number_field_order;
 
 ///
 /// A table of Conway polynomials, for standardized creation of finite fields.
