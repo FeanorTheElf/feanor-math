@@ -9,8 +9,8 @@ use serde::Serializer;
 use crate::algorithms::convolution::*;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::poly_factor::FactorPolyField;
-use crate::compute_locally::InterpolationBaseRing;
 use crate::divisibility::*;
+use crate::reduce_lift::poly_eval::InterpolationBaseRing;
 use crate::{impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 use crate::integer::*;
 use crate::iters::multi_cartesian_product;
@@ -792,7 +792,7 @@ use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
 #[cfg(test)]
-use crate::compute_locally::ToExtRingMap;
+use crate::reduce_lift::poly_eval::ToExtRingMap;
 #[cfg(test)]
 use crate::rings::rational::RationalField;
 #[cfg(test)]

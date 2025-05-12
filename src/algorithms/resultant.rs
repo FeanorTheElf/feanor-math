@@ -1,5 +1,5 @@
 
-use crate::compute_locally::{EvaluatePolyLocallyRing, EvaluatePolyLocallyReductionMap};
+use crate::reduce_lift::poly_eval::{EvaluatePolyLocallyRing, EvaluatePolyLocallyReductionMap};
 use crate::divisibility::{DivisibilityRingStore, Domain};
 use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::rings::poly::*;

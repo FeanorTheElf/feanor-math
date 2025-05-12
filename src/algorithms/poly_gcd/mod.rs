@@ -1,10 +1,10 @@
 use gcd::poly_gcd_local;
 use finite::poly_power_decomposition_finite_field;
-use local::PolyGCDLocallyDomain;
 use squarefree_part::poly_power_decomposition_local;
 
 use crate::computation::DontObserve;
 use crate::divisibility::*;
+use crate::reduce_lift::poly_factor_gcd::*;
 use crate::homomorphism::*;
 use crate::integer::*;
 use crate::pid::*;
@@ -14,13 +14,11 @@ use crate::delegate::DelegateRing;
 use crate::rings::poly::dense_poly::*;
 use crate::rings::poly::*;
 use crate::rings::finite::*;
-use crate::field::*;
 use crate::specialization::FiniteRingOperation;
 
 use super::eea::gcd;
 
 pub mod finite;
-pub mod local;
 pub mod hensel;
 pub mod squarefree_part;
 pub mod gcd;

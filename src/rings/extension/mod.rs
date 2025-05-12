@@ -31,6 +31,8 @@ pub mod galois_field;
 
 pub mod number_field;
 
+pub mod number_field_order;
+
 ///
 /// A table of Conway polynomials, for standardized creation of finite fields.
 ///

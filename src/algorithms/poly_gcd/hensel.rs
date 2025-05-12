@@ -9,7 +9,7 @@ use crate::homomorphism::*;
 use crate::rings::zn::FromModulusCreateableZnRing;
 use crate::rings::zn::*;
 use crate::seq::*;
-use crate::algorithms::poly_gcd::local::*;
+use crate::reduce_lift::poly_factor_gcd::*;
 
 use crate::computation::DontObserve;
 use super::DensePolyRing;

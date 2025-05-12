@@ -1,5 +1,5 @@
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
-use crate::compute_locally::InterpolationBaseRing;
+use crate::reduce_lift::poly_eval::InterpolationBaseRing;
 use crate::delegate::DelegateRing;
 use crate::delegate::DelegateRingImplFiniteRing;
 use crate::divisibility::*;

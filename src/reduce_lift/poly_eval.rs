@@ -24,7 +24,7 @@ pub trait InterpolationBaseRing: DivisibilityRing {
     ///
     /// Restricting this here to be `DivisibilityRing + PrincipalIdealRing + Domain`
     /// is necessary, because of a compiler bug, see also
-    /// [`crate::compute_locally::EvaluatePolyLocallyRing::LocalRingBase`]
+    /// [`crate::reduce_lift::poly_eval::EvaluatePolyLocallyRing::LocalRingBase`]
     /// 
     type ExtendedRingBase<'a>: ?Sized + DivisibilityRing + PrincipalIdealRing + Domain
         where Self: 'a;
@@ -313,7 +313,7 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for EvaluatePolyL
 #[macro_export]
 macro_rules! impl_interpolation_base_ring_char_zero {
     (<{$($gen_args:tt)*}> InterpolationBaseRing for $self_type:ty where $($constraints:tt)*) => {
-        impl<$($gen_args)*> $crate::compute_locally::InterpolationBaseRing for $self_type where $($constraints)* {
+        impl<$($gen_args)*> $crate::reduce_lift::poly_eval::InterpolationBaseRing for $self_type where $($constraints)* {
                 
             type ExtendedRing<'a> = RingRef<'a, Self>
                 where Self: 'a;

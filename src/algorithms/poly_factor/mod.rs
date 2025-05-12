@@ -84,7 +84,7 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
     }
 }
 
-impl<R> FactorPolyField for R
+impl<R: ?Sized> FactorPolyField for R
     where R: FiniteRing + Field + SelfIso
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)

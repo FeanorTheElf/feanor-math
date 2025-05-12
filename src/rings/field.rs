@@ -1,6 +1,6 @@
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
-use crate::compute_locally::{InterpolationBaseRing, InterpolationBaseRingStore};
+use crate::reduce_lift::poly_eval::{InterpolationBaseRing, InterpolationBaseRingStore};
 use crate::delegate::*;
 use crate::divisibility::*;
 use crate::local::PrincipalLocalRing;
@@ -65,6 +65,7 @@ use crate::primitive_int::*;
 ///     let x_mapped_back = R_as_field.get_ring().delegate(x_mapped);
 /// }
 /// ```
+/// The alternative is to explicitly use [`WrapHom`] and [`UnwrapHom`].
 /// 
 pub struct AsFieldBase<R: RingStore> 
     where R::Type: DivisibilityRing

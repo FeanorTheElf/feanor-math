@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use serde::de;
 use serde::{Deserializer, Serializer}; 
 
-use crate::compute_locally::InterpolationBaseRing;
+use crate::reduce_lift::poly_eval::InterpolationBaseRing;
 use crate::divisibility::DivisibilityRing;
 use crate::impl_localpir_wrap_unwrap_homs;
 use crate::impl_localpir_wrap_unwrap_isos;

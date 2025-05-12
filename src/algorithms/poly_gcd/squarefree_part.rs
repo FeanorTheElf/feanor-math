@@ -1,7 +1,6 @@
 use dense_poly::DensePolyRing;
 
 use crate::algorithms::poly_gcd::*;
-use crate::algorithms::poly_gcd::local::*;
 use crate::algorithms::poly_gcd::hensel::*;
 use crate::computation::*;
 use crate::seq::*;
@@ -109,7 +108,7 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2, Controller
 
     let mut power_decomposition_mod_m = Vec::new();
     let mut signature = Vec::new();
-    for (f, k) in poly_power_decomposition_finite_field(&FX, &f_mod_m).into_iter() {
+    for (f, k) in <_ as PolyTFracGCDRing>::power_decomposition(&FX, &f_mod_m).into_iter() {
         signature.push(Signature {
             perfect_power: k,
             degree: FX.degree(&f).unwrap()

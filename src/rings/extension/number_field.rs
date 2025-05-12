@@ -1,28 +1,22 @@
 
 use std::alloc::Global;
 
-use extension_impl::FreeAlgebraImplBase;
-use gcd::poly_gcd_local;
-use local::*;
-use hensel::hensel_lift_factorization;
-use sparse::SparseMapVector;
-use squarefree_part::poly_power_decomposition_local;
-
 use crate::algorithms::interpolate::product_except_one;
 use crate::algorithms::newton;
 use crate::algorithms::poly_factor::extension::poly_factor_extension;
 use crate::algorithms::poly_gcd::factor::factor_and_lift_mod_pe;
+use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
+use crate::algorithms::poly_gcd::gcd::poly_gcd_local;
+use crate::reduce_lift::poly_factor_gcd::*;
 use crate::rings::extension::number_field::newton::find_approximate_complex_root;
-use crate::algorithms::poly_factor::finite::poly_factor_finite_field;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
 use crate::computation::*;
-use crate::delegate::DelegateRingImplEuclideanRing;
+use crate::delegate::{DelegateRing, DelegateRingImplEuclideanRing, DelegateRingImplFiniteRing, UnwrapHom, WrapHom};
 use crate::specialization::*;
 use crate::algorithms::convolution::*;
 use crate::algorithms::eea::signed_lcm;
 use crate::algorithms::poly_gcd::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
-use crate::delegate::DelegateRing;
 use crate::integer::*;
 use crate::pid::*;
 use crate::ring::*;
@@ -32,7 +26,9 @@ use crate::rings::zn::ZnRingStore;
 use crate::rings::rational::*;
 use crate::divisibility::*;
 use crate::rings::extension::*;
+use crate::rings::extension::extension_impl::*;
 use crate::rings::float_complex::{Complex64Base, Complex64};
+use crate::rings::extension::sparse::SparseMapVector;
 
 use super::extension_impl::FreeAlgebraImpl;
 use super::Field;
@@ -630,6 +626,8 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
 /// We don't want to expose the interface of [`PolyGCDLocallyDomain`] for number
 /// fields generally, thus use a private newtype.
 /// 
+/// TODO: Make this a proper, exposed type `NumberFieldOrder`.
+/// 
 struct NumberFieldByOrder<'a, Impl, I>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
@@ -739,8 +737,147 @@ impl<'a, Impl, I> Domain for NumberFieldByOrder<'a, Impl, I>
         I::Type: IntegerRing
 {}
 
+type LocalRingAsZn<'ring, I> = <<I as RingStore>::Type as IntegerPolyGCDRing>::LocalRingAsZn<'ring>;
 type LocalRing<'ring, I> = <<I as RingStore>::Type as PolyGCDLocallyDomain>::LocalRing<'ring>;
-type LocalField<'ring, I> = <<I as RingStore>::Type as PolyGCDLocallyDomain>::LocalField<'ring>;
+
+struct NumberFieldOrderQuotient<'ring, I>
+    where I: 'ring + RingStore,
+        I::Type: IntegerRing
+{
+    base: AsField<FreeAlgebraImpl<AsField<LocalRingAsZn<'ring, I>>, SparseMapVector<AsField<LocalRingAsZn<'ring, I>>>>>
+}
+
+impl<'ring, I> PartialEq for NumberFieldOrderQuotient<'ring, I>
+    where I: 'ring + RingStore,
+        I::Type: IntegerRing
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.base.get_ring() == other.base.get_ring()
+    }
+}
+
+impl<'ring, I> DelegateRing for NumberFieldOrderQuotient<'ring, I>
+    where I: 'ring + RingStore,
+        I::Type: IntegerRing
+{
+    type Base = AsFieldBase<FreeAlgebraImpl<AsField<LocalRingAsZn<'ring, I>>, SparseMapVector<AsField<LocalRingAsZn<'ring, I>>>>>;
+    type Element = El<AsField<FreeAlgebraImpl<AsField<LocalRingAsZn<'ring, I>>, SparseMapVector<AsField<LocalRingAsZn<'ring, I>>>>>>;
+
+    fn get_delegate(&self) -> &Self::Base {
+        self.base.get_ring()
+    }
+
+    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+    fn delegate_mut<'b>(&self, el: &'b mut Self::Element) -> &'b mut <Self::Base as RingBase>::Element { el }
+    fn delegate_ref<'b>(&self, el: &'b Self::Element) -> &'b <Self::Base as RingBase>::Element { el }
+    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
+}
+
+impl<'ring, I> Domain for NumberFieldOrderQuotient<'ring, I>
+    where I: 'ring + RingStore,
+        I::Type: IntegerRing
+{}
+
+impl<'ring, I> DelegateRingImplEuclideanRing for NumberFieldOrderQuotient<'ring, I>
+    where I: 'ring + RingStore,
+        I::Type: IntegerRing
+{}
+
+impl<'ring, I> DelegateRingImplFiniteRing for NumberFieldOrderQuotient<'ring, I>
+    where I: 'ring + RingStore,
+        I::Type: IntegerRing
+{}
+
+impl<'ring, I> Field for NumberFieldOrderQuotient<'ring, I>
+    where I: 'ring + RingStore,
+        I::Type: IntegerRing
+{}
+
+impl<'ring, I> CanHomFrom<Self> for NumberFieldOrderQuotient<'ring, I>
+    where I: 'ring + RingStore,
+        I::Type: IntegerRing
+{
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, from: &Self) -> Option<Self::Homomorphism> {
+        if self == from {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn map_in(&self, _from: &Self, el: <Self as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
+        el
+    }
+}
+
+impl<'ring, I> CanIsoFromTo<Self> for NumberFieldOrderQuotient<'ring, I>
+    where I: 'ring + RingStore,
+        I::Type: IntegerRing
+{
+    type Isomorphism = <Self as CanHomFrom<Self>>::Homomorphism;
+
+    fn has_canonical_iso(&self, from: &Self) -> Option<Self::Isomorphism> {
+        from.has_canonical_hom(self)
+    }
+
+    fn map_out(&self, from: &Self, el: Self::Element, iso: &Self::Isomorphism) -> <Self as RingBase>::Element {
+        from.map_in(self, el, iso)
+    }
+}
+
+impl<'ring, I> CanHomFrom<FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>> for NumberFieldOrderQuotient<'ring, I>
+    where I: 'ring + RingStore,
+        I::Type: IntegerRing
+{
+    type Homomorphism = <<LocalRingAsZn<'ring, I> as RingStore>::Type as CanHomFrom<<LocalRing<'ring, I> as RingStore>::Type>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>) -> Option<Self::Homomorphism> {
+        let base = RingRef::new(self.base.base_ring().get_ring().get_delegate());
+        let hom = base.can_hom(from.base_ring())?;
+        let poly_ring = DensePolyRing::new(base, "X");
+        if poly_ring.eq_el(&self.base.generating_poly(&poly_ring, UnwrapHom::new(self.base.base_ring().get_ring())), &RingRef::new(from).generating_poly(&poly_ring, &hom)) {
+            return Some(hom.into_raw_hom());
+        } else {
+            return None;
+        }
+    }
+
+    fn map_in_ref(&self, from: &FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>, el: &El<FreeAlgebraImpl<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>>, hom: &Self::Homomorphism) -> Self::Element {
+        self.base.from_canonical_basis(from.wrt_canonical_basis(el).iter().map(|c| {
+            self.base.base_ring().get_ring().rev_delegate(self.base.base_ring().get_ring().get_delegate().map_in(from.base_ring().get_ring(), c, hom))
+        }))
+    }
+
+    fn map_in(&self, from: &FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>, el: <FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in_ref(from, &el, hom)
+    }
+}
+
+impl<'ring, I> CanIsoFromTo<FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>> for NumberFieldOrderQuotient<'ring, I>
+    where I: 'ring + RingStore,
+        I::Type: IntegerRing
+{
+    type Isomorphism = <<LocalRingAsZn<'ring, I> as RingStore>::Type as CanIsoFromTo<<LocalRing<'ring, I> as RingStore>::Type>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>) -> Option<Self::Isomorphism> {
+        let base = RingRef::new(self.base.base_ring().get_ring().get_delegate());
+        let iso = base.can_iso(from.base_ring())?;
+        let poly_ring = DensePolyRing::new(base, "X");
+        if poly_ring.eq_el(&self.base.generating_poly(&poly_ring, UnwrapHom::new(self.base.base_ring().get_ring())), &RingRef::new(from).generating_poly(&poly_ring, &iso.inv())) {
+            return Some(iso.into_raw_iso());
+        } else {
+            return None;
+        }
+    }
+    
+    fn map_out(&self, from: &FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>, el: Self::Element, iso: &Self::Isomorphism) -> <FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>> as RingBase>::Element {
+        from.from_canonical_basis(self.base.wrt_canonical_basis(&el).iter().map(|c| {
+            self.base.base_ring().get_ring().get_delegate().map_out(from.base_ring().get_ring(), self.base.base_ring().get_ring().delegate(c), iso)
+        }))
+    }
+}
 
 pub struct NumberRingIdeal<'ring, I>
     where I: RingStore,
@@ -769,7 +906,7 @@ impl<'ring, I> NumberRingIdeal<'ring, I>
         let Zpe_to_Fp = PolyGCDLocallyIntermediateReductionMap::new(ZZ.get_ring(), &self.prime, Zpe, e, &self.Fp_as_ring, 1, 0);
         let ZZ_to_Zpe = PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &self.prime, &Zpe, e, 0);
 
-        let factors = hensel_lift_factorization(
+        let factors = hensel::hensel_lift_factorization(
             &Zpe_to_Fp,
             &ZpeX,
             FpX,
@@ -798,10 +935,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
     type LocalRing<'ring> = RingValue<Self::LocalRingBase<'ring>>
         where Self: 'ring;
 
-    type LocalFieldBase<'ring> = AsFieldBase<FreeAlgebraImpl<
-        LocalField<'ring, I>, 
-        SparseMapVector<LocalField<'ring, I>>
-    >>
+    type LocalFieldBase<'ring> = NumberFieldOrderQuotient<'ring, I>
         where Self: 'ring;
 
     type LocalField<'ring> = RingValue<Self::LocalFieldBase<'ring>>
@@ -854,7 +988,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
             let ZZ_to_Fp = Fp.can_hom(&Fp_as_ring).unwrap().compose(PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &p, &Fp_as_ring, 1, 0));
 
             let gen_poly_mod_p = FpX.from_terms(ZZX.terms(&gen_poly).map(|(c, i)| (ZZ_to_Fp.map_ref(c), i)));
-            let (factorization, _) = poly_factor_finite_field(&FpX, &gen_poly_mod_p);
+            let (factorization, _) = <_ as FactorPolyField>::factor_poly(&FpX, &gen_poly_mod_p);
             if factorization.iter().all(|(_, e)| *e == 1) {
 
                 return NumberRingIdeal {
@@ -876,19 +1010,22 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
         assert!(idx < self.maximal_ideal_factor_count(ideal));
         let QQ = self.base.base_ring();
         let ZZ = QQ.base_ring();
-        let Fp = ZZ.get_ring().local_field_at(&ideal.prime, 0);
+        let Zp = ZZ.get_ring().local_ring_at(&ideal.prime, 1, 0);
+        let Fp = ZZ.get_ring().local_ring_into_zn(ZZ.get_ring().local_ring_at(&ideal.prime, 1, 0)).as_field().ok().unwrap();
         let FpX = &ideal.FpX;
-        assert!(Fp.get_ring() == FpX.base_ring().get_ring());
+        let hom = WrapHom::new(Fp.get_ring()).compose(RingRef::new(Fp.get_ring().get_delegate()).into_can_hom(&Zp).ok().unwrap()).compose(FpX.base_ring().can_iso(&Zp).unwrap());
 
         let irred_poly = &ideal.minpoly_factors_mod_p[idx];
-        let mut x_pow_rank = SparseMapVector::new(FpX.degree(irred_poly).unwrap(), ZZ.get_ring().local_field_at(&ideal.prime, 0));
+        let mut x_pow_rank = SparseMapVector::new(FpX.degree(irred_poly).unwrap(), ZZ.get_ring().local_ring_into_zn(ZZ.get_ring().local_ring_at(&ideal.prime, 1, 0)).as_field().ok().unwrap());
         for (c, i) in FpX.terms(irred_poly) {
             if i < x_pow_rank.len() {
-                *x_pow_rank.at_mut(i) = Fp.negate(Fp.clone_el(c));
+                *x_pow_rank.at_mut(i) = Fp.negate(hom.map_ref(c));
             }
         }
         _ = x_pow_rank.at_mut(0);
-        return AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new(Fp, FpX.degree(irred_poly).unwrap(), x_pow_rank)));
+        return RingValue::from(NumberFieldOrderQuotient {
+            base: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new(Fp, FpX.degree(irred_poly).unwrap(), x_pow_rank)))
+        });
     }
 
     fn local_ring_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, e: usize, idx: usize) -> Self::LocalRing<'ring>
@@ -898,7 +1035,8 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
         let QQ = self.base.base_ring();
         let ZZ = QQ.base_ring();
         let (ZpeX, factors) = ideal.lifted_factorization(e);
-        let Zpe = ZpeX.base_ring();
+        let Zpe = ZZ.get_ring().local_ring_at(&ideal.prime, e, 0);
+        assert!(Zpe.get_ring() == ZpeX.base_ring().get_ring());
 
         let irred_poly = &factors[idx];
         let degree = ZpeX.degree(irred_poly).unwrap();
@@ -909,7 +1047,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
             }
         }
         _ = x_pow_rank.at_mut(0);
-        return FreeAlgebraImpl::new(ZZ.get_ring().local_ring_at(&ideal.prime, e, 0), degree, x_pow_rank);
+        return FreeAlgebraImpl::new(Zpe, degree, x_pow_rank);
     }
 
     fn reduce_ring_el<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), idx: usize, x: Self::Element) -> El<Self::LocalRing<'ring>>
@@ -923,7 +1061,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
             assert!(ZZ.is_one(QQ.get_ring().den(&x)));
             ZZ.clone_el(QQ.get_ring().num(&x))
         });
-        let ZZ_to_Zpe = PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &ideal.prime, to.0.base_ring(), to.1, 0);
+        let ZZ_to_Zpe = PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &ideal.prime, to.0.get_ring().base_ring(), to.1, 0);
 
         ZZX.evaluate(
             &self.base.poly_repr(ZZX, &x, partial_QQ_to_ZZ), 

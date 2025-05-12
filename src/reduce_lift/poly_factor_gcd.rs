@@ -14,11 +14,11 @@ use crate::ring::*;
 use crate::rings::zn::*;
 use crate::seq::*;
 use crate::specialization::FiniteRingSpecializable;
-
-use super::AsField;
-use super::AsFieldBase;
-use super::Field;
-use super::FiniteRing;
+use crate::algorithms::poly_factor::FactorPolyField;
+use crate::algorithms::poly_gcd::PolyTFracGCDRing;
+use crate::rings::field::{AsField, AsFieldBase};
+use crate::field::Field;
+use crate::rings::finite::FiniteRing;
 
 ///
 /// Trait for rings that support lifting partial factorizations of polynomials modulo a prime
@@ -29,7 +29,7 @@ use super::FiniteRing;
 /// that work modulo prime ideals (or their powers), which is different from the mathematical concept
 /// of localization.
 /// 
-/// The general philosophy is similar to [`crate::compute_locally::EvaluatePolyLocallyRing`].
+/// The general philosophy is similar to [`crate::reduce_lift::poly_eval::EvaluatePolyLocallyRing`].
 /// However, when working with factorizations, it is usually better to compute modulo the factorization
 /// modulo an ideal `I`, and use Hensel lifting to derive the factorization modulo `I^e`.
 /// `EvaluatePolyLocallyRing` on the other hand is designed to allow computations modulo multiple different 
@@ -85,7 +85,7 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
 
     ///
     /// The proper way would be to define this with two lifetime parameters `'ring` and `'data`,
-    /// see also [`crate::compute_locally::EvaluatePolyLocallyRing::LocalRingBase`]
+    /// see also [`crate::reduce_lift::poly_eval::EvaluatePolyLocallyRing::LocalRingBase`]
     /// 
     type LocalRingBase<'ring>: ?Sized + LinSolveRing
         where Self: 'ring;
@@ -93,7 +93,7 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
     type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
         where Self: 'ring;
     
-    type LocalFieldBase<'ring>: ?Sized + CanIsoFromTo<Self::LocalRingBase<'ring>> + FiniteRing + Field + SelfIso
+    type LocalFieldBase<'ring>: ?Sized + CanIsoFromTo<Self::LocalRingBase<'ring>> + PolyTFracGCDRing + FactorPolyField + Field + SelfIso
         where Self: 'ring;
 
     type LocalField<'ring>: RingStore<Type = Self::LocalFieldBase<'ring>>
@@ -194,13 +194,15 @@ pub trait IntegerPolyGCDRing: PolyGCDLocallyDomain {
     /// It would be much preferrable if we could restrict associated types from supertraits,
     /// this is just a workaround (and an ugly one at that)
     /// 
-    type LocalRingAsZnBase<'ring>: ?Sized + CanIsoFromTo<Self::LocalRingBase<'ring>> + ZnRing
+    type LocalRingAsZnBase<'ring>: ?Sized + CanIsoFromTo<Self::LocalRingBase<'ring>> + ZnRing + SelfIso
         where Self: 'ring;
 
     type LocalRingAsZn<'ring>: RingStore<Type = Self::LocalRingAsZnBase<'ring>>
         where Self: 'ring;
 
     fn local_ring_as_zn<'a, 'ring>(&self, local_field: &'a Self::LocalRing<'ring>) -> &'a Self::LocalRingAsZn<'ring>;
+
+    fn local_ring_into_zn<'ring>(&self, local_field: Self::LocalRing<'ring>) -> Self::LocalRingAsZn<'ring>;
 
     fn principal_ideal_generator<'ring>(&self, p: &Self::SuitableIdeal<'ring>) -> i64
         where Self: 'ring
@@ -465,7 +467,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
     };
     (<{$($gen_args:tt)*}> IntegerPolyGCDRing for $int_ring_type:ty where $($constraints:tt)*) => {
 
-        impl<$($gen_args)*> $crate::algorithms::poly_gcd::local::PolyGCDLocallyDomain for $int_ring_type
+        impl<$($gen_args)*> $crate::reduce_lift::poly_factor_gcd::PolyGCDLocallyDomain for $int_ring_type
             where $($constraints)*
         {
             type LocalRing<'ring> = $crate::rings::zn::zn_big::Zn<BigIntRing>
@@ -563,7 +565,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
             {
                 let log2_max_coeff = coefficients.map(|c| RingRef::new(self).abs_log2_ceil(c).unwrap_or(0)).max().unwrap_or(0);
                 // this is in no way a rigorous bound, but equals the worst-case bound at least asymptotically (up to constants)
-                return ((log2_max_coeff as f64 + poly_deg as f64) / (*p as f64).log2() * $crate::algorithms::poly_gcd::local::INTRING_HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR).ceil() as usize + 1;
+                return ((log2_max_coeff as f64 + poly_deg as f64) / (*p as f64).log2() * $crate::reduce_lift::poly_factor_gcd::INTRING_HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR).ceil() as usize + 1;
             }
             
             fn dbg_ideal<'ring>(&self, p: &Self::SuitableIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
@@ -573,7 +575,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
             }
         }
 
-        impl<$($gen_args)*> $crate::algorithms::poly_gcd::local::IntegerPolyGCDRing for $int_ring_type
+        impl<$($gen_args)*> $crate::reduce_lift::poly_factor_gcd::IntegerPolyGCDRing for $int_ring_type
             where $($constraints)*
         {
             type LocalRingAsZnBase<'ring> = Self::LocalRingBase<'ring>
@@ -583,6 +585,12 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 where Self: 'ring;
 
             fn local_ring_as_zn<'a, 'ring>(&self, local_field: &'a Self::LocalRing<'ring>) -> &'a Self::LocalRingAsZn<'ring>
+                where Self: 'ring
+            {
+                local_field
+            }
+            
+            fn local_ring_into_zn<'ring>(&self, local_field: Self::LocalRing<'ring>) -> Self::LocalRingAsZn<'ring>
                 where Self: 'ring
             {
                 local_field
@@ -603,7 +611,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
 /// 
 #[allow(unused)]
 impl<R> PolyGCDLocallyDomain for R
-    where R: ?Sized + FiniteRing + Field + SelfIso
+    where R: ?Sized + FiniteRing + FactorPolyField + Field + SelfIso
 {
     type LocalRingBase<'ring> = Self
         where Self: 'ring;
@@ -770,7 +778,7 @@ impl<'a, R> PolyGCDLocallyDomain for IntegersWithLocalZnQuotient<'a, R>
     {
         let log2_max_coeff = coefficients.map(|c| self.integers.abs_log2_ceil(c).unwrap_or(0)).max().unwrap_or(0);
         // this is in no way a rigorous bound, but equals the worst-case bound at least asymptotically (up to constants)
-        return ((log2_max_coeff as f64 + poly_deg as f64) / self.integers.abs_log2_floor(ideal).unwrap_or(1) as f64 * crate::algorithms::poly_gcd::local::INTRING_HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR).ceil() as usize + 1;
+        return ((log2_max_coeff as f64 + poly_deg as f64) / self.integers.abs_log2_floor(ideal).unwrap_or(1) as f64 * crate::reduce_lift::poly_factor_gcd::INTRING_HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR).ceil() as usize + 1;
     }
 
     fn random_suitable_ideal<'ring, F>(&'ring self, _rng: F) -> Self::SuitableIdeal<'ring>

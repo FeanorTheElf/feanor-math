@@ -411,6 +411,10 @@ impl<R, S> CanHom<R, S>
         &self.data
     }
 
+    pub fn into_raw_hom(self) -> <S::Type as CanHomFrom<R::Type>>::Homomorphism {
+        self.data
+    }
+
     #[stability::unstable(feature = "enable")]
     pub fn from_raw_parts(from: R, to: S, data: <S::Type as CanHomFrom<R::Type>>::Homomorphism) -> Self {
         Self { from, to, data }
@@ -591,6 +595,10 @@ impl<R, S> CanIso<R, S>
 
     pub fn raw_iso(&self) -> &<S::Type as CanIsoFromTo<R::Type>>::Isomorphism {
         &self.data
+    }
+
+    pub fn into_raw_iso(self) -> <S::Type as CanIsoFromTo<R::Type>>::Isomorphism {
+        self.data
     }
 }
 

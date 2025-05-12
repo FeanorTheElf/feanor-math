@@ -38,6 +38,9 @@ pub trait FractionField: Field + RingExtension {
     }
 }
 
+///
+/// [`RingStore`] corresponding to [`FractionField`]
+/// 
 #[stability::unstable(feature = "enable")]
 pub trait FractionFieldStore: RingStore
     where Self::Type: FractionField

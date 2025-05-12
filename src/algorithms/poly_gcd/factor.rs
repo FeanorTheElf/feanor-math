@@ -1,10 +1,9 @@
 use std::convert::identity;
 
-use crate::algorithms::poly_factor::finite::poly_factor_finite_field;
 use crate::algorithms::poly_gcd::*;
-use crate::algorithms::poly_gcd::local::*;
 use crate::algorithms::poly_gcd::hensel::*;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
+use crate::algorithms::poly_factor::FactorPolyField;
 use crate::computation::*;
 use crate::iters::clone_slice;
 use crate::iters::powerset;
@@ -85,7 +84,7 @@ pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::
 
     let poly_mod_m = FX.lifted_hom(poly_ring, R_to_F).map_ref(poly);
     let mut factors = Vec::new();
-    for (f, k) in poly_factor_finite_field(&FX, &poly_mod_m).0 {
+    for (f, k) in <_ as FactorPolyField>::factor_poly(&FX, &poly_mod_m).0 {
         if k > 1 {
             return None;
         }
