@@ -11,7 +11,9 @@ use crate::rings::float_real::Real64Base;
 use crate::rings::rational::*;
 use crate::ordered::{OrderedRing, OrderedRingStore};
 use crate::ring::*;
+use crate::MAX_PROBABILISTIC_REPETITIONS;
 
+use core::f64;
 use std::alloc::Allocator;
 use std::cmp::max;
 use std::marker::PhantomData;
@@ -176,22 +178,29 @@ fn lll_base<R, I, V, T>(ring: R, int_ring: I, mut gso: SubmatrixMut<V, El<R>>, m
 /// Computes the LDL-decomposition of the given matrix, i.e. writes it as
 /// a product `L * D * L^T`, where `D` is diagonal and `L` is lower triangle.
 /// 
-/// Currently this requires that the input matrix is invertible (or in the 
-/// floating point case that no eigenvalues are very small in absolute value).
+/// If the matrix is not invertible, or (in the floating point case) some eigenvalues
+/// are very small, this function cannot proceed, and will return the index of the 
+/// column in which on to small values have been detected as `Err()`. The top left
+/// square until this index will contain a valid LDL-decomposition of the corresponding
+/// square of the input.
 /// 
 /// `D` is returned on the diagonal of the matrix, and `L^T` is returned in
 /// the upper triangle of the matrix.
 /// 
-fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>)
+fn ldl<R, V, F>(ring: R, mut matrix: SubmatrixMut<V, El<R>>, mut is_too_small: F) -> Result<(), usize>
     where R: RingStore,
         R::Type: Field, 
-        V: AsPointerToSlice<El<R>>
+        V: AsPointerToSlice<El<R>>,
+        F: FnMut(&El<R>) -> bool
 {
     // only the upper triangle part of matrix is used
     assert_eq!(matrix.row_count(), matrix.col_count());
     let n = matrix.row_count();
     for i in 0..n {
         let pivot = ring.clone_el(matrix.at(i, i));
+        if is_too_small(&pivot) {
+            return Err(i);
+        }
         let pivot_inv = ring.div(&ring.one(), matrix.at(i, i));
         for j in (i + 1)..n {
             ring.mul_assign_ref(matrix.at_mut(i, j), &pivot_inv);
@@ -203,6 +212,7 @@ fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>)
             }
         }
     }
+    return Ok(());
 }
 
 ///
@@ -226,7 +236,7 @@ fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>)
 /// somewhat longer than explained above.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn lll_float<I, V1, V2, A>(ring: I, quadratic_form: Submatrix<V1, El<Real64>>, matrix: SubmatrixMut<V2, El<I>>, delta: f64, allocator: A)
+pub fn lll_float<I, V1, V2, A>(ring: I, quadratic_form: Submatrix<V1, El<Real64>>, mut matrix: SubmatrixMut<V2, El<I>>, delta: f64, allocator: A)
     where I: IntegerRingStore,
         I::Type: IntegerRing,
         V1: AsPointerToSlice<El<Real64>>,
@@ -244,12 +254,40 @@ pub fn lll_float<I, V1, V2, A>(ring: I, quadratic_form: Submatrix<V1, El<Real64>
     let n = matrix.col_count();
     let mut gso: OwnedMatrix<f64, &A> = OwnedMatrix::zero_in(n, n, &lll_reals, &allocator);
     let mut tmp: OwnedMatrix<f64, &A> = OwnedMatrix::zero_in(n, n, &lll_reals, &allocator);
-    let matrix_RR: OwnedMatrix<f64, &A> = OwnedMatrix::from_fn_in(matrix.row_count(), matrix.col_count(), |i, j| hom.map_ref(matrix.at(i, j)), &allocator);
-    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(matrix_RR.data()).transpose(), TransposableSubmatrix::from(quadratic_form), TransposableSubmatrixMut::from(tmp.data_mut()), lll_reals);
-    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(tmp.data()), TransposableSubmatrix::from(matrix_RR.data()), TransposableSubmatrixMut::from(gso.data_mut()), lll_reals);
-
-    ldl(&lll_reals, gso.data_mut());
-    lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut(), TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);
+    let mut matrix_RR: OwnedMatrix<f64, &A> = OwnedMatrix::zero_in(matrix.row_count(), matrix.col_count(), &lll_reals, &allocator);
+    
+    for _ in 0..(MAX_PROBABILISTIC_REPETITIONS * n) {
+        for i in 0..n {
+            for j in 0..n {
+                *matrix_RR.at_mut(i, j) = hom.map_ref(matrix.at(i, j));
+            }
+        }
+        STANDARD_MATMUL.matmul(TransposableSubmatrix::from(matrix_RR.data()).transpose(), TransposableSubmatrix::from(quadratic_form), TransposableSubmatrixMut::from(tmp.data_mut()), lll_reals);
+        STANDARD_MATMUL.matmul(TransposableSubmatrix::from(tmp.data()), TransposableSubmatrix::from(matrix_RR.data()), TransposableSubmatrixMut::from(gso.data_mut()), lll_reals);
+        
+        match ldl(&lll_reals, gso.data_mut(), |x| *x < 1000. * f64::EPSILON) {
+            Ok(()) => {
+                lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut(), TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData }, &delta);
+                return;
+            },
+            Err(k) => {
+                // in this case, there are some precision problems;
+                // In particular, the `k`-th column has a vector whose projection onto the orthogonal
+                // subspace of the previous vectors is extremely short, such as to cause precision issues.
+                // However, LLL can deal with this, since it will move this vector to the front and then
+                // fix the problem by size-reducing the later vectors, hence we just move it to the front here
+                lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut().submatrix(0..k, 0..k), TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData }, &delta);
+                for i in 0..n {
+                    let mut last = ring.clone_el(matrix.at(i, k));
+                    for j in 0..k {
+                        std::mem::swap(matrix.at_mut(i, j), &mut last);
+                    }
+                    *matrix.at_mut(i, k) = last;
+                }
+            }
+        }
+    }
+    unreachable!();
 }
 
 ///
@@ -295,7 +333,7 @@ pub fn lll_exact<I, V, A>(ring: I, mut matrix: SubmatrixMut<V, El<I>>, delta: f6
     let matrix_RR: OwnedMatrix<_, &A> = OwnedMatrix::from_fn_in(matrix.row_count(), matrix.col_count(), |i, j| hom.map_ref(matrix.at(i, j)), &allocator);
     STANDARD_MATMUL.matmul(TransposableSubmatrix::from(matrix_RR.data()).transpose(), TransposableSubmatrix::from(matrix_RR.data()), TransposableSubmatrixMut::from(gso.data_mut()), &lll_reals);
 
-    ldl(&lll_reals, gso.data_mut());
+    ldl(&lll_reals, gso.data_mut(), |_| false).unwrap();
     lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut(), TransformLatticeBasis { basis: matrix, hom: ring.identity(), int_ring: PhantomData }, &delta);
 }
 
@@ -406,7 +444,7 @@ fn test_ldl() {
         [0, 1, -2],
         [0, 0, 2]
     ];
-    ldl(QQ, matrix.reborrow());
+    ldl(QQ, matrix.reborrow(), |_| false).unwrap();
 
     // only the upper triangle is filled
     expected[1][0] = *matrix.at(1, 0);
@@ -517,6 +555,29 @@ fn test_lll_float_3d() {
     assert_eq!(144 * 144, norm_squared(&reduced_matrix.as_const().col_at(0)));
     assert_eq!(72 * 72 + 279 * 279, norm_squared(&reduced_matrix.as_const().col_at(1)));
     assert_eq!(72 * 72 * 2 + 272 * 272, norm_squared(&reduced_matrix.as_const().col_at(2)));
+}
+
+#[test]
+fn test_lll_5d() {
+    let ZZ = StaticRing::<i64>::RING;
+    let original = [
+        DerefArray::from([1, 0, 0, 0, 0]),
+        DerefArray::from([65208, 1, 0, 0, 0]),
+        DerefArray::from([0, 65208, 1, 0, 0]),
+        DerefArray::from([0, 0, 65208, 1, 0]),
+        DerefArray::from([0, 0, 0, 65208, 999769]),
+    ];
+
+    let mut reduced = original;
+    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 5>, _>::from_2d(&mut reduced);
+    lll_float(&ZZ, OwnedMatrix::<_>::identity(5, 5, Real64::RING).data(), reduced_matrix.reborrow(), 0.999, Global);
+
+    assert_lattice_isomorphic(&original, &reduced_matrix.as_const());
+    assert!(norm_squared(&reduced_matrix.as_const().col_at(0)) < 500);
+    assert!(norm_squared(&reduced_matrix.as_const().col_at(1)) < 500);
+    assert!(norm_squared(&reduced_matrix.as_const().col_at(2)) < 500);
+    assert!(norm_squared(&reduced_matrix.as_const().col_at(3)) < 500);
+    assert!(norm_squared(&reduced_matrix.as_const().col_at(4)) < 500);
 }
 
 #[bench]
