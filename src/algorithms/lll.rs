@@ -27,7 +27,7 @@ use std::marker::PhantomData;
 pub trait LLLRealField<I>: OrderedRing + Field
     where I: ?Sized + IntegerRing
 {
-    fn from_integer(&self, x: I::Element, ZZ: &I) -> Self::Element;
+    fn from_integer(&self, x: &I::Element, ZZ: &I) -> Self::Element;
     fn round_to_integer(&self, x: &Self::Element, ZZ: &I) -> I::Element;
 }
 
@@ -36,8 +36,8 @@ impl<I, J> LLLRealField<J> for RationalFieldBase<I>
         I::Type: IntegerRing,
         J: ?Sized + IntegerRing
 {
-    fn from_integer(&self, x: J::Element, ZZ: &J) -> Self::Element {
-        RingRef::new(self).inclusion().map(int_cast(x, self.base_ring(), RingRef::new(ZZ)))
+    fn from_integer(&self, x: &J::Element, ZZ: &J) -> Self::Element {
+        RingRef::new(self).inclusion().map(int_cast(ZZ.clone_el(x), self.base_ring(), RingRef::new(ZZ)))
     }
 
     fn round_to_integer(&self, x: &Self::Element, ZZ: &J) -> J::Element {
@@ -48,8 +48,8 @@ impl<I, J> LLLRealField<J> for RationalFieldBase<I>
 impl<J> LLLRealField<J> for Real64Base
     where J: ?Sized + IntegerRing
 {
-    fn from_integer(&self, x: J::Element, ZZ: &J) -> Self::Element {
-        ZZ.to_float_approx(&x)
+    fn from_integer(&self, x: &J::Element, ZZ: &J) -> Self::Element {
+        ZZ.to_float_approx(x)
     }
 
     fn round_to_integer(&self, x: &Self::Element, ZZ: &J) -> J::Element {
@@ -68,7 +68,7 @@ fn size_reduce<R, I, V, T>(ring: R, int_ring: I, mut target: SubmatrixMut<V, El<
     for j in (0..matrix.col_count()).rev() {
         let factor = ring.get_ring().round_to_integer(target.as_const().at(j, 0), int_ring.get_ring());
         col_ops.subtract(int_ring, j, target_j, &factor);
-        let factor = ring.get_ring().from_integer(factor, int_ring.get_ring());
+        let factor = ring.get_ring().from_integer(&factor, int_ring.get_ring());
         ring.sub_assign_ref(target.at_mut(j, 0), &factor);
         for k in 0..j {
             ring.sub_assign(target.at_mut(k, 0), ring.mul_ref(matrix.at(k, j), &factor));
@@ -287,7 +287,7 @@ pub fn lll_exact<I, V, A>(ring: I, mut matrix: SubmatrixMut<V, El<I>>, delta: f6
 
     let lll_reals = RationalField::new(BigIntRing::RING);
     let delta_int = ring.from_float_approx(delta * 2f64.powi(20)).unwrap();
-    let delta = lll_reals.div(&lll_reals.get_ring().from_integer(delta_int, ring.get_ring()), &lll_reals.get_ring().from_integer(ring.power_of_two(20), ring.get_ring()));
+    let delta = lll_reals.div(&lll_reals.get_ring().from_integer(&delta_int, ring.get_ring()), &lll_reals.get_ring().from_integer(&ring.power_of_two(20), ring.get_ring()));
 
     let n = matrix.col_count();
     let mut gso = OwnedMatrix::zero_in(n, n, &lll_reals, &allocator);
