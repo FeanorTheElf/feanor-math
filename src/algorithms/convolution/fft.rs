@@ -172,10 +172,10 @@ impl<R, A> ConvolutionAlgorithm<R> for FFTConvolutionZn<A>
         true
     }
 
-    fn specialize_prepared_convolution<F>(function: F) -> Result<F::Output, F>
+    fn specialize_prepared_convolution<F>(function: F) -> F::Output
         where F: PreparedConvolutionOperation<Self, R>
     {
-        Ok(function.execute())
+        function.execute()
     }
 }
 
@@ -199,10 +199,10 @@ impl<I, A> ConvolutionAlgorithm<I> for FFTConvolution<A>
         true
     }
 
-    fn specialize_prepared_convolution<F>(function: F) -> Result<F::Output, F>
+    fn specialize_prepared_convolution<F>(function: F) -> F::Output
         where F: PreparedConvolutionOperation<Self, I>
     {
-        Ok(function.execute())
+        function.execute()
     }
 }
 

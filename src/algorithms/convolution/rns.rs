@@ -500,7 +500,7 @@ impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolution<I, C, A, Cr
         true
     }
 
-    fn specialize_prepared_convolution<F>(function: F) -> Result<F::Output, F>
+    fn specialize_prepared_convolution<F>(function: F) -> F::Output
         where F: PreparedConvolutionOperation<Self, R>
     {
         struct CallFunction<F, R, I, C, A, CreateC>
@@ -532,12 +532,16 @@ impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolution<I, C, A, Cr
             {
                 self.function.execute()
             }
+
+            fn fallback(self) -> Self::Output {
+                self.function.fallback()
+            }
         }
         return <C as ConvolutionAlgorithm<ZnBase>>::specialize_prepared_convolution::<CallFunction<F, R, I, C, A, CreateC>>(CallFunction {
             function: function,
             ring: PhantomData,
             convolution: PhantomData
-        }).map_err(|f| f.function);
+        });
     }
 }
 
@@ -647,7 +651,7 @@ impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolutionZn<I, C, A, 
         true
     }
 
-    fn specialize_prepared_convolution<F>(function: F) -> Result<F::Output, F>
+    fn specialize_prepared_convolution<F>(function: F) -> F::Output
         where F: PreparedConvolutionOperation<Self, R>
     {
         struct CallFunction<F, R, I, C, A, CreateC>
@@ -679,12 +683,15 @@ impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolutionZn<I, C, A, 
             {
                 self.function.execute()
             }
+            fn fallback(self) -> Self::Output {
+                self.function.fallback()
+            }
         }
         return <C as ConvolutionAlgorithm<ZnBase>>::specialize_prepared_convolution::<CallFunction<F, R, I, C, A, CreateC>>(CallFunction {
             function: function,
             ring: PhantomData,
             convolution: PhantomData
-        }).map_err(|f| f.function);
+        });
     }
 }
 
@@ -794,10 +801,14 @@ fn test_specialize_prepared() {
 
     struct CheckIsPrepared(RNSConvolutionZn, Zn);
     impl PreparedConvolutionOperation<RNSConvolutionZn, ZnBase> for CheckIsPrepared {
-        type Output = ();
+        type Output = bool;
         fn execute(self) -> Self::Output {
             super::generic_tests::test_prepared_convolution(&self.0, &self.1, self.1.int_hom().map(1 << 30));
+            true
+        }
+        fn fallback(self) -> Self::Output {
+            false
         }
     }
-    assert!(RNSConvolutionZn::specialize_prepared_convolution(CheckIsPrepared(convolution, ring)).is_ok());
+    assert!(RNSConvolutionZn::specialize_prepared_convolution(CheckIsPrepared(convolution, ring)));
 }

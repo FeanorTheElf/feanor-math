@@ -34,8 +34,9 @@ pub fn compute_galois_closure<K, >(field: K) -> Result<
     where K: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>
 {
     let poly_ring = DensePolyRing::new(&field, "X");
+    let gen_poly = field.generating_poly(&poly_ring, field.inclusion());
     let next_poly_to_factor = poly_ring.checked_div(
-        &field.generating_poly(&poly_ring, field.inclusion()),
+        &gen_poly,
         &poly_ring.sub(poly_ring.indeterminate(), poly_ring.inclusion().map(field.canonical_gen()))
     ).unwrap();
     let (factors, _) = <_ as FactorPolyField>::factor_poly(&poly_ring, &next_poly_to_factor);
@@ -118,7 +119,7 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
     #[stability::unstable(feature = "enable")]
     pub fn compose_gal(self, first: &Self) -> Self {
         assert!(self.field.get_ring() == first.field.get_ring());
-        let new_image = self.map_ref(&self.image_of_canonical_gen_powers[1]);
+        let new_image = self.map_ref(&first.image_of_canonical_gen_powers[1]);
         return Self::new(self.field, new_image);
     }
     
@@ -412,12 +413,15 @@ fn test_compute_galois_group() {
     let id = &galois_group[0];
     assert!(id.is_identity());
     let mut g1 = &galois_group[1];
-    let subgroup: Vec<_> = [g1.clone()].into_iter().chain((1..).map(|i| g1.clone().pow(i)).take_while(|g| !g.is_identity())).collect();
+    assert!(!g1.is_identity());
+    let subgroup: Vec<_> = [id.clone()].into_iter().chain((1..).map(|i| g1.clone().pow(i)).take_while(|g| !g.is_identity())).collect();
     let mut g2 = galois_group.iter().filter(|g| !subgroup.contains(g)).next().unwrap();
     if g1.clone().pow(2).is_identity() {
         std::mem::swap(&mut g1, &mut g2);
     }
     // now g1 has order 5 and g2 has order 2, and together they generate the Dihedral group D5
+    assert!(!g1.is_identity());
+    assert!(!g2.is_identity());
     assert!(g1.clone().pow(5).is_identity());
     assert!(g2.clone().pow(2).is_identity());
     assert_eq!(g2.clone().compose_gal(&g1).compose_gal(&g2), g1.clone().invert());

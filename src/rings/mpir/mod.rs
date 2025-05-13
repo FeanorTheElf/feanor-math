@@ -43,6 +43,12 @@ impl MPZEl {
     }
 }
 
+impl Clone for MPZEl {
+    fn clone(&self) -> Self {
+        MPZ::RING.clone_el(self)
+    }
+}
+
 ///
 /// Except for random number generation (which we do in Rust), GMP/MPIR
 /// is thread-safe (Section 3.7 of the manual)
@@ -611,8 +617,8 @@ impl_poly_gcd_locally_for_ZZ!{ IntegerPolyGCDRing for MPZBase }
 
 impl FiniteRingSpecializable for MPZBase {
     
-    fn specialize<O: FiniteRingOperation<Self>>(_op: O) -> Result<O::Output, ()> {
-        Err(())
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
+        op.fallback()
     }
 }
 

@@ -608,7 +608,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
 }
 
 ///
-/// We cannot provide a blanket impl of [`super::PolyTFracGCDRing`] for finite fields, since it would
+/// We cannot provide a blanket impl of [`crate::algorithms::poly_gcd::PolyTFracGCDRing`] for finite fields, since it would
 /// conflict with the one for all rings that impl [`PolyGCDLocallyDomain`]. Thus, we implement
 /// [`PolyGCDLocallyDomain`] for all finite fields, and reuse the blanket impl.
 /// 

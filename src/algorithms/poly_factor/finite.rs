@@ -71,5 +71,6 @@ pub fn poly_factor_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usiz
     }
     poly_ring.base_ring().mul_assign_ref(&mut unit, poly_ring.coefficient_at(&el, 0));
     debug_assert!(poly_ring.base_ring().is_unit(&unit));
+
     return (result, unit);
 }

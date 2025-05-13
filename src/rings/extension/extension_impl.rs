@@ -389,14 +389,15 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
                 }
                 return self.x;
             }
+
+            fn fallback(self) -> Self::Output {
+                self.ring.mul_ref(&self.x, &self.x)
+            }
         }
-        match <C as ConvolutionAlgorithm<R::Type>>::specialize_prepared_convolution(SquareIfPreparable {
+        *value = <C as ConvolutionAlgorithm<R::Type>>::specialize_prepared_convolution(SquareIfPreparable {
             x: std::mem::replace(value, FreeAlgebraImplEl { values: Vec::new_in(self.element_allocator.clone()).into_boxed_slice() }),
             ring: self
-        }) {
-            Ok(result) => *value = result,
-            Err(function) => *value = self.mul_ref(&function.x, &function.x)
-        }
+        });
     }
 }
 

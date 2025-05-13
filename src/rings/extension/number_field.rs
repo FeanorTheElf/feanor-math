@@ -11,7 +11,9 @@ use crate::reduce_lift::poly_factor_gcd::*;
 use crate::rings::extension::number_field::newton::find_approximate_complex_root;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
 use crate::computation::*;
-use crate::delegate::{DelegateRing, DelegateRingImplEuclideanRing, DelegateRingImplFiniteRing, UnwrapHom, WrapHom};
+use crate::delegate::{DelegateRing, DelegateRingImplEuclideanRing, DelegateRingImplFiniteRing};
+use crate::rings::zn::zn_64::Zn;
+use crate::rings::zn::ZnReductionMap;
 use crate::specialization::*;
 use crate::algorithms::convolution::*;
 use crate::algorithms::eea::signed_lcm;
@@ -746,7 +748,8 @@ struct NumberFieldOrderQuotient<'ring, I>
     where I: 'ring + RingStore,
         I::Type: IntegerRing
 {
-    base: AsField<FreeAlgebraImpl<AsField<LocalRingAsZn<'ring, I>>, SparseMapVector<AsField<LocalRingAsZn<'ring, I>>>>>
+    implementation: AsField<FreeAlgebraImpl<AsField<Zn>, SparseMapVector<AsField<Zn>>>>,
+    Zp_zn: LocalRingAsZn<'ring, I>
 }
 
 impl<'ring, I> PartialEq for NumberFieldOrderQuotient<'ring, I>
@@ -754,7 +757,7 @@ impl<'ring, I> PartialEq for NumberFieldOrderQuotient<'ring, I>
         I::Type: IntegerRing
 {
     fn eq(&self, other: &Self) -> bool {
-        self.base.get_ring() == other.base.get_ring()
+        self.implementation.get_ring() == other.implementation.get_ring()
     }
 }
 
@@ -762,11 +765,11 @@ impl<'ring, I> DelegateRing for NumberFieldOrderQuotient<'ring, I>
     where I: 'ring + RingStore,
         I::Type: IntegerRing
 {
-    type Base = AsFieldBase<FreeAlgebraImpl<AsField<LocalRingAsZn<'ring, I>>, SparseMapVector<AsField<LocalRingAsZn<'ring, I>>>>>;
-    type Element = El<AsField<FreeAlgebraImpl<AsField<LocalRingAsZn<'ring, I>>, SparseMapVector<AsField<LocalRingAsZn<'ring, I>>>>>>;
+    type Base = AsFieldBase<FreeAlgebraImpl<AsField<Zn>, SparseMapVector<AsField<Zn>>>>;
+    type Element = El<AsField<FreeAlgebraImpl<AsField<Zn>, SparseMapVector<AsField<Zn>>>>>;
 
     fn get_delegate(&self) -> &Self::Base {
-        self.base.get_ring()
+        self.implementation.get_ring()
     }
 
     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
@@ -836,10 +839,9 @@ impl<'ring, I> CanHomFrom<FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVect
     type Homomorphism = <<LocalRingAsZn<'ring, I> as RingStore>::Type as CanHomFrom<<LocalRing<'ring, I> as RingStore>::Type>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>) -> Option<Self::Homomorphism> {
-        let base = RingRef::new(self.base.base_ring().get_ring().get_delegate());
-        let hom = base.can_hom(from.base_ring())?;
-        let poly_ring = DensePolyRing::new(base, "X");
-        if poly_ring.eq_el(&self.base.generating_poly(&poly_ring, UnwrapHom::new(self.base.base_ring().get_ring())), &RingRef::new(from).generating_poly(&poly_ring, &hom)) {
+        let hom = self.Zp_zn.can_hom(from.base_ring())?;
+        let poly_ring = DensePolyRing::new(&self.Zp_zn, "X");
+        if poly_ring.eq_el(&self.implementation.generating_poly(&poly_ring, ZnReductionMap::new(self.implementation.base_ring(), &self.Zp_zn).unwrap()), &RingRef::new(from).generating_poly(&poly_ring, &hom)) {
             return Some(hom.into_raw_hom());
         } else {
             return None;
@@ -847,8 +849,9 @@ impl<'ring, I> CanHomFrom<FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVect
     }
 
     fn map_in_ref(&self, from: &FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>, el: &El<FreeAlgebraImpl<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>>, hom: &Self::Homomorphism) -> Self::Element {
-        self.base.from_canonical_basis(from.wrt_canonical_basis(el).iter().map(|c| {
-            self.base.base_ring().get_ring().rev_delegate(self.base.base_ring().get_ring().get_delegate().map_in(from.base_ring().get_ring(), c, hom))
+        let red_map = ZnReductionMap::new(&self.Zp_zn, self.implementation.base_ring()).unwrap();
+        self.implementation.from_canonical_basis(from.wrt_canonical_basis(el).iter().map(|c| {
+            red_map.map(self.Zp_zn.get_ring().map_in(from.base_ring().get_ring(), c, hom))
         }))
     }
 
@@ -864,10 +867,9 @@ impl<'ring, I> CanIsoFromTo<FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVe
     type Isomorphism = <<LocalRingAsZn<'ring, I> as RingStore>::Type as CanIsoFromTo<<LocalRing<'ring, I> as RingStore>::Type>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>) -> Option<Self::Isomorphism> {
-        let base = RingRef::new(self.base.base_ring().get_ring().get_delegate());
-        let iso = base.can_iso(from.base_ring())?;
-        let poly_ring = DensePolyRing::new(base, "X");
-        if poly_ring.eq_el(&self.base.generating_poly(&poly_ring, UnwrapHom::new(self.base.base_ring().get_ring())), &RingRef::new(from).generating_poly(&poly_ring, &iso.inv())) {
+        let iso = self.Zp_zn.can_iso(from.base_ring())?;
+        let poly_ring = DensePolyRing::new(&self.Zp_zn, "X");
+        if poly_ring.eq_el(&self.implementation.generating_poly(&poly_ring, ZnReductionMap::new(self.implementation.base_ring(), &self.Zp_zn).unwrap()), &RingRef::new(from).generating_poly(&poly_ring, &iso.inv())) {
             return Some(iso.into_raw_iso());
         } else {
             return None;
@@ -875,8 +877,9 @@ impl<'ring, I> CanIsoFromTo<FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVe
     }
     
     fn map_out(&self, from: &FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>, el: Self::Element, iso: &Self::Isomorphism) -> <FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>> as RingBase>::Element {
-        from.from_canonical_basis(self.base.wrt_canonical_basis(&el).iter().map(|c| {
-            self.base.base_ring().get_ring().get_delegate().map_out(from.base_ring().get_ring(), self.base.base_ring().get_ring().delegate(c), iso)
+        let red_map = ZnReductionMap::new(self.implementation.base_ring(), &self.Zp_zn).unwrap();
+        from.from_canonical_basis(self.implementation.wrt_canonical_basis(&el).iter().map(|c| {
+            self.Zp_zn.get_ring().map_out(from.base_ring().get_ring(), red_map.map(c), iso)
         }))
     }
 }
@@ -1012,13 +1015,15 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
         assert!(idx < self.maximal_ideal_factor_count(ideal));
         let QQ = self.base.base_ring();
         let ZZ = QQ.base_ring();
+        assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&ideal.prime));
         let Zp = ZZ.get_ring().local_ring_at(&ideal.prime, 1, 0);
-        let Fp = ZZ.get_ring().local_ring_into_zn(ZZ.get_ring().local_ring_at(&ideal.prime, 1, 0)).as_field().ok().unwrap();
+        let Zp_zn = ZZ.get_ring().local_ring_into_zn(ZZ.get_ring().local_ring_at(&ideal.prime, 1, 0));
+        let Fp = Zn::new(ZZ.get_ring().principal_ideal_generator(&ideal.prime) as u64).as_field().ok().unwrap();
         let FpX = &ideal.FpX;
-        let hom = WrapHom::new(Fp.get_ring()).compose(RingRef::new(Fp.get_ring().get_delegate()).into_can_hom(&Zp).ok().unwrap()).compose(FpX.base_ring().can_iso(&Zp).unwrap());
+        let hom = ZnReductionMap::new(&Zp_zn, &Fp).unwrap().compose(Zp_zn.can_hom(&Zp).unwrap()).compose(FpX.base_ring().can_iso(&Zp).unwrap());
 
         let irred_poly = &ideal.minpoly_factors_mod_p[idx];
-        let mut x_pow_rank = SparseMapVector::new(FpX.degree(irred_poly).unwrap(), ZZ.get_ring().local_ring_into_zn(ZZ.get_ring().local_ring_at(&ideal.prime, 1, 0)).as_field().ok().unwrap());
+        let mut x_pow_rank = SparseMapVector::new(FpX.degree(irred_poly).unwrap(), Fp);
         for (c, i) in FpX.terms(irred_poly) {
             if i < x_pow_rank.len() {
                 *x_pow_rank.at_mut(i) = Fp.negate(hom.map_ref(c));
@@ -1026,7 +1031,8 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
         }
         _ = x_pow_rank.at_mut(0);
         return RingValue::from(NumberFieldOrderQuotient {
-            base: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new(Fp, FpX.degree(irred_poly).unwrap(), x_pow_rank)))
+            implementation: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new(Fp, FpX.degree(irred_poly).unwrap(), x_pow_rank))),
+            Zp_zn: Zp_zn
         });
     }
 

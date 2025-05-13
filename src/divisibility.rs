@@ -117,11 +117,9 @@ pub trait DivisibilityRing: RingBase {
     ///
     /// "Prepares" an element of this ring for division.
     /// 
-    /// The returned [`DivisibilityRing::PreparedDivisor`] can then be used in calls
+    /// The returned [`PreparedDivisor`] can then be used in calls
     /// to [`DivisibilityRing::checked_left_div_prepared()`] and other "prepared" division
     /// functions, which can be faster than for an "unprepared" element.
-    /// 
-    /// See also [`DivisibilityRingBase::prepare_divisor()`].
     /// 
     /// # Caveat
     /// 

@@ -1,7 +1,11 @@
 use crate::algorithms::eea::signed_gcd;
+use crate::algorithms::matmul::StrassenHint;
+use crate::algorithms::convolution::KaratsubaHint;
+use crate::homomorphism::*;
 use crate::divisibility::*;
 use crate::field::Field;
 use crate::homomorphism::Homomorphism;
+use crate::rings::rational::RationalFieldBase;
 use crate::integer::IntegerRing;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::ring::*;
@@ -365,6 +369,93 @@ impl<R> HashableElRing for FractionFieldImplBase<R>
         let gcd = signed_gcd(self.base_ring.clone_el(&el.den), self.base_ring.clone_el(&el.num), &self.base_ring);
         self.base_ring.get_ring().hash(&self.base_ring.checked_div(&el.num, &gcd).unwrap(), h);
         self.base_ring.get_ring().hash(&self.base_ring.checked_div(&el.den, &gcd).unwrap(), h);
+    }
+}
+
+impl<R: RingStore> StrassenHint for FractionFieldImplBase<R>
+    where R: RingStore,
+        R::Type: Domain
+{
+    default fn strassen_threshold(&self) -> usize {
+        usize::MAX
+    }
+}
+
+impl<R: RingStore> KaratsubaHint for FractionFieldImplBase<R>
+    where R: RingStore,
+        R::Type: Domain
+{
+    default fn karatsuba_threshold(&self) -> usize {
+        usize::MAX
+    }
+}
+
+impl<R: RingStore, S: RingStore> CanHomFrom<FractionFieldImplBase<S>> for FractionFieldImplBase<R>
+    where R: RingStore,
+        S: RingStore,
+        R::Type: Domain + CanHomFrom<S::Type>,
+        S::Type: Domain
+{
+    type Homomorphism = <R::Type as CanHomFrom<S::Type>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &FractionFieldImplBase<S>) -> Option<Self::Homomorphism> {
+        self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
+    }
+
+    fn map_in(&self, from: &FractionFieldImplBase<S>, el: <FractionFieldImplBase<S> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.from_fraction(self.base_ring().get_ring().map_in(from.base_ring().get_ring(), el.num, hom), self.base_ring().get_ring().map_in(from.base_ring().get_ring(), el.den, hom))
+    }
+}
+
+impl<R: RingStore, S: RingStore> CanIsoFromTo<FractionFieldImplBase<S>> for FractionFieldImplBase<R>
+    where R: RingStore,
+        S: RingStore,
+        R::Type: Domain + CanIsoFromTo<S::Type>,
+        S::Type: Domain
+{
+    type Isomorphism = <R::Type as CanIsoFromTo<S::Type>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &FractionFieldImplBase<S>) -> Option<Self::Isomorphism> {
+        self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
+    }
+
+    fn map_out(&self, from: &FractionFieldImplBase<S>, el: Self::Element, iso: &Self::Isomorphism) -> <FractionFieldImplBase<S> as RingBase>::Element {
+        from.from_fraction(self.base_ring().get_ring().map_out(from.base_ring().get_ring(), el.num, iso), self.base_ring().get_ring().map_out(from.base_ring().get_ring(), el.den, iso))
+    }
+}
+
+impl<R: RingStore, I: RingStore> CanHomFrom<RationalFieldBase<I>> for FractionFieldImplBase<R>
+    where R: RingStore,
+        I: RingStore,
+        R::Type: Domain + CanHomFrom<I::Type>,
+        I::Type: IntegerRing
+{
+    type Homomorphism = <R::Type as CanHomFrom<I::Type>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &RationalFieldBase<I>) -> Option<Self::Homomorphism> {
+        self.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
+    }
+
+    fn map_in(&self, from: &RationalFieldBase<I>, el: <RationalFieldBase<I> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        let (num, den) = from.as_fraction(el);
+        self.from_fraction(self.base_ring().get_ring().map_in(from.base_ring().get_ring(), num, hom), self.base_ring().get_ring().map_in(from.base_ring().get_ring(), den, hom))
+    }
+}
+
+impl<R: RingStore, I: RingStore> CanIsoFromTo<RationalFieldBase<I>> for FractionFieldImplBase<R>
+    where R: RingStore,
+        I: RingStore,
+        R::Type: Domain + CanIsoFromTo<I::Type>,
+        I::Type: IntegerRing
+{
+    type Isomorphism = <R::Type as CanIsoFromTo<I::Type>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &RationalFieldBase<I>) -> Option<Self::Isomorphism> {
+        self.base_ring().get_ring().has_canonical_iso(from.base_ring().get_ring())
+    }
+
+    fn map_out(&self, from: &RationalFieldBase<I>, el: Self::Element, iso: &Self::Isomorphism) -> <RationalFieldBase<I> as RingBase>::Element {
+        from.from_fraction(self.base_ring().get_ring().map_out(from.base_ring().get_ring(), el.num, iso), self.base_ring().get_ring().map_out(from.base_ring().get_ring(), el.den, iso))
     }
 }
 

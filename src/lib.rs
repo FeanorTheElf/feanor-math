@@ -180,4 +180,10 @@ pub mod serialization;
 /// Contains a workaround for specialization.
 /// 
 pub mod specialization;
+///
+/// Contains the two traits [`reduce_lift::poly_eval::EvalPolyLocallyRing`] and
+/// [`reduce_lift::poly_factor_gcd::PolyGCDLocallyDomain`] that formalize the assumptions required
+/// to perform certain computations over a ring modulo prime ideals, and then reconstruct the element
+/// from the resulting congruences.
+/// 
 pub mod reduce_lift;

@@ -58,6 +58,7 @@ pub mod conway;
 /// of this type must also preserve the canonical generator.
 ///
 /// # Examples
+/// 
 /// One of the most common use cases seems to be the implementation of finite fields (sometimes
 /// called galois fields).
 /// ```
@@ -85,8 +86,7 @@ pub mod conway;
 ///         assert_el_eq!(galois_field, galois_field.one(), galois_field.mul(x, inv_x));
 ///     }
 /// }
-/// // since galois fields are so important, an efficient construction is provided by feanor-math;
-/// // this is the new impl, the old one is instead available under `self::galois_field::galois_field_dyn()`
+/// // since galois fields are so important, an efficient construction is provided by feanor-math
 /// let galois_field_2 = galois_field::GaloisField::new_with(prime_field, 3, Global, STANDARD_CONVOLUTION);
 /// // note that the generating polynomial might be different, so it is not necessarily the "same" ring
 /// assert!(galois_field_2.can_iso(&galois_field).is_none());

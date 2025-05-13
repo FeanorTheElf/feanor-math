@@ -137,10 +137,10 @@ impl<R, A> ConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
         self.compute_convolution_impl(lhs_prep, &rhs_prep, dst);
     }
 
-    fn specialize_prepared_convolution<F>(function: F) -> Result<F::Output, F>
+    fn specialize_prepared_convolution<F>(function: F) -> F::Output
         where F: PreparedConvolutionOperation<Self, R::Type>
     {
-        Ok(function.execute())
+        function.execute()
     }
 }
 

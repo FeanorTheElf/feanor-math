@@ -14,12 +14,20 @@ use karatsuba::*;
 pub mod karatsuba;
 
 ///
-/// Contains an implementation of computing convolutions using complex FFTs.
+/// Contains an implementation of computing convolutions using complex floating-point FFTs.
 /// 
 pub mod fft;
 
+///
+/// Contains an implementation of computing convolutions using NTTs, i.e. FFTs over
+/// a finite field that has suitable roots of unity.
+/// 
 pub mod ntt;
 
+///
+/// Contains an implementation of computing convolutions by considering them modulo
+/// various primes that are either smaller or allow for suitable roots of unity.
+/// 
 pub mod rns;
 
 ///
@@ -91,10 +99,10 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// `Err` is returned.
     /// 
     #[stability::unstable(feature = "enable")]
-    fn specialize_prepared_convolution<F>(function: F) -> Result<F::Output, F>
+    fn specialize_prepared_convolution<F>(function: F) -> F::Output
         where F: PreparedConvolutionOperation<Self, R>
     {
-        Err(function)
+        function.fallback()
     }
 }
 
@@ -110,6 +118,8 @@ pub trait PreparedConvolutionOperation<C: ?Sized, R: ?Sized + RingBase> {
 
     fn execute(self) -> Self::Output
         where C: PreparedConvolutionAlgorithm<R>;
+
+    fn fallback(self) -> Self::Output;
 }
 
 ///
@@ -177,7 +187,7 @@ impl<'a, R, C> ConvolutionAlgorithm<R> for C
         (**self).supports_ring(ring)
     }
 
-    fn specialize_prepared_convolution<F>(function: F) -> Result<F::Output, F>
+    fn specialize_prepared_convolution<F>(function: F) -> F::Output
         where F: PreparedConvolutionOperation<Self, R>
     {
         struct CallFunction<F, C, R>
@@ -203,12 +213,16 @@ impl<'a, R, C> ConvolutionAlgorithm<R> for C
             {
                 self.function.execute()
             }
+
+            fn fallback(self) -> Self::Output {
+                self.function.fallback()
+            }
         }
         return <C::Target as ConvolutionAlgorithm<R>>::specialize_prepared_convolution::<CallFunction<F, C, R>>(CallFunction {
             function: function,
             ring: PhantomData,
             convolution: PhantomData
-        }).map_err(|f| f.function);
+        });
     }
 }
 
