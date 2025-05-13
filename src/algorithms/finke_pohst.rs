@@ -162,4 +162,9 @@ fn test_fincke_pohst_3d() {
     for p in &result {
         assert!(ZZ.pow(p[0] + p[1] + p[2], 2) + ZZ.pow(p[0], 2) + ZZ.pow(p[1], 2) + ZZ.pow(p[2], 2) <= 2);
     }
+    
+    let quadratic_form = [vec![2., 1., 1.], vec![1., 2., 1.], vec![1., 1., 2.]];
+    let mut result = Vec::new();
+    fincke_pohst(&ZZ, &RR, Submatrix::from_2d(&quadratic_form), &[0.3, -2.1, 0.7], 0.5, |point| { result.push(point.to_owned()); None });
+    assert_eq!(vec![vec![0, -2, 1]], result);
 }
