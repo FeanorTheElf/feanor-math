@@ -3,7 +3,8 @@ use std::ops::{AddAssign, Div, MulAssign, Neg, Rem, Shr, SubAssign};
 use std::marker::PhantomData;
 use std::fmt::Display;
 
-use serde::{de::DeserializeOwned, Deserializer, Serialize, Serializer}; 
+use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
+use serde::de::{DeserializeOwned, DeserializeSeed};
 
 use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ};
 use crate::ring::*;
@@ -16,7 +17,7 @@ use crate::integer::*;
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::StrassenHint;
 use crate::specialization::*;
-use crate::serialization::SerializableElementRing;
+use crate::serialization::{DeserializeSeedUnitStruct, SerializableElementRing};
 
 ///
 /// Trait for `i8` to `i128`.
@@ -455,6 +456,24 @@ impl<T: PrimitiveInt> SerializableElementRing for StaticRingBase<T> {
     }
 }
 
+impl<T: PrimitiveInt> Serialize for StaticRingBase<T> {
+
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        serializer.serialize_unit_struct("IntegerRing(primitive)")
+    }
+}
+
+impl<'de, T: PrimitiveInt> Deserialize<'de> for StaticRingBase<T> {
+
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        DeserializeSeedUnitStruct::new("IntegerRing(primitive)", StaticRing::<T>::RING.into()).deserialize(deserializer)
+    }
+}
+
 ///
 /// The ring of integers `Z`, using the arithmetic of the primitive integer type `T`.
 /// 
@@ -552,4 +571,13 @@ fn test_prepared_div() {
             }
         }
     }
+}
+
+#[test]
+fn test_serialization() {
+    crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i8>::RING.into());
+    crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i16>::RING.into());
+    crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i32>::RING.into());
+    crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i64>::RING.into());
+    crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i128>::RING.into());
 }

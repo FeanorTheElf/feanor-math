@@ -14,6 +14,12 @@ use crate::rings::zn::*;
 use crate::specialization::FiniteRingSpecializable;
 use super::local::AsLocalPIRBase;
 use crate::primitive_int::*;
+use crate::serialization::*;
+
+use std::marker::PhantomData;
+
+use serde::{Deserialize, Serialize, Deserializer, Serializer};
+use serde::de::DeserializeSeed;
 
 ///
 /// A wrapper around a ring that marks this ring to be a perfect field. In particular,
@@ -449,6 +455,28 @@ impl<R> FromModulusCreateableZnRing for AsFieldBase<RingValue<R>>
         where F:FnOnce(&Self::IntegerRingBase) -> Result<El<Self::IntegerRing>, E> 
     {
         <R as FromModulusCreateableZnRing>::create(create_modulus).map(|ring| RingValue::from(ring).as_field().ok().unwrap().into())
+    }
+}
+
+impl<R> Serialize for AsFieldBase<R>
+    where R: RingStore + Serialize,
+        R::Type: DivisibilityRing
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        SerializableNewtype::new("AsField", &self.base).serialize(serializer)
+    }
+}
+
+impl<'de, R> Deserialize<'de> for AsFieldBase<R>
+    where R: RingStore + Deserialize<'de>,
+        R::Type: DivisibilityRing
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        DeserializeSeedNewtype::new("AsField", PhantomData::<R>).deserialize(deserializer).map(|base_ring| AsFieldBase { zero: FieldEl(base_ring.zero()), base: base_ring })
     }
 }
 

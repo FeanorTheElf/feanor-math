@@ -1,10 +1,9 @@
 use std::alloc::{Allocator, Global};
 use std::marker::PhantomData;
+use std::cell::OnceCell;
 
 use serde::de::DeserializeSeed;
-use serde::Deserializer;
-use serde::Serialize;
-use serde::Serializer;
+use serde::{Deserializer, Serialize, Serializer, Deserialize};
 
 use crate::algorithms::convolution::*;
 use crate::algorithms::linsolve::LinSolveRing;
@@ -15,6 +14,7 @@ use crate::{impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos, impl
 use crate::integer::*;
 use crate::iters::multi_cartesian_product;
 use crate::iters::MultiProduct;
+use crate::rings::poly::PolyRingStore;
 use crate::matrix::OwnedMatrix;
 use crate::primitive_int::StaticRing;
 use crate::rings::field::{AsField, AsFieldBase};
@@ -476,6 +476,65 @@ impl<R, V, A, C> DivisibilityRing for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
+impl<R, V> Serialize for FreeAlgebraImplBase<R, V, Global, KaratsubaAlgorithm>
+    where R: RingStore + Serialize, 
+        R::Type: SerializableElementRing,
+        V: VectorView<El<R>>,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let poly_ring = DensePolyRing::new(self.base_ring(), "X");
+        SerializableNewtype::new("FreeAlgebraImpl", (self.base_ring(), SerializeOwnedWithRing::new(RingRef::new(self).generating_poly(&poly_ring, self.base_ring().identity()), poly_ring))).serialize(serializer)
+    }
+}
+
+impl<'de, R> Deserialize<'de> for FreeAlgebraImplBase<R, SparseMapVector<R>, Global, KaratsubaAlgorithm>
+    where R: RingStore + Deserialize<'de> + Clone, 
+        R::Type: SerializableElementRing,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        let ring_cell = OnceCell::new();
+        let poly = <_ as DeserializeSeed<'de>>::deserialize(DeserializeSeedNewtype::new("FreeAlgebraImpl", DeserializeSeedDependentTuple::new(PhantomData::<R>, |ring| {
+            let poly_ring = DensePolyRing::new(ring, "X");
+            ring_cell.set(poly_ring).ok().unwrap();
+            DeserializeWithRing::new(ring_cell.get().unwrap())
+        })), deserializer)?;
+        let poly_ring = ring_cell.into_inner().unwrap();
+        assert!(poly_ring.base_ring().is_one(poly_ring.lc(&poly).unwrap()));
+        let rank = poly_ring.degree(&poly).unwrap();
+        let mut x_pow_rank = SparseMapVector::new(rank, (*poly_ring.base_ring()).clone());
+        for (c, i) in poly_ring.terms(&poly) {
+            *x_pow_rank.at_mut(i) = poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(c));
+        }
+        _ = x_pow_rank.at_mut(0);
+        return Ok(FreeAlgebraImpl::new_with(poly_ring.into().into_base_ring(), rank, x_pow_rank, "θ", Global, STANDARD_CONVOLUTION).into());
+    }
+}
+
+impl<'de, R> Deserialize<'de> for FreeAlgebraImplBase<R, Vec<El<R>>, Global, KaratsubaAlgorithm>
+    where R: RingStore + Deserialize<'de>, 
+        R::Type: SerializableElementRing
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        let ring_cell = OnceCell::new();
+        let poly = <_ as DeserializeSeed<'de>>::deserialize(DeserializeSeedNewtype::new("FreeAlgebraImpl", DeserializeSeedDependentTuple::new(PhantomData::<R>, |ring| {
+            let poly_ring = DensePolyRing::new(ring, "X");
+            ring_cell.set(poly_ring).ok().unwrap();
+            DeserializeWithRing::new(ring_cell.get().unwrap())
+        })), deserializer)?;
+        let poly_ring = ring_cell.into_inner().unwrap();
+        assert!(poly_ring.base_ring().is_one(poly_ring.lc(&poly).unwrap()));
+        let rank = poly_ring.degree(&poly).unwrap();
+        let x_pow_rank = (0..rank).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&poly, i)))).collect::<Vec<_>>();
+        return Ok(FreeAlgebraImpl::new_with(poly_ring.into().into_base_ring(), rank, x_pow_rank, "θ", Global, STANDARD_CONVOLUTION).into());
+    }
+}
+
 impl<R, V, A, C> SerializableElementRing for FreeAlgebraImplBase<R, V, A, C>
     where R: RingStore, 
         V: VectorView<El<R>>,
@@ -486,6 +545,7 @@ impl<R, V, A, C> SerializableElementRing for FreeAlgebraImplBase<R, V, A, C>
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
         where D: Deserializer<'de>
     {
+        // TODO: find better serialization name
         DeserializeSeedNewtype::new("ExtensionRingEl", DeserializeSeedSeq::new(
             std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(self.rank()),
             Vec::with_capacity_in(1 << self.log2_padded_len, self.element_allocator.clone()),
@@ -842,8 +902,8 @@ use crate::rings::rational::RationalField;
 use crate::algorithms::convolution::fft::FFTConvolution;
 
 #[cfg(test)]
-fn test_ring0_and_elements() -> (FreeAlgebraImpl<Zn, [ZnEl; 1]>, Vec<FreeAlgebraImplEl<Zn>>) {
-    let R = FreeAlgebraImpl::new(Zn::new(7), 1, [Zn::new(7).neg_one()]);
+fn test_ring0_and_elements() -> (FreeAlgebraImpl<Zn, Vec<ZnEl>>, Vec<FreeAlgebraImplEl<Zn>>) {
+    let R = FreeAlgebraImpl::new(Zn::new(7), 1, vec![Zn::new(7).neg_one()]);
     let elements = R.elements().collect();
     return (R, elements);
 }
@@ -862,9 +922,9 @@ fn test_ring1_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 2]>, V
 }
 
 #[cfg(test)]
-fn test_ring2_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 3]>, Vec<FreeAlgebraImplEl<StaticRing<i64>>>) {
+fn test_ring2_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, Vec<i64>>, Vec<FreeAlgebraImplEl<StaticRing<i64>>>) {
     let ZZ = StaticRing::<i64>::RING;
-    let R = FreeAlgebraImpl::new(ZZ, 3, [1, -1, 1]);
+    let R = FreeAlgebraImpl::new(ZZ, 3, vec![1, -1, 1]);
     let mut elements = Vec::new();
     for a in [-2, 0, 1, 2] {
         for b in [-2, 0, 2] {
@@ -877,9 +937,9 @@ fn test_ring2_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 3]>, V
 }
 
 #[cfg(test)]
-fn test_ring3_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, [i64; 1]>, Vec<FreeAlgebraImplEl<StaticRing<i64>>>) {
+fn test_ring3_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, Vec<i64>>, Vec<FreeAlgebraImplEl<StaticRing<i64>>>) {
     let ZZ = StaticRing::<i64>::RING;
-    let R = FreeAlgebraImpl::new(ZZ, 3, [1]);
+    let R = FreeAlgebraImpl::new(ZZ, 3, vec![1]);
     let mut elements = Vec::new();
     for a in [-2, 0, 1, 2] {
         for b in [-2, 0, 2] {
@@ -1062,4 +1122,11 @@ fn test_interpolation_base_ring() {
     for _ in points {
         assert_el_eq!(&ring, ring.invert(&ring.canonical_gen()).unwrap(), ext_map.as_base_ring_el(ext_map.codomain().invert(&ext_map.map(ring.canonical_gen())).unwrap()));
     }
+}
+
+#[test]
+fn test_serialize_deserialize() {
+    crate::serialization::generic_tests::test_serialize_deserialize(test_ring0_and_elements().0.into());
+    crate::serialization::generic_tests::test_serialize_deserialize(test_ring2_and_elements().0.into());
+    crate::serialization::generic_tests::test_serialize_deserialize(test_ring3_and_elements().0.into());
 }

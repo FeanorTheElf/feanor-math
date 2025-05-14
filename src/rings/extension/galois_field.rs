@@ -1,25 +1,20 @@
 use std::alloc::{Allocator, Global};
+use std::marker::PhantomData;
 
 use extension_impl::FreeAlgebraImplBase;
 use sparse::SparseMapVector;
 use zn_64::Zn;
 
-use crate::algorithms::convolution::ConvolutionAlgorithm;
-use crate::algorithms::convolution::KaratsubaAlgorithm;
-use crate::algorithms::convolution::KaratsubaHint;
-use crate::algorithms::convolution::STANDARD_CONVOLUTION;
+use crate::algorithms::convolution::*;
 use crate::algorithms::eea::signed_gcd;
 use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
 use crate::algorithms::int_factor::factor;
 use crate::algorithms::int_factor::is_prime_power;
-use crate::algorithms::matmul::ComputeInnerProduct;
-use crate::algorithms::matmul::StrassenHint;
+use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::unity_root::*;
-use crate::delegate::DelegateRing;
-use crate::delegate::DelegateRingImplFiniteRing;
-use crate::divisibility::DivisibilityRingStore;
-use crate::divisibility::Domain;
+use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
+use crate::divisibility::{DivisibilityRingStore, Domain};
 use crate::field::*;
 use crate::pid::PrincipalIdealRing;
 use crate::rings::extension::extension_impl::FreeAlgebraImpl;
@@ -27,18 +22,19 @@ use crate::rings::finite::*;
 use crate::algorithms::convolution::fft::*;
 use crate::algorithms::poly_factor::cantor_zassenhaus;
 use crate::pid::EuclideanRing;
-use crate::primitive_int::StaticRing;
-use crate::primitive_int::StaticRingBase;
-use crate::rings::field::AsField;
-use crate::rings::field::AsFieldBase;
-use crate::rings::local::AsLocalPIR;
-use crate::rings::local::AsLocalPIRBase;
+use crate::primitive_int::{StaticRing, StaticRingBase};
+use crate::rings::field::{AsField, AsFieldBase};
+use crate::rings::local::{AsLocalPIR, AsLocalPIRBase};
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::PolyRing;
 use crate::rings::zn::*;
 use crate::ring::*;
 use crate::rings::extension::*;
 use crate::integer::*;
+use crate::serialization::*;
+
+use serde::{Serialize, Deserialize, Deserializer, Serializer};
+use serde::de::DeserializeSeed;
 
 fn filter_irreducible<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Option<El<P>>
     where P: RingStore,
@@ -622,6 +618,30 @@ impl<Impl> PrincipalIdealRing for GaloisFieldBase<Impl>
         } else {
             (self.one(), self.zero(), self.clone_el(lhs))
         }
+    }
+}
+
+impl<Impl> Serialize for GaloisFieldBase<Impl>
+    where Impl: RingStore + Serialize,
+        Impl::Type: Field + FreeAlgebra + FiniteRing + SerializableElementRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        SerializableNewtype::new("GaloisField", &self.base).serialize(serializer)
+    }
+}
+
+impl<'de, Impl> Deserialize<'de> for GaloisFieldBase<Impl>
+    where Impl: RingStore + Deserialize<'de>,
+        Impl::Type: Field + FreeAlgebra + FiniteRing + SerializableElementRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        DeserializeSeedNewtype::new("GaloisField", PhantomData::<Impl>).deserialize(deserializer).map(|res| GaloisField::create(res).into())
     }
 }
 

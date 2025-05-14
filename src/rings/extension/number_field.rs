@@ -1,5 +1,6 @@
 
 use std::alloc::Global;
+use std::marker::PhantomData;
 
 use crate::algorithms::interpolate::product_except_one;
 use crate::algorithms::newton;
@@ -30,7 +31,11 @@ use crate::divisibility::*;
 use crate::rings::extension::*;
 use crate::rings::extension::extension_impl::*;
 use crate::rings::float_complex::{Complex64Base, Complex64};
+use crate::serialization::*;
 use crate::rings::extension::sparse::SparseMapVector;
+
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
+use serde::de::DeserializeSeed;
 
 use super::extension_impl::FreeAlgebraImpl;
 use super::Field;
@@ -1158,6 +1163,34 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
     {
         let QQ = self.base.base_ring();
         QQ.base_ring().get_ring().dbg_ideal(&ideal.prime, out)
+    }
+}
+
+impl<Impl, I> Serialize for NumberFieldBase<Impl, I>
+    where Impl: RingStore + Serialize,
+        Impl::Type: Field + FreeAlgebra + SerializableElementRing,
+        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Type: IntegerRing
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        SerializableNewtype::new("NumberField", &self.base).serialize(serializer)
+    }
+}
+
+impl<'de, Impl, I> Deserialize<'de> for NumberFieldBase<Impl, I>
+    where Impl: RingStore + Deserialize<'de>,
+        Impl::Type: Field + FreeAlgebra + SerializableElementRing,
+        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Type: IntegerRing
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        DeserializeSeedNewtype::new("NumberField", PhantomData::<Impl>).deserialize(deserializer).map(|res| NumberField::create(res).into())
     }
 }
 

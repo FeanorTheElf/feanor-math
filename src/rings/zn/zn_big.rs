@@ -1,7 +1,9 @@
 use std::fmt::Debug;
+use std::marker::PhantomData;
+use std::cell::OnceCell;
 
-use serde::de;
-use serde::{Deserializer, Serializer}; 
+use serde::de::{Error, DeserializeSeed};
+use serde::{Deserializer, Serializer, Serialize, Deserialize}; 
 
 use crate::reduce_lift::poly_eval::InterpolationBaseRing;
 use crate::divisibility::DivisibilityRing;
@@ -20,7 +22,7 @@ use crate::seq::*;
 use crate::delegate::DelegateRing;
 use crate::rings::extension::galois_field::*;
 use crate::rings::zn::*;
-use crate::serialization::SerializableElementRing;
+use crate::serialization::*;
 
 ///
 /// Ring representing `Z/nZ`, computing the modular reductions
@@ -500,6 +502,34 @@ impl<'a, I> Iterator for ZnBaseElementsIter<'a, I>
     }
 }
 
+impl<I> Serialize for ZnBase<I>
+    where I: RingStore + Serialize,
+        I::Type: IntegerRing + SerializableElementRing
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        SerializableNewtype::new("Zn", (self.integer_ring(), SerializeWithRing::new(self.modulus(), self.integer_ring()))).serialize(serializer)
+    }
+}
+
+impl<'de, I> Deserialize<'de> for ZnBase<I>
+    where I: RingStore + Deserialize<'de>,
+        I::Type: IntegerRing + SerializableElementRing
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        let ring_cell = OnceCell::new();
+        let modulus = <_ as DeserializeSeed<'de>>::deserialize(DeserializeSeedNewtype::new("Zn", DeserializeSeedDependentTuple::new(PhantomData::<I>, |ring| {
+            ring_cell.set(ring).ok().unwrap();
+            DeserializeWithRing::new(ring_cell.get().unwrap())
+        })), deserializer)?;
+        let ring = ring_cell.into_inner().unwrap();
+        return Ok(Zn::new(ring, modulus).into());
+    }
+}
+
 impl<I: RingStore> SerializableElementRing for ZnBase<I>
     where I::Type: IntegerRing + SerializableElementRing
 {
@@ -507,7 +537,7 @@ impl<I: RingStore> SerializableElementRing for ZnBase<I>
         where D: Deserializer<'de>
     {
         self.integer_ring().get_ring().deserialize(deserializer)
-            .and_then(|x| if self.integer_ring().is_neg(&x) || self.integer_ring().is_geq(&x, self.modulus()) { Err(de::Error::custom("ring element value out of bounds for ring Z/nZ")) } else { Ok(x) })
+            .and_then(|x| if self.integer_ring().is_neg(&x) || self.integer_ring().is_geq(&x, self.modulus()) { Err(Error::custom("ring element value out of bounds for ring Z/nZ")) } else { Ok(x) })
             .map(|x| self.from_int_promise_reduced(x))
     }
 
@@ -733,4 +763,11 @@ fn test_unreduced() {
     assert!(ring.is_one(&ring.mul_ref(&x, &x)));
     assert!(ring.eq_el(&x, &ring.mul_ref(&x, &x)));
     assert_eq!("1", format!("{}", ring.format(&x)));
+}
+
+#[test]
+fn test_serialize_deserialize() {
+    crate::serialization::generic_tests::test_serialize_deserialize(Zn::new(StaticRing::<i64>::RING, 128).into());
+    crate::serialization::generic_tests::test_serialize_deserialize(Zn::new(StaticRing::<i64>::RING, 129).into());
+    crate::serialization::generic_tests::test_serialize_deserialize(Zn::new(BigIntRing::RING, BigIntRing::RING.power_of_two(10)).into());
 }

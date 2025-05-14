@@ -12,15 +12,17 @@ use crate::rings::extension::FreeAlgebraStore;
 use crate::ring::*;
 use crate::rings::extension::galois_field::*;
 use crate::seq::*;
-use crate::serialization::SerializableElementRing;
+use crate::serialization::*;
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::algorithms::matmul::StrassenHint;
 use crate::specialization::*;
-use serde::de;
-use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
-
 use crate::homomorphism::*;
+
+use std::marker::PhantomData;
+
+use serde::de::{DeserializeSeed, Error};
+use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
 
 use super::*;
 use super::zn_big;
@@ -322,7 +324,7 @@ impl SerializableElementRing for ZnBase {
         where D: Deserializer<'de>
     {
         <i64 as Deserialize>::deserialize(deserializer)
-            .and_then(|x| if x < 0 || x >= *self.modulus() { Err(de::Error::custom("ring element value out of bounds for ring Z/nZ")) } else { Ok(x) })
+            .and_then(|x| if x < 0 || x >= *self.modulus() { Err(Error::custom("ring element value out of bounds for ring Z/nZ")) } else { Ok(x) })
             .map(|x| self.from_int_promise_reduced(x))
     }
 
@@ -524,6 +526,22 @@ impl<I: ?Sized + IntegerRing> CanHomFrom<I> for ZnBase {
             debug_assert!(n <= (self.repr_bound() as i128 * self.repr_bound() as i128));
             self.from_u64_promise_reduced(self.bounded_reduce(n as u128))
         })
+    }
+}
+
+impl Serialize for ZnBase {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        SerializableNewtype::new("Zn", *self.modulus()).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ZnBase {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        DeserializeSeedNewtype::new("Zn", PhantomData::<i64>).deserialize(deserializer).map(|n| ZnBase::new(n as u64))
     }
 }
 

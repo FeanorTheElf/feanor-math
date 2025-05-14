@@ -1,5 +1,6 @@
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::eea::{signed_gcd, signed_lcm};
+use crate::serialization::*;
 use crate::algorithms::matmul::StrassenHint;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::poly_gcd::gcd::poly_gcd_local;
@@ -16,8 +17,13 @@ use crate::impl_interpolation_base_ring_char_zero;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::specialization::*;
 use crate::ring::*;
+use crate::seq::*;
+
+use serde::{Serialize, Deserialize, Deserializer, Serializer};
+use serde::de::DeserializeSeed;
 
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 ///
 /// An implementation of the rational number `Q`, based on representing them
@@ -357,6 +363,60 @@ impl<I> RingExtension for RationalFieldBase<I>
     }
 }
 
+impl<I> Serialize for RationalFieldBase<I>
+    where I: RingStore + Serialize,
+        I::Type: IntegerRing
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        SerializableNewtype::new("RationalField", self.base_ring()).serialize(serializer)
+    }
+}
+
+impl<'de, I> Deserialize<'de> for RationalFieldBase<I>
+    where I: RingStore + Deserialize<'de>,
+        I::Type: IntegerRing
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        DeserializeSeedNewtype::new("RationalField", PhantomData::<I>).deserialize(deserializer).map(|base_ring| RationalFieldBase { integers: base_ring })
+    }
+}
+
+impl<I> SerializableElementRing for RationalFieldBase<I>
+    where I: RingStore,
+        I::Type: IntegerRing + SerializableElementRing
+{
+    fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
+        where D: serde::Deserializer<'de>
+    {
+        DeserializeSeedNewtype::new("Rational", DeserializeSeedSeq::new(
+            std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(2),
+            (None, None),
+            |mut current, next| {
+                if current.0.is_none() {
+                    current.0 = Some(next);
+                } else if current.1.is_none() {
+                    current.1 = Some(next);
+                } else {
+                    unreachable!();
+                }
+                return current;
+            }
+        )).deserialize(deserializer).map(|res| self.from_fraction(res.0.unwrap(), res.1.unwrap()))
+    }
+
+    fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
+        where S: serde::Serializer
+    {
+        SerializableNewtype::new("Rational", SerializableSeq::new(
+            [SerializeWithRing::new(&el.0, self.base_ring()), SerializeWithRing::new(&el.1, self.base_ring())].as_fn()
+        )).serialize(serializer)
+    }
+}
+
 impl<I, J> CanHomFrom<RationalFieldBase<J>> for RationalFieldBase<I>
     where I: RingStore,
         I::Type: IntegerRing,
@@ -613,4 +673,16 @@ fn test_principal_ideal_ring_axioms() {
 fn test_int_hom_axioms() {
     let ring = RationalField::new(StaticRing::<i64>::RING);
     crate::ring::generic_tests::test_hom_axioms(&StaticRing::<i64>::RING, ring, -16..15);
+}
+
+#[test]
+fn test_serialization() {
+    let ring = RationalField::new(StaticRing::<i64>::RING);
+    crate::serialization::generic_tests::test_serialization(ring, edge_case_elements());
+}
+
+#[test]
+fn test_serialize_deserialize() {
+    crate::serialization::generic_tests::test_serialize_deserialize(RationalField::new(StaticRing::<i64>::RING).into());
+    crate::serialization::generic_tests::test_serialize_deserialize(RationalField::new(BigIntRing::RING).into());
 }

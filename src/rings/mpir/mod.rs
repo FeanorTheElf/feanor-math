@@ -1,7 +1,7 @@
 use libc;
 use serde::de::DeserializeSeed;
 use serde::ser::SerializeTuple;
-use serde::{Deserializer, Serializer, Serialize};
+use serde::{Deserializer, Serializer, Serialize, Deserialize};
 
 use crate::impl_poly_gcd_locally_for_ZZ;
 use crate::algorithms;
@@ -369,6 +369,24 @@ impl OrderedRing for MPZBase {
         unsafe {
             mpir_bindings::mpz_is_neg(&value.integer as mpir_bindings::mpz_srcptr)
         }
+    }
+}
+
+impl Serialize for MPZBase {
+
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        serializer.serialize_unit_struct("IntegerRing(MPZ)")
+    }
+}
+
+impl<'de> Deserialize<'de> for MPZBase {
+
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        DeserializeSeedUnitStruct::new("IntegerRing(MPZ)", MPZ::RING.into()).deserialize(deserializer)
     }
 }
 

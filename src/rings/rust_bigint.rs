@@ -1,6 +1,6 @@
 use serde::de::{self, DeserializeSeed};
 use serde::ser::SerializeTuple;
-use serde::{Deserializer, Serialize, Serializer}; 
+use serde::{Deserializer, Serialize, Deserialize, Serializer}; 
 
 use crate::algorithms::bigint::{deserialize_bigint_from_bytes, highest_set_block};
 use crate::divisibility::{DivisibilityRing, Domain};
@@ -13,6 +13,7 @@ use crate::ring::*;
 use crate::algorithms;
 use crate::serialization::{DeserializeSeedNewtype, SerializableElementRing, SerializableNewtype};
 use crate::specialization::*;
+use crate::serialization::DeserializeSeedUnitStruct;
 
 use std::alloc::Allocator;
 use std::alloc::Global;
@@ -383,6 +384,24 @@ impl<A: Allocator + Clone> HashableElRing for RustBigintRingBase<A> {
                 h.write_u64(el.1[i])
             }
         }
+    }
+}
+
+impl Serialize for RustBigintRingBase<Global> {
+
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        serializer.serialize_unit_struct("IntegerRing(RustBigInt)")
+    }
+}
+
+impl<'de> Deserialize<'de> for RustBigintRingBase<Global> {
+
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        DeserializeSeedUnitStruct::new("IntegerRing(RustBigInt)", RustBigintRing::RING.into()).deserialize(deserializer)
     }
 }
 

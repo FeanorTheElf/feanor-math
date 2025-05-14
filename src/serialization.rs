@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use serde::de::{DeserializeSeed, IgnoredAny, SeqAccess, Visitor};
+use serde::de::*;
 use serde::{Deserializer, Serialize, Serializer};
 
 use crate::seq::VectorFn;
@@ -195,6 +195,74 @@ impl<T> Serialize for SerializableNewtype<T>
 }
 
 #[stability::unstable(feature = "enable")]
+pub struct DeserializeSeedUnitStruct<'de, T> {
+    deserializer: PhantomData<&'de ()>,
+    name: &'static str,
+    result: T
+}
+
+impl<'de, T> DeserializeSeedUnitStruct<'de, T> {
+    #[stability::unstable(feature = "enable")]
+    pub fn new(name: &'static str, result: T) -> Self {
+        Self {
+            deserializer: PhantomData,
+            name: name,
+            result: result
+        }
+    }
+}
+
+impl<'de, T> DeserializeSeed<'de> for DeserializeSeedUnitStruct<'de, T> {
+    type Value = T;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where D: Deserializer<'de>
+    {
+        struct UnitStructVisitor<'de, T> {
+            result: T,
+            name: &'static str,
+            deserializer: PhantomData<&'de ()>
+        }
+    
+        impl<'de, T> Visitor<'de> for UnitStructVisitor<'de, T> {
+            type Value = T;
+    
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(formatter, "a unit struct named {}", self.name)
+            }
+    
+            fn visit_unit<E>(self) -> Result<Self::Value, E>
+                where E: Error
+            {
+                Ok(self.result)
+            }
+            
+            fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+                where D: Deserializer<'de>
+            {
+                struct UnitVisitor;
+                impl<'de> Visitor<'de> for UnitVisitor {
+                    type Value = ();
+            
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        write!(formatter, "()")
+                    }
+            
+                    fn visit_unit<E>(self) -> Result<Self::Value, E>
+                        where E: Error
+                    {
+                        Ok(())
+                    }
+                }
+                deserializer.deserialize_unit(UnitVisitor).map(|()| self.result)
+            }
+        }
+    
+        return deserializer.deserialize_unit_struct(self.name, UnitStructVisitor { result: self.result, name: self.name, deserializer: PhantomData });
+    }
+}
+
+#[stability::unstable(feature = "enable")]
 pub struct DeserializeSeedNewtype<'de, S>
     where S: DeserializeSeed<'de>
 {
@@ -341,6 +409,91 @@ impl<R: RingStore> Serialize for SerializeOwnedWithRing<R>
     }
 }
 
+///
+/// Copied from Fheanor, I will probably never expose this madness
+/// 
+pub(crate) struct DeserializeSeedDependentTuple<'de, T0, F, T1>
+    where T0: DeserializeSeed<'de>,
+        T1: DeserializeSeed<'de>,
+        F: FnOnce(T0::Value) -> T1
+{
+    deserializer: PhantomData<&'de ()>,
+    first: T0,
+    derive_second: F
+}
+
+impl<'de, T0, F, T1> DeserializeSeedDependentTuple<'de, T0, F, T1>
+    where T0: DeserializeSeed<'de>,
+        T1: DeserializeSeed<'de>,
+        F: FnOnce(T0::Value) -> T1
+{
+    pub(crate) fn new(first: T0, derive_second: F) -> Self {
+        Self {
+            deserializer: PhantomData,
+            first: first,
+            derive_second: derive_second
+        }
+    }
+}
+
+impl<'de, T0, F, T1> DeserializeSeed<'de> for DeserializeSeedDependentTuple<'de, T0, F, T1>
+    where T0: DeserializeSeed<'de>,
+        T1: DeserializeSeed<'de>,
+        F: FnOnce(T0::Value) -> T1
+{
+    type Value = T1::Value;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where D: Deserializer<'de>
+    {
+        pub struct ResultVisitor<'de, T0, F, T1>
+            where T0: DeserializeSeed<'de>,
+                T1: DeserializeSeed<'de>,
+                F: FnOnce(T0::Value) -> T1
+        {
+            deserializer: PhantomData<&'de ()>,
+            first: T0,
+            derive_second: F
+        }
+
+        impl<'de, T0, F, T1> Visitor<'de> for ResultVisitor<'de, T0, F, T1>
+            where T0: DeserializeSeed<'de>,
+                T1: DeserializeSeed<'de>,
+                F: FnOnce(T0::Value) -> T1
+        {
+            type Value = T1::Value;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "a tuple with 2 elements")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                where A: SeqAccess<'de>
+            {
+                if let Some(first) = seq.next_element_seed(self.first)? {
+                    if let Some(second) = seq.next_element_seed((self.derive_second)(first))? {
+                        if let Some(_) = seq.next_element::<IgnoredAny>()? {
+                            return Err(<A::Error as serde::de::Error>::invalid_length(3, &"a tuple with 2 elements"));
+                        } else {
+                            return Ok(second);
+                        }
+                    } else {
+                        return Err(<A::Error as serde::de::Error>::invalid_length(1, &"a tuple with 2 elements"));
+                    }
+                } else {
+                    return Err(<A::Error as serde::de::Error>::invalid_length(0, &"a tuple with 2 elements"));
+                }
+            }
+        }
+
+        return deserializer.deserialize_tuple(2, ResultVisitor {
+            deserializer: PhantomData,
+            first: self.first,
+            derive_second: self.derive_second
+        });
+    }
+}
+
 #[stability::unstable(feature = "enable")]
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
@@ -368,6 +521,21 @@ pub mod generic_tests {
             let result = ring.get_ring().deserialize(&mut deserializer).unwrap();
             assert_el_eq!(ring, &result, &x);
         }
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn test_serialize_deserialize<T: Serialize + for<'de> Deserialize<'de> + PartialEq>(x: T) {
+        let serializer = serde_assert::Serializer::builder().is_human_readable(true).build();
+        let tokens = x.serialize(&serializer).unwrap();
+        let mut deserializer = serde_assert::Deserializer::builder(tokens).is_human_readable(true).build();
+        let result = T::deserialize(&mut deserializer).unwrap();
+        assert!(result == x);
+
+        let serializer = serde_assert::Serializer::builder().is_human_readable(false).build();
+        let tokens = x.serialize(&serializer).unwrap();
+        let mut deserializer = serde_assert::Deserializer::builder(tokens).is_human_readable(false).build();
+        let result = T::deserialize(&mut deserializer).unwrap();
+        assert!(result == x);
     }
 }
 
