@@ -26,4 +26,4 @@ pub mod splitting_field;
 pub mod extension_invert;
 pub mod galois;
 pub mod newton;
-pub mod finke_pohst;
+pub mod fincke_pohst;
