@@ -57,12 +57,26 @@ impl<J> LLLRealField<J> for Real64Base
     }
 
     fn round_to_integer(&self, x: &Self::Element, ZZ: &J) -> J::Element {
-        // we use `round_ties_even()` here since we want to round `+/- 0.5` to `0`;
-        // otherwise this can lead to an infinite add-and-subtract during `size_reduce()`
-        int_cast(x.round_ties_even() as i64, RingRef::new(ZZ), StaticRing::<i64>::RING)
+        int_cast(x.round() as i64, RingRef::new(ZZ), StaticRing::<i64>::RING)
     }
 }
 
+///
+/// Size-reduces `target` w.r.t. the GSO matrix, and also sends the performed
+/// operations to `col_ops`.
+/// 
+/// Returns `true` if, during size-reduction, a multiple greater than `+/- 1` of
+/// a matrix vector was added to the `target`. This value is used to determine whether
+/// the basis matrix has changed significantly, and if so, the GSO matrix will be
+/// recomputed from scratch and LLL performed again - this will fix floating point
+/// precision problems caused by an ill-conditioned matrix during the first run.
+/// In theory, the return value could then be just whether `target` was changed at
+/// all, but doing that means that in cases where the GSO coefficient is `+/- 0.5`, 
+/// we might infinitely add and subtract the vector (since `-0.5` rounds to `-1` and
+/// `+0.5` rounds to `1`). When the value is exactly `0.5`, this could also be fixed
+/// by rounding ties to zero, but this won't work anymore if floating point errors cause
+/// it to be slightly larger than `0.5` in absolute value.
+/// 
 fn size_reduce<R, I, V, T>(ring: R, int_ring: I, mut target: SubmatrixMut<V, El<R>>, target_j: usize, matrix: Submatrix<V, El<R>>, col_ops: &mut T) -> bool
     where R: RingStore,
         R::Type: LLLRealField<I::Type>,
@@ -74,7 +88,7 @@ fn size_reduce<R, I, V, T>(ring: R, int_ring: I, mut target: SubmatrixMut<V, El<
     let mut changed = false;
     for j in (0..matrix.col_count()).rev() {
         let factor = ring.get_ring().round_to_integer(target.as_const().at(j, 0), int_ring.get_ring());
-        changed |= !int_ring.is_zero(&factor);
+        changed |= !(int_ring.is_zero(&factor) || int_ring.is_one(&factor) || int_ring.is_neg_one(&factor));
         col_ops.subtract(int_ring, j, target_j, &factor);
         let factor = ring.get_ring().from_integer(&factor, int_ring.get_ring());
         ring.sub_assign_ref(target.at_mut(j, 0), &factor);
@@ -161,11 +175,11 @@ fn lll_base<R, I, V, T>(ring: R, int_ring: I, mut gso: SubmatrixMut<V, El<R>>, m
         V: AsPointerToSlice<El<R>>,
         T: TransformTarget<I::Type>
 {
-    let mut changed = false;
+    let mut changed_significantly = false;
     let mut i = 0;
     while i + 1 < gso.col_count() {
         let (target, matrix) = gso.reborrow().split_cols((i + 1)..(i + 2), 0..(i + 1));
-        changed |= size_reduce(ring, int_ring, target, i + 1, matrix.as_const(), &mut col_ops);
+        changed_significantly |= size_reduce(ring, int_ring, target, i + 1, matrix.as_const(), &mut col_ops);
         if ring.is_gt(
             &ring.mul_ref_snd(
                 ring.sub_ref_fst(delta, ring.mul_ref(gso.as_const().at(i, i + 1), gso.as_const().at(i, i + 1))),
@@ -173,7 +187,7 @@ fn lll_base<R, I, V, T>(ring: R, int_ring: I, mut gso: SubmatrixMut<V, El<R>>, m
             ),
             gso.as_const().at(i + 1, i + 1)
         ) {
-            changed = true;
+            changed_significantly = true;
             col_ops.swap(int_ring, i, i + 1);
             swap_gso_cols(ring, gso.reborrow(), i, i + 1);
             i = max(i, 1) - 1;
@@ -181,7 +195,7 @@ fn lll_base<R, I, V, T>(ring: R, int_ring: I, mut gso: SubmatrixMut<V, El<R>>, m
             i += 1;
         }
     }
-    return changed;
+    return changed_significantly;
 }
 
 ///
@@ -310,29 +324,17 @@ pub fn lll_float<I, V1, V2, A>(ring: I, quadratic_form: Submatrix<V1, El<Real64>
         
         match ldl(&lll_reals, gso.data_mut(), |x| *x < 1000. * f64::EPSILON) {
             Ok(()) => {
-                println!("LDL success");
-                println!("GSO");
-                println!("{}", format_matrix(n, n, |i, j| gso.at(i, j), &lll_reals));
-                println!("basis");
-                println!("{}", format_matrix(n, n, |i, j| matrix.at(i, j), &ring));
-                println!();
-                let changed = lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut(), TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData }, &delta);
-                if !changed {
+                let changed_significantly = lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut(), TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData }, &delta);
+                if !changed_significantly {
                     return Ok(());
                 }
             },
             Err(k) => {
-                println!("LDL failure {}", k);
-                println!("GSO");
-                println!("{}", format_matrix(n, n, |i, j| gso.at(i, j), &lll_reals));
-                println!("basis");
-                println!("{}", format_matrix(n, n, |i, j| matrix.at(i, j), &ring));
-                println!();
                 assert!(k > 0);
-                let mut changed = lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut().submatrix(0..k, 0..k), TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData }, &delta);
+                let mut changed_significantly = lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut().submatrix(0..k, 0..k), TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData }, &delta);
                 let (target, reduced) = gso.data_mut().split_cols(k..(k + 1), 0..k);
-                changed |= size_reduce(Real64::RING, &ring, target, k, reduced.as_const(), &mut TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData });
-                if !changed {
+                changed_significantly |= size_reduce(Real64::RING, &ring, target, k, reduced.as_const(), &mut TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData });
+                if !changed_significantly {
                     return Err(LLLConditionError);
                 }
                 for i in 0..n {
