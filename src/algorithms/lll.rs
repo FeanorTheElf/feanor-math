@@ -313,6 +313,10 @@ pub fn lll_float<I, V1, V2, A>(ring: I, quadratic_form: Submatrix<V1, El<Real64>
     //    matrix from scratch; This way, even if the original matrix is very badly conditioned,
     //    after the first columns have been reduced using `lll_base()`, it is in a better shape
     //    and we might still succeed
+
+    // Note that this number of iterations is much lower than the maximal number of LLL loop
+    // iterations; Hence, it can happen (for very unlucky and ill-conditioned matrices) that
+    // we indeed exhaust this count.
     for _ in 0..(MAX_PROBABILISTIC_REPETITIONS * n) {
         for i in 0..n {
             for j in 0..n {
@@ -321,7 +325,7 @@ pub fn lll_float<I, V1, V2, A>(ring: I, quadratic_form: Submatrix<V1, El<Real64>
         }
         STANDARD_MATMUL.matmul(TransposableSubmatrix::from(matrix_RR.data()).transpose(), TransposableSubmatrix::from(quadratic_form), TransposableSubmatrixMut::from(tmp.data_mut()), lll_reals);
         STANDARD_MATMUL.matmul(TransposableSubmatrix::from(tmp.data()), TransposableSubmatrix::from(matrix_RR.data()), TransposableSubmatrixMut::from(gso.data_mut()), lll_reals);
-        
+
         match ldl(&lll_reals, gso.data_mut(), |x| *x < 1000. * f64::EPSILON) {
             Ok(()) => {
                 let changed_significantly = lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut(), TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData }, &delta);
@@ -330,20 +334,20 @@ pub fn lll_float<I, V1, V2, A>(ring: I, quadratic_form: Submatrix<V1, El<Real64>
                 }
             },
             Err(k) => {
-                assert!(k > 0);
-                let mut changed_significantly = lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut().submatrix(0..k, 0..k), TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData }, &delta);
-                let (target, reduced) = gso.data_mut().split_cols(k..(k + 1), 0..k);
-                changed_significantly |= size_reduce(Real64::RING, &ring, target, k, reduced.as_const(), &mut TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData });
-                if !changed_significantly {
+                if k == 0 {
+                    // top left entry of quadratic form is zero or negative
                     return Err(LLLConditionError);
                 }
+                _ = lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut().submatrix(0..k, 0..k), TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData }, &delta);
+                let (target, reduced) = gso.data_mut().split_cols(k..(k + 1), 0..k);
+                _ = size_reduce(Real64::RING, &ring, target, k, reduced.as_const(), &mut TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData });
                 for i in 0..n {
                     matrix.row_mut_at(i).swap(k - 1, k);
                 }
             }
         }
     }
-    unreachable!();
+    return Err(LLLConditionError);
 }
 
 ///
@@ -663,6 +667,27 @@ fn test_lll_precision() {
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)) < 1200);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(3)) < 1300);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(4)) < 2000);
+
+    
+    let ZZ = StaticRing::<i128>::RING;
+    let original = [
+        DerefArray::from([1, 0, 0, 0, 0]),
+        DerefArray::from([207432708, 1, 0, 0, 0]),
+        DerefArray::from([0, 207432708, 1, 0, 0]),
+        DerefArray::from([0, 0, 207432708, 1, 0]),
+        DerefArray::from([0, 0, 0, 207432708, 447741953]),
+    ];
+    
+    let mut reduced = original;
+    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 5>, _>::from_2d(&mut reduced);
+    lll_float(&ZZ, OwnedMatrix::<_>::identity(5, 5, Real64::RING).data(), reduced_matrix.reborrow(), 0.9, Global).unwrap();
+    
+    assert_lattice_isomorphic(ZZ, Submatrix::from_2d(&original), &reduced_matrix.as_const());
+    assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)) < 1800);
+    assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)) < 1800);
+    assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)) < 4600);
+    assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(3)) < 4600);
+    assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(4)) < 5600);
 }
 
 #[bench]

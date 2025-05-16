@@ -1,5 +1,7 @@
 use std::f64::EPSILON;
 
+use crate::algorithms::convolution::KaratsubaHint;
+use crate::algorithms::matmul::StrassenHint;
 use crate::ordered::OrderedRing;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::Field;
@@ -142,6 +144,20 @@ impl EuclideanRing for Real64Base {
 
     fn euclidean_deg(&self, _: &Self::Element) -> Option<usize> {
         panic!("Since Complex64 is only approximate, this cannot be implemented properly")
+    }
+}
+
+impl StrassenHint for Real64Base {
+    fn strassen_threshold(&self) -> usize {
+        // disable Strassen's algorithm, as it is very numerically unstable
+        usize::MAX
+    }
+}
+
+impl KaratsubaHint for Real64Base {
+    fn karatsuba_threshold(&self) -> usize {
+        // disable Karatsuba's algorithm, as it is very numerically unstable
+        usize::MAX
     }
 }
 
