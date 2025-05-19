@@ -390,7 +390,7 @@ impl<I> SerializableElementRing for RationalFieldBase<I>
         I::Type: IntegerRing + SerializableElementRing
 {
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
-        where D: serde::Deserializer<'de>
+        where D: Deserializer<'de>
     {
         DeserializeSeedNewtype::new("Rational", DeserializeSeedSeq::new(
             std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(2),
@@ -409,7 +409,7 @@ impl<I> SerializableElementRing for RationalFieldBase<I>
     }
 
     fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
-        where S: serde::Serializer
+        where S: Serializer
     {
         SerializableNewtype::new("Rational", SerializableSeq::new(
             [SerializeWithRing::new(&el.0, self.base_ring()), SerializeWithRing::new(&el.1, self.base_ring())].as_fn()

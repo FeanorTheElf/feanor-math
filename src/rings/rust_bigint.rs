@@ -104,17 +104,6 @@ impl<A: Allocator + Clone> RustBigintRingBase<A> {
         }
     }
 
-    pub fn parse(&self, string: &str, base: u32) -> Result<RustBigint<A>, ()> {
-        let (negative, rest) = if string.chars().next() == Some('-') {
-            (true, string.split_at(1).1)
-        } else if string.chars().next() == Some('+') {
-            (false, string.split_at(1).1)
-        } else {
-            (false, string)
-        };
-        Ok(RustBigint(negative, algorithms::bigint::from_str_radix(rest, base, self.zero().1)?))
-    }
-
     pub fn abs_base_u64_repr<'a>(&self, el: &'a RustBigint) -> impl 'a + Iterator<Item = u64> {
         el.1.iter().copied()
     }

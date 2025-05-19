@@ -15,6 +15,7 @@ use crate::seq::sparse::*;
 use std::alloc::Allocator;
 use std::cmp::max;
 use std::rc::Rc;
+use std::fmt::{Formatter, Result};
 
 ///
 /// The univariate polynomial ring `R[X]`. Polynomials are stored as sparse vectors of
@@ -197,11 +198,11 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         self.base_ring.is_noetherian()
     }
 
-    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut Formatter<'a>, env: EnvBindingStrength) -> Result {
         super::generic_impls::dbg_poly(self, value, out, self.unknown_name, env)
     }
 
-    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+    fn dbg<'a>(&self, value: &Self::Element, out: &mut Formatter<'a>) -> Result {
         self.dbg_within(value, out, EnvBindingStrength::Weakest)
     }
 
@@ -352,7 +353,7 @@ impl<R1, R2> CanIsoFromTo<SparsePolyRingBase<R1>> for SparsePolyRingBase<R2>
 pub struct TermIterator<'a, R>
     where R: RingStore
 {
-    iter: sparse::SparseMapVectorIter<'a, Rc<R>>
+    iter: SparseMapVectorIter<'a, Rc<R>>
 }
 
 impl<'a, R> Iterator for TermIterator<'a, R>

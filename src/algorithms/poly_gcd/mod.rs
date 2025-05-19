@@ -18,10 +18,29 @@ use crate::specialization::FiniteRingOperation;
 
 use super::eea::gcd;
 
+///
+/// Contains an implementation of factoring polynomials over finite fields.
+/// 
 pub mod finite;
+///
+/// Contains an implementation of Hensel lifting, to lift a factorization modulo
+/// a maximal ideal to a factorization modulo a power of this ideal.
+/// 
 pub mod hensel;
+///
+/// Contains algorithms for computing power decompositions and the square-free
+/// part of polynomials.
+/// 
 pub mod squarefree_part;
+///
+/// Contains algorithms for computing the gcd of polynomials.
+/// 
 pub mod gcd;
+///
+/// Contains algorithms for computing the factorization of polynomials.
+/// 
+/// TODO: move to [`crate::algorithms::poly_factor`].
+/// 
 pub mod factor;
 
 const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;

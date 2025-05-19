@@ -233,6 +233,10 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H>
         Some(Self::new_with_hom(hom, root_of_unity, log2_n))
     }
 
+    ///
+    /// Permutes the given list of length `n` according to `values[bitreverse(i, log2(n))] = values[i]`.
+    /// This is exactly the permutation that is implicitly applied by [`CooleyTuckeyFFT::unordered_fft()`].
+    /// 
     pub fn bitreverse_permute_inplace<V, T>(&self, mut values: V) 
         where V: SwappableVectorViewMut<T>
     {

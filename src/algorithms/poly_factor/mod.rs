@@ -74,6 +74,12 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
 
+    ///
+    /// Returns whether the given polynomial is irreducible over the base field.
+    /// 
+    /// This is functionally equivalent to checking whether the output of [`FactorPolyField::factor_poly()`]
+    /// has only a single factor, but may be faster.
+    /// 
     fn is_irred<P>(poly_ring: P, poly: &El<P>) -> bool
         where P: RingStore + Copy,
             P::Type: PolyRing + EuclideanRing,

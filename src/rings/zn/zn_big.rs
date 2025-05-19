@@ -325,7 +325,7 @@ impl<I: RingStore> InterpolationBaseRing for AsFieldBase<Zn<I>>
     }
 
     fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
-        let ring = generic_impls::interpolation_ring(RingRef::new(self), count);
+        let ring = super::generic_impls::interpolation_ring(RingRef::new(self), count);
         let points = ring.elements().take(count).collect();
         return (ring, points);
     }
@@ -360,7 +360,7 @@ impl<I: RingStore> DivisibilityRing for ZnBase<I>
     where I::Type: IntegerRing
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        generic_impls::checked_left_div(RingRef::new(self), lhs, rhs)
+        super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs)
     }
 }
 
@@ -450,14 +450,14 @@ impl<I: RingStore, J: IntegerRing + ?Sized> CanHomFrom<J> for ZnBase<I>
     where I::Type: IntegerRing, 
         J: CanIsoFromTo<I::Type>
 {
-    type Homomorphism = generic_impls::BigIntToZnHom<J, I::Type, ZnBase<I>>;
+    type Homomorphism = super::generic_impls::BigIntToZnHom<J, I::Type, ZnBase<I>>;
 
     fn has_canonical_hom(&self, from: &J) -> Option<Self::Homomorphism> {
-        generic_impls::has_canonical_hom_from_bigint(from, self, self.integer_ring.get_ring(), Some(&self.integer_ring.mul_ref(&self.twice_modulus, &self.twice_modulus)))
+        super::generic_impls::has_canonical_hom_from_bigint(from, self, self.integer_ring.get_ring(), Some(&self.integer_ring.mul_ref(&self.twice_modulus, &self.twice_modulus)))
     }
 
     fn map_in(&self, from: &J, el: J::Element, hom: &Self::Homomorphism) -> Self::Element {
-        generic_impls::map_in_from_bigint(from, self, self.integer_ring.get_ring(), el, hom, |n| {
+        super::generic_impls::map_in_from_bigint(from, self, self.integer_ring.get_ring(), el, hom, |n| {
             debug_assert!(self.integer_ring.is_lt(&n, &self.modulus));
             ZnEl(n)
         }, |mut n| {
@@ -562,7 +562,7 @@ impl<I: RingStore> FiniteRing for ZnBase<I>
     }
 
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element {
-        generic_impls::random_element(self, rng)
+        super::generic_impls::random_element(self, rng)
     }
     
     fn size<J: RingStore + Copy>(&self, ZZ: J) -> Option<El<J>>
@@ -580,7 +580,7 @@ impl<I: RingStore> PrincipalIdealRing for ZnBase<I>
     where I::Type: IntegerRing
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        generic_impls::checked_div_min(RingRef::new(self), lhs, rhs)
+        super::generic_impls::checked_div_min(RingRef::new(self), lhs, rhs)
     }
 
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {

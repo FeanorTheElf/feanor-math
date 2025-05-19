@@ -292,9 +292,9 @@ fn test_pow() {
     assert!(CC.is_approx_eq(CC.negate(i), CC.pow(i, 3), 1));
     assert!(!CC.is_approx_eq(CC.negate(i), CC.pow(i, 1024 + 3), 1));
     assert!(CC.is_approx_eq(CC.negate(i), CC.pow(i, 1024 + 3), 100));
-    assert!(CC.is_approx_eq(CC.exp(CC.mul(CC.from_f64(std::f64::consts::PI / 4.), i)), CC.mul(CC.add(CC.one(), i), CC.from_f64(2f64.powf(-0.5))), 1));
+    assert!(CC.is_approx_eq(CC.exp(CC.mul(CC.from_f64(PI / 4.), i)), CC.mul(CC.add(CC.one(), i), CC.from_f64(2f64.powf(-0.5))), 1));
 
-    let seventh_root_of_unity = CC.exp(CC.mul(i, CC.from_f64(2. * std::f64::consts::PI / 7.)));
+    let seventh_root_of_unity = CC.exp(CC.mul(i, CC.from_f64(2. * PI / 7.)));
     assert!(CC.is_approx_eq(CC.pow(seventh_root_of_unity, 7 * 100 + 1), seventh_root_of_unity, 1000));
 }
 

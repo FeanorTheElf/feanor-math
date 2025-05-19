@@ -8,6 +8,10 @@ use std::alloc::Allocator;
 use std::alloc::Global;
 use std::ops::Deref;
 
+///
+/// Contains [`strassen::strassen()`], an implementation of Strassen's algorithm
+/// for matrix multiplication.
+/// 
 pub mod strassen;
 
 ///

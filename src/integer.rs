@@ -286,6 +286,18 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + I
     /// Returning `None` means that the size of representable integers is unbounded.
     /// 
     fn representable_bits(&self) -> Option<usize>;
+
+    ///
+    /// Parses the given string as a number.
+    /// 
+    /// Returns `Err(())` if it is not a valid number w.r.t. base, i.e. if the string
+    /// is not a sequence of digit characters, optionally beginning with `+` or `-`. 
+    /// To denote digits larger than `9`, the same characters as in [`u64::from_str_radix()`]
+    /// should be used.
+    /// 
+    fn parse(&self, string: &str, base: u32) -> Result<Self::Element, ()> {
+        generic_impls::parse(RingRef::new(self), string, base)
+    }
 }
 
 impl<I, J> CanHomFrom<I> for J
@@ -474,6 +486,7 @@ pub trait IntegerRingStore: RingStore
     delegate!{ IntegerRing, fn rounded_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
     delegate!{ IntegerRing, fn floor_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
     delegate!{ IntegerRing, fn ceil_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ IntegerRing, fn parse(&self, string: &str, base: u32) -> Result<El<Self>, ()> }
 
     ///
     /// Using the randomness of the given rng, samples a uniformly random integer
@@ -540,6 +553,50 @@ impl<R> IntegerRingStore for R
     where R: RingStore,
         R::Type: IntegerRing
 {}
+
+pub mod generic_impls {
+    use crate::ring::*;
+    use crate::primitive_int::*;
+    use super::*;
+    
+    #[stability::unstable(feature = "enable")]
+    pub fn parse<I>(ring: I, string: &str, base: u32) -> Result<El<I>, ()>
+        where I: RingStore, I::Type: IntegerRing
+    {
+        let (negative, rest) = if string.chars().next() == Some('-') {
+            (true, string.split_at(1).1)
+        } else if string.chars().next() == Some('+') {
+            (false, string.split_at(1).1)
+        } else {
+            (false, string)
+        };
+        assert!(base >= 2);
+
+        let bits_per_chunk = u32::BITS as usize;
+        assert!(bits_per_chunk <= i64::BITS as usize - 2);
+        let chunk_size = (bits_per_chunk as f32 / (base as f32).log2()).floor() as usize;
+        let it = <str as AsRef<[u8]>>::as_ref(rest)
+            .rchunks(chunk_size)
+            .rev()
+            .map(std::str::from_utf8)
+            .map(|chunk| chunk.map_err(|_| ()))
+            .map(|chunk| chunk.and_then(|n| 
+                u64::from_str_radix(n, base).map_err(|_| ()))
+            );
+        let chunk_base = ring.pow(int_cast(base as i64, &ring, StaticRing::<i64>::RING), chunk_size);
+        let result = it.fold(Ok(ring.zero()), |current, next| {
+            current.and_then(|mut current| next.map(|next| {
+                ring.mul_assign_ref(&mut current, &chunk_base);
+                ring.add(current, int_cast(next as i64, &ring, StaticRing::<i64>::RING))
+            }))
+        });
+        if negative {
+            return result.map(|result| ring.negate(result));
+        } else {
+            return result;
+        }
+    }
+}
 
 #[cfg(test)]
 use crate::primitive_int::*;
@@ -703,4 +760,15 @@ fn test_ceil_floor_div() {
             assert_eq!((lhs as f64 / rhs as f64).floor() as i32, result);
         }
     }
+}
+
+#[test]
+fn test_parse() {
+    let ZZbig = BigIntRing::RING;
+    assert_el_eq!(&ZZbig, &ZZbig.int_hom().map(3), ZZbig.parse("3", 10).unwrap());
+    assert_el_eq!(&ZZbig, &ZZbig.power_of_two(100), ZZbig.parse("1267650600228229401496703205376", 10).unwrap());
+    assert_el_eq!(&ZZbig, &ZZbig.power_of_two(100), ZZbig.parse("+1267650600228229401496703205376", 10).unwrap());
+    assert_el_eq!(&ZZbig, &ZZbig.negate(ZZbig.power_of_two(100)), ZZbig.parse("-1267650600228229401496703205376", 10).unwrap());
+    assert_el_eq!(&ZZbig, &ZZbig.mul(ZZbig.pow(ZZbig.int_hom().map(11), 26), ZZbig.int_hom().map(10)), ZZbig.parse("a00000000000000000000000000", 11).unwrap());
+    assert!(ZZbig.parse("238597a", 10).is_err());
 }

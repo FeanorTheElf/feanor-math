@@ -30,11 +30,21 @@ pub mod extension;
 /// 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SolveResult {
-    FoundSomeSolution, FoundUniqueSolution, NoSolution
+    /// The system has at least one solution. This is also an allowed
+    /// value for systems with a unique solution.
+    FoundSomeSolution,
+    /// The system is guaranteed to have a unique solution 
+    FoundUniqueSolution,
+    /// The system has no solution. In particular, the output matrix
+    /// is in an unspecified (but safe) state.
+    NoSolution
 }
 
 impl SolveResult {
 
+    ///
+    /// Returns whether some solution to the system has been found.
+    /// 
     pub fn is_solved(&self) -> bool {
         match self {
             Self::FoundSomeSolution | Self::FoundUniqueSolution => true,
@@ -42,6 +52,9 @@ impl SolveResult {
         }
     }
     
+    ///
+    /// Panics if the system does not have a solution.
+    /// 
     pub fn assert_solved(&self) {
         assert!(self.is_solved());
     }

@@ -370,7 +370,7 @@ impl InterpolationBaseRing for AsFieldBase<Zn> {
     }
 
     fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
-        let ring = generic_impls::interpolation_ring(RingRef::new(self), count);
+        let ring = super::generic_impls::interpolation_ring(RingRef::new(self), count);
         let points = ring.elements().take(count).collect();
         return (ring, points);
     }
@@ -633,7 +633,7 @@ impl FiniteRing for ZnBase {
 impl PrincipalIdealRing for ZnBase {
 
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        generic_impls::checked_div_min(RingRef::new(self), lhs, rhs)
+        super::generic_impls::checked_div_min(RingRef::new(self), lhs, rhs)
     }
 
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {

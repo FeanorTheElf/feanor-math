@@ -58,7 +58,7 @@ impl<V, T> Serialize for SerializableSeq<V, T>
     where V: VectorFn<T>, T: Serialize
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: serde::Serializer
+        where S: Serializer
     {
         serializer.collect_seq(self.data.iter())
     }
@@ -147,7 +147,7 @@ impl<'de, V, S, T, C> DeserializeSeed<'de> for DeserializeSeedSeq<'de, V, S, T, 
                         }
                     } else {
                         if let Some(_) = seq.next_element::<IgnoredAny>()? {
-                            return Err(<B::Error as serde::de::Error>::invalid_length(current + 1, &format!("a sequence of at most {} elements", current).as_str()));
+                            return Err(<B::Error as Error>::invalid_length(current + 1, &format!("a sequence of at most {} elements", current).as_str()));
                         } else {
                             return Ok(result);
                         }
@@ -473,15 +473,15 @@ impl<'de, T0, F, T1> DeserializeSeed<'de> for DeserializeSeedDependentTuple<'de,
                 if let Some(first) = seq.next_element_seed(self.first)? {
                     if let Some(second) = seq.next_element_seed((self.derive_second)(first))? {
                         if let Some(_) = seq.next_element::<IgnoredAny>()? {
-                            return Err(<A::Error as serde::de::Error>::invalid_length(3, &"a tuple with 2 elements"));
+                            return Err(<A::Error as Error>::invalid_length(3, &"a tuple with 2 elements"));
                         } else {
                             return Ok(second);
                         }
                     } else {
-                        return Err(<A::Error as serde::de::Error>::invalid_length(1, &"a tuple with 2 elements"));
+                        return Err(<A::Error as Error>::invalid_length(1, &"a tuple with 2 elements"));
                     }
                 } else {
-                    return Err(<A::Error as serde::de::Error>::invalid_length(0, &"a tuple with 2 elements"));
+                    return Err(<A::Error as Error>::invalid_length(0, &"a tuple with 2 elements"));
                 }
             }
         }

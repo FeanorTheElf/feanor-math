@@ -453,35 +453,6 @@ pub fn bigint_div_small(lhs: &mut [BlockInt], rhs: BlockInt) -> BlockInt {
 	}
 }
 
-#[stability::unstable(feature = "enable")]
-pub fn from_radix<A: Allocator, I: Iterator<Item = Result<u64, E>>, E>(data: I, base: u64, mut out: Vec<BlockInt, A>) -> Result<Vec<BlockInt, A>, E> {
-	out.clear();
-	for value in data {
-		let val = value?;
-		debug_assert!(val < base);
-		bigint_mul_small(&mut out, base);
-		bigint_add_small(&mut out, val);
-	}
-	return Ok(out);
-}
-
-#[stability::unstable(feature = "enable")]
-pub fn from_str_radix<A: Allocator>(string: &str, base: u32, out: Vec<BlockInt, A>) -> Result<Vec<BlockInt, A>, ()> {
-	assert!(base >= 2);
-	// we need the -1 in BLOCK_BITS to ensure that base^chunk_size is 
-	// really smaller than 2^64
-	let chunk_size = ((BLOCK_BITS - 1) as f32 / (base as f32).log2()).floor() as usize;
-	let it = <str as AsRef<[u8]>>::as_ref(string)
-		.rchunks(chunk_size)
-		.rev()
-		.map(std::str::from_utf8)
-		.map(|chunk| chunk.map_err(|_| ()))
-		.map(|chunk| chunk.and_then(|n| 
-			u64::from_str_radix(n, base).map_err(|_| ()))
-		);
-	return from_radix::<A, _, ()>(it, (base as u64).pow(chunk_size as u32), out);
-}
-
 ///
 /// Deserializes a 2-element tuple, consisting of a sign bit and a list of bytes
 /// in little endian order to represent a number.
@@ -569,64 +540,68 @@ pub fn deserialize_bigint_from_bytes<'de, D, F, T>(deserializer: D, from_bytes: 
 }
 
 #[cfg(test)]
-fn parse(s: &str) -> Vec<BlockInt> {
-	from_str_radix(s, 10, Vec::new()).unwrap()
+fn parse(s: &str, base: u32) -> Vec<BlockInt> {
+    use crate::rings::rust_bigint::RustBigintRing;
+	use crate::integer::*;
+	use crate::ring::*;
+
+	truncate_zeros(RustBigintRing::RING.get_ring().abs_base_u64_repr(&RustBigintRing::RING.parse(s, base).unwrap()).collect::<Vec<_>>())
 }
 
 #[test]
 fn test_sub() {
-    let mut x = parse("923645871236598172365987287530543");
-    let y = parse("58430657823473456743684735863478");
-    let z = parse("865215213413124715622302551667065");
+    let mut x = parse("923645871236598172365987287530543", 10);
+    let y = parse("58430657823473456743684735863478", 10);
+    let z = parse("865215213413124715622302551667065", 10);
     bigint_sub(&mut x, &y, 0);
     assert_eq!(truncate_zeros(z), truncate_zeros(x));
 
-    let x = parse("4294836225");
-    let mut y = parse("4294967297");
-    let z = parse("131072");
+    let x = parse("4294836225", 10);
+    let mut y = parse("4294967297", 10);
+    let z = parse("131072", 10);
     bigint_sub(&mut y, &x, 0);
     assert_eq!(truncate_zeros(y), truncate_zeros(z));
 }
 
 #[test]
 fn test_sub_with_carry() {
-    let mut x = from_str_radix("1000000000000000000", 16, Vec::new()).unwrap();
-    let y = from_str_radix("FFFFFFFFFFFFFFFF00", 16, Vec::new()).unwrap();
+    let mut x = parse("1000000000000000000", 16);
+    let y = parse("FFFFFFFFFFFFFFFF00", 16);
     bigint_sub(&mut x, &y, 0);
     assert_eq!(vec![256], truncate_zeros(x));
 }
 
 #[test]
 fn test_add() {
-    let mut x = parse("923645871236598172365987287530543");
-    let y = parse("58430657823473456743684735863478");
-    let z = parse("982076529060071629109672023394021");
+    let mut x = parse("923645871236598172365987287530543", 10);
+    let y = parse("58430657823473456743684735863478", 10);
+    let z = parse("982076529060071629109672023394021", 10);
     bigint_add(&mut x, &y, 0);
     assert_eq!(truncate_zeros(z), truncate_zeros(x));
 }
 
 #[test]
 fn test_add_with_carry() {
-    let mut x = from_str_radix("1BC00000000000000BC", 16, Vec::new()).unwrap();
-    let y =  from_str_radix("FFFFFFFFFFFFFFFF0000000000000000BC", 16, Vec::new()).unwrap();
-    let z = from_str_radix("10000000000000000BC0000000000000178", 16, Vec::new()).unwrap();
+    let mut x = parse("1BC00000000000000BC", 16);
+    let y =  parse("FFFFFFFFFFFFFFFF0000000000000000BC", 16);
+    let z = parse("10000000000000000BC0000000000000178", 16);
     bigint_add(&mut x, &y, 0);
     assert_eq!(truncate_zeros(z), truncate_zeros(x));
 }
 
 #[test]
 fn test_mul() {
-    let x = parse("57873674586797895671345345");
-    let y = parse("21308561789045691782534873921650342768903561413264128756389247568729346542359871235465");
-    let z = parse("1233204770891906354921751949503652431220138020953161094405729272872607166072371117664593787957056214903826660425");
+    let x = parse("57873674586797895671345345", 10);
+    let y = parse("21308561789045691782534873921650342768903561413264128756389247568729346542359871235465", 10);
+    let z = parse("1233204770891906354921751949503652431220138020953161094405729272872607166072371117664593787957056214903826660425", 10);
     assert_eq!(truncate_zeros(z), truncate_zeros(bigint_mul(&x, &y, Vec::new())));
 }
 
 #[test]
 fn test_div_no_remainder() {
-    let mut x = from_str_radix("578435387FF0582367863200000000000000000000", 16, Vec::new()).unwrap();
-    let y = from_str_radix("200000000000000000000", 16, Vec::new()).unwrap();
-    let z = from_str_radix("2BC21A9C3FF82C11B3C319", 16, Vec::new()).unwrap();
+    let mut x = parse("578435387FF0582367863200000000000000000000", 16);
+    let y = parse("200000000000000000000", 16);
+    let z = parse("2BC21A9C3FF82C11B3C319", 16);
     let quotient = bigint_div(&mut x, &y, Vec::new());
     assert_eq!(Vec::<BlockInt>::new(), truncate_zeros(x));
     assert_eq!(truncate_zeros(z), truncate_zeros(quotient));
@@ -634,10 +609,10 @@ fn test_div_no_remainder() {
 
 #[test]
 fn test_div_with_remainder() {
-    let mut x = from_str_radix("578435387FF0582367863200000000007651437856", 16, Vec::new()).unwrap();
-    let y = from_str_radix("200000000000000000000", 16, Vec::new()).unwrap();
-    let z = from_str_radix("2BC21A9C3FF82C11B3C319", 16, Vec::new()).unwrap();
-    let r = from_str_radix("7651437856", 16, Vec::new()).unwrap();
+    let mut x = parse("578435387FF0582367863200000000007651437856", 16);
+    let y = parse("200000000000000000000", 16);
+    let z = parse("2BC21A9C3FF82C11B3C319", 16);
+    let r = parse("7651437856", 16);
     let quotient = bigint_div(&mut x, &y, Vec::new());
     assert_eq!(truncate_zeros(r), truncate_zeros(x));
     assert_eq!(truncate_zeros(z), truncate_zeros(quotient));
@@ -645,17 +620,17 @@ fn test_div_with_remainder() {
 
 #[test]
 fn test_div_big() {
-    let mut x = parse("581239456149785691238569872349872348569871269871234657986123987237865847935698734296434575367565723846982523852347");
-    let y = parse("903852718907268716125180964783634518356783568793426834569872365791233387356325");
-    let q = parse("643068769934649368349591185247155725");
-    let r = parse("265234469040774335115597728873888165088018116561138613092906563355599185141722");
+    let mut x = parse("581239456149785691238569872349872348569871269871234657986123987237865847935698734296434575367565723846982523852347", 10);
+    let y = parse("903852718907268716125180964783634518356783568793426834569872365791233387356325", 10);
+    let q = parse("643068769934649368349591185247155725", 10);
+    let r = parse("265234469040774335115597728873888165088018116561138613092906563355599185141722", 10);
     let actual = bigint_div(&mut x, &y, Vec::new());
     assert_eq!(truncate_zeros(r), truncate_zeros(x));
     assert_eq!(truncate_zeros(q), truncate_zeros(actual));
 
 	let mut x = vec![0, 0, 0, 0, 1];
-	let y = parse("170141183460469231731687303715884105727");
-	let q = parse("680564733841876926926749214863536422916");
+	let y = parse("170141183460469231731687303715884105727", 10);
+	let q = parse("680564733841876926926749214863536422916", 10);
 	let r = vec![4];
 	let actual = bigint_div(&mut x, &y, Vec::new());
 	assert_eq!(truncate_zeros(r), truncate_zeros(x));
@@ -664,9 +639,9 @@ fn test_div_big() {
 
 #[test]
 fn test_div_last_block_overflow() {
-    let mut x = parse("3227812347608635737069898965003764842912132241036529391038324195675809527521051493287056691600172289294878964965934366720");
-    let y = parse("302231454903657293676544");
-    let q = parse("10679935179604550411975108530847760573013522611783263849735208039111098628903202750114810434682880");
+    let mut x = parse("3227812347608635737069898965003764842912132241036529391038324195675809527521051493287056691600172289294878964965934366720", 10);
+    let y = parse("302231454903657293676544", 10);
+    let q = parse("10679935179604550411975108530847760573013522611783263849735208039111098628903202750114810434682880", 10);
     let quotient = bigint_div(&mut x, &y, Vec::new());
     assert_eq!(truncate_zeros(q), truncate_zeros(quotient));
     assert_eq!(Vec::<BlockInt>::new(), truncate_zeros(x));
@@ -674,35 +649,35 @@ fn test_div_last_block_overflow() {
 
 #[test]
 fn test_div_small() {
-    let mut x = parse("891023591340178345678931246518793456983745682137459364598623489512389745698237456890239238476873429872346579");
-    let q = parse("255380794307875708133829534685810678413226048190730686328066348384175908769916152734376393945793473738133");
+    let mut x = parse("891023591340178345678931246518793456983745682137459364598623489512389745698237456890239238476873429872346579", 10);
+    let q = parse("255380794307875708133829534685810678413226048190730686328066348384175908769916152734376393945793473738133", 10);
     _ = bigint_div_small(&mut x, 3489);
     assert_eq!(truncate_zeros(q), truncate_zeros(x));
 }
 
 #[test]
 fn test_bigint_rshift() {
-    let mut x = from_str_radix("9843a756781b34567f81394", 16, Vec::new()).unwrap();
-    let z = from_str_radix("9843a756781b34567", 16, Vec::new()).unwrap();
+    let mut x = parse("9843a756781b34567f81394", 16);
+    let z = parse("9843a756781b34567", 16);
 	bigint_rshift(&mut x, 24);
     assert_eq!(truncate_zeros(x), truncate_zeros(z));
 
-    let mut x = from_str_radix("9843a756781b34567f81394", 16, Vec::new()).unwrap();
+    let mut x = parse("9843a756781b34567f81394", 16);
 	bigint_rshift(&mut x, 1000);
     assert_eq!(truncate_zeros(x), Vec::<u64>::new());
 }
 
 #[test]
 fn test_bigint_lshift() {
-    let mut x = parse("2");
+    let mut x = parse("2", 10);
 	bigint_lshift(&mut x, 0);
-    assert_eq!(parse("2"), truncate_zeros(x));
+    assert_eq!(parse("2", 10), truncate_zeros(x));
 
-    let mut x = parse("4829192");
+    let mut x = parse("4829192", 10);
 	bigint_lshift(&mut x, 3);
-    assert_eq!(parse("38633536"), truncate_zeros(x));
+    assert_eq!(parse("38633536", 10), truncate_zeros(x));
 
-    let mut x = parse("4829192");
+    let mut x = parse("4829192", 10);
 	bigint_lshift(&mut x, 64);
-    assert_eq!(parse("89082868906805576987574272"), truncate_zeros(x));
+    assert_eq!(parse("89082868906805576987574272", 10), truncate_zeros(x));
 }

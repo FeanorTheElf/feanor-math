@@ -147,7 +147,7 @@ fn test_fincke_pohst_2d() {
     let quadratic_form = [vec![2., 1.], vec![1., 2.]];
     let mut result = Vec::new();
     fincke_pohst(&ZZ, &RR, Submatrix::from_2d(&quadratic_form), &[4., 7.], 2.1, |point| { result.push(point.to_owned()); None });
-    assert_eq!(vec![vec![4, 7], vec![4, 8], vec![4, 6], vec![5, 6], vec![5, 7], vec![3, 8], vec![3, 7]], result);
+    assert_eq!(vec![vec![4, 7], vec![4, 8], vec![4, 6], vec![5, 7], vec![5, 6], vec![3, 8], vec![3, 7]], result);
 }
 
 #[test]

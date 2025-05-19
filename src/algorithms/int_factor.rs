@@ -40,6 +40,9 @@ impl<I> ZnOperation for ECFactorInt<I>
     }
 }
 
+///
+/// If the given integer is a power of a prime `p`, returns `Some((p, ln(n)/ln(p)))`.
+/// 
 pub fn is_prime_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
     where I: RingStore + Copy,
         I::Type: IntegerRing
@@ -69,6 +72,11 @@ fn is_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
     return None;
 }
 
+///
+/// Factors the given integer.
+/// 
+/// Returns a list of all factors with their multipliplicities.
+/// 
 pub fn factor<I>(ZZ: I, mut n: El<I>) -> Vec<(El<I>, usize)> 
     where I: RingStore + Copy, 
         I::Type: IntegerRing + OrderedRing + CanIsoFromTo<BigIntRingBase> + CanIsoFromTo<StaticRingBase<i128>>

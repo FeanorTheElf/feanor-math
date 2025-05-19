@@ -232,7 +232,7 @@ pub fn is_prime_base<R>(Zn: R, k: usize) -> bool
 use crate::rings::rust_bigint::RustBigintRing;
 
 #[test]
-pub fn test_is_prime() {
+fn test_is_prime() {
     assert!(is_prime(StaticRing::<i128>::RING, &2, 5));
     assert!(is_prime(StaticRing::<i128>::RING, &3, 5));
     assert!(is_prime(StaticRing::<i128>::RING, &5, 5));
