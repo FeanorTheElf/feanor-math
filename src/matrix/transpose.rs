@@ -42,6 +42,18 @@ impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> Clone for Transposab
 impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> TransposableSubmatrix<'a, V, T, TRANSPOSED> {
     
     #[stability::unstable(feature = "enable")]
+    pub fn into_base(self) -> Submatrix<'a, V, T> {
+        assert!(!TRANSPOSED);
+        self.data
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn into_base_transposed(self) -> Submatrix<'a, V, T> {
+        assert!(TRANSPOSED);
+        self.data
+    }
+
+    #[stability::unstable(feature = "enable")]
     pub fn submatrix(self, rows: Range<usize>, cols: Range<usize>) -> Self {
         if TRANSPOSED {
             Self { data: self.data.submatrix(cols, rows) }
@@ -134,6 +146,18 @@ impl<'a, V: AsPointerToSlice<T>, T> From<SubmatrixMut<'a, V, T>> for Transposabl
 }
 
 impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> TransposableSubmatrixMut<'a, V, T, TRANSPOSED> {
+
+    #[stability::unstable(feature = "enable")]
+    pub fn into_base(self) -> SubmatrixMut<'a, V, T> {
+        assert!(!TRANSPOSED);
+        self.data
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn into_base_transposed(self) -> SubmatrixMut<'a, V, T> {
+        assert!(TRANSPOSED);
+        self.data
+    }
 
     #[stability::unstable(feature = "enable")]
     pub fn submatrix(self, rows: Range<usize>, cols: Range<usize>) -> Self {

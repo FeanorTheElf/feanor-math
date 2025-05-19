@@ -198,6 +198,40 @@ impl<R: ?Sized + RingBase, A: Allocator> MatmulAlgorithm<R> for StrassenAlgorith
     }
 }
 
+///
+/// Computes `dst = lhs * rhs` if `ADD_ASSIGN = false` and `dst += lhs * rhs` if `ADD_ASSIGN = true`,
+/// using the standard cubic formula for matrix multiplication. 
+/// 
+/// This implementation is very simple and not very optimized. Usually it is used as a fallback
+/// for more sophisticated implementations. 
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn naive_matmul<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
+    lhs: TransposableSubmatrix<V1, El<R>, T1>, 
+    rhs: TransposableSubmatrix<V2, El<R>, T2>, 
+    mut dst: TransposableSubmatrixMut<V3, El<R>, T3>, 
+    ring: R
+)
+    where R: RingStore + Copy, 
+        V1: AsPointerToSlice<El<R>>,
+        V2: AsPointerToSlice<El<R>>,
+        V3: AsPointerToSlice<El<R>>
+{
+    assert_eq!(lhs.row_count(), dst.row_count());
+    assert_eq!(rhs.col_count(), dst.col_count());
+    assert_eq!(lhs.col_count(), rhs.row_count());
+    for i in 0..lhs.row_count() {
+        for j in 0..rhs.col_count() {
+            let inner_prod = <_ as ComputeInnerProduct>::inner_product_ref(ring.get_ring(), (0..lhs.col_count()).map(|k| (lhs.at(i, k), rhs.at(k, j))));
+            if ADD_ASSIGN {
+                ring.add_assign(dst.at_mut(i, j), inner_prod);
+            } else {
+                *dst.at_mut(i, j) = inner_prod;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 use test;
 #[cfg(test)]
@@ -217,9 +251,9 @@ fn bench_naive_matmul(bencher: &mut test::Bencher) {
         strassen::<_, _, _, _, _, false, false, false>(
             false, 
             100, 
-            TransposableSubmatrix::from(lhs.data()), 
-            TransposableSubmatrix::from(rhs.data()), 
-            TransposableSubmatrixMut::from(result.data_mut()), 
+            std::hint::black_box(TransposableSubmatrix::from(lhs.data())), 
+            std::hint::black_box(TransposableSubmatrix::from(rhs.data())), 
+            std::hint::black_box(TransposableSubmatrixMut::from(result.data_mut())), 
             StaticRing::<BenchInt>::RING, 
             &Global
         );
@@ -237,9 +271,9 @@ fn bench_strassen_matmul(bencher: &mut test::Bencher) {
         strassen::<_, _, _, _, _, false, false, false>(
             false, 
             threshold_log_2, 
-            TransposableSubmatrix::from(lhs.data()), 
-            TransposableSubmatrix::from(rhs.data()), 
-            TransposableSubmatrixMut::from(result.data_mut()), 
+            std::hint::black_box(TransposableSubmatrix::from(lhs.data())), 
+            std::hint::black_box(TransposableSubmatrix::from(rhs.data())), 
+            std::hint::black_box(TransposableSubmatrixMut::from(result.data_mut())), 
             StaticRing::<BenchInt>::RING, 
             &Global
         );

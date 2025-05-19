@@ -1,41 +1,10 @@
-use crate::algorithms::matmul::ComputeInnerProduct;
+use crate::algorithms::matmul::naive_matmul;
 use crate::matrix::*;
 use crate::ring::*;
 use crate::integer::*;
 use crate::primitive_int::StaticRing;
 use std::alloc::Allocator;
 use std::ops::Range;
-
-///
-/// Computes `dst = lhs * rhs` if `ADD_ASSIGN = false` and `dst += lhs * rhs` if `ADD_ASSIGN = true`,
-/// using the standard cubic formula for matrix multiplication.
-/// 
-#[stability::unstable(feature = "enable")]
-pub fn naive_matmul<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
-    lhs: TransposableSubmatrix<V1, El<R>, T1>, 
-    rhs: TransposableSubmatrix<V2, El<R>, T2>, 
-    mut dst: TransposableSubmatrixMut<V3, El<R>, T3>, 
-    ring: R
-)
-    where R: RingStore + Copy, 
-        V1: AsPointerToSlice<El<R>>,
-        V2: AsPointerToSlice<El<R>>,
-        V3: AsPointerToSlice<El<R>>
-{
-    assert_eq!(lhs.row_count(), dst.row_count());
-    assert_eq!(rhs.col_count(), dst.col_count());
-    assert_eq!(lhs.col_count(), rhs.row_count());
-    for i in 0..lhs.row_count() {
-        for j in 0..rhs.col_count() {
-            let inner_prod = <_ as ComputeInnerProduct>::inner_product_ref(ring.get_ring(), (0..lhs.col_count()).map(|k| (lhs.at(i, k), rhs.at(k, j))));
-            if ADD_ASSIGN {
-                ring.add_assign(dst.at_mut(i, j), inner_prod);
-            } else {
-                *dst.at_mut(i, j) = inner_prod;
-            }
-        }
-    }
-}
 
 fn matrix_add_add_sub<R, V1, V2, V3, V4, const T1: bool, const T2: bool, const T3: bool, const T4: bool>(
     a: TransposableSubmatrix<V1, El<R>, T1>, 
@@ -215,7 +184,27 @@ pub const fn strassen_mem_size(add_assign: bool, block_size_log2: usize, thresho
 }
 
 macro_rules! strassen_base_algorithm {
-    ($R:expr, $V1:expr, $V2:expr, $V3:expr, $ADD_ASSIGN:expr, $T1:expr, $T2:expr, $T3:expr, $steps_left:expr, $block_size_log2:expr, $lhs:expr, $rhs:expr, $dst:expr, $ring:expr, $memory:expr, $smaller_strassen:ident) => {
+    (
+        // generic args
+        $R:expr, 
+        $V1:expr, 
+        $V2:expr, 
+        $V3:expr, 
+        $ADD_ASSIGN:expr, 
+        $T1:expr, 
+        $T2:expr, 
+        $T3:expr, 
+        // sometimes generic args
+        $steps_left:expr, 
+        $block_size_log2:expr, 
+        // actual args
+        $lhs:expr, 
+        $rhs:expr, 
+        $dst:expr, 
+        $ring:expr, 
+        $memory:expr, 
+        $smaller_strassen:ident
+    ) => {
         {
             let steps_left = $steps_left;
             let block_size_log2 = $block_size_log2;
@@ -399,6 +388,12 @@ macro_rules! unrolled_strassen_impl {
                 V2: AsPointerToSlice<El<R>>,
                 V3: AsPointerToSlice<El<R>>
         {
+            assert_eq!(1 << block_size_log2, lhs.row_count());
+            assert_eq!(1 << block_size_log2, lhs.col_count());
+            assert_eq!(1 << block_size_log2, rhs.row_count());
+            assert_eq!(1 << block_size_log2, rhs.col_count());
+            assert_eq!(1 << block_size_log2, dst.row_count());
+            assert_eq!(1 << block_size_log2, dst.col_count());
             $(
                 fn $fun<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
                     block_size_log2: usize,
@@ -431,7 +426,7 @@ macro_rules! unrolled_strassen_impl {
     };
 }
 
-#[cfg(feature = "unrolled_strassen")]
+#[cfg(feature = "optimized_matmul")]
 unrolled_strassen_impl!{
     (0, strassen_impl_0, strassen_impl_0),
     (1, strassen_impl_1, strassen_impl_0),
@@ -460,7 +455,7 @@ unrolled_strassen_impl!{
 /// as temporary memory during the computation. In particular, its content may be arbitrarily changed
 /// (it will be in a safe, but unspecified state at the end).
 /// 
-#[cfg(not(feature = "unrolled_strassen"))]
+#[cfg(not(feature = "optimized_matmul"))]
 #[stability::unstable(feature = "enable")]
 pub fn dispatch_strassen_impl<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
     block_size_log2: usize, 
@@ -482,6 +477,8 @@ pub fn dispatch_strassen_impl<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: b
     assert_eq!(1 << block_size_log2, rhs.col_count());
     assert_eq!(1 << block_size_log2, dst.row_count());
     assert_eq!(1 << block_size_log2, dst.col_count());
+
+    #[inline(never)]
     fn strassen_impl<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
         block_size_log2: usize, 
         lhs: TransposableSubmatrix<V1, El<R>, T1>, 

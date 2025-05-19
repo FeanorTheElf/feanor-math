@@ -378,30 +378,29 @@ impl InterpolationBaseRing for AsFieldBase<Zn> {
 
 impl ComputeInnerProduct for ZnBase {
 
-    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, mut els: I) -> Self::Element
-    {
-        fn body<I: Iterator<Item = (ZnEl, ZnEl)>>(ring: &ZnBase, els: &mut I) -> Option<ZnEl> {
-            debug_assert!(u128::MAX / (ring.repr_bound() as u128 * ring.repr_bound() as u128) >= 36);
-            const REDUCE_AFTER_STEPS: usize = 32;
-            
-            let mut current = 0;
-            for i in 0..REDUCE_AFTER_STEPS {
-                let next_pair = els.next();
-                if let Some((l, r)) = next_pair {
-                    debug_assert!(l.0 <= ring.repr_bound());
-                    debug_assert!(r.0 <= ring.repr_bound());
-                    current += l.0 as u128 * r.0 as u128;
-                    debug_assert!(current <= (i + 1) as u128 * ring.repr_bound() as u128 * ring.repr_bound() as u128);
-                } else if i == 0 {
-                    return None;
-                } else {
-                    break;
-                }
-            }
-            return Some(ZnEl(ring.bounded_reduce_larger::<REDUCE_AFTER_STEPS>(current)));
-        }
+    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
 
-        self.sum((0..).map(|_| body(self, &mut els)).take_while(|x| x.is_some()).map(|x| x.unwrap()))
+        debug_assert!(u128::MAX / (self.repr_bound() as u128 * self.repr_bound() as u128) >= 36);
+        const REDUCE_AFTER_STEPS: usize = 32;
+        let mut array_chunks = els.array_chunks::<REDUCE_AFTER_STEPS>();
+        let mut result = self.zero();
+        while let Some(chunk) = array_chunks.next() {
+            let mut sum: u128 = 0;
+            for (l, r) in chunk {
+                debug_assert!(l.0 <= self.repr_bound());
+                debug_assert!(r.0 <= self.repr_bound());
+                sum += l.0 as u128 * r.0 as u128;
+            }
+            self.add_assign(&mut result, ZnEl(self.bounded_reduce_larger::<REDUCE_AFTER_STEPS>(sum)));
+        }
+        let mut sum: u128 = 0;
+        for (l, r) in array_chunks.into_remainder().unwrap() {
+            debug_assert!(l.0 <= self.repr_bound());
+            debug_assert!(r.0 <= self.repr_bound());
+            sum += l.0 as u128 * r.0 as u128;
+        }
+        self.add_assign(&mut result, ZnEl(self.bounded_reduce_larger::<REDUCE_AFTER_STEPS>(sum)));
+        return result;
     }
 
     fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element

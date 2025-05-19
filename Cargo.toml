@@ -57,8 +57,9 @@ parallel = ["dep:rayon"]
 # Includes the matrix and tensor library ndarray, together with a (currently minimalistic) interface to matrices in this crate.
 ndarray = ["dep:ndarray"]
 
-# Uses macros to unroll all stages in the Strassen algorithm. Slightly improves performance at the cost of compilation time.
-unrolled_strassen = []
+# Use many kernels optimized for various settings during matrix multiplication. Somewhat improves performance at
+# the cost of code generation time.
+optimized_matmul = []
 
 [profile.profiling]
 inherits = "bench"
