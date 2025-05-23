@@ -7,7 +7,7 @@ pub mod subvector;
 pub mod permute;
 pub mod sparse;
 
-use std::ops::{Bound, Range, RangeBounds};
+use std::{alloc::Allocator, ops::{Bound, Range, RangeBounds}};
 
 pub use conversion::{CloneElFn, VectorViewFn, VectorFnIter};
 pub use map::{VectorFnMap, VectorViewMap, VectorViewMapMut};
@@ -94,6 +94,16 @@ pub trait VectorView<T: ?Sized> {
     /// 
     fn as_fn<'a>(&'a self) -> VectorViewFn<'a, Self, T> {
         VectorViewFn::new(self)
+    }
+
+    ///
+    /// If the underlying data of this [`VectorView`] can be represented as a slice,
+    /// returns it. Otherwise, `None` is returned.
+    /// 
+    fn as_slice<'a>(&'a self) -> Option<&'a [T]>
+        where T: Sized
+    {
+        None
     }
 
     ///
@@ -350,6 +360,12 @@ impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for Box<V> {
     fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
         (**self).specialize_sparse(op)
     }
+
+    fn as_slice<'a>(&'a self) -> Option<&'a [T]>
+        where T: Sized
+    {
+        (**self).as_slice()
+    }
 }
 
 impl<T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for Box<V> {
@@ -360,6 +376,12 @@ impl<T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for Box<V> {
 
     unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
         (**self).at_unchecked_mut(i)
+    }
+
+    fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
+        where T: Sized
+    {
+        (**self).as_slice_mut()    
     }
 }
 
@@ -374,6 +396,7 @@ impl<T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for Box<V> 
 }
 
 impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a V {
+
     fn len(&self) -> usize {
         (**self).len()
     }
@@ -388,6 +411,12 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a V {
 
     fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Result<Op::Output<'b>, ()> {
         (**self).specialize_sparse(op)
+    }
+    
+    fn as_slice<'b>(&'b self) -> Option<&'b [T]>
+        where T: Sized
+    {
+        (**self).as_slice()
     }
 }
 
@@ -417,6 +446,12 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a mut V {
     fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Result<Op::Output<'b>, ()> {
         (**self).specialize_sparse(op)
     }
+    
+    fn as_slice<'b>(&'b self) -> Option<&'b [T]>
+        where T: Sized
+    {
+        (**self).as_slice()
+    }
 }
 
 impl<'a, T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for &'a mut V {
@@ -427,6 +462,12 @@ impl<'a, T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for &'a mut V
 
     unsafe fn at_unchecked_mut(&mut self, i: usize) -> &mut T {
         (**self).at_unchecked_mut(i)
+    }
+
+    fn as_slice_mut<'b>(&'b mut self) -> Option<&'b mut [T]>
+        where T: Sized
+    {
+        (**self).as_slice_mut()
     }
 }
 
@@ -464,6 +505,16 @@ pub trait VectorViewMut<T: ?Sized>: VectorView<T> {
         where Self: Sized
     {
         VectorViewMapMut::new(self, (map_const, map_mut))
+    }
+
+    ///
+    /// If the underlying data of this [`VectorView`] can be represented as a slice,
+    /// returns it. Otherwise, `None` is returned.
+    /// 
+    fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
+        where T: Sized
+    {
+        None
     }
 
     ///
@@ -661,6 +712,12 @@ impl<T> VectorView<T> for [T] {
     unsafe fn at_unchecked(&self, i: usize) -> &T {
         self.get_unchecked(i)
     }
+
+    fn as_slice<'a>(&'a self) -> Option<&'a [T]>
+        where T: Sized
+    {
+        Some(self)
+    }
 }
 
 impl<'a, T> SelfSubvectorView<T> for &'a [T] {
@@ -686,6 +743,12 @@ impl<T> VectorViewMut<T> for [T] {
     unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
         self.get_unchecked_mut(i)
     }
+
+    fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
+        where T: Sized
+    {
+        Some(self)
+    }
 }
 
 impl<T> SwappableVectorViewMut<T> for [T] {
@@ -695,7 +758,7 @@ impl<T> SwappableVectorViewMut<T> for [T] {
     }
 }
 
-impl<T> VectorView<T> for Vec<T> {
+impl<T, A: Allocator> VectorView<T> for Vec<T, A> {
 
     fn len(&self) -> usize {
         <[T]>::len(self)
@@ -708,9 +771,15 @@ impl<T> VectorView<T> for Vec<T> {
     unsafe fn at_unchecked(&self, i: usize) -> &T {
         self.get_unchecked(i)
     }
+
+    fn as_slice<'a>(&'a self) -> Option<&'a [T]>
+        where T: Sized
+    {
+        Some(&*self)
+    }
 }
 
-impl<T> VectorViewMut<T> for Vec<T> {
+impl<T, A: Allocator> VectorViewMut<T> for Vec<T, A> {
 
     fn at_mut(&mut self, i: usize) -> &mut T {
         &mut self[i]
@@ -719,9 +788,15 @@ impl<T> VectorViewMut<T> for Vec<T> {
     unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
         self.get_unchecked_mut(i)
     }
+
+    fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
+        where T: Sized
+    {
+        Some(&mut *self)
+    }
 }
 
-impl<T> SwappableVectorViewMut<T> for Vec<T> {
+impl<T, A: Allocator> SwappableVectorViewMut<T> for Vec<T, A> {
 
     fn swap(&mut self, i: usize, j: usize) {
         <[T]>::swap(self, i, j)
@@ -741,6 +816,12 @@ impl<T, const N: usize> VectorView<T> for [T; N] {
     unsafe fn at_unchecked(&self, i: usize) -> &T {
         self.get_unchecked(i)
     }
+
+    fn as_slice<'a>(&'a self) -> Option<&'a [T]>
+        where T: Sized
+    {
+        Some(&self[..])
+    }
 }
 
 impl<T, const N: usize> VectorViewMut<T> for [T; N] {
@@ -751,6 +832,12 @@ impl<T, const N: usize> VectorViewMut<T> for [T; N] {
 
     unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
         self.get_unchecked_mut(i)
+    }
+    
+    fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
+        where T: Sized
+    {
+        Some(&mut *self)
     }
 }
 

@@ -4,7 +4,7 @@ use std::ops::Deref;
 
 use crate::ring::*;
 use crate::seq::subvector::SubvectorView;
-use crate::seq::VectorView;
+use crate::seq::{VectorView, VectorViewMut};
 
 use karatsuba::*;
 
@@ -132,8 +132,36 @@ pub trait PreparedConvolutionAlgorithm<R: ?Sized + RingBase>: ConvolutionAlgorit
 
     type PreparedConvolutionOperand;
 
-    fn prepare_convolution_operand<S, V>(&self, val: V, ring: S) -> Self::PreparedConvolutionOperand
+    ///
+    /// Takes an input list of values and computes an opaque [`PreparedConvolutionAlgorithm::PreparedConvolutionOperand`],
+    /// which can be used to compute the convolution with this list of values faster.
+    /// 
+    /// This function can optionally be given a `length_hint`, which should be an expected upper bound to the
+    /// length of the convolution output of the input list and any future second operand. Note that the hint serves
+    /// only as a performance optimization, the prepared convolution operand can also be used as operand in
+    /// convolutions with larger result.
+    /// 
+    /// # Example
+    /// 
+    /// TODO 
+    /// 
+    fn prepare_convolution_operand<S, V>(&self, val: V, length_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
         where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>;
+
+    ///
+    /// Returns the length of the list of values that was prepared as convolution operand.
+    /// 
+    fn prepared_operand_len(&self, prepared_operand: &Self::PreparedConvolutionOperand) -> usize;
+
+    ///
+    /// Retrieves the list of values that was prepared as a convolution operand.
+    /// 
+    /// The result is written to `output`, which must be sufficiently long (i.e. its length must be at
+    /// least the number returned by [`PreparedConvolutionAlgorithm::prepared_operand_len()`]). The rest
+    /// of `output` is filled with zeros.
+    /// 
+    fn prepared_operand_data<S, V>(&self, prepared_operand: &Self::PreparedConvolutionOperand, output: V, ring: S)
+        where S: RingStore<Type = R> + Copy, V: VectorViewMut<R::Element>;
 
     fn compute_convolution_lhs_prepared<S, V>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: V, dst: &mut [R::Element], ring: S)
         where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>;
@@ -233,10 +261,20 @@ impl<'a, R, C> PreparedConvolutionAlgorithm<R> for C
 {
     type PreparedConvolutionOperand = <C::Target as PreparedConvolutionAlgorithm<R>>::PreparedConvolutionOperand;
 
-    fn prepare_convolution_operand<S, V>(&self, val: V, ring: S) -> Self::PreparedConvolutionOperand
+    fn prepare_convolution_operand<S, V>(&self, val: V, len_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
         where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
     {
-        (**self).prepare_convolution_operand(val, ring)
+        (**self).prepare_convolution_operand(val, len_hint, ring)
+    }
+
+    fn prepared_operand_len(&self, prepared_operand: &Self::PreparedConvolutionOperand) -> usize {
+        (**self).prepared_operand_len(prepared_operand)
+    }
+
+    fn prepared_operand_data<S, V>(&self, prepared_operand: &Self::PreparedConvolutionOperand, output: V, ring: S)
+        where S: RingStore<Type = R> + Copy, V: VectorViewMut<R::Element>
+    {
+        (**self).prepared_operand_data(prepared_operand, output, ring)
     }
 
     fn compute_convolution_lhs_prepared<S, V>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: V, dst: &mut [R::Element], ring: S)
@@ -439,8 +477,8 @@ pub mod generic_tests {
                 let mut actual = Vec::new();
                 actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
                 convolution.compute_convolution_prepared(
-                    &convolution.prepare_convolution_operand(&lhs, &ring),
-                    &convolution.prepare_convolution_operand(&rhs, &ring),
+                    &convolution.prepare_convolution_operand(&lhs, None, &ring),
+                    &convolution.prepare_convolution_operand(&rhs, None, &ring),
                     &mut actual, 
                     &ring
                 );
@@ -451,7 +489,7 @@ pub mod generic_tests {
                 let mut actual = Vec::new();
                 actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
                 convolution.compute_convolution_lhs_prepared(
-                    &convolution.prepare_convolution_operand(&lhs, &ring),
+                    &convolution.prepare_convolution_operand(&lhs, None, &ring),
                     &rhs,
                     &mut actual, 
                     &ring
@@ -463,8 +501,8 @@ pub mod generic_tests {
                 let mut actual = Vec::new();
                 actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
                 let data = [
-                    (convolution.prepare_convolution_operand(&lhs, &ring), convolution.prepare_convolution_operand(&rhs, &ring)),
-                    (convolution.prepare_convolution_operand(&[ring.one()], &ring), convolution.prepare_convolution_operand(&[ring.one()], &ring))
+                    (convolution.prepare_convolution_operand(&lhs, None, &ring), convolution.prepare_convolution_operand(&rhs, None, &ring)),
+                    (convolution.prepare_convolution_operand(&[ring.one()], None, &ring), convolution.prepare_convolution_operand(&[ring.one()], None, &ring))
                 ];
                 convolution.compute_convolution_inner_product_prepared(
                     data.iter().map(|(l, r)| (l, r)),
@@ -479,8 +517,8 @@ pub mod generic_tests {
                 let mut actual = Vec::new();
                 actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
                 let data = [
-                    (convolution.prepare_convolution_operand(&lhs, &ring), rhs),
-                    (convolution.prepare_convolution_operand(&[ring.one()], &ring), vec![ring.one()])
+                    (convolution.prepare_convolution_operand(&lhs, None, &ring), rhs),
+                    (convolution.prepare_convolution_operand(&[ring.one()], None, &ring), vec![ring.one()])
                 ];
                 convolution.compute_convolution_inner_product_lhs_prepared(
                     data.iter().map(|(l, r)| (l, r)),

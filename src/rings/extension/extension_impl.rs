@@ -381,7 +381,7 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
             {
                 let mut tmp = Vec::with_capacity_in(2 << self.ring.log2_padded_len, self.ring.element_allocator.clone());
                 tmp.resize_with(2 << self.ring.log2_padded_len, || self.ring.base_ring().zero());
-                let x_prepared = self.ring.convolution.prepare_convolution_operand(&self.x.values[..], self.ring.base_ring());
+                let x_prepared = self.ring.convolution.prepare_convolution_operand(&self.x.values[..], None, self.ring.base_ring());
                 self.ring.convolution.compute_convolution_prepared(&x_prepared, &x_prepared, &mut tmp, self.ring.base_ring());
                 self.ring.reduce_mod_poly(&mut tmp);
                 for i in 0..self.ring.rank() {

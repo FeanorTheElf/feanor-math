@@ -69,6 +69,12 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for SubvectorView<V, T> {
 
         self.base.specialize_sparse(WrapSubvector { op: op, element: PhantomData, begin: self.begin, end: self.end })
     }
+
+    fn as_slice<'a>(&'a self) -> Option<&'a [T]>
+        where T: Sized
+    {
+        self.base.as_slice().map(|slice| &slice[self.begin..self.end])
+    }
 }
 
 pub struct FilterWithinRangeIter<'a, T: ?Sized, I>
@@ -110,6 +116,12 @@ impl<V: VectorViewMut<T>, T: ?Sized> VectorViewMut<T> for SubvectorView<V, T> {
     fn at_mut(&mut self, i: usize) -> &mut T {
         assert!(i < self.len());
         self.base.at_mut(i + self.begin)
+    }
+
+    fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
+        where T: Sized
+    {
+        self.base.as_slice_mut().map(|slice| &mut slice[self.begin..self.end])
     }
 }
 
