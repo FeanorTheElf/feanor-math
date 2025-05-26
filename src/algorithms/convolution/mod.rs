@@ -4,7 +4,7 @@ use std::ops::Deref;
 
 use crate::ring::*;
 use crate::seq::subvector::SubvectorView;
-use crate::seq::{VectorView, VectorViewMut};
+use crate::seq::*;
 
 use karatsuba::*;
 
@@ -28,7 +28,7 @@ pub mod ntt;
 /// Contains an implementation of computing convolutions by considering them modulo
 /// various primes that are either smaller or allow for suitable roots of unity.
 /// 
-pub mod rns;
+// pub mod rns;
 
 ///
 /// Trait for objects that can compute a convolution over some ring.
@@ -134,12 +134,24 @@ pub trait PreparedConvolutionAlgorithm<R: ?Sized + RingBase>: ConvolutionAlgorit
 
     ///
     /// Takes an input list of values and computes an opaque [`PreparedConvolutionAlgorithm::PreparedConvolutionOperand`],
-    /// which can be used to compute the convolution with this list of values faster.
+    /// which can be used to compute future convolutions with this list of values faster.
     /// 
-    /// This function can optionally be given a `length_hint`, which should be an expected upper bound to the
-    /// length of the convolution output of the input list and any future second operand. Note that the hint serves
-    /// only as a performance optimization, the prepared convolution operand can also be used as operand in
-    /// convolutions with larger result.
+    /// Although the [`PreparedConvolutionAlgorithm::PreparedConvolutionOperand`] does not have any explicit reference
+    /// to the list of values it was created for, passing it to [`PreparedConvolutionAlgorithm::prepare_convolution_operand()`]
+    /// with another list of values will give erroneous results.
+    /// 
+    /// # Length-dependent convolution preparation
+    /// 
+    /// For some algorithms, different data is required to speed up the convolution with an operand, depending on the 
+    /// length of the other operand. For example, for FFT-based convolutions, the prepared data would consist of the
+    /// Fourier transform of the list of values, zero-padded to a length that can store the complete result of the
+    /// (future) convolution.
+    /// 
+    /// To handle this, implementations can make use of the `length_hint`, which - if given - should be an upper bound
+    /// to the length of the output of any future convolution that uses the given operand. Alternatively, implementations
+    /// are encouraged to not compute any data during [`PreparedConvolutionAlgorithm::prepare_convolution_operand()`],
+    /// but initialize an object with interior mutability, and use it to cache data computed during
+    /// [`PreparedConvolutionAlgorithm::compute_convolution_prepared()`].
     /// 
     /// # Example
     /// 
@@ -148,56 +160,27 @@ pub trait PreparedConvolutionAlgorithm<R: ?Sized + RingBase>: ConvolutionAlgorit
     fn prepare_convolution_operand<S, V>(&self, val: V, length_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
         where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>;
 
-    ///
-    /// Returns the length of the list of values that was prepared as convolution operand.
-    /// 
-    fn prepared_operand_len(&self, prepared_operand: &Self::PreparedConvolutionOperand) -> usize;
+    fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: S)
+        where S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>;
 
     ///
-    /// Retrieves the list of values that was prepared as a convolution operand.
+    /// Computes a convolution for each tuple in the given sequence, and sums the result of each convolution
+    /// to `dst`.
     /// 
-    /// The result is written to `output`, which must be sufficiently long (i.e. its length must be at
-    /// least the number returned by [`PreparedConvolutionAlgorithm::prepared_operand_len()`]). The rest
-    /// of `output` is filled with zeros.
+    /// In other words, this computes `dst[k] += sum_l sum_(i + j = k) values[l][i] * values[l][k]`.
+    /// It can be faster than calling [`PreparedConvolutionAlgorithm::prepare_convolution_operand()`].
     /// 
-    fn prepared_operand_data<S, V>(&self, prepared_operand: &Self::PreparedConvolutionOperand, output: V, ring: S)
-        where S: RingStore<Type = R> + Copy, V: VectorViewMut<R::Element>;
-
-    fn compute_convolution_lhs_prepared<S, V>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: V, dst: &mut [R::Element], ring: S)
-        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>;
-
-    fn compute_convolution_prepared<S>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: &Self::PreparedConvolutionOperand, dst: &mut [R::Element], ring: S)
-        where S: RingStore<Type = R> + Copy;
-
-    fn compute_convolution_rhs_prepared<S, V>(&self, lhs: V, rhs: &Self::PreparedConvolutionOperand, dst: &mut [R::Element], ring: S)
-        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
-    {
-        assert!(ring.is_commutative());
-        self.compute_convolution_lhs_prepared(rhs, lhs, dst, ring);
-    }
-
-    fn compute_convolution_inner_product_lhs_prepared<'a, S, I, V>(&self, values: I, dst: &mut [R::Element], ring: S) 
+    fn compute_convolution_sum<'a, S, I, V1, V2>(&self, values: I, dst: &mut [R::Element], ring: S) 
         where S: RingStore<Type = R> + Copy, 
-            I: Iterator<Item = (&'a Self::PreparedConvolutionOperand, V)>,
-            V: VectorView<R::Element>,
+            I: Iterator<Item = (V1, Option<&'a Self::PreparedConvolutionOperand>, V2, Option<&'a Self::PreparedConvolutionOperand>)>,
+            V1: VectorView<R::Element>,
+            V2: VectorView<R::Element>,
             Self: 'a,
             R: 'a,
             Self::PreparedConvolutionOperand: 'a
     {
-        for (lhs, rhs) in values {
-            self.compute_convolution_lhs_prepared(lhs, rhs, dst, ring)
-        }
-    }
-
-    fn compute_convolution_inner_product_prepared<'a, S, I>(&self, values: I, dst: &mut [R::Element], ring: S) 
-        where S: RingStore<Type = R> + Copy, 
-            I: Iterator<Item = (&'a Self::PreparedConvolutionOperand, &'a Self::PreparedConvolutionOperand)>,
-            Self::PreparedConvolutionOperand: 'a,
-            Self: 'a,
-            R: 'a,
-    {
-        for (lhs, rhs) in values {
-            self.compute_convolution_prepared(lhs, rhs, dst, ring)
+        for (lhs, lhs_prep, rhs, rhs_prep) in values {
+            self.compute_convolution_prepared(lhs, lhs_prep, rhs, rhs_prep, dst, ring)
         }
     }
 }
@@ -267,53 +250,22 @@ impl<'a, R, C> PreparedConvolutionAlgorithm<R> for C
         (**self).prepare_convolution_operand(val, len_hint, ring)
     }
 
-    fn prepared_operand_len(&self, prepared_operand: &Self::PreparedConvolutionOperand) -> usize {
-        (**self).prepared_operand_len(prepared_operand)
-    }
-
-    fn prepared_operand_data<S, V>(&self, prepared_operand: &Self::PreparedConvolutionOperand, output: V, ring: S)
-        where S: RingStore<Type = R> + Copy, V: VectorViewMut<R::Element>
+    fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: S)
+        where S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>
     {
-        (**self).prepared_operand_data(prepared_operand, output, ring)
+        (**self).compute_convolution_prepared(lhs, lhs_prep, rhs, rhs_prep, dst, ring);
     }
 
-    fn compute_convolution_lhs_prepared<S, V>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: V, dst: &mut [R::Element], ring: S)
-        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
-    {
-        (**self).compute_convolution_lhs_prepared(lhs, rhs, dst, ring)
-    }
-
-    fn compute_convolution_prepared<S>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: &Self::PreparedConvolutionOperand, dst: &mut [R::Element], ring: S)
-        where S: RingStore<Type = R> + Copy
-    {
-        (**self).compute_convolution_prepared(lhs, rhs, dst, ring)
-    }
-
-    fn compute_convolution_rhs_prepared<S, V>(&self, lhs: V, rhs: &Self::PreparedConvolutionOperand, dst: &mut [R::Element], ring: S)
-        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
-    {
-        (**self).compute_convolution_rhs_prepared(lhs, rhs, dst, ring)
-    }
-
-    fn compute_convolution_inner_product_lhs_prepared<'b, S, I, V>(&self, values: I, dst: &mut [R::Element], ring: S) 
+    fn compute_convolution_sum<'b, S, I, V1, V2>(&self, values: I, dst: &mut [R::Element], ring: S) 
         where S: RingStore<Type = R> + Copy, 
-            I: Iterator<Item = (&'b Self::PreparedConvolutionOperand, V)>,
-            V: VectorView<R::Element>,
+            I: Iterator<Item = (V1, Option<&'b Self::PreparedConvolutionOperand>, V2, Option<&'b Self::PreparedConvolutionOperand>)>,
+            V1: VectorView<R::Element>,
+            V2: VectorView<R::Element>,
             Self: 'b,
             R: 'b,
             Self::PreparedConvolutionOperand: 'b
     {
-        (**self).compute_convolution_inner_product_lhs_prepared(values, dst, ring)
-    }
-
-    fn compute_convolution_inner_product_prepared<'b, S, I>(&self, values: I, dst: &mut [R::Element], ring: S) 
-        where S: RingStore<Type = R> + Copy, 
-            I: Iterator<Item = (&'b Self::PreparedConvolutionOperand, &'b Self::PreparedConvolutionOperand)>,
-            Self: 'b,
-            R: 'b,
-            Self::PreparedConvolutionOperand: 'b
-    {
-        (**self).compute_convolution_inner_product_prepared(values, dst, ring)
+        (**self).compute_convolution_sum(values, dst, ring);
     }
 }
 
@@ -477,20 +429,38 @@ pub mod generic_tests {
                 let mut actual = Vec::new();
                 actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
                 convolution.compute_convolution_prepared(
-                    &convolution.prepare_convolution_operand(&lhs, None, &ring),
-                    &convolution.prepare_convolution_operand(&rhs, None, &ring),
-                    &mut actual, 
-                    &ring
-                );
-                for i in 0..(lhs_len + rhs_len) {
-                    assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
-                }
-
-                let mut actual = Vec::new();
-                actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
-                convolution.compute_convolution_lhs_prepared(
-                    &convolution.prepare_convolution_operand(&lhs, None, &ring),
+                    &lhs,
+                    Some(&convolution.prepare_convolution_operand(&lhs, None, &ring)),
                     &rhs,
+                    Some(&convolution.prepare_convolution_operand(&rhs, None, &ring)),
+                    &mut actual, 
+                    &ring
+                );
+                for i in 0..(lhs_len + rhs_len) {
+                    assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
+                }
+
+                let mut actual = Vec::new();
+                actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
+                convolution.compute_convolution_prepared(
+                    &lhs,
+                    Some(&convolution.prepare_convolution_operand(&lhs, None, &ring)),
+                    &rhs,
+                    None,
+                    &mut actual, 
+                    &ring
+                );
+                for i in 0..(lhs_len + rhs_len) {
+                    assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
+                }
+                
+                let mut actual = Vec::new();
+                actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
+                convolution.compute_convolution_prepared(
+                    &lhs,
+                    None,
+                    &rhs,
+                    Some(&convolution.prepare_convolution_operand(&rhs, None, &ring)),
                     &mut actual, 
                     &ring
                 );
@@ -501,33 +471,31 @@ pub mod generic_tests {
                 let mut actual = Vec::new();
                 actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
                 let data = [
-                    (convolution.prepare_convolution_operand(&lhs, None, &ring), convolution.prepare_convolution_operand(&rhs, None, &ring)),
-                    (convolution.prepare_convolution_operand(&[ring.one()], None, &ring), convolution.prepare_convolution_operand(&[ring.one()], None, &ring))
+                    (&lhs[..], Some(convolution.prepare_convolution_operand(&lhs, None, &ring)), &rhs[..], Some(convolution.prepare_convolution_operand(&rhs, None, &ring))),
+                    (&rhs[..], None, &lhs[..], None)
                 ];
-                convolution.compute_convolution_inner_product_prepared(
-                    data.iter().map(|(l, r)| (l, r)),
+                convolution.compute_convolution_sum(
+                    data.as_fn().map_fn(|(l, l_prep, r, r_prep): &(_, _, _, _)| (l, l_prep.as_ref(), r, r_prep.as_ref())).iter(),
                     &mut actual, 
                     &ring
                 );
-                assert_el_eq!(&ring, ring.add_ref_fst(&expected[0], ring.one()), &actual[0]);
-                for i in 1..(lhs_len + rhs_len) {
-                    assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
+                for i in 0..(lhs_len + rhs_len) {
+                    assert_el_eq!(&ring, &ring.add_ref(&expected[i as usize], &expected[i as usize]), &actual[i as usize]);
                 }
 
                 let mut actual = Vec::new();
                 actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
                 let data = [
-                    (convolution.prepare_convolution_operand(&lhs, None, &ring), rhs),
-                    (convolution.prepare_convolution_operand(&[ring.one()], None, &ring), vec![ring.one()])
+                    (&lhs[..], Some(convolution.prepare_convolution_operand(&lhs, None, &ring)), &rhs[..], None),
+                    (&rhs[..], None, &lhs[..], Some(convolution.prepare_convolution_operand(&lhs, None, &ring)))
                 ];
-                convolution.compute_convolution_inner_product_lhs_prepared(
-                    data.iter().map(|(l, r)| (l, r)),
+                convolution.compute_convolution_sum(
+                    data.as_fn().map_fn(|(l, l_prep, r, r_prep)| (l, l_prep.as_ref(), r, r_prep.as_ref())).iter(),
                     &mut actual, 
                     &ring
                 );
-                assert_el_eq!(&ring, ring.add_ref_fst(&expected[0], ring.one()), &actual[0]);
-                for i in 1..(lhs_len + rhs_len) {
-                    assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
+                for i in 0..(lhs_len + rhs_len) {
+                    assert_el_eq!(&ring, &ring.add_ref(&expected[i as usize], &expected[i as usize]), &actual[i as usize]);
                 }
             }
         }

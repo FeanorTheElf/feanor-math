@@ -19,22 +19,24 @@ impl<T> LazyVec<T> {
         }
     }
 
+    #[allow(unused)]
     pub fn get(&self, i: usize) -> Option<&T> {
         self.data[i].get()
     }
 
-    pub fn get_or_init_incremental<F>(&self, target_len: usize, mut derive_next: F)
+    #[allow(unused)]
+    pub fn get_or_init_incremental<F>(&self, target_index: usize, mut derive_next: F) -> &T
         where F: FnMut(usize, &T) -> T
     {
-        while self.data.len() <= target_len {
+        while self.data.len() <= target_index {
             _ = self.data.push(OnceLock::new());
         }
-        for i in (0..=target_len).rev() {
+        for i in (0..=target_index).rev() {
             if let Some(mut value) = self.data[i].get() {
-                for j in (i + 1)..=target_len {
+                for j in (i + 1)..=target_index {
                     value = self.data[j].get_or_init(|| derive_next(j, value));
                 }
-                return;
+                return self.data[target_index].get().unwrap();
             }
         }
         panic!("get_or_init_incremental() is only valid when the vector has at least one initialized element")

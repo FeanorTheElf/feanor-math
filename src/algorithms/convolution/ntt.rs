@@ -1,12 +1,13 @@
 use std::alloc::{Allocator, Global};
 
+use crate::boo::Boo;
 use crate::{algorithms::fft::cooley_tuckey::CooleyTuckeyFFT, lazy::LazyVec};
 use crate::homomorphism::*;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::zn::*;
 use crate::integer::*;
-use crate::seq::{VectorView, VectorViewMut};
+use crate::seq::VectorView;
 
 use super::{ConvolutionAlgorithm, PreparedConvolutionAlgorithm, PreparedConvolutionOperation};
 
@@ -32,9 +33,8 @@ pub struct PreparedConvolutionOperand<R, A = Global>
         R::Type: ZnRing,
         A: Allocator + Clone
 {
-    original_len: usize,
     significant_entries: usize,
-    data: Vec<El<R>, A>
+    ntt_data: Vec<El<R>, A>
 }
 
 impl<R, A> NTTConvolution<R, A>
@@ -56,77 +56,110 @@ impl<R, A> NTTConvolution<R, A>
         &self.ring
     }
 
-    fn add_assign_elementwise_product(&self, lhs: &[El<R>], rhs: &[El<R>], dst: &mut [El<R>]) {
-        assert_eq!(lhs.len(), rhs.len());
-        assert_eq!(lhs.len(), dst.len());
-        for i in 0..lhs.len() {
-            self.ring.add_assign(&mut dst[i], self.ring.mul_ref(&lhs[i], &rhs[i]));
-        }
-    }
-
-    fn compute_convolution_impl(&self, mut lhs: PreparedConvolutionOperand<R, A>, rhs: &PreparedConvolutionOperand<R, A>, dst: &mut [El<R>]) {
-        if lhs.original_len == 0 || rhs.original_len == 0 {
-            return;
-        }
-        let log2_n = StaticRing::<i64>::RING.abs_log2_ceil(&lhs.data.len().try_into().unwrap()).unwrap();
-        assert_eq!(1 << log2_n, lhs.data.len());
-        assert_eq!(1 << log2_n, rhs.data.len());
-
-        let significant_entries =  lhs.original_len + rhs.original_len - 1;
-        assert!(significant_entries <= lhs.significant_entries);
-        assert!(significant_entries <= rhs.significant_entries);
-        assert!(dst.len() >= significant_entries);
-
-        for i in 0..significant_entries {
-            self.ring.mul_assign_ref(&mut lhs.data[i], &rhs.data[i]);
-        }
-        self.get_fft(log2_n).unordered_truncated_fft_inv(&mut lhs.data, significant_entries);
-        for (i, x) in lhs.data.into_iter().take(significant_entries).enumerate() {
-            self.ring.add_assign(&mut dst[i], x);
-        }
-    }
-
-    fn retrieve_original_data(&self, value: &PreparedConvolutionOperand<R, A>) -> Vec<El<R>, A> {
-        let log2_n = ZZ.abs_log2_ceil(&value.data.len().try_into().unwrap()).unwrap();
-        assert_eq!(value.data.len(), 1 << log2_n);
-        let mut result = Vec::with_capacity_in(1 << log2_n, self.allocator.clone());
-        result.extend(value.data.iter().map(|x| self.ring.clone_el(x)));
-        self.get_fft(log2_n).unordered_truncated_fft_inv(&mut result, value.significant_entries);
-        result.truncate(value.original_len);
-        return result;
-    }
-
-    fn get_fft<'a>(&'a self, log2_n: usize) -> &'a CooleyTuckeyFFT<R::Type, R::Type, Identity<R>> {
+    fn get_ntt_table<'a>(&'a self, log2_n: usize) -> &'a CooleyTuckeyFFT<R::Type, R::Type, Identity<R>> {
         self.fft_algos.get_or_init(log2_n, || CooleyTuckeyFFT::for_zn(self.ring().clone(), log2_n).unwrap())
     }
 
-    fn clone_prepared_operand(&self, operand: &PreparedConvolutionOperand<R, A>) -> PreparedConvolutionOperand<R, A> {
-        let mut result = Vec::with_capacity_in(operand.data.len(), self.allocator.clone());
-        result.extend(operand.data.iter().map(|x| self.ring.clone_el(x)));
+    fn get_ntt_data<'a, V>(
+        &self,
+        data: V,
+        data_prep: Option<&'a PreparedConvolutionOperand<R, A>>,
+        significant_entries: usize,
+    ) -> Boo<'a, Vec<El<R>, A>>
+        where V: VectorView<El<R>>
+    {
+        assert!(data.len() <= significant_entries);
+        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&significant_entries.try_into().unwrap()).unwrap();
+
+        let compute_result = || {
+            let mut result = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
+            result.extend(data.as_iter().map(|x| self.ring.clone_el(x)));
+            result.resize_with(1 << log2_len, || self.ring.zero());
+            self.get_ntt_table(log2_len).unordered_truncated_fft(&mut result, significant_entries);
+            return result;
+        };
+
+        return if let Some(data_prep) = data_prep {
+            assert!(data_prep.significant_entries >= significant_entries);
+            Boo::Borrowed(&data_prep.ntt_data)
+        } else {
+            Boo::Owned(compute_result())
+        }
+    }
+
+    fn prepare_convolution_impl<V>(
+        &self,
+        data: V,
+        len_hint: Option<usize>
+    ) -> PreparedConvolutionOperand<R, A>
+        where V: VectorView<El<R>>
+    {
+        let significant_entries = if let Some(out_len) = len_hint {
+            assert!(data.len() <= out_len);
+            out_len
+        } else {
+            2 * data.len()
+        };
+        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&significant_entries.try_into().unwrap()).unwrap();
+
+        let mut result = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
+        result.extend(data.as_iter().map(|x| self.ring.clone_el(x)));
+        result.resize_with(1 << log2_len, || self.ring.zero());
+        self.get_ntt_table(log2_len).unordered_truncated_fft(&mut result, significant_entries);
+
         return PreparedConvolutionOperand {
-            original_len: operand.original_len,
-            significant_entries: operand.significant_entries,
-            data: result
+            ntt_data: result,
+            significant_entries: significant_entries
         };
     }
-    
-    fn prepare_convolution_impl<V: VectorView<El<R>>>(&self, val: V, len_hint: Option<usize>) -> PreparedConvolutionOperand<R, A> {
-        let out_len = if let Some(len_hint) = len_hint {
-            assert!(val.len() <= len_hint);
-            len_hint
-        } else {
-            2 * val.len()
+
+    fn compute_convolution_impl<V1, V2>(
+        &self,
+        lhs: V1,
+        mut lhs_prep: Option<&PreparedConvolutionOperand<R, A>>,
+        rhs: V2,
+        mut rhs_prep: Option<&PreparedConvolutionOperand<R, A>>,
+        dst: &mut [El<R>]
+    )
+        where V1: VectorView<El<R>>,
+            V2: VectorView<El<R>>
+    {
+        if lhs.len() == 0 || rhs.len() == 0 {
+            return;
+        }
+        let len = lhs.len() + rhs.len() - 1;
+        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
+
+        if lhs_prep.is_some() && (lhs_prep.unwrap().significant_entries < len || lhs_prep.unwrap().ntt_data.len() != 1 << log2_len) {
+            lhs_prep = None;
+        }
+        if rhs_prep.is_some() && (rhs_prep.unwrap().significant_entries < len || rhs_prep.unwrap().ntt_data.len() != 1 << log2_len) {
+            rhs_prep = None;
+        }
+
+        let mut lhs_ntt = self.get_ntt_data(lhs, lhs_prep, len);
+        let mut rhs_ntt = self.get_ntt_data(rhs, rhs_prep, len);
+        if rhs_ntt.is_owned() {
+            std::mem::swap(&mut lhs_ntt, &mut rhs_ntt);
+        }
+        let mut lhs_ntt = match lhs_ntt {
+            Boo::Owned(data) => data,
+            Boo::Borrowed(data) => {
+                let mut copied_data = Vec::with_capacity_in(data.len(), self.allocator.clone());
+                copied_data.extend(data.iter().map(|x| self.ring.clone_el(x)));
+                copied_data
+            }
         };
-        let log2_out_len = ZZ.abs_log2_ceil(&out_len.try_into().unwrap()).unwrap();
-        let mut result = Vec::with_capacity_in(1 << log2_out_len, self.allocator.clone());
-        result.extend(val.as_iter().map(|x| self.ring.clone_el(x)));
-        result.resize_with(1 << log2_out_len, || self.ring.zero());
-        self.get_fft(log2_out_len).unordered_truncated_fft(&mut result[..], out_len);
-        return PreparedConvolutionOperand {
-            significant_entries: out_len,
-            original_len: val.len(),
-            data: result
-        };
+
+        for i in 0..len {
+            self.ring.mul_assign_ref(&mut lhs_ntt[i], &rhs_ntt[i]);
+        }
+
+        self.get_ntt_table(log2_len).unordered_truncated_fft_inv(&mut lhs_ntt, len);
+
+        for (i, x) in lhs_ntt.into_iter().enumerate().take(len) {
+            self.ring.add_assign(&mut dst[i], x);
+        }
     }
 }
 
@@ -140,16 +173,14 @@ impl<R, A> ConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
     }
 
     fn compute_convolution<S: RingStore<Type = R::Type> + Copy, V1: VectorView<<R::Type as RingBase>::Element>, V2: VectorView<<R::Type as RingBase>::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [El<R>], ring: S) {
-        assert!(self.supports_ring(&ring));
-        if lhs.len() == 0 || rhs.len() == 0 {
-            return;
-        }
-        let out_len = lhs.len() + rhs.len() - 1;
+        assert!(self.supports_ring(ring));
         self.compute_convolution_impl(
-            self.prepare_convolution_impl(lhs, Some(out_len)),
-            &self.prepare_convolution_impl(rhs, Some(out_len)),
+            lhs,
+            None,
+            rhs,
+            None,
             dst
-        );
+        )
     }
 
     fn specialize_prepared_convolution<F>(function: F) -> F::Output
@@ -159,8 +190,6 @@ impl<R, A> ConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
     }
 }
 
-const ZZ: StaticRing<i64> = StaticRing::<i64>::RING;
-
 impl<R, A> PreparedConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
     where R: RingStore + Clone,
         R::Type: ZnRing,
@@ -168,114 +197,27 @@ impl<R, A> PreparedConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
 {
     type PreparedConvolutionOperand = PreparedConvolutionOperand<R, A>;
 
-    fn prepare_convolution_operand<S: RingStore<Type = R::Type> + Copy, V: VectorView<El<R>>>(&self, val: V, len_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand {
-        assert!(self.supports_ring(&ring));
-        return self.prepare_convolution_impl(val, len_hint);
-    }
-
-    fn prepared_operand_len(&self, prepared_operand: &Self::PreparedConvolutionOperand) -> usize {
-        prepared_operand.original_len
-    }
-
-    fn prepared_operand_data<S, V>(&self, prepared_operand: &Self::PreparedConvolutionOperand, mut output: V, ring: S)
-        where S: RingStore<Type = R::Type> + Copy,
-            V: VectorViewMut<<R::Type as RingBase>::Element>
+    fn prepare_convolution_operand<S, V>(&self, val: V, length_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
+        where S: RingStore<Type = R::Type> + Copy, V: VectorView<El<R>>
     {
-        assert!(self.supports_ring(&ring));
-        let data = self.retrieve_original_data(prepared_operand);
-        let len = data.len();
-        assert!(output.len() >= len);
-        for (i, x) in data.into_iter().enumerate() {
-            *output.at_mut(i) = x;
-        }
-        for i in len..output.len() {
-            *output.at_mut(i) = ring.zero();
-        }
+        assert!(self.supports_ring(ring));
+        self.prepare_convolution_impl(
+            val,
+            length_hint
+        )
     }
 
-    fn compute_convolution_lhs_prepared<S: RingStore<Type = R::Type> + Copy, V: VectorView<El<R>>>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: V, dst: &mut [El<R>], ring: S) {
-        assert!(self.supports_ring(&ring));
-        if lhs.original_len == 0 || rhs.len() == 0 {
-            return;
-        }
-        let out_len = lhs.original_len + rhs.len() - 1;
-        let log2_out_len = StaticRing::<i64>::RING.abs_log2_ceil(&out_len.try_into().unwrap()).unwrap();
-        if out_len <= lhs.significant_entries && lhs.data.len() == 1 << log2_out_len {
-            self.compute_convolution_impl(
-                self.prepare_convolution_impl(rhs, Some(out_len)),
-                lhs,
-                dst
-            );
-        } else {
-            let lhs_data = self.retrieve_original_data(lhs);
-            self.compute_convolution(lhs_data, rhs, dst, ring);
-        }
-    }
-
-    fn compute_convolution_prepared<S: RingStore<Type = R::Type> + Copy>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: &Self::PreparedConvolutionOperand, dst: &mut [El<R>], ring: S) {
-        assert!(self.supports_ring(&ring));
-        if lhs.original_len == 0 || rhs.original_len == 0 {
-            return;
-        }
-        let out_len = lhs.original_len + rhs.original_len - 1;
-        let log2_out_len = StaticRing::<i64>::RING.abs_log2_ceil(&out_len.try_into().unwrap()).unwrap();
-        match (
-            out_len <= lhs.significant_entries && lhs.data.len() == 1 << log2_out_len, 
-            out_len <= rhs.significant_entries && rhs.data.len() == 1 << log2_out_len
-        ) {
-            (true, true) => self.compute_convolution_impl(self.clone_prepared_operand(lhs), rhs, dst),
-            (true, false) => self.compute_convolution_lhs_prepared(lhs, self.retrieve_original_data(rhs), dst, ring),
-            (false, true) => self.compute_convolution_lhs_prepared(rhs, self.retrieve_original_data(lhs), dst, ring),
-            (false, false) => self.compute_convolution(self.retrieve_original_data(lhs), self.retrieve_original_data(rhs), dst, ring)
-        }
-    }
-
-    fn compute_convolution_inner_product_prepared<'a, S, I>(&self, values: I, dst: &mut [El<R>], ring: S)
-        where S: RingStore<Type = R::Type> + Copy, 
-            I: Iterator<Item = (&'a Self::PreparedConvolutionOperand, &'a Self::PreparedConvolutionOperand)>,
-            Self: 'a,
-            R: 'a,
-            PreparedConvolutionOperand<R, A>: 'a
+    fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [El<R>], ring: S)
+        where S: RingStore<Type = R::Type> + Copy, V1: VectorView<El<R>>, V2: VectorView<El<R>>
     {
-        assert!(self.supports_ring(&ring));
-        let data = values.collect::<Vec<_>>();
-        let out_len = data.iter().map(|(lhs, rhs)| (lhs.original_len + rhs.original_len).saturating_sub(1)).max();
-        if out_len.is_none() || out_len == Some(0) {
-            return;
-        }
-        let out_len = out_len.unwrap();
-        let log2_out_len = StaticRing::<i64>::RING.abs_log2_ceil(&out_len.try_into().unwrap()).unwrap();
-        let mut tmp = Vec::with_capacity_in(1 << log2_out_len, self.allocator.clone());
-        tmp.resize_with(1 << log2_out_len, || self.ring.zero());
-
-        for (lhs, rhs) in data.into_iter() {
-            match (
-                out_len <= lhs.significant_entries && (1 << log2_out_len) == lhs.data.len(), 
-                out_len <= rhs.significant_entries && (1 << log2_out_len) == rhs.data.len()
-            ) {
-                (true, true) => self.add_assign_elementwise_product(&lhs.data, &rhs.data, &mut tmp),
-                (true, false) => self.add_assign_elementwise_product(
-                    &lhs.data, 
-                    &self.prepare_convolution_impl(self.retrieve_original_data(rhs), Some(out_len)).data, 
-                    &mut tmp
-                ),
-                (false, true) => self.add_assign_elementwise_product(
-                    &self.prepare_convolution_impl(self.retrieve_original_data(lhs), Some(out_len)).data, 
-                    &rhs.data, 
-                    &mut tmp
-                ),
-                (false, false) => self.add_assign_elementwise_product(
-                    &self.prepare_convolution_impl(self.retrieve_original_data(lhs), Some(out_len)).data, 
-                    &self.prepare_convolution_impl(self.retrieve_original_data(rhs), Some(out_len)).data, 
-                    &mut tmp
-                )
-            }
-        }
-
-        self.get_fft(log2_out_len).unordered_truncated_fft_inv(&mut tmp, out_len);
-        for (i, x) in tmp.into_iter().enumerate().take(out_len) {
-            ring.add_assign(&mut dst[i], x);
-        }
+        assert!(self.supports_ring(ring));
+        self.compute_convolution_impl(
+            lhs,
+            lhs_prep,
+            rhs,
+            rhs_prep,
+            dst
+        )
     }
 }
 

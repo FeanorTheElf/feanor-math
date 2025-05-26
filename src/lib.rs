@@ -18,6 +18,7 @@
 #![feature(maybe_uninit_slice)]
 #![feature(iter_array_chunks)]
 #![feature(allocator_api)]
+#![feature(cow_is_borrowed)]
 #![feature(fn_traits)]
 #![feature(iter_advance_by)]
 #![feature(ptr_metadata)]
@@ -67,6 +68,7 @@ pub mod unstable_sealed {
 
 mod unsafe_any;
 mod lazy;
+mod boo;
 
 ///
 /// Contains [`computation::ComputationController`] to observe long-running computations.
