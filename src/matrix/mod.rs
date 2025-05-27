@@ -11,6 +11,10 @@ pub use submatrix::*;
 pub use transpose::*;
 pub use owned::*;
 
+///
+/// Contains the trait [`transform::TransformTarget`], for "consumers" of elementary
+/// matrix operations.
+/// 
 pub mod transform;
 
 #[stability::unstable(feature = "enable")]

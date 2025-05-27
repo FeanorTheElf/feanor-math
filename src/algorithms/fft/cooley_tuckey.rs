@@ -397,6 +397,9 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         H: Homomorphism<R_twiddle, R_main>,
         A: Allocator
 {
+    ///
+    /// Returns the ring over which this object can compute FFTs.
+    /// 
     pub fn ring<'a>(&'a self) -> &'a <H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
         self.hom.codomain()
     }

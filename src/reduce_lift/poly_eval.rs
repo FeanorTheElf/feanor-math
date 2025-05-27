@@ -328,6 +328,45 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for EvaluatePolyL
     }
 }
 
+///
+/// Generates an implementation of [`crate::reduce_lift::poly_eval::InterpolationBaseRing`]
+/// for a ring of characteristic zero. Not that in this case, the only sensible implementation
+/// is trivial, since the ring itself has enough elements for any interpolation task.
+/// 
+/// # Example
+/// ```rust
+/// # use feanor_math::ring::*;
+/// # use feanor_math::delegate::*;
+/// # use feanor_math::reduce_lift::poly_eval::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::divisibility::*;
+/// # use feanor_math::pid::*;
+/// # use feanor_math::impl_interpolation_base_ring_char_zero;
+/// // we wrap a `RingBase` here for simplicity, but in practice a wrapper should always
+/// // store a `RingStore` instead
+/// #[derive(PartialEq)]
+/// struct MyRingWrapper<R: RingBase>(R);
+/// impl<R: RingBase> DelegateRing for MyRingWrapper<R> {
+///     type Element = R::Element;
+///     type Base = R;
+///     fn get_delegate(&self) -> &Self::Base { &self.0 }
+///     fn delegate(&self, x: R::Element) -> R::Element { x }
+///     fn rev_delegate(&self, x: R::Element) -> R::Element { x }
+///     fn delegate_ref<'a>(&self, x: &'a R::Element) -> &'a R::Element { x }
+///     fn delegate_mut<'a>(&self, x: &'a mut R::Element) -> &'a mut R::Element { x }
+/// }
+/// impl<R: RingBase> DelegateRingImplEuclideanRing for MyRingWrapper<R> {}
+/// impl<R: Domain> Domain for MyRingWrapper<R> {}
+/// impl_interpolation_base_ring_char_zero!{ <{ R }> InterpolationBaseRing for MyRingWrapper<R> where R: PrincipalIdealRing + Domain }
+/// 
+/// // now we can use `InterpolationBaseRing`-functionality
+/// let ring = MyRingWrapper(StaticRing::<i64>::RING.into());
+/// let (embedding, points) = ToExtRingMap::for_interpolation(&ring, 3);
+/// assert_eq!(0, points[0]);
+/// assert_eq!(1, points[1]);
+/// assert_eq!(2, points[2]);
+/// ```
+/// 
 #[macro_export]
 macro_rules! impl_interpolation_base_ring_char_zero {
     (<{$($gen_args:tt)*}> InterpolationBaseRing for $self_type:ty where $($constraints:tt)*) => {
@@ -359,4 +398,7 @@ macro_rules! impl_interpolation_base_ring_char_zero {
             }
         }
     };
+    (InterpolationBaseRing for $self_type:ty) => {
+        impl_interpolation_base_ring_char_zero!{ <{}> InterpolationBaseRing for $self_type where }
+    }
 }

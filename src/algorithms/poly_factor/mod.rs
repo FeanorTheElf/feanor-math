@@ -11,9 +11,31 @@ use crate::rings::zn::zn_64::*;
 use finite::*;
 use rational::*;
 
+///
+/// Contains an implementation of the Cantor-Zassenhaus algorithm for
+/// finding factors of univariate polynomials over finite fields.
+/// 
+/// Additionally, a distinct-degree factorization and variants of Cantor-
+/// Zassenhaus are also implemented.
+/// 
 pub mod cantor_zassenhaus;
+
+///
+/// Contains an an algorithm to factor univariate polynomials over 
+/// field extensions.
+/// 
 pub mod extension;
+
+///
+/// Contains an algorithm to factor univariate polynomials over the integers
+/// and the rational numbers.
+/// 
 pub mod rational;
+
+///
+/// Contains an algorithm to factor univariate polynomials over finite fields,
+/// based on the more basic functionality of [`cantor_zassenhaus`].
+/// 
 pub mod finite;
 
 ///

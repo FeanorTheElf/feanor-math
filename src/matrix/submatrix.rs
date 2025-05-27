@@ -396,6 +396,13 @@ impl<'a, V, T> ColumnMut<'a, V, T>
         }
     }
 
+    ///
+    /// Returns mutable references to two different entries of the column.
+    /// 
+    /// This requires `i != j`, otherwise the function will panic. This
+    /// is necessary, since otherwise the two references would violate the
+    /// borrowing rules of Rust.
+    /// 
     pub fn two_entries<'b>(&'b mut self, i: usize, j: usize) -> (&'b mut T, &'b mut T) {
         assert!(i != j);
         // safe since i != j
@@ -500,6 +507,11 @@ impl<'a, V, T> SwappableVectorViewMut<T> for ColumnMut<'a, V, T>
 ///
 /// Immutable view on a matrix that stores elements of type `T`.
 /// 
+/// Note that a [`Submatrix`] never owns the data, but always behaves like
+/// a reference. In particular, this means that [`Submatrix`] is `Copy`,
+/// unconditionally. The equivalent to a mutable reference is given by
+/// [`SubmatrixMut`].
+/// 
 /// This view is designed to work with various underlying representations
 /// of the matrix, as described by [`AsPointerToSlice`].
 /// 
@@ -513,10 +525,17 @@ pub struct Submatrix<'a, V, T>
 impl<'a, V, T> Submatrix<'a, V, T>
     where V: 'a + AsPointerToSlice<T>
 {
+    ///
+    /// Returns the submatrix that references only the entries whose row resp. column
+    /// indices are within the given ranges.
+    /// 
     pub fn submatrix(self, rows: Range<usize>, cols: Range<usize>) -> Self {
         self.restrict_rows(rows).restrict_cols(cols)
     }
 
+    ///
+    /// Returns the submatrix that references only the entries whose row indices are within the given range.
+    /// 
     pub fn restrict_rows(self, rows: Range<usize>) -> Self {
         Self {
             entry: PhantomData,
@@ -524,6 +543,13 @@ impl<'a, V, T> Submatrix<'a, V, T>
         }
     }
 
+    ///
+    /// Consumes the submatrix and produces a reference to its `(i, j)`-th entry.
+    /// 
+    /// In most cases, you will use [`Submatrix::at()`] instead, but in rare occasions,
+    /// `into_at()` might be necessary to provide a reference whose lifetime is not
+    /// coupled to the lifetime of the submatrix object.
+    /// 
     pub fn into_at(self, i: usize, j: usize) -> &'a T {
         &self.into_row_at(i)[j]
     }
@@ -532,6 +558,9 @@ impl<'a, V, T> Submatrix<'a, V, T>
         &self.row_at(i)[j]
     }
 
+    ///
+    /// Returns the submatrix that references only the entries whose column indices are within the given range.
+    /// 
     pub fn restrict_cols(self, cols: Range<usize>) -> Self {
         Self {
             entry: PhantomData,
@@ -539,6 +568,9 @@ impl<'a, V, T> Submatrix<'a, V, T>
         }
     }
 
+    ///
+    /// Returns an iterator over all rows of the matrix.
+    /// 
     pub fn row_iter(self) -> impl 'a + Clone + ExactSizeIterator<Item = &'a [T]> {
         (0..self.raw_data.row_count).map(move |i| 
         // safe since there are no immutable references to self.raw_data    
@@ -547,6 +579,9 @@ impl<'a, V, T> Submatrix<'a, V, T>
         })
     }
 
+    ///
+    /// Returns an iterator over all columns of the matrix.
+    /// 
     pub fn col_iter(self) -> impl 'a + Clone + ExactSizeIterator<Item = Column<'a, V, T>> {
         (0..self.raw_data.col_count).map(move |j| {
             debug_assert!(j < self.raw_data.col_count);
@@ -560,6 +595,13 @@ impl<'a, V, T> Submatrix<'a, V, T>
         })
     }
 
+    ///
+    /// Consumes the submatrix and produces a reference to its `i`-th row.
+    /// 
+    /// In most cases, you will use [`Submatrix::row_at()`] instead, but in rare occasions,
+    /// `into_row_at()` might be necessary to provide a reference whose lifetime is not
+    /// coupled to the lifetime of the submatrix object.
+    /// 
     pub fn into_row_at(self, i: usize) -> &'a [T] {
         // safe since there are no mutable references to self.raw_data
         unsafe {
@@ -574,6 +616,13 @@ impl<'a, V, T> Submatrix<'a, V, T>
         }
     }
 
+    ///
+    /// Consumes the submatrix and produces a reference to its `j`-th column.
+    /// 
+    /// In most cases, you will use [`Submatrix::col_at()`] instead, but in rare occasions,
+    /// `into_col_at()` might be necessary to provide a reference whose lifetime is not
+    /// coupled to the lifetime of the submatrix object.
+    /// 
     pub fn into_col_at(self, j: usize) -> Column<'a, V, T> {
         assert!(j < self.raw_data.col_count);
         let mut result_raw = self.raw_data;
@@ -620,6 +669,9 @@ impl<'a, V, T> Copy for Submatrix<'a, V, T>
 ///
 /// Mutable view on a matrix that stores elements of type `T`.
 /// 
+/// As for [`Submatrix`], a [`SubmatrixMut`] never owns the data, but
+/// behaves similarly to a mutable reference.
+/// 
 /// This view is designed to work with various underlying representations
 /// of the matrix, as described by [`AsPointerToSlice`].
 /// 
@@ -633,10 +685,17 @@ pub struct SubmatrixMut<'a, V, T>
 impl<'a, V, T> SubmatrixMut<'a, V, T>
     where V: 'a + AsPointerToSlice<T>
 {
+    ///
+    /// Returns the submatrix that references only the entries whose row resp. column
+    /// indices are within the given ranges.
+    /// 
     pub fn submatrix(self, rows: Range<usize>, cols: Range<usize>) -> Self {
         self.restrict_rows(rows).restrict_cols(cols)
     }
 
+    ///
+    /// Returns the submatrix that references only the entries whose row indices are within the given range.
+    /// 
     pub fn restrict_rows(self, rows: Range<usize>) -> Self {
         Self {
             entry: PhantomData,
@@ -644,6 +703,9 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         }
     }
 
+    ///
+    /// Returns the submatrix that references only the entries whose column indices are within the given range.
+    /// 
     pub fn restrict_cols(self, cols: Range<usize>) -> Self {
         Self {
             entry: PhantomData,
@@ -651,6 +713,11 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         }
     }
 
+    ///
+    /// Returns the two submatrices referencing the entries whose row index is within the given ranges.
+    /// 
+    /// The ranges must not overlap, so that the returned matrices don't alias the same entry.
+    /// 
     pub fn split_rows(self, fst_rows: Range<usize>, snd_rows: Range<usize>) -> (Self, Self) {
         assert!(fst_rows.end <= snd_rows.start || snd_rows.end <= fst_rows.start);
         (
@@ -665,6 +732,11 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         )
     }
 
+    ///
+    /// Returns the two submatrices referencing the entries whose column index is within the given ranges.
+    /// 
+    /// The ranges must not overlap, so that the returned matrices don't alias the same entry.
+    /// 
     pub fn split_cols(self, fst_cols: Range<usize>, snd_cols: Range<usize>) -> (Self, Self) {
         assert!(fst_cols.end <= snd_cols.start || snd_cols.end <= fst_cols.start);
         (
@@ -699,6 +771,13 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         })
     }
 
+    ///
+    /// Consumes the submatrix and produces a reference to its `(i, j)`-th entry.
+    /// 
+    /// In most cases, you will use [`SubmatrixMut::at_mut()`] instead, but in rare occasions,
+    /// `into_at_mut()` might be necessary to provide a reference whose lifetime is not
+    /// coupled to the lifetime of the submatrix object.
+    /// 
     pub fn into_at_mut(self, i: usize, j: usize) -> &'a mut T {
         &mut self.into_row_mut_at(i)[j]
     }
@@ -715,6 +794,13 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         self.as_const().into_row_at(i)
     }
 
+    ///
+    /// Consumes the submatrix and produces a reference to its `i`-th row.
+    /// 
+    /// In most cases, you will use [`SubmatrixMut::row_mut_at()`] instead, but in rare occasions,
+    /// `into_row_mut_at()` might be necessary to provide a reference whose lifetime is not
+    /// coupled to the lifetime of the submatrix object.
+    /// 
     pub fn into_row_mut_at(self, i: usize) -> &'a mut [T] {
         // safe since self is exists borrowed for 'a
         unsafe {
@@ -730,6 +816,13 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         self.as_const().into_col_at(j)
     }
 
+    ///
+    /// Consumes the submatrix and produces a reference to its `j`-th column.
+    /// 
+    /// In most cases, you will use [`SubmatrixMut::col_mut_at()`] instead, but in rare occasions,
+    /// `into_col_mut_at()` might be necessary to provide a reference whose lifetime is not
+    /// coupled to the lifetime of the submatrix object.
+    /// 
     pub fn col_mut_at<'b>(&'b mut self, j: usize) -> ColumnMut<'b, V, T> {
         assert!(j < self.raw_data.col_count);
         let mut result_raw = self.raw_data;
@@ -741,6 +834,11 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         }
     }
 
+    ///
+    /// "Reborrows" the [`SubmatrixMut`], which is somewhat like cloning the submatrix, but
+    /// disallows the cloned object to be used while its copy is alive. This is necessary
+    /// to follow the aliasing rules of Rust.
+    /// 
     pub fn reborrow<'b>(&'b mut self) -> SubmatrixMut<'b, V, T> {
         SubmatrixMut {
             entry: PhantomData,
