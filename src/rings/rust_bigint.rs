@@ -282,7 +282,7 @@ macro_rules! specialize_int_cast {
             impl<A: Allocator + Clone> IntCast<RustBigintRingBase<A>> for StaticRingBase<$from> {
 
                 fn cast(&self, from: &RustBigintRingBase<A>, value: RustBigint<A>) -> $from {
-                    <$from>::try_from(from.map_i128(&value).unwrap()).ok().unwrap()
+                    <$from>::try_from(from.map_i128(&value).expect(concat!("integer does not fit into a ", stringify!($from)))).ok().expect(concat!("integer does not fit into a ", stringify!($from)))
                 }
             }
         )*

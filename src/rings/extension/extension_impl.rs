@@ -359,45 +359,14 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
     }
 
     fn square(&self, value: &mut Self::Element) {
-        struct SquareIfPreparable<'a, R, V, A, C>
-            where R: RingStore, 
-                V: VectorView<El<R>>,
-                A: Allocator + Clone,
-                C: ConvolutionAlgorithm<R::Type>
-        {
-            x: El<FreeAlgebraImpl<R, V, A, C>>,
-            ring: &'a FreeAlgebraImplBase<R, V, A, C>
+        let mut tmp = Vec::with_capacity_in(2 << self.log2_padded_len, self.element_allocator.clone());
+        tmp.resize_with(2 << self.log2_padded_len, || self.base_ring().zero());
+        let x_prepared = self.convolution.prepare_convolution_operand(&value.values[..], Some(2 * self.rank()), self.base_ring());
+        self.convolution.compute_convolution_prepared(&value.values[..], Some(&x_prepared), &value.values[..], Some(&x_prepared), &mut tmp, self.base_ring());
+        self.reduce_mod_poly(&mut tmp);
+        for i in 0..self.rank() {
+            value.values[i] = std::mem::replace(&mut tmp[i], self.base_ring().zero());
         }
-        impl<'a, R, V, A, C> PreparedConvolutionOperation<C, R::Type> for SquareIfPreparable<'a, R, V, A, C>
-            where R: RingStore, 
-                V: VectorView<El<R>>,
-                A: Allocator + Clone,
-                C: ConvolutionAlgorithm<R::Type>
-        {
-            type Output = El<FreeAlgebraImpl<R, V, A, C>>;
-
-            fn execute(mut self) -> Self::Output
-                where C: PreparedConvolutionAlgorithm<R::Type>
-            {
-                let mut tmp = Vec::with_capacity_in(2 << self.ring.log2_padded_len, self.ring.element_allocator.clone());
-                tmp.resize_with(2 << self.ring.log2_padded_len, || self.ring.base_ring().zero());
-                let x_prepared = self.ring.convolution.prepare_convolution_operand(&self.x.values[..], Some(2 * self.ring.rank()), self.ring.base_ring());
-                self.ring.convolution.compute_convolution_prepared(&self.x.values[..], Some(&x_prepared), &self.x.values[..], Some(&x_prepared), &mut tmp, self.ring.base_ring());
-                self.ring.reduce_mod_poly(&mut tmp);
-                for i in 0..self.ring.rank() {
-                    self.x.values[i] = std::mem::replace(&mut tmp[i], self.ring.base_ring().zero());
-                }
-                return self.x;
-            }
-
-            fn fallback(self) -> Self::Output {
-                self.ring.mul_ref(&self.x, &self.x)
-            }
-        }
-        *value = <C as ConvolutionAlgorithm<R::Type>>::specialize_prepared_convolution(SquareIfPreparable {
-            x: std::mem::replace(value, FreeAlgebraImplEl { values: Vec::new_in(self.element_allocator.clone()).into_boxed_slice() }),
-            ring: self
-        });
     }
 }
 

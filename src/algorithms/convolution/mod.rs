@@ -28,7 +28,7 @@ pub mod ntt;
 /// Contains an implementation of computing convolutions by considering them modulo
 /// various primes that are either smaller or allow for suitable roots of unity.
 /// 
-// pub mod rns;
+pub mod rns;
 
 ///
 /// Trait for objects that can compute a convolution over some ring.
@@ -66,6 +66,17 @@ pub mod ntt;
 pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
 
     ///
+    /// Additional data associated to a list of ring elements, which can be used to
+    /// compute a convolution where this list is one of the operands faster.
+    ///
+    /// For more details, see [`ConvolutionAlgorithm::prepare_convolution_operand()`].
+    /// Note that a `PreparedConvolutionOperand` can only be used for convolutions
+    /// with the same list of values it was created for.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    type PreparedConvolutionOperand = ();
+
+    ///
     /// Elementwise adds the convolution of `lhs` and `rhs` to `dst`.
     /// 
     /// In other words, computes `dst[i] += sum_j lhs[j] * rhs[i - j]` for all `i`, where
@@ -94,53 +105,14 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, ring: S) -> bool;
 
     ///
-    /// If this convolution implements [`PreparedConvolutionAlgorithm`], then
-    /// the given function is called and its result is returned. Otherwise,
-    /// `Err` is returned.
-    /// 
-    #[stability::unstable(feature = "enable")]
-    fn specialize_prepared_convolution<F>(function: F) -> F::Output
-        where F: PreparedConvolutionOperation<Self, R>
-    {
-        function.fallback()
-    }
-}
-
-///
-/// Operation that only makes sense when `C` implements [`PreparedConvolutionAlgorithm`].
-/// Used together with [`ConvolutionAlgorithm::specialize_prepared_convolution()`] as
-/// a workaround for specialization.
-/// 
-#[stability::unstable(feature = "enable")]
-pub trait PreparedConvolutionOperation<C: ?Sized, R: ?Sized + RingBase> {
-
-    type Output;
-
-    fn execute(self) -> Self::Output
-        where C: PreparedConvolutionAlgorithm<R>;
-
-    fn fallback(self) -> Self::Output;
-}
-
-///
-/// Trait for convolution algorithms that can "prepare" one (or both) operands in advance
-/// by computing additional data, and then use this data to perform the actual convolution
-/// more efficiently.
-/// 
-#[stability::unstable(feature = "enable")]
-pub trait PreparedConvolutionAlgorithm<R: ?Sized + RingBase>: ConvolutionAlgorithm<R> {
-
-    type PreparedConvolutionOperand;
-
-    ///
     /// Takes an input list of values and computes an opaque [`PreparedConvolutionAlgorithm::PreparedConvolutionOperand`],
     /// which can be used to compute future convolutions with this list of values faster.
     /// 
     /// Although the [`PreparedConvolutionAlgorithm::PreparedConvolutionOperand`] does not have any explicit reference
-    /// to the list of values it was created for, passing it to [`PreparedConvolutionAlgorithm::prepare_convolution_operand()`]
+    /// to the list of values it was created for, passing it to [`PreparedConvolutionAlgorithm::compute_convolution_prepared()`]
     /// with another list of values will give erroneous results.
     /// 
-    /// # Length-dependent convolution preparation
+    /// # Length-dependence when preparing a convolution
     /// 
     /// For some algorithms, different data is required to speed up the convolution with an operand, depending on the 
     /// length of the other operand. For example, for FFT-based convolutions, the prepared data would consist of the
@@ -153,15 +125,37 @@ pub trait PreparedConvolutionAlgorithm<R: ?Sized + RingBase>: ConvolutionAlgorit
     /// but initialize an object with interior mutability, and use it to cache data computed during
     /// [`PreparedConvolutionAlgorithm::compute_convolution_prepared()`].
     /// 
+    /// TODO: At next breaking release, remove the default implementation
+    /// 
     /// # Example
     /// 
     /// TODO 
     /// 
+    #[stability::unstable(feature = "enable")]
     fn prepare_convolution_operand<S, V>(&self, val: V, length_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
-        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>;
-
+        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
+    {
+        struct ProduceUnitType;
+        trait ProduceValue<T> {
+            fn produce() -> T;
+        }
+        impl<T> ProduceValue<T> for ProduceUnitType {
+            default fn produce() -> T {
+                panic!("if you specialize ConvolutionAlgorithm::PreparedConvolutionOperand, you must also specialize ConvolutionAlgorithm::prepare_convolution_operand()")
+            }
+        }
+        impl ProduceValue<()> for ProduceUnitType {
+            fn produce() -> () {}
+        }
+        return <ProduceUnitType as ProduceValue<Self::PreparedConvolutionOperand>>::produce();
+    }
+    
+    #[stability::unstable(feature = "enable")]
     fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: S)
-        where S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>;
+        where S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>
+    {
+        self.compute_convolution(lhs, rhs, dst, ring)
+    }
 
     ///
     /// Computes a convolution for each tuple in the given sequence, and sums the result of each convolution
@@ -170,14 +164,14 @@ pub trait PreparedConvolutionAlgorithm<R: ?Sized + RingBase>: ConvolutionAlgorit
     /// In other words, this computes `dst[k] += sum_l sum_(i + j = k) values[l][i] * values[l][k]`.
     /// It can be faster than calling [`PreparedConvolutionAlgorithm::prepare_convolution_operand()`].
     /// 
+    #[stability::unstable(feature = "enable")]
     fn compute_convolution_sum<'a, S, I, V1, V2>(&self, values: I, dst: &mut [R::Element], ring: S) 
         where S: RingStore<Type = R> + Copy, 
-            I: Iterator<Item = (V1, Option<&'a Self::PreparedConvolutionOperand>, V2, Option<&'a Self::PreparedConvolutionOperand>)>,
+            I: ExactSizeIterator<Item = (V1, Option<&'a Self::PreparedConvolutionOperand>, V2, Option<&'a Self::PreparedConvolutionOperand>)>,
             V1: VectorView<R::Element>,
             V2: VectorView<R::Element>,
             Self: 'a,
-            R: 'a,
-            Self::PreparedConvolutionOperand: 'a
+            R: 'a
     {
         for (lhs, lhs_prep, rhs, rhs_prep) in values {
             self.compute_convolution_prepared(lhs, lhs_prep, rhs, rhs_prep, dst, ring)
@@ -190,6 +184,8 @@ impl<'a, R, C> ConvolutionAlgorithm<R> for C
         C: Deref,
         C::Target: ConvolutionAlgorithm<R>
 {
+    type PreparedConvolutionOperand = <C::Target as ConvolutionAlgorithm<R>>::PreparedConvolutionOperand;
+
     fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S) {
         (**self).compute_convolution(lhs, rhs, dst, ring)
     }
@@ -197,52 +193,6 @@ impl<'a, R, C> ConvolutionAlgorithm<R> for C
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, ring: S) -> bool {
         (**self).supports_ring(ring)
     }
-
-    fn specialize_prepared_convolution<F>(function: F) -> F::Output
-        where F: PreparedConvolutionOperation<Self, R>
-    {
-        struct CallFunction<F, C, R>
-            where R: ?Sized + RingBase,
-                C: Deref,
-                C::Target: ConvolutionAlgorithm<R>,
-                F: PreparedConvolutionOperation<C, R>
-        {
-            convolution: PhantomData<Box<C>>,
-            ring: PhantomData<Box<R>>,
-            function: F
-        }
-        impl<F, C, R> PreparedConvolutionOperation<C::Target, R> for CallFunction<F, C, R>
-            where R: ?Sized + RingBase,
-                C: Deref,
-                C::Target: ConvolutionAlgorithm<R>,
-                F: PreparedConvolutionOperation<C, R>
-        {
-            type Output = F::Output;
-
-            fn execute(self) -> Self::Output
-                where C::Target:PreparedConvolutionAlgorithm<R>
-            {
-                self.function.execute()
-            }
-
-            fn fallback(self) -> Self::Output {
-                self.function.fallback()
-            }
-        }
-        return <C::Target as ConvolutionAlgorithm<R>>::specialize_prepared_convolution::<CallFunction<F, C, R>>(CallFunction {
-            function: function,
-            ring: PhantomData,
-            convolution: PhantomData
-        });
-    }
-}
-
-impl<'a, R, C> PreparedConvolutionAlgorithm<R> for C
-    where R: ?Sized + RingBase,
-        C: Deref,
-        C::Target: PreparedConvolutionAlgorithm<R>
-{
-    type PreparedConvolutionOperand = <C::Target as PreparedConvolutionAlgorithm<R>>::PreparedConvolutionOperand;
 
     fn prepare_convolution_operand<S, V>(&self, val: V, len_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
         where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
@@ -258,12 +208,11 @@ impl<'a, R, C> PreparedConvolutionAlgorithm<R> for C
 
     fn compute_convolution_sum<'b, S, I, V1, V2>(&self, values: I, dst: &mut [R::Element], ring: S) 
         where S: RingStore<Type = R> + Copy, 
-            I: Iterator<Item = (V1, Option<&'b Self::PreparedConvolutionOperand>, V2, Option<&'b Self::PreparedConvolutionOperand>)>,
+            I: ExactSizeIterator<Item = (V1, Option<&'b Self::PreparedConvolutionOperand>, V2, Option<&'b Self::PreparedConvolutionOperand>)>,
             V1: VectorView<R::Element>,
             V2: VectorView<R::Element>,
             Self: 'b,
-            R: 'b,
-            Self::PreparedConvolutionOperand: 'b
+            R: 'b
     {
         (**self).compute_convolution_sum(values, dst, ring);
     }
@@ -408,11 +357,11 @@ pub mod generic_tests {
                 }
             }
         }
+        test_prepared_convolution(convolution, ring, scale);
     }
 
-    #[stability::unstable(feature = "enable")]
-    pub fn test_prepared_convolution<C, R>(convolution: C, ring: R, scale: El<R>)
-        where C: PreparedConvolutionAlgorithm<R::Type>,
+    fn test_prepared_convolution<C, R>(convolution: C, ring: R, scale: El<R>)
+        where C: ConvolutionAlgorithm<R::Type>,
             R: RingStore
     {
         for lhs_len in [2, 3, 4, 14, 15] {

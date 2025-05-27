@@ -9,7 +9,7 @@ use crate::rings::zn::*;
 use crate::integer::*;
 use crate::seq::VectorView;
 
-use super::{ConvolutionAlgorithm, PreparedConvolutionAlgorithm, PreparedConvolutionOperation};
+use super::ConvolutionAlgorithm;
 
 ///
 /// Computes the convolution over a finite field that has suitable roots of unity
@@ -168,6 +168,8 @@ impl<R, A> ConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
         R::Type: ZnRing,
         A: Allocator + Clone
 {
+    type PreparedConvolutionOperand = PreparedConvolutionOperand<R, A>;
+
     fn supports_ring<S: RingStore<Type = R::Type> + Copy>(&self, ring: S) -> bool {
         ring.get_ring() == self.ring.get_ring()
     }
@@ -182,20 +184,6 @@ impl<R, A> ConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
             dst
         )
     }
-
-    fn specialize_prepared_convolution<F>(function: F) -> F::Output
-        where F: PreparedConvolutionOperation<Self, R::Type>
-    {
-        function.execute()
-    }
-}
-
-impl<R, A> PreparedConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
-    where R: RingStore + Clone,
-        R::Type: ZnRing,
-        A: Allocator + Clone
-{
-    type PreparedConvolutionOperand = PreparedConvolutionOperand<R, A>;
 
     fn prepare_convolution_operand<S, V>(&self, val: V, length_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
         where S: RingStore<Type = R::Type> + Copy, V: VectorView<El<R>>
@@ -226,5 +214,4 @@ fn test_convolution() {
     let ring = zn_64::Zn::new(65537);
     let convolution = NTTConvolution::new_with(ring, Global);
     super::generic_tests::test_convolution(&convolution, &ring, ring.one());
-    super::generic_tests::test_prepared_convolution(&convolution, &ring, ring.one());
 }

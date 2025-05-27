@@ -14,7 +14,7 @@ use crate::divisibility::*;
 use crate::seq::*;
 
 use super::ntt::NTTConvolution;
-use super::{ConvolutionAlgorithm, PreparedConvolutionAlgorithm, PreparedConvolutionOperation};
+use super::{ConvolutionAlgorithm, STANDARD_CONVOLUTION};
 
 ///
 /// A [`ConvolutionAlgorithm`] that computes convolutions by computing them modulo a
@@ -62,21 +62,13 @@ pub struct RNSConvolutionZn<I = BigIntRing, C = NTTConvolution<Zn>, A = Global, 
 #[stability::unstable(feature = "enable")]
 pub struct PreparedConvolutionOperand<R, C = NTTConvolution<Zn>>
     where R: ?Sized + RingBase,
-        C: PreparedConvolutionAlgorithm<ZnBase>
+        C: ConvolutionAlgorithm<ZnBase>
 {
-    data: Vec<R::Element>,
     prepared: LazyVec<C::PreparedConvolutionOperand>,
     log2_data_size: usize,
-    significant_entries: usize
+    ring: PhantomData<R>,
+    len_hint: Option<usize>
 }
-
-///
-/// A prepared convolution operand for a [`RNSConvolutionZn`].
-/// 
-#[stability::unstable(feature = "enable")]
-pub struct PreparedConvolutionOperandZn<R, C = NTTConvolution<Zn>>(PreparedConvolutionOperand<R::IntegerRingBase, C>)
-    where R: ?Sized + ZnRing,
-        C: PreparedConvolutionAlgorithm<ZnBase>;
 
 ///
 /// Function that creates an [`NTTConvolution`] when given a suitable modulus.
@@ -137,6 +129,7 @@ impl<'a, I, C, A, CreateC> From<&'a RNSConvolution<I, C, A, CreateC>> for &'a RN
 }
 
 impl CreateNTTConvolution<Global> {
+
     #[stability::unstable(feature = "enable")]
     pub fn new() -> Self {
         Self { allocator: Global }
@@ -231,12 +224,11 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
     }
 
     fn get_rns_ring(&self, moduli_count: usize) -> &zn_rns::Zn<Zn, I, A> {
-        self.rns_rings.get_or_init_incremental(moduli_count, |_, prev| zn_rns::Zn::new_with(
+        self.rns_rings.get_or_init_incremental(moduli_count - 1, |_, prev| zn_rns::Zn::new_with(
             prev.as_iter().cloned().chain([Zn::new(Self::sample_next_prime(self.required_root_of_unity_log2, *prev.at(prev.len() - 1).modulus()).unwrap() as u64)]).collect(),
             self.integer_ring.clone(),
             self.allocator.clone()
-        ));
-        return self.rns_rings.get(moduli_count - 1).unwrap();
+        ))
     }
 
     fn get_rns_factor(&self, i: usize) -> &Zn {
@@ -246,23 +238,6 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
 
     fn get_convolution(&self, i: usize) -> &C {
         self.convolutions.get_or_init(i, || (self.create_convolution)(*self.get_rns_factor(i)))
-    }
-
-    fn extend_operand<R, F>(&self, operand: &PreparedConvolutionOperand<R, C>, target_width: usize, mut mod_part: F)
-        where R: ?Sized + RingBase,
-            C: PreparedConvolutionAlgorithm<ZnBase>,
-            F: FnMut(&R::Element, usize) -> El<Zn>
-    {
-        let mut tmp = Vec::new();
-        tmp.resize_with(operand.data.len(), || self.get_rns_factor(0).zero());
-        for i in 0..target_width {
-            _ = operand.prepared.get_or_init(i, || {
-                for j in 0..operand.data.len() {
-                    tmp[j] = mod_part(&operand.data[j], i);
-                }
-                self.get_convolution(i).prepare_convolution_operand(&tmp, Some(operand.significant_entries), self.get_rns_factor(i))
-            });
-        }
     }
 
     fn compute_required_width(&self, input_size_log2: usize, lhs_len: usize, rhs_len: usize, inner_prod_len: usize) -> usize {
@@ -277,201 +252,220 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
         return width;
     }
 
-    fn compute_convolution_impl<S, V1, V2, D>(&self, input_size_log2: usize, lhs: V1, rhs: V2, mut dst: D, ring: S)
-        where S: RingStore,
-            S::Type: RingBase + IntegerRing,
-            D: FnMut(usize, El<I>),
-            V1: VectorFn<El<S>>,
-            V2: VectorFn<El<S>>
+    fn get_log2_input_size<R, V1, V2, ToInt>(
+        &self,
+        lhs: V1,
+        lhs_prep: Option<&PreparedConvolutionOperand<R, C>>,
+        rhs: V2,
+        rhs_prep: Option<&PreparedConvolutionOperand<R, C>>,
+        ring: &R,
+        mut to_int: ToInt,
+        ring_log2_el_size: Option<usize>
+    ) -> usize
+        where R: ?Sized + RingBase,
+            V1: VectorView<R::Element>,
+            V2: VectorView<R::Element>,
+            ToInt: FnMut(&R::Element) -> El<I>,
     {
-        let width = self.compute_required_width(input_size_log2, lhs.len(), rhs.len(), 1);
-        let len = lhs.len() + rhs.len();
-        let mut res_data = Vec::with_capacity(len * width);
-        for i in 0..width {
-            res_data.extend((0..len).map(|_| self.get_rns_factor(i).zero()));
-        }
-
-        let mut lhs_tmp = Vec::with_capacity(lhs.len());
-        lhs_tmp.resize_with(lhs.len(), || self.get_rns_factor(0).zero());
-        let mut rhs_tmp = Vec::with_capacity(rhs.len());
-        rhs_tmp.resize_with(rhs.len(), || self.get_rns_factor(0).zero());
-        for i in 0..width {
-            let hom = self.get_rns_factor(i).can_hom(&ring).unwrap();
-            for j in 0..lhs.len() {
-                lhs_tmp[j] = hom.map(lhs.at(j));
-            }
-            for j in 0..rhs.len() {
-                rhs_tmp[j] = hom.map(rhs.at(j));
-            }
-            self.get_convolution(i).compute_convolution(&lhs_tmp, &rhs_tmp, &mut res_data[(i * len)..((i + 1) * len)], self.get_rns_factor(i));
-        }
-
-        for j in 0..(len - 1) {
-            dst(j, self.get_rns_ring(width).smallest_lift(self.get_rns_ring(width).from_congruence((0..width).map(|i| res_data[i * len + j]))));
-        }
-    }
-}
-
-impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
-    where I: RingStore + Clone,
-        I::Type: IntegerRing,
-        C: PreparedConvolutionAlgorithm<ZnBase>,
-        A: Allocator + Clone,
-        CreateC: Fn(Zn) -> C
-{
-    fn prepare_convolution_operand_impl<S, V>(&self, len_hint: Option<usize>, input_size_log2: usize, val: V, _ring: S) -> PreparedConvolutionOperand<S::Type, C>
-        where S: RingStore + Copy,
-            S::Type: IntegerRing, 
-            V: VectorFn<El<S>>
-    {
-        let significant_entries = if let Some(len_hint) = len_hint {
-            assert!(val.len() <= len_hint);
-            len_hint
-        } else {
-            2 * val.len()
-        };
-        let mut data = Vec::with_capacity(val.len());
-        data.extend(val.iter());
-        return PreparedConvolutionOperand {
-            data: data,
-            prepared: LazyVec::new(),
-            log2_data_size: input_size_log2,
-            significant_entries: significant_entries
-        };
-    }
-
-    fn compute_convolution_inner_product_lhs_prepared_impl<'a, S, V, D>(&self, rhs_input_size_log2: usize, values: &[(&'a PreparedConvolutionOperand<S::Type, C>, V)], mut dst: D, ring: S)
-        where S: RingStore + Copy,
-            S::Type: IntegerRing, 
-            D: FnMut(usize, El<I>),
-            V: VectorFn<El<S>>,
-            S: 'a,
-            Self: 'a,
-            PreparedConvolutionOperand<S::Type, C>: 'a
-    {
-        let max_len = values.iter().map(|(lhs, rhs)| lhs.data.len() + rhs.len()).max().unwrap_or(0);
-        let input_size_log2 = max(rhs_input_size_log2, values.iter().map(|(lhs, _)| lhs.log2_data_size).max().unwrap_or(0));
-        let width = self.compute_required_width(input_size_log2, (max_len - 1) / 2 + 1, (max_len - 1) / 2 + 1, values.len());
-        let mut res_data = Vec::with_capacity(max_len * width);
-        for i in 0..width {
-            res_data.extend((0..max_len).map(|_| self.get_rns_factor(i).zero()));
-        }
-
-        let mut rhs_tmp = Vec::with_capacity(max_len * values.len());
-        rhs_tmp.resize_with(max_len * values.len(), || self.get_rns_factor(0).zero());
-
-        let homs = (0..width).map(|i| self.get_rns_factor(i).can_hom(&ring).unwrap()).collect::<Vec<_>>();
-        for j in 0..values.len() {
-            self.extend_operand(values[j].0, width, |x, i| homs[i].map_ref(x));
-        }
-
-        for i in 0..width {
-            for j in 0..values.len() {
-                for k in 0..values[j].1.len() {
-                    rhs_tmp[j * max_len + k] = homs[i].map(values[j].1.at(k));
+        if let Some(log2_data_size) = ring_log2_el_size {
+            assert!(lhs_prep.is_none() || lhs_prep.unwrap().log2_data_size == log2_data_size);
+            assert!(rhs_prep.is_none() || rhs_prep.unwrap().log2_data_size == log2_data_size);
+            log2_data_size
+        } else { 
+            max(
+                if let Some(lhs_prep) = lhs_prep {
+                    lhs_prep.log2_data_size
+                } else {
+                    lhs.as_iter().map(|x| self.integer_ring.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap()
+                },
+                if let Some(rhs_prep) = rhs_prep {
+                    rhs_prep.log2_data_size
+                } else {
+                    rhs.as_iter().map(|x| self.integer_ring.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap()
                 }
-            }
-            self.get_convolution(i).compute_convolution_inner_product_lhs_prepared(
-                values.iter().enumerate().map(|(j, (lhs, _))| (lhs.prepared.get(i).unwrap(), &rhs_tmp[(j * max_len)..(j * max_len + values[j].1.len())])), 
-                &mut res_data[(i * max_len)..((i + 1) * max_len)], 
+            )
+        }
+    }
+    
+    fn get_prepared_operand<'a, R, V>(
+        &self,
+        data: V,
+        data_prep: &'a PreparedConvolutionOperand<R, C>,
+        rns_index: usize,
+        ring: &R
+    ) -> &'a C::PreparedConvolutionOperand
+        where R: ?Sized + RingBase,
+            V: VectorView<El<Zn>> + Copy
+    {
+        data_prep.prepared.get_or_init(rns_index, || self.get_convolution(rns_index).prepare_convolution_operand(data, data_prep.len_hint, self.get_rns_factor(rns_index)))
+    }
+
+    fn compute_convolution_impl<R, V1, V2, ToInt, FromInt>(
+        &self,
+        lhs: V1,
+        lhs_prep: Option<&PreparedConvolutionOperand<R, C>>,
+        rhs: V2,
+        rhs_prep: Option<&PreparedConvolutionOperand<R, C>>,
+        dst: &mut [R::Element],
+        ring: &R,
+        mut to_int: ToInt,
+        mut from_int: FromInt,
+        ring_log2_el_size: Option<usize>
+    )
+        where R: ?Sized + RingBase,
+            V1: VectorView<R::Element>,
+            V2: VectorView<R::Element>,
+            ToInt: FnMut(&R::Element) -> El<I>,
+            FromInt: FnMut(El<I>) -> R::Element
+    {
+        if lhs.len() == 0 || rhs.len() == 0 {
+            return;
+        }
+
+        let input_size_log2 = self.get_log2_input_size(&lhs, lhs_prep, &rhs, rhs_prep, ring, &mut to_int, ring_log2_el_size);
+        let width = self.compute_required_width(input_size_log2, lhs.len(), rhs.len(), 1);
+        let len = lhs.len() + rhs.len() - 1;
+
+        let mut res_data = Vec::with_capacity_in(len * width, self.allocator.clone());
+        for i in 0..width {
+            res_data.extend((0..len).map(|_| self.get_rns_factor(i).zero()));
+        }
+        let mut lhs_tmp = Vec::with_capacity_in(lhs.len(), self.allocator.clone());
+        let mut rhs_tmp = Vec::with_capacity_in(rhs.len(), self.allocator.clone());
+        for i in 0..width {
+            let hom = self.get_rns_factor(i).into_can_hom(&self.integer_ring).ok().unwrap();
+            lhs_tmp.clear();
+            lhs_tmp.extend(lhs.as_iter().map(|x| hom.map(to_int(x))));
+            rhs_tmp.clear();
+            rhs_tmp.extend(rhs.as_iter().map(|x| hom.map(to_int(x))));
+            self.get_convolution(i).compute_convolution_prepared(
+                &lhs_tmp, 
+                lhs_prep.map(|lhs_prep| self.get_prepared_operand(&lhs_tmp, lhs_prep, i, ring)),
+                &rhs_tmp, 
+                rhs_prep.map(|rhs_prep| self.get_prepared_operand(&rhs_tmp, rhs_prep, i, ring)),
+                &mut res_data[(i * len)..((i + 1) * len)], 
                 self.get_rns_factor(i)
             );
         }
-        
-        for j in 0..(max_len - 1) {
-            dst(j, self.get_rns_ring(width).smallest_lift(self.get_rns_ring(width).from_congruence((0..width).map(|i| res_data[i * max_len + j]))));
+        for j in 0..len {
+            let add = self.get_rns_ring(width).smallest_lift(self.get_rns_ring(width).from_congruence((0..width).map(|i| res_data[i * len + j])));
+            ring.add_assign(&mut dst[j], from_int(add));
         }
     }
 
-    fn compute_convolution_inner_product_prepared_impl<'a, S, D>(&self, values: &[(&'a PreparedConvolutionOperand<S::Type, C>, &'a PreparedConvolutionOperand<S::Type, C>)], mut dst: D, ring: S)
-        where S: RingStore + Copy,
-            S::Type: IntegerRing, 
-            D: FnMut(usize, El<I>),
+    fn compute_convolution_sum_impl<'a, R, J, V1, V2, ToInt, FromInt>(
+        &self, 
+        values: J, 
+        dst: &mut [R::Element], 
+        ring: &R,
+        mut to_int: ToInt,
+        mut from_int: FromInt,
+        ring_log2_el_size: Option<usize>
+    ) 
+        where R: ?Sized + RingBase, 
+            J: ExactSizeIterator<Item = (V1, Option<&'a PreparedConvolutionOperand<R, C>>, V2, Option<&'a PreparedConvolutionOperand<R, C>>)>,
+            V1: VectorView<R::Element>,
+            V2: VectorView<R::Element>,
+            ToInt: FnMut(&R::Element) -> El<I>,
+            FromInt: FnMut(El<I>) -> R::Element,
             Self: 'a,
-            S: 'a,
-            PreparedConvolutionOperand<S::Type, C>: 'a
+            R: 'a
     {
-        let max_len = values.iter().map(|(lhs, rhs)| lhs.data.len() + rhs.data.len()).max().unwrap_or(0);
-        let input_size_log2 = values.iter().map(|(lhs, rhs)| max(lhs.log2_data_size, rhs.log2_data_size)).max().unwrap_or(0);
-        let width = self.compute_required_width(input_size_log2, (max_len - 1) / 2 + 1, (max_len - 1) / 2 + 1, values.len());
-        let mut res_data = Vec::with_capacity(max_len * width);
-        for i in 0..width {
-            res_data.extend((0..max_len).map(|_| self.get_rns_factor(i).zero()));
-        }
+        let out_len = dst.len();
+        let inner_product_length = dst.len();
 
-        let homs = (0..width).map(|i| self.get_rns_factor(i).can_hom(&ring).unwrap()).collect::<Vec<_>>();
-        for j in 0..values.len() {
-            self.extend_operand(values[j].0, width, |x, i| homs[i].map_ref(x));
-            self.extend_operand(values[j].1, width, |x, i| homs[i].map_ref(x));
-        }
-
-        for i in 0..width {
-            self.get_convolution(i).compute_convolution_inner_product_prepared(
-                values.iter().map(|(lhs, rhs)| (lhs.prepared.get(i).unwrap(), rhs.prepared.get(i).unwrap())), 
-                &mut res_data[(i * max_len)..((i + 1) * max_len)], 
-                self.get_rns_factor(i)
-            );
-        }
+        let mut current_width = 0;
+        let mut current_input_size_log2 = 0;
+        let mut lhs_max_len = 0;
+        let mut rhs_max_len = 0;
+        let mut res_data = Vec::new_in(self.allocator.clone());
+        let mut lhs_tmp = Vec::new_in(self.allocator.clone());
+        let mut rhs_tmp = Vec::new_in(self.allocator.clone());
         
-        for j in 0..(max_len - 1) {
-            dst(j, self.get_rns_ring(width).smallest_lift(self.get_rns_ring(width).from_congruence((0..width).map(|i| res_data[i * max_len + j]))));
-        }
-    }
-
-    fn compute_convolution_lhs_prepared_impl<S, V, D>(&self, rhs_input_size_log2: usize, lhs: &PreparedConvolutionOperand<S::Type, C>, rhs: V, mut dst: D, ring: S)
-        where S: RingStore + Copy,
-            S::Type: IntegerRing, 
-            D: FnMut(usize, El<I>),
-            V: VectorFn<El<S>>
-    {
-        let width = self.compute_required_width(max(rhs_input_size_log2, lhs.log2_data_size), lhs.data.len(), rhs.len(), 1);
-        let len = lhs.data.len() + rhs.len();
-        let mut res_data = Vec::with_capacity(len * width);
-        for i in 0..width {
-            res_data.extend((0..len).map(|_| self.get_rns_factor(i).zero()));
-        }
-
-        let mut rhs_tmp = Vec::with_capacity(rhs.len());
-        rhs_tmp.resize_with(rhs.len(), || self.get_rns_factor(0).zero());
-
-        let homs = (0..width).map(|i| self.get_rns_factor(i).can_hom(&ring).unwrap()).collect::<Vec<_>>();
-        self.extend_operand(lhs, width, |x, i| homs[i].map_ref(x));
-
-        for i in 0..width {
-            for j in 0..rhs.len() {
-                rhs_tmp[j] = homs[i].map(rhs.at(j));
+        let mut merge_current = |current_width: usize, lhs_tmp: &mut Vec<(Vec<El<Zn>, _>, Option<&'a PreparedConvolutionOperand<R, C>>), _>, rhs_tmp: &mut Vec<(Vec<El<Zn>, _>, Option<&'a PreparedConvolutionOperand<R, C>>), _>| {
+            if current_width == 0 {
+                lhs_tmp.clear();
+                rhs_tmp.clear();
+                return;
             }
-            self.get_convolution(i).compute_convolution_lhs_prepared(lhs.prepared.get(i).unwrap(), &rhs_tmp, &mut res_data[(i * len)..((i + 1) * len)], self.get_rns_factor(i));
+            res_data.clear();
+            for i in 0..current_width {
+                res_data.extend((0..out_len).map(|_| self.get_rns_factor(i).zero()));
+                self.get_convolution(i).compute_convolution_sum(
+                    lhs_tmp.iter().zip(rhs_tmp.iter()).map(|((lhs, lhs_prep), (rhs, rhs_prep))| {
+                        let lhs_data = &lhs[(i * lhs.len() / current_width)..((i + 1) * lhs.len() / current_width)];
+                        let rhs_data = &rhs[(i * rhs.len() / current_width)..((i + 1) * rhs.len() / current_width)];
+                        (
+                            lhs_data,
+                            lhs_prep.map(|lhs_prep| self.get_prepared_operand(lhs_data, lhs_prep, i, ring)),
+                            rhs_data,
+                            rhs_prep.map(|rhs_prep| self.get_prepared_operand(rhs_data, rhs_prep, i, ring)),
+                    )
+                    }),
+                    &mut res_data[(i * out_len)..((i + 1) * out_len)],
+                    self.get_rns_factor(i)
+                );
+            }
+            lhs_tmp.clear();
+            rhs_tmp.clear();
+            for j in 0..out_len {
+                let add = self.get_rns_ring(current_width).smallest_lift(self.get_rns_ring(current_width).from_congruence((0..current_width).map(|i| res_data[i * out_len + j])));
+                ring.add_assign(&mut dst[j], from_int(add));
+            }
+        };
+
+        for (lhs, lhs_prep, rhs, rhs_prep) in values {
+            if lhs.len() == 0 || rhs.len() == 0 {
+                continue;
+            }
+            assert!(out_len >= lhs.len() + rhs.len() - 1);
+            current_input_size_log2 = max(
+                current_input_size_log2,
+                self.get_log2_input_size(&lhs, lhs_prep, &rhs, rhs_prep, ring, &mut to_int, ring_log2_el_size)
+            );
+            lhs_max_len = max(lhs_max_len, lhs.len());
+            rhs_max_len = max(rhs_max_len, rhs.len());
+            let required_width = self.compute_required_width(current_input_size_log2, lhs_max_len, rhs_max_len, inner_product_length);
+
+            if required_width > current_width {
+                merge_current(current_width, &mut lhs_tmp, &mut rhs_tmp);
+                current_width = required_width;
+            }
+
+            lhs_tmp.push((Vec::with_capacity_in(lhs.len() * current_width, self.allocator.clone()), lhs_prep));
+            rhs_tmp.push((Vec::with_capacity_in(rhs.len() * current_width, self.allocator.clone()), rhs_prep));
+            for i in 0..current_width {
+                let hom = self.get_rns_factor(i).into_can_hom(&self.integer_ring).ok().unwrap();
+                lhs_tmp.last_mut().unwrap().0.extend(lhs.as_iter().map(|x| hom.map(to_int(x))));
+                rhs_tmp.last_mut().unwrap().0.extend(rhs.as_iter().map(|x| hom.map(to_int(x))));
+            }
         }
-        
-        for j in 0..(len - 1) {
-            dst(j, self.get_rns_ring(width).smallest_lift(self.get_rns_ring(width).from_congruence((0..width).map(|i| res_data[i * len + j]))));
-        }
+        merge_current(current_width, &mut lhs_tmp, &mut rhs_tmp);
     }
-
-    fn compute_convolution_prepared_impl<S, D>(&self, lhs: &PreparedConvolutionOperand<S::Type, C>, rhs: &PreparedConvolutionOperand<S::Type, C>, mut dst: D, ring: S)
-        where S: RingStore + Copy,
-            S::Type: IntegerRing, 
-            D: FnMut(usize, El<I>),
+    
+    fn prepare_convolution_impl<R, V, ToInt>(
+        &self,
+        data: V,
+        ring: &R,
+        length_hint: Option<usize>,
+        mut to_int: ToInt,
+        ring_log2_el_size: Option<usize>
+    ) -> PreparedConvolutionOperand<R, C>
+        where R: ?Sized + RingBase,
+            V: VectorView<R::Element>,
+            ToInt: FnMut(&R::Element) -> El<I>
     {
-        let width = self.compute_required_width(max(lhs.log2_data_size, rhs.log2_data_size), lhs.data.len(), rhs.data.len(), 1);
-        let len = lhs.data.len() + rhs.data.len();
-        let mut res_data = Vec::with_capacity(len * width);
-        for i in 0..width {
-            res_data.extend((0..len).map(|_| self.get_rns_factor(i).zero()));
-        }
-
-        let homs = (0..width).map(|i| self.get_rns_factor(i).can_hom(&ring).unwrap()).collect::<Vec<_>>();
-        self.extend_operand(lhs, width, |x, i| homs[i].map_ref(x));
-        self.extend_operand(rhs, width, |x, i| homs[i].map_ref(x));
-
-        for i in 0..width {
-            self.get_convolution(i).compute_convolution_prepared(lhs.prepared.get(i).unwrap(), rhs.prepared.get(i).unwrap(), &mut res_data[(i * len)..((i + 1) * len)], self.get_rns_factor(i));
-        }
-        
-        for j in 0..(len - 1) {
-            dst(j, self.get_rns_ring(width).smallest_lift(self.get_rns_ring(width).from_congruence((0..width).map(|i| res_data[i * len + j]))));
-        }
+        let input_size_log2 = if let Some(log2_data_size) = ring_log2_el_size {
+            log2_data_size
+        } else { 
+            data.as_iter().map(|x| self.integer_ring.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap()
+        };
+        return PreparedConvolutionOperand {
+            ring: PhantomData,
+            len_hint: length_hint,
+            prepared: LazyVec::new(),
+            log2_data_size: input_size_log2
+        };
     }
 }
 
@@ -483,172 +477,72 @@ impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolution<I, C, A, Cr
         CreateC: Fn(Zn) -> C,
         R: ?Sized + IntegerRing
 {
+    type PreparedConvolutionOperand = PreparedConvolutionOperand<R, C>;
+
     fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<<R as RingBase>::Element>, V2: VectorView<<R as RingBase>::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [<R as RingBase>::Element], ring: S) {
-        assert!(self.supports_ring(ring));
-        assert!(dst.len() >= lhs.len() + rhs.len() - 1);
-        let log2_input_size = lhs.as_iter().chain(rhs.as_iter()).map(|x| ring.abs_log2_ceil(x).unwrap_or(0)).max().unwrap_or(0);
-        let hom = ring.can_hom(&self.integer_ring).unwrap();
-        return self.compute_convolution_impl(
-            log2_input_size,
-            lhs.clone_ring_els(ring),
-            rhs.clone_ring_els(ring),
-            |i, x| ring.add_assign(&mut dst[i], hom.map(x)),
-            ring
-        );
+        self.compute_convolution_impl(
+            lhs,
+            None,
+            rhs,
+            None,
+            dst,
+            ring.get_ring(),
+            |x| int_cast(ring.clone_el(x), &self.integer_ring, ring),
+            |x| int_cast(x, ring, &self.integer_ring),
+            None
+        )
     }
 
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool {
         true
     }
 
-    fn specialize_prepared_convolution<F>(function: F) -> F::Output
-        where F: PreparedConvolutionOperation<Self, R>
-    {
-        struct CallFunction<F, R, I, C, A, CreateC>
-            where I: RingStore + Clone,
-                I::Type: IntegerRing,
-                C: ConvolutionAlgorithm<ZnBase>,
-                A: Allocator + Clone,
-                CreateC: Fn(Zn) -> C,
-                R: ?Sized + IntegerRing,
-                F: PreparedConvolutionOperation<RNSConvolution<I, C, A, CreateC>, R>
-        {
-            ring: PhantomData<Box<R>>,
-            convolution: PhantomData<RNSConvolution<I, C, A, CreateC>>,
-            function: F
-        }
-        impl<F, R, I, C, A, CreateC> PreparedConvolutionOperation<C, ZnBase> for CallFunction<F, R, I, C, A, CreateC>
-            where I: RingStore + Clone,
-                I::Type: IntegerRing,
-                C: ConvolutionAlgorithm<ZnBase>,
-                A: Allocator + Clone,
-                CreateC: Fn(Zn) -> C,
-                R: ?Sized + IntegerRing,
-                F: PreparedConvolutionOperation<RNSConvolution<I, C, A, CreateC>, R>
-        {
-            type Output = F::Output;
-
-            fn execute(self) -> Self::Output
-                where C: PreparedConvolutionAlgorithm<ZnBase>
-            {
-                self.function.execute()
-            }
-
-            fn fallback(self) -> Self::Output {
-                self.function.fallback()
-            }
-        }
-        return <C as ConvolutionAlgorithm<ZnBase>>::specialize_prepared_convolution::<CallFunction<F, R, I, C, A, CreateC>>(CallFunction {
-            function: function,
-            ring: PhantomData,
-            convolution: PhantomData
-        });
-    }
-}
-
-impl<R, I, C, A, CreateC> PreparedConvolutionAlgorithm<R> for RNSConvolution<I, C, A, CreateC>
-    where I: RingStore + Clone,
-        I::Type: IntegerRing,
-        C: PreparedConvolutionAlgorithm<ZnBase>,
-        A: Allocator + Clone,
-        CreateC: Fn(Zn) -> C,
-        R: ?Sized + IntegerRing
-{
-    type PreparedConvolutionOperand = PreparedConvolutionOperand<R, C>;
-    
     fn prepare_convolution_operand<S, V>(&self, val: V, len_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
         where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
     {
-        assert!(self.supports_ring(&ring));
-        let log2_input_size = val.as_iter().map(|x| ring.abs_log2_ceil(x).unwrap_or(0)).max().unwrap_or(0);
-        return self.prepare_convolution_operand_impl(len_hint, log2_input_size, val.clone_ring_els(ring), ring);
+        self.prepare_convolution_impl(
+            val,
+            ring.get_ring(),
+            len_hint,
+            |x| int_cast(ring.clone_el(x), &self.integer_ring, ring),
+            None
+        )
     }
-
-    fn prepared_operand_len(&self, prepared_operand: &Self::PreparedConvolutionOperand) -> usize {
-        prepared_operand.data.len()
-    }
-
-    fn prepared_operand_data<S, V>(&self, prepared_operand: &Self::PreparedConvolutionOperand, mut output: V, ring: S)
+    
+    fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: S)
         where S: RingStore<Type = R> + Copy,
-            V: VectorViewMut<<R as RingBase>::Element>
+            V1: VectorView<El<S>>,
+            V2: VectorView<El<S>>
     {
-        assert!(self.supports_ring(&ring));
-        let data = &prepared_operand.data;
-        let len = data.len();
-        assert!(output.len() >= len);
-        for (i, x) in data.into_iter().enumerate() {
-            *output.at_mut(i) = ring.clone_el(x);
-        }
-        for i in len..output.len() {
-            *output.at_mut(i) = ring.zero();
-        }
+        self.compute_convolution_impl(
+            lhs,
+            lhs_prep,
+            rhs,
+            rhs_prep,
+            dst,
+            ring.get_ring(),
+            |x| int_cast(ring.clone_el(x), &self.integer_ring, ring),
+            |x| int_cast(x, ring, &self.integer_ring),
+            None
+        )
     }
 
-    fn compute_convolution_lhs_prepared<S, V>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: V, dst: &mut [R::Element], ring: S)
-        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
-    {
-        assert!(self.supports_ring(&ring));
-        assert!(dst.len() >= lhs.data.len() + rhs.len() - 1);
-        let rhs_log2_input_size = rhs.as_iter().map(|x| ring.abs_log2_ceil(x).unwrap_or(0)).max().unwrap_or(0);
-        let hom = ring.can_hom(&self.integer_ring).unwrap();
-        return self.compute_convolution_lhs_prepared_impl(
-            rhs_log2_input_size, 
-            lhs, 
-            rhs.clone_ring_els(ring), 
-            |i, x| ring.add_assign(&mut dst[i], hom.map(x)), 
-            ring
-        );
-    }
-
-    fn compute_convolution_prepared<S>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: &Self::PreparedConvolutionOperand, dst: &mut [R::Element], ring: S)
-        where S: RingStore<Type = R> + Copy
-    {
-        assert!(self.supports_ring(&ring));
-        assert!(dst.len() >= lhs.data.len() + rhs.data.len() - 1);
-        let hom = ring.can_hom(&self.integer_ring).unwrap();
-        return self.compute_convolution_prepared_impl(
-            lhs, 
-            rhs, 
-            |i, x| ring.add_assign(&mut dst[i], hom.map(x)), 
-            ring
-        );
-    }
-
-    fn compute_convolution_inner_product_lhs_prepared<'a, S, J, V>(&self, values: J, dst: &mut [R::Element], ring: S) 
+    fn compute_convolution_sum<'a, S, J, V1, V2>(&self, values: J, dst: &mut [R::Element], ring: S) 
         where S: RingStore<Type = R> + Copy, 
-            J: Iterator<Item = (&'a Self::PreparedConvolutionOperand, V)>,
-            V: VectorView<R::Element>,
+            J: ExactSizeIterator<Item = (V1, Option<&'a Self::PreparedConvolutionOperand>, V2, Option<&'a Self::PreparedConvolutionOperand>)>,
+            V1: VectorView<R::Element>,
+            V2: VectorView<R::Element>,
             Self: 'a,
-            R: 'a,
-            Self::PreparedConvolutionOperand: 'a
+            R: 'a
     {
-        assert!(self.supports_ring(&ring));
-        let values = values.map(|(lhs, rhs)| (lhs, rhs.into_clone_ring_els(ring))).collect::<Vec<_>>();
-        let rhs_log2_input_size = values.iter().flat_map(|(_, rhs)| rhs.iter()).map(|x| ring.abs_log2_ceil(&x).unwrap_or(0)).max().unwrap_or(0);
-        let hom = ring.can_hom(&self.integer_ring).unwrap();
-        return self.compute_convolution_inner_product_lhs_prepared_impl(
-            rhs_log2_input_size,
-            &values,
-            |i, x| ring.add_assign(&mut dst[i], hom.map(x)),
-            ring
-        );
-    }
-
-    fn compute_convolution_inner_product_prepared<'a, S, J>(&self, values: J, dst: &mut [R::Element], ring: S) 
-        where S: RingStore<Type = R> + Copy, 
-            J: Iterator<Item = (&'a Self::PreparedConvolutionOperand, &'a Self::PreparedConvolutionOperand)>,
-            Self::PreparedConvolutionOperand: 'a,
-            Self: 'a,
-            R: 'a,
-    {
-        assert!(self.supports_ring(&ring));
-        let values = values.collect::<Vec<_>>();
-        let hom = ring.can_hom(&self.integer_ring).unwrap();
-        return self.compute_convolution_inner_product_prepared_impl(
-            &values,
-            |i, x| ring.add_assign(&mut dst[i], hom.map(x)),
-            ring
-        );
+        self.compute_convolution_sum_impl(
+            values,
+            dst,
+            ring.get_ring(),
+            |x| int_cast(ring.clone_el(x), &self.integer_ring, ring),
+            |x| int_cast(x, ring, &self.integer_ring),
+            None
+        )
     }
 }
 
@@ -660,172 +554,75 @@ impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolutionZn<I, C, A, 
         CreateC: Fn(Zn) -> C,
         R: ?Sized + ZnRing + CanHomFrom<I::Type>
 {
+    type PreparedConvolutionOperand = PreparedConvolutionOperand<R, C>;
+
     fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<<R as RingBase>::Element>, V2: VectorView<<R as RingBase>::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [<R as RingBase>::Element], ring: S) {
-        assert!(self.supports_ring(&ring));
-        assert!(dst.len() >= lhs.len() + rhs.len() - 1);
-        let log2_input_size = ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap() - 1;
         let hom = ring.can_hom(&self.base.integer_ring).unwrap();
-        return self.base.compute_convolution_impl(
-            log2_input_size,
-            lhs.clone_ring_els(ring).map_fn(|x| ring.smallest_lift(x)),
-            rhs.clone_ring_els(ring).map_fn(|x| ring.smallest_lift(x)),
-            |i, x| ring.add_assign(&mut dst[i], hom.map(x)),
-            ring.integer_ring()
-        );
+        self.base.compute_convolution_impl(
+            lhs,
+            None,
+            rhs,
+            None,
+            dst,
+            ring.get_ring(),
+            |x| int_cast(ring.smallest_lift(ring.clone_el(x)), &self.base.integer_ring, ring.integer_ring()),
+            |x| hom.map(x),
+            Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap())
+        )
     }
 
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool {
         true
     }
 
-    fn specialize_prepared_convolution<F>(function: F) -> F::Output
-        where F: PreparedConvolutionOperation<Self, R>
-    {
-        struct CallFunction<F, R, I, C, A, CreateC>
-            where I: RingStore + Clone,
-                I::Type: IntegerRing,
-                C: ConvolutionAlgorithm<ZnBase>,
-                A: Allocator + Clone,
-                CreateC: Fn(Zn) -> C,
-                R: ?Sized + ZnRing + CanHomFrom<I::Type>,
-                F: PreparedConvolutionOperation<RNSConvolutionZn<I, C, A, CreateC>, R>
-        {
-            ring: PhantomData<Box<R>>,
-            convolution: PhantomData<RNSConvolution<I, C, A, CreateC>>,
-            function: F
-        }
-        impl<F, R, I, C, A, CreateC> PreparedConvolutionOperation<C, ZnBase> for CallFunction<F, R, I, C, A, CreateC>
-            where I: RingStore + Clone,
-                I::Type: IntegerRing,
-                C: ConvolutionAlgorithm<ZnBase>,
-                A: Allocator + Clone,
-                CreateC: Fn(Zn) -> C,
-                R: ?Sized + ZnRing + CanHomFrom<I::Type>,
-                F: PreparedConvolutionOperation<RNSConvolutionZn<I, C, A, CreateC>, R>
-        {
-            type Output = F::Output;
-
-            fn execute(self) -> Self::Output
-                where C: PreparedConvolutionAlgorithm<ZnBase>
-            {
-                self.function.execute()
-            }
-            fn fallback(self) -> Self::Output {
-                self.function.fallback()
-            }
-        }
-        return <C as ConvolutionAlgorithm<ZnBase>>::specialize_prepared_convolution::<CallFunction<F, R, I, C, A, CreateC>>(CallFunction {
-            function: function,
-            ring: PhantomData,
-            convolution: PhantomData
-        });
-    }
-}
-
-impl<R, I, C, A, CreateC> PreparedConvolutionAlgorithm<R> for RNSConvolutionZn<I, C, A, CreateC>
-    where I: RingStore + Clone,
-        I::Type: IntegerRing,
-        C: PreparedConvolutionAlgorithm<ZnBase>,
-        A: Allocator + Clone,
-        CreateC: Fn(Zn) -> C,
-        R: ?Sized + ZnRing + CanHomFrom<I::Type>
-{
-    type PreparedConvolutionOperand = PreparedConvolutionOperandZn<R, C>;
-    
     fn prepare_convolution_operand<S, V>(&self, val: V, len_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
         where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
     {
-        assert!(self.supports_ring(&ring));
-        let log2_input_size = ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap() - 1;
-        return PreparedConvolutionOperandZn(self.base.prepare_convolution_operand_impl(len_hint, log2_input_size, val.clone_ring_els(ring).map_fn(|x| ring.smallest_lift(x)), ring.integer_ring()));
+        self.base.prepare_convolution_impl(
+            val,
+            ring.get_ring(),
+            len_hint,
+            |x| int_cast(ring.smallest_lift(ring.clone_el(x)), &self.base.integer_ring, ring.integer_ring()),
+            Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap())
+        )
     }
 
-    fn prepared_operand_len(&self, prepared_operand: &Self::PreparedConvolutionOperand) -> usize {
-        prepared_operand.0.data.len()
-    }
-
-    fn prepared_operand_data<S, V>(&self, prepared_operand: &Self::PreparedConvolutionOperand, mut output: V, ring: S)
+    fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: S)
         where S: RingStore<Type = R> + Copy,
-            V: VectorViewMut<<R as RingBase>::Element>
+            V1: VectorView<El<S>>,
+            V2: VectorView<El<S>>
     {
-        assert!(self.supports_ring(&ring));
-        let data = &prepared_operand.0.data;
-        let len = data.len();
-        assert!(output.len() >= len);
-        let hom = ring.can_hom(ring.integer_ring()).unwrap();
-        for (i, x) in data.into_iter().enumerate() {
-            *output.at_mut(i) = hom.map_ref(x);
-        }
-        for i in len..output.len() {
-            *output.at_mut(i) = ring.zero();
-        }
-    }
-
-    fn compute_convolution_lhs_prepared<S, V>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: V, dst: &mut [R::Element], ring: S)
-        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
-    {
-        assert!(self.supports_ring(&ring));
-        assert!(dst.len() >= lhs.0.data.len() + rhs.len() - 1);
-        let rhs_log2_input_size = ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap() - 1;
         let hom = ring.can_hom(&self.base.integer_ring).unwrap();
-        return self.base.compute_convolution_lhs_prepared_impl(
-            rhs_log2_input_size, 
-            &lhs.0, 
-            rhs.clone_ring_els(ring).map_fn(|x| ring.smallest_lift(x)), 
-            |i, x| ring.add_assign(&mut dst[i], hom.map(x)),
-            ring.integer_ring()
-        );
+        self.base.compute_convolution_impl(
+            lhs,
+            lhs_prep,
+            rhs,
+            rhs_prep,
+            dst,
+            ring.get_ring(),
+            |x| int_cast(ring.smallest_lift(ring.clone_el(x)), &self.base.integer_ring, ring.integer_ring()),
+            |x| hom.map(x),
+            Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap())
+        )
     }
 
-    fn compute_convolution_prepared<S>(&self, lhs: &Self::PreparedConvolutionOperand, rhs: &Self::PreparedConvolutionOperand, dst: &mut [R::Element], ring: S)
-        where S: RingStore<Type = R> + Copy
-    {
-        assert!(self.supports_ring(&ring));
-        assert!(dst.len() >= lhs.0.data.len() + rhs.0.data.len() - 1);
-        let hom = ring.can_hom(&self.base.integer_ring).unwrap();
-        return self.base.compute_convolution_prepared_impl(
-            &lhs.0, 
-            &rhs.0, 
-            |i, x| ring.add_assign(&mut dst[i], hom.map(x)),
-            ring.integer_ring()
-        );
-    }
-
-    fn compute_convolution_inner_product_lhs_prepared<'a, S, J, V>(&self, values: J, dst: &mut [R::Element], ring: S) 
+    fn compute_convolution_sum<'a, S, J, V1, V2>(&self, values: J, dst: &mut [R::Element], ring: S) 
         where S: RingStore<Type = R> + Copy, 
-            J: Iterator<Item = (&'a Self::PreparedConvolutionOperand, V)>,
-            V: VectorView<R::Element>,
+            J: ExactSizeIterator<Item = (V1, Option<&'a Self::PreparedConvolutionOperand>, V2, Option<&'a Self::PreparedConvolutionOperand>)>,
+            V1: VectorView<R::Element>,
+            V2: VectorView<R::Element>,
             Self: 'a,
-            R: 'a,
-            Self::PreparedConvolutionOperand: 'a
+            R: 'a
     {
-        assert!(self.supports_ring(&ring));
-        let values = values.map(|(lhs, rhs)| (&lhs.0, rhs.into_clone_ring_els(ring).map_fn(|x| ring.smallest_lift(x)))).collect::<Vec<_>>();
-        let rhs_log2_input_size = ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap() - 1;
         let hom = ring.can_hom(&self.base.integer_ring).unwrap();
-        return self.base.compute_convolution_inner_product_lhs_prepared_impl(
-            rhs_log2_input_size,
-            &values,
-            |i, x| ring.add_assign(&mut dst[i], hom.map(x)),
-            ring.integer_ring()
-        );
-    }
-
-    fn compute_convolution_inner_product_prepared<'a, S, J>(&self, values: J, dst: &mut [R::Element], ring: S) 
-        where S: RingStore<Type = R> + Copy, 
-            J: Iterator<Item = (&'a Self::PreparedConvolutionOperand, &'a Self::PreparedConvolutionOperand)>,
-            Self::PreparedConvolutionOperand: 'a,
-            Self: 'a,
-            R: 'a,
-    {
-        assert!(self.supports_ring(&ring));
-        let values = values.map(|(lhs, rhs)| (&lhs.0, &rhs.0)).collect::<Vec<_>>();
-        let hom = ring.can_hom(&self.base.integer_ring).unwrap();
-        return self.base.compute_convolution_inner_product_prepared_impl(
-            &values,
-            |i, x| ring.add_assign(&mut dst[i], hom.map(x)),
-            ring.integer_ring()
-        );
+        self.base.compute_convolution_sum_impl(
+            values,
+            dst,
+            ring.get_ring(),
+            |x| int_cast(ring.smallest_lift(ring.clone_el(x)), &self.base.integer_ring, ring.integer_ring()),
+            |x| hom.map(x),
+            Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap())
+        )
     }
 }
 
@@ -835,7 +632,6 @@ fn test_convolution_integer() {
     let convolution = RNSConvolution::new_with(7, usize::MAX, BigIntRing::RING, Global, |Fp| NTTConvolution::new_with(Fp, Global));
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
-    super::generic_tests::test_prepared_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
 }
 
 #[test]
@@ -844,24 +640,40 @@ fn test_convolution_zn() {
     let convolution = RNSConvolutionZn::from(RNSConvolution::new_with(7, usize::MAX, BigIntRing::RING, Global, |Fp| NTTConvolution::new_with(Fp, Global)));
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
-    super::generic_tests::test_prepared_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
 }
 
 #[test]
-fn test_specialize_prepared() {
-    let ring = Zn::new((1 << 57) + 1);
-    let convolution = RNSConvolutionZn::from(RNSConvolution::new(7));
+fn test_convolution_sum() {
+    let ring = StaticRing::<i128>::RING;
+    let convolution = RNSConvolution::new_with(7, 20, BigIntRing::RING, Global, |Fp| NTTConvolution::new_with(Fp, Global));
+    
+    let data = (0..40usize).map(|i| (
+        (0..(5 + i % 5)).map(|x| (1 << i) * (x as i128 - 2)).collect::<Vec<_>>(),
+        (0..(13 - i % 7)).map(|x| (1 << i) * (x as i128 + 1)).collect::<Vec<_>>(),
+    ));
+    let mut expected = (0..22).map(|_| 0).collect::<Vec<_>>();
+    STANDARD_CONVOLUTION.compute_convolution_sum(data.clone().map(|(l, r)| (l, None, r, None)), &mut expected, ring);
 
-    struct CheckIsPrepared(RNSConvolutionZn, Zn);
-    impl PreparedConvolutionOperation<RNSConvolutionZn, ZnBase> for CheckIsPrepared {
-        type Output = bool;
-        fn execute(self) -> Self::Output {
-            super::generic_tests::test_prepared_convolution(&self.0, &self.1, self.1.int_hom().map(1 << 30));
-            true
-        }
-        fn fallback(self) -> Self::Output {
-            false
-        }
-    }
-    assert!(RNSConvolutionZn::specialize_prepared_convolution(CheckIsPrepared(convolution, ring)));
+    let mut actual = (0..21).map(|_| 0).collect::<Vec<_>>();
+    convolution.compute_convolution_sum(data.clone().map(|(l, r)| (l, None, r, None)), &mut actual, ring);
+    assert_eq!(&expected[..21], actual);
+    
+    let data_prep = data.clone().map(|(l, r)| {
+        let l_prep = convolution.prepare_convolution_operand(&l, Some(21), ring);
+        let r_prep = convolution.prepare_convolution_operand(&r, Some(21), ring);
+        (l, l_prep, r, r_prep)
+    }).collect::<Vec<_>>();
+    let mut actual = (0..21).map(|_| 0).collect::<Vec<_>>();
+    convolution.compute_convolution_sum(data_prep.iter().map(|(l, l_prep, r, r_prep)| (l, Some(l_prep), r, Some(r_prep))), &mut actual, ring);
+    assert_eq!(&expected[..21], actual);
+    
+    let mut actual = (0..21).map(|_| 0).collect::<Vec<_>>();
+    convolution.compute_convolution_sum(data_prep.iter().enumerate().map(|(i, (l, l_prep, r, r_prep))| match i % 4 {
+        0 => (l, Some(l_prep), r, Some(r_prep)),
+        1 => (l, None, r, Some(r_prep)),
+        2 => (l, Some(l_prep), r, None),
+        3 => (l, None, r, None),
+        _ => unreachable!()
+    }), &mut actual, ring);
+    assert_eq!(&expected[..21], actual);
 }

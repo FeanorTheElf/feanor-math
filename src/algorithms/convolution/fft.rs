@@ -16,7 +16,7 @@ use crate::homomorphism::*;
 use crate::rings::float_complex::*;
 use crate::rings::zn::*;
 
-use super::{ConvolutionAlgorithm, PreparedConvolutionAlgorithm, PreparedConvolutionOperation};
+use super::ConvolutionAlgorithm;
 
 const CC: Complex64 = Complex64::RING;
 
@@ -223,7 +223,7 @@ impl<A> FFTConvolution<A>
             }
             assert!(current_max_sum_len > 0);
             
-            if count_since_last_reduction >= current_max_sum_len {
+            if count_since_last_reduction > current_max_sum_len {
                 count_since_last_reduction = 0;
                 self.get_fft_table(log2_len).unordered_inv_fft(&mut *buffer, CC);
                 for i in 0..len {
@@ -246,6 +246,7 @@ impl<A> FFTConvolution<A>
                 CC.mul_assign(&mut lhs_fft[i], rhs_fft[i]);
                 CC.add_assign(&mut buffer[i], lhs_fft[i]);
             }
+            count_since_last_reduction += 1;
         }
         self.get_fft_table(log2_len).unordered_inv_fft(&mut *buffer, CC);
         for i in 0..len {
@@ -342,6 +343,8 @@ impl<R, A> ConvolutionAlgorithm<R> for FFTConvolutionZn<A>
     where R: ?Sized + ZnRing + CanHomFrom<StaticRingBase<i64>>,
         A: Allocator + Clone
 {
+    type PreparedConvolutionOperand = PreparedConvolutionOperand<R, A>;
+
     fn compute_convolution<S: RingStore<Type = R>, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S) {
         self.base.compute_convolution_impl(
             lhs,
@@ -352,109 +355,13 @@ impl<R, A> ConvolutionAlgorithm<R> for FFTConvolutionZn<A>
             ring.get_ring(),
             to_int_zn(&ring),
             from_int_zn(&ring),
-    Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap())
+            Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap())
         )
     }
 
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool {
         true
     }
-
-    fn specialize_prepared_convolution<F>(function: F) -> F::Output
-        where F: PreparedConvolutionOperation<Self, R>
-    {
-        function.execute()
-    }
-}
-
-impl<I, A> ConvolutionAlgorithm<I> for FFTConvolution<A>
-    where I: ?Sized + IntegerRing,
-        A: Allocator + Clone
-{
-    fn compute_convolution<S: RingStore<Type = I>, V1: VectorView<I::Element>, V2: VectorView<I::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [I::Element], ring: S) {
-        self.compute_convolution_impl(
-            lhs,
-            None,
-            rhs,
-            None,
-            dst,
-            ring.get_ring(),
-            to_int_int(&ring),
-            from_int_int(&ring),
-            None
-        )
-    }
-
-    fn supports_ring<S: RingStore<Type = I> + Copy>(&self, _ring: S) -> bool {
-        true
-    }
-
-    fn specialize_prepared_convolution<F>(function: F) -> F::Output
-        where F: PreparedConvolutionOperation<Self, I>
-    {
-        function.execute()
-    }
-}
-
-impl<I, A> PreparedConvolutionAlgorithm<I> for FFTConvolution<A>
-    where I: ?Sized + IntegerRing,
-        A: Allocator + Clone
-{
-    type PreparedConvolutionOperand = PreparedConvolutionOperand<I, A>;
-
-    fn prepare_convolution_operand<S, V>(&self, val: V, len_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
-        where S: RingStore<Type = I> + Copy, V: VectorView<I::Element>
-    {
-        self.prepare_convolution_impl(
-            val,
-            ring.get_ring(),
-            len_hint,
-            to_int_int(&ring),
-            None
-        )
-    }
-
-    fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [I::Element], ring: S)
-        where S: RingStore<Type = I> + Copy, V1: VectorView<I::Element>, V2: VectorView<I::Element>
-    {
-        self.compute_convolution_impl(
-            lhs,
-            lhs_prep,
-            rhs,
-            rhs_prep,
-            dst,
-            ring.get_ring(),
-            to_int_int(&ring),
-            from_int_int(&ring),
-            None
-        )
-    }
-
-    fn compute_convolution_sum<'a, S, J, V1, V2>(&self, values: J, dst: &mut [I::Element], ring: S) 
-        where S: RingStore<Type = I> + Copy, 
-            J: Iterator<Item = (V1, Option<&'a Self::PreparedConvolutionOperand>, V2, Option<&'a Self::PreparedConvolutionOperand>)>,
-            V1: VectorView<I::Element>,
-            V2: VectorView<I::Element>,
-            Self: 'a,
-            I: 'a,
-            Self::PreparedConvolutionOperand: 'a
-    {
-        self.compute_convolution_sum_impl(
-            values,
-            dst,
-            ring.get_ring(),
-            to_int_int(&ring),
-            from_int_int(&ring),
-            None
-        )
-    }
-}
-
-impl<R, A> PreparedConvolutionAlgorithm<R> for FFTConvolutionZn<A>
-    where R: ?Sized + ZnRing + CanHomFrom<StaticRingBase<i64>>,
-        A: Allocator + Clone
-{
-    type PreparedConvolutionOperand = PreparedConvolutionOperand<R, A>;
 
     fn prepare_convolution_operand<S, V>(&self, val: V, len_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
         where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
@@ -504,6 +411,78 @@ impl<R, A> PreparedConvolutionAlgorithm<R> for FFTConvolutionZn<A>
     }
 }
 
+impl<I, A> ConvolutionAlgorithm<I> for FFTConvolution<A>
+    where I: ?Sized + IntegerRing,
+        A: Allocator + Clone
+{
+    type PreparedConvolutionOperand = PreparedConvolutionOperand<I, A>;
+
+    fn compute_convolution<S: RingStore<Type = I>, V1: VectorView<I::Element>, V2: VectorView<I::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [I::Element], ring: S) {
+        self.compute_convolution_impl(
+            lhs,
+            None,
+            rhs,
+            None,
+            dst,
+            ring.get_ring(),
+            to_int_int(&ring),
+            from_int_int(&ring),
+            None
+        )
+    }
+
+    fn supports_ring<S: RingStore<Type = I> + Copy>(&self, _ring: S) -> bool {
+        true
+    }
+
+    fn prepare_convolution_operand<S, V>(&self, val: V, len_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
+        where S: RingStore<Type = I> + Copy, V: VectorView<I::Element>
+    {
+        self.prepare_convolution_impl(
+            val,
+            ring.get_ring(),
+            len_hint,
+            to_int_int(&ring),
+            None
+        )
+    }
+
+    fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [I::Element], ring: S)
+        where S: RingStore<Type = I> + Copy, V1: VectorView<I::Element>, V2: VectorView<I::Element>
+    {
+        self.compute_convolution_impl(
+            lhs,
+            lhs_prep,
+            rhs,
+            rhs_prep,
+            dst,
+            ring.get_ring(),
+            to_int_int(&ring),
+            from_int_int(&ring),
+            None
+        )
+    }
+
+    fn compute_convolution_sum<'a, S, J, V1, V2>(&self, values: J, dst: &mut [I::Element], ring: S) 
+        where S: RingStore<Type = I> + Copy, 
+            J: Iterator<Item = (V1, Option<&'a Self::PreparedConvolutionOperand>, V2, Option<&'a Self::PreparedConvolutionOperand>)>,
+            V1: VectorView<I::Element>,
+            V2: VectorView<I::Element>,
+            Self: 'a,
+            I: 'a,
+            Self::PreparedConvolutionOperand: 'a
+    {
+        self.compute_convolution_sum_impl(
+            values,
+            dst,
+            ring.get_ring(),
+            to_int_int(&ring),
+            from_int_int(&ring),
+            None
+        )
+    }
+}
+
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
 #[cfg(test)]
@@ -515,7 +494,6 @@ fn test_convolution_zn() {
     let ring = Zn::new(17 * 257);
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.one());
-    super::generic_tests::test_prepared_convolution(&convolution, &ring, ring.one());
 }
 
 #[test]
@@ -524,7 +502,6 @@ fn test_convolution_int() {
     let ring = StaticRing::<i64>::RING;
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.one());
-    super::generic_tests::test_prepared_convolution(&convolution, &ring, ring.one());
 }
 
 #[test]
