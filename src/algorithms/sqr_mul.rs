@@ -8,7 +8,7 @@ use crate::primitive_int::*;
 /// w.r.t. the given operation. The operation must be associative to provide correct results.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::algorithms::sqr_mul::generic_abs_square_and_multiply;
 /// # use feanor_math::primitive_int::*;
 /// let mut mul_count = 0;

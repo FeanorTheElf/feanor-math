@@ -27,7 +27,7 @@ const ZZ: StaticRing<i64> = StaticRing::<i64>::RING;
 /// 
 /// # Example
 /// 
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;

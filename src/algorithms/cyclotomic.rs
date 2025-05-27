@@ -23,7 +23,7 @@ use crate::algorithms;
 /// the result).
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::rings::poly::sparse_poly::*;

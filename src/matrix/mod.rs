@@ -148,7 +148,7 @@ pub mod matrix_compare {
 /// Variant of `assert_eq!` for matrices elements, i.e. assert that two ring matrices are equal.
 /// Frequently used in tests.
 /// 
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::matrix::*;

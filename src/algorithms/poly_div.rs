@@ -193,7 +193,7 @@ pub enum PolyDivRemReducedError<R>
 /// 
 /// The result of this function does not have to be unique.
 /// Consider for example
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::zn_64::*;

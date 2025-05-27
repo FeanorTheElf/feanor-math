@@ -74,7 +74,7 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + I
     /// 
     /// # Example
     /// 
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::integer::*;
     /// let ZZ = BigIntRing::RING;
@@ -83,7 +83,7 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + I
     /// assert!(ZZ.to_float_approx(&x) < 2f64.powi(1023) * 1.000001);
     /// ```
     /// If the value is too large for the exponent of a `f64`, infinity is returned.
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::integer::*;
     /// let ZZ = BigIntRing::RING;
@@ -109,7 +109,7 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + I
     /// is `1`.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::integer::*;
     /// # use feanor_math::ring::*;
@@ -125,7 +125,7 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + I
     /// or `None` if the value is zero.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::integer::*;
     /// # use feanor_math::ring::*;
@@ -141,7 +141,7 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + I
     /// or `None` if the value is zero.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::integer::*;
     /// # use feanor_math::ring::*;
@@ -159,7 +159,7 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + I
     /// leave multiple possible results).
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::integer::*;
     /// # use feanor_math::ring::*;
@@ -186,7 +186,7 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + I
     /// In the case of a tie (i.e. `round(0.5)`), we round towards `+/- infinity`.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::integer::*;
     /// # use feanor_math::ring::*;
@@ -225,7 +225,7 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + I
     /// `quo * rhs <= lhs`.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::integer::*;
     /// # use feanor_math::ring::*;
@@ -258,7 +258,7 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + I
     /// `quo * rhs >= lhs`.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::integer::*;
     /// # use feanor_math::ring::*;
@@ -381,7 +381,7 @@ impl<F: ?Sized + IntegerRing, T: ?Sized + IntegerRing> IntCast<F> for T {
 /// 
 /// # Example
 /// 
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::primitive_int::*;
@@ -408,7 +408,7 @@ pub fn int_cast<T: RingStore, F: RingStore>(value: El<F>, to: T, from: F) -> El<
 /// `binomial(n, k) * k`.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::iters::*;

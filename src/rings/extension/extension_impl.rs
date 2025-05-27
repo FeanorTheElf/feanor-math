@@ -38,7 +38,7 @@ use super::FreeAlgebraStore;
 /// equivalently a quotient of a univariate polynomial ring `R[X]/(f(X))`.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::extension::*;
 /// # use feanor_math::primitive_int::*;

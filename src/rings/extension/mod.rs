@@ -61,7 +61,7 @@ pub mod conway;
 /// 
 /// One of the most common use cases seems to be the implementation of finite fields (sometimes
 /// called galois fields).
-/// ```
+/// ```rust
 /// #![feature(allocator_api)]
 /// # use std::alloc::Global;
 /// # use feanor_math::assert_el_eq;

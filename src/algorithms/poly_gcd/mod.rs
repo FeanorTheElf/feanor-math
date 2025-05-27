@@ -56,7 +56,7 @@ const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
 /// even defined, since `R` does not have to be UFD).
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::algorithms::poly_gcd::*;
@@ -91,7 +91,7 @@ pub trait PolyTFracGCDRing {
     /// we impose the additional constraint that it be monic, which makes it unique.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::assert_el_eq;
     /// # use feanor_math::ring::*;
     /// # use feanor_math::algorithms::poly_gcd::*;
@@ -133,7 +133,7 @@ pub trait PolyTFracGCDRing {
     /// we impose the additional constraint that it be monic, which makes it unique.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::assert_el_eq;
     /// # use feanor_math::ring::*;
     /// # use feanor_math::algorithms::poly_gcd::*;
@@ -220,7 +220,7 @@ pub fn make_primitive<P>(poly_ring: P, f: &El<P>) -> (El<P>, El<<P::Type as Ring
 /// returns `g`.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::poly::*;

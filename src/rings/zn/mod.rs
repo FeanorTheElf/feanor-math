@@ -366,7 +366,7 @@ pub trait ZnOperation {
 /// macros, but currently something simple seems like the best solution.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
@@ -492,7 +492,7 @@ impl<R, S> ZnReductionMap<R, S>
     /// Computes the additive group homomorphism `Z/mZ -> Z/nZ, x -> (n/m)x`.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::assert_el_eq;
     /// # use feanor_math::ring::*;
     /// # use feanor_math::homomorphism::*;
@@ -513,7 +513,7 @@ impl<R, S> ZnReductionMap<R, S>
     /// "smallest" refers to the element that has the smallest lift to `Z`.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::assert_el_eq;
     /// # use feanor_math::ring::*;
     /// # use feanor_math::homomorphism::*;

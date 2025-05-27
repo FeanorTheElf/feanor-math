@@ -29,7 +29,7 @@ pub trait DivisibilityRing: RingBase {
     /// if available, might sometimes behave more intuitively.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::divisibility::*;
@@ -38,7 +38,7 @@ pub trait DivisibilityRing: RingBase {
     /// assert_eq!(None, ZZ.checked_left_div(&6, &4));
     /// ```
     /// In rings that have zero-divisors, there are usually multiple possible results.
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::divisibility::*;
     /// # use feanor_math::homomorphism::*;
@@ -56,7 +56,7 @@ pub trait DivisibilityRing: RingBase {
     /// If you need such an element, consider using [`DivisibilityRing::checked_left_div()`].
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::divisibility::*;
@@ -138,7 +138,7 @@ pub trait DivisibilityRing: RingBase {
     /// 
     /// Assume we want to go through all positive integers `<= 1000` that are divisible by `257`. The naive 
     /// way would be the following
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::divisibility::*;
     /// # use feanor_math::primitive_int::*;
@@ -152,7 +152,7 @@ pub trait DivisibilityRing: RingBase {
     /// It can be faster to instead prepare the divisor `257` once and use this "prepared" divisor for
     /// all checks (of course, it will be much faster to iterate over `(0..10000).step_by(257)`, but
     /// for the sake of this example, let's use individual divisibility checks).
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::divisibility::*;
     /// # use feanor_math::primitive_int::*;

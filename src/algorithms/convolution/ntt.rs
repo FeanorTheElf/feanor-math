@@ -37,6 +37,16 @@ pub struct PreparedConvolutionOperand<R, A = Global>
     ntt_data: Vec<El<R>, A>
 }
 
+impl<R> NTTConvolution<R>
+    where R: RingStore + Clone,
+        R::Type: ZnRing
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(ring: R) -> Self {
+        Self::new_with(ring, Global)
+    }
+}
+
 impl<R, A> NTTConvolution<R, A>
     where R: RingStore + Clone,
         R::Type: ZnRing,

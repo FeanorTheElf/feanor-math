@@ -52,7 +52,7 @@ pub trait MultivariatePolyRing: RingExtension {
     /// to use [`MultivariatePolyRingStore::with_wrapped_indeterminates()`].
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::rings::multivariate::*;
@@ -163,7 +163,7 @@ pub trait MultivariatePolyRing: RingExtension {
     /// appears in some term.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::ring::*;
     /// # use feanor_math::rings::multivariate::*;
@@ -232,7 +232,7 @@ pub trait MultivariatePolyRing: RingExtension {
     /// Evaluates the given polynomial at the given values.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::rings::multivariate::*;
     /// # use feanor_math::rings::multivariate::multivariate_impl::*;
@@ -424,7 +424,7 @@ pub trait MultivariatePolyRingStore: RingStore
     /// Note however that [`MultivariatePolyRingStore::from_terms()`] might be more performant.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// use feanor_math::assert_el_eq;
     /// use feanor_math::homomorphism::*;
     /// use feanor_math::ring::*;
@@ -454,7 +454,7 @@ pub trait MultivariatePolyRingStore: RingStore
     /// as an array to allow pattern matching.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// use feanor_math::assert_el_eq;
     /// use feanor_math::homomorphism::*;
     /// use feanor_math::ring::*;
@@ -555,7 +555,7 @@ pub trait GradedMonomialOrder: MonomialOrder {}
 /// of variables.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::multivariate::*;
 /// # use feanor_math::rings::multivariate::multivariate_impl::*;

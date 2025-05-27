@@ -34,7 +34,7 @@ use crate::ring::*;
 /// Finally, there is [`SelfSubvectorView`], which directly supports taking subvectors.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::seq::*;
 /// fn compute_sum<V: VectorView<i32>>(vec: V) -> i32 {
 ///     let mut result = 0;
@@ -194,7 +194,7 @@ pub trait VectorView<T: ?Sized> {
     /// Called `map_view()` to prevent name conflicts with [`Iterator::map()`].
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// use feanor_math::seq::*;
     /// fn foo<V: VectorView<i64>>(data: V) {
     ///     // some logic
@@ -237,7 +237,7 @@ pub trait VectorViewSparse<T: ?Sized>: VectorView<T> {
     /// that are "nonzero" (`T` must have an appropriate notion of zero).
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::seq::*;
     /// # use feanor_math::ring::*;
     /// # use feanor_math::primitive_int::*;
@@ -310,7 +310,7 @@ fn range_within<R: RangeBounds<usize>>(len: usize, range: R) -> Range<usize> {
 /// This is the [`VectorView`]-counterpart to [`SelfSubvectorFn`].
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::seq::*;
 /// # use feanor_math::seq::subvector::*;
 /// fn compute_sum_recursive<V: SelfSubvectorView<i32>>(vec: V) -> i32 {
@@ -561,7 +561,7 @@ pub trait SwappableVectorViewMut<T: ?Sized>: VectorViewMut<T> {
 /// Finally, there is the subtrait [`SelfSubvectorFn`], which directly supports taking subvectors.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::seq::*;
 /// fn compute_sum<V: VectorFn<usize>>(vec: V) -> usize {
 ///     let mut result = 0;
@@ -655,7 +655,7 @@ pub trait VectorFn<T> {
 /// for yet another way of creating arbitrary `VectorFn`s by using `(0..len).map_fn(|i| ...)`.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::seq::*;
 /// # use feanor_math::seq::subvector::*;
 /// fn compute_sum_recursive<V: SelfSubvectorFn<usize>>(vec: V) -> usize {

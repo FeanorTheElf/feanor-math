@@ -78,7 +78,7 @@ impl<I, F, T> FusedIterator for IterCombinations<I, F, T>
 /// 
 /// # Example
 /// 
-/// ```
+/// ```rust
 /// # use feanor_math::iters::combinations;
 /// assert_eq!(
 ///     vec![(1, 2), (1, 3), (2, 3)],
@@ -251,7 +251,7 @@ impl<'a, F, T> FusedIterator for MultisetCombinations<'a, F, T>
 /// yielded element is the largest one w.r.t. lexicographic order.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::iters::multiset_combinations;
 /// assert_eq!(
 ///     vec![(1, 1, 0), (1, 0, 1), (0, 2, 0), (0, 1, 1), (0, 0, 2)],
@@ -262,7 +262,7 @@ impl<'a, F, T> FusedIterator for MultisetCombinations<'a, F, T>
 ///     ).collect::<Vec<_>>()
 /// );
 /// ```
-/// ```
+/// ```rust
 /// # use feanor_math::iters::multiset_combinations;
 /// assert_eq!(
 ///     vec![(2, 0, 0), (1, 1, 0), (1, 0, 1), (0, 2, 0), (0, 1, 1), (0, 0, 2)],
@@ -395,7 +395,7 @@ impl<I, F, G, T> FusedIterator for MultiProduct<I, F, G, T>
 /// Note that clones of the given base iterator must all have the same iteration order.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::iters::multi_cartesian_product;
 /// assert_eq!(
 ///     vec![(2, 0), (2, 1), (2, 2), (3, 0), (3, 1), (3, 2)],
@@ -484,7 +484,7 @@ impl<I, F, T> FusedIterator for CondenseIter<I, F, T>
 /// iterator.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::iters::condense;
 /// let mut accumulator = 0;
 /// assert_eq!(vec![6, 9, 6, 7], condense(vec![1, 2, 3, 4, 5, 6, 7].into_iter(), move |a| {

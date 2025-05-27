@@ -28,7 +28,7 @@ use std::marker::PhantomData;
 /// but it follows the general approach of `feanor-math` to expose its actual
 /// behavior through the ring, and not through the elements. For example, to
 /// add integers, use
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::rings::rust_bigint::*;

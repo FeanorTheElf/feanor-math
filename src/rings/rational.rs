@@ -34,7 +34,7 @@ use std::marker::PhantomData;
 /// dramatically, even when the numbers itself are of moderate size.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
@@ -48,7 +48,7 @@ use std::marker::PhantomData;
 /// assert_el_eq!(QQ, QQ.div(&QQ.one(), &hom.map(4)), QQ.pow(one_half, 2));
 /// ```
 /// You can also retrieve numerator and denominator.
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
@@ -139,7 +139,7 @@ impl<I> RationalFieldBase<I>
     /// The numerator of the fully reduced fraction.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::assert_el_eq;
     /// # use feanor_math::ring::*;
     /// # use feanor_math::primitive_int::*;
@@ -160,7 +160,7 @@ impl<I> RationalFieldBase<I>
     /// The denominator of the fully reduced fraction.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::assert_el_eq;
     /// # use feanor_math::ring::*;
     /// # use feanor_math::primitive_int::*;

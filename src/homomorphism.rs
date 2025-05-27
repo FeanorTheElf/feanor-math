@@ -116,7 +116,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// # Example
 /// 
 /// Most integer rings support canonical homomorphisms between them.
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
@@ -154,7 +154,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// ## Integer rings
 /// 
 /// All given integer rings have canonical isomorphisms between each other.
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::primitive_int::*;
@@ -189,7 +189,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// 
 /// Due to conflicting implementations, only the most useful conversions
 /// are implemented for `Z/nZ`.
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::homomorphism::*;
@@ -220,7 +220,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// ```
 /// Most notably, reduction homomorphisms are currently not available.
 /// You can use [`crate::rings::zn::ZnReductionMap`] instead.
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::homomorphism::*;
@@ -236,7 +236,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// Additionally, there are the projections `Z -> Z/nZ`.
 /// They are all implemented, even though [`crate::rings::zn::ZnRing`] currently
 /// only requires the projection from the "associated" integer ring.
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
@@ -266,7 +266,7 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 /// ## Polynomial Rings
 /// 
 /// For the two provided univariate polynomial ring implementations, we have the isomorphisms
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::integer::*;
@@ -363,7 +363,7 @@ impl<R: ?Sized + CanIsoFromTo<R>> SelfIso for R {}
 /// domain and codomain rings, and is much easier to use.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::homomorphism::*;
@@ -530,7 +530,7 @@ impl<'a, R, S> Homomorphism<R::Type, S::Type> for CanHomRef<'a, R, S>
 /// in the other direction, i.e. allows mapping in both directions.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
@@ -625,7 +625,7 @@ impl<R, S> Homomorphism<S::Type,R::Type> for CanIso<R, S>
 /// The ring homomorphism induced by a [`RingExtension`].
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
@@ -692,7 +692,7 @@ impl<R> Homomorphism<<<R::Type as RingExtension>::BaseRing as RingStore>::Type, 
 /// The ring homomorphism `Z -> R` that exists for any ring `R`.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
@@ -987,7 +987,7 @@ impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
 /// or something similar.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;

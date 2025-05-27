@@ -20,7 +20,7 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 /// less than `d`.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// use feanor_math::ring::*;
 /// use feanor_math::primitive_int::*;
 /// use feanor_math::rings::poly::dense_poly::DensePolyRing;
@@ -102,7 +102,7 @@ pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type a
 /// the full resultant from this. For infinite rings, this is usually much faster.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// use feanor_math::assert_el_eq;
 /// use feanor_math::ring::*;
 /// use feanor_math::integer::*;

@@ -31,7 +31,7 @@ use serde::de::DeserializeSeed;
 /// A common case where you might encounter [`AsFieldBase`] is when working with rings
 /// which might or might not be a field depending on data only known at runtime. One
 /// example are implementations of [`ZnRing`] with modulus chosen at runtime.
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::ring::*;
@@ -50,7 +50,7 @@ use serde::de::DeserializeSeed;
 /// (unfortunately there are some conflicts...), they are often not available in
 /// generic contexts. In this case, the currently best solution is to directly
 /// use the functions given by [`DelegateRing`], e.g.
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::ring::*;
@@ -491,7 +491,7 @@ impl<'de, R> Deserialize<'de> for AsFieldBase<R>
 /// that simplify conversion from and to the field wrapper.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::rings::field::*;

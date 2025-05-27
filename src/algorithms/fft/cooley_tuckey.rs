@@ -17,7 +17,7 @@ use super::complex_fft::*;
 /// the Fourier transform of an array with power-of-two length.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::algorithms::fft::*;
@@ -41,7 +41,7 @@ use super::complex_fft::*;
 ///   (a_0, ..., a_(N - 1)) -> (sum_j a_j zeta^(-ij))_i
 /// ```
 /// as demonstrated by
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::algorithms::fft::*;
@@ -54,7 +54,7 @@ use super::complex_fft::*;
 /// let root_of_unity = ring.int_hom().map(2);
 /// let fft_table = CooleyTuckeyFFT::new(ring, root_of_unity, 2);
 /// let mut data = [ring.one(), ring.one(), ring.zero(), ring.zero()];
-/// fft_table.fft(&mut data);
+/// fft_table.fft(&mut data, ring);
 /// let inv_root_of_unity = ring.invert(&root_of_unity).unwrap();
 /// assert_el_eq!(ring, ring.add(ring.one(), inv_root_of_unity), data[1]);
 /// ```
@@ -118,9 +118,6 @@ fn butterfly_loop_vec<T, S, F, F_vec>(log2_n: usize, data: &mut [T], butterfly_r
         assert_eq!(0, second_unaligned1.len());
         assert_eq!(first_unaligned2.len(), second_unaligned2.len());
         assert_eq!(first_aligned.len(), second_aligned.len());
-        for (a, b) in first_unaligned1.iter_mut().zip(second_unaligned1.iter_mut()) {
-            butterfly(a, b, &twiddle);
-        }
         for (a, b) in first_unaligned2.iter_mut().zip(second_unaligned2.iter_mut()) {
             butterfly(a, b, &twiddle);
         }

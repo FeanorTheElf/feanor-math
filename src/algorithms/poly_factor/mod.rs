@@ -30,7 +30,7 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
     /// as second tuple element.
     /// 
     /// # Example - factorization over `QQ`
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::rings::poly::*;

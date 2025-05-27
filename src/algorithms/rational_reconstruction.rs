@@ -71,7 +71,7 @@ pub fn reduce_2d_modular_relation_basis<R>(Zn: R, x: El<R>) -> (
 /// 
 /// # Example
 /// 
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::divisibility::*;

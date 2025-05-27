@@ -10,7 +10,7 @@ use super::*;
 /// To pass it to algorithms, use the `.data()` and `.data_mut()` functions.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// #![feature(allocator_api)]
 /// # use std::alloc::*;
 /// # use feanor_math::ring::*;

@@ -29,7 +29,7 @@ use crate::primitive_int::*;
 /// accessed via the [`crate::seq::VectorView`]-functions.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
@@ -48,7 +48,7 @@ use crate::primitive_int::*;
 /// 
 /// # Canonical mappings
 /// This ring has a canonical isomorphism to Barett-reduction based Zn
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
@@ -61,7 +61,7 @@ use crate::primitive_int::*;
 /// assert!(S.eq_el(&S.int_hom().map(12), &R.can_iso(&S).unwrap().map(R.int_hom().map(12))));
 /// ```
 /// and a canonical homomorphism from any integer ring
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;

@@ -152,7 +152,7 @@ unsafe impl<'a, T> AsPointerToSlice<T> for AsFirstElement<T> {
 /// aliasing pointers, that must not be converted into references.
 /// 
 /// ## Example of illegal use
-/// ```
+/// ```rust
 /// # use feanor_math::matrix::*;
 /// # use core::ptr::NonNull;
 /// let mut data = [1, 2, 3];

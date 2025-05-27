@@ -46,7 +46,7 @@ fn invert_many<R>(ring: R, values: &[El<R>], out: &mut [El<R>]) -> Result<(), ()
 /// where `c` is the multiplication exponent, e.g. `c = 1.58...` for Karatsuba multiplication.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::algorithms::interpolate::*;
@@ -114,7 +114,7 @@ pub enum InterpolationError {
 /// The complexity is `O(n T(n))` where `T(n)` is the cost of multiplying two degree-`n` polynomials.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # #![feature(allocator_api)]
 /// # use std::alloc::Global;
 /// # use feanor_math::ring::*;
@@ -130,7 +130,7 @@ pub enum InterpolationError {
 /// assert_el_eq!(&ZZX, expected, actual);
 /// ```
 /// In some cases the interpolation polynomial does not exist.
-/// ```
+/// ```rust
 /// # #![feature(allocator_api)]
 /// # use std::alloc::Global;
 /// # use feanor_math::ring::*;

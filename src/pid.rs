@@ -33,7 +33,7 @@ pub trait PrincipalIdealRing: DivisibilityRing {
     /// which it returns any unit).
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::assert_el_eq;
     /// # use feanor_math::ring::*;
     /// # use feanor_math::pid::*;
@@ -145,7 +145,7 @@ impl<R> PrincipalIdealRingStore for R
 /// and implementations are free to use any choice.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::pid::*;

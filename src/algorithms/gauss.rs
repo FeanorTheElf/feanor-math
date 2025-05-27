@@ -17,7 +17,7 @@ use crate::ring::*;
 /// relies on divisibility inducing a total order.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;

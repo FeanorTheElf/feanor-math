@@ -113,7 +113,7 @@ pub trait PolyRing: RingExtension {
     /// Evaluates the given polynomial at the given values.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::rings::poly::*;
     /// # use feanor_math::primitive_int::*; 
@@ -203,7 +203,7 @@ pub trait PolyRingStore: RingStore
     /// Panics if the leading coefficient is not a unit.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::rings::poly::*;
     /// # use feanor_math::assert_el_eq;
@@ -265,7 +265,7 @@ pub trait PolyRingStore: RingStore
     /// Note however that [`PolyRingStore::from_terms()`] might be more performant.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// use feanor_math::assert_el_eq;
     /// use feanor_math::ring::*;
     /// use feanor_math::rings::poly::*;

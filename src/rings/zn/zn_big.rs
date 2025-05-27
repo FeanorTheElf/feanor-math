@@ -37,7 +37,7 @@ use crate::serialization::*;
 /// (like [`crate::rings::zn::zn_64::Zn`]), which will be much faster.
 ///
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
@@ -49,7 +49,7 @@ use crate::serialization::*;
 /// assert!(R.is_one(&R.pow(a, 4)));
 /// ```
 /// However, this will panic as `2053^3 > i32::MAX`.
-/// ```should_panic
+/// ```rust,should_panic
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_big::*;
@@ -59,7 +59,7 @@ use crate::serialization::*;
 ///
 /// # Canonical mappings
 /// This ring has a canonical homomorphism from any integer ring
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;

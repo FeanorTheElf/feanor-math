@@ -11,7 +11,7 @@ use crate::field::*;
 /// might also be necessary when e.g. storing elements in a set.
 /// 
 /// # Examples
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
@@ -25,7 +25,7 @@ use crate::field::*;
 /// println!("The result is: {}", ring.format(&ring.add(ring.mul(ring.clone_el(&x), ring.clone_el(&x)), ring.clone_el(&x))));
 /// ```
 /// You can also retrieve the wrapped element
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::poly::*;

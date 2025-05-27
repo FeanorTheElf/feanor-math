@@ -55,7 +55,7 @@ const TRY_FACTOR_DIRECTLY_ATTEMPTS: usize = 5;
 /// 
 /// # Example
 /// 
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::extension::*;
@@ -75,7 +75,7 @@ const TRY_FACTOR_DIRECTLY_ATTEMPTS: usize = 5;
 /// So far, we could have done the same with just [`FreeAlgebraImpl`], which indeed
 /// is used as the default implementation of the arithmetic. However, [`NumberField`]
 /// provides additional functionality, that is not available for general extensions.
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::extension::*;
@@ -98,7 +98,7 @@ const TRY_FACTOR_DIRECTLY_ATTEMPTS: usize = 5;
 /// The internal generating polynomial of a number field is currently always
 /// integral, but you can create a number field also from a rational polynomial
 /// using [`NumberField::adjoin_root()`].
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;

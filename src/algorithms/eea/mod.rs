@@ -84,7 +84,7 @@ pub fn half_eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>)
 /// whose sign matches the sign of a.
 /// 
 /// In particular, have 
-/// ```
+/// ```rust
 /// # use feanor_math::algorithms::eea::signed_gcd;
 /// # use feanor_math::primitive_int::*;
 /// assert_eq!(2, signed_gcd(6, 8, &StaticRing::<i64>::RING));

@@ -35,7 +35,7 @@ use crate::specialization::*;
 /// 
 /// # Example
 /// 
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
@@ -86,7 +86,7 @@ use crate::specialization::*;
 /// ```
 /// An example when special ring traits are automatically implemented is 
 /// given by the following.
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::delegate::*;
@@ -119,7 +119,7 @@ use crate::specialization::*;
 /// }
 /// ```
 /// [`DivisibilityRing`] is automatically implemented (but can be specialized):
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::divisibility::*;
@@ -160,7 +160,7 @@ use crate::specialization::*;
 /// }
 /// ```
 /// [`FiniteRing`] for example is not automatically implemented:
-/// ```compile_fail
+/// ```rust,compile_fail
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::finite::*;
@@ -202,7 +202,7 @@ use crate::specialization::*;
 /// }
 /// ```
 /// But we can add a delegate-implementation of [`FiniteRing`] by adding the marker trait [`DelegateRingImplFiniteRing`]:
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::finite::*;

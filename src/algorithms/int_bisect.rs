@@ -73,7 +73,7 @@ pub fn find_root_floor<R, F>(ZZ: R, approx: El<R>, mut func: F) -> El<R>
 /// assert!(result.pow(62) <= (1 << 62) && (result + 1).pow(62) > (1 << 62));
 /// ```
 /// These cases can somewhat be avoided by first doing a size estimate.
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::algorithms::int_bisect::*;
 /// # use feanor_math::primitive_int::*;

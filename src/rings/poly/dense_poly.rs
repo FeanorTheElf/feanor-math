@@ -29,7 +29,7 @@ use std::cmp::min;
 /// instead for improved performance.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::poly::*;
@@ -42,7 +42,7 @@ use std::cmp::min;
 /// assert_eq!(10 * 9 * 8 * 7 * 6 / 120, *P.coefficient_at(&binomial_coefficients, 5));
 /// ```
 /// This ring has a [`CanIsoFromTo`] to [`sparse_poly::SparsePolyRingBase`].
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;

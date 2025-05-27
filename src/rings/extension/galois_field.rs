@@ -192,7 +192,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
 /// # Example
 /// 
 /// The easiest way to create a Galois field is by using `new()`:
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::extension::*;
 /// # use feanor_math::rings::finite::*;
@@ -206,7 +206,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
 /// More configurations are possible using [`GaloisField::new_with()`] or [`GaloisField::create()`].
 /// 
 /// We also support conversion to and from a plain [`super::extension_impl::FreeAlgebraImpl`] representation.
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::extension::*;
 /// # use feanor_math::rings::extension::extension_impl::*;
@@ -221,7 +221,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
 /// ```
 /// The other way is slightly more dangerous, since at some point we either have to check, or assume
 /// that the extension ring is indeed a field.
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::extension::*;
 /// # use feanor_math::rings::extension::extension_impl::*;
@@ -297,7 +297,7 @@ impl GaloisField {
     /// the most general [`GaloisField::create()`].
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::rings::extension::*;
     /// # use feanor_math::rings::finite::*;
@@ -334,7 +334,7 @@ impl<R, A, C> GaloisFieldOver<R, A, C>
     /// 
     /// Sometimes it is useful to have the base ring also be a field. This can e.g. be achieved
     /// by
-    /// ```
+    /// ```rust
     /// #![feature(allocator_api)]
     /// # use std::alloc::Global;
     /// # use feanor_math::ring::*;

@@ -143,7 +143,7 @@ pub mod rings;
 /// 
 /// Using this is for example necessary if you want to use elements of a [`crate::ring::HashableElRing`]-ring
 /// as elements in a [`std::collections::HashSet`].
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::wrapper::*;

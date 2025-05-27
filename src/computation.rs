@@ -6,7 +6,7 @@ use crate::{seq::VectorFn, unstable_sealed::UnstableSealed};
 
 ///
 /// Provides an idiomatic way to convert a `Result<T, !>` into `T`, via
-/// ```
+/// ```rust
 /// # #![feature(never_type)]
 /// # use feanor_math::computation::*;
 /// fn some_computation() -> Result<&'static str, !> { Ok("this computation does not fail") }
@@ -43,7 +43,7 @@ pub fn no_error<T>(error: !) -> T {
 /// Which features of a [`ComputationController`] an algorithm supports is completely up
 /// to the algorithm. Elliptic Curve factorization currently supports logging, abortion
 /// and multithreading.
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::algorithms::ec_factor::*;
 /// # use feanor_math::rings::zn::*;
@@ -57,7 +57,7 @@ pub fn no_error<T>(error: !) -> T {
 /// assert!(8591966237 % factor == 0);
 /// ```
 /// If the multithreading with rayon is enabled, we can also do
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::algorithms::ec_factor::*;
 /// # use feanor_math::rings::zn::*;

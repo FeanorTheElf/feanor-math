@@ -29,7 +29,7 @@ pub trait FractionField: Field + RingExtension {
     /// guaranteed to be a unit (for rings that are not [`crate::pid::PrincipalIdealRing`], this
     /// is not even defined). Hence, when you want to convert the result to the base ring, use
     /// [`crate::divisibility::DivisibilityRing::checked_div()`] as follows:
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::divisibility::*;
     /// # use feanor_math::rings::fraction::*;

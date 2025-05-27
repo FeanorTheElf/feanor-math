@@ -52,7 +52,7 @@ fn mullo(lhs: u64, rhs: u64) -> u64 {
 /// Note that the exact value might change in the future.
 /// 
 /// # Examples
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
@@ -708,7 +708,7 @@ impl ZnRing for ZnBase {
     /// to work on elements `{ 0, ..., 6 * n }` instead of only `{ 0, ..., n - 1 }`.
     /// 
     /// # Examples
-    /// ```
+    /// ```rust
     /// # use feanor_math::rings::zn::*;
     /// # use feanor_math::assert_el_eq;
     /// # use feanor_math::ring::*;
@@ -752,7 +752,7 @@ impl HashableElRing for ZnBase {
 /// The following use of the FFT is usually faster than the standard use, as
 /// the FFT requires a high amount of multiplications with the internally stored
 /// roots of unity.
-/// ```
+/// ```rust
 /// # #![feature(const_type_name)]
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::ring::*;

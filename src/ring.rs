@@ -13,7 +13,7 @@ use serde::{Serialize, Deserialize};
 /// It is usually used to determine when to use parenthesis during printing.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::primitive_int::*;
@@ -106,7 +106,7 @@ pub enum EnvBindingStrength {
 /// Hence, be careful to not mix up elements of different rings, even if they
 /// have the same type. This can easily lead to nasty errors. For example, 
 /// consider the following code
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
@@ -123,7 +123,7 @@ pub enum EnvBindingStrength {
 /// 
 /// However, swapping elements between rings is well-defined and correct if they are "equal"
 /// as given by `PartialEq` (not just canonically isomorphic)
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
@@ -139,7 +139,7 @@ pub enum EnvBindingStrength {
 /// 
 /// An example implementation of a new, very useless ring type that represents
 /// 32-bit integers stored on the heap.
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::integer::*;
@@ -466,7 +466,7 @@ pub trait RingBase: PartialEq {
     /// fact be able to represent the characteristic.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::rings::zn::*;
@@ -486,7 +486,7 @@ pub trait RingBase: PartialEq {
 /// function of the underlying [`RingBase`].
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # #[macro_use] use feanor_math::delegate;
 /// 
@@ -527,7 +527,7 @@ macro_rules! delegate {
 /// Frequently used in tests
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::assert_el_eq;
@@ -537,7 +537,7 @@ macro_rules! delegate {
 /// assert_eq!(3, 3);
 /// ```
 /// If the ring elements are not comparable on their own, this is really useful
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::integer::*;
@@ -575,7 +575,7 @@ macro_rules! assert_el_eq {
 /// 
 /// # Example
 /// 
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
@@ -740,7 +740,7 @@ pub trait RingStore: Sized {
     /// Computes the sum of all elements returned by the iterator.
     /// 
     /// This is equivalent to
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::assert_el_eq;
@@ -787,7 +787,7 @@ pub trait RingStore: Sized {
     /// Computes the product of all elements returned by the iterator.
     /// 
     /// This is equivalent to
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::assert_el_eq;
@@ -841,13 +841,14 @@ pub trait RingStore: Sized {
     /// [`std::fmt::Display`], to use as formatting parameter.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::homomorphism::*;
     /// # use feanor_math::integer::*;
     /// let ring = BigIntRing::RING;
     /// let element = ring.int_hom().map(3);
     /// assert_eq!("3", format!("{}", ring.format(&element)));
+    /// ```
     /// 
     fn format<'a>(&'a self, value: &'a El<Self>) -> RingElementDisplayWrapper<'a, Self> {
         self.format_within(value, EnvBindingStrength::Weakest)
@@ -861,7 +862,7 @@ pub trait RingStore: Sized {
     /// whether to put the value in parenthesis or not.
     /// 
     /// # Example
-    /// ```
+    /// ```rust
     /// # use feanor_math::ring::*;
     /// # use feanor_math::homomorphism::*;
     /// # use feanor_math::integer::*;
@@ -874,6 +875,7 @@ pub trait RingStore: Sized {
     /// assert_eq!("X", format!("{}", ring.format_within(&f, EnvBindingStrength::Product)));
     /// assert_eq!("1 + X", format!("{}", ring.format_within(&g, EnvBindingStrength::Sum)));
     /// assert_eq!("(1 + X)", format!("{}", ring.format_within(&g, EnvBindingStrength::Product)));
+    /// ```
     /// 
     fn format_within<'a>(&'a self, value: &'a El<Self>, within: EnvBindingStrength) -> RingElementDisplayWrapper<'a, Self> {
         RingElementDisplayWrapper { ring: self, element: value, within: within }

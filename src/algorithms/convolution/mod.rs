@@ -34,7 +34,7 @@ pub mod rns;
 /// Trait for objects that can compute a convolution over some ring.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use std::cmp::{min, max};
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
@@ -105,11 +105,11 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, ring: S) -> bool;
 
     ///
-    /// Takes an input list of values and computes an opaque [`PreparedConvolutionAlgorithm::PreparedConvolutionOperand`],
+    /// Takes an input list of values and computes an opaque [`ConvolutionAlgorithm::PreparedConvolutionOperand`],
     /// which can be used to compute future convolutions with this list of values faster.
     /// 
-    /// Although the [`PreparedConvolutionAlgorithm::PreparedConvolutionOperand`] does not have any explicit reference
-    /// to the list of values it was created for, passing it to [`PreparedConvolutionAlgorithm::compute_convolution_prepared()`]
+    /// Although the [`ConvolutionAlgorithm::PreparedConvolutionOperand`] does not have any explicit reference
+    /// to the list of values it was created for, passing it to [`ConvolutionAlgorithm::compute_convolution_prepared()`]
     /// with another list of values will give erroneous results.
     /// 
     /// # Length-dependence when preparing a convolution
@@ -121,15 +121,37 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// 
     /// To handle this, implementations can make use of the `length_hint`, which - if given - should be an upper bound
     /// to the length of the output of any future convolution that uses the given operand. Alternatively, implementations
-    /// are encouraged to not compute any data during [`PreparedConvolutionAlgorithm::prepare_convolution_operand()`],
+    /// are encouraged to not compute any data during [`ConvolutionAlgorithm::prepare_convolution_operand()`],
     /// but initialize an object with interior mutability, and use it to cache data computed during
-    /// [`PreparedConvolutionAlgorithm::compute_convolution_prepared()`].
+    /// [`ConvolutionAlgorithm::compute_convolution_prepared()`].
     /// 
     /// TODO: At next breaking release, remove the default implementation
     /// 
     /// # Example
     /// 
-    /// TODO 
+    /// ```rust
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::algorithms::convolution::*;
+    /// # use feanor_math::algorithms::convolution::ntt::*;
+    /// # use feanor_math::rings::zn::*;
+    /// # use feanor_math::rings::zn::zn_64::*;
+    /// # use feanor_math::rings::finite::*;
+    /// let ring = Zn::new(65537);
+    /// let convolution = NTTConvolution::new(ring);
+    /// let lhs = ring.elements().take(10).collect::<Vec<_>>();
+    /// let rhs = ring.elements().take(10).collect::<Vec<_>>();
+    /// // "standard" use
+    /// let mut expected = (0..19).map(|_| ring.zero()).collect::<Vec<_>>();
+    /// convolution.compute_convolution(&lhs, &rhs, &mut expected, ring);
+    /// 
+    /// // "prepared" variant
+    /// let lhs_prep = convolution.prepare_convolution_operand(&lhs, None, ring);
+    /// let rhs_prep = convolution.prepare_convolution_operand(&rhs, None, ring);
+    /// let mut actual = (0..19).map(|_| ring.zero()).collect::<Vec<_>>();
+    /// // this will now be faster than `convolution.compute_convolution()`
+    /// convolution.compute_convolution_prepared(&lhs, Some(&lhs_prep), &rhs, Some(&rhs_prep), &mut expected, ring);
+    /// assert!(expected.iter().zip(actual.iter()).all(|(l, r)| ring.eq_el(l, r)));
+    /// ```
     /// 
     #[stability::unstable(feature = "enable")]
     fn prepare_convolution_operand<S, V>(&self, val: V, length_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
@@ -150,6 +172,13 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
         return <ProduceUnitType as ProduceValue<Self::PreparedConvolutionOperand>>::produce();
     }
     
+    ///
+    /// Elementwise adds the convolution of `lhs` and `rhs` to `dst`. If provided, the given
+    /// prepared convolution operands are used for a faster computation.
+    /// 
+    /// When called with `None` as both the prepared convolution operands, this is exactly
+    /// equivalent to [`ConvolutionAlgorithm::compute_convolution()`].
+    /// 
     #[stability::unstable(feature = "enable")]
     fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: S)
         where S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>
@@ -162,7 +191,7 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// to `dst`.
     /// 
     /// In other words, this computes `dst[k] += sum_l sum_(i + j = k) values[l][i] * values[l][k]`.
-    /// It can be faster than calling [`PreparedConvolutionAlgorithm::prepare_convolution_operand()`].
+    /// It can be faster than calling [`ConvolutionAlgorithm::prepare_convolution_operand()`].
     /// 
     #[stability::unstable(feature = "enable")]
     fn compute_convolution_sum<'a, S, I, V1, V2>(&self, values: I, dst: &mut [R::Element], ring: S) 

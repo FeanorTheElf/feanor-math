@@ -23,7 +23,7 @@ use std::fmt::{Formatter, Result};
 /// zero.
 /// 
 /// # Example
-/// ```
+/// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::poly::*;
@@ -37,7 +37,7 @@ use std::fmt::{Formatter, Result};
 /// assert_eq!(0, *P.coefficient_at(&power, 1));
 /// ```
 /// This ring has a [`CanIsoFromTo`] to [`dense_poly::DensePolyRingBase`].
-/// ```
+/// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::ring::*;
