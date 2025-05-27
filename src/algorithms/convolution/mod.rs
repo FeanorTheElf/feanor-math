@@ -1,5 +1,4 @@
 use std::alloc::{Allocator, Global};
-use std::marker::PhantomData;
 use std::ops::Deref;
 
 use crate::ring::*;
@@ -149,12 +148,13 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// let rhs_prep = convolution.prepare_convolution_operand(&rhs, None, ring);
     /// let mut actual = (0..19).map(|_| ring.zero()).collect::<Vec<_>>();
     /// // this will now be faster than `convolution.compute_convolution()`
-    /// convolution.compute_convolution_prepared(&lhs, Some(&lhs_prep), &rhs, Some(&rhs_prep), &mut expected, ring);
+    /// convolution.compute_convolution_prepared(&lhs, Some(&lhs_prep), &rhs, Some(&rhs_prep), &mut actual, ring);
+    /// println!("{:?}, {:?}", actual.iter().map(|x| ring.format(x)).collect::<Vec<_>>(), expected.iter().map(|x| ring.format(x)).collect::<Vec<_>>());
     /// assert!(expected.iter().zip(actual.iter()).all(|(l, r)| ring.eq_el(l, r)));
     /// ```
     /// 
     #[stability::unstable(feature = "enable")]
-    fn prepare_convolution_operand<S, V>(&self, val: V, length_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
+    fn prepare_convolution_operand<S, V>(&self, _val: V, _length_hint: Option<usize>, _ring: S) -> Self::PreparedConvolutionOperand
         where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
     {
         struct ProduceUnitType;
@@ -180,7 +180,7 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// equivalent to [`ConvolutionAlgorithm::compute_convolution()`].
     /// 
     #[stability::unstable(feature = "enable")]
-    fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: S)
+    fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, _lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, _rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: S)
         where S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>
     {
         self.compute_convolution(lhs, rhs, dst, ring)

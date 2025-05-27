@@ -1,8 +1,8 @@
-use std::alloc::{Allocator, Global};
-use std::borrow::Cow;
 use std::cmp::max;
+use std::alloc::{Allocator, Global};
 use std::marker::PhantomData;
 
+use crate::cow::*;
 use crate::algorithms::fft::complex_fft::FFTErrorEstimate;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::algorithms::fft::FFTAlgorithm;
@@ -59,7 +59,7 @@ impl<A> FFTConvolution<A>
         log2_len: usize,
         mut to_int: ToInt,
         log2_el_size: Option<usize>
-    ) -> Cow<'a, Vec<El<Complex64>, A>>
+    ) -> MyCow<'a, Vec<El<Complex64>, A>>
         where R: ?Sized + RingBase,
             V: VectorView<R::Element>,
             ToInt: FnMut(&R::Element) -> i64
@@ -84,9 +84,9 @@ impl<A> FFTConvolution<A>
         };
 
         return if let Some(data_prep) = data_prep {
-            Cow::Borrowed(data_prep.fft_data.get_or_init(log2_len, compute_result))
+            MyCow::Borrowed(data_prep.fft_data.get_or_init(log2_len, compute_result))
         } else {
-            Cow::Owned(compute_result())
+            MyCow::Owned(compute_result())
         }
     }
 

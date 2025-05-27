@@ -50,7 +50,7 @@ use super::complex_fft::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::divisibility::*;
 /// // this ring has a 4-th primitive root of unity
-/// let ring = zn_64::Zn::new(4);
+/// let ring = zn_64::Zn::new(5);
 /// let root_of_unity = ring.int_hom().map(2);
 /// let fft_table = CooleyTuckeyFFT::new(ring, root_of_unity, 2);
 /// let mut data = [ring.one(), ring.one(), ring.zero(), ring.zero()];

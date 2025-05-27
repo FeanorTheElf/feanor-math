@@ -418,13 +418,13 @@ impl<R, V, A, C> DivisibilityRing for FreeAlgebraImplBase<R, V, A, C>
         C: ConvolutionAlgorithm<R::Type>
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        let mut mul_matrix: OwnedMatrix<_> = create_multiplication_matrix(RingRef::new(self), rhs);
-        let mut lhs_matrix: OwnedMatrix<_> = OwnedMatrix::zero(self.rank(), 1, self.base_ring());
+        let mut mul_matrix: OwnedMatrix<_, _> = create_multiplication_matrix(RingRef::new(self), rhs, self.allocator().clone());
+        let mut lhs_matrix: OwnedMatrix<_, _> = OwnedMatrix::zero_in(self.rank(), 1, self.base_ring(), self.allocator().clone());
         let data = self.wrt_canonical_basis(&lhs);
         for j in 0..self.rank() {
             *lhs_matrix.at_mut(j, 0) = data.at(j);
         }
-        let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(self.rank(), 1, self.base_ring());
+        let mut solution: OwnedMatrix<_, _> = OwnedMatrix::zero_in(self.rank(), 1, self.base_ring(), self.allocator().clone());
         let has_sol = self.base_ring().get_ring().solve_right(mul_matrix.data_mut(), lhs_matrix.data_mut(), solution.data_mut(), Global);
         if has_sol.is_solved() {
             return Some(self.from_canonical_basis((0..self.rank()).map(|i| self.base_ring().clone_el(solution.at(i, 0)))));

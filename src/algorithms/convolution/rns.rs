@@ -8,13 +8,13 @@ use crate::integer::*;
 use crate::lazy::LazyVec;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
-use crate::rings::zn::zn_64::{Zn, ZnBase};
+use crate::rings::zn::zn_64::{Zn, ZnBase, ZnFastmul, ZnFastmulBase};
 use crate::rings::zn::*;
 use crate::divisibility::*;
 use crate::seq::*;
 
 use super::ntt::NTTConvolution;
-use super::{ConvolutionAlgorithm, STANDARD_CONVOLUTION};
+use super::ConvolutionAlgorithm;
 
 ///
 /// A [`ConvolutionAlgorithm`] that computes convolutions by computing them modulo a
@@ -26,7 +26,7 @@ use super::{ConvolutionAlgorithm, STANDARD_CONVOLUTION};
 /// [`RNSConvolutionZn`].
 /// 
 #[stability::unstable(feature = "enable")]
-pub struct RNSConvolution<I = BigIntRing, C = NTTConvolution<Zn>, A = Global, CreateC = CreateNTTConvolution>
+pub struct RNSConvolution<I = BigIntRing, C = NTTConvolution<ZnBase, ZnFastmulBase, CanHom<ZnFastmul, Zn>>, A = Global, CreateC = CreateNTTConvolution>
     where I: RingStore + Clone,
         I::Type: IntegerRing,
         C: ConvolutionAlgorithm<ZnBase>,
@@ -46,7 +46,7 @@ pub struct RNSConvolution<I = BigIntRing, C = NTTConvolution<Zn>, A = Global, Cr
 /// 
 #[stability::unstable(feature = "enable")]
 #[repr(transparent)]
-pub struct RNSConvolutionZn<I = BigIntRing, C = NTTConvolution<Zn>, A = Global, CreateC = CreateNTTConvolution>
+pub struct RNSConvolutionZn<I = BigIntRing, C = NTTConvolution<ZnBase, ZnFastmulBase, CanHom<ZnFastmul, Zn>>, A = Global, CreateC = CreateNTTConvolution>
     where I: RingStore + Clone,
         I::Type: IntegerRing,
         C: ConvolutionAlgorithm<ZnBase>,
@@ -60,7 +60,7 @@ pub struct RNSConvolutionZn<I = BigIntRing, C = NTTConvolution<Zn>, A = Global, 
 /// A prepared convolution operand for a [`RNSConvolution`].
 /// 
 #[stability::unstable(feature = "enable")]
-pub struct PreparedConvolutionOperand<R, C = NTTConvolution<Zn>>
+pub struct PreparedConvolutionOperand<R, C = NTTConvolution<ZnBase, ZnFastmulBase, CanHom<ZnFastmul, Zn>>>
     where R: ?Sized + RingBase,
         C: ConvolutionAlgorithm<ZnBase>
 {
@@ -139,7 +139,7 @@ impl CreateNTTConvolution<Global> {
 impl<A> FnOnce<(Zn,)> for CreateNTTConvolution<A>
     where A: Allocator + Clone
 {
-    type Output = NTTConvolution<Zn, A>;
+    type Output = NTTConvolution<ZnBase, ZnFastmulBase, CanHom<ZnFastmul, Zn>, A>;
 
     extern "rust-call" fn call_once(self, args: (Zn,)) -> Self::Output {
         self.call(args)
@@ -158,7 +158,10 @@ impl<A> Fn<(Zn,)> for CreateNTTConvolution<A>
     where A: Allocator + Clone
 {
     extern "rust-call" fn call(&self, args: (Zn,)) -> Self::Output {
-        NTTConvolution::new_with(args.0, self.allocator.clone())
+        let ring = args.0;
+        let ring_fastmul = ZnFastmul::new(ring).unwrap();
+        let hom = ring.into_can_hom(ring_fastmul).ok().unwrap();
+        NTTConvolution::new_with(hom, self.allocator.clone())
     }
 }
 
@@ -258,7 +261,7 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
         lhs_prep: Option<&PreparedConvolutionOperand<R, C>>,
         rhs: V2,
         rhs_prep: Option<&PreparedConvolutionOperand<R, C>>,
-        ring: &R,
+        _ring: &R,
         mut to_int: ToInt,
         ring_log2_el_size: Option<usize>
     ) -> usize
@@ -292,7 +295,7 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
         data: V,
         data_prep: &'a PreparedConvolutionOperand<R, C>,
         rns_index: usize,
-        ring: &R
+        _ring: &R
     ) -> &'a C::PreparedConvolutionOperand
         where R: ?Sized + RingBase,
             V: VectorView<El<Zn>> + Copy
@@ -446,7 +449,7 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
     fn prepare_convolution_impl<R, V, ToInt>(
         &self,
         data: V,
-        ring: &R,
+        _ring: &R,
         length_hint: Option<usize>,
         mut to_int: ToInt,
         ring_log2_el_size: Option<usize>
@@ -626,10 +629,13 @@ impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolutionZn<I, C, A, 
     }
 }
 
+#[cfg(test)]
+use super::STANDARD_CONVOLUTION;
+
 #[test]
 fn test_convolution_integer() {
     let ring = StaticRing::<i128>::RING;
-    let convolution = RNSConvolution::new_with(7, usize::MAX, BigIntRing::RING, Global, |Fp| NTTConvolution::new_with(Fp, Global));
+    let convolution = RNSConvolution::new_with(7, usize::MAX, BigIntRing::RING, Global, |Fp| NTTConvolution::new_with(Fp.into_identity(), Global));
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
 }
@@ -637,7 +643,7 @@ fn test_convolution_integer() {
 #[test]
 fn test_convolution_zn() {
     let ring = Zn::new((1 << 57) + 1);
-    let convolution = RNSConvolutionZn::from(RNSConvolution::new_with(7, usize::MAX, BigIntRing::RING, Global, |Fp| NTTConvolution::new_with(Fp, Global)));
+    let convolution = RNSConvolutionZn::from(RNSConvolution::new_with(7, usize::MAX, BigIntRing::RING, Global, |Fp| NTTConvolution::new_with(Fp.into_identity(), Global)));
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
 }
@@ -645,7 +651,7 @@ fn test_convolution_zn() {
 #[test]
 fn test_convolution_sum() {
     let ring = StaticRing::<i128>::RING;
-    let convolution = RNSConvolution::new_with(7, 20, BigIntRing::RING, Global, |Fp| NTTConvolution::new_with(Fp, Global));
+    let convolution = RNSConvolution::new_with(7, 20, BigIntRing::RING, Global, |Fp| NTTConvolution::new_with(Fp.into_identity(), Global));
     
     let data = (0..40usize).map(|i| (
         (0..(5 + i % 5)).map(|x| (1 << i) * (x as i128 - 2)).collect::<Vec<_>>(),

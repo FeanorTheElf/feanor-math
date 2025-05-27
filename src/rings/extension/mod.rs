@@ -1,4 +1,4 @@
-use std::alloc::Global;
+use std::alloc::{Global, Allocator};
 use std::cmp::min;
 
 use crate::algorithms::linsolve::smith::determinant_using_pre_smith;
@@ -468,10 +468,10 @@ mod default_implementations {
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn create_multiplication_matrix<R: FreeAlgebraStore>(ring: R, el: &El<R>) -> OwnedMatrix<El<<R::Type as RingExtension>::BaseRing>>
+pub fn create_multiplication_matrix<R: FreeAlgebraStore, A: Allocator>(ring: R, el: &El<R>, allocator: A) -> OwnedMatrix<El<<R::Type as RingExtension>::BaseRing>, A>
     where R::Type: FreeAlgebra
 {
-    let mut result = OwnedMatrix::zero(ring.rank(), ring.rank(), ring.base_ring());
+    let mut result = OwnedMatrix::zero_in(ring.rank(), ring.rank(), ring.base_ring(), allocator);
     let mut current = ring.clone_el(el);
     let gen = ring.canonical_gen();
     for i in 0..ring.rank() {

@@ -1,6 +1,6 @@
 use std::alloc::{Allocator, Global};
 
-use crate::boo::Boo;
+use crate::cow::*;
 use crate::{algorithms::fft::cooley_tuckey::CooleyTuckeyFFT, lazy::LazyVec};
 use crate::homomorphism::*;
 use crate::primitive_int::StaticRing;
@@ -17,83 +17,84 @@ use super::ConvolutionAlgorithm;
 /// NTT in this context).
 /// 
 #[stability::unstable(feature = "enable")]
-pub struct NTTConvolution<R, A = Global>
-    where R: RingStore + Clone,
-        R::Type: ZnRing,
+pub struct NTTConvolution<R_main, R_twiddle, H, A = Global>
+    where R_main: ?Sized + ZnRing,
+        R_twiddle: ?Sized + ZnRing,
+        H: Homomorphism<R_twiddle, R_main> + Clone,
         A: Allocator + Clone
 {
-    ring: R,
-    fft_algos: LazyVec<CooleyTuckeyFFT<R::Type, R::Type, Identity<R>>>,
+    hom: H,
+    fft_algos: LazyVec<CooleyTuckeyFFT<R_main, R_twiddle, H>>,
     allocator: A
 }
 
 #[stability::unstable(feature = "enable")]
 pub struct PreparedConvolutionOperand<R, A = Global>
-    where R: RingStore + Clone,
-        R::Type: ZnRing,
+    where R: ?Sized + ZnRing,
         A: Allocator + Clone
 {
     significant_entries: usize,
-    ntt_data: Vec<El<R>, A>
+    ntt_data: Vec<R::Element, A>
 }
 
-impl<R> NTTConvolution<R>
+impl<R> NTTConvolution<R::Type, R::Type, Identity<R>>
     where R: RingStore + Clone,
         R::Type: ZnRing
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: R) -> Self {
-        Self::new_with(ring, Global)
+        Self::new_with(ring.into_identity(), Global)
     }
 }
 
-impl<R, A> NTTConvolution<R, A>
-    where R: RingStore + Clone,
-        R::Type: ZnRing,
+impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
+    where R_main: ?Sized + ZnRing,
+        R_twiddle: ?Sized + ZnRing,
+        H: Homomorphism<R_twiddle, R_main> + Clone,
         A: Allocator + Clone
 {
     #[stability::unstable(feature = "enable")]
-    pub fn new_with(ring: R, allocator: A) -> Self {
+    pub fn new_with(hom: H, allocator: A) -> Self {
         Self {
             fft_algos: LazyVec::new(),
-            ring: ring,
+            hom: hom,
             allocator: allocator
         }
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn ring(&self) -> &R {
-        &self.ring
+    pub fn ring(&self) -> RingRef<R_main> {
+        RingRef::new(self.hom.codomain().get_ring())
     }
 
-    fn get_ntt_table<'a>(&'a self, log2_n: usize) -> &'a CooleyTuckeyFFT<R::Type, R::Type, Identity<R>> {
-        self.fft_algos.get_or_init(log2_n, || CooleyTuckeyFFT::for_zn(self.ring().clone(), log2_n).unwrap())
+    fn get_ntt_table<'a>(&'a self, log2_n: usize) -> &'a CooleyTuckeyFFT<R_main, R_twiddle, H> {
+        self.fft_algos.get_or_init(log2_n, || CooleyTuckeyFFT::for_zn_with_hom(self.hom.clone(), log2_n).expect("NTTConvolution was instantiated with parameters that don't support this length"))
     }
 
     fn get_ntt_data<'a, V>(
         &self,
         data: V,
-        data_prep: Option<&'a PreparedConvolutionOperand<R, A>>,
+        data_prep: Option<&'a PreparedConvolutionOperand<R_main, A>>,
         significant_entries: usize,
-    ) -> Boo<'a, Vec<El<R>, A>>
-        where V: VectorView<El<R>>
+    ) -> MyCow<'a, Vec<R_main::Element, A>>
+        where V: VectorView<R_main::Element>
     {
         assert!(data.len() <= significant_entries);
         let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&significant_entries.try_into().unwrap()).unwrap();
 
         let compute_result = || {
             let mut result = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
-            result.extend(data.as_iter().map(|x| self.ring.clone_el(x)));
-            result.resize_with(1 << log2_len, || self.ring.zero());
+            result.extend(data.as_iter().map(|x| self.ring().clone_el(x)));
+            result.resize_with(1 << log2_len, || self.ring().zero());
             self.get_ntt_table(log2_len).unordered_truncated_fft(&mut result, significant_entries);
             return result;
         };
 
         return if let Some(data_prep) = data_prep {
             assert!(data_prep.significant_entries >= significant_entries);
-            Boo::Borrowed(&data_prep.ntt_data)
+            MyCow::Borrowed(&data_prep.ntt_data)
         } else {
-            Boo::Owned(compute_result())
+            MyCow::Owned(compute_result())
         }
     }
 
@@ -101,8 +102,8 @@ impl<R, A> NTTConvolution<R, A>
         &self,
         data: V,
         len_hint: Option<usize>
-    ) -> PreparedConvolutionOperand<R, A>
-        where V: VectorView<El<R>>
+    ) -> PreparedConvolutionOperand<R_main, A>
+        where V: VectorView<R_main::Element>
     {
         let significant_entries = if let Some(out_len) = len_hint {
             assert!(data.len() <= out_len);
@@ -113,8 +114,8 @@ impl<R, A> NTTConvolution<R, A>
         let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&significant_entries.try_into().unwrap()).unwrap();
 
         let mut result = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
-        result.extend(data.as_iter().map(|x| self.ring.clone_el(x)));
-        result.resize_with(1 << log2_len, || self.ring.zero());
+        result.extend(data.as_iter().map(|x| self.ring().clone_el(x)));
+        result.resize_with(1 << log2_len, || self.ring().zero());
         self.get_ntt_table(log2_len).unordered_truncated_fft(&mut result, significant_entries);
 
         return PreparedConvolutionOperand {
@@ -126,13 +127,13 @@ impl<R, A> NTTConvolution<R, A>
     fn compute_convolution_impl<V1, V2>(
         &self,
         lhs: V1,
-        mut lhs_prep: Option<&PreparedConvolutionOperand<R, A>>,
+        mut lhs_prep: Option<&PreparedConvolutionOperand<R_main, A>>,
         rhs: V2,
-        mut rhs_prep: Option<&PreparedConvolutionOperand<R, A>>,
-        dst: &mut [El<R>]
+        mut rhs_prep: Option<&PreparedConvolutionOperand<R_main, A>>,
+        dst: &mut [R_main::Element]
     )
-        where V1: VectorView<El<R>>,
-            V2: VectorView<El<R>>
+        where V1: VectorView<R_main::Element>,
+            V2: VectorView<R_main::Element>
     {
         if lhs.len() == 0 || rhs.len() == 0 {
             return;
@@ -152,39 +153,37 @@ impl<R, A> NTTConvolution<R, A>
         if rhs_ntt.is_owned() {
             std::mem::swap(&mut lhs_ntt, &mut rhs_ntt);
         }
-        let mut lhs_ntt = match lhs_ntt {
-            Boo::Owned(data) => data,
-            Boo::Borrowed(data) => {
-                let mut copied_data = Vec::with_capacity_in(data.len(), self.allocator.clone());
-                copied_data.extend(data.iter().map(|x| self.ring.clone_el(x)));
-                copied_data
-            }
-        };
+        let mut lhs_ntt = lhs_ntt.to_mut_with(|data| {
+            let mut copied_data = Vec::with_capacity_in(data.len(), self.allocator.clone());
+            copied_data.extend(data.iter().map(|x| self.ring().clone_el(x)));
+            copied_data
+        });
 
         for i in 0..len {
-            self.ring.mul_assign_ref(&mut lhs_ntt[i], &rhs_ntt[i]);
+            self.ring().mul_assign_ref(&mut lhs_ntt[i], &rhs_ntt[i]);
         }
 
         self.get_ntt_table(log2_len).unordered_truncated_fft_inv(&mut lhs_ntt, len);
 
-        for (i, x) in lhs_ntt.into_iter().enumerate().take(len) {
-            self.ring.add_assign(&mut dst[i], x);
+        for (i, x) in lhs_ntt.drain(..).enumerate().take(len) {
+            self.ring().add_assign(&mut dst[i], x);
         }
     }
 }
 
-impl<R, A> ConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
-    where R: RingStore + Clone,
-        R::Type: ZnRing,
+impl<R_main, R_twiddle, H, A> ConvolutionAlgorithm<R_main> for NTTConvolution<R_main, R_twiddle, H, A>
+    where R_main: ?Sized + ZnRing,
+        R_twiddle: ?Sized + ZnRing,
+        H: Homomorphism<R_twiddle, R_main> + Clone,
         A: Allocator + Clone
 {
-    type PreparedConvolutionOperand = PreparedConvolutionOperand<R, A>;
+    type PreparedConvolutionOperand = PreparedConvolutionOperand<R_main, A>;
 
-    fn supports_ring<S: RingStore<Type = R::Type> + Copy>(&self, ring: S) -> bool {
-        ring.get_ring() == self.ring.get_ring()
+    fn supports_ring<S: RingStore<Type = R_main> + Copy>(&self, ring: S) -> bool {
+        ring.get_ring() == self.ring().get_ring()
     }
 
-    fn compute_convolution<S: RingStore<Type = R::Type> + Copy, V1: VectorView<<R::Type as RingBase>::Element>, V2: VectorView<<R::Type as RingBase>::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [El<R>], ring: S) {
+    fn compute_convolution<S: RingStore<Type = R_main> + Copy, V1: VectorView<<R_main as RingBase>::Element>, V2: VectorView<<R_main as RingBase>::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R_main::Element], ring: S) {
         assert!(self.supports_ring(ring));
         self.compute_convolution_impl(
             lhs,
@@ -196,7 +195,7 @@ impl<R, A> ConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
     }
 
     fn prepare_convolution_operand<S, V>(&self, val: V, length_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
-        where S: RingStore<Type = R::Type> + Copy, V: VectorView<El<R>>
+        where S: RingStore<Type = R_main> + Copy, V: VectorView<R_main::Element>
     {
         assert!(self.supports_ring(ring));
         self.prepare_convolution_impl(
@@ -205,8 +204,8 @@ impl<R, A> ConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
         )
     }
 
-    fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [El<R>], ring: S)
-        where S: RingStore<Type = R::Type> + Copy, V1: VectorView<El<R>>, V2: VectorView<El<R>>
+    fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R_main::Element], ring: S)
+        where S: RingStore<Type = R_main> + Copy, V1: VectorView<R_main::Element>, V2: VectorView<R_main::Element>
     {
         assert!(self.supports_ring(ring));
         self.compute_convolution_impl(
@@ -222,6 +221,6 @@ impl<R, A> ConvolutionAlgorithm<R::Type> for NTTConvolution<R, A>
 #[test]
 fn test_convolution() {
     let ring = zn_64::Zn::new(65537);
-    let convolution = NTTConvolution::new_with(ring, Global);
+    let convolution = NTTConvolution::new_with(ring.identity(), Global);
     super::generic_tests::test_convolution(&convolution, &ring, ring.one());
 }

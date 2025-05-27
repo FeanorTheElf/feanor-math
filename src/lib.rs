@@ -2,8 +2,6 @@
 #![allow(non_camel_case_types)]
 #![allow(rustdoc::private_intra_doc_links)]
 
-#![allow(unused)]
-
 #![warn(
     // missing_debug_implementations,
     unused_extern_crates,
@@ -70,7 +68,7 @@ pub mod unstable_sealed {
 
 mod unsafe_any;
 mod lazy;
-mod boo;
+mod cow;
 
 ///
 /// Contains [`computation::ComputationController`] to observe long-running computations.
