@@ -416,6 +416,10 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     ///   (u, v) -> (u + v, twiddle * (u - v))
     /// ```
     /// 
+    /// The `#[inline(never)]` here is absolutely important for performance!
+    /// No idea why...
+    /// 
+    #[inline(never)]
     fn butterfly_step_main<const INV: bool>(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize, twiddles: &[R_twiddle::Element]) {
         butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, twiddles, |a, b, twiddle| {
             let mut values = [self.ring().clone_el(a), self.ring().clone_el(b)];
