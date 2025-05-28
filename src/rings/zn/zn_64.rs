@@ -920,23 +920,37 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
     #[inline(always)]
     fn butterfly<V: crate::seq::VectorViewMut<Self::Element>, H: Homomorphism<ZnFastmulBase, Self>>(&self, hom: H, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
         let mut a = *values.at(i1);
+        let mut b = *values.at(i2);
+
         if a.0 >= self.modulus_times_three {
             a.0 -= self.modulus_times_three;
         }
-        let mut b = *values.at(i2);
         hom.mul_assign_ref_map(&mut b, twiddle);
 
         *values.at_mut(i1) = self.from_u64_promise_reduced(a.0 + b.0);
         *values.at_mut(i2) = self.from_u64_promise_reduced(a.0 + self.modulus_times_three - b.0);
     }
 
+    #[inline(always)]
     fn inv_butterfly<V: crate::seq::VectorViewMut<Self::Element>, H: Homomorphism<ZnFastmulBase, Self>>(&self, hom: H, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
-        let a = *values.at(i1);
-        let b = *values.at(i2);
+        let mut a = *values.at(i1);
+        let mut b = *values.at(i2);
 
-        *values.at_mut(i1) = self.add(a, b);
-        *values.at_mut(i2) = self.sub(a, b);
-        hom.mul_assign_ref_map(values.at_mut(i2), twiddle);
+        (a.0, b.0) = (a.0 + b.0, a.0 + self.modulus_times_three - b.0);
+        if a.0 >= self.modulus_times_three {
+            a.0 -= self.modulus_times_three;
+        }
+        hom.mul_assign_ref_map(&mut b, twiddle);
+
+        *values.at_mut(i1) = self.from_u64_promise_reduced(a.0);
+        *values.at_mut(i2) = self.from_u64_promise_reduced(b.0);
+    }
+
+    #[inline(always)]
+    fn prepare_for_inv_fft(&self, value: &mut Self::Element) {
+        if value.0 >= self.modulus_times_three {
+            value.0 -= self.modulus_times_three;
+        }
     }
 }
 
@@ -955,13 +969,26 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
         *values.at_mut(i2) = self.from_u64_promise_reduced(a.0 + self.modulus_times_three - b.0);
     }
 
+    #[inline(always)]
     fn inv_butterfly<V: crate::seq::VectorViewMut<Self::Element>, H: Homomorphism<ZnBase, Self>>(&self, _hom: H, values: &mut V, twiddle: &ZnEl, i1: usize, i2: usize) {
-        let a = *values.at(i1);
-        let b = *values.at(i2);
+        let mut a = *values.at(i1);
+        let mut b = *values.at(i2);
 
-        *values.at_mut(i1) = self.add(a, b);
-        *values.at_mut(i2) = self.sub(a, b);
-        self.mul_assign_ref(values.at_mut(i2), twiddle);
+        (a.0, b.0) = (a.0 + b.0, a.0 + self.modulus_times_three - b.0);
+        if a.0 >= self.modulus_times_three {
+            a.0 -= self.modulus_times_three;
+        }
+        self.mul_assign_ref(&mut b, twiddle);
+
+        *values.at_mut(i1) = self.from_u64_promise_reduced(a.0);
+        *values.at_mut(i2) = self.from_u64_promise_reduced(b.0);
+    }
+    
+    #[inline(always)]
+    fn prepare_for_inv_fft(&self, value: &mut Self::Element) {
+        if value.0 >= self.modulus_times_three {
+            value.0 -= self.modulus_times_three;
+        }
     }
 }
 

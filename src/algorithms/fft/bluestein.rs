@@ -1,5 +1,6 @@
 use std::alloc::Allocator;
 use std::alloc::Global;
+use std::fmt::Debug;
 
 use crate::algorithms::fft::FFTAlgorithm;
 use crate::algorithms::unity_root::is_prim_root_of_unity;
@@ -18,7 +19,6 @@ use crate::seq::SwappableVectorViewMut;
 /// Bluestein's FFT algorithm (also known as Chirp-Z-transform) to compute the Fourier
 /// transform of arbitrary length (including prime numbers).
 /// 
-#[derive(Debug)]
 pub struct BluesteinFFT<R_main, R_twiddle, H, A = Global>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
@@ -34,9 +34,9 @@ pub struct BluesteinFFT<R_main, R_twiddle, H, A = Global>
     /// at a negative index i must be stored at index (i + m). The other values are
     /// irrelevant.
     /// 
-    b_bitreverse_fft: Vec<R_twiddle::Element>,
+    b_bitreverse_fft: Vec<R_main::Element>,
     /// the powers `zeta^(-i * i)` for `zeta` the 2n-th root of unity
-    inv_root_of_unity_2n: Vec<R_twiddle::Element>,
+    inv_root_of_unity_2n: Vec<R_main::Element>,
     /// contrary to expectations, this should be an n-th root of unity and inverse to `inv_root_of_unity^2`
     root_of_unity_n: R_main::Element,
     n: usize
@@ -174,53 +174,28 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     /// of length `2^log2_m`.
     /// 
     pub fn new_with_hom(hom: H, root_of_unity_2n: R_twiddle::Element, root_of_unity_m: R_twiddle::Element, n: usize, log2_m: usize, tmp_mem_allocator: A) -> Self {
-        // we cannot cannot call `new_with_mem_and_pows` because of borrowing conflicts 
-
-        // checks on m and root_of_unity_m are done by the FFTTableCooleyTuckey
-        assert!((1 << log2_m) >= 2 * n + 1);
-        assert!(!hom.domain().get_ring().is_approximate());
-        assert!(is_prim_root_of_unity(hom.domain(), &root_of_unity_2n, 2 * n));
-        assert!(is_prim_root_of_unity(hom.codomain(), &hom.map_ref(&root_of_unity_2n), 2 * n));
-        assert!(is_prim_root_of_unity(hom.domain(), &root_of_unity_m, 1 << log2_m));
-        assert!(is_prim_root_of_unity(hom.codomain(), &hom.map_ref(&root_of_unity_m), 1 << log2_m));
-
-        let root_of_unity_2n_pows = |x: i64| if x >= 0 {
-            hom.domain().pow(hom.domain().clone_el(&root_of_unity_2n), x as usize % (2 * n))
-        } else {
-            hom.domain().invert(&hom.domain().pow(hom.domain().clone_el(&root_of_unity_2n), (-x) as usize % (2 * n))).unwrap()
-        };
-        
-        let mut b = Self::create_b_array(hom.domain().get_ring(), root_of_unity_2n_pows, n, 1 << log2_m);
-        let inv_root_of_unity_2n = (0..n).map(|i| root_of_unity_2n_pows(-TryInto::<i64>::try_into(i * i).unwrap())).collect::<Vec<_>>();
-        let root_of_unity_n = hom.codomain().pow(hom.map_ref(&root_of_unity_2n), 2);
-
-        let m_fft_table_base = CooleyTuckeyFFT::new(hom.domain(), hom.domain().clone_el(&root_of_unity_m), log2_m);
-        m_fft_table_base.unordered_fft(&mut b[..], &hom.domain());
-        drop(m_fft_table_base);
-
-        // we actually require that this has the same ordering of outputs as `m_fft_table_base`, but since it's Cooley-Tuckey, both are bitreversed
-        let m_fft_table = CooleyTuckeyFFT::create(
-            hom.clone(), 
+        let hom_copy = hom.clone();
+        let twiddle_ring = hom_copy.domain();
+        return Self::new_with_pows_with_hom(
+            hom, 
             |i: i64| if i >= 0 {
-                hom.domain().pow(hom.domain().clone_el(&root_of_unity_m), i as usize)
+                twiddle_ring.pow(twiddle_ring.clone_el(&root_of_unity_2n), i as usize % (2 * n))
             } else {
-                hom.domain().invert(&hom.domain().pow(hom.domain().clone_el(&root_of_unity_m), (-i) as usize)).unwrap()
+                twiddle_ring.invert(&twiddle_ring.pow(twiddle_ring.clone_el(&root_of_unity_2n), (-i) as usize % (2 * n))).unwrap()
             }, 
+            |i: i64| if i >= 0 {
+                twiddle_ring.pow(twiddle_ring.clone_el(&root_of_unity_m), i as usize)
+            } else {
+                twiddle_ring.invert(&twiddle_ring.pow(twiddle_ring.clone_el(&root_of_unity_m), (-i) as usize)).unwrap()
+            }, 
+            n, 
             log2_m, 
             tmp_mem_allocator
         );
-        return BluesteinFFT { 
-            m_fft_table: m_fft_table, 
-            b_bitreverse_fft: b, 
-            inv_root_of_unity_2n: inv_root_of_unity_2n, 
-            root_of_unity_n: root_of_unity_n,
-            n: n,
-            hom: hom
-        };
     }
-    
-    fn create_b_array<F>(ring: &R_twiddle, mut root_of_unity_2n_pows: F, n: usize, m: usize) -> Vec<R_twiddle::Element>
-        where F: FnMut(i64) -> R_twiddle::Element
+
+    fn create_b_array<F>(ring: &R_main, mut root_of_unity_2n_pows: F, n: usize, m: usize) -> Vec<R_main::Element>
+        where F: FnMut(i64) -> R_main::Element
     {
         let mut b = (0..m).map(|_| ring.zero()).collect::<Vec<_>>();
         b[0] = ring.one();
@@ -260,16 +235,18 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         assert!(hom.domain().get_ring().is_approximate() || is_prim_root_of_unity(hom.domain(), &root_of_unity_m_pows(1), 1 << log2_m));
         assert!(hom.codomain().get_ring().is_approximate() || is_prim_root_of_unity(hom.codomain(), &hom.map(root_of_unity_m_pows(1)), 1 << log2_m));
 
-        let mut b = Self::create_b_array(hom.domain().get_ring(), &mut root_of_unity_2n_pows, n, 1 << log2_m);
-        let inv_root_of_unity_2n = (0..n).map(|i| root_of_unity_2n_pows(-TryInto::<i64>::try_into(i * i).unwrap())).collect::<Vec<_>>();
+        let mut b = Self::create_b_array(hom.codomain().get_ring(), |i| hom.map(root_of_unity_2n_pows(i)), n, 1 << log2_m);
+        let inv_root_of_unity_2n = (0..n).map(|i| hom.map(root_of_unity_2n_pows(-TryInto::<i64>::try_into(i * i).unwrap()))).collect::<Vec<_>>();
         let root_of_unity_n = hom.map(root_of_unity_2n_pows(2));
 
-        let m_fft_table_base = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::new_with_pows(hom.domain(), &mut root_of_unity_m_pows, log2_m);
-        m_fft_table_base.unordered_fft(&mut b[..], &hom.domain());
-        drop(m_fft_table_base);
+        let m_fft_table = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::create(
+            hom.clone(), 
+            root_of_unity_m_pows, 
+            log2_m, 
+            tmp_mem_allocator
+        );
+        m_fft_table.unordered_fft(&mut b, hom.codomain());
 
-        // we actually require that this has the same ordering of outputs as `m_fft_table_base`, but since it's Cooley-Tuckey, both are bitreversed
-        let m_fft_table = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::create(hom.clone(), root_of_unity_m_pows, log2_m, tmp_mem_allocator);
         return BluesteinFFT { 
             m_fft_table: m_fft_table, 
             b_bitreverse_fft: b, 
@@ -332,6 +309,8 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     /// and compute the convolution efficiently using a power-of-two FFT (e.g. with the Cooley-Tuckey 
     /// algorithm).
     /// 
+    /// TODO: At next breaking release, make this private
+    /// 
     pub fn fft_base<V, W, const INV: bool>(&self, mut values: V, mut buffer: W)
         where V: SwappableVectorViewMut<R_main::Element>, 
             W: SwappableVectorViewMut<R_main::Element>
@@ -349,7 +328,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
                 values.at(i)
             };
             *buffer.at_mut(i) = ring.clone_el(value);
-            self.hom.mul_assign_ref_map(buffer.at_mut(i), &self.inv_root_of_unity_2n[i]);
+            ring.mul_assign_ref(buffer.at_mut(i), &self.inv_root_of_unity_2n[i]);
         }
         for i in self.n..self.m_fft_table.len() {
             *buffer.at_mut(i) = ring.zero();
@@ -358,14 +337,14 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         // perform convoluted product with b using a power-of-two fft
         self.m_fft_table.unordered_fft(&mut buffer, &self.ring());
         for i in 0..self.m_fft_table.len() {
-            self.hom.mul_assign_ref_map(buffer.at_mut(i), &self.b_bitreverse_fft[i]);
+            ring.mul_assign_ref(buffer.at_mut(i), &self.b_bitreverse_fft[i]);
         }
         self.m_fft_table.unordered_inv_fft(&mut buffer, &self.ring());
 
         // write values back, and multiply them with a twiddle factor
         for i in 0..self.n {
             *values.at_mut(i) = std::mem::replace(buffer.at_mut(i), ring.zero());
-            self.hom.mul_assign_ref_map(values.at_mut(i), &self.inv_root_of_unity_2n[i]);
+            ring.mul_assign_ref(values.at_mut(i), &self.inv_root_of_unity_2n[i]);
         }
 
         if INV {
@@ -393,6 +372,17 @@ impl<R_main, R_twiddle, H, A> PartialEq for BluesteinFFT<R_main, R_twiddle, H, A
         self.ring().get_ring() == other.ring().get_ring() &&
             self.n == other.n &&
             self.ring().eq_el(self.root_of_unity(self.ring()), other.root_of_unity(self.ring()))
+    }
+}
+
+impl<R_main, R_twiddle, H, A> Debug for BluesteinFFT<R_main, R_twiddle, H, A>
+    where R_main: ?Sized + RingBase + Debug,
+        R_twiddle: ?Sized + RingBase + DivisibilityRing,
+        H: Homomorphism<R_twiddle, R_main>, 
+        A: Allocator + Clone
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Bluestein FFT of length {} over ring {:?}", self.n, self.ring().get_ring())
     }
 }
 

@@ -1,5 +1,6 @@
 use std::alloc::{Allocator, Global};
 use std::ops::Range;
+use std::fmt::Debug;
 
 use crate::algorithms::unity_root::*;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
@@ -59,7 +60,6 @@ use super::complex_fft::*;
 /// assert_el_eq!(ring, ring.add(ring.one(), inv_root_of_unity), data[1]);
 /// ```
 /// 
-#[derive(Debug)]
 pub struct CooleyTuckeyFFT<R_main, R_twiddle, H, A = Global> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
@@ -303,6 +303,17 @@ impl<R_main, R_twiddle, H, A> PartialEq for CooleyTuckeyFFT<R_main, R_twiddle, H
     }
 }
 
+impl<R_main, R_twiddle, H, A> Debug for CooleyTuckeyFFT<R_main, R_twiddle, H, A> 
+    where R_main: ?Sized + RingBase + Debug,
+        R_twiddle: ?Sized + RingBase + DivisibilityRing,
+        H: Homomorphism<R_twiddle, R_main>,
+        A: Allocator
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Cooley-Tuckey FFT of length 2^{} over ring {:?}", self.log2_n, self.ring().get_ring())
+    }
+}
+
 impl<R_main, R_twiddle, H, A> Clone for CooleyTuckeyFFT<R_main, R_twiddle, H, A> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
@@ -331,14 +342,36 @@ pub trait CooleyTuckeyButterfly<S>: RingBase
     where S: ?Sized + RingBase
 {
     ///
-    /// Should compute `(values[i1], values[i2]) := (values[i1] + twiddle * values[i2], values[i1] - twiddle * values[i2])`
+    /// Should compute `(values[i1], values[i2]) := (values[i1] + twiddle * values[i2], values[i1] - twiddle * values[i2])`.
+    /// 
+    /// It is guaranteed that the input elements are either outputs of
+    /// [`CooleyTuckeyButterfly::butterfly()`] or of [`CooleyTuckeyButterfly::prepare_for_fft()`].
     /// 
     fn butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: H, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
 
     ///
     /// Should compute `(values[i1], values[i2]) := (values[i1] + values[i2], (values[i1] - values[i2]) * twiddle)`
     /// 
+    /// It is guaranteed that the input elements are either outputs of
+    /// [`CooleyTuckeyButterfly::inv_butterfly()`] or of [`CooleyTuckeyButterfly::prepare_for_inv_fft()`].
+    /// 
     fn inv_butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: H, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
+    
+    ///
+    /// Possibly pre-processes elements before the FFT starts. Here you can
+    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterfly::butterfly()`]
+    /// that the inputs are in this form.
+    /// 
+    #[inline(always)]
+    fn prepare_for_fft(&self, _value: &mut Self::Element) {}
+    
+    ///
+    /// Possibly pre-processes elements before the inverse FFT starts. Here you can
+    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterfly::inv_butterfly()`]
+    /// that the inputs are in this form.
+    /// 
+    #[inline(always)]
+    fn prepare_for_inv_fft(&self, _value: &mut Self::Element) {}
 }
 
 impl<R, S> CooleyTuckeyButterfly<S> for R
@@ -359,6 +392,12 @@ impl<R, S> CooleyTuckeyButterfly<S> for R
         self.sub_self_assign(values.at_mut(i2), a);
         hom.mul_assign_ref_map(values.at_mut(i2), twiddle);
     }
+    
+    #[inline(always)]
+    default fn prepare_for_fft(&self, _value: &mut Self::Element) {}
+    
+    #[inline(always)]
+    default fn prepare_for_inv_fft(&self, _value: &mut Self::Element) {}
 }
 
 impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A> 
@@ -427,12 +466,20 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     /// No idea why...
     /// 
     #[inline(never)]
-    fn butterfly_step_main<const INV: bool>(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize, twiddles: &[R_twiddle::Element]) {
+    fn butterfly_step_main<const INV: bool, const IS_PREPARED: bool>(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize, twiddles: &[R_twiddle::Element]) {
         butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, twiddles, |a, b, twiddle| {
             let mut values = [self.ring().clone_el(a), self.ring().clone_el(b)];
             if INV {
+                if !IS_PREPARED {
+                    <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_inv_fft(self.ring().get_ring(), &mut values[0]);
+                    <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_inv_fft(self.ring().get_ring(), &mut values[1]);
+                }
                 self.ring().get_ring().inv_butterfly(&self.hom, &mut values, twiddle, 0, 1);
             } else {
+                if !IS_PREPARED {
+                    <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_fft(self.ring().get_ring(), &mut values[0]);
+                    <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_fft(self.ring().get_ring(), &mut values[1]);
+                }
                 self.ring().get_ring().butterfly(&self.hom, &mut values, twiddle, 0, 1);
             }
             [*a, *b] = values;
@@ -545,14 +592,17 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         for i in nonzero_entries..self.len() {
             debug_assert!(self.ring().is_zero(&data[i]));
         }
-        
+
         if self.log2_n > 0 {
             self.butterfly_step_initial(data, 0..(1 << (self.log2_n - 1)));
+        }
+        for i in 0..data.len() {
+            <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_fft(self.ring().get_ring(), &mut data[i]);
         }
         for log2_step in 1..self.log2_n {
             let stride = 1 << (self.log2_n - log2_step - 1);
             let butterfly_count = nonzero_entries.div_ceil(2 * stride);
-            self.butterfly_step_main::<false>(data, 0..butterfly_count, 0..stride, log2_step, &self.root_of_unity_list[log2_step]);
+            self.butterfly_step_main::<false, true>(data, 0..butterfly_count, 0..stride, log2_step, &self.root_of_unity_list[log2_step]);
         }
     }
     
@@ -571,10 +621,13 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         assert!(nonzero_entries > self.len() / 2);
         assert!(nonzero_entries <= self.len());
 
-        for log2_step in (0..self.log2_n).rev() {
+        for i in 0..data.len() {
+            <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_inv_fft(self.ring().get_ring(), &mut data[i]);
+        }
+        for log2_step in (1..self.log2_n).rev() {
             let stride = 1 << (self.log2_n - log2_step - 1);
             let current_block = nonzero_entries / (2 * stride);
-            self.butterfly_step_main::<true>(data, 0..current_block, 0..stride, log2_step, &self.inv_root_of_unity_list[log2_step]);
+            self.butterfly_step_main::<true, true>(data, 0..current_block, 0..stride, log2_step, &self.inv_root_of_unity_list[log2_step]);
         }
         if nonzero_entries < (1 << self.log2_n) {
             for i in nonzero_entries..(1 << self.log2_n) {
@@ -595,19 +648,22 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
                 let current_block = nonzero_entries / (2 * stride);
                 let known_area = nonzero_entries % (2 * stride);
                 if known_area >= stride {
-                    self.butterfly_step_main::<true>(data, current_block..(current_block + 1), 0..(known_area - stride), log2_step, &self.inv_root_of_unity_list[log2_step]);
+                    self.butterfly_step_main::<true, false>(data, current_block..(current_block + 1), 0..(known_area - stride), log2_step, &self.inv_root_of_unity_list[log2_step]);
                     self.diagonal_partial_left_inv_butterfly(data, current_block..(current_block + 1), (known_area - stride)..stride, log2_step);
                 } else {
-                    self.butterfly_step_main::<true>(data, current_block..(current_block + 1), known_area..stride, log2_step, &self.inv_root_of_unity_list[log2_step]);
+                    self.butterfly_step_main::<true, false>(data, current_block..(current_block + 1), known_area..stride, log2_step, &self.inv_root_of_unity_list[log2_step]);
                     self.diagonal_partial_right_inv_butterfly(data, current_block..(current_block + 1), 0..known_area, log2_step);
                 }
             }
-            {
+            if self.log2_n > 0 {
                 let stride = 1 << (self.log2_n - 1);
                 let known_area = nonzero_entries;
                 self.butterfly_step_initial(data, 0..(known_area - stride));
                 self.diagonal_partial_left_inv_butterfly(data, 0..1, (known_area - stride)..stride, 0);
             }
+        } else if self.log2_n > 0 {
+            let stride = 1 << (self.log2_n - 1);
+            self.butterfly_step_initial(data, 0..stride);
         }
         let n_inv = self.hom.domain().invert(&self.hom.domain().int_hom().map(1 << self.log2_n)).unwrap();
         for i in 0..(1 << self.log2_n) {
