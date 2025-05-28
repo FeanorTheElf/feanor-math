@@ -3,8 +3,8 @@ use std::alloc::Global;
 
 use crate::algorithms::fft::FFTAlgorithm;
 use crate::algorithms::unity_root::is_prim_root_of_unity;
-use crate::divisibility::DivisibilityRing;
-use crate::divisibility::DivisibilityRingStore;
+use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::integer::IntegerRingStore;
 use crate::primitive_int::*;
 use crate::ring::*;
@@ -26,8 +26,7 @@ pub struct BluesteinFFT<R_main, R_twiddle, H, A = Global>
         A: Allocator + Clone
 {
     hom: H,
-    m_fft_table: algorithms::fft::cooley_tuckey::CooleyTuckeyFFT<R_main, R_twiddle, H>,
-    tmp_mem_allocator: A,
+    m_fft_table: CooleyTuckeyFFT<R_main, R_twiddle, H, A>,
     ///
     /// This is the bitreverse fft of a part of the sequence b_i := z^(i^2) where
     /// z is a 2n-th root of unity.
@@ -195,19 +194,27 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         let inv_root_of_unity_2n = (0..n).map(|i| root_of_unity_2n_pows(-TryInto::<i64>::try_into(i * i).unwrap())).collect::<Vec<_>>();
         let root_of_unity_n = hom.codomain().pow(hom.map_ref(&root_of_unity_2n), 2);
 
-        let m_fft_table_base = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::new(hom.domain(), hom.domain().clone_el(&root_of_unity_m), log2_m);
+        let m_fft_table_base = CooleyTuckeyFFT::new(hom.domain(), hom.domain().clone_el(&root_of_unity_m), log2_m);
         m_fft_table_base.unordered_fft(&mut b[..], &hom.domain());
         drop(m_fft_table_base);
 
         // we actually require that this has the same ordering of outputs as `m_fft_table_base`, but since it's Cooley-Tuckey, both are bitreversed
-        let m_fft_table = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::new_with_hom(hom.clone(), root_of_unity_m, log2_m);
+        let m_fft_table = CooleyTuckeyFFT::create(
+            hom.clone(), 
+            |i: i64| if i >= 0 {
+                hom.domain().pow(hom.domain().clone_el(&root_of_unity_m), i as usize)
+            } else {
+                hom.domain().invert(&hom.domain().pow(hom.domain().clone_el(&root_of_unity_m), (-i) as usize)).unwrap()
+            }, 
+            log2_m, 
+            tmp_mem_allocator
+        );
         return BluesteinFFT { 
             m_fft_table: m_fft_table, 
             b_bitreverse_fft: b, 
             inv_root_of_unity_2n: inv_root_of_unity_2n, 
             root_of_unity_n: root_of_unity_n,
             n: n,
-            tmp_mem_allocator: tmp_mem_allocator,
             hom: hom
         };
     }
@@ -262,14 +269,13 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         drop(m_fft_table_base);
 
         // we actually require that this has the same ordering of outputs as `m_fft_table_base`, but since it's Cooley-Tuckey, both are bitreversed
-        let m_fft_table = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::new_with_pows_with_hom(hom.clone(), root_of_unity_m_pows, log2_m);
+        let m_fft_table = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::create(hom.clone(), root_of_unity_m_pows, log2_m, tmp_mem_allocator);
         return BluesteinFFT { 
             m_fft_table: m_fft_table, 
             b_bitreverse_fft: b, 
             inv_root_of_unity_2n: inv_root_of_unity_2n, 
             root_of_unity_n: root_of_unity_n,
             n: n,
-            tmp_mem_allocator: tmp_mem_allocator,
             hom: hom
         };
     }
@@ -311,6 +317,11 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         H: Homomorphism<R_twiddle, R_main>, 
         A: Allocator + Clone
 {
+    #[stability::unstable(feature = "enable")]
+    pub fn allocator(&self) -> &A {
+        self.m_fft_table.allocator()
+    }
+
     ///
     /// Computes the FFT of the given values using Bluestein's algorithm, using only the passed
     /// buffer as temporary storage.
@@ -413,7 +424,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for BluesteinFFT<R_main, R_tw
             S: RingStore<Type = R_main> + Copy 
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
-        let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.tmp_mem_allocator.clone());
+        let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.allocator().clone());
         buffer.extend((0..self.m_fft_table.len()).map(|_| self.hom.codomain().zero()));
         self.fft_base::<_, _, false>(values, &mut buffer[..]);
     }
@@ -423,7 +434,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for BluesteinFFT<R_main, R_tw
             S: RingStore<Type = R_main> + Copy 
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
-        let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.tmp_mem_allocator.clone());
+        let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.allocator().clone());
         buffer.extend((0..self.m_fft_table.len()).map(|_| self.hom.codomain().zero()));
         self.fft_base::<_, _, true>(values, &mut buffer[..]);
     }
