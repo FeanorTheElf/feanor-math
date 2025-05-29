@@ -337,7 +337,7 @@ impl SerializableElementRing for ZnBase {
 
 impl FromModulusCreateableZnRing for ZnBase {
 
-    fn create<F, E>(create_modulus: F) -> Result<Self, E>
+    fn from_modulus<F, E>(create_modulus: F) -> Result<Self, E>
         where F: FnOnce(&Self::IntegerRingBase) -> Result<El<Self::IntegerRing>, E>
     {
         create_modulus(StaticRing::<i64>::RING.get_ring()).map(|n| Self::new(n as u64))

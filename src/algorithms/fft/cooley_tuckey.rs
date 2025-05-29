@@ -1,6 +1,9 @@
 use std::alloc::{Allocator, Global};
 use std::ops::Range;
 use std::fmt::Debug;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 use crate::algorithms::unity_root::*;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
@@ -60,6 +63,18 @@ use super::complex_fft::*;
 /// assert_el_eq!(ring, ring.add(ring.one(), inv_root_of_unity), data[1]);
 /// ```
 /// 
+/// # On optimizations
+/// 
+/// I tried my best to make this as fast as possible in general, with special focus
+/// on the Number-theoretic transform case. I did not implement the following
+/// optimizations, for the following reasons:
+///  - Larger butterflies: This would improve data locality, but decrease twiddle
+///    locality (or increase arithmetic operation count). Since I focused mainly on
+///    the `Z/nZ` case, where the twiddles are larger than the ring elements (since they
+///    have additional data to speed up multiplications), this is not sensible.
+///  - The same reasoning applies to a SplitRadix approach, which only actually decreases
+///    the total number of operations if multiplication-by-`i` is free.
+/// 
 pub struct CooleyTuckeyFFT<R_main, R_twiddle, H, A = Global> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
@@ -71,8 +86,10 @@ pub struct CooleyTuckeyFFT<R_main, R_twiddle, H, A = Global>
     log2_n: usize,
     // stores the powers of root_of_unity in special bitreversed order
     root_of_unity_list: Vec<Vec<R_twiddle::Element>>,
+    // root_of_unity_list_base: Vec<Vec<R_main::Element>>,
     // stores the powers of inv_root_of_unity in special bitreversed order
     inv_root_of_unity_list: Vec<Vec<R_twiddle::Element>>,
+    // inv_root_of_unity_list_base: Vec<Vec<R_main::Element>>,
     allocator: A,
     two_inv: R_twiddle::Element
 }
@@ -86,12 +103,9 @@ pub fn bitreverse(index: usize, bits: usize) -> usize {
     index.reverse_bits().checked_shr(usize::BITS - bits as u32).unwrap_or(0)
 }
 
-const UNROLL_COUNT: usize = 8;
-
 #[inline(always)]
-fn butterfly_loop_vec<T, S, F, F_vec>(log2_n: usize, data: &mut [T], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize, twiddles: &[S], mut butterfly: F, mut butterfly_vec: F_vec)
-    where F: FnMut(&mut T, &mut T, &S),
-        F_vec: FnMut(&mut [T; UNROLL_COUNT], &mut [T; UNROLL_COUNT], &S)
+fn butterfly_loop<T, S, F>(log2_n: usize, data: &mut [T], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize, twiddles: &[S], butterfly: F)
+    where F: Fn(&mut T, &mut T, &S) + Clone
 {
     assert_eq!(1 << log2_n, data.len());
     assert!(log2_step < log2_n);
@@ -107,39 +121,30 @@ fn butterfly_loop_vec<T, S, F, F_vec>(log2_n: usize, data: &mut [T], butterfly_r
     assert!(butterfly_range.end <= twiddles.len());
     
     // `i` refers to the "how-many-th" butterfly within each output NTT we currently compute
-    for i in butterfly_range {
-        let butterfly_data = &mut data[(2 * i * stride + stride_range.start)..(2 * i * stride + stride + stride_range.end)];
-        let (first, second) = butterfly_data.split_at_mut(stride);
-        let first = &mut first[0..(stride_range.end - stride_range.start)];    
-        let twiddle = &twiddles[i];
-        let (first_unaligned1, first_aligned, first_unaligned2) = unsafe { first.align_to_mut::<[T; UNROLL_COUNT]>() };
-        let (second_unaligned1, second_aligned, second_unaligned2) = unsafe { second.align_to_mut::<[T; UNROLL_COUNT]>() };
-        assert_eq!(0, first_unaligned1.len());
-        assert_eq!(0, second_unaligned1.len());
-        assert_eq!(first_unaligned2.len(), second_unaligned2.len());
-        assert_eq!(first_aligned.len(), second_aligned.len());
-        for (a, b) in first_unaligned2.iter_mut().zip(second_unaligned2.iter_mut()) {
-            butterfly(a, b, &twiddle);
+    let mut current_data = &mut data[stride_range.start..];
+    let stride_len = stride + stride_range.end - stride_range.start;
+    if stride_range.end - stride_range.start % 4 == 0 {
+        for twiddle in twiddles[butterfly_range].iter() {
+            let butterfly_data = &mut current_data[..stride_len];
+            let (first, second) = butterfly_data.split_at_mut(stride);
+            for (a, b) in first.array_chunks_mut::<4>().zip(second.array_chunks_mut::<4>()) {
+                butterfly(&mut a[0], &mut b[0], &twiddle);
+                butterfly(&mut a[1], &mut b[1], &twiddle);
+                butterfly(&mut a[2], &mut b[2], &twiddle);
+                butterfly(&mut a[3], &mut b[3], &twiddle);
+            }
+            current_data = &mut current_data[(2 * stride)..];
         }
-        for (a, b) in first_aligned.iter_mut().zip(second_aligned.iter_mut()) {
-            butterfly_vec(a, b, &twiddle);
-        }
-    }
-}
-
-#[inline(always)]
-fn butterfly_loop<T, S, F>(log2_n: usize, data: &mut [T], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize, twiddles: &[S], butterfly: F)
-    where F: Fn(&mut T, &mut T, &S) + Clone
-{
-    #[inline(always)]
-    fn unrolled_closure<T, S, F>(first: &mut [T; UNROLL_COUNT], second: &mut [T; UNROLL_COUNT], twiddle: &S, f: &F) 
-        where F: Fn(&mut T, &mut T, &S)
-    {
-        for i in 0..UNROLL_COUNT {
-            f(&mut first[i], &mut second[i], twiddle)
+    } else {
+        for twiddle in twiddles[butterfly_range].iter() {
+            let butterfly_data = &mut current_data[..stride_len];
+            let (first, second) = butterfly_data.split_at_mut(stride);
+            for (a, b) in first.iter_mut().zip(second.iter_mut()) {
+                butterfly(a, b, &twiddle);
+            }
+            current_data = &mut current_data[(2 * stride)..];
         }
     }
-    butterfly_loop_vec(log2_n, data, butterfly_range, stride_range, log2_step, twiddles, butterfly.clone(), |first, second, twiddle| unrolled_closure(first, second, twiddle, &butterfly));
 }
 
 impl<R_main, H> CooleyTuckeyFFT<R_main, Complex64Base, H, Global> 
@@ -231,26 +236,18 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H, Global>
         } else {
             ring.invert(&ring.pow(ring.clone_el(&root_of_unity), (-i) as usize)).unwrap()
         };
-
-        // cannot call new_with_mem_and_pows() because of borrowing conflict
-        assert!(ring.is_commutative());
-        assert!(!hom.domain().get_ring().is_approximate());
-        assert!(is_prim_root_of_unity_pow2(&ring, &root_of_unity_pow(1), log2_n));
-        assert!(is_prim_root_of_unity_pow2(&hom.codomain(), &hom.map(root_of_unity_pow(1)), log2_n));
-
-        let root_of_unity_list = Self::create_root_of_unity_list(|i| root_of_unity_pow(-i), log2_n);
-        let inv_root_of_unity_list = Self::create_root_of_unity_list(|i| root_of_unity_pow(i), log2_n);
-        let root_of_unity = root_of_unity_pow(1);
-
-        CooleyTuckeyFFT {
-            two_inv: hom.domain().invert(&hom.domain().int_hom().map(2)).unwrap(),
-            root_of_unity: hom.map(root_of_unity), 
-            hom, 
-            log2_n, 
-            root_of_unity_list, 
-            inv_root_of_unity_list,
-            allocator: Global
-        }
+        let result = CooleyTuckeyFFT::create(&hom, root_of_unity_pow, log2_n, Global);
+        return Self {
+            allocator: result.allocator,
+            inv_root_of_unity_list: result.inv_root_of_unity_list,
+            // inv_root_of_unity_list_base: result.inv_root_of_unity_list_base,
+            log2_n: result.log2_n,
+            root_of_unity: result.root_of_unity,
+            root_of_unity_list: result.root_of_unity_list,
+            // root_of_unity_list_base: result.root_of_unity_list_base,
+            two_inv: result.two_inv,
+            hom: hom
+        };
     }
 
     ///
@@ -322,12 +319,14 @@ impl<R_main, R_twiddle, H, A> Clone for CooleyTuckeyFFT<R_main, R_twiddle, H, A>
 {
     fn clone(&self) -> Self {
         Self {
+            // root_of_unity_list_base: self.root_of_unity_list_base.iter().map(|list| list.iter().map(|x| self.hom.codomain().clone_el(x)).collect()).collect(),
+            // inv_root_of_unity_list_base: self.inv_root_of_unity_list_base.iter().map(|list| list.iter().map(|x| self.hom.codomain().clone_el(x)).collect()).collect(),
             two_inv: self.hom.domain().clone_el(&self.two_inv),
             hom: self.hom.clone(),
             inv_root_of_unity_list: self.inv_root_of_unity_list.iter().map(|list| list.iter().map(|x| self.hom.domain().clone_el(x)).collect()).collect(),
+            root_of_unity_list: self.root_of_unity_list.iter().map(|list| list.iter().map(|x| self.hom.domain().clone_el(x)).collect()).collect(),
             root_of_unity: self.hom.codomain().clone_el(&self.root_of_unity),
             log2_n: self.log2_n,
-            root_of_unity_list: self.root_of_unity_list.iter().map(|list| list.iter().map(|x| self.hom.domain().clone_el(x)).collect()).collect(),
             allocator: self.allocator.clone()
         }
     }
@@ -400,6 +399,8 @@ impl<R, S> CooleyTuckeyButterfly<S> for R
     default fn prepare_for_inv_fft(&self, _value: &mut Self::Element) {}
 }
 
+pub static BUTTERFLY_TIMES: [AtomicUsize; 20] = [AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0)];
+
 impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A> 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
@@ -419,13 +420,16 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         let inv_root_of_unity_list = Self::create_root_of_unity_list(|i| root_of_unity_pow(i), log2_n);
         let root_of_unity = root_of_unity_pow(1);
         
+        let store_twiddle_ring = root_of_unity_list.len();
         CooleyTuckeyFFT {
+            // root_of_unity_list_base: root_of_unity_list[store_twiddle_ring..].iter().map(|list| list.iter().map(|x| hom.map_ref(x)).collect()).collect(),
+            root_of_unity_list: root_of_unity_list.into_iter().take(store_twiddle_ring).collect(),
+            // inv_root_of_unity_list_base: inv_root_of_unity_list[store_twiddle_ring..].iter().map(|list| list.iter().map(|x| hom.map_ref(x)).collect()).collect(),
+            inv_root_of_unity_list: inv_root_of_unity_list.into_iter().take(store_twiddle_ring).collect(),
             two_inv: hom.domain().invert(&hom.domain().int_hom().map(2)).unwrap(),
             root_of_unity: hom.map(root_of_unity), 
             hom, 
             log2_n, 
-            root_of_unity_list, 
-            inv_root_of_unity_list,
             allocator
         }
     }
@@ -481,6 +485,19 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
                     <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_fft(self.ring().get_ring(), &mut values[1]);
                 }
                 self.ring().get_ring().butterfly(&self.hom, &mut values, twiddle, 0, 1);
+            }
+            [*a, *b] = values;
+        });
+    } 
+
+    #[inline(never)]
+    fn butterfly_step_main_base<const INV: bool>(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize, twiddles: &[R_main::Element]) {
+        butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, twiddles, |a, b, twiddle| {
+            let mut values = [self.ring().clone_el(a), self.ring().clone_el(b)];
+            if INV {
+                self.ring().get_ring().inv_butterfly(self.ring().identity(), &mut values, twiddle, 0, 1);
+            } else {
+                self.ring().get_ring().butterfly(self.ring().identity(), &mut values, twiddle, 0, 1);
             }
             [*a, *b] = values;
         });
@@ -556,7 +573,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
 
     #[inline(never)]
     fn butterfly_step_initial(&self, data: &mut [R_main::Element], stride_range: Range<usize>) {
-        butterfly_loop(self.log2_n, data, 0..1, stride_range, 0, &self.root_of_unity_list[0], |a, b, _twiddle| {
+        butterfly_loop(self.log2_n, data, 0..1, stride_range, 0, &[()], |a, b, _twiddle| {
             let a_val = self.ring().clone_el(a);
             self.ring().add_assign_ref(a, b);
             self.ring().sub_self_assign(b, a_val);
@@ -566,6 +583,11 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     #[stability::unstable(feature = "enable")]
     pub fn allocator(&self) -> &A {
         &self.allocator
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn hom(&self) -> &H {
+        &self.hom
     }
 
     ///
@@ -599,11 +621,22 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         for i in 0..data.len() {
             <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_fft(self.ring().get_ring(), &mut data[i]);
         }
-        for log2_step in 1..self.log2_n {
+        for (log2_step, twiddles) in self.root_of_unity_list.iter().enumerate().filter(|(i, _)| *i != 0) {
+            let start = Instant::now();
             let stride = 1 << (self.log2_n - log2_step - 1);
             let butterfly_count = nonzero_entries.div_ceil(2 * stride);
-            self.butterfly_step_main::<false, true>(data, 0..butterfly_count, 0..stride, log2_step, &self.root_of_unity_list[log2_step]);
+            self.butterfly_step_main::<false, true>(data, 0..butterfly_count, 0..stride, log2_step, twiddles);
+            let end = Instant::now();
+            BUTTERFLY_TIMES[log2_step].fetch_add((end - start).as_micros() as usize, Ordering::Relaxed);
         }
+        // for (log2_step, twiddles) in self.root_of_unity_list_base.iter().enumerate().map(|(i, twiddles)| (i + self.root_of_unity_list.len(), twiddles)).filter(|(i, _)| *i != 0) {
+        //     let start = Instant::now();
+        //     let stride = 1 << (self.log2_n - log2_step - 1);
+        //     let butterfly_count = nonzero_entries.div_ceil(2 * stride);
+        //     self.butterfly_step_main_base::<false>(data, 0..butterfly_count, 0..stride, log2_step, twiddles);
+        //     let end = Instant::now();
+        //     BUTTERFLY_TIMES[log2_step].fetch_add((end - start).as_micros() as usize, Ordering::Relaxed);
+        // }
     }
     
     ///
@@ -624,10 +657,21 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         for i in 0..data.len() {
             <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_inv_fft(self.ring().get_ring(), &mut data[i]);
         }
-        for log2_step in (1..self.log2_n).rev() {
+        // for (log2_step, twiddles) in self.inv_root_of_unity_list_base.iter().enumerate().map(|(i, twiddles)| (i + self.root_of_unity_list.len(), twiddles)).filter(|(i, _)| *i != 0).rev() {
+        //     let start = Instant::now();
+        //     let stride = 1 << (self.log2_n - log2_step - 1);
+        //     let current_block = nonzero_entries / (2 * stride);
+        //     self.butterfly_step_main_base::<true>(data, 0..current_block, 0..stride, log2_step, twiddles);
+        //     let end = Instant::now();
+        //     BUTTERFLY_TIMES[log2_step].fetch_add((end - start).as_micros() as usize, Ordering::Relaxed);
+        // }
+        for (log2_step, twiddles) in self.inv_root_of_unity_list.iter().enumerate().filter(|(i, _)| *i != 0).rev() {
+            let start = Instant::now();
             let stride = 1 << (self.log2_n - log2_step - 1);
             let current_block = nonzero_entries / (2 * stride);
-            self.butterfly_step_main::<true, true>(data, 0..current_block, 0..stride, log2_step, &self.inv_root_of_unity_list[log2_step]);
+            self.butterfly_step_main::<true, true>(data, 0..current_block, 0..stride, log2_step, twiddles);
+            let end = Instant::now();
+            BUTTERFLY_TIMES[log2_step].fetch_add((end - start).as_micros() as usize, Ordering::Relaxed);
         }
         if nonzero_entries < (1 << self.log2_n) {
             for i in nonzero_entries..(1 << self.log2_n) {

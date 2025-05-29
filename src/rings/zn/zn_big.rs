@@ -347,7 +347,7 @@ impl<I: RingStore> HashableElRing for ZnBase<I>
 impl<I: RingStore + Default> FromModulusCreateableZnRing for ZnBase<I>
     where I::Type: IntegerRing
 {
-    fn create<F, E>(create_modulus: F) -> Result<Self, E>
+    fn from_modulus<F, E>(create_modulus: F) -> Result<Self, E>
         where F: FnOnce(&Self::IntegerRingBase) -> Result<El<Self::IntegerRing>, E>
     {
         let ZZ = I::default();

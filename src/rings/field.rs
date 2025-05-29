@@ -451,10 +451,10 @@ impl<R: RingStore> StrassenHint for AsFieldBase<R>
 impl<R> FromModulusCreateableZnRing for AsFieldBase<RingValue<R>> 
     where R: DivisibilityRing + ZnRing + FromModulusCreateableZnRing
 {
-    fn create<F, E>(create_modulus: F) -> Result<Self, E>
+    fn from_modulus<F, E>(create_modulus: F) -> Result<Self, E>
         where F:FnOnce(&Self::IntegerRingBase) -> Result<El<Self::IntegerRing>, E> 
     {
-        <R as FromModulusCreateableZnRing>::create(create_modulus).map(|ring| RingValue::from(ring).as_field().ok().unwrap().into())
+        <R as FromModulusCreateableZnRing>::from_modulus(create_modulus).map(|ring| RingValue::from(ring).as_field().ok().unwrap().into())
     }
 }
 

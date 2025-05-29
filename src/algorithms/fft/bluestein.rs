@@ -25,7 +25,6 @@ pub struct BluesteinFFT<R_main, R_twiddle, H, A = Global>
         H: Homomorphism<R_twiddle, R_main>, 
         A: Allocator + Clone
 {
-    hom: H,
     m_fft_table: CooleyTuckeyFFT<R_main, R_twiddle, H, A>,
     ///
     /// This is the bitreverse fft of a part of the sequence b_i := z^(i^2) where
@@ -194,18 +193,6 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         );
     }
 
-    fn create_b_array<F>(ring: &R_main, mut root_of_unity_2n_pows: F, n: usize, m: usize) -> Vec<R_main::Element>
-        where F: FnMut(i64) -> R_main::Element
-    {
-        let mut b = (0..m).map(|_| ring.zero()).collect::<Vec<_>>();
-        b[0] = ring.one();
-        for i in 1..n {
-            b[i] = root_of_unity_2n_pows(TryInto::<i64>::try_into((i * i) % (2 * n)).unwrap());
-            b[m - i] = ring.clone_el(&b[i]);
-        }
-        return b;
-    }
-
     ///
     /// Creates an [`BluesteinFFT`] for the given rings, using the given function to create
     /// the necessary powers of roots of unity. This is the most generic way to create [`BluesteinFFT`].
@@ -224,37 +211,22 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
     /// of length `2^log2_m`
     /// 
-    pub fn new_with_pows_with_hom<F, G>(hom: H, mut root_of_unity_2n_pows: F, mut root_of_unity_m_pows: G, n: usize, log2_m: usize, tmp_mem_allocator: A) -> Self
+    pub fn new_with_pows_with_hom<F, G>(hom: H, root_of_unity_2n_pows: F, mut root_of_unity_m_pows: G, n: usize, log2_m: usize, tmp_mem_allocator: A) -> Self
         where F: FnMut(i64) -> R_twiddle::Element,
             G: FnMut(i64) -> R_twiddle::Element
     {
         // checks on m and root_of_unity_m are done by the FFTTableCooleyTuckey
         assert!((1 << log2_m) >= 2 * n + 1);
-        assert!(hom.domain().get_ring().is_approximate() || is_prim_root_of_unity(hom.domain(), &root_of_unity_2n_pows(1), 2 * n));
-        assert!(hom.codomain().get_ring().is_approximate() || is_prim_root_of_unity(hom.codomain(), &hom.map(root_of_unity_2n_pows(1)), 2 * n));
         assert!(hom.domain().get_ring().is_approximate() || is_prim_root_of_unity(hom.domain(), &root_of_unity_m_pows(1), 1 << log2_m));
         assert!(hom.codomain().get_ring().is_approximate() || is_prim_root_of_unity(hom.codomain(), &hom.map(root_of_unity_m_pows(1)), 1 << log2_m));
 
-        let mut b = Self::create_b_array(hom.codomain().get_ring(), |i| hom.map(root_of_unity_2n_pows(i)), n, 1 << log2_m);
-        let inv_root_of_unity_2n = (0..n).map(|i| hom.map(root_of_unity_2n_pows(-TryInto::<i64>::try_into(i * i).unwrap()))).collect::<Vec<_>>();
-        let root_of_unity_n = hom.map(root_of_unity_2n_pows(2));
-
-        let m_fft_table = algorithms::fft::cooley_tuckey::CooleyTuckeyFFT::create(
+        let m_fft_table = CooleyTuckeyFFT::create(
             hom.clone(), 
             root_of_unity_m_pows, 
             log2_m, 
             tmp_mem_allocator
         );
-        m_fft_table.unordered_fft(&mut b, hom.codomain());
-
-        return BluesteinFFT { 
-            m_fft_table: m_fft_table, 
-            b_bitreverse_fft: b, 
-            inv_root_of_unity_2n: inv_root_of_unity_2n, 
-            root_of_unity_n: root_of_unity_n,
-            n: n,
-            hom: hom
-        };
+        return Self::create(m_fft_table, root_of_unity_2n_pows, n);
     }
 
     ///
@@ -295,6 +267,44 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         A: Allocator + Clone
 {
     #[stability::unstable(feature = "enable")]
+    pub fn create<F>(base_fft_table: CooleyTuckeyFFT<R_main, R_twiddle, H, A>, mut root_of_unity_2n_pows: F, n: usize) -> Self
+        where F: FnMut(i64) -> R_twiddle::Element
+    {
+        let hom = base_fft_table.hom();
+        let log2_m = StaticRing::<i64>::RING.abs_log2_ceil(&base_fft_table.len().try_into().unwrap()).unwrap();
+        assert_eq!(1 << log2_m, base_fft_table.len());
+        // checks on m and root_of_unity_m are done by the FFTTableCooleyTuckey
+        assert!((1 << log2_m) >= 2 * n + 1);
+        assert!(hom.domain().get_ring().is_approximate() || is_prim_root_of_unity(hom.domain(), &root_of_unity_2n_pows(1), 2 * n));
+        assert!(hom.codomain().get_ring().is_approximate() || is_prim_root_of_unity(hom.codomain(), &hom.map(root_of_unity_2n_pows(1)), 2 * n));
+
+        let mut b = Self::create_b_array(hom.codomain().get_ring(), |i| hom.map(root_of_unity_2n_pows(i)), n, 1 << log2_m);
+        let inv_root_of_unity_2n = (0..n).map(|i| hom.map(root_of_unity_2n_pows(-TryInto::<i64>::try_into(i * i).unwrap()))).collect::<Vec<_>>();
+        let root_of_unity_n = hom.map(root_of_unity_2n_pows(2));
+        base_fft_table.unordered_fft(&mut b, hom.codomain());
+
+        return BluesteinFFT { 
+            m_fft_table: base_fft_table, 
+            b_bitreverse_fft: b, 
+            inv_root_of_unity_2n: inv_root_of_unity_2n, 
+            root_of_unity_n: root_of_unity_n,
+            n: n
+        };
+    }
+
+    fn create_b_array<F>(ring: &R_main, mut root_of_unity_2n_pows: F, n: usize, m: usize) -> Vec<R_main::Element>
+        where F: FnMut(i64) -> R_main::Element
+    {
+        let mut b = (0..m).map(|_| ring.zero()).collect::<Vec<_>>();
+        b[0] = ring.one();
+        for i in 1..n {
+            b[i] = root_of_unity_2n_pows(TryInto::<i64>::try_into((i * i) % (2 * n)).unwrap());
+            b[m - i] = ring.clone_el(&b[i]);
+        }
+        return b;
+    }
+
+    #[stability::unstable(feature = "enable")]
     pub fn allocator(&self) -> &A {
         self.m_fft_table.allocator()
     }
@@ -318,7 +328,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         assert_eq!(values.len(), self.n);
         assert_eq!(buffer.len(), self.m_fft_table.len());
 
-        let ring = self.hom.codomain();
+        let ring = self.m_fft_table.hom().codomain();
 
         // set buffer to the zero-padded sequence values_i * z^(-i^2/2)
         for i in 0..self.n {
@@ -349,7 +359,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
 
         if INV {
             // finally, scale by 1/n
-            let scale = self.hom.map(self.hom.domain().checked_div(&self.hom.domain().one(), &self.hom.domain().int_hom().map(self.n.try_into().unwrap())).unwrap());
+            let scale = self.hom().map(self.hom().domain().checked_div(&self.hom().domain().one(), &self.hom().domain().int_hom().map(self.n.try_into().unwrap())).unwrap());
             for i in 0..values.len() {
                 ring.mul_assign_ref(values.at_mut(i), &scale);
             }
@@ -357,9 +367,12 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     }
 
     fn ring<'a>(&'a self) -> &'a <H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
-        self.hom.codomain()
+        self.hom().codomain()
     }
 
+    fn hom(&self) -> &H {
+        self.m_fft_table.hom()
+    }
 }
 
 impl<R_main, R_twiddle, H, A> PartialEq for BluesteinFFT<R_main, R_twiddle, H, A>
@@ -415,7 +428,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for BluesteinFFT<R_main, R_tw
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.allocator().clone());
-        buffer.extend((0..self.m_fft_table.len()).map(|_| self.hom.codomain().zero()));
+        buffer.extend((0..self.m_fft_table.len()).map(|_| self.ring().zero()));
         self.fft_base::<_, _, false>(values, &mut buffer[..]);
     }
 
@@ -425,7 +438,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for BluesteinFFT<R_main, R_tw
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.allocator().clone());
-        buffer.extend((0..self.m_fft_table.len()).map(|_| self.hom.codomain().zero()));
+        buffer.extend((0..self.m_fft_table.len()).map(|_| self.ring().zero()));
         self.fft_base::<_, _, true>(values, &mut buffer[..]);
     }
 
