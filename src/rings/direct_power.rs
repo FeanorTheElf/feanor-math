@@ -4,11 +4,13 @@ use std::marker::PhantomData;
 use crate::divisibility::*;
 use crate::serialization::*;
 use crate::specialization::{FiniteRingSpecializable, FiniteRingOperation};
-use crate::homomorphism::{CanHomFrom, CanIsoFromTo, Homomorphism};
+use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterflyNew;
 use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::rings::finite::{FiniteRing, FiniteRingStore};
 use crate::ring::*;
 use crate::iters::*;
+use crate::rings::zn::zn_64::*;
+use crate::homomorphism::*;
 use crate::seq::CloneRingEl;
 use crate::seq::VectorFn;
 
@@ -378,6 +380,43 @@ impl<R: RingStore, const N: usize> FiniteRing for DirectPowerRingBase<R, N>
     }
 }
 
+macro_rules! specialize_butterfly {
+    ($($num:literal),*) => { $(
+                
+        impl CooleyTuckeyButterflyNew<ZnFastmulBase, DirectPowerRingBase<Zn, $num>> for ComposedHom<ZnFastmulBase, ZnBase, DirectPowerRingBase<Zn, $num>, CanHom<ZnFastmul, Zn>, Inclusion<DirectPowerRing<Zn, $num>>> {
+
+            #[inline(always)]
+            fn butterfly(&self, x: &mut [ZnEl; $num], y: &mut [ZnEl; $num], twiddle: &ZnFastmulEl) {
+                for (x, y) in x.into_iter().zip(y.into_iter()) {
+                    self.first().butterfly(x, y, twiddle)
+                }
+            }
+
+            #[inline(always)]
+            fn inv_butterfly(&self, x: &mut [ZnEl; $num], y: &mut [ZnEl; $num], twiddle: &ZnFastmulEl) {
+                for (x, y) in x.into_iter().zip(y.into_iter()) {
+                    self.first().inv_butterfly(x, y, twiddle)
+                }
+            }
+            
+            #[inline(always)]
+            fn prepare_for_fft(&self, value: &mut [ZnEl; $num]) {
+                for x in value.into_iter() {
+                    self.first().prepare_for_fft(x)
+                }
+            }
+            
+            #[inline(always)]
+            fn prepare_for_inv_fft(&self, value: &mut [ZnEl; $num]) {
+                for x in value.into_iter() {
+                    self.first().prepare_for_fft(x)
+                }
+            }
+        }
+    )* }
+}
+specialize_butterfly!{ 1, 2, 3, 4, 5, 6, 7, 8, 16 }
+
 impl<R: RingStore, const N: usize> HashableElRing for DirectPowerRingBase<R, N>
     where R::Type: HashableElRing
 {
@@ -418,8 +457,6 @@ impl<R: RingStore, const N: usize> SerializableElementRing for DirectPowerRingBa
     }
 }
 
-#[cfg(test)]
-use crate::rings::zn::zn_64::*;
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 

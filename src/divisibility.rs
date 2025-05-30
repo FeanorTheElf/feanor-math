@@ -157,9 +157,9 @@ pub trait DivisibilityRing: RingBase {
     /// # use feanor_math::divisibility::*;
     /// # use feanor_math::primitive_int::*;
     /// # let ring = StaticRing::<i128>::RING;
-    /// let prepared_257 = ring.get_ring().prepare_divisor(257);
+    /// let prepared_257 = PreparedDivisor::new(ring.get_ring(), 257);
     /// for integer in 0..1000 {
-    ///     if ring.get_ring().divides_left_prepared(&integer, &prepared_257) {
+    ///     if prepared_257.checked_left_div_by(&integer, ring.get_ring()).is_some(){
     ///         assert!(integer == 0 || integer == 257 || integer == 514 || integer == 771);
     ///     }
     /// }

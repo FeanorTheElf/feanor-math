@@ -325,11 +325,88 @@ impl<R_main, R_twiddle, H, A> Clone for CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     }
 }
 
+#[stability::unstable(feature = "enable")]
+pub trait CooleyTuckeyButterflyNew<R, S>: Homomorphism<R, S>
+    where R: ?Sized + RingBase, S: ?Sized + RingBase
+{
+    ///
+    /// Should compute `(x, y) := (x + twiddle * y, x - twiddle * y)`.
+    /// 
+    /// It is guaranteed that the input elements are either outputs of
+    /// [`CooleyTuckeyButterflyNew::butterfly()`] or of [`CooleyTuckeyButterflyNew::prepare_for_fft()`].
+    /// 
+    fn butterfly(&self, x: &mut S::Element, y: &mut S::Element, twiddle: &R::Element);
+
+    ///
+    /// Should compute `(x, y) := (x + y, (x - y) * twiddle)`
+    /// 
+    /// It is guaranteed that the input elements are either outputs of
+    /// [`CooleyTuckeyButterflyNew::inv_butterfly()`] or of [`CooleyTuckeyButterflyNew::prepare_for_inv_fft()`].
+    /// 
+    fn inv_butterfly(&self, x: &mut S::Element, y: &mut S::Element, twiddle: &R::Element);
+    
+    ///
+    /// Possibly pre-processes elements before the FFT starts. Here you can
+    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterflyNew::butterfly()`]
+    /// that the inputs are in this form.
+    /// 
+    #[inline(always)]
+    fn prepare_for_fft(&self, _value: &mut S::Element) {}
+    
+    ///
+    /// Possibly pre-processes elements before the inverse FFT starts. Here you can
+    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterflyNew::inv_butterfly()`]
+    /// that the inputs are in this form.
+    /// 
+    #[inline(always)]
+    fn prepare_for_inv_fft(&self, _value: &mut S::Element) {}
+}
+
+///
+/// A helper trait that defines the Cooley-Tuckey butterfly operation.
+/// It is default-implemented for all homomorphisms, but for increase FFT performance, some rings
+/// might wish to provide a specialization.
+/// 
+/// This replaces the deprecated trait [`CooleyTuckeyButterfly`].
+/// 
+impl<R, S, H> CooleyTuckeyButterflyNew<R, S> for H
+    where R: ?Sized + RingBase, S: ?Sized + RingBase, H: Homomorphism<R, S>
+{
+    #[inline(always)]
+    #[allow(deprecated)]
+    default fn butterfly(&self, x: &mut S::Element, y: &mut S::Element, twiddle: &R::Element) {
+        let mut values = [self.codomain().clone_el(x), self.codomain().clone_el(y)];
+        <S as CooleyTuckeyButterfly<R>>::butterfly(self.codomain().get_ring(), &self, &mut values, twiddle, 0, 1);
+        [*x, *y] = values;
+    }
+
+    #[inline(always)]
+    #[allow(deprecated)]
+    default fn inv_butterfly(&self, x: &mut S::Element, y: &mut S::Element, twiddle: &R::Element) {
+        let mut values = [self.codomain().clone_el(x), self.codomain().clone_el(y)];
+        <S as CooleyTuckeyButterfly<R>>::inv_butterfly(self.codomain().get_ring(), &self, &mut values, twiddle, 0, 1);
+        [*x, *y] = values;
+    }
+    
+    #[inline(always)]
+    #[allow(deprecated)]
+    default fn prepare_for_fft(&self, value: &mut S::Element) {
+        <S as CooleyTuckeyButterfly<R>>::prepare_for_fft(self.codomain().get_ring(), value);
+    }
+    
+    #[inline(always)]
+    #[allow(deprecated)]
+    default fn prepare_for_inv_fft(&self, value: &mut S::Element) {
+        <S as CooleyTuckeyButterfly<R>>::prepare_for_inv_fft(self.codomain().get_ring(), value);
+    }
+}
+
 ///
 /// A helper trait that defines the Cooley-Tuckey butterfly operation.
 /// It is default-implemented for all rings, but for increase FFT performance, some rings
 /// might wish to provide a specialization.
 /// 
+#[deprecated]
 pub trait CooleyTuckeyButterfly<S>: RingBase
     where S: ?Sized + RingBase
 {
@@ -366,6 +443,7 @@ pub trait CooleyTuckeyButterfly<S>: RingBase
     fn prepare_for_inv_fft(&self, _value: &mut Self::Element) {}
 }
 
+#[allow(deprecated)]
 impl<R, S> CooleyTuckeyButterfly<S> for R
     where S: ?Sized + RingBase, R: ?Sized + RingBase
 {
@@ -413,9 +491,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         
         let store_twiddle_ring = root_of_unity_list.len();
         CooleyTuckeyFFT {
-            // root_of_unity_list_base: root_of_unity_list[store_twiddle_ring..].iter().map(|list| list.iter().map(|x| hom.map_ref(x)).collect()).collect(),
             root_of_unity_list: root_of_unity_list.into_iter().take(store_twiddle_ring).collect(),
-            // inv_root_of_unity_list_base: inv_root_of_unity_list[store_twiddle_ring..].iter().map(|list| list.iter().map(|x| hom.map_ref(x)).collect()).collect(),
             inv_root_of_unity_list: inv_root_of_unity_list.into_iter().take(store_twiddle_ring).collect(),
             two_inv: hom.domain().invert(&hom.domain().int_hom().map(2)).unwrap(),
             root_of_unity: hom.map(root_of_unity), 
@@ -423,6 +499,27 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
             log2_n, 
             allocator
         }
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn change_ring<R_new: ?Sized + RingBase, H_new: Homomorphism<R_twiddle, R_new>>(self, new_hom: H_new) -> (CooleyTuckeyFFT<R_new, R_twiddle, H_new, A>, H) {
+        let ring = new_hom.codomain();
+        let root_of_unity = new_hom.map_ref(&self.inv_root_of_unity_list[self.log2_n - 1][bitreverse(1, self.log2_n - 1)]);
+        assert!(ring.is_commutative());
+        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &root_of_unity, self.log2_n));
+
+        return (
+            CooleyTuckeyFFT {
+                root_of_unity_list: self.root_of_unity_list,
+                inv_root_of_unity_list: self.inv_root_of_unity_list,
+                two_inv: self.two_inv,
+                root_of_unity: root_of_unity, 
+                hom: new_hom, 
+                log2_n: self.log2_n, 
+                allocator: self.allocator
+            },
+            self.hom
+        );
     }
 
     fn create_root_of_unity_list<F>(mut root_of_unity_pow: F, log2_n: usize) -> Vec<Vec<R_twiddle::Element>>
@@ -463,21 +560,19 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     #[inline(never)]
     fn butterfly_step_main<const INV: bool, const IS_PREPARED: bool>(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize, twiddles: &[R_twiddle::Element]) {
         let butterfly = |a: &mut _, b: &mut _, twiddle: &_| {
-            let mut values = [self.ring().clone_el(a), self.ring().clone_el(b)];
             if INV {
                 if !IS_PREPARED {
-                    <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_inv_fft(self.ring().get_ring(), &mut values[0]);
-                    <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_inv_fft(self.ring().get_ring(), &mut values[1]);
+                    self.hom.prepare_for_inv_fft(a);
+                    self.hom.prepare_for_inv_fft(b);
                 }
-                self.ring().get_ring().inv_butterfly(&self.hom, &mut values, twiddle, 0, 1);
+                self.hom.inv_butterfly(a, b, twiddle);
             } else {
                 if !IS_PREPARED {
-                    <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_fft(self.ring().get_ring(), &mut values[0]);
-                    <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_fft(self.ring().get_ring(), &mut values[1]);
+                    self.hom.prepare_for_fft(a);
+                    self.hom.prepare_for_fft(b);
                 }
-                self.ring().get_ring().butterfly(&self.hom, &mut values, twiddle, 0, 1);
+                self.hom.butterfly(a, b, twiddle);
             }
-            [*a, *b] = values;
         };
         butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, twiddles, butterfly);
     }
@@ -490,11 +585,9 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     #[inline(never)]
     fn butterfly_step_forward(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize, twiddles: &[R_twiddle::Element]) {
         butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, twiddles, |a, b, twiddle| {
-            let mut values = [self.ring().clone_el(a), self.ring().clone_el(b)];
-            self.hom.mul_assign_ref_map(&mut values[0], &self.two_inv);
-            self.hom.mul_assign_ref_map(&mut values[1], &self.two_inv);
-            self.ring().get_ring().butterfly(&self.hom, &mut values, twiddle, 0, 1);
-            [*a, *b] = values;
+            self.hom.mul_assign_ref_map(a, &self.two_inv);
+            self.hom.mul_assign_ref_map(b, &self.two_inv);
+            self.hom.butterfly(a, b, twiddle);
         });
     }
 
@@ -598,7 +691,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
             self.butterfly_step_initial(data, 0..(1 << (self.log2_n - 1)));
         }
         for i in 0..data.len() {
-            <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_fft(self.ring().get_ring(), &mut data[i]);
+            self.hom.prepare_for_fft(&mut data[i]);
         }
         for (log2_step, twiddles) in self.root_of_unity_list.iter().enumerate().filter(|(i, _)| *i != 0) {
             let stride = 1 << (self.log2_n - log2_step - 1);
@@ -623,7 +716,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         assert!(nonzero_entries <= self.len());
 
         for i in 0..data.len() {
-            <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_inv_fft(self.ring().get_ring(), &mut data[i]);
+            self.hom.prepare_for_inv_fft(&mut data[i]);
         }
         for (log2_step, twiddles) in self.inv_root_of_unity_list.iter().enumerate().filter(|(i, _)| *i != 0).rev() {
             let stride = 1 << (self.log2_n - log2_step - 1);
@@ -951,23 +1044,23 @@ pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Itera
     for a in &elements {
         for b in &elements {
 
-            let mut vector = [ring.clone_el(a), ring.clone_el(b)];
-            ring.get_ring().butterfly(&hom, &mut vector, &test_twiddle, 0, 1);
-            assert_el_eq!(ring, ring.add_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &vector[0]);
-            assert_el_eq!(ring, ring.sub_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &vector[1]);
+            let [mut x, mut y] = [ring.clone_el(a), ring.clone_el(b)];
+            hom.butterfly(&mut x, &mut y, &test_twiddle);
+            assert_el_eq!(ring, ring.add_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &x);
+            assert_el_eq!(ring, ring.sub_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &y);
 
-            ring.get_ring().inv_butterfly(&hom, &mut vector, &test_inv_twiddle, 0, 1);
-            assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(a, 2), &vector[0]);
-            assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(b, 2), &vector[1]);
+            hom.inv_butterfly(&mut x, &mut y, &test_inv_twiddle);
+            assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(a, 2), &x);
+            assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(b, 2), &y);
 
-            let mut vector = [ring.clone_el(a), ring.clone_el(b)];
-            ring.get_ring().butterfly(&hom, &mut vector, &test_twiddle, 1, 0);
-            assert_el_eq!(ring, ring.add_ref_fst(b, ring.mul_ref_fst(a, hom.map_ref(test_twiddle))), &vector[1]);
-            assert_el_eq!(ring, ring.sub_ref_fst(b, ring.mul_ref_fst(a, hom.map_ref(test_twiddle))), &vector[0]);
+            let [mut x, mut y] = [ring.clone_el(a), ring.clone_el(b)];
+            hom.butterfly(&mut x, &mut y, &test_twiddle);
+            assert_el_eq!(ring, ring.add_ref_fst(b, ring.mul_ref_fst(a, hom.map_ref(test_twiddle))), &x);
+            assert_el_eq!(ring, ring.sub_ref_fst(b, ring.mul_ref_fst(a, hom.map_ref(test_twiddle))), &y);
 
-            ring.get_ring().inv_butterfly(&hom, &mut vector, &test_inv_twiddle, 1, 0);
-            assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(a, 2), &vector[0]);
-            assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(b, 2), &vector[1]);
+            hom.inv_butterfly(&mut x, &mut y, &test_inv_twiddle);
+            assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(a, 2), &x);
+            assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(b, 2), &y);
         }
     }
 }

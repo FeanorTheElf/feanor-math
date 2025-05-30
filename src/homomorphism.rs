@@ -534,6 +534,14 @@ impl<R, S> Homomorphism<R::Type, S::Type> for CanHom<R, S>
     fn codomain(&self) -> &S {
         &self.to
     }
+
+    fn mul_assign_map(&self, lhs: &mut <S::Type as RingBase>::Element, rhs: <R::Type as RingBase>::Element) {
+        self.to.get_ring().mul_assign_map_in(self.from.get_ring(), lhs, rhs, &self.data);
+    }
+
+    fn mul_assign_ref_map(&self, lhs: &mut <S::Type as RingBase>::Element, rhs: &<R::Type as RingBase>::Element) {
+        self.to.get_ring().mul_assign_map_in_ref(self.from.get_ring(), lhs, rhs, &self.data);
+    }
 }
 
 ///
@@ -873,6 +881,14 @@ impl<R: RingStore> Homomorphism<R::Type, R::Type> for Identity<R> {
     fn map(&self, x: <R::Type as RingBase>::Element) -> <R::Type as RingBase>::Element {
         x
     }
+
+    fn mul_assign_map_through_hom<First: ?Sized + RingBase, H: Homomorphism<First, R::Type>>(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: First::Element, hom: H) {
+        hom.mul_assign_map(lhs, rhs);
+    }
+
+    fn mul_assign_ref_map_through_hom<First: ?Sized + RingBase, H: Homomorphism<First, R::Type>>(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: &First::Element, hom: H) {
+        hom.mul_assign_ref_map(lhs, rhs);
+    }
 }
 
 impl<'a, S, R, H> Homomorphism<S, R> for &'a H 
@@ -969,6 +985,24 @@ pub struct ComposedHom<R, S, T, F, G>
     domain: PhantomData<R>,
     intermediate: PhantomData<S>,
     codomain: PhantomData<T>
+}
+
+impl<R, S, T, F, G> ComposedHom<R, S, T, F, G>
+    where F: Clone + Homomorphism<R, S>,
+        G: Clone + Homomorphism<S, T>,
+        R: ?Sized + RingBase,
+        S: ?Sized + RingBase,
+        T: ?Sized + RingBase
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn first(&self) -> &F {
+        &self.f
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn second(&self) -> &G {
+        &self.g
+    }
 }
 
 impl<R, S, T, F, G> Clone for ComposedHom<R, S, T, F, G>
