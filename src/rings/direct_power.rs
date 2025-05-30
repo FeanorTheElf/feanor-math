@@ -8,7 +8,7 @@ use crate::homomorphism::{CanHomFrom, CanIsoFromTo, Homomorphism};
 use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::rings::finite::{FiniteRing, FiniteRingStore};
 use crate::ring::*;
-use crate::iters::{multi_cartesian_product, MultiProduct};
+use crate::iters::*;
 use crate::seq::CloneRingEl;
 use crate::seq::VectorFn;
 
@@ -433,7 +433,7 @@ fn test_ring_axioms() {
 fn test_can_hom_axioms() {
     let from: DirectPowerRing<_, 3> = DirectPowerRing::new(StaticRing::<i64>::RING);
     let ring: DirectPowerRing<_, 3> = DirectPowerRing::new(Zn::new(3));
-    crate::ring::generic_tests::test_hom_axioms(&from, &ring, -10..10);
+    crate::ring::generic_tests::test_hom_axioms(&from, &ring, multi_cartesian_product((0..3).map(|_| -4..5), clone_array::<_, 3>, |_, x| *x));
 }
 
 #[test]
