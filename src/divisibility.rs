@@ -166,7 +166,7 @@ pub trait DivisibilityRing: RingBase {
     /// ```
     /// 
     #[stability::unstable(feature = "enable")]
-    fn prepare_divisor(&self, x: Self::Element) -> PreparedDivisor<Self> {
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {
         struct ProduceUnitType;
         trait ProduceValue<T> {
             fn produce() -> T;
@@ -179,10 +179,7 @@ pub trait DivisibilityRing: RingBase {
         impl ProduceValue<()> for ProduceUnitType {
             fn produce() -> () {}
         }
-        PreparedDivisor {
-            element: x,
-            data: <ProduceUnitType as ProduceValue<Self::PreparedDivisorData>>::produce()
-        }
+        <ProduceUnitType as ProduceValue<Self::PreparedDivisorData>>::produce()
     }
 
     ///
@@ -191,8 +188,8 @@ pub trait DivisibilityRing: RingBase {
     /// See also [`DivisibilityRing::prepare_divisor()`].
     /// 
     #[stability::unstable(feature = "enable")]
-    fn checked_left_div_prepared(&self, lhs: &Self::Element, rhs: &PreparedDivisor<Self>) -> Option<Self::Element> {
-        self.checked_left_div(lhs, &rhs.element)
+    fn checked_left_div_prepared(&self, lhs: &Self::Element, rhs: &Self::Element, _rhs_prep: &Self::PreparedDivisorData) -> Option<Self::Element> {
+        self.checked_left_div(lhs, rhs)
     }
 
     ///
@@ -201,8 +198,8 @@ pub trait DivisibilityRing: RingBase {
     /// See also [`DivisibilityRing::prepare_divisor()`].
     /// 
     #[stability::unstable(feature = "enable")]
-    fn divides_left_prepared(&self, lhs: &Self::Element, rhs: &PreparedDivisor<Self>) -> bool {
-        self.divides_left(lhs, &rhs.element)
+    fn divides_left_prepared(&self, lhs: &Self::Element, rhs: &Self::Element, _rhs_prep: &Self::PreparedDivisorData) -> bool {
+        self.divides_left(lhs, rhs)
     }
 
     ///
@@ -236,6 +233,31 @@ pub struct PreparedDivisor<R>
 {
     pub element: R::Element,
     pub data: R::PreparedDivisorData
+}
+
+impl<R> PreparedDivisor<R>
+    where R: ?Sized + RingBase + DivisibilityRing,
+{
+    ///
+    /// Creates a new [`PreparedDivisor`] from the given ring element, obtaining
+    /// any additional data by calling [`DivisibilityRing::prepare_divisor()`].
+    /// 
+    pub fn new(ring: &R, el: R::Element) -> Self {
+        Self {
+            data: ring.prepare_divisor(&el),
+            element: el
+        }
+    }
+
+    ///
+    /// Computes some `q` such that `q * self == lhs`, if it exists.
+    /// 
+    /// If the underlying ring supports it, this uses precomputed data
+    /// and thus can be faster than [`DivisibilityRing::checked_left_div()`]. 
+    /// 
+    pub fn checked_left_div_by(&self, lhs: &R::Element, ring: &R) -> Option<R::Element> {
+        ring.checked_left_div_prepared(lhs, &self.element, &self.data)
+    }
 }
 
 impl<R> Debug for PreparedDivisor<R>
@@ -331,23 +353,23 @@ pub mod generic_tests {
         }
 
         for a in &elements {
-            let a_prepared_divisor = ring.get_ring().prepare_divisor(ring.clone_el(a));
+            let a_prepared_divisor = PreparedDivisor::new(ring.get_ring(), ring.clone_el(a));
             for b in &elements {
                 let ab = ring.mul(ring.clone_el(a), ring.clone_el(b));
-                let c = ring.get_ring().checked_left_div_prepared(&ab, &a_prepared_divisor);
+                let c = a_prepared_divisor.checked_left_div_by(&ab, ring.get_ring());
                 assert!(c.is_some(), "Divisibility existence failed for prepared divisor: there should exist b = {} such that {} = b * {}, but none was found", ring.format(b), ring.format(&ab), ring.format(&a));
                 assert!(ring.eq_el(&ab, &ring.mul_ref_snd(ring.clone_el(a), c.as_ref().unwrap())), "Division failed: {} * {} != {} but {} = checked_div({}, {})", ring.format(a), ring.format(c.as_ref().unwrap()), ring.format(&ab), ring.format(c.as_ref().unwrap()), ring.format(&ab), ring.format(&a));
 
                 if !ring.get_ring().is_unit_prepared(&a_prepared_divisor) {
                     let ab_plus_one = ring.add(ring.clone_el(&ab), ring.one());
-                    let c = ring.get_ring().checked_left_div_prepared(&ab_plus_one, &a_prepared_divisor);
+                    let c = a_prepared_divisor.checked_left_div_by(&ab_plus_one, ring.get_ring());
                     assert!(c.is_none(), "Unit check failed for prepared divisor: is_unit({}) is false but checked_div({}, {}) = {}", ring.format(a), ring.format(&ab_plus_one), ring.format(a), ring.format(c.as_ref().unwrap()));
 
                     let ab_minus_one = ring.sub(ring.clone_el(&ab), ring.one());
-                    let c = ring.get_ring().checked_left_div_prepared(&ab_minus_one, &a_prepared_divisor);
+                    let c = a_prepared_divisor.checked_left_div_by(&ab_minus_one, ring.get_ring());
                     assert!(c.is_none(), "Unit check failed for prepared divisor: is_unit({}) is false but checked_div({}, {}) = {}", ring.format(a), ring.format(&ab_minus_one), ring.format(a), ring.format(c.as_ref().unwrap()));
                 } else {
-                    let inv = ring.get_ring().checked_left_div_prepared(&ring.one(), &a_prepared_divisor);
+                    let inv = a_prepared_divisor.checked_left_div_by(&ring.one(), ring.get_ring());
                     assert!(inv.is_some(), "Unit check failed for prepared divisor: is_unit({}) is true but checked_div({}, {}) is None", ring.format(a), ring.format(&ring.one()), ring.format(&a));
                     let prod = ring.mul_ref(a, inv.as_ref().unwrap());
                     assert!(ring.eq_el(&ring.one(), &prod), "Division failed for prepared divisor: {} != {} * {} but checked_div({}, {}) = {}", ring.format(&ring.one()), ring.format(a), ring.format(inv.as_ref().unwrap()), ring.format(&ring.one()), ring.format(a), ring.format(c.as_ref().unwrap()));

@@ -84,3 +84,5 @@ pub mod local;
 /// of an underlying domain.
 /// 
 pub mod fraction;
+
+pub mod direct_power;

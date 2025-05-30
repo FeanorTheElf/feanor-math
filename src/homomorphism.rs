@@ -36,43 +36,127 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
     fn domain<'a>(&'a self) -> &'a Self::DomainStore;
     fn codomain<'a>(&'a self) -> &'a Self::CodomainStore;
 
+    ///
+    /// Applies this homomorphism to the given element from the domain ring,
+    /// resulting in an element in the codomain ring.
+    /// 
     fn map(&self, x: Domain::Element) -> Codomain::Element;
 
+    ///
+    /// Applies this homomorphism to the given element from the domain ring,
+    /// resulting in an element in the codomain ring.
+    /// 
     fn map_ref(&self, x: &Domain::Element) -> Codomain::Element {
         self.map(self.domain().clone_el(x))
     }
 
+    ///
+    /// Multiplies the given element in the codomain ring with an element obtained
+    /// by applying this homomorphism to a given element from the domain ring.
+    /// 
+    /// This is equivalent to, but may be faster than, first mapping the domain
+    /// ring element via this homomorphism, and then performing ring multiplication.
+    /// 
     fn mul_assign_map(&self, lhs: &mut Codomain::Element, rhs: Domain::Element) {
         self.codomain().mul_assign(lhs, self.map(rhs))
     }
 
+    ///
+    /// Multiplies the given element in the codomain ring with an element obtained
+    /// by applying this homomorphism to a given element from the domain ring.
+    /// 
+    /// This is equivalent to, but may be faster than, first mapping the domain
+    /// ring element via this homomorphism, and then performing ring multiplication.
+    /// 
     fn mul_assign_ref_map(&self, lhs: &mut Codomain::Element, rhs: &Domain::Element) {
         self.codomain().mul_assign(lhs, self.map_ref(rhs))
     }
 
+    ///
+    /// Multiplies the given element in the codomain ring with an element obtained
+    /// by applying this homomorphism to a given element from the domain ring.
+    /// 
+    /// This is equivalent to, but may be faster than, first mapping the domain
+    /// ring element via this homomorphism, and then performing ring multiplication.
+    /// 
     fn mul_map(&self, mut lhs: Codomain::Element, rhs: Domain::Element) -> Codomain::Element {
         self.mul_assign_map(&mut lhs, rhs);
         lhs
     }
 
+    ///
+    /// Multiplies the given element in the codomain ring with an element obtained
+    /// by applying this homomorphism to a given element from the domain ring.
+    /// 
+    /// This is equivalent to, but may be faster than, first mapping the domain
+    /// ring element via this homomorphism, and then performing ring multiplication.
+    /// 
     fn mul_ref_fst_map(&self, lhs: &Codomain::Element, rhs: Domain::Element) -> Codomain::Element {
         self.mul_map(self.codomain().clone_el(lhs), rhs)
     }
 
+    ///
+    /// Multiplies the given element in the codomain ring with an element obtained
+    /// by applying this homomorphism to a given element from the domain ring.
+    /// 
+    /// This is equivalent to, but may be faster than, first mapping the domain
+    /// ring element via this homomorphism, and then performing ring multiplication.
+    /// 
     fn mul_ref_snd_map(&self, mut lhs: Codomain::Element, rhs: &Domain::Element) -> Codomain::Element {
         self.mul_assign_ref_map(&mut lhs, rhs);
         lhs
     }
 
+    ///
+    /// Multiplies the given element in the codomain ring with an element obtained
+    /// by applying this homomorphism to a given element from the domain ring.
+    /// 
+    /// This is equivalent to, but may be faster than, first mapping the domain
+    /// ring element via this homomorphism, and then performing ring multiplication.
+    /// 
     fn mul_ref_map(&self, lhs: &Codomain::Element, rhs: &Domain::Element) -> Codomain::Element {
         self.mul_ref_snd_map(self.codomain().clone_el(lhs), rhs)
     }
 
+    ///
+    /// Constructs the homomorphism `x -> self.map(prev.map(x))`.
+    /// 
     fn compose<F, PrevDomain: ?Sized + RingBase>(self, prev: F) -> ComposedHom<PrevDomain, Domain, Codomain, F, Self>
         where Self: Sized, F: Homomorphism<PrevDomain, Domain>
     {
         assert!(prev.codomain().get_ring() == self.domain().get_ring());
         ComposedHom { f: prev, g: self, domain: PhantomData, intermediate: PhantomData, codomain: PhantomData }
+    }
+    
+    ///
+    /// Multiplies the given element in the codomain ring with an element obtained
+    /// by applying this and another homomorphism to a given element from another ring.
+    /// 
+    /// The equivalent of [`Homomorphism::mul_assign_map()`] for a chain of two 
+    /// homomorphisms. While providing specialized implementations for longer and longer
+    /// chains soon becomes ridiculous, there is one important use case why we would want
+    /// at least length-2 chains:
+    /// 
+    /// In particular, many [`RingExtension`]s have elements that consist of multiple
+    /// elements of the base ring, with base-ring-multiplication being scalar-vector
+    /// multiplication. Hence, if the base ring allows a fast-multiplication through
+    /// a single homomorphism, it makes sense to extend that along an [`Inclusion`].
+    /// Hence, we also have [`RingExtension::mul_assign_base_through_hom()`].
+    /// 
+    #[stability::unstable(feature = "enable")]
+    fn mul_assign_ref_map_through_hom<First: ?Sized + RingBase, H: Homomorphism<First, Domain>>(&self, lhs: &mut Codomain::Element, rhs: &First::Element, hom: H) {
+        self.mul_assign_map(lhs, hom.map_ref(rhs));
+    }
+    
+    ///
+    /// Multiplies the given element in the codomain ring with an element obtained
+    /// by applying this and another homomorphism to a given element from another ring.
+    /// 
+    /// For details, see [`Homomorphism::mul_assign_ref_map_through_hom()`].
+    /// 
+    #[stability::unstable(feature = "enable")]
+    fn mul_assign_map_through_hom<First: ?Sized + RingBase, H: Homomorphism<First, Domain>>(&self, lhs: &mut Codomain::Element, rhs: First::Element, hom: H) {
+        self.mul_assign_map(lhs, hom.map(rhs));
     }
 }
 
@@ -686,6 +770,14 @@ impl<R> Homomorphism<<<R::Type as RingExtension>::BaseRing as RingStore>::Type, 
     fn mul_assign_map(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: <<<R::Type as RingExtension>::BaseRing as RingStore>::Type as RingBase>::Element) {
         self.mul_assign_ref_map(lhs, &rhs)
     }
+
+    fn mul_assign_map_through_hom<First: ?Sized + RingBase, H: Homomorphism<First, <<R::Type as RingExtension>::BaseRing as RingStore>::Type>>(&self, lhs: &mut El<R>, rhs: First::Element, hom: H) {
+        self.ring.get_ring().mul_assign_base_through_hom(lhs, &rhs, hom)
+    }
+
+    fn mul_assign_ref_map_through_hom<First: ?Sized + RingBase, H: Homomorphism<First, <<R::Type as RingExtension>::BaseRing as RingStore>::Type>>(&self, lhs: &mut El<R>, rhs: &First::Element, hom: H) {
+        self.ring.get_ring().mul_assign_base_through_hom(lhs, rhs, hom)
+    }
 }
 
 ///
@@ -932,11 +1024,11 @@ impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
     }
 
     fn mul_assign_map(&self, lhs: &mut <T as RingBase>::Element, rhs: <R as RingBase>::Element) {
-        self.g.mul_assign_map(lhs, self.f.map(rhs))
+        self.g.mul_assign_map_through_hom(lhs, rhs, &self.f)
     }
 
     fn mul_assign_ref_map(&self, lhs: &mut <T as RingBase>::Element, rhs: &<R as RingBase>::Element) {
-        self.g.mul_assign_map(lhs, self.f.map_ref(rhs))
+        self.g.mul_assign_ref_map_through_hom(lhs, rhs, &self.f)
     }
 }
 

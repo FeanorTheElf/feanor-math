@@ -137,56 +137,45 @@ impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
         Some(elements.fold(self.zero(), |a, b| self.ideal_gen(&a, b)))
     }
 
-    fn prepare_divisor(&self, x: Self::Element) -> PreparedDivisor<Self> {
+    fn prepare_divisor(&self, x: &Self::Element) -> Self::PreparedDivisorData {
         // currently prepared division is not implemented for i128, as using Barett-reduction here
         // requires 256-bit arithmetic, and I saw no need to make that effort
         if TypeId::of::<T>() == TypeId::of::<i128>() {
-            return PreparedDivisor {
-                element: x,
-                data: PrimitiveIntPreparedDivisorData(T::from(0))
-            };
+            return PrimitiveIntPreparedDivisorData(T::from(0));
         }
-        let data = match <T as Into<i128>>::into(x) {
+        return match <T as Into<i128>>::into(*x) {
             0 => PrimitiveIntPreparedDivisorData(T::from(0)),
             1 => PrimitiveIntPreparedDivisorData(T::try_from((1i128 << (T::bits() - 1)) - 1).ok().unwrap()),
             -1 => PrimitiveIntPreparedDivisorData(T::try_from((-1i128 << (T::bits() - 1)) + 1).ok().unwrap()),
             val => PrimitiveIntPreparedDivisorData(<T as TryFrom<i128>>::try_from((1i128 << (T::bits() - 1)) / val).ok().unwrap())
         };
-        return PreparedDivisor {
-            element: x,
-            data: data
-        };
     }
     
-    fn checked_left_div_prepared(&self, lhs: &Self::Element, rhs: &PreparedDivisor<Self>) -> Option<Self::Element> {
+    fn checked_left_div_prepared(&self, lhs: &Self::Element, rhs: &Self::Element, rhs_prep: &Self::PreparedDivisorData) -> Option<Self::Element> {
         // currently prepared division is not implemented for i128, as using Barett-reduction here
         // requires 256-bit arithmetic, and I saw no need to make that effort
         if TypeId::of::<T>() == TypeId::of::<i128>() {
-            return self.checked_left_div(lhs, &rhs.element);
+            return self.checked_left_div(lhs, &rhs);
         }
-        if rhs.element == T::from(0) {
+        if *rhs == T::from(0) {
             if *lhs == T::from(0) { Some(T::from(0)) } else { None }
         } else {
             let mut prod = <T as Into<T::Larger>>::into(*lhs);
-            prod *=  <T as Into<T::Larger>>::into(rhs.data.0);
+            prod *=  <T as Into<T::Larger>>::into(rhs_prep.0);
             let mut result = <T as TryFrom<T::Larger>>::try_from(prod >> (T::bits() - 1)).ok().unwrap();
-            let remainder = T::overflowing_sub(*lhs, T::overflowing_mul(result, rhs.element));
+            let remainder = T::overflowing_sub(*lhs, T::overflowing_mul(result, *rhs));
             if remainder == T::from(0) {
                 Some(result)
-            } else if remainder == rhs.element {
+            } else if remainder == *rhs {
                 result += T::from(1);
                 Some(result)
-            } else if -remainder == rhs.element {
+            } else if -remainder == *rhs {
                 result -= T::from(1);
                 Some(result)
             } else {
                 None
             }
         }
-    }
-
-    fn divides_left_prepared(&self, lhs: &Self::Element, rhs: &PreparedDivisor<Self>) -> bool {
-        self.checked_left_div_prepared(lhs, rhs).is_some()
     }
 }
 
@@ -554,20 +543,20 @@ fn test_lowest_set_bit() {
 fn test_prepared_div() {
     type PrimInt = i8;
     for x in PrimInt::MIN..PrimInt::MAX {
-        let div_x = StaticRing::<PrimInt>::RING.get_ring().prepare_divisor(x);
+        let div_x = PreparedDivisor::new(StaticRing::<PrimInt>::RING.get_ring(), x);
         for y in PrimInt::MIN..PrimInt::MAX {
             if x == 0 {
                 if y == 0 {
-                    assert!(StaticRing::<PrimInt>::RING.get_ring().checked_left_div_prepared(&y, &div_x).is_some());
+                    assert!(div_x.checked_left_div_by(&y, StaticRing::<PrimInt>::RING.get_ring()).is_some());
                 } else {
-                    assert!(StaticRing::<PrimInt>::RING.get_ring().checked_left_div_prepared(&y, &div_x).is_none());
+                    assert!(div_x.checked_left_div_by(&y, StaticRing::<PrimInt>::RING.get_ring()).is_none());
                 }
             } else if y == PrimInt::MIN && x == -1 {
                 // this cannot be evaluated without overflow
             } else if y % x == 0 {
-                assert_eq!(y / x, StaticRing::<PrimInt>::RING.get_ring().checked_left_div_prepared(&y, &div_x).unwrap());
+                assert_eq!(y / x, div_x.checked_left_div_by(&y, StaticRing::<PrimInt>::RING.get_ring()).unwrap());
             } else {
-                assert!(StaticRing::<PrimInt>::RING.get_ring().checked_left_div_prepared(&y, &div_x).is_none());
+                assert!(div_x.checked_left_div_by(&y, StaticRing::<PrimInt>::RING.get_ring()).is_none());
             }
         }
     }

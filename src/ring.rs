@@ -1008,6 +1008,11 @@ pub trait RingExtension: RingBase {
     fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {
         self.mul_assign(lhs, self.from_ref(rhs));
     }
+
+    #[stability::unstable(feature = "enable")]
+    fn mul_assign_base_through_hom<S: ?Sized + RingBase, H: Homomorphism<S, <Self::BaseRing as RingStore>::Type>>(&self, lhs: &mut Self::Element, rhs: &S::Element, hom: H) {
+        self.mul_assign_base(lhs, &hom.map_ref(rhs));
+    }
 }
 
 ///
@@ -1473,6 +1478,13 @@ pub mod generic_tests {
         let elements = edge_case_elements.collect::<Vec<_>>();
         let zero = ring.zero();
         let one = ring.one();
+
+        assert!(ring.is_zero(&zero));
+        assert!(ring.is_one(&one));
+        assert!(ring.is_neg_one(&ring.neg_one()));
+        assert!(ring.eq_el(&ring.neg_one(), &ring.get_ring().from_int(-1)));
+        assert!(ring.eq_el(&zero, &ring.get_ring().from_int(0)));
+        assert!(ring.eq_el(&one, &ring.get_ring().from_int(1)));
 
         // check self-subtraction
         for a in &elements {

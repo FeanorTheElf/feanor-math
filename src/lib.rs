@@ -29,6 +29,7 @@
 #![feature(array_chunks)]
 #![feature(doc_cfg)]
 #![feature(int_roundings)]
+#![feature(array_try_from_fn)]
 #![feature(hasher_prefixfree_extras)]
 
 #![doc = include_str!("../Readme.md")]

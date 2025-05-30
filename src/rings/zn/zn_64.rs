@@ -481,31 +481,24 @@ impl DivisibilityRing for ZnBase {
         super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs)
     }
 
-    fn prepare_divisor(&self, x: Self::Element) -> PreparedDivisor<Self> {
-        let (s, _t, d) = algorithms::eea::signed_eea(self.smallest_positive_lift(x), *self.modulus(), self.integer_ring());
+    fn prepare_divisor(&self, x: &Self::Element) -> Self::PreparedDivisorData {
+        let (s, _t, d) = algorithms::eea::signed_eea(self.smallest_positive_lift(*x), *self.modulus(), self.integer_ring());
         debug_assert!(d > 0);
         debug_assert!(d <= *self.modulus());
-        return PreparedDivisor {
-            data: ZnPreparedDivisorData {
-                is_unit: d == 1,
-                unit_part: if s < 0 { self.negate(self.from_u64_promise_reduced(-s as u64)) } else { self.from_u64_promise_reduced(s as u64) },
-                smallest_positive_zero_divisor_part: StaticRing::<i64>::RING.get_ring().prepare_divisor(d)
-            },
-            element: x
+        return ZnPreparedDivisorData {
+            is_unit: d == 1,
+            unit_part: if s < 0 { self.negate(self.from_u64_promise_reduced(-s as u64)) } else { self.from_u64_promise_reduced(s as u64) },
+            smallest_positive_zero_divisor_part: PreparedDivisor::new(StaticRing::<i64>::RING.get_ring(), d)
         };
     }
 
-    fn checked_left_div_prepared(&self, lhs: &Self::Element, rhs: &PreparedDivisor<Self>) -> Option<Self::Element> {
-        if rhs.data.is_unit {
-            Some(self.mul_ref(lhs, &rhs.data.unit_part))
+    fn checked_left_div_prepared(&self, lhs: &Self::Element, _rhs: &Self::Element, rhs_prep: &Self::PreparedDivisorData) -> Option<Self::Element> {
+        if rhs_prep.is_unit {
+            Some(self.mul_ref(lhs, &rhs_prep.unit_part))
         } else {
-            StaticRing::<i64>::RING.get_ring().checked_left_div_prepared(&self.smallest_positive_lift(*lhs), &rhs.data.smallest_positive_zero_divisor_part)
-                .map(|x| self.mul(self.from_u64_promise_reduced(x as u64), rhs.data.unit_part))
+            StaticRing::<i64>::RING.get_ring().checked_left_div_prepared(&self.smallest_positive_lift(*lhs), &rhs_prep.smallest_positive_zero_divisor_part.element, &rhs_prep.smallest_positive_zero_divisor_part.data)
+                .map(|x| self.mul(self.from_u64_promise_reduced(x as u64), rhs_prep.unit_part))
         }
-    }
-
-    fn divides_left_prepared(&self, lhs: &Self::Element, rhs: &PreparedDivisor<Self>) -> bool {
-        self.checked_left_div_prepared(lhs, rhs).is_some()
     }
 }
 
@@ -1258,12 +1251,12 @@ fn bench_reduction_map_use_case(bencher: &mut Bencher) {
     let Zp2 = Zn::new(p * p);
     let Zp = Zn::new(p);
     let Zp2_mod_p = ZnReductionMap::new(&Zp2, &Zp).unwrap();
-    let Zp2_p = Zp2.get_ring().prepare_divisor(Zp2.int_hom().map(p as i32));
+    let Zp2_p = PreparedDivisor::new(Zp2.get_ring(), Zp2.int_hom().map(p as i32));
 
     let split_quo_rem = |x: El<Zn>| {
         let rem = Zp2_mod_p.map_ref(&x);
         let Zp2_rem = Zp2_mod_p.smallest_lift(rem);
-        let quo = Zp2.get_ring().checked_left_div_prepared(&Zp2.sub(x, Zp2_rem), &Zp2_p).unwrap();
+        let quo = Zp2_p.checked_left_div_by(&Zp2.sub(x, Zp2_rem), Zp2.get_ring()).unwrap();
         (rem, Zp2_mod_p.map(quo))
     };
 
