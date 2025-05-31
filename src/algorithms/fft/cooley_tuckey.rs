@@ -14,7 +14,7 @@ use crate::rings::float_complex::*;
 use super::complex_fft::*;
 
 ///
-/// An optimized implementation of the Cooley-Tuckey FFT algorithm, to compute
+/// An optimized implementation of the Cooley-Tukey FFT algorithm, to compute
 /// the Fourier transform of an array with power-of-two length.
 /// 
 /// # Example
@@ -233,11 +233,9 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H, Global>
         return Self {
             allocator: result.allocator,
             inv_root_of_unity_list: result.inv_root_of_unity_list,
-            // inv_root_of_unity_list_base: result.inv_root_of_unity_list_base,
             log2_n: result.log2_n,
             root_of_unity: result.root_of_unity,
             root_of_unity_list: result.root_of_unity_list,
-            // root_of_unity_list_base: result.root_of_unity_list_base,
             two_inv: result.two_inv,
             hom: hom
         };
@@ -245,7 +243,7 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H, Global>
 
     ///
     /// Creates an [`CooleyTuckeyFFT`] for the given rings, using the given function to create
-    /// the necessary powers of roots of unity. This is the most generic way to create [`CooleyTuckeyFFT`].
+    /// the necessary powers of roots of unity.
     /// 
     /// Concretely, `root_of_unity_pow(i)` should return `z^i`, where `z` is a `2^log2_n`-th
     /// primitive root of unity.
@@ -300,7 +298,7 @@ impl<R_main, R_twiddle, H, A> Debug for CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         A: Allocator
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Cooley-Tuckey FFT of length 2^{} over ring {:?}", self.log2_n, self.ring().get_ring())
+        write!(f, "Cooley-Tukey FFT of length 2^{} over ring {:?}", self.log2_n, self.ring().get_ring())
     }
 }
 
@@ -312,8 +310,6 @@ impl<R_main, R_twiddle, H, A> Clone for CooleyTuckeyFFT<R_main, R_twiddle, H, A>
 {
     fn clone(&self) -> Self {
         Self {
-            // root_of_unity_list_base: self.root_of_unity_list_base.iter().map(|list| list.iter().map(|x| self.hom.codomain().clone_el(x)).collect()).collect(),
-            // inv_root_of_unity_list_base: self.inv_root_of_unity_list_base.iter().map(|list| list.iter().map(|x| self.hom.codomain().clone_el(x)).collect()).collect(),
             two_inv: self.hom.domain().clone_el(&self.two_inv),
             hom: self.hom.clone(),
             inv_root_of_unity_list: self.inv_root_of_unity_list.iter().map(|list| list.iter().map(|x| self.hom.domain().clone_el(x)).collect()).collect(),
@@ -326,7 +322,7 @@ impl<R_main, R_twiddle, H, A> Clone for CooleyTuckeyFFT<R_main, R_twiddle, H, A>
 }
 
 ///
-/// A helper trait that defines the Cooley-Tuckey butterfly operation.
+/// A helper trait that defines the Cooley-Tukey butterfly operation.
 /// It is default-implemented for all rings, but for increase FFT performance, some rings
 /// might wish to provide a specialization.
 /// 
@@ -386,7 +382,7 @@ pub trait CooleyTuckeyButterfly<S>: RingBase
 
     ///
     /// Possibly pre-processes elements before the FFT starts. Here you can
-    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterfly::butterfly()`]
+    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterfly::butterfly_new()`]
     /// that the inputs are in this form.
     /// 
     #[inline(always)]
@@ -394,7 +390,7 @@ pub trait CooleyTuckeyButterfly<S>: RingBase
     
     ///
     /// Possibly pre-processes elements before the inverse FFT starts. Here you can
-    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterfly::inv_butterfly()`]
+    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterfly::inv_butterfly_new()`]
     /// that the inputs are in this form.
     /// 
     #[inline(always)]
@@ -450,6 +446,9 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         H: Homomorphism<R_twiddle, R_main>,
         A: Allocator
 {
+    ///
+    /// Most general way to create a [`CooleyTuckeyFFT`].
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn create<F>(hom: H, mut root_of_unity_pow: F, log2_n: usize, allocator: A) -> Self 
         where F: FnMut(i64) -> R_twiddle::Element
@@ -478,7 +477,11 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     #[stability::unstable(feature = "enable")]
     pub fn change_ring<R_new: ?Sized + RingBase, H_new: Homomorphism<R_twiddle, R_new>>(self, new_hom: H_new) -> (CooleyTuckeyFFT<R_new, R_twiddle, H_new, A>, H) {
         let ring = new_hom.codomain();
-        let root_of_unity = new_hom.map_ref(&self.inv_root_of_unity_list[self.log2_n - 1][bitreverse(1, self.log2_n - 1)]);
+        let root_of_unity = if self.log2_n == 0 {
+            new_hom.codomain().one()
+        } else {
+            new_hom.map_ref(&self.inv_root_of_unity_list[self.log2_n - 1][bitreverse(1, self.log2_n - 1)])
+        };
         assert!(ring.is_commutative());
         assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &root_of_unity, self.log2_n));
 
@@ -840,8 +843,10 @@ impl<H, A> FFTErrorEstimate for CooleyTuckeyFFT<Complex64Base, Complex64Base, H,
         A: Allocator
 {
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
-        // each butterfly doubles the error, and then adds up to 
-        let butterfly_absolute_error = input_bound * (root_of_unity_error() + f64::EPSILON);
+        // the butterfly performs a multiplication with a root of unity, and an addition
+        let multiply_absolute_error = input_bound * root_of_unity_error() + input_bound * f64::EPSILON;
+        let addition_absolute_error = input_bound * f64::EPSILON;
+        let butterfly_absolute_error = multiply_absolute_error + addition_absolute_error;
         // the operator inf-norm of the FFT is its length
         return 2. * self.len() as f64 * butterfly_absolute_error + self.len() as f64 * input_error;
     }
@@ -995,7 +1000,7 @@ fn test_approximate_fft() {
 #[test]
 fn test_size_1_fft() {
     let ring = Fp::<17>::RING;
-    let fft = CooleyTuckeyFFT::for_zn(&ring, 0).unwrap();
+    let fft = CooleyTuckeyFFT::for_zn(&ring, 0).unwrap().change_ring(ring.identity()).0;
     let values: [u64; 1] = [3];
     let mut work = values;
     fft.unordered_fft(&mut work, ring);

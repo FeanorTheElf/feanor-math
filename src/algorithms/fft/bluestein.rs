@@ -6,6 +6,7 @@ use crate::algorithms::fft::FFTAlgorithm;
 use crate::algorithms::unity_root::is_prim_root_of_unity;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
+use crate::algorithms::fft::radix3::CooleyTukeyRadix3FFT;
 use crate::integer::IntegerRingStore;
 use crate::primitive_int::*;
 use crate::ring::*;
@@ -14,6 +15,14 @@ use crate::algorithms;
 use crate::rings::zn::*;use crate::rings::float_complex::*;
 use crate::algorithms::fft::complex_fft::*;
 use crate::seq::SwappableVectorViewMut;
+
+type BaseFFT<R_main, R_twiddle, H, A> = GeneralCooleyTukeyFFT<
+    R_main,
+    R_twiddle,
+    H,
+    CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>,
+    CooleyTuckeyFFT<R_main, R_twiddle, H, A>,
+>;
 
 ///
 /// Bluestein's FFT algorithm (also known as Chirp-Z-transform) to compute the Fourier
@@ -25,18 +34,9 @@ pub struct BluesteinFFT<R_main, R_twiddle, H, A = Global>
         H: Homomorphism<R_twiddle, R_main>, 
         A: Allocator + Clone
 {
-    m_fft_table: CooleyTuckeyFFT<R_main, R_twiddle, H, A>,
-    ///
-    /// This is the bitreverse fft of a part of the sequence b_i := z^(i^2) where
-    /// z is a 2n-th root of unity.
-    /// In particular, we choose the part b_i for 1 - n < i < n. Clearly, the value
-    /// at a negative index i must be stored at index (i + m). The other values are
-    /// irrelevant.
-    /// 
-    b_bitreverse_fft: Vec<R_twiddle::Element>,
-    /// the powers `zeta^(-i * i)` for `zeta` the 2n-th root of unity
+    m_fft_table: BaseFFT<R_main, R_twiddle, H, A>,
+    b_unordered_fft: Vec<R_twiddle::Element>,
     inv_root_of_unity_2n: Vec<R_twiddle::Element>,
-    /// contrary to expectations, this should be an n-th root of unity and inverse to `inv_root_of_unity^2`
     root_of_unity_n: R_main::Element,
     n: usize
 }
@@ -53,11 +53,6 @@ impl<H, A> BluesteinFFT<Complex64Base, Complex64Base, H, A>
     /// it currently does not make much sense to use a different homomorphism than the identity.
     /// Hence, it is simpler to use [`BluesteinFFT::for_complex()`].
     /// 
-    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
-    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
-    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
-    /// of length `2^log2_m`, where `2^log2_m` is the smallest power of two that is `> 2n`.
-    /// 
     pub fn for_complex_with_hom(hom: H, n: usize, tmp_mem_allocator: A) -> Self{
         let ZZ = StaticRing::<i64>::RING;
         let CC = Complex64::RING;
@@ -73,11 +68,6 @@ impl<R, A> BluesteinFFT<Complex64Base, Complex64Base, Identity<R>, A>
 {
     ///
     /// Creates an [`BluesteinFFT`] for the complex field.
-    /// 
-    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
-    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
-    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
-    /// of length `2^log2_m`, where `2^log2_m` is the smallest power of two that is `> 2n`.
     /// 
     pub fn for_complex(ring: R, n: usize, tmp_mem_allocator: A) -> Self{
         Self::for_complex_with_hom(ring.into_identity(), n, tmp_mem_allocator)
@@ -99,11 +89,6 @@ impl<R, A> BluesteinFFT<R::Type, R::Type, Identity<R>, A>
     /// Do not use this for approximate rings, as computing the powers of `root_of_unity`
     /// will incur avoidable precision loss.
     /// 
-    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
-    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
-    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
-    /// of length `2^log2_m`.
-    /// 
     pub fn new(ring: R, root_of_unity_2n: El<R>, root_of_unity_m: El<R>, n: usize, log2_m: usize, tmp_mem_allocator: A) -> Self {
         Self::new_with_hom(ring.into_identity(), root_of_unity_2n, root_of_unity_m, n, log2_m, tmp_mem_allocator)
     }
@@ -115,11 +100,6 @@ impl<R, A> BluesteinFFT<R::Type, R::Type, Identity<R>, A>
     /// Concretely, `root_of_unity_2n_pows(i)` should return `z^i`, where `z` is a `2n`-th
     /// primitive root of unity, and `root_of_unity_m_pows(i)` should return `w^i` where `w`
     /// is a `2^log2_m`-th primitive root of unity, where `2^log2_m > 2n`.
-    /// 
-    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
-    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
-    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
-    /// of length `2^log2_m`.
     /// 
     pub fn new_with_pows<F, G>(ring: R, root_of_unity_2n_pows: F, root_of_unity_m_pows: G, n: usize, log2_m: usize, tmp_mem_allocator: A) -> Self 
         where F: FnMut(i64) -> El<R>,
@@ -134,11 +114,6 @@ impl<R, A> BluesteinFFT<R::Type, R::Type, Identity<R>, A>
     /// 
     /// Concretely, this requires that the characteristic `p` is congruent to 1 modulo
     /// `2^log2_m n`, where `2^log2_m` is the smallest power of two that is `> 2n`.
-    /// 
-    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
-    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
-    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
-    /// of length `2^log2_m`, where `2^log2_m` is the smallest power of two that is `> 2n`.
     /// 
     pub fn for_zn(ring: R, n: usize, tmp_mem_allocator: A) -> Option<Self>
         where R::Type: ZnRing
@@ -167,11 +142,6 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     /// Do not use this for approximate rings, as computing the powers of `root_of_unity`
     /// will incur avoidable precision loss.
     /// 
-    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
-    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
-    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
-    /// of length `2^log2_m`.
-    /// 
     pub fn new_with_hom(hom: H, root_of_unity_2n: R_twiddle::Element, root_of_unity_m: R_twiddle::Element, n: usize, log2_m: usize, tmp_mem_allocator: A) -> Self {
         let hom_copy = hom.clone();
         let twiddle_ring = hom_copy.domain();
@@ -195,7 +165,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
 
     ///
     /// Creates an [`BluesteinFFT`] for the given rings, using the given function to create
-    /// the necessary powers of roots of unity. This is the most generic way to create [`BluesteinFFT`].
+    /// the necessary powers of roots of unity.
     /// 
     /// Concretely, `root_of_unity_2n_pows(i)` should return `z^i`, where `z` is a `2n`-th
     /// primitive root of unity, and `root_of_unity_m_pows(i)` should return `w^i` where `w`
@@ -205,11 +175,6 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
     /// performed in `S`. This allows both implicit ring conversions, and using patterns like 
     /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
-    /// 
-    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
-    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
-    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
-    /// of length `2^log2_m`
     /// 
     pub fn new_with_pows_with_hom<F, G>(hom: H, root_of_unity_2n_pows: F, mut root_of_unity_m_pows: G, n: usize, log2_m: usize, tmp_mem_allocator: A) -> Self
         where F: FnMut(i64) -> R_twiddle::Element,
@@ -222,11 +187,17 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
 
         let m_fft_table = CooleyTuckeyFFT::create(
             hom.clone(), 
-            root_of_unity_m_pows, 
+            &mut root_of_unity_m_pows, 
             log2_m, 
-            tmp_mem_allocator
+            tmp_mem_allocator.clone()
         );
-        return Self::create(m_fft_table, root_of_unity_2n_pows, n);
+        let complete_fft_table = GeneralCooleyTukeyFFT::create(
+            hom.clone(),
+            root_of_unity_m_pows,
+            CooleyTukeyRadix3FFT::create(hom.clone(), |_| hom.domain().one(), 0, tmp_mem_allocator),
+            m_fft_table,
+        );
+        return Self::create(complete_fft_table, root_of_unity_2n_pows, n);
     }
 
     ///
@@ -240,11 +211,6 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
     /// performed in `S`. This allows both implicit ring conversions, and using patterns like 
     /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
-    /// 
-    /// The given `tmp_mem_allocator` will be used for allocating temporary memory during the
-    /// FFT computations, but not for storing precomputed data that will live as long as the FFT table
-    /// itself. Currently, it suffices if `tmp_mem_allocator` supports the allocation of arrays `[R_main::Element]`
-    /// of length `2^log2_m`, where `2^log2_m` is the smallest power of two that is `> 2n`. 
     /// 
     pub fn for_zn_with_hom(hom: H, n: usize, tmp_mem_allocator: A) -> Option<Self>
         where R_twiddle: ZnRing
@@ -263,26 +229,25 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     /// Most general way to construct a [`BluesteinFFT`].
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn create<F>(base_fft_table: CooleyTuckeyFFT<R_main, R_twiddle, H, A>, mut root_of_unity_2n_pows: F, n: usize) -> Self
+    pub fn create<F>(m_fft_table: BaseFFT<R_main, R_twiddle, H, A>, mut root_of_unity_2n_pows: F, n: usize) -> Self
         where F: FnMut(i64) -> R_twiddle::Element
     {
-        let hom = base_fft_table.hom().clone();
-        let log2_m = StaticRing::<i64>::RING.abs_log2_ceil(&base_fft_table.len().try_into().unwrap()).unwrap();
-        assert_eq!(1 << log2_m, base_fft_table.len());
-        // checks on m and root_of_unity_m are done by the FFTTableCooleyTuckey
-        assert!((1 << log2_m) >= 2 * n + 1);
+        let hom = m_fft_table.hom().clone();
+        let m = m_fft_table.len();
+        assert!(m >= 2 * n);
+        assert!(hom.codomain().is_commutative());
         assert!(hom.domain().get_ring().is_approximate() || is_prim_root_of_unity(hom.domain(), &root_of_unity_2n_pows(1), 2 * n));
         assert!(hom.codomain().get_ring().is_approximate() || is_prim_root_of_unity(hom.codomain(), &hom.map(root_of_unity_2n_pows(1)), 2 * n));
 
-        let mut b = Self::create_b_array(hom.domain().get_ring(), |i| root_of_unity_2n_pows(i), n, 1 << log2_m);
+        let mut b = Self::create_b_array(hom.domain().get_ring(), |i| root_of_unity_2n_pows(i), n, m);
         let inv_root_of_unity_2n = (0..n).map(|i| root_of_unity_2n_pows(-TryInto::<i64>::try_into(i * i).unwrap())).collect::<Vec<_>>();
         let root_of_unity_n = hom.map(root_of_unity_2n_pows(2));
-        let (twiddle_fft, old_hom) = base_fft_table.change_ring(hom.domain().identity());
+        let (twiddle_fft, old_hom) = m_fft_table.change_ring(hom.domain().identity());
         twiddle_fft.unordered_fft(&mut b, hom.domain());
 
         return BluesteinFFT { 
             m_fft_table: twiddle_fft.change_ring(old_hom).0, 
-            b_bitreverse_fft: b, 
+            b_unordered_fft: b, 
             inv_root_of_unity_2n: inv_root_of_unity_2n, 
             root_of_unity_n: root_of_unity_n,
             n: n
@@ -310,7 +275,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
 
     #[stability::unstable(feature = "enable")]
     pub fn allocator(&self) -> &A {
-        self.m_fft_table.allocator()
+        self.m_fft_table.left_fft_table().allocator()
     }
 
     ///
@@ -320,7 +285,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     /// This will not allocate additional memory, as opposed to [`BluesteinFFT::fft()`] etc.
     /// 
     /// Basically, the idea is to write an FFT of any length (e.g. prime length) as a convolution,
-    /// and compute the convolution efficiently using a power-of-two FFT (e.g. with the Cooley-Tuckey 
+    /// and compute the convolution efficiently using a power-of-two FFT (e.g. with the Cooley-Tukey 
     /// algorithm).
     /// 
     /// TODO: At next breaking release, make this private
@@ -351,7 +316,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         // perform convoluted product with b using a power-of-two fft
         self.m_fft_table.unordered_fft(&mut buffer, &self.ring());
         for i in 0..self.m_fft_table.len() {
-            self.hom().mul_assign_ref_map(buffer.at_mut(i), &self.b_bitreverse_fft[i]);
+            self.hom().mul_assign_ref_map(buffer.at_mut(i), &self.b_unordered_fft[i]);
         }
         self.m_fft_table.unordered_inv_fft(&mut buffer, &self.ring());
 
@@ -481,6 +446,8 @@ impl<H, A> FFTErrorEstimate for BluesteinFFT<Complex64Base, Complex64Base, H, A>
 
 #[cfg(test)]
 use crate::rings::zn::zn_static::*;
+
+use super::factor_fft::GeneralCooleyTukeyFFT;
 
 #[test]
 fn test_fft_base() {

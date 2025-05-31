@@ -37,7 +37,7 @@ The following rings are provided
  - Combining the above, you can get Galois fields (easily available using [`crate::rings::extension::galois_field::GaloisField`]) or arbitrary number fields (they also have the wrapper type [`crate::rings::extension::number_field::NumberField`] for a more convenient interface).
 
 The following algorithms are implemented
- - Fast Fourier transforms, including an optimized implementation of the Cooley-Tuckey algorithm for the power-of-two case, an implementation of the Bluestein algorithm for arbitrary lengths, and a factor FFT implementation (also based on the Cooley-Tuckey algorithm). The Fourier transforms work on all rings that have suitable roots of unity, in particular the complex numbers `C` and suitable finite rings `Fq`.
+ - Fast Fourier transforms, including an optimized implementation of the Cooley-Tukey algorithm for the power-of-two and power-of-three cases, an implementation of the Bluestein algorithm for arbitrary lengths, and a factor FFT implementation (also based on the Cooley-Tukey algorithm). The Fourier transforms work on all rings that have suitable roots of unity, in particular the complex numbers `C` and suitable finite rings `Fq`.
  - An optimized variant of the Karatsuba algorithm for fast convolution.
  - An implementation of the Cantor-Zassenhaus algorithm to factor polynomials over finite fields.
  - Factoring polynomials over the rationals/integers (using Hensel lifting) and over number fields.

@@ -4,17 +4,22 @@ use crate::ring::*;
 use crate::seq::*;
 
 ///
-/// Contains the implementation [`cooley_tuckey::CooleyTuckeyFFT`] of the Cooley-Tuckey FFT algorithm
+/// Contains the implementation [`cooley_tuckey::CooleyTuckeyFFT`] of the Cooley-Tukey FFT algorithm
 /// to compute the FFT for power-of-two lengths.
 /// 
 pub mod cooley_tuckey;
+///
+/// Contains the implementation [`radix3::CooleyTukeyRadix3FFT`] of the Cooley-Tukey FFT algorithm
+/// to compute the FFT for power-of-three lengths.
+/// 
+pub mod radix3;
 ///
 /// Contains the implementation [`bluestein::BluesteinFFT`] of the Bluestein FFT algorithm
 /// to compute the FFT for arbitrary lengths.
 /// 
 pub mod bluestein;
 ///
-/// Contains the implementation [`factor_fft::CoprimeCooleyTuckeyFFT`] of the Cooley-Tuckey algorithm
+/// Contains the implementation [`factor_fft::GeneralCooleyTukeyFFT`] of the Cooley-Tukey algorithm
 /// to compute the FFT for lengths that are the product of two coprime factors.
 /// 
 pub mod factor_fft;
