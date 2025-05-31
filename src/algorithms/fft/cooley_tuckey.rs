@@ -635,6 +635,19 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     }
 
     #[stability::unstable(feature = "enable")]
+    pub fn with_allocator<A_new: Allocator>(self, allocator: A_new) -> CooleyTuckeyFFT<R_main, R_twiddle, H, A_new> {
+        CooleyTuckeyFFT {
+            root_of_unity_list: self.root_of_unity_list,
+            inv_root_of_unity_list: self.inv_root_of_unity_list,
+            two_inv: self.two_inv,
+            root_of_unity: self.root_of_unity, 
+            hom: self.hom, 
+            log2_n: self.log2_n, 
+            allocator: allocator
+        }
+    }
+
+    #[stability::unstable(feature = "enable")]
     pub fn hom(&self) -> &H {
         &self.hom
     }

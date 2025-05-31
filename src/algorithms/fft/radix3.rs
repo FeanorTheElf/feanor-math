@@ -151,8 +151,14 @@ impl<R_main, R_twiddle, H, A> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>
         let ring = new_hom.codomain();
         let root_of_unity = if self.log3_n == 0 {
             new_hom.codomain().one()
+        } else if self.log3_n == 1 {
+            let root_of_unity = self.hom.domain().pow(self.hom.domain().clone_el(&self.third_root_of_unity), 2);
+            debug_assert!(self.ring().eq_el(&self.hom.map_ref(&root_of_unity), self.root_of_unity(self.hom.codomain())));
+            new_hom.map(root_of_unity)
         } else {
-            new_hom.map_ref(&self.inv_twiddles[self.log3_n - 1][threeadic_reverse(1, self.log3_n - 1)])
+            let root_of_unity = &self.inv_twiddles[self.log3_n - 1][threeadic_reverse(1, self.log3_n - 1)];
+            debug_assert!(self.ring().eq_el(&self.hom.map_ref(root_of_unity), self.root_of_unity(self.hom.codomain())));
+            new_hom.map_ref(root_of_unity)
         };
         assert!(ring.is_commutative());
         assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity(&ring, &root_of_unity, self.len()));
@@ -185,6 +191,19 @@ impl<R_main, R_twiddle, H, A> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>
     #[stability::unstable(feature = "enable")]
     pub fn allocator<'a>(&'a self) -> &'a A {
         &self.allocator
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn with_allocator<A_new: Allocator>(self, allocator: A_new) -> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A_new> {
+        CooleyTukeyRadix3FFT {
+            twiddles: self.twiddles,
+            inv_twiddles: self.inv_twiddles,
+            main_root_of_unity: self.main_root_of_unity, 
+            third_root_of_unity: self.third_root_of_unity,
+            hom: self.hom, 
+            log3_n: self.log3_n, 
+            allocator: allocator
+        }
     }
 
     ///
