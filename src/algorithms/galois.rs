@@ -17,7 +17,6 @@ use crate::ring::*;
 use crate::seq::VectorFn;
 use super::poly_factor::FactorPolyField;
 use super::splitting_field::extend_number_field_promise_is_irreducible;
-use super::splitting_field::NumberFieldHom;
 use super::sqr_mul::generic_pow_shortest_chain_table;
 
 ///
@@ -28,7 +27,7 @@ use super::sqr_mul::generic_pow_shortest_chain_table;
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn compute_galois_closure<K, >(field: K) -> Result<
-        NumberFieldHom<K, DefaultNumberFieldImpl, BigIntRing, NumberField<DefaultNumberFieldImpl, BigIntRing>, DefaultNumberFieldImpl, BigIntRing>,
+        FreeAlgebraHom<K, NumberField>,
         Vec<El<K>>
     >
     where K: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>
@@ -57,7 +56,7 @@ pub fn compute_galois_closure<K, >(field: K) -> Result<
         let (inclusion, new_root) = extend_number_field_promise_is_irreducible(&poly_ring, &unfinished[extend_poly_idx]);
         let (_, new_number_field, image_of_gen) = inclusion.destruct();
         let new_poly_ring = DensePolyRing::new(new_number_field, "X");
-        let inclusion_ref = NumberFieldHom::new(poly_ring.base_ring(), new_poly_ring.base_ring(), image_of_gen);
+        let inclusion_ref = FreeAlgebraHom::new(poly_ring.base_ring(), new_poly_ring.base_ring(), image_of_gen);
         let poly_ring_inclusion = new_poly_ring.lifted_hom(&poly_ring, &inclusion_ref);
 
         let mut to_factor: Vec<_> = [new_poly_ring.checked_div(
@@ -73,7 +72,7 @@ pub fn compute_galois_closure<K, >(field: K) -> Result<
         }
 
         let final_number_field = poly_ring.into().into_base_ring();
-        let embedding = NumberFieldHom::new(field, final_number_field, image_of_generator);
+        let embedding = FreeAlgebraHom::new(field, final_number_field, image_of_generator);
         return Ok(embedding);
     }
 }
@@ -264,7 +263,7 @@ impl<K, Impl, I> Hash for GaloisAutomorphism<K, Impl, I>
 #[stability::unstable(feature = "enable")]
 pub fn compute_galois_group<K>(field: K) -> Result<
         Vec<GaloisAutomorphism<K, DefaultNumberFieldImpl, BigIntRing>>, 
-        NumberFieldHom<K, DefaultNumberFieldImpl, BigIntRing, NumberField<DefaultNumberFieldImpl, BigIntRing>, DefaultNumberFieldImpl, BigIntRing>
+        FreeAlgebraHom<K, NumberField>
     >
     where K: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>> + Clone
 {
@@ -334,7 +333,7 @@ fn compute_galois_closure_impl_step(
         let (inclusion, new_root) = extend_number_field_promise_is_irreducible(&poly_ring, &unfinished[extend_poly_idx]);
         let (_, new_number_field, image_of_gen) = inclusion.destruct();
         let new_poly_ring = DensePolyRing::new(new_number_field, "X");
-        let inclusion_ref = NumberFieldHom::new(poly_ring.base_ring(), new_poly_ring.base_ring(), image_of_gen);
+        let inclusion_ref = FreeAlgebraHom::new(poly_ring.base_ring(), new_poly_ring.base_ring(), image_of_gen);
         let poly_ring_inclusion = new_poly_ring.lifted_hom(&poly_ring, &inclusion_ref);
 
         to_factor = to_factor.into_iter().map(|f| poly_ring_inclusion.map(f)).chain(

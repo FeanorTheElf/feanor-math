@@ -1,16 +1,13 @@
 use std::alloc::*;
-use std::marker::PhantomData;
 
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 use crate::homomorphism::*;
 use crate::matrix::OwnedMatrix;
-use crate::field::*;
 use crate::rings::extension::number_field::*;
-use crate::rings::rational::*;
 use crate::pid::*;
 use crate::primitive_int::StaticRing;
 use crate::rings::extension::extension_impl::*;
-use crate::rings::extension::{FreeAlgebra, FreeAlgebraStore};
+use crate::rings::extension::*;
 use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::{PolyRing, PolyRingStore};
@@ -21,107 +18,6 @@ use crate::ring::*;
 use crate::algorithms::linsolve::*;
 use super::poly_factor::FactorPolyField;
 use super::poly_gcd::PolyTFracGCDRing;
-
-///
-/// A ring homomorphism between two number fields, `K -> L`.
-/// 
-/// This is returned by [`extend_number_field()`].
-/// 
-#[stability::unstable(feature = "enable")]
-pub struct NumberFieldHom<R1, Impl1, I1, R2, Impl2, I2>
-    where R1: RingStore<Type = NumberFieldBase<Impl1, I1>>,
-        Impl1: RingStore,
-        Impl1::Type: Field + FreeAlgebra,
-        <Impl1::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I1>>,
-        I1: RingStore,
-        I1::Type: IntegerRing,
-        R2: RingStore<Type = NumberFieldBase<Impl2, I2>>,
-        Impl2: RingStore,
-        Impl2::Type: Field + FreeAlgebra,
-        <Impl2::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I2>>,
-        I2: RingStore,
-        I2::Type: IntegerRing
-{
-    from: R1,
-    to: R2,
-    from_int: PhantomData<I1>,
-    to_int: PhantomData<I2>,
-    generator_image: El<NumberField<Impl2, I2>>,
-}
-
-impl<R1, Impl1, I1, R2, Impl2, I2> NumberFieldHom<R1, Impl1, I1, R2, Impl2, I2>
-    where R1: RingStore<Type = NumberFieldBase<Impl1, I1>>,
-        Impl1: RingStore,
-        Impl1::Type: Field + FreeAlgebra,
-        <Impl1::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I1>>,
-        I1: RingStore,
-        I1::Type: IntegerRing,
-        R2: RingStore<Type = NumberFieldBase<Impl2, I2>>,
-        Impl2: RingStore,
-        Impl2::Type: Field + FreeAlgebra,
-        <Impl2::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I2>>,
-        I2: RingStore,
-        I2::Type: IntegerRing
-{
-    #[stability::unstable(feature = "enable")]
-    pub fn new(from: R1, to: R2, image_of_R1_gen: El<R2>) -> Self {
-        Self {
-            from: from,
-            to: to,
-            from_int: PhantomData,
-            to_int: PhantomData,
-            generator_image: image_of_R1_gen
-        }
-    }
-
-    ///
-    /// Consumes this object, producing the domain ring store, the codomain ring store
-    /// and the image of the canonical generator of the domain number field.
-    /// 
-    #[stability::unstable(feature = "enable")]
-    pub fn destruct(self) -> (R1, R2, El<NumberField<Impl2, I2>>) {
-        (self.from, self.to, self.generator_image)
-    }
-}
-
-impl<R1, Impl1, I1, R2, Impl2, I2> Homomorphism<NumberFieldBase<Impl1, I1>, NumberFieldBase<Impl2, I2>> for NumberFieldHom<R1, Impl1, I1, R2, Impl2, I2>
-    where R1: RingStore<Type = NumberFieldBase<Impl1, I1>>,
-        Impl1: RingStore,
-        Impl1::Type: Field + FreeAlgebra,
-        <Impl1::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I1>>,
-        I1: RingStore,
-        I1::Type: IntegerRing,
-        R2: RingStore<Type = NumberFieldBase<Impl2, I2>>,
-        Impl2: RingStore,
-        Impl2::Type: Field + FreeAlgebra,
-        <Impl2::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I2>>,
-        I2: RingStore,
-        I2::Type: IntegerRing
-{
-    type DomainStore = R1;
-    type CodomainStore = R2;
-
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
-        &self.from
-    }
-
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
-        &self.to
-    }
-
-    fn map(&self, x: <NumberFieldBase<Impl1, I1> as RingBase>::Element) -> <NumberFieldBase<Impl2, I2> as RingBase>::Element {
-        self.map_ref(&x)
-    }
-
-    fn map_ref(&self, x: &<NumberFieldBase<Impl1, I1> as RingBase>::Element) -> <NumberFieldBase<Impl2, I2> as RingBase>::Element {
-        let poly_ring = DensePolyRing::new(self.to.base_ring(), "X");
-        return poly_ring.evaluate(
-            &self.from.poly_repr(&poly_ring, &x, self.to.base_ring().can_hom(self.from.base_ring()).unwrap()),
-            &self.generator_image,
-            self.to.inclusion()
-        )
-    }
-}
 
 ///
 /// Given a number field `K` and an irreducible polynomial `f`, computes a representation of
@@ -137,7 +33,7 @@ impl<R1, Impl1, I1, R2, Impl2, I2> Homomorphism<NumberFieldBase<Impl1, I1>, Numb
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn extend_number_field<P>(poly_ring: P, irred_poly: &El<P>) -> (
-    NumberFieldHom<<<P as RingStore>::Type as RingExtension>::BaseRing, DefaultNumberFieldImpl, BigIntRing, NumberField, DefaultNumberFieldImpl, BigIntRing>,
+    FreeAlgebraHom<<P::Type as RingExtension>::BaseRing, NumberField>,
     El<NumberField>
 )
     where P: RingStore,
@@ -165,7 +61,7 @@ pub fn extend_number_field<P>(poly_ring: P, irred_poly: &El<P>) -> (
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn extend_number_field_promise_is_irreducible<P>(poly_ring: P, irred_poly: &El<P>) -> (
-    NumberFieldHom<<<P as RingStore>::Type as RingExtension>::BaseRing, DefaultNumberFieldImpl, BigIntRing, NumberField, DefaultNumberFieldImpl, BigIntRing>,
+    FreeAlgebraHom<<P::Type as RingExtension>::BaseRing, NumberField>,
     El<NumberField>
 )
     where P: RingStore,
@@ -267,14 +163,7 @@ pub fn extend_number_field_promise_is_irreducible<P>(poly_ring: P, irred_poly: &
                 let K_generator = <_ as RingStore>::sum(&result, (0..total_rank).map(|i| result.inclusion().mul_map(result.pow(result.clone_el(&x), i), QQ.clone_el(sol.at(i, 1)))));
                 let L_generator = <_ as RingStore>::sum(&result, (0..total_rank).map(|i| result.inclusion().mul_map(result.pow(result.clone_el(&x), i), QQ.clone_el(sol.at(i, 2)))));
 
-                let result = NumberFieldHom {
-                    from: K.clone(),
-                    to: result,
-                    from_int: PhantomData,
-                    to_int: PhantomData,
-                    generator_image: K_generator
-                };
-
+                let result = FreeAlgebraHom::new(K.clone(), result, K_generator);
                 return (result, L_generator);
             }
         }

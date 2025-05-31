@@ -490,6 +490,78 @@ impl<R: RingStore> FreeAlgebraStore for R
     where R::Type: FreeAlgebra
 {}
 
+#[stability::unstable(feature = "enable")]
+pub struct FreeAlgebraHom<R, S>
+    where R: RingStore,
+        R::Type: FreeAlgebra,
+        S: RingStore,
+        S::Type: FreeAlgebra,
+        <S::Type as RingExtension>::BaseRing: RingStore<Type = <<R::Type as RingExtension>::BaseRing as RingStore>::Type>
+{
+    from: R,
+    to: S,
+    image_of_generator: El<S>
+}
+
+impl<R, S> FreeAlgebraHom<R, S>
+    where R: RingStore,
+        R::Type: FreeAlgebra,
+        S: RingStore,
+        S::Type: FreeAlgebra,
+        <S::Type as RingExtension>::BaseRing: RingStore<Type = <<R::Type as RingExtension>::BaseRing as RingStore>::Type>
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(from: R, to: S, image_of_generator: El<S>) -> Self {
+        assert!(from.base_ring().get_ring() == to.base_ring().get_ring());
+        Self {
+            from: from,
+            to: to,
+            image_of_generator: image_of_generator
+        }
+    }
+
+    ///
+    /// Consumes this object, producing the domain ring store, the codomain ring store
+    /// and the image of the canonical generator of the domain number field.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    pub fn destruct(self) -> (R, S, El<S>) {
+        (self.from, self.to, self.image_of_generator)
+    }
+}
+
+impl<R, S> Homomorphism<R::Type, S::Type> for FreeAlgebraHom<R, S>
+    where R: RingStore,
+        R::Type: FreeAlgebra,
+        S: RingStore,
+        S::Type: FreeAlgebra,
+        <S::Type as RingExtension>::BaseRing: RingStore<Type = <<R::Type as RingExtension>::BaseRing as RingStore>::Type>
+{
+    type DomainStore = R;
+    type CodomainStore = S;
+
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
+        &self.from
+    }
+
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
+        &self.to
+    }
+
+    fn map(&self, x: El<R>) -> El<S> {
+        self.map_ref(&x)
+    }
+
+    fn map_ref(&self, x: &El<R>) -> El<S> {
+        let poly_ring = DensePolyRing::new(self.to.base_ring(), "X");
+        return poly_ring.evaluate(
+            &self.from.poly_repr(&poly_ring, &x, self.to.base_ring().identity()),
+            &self.image_of_generator,
+            self.to.inclusion()
+        )
+    }
+}
+
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
     use super::*;
