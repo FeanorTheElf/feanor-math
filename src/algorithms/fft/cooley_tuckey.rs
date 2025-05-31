@@ -1019,20 +1019,20 @@ pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Itera
         for b in &elements {
 
             let [mut x, mut y] = [ring.clone_el(a), ring.clone_el(b)];
-            hom.butterfly(&mut x, &mut y, &test_twiddle);
+            <R::Type as CooleyTuckeyButterfly<S::Type>>::butterfly_new(&hom, &mut x, &mut y, &test_twiddle);
             assert_el_eq!(ring, ring.add_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &x);
             assert_el_eq!(ring, ring.sub_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &y);
 
-            hom.inv_butterfly(&mut x, &mut y, &test_inv_twiddle);
+            <R::Type as CooleyTuckeyButterfly<S::Type>>::inv_butterfly_new(&hom, &mut x, &mut y, &test_inv_twiddle);
             assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(a, 2), &x);
             assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(b, 2), &y);
 
             let [mut x, mut y] = [ring.clone_el(a), ring.clone_el(b)];
-            hom.butterfly(&mut x, &mut y, &test_twiddle);
-            assert_el_eq!(ring, ring.add_ref_fst(b, ring.mul_ref_fst(a, hom.map_ref(test_twiddle))), &x);
-            assert_el_eq!(ring, ring.sub_ref_fst(b, ring.mul_ref_fst(a, hom.map_ref(test_twiddle))), &y);
+            <R::Type as CooleyTuckeyButterfly<S::Type>>::inv_butterfly_new(&hom, &mut x, &mut y, &test_twiddle);
+            assert_el_eq!(ring, ring.add_ref(a, b), &x);
+            assert_el_eq!(ring, ring.mul(ring.sub_ref(a, b), hom.map_ref(test_twiddle)), &y);
 
-            hom.inv_butterfly(&mut x, &mut y, &test_inv_twiddle);
+            <R::Type as CooleyTuckeyButterfly<S::Type>>::butterfly_new(&hom, &mut x, &mut y, &test_inv_twiddle);
             assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(a, 2), &x);
             assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(b, 2), &y);
         }
