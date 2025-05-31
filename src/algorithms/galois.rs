@@ -15,8 +15,8 @@ use crate::integer::*;
 use crate::rings::rational::*;
 use crate::ring::*;
 use crate::seq::VectorFn;
-use super::poly_factor::FactorPolyField;
 use super::splitting_field::extend_number_field_promise_is_irreducible;
+use super::splitting_field::splitting_field;
 use super::sqr_mul::generic_pow_shortest_chain_table;
 
 ///
@@ -26,54 +26,34 @@ use super::sqr_mul::generic_pow_shortest_chain_table;
 /// generator are returned via [`Result::Err`] instead.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn compute_galois_closure<K, >(field: K) -> Result<
-        FreeAlgebraHom<K, NumberField>,
-        Vec<El<K>>
+pub fn compute_galois_closure(field: NumberField) -> Result<
+        FreeAlgebraHom<NumberField, NumberField>,
+        (NumberField, Vec<El<NumberField>>)
     >
-    where K: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>
 {
-    let poly_ring = DensePolyRing::new(&field, "X");
-    let gen_poly = field.generating_poly(&poly_ring, field.inclusion());
-    let next_poly_to_factor = poly_ring.checked_div(
+    let poly_ring = DensePolyRing::new(field, "X");
+    let gen_poly = poly_ring.base_ring().generating_poly(&poly_ring, poly_ring.base_ring().inclusion());
+    let poly_to_factor = poly_ring.checked_div(
         &gen_poly,
-        &poly_ring.sub(poly_ring.indeterminate(), poly_ring.inclusion().map(field.canonical_gen()))
+        &poly_ring.sub(poly_ring.indeterminate(), poly_ring.inclusion().map(poly_ring.base_ring().canonical_gen()))
     ).unwrap();
-    let (factors, _) = <_ as FactorPolyField>::factor_poly(&poly_ring, &next_poly_to_factor);
-    let mut roots = vec![field.canonical_gen()];
-    let mut unfinished = Vec::new();
-    for (f, _) in factors.into_iter() {
-        if poly_ring.degree(&f).unwrap() == 1 {
-            roots.push(poly_ring.base_ring().negate(poly_ring.base_ring().div(poly_ring.coefficient_at(&f, 0), poly_ring.coefficient_at(&f, 1))));
-        } else {
-            unfinished.push(f);
-        }
-    }
 
-    if unfinished.len() == 0 {
-        return Err(roots);
+    let mut extended_field = false;
+    let (into_extension_field, roots) = splitting_field(
+        poly_ring,
+        poly_to_factor,
+        |poly_ring, extend_with| {
+            extended_field = true;
+            extend_number_field_promise_is_irreducible(poly_ring, &extend_with)
+        }
+    );
+
+    if extended_field {
+        return Ok(into_extension_field);
     } else {
-        let extend_poly_idx = unfinished.iter().enumerate().max_by_key(|(_, f)| poly_ring.degree(f).unwrap()).unwrap().0;
-        let (inclusion, new_root) = extend_number_field_promise_is_irreducible(&poly_ring, &unfinished[extend_poly_idx]);
-        let (_, new_number_field, image_of_gen) = inclusion.destruct();
-        let new_poly_ring = DensePolyRing::new(new_number_field, "X");
-        let inclusion_ref = FreeAlgebraHom::new(poly_ring.base_ring(), new_poly_ring.base_ring(), image_of_gen);
-        let poly_ring_inclusion = new_poly_ring.lifted_hom(&poly_ring, &inclusion_ref);
-
-        let mut to_factor: Vec<_> = [new_poly_ring.checked_div(
-            &poly_ring_inclusion.map_ref(&unfinished[extend_poly_idx]), 
-            &new_poly_ring.sub(new_poly_ring.indeterminate(), new_poly_ring.inclusion().map_ref(&new_root))
-        ).unwrap()].into_iter().chain(
-            unfinished.into_iter().enumerate().filter(|(i, _)| *i != extend_poly_idx).map(|(_, f)| poly_ring_inclusion.map(f))
-        ).collect();
-        let mut image_of_generator = inclusion_ref.map(roots.into_iter().next().unwrap());
-        let mut poly_ring = new_poly_ring;
-        while to_factor.len() > 0 {
-            (poly_ring, image_of_generator, to_factor) = compute_galois_closure_impl_step(poly_ring, image_of_generator, to_factor);
-        }
-
-        let final_number_field = poly_ring.into().into_base_ring();
-        let embedding = FreeAlgebraHom::new(field, final_number_field, image_of_generator);
-        return Ok(embedding);
+        let (field, field_again, _) = into_extension_field.destruct();
+        debug_assert!(field.get_ring() == field_again.get_ring());
+        return Err((field, [field_again.canonical_gen()].into_iter().chain(roots.into_iter().map(|(f, _)| f)).collect()));
     }
 }
 
@@ -265,11 +245,14 @@ pub fn compute_galois_group<K>(field: K) -> Result<
         Vec<GaloisAutomorphism<K, DefaultNumberFieldImpl, BigIntRing>>, 
         FreeAlgebraHom<K, NumberField>
     >
-    where K: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>> + Clone
+    where K: Clone + RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>
 {
-    match compute_galois_closure(field.clone()) {
-        Ok(embedding) => Err(embedding),
-        Err(conjugates) => {
+    match compute_galois_closure(RingValue::from_ref(field.get_ring()).clone()) {
+        Ok(embedding) => {
+            let (_, target, image) = embedding.destruct();
+            return Err(FreeAlgebraHom::new(field, target, image));
+        },
+        Err((_, conjugates)) => {
             let mut result: Vec<_> = conjugates.into_iter().map(|x| GaloisAutomorphism::new(field.clone(), x)).collect();
             let id_idx = result.iter().enumerate().filter(|(_, g)| g.is_identity()).next().unwrap().0;
             result.swap(0, id_idx);
@@ -309,45 +292,8 @@ pub fn find_complex_conjugation<'a, K1, K2, K3>(field: K1, complex_embedding: &C
     return result.unwrap();
 }
 
-fn compute_galois_closure_impl_step(
-    poly_ring: DensePolyRing<NumberField<DefaultNumberFieldImpl, BigIntRing>>,
-    image_of_generator: El<NumberField<DefaultNumberFieldImpl, BigIntRing>>,
-    mut to_factor: Vec<El<DensePolyRing<NumberField<DefaultNumberFieldImpl, BigIntRing>>>>
-) -> (
-    DensePolyRing<NumberField<DefaultNumberFieldImpl, BigIntRing>>,
-    El<NumberField<DefaultNumberFieldImpl, BigIntRing>>,
-    Vec<El<DensePolyRing<NumberField<DefaultNumberFieldImpl, BigIntRing>>>>
-) {
-    to_factor.sort_unstable_by_key(|f| poly_ring.degree(f).unwrap());
-    let next_poly_to_factor = to_factor.pop().unwrap();
-    let (factors, _) = <_ as FactorPolyField>::factor_poly(&poly_ring, &next_poly_to_factor);
-    let mut unfinished = Vec::new();
-    for (f, _) in factors.into_iter() {
-        if poly_ring.degree(&f).unwrap() > 1 {
-            unfinished.push(f);
-        }
-    }
-
-    if unfinished.len() > 0 {
-        let extend_poly_idx = unfinished.iter().enumerate().max_by_key(|(_, f)| poly_ring.degree(f).unwrap()).unwrap().0;
-        let (inclusion, new_root) = extend_number_field_promise_is_irreducible(&poly_ring, &unfinished[extend_poly_idx]);
-        let (_, new_number_field, image_of_gen) = inclusion.destruct();
-        let new_poly_ring = DensePolyRing::new(new_number_field, "X");
-        let inclusion_ref = FreeAlgebraHom::new(poly_ring.base_ring(), new_poly_ring.base_ring(), image_of_gen);
-        let poly_ring_inclusion = new_poly_ring.lifted_hom(&poly_ring, &inclusion_ref);
-
-        to_factor = to_factor.into_iter().map(|f| poly_ring_inclusion.map(f)).chain(
-            [new_poly_ring.checked_div(&poly_ring_inclusion.map_ref(&unfinished[extend_poly_idx]), &new_poly_ring.sub(new_poly_ring.indeterminate(), new_poly_ring.inclusion().map_ref(&new_root))).unwrap()]
-        ).chain(
-            unfinished.into_iter().enumerate().filter(|(i, _)| *i != extend_poly_idx).map(|(_, f)| poly_ring_inclusion.map(f))
-        ).collect();
-
-        let image_of_generator = inclusion_ref.map(image_of_generator);
-        return (new_poly_ring, image_of_generator, to_factor);
-    } else {
-        return (poly_ring, image_of_generator, to_factor);
-    }
-}
+#[cfg(test)]
+use crate::algorithms::poly_factor::FactorPolyField;
 
 #[test]
 fn test_compute_galois_closure() {
@@ -356,13 +302,14 @@ fn test_compute_galois_closure() {
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2]);
     let number_field = NumberField::new(&ZZX, &f);
-    let conjugates = compute_galois_closure(&number_field).err().unwrap();
+    let (number_field, conjugates) = compute_galois_closure(number_field).err().unwrap();
     assert_el_eq!(&number_field, number_field.canonical_gen(), &conjugates[0]);
     assert_el_eq!(&number_field, number_field.negate(number_field.canonical_gen()), &conjugates[1]);
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2]);
     let number_field = NumberField::new(&ZZX, &f);
-    let into_closure = compute_galois_closure(&number_field).ok().unwrap();
+    let into_closure = compute_galois_closure(number_field).ok().unwrap();
+    let number_field = into_closure.domain();
     assert_eq!(8, into_closure.codomain().rank());
     crate::homomorphism::generic_tests::test_homomorphism_axioms(&into_closure, (0..8).map(|i| number_field.pow(number_field.canonical_gen(), i)));
     let KX = DensePolyRing::new(into_closure.codomain(), "X");
@@ -371,7 +318,8 @@ fn test_compute_galois_closure() {
     
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(3) - X.pow_ref(2) + 1]);
     let number_field = NumberField::new(&ZZX, &f);
-    let into_closure = compute_galois_closure(&number_field).ok().unwrap();
+    let into_closure = compute_galois_closure(number_field).ok().unwrap();
+    let number_field = into_closure.domain();
     assert_eq!(6, into_closure.codomain().rank());
     crate::homomorphism::generic_tests::test_homomorphism_axioms(&into_closure, (0..6).map(|i| number_field.pow(number_field.canonical_gen(), i)));
     let KX = DensePolyRing::new(into_closure.codomain(), "X");

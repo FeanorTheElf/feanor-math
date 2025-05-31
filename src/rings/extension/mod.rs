@@ -503,6 +503,20 @@ pub struct FreeAlgebraHom<R, S>
     image_of_generator: El<S>
 }
 
+impl<R> FreeAlgebraHom<R, R>
+    where R: RingStore + Clone,
+        R::Type: FreeAlgebra
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn identity(ring: R) -> Self {
+        Self {
+            image_of_generator: ring.canonical_gen(),
+            from: ring.clone(),
+            to: ring
+        }
+    }
+}
+
 impl<R, S> FreeAlgebraHom<R, S>
     where R: RingStore,
         R::Type: FreeAlgebra,

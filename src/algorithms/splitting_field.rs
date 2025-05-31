@@ -9,8 +9,12 @@ use crate::primitive_int::StaticRing;
 use crate::rings::extension::extension_impl::*;
 use crate::rings::extension::*;
 use crate::rings::field::{AsField, AsFieldBase};
+use crate::rings::multivariate::MultivariatePolyRing;
 use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::rings::poly::{PolyRing, PolyRingStore};
+use crate::rings::poly::*;
+use crate::divisibility::*;
+use crate::field::*;
+use crate::rings::multivariate::MultivariatePolyRingStore;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::integer::*;
 use crate::seq::*;
@@ -32,13 +36,11 @@ use super::poly_gcd::PolyTFracGCDRing;
 /// indeed irreducible.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn extend_number_field<P>(poly_ring: P, irred_poly: &El<P>) -> (
-    FreeAlgebraHom<<P::Type as RingExtension>::BaseRing, NumberField>,
+pub fn extend_number_field<K>(poly_ring: DensePolyRing<K>, irred_poly: &El<DensePolyRing<K>>) -> (
+    FreeAlgebraHom<K, NumberField>,
     El<NumberField>
 )
-    where P: RingStore,
-        P::Type: PolyRing + EuclideanRing,
-        <P::Type as RingExtension>::BaseRing: Clone + RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>
+    where K: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>
 {
     assert!(!poly_ring.is_zero(&irred_poly));
     assert!(poly_ring.degree(&irred_poly).unwrap() > 1);
@@ -60,13 +62,11 @@ pub fn extend_number_field<P>(poly_ring: P, irred_poly: &El<P>) -> (
 /// may be nonsensical (but of course not UB).
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn extend_number_field_promise_is_irreducible<P>(poly_ring: P, irred_poly: &El<P>) -> (
-    FreeAlgebraHom<<P::Type as RingExtension>::BaseRing, NumberField>,
+pub fn extend_number_field_promise_is_irreducible<K>(poly_ring: DensePolyRing<K>, irred_poly: &El<DensePolyRing<K>>) -> (
+    FreeAlgebraHom<K, NumberField>,
     El<NumberField>
 )
-    where P: RingStore,
-        P::Type: PolyRing + EuclideanRing,
-        <P::Type as RingExtension>::BaseRing: Clone + RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>
+    where K: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>
 {
     static_assert_impls!(NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>: FactorPolyField);
     static_assert_impls!(NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>: PolyTFracGCDRing);
@@ -163,7 +163,7 @@ pub fn extend_number_field_promise_is_irreducible<P>(poly_ring: P, irred_poly: &
                 let K_generator = <_ as RingStore>::sum(&result, (0..total_rank).map(|i| result.inclusion().mul_map(result.pow(result.clone_el(&x), i), QQ.clone_el(sol.at(i, 1)))));
                 let L_generator = <_ as RingStore>::sum(&result, (0..total_rank).map(|i| result.inclusion().mul_map(result.pow(result.clone_el(&x), i), QQ.clone_el(sol.at(i, 2)))));
 
-                let result = FreeAlgebraHom::new(K.clone(), result, K_generator);
+                let result = FreeAlgebraHom::new(poly_ring.into().into_base_ring(), result, K_generator);
                 return (result, L_generator);
             }
         }
@@ -172,8 +172,173 @@ pub fn extend_number_field_promise_is_irreducible<P>(poly_ring: P, irred_poly: &
     unreachable!()
 }
 
+///
+/// Given a polynomial `f in K[X]` over a field `K`, this computes an 
+/// extension `L` of `K` such that `f` splits in `L`.
+/// 
+/// This function returns the embedding `K -> L` and the list of roots of `f`.
+/// 
+/// The closure `create_field` should, when given a field `K'` and an irreducible
+/// polynomial `g in K'[X]`, compute an extension field `K''`, and return both the
+/// embedding `K' -> K''` and a root `a in K''` of `g`.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn splitting_field<K, F>(
+    mut poly_ring: DensePolyRing<K>, 
+    f: El<DensePolyRing<K>>, 
+    mut create_field: F
+) -> (
+    FreeAlgebraHom<K, K>,
+    Vec<(El<K>, usize)>
+)
+    where K: RingStore + Clone,
+        K::Type: FactorPolyField + FreeAlgebra,
+        F: for<'a> FnMut(DensePolyRing<&'a K>, El<DensePolyRing<&'a K>>) -> (FreeAlgebraHom<&'a K, K>, El<K>)
+{
+    assert!(!poly_ring.is_zero(&f));
+    let mut to_split = vec![(f, 1)];
+    let mut roots = Vec::new();
+    let mut base_field = None;
+    let mut image_of_base_can_gen = poly_ring.base_ring().canonical_gen();
+
+    while let Some((next_to_split, multiplicity)) = to_split.pop() {
+        let (mut factorization, _) = <_ as FactorPolyField>::factor_poly(&poly_ring, &next_to_split);
+        let extend_idx = factorization.iter().enumerate().max_by_key(|(_, (f, _))| poly_ring.degree(f).unwrap()).unwrap().0;
+        
+        let extend_with_poly = if poly_ring.degree(&factorization[extend_idx].0).unwrap() > 1 {
+            Some(factorization.remove(extend_idx))
+        } else {
+            None
+        };
+
+        for (g, e) in factorization.into_iter() {
+            if poly_ring.degree(&g).unwrap() > 1 {
+                to_split.push((g, e * multiplicity));
+            } else {
+                roots.push((poly_ring.base_ring().negate(poly_ring.base_ring().div(poly_ring.coefficient_at(&g, 0), poly_ring.coefficient_at(&g, 1))), e * multiplicity));
+            }
+        }
+
+        if let Some((extend_with_poly, e)) = extend_with_poly {
+            let ref_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
+            let ref_extend_with_poly = ref_poly_ring.lifted_hom(&poly_ring, poly_ring.base_ring().identity()).map_ref(&extend_with_poly);
+            let (into_new_field, root) = create_field(ref_poly_ring, ref_extend_with_poly);
+            let (old_field, new_field, image) = into_new_field.destruct();
+            let new_poly_ring = DensePolyRing::new(new_field, "X");
+            let into_new_field = FreeAlgebraHom::new(old_field, new_poly_ring.base_ring(), image);
+            
+            image_of_base_can_gen = into_new_field.map(image_of_base_can_gen);
+            roots = roots.into_iter().map(|(r, e)| (into_new_field.map(r), e)).collect();
+            let lifted_hom = new_poly_ring.lifted_hom(&poly_ring, &into_new_field);
+            to_split = to_split.into_iter().map(|(f, e)| (lifted_hom.map(f), e)).collect();
+
+            to_split.push((new_poly_ring.checked_div(
+                &lifted_hom.map(extend_with_poly), 
+                &new_poly_ring.sub(new_poly_ring.indeterminate(), new_poly_ring.inclusion().map_ref(&root))
+            ).unwrap(), multiplicity * e));
+            roots.push((root, multiplicity * e));
+
+            if base_field.is_none() {
+                base_field = Some(poly_ring.into().into_base_ring());
+            }
+            poly_ring = new_poly_ring;
+        }
+    }
+
+    return (
+        FreeAlgebraHom::new(
+            base_field.unwrap_or_else(|| poly_ring.clone().into().into_base_ring()),
+            poly_ring.into().into_base_ring(),
+            image_of_base_can_gen
+        ),
+        roots
+    );
+}
+
+#[stability::unstable(feature = "enable")]
+pub fn variety_from_lex_gb<K, P, F>(
+    poly_ring: P, 
+    lex_gb: &[El<P>], 
+    mut create_field: F, 
+    begin: FreeAlgebraHom<<P::Type as RingExtension>::BaseRing, K>
+) -> (FreeAlgebraHom<<P::Type as RingExtension>::BaseRing, K>, Vec<Vec<El<K>>>)
+    where P: RingStore,
+        K: RingStore + Clone,
+        K::Type: FactorPolyField + FreeAlgebra,
+        P::Type: MultivariatePolyRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra,
+        <<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing: RingStore<Type = <<K::Type as RingExtension>::BaseRing as RingStore>::Type>,
+        F: for<'a> FnMut(DensePolyRing<&'a K>, El<DensePolyRing<&'a K>>) -> (FreeAlgebraHom<&'a K, K>, El<K>)
+{
+    let n = poly_ring.indeterminate_count();
+    let constant_monomial = poly_ring.create_monomial((0..n).map(|_| 0));
+    if lex_gb.iter().any(|f| poly_ring.appearing_indeterminates(f).len() == 0 && !poly_ring.base_ring().is_zero(poly_ring.coefficient_at(f, &constant_monomial))) {
+        return (begin, Vec::new());
+    }
+
+    let mut relevant_indeterminates = Vec::new();
+    for f in lex_gb {
+        relevant_indeterminates.extend(poly_ring.appearing_indeterminates(f).into_iter().map(|(v, _)| v));
+    }
+    relevant_indeterminates.sort_unstable();
+    relevant_indeterminates.dedup();
+    let contains_indeterminate = |f, indet| poly_ring.appearing_indeterminates(f).iter().any(|(v, _)| v == indet);
+    let has_no_indeterminate_before = |f, indet| poly_ring.appearing_indeterminates(f).iter().all(|(v, _)| v >= indet);
+    
+    let polys_for_indeterminate = relevant_indeterminates.iter().map(|indet| {
+        let relevant_polys = lex_gb.iter().filter(|f| contains_indeterminate(f, indet) && has_no_indeterminate_before(f, indet)).collect::<Vec<_>>();
+        assert!(relevant_polys.len() > 0, "basis is either not a lex-GB or does not generate a zero-dimensional ideal");
+        return relevant_polys;
+    }).collect::<Vec<_>>();
+
+    let mut current_embedding: FreeAlgebraHom<_, K> = begin;
+    let mut current_roots: Vec<(usize, Vec<El<K>>)> = vec![(0, (0..relevant_indeterminates.len()).map(|_| current_embedding.codomain().zero()).collect())];
+    let mut final_roots: Vec<Vec<El<K>>> = Vec::new();
+
+    while let Some((set_indeterminates, current_root)) = current_roots.pop() {
+        let next_indet_idx = relevant_indeterminates.len() - set_indeterminates - 1;
+        let next_indet = relevant_indeterminates[next_indet_idx];
+        
+        let (base_field, current_field, base_field_gen) = current_embedding.destruct();
+        let KX = DensePolyRing::new(current_field, "X");
+        let ref_current_embedding = FreeAlgebraHom::new(&base_field, KX.base_ring(), base_field_gen);
+        let next_roots_from: El<DensePolyRing<K>> = polys_for_indeterminate[next_indet_idx].iter().map(|f| 
+            poly_ring.evaluate(
+                f, 
+                (0..n).map_fn(|i| if i == next_indet {
+                    KX.indeterminate()
+                } else {
+                    KX.inclusion().map_ref(&current_root[i])
+                }),
+                KX.inclusion().compose(&ref_current_embedding)
+            )
+        ).fold(KX.zero(), |current, next| KX.ideal_gen(&current, &next));
+
+        let (_, _, base_field_gen) = ref_current_embedding.destruct();
+        let (into_new_field, roots) = splitting_field(KX, next_roots_from, &mut create_field);
+
+        final_roots = final_roots.into_iter().map(|root| root.into_iter().map(|x| into_new_field.map(x)).collect()).collect();
+        current_roots = current_roots.into_iter().map(|(l, root)| (l, root.into_iter().map(|x| into_new_field.map(x)).collect())).collect();
+        for (r, _) in roots.into_iter() {
+            let mut new_root: Vec<El<K>> = current_root.iter().map(|x| into_new_field.map_ref(x)).collect();
+            new_root[next_indet_idx] = r;
+            if set_indeterminates + 1 < relevant_indeterminates.len() {
+                current_roots.push((set_indeterminates + 1, new_root));
+            } else {
+                final_roots.push(new_root);
+            }
+        }
+        let base_field_gen = into_new_field.map(base_field_gen);
+        let (_, new_field, _) = into_new_field.destruct();
+        current_embedding = FreeAlgebraHom::new(base_field, new_field, base_field_gen);
+    }
+    return (current_embedding, final_roots);
+}
+
 #[cfg(test)]
 use crate::wrapper::RingElementWrapper;
+#[cfg(test)]
+use crate::rings::rational::RationalField;
 
 #[test]
 fn test_extend_field() {
@@ -186,7 +351,7 @@ fn test_extend_field() {
 
     // extend `QQ[i]` by `X^4 - i`
     let [g] = KX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - RingElementWrapper::new(&KX, KX.inclusion().map(K.canonical_gen()))]);
-    let (extension_field_embedding, x) = extend_number_field(&KX, &g);
+    let (extension_field_embedding, x) = extend_number_field(KX.clone(), &g);
     let ext_field = extension_field_embedding.codomain();
     assert_eq!(8, ext_field.rank());
     assert_el_eq!(ext_field, ext_field.neg_one(), ext_field.pow(extension_field_embedding.map(K.canonical_gen()), 2));
@@ -199,7 +364,7 @@ fn test_extend_field() {
 
     // extend `QQ[i]` by `X^3 - 2`
     let [g] = KX.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 2]);
-    let (extension_field_embedding, x) = extend_number_field(&KX, &g);
+    let (extension_field_embedding, x) = extend_number_field(KX, &g);
     let ext_field = extension_field_embedding.codomain();
     assert_eq!(6, ext_field.rank());
     assert_el_eq!(ext_field, ext_field.neg_one(), ext_field.pow(extension_field_embedding.map(K.canonical_gen()), 2));
