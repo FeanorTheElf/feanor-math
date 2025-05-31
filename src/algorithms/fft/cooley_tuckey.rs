@@ -325,88 +325,24 @@ impl<R_main, R_twiddle, H, A> Clone for CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     }
 }
 
-#[stability::unstable(feature = "enable")]
-pub trait CooleyTuckeyButterflyNew<R, S>: Homomorphism<R, S>
-    where R: ?Sized + RingBase, S: ?Sized + RingBase
-{
-    ///
-    /// Should compute `(x, y) := (x + twiddle * y, x - twiddle * y)`.
-    /// 
-    /// It is guaranteed that the input elements are either outputs of
-    /// [`CooleyTuckeyButterflyNew::butterfly()`] or of [`CooleyTuckeyButterflyNew::prepare_for_fft()`].
-    /// 
-    fn butterfly(&self, x: &mut S::Element, y: &mut S::Element, twiddle: &R::Element);
-
-    ///
-    /// Should compute `(x, y) := (x + y, (x - y) * twiddle)`
-    /// 
-    /// It is guaranteed that the input elements are either outputs of
-    /// [`CooleyTuckeyButterflyNew::inv_butterfly()`] or of [`CooleyTuckeyButterflyNew::prepare_for_inv_fft()`].
-    /// 
-    fn inv_butterfly(&self, x: &mut S::Element, y: &mut S::Element, twiddle: &R::Element);
-    
-    ///
-    /// Possibly pre-processes elements before the FFT starts. Here you can
-    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterflyNew::butterfly()`]
-    /// that the inputs are in this form.
-    /// 
-    #[inline(always)]
-    fn prepare_for_fft(&self, _value: &mut S::Element) {}
-    
-    ///
-    /// Possibly pre-processes elements before the inverse FFT starts. Here you can
-    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterflyNew::inv_butterfly()`]
-    /// that the inputs are in this form.
-    /// 
-    #[inline(always)]
-    fn prepare_for_inv_fft(&self, _value: &mut S::Element) {}
-}
-
-///
-/// A helper trait that defines the Cooley-Tuckey butterfly operation.
-/// It is default-implemented for all homomorphisms, but for increase FFT performance, some rings
-/// might wish to provide a specialization.
-/// 
-/// This replaces the deprecated trait [`CooleyTuckeyButterfly`].
-/// 
-impl<R, S, H> CooleyTuckeyButterflyNew<R, S> for H
-    where R: ?Sized + RingBase, S: ?Sized + RingBase, H: Homomorphism<R, S>
-{
-    #[inline(always)]
-    #[allow(deprecated)]
-    default fn butterfly(&self, x: &mut S::Element, y: &mut S::Element, twiddle: &R::Element) {
-        let mut values = [self.codomain().clone_el(x), self.codomain().clone_el(y)];
-        <S as CooleyTuckeyButterfly<R>>::butterfly(self.codomain().get_ring(), &self, &mut values, twiddle, 0, 1);
-        [*x, *y] = values;
-    }
-
-    #[inline(always)]
-    #[allow(deprecated)]
-    default fn inv_butterfly(&self, x: &mut S::Element, y: &mut S::Element, twiddle: &R::Element) {
-        let mut values = [self.codomain().clone_el(x), self.codomain().clone_el(y)];
-        <S as CooleyTuckeyButterfly<R>>::inv_butterfly(self.codomain().get_ring(), &self, &mut values, twiddle, 0, 1);
-        [*x, *y] = values;
-    }
-    
-    #[inline(always)]
-    #[allow(deprecated)]
-    default fn prepare_for_fft(&self, value: &mut S::Element) {
-        <S as CooleyTuckeyButterfly<R>>::prepare_for_fft(self.codomain().get_ring(), value);
-    }
-    
-    #[inline(always)]
-    #[allow(deprecated)]
-    default fn prepare_for_inv_fft(&self, value: &mut S::Element) {
-        <S as CooleyTuckeyButterfly<R>>::prepare_for_inv_fft(self.codomain().get_ring(), value);
-    }
-}
-
 ///
 /// A helper trait that defines the Cooley-Tuckey butterfly operation.
 /// It is default-implemented for all rings, but for increase FFT performance, some rings
 /// might wish to provide a specialization.
 /// 
-#[deprecated]
+/// # Why not a subtrait of [`Homomorphism`]?
+/// 
+/// With the current design, indeed making this a subtrait of [`Homomorphism`] would
+/// indeed be the conceptually most fitting choice. It would allow specializing on
+/// the twiddle ring, the main ring and the inclusion. 
+/// 
+/// Unfortunately, there is a technical issue: With the current `min_specialization`, 
+/// we can only specialize on concrete type. If this is a subtrait of [`Homomorphism`], this 
+/// means we can only specialize on, say, `CanHom<ZnFastmul, Zn>`, which then does not give a
+/// specialization for `CanHom<&ZnFastmul, Zn>` - in other words, we would specialize on
+/// the [`RingStore`], and not on the [`RingBase`] as we should. Hence, we'll keep this
+/// suboptimal design until full specialization works.
+/// 
 pub trait CooleyTuckeyButterfly<S>: RingBase
     where S: ?Sized + RingBase
 {
@@ -416,6 +352,9 @@ pub trait CooleyTuckeyButterfly<S>: RingBase
     /// It is guaranteed that the input elements are either outputs of
     /// [`CooleyTuckeyButterfly::butterfly()`] or of [`CooleyTuckeyButterfly::prepare_for_fft()`].
     /// 
+    /// Deprecated in favor of [`CooleyTuckeyButterfly::butterfly_new()`].
+    /// 
+    #[deprecated]
     fn butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: H, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
 
     ///
@@ -424,8 +363,27 @@ pub trait CooleyTuckeyButterfly<S>: RingBase
     /// It is guaranteed that the input elements are either outputs of
     /// [`CooleyTuckeyButterfly::inv_butterfly()`] or of [`CooleyTuckeyButterfly::prepare_for_inv_fft()`].
     /// 
+    /// Deprecated in favor of [`CooleyTuckeyButterfly::inv_butterfly_new()`].
+    /// 
+    #[deprecated]
     fn inv_butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: H, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
     
+    ///
+    /// Should compute `(x, y) := (x + twiddle * y, x - twiddle * y)`.
+    /// 
+    /// It is guaranteed that the input elements are either outputs of
+    /// [`CooleyTuckeyButterfly::butterfly_new()`] or of [`CooleyTuckeyButterfly::prepare_for_fft()`].
+    /// 
+    fn butterfly_new<H: Homomorphism<S, Self>>(hom: H, x: &mut Self::Element, y: &mut Self::Element, twiddle: &S::Element);
+    
+    ///
+    /// Should compute `(x, y) := (x + y, (x - y) * twiddle)`
+    /// 
+    /// It is guaranteed that the input elements are either outputs of
+    /// [`CooleyTuckeyButterfly::inv_butterfly_new()`] or of [`CooleyTuckeyButterfly::prepare_for_inv_fft()`].
+    /// 
+    fn inv_butterfly_new<H: Homomorphism<S, Self>>(hom: H, x: &mut Self::Element, y: &mut Self::Element, twiddle: &S::Element);
+
     ///
     /// Possibly pre-processes elements before the FFT starts. Here you can
     /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterfly::butterfly()`]
@@ -456,6 +414,14 @@ impl<R, S> CooleyTuckeyButterfly<S> for R
     }
 
     #[inline(always)]
+    #[allow(deprecated)]
+    default fn butterfly_new<H: Homomorphism<S, Self>>(hom: H, x: &mut Self::Element, y: &mut Self::Element, twiddle: &S::Element) {
+        let mut values = [hom.codomain().clone_el(x), hom.codomain().clone_el(y)];
+        <Self as CooleyTuckeyButterfly<S>>::butterfly(hom.codomain().get_ring(), &hom, &mut values, twiddle, 0, 1);
+        [*x, *y] = values;
+    }
+
+    #[inline(always)]
     default fn inv_butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: H, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
         let new_a = self.add_ref(values.at(i1), values.at(i2));
         let a = std::mem::replace(values.at_mut(i1), new_a);
@@ -463,6 +429,14 @@ impl<R, S> CooleyTuckeyButterfly<S> for R
         hom.mul_assign_ref_map(values.at_mut(i2), twiddle);
     }
     
+    #[inline(always)]
+    #[allow(deprecated)]
+    default fn inv_butterfly_new<H: Homomorphism<S, Self>>(hom: H, x: &mut Self::Element, y: &mut Self::Element, twiddle: &S::Element) {
+        let mut values = [hom.codomain().clone_el(x), hom.codomain().clone_el(y)];
+        <Self as CooleyTuckeyButterfly<S>>::inv_butterfly(hom.codomain().get_ring(), &hom, &mut values, twiddle, 0, 1);
+        [*x, *y] = values;
+    }
+
     #[inline(always)]
     default fn prepare_for_fft(&self, _value: &mut Self::Element) {}
     
@@ -562,16 +536,16 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         let butterfly = |a: &mut _, b: &mut _, twiddle: &_| {
             if INV {
                 if !IS_PREPARED {
-                    self.hom.prepare_for_inv_fft(a);
-                    self.hom.prepare_for_inv_fft(b);
+                    <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_inv_fft(self.ring().get_ring(), a);
+                    <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_inv_fft(self.ring().get_ring(), b);
                 }
-                self.hom.inv_butterfly(a, b, twiddle);
+                <R_main as CooleyTuckeyButterfly<R_twiddle>>::inv_butterfly_new(&self.hom, a, b, twiddle);
             } else {
                 if !IS_PREPARED {
-                    self.hom.prepare_for_fft(a);
-                    self.hom.prepare_for_fft(b);
+                    <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_fft(self.ring().get_ring(), a);
+                    <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_fft(self.ring().get_ring(), b);
                 }
-                self.hom.butterfly(a, b, twiddle);
+                <R_main as CooleyTuckeyButterfly<R_twiddle>>::butterfly_new(&self.hom, a, b, twiddle);
             }
         };
         butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, twiddles, butterfly);
@@ -587,7 +561,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, twiddles, |a, b, twiddle| {
             self.hom.mul_assign_ref_map(a, &self.two_inv);
             self.hom.mul_assign_ref_map(b, &self.two_inv);
-            self.hom.butterfly(a, b, twiddle);
+            <R_main as CooleyTuckeyButterfly<R_twiddle>>::butterfly_new(&self.hom, a, b, twiddle);
         });
     }
 
@@ -691,7 +665,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
             self.butterfly_step_initial(data, 0..(1 << (self.log2_n - 1)));
         }
         for i in 0..data.len() {
-            self.hom.prepare_for_fft(&mut data[i]);
+            <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_fft(self.ring().get_ring(), &mut data[i]);
         }
         for (log2_step, twiddles) in self.root_of_unity_list.iter().enumerate().filter(|(i, _)| *i != 0) {
             let stride = 1 << (self.log2_n - log2_step - 1);
@@ -716,7 +690,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         assert!(nonzero_entries <= self.len());
 
         for i in 0..data.len() {
-            self.hom.prepare_for_inv_fft(&mut data[i]);
+            <R_main as CooleyTuckeyButterfly<R_twiddle>>::prepare_for_inv_fft(self.ring().get_ring(), &mut data[i]);
         }
         for (log2_step, twiddles) in self.inv_root_of_unity_list.iter().enumerate().filter(|(i, _)| *i != 0).rev() {
             let stride = 1 << (self.log2_n - log2_step - 1);

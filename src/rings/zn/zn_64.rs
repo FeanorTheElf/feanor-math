@@ -911,32 +911,26 @@ impl CanIsoFromTo<ZnFastmulBase> for ZnBase {
 impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
 
     #[inline(always)]
-    fn butterfly<V: crate::seq::VectorViewMut<Self::Element>, H: Homomorphism<ZnFastmulBase, Self>>(&self, hom: H, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
-        let mut a = *values.at(i1);
-        let mut b = *values.at(i2);
-
-        if a.0 >= self.modulus_times_three {
-            a.0 -= self.modulus_times_three;
+    fn butterfly_new<H: Homomorphism<ZnFastmulBase, Self>>(hom: H, a: &mut ZnEl, b: &mut ZnEl, twiddle: &<ZnFastmulBase as RingBase>::Element) {
+        let self_ = hom.codomain().get_ring();
+        
+        if a.0 >= self_.modulus_times_three {
+            a.0 -= self_.modulus_times_three;
         }
-        hom.mul_assign_ref_map(&mut b, twiddle);
+        hom.mul_assign_ref_map(b, twiddle);
 
-        *values.at_mut(i1) = self.from_u64_promise_reduced(a.0 + b.0);
-        *values.at_mut(i2) = self.from_u64_promise_reduced(a.0 + self.modulus_times_three - b.0);
+        (a.0, b.0) = (a.0 + b.0, a.0 + self_.modulus_times_three - b.0);
     }
 
     #[inline(always)]
-    fn inv_butterfly<V: crate::seq::VectorViewMut<Self::Element>, H: Homomorphism<ZnFastmulBase, Self>>(&self, hom: H, values: &mut V, twiddle: &<ZnFastmulBase as RingBase>::Element, i1: usize, i2: usize) {
-        let mut a = *values.at(i1);
-        let mut b = *values.at(i2);
+    fn inv_butterfly_new<H: Homomorphism<ZnFastmulBase, Self>>(hom: H, a: &mut ZnEl, b: &mut ZnEl, twiddle: &<ZnFastmulBase as RingBase>::Element) {
+        let self_ = hom.codomain().get_ring();
 
-        (a.0, b.0) = (a.0 + b.0, a.0 + self.modulus_times_three - b.0);
-        if a.0 >= self.modulus_times_three {
-            a.0 -= self.modulus_times_three;
+        (a.0, b.0) = (a.0 + b.0, a.0 + self_.modulus_times_three - b.0);
+        if a.0 >= self_.modulus_times_three {
+            a.0 -= self_.modulus_times_three;
         }
-        hom.mul_assign_ref_map(&mut b, twiddle);
-
-        *values.at_mut(i1) = self.from_u64_promise_reduced(a.0);
-        *values.at_mut(i2) = self.from_u64_promise_reduced(b.0);
+        hom.mul_assign_ref_map(b, twiddle);
     }
 
     #[inline(always)]
@@ -950,31 +944,26 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
 impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
 
     #[inline(always)]
-    fn butterfly<V: crate::seq::VectorViewMut<Self::Element>, H: Homomorphism<ZnBase, Self>>(&self, _hom: H, values: &mut V, twiddle: &ZnEl, i1: usize, i2: usize) {
-        let mut a = *values.at(i1);
-        if a.0 >= self.modulus_times_three {
-            a.0 -= self.modulus_times_three;
+    fn butterfly_new<H: Homomorphism<Self, Self>>(hom: H, a: &mut ZnEl, b: &mut ZnEl, twiddle: &ZnEl) {
+        let self_ = hom.codomain().get_ring();
+        
+        if a.0 >= self_.modulus_times_three {
+            a.0 -= self_.modulus_times_three;
         }
-        let mut b = *values.at(i2);
-        self.mul_assign_ref(&mut b, twiddle);
+        hom.mul_assign_ref_map(b, twiddle);
 
-        *values.at_mut(i1) = self.from_u64_promise_reduced(a.0 + b.0);
-        *values.at_mut(i2) = self.from_u64_promise_reduced(a.0 + self.modulus_times_three - b.0);
+        (a.0, b.0) = (a.0 + b.0, a.0 + self_.modulus_times_three - b.0);
     }
 
     #[inline(always)]
-    fn inv_butterfly<V: crate::seq::VectorViewMut<Self::Element>, H: Homomorphism<ZnBase, Self>>(&self, _hom: H, values: &mut V, twiddle: &ZnEl, i1: usize, i2: usize) {
-        let mut a = *values.at(i1);
-        let mut b = *values.at(i2);
+    fn inv_butterfly_new<H: Homomorphism<Self, Self>>(hom: H, a: &mut ZnEl, b: &mut ZnEl, twiddle: &ZnEl) {
+        let self_ = hom.codomain().get_ring();
 
-        (a.0, b.0) = (a.0 + b.0, a.0 + self.modulus_times_three - b.0);
-        if a.0 >= self.modulus_times_three {
-            a.0 -= self.modulus_times_three;
+        (a.0, b.0) = (a.0 + b.0, a.0 + self_.modulus_times_three - b.0);
+        if a.0 >= self_.modulus_times_three {
+            a.0 -= self_.modulus_times_three;
         }
-        self.mul_assign_ref(&mut b, twiddle);
-
-        *values.at_mut(i1) = self.from_u64_promise_reduced(a.0);
-        *values.at_mut(i2) = self.from_u64_promise_reduced(b.0);
+        hom.mul_assign_ref_map(b, twiddle);
     }
     
     #[inline(always)]
