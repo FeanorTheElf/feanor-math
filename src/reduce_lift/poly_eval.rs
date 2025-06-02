@@ -1,14 +1,13 @@
 
-use crate::algorithms::miller_rabin::prev_prime;
+use crate::algorithms::linsolve::LinSolveRing;
+use crate::algorithms::resultant::ComputeResultantRing;
 use crate::divisibility::{DivisibilityRing, Domain};
 use crate::homomorphism::*;
-use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::pid::PrincipalIdealRing;
-use crate::primitive_int::StaticRing;
 use crate::ring::*;
-use crate::rings::field::{AsField, AsFieldBase};
-use crate::rings::zn::{zn_64, zn_rns, ZnRingStore};
-use crate::seq::VectorView;
+use crate::field::*;
+use crate::rings::finite::FiniteRing;
+use crate::specialization::FiniteRingSpecializable;
 
 ///
 /// Trait for rings that can be temporarily replaced by an extension when we need more points,
@@ -22,11 +21,11 @@ use crate::seq::VectorView;
 pub trait InterpolationBaseRing: DivisibilityRing {
 
     ///
-    /// Restricting this here to be `DivisibilityRing + PrincipalIdealRing + Domain`
+    /// Restricting this here to be `DivisibilityRing + PrincipalIdealRing + Domain + EvaluatePolyLocallyRing`
     /// is necessary, because of a compiler bug, see also
     /// [`crate::reduce_lift::poly_eval::EvalPolyLocallyRing::LocalRingBase`]
     /// 
-    type ExtendedRingBase<'a>: ?Sized + DivisibilityRing + PrincipalIdealRing + Domain
+    type ExtendedRingBase<'a>: ?Sized + PrincipalIdealRing + Domain + ComputeResultantRing + LinSolveRing
         where Self: 'a;
 
     type ExtendedRing<'a>: RingStore<Type = Self::ExtendedRingBase<'a>> + Clone
@@ -152,7 +151,7 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
 /// few primes. This approach is formalized by [`crate::reduce_lift::poly_factor_gcd::PolyGCDLocallyDomain`].
 /// 
 #[stability::unstable(feature = "enable")]
-pub trait EvalPolyLocallyRing: RingBase {
+pub trait EvalPolyLocallyRing: RingBase + FiniteRingSpecializable {
     
     ///
     /// The proper way would be to define this with two lifetime parameters `'ring` and `'data`,
@@ -164,7 +163,7 @@ pub trait EvalPolyLocallyRing: RingBase {
     /// unfortunately, the a constraint `for<'a> SomeRing::LocalRingBase<'a>: PrincipalIdealRing` again
     /// triggers the bug in some settings.
     /// 
-    type LocalRingBase<'ring>: ?Sized + PrincipalIdealRing + Domain
+    type LocalRingBase<'ring>: ?Sized + PrincipalIdealRing + Domain + ComputeResultantRing + LinSolveRing
         where Self: 'ring;
 
     type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
@@ -225,62 +224,49 @@ pub trait EvalPolyLocallyRing: RingBase {
         where Self: 'ring;
 }
 
-impl<I> EvalPolyLocallyRing for I
-    where I: IntegerRing
+impl<R> EvalPolyLocallyRing for R
+    where R: ?Sized + FiniteRing + Field
 {
-    type LocalComputationData<'ring> = zn_rns::Zn<AsField<zn_64::Zn>, RingRef<'ring, Self>>
+    type LocalComputationData<'ring> = RingRef<'ring, Self>
         where Self: 'ring;
 
-    type LocalRing<'ring> = AsField<zn_64::Zn>
+    type LocalRing<'ring> = RingRef<'ring, Self>
         where Self: 'ring;
 
-    type LocalRingBase<'ring> = AsFieldBase<zn_64::Zn>
+    type LocalRingBase<'ring> = Self
         where Self: 'ring;
 
-    fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
-        RingRef::new(self).abs_log2_ceil(el).unwrap_or(0) as f64 * 2f64.ln()
+    fn ln_pseudo_norm(&self, _el: &Self::Element) -> f64 {
+        0.
     }
 
-    fn local_computation<'ring>(&'ring self, ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
-        let mut primes = Vec::new();
-        let mut ln_current = 0.;
-        let mut current_value = (1 << 62) / 9;
-        while ln_current < ln_pseudo_norm_bound + 1. {
-            current_value = prev_prime(StaticRing::<i64>::RING, current_value).unwrap();
-            if current_value < (1 << 32) {
-                panic!("not enough primes");
-            }
-            primes.push(current_value);
-            ln_current += (current_value as f64).ln();
-        }
-        return zn_rns::Zn::new(
-            primes.into_iter().map(|p| AsField::from(AsFieldBase::promise_is_perfect_field(zn_64::Zn::new(p as u64)))).collect(),
-            RingRef::new(self)
-        );
+    fn local_computation<'ring>(&'ring self, _ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
+        RingRef::new(self)
     }
 
-    fn local_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
+    fn local_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, _i: usize) -> Self::LocalRing<'ring>
         where Self: 'ring
     {
-        computation.at(i).clone()
+        *computation
     }
 
-    fn local_ring_count<'ring>(&self, computation: &Self::LocalComputationData<'ring>) -> usize
+    fn local_ring_count<'ring>(&self, _computation: &Self::LocalComputationData<'ring>) -> usize
         where Self: 'ring
     {
-        computation.len()
+        1
     }
 
-    fn reduce<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &Self::Element) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
+    fn reduce<'ring>(&self, _computation: &Self::LocalComputationData<'ring>, el: &Self::Element) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
         where Self: 'ring
     {
-        computation.get_congruence(&computation.coerce(RingValue::from_ref(self), self.clone_el(el))).as_iter().map(|x| *x).collect()
+        vec![self.clone_el(el)]
     }
 
-    fn lift_combine<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
+    fn lift_combine<'ring>(&self, _computation: &Self::LocalComputationData<'ring>, el: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
         where Self: 'ring
     {
-        computation.smallest_lift(computation.from_congruence(el.iter().copied()))
+        assert_eq!(1, el.len());
+        return self.clone_el(&el[0]);
     }
 }
 
@@ -401,4 +387,72 @@ macro_rules! impl_interpolation_base_ring_char_zero {
     (InterpolationBaseRing for $self_type:ty) => {
         impl_interpolation_base_ring_char_zero!{ <{}> InterpolationBaseRing for $self_type where }
     }
+}
+
+#[macro_export]
+macro_rules! impl_eval_poly_locally_for_ZZ {
+    (EvalPolyLocallyRing for $int_ring_type:ty) => {
+        impl_eval_poly_locally_for_ZZ!{ <{}> IntegerPolyGCDRing for $int_ring_type where }
+    };
+    (<{$($gen_args:tt)*}> EvalPolyLocallyRing for $int_ring_type:ty where $($constraints:tt)*) => {
+
+        impl<$($gen_args)*> $crate::reduce_lift::poly_eval::EvalPolyLocallyRing for $int_ring_type
+            where $($constraints)*
+        {
+            type LocalComputationData<'ring> = $crate::rings::zn::zn_rns::Zn<$crate::rings::field::AsField<$crate::rings::zn::zn_64::Zn>, RingRef<'ring, Self>>
+                where Self: 'ring;
+
+            type LocalRing<'ring> = $crate::rings::field::AsField<$crate::rings::zn::zn_64::Zn>
+                where Self: 'ring;
+
+            type LocalRingBase<'ring> = $crate::rings::field::AsFieldBase<$crate::rings::zn::zn_64::Zn>
+                where Self: 'ring;
+
+            fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
+                RingRef::new(self).abs_log2_ceil(el).unwrap_or(0) as f64 * 2f64.ln()
+            }
+
+            fn local_computation<'ring>(&'ring self, ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
+                let mut primes = Vec::new();
+                let mut ln_current = 0.;
+                let mut current_value = (1 << 62) / 9;
+                while ln_current < ln_pseudo_norm_bound + 1. {
+                    current_value = $crate::algorithms::miller_rabin::prev_prime(StaticRing::<i64>::RING, current_value).unwrap();
+                    if current_value < (1 << 32) {
+                        panic!("not enough primes");
+                    }
+                    primes.push(current_value);
+                    ln_current += (current_value as f64).ln();
+                }
+                return $crate::rings::zn::zn_rns::Zn::new(
+                    primes.into_iter().map(|p| $crate::rings::field::AsField::from($crate::rings::field::AsFieldBase::promise_is_perfect_field($crate::rings::zn::zn_64::Zn::new(p as u64)))).collect(),
+                    RingRef::new(self)
+                );
+            }
+
+            fn local_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
+                where Self: 'ring
+            {
+                <_ as $crate::seq::VectorView<_>>::at(computation, i).clone()
+            }
+
+            fn local_ring_count<'ring>(&self, computation: &Self::LocalComputationData<'ring>) -> usize
+                where Self: 'ring
+            {
+                <_ as $crate::seq::VectorView<_>>::len(computation)
+            }
+
+            fn reduce<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &Self::Element) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
+                where Self: 'ring
+            {
+                <_ as $crate::seq::VectorView<_>>::as_iter(&computation.get_congruence(&computation.coerce(RingValue::from_ref(self), self.clone_el(el)))).map(|x| *x).collect()
+            }
+
+            fn lift_combine<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
+                where Self: 'ring
+            {
+                <_ as $crate::rings::zn::ZnRingStore>::smallest_lift(computation, computation.from_congruence(el.iter().copied()))
+            }
+        }
+    };
 }

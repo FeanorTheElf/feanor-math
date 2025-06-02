@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use crate::algorithms::interpolate::product_except_one;
 use crate::algorithms::newton;
 use crate::algorithms::poly_factor::extension::poly_factor_extension;
-use crate::algorithms::poly_gcd::factor::factor_and_lift_mod_pe;
+use crate::algorithms::poly_gcd::factor::{factor_and_lift_mod_pe, FactorAndLiftModpeResult};
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::poly_gcd::gcd::poly_gcd_local;
 use crate::reduce_lift::poly_factor_gcd::*;
@@ -508,7 +508,7 @@ impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
         let lhs_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, lhs);
         let rhs_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, rhs);
 
-        let result = poly_gcd_local(&order_poly_ring, order_poly_ring.clone_el(&lhs_order), order_poly_ring.clone_el(&rhs_order), DontObserve);
+        let result = poly_gcd_local(&order_poly_ring, order_poly_ring.clone_el(&lhs_order), order_poly_ring.clone_el(&rhs_order), LOG_PROGRESS);
 
         return self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &result);
     }
@@ -522,10 +522,19 @@ impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
         let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
         let poly_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, poly);
 
-        let result = poly_power_decomposition_local(&order_poly_ring, poly_order, DontObserve);
+        let result = poly_power_decomposition_local(&order_poly_ring, poly_order, LOG_PROGRESS);
 
         return result.into_iter().map(|(f, k)| (self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), k)).collect();
     }
+}
+
+enum HeuristicFactorPolyInOrderResult<P>
+    where P: RingStore,
+        P::Type: PolyRing
+{
+    PartialFactorization(Vec<(El<P>, usize)>),
+    Irreducible,
+    Unknown
 }
 
 ///
@@ -540,7 +549,7 @@ impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
 /// E.g. `X^4 - 10 X^2 + 1` is reducible modulo every prime. In fact, it is a theorem that
 /// there exists inert primes if and only if the Galois group of the extension is cyclic.
 /// 
-fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> Option<Vec<(El<P>, usize)>>
+fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> HeuristicFactorPolyInOrderResult<P>
     where Impl: 'a + RingStore,
         Impl::Type: Field + FreeAlgebra,
         <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
@@ -570,25 +579,33 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I, Controller>(poly_ring
                 let lc_poly = self_.clone_el(poly_ring.lc(poly).unwrap());
                 let monic_poly = evaluate_aX(poly_ring, poly, &lc_poly);
                 let e = 2 * self_.get_ring().heuristic_exponent(&p, poly_ring.degree(&monic_poly).unwrap(), poly_ring.terms(&monic_poly).map(|(c, _)| c));
-                if let Some(potential_factorization) = factor_and_lift_mod_pe(poly_ring, &p, e, &monic_poly, controller.clone()) {
-                    if potential_factorization.len() > 1 {
+                match factor_and_lift_mod_pe(poly_ring, &p, e, &monic_poly, controller.clone()) {
+                    FactorAndLiftModpeResult::PartialFactorization(factorization) => {
                         log_progress!(controller, "(partial_success)");
-                        debug_assert!(poly_ring.eq_el(&monic_poly, &poly_ring.normalize(poly_ring.prod(potential_factorization.iter().map(|f| poly_ring.clone_el(f))))));
-                        let result: Vec<_> = potential_factorization.into_iter().map(|f| (unevaluate_aX(poly_ring, &f, &lc_poly), 1)).collect();
+                        debug_assert!(poly_ring.eq_el(&monic_poly, &poly_ring.normalize(poly_ring.prod(factorization.iter().map(|f| poly_ring.clone_el(f))))));
+                        let result: Vec<_> = factorization.into_iter().map(|f| (unevaluate_aX(poly_ring, &f, &lc_poly), 1)).collect();
                         debug_assert!(poly_ring.eq_el(&poly_ring.normalize(poly_ring.clone_el(poly)), &poly_ring.normalize(poly_ring.prod(result.iter().map(|(f, e)| poly_ring.pow(poly_ring.clone_el(f), *e))))));
-                        return Some(result);
-                    }
-                } else {
-                    // not squarefree
-                    log_progress!(controller, "(partial_success)");
-                    return Some(poly_power_decomposition_local(poly_ring, poly_ring.clone_el(poly), controller));
+                        return HeuristicFactorPolyInOrderResult::PartialFactorization(result);
+                    },
+                    FactorAndLiftModpeResult::Irreducible => {
+                        return HeuristicFactorPolyInOrderResult::Irreducible;
+                    },
+                    FactorAndLiftModpeResult::NotSquarefreeModpe => {
+                        // probably not square-free
+                        let power_decomposition = poly_power_decomposition_local(poly_ring, poly_ring.clone_el(poly), controller.clone());
+                        if power_decomposition.len() > 1 {
+                            log_progress!(controller, "(partial_success)");
+                            return HeuristicFactorPolyInOrderResult::PartialFactorization(power_decomposition);
+                        }
+                    },
+                    FactorAndLiftModpeResult::Unknown => {}
                 }
             } else {
                 break 'try_factor_directly;
             }
         }
         log_progress!(controller, "(fail)");
-        return None;
+        return HeuristicFactorPolyInOrderResult::Unknown;
     })
 }
 
@@ -616,10 +633,14 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
             } else {
                 let poly_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, &current);
                 // try the direct factorization
-                if let Some(partial_factorization) = heuristic_factor_poly_directly_in_order(&order_poly_ring, &poly_order, controller.clone()) {
-                    to_factor.extend(partial_factorization.into_iter().map(|(f, e)| (self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), e * e_base)));
-                } else {
-                    result.extend(poly_factor_extension(&poly_ring, &current, controller.clone()).0.into_iter().map(|(f, e)| (f, e * e_base)));
+                match heuristic_factor_poly_directly_in_order(&order_poly_ring, &poly_order, controller.clone()) {
+                    HeuristicFactorPolyInOrderResult::PartialFactorization(partial_factorization) => to_factor.extend(
+                        partial_factorization.into_iter().map(|(f, e)| (self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), e * e_base))
+                    ),
+                    HeuristicFactorPolyInOrderResult::Irreducible => result.push((current, e_base)),
+                    HeuristicFactorPolyInOrderResult::Unknown => result.extend(
+                        poly_factor_extension(&poly_ring, &current, controller.clone()).0.into_iter().map(|(f, e)| (f, e * e_base))
+                    )
                 }
             }
         }

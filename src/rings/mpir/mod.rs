@@ -3,7 +3,7 @@ use serde::de::DeserializeSeed;
 use serde::ser::SerializeTuple;
 use serde::{Deserializer, Serializer, Serialize, Deserialize};
 
-use crate::impl_poly_gcd_locally_for_ZZ;
+use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ, impl_eval_poly_locally_for_ZZ};
 use crate::algorithms;
 use crate::pid::*;
 use crate::ordered::*;
@@ -631,7 +631,11 @@ impl IntegerRing for MPZBase {
     }
 }
 
+impl_interpolation_base_ring_char_zero!{ InterpolationBaseRing for MPZBase }
+
 impl_poly_gcd_locally_for_ZZ!{ IntegerPolyGCDRing for MPZBase }
+
+impl_eval_poly_locally_for_ZZ!{ EvalPolyLocallyRing for MPZBase }
 
 impl FiniteRingSpecializable for MPZBase {
     

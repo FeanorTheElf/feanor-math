@@ -4,7 +4,6 @@ use crate::algorithms::poly_gcd::*;
 use crate::algorithms::poly_gcd::hensel::*;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::poly_factor::FactorPolyField;
-use crate::computation::*;
 use crate::iters::clone_slice;
 use crate::iters::powerset;
 use crate::seq::VectorView;
@@ -55,6 +54,17 @@ fn combine_local_factors_local<'ring, 'data, 'local, R, P1, P2>(reduction: &'loc
     return result;
 }
 
+#[stability::unstable(feature = "enable")]
+pub enum FactorAndLiftModpeResult<P>
+    where P: RingStore,
+        P::Type: PolyRing
+{
+    PartialFactorization(Vec<El<P>>),
+    Irreducible,
+    Unknown,
+    NotSquarefreeModpe
+}
+
 ///
 /// Factors the given monic polynomial modulo `p^e` and searches for the smallest groups of factors whose product
 /// lifts and gives a factor of `f` globally. If all factors of `f` are shortest lifts of polynomials modulo `p^e`,
@@ -64,7 +74,7 @@ fn combine_local_factors_local<'ring, 'data, 'local, R, P1, P2>(reduction: &'loc
 /// return non-irreducible factors of `f`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::SuitableIdeal<'ring>, e: usize, poly: &El<P>, controller: Controller) -> Option<Vec<El<P>>>
+pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::SuitableIdeal<'ring>, e: usize, poly: &El<P>, controller: Controller) -> FactorAndLiftModpeResult<P>
     where R: ?Sized + PolyGCDLocallyDomain,
         P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
@@ -86,15 +96,23 @@ pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::
     let mut factors = Vec::new();
     for (f, k) in <_ as FactorPolyField>::factor_poly(&FX, &poly_mod_m).0 {
         if k > 1 {
-            return None;
+            return FactorAndLiftModpeResult::NotSquarefreeModpe;
         }
         factors.push(f);
+    }
+    if factors.len() == 1 {
+        return FactorAndLiftModpeResult::Irreducible;
     }
 
     let SX = DensePolyRing::new(*red_map.domain(), "X");
     let poly_mod_me = SX.lifted_hom(poly_ring, reduction.main_ring_to_intermediate_ring_reduction(0)).map_ref(poly);
     let factorization_mod_me = hensel_lift_factorization(&red_map, &SX, &FX, &poly_mod_me, &factors[..], controller);
-    return Some(combine_local_factors_local(&reduction, poly_ring, poly, &SX, e, factorization_mod_me));
+    let combined_factorization = combine_local_factors_local(&reduction, poly_ring, poly, &SX, e, factorization_mod_me);
+    if combined_factorization.len() == 1 {
+        return FactorAndLiftModpeResult::Unknown;
+    } else {
+        return FactorAndLiftModpeResult::PartialFactorization(combined_factorization);
+    }
 }
 
 fn ln_factor_max_coeff<P>(ZZX: P, f: &El<P>) -> f64
@@ -130,8 +148,12 @@ fn factor_squarefree_monic_integer_poly_local<'a, P, Controller>(ZZX: P, f: &El<
         let prime_i64 = ZZ.get_ring().principal_ideal_generator(&prime);
         let e = (bound / (prime_i64 as f64).ln()).ceil() as usize + 1;
         log_progress!(controller, "(mod={}^{})", IdealDisplayWrapper::new(ZZ.get_ring(), &prime), e);
-        if let Some(result) = factor_and_lift_mod_pe(ZZX, &prime, e, f, controller.clone()) {
-            return result;
+        match factor_and_lift_mod_pe(ZZX, &prime, e, f, controller.clone()) {
+            FactorAndLiftModpeResult::Irreducible => return vec![ZZX.clone_el(f)],
+            FactorAndLiftModpeResult::PartialFactorization(result) => return result,
+            // unknown means irreducible, since we chose `e` large enough
+            FactorAndLiftModpeResult::Unknown => return vec![ZZX.clone_el(f)],
+            FactorAndLiftModpeResult::NotSquarefreeModpe => {}
         }
     }
     unreachable!()
@@ -144,14 +166,16 @@ fn factor_squarefree_monic_integer_poly_local<'a, P, Controller>(ZZX: P, f: &El<
 /// product is `f` only up to multiplication by a nonzero integer. 
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn poly_factor_integer<'a, P, Controller>(ZZX: P, f: El<P>, controller: Controller) -> Vec<(El<P>, usize)>
-    where P: 'a + PolyRingStore + Copy,
+pub fn poly_factor_integer<P, Controller>(ZZX: P, f: El<P>, controller: Controller) -> Vec<(El<P>, usize)>
+    where P: PolyRingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
         Controller: ComputationController
 {
     assert!(!ZZX.is_zero(&f));
     let power_decomposition = poly_power_decomposition_local(ZZX, ZZX.clone_el(&f), controller.clone());
+
+    ZZX.println(&f);
 
     controller.run_computation(format_args!("factor_int_poly(deg={})", ZZX.degree(&f).unwrap()), |controller| {
 

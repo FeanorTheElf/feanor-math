@@ -1,8 +1,8 @@
-use dense_poly::DensePolyRing;
+use std::fmt::{Debug, Formatter};
 
+use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::algorithms::poly_gcd::*;
 use crate::algorithms::poly_gcd::hensel::*;
-use crate::computation::*;
 use crate::seq::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 
@@ -17,6 +17,13 @@ use super::INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT;
 struct Signature {
     perfect_power: usize,
     degree: usize
+}
+
+impl Debug for Signature {
+
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "deg-{}-poly^{}", self.degree, self.perfect_power)
+    }
 }
 
 ///
@@ -172,7 +179,9 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &
                     None => {
                         unreachable!("`compute_local_power_decomposition()` currently cannot fail");
                     },
-                    Some((new_signature, local_power_decomposition)) => if signature.is_some() && &signature.as_ref().unwrap()[..] != &new_signature[..] {
+                    Some((new_signature, local_power_decomposition)) => if new_signature == &[Signature { degree: poly_ring.degree(poly).unwrap(), perfect_power: 1 }] {
+                        return vec![(poly_ring.clone_el(poly), 1)];
+                    } else if signature.is_some() && &signature.as_ref().unwrap()[..] != &new_signature[..] {
                         log_progress!(controller, "(signature_mismatch)");
                         continue 'try_random_ideal;
                     } else {

@@ -11,6 +11,7 @@ use crate::divisibility::*;
 use crate::integer::*;
 use crate::pid::*;
 use crate::field::Field;
+use crate::specialization::{FiniteRingSpecializable, FiniteRingOperation};
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::algorithms;
@@ -513,6 +514,12 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
             hom.codomain().add_assign(&mut current, hom.map_ref(self.coefficient_at(f, i)));
         }
         return current;
+    }
+}
+impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> FiniteRingSpecializable for DensePolyRingBase<R, A, C> {
+
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
+        op.fallback()
     }
 }
 

@@ -9,6 +9,7 @@ use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::*;
 use crate::homomorphism::*;
 use crate::computation::DontObserve;
+use crate::algorithms::resultant::ComputeResultantRing;
 use crate::integer::*;
 use crate::ordered::{OrderedRing, OrderedRingStore};
 use crate::rings::poly::dense_poly::DensePolyRing;
@@ -498,7 +499,7 @@ impl<I> DivisibilityRing for RationalFieldBase<I>
     }
 }
 
-impl_interpolation_base_ring_char_zero!{ <{I}> InterpolationBaseRing for RationalFieldBase<I> where I: RingStore, I::Type: IntegerRing }
+impl_interpolation_base_ring_char_zero!{ <{I}> InterpolationBaseRing for RationalFieldBase<I> where I: RingStore, I::Type: IntegerRing + ComputeResultantRing }
 
 impl<I> PrincipalIdealRing for RationalFieldBase<I>
     where I: RingStore,

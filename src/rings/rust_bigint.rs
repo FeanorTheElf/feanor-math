@@ -5,7 +5,7 @@ use serde::{Deserializer, Serialize, Deserialize, Serializer};
 use crate::algorithms::bigint::{deserialize_bigint_from_bytes, highest_set_block};
 use crate::divisibility::{DivisibilityRing, Domain};
 use crate::pid::*;
-use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ};
+use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ, impl_eval_poly_locally_for_ZZ};
 use crate::integer::*;
 use crate::ordered::*;
 use crate::primitive_int::*;
@@ -441,6 +441,8 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
 impl_interpolation_base_ring_char_zero!{ <{A}> InterpolationBaseRing for RustBigintRingBase<A> where A: Allocator + Clone }
 
 impl_poly_gcd_locally_for_ZZ!{ <{A}> IntegerPolyGCDRing for RustBigintRingBase<A> where A: Allocator + Clone }
+
+impl_eval_poly_locally_for_ZZ!{ <{A}> EvalPolyLocallyRing for RustBigintRingBase<A> where A: Allocator + Clone }
 
 impl<A> FiniteRingSpecializable for RustBigintRingBase<A>
     where A: Allocator + Clone

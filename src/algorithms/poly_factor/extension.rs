@@ -1,10 +1,10 @@
-use crate::algorithms;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::computation::*;
 use crate::reduce_lift::poly_eval::InterpolationBaseRing;
 use crate::field::*;
 use crate::homomorphism::*;
+use crate::algorithms::resultant::ComputeResultantRing;
 use crate::ordered::OrderedRingStore;
 use crate::pid::EuclideanRing;
 use crate::primitive_int::StaticRing;
@@ -32,7 +32,7 @@ pub fn poly_factor_squarefree_extension<P, Controller>(LX: P, f: &El<P>, attempt
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra + PolyTFracGCDRing,
-        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable,
+        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + ComputeResultantRing,
         Controller: ComputationController
 {
     controller.run_computation(format_args!("factor_ring_ext(pdeg={}, extdeg={})", LX.degree(f).unwrap(), LX.base_ring().rank()), |controller| {
@@ -55,7 +55,7 @@ pub fn poly_factor_squarefree_extension<P, Controller>(LX: P, f: &El<P>, attempt
             );
             let gen_poly = L.generating_poly(&KXY, KX.inclusion());
         
-            return algorithms::resultant::resultant_local::<&DensePolyRing<_>>(&KXY, f_over_KY, gen_poly);
+            return <_ as ComputeResultantRing>::resultant(&KXY, f_over_KY, gen_poly);
         };
 
         // we want to find `k` such that `N(f(X + k theta))` remains square-free, where `theta` generates `L`;
@@ -118,7 +118,7 @@ pub fn poly_factor_extension<P, Controller>(poly_ring: P, f: &El<P>, controller:
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra + PerfectField + FiniteRingSpecializable + PolyTFracGCDRing,
-        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable,
+        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + ComputeResultantRing,
         Controller: ComputationController
 {
     let KX = &poly_ring;

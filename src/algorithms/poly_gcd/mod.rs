@@ -2,7 +2,7 @@ use gcd::poly_gcd_local;
 use finite::poly_power_decomposition_finite_field;
 use squarefree_part::poly_power_decomposition_local;
 
-use crate::computation::DontObserve;
+use crate::computation::*;
 use crate::divisibility::*;
 use crate::reduce_lift::poly_factor_gcd::*;
 use crate::homomorphism::*;

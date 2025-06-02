@@ -7,9 +7,7 @@ use serde::{Deserializer, Serialize, Serializer, Deserialize};
 
 use crate::algorithms::convolution::*;
 use crate::algorithms::linsolve::LinSolveRing;
-use crate::algorithms::poly_factor::FactorPolyField;
 use crate::divisibility::*;
-use crate::reduce_lift::poly_eval::InterpolationBaseRing;
 use crate::{impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 use crate::integer::*;
 use crate::iters::multi_cartesian_product;
@@ -17,7 +15,6 @@ use crate::iters::MultiProduct;
 use crate::rings::poly::PolyRingStore;
 use crate::matrix::OwnedMatrix;
 use crate::primitive_int::StaticRing;
-use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::finite::*;
 use crate::specialization::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
@@ -601,51 +598,6 @@ impl<R, V, A, C> HashableElRing for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> InterpolationBaseRing for AsFieldBase<FreeAlgebraImpl<R, V, A, C>>
-    where R: RingStore + Clone, 
-        R::Type: LinSolveRing + FactorPolyField,
-        V: VectorView<El<R>>,
-        A: Allocator + Clone,
-        C: ConvolutionAlgorithm<R::Type>
-{
-    type ExtendedRingBase<'a> = AsFieldBase<FreeAlgebraImpl<RingRef<'a, Self>, SparseMapVector<RingRef<'a, Self>>, A, KaratsubaAlgorithm<Global>>>
-        where Self: 'a;
-
-    type ExtendedRing<'a> = AsField<FreeAlgebraImpl<RingRef<'a, Self>, SparseMapVector<RingRef<'a, Self>>, A, KaratsubaAlgorithm<Global>>>
-        where Self: 'a;
-
-    fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
-        where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
-    {
-        let wrt_basis = ext_ring.wrt_canonical_basis(&el);
-        if wrt_basis.iter().skip(1).all(|x| self.is_zero(&x)) {
-            return Some(wrt_basis.at(0));
-        } else {
-            return None;
-        }
-    }
-
-    fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
-        where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
-    {
-        ext_ring.inclusion().map(el)
-    }
-
-    fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
-        let ZZbig = BigIntRing::RING;
-        let characteristic = self.base_ring().characteristic(&ZZbig).unwrap();
-        if ZZbig.is_zero(&characteristic) {
-            let mut modulus = SparseMapVector::new(1, RingRef::new(self));
-            *modulus.at_mut(0) = self.one();
-            let field = AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with(RingRef::new(self), 1, modulus, "X", self.get_delegate().element_allocator.clone(), STANDARD_CONVOLUTION)));
-            let points = (0..count).map(|n| field.int_hom().map(n.try_into().unwrap())).collect();
-            return (field, points);
-        } else {
-            unimplemented!()
-        }
-    }
-}
-
 pub struct WRTCanonicalBasisElementCreator<'a, R, V, A, C>
     where R: RingStore, 
         R::Type: FiniteRing, 
@@ -864,10 +816,6 @@ use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
 #[cfg(test)]
-use crate::reduce_lift::poly_eval::ToExtRingMap;
-#[cfg(test)]
-use crate::rings::rational::RationalField;
-#[cfg(test)]
 use crate::algorithms::convolution::fft::FFTConvolution;
 
 #[cfg(test)]
@@ -1081,16 +1029,6 @@ fn test_serialization() {
 fn test_from_canonical_basis_enforce_len() {
     let (ring, _) = test_ring1_and_elements();
     _ = ring.from_canonical_basis([0, 1, 2]);
-}
-
-#[test]
-fn test_interpolation_base_ring() {
-    let base_ring = RationalField::new(StaticRing::<i64>::RING);
-    let ring = FreeAlgebraImpl::new(base_ring, 3, [base_ring.neg_one(), base_ring.neg_one()]).as_field().ok().unwrap();
-    let (ext_map, points) = ToExtRingMap::for_interpolation(ring.get_ring(), 3);
-    for _ in points {
-        assert_el_eq!(&ring, ring.invert(&ring.canonical_gen()).unwrap(), ext_map.as_base_ring_el(ext_map.codomain().invert(&ext_map.map(ring.canonical_gen())).unwrap()));
-    }
 }
 
 #[test]
