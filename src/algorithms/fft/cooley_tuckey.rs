@@ -321,6 +321,8 @@ impl<R_main, R_twiddle, H, A> Clone for CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     }
 }
 
+// pub static BUTTERFLY_TIMES: [std::sync::atomic::AtomicUsize; 20] = [const { std::sync::atomic::AtomicUsize::new(0) }; 20];
+
 ///
 /// A helper trait that defines the Cooley-Tukey butterfly operation.
 /// It is default-implemented for all rings, but for increase FFT performance, some rings
@@ -536,6 +538,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     /// 
     #[inline(never)]
     fn butterfly_step_main<const INV: bool, const IS_PREPARED: bool>(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize, twiddles: &[R_twiddle::Element]) {
+        // let start = std::time::Instant::now();
         let butterfly = |a: &mut _, b: &mut _, twiddle: &_| {
             if INV {
                 if !IS_PREPARED {
@@ -552,6 +555,8 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
             }
         };
         butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, twiddles, butterfly);
+        // let end = std::time::Instant::now();
+        // BUTTERFLY_TIMES[log2_step].fetch_add((end - start).as_micros() as usize, std::sync::atomic::Ordering::Relaxed);
     }
     
     ///

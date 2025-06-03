@@ -254,11 +254,14 @@ impl<R_main, R_twiddle, H, A> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>
             &self.twiddles[step]
         };
         let third_root_of_unity = &self.third_root_of_unity;
+        // let start = std::time::Instant::now();
         butterfly_loop(self.log3_n, data, step, twiddles, |x, y, z, twiddle1, twiddle2| if INV {
             <R_main as CooleyTukeyRadix3Butterfly<R_twiddle>>::inv_butterfly(&self.hom, x, y, z, &third_root_of_unity, twiddle1, twiddle2)
         } else {
             <R_main as CooleyTukeyRadix3Butterfly<R_twiddle>>::butterfly(&self.hom, x, y, z, &third_root_of_unity, twiddle1, twiddle2)
         });
+        // let end = std::time::Instant::now();
+        // BUTTERFLY_RADIX3_TIMES[step].fetch_add((end - start).as_micros() as usize, std::sync::atomic::Ordering::Relaxed);
     }
 
     fn fft_impl(&self, data: &mut [R_main::Element]) {
@@ -428,9 +431,11 @@ pub trait CooleyTukeyRadix3Butterfly<S: ?Sized + RingBase>: RingBase {
     fn prepare_for_inv_fft(&self, _value: &mut Self::Element) {}
 }
 
+// pub static BUTTERFLY_RADIX3_TIMES: [std::sync::atomic::AtomicUsize; 20] = [const { std::sync::atomic::AtomicUsize::new(0) }; 20];
+
 impl<R: ?Sized + RingBase, S: ?Sized + RingBase> CooleyTukeyRadix3Butterfly<S> for R {
 
-    fn butterfly<H: Homomorphism<S, Self>>(
+    default fn butterfly<H: Homomorphism<S, Self>>(
         hom: H, 
         a: &mut Self::Element, 
         b: &mut Self::Element, 
@@ -452,7 +457,7 @@ impl<R: ?Sized + RingBase, S: ?Sized + RingBase> CooleyTukeyRadix3Butterfly<S> f
         ring.add_assign(a, s1); // this is now `a + t b + t^2 c`
     }
     
-    fn inv_butterfly<H: Homomorphism<S, Self>>(
+    default fn inv_butterfly<H: Homomorphism<S, Self>>(
         hom: H, 
         a: &mut Self::Element, 
         b: &mut Self::Element,
@@ -475,20 +480,20 @@ impl<R: ?Sized + RingBase, S: ?Sized + RingBase> CooleyTukeyRadix3Butterfly<S> f
     }
 
     ///
-    /// Possibly pre-processes elements before the FFT starts. Here you can
-    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterfly::butterfly()`]
+    /// Possibly pre-processes elements before the FFT starts. Here you can bring ring element 
+    /// into a certain form, and assume during [`CooleyTukeyRadix3Butterfly::butterfly()`]
     /// that the inputs are in this form.
     /// 
     #[inline(always)]
-    fn prepare_for_fft(&self, _value: &mut Self::Element) {}
+    default fn prepare_for_fft(&self, _value: &mut Self::Element) {}
     
     ///
-    /// Possibly pre-processes elements before the inverse FFT starts. Here you can
-    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterfly::inv_butterfly()`]
+    /// Possibly pre-processes elements before the inverse FFT starts. Here you can bring ring element
+    /// into a certain form, and assume during [`CooleyTukeyRadix3Butterfly::inv_butterfly()`]
     /// that the inputs are in this form.
     /// 
     #[inline(always)]
-    fn prepare_for_inv_fft(&self, _value: &mut Self::Element) {}
+    default fn prepare_for_inv_fft(&self, _value: &mut Self::Element) {}
 }
 
 impl<H, A> FFTErrorEstimate for CooleyTukeyRadix3FFT<Complex64Base, Complex64Base, H, A> 

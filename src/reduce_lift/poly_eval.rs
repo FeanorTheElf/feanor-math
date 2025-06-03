@@ -392,7 +392,7 @@ macro_rules! impl_interpolation_base_ring_char_zero {
 #[macro_export]
 macro_rules! impl_eval_poly_locally_for_ZZ {
     (EvalPolyLocallyRing for $int_ring_type:ty) => {
-        impl_eval_poly_locally_for_ZZ!{ <{}> IntegerPolyGCDRing for $int_ring_type where }
+        impl_eval_poly_locally_for_ZZ!{ <{}> EvalPolyLocallyRing for $int_ring_type where }
     };
     (<{$($gen_args:tt)*}> EvalPolyLocallyRing for $int_ring_type:ty where $($constraints:tt)*) => {
 
