@@ -175,8 +175,6 @@ pub fn poly_factor_integer<P, Controller>(ZZX: P, f: El<P>, controller: Controll
     assert!(!ZZX.is_zero(&f));
     let power_decomposition = poly_power_decomposition_local(ZZX, ZZX.clone_el(&f), controller.clone());
 
-    ZZX.println(&f);
-
     controller.run_computation(format_args!("factor_int_poly(deg={})", ZZX.degree(&f).unwrap()), |controller| {
 
         let mut result = Vec::new();

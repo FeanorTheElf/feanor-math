@@ -172,7 +172,6 @@ impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain> ComputeResul
                 let ln_max_norm = ring.terms(&f).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap() * ring.degree(&g).unwrap() as f64 +
                     ring.terms(&g).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap() * ring.degree(&f).unwrap() as f64;
                 let work_locally = base_ring.get_ring().local_computation(ln_max_norm);
-                println!("Splitting resultant to {} local computations", base_ring.get_ring().local_ring_count(&work_locally));
                 let mut resultants = Vec::new();
                 for i in 0..base_ring.get_ring().local_ring_count(&work_locally) {
                     let embedding = EvaluatePolyLocallyReductionMap::new(base_ring.get_ring(), &work_locally, i);

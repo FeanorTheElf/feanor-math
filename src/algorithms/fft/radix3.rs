@@ -548,7 +548,6 @@ fn test_radix3_butterflies() {
         threeadic_reverse(i / ZZ.pow(3, log3_n - step) as usize, step)
     ));
     let begin = expected_threeadic_reverse(0);
-    println!("begin    = {:?}", begin.iter().map(|x| ring.format(x)).collect::<Vec<_>>());
     for (a, e) in data.iter().zip(begin.iter()) {
         assert_el_eq!(ring, a, e);
     }
@@ -557,9 +556,6 @@ fn test_radix3_butterflies() {
     for i in 0..log3_n {
         fft.butterfly_step_main::<false>(&mut actual, i);
         let expected: [ZnEl; LEN] = expected_threeadic_reverse(i + 1);
-        println!("{}", i);
-        println!("actual   = {:?}", actual.iter().map(|x| ring.format(x)).collect::<Vec<_>>());
-        println!("expected = {:?}", expected.iter().map(|x| ring.format(x)).collect::<Vec<_>>());
         for (a, e) in actual.iter().zip(expected.iter()) {
             assert_el_eq!(ring, a, e);
         }
