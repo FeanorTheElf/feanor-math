@@ -42,11 +42,18 @@ fn butterfly_loop<T, S, F>(log3_n: usize, data: &mut [T], step: usize, twiddles:
     assert!(data.len() % (3 * stride) == 0);
     assert_eq!(twiddles.array_chunks::<2>().len(), data.chunks_mut(3 * stride).len());
 
-    for ([twiddle1, twiddle2], butterfly_data) in twiddles.array_chunks::<2>().zip(data.chunks_mut(3 * stride)) {
-        let (first, rest) = butterfly_data.split_at_mut(stride);
-        let (second, third) = rest.split_at_mut(stride);
-        for ((a, b), c) in first.iter_mut().zip(second.iter_mut()).zip(third.iter_mut()) {
+    if stride == 1 {
+        for ([twiddle1, twiddle2], butterfly_data) in twiddles.array_chunks::<2>().zip(data.array_chunks_mut::<3>()) {
+            let [a, b, c] = butterfly_data.each_mut();
             butterfly(a, b, c, twiddle1, twiddle2);
+        }
+    } else {
+        for ([twiddle1, twiddle2], butterfly_data) in twiddles.array_chunks::<2>().zip(data.chunks_mut(3 * stride)) {
+            let (first, rest) = butterfly_data.split_at_mut(stride);
+            let (second, third) = rest.split_at_mut(stride);
+            for ((a, b), c) in first.iter_mut().zip(second.iter_mut()).zip(third.iter_mut()) {
+                butterfly(a, b, c, twiddle1, twiddle2);
+            }
         }
     }
 }
