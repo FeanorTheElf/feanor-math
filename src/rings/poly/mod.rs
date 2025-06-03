@@ -429,7 +429,7 @@ pub mod generic_impls {
             }
         };
         if let Some((c, i)) = terms.next() {
-            if !ring.base_ring().is_one(c) || i == 0 {
+            if ring.base_ring().get_ring().is_approximate() || !ring.base_ring().is_one(c) || i == 0 {
                 ring.base_ring().get_ring().dbg_within(c, out, if i == 0 { EnvBindingStrength::Sum } else { EnvBindingStrength:: Product })?;
             }
             print_unknown(i, out)?;
@@ -438,7 +438,7 @@ pub mod generic_impls {
         }
         while let Some((c, i)) = terms.next() {
             write!(out, " + ")?;
-            if !ring.base_ring().is_one(c) || i == 0 {
+            if ring.base_ring().get_ring().is_approximate() || !ring.base_ring().is_one(c) || i == 0 {
                 ring.base_ring().get_ring().dbg_within(c, out, if i == 0 { EnvBindingStrength::Sum } else { EnvBindingStrength:: Product })?;
             }
             print_unknown(i, out)?;

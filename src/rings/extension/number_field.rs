@@ -354,7 +354,7 @@ impl<Impl, I> NumberField<Impl, I>
         let ZZ = self.base_ring().base_ring();
         let poly_ring = DensePolyRing::new(ZZ, "X");
         let poly = self.get_ring().generating_poly_as_int(&poly_ring);
-        let (root, error) = find_approximate_complex_root(&poly_ring, &poly);
+        let (root, error) = find_approximate_complex_root(&poly_ring, &poly).unwrap();
         return ComplexEmbedding {
             from: self,
             image_of_generator: root,
@@ -367,7 +367,7 @@ impl<Impl, I> NumberField<Impl, I>
         let ZZ = self.base_ring().base_ring();
         let poly_ring = DensePolyRing::new(ZZ, "X");
         let poly = self.get_ring().generating_poly_as_int(&poly_ring);
-        let (root, error) = find_approximate_complex_root(&poly_ring, &poly);
+        let (root, error) = find_approximate_complex_root(&poly_ring, &poly).unwrap();
         return ComplexEmbedding {
             from: self,
             image_of_generator: root,
@@ -508,7 +508,7 @@ impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
         let lhs_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, lhs);
         let rhs_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, rhs);
 
-        let result = poly_gcd_local(&order_poly_ring, order_poly_ring.clone_el(&lhs_order), order_poly_ring.clone_el(&rhs_order), LOG_PROGRESS);
+        let result = poly_gcd_local(&order_poly_ring, order_poly_ring.clone_el(&lhs_order), order_poly_ring.clone_el(&rhs_order), DontObserve);
 
         return self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &result);
     }
@@ -522,7 +522,7 @@ impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
         let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
         let poly_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, poly);
 
-        let result = poly_power_decomposition_local(&order_poly_ring, poly_order, LOG_PROGRESS);
+        let result = poly_power_decomposition_local(&order_poly_ring, poly_order, DontObserve);
 
         return result.into_iter().map(|(f, k)| (self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), k)).collect();
     }
@@ -621,7 +621,7 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        let controller = LOG_PROGRESS;
+        let controller = DontObserve;
         let self_ = NumberFieldByOrder { base: RingRef::new(poly_ring.base_ring().get_ring()) };
         let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
 
