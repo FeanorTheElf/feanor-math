@@ -229,8 +229,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         let half_mod_n = (n + 1) / 2;
         let mut b: Vec<_> = (0..n).map(|i| root_of_unity_n_pows(TryInto::<i64>::try_into(i * i * half_mod_n).unwrap())).collect();
         b.resize_with(m, || hom.domain().zero());
-        println!("{:?}", b.iter().map(|x| hom.domain().format(x)).collect::<Vec<_>>());
-
+        
         twiddle_fft.unordered_fft(&mut b, hom.domain());
 
         let twiddles = (0..n).map(|i| root_of_unity_n_pows(-TryInto::<i64>::try_into(i * i * half_mod_n).unwrap())).collect::<Vec<_>>();
@@ -295,22 +294,17 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
             buffer[i] = ring.zero();
         }
  
-        println!("{:?}", buffer.iter().map(|x| self.ring().format(x)).collect::<Vec<_>>());
-
         self.m_fft_table.unordered_truncated_fft(&mut buffer, self.n * 2);
         for i in 0..self.m_fft_table.len() {
             self.hom().mul_assign_ref_map(&mut buffer[i], &self.b_unordered_fft[i]);
         }
         self.m_fft_table.unordered_truncated_fft_inv(&mut buffer, self.n * 2);
         
-        println!("{:?}", buffer.iter().map(|x| self.ring().format(x)).collect::<Vec<_>>());
-
         // make the normal convolution into a cyclic convolution of length n by taking it modulo `x^n - 1`
         let (buffer1, buffer2) = buffer[..(2 * self.n)].split_at_mut(self.n);
         for (a, b) in buffer1.iter_mut().zip(buffer2.iter_mut()) {
             ring.add_assign_ref(a, b);
         }
-        println!("{:?}", buffer.iter().map(|x| self.ring().format(x)).collect::<Vec<_>>());
 
         // write values back, and multiply them with a twiddle factor
         for (i, x) in buffer.into_iter().enumerate().take(self.n) {
