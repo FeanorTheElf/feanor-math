@@ -118,17 +118,17 @@ fn butterfly_loop<T, S, F>(log2_n: usize, data: &mut [T], butterfly_range: Range
     assert!(butterfly_range.end <= twiddles.len());
     
     let current_data = &mut data[(stride_range.start + butterfly_range.start * 2 * stride)..];
-    let stride_len = stride + stride_range.end - stride_range.start;
+    let stride_range_len = stride_range.end - stride_range.start;
     
-    if stride_range.end - stride_range.start == 1 {
+    if stride == 1 && stride_range_len == 1 {
         for (twiddle, butterfly_data) in twiddles[butterfly_range].iter().zip(current_data.array_chunks_mut::<2>()) {
             let [a, b] = butterfly_data.each_mut();
             butterfly(a, b, &twiddle);
         }
-    } else {
+    } else if stride_range_len >= 1 {
         for (twiddle, butterfly_data) in twiddles[butterfly_range].iter().zip(current_data.chunks_mut(2 * stride)) {
-            let (first, second) = butterfly_data[..stride_len].split_at_mut(stride);
-            let mut first_it = first.array_chunks_mut::<4>();
+            let (first, second) = butterfly_data[..(stride + stride_range_len)].split_at_mut(stride);
+            let mut first_it = first[..stride_range_len].array_chunks_mut::<4>();
             let mut second_it = second.array_chunks_mut::<4>();
             for (a, b) in first_it.by_ref().zip(second_it.by_ref()) {
                 butterfly(&mut a[0], &mut b[0], &twiddle);
@@ -682,7 +682,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         assert!(nonzero_entries > self.len() / 2);
         assert!(nonzero_entries <= self.len());
         for i in nonzero_entries..self.len() {
-            debug_assert!(self.ring().is_zero(&data[i]));
+            debug_assert!(self.ring().get_ring().is_approximate() || self.ring().is_zero(&data[i]));
         }
 
         if self.log2_n > 0 {
@@ -941,6 +941,23 @@ fn test_bitreverse_inv_fft_inplace() {
     fft.unordered_fft(&mut work, ring);
     fft.unordered_inv_fft(&mut work, ring);
     assert_eq!(&work, &values);
+}
+
+#[test]
+fn test_truncated_fft() {
+    let ring = Fp::<17>::RING;
+    let fft = CooleyTuckeyFFT::new(ring, 2, 3);
+
+    let data = [2, 3, 0, 1, 1, 0, 0, 0];
+    let mut complete_fft = data;
+    fft.unordered_fft(&mut complete_fft, ring);
+    for k in 5..=8 {
+        let mut truncated_fft = data;
+        fft.unordered_truncated_fft(&mut truncated_fft, k);
+        assert_eq!(&complete_fft[..k], &truncated_fft[..k]);
+        fft.unordered_truncated_fft_inv(&mut truncated_fft, k);
+        assert_eq!(data, truncated_fft);
+    }
 }
 
 #[test]
