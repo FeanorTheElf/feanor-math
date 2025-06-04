@@ -266,7 +266,11 @@ pub fn compute_galois_group<K>(field: K) -> Result<
 /// the given embedding `K -> C`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn find_complex_conjugation<'a, K1, K2, K3>(field: K1, complex_embedding: &ComplexEmbedding<K2, DefaultNumberFieldImpl, BigIntRing>, galois_group: &'a [GaloisAutomorphism<K3, DefaultNumberFieldImpl, BigIntRing>]) -> &'a GaloisAutomorphism<K3, DefaultNumberFieldImpl, BigIntRing>
+pub fn find_complex_conjugation<'a, K1, K2, K3>(
+    field: K1, 
+    complex_embedding: &ComplexEmbedding<K2, DefaultNumberFieldImpl, BigIntRing>, 
+    galois_group: &'a [GaloisAutomorphism<K3, DefaultNumberFieldImpl, BigIntRing>]
+) -> &'a GaloisAutomorphism<K3, DefaultNumberFieldImpl, BigIntRing>
     where K1: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>,
         K2: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>,
         K3: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>,

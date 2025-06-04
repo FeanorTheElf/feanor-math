@@ -3,7 +3,7 @@ use std::alloc::Global;
 use std::marker::PhantomData;
 
 use crate::algorithms::interpolate::product_except_one;
-use crate::algorithms::newton;
+use crate::algorithms::newton::{self, absolute_error_of_poly_eval};
 use crate::algorithms::poly_factor::extension::poly_factor_extension;
 use crate::algorithms::poly_gcd::factor::{factor_and_lift_mod_pe, FactorAndLiftModpeResult};
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
@@ -189,24 +189,10 @@ impl<K, Impl, I> ComplexEmbedding<K, Impl, I>
     /// 
     #[stability::unstable(feature = "enable")]
     pub fn absolute_error_bound_at(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> f64 {
-        // we estimate the error |f(x + delta) - f(x)| via the taylor series
         let CC = Complex64::RING;
-        let QQ = self.from.base_ring();
-        let QQX = DensePolyRing::new(QQ, "X");
-        let hom = CC.can_hom(QQ).unwrap();
-        // taylor series expansion of f at image_of_generator, skipping the first (i.e. constant) coefficient
-        let mut taylor_coefficients = Vec::new();
-        let mut current = derive_poly(&QQX, &self.from.poly_repr(&QQX, x, QQ.identity()));
-        while !QQX.is_zero(&current) {
-            taylor_coefficients.push(CC.abs(QQX.evaluate(&current, &self.image_of_generator, &hom)));
-            current = derive_poly(&QQX, &current);
-        }
-        let mut error = 0.0;
-        for c in taylor_coefficients.iter().rev() {
-            error = *c + error * self.absolute_error_image_of_generator;
-        }
-        error = error * self.absolute_error_image_of_generator;
-        return error;
+        let CCX = DensePolyRing::new(CC, "X");
+        let f = self.from.poly_repr(&CCX, x, CC.can_hom(self.from.base_ring()).unwrap());
+        return absolute_error_of_poly_eval(&CCX, &f, self.from.rank(), self.image_of_generator, self.absolute_error_image_of_generator / CC.abs(self.image_of_generator));
     }
 }
 

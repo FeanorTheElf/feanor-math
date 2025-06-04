@@ -22,6 +22,25 @@ const ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR: f64 = 2.;
 #[stability::unstable(feature = "enable")]
 pub struct PrecisionError;
 
+#[stability::unstable(feature = "enable")]
+pub fn absolute_error_of_poly_eval<P>(poly_ring: P, f: &El<P>, poly_deg: usize, point: Complex64El, relative_error_point: f64) -> f64
+    where P: RingStore,
+        P::Type: PolyRing + DivisibilityRing,
+        <P::Type as RingExtension>::BaseRing: RingStore<Type = Complex64Base>
+{
+    let CC = Complex64::RING;
+    let mut current = point;
+    let mut current_relative_error = relative_error_point;
+    let mut total_error = 0.;
+    for i in 1..=poly_deg {
+        total_error += CC.abs(*poly_ring.coefficient_at(f, i)) * CC.abs(current) * current_relative_error;
+        // technically, we would have `(1 + current_relative_error)(1 + f64::EPSILON) - 1`, but we ignore `O(f64::EPSILON^2)` terms here
+        current_relative_error += f64::EPSILON;
+        CC.mul_assign(&mut current, point);
+    }
+    return total_error;
+}
+
 fn bound_distance_to_root<P>(approx_root: Complex64El, CCX: P, poly: &El<P>, poly_deg: usize) -> Result<f64, PrecisionError>
     where P: RingStore,
         P::Type: PolyRing + DivisibilityRing,
@@ -31,7 +50,7 @@ fn bound_distance_to_root<P>(approx_root: Complex64El, CCX: P, poly: &El<P>, pol
     let f = poly;
     let f_prime = derive_poly(&CCX, &f);
     
-    let approx_radius = CC.abs(CCX.evaluate(&f, &approx_root, CC.identity())) / CC.abs(CCX.evaluate(&f_prime, &approx_root, CC.identity()));
+    let approx_radius = (CC.abs(CCX.evaluate(&f, &approx_root, CC.identity())) + absolute_error_of_poly_eval(&CCX, &f, poly_deg, approx_root, 0.)) / CC.abs(CCX.evaluate(&f_prime, &approx_root, CC.identity()));
     if !approx_radius.is_finite() {
         return Err(PrecisionError);
     }
@@ -53,8 +72,8 @@ fn bound_distance_to_root<P>(approx_root: Complex64El, CCX: P, poly: &El<P>, pol
 
     // The idea is as follows: We have `f(x + t) = f(x) + f'(g(t)) t` where `g(t)` is a value between `x` and `x + t`;
     // Using `|f'(g(t))| >= |f'(x)| - f_prime_bound` and rearranging it gives `t <= |f(x)| / (|f'(x)| - f_prime_bound)`;
-    // For this to be at most `assume_radius`, it suffices to assume `f_prime_bound <= |f'(x)| - |f(x)|/R`
-    if f_prime_bound > CC.abs(CCX.evaluate(&f_prime, &approx_root, CC.identity())) - CC.abs(CCX.evaluate(&f, &approx_root, CC.identity())) / assume_radius {
+    // For this to be at most `assume_radius`, it suffices to assume `f_prime_bound <= |f'(x)| - |f(x)|/R = |f'(x)| (1 - approx_radius / assume_radius)`
+    if f_prime_bound > CC.abs(CCX.evaluate(&f_prime, &approx_root, CC.identity())) * (ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR - 1.) / ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR {
         return Err(PrecisionError);
     }
 
@@ -123,7 +142,7 @@ fn find_approximate_complex_root_squarefree<P>(poly_ring: P, f: &El<P>, poly_deg
 /// to avoid (or at least detect) as many numerical problems as possible.
 /// 
 /// The first return value is an approximation to the root of the polynomial, and the
-/// second return value is an upper bound to the distance of the actual root.
+/// second return value is an upper bound to the distance to the exact root.
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn find_approximate_complex_root<P>(ZZX: P, f: &El<P>) -> Result<(El<Complex64>, f64), PrecisionError>
@@ -138,6 +157,18 @@ pub fn find_approximate_complex_root<P>(ZZX: P, f: &El<P>) -> Result<(El<Complex
     return find_approximate_complex_root_squarefree(&CCX, &CCX.lifted_hom(&ZZX, CC.can_hom(ZZX.base_ring()).unwrap()).map_ref(f), ZZX.degree(f).unwrap());
 }
 
+///
+/// Finds an approximation to all complex roots of the given integer polynomial.
+/// 
+/// This function does not try to be as efficient as possible, but instead tries
+/// to avoid (or at least detect) as many numerical problems as possible.
+/// However, the task of finding all roots has quite bad numerical stability, especially
+/// if some of the roots are close together. Hence, this is likely to fail for polynomials
+/// with large degrees (say > 100) or very large coefficients.
+/// 
+/// The first component of each returned tuple is an approximation to a root of the
+/// polynomial, and the second component is an upper bound to the distance to exact root.
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn find_all_approximate_complex_roots<P>(ZZX: P, poly: &El<P>) -> Result<Vec<(El<Complex64>, f64)>, PrecisionError>
     where P: RingStore,
@@ -171,7 +202,7 @@ pub fn find_all_approximate_complex_roots<P>(ZZX: P, poly: &El<P>) -> Result<Vec
         remaining_poly = new_remaining_poly;
     }
     // just some canonical order to make tests and debugging easier
-    result.sort_unstable_by(|(l, _), (r, _)| f64::total_cmp(&CC.re(*l), &CC.re(*r)).then(f64::total_cmp(&CC.im(*l), &CC.im(*r))));
+    result.sort_unstable_by(|(l, _), (r, _)| f64::total_cmp(&(CC.re(*l) + CC.im(*l) * 0.000001), &(CC.re(*r) + CC.im(*r) * 0.000001)));
     return Ok(result);
 }
 
@@ -250,11 +281,11 @@ fn test_find_all_approximate_complex_roots() {
     
     let root_of_unity = |k, n| CC.exp(CC.mul(CC.from_f64(2.0 * PI * k as f64 / n as f64), Complex64::I));
     let f = cyclotomic_polynomial(&ZZX, 105);
-    let expected = (1..=52).rev().flat_map(|i| [root_of_unity(105 - i, 105), root_of_unity(i, 105)]).chain([CC.one()]);
+    let expected = (1..=52).rev().filter(|i| signed_gcd(*i, 105, StaticRing::<i64>::RING) == 1).flat_map(|i| [root_of_unity(105 - i, 105), root_of_unity(i, 105)]).chain([CC.one()]);
     let actual = find_all_approximate_complex_roots(&ZZX, &f).unwrap();
+    assert_eq!(48, actual.len());
     for (expected, (actual, dist)) in expected.zip(actual.iter().copied()) {
         assert!(dist < 0.000000001);
-        println!("{}, {}, {}, {}", CC.format(&actual), CC.format(&expected), CC.abs(CC.sub(actual, expected)), dist);
         assert!(CC.abs(CC.sub(actual, expected)) <= dist);
     }
 }
