@@ -10,6 +10,11 @@ use crate::pid::*;
 /// 
 pub trait Field: Domain + EuclideanRing {
 
+    ///
+    /// Computes the division `lhs / rhs`, where `rhs != 0`.
+    /// 
+    /// Panics if `rhs = 0`.
+    /// 
     fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         assert!(!self.is_zero(rhs));
         assert!(self.is_commutative());

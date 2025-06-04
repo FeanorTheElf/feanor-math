@@ -231,7 +231,9 @@ pub trait DivisibilityRing: RingBase {
 pub struct PreparedDivisor<R>
     where R: ?Sized + RingBase + DivisibilityRing
 {
+    /// This [`PreparedDivisor`] can perform the division by this element
     pub element: R::Element,
+    /// Additional data used to compute the division by the stored element more efficiently
     pub data: R::PreparedDivisorData
 }
 

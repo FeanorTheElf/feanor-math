@@ -94,6 +94,10 @@ pub mod conway;
 ///
 pub trait FreeAlgebra: RingExtension {
 
+    ///
+    /// Type of the canonical-basis representation of a ring element, as returned by
+    /// [`FreeAlgebra::wrt_canonical_basis()`].
+    /// 
     type VectorRepresentation<'a>: VectorFn<El<Self::BaseRing>>
         where Self: 'a;
 
@@ -339,6 +343,10 @@ pub trait FreeAlgebraStore: RingStore
         self.get_ring().charpoly(el, poly_ring, hom)
     }
 
+    ///
+    /// Temporarily wraps the canonical generator in a [`RingElementWrapper`], for more
+    /// natural creation of ring elements.
+    /// 
     #[stability::unstable(feature = "enable")]
     fn with_wrapped_generator<'a, F, const M: usize>(&'a self, f: F) -> [El<Self>; M]
         where F: FnOnce(&RingElementWrapper<&'a Self>) -> [RingElementWrapper<&'a Self>; M]

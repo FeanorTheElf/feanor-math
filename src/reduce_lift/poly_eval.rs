@@ -389,6 +389,15 @@ macro_rules! impl_interpolation_base_ring_char_zero {
     }
 }
 
+///
+/// Implements [`EvalPolyLocallyRing`] for an integer ring.
+/// 
+/// This uses a default implementation, where the prime ideals are given by the largest prime numbers
+/// such that the corresponding residue field can be implemented using [`crate::rings::zn::zn_64::Zn`]. 
+/// This should be suitable in almost all scenarios.
+/// 
+/// The syntax is the same as for other impl-macros, see e.g. [`crate::impl_interpolation_base_ring_char_zero!`].
+/// 
 #[macro_export]
 macro_rules! impl_eval_poly_locally_for_ZZ {
     (EvalPolyLocallyRing for $int_ring_type:ty) => {

@@ -38,6 +38,14 @@ impl<R, T1, T2> GeneralCooleyTukeyFFT<R::Type, R::Type, Identity<R>, T1, T2>
         T1: FFTAlgorithm<R::Type>,
         T2: FFTAlgorithm<R::Type>
 {
+    ///
+    /// Creates a new [`GeneralCooleyTukeyFFT`] over the given ring of length `n`, based on FFTs
+    /// of length `n1` and `n2`, where `n = n1 * n2`.
+    /// 
+    /// The closure `root_of_unity_pows` should, on input `i`, return `z^i` for the primitive `n`-th root of
+    /// unity `z` satisfying `z^n1 == right_table.root_of_unity()` and `z^n2 - left_table.root_of_unity()`,
+    /// where `n1` and `n2` are the lengths of `left_table` and `right_table`, respectively. 
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn new_with_pows<F>(ring: R, root_of_unity_pows: F, left_table: T1, right_table: T2) -> Self
         where F: FnMut(i64) -> El<R>
@@ -45,6 +53,17 @@ impl<R, T1, T2> GeneralCooleyTukeyFFT<R::Type, R::Type, Identity<R>, T1, T2>
         Self::new_with_pows_with_hom(ring.into_identity(), root_of_unity_pows, left_table, right_table)
     }
 
+    ///
+    /// Creates a new [`GeneralCooleyTukeyFFT`] over the given ring of length `n`, based on FFTs
+    /// of length `n1` and `n2`, where `n = n1 * n2`.
+    /// 
+    /// The given root of unity should be the primitive `n`-th root of unity satisfying
+    /// `root_of_unity^n1 == right_table.root_of_unity()` and `root_of_unity^n2 - left_table.root_of_unity()`,
+    /// where `n1` and `n2` are the lengths of `left_table` and `right_table`, respectively. 
+    /// 
+    /// Do not use this for approximate rings, as computing the powers of `root_of_unity`
+    /// will incur avoidable precision loss.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: R, root_of_unity: El<R>, left_table: T1, right_table: T2) -> Self {
         Self::new_with_hom(ring.into_identity(), root_of_unity, left_table, right_table)
@@ -58,6 +77,14 @@ impl<R_main, R_twiddle, H, A1, A2> GeneralCooleyTukeyFFT<R_main, R_twiddle, H, C
         A1: Allocator + Clone,
         A2: Allocator + Clone
 {
+    ///
+    /// Replaces the ring that this object can compute FFTs over, assuming that the current
+    /// twiddle factors can be mapped into the new ring with the given homomorphism.
+    /// 
+    /// In particular, this function does not recompute twiddles, but uses a different
+    /// homomorphism to map the current twiddles into a new ring. Hence, it is extremely
+    /// cheap. 
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn change_ring<R_new: ?Sized + RingBase, H_new: Clone + Homomorphism<R_twiddle, R_new>>(self, new_hom: H_new) -> (GeneralCooleyTukeyFFT<R_new, R_twiddle, H_new, CooleyTukeyRadix3FFT<R_new, R_twiddle, H_new, A1>, CooleyTuckeyFFT<R_new, R_twiddle, H_new, A2>>, H) {
         let ring = new_hom.codomain();
@@ -87,6 +114,19 @@ impl<R_main, R_twiddle, H, T1, T2> GeneralCooleyTukeyFFT<R_main, R_twiddle, H, T
         T1: FFTAlgorithm<R_main>,
         T2: FFTAlgorithm<R_main>
 {
+    ///
+    /// Creates a new [`GeneralCooleyTukeyFFT`] over the given ring of length `n`, based on FFTs
+    /// of length `n1` and `n2`, where `n = n1 * n2`.
+    /// 
+    /// The closure `root_of_unity_pows` should, on input `i`, return `z^i` for the primitive `n`-th root of
+    /// unity `z` satisfying `z^n1 == right_table.root_of_unity()` and `z^n2 - left_table.root_of_unity()`,
+    /// where `n1` and `n2` are the lengths of `left_table` and `right_table`, respectively. 
+    /// 
+    /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
+    /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
+    /// performed in `S`. This allows both implicit ring conversions, and using patterns like 
+    /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn new_with_pows_with_hom<F>(hom: H, root_of_unity_pows: F, left_table: T1, right_table: T2) -> Self
         where F: FnMut(i64) -> R_twiddle::Element
@@ -94,6 +134,9 @@ impl<R_main, R_twiddle, H, T1, T2> GeneralCooleyTukeyFFT<R_main, R_twiddle, H, T
         Self::create(hom, root_of_unity_pows, left_table, right_table)
     }
 
+    ///
+    /// Most general way to create a [`GeneralCooleyTukeyFFT`]. Currently equivalent to [`GeneralCooleyTukeyFFT::new_with_pows_with_hom()`].
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn create<F>(hom: H, mut root_of_unity_pows: F, left_table: T1, right_table: T2) -> Self
         where F: FnMut(i64) -> R_twiddle::Element
@@ -120,11 +163,17 @@ impl<R_main, R_twiddle, H, T1, T2> GeneralCooleyTukeyFFT<R_main, R_twiddle, H, T
         }
     }
 
+    ///
+    /// Returns the length-`n1` FFT used by this object to compute length-`n` FFTs.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn left_fft_table(&self) -> &T1 {
         &self.left_table
     }
     
+    ///
+    /// Returns the length-`n2` FFT used by this object to compute length-`n` FFTs.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn right_fft_table(&self) -> &T2 {
         &self.right_table
@@ -139,6 +188,22 @@ impl<R_main, R_twiddle, H, T1, T2> GeneralCooleyTukeyFFT<R_main, R_twiddle, H, T
         &self.hom
     }
 
+    ///
+    /// Creates a new [`GeneralCooleyTukeyFFT`] over the given ring of length `n`, based on FFTs
+    /// of length `n1` and `n2`, where `n = n1 * n2`.
+    /// 
+    /// The given root of unity should be the primitive `n`-th root of unity satisfying
+    /// `root_of_unity^n1 == right_table.root_of_unity()` and `root_of_unity^n2 - left_table.root_of_unity()`,
+    /// where `n1` and `n2` are the lengths of `left_table` and `right_table`, respectively. 
+    /// 
+    /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
+    /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
+    /// performed in `S`. This allows both implicit ring conversions, and using patterns like 
+    /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
+    /// 
+    /// Do not use this for approximate rings, as computing the powers of `root_of_unity`
+    /// will incur avoidable precision loss.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn new_with_hom(hom: H, root_of_unity: R_twiddle::Element, left_table: T1, right_table: T2) -> Self {
         let len = left_table.len() * right_table.len();
@@ -170,6 +235,9 @@ impl<R_main, R_twiddle, H, T1, T2> GeneralCooleyTukeyFFT<R_main, R_twiddle, H, T
         }).collect::<Vec<_>>()
     }
     
+    ///
+    /// Returns the ring over which this object can compute FFTs.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn ring<'a>(&'a self) -> &'a <H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
         self.hom.codomain()

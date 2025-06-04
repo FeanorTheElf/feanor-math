@@ -267,6 +267,10 @@ pub struct GaloisFieldBase<Impl>
     base: Impl
 }
 
+///
+/// The default implementation of a finite field extension of a prime field, 
+/// based on [`Zn`].
+/// 
 pub type DefaultGaloisFieldImpl = AsField<FreeAlgebraImpl<AsField<Zn>, SparseMapVector<AsField<Zn>>, Global, KaratsubaAlgorithm>>;
 
 ///

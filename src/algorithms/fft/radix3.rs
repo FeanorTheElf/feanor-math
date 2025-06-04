@@ -12,6 +12,9 @@ use crate::rings::zn::*;
 use crate::ring::*;
 use crate::seq::VectorFn;
 
+///
+/// Implementation of the Cooley-Tukey FFT algorithm for power-of-three lengths.
+/// 
 #[stability::unstable(feature = "enable")]
 pub struct CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A = Global>
     where R_main: ?Sized + RingBase,
@@ -135,6 +138,10 @@ impl<R_main, R_twiddle, H, A> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>
     ///
     /// Most general way to create a [`CooleyTukeyRadix3FFT`].
     /// 
+    /// The given closure should, on input `i`, return `z^i` for a primitive
+    /// `3^log3_n`-th root of unity. The given allocator is used to copy the input
+    /// data in cases where the input data layout is not optimal for the algorithm
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn create<F>(hom: H, mut root_of_unity_pow: F, log3_n: usize, allocator: A) -> Self 
         where F: FnMut(i64) -> R_twiddle::Element
@@ -153,6 +160,14 @@ impl<R_main, R_twiddle, H, A> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>
         };
     }
     
+    ///
+    /// Replaces the ring that this object can compute FFTs over, assuming that the current
+    /// twiddle factors can be mapped into the new ring with the given homomorphism.
+    /// 
+    /// In particular, this function does not recompute twiddles, but uses a different
+    /// homomorphism to map the current twiddles into a new ring. Hence, it is extremely
+    /// cheap. 
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn change_ring<R_new: ?Sized + RingBase, H_new: Homomorphism<R_twiddle, R_new>>(self, new_hom: H_new) -> (CooleyTukeyRadix3FFT<R_new, R_twiddle, H_new, A>, H) {
         let ring = new_hom.codomain();
@@ -191,15 +206,18 @@ impl<R_main, R_twiddle, H, A> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>
     pub fn ring<'a>(&'a self) -> &'a <H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
         self.hom.codomain()
     }
-    
+
     ///
-    /// Returns the allocator used for temporary allocation by this object.
+    /// Returns a reference to the allocator currently used for temporary allocations by this FFT.
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn allocator<'a>(&'a self) -> &'a A {
+    pub fn allocator(&self) -> &A {
         &self.allocator
     }
 
+    ///
+    /// Replaces the allocator used for temporary allocations by this FFT.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn with_allocator<A_new: Allocator>(self, allocator: A_new) -> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A_new> {
         CooleyTukeyRadix3FFT {
@@ -214,8 +232,8 @@ impl<R_main, R_twiddle, H, A> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>
     }
 
     ///
-    /// Returns the homomorphism used to map twiddle factors into the main
-    /// ring during the computation of FFTs.
+    /// Returns a reference to the homomorphism that is used to map the stored twiddle
+    /// factors into main ring, over which FFTs are computed.
     /// 
     #[stability::unstable(feature = "enable")]
     pub fn hom<'a>(&'a self) -> &'a H {
@@ -423,7 +441,7 @@ pub trait CooleyTukeyRadix3Butterfly<S: ?Sized + RingBase>: RingBase {
 
     ///
     /// Possibly pre-processes elements before the FFT starts. Here you can
-    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterfly::butterfly()`]
+    /// bring ring element into a certain form, and assume during [`CooleyTukeyRadix3Butterfly::butterfly()`]
     /// that the inputs are in this form.
     /// 
     #[inline(always)]
@@ -431,14 +449,12 @@ pub trait CooleyTukeyRadix3Butterfly<S: ?Sized + RingBase>: RingBase {
     
     ///
     /// Possibly pre-processes elements before the inverse FFT starts. Here you can
-    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterfly::inv_butterfly()`]
+    /// bring ring element into a certain form, and assume during [`CooleyTukeyRadix3Butterfly::inv_butterfly()`]
     /// that the inputs are in this form.
     /// 
     #[inline(always)]
     fn prepare_for_inv_fft(&self, _value: &mut Self::Element) {}
 }
-
-// pub static BUTTERFLY_RADIX3_TIMES: [std::sync::atomic::AtomicUsize; 20] = [const { std::sync::atomic::AtomicUsize::new(0) }; 20];
 
 impl<R: ?Sized + RingBase, S: ?Sized + RingBase> CooleyTukeyRadix3Butterfly<S> for R {
 
@@ -527,8 +543,6 @@ use crate::assert_el_eq;
 use crate::rings::zn::zn_64::*;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
-
-use super::complex_fft::FFTErrorEstimate;
 
 #[test]
 fn test_radix3_butterflies() {

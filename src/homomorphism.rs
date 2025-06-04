@@ -30,10 +30,23 @@ use crate::primitive_int::{StaticRingBase, StaticRing};
 pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized> 
     where Domain: RingBase, Codomain: RingBase
 {
+    ///
+    /// The type of the [`RingStore`] used by this object to store the domain ring.
+    /// 
     type DomainStore: RingStore<Type = Domain>;
+    ///
+    /// The type of the [`RingStore`] used by this object to store the codomain ring.
+    /// 
     type CodomainStore: RingStore<Type = Codomain>;
 
+    ///
+    /// Returns a reference to the domain ring.
+    /// 
     fn domain<'a>(&'a self) -> &'a Self::DomainStore;
+
+    ///
+    /// Returns a reference to the codomain ring.
+    /// 
     fn codomain<'a>(&'a self) -> &'a Self::CodomainStore;
 
     ///
@@ -371,8 +384,16 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
 pub trait CanHomFrom<S>: RingBase
     where S: RingBase + ?Sized
 {
+    ///
+    /// Data required to compute the action of the canonical homomorphism on ring elements.
+    /// 
     type Homomorphism;
 
+    ///
+    /// If there is a canonical homomorphism `from -> self`, returns `Some(data)`, where 
+    /// `data` is additional data that can be used to compute the action of the homomorphism
+    /// on ring elements. Otherwise, `None` is returned.
+    /// 
     fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism>;
     fn map_in(&self, from: &S, el: S::Element, hom: &Self::Homomorphism) -> Self::Element;
 
@@ -428,9 +449,22 @@ pub trait CanHomFrom<S>: RingBase
 pub trait CanIsoFromTo<S>: CanHomFrom<S>
     where S: RingBase + ?Sized
 {
+    ///
+    /// Data required to compute a preimage under the canonical homomorphism.
+    /// 
     type Isomorphism;
 
+    ///
+    /// If there is a canonical homomorphism `from -> self`, and this homomorphism
+    /// is an isomorphism, returns `Some(data)`, where `data` is additional data that
+    /// can be used to compute preimages under the homomorphism. Otherwise, `None` is
+    /// returned.
+    /// 
     fn has_canonical_iso(&self, from: &S) -> Option<Self::Isomorphism>;
+
+    ///
+    /// Computes the preimage of `el` under the canonical homomorphism `from -> self`.
+    /// 
     fn map_out(&self, from: &S, el: Self::Element, iso: &Self::Isomorphism) -> S::Element;
 }
 
@@ -744,6 +778,9 @@ impl<R: RingStore> Copy for Inclusion<R>
 impl<R> Inclusion<R>
     where R: RingStore, R::Type: RingExtension
 {
+    ///
+    /// Returns the [`Inclusion`] from the base ring of the given ring to itself.
+    /// 
     pub fn new(ring: R) -> Self {
         Inclusion { ring }
     }
@@ -844,11 +881,21 @@ impl<R> Homomorphism<StaticRingBase<i32>, R::Type> for IntHom<R>
 impl<R> IntHom<R>
     where R: RingStore
 {
+    ///
+    /// Creates the [`IntHom`] homomorphism
+    /// ```text
+    ///   Z -> R, n -> 1 + ... + 1 [n times]
+    /// ```
+    /// for the given ring `R`.
+    /// 
     pub fn new(ring: R) -> Self {
         Self { ring }
     }
 }
 
+///
+/// The identity homomorphism `R -> R, x -> x` on the given ring `R`.
+/// 
 #[derive(Clone)]
 pub struct Identity<R: RingStore> {
     ring: R
@@ -860,6 +907,9 @@ impl<R: RingStore> Copy for Identity<R>
 
 impl<R: RingStore> Identity<R> {
 
+    ///
+    /// Creates the [`Identity`] homomorphism `R -> R, x -> x` on the given ring `R`.
+    /// 
     pub fn new(ring: R) -> Self {
         Identity { ring }
     }
@@ -922,6 +972,21 @@ impl<'a, S, R, H> Homomorphism<S, R> for &'a H
     }
 }
 
+///
+/// A homomorphism between rings `R -> S`, with its action on elements
+/// defined by a user-provided closure.
+/// 
+/// It is up to the user to ensure that the given closure indeed
+/// satisfies the ring homomorphism axioms:
+///  - For `x, y in R`, it should satisfy `f(x) + f(y) = f(x + y)`
+///  - For `x, y in R`, it should satisfy `f(x) * f(y) = f(x * y)`
+///  - It should map `f(0) = 0` and `f(1) = 1`
+/// 
+/// Hence, a [`LambdaHom`] should only be used if none of the builtin
+/// homomorphisms can achieve the same result, since a function that does
+/// not follow the above axioms will make algorithms misbehave, and can
+/// lead to hard-to-debug errors.
+/// 
 #[derive(Clone)]
 pub struct LambdaHom<R: RingStore, S: RingStore, F>
     where F: Fn(&R, &S, &El<R>) -> El<S>
@@ -940,10 +1005,28 @@ impl<R: RingStore, S: RingStore, F> Copy for LambdaHom<R, S, F>
 impl<R: RingStore, S: RingStore, F> LambdaHom<R, S, F>
     where F: Fn(&R, &S, &El<R>) -> El<S>
 {
+    ///
+    /// Creates a new [`LambdaHom`] from `from` to `to`, mapping elements as
+    /// specified by the given function.
+    /// 
+    /// It is up to the user to ensure that the given closure indeed
+    /// satisfies the ring homomorphism axioms:
+    ///  - For `x, y in R`, it should satisfy `f(x) + f(y) = f(x + y)`
+    ///  - For `x, y in R`, it should satisfy `f(x) * f(y) = f(x * y)`
+    ///  - It should map `f(0) = 0` and `f(1) = 1`
+    /// 
+    /// Hence, a [`LambdaHom`] should only be used if none of the builtin
+    /// homomorphisms can achieve the same result, since a function that does
+    /// not follow the above axioms will make algorithms misbehave, and can
+    /// lead to hard-to-debug errors.
+    /// 
     pub fn new(from: R, to: S, f: F) -> Self {
         Self { from, to, f }
     }
 
+    ///
+    /// Returns the stored domain and codomain rings, consuming this object.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn into_domain_codomain(self) -> (R, S) {
         (self.from, self.to)
@@ -973,6 +1056,12 @@ impl<R: RingStore, S: RingStore, F> Homomorphism<R::Type, S::Type> for LambdaHom
     }
 }
 
+///
+/// The function composition of two homomorphisms `f: R -> S` and `g: S -> T`.
+/// 
+/// More concretely, this is the homomorphism `R -> T` that maps `x` to `g(f(x))`.
+/// The best way to create a [`ComposedHom`] is through [`Homomorphism::compose()`].
+/// 
 pub struct ComposedHom<R, S, T, F, G>
     where F: Homomorphism<R, S>,
         G: Homomorphism<S, T>,
@@ -994,11 +1083,19 @@ impl<R, S, T, F, G> ComposedHom<R, S, T, F, G>
         S: ?Sized + RingBase,
         T: ?Sized + RingBase
 {
+    ///
+    /// Returns a reference to `f`, the homomorphism that is applied first
+    /// to input elements `x`.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn first(&self) -> &F {
         &self.f
     }
 
+    ///
+    /// Returns a reference to `g`, the homomorphism that is applied second,
+    /// so to `f(x)` when mapping an input element `x`.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn second(&self) -> &G {
         &self.g

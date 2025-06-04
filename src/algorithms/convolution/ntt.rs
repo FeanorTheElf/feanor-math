@@ -1,7 +1,8 @@
 use std::alloc::{Allocator, Global};
 
 use crate::cow::*;
-use crate::{algorithms::fft::cooley_tuckey::CooleyTuckeyFFT, lazy::LazyVec};
+use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
+use crate::lazy::LazyVec;
 use crate::homomorphism::*;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
@@ -28,6 +29,9 @@ pub struct NTTConvolution<R_main, R_twiddle, H, A = Global>
     allocator: A
 }
 
+///
+/// A prepared convolution operand for a [`NTTConvolution`].
+/// 
 #[stability::unstable(feature = "enable")]
 pub struct PreparedConvolutionOperand<R, A = Global>
     where R: ?Sized + ZnRing,
@@ -41,6 +45,13 @@ impl<R> NTTConvolution<R::Type, R::Type, Identity<R>>
     where R: RingStore + Clone,
         R::Type: ZnRing
 {
+    ///
+    /// Creates a new [`NTTConvolution`].
+    /// 
+    /// Note that this convolution will be able to compute convolutions whose output is
+    /// of length `<= n`, where `n` is the largest power of two such that the given ring
+    /// has a primitive `n`-th root of unity.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: R) -> Self {
         Self::new_with(ring.into_identity(), Global)
@@ -53,6 +64,17 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
         H: Homomorphism<R_twiddle, R_main> + Clone,
         A: Allocator + Clone
 {
+    ///
+    /// Creates a new [`NTTConvolution`].
+    /// 
+    /// Note that this convolution will be able to compute convolutions whose output is
+    /// of length `<= n`, where `n` is the largest power of two such that the domain of
+    /// the given homomorphism has a primitive `n`-th root of unity.
+    /// 
+    /// Internally, twiddle factors for the underlying NTT will be stored as elements of
+    /// the domain of the given homomorphism, while the convolutions are performed over the
+    /// codomain. This can be used for more efficient NTTs, see e.g. [`zn_64::ZnFastmul`].
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn new_with(hom: H, allocator: A) -> Self {
         Self {
@@ -62,6 +84,9 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
         }
     }
 
+    ///
+    /// Returns the ring over which this object can compute convolutions.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn ring(&self) -> RingRef<R_main> {
         RingRef::new(self.hom.codomain().get_ring())

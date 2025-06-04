@@ -598,6 +598,12 @@ impl<R, V, A, C> HashableElRing for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
+///
+/// Function that creates a [`FreeAlgebraImplEl`] from its canonical basis
+/// representation.
+/// 
+/// Used by the implementation of [`FiniteRing::elements()`] for [`FreeAlgebraImplBase`].
+/// 
 pub struct WRTCanonicalBasisElementCreator<'a, R, V, A, C>
     where R: RingStore, 
         R::Type: FiniteRing, 

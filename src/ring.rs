@@ -1009,6 +1009,15 @@ pub trait RingExtension: RingBase {
         self.mul_assign(lhs, self.from_ref(rhs));
     }
 
+    ///
+    /// Computes `lhs := lhs * rhs`, where `rhs` is mapped into this ring
+    /// via the given homomorphism, followed by the inclusion (as specified by
+    /// [`RingExtension::from_ref()`]).
+    /// 
+    /// This is designed for the case that an extension ring element is represented
+    /// as a vector of base ring elements, in which case this function can make
+    /// use of an optimized [`Homomorphism::mul_assign_map()`] implementation.
+    /// 
     #[stability::unstable(feature = "enable")]
     fn mul_assign_base_through_hom<S: ?Sized + RingBase, H: Homomorphism<S, <Self::BaseRing as RingStore>::Type>>(&self, lhs: &mut Self::Element, rhs: &S::Element, hom: H) {
         self.mul_assign_base(lhs, &hom.map_ref(rhs));

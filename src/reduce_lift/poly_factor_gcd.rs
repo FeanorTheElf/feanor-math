@@ -468,6 +468,15 @@ impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
 #[stability::unstable(feature = "enable")]
 pub const INTRING_HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR: f64 = 0.25;
 
+///
+/// Implements [`PolyGCDLocallyDomain`] and [`IntegerPolyGCDRing`] for an integer ring.
+/// 
+/// This uses a default implementation, where the maximal ideals are random 24-bit prime numbers,
+/// and the corresponding residue field is implemented using [`crate::rings::zn::zn_64::Zn`]. This
+/// should be suitable in almost all scenarios.
+/// 
+/// The syntax is the same as for other impl-macros, see e.g. [`crate::impl_interpolation_base_ring_char_zero!`].
+/// 
 #[macro_export]
 macro_rules! impl_poly_gcd_locally_for_ZZ {
     (IntegerPolyGCDRing for $int_ring_type:ty) => {

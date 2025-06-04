@@ -99,14 +99,29 @@ impl<R: RingStore> RingElementWrapper<R> {
         &self.ring
     }
 
+    ///
+    /// Returns `true` if this element is zero.
+    /// 
+    /// Equivalent to `self.parent().is_zero(self.unwrap_ref())`.
+    /// 
     pub fn is_zero(&self) -> bool {
         self.parent().is_zero(self.unwrap_ref())
     }
 
+    ///
+    /// Returns `true` if this element is one.
+    /// 
+    /// Equivalent to `self.parent().is_one(self.unwrap_ref())`.
+    /// 
     pub fn is_one(&self) -> bool {
         self.parent().is_one(self.unwrap_ref())
     }
     
+    ///
+    /// Returns `true` if this element is negative one.
+    /// 
+    /// Equivalent to `self.parent().is_neg_one(self.unwrap_ref())`.
+    /// 
     pub fn is_neg_one(&self) -> bool {
         self.parent().is_neg_one(self.unwrap_ref())
     }

@@ -60,6 +60,14 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
     /// of unity can be used equally for computing a Fourier transform, the 
     /// concrete one used determines the order of the output values.
     /// 
+    /// Note that it is standard mathematical convention to compute the forward-transform
+    /// using the inverse of the considered root of unity. Hence, if `z` is the output
+    /// of [`FFTAlgorithm::root_of_unity()`], the forward FFT [`FFTAlgorithm::fft()`]
+    /// should compute
+    /// ```text
+    ///   (a_0, ..., a_(n - 1)) -> (sum_j a_j z^(-ij))_i
+    /// ```
+    /// 
     /// See also [`FFTAlgorithm::unordered_fft_permutation()`].
     /// 
     fn root_of_unity<S>(&self, ring: S) -> &R::Element
@@ -67,8 +75,8 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
 
     ///
     /// On input `i`, returns `j` such that `unordered_fft(values)[i]` contains the evaluation
-    /// at `zeta^(-j)` of values (note the `-`, which is standard convention for Fourier transforms).
-    /// Here `zeta` is the value returned by [`FFTAlgorithm::root_of_unity()`].
+    /// at `z^(-j)` of values (note the `-`, which is standard convention for Fourier transforms).
+    /// Here `z` is the value returned by [`FFTAlgorithm::root_of_unity()`].
     /// 
     /// # Example
     /// ```text

@@ -910,6 +910,12 @@ impl<'ring, I> CanIsoFromTo<FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVe
     }
 }
 
+///
+/// A prime ideal of a [`NumberField`].
+/// 
+/// Used for various implementations that work on the ring modulus prime ideals,
+/// and lift the result back to the ring.
+/// 
 pub struct NumberRingIdeal<'ring, I>
     where I: RingStore,
         I::Type: IntegerRing,

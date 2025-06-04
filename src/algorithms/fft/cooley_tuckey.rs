@@ -36,10 +36,10 @@ use super::complex_fft::*;
 /// # Convention
 /// 
 /// This implementation does not follows the standard convention for the mathematical
-/// DFT, by performing the standard/forward FFT with the inverse root of unity `zeta^-1`.
+/// DFT, by performing the standard/forward FFT with the inverse root of unity `z^-1`.
 /// In other words, the forward FFT computes
 /// ```text
-///   (a_0, ..., a_(N - 1)) -> (sum_j a_j zeta^(-ij))_i
+///   (a_0, ..., a_(n - 1)) -> (sum_j a_j z^(-ij))_i
 /// ```
 /// as demonstrated by
 /// ```rust
@@ -81,12 +81,10 @@ pub struct CooleyTuckeyFFT<R_main, R_twiddle, H, A = Global>
     hom: H,
     root_of_unity: R_main::Element,
     log2_n: usize,
-    // stores the powers of root_of_unity in special bitreversed order
+    // stores the powers of `root_of_unity^-1` in special bitreversed order
     root_of_unity_list: Vec<Vec<R_twiddle::Element>>,
-    // root_of_unity_list_base: Vec<Vec<R_main::Element>>,
-    // stores the powers of inv_root_of_unity in special bitreversed order
+    // stores the powers of `root_of_unity` in special bitreversed order
     inv_root_of_unity_list: Vec<Vec<R_twiddle::Element>>,
-    // inv_root_of_unity_list_base: Vec<Vec<R_main::Element>>,
     allocator: A,
     two_inv: R_twiddle::Element,
     n_inv: R_twiddle::Element
@@ -178,8 +176,9 @@ impl<R> CooleyTuckeyFFT<R::Type, R::Type, Identity<R>, Global>
         R::Type: DivisibilityRing
 {
     ///
-    /// Creates an [`CooleyTuckeyFFT`] for the given ring, using the given root of unity
-    /// as base. Do not use this for approximate rings, as computing the powers of `root_of_unity`
+    /// Creates an [`CooleyTuckeyFFT`] for the given ring, using the given root of unity. 
+    /// 
+    /// Do not use this for approximate rings, as computing the powers of `root_of_unity`
     /// will incur avoidable precision loss.
     /// 
     pub fn new(ring: R, root_of_unity: El<R>, log2_n: usize) -> Self {
@@ -328,8 +327,6 @@ impl<R_main, R_twiddle, H, A> Clone for CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     }
 }
 
-// pub static BUTTERFLY_TIMES: [std::sync::atomic::AtomicUsize; 20] = [const { std::sync::atomic::AtomicUsize::new(0) }; 20];
-
 ///
 /// A helper trait that defines the Cooley-Tukey butterfly operation.
 /// It is default-implemented for all rings, but for increase FFT performance, some rings
@@ -458,6 +455,10 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     ///
     /// Most general way to create a [`CooleyTuckeyFFT`].
     /// 
+    /// This is currently the same as [`CooleyTuckeyFFT::new_with_pows_with_hom()`], except
+    /// that it additionally accepts an allocator, which is used to copy the input data in
+    /// cases where the input data layout is not optimal for the algorithm.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn create<F>(hom: H, mut root_of_unity_pow: F, log2_n: usize, allocator: A) -> Self 
         where F: FnMut(i64) -> R_twiddle::Element
@@ -484,6 +485,14 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         }
     }
 
+    ///
+    /// Replaces the ring that this object can compute FFTs over, assuming that the current
+    /// twiddle factors can be mapped into the new ring with the given homomorphism.
+    /// 
+    /// In particular, this function does not recompute twiddles, but uses a different
+    /// homomorphism to map the current twiddles into a new ring. Hence, it is extremely
+    /// cheap. 
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn change_ring<R_new: ?Sized + RingBase, H_new: Homomorphism<R_twiddle, R_new>>(self, new_hom: H_new) -> (CooleyTuckeyFFT<R_new, R_twiddle, H_new, A>, H) {
         let ring = new_hom.codomain();
@@ -619,11 +628,17 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         });
     }
 
+    ///
+    /// Returns a reference to the allocator currently used for temporary allocations by this FFT.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn allocator(&self) -> &A {
         &self.allocator
     }
 
+    ///
+    /// Replaces the allocator used for temporary allocations by this FFT.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn with_allocator<A_new: Allocator>(self, allocator: A_new) -> CooleyTuckeyFFT<R_main, R_twiddle, H, A_new> {
         CooleyTuckeyFFT {
@@ -638,6 +653,10 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         }
     }
 
+    ///
+    /// Returns a reference to the homomorphism that is used to map the stored twiddle
+    /// factors into main ring, over which FFTs are computed.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn hom(&self) -> &H {
         &self.hom

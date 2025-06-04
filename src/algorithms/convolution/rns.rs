@@ -130,8 +130,11 @@ impl<'a, I, C, A, CreateC> From<&'a RNSConvolution<I, C, A, CreateC>> for &'a RN
 
 impl CreateNTTConvolution<Global> {
 
+    ///
+    /// Creates a new [`CreateNTTConvolution`].
+    /// 
     #[stability::unstable(feature = "enable")]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { allocator: Global }
     }
 }

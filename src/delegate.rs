@@ -249,15 +249,46 @@ use crate::specialization::*;
 /// 
 pub trait DelegateRing: PartialEq {
 
+    ///
+    /// Type of the delegated-to ring.
+    /// 
     type Base: ?Sized + RingBase;
+
+    ///
+    /// Type of elements of this ring. These should always wrap elements from the delegated-to ring,
+    /// but may store additional data.
+    /// 
     type Element;
 
     fn get_delegate(&self) -> &Self::Base;
+    
+    ///
+    /// Provides a reference to the delegated-to ring element stored in the given element from this ring.
+    /// 
     fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element;
+    
+    ///
+    /// Provides a mutable reference to the delegated-to ring element stored in the given element from this ring.
+    /// 
     fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element;
+    
+    ///
+    /// Creates an element of the delegated-to ring, representing the given element from this ring.
+    /// 
     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element;
+
+    ///
+    /// Creates an element of this ring, representing the given element from the delegated-to ring.
+    /// 
     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element;
     
+    ///
+    /// Called after every operation of the delegated-to ring that accepts a mutable reference
+    /// (which is acquired using [`DelegateRing::delegate_mut()`]). 
+    /// 
+    /// This can be used to update additional data, that is stored for every element in 
+    /// addition to the delegated-to ring element. In many cases, this can be empty.
+    /// 
     fn postprocess_delegate_mut(&self, el: &mut Self::Element) {
         *el = self.rev_delegate(self.get_delegate().clone_el(self.delegate_ref(el)));
     }
@@ -517,6 +548,9 @@ impl<R: DelegateRing + ?Sized> SerializableElementRing for R
     }
 }
 
+///
+/// Iterator over all elements of a finite [`DelegateRing`].
+/// 
 pub struct DelegateFiniteRingElementsIter<'a, R: ?Sized>
     where R: DelegateRing, R::Base: FiniteRing
 {

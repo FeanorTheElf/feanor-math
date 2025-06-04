@@ -68,6 +68,7 @@ unsafe impl<T> AsPointerToSlice<T> for Vec<T> {
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct DerefArray<T, const SIZE: usize> {
+    /// The wrapped array
     pub data: [T; SIZE]
 }
 
@@ -389,6 +390,11 @@ impl<'a, V, T> ColumnMut<'a, V, T>
         }
     }
     
+    ///
+    /// "Reborrows" the [`ColumnMut`], which is somewhat like cloning the submatrix, but
+    /// disallows the cloned object to be used while its copy is alive. This is necessary
+    /// to follow the aliasing rules of Rust.
+    /// 
     pub fn reborrow<'b>(&'b mut self) -> ColumnMut<'b, V, T> {
         ColumnMut {
             entry: PhantomData,
@@ -411,6 +417,9 @@ impl<'a, V, T> ColumnMut<'a, V, T>
         }
     }
     
+    ///
+    /// Returns an immutable view on this matrix column.
+    /// 
     pub fn as_const<'b>(&'b self) -> Column<'b, V, T> {
         Column {
             entry: PhantomData,
@@ -554,6 +563,9 @@ impl<'a, V, T> Submatrix<'a, V, T>
         &self.into_row_at(i)[j]
     }
     
+    ///
+    /// Returns a reference to the `(i, j)`-th entry of this matrix.
+    /// 
     pub fn at<'b>(&'b self, i: usize, j: usize) -> &'b T {
         &self.row_at(i)[j]
     }
@@ -609,6 +621,9 @@ impl<'a, V, T> Submatrix<'a, V, T>
         }
     }
 
+    ///
+    /// Returns a view on the `i`-th row of this matrix.
+    /// 
     pub fn row_at<'b>(&'b self, i: usize) -> &'b [T] {
         // safe since there are no immutable references to self.raw_data
         unsafe {
@@ -634,6 +649,9 @@ impl<'a, V, T> Submatrix<'a, V, T>
         }
     }
 
+    ///
+    /// Returns a view on the `j`-th column of this matrix.
+    /// 
     pub fn col_at<'b>(&'b self, j: usize) -> Column<'b, V, T> {
         assert!(j < self.raw_data.col_count);
         let mut result_raw = self.raw_data;
@@ -645,10 +663,16 @@ impl<'a, V, T> Submatrix<'a, V, T>
         }
     }
 
+    ///
+    /// Returns the number of columns of this matrix.
+    /// 
     pub fn col_count(&self) -> usize {
         self.raw_data.col_count
     }
 
+    ///
+    /// Returns the number of rows of this matrix.
+    /// 
     pub fn row_count(&self) -> usize {
         self.raw_data.row_count
     }
@@ -751,6 +775,9 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         )
     }
 
+    ///
+    /// Returns an iterator over (mutable views onto) the rows of this matrix.
+    /// 
     pub fn row_iter(self) -> impl 'a + ExactSizeIterator<Item = &'a mut [T]> {
         (0..self.raw_data.row_count).map(move |i| 
         // safe since each access goes to a different location
@@ -759,6 +786,9 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         })
     }
 
+    ///
+    /// Returns an iterator over (mutable views onto) the columns of this matrix.
+    /// 
     pub fn col_iter(self) -> impl 'a + ExactSizeIterator<Item = ColumnMut<'a, V, T>> {
         (0..self.raw_data.col_count).map(move |j| {
             let mut result_raw = self.raw_data;
@@ -782,14 +812,23 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         &mut self.into_row_mut_at(i)[j]
     }
 
+    ///
+    /// Returns a mutable reference to the `(i, j)`-th entry of this matrix.
+    /// 
     pub fn at_mut<'b>(&'b mut self, i: usize, j: usize) -> &'b mut T {
         &mut self.row_mut_at(i)[j]
     }
 
+    ///
+    /// Returns a reference to the `(i, j)`-th entry of this matrix.
+    /// 
     pub fn at<'b>(&'b self, i: usize, j: usize) -> &'b T {
         self.as_const().into_at(i, j)
     }
 
+    ///
+    /// Returns a view onto the `i`-th row of this matrix.
+    /// 
     pub fn row_at<'b>(&'b self, i: usize) -> &'b [T] {
         self.as_const().into_row_at(i)
     }
@@ -808,20 +847,22 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         }
     }
 
+    ///
+    /// Returns a mutable view onto the `i`-th row of this matrix.
+    /// 
     pub fn row_mut_at<'b>(&'b mut self, i: usize) -> &'b mut [T] {
         self.reborrow().into_row_mut_at(i)
     }
 
+    ///
+    /// Returns a view onto the `i`-th column of this matrix.
+    /// 
     pub fn col_at<'b>(&'b self, j: usize) -> Column<'b, V, T> {
         self.as_const().into_col_at(j)
     }
 
     ///
-    /// Consumes the submatrix and produces a reference to its `j`-th column.
-    /// 
-    /// In most cases, you will use [`SubmatrixMut::col_mut_at()`] instead, but in rare occasions,
-    /// `into_col_mut_at()` might be necessary to provide a reference whose lifetime is not
-    /// coupled to the lifetime of the submatrix object.
+    /// Returns a mutable view onto the `j`-th row of this matrix.
     /// 
     pub fn col_mut_at<'b>(&'b mut self, j: usize) -> ColumnMut<'b, V, T> {
         assert!(j < self.raw_data.col_count);
@@ -846,6 +887,9 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         }
     }
 
+    ///
+    /// Returns an immutable view on the data of this matrix.
+    /// 
     pub fn as_const<'b>(&'b self) -> Submatrix<'b, V, T> {
         Submatrix {
             entry: PhantomData,
@@ -853,10 +897,16 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
         }
     }
 
+    ///
+    /// Returns the number of columns of this matrix.
+    /// 
     pub fn col_count(&self) -> usize {
         self.raw_data.col_count
     }
 
+    ///
+    /// Returns the number of rows of this matrix.
+    /// 
     pub fn row_count(&self) -> usize {
         self.raw_data.row_count
     }

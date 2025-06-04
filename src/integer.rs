@@ -555,6 +555,11 @@ impl<R> IntegerRingStore for R
         R::Type: IntegerRing
 {}
 
+///
+/// Implementations of [`IntegerRing`] functionality that make sense for
+/// any [`IntegerRing`], and thus can be used as default if no better implementation
+/// can be provided for a concrete [`IntegerRing`].
+/// 
 pub mod generic_impls {
     use crate::ring::*;
     use crate::primitive_int::*;

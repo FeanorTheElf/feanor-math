@@ -133,6 +133,12 @@ pub mod matrix_compare {
         fn at(&self, i: usize, j: usize) -> &T { (**self).at(i, j) }
     }
 
+    ///
+    /// Checks whether two matrices are equal.
+    /// 
+    /// The prime use case is [`crate::assert_matrix_eq!`], which should be applicable
+    /// to all types that are, in some sense, interpretable as matrices.
+    /// 
     pub fn is_matrix_eq<R: ?Sized + RingBase, M1: MatrixCompare<R::Element>, M2: MatrixCompare<R::Element>>(ring: &R, lhs: &M1, rhs: &M2) -> bool {
         if lhs.row_count() != rhs.row_count() || lhs.col_count() != rhs.col_count() {
             return false;
@@ -152,6 +158,10 @@ pub mod matrix_compare {
 /// Variant of `assert_eq!` for matrices elements, i.e. assert that two ring matrices are equal.
 /// Frequently used in tests.
 /// 
+/// This takes any arguments that implement [`matrix_compare::MatrixCompare`], a very minimal trait
+/// for matrices that is implemented for all types that are, in some sense, interpretable as matrices.
+/// 
+/// # Example
 /// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;

@@ -21,6 +21,16 @@ type BaseFFT<R_main, R_twiddle, H, A> = CooleyTuckeyFFT<R_main, R_twiddle, H, A>
 /// Bluestein's FFT algorithm (also known as Chirp-Z-transform) to compute the Fourier
 /// transform of arbitrary length (including prime numbers).
 /// 
+/// # Convention
+/// 
+/// This implementation does not follows the standard convention for the mathematical
+/// DFT, by performing the standard/forward FFT with the inverse root of unity `z^-1`.
+/// In other words, the forward FFT computes
+/// ```text
+///   (a_0, ..., a_(N - 1)) -> (sum_j a_j z^(-ij))_i
+/// ```
+/// where `z` is the primitive `n`-th root of unity returned by [`FFTAlgorithm::root_of_unity()`].
+/// 
 pub struct BluesteinFFT<R_main, R_twiddle, H, A = Global>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
