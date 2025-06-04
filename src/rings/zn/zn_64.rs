@@ -202,6 +202,32 @@ impl ZnBase {
         debug_assert!(value < self.modulus_u64());
         return value;
     }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn from_primitive_int<T: PrimitiveInt>(&self, el: T) -> ZnEl {
+        let is_neg = StaticRing::<T>::RING.is_neg(&el);
+        let el_abs = <T as Into<i128>>::into(el).unsigned_abs();
+        if el_abs <= self.modulus_u64() as u128 {
+            if is_neg {
+                self.negate(self.from_u64_promise_reduced(el_abs as u64))
+            } else {
+                self.from_u64_promise_reduced(el_abs as u64)
+            }
+        } else if el_abs <= self.repr_bound() as u128 {
+            if is_neg {
+                self.negate(self.from_u64_promise_reduced(self.bounded_reduce(el_abs)))
+            } else {
+                self.from_u64_promise_reduced(self.bounded_reduce(el_abs))
+            }
+        } else {
+            let el_i128 = <T as Into<i128>>::into(el);
+            if is_neg {
+                self.from_u64_promise_reduced(((el_i128 % self.modulus as i128) as i64 + self.modulus) as u64)
+            } else {
+                self.from_u64_promise_reduced((el_i128 % self.modulus as i128) as u64)
+            }
+        }
+    }
 }
 
 /// 
@@ -252,7 +278,11 @@ impl RingBase for ZnBase {
     }
 
     fn from_int(&self, value: i32) -> Self::Element {
-        RingRef::new(self).coerce(&StaticRing::<i32>::RING, value)
+        self.from_primitive_int(value)
+    }
+
+    fn zero(&self) -> Self::Element {
+        ZnEl(0)
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -542,27 +572,8 @@ macro_rules! impl_static_int_to_zn {
     ($($int:ident),*) => {
         $(
             impl CanHomFrom<StaticRingBase<$int>> for ZnBase {
-            
                 fn map_in(&self, _from: &StaticRingBase<$int>, el: $int, _hom: &Self::Homomorphism) -> Self::Element {
-                    if el.abs() as u128 <= self.modulus_u64() as u128 {
-                        if el < 0 {
-                            self.negate(self.from_u64_promise_reduced(el.unsigned_abs() as u64))
-                        } else {
-                            self.from_u64_promise_reduced(el as u64)
-                        }
-                    } else if el.abs() as u128 <= self.repr_bound() as u128 {
-                        if el < 0 {
-                            self.negate(self.from_u64_promise_reduced(self.bounded_reduce(el.unsigned_abs() as u128)))
-                        } else {
-                            self.from_u64_promise_reduced(self.bounded_reduce(el as u128))
-                        }
-                    } else {
-                        if el < 0 {
-                            self.from_u64_promise_reduced(((el as i128 % self.modulus as i128) as i64 + self.modulus) as u64)
-                        } else {
-                            self.from_u64_promise_reduced((el as i128 % self.modulus as i128) as u64)
-                        }
-                    }
+                    self.from_primitive_int(el)
                 }
             }
         )*

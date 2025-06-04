@@ -73,12 +73,11 @@ impl<R, A> BluesteinFFT<R::Type, R::Type, Identity<R>, A>
         A: Allocator + Clone
 {
     ///
-    /// Creates an [`BluesteinFFT`] for the given ring, using the given root of unity
-    /// as base.
+    /// Creates an [`BluesteinFFT`] for the given ring, using the given roots of unity.
     /// 
     /// It is necessary that `root_of_unity_2n` is a primitive `2n`-th root of unity, and
-    /// `root_of_unity_m` is a `2^log2_m`-th root of unity, where `2^log2_m > 2n`.
-    /// 
+    /// `root_of_unity_m` is a `2^log2_m`-th root of unity, where `2^log2_m >= 2n`.
+    ///  
     /// Do not use this for approximate rings, as computing the powers of `root_of_unity`
     /// will incur avoidable precision loss.
     /// 
@@ -106,7 +105,7 @@ impl<R, A> BluesteinFFT<R::Type, R::Type, Identity<R>, A>
     /// unity.
     /// 
     /// Concretely, this requires that the characteristic `p` is congruent to 1 modulo
-    /// `2^log2_m n`, where `2^log2_m` is the smallest power of two that is `> 2n`.
+    /// `2^log2_m n`, where `2^log2_m` is the smallest power of two that is `>= 2n`.
     /// 
     pub fn for_zn(ring: R, n: usize, tmp_mem_allocator: A) -> Option<Self>
         where R::Type: ZnRing
@@ -122,10 +121,10 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         A: Allocator + Clone
 {
     ///
-    /// Creates an [`BluesteinFFT`] for the given rings, using the given root of unity.
+    /// Creates an [`BluesteinFFT`] for the given ring, using the given roots of unity.
     /// 
     /// It is necessary that `root_of_unity_2n` is a primitive `2n`-th root of unity, and
-    /// `root_of_unity_m` is a `2^log2_m`-th root of unity, where `2^log2_m > 2n`.
+    /// `root_of_unity_m` is a `2^log2_m`-th root of unity, where `2^log2_m >= 2n`.
     /// 
     /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
     /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
@@ -162,7 +161,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     /// 
     /// Concretely, `root_of_unity_2n_pows(i)` should return `z^i`, where `z` is a `2n`-th
     /// primitive root of unity, and `root_of_unity_m_pows(i)` should return `w^i` where `w`
-    /// is a `2^log2_m`-th primitive root of unity, where `2^log2_m > 2n`.
+    /// is a `2^log2_m`-th primitive root of unity, where `2^log2_m >= 2n`.
     /// 
     /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
     /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
@@ -173,11 +172,6 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         where F: FnMut(i64) -> R_twiddle::Element,
             G: FnMut(i64) -> R_twiddle::Element
     {
-        // checks on m and root_of_unity_m are done by the FFTTableCooleyTuckey
-        assert!((1 << log2_m) >= 2 * n + 1);
-        assert!(hom.domain().get_ring().is_approximate() || is_prim_root_of_unity(hom.domain(), &root_of_unity_m_pows(1), 1 << log2_m));
-        assert!(hom.codomain().get_ring().is_approximate() || is_prim_root_of_unity(hom.codomain(), &hom.map(root_of_unity_m_pows(1)), 1 << log2_m));
-
         let m_fft_table = CooleyTuckeyFFT::create(
             hom, 
             &mut root_of_unity_m_pows, 
@@ -192,7 +186,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     /// roots of unity.
     /// 
     /// Concretely, this requires that the characteristic `p` is congruent to 1 modulo
-    /// `2^log2_m n`, where `2^log2_m` is the smallest power of two that is `> 2n`.
+    /// `2^log2_m n`, where `2^log2_m` is the smallest power of two that is `>= 2n`.
     /// 
     /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
     /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
@@ -211,6 +205,9 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     
     ///
     /// Most general way to construct a [`BluesteinFFT`].
+    /// 
+    /// This function takes a length-`m` base FFT, where `m >= 2m`, and a function `root_of_unity_pows`,
+    /// on input `i`, should return `z^i` for an `n`-th primitive root of unity `z`.
     /// 
     #[stability::unstable(feature = "enable")]
     pub fn create<F>(m_fft_table: BaseFFT<R_main, R_twiddle, H, A>, mut root_of_unity_n_pows: F, n: usize) -> Self
