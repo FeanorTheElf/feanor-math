@@ -140,6 +140,12 @@ const TRY_FACTOR_DIRECTLY_ATTEMPTS: usize = 5;
 /// 
 /// To summarize, all number fields are represented absolutely, i.e. as extensions of `QQ`.
 /// 
+/// # Factoring out denominators
+/// 
+/// TODO: At next breaking release, investigate whether it is sensible to have `Impl` be an
+/// algebraic extension of `Z` instead of `Q`, and store the joint denominator once for every
+/// element.
+/// 
 /// # Choice of blanket implementations of [`CanHomFrom`]
 /// 
 /// This is done analogously to [`crate::rings::extension::galois_field::GaloisFieldBase`], see

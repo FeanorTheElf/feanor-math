@@ -532,9 +532,36 @@ impl<R, S> FreeAlgebraHom<R, S>
         S::Type: FreeAlgebra,
         <S::Type as RingExtension>::BaseRing: RingStore<Type = <<R::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
+    ///
+    /// Creates a new [`FreeAlgebraHom`] from `R` to `S`, mapping the canonical
+    /// generator of `R` to the given element of `S`. This assumes that the resulting
+    /// homomorphism is well-defined, i.e. the generating polynomial of `R` evaluated
+    /// at `image_of_generator` gives zero in `S`.
+    /// 
+    /// The checked variant of this function is [`FreeAlgebraHom::new()`].
+    /// 
+    #[stability::unstable(feature = "enable")]
+    pub fn promise_is_well_defined(from: R, to: S, image_of_generator: El<S>) -> Self {
+        assert!(from.base_ring().get_ring() == to.base_ring().get_ring());
+        Self {
+            from: from,
+            to: to,
+            image_of_generator: image_of_generator
+        }
+    }
+
+    ///
+    /// Creates a new [`FreeAlgebraHom`] from `R` to `S`, mapping the canonical
+    /// generator of `R` to the given element of `S`.
+    /// 
+    /// As opposed to [`FreeAlgebraHom::promise_is_well_defined()`], this function
+    /// checks that the resulting homomorphism is well-defined.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn new(from: R, to: S, image_of_generator: El<S>) -> Self {
         assert!(from.base_ring().get_ring() == to.base_ring().get_ring());
+        let poly_ring = DensePolyRing::new(to.base_ring(), "X");
+        assert!(to.is_zero(&poly_ring.evaluate(&from.generating_poly(&poly_ring, poly_ring.base_ring().identity()), &image_of_generator, to.inclusion())));
         Self {
             from: from,
             to: to,

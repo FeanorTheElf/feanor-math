@@ -38,11 +38,12 @@ The following rings are provided
 
 The following algorithms are implemented
  - Fast Fourier transforms, including an optimized implementation of the Cooley-Tukey algorithm for the power-of-two and power-of-three cases, an implementation of the Bluestein algorithm for arbitrary lengths, and a factor FFT implementation (also based on the Cooley-Tukey algorithm). The Fourier transforms work on all rings that have suitable roots of unity, in particular the complex numbers `C` and suitable finite rings `Fq`.
- - An optimized variant of the Karatsuba algorithm for fast convolution.
+ - Various algorithms for computing convolutions, including Karatsuba's algorithm and FFT-based methods.
  - An implementation of the Cantor-Zassenhaus algorithm to factor polynomials over finite fields.
  - Factoring polynomials over the rationals/integers (using Hensel lifting) and over number fields.
  - Lenstra's Elliptic Curve algorithm to factor integers.
  - LLL algorithm for lattice reduction.
+ - The Finke-Pohst lattice point enumeration algorithm.
  - Basic linear algebra over various rings, including finite integral extensions of principal ideal rings.
  - Miller-Rabin test to check primality of integers.
  - A baby-step-giant-step and factorization-based algorithm to compute arbitrary discrete logarithms.
@@ -52,12 +53,10 @@ Unfortunately, operations with polynomials over infinite rings (integers, ration
 
 ### Most important missing features
 
- - Comprehensive treatment of matrices and linear algebra. Currently there is only a very minimalistic abstraction of matrices [`crate::matrix`] and linear algebra, mainly for internal use. This is currently WIP and partly implemented, as we at least have [`crate::algorithms::linsolve::LinSolveRing`] for solving linear systems and [`crate::matrix::Submatrix`] as abstraction of view on matrices.
- - Careful treatment of polynomials over infinite rings, primarily with specialized implementations that prevent coefficient growth. This is currently WIP, as in some places, local computations with polynomials over `Q` already are used.
- - Implementation of algebraic closures.
- - ~~Lattice reduction and the LLL algorithm. This might also be necessary for above point.~~ Implemented now!
- - ~~More carefully designed memory allocation abstractions (preferably we would use a new crate `memory-provider` or similar).~~ Using the Rust `allocator-api` together with [`feanor-mempool`](https://github.com/FeanorTheElf/feanor-mempool) now!
- - More number theory algorithms, e.g. computing Galois groups. I am not yet sure where to draw the line here, as I think high-level number theory algorithms (Elliptic Curves, Class Groups, ...) are out of scope for this project. Technically I would include integer factoring here, but it is too important a primitive for other algorithms.
+ - Optimization and better handling of coefficient blowup during algorithms over infinite rings (in particular `Q`, `Z` and number fields). 
+ - More linear algebra operations, apart from determinants and solving linear systems.
+ - Higher-level number theory algorithms, e.g. computing maximal orders.
+ - An implementation of general fraction fields (implementations of `Q` and the ring of rational functions already exist).
 
 ## SemVer
 
@@ -261,7 +260,7 @@ This function now works with any ring that implements `IntegerRing`, a subtrait 
 
 ## Implementing rings
 
-To implement a custom ring, just create a struct and add an `impl RingBase` - that's it!
+To implement a custom ring, just create a struct and add an `impl PartialEq` and an `impl RingBase` - that's it!
 Assuming we want to provide our own implementation of the finite binary field F2, we could do it as follows.
 ```rust
 use feanor_math::homomorphism::*;
@@ -500,8 +499,8 @@ However, I did not have the time so far to thoroughly optimize many of the algor
 
 ## Tipps for achieving optimal performance
 
- - Use `lto = "fat"` in the `Cargo.toml` of your project. This is absolutely vital to enable inlining across crate boundaries, and can have a huge impact if you extensively use rings that have "simple" basic arithmetic - like `zn_64::Zn` or `primitive_int::StaticRing`.
+ - Use `lto = "fat"` in the `Cargo.toml` of your project. This is absolutely vital to enable inlining across crate boundaries, and can have a huge impact if you extensively use rings that have "simple" basic arithmetic - like [`crate::rings::zn::zn_64::Zn`] or [`crate::primitive_int::StaticRing`].
  - Different parts of this library are at different stages of optimization. While I have spent some time on finite fields and the FFT algorithms, for example working over rationals is currently somewhat slow.
  - If you extensively use rings whose elements require dynamic memory allocation, be careful to use a custom allocator, e.g. one from [`feanor-mempool`](https://github.com/FeanorTheElf/feanor-mempool).
  - The default arbitrary-precision integer arithmetic is somewhat slow. Use the feature "mpir" together with an installation of the [mpir](https://github.com/wbhart/mpir) library if you heavily use arbitrary-precision integers. 
- - Write your code so that it is easy to replace ring types and other generic parameters! `feanor-math` often provides different implementations of the same thing, but with different performance characteristics (e.g. `SparsePolyRing` vs `DensePolyRing`, `KaratsubaAlgorithm` vs `FFTBasedConvolution` and so on). If your code makes it easy to replace one with the other, you can just experiment which version gives the best performance. `feanor-math` supports that by exposing basically all interfaces through traits.
+ - Write your code so that it is easy to replace ring types and other generic parameters! `feanor-math` often provides different implementations of the same thing, but with different performance characteristics (e.g. [`crate::rings::poly::sparse_poly::SparsePolyRing`] vs [`crate::rings::poly::dense_poly::DensePolyRing`], [`crate::algorithms::convolution::KaratsubaAlgorithm`] vs [`crate::algorithms::convolution::ntt::NTTConvolution`] and so on). If your code makes it easy to replace one with the other, you can just experiment which version gives the best performance. `feanor-math` supports that by exposing basically all interfaces through traits.

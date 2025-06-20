@@ -1,13 +1,12 @@
-use crate::algorithms::matmul::MatmulAlgorithm;
-use crate::algorithms::matmul::STANDARD_MATMUL;
+use crate::algorithms::matmul::*;
 use crate::field::*;
 use crate::integer::*;
 use crate::homomorphism::*;
 use crate::matrix::*;
 use crate::matrix::transform::TransformTarget;
 use crate::primitive_int::*;
-use crate::rings::float_real::Real64;
-use crate::rings::float_real::Real64Base;
+use crate::rings::float_real::*;
+use crate::seq::*;
 use crate::rings::fraction::FractionFieldStore;
 use crate::rings::rational::*;
 use crate::ordered::{OrderedRing, OrderedRingStore};
@@ -32,7 +31,7 @@ pub trait LLLRealField<I>: OrderedRing + Field
     where I: ?Sized + IntegerRing
 {
     fn from_integer(&self, x: &I::Element, ZZ: &I) -> Self::Element;
-    fn round_to_integer(&self, x: &Self::Element, ZZ: &I) -> I::Element;
+    fn round_to_integer(&self, x: &Self::Element, ZZ: &I) -> Option<I::Element>;
 }
 
 impl<I, J> LLLRealField<J> for RationalFieldBase<I>
@@ -44,8 +43,8 @@ impl<I, J> LLLRealField<J> for RationalFieldBase<I>
         RingRef::new(self).inclusion().map(int_cast(ZZ.clone_el(x), self.base_ring(), RingRef::new(ZZ)))
     }
 
-    fn round_to_integer(&self, x: &Self::Element, ZZ: &J) -> J::Element {
-        int_cast(self.base_ring().rounded_div(self.base_ring().clone_el(self.num(x)), self.den(x)), RingRef::new(ZZ), self.base_ring())
+    fn round_to_integer(&self, x: &Self::Element, ZZ: &J) -> Option<J::Element> {
+        Some(int_cast(self.base_ring().rounded_div(self.base_ring().clone_el(self.num(x)), self.den(x)), RingRef::new(ZZ), self.base_ring()))
     }
 }
 
@@ -56,8 +55,11 @@ impl<J> LLLRealField<J> for Real64Base
         ZZ.to_float_approx(x)
     }
 
-    fn round_to_integer(&self, x: &Self::Element, ZZ: &J) -> J::Element {
-        int_cast(x.round() as i64, RingRef::new(ZZ), StaticRing::<i64>::RING)
+    fn round_to_integer(&self, x: &Self::Element, ZZ: &J) -> Option<J::Element> {
+        if x.is_nan() || x.abs() > i64::MAX as f64 {
+            return None;
+        }
+        Some(int_cast(x.round() as i64, RingRef::new(ZZ), StaticRing::<i64>::RING))
     }
 }
 
@@ -77,7 +79,7 @@ impl<J> LLLRealField<J> for Real64Base
 /// by rounding ties to zero, but this won't work anymore if floating point errors cause
 /// it to be slightly larger than `0.5` in absolute value.
 /// 
-fn size_reduce<R, I, V, T>(ring: R, int_ring: I, mut target: SubmatrixMut<V, El<R>>, target_j: usize, matrix: Submatrix<V, El<R>>, col_ops: &mut T) -> bool
+fn size_reduce<R, I, V, T>(ring: R, int_ring: I, mut target: SubmatrixMut<V, El<R>>, target_j: usize, matrix: Submatrix<V, El<R>>, col_ops: &mut T) -> Result<bool, LLLConditionError>
     where R: RingStore,
         R::Type: LLLRealField<I::Type>,
         I: IntegerRingStore + Copy,
@@ -87,7 +89,7 @@ fn size_reduce<R, I, V, T>(ring: R, int_ring: I, mut target: SubmatrixMut<V, El<
 {
     let mut changed = false;
     for j in (0..matrix.col_count()).rev() {
-        let factor = ring.get_ring().round_to_integer(target.as_const().at(j, 0), int_ring.get_ring());
+        let factor = ring.get_ring().round_to_integer(target.as_const().at(j, 0), int_ring.get_ring()).ok_or(LLLConditionError)?;
         changed |= !(int_ring.is_zero(&factor) || int_ring.is_one(&factor) || int_ring.is_neg_one(&factor));
         col_ops.subtract(int_ring, j, target_j, &factor);
         let factor = ring.get_ring().from_integer(&factor, int_ring.get_ring());
@@ -96,7 +98,7 @@ fn size_reduce<R, I, V, T>(ring: R, int_ring: I, mut target: SubmatrixMut<V, El<
             ring.sub_assign(target.at_mut(k, 0), ring.mul_ref(matrix.at(k, j), &factor));
         }
     }
-    return changed;
+    return Ok(changed);
 }
 
 ///
@@ -142,24 +144,46 @@ fn swap_gso_cols<R, V>(ring: R, mut gso: SubmatrixMut<V, El<R>>, i: usize, j: us
     let mu_sqr = ring.pow(ring.clone_el(&mu), 2);
 
     let new_bi_star_norm_sqr = ring.add_ref_fst(&bi1_star_norm_sqr, ring.mul_ref(&mu_sqr, &bi_star_norm_sqr));
-    // `|b_i*|^2 / |bnew_i*|^2`
-    let gamma_sqr = ring.div(&bi_star_norm_sqr, &new_bi_star_norm_sqr);
-    let new_bi1_star_norm_sqr = ring.mul_ref(&gamma_sqr, &bi1_star_norm_sqr);
-    let new_mu = ring.mul_ref(&gamma_sqr, &mu);
+    // `gamma := |b_(i + 1)*|^2 / |bnew_i*|^2`
+    let gamma = if ring.is_leq(&new_bi_star_norm_sqr, &bi1_star_norm_sqr) {
+        // in this case, we must have `|bnew_i*|^2 = |b_(i + 1)*|^2`, except possibly
+        // for numerical instability issues
+        ring.one()
+    } else {
+        ring.div(&bi1_star_norm_sqr, &new_bi_star_norm_sqr)
+    };
+    let new_bi1_star_norm_sqr = ring.mul_ref(&gamma, &bi_star_norm_sqr);
 
-    // we now update the `mu_ki` resp. `mu_k(i + 1)` by a linear transform
-    let lin_transform_muki = [ring.mul_ref(&gamma_sqr, &mu), ring.sub(ring.one(), ring.mul_ref(&gamma_sqr, &mu_sqr))];
-    let (mut row_i, mut row_i1) = gso.reborrow().restrict_rows(i..(i + 2)).split_rows(0..1, 1..2);
+    // we now update the `mu_ki` resp. `mu_k(i + 1)` by a linear transform;
+    // Concretely it is given by the matrix multiplication
+    // mu_(j, i)' = mu_(i + 1, i)' mu_(j, i) + gamma mu_(j, i + 1)
+    // mu_(j, i + 1)' = mu_(j, i) - mu_(i, i + 1) mu_(j, i + 1)
+
+    // we use `mu_(i + 1, i)' = mu_(i + 1, i) * |b_i*|^2 / |bnew_i*|^2`;
+    // this is somewhat problematic, but only if both `mu_(i + 1, i)` and
+    // `|b_(i + 1)*|^2` are both small (and in that case, there's not really
+    // anything we can do at this point)
+    let new_mu = if !ring.get_ring().is_approximate() && ring.is_zero(&new_bi_star_norm_sqr) {
+        ring.zero()
+    } else {
+        // this is the main problem when it comes to numerical stability.
+        ring.div(&ring.mul_ref(&mu, &bi_star_norm_sqr), &new_bi_star_norm_sqr)
+    };
+    let (row_i, row_i1) = gso.reborrow().restrict_rows(i..(i + 2)).split_rows(0..1, 1..2);
+    let row_i = row_i.into_row_mut_at(0);
+    let row_i1 = row_i1.into_row_mut_at(0);
     for k in (i + 2)..col_count {
-        let mu_ki = ring.clone_el(row_i.at(0, k));
-        std::mem::swap(row_i.at_mut(0, k), row_i1.at_mut(0, k));
-        ring.sub_assign(row_i1.at_mut(0, k), ring.mul_ref(&mu, row_i.at(0, k)));
-        ring.mul_assign_ref(row_i.at_mut(0, k), &lin_transform_muki[1]);
-        ring.add_assign(row_i.at_mut(0, k), ring.mul_ref_fst(&lin_transform_muki[0], mu_ki));
+        let new_mu_j_i = ring.add(
+            ring.mul_ref(&new_mu, row_i.at(k)),
+            ring.mul_ref(&gamma, row_i1.at(k))
+        );
+        let new_mu_j_i1 = ring.sub_ref_fst(row_i.at(k), ring.mul_ref(&mu, row_i1.at(k)));
+        *row_i.at_mut(k) = new_mu_j_i;
+        *row_i1.at_mut(k) = new_mu_j_i1;
     }
 
-    *gso.at_mut(i, i) = new_bi_star_norm_sqr;
     *gso.at_mut(i, i + 1) = new_mu;
+    *gso.at_mut(i, i) = new_bi_star_norm_sqr;
     *gso.at_mut(i + 1, i + 1) = new_bi1_star_norm_sqr;
 }
 
@@ -167,7 +191,7 @@ fn swap_gso_cols<R, V>(ring: R, mut gso: SubmatrixMut<V, El<R>>, i: usize, j: us
 /// gso contains on the diagonal the squared lengths of the GS-orthogonalized basis vectors `|bi*|^2`,
 /// and above it the GS-coefficients `mu_ij = <bi, bj*> / <bj*, bj*>`.
 /// 
-fn lll_base<R, I, V, T>(ring: R, int_ring: I, mut gso: SubmatrixMut<V, El<R>>, mut col_ops: T, delta: &El<R>) -> bool
+fn lll_base<R, I, V, T>(ring: R, int_ring: I, mut gso: SubmatrixMut<V, El<R>>, mut col_ops: T, delta: &El<R>) -> Result<bool, LLLConditionError>
     where R: RingStore + Copy,
         R::Type: LLLRealField<I::Type>,
         I: IntegerRingStore + Copy,
@@ -178,8 +202,16 @@ fn lll_base<R, I, V, T>(ring: R, int_ring: I, mut gso: SubmatrixMut<V, El<R>>, m
     let mut changed_significantly = false;
     let mut i = 0;
     while i + 1 < gso.col_count() {
+
+        println!("{}:", i);
+        println!("{}", format_matrix(gso.row_count(), gso.col_count(), |i, j| gso.at(i, j), ring));
+
         let (target, matrix) = gso.reborrow().split_cols((i + 1)..(i + 2), 0..(i + 1));
-        changed_significantly |= size_reduce(ring, int_ring, target, i + 1, matrix.as_const(), &mut col_ops);
+        changed_significantly |= size_reduce(ring, int_ring, target, i + 1, matrix.as_const(), &mut col_ops)?;
+
+        println!();
+        println!("{}", format_matrix(gso.row_count(), gso.col_count(), |i, j| gso.at(i, j), ring));
+
         if ring.is_gt(
             &ring.mul_ref_snd(
                 ring.sub_ref_fst(delta, ring.mul_ref(gso.as_const().at(i, i + 1), gso.as_const().at(i, i + 1))),
@@ -191,11 +223,15 @@ fn lll_base<R, I, V, T>(ring: R, int_ring: I, mut gso: SubmatrixMut<V, El<R>>, m
             col_ops.swap(int_ring, i, i + 1);
             swap_gso_cols(ring, gso.reborrow(), i, i + 1);
             i = max(i, 1) - 1;
+            
+            println!();
+            println!("{}", format_matrix(gso.row_count(), gso.col_count(), |i, j| gso.at(i, j), ring));
+
         } else {
             i += 1;
         }
     }
-    return changed_significantly;
+    return Ok(changed_significantly);
 }
 
 ///
@@ -254,7 +290,7 @@ pub struct LLLConditionError;
 impl Debug for LLLConditionError {
     
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "quadratic form is not positive definite, or very badly conditioned")
+        write!(f, "either the quadratic form is not positive definite, or basis resp. quadratic form are very badly conditioned")
     }
 }
 
@@ -291,8 +327,8 @@ pub fn lll_float<I, V1, V2, A>(ring: I, quadratic_form: Submatrix<V1, El<Real64>
         A: Allocator
 {
     let n = matrix.row_count();
-    assert_eq!(n, matrix.col_count());
-    assert_eq!(n, quadratic_form.col_count());
+    let m = matrix.col_count();
+    assert_eq!(n, quadratic_form.row_count());
     assert_eq!(n, quadratic_form.col_count());
 
     assert!(delta < 1.);
@@ -301,9 +337,10 @@ pub fn lll_float<I, V1, V2, A>(ring: I, quadratic_form: Submatrix<V1, El<Real64>
     let lll_reals = Real64::RING;
     let hom = lll_reals.can_hom(&ring).unwrap();
 
-    let mut gso: OwnedMatrix<f64, &A> = OwnedMatrix::zero_in(n, n, &lll_reals, &allocator);
-    let mut tmp: OwnedMatrix<f64, &A> = OwnedMatrix::zero_in(n, n, &lll_reals, &allocator);
+    let mut gso: OwnedMatrix<f64, &A> = OwnedMatrix::zero_in(m, m, &lll_reals, &allocator);
+    let mut tmp: OwnedMatrix<f64, &A> = OwnedMatrix::zero_in(m, n, &lll_reals, &allocator);
     let mut matrix_RR: OwnedMatrix<f64, &A> = OwnedMatrix::zero_in(matrix.row_count(), matrix.col_count(), &lll_reals, &allocator);
+    let mut zero_cols = 0;
 
     // We perform LLL on two levels:
     //  - the inner level is `lll_base()` and does as much work as possible
@@ -318,19 +355,41 @@ pub fn lll_float<I, V1, V2, A>(ring: I, quadratic_form: Submatrix<V1, El<Real64>
     // iterations; Hence, it can happen (for very unlucky and ill-conditioned matrices) that
     // we indeed exhaust this count.
     for _ in 0..(MAX_PROBABILISTIC_REPETITIONS * n) {
+        while matrix.col_at(zero_cols).as_iter().all(|x| ring.is_zero(x)) {
+            zero_cols += 1;
+        }
+
+        let mut matrix_RR = matrix_RR.data_mut().submatrix(0..n, zero_cols..m);
+        let mut tmp = tmp.data_mut().submatrix(zero_cols..m, 0..n);
+        let mut gso = gso.data_mut().submatrix(zero_cols..m, zero_cols..m);
         for i in 0..n {
-            for j in 0..n {
-                *matrix_RR.at_mut(i, j) = hom.map_ref(matrix.at(i, j));
+            for j in zero_cols..m {
+                *matrix_RR.at_mut(i, j - zero_cols) = hom.map_ref(matrix.at(i, j));
             }
         }
-        STANDARD_MATMUL.matmul(TransposableSubmatrix::from(matrix_RR.data()).transpose(), TransposableSubmatrix::from(quadratic_form), TransposableSubmatrixMut::from(tmp.data_mut()), lll_reals);
-        STANDARD_MATMUL.matmul(TransposableSubmatrix::from(tmp.data()), TransposableSubmatrix::from(matrix_RR.data()), TransposableSubmatrixMut::from(gso.data_mut()), lll_reals);
+        STANDARD_MATMUL.matmul(TransposableSubmatrix::from(matrix_RR.as_const()).transpose(), TransposableSubmatrix::from(quadratic_form), TransposableSubmatrixMut::from(tmp.reborrow()), lll_reals);
+        STANDARD_MATMUL.matmul(TransposableSubmatrix::from(tmp.as_const()), TransposableSubmatrix::from(matrix_RR.as_const()), TransposableSubmatrixMut::from(gso.reborrow()), lll_reals);
 
-        match ldl(&lll_reals, gso.data_mut(), |x| *x < 1000. * f64::EPSILON) {
+        match ldl(&lll_reals, gso.reborrow(), |x| *x < 1000. * f64::EPSILON) {
             Ok(()) => {
-                let changed_significantly = lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut(), TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData }, &delta);
-                if !changed_significantly {
-                    return Ok(());
+                match lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(
+                    &lll_reals, 
+                    &ring, 
+                    gso.reborrow(), 
+                    TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData }, 
+                    &delta
+                ) {
+                    Err(LLLConditionError) => {
+                        // we go to the next round, hopefully the problem will be fixed when removing zero columns
+                    },
+                    Ok(false) => {
+                        // no changes occurred, so the basis is LLL-reduced. Congratulations!
+                        return Ok(());
+                    },
+                    Ok(true) => {
+                        // significant changes occurred, do another round in case some reduction parts were not
+                        // performed optimally due to precision problems, which have been improved now
+                    }
                 }
             },
             Err(k) => {
@@ -338,11 +397,21 @@ pub fn lll_float<I, V1, V2, A>(ring: I, quadratic_form: Submatrix<V1, El<Real64>
                     // top left entry of quadratic form is zero or negative
                     return Err(LLLConditionError);
                 }
-                _ = lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.data_mut().submatrix(0..k, 0..k), TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData }, &delta);
-                let (target, reduced) = gso.data_mut().split_cols(k..(k + 1), 0..k);
-                _ = size_reduce(Real64::RING, &ring, target, k, reduced.as_const(), &mut TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData });
-                for i in 0..n {
-                    matrix.row_mut_at(i).swap(k - 1, k);
+                match lll_base::<_, _, _, TransformLatticeBasis<I::Type, I::Type, _, _>>(&lll_reals, &ring, gso.reborrow().submatrix(0..k, 0..k), TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData }, &delta) {
+                    Err(LLLConditionError) => {
+                        // we skip to the next round, hopefully the problem will be fixed when removing zero columns
+                    },
+                    Ok(_changed) => {
+                        // we successfully LLL-reduced this part, now we have to deal with the next, ill-conditioned column
+                        let (target, reduced) = gso.reborrow().split_cols(k..(k + 1), 0..k);
+                        // if the size-reduction here fails due to condition problems, then there is no chance we will
+                        // improve the conditioning anymore; this will only happen if the new column is more than `i64::MAX`
+                        // times longer than some `b_i*` in the direction of `b_i*`
+                        let _changed: bool = size_reduce(Real64::RING, &ring, target, k, reduced.as_const(), &mut TransformLatticeBasis { basis: matrix.reborrow(), hom: ring.identity(), int_ring: PhantomData })?;
+                        for i in 0..n {
+                            matrix.row_mut_at(i).swap(k - 1, k);
+                        }
+                    }
                 }
             }
         }
@@ -439,6 +508,8 @@ impl<'a, R, I, V, H> TransformTarget<I> for TransformLatticeBasis<'a, R, I, V, H
             let subtract = self.hom.mul_ref_map(self.basis.at(k, src), factor);
             ring.sub_assign(self.basis.at_mut(k, dst), subtract);
         }
+        println!("basis");
+        println!("{}", format_matrix(self.basis.row_count(), self.basis.col_count(), |i, j| self.basis.at(i, j), ring));
     }
 
     fn swap<S: Copy + RingStore<Type = I>>(&mut self, ring: S, i: usize, j: usize) {
@@ -454,8 +525,6 @@ impl<'a, R, I, V, H> TransformTarget<I> for TransformLatticeBasis<'a, R, I, V, H
     }
 }
 
-#[cfg(test)]
-use crate::seq::*;
 #[cfg(test)]
 use test::Bencher;
 #[cfg(test)]

@@ -250,7 +250,7 @@ pub fn compute_galois_group<K>(field: K) -> Result<
     match compute_galois_closure(RingValue::from_ref(field.get_ring()).clone()) {
         Ok(embedding) => {
             let (_, target, image) = embedding.destruct();
-            return Err(FreeAlgebraHom::new(field, target, image));
+            return Err(FreeAlgebraHom::promise_is_well_defined(field, target, image));
         },
         Err((_, conjugates)) => {
             let mut result: Vec<_> = conjugates.into_iter().map(|x| GaloisAutomorphism::new(field.clone(), x)).collect();

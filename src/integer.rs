@@ -1,4 +1,5 @@
 use crate::algorithms;
+use crate::integer::generic_impls::map_from_integer_ring;
 use crate::reduce_lift::poly_factor_gcd::IntegerPolyGCDRing;
 use crate::reduce_lift::poly_eval::EvalPolyLocallyRing;
 use crate::divisibility::*;
@@ -365,12 +366,7 @@ pub trait IntCast<F: ?Sized + IntegerRing>: IntegerRing {
 impl<F: ?Sized + IntegerRing, T: ?Sized + IntegerRing> IntCast<F> for T {
 
     default fn cast(&self, from: &F, value: F::Element) -> Self::Element {
-        let result = algorithms::sqr_mul::generic_abs_square_and_multiply(self.one(), &value, RingRef::new(from), |a| self.add_ref(&a, &a), |a, b| self.add_ref_fst(a, b), self.zero());
-        if from.is_neg(&value) {
-            return self.negate(result);
-        } else {
-            return result;
-        }
+        generic_impls::map_from_integer_ring(RingRef::new(from), RingRef::new(self), value)
     }
 }
 
@@ -565,6 +561,39 @@ pub mod generic_impls {
     use crate::primitive_int::*;
     use super::*;
     
+    #[stability::unstable(feature = "enable")]
+    pub fn map_from_integer_ring<I, R>(from: I, to: R, mut x: El<I>) -> El<R>
+        where I: RingStore,
+            I::Type: IntegerRing,
+            R: RingStore
+    {
+        let basis = to.int_hom().map(1 << 16);
+        let is_neg = if from.is_neg(&x) {
+            from.negate_inplace(&mut x);
+            true
+        } else {
+            false
+        };
+        let mut current = to.zero();
+        let mut current_pow = to.one();
+        while !from.is_zero(&x) {
+            let mut quo = from.clone_el(&x);
+            from.euclidean_div_pow_2(&mut quo, 16);
+            let mut rem = from.clone_el(&quo);
+            from.mul_pow_2(&mut rem, 16);
+            from.sub_self_assign(&mut rem, x);
+            let rem = int_cast(rem, StaticRing::<i32>::RING, &from);
+            to.add_assign(&mut current, to.mul_ref_snd(to.int_hom().map(rem), &current_pow));
+            x = quo;
+            to.mul_assign_ref(&mut current_pow, &basis);
+        }
+        if is_neg {
+            return to.negate(current);
+        } else {
+            return current;
+        }
+    }
+
     #[stability::unstable(feature = "enable")]
     pub fn parse<I>(ring: I, string: &str, base: u32) -> Result<El<I>, ()>
         where I: RingStore, I::Type: IntegerRing
@@ -777,4 +806,13 @@ fn test_parse() {
     assert_el_eq!(&ZZbig, &ZZbig.negate(ZZbig.power_of_two(100)), ZZbig.parse("-1267650600228229401496703205376", 10).unwrap());
     assert_el_eq!(&ZZbig, &ZZbig.mul(ZZbig.pow(ZZbig.int_hom().map(11), 26), ZZbig.int_hom().map(10)), ZZbig.parse("a00000000000000000000000000", 11).unwrap());
     assert!(ZZbig.parse("238597a", 10).is_err());
+}
+
+#[test]
+fn test_map_from_integer() {
+    let ZZbig = BigIntRing::RING;
+    assert_el_eq!(&ZZbig, ZZbig.parse("0", 10).unwrap(), map_from_integer_ring(ZZbig, ZZbig, ZZbig.parse("0", 10).unwrap()));
+    assert_el_eq!(&ZZbig, ZZbig.parse("-1", 10).unwrap(), map_from_integer_ring(ZZbig, ZZbig, ZZbig.parse("-1", 10).unwrap()));
+    assert_el_eq!(&ZZbig, ZZbig.parse("80934517340527398320561", 10).unwrap(), map_from_integer_ring(ZZbig, ZZbig, ZZbig.parse("80934517340527398320561", 10).unwrap()));
+    assert_el_eq!(&ZZbig, ZZbig.parse("-4861235897136598713465987138952643", 10).unwrap(), map_from_integer_ring(ZZbig, ZZbig, ZZbig.parse("-4861235897136598713465987138952643", 10).unwrap()));
 }

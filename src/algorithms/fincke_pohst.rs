@@ -53,7 +53,7 @@ pub fn fincke_pohst<I, R, V, F>(ZZ: I, RR: R, quadratic_form: Submatrix<V, El<R>
 
     linear_components[i] = RR.zero();
     norms_square[i] = RR.zero();
-    let center_int = RR.get_ring().round_to_integer(&target[i], ZZ.get_ring());
+    let center_int = RR.get_ring().round_to_integer(&target[i], ZZ.get_ring()).unwrap();
     current[i] = ZZ.clone_el(&center_int);
     centers[i] = center_int;
 
@@ -96,7 +96,7 @@ pub fn fincke_pohst<I, R, V, F>(ZZ: I, RR: R, quadratic_form: Submatrix<V, El<R>
                         &target[i],
                         RR.div(&linear_components[i], quadratic_form.at(i, i))
                     );
-                    let center_int = RR.get_ring().round_to_integer(&center, ZZ.get_ring());
+                    let center_int = RR.get_ring().round_to_integer(&center, ZZ.get_ring()).unwrap();
                     current[i] = ZZ.clone_el(&center_int);
                     centers[i] = center_int;
                     norms_square[i] = norm_square;

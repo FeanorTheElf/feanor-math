@@ -187,7 +187,7 @@ pub fn extend_galois_field<K>(poly_ring: DensePolyRing<K>, irred_poly: &El<Dense
                 let K_generator = result.from_canonical_basis((0..total_rank).map(|i| Fp.clone_el(FpX.coefficient_at(&K_gen, i))));
                 let L_generator = result.from_canonical_basis((0..total_rank).map(|i| Fp.clone_el(FpX.coefficient_at(&L_gen, i))));
 
-                let result = FreeAlgebraHom::new(poly_ring.into().into_base_ring(), result, K_generator);
+                let result = FreeAlgebraHom::promise_is_well_defined(poly_ring.into().into_base_ring(), result, K_generator);
                 return (result, L_generator);
             }
         }
@@ -266,7 +266,7 @@ pub fn extend_number_field_promise_is_irreducible<K>(poly_ring: DensePolyRing<K>
                 let K_generator = QQX.evaluate(&K_gen, &x, result.inclusion());
                 let L_generator = QQX.evaluate(&L_gen, &x, result.inclusion());
 
-                let result = FreeAlgebraHom::new(poly_ring.into().into_base_ring(), result, K_generator);
+                let result = FreeAlgebraHom::promise_is_well_defined(poly_ring.into().into_base_ring(), result, K_generator);
                 return (result, L_generator);
             }
         }
@@ -328,7 +328,7 @@ pub fn splitting_field<K, F>(
             let (into_new_field, root) = create_field(ref_poly_ring, ref_extend_with_poly);
             let (old_field, new_field, image) = into_new_field.destruct();
             let new_poly_ring = DensePolyRing::new(new_field, "X");
-            let into_new_field = FreeAlgebraHom::new(old_field, new_poly_ring.base_ring(), image);
+            let into_new_field = FreeAlgebraHom::promise_is_well_defined(old_field, new_poly_ring.base_ring(), image);
             
             image_of_base_can_gen = into_new_field.map(image_of_base_can_gen);
             roots = roots.into_iter().map(|(r, e)| (into_new_field.map(r), e)).collect();
@@ -348,7 +348,7 @@ pub fn splitting_field<K, F>(
         }
     }
     return (
-        FreeAlgebraHom::new(
+        FreeAlgebraHom::promise_is_well_defined(
             base_field.unwrap_or_else(|| poly_ring.clone().into().into_base_ring()),
             poly_ring.into().into_base_ring(),
             image_of_base_can_gen
@@ -406,7 +406,7 @@ pub fn variety_from_lex_gb<K, P, F>(
         
         let (base_field, current_field, base_field_gen) = current_embedding.destruct();
         let KX = DensePolyRing::new(current_field, "X");
-        let ref_current_embedding = FreeAlgebraHom::new(&base_field, KX.base_ring(), base_field_gen);
+        let ref_current_embedding = FreeAlgebraHom::promise_is_well_defined(&base_field, KX.base_ring(), base_field_gen);
         let next_roots_from: El<DensePolyRing<K>> = polys_for_indeterminate[next_indet_idx].iter().map(|f| 
             poly_ring.evaluate(
                 f, 
@@ -422,7 +422,7 @@ pub fn variety_from_lex_gb<K, P, F>(
         assert!(!KX.is_zero(&next_roots_from), "basis is either not a lex-GB or does not generate a zero-dimensional ideal");
         if KX.degree(&next_roots_from).unwrap() == 0 {
             let (_, _, base_field_gen) = ref_current_embedding.destruct();
-            current_embedding = FreeAlgebraHom::new(base_field, KX.into().into_base_ring(), base_field_gen);
+            current_embedding = FreeAlgebraHom::promise_is_well_defined(base_field, KX.into().into_base_ring(), base_field_gen);
             // continue
         } else if KX.degree(&next_roots_from).unwrap() == 1 {
             let mut new_root = current_root;
@@ -433,7 +433,7 @@ pub fn variety_from_lex_gb<K, P, F>(
                 final_roots.push(new_root);
             }
             let (_, _, base_field_gen) = ref_current_embedding.destruct();
-            current_embedding = FreeAlgebraHom::new(base_field, KX.into().into_base_ring(), base_field_gen);
+            current_embedding = FreeAlgebraHom::promise_is_well_defined(base_field, KX.into().into_base_ring(), base_field_gen);
         } else {
             let (_, _, base_field_gen) = ref_current_embedding.destruct();
             let (into_new_field, roots) = splitting_field(KX, next_roots_from, &mut create_field);
@@ -451,7 +451,7 @@ pub fn variety_from_lex_gb<K, P, F>(
             }
             let base_field_gen = into_new_field.map(base_field_gen);
             let (_, new_field, _) = into_new_field.destruct();
-            current_embedding = FreeAlgebraHom::new(base_field, new_field, base_field_gen);
+            current_embedding = FreeAlgebraHom::promise_is_well_defined(base_field, new_field, base_field_gen);
         }
     }
     return (current_embedding, final_roots);
