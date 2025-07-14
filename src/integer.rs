@@ -1,5 +1,3 @@
-use crate::algorithms;
-use crate::integer::generic_impls::map_from_integer_ring;
 use crate::reduce_lift::poly_factor_gcd::IntegerPolyGCDRing;
 use crate::reduce_lift::poly_eval::EvalPolyLocallyRing;
 use crate::divisibility::*;
@@ -635,6 +633,8 @@ pub mod generic_impls {
 
 #[cfg(test)]
 use crate::primitive_int::*;
+#[cfg(test)]
+use generic_impls::map_from_integer_ring;
 
 #[allow(missing_docs)]
 #[cfg(any(test, feature = "generic_tests"))]
