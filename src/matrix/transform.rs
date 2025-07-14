@@ -219,3 +219,13 @@ impl<R> TransformTarget<R> for TransformList<R>
         self.transforms.push(Transform::Swap(i, j))
     }
 }
+
+impl<R> TransformTarget<R> for ()
+    where R: ?Sized + RingBase
+{
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, _: S, _: usize, _: usize, _: &[R::Element; 4]) {}
+
+    fn subtract<S: Copy + RingStore<Type = R>>(&mut self, _: S, _: usize, _: usize, _: &R::Element) {}
+
+    fn swap<S: Copy + RingStore<Type = R>>(&mut self, _: S, _: usize, _: usize) {}
+}

@@ -1,23 +1,17 @@
-use std::cmp::max;
-
-use crate::algorithms::lll::assert_lattice_isomorphic;
-use crate::algorithms::lll::norm_squared;
-use crate::algorithms::matmul::*;
+use crate::algorithms::matmul::{STANDARD_MATMUL, MatmulAlgorithm};
 use crate::field::*;
-use crate::integer::*;
 use crate::homomorphism::*;
+use crate::integer::generic_impls::map_from_integer_ring;
+use crate::integer::BigIntRing;
 use crate::matrix::*;
-use crate::matrix::transform::TransformTarget;
-use crate::primitive_int::StaticRing;
-use crate::seq::*;
-use crate::ordered::{OrderedRing, OrderedRingStore};
+use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
+use crate::ordered::*;
 use crate::ring::*;
-
-struct NotEnoughPrecision;
+use crate::rings::approx_real::{ApproxRealField, NotEnoughPrecision, SqrtRing};
 
 struct GSOMatrix<'a, I, R, V1, V2, V3>
     where I: ?Sized + RingBase,
-        R: ?Sized + Field + OrderedRing,
+        R: ?Sized + ApproxRealField + SqrtRing,
         V1: AsPointerToSlice<I::Element>,
         V2: AsPointerToSlice<R::Element>,
         V3: AsPointerToSlice<R::Element>
@@ -27,11 +21,149 @@ struct GSOMatrix<'a, I, R, V1, V2, V3>
     /// Cholesky-decomposition of the upper left part of `quadratic_form`;
     /// stored in the upper triangle
     cholesky: SubmatrixMut<'a, V2, R::Element>,
-    /// Bound on the error of the Cholesky-decomposition, relative to the pivot;
-    /// in other words, `E[i, j]` is an upper bound on `|C[i, j] - C*[i, j]| / C[i, i]`
-    /// for `j >= i`; only the upper triangle is used
+    /// Bound on the absolute error of the Cholesky decomposition,;
+    /// in other words, `E[i, j]` is an upper bound on `|C[i, j] - C*[i, j]|`
+    /// for `j >= i`, where `C*` is the real Cholesky decomposition; only
+    /// the upper triangle is used
     error_bound: SubmatrixMut<'a, V3, R::Element>
-} 
+}
+
+impl<'a, I, R, V1, V2, V3> TransformTarget<I> for GSOMatrix<'a, I, R, V1, V2, V3>
+    where I: ?Sized + RingBase,
+        R: ?Sized + ApproxRealField + SqrtRing,
+        V1: AsPointerToSlice<I::Element>,
+        V2: AsPointerToSlice<R::Element>,
+        V3: AsPointerToSlice<R::Element>
+{
+    fn transform<S: Copy + RingStore<Type = I>>(&mut self, ring: S, i: usize, j: usize, transform: &[<I as RingBase>::Element; 4]) {
+        TransformRows(self.quadratic_form.reborrow(), ring.get_ring()).transform(ring, i, j, transform);
+        TransformCols(self.quadratic_form.reborrow(), ring.get_ring()).transform(ring, i, j, transform);
+    }
+
+    fn swap<S: Copy + RingStore<Type = I>>(&mut self, ring: S, i: usize, j: usize) {
+        TransformRows(self.quadratic_form.reborrow(), ring.get_ring()).swap(ring, i, j);
+        TransformCols(self.quadratic_form.reborrow(), ring.get_ring()).swap(ring, i, j);
+    }
+
+    fn subtract<S: Copy + RingStore<Type = I>>(&mut self, ring: S, src: usize, dst: usize, factor: &<I as RingBase>::Element) {
+        TransformRows(self.quadratic_form.reborrow(), ring.get_ring()).subtract(ring, src, dst, factor);
+        TransformCols(self.quadratic_form.reborrow(), ring.get_ring()).subtract(ring, src, dst, factor);
+    }
+}
+
+fn divide_with_error<R>(RR: &R, num: &R::Element, num_err: &R::Element, den: &R::Element, den_err: &R::Element) -> (R::Element, R::Element)
+    where R: ?Sized + ApproxRealField
+{
+    assert!(!RR.is_neg(den));
+    let result = RR.div(num, den);
+    let pivot_inv_error = if RR.is_geq(den_err, den) {
+        RR.infinity()
+    } else {
+        RR.div(
+            den_err, 
+            &RR.mul_ref_fst(
+                den,
+                RR.sub_ref(den, den_err)
+            )
+        )
+    };
+    assert!(!RR.is_neg(&pivot_inv_error));
+    let result_err = RR.sum([
+        RR.mul_ref_fst(num_err, RR.div(&RR.one(), &den)),
+        RR.mul(RR.abs(RR.clone_el(num)), pivot_inv_error)
+    ]);
+    return (result, result_err);
+}
+
+///
+/// Computes the column `C[..i, i]` of the Cholesky decomposition `C`
+/// of `A` and the corresponding error bounds, assuming that `Q[..i, ..i]`
+/// is already computed.
+/// 
+fn compute_cholesky_column_without_pivot<I, R, H, V1, V2, V3>(
+    gso: &mut GSOMatrix<I, R, V1, V2, V3>,
+    i: usize,
+    h: &H
+)
+    where I: ?Sized + RingBase,
+        R: ?Sized + ApproxRealField + SqrtRing,
+        H: Homomorphism<I, R>,
+        V1: AsPointerToSlice<I::Element>,
+        V2: AsPointerToSlice<R::Element>,
+        V3: AsPointerToSlice<R::Element>
+{
+    let RR = h.codomain();
+    let eps = RR.get_ring().epsilon();
+    for k in 0..i {
+        let sum = RR.sub(
+            h.map_ref(gso.quadratic_form.at(k, i)),
+            RR.sum(
+                (0..k).map(|l| RR.mul_ref(gso.cholesky.at(l, i), gso.cholesky.at(l, k)))
+            )
+        );
+        let sum_error = RR.sum([
+            RR.mul_ref_fst(eps, RR.abs(h.map_ref(gso.quadratic_form.at(k, i)))),
+            RR.sum(
+                (0..k).map(|l| RR.add(
+                    RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, i))), &gso.error_bound.at(l, k)),
+                    RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, k))), &gso.error_bound.at(l, i))
+                ))
+            )
+        ]);
+        assert!(!RR.is_neg(&sum_error));
+        assert!(!RR.is_neg(gso.cholesky.at(k, k)));
+
+        let (result, result_error) = divide_with_error(RR.get_ring(), &sum, &sum_error, gso.cholesky.at(k, k), gso.error_bound.at(k, k));
+        *gso.cholesky.at_mut(k, i) = result;
+        *gso.error_bound.at_mut(k, i) = result_error;
+    }
+}
+
+///
+/// Computes the entry `C[i, i]` of the Cholesky decomposition `C`
+/// of `A` and the corresponding error bounds, assuming that
+/// `Q[..i, ..=i]` is already computed.
+/// 
+fn compute_cholesky_pivot<I, R, H, V1, V2, V3>(
+    gso: &mut GSOMatrix<I, R, V1, V2, V3>,
+    i: usize,
+    h: &H
+)
+    where I: ?Sized + RingBase,
+        R: ?Sized + ApproxRealField + SqrtRing,
+        H: Homomorphism<I, R>,
+        V1: AsPointerToSlice<I::Element>,
+        V2: AsPointerToSlice<R::Element>,
+        V3: AsPointerToSlice<R::Element>
+{
+    let RR = h.codomain();
+    let eps = RR.get_ring().epsilon();
+    let sum = RR.sub(
+        h.map_ref(gso.quadratic_form.at(i, i)),
+        RR.sum(
+            (0..i).map(|l| RR.pow(RR.clone_el(gso.cholesky.at(l, i)), 2))
+        )
+    );
+    let sum_error = RR.sum([
+        RR.mul_ref_fst(eps, RR.abs(h.map_ref(gso.quadratic_form.at(i, i)))),
+        RR.int_hom().mul_map(RR.sum(
+            (0..i).map(|l| RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, i))), &gso.error_bound.at(l, i)))
+        ), 2)
+    ]);
+    assert!(!RR.is_neg(&sum_error));
+
+    let upper = RR.add_ref(&sum, &sum_error);
+    assert!(!RR.is_neg(&upper));
+    let (value, error) = if !RR.is_pos(&RR.sub_ref(&sum, &sum_error)) {
+        // we assume the matrix is positive semi-definite
+        (RR.div(&upper, &RR.int_hom().map(2)), RR.div(&upper, &RR.int_hom().map(2)))
+    } else {
+        (sum, sum_error)
+    };
+
+    *gso.cholesky.at_mut(i, i) = RR.get_ring().sqrt(value);
+    *gso.error_bound.at_mut(i, i) = RR.get_ring().sqrt(error);
+}
 
 ///
 /// Size-reduces the `i`-th basis vector, implicitly defined by
@@ -41,20 +173,75 @@ struct GSOMatrix<'a, I, R, V1, V2, V3>
 /// Cholesky decomposition `C` and the corresponding entries in
 /// the error bound matrix.
 /// 
-fn size_reduce<I, R, H, V1, V2, V3>(
+fn size_reduce<I, R, H, V1, V2, V3, T>(
     gso: &mut GSOMatrix<I, R, V1, V2, V3>,
     i: usize,
-    h: H,
-    precision_bound: &R::Element
+    h: &H,
+    eta: &R::Element,
+    transform: &mut T
 ) -> Result<(), NotEnoughPrecision>
     where I: ?Sized + RingBase,
-        R: ?Sized + Field + OrderedRing,
+        R: ?Sized + ApproxRealField + SqrtRing,
         H: Homomorphism<I, R>,
         V1: AsPointerToSlice<I::Element>,
         V2: AsPointerToSlice<R::Element>,
-        V3: AsPointerToSlice<R::Element>
+        V3: AsPointerToSlice<R::Element>,
+        T: TransformTarget<I>
 {
-    return Ok(());
+    let RR = h.codomain();
+
+    // the largest value of `abs(mu) + error` we encountered in the last iteration;
+    // this should decrease each iteration, otherwise we are not making progress
+    let mut largest_max_mu = RR.get_ring().infinity();
+    loop {
+        compute_cholesky_column_without_pivot(gso, i, &h);
+
+        // first, check precision and progress
+        let new_largest_max_mu = (0..i).map(|k| RR.div(
+            &RR.add_ref_snd(
+                RR.abs(RR.clone_el(gso.cholesky.at(k, i))), 
+                gso.error_bound.at(k, i)
+            ),
+            gso.cholesky.at(k, k)
+        )).fold(RR.zero(), |l, r| if RR.is_leq(&l, &r) { r } else { l });
+        if RR.is_leq(&new_largest_max_mu, &eta) {
+            return Ok(());
+        } else if RR.is_geq(&new_largest_max_mu, &largest_max_mu) {
+            return Err(NotEnoughPrecision);
+        } else {
+            largest_max_mu = new_largest_max_mu;
+        }
+
+        for k in (0..i).rev() {
+            let min_entry = RR.sub(
+                RR.abs(RR.clone_el(gso.cholesky.at(k, i))), 
+                // add epsilon here, to avoid `NotEnoughPrecision` error in the case that `mu = +/- 1/2` and `error = 0`
+                RR.add_ref(
+                    gso.error_bound.at(k, i),
+                    RR.get_ring().epsilon()
+                )
+            );
+            let min_entry = if RR.is_neg(&min_entry) {
+                RR.zero()
+            } else if RR.is_neg(gso.cholesky.at(k, i)) {
+                RR.negate(min_entry)
+            } else {
+                min_entry
+            };
+            let min_mu = RR.div(&min_entry, gso.cholesky.at(k, k));
+
+            let factor = RR.get_ring().round_to_integer(BigIntRing::RING, min_mu).ok_or(NotEnoughPrecision)?;
+            if !BigIntRing::RING.is_zero(&factor) {
+                let (mut target, rest) = gso.cholesky.reborrow().split_cols(i..(i + 1), 0..i);
+                let factor = map_from_integer_ring(&BigIntRing::RING, h.domain(), factor);
+                for l in 0..k {
+                    RR.sub_assign(target.at_mut(l, 0), h.mul_ref_map(rest.at(l, k), &factor));
+                }
+                gso.subtract(h.domain(), k, i, &factor);
+                transform.subtract(h.domain(), k, i, &factor);
+            }
+        }
+    }
 }
 
 enum LovaszCondition {
@@ -77,35 +264,37 @@ enum LovaszCondition {
 fn check_lovasz_condition<I, R, H, V1, V2, V3>(
     gso: &mut GSOMatrix<I, R, V1, V2, V3>,
     i: usize,
-    h: H,
+    h: &H,
     delta: &R::Element
 ) -> LovaszCondition
     where I: ?Sized + RingBase,
-        R: ?Sized + Field + OrderedRing,
+        R: ?Sized + ApproxRealField + SqrtRing,
         H: Homomorphism<I, R>,
         V1: AsPointerToSlice<I::Element>,
         V2: AsPointerToSlice<R::Element>,
         V3: AsPointerToSlice<R::Element>
 {
-    return unimplemented!();
+    let RR = h.codomain();
+    compute_cholesky_pivot(gso, i, h);
+
+    let prev_norm_squared = RR.pow(RR.clone_el(gso.cholesky.at(i - 1, i - 1)), 2);
+    let current_norm_squared = RR.pow(RR.clone_el(gso.cholesky.at(i, i)), 2);
+    let mu = RR.div(gso.cholesky.at(i - 1, i), gso.cholesky.at(i - 1, i - 1));
+    let factor = RR.sub_ref_fst(delta, RR.pow(mu, 2));
+    assert!(!RR.is_neg(&factor));
+    if RR.is_lt(
+        &current_norm_squared,
+        &RR.mul(factor, prev_norm_squared),
+    ) {
+        LovaszCondition::Swap
+    } else {
+        LovaszCondition::Satisfied
+    }
 }
 
 ///
-/// Swaps the `(i - 1)`-th and `i`-th rows, and then the `(i - 1)`-th and `i`-th columns.
-/// 
-fn swap_basis_vectors<I, V1>(
-    A: SubmatrixMut<V1, I::Element>,
-    i: usize,
-    ring: &I
-)
-    where I: ?Sized + RingBase,
-        V1: AsPointerToSlice<I::Element>,
-{
-    unimplemented!()
-}
-
-///
-/// LLL-reduces the given positive semidefinite quadratic form `A`.
+/// LLL-reduces the given positive semidefinite quadratic form, using
+/// a custom variant of the L^2 algorithm.
 /// 
 /// Note that the algorithm may return [`NotEnoughPrecision`], if it cannot
 /// prove that the result is `(delta, eta)`-LLL-reduced. However, it will usually
@@ -127,48 +316,59 @@ fn swap_basis_vectors<I, V1>(
 ///    precision floating point numbers, it can make sense to increase the precision
 ///    and try again.
 ///
-fn lll_float<I, R, H, V1>(
-    mut A: SubmatrixMut<V1, I::Element>,
+#[stability::unstable(feature = "enable")]
+pub fn lll_float_quadratic_form<I, R, H, V1, T>(
+    quadratic_form: SubmatrixMut<V1, I::Element>,
     h: H,
     delta: &R::Element,
-    eta: &R::Element
+    eta: &R::Element,
+    transform: &mut T
 ) -> Result<(), NotEnoughPrecision>
     where I: ?Sized + RingBase,
-        R: ?Sized + Field + OrderedRing,
+        R: ?Sized + ApproxRealField + SqrtRing,
         H: Homomorphism<I, R>,
-        V1: AsPointerToSlice<I::Element>
+        V1: AsPointerToSlice<I::Element>,
+        T: TransformTarget<I>
 {
     assert!(!h.domain().get_ring().is_approximate());
     let RR = h.codomain();
-    let n = A.row_count();
-    assert_eq!(n, A.col_count());
+    let n = quadratic_form.row_count();
+    assert_eq!(n, quadratic_form.col_count());
     let half = RR.div(&RR.one(), &RR.int_hom().map(2));
     assert!(RR.is_gt(eta, &half));
     assert!(RR.is_lt(delta, &RR.one()));
     assert!(RR.is_gt(delta, &RR.mul_ref(eta, eta)));
     let strict_delta = RR.mul_ref_snd(RR.add_ref_fst(delta, RR.one()), &half);
-    let precision_bound = RR.sub_ref_fst(eta, half);
 
     let mut C = OwnedMatrix::zero(n, n, RR);
     let mut E = OwnedMatrix::zero(n, n, RR);
     let mut gso = GSOMatrix {
         cholesky: C.data_mut(),
         error_bound: E.data_mut(),
-        quadratic_form: A
+        quadratic_form: quadratic_form
     };
+    *gso.cholesky.at_mut(0, 0) = RR.get_ring().sqrt(h.map_ref(gso.quadratic_form.at(0, 0)));
+    *gso.error_bound.at_mut(0, 0) = RR.mul_ref(gso.cholesky.at(0, 0), RR.get_ring().epsilon());
 
     let mut i = 1;
-    let mut remaining_swaps = 100000;
+    let mut remaining_swaps = n * n * 1000;
     while i < n {
-        size_reduce(&mut gso, i, &h, &precision_bound)?;
+        assert!(i > 0);
+        size_reduce(&mut gso, i, &h, eta, transform)?;
         match check_lovasz_condition(&mut gso, i, &h, &strict_delta) {
             LovaszCondition::Swap if remaining_swaps == 0 => {
                 return Err(NotEnoughPrecision);
             }
             LovaszCondition::Swap => {
                 remaining_swaps -= 1;
-                swap_basis_vectors(A.reborrow(), i - 1, h.domain().get_ring());
-                i = max(i, 2) - 1;
+                gso.swap(h.domain(), i - 1, i);
+                transform.swap(h.domain(), i - 1, i);
+                if i == 1 {
+                    *gso.cholesky.at_mut(0, 0) = RR.get_ring().sqrt(h.map_ref(gso.quadratic_form.at(0, 0)));
+                    *gso.error_bound.at_mut(0, 0) = RR.mul_ref(gso.cholesky.at(0, 0), RR.get_ring().epsilon());
+                } else {
+                    i -= 1;
+                }
             },
             LovaszCondition::Satisfied => {
                 i += 1;
@@ -176,35 +376,139 @@ fn lll_float<I, R, H, V1>(
         }
     }
 
-    // check if it is indeed (delta, eta)-LLL-reduced, considering errors
+    // check if it is indeed `(delta, eta)`-LLL-reduced, considering errors;
+    // we only have to check for the Lovasz condition, since size-reduce already
+    // ensures that it is `eta`-size reduced
 
     return Ok(());
+}
+
+///
+/// LLL-reduces the given lattice basis, defined by the columns of the given
+/// matrix, using a custom variant of the L^2 algorithm.
+/// 
+/// Note that the algorithm may return [`NotEnoughPrecision`], if it cannot
+/// prove that the result is `(delta, eta)`-LLL-reduced. However, it will usually
+/// be quite reduced already, and may even be `(delta, eta)`-LLL-reduced.
+/// 
+/// For more details, see [`lll_float_quadratic_form()`].
+///
+#[stability::unstable(feature = "enable")]
+pub fn lll_float_lattice<I, R, H, V1>(
+    basis: SubmatrixMut<V1, I::Element>,
+    h: H,
+    delta: &R::Element,
+    eta: &R::Element
+) -> Result<(), NotEnoughPrecision>
+    where I: ?Sized + RingBase,
+        R: ?Sized + ApproxRealField + SqrtRing,
+        H: Homomorphism<I, R>,
+        V1: AsPointerToSlice<I::Element>
+{
+    let n = basis.col_count();
+    let mut quadratic_form = OwnedMatrix::zero(n, n, h.domain());
+    STANDARD_MATMUL.matmul(
+        TransposableSubmatrix::from(basis.as_const()).transpose(),
+        TransposableSubmatrix::from(basis.as_const()),
+        TransposableSubmatrixMut::from(quadratic_form.data_mut()),
+        h.domain()
+    );
+
+    lll_float_quadratic_form(
+        quadratic_form.data_mut(),
+        &h,
+        delta,
+        eta,
+        &mut TransformCols(basis, h.domain().get_ring())
+    )?;
+
+    return Ok(());
+}
+
+#[cfg(test)]
+use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use crate::assert_matrix_eq;
+#[cfg(test)]
+use crate::algorithms::lll::{assert_lattice_isomorphic, norm_squared};
+#[cfg(test)]
+use crate::rings::approx_real::float::*;
+
+#[test]
+fn test_compute_cholesky_column_without_pivot() {
+    let RR = Real64::RING;
+    let mut quadratic_form = [
+        DerefArray::from([4., 5.]),
+        DerefArray::from([5., 12.])
+    ];
+    let mut cholesky = [
+        DerefArray::from([2., 0.]),
+        DerefArray::from([0., 0.])
+    ];
+    let mut errors = [
+        DerefArray::from([0., 0.]),
+        DerefArray::from([0., 0.])
+    ];
+    let mut gso = GSOMatrix {
+        quadratic_form: SubmatrixMut::from_2d(&mut quadratic_form),
+        cholesky: SubmatrixMut::from_2d(&mut cholesky),
+        error_bound: SubmatrixMut::from_2d(&mut errors)
+    };
+    compute_cholesky_column_without_pivot(&mut gso, 1, &RR.identity());
+
+    assert!(errors[0][1] <= 5. * f64::EPSILON);
+    assert!((cholesky[0][1] - 2.5).abs() <= errors[0][1]);
+    
+    let mut quadratic_form = [
+        DerefArray::from([16., 6., 4.]),
+        DerefArray::from([6., 11., 2.5]),
+        DerefArray::from([4., 2.5, 2.]),
+    ];
+    let mut cholesky = [
+        DerefArray::from([4., 1.5, 0.]),
+        DerefArray::from([0., 2.9580398915498080212836641, 0.]),
+        DerefArray::from([0., 0., 0.]),
+    ];
+    let mut errors = [
+        DerefArray::from([0., 0., 0.]),
+        DerefArray::from([0., f64::EPSILON, 0.]),
+        DerefArray::from([0., 0., 0.]),
+    ];
+    let mut gso = GSOMatrix {
+        quadratic_form: SubmatrixMut::from_2d(&mut quadratic_form),
+        cholesky: SubmatrixMut::from_2d(&mut cholesky),
+        error_bound: SubmatrixMut::from_2d(&mut errors)
+    };
+    compute_cholesky_column_without_pivot(&mut gso, 2, &RR.identity());
+
+    assert!(errors[0][2] <= 5. * f64::EPSILON);
+    assert!((cholesky[0][2] - 1.).abs() <= errors[0][2]);
+    assert!(errors[1][2] <= 10. * f64::EPSILON);
+    assert!((cholesky[1][2] - 0.33806170189140663100384733).abs() <= errors[1][2]);
 }
 
 #[test]
 fn test_lll_float_2d() {
     let ZZ = StaticRing::<i64>::RING;
+    let RR = Real64::RING;
     let original = [
-        DerefArray::from([5,   9]),
-        DerefArray::from([11, 20])
+        DerefArray::from([146, 265]),
+        DerefArray::from([265, 481])
     ];
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
-    lll_float(&ZZ, OwnedMatrix::<_>::identity(2, 2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9, Global).unwrap();
-
-    assert_lattice_isomorphic(ZZ, Submatrix::from_2d(&original), &reduced_matrix.as_const());
-    assert_eq!(1, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
-    assert_eq!(1, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
-
+    let reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
+    lll_float_quadratic_form(reduced_matrix, RR.can_hom(&ZZ).unwrap(), &0.9, &0.55, &mut ()).unwrap();
+    assert_matrix_eq!(ZZ, OwnedMatrix::identity(2, 2, ZZ), reduced);
+    
     let original = [
         DerefArray::from([10, 8]),
         DerefArray::from([27, 22])
     ];
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
-    lll_float(&ZZ, OwnedMatrix::<_>::identity(2, 2, Real64::RING).data(), reduced_matrix.reborrow(), 0.9, Global).unwrap();
+    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.9, &0.55).unwrap();
 
-    assert_lattice_isomorphic(ZZ, Submatrix::from_2d(&original), &reduced_matrix.as_const());
+    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), &reduced_matrix.as_const());
     assert_eq!(4, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
     assert_eq!(5, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
 }
@@ -212,6 +516,7 @@ fn test_lll_float_2d() {
 #[test]
 fn test_lll_float_3d() {
     let ZZ = StaticRing::<i64>::RING;
+    let RR = Real64::RING;
     // in this case, the shortest vector is shorter than half the second successive minimum,
     // so LLL will find it (for delta = 0.9 > 0.75)
     let original = [
@@ -219,17 +524,12 @@ fn test_lll_float_3d() {
         DerefArray::from([0,  9, 0]),
         DerefArray::from([8432, 7344, 16864])
     ];
-    let _expected = [
-        [144, 72, 72],
-        [0, 279, -72],
-        [0,   0, 272]
-    ];
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 3>, _>::from_2d(&mut reduced);
-    lll_float(&ZZ, OwnedMatrix::<_>::identity(3, 3, Real64::RING).data(), reduced_matrix.reborrow(), 0.999, Global).unwrap();
+    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
 
-    assert_lattice_isomorphic(ZZ, Submatrix::from_2d(&original), &reduced_matrix.as_const());
+    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), &reduced_matrix.as_const());
     assert_eq!(144 * 144, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
     assert_eq!(72 * 72 + 279 * 279, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
     assert_eq!(72 * 72 * 2 + 272 * 272, norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)));
@@ -238,6 +538,7 @@ fn test_lll_float_3d() {
 #[test]
 fn test_lll_precision() {
     let ZZ = StaticRing::<i128>::RING;
+    let RR = Real64::RING;
     let original = [
         DerefArray::from([1, 0, 0, 0, 0]),
         DerefArray::from([65208, 1, 0, 0, 0]),
@@ -248,9 +549,9 @@ fn test_lll_precision() {
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 5>, _>::from_2d(&mut reduced);
-    lll_float(&ZZ, OwnedMatrix::<_>::identity(5, 5, Real64::RING).data(), reduced_matrix.reborrow(), 0.999, Global).unwrap();
+    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
 
-    assert_lattice_isomorphic(ZZ, Submatrix::from_2d(&original), &reduced_matrix.as_const());
+    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), &reduced_matrix.as_const());
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)) < 200);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)) < 300);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)) < 300);
@@ -268,9 +569,9 @@ fn test_lll_precision() {
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 5>, _>::from_2d(&mut reduced);
-    lll_float(&ZZ, OwnedMatrix::<_>::identity(5, 5, Real64::RING).data(), reduced_matrix.reborrow(), 0.999, Global).unwrap();
+    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
     
-    assert_lattice_isomorphic(ZZ, Submatrix::from_2d(&original), &reduced_matrix.as_const());
+    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), &reduced_matrix.as_const());
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)) < 500);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)) < 900);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)) < 1200);
@@ -289,50 +590,12 @@ fn test_lll_precision() {
     
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 5>, _>::from_2d(&mut reduced);
-    lll_float(&ZZ, OwnedMatrix::<_>::identity(5, 5, Real64::RING).data(), reduced_matrix.reborrow(), 0.9, Global).unwrap();
+    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
     
-    assert_lattice_isomorphic(ZZ, Submatrix::from_2d(&original), &reduced_matrix.as_const());
+    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), &reduced_matrix.as_const());
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)) < 1800);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)) < 1800);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)) < 4600);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(3)) < 4600);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(4)) < 5600);
-}
-
-#[bench]
-fn bench_lll_float_10d(bencher: &mut Bencher) {
-    let ZZ = StaticRing::<i64>::RING;
-
-    let _expected = [
-        [  2,   0,   0,  -2,  -6,  -2,  -3,   1,  -1,  -1],
-        [  0,   0,   1,  -2,  -1,   2,  -7,  -8,   8,   1],
-        [ -1,   1,   0,   4,  -1,   1,  -1,  -5,   1, -11],
-        [  3,   1,  -2,   0,   2,   1,  -2,   1,   5, -11],
-        [ -1,   5,   3,  -1,  -1,  -2,  -3,   1,  -3,   5],
-        [  1,  -1,   3,   1,   1,   2,  -1,   0,  -6,   2],
-        [  1,   1,   0,   3,   0,  -2,   1,  -1,   4,   6],
-        [  1,   1,   2,  -1,   0,   2,   7,   1,   2,   2],
-        [  1,   0,  -4,   2,   2,   4,  -1,   3,  -3,   8],
-        [ -1,  -2,   1,   1,   0,   3,   0,   7,   5,  -2]
-    ];
-    bencher.iter(|| {
-        let original = [
-            DerefArray::from([       1,        0,        0,        0,        0,        0,        0,        0,        0,        0]),
-            DerefArray::from([       0,        1,        0,        0,        0,        0,        0,        0,        0,        0]),
-            DerefArray::from([       0,        0,        1,        0,        0,        0,        0,        0,        0,        0]),
-            DerefArray::from([       0,        0,        0,        1,        0,        0,        0,        0,        0,        0]),
-            DerefArray::from([       0,        0,        0,        0,        1,        0,        0,        0,        0,        0]),
-            DerefArray::from([       0,        0,        0,        0,        0,        1,        0,        0,        0,        0]),
-            DerefArray::from([       0,        0,        0,        0,        0,        0,        1,        0,        0,        0]),
-            DerefArray::from([       2,        2,        2,        2,        0,        0,        1,        4,        0,        0]),
-            DerefArray::from([       4,        3,        3,        3,        1,        2,        1,        0,        5,        0]),
-            DerefArray::from([ 3433883, 14315221, 24549008,  6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304])
-        ];
-        let mut reduced = original;
-        let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 10>, _>::from_2d(&mut reduced);
-        lll_float(&ZZ, OwnedMatrix::<_>::identity(10, 10, Real64::RING).data(), reduced_matrix.reborrow(), 0.9, Global).unwrap();
-
-        assert_lattice_isomorphic(ZZ, Submatrix::from_2d(&original), &reduced_matrix.as_const());
-        assert!(16 * 16 > norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
-    });
 }

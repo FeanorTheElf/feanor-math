@@ -3,7 +3,6 @@ use crate::homomorphism::Homomorphism;
 use crate::integer::*;
 use crate::field::*;
 use crate::matrix::*;
-use crate::algorithms::lll::LLLRealField;
 use crate::ordered::OrderedRingStore;
 use crate::algorithms::matmul::ComputeInnerProduct;
 
@@ -23,19 +22,20 @@ use crate::algorithms::matmul::ComputeInnerProduct;
 /// not be selected accurately.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn fincke_pohst<I, R, V, F>(ZZ: I, RR: R, quadratic_form: Submatrix<V, El<R>>, target: &[El<R>], radius_sqr: El<R>, mut for_point: F)
-    where I: RingStore + Copy,
-        I::Type: IntegerRing,
-        R: RingStore + Copy,
-        R::Type: LLLRealField<I::Type>,
-        V: AsPointerToSlice<El<R>>,
-        F: FnMut(&[El<I>]) -> Option<El<R>>
+pub fn fincke_pohst<I, R, H, V, F>(h: H, quadratic_form: Submatrix<V, R::Element>, target: &[R::Element], radius_sqr: R::Element, mut for_point: F)
+    where I: ?Sized + IntegerRing,
+        R: ?Sized + ApproxRealField,
+        H: Homomorphism<I, R>,
+        V: AsPointerToSlice<R::Element>,
+        F: FnMut(&[I::Element]) -> Option<R::Element>
 {
+    let ZZ = h.domain();
+    let RR = h.codomain();
     let n = quadratic_form.row_count();
     assert_eq!(n, quadratic_form.col_count());
     assert_eq!(n, target.len());
     let one = ZZ.one();
-    let update = |x: &mut El<I>, center: &El<I>| {
+    let update = |x: &mut I::Element, center: &I::Element| {
         *x = ZZ.add_ref_fst(center, ZZ.sub_ref(center, x));
         if ZZ.is_geq(x, center) {
             ZZ.add_assign_ref(x, &one);
@@ -53,7 +53,7 @@ pub fn fincke_pohst<I, R, V, F>(ZZ: I, RR: R, quadratic_form: Submatrix<V, El<R>
 
     linear_components[i] = RR.zero();
     norms_square[i] = RR.zero();
-    let center_int = RR.get_ring().round_to_integer(&target[i], ZZ.get_ring()).unwrap();
+    let center_int = RR.get_ring().round_to_integer(ZZ, RR.clone_el(&target[i])).unwrap();
     current[i] = ZZ.clone_el(&center_int);
     centers[i] = center_int;
 
@@ -62,7 +62,7 @@ pub fn fincke_pohst<I, R, V, F>(ZZ: I, RR: R, quadratic_form: Submatrix<V, El<R>
         // center, we have to consider both ends of the interval; we do this using a for loop
         for _ in 0..2 {
             let x = RR.sub_ref_snd(
-                RR.get_ring().from_integer(&current[i], ZZ.get_ring()),
+                h.map_ref(&current[i]),
                 &target[i]
             );
             let norm_square = RR.add_ref_fst(
@@ -88,7 +88,7 @@ pub fn fincke_pohst<I, R, V, F>(ZZ: I, RR: R, quadratic_form: Submatrix<V, El<R>
                     linear_components[i] = <_ as ComputeInnerProduct>::inner_product_ref_fst(RR.get_ring(), (0..i).map(|j| (
                         quadratic_form.at(j, i),
                         RR.sub_ref_snd(
-                            RR.get_ring().from_integer(&current[j], ZZ.get_ring()),
+                            h.map_ref(&current[j]),
                             &target[j]
                         )
                     )));
@@ -96,7 +96,7 @@ pub fn fincke_pohst<I, R, V, F>(ZZ: I, RR: R, quadratic_form: Submatrix<V, El<R>
                         &target[i],
                         RR.div(&linear_components[i], quadratic_form.at(i, i))
                     );
-                    let center_int = RR.get_ring().round_to_integer(&center, ZZ.get_ring()).unwrap();
+                    let center_int = RR.get_ring().round_to_integer(ZZ, center).unwrap();
                     current[i] = ZZ.clone_el(&center_int);
                     centers[i] = center_int;
                     norms_square[i] = norm_square;
@@ -114,8 +114,9 @@ pub fn fincke_pohst<I, R, V, F>(ZZ: I, RR: R, quadratic_form: Submatrix<V, El<R>
     }
 }
 
+use crate::rings::approx_real::ApproxRealField;
 #[cfg(test)]
-use crate::rings::float_real::*;
+use crate::rings::approx_real::float::*;
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 
@@ -126,27 +127,27 @@ fn test_fincke_pohst_2d() {
 
     let quadratic_form = [vec![1., 0.], vec![0., 1.]];
     let mut result = Vec::new();
-    fincke_pohst(&ZZ, &RR, Submatrix::from_2d(&quadratic_form), &[0., 0.], 2.001, |point| { result.push(point.to_owned()); None });
+    fincke_pohst(RR.can_hom(&ZZ).unwrap(), Submatrix::from_2d(&quadratic_form), &[0., 0.], 2.001, |point| { result.push(point.to_owned()); None });
     assert_eq!(vec![vec![0, 0], vec![0, 1], vec![0, -1], vec![1, 0], vec![1, 1], vec![1, -1], vec![-1, 0], vec![-1, 1], vec![-1, -1]], result);
     
     let quadratic_form = [vec![1., 0.], vec![0., 1.]];
     let mut result = Vec::new();
-    fincke_pohst(&ZZ, &RR, Submatrix::from_2d(&quadratic_form), &[0.51, 0.51], 0.6, |point| { result.push(point.to_owned()); None });
+    fincke_pohst(RR.can_hom(&ZZ).unwrap(), Submatrix::from_2d(&quadratic_form), &[0.51, 0.51], 0.6, |point| { result.push(point.to_owned()); None });
     assert_eq!(vec![vec![1, 1], vec![1, 0], vec![0, 1], vec![0, 0]], result);
     
     let quadratic_form = [vec![1., 0.], vec![0., 1.]];
     let mut result = Vec::new();
-    fincke_pohst(&ZZ, &RR, Submatrix::from_2d(&quadratic_form), &[10.75, 15.1], 0.3, |point| { result.push(point.to_owned()); None });
+    fincke_pohst(RR.can_hom(&ZZ).unwrap(), Submatrix::from_2d(&quadratic_form), &[10.75, 15.1], 0.3, |point| { result.push(point.to_owned()); None });
     assert_eq!(vec![vec![11, 15]], result);
     
     let quadratic_form = [vec![2., 1.], vec![1., 2.]];
     let mut result = Vec::new();
-    fincke_pohst(&ZZ, &RR, Submatrix::from_2d(&quadratic_form), &[0.22, 0.57], 0.3, |point| { result.push(point.to_owned()); None });
+    fincke_pohst(RR.can_hom(&ZZ).unwrap(), Submatrix::from_2d(&quadratic_form), &[0.22, 0.57], 0.3, |point| { result.push(point.to_owned()); None });
     assert_eq!(vec![vec![0, 1]], result);
 
     let quadratic_form = [vec![2., 1.], vec![1., 2.]];
     let mut result = Vec::new();
-    fincke_pohst(&ZZ, &RR, Submatrix::from_2d(&quadratic_form), &[4., 7.], 2.1, |point| { result.push(point.to_owned()); None });
+    fincke_pohst(RR.can_hom(&ZZ).unwrap(), Submatrix::from_2d(&quadratic_form), &[4., 7.], 2.1, |point| { result.push(point.to_owned()); None });
     assert_eq!(vec![vec![4, 7], vec![4, 8], vec![4, 6], vec![5, 7], vec![5, 6], vec![3, 8], vec![3, 7]], result);
 }
 
@@ -157,7 +158,7 @@ fn test_fincke_pohst_3d() {
 
     let quadratic_form = [vec![2., 1., 1.], vec![1., 2., 1.], vec![1., 1., 2.]];
     let mut result = Vec::new();
-    fincke_pohst(&ZZ, &RR, Submatrix::from_2d(&quadratic_form), &[0., 0., 0.], 2.001, |point| { result.push(point.to_owned()); None });
+    fincke_pohst(RR.can_hom(&ZZ).unwrap(), Submatrix::from_2d(&quadratic_form), &[0., 0., 0.], 2.001, |point| { result.push(point.to_owned()); None });
     assert_eq!(13, result.len());
     for p in &result {
         assert!(ZZ.pow(p[0] + p[1] + p[2], 2) + ZZ.pow(p[0], 2) + ZZ.pow(p[1], 2) + ZZ.pow(p[2], 2) <= 2);
@@ -165,6 +166,6 @@ fn test_fincke_pohst_3d() {
     
     let quadratic_form = [vec![2., 1., 1.], vec![1., 2., 1.], vec![1., 1., 2.]];
     let mut result = Vec::new();
-    fincke_pohst(&ZZ, &RR, Submatrix::from_2d(&quadratic_form), &[0.3, -2.1, 0.7], 0.5, |point| { result.push(point.to_owned()); None });
+    fincke_pohst(RR.can_hom(&ZZ).unwrap(), Submatrix::from_2d(&quadratic_form), &[0.3, -2.1, 0.7], 0.5, |point| { result.push(point.to_owned()); None });
     assert_eq!(vec![vec![0, -2, 1]], result);
 }

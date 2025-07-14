@@ -858,7 +858,7 @@ use crate::rings::zn::zn_static::F17;
 #[cfg(test)]
 use crate::rings::zn::*;
 #[cfg(test)]
-use crate::rings::float_real::Real64;
+use crate::rings::approx_real::float::Real64;
 
 #[cfg(test)]
 fn ring_and_elements() -> (MultivariatePolyRingImpl<zn_static::Fp<17>>, Vec<MultivariatePolyRingEl<zn_static::Fp<17>>>) {

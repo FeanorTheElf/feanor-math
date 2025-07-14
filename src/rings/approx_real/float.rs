@@ -1,3 +1,4 @@
+use core::f64;
 use std::f64::EPSILON;
 
 use crate::algorithms::convolution::KaratsubaHint;
@@ -7,11 +8,11 @@ use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::Field;
 use crate::integer::{int_cast, IntegerRing, IntegerRingStore};
 use crate::primitive_int::StaticRing;
+use crate::rings::approx_real::{ApproxRealField, SqrtRing};
 use crate::{impl_eq_based_self_iso, ring::*};
 use crate::homomorphism::*;
 use crate::divisibility::{DivisibilityRing, Domain};
-
-use super::rational::{RationalField, RationalFieldBase};
+use crate::rings::rational::{RationalField, RationalFieldBase};
 
 ///
 /// An approximate implementation of the real numbers `R`, using 64 bit floating
@@ -209,5 +210,29 @@ impl<I> CanHomFrom<RationalFieldBase<I>> for Real64Base
 
     fn map_in_ref(&self, from: &RationalFieldBase<I>, el: &El<RationalField<I>>, _hom: &Self::Homomorphism) -> Self::Element {
         from.base_ring().to_float_approx(from.num(el)) / from.base_ring().to_float_approx(from.den(el))
+    }
+}
+
+impl ApproxRealField for Real64Base {
+
+    fn epsilon(&self) -> &Self::Element {
+        &f64::EPSILON
+    }
+
+    fn infinity(&self) -> Self::Element {
+        f64::INFINITY
+    }
+
+    fn round_to_integer<I>(&self, ZZ: I, x: Self::Element) -> Option<El<I>>
+        where I: RingStore, I::Type: IntegerRing
+    {
+        ZZ.from_float_approx(x.round())
+    }
+}
+
+impl SqrtRing for Real64Base {
+
+    fn sqrt(&self, x: Self::Element) -> Self::Element {
+        x.sqrt()
     }
 }

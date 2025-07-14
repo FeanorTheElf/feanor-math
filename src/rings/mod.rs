@@ -33,12 +33,6 @@ pub mod field;
 pub mod float_complex;
 
 ///
-/// An approximate implementation of the field of real numbers `R`, using 64-bit floating point
-/// numbers.
-/// 
-pub mod float_real;
-
-///
 /// This module contains the trait [`extension::FreeAlgebra`] for rings that are free modules of finite
 /// rank over a base ring. It also provides one implementation in [`extension::extension_impl`] based
 /// on polynomial division.
@@ -55,6 +49,12 @@ pub mod finite;
 /// rings.
 /// 
 pub mod multivariate;
+
+///
+/// This module contains the trait [`approx_real::ApproxRealField`] for rings that implement
+/// approximations to the real numbers, usually using floating-point numbers.
+/// 
+pub mod approx_real;
 
 ///
 /// This module contains [`rational::RationalField`], which provides an implementation of the field of 

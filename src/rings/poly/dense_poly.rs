@@ -697,7 +697,7 @@ use crate::rings::extension::galois_field::GaloisField;
 #[cfg(test)]
 use std::time::Instant;
 #[cfg(test)]
-use crate::rings::float_real::Real64;
+use crate::rings::approx_real::float::Real64;
 #[cfg(test)]
 use crate::ordered::OrderedRingStore;
 #[cfg(test)]

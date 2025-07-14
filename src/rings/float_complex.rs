@@ -8,9 +8,8 @@ use crate::integer::{IntegerRingStore, IntegerRing};
 use crate::impl_eq_based_self_iso;
 use crate::ring::*;
 use crate::divisibility::{DivisibilityRing, Domain};
-
-use super::float_real::Real64;
-use super::rational::RationalFieldBase;
+use crate::rings::approx_real::float::Real64;
+use crate::rings::rational::RationalFieldBase;
 
 ///
 /// An approximate implementation of the complex numbers `C`, using 64 bit floating
