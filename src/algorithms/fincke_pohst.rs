@@ -10,6 +10,10 @@ use crate::algorithms::matmul::ComputeInnerProduct;
 /// Uses the Fincke-Pohst algorithm to find integer points close to `target`, where
 /// "closeness" is measured according to the norm defined by the given quadratic form.
 /// 
+/// Generally, and especially in the case of using floating-point numbers, it is strongly
+/// recommended to use this on a quadratic form that is reduced in some sense, e.g. LLL-reduced.
+/// This will vastly improve performance.
+/// 
 /// More concretely, this function calls `for_point` for each point `x` for which
 /// `(x - target)^T Q (x - target) < radius_sqr`, where `Q` is the given quadratic form.
 /// If `for_point` returns a value, this is used as the new `radius_sqr` for the remainder

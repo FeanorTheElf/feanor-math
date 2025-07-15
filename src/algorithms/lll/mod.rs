@@ -1,6 +1,14 @@
 
+///
+/// Contains [`float::lll_quadratic_form()`] and [`float::lll()`], an implementation
+/// of the Lenstra-Lenstra-Lovasz lattice basis reduction algorithm, using floating point numbers.
+/// 
 pub mod float;
 
+///
+/// Contains [`exact::lll()`], an implementation of the Lenstra-Lenstra-Lovasz lattice basis
+/// reduction algorithm, using arbitrary-precision arithmetic.
+/// 
 pub mod exact;
 
 #[cfg(test)]

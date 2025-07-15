@@ -1,4 +1,4 @@
-use crate::algorithms::lll::float::lll_float_quadratic_form;
+use crate::algorithms::lll::float::lll_quadratic_form;
 use crate::algorithms::matmul::*;
 use crate::field::*;
 use crate::integer::*;
@@ -170,8 +170,8 @@ fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>) -> Result<(), usize>
 }
 
 ///
-/// LLL-reduces the given matrix, i.e. transforms `B` into `B'` such that
-/// `B' = BU` with `U in GL(Z)` and the columns of `B'` are "short".
+/// LLL-reduces the lattice basis given by the columns of the given matrix, w.r.t.
+/// the norm induced by the given quadratic form.
 /// 
 /// The exact restrictions imposed on `B'` are that its columns `b1, ..., bn`
 /// are `delta`-LLL-reduced. This means
@@ -180,15 +180,17 @@ fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>) -> Result<(), usize>
 /// 
 /// Here the `bi*` refer to the Gram-Schmidt orthogonalization of the `bi`.
 /// 
+/// The given quadratic form must be positive definite.
+/// 
 /// # Internal computations with floating point numbers
 /// 
 /// If `disable_float_lll` is not set, this function will first heuristically reduce
-/// the matrix using [`crate::algorithms::lll::float::lll_float_quadratic_form()`].
+/// the matrix using [`crate::algorithms::lll::float::lll_quadratic_form()`].
 /// This can significantly speed up the whole computation, as it means we have to do
 /// less rational arithmetic, which can be very slow.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn lll_exact<R, I, V1, V2, A>(
+pub fn lll<R, I, V1, V2, A>(
     ring: R, 
     quadratic_form: Submatrix<V1, El<R>>, 
     mut matrix: SubmatrixMut<V2, El<R>>, 
@@ -233,7 +235,7 @@ pub fn lll_exact<R, I, V1, V2, A>(
     if !disable_float_lll {
         let RR = Real64::RING;
         let QQ_to_RR = RR.can_hom(&ring).unwrap();
-        _ = lll_float_quadratic_form(
+        _ = lll_quadratic_form(
             gram_matrix.reborrow(),
             QQ_to_RR,
             &0.999,
@@ -391,7 +393,7 @@ fn test_swap_gso_cols() {
 }
 
 #[test]
-fn test_lll_exact_2d() {
+fn test_lll_2d() {
     let ZZ = StaticRing::<i64>::RING;
     let QQ = RationalField::new(ZZ);
     let original = matrix!(
@@ -401,7 +403,7 @@ fn test_lll_exact_2d() {
     );
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
-    lll_exact(QQ, OwnedMatrix::identity(2, 2, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(9, 10), Global, true);
+    lll(QQ, OwnedMatrix::identity(2, 2, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(9, 10), Global, true);
 
     assert_rational_lattice_isomorphic(QQ, RationalField::new(BigIntRing::RING), Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_el_eq!(QQ, QQ.int_hom().map(1), norm_squared(QQ, &reduced_matrix.as_const().col_at(0)));
@@ -414,7 +416,7 @@ fn test_lll_exact_2d() {
     );
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
-    lll_exact(QQ, OwnedMatrix::identity(2, 2, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(9, 10), Global, true);
+    lll(QQ, OwnedMatrix::identity(2, 2, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(9, 10), Global, true);
 
     assert_rational_lattice_isomorphic(QQ, RationalField::new(BigIntRing::RING), Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_el_eq!(QQ, QQ.int_hom().map(4), norm_squared(QQ, &reduced_matrix.as_const().col_at(0)));
@@ -422,7 +424,7 @@ fn test_lll_exact_2d() {
 }
 
 #[test]
-fn test_lll_exact_3d() {
+fn test_lll_3d() {
     let ZZ = StaticRing::<i128>::RING;
     let QQ = RationalField::new(ZZ);
     // in this case, the shortest vector is shorter than half the second successive minimum,
@@ -436,7 +438,7 @@ fn test_lll_exact_3d() {
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll_exact(QQ, OwnedMatrix::identity(3, 3, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(999, 1000), Global, true);
+    lll(QQ, OwnedMatrix::identity(3, 3, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(999, 1000), Global, true);
 
     assert_rational_lattice_isomorphic(QQ, RationalField::new(BigIntRing::RING), Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_el_eq!(QQ, QQ.int_hom().map(144 * 144), norm_squared(QQ, &reduced_matrix.as_const().col_at(0)));
@@ -458,7 +460,7 @@ fn test_lll_generating_set() {
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll_exact(QQ, OwnedMatrix::identity(3, 3, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(999, 1000), Global, true);
+    lll(QQ, OwnedMatrix::identity(3, 3, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(999, 1000), Global, true);
 
     assert_rational_lattice_isomorphic(QQ, RationalField::new(BigIntRing::RING), Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_el_eq!(QQ, QQ.zero(), norm_squared(QQ, &reduced_matrix.as_const().col_at(0)));
@@ -479,7 +481,7 @@ fn test_lll_generating_set() {
     );
     let mut reduced = original.clone();
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll_exact(
+    lll(
         &QQ, 
         OwnedMatrix::identity(5, 5, &QQ).data(), 
         reduced_matrix.reborrow(), 
@@ -508,7 +510,7 @@ fn test_lll_generating_set() {
     );
     let mut reduced = original.clone();
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll_exact(
+    lll(
         &QQ, 
         OwnedMatrix::identity(5, 5, &QQ).data(), 
         reduced_matrix.reborrow(), 
@@ -529,7 +531,7 @@ fn test_lll_generating_set() {
 }
 
 #[bench]
-fn bench_lll_exact_10d(bencher: &mut Bencher) {
+fn bench_lll_10d(bencher: &mut Bencher) {
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
 
@@ -550,7 +552,7 @@ fn bench_lll_exact_10d(bencher: &mut Bencher) {
         let mut reduced = original.clone();
         let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
         let delta = QQ.from_fraction(int_cast(9, ZZ, StaticRing::<i64>::RING), int_cast(10, ZZ, StaticRing::<i64>::RING));
-        lll_exact(&QQ, OwnedMatrix::identity(10, 10, &QQ).data(), reduced_matrix.reborrow(), &delta, Global, true);
+        lll(&QQ, OwnedMatrix::identity(10, 10, &QQ).data(), reduced_matrix.reborrow(), &delta, Global, true);
 
         assert_rational_lattice_isomorphic(&QQ, &QQ, Submatrix::from_2d(&original), reduced_matrix.as_const());
         assert!(QQ.is_geq(&QQ.int_hom().map(16 * 16), &norm_squared(&QQ, &reduced_matrix.as_const().col_at(0))));

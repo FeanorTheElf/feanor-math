@@ -70,7 +70,7 @@ pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + I
     /// 
     /// Note that a high-quality implementation of this function can vastly improve
     /// performance in some cases, e.g. of [`crate::algorithms::int_bisect::root_floor()`] or 
-    /// [`crate::algorithms::lll::lll_exact()`].
+    /// [`crate::algorithms::lll::exact::lll()`].
     /// 
     /// # Example
     /// 

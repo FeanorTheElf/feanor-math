@@ -253,6 +253,10 @@ impl<R> TransformTarget<R> for ()
     fn swap<S: Copy + RingStore<Type = R>>(&mut self, _: S, _: usize, _: usize) {}
 }
 
+///
+/// A [`TransformTarget`] that forwards all transforms to a fixed
+/// delegate, but offsets every row/column index by a given value.
+/// 
 pub struct OffsetTransformIndex<R, T>
     where R: ?Sized + RingBase,
         T: TransformTarget<R>
@@ -280,14 +284,63 @@ impl<R, T> TransformTarget<R> for OffsetTransformIndex<R, T>
         T: TransformTarget<R>
 {
     fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize, transform: &[R::Element; 4]) {
-        <T as TransformTarget<R>>::transform(&mut self.delegate, ring, i + self.index_offset, j + self.index_offset, transform)
+        <T as TransformTarget<R>>::transform(&mut self.delegate, ring, i + self.index_offset, j + self.index_offset, transform);
     }
 
     fn subtract<S: Copy + RingStore<Type = R>>(&mut self, ring: S, src: usize, dst: usize, factor: &R::Element) {
-        <T as TransformTarget<R>>::subtract(&mut self.delegate, ring, src + self.index_offset, dst + self.index_offset, factor)
+        <T as TransformTarget<R>>::subtract(&mut self.delegate, ring, src + self.index_offset, dst + self.index_offset, factor);
     }
 
     fn swap<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize) {
-        <T as TransformTarget<R>>::swap(&mut self.delegate, ring, i + self.index_offset, j + self.index_offset)
+        <T as TransformTarget<R>>::swap(&mut self.delegate, ring, i + self.index_offset, j + self.index_offset);
+    }
+}
+
+///
+/// A [`TransformTarget`] that forwards all transforms to
+/// two fixed delegates.
+/// 
+pub struct DuplicateTransforms<R, T1, T2>
+    where R: ?Sized + RingBase,
+        T1: TransformTarget<R>,
+        T2: TransformTarget<R>
+{
+    delegate1: T1,
+    delegate2: T2,
+    ring: PhantomData<R>
+}
+
+impl<R, T1, T2> DuplicateTransforms<R, T1, T2>
+    where R: ?Sized + RingBase,
+        T1: TransformTarget<R>,
+        T2: TransformTarget<R>
+{
+    pub fn new(first: T1, second: T2) -> Self {
+        Self {
+            delegate1: first,
+            delegate2: second, 
+            ring: PhantomData
+        }
+    }
+}
+
+impl<R, T1, T2> TransformTarget<R> for DuplicateTransforms<R, T1, T2>
+    where R: ?Sized + RingBase,
+        T1: TransformTarget<R>,
+        T2: TransformTarget<R>
+{
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize, transform: &[R::Element; 4]) {
+        <T1 as TransformTarget<R>>::transform(&mut self.delegate1, ring, i, j, transform);
+        <T2 as TransformTarget<R>>::transform(&mut self.delegate2, ring, i, j, transform);
+    }
+
+    fn subtract<S: Copy + RingStore<Type = R>>(&mut self, ring: S, src: usize, dst: usize, factor: &R::Element) {
+        <T1 as TransformTarget<R>>::subtract(&mut self.delegate1, ring, src, dst, factor);
+        <T2 as TransformTarget<R>>::subtract(&mut self.delegate2, ring, src, dst, factor);
+    }
+
+    fn swap<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize) {
+        <T1 as TransformTarget<R>>::swap(&mut self.delegate1, ring, i, j);
+        <T2 as TransformTarget<R>>::swap(&mut self.delegate2, ring, i, j);
     }
 }

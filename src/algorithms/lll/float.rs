@@ -4,7 +4,7 @@ use crate::homomorphism::*;
 use crate::integer::generic_impls::map_from_integer_ring;
 use crate::integer::BigIntRing;
 use crate::matrix::*;
-use crate::matrix::transform::{OffsetTransformIndex, TransformCols, TransformRows, TransformTarget};
+use crate::matrix::transform::{DuplicateTransforms, OffsetTransformIndex, TransformCols, TransformRows, TransformTarget};
 use crate::ordered::*;
 use crate::ring::*;
 use crate::rings::approx_real::{ApproxRealField, NotEnoughPrecision, SqrtRing};
@@ -351,6 +351,8 @@ fn remove_zero_vectors<'a, I, R, H, V1, V2, V3>(
 /// is not sufficient to prove that the result is `(delta, eta)`-LLL-reduced. However,
 /// it will usually be quite reduced already, and may even be `(delta, eta)`-LLL-reduced.
 /// 
+/// The given quadratic form must be positive semidefinite.
+/// 
 /// More concretely, this function transforms the quadratic form into another quadratic
 /// form `Q` by unimodular operations that are simultaneously applied to rows and columns,
 /// such that
@@ -377,7 +379,7 @@ fn remove_zero_vectors<'a, I, R, H, V1, V2, V3>(
 ///    and try again.
 ///
 #[stability::unstable(feature = "enable")]
-pub fn lll_float_quadratic_form<I, R, H, V1, T>(
+pub fn lll_quadratic_form<I, R, H, V1, T>(
     quadratic_form: SubmatrixMut<V1, I::Element>,
     h: H,
     delta: &R::Element,
@@ -450,19 +452,21 @@ pub fn lll_float_quadratic_form<I, R, H, V1, T>(
 /// prove that the result is `(delta, eta)`-LLL-reduced. However, it will usually
 /// be quite reduced already, and may even be `(delta, eta)`-LLL-reduced.
 /// 
-/// For more details, see [`lll_float_quadratic_form()`].
+/// For more details, see [`lll_quadratic_form()`].
 ///
 #[stability::unstable(feature = "enable")]
-pub fn lll_float_lattice<I, R, H, V1>(
+pub fn lll<I, R, H, V1, T>(
     basis: SubmatrixMut<V1, I::Element>,
     h: H,
     delta: &R::Element,
-    eta: &R::Element
+    eta: &R::Element,
+    transform: T
 ) -> Result<(), NotEnoughPrecision>
     where I: ?Sized + RingBase,
         R: ?Sized + ApproxRealField + SqrtRing,
         H: Homomorphism<I, R>,
-        V1: AsPointerToSlice<I::Element>
+        V1: AsPointerToSlice<I::Element>,
+        T: TransformTarget<I>
 {
     let n = basis.col_count();
     let mut quadratic_form = OwnedMatrix::zero(n, n, h.domain());
@@ -473,12 +477,12 @@ pub fn lll_float_lattice<I, R, H, V1>(
         h.domain()
     );
 
-    lll_float_quadratic_form(
+    lll_quadratic_form(
         quadratic_form.data_mut(),
         &h,
         delta,
         eta,
-        &mut TransformCols(basis, h.domain().get_ring())
+        DuplicateTransforms::new(TransformCols(basis, h.domain().get_ring()), transform)
     )?;
 
     return Ok(());
@@ -555,17 +559,39 @@ fn test_lll_float_2d() {
         DerefArray::from([265, 481])
     ];
     let mut reduced = original;
-    let reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
-    lll_float_quadratic_form(reduced_matrix, RR.can_hom(&ZZ).unwrap(), &0.9, &0.55, &mut ()).unwrap();
-    assert_matrix_eq!(ZZ, OwnedMatrix::identity(2, 2, ZZ), reduced);
+    let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
+    let mut transform_matrix = OwnedMatrix::identity(2, 2, ZZ);
+    lll_quadratic_form(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.9, &0.55, TransformCols(transform_matrix.data_mut(), ZZ.get_ring())).unwrap();
+    assert_matrix_eq!(ZZ, OwnedMatrix::identity(2, 2, ZZ), reduced_matrix);
+
+    let mut tmp = original;
+    let mut tmp_matrix = SubmatrixMut::from_2d(&mut tmp);
+    STANDARD_MATMUL.matmul(
+        TransposableSubmatrix::from(transform_matrix.data()).transpose(),
+        TransposableSubmatrix::from(Submatrix::from_2d(&original)),
+        TransposableSubmatrixMut::from(tmp_matrix.reborrow()),
+        ZZ
+    );
+    let mut check = original;
+    let mut check_matrix = SubmatrixMut::from_2d(&mut check);
+    STANDARD_MATMUL.matmul(
+        TransposableSubmatrix::from(tmp_matrix.as_const()),
+        TransposableSubmatrix::from(transform_matrix.data()),
+        TransposableSubmatrixMut::from(check_matrix.reborrow()),
+        ZZ
+    );
+    assert_matrix_eq!(ZZ, reduced_matrix, check_matrix);
     
     let original = [
         DerefArray::from([10, 8]),
         DerefArray::from([27, 22])
     ];
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
-    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.9, &0.55).unwrap();
+    let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
+    let mut transformed = original;
+    let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
+    lll(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.9, &0.55, TransformCols(transformed_matrix, ZZ.get_ring())).unwrap();
+    assert_matrix_eq!(ZZ, reduced_matrix, transformed);
 
     assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_eq!(4, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
@@ -586,7 +612,10 @@ fn test_lll_float_3d() {
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 3>, _>::from_2d(&mut reduced);
-    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
+    let mut transformed = original;
+    let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
+    lll(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51, TransformCols(transformed_matrix, ZZ.get_ring())).unwrap();
+    assert_matrix_eq!(ZZ, reduced_matrix, transformed);
 
     assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_eq!(144 * 144, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
@@ -608,7 +637,10 @@ fn test_lll_precision() {
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
+    let mut transformed = original;
+    let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
+    lll(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51, TransformCols(transformed_matrix, ZZ.get_ring())).unwrap();
+    assert_matrix_eq!(ZZ, reduced_matrix, transformed);
 
     assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)) < 200);
@@ -628,7 +660,10 @@ fn test_lll_precision() {
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
+    let mut transformed = original;
+    let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
+    lll(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51, TransformCols(transformed_matrix, ZZ.get_ring())).unwrap();
+    assert_matrix_eq!(ZZ, reduced_matrix, transformed);
     
     assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)) < 500);
@@ -649,7 +684,10 @@ fn test_lll_precision() {
     
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
+    let mut transformed = original;
+    let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
+    lll(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51, TransformCols(transformed_matrix, ZZ.get_ring())).unwrap();
+    assert_matrix_eq!(ZZ, reduced_matrix, transformed);
     
     assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)) < 1800);
@@ -671,7 +709,10 @@ fn test_lll_generating_set() {
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
+    let mut transformed = original;
+    let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
+    lll(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51, TransformCols(transformed_matrix, ZZ.get_ring())).unwrap();
+    assert_matrix_eq!(ZZ, reduced_matrix, transformed);
 
     assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
@@ -689,7 +730,10 @@ fn test_lll_generating_set() {
     ];
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
+    let mut transformed = original;
+    let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
+    lll(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51, TransformCols(transformed_matrix, ZZ.get_ring())).unwrap();
+    assert_matrix_eq!(ZZ, reduced_matrix, transformed);
 
     assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
@@ -710,7 +754,10 @@ fn test_lll_generating_set() {
     ];
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
+    let mut transformed = original;
+    let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
+    lll(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51, TransformCols(transformed_matrix, ZZ.get_ring())).unwrap();
+    assert_matrix_eq!(ZZ, reduced_matrix, transformed);
 
     assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
