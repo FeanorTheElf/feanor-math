@@ -9,6 +9,11 @@ use crate::ordered::*;
 use crate::ring::*;
 use crate::rings::approx_real::{ApproxRealField, NotEnoughPrecision, SqrtRing};
 
+///
+/// Stores the Gram matrix, its (partial) floating-point Cholesky decomposition,
+/// and an error bound on the latter. These values are jointly modified during the
+/// LLL algorithm
+/// 
 struct GSOMatrix<'a, I, R, V1, V2, V3>
     where I: ?Sized + RingBase,
         R: ?Sized + ApproxRealField + SqrtRing,
@@ -51,6 +56,10 @@ impl<'a, I, R, V1, V2, V3> TransformTarget<I> for GSOMatrix<'a, I, R, V1, V2, V3
     }
 }
 
+///
+/// Computes the floating-point division `num / den` and also computes information on
+/// the error of the result.
+/// 
 fn divide_with_error<R>(RR: &R, num: &R::Element, num_err: &R::Element, den: &R::Element, den_err: &R::Element) -> (R::Element, R::Element)
     where R: ?Sized + ApproxRealField
 {
@@ -335,12 +344,21 @@ fn remove_zero_vectors<'a, I, R, H, V1, V2, V3>(
 }
 
 ///
-/// LLL-reduces the given positive semidefinite quadratic form, using
-/// a custom variant of the L^2 algorithm.
+/// Computes an `(delta, eta)`-LLL-reduced form of the given positive semidefinite
+/// quadratic form, using a custom variant of the L^2 algorithm.
 /// 
-/// Note that the algorithm may return [`NotEnoughPrecision`], if it cannot
-/// prove that the result is `(delta, eta)`-LLL-reduced. However, it will usually
-/// be quite reduced already, and may even be `(delta, eta)`-LLL-reduced.
+/// Note that the algorithm may return [`NotEnoughPrecision`], if the given precision
+/// is not sufficient to prove that the result is `(delta, eta)`-LLL-reduced. However,
+/// it will usually be quite reduced already, and may even be `(delta, eta)`-LLL-reduced.
+/// 
+/// More concretely, this function transforms the quadratic form into another quadratic
+/// form `Q` by unimodular operations that are simultaneously applied to rows and columns,
+/// such that
+///  - (size-reduced) `|ei^T Q ej*| < eta (ej*^T Q ej*)` whenever `i > j`
+///  - (Lovasz-condition) `(ek*^T Q ek*) >= delta (e(k-1)*^T Q e(k - 1)*) - (ek^T Q e(k-1)*) / (e(k-1)*^T Q e(k - 1)*)`
+/// 
+/// Here the `ei*` refer to the Gram-Schmidt orthogonalization of the unit vectors `ei`
+/// w.r.t. the inner product defined by `Q`.
 /// 
 /// # Algorithm and numerical stability
 /// 
@@ -589,7 +607,7 @@ fn test_lll_precision() {
     ];
 
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 5>, _>::from_2d(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
     lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
 
     assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
@@ -609,7 +627,7 @@ fn test_lll_precision() {
     ];
 
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 5>, _>::from_2d(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
     lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
     
     assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
@@ -630,7 +648,7 @@ fn test_lll_precision() {
     ];
     
     let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 5>, _>::from_2d(&mut reduced);
+    let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
     lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
     
     assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
@@ -639,4 +657,68 @@ fn test_lll_precision() {
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)) < 4600);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(3)) < 4600);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(4)) < 5600);
+}
+
+#[test]
+fn test_lll_generating_set() {
+    let RR = Real64::RING;
+    let ZZ = StaticRing::<i128>::RING;
+    let original = [
+        DerefArray::from([ -6,  -1,  6, 116, -2]),
+        DerefArray::from([-14, -12,  8, 232, -2]),
+        DerefArray::from([-10,   2, 12,   0,  2])
+    ];
+
+    let mut reduced = original;
+    let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
+    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
+
+    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
+    assert_el_eq!(ZZ, 5, norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)));
+    assert_el_eq!(ZZ, 5, norm_squared(ZZ, &reduced_matrix.as_const().col_at(3)));
+    assert_el_eq!(ZZ, 12, norm_squared(ZZ, &reduced_matrix.as_const().col_at(4)));
+
+    let original = [
+        DerefArray::from([-4,   8, -54,  -1,   42,   15,   -23,   -259]),
+        DerefArray::from([-3,  10, -36,  18,  -48, -473, -1200,  -6493]),
+        DerefArray::from([ 5, -13,  62, -15,   17,  398,  1043,   5721]),
+        DerefArray::from([-8,  10, -68,  18,  -18, -434, -1118,  -6126]),
+        DerefArray::from([11,  -5,  90,  26, -215, -910, -2227, -11637])
+    ];
+    let mut reduced = original;
+    let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
+    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
+
+    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)));
+    assert_el_eq!(ZZ, 1, norm_squared(ZZ, &reduced_matrix.as_const().col_at(3)));
+    assert_el_eq!(ZZ, 1, norm_squared(ZZ, &reduced_matrix.as_const().col_at(4)));
+    assert_el_eq!(ZZ, 1, norm_squared(ZZ, &reduced_matrix.as_const().col_at(5)));
+    assert_el_eq!(ZZ, 5, norm_squared(ZZ, &reduced_matrix.as_const().col_at(6)));
+    assert_el_eq!(ZZ, 40, norm_squared(ZZ, &reduced_matrix.as_const().col_at(7)));
+
+    let original = [
+        DerefArray::from([  -60725263117,   -448122081513,  -218368759847,   2100701846793,   216156377534,   -3137996709827,   14835704835919,    67504381450573]),
+        DerefArray::from([-1310716961940,  -9682451257943, -4729935920987,  45413204073392,  4667627712725,  -67791459966817,  320528485599331,  1458334256347773]),
+        DerefArray::from([ 1159398893231,   8564380015666,  4183444050825, -40168532351902, -4128711773154,   59963582382418, -283516375460965, -1289940218804617]),
+        DerefArray::from([-1236320093452,  -9132639612642, -4461079566742,  42833893239948,  4402644221490,  -63942205977848,  302328006373120,  1375528654002990]),
+        DerefArray::from([-2344979577397, -17323890604545, -8464219959177,  81256383857324,  8351008895542, -121291584595649,  573488494361461,  2609233431319737])
+    ];
+    let mut reduced = original;
+    let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
+    lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
+
+    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)));
+    assert_el_eq!(ZZ, 1, norm_squared(ZZ, &reduced_matrix.as_const().col_at(3)));
+    assert_el_eq!(ZZ, 1, norm_squared(ZZ, &reduced_matrix.as_const().col_at(4)));
+    assert_el_eq!(ZZ, 1, norm_squared(ZZ, &reduced_matrix.as_const().col_at(5)));
+    assert_el_eq!(ZZ, 5, norm_squared(ZZ, &reduced_matrix.as_const().col_at(6)));
+    assert_el_eq!(ZZ, 40, norm_squared(ZZ, &reduced_matrix.as_const().col_at(7)));
 }

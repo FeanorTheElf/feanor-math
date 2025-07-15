@@ -174,22 +174,18 @@ fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>) -> Result<(), usize>
 /// `B' = BU` with `U in GL(Z)` and the columns of `B'` are "short".
 /// 
 /// The exact restrictions imposed on `B'` are that its columns `b1, ..., bn`
-/// are "LLL-reduced". This means
-///  - (size-reduced) `|<bi,bj*>| < <bj*,bj*> / 2` whenever `i > j`
-///  - (Lovasz-condition) `delta |b(k - 1)|^2 - <bk, b(k - 1)*>^2 / |b(k - 1)|^2 <= |bk*|^2`
+/// are `delta`-LLL-reduced. This means
+///  - (size-reduced) `|<bi,bj*>| < |bj*|^2 / 2` whenever `i > j`
+///  - (Lovasz-condition) `|bk*|^2 >= delta |b(k - 1)*|^2 - <bk, b(k - 1)*>^2 / |b(k - 1)*|^2`
+/// 
 /// Here the `bi*` refer to the Gram-Schmidt orthogonalization of the `bi`.
 /// 
 /// # Internal computations with floating point numbers
 /// 
-/// The LLL algorithm has to handle fractional values internally, which can get huge
-/// denominators. Since only their size is relevant, it is usually much better to work
-/// with floating point numbers instead. This is done as a precomputation in this function,
-/// and as the only version in [`lll_float()`].
-/// 
-/// Despite precomputing the floating-point LLL in this function, we still perform the
-/// computation with rationals here, hence the runtime is likely to be vastly longer than
-/// the one of [`lll_float()`]. Since it is very unlikely that you need the exact guarantees
-/// of [`lll_exact()`], but just want a "short" matrix, prefer using [`lll_float()`] instead.
+/// If `disable_float_lll` is not set, this function will first heuristically reduce
+/// the matrix using [`crate::algorithms::lll::float::lll_float_quadratic_form()`].
+/// This can significantly speed up the whole computation, as it means we have to do
+/// less rational arithmetic, which can be very slow.
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn lll_exact<R, I, V1, V2, A>(
@@ -197,7 +193,8 @@ pub fn lll_exact<R, I, V1, V2, A>(
     quadratic_form: Submatrix<V1, El<R>>, 
     mut matrix: SubmatrixMut<V2, El<R>>, 
     delta: &El<R>, 
-    allocator: A
+    allocator: A,
+    disable_float_lll: bool
 )
     where R: RingStore<Type = RationalFieldBase<I>> + Copy,
         I: RingStore,
@@ -233,16 +230,24 @@ pub fn lll_exact<R, I, V1, V2, A>(
     let mut gram_matrix = gram_matrix.data_mut();
     compute_gram_matrix(matrix.as_const(), gram_matrix.reborrow());
 
-    // let RR = Real64::RING;
-    // let QQ_to_RR = RR.can_hom(&ring).unwrap();
-    // _ = lll_float_quadratic_form(
-    //     gram_matrix.reborrow(),
-    //     QQ_to_RR,
-    //     &0.999,
-    //     &0.51,
-    //     &mut TransformCols(matrix.reborrow(), ring.get_ring())
-    // );
+    if !disable_float_lll {
+        let RR = Real64::RING;
+        let QQ_to_RR = RR.can_hom(&ring).unwrap();
+        _ = lll_float_quadratic_form(
+            gram_matrix.reborrow(),
+            QQ_to_RR,
+            &0.999,
+            &0.51,
+            &mut TransformCols(matrix.reborrow(), ring.get_ring())
+        );
+    }
     
+    // we have an outer loop which removes all generated zero vectors from
+    // `matrix` and `gram_matrix`, thus shrinking these matrices; It will
+    // then perform the actual LLL on the top left part of the `gram_matrix`;
+    // we might not be able to run it on the whole `gram_matrix` (with zero
+    // vectors removed), since LDL can handle at most a single vector that is
+    // in the Q-span of the previous ones
     'remove_zero_vectors: loop {
 
         compute_gram_matrix(matrix.as_const(), gram_matrix.reborrow());
@@ -260,7 +265,8 @@ pub fn lll_exact<R, I, V1, V2, A>(
         let mut col_ops = TransformCols(matrix.reborrow(), ring.get_ring());
         let mut i = 1;
 
-        while i < n {
+        #[allow(unused_labels)]
+        'lll_main_loop: while i < n {
             assert!(i > 0);
             let (target, gso_part) = gso.reborrow().split_cols(i..(i + 1), 0..i);
             size_reduce(ring, target, i, gso_part.as_const(), &mut col_ops);
@@ -276,6 +282,8 @@ pub fn lll_exact<R, I, V1, V2, A>(
                 swap_gso_cols(&ring, gso.reborrow(), i - 1, i);
                 i -= 1;
                 if i == 0 {
+                    // we might have generated a new zero vector, continue
+                    // with outer loop where it will be removed
                     continue 'remove_zero_vectors;
                 }
             } else {
@@ -283,8 +291,9 @@ pub fn lll_exact<R, I, V1, V2, A>(
             }
         }
 
-        let current_dimension = gso.row_count();
-        if current_dimension == gram_matrix.row_count() {
+        // if we ran the lll main loop on the whole matrix, we are done now
+        let just_lll_reduced_dimension = gso.row_count();
+        if just_lll_reduced_dimension == gram_matrix.row_count() {
             return;
         }
     }
@@ -302,29 +311,29 @@ use crate::algorithms::lll::{assert_rational_lattice_isomorphic, norm_squared};
 use crate::primitive_int::StaticRing;
 
 #[cfg(test)]
-macro_rules! in_QQ {
+macro_rules! matrix {
     (# $hom:expr; $num:literal) => {
         ($hom).map($num)
     };
     (# $hom:expr; $num:literal, $den:literal) => {
         ($hom).codomain().div(&($hom).map($num), &($hom).map($den))
     };
-    ($ZZ:expr, $([$($num:literal $(/ $den:literal)?),*]),*) => {
+    ($hom:expr, $([$($num:literal $(/ $den:literal)?),*]),*) => {
         {
-            let ZZ_to_QQ = RationalField::new($ZZ).into_inclusion();
+            let ZZ_to_ring = $hom;
             [
                 $([$(
-                    in_QQ!(# ZZ_to_QQ; $num $(, $den)?)
+                    matrix!(# ZZ_to_ring; $num $(, $den)?)
                 ),*]),*
             ]
         }
     };
-    ($ZZ:expr, $(DerefArray::from([$($num:literal $(/ $den:literal)?),*])),*) => {
+    ($hom:expr, $(DerefArray::from([$($num:literal $(/ $den:literal)?),*])),*) => {
         {
-            let ZZ_to_QQ = RationalField::new($ZZ).into_inclusion();
+            let ZZ_to_ring = $hom;
             [
                 $(DerefArray::from([$(
-                    in_QQ!(# ZZ_to_QQ; $num $(, $den)?)
+                    matrix!(# ZZ_to_ring; $num $(, $den)?)
                 ),*])),*
             ]
         }
@@ -335,17 +344,19 @@ macro_rules! in_QQ {
 fn test_ldl() {
     let ZZ = StaticRing::<i64>::RING;
     let QQ = RationalField::new(ZZ);
-    let mut data = in_QQ![ZZ,
+    let mut data = matrix!(
+        QQ.inclusion(),
         DerefArray::from([1, 2, 1]),
         DerefArray::from([2, 5, 0]),
         DerefArray::from([1, 0, 7])
-    ];
+    );
     let mut matrix = SubmatrixMut::from_2d(&mut data);
-    let mut expected = in_QQ![ZZ,
+    let mut expected = matrix!(
+        QQ.inclusion(),
         [1, 2, 1],
         [0, 1, -2],
         [0, 0, 2]
-    ];
+    );
     ldl(QQ, matrix.reborrow()).unwrap();
 
     // only the upper triangle is filled
@@ -360,16 +371,18 @@ fn test_ldl() {
 fn test_swap_gso_cols() {
     let ZZ = StaticRing::<i64>::RING;
     let QQ = RationalField::new(ZZ);
-    let mut matrix = in_QQ![ZZ,
+    let mut matrix = matrix!(
+        QQ.inclusion(),
         DerefArray::from([2, 1/2, 2/5]),
         DerefArray::from([0, 3/2, 1/4]),
         DerefArray::from([0,   0,   1])
-    ];
-    let expected = in_QQ![ZZ,
+    );
+    let expected = matrix!(
+        QQ.inclusion(),
         [2, 1/2, 31/80],
         [0, 3/2, 11/40],
         [0,   0,     1]
-    ];
+    );
     let matrix_view = SubmatrixMut::from_2d(&mut matrix);
 
     swap_gso_cols(&QQ, matrix_view, 0, 1);
@@ -381,25 +394,27 @@ fn test_swap_gso_cols() {
 fn test_lll_exact_2d() {
     let ZZ = StaticRing::<i64>::RING;
     let QQ = RationalField::new(ZZ);
-    let original = in_QQ![ZZ,
+    let original = matrix!(
+        QQ.inclusion(),
         DerefArray::from([5,   9]),
         DerefArray::from([11, 20])
-    ];
+    );
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
-    lll_exact(QQ, OwnedMatrix::identity(2, 2, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(9, 10), Global);
+    lll_exact(QQ, OwnedMatrix::identity(2, 2, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(9, 10), Global, true);
 
     assert_rational_lattice_isomorphic(QQ, RationalField::new(BigIntRing::RING), Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_el_eq!(QQ, QQ.int_hom().map(1), norm_squared(QQ, &reduced_matrix.as_const().col_at(0)));
     assert_el_eq!(QQ, QQ.int_hom().map(1), norm_squared(QQ, &reduced_matrix.as_const().col_at(1)));
 
-    let original = in_QQ![ZZ,
+    let original = matrix!(
+        QQ.inclusion(),
         DerefArray::from([10, 8]),
         DerefArray::from([27, 22])
-    ];
+    );
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
-    lll_exact(QQ, OwnedMatrix::identity(2, 2, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(9, 10), Global);
+    lll_exact(QQ, OwnedMatrix::identity(2, 2, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(9, 10), Global, true);
 
     assert_rational_lattice_isomorphic(QQ, RationalField::new(BigIntRing::RING), Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_el_eq!(QQ, QQ.int_hom().map(4), norm_squared(QQ, &reduced_matrix.as_const().col_at(0)));
@@ -412,15 +427,16 @@ fn test_lll_exact_3d() {
     let QQ = RationalField::new(ZZ);
     // in this case, the shortest vector is shorter than half the second successive minimum,
     // so LLL will find it (for delta = 0.9 > 0.75)
-    let original = in_QQ![ZZ,
+    let original = matrix!(
+        QQ.inclusion(),
         DerefArray::from([72, 0, 0]),
         DerefArray::from([0,  9, 0]),
         DerefArray::from([8432, 7344, 16864])
-    ];
+    );
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll_exact(QQ, OwnedMatrix::identity(3, 3, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(999, 1000), Global);
+    lll_exact(QQ, OwnedMatrix::identity(3, 3, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(999, 1000), Global, true);
 
     assert_rational_lattice_isomorphic(QQ, RationalField::new(BigIntRing::RING), Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_el_eq!(QQ, QQ.int_hom().map(144 * 144), norm_squared(QQ, &reduced_matrix.as_const().col_at(0)));
@@ -433,15 +449,16 @@ fn test_lll_generating_set() {
     let ZZ = StaticRing::<i64>::RING;
     let QQ = RationalField::new(ZZ);
 
-    let original = in_QQ![ZZ,
+    let original = matrix!(
+        QQ.inclusion(),
         DerefArray::from([ -6,  -1,  6, 116, -2]),
         DerefArray::from([-14, -12,  8, 232, -2]),
         DerefArray::from([-10,   2, 12,   0,  2])
-    ];
+    );
 
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll_exact(QQ, OwnedMatrix::identity(3, 3, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(999, 1000), Global);
+    lll_exact(QQ, OwnedMatrix::identity(3, 3, QQ).data(), reduced_matrix.reborrow(), &QQ.from_fraction(999, 1000), Global, true);
 
     assert_rational_lattice_isomorphic(QQ, RationalField::new(BigIntRing::RING), Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_el_eq!(QQ, QQ.zero(), norm_squared(QQ, &reduced_matrix.as_const().col_at(0)));
@@ -449,6 +466,66 @@ fn test_lll_generating_set() {
     assert_el_eq!(QQ, QQ.int_hom().map(5), norm_squared(QQ, &reduced_matrix.as_const().col_at(2)));
     assert_el_eq!(QQ, QQ.int_hom().map(5), norm_squared(QQ, &reduced_matrix.as_const().col_at(3)));
     assert_el_eq!(QQ, QQ.int_hom().map(12), norm_squared(QQ, &reduced_matrix.as_const().col_at(4)));
+
+    let ZZ = BigIntRing::RING;
+    let QQ = RationalField::new(ZZ);
+    let original = matrix!(
+        QQ.inclusion().compose(ZZ.can_hom(&StaticRing::<i128>::RING).unwrap()),
+        DerefArray::from([-4,   8, -54,  -1,   42,   15,   -23,   -259]),
+        DerefArray::from([-3,  10, -36,  18,  -48, -473, -1200,  -6493]),
+        DerefArray::from([ 5, -13,  62, -15,   17,  398,  1043,   5721]),
+        DerefArray::from([-8,  10, -68,  18,  -18, -434, -1118,  -6126]),
+        DerefArray::from([11,  -5,  90,  26, -215, -910, -2227, -11637])
+    );
+    let mut reduced = original.clone();
+    let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
+    lll_exact(
+        &QQ, 
+        OwnedMatrix::identity(5, 5, &QQ).data(), 
+        reduced_matrix.reborrow(), 
+        &QQ.from_fraction(int_cast(999, ZZ, StaticRing::<i64>::RING), int_cast(1000, ZZ, StaticRing::<i64>::RING)), 
+        Global, 
+        true
+    );
+
+    assert_rational_lattice_isomorphic(&QQ, &QQ, Submatrix::from_2d(&original), reduced_matrix.as_const());
+    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(0)));
+    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(1)));
+    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(2)));
+    assert_el_eq!(QQ, QQ.int_hom().map(1), norm_squared(&QQ, &reduced_matrix.as_const().col_at(3)));
+    assert_el_eq!(QQ, QQ.int_hom().map(1), norm_squared(&QQ, &reduced_matrix.as_const().col_at(4)));
+    assert_el_eq!(QQ, QQ.int_hom().map(1), norm_squared(&QQ, &reduced_matrix.as_const().col_at(5)));
+    assert_el_eq!(QQ, QQ.int_hom().map(5), norm_squared(&QQ, &reduced_matrix.as_const().col_at(6)));
+    assert_el_eq!(QQ, QQ.int_hom().map(40), norm_squared(&QQ, &reduced_matrix.as_const().col_at(7)));
+
+    let original = matrix!(
+        QQ.inclusion().compose(ZZ.can_hom(&StaticRing::<i128>::RING).unwrap()),
+        DerefArray::from([  -60725263117,   -448122081513,  -218368759847,   2100701846793,   216156377534,   -3137996709827,   14835704835919,    67504381450573]),
+        DerefArray::from([-1310716961940,  -9682451257943, -4729935920987,  45413204073392,  4667627712725,  -67791459966817,  320528485599331,  1458334256347773]),
+        DerefArray::from([ 1159398893231,   8564380015666,  4183444050825, -40168532351902, -4128711773154,   59963582382418, -283516375460965, -1289940218804617]),
+        DerefArray::from([-1236320093452,  -9132639612642, -4461079566742,  42833893239948,  4402644221490,  -63942205977848,  302328006373120,  1375528654002990]),
+        DerefArray::from([-2344979577397, -17323890604545, -8464219959177,  81256383857324,  8351008895542, -121291584595649,  573488494361461,  2609233431319737])
+    );
+    let mut reduced = original.clone();
+    let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
+    lll_exact(
+        &QQ, 
+        OwnedMatrix::identity(5, 5, &QQ).data(), 
+        reduced_matrix.reborrow(), 
+        &QQ.from_fraction(int_cast(999, ZZ, StaticRing::<i64>::RING), int_cast(1000, ZZ, StaticRing::<i64>::RING)), 
+        Global, 
+        true
+    );
+
+    assert_rational_lattice_isomorphic(&QQ, &QQ, Submatrix::from_2d(&original), reduced_matrix.as_const());
+    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(0)));
+    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(1)));
+    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(2)));
+    assert_el_eq!(QQ, QQ.int_hom().map(1), norm_squared(&QQ, &reduced_matrix.as_const().col_at(3)));
+    assert_el_eq!(QQ, QQ.int_hom().map(1), norm_squared(&QQ, &reduced_matrix.as_const().col_at(4)));
+    assert_el_eq!(QQ, QQ.int_hom().map(1), norm_squared(&QQ, &reduced_matrix.as_const().col_at(5)));
+    assert_el_eq!(QQ, QQ.int_hom().map(5), norm_squared(&QQ, &reduced_matrix.as_const().col_at(6)));
+    assert_el_eq!(QQ, QQ.int_hom().map(40), norm_squared(&QQ, &reduced_matrix.as_const().col_at(7)));
 }
 
 #[bench]
@@ -457,22 +534,23 @@ fn bench_lll_exact_10d(bencher: &mut Bencher) {
     let QQ = RationalField::new(ZZ);
 
     bencher.iter(|| {
-        let original: Vec<Vec<_>> = [
-            [       1,        0,        0,        0,        0,        0,        0,        0,        0,        0],
-            [       0,        1,        0,        0,        0,        0,        0,        0,        0,        0],
-            [       0,        0,        1,        0,        0,        0,        0,        0,        0,        0],
-            [       0,        0,        0,        1,        0,        0,        0,        0,        0,        0],
-            [       0,        0,        0,        0,        1,        0,        0,        0,        0,        0],
-            [       0,        0,        0,        0,        0,        1,        0,        0,        0,        0],
-            [       0,        0,        0,        0,        0,        0,        1,        0,        0,        0],
-            [       2,        2,        2,        2,        0,        0,        1,        4,        0,        0],
-            [       4,        3,        3,        3,        1,        2,        1,        0,        5,        0],
-            [ 3433883, 14315221, 24549008,  6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304]
-        ].into_iter().map(|row| row.into_iter().map(|x| QQ.inclusion().map(int_cast(x, ZZ, StaticRing::<i64>::RING))).collect()).collect();
+        let original = matrix!(
+            QQ.inclusion().compose(ZZ.can_hom(&StaticRing::<i128>::RING).unwrap()),
+            DerefArray::from([       1,        0,        0,        0,        0,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        1,        0,        0,        0,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        1,        0,        0,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        0,        1,        0,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        0,        0,        1,        0,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        0,        0,        0,        1,        0,        0,        0,        0]),
+            DerefArray::from([       0,        0,        0,        0,        0,        0,        1,        0,        0,        0]),
+            DerefArray::from([       2,        2,        2,        2,        0,        0,        1,        4,        0,        0]),
+            DerefArray::from([       4,        3,        3,        3,        1,        2,        1,        0,        5,        0]),
+            DerefArray::from([ 3433883, 14315221, 24549008,  6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304])
+        );
         let mut reduced = original.clone();
-        let mut reduced_matrix = SubmatrixMut::<Vec<_>, _>::from_2d(&mut reduced);
+        let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
         let delta = QQ.from_fraction(int_cast(9, ZZ, StaticRing::<i64>::RING), int_cast(10, ZZ, StaticRing::<i64>::RING));
-        lll_exact(&QQ, OwnedMatrix::identity(10, 10, &QQ).data(), reduced_matrix.reborrow(), &delta, Global);
+        lll_exact(&QQ, OwnedMatrix::identity(10, 10, &QQ).data(), reduced_matrix.reborrow(), &delta, Global, true);
 
         assert_rational_lattice_isomorphic(&QQ, &QQ, Submatrix::from_2d(&original), reduced_matrix.as_const());
         assert!(QQ.is_geq(&QQ.int_hom().map(16 * 16), &norm_squared(&QQ, &reduced_matrix.as_const().col_at(0))));
