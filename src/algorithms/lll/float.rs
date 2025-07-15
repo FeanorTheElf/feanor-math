@@ -4,7 +4,7 @@ use crate::homomorphism::*;
 use crate::integer::generic_impls::map_from_integer_ring;
 use crate::integer::BigIntRing;
 use crate::matrix::*;
-use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
+use crate::matrix::transform::{OffsetTransformIndex, TransformCols, TransformRows, TransformTarget};
 use crate::ordered::*;
 use crate::ring::*;
 use crate::rings::approx_real::{ApproxRealField, NotEnoughPrecision, SqrtRing};
@@ -153,7 +153,7 @@ fn compute_cholesky_pivot<I, R, H, V1, V2, V3>(
     assert!(!RR.is_neg(&sum_error));
 
     let upper = RR.add_ref(&sum, &sum_error);
-    assert!(!RR.is_neg(&upper));
+    assert!(!RR.is_neg(&upper), "Quadratic form is not positive semidefinite");
     let (value, error) = if !RR.is_pos(&RR.sub_ref(&sum, &sum_error)) {
         // we assume the matrix is positive semi-definite
         (RR.div(&upper, &RR.int_hom().map(2)), RR.div(&upper, &RR.int_hom().map(2)))
@@ -178,7 +178,7 @@ fn size_reduce<I, R, H, V1, V2, V3, T>(
     i: usize,
     h: &H,
     eta: &R::Element,
-    transform: &mut T
+    mut transform: T
 ) -> Result<(), NotEnoughPrecision>
     where I: ?Sized + RingBase,
         R: ?Sized + ApproxRealField + SqrtRing,
@@ -188,6 +188,7 @@ fn size_reduce<I, R, H, V1, V2, V3, T>(
         V3: AsPointerToSlice<R::Element>,
         T: TransformTarget<I>
 {
+    debug_assert!(i < gso.quadratic_form.row_count());
     let RR = h.codomain();
 
     // the largest value of `abs(mu) + error` we encountered in the last iteration;
@@ -293,6 +294,47 @@ fn check_lovasz_condition<I, R, H, V1, V2, V3>(
 }
 
 ///
+/// Shrinks all matrices associated to the `gso` as long as the top left
+/// element of the quadratic form is zero. Increments `zero_vector_count` for
+/// each dimension removed this way.
+/// 
+/// Afterwards, the top left element of the Cholesky decomposition is properly
+/// initialized, by taking the root of the 
+/// 
+fn remove_zero_vectors<'a, I, R, H, V1, V2, V3>(
+    mut gso: GSOMatrix<'a, I, R, V1, V2, V3>,
+    h: &H,
+    zero_vector_count: &mut usize
+) -> GSOMatrix<'a, I, R, V1, V2, V3>
+    where I: ?Sized + RingBase,
+        R: ?Sized + ApproxRealField + SqrtRing,
+        H: Homomorphism<I, R>,
+        V1: AsPointerToSlice<I::Element>,
+        V2: AsPointerToSlice<R::Element>,
+        V3: AsPointerToSlice<R::Element>
+{
+    while gso.quadratic_form.row_count() > 1 && h.domain().is_zero(gso.quadratic_form.at(0, 0)) {
+        let n = gso.quadratic_form.row_count();
+        assert!(
+            (1..n).all(|j| h.domain().is_zero(gso.quadratic_form.at(j, 0))),
+            "Quadratic form is not positive semidefinite"
+        );
+        *zero_vector_count += 1;
+        gso.quadratic_form = gso.quadratic_form.submatrix(1..n, 1..n);
+        gso.error_bound = gso.error_bound.submatrix(1..n, 1..n);
+        gso.cholesky = gso.cholesky.submatrix(1..n, 1..n);
+    }
+    let RR = h.codomain();
+    assert!(
+        RR.is_pos(&h.map_ref(gso.quadratic_form.at(0, 0))),
+        "Quadratic form is not positive semidefinite"
+    );
+    *gso.cholesky.at_mut(0, 0) = RR.get_ring().sqrt(h.map_ref(gso.quadratic_form.at(0, 0)));
+    *gso.error_bound.at_mut(0, 0) = RR.mul_ref(gso.cholesky.at(0, 0), RR.get_ring().epsilon());
+    return gso;
+}
+
+///
 /// LLL-reduces the given positive semidefinite quadratic form, using
 /// a custom variant of the L^2 algorithm.
 /// 
@@ -322,7 +364,7 @@ pub fn lll_float_quadratic_form<I, R, H, V1, T>(
     h: H,
     delta: &R::Element,
     eta: &R::Element,
-    transform: &mut T
+    mut transform: T
 ) -> Result<(), NotEnoughPrecision>
     where I: ?Sized + RingBase,
         R: ?Sized + ApproxRealField + SqrtRing,
@@ -332,29 +374,29 @@ pub fn lll_float_quadratic_form<I, R, H, V1, T>(
 {
     assert!(!h.domain().get_ring().is_approximate());
     let RR = h.codomain();
-    let n = quadratic_form.row_count();
-    assert_eq!(n, quadratic_form.col_count());
+    assert_eq!(quadratic_form.row_count(), quadratic_form.col_count());
+
     let half = RR.div(&RR.one(), &RR.int_hom().map(2));
     assert!(RR.is_gt(eta, &half));
     assert!(RR.is_lt(delta, &RR.one()));
     assert!(RR.is_gt(delta, &RR.mul_ref(eta, eta)));
     let strict_delta = RR.mul_ref_snd(RR.add_ref_fst(delta, RR.one()), &half);
 
-    let mut C = OwnedMatrix::zero(n, n, RR);
-    let mut E = OwnedMatrix::zero(n, n, RR);
+    let mut C = OwnedMatrix::zero(quadratic_form.row_count(), quadratic_form.row_count(), RR);
+    let mut E = OwnedMatrix::zero(quadratic_form.row_count(), quadratic_form.row_count(), RR);
     let mut gso = GSOMatrix {
         cholesky: C.data_mut(),
         error_bound: E.data_mut(),
         quadratic_form: quadratic_form
     };
-    *gso.cholesky.at_mut(0, 0) = RR.get_ring().sqrt(h.map_ref(gso.quadratic_form.at(0, 0)));
-    *gso.error_bound.at_mut(0, 0) = RR.mul_ref(gso.cholesky.at(0, 0), RR.get_ring().epsilon());
 
     let mut i = 1;
-    let mut remaining_swaps = n * n * 1000;
-    while i < n {
+    let mut zero_vector_count = 0;
+    let mut remaining_swaps = gso.quadratic_form.row_count() * gso.quadratic_form.row_count() * 1000;
+    gso = remove_zero_vectors(gso, &h, &mut zero_vector_count);
+    while i < gso.quadratic_form.row_count() {
         assert!(i > 0);
-        size_reduce(&mut gso, i, &h, eta, transform)?;
+        size_reduce(&mut gso, i, &h, eta, OffsetTransformIndex::new(&mut transform, zero_vector_count))?;
         match check_lovasz_condition(&mut gso, i, &h, &strict_delta) {
             LovaszCondition::Swap if remaining_swaps == 0 => {
                 return Err(NotEnoughPrecision);
@@ -362,12 +404,11 @@ pub fn lll_float_quadratic_form<I, R, H, V1, T>(
             LovaszCondition::Swap => {
                 remaining_swaps -= 1;
                 gso.swap(h.domain(), i - 1, i);
-                transform.swap(h.domain(), i - 1, i);
-                if i == 1 {
-                    *gso.cholesky.at_mut(0, 0) = RR.get_ring().sqrt(h.map_ref(gso.quadratic_form.at(0, 0)));
-                    *gso.error_bound.at_mut(0, 0) = RR.mul_ref(gso.cholesky.at(0, 0), RR.get_ring().epsilon());
-                } else {
-                    i -= 1;
+                OffsetTransformIndex::new(&mut transform, zero_vector_count).swap(h.domain(), i - 1, i);
+                i -= 1;
+                if i == 0 {
+                    gso = remove_zero_vectors(gso, &h, &mut zero_vector_count);
+                    i = 1;
                 }
             },
             LovaszCondition::Satisfied => {
@@ -508,7 +549,7 @@ fn test_lll_float_2d() {
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
     lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.9, &0.55).unwrap();
 
-    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), &reduced_matrix.as_const());
+    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_eq!(4, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
     assert_eq!(5, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
 }
@@ -529,7 +570,7 @@ fn test_lll_float_3d() {
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 3>, _>::from_2d(&mut reduced);
     lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
 
-    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), &reduced_matrix.as_const());
+    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_eq!(144 * 144, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
     assert_eq!(72 * 72 + 279 * 279, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
     assert_eq!(72 * 72 * 2 + 272 * 272, norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)));
@@ -551,7 +592,7 @@ fn test_lll_precision() {
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 5>, _>::from_2d(&mut reduced);
     lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
 
-    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), &reduced_matrix.as_const());
+    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)) < 200);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)) < 300);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)) < 300);
@@ -571,7 +612,7 @@ fn test_lll_precision() {
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 5>, _>::from_2d(&mut reduced);
     lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
     
-    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), &reduced_matrix.as_const());
+    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)) < 500);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)) < 900);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)) < 1200);
@@ -592,7 +633,7 @@ fn test_lll_precision() {
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 5>, _>::from_2d(&mut reduced);
     lll_float_lattice(reduced_matrix.reborrow(), RR.can_hom(&ZZ).unwrap(), &0.999, &0.51).unwrap();
     
-    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), &reduced_matrix.as_const());
+    assert_lattice_isomorphic(ZZ, BigIntRing::RING, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)) < 1800);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)) < 1800);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)) < 4600);

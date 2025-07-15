@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::ring::*;
 
 use super::{AsPointerToSlice, OwnedMatrix, SubmatrixMut};
@@ -68,9 +70,28 @@ pub trait TransformTarget<R>
     }
 }
 
+impl<'a, T, R> TransformTarget<R> for &'a mut T
+    where R: ?Sized + RingBase,
+        T: TransformTarget<R>
+{
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize, transform: &[R::Element; 4]) {
+        <T as TransformTarget<R>>::transform(*self, ring, i, j, transform)
+    }
+
+    fn subtract<S: Copy + RingStore<Type = R>>(&mut self, ring: S, src: usize, dst: usize, factor: &R::Element) {
+        <T as TransformTarget<R>>::subtract(*self, ring, src, dst, factor)
+    }
+
+    fn swap<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize) {
+        <T as TransformTarget<R>>::swap(*self, ring, i, j)
+    }
+}
+
 ///
 /// Wraps a [`SubmatrixMut`] to get a [`TransformTarget`]. Every transform is multiplied to
 /// the wrapped matrix from the left, i.e. applied to the rows of the matrix.
+/// 
+/// TODO: at next breaking release, remove the reference to the ring
 /// 
 pub struct TransformRows<'a, V, R>(pub SubmatrixMut<'a, V, R::Element>, pub &'a R)
     where V: AsPointerToSlice<R::Element>, R: ?Sized + RingBase;
@@ -78,6 +99,8 @@ pub struct TransformRows<'a, V, R>(pub SubmatrixMut<'a, V, R::Element>, pub &'a 
 ///
 /// Wraps a [`SubmatrixMut`] to get a [`TransformTarget`]. Every transform is multiplied to
 /// the wrapped matrix from the right, i.e. applied to the cols of the matrix.
+/// 
+/// TODO: at next breaking release, remove the reference to the ring
 /// 
 pub struct TransformCols<'a, V, R>(pub SubmatrixMut<'a, V, R::Element>, pub &'a R)
     where V: AsPointerToSlice<R::Element>, R: ?Sized + RingBase;
@@ -228,4 +251,43 @@ impl<R> TransformTarget<R> for ()
     fn subtract<S: Copy + RingStore<Type = R>>(&mut self, _: S, _: usize, _: usize, _: &R::Element) {}
 
     fn swap<S: Copy + RingStore<Type = R>>(&mut self, _: S, _: usize, _: usize) {}
+}
+
+pub struct OffsetTransformIndex<R, T>
+    where R: ?Sized + RingBase,
+        T: TransformTarget<R>
+{
+    delegate: T,
+    index_offset: usize,
+    ring: PhantomData<R>
+}
+
+impl<R, T> OffsetTransformIndex<R, T>
+    where R: ?Sized + RingBase,
+        T: TransformTarget<R>
+{
+    pub fn new(delegate: T, offset: usize) -> Self {
+        Self {
+            delegate: delegate, 
+            index_offset: offset, 
+            ring: PhantomData
+        }
+    }
+}
+
+impl<R, T> TransformTarget<R> for OffsetTransformIndex<R, T>
+    where R: ?Sized + RingBase,
+        T: TransformTarget<R>
+{
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize, transform: &[R::Element; 4]) {
+        <T as TransformTarget<R>>::transform(&mut self.delegate, ring, i + self.index_offset, j + self.index_offset, transform)
+    }
+
+    fn subtract<S: Copy + RingStore<Type = R>>(&mut self, ring: S, src: usize, dst: usize, factor: &R::Element) {
+        <T as TransformTarget<R>>::subtract(&mut self.delegate, ring, src + self.index_offset, dst + self.index_offset, factor)
+    }
+
+    fn swap<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize) {
+        <T as TransformTarget<R>>::swap(&mut self.delegate, ring, i + self.index_offset, j + self.index_offset)
+    }
 }
