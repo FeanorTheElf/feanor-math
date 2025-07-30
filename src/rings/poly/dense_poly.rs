@@ -129,7 +129,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
         let mut data = Vec::with_capacity_in(val.data.len(), self.element_allocator.clone());
-        data.extend((0..val.data.len()).map(|i| (self.base_ring.clone_el(&val.data.at(i)))));
+        data.extend((0..val.data.len()).map(|i| self.base_ring.clone_el(&val.data.at(i))));
         DensePolyRingEl { data }
     }
 
@@ -591,7 +591,7 @@ impl<R, A: Allocator + Clone, C> DivisibilityRing for DensePolyRingBase<R, A, C>
         if let Some(d) = self.degree(rhs) {
             if d == 0 {
                 let rhs = self.coefficient_at(rhs, 0);
-                return RingRef::new(self).try_from_terms(self.terms(lhs).map(|(c, i)| (self.base_ring().checked_left_div(c, rhs).map(|c| (c, i)).ok_or(())))).ok();
+                return RingRef::new(self).try_from_terms(self.terms(lhs).map(|(c, i)| self.base_ring().checked_left_div(c, rhs).map(|c| (c, i)).ok_or(()))).ok();
             } else {
                 let lc = &rhs.data[d];
                 let (quo, rem) = poly_div_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| self.base_ring().checked_left_div(&x, lc).ok_or(())).ok()?;

@@ -88,7 +88,7 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
     /// Returns the ring over which this object can compute convolutions.
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn ring(&self) -> RingRef<R_main> {
+    pub fn ring(&self) -> RingRef<'_, R_main> {
         RingRef::new(self.hom.codomain().get_ring())
     }
 

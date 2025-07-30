@@ -69,6 +69,13 @@ impl Drop for MPZEl {
     }
 }
 
+impl std::fmt::Debug for MPZEl {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        MPZ::RING.get_ring().dbg(self, f)
+    }
+}
+
 ///
 /// Arbitrary-precision integer ring, implemented by binding to the well-known
 /// and heavily optimized library mpir (fork of gmp).
