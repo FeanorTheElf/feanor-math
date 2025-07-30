@@ -227,7 +227,7 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
     }
 
     #[inline(always)]
-    fn tmp_monomials(&self) -> (RefMut<[u16]>, RefMut<[u16]>) {
+    fn tmp_monomials(&self) -> (RefMut<'_, [u16]>, RefMut<'_, [u16]>) {
         (self.tmp_monomial1(), self.tmp_monomial2())
     }
 
@@ -240,7 +240,7 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
     /// checks of `RefCell`.
     /// 
     #[inline(always)]
-    fn tmp_monomial1(&self) -> RefMut<[u16]> {
+    fn tmp_monomial1(&self) -> RefMut<'_, [u16]> {
         let (mon, _) = self.tmp_monomials.get_or(|| (RefCell::new((0..self.variable_count).map(|_| 0).collect::<Vec<_>>().into_boxed_slice()), RefCell::new((0..self.variable_count).map(|_| 0).collect::<Vec<_>>().into_boxed_slice())));
         RefMut::map(mon.borrow_mut(), |mon| &mut**mon)
     }
@@ -249,7 +249,7 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
     /// See [`MultivariatePolyRingImplBase::tmp_monomial1()`]
     /// 
     #[inline(always)]
-    fn tmp_monomial2(&self) -> RefMut<[u16]> {
+    fn tmp_monomial2(&self) -> RefMut<'_, [u16]> {
         let (_, mon) = self.tmp_monomials.get_or(|| (RefCell::new((0..self.variable_count).map(|_| 0).collect::<Vec<_>>().into_boxed_slice()), RefCell::new((0..self.variable_count).map(|_| 0).collect::<Vec<_>>().into_boxed_slice())));
         RefMut::map(mon.borrow_mut(), |mon| &mut**mon)
     }
