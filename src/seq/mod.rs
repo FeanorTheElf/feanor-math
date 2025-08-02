@@ -7,11 +7,12 @@ pub mod subvector;
 pub mod permute;
 pub mod sparse;
 
-use std::{alloc::Allocator, ops::{Bound, Range, RangeBounds}};
+use std::alloc::Allocator;
+use std::ops::{Bound, Range, RangeBounds};
 
 pub use conversion::{CloneElFn, VectorViewFn, VectorFnIter};
 pub use map::{VectorFnMap, VectorViewMap, VectorViewMapMut};
-use step_by::{StepBy, StepByFn};
+use step_by::{StepByFn, StepBy};
 
 use crate::ring::*;
 
