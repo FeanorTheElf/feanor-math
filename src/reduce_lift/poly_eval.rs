@@ -21,11 +21,12 @@ use crate::specialization::FiniteRingSpecializable;
 pub trait InterpolationBaseRing: DivisibilityRing {
 
     ///
-    /// Restricting this here to be `DivisibilityRing + PrincipalIdealRing + Domain + EvaluatePolyLocallyRing`
-    /// is necessary, because of a compiler bug, see also
-    /// [`crate::reduce_lift::poly_eval::EvalPolyLocallyRing::LocalRingBase`]
+    /// The type of the extension ring we can switch to to get more points.
     /// 
-    type ExtendedRingBase<'a>: ?Sized + PrincipalIdealRing + Domain + ComputeResultantRing + LinSolveRing
+    /// For the reason why there are so many quite specific trait bounds here:
+    /// See the doc of [`EvalPolyLocallyRing::LocalRingBase`].
+    /// 
+    type ExtendedRingBase<'a>: ?Sized + PrincipalIdealRing + Domain + LinSolveRing + ComputeResultantRing
         where Self: 'a;
 
     type ExtendedRing<'a>: RingStore<Type = Self::ExtendedRingBase<'a>> + Clone
@@ -150,20 +151,211 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
 /// rely on Hensel lifting to compute the result modulo a large power of a single prime, or very
 /// few primes. This approach is formalized by [`crate::reduce_lift::poly_factor_gcd::PolyGCDLocallyDomain`].
 /// 
+/// # Type-level recursion in feanor-math
+/// 
+/// [`EvalPolyLocallyRing`] and [`PolyGCDLocallyDomain`] are the two traits in feanor-math which
+/// use type-level recursion with blanket implementations. The idea is simple: If our ring is an
+/// [`EvalPolyLocallyRing`], whose quotients are again [`EvalPolyLocallyRing`], whose quotients are
+/// again [`EvalPolyLocallyRing`] and so on, ending with a finite field. Then, for all kinds of
+/// operations which are actually just polynomial evaluations (resultants, determinants, unique-solution
+/// linear systems, ...) we already have all the information for an efficient algorithm. However,
+/// providing this through blanket implementations is not that simple. We now explain how it is
+/// done in feanor-math.
+/// 
+/// The proper solution:
+/// ```compile_fail,E0391
+/// #![feature(min_specialization)]
+/// // Some special property, in practice this might be LinSolveRing, ComputeResultantRing, FactorPolyRing, ...
+/// pub trait SpecialProperty {
+/// 
+///     fn foo<'a>(&'a self);
+/// }
+/// 
+/// impl<T> SpecialProperty for T
+///     where T: Recursive,
+///         for<'a> T::PrevCase<'a>: SpecialProperty
+/// {
+///     default fn foo<'a>(&'a self) {
+///         println!("recursion");
+///         <T::PrevCase<'a> as SpecialProperty>::foo(&self.map_down());
+///     }
+/// }
+/// 
+/// // Newtype to allow `&'a T: SpecialProperty` without conflicting with above blanket impl
+/// pub struct RefWrapper<'a, T>(&'a T);
+/// 
+/// impl<'a, T: Recursive> SpecialProperty for RefWrapper<'a, T> {
+/// 
+///     fn foo<'b>(&'b self) {
+///         self.0.foo()
+///     }
+/// }
+/// 
+/// // The main recursion type
+/// pub trait Recursive {
+/// 
+///     type PrevCase<'a> where Self: 'a;
+/// 
+///     fn map_down<'a>(&'a self) -> Self::PrevCase<'a>;
+/// }
+/// 
+/// #[derive(Clone, Copy)]
+/// pub struct BaseCase;
+/// 
+/// impl Recursive for BaseCase {
+/// 
+///     type PrevCase<'a> = Self where Self: 'a;
+/// 
+///     fn map_down<'a>(&'a self) -> Self::PrevCase<'a> { *self }
+/// }
+/// 
+/// impl SpecialProperty for BaseCase {
+/// 
+///     fn foo<'a>(&'a self) {
+///         println!("BaseCaseSpecial")
+///     }
+/// }
+/// 
+/// pub struct RecursiveCase<T: Recursive>(T);
+/// 
+/// impl<T: Recursive> Recursive for RecursiveCase<T> {
+/// 
+///     type PrevCase<'a> = RefWrapper<'a, T> where Self: 'a;
+/// 
+///     fn map_down<'a>(&'a self) -> Self::PrevCase<'a> {
+///         RefWrapper(&self.0)
+///     }
+/// }
+/// 
+/// fn run_type_recursion<'b, T>(t: &'b T)
+///     where T: 'b + Recursive,
+///         for<'a> T::PrevCase<'a>: SpecialProperty
+/// {
+///     t.foo()
+/// }
+/// 
+/// run_type_recursion(&BaseCase);
+/// run_type_recursion(&RecursiveCase(BaseCase));
+/// ```
+/// Unfortunately, this currently fails with an error
+/// ```text
+/// error[E0391]: cycle detected when computing whether impls specialize one another
+///   --> src/main.rs:9:1
+///    |
+/// 9  | / impl<T> SpecialProperty for T
+/// 10 | |     where T: Recursive,
+/// 11 | |         for<'a> T::PrevCase<'a>: SpecialProperty
+///    | |________________________________________________^
+///    |
+///    = note: ...which requires evaluating trait selection obligation `BaseCase: SpecialProperty`...
+///    = note: ...which again requires computing whether impls specialize one another, completing the cycle
+/// ```
+/// The only solution I found is to put the constraint by `SpecialProperty` directly into
+/// the declaration `type PrevCase<'a>: SpecialProperty where Self: 'a`. This works, but
+/// unfortunately makes things much less generic than we would want to. In particular,
+/// If we have a `NonSpecialBaseCase` in addition to `BaseCase`, and we want it to not
+/// implement `SpecialProperty`, then we cannot use `RecursiveCase` as well. On the other hand,
+/// if the compiler would accept the first variant, this would work out fine - the only effect
+/// of `NonSpecialBaseCase: !SpecialProperty` would then be that also
+/// `RecursiveCase<NonSpecialBaseCase>: !SpecialProperty`, which of course makes sense.
+/// 
+/// However, for now we stay with this workaround, which then looks as follows:
+/// ```
+/// #![feature(min_specialization)]
+/// // Some special property, in practice this might be LinSolveRing, ComputeResultantRing, FactorPolyRing, ...
+/// pub trait SpecialProperty {
+/// 
+///     fn foo<'a>(&'a self);
+/// }
+/// 
+/// impl<T> SpecialProperty for T
+///     where T: Recursive
+/// {
+///     default fn foo<'a>(&'a self) {
+///         println!("recursion");
+///         <T::PrevCase<'a> as SpecialProperty>::foo(&self.map_down());
+///     }
+/// }
+/// 
+/// // Newtype to allow `&'a T: SpecialProperty` without conflicting with above blanket impl
+/// pub struct RefWrapper<'a, T: SpecialProperty>(&'a T);
+/// 
+/// impl<'a, T: Recursive> SpecialProperty for RefWrapper<'a, T> {
+/// 
+///     fn foo<'b>(&'b self) {
+///         self.0.foo()
+///     }
+/// }
+/// 
+/// // The main recursion type
+/// pub trait Recursive {
+/// 
+///     type PrevCase<'a>: SpecialProperty where Self: 'a;
+/// 
+///     fn map_down<'a>(&'a self) -> Self::PrevCase<'a>;
+/// }
+/// 
+/// #[derive(Clone, Copy)]
+/// pub struct BaseCase;
+/// 
+/// impl Recursive for BaseCase {
+/// 
+///     type PrevCase<'a> = Self where Self: 'a;
+/// 
+///     fn map_down<'a>(&'a self) -> Self::PrevCase<'a> { *self }
+/// }
+/// 
+/// impl SpecialProperty for BaseCase {
+/// 
+///     fn foo<'a>(&'a self) {
+///         println!("BaseCaseSpecial")
+///     }
+/// }
+/// 
+/// pub struct RecursiveCase<T: Recursive + SpecialProperty>(T);
+/// 
+/// impl<T: Recursive> Recursive for RecursiveCase<T> {
+/// 
+///     type PrevCase<'a> = RefWrapper<'a, T> where Self: 'a;
+/// 
+///     fn map_down<'a>(&'a self) -> Self::PrevCase<'a> {
+///         RefWrapper(&self.0)
+///     }
+/// }
+/// 
+/// fn run_type_recursion<'b, T>(t: &'b T)
+///     where T: 'b + Recursive
+/// {
+///     t.foo()
+/// }
+/// 
+/// run_type_recursion(&BaseCase);
+/// run_type_recursion(&RecursiveCase(BaseCase));
+/// ```
+/// 
+/// Another advantage is that every function 
+/// 
 #[stability::unstable(feature = "enable")]
 pub trait EvalPolyLocallyRing: RingBase + FiniteRingSpecializable {
     
     ///
-    /// The proper way would be to define this with two lifetime parameters `'ring` and `'data`,
-    /// to allow it to reference both the ring itself and the current `LocalComputationData`.
-    /// However, when doing this, I ran into the compiler bug
-    /// [https://github.com/rust-lang/rust/issues/100013](https://github.com/rust-lang/rust/issues/100013).
+    /// The type of the ring we get once quotienting by a prime ideal.
     /// 
-    /// This is also the reason why we restrict this type here to be [`PrincipalIdealRing`], because
-    /// unfortunately, the a constraint `for<'a> SomeRing::LocalRingBase<'a>: PrincipalIdealRing` again
-    /// triggers the bug in some settings.
+    /// The proper solution would be to just require `LocalRingBase<'ring>: ?Sized + RingBase`.
+    /// Algorithms which require this type to provide additional functionality (like being
+    /// a [`ComputeResultantRing`]) should then add a constraint
+    /// ```ignore
+    ///   for<'ring> R::LocalRingBase<'ring>: ComputeResultantRing
+    /// ```
+    /// However, this causes problems, more concretely an error 
+    /// "cycle detected when computing whether impls specialize one another".
+    /// More on that in the trait-level doc.
     /// 
-    type LocalRingBase<'ring>: ?Sized + PrincipalIdealRing + Domain + ComputeResultantRing + LinSolveRing
+    /// Hence, we have to already bound `LocalRingBase` by all the traits that are reasonably
+    /// required by some algorithms. This clearly makes it a lot less generic than it should be,
+    /// but so far it worked out without too much trouble.
+    /// 
+    type LocalRingBase<'ring>: ?Sized + PrincipalIdealRing + Domain + LinSolveRing + ComputeResultantRing
         where Self: 'ring;
 
     type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
@@ -325,11 +517,15 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for EvaluatePolyL
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::reduce_lift::poly_eval::*;
 /// # use feanor_math::primitive_int::*;
+/// # use feanor_math::algorithms::resultant::*;
 /// # use feanor_math::divisibility::*;
+/// # use crate::feanor_math::homomorphism::Homomorphism;
+/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::rings::poly::dense_poly::DensePolyRing;
 /// # use feanor_math::pid::*;
 /// # use feanor_math::impl_interpolation_base_ring_char_zero;
-/// // we wrap a `RingBase` here for simplicity, but in practice a wrapper should always
-/// // store a `RingStore` instead
+/// // we wrap a `RingBase` here for simplicity, but in practice a wrapper should
+/// // always store a `RingStore` instead
 /// #[derive(PartialEq)]
 /// struct MyRingWrapper<R: RingBase>(R);
 /// impl<R: RingBase> DelegateRing for MyRingWrapper<R> {
@@ -342,8 +538,9 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for EvaluatePolyL
 ///     fn delegate_mut<'a>(&self, x: &'a mut R::Element) -> &'a mut R::Element { x }
 /// }
 /// impl<R: RingBase> DelegateRingImplEuclideanRing for MyRingWrapper<R> {}
+/// impl<R: RingBase> DelegateRingImplFiniteRing for MyRingWrapper<R> {}
 /// impl<R: Domain> Domain for MyRingWrapper<R> {}
-/// impl_interpolation_base_ring_char_zero!{ <{ R }> InterpolationBaseRing for MyRingWrapper<R> where R: PrincipalIdealRing + Domain }
+/// impl_interpolation_base_ring_char_zero!{ <{ R }> InterpolationBaseRing for MyRingWrapper<R> where R: PrincipalIdealRing + Domain + ComputeResultantRing }
 /// 
 /// // now we can use `InterpolationBaseRing`-functionality
 /// let ring = MyRingWrapper(StaticRing::<i64>::RING.into());
@@ -351,6 +548,20 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for EvaluatePolyL
 /// assert_eq!(0, points[0]);
 /// assert_eq!(1, points[1]);
 /// assert_eq!(2, points[2]);
+/// 
+/// // There is a problem here, described in EvalPolyLocallyRing::LocalRingBase.
+/// // Short version: we need to manually impl ComputeResultantRing
+/// impl<R: ComputeResultantRing> ComputeResultantRing for MyRingWrapper<R> {
+///     fn resultant<P>(poly_ring: P, f: El<P>, g: El<P>) -> Self::Element
+///         where P: RingStore + Copy,
+///             P::Type: PolyRing,
+///             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+///     {
+///         let new_poly_ring = DensePolyRing::new(RingRef::new(poly_ring.base_ring().get_ring().get_delegate()), "X");
+///         let hom = new_poly_ring.lifted_hom(&poly_ring, UnwrapHom::new(poly_ring.base_ring().get_ring()));
+///         poly_ring.base_ring().get_ring().rev_delegate(R::resultant(&new_poly_ring, hom.map(f), hom.map(g)))
+///     }
+/// }
 /// ```
 /// 
 #[macro_export]

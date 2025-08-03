@@ -26,7 +26,7 @@ use crate::rings::rational::{RationalField, RationalFieldBase};
 /// Hence, this ring has only limited use within this crate, and is currently only used for
 /// floating-point FFTs and some approximate computations in the LLL algorithm. 
 /// 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Real64Base;
 
 ///

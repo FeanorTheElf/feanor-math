@@ -115,6 +115,9 @@ impl<R> PartialEq for AsFieldBase<R>
 #[allow(type_alias_bounds)]
 pub type AsField<R: RingStore> = RingValue<AsFieldBase<R>>;
 
+///
+/// An element of [`AsField`].
+/// 
 pub struct FieldEl<R: RingStore>(El<R>)
     where R::Type: DivisibilityRing;
 

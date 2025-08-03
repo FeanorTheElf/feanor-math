@@ -1,4 +1,6 @@
-use std::alloc::{Allocator, Global};
+use std::{alloc::{Allocator, Global}, fmt::{Debug, Formatter, Result}};
+
+use crate::seq::dbg_iter;
 
 use self::submatrix::{AsFirstElement, Submatrix, SubmatrixMut};
 
@@ -187,5 +189,12 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
         where F: FnMut() -> T
     {
         self.data.resize_with(new_count * self.col_count(), new_entries);
+    }
+}
+
+impl<T: Debug, A: Allocator> Debug for OwnedMatrix<T, A> {
+
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "[{:?}]", dbg_iter(self.data().row_iter()))
     }
 }

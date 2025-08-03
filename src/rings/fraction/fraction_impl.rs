@@ -1,3 +1,6 @@
+use std::fmt::Debug;
+use std::fmt::Formatter;
+
 use crate::algorithms::eea::signed_gcd;
 use crate::algorithms::matmul::StrassenHint;
 use crate::algorithms::convolution::KaratsubaHint;
@@ -70,6 +73,16 @@ impl<R> FractionFieldImplBase<R>
             el.num = self.base_ring.checked_div(&el.num, &factor).unwrap();
             el.den = self.base_ring.checked_div(&el.den, &factor).unwrap();
         }
+    }
+}
+
+impl<R> Debug for FractionFieldEl<R>
+    where R: RingStore,
+        R::Type: Domain,
+        El<R>: Debug
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FractionFieldEl {{ num: {:?}, den: {:?} }}", self.num, self.den)
     }
 }
 

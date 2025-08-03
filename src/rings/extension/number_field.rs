@@ -1,4 +1,4 @@
-
+use std::fmt::{Debug, Formatter};
 use std::alloc::Global;
 use std::marker::PhantomData;
 
@@ -8,6 +8,7 @@ use crate::algorithms::poly_factor::extension::poly_factor_extension;
 use crate::algorithms::poly_gcd::factor::{factor_and_lift_mod_pe, FactorAndLiftModpeResult};
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::poly_gcd::gcd::poly_gcd_local;
+use crate::algorithms::resultant::ComputeResultantRing;
 use crate::reduce_lift::poly_factor_gcd::*;
 use crate::rings::extension::number_field::newton::find_approximate_complex_root;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
@@ -606,7 +607,7 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
         Impl::Type: Field + FreeAlgebra,
         <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
-        I::Type: IntegerRing
+        I::Type: IntegerRing + ComputeResultantRing
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: RingStore + Copy,
@@ -945,6 +946,17 @@ impl<'ring, I> NumberRingIdeal<'ring, I>
         );
         
         return (ZpeX, factors);
+    }
+}
+
+impl<'ring, I> Debug for NumberRingIdeal<'ring, I>
+    where I: RingStore,
+        I::Type: IntegerRing,
+        I: 'ring,
+        <I::Type as PolyGCDLocallyDomain>::SuitableIdeal<'ring>: Debug
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NumberRingIdeal {{ ideal: {:?} }}", self.prime)
     }
 }
 

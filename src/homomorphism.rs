@@ -395,16 +395,29 @@ pub trait CanHomFrom<S>: RingBase
     /// on ring elements. Otherwise, `None` is returned.
     /// 
     fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism>;
+
+    ///
+    /// Evaluates the homomorphism.
+    /// 
     fn map_in(&self, from: &S, el: S::Element, hom: &Self::Homomorphism) -> Self::Element;
 
+    ///
+    /// Evaluates the homomorphism, taking the element by reference.
+    /// 
     fn map_in_ref(&self, from: &S, el: &S::Element, hom: &Self::Homomorphism) -> Self::Element {
         self.map_in(from, from.clone_el(el), hom)
     }
 
+    ///
+    /// Evaluates the homomorphism on `rhs`, and multiplies the result to `lhs`.
+    /// 
     fn mul_assign_map_in(&self, from: &S, lhs: &mut Self::Element, rhs: S::Element, hom: &Self::Homomorphism) {
         self.mul_assign(lhs, self.map_in(from, rhs, hom));
     }
 
+    ///
+    /// Evaluates the homomorphism on `rhs`, taking it by reference, and multiplies the result to `lhs`.
+    /// 
     fn mul_assign_map_in_ref(&self, from: &S, lhs: &mut Self::Element, rhs: &S::Element, hom: &Self::Homomorphism) {
         self.mul_assign(lhs, self.map_in_ref(from, rhs, hom));
     }
@@ -518,6 +531,10 @@ impl<R, S> Debug for CanHom<R, S>
 impl<R, S> CanHom<R, S>
     where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
 {
+    ///
+    /// Creates a new [`CanHom`] from `from` to `to`, if the 
+    /// corresonding rings support it.
+    /// 
     pub fn new(from: R, to: S) -> Result<Self, (R, S)> {
         match to.get_ring().has_canonical_hom(from.get_ring()) {
             Some(data) => Ok(Self::from_raw_parts(from, to, data)),
@@ -525,10 +542,16 @@ impl<R, S> CanHom<R, S>
         }
     }
 
+    ///
+    /// Returns a reference to the underlying [`CanHomFrom::Homomorphism`].
+    /// 
     pub fn raw_hom(&self) -> &<S::Type as CanHomFrom<R::Type>>::Homomorphism {
         &self.data
     }
 
+    ///
+    /// Returns the underlying [`CanHomFrom::Homomorphism`], consuming this object.
+    /// 
     pub fn into_raw_hom(self) -> <S::Type as CanHomFrom<R::Type>>::Homomorphism {
         self.data
     }
@@ -701,6 +724,16 @@ impl<R, S> Clone for CanIso<R, S>
 impl<R, S> CanIso<R, S>
     where R: RingStore, S: RingStore, S::Type: CanIsoFromTo<R::Type>
 {
+    ///
+    /// Creates a new [`CanIso`] between `from` and `to`, if the 
+    /// corresonding rings support it.
+    /// 
+    /// Somewhat counter-intuitively, the returned object actually
+    /// implements the homomorphism in the direction `to -> from`.
+    /// However, for an isomorphism, the direction is not that relevant,
+    /// and the map in the direction `from -> to` can be obtained by
+    /// [`CanIso::inv()`] or [`CanIso::into_inv()`].
+    /// 
     pub fn new(from: R, to: S) -> Result<Self, (R, S)> {
         match to.get_ring().has_canonical_iso(from.get_ring()) {
             Some(data) => {
@@ -711,18 +744,30 @@ impl<R, S> CanIso<R, S>
         }
     }
 
+    ///
+    /// Returns the inverse homomorphism, consuming this object.
+    /// 
     pub fn into_inv(self) -> CanHom<R, S> {
         CanHom::new(self.from, self.to).unwrap_or_else(|_| unreachable!())
     }
 
+    ///
+    /// Returns the inverse homomorphism.
+    /// 
     pub fn inv<'a>(&'a self) -> CanHom<&'a R, &'a S> {
         CanHom::new(&self.from, &self.to).unwrap_or_else(|_| unreachable!())
     }
 
+    ///
+    /// Returns a reference to the underlying [`CanIsoFromTo::Isomorphism`].
+    /// 
     pub fn raw_iso(&self) -> &<S::Type as CanIsoFromTo<R::Type>>::Isomorphism {
         &self.data
     }
 
+    ///
+    /// Returns the underlying [`CanIsoFromTo::Isomorphism`], consuming this object.
+    /// 
     pub fn into_raw_iso(self) -> <S::Type as CanIsoFromTo<R::Type>>::Isomorphism {
         self.data
     }

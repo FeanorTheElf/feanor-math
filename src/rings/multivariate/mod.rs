@@ -575,7 +575,7 @@ pub trait GradedMonomialOrder: MonomialOrder {}
 /// }
 /// ```
 /// 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct DegRevLex;
 
 impl MonomialOrder for DegRevLex {
@@ -612,7 +612,7 @@ impl GradedMonomialOrder for DegRevLex {}
 ///
 /// Lexicographic ordering of monomials.
 /// 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Lex;
 
 impl MonomialOrder for Lex {

@@ -260,6 +260,10 @@ pub trait DelegateRing: PartialEq {
     /// 
     type Element;
 
+    ///
+    /// Returns a reference to the delegated-to ring, which is used by all other default
+    /// implementations to actually implement arithmetic operations.
+    /// 
     fn get_delegate(&self) -> &Self::Base;
     
     ///

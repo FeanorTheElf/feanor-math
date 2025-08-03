@@ -17,6 +17,10 @@ use crate::unsafe_any::UnsafeAny;
 /// 
 pub trait FiniteRing: RingBase + FiniteRingSpecializable {
 
+    ///
+    /// Type of the iterator returned by [`FiniteRing::elements()`], which should
+    /// iterate over all elements of the ring.
+    /// 
     type ElementsIter<'a>: Sized + Clone + Iterator<Item = <Self as RingBase>::Element>
         where Self: 'a;
 

@@ -1,3 +1,4 @@
+use std::fmt::{Formatter, Debug};
 use std::ops::{Deref, Range};
 use std::marker::PhantomData;
 use std::ptr::{addr_of_mut, NonNull};
@@ -5,7 +6,7 @@ use std::ptr::{addr_of_mut, NonNull};
 #[cfg(feature = "ndarray")]
 use ndarray::{ArrayBase, DataMut, Ix2};
 
-use crate::seq::SwappableVectorViewMut;
+use crate::seq::{dbg_iter, SwappableVectorViewMut};
 use crate::seq::{VectorView, VectorViewMut};
 
 ///
@@ -327,6 +328,14 @@ impl<'a, V, T> Column<'a, V, T>
     }
 }
 
+impl<'a, V, T: Debug> Debug for Column<'a, V, T>
+    where V: AsPointerToSlice<T>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", dbg_iter(self.as_iter()))
+    }
+}
+
 impl<'a, V, T> Clone for Column<'a, V, T>
     where V: AsPointerToSlice<T>
 {
@@ -365,6 +374,14 @@ pub struct ColumnMut<'a, V, T>
 {
     entry: PhantomData<&'a mut T>,
     raw_data: SubmatrixRaw<V, T>
+}
+
+impl<'a, V, T: Debug> Debug for ColumnMut<'a, V, T>
+    where V: AsPointerToSlice<T>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", dbg_iter(self.as_iter()))
+    }
 }
 
 impl<'a, V, T> ColumnMut<'a, V, T>
@@ -678,6 +695,14 @@ impl<'a, V, T> Submatrix<'a, V, T>
     }
 }
 
+impl<'a, V, T: Debug> Debug for Submatrix<'a, V, T>
+    where V: 'a + AsPointerToSlice<T>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{:?}]", dbg_iter(self.row_iter()))
+    }
+}
+
 impl<'a, V, T> Clone for Submatrix<'a, V, T>
     where V: 'a + AsPointerToSlice<T>
 {
@@ -912,6 +937,14 @@ impl<'a, V, T> SubmatrixMut<'a, V, T>
     }
 }
 
+impl<'a, V, T: Debug> Debug for SubmatrixMut<'a, V, T>
+    where V: 'a + AsPointerToSlice<T>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{:?}]", dbg_iter(self.as_const().row_iter()))
+    }
+}
+
 impl<'a, T> SubmatrixMut<'a, AsFirstElement<T>, T> {
 
     ///
@@ -1010,9 +1043,6 @@ impl<'a, V: AsPointerToSlice<T> + Deref<Target = [T]>, T> Submatrix<'a, V, T> {
         }
     }
 }
-
-#[cfg(test)]
-use std::fmt::Debug;
 
 #[cfg(test)]
 fn assert_submatrix_eq<V: AsPointerToSlice<T>, T: PartialEq + Debug, const N: usize, const M: usize>(expected: [[T; M]; N], actual: &mut SubmatrixMut<V, T>) {

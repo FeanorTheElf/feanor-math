@@ -86,6 +86,10 @@ impl<A: Allocator + Clone + Default> Default for RustBigintRingBase<A> {
 
 impl<A: Allocator + Clone> RustBigintRingBase<A> {
 
+    ///
+    /// If the given big integer fits into a `i128`, this will be
+    /// returned. Otherwise, `None` is returned.
+    /// 
     pub fn map_i128(&self, val: &RustBigint<A>) -> Option<i128> {
         match highest_set_block(&val.1) {
             None => Some(0),
@@ -104,10 +108,18 @@ impl<A: Allocator + Clone> RustBigintRingBase<A> {
         }
     }
 
+    ///
+    /// Returns an iterator over the digits of the `2^64`-adic digit
+    /// representation of the absolute value of the given element.
+    /// 
     pub fn abs_base_u64_repr<'a>(&self, el: &'a RustBigint) -> impl 'a + Iterator<Item = u64> {
         el.1.iter().copied()
     }
 
+    ///
+    /// Interprets the elements of the iterator as digits in a `2^64`-adic
+    /// digit representation, and returns the big integer represented by it.
+    /// 
     pub fn from_base_u64_repr<I>(&self, data: I) -> RustBigint
         where I: Iterator<Item = u64>
     {

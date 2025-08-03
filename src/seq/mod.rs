@@ -2,12 +2,34 @@
 mod conversion;
 mod map;
 
+///
+/// Contains [`step_by::StepBy`] and [`step_by::StepByFn`], which wrap a
+/// [`VectorView`] or [`VectorFn`], respectively, and give a new [`VectorView`]
+/// or [`VectorFn`] that only yields every `n`-th element.
+/// 
 pub mod step_by;
+
+///
+/// Contains [`subvector::SubvectorView`] and [`subvector::SubvectorFn`], which
+/// wrap a [`VectorView`] or [`VectorFn`], respectively, and give a new [`VectorView`]
+/// or [`VectorFn`] that only yields elements from a given range.
+/// 
 pub mod subvector;
+
+///
+/// Contains the utility functions [`permute::permute()`] and [`permute::permute_inv()`]
+/// for applying permutations [`VectorViewMut`]s.
+/// 
 pub mod permute;
+
+///
+/// Contains [`sparse::SparseMapVector`], a container for sparse vectors.
+/// 
 pub mod sparse;
 
 use std::alloc::Allocator;
+use std::cell::RefCell;
+use std::fmt::{Debug, Formatter};
 use std::ops::{Bound, Range, RangeBounds};
 
 pub use conversion::{CloneElFn, VectorViewFn, VectorFnIter};
@@ -954,6 +976,36 @@ impl<'a, T: Clone> Fn<(&'a T,)> for CloneValue {
     extern "rust-call" fn call(&self, args: (&'a T,)) -> Self::Output {
         args.0.clone()
     }
+}
+
+///
+/// Creates an object that, on [`Debug::fmt()`], will consume
+/// the iterator and print all its elements.
+/// 
+/// Little quirk: Since the iterator is consumed, every further call
+/// to [`Debug::fmt()`] will panic. 
+/// 
+pub(crate) fn dbg_iter<I>(it: I) -> impl use<I> + Debug
+    where I: Iterator,
+        I::Item: Debug
+{
+    struct DebugIter<I>(RefCell<Option<I>>);
+    impl<I> Debug for DebugIter<I>
+        where I: Iterator,
+            I::Item: Debug
+    {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            let mut it = self.0.borrow_mut().take().expect("Can only be debugged once");
+            if let Some(first) = it.next() {
+                write!(f, "{:?}", first)?;
+                for el in it {
+                    write!(f, ", {:?}", el)?;
+                }
+            }
+            return Ok(());
+        }
+    }
+    return DebugIter(RefCell::new(Some(it)));
 }
 
 #[test]

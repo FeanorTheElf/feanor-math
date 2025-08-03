@@ -23,10 +23,13 @@ use crate::rings::rational::RationalFieldBase;
 /// Hence, this ring has only limited use within this crate, and is currently only used for
 /// floating-point FFTs. 
 /// 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Complex64Base;
 
-#[derive(Clone, Copy)]
+///
+/// An element of [`Complex64`].
+/// 
+#[derive(Clone, Copy, Debug)]
 pub struct Complex64El(f64, f64);
 
 ///

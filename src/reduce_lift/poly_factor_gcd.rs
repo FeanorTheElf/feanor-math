@@ -81,12 +81,15 @@ use crate::rings::finite::FiniteRing;
 /// I cannot think of any other good examples (these were the ones I had in mind when writing this trait), but 
 /// who knows, maybe there are other rings that satisfy this and which we can thus do polynomial factorization in.
 /// 
+/// # Type-level recursion
+/// 
+/// This trait and related functionality use type-level recursion, as explained in [`crate::reduce_lift::poly_eval::EvalPolyLocallyRing`].
+/// 
 #[stability::unstable(feature = "enable")]
 pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializable {
 
     ///
-    /// The proper way would be to define this with two lifetime parameters `'ring` and `'data`,
-    /// see also [`crate::reduce_lift::poly_eval::EvalPolyLocallyRing::LocalRingBase`]
+    /// The type of the local ring once we quotiented out a power of a prime ideal.
     /// 
     type LocalRingBase<'ring>: ?Sized + LinSolveRing
         where Self: 'ring;
@@ -94,6 +97,12 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
     type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
         where Self: 'ring;
     
+    ///
+    /// The type of the field we get by quotienting out a power of a prime ideal.
+    /// 
+    /// For the reason why there are so many quite specific trait bounds here:
+    /// See the doc of [`crate::reduce_lift::poly_eval::EvalPolyLocallyRing::LocalRingBase`].
+    /// 
     type LocalFieldBase<'ring>: ?Sized + CanIsoFromTo<Self::LocalRingBase<'ring>> + PolyTFracGCDRing + FactorPolyField + Field + SelfIso
         where Self: 'ring;
 

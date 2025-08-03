@@ -259,6 +259,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
 /// anymore if a nonstandard `Impl` is chosen - which I believe will be very rarely the case in practice.
 /// 
 #[repr(transparent)]
+#[derive(Debug)]
 pub struct GaloisFieldBase<Impl>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra + FiniteRing,

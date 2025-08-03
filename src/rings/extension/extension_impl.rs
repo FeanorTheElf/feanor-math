@@ -1,4 +1,5 @@
 use std::alloc::{Allocator, Global};
+use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::cell::OnceCell;
 
@@ -114,6 +115,15 @@ pub struct FreeAlgebraImplEl<R, A = Global>
     where R: RingStore, A: Allocator
 {
     values: Box<[El<R>], A>
+}
+
+impl<R, A> Debug for FreeAlgebraImplEl<R, A>
+    where R: RingStore, A: Allocator,
+        El<R>: Debug
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", &self.values)
+    }
 }
 
 impl<R, V, A, C> FreeAlgebraImpl<R, V, A, C>
@@ -439,6 +449,21 @@ impl<R, V, A, C> DivisibilityRing for FreeAlgebraImplBase<R, V, A, C>
 
     default fn invert(&self, el: &Self::Element) -> Option<Self::Element> {
         self.checked_left_div(&self.one(), el)
+    }
+}
+
+impl<R, V, A, C> Debug for FreeAlgebraImplBase<R, V, A, C>
+    where R: RingStore + Debug, 
+        V: VectorView<El<R>>, 
+        A: Allocator + Clone,
+        C: ConvolutionAlgorithm<R::Type>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let poly_ring = DensePolyRing::new(self.base_ring(), self.gen_name);
+        write!(f, "FreeAlgebraImplBase {{ base_ring: {:?}, quotient_by: {:?} }}", 
+            self.base_ring, 
+            poly_ring.format(&RingRef::new(self).generating_poly(&poly_ring, self.base_ring.identity()))
+        )
     }
 }
 

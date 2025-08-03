@@ -93,6 +93,9 @@ impl<I> Copy for RationalFieldBase<I>
 /// 
 pub type RationalField<I> = RingValue<RationalFieldBase<I>>;
 
+///
+/// An element of [`RationalField`], i.e. a fraction of two integers.
+/// 
 pub struct RationalFieldEl<I>(El<I>, El<I>)
     where I: RingStore,
         I::Type: IntegerRing;
@@ -183,6 +186,9 @@ impl<I> RationalField<I>
     where I: RingStore,
         I::Type: IntegerRing
 {
+    ///
+    /// Returns the fraction field of the given integer ring.
+    /// 
     pub const fn new(integers: I) -> Self {
         RingValue::from(RationalFieldBase { integers })
     }

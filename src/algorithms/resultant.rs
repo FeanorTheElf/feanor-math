@@ -190,7 +190,7 @@ impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain> ComputeResul
 
 impl<I> ComputeResultantRing for RationalFieldBase<I>
     where I: RingStore,
-        I::Type: IntegerRing + ComputeResultantRing
+        I::Type: IntegerRing 
 {
     fn resultant<P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
         where P: RingStore + Copy,

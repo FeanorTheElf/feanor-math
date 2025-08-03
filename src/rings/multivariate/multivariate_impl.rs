@@ -81,11 +81,12 @@ fn nth_monomial_degrevlex<F>(n: usize, d: Exponent, mut index: u64, cum_binomial
 /// Stores a reference to a monomial w.r.t. a given [`MultivariatePolyRingImplBase`].
 /// 
 #[repr(transparent)]
+#[derive(Debug)]
 pub struct MonomialIdentifier {
     data: InternalMonomialIdentifier
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct InternalMonomialIdentifier {
     deg: Exponent,
     order: OrderIdx
