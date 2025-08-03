@@ -27,7 +27,6 @@
 #![feature(unboxed_closures)]
 #![feature(ptr_alignment_type)]
 #![feature(never_type)]
-#![feature(array_chunks)]
 #![feature(doc_cfg)]
 #![feature(int_roundings)]
 #![feature(array_try_from_fn)]

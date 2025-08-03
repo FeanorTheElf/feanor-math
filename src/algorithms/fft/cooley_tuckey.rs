@@ -120,22 +120,22 @@ fn butterfly_loop<T, S, F>(log2_n: usize, data: &mut [T], butterfly_range: Range
     let stride_range_len = stride_range.end - stride_range.start;
     
     if stride == 1 && stride_range_len == 1 {
-        for (twiddle, butterfly_data) in twiddles[butterfly_range].iter().zip(current_data.array_chunks_mut::<2>()) {
+        for (twiddle, butterfly_data) in twiddles[butterfly_range].iter().zip(current_data.as_chunks_mut::<2>().0.iter_mut()) {
             let [a, b] = butterfly_data.each_mut();
             butterfly(a, b, &twiddle);
         }
     } else if stride_range_len >= 1 {
         for (twiddle, butterfly_data) in twiddles[butterfly_range].iter().zip(current_data.chunks_mut(2 * stride)) {
             let (first, second) = butterfly_data[..(stride + stride_range_len)].split_at_mut(stride);
-            let mut first_it = first[..stride_range_len].array_chunks_mut::<4>();
-            let mut second_it = second.array_chunks_mut::<4>();
-            for (a, b) in first_it.by_ref().zip(second_it.by_ref()) {
+            let (first_chunks, first_rem) = first[..stride_range_len].as_chunks_mut::<4>();
+            let (second_chunks, second_rem) = second.as_chunks_mut::<4>();
+            for (a, b) in first_chunks.iter_mut().zip(second_chunks.iter_mut()) {
                 butterfly(&mut a[0], &mut b[0], &twiddle);
                 butterfly(&mut a[1], &mut b[1], &twiddle);
                 butterfly(&mut a[2], &mut b[2], &twiddle);
                 butterfly(&mut a[3], &mut b[3], &twiddle);
             }
-            for (a, b) in first_it.into_remainder().into_iter().zip(second_it.into_remainder().into_iter()) {
+            for (a, b) in first_rem.iter_mut().zip(second_rem.iter_mut()) {
                 butterfly(a, b, &twiddle);
             }
         }

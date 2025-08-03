@@ -419,11 +419,10 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
         } else {
             let (negative, data) = deserialize_bigint_from_bytes(deserializer, |data| {
                 let mut result_data = Vec::with_capacity_in((data.len() - 1) / size_of::<u64>() + 1, self.allocator.clone());
-                let mut it = data.array_chunks();
-                while let Some(digit) = it.next() {
+                let (chunks, last) = data.as_chunks();
+                for digit in chunks {
                     result_data.push(u64::from_le_bytes(*digit));
                 }
-                let last = it.remainder();
                 result_data.push(u64::from_le_bytes(std::array::from_fn(|i| if i >= last.len() { 0 } else { last[i] })));
                 return result_data;
             })?;
