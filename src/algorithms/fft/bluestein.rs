@@ -251,11 +251,6 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         };
     }
 
-    #[stability::unstable(feature = "enable")]
-    pub fn allocator(&self) -> &A {
-        self.m_fft_table.allocator()
-    }
-
     ///
     /// Computes the FFT of the given values using Bluestein's algorithm, using only the passed
     /// buffer as temporary storage.
@@ -327,11 +322,28 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         }
     }
 
-    fn ring<'a>(&'a self) -> &'a <H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
+    ///
+    /// Returns a reference to the allocator currently used for temporary allocations by this FFT.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    pub fn allocator(&self) -> &A {
+        self.m_fft_table.allocator()
+    }
+    
+    ///
+    /// Returns the ring over which this object can compute FFTs.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    pub fn ring<'a>(&'a self) -> &'a <H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
         self.hom().codomain()
     }
 
-    fn hom(&self) -> &H {
+    ///
+    /// Returns a reference to the homomorphism that is used to map the stored twiddle
+    /// factors into main ring, over which FFTs are computed.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    pub fn hom(&self) -> &H {
         self.m_fft_table.hom()
     }
 }

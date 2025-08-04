@@ -91,6 +91,14 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// Panics if `dst` is shorter than `lhs.len() + rhs.len() - 1`. May panic if `dst` is shorter
     /// than `lhs.len() + rhs.len()`.
     /// 
+    /// TODO: On next breaking release, just take slice instead of [`VectorView`]s.
+    /// This might require the user to copy the data once, but so far most algorithms copy
+    /// it anyway, because this will make subsequent memory accesses more predictable and
+    /// better optimized.
+    /// 
+    /// Maybe also consider taking the ring by `&RingBase`, since this would then allow
+    /// for dynamic dispatch.
+    /// 
     fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S);
 
     ///
@@ -152,6 +160,14 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// println!("{:?}, {:?}", actual.iter().map(|x| ring.format(x)).collect::<Vec<_>>(), expected.iter().map(|x| ring.format(x)).collect::<Vec<_>>());
     /// assert!(expected.iter().zip(actual.iter()).all(|(l, r)| ring.eq_el(l, r)));
     /// ```
+    /// 
+    /// TODO: On next breaking release, just take slice instead of [`VectorView`]s.
+    /// This might require the user to copy the data once, but so far most algorithms copy
+    /// it anyway, because this will make subsequent memory accesses more predictable and
+    /// better optimized.
+    /// 
+    /// Maybe also consider taking the ring by `&RingBase`, since this would then allow
+    /// for dynamic dispatch.
     /// 
     #[stability::unstable(feature = "enable")]
     fn prepare_convolution_operand<S, V>(&self, _val: V, _length_hint: Option<usize>, _ring: S) -> Self::PreparedConvolutionOperand

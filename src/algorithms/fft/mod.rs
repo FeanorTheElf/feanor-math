@@ -114,6 +114,14 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
     /// # Panics
     /// 
     /// This function panics if `values.len() != self.len()`.
+    /// 
+    /// TODO: On next breaking release, just take slice instead of [`VectorView`]s.
+    /// This might require the user to copy the data once, but so far most algorithms copy
+    /// it anyway, because this will make subsequent memory accesses more predictable and
+    /// better optimized.
+    /// 
+    /// Maybe also consider taking the ring by `&RingBase`, since this would then allow
+    /// for dynamic dispatch.
     ///
     fn fft<V, S>(&self, mut values: V, ring: S)
         where V: SwappableVectorViewMut<R::Element>,
@@ -132,6 +140,14 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
     /// 
     /// This function panics if `values.len() != self.len()`.
     ///
+    /// TODO: On next breaking release, just take slice instead of [`VectorView`]s.
+    /// This might require the user to copy the data once, but so far most algorithms copy
+    /// it anyway, because this will make subsequent memory accesses more predictable and
+    /// better optimized.
+    /// 
+    /// Maybe also consider taking the ring by `&RingBase`, since this would then allow
+    /// for dynamic dispatch.
+    /// 
     fn inv_fft<V, S>(&self, mut values: V, ring: S)
         where V: SwappableVectorViewMut<R::Element>,
             S: RingStore<Type = R> + Copy
@@ -147,12 +163,28 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
     /// Note that the FFT of a sequence `a_0, ..., a_(N - 1)` is defined as `Fa_k = sum_i a_i z^(-ik)`
     /// where `z` is an N-th root of unity.
     /// 
+    /// TODO: On next breaking release, just take slice instead of [`VectorView`]s.
+    /// This might require the user to copy the data once, but so far most algorithms copy
+    /// it anyway, because this will make subsequent memory accesses more predictable and
+    /// better optimized.
+    /// 
+    /// Maybe also consider taking the ring by `&RingBase`, since this would then allow
+    /// for dynamic dispatch.
+    /// 
     fn unordered_fft<V, S>(&self, values: V, ring: S)
         where V: SwappableVectorViewMut<R::Element>,
             S: RingStore<Type = R> + Copy;
     
     ///
     /// Inverse to [`FFTAlgorithm::unordered_fft()`], with basically the same contract.
+    /// 
+    /// TODO: On next breaking release, just take slice instead of [`VectorView`]s.
+    /// This might require the user to copy the data once, but so far most algorithms copy
+    /// it anyway, because this will make subsequent memory accesses more predictable and
+    /// better optimized.
+    /// 
+    /// Maybe also consider taking the ring by `&RingBase`, since this would then allow
+    /// for dynamic dispatch.
     /// 
     fn unordered_inv_fft<V, S>(&self, values: V, ring: S)
         where V: SwappableVectorViewMut<R::Element>,
