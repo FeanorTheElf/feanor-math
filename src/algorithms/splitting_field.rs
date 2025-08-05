@@ -150,7 +150,7 @@ pub fn extend_galois_field<K>(poly_ring: DensePolyRing<K>, irred_poly: &El<Dense
     
     let L = AsField::from(
         AsFieldBase::promise_is_perfect_field(
-            FreeAlgebraImpl::new_with(
+            FreeAlgebraImpl::new_with_convolution(
                 K, 
                 poly_ring.degree(&irred_poly).unwrap(), 
                 (0..poly_ring.degree(&irred_poly).unwrap()).map(|i| K.negate(K.clone_el(poly_ring.coefficient_at(&irred_poly, i)))).collect::<Vec<_>>(),
@@ -224,7 +224,7 @@ pub fn extend_number_field_promise_is_irreducible<K>(poly_ring: DensePolyRing<K>
 
     let L = AsField::from(
         AsFieldBase::promise_is_perfect_field(
-            FreeAlgebraImpl::new_with(
+            FreeAlgebraImpl::new_with_convolution(
                 K, 
                 poly_ring.degree(&irred_poly).unwrap(), 
                 (0..poly_ring.degree(&irred_poly).unwrap()).map(|i| K.negate(K.clone_el(poly_ring.coefficient_at(&irred_poly, i)))).collect::<Vec<_>>(),

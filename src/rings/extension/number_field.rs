@@ -258,7 +258,7 @@ impl NumberField {
         let QQ = RationalField::new(BigIntRing::RING);
         let rank = poly_ring.degree(generating_poly).unwrap();
         let modulus = (0..rank).map(|i| QQ.negate(QQ.inclusion().map_ref(poly_ring.coefficient_at(generating_poly, i)))).collect::<Vec<_>>();
-        return FreeAlgebraImpl::new_with(QQ, rank, modulus, "θ", Global, STANDARD_CONVOLUTION).as_field().ok().map(Self::create);
+        return FreeAlgebraImpl::new_with_convolution(QQ, rank, modulus, "θ", Global, STANDARD_CONVOLUTION).as_field().ok().map(Self::create);
     }
     
     ///

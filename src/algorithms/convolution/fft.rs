@@ -36,11 +36,19 @@ pub struct PreparedConvolutionOperand<R, A = Global>
     log2_data_size: usize
 }
 
+impl FFTConvolution<Global> {
+    
+    #[stability::unstable(feature = "enable")]
+    pub fn new() -> Self {
+        Self::new_with_alloc(Global)
+    }
+}
+
 impl<A> FFTConvolution<A>
     where A: Allocator + Clone
 {
     #[stability::unstable(feature = "enable")]
-    pub fn new_with(allocator: A) -> Self {
+    pub fn new_with_alloc(allocator: A) -> Self {
         Self {
             allocator: allocator,
             fft_tables: LazyVec::new()
@@ -490,7 +498,7 @@ use crate::rings::zn::zn_64::Zn;
 
 #[test]
 fn test_convolution_zn() {
-    let convolution: FFTConvolutionZn = FFTConvolution::new_with(Global).into();
+    let convolution: FFTConvolutionZn = FFTConvolution::new().into();
     let ring = Zn::new(17 * 257);
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.one());
@@ -498,7 +506,7 @@ fn test_convolution_zn() {
 
 #[test]
 fn test_convolution_int() {
-    let convolution: FFTConvolution = FFTConvolution::new_with(Global);
+    let convolution: FFTConvolution = FFTConvolution::new();
     let ring = StaticRing::<i64>::RING;
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.one());
@@ -507,7 +515,7 @@ fn test_convolution_int() {
 #[test]
 #[should_panic(expected = "precision")]
 fn test_fft_convolution_not_enough_precision() {
-    let convolution_algorithm: FFTConvolutionZn = FFTConvolution::new_with(Global).into();
+    let convolution_algorithm: FFTConvolutionZn = FFTConvolution::new().into();
 
     let ring = Zn::new(1099511627791);
     let lhs = ring.elements().take(1024).collect::<Vec<_>>();

@@ -307,7 +307,7 @@ pub mod generic_impls {
             -1
         }) + 1;
         assert!(degree >= 1);
-        return GaloisField::new_with(ring, degree as usize, Global, STANDARD_CONVOLUTION);
+        return GaloisField::new_with_convolution(ring, degree as usize, Global, STANDARD_CONVOLUTION);
     }
 }
 

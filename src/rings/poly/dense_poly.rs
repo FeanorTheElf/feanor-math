@@ -88,14 +88,14 @@ pub type DensePolyRing<R, A = Global, C = KaratsubaAlgorithm> = RingValue<DenseP
 impl<R: RingStore> DensePolyRing<R> {
 
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        Self::new_with(base_ring, unknown_name, Global, STANDARD_CONVOLUTION)
+        Self::new_with_convolution(base_ring, unknown_name, Global, STANDARD_CONVOLUTION)
     }
 }
 
 impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> DensePolyRing<R, A, C> {
 
     #[stability::unstable(feature = "enable")]
-    pub fn new_with(base_ring: R, unknown_name: &'static str, element_allocator: A, convolution_algorithm: C) -> Self {
+    pub fn new_with_convolution(base_ring: R, unknown_name: &'static str, element_allocator: A, convolution_algorithm: C) -> Self {
         let zero = base_ring.zero();
         RingValue::from(DensePolyRingBase {
             base_ring, 

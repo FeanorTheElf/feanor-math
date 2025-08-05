@@ -54,7 +54,7 @@ impl<R> NTTConvolution<R::Type, R::Type, Identity<R>>
     /// 
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: R) -> Self {
-        Self::new_with(ring.into_identity(), Global)
+        Self::new_with_hom(ring.into_identity(), Global)
     }
 }
 
@@ -76,7 +76,7 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
     /// codomain. This can be used for more efficient NTTs, see e.g. [`zn_64::ZnFastmul`].
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn new_with(hom: H, allocator: A) -> Self {
+    pub fn new_with_hom(hom: H, allocator: A) -> Self {
         Self {
             fft_algos: LazyVec::new(),
             hom: hom,
@@ -246,6 +246,6 @@ impl<R_main, R_twiddle, H, A> ConvolutionAlgorithm<R_main> for NTTConvolution<R_
 #[test]
 fn test_convolution() {
     let ring = zn_64::Zn::new(65537);
-    let convolution = NTTConvolution::new_with(ring.identity(), Global);
+    let convolution = NTTConvolution::new(ring);
     super::generic_tests::test_convolution(&convolution, &ring, ring.one());
 }

@@ -80,7 +80,7 @@ impl<R, V> FreeAlgebraImpl<R, V>
     /// The created ring is `R[X]/(X^rank - sum_i x_pow_rank[i] X^i)`.
     /// 
     pub fn new(base_ring: R, rank: usize, x_pow_rank: V) -> Self {
-        Self::new_with(base_ring, rank, x_pow_rank, "θ", Global, STANDARD_CONVOLUTION)
+        Self::new_with_convolution(base_ring, rank, x_pow_rank, "θ", Global, STANDARD_CONVOLUTION)
     }
 }
 
@@ -133,7 +133,7 @@ impl<R, V, A, C> FreeAlgebraImpl<R, V, A, C>
         C: ConvolutionAlgorithm<R::Type>
 {
     #[stability::unstable(feature = "enable")]
-    pub fn new_with(base_ring: R, rank: usize, x_pow_rank: V, gen_name: &'static str, element_allocator: A, convolution: C) -> Self {
+    pub fn new_with_convolution(base_ring: R, rank: usize, x_pow_rank: V, gen_name: &'static str, element_allocator: A, convolution: C) -> Self {
         assert!(rank >= 1);
         assert!(x_pow_rank.len() <= rank);
         let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
@@ -501,7 +501,7 @@ impl<'de, R> Deserialize<'de> for FreeAlgebraImplBase<R, SparseMapVector<R>, Glo
             *x_pow_rank.at_mut(i) = poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(c));
         }
         _ = x_pow_rank.at_mut(0);
-        return Ok(FreeAlgebraImpl::new_with(poly_ring.into().into_base_ring(), rank, x_pow_rank, "θ", Global, STANDARD_CONVOLUTION).into());
+        return Ok(FreeAlgebraImpl::new_with_convolution(poly_ring.into().into_base_ring(), rank, x_pow_rank, "θ", Global, STANDARD_CONVOLUTION).into());
     }
 }
 
@@ -522,7 +522,7 @@ impl<'de, R> Deserialize<'de> for FreeAlgebraImplBase<R, Vec<El<R>>, Global, Kar
         assert!(poly_ring.base_ring().is_one(poly_ring.lc(&poly).unwrap()));
         let rank = poly_ring.degree(&poly).unwrap();
         let x_pow_rank = (0..rank).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&poly, i)))).collect::<Vec<_>>();
-        return Ok(FreeAlgebraImpl::new_with(poly_ring.into().into_base_ring(), rank, x_pow_rank, "θ", Global, STANDARD_CONVOLUTION).into());
+        return Ok(FreeAlgebraImpl::new_with_convolution(poly_ring.into().into_base_ring(), rank, x_pow_rank, "θ", Global, STANDARD_CONVOLUTION).into());
     }
 }
 
@@ -937,7 +937,7 @@ fn test_ring_axioms() {
     crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
     
     let (ring, els) = test_ring2_and_elements();
-    let ring = ring.into().set_convolution(FFTConvolution::new_with(Global));
+    let ring = ring.into().set_convolution(FFTConvolution::new_with_alloc(Global));
     crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
 
     let base_ring = zn_static::Fp::<257>::RING;

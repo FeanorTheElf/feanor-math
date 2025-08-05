@@ -164,7 +164,7 @@ impl<A> Fn<(Zn,)> for CreateNTTConvolution<A>
         let ring = args.0;
         let ring_fastmul = ZnFastmul::new(ring).unwrap();
         let hom = ring.into_can_hom(ring_fastmul).ok().unwrap();
-        NTTConvolution::new_with(hom, self.allocator.clone())
+        NTTConvolution::new_with_hom(hom, self.allocator.clone())
     }
 }
 
@@ -176,7 +176,7 @@ impl RNSConvolution {
     /// 
     #[stability::unstable(feature = "enable")]
     pub fn new(max_log2_n: usize) -> Self {
-        Self::new_with(max_log2_n, usize::MAX, BigIntRing::RING, Global, CreateNTTConvolution { allocator: Global })
+        Self::new_with_convolution(max_log2_n, usize::MAX, BigIntRing::RING, Global, CreateNTTConvolution { allocator: Global })
     }
 }
 
@@ -202,7 +202,7 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
     ///    and `required_root_of_unity_log2`
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn new_with(required_root_of_unity_log2: usize, mut max_prime_size_log2: usize, integer_ring: I, allocator: A, create_convolution: CreateC) -> Self {
+    pub fn new_with_convolution(required_root_of_unity_log2: usize, mut max_prime_size_log2: usize, integer_ring: I, allocator: A, create_convolution: CreateC) -> Self {
         max_prime_size_log2 = min(max_prime_size_log2, 57);
         let result = Self {
             integer_ring: integer_ring,
@@ -212,7 +212,11 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
             required_root_of_unity_log2: required_root_of_unity_log2,
             allocator: allocator
         };
-        let initial_ring = zn_rns::Zn::new_with(vec![Zn::new(Self::sample_next_prime(required_root_of_unity_log2, (1 << max_prime_size_log2) + 1).unwrap() as u64)], result.integer_ring.clone(), result.allocator.clone());
+        let initial_ring = zn_rns::Zn::new_with_alloc(
+            vec![Zn::new(Self::sample_next_prime(required_root_of_unity_log2, (1 << max_prime_size_log2) + 1).unwrap() as u64)],
+            result.integer_ring.clone(), 
+            result.allocator.clone()
+        );
         _ = result.rns_rings.get_or_init(0, || initial_ring);
         return result;
     }
@@ -230,7 +234,7 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
     }
 
     fn get_rns_ring(&self, moduli_count: usize) -> &zn_rns::Zn<Zn, I, A> {
-        self.rns_rings.get_or_init_incremental(moduli_count - 1, |_, prev| zn_rns::Zn::new_with(
+        self.rns_rings.get_or_init_incremental(moduli_count - 1, |_, prev| zn_rns::Zn::new_with_alloc(
             prev.as_iter().cloned().chain([Zn::new(Self::sample_next_prime(self.required_root_of_unity_log2, *prev.at(prev.len() - 1).modulus()).unwrap() as u64)]).collect(),
             self.integer_ring.clone(),
             self.allocator.clone()
@@ -638,7 +642,7 @@ use super::STANDARD_CONVOLUTION;
 #[test]
 fn test_convolution_integer() {
     let ring = StaticRing::<i128>::RING;
-    let convolution = RNSConvolution::new_with(7, usize::MAX, BigIntRing::RING, Global, |Fp| NTTConvolution::new_with(Fp.into_identity(), Global));
+    let convolution = RNSConvolution::new_with_convolution(7, usize::MAX, BigIntRing::RING, Global, NTTConvolution::new);
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
 }
@@ -646,7 +650,7 @@ fn test_convolution_integer() {
 #[test]
 fn test_convolution_zn() {
     let ring = Zn::new((1 << 57) + 1);
-    let convolution = RNSConvolutionZn::from(RNSConvolution::new_with(7, usize::MAX, BigIntRing::RING, Global, |Fp| NTTConvolution::new_with(Fp.into_identity(), Global)));
+    let convolution = RNSConvolutionZn::from(RNSConvolution::new_with_convolution(7, usize::MAX, BigIntRing::RING, Global, NTTConvolution::new));
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
 }
@@ -654,7 +658,7 @@ fn test_convolution_zn() {
 #[test]
 fn test_convolution_sum() {
     let ring = StaticRing::<i128>::RING;
-    let convolution = RNSConvolution::new_with(7, 20, BigIntRing::RING, Global, |Fp| NTTConvolution::new_with(Fp.into_identity(), Global));
+    let convolution = RNSConvolution::new_with_convolution(7, 20, BigIntRing::RING, Global, NTTConvolution::new);
     
     let data = (0..40usize).map(|i| (
         (0..(5 + i % 5)).map(|x| (1 << i) * (x as i128 - 2)).collect::<Vec<_>>(),

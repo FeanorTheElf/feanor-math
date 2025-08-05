@@ -311,10 +311,10 @@ pub fn cantor_zassenhaus_even_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) 
     if e % 2 != 0 {
         // adjoin a third root of unity, this will enable use to use the main idea
         // use `promise_as_field()`, since `as_field().unwrap()` can cause infinite generic expansion (always adding a `&`)
-        let new_base_ring = AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with(Fq, 2, [Fq.neg_one(), Fq.neg_one()], "𝝵", Global, STANDARD_CONVOLUTION)));
+        let new_base_ring = AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with_convolution(Fq, 2, [Fq.neg_one(), Fq.neg_one()], "𝝵", Global, STANDARD_CONVOLUTION)));
         let new_x_pow_rank = mod_f_ring.wrt_canonical_basis(&mod_f_ring.pow(mod_f_ring.canonical_gen(), mod_f_ring.rank())).into_iter().map(|x| new_base_ring.inclusion().map(x)).collect::<Vec<_>>();
         // once we have any kind of tensoring operation, maybe we can find a way to do this that preserves e.g. sparse implementations?
-        let new_mod_f_ring = FreeAlgebraImpl::new_with(&new_base_ring, new_x_pow_rank.len(), &new_x_pow_rank, "x", Global, STANDARD_CONVOLUTION);
+        let new_mod_f_ring = FreeAlgebraImpl::new_with_convolution(&new_base_ring, new_x_pow_rank.len(), &new_x_pow_rank, "x", Global, STANDARD_CONVOLUTION);
         let new_poly_ring = DensePolyRing::new(&new_base_ring, "X");
 
         // it might happen that cantor_zassenhaus gives a nontrivial factor over the extension, but that factor only
@@ -364,7 +364,7 @@ pub fn cantor_zassenhaus_even<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
     f = poly_ring.normalize(f);
 
     let f_coeffs = (0..poly_ring.degree(&f).unwrap()).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))).collect::<Vec<_>>();
-    let mod_f_ring = FreeAlgebraImpl::new_with(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs, "x", Global, STANDARD_CONVOLUTION);
+    let mod_f_ring = FreeAlgebraImpl::new_with_convolution(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs, "x", Global, STANDARD_CONVOLUTION);
 
     let result = cantor_zassenhaus_even_base(&poly_ring, &mod_f_ring, d);
     return result;

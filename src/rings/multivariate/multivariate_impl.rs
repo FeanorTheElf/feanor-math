@@ -165,7 +165,7 @@ impl<R> MultivariatePolyRingImpl<R>
     /// Creates a new instance of the ring `base_ring[X0, ..., Xn]` where `n = variable_count - 1`.
     /// 
     pub fn new(base_ring: R, variable_count: usize) -> Self {
-        Self::new_with(base_ring, variable_count, 64, (6, 8), Global)
+        Self::new_with_mult_table(base_ring, variable_count, 64, (6, 8), Global)
     }
 }
 
@@ -185,7 +185,7 @@ impl<R, A> MultivariatePolyRingImpl<R, A>
     /// required.
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn new_with(base_ring: R, variable_count: usize, max_supported_deg: Exponent, max_multiplication_table: (Exponent, Exponent), allocator: A) -> Self {
+    pub fn new_with_mult_table(base_ring: R, variable_count: usize, max_supported_deg: Exponent, max_multiplication_table: (Exponent, Exponent), allocator: A) -> Self {
         assert!(variable_count >= 1);
         assert!(max_multiplication_table.0 <= max_multiplication_table.1);
         assert!(max_multiplication_table.0 + max_multiplication_table.1 <= max_supported_deg);
@@ -969,7 +969,7 @@ fn test_monomial_small() {
 #[test]
 fn test_new_many_variables() {
     for m in 1..32 {
-        let ring = MultivariatePolyRingImpl::new_with(StaticRing::<i64>::RING, m, 32, (2, 3), Global);
+        let ring = MultivariatePolyRingImpl::new_with_mult_table(StaticRing::<i64>::RING, m, 32, (2, 3), Global);
         assert_eq!(m, ring.indeterminate_count());
     }
 }
@@ -985,7 +985,7 @@ fn test_evaluate_approximate_ring() {
 
 #[test]
 fn test_evaluate_many_variables() {
-    let ring = MultivariatePolyRingImpl::new_with(StaticRing::<i64>::RING, 20, 16, (4, 6), Global);
+    let ring = MultivariatePolyRingImpl::new_with_mult_table(StaticRing::<i64>::RING, 20, 16, (4, 6), Global);
     let [f] = ring.with_wrapped_indeterminates(|X: [_; 20]| [X[0] + X[5] + X[19]]);
     assert_eq!(1 + 6 + 20, ring.evaluate(&f, (1..21).map_fn(|x| x as i64), StaticRing::<i64>::RING.identity()));
 }

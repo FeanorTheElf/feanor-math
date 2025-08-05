@@ -77,7 +77,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
                 *f_body.at_mut(i) = poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(c));
             }
         }
-        return FreeAlgebraImpl::new_with(Fp, degree, f_body, "θ", Global, &convolution);
+        return FreeAlgebraImpl::new_with_convolution(Fp, degree, f_body, "θ", Global, &convolution);
     };
 
     if degree > 3 {
@@ -162,7 +162,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
     static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyTFracGCDRing);
     
     let log2_modulus = poly_ring.base_ring().integer_ring().abs_log2_ceil(poly_ring.base_ring().modulus()).unwrap();
-    let fft_convolution = FFTConvolution::new_with(Global);
+    let fft_convolution = FFTConvolution::new_with_alloc(Global);
     if fft_convolution.has_sufficient_precision(StaticRing::<i64>::RING.abs_log2_ceil(&degree.try_into().unwrap()).unwrap() + 1, log2_modulus) {
         find_small_irreducible_poly_base(
             &poly_ring,
@@ -319,7 +319,7 @@ impl GaloisField {
     /// ```
     /// 
     pub fn new(p: i64, degree: usize) -> Self {
-        Self::new_with(Zn::new(p as u64).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION)
+        Self::new_with_convolution(Zn::new(p as u64).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION)
     }
 }
 
@@ -361,7 +361,7 @@ impl<R, A, C> GaloisFieldOver<R, A, C>
     /// ```
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn new_with(base_field: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self {
+    pub fn new_with_convolution(base_field: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self {
         assert!(degree >= 1);
         let poly_ring = DensePolyRing::new(&base_field, "X");
         let mut rng = oorandom::Rand64::new(poly_ring.base_ring().integer_ring().default_hash(poly_ring.base_ring().modulus()) as u128);
@@ -373,7 +373,7 @@ impl<R, A, C> GaloisFieldOver<R, A, C>
             }
         }
         return RingValue::from(GaloisFieldBase { 
-            base: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with(base_field, degree, modulus_vec, "θ", allocator, convolution_algorithm)))
+            base: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with_convolution(base_field, degree, modulus_vec, "θ", allocator, convolution_algorithm)))
         });
     }
 
@@ -396,7 +396,7 @@ impl<R, A, C> GaloisFieldOver<R, A, C>
             }
         }
         return RingValue::from(GaloisFieldBase { 
-            base: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with(base_ring, degree, modulus_vec, "θ", allocator, convolution_algorithm)))
+            base: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with_convolution(base_ring, degree, modulus_vec, "θ", allocator, convolution_algorithm)))
         });
     }
 }
@@ -455,7 +455,7 @@ impl<Impl> GaloisFieldBase<Impl>
                 *modulus_vec.at_mut(i) = hom.map(self.base_ring().smallest_lift(x_pow_deg.at(i)));
             }
         }
-        let result = FreeAlgebraImpl::new_with(
+        let result = FreeAlgebraImpl::new_with_convolution(
             new_base_ring,
             self.rank(),
             modulus_vec,
@@ -903,7 +903,7 @@ fn test_principal_ideal_ring_axioms() {
 #[test]
 fn test_galois_field_even() {
     for degree in 1..=9 {
-        let field = GaloisField::new_with(Zn::new(2).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
+        let field = GaloisField::new_with_convolution(Zn::new(2).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
         assert_eq!(degree, field.rank());
         assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
     }
@@ -912,13 +912,13 @@ fn test_galois_field_even() {
 #[test]
 fn test_galois_field_odd() {
     for degree in 1..=9 {
-        let field = GaloisField::new_with(Zn::new(3).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
+        let field = GaloisField::new_with_convolution(Zn::new(3).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
         assert_eq!(degree, field.rank());
         assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
     }
 
     for degree in 1..=9 {
-        let field = GaloisField::new_with(Zn::new(5).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
+        let field = GaloisField::new_with_convolution(Zn::new(5).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
         assert_eq!(degree, field.rank());
         assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
     }
@@ -926,19 +926,19 @@ fn test_galois_field_odd() {
 
 #[test]
 fn test_galois_field_no_trinomial() {
-    let field = GaloisField::new_with(Zn::new(2).as_field().ok().unwrap(), 24, Global, STANDARD_CONVOLUTION);
+    let field = GaloisField::new_with_convolution(Zn::new(2).as_field().ok().unwrap(), 24, Global, STANDARD_CONVOLUTION);
     assert_eq!(24, field.rank());
     let poly_ring = DensePolyRing::new(field.base_ring(), "X");
     poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
     assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
 
-    let field = GaloisField::new_with(Zn::new(3).as_field().ok().unwrap(), 30, Global, STANDARD_CONVOLUTION);
+    let field = GaloisField::new_with_convolution(Zn::new(3).as_field().ok().unwrap(), 30, Global, STANDARD_CONVOLUTION);
     assert_eq!(30, field.rank());
     let poly_ring = DensePolyRing::new(field.base_ring(), "X");
     poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
     assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
 
-    let field = GaloisField::new_with(Zn::new(17).as_field().ok().unwrap(), 32, Global, STANDARD_CONVOLUTION);
+    let field = GaloisField::new_with_convolution(Zn::new(17).as_field().ok().unwrap(), 32, Global, STANDARD_CONVOLUTION);
     assert_eq!(32, field.rank());
     let poly_ring = DensePolyRing::new(field.base_ring(), "X");
     poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));

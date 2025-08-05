@@ -64,7 +64,7 @@ pub type RustBigintRing<A = Global> = RingValue<RustBigintRingBase<A>>;
 impl<A: Allocator + Clone> RustBigintRing<A> {
     
     #[stability::unstable(feature = "enable")]
-    pub fn new_with(allocator: A) -> RustBigintRing<A> {
+    pub fn new_with_alloc(allocator: A) -> RustBigintRing<A> {
         Self::from(RustBigintRingBase { allocator })
     }
 }
