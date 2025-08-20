@@ -1,6 +1,6 @@
 use std::{alloc::{Allocator, Global}, fmt::{Debug, Formatter, Result}};
 
-use crate::seq::dbg_iter;
+use crate::{primitive_int::StaticRing, seq::dbg_iter};
 
 use self::submatrix::{AsFirstElement, Submatrix, SubmatrixMut};
 
@@ -27,7 +27,8 @@ use super::*;
 /// 
 pub struct OwnedMatrix<T, A: Allocator = Global> {
     data: Vec<T, A>,
-    col_count: usize
+    col_count: usize,
+    row_count: usize
 }
 
 impl<T> OwnedMatrix<T> {
@@ -90,7 +91,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
     /// 
     pub fn new_with_shape(data: Vec<T, A>, row_count: usize, col_count: usize) -> Self {
         assert_eq!(row_count * col_count, data.len());
-        Self { data, col_count }
+        Self { data, col_count, row_count }
     }
 
     ///
@@ -107,7 +108,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
                 data.push(f(i, j));
             }
         }
-        return Self::new(data, col_count);
+        return Self::new_with_shape(data, row_count, col_count);
     }
 
     ///
@@ -144,7 +145,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
     /// Returns the number of rows of this matrix.
     /// 
     pub fn row_count(&self) -> usize {
-        self.data.len() / self.col_count()
+        self.row_count
     }
     
     ////
@@ -167,7 +168,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
                 result.push(ring.zero());
             }
         }
-        return Self::new(result, col_count);
+        return Self::new_with_shape(result, row_count, col_count);
     }
 
     ///
@@ -187,7 +188,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
                 }
             }
         }
-        return Self::new(result, col_count);
+        return Self::new_with_shape(result, row_count, col_count);
     }
 
     #[stability::unstable(feature = "enable")]
@@ -201,7 +202,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
                 result.push(ring.clone_el(self.at(i, j)));
             }
         }
-        return Self::new(result, self.col_count());
+        return Self::new_with_shape(result, self.row_count(), self.col_count());
     }
 
     #[stability::unstable(feature = "enable")]
@@ -217,4 +218,15 @@ impl<T: Debug, A: Allocator> Debug for OwnedMatrix<T, A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "[{:?}]", dbg_iter(self.data().row_iter()))
     }
+}
+
+#[test]
+fn test_zero_col_matrix() {
+    let A: OwnedMatrix<i64> = OwnedMatrix::new_with_shape(Vec::new(), 10, 0);
+    assert_eq!(0, A.col_count());
+    assert_eq!(10, A.row_count());
+
+    let B: OwnedMatrix<i64> = OwnedMatrix::zero(11, 0, StaticRing::<i64>::RING);
+    assert_eq!(0, A.col_count());
+    assert_eq!(11, A.row_count());
 }
