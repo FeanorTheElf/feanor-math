@@ -227,6 +227,6 @@ fn test_zero_col_matrix() {
     assert_eq!(10, A.row_count());
 
     let B: OwnedMatrix<i64> = OwnedMatrix::zero(11, 0, StaticRing::<i64>::RING);
-    assert_eq!(0, A.col_count());
-    assert_eq!(11, A.row_count());
+    assert_eq!(0, B.col_count());
+    assert_eq!(11, B.row_count());
 }
