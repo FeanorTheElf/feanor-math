@@ -3,6 +3,10 @@ use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::cell::OnceCell;
 
+use feanor_serde::dependent_tuple::DeserializeSeedDependentTuple;
+use feanor_serde::newtype_struct::DeserializeSeedNewtypeStruct;
+use feanor_serde::seq::*;
+use feanor_serde::newtype_struct::*;
 use serde::de::DeserializeSeed;
 use serde::{Deserializer, Serialize, Serializer, Deserialize};
 
@@ -476,7 +480,7 @@ impl<R, V> Serialize for FreeAlgebraImplBase<R, V, Global, KaratsubaAlgorithm>
         where S: Serializer
     {
         let poly_ring = DensePolyRing::new(self.base_ring(), "X");
-        SerializableNewtype::new("FreeAlgebraImpl", (self.base_ring(), SerializeOwnedWithRing::new(RingRef::new(self).generating_poly(&poly_ring, self.base_ring().identity()), poly_ring))).serialize(serializer)
+        SerializableNewtypeStruct::new("FreeAlgebraImpl", (self.base_ring(), SerializeOwnedWithRing::new(RingRef::new(self).generating_poly(&poly_ring, self.base_ring().identity()), poly_ring))).serialize(serializer)
     }
 }
 
@@ -488,7 +492,7 @@ impl<'de, R> Deserialize<'de> for FreeAlgebraImplBase<R, SparseMapVector<R>, Glo
         where D: Deserializer<'de>
     {
         let ring_cell = OnceCell::new();
-        let poly = <_ as DeserializeSeed<'de>>::deserialize(DeserializeSeedNewtype::new("FreeAlgebraImpl", DeserializeSeedDependentTuple::new(PhantomData::<R>, |ring| {
+        let poly = <_ as DeserializeSeed<'de>>::deserialize(DeserializeSeedNewtypeStruct::new("FreeAlgebraImpl", DeserializeSeedDependentTuple::new(PhantomData::<R>, |ring| {
             let poly_ring = DensePolyRing::new(ring, "X");
             ring_cell.set(poly_ring).ok().unwrap();
             DeserializeWithRing::new(ring_cell.get().unwrap())
@@ -513,7 +517,7 @@ impl<'de, R> Deserialize<'de> for FreeAlgebraImplBase<R, Vec<El<R>>, Global, Kar
         where D: Deserializer<'de>
     {
         let ring_cell = OnceCell::new();
-        let poly = <_ as DeserializeSeed<'de>>::deserialize(DeserializeSeedNewtype::new("FreeAlgebraImpl", DeserializeSeedDependentTuple::new(PhantomData::<R>, |ring| {
+        let poly = <_ as DeserializeSeed<'de>>::deserialize(DeserializeSeedNewtypeStruct::new("FreeAlgebraImpl", DeserializeSeedDependentTuple::new(PhantomData::<R>, |ring| {
             let poly_ring = DensePolyRing::new(ring, "X");
             ring_cell.set(poly_ring).ok().unwrap();
             DeserializeWithRing::new(ring_cell.get().unwrap())
@@ -537,7 +541,7 @@ impl<R, V, A, C> SerializableElementRing for FreeAlgebraImplBase<R, V, A, C>
         where D: Deserializer<'de>
     {
         // TODO: find better serialization name
-        DeserializeSeedNewtype::new("ExtensionRingEl", DeserializeSeedSeq::new(
+        DeserializeSeedNewtypeStruct::new("ExtensionRingEl", DeserializeSeedSeq::new(
             std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(self.rank()),
             Vec::with_capacity_in(1 << self.log2_padded_len, self.element_allocator.clone()),
             |mut current, next| { current.push(next); current }
@@ -551,8 +555,8 @@ impl<R, V, A, C> SerializableElementRing for FreeAlgebraImplBase<R, V, A, C>
         where S: Serializer
     {
         debug_assert_eq!(1 << self.log2_padded_len, el.values.len());
-        SerializableNewtype::new("ExtensionRingEl", SerializableSeq::new(
-            (0..self.rank()).map_fn(|i| SerializeWithRing::new(&el.values[i], self.base_ring()))
+        SerializableNewtypeStruct::new("ExtensionRingEl", SerializableSeq::new_with_len(
+            (0..self.rank()).map(|i| SerializeWithRing::new(&el.values[i], self.base_ring())), self.rank()
         )).serialize(serializer)
     }
 }

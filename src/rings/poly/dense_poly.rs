@@ -1,5 +1,7 @@
+use feanor_serde::newtype_struct::*;
 use serde::de::DeserializeSeed;
 use serde::{Deserializer, Serialize, Serializer};
+use feanor_serde::seq::*;
 
 use crate::algorithms::convolution::*;
 use crate::algorithms::interpolate::interpolate;
@@ -428,7 +430,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> SerializableElem
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
         where D: Deserializer<'de>
     {
-        DeserializeSeedNewtype::new("DensePoly", DeserializeSeedSeq::new(
+        DeserializeSeedNewtypeStruct::new("DensePoly", DeserializeSeedSeq::new(
             std::iter::repeat(DeserializeWithRing::new(self.base_ring())),
             Vec::new_in(self.element_allocator.clone()),
             |mut current, next| { current.push(next); current }
@@ -439,9 +441,9 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> SerializableElem
         where S: Serializer
     {
         let len = self.degree(el).map(|d| d + 1).unwrap_or(0);
-        SerializableNewtype::new(
+        SerializableNewtypeStruct::new(
             "DensePoly", 
-            SerializableSeq::new((0..len).map_fn(|i| SerializeWithRing::new(self.coefficient_at(el, i), self.base_ring())))
+            SerializableSeq::new_with_len((0..len).map(|i| SerializeWithRing::new(self.coefficient_at(el, i), self.base_ring())), len)
         ).serialize(serializer)
     }
 }

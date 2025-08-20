@@ -35,6 +35,7 @@ use crate::rings::float_complex::{Complex64Base, Complex64};
 use crate::serialization::*;
 use crate::rings::extension::sparse::SparseMapVector;
 
+use feanor_serde::newtype_struct::*;
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use serde::de::DeserializeSeed;
 
@@ -1207,7 +1208,7 @@ impl<Impl, I> Serialize for NumberFieldBase<Impl, I>
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        SerializableNewtype::new("NumberField", &self.base).serialize(serializer)
+        SerializableNewtypeStruct::new("NumberField", &self.base).serialize(serializer)
     }
 }
 
@@ -1221,7 +1222,7 @@ impl<'de, Impl, I> Deserialize<'de> for NumberFieldBase<Impl, I>
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer<'de>
     {
-        DeserializeSeedNewtype::new("NumberField", PhantomData::<Impl>).deserialize(deserializer).map(|res| NumberField::create(res).into())
+        DeserializeSeedNewtypeStruct::new("NumberField", PhantomData::<Impl>).deserialize(deserializer).map(|res| NumberField::create(res).into())
     }
 }
 

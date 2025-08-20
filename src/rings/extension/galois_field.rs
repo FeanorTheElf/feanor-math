@@ -33,6 +33,7 @@ use crate::rings::extension::*;
 use crate::integer::*;
 use crate::serialization::*;
 
+use feanor_serde::newtype_struct::*;
 use serde::{Serialize, Deserialize, Deserializer, Serializer};
 use serde::de::DeserializeSeed;
 
@@ -634,7 +635,7 @@ impl<Impl> Serialize for GaloisFieldBase<Impl>
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        SerializableNewtype::new("GaloisField", &self.base).serialize(serializer)
+        SerializableNewtypeStruct::new("GaloisField", &self.base).serialize(serializer)
     }
 }
 
@@ -646,7 +647,7 @@ impl<'de, Impl> Deserialize<'de> for GaloisFieldBase<Impl>
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer<'de>
     {
-        DeserializeSeedNewtype::new("GaloisField", PhantomData::<Impl>).deserialize(deserializer).map(|res| GaloisField::create(res).into())
+        DeserializeSeedNewtypeStruct::new("GaloisField", PhantomData::<Impl>).deserialize(deserializer).map(|res| GaloisField::create(res).into())
     }
 }
 

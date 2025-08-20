@@ -14,10 +14,10 @@ use crate::rings::zn::*;
 use crate::specialization::FiniteRingSpecializable;
 use super::local::AsLocalPIRBase;
 use crate::primitive_int::*;
-use crate::serialization::*;
 
 use std::marker::PhantomData;
 
+use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNewtypeStruct};
 use serde::{Deserialize, Serialize, Deserializer, Serializer};
 use serde::de::DeserializeSeed;
 
@@ -468,7 +468,7 @@ impl<R> Serialize for AsFieldBase<R>
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        SerializableNewtype::new("AsField", &self.base).serialize(serializer)
+        SerializableNewtypeStruct::new("AsField", &self.base).serialize(serializer)
     }
 }
 
@@ -479,7 +479,7 @@ impl<'de, R> Deserialize<'de> for AsFieldBase<R>
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer<'de>
     {
-        DeserializeSeedNewtype::new("AsField", PhantomData::<R>).deserialize(deserializer).map(|base_ring| AsFieldBase { zero: FieldEl(base_ring.zero()), base: base_ring })
+        DeserializeSeedNewtypeStruct::new("AsField", PhantomData::<R>).deserialize(deserializer).map(|base_ring| AsFieldBase { zero: FieldEl(base_ring.zero()), base: base_ring })
     }
 }
 

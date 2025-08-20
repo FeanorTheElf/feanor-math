@@ -1,6 +1,6 @@
 use std::{alloc::{Allocator, Global}, fmt::{Debug, Formatter, Result}};
 
-use crate::{primitive_int::StaticRing, seq::dbg_iter};
+use crate::seq::dbg_iter;
 
 use self::submatrix::{AsFirstElement, Submatrix, SubmatrixMut};
 
@@ -219,6 +219,9 @@ impl<T: Debug, A: Allocator> Debug for OwnedMatrix<T, A> {
         write!(f, "[{:?}]", dbg_iter(self.data().row_iter()))
     }
 }
+
+#[cfg(test)]
+use crate::primitive_int::*;
 
 #[test]
 fn test_zero_col_matrix() {

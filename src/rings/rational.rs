@@ -18,8 +18,9 @@ use crate::impl_interpolation_base_ring_char_zero;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::specialization::*;
 use crate::ring::*;
-use crate::seq::*;
 
+use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNewtypeStruct};
+use feanor_serde::seq::{DeserializeSeedSeq, SerializableSeq};
 use serde::{Serialize, Deserialize, Deserializer, Serializer};
 use serde::de::DeserializeSeed;
 
@@ -377,7 +378,7 @@ impl<I> Serialize for RationalFieldBase<I>
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        SerializableNewtype::new("RationalField", self.base_ring()).serialize(serializer)
+        SerializableNewtypeStruct::new("RationalField", self.base_ring()).serialize(serializer)
     }
 }
 
@@ -388,7 +389,7 @@ impl<'de, I> Deserialize<'de> for RationalFieldBase<I>
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer<'de>
     {
-        DeserializeSeedNewtype::new("RationalField", PhantomData::<I>).deserialize(deserializer).map(|base_ring| RationalFieldBase { integers: base_ring })
+        DeserializeSeedNewtypeStruct::new("RationalField", PhantomData::<I>).deserialize(deserializer).map(|base_ring| RationalFieldBase { integers: base_ring })
     }
 }
 
@@ -399,7 +400,7 @@ impl<I> SerializableElementRing for RationalFieldBase<I>
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
         where D: Deserializer<'de>
     {
-        DeserializeSeedNewtype::new("Rational", DeserializeSeedSeq::new(
+        DeserializeSeedNewtypeStruct::new("Rational", DeserializeSeedSeq::new(
             std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(2),
             (None, None),
             |mut current, next| {
@@ -418,8 +419,8 @@ impl<I> SerializableElementRing for RationalFieldBase<I>
     fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        SerializableNewtype::new("Rational", SerializableSeq::new(
-            [SerializeWithRing::new(&el.0, self.base_ring()), SerializeWithRing::new(&el.1, self.base_ring())].as_fn()
+        SerializableNewtypeStruct::new("Rational", SerializableSeq::new_with_len(
+            [SerializeWithRing::new(&el.0, self.base_ring()), SerializeWithRing::new(&el.1, self.base_ring())].iter(), 2
         )).serialize(serializer)
     }
 }
@@ -692,4 +693,15 @@ fn test_serialization() {
 fn test_serialize_deserialize() {
     crate::serialization::generic_tests::test_serialize_deserialize(RationalField::new(StaticRing::<i64>::RING).into());
     crate::serialization::generic_tests::test_serialize_deserialize(RationalField::new(BigIntRing::RING).into());
+}
+
+#[test]
+fn test_serialize_postcard() {
+    let ring: RingValue<RationalFieldBase<RingValue<crate::primitive_int::StaticRingBase<i64>>>> = RationalField::new(StaticRing::<i64>::RING);
+    let serialized = postcard::to_allocvec(&SerializeWithRing::new(&ring.int_hom().map(42), &ring)).unwrap();
+    let result = DeserializeWithRing::new(&ring).deserialize(
+        &mut postcard::Deserializer::from_flavor(postcard::de_flavors::Slice::new(&serialized))
+    ).unwrap();
+
+    assert_el_eq!(&ring, ring.int_hom().map(42), result);
 }

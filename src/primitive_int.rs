@@ -3,6 +3,7 @@ use std::ops::{AddAssign, Div, MulAssign, Neg, Rem, Shr, SubAssign};
 use std::marker::PhantomData;
 use std::fmt::Display;
 
+use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNewtypeStruct};
 use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
 use serde::de::{DeserializeOwned, DeserializeSeed};
 
@@ -17,7 +18,7 @@ use crate::integer::*;
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::StrassenHint;
 use crate::specialization::*;
-use crate::serialization::{DeserializeSeedUnitStruct, SerializableElementRing};
+use crate::serialization::SerializableElementRing;
 
 ///
 /// Trait for `i8` to `i128`.
@@ -452,7 +453,7 @@ impl<T: PrimitiveInt> Serialize for StaticRingBase<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        serializer.serialize_unit_struct("IntegerRing(primitive)")
+        SerializableNewtypeStruct::new("IntegerRing(primitive int)", ()).serialize(serializer)
     }
 }
 
@@ -461,7 +462,7 @@ impl<'de, T: PrimitiveInt> Deserialize<'de> for StaticRingBase<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer<'de>
     {
-        DeserializeSeedUnitStruct::new("IntegerRing(primitive)", StaticRing::<T>::RING.into()).deserialize(deserializer)
+        DeserializeSeedNewtypeStruct::new("IntegerRing(primitive int)", PhantomData::<()>).deserialize(deserializer).map(|()| StaticRing::<T>::RING.into())
     }
 }
 

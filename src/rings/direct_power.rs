@@ -12,8 +12,9 @@ use crate::iters::*;
 use crate::rings::zn::zn_64::*;
 use crate::homomorphism::*;
 use crate::seq::CloneRingEl;
-use crate::seq::VectorFn;
 
+use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNewtypeStruct};
+use feanor_serde::seq::{DeserializeSeedSeq, SerializableSeq};
 use serde::{Serializer, Deserializer, Serialize};
 use serde::de::DeserializeSeed;
 
@@ -435,7 +436,7 @@ impl<R: RingStore, const N: usize> SerializableElementRing for DirectPowerRingBa
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
         where D: Deserializer<'de>
     {
-        DeserializeSeedNewtype::new("DirectPowerRingEl", DeserializeSeedSeq::new(
+        DeserializeSeedNewtypeStruct::new("DirectPowerRingEl", DeserializeSeedSeq::new(
             std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(N),
             (from_fn(|_| None), 0),
             |(mut current, mut current_idx), next| {
@@ -453,8 +454,8 @@ impl<R: RingStore, const N: usize> SerializableElementRing for DirectPowerRingBa
     fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        SerializableNewtype::new("DirectPowerRingEl", SerializableSeq::new(
-            (0..N).map_fn(|i| SerializeWithRing::new(&el[i], self.base_ring()))
+        SerializableNewtypeStruct::new("DirectPowerRingEl", SerializableSeq::new_with_len(
+            (0..N).map(|i| SerializeWithRing::new(&el[i], self.base_ring())), N
         )).serialize(serializer)
     }
 }

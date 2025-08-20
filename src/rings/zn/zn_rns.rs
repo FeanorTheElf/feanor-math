@@ -2,18 +2,16 @@ use std::alloc::{Allocator, Global};
 
 use serde::Serialize;
 use serde::de::DeserializeSeed;
+use feanor_serde::newtype_struct::*;
+use feanor_serde::seq::*;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::iters::multi_cartesian_product;
 use crate::iters::MultiProduct;
-use crate::seq::{VectorView, VectorFn};
+use crate::seq::VectorView;
 use crate::integer::*;
 use crate::divisibility::DivisibilityRingStore;
 use crate::rings::zn::*;
-use crate::serialization::DeserializeSeedNewtype;
-use crate::serialization::DeserializeSeedSeq;
-use crate::serialization::SerializableNewtype;
-use crate::serialization::SerializableSeq;
 use crate::serialization::{DeserializeWithRing, SerializableElementRing, SerializeWithRing};
 use crate::specialization::*;
 use crate::primitive_int::*;
@@ -795,7 +793,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> SerializableElementRing f
             )
         } else {
             let el_congruence = self.get_congruence(el);
-            SerializableNewtype::new("RNSZnEl", SerializableSeq::new((0..self.len()).map_fn(|i| SerializeWithRing::new(el_congruence.at(i), self.at(i))))).serialize(serializer)
+            SerializableNewtypeStruct::new("RNSZnEl", SerializableSeq::new_with_len((0..self.len()).map(|i| SerializeWithRing::new(el_congruence.at(i), self.at(i))), self.len())).serialize(serializer)
         }
     }
 
@@ -807,7 +805,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> SerializableElementRing f
                 self.total_ring.get_ring().deserialize(deserializer)?
             ))
         } else {
-            DeserializeSeedNewtype::new("RNSZnEl", DeserializeSeedSeq::new(
+            DeserializeSeedNewtypeStruct::new("RNSZnEl", DeserializeSeedSeq::new(
                 self.as_iter().map(|ring| DeserializeWithRing::new(ring)), 
                 Vec::with_capacity_in(self.len(), self.element_allocator.clone()), 
                 |mut current, next| { current.push(next); current }

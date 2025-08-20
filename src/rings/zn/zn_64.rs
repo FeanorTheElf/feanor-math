@@ -22,6 +22,7 @@ use crate::homomorphism::*;
 
 use std::marker::PhantomData;
 
+use feanor_serde::newtype_struct::*;
 use serde::de::{DeserializeSeed, Error};
 use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
 
@@ -556,7 +557,7 @@ impl Serialize for ZnBase {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        SerializableNewtype::new("Zn", *self.modulus()).serialize(serializer)
+        SerializableNewtypeStruct::new("Zn", *self.modulus()).serialize(serializer)
     }
 }
 
@@ -564,7 +565,7 @@ impl<'de> Deserialize<'de> for ZnBase {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer<'de>
     {
-        DeserializeSeedNewtype::new("Zn", PhantomData::<i64>).deserialize(deserializer).map(|n| ZnBase::new(n as u64))
+        DeserializeSeedNewtypeStruct::new("Zn", PhantomData::<i64>).deserialize(deserializer).map(|n| ZnBase::new(n as u64))
     }
 }
 

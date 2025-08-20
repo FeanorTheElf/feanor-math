@@ -1,3 +1,4 @@
+use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNewtypeStruct};
 use serde::de::{self, DeserializeSeed};
 use serde::ser::SerializeTuple;
 use serde::{Deserializer, Serialize, Deserialize, Serializer}; 
@@ -11,9 +12,8 @@ use crate::ordered::*;
 use crate::primitive_int::*;
 use crate::ring::*;
 use crate::algorithms;
-use crate::serialization::{DeserializeSeedNewtype, SerializableElementRing, SerializableNewtype};
+use crate::serialization::*;
 use crate::specialization::*;
-use crate::serialization::DeserializeSeedUnitStruct;
 
 use std::alloc::Allocator;
 use std::alloc::Global;
@@ -393,7 +393,7 @@ impl Serialize for RustBigintRingBase<Global> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        serializer.serialize_unit_struct("IntegerRing(RustBigInt)")
+        SerializableNewtypeStruct::new("IntegerRing(RustBigInt)", ()).serialize(serializer)
     }
 }
 
@@ -402,7 +402,7 @@ impl<'de> Deserialize<'de> for RustBigintRingBase<Global> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer<'de>
     {
-        DeserializeSeedUnitStruct::new("IntegerRing(RustBigInt)", RustBigintRing::RING.into()).deserialize(deserializer)
+        DeserializeSeedNewtypeStruct::new("IntegerRing(RustBigInt)", PhantomData::<()>).deserialize(deserializer).map(|_| RustBigintRing::RING.into())
     }
 }
 
@@ -414,7 +414,7 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
         if deserializer.is_human_readable() {
             // this makes an unnecessary temporary allocation, but then the cost is probably negligible compared
             // to the parsing of a string as a number
-            let string = DeserializeSeedNewtype::new("BigInt", PhantomData::<String>).deserialize(deserializer)?;
+            let string = DeserializeSeedNewtypeStruct::new("BigInt", PhantomData::<String>).deserialize(deserializer)?;
             return self.parse(string.as_str(), 10).map_err(|()| de::Error::custom(format!("cannot parse \"{}\" as number", string)));
         } else {
             let (negative, data) = deserialize_bigint_from_bytes(deserializer, |data| {
@@ -434,7 +434,7 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
         where S: Serializer
     {
         if serializer.is_human_readable() {
-            SerializableNewtype::new("BigInt", format!("{}", RingRef::new(self).format(el)).as_str()).serialize(serializer)
+            SerializableNewtypeStruct::new("BigInt", format!("{}", RingRef::new(self).format(el)).as_str()).serialize(serializer)
         } else {
             let len = highest_set_block(&el.1).map(|n| n + 1).unwrap_or(0);
             let mut data = Vec::with_capacity_in(len * size_of::<u64>(), &self.allocator);
@@ -729,4 +729,14 @@ fn test_canonical_iso_static_int() {
 #[test]
 fn test_serialize() {
     crate::serialization::generic_tests::test_serialization(ZZ, edge_case_elements())
+}
+
+#[test]
+fn test_serialize_postcard() {
+    let serialized = postcard::to_allocvec(&SerializeWithRing::new(&ZZ.power_of_two(10000), ZZ)).unwrap();
+    let result = DeserializeWithRing::new(ZZ).deserialize(
+        &mut postcard::Deserializer::from_flavor(postcard::de_flavors::Slice::new(&serialized))
+    ).unwrap();
+
+    assert_el_eq!(ZZ, ZZ.power_of_two(10000), result);
 }

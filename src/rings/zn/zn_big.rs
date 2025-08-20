@@ -2,6 +2,8 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::cell::OnceCell;
 
+use feanor_serde::dependent_tuple::DeserializeSeedDependentTuple;
+use feanor_serde::newtype_struct::*;
 use serde::de::{Error, DeserializeSeed};
 use serde::{Deserializer, Serializer, Serialize, Deserialize}; 
 
@@ -509,7 +511,7 @@ impl<I> Serialize for ZnBase<I>
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        SerializableNewtype::new("Zn", (self.integer_ring(), SerializeWithRing::new(self.modulus(), self.integer_ring()))).serialize(serializer)
+        SerializableNewtypeStruct::new("Zn", (self.integer_ring(), SerializeWithRing::new(self.modulus(), self.integer_ring()))).serialize(serializer)
     }
 }
 
@@ -521,7 +523,7 @@ impl<'de, I> Deserialize<'de> for ZnBase<I>
         where D: Deserializer<'de>
     {
         let ring_cell = OnceCell::new();
-        let modulus = <_ as DeserializeSeed<'de>>::deserialize(DeserializeSeedNewtype::new("Zn", DeserializeSeedDependentTuple::new(PhantomData::<I>, |ring| {
+        let modulus = <_ as DeserializeSeed<'de>>::deserialize(DeserializeSeedNewtypeStruct::new("Zn", DeserializeSeedDependentTuple::new(PhantomData::<I>, |ring| {
             ring_cell.set(ring).ok().unwrap();
             DeserializeWithRing::new(ring_cell.get().unwrap())
         })), deserializer)?;
