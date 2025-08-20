@@ -68,8 +68,28 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
     /// taken from the given vector, interpreted as a row-major matrix. The number of
     /// rows is `row_count = data.len() / col_count`.
     /// 
+    /// If `col_count` is zero, this will panic. If that can happen, consider
+    /// using [`OwnedMatrix::new_with_shape()`].
+    /// 
     pub fn new(data: Vec<T, A>, col_count: usize) -> Self {
-        assert!(data.len() % col_count == 0);
+        let row_count = data.len() / col_count;
+        Self::new_with_shape(data, row_count, col_count)
+    }
+
+    ///
+    /// Creates the `row_count x col_count` [`OwnedMatrix`] matrix, whose entries are
+    /// taken from the given vector, interpreted as a row-major matrix.
+    /// 
+    /// # Example
+    /// ```
+    /// # use feanor_math::matrix::*;
+    /// let matrix = OwnedMatrix::new_with_shape(vec![1, 2, 3, 4, 5, 6], 3, 2);
+    /// assert_eq!(3, *matrix.at(1, 0));
+    /// assert_eq!(6, *matrix.at(2, 1));
+    /// ```
+    /// 
+    pub fn new_with_shape(data: Vec<T, A>, row_count: usize, col_count: usize) -> Self {
+        assert_eq!(row_count * col_count, data.len());
         Self { data, col_count }
     }
 

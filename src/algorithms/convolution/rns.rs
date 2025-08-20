@@ -250,6 +250,9 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
         self.convolutions.get_or_init(i, || (self.create_convolution)(*self.get_rns_factor(i)))
     }
 
+    ///
+    /// "width" refers to the number of RNS factors we need
+    /// 
     fn compute_required_width(&self, input_size_log2: usize, lhs_len: usize, rhs_len: usize, inner_prod_len: usize) -> usize {
         let log2_output_size = input_size_log2 * 2 + 
             StaticRing::<i64>::RING.abs_log2_ceil(&min(lhs_len, rhs_len).try_into().unwrap()).unwrap_or(0) +
@@ -392,7 +395,17 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
         let mut lhs_tmp = Vec::new_in(self.allocator.clone());
         let mut rhs_tmp = Vec::new_in(self.allocator.clone());
         
-        let mut merge_current = |current_width: usize, lhs_tmp: &mut Vec<(Vec<El<Zn>, _>, Option<&'a PreparedConvolutionOperand<R, C>>), _>, rhs_tmp: &mut Vec<(Vec<El<Zn>, _>, Option<&'a PreparedConvolutionOperand<R, C>>), _>| {
+        // the algorithm is as follows:
+        //  - we keep track of the current "width" (i.e. number of RNS factors) to represent the result
+        //  - we collect iterator elements, until the current width is not sufficient anymore
+        //  - then we do `merge_current()`: forward all collected samples to the child convolutions,
+        //    add the result to `dst`, and clear the buffers; continue with updated width
+
+        let mut merge_current = |
+            current_width: usize, 
+            lhs_tmp: &mut Vec<(Vec<El<Zn>, _>, Option<&'a PreparedConvolutionOperand<R, C>>), _>, 
+            rhs_tmp: &mut Vec<(Vec<El<Zn>, _>, Option<&'a PreparedConvolutionOperand<R, C>>), _>
+        | {
             if current_width == 0 {
                 lhs_tmp.clear();
                 rhs_tmp.clear();

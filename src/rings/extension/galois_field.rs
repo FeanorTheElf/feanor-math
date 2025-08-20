@@ -350,7 +350,7 @@ impl<R, A, C> GaloisFieldOver<R, A, C>
     /// # use feanor_math::rings::zn::*;
     /// # use feanor_math::algorithms::convolution::*;
     /// # use feanor_math::rings::extension::galois_field::*;
-    /// let F25 = GaloisField::new_with(Zn::new(5).as_field().ok().unwrap(), 2, Global, STANDARD_CONVOLUTION);
+    /// let F25 = GaloisField::new_with_convolution(Zn::new(5).as_field().ok().unwrap(), 2, Global, STANDARD_CONVOLUTION);
     /// let generator = F25.canonical_gen();
     /// let norm = F25.mul_ref_fst(&generator, F25.pow(F25.clone_el(&generator), 5));
     /// let inclusion = F25.inclusion();

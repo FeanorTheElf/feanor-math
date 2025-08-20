@@ -87,7 +87,7 @@ pub mod conway;
 ///     }
 /// }
 /// // since galois fields are so important, an efficient construction is provided by feanor-math
-/// let galois_field_2 = galois_field::GaloisField::new_with(prime_field, 3, Global, STANDARD_CONVOLUTION);
+/// let galois_field_2 = galois_field::GaloisField::new_with_convolution(prime_field, 3, Global, STANDARD_CONVOLUTION);
 /// // note that the generating polynomial might be different, so it is not necessarily the "same" ring
 /// assert!(galois_field_2.can_iso(&galois_field).is_none());
 /// ```
