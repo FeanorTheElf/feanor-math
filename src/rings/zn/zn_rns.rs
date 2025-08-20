@@ -805,8 +805,9 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> SerializableElementRing f
                 self.total_ring.get_ring().deserialize(deserializer)?
             ))
         } else {
+            let dummy_ring = self.at(0);
             DeserializeSeedNewtypeStruct::new("RNSZnEl", DeserializeSeedSeq::new(
-                self.as_iter().map(|ring| DeserializeWithRing::new(ring)), 
+                self.as_iter().map(|ring| DeserializeWithRing::new(ring)).chain([DeserializeWithRing::new(dummy_ring)].into_iter()), 
                 Vec::with_capacity_in(self.len(), self.element_allocator.clone()), 
                 |mut current, next| { current.push(next); current }
             )).deserialize(deserializer).map(|result| ZnEl {

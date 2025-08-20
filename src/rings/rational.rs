@@ -401,7 +401,7 @@ impl<I> SerializableElementRing for RationalFieldBase<I>
         where D: Deserializer<'de>
     {
         DeserializeSeedNewtypeStruct::new("Rational", DeserializeSeedSeq::new(
-            std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(2),
+            std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(3),
             (None, None),
             |mut current, next| {
                 if current.0.is_none() {

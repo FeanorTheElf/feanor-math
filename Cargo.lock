@@ -145,9 +145,9 @@ dependencies = [
 
 [[package]]
 name = "feanor-serde"
-version = "0.1.0"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2a7ca8fbab4a7a31eccd610225bc6a60aedcd09fbfbef38a220febe7a48a40c"
+checksum = "4d2e8a926c656c8be9a21c9b88c5361e803548c414ca5be3d7e62d2a76326768"
 dependencies = [
  "serde",
 ]

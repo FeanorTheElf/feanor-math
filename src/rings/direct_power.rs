@@ -437,7 +437,7 @@ impl<R: RingStore, const N: usize> SerializableElementRing for DirectPowerRingBa
         where D: Deserializer<'de>
     {
         DeserializeSeedNewtypeStruct::new("DirectPowerRingEl", DeserializeSeedSeq::new(
-            std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(N),
+            std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(N + 1),
             (from_fn(|_| None), 0),
             |(mut current, mut current_idx), next| {
                 current[current_idx] = Some(next);

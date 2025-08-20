@@ -542,7 +542,7 @@ impl<R, V, A, C> SerializableElementRing for FreeAlgebraImplBase<R, V, A, C>
     {
         // TODO: find better serialization name
         DeserializeSeedNewtypeStruct::new("ExtensionRingEl", DeserializeSeedSeq::new(
-            std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(self.rank()),
+            std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(self.rank() + 1),
             Vec::with_capacity_in(1 << self.log2_padded_len, self.element_allocator.clone()),
             |mut current, next| { current.push(next); current }
         )).deserialize(deserializer).map(|mut values| {
