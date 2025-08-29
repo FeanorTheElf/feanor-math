@@ -1024,6 +1024,12 @@ pub trait RingExtension: RingBase {
         self.mul_assign(lhs, self.from_ref(rhs));
     }
 
+    fn fma_base(&self, lhs: &Self::Element, rhs: &El<Self::BaseRing>, summand: Self::Element) -> Self::Element {
+        let mut tmp = self.clone_el(lhs);
+        self.mul_assign_base(&mut tmp, rhs);
+        return self.add(summand, tmp);
+    }
+
     ///
     /// Computes `lhs := lhs * rhs`, where `rhs` is mapped into this ring
     /// via the given homomorphism, followed by the inclusion (as specified by
