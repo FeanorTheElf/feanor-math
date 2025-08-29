@@ -46,6 +46,19 @@ fn mullo(lhs: u64, rhs: u64) -> u64 {
 }
 
 ///
+/// Assuming that `x <= 2 * bound`, computes `x' <= bound` that is congruent
+/// to `x` modulo `bound`
+/// 
+fn reduce_to_half(x: u64, bound: u64) -> u64 {
+    let (result, overflow) = x.overflowing_sub(bound);
+    if overflow {
+        x
+    } else {
+        result
+    }
+}
+
+///
 /// Represents the ring `Z/nZ`.
 /// A variant of Barett reduction is used to perform fast modular
 /// arithmetic for `n` slightly smaller than 64 bit.
@@ -77,6 +90,7 @@ pub struct ZnBase {
     modulus: i64,
     modulus_half: i64,
     modulus_times_three: u64,
+    modulus_times_six: u64,
     inv_modulus: u128
 }
 
@@ -105,7 +119,8 @@ impl ZnBase {
             modulus: modulus_i64,
             inv_modulus: inv_modulus,
             modulus_half: (modulus_i64 - 1) / 2 + 1,
-            modulus_times_three: modulus * 3
+            modulus_times_three: modulus * 3,
+            modulus_times_six: modulus * 6
         }
     }
 
@@ -118,7 +133,7 @@ impl ZnBase {
     /// valid representatives of ring elements.
     /// 
     fn repr_bound(&self) -> u64 {
-        self.modulus_times_three * 2
+        self.modulus_times_six
     }
 
     ///
@@ -157,21 +172,6 @@ impl ZnBase {
         let approx_quotient = in_high as u128 * invmod_high as u128 + mulhi(in_low, invmod_high) as u128;
 
         return self.bounded_reduce(value - (approx_quotient * self.modulus as u128));
-    }
-
-    ///
-    /// Reduces from `[0, 2 * self.repr_bound()]` to `[0, 3 * self.modulus()]`
-    /// 
-    fn potential_reduce(&self, mut value: u64) -> u64 {
-        debug_assert!(value as u128 <= 2 * self.repr_bound() as u128);
-        if value >= self.repr_bound() {
-            value -= self.repr_bound();
-        }
-        if value >= self.modulus_times_three {
-            value -= self.modulus_times_three;
-        }
-        debug_assert!(value <= self.modulus_times_three);
-        return value;
     }
 
     ///
@@ -264,7 +264,21 @@ impl RingBase for ZnBase {
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         debug_assert!(lhs.0 <= self.repr_bound());
         debug_assert!(rhs.0 <= self.repr_bound());
-        lhs.0 = self.potential_reduce(lhs.0 + rhs.0);
+        lhs.0 += rhs.0;
+        lhs.0 = reduce_to_half(lhs.0, self.repr_bound());
+        debug_assert!(lhs.0 <= self.repr_bound());
+    }
+
+    fn sub_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
+        debug_assert!(lhs.0 <= self.repr_bound());
+        debug_assert!(rhs.0 <= self.repr_bound());
+        let (result, overflow) = lhs.0.overflowing_sub(rhs.0);
+        if overflow {
+            lhs.0 = result.wrapping_add(self.repr_bound());
+        } else {
+            lhs.0 = result;
+        }
+        debug_assert!(lhs.0 <= self.repr_bound());
     }
 
     fn negate_inplace(&self, lhs: &mut Self::Element) {
@@ -927,9 +941,7 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
     fn butterfly_new<H: Homomorphism<ZnFastmulBase, Self>>(hom: H, a: &mut ZnEl, b: &mut ZnEl, twiddle: &<ZnFastmulBase as RingBase>::Element) {
         let self_ = hom.codomain().get_ring();
         
-        if a.0 >= self_.modulus_times_three {
-            a.0 -= self_.modulus_times_three;
-        }
+        a.0 = reduce_to_half(a.0, self_.modulus_times_three);
         hom.mul_assign_ref_map(b, twiddle);
 
         (a.0, b.0) = (a.0 + b.0, a.0 + self_.modulus_times_three - b.0);
@@ -942,9 +954,7 @@ impl CooleyTuckeyButterfly<ZnFastmulBase> for ZnBase {
         // we assume that a, b are already at most `self.modulus_times_three`
 
         (a.0, b.0) = (a.0 + b.0, a.0 + self_.modulus_times_three - b.0);
-        if a.0 >= self_.modulus_times_three {
-            a.0 -= self_.modulus_times_three;
-        }
+        a.0 = reduce_to_half(a.0, self_.modulus_times_three);
         hom.mul_assign_ref_map(b, twiddle);
     }
 
@@ -976,19 +986,13 @@ impl CooleyTukeyRadix3Butterfly<ZnFastmulBase> for ZnBase {
 
         let mut s1 = b.0 + c_.0;
         let mut s2 = b_.0 + c.0;
-        if a.0 >= self_.modulus_times_three {
-            a.0 -= self_.modulus_times_three;
-        }
-        if s1 >= self_.modulus_times_three {
-            s1 -= self_.modulus_times_three;
-        }
-        if s2 >= self_.modulus_times_three {
-            s2 -= self_.modulus_times_three;
-        }
+        a.0 = reduce_to_half(a.0, self_.modulus_times_three);
+        s1 = reduce_to_half(s1, self_.modulus_times_three);
+        s2 = reduce_to_half(s2, self_.modulus_times_three);
+
         let mut s3 = s1 + s2;
-        if s3 >= self_.modulus_times_three {
-            s3 -= self_.modulus_times_three;
-        }
+        s3 = reduce_to_half(s3, self_.modulus_times_three);
+
         b.0 = a.0 + s2;
         c.0 = a.0 + self_.modulus_times_three - s3;
         a.0 = a.0 + s1;
@@ -1009,25 +1013,19 @@ impl CooleyTukeyRadix3Butterfly<ZnFastmulBase> for ZnBase {
 
         let b_ = hom.mul_ref_map(b, z);
         let mut s1 = b.0 + c.0;
-        if s1 >= self_.modulus_times_three {
-            s1 -= self_.modulus_times_three;
-        }
+        s1 = reduce_to_half(s1, self_.modulus_times_three);
 
         let s2 = b_.0 + c.0;
         let s2_ = hom.mul_ref_snd_map(self_.from_u64_promise_reduced(s2), z);
 
         let mut s3 = s1 + s2_.0;
-        if s3 >= self_.modulus_times_three {
-            s3 -= self_.modulus_times_three;
-        }
+        s3 = reduce_to_half(s3, self_.modulus_times_three);
 
         b.0 = a.0 + s2_.0;
         c.0 = a.0 + self_.modulus_times_three - s3;
         a.0 = a.0 + s1;
 
-        if a.0 >= self_.modulus_times_three {
-            a.0 -= self_.modulus_times_three;
-        }
+        a.0 = reduce_to_half(a.0, self_.modulus_times_three);
         hom.mul_assign_ref_map(b, t);
         hom.mul_assign_ref_map(c, t_sqr);
     }
@@ -1049,9 +1047,7 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
     fn butterfly_new<H: Homomorphism<Self, Self>>(hom: H, a: &mut ZnEl, b: &mut ZnEl, twiddle: &ZnEl) {
         let self_ = hom.codomain().get_ring();
         
-        if a.0 >= self_.modulus_times_three {
-            a.0 -= self_.modulus_times_three;
-        }
+        a.0 = reduce_to_half(a.0, self_.modulus_times_three);
         hom.mul_assign_ref_map(b, twiddle);
 
         (a.0, b.0) = (a.0 + b.0, a.0 + self_.modulus_times_three - b.0);
@@ -1062,9 +1058,7 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
         let self_ = hom.codomain().get_ring();
 
         (a.0, b.0) = (a.0 + b.0, a.0 + self_.modulus_times_three - b.0);
-        if a.0 >= self_.modulus_times_three {
-            a.0 -= self_.modulus_times_three;
-        }
+        a.0 = reduce_to_half(a.0, self_.modulus_times_three);
         hom.mul_assign_ref_map(b, twiddle);
     }
     
@@ -1096,19 +1090,12 @@ impl CooleyTukeyRadix3Butterfly<ZnBase> for ZnBase {
 
         let mut s1 = b.0 + c_.0;
         let mut s2 = b_.0 + c.0;
-        if a.0 >= self_.modulus_times_three {
-            a.0 -= self_.modulus_times_three;
-        }
-        if s1 >= self_.modulus_times_three {
-            s1 -= self_.modulus_times_three;
-        }
-        if s2 >= self_.modulus_times_three {
-            s2 -= self_.modulus_times_three;
-        }
+        a.0 = reduce_to_half(a.0, self_.modulus_times_three);
+        s1 = reduce_to_half(s1, self_.modulus_times_three);
+        s2 = reduce_to_half(s2, self_.modulus_times_three);
         let mut s3 = s1 + s2;
-        if s3 >= self_.modulus_times_three {
-            s3 -= self_.modulus_times_three;
-        }
+        s3 = reduce_to_half(s3, self_.modulus_times_three);
+
         b.0 = a.0 + s2;
         c.0 = a.0 + self_.modulus_times_three - s3;
         a.0 = a.0 + s1;
@@ -1129,25 +1116,19 @@ impl CooleyTukeyRadix3Butterfly<ZnBase> for ZnBase {
 
         let b_ = hom.mul_ref_map(b, z);
         let mut s1 = b.0 + c.0;
-        if s1 >= self_.modulus_times_three {
-            s1 -= self_.modulus_times_three;
-        }
+        s1 = reduce_to_half(s1, self_.modulus_times_three);
 
         let s2 = b_.0 + c.0;
         let s2_ = hom.mul_ref_snd_map(self_.from_u64_promise_reduced(s2), z);
 
         let mut s3 = s1 + s2_.0;
-        if s3 >= self_.modulus_times_three {
-            s3 -= self_.modulus_times_three;
-        }
+        s3 = reduce_to_half(s3, self_.modulus_times_three);
 
         b.0 = a.0 + s2_.0;
         c.0 = a.0 + self_.modulus_times_three - s3;
         a.0 = a.0 + s1;
+        a.0 = reduce_to_half(a.0, self_.modulus_times_three);
 
-        if a.0 >= self_.modulus_times_three {
-            a.0 -= self_.modulus_times_three;
-        }
         hom.mul_assign_ref_map(b, t);
         hom.mul_assign_ref_map(c, t_sqr);
     }
