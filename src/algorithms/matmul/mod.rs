@@ -46,17 +46,29 @@ impl<R: ?Sized + RingBase> ComputeInnerProduct for R {
     default fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
         where Self::Element: 'a
     {
-        self.inner_product(els.map(|(l, r)| (self.clone_el(l), r)))
+        let mut result = self.zero();
+        for (l, r) in els {
+            result = self.fma(l, &r, result);
+        }
+        return result;
     }
 
     default fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
         where Self::Element: 'a
     {
-        self.inner_product_ref_fst(els.map(|(l, r)| (l, self.clone_el(r))))
+        let mut result = self.zero();
+        for (l, r) in els {
+            result = self.fma(l, r, result);
+        }
+        return result;
     }
 
     default fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
-        self.sum(els.map(|(l, r)| self.mul(l, r)))
+        let mut result = self.zero();
+        for (l, r) in els {
+            result = self.fma(&l, &r, result);
+        }
+        return result;
     }
 }
 

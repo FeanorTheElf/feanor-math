@@ -3,7 +3,7 @@ use serde::de::{self, DeserializeSeed};
 use serde::ser::SerializeTuple;
 use serde::{Deserializer, Serialize, Deserialize, Serializer}; 
 
-use crate::algorithms::bigint::{deserialize_bigint_from_bytes, highest_set_block};
+use crate::algorithms::bigint::*;
 use crate::divisibility::{DivisibilityRing, Domain};
 use crate::pid::*;
 use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ, impl_eval_poly_locally_for_ZZ};
@@ -152,19 +152,19 @@ impl<A: Allocator + Clone> RingBase for RustBigintRingBase<A> {
         match (lhs, rhs) {
             (RustBigint(false, lhs_val), RustBigint(false, rhs_val)) |
             (RustBigint(true, lhs_val), RustBigint(true, rhs_val)) => {
-                algorithms::bigint::bigint_add(lhs_val, rhs_val, 0);
+                bigint_add(lhs_val, rhs_val, 0);
             },
             (RustBigint(lhs_sgn, lhs_val), RustBigint(_, rhs_val)) => {
-                match algorithms::bigint::bigint_cmp(lhs_val, rhs_val) {
+                match bigint_cmp(lhs_val, rhs_val) {
                     Less => {
-                        algorithms::bigint::bigint_sub_self(lhs_val, rhs_val);
+                        bigint_sub_self(lhs_val, rhs_val);
                         *lhs_sgn = !*lhs_sgn;
                     },
                     Equal => {
                         lhs_val.clear();
                     },
                     Greater => {
-                        algorithms::bigint::bigint_sub(lhs_val, rhs_val, 0);
+                        bigint_sub(lhs_val, rhs_val, 0);
                     }
                 }
             }
@@ -190,8 +190,24 @@ impl<A: Allocator + Clone> RingBase for RustBigintRingBase<A> {
     }
 
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        let result = algorithms::bigint::bigint_mul(&lhs.1, &rhs.1, Vec::new_in(self.allocator.clone()));
+        let result = bigint_fma(&lhs.1, &rhs.1, Vec::new_in(self.allocator.clone()), &self.allocator);
         *lhs = RustBigint(lhs.0 ^ rhs.0, result);
+    }
+
+    fn fma(&self, lhs: &Self::Element, rhs: &Self::Element, summand: Self::Element) -> Self::Element {
+        if lhs.0 ^ rhs.0 == summand.0 {
+            let result = bigint_fma(&lhs.1, &rhs.1, summand.1, &self.allocator);
+            RustBigint(summand.0, result)
+        } else {
+            self.add(summand, self.mul_ref(lhs, rhs))
+        }
+    }
+
+    fn mul_int(&self, mut lhs: Self::Element, rhs: i32) -> Self::Element {
+        lhs.0 ^= rhs < 0;
+        let rhs = rhs.unsigned_abs();
+        bigint_mul_small(&mut lhs.1, rhs.into());
+        return lhs;
     }
 
     fn zero(&self) -> Self::Element {
@@ -206,7 +222,7 @@ impl<A: Allocator + Clone> RingBase for RustBigintRingBase<A> {
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         if lhs.0 == rhs.0 {
-            algorithms::bigint::bigint_cmp(&lhs.1, &rhs.1) == Equal
+            bigint_cmp(&lhs.1, &rhs.1) == Equal
         } else {
             self.is_zero(lhs) && self.is_zero(rhs)
         }
@@ -242,7 +258,7 @@ impl<A: Allocator + Clone> RingBase for RustBigintRingBase<A> {
             (highest_set_block(&value.1).unwrap_or(0) + 1) * u64::BITS as usize / 3
         );
         while !self.is_zero(&copy) {
-            let rem = algorithms::bigint::bigint_div_small(&mut copy.1, BIG_POWER_TEN);
+            let rem = bigint_div_small(&mut copy.1, BIG_POWER_TEN);
             remainders.push(rem);
         }
         remainders.reverse();
@@ -309,8 +325,8 @@ impl<A: Allocator + Clone> OrderedRing for RustBigintRingBase<A> {
 
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> Ordering {
         match (lhs.0, rhs.0) {
-            (true, true) => algorithms::bigint::bigint_cmp(&rhs.1, &lhs.1),
-            (false, false) => algorithms::bigint::bigint_cmp(&lhs.1, &rhs.1),
+            (true, true) => bigint_cmp(&rhs.1, &lhs.1),
+            (false, false) => bigint_cmp(&lhs.1, &rhs.1),
             (_, _) if self.is_zero(lhs) && self.is_zero(rhs) => Equal,
             (true, false) => Less,
             (false, true) => Greater
@@ -318,7 +334,7 @@ impl<A: Allocator + Clone> OrderedRing for RustBigintRingBase<A> {
     }
 
     fn abs_cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> Ordering {
-        algorithms::bigint::bigint_cmp(&rhs.1, &lhs.1)
+        bigint_cmp(&rhs.1, &lhs.1)
     }
 }
 
@@ -364,7 +380,7 @@ impl<A: Allocator + Clone> EuclideanRing for RustBigintRingBase<A> {
 
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
-        let mut quo = RustBigint(false, algorithms::bigint::bigint_div(&mut lhs.1, &rhs.1, self.zero().1));
+        let mut quo = RustBigint(false, bigint_div(&mut lhs.1, &rhs.1, self.zero().1, &self.allocator));
         if rhs.0 ^ lhs.0 {// if result of division is zero, `.is_neg(&lhs)` does not work as expected
             self.negate_inplace(&mut quo);
         }
@@ -516,11 +532,11 @@ impl<A: Allocator + Clone> IntegerRing for RustBigintRingBase<A> {
     }
 
     fn euclidean_div_pow_2(&self, value: &mut Self::Element, power: usize) {
-        algorithms::bigint::bigint_rshift(&mut value.1, power);
+        bigint_rshift(&mut value.1, power);
     }
 
     fn mul_pow_2(&self, value: &mut Self::Element, power: usize) {
-        algorithms::bigint::bigint_lshift(&mut value.1, power)
+        bigint_lshift(&mut value.1, power)
     }
 
     fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, mut rng: G) -> Self::Element {

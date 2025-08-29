@@ -132,7 +132,7 @@ pub struct AsFirstElement<T>(T);
 unsafe impl<'a, T> AsPointerToSlice<T> for AsFirstElement<T> {
 
     unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> {
-        std::mem::transmute(self_)
+        unsafe { std::mem::transmute(self_) }
     }
 }
 

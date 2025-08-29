@@ -39,11 +39,11 @@ pub unsafe fn mpz_is_neg(val: mpz_srcptr) -> bool {
     // of mpir here.
     // In particular, they indicate a negative value by having size to be
     // negative (its absolute value is still the "real" size)
-    (*val)._mp_size < 0
+    unsafe { (*val)._mp_size < 0 }
 }
 
 #[link(name = "mpir", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     //
     // It is a very hidden, but important fact that we are allowed
     // to pass the same pointer as multiple arguments, even in and

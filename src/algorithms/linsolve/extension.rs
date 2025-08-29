@@ -23,7 +23,7 @@ pub fn solve_right_over_extension<R, V1, V2, V3, A>(ring: R, lhs: SubmatrixMut<V
 
     let mut expanded_lhs = OwnedMatrix::zero_in(lhs.row_count() * ring.rank(), lhs.col_count() * ring.rank(), ring.base_ring(), &allocator);
     let mut current;
-    let gen = ring.canonical_gen();
+    let g = ring.canonical_gen();
     for i in 0..lhs.row_count() {
         for j in 0..lhs.col_count() {
             current = ring.clone_el(lhs.at(i, j));
@@ -33,7 +33,7 @@ pub fn solve_right_over_extension<R, V1, V2, V3, A>(ring: R, lhs: SubmatrixMut<V
                     *expanded_lhs.at_mut(i * ring.rank() + k, j * ring.rank() + l) = current_wrt_basis.at(k);
                 }
                 drop(current_wrt_basis);
-                ring.mul_assign_ref(&mut current, &gen);
+                ring.mul_assign_ref(&mut current, &g);
             }
         }
     }

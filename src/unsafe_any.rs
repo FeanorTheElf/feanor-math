@@ -15,9 +15,9 @@ pub struct UnsafeAny {
 
 unsafe fn delete<T>(value: NonNull<[u8]>) {
     // that is basicaly the only check we are able to do...
-    assert_eq!(size_of::<T>(), value.as_ref().len());
-    let ptr = std::mem::transmute::<*const (), *const T>(value.as_ptr() as *const ());
-    drop(std::ptr::read(ptr));
+    assert_eq!(size_of::<T>(), unsafe { value.as_ref().len() });
+    let ptr = unsafe { std::mem::transmute::<*const (), *const T>(value.as_ptr() as *const ()) };
+    drop(unsafe { std::ptr::read(ptr) });
 }
 
 impl UnsafeAny {
@@ -38,8 +38,8 @@ impl UnsafeAny {
     pub unsafe fn get<'a, T>(&'a self) -> &'a T {
         assert!(self.data.is_some());
         // that is basicaly the only check we are able to do...
-        assert_eq!(size_of::<T>(), self.data.unwrap().as_ref().len());
-        &*std::mem::transmute::<*const (), *const T>(self.data.unwrap().as_ptr() as *const ())
+        assert_eq!(size_of::<T>(), unsafe { self.data.unwrap().as_ref().len() });
+        unsafe { &*std::mem::transmute::<*const (), *const T>(self.data.unwrap().as_ptr() as *const ()) }
     }
 }
 

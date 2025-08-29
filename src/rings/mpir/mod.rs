@@ -1,7 +1,11 @@
 use libc;
+
+use std::marker::PhantomData;
+
 use serde::de::DeserializeSeed;
 use serde::ser::SerializeTuple;
 use serde::{Deserializer, Serializer, Serialize, Deserialize};
+use feanor_serde::newtype_struct::*;
 
 use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ, impl_eval_poly_locally_for_ZZ};
 use crate::algorithms;
@@ -15,7 +19,6 @@ use crate::integer::*;
 use crate::specialization::*;
 use crate::rings::rust_bigint::*;
 use crate::algorithms::bigint::deserialize_bigint_from_bytes;
-use crate::serialization::*;
 
 mod mpir_bindings;
 
@@ -384,7 +387,7 @@ impl Serialize for MPZBase {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        serializer.serialize_unit_struct("IntegerRing(MPZ)")
+        SerializableNewtypeStruct::new("IntegerRing(MPZ)", ()).serialize(serializer)
     }
 }
 
@@ -393,7 +396,7 @@ impl<'de> Deserialize<'de> for MPZBase {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer<'de>
     {
-        DeserializeSeedUnitStruct::new("IntegerRing(MPZ)", MPZ::RING.into()).deserialize(deserializer)
+        DeserializeSeedNewtypeStruct::new("IntegerRing(MPZ)", PhantomData::<()>).deserialize(deserializer).map(|()| MPZ::RING.into())
     }
 }
 
@@ -421,7 +424,7 @@ impl SerializableElementRing for MPZBase {
         where S: Serializer
     {
         if serializer.is_human_readable() {
-            SerializableNewtype::new("BigInt", format!("{}", RingRef::new(self).format(el)).as_str()).serialize(serializer)
+            SerializableNewtypeStruct::new("BigInt", format!("{}", RingRef::new(self).format(el)).as_str()).serialize(serializer)
         } else {
             let len = self.to_le_bytes_len(el);
             let mut data = Vec::with_capacity(len);

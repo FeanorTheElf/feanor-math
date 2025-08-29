@@ -1,7 +1,7 @@
 [package]
 name = "feanor-math"
-version = "3.4.7"
-edition = "2021"
+version = "3.4.8"
+edition = "2024"
 authors = ["Simon Pohmann <simon@pohmann.de>"]
 
 repository = "https://github.com/FeanorTheElf/feanor-math"

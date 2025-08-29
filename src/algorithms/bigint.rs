@@ -204,15 +204,12 @@ pub fn bigint_rshift(lhs: &mut [BlockInt], power: usize) {
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn bigint_mul<A: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt], mut out: Vec<BlockInt, A>) -> Vec<BlockInt, A> {
-	out.clear();
-	out.resize(
-		highest_set_block(lhs.as_ref()).unwrap_or(0) + 
-		highest_set_block(rhs.as_ref()).unwrap_or(0) + 2, 
-		0
-	);
+pub fn bigint_fma<A: Allocator, A2: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt], mut out: Vec<BlockInt, A>, scratch_alloc: A2) -> Vec<BlockInt, A> {
+	let prev_len = highest_set_block(&out).map(|x| x + 1).unwrap_or(0);
+	let new_len = max(prev_len + 1, highest_set_block(lhs.as_ref()).and_then(|lb| highest_set_block(rhs.as_ref()).map(|rb| lb + rb + 2)).unwrap_or(0));
+	out.resize(new_len, 0);
 	if let Some(d) = highest_set_block(rhs.as_ref()) {
-		let mut val = Vec::new();
+		let mut val = Vec::new_in(scratch_alloc);
 		for i in 0..=d {
 			assign(&mut val, lhs.as_ref());
 			bigint_mul_small(&mut val, rhs[i]);
@@ -385,7 +382,7 @@ fn division_step<A: Allocator>(
 /// Complexity O(log(n)^2)
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn bigint_div<A: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], mut out: Vec<BlockInt, A>) -> Vec<BlockInt, A> {
+pub fn bigint_div<A: Allocator, A2: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], mut out: Vec<BlockInt, A>, scratch_alloc: A2) -> Vec<BlockInt, A> {
 	assert!(highest_set_block(rhs.as_ref()).is_some());
 	
 	out.clear();
@@ -403,7 +400,7 @@ pub fn bigint_div<A: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], mut out:
 			return out;
 		},
 		(Some(mut d), Some(k)) => {
-			let mut tmp = Vec::new();
+			let mut tmp = Vec::new_in(scratch_alloc);
 			expand(&mut out, d - k + 1);
 			while d > k {
 				if lhs[d] != 0 {
@@ -540,6 +537,9 @@ pub fn deserialize_bigint_from_bytes<'de, D, F, T>(deserializer: D, from_bytes: 
 }
 
 #[cfg(test)]
+use std::alloc::Global;
+
+#[cfg(test)]
 fn parse(s: &str, base: u32) -> Vec<BlockInt> {
     use crate::rings::rust_bigint::RustBigintRing;
 	use crate::integer::*;
@@ -594,7 +594,16 @@ fn test_mul() {
     let x = parse("57873674586797895671345345", 10);
     let y = parse("21308561789045691782534873921650342768903561413264128756389247568729346542359871235465", 10);
     let z = parse("1233204770891906354921751949503652431220138020953161094405729272872607166072371117664593787957056214903826660425", 10);
-    assert_eq!(truncate_zeros(z), truncate_zeros(bigint_mul(&x, &y, Vec::new())));
+    assert_eq!(truncate_zeros(z), truncate_zeros(bigint_fma(&x, &y, Vec::new(), Global)));
+}
+
+#[test]
+fn test_fma() {
+    let x = parse("543929578293075482904560982347609823468792", 10);
+    let y = parse("598147578092315980234089723484389243859743", 10);
+    let a = parse("98734435342", 10);
+    let z = parse("325350159908777866468983871740437853305599423427707736569559476320508903561720075798", 10);
+    assert_eq!(truncate_zeros(z), truncate_zeros(bigint_fma(&x, &y, a, Global)));
 }
 
 #[test]
@@ -602,7 +611,7 @@ fn test_div_no_remainder() {
     let mut x = parse("578435387FF0582367863200000000000000000000", 16);
     let y = parse("200000000000000000000", 16);
     let z = parse("2BC21A9C3FF82C11B3C319", 16);
-    let quotient = bigint_div(&mut x, &y, Vec::new());
+    let quotient = bigint_div(&mut x, &y, Vec::new(), Global);
     assert_eq!(Vec::<BlockInt>::new(), truncate_zeros(x));
     assert_eq!(truncate_zeros(z), truncate_zeros(quotient));
 }
@@ -613,7 +622,7 @@ fn test_div_with_remainder() {
     let y = parse("200000000000000000000", 16);
     let z = parse("2BC21A9C3FF82C11B3C319", 16);
     let r = parse("7651437856", 16);
-    let quotient = bigint_div(&mut x, &y, Vec::new());
+    let quotient = bigint_div(&mut x, &y, Vec::new(), Global);
     assert_eq!(truncate_zeros(r), truncate_zeros(x));
     assert_eq!(truncate_zeros(z), truncate_zeros(quotient));
 }
@@ -624,7 +633,7 @@ fn test_div_big() {
     let y = parse("903852718907268716125180964783634518356783568793426834569872365791233387356325", 10);
     let q = parse("643068769934649368349591185247155725", 10);
     let r = parse("265234469040774335115597728873888165088018116561138613092906563355599185141722", 10);
-    let actual = bigint_div(&mut x, &y, Vec::new());
+    let actual = bigint_div(&mut x, &y, Vec::new(), Global);
     assert_eq!(truncate_zeros(r), truncate_zeros(x));
     assert_eq!(truncate_zeros(q), truncate_zeros(actual));
 
@@ -632,7 +641,7 @@ fn test_div_big() {
 	let y = parse("170141183460469231731687303715884105727", 10);
 	let q = parse("680564733841876926926749214863536422916", 10);
 	let r = vec![4];
-	let actual = bigint_div(&mut x, &y, Vec::new());
+	let actual = bigint_div(&mut x, &y, Vec::new(), Global);
 	assert_eq!(truncate_zeros(r), truncate_zeros(x));
     assert_eq!(truncate_zeros(q), truncate_zeros(actual));
 }
@@ -642,7 +651,7 @@ fn test_div_last_block_overflow() {
     let mut x = parse("3227812347608635737069898965003764842912132241036529391038324195675809527521051493287056691600172289294878964965934366720", 10);
     let y = parse("302231454903657293676544", 10);
     let q = parse("10679935179604550411975108530847760573013522611783263849735208039111098628903202750114810434682880", 10);
-    let quotient = bigint_div(&mut x, &y, Vec::new());
+    let quotient = bigint_div(&mut x, &y, Vec::new(), Global);
     assert_eq!(truncate_zeros(q), truncate_zeros(quotient));
     assert_eq!(Vec::<BlockInt>::new(), truncate_zeros(x));
 }

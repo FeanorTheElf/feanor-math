@@ -377,7 +377,7 @@ impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for Box<V> {
     }
 
     unsafe fn at_unchecked(&self, i: usize) -> &T {
-        (**self).at_unchecked(i)
+        unsafe { (**self).at_unchecked(i) }
     }
 
     fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
@@ -398,7 +398,7 @@ impl<T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for Box<V> {
     }
 
     unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
-        (**self).at_unchecked_mut(i)
+        unsafe { (**self).at_unchecked_mut(i) }
     }
 
     fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
@@ -429,7 +429,7 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a V {
     }
 
     unsafe fn at_unchecked(&self, i: usize) -> &T {
-        (**self).at_unchecked(i)
+        unsafe { (**self).at_unchecked(i) }
     }
 
     fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Result<Op::Output<'b>, ()> {
@@ -463,7 +463,7 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a mut V {
     }
 
     unsafe fn at_unchecked(&self, i: usize) -> &T {
-        (**self).at_unchecked(i)
+        unsafe { (**self).at_unchecked(i) }
     }
 
     fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Result<Op::Output<'b>, ()> {
@@ -484,7 +484,7 @@ impl<'a, T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for &'a mut V
     }
 
     unsafe fn at_unchecked_mut(&mut self, i: usize) -> &mut T {
-        (**self).at_unchecked_mut(i)
+        unsafe { (**self).at_unchecked_mut(i) }
     }
 
     fn as_slice_mut<'b>(&'b mut self) -> Option<&'b mut [T]>
@@ -733,7 +733,7 @@ impl<T> VectorView<T> for [T] {
     }
 
     unsafe fn at_unchecked(&self, i: usize) -> &T {
-        self.get_unchecked(i)
+        unsafe { self.get_unchecked(i) }
     }
 
     fn as_slice<'a>(&'a self) -> Option<&'a [T]>
@@ -764,7 +764,7 @@ impl<T> VectorViewMut<T> for [T] {
     }
 
     unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
-        self.get_unchecked_mut(i)
+        unsafe { self.get_unchecked_mut(i) }
     }
 
     fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
@@ -792,7 +792,7 @@ impl<T, A: Allocator> VectorView<T> for Vec<T, A> {
     }
 
     unsafe fn at_unchecked(&self, i: usize) -> &T {
-        self.get_unchecked(i)
+        unsafe { self.get_unchecked(i) }
     }
 
     fn as_slice<'a>(&'a self) -> Option<&'a [T]>
@@ -809,7 +809,7 @@ impl<T, A: Allocator> VectorViewMut<T> for Vec<T, A> {
     }
 
     unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
-        self.get_unchecked_mut(i)
+        unsafe { self.get_unchecked_mut(i) }
     }
 
     fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
@@ -837,7 +837,7 @@ impl<T, const N: usize> VectorView<T> for [T; N] {
     }
 
     unsafe fn at_unchecked(&self, i: usize) -> &T {
-        self.get_unchecked(i)
+        unsafe { self.get_unchecked(i) }
     }
 
     fn as_slice<'a>(&'a self) -> Option<&'a [T]>
@@ -854,7 +854,7 @@ impl<T, const N: usize> VectorViewMut<T> for [T; N] {
     }
 
     unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
-        self.get_unchecked_mut(i)
+        unsafe { self.get_unchecked_mut(i) }
     }
     
     fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>

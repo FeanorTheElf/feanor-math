@@ -239,6 +239,13 @@ pub trait RingBase: PartialEq {
     fn is_neg_one(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.neg_one()) }
 
     ///
+    /// Fused-multiply-add. This computes `summand + lhs * rhs`.
+    /// 
+    fn fma(&self, lhs: &Self::Element, rhs: &Self::Element, summand: Self::Element) -> Self::Element {
+        self.add(summand, self.mul_ref(lhs, rhs))
+    }
+
+    ///
     /// Returns whether the ring is commutative, i.e. `a * b = b * a` for all elements `a, b`.
     /// Note that addition is assumed to be always commutative.
     /// 
@@ -312,6 +319,13 @@ pub trait RingBase: PartialEq {
 
     fn mul_int_ref(&self, lhs: &Self::Element, rhs: i32) -> Self::Element {
         self.mul_int(self.clone_el(lhs), rhs)
+    }
+
+    ///
+    /// Fused-multiply-add with an integer. This computes `summand + lhs * rhs`.
+    /// 
+    fn fma_int(&self, lhs: &Self::Element, rhs: i32, summand: Self::Element) -> Self::Element {
+        self.add(summand, self.mul_int_ref(lhs, rhs))
     }
 
     ///
@@ -655,6 +669,7 @@ pub trait RingStore: Sized {
     delegate!{ RingBase, fn mul_ref_snd(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
     delegate!{ RingBase, fn mul(&self, lhs: El<Self>, rhs: El<Self>) -> El<Self> }
     delegate!{ RingBase, fn square(&self, value: &mut El<Self>) -> () }
+    delegate!{ RingBase, fn fma(&self, lhs: &El<Self>, rhs: &El<Self>, summand: El<Self>) -> El<Self> }
 
     ///
     /// Tries to map the given element into this ring.
@@ -1560,6 +1575,21 @@ pub mod generic_tests {
             }
         }
 
+        // check fma
+        for a in &elements {
+            for b in &elements {
+                for c in &elements {
+                    let actual = ring.fma(a, b, ring.clone_el(c));
+                    let expected = ring.add(ring.mul_ref(a, b), ring.clone_el(c));
+                    assert!(ring.eq_el(&expected, &actual), "FMA failed: fma({}, {}, {}) = {} != {} = ({} * {}) + {}", ring.format(a), ring.format(b), ring.format(c), ring.format(&actual), ring.format(&expected), ring.format_within(a, EnvBindingStrength::Product), ring.format_within(b, EnvBindingStrength::Product), ring.format_within(c, EnvBindingStrength::Sum));
+                }
+
+                let actual = ring.get_ring().fma_int(a, 2, ring.clone_el(b));
+                let expected = ring.get_ring().add(ring.get_ring().add_ref(a, a), ring.clone_el(b));
+                assert!(ring.eq_el(&expected, &actual), "Int-FMA failed: int-fma({}, 2, {}) = {} != {} = ({} * 2) + {}", ring.format(a), ring.format(b), ring.format(&actual), ring.format(&expected), ring.format_within(a, EnvBindingStrength::Product), ring.format_within(b, EnvBindingStrength::Sum));
+            }
+        }
+
         // check powering
         for a in &elements {
             for n in [0, 1, 2, 3, 7, 8] {
@@ -1568,7 +1598,7 @@ pub mod generic_tests {
                 assert!(ring.eq_el(&expected, &actual), "Powering failed: {} * ... * {} = {} != {} = {}^{}", ring.format_within(a, EnvBindingStrength::Product), ring.format_within(a, EnvBindingStrength::Product), ring.format(&expected), ring.format(&actual), ring.format_within(a, EnvBindingStrength::Power), n);
             }
         }
-
+        
         // check characteristic
         let ZZbig = BigIntRing::RING;
         let char = ring.characteristic(&ZZbig).unwrap();

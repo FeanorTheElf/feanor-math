@@ -97,14 +97,14 @@ impl<GuardType: ?Sized> UnsafeAnyFrobeniusDataGuarded<GuardType> {
     #[stability::unstable(feature = "enable")]
     pub unsafe fn from<T>(value: T) -> UnsafeAnyFrobeniusDataGuarded<GuardType> {
         Self {
-            content: UnsafeAny::from(value),
+            content: unsafe { UnsafeAny::from(value) },
             guard: PhantomData
         }
     }
     
     #[stability::unstable(feature = "enable")]
     pub unsafe fn get<'a, T>(&'a self) -> &'a T {
-        self.content.get()
+        unsafe { self.content.get() }
     }
 }
 

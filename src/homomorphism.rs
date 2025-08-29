@@ -98,6 +98,17 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>
     }
 
     ///
+    /// Fused-multiply-add. This computes `lhs * rhs + summand`, where `rhs` is mapped
+    /// into the ring via this homomorphism.
+    /// 
+    /// This is equivalent to, but may be faster than, first mapping the domain
+    /// ring element via this homomorphism, and then using [`RingBase::fma()`].
+    /// 
+    fn fma_map(&self, lhs: &Codomain::Element, rhs: &Domain::Element, summand: Codomain::Element) -> Codomain::Element {
+        self.codomain().add(summand, self.mul_ref_map(lhs, rhs))
+    }
+
+    ///
     /// Multiplies the given element in the codomain ring with an element obtained
     /// by applying this homomorphism to a given element from the domain ring.
     /// 
@@ -421,6 +432,15 @@ pub trait CanHomFrom<S>: RingBase
     fn mul_assign_map_in_ref(&self, from: &S, lhs: &mut Self::Element, rhs: &S::Element, hom: &Self::Homomorphism) {
         self.mul_assign(lhs, self.map_in_ref(from, rhs, hom));
     }
+
+    ///
+    /// Fused-multiply-add. Computes `summand + lhs * rhs`, where `rhs` is mapped into the ring via the homomorphism.
+    /// 
+    fn fma_map_in(&self, from: &S, lhs: &Self::Element, rhs: &S::Element, summand: Self::Element, hom: &Self::Homomorphism) -> Self::Element {
+        let mut lhs_copy = self.clone_el(lhs);
+        self.mul_assign_map_in_ref(from, &mut lhs_copy, rhs, hom);
+        return self.add(lhs_copy, summand);
+    }
 }
 
 ///
@@ -592,12 +612,16 @@ impl<R, S> Homomorphism<R::Type, S::Type> for CanHom<R, S>
         &self.to
     }
 
-    fn mul_assign_map(&self, lhs: &mut <S::Type as RingBase>::Element, rhs: <R::Type as RingBase>::Element) {
+    fn mul_assign_map(&self, lhs: &mut El<S>, rhs: El<R>) {
         self.to.get_ring().mul_assign_map_in(self.from.get_ring(), lhs, rhs, &self.data);
     }
 
-    fn mul_assign_ref_map(&self, lhs: &mut <S::Type as RingBase>::Element, rhs: &<R::Type as RingBase>::Element) {
+    fn mul_assign_ref_map(&self, lhs: &mut El<S>, rhs: &El<R>) {
         self.to.get_ring().mul_assign_map_in_ref(self.from.get_ring(), lhs, rhs, &self.data);
+    }
+
+    fn fma_map(&self, lhs: &El<S>, rhs: &El<R>, summand: El<S>) -> El<S> {
+        self.to.get_ring().fma_map_in(self.from.get_ring(), lhs, rhs, summand, &self.data)
     }
 }
 
@@ -670,6 +694,18 @@ impl<'a, R, S> Homomorphism<R::Type, S::Type> for CanHomRef<'a, R, S>
 
     fn codomain(&self) -> &S {
         &self.to
+    }
+
+    fn mul_assign_map(&self, lhs: &mut El<S>, rhs: El<R>) {
+        self.to.get_ring().mul_assign_map_in(self.from.get_ring(), lhs, rhs, &self.data);
+    }
+
+    fn mul_assign_ref_map(&self, lhs: &mut El<S>, rhs: &El<R>) {
+        self.to.get_ring().mul_assign_map_in_ref(self.from.get_ring(), lhs, rhs, &self.data);
+    }
+
+    fn fma_map(&self, lhs: &El<S>, rhs: &El<R>, summand: El<S>) -> El<S> {
+        self.to.get_ring().fma_map_in(self.from.get_ring(), lhs, rhs, summand, &self.data)
     }
 }
 
@@ -773,7 +809,7 @@ impl<R, S> CanIso<R, S>
     }
 }
 
-impl<R, S> Homomorphism<S::Type,R::Type> for CanIso<R, S>
+impl<R, S> Homomorphism<S::Type, R::Type> for CanIso<R, S>
     where R: RingStore, S: RingStore, S::Type: CanIsoFromTo<R::Type>
 {
     type DomainStore = S;
@@ -910,16 +946,20 @@ impl<R> Homomorphism<StaticRingBase<i32>, R::Type> for IntHom<R>
         &self.ring
     }
 
-    fn map(&self, x: i32) -> <R::Type as RingBase>::Element {
+    fn map(&self, x: i32) -> El<R> {
         self.ring.get_ring().from_int(x)
     }
 
-    fn mul_assign_map(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: i32) {
+    fn mul_assign_map(&self, lhs: &mut El<R>, rhs: i32) {
         self.ring.get_ring().mul_assign_int(lhs, rhs)
     }
 
-    fn mul_assign_ref_map(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: &<StaticRingBase<i32> as RingBase>::Element) {
+    fn mul_assign_ref_map(&self, lhs: &mut El<R>, rhs: &<StaticRingBase<i32> as RingBase>::Element) {
         self.mul_assign_map(lhs, *rhs)
+    }
+
+    fn fma_map(&self, lhs: &El<R>, rhs: &i32, summand: El<R>) -> El<R> {
+        self.ring.get_ring().fma_int(lhs, *rhs, summand)
     }
 }
 
@@ -984,6 +1024,10 @@ impl<R: RingStore> Homomorphism<R::Type, R::Type> for Identity<R> {
     fn mul_assign_ref_map_through_hom<First: ?Sized + RingBase, H: Homomorphism<First, R::Type>>(&self, lhs: &mut <R::Type as RingBase>::Element, rhs: &First::Element, hom: H) {
         hom.mul_assign_ref_map(lhs, rhs);
     }
+
+    fn fma_map(&self, lhs: &<R::Type as RingBase>::Element, rhs: &<R::Type as RingBase>::Element, summand: <R::Type as RingBase>::Element) -> <R::Type as RingBase>::Element {
+        self.ring.get_ring().fma(lhs, rhs, summand)
+    }
 }
 
 impl<'a, S, R, H> Homomorphism<S, R> for &'a H 
@@ -1014,6 +1058,10 @@ impl<'a, S, R, H> Homomorphism<S, R> for &'a H
 
     fn mul_assign_ref_map(&self, lhs: &mut <R as RingBase>::Element, rhs: &<S as RingBase>::Element) {
         (*self).mul_assign_ref_map(lhs, rhs)
+    }
+
+    fn fma_map(&self, lhs: &<R as RingBase>::Element, rhs: &<S as RingBase>::Element, summand: <R as RingBase>::Element) -> <R as RingBase>::Element {
+        (*self).fma_map(lhs, rhs, summand)
     }
 }
 
@@ -1205,6 +1253,10 @@ impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
 
     fn mul_assign_ref_map(&self, lhs: &mut <T as RingBase>::Element, rhs: &<R as RingBase>::Element) {
         self.g.mul_assign_ref_map_through_hom(lhs, rhs, &self.f)
+    }
+
+    fn fma_map(&self, lhs: &<T as RingBase>::Element, rhs: &<R as RingBase>::Element, summand: <T as RingBase>::Element) -> <T as RingBase>::Element {
+        self.g.fma_map(lhs, &self.f.map_ref(rhs), summand)
     }
 }
 

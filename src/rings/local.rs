@@ -86,8 +86,8 @@ impl<R> AsLocalPIR<R>
     #[stability::unstable(feature = "enable")]
     pub fn from_zn(ring: R) -> Option<Self> {
         let (p, e) = is_prime_power(ring.integer_ring(), ring.modulus())?;
-        let gen = ring.can_hom(ring.integer_ring()).unwrap().map(p);
-        Some(Self::from(AsLocalPIRBase::promise_is_local_pir(ring, gen, Some(e))))
+        let g = ring.can_hom(ring.integer_ring()).unwrap().map(p);
+        Some(Self::from(AsLocalPIRBase::promise_is_local_pir(ring, g, Some(e))))
     }
 }
 

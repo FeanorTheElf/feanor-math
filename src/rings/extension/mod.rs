@@ -481,7 +481,7 @@ pub fn create_multiplication_matrix<R: FreeAlgebraStore, A: Allocator>(ring: R, 
 {
     let mut result = OwnedMatrix::zero_in(ring.rank(), ring.rank(), ring.base_ring(), allocator);
     let mut current = ring.clone_el(el);
-    let gen = ring.canonical_gen();
+    let g = ring.canonical_gen();
     for i in 0..ring.rank() {
         {
             let current_basis_repr = ring.wrt_canonical_basis(&current);
@@ -489,7 +489,7 @@ pub fn create_multiplication_matrix<R: FreeAlgebraStore, A: Allocator>(ring: R, 
                 *result.at_mut(j, i) = current_basis_repr.at(j);
             }
         }
-        ring.mul_assign_ref(&mut current, &gen);
+        ring.mul_assign_ref(&mut current, &g);
     }
     return result;
 }
