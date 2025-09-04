@@ -589,6 +589,14 @@ impl<R: RingStore> MultGroup<R>
             None
         }
     }
+
+    ///
+    /// Returns the ring element represented by the given group element.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    pub fn as_ring_el<'a>(&self, x: &'a MultGroupEl<R>) -> &'a El<R> {
+        &x.0
+    }
 }
 
 impl<R: RingStore> DlogCapableGroup for MultGroup<R> 
