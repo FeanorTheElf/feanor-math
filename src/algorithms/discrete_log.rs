@@ -35,6 +35,7 @@ use crate::RANDOM_TEST_INSTANCE_COUNT;
 
 use std::alloc::Global;
 use std::array::from_fn;
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::collections::HashMap;
 use std::hash::Hasher;
@@ -532,6 +533,44 @@ impl<G: DlogCapableGroup, const N: usize> DlogCapableGroup for ProdGroup<G, N> {
     fn op(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element { 
         let mut it = lhs.into_iter().zip(rhs.into_iter()).map(|(l, r)| self.0.op(l, r));
         return from_fn(|_| it.next().unwrap());
+    }
+}
+
+impl<R: RingStore> Clone for MultGroup<R> 
+    where R: Clone, R::Type: HashableElRing + DivisibilityRing
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<R: RingStore> Copy for MultGroup<R> 
+    where R: Copy, R::Type: HashableElRing + DivisibilityRing
+{}
+
+impl<R: RingStore> Debug for MultGroup<R> 
+    where R::Type: Debug + HashableElRing + DivisibilityRing
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({:?})*", self.0.get_ring())
+    }
+}
+
+impl<R: RingStore> Clone for MultGroupEl<R> 
+    where R::Type: HashableElRing + DivisibilityRing,
+        El<R>: Clone
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<R: RingStore> Debug for MultGroupEl<R> 
+    where R::Type: HashableElRing + DivisibilityRing,
+        El<R>: Debug
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
     }
 }
 
