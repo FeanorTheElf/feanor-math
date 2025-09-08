@@ -294,6 +294,14 @@ impl<R: RingStore> AddGroup<R>
     }
 }
 
+impl<R: RingStore + Clone> Clone for AddGroupBase<R>
+    where R::Type: HashableElRing
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
 impl<R: RingStore> PartialEq for MultGroupBase<R> 
     where R::Type: HashableElRing + DivisibilityRing
 {
