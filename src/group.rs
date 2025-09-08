@@ -248,6 +248,7 @@ pub type AddGroup<R: RingStore> = GroupValue<AddGroupBase<R>>;
 /// The multiplicative group of a ring, implements [`AbelianGroupBase`].
 /// 
 #[stability::unstable(feature = "enable")]
+#[derive(Serialize, Deserialize)]
 pub struct MultGroupBase<R: RingStore>(R);
 
 ///
