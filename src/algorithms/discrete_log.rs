@@ -409,11 +409,11 @@ impl<G: AbelianGroupStore> Subgroup<G> {
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn enumerate_elements<'a>(&'a self, group: &'a G) -> impl use<'a, G> + Clone + Iterator<Item = GroupEl<G>> {
+    pub fn enumerate_elements<'a>(&'a self) -> impl use<'a, G> + Clone + Iterator<Item = GroupEl<G>> {
         multi_cartesian_product(
             (0..self.order_factorization.len()).map(|i| self.padic_enumerate_elements(i)),
-            |elements| elements.iter().fold(group.identity(), |current, next| group.op_ref_snd(current, next)),
-            |_, x| group.clone_el(x)
+            |elements| elements.iter().fold(self.parent().identity(), |current, next| self.parent().op_ref_snd(current, next)),
+            |_, x| self.parent().clone_el(x)
         )
     }
 
@@ -1022,7 +1022,7 @@ fn test_enumerate_elements() {
     let group = AddGroup::new(ring);
 
     let subgroup = Subgroup::new(group, int_cast(45, ZZbig, ZZ), vec![9, 15]);
-    let mut elements = subgroup.enumerate_elements(subgroup.parent()).collect::<Vec<_>>();
+    let mut elements = subgroup.enumerate_elements().collect::<Vec<_>>();
     elements.sort_unstable();
     assert_eq!((0..45).step_by(3).collect::<Vec<_>>(), elements);
 }
