@@ -33,7 +33,7 @@ bytemuck = { version = "1.16.3" }
 serde_assert = { version = "0.8.0", optional = true }
 rayon = { version = "1.8.0", optional = true }
 ndarray = { version = "0.15.6", optional = true }
-feanor-serde = "0.1.0"
+feanor-serde = "0.1.5"
 
 [dev-dependencies]
 debugit = "0.2.0"

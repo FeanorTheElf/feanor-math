@@ -2,11 +2,16 @@ use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
+use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNewtypeStruct};
+use serde::de::DeserializeSeed;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 use crate::algorithms::sqr_mul::generic_abs_square_and_multiply;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::integer::BigIntRing;
 use crate::ring::*;
 use crate::ordered::OrderedRingStore;
+use crate::serialization::{DeserializeWithRing, SerializableElementRing, SerializeWithRing};
 
 ///
 /// Trait for implementations of generic abelian groups, for which only
@@ -176,12 +181,13 @@ impl<G> AbelianGroupStore for G
 /// 
 #[stability::unstable(feature = "enable")]
 #[repr(transparent)]
+#[derive(Serialize, Deserialize)]
 pub struct GroupValue<G: AbelianGroupBase> {
     group: G
 }
 
 impl<G: AbelianGroupBase> From<G> for GroupValue<G> {
-    
+
     fn from(value: G) -> Self {
         Self { group: value }
     }
@@ -189,6 +195,11 @@ impl<G: AbelianGroupBase> From<G> for GroupValue<G> {
 
 impl<G: AbelianGroupBase + Sized> GroupValue<G> {
     
+    #[stability::unstable(feature = "enable")]
+    pub fn into(self) -> G {
+        self.group
+    }
+
     #[stability::unstable(feature = "enable")]
     pub fn from_ref<'a>(group: &'a G) -> &'a Self {
         unsafe { std::mem::transmute(group) }
@@ -301,6 +312,22 @@ impl<R: RingStore> AbelianGroupBase for MultGroupBase<R>
     fn identity(&self) -> Self::Element { MultGroupEl(self.0.one()) }
     fn hash<H: Hasher>(&self, x: &Self::Element, hasher: &mut H) { self.0.hash(&x.0, hasher) }
     fn op(&self, lhs: Self::Element, rhs: Self::Element) -> Self::Element { MultGroupEl(self.0.mul(lhs.0, rhs.0)) }
+}
+
+impl<R: RingStore> SerializableElementGroup for MultGroupBase<R> 
+    where R::Type: HashableElRing + DivisibilityRing + SerializableElementRing
+{
+    fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        SerializableNewtypeStruct::new("MultGroupEl", SerializeWithRing::new(&el.0, &self.0)).serialize(serializer)
+    }
+
+    fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
+        where D: Deserializer<'de>
+    {
+        DeserializeSeedNewtypeStruct::new("MultGroupEl", DeserializeWithRing::new(&self.0)).deserialize(deserializer).map(|x| MultGroupEl(x))
+    }
 }
 
 impl<R: RingStore> Clone for MultGroupBase<R> 
@@ -433,5 +460,125 @@ impl<G: AbelianGroupStore> Eq for HashableGroupEl<G> {}
 impl<G: AbelianGroupStore> Hash for HashableGroupEl<G> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.group.hash(&self.el, state)
+    }
+}
+
+///
+/// Trait for rings whose elements can be serialized.
+/// 
+/// Serialization and deserialization mostly follow the principles of the `serde` crate, with
+/// the main difference that ring elements cannot be serialized/deserialized on their own, but
+/// only w.r.t. a specific ring.
+/// 
+#[stability::unstable(feature = "enable")]
+pub trait SerializableElementGroup: AbelianGroupBase {
+
+    ///
+    /// Deserializes an element of this ring from the given deserializer.
+    /// 
+    fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
+        where D: Deserializer<'de>;
+
+    ///
+    /// Serializes an element of this ring to the given serializer.
+    /// 
+    fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer;
+}
+
+///
+/// Wrapper of a group that implements [`serde::DeserializationSeed`] by trying to deserialize
+/// an element w.r.t. the wrapped group.
+/// 
+#[stability::unstable(feature = "enable")]
+#[derive(Clone)]
+pub struct DeserializeWithGroup<G: AbelianGroupStore>
+    where G::Type: SerializableElementGroup
+{
+    group: G
+}
+
+impl<G> DeserializeWithGroup<G>
+    where G: AbelianGroupStore,
+        G::Type: SerializableElementGroup
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(group: G) -> Self {
+        Self { group }
+    }
+}
+
+impl<'de, G> DeserializeSeed<'de> for DeserializeWithGroup<G>
+    where G: AbelianGroupStore,
+        G::Type: SerializableElementGroup
+{
+    type Value = GroupEl<G>;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where D: Deserializer<'de>
+    {
+        self.group.get_group().deserialize(deserializer)
+    }
+}
+
+///
+/// Wraps a group and a reference to one of its elements. Implements [`serde::Serialize`]
+/// and will serialize the element w.r.t. the group.
+/// 
+#[stability::unstable(feature = "enable")]
+pub struct SerializeWithGroup<'a, G: AbelianGroupStore>
+    where G::Type: SerializableElementGroup
+{
+    group: G,
+    el: &'a GroupEl<G>
+}
+
+impl<'a, G: AbelianGroupStore> SerializeWithGroup<'a, G>
+    where G::Type: SerializableElementGroup
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(el: &'a GroupEl<G>, group: G) -> Self {
+        Self { el, group }
+    }
+}
+
+impl<'a, G: AbelianGroupStore> Serialize for SerializeWithGroup<'a, G>
+    where G::Type: SerializableElementGroup
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        self.group.get_group().serialize(self.el, serializer)
+    }
+}
+
+///
+/// Wraps a ring and a one of its elements. Implements [`serde::Serialize`] and
+/// will serialize the element w.r.t. the ring.
+/// 
+#[stability::unstable(feature = "enable")]
+pub struct SerializeOwnedWithGroup<G: AbelianGroupStore>
+    where G::Type: SerializableElementGroup
+{
+    group: G,
+    el: GroupEl<G>
+}
+
+impl<G: AbelianGroupStore> SerializeOwnedWithGroup<G>
+    where G::Type: SerializableElementGroup
+{
+    #[stability::unstable(feature = "enable")]
+    pub fn new(el: GroupEl<G>, group: G) -> Self {
+        Self { el, group }
+    }
+}
+
+impl<G: AbelianGroupStore> Serialize for SerializeOwnedWithGroup<G>
+    where G::Type: SerializableElementGroup
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        self.group.get_group().serialize(&self.el, serializer)
     }
 }

@@ -1,10 +1,8 @@
 
-use crate::algorithms::eea::inv_crt;
-use crate::algorithms::eea::signed_gcd;
+use crate::algorithms::eea::{inv_crt, signed_gcd};
 use crate::algorithms::int_bisect::root_floor;
 use crate::algorithms::int_factor::factor;
-use crate::algorithms::linsolve::smith::determinant_using_pre_smith;
-use crate::algorithms::linsolve::smith::pre_smith;
+use crate::algorithms::linsolve::smith::{determinant_using_pre_smith, pre_smith};
 use crate::algorithms::linsolve::LinSolveRingStore;
 use crate::algorithms::lll::exact::lll;
 use crate::algorithms::matmul::MatmulAlgorithm;
@@ -22,12 +20,7 @@ use crate::field::FieldStore;
 use crate::homomorphism::Homomorphism;
 use crate::integer::int_cast;
 use crate::integer::BigIntRing;
-use crate::matrix::AsPointerToSlice;
-use crate::matrix::OwnedMatrix;
-use crate::matrix::Submatrix;
-use crate::matrix::SubmatrixMut;
-use crate::matrix::TransposableSubmatrix;
-use crate::matrix::TransposableSubmatrixMut;
+use crate::matrix::*;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::rational::RationalField;
@@ -35,10 +28,18 @@ use crate::ordered::OrderedRingStore;
 use crate::rings::zn::ZnRingStore;
 use crate::rings::zn::zn_big;
 use crate::rings::zn::ZnRing;
-use crate::seq::VectorView;
+use crate::serialization::{DeserializeWithRing, SerializeWithRing};
+
+use serde::{Deserialize, Serialize};
+use feanor_serde::dependent_tuple::DeserializeSeedDependentTuple;
+use feanor_serde::impl_deserialize_seed_for_dependent_struct;
+use feanor_serde::map::DeserializeSeedMapped;
+use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNewtypeStruct};
+use feanor_serde::seq::{DeserializeSeedSeq, SerializableSeq};
 
 use std::alloc::Global;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::mem::replace;
 use std::rc::Rc;
 
@@ -461,6 +462,61 @@ impl<G: AbelianGroupStore> Subgroup<G> {
         let result = OwnedMatrix::from_fn(n, n, |i, j| as_ZZ(result_QQ.at(i, j)));
 
         return result;
+    }
+}
+
+impl<G: AbelianGroupStore + Serialize> Serialize for Subgroup<G>
+    where G::Type: SerializableElementGroup
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: serde::Serializer
+    {
+        #[derive(Serialize)]
+        struct SubgroupData<'a, Gens: Serialize> {
+            order_multiple: SerializeWithRing<'a, BigIntRing>,
+            generators: Gens,
+            group: ()
+        }
+        SerializableNewtypeStruct::new("Subgroup", (self.parent(), SubgroupData {
+            order_multiple: SerializeWithRing::new(&self.order_multiple, ZZbig), 
+            generators: SerializableSeq::new(self.generators.iter().map(|g| SerializeWithGroup::new(g, self.parent()))),
+            group: ()
+        })).serialize(serializer)
+    }
+}
+
+impl<'de, G: AbelianGroupStore + Clone + Deserialize<'de>> Deserialize<'de> for Subgroup<G>
+    where G::Type: SerializableElementGroup
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where  D: serde::Deserializer<'de>
+    {
+        use serde::de::DeserializeSeed;
+
+        struct DeserializeSeedSubgroupData<G: AbelianGroupStore>
+            where G::Type: SerializableElementGroup
+        {
+            group: G
+        }
+
+        impl_deserialize_seed_for_dependent_struct!{
+            <{ 'de, G }> pub struct SubgroupData<{'de, G}> using DeserializeSeedSubgroupData<G> {
+                order_multiple: El<BigIntRing>: |_| DeserializeWithRing::new(ZZbig),
+                generators: Vec<GroupEl<G>>: |master: &DeserializeSeedSubgroupData<G>| {
+                    let group_clone = master.group.clone();
+                    DeserializeSeedSeq::new((0..).map(move |_| DeserializeWithGroup::new(group_clone.clone())), Vec::new(), |mut current, next| { current.push(next); current })
+                },
+                group: G: |master: &DeserializeSeedSubgroupData<G>| {
+                    let group_clone = master.group.clone();
+                    DeserializeSeedMapped::new(PhantomData::<()>, move |()| group_clone)
+                }
+            } where G: AbelianGroupStore + Clone, G::Type: SerializableElementGroup
+        }
+
+        DeserializeSeedNewtypeStruct::new("Subgroup", DeserializeSeedDependentTuple::new(
+            PhantomData::<G>,
+            |group| DeserializeSeedSubgroupData { group }
+        )).deserialize(deserializer).map(|data| Subgroup::new(data.group, data.order_multiple, data.generators))
     }
 }
 

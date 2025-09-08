@@ -26,7 +26,6 @@ pub trait SerializableElementRing: RingBase {
         where S: Serializer;
 }
 
-
 ///
 /// Wrapper of a ring that implements [`serde::DeserializationSeed`] by trying to deserialize an element
 /// w.r.t. the wrapped ring.

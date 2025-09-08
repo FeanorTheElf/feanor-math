@@ -113,7 +113,7 @@ checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
 
 [[package]]
 name = "feanor-math"
-version = "3.4.11"
+version = "3.4.10"
 dependencies = [
  "append-only-vec",
  "atomicbox",
@@ -145,9 +145,9 @@ dependencies = [
 
 [[package]]
 name = "feanor-serde"
-version = "0.1.3"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f7b735c00dfdbcd8187db2acb62637dae8963f637fe28a4ee7348f0d9abb70d"
+checksum = "71fa2c7f5c1d04782a554cc8c74e5936d8316463c9c32c9f6e622b354a845ca3"
 dependencies = [
  "serde",
 ]
