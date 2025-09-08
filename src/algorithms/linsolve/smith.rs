@@ -1,11 +1,14 @@
 use std::alloc::Allocator;
 use std::cmp::min;
+
 use crate::algorithms::linsolve::SolveResult;
 use crate::divisibility::*;
 use crate::matrix::*;
 use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
 use crate::ring::*;
 use crate::pid::PrincipalIdealRing;
+
+use transform::TransformList;
 
 ///
 /// Transforms `A` into `A'` via transformations `L, R` such that
@@ -130,7 +133,10 @@ pub fn determinant_using_pre_smith<R, V, A>(ring: R, mut matrix: SubmatrixMut<V,
     let mut unit_part_rows = ring.one();
     let mut unit_part_cols = ring.one();
     pre_smith(ring, &mut DetUnit { current_unit: &mut unit_part_rows }, &mut DetUnit { current_unit: &mut unit_part_cols }, matrix.reborrow());
-    return ring.prod((0..matrix.row_count()).map(|i| ring.clone_el(matrix.at(i, i))).chain([unit_part_rows, unit_part_cols].into_iter()));
+    return ring.checked_div(
+        &ring.prod((0..matrix.row_count()).map(|i| ring.clone_el(matrix.at(i, i)))),
+        &ring.prod([unit_part_rows, unit_part_cols])
+    ).unwrap();
 }
 
 struct DetUnit<'a, R: ?Sized + RingBase> {
@@ -149,7 +155,8 @@ impl<'a, R> TransformTarget<R> for DetUnit<'a, R>
     }
 
     fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, _i: usize, _j: usize, transform: &[<R as RingBase>::Element; 4]) {
-        ring.mul_assign(&mut self.current_unit, ring.sub(ring.mul_ref(&transform[0], &transform[3]), ring.mul_ref(&transform[1], &transform[2])));
+        let unit = ring.sub(ring.mul_ref(&transform[0], &transform[3]), ring.mul_ref(&transform[1], &transform[2]));
+        ring.mul_assign(&mut self.current_unit, unit);
     }
 }
 
@@ -177,7 +184,6 @@ use crate::algorithms::matmul::ComputeInnerProduct;
 use std::alloc::Global;
 #[cfg(test)]
 use test::Bencher;
-use transform::TransformList;
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
 #[cfg(test)]
@@ -334,6 +340,48 @@ fn test_determinant() {
         3
     );
     assert_el_eq!(ring, (7 + 48 - 27), determinant_using_pre_smith(ring, A.clone_matrix(&ring).data_mut(), Global));
+    
+    // we need a ring that has units of order > 2 to test whether an inversion is necessary for
+    // the accumulated determinant units
+    #[derive(PartialEq, Clone, Copy)]
+    struct TestRing;
+    use crate::delegate::DelegateRing;
+    impl DelegateRing for TestRing {
+        type Base = zn_static::ZnBase<45, false>;
+        type Element = u64;
+
+        fn get_delegate(&self) -> &Self::Base { zn_static::Zn::RING.get_ring() }
+        fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+        fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
+        fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
+        fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
+    }
+    impl PrincipalIdealRing for TestRing {
+
+        fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+            self.get_delegate().extended_ideal_gen(lhs, rhs)
+        }
+
+        fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+            self.get_delegate().checked_div_min(lhs, rhs)
+        }
+
+        fn create_elimination_matrix(&self, a: &Self::Element, b: &Self::Element) -> ([Self::Element; 4], Self::Element) {
+            assert_eq!(9, *a);
+            assert_eq!(15, *b);
+            assert_eq!(3, self.add(self.mul(42, *a), self.mul(2, *b)));
+            assert_eq!(0, self.add(self.mul(5, *a), self.mul(3, *b)));
+            return ([42, 2, 10, 6], 3);
+        }
+    }
+
+    let ring = RingValue::from(TestRing);
+    let A = OwnedMatrix::new(
+        vec![ 9, 0, 
+                   15, 3],
+        2
+    );
+    assert_el_eq!(ring, 27, determinant_using_pre_smith(ring, A.clone_matrix(&ring).data_mut(), Global));
 }
 
 #[test]
