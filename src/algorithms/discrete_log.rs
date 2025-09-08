@@ -9,11 +9,14 @@ use crate::algorithms::linsolve::LinSolveRingStore;
 use crate::algorithms::lll::exact::lll;
 use crate::algorithms::matmul::MatmulAlgorithm;
 use crate::algorithms::matmul::STANDARD_MATMUL;
-use crate::algorithms::sqr_mul::generic_abs_square_and_multiply;
 use crate::divisibility::DivisibilityRing;
 use crate::divisibility::DivisibilityRingStore;
+use crate::group::*;
+use crate::group::HashableGroupEl;
+use crate::group::MultGroup;
 use crate::iters::multi_cartesian_product;
 use crate::matrix::transform::TransformTarget;
+use crate::pid::PrincipalIdealRingStore;
 use crate::rings::finite::FiniteRingStore;
 use crate::field::FieldStore;
 use crate::homomorphism::Homomorphism;
@@ -33,61 +36,17 @@ use crate::rings::zn::ZnRingStore;
 use crate::rings::zn::zn_big;
 use crate::rings::zn::ZnRing;
 use crate::seq::VectorView;
-#[cfg(test)]
-use crate::RANDOM_TEST_INSTANCE_COUNT;
 
 use std::alloc::Global;
-use std::array::from_fn;
-use std::fmt::Debug;
-use std::hash::Hash;
 use std::collections::HashMap;
-use std::hash::Hasher;
 use std::mem::replace;
+use std::rc::Rc;
 
 const ZZ: StaticRing<i64> = StaticRing::<i64>::RING;
 const ZZbig: BigIntRing = BigIntRing::RING;
 
 ///
-/// Trait for implementations of generic groups, for which only the group operation,
-/// equality testing and computing hash values is supported.
-/// 
-/// These groups from the model for which most dlog algorithms have been developed.
-/// Note that if your group is actually the additive group of a ring, it is very
-/// likely that you can solve dlog much more efficiently by using [`crate::algorithms::linsolve`].
-/// 
-/// The design of this trait is a little bit like [`crate::ring::RingBase`], but
-/// since it is only used locally, it is much less sophisticated.
-/// 
-#[stability::unstable(feature = "enable")]
-pub trait DlogCapableGroup {
-    type Element;
-
-    fn clone_el(&self, x: &Self::Element) -> Self::Element;
-    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool;
-    fn op(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element;
-    fn inv(&self, x: &Self::Element) -> Self::Element;
-    fn identity(&self) -> Self::Element;
-    fn hash<H: Hasher>(&self, x: &Self::Element, hasher: &mut H);
-
-    fn pow(&self, x: &Self::Element, e: i64) -> Self::Element {
-        let res = generic_abs_square_and_multiply(
-            self.clone_el(x), 
-            &e, 
-            ZZ, 
-            |a| self.op(self.clone_el(&a), &a), 
-            |a, b| self.op(b, &a), 
-            self.identity()
-        );
-        if e >= 0 { res } else { self.inv(&res) }
-    }
-
-    fn is_identity(&self, x: &Self::Element) -> bool {
-        self.eq_el(x, &self.identity())
-    }
-}
-
-///
-/// Represents a subgroup of a [`DlogCapableGroup`] by a set of generators.
+/// Represents a subgroup of an [`AbelianGroupBase`] by a set of generators.
 /// Supports computing discrete logarithms, i.e. representing a given element
 /// as a combination of the generators.
 /// 
@@ -97,8 +56,9 @@ pub trait DlogCapableGroup {
 /// are used.
 /// 
 #[stability::unstable(feature = "enable")]
-pub struct GeneratingSet<G: DlogCapableGroup> {
-    generators: Vec<G::Element>,
+pub struct Subgroup<G: AbelianGroupStore> {
+    parent: G,
+    generators: Vec<GroupEl<G>>,
     order_multiple: El<BigIntRing>,
     order_factorization: Vec<(i64, usize)>,
     /// the `(i, j)`-th entry has rows that form a basis of the relation lattice of
@@ -109,10 +69,10 @@ pub struct GeneratingSet<G: DlogCapableGroup> {
     /// `row` is the `k`-th row of `scaled_relation_lattice[i, j]`; These values
     /// are important, since they form a basis of the `p`-torsion subgroup of
     /// `< n/pi^(j + 1) g1, ..., n/pi^(j + 1) gk >`
-    scaled_generating_sets: Vec<Vec<Vec<G::Element>>>
+    scaled_generating_sets: Vec<Vec<Vec<GroupEl<G>>>>
 }
 
-impl<G: DlogCapableGroup> GeneratingSet<G> {
+impl<G: AbelianGroupStore> Subgroup<G> {
 
     ///
     /// Creates a new [`GeneratingSet`] representing the subgroup generated
@@ -123,10 +83,11 @@ impl<G: DlogCapableGroup> GeneratingSet<G> {
     /// [`GeneratingSet::add_generator()`].
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn new(group: &G, order_multiple: El<BigIntRing>, generators: Vec<G::Element>) -> Self {
+    pub fn new(group: G, order_multiple: El<BigIntRing>, generators: Vec<GroupEl<G>>) -> Self {
         let n = generators.len();
         if n == 0 {
             return Self {
+                parent: group,
                 generators: Vec::new(),
                 order_multiple: ZZbig.clone_el(&order_multiple),
                 order_factorization: factor(ZZbig, order_multiple).into_iter().map(|(p, e)| (int_cast(p, ZZ, ZZbig), e)).collect(),
@@ -136,10 +97,15 @@ impl<G: DlogCapableGroup> GeneratingSet<G> {
         } else {
             let mut result = Self::new(group, order_multiple, Vec::new());
             for g in generators {
-                result = result.add_generator(group, g);
+                result = result.add_generator(g);
             }
             return result;
         }
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn parent(&self) -> &G {
+        &self.parent
     }
 
     ///
@@ -177,27 +143,37 @@ impl<G: DlogCapableGroup> GeneratingSet<G> {
     }
 
     ///
+    /// Returns a set of generators of this subgroup.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    pub fn generators(&self) -> &[GroupEl<G>] {
+        &self.generators
+    }
+
+    ///
     /// Extends the generating set by an additional generator, which is likely
     /// to grow the represented subgroup.
     /// 
     /// The new generator must be of order dividing [`GeneratingSet::order_multiple()`].
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn add_generator(&self, group: &G, new_gen_base: G::Element) -> Self {
-        assert!(group.is_identity(&group.pow(&new_gen_base, int_cast(ZZbig.clone_el(&self.order_multiple), ZZ, ZZbig))));
+    pub fn add_generator(self, new_gen_base: GroupEl<G>) -> Self {
+        let group = &self.parent;
+        assert!(group.is_identity(&group.pow(&new_gen_base, &self.order_multiple)));
+        let ZZ_to_ZZbig = ZZbig.can_hom(&ZZ).unwrap();
 
         let mut scaled_relation_lattices = Vec::new();
         let mut scaled_generating_sets = Vec::new();
         for p_idx in 0..self.order_factorization.len() {
             
             let (p, e) = self.order_factorization[p_idx];
+            let p_bigint = ZZ_to_ZZbig.map(p);
             let power = ZZbig.checked_div(
                 &self.order_multiple, 
-                &ZZbig.pow(int_cast(p, ZZbig, ZZ), e)
+                &ZZbig.pow(ZZbig.clone_el(&p_bigint), e)
             ).unwrap();
-            let power = int_cast(power, ZZ, ZZbig);
-            let gens = self.generators.iter().map(|g| group.pow(g, power)).collect::<Vec<_>>();
-            let new_gen = group.pow(&new_gen_base, power);
+            let gens = self.generators.iter().map(|g| group.pow(g, &power)).collect::<Vec<_>>();
+            let new_gen = group.pow(&new_gen_base, &power);
             
             let n = self.generators.len();
 
@@ -209,7 +185,7 @@ impl<G: DlogCapableGroup> GeneratingSet<G> {
             }
             *main_relation_matrix.at_mut(n, n) = -ZZ.pow(p, e);
             for k in 0..e {
-                if let Some(dlog) = self.padic_dlog(group, p_idx, e, &group.pow(&new_gen, ZZ.pow(p, k))) {
+                if let Some(dlog) = self.padic_dlog(p_idx, e, &group.pow(&new_gen, &ZZbig.pow(ZZbig.clone_el(&p_bigint), k))) {
                     *main_relation_matrix.at_mut(n, n) = -ZZ.pow(p, k);
                     for j in 0..n {
                         *main_relation_matrix.at_mut(n, j) = dlog[j];
@@ -218,7 +194,7 @@ impl<G: DlogCapableGroup> GeneratingSet<G> {
                 }
             }
             debug_assert!(main_relation_matrix.data().row_iter().all(|row| group.is_identity(
-                &(0..n).fold(group.pow(&new_gen, row[n]), |current, i| group.op(current, &group.pow(&gens[i], row[i])))
+                &(0..n).fold(group.pow(&new_gen, &ZZ_to_ZZbig.map(row[n])), |current, i| group.op(current, group.pow(&gens[i], &ZZ_to_ZZbig.map(row[i]))))
             )));
 
             let mut result = Vec::with_capacity(e + 1);
@@ -232,10 +208,11 @@ impl<G: DlogCapableGroup> GeneratingSet<G> {
             let mut generating_sets = Vec::new();
             for i in 0..e {
                 let generating_set = scaled_relation_lattices.last().unwrap()[i].data().row_iter().map(|row| {
-                    let result = (0..n).fold(group.pow(&new_gen, row[n] * ZZ.pow(p, e - i - 1)), |current, j| 
-                        group.op(current, &group.pow(&gens[j], row[j] * ZZ.pow(p, e - i - 1)))
+                    let scale = ZZbig.pow(ZZbig.clone_el(&p_bigint), e - i - 1);
+                    let result = (0..n).fold(group.pow(&new_gen, &ZZ_to_ZZbig.mul_ref_map(&scale, &row[n])), |current, j| 
+                        group.op(current, group.pow(&gens[j], &ZZ_to_ZZbig.mul_ref_map(&scale, &row[j])))
                     );
-                    debug_assert!(group.is_identity(&group.pow(&result, p)));
+                    debug_assert!(group.is_identity(&group.pow(&result, &p_bigint)));
                     result
                 }).collect::<Vec<_>>();
                 generating_sets.push(generating_set);
@@ -248,7 +225,8 @@ impl<G: DlogCapableGroup> GeneratingSet<G> {
             order_multiple: ZZbig.clone_el(&self.order_multiple),
             order_factorization: self.order_factorization.clone(),
             scaled_generating_sets: scaled_generating_sets,
-            scaled_relation_lattices: scaled_relation_lattices
+            scaled_relation_lattices: scaled_relation_lattices,
+            parent: self.parent
         };
     }
 
@@ -269,7 +247,9 @@ impl<G: DlogCapableGroup> GeneratingSet<G> {
     /// the baby-giant step method - if we can find a generating set of `H`. We find it
     /// using the already provided basis of the relation modulo of the generators.
     /// 
-    fn padic_dlog(&self, group: &G, p_idx: usize, e: usize, target: &G::Element) -> Option<Vec<i64>> {
+    fn padic_dlog(&self, p_idx: usize, e: usize, target: &GroupEl<G>) -> Option<Vec<i64>> {
+        let group = &self.parent;
+        let ZZ_to_ZZbig = ZZbig.can_hom(&ZZ).unwrap();
         
         let n = self.generators.len();
         if n == 0 {
@@ -280,32 +260,30 @@ impl<G: DlogCapableGroup> GeneratingSet<G> {
         }
 
         let p = self.order_factorization[p_idx].0;
-        debug_assert!(group.is_identity(&group.pow(target, ZZ.pow(p, e))));
+        debug_assert!(group.is_identity(&group.pow(target, &ZZbig.pow(ZZ_to_ZZbig.map(p), e))));
 
         let power = ZZbig.checked_div(
             &self.order_multiple, 
             &ZZbig.pow(int_cast(p, ZZbig, ZZ), e)
         ).unwrap();
-        let power = int_cast(power, ZZ, ZZbig);
-        let gens = self.generators.iter().map(|g| group.pow(g, power)).collect::<Vec<_>>();
+        let gens = self.generators.iter().map(|g| group.pow(g, &power)).collect::<Vec<_>>();
 
         // here we use the power-of-`p` map and the fact that `G/H ~ pG` to compute the dlog in `G/H`
         let G_mod_H_dlog = self.padic_dlog(
-            group,
             p_idx,
             e - 1,
-            &group.pow(target, p)
+            &group.pow(target, &ZZ_to_ZZbig.map(p))
         )?;
         debug_assert!(group.eq_el(
-            &group.pow(target, p),
-            &(0..n).fold(group.identity(), |current, i| group.op(current, &group.pow(&gens[i], p * G_mod_H_dlog[i])))
+            &group.pow(target, &ZZ_to_ZZbig.map(p)),
+            &(0..n).fold(group.identity(), |current, i| group.op(current, group.pow(&gens[i], &ZZ_to_ZZbig.map(p * G_mod_H_dlog[i]))))
         ));
 
         // delta is now in H, i.e. is a p-torsion element
         let delta = (0..n).fold(group.clone_el(target), |current, i|
-            group.op(current, &group.pow(&gens[i], -G_mod_H_dlog[i]))
+            group.op(current, group.pow(&gens[i], &ZZ_to_ZZbig.map(-G_mod_H_dlog[i])))
         );
-        debug_assert!(group.is_identity(&group.pow(&delta, p)));
+        debug_assert!(group.is_identity(&group.pow(&delta, &ZZ_to_ZZbig.map(p))));
 
         let H_generators = &self.scaled_generating_sets[p_idx][e - 1];
 
@@ -329,7 +307,7 @@ impl<G: DlogCapableGroup> GeneratingSet<G> {
         let result = G_mod_H_dlog.into_iter().zip(H_dlog.into_iter()).map(|(x, y)| x + y).collect::<Vec<_>>();
         debug_assert!(group.eq_el(
             target,
-            &(0..n).fold(group.identity(), |current, i| group.op(current, &group.pow(&gens[i], result[i])))
+            &(0..n).fold(group.identity(), |current, i| group.op(current, group.pow(&gens[i], &ZZ_to_ZZbig.map(result[i]))))
         ));
 
         return Some(result);
@@ -341,7 +319,9 @@ impl<G: DlogCapableGroup> GeneratingSet<G> {
     /// these generators
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn dlog(&self, group: &G, target: &G::Element) -> Option<Vec<i64>> {
+    pub fn dlog(&self, target: &GroupEl<G>) -> Option<Vec<i64>> {
+        let group = &self.parent;
+        let ZZ_to_ZZbig = ZZbig.can_hom(&ZZ).unwrap();
         
         let n = self.generators.len();
         if n == 0 {
@@ -357,8 +337,7 @@ impl<G: DlogCapableGroup> GeneratingSet<G> {
                 &self.order_multiple, 
                 &ZZbig.pow(int_cast(p, ZZbig, ZZ), e)
             ).unwrap();
-            let power = int_cast(power, ZZ, ZZbig);
-            let padic_dlog = self.padic_dlog(group, p_idx, e, &group.pow(target, power))?;
+            let padic_dlog = self.padic_dlog(p_idx, e, &group.pow(target, &power))?;
             for j in 0..n {
                 current_dlog[j] = inv_crt(current_dlog[j], padic_dlog[j], &current_order[j], &ZZ.pow(p, e), ZZ);
                 current_order[j] *= ZZ.pow(p, e);
@@ -366,10 +345,75 @@ impl<G: DlogCapableGroup> GeneratingSet<G> {
         }
         debug_assert!(group.eq_el(
             target,
-            &(0..n).fold(group.identity(), |current, i| group.op(current, &group.pow(&self.generators[i], current_dlog[i])))
+            &(0..n).fold(group.identity(), |current, i| group.op(current, group.pow(&self.generators[i], &ZZ_to_ZZbig.map(current_dlog[i]))))
         ));
 
         return Some(current_dlog);
+    }
+
+    fn padic_enumerate_elements<'a>(&'a self, p_idx: usize) -> impl use<'a, G> + Clone + Iterator<Item = GroupEl<G>> {
+        let group = &self.parent;
+        let (p, e) = self.order_factorization[p_idx];
+        let power = ZZbig.checked_div(
+            &self.order_multiple, 
+            &ZZbig.pow(int_cast(p, ZZbig, ZZ), e)
+        ).unwrap();
+        let n = self.generators.len();
+
+        let relation_lattice = self.scaled_relation_lattices[p_idx][e].data();
+        let Zpne = zn_big::Zn::new(ZZbig, ZZbig.pow(int_cast(p, ZZbig, StaticRing::<i64>::RING), e * n));
+        let mod_pne = Zpne.can_hom(&StaticRing::<i64>::RING).unwrap();
+        let mut relation_lattice_mod_pne = OwnedMatrix::from_fn(relation_lattice.row_count(), relation_lattice.col_count(), |k, l| mod_pne.map(*relation_lattice.at(k, l)));
+        let mut generators = self.generators.iter().map(|g| group.pow(g, &power)).collect::<Vec<_>>();
+
+        struct TransformGenerators<'a, G: AbelianGroupStore> {
+            group: &'a G,
+            generators: &'a mut [GroupEl<G>]
+        }
+        impl<'a, G: AbelianGroupStore> TransformTarget<zn_big::ZnBase<BigIntRing>> for TransformGenerators<'a, G> {
+
+            fn transform<S: Copy + RingStore<Type = zn_big::ZnBase<BigIntRing>>>(&mut self, ring: S, i: usize, j: usize, transform: &[El<zn_big::Zn<BigIntRing>>; 4]) {
+                let transform_inv_det = ring.invert(&ring.sub(
+                    ring.mul_ref(&transform[0], &transform[3]),
+                    ring.mul_ref(&transform[1], &transform[2])
+                )).unwrap();
+                let inv_transform = [
+                    ring.smallest_positive_lift(ring.mul_ref(&transform[3], &transform_inv_det)),
+                    ring.smallest_positive_lift(ring.negate(ring.mul_ref(&transform[1], &transform_inv_det))),
+                    ring.smallest_positive_lift(ring.negate(ring.mul_ref(&transform[2], &transform_inv_det))),
+                    ring.smallest_positive_lift(ring.mul_ref(&transform[0], &transform_inv_det))
+                ];
+                let new_gens = (
+                    self.group.op(self.group.pow(&self.generators[i], &inv_transform[0]), self.group.pow(&self.generators[j], &inv_transform[1])),
+                    self.group.op(self.group.pow(&self.generators[i], &inv_transform[2]), self.group.pow(&self.generators[j], &inv_transform[3])),
+                );
+                self.generators[i] = new_gens.0;
+                self.generators[j] = new_gens.1;
+            }
+        }
+
+        pre_smith(
+            &Zpne,
+            &mut (),
+            &mut TransformGenerators { group: group, generators: &mut generators },
+            relation_lattice_mod_pne.data_mut()
+        );
+
+        let generators_rc = Rc::new(generators);
+        return multi_cartesian_product(
+            (0..n).map(|i| 0..(int_cast(ZZbig.ideal_gen(Zpne.modulus(), &Zpne.smallest_positive_lift(Zpne.clone_el(relation_lattice_mod_pne.at(i, i)))), ZZ, ZZbig) as usize)),
+            move |powers| (0..n).fold(group.identity(), |current, i| group.op(current, group.pow(&generators_rc[i], &int_cast(powers[i] as i64, ZZbig, ZZ)))),
+            |_, x| *x
+        );
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn enumerate_elements<'a>(&'a self, group: &'a G) -> impl use<'a, G> + Clone + Iterator<Item = GroupEl<G>> {
+        multi_cartesian_product(
+            (0..self.order_factorization.len()).map(|i| self.padic_enumerate_elements(i)),
+            |elements| elements.iter().fold(group.identity(), |current, next| group.op_ref_snd(current, next)),
+            |_, x| group.clone_el(x)
+        )
     }
 
     ///
@@ -420,39 +464,30 @@ impl<G: DlogCapableGroup> GeneratingSet<G> {
     }
 }
 
-impl<G: DlogCapableGroup> Clone for GeneratingSet<G>
-    where G::Element: Clone
+impl<G: AbelianGroupStore> Clone for Subgroup<G>
+    where G: Clone
 {
     fn clone(&self) -> Self {
         Self {
-            generators: self.generators.clone(),
+            parent: self.parent.clone(),
+            generators: self.generators.iter().map(|g| self.parent.clone_el(g)).collect(),
             order_factorization: self.order_factorization.clone(),
             order_multiple: self.order_multiple.clone(),
-            scaled_generating_sets: self.scaled_generating_sets.clone(),
+            scaled_generating_sets: self.scaled_generating_sets.iter().map(|sets| sets.iter().map(|set| set.iter().map(|g| self.parent.clone_el(g)).collect()).collect()).collect(),
             scaled_relation_lattices: self.scaled_relation_lattices.iter().map(|x| x.iter().map(|x| x.clone_matrix(StaticRing::<i64>::RING)).collect()).collect()
         }
     }
 }
 
-impl<G: DlogCapableGroup> VectorView<G::Element> for GeneratingSet<G> {
-
-    fn len(&self) -> usize {
-        self.generators.len()
-    }
-
-    fn at(&self, i: usize) -> &G::Element {
-        self.generators.at(i)
-    }
-}
-
-impl<R> GeneratingSet<MultGroup<R>>
+impl<R> Subgroup<MultGroup<R>>
     where R: RingStore,
         R::Type: ZnRing + HashableElRing + DivisibilityRing
 {
-    pub fn for_zn(group: &MultGroup<R>, generators: Vec<<MultGroup<R> as DlogCapableGroup>::Element>) -> Self {
+    #[stability::unstable(feature = "enable")]
+    pub fn for_zn(group: MultGroup<R>, generators: Vec<GroupEl<MultGroup<R>>>) -> Self {
         let n = generators.len();
         if n == 0 {
-            let n_factorization = factor(ZZbig, group.0.size(ZZbig).unwrap());
+            let n_factorization = factor(ZZbig, group.underlying_ring().size(ZZbig).unwrap());
             let mut order_factorization = n_factorization.into_iter().flat_map(|(p, e)| 
                 factor(ZZbig, ZZbig.sub_ref_fst(&p, ZZbig.one())).into_iter().chain([(p, e - 1)].into_iter())
             ).collect::<Vec<_>>();
@@ -467,6 +502,7 @@ impl<R> GeneratingSet<MultGroup<R>>
             let order = ZZbig.prod(order_factorization.iter().map(|(p, e)| ZZbig.pow(ZZbig.clone_el(p), *e)));
             let order_factorization = order_factorization.into_iter().map(|(p, e)| (int_cast(p, ZZ, ZZbig), e)).collect();
             return Self {
+                parent: group,
                 generators: Vec::new(),
                 order_multiple: order,
                 order_factorization: order_factorization,
@@ -476,167 +512,10 @@ impl<R> GeneratingSet<MultGroup<R>>
         } else {
             let mut result = Self::for_zn(group, Vec::new());
             for g in generators {
-                result = result.add_generator(group, g);
+                result = result.add_generator(g);
             }
             return result;
         }
-    }
-}
-
-///
-/// The additive group of a ring, implements [`DlogCapableGroup`].
-/// 
-/// Note that in most cases, it does not make much sense to compute
-/// dlogs in the additive group of a ring using generic methods, since
-/// algorithms as in [`crate::algorithms::linsolve`] will be much faster.
-/// 
-#[stability::unstable(feature = "enable")]
-pub struct AddGroup<R: RingStore>(pub R);
-
-///
-/// The direct product of `N` copies of an underlying group, implements [`DlogCapableGroup`].
-/// 
-#[stability::unstable(feature = "enable")]
-pub struct ProdGroup<G: DlogCapableGroup, const N: usize>(pub G);
-
-///
-/// The multiplicative group of a ring, implements [`DlogCapableGroup`].
-/// 
-#[stability::unstable(feature = "enable")]
-pub struct MultGroup<R: RingStore>(pub R);
-
-///
-/// Elements from the multiplicative group of `R`.
-/// 
-#[stability::unstable(feature = "enable")]
-pub struct MultGroupEl<R: RingStore>(El<R>);
-
-impl<R: RingStore> DlogCapableGroup for AddGroup<R>
-    where R::Type: HashableElRing
-{
-    type Element = El<R>;
-
-    fn clone_el(&self, x: &Self::Element) -> Self::Element { self.0.clone_el(x) }
-    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { self.0.eq_el(lhs, rhs) }
-    fn op(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element { self.0.add_ref_snd(lhs, rhs)}
-    fn inv(&self, x: &Self::Element) -> Self::Element { self.0.negate(self.0.clone_el(x)) }
-    fn identity(&self) -> Self::Element { self.0.zero() }
-    fn hash<H: Hasher>(&self, x: &Self::Element, hasher: &mut H) { self.0.hash(x, hasher) }
-}
-
-impl<G: DlogCapableGroup, const N: usize> DlogCapableGroup for ProdGroup<G, N> {
-    type Element = [G::Element; N];
-
-    fn clone_el(&self, x: &Self::Element) -> Self::Element { from_fn(|i| self.0.clone_el(&x[i])) }
-    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { (0..N).all(|i| self.0.eq_el(&lhs[i], &rhs[i])) }
-    fn inv(&self, x: &Self::Element) -> Self::Element { from_fn(|i| self.0.inv(&x[i])) }
-    fn identity(&self) -> Self::Element { from_fn(|_| self.0.identity()) }
-    fn hash<H: Hasher>(&self, x: &Self::Element, hasher: &mut H) { x.into_iter().for_each(|x| self.0.hash(x, hasher)) }
-    
-    fn op(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element { 
-        let mut it = lhs.into_iter().zip(rhs.into_iter()).map(|(l, r)| self.0.op(l, r));
-        return from_fn(|_| it.next().unwrap());
-    }
-}
-
-impl<R: RingStore> Clone for MultGroup<R> 
-    where R: Clone, R::Type: HashableElRing + DivisibilityRing
-{
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl<R: RingStore> Copy for MultGroup<R> 
-    where R: Copy, R::Type: HashableElRing + DivisibilityRing
-{}
-
-impl<R: RingStore> Debug for MultGroup<R> 
-    where R::Type: Debug + HashableElRing + DivisibilityRing
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({:?})*", self.0.get_ring())
-    }
-}
-
-impl<R: RingStore> Clone for MultGroupEl<R> 
-    where R::Type: HashableElRing + DivisibilityRing,
-        El<R>: Clone
-{
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl<R: RingStore> Debug for MultGroupEl<R> 
-    where R::Type: HashableElRing + DivisibilityRing,
-        El<R>: Debug
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.0)
-    }
-}
-
-impl<R: RingStore> MultGroup<R> 
-    where R::Type: HashableElRing + DivisibilityRing
-{
-    ///
-    /// If `x` is contained in `R*`, returns a [`MultGroupEl`] representing
-    /// `x`. Otherwise, `None` is returned.
-    /// 
-    #[stability::unstable(feature = "enable")]
-    pub fn from_ring_el(&self, x: El<R>) -> Option<MultGroupEl<R>> {
-        if self.0.is_unit(&x) {
-            Some(MultGroupEl(x))
-        } else {
-            None
-        }
-    }
-
-    ///
-    /// Returns the ring element represented by the given group element.
-    /// 
-    #[stability::unstable(feature = "enable")]
-    pub fn as_ring_el<'a>(&self, x: &'a MultGroupEl<R>) -> &'a El<R> {
-        &x.0
-    }
-}
-
-impl<R: RingStore> DlogCapableGroup for MultGroup<R> 
-    where R::Type: HashableElRing + DivisibilityRing
-{
-    type Element = MultGroupEl<R>;
-
-    fn clone_el(&self, x: &Self::Element) -> Self::Element { MultGroupEl(self.0.clone_el(&x.0)) }
-    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { self.0.eq_el(&lhs.0, &rhs.0) }
-    fn inv(&self, x: &Self::Element) -> Self::Element { MultGroupEl(self.0.invert(&x.0).unwrap()) }
-    fn identity(&self) -> Self::Element { MultGroupEl(self.0.one()) }
-    fn hash<H: Hasher>(&self, x: &Self::Element, hasher: &mut H) { self.0.hash(&x.0, hasher) }
-    fn op(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element { MultGroupEl(self.0.mul_ref_snd(lhs.0, &rhs.0)) }
-}
-
-struct HashableGroupEl<'a, G: DlogCapableGroup> {
-    group: &'a G,
-    el: G::Element
-}
-
-impl<'a, G: DlogCapableGroup> HashableGroupEl<'a, G> {
-    fn new(group: &'a G, el: G::Element) -> Self {
-        Self { group, el }
-    }
-}
-
-impl<'a, G: DlogCapableGroup> PartialEq for HashableGroupEl<'a, G> {
-    fn eq(&self, other: &Self) -> bool {
-        self.group.eq_el(&self.el, &other.el)
-    }
-}
-
-impl<'a, G: DlogCapableGroup> Eq for HashableGroupEl<'a, G> {}
-
-impl<'a, G: DlogCapableGroup> Hash for HashableGroupEl<'a, G> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.group.hash(&self.el, state)
     }
 }
 
@@ -656,8 +535,9 @@ impl<'a, G: DlogCapableGroup> Hash for HashableGroupEl<'a, G> {
 /// ```
 /// # use feanor_math::algorithms::discrete_log::*;
 /// # use feanor_math::integer::*;
+/// # use feanor_math::group::*;
 /// # use feanor_math::primitive_int::*;
-/// let group = AddGroup(StaticRing::<i64>::RING);
+/// let group = AddGroup::new(StaticRing::<i64>::RING);
 /// assert_eq!(Some(vec![1]), baby_giant_step(&group, 0, &[0], &[BigIntRing::RING.power_of_two(10)]));
 /// ```
 /// 
@@ -680,21 +560,23 @@ impl<'a, G: DlogCapableGroup> Hash for HashableGroupEl<'a, G> {
 /// 
 /// ```rust
 /// # use feanor_math::ring::*;
+/// # use feanor_math::group::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::integer::*;
+/// # use feanor_math::primitive_int::StaticRing;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::wrapper::*;
 /// # use feanor_math::algorithms::discrete_log::*;
 /// let ring = Zn::new(17);
-/// let group = MultGroup(ring);
+/// let group = MultGroup::new(ring);
 /// let x = group.from_ring_el(ring.int_hom().map(9)).unwrap();
-/// assert_eq!(Some(vec![3]), baby_giant_step(&group, group.pow(&x, 3), &[x], &[BigIntRing::RING.power_of_two(4)]));
+/// assert_eq!(Some(vec![3]), baby_giant_step(&group, group.pow(&x, &int_cast(3, BigIntRing::RING, StaticRing::<i64>::RING)), &[x], &[BigIntRing::RING.power_of_two(4)]));
 /// ```
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn baby_giant_step<G>(group: &G, value: G::Element, generators: &[G::Element], dlog_bounds: &[El<BigIntRing>]) -> Option<Vec<i64>> 
-    where G: DlogCapableGroup
+pub fn baby_giant_step<G>(group: G, value: GroupEl<G>, generators: &[GroupEl<G>], dlog_bounds: &[El<BigIntRing>]) -> Option<Vec<i64>> 
+    where G: AbelianGroupStore
 {
     let n = generators.len();
     assert_eq!(n, dlog_bounds.len());
@@ -714,7 +596,7 @@ pub fn baby_giant_step<G>(group: &G, value: G::Element, generators: &[G::Element
         let mut current_els = (0..n).map(|_| group.clone_el(&value)).collect::<Vec<_>>();
         let mut current_idxs = (0..n).map(|_| 0).collect::<Vec<_>>();
         for idx in 0..count {
-            _ = baby_step_table.insert(HashableGroupEl::new(group, group.clone_el(&current_els[n - 1])), idx);
+            _ = baby_step_table.insert(HashableGroupEl::new(&group, group.clone_el(&current_els[n - 1])), idx);
 
             let mut i = n - 1;
             while current_idxs[i] == ns[i] - 1 {
@@ -726,21 +608,21 @@ pub fn baby_giant_step<G>(group: &G, value: G::Element, generators: &[G::Element
                 i -= 1;
             }
             current_idxs[i] += 1;
-            current_els[i] = group.op(replace(&mut current_els[i], group.identity()), &generators[i]);
+            current_els[i] = group.op_ref_snd(replace(&mut current_els[i], group.identity()), &generators[i]);
             for j in (i + 1)..n {
                 current_els[j] = group.clone_el(&current_els[i]);
             }
         }
     }
 
-    let giant_steps = generators.iter().zip(ns.iter()).map(|(g, n)| group.pow(g, *n)).collect::<Vec<_>>();
+    let giant_steps = generators.iter().zip(ns.iter()).map(|(g, n)| group.pow(g, &int_cast(*n, ZZbig, ZZ))).collect::<Vec<_>>();
     // iterate through giant steps
     {
-        let start_el = giant_steps.iter().fold(group.identity(), |x, y| group.op(x, y));
+        let start_el = giant_steps.iter().fold(group.identity(), |x, y| group.op_ref_snd(x, y));
         let mut current_els = (0..n).map(|_| group.clone_el(&start_el)).collect::<Vec<_>>();
         let mut current_idxs = (0..n).map(|_| 1).collect::<Vec<_>>();
         for idx in 0..count {
-            if let Some(bs_idx) = baby_step_table.get(&HashableGroupEl::new(group, group.clone_el(&current_els[n - 1]))) {
+            if let Some(bs_idx) = baby_step_table.get(&HashableGroupEl::new(&group, group.clone_el(&current_els[n - 1]))) {
                 let mut bs_idx = *bs_idx;
                 let mut result = current_idxs.clone();
                 for j in (0..n).rev() {
@@ -764,7 +646,7 @@ pub fn baby_giant_step<G>(group: &G, value: G::Element, generators: &[G::Element
                 i -= 1;
             }
             current_idxs[i] += 1;
-            current_els[i] = group.op(replace(&mut current_els[i], group.identity()), &giant_steps[i]);
+            current_els[i] = group.op_ref_snd(replace(&mut current_els[i], group.identity()), &giant_steps[i]);
             for j in (i + 1)..n {
                 current_els[j] = group.clone_el(&current_els[i]);
             }
@@ -783,9 +665,10 @@ pub fn baby_giant_step<G>(group: &G, value: G::Element, generators: &[G::Element
 pub fn finite_field_discrete_log<R: RingStore>(value: El<R>, base: El<R>, Zn: R) -> Option<i64>
     where R::Type: ZnRing + HashableElRing
 {
-    let group = MultGroup(Zn);
-    let gen_set = GeneratingSet::for_zn(&group, vec![group.from_ring_el(base).unwrap()]);
-    return gen_set.dlog(&group, &group.from_ring_el(value).unwrap())
+    let group = MultGroup::new(Zn);
+    let generators = vec![group.from_ring_el(base).unwrap()];
+    let subgroup = Subgroup::for_zn(group, generators);
+    return subgroup.dlog(&subgroup.parent().from_ring_el(value).unwrap())
         .map(|res| res[0]);
 }
 
@@ -795,9 +678,9 @@ pub fn finite_field_discrete_log<R: RingStore>(value: El<R>, base: El<R>, Zn: R)
 pub fn multiplicative_order<R: RingStore>(x: El<R>, Zn: R) -> i64
     where R::Type: ZnRing + HashableElRing
 {
-    let group = MultGroup(Zn);
-    let Zn = &group.0;
-    let gen_set = GeneratingSet::for_zn(&group, Vec::new());
+    let group = MultGroup::new(Zn);
+    let gen_set = Subgroup::for_zn(group, Vec::new());
+    let Zn = gen_set.parent().underlying_ring();
 
     let mut result = ZZbig.one();
     for (p, e) in &gen_set.order_factorization {
@@ -815,21 +698,66 @@ pub fn multiplicative_order<R: RingStore>(x: El<R>, Zn: R) -> i64
 }
 
 #[cfg(test)]
+struct ProdGroupBase<G: AbelianGroupStore, const N: usize>(G);
+
+#[cfg(test)]
+impl<G: AbelianGroupStore, const N: usize> PartialEq for ProdGroupBase<G, N> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.get_group() == other.0.get_group()
+    }
+}
+
+#[cfg(test)]
+impl<G: AbelianGroupStore, const N: usize> AbelianGroupBase for ProdGroupBase<G, N> {
+    type Element = [GroupEl<G>; N];
+
+    fn clone_el(&self, x: &Self::Element) -> Self::Element {
+        from_fn(|i| self.0.clone_el(&x[i]))
+    }
+
+    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+        (0..N).all(|i| self.0.eq_el(&lhs[i], &rhs[i]))
+    }
+
+    fn op(&self, lhs: Self::Element, rhs: Self::Element) -> Self::Element {
+        from_fn(|i| self.0.op_ref(&lhs[i], &rhs[i]))
+    }
+    
+    fn hash<H: std::hash::Hasher>(&self, x: &Self::Element, hasher: &mut H) {
+        for i in 0..N {
+            self.0.hash(&x[i], hasher)
+        }
+    }
+
+    fn inv(&self, x: &Self::Element) -> Self::Element {
+        from_fn(|i| self.0.inv(&x[i]))
+    }
+
+    fn identity(&self) -> Self::Element {
+        from_fn(|_| self.0.identity())
+    }
+}
+
+#[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
 #[cfg(test)]
 use oorandom::Rand64;
 #[cfg(test)]
-use crate::algorithms::linsolve::SolveResult;
-#[cfg(test)]
 use crate::algorithms::matmul::ComputeInnerProduct;
 #[cfg(test)]
+use crate::group::AddGroup;
+#[cfg(test)]
 use crate::assert_matrix_eq;
+#[cfg(test)]
+use crate::RANDOM_TEST_INSTANCE_COUNT;
+#[cfg(test)]
+use std::array::from_fn;
 
 #[test]
 fn test_baby_giant_step() {
     for base_bound in [21, 26, 31, 37] {
         let dlog_bound = [int_cast(base_bound, ZZbig, ZZ)];
-        let G = AddGroup(ZZ);
+        let G = AddGroup::new(ZZ);
         assert_eq!(
             Some(vec![6]), 
             baby_giant_step(&G, 6, &[1], &dlog_bound)
@@ -839,7 +767,7 @@ fn test_baby_giant_step() {
             baby_giant_step(&G, 0, &[1], &dlog_bound)
         );
 
-        let G = AddGroup(Zn::<20>::RING);
+        let G = AddGroup::new(Zn::<20>::RING);
         assert_eq!(
             Some(vec![20]), 
             baby_giant_step(&G, 0, &[1], &dlog_bound)
@@ -852,20 +780,9 @@ fn test_baby_giant_step() {
             Some(vec![5]), 
             baby_giant_step(&G, 0, &[16], &dlog_bound)
         );
-        
-        let G = ProdGroup(AddGroup(Zn::<20>::RING));
-        let dlog_bound: [_; 2] = from_fn(|_| int_cast(base_bound, ZZbig, ZZ));
-        assert_eq!(
-            Some(vec![10, 10]), 
-            baby_giant_step(&G, [10, 10], &[[1, 0], [0, 1]], &dlog_bound)
-        );
-        assert_eq!(
-            Some(vec![8, 14]), 
-            baby_giant_step(&G, [8, 10], &[[1, 2], [0, 1]], &dlog_bound)
-        );
     }
     
-    let G = AddGroup(ZZ);
+    let G = AddGroup::new(ZZ);
 
     // the collision point is at 96
     assert_eq!(
@@ -887,48 +804,48 @@ fn test_baby_giant_step() {
 
 #[test]
 fn test_padic_relation_lattice() {
-    let G = AddGroup(Zn::<81>::RING);
+    let G = AddGroup::new(Zn::<81>::RING);
 
-    let gen_set = GeneratingSet::new(&G, int_cast(81, ZZbig, ZZ), vec![1]);
-    assert_matrix_eq!(ZZ, [[-81]], gen_set.scaled_relation_lattices[0][4]);
-    assert_matrix_eq!(ZZ, [[-27]], gen_set.scaled_relation_lattices[0][3]);
-    assert_matrix_eq!(ZZ, [[-9]], gen_set.scaled_relation_lattices[0][2]);
-    assert_matrix_eq!(ZZ, [[-3]], gen_set.scaled_relation_lattices[0][1]);
-    assert_matrix_eq!(ZZ, [[1]], gen_set.scaled_relation_lattices[0][0]);
+    let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZ), vec![1]);
+    assert_matrix_eq!(ZZ, [[-81]], subgroup.scaled_relation_lattices[0][4]);
+    assert_matrix_eq!(ZZ, [[-27]], subgroup.scaled_relation_lattices[0][3]);
+    assert_matrix_eq!(ZZ, [[-9]], subgroup.scaled_relation_lattices[0][2]);
+    assert_matrix_eq!(ZZ, [[-3]], subgroup.scaled_relation_lattices[0][1]);
+    assert_matrix_eq!(ZZ, [[1]], subgroup.scaled_relation_lattices[0][0]);
 
-    let gen_set = GeneratingSet::new(&G, int_cast(81, ZZbig, ZZ), vec![3, 6]);
-    let matrix = &gen_set.scaled_relation_lattices[0][4];
+    let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZ), vec![3, 6]);
+    let matrix = &subgroup.scaled_relation_lattices[0][4];
     assert_eq!(-27, *matrix.at(0, 0));
     assert_eq!(-1, *matrix.at(1, 1));
     assert_eq!(0, ZZ.get_ring().inner_product_ref(matrix.data().row_at(1).iter().zip([3, 6].iter())) % 81);
 
-    let gen_set = GeneratingSet::new(&G, int_cast(81, ZZbig, ZZ), vec![3, 9]);
-    let matrix = &gen_set.scaled_relation_lattices[0][4];
+    let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZ), vec![3, 9]);
+    let matrix = &subgroup.scaled_relation_lattices[0][4];
     assert_eq!(-27, *matrix.at(0, 0));
     assert_eq!(-1, *matrix.at(1, 1));
     assert_eq!(0, ZZ.get_ring().inner_product_ref(matrix.data().row_at(1).iter().zip([3, 9].iter())) % 81);
 
-    let gen_set = GeneratingSet::new(&G, int_cast(81, ZZbig, ZZ), vec![6, 18, 9]);
-    let matrix = &gen_set.scaled_relation_lattices[0][4];
+    let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZ), vec![6, 18, 9]);
+    let matrix = &subgroup.scaled_relation_lattices[0][4];
     assert_eq!(-27, *matrix.at(0, 0));
     assert_eq!(-1, *matrix.at(1, 1));
     assert_eq!(-1, *matrix.at(2, 2));
     assert_eq!(0, ZZ.get_ring().inner_product_ref(matrix.data().row_at(1).iter().zip([6, 18, 9].iter())) % 81);
     assert_eq!(0, ZZ.get_ring().inner_product_ref(matrix.data().row_at(2).iter().zip([6, 18, 9].iter())) % 81);
 
-    let G = ProdGroup(AddGroup(Zn::<81>::RING));
+    let G = GroupValue::from(ProdGroupBase(AddGroup::new(Zn::<81>::RING)));
 
-    let gen_set = GeneratingSet::new(&G, int_cast(81, ZZbig, ZZ), vec![[1, 4], [1, 1]]);
-    let matrix = &gen_set.scaled_relation_lattices[0][4];
+    let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZ), vec![[1, 4], [1, 1]]);
+    let matrix = &subgroup.scaled_relation_lattices[0][4];
     assert_eq!(-81, *matrix.at(0, 0));
     assert_eq!(-27, *matrix.at(1, 1));
     assert_eq!(0, ZZ.get_ring().inner_product_ref(matrix.data().row_at(1).iter().zip([1, 1].iter())) % 81);
     assert_eq!(0, ZZ.get_ring().inner_product_ref(matrix.data().row_at(1).iter().zip([4, 1].iter())) % 81);
 
-    let G = ProdGroup(AddGroup(Zn::<8>::RING));
+    let G = GroupValue::from(ProdGroupBase(AddGroup::new(Zn::<8>::RING)));
 
-    let gen_set = GeneratingSet::new(&G, int_cast(8, ZZbig, ZZ), vec![[6, 3, 5], [6, 2, 6], [4, 5, 7]]);
-    let matrix = &gen_set.scaled_relation_lattices[0][3];
+    let subgroup = Subgroup::new(&G, int_cast(8, ZZbig, ZZ), vec![[6, 3, 5], [6, 2, 6], [4, 5, 7]]);
+    let matrix = &subgroup.scaled_relation_lattices[0][3];
     assert_eq!(-8, *matrix.at(0, 0));
     assert_eq!(-4, *matrix.at(1, 1));
     assert_eq!(-2, *matrix.at(2, 2));
@@ -945,16 +862,16 @@ fn random_test_dlog() {
     let ring = Zn::<1400>::RING;
     let i = ring.can_hom(&ZZ).unwrap();
     let mut rng = Rand64::new(0);
-    let G = ProdGroup(AddGroup(ring));
+    let G = GroupValue::from(ProdGroupBase(AddGroup::new(ring)));
     let rand_gs = |rng: &mut Rand64| from_fn::<_, 3, _>(|_| ring.random_element(|| rng.rand_u64()));
 
     for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
         let gs = from_fn::<_, 3, _>(|_| rand_gs(&mut rng));
-        let gen_set = GeneratingSet::new(&G, int_cast(1400, ZZbig, ZZ), gs.into());
+        let subgroup = Subgroup::new(&G, int_cast(1400, ZZbig, ZZ), gs.into());
 
         let coeffs = rand_gs(&mut rng);
-        let val = (0..3).fold(G.identity(), |current, i| G.op(current, &G.pow(&gs[i], coeffs[i] as i64)));
-        let dlog = gen_set.dlog(&G, &val);
+        let val = (0..3).fold(G.identity(), |current, i| G.op(current, G.pow(&gs[i], &int_cast(coeffs[i] as i64, ZZbig, ZZ))));
+        let dlog = subgroup.dlog(&val);
         println!("{:?} * x + {:?} * y + {:?} * z = {:?} mod 1400", gs[0], gs[1], gs[2], val);
         if let Some(dlog) = dlog {
             for k in 0..3 {
@@ -966,10 +883,10 @@ fn random_test_dlog() {
 
     for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
         let gs = from_fn::<_, 3, _>(|_| rand_gs(&mut rng));
-        let gen_set = GeneratingSet::new(&G, int_cast(1400, ZZbig, ZZ), gs.into());
+        let subgroup = Subgroup::new(&G, int_cast(1400, ZZbig, ZZ), gs.into());
 
         let val = rand_gs(&mut rng);
-        let dlog = gen_set.dlog(&G, &val);
+        let dlog = subgroup.dlog(&val);
         println!("{:?} * x + {:?} * y + {:?} * z = {:?} mod 1400", gs[0], gs[1], gs[2], val);
         if let Some(dlog) = dlog {
             for k in 0..3 {
@@ -986,7 +903,7 @@ fn random_test_dlog() {
                 for k in 0..3 {
                     assert_el_eq!(ring, val[k], ring.sum([ring.mul(gs[0][k], *res.at(0, 0)), ring.mul(gs[1][k], *res.at(1, 0)), ring.mul(gs[2][k], *res.at(2, 0))]));
                 }
-                assert!(solved == SolveResult::NoSolution);
+                assert!(solved == crate::algorithms::linsolve::SolveResult::NoSolution);
             }
             println!("has no solution");
         }
@@ -1019,23 +936,37 @@ fn test_zn_dlog() {
 #[test]
 fn test_zn_subgroup_size() {
     let ring = Zn::<153>::RING;
-    let group = MultGroup(ring);
+    let group = MultGroup::new(ring);
     let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
     let g2 = group.from_ring_el(ring.int_hom().map(37)).unwrap();
 
-    let mut generating_set = GeneratingSet::for_zn(&group, Vec::new());
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(1), generating_set.subgroup_order());
+    let mut subgroup = Subgroup::for_zn(group.clone(), Vec::new());
+    assert_el_eq!(ZZbig, ZZbig.int_hom().map(1), subgroup.subgroup_order());
 
-    generating_set = generating_set.add_generator(&MultGroup(ring), group.clone_el(&g1));
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(24), generating_set.subgroup_order());
+    let next_gen = subgroup.parent().clone_el(&g1);
+    subgroup = subgroup.add_generator(next_gen);
+    assert_el_eq!(ZZbig, ZZbig.int_hom().map(24), subgroup.subgroup_order());
     
-    generating_set = generating_set.add_generator(&MultGroup(ring), group.pow(&g1, 2));
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(24), generating_set.subgroup_order());
+    let next_gen = subgroup.parent().pow(&g1, &ZZbig.int_hom().map(2));
+    subgroup = subgroup.add_generator(next_gen);
+    assert_el_eq!(ZZbig, ZZbig.int_hom().map(24), subgroup.subgroup_order());
     
-    generating_set = generating_set.add_generator(&MultGroup(ring), group.clone_el(&g2));
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(96), generating_set.subgroup_order());
+    let next_gen = subgroup.parent().clone_el(&g2);
+    subgroup = subgroup.add_generator(next_gen);
+    assert_el_eq!(ZZbig, ZZbig.int_hom().map(96), subgroup.subgroup_order());
     
-    let generating_set = GeneratingSet::for_zn(&group, vec![g2]);
+    let generating_set = Subgroup::for_zn(group, vec![g2]);
     assert_el_eq!(ZZbig, ZZbig.int_hom().map(16), generating_set.subgroup_order());
 
+}
+
+#[test]
+fn test_enumerate_elements() {
+    let ring = Zn::<45>::RING;
+    let group = AddGroup::new(ring);
+
+    let subgroup = Subgroup::new(group, int_cast(45, ZZbig, ZZ), vec![9, 15]);
+    let mut elements = subgroup.enumerate_elements(subgroup.parent()).collect::<Vec<_>>();
+    elements.sort_unstable();
+    assert_eq!((0..45).step_by(3).collect::<Vec<_>>(), elements);
 }

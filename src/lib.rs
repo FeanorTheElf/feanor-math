@@ -82,6 +82,12 @@ pub mod computation;
 #[macro_use]
 pub mod ring;
 ///
+/// Contains the traits [`group::AbelianGroupBase`] and [`group::AbelianGroupStore`], which (in analogue
+/// to [`ring::RingBase`] and [`ring::RingStore`]) model groups. These are much less central
+/// to this library than the ring traits, however.
+/// 
+pub mod group;
+///
 /// Contains the trait [`delegate::DelegateRing`] that simplifies implementing the 
 /// newtype-pattern for rings.
 /// 

@@ -204,7 +204,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
 /// assert_eq!(5, F25.characteristic(&StaticRing::<i64>::RING).unwrap());
 /// assert_eq!(2, F25.rank());
 /// ```
-/// More configurations are possible using [`GaloisField::new_with()`] or [`GaloisField::create()`].
+/// More configurations are possible using [`GaloisField::new_with_convolution()`] or [`GaloisField::create()`].
 /// 
 /// We also support conversion to and from a plain [`super::extension_impl::FreeAlgebraImpl`] representation.
 /// ```rust
@@ -299,7 +299,7 @@ impl GaloisField {
     ///
     /// Creates a new instance of the finite/galois field `GF(p^degree)`.
     /// 
-    /// If you need more options for configuration, consider using [`GaloisField::new_with()`] or
+    /// If you need more options for configuration, consider using [`GaloisField::new_with_convolution()`] or
     /// the most general [`GaloisField::create()`].
     /// 
     /// # Example
