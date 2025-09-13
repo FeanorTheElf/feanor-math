@@ -428,7 +428,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
         return Some(current_dlog);
     }
 
-    fn padic_enumerate_elements<'a>(&'a self, p_idx: usize) -> impl use<'a, G> + Clone + Iterator<Item = GroupEl<G>> {
+    fn padic_rectangular_form<'a>(&'a self, p_idx: usize) -> Vec<(GroupEl<G>, usize)> {
         let group = &self.parent;
         let (p, e) = self.order_factorization[p_idx];
         let power = ZZbig.checked_div(
@@ -437,65 +437,76 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
         ).unwrap();
         let n = self.generators.len();
 
-        let (Zpne, generators, diagonalized_basis) = if n > 0 {
-            let Zpne = zn_big::Zn::new(ZZbig, ZZbig.pow(int_cast(p, ZZbig, StaticRing::<i64>::RING), e * n));
-            let mod_pne = Zpne.can_hom(&StaticRing::<i64>::RING).unwrap();
-            let relation_lattice = self.scaled_relation_lattices[p_idx][e].data();
-            let mut relation_lattice_mod_pne = OwnedMatrix::from_fn(relation_lattice.row_count(), relation_lattice.col_count(), |k, l| mod_pne.map(*relation_lattice.at(k, l)));
-            let mut generators = self.generators.iter().map(|g| group.pow(g, &power)).collect::<Vec<_>>();
+        if n == 0 {
+            return Vec::new();
+        }
 
-            struct TransformGenerators<'a, G: AbelianGroupStore> {
-                group: &'a G,
-                generators: &'a mut [GroupEl<G>]
+        let Zpne = zn_big::Zn::new(ZZbig, ZZbig.pow(int_cast(p, ZZbig, StaticRing::<i64>::RING), e * n));
+        let mod_pne = Zpne.can_hom(&StaticRing::<i64>::RING).unwrap();
+        let relation_lattice = self.scaled_relation_lattices[p_idx][e].data();
+        let mut relation_lattice_mod_pne = OwnedMatrix::from_fn(relation_lattice.row_count(), relation_lattice.col_count(), |k, l| mod_pne.map(*relation_lattice.at(k, l)));
+        let mut generators = self.generators.iter().map(|g| group.pow(g, &power)).collect::<Vec<_>>();
+     
+        struct TransformGenerators<'a, G: AbelianGroupStore> {
+            group: &'a G,
+            generators: &'a mut [GroupEl<G>]
+        }
+        impl<'a, G: AbelianGroupStore> TransformTarget<zn_big::ZnBase<BigIntRing>> for TransformGenerators<'a, G> {
+         fn transform<S: Copy + RingStore<Type = zn_big::ZnBase<BigIntRing>>>(&mut self, ring: S, i: usize, j: usize, transform: &[El<zn_big::Zn<BigIntRing>>; 4]) {
+                let transform_inv_det = ring.invert(&ring.sub(
+                    ring.mul_ref(&transform[0], &transform[3]),
+                    ring.mul_ref(&transform[1], &transform[2])
+                )).unwrap();
+                let inv_transform = [
+                    ring.smallest_positive_lift(ring.mul_ref(&transform[3], &transform_inv_det)),
+                    ring.smallest_positive_lift(ring.negate(ring.mul_ref(&transform[1], &transform_inv_det))),
+                    ring.smallest_positive_lift(ring.negate(ring.mul_ref(&transform[2], &transform_inv_det))),
+                    ring.smallest_positive_lift(ring.mul_ref(&transform[0], &transform_inv_det))
+                ];
+                let new_gens = (
+                    self.group.op(self.group.pow(&self.generators[i], &inv_transform[0]), self.group.pow(&self.generators[j], &inv_transform[1])),
+                    self.group.op(self.group.pow(&self.generators[i], &inv_transform[2]), self.group.pow(&self.generators[j], &inv_transform[3])),
+                );
+                self.generators[i] = new_gens.0;
+                self.generators[j] = new_gens.1;
             }
-            impl<'a, G: AbelianGroupStore> TransformTarget<zn_big::ZnBase<BigIntRing>> for TransformGenerators<'a, G> {
-
-                fn transform<S: Copy + RingStore<Type = zn_big::ZnBase<BigIntRing>>>(&mut self, ring: S, i: usize, j: usize, transform: &[El<zn_big::Zn<BigIntRing>>; 4]) {
-                    let transform_inv_det = ring.invert(&ring.sub(
-                        ring.mul_ref(&transform[0], &transform[3]),
-                        ring.mul_ref(&transform[1], &transform[2])
-                    )).unwrap();
-                    let inv_transform = [
-                        ring.smallest_positive_lift(ring.mul_ref(&transform[3], &transform_inv_det)),
-                        ring.smallest_positive_lift(ring.negate(ring.mul_ref(&transform[1], &transform_inv_det))),
-                        ring.smallest_positive_lift(ring.negate(ring.mul_ref(&transform[2], &transform_inv_det))),
-                        ring.smallest_positive_lift(ring.mul_ref(&transform[0], &transform_inv_det))
-                    ];
-                    let new_gens = (
-                        self.group.op(self.group.pow(&self.generators[i], &inv_transform[0]), self.group.pow(&self.generators[j], &inv_transform[1])),
-                        self.group.op(self.group.pow(&self.generators[i], &inv_transform[2]), self.group.pow(&self.generators[j], &inv_transform[3])),
-                    );
-                    self.generators[i] = new_gens.0;
-                    self.generators[j] = new_gens.1;
-                }
-            }
-
-            pre_smith(
-                &Zpne,
-                &mut (),
-                &mut TransformGenerators { group: group, generators: &mut generators },
-                relation_lattice_mod_pne.data_mut()
-            );
-
-            (Zpne, Rc::new(generators), relation_lattice_mod_pne)
-        } else {
-            let Zpne = zn_big::Zn::new(ZZbig, int_cast(p, ZZbig, StaticRing::<i64>::RING));
-            (Zpne, Rc::new(Vec::new()), OwnedMatrix::new_with_shape(Vec::new(), 0, 0))
-        };
-
-        return multi_cartesian_product(
-            (0..n).map(|i| 0..(int_cast(ZZbig.ideal_gen(Zpne.modulus(), &Zpne.smallest_positive_lift(Zpne.clone_el(diagonalized_basis.at(i, i)))), ZZ, ZZbig) as usize)),
-            move |powers| (0..n).fold(group.identity(), |current, i| group.op(current, group.pow(&generators[i], &int_cast(powers[i] as i64, ZZbig, ZZ)))),
-            |_, x| *x
+        }
+     
+        pre_smith(
+            &Zpne,
+            &mut (),
+            &mut TransformGenerators { group: group, generators: &mut generators },
+            relation_lattice_mod_pne.data_mut()
         );
+     
+        return generators.into_iter().enumerate().map(|(i, g)| (
+            g,
+            int_cast(ZZbig.ideal_gen(Zpne.modulus(), &Zpne.smallest_positive_lift(Zpne.clone_el(relation_lattice_mod_pne.at(i, i)))), ZZ, ZZbig) as usize
+        )).collect()
     }
 
+    ///
+    /// Returns a list (g[i], l[i]) such that every element of the subgroup
+    /// can be uniquely written as `prod_i g[i]^k[i]` with `0 <= k[i] < l[i]`.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    pub fn rectangular_form<'a>(&'a self) -> Vec<(GroupEl<G>, usize)> {
+        (0..self.order_factorization.len()).flat_map(|p_idx| self.padic_rectangular_form(p_idx)).collect()
+    }
+
+    ///
+    /// Returns an iterator that yields every element contained in the subgroup
+    /// exactly once.
+    /// 
     #[stability::unstable(feature = "enable")]
     pub fn enumerate_elements<'a>(&'a self) -> impl use<'a, G> + Clone + Iterator<Item = GroupEl<G>> {
+        let rectangular_form = Rc::new(self.rectangular_form());
         multi_cartesian_product(
-            (0..self.order_factorization.len()).map(|i| self.padic_enumerate_elements(i)),
-            |elements| elements.iter().fold(self.parent().identity(), |current, next| self.parent().op_ref_snd(current, next)),
-            |_, x| self.parent().clone_el(x)
+            rectangular_form.iter().map(|(_, l)| 0..*l).collect::<Vec<_>>().into_iter(),
+            move |pows| pows.iter().enumerate().fold(self.parent().identity(), |current, (i, e)| 
+                self.parent().op(current, self.parent().pow(&rectangular_form[i].0, &int_cast(*e as i64, ZZbig, ZZ)))
+            ),
+            |_, x| *x
         )
     }
 
