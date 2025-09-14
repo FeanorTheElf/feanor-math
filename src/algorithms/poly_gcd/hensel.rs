@@ -47,7 +47,7 @@ fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2, Controller>(
 
     let prime_field = base_poly_ring.base_ring();
     let prime_ring = reduction_map.codomain();
-    let prime_ring_iso = prime_field.can_iso(&prime_ring).unwrap();
+    let prime_ring_iso = PolyGCDLocallyBaseRingToFieldIso::new(reduction_map.parent_ring().into(), reduction_map.ideal(), prime_ring.get_ring(), prime_field.get_ring(), reduction_map.max_ideal_idx());
 
     let (g, h) = factors;
     let (mut s, mut t, d) = base_poly_ring.extended_ideal_gen(g, h);
@@ -57,10 +57,13 @@ fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2, Controller>(
     base_poly_ring.inclusion().mul_assign_map(&mut t, d_inv);
 
     let lift_to_target_poly_ring = |f| {
-        target_poly_ring.from_terms(base_poly_ring.terms(f).map(|(c, i)| (
-            reduction_map.parent_ring().get_ring().lift_partial(reduction_map.ideal(), (reduction_map.codomain(), reduction_map.to_e()), (reduction_map.domain(), reduction_map.from_e()), reduction_map.max_ideal_idx(), prime_ring_iso.map_ref(c)), 
-            i
-        )))
+        target_poly_ring.from_terms(base_poly_ring.terms(f).map(|(c, i)| (reduction_map.parent_ring().get_ring().lift_partial(
+            reduction_map.ideal(), 
+            (reduction_map.codomain().get_ring(), reduction_map.to_e()), 
+            (reduction_map.domain().get_ring(), reduction_map.from_e()), 
+            reduction_map.max_ideal_idx(), 
+            prime_ring_iso.inv().map_ref(c)
+        ), i)))
     };
 
     let lifted_s = lift_to_target_poly_ring(&s);
@@ -116,7 +119,7 @@ pub fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
 
     let prime_field = base_poly_ring.base_ring();
     let prime_ring = reduction_map.codomain();
-    let prime_ring_iso = prime_field.can_iso(&prime_ring).unwrap();
+    let prime_ring_iso = PolyGCDLocallyBaseRingToFieldIso::new(reduction_map.parent_ring().into(), reduction_map.ideal(), prime_ring.get_ring(), prime_field.get_ring(), reduction_map.max_ideal_idx());
 
     let (g, h) = factors;
     let (mut s, mut t, d) = base_poly_ring.extended_ideal_gen(g, h);
@@ -126,10 +129,13 @@ pub fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
     base_poly_ring.inclusion().mul_assign_map(&mut t, d_inv);
 
     let lift_to_target_poly_ring = |f| {
-        target_poly_ring.from_terms(base_poly_ring.terms(f).map(|(c, i)| (
-            reduction_map.parent_ring().get_ring().lift_partial(reduction_map.ideal(), (reduction_map.codomain(), reduction_map.to_e()), (reduction_map.domain(), reduction_map.from_e()), reduction_map.max_ideal_idx(), prime_ring_iso.map_ref(c)), 
-            i
-        )))
+        target_poly_ring.from_terms(base_poly_ring.terms(f).map(|(c, i)| (reduction_map.parent_ring().get_ring().lift_partial(
+            reduction_map.ideal(), 
+            (reduction_map.codomain().get_ring(), reduction_map.to_e()), 
+            (reduction_map.domain().get_ring(), reduction_map.from_e()), 
+            reduction_map.max_ideal_idx(), 
+            prime_ring_iso.inv().map_ref(c)
+        ), i)))
     };
 
     let mut current_s = lift_to_target_poly_ring(&s);
@@ -197,17 +203,20 @@ fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Contro
 
     let prime_field = base_poly_ring.base_ring();
     let prime_ring = reduction_map.codomain();
-    let prime_ring_iso = prime_field.can_iso(&prime_ring).unwrap();
+    let prime_ring_iso = PolyGCDLocallyBaseRingToFieldIso::new(reduction_map.parent_ring().into(), reduction_map.ideal(), prime_ring.get_ring(), prime_field.get_ring(), reduction_map.max_ideal_idx());
 
-    let f_base = base_poly_ring.lifted_hom(&target_poly_ring, prime_ring_iso.inv().compose(reduction_map)).map_ref(&f);
-    let g_base = base_poly_ring.lifted_hom(&target_poly_ring, prime_ring_iso.inv().compose(reduction_map)).map_ref(&g);
+    let f_base = base_poly_ring.lifted_hom(&target_poly_ring, (&prime_ring_iso).compose(reduction_map)).map_ref(&f);
+    let g_base = base_poly_ring.lifted_hom(&target_poly_ring, (&prime_ring_iso).compose(reduction_map)).map_ref(&g);
     assert!(base_poly_ring.is_one(&base_poly_ring.add(base_poly_ring.mul_ref(&f_base, s), base_poly_ring.mul_ref(&g_base, t))));
 
     let lift_to_target_poly_ring = |f| {
-        target_poly_ring.from_terms(base_poly_ring.terms(f).map(|(c, i)| (
-            reduction_map.parent_ring().get_ring().lift_partial(reduction_map.ideal(), (reduction_map.codomain(), reduction_map.to_e()), (reduction_map.domain(), reduction_map.from_e()), reduction_map.max_ideal_idx(), prime_ring_iso.map_ref(c)), 
-            i
-        )))
+        target_poly_ring.from_terms(base_poly_ring.terms(f).map(|(c, i)| (reduction_map.parent_ring().get_ring().lift_partial(
+            reduction_map.ideal(), 
+            (reduction_map.codomain().get_ring(), reduction_map.to_e()), 
+            (reduction_map.domain().get_ring(), reduction_map.from_e()), 
+            reduction_map.max_ideal_idx(), 
+            prime_ring_iso.inv().map_ref(c)
+        ), i)))
     };
 
     let mut current_s = lift_to_target_poly_ring(&s);
@@ -284,7 +293,7 @@ pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> O
     let ZZ = Zpe.integer_ring();
     let (p, e) = is_prime_power(ZZ, Zpe.modulus()).unwrap();
     let wrapped_ring: IntegersWithLocalZnQuotient<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> = IntegersWithLocalZnQuotient::new(ZZ, p);
-    let reduction_context = wrapped_ring.reduction_context(e, 1);
+    let reduction_context = wrapped_ring.reduction_context(e);
 
     let Zpe_to_Zp = reduction_context.intermediate_ring_to_field_reduction(0);
     let Fp = wrapped_ring.local_field_at(Zpe_to_Zp.ideal(), 0);

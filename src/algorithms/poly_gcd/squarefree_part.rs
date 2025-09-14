@@ -102,14 +102,14 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2, Controller
     let R = RX.base_ring().get_ring();
     let F = R.local_field_at(S_to_F.ideal(), S_to_F.max_ideal_idx());
     let FX = DensePolyRing::new(&F, "X");
-    let iso = F.can_iso(S_to_F.codomain()).unwrap();
+    let iso = PolyGCDLocallyBaseRingToFieldIso::new(R, S_to_F.ideal(), S_to_F.codomain().get_ring(), F.get_ring(), S_to_F.max_ideal_idx());
 
     let f_mod_m = FX.from_terms(RX.terms(f).map(|(c, i)| (
-        iso.inv().map(R.reduce_ring_el(S_to_F.ideal(), (S_to_F.codomain(), 1), S_to_F.max_ideal_idx(), R.clone_el(c))),
+        iso.map(R.reduce_ring_el(S_to_F.ideal(), (S_to_F.codomain().get_ring(), 1), S_to_F.max_ideal_idx(), R.clone_el(c))),
         i
     )));
     let f_mod_me = SX.from_terms(RX.terms(f).map(|(c, i)| (
-        R.reduce_ring_el(S_to_F.ideal(), (S_to_F.domain(), S_to_F.from_e()), S_to_F.max_ideal_idx(), R.clone_el(c)),
+        R.reduce_ring_el(S_to_F.ideal(), (S_to_F.domain().get_ring(), S_to_F.from_e()), S_to_F.max_ideal_idx(), R.clone_el(c)),
         i
     )));
 

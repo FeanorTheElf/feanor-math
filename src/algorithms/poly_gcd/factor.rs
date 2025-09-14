@@ -87,10 +87,10 @@ pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::
     let reduction = ReductionContext::new(ring, prime, e);
     let red_map = reduction.intermediate_ring_to_field_reduction(0);
 
-    let F = ring.local_field_at(&prime, 0);
+    let iso = reduction.base_ring_to_field_iso(0);
+    let F = iso.codomain();
     let FX = DensePolyRing::new(&F, "X");
-    let iso = F.can_iso(*red_map.codomain()).unwrap();
-    let R_to_F = iso.inv().compose(reduction.main_ring_to_field_reduction(0));
+    let R_to_F = (&iso).compose(reduction.main_ring_to_field_reduction(0));
 
     let poly_mod_m = FX.lifted_hom(poly_ring, R_to_F).map_ref(poly);
     let mut factors = Vec::new();

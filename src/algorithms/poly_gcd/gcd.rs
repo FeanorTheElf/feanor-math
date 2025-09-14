@@ -69,9 +69,9 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
 
         let start = Instant::now();
         let S_to_F = reduction.intermediate_ring_to_field_reduction(idx);
-        let F = ring.local_field_at(S_to_F.ideal(), S_to_F.max_ideal_idx());
-        let F_iso = F.can_iso(*S_to_F.codomain()).unwrap();
-        let R_to_F = F_iso.inv().compose(reduction.main_ring_to_field_reduction(idx));
+        let F_iso = reduction.base_ring_to_field_iso(idx);
+        let F = F_iso.codomain();
+        let R_to_F = (&F_iso).compose(reduction.main_ring_to_field_reduction(idx));
         let FX = DensePolyRing::new(&F, "X");
         let RX_to_FX = FX.lifted_hom(poly_ring, &R_to_F);
         let end = Instant::now();

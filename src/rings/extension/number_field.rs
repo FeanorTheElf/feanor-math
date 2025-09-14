@@ -852,58 +852,6 @@ impl<'ring, I> CanIsoFromTo<Self> for NumberFieldOrderQuotient<'ring, I>
     }
 }
 
-impl<'ring, I> CanHomFrom<FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>> for NumberFieldOrderQuotient<'ring, I>
-    where I: 'ring + RingStore,
-        I::Type: IntegerRing
-{
-    type Homomorphism = <<LocalRingAsZn<'ring, I> as RingStore>::Type as CanHomFrom<<LocalRing<'ring, I> as RingStore>::Type>>::Homomorphism;
-
-    fn has_canonical_hom(&self, from: &FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>) -> Option<Self::Homomorphism> {
-        let hom = self.Zp_zn.can_hom(from.base_ring())?;
-        let poly_ring = DensePolyRing::new(&self.Zp_zn, "X");
-        if poly_ring.eq_el(&self.implementation.generating_poly(&poly_ring, ZnReductionMap::new(self.implementation.base_ring(), &self.Zp_zn).unwrap()), &RingRef::new(from).generating_poly(&poly_ring, &hom)) {
-            return Some(hom.into_raw_hom());
-        } else {
-            return None;
-        }
-    }
-
-    fn map_in_ref(&self, from: &FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>, el: &El<FreeAlgebraImpl<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>>, hom: &Self::Homomorphism) -> Self::Element {
-        let red_map = ZnReductionMap::new(&self.Zp_zn, self.implementation.base_ring()).unwrap();
-        self.implementation.from_canonical_basis(from.wrt_canonical_basis(el).iter().map(|c| {
-            red_map.map(self.Zp_zn.get_ring().map_in(from.base_ring().get_ring(), c, hom))
-        }))
-    }
-
-    fn map_in(&self, from: &FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>, el: <FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.map_in_ref(from, &el, hom)
-    }
-}
-
-impl<'ring, I> CanIsoFromTo<FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>> for NumberFieldOrderQuotient<'ring, I>
-    where I: 'ring + RingStore,
-        I::Type: IntegerRing
-{
-    type Isomorphism = <<LocalRingAsZn<'ring, I> as RingStore>::Type as CanIsoFromTo<<LocalRing<'ring, I> as RingStore>::Type>>::Isomorphism;
-
-    fn has_canonical_iso(&self, from: &FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>) -> Option<Self::Isomorphism> {
-        let iso = self.Zp_zn.can_iso(from.base_ring())?;
-        let poly_ring = DensePolyRing::new(&self.Zp_zn, "X");
-        if poly_ring.eq_el(&self.implementation.generating_poly(&poly_ring, ZnReductionMap::new(self.implementation.base_ring(), &self.Zp_zn).unwrap()), &RingRef::new(from).generating_poly(&poly_ring, &iso.inv())) {
-            return Some(iso.into_raw_iso());
-        } else {
-            return None;
-        }
-    }
-    
-    fn map_out(&self, from: &FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>>, el: Self::Element, iso: &Self::Isomorphism) -> <FreeAlgebraImplBase<LocalRing<'ring, I>, SparseMapVector<LocalRing<'ring, I>>> as RingBase>::Element {
-        let red_map = ZnReductionMap::new(self.implementation.base_ring(), &self.Zp_zn).unwrap();
-        from.from_canonical_basis(self.implementation.wrt_canonical_basis(&el).iter().map(|c| {
-            self.Zp_zn.get_ring().map_out(from.base_ring().get_ring(), red_map.map(c), iso)
-        }))
-    }
-}
-
 ///
 /// A prime ideal of a [`NumberField`].
 /// 
@@ -1027,7 +975,8 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
             let Fp_as_ring = ZZ.get_ring().local_ring_at(&p, 1, 0);
             let FpX = DensePolyRing::new(ZZ.get_ring().local_field_at(&p, 0), "X");
             let Fp = FpX.base_ring();
-            let ZZ_to_Fp = Fp.can_hom(&Fp_as_ring).unwrap().compose(PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &p, &Fp_as_ring, 1, 0));
+            let ZZ_to_Fp = LambdaHom::new(ZZ, Fp, |ZZ, Fp, x| ZZ.get_ring().base_ring_to_field(&p, Fp_as_ring.get_ring(), Fp.get_ring(), 0, 
+                ZZ.get_ring().reduce_ring_el(&p, (Fp_as_ring.get_ring(), 1), 0, ZZ.clone_el(x))));
 
             let gen_poly_mod_p = FpX.from_terms(ZZX.terms(&gen_poly).map(|(c, i)| (ZZ_to_Fp.map_ref(c), i)));
             let (factorization, _) = <_ as FactorPolyField>::factor_poly(&FpX, &gen_poly_mod_p);
@@ -1053,23 +1002,23 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
         let QQ = self.base.base_ring();
         let ZZ = QQ.base_ring();
         assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&ideal.prime));
-        let Zp = ZZ.get_ring().local_ring_at(&ideal.prime, 1, 0);
-        let Zp_zn = ZZ.get_ring().local_ring_into_zn(ZZ.get_ring().local_ring_at(&ideal.prime, 1, 0));
+        let Fp_zn = ZZ.get_ring().local_ring_into_zn(ZZ.get_ring().local_ring_at(&ideal.prime, 1, 0));
         let Fp = Zn::new(ZZ.get_ring().principal_ideal_generator(&ideal.prime) as u64).as_field().ok().unwrap();
         let FpX = &ideal.FpX;
-        let hom = ZnReductionMap::new(&Zp_zn, &Fp).unwrap().compose(Zp_zn.can_hom(&Zp).unwrap()).compose(FpX.base_ring().can_iso(&Zp).unwrap());
+        let hom = ZnReductionMap::new(&Fp_zn, &Fp).unwrap().compose(Fp_zn.can_hom(&ideal.Fp_as_ring).unwrap());
+        let Fp_to_Fp = LambdaHom::new(FpX.base_ring(), &Fp, |Fp_from, _, x| hom.map(ZZ.get_ring().field_to_base_ring(&ideal.prime, Fp_from.get_ring(), ideal.Fp_as_ring.get_ring(), 0, Fp_from.clone_el(x))));
 
         let irred_poly = &ideal.minpoly_factors_mod_p[idx];
         let mut x_pow_rank = SparseMapVector::new(FpX.degree(irred_poly).unwrap(), Fp);
         for (c, i) in FpX.terms(irred_poly) {
             if i < x_pow_rank.len() {
-                *x_pow_rank.at_mut(i) = Fp.negate(hom.map_ref(c));
+                *x_pow_rank.at_mut(i) = Fp.negate(Fp_to_Fp.map_ref(c));
             }
         }
         _ = x_pow_rank.at_mut(0);
         return RingValue::from(NumberFieldOrderQuotient {
             implementation: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new(Fp, FpX.degree(irred_poly).unwrap(), x_pow_rank))),
-            Zp_zn: Zp_zn
+            Zp_zn: Fp_zn
         });
     }
 
@@ -1095,7 +1044,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
         return FreeAlgebraImpl::new(Zpe, degree, x_pow_rank);
     }
 
-    fn reduce_ring_el<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, to: (&Self::LocalRing<'ring>, usize), idx: usize, x: Self::Element) -> El<Self::LocalRing<'ring>>
+    fn reduce_ring_el<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, to: (&Self::LocalRingBase<'ring>, usize), idx: usize, x: Self::Element) -> El<Self::LocalRing<'ring>>
         where Self: 'ring
     {
         assert!(idx < self.maximal_ideal_factor_count(ideal));
@@ -1106,31 +1055,47 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
             assert!(ZZ.is_one(QQ.get_ring().den(&x)));
             ZZ.clone_el(QQ.get_ring().num(&x))
         });
-        let ZZ_to_Zpe = PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &ideal.prime, to.0.get_ring().base_ring(), to.1, 0);
+        let ZZ_to_Zpe = PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &ideal.prime, to.0.base_ring(), to.1, 0);
 
         ZZX.evaluate(
             &self.base.poly_repr(ZZX, &x, partial_QQ_to_ZZ), 
             &to.0.canonical_gen(), 
-            to.0.inclusion().compose(ZZ_to_Zpe)
+            RingRef::new(to.0).into_inclusion().compose(ZZ_to_Zpe)
         )
     }
 
-    fn reduce_partial<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+    fn base_ring_to_field<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, from: &Self::LocalRingBase<'ring>, to: &Self::LocalFieldBase<'ring>, idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalField<'ring>>
         where Self: 'ring
     {
         assert!(idx < self.maximal_ideal_factor_count(ideal));
-        let QQ = self.base.base_ring();
-        let ZZ = QQ.base_ring();
-        to.0.from_canonical_basis(from.0.wrt_canonical_basis(&x).iter().map(|c| ZZ.get_ring().reduce_partial(&ideal.prime, (from.0.base_ring(), from.1), (to.0.base_ring(), to.1), 0, c)))
+        let hom = ZnReductionMap::new(&to.Zp_zn, to.implementation.base_ring()).unwrap().compose(to.Zp_zn.can_hom(from.base_ring()).unwrap());
+        to.implementation.from_canonical_basis(from.wrt_canonical_basis(&x).iter().map(|c| hom.map(c)))
     }
 
-    fn lift_partial<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRing<'ring>, usize), to: (&Self::LocalRing<'ring>, usize), idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+    fn field_to_base_ring<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, from: &Self::LocalFieldBase<'ring>, to: &Self::LocalRingBase<'ring>, idx: usize, x: El<Self::LocalField<'ring>>) -> El<Self::LocalRing<'ring>>
+        where Self: 'ring
+    {
+        assert!(idx < self.maximal_ideal_factor_count(ideal));
+        let hom = from.Zp_zn.can_iso(to.base_ring()).unwrap().compose(ZnReductionMap::new(from.implementation.base_ring(), &from.Zp_zn).unwrap());
+        to.from_canonical_basis(from.implementation.wrt_canonical_basis(&x).iter().map(|c| hom.map(c)))
+    }
+
+    fn reduce_partial<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRingBase<'ring>, usize), to: (&Self::LocalRingBase<'ring>, usize), idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
         where Self: 'ring
     {
         assert!(idx < self.maximal_ideal_factor_count(ideal));
         let QQ = self.base.base_ring();
         let ZZ = QQ.base_ring();
-        to.0.from_canonical_basis(from.0.wrt_canonical_basis(&x).iter().map(|c| ZZ.get_ring().lift_partial(&ideal.prime, (from.0.base_ring(), from.1), (to.0.base_ring(), to.1), 0, c)))
+        to.0.from_canonical_basis(from.0.wrt_canonical_basis(&x).iter().map(|c| ZZ.get_ring().reduce_partial(&ideal.prime, (from.0.base_ring().get_ring(), from.1), (to.0.base_ring().get_ring(), to.1), 0, c)))
+    }
+
+    fn lift_partial<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRingBase<'ring>, usize), to: (&Self::LocalRingBase<'ring>, usize), idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
+        where Self: 'ring
+    {
+        assert!(idx < self.maximal_ideal_factor_count(ideal));
+        let QQ = self.base.base_ring();
+        let ZZ = QQ.base_ring();
+        to.0.from_canonical_basis(from.0.wrt_canonical_basis(&x).iter().map(|c| ZZ.get_ring().lift_partial(&ideal.prime, (from.0.base_ring().get_ring(), from.1), (to.0.base_ring().get_ring(), to.1), 0, c)))
     }
 
     fn reconstruct_ring_el<'local, 'element, 'ring, V1, V2>(&self, ideal: &Self::SuitableIdeal<'ring>, from: V1, e: usize, x: V2) -> Self::Element
