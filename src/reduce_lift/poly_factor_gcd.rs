@@ -3,13 +3,12 @@ use std::fmt::Display;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::miller_rabin::is_prime;
 use crate::computation::no_error;
-use crate::delegate::DelegateRing;
-use crate::delegate::DelegateRingImplFiniteRing;
+use crate::delegate::*;
 use crate::divisibility::*;
 use crate::homomorphism::*;
 use crate::local::PrincipalLocalRing;
-use crate::primitive_int::StaticRing;
 use crate::integer::*;
+use crate::ordered::OrderedRing;
 use crate::ring::*;
 use crate::rings::zn::*;
 use crate::seq::*;
@@ -94,7 +93,7 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
     type LocalRingBase<'ring>: ?Sized + LinSolveRing
         where Self: 'ring;
 
-    type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
+    type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>> + Clone
         where Self: 'ring;
     
     ///
@@ -103,10 +102,10 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
     /// For the reason why there are so many quite specific trait bounds here:
     /// See the doc of [`crate::reduce_lift::poly_eval::EvalPolyLocallyRing::LocalRingBase`].
     /// 
-    type LocalFieldBase<'ring>: ?Sized + PolyTFracGCDRing + FactorPolyField + Field + SelfIso
+    type LocalFieldBase<'ring>: ?Sized + PolyTFracGCDRing + FactorPolyField + Field + SelfIso + FiniteRingSpecializable
         where Self: 'ring;
 
-    type LocalField<'ring>: RingStore<Type = Self::LocalFieldBase<'ring>>
+    type LocalField<'ring>: RingStore<Type = Self::LocalFieldBase<'ring>> + Clone
         where Self: 'ring;
 
     ///
@@ -226,20 +225,20 @@ pub trait IntegerPolyGCDRing: PolyGCDLocallyDomain {
     type LocalRingAsZnBase<'ring>: ?Sized + CanIsoFromTo<Self::LocalRingBase<'ring>> + ZnRing + SelfIso
         where Self: 'ring;
 
-    type LocalRingAsZn<'ring>: RingStore<Type = Self::LocalRingAsZnBase<'ring>>
+    type LocalRingAsZn<'ring>: RingStore<Type = Self::LocalRingAsZnBase<'ring>> + Clone
         where Self: 'ring;
 
     fn local_ring_as_zn<'a, 'ring>(&self, local_field: &'a Self::LocalRing<'ring>) -> &'a Self::LocalRingAsZn<'ring>;
 
     fn local_ring_into_zn<'ring>(&self, local_field: Self::LocalRing<'ring>) -> Self::LocalRingAsZn<'ring>;
 
-    fn principal_ideal_generator<'ring>(&self, p: &Self::SuitableIdeal<'ring>) -> i64
+    fn principal_ideal_generator<'ring>(&self, p: &Self::SuitableIdeal<'ring>) -> El<BigIntRing>
         where Self: 'ring
     {
         assert_eq!(1, self.maximal_ideal_factor_count(p));
         let Fp = self.local_ring_at(p, 1, 0);
         let Fp = self.local_ring_as_zn(&Fp);
-        return int_cast(Fp.integer_ring().clone_el(Fp.modulus()), StaticRing::<i64>::RING, Fp.integer_ring());
+        return int_cast(Fp.integer_ring().clone_el(Fp.modulus()), BigIntRing::RING, Fp.integer_ring());
     }
 }
 
@@ -893,14 +892,14 @@ impl<R> PolyGCDLocallyDomain for R
 
 #[stability::unstable(feature = "enable")]
 pub struct IntegersWithLocalZnQuotient<'a, R>
-    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing + Clone
 {
     integers: &'a R::IntegerRing,
     prime: El<R::IntegerRing>
 }
 
 impl<'a, R> IntegersWithLocalZnQuotient<'a, R>
-    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing + Clone
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(integers: &'a R::IntegerRing, prime: El<R::IntegerRing>) -> Self {
@@ -922,7 +921,7 @@ impl<'a, R> IntegersWithLocalZnQuotient<'a, R>
 }
 
 impl<'a, R> PartialEq for IntegersWithLocalZnQuotient<'a, R>
-    where R: ?Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
+    where R: ?Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing + Clone
 {
     fn eq(&self, other: &Self) -> bool {
         self.integers.get_ring() == other.integers.get_ring()
@@ -930,7 +929,7 @@ impl<'a, R> PartialEq for IntegersWithLocalZnQuotient<'a, R>
 }
 
 impl<'a, R> DelegateRing for IntegersWithLocalZnQuotient<'a, R>
-    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing + Clone
 {
     type Base = <R as ZnRing>::IntegerRingBase;
     type Element = El<<R as ZnRing>::IntegerRing>;
@@ -945,16 +944,97 @@ impl<'a, R> DelegateRing for IntegersWithLocalZnQuotient<'a, R>
     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
 }
 
+impl<'a, R> OrderedRing for IntegersWithLocalZnQuotient<'a, R>
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + Clone
+{
+    fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering { self.get_delegate().cmp(self.delegate_ref(lhs), self.delegate_ref(rhs)) }
+    fn abs_cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering { self.get_delegate().abs_cmp(self.delegate_ref(lhs), self.delegate_ref(rhs)) }
+}
+
 impl<'a, R> Domain for IntegersWithLocalZnQuotient<'a, R>
-    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + Clone
 {}
 
 impl<'a, R> DelegateRingImplFiniteRing for IntegersWithLocalZnQuotient<'a, R>
-    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + Clone
 {}
 
+impl<'a, R> DelegateRingImplEuclideanRing for IntegersWithLocalZnQuotient<'a, R>
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + Clone
+{}
+
+impl<'a, R> crate::reduce_lift::poly_eval::EvalPolyLocallyRing for IntegersWithLocalZnQuotient<'a, R>
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + Clone
+{
+    type LocalRingBase<'ring> = <<Self as DelegateRing>::Base as crate::reduce_lift::poly_eval::EvalPolyLocallyRing>::LocalRingBase<'ring>
+        where Self: 'ring;
+    type LocalRing<'ring> = <<Self as DelegateRing>::Base as crate::reduce_lift::poly_eval::EvalPolyLocallyRing>::LocalRing<'ring>
+        where Self: 'ring;
+    type LocalComputationData<'ring> = <<Self as DelegateRing>::Base as crate::reduce_lift::poly_eval::EvalPolyLocallyRing>::LocalComputationData<'ring>
+        where Self:'ring;
+    
+    fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
+        self.get_delegate().ln_pseudo_norm(self.delegate_ref(el))
+    }
+    
+    fn reduce<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &Self::Element) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
+        where Self: 'ring
+    {
+        self.get_delegate().reduce(computation, self.delegate_ref(el))
+    }
+
+    fn local_ring_count<'ring>(&self, computation: &Self::LocalComputationData<'ring>) -> usize
+        where Self: 'ring
+    {
+        self.get_delegate().local_ring_count(computation)
+    }
+
+    fn local_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
+        where Self: 'ring
+    {
+        crate::reduce_lift::poly_eval::EvalPolyLocallyRing::local_ring_at(self.get_delegate(), computation, i)
+    }
+
+    fn local_computation<'ring>(&'ring self, ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
+        self.get_delegate().local_computation(ln_pseudo_norm_bound)
+    }
+
+    fn lift_combine<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
+        where Self: 'ring
+    {
+        self.rev_delegate(self.get_delegate().lift_combine(computation, el))
+    }
+}
+
+impl<'a, R> IntegerRing for IntegersWithLocalZnQuotient<'a, R>
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + Clone
+{
+    fn to_float_approx(&self, value: &Self::Element) -> f64 { self.get_delegate().to_float_approx(self.delegate_ref(self.rev_element_cast_ref(value))) }
+    fn from_float_approx(&self, value: f64) -> Option<Self::Element> { self.get_delegate().from_float_approx(value).map(|x| self.element_cast(self.rev_delegate(x))) }
+    fn abs_is_bit_set(&self, value: &Self::Element, i: usize) -> bool { self.get_delegate().abs_is_bit_set(self.delegate_ref(self.rev_element_cast_ref(value)), i) }
+    fn abs_highest_set_bit(&self, value: &Self::Element) -> Option<usize> { self.get_delegate().abs_highest_set_bit(self.delegate_ref(self.rev_element_cast_ref(value))) }
+    fn abs_lowest_set_bit(&self, value: &Self::Element) -> Option<usize> { self.get_delegate().abs_lowest_set_bit(self.delegate_ref(self.rev_element_cast_ref(value))) }
+    fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, rng: G) -> Self::Element { self.element_cast(self.rev_delegate(self.get_delegate().get_uniformly_random_bits(log2_bound_exclusive, rng))) }
+    fn rounded_div(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element { self.element_cast(self.rev_delegate(self.get_delegate().rounded_div(self.delegate(self.rev_element_cast(lhs)), self.delegate_ref(self.rev_element_cast_ref(rhs))))) }
+    fn ceil_div(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element { self.element_cast(self.rev_delegate(self.get_delegate().ceil_div(self.delegate(self.rev_element_cast(lhs)), self.delegate_ref(self.rev_element_cast_ref(rhs))))) } 
+    fn floor_div(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element { self.element_cast(self.rev_delegate(self.get_delegate().floor_div(self.delegate(self.rev_element_cast(lhs)), self.delegate_ref(self.rev_element_cast_ref(rhs))))) }
+    fn power_of_two(&self, power: usize) -> Self::Element { self.element_cast(self.rev_delegate(self.get_delegate().power_of_two(power))) }
+    fn representable_bits(&self) -> Option<usize> { self.get_delegate().representable_bits() }
+    fn parse(&self, string: &str, base: u32) -> Result<Self::Element, ()> { self.get_delegate().parse(string, base).map(|x| self.element_cast(self.rev_delegate(x))) }
+
+    fn euclidean_div_pow_2(&self, value: &mut Self::Element, power: usize) {
+        self.get_delegate().euclidean_div_pow_2(self.delegate_mut(self.rev_element_cast_mut(value)), power);
+        self.postprocess_delegate_mut(self.rev_element_cast_mut(value));
+    }
+
+    fn mul_pow_2(&self, value: &mut Self::Element, power: usize) {
+        self.get_delegate().mul_pow_2(self.delegate_mut(self.rev_element_cast_mut(value)), power);
+        self.postprocess_delegate_mut(self.rev_element_cast_mut(value));
+    }
+}
+
 impl<'a, R> PolyGCDLocallyDomain for IntegersWithLocalZnQuotient<'a, R>
-    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing + Clone
 {
     type LocalRingBase<'ring> = R
         where Self: 'ring;
@@ -1072,5 +1152,26 @@ impl<'a, R> PolyGCDLocallyDomain for IntegersWithLocalZnQuotient<'a, R>
         where Self: 'ring
     {
         self.dbg(ideal, out)
+    }
+}
+
+impl<'a, R> IntegerPolyGCDRing for IntegersWithLocalZnQuotient<'a, R>
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing + Clone
+{
+    type LocalRingAsZn<'ring> = Self::LocalRing<'ring>
+        where Self:'ring;
+    type LocalRingAsZnBase<'ring> = Self::LocalRingBase<'ring>
+        where Self:'ring;
+
+    fn local_ring_as_zn<'b, 'ring>(&self, local_field: &'b Self::LocalRing<'ring>) -> &'b Self::LocalRingAsZn<'ring>
+        where Self: 'ring
+    {
+        local_field
+    }
+
+    fn local_ring_into_zn<'ring>(&self, local_field: Self::LocalRing<'ring>) -> Self::LocalRingAsZn<'ring>
+        where Self: 'ring
+    {
+        local_field
     }
 }

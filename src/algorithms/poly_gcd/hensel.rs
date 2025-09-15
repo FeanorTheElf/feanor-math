@@ -13,7 +13,6 @@ use crate::reduce_lift::poly_factor_gcd::*;
 
 use crate::computation::DontObserve;
 use super::DensePolyRing;
-use super::AsFieldBase;
 
 ///
 /// Given a monic polynomial `f` modulo `p^r` and a factorization `f = gh mod p^e`
@@ -273,7 +272,7 @@ fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Contro
 pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> Option<(El<P>, El<P>)>
     where P: RingStore,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + Clone
 {
     if poly_ring.is_zero(f) {
         if poly_ring.is_one(g) {

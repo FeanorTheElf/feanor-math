@@ -145,8 +145,8 @@ fn factor_squarefree_monic_integer_poly_local<'a, P, Controller>(ZZX: P, f: &El<
 
         let prime = ZZ.get_ring().random_suitable_ideal(|| rng.rand_u64());
         assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&prime));
-        let prime_i64 = ZZ.get_ring().principal_ideal_generator(&prime);
-        let e = (bound / (prime_i64 as f64).ln()).ceil() as usize + 1;
+        let prime_f64 = BigIntRing::RING.to_float_approx(&ZZ.get_ring().principal_ideal_generator(&prime));
+        let e = (bound / prime_f64.ln()).ceil() as usize + 1;
         log_progress!(controller, "(mod={}^{})", IdealDisplayWrapper::new(ZZ.get_ring(), &prime), e);
         match factor_and_lift_mod_pe(ZZX, &prime, e, f, controller.clone()) {
             FactorAndLiftModpeResult::Irreducible => return vec![ZZX.clone_el(f)],

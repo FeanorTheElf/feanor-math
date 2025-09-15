@@ -27,7 +27,7 @@ use crate::algorithms::poly_gcd::hensel::local_zn_ring_bezout_identity;
 pub fn invert_over_local_zn<S>(ring: S, el: &El<S>) -> Option<El<S>>
     where S: RingStore,
         S::Type: FreeAlgebra,
-        <<S::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing
+        <<S::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + Clone
 {
     let base_ring = ring.base_ring();
     let poly_ring = DensePolyRing::new(base_ring, "X");
