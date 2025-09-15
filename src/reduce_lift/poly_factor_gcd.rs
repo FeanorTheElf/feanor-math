@@ -893,15 +893,14 @@ impl<R> PolyGCDLocallyDomain for R
 
 #[stability::unstable(feature = "enable")]
 pub struct IntegersWithLocalZnQuotient<'a, R>
-    where R: Sized + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
 {
     integers: &'a R::IntegerRing,
     prime: El<R::IntegerRing>
 }
 
 impl<'a, R> IntegersWithLocalZnQuotient<'a, R>
-    where R: Sized + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing,
-        AsFieldBase<RingValue<R>>: CanIsoFromTo<R> + SelfIso
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(integers: &'a R::IntegerRing, prime: El<R::IntegerRing>) -> Self {
@@ -923,7 +922,7 @@ impl<'a, R> IntegersWithLocalZnQuotient<'a, R>
 }
 
 impl<'a, R> PartialEq for IntegersWithLocalZnQuotient<'a, R>
-    where R: ?Sized + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
+    where R: ?Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
 {
     fn eq(&self, other: &Self) -> bool {
         self.integers.get_ring() == other.integers.get_ring()
@@ -931,7 +930,7 @@ impl<'a, R> PartialEq for IntegersWithLocalZnQuotient<'a, R>
 }
 
 impl<'a, R> DelegateRing for IntegersWithLocalZnQuotient<'a, R>
-    where R: Sized + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
 {
     type Base = <R as ZnRing>::IntegerRingBase;
     type Element = El<<R as ZnRing>::IntegerRing>;
@@ -947,16 +946,15 @@ impl<'a, R> DelegateRing for IntegersWithLocalZnQuotient<'a, R>
 }
 
 impl<'a, R> Domain for IntegersWithLocalZnQuotient<'a, R>
-    where R: Sized + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing
 {}
 
 impl<'a, R> DelegateRingImplFiniteRing for IntegersWithLocalZnQuotient<'a, R>
-    where R: Sized + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing
 {}
 
 impl<'a, R> PolyGCDLocallyDomain for IntegersWithLocalZnQuotient<'a, R>
-    where R: Sized + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing,
-        AsFieldBase<RingValue<R>>: CanIsoFromTo<R> + SelfIso
+    where R: Sized + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + LinSolveRing
 {
     type LocalRingBase<'ring> = R
         where Self: 'ring;

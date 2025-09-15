@@ -273,8 +273,7 @@ fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Contro
 pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> Option<(El<P>, El<P>)>
     where P: RingStore,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing,
-        AsFieldBase<RingValue<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>>: CanIsoFromTo<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> + SelfIso
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing
 {
     if poly_ring.is_zero(f) {
         if poly_ring.is_one(g) {
@@ -297,9 +296,8 @@ pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> O
 
     let Zpe_to_Zp = reduction_context.intermediate_ring_to_field_reduction(0);
     let Fp = wrapped_ring.local_field_at(Zpe_to_Zp.ideal(), 0);
-    let Zp = Zpe_to_Zp.codomain();
     let FpX = DensePolyRing::new(&Fp, "X");
-    let Zpe_to_Fp = Fp.can_hom(&Zp).unwrap().compose(&Zpe_to_Zp);
+    let Zpe_to_Fp = reduction_context.base_ring_to_field_iso(0).compose(&Zpe_to_Zp);
     let ZpeX_to_FpX = FpX.lifted_hom(&poly_ring, &Zpe_to_Fp);
 
     let (mut s_base, mut t_base, d_base) = FpX.extended_ideal_gen(&ZpeX_to_FpX.map_ref(f), &ZpeX_to_FpX.map_ref(g));
