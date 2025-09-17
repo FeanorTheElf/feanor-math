@@ -79,6 +79,14 @@ pub trait PolyRing: RingExtension {
     /// This function panics if `rhs` is not monic.
     /// 
     fn div_rem_monic(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element);
+
+    ///
+    /// Truncates the monomials of the given polynomial from the given position on, i.e.
+    /// computes the remainder of the polynomial division of `lhs` by `X^truncated_at_inclusive`.
+    /// 
+    fn truncate_monomials(&self, lhs: &mut Self::Element, truncated_at_inclusive: usize) {
+        *lhs = RingRef::new(self).from_terms(self.terms(lhs).filter(|(_, i)| *i < truncated_at_inclusive).map(|(c, i)| (self.base_ring().clone_el(c), i)))
+    }
     
     fn map_terms<P, H>(&self, from: &P, el: &P::Element, hom: H) -> Self::Element
         where P: ?Sized + PolyRing,
@@ -144,6 +152,7 @@ pub trait PolyRingStore: RingStore
     delegate!{ PolyRing, fn degree(&self, f: &El<Self>) -> Option<usize> }
     delegate!{ PolyRing, fn mul_assign_monomial(&self, lhs: &mut El<Self>, rhs_power: usize) -> () }
     delegate!{ PolyRing, fn div_rem_monic(&self, lhs: El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>) }
+    delegate!{ PolyRing, fn truncate_monomials(&self, lhs: &mut El<Self>, truncated_at_degree: usize) -> () }
 
     ///
     /// See [`PolyRing::coefficient_at()`].
@@ -554,6 +563,22 @@ pub mod generic_tests {
             }
         }
 
+        // test truncate_monomials()
+        for a in &elements {
+            for b in &elements {
+                for i in 2..5 {
+                    let a = ring.from_terms([(ring.base_ring().clone_el(a), 0), (ring.base_ring().one(), 3), (ring.base_ring().clone_el(b), 4), (ring.base_ring().one(), 5)]);
+                    let mut a_trunc = ring.clone_el(&a);
+                    ring.truncate_monomials(&mut a_trunc, i);
+                    assert_el_eq!(
+                        &ring,
+                        ring.div_rem_monic(ring.clone_el(&a), &ring.from_terms([(ring.base_ring().one(), i)])).1,
+                        a_trunc
+                    );
+                }
+            }
+        }
+
         // test evaluate()
         let hom = ring.base_ring().int_hom();
         let base_ring = hom.codomain();
@@ -597,12 +622,12 @@ fn test_dbg_poly() {
     assert_eq!("X", to_str(&ring, &f1, EnvBindingStrength::Sum));
     assert_eq!("X", to_str(&ring, &f1, EnvBindingStrength::Product));
     assert_eq!("X", to_str(&ring, &f1, EnvBindingStrength::Power));
-    assert_eq!("1 + X", to_str(&ring, &f2, EnvBindingStrength::Sum));
-    assert_eq!("(1 + X)", to_str(&ring, &f2, EnvBindingStrength::Product));
-    assert_eq!("(1 + X)", to_str(&ring, &f2, EnvBindingStrength::Power));
-    assert_eq!("1 + 2X", to_str(&ring, &f3, EnvBindingStrength::Sum));
-    assert_eq!("(1 + 2X)", to_str(&ring, &f3, EnvBindingStrength::Product));
-    assert_eq!("(1 + 2X)", to_str(&ring, &f3, EnvBindingStrength::Power));
+    assert_eq!("X + 1", to_str(&ring, &f2, EnvBindingStrength::Sum));
+    assert_eq!("(X + 1)", to_str(&ring, &f2, EnvBindingStrength::Product));
+    assert_eq!("(X + 1)", to_str(&ring, &f2, EnvBindingStrength::Power));
+    assert_eq!("2X + 1", to_str(&ring, &f3, EnvBindingStrength::Sum));
+    assert_eq!("(2X + 1)", to_str(&ring, &f3, EnvBindingStrength::Product));
+    assert_eq!("(2X + 1)", to_str(&ring, &f3, EnvBindingStrength::Power));
     assert_eq!("2X", to_str(&ring, &f4, EnvBindingStrength::Sum));
     assert_eq!("2X", to_str(&ring, &f4, EnvBindingStrength::Product));
     assert_eq!("(2X)", to_str(&ring, &f4, EnvBindingStrength::Power));

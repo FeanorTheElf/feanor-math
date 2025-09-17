@@ -380,7 +380,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingE
 pub struct TermIterator<'a, R>
     where R: RingStore
 {
-    iter: std::iter::Enumerate<std::slice::Iter<'a, El<R>>>,
+    iter: std::iter::Rev<std::iter::Enumerate<std::slice::Iter<'a, El<R>>>>,
     ring: &'a R
 }
 
@@ -462,7 +462,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
 
     fn terms<'a>(&'a self, f: &'a Self::Element) -> TermIterator<'a, R> {
         TermIterator {
-            iter: f.data.iter().enumerate(), 
+            iter: f.data.iter().enumerate().rev(), 
             ring: self.base_ring()
         }
     }
@@ -476,6 +476,10 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
             }
             self.base_ring().add_assign(&mut lhs.data[i], c);
         }
+    }
+
+    fn truncate_monomials(&self, lhs: &mut Self::Element, truncated_at_degree: usize) {
+        lhs.data.truncate(truncated_at_degree)
     }
 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, i: usize) -> &'a El<Self::BaseRing> {
@@ -569,7 +573,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> EvalPolyLocallyR
     {
         return data.1.iter().map(|x| self.evaluate(el, x, &data.0)).collect::<Vec<_>>();
     }
-        
+
     fn lift_combine<'ring>(&self, data: &Self::LocalComputationData<'ring>, els: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
         where Self: 'ring
     {
@@ -800,7 +804,7 @@ fn test_print() {
         (base_poly_ring.from_terms([(1, 0), (2, 2)].into_iter()), 0),
         (base_poly_ring.from_terms([(3, 0), (4, 2)].into_iter()), 2)
     ].into_iter());
-    assert_eq!("1 + 2X^2 + (3 + 4X^2)Y^2", format!("{}", poly_ring.format(&poly)));
+    assert_eq!("(4X^2 + 3)Y^2 + 2X^2 + 1", format!("{}", poly_ring.format(&poly)));
 
     let poly = poly_ring.from_terms([
         (base_poly_ring.zero(), 0),

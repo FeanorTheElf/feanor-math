@@ -240,6 +240,9 @@ pub fn poly_gcd_local<P, Controller>(poly_ring: P, mut f: El<P>, mut g: El<P>, c
 
     let mut result = unevaluate_aX(poly_ring, &d_monic, &a);
     _ = poly_ring.balance_poly(&mut result);
+    if let Some(lc_inv) = poly_ring.base_ring().invert(poly_ring.lc(&result).unwrap()) {
+        poly_ring.inclusion().mul_assign_map(&mut result, lc_inv);
+    }
     return result;
 }
 

@@ -38,20 +38,28 @@ pub fn poly_div_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left
     if lhs_deg < rhs_deg {
         return Ok((poly_ring.zero(), lhs));
     }
-    let mut result = poly_ring.zero();
-    for i in (0..(lhs_deg + 1 - rhs_deg)).rev() {
-        let quo = left_div_lc(poly_ring.coefficient_at(&lhs, i +  rhs_deg))?;
-        if !poly_ring.base_ring().is_zero(&quo) {
-            poly_ring.get_ring().add_assign_from_terms(
-                &mut lhs, 
-                poly_ring.terms(rhs)
-                    .map(|(c, j)| {
-                        (poly_ring.base_ring().negate(poly_ring.base_ring().mul_ref(&quo, c)), i + j)
-                    })
-            );
-        }
-        poly_ring.get_ring().add_assign_from_terms(&mut result, std::iter::once((quo, i)));
-    }
+    let result = poly_ring.try_from_terms(
+#[test]
+fn test_poly_div_rem_finite_reduced() {
+    let base_ring = Zn::new(5 * 7 * 11);
+    let ring = DensePolyRing::new(base_ring, "X");
+
+    let [f, g, _q, _r] = ring.with_wrapped_indeterminate(|X| [
+
+        (0..(lhs_deg + 1 - rhs_deg)).rev().map(|i| {
+            let quo = left_div_lc(poly_ring.coefficient_at(&lhs, i +  rhs_deg))?;
+            let neg_quo = poly_ring.base_ring().negate(quo);
+            if !poly_ring.base_ring().is_zero(&neg_quo) {
+                poly_ring.get_ring().add_assign_from_terms(
+                    &mut lhs, 
+                    poly_ring.terms(rhs).map(|(c, j)| 
+                        (poly_ring.base_ring().mul_ref(&neg_quo, c), i + j)
+                    )
+                );
+            }
+            Ok((poly_ring.base_ring().negate(neg_quo), i))
+        })
+    )?;
     return Ok((result, lhs));
 }
 

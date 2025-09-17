@@ -59,6 +59,8 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P
         )));
         if let Some(mut root_of_factor) = poly_root(RX, &power_factor, sig.perfect_power) {
             _ = RX.balance_poly(&mut root_of_factor);
+            let lc_inv = RX.base_ring().invert(RX.lc(&root_of_factor).unwrap()).unwrap();
+            RX.inclusion().mul_assign_map(&mut root_of_factor, lc_inv);
             result.push((root_of_factor, sig.perfect_power));
         } else {
             return None;
