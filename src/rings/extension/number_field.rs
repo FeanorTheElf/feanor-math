@@ -613,7 +613,7 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        let controller = LOG_PROGRESS;
+        let controller = DontObserve;
         let self_ = NumberFieldByOrder { base: RingRef::new(poly_ring.base_ring().get_ring()) };
         let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
 

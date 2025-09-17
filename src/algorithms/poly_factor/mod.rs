@@ -1,4 +1,5 @@
-use crate::computation::LOG_PROGRESS;
+use crate::computation::*;
+use super::poly_gcd::PolyTFracGCDRing;
 use crate::field::*;
 use crate::homomorphism::*;
 use crate::integer::*;
@@ -127,7 +128,7 @@ impl<R: ?Sized> FactorPolyField for R
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        poly_factor_finite_field(poly_ring, poly, LOG_PROGRESS)
+        poly_factor_finite_field(poly_ring, poly, DontObserve)
     }
 }
 
@@ -149,8 +150,6 @@ impl<I> FactorPolyField for RationalFieldBase<I>
 use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::rings::zn::*;
-
-use super::poly_gcd::PolyTFracGCDRing;
 
 #[test]
 fn test_factor_rational_poly() {

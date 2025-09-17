@@ -31,7 +31,7 @@ pub fn poly_factor_rational<'a, P, I>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>
     
     let ZZX = DensePolyRing::new(ZZ, "X");
     let f = ZZX.from_terms(QQX.terms(poly).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
-    let mut factorization = poly_factor_integer(&ZZX, f, LOG_PROGRESS);
+    let mut factorization = poly_factor_integer(&ZZX, f, DontObserve);
     factorization.sort_unstable_by_key(|(factor, e)| (ZZX.degree(factor).unwrap(), *e));
 
     let ZZX_to_QQX = QQX.lifted_hom(&ZZX, QQ.inclusion());
