@@ -6,7 +6,6 @@ use crate::computation::*;
 use crate::divisibility::*;
 use crate::reduce_lift::poly_factor_gcd::*;
 use crate::homomorphism::*;
-use crate::integer::*;
 use crate::pid::*;
 use crate::rings::field::*;
 use crate::ring::*;
@@ -36,12 +35,6 @@ pub mod squarefree_part;
 /// Contains algorithms for computing the gcd of polynomials.
 /// 
 pub mod gcd;
-///
-/// Contains algorithms for computing the factorization of polynomials.
-/// 
-/// TODO: move to [`crate::algorithms::poly_factor`].
-/// 
-pub mod factor;
 
 const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
 
@@ -339,6 +332,15 @@ impl<R> PolyTFracGCDRing for R
     }
 }
 
+#[cfg(test)]
+use crate::rings::extension::galois_field::GaloisField;
+#[cfg(test)]
+use crate::rings::zn::zn_64;
+#[cfg(test)]
+use crate::rings::zn::ZnRingStore;
+#[cfg(test)]
+use crate::integer::*;
+
 #[test]
 fn test_poly_root() {
     let ring = BigIntRing::RING;
@@ -353,13 +355,6 @@ fn test_poly_root() {
         assert_el_eq!(&poly_ring, &f, poly_root(&poly_ring, &poly_ring.pow(poly_ring.clone_el(&f), k), k).unwrap());
     }
 }
-
-#[cfg(test)]
-use crate::rings::extension::galois_field::GaloisField;
-#[cfg(test)]
-use crate::rings::zn::zn_64;
-#[cfg(test)]
-use crate::rings::zn::ZnRingStore;
 
 #[test]
 fn test_poly_gcd_galois_field() {

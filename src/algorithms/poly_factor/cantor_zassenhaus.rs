@@ -2,6 +2,7 @@ use std::alloc::Global;
 
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
+use crate::computation::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::algorithms::unity_root::get_prim_root_of_unity;
 use crate::divisibility::DivisibilityRingStore;
@@ -220,19 +221,22 @@ pub fn cantor_zassenhaus_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) -> El
 /// `T` of very large degree with `T mod f`, i.e. with a random polynomial of degree `d - 1`.
 ///
 #[stability::unstable(feature = "enable")]
-pub fn cantor_zassenhaus<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
+pub fn cantor_zassenhaus<P, Controller>(poly_ring: P, mut f: El<P>, d: usize, controller: Controller) -> El<P>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P as RingStore>::Type as RingExtension>::BaseRing: RingStore + FieldStore,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field,
+        Controller: ComputationController
 {
-    f = poly_ring.normalize(f);
+    controller.run_computation(format_args!("cantor_zassenhaus(deg={}, fdeg={})", poly_ring.degree(&f).unwrap(), d), |_| {
+        f = poly_ring.normalize(f);
 
-    let f_coeffs = (0..poly_ring.degree(&f).unwrap()).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))).collect::<Vec<_>>();
-    let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
+        let f_coeffs = (0..poly_ring.degree(&f).unwrap()).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))).collect::<Vec<_>>();
+        let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
 
-    let result = cantor_zassenhaus_base(&poly_ring, mod_f_ring, d);
-    return result;
+        let result = cantor_zassenhaus_base(&poly_ring, mod_f_ring, d);
+        return result;
+    })
 }
 
 ///
@@ -355,19 +359,22 @@ pub fn cantor_zassenhaus_even_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) 
 /// assuming all its irreducible factors have degree `d`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn cantor_zassenhaus_even<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
+pub fn cantor_zassenhaus_even<P, Controller>(poly_ring: P, mut f: El<P>, d: usize, controller: Controller) -> El<P>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P as RingStore>::Type as RingExtension>::BaseRing: RingStore + FieldStore,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso
+        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso,
+        Controller: ComputationController
 {
-    f = poly_ring.normalize(f);
+    controller.run_computation(format_args!("cantor_zassenhaus(deg={}, fdeg={})", poly_ring.degree(&f).unwrap(), d), |_| {
+        f = poly_ring.normalize(f);
 
-    let f_coeffs = (0..poly_ring.degree(&f).unwrap()).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))).collect::<Vec<_>>();
-    let mod_f_ring = FreeAlgebraImpl::new_with_convolution(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs, "x", Global, STANDARD_CONVOLUTION);
+        let f_coeffs = (0..poly_ring.degree(&f).unwrap()).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))).collect::<Vec<_>>();
+        let mod_f_ring = FreeAlgebraImpl::new_with_convolution(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs, "x", Global, STANDARD_CONVOLUTION);
 
-    let result = cantor_zassenhaus_even_base(&poly_ring, &mod_f_ring, d);
-    return result;
+        let result = cantor_zassenhaus_even_base(&poly_ring, &mod_f_ring, d);
+        return result;
+    })
 }
 
 #[cfg(test)]
@@ -424,7 +431,7 @@ fn test_cantor_zassenhaus() {
     let f = ring.from_terms([(1, 0), (1, 2)].into_iter());
     let g = ring.from_terms([(3, 0), (1, 1), (1, 2)].into_iter());
     let p = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus(&ring, p, 2));
+    let factor = ring.normalize(cantor_zassenhaus(&ring, p, 2, DontObserve));
     assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
 }
 
@@ -435,14 +442,14 @@ fn test_cantor_zassenhaus_even() {
     let f = ring.from_terms([(1, 0), (1, 1), (1, 3)].into_iter());
     let g = ring.from_terms([(1, 0), (1, 2), (1, 3)].into_iter());
     let h = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 3));
+    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 3, DontObserve));
     assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
     
     // (X^4 + X + 1) (X^4 + X^3 + 1)
     let f = ring.from_terms([(1, 0), (1, 1), (1, 4)].into_iter());
     let g = ring.from_terms([(1, 0), (1, 3), (1, 4)].into_iter());
     let h = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 4));
+    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 4, DontObserve));
     assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
 }
 
@@ -456,7 +463,7 @@ fn test_cantor_zassenhaus_even_extension_field() {
     let f = ring.from_terms([(Fq.one(), 0), (Fq.one(), 1), (Fq.one(), 3)].into_iter());
     let g = ring.from_terms([(Fq.one(), 0), (Fq.one(), 2), (Fq.one(), 3)].into_iter());
     let h = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 3));
+    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 3, DontObserve));
     assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
     
     // (X^4 + X + 1) = (X + a) (X + a + 1) (X + a^2) (X + a^2 + 1)
@@ -465,7 +472,7 @@ fn test_cantor_zassenhaus_even_extension_field() {
     let f3 = ring.from_terms([(Fq.pow(Fq.canonical_gen(), 2), 0), (Fq.one(), 1)].into_iter());
     let f4 = ring.from_terms([(Fq.add(Fq.pow(Fq.canonical_gen(), 2), Fq.one()), 0), (Fq.one(), 1)].into_iter());
     let h = ring.from_terms([(Fq.one(), 0), (Fq.one(), 1), (Fq.one(), 4)].into_iter());
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 1));
+    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 1, DontObserve));
     assert!(ring.eq_el(&factor, &f1) || ring.eq_el(&factor, &f2) || ring.eq_el(&factor, &f3) || ring.eq_el(&factor, &f4));
 
     let Fq = FreeAlgebraImpl::new(Fp::<2>::RING, 3, [1, 1, 0]).as_field().ok().unwrap();
@@ -475,6 +482,6 @@ fn test_cantor_zassenhaus_even_extension_field() {
     let f = ring.from_terms([(Fq.one(), 0), (Fq.one(), 1), (Fq.one(), 4)].into_iter());
     let g = ring.from_terms([(Fq.one(), 0), (Fq.one(), 3), (Fq.one(), 4)].into_iter());
     let h = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 4));
+    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 4, DontObserve));
     assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
 }

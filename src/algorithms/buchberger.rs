@@ -512,7 +512,7 @@ fn test_buchberger_small() {
         (15, ring.create_monomial([0, 0]))
     ].into_iter());
 
-    let actual = buchberger(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, LOG_PROGRESS).unwrap_or_else(no_error);
+    let actual = buchberger(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_LOG_PROGRESS).unwrap_or_else(no_error);
 
     let expected = ring.from_terms([
         (16, ring.create_monomial([0, 3])),
@@ -550,7 +550,7 @@ fn test_buchberger_larger() {
         (7, ring.create_monomial([0, 0, 0]))
     ].into_iter());
 
-    let actual = buchberger(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, LOG_PROGRESS).unwrap_or_else(no_error);
+    let actual = buchberger(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_LOG_PROGRESS).unwrap_or_else(no_error);
 
     let g1 = ring.from_terms([
         (1, ring.create_monomial([0, 4, 0])),
@@ -594,7 +594,7 @@ fn test_generic_computation() {
     ];
 
     let start = std::time::Instant::now();
-    let gb1 = buchberger(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, LOG_PROGRESS).unwrap_or_else(no_error);
+    let gb1 = buchberger(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_LOG_PROGRESS).unwrap_or_else(no_error);
     let end = std::time::Instant::now();
 
     println!("Computed GB in {} ms", (end - start).as_millis());
@@ -608,7 +608,7 @@ fn test_gb_local_ring() {
     let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 1);
     
     let f = ring.from_terms([(base.int_hom().map(4), ring.create_monomial([1])), (base.one(), ring.create_monomial([0]))].into_iter());
-    let gb = buchberger(&ring, vec![f], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, LOG_PROGRESS).unwrap_or_else(no_error);
+    let gb = buchberger(&ring, vec![f], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_LOG_PROGRESS).unwrap_or_else(no_error);
 
     assert_eq!(1, gb.len());
     assert_el_eq!(ring, ring.one(), gb[0]);
@@ -643,7 +643,7 @@ fn test_gb_lex() {
 static TEST_COMPUTATION_CONTROLLER: ExecuteMultithreaded<LogProgress> = RunMultithreadedLogProgress;
 #[cfg(test)]
 #[cfg(not(feature = "parallel"))]
-static TEST_COMPUTATION_CONTROLLER: LogProgress = LOG_PROGRESS;
+static TEST_COMPUTATION_CONTROLLER: LogProgress = TEST_LOG_PROGRESS;
 
 #[ignore]
 #[test]

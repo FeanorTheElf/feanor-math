@@ -1,3 +1,4 @@
+use crate::computation::LOG_PROGRESS;
 use crate::field::*;
 use crate::homomorphism::*;
 use crate::integer::*;
@@ -11,6 +12,12 @@ use crate::rings::zn::zn_64::*;
 use finite::*;
 use rational::*;
 
+///
+/// Contains algorithms for computing the factorization of polynomials.
+/// 
+/// TODO: move to [`crate::algorithms::poly_factor`].
+/// 
+pub mod factor_locally;
 ///
 /// Contains an implementation of the Cantor-Zassenhaus algorithm for
 /// finding factors of univariate polynomials over finite fields.
@@ -120,7 +127,7 @@ impl<R: ?Sized> FactorPolyField for R
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        poly_factor_finite_field(poly_ring, poly)
+        poly_factor_finite_field(poly_ring, poly, LOG_PROGRESS)
     }
 }
 

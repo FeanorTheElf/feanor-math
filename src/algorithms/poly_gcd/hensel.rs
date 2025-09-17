@@ -94,9 +94,8 @@ fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2, Controller>(
 /// 
 /// This uses quadratic Hensel lifting, thus will be faster than [`hensel_lift_linear()`]
 /// if `r >> e`.
-/// 
-#[stability::unstable(feature = "enable")]
-pub fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
+///
+fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
     reduction_map: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
@@ -119,6 +118,7 @@ pub fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
     let prime_field = base_poly_ring.base_ring();
     let prime_ring = reduction_map.codomain();
     let prime_ring_iso = PolyGCDLocallyBaseRingToFieldIso::new(reduction_map.parent_ring().into(), reduction_map.ideal(), prime_ring.get_ring(), prime_field.get_ring(), reduction_map.max_ideal_idx());
+    assert_el_eq!(base_poly_ring, base_poly_ring.lifted_hom(&target_poly_ring, (&prime_ring_iso).compose(&reduction_map)).map_ref(f), base_poly_ring.mul_ref(factors.0, factors.1));
 
     let (g, h) = factors;
     let (mut s, mut t, d) = base_poly_ring.extended_ideal_gen(g, h);
@@ -203,6 +203,8 @@ fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Contro
     let prime_field = base_poly_ring.base_ring();
     let prime_ring = reduction_map.codomain();
     let prime_ring_iso = PolyGCDLocallyBaseRingToFieldIso::new(reduction_map.parent_ring().into(), reduction_map.ideal(), prime_ring.get_ring(), prime_field.get_ring(), reduction_map.max_ideal_idx());
+    let poly_hom = base_poly_ring.lifted_hom(&target_poly_ring, (&prime_ring_iso).compose(&reduction_map));
+    assert_el_eq!(base_poly_ring, base_poly_ring.one(), base_poly_ring.add(poly_hom.mul_ref_map(s, f), poly_hom.mul_ref_map(t, g)));
 
     let f_base = base_poly_ring.lifted_hom(&target_poly_ring, (&prime_ring_iso).compose(reduction_map)).map_ref(&f);
     let g_base = base_poly_ring.lifted_hom(&target_poly_ring, (&prime_ring_iso).compose(reduction_map)).map_ref(&g);
@@ -371,7 +373,7 @@ pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V, Controller>
 }
 
 #[cfg(test)]
-use super::BigIntRing;
+use crate::integer::*;
 
 #[test]
 fn test_hensel_lift() {

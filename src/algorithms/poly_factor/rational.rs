@@ -1,5 +1,5 @@
 
-use crate::algorithms::poly_gcd::factor::poly_factor_integer;
+use crate::algorithms::poly_factor::factor_locally::poly_factor_integer;
 use crate::computation::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::ring::*;

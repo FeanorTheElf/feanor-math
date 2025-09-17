@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use crate::algorithms::interpolate::product_except_one;
 use crate::algorithms::newton::{self, absolute_error_of_poly_eval};
 use crate::algorithms::poly_factor::extension::poly_factor_extension;
-use crate::algorithms::poly_gcd::factor::{factor_and_lift_mod_pe, FactorAndLiftModpeResult};
+use crate::algorithms::poly_factor::factor_locally::{factor_and_lift_mod_pe, FactorAndLiftModpeResult};
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::poly_gcd::gcd::poly_gcd_local;
 use crate::algorithms::resultant::ComputeResultantRing;
@@ -613,7 +613,7 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        let controller = DontObserve;
+        let controller = LOG_PROGRESS;
         let self_ = NumberFieldByOrder { base: RingRef::new(poly_ring.base_ring().get_ring()) };
         let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
 
@@ -759,7 +759,6 @@ impl<'a, Impl, I> Domain for NumberFieldByOrder<'a, Impl, I>
         I::Type: IntegerRing
 {}
 
-type LocalRingAsZn<'ring, I> = <<I as RingStore>::Type as IntegerPolyGCDRing>::LocalRingAsZn<'ring>;
 type LocalRing<'ring, I> = <<I as RingStore>::Type as PolyGCDLocallyDomain>::LocalRing<'ring>;
 
 type ImplementationRing<'ring, I> = AsFieldBase<FreeAlgebraImpl<

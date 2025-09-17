@@ -4,6 +4,14 @@ use crate::algorithms::poly_gcd::*;
 use crate::algorithms::poly_gcd::hensel::*;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::poly_factor::FactorPolyField;
+use crate::computation::ComputationController;
+use crate::reduce_lift::poly_factor_gcd::*;
+use crate::ring::*;
+use crate::rings::poly::*;
+use crate::homomorphism::*;
+use crate::integer::*;
+use crate::rings::poly::dense_poly::*;
+use crate::divisibility::*;
 use crate::iters::clone_slice;
 use crate::iters::powerset;
 use crate::seq::VectorView;
@@ -206,13 +214,15 @@ pub fn poly_factor_integer<P, Controller>(ZZX: P, f: El<P>, controller: Controll
 use crate::primitive_int::*;
 #[cfg(test)]
 use crate::algorithms::poly_gcd::make_primitive;
+#[cfg(test)]
+use crate::computation::TEST_LOG_PROGRESS;
 
 #[test]
 fn test_factor_int_poly() {
     let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
     let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1, X + 1]);
     let input = ZZX.mul_ref(&f, &g);
-    let actual = poly_factor_integer(&ZZX, input, LOG_PROGRESS);
+    let actual = poly_factor_integer(&ZZX, input, TEST_LOG_PROGRESS);
     assert_eq!(2, actual.len());
     for (factor, e) in &actual {
         assert_eq!(1, *e);
@@ -221,7 +231,7 @@ fn test_factor_int_poly() {
 
     let [f, g] = ZZX.with_wrapped_indeterminate(|X| [5 * X.pow_ref(2) + 1, 3 * X.pow_ref(2) + 2]);
     let input = ZZX.mul_ref(&f, &g);
-    let actual = poly_factor_integer(&ZZX, input, LOG_PROGRESS);
+    let actual = poly_factor_integer(&ZZX, input, TEST_LOG_PROGRESS);
     assert_eq!(2, actual.len());
     for (factor, e) in &actual {
         assert_eq!(1, *e);
@@ -230,7 +240,7 @@ fn test_factor_int_poly() {
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [5 * X.pow_ref(2) + 1]);
     let input = ZZX.mul_ref(&f, &f);
-    let actual = poly_factor_integer(&ZZX, input, LOG_PROGRESS);
+    let actual = poly_factor_integer(&ZZX, input, TEST_LOG_PROGRESS);
     assert_eq!(1, actual.len());
     assert_eq!(2, actual[0].1);
     assert_el_eq!(&ZZX, &f, &actual[0].0);

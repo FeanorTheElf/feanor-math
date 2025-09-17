@@ -101,11 +101,6 @@ pub mod rational_reconstruction;
 /// 
 pub mod interpolate;
 ///
-/// Contains algorithms related to Gaussian elimination. Note that you will most likely want
-/// to use functionality from [`linsolve`] instead.
-/// 
-pub mod gauss;
-///
 /// Contains Buchberger's algorithm for computing Groebner basis.
 /// 
 pub mod buchberger;

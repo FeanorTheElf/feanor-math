@@ -280,23 +280,23 @@ fn test_squarefree_part_local() {
     };
 
     let expected = [(poly_ring.clone_el(&f1), 1)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
     assert_eq(&expected, &actual);
 
     let expected = [(poly_ring.mul_ref(&f3, &f4), 3)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
     assert_eq(&expected, &actual);
 
     let expected = [(poly_ring.clone_el(&f2), 2), (poly_ring.mul_ref(&f3, &f4), 3)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
     assert_eq(&expected, &actual);
     
     let expected = [(poly_ring.mul_ref(&f1, &f2), 1), (poly_ring.clone_el(&f4), 2), (poly_ring.clone_el(&f3), 3)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
     assert_eq(&expected, &actual);
     
     let expected = [(poly_ring.mul_ref(&f1, &f2), 2), (poly_ring.clone_el(&f4), 4), (poly_ring.clone_el(&f3), 6)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
     assert_eq(&expected, &actual);
 }
 
@@ -313,7 +313,7 @@ fn random_test_poly_power_decomposition_local() {
         let h = poly_ring.from_terms((0..=2).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
         let poly = make_primitive(&poly_ring, &poly_ring.prod([&f, &g, &g, &h, &h, &h, &h, &h].into_iter().map(|poly| poly_ring.clone_el(poly)))).0;
         
-        let mut power_decomp = poly_power_decomposition_local(&poly_ring, poly_ring.clone_el(&poly), LOG_PROGRESS);
+        let mut power_decomp = poly_power_decomposition_local(&poly_ring, poly_ring.clone_el(&poly), TEST_LOG_PROGRESS);
         for (f, _k) in &mut power_decomp {
             *f = make_primitive(&poly_ring, &f).0;
         }
