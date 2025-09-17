@@ -39,13 +39,6 @@ pub fn poly_div_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left
         return Ok((poly_ring.zero(), lhs));
     }
     let result = poly_ring.try_from_terms(
-#[test]
-fn test_poly_div_rem_finite_reduced() {
-    let base_ring = Zn::new(5 * 7 * 11);
-    let ring = DensePolyRing::new(base_ring, "X");
-
-    let [f, g, _q, _r] = ring.with_wrapped_indeterminate(|X| [
-
         (0..(lhs_deg + 1 - rhs_deg)).rev().map(|i| {
             let quo = left_div_lc(poly_ring.coefficient_at(&lhs, i +  rhs_deg))?;
             let neg_quo = poly_ring.base_ring().negate(quo);
