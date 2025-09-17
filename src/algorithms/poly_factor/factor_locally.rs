@@ -102,7 +102,7 @@ pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::
 
     let poly_mod_m = FX.lifted_hom(poly_ring, R_to_F).map_ref(poly);
     let mut factors = Vec::new();
-    for (f, k) in <_ as FactorPolyField>::factor_poly(&FX, &poly_mod_m).0 {
+    for (f, k) in <_ as FactorPolyField>::factor_poly_with_controller(&FX, &poly_mod_m, controller.clone()).0 {
         if k > 1 {
             return FactorAndLiftModpeResult::NotSquarefreeModpe;
         }

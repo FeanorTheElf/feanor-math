@@ -50,7 +50,7 @@ pub fn no_error<T>(error: !) -> T {
 /// # use feanor_math::computation::*;
 /// let ring = zn_64::Zn::new(8591966237);
 /// // factors 8591966237 while printing progress
-/// let factor = lenstra_ec_factor(ring, TEST_LOG_PROGRESS).unwrap_or_else(no_error);
+/// let factor = lenstra_ec_factor(ring, LOG_PROGRESS).unwrap_or_else(no_error);
 /// assert!(8591966237 % factor == 0);
 /// // factor it again, but don't print progress
 /// let factor = lenstra_ec_factor(ring, DontObserve).unwrap_or_else(no_error);

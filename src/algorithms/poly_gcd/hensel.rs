@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::algorithms::int_factor::is_prime_power;
 use crate::computation::ComputationController;
 use crate::local::PrincipalLocalRing;
@@ -87,6 +89,57 @@ fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2, Controller>(
     return (current_g, current_h);
 }
 
+struct HenselLiftableBarrettReducer<P: ?Sized + PolyRing> {
+    ring: PhantomData<Box<P>>,
+    n: usize,
+    neg_Xn_div_poly: P::Element,
+    poly: P::Element,
+    poly_deg: usize,
+    e: usize
+}
+
+impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
+
+    fn div_rem_poly<S>(&self, poly_ring: S, poly: El<S>) -> (El<S>, El<S>)
+        where S: RingStore<Type = P>
+    {
+        assert!(poly_ring.degree(&poly).unwrap_or(0) <= self.n);
+        let scaled_quotient = poly_ring.mul_ref(&poly, &self.neg_Xn_div_poly);
+        let quotient = poly_ring.from_terms(poly_ring.terms(&scaled_quotient).filter(|(_, i)| *i >= self.n).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i - self.n)));
+        let remainder = poly_ring.add(poly, poly_ring.mul_ref(&quotient, &self.poly));
+        let truncated_remainder = poly_ring.from_terms(poly_ring.terms(&remainder).filter(|(_, i)| *i < self.poly_deg).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
+        return (poly_ring.negate(quotient), truncated_remainder);
+    }
+
+    fn new<S>(poly_ring: S, poly: El<S>, other_d: usize, start_e: usize) -> Self
+        where S: RingStore<Type = P> + Copy
+    {
+        let poly_deg = poly_ring.degree(&poly).unwrap();
+        let n = poly_deg + other_d;
+        assert!(poly_ring.base_ring().is_one(poly_ring.lc(&poly).unwrap()));
+        let neg_Xn_div_poly = poly_ring.div_rem_monic(poly_ring.from_terms([(poly_ring.base_ring().neg_one(), n)]), &poly).0;
+        return Self {
+            ring: PhantomData,
+            n: n,
+            e: start_e,
+            poly: poly,
+            poly_deg: poly_deg,
+            neg_Xn_div_poly: neg_Xn_div_poly
+        };
+    }
+
+    fn lift<S>(&mut self, poly_ring: S, delta_poly: El<S>, new_e: usize)
+        where S: RingStore<Type = P> + Copy
+    {
+        assert!(new_e <= 2 * self.e);
+        self.e = new_e;
+        let new_f = poly_ring.add_ref(&self.poly, &delta_poly);
+        let delta_quo = self.div_rem_poly(poly_ring, poly_ring.add(poly_ring.from_terms([(poly_ring.base_ring().one(), self.n)]), poly_ring.mul_ref(&self.neg_Xn_div_poly, &new_f))).0;
+        self.poly = new_f;
+        poly_ring.sub_assign(&mut self.neg_Xn_div_poly, delta_quo);
+    }
+}
+
 ///
 /// Given a monic polynomial `f` modulo `p^r` and a factorization `f = gh mod p^e`
 /// into monic and coprime polynomials `g, h` modulo `p^e`, `r > e`, computes a factorization
@@ -119,7 +172,7 @@ fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
     let prime_ring = reduction_map.codomain();
     let prime_ring_iso = PolyGCDLocallyBaseRingToFieldIso::new(reduction_map.parent_ring().into(), reduction_map.ideal(), prime_ring.get_ring(), prime_field.get_ring(), reduction_map.max_ideal_idx());
     assert_el_eq!(base_poly_ring, base_poly_ring.lifted_hom(&target_poly_ring, (&prime_ring_iso).compose(&reduction_map)).map_ref(f), base_poly_ring.mul_ref(factors.0, factors.1));
-
+    
     let (g, h) = factors;
     let (mut s, mut t, d) = base_poly_ring.extended_ideal_gen(g, h);
     assert!(base_poly_ring.degree(&d).unwrap() == 0);
@@ -139,40 +192,47 @@ fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
 
     let mut current_s = lift_to_target_poly_ring(&s);
     let mut current_t = lift_to_target_poly_ring(&t);
-    let mut current_g = lift_to_target_poly_ring(g);
-    let mut current_h = lift_to_target_poly_ring(h);
+    let degree_delta_bound = base_poly_ring.degree(g).unwrap() + base_poly_ring.degree(h).unwrap();
+    let mut current_g = HenselLiftableBarrettReducer::new(&target_poly_ring, lift_to_target_poly_ring(g), degree_delta_bound, 1);
+    let mut current_h = HenselLiftableBarrettReducer::new(&target_poly_ring, lift_to_target_poly_ring(h), degree_delta_bound, 1);
+    log_progress!(controller, "(setup)");
+
     // we have to lift the Bezout identity starting from `e = 1`, so for simplicity,
     // start lifting everything from `e = 1` on
     let mut current_e = 1;
-
     let P = target_poly_ring;
     while current_e < reduction_map.from_e() {
-        log_progress!(controller, ".");
-
         // first, lift the polynomials
         // the formula is `g' = g - delta * t`, `h' = h - delta * s` where `delta = gh - f`
-        let delta = P.sub_ref_fst(f, P.mul_ref(&current_g, &current_h));
+        let delta = P.sub_ref_fst(f, P.mul_ref(&current_g.poly, &current_h.poly));
+        debug_assert!(P.degree(&delta).is_none() || P.degree(&delta).unwrap() < degree_delta_bound);
         let mut delta_g = P.mul_ref(&current_t, &delta);
         let mut delta_h = P.mul_ref(&current_s, &delta);
-        delta_g = P.div_rem_monic(delta_g, &current_g).1;
-        delta_h = P.div_rem_monic(delta_h, &current_h).1;
-        P.add_assign(&mut current_g, delta_g);
-        P.add_assign(&mut current_h, delta_h);
-        debug_assert!(P.degree(&current_g).unwrap() == base_poly_ring.degree(&g).unwrap());
-        debug_assert!(P.degree(&current_h).unwrap() == base_poly_ring.degree(&h).unwrap());
-
+        delta_g = current_g.div_rem_poly(&P, delta_g).1;
+        delta_h = current_h.div_rem_poly(&P, delta_h).1;
+        current_g.lift(&P, delta_g, 2 * current_e);
+        current_h.lift(&P, delta_h, 2 * current_e);
+        debug_assert!(P.degree(&current_g.poly).unwrap() == base_poly_ring.degree(&g).unwrap());
+        debug_assert!(P.degree(&current_h.poly).unwrap() == base_poly_ring.degree(&h).unwrap());
+        
         // now lift the bezout identity
         // the formula is `s' = s(2 - (sg + th))`, `t' = t(2 - (sg + th))`
-        let bezout_value = P.add(P.mul_ref(&current_s, &current_g), P.mul_ref(&current_t, &current_h));
+        let bezout_value = P.add(P.mul_ref(&current_s, &current_g.poly), P.mul_ref(&current_t, &current_h.poly));
+        debug_assert!(P.degree(&bezout_value).is_none() || P.degree(&bezout_value).unwrap() < degree_delta_bound);
         P.mul_assign(&mut current_s, P.sub_ref_snd(P.int_hom().map(2), &bezout_value));
         P.mul_assign(&mut current_t, P.sub_ref_snd(P.int_hom().map(2), &bezout_value));
-        current_s = P.div_rem_monic(current_s, &current_h).1;
-        current_t = P.div_rem_monic(current_t, &current_g).1;
+        assert!(P.degree(&current_s).is_none() || P.degree(&current_s).unwrap() < base_poly_ring.degree(&h).unwrap() + degree_delta_bound);
+        assert!(P.degree(&current_t).is_none() || P.degree(&current_t).unwrap() < base_poly_ring.degree(&g).unwrap() + degree_delta_bound);
+        current_s = current_h.div_rem_poly(&P, current_s).1;
+        current_t = current_g.div_rem_poly(&P, current_t).1;
+        debug_assert!(P.degree(&current_s).is_none() || P.degree(&current_s).unwrap() < base_poly_ring.degree(&h).unwrap());
+        debug_assert!(P.degree(&current_t).is_none() || P.degree(&current_t).unwrap() < base_poly_ring.degree(&g).unwrap());
 
         current_e = 2 * current_e;
+        log_progress!(controller, ".");
     }
-    assert_el_eq!(P, f, P.mul_ref(&current_g, &current_h));
-    return (current_g, current_h);
+    debug_assert!(P.eq_el(f, &P.mul_ref(&current_g.poly, &current_h.poly)));
+    return (current_g.poly, current_h.poly);
 }
 
 ///

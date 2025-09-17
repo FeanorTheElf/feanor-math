@@ -1,6 +1,7 @@
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::poly_div::poly_div_rem_finite_reduced;
 use crate::algorithms::poly_div::PolyDivRemReducedError;
+use crate::computation::ComputationController;
 use crate::primitive_int::*;
 use crate::ring::*;
 use crate::rings::poly::*;
@@ -16,18 +17,19 @@ use crate::rings::finite::*;
 /// `f = a prod_i fi^ki` for a unit `a` of the base field.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn poly_power_decomposition_finite_field<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
+pub fn poly_power_decomposition_finite_field<P, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> Vec<(El<P>, usize)>
     where P: RingStore + Copy,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field,
+        Controller: ComputationController
 {
     assert!(!poly_ring.is_zero(&poly));
-    let squarefree_part = poly_squarefree_part_finite_field(poly_ring, poly);
+    let squarefree_part = poly_squarefree_part_finite_field(poly_ring, poly, controller.clone());
     if poly_ring.degree(&squarefree_part).unwrap() == poly_ring.degree(&poly).unwrap() {
         return vec![(squarefree_part, 1)];
     } else {
         let square_part = poly_ring.checked_div(&poly, &squarefree_part).unwrap();
-        let square_part_decomposition = poly_power_decomposition_finite_field(poly_ring, &square_part);
+        let square_part_decomposition = poly_power_decomposition_finite_field(poly_ring, &square_part, controller);
         let mut result = square_part_decomposition;
         let mut degree = 0;
         for (g, k) in &mut result {
@@ -50,10 +52,11 @@ pub fn poly_power_decomposition_finite_field<P>(poly_ring: P, poly: &El<P>) -> V
 /// is unique.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn poly_squarefree_part_finite_field<P>(poly_ring: P, poly: &El<P>) -> El<P>
+pub fn poly_squarefree_part_finite_field<P, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> El<P>
     where P: RingStore,
         P::Type: PolyRing + PrincipalIdealRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field,
+        Controller: ComputationController
 {
     assert!(!poly_ring.is_zero(&poly));
     if poly_ring.degree(poly).unwrap() == 0 {
@@ -70,7 +73,7 @@ pub fn poly_squarefree_part_finite_field<P>(poly_ring: P, poly: &El<P>) -> El<P>
             debug_assert!(i % p == 0);
             (undo_frobenius.map_ref(c), i / p)
         }));
-        return poly_squarefree_part_finite_field(poly_ring, &base_poly);
+        return poly_squarefree_part_finite_field(poly_ring, &base_poly, controller);
     } else {
         let square_part = poly_ring.ideal_gen(poly, &derivate);
         let result = poly_ring.checked_div(poly, &square_part).unwrap();

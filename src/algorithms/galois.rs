@@ -42,9 +42,9 @@ pub fn compute_galois_closure<Controller: ComputationController>(field: NumberFi
     let (into_extension_field, roots) = splitting_field(
         poly_ring,
         poly_to_factor,
-        |poly_ring, extend_with| {
+        |poly_ring, extend_with, controller| {
             extended_field = true;
-            extend_number_field_promise_is_irreducible(poly_ring, &extend_with)
+            extend_number_field_promise_is_irreducible(poly_ring, &extend_with, controller)
         },
         controller
     );

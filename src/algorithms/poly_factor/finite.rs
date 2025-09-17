@@ -32,11 +32,11 @@ pub fn poly_factor_finite_field<P, Controller>(poly_ring: P, f: &El<P>, controll
         // we repeatedly remove the square-free part
         while !poly_ring.is_unit(&el) {
 
-            let sqrfree_part = poly_squarefree_part_finite_field(&poly_ring, &el);
+            let sqrfree_part = poly_squarefree_part_finite_field(&poly_ring, &el, controller.clone());
             assert!(!poly_ring.is_unit(&sqrfree_part));
 
             // factor the square-free part into distinct-degree factors
-            let distinct_degree_factors = cantor_zassenhaus::distinct_degree_factorization(&poly_ring, poly_ring.clone_el(&sqrfree_part));
+            let distinct_degree_factors = cantor_zassenhaus::distinct_degree_factorization(&poly_ring, poly_ring.clone_el(&sqrfree_part), controller.clone());
             for (d, factor_d) in distinct_degree_factors.into_iter().enumerate() {
                 let mut stack = Vec::new();
                 stack.push(factor_d);
