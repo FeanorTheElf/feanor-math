@@ -22,7 +22,7 @@ use crate::seq::*;
 use crate::serialization::*;
 
 use std::alloc::{Allocator, Global};
-use std::cmp::min;
+use std::cmp::{min, max};
 
 ///
 /// The univariate polynomial ring `R[X]`. Polynomials are stored as dense vectors of
@@ -373,14 +373,16 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingE
         return result;
     }
 
-    fn fma_base(&self, lhs: &Self::Element, rhs: &El<Self::BaseRing>, mut summand: Self::Element) -> Self::Element {
-        for i in 0..min(lhs.data.len(), summand.data.len()) {
-            self.base_ring.add_assign(&mut summand.data[i], self.base_ring().mul_ref(&lhs.data[i], rhs));
-        }
-        for i in min(lhs.data.len(), summand.data.len())..lhs.data.len() {
-            summand.data.push(self.base_ring().mul_ref(&lhs.data[i], rhs));
-        }
-        return summand;
+    fn fma_base(&self, lhs: &Self::Element, rhs: &El<Self::BaseRing>, summand: Self::Element) -> Self::Element {
+        let lhs_len = self.degree(lhs).map(|d| d + 1).unwrap_or(0);
+        let len = max(lhs_len, self.degree(&summand).map(|d| d + 1).unwrap_or(0));
+        let mut result = Vec::with_capacity_in(len, self.element_allocator.clone());
+        let mut summand_it = summand.data.into_iter();
+        result.extend(summand_it.by_ref().take(min(len, lhs_len)).enumerate().map(|(i, x)| self.base_ring().fma(&lhs.data[i], rhs, x)));
+        result.extend(summand_it.take(len - min(len, lhs_len)));
+        return DensePolyRingEl {
+            data: result
+        };
     }
 
     fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {

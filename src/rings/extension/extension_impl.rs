@@ -426,6 +426,15 @@ impl<R, V, A, C> RingExtension for FreeAlgebraImplBase<R, V, A, C>
             self.base_ring().mul_assign_ref(&mut lhs.values[i], rhs);
         }
     }
+
+    fn fma_base(&self, lhs: &Self::Element, rhs: &El<Self::BaseRing>, summand: Self::Element) -> Self::Element {
+        let mut new = Vec::with_capacity_in(1 << self.log2_padded_len, self.element_allocator.clone());
+        new.extend(summand.values.into_iter().take(self.rank()).enumerate().map(|(i, x)| self.base_ring.fma(&lhs.values[i], rhs, x)));
+        new.resize_with(1 << self.log2_padded_len, || self.base_ring().zero());
+        return FreeAlgebraImplEl {
+            values: new.into_boxed_slice()
+        };
+    }
 }
 
 ///
