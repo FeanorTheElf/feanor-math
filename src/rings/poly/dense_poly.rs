@@ -375,11 +375,12 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingE
 
     fn fma_base(&self, lhs: &Self::Element, rhs: &El<Self::BaseRing>, summand: Self::Element) -> Self::Element {
         let lhs_len = self.degree(lhs).map(|d| d + 1).unwrap_or(0);
-        let len = max(lhs_len, self.degree(&summand).map(|d| d + 1).unwrap_or(0));
-        let mut result = Vec::with_capacity_in(len, self.element_allocator.clone());
+        let summand_len = self.degree(&summand).map(|d| d + 1).unwrap_or(0);
+        let mut result = Vec::with_capacity_in(max(lhs_len, summand_len), self.element_allocator.clone());
         let mut summand_it = summand.data.into_iter();
-        result.extend(summand_it.by_ref().take(min(len, lhs_len)).enumerate().map(|(i, x)| self.base_ring().fma(&lhs.data[i], rhs, x)));
-        result.extend(summand_it.take(len - min(len, lhs_len)));
+        result.extend(summand_it.by_ref().take(min(summand_len, lhs_len)).enumerate().map(|(i, x)| self.base_ring().fma(&lhs.data[i], rhs, x)));
+        result.extend(summand_it.take(summand_len - min(summand_len, lhs_len)));
+        result.extend((min(summand_len, lhs_len)..lhs_len).map(|i| self.base_ring().mul_ref(&lhs.data[i], rhs)));
         return DensePolyRingEl {
             data: result
         };
@@ -765,6 +766,21 @@ fn test_prod() {
         }).sum::<usize>();
         assert_eq!(expected as i64, *poly_ring.coefficient_at(&product, i));
     }
+}
+
+#[test]
+fn test_fma_base() {
+    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    let [f, g, h] = poly_ring.with_wrapped_indeterminate(|X| [X + 3, X.pow_ref(2) - 1, X.pow_ref(2) + 2 * X + 5]);
+    assert_el_eq!(&poly_ring, h, poly_ring.get_ring().fma_base(&f, &2, g));
+
+    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    let [f, g, h] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) + X, X.pow_ref(2) - 1, 2 * X.pow_ref(3) + X.pow_ref(2) + 2 * X - 1]);
+    assert_el_eq!(&poly_ring, h, poly_ring.get_ring().fma_base(&f, &2, g));
+
+    let poly_ring = DensePolyRing::new(zn_64::Zn::new(7), "X");
+    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [3 * X.pow_ref(2) + 5, 5 * X.pow_ref(2) + 6]);
+    assert_el_eq!(&poly_ring, g, poly_ring.get_ring().fma_base(&f, &poly_ring.base_ring().int_hom().map(4), poly_ring.zero()));
 }
 
 #[test]
