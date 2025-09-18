@@ -362,7 +362,8 @@ pub trait FreeAlgebraStore: RingStore
 /// to facilitate testing of default implementations, even if the used ring
 /// implementation overrides the default implementation.
 /// 
-mod default_implementations {
+#[stability::unstable(feature = "enable")]
+pub mod default_implementations {
     use crate::algorithms::int_bisect::bisect_floor;
     use crate::algorithms::linsolve::SolveResult;
     use crate::divisibility::*;
