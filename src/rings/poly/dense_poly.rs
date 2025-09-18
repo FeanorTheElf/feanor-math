@@ -372,6 +372,22 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingE
         result.data.push(x);
         return result;
     }
+
+    fn fma_base(&self, lhs: &Self::Element, rhs: &El<Self::BaseRing>, mut summand: Self::Element) -> Self::Element {
+        for i in 0..min(lhs.data.len(), summand.data.len()) {
+            self.base_ring.add_assign(&mut summand.data[i], self.base_ring().mul_ref(&lhs.data[i], rhs));
+        }
+        for i in min(lhs.data.len(), summand.data.len())..lhs.data.len() {
+            summand.data.push(self.base_ring().mul_ref(&lhs.data[i], rhs));
+        }
+        return summand;
+    }
+
+    fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {
+        for c in &mut lhs.data {
+            self.base_ring().mul_assign_ref(c, rhs)
+        }
+    }
 }
 
 ///
