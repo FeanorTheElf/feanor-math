@@ -11,6 +11,7 @@ use serde::de::DeserializeSeed;
 use serde::{Deserializer, Serialize, Serializer, Deserialize};
 
 use crate::algorithms::convolution::*;
+use crate::algorithms::extension_ops::create_multiplication_matrix;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::divisibility::*;
 use crate::{impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
@@ -26,7 +27,6 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::seq::*;
 use crate::ring::*;
 use crate::integer::IntegerRingStore;
-use crate::rings::extension::create_multiplication_matrix;
 use crate::delegate::DelegateRing;
 use crate::homomorphism::*;
 use crate::serialization::*;

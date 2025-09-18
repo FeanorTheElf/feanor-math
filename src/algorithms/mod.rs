@@ -31,7 +31,13 @@ pub mod fft;
 /// integers. Unless you are implementing your own big integer type, you should use
 /// [`crate::integer::BigIntRing`] instead.
 /// 
-pub mod bigint;
+pub mod bigint_ops;
+///
+/// Contains basic algorithms for implementing operations on ring extensions. Unless
+/// you are implementing your own extension ring type, you should use the operations
+/// through [`crate::rings::extension::FreeAlgebra`] instead.
+/// 
+pub mod extension_ops;
 ///
 /// Contains an implementation of the Miller-Rabin probabilistic primality test.
 /// 
