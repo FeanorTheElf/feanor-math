@@ -605,7 +605,6 @@ macro_rules! impl_static_int_to_zn {
 
 impl_static_int_to_zn!{ i8, i16, i32, i64, i128 }
 
-#[allow(missing_debug_implementations)]
 #[derive(Clone, Copy)]
 pub struct ZnBaseElementsIter<'a> {
     ring: &'a ZnBase,

@@ -664,7 +664,6 @@ impl<R, V, A, C> HashableElRing for FreeAlgebraImplBase<R, V, A, C>
 /// 
 /// Used by the implementation of [`FiniteRing::elements()`] for [`FreeAlgebraImplBase`].
 /// 
-#[allow(missing_debug_implementations)]
 pub struct WRTCanonicalBasisElementCreator<'a, R, V, A, C>
     where R: RingStore, 
         R::Type: FiniteRing, 

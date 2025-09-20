@@ -580,7 +580,6 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> DivisibilityRing for ZnBa
     }
 }
 
-#[allow(missing_debug_implementations)]
 pub struct FromCongruenceElementCreator<'a, C: RingStore, J: RingStore, A: Allocator + Clone>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
@@ -627,7 +626,6 @@ impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> FnMut<(&'b [El<C>
     }
 }
 
-#[allow(missing_debug_implementations)]
 pub struct CloneComponentElement<'a, C: RingStore, J: RingStore, A: Allocator + Clone>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,

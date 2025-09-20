@@ -18,7 +18,7 @@ use crate::homomorphism::*;
 use crate::integer::*;
 use crate::specialization::*;
 use crate::rings::rust_bigint::*;
-use crate::algorithms::bigint::deserialize_bigint_from_bytes;
+use crate::algorithms::bigint_ops::deserialize_bigint_from_bytes;
 
 mod mpir_bindings;
 

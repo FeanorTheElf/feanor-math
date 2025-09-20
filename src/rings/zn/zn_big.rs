@@ -481,7 +481,6 @@ impl<I: RingStore, J: IntegerRing + ?Sized> CanHomFrom<J> for ZnBase<I>
     }
 }
 
-#[allow(missing_debug_implementations)]
 pub struct ZnBaseElementsIter<'a, I>
     where I: RingStore,
         I::Type: IntegerRing

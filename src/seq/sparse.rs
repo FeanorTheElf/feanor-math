@@ -112,7 +112,6 @@ impl<R: RingStore> VectorView<El<R>> for SparseMapVector<R> {
     }
 }
 
-#[allow(missing_debug_implementations)]
 pub struct SparseMapVectorIter<'a, R>
     where R: RingStore
 {

@@ -417,7 +417,6 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingE
 ///
 /// Iterator over all terms of an element of [`DensePolyRing`].
 /// 
-#[allow(missing_debug_implementations)]
 pub struct TermIterator<'a, R>
     where R: RingStore
 {

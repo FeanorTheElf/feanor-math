@@ -93,7 +93,6 @@ impl<'a, T, R> TransformTarget<R> for &'a mut T
 /// 
 /// TODO: at next breaking release, remove the reference to the ring
 /// 
-#[allow(missing_debug_implementations)]
 pub struct TransformRows<'a, V, R>(pub SubmatrixMut<'a, V, R::Element>, pub &'a R)
     where V: AsPointerToSlice<R::Element>, R: ?Sized + RingBase;
 
@@ -103,7 +102,6 @@ pub struct TransformRows<'a, V, R>(pub SubmatrixMut<'a, V, R::Element>, pub &'a 
 /// 
 /// TODO: at next breaking release, remove the reference to the ring
 /// 
-#[allow(missing_debug_implementations)]
 pub struct TransformCols<'a, V, R>(pub SubmatrixMut<'a, V, R::Element>, pub &'a R)
     where V: AsPointerToSlice<R::Element>, R: ?Sized + RingBase;
 
@@ -259,7 +257,6 @@ impl<R> TransformTarget<R> for ()
 /// A [`TransformTarget`] that forwards all transforms to a fixed
 /// delegate, but offsets every row/column index by a given value.
 /// 
-#[allow(missing_debug_implementations)]
 pub struct OffsetTransformIndex<R, T>
     where R: ?Sized + RingBase,
         T: TransformTarget<R>
@@ -306,7 +303,6 @@ impl<R, T> TransformTarget<R> for OffsetTransformIndex<R, T>
 /// A [`TransformTarget`] that forwards all transforms to
 /// two fixed delegates.
 /// 
-#[allow(missing_debug_implementations)]
 pub struct DuplicateTransforms<R, T1, T2>
     where R: ?Sized + RingBase,
         T1: TransformTarget<R>,

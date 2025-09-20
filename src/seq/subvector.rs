@@ -89,7 +89,6 @@ impl<V: VectorView<T> + Debug, T: ?Sized> Debug for SubvectorView<V, T> {
     }
 }
 
-#[allow(missing_debug_implementations)]
 pub struct FilterWithinRangeIter<'a, T: ?Sized, I>
     where T: 'a,
         I: Iterator<Item = (usize, &'a T)>
@@ -158,7 +157,6 @@ impl<V: VectorView<T>, T: ?Sized> SelfSubvectorView<T> for SubvectorView<V, T> {
     }
 }
 
-#[allow(missing_debug_implementations)]
 pub struct SubvectorFn<V: VectorFn<T>, T> {
     begin: usize,
     end: usize,

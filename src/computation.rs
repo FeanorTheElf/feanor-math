@@ -126,7 +126,6 @@ pub trait ComputationController: Clone + UnstableSealed {
 /// found a result or aborted. `Abort(e)` means that the controller chose to abort 
 /// the computation at a checkpoint, with data `e`.
 /// 
-#[allow(missing_debug_implementations)]
 pub enum ShortCircuitingComputationAbort<E> {
     Finished,
     Abort(E)
@@ -135,7 +134,6 @@ pub enum ShortCircuitingComputationAbort<E> {
 ///
 /// Shared data of a short-circuiting computation.
 /// 
-#[allow(missing_debug_implementations)]
 pub struct ShortCircuitingComputation<T, Controller>
     where T: Send,
         Controller: ComputationController
@@ -148,7 +146,6 @@ pub struct ShortCircuitingComputation<T, Controller>
 ///
 /// Handle to a short-circuiting computation.
 /// 
-#[allow(missing_debug_implementations)]
 pub struct ShortCircuitingComputationHandle<'a, T, Controller>
     where T: Send,
         Controller: ComputationController

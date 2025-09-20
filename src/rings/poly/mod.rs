@@ -376,7 +376,6 @@ pub trait PolyRingStore: RingStore
 /// This is the type returned by [`PolyRingStore::lifted_hom()`] and [`PolyRingStore::into_lifted_hom()`],
 /// which should be used to create an instance of this type.
 /// 
-#[allow(missing_debug_implementations)]
 pub struct CoefficientHom<PFrom, PTo, H>
     where PFrom: RingStore,
         PTo: RingStore,

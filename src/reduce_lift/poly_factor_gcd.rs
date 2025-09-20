@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::fmt::Display;
 
 use crate::algorithms::linsolve::LinSolveRing;
@@ -916,6 +917,17 @@ impl<'a, R> IntegersWithLocalZnQuotient<'a, R>
             to: vec![self.local_ring_at(&self.prime, 1, 0)], 
             to_fields: vec![self.local_field_at(&self.prime, 0)], 
         }
+    }
+}
+
+impl<'a, R> Debug for IntegersWithLocalZnQuotient<'a, R>
+    where R: ?Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + LinSolveRing + Clone,
+        R::IntegerRingBase: Debug
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IntegersWithLocalZnQuotient")
+            .field("integers", &self.integers.get_ring())
+            .finish()
     }
 }
 

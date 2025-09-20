@@ -126,7 +126,6 @@ unsafe impl<T, const SIZE: usize> AsPointerToSlice<T> for DerefArray<T, SIZE> {
 /// the first value.
 /// 
 #[repr(transparent)]
-#[allow(missing_debug_implementations)]
 pub struct AsFirstElement<T>(T);
 
 unsafe impl<'a, T> AsPointerToSlice<T> for AsFirstElement<T> {
@@ -472,7 +471,6 @@ impl<'a, V, T> VectorView<T> for ColumnMut<'a, V, T>
 /// Iterator over mutable references to the entries of a column
 /// of a matrix [`SubmatrixMut`].
 /// 
-#[allow(missing_debug_implementations)]
 pub struct ColumnMutIter<'a, V, T> 
     where V: AsPointerToSlice<T>
 {

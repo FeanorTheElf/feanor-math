@@ -144,8 +144,7 @@ pub mod generic_impls {
     /// large, but allow for efficient estimation of their approximate size.
     /// 
     
-    #[allow(missing_debug_implementations)]
-    pub struct BigIntToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
+        pub struct BigIntToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
         where I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>
     {
         highbit_mod: usize,
@@ -446,7 +445,6 @@ enum ReductionMapRequirements {
 /// [`CanHomFrom`]-homomorphisms when the moduli are different (but divide each
 /// other).
 /// 
-#[allow(missing_debug_implementations)]
 pub struct ZnReductionMap<R, S>
     where R: RingStore,
         R::Type: ZnRing,

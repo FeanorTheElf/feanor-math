@@ -899,7 +899,6 @@ impl VectorFn<usize> for Range<usize> {
 /// additionally is also callable with signature `(usize, &El<R>) -> El<R>`. In this
 /// case, the first parameter is ignored.
 /// 
-#[allow(missing_debug_implementations)]
 #[derive(Copy, Clone)]
 pub struct CloneRingEl<R: RingStore>(pub R);
 
@@ -952,7 +951,6 @@ impl<'a, R: RingStore> Fn<(usize, &'a El<R>,)> for CloneRingEl<R> {
 ///
 /// Callable struct that wraps [`Clone::clone()`].
 /// 
-#[allow(missing_debug_implementations)]
 #[derive(Copy, Clone)]
 pub struct CloneValue;
 

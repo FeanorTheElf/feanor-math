@@ -636,7 +636,6 @@ impl MonomialOrder for Lex {
     }
 }
 
-#[allow(missing_debug_implementations)]
 pub struct CoefficientHom<PFrom, PTo, H>
     where PFrom: RingStore,
         PTo: RingStore,

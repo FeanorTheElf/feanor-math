@@ -377,7 +377,6 @@ impl<R1, R2> CanIsoFromTo<SparsePolyRingBase<R1>> for SparsePolyRingBase<R2>
     }
 }
 
-#[allow(missing_debug_implementations)]
 pub struct TermIterator<'a, R>
     where R: RingStore
 {
