@@ -95,7 +95,7 @@ pub fn poly_factor_squarefree_extension<P, Controller>(LX: P, f: &El<P>, attempt
 
             if KX.degree(&squarefree_part).unwrap() == degree {
                 let lin_transform_rev = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0), (L.one(), 1)].into_iter());
-                let (factorization, _unit) = <_ as FactorPolyField>::factor_poly(&KX, &squarefree_part);
+                let (factorization, _unit) = <_ as FactorPolyField>::factor_poly_with_controller(&KX, &squarefree_part, controller.clone());
                 log_progress!(controller, "(factored)");
                 
                 return Ok(factorization.into_iter().map(|(factor, e)| {

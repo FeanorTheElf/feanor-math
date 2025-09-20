@@ -60,7 +60,7 @@ pub fn half_eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>)
     let (mut s, mut t) = (ring.one(), ring.zero());
 
     // invariant: `s * a == a mod b` and `t * a == b mod b`
-    while !ring.is_zero(&a) {
+    while !ring.is_zero(&b) {
         let (q, r) = ring.euclidean_div_rem(a, &b);
         a = r;
         ring.sub_assign(&mut s, ring.mul_ref_snd(q, &t));
@@ -141,8 +141,15 @@ pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
     where R: RingStore,
         R::Type: EuclideanRing
 {
-    let (_, _, d) = eea(a, b, ring);
-    return d;
+    let (mut a, mut b) = (a, b);
+    
+    // invariant: `gcd(a, b) = gcd(original_a, original_b)`
+    while !ring.is_zero(&b) {
+        let (_, r) = ring.euclidean_div_rem(a, &b);
+        a = b;
+        b = r;
+    }
+    return a;
 }
 
 /// 
@@ -232,6 +239,26 @@ use crate::primitive_int::*;
 
 #[test]
 fn test_gcd() {
+    assert_eq!(3, gcd(15, 6, &StaticRing::<i64>::RING).abs());
+    assert_eq!(3, gcd(6, 15, &StaticRing::<i64>::RING).abs());
+
+    assert_eq!(7, gcd(0, 7, &StaticRing::<i64>::RING).abs());
+    assert_eq!(7, gcd(7, 0, &StaticRing::<i64>::RING).abs());
+    assert_eq!(0, gcd(0, 0, &StaticRing::<i64>::RING).abs());
+
+    assert_eq!(1, gcd(9, 1, &StaticRing::<i64>::RING).abs());
+    assert_eq!(1, gcd(1, 9, &StaticRing::<i64>::RING).abs());
+
+    assert_eq!(1, gcd(13, 300, &StaticRing::<i64>::RING).abs());
+    assert_eq!(1, gcd(300, 13, &StaticRing::<i64>::RING).abs());
+
+    assert_eq!(3, gcd(-15, 6, &StaticRing::<i64>::RING).abs());
+    assert_eq!(3, gcd(6, -15, &StaticRing::<i64>::RING).abs());
+    assert_eq!(3, gcd(-6, -15, &StaticRing::<i64>::RING).abs());
+}
+
+#[test]
+fn test_signed_gcd() {
     assert_eq!(3, signed_gcd(15, 6, &StaticRing::<i64>::RING));
     assert_eq!(3, signed_gcd(6, 15, &StaticRing::<i64>::RING));
 

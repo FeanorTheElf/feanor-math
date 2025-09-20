@@ -5,9 +5,9 @@ use feanor_serde::seq::*;
 
 use crate::algorithms::convolution::*;
 use crate::algorithms::interpolate::interpolate;
-use crate::algorithms::poly_div::{poly_div_rem, poly_rem};
+use crate::algorithms::poly_div::fast_poly_div_rem;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
-use crate::computation::no_error;
+use crate::computation::{no_error, ComputationController, DontObserve};
 use crate::reduce_lift::poly_eval::{EvalPolyLocallyRing, InterpolationBaseRing, ToExtRingMap};
 use crate::divisibility::*;
 use crate::integer::*;
@@ -22,8 +22,8 @@ use crate::seq::*;
 use crate::serialization::*;
 
 use std::alloc::{Allocator, Global};
-use std::cmp::min;
 use std::fmt::Debug;
+use std::cmp::{min, max};
 
 ///
 /// The univariate polynomial ring `R[X]`. Polynomials are stored as dense vectors of
@@ -393,6 +393,25 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingE
         result.data.push(x);
         return result;
     }
+
+    fn fma_base(&self, lhs: &Self::Element, rhs: &El<Self::BaseRing>, summand: Self::Element) -> Self::Element {
+        let lhs_len = self.degree(lhs).map(|d| d + 1).unwrap_or(0);
+        let summand_len = self.degree(&summand).map(|d| d + 1).unwrap_or(0);
+        let mut result = Vec::with_capacity_in(max(lhs_len, summand_len), self.element_allocator.clone());
+        let mut summand_it = summand.data.into_iter();
+        result.extend(summand_it.by_ref().take(min(summand_len, lhs_len)).enumerate().map(|(i, x)| self.base_ring().fma(&lhs.data[i], rhs, x)));
+        result.extend(summand_it.take(summand_len - min(summand_len, lhs_len)));
+        result.extend((min(summand_len, lhs_len)..lhs_len).map(|i| self.base_ring().mul_ref(&lhs.data[i], rhs)));
+        return DensePolyRingEl {
+            data: result
+        };
+    }
+
+    fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {
+        for c in &mut lhs.data {
+            self.base_ring().mul_assign_ref(c, rhs)
+        }
+    }
 }
 
 ///
@@ -402,7 +421,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingE
 pub struct TermIterator<'a, R>
     where R: RingStore
 {
-    iter: std::iter::Enumerate<std::slice::Iter<'a, El<R>>>,
+    iter: std::iter::Rev<std::iter::Enumerate<std::slice::Iter<'a, El<R>>>>,
     ring: &'a R
 }
 
@@ -484,7 +503,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
 
     fn terms<'a>(&'a self, f: &'a Self::Element) -> TermIterator<'a, R> {
         TermIterator {
-            iter: f.data.iter().enumerate(), 
+            iter: f.data.iter().enumerate().rev(), 
             ring: self.base_ring()
         }
     }
@@ -498,6 +517,10 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
             }
             self.base_ring().add_assign(&mut lhs.data[i], c);
         }
+    }
+
+    fn truncate_monomials(&self, lhs: &mut Self::Element, truncated_at_degree: usize) {
+        lhs.data.truncate(truncated_at_degree)
     }
 
     fn coefficient_at<'a>(&'a self, f: &'a Self::Element, i: usize) -> &'a El<Self::BaseRing> {
@@ -523,7 +546,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for Den
 
     fn div_rem_monic(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(self.base_ring().is_one(self.coefficient_at(rhs, self.degree(rhs).unwrap())));
-        let (quo, rem) = poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().clone_el(x))).unwrap_or_else(no_error);
+        let (quo, rem) = fast_poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().clone_el(x)), DontObserve).unwrap_or_else(no_error);
         return (quo, rem);
     }
 
@@ -591,7 +614,7 @@ impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> EvalPolyLocallyR
     {
         return data.1.iter().map(|x| self.evaluate(el, x, &data.0)).collect::<Vec<_>>();
     }
-        
+
     fn lift_combine<'ring>(&self, data: &Self::LocalComputationData<'ring>, els: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
         where Self: 'ring
     {
@@ -618,7 +641,7 @@ impl<R, A: Allocator + Clone, C> DivisibilityRing for DensePolyRingBase<R, A, C>
                 return RingRef::new(self).try_from_terms(self.terms(lhs).map(|(c, i)| self.base_ring().checked_left_div(c, rhs).map(|c| (c, i)).ok_or(()))).ok();
             } else {
                 let lc = &rhs.data[d];
-                let (quo, rem) = poly_div_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| self.base_ring().checked_left_div(&x, lc).ok_or(())).ok()?;
+                let (quo, rem) = fast_poly_div_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| self.base_ring().checked_left_div(&x, lc).ok_or(()), DontObserve).ok()?;
                 if self.is_zero(&rem) {
                     Some(quo)
                 } else {
@@ -638,7 +661,7 @@ impl<R, A: Allocator + Clone, C> DivisibilityRing for DensePolyRingBase<R, A, C>
                 true
             } else {
                 let lc = &rhs.data[d];
-                if let Ok(rem) = poly_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| self.base_ring().checked_left_div(&x, lc).ok_or(())) {
+                if let Ok((_, rem)) = fast_poly_div_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| self.base_ring().checked_left_div(&x, lc).ok_or(()), DontObserve) {
                     if self.is_zero(&rem) {
                         true
                     } else {
@@ -688,6 +711,12 @@ impl<R, A, C> PrincipalIdealRing for DensePolyRingBase<R, A, C>
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         <_ as PolyTFracGCDRing>::gcd(RingRef::new(self), lhs, rhs)
     }
+
+    fn ideal_gen_with_controller<Controller>(&self, lhs: &Self::Element, rhs: &Self::Element, controller: Controller) -> Self::Element
+        where Controller: ComputationController
+    {
+        <_ as PolyTFracGCDRing>::gcd_with_controller(RingRef::new(self), lhs, rhs, controller)
+    }
 }
 
 impl<R, A, C> EuclideanRing for DensePolyRingBase<R, A, C> 
@@ -695,7 +724,7 @@ impl<R, A, C> EuclideanRing for DensePolyRingBase<R, A, C>
 {
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         let lc_inv = self.base_ring.invert(&rhs.data[self.degree(rhs).unwrap()]).unwrap();
-        let (quo, rem) = poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().mul_ref(&x, &lc_inv))).unwrap_or_else(no_error);
+        let (quo, rem) = fast_poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().mul_ref(&x, &lc_inv)), DontObserve).unwrap_or_else(no_error);
         return (quo, rem);
     }
 
@@ -762,6 +791,21 @@ fn test_prod() {
 }
 
 #[test]
+fn test_fma_base() {
+    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    let [f, g, h] = poly_ring.with_wrapped_indeterminate(|X| [X + 3, X.pow_ref(2) - 1, X.pow_ref(2) + 2 * X + 5]);
+    assert_el_eq!(&poly_ring, h, poly_ring.get_ring().fma_base(&f, &2, g));
+
+    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+    let [f, g, h] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) + X, X.pow_ref(2) - 1, 2 * X.pow_ref(3) + X.pow_ref(2) + 2 * X - 1]);
+    assert_el_eq!(&poly_ring, h, poly_ring.get_ring().fma_base(&f, &2, g));
+
+    let poly_ring = DensePolyRing::new(zn_64::Zn::new(7), "X");
+    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [3 * X.pow_ref(2) + 5, 5 * X.pow_ref(2) + 6]);
+    assert_el_eq!(&poly_ring, g, poly_ring.get_ring().fma_base(&f, &poly_ring.base_ring().int_hom().map(4), poly_ring.zero()));
+}
+
+#[test]
 fn test_ring_axioms() {
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
     crate::ring::generic_tests::test_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
@@ -822,7 +866,7 @@ fn test_print() {
         (base_poly_ring.from_terms([(1, 0), (2, 2)].into_iter()), 0),
         (base_poly_ring.from_terms([(3, 0), (4, 2)].into_iter()), 2)
     ].into_iter());
-    assert_eq!("1 + 2X^2 + (3 + 4X^2)Y^2", format!("{}", poly_ring.format(&poly)));
+    assert_eq!("(4X^2 + 3)Y^2 + 2X^2 + 1", format!("{}", poly_ring.format(&poly)));
 
     let poly = poly_ring.from_terms([
         (base_poly_ring.zero(), 0),

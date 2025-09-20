@@ -2,6 +2,7 @@ use std::alloc::*;
 use std::borrow::Borrow;
 
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
+use crate::computation::*;
 use crate::homomorphism::*;
 use crate::matrix::OwnedMatrix;
 use crate::rings::extension::galois_field::*;
@@ -39,23 +40,24 @@ use super::poly_gcd::PolyTFracGCDRing;
 /// indeed irreducible.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn extend_number_field<K>(poly_ring: DensePolyRing<K>, irred_poly: &El<DensePolyRing<K>>) -> (
+pub fn extend_number_field<K, Controller>(poly_ring: DensePolyRing<K>, irred_poly: &El<DensePolyRing<K>>, controller: Controller) -> (
     FreeAlgebraHom<K, NumberField>,
     El<NumberField>
 )
-    where K: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>
+    where K: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>,
+        Controller: ComputationController
 {
     assert!(!poly_ring.is_zero(&irred_poly));
     assert!(poly_ring.degree(&irred_poly).unwrap() > 1);
     assert!(<NumberFieldBase<_, _> as FactorPolyField>::is_irred(&poly_ring, irred_poly));
 
-    extend_number_field_promise_is_irreducible(poly_ring, irred_poly)
+    extend_number_field_promise_is_irreducible(poly_ring, irred_poly, controller)
 }
 
 ///
 /// If the powers of `potential_primitive_element` up to `[L : K] [K : k]` generate `L`,
 /// this returns the minimal polynomial of `potential_primitive_element`, as well as polynomials
-/// `f, g` such that `f(potential_primitive_element)` and `f(potential_primitive_element)` give
+/// `f, g` such that `f(potential_primitive_element)` and `g(potential_primitive_element)` give
 /// the canonical generators of `K` resp. `L`.
 /// 
 fn test_primitive_element<R>(L: R, potential_primitive_element: El<R>) -> Option<(
@@ -208,11 +210,12 @@ pub fn extend_galois_field<K>(poly_ring: DensePolyRing<K>, irred_poly: &El<Dense
 /// may be nonsensical (but of course not UB).
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn extend_number_field_promise_is_irreducible<K>(poly_ring: DensePolyRing<K>, irred_poly: &El<DensePolyRing<K>>) -> (
+pub fn extend_number_field_promise_is_irreducible<K, Controller>(poly_ring: DensePolyRing<K>, irred_poly: &El<DensePolyRing<K>>, controller: Controller) -> (
     FreeAlgebraHom<K, NumberField>,
     El<NumberField>
 )
-    where K: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>
+    where K: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>,
+        Controller: ComputationController
 {
     static_assert_impls!(NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>: FactorPolyField);
     static_assert_impls!(NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>: PolyTFracGCDRing);
@@ -220,59 +223,68 @@ pub fn extend_number_field_promise_is_irreducible<K>(poly_ring: DensePolyRing<K>
     assert!(!poly_ring.is_zero(&irred_poly));
     assert!(poly_ring.degree(&irred_poly).unwrap() > 1);
 
-    let K = poly_ring.base_ring();
+    controller.run_computation(format_args!("extend_number_field(deg={}, extdeg={})", poly_ring.base_ring().rank(), poly_ring.degree(irred_poly).unwrap()), |controller| {
 
-    let L = AsField::from(
-        AsFieldBase::promise_is_perfect_field(
-            FreeAlgebraImpl::new_with_convolution(
-                K, 
-                poly_ring.degree(&irred_poly).unwrap(), 
-                (0..poly_ring.degree(&irred_poly).unwrap()).map(|i| K.negate(K.clone_el(poly_ring.coefficient_at(&irred_poly, i)))).collect::<Vec<_>>(),
-                "X",
-                Global,
-                STANDARD_CONVOLUTION
+        let K = poly_ring.base_ring();
+
+        let L = AsField::from(
+            AsFieldBase::promise_is_perfect_field(
+                FreeAlgebraImpl::new_with_convolution(
+                    K, 
+                    poly_ring.degree(&irred_poly).unwrap(), 
+                    (0..poly_ring.degree(&irred_poly).unwrap()).map(|i| K.negate(K.clone_el(poly_ring.coefficient_at(&irred_poly, i)))).collect::<Vec<_>>(),
+                    "X",
+                    Global,
+                    STANDARD_CONVOLUTION
+                )
             )
-        )
-    );
-    
-    let total_rank = K.rank() * L.rank();
+        );
+        
+        let total_rank = K.rank() * L.rank();
 
-    // the main task is to find a primitive element of `L`, i.e. that generates it over `K`.
-    // we use the following approach:
-    //  - Consider generator `a` of `K` and `b` of `L` over `K`
-    //  - Consider the set `A_n = { b, b + a, b + 2a, ..., b + (n - 1)a }`
-    //  - Consider also the subset `B_n = { x in A_n | QQ[x] != L }`
-    //  - The idea is now to choose a random element from `A_n`, and hope that it is not in `B_n`
-    //  - To estimate the probability, consider the map `B_n -> { maximal proper subfields of L }` that maps any `x`
-    //    to some maximal proper subfield containing `QQ[x]`
-    //  - Then this map is injective, as any field containing `a + ib` and `a + jb`, `j > i` must contain `a, b`, thus be `L`
-    //  - In other words, to find `n`, we need a bound on the maximal proper subfields
-    //  - I believe the degree `[L : QQ]` is such a bound (in the Galois case it is, at least)
+        // the main task is to find a primitive element of `L`, i.e. that generates it over `K`.
+        // we use the following approach:
+        //  - Consider generator `a` of `K` and `b` of `L` over `K`
+        //  - Consider the set `A_n = { b, b + a, b + 2a, ..., b + (n - 1)a }`
+        //  - Consider also the subset `B_n = { x in A_n | QQ[x] != L }`
+        //  - The idea is now to choose a random element from `A_n`, and hope that it is not in `B_n`
+        //  - To estimate the probability, consider the map `B_n -> { maximal proper subfields of L }` that maps any `x`
+        //    to some maximal proper subfield containing `QQ[x]`
+        //  - Then this map is injective, as any field containing `a + ib` and `a + jb`, `j > i` must contain `a, b`, thus be `L`
+        //  - In other words, to find `n`, we need a bound on the maximal proper subfields
+        //  - I believe the degree `[L : QQ]` is such a bound (in the Galois case it is, at least)
 
-    // take `A` twice as large, so that we find a good element with probability >= 1/2
-    let size_of_A: i32 = (2 * total_rank).try_into().unwrap();
+        // take `A` twice as large, so that we find a good element with probability >= 1/2
+        let size_of_A: i32 = (2 * total_rank).try_into().unwrap();
 
-    let mut rng = oorandom::Rand64::new(1);
+        let mut rng = oorandom::Rand64::new(1);
 
-    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+        for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
 
-        let a = StaticRing::<i32>::RING.get_uniformly_random(&size_of_A, || rng.rand_u64());
-        let potential_primitive_element = L.add(L.canonical_gen(), L.inclusion().map(K.int_hom().mul_map(K.canonical_gen(), a)));
-    
-        if let Some((QQX, gen_poly, K_gen, L_gen)) = test_primitive_element(&L, potential_primitive_element) {
-            if let Some((result, x)) = NumberField::try_adjoin_root(&QQX, &gen_poly) {
+            let a = StaticRing::<i32>::RING.get_uniformly_random(&size_of_A, || rng.rand_u64());
+            let potential_primitive_element = L.add(L.canonical_gen(), L.inclusion().map(K.int_hom().mul_map(K.canonical_gen(), a)));
+        
+            if let Some((QQX, gen_poly, K_gen, L_gen)) = test_primitive_element(&L, potential_primitive_element) {
+                if let Some((result, x)) = NumberField::try_adjoin_root(&QQX, &gen_poly) {
 
-                // note that `sol` contains coefficients w.r.t. `x` and not `result.canonical_gen()`
-                let K_generator = QQX.evaluate(&K_gen, &x, result.inclusion());
-                let L_generator = QQX.evaluate(&L_gen, &x, result.inclusion());
+                    // note that `sol` contains coefficients w.r.t. `x` and not `result.canonical_gen()`
+                    let K_generator = QQX.evaluate(&K_gen, &x, result.inclusion());
+                    let L_generator = QQX.evaluate(&L_gen, &x, result.inclusion());
 
-                let result = FreeAlgebraHom::promise_is_well_defined(poly_ring.into().into_base_ring(), result, K_generator);
-                return (result, L_generator);
+                    let result = FreeAlgebraHom::promise_is_well_defined(poly_ring.into().into_base_ring(), result, K_generator);
+
+                    log_progress!(controller, "success");
+                    return (result, L_generator);
+                } else {
+                    unreachable!()
+                }
+            } else {
+                log_progress!(controller, "(not_primitive)");
             }
         }
-    }
 
-    unreachable!()
+        unreachable!()
+})
 }
 
 ///
@@ -286,17 +298,19 @@ pub fn extend_number_field_promise_is_irreducible<K>(poly_ring: DensePolyRing<K>
 /// embedding `K' -> K''` and a root `a in K''` of `g`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn splitting_field<K, F>(
+pub fn splitting_field<K, F, Controller>(
     mut poly_ring: DensePolyRing<K>, 
     f: El<DensePolyRing<K>>, 
-    mut create_field: F
+    mut create_field: F,
+    controller: Controller
 ) -> (
     FreeAlgebraHom<K, K>,
     Vec<(El<K>, usize)>
 )
     where K: RingStore + Clone,
         K::Type: FactorPolyField + FreeAlgebra,
-        F: for<'a> FnMut(DensePolyRing<&'a K>, El<DensePolyRing<&'a K>>) -> (FreeAlgebraHom<&'a K, K>, El<K>)
+        F: for<'a> FnMut(DensePolyRing<&'a K>, El<DensePolyRing<&'a K>>, Controller) -> (FreeAlgebraHom<&'a K, K>, El<K>),
+        Controller: ComputationController
 {
     assert!(!poly_ring.is_zero(&f));
     let mut to_split = vec![(f, 1)];
@@ -304,57 +318,61 @@ pub fn splitting_field<K, F>(
     let mut base_field = None;
     let mut image_of_base_can_gen = poly_ring.base_ring().canonical_gen();
 
-    while let Some((next_to_split, multiplicity)) = to_split.pop() {
-        let (mut factorization, _) = <_ as FactorPolyField>::factor_poly(&poly_ring, &next_to_split);
-        let extend_idx = factorization.iter().enumerate().max_by_key(|(_, (f, _))| poly_ring.degree(f).unwrap()).unwrap().0;
-        
-        let extend_with_poly = if poly_ring.degree(&factorization[extend_idx].0).unwrap() > 1 {
-            Some(factorization.remove(extend_idx))
-        } else {
-            None
-        };
+    controller.run_computation(format_args!("splitting_field(base_deg={}, deg={})", poly_ring.base_ring().rank(), poly_ring.degree(&to_split[0].0).unwrap()), |controller| {
 
-        for (g, e) in factorization.into_iter() {
-            if poly_ring.degree(&g).unwrap() > 1 {
-                to_split.push((g, e * multiplicity));
-            } else {
-                roots.push((poly_ring.base_ring().negate(poly_ring.base_ring().div(poly_ring.coefficient_at(&g, 0), poly_ring.coefficient_at(&g, 1))), e * multiplicity));
-            }
-        }
-
-        if let Some((extend_with_poly, e)) = extend_with_poly {
-            let ref_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
-            let ref_extend_with_poly = ref_poly_ring.lifted_hom(&poly_ring, poly_ring.base_ring().identity()).map_ref(&extend_with_poly);
-            let (into_new_field, root) = create_field(ref_poly_ring, ref_extend_with_poly);
-            let (old_field, new_field, image) = into_new_field.destruct();
-            let new_poly_ring = DensePolyRing::new(new_field, "X");
-            let into_new_field = FreeAlgebraHom::promise_is_well_defined(old_field, new_poly_ring.base_ring(), image);
+        while let Some((next_to_split, multiplicity)) = to_split.pop() {
+            let (mut factorization, _) = <_ as FactorPolyField>::factor_poly_with_controller(&poly_ring, &next_to_split, controller.clone());
+            let extend_idx = factorization.iter().enumerate().max_by_key(|(_, (f, _))| poly_ring.degree(f).unwrap()).unwrap().0;
             
-            image_of_base_can_gen = into_new_field.map(image_of_base_can_gen);
-            roots = roots.into_iter().map(|(r, e)| (into_new_field.map(r), e)).collect();
-            let lifted_hom = new_poly_ring.lifted_hom(&poly_ring, &into_new_field);
-            to_split = to_split.into_iter().map(|(f, e)| (lifted_hom.map(f), e)).collect();
+            let extend_with_poly = if poly_ring.degree(&factorization[extend_idx].0).unwrap() > 1 {
+                Some(factorization.remove(extend_idx))
+            } else {
+                None
+            };
 
-            to_split.push((new_poly_ring.checked_div(
-                &lifted_hom.map(extend_with_poly), 
-                &new_poly_ring.sub(new_poly_ring.indeterminate(), new_poly_ring.inclusion().map_ref(&root))
-            ).unwrap(), multiplicity * e));
-            roots.push((root, multiplicity * e));
-
-            if base_field.is_none() {
-                base_field = Some(poly_ring.into().into_base_ring());
+            for (g, e) in factorization.into_iter() {
+                if poly_ring.degree(&g).unwrap() > 1 {
+                    to_split.push((g, e * multiplicity));
+                } else {
+                    roots.push((poly_ring.base_ring().negate(poly_ring.base_ring().div(poly_ring.coefficient_at(&g, 0), poly_ring.coefficient_at(&g, 1))), e * multiplicity));
+                }
             }
-            poly_ring = new_poly_ring;
+
+            if let Some((extend_with_poly, e)) = extend_with_poly {
+                log_progress!(controller, "({})", poly_ring.degree(&extend_with_poly).unwrap());
+                let ref_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
+                let ref_extend_with_poly = ref_poly_ring.lifted_hom(&poly_ring, poly_ring.base_ring().identity()).map_ref(&extend_with_poly);
+                let (into_new_field, root) = create_field(ref_poly_ring, ref_extend_with_poly, controller.clone());
+                let (old_field, new_field, image) = into_new_field.destruct();
+                let new_poly_ring = DensePolyRing::new(new_field, "X");
+                let into_new_field = FreeAlgebraHom::promise_is_well_defined(old_field, new_poly_ring.base_ring(), image);
+                
+                image_of_base_can_gen = into_new_field.map(image_of_base_can_gen);
+                roots = roots.into_iter().map(|(r, e)| (into_new_field.map(r), e)).collect();
+                let lifted_hom = new_poly_ring.lifted_hom(&poly_ring, &into_new_field);
+                to_split = to_split.into_iter().map(|(f, e)| (lifted_hom.map(f), e)).collect();
+
+                to_split.push((new_poly_ring.checked_div(
+                    &lifted_hom.map(extend_with_poly), 
+                    &new_poly_ring.sub(new_poly_ring.indeterminate(), new_poly_ring.inclusion().map_ref(&root))
+                ).unwrap(), multiplicity * e));
+                roots.push((root, multiplicity * e));
+
+                if base_field.is_none() {
+                    base_field = Some(poly_ring.into().into_base_ring());
+                }
+                poly_ring = new_poly_ring;
+            }
         }
-    }
-    return (
-        FreeAlgebraHom::promise_is_well_defined(
-            base_field.unwrap_or_else(|| poly_ring.clone().into().into_base_ring()),
-            poly_ring.into().into_base_ring(),
-            image_of_base_can_gen
-        ),
-        roots
-    );
+        return (
+            FreeAlgebraHom::promise_is_well_defined(
+                base_field.unwrap_or_else(|| poly_ring.clone().into().into_base_ring()),
+                poly_ring.into().into_base_ring(),
+                image_of_base_can_gen
+            ),
+            roots
+        );
+})
 }
 
 ///
@@ -363,17 +381,19 @@ pub fn splitting_field<K, F>(
 /// embedding `K' -> K''` and a root `a in K''` of `g`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn variety_from_lex_gb<K, P, F>(
+pub fn variety_from_lex_gb<K, P, F, Controller>(
     poly_ring: P, 
     lex_gb: &[El<P>], 
-    mut create_field: F
+    mut create_field: F,
+    controller: Controller
 ) -> (FreeAlgebraHom<K, K>, Vec<Vec<El<K>>>)
     where P: RingStore,
         K: RingStore + Clone,
         K::Type: FactorPolyField + FreeAlgebra,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: Borrow<K> + RingStore<Type = K::Type>,
-        F: for<'a> FnMut(DensePolyRing<&'a K>, El<DensePolyRing<&'a K>>) -> (FreeAlgebraHom<&'a K, K>, El<K>)
+        F: for<'a> FnMut(DensePolyRing<&'a K>, El<DensePolyRing<&'a K>>, Controller) -> (FreeAlgebraHom<&'a K, K>, El<K>),
+        Controller: ComputationController
 {
     let n = poly_ring.indeterminate_count();
     let constant_monomial = poly_ring.create_monomial((0..n).map(|_| 0));
@@ -436,7 +456,7 @@ pub fn variety_from_lex_gb<K, P, F>(
             current_embedding = FreeAlgebraHom::promise_is_well_defined(base_field, KX.into().into_base_ring(), base_field_gen);
         } else {
             let (_, _, base_field_gen) = ref_current_embedding.destruct();
-            let (into_new_field, roots) = splitting_field(KX, next_roots_from, &mut create_field);
+            let (into_new_field, roots) = splitting_field(KX, next_roots_from, &mut create_field, controller.clone());
 
             final_roots = final_roots.into_iter().map(|root| root.into_iter().map(|x| into_new_field.map(x)).collect()).collect();
             current_roots = current_roots.into_iter().map(|(l, root)| (l, root.into_iter().map(|x| into_new_field.map(x)).collect())).collect();
@@ -475,7 +495,7 @@ fn test_extend_field() {
 
     // extend `QQ[i]` by `X^4 - i`
     let [g] = KX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - RingElementWrapper::new(&KX, KX.inclusion().map(K.canonical_gen()))]);
-    let (extension_field_embedding, x) = extend_number_field(KX.clone(), &g);
+    let (extension_field_embedding, x) = extend_number_field(KX.clone(), &g, TEST_LOG_PROGRESS);
     let ext_field = extension_field_embedding.codomain();
     assert_eq!(8, ext_field.rank());
     assert_el_eq!(ext_field, ext_field.neg_one(), ext_field.pow(extension_field_embedding.map(K.canonical_gen()), 2));
@@ -488,7 +508,7 @@ fn test_extend_field() {
 
     // extend `QQ[i]` by `X^3 - 2`
     let [g] = KX.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 2]);
-    let (extension_field_embedding, x) = extend_number_field(KX, &g);
+    let (extension_field_embedding, x) = extend_number_field(KX, &g, TEST_LOG_PROGRESS);
     let ext_field = extension_field_embedding.codomain();
     assert_eq!(6, ext_field.rank());
     assert_el_eq!(ext_field, ext_field.neg_one(), ext_field.pow(extension_field_embedding.map(K.canonical_gen()), 2));
@@ -517,7 +537,7 @@ fn test_variety_from_lex_gb() {
         y - z.pow_ref(4) + 3 * z.pow_ref(2) - 1,
         x + z.pow_ref(3) - 2 * z
     ]);
-    let (into_L, variety) = variety_from_lex_gb(&QQXYZ, &lex_gb, |poly_ring, poly| extend_number_field_promise_is_irreducible(poly_ring, &poly));
+    let (into_L, variety) = variety_from_lex_gb(&QQXYZ, &lex_gb, |poly_ring, poly, controller| extend_number_field_promise_is_irreducible(poly_ring, &poly, controller), TEST_LOG_PROGRESS);
     let L = into_L.codomain();
 
     assert_eq!(6, variety.len());

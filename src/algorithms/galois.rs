@@ -2,7 +2,7 @@
 use std::fmt::Debug;
 use std::hash::Hash;
 
-use crate::computation::no_error;
+use crate::computation::*;
 use crate::homomorphism::*;
 use crate::field::*;
 use crate::divisibility::*;
@@ -26,7 +26,7 @@ use super::sqr_mul::generic_pow_shortest_chain_table;
 /// generator are returned via [`Result::Err`] instead.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn compute_galois_closure(field: NumberField) -> Result<
+pub fn compute_galois_closure<Controller: ComputationController>(field: NumberField, controller: Controller) -> Result<
         FreeAlgebraHom<NumberField, NumberField>,
         (NumberField, Vec<El<NumberField>>)
     >
@@ -42,10 +42,11 @@ pub fn compute_galois_closure(field: NumberField) -> Result<
     let (into_extension_field, roots) = splitting_field(
         poly_ring,
         poly_to_factor,
-        |poly_ring, extend_with| {
+        |poly_ring, extend_with, controller| {
             extended_field = true;
-            extend_number_field_promise_is_irreducible(poly_ring, &extend_with)
-        }
+            extend_number_field_promise_is_irreducible(poly_ring, &extend_with, controller)
+        },
+        controller
     );
 
     if extended_field {
@@ -241,13 +242,14 @@ impl<K, Impl, I> Hash for GaloisAutomorphism<K, Impl, I>
 /// Otherwise, returns its embedding into its Galois closure as [`Result::Err`].
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn compute_galois_group<K>(field: K) -> Result<
+pub fn compute_galois_group<K, Controller>(field: K, controller: Controller) -> Result<
         Vec<GaloisAutomorphism<K, DefaultNumberFieldImpl, BigIntRing>>, 
         FreeAlgebraHom<K, NumberField>
     >
-    where K: Clone + RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>
+    where K: Clone + RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>,
+        Controller: ComputationController
 {
-    match compute_galois_closure(RingValue::from_ref(field.get_ring()).clone()) {
+    match compute_galois_closure(RingValue::from_ref(field.get_ring()).clone(), controller) {
         Ok(embedding) => {
             let (_, target, image) = embedding.destruct();
             return Err(FreeAlgebraHom::promise_is_well_defined(field, target, image));
@@ -306,13 +308,13 @@ fn test_compute_galois_closure() {
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2]);
     let number_field = NumberField::new(&ZZX, &f);
-    let (number_field, conjugates) = compute_galois_closure(number_field).err().unwrap();
+    let (number_field, conjugates) = compute_galois_closure(number_field, TEST_LOG_PROGRESS).err().unwrap();
     assert_el_eq!(&number_field, number_field.canonical_gen(), &conjugates[0]);
     assert_el_eq!(&number_field, number_field.negate(number_field.canonical_gen()), &conjugates[1]);
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2]);
     let number_field = NumberField::new(&ZZX, &f);
-    let into_closure = compute_galois_closure(number_field).ok().unwrap();
+    let into_closure = compute_galois_closure(number_field, TEST_LOG_PROGRESS).ok().unwrap();
     let number_field = into_closure.domain();
     assert_eq!(8, into_closure.codomain().rank());
     crate::homomorphism::generic_tests::test_homomorphism_axioms(&into_closure, (0..8).map(|i| number_field.pow(number_field.canonical_gen(), i)));
@@ -322,7 +324,7 @@ fn test_compute_galois_closure() {
     
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(3) - X.pow_ref(2) + 1]);
     let number_field = NumberField::new(&ZZX, &f);
-    let into_closure = compute_galois_closure(number_field).ok().unwrap();
+    let into_closure = compute_galois_closure(number_field, TEST_LOG_PROGRESS).ok().unwrap();
     let number_field = into_closure.domain();
     assert_eq!(6, into_closure.codomain().rank());
     crate::homomorphism::generic_tests::test_homomorphism_axioms(&into_closure, (0..6).map(|i| number_field.pow(number_field.canonical_gen(), i)));
@@ -338,7 +340,7 @@ fn test_compute_galois_group() {
     
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(3) - X.pow_ref(2) - 6 * X + 7]);
     let number_field = NumberField::new(&ZZX, &f);
-    let galois_group = compute_galois_group(&number_field).ok().unwrap();
+    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS).ok().unwrap();
     assert_eq!(3, galois_group.len());
     assert!(galois_group[0].is_identity());
     let g = &galois_group[1];
@@ -348,7 +350,7 @@ fn test_compute_galois_group() {
     // the galois group in this case is C12
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(12) - X.pow_ref(11) + 3 * X.pow_ref(10) - 4 * X.pow_ref(9) + 9 * X.pow_ref(8) + 2 * X.pow_ref(7) + 12 * X.pow_ref(6) + X.pow_ref(5) + 25 * X.pow_ref(4) - 11 * X.pow_ref(3) + 5 * X.pow_ref(2) - 2 * X + 1]);
     let number_field = NumberField::new(&ZZX, &f);
-    let galois_group = compute_galois_group(&number_field).ok().unwrap();
+    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS).ok().unwrap();
     assert_eq!(12, galois_group.len());
     let g = galois_group.iter().filter(|g| !(*g).clone().pow(4).is_identity() && !(*g).clone().pow(6).is_identity()).next().unwrap();
     assert!(g.clone().pow(12).is_identity());
@@ -359,7 +361,7 @@ fn test_compute_galois_group() {
     // the galois group in this case is D5
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(10) - 2 * X.pow_ref(8) - 9 * X.pow_ref(6) + 57 * X.pow_ref(4) - 69 * X.pow_ref(2) + 47]);
     let number_field = NumberField::new(&ZZX, &f);
-    let galois_group = compute_galois_group(&number_field).ok().unwrap();
+    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS).ok().unwrap();
     assert_eq!(10, galois_group.len());
     let id = &galois_group[0];
     assert!(id.is_identity());
@@ -386,14 +388,14 @@ fn test_complex_conjugation() {
     
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
     let number_field = NumberField::new(&ZZX, &f);
-    let galois_group = compute_galois_group(&number_field).ok().unwrap();
+    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS).ok().unwrap();
     let complex_embedding = number_field.choose_complex_embedding();
     let conjugation = find_complex_conjugation(&number_field, &complex_embedding, &galois_group);
     assert_el_eq!(&number_field, number_field.negate(number_field.canonical_gen()), conjugation.map(number_field.canonical_gen()));
     
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1]);
     let number_field = NumberField::new(&ZZX, &f);
-    let galois_group = compute_galois_group(&number_field).ok().unwrap();
+    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS).ok().unwrap();
     let complex_embedding = number_field.choose_complex_embedding();
     let conjugation = find_complex_conjugation(&number_field, &complex_embedding, &galois_group);
     assert_el_eq!(&number_field, number_field.invert(&number_field.canonical_gen()).unwrap(), conjugation.map(number_field.canonical_gen()));

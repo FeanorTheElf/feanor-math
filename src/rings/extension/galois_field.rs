@@ -13,6 +13,7 @@ use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::unity_root::*;
+use crate::computation::DontObserve;
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
 use crate::divisibility::{DivisibilityRingStore, Domain};
 use crate::field::*;
@@ -46,7 +47,7 @@ fn filter_irreducible<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Optio
         <R::Type as RingExtension>::BaseRing: RingStore<Type = <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
     let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
-    let squarefree_part = poly_squarefree_part_finite_field(&poly_ring, &f);
+    let squarefree_part = poly_squarefree_part_finite_field(&poly_ring, &f, DontObserve);
     if poly_ring.degree(&squarefree_part) != Some(degree) {
         return None;
     }

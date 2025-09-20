@@ -338,6 +338,13 @@ pub struct LogProgress {
 
 pub const LOG_PROGRESS: LogProgress = LogProgress { inner_comp: false };
 
+///
+/// Use this in tests, to distinguish it from temporary uses of
+/// `LOG_PROGRESS` that shouldn't be used when publishing the crate.
+/// 
+#[cfg(test)]
+pub(crate) const TEST_LOG_PROGRESS: LogProgress = LogProgress { inner_comp: false };
+
 impl UnstableSealed for LogProgress {}
 
 impl ComputationController for LogProgress {

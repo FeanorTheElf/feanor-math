@@ -52,6 +52,8 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P
         )));
         if let Some(mut root_of_factor) = poly_root(RX, &power_factor, sig.perfect_power) {
             _ = RX.balance_poly(&mut root_of_factor);
+            let lc_inv = RX.base_ring().invert(RX.lc(&root_of_factor).unwrap()).unwrap();
+            RX.inclusion().mul_assign_map(&mut root_of_factor, lc_inv);
             result.push((root_of_factor, sig.perfect_power));
         } else {
             return None;
@@ -95,14 +97,14 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2, Controller
     let R = RX.base_ring().get_ring();
     let F = R.local_field_at(S_to_F.ideal(), S_to_F.max_ideal_idx());
     let FX = DensePolyRing::new(&F, "X");
-    let iso = F.can_iso(S_to_F.codomain()).unwrap();
+    let iso = PolyGCDLocallyBaseRingToFieldIso::new(R, S_to_F.ideal(), S_to_F.codomain().get_ring(), F.get_ring(), S_to_F.max_ideal_idx());
 
     let f_mod_m = FX.from_terms(RX.terms(f).map(|(c, i)| (
-        iso.inv().map(R.reduce_ring_el(S_to_F.ideal(), (S_to_F.codomain(), 1), S_to_F.max_ideal_idx(), R.clone_el(c))),
+        iso.map(R.reduce_ring_el(S_to_F.ideal(), (S_to_F.codomain().get_ring(), 1), S_to_F.max_ideal_idx(), R.clone_el(c))),
         i
     )));
     let f_mod_me = SX.from_terms(RX.terms(f).map(|(c, i)| (
-        R.reduce_ring_el(S_to_F.ideal(), (S_to_F.domain(), S_to_F.from_e()), S_to_F.max_ideal_idx(), R.clone_el(c)),
+        R.reduce_ring_el(S_to_F.ideal(), (S_to_F.domain().get_ring(), S_to_F.from_e()), S_to_F.max_ideal_idx(), R.clone_el(c)),
         i
     )));
 
@@ -273,23 +275,23 @@ fn test_squarefree_part_local() {
     };
 
     let expected = [(poly_ring.clone_el(&f1), 1)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
     assert_eq(&expected, &actual);
 
     let expected = [(poly_ring.mul_ref(&f3, &f4), 3)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
     assert_eq(&expected, &actual);
 
     let expected = [(poly_ring.clone_el(&f2), 2), (poly_ring.mul_ref(&f3, &f4), 3)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
     assert_eq(&expected, &actual);
     
     let expected = [(poly_ring.mul_ref(&f1, &f2), 1), (poly_ring.clone_el(&f4), 2), (poly_ring.clone_el(&f3), 3)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
     assert_eq(&expected, &actual);
     
     let expected = [(poly_ring.mul_ref(&f1, &f2), 2), (poly_ring.clone_el(&f4), 4), (poly_ring.clone_el(&f3), 6)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
     assert_eq(&expected, &actual);
 }
 
@@ -306,7 +308,7 @@ fn random_test_poly_power_decomposition_local() {
         let h = poly_ring.from_terms((0..=2).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
         let poly = make_primitive(&poly_ring, &poly_ring.prod([&f, &g, &g, &h, &h, &h, &h, &h].into_iter().map(|poly| poly_ring.clone_el(poly)))).0;
         
-        let mut power_decomp = poly_power_decomposition_local(&poly_ring, poly_ring.clone_el(&poly), LOG_PROGRESS);
+        let mut power_decomp = poly_power_decomposition_local(&poly_ring, poly_ring.clone_el(&poly), TEST_LOG_PROGRESS);
         for (f, _k) in &mut power_decomp {
             *f = make_primitive(&poly_ring, &f).0;
         }

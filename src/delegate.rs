@@ -317,6 +317,13 @@ pub trait DelegateRing: PartialEq {
     fn rev_element_cast_ref<'a>(&self, el: &'a <Self as RingBase>::Element) -> &'a Self::Element {
         el
     }
+
+    ///
+    /// Necessary in some locations to satisfy the type system
+    /// 
+    fn rev_element_cast_mut<'a>(&self, el: &'a mut <Self as RingBase>::Element) -> &'a mut Self::Element {
+        el
+    }
 }
 
 impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
@@ -850,3 +857,4 @@ impl<'a, R> Homomorphism<R, <R as DelegateRing>::Base> for UnwrapHom<'a, R>
         self.from.get_ring().delegate(self.from.get_ring().rev_element_cast(x))
     }
 }
+

@@ -1,3 +1,5 @@
+use crate::computation::*;
+use super::poly_gcd::PolyTFracGCDRing;
 use crate::field::*;
 use crate::homomorphism::*;
 use crate::integer::*;
@@ -11,6 +13,12 @@ use crate::rings::zn::zn_64::*;
 use finite::*;
 use rational::*;
 
+///
+/// Contains algorithms for computing the factorization of polynomials.
+/// 
+/// TODO: move to [`crate::algorithms::poly_factor`].
+/// 
+pub mod factor_locally;
 ///
 /// Contains an implementation of the Cantor-Zassenhaus algorithm for
 /// finding factors of univariate polynomials over finite fields.
@@ -97,6 +105,20 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
 
     ///
+    /// As [`FactorPolyField::factor_poly()`], this computes the factorization of
+    /// a polynomial. However, it additionally accepts a [`ComputationController`]
+    /// to customize the performed computation.
+    /// 
+    fn factor_poly_with_controller<P, Controller>(poly_ring: P, poly: &El<P>, _: Controller) -> (Vec<(El<P>, usize)>, Self::Element)
+        where P: RingStore + Copy,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
+            Controller: ComputationController
+    {
+        Self::factor_poly(poly_ring, poly)
+    }
+
+    ///
     /// Returns whether the given polynomial is irreducible over the base field.
     /// 
     /// This is functionally equivalent to checking whether the output of [`FactorPolyField::factor_poly()`]
@@ -116,11 +138,20 @@ impl<R: ?Sized> FactorPolyField for R
     where R: FiniteRing + Field + SelfIso
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: RingStore,
+        where P: RingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        poly_factor_finite_field(poly_ring, poly)
+        Self::factor_poly_with_controller(poly_ring, poly, DontObserve)
+    }
+
+    fn factor_poly_with_controller<P, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> (Vec<(El<P>, usize)>, Self::Element)
+        where P: RingStore,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
+            Controller: ComputationController
+    {
+        poly_factor_finite_field(poly_ring, poly, controller)
     }
 }
 
@@ -130,11 +161,20 @@ impl<I> FactorPolyField for RationalFieldBase<I>
         ZnBase: CanHomFrom<I::Type>
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: RingStore,
+        where P: RingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        poly_factor_rational(poly_ring, poly)
+        Self::factor_poly_with_controller(poly_ring, poly, DontObserve)
+    }
+
+    fn factor_poly_with_controller<P, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> (Vec<(El<P>, usize)>, Self::Element)
+        where P: RingStore + Copy,
+            P::Type: PolyRing + EuclideanRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
+            Controller: ComputationController
+    {
+        poly_factor_rational(poly_ring, poly, controller)
     }
 }
 
@@ -142,8 +182,6 @@ impl<I> FactorPolyField for RationalFieldBase<I>
 use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::rings::zn::*;
-
-use super::poly_gcd::PolyTFracGCDRing;
 
 #[test]
 fn test_factor_rational_poly() {

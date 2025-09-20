@@ -31,7 +31,13 @@ pub mod fft;
 /// integers. Unless you are implementing your own big integer type, you should use
 /// [`crate::integer::BigIntRing`] instead.
 /// 
-pub mod bigint;
+pub mod bigint_ops;
+///
+/// Contains basic algorithms for implementing operations on ring extensions. Unless
+/// you are implementing your own extension ring type, you should use the operations
+/// through [`crate::rings::extension::FreeAlgebra`] instead.
+/// 
+pub mod extension_ops;
 ///
 /// Contains an implementation of the Miller-Rabin probabilistic primality test.
 /// 
@@ -100,11 +106,6 @@ pub mod rational_reconstruction;
 /// Contains algorithms for polynomial interpolation.
 /// 
 pub mod interpolate;
-///
-/// Contains algorithms related to Gaussian elimination. Note that you will most likely want
-/// to use functionality from [`linsolve`] instead.
-/// 
-pub mod gauss;
 ///
 /// Contains Buchberger's algorithm for computing Groebner basis.
 /// 

@@ -3,7 +3,7 @@ use serde::de::{self, DeserializeSeed};
 use serde::ser::SerializeTuple;
 use serde::{Deserializer, Serialize, Deserialize, Serializer}; 
 
-use crate::algorithms::bigint::*;
+use crate::algorithms::bigint_ops::*;
 use crate::divisibility::{DivisibilityRing, Domain};
 use crate::pid::*;
 use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ, impl_eval_poly_locally_for_ZZ};

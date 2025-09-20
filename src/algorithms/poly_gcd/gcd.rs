@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use dense_poly::DensePolyRing;
 use squarefree_part::poly_power_decomposition_monic_local;
 
@@ -59,30 +57,19 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
     let mut poly_rings_mod_me = Vec::new();
     let mut gcds_mod_me = Vec::new();
 
-    let mut setup_time = 0;
-    let mut local_gcd_time = 0;
-    let mut hensel_lift_time = 0;
-    let mut prepare_lift_time = 0;
-    let complete_start = Instant::now();
-
     for idx in 0..reduction.len() {
 
-        let start = Instant::now();
         let S_to_F = reduction.intermediate_ring_to_field_reduction(idx);
-        let F = ring.local_field_at(S_to_F.ideal(), S_to_F.max_ideal_idx());
-        let F_iso = F.can_iso(*S_to_F.codomain()).unwrap();
-        let R_to_F = F_iso.inv().compose(reduction.main_ring_to_field_reduction(idx));
+        let F_iso = reduction.base_ring_to_field_iso(idx);
+        let F = F_iso.codomain();
+        let R_to_F = (&F_iso).compose(reduction.main_ring_to_field_reduction(idx));
         let FX = DensePolyRing::new(&F, "X");
         let RX_to_FX = FX.lifted_hom(poly_ring, &R_to_F);
-        let end = Instant::now();
-        setup_time += (end - start).as_millis();
 
-        let start = Instant::now();
-        let d = FX.normalize(FX.ideal_gen(&RX_to_FX.map_ref(f), &RX_to_FX.map_ref(g)));
-        let end = Instant::now();
-        local_gcd_time += (end - start).as_millis();
+        let d = controller.clone().run_computation(format_args!("local_gcd."), |_| 
+            FX.normalize(FX.ideal_gen(&RX_to_FX.map_ref(f), &RX_to_FX.map_ref(g)))
+        );
 
-        let start = Instant::now();
         let f_over_d = FX.checked_div(&RX_to_FX.map_ref(f), &d).unwrap();
         let g_over_d = FX.checked_div(&RX_to_FX.map_ref(g), &d).unwrap();
         let deg_d = FX.degree(&d).unwrap();
@@ -101,39 +88,29 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
         signature = Some(new_signature);
         let SX = DensePolyRing::new(*S_to_F.domain(), "X");
         let RX_to_SX = SX.lifted_hom(poly_ring, reduction.main_ring_to_intermediate_ring_reduction(idx));
-        let end = Instant::now();
-        prepare_lift_time += (end - start).as_millis();
 
-        let start = Instant::now();
-        let (d, _) = hensel_lift_quadratic(&S_to_F, &SX, &FX, &RX_to_SX.map_ref(poly), (&factor1, &factor2), controller.clone());
-        let end = Instant::now();
-        hensel_lift_time += (end - start).as_millis();
+        let factors = [factor1, factor2];
+        let [d, _] = hensel_lift_factorization(&S_to_F, &SX, &FX, &RX_to_SX.map_ref(poly), &factors[..], controller.clone()).try_into().ok().unwrap();
 
         poly_rings_mod_me.push(SX);
         gcds_mod_me.push(d);
     }
 
-    let start = Instant::now();
     let signature = signature.unwrap();
-    let mut result = poly_ring.from_terms((0..=signature.gcd_deg).map(|i| (
-        reduction.reconstruct_ring_el((0..reduction.len()).map_fn(|j| poly_rings_mod_me[j].coefficient_at(&gcds_mod_me[j], i))),
-        i
-    )));
-    let end = Instant::now();
-    let reconstruct_time = (end - start).as_millis();
+    let mut result = controller.clone().run_computation(format_args!("reconstruct."), |_|
+        poly_ring.from_terms((0..=signature.gcd_deg).map(|i| (
+            reduction.reconstruct_ring_el((0..reduction.len()).map_fn(|j| poly_rings_mod_me[j].coefficient_at(&gcds_mod_me[j], i))),
+            i
+        )))
+    );
 
-    let start = Instant::now();
-    let divides_f_and_g = poly_ring.divides(&f, &result) && poly_ring.divides(&g, &result);
-    let end = Instant::now();
-    let test_division_time = (end - start).as_millis();
+    let divides_f_and_g = controller.clone().run_computation(format_args!("check_division."), |_|
+        poly_ring.divides(&f, &result) && poly_ring.divides(&g, &result)
+    );
     if !divides_f_and_g {
-        let complete_end = Instant::now();
-        log_progress!(controller, "(setup: {} ms, localgcd: {} ms, preparelift: {} ms, hensel: {} ms, reconstruct: {} ms, test: {} ms, all: {} ms)", setup_time, local_gcd_time, prepare_lift_time, hensel_lift_time, reconstruct_time, test_division_time, (complete_end - complete_start).as_millis());
         log_progress!(controller, "(no_divisor)");
         return None;
     } else {
-        let complete_end = Instant::now();
-        log_progress!(controller, "(setup: {} ms, localgcd: {} ms, preparelift: {} ms, hensel: {} ms, reconstruct: {} ms, test: {} ms, all: {} ms)", setup_time, local_gcd_time, prepare_lift_time, hensel_lift_time, reconstruct_time, test_division_time, (complete_end - complete_start).as_millis());
         _ = poly_ring.balance_poly(&mut result);
         return Some(result);
     }
@@ -263,6 +240,9 @@ pub fn poly_gcd_local<P, Controller>(poly_ring: P, mut f: El<P>, mut g: El<P>, c
 
     let mut result = unevaluate_aX(poly_ring, &d_monic, &a);
     _ = poly_ring.balance_poly(&mut result);
+    if let Some(lc_inv) = poly_ring.base_ring().invert(poly_ring.lc(&result).unwrap()) {
+        poly_ring.inclusion().mul_assign_map(&mut result, lc_inv);
+    }
     return result;
 }
 
@@ -270,6 +250,8 @@ pub fn poly_gcd_local<P, Controller>(poly_ring: P, mut f: El<P>, mut g: El<P>, c
 use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[cfg(test)]
 use crate::algorithms::poly_gcd::make_primitive;
+#[cfg(test)]
+use crate::integer::*;
 
 #[test]
 fn test_poly_gcd_local() {
@@ -287,25 +269,25 @@ fn test_poly_gcd_local() {
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 0, 0, 0], 1),
-        poly_gcd_local(&poly_ring, poly([1, 0, 1, 0, 0], 1), poly([1, 0, 0, 1, 0], 2), LOG_PROGRESS)
+        poly_gcd_local(&poly_ring, poly([1, 0, 1, 0, 0], 1), poly([1, 0, 0, 1, 0], 2), TEST_LOG_PROGRESS)
     );
     
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 1, 0, 1], 1),
-        poly_gcd_local(&poly_ring, poly([1, 1, 1, 0, 1], 20), poly([1, 0, 1, 1, 1], 12), LOG_PROGRESS)
+        poly_gcd_local(&poly_ring, poly([1, 1, 1, 0, 1], 20), poly([1, 0, 1, 1, 1], 12), TEST_LOG_PROGRESS)
     );
 
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 2, 0, 1], 1),
-        poly_gcd_local(&poly_ring, poly([1, 1, 3, 0, 1], 20), poly([3, 0, 2, 0, 3], 12), LOG_PROGRESS)
+        poly_gcd_local(&poly_ring, poly([1, 1, 3, 0, 1], 20), poly([3, 0, 2, 0, 3], 12), TEST_LOG_PROGRESS)
     );
 
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 0, 5, 0], 1),
-        poly_gcd_local(&poly_ring, poly([2, 1, 3, 5, 1], 20), poly([1, 0, 0, 7, 0], 12), LOG_PROGRESS)
+        poly_gcd_local(&poly_ring, poly([2, 1, 3, 5, 1], 20), poly([1, 0, 0, 7, 0], 12), TEST_LOG_PROGRESS)
     );
 }
 
@@ -322,7 +304,7 @@ fn random_test_poly_gcd_local() {
         // println!("Testing gcd on ({}) * ({}) and ({}) * ({})", poly_ring.format(&f), poly_ring.format(&h), poly_ring.format(&g), poly_ring.format(&h));
         let lhs = poly_ring.mul_ref(&f, &h);
         let rhs = poly_ring.mul_ref(&g, &h);
-        let gcd = make_primitive(&poly_ring, &poly_gcd_local(&poly_ring, poly_ring.clone_el(&lhs), poly_ring.clone_el(&rhs), LOG_PROGRESS)).0;
+        let gcd = make_primitive(&poly_ring, &poly_gcd_local(&poly_ring, poly_ring.clone_el(&lhs), poly_ring.clone_el(&rhs), TEST_LOG_PROGRESS)).0;
         // println!("Result {}", poly_ring.format(&gcd));
 
         assert!(poly_ring.divides(&lhs, &gcd));

@@ -26,11 +26,11 @@ use serde::{Serialize, Deserialize};
 /// }
 /// let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
 /// let f = poly_ring.add(poly_ring.one(), poly_ring.indeterminate());
-/// assert_eq!("1 + X", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Weakest)));
-/// assert_eq!("1 + X", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Sum)));
-/// assert_eq!("(1 + X)", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Product)));
-/// assert_eq!("(1 + X)", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Power)));
-/// assert_eq!("(1 + X)", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Strongest)));
+/// assert_eq!("X + 1", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Weakest)));
+/// assert_eq!("X + 1", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Sum)));
+/// assert_eq!("(X + 1)", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Product)));
+/// assert_eq!("(X + 1)", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Power)));
+/// assert_eq!("(X + 1)", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Strongest)));
 /// ```
 /// 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, PartialOrd, Ord)]
@@ -888,8 +888,8 @@ pub trait RingStore: Sized {
     /// let [f, g] = ring.with_wrapped_indeterminate(|X| [X.clone(), X + 1]);
     /// assert_eq!("X", format!("{}", ring.format_within(&f, EnvBindingStrength::Sum)));
     /// assert_eq!("X", format!("{}", ring.format_within(&f, EnvBindingStrength::Product)));
-    /// assert_eq!("1 + X", format!("{}", ring.format_within(&g, EnvBindingStrength::Sum)));
-    /// assert_eq!("(1 + X)", format!("{}", ring.format_within(&g, EnvBindingStrength::Product)));
+    /// assert_eq!("X + 1", format!("{}", ring.format_within(&g, EnvBindingStrength::Sum)));
+    /// assert_eq!("(X + 1)", format!("{}", ring.format_within(&g, EnvBindingStrength::Product)));
     /// ```
     /// 
     fn format_within<'a>(&'a self, value: &'a El<Self>, within: EnvBindingStrength) -> RingElementDisplayWrapper<'a, Self> {

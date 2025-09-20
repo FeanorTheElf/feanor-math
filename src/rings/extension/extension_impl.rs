@@ -11,6 +11,7 @@ use serde::de::DeserializeSeed;
 use serde::{Deserializer, Serialize, Serializer, Deserialize};
 
 use crate::algorithms::convolution::*;
+use crate::algorithms::extension_ops::create_multiplication_matrix;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::divisibility::*;
 use crate::{impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
@@ -26,7 +27,6 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::seq::*;
 use crate::ring::*;
 use crate::integer::IntegerRingStore;
-use crate::rings::extension::create_multiplication_matrix;
 use crate::delegate::DelegateRing;
 use crate::homomorphism::*;
 use crate::serialization::*;
@@ -428,6 +428,15 @@ impl<R, V, A, C> RingExtension for FreeAlgebraImplBase<R, V, A, C>
         for i in 0..self.rank() {
             self.base_ring().mul_assign_ref(&mut lhs.values[i], rhs);
         }
+    }
+
+    fn fma_base(&self, lhs: &Self::Element, rhs: &El<Self::BaseRing>, summand: Self::Element) -> Self::Element {
+        let mut new = Vec::with_capacity_in(1 << self.log2_padded_len, self.element_allocator.clone());
+        new.extend(summand.values.into_iter().take(self.rank()).enumerate().map(|(i, x)| self.base_ring.fma(&lhs.values[i], rhs, x)));
+        new.resize_with(1 << self.log2_padded_len, || self.base_ring().zero());
+        return FreeAlgebraImplEl {
+            values: new.into_boxed_slice()
+        };
     }
 }
 

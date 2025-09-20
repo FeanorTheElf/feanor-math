@@ -4,7 +4,6 @@ use crate::divisibility::*;
 use crate::primitive_int::StaticRing;
 use crate::rings::extension::*;
 use crate::ring::*;
-use crate::rings::field::AsFieldBase;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::zn::*;
 use crate::integer::*;
@@ -28,8 +27,7 @@ use crate::algorithms::poly_gcd::hensel::local_zn_ring_bezout_identity;
 pub fn invert_over_local_zn<S>(ring: S, el: &El<S>) -> Option<El<S>>
     where S: RingStore,
         S::Type: FreeAlgebra,
-        <<S::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing,
-        AsFieldBase<RingValue<<<S::Type as RingExtension>::BaseRing as RingStore>::Type>>: CanIsoFromTo<<<S::Type as RingExtension>::BaseRing as RingStore>::Type> + SelfIso
+        <<S::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + Clone
 {
     let base_ring = ring.base_ring();
     let poly_ring = DensePolyRing::new(base_ring, "X");
