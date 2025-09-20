@@ -491,7 +491,14 @@ As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` ca
    The first should be seen as the default, while the second way can be used if the implementation of the algorithm depends heavily on the ring in question (e.g. factoring polynomials, see [`crate::algorithms::poly_factor::FactorPolyField`]).
    Furthermore, in some situations, one might want algorithms to store data between multiple executions, and/or make higher-level algorithms (or rings) configurable with a concrete implementation of a used sub-algorithm (strategy pattern).
    In these cases, it makes sense to define a new trait for objects representing an implementation of the algorithm (e.g. computing convolutions, see [`crate::algorithms::convolution::ConvolutionAlgorithm`]).
- - More complicated objects often have multiple functions to construct them: A function `new()`, which makes default choices for all but the core parameters, multiple functions `new_with_xyz()` that allow to additionally configure `xyz`, and a function `create()`. The latter usually allows complete customization, and usually is `#[stability::unstable]`, since it will change whenever the object's implementation changes to allow for more (or less) configuration.
+ - More complicated objects often have multiple functions to construct them: 
+   A function `new()`, which makes default choices for all but the core parameters, multiple functions `new_with_xyz()` that allow to additionally configure `xyz`, and a function `create()`. 
+   The latter usually allows complete customization, and usually is `#[stability::unstable]`, since it will change whenever the object's implementation changes to allow for more (or less) configuration.
+ - When creating some type that stores ring elements, you should decide whether it self-contained, or ring-dependent.
+   A self-contained object should store a `RingStore` together with elements of that ring - it then can perform all ring operations using the stored data.
+   On the other hand, a ring-dependent object only stores ring elements - and will take the ring as parameter to all functions that require it.
+   If your object is generic, it should be generic in `R: RingStore` in the self-contained object case, and generic in the ring element type `T` in the ring-dependent object case.
+   Since there is no common supertrait for ring elements, this means that a ring-dependent object will be generic in some unconstraint type `T`, and each function will take some parameter of generic type `R: RingStore, R::Type: RingBase<Element = T>`.
 
 # Performance
 
