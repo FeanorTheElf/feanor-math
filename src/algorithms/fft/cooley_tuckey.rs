@@ -303,7 +303,11 @@ impl<R_main, R_twiddle, H, A> Debug for CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         A: Allocator
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Cooley-Tukey FFT of length 2^{} over ring {:?}", self.log2_n, self.ring().get_ring())
+        f.debug_struct("CooleyTuckeyFFT")
+            .field("ring", &self.ring().get_ring())
+            .field("n", &(1 << self.log2_n))
+            .field("root_of_unity", &self.ring().format(&self.root_of_unity(self.ring())))
+            .finish()
     }
 }
 

@@ -6,8 +6,7 @@ use std::ptr::{addr_of_mut, NonNull};
 #[cfg(feature = "ndarray")]
 use ndarray::{ArrayBase, DataMut, Ix2};
 
-use crate::seq::{dbg_iter, SwappableVectorViewMut};
-use crate::seq::{VectorView, VectorViewMut};
+use crate::seq::{VectorView, VectorViewMut, SwappableVectorViewMut};
 
 ///
 /// Trait for objects that can be considered a contiguous part of memory. In particular,
@@ -127,6 +126,7 @@ unsafe impl<T, const SIZE: usize> AsPointerToSlice<T> for DerefArray<T, SIZE> {
 /// the first value.
 /// 
 #[repr(transparent)]
+#[allow(missing_debug_implementations)]
 pub struct AsFirstElement<T>(T);
 
 unsafe impl<'a, T> AsPointerToSlice<T> for AsFirstElement<T> {
@@ -332,7 +332,11 @@ impl<'a, V, T: Debug> Debug for Column<'a, V, T>
     where V: AsPointerToSlice<T>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", dbg_iter(self.as_iter()))
+        let mut output = f.debug_list();
+        for x in self.as_iter() {
+            _ = output.entry(x);
+        }
+        output.finish()
     }
 }
 
@@ -380,7 +384,7 @@ impl<'a, V, T: Debug> Debug for ColumnMut<'a, V, T>
     where V: AsPointerToSlice<T>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", dbg_iter(self.as_iter()))
+        self.as_const().fmt(f)
     }
 }
 
@@ -468,6 +472,7 @@ impl<'a, V, T> VectorView<T> for ColumnMut<'a, V, T>
 /// Iterator over mutable references to the entries of a column
 /// of a matrix [`SubmatrixMut`].
 /// 
+#[allow(missing_debug_implementations)]
 pub struct ColumnMutIter<'a, V, T> 
     where V: AsPointerToSlice<T>
 {
@@ -699,7 +704,11 @@ impl<'a, V, T: Debug> Debug for Submatrix<'a, V, T>
     where V: 'a + AsPointerToSlice<T>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{:?}]", dbg_iter(self.row_iter()))
+        let mut output = f.debug_list();
+        for row in self.row_iter() {
+            _ = output.entry(&row);
+        }
+        output.finish()
     }
 }
 
@@ -941,7 +950,7 @@ impl<'a, V, T: Debug> Debug for SubmatrixMut<'a, V, T>
     where V: 'a + AsPointerToSlice<T>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{:?}]", dbg_iter(self.as_const().row_iter()))
+        self.as_const().fmt(f)
     }
 }
 

@@ -138,12 +138,23 @@ impl<I: RingStore> ZnBase<I>
 pub struct ZnEl<I: RingStore>(/* allow it to grow up to 2 * modulus(), inclusively */ El<I>)
     where I::Type: IntegerRing;
 
+impl<I> Debug for ZnBase<I> 
+    where I: RingStore,
+        I::Type: IntegerRing
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Z/{}Z", self.integer_ring().format(self.modulus()))
+    }
+}
+
 impl<I: RingStore> Debug for ZnEl<I> 
     where El<I>: Clone + Debug,
         I::Type: IntegerRing
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ZnEl({:?})", self.0)
+        f.debug_tuple("ZnEl")
+            .field(&self.0)
+            .finish()
     }
 }
 
@@ -470,6 +481,7 @@ impl<I: RingStore, J: IntegerRing + ?Sized> CanHomFrom<J> for ZnBase<I>
     }
 }
 
+#[allow(missing_debug_implementations)]
 pub struct ZnBaseElementsIter<'a, I>
     where I: RingStore,
         I::Type: IntegerRing

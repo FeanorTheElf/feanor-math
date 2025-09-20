@@ -14,13 +14,16 @@ use crate::seq::sparse::*;
 
 use std::alloc::Allocator;
 use std::cmp::max;
-use std::rc::Rc;
+use std::fmt::Debug;
 use std::fmt::{Formatter, Result};
+use std::sync::Arc;
 
 ///
 /// The univariate polynomial ring `R[X]`. Polynomials are stored as sparse vectors of
 /// coefficients, thus giving improved performance in the case that most coefficients are
 /// zero.
+/// 
+/// Unless polynomials are very sparse, [`DensePolyRing`] will provide better performance.
 /// 
 /// # Example
 /// ```rust
@@ -54,7 +57,7 @@ use std::fmt::{Formatter, Result};
 /// ```
 /// 
 pub struct SparsePolyRingBase<R: RingStore> {
-    base_ring: Rc<R>,
+    base_ring: Arc<R>,
     unknown_name: &'static str,
     zero: El<R>
 }
@@ -70,6 +73,16 @@ impl<R: RingStore + Clone> Clone for SparsePolyRingBase<R> {
     }
 }
 
+impl<R: RingStore> Debug for SparsePolyRingBase<R>
+    where R::Type: Debug
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        f.debug_struct("SparsePolyRingBase")
+            .field("base_ring", &self.base_ring.get_ring())
+            .finish()
+    }
+}
+
 ///
 /// The univariate polynomial ring `R[X]`, with polynomials being stored as sparse vectors of coefficients.
 /// For details, see [`SparsePolyRingBase`].
@@ -79,10 +92,13 @@ pub type SparsePolyRing<R: RingStore> = RingValue<SparsePolyRingBase<R>>;
 
 impl<R: RingStore> SparsePolyRing<R> {
 
+    ///
+    /// Creates a new sparse polynomial ring over the given base ring.
+    /// 
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
         let zero = base_ring.zero();
         Self::from(SparsePolyRingBase { 
-            base_ring: Rc::new(base_ring), 
+            base_ring: Arc::new(base_ring), 
             unknown_name: unknown_name, 
             zero: zero
         })
@@ -91,7 +107,7 @@ impl<R: RingStore> SparsePolyRing<R> {
 
 impl<R: RingStore> SparsePolyRingBase<R> {
 
-    fn degree_truncate(&self, el: &mut SparseMapVector<Rc<R>>) {
+    fn degree_truncate(&self, el: &mut SparseMapVector<Arc<R>>) {
         for i in (0..el.len()).rev() {
             if !self.base_ring.is_zero(&el.at(i)) {
                 el.set_len(i + 1);
@@ -116,8 +132,19 @@ impl<R: RingStore> SparsePolyRingBase<R> {
     }
 }
 
+///
+/// An element of a [`SparsePolyRing`].
+/// 
 pub struct SparsePolyRingEl<R: RingStore> {
-    data: SparseMapVector<Rc<R>>
+    data: SparseMapVector<Arc<R>>
+}
+
+impl<R: RingStore> Debug for SparsePolyRingEl<R>
+    where El<R>: Debug
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        self.data.fmt(f)
+    }
 }
 
 impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
@@ -350,10 +377,11 @@ impl<R1, R2> CanIsoFromTo<SparsePolyRingBase<R1>> for SparsePolyRingBase<R2>
     }
 }
 
+#[allow(missing_debug_implementations)]
 pub struct TermIterator<'a, R>
     where R: RingStore
 {
-    iter: SparseMapVectorIter<'a, Rc<R>>
+    iter: SparseMapVectorIter<'a, Arc<R>>
 }
 
 impl<'a, R> Iterator for TermIterator<'a, R>

@@ -957,7 +957,9 @@ impl<'ring, I> Debug for NumberRingIdeal<'ring, I>
         <I::Type as PolyGCDLocallyDomain>::SuitableIdeal<'ring>: Debug
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "NumberRingIdeal {{ ideal: {:?} }}", self.prime)
+        f.debug_struct("NumberRingIdeal")
+            .field("prime", &self.prime)
+            .finish()
     }
 }
 

@@ -66,6 +66,17 @@ impl<R: RingStore> SparseMapVector<R> {
     }
 }
 
+impl<R: RingStore + Clone> Debug for SparseMapVector<R> {
+    
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut output = f.debug_map();
+        for (key, value) in self.nontrivial_entries() {
+            _ = output.entry(&key, &self.ring.format(value));
+        }
+        output.finish()
+    }
+}
+
 impl<R: RingStore + Clone> Clone for SparseMapVector<R> {
 
     fn clone(&self) -> Self {
@@ -101,6 +112,7 @@ impl<R: RingStore> VectorView<El<R>> for SparseMapVector<R> {
     }
 }
 
+#[allow(missing_debug_implementations)]
 pub struct SparseMapVectorIter<'a, R>
     where R: RingStore
 {

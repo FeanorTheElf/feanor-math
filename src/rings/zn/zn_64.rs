@@ -21,6 +21,7 @@ use crate::specialization::*;
 use crate::homomorphism::*;
 
 use std::marker::PhantomData;
+use std::fmt::Debug;
 
 use feanor_serde::newtype_struct::*;
 use serde::de::{DeserializeSeed, Error};
@@ -250,6 +251,13 @@ pub struct ZnEl(/* a representative within `[0, ring.repr_bound()]` */ u64);
 impl PartialEq for ZnBase {
     fn eq(&self, other: &Self) -> bool {
         self.modulus == other.modulus
+    }
+}
+
+impl Debug for ZnBase {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Z/{}Z", self.modulus)
     }
 }
 
@@ -597,6 +605,7 @@ macro_rules! impl_static_int_to_zn {
 
 impl_static_int_to_zn!{ i8, i16, i32, i64, i128 }
 
+#[allow(missing_debug_implementations)]
 #[derive(Clone, Copy)]
 pub struct ZnBaseElementsIter<'a> {
     ring: &'a ZnBase,
@@ -788,7 +797,7 @@ impl HashableElRing for ZnBase {
 /// fft.unordered_fft(&mut data[..], &ring);
 /// ```
 /// 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ZnFastmulBase {
     base: RingValue<ZnBase>
 }
@@ -828,7 +837,7 @@ impl PrincipalIdealRing for ZnFastmulBase {
 
 impl_eq_based_self_iso!{ ZnFastmulBase }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ZnFastmulEl {
     el: ZnEl,
     value_invmod_shifted: u64

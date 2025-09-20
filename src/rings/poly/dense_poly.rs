@@ -23,6 +23,7 @@ use crate::serialization::*;
 
 use std::alloc::{Allocator, Global};
 use std::cmp::min;
+use std::fmt::Debug;
 
 ///
 /// The univariate polynomial ring `R[X]`. Polynomials are stored as dense vectors of
@@ -81,6 +82,16 @@ impl<R: RingStore + Clone, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type
     }
 }
 
+impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> Debug for DensePolyRingBase<R, A, C>
+    where R::Type: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DensePolyRing")
+            .field("base_ring", &self.base_ring.get_ring())
+            .finish()
+    }
+}
+
 ///
 /// The univariate polynomial ring `R[X]`, with polynomials being stored as dense vectors of coefficients.
 /// For details, see [`DensePolyRingBase`].
@@ -123,6 +134,16 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> Dense
 /// 
 pub struct DensePolyRingEl<R: RingStore, A: Allocator + Clone = Global> {
     data: Vec<El<R>, A>
+}
+
+impl<R, A> Debug for DensePolyRingEl<R, A> 
+    where R: RingStore,
+        A: Allocator + Clone,
+        El<R>: Debug
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.data.fmt(f)
+    }
 }
 
 impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingBase for DensePolyRingBase<R, A, C> {
@@ -377,6 +398,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingE
 ///
 /// Iterator over all terms of an element of [`DensePolyRing`].
 /// 
+#[allow(missing_debug_implementations)]
 pub struct TermIterator<'a, R>
     where R: RingStore
 {

@@ -107,7 +107,10 @@ impl<I> Debug for RationalFieldEl<I>
         El<I>: Debug
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "RationalFieldEl({:?}, {:?})", &self.0, &self.1)
+        f.debug_struct("RationalFieldEl")
+            .field("num", &self.0)
+            .field("den", &self.1)
+            .finish()
     }
 }
 

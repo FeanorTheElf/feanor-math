@@ -555,6 +555,7 @@ impl<R: DelegateRing + ?Sized> SerializableElementRing for R
 ///
 /// Iterator over all elements of a finite [`DelegateRing`].
 /// 
+#[allow(missing_debug_implementations)]
 pub struct DelegateFiniteRingElementsIter<'a, R: ?Sized>
     where R: DelegateRing, R::Base: FiniteRing
 {

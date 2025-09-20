@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::fmt::Debug;
 
 use super::{SelfSubvectorFn, SelfSubvectorView, SparseVectorViewOperation, SwappableVectorViewMut, VectorFn, VectorView, VectorViewMut, VectorViewSparse};
 
@@ -77,6 +78,18 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for SubvectorView<V, T> {
     }
 }
 
+impl<V: VectorView<T> + Debug, T: ?Sized> Debug for SubvectorView<V, T> {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SubvectorView")
+            .field("begin", &self.begin)
+            .field("end", &self.end)
+            .field("base", &self.base)
+            .finish()
+    }
+}
+
+#[allow(missing_debug_implementations)]
 pub struct FilterWithinRangeIter<'a, T: ?Sized, I>
     where T: 'a,
         I: Iterator<Item = (usize, &'a T)>
@@ -145,6 +158,7 @@ impl<V: VectorView<T>, T: ?Sized> SelfSubvectorView<T> for SubvectorView<V, T> {
     }
 }
 
+#[allow(missing_debug_implementations)]
 pub struct SubvectorFn<V: VectorFn<T>, T> {
     begin: usize,
     end: usize,

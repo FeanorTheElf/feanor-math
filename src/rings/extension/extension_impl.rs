@@ -115,6 +115,9 @@ impl<R, V, A, C> Copy for FreeAlgebraImplBase<R, V, A, C>
         El<R>: Copy
 {}
 
+///
+/// Type of an element of [`FreeAlgebraImpl`].
+/// 
 pub struct FreeAlgebraImplEl<R, A = Global>
     where R: RingStore, A: Allocator
 {
@@ -483,10 +486,10 @@ impl<R, V, A, C> Debug for FreeAlgebraImplBase<R, V, A, C>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let poly_ring = DensePolyRing::new(self.base_ring(), self.gen_name);
-        write!(f, "FreeAlgebraImplBase {{ base_ring: {:?}, quotient_by: {:?} }}", 
-            self.base_ring, 
-            poly_ring.format(&RingRef::new(self).generating_poly(&poly_ring, self.base_ring.identity()))
-        )
+        f.debug_struct("FreeAlgebraImplBase")
+            .field("base_ring", &self.base_ring)
+            .field("modulus", &poly_ring.format(&RingRef::new(self).generating_poly(&poly_ring, self.base_ring.identity())))
+            .finish()
     }
 }
 
@@ -652,6 +655,7 @@ impl<R, V, A, C> HashableElRing for FreeAlgebraImplBase<R, V, A, C>
 /// 
 /// Used by the implementation of [`FiniteRing::elements()`] for [`FreeAlgebraImplBase`].
 /// 
+#[allow(missing_debug_implementations)]
 pub struct WRTCanonicalBasisElementCreator<'a, R, V, A, C>
     where R: RingStore, 
         R::Type: FiniteRing, 

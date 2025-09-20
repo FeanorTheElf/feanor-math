@@ -36,6 +36,9 @@ pub type Real64 = RingValue<Real64Base>;
 
 impl Real64 {
 
+    ///
+    /// The singleton ring instance of [`Real64`].
+    /// 
     pub const RING: RingValue<Real64Base> = RingValue::from(Real64Base);
 }
 

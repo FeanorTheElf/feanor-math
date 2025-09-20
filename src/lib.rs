@@ -4,7 +4,7 @@
 #![allow(rustdoc::private_intra_doc_links)]
 
 #![warn(
-    // missing_debug_implementations,
+    missing_debug_implementations,
     unused_extern_crates,
     unused_import_braces,
     // unused_qualifications,

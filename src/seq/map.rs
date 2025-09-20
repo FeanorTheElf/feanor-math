@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use super::{SwappableVectorViewMut, VectorFn, VectorView, VectorViewMut};
 
+#[allow(missing_debug_implementations)]
 pub struct VectorViewMap<V: VectorView<T>, T: ?Sized, U: ?Sized, F: for<'a> Fn(&'a T) -> &'a U> {
     base: V,
     mapping_fn: F,
@@ -43,6 +44,7 @@ impl<V: VectorView<T>, T: ?Sized, U: ?Sized, F: for<'a> Fn(&'a T) -> &'a U> Vect
     }
 }
 
+#[allow(missing_debug_implementations)]
 pub struct VectorViewMapMut<V: VectorViewMut<T>, T: ?Sized, U: ?Sized, F_const: for<'a> Fn(&'a T) -> &'a U, F_mut: for<'a> FnMut(&'a mut T) -> &'a mut U> {
     base: V,
     mapping_fns: (F_const, F_mut),
@@ -85,6 +87,7 @@ impl<V: SwappableVectorViewMut<T>, T: ?Sized, U: ?Sized, F_const: for<'a> Fn(&'a
     }
 }
 
+#[allow(missing_debug_implementations)]
 pub struct VectorFnMap<V: VectorFn<T>, T, U, F: Fn(T) -> U> {
     base: V,
     mapping_fn: F,

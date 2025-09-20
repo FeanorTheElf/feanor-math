@@ -93,6 +93,7 @@ impl<'a, T, R> TransformTarget<R> for &'a mut T
 /// 
 /// TODO: at next breaking release, remove the reference to the ring
 /// 
+#[allow(missing_debug_implementations)]
 pub struct TransformRows<'a, V, R>(pub SubmatrixMut<'a, V, R::Element>, pub &'a R)
     where V: AsPointerToSlice<R::Element>, R: ?Sized + RingBase;
 
@@ -102,6 +103,7 @@ pub struct TransformRows<'a, V, R>(pub SubmatrixMut<'a, V, R::Element>, pub &'a 
 /// 
 /// TODO: at next breaking release, remove the reference to the ring
 /// 
+#[allow(missing_debug_implementations)]
 pub struct TransformCols<'a, V, R>(pub SubmatrixMut<'a, V, R::Element>, pub &'a R)
     where V: AsPointerToSlice<R::Element>, R: ?Sized + RingBase;
 
@@ -257,6 +259,7 @@ impl<R> TransformTarget<R> for ()
 /// A [`TransformTarget`] that forwards all transforms to a fixed
 /// delegate, but offsets every row/column index by a given value.
 /// 
+#[allow(missing_debug_implementations)]
 pub struct OffsetTransformIndex<R, T>
     where R: ?Sized + RingBase,
         T: TransformTarget<R>
@@ -270,6 +273,9 @@ impl<R, T> OffsetTransformIndex<R, T>
     where R: ?Sized + RingBase,
         T: TransformTarget<R>
 {
+    ///
+    /// Creates a new [`OffsetTransformIndex`] that forwards all transforms to `delegate`.
+    /// 
     pub fn new(delegate: T, offset: usize) -> Self {
         Self {
             delegate: delegate, 
@@ -300,6 +306,7 @@ impl<R, T> TransformTarget<R> for OffsetTransformIndex<R, T>
 /// A [`TransformTarget`] that forwards all transforms to
 /// two fixed delegates.
 /// 
+#[allow(missing_debug_implementations)]
 pub struct DuplicateTransforms<R, T1, T2>
     where R: ?Sized + RingBase,
         T1: TransformTarget<R>,
@@ -315,6 +322,9 @@ impl<R, T1, T2> DuplicateTransforms<R, T1, T2>
         T1: TransformTarget<R>,
         T2: TransformTarget<R>
 {
+    ///
+    /// Creates a new [`DuplicateTransforms`] that forwards all transforms to `first` and `second`.
+    /// 
     pub fn new(first: T1, second: T2) -> Self {
         Self {
             delegate1: first,

@@ -1,4 +1,5 @@
 use std::alloc::{Allocator, Global};
+use std::fmt::Debug;
 
 use serde::Serialize;
 use serde::de::DeserializeSeed;
@@ -205,6 +206,16 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> ZnBase<C, J, A>
     }
 }
 
+impl<C: RingStore, J: RingStore, A: Allocator + Clone> Debug for ZnBase<C, J, A>
+    where C::Type: ZnRing + CanHomFrom<J::Type>,
+        J::Type: IntegerRing,
+        <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Z/{}Z", self.integer_ring().format(self.modulus()))
+    }
+}
+
 impl<C: RingStore, J: RingStore, A: Allocator + Clone> VectorView<C> for Zn<C, J, A>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
@@ -237,6 +248,19 @@ pub struct ZnEl<C: RingStore, A: Allocator + Clone>
     where C::Type: ZnRing
 {
     data: Vec<El<C>, A>
+}
+
+impl<C, A> Debug for ZnEl<C, A> 
+    where C: RingStore,
+        C::Type: ZnRing,
+        A: Allocator + Clone,
+        El<C>: Debug
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ZnEl")
+            .field("congruences", &self.data)
+            .finish()
+    }
 }
 
 impl<C: RingStore, J: RingStore, A: Allocator + Clone> RingBase for ZnBase<C, J, A> 
@@ -556,6 +580,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> DivisibilityRing for ZnBa
     }
 }
 
+#[allow(missing_debug_implementations)]
 pub struct FromCongruenceElementCreator<'a, C: RingStore, J: RingStore, A: Allocator + Clone>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
@@ -602,6 +627,7 @@ impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> FnMut<(&'b [El<C>
     }
 }
 
+#[allow(missing_debug_implementations)]
 pub struct CloneComponentElement<'a, C: RingStore, J: RingStore, A: Allocator + Clone>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,

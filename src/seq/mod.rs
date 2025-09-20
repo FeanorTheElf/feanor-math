@@ -1,4 +1,14 @@
 
+use std::alloc::Allocator;
+use std::fmt::{Debug, Formatter};
+use std::ops::{Bound, Range, RangeBounds};
+
+pub use conversion::{CloneElFn, VectorViewFn, VectorFnIter};
+pub use map::{VectorFnMap, VectorViewMap, VectorViewMapMut};
+use step_by::{StepByFn, StepBy};
+
+use crate::ring::*;
+
 mod conversion;
 mod map;
 
@@ -26,17 +36,6 @@ pub mod permute;
 /// Contains [`sparse::SparseMapVector`], a container for sparse vectors.
 /// 
 pub mod sparse;
-
-use std::alloc::Allocator;
-use std::cell::RefCell;
-use std::fmt::{Debug, Formatter};
-use std::ops::{Bound, Range, RangeBounds};
-
-pub use conversion::{CloneElFn, VectorViewFn, VectorFnIter};
-pub use map::{VectorFnMap, VectorViewMap, VectorViewMapMut};
-use step_by::{StepByFn, StepBy};
-
-use crate::ring::*;
 
 ///
 /// A trait for objects that provides random-position read access to a 1-dimensional 
@@ -900,6 +899,7 @@ impl VectorFn<usize> for Range<usize> {
 /// additionally is also callable with signature `(usize, &El<R>) -> El<R>`. In this
 /// case, the first parameter is ignored.
 /// 
+#[allow(missing_debug_implementations)]
 #[derive(Copy, Clone)]
 pub struct CloneRingEl<R: RingStore>(pub R);
 
@@ -952,6 +952,7 @@ impl<'a, R: RingStore> Fn<(usize, &'a El<R>,)> for CloneRingEl<R> {
 ///
 /// Callable struct that wraps [`Clone::clone()`].
 /// 
+#[allow(missing_debug_implementations)]
 #[derive(Copy, Clone)]
 pub struct CloneValue;
 
@@ -976,36 +977,6 @@ impl<'a, T: Clone> Fn<(&'a T,)> for CloneValue {
     extern "rust-call" fn call(&self, args: (&'a T,)) -> Self::Output {
         args.0.clone()
     }
-}
-
-///
-/// Creates an object that, on [`Debug::fmt()`], will consume
-/// the iterator and print all its elements.
-/// 
-/// Little quirk: Since the iterator is consumed, every further call
-/// to [`Debug::fmt()`] will panic. 
-/// 
-pub(crate) fn dbg_iter<I>(it: I) -> impl use<I> + Debug
-    where I: Iterator,
-        I::Item: Debug
-{
-    struct DebugIter<I>(RefCell<Option<I>>);
-    impl<I> Debug for DebugIter<I>
-        where I: Iterator,
-            I::Item: Debug
-    {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            let mut it = self.0.borrow_mut().take().expect("Can only be debugged once");
-            if let Some(first) = it.next() {
-                write!(f, "{:?}", first)?;
-                for el in it {
-                    write!(f, ", {:?}", el)?;
-                }
-            }
-            return Ok(());
-        }
-    }
-    return DebugIter(RefCell::new(Some(it)));
 }
 
 #[test]

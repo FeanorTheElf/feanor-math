@@ -1,5 +1,6 @@
 use std::alloc::{Allocator, Global};
 use std::cell::{RefCell, RefMut};
+use std::fmt::Debug;
 
 use atomicbox::AtomicOptionBox;
 use thread_local::ThreadLocal;
@@ -81,9 +82,17 @@ fn nth_monomial_degrevlex<F>(n: usize, d: Exponent, mut index: u64, cum_binomial
 /// Stores a reference to a monomial w.r.t. a given [`MultivariatePolyRingImplBase`].
 /// 
 #[repr(transparent)]
-#[derive(Debug)]
 pub struct MonomialIdentifier {
     data: InternalMonomialIdentifier
+}
+
+impl Debug for MonomialIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MonomialIdentifier")
+            .field("deg", &self.data.deg)
+            .field("idx", &self.data.order)
+            .finish()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -128,6 +137,16 @@ pub struct MultivariatePolyRingEl<R, A = Global>
         A: Allocator + Clone
 {
     data: Vec<(El<R>, MonomialIdentifier), A>
+}
+
+impl<R, A> Debug for MultivariatePolyRingEl<R, A>
+    where R: RingStore,
+        El<R>: Debug,
+        A: Allocator + Clone
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.data)
+    }
 }
 
 ///
@@ -376,6 +395,20 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
     }
 }
 
+impl<R, A> Debug for MultivariatePolyRingImplBase<R, A>
+    where R: RingStore,
+        R::Type: Debug,
+        A: Clone + Allocator + Send
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MultivariatePolyRingImplBase")
+            .field("base_ring", &self.base_ring.get_ring())
+            .field("variable_count", &self.variable_count)
+            .field("max_supported_deg", &self.max_supported_deg)
+            .finish()
+    }
+}
+
 impl<R, A> PartialEq for MultivariatePolyRingImplBase<R, A>
     where R: RingStore,
         A: Clone + Allocator + Send
@@ -519,6 +552,10 @@ impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
     }
 }
 
+/// 
+/// Iterator over the terms of a [`MultivariatePolyImplEl`].
+/// 
+#[allow(missing_debug_implementations)]
 pub struct TermIterImpl<'a, R>
     where R: RingStore
 {

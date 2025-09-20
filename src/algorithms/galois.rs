@@ -179,7 +179,7 @@ impl<K, Impl, I> Debug for GaloisAutomorphism<K, Impl, I>
         I::Type: IntegerRing
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "GaloisAutomorphism({} -> {})", self.field.format(&self.field.canonical_gen()), self.field.format(&self.image_of_canonical_gen_powers[1]))
+        f.debug_struct("GaloisAutomorphism").field("gen_image", &self.field.format(&self.image_of_canonical_gen_powers[1])).finish()
     }
 }
 

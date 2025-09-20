@@ -25,6 +25,10 @@ pub mod sparse_poly;
 /// 
 pub trait PolyRing: RingExtension {
 
+    /// 
+    /// Type of the iterator over all non-zero terms of a polynomial in this ring,
+    /// as returned by [`PolyRing::terms()`].
+    /// 
     type TermsIterator<'a>: Iterator<Item = (&'a El<Self::BaseRing>, usize)>
         where Self: 'a;
 
@@ -80,6 +84,12 @@ pub trait PolyRing: RingExtension {
     /// 
     fn div_rem_monic(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element);
     
+    ///
+    /// Computes the polynomial whose coefficients are the images of the coefficients of `el`
+    /// under the given homomorphism.
+    /// 
+    /// This is used to implement [`PolyRingStore::lifted_hom()`].
+    /// 
     fn map_terms<P, H>(&self, from: &P, el: &P::Element, hom: H) -> Self::Element
         where P: ?Sized + PolyRing,
             H: Homomorphism<<P::BaseRing as RingStore>::Type, <Self::BaseRing as RingStore>::Type>
@@ -173,6 +183,12 @@ pub trait PolyRingStore: RingStore
         return result;
     }
 
+    ///
+    /// Computes the polynomial from the given terms.
+    /// 
+    /// As opposed to [`PolyRingStore::from_terms()`], the iterator may return errors,
+    /// in which case the computation is aborted and the first error is returned.
+    /// 
     fn try_from_terms<E, I>(&self, iter: I) -> Result<El<Self>, E>
         where I: IntoIterator<Item = Result<(El<<Self::Type as RingExtension>::BaseRing>, usize), E>>,
     {
@@ -238,6 +254,13 @@ pub trait PolyRingStore: RingStore
         self.get_ring().evaluate(f, value, hom)
     }
 
+    ///
+    /// Lifts the given homomorphism of base rings `S -> R` to the corresponding
+    /// homomorphism of polynomial rings `S[X] -> R[X]`.
+    /// 
+    /// As opposed to [`PolyRingStore::lifted_hom()`], this transfers the ownership
+    /// of `self` into the homomorphism object.
+    /// 
     fn into_lifted_hom<P, H>(self, from: P, hom: H) -> CoefficientHom<P, Self, H>
         where P: RingStore,
             P::Type: PolyRing,
@@ -250,6 +273,10 @@ pub trait PolyRingStore: RingStore
         }
     }
 
+    ///
+    /// Lifts the given homomorphism of base rings `S -> R` to the corresponding
+    /// homomorphism of polynomial rings `S[X] -> R[X]`.
+    /// 
     fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
         where P: RingStore,
             P::Type: PolyRing,
@@ -263,6 +290,9 @@ pub trait PolyRingStore: RingStore
     /// Use for convenient creation of polynomials.
     /// 
     /// Note however that [`PolyRingStore::from_terms()`] might be more performant.
+    /// 
+    /// If the number of polynomials to be created is known at compile time, it is more convenient
+    /// to instead use [`PolyRingStore::with_wrapped_indeterminate()`].
     /// 
     /// # Example
     /// ```rust
@@ -288,6 +318,30 @@ pub trait PolyRingStore: RingStore
         f(&wrapped_indet).into_iter().map(|f| f.unwrap()).collect()
     }
 
+    ///
+    /// Invokes the function with a wrapped version of the indeterminate of this poly ring.
+    /// Use for convenient creation of polynomials.
+    /// 
+    /// Note however that [`PolyRingStore::from_terms()`] might be more performant.
+    /// 
+    /// If the number of polynomials to be created is not known at compile time, instead
+    /// use [`PolyRingStore::with_wrapped_indeterminate_dyn()`].
+    /// 
+    /// # Example
+    /// ```rust
+    /// use feanor_math::assert_el_eq;
+    /// use feanor_math::ring::*;
+    /// use feanor_math::rings::poly::*;
+    /// use feanor_math::homomorphism::*;
+    /// use feanor_math::rings::zn::zn_64::*;
+    /// use feanor_math::rings::poly::dense_poly::*;
+    /// let base_ring = Zn::new(7);
+    /// let poly_ring = DensePolyRing::new(base_ring, "X");
+    /// let f_version1 = poly_ring.from_terms([(base_ring.int_hom().map(3), 0), (base_ring.int_hom().map(2), 1), (base_ring.one(), 3)].into_iter());
+    /// let [f_version2] = poly_ring.with_wrapped_indeterminate(|x| [3 + 2 * x + x.pow_ref(3)]);
+    /// assert_el_eq!(poly_ring, f_version1, f_version2);
+    /// ```
+    /// 
     fn with_wrapped_indeterminate<'a, F, const M: usize>(&'a self, f: F) -> [El<Self>; M]
         where F: FnOnce(&RingElementWrapper<&'a Self>) -> [RingElementWrapper<&'a Self>; M]
     {
@@ -296,6 +350,9 @@ pub trait PolyRingStore: RingStore
         return std::array::from_fn(|_| result_it.next().unwrap().unwrap());
     }
     
+    ///
+    /// See [`PolyRing::balance_poly()`].
+    /// 
     #[stability::unstable(feature = "enable")]
     fn balance_poly(&self, f: &mut El<Self>) -> Option<El<<Self::Type as RingExtension>::BaseRing>>
         where <<Self::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing
@@ -304,6 +361,13 @@ pub trait PolyRingStore: RingStore
     }
 }
 
+///
+/// Homomorphism between two polynomial rings, induced by a homomorphism between their coefficient rings.
+/// 
+/// This is the type returned by [`PolyRingStore::lifted_hom()`] and [`PolyRingStore::into_lifted_hom()`],
+/// which should be used to create an instance of this type.
+/// 
+#[allow(missing_debug_implementations)]
 pub struct CoefficientHom<PFrom, PTo, H>
     where PFrom: RingStore,
         PTo: RingStore,
@@ -450,6 +514,12 @@ pub mod generic_impls {
     }
 }
 
+///
+/// Constructs the homomorphism `R[X][Y] -> S[X][Y], X -> Y, Y -> X` that swaps the
+/// the two indeterminates of a polynomial ring in two indeterminates.
+/// 
+/// Coefficients are mapped from `R` to `S` using the given homomorphism.
+/// 
 pub fn transpose_indeterminates<P1, P2, H>(from: P1, to: P2, base_hom: H) -> impl Homomorphism<P1::Type, P2::Type>
     where P1: RingStore, P1::Type: PolyRing,
         P2: RingStore, P2::Type: PolyRing,

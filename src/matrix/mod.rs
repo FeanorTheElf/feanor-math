@@ -72,8 +72,20 @@ pub mod matrix_compare {
     /// very general sense.
     /// 
     pub trait MatrixCompare<T> {
+
+        ///
+        /// Returns the number of rows of the matrix.
+        /// 
         fn row_count(&self) -> usize;
+
+        ///
+        /// Returns the number of columns of the matrix.
+        /// 
         fn col_count(&self) -> usize;
+
+        ///
+        /// Returns a reference to the element at the given position.
+        /// 
         fn at(&self, i: usize, j: usize) -> &T;
     }
 

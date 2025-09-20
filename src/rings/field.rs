@@ -16,6 +16,7 @@ use super::local::AsLocalPIRBase;
 use crate::primitive_int::*;
 
 use std::marker::PhantomData;
+use std::fmt::Debug;
 
 use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNewtypeStruct};
 use serde::{Deserialize, Serialize, Deserializer, Serializer};
@@ -100,6 +101,17 @@ impl<R> Copy for AsFieldBase<R>
         El<R>: Copy
 {}
 
+impl<R> Debug for AsFieldBase<R>
+    where R: RingStore,
+        R::Type: DivisibilityRing + Debug
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("AsField")
+            .field(&self.base.get_ring())
+            .finish()
+    }
+}
+
 impl<R> PartialEq for AsFieldBase<R>
     where R: RingStore,
         R::Type: DivisibilityRing
@@ -120,6 +132,17 @@ pub type AsField<R: RingStore> = RingValue<AsFieldBase<R>>;
 /// 
 pub struct FieldEl<R: RingStore>(El<R>)
     where R::Type: DivisibilityRing;
+
+impl<R: RingStore> Debug for FieldEl<R> 
+    where El<R>: Debug,
+        R::Type: DivisibilityRing
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("FieldEl")
+            .field(&self.0)
+            .finish()
+    }
+}
 
 impl<R: RingStore> Clone for FieldEl<R> 
     where El<R>: Clone,

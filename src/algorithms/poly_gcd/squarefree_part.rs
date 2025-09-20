@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::algorithms::poly_gcd::*;
@@ -13,17 +13,10 @@ use super::INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT;
 ///
 /// For the power-decomposition `f = f1^e1 ... fr^er`, stores a tuple (ei, deg(fi))
 /// 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 struct Signature {
     perfect_power: usize,
     degree: usize
-}
-
-impl Debug for Signature {
-
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "deg-{}-poly^{}", self.degree, self.perfect_power)
-    }
 }
 
 ///

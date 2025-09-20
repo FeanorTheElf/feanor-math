@@ -268,7 +268,7 @@ impl<R> Debug for PreparedDivisor<R>
         R::PreparedDivisorData: Debug
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "PreparedDivisor {{ element: {:?}, data: {:?} }}", &self.element, &self.data)
+        f.debug_struct("PreparedDivisor").field("element", &self.element).field("data", &self.data).finish()
     }
 }
 

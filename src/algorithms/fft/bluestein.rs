@@ -368,7 +368,11 @@ impl<R_main, R_twiddle, H, A> Debug for BluesteinFFT<R_main, R_twiddle, H, A>
         A: Allocator + Clone
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Bluestein FFT of length {} over ring {:?}", self.n, self.ring().get_ring())
+        f.debug_struct("BluesteinFFT")
+            .field("ring", &self.ring().get_ring())
+            .field("n", &self.n)
+            .field("root_of_unity_n", &self.ring().format(&self.root_of_unity(self.ring())))
+            .finish()
     }
 }
 

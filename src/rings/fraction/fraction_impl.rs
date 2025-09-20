@@ -82,7 +82,10 @@ impl<R> Debug for FractionFieldEl<R>
         El<R>: Debug
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "FractionFieldEl {{ num: {:?}, den: {:?} }}", self.num, self.den)
+        f.debug_struct("FractionFieldEl")
+            .field("num", &self.num)
+            .field("den", &self.den)
+            .finish()
     }
 }
 

@@ -1,7 +1,5 @@
 use std::{alloc::{Allocator, Global}, fmt::{Debug, Formatter, Result}};
 
-use crate::seq::dbg_iter;
-
 use self::submatrix::{AsFirstElement, Submatrix, SubmatrixMut};
 
 use super::*;
@@ -216,7 +214,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
 impl<T: Debug, A: Allocator> Debug for OwnedMatrix<T, A> {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "[{:?}]", dbg_iter(self.data().row_iter()))
+        self.data().fmt(f)
     }
 }
 

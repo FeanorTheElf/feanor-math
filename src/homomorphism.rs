@@ -544,7 +544,7 @@ impl<R, S> Debug for CanHom<R, S>
     where R: RingStore + Debug, S: RingStore + Debug, S::Type: CanHomFrom<R::Type>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "CanHom({:?}, {:?})", self.from, self.to)
+        f.debug_struct("CanHom").field("from", &self.from).field("to", &self.to).finish()
     }
 }
 
@@ -730,6 +730,7 @@ impl<'a, R, S> Homomorphism<R::Type, S::Type> for CanHomRef<'a, R, S>
 /// ```
 /// 
 /// # See also
+/// 
 /// The "one-directional" variant [`CanHom`], the basic interfaces [`CanHomFrom`] and
 /// [`CanIsoFromTo`] and the very simplified function [`RingStore::coerce()`].
 /// 
@@ -745,7 +746,7 @@ impl<R, S> Debug for CanIso<R, S>
     where R: RingStore + Debug, S: RingStore + Debug, S::Type: CanIsoFromTo<R::Type>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "CanIso({:?}, {:?})", self.from, self.to)
+        f.debug_struct("CanIso").field("from", &self.from).field("to", &self.to).finish()
     }
 }
 
@@ -925,6 +926,7 @@ impl<R> Homomorphism<<<R::Type as RingExtension>::BaseRing as RingStore>::Type, 
 /// assert_el_eq!(ring, hom.map(1), hom.map(18));
 /// ```
 /// 
+#[allow(missing_debug_implementations)]
 #[derive(Clone)]
 pub struct IntHom<R>
     where R: RingStore
@@ -985,6 +987,7 @@ impl<R> IntHom<R>
 ///
 /// The identity homomorphism `R -> R, x -> x` on the given ring `R`.
 /// 
+#[allow(missing_debug_implementations)]
 #[derive(Clone)]
 pub struct Identity<R: RingStore> {
     ring: R
@@ -1085,6 +1088,7 @@ impl<'a, S, R, H> Homomorphism<S, R> for &'a H
 /// lead to hard-to-debug errors.
 /// 
 #[derive(Clone)]
+#[allow(missing_debug_implementations)]
 pub struct LambdaHom<R: RingStore, S: RingStore, F>
     where F: Fn(&R, &S, &El<R>) -> El<S>
 {
@@ -1159,6 +1163,7 @@ impl<R: RingStore, S: RingStore, F> Homomorphism<R::Type, S::Type> for LambdaHom
 /// More concretely, this is the homomorphism `R -> T` that maps `x` to `g(f(x))`.
 /// The best way to create a [`ComposedHom`] is through [`Homomorphism::compose()`].
 /// 
+#[allow(missing_debug_implementations)]
 pub struct ComposedHom<R, S, T, F, G>
     where F: Homomorphism<R, S>,
         G: Homomorphism<S, T>,
