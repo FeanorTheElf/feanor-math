@@ -57,7 +57,7 @@ pub fn poly_div_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left
     return Ok((result, lhs));
 }
 
-const FAST_POLY_DIV_THRESHOLD: usize = 31;
+const FAST_POLY_DIV_THRESHOLD: usize = 32;
 
 #[stability::unstable(feature = "enable")]
 fn fast_poly_div_impl<P, F, E, Controller>(poly_ring: P, f: El<P>, g: &El<P>, left_div_lc: &mut F, controller: Controller)-> Result<(El<P>, El<P>), E>
