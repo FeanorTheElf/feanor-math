@@ -156,10 +156,18 @@ pub fn interpolate<P, V1, V2, A: Allocator>(poly_ring: P, x: V1, y: V2, allocato
         V2: VectorFn<El<<P::Type as RingExtension>::BaseRing>>
 {
     assert_eq!(x.len(), y.len());
-    let mut nums = Vec::with_capacity_in(x.len(), &allocator);
-    nums.resize_with(x.len(), || poly_ring.zero());
     let R = poly_ring.base_ring();
-    product_except_one(&poly_ring, (0..x.len()).map_fn(|i| poly_ring.from_terms([(R.negate(x.at(i)), 0), (R.one(), 1)].into_iter())), &mut nums[..]);
+    let null_poly = poly_ring.prod(x.iter().map(|x| poly_ring.from_terms([(R.one(), 1), (R.negate(x), 0)])));
+    let mut nums = Vec::with_capacity_in(x.len(), &allocator);
+    let div_linear = |poly: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>| if let Some(d) = poly_ring.degree(poly) {
+        poly_ring.from_terms((0..d).rev().scan(R.zero(), |current, i| {
+            R.add_assign_ref(current, poly_ring.coefficient_at(poly, i + 1));
+            let result = R.clone_el(current);
+            R.mul_assign_ref(current, a);
+            return Some((result, i));
+        }))
+    } else { poly_ring.zero() };
+    nums.extend(x.iter().map(|x| div_linear(&null_poly, &x)));
 
     let mut denoms = Vec::with_capacity_in(x.len(), &allocator);
     denoms.extend((0..x.len()).map(|i| poly_ring.evaluate(&nums[i], &x.at(i), &R.identity())));
@@ -172,22 +180,10 @@ pub fn interpolate<P, V1, V2, A: Allocator>(poly_ring: P, x: V1, y: V2, allocato
     }
 
     if let Some(inv) = R.invert(&denominator) {
-        return Ok(poly_ring.inclusion().mul_map(<_ as RingStore>::sum(&poly_ring, nums.into_iter().zip(factors.into_iter()).map(|(num, c)| poly_ring.inclusion().mul_map(num, c))), inv));
+        Ok(poly_ring.inclusion().mul_map(<_ as RingStore>::sum(&poly_ring, nums.into_iter().zip(factors.into_iter()).map(|(num, c)| poly_ring.inclusion().mul_map(num, c))), inv))
     } else {
         let scaled_result = <_ as RingStore>::sum(&poly_ring, nums.into_iter().zip(factors.into_iter()).map(|(num, c)| poly_ring.inclusion().mul_map(num, c)));
-        let mut failed_division = false;
-        let result = poly_ring.from_terms(poly_ring.terms(&scaled_result).map_while(|(c, i)| match R.checked_div(&c, &denominator) {
-            Some(c) => Some((c, i)),
-            None => {
-                failed_division = true;
-                None
-            }
-        }));
-        if failed_division {
-            return Err(InterpolationError::NotInvertible);
-        } else {
-            return Ok(result);
-        }
+        poly_ring.try_from_terms(poly_ring.terms(&scaled_result).map(|(c, i)| R.checked_div(&c, &denominator).map(|c| (c, i)).ok_or(InterpolationError::NotInvertible)))
     }
 }
 
@@ -234,6 +230,8 @@ pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_po
 use crate::rings::finite::FiniteRingStore;
 #[cfg(test)]
 use crate::rings::zn::zn_64::Zn;
+#[cfg(test)]
+use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
 use std::alloc::Global;
 #[cfg(test)]
@@ -349,4 +347,14 @@ fn test_interpolate_multivariate() {
             }
         }
     }
+}
+
+#[test]
+#[ignore]
+fn large_polynomial_interpolation() {
+    let field = Zn::new(65537).as_field().ok().unwrap();
+    let poly_ring = DensePolyRing::new(field, "X");
+    let hom = poly_ring.base_ring().can_hom(&StaticRing::<i64>::RING).unwrap();
+    let actual = interpolate(&poly_ring, (0..65536).map_fn(|x| hom.map(x as i64)), (0..65536).map_fn(|x| hom.map(x as i64)), Global).unwrap();
+    assert_el_eq!(&poly_ring, poly_ring.indeterminate(), actual);
 }

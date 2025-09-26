@@ -124,7 +124,7 @@ pub mod splitting_field;
 /// Contains algorithms for computing divisions in ring extensions for which standard methods
 /// are not sufficient.
 /// 
-pub mod extension_invert;
+pub mod zpe_extension;
 ///
 /// Contains algorithms for computing the Galois group and Galois closure of a
 /// [`crate::rings::extension::number_field::NumberField`].

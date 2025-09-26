@@ -1,13 +1,8 @@
 use crate::homomorphism::*;
-use crate::local::*;
-use crate::divisibility::*;
-use crate::primitive_int::StaticRing;
 use crate::rings::extension::*;
 use crate::ring::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::zn::*;
-use crate::integer::*;
-use crate::seq::*;
 use crate::rings::poly::*;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::poly_gcd::hensel::local_zn_ring_bezout_identity;
@@ -27,45 +22,15 @@ use crate::algorithms::poly_gcd::hensel::local_zn_ring_bezout_identity;
 pub fn invert_over_local_zn<S>(ring: S, el: &El<S>) -> Option<El<S>>
     where S: RingStore,
         S::Type: FreeAlgebra,
-        <<S::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing + SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + Clone
+        <<S::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing + SelfIso + ZnRing + FromModulusCreateableZnRing + Clone
 {
     let base_ring = ring.base_ring();
     let poly_ring = DensePolyRing::new(base_ring, "X");
     let modulus = ring.generating_poly(&poly_ring, base_ring.identity());
+    let poly = ring.poly_repr(&poly_ring, el, base_ring.identity());
 
-    // we consider the element as a polynomial `f(X)` of degree `< rank` and 
-    // write `f(X) = g(X) + p h(X)` where `g(X)` has unit coefficients. This allows
-    // us to normalize `g(X)`, which is required for `local_zn_ring_bezout_identity()`
-    let mut nilpotent_part = Vec::new();
-    let mut possibly_invertible_part = Vec::new();
-    for (i, c) in ring.wrt_canonical_basis(el).iter().enumerate() {
-        if base_ring.divides(&c, base_ring.max_ideal_gen()) {
-            nilpotent_part.push((c, i));
-        } else {
-            possibly_invertible_part.push((c, i));
-        }
-    }
-    let nilpotent_part = poly_ring.from_terms(nilpotent_part.into_iter());
-    let nilpotent_part = ring.from_canonical_basis((0..ring.rank()).map(|i| base_ring.clone_el(poly_ring.coefficient_at(&nilpotent_part, i))));
-    let mut possibly_invertible_part = poly_ring.from_terms(possibly_invertible_part.into_iter());
-    let lc_inv = base_ring.invert(poly_ring.lc(&possibly_invertible_part)?).unwrap();
-    poly_ring.inclusion().mul_assign_ref_map(&mut possibly_invertible_part, &lc_inv);
-
-    let (mut inverse, _) = local_zn_ring_bezout_identity(&poly_ring, &possibly_invertible_part, &modulus)?;
-    poly_ring.inclusion().mul_assign_map(&mut inverse, lc_inv);
-
-    // `inverse` is now the inverse of `possibly_invertible_part`, and we can
-    // annihilate `nilpotent_part` by the third binomial formula, since a sufficiently
-    // large power of it is zero
-    let inverse = ring.from_canonical_basis((0..ring.rank()).map(|i| base_ring.clone_el(poly_ring.coefficient_at(&inverse, i))));
-
-    let mut nilpotent_correction = ring.negate(ring.mul_ref_snd(nilpotent_part, &inverse));
-    let mut result = inverse;
-    for _ in 0..StaticRing::<i64>::RING.abs_log2_ceil(&base_ring.nilpotent_power().unwrap_or(1).try_into().unwrap()).unwrap() {
-        ring.mul_assign(&mut result, ring.add_ref_snd(ring.one(), &nilpotent_correction));
-        ring.square(&mut nilpotent_correction);
-    }
-    return Some(result);
+    let (inverse, _) = local_zn_ring_bezout_identity(&poly_ring, &poly_ring.add_ref_fst(&modulus, poly), &modulus)?;
+    return Some(ring.from_canonical_basis_extended((0..=poly_ring.degree(&inverse).unwrap()).map(|i| base_ring.clone_el(poly_ring.coefficient_at(&inverse, i)))));
 }
 
 #[cfg(test)]

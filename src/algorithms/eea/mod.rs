@@ -233,7 +233,6 @@ pub fn inv_crt<I>(a: El<I>, b: El<I>, p: &El<I>, q: &El<I>, ZZ: I) -> El<I>
     return result;
 }
 
-
 #[cfg(test)]
 use crate::primitive_int::*;
 

@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 
 use crate::algorithms::int_factor::is_prime_power;
 use crate::computation::ComputationController;
-use crate::local::PrincipalLocalRing;
 use crate::pid::*;
 use crate::ring::*;
 use crate::divisibility::*;
@@ -334,7 +333,7 @@ fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Contro
 pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> Option<(El<P>, El<P>)>
     where P: RingStore,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: SelfIso + ZnRing + PrincipalLocalRing + FromModulusCreateableZnRing + Clone
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: SelfIso + ZnRing + FromModulusCreateableZnRing + Clone
 {
     if poly_ring.is_zero(f) {
         if poly_ring.is_one(g) {
