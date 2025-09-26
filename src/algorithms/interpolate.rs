@@ -1,4 +1,4 @@
-use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::integer::IntegerRingStore;
 use crate::iters::multi_cartesian_product;
 use crate::primitive_int::StaticRing;
@@ -12,28 +12,6 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use std::alloc::Allocator;
 use std::cmp::min;
 use std::ops::Range;
-
-#[allow(unused)]
-#[stability::unstable(feature = "enable")]
-fn invert_many<R>(ring: R, values: &[El<R>], out: &mut [El<R>]) -> Result<(), ()>
-    where R: RingStore,
-        R::Type: DivisibilityRing
-{
-    assert_eq!(out.len(), values.len());
-    out[0] = ring.clone_el(&values[0]);
-    for i in 1..out.len() {
-        out[i] = ring.mul_ref(&values[i], &out[i - 1]);
-    }
-    let joint_inv = ring.invert(&out[out.len() - 1]).ok_or(())?;
-    out[out.len() - 1] = joint_inv;
-    for i in (1..out.len()).rev() {
-        let (fst, snd) = out.split_at_mut(i);
-        ring.mul_assign_ref(&mut fst[i - 1], &snd[0]);
-        ring.mul_assign_ref(&mut snd[0], &values[i]);
-        std::mem::swap(&mut fst[i - 1], &mut snd[0]);
-    }
-    return Ok(());
-}
 
 ///
 /// Computes `out[i] = prod_(j != i) values[j]`.
@@ -151,7 +129,7 @@ pub enum InterpolationError {
 pub fn interpolate<P, V1, V2, A: Allocator>(poly_ring: P, x: V1, y: V2, allocator: A) -> Result<El<P>, InterpolationError>
     where P: RingStore,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain,
         V1: VectorFn<El<<P::Type as RingExtension>::BaseRing>>,
         V2: VectorFn<El<<P::Type as RingExtension>::BaseRing>>
 {
@@ -191,7 +169,7 @@ pub fn interpolate<P, V1, V2, A: Allocator>(poly_ring: P, x: V1, y: V2, allocato
 pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_points: V1, mut values: Vec<El<<P::Type as RingExtension>::BaseRing>, A2>, allocator: A) -> Result<El<P>, InterpolationError>
     where P: RingStore,
         P::Type: MultivariatePolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain,
         V1: VectorFn<V2>,
         V2: VectorFn<El<<P::Type as RingExtension>::BaseRing>>,
         A: Allocator,
@@ -226,8 +204,6 @@ pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_po
     ));
 }
 
-#[cfg(test)]
-use crate::rings::finite::FiniteRingStore;
 #[cfg(test)]
 use crate::rings::zn::zn_64::Zn;
 #[cfg(test)]
@@ -286,40 +262,27 @@ fn test_product_except_one() {
 }
 
 #[test]
-fn test_invert_many() {
-    let ring = Zn::new(17);
-    let data = ring.elements().skip(1).collect::<Vec<_>>();
-    let mut actual = (0..16).map(|_| ring.zero()).collect::<Vec<_>>();
-    let expected = ring.elements().skip(1).map(|x| ring.invert(&x).unwrap()).collect::<Vec<_>>();
-    invert_many(&ring, &data, &mut actual).unwrap();
-    for i in 0..16 {
-        assert_el_eq!(&ring, &expected[i], &actual[i]);
-    }
-}
-
-#[test]
 fn test_interpolate() {
     let ring = StaticRing::<i64>::RING;
     let poly_ring = DensePolyRing::new(ring, "X");
     let poly = poly_ring.from_terms([(3, 0), (1, 1), (-1, 3), (2, 4), (1, 5)].into_iter());
-    let actual = interpolate(&poly_ring, (0..6).map_fn(|x| x.try_into().unwrap()), (0..6).map_fn(|x| poly_ring.evaluate(&poly, &x.try_into().unwrap(), &ring.identity())), Global).unwrap();
+    let x = (0..6).map_fn(|x| x.try_into().unwrap());
+    let actual = interpolate(&poly_ring, x.clone(), x.map_fn(|x| poly_ring.evaluate(&poly, &x, &ring.identity())), Global).unwrap();
     assert_el_eq!(&poly_ring, &poly, &actual);
 
-    let ring = Zn::new(25);
+    let ring = Zn::new(29).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(ring, "X");
-    let poly = interpolate(&poly_ring, (0..5).map_fn(|x| ring.int_hom().map(x as i32)), (0..5).map_fn(|x| if x == 3 { ring.int_hom().map(6) } else { ring.zero() }), Global).unwrap();
-    for x in 0..5 {
-        if x == 3 {
-            assert_el_eq!(ring, ring.int_hom().map(6), poly_ring.evaluate(&poly, &ring.int_hom().map(x), &ring.identity()));
-        } else {
-            assert_el_eq!(ring, ring.zero(), poly_ring.evaluate(&poly, &ring.int_hom().map(x), &ring.identity()));
-        }
+    let x = (0..5).map_fn(|x| ring.int_hom().map(x as i32));
+    let y = (0..5).map_fn(|x| if x == 3 { ring.int_hom().map(6) } else { ring.zero() });
+    let poly = interpolate(&poly_ring, x.clone(), y.clone(), Global).unwrap();
+    for i in 0..5 {
+        assert_el_eq!(ring, y.at(i), poly_ring.evaluate(&poly, &x.at(i), &ring.identity()));
     }
 }
 
 #[test]
 fn test_interpolate_multivariate() {
-    let ring = Zn::new(25);
+    let ring = Zn::new(29).as_field().ok().unwrap();
     let poly_ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(ring, 2);
 
     let interpolation_points = (0..2).map_fn(|_| (0..5).map_fn(|x| ring.int_hom().map(x as i32)));

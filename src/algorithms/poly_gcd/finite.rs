@@ -1,10 +1,11 @@
 use std::mem::swap;
+use std::cmp::max;
 
-use crate::algorithms::eea::eea;
+use crate::algorithms::matmul::strassen::{dispatch_strassen_impl, strassen_mem_size};
 use crate::algorithms::int_factor::is_prime_power;
-use crate::algorithms::poly_div::poly_div_rem_finite_reduced;
-use crate::algorithms::poly_div::PolyDivRemReducedError;
-use crate::computation::ComputationController;
+use crate::algorithms::poly_div::{poly_div_rem_finite_reduced, PolyDivRemReducedError};
+use crate::computation::*;
+use crate::matrix::*;
 use crate::primitive_int::*;
 use crate::ring::*;
 use crate::rings::poly::*;
@@ -87,25 +88,26 @@ pub fn poly_squarefree_part_finite_field<P, Controller>(poly_ring: P, poly: &El<
 const FAST_POLY_EEA_THRESHOLD: usize = 32;
 
 ///
-/// Computes linearly independent vectors `(s, t)` and `(s', t')` such that
-/// `s * lhs + t * rhs` and `s' * lhs + t' * rhs` are both of degree at most
-/// `target_deg`.
+/// Computes linearly independent vectors `(s, t)` and `(s', t')` and `a, a'` 
+/// such that `a = s * lhs + t * rhs` and `a' = s' * lhs + t' * rhs` are both of
+/// degree at most `target_deg`, or alternatively one of them is zero (in which
+/// case the degree cannot be reduced further).
 /// 
 /// The degrees of `s, t, s', t'` are bounded as
 /// ```text
-///   deg(s) < deg(rhs) - deg(s * lhs + t * rhs)
-///   deg(t) < deg(lhs) - deg(s * lhs + t * rhs)
-///   deg(s') < deg(rhs) - deg(s' * lhs + t' * rhs)
-///   deg(t') < deg(lhs) - deg(s' * lhs + t' * rhs)
+///   deg(s) < deg(rhs) - deg(a)
+///   deg(t) < deg(lhs) - deg(a)
+///   deg(s') < deg(rhs) - deg(a')
+///   deg(t') < deg(lhs) - deg(a')
 /// ```
 ///
-fn partial_eea<P>(ring: P, lhs: El<P>, rhs: El<P>, target_deg: usize) -> [El<P>; 4]
+fn partial_eea<P>(ring: P, lhs: El<P>, rhs: El<P>, target_deg: usize) -> ([El<P>; 4], [El<P>; 2])
     where P: RingStore + Copy,
         P::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field
 {
     if ring.is_zero(&lhs) || ring.is_zero(&rhs) {
-        return [ring.one(), ring.zero(), ring.zero(), ring.one()];
+        return ([ring.one(), ring.zero(), ring.zero(), ring.one()], [lhs, rhs]);
     }
     let (mut a, mut b) = (ring.clone_el(&lhs), ring.clone_el(&rhs));
     let (mut sa, mut ta) = (ring.one(), ring.zero());
@@ -133,26 +135,109 @@ fn partial_eea<P>(ring: P, lhs: El<P>, rhs: El<P>, target_deg: usize) -> [El<P>;
         debug_assert_eq!(ring.degree(&sb).unwrap(), ring.degree(&rhs).unwrap() - ring.degree(&a).unwrap());
         debug_assert_eq!(ring.degree(&tb).unwrap(), ring.degree(&lhs).unwrap() - ring.degree(&a).unwrap());
     }
-    return [sa, ta, sb, tb];
+    return ([sa, ta, sb, tb], [a, b]);
 }
 
+///
+/// Computes a Bezout identity for polynomials, using a fast divide-and-conquer
+/// polynomial gcd algorithm. Unless you are implementing [`crate::pid::PrincipalIdealRing`]
+/// for a custom type, you should use [`crate::pid::PrincipalIdealRing::extended_ideal_gen()`]
+/// to get a Bezout identity instead.
+/// 
+/// A Bezout identity is exactly as specified by [`crate::pid::PrincipalIdealRing::extended_ideal_gen()`],
+/// i.e. `s, t, d` such that `d` is the gcd of `lhs` and `rhs`, and `d = lhs * s + rhs * t`.
+/// Note that this algorithm does not try to avoid coefficient growth, and thus is only fast
+/// over finite fields. Furthermore, it will fall back to a slightly less efficient variant of
+/// the standard Euclidean algorithm on small inputs.
+/// 
 #[stability::unstable(feature = "enable")]
-pub fn fast_poly_eea<P, Controller>(poly_ring: P, lhs: &El<P>, rhs: &El<P>, controller: Controller) -> (El<P>, El<P>, El<P>)
-    where P: RingStore,
+pub fn fast_poly_eea<P, Controller>(poly_ring: P, lhs: El<P>, rhs: El<P>, controller: Controller) -> (El<P>, El<P>, El<P>)
+    where P: RingStore + Copy,
         P::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
         Controller: ComputationController
 {
-    fn fast_poly_eea_rec<P, Controller>(poly_ring: P, lhs: El<P>, rhs: El<P>, controller: Controller) -> (El<P>, El<P>, El<P>, El<P>, El<P>)
+    fn fast_poly_eea_impl<P, Controller>(poly_ring: P, lhs: El<P>, rhs: El<P>, target_deg: usize, controller: Controller, memory: &mut [El<P>]) -> ([El<P>; 4], [El<P>; 2])
         where P: RingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
             <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
             Controller: ComputationController
     {
-        unimplemented!()
+        if poly_ring.is_zero(&lhs) || poly_ring.is_zero(&rhs) {
+            return ([poly_ring.one(), poly_ring.zero(), poly_ring.zero(), poly_ring.one()], [lhs, rhs]);
+        }
+        let ldeg = poly_ring.degree(&lhs).unwrap();
+        let rdeg = poly_ring.degree(&rhs).unwrap();
+        if ldeg < target_deg + FAST_POLY_EEA_THRESHOLD || rdeg < target_deg + FAST_POLY_EEA_THRESHOLD {
+            log_progress!(controller, ".");
+            return partial_eea(poly_ring, lhs, rhs, target_deg);
+        } else if ldeg >= 2 * rdeg {
+            let (mut q, r) = poly_ring.euclidean_div_rem(lhs, &rhs);
+            poly_ring.negate_inplace(&mut q);
+            let (transform, rest) = fast_poly_eea_impl(poly_ring, r, rhs, target_deg, controller, memory);
+            let mut transform: (_, _, _, _) = transform.into();
+            transform.1 = poly_ring.fma(&q, &transform.0, transform.1);
+            transform.3 = poly_ring.fma(&q, &transform.2, transform.3);
+            return (transform.into(), rest);
+        } else if rdeg >= 2 * ldeg {
+            let (transform, rest) = fast_poly_eea_impl(poly_ring, rhs, lhs, target_deg, controller, memory);
+            let transform: (_, _, _, _) = transform.into();
+            return ([transform.1, transform.0, transform.3, transform.2], rest);
+        }
+        let split_deg = max(ldeg, rdeg) / 3;
+        assert!(2 * split_deg + 1 < max(ldeg, rdeg));
+        let part_target_deg = max(split_deg, target_deg.saturating_sub(split_deg));
+
+        let lhs_upper = poly_ring.from_terms(poly_ring.terms(&lhs).filter(|(_, i)| *i >= split_deg).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i - split_deg)));
+        let mut lhs_lower = lhs;
+        poly_ring.truncate_monomials(&mut lhs_lower, split_deg);
+        let rhs_upper = poly_ring.from_terms(poly_ring.terms(&rhs).filter(|(_, i)| *i >= split_deg).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i - split_deg)));
+        let mut rhs_lower = rhs;
+        poly_ring.truncate_monomials(&mut rhs_lower, split_deg);
+
+        log_progress!(controller, "({},{})", max(poly_ring.degree(&lhs_upper).unwrap(), poly_ring.degree(&rhs_upper).unwrap()), part_target_deg);
+        let (fst_transform, [mut lhs_rest, mut rhs_rest]) = fast_poly_eea_impl(poly_ring, lhs_upper, rhs_upper, part_target_deg, controller.clone(), memory);
+        poly_ring.mul_assign_monomial(&mut lhs_rest, split_deg);
+        poly_ring.mul_assign_monomial(&mut rhs_rest, split_deg);
+
+        lhs_rest = poly_ring.fma(&fst_transform[0], &lhs_lower, lhs_rest);
+        lhs_rest = poly_ring.fma(&fst_transform[1], &rhs_lower, lhs_rest);
+        rhs_rest = poly_ring.fma(&fst_transform[2], &lhs_lower, rhs_rest);
+        rhs_rest = poly_ring.fma(&fst_transform[3], &rhs_lower, rhs_rest);
+
+        log_progress!(controller, "({},{})", max(poly_ring.degree(&lhs_rest).unwrap_or(0), poly_ring.degree(&rhs_rest).unwrap_or(0)), target_deg);
+        let (snd_transform, rest) = fast_poly_eea_impl(poly_ring, lhs_rest, rhs_rest, target_deg, controller, memory);
+
+        // multiply snd_transform * fst_transform
+        let mut result = [poly_ring.zero(), poly_ring.zero(), poly_ring.zero(), poly_ring.zero()];
+        dispatch_strassen_impl::<_, _, _, _, false, _, _, _>(
+            1, 
+            0, 
+            TransposableSubmatrix::from(Submatrix::from_1d(&snd_transform, 2, 2)),
+            TransposableSubmatrix::from(Submatrix::from_1d(&fst_transform, 2, 2)),
+            TransposableSubmatrixMut::from(SubmatrixMut::from_1d(&mut result, 2, 2)), 
+            poly_ring, 
+            memory
+        );
+
+        return (result, rest);
     }
 
-    return unimplemented!();
+    if poly_ring.is_zero(&lhs) {
+        return (poly_ring.zero(), poly_ring.one(), rhs);
+    } else if poly_ring.is_zero(&rhs) {
+        return (poly_ring.one(), poly_ring.zero(), lhs);
+    }
+
+    controller.run_computation(format_args!("fast_poly_eea(ldeg={}, rdeg={})", poly_ring.degree(&lhs).unwrap(), poly_ring.degree(&rhs).unwrap()), |controller| {
+        let ([s1, t1, s2, t2], [a1, a2]) = fast_poly_eea_impl(poly_ring, lhs, rhs, 0, controller,  &mut (0..strassen_mem_size(false, 2, 0)).map(|_| poly_ring.zero()).collect::<Vec<_>>());
+        if poly_ring.is_zero(&a1) {
+            return (s2, t2, a2);
+        } else {
+            assert!(poly_ring.is_zero(&a2));
+            return (s1, t1, a1);
+        }
+    })
 }
 
 ///
@@ -264,9 +349,9 @@ fn test_partial_eea() {
     ]);
 
     for k in (1..10).rev() {
-        let [s1, t1, s2, t2] = partial_eea(&poly_ring, poly_ring.clone_el(&f), poly_ring.clone_el(&g), k);
-        let a = poly_ring.add(poly_ring.mul_ref(&s1, &f), poly_ring.mul_ref(&t1, &g));
-        let b = poly_ring.add(poly_ring.mul_ref(&s2, &f), poly_ring.mul_ref(&t2, &g));
+        let ([s1, t1, s2, t2], [a, b]) = partial_eea(&poly_ring, poly_ring.clone_el(&f), poly_ring.clone_el(&g), k);
+        assert_el_eq!(&poly_ring, poly_ring.add(poly_ring.mul_ref(&s1, &f), poly_ring.mul_ref(&t1, &g)), &a);
+        assert_el_eq!(&poly_ring, poly_ring.add(poly_ring.mul_ref(&s2, &f), poly_ring.mul_ref(&t2, &g)), &b);
         assert_eq!(k, poly_ring.degree(&a).unwrap());
         assert_eq!(k - 1, poly_ring.degree(&b).unwrap());
         assert!(poly_ring.degree(&s1).is_none() || poly_ring.degree(&s1).unwrap() < 10 - poly_ring.degree(&a).unwrap());
@@ -274,4 +359,27 @@ fn test_partial_eea() {
         assert!(poly_ring.degree(&s2).is_none() || poly_ring.degree(&s2).unwrap() < 10 - poly_ring.degree(&b).unwrap());
         assert!(poly_ring.degree(&t2).is_none() || poly_ring.degree(&t2).unwrap() < 9 - poly_ring.degree(&b).unwrap());
     }
+}
+
+#[test]
+fn test_fast_poly_eea() {
+    let field = zn_64::Zn::new(65537).as_field().ok().unwrap();
+    let poly_ring = DensePolyRing::new(field, "X");
+    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [
+        X.pow_ref(90) - X.pow_ref(70) + 3 * X.pow_ref(20) - 1,
+        X.pow_ref(100) + X.pow_ref(60) + 1,
+    ]);
+
+    let (s, t, d) = fast_poly_eea(&poly_ring, poly_ring.clone_el(&f), poly_ring.clone_el(&g), LOG_PROGRESS);
+    assert!(poly_ring.is_unit(&d));
+    assert_el_eq!(&poly_ring, &d, poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g)));
+
+    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [
+        X.pow_ref(9) - X.pow_ref(7) + 3 * X.pow_ref(2) - 1,
+        X.pow_ref(100) + X.pow_ref(60) + 1,
+    ]);
+
+    let (s, t, d) = fast_poly_eea(&poly_ring, poly_ring.clone_el(&f), poly_ring.clone_el(&g), LOG_PROGRESS);
+    assert!(poly_ring.is_unit(&d));
+    assert_el_eq!(&poly_ring, &d, poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g)));
 }

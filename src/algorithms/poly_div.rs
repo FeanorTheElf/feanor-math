@@ -59,54 +59,6 @@ pub fn poly_div_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left
 
 const FAST_POLY_DIV_THRESHOLD: usize = 32;
 
-#[stability::unstable(feature = "enable")]
-fn fast_poly_div_impl<P, F, E, Controller>(poly_ring: P, f: El<P>, g: &El<P>, left_div_lc: &mut F, controller: Controller)-> Result<(El<P>, El<P>), E>
-    where P: RingStore + Copy,
-        P::Type: PolyRing,
-        F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>,
-        Controller: ComputationController
-{
-    let deg_g = poly_ring.degree(g).unwrap();
-    if poly_ring.degree(&f).is_none() || poly_ring.degree(&f).unwrap() < deg_g {
-        return Ok((poly_ring.zero(), f));
-    } 
-    let deg_f = poly_ring.degree(&f).unwrap();
-    if deg_g < FAST_POLY_DIV_THRESHOLD || (deg_f - deg_g) < FAST_POLY_DIV_THRESHOLD {
-        return poly_div_rem(poly_ring, f, g, left_div_lc);
-    }
-
-    let (split_degree_f, split_degree_g) = if deg_f >= 3 * deg_g {
-        (deg_f / 3, 0)
-    } else if 2 * (deg_f / 3) < deg_g {
-        (deg_g / 2, deg_g / 2)
-    } else {
-        (deg_f / 3, deg_g - deg_f / 3)
-    };
-    assert!(split_degree_f >= split_degree_g);
-    assert!(split_degree_f <= deg_f);
-    assert!(split_degree_g <= deg_g);
-
-    let f_upper = poly_ring.from_terms(poly_ring.terms(&f).filter(|(_, i)| *i >= split_degree_f).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i - split_degree_f)));
-    let mut f_lower = poly_ring.from_terms(poly_ring.terms(&f).filter(|(_, i)| *i < split_degree_f).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-    let g_upper = poly_ring.from_terms(poly_ring.terms(&g).filter(|(_, i)| *i >= split_degree_g).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i - split_degree_g)));
-    let mut g_lower = poly_ring.from_terms(poly_ring.terms(&g).filter(|(_, i)| *i < split_degree_g).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)));
-
-    let (q_upper, r) = fast_poly_div_impl(poly_ring, poly_ring.clone_el(&f_upper), &g_upper, &mut *left_div_lc, controller.clone())?;
-    debug_assert!(poly_ring.degree(&q_upper).is_none() || poly_ring.degree(&q_upper).unwrap() <= deg_f + split_degree_g - split_degree_f - deg_g);
-    debug_assert!(poly_ring.degree(&r).is_none() || poly_ring.degree(&r).unwrap() <= deg_g - split_degree_g - 1);
-
-    poly_ring.get_ring().add_assign_from_terms(&mut f_lower, poly_ring.terms(&r).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i + split_degree_f)));
-    debug_assert!(poly_ring.degree(&f_lower).is_none() || poly_ring.degree(&f_lower).unwrap() <= deg_g + split_degree_f - split_degree_g);
-    poly_ring.mul_assign_ref(&mut g_lower, &q_upper);
-    poly_ring.get_ring().add_assign_from_terms(&mut f_lower, poly_ring.terms(&g_lower).map(|(c, i)| (poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(c)), i + split_degree_f - split_degree_g)));
-    debug_assert!(poly_ring.degree(&f_lower).is_none() || poly_ring.degree(&f_lower).unwrap() <= max(deg_f + split_degree_g - deg_g, deg_g + split_degree_f - split_degree_g));
-
-    let (mut q_lower, r) = fast_poly_div_impl(poly_ring, poly_ring.clone_el(&f_lower), g, &mut *left_div_lc, controller)?;
-
-    poly_ring.get_ring().add_assign_from_terms(&mut q_lower, poly_ring.terms(&q_upper).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i + split_degree_f - split_degree_g)));
-    return Ok((q_lower, r));
-}
-
 ///
 /// Computes the polynomial division of `lhs` by `rhs`, i.e. `lhs = q * rhs + r` with
 /// `deg(r) < deg(rhs)`, i.e. is functionally equivalent to [`poly_div_rem()`].
@@ -120,11 +72,60 @@ pub fn fast_poly_div_rem<P, F, E, Controller>(poly_ring: P, f: El<P>, g: &El<P>,
         F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>,
         Controller: ComputationController
 {
+    fn fast_poly_div_impl<P, F, E, Controller>(poly_ring: P, f: El<P>, g: &El<P>, left_div_lc: &mut F, controller: Controller)-> Result<(El<P>, El<P>), E>
+        where P: RingStore + Copy,
+            P::Type: PolyRing,
+            F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>,
+            Controller: ComputationController
+    {
+        let deg_g = poly_ring.degree(g).unwrap();
+        if poly_ring.degree(&f).is_none() || poly_ring.degree(&f).unwrap() < deg_g {
+            return Ok((poly_ring.zero(), f));
+        } 
+        let deg_f = poly_ring.degree(&f).unwrap();
+        if deg_g < FAST_POLY_DIV_THRESHOLD || (deg_f - deg_g) < FAST_POLY_DIV_THRESHOLD {
+            return poly_div_rem(poly_ring, f, g, left_div_lc);
+        }
+
+        let (split_degree_f, split_degree_g) = if deg_f >= 3 * deg_g {
+            (deg_f / 3, 0)
+        } else if 2 * (deg_f / 3) < deg_g {
+            (deg_g / 2, deg_g / 2)
+        } else {
+            (deg_f / 3, deg_g - deg_f / 3)
+        };
+        assert!(split_degree_f >= split_degree_g);
+        assert!(split_degree_f <= deg_f);
+        assert!(split_degree_g <= deg_g);
+
+        let f_upper = poly_ring.from_terms(poly_ring.terms(&f).filter(|(_, i)| *i >= split_degree_f).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i - split_degree_f)));
+        let mut f_lower = f;
+        poly_ring.truncate_monomials(&mut f_lower, split_degree_f);
+        let g_upper = poly_ring.from_terms(poly_ring.terms(&g).filter(|(_, i)| *i >= split_degree_g).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i - split_degree_g)));
+        let mut g_lower = poly_ring.clone_el(g);
+        poly_ring.truncate_monomials(&mut g_lower, split_degree_g);
+
+        let (q_upper, r) = fast_poly_div_impl(poly_ring, poly_ring.clone_el(&f_upper), &g_upper, &mut *left_div_lc, controller.clone())?;
+        debug_assert!(poly_ring.degree(&q_upper).is_none() || poly_ring.degree(&q_upper).unwrap() <= deg_f + split_degree_g - split_degree_f - deg_g);
+        debug_assert!(poly_ring.degree(&r).is_none() || poly_ring.degree(&r).unwrap() <= deg_g - split_degree_g - 1);
+
+        poly_ring.get_ring().add_assign_from_terms(&mut f_lower, poly_ring.terms(&r).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i + split_degree_f)));
+        debug_assert!(poly_ring.degree(&f_lower).is_none() || poly_ring.degree(&f_lower).unwrap() <= deg_g + split_degree_f - split_degree_g);
+        poly_ring.mul_assign_ref(&mut g_lower, &q_upper);
+        poly_ring.get_ring().add_assign_from_terms(&mut f_lower, poly_ring.terms(&g_lower).map(|(c, i)| (poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(c)), i + split_degree_f - split_degree_g)));
+        debug_assert!(poly_ring.degree(&f_lower).is_none() || poly_ring.degree(&f_lower).unwrap() <= max(deg_f + split_degree_g - deg_g, deg_g + split_degree_f - split_degree_g));
+
+        let (mut q_lower, r) = fast_poly_div_impl(poly_ring, poly_ring.clone_el(&f_lower), g, &mut *left_div_lc, controller)?;
+
+        poly_ring.get_ring().add_assign_from_terms(&mut q_lower, poly_ring.terms(&q_upper).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i + split_degree_f - split_degree_g)));
+        return Ok((q_lower, r));
+    }
+
     assert!(!poly_ring.is_zero(g));
     if poly_ring.is_zero(&f) {
         return Ok((poly_ring.zero(), f));
     }
-    controller.run_computation(format_args!("fast_poly_div(ldeg = {}, rdeg = {})", poly_ring.degree(&f).unwrap(), poly_ring.degree(g).unwrap()), |controller| 
+    controller.run_computation(format_args!("fast_poly_div(ldeg={}, rdeg={})", poly_ring.degree(&f).unwrap(), poly_ring.degree(g).unwrap()), |controller| 
         fast_poly_div_impl(poly_ring, f, g, &mut left_div_lc, controller)
     )
 }

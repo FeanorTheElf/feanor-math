@@ -1,5 +1,5 @@
 use gcd::poly_gcd_local;
-use finite::poly_power_decomposition_finite_field;
+use finite::{poly_power_decomposition_finite_field, fast_poly_eea};
 use squarefree_part::poly_power_decomposition_local;
 
 use crate::computation::*;
@@ -14,8 +14,6 @@ use crate::rings::poly::dense_poly::*;
 use crate::rings::poly::*;
 use crate::rings::finite::*;
 use crate::specialization::FiniteRingOperation;
-
-use super::eea::gcd;
 
 ///
 /// Contains an implementation of factoring polynomials over finite fields.
@@ -370,9 +368,7 @@ impl<R> PolyTFracGCDRing for R
                 let new_poly_ring = DensePolyRing::new(AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())), "X");
                 let new_lhs = new_poly_ring.from_terms(self.0.terms(&self.1).map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(self.0.base_ring().clone_el(c)), i)));
                 let new_rhs = new_poly_ring.from_terms(self.0.terms(&self.2).map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(self.0.base_ring().clone_el(c)), i)));
-                let result = self.3.run_computation(format_args!("poly_gcd_GF(ldeg={}, rdeg={})", new_poly_ring.degree(&new_lhs).unwrap_or(0), new_poly_ring.degree(&new_rhs).unwrap_or(0)), |_|
-                    gcd(new_lhs, new_rhs, &new_poly_ring)
-                );
+                let result = new_poly_ring.normalize(fast_poly_eea(&new_poly_ring, new_lhs, new_rhs, self.3).2);
                 return self.0.from_terms(new_poly_ring.terms(&result).map(|(c, i)| (new_poly_ring.base_ring().get_ring().unwrap_element(new_poly_ring.base_ring().clone_el(c)), i)));
             }
 

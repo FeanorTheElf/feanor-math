@@ -87,13 +87,13 @@ pub fn distinct_degree_factorization_base<P, R, Controller>(poly_ring: P, mod_f_
         result.push(poly_ring.one());
         let mut x_power_Q_mod_f = mod_f_ring.canonical_gen();
         while 2 * current_deg <= poly_ring.degree(&f).unwrap() {
-            log_progress!(controller, ".");
             current_deg += 1;
             x_power_Q_mod_f = mod_f_ring.pow_gen(x_power_Q_mod_f, &q, ZZ);
             let fq_defining_poly_mod_f = poly_ring.sub(mod_f_ring.poly_repr(&poly_ring, &x_power_Q_mod_f, &poly_ring.base_ring().identity()), poly_ring.indeterminate());
             let deg_i_factor = poly_ring.normalize(poly_ring.get_ring().ideal_gen_with_controller(&f, &fq_defining_poly_mod_f, controller.clone()));
             f = poly_ring.checked_div(&f, &deg_i_factor).unwrap();
             result.push(deg_i_factor);
+            log_progress!(controller, ".");
         }
         if poly_ring.degree(&f).unwrap() >= result.len() {
             result.resize_with(poly_ring.degree(&f).unwrap(), || poly_ring.one());
