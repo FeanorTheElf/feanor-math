@@ -181,11 +181,7 @@ impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain> ComputeResul
                     let poly_ring_embedding = new_poly_ring.lifted_hom(ring, &embedding);
                     let local_f = poly_ring_embedding.map_ref(&f);
                     let local_g = poly_ring_embedding.map_ref(&g);
-                    println!("{:?}", embedding.codomain().get_ring());
-                    new_poly_ring.println(&local_f);
-                    new_poly_ring.println(&local_g);
                     let local_resultant = <_ as ComputeResultantRing>::resultant(&new_poly_ring, local_f, local_g);
-                    embedding.codomain().println(&local_resultant);
                     resultants.push(local_resultant);
                 }
                 return base_ring.get_ring().lift_combine(&work_locally, &resultants);
