@@ -1,6 +1,8 @@
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::ring::*;
 use crate::seq::*;
+use crate::integer::*;
+use crate::primitive_int::*;
 
 use std::alloc::Allocator;
 use std::cmp::{max, min};
@@ -151,66 +153,80 @@ pub fn karatsuba<R, V1, V2, A: Allocator>(threshold_size_log2: usize, dst: &mut 
         naive_assign_mul::<R, _, _, _, true>(dst, lhs, rhs, ring);
         return;
     }
-    let block_size_log2 = (usize::BITS - 1 - max(lhs.len().leading_zeros(), rhs.len().leading_zeros())) as usize;
+
+    let lhs_log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&(lhs.len() as i64)).unwrap();
+    let rhs_log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&(rhs.len() as i64)).unwrap();
+
+    fn pad<'a, R, V, A>(data: V, len: usize, ring: R, allocator: &'a A) -> Vec<El<R>, &'a A>
+        where R: RingStore + Copy, V: SelfSubvectorView<El<R>> + Copy, A: Allocator
+    {
+        let mut new = Vec::with_capacity_in(len, allocator);
+        new.extend(data.clone_ring_els(ring).iter());
+        if new.len() < len {
+            new.resize_with(len, || ring.zero());
+        }
+        return new;
+    }
+    
+    if lhs.len() != 1 << lhs_log2_len {
+        if dst.len() < (1 << lhs_log2_len) + (1 << rhs_log2_len) {
+            let mut new_dst = pad(&dst[..], (1 << lhs_log2_len) + (1 << rhs_log2_len), ring, allocator);
+            karatsuba(threshold_size_log2, &mut new_dst, &pad(lhs, 1 << lhs_log2_len, ring, allocator)[..], rhs, ring, allocator);
+            for (i, x) in new_dst.into_iter().enumerate().take(dst.len()) {
+                dst[i] = x;
+            }
+        } else {
+            karatsuba(threshold_size_log2, dst, &pad(lhs, 1 << lhs_log2_len, ring, allocator)[..], rhs, ring, allocator);
+        }
+        return;
+    }
+    if rhs.len() != 1 << rhs_log2_len {
+        if dst.len() < (1 << lhs_log2_len) + (1 << rhs_log2_len) {
+            let mut new_dst = pad(&dst[..], (1 << lhs_log2_len) + (1 << rhs_log2_len), ring, allocator);
+            karatsuba(threshold_size_log2, &mut new_dst, lhs, &pad(rhs, 1 << rhs_log2_len, ring, allocator)[..], ring, allocator);
+            for (i, x) in new_dst.into_iter().enumerate().take(dst.len()) {
+                dst[i] = x;
+            }
+        } else {
+            karatsuba(threshold_size_log2, dst, lhs, &pad(rhs, 1 << rhs_log2_len, ring, allocator)[..], ring, allocator);
+        }
+        return;
+    }
+
+    let block_size_log2 = min(lhs_log2_len, rhs_log2_len);
     let n = 1 << block_size_log2;
-    assert!(lhs.len() >= n);
-    assert!(rhs.len() >= n);
-    assert!(lhs.len() < 2 * n || rhs.len() < 2 * n);
 
     let memory_size = karatsuba_mem_size(block_size_log2, threshold_size_log2);
     let mut memory = Vec::with_capacity_in(memory_size, allocator);
     memory.extend((0..memory_size).map(|_| ring.zero()));
-    for i in (0..=(lhs.len() - n)).step_by(n) {
-        for j in (0..=(rhs.len() - n)).step_by(n) {
+
+    if lhs.len() == n {
+        assert!(rhs.len() % n == 0);
+        for i in 0..(rhs.len() / n) {
             dispatch_karatsuba_impl::<R, _, _, true>(
-                block_size_log2, 
-                threshold_size_log2,
-                &mut dst[(i + j)..(i + j + 2 * n)], 
-                lhs.restrict(i..(i + n)), 
-                rhs.restrict(j..(j + n)), 
+                block_size_log2,
+                threshold_size_log2, 
+                &mut dst[(i * n)..(i * n + 2 * n)], 
+                lhs, 
+                rhs.restrict((i * n)..(i * n + n)), 
                 &mut memory[..], 
                 ring
             );
         }
-    }
-
-    let mut lhs_rem = (lhs.len() / n) * n;
-    let mut rhs_rem = (rhs.len() / n) * n;
-    let mut rem_block_size_log2: isize = block_size_log2 as isize - 1;
-    let mut rem_n = n / 2;
-    while rem_block_size_log2 >= 0 {
-        let n = rem_n;
-        let block_size_log2: usize = rem_block_size_log2 as usize;
-        if lhs.len() >= lhs_rem + n {
-            for j in (0..=(rhs_rem - n)).step_by(n) {
-                dispatch_karatsuba_impl::<R, _, _, true>(
-                    block_size_log2, 
-                    threshold_size_log2,
-                    &mut dst[(lhs_rem + j)..(lhs_rem + j + 2 * n)], 
-                    lhs.restrict(lhs_rem..(lhs_rem + n)), 
-                    rhs.restrict(j..(j + n)), 
-                    &mut memory[..], 
-                    ring
-                );
-            }
-            lhs_rem += n;
+    } else {
+        assert!(lhs.len() % n == 0);
+        assert!(rhs.len() == n);
+        for i in 0..(lhs.len() / n) {
+            dispatch_karatsuba_impl::<R, _, _, true>(
+                block_size_log2,
+                threshold_size_log2, 
+                &mut dst[(i * n)..(i * n + 2 * n)], 
+                lhs.restrict((i * n)..(i * n + n)), 
+                rhs, 
+                &mut memory[..], 
+                ring
+            );
         }
-        if rhs.len() >= rhs_rem + n {
-            for i in (0..=(lhs.len() - n)).step_by(n) {
-                dispatch_karatsuba_impl::<R, _, _, true>(
-                    rem_block_size_log2 as usize,
-                    threshold_size_log2, 
-                    &mut dst[(rhs_rem + i)..(rhs_rem + i + 2 * n)], 
-                    lhs.restrict(i..(i + n)), 
-                    rhs.restrict(rhs_rem..(rhs_rem + n)), 
-                    &mut memory[..], 
-                    ring
-                );
-            }
-            rhs_rem += n;
-        }
-        rem_n = rem_n / 2;
-        rem_block_size_log2 = rem_block_size_log2 - 1;
     }
 }
 
@@ -221,8 +237,6 @@ fn karatsuba_mem_size(block_size_log2: usize, threshold_size_log2: usize) -> usi
     return (2 << block_size_log2) - (2 << threshold_size_log2);
 }
 
-#[cfg(test)]
-use crate::primitive_int::*;
 #[cfg(test)]
 use std::alloc::Global;
 

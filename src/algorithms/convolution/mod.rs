@@ -134,6 +134,11 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// 
     /// TODO: At next breaking release, remove the default implementation
     /// 
+    /// TODO: On next breaking release, just take slice instead of [`VectorView`]s.
+    /// This might require the user to copy the data once, but so far most algorithms copy
+    /// it anyway, because this will make subsequent memory accesses more predictable and
+    /// better optimized.
+    /// 
     /// # Example
     /// 
     /// ```rust
@@ -195,6 +200,11 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// When called with `None` as both the prepared convolution operands, this is exactly
     /// equivalent to [`ConvolutionAlgorithm::compute_convolution()`].
     /// 
+    /// TODO: On next breaking release, just take slice instead of [`VectorView`]s.
+    /// This might require the user to copy the data once, but so far most algorithms copy
+    /// it anyway, because this will make subsequent memory accesses more predictable and
+    /// better optimized.
+    /// 
     #[stability::unstable(feature = "enable")]
     fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, _lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, _rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: S)
         where S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>
@@ -208,6 +218,11 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// 
     /// In other words, this computes `dst[k] += sum_l sum_(i + j = k) values[l][i] * values[l][k]`.
     /// It can be faster than calling [`ConvolutionAlgorithm::prepare_convolution_operand()`].
+    /// 
+    /// TODO: On next breaking release, just take slice instead of [`VectorView`]s.
+    /// This might require the user to copy the data once, but so far most algorithms copy
+    /// it anyway, because this will make subsequent memory accesses more predictable and
+    /// better optimized.
     /// 
     #[stability::unstable(feature = "enable")]
     fn compute_convolution_sum<'a, S, I, V1, V2>(&self, values: I, dst: &mut [R::Element], ring: S) 
