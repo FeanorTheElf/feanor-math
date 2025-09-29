@@ -446,6 +446,18 @@ impl<Impl, I> DelegateRingImplEuclideanRing for NumberFieldBase<Impl, I>
         I::Type: IntegerRing
 {}
 
+impl<Impl, I> Debug for NumberFieldBase<Impl, I>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + Debug,
+        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Type: IntegerRing
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NumberField({:?})", self.base.get_ring())
+    }
+}
+
 impl<Impl, I> FiniteRingSpecializable for NumberFieldBase<Impl, I>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,

@@ -169,8 +169,10 @@ impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain> ComputeResul
                 if ring.is_zero(&f) || ring.is_zero(&g) {
                     return base_ring.zero();
                 }
-                let ln_max_norm = ring.terms(&f).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap() * ring.degree(&g).unwrap() as f64 +
-                    ring.terms(&g).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap() * ring.degree(&f).unwrap() as f64;
+                let n = ring.degree(&f).unwrap() + ring.degree(&g).unwrap();
+                let coeff_bound_ln = ring.terms(&f).chain(ring.terms(&g)).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap();
+                let ln_max_norm = (coeff_bound_ln + base_ring.get_ring().ln_pseudo_norm(&base_ring.int_hom().map(n as i32))) * n as f64;
+
                 let work_locally = base_ring.get_ring().local_computation(ln_max_norm);
                 let mut resultants = Vec::new();
                 for i in 0..base_ring.get_ring().local_ring_count(&work_locally) {
@@ -179,7 +181,12 @@ impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain> ComputeResul
                     let poly_ring_embedding = new_poly_ring.lifted_hom(ring, &embedding);
                     let local_f = poly_ring_embedding.map_ref(&f);
                     let local_g = poly_ring_embedding.map_ref(&g);
-                    resultants.push(<_ as ComputeResultantRing>::resultant(&new_poly_ring, local_f, local_g));
+                    println!("{:?}", embedding.codomain().get_ring());
+                    new_poly_ring.println(&local_f);
+                    new_poly_ring.println(&local_g);
+                    let local_resultant = <_ as ComputeResultantRing>::resultant(&new_poly_ring, local_f, local_g);
+                    embedding.codomain().println(&local_resultant);
+                    resultants.push(local_resultant);
                 }
                 return base_ring.get_ring().lift_combine(&work_locally, &resultants);
             }
@@ -226,9 +233,13 @@ use crate::algorithms::buchberger::buchberger_simple;
 use crate::integer::BigIntRing;
 #[cfg(test)]
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
+#[cfg(test)]
+use crate::rings::zn::ZnRingStore;
+#[cfg(test)]
+use crate::rings::zn::zn_64::Zn;
 
 #[test]
-fn test_resultant() {
+fn test_resultant_global() {
     let ZZ = StaticRing::<i64>::RING;
     let ZZX = DensePolyRing::new(ZZ, "X");
 
@@ -248,6 +259,12 @@ fn test_resultant() {
     let f = ZZX.from_terms([(5, 0), (-1, 1), (3, 2), (1, 4)].into_iter());
     let g = ZZX.from_terms([(-1, 0), (-1, 2), (1, 3), (4, 5)].into_iter());
     assert_el_eq!(ZZ, 642632, resultant_global(&ZZX, f, g));
+
+    let Fp = Zn::new(512409557603043077).as_field().ok().unwrap();
+    let FpX = DensePolyRing::new(Fp, "X");
+    let f = FpX.from_terms([(Fp.one(), 4), (Fp.int_hom().map(-2), 1), (Fp.int_hom().map(2), 0)].into_iter());
+    let g = FpX.from_terms([(Fp.one(), 64), (Fp.one(), 0)].into_iter());
+    assert_el_eq!(Fp, Fp.coerce(&StaticRing::<i64>::RING, 148105674794572153), resultant_global(&FpX, f, g));
 }
 
 #[test]
@@ -300,4 +317,16 @@ fn test_resultant_local_integer() {
         X.pow_ref(2) - X - 1
     ]);
     assert_el_eq!(ZZ, ZZ.int_hom().map(4870849), <_ as ComputeResultantRing>::resultant(&ZZX, f, g));
+
+    let [f, g] = ZZX.with_wrapped_indeterminate(|X| [
+        X.pow_ref(4) - 2 * X + 2,
+        X.pow_ref(64) + 1
+    ]);
+    assert_el_eq!(ZZ, ZZ.parse("381380816531458621441", 10).unwrap(), <_ as ComputeResultantRing>::resultant(&ZZX, f, g));
+
+    let [f, g] = ZZX.with_wrapped_indeterminate(|X| [
+        X.pow_ref(32) - 2 * X.pow_ref(8) + 2,
+        X.pow_ref(512) + 1
+    ]);
+    assert_el_eq!(ZZ, ZZ.pow(ZZ.parse("381380816531458621441", 10).unwrap(), 8), <_ as ComputeResultantRing>::resultant(&ZZX, f, g));
 }

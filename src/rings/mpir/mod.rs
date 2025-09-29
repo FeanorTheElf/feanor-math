@@ -217,6 +217,12 @@ impl MPZBase {
     }
 }
 
+impl Debug for MPZBase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Z")
+    }
+}
+
 impl RingBase for MPZBase {
     
     type Element = MPZEl;

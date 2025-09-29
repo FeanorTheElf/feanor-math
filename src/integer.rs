@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::reduce_lift::poly_factor_gcd::IntegerPolyGCDRing;
 use crate::reduce_lift::poly_eval::EvalPolyLocallyRing;
 use crate::divisibility::*;
@@ -53,7 +55,7 @@ pub type BigIntRingBase = crate::rings::rust_bigint::RustBigintRingBase;
 /// [`EvalPolyLocallyRing`] so it is at the moment impossible to implement [`IntegerRing`] for a
 /// custom ring type without enabling unstable features. Sorry.
 /// 
-pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + IntegerPolyGCDRing + EvalPolyLocallyRing {
+pub trait IntegerRing: Domain + EuclideanRing + OrderedRing + HashableElRing + IntegerPolyGCDRing + EvalPolyLocallyRing + Debug {
 
     ///
     /// Computes a float value that is "close" to the given integer.

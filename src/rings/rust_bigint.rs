@@ -19,6 +19,7 @@ use std::alloc::Allocator;
 use std::alloc::Global;
 use std::cmp::Ordering::*;
 use std::cmp::Ordering;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 
 ///
@@ -51,7 +52,7 @@ pub struct RustBigint<A: Allocator = Global>(bool, Vec<u64, A>);
 /// If you need very high performance, consider using [`crate::rings::mpir::MPZ`]
 /// (requires an installation of mpir and activating the feature "mpir").
 /// 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct RustBigintRingBase<A: Allocator + Clone = Global> {
     allocator: A
 }
@@ -124,6 +125,12 @@ impl<A: Allocator + Clone> RustBigintRingBase<A> {
         where I: Iterator<Item = u64>
     {
         RustBigint(false, data.collect())
+    }
+}
+
+impl<A: Allocator + Clone> Debug for RustBigintRingBase<A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Z")
     }
 }
 

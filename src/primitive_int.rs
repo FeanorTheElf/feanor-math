@@ -1,7 +1,7 @@
 use std::any::TypeId;
 use std::ops::{AddAssign, Div, MulAssign, Neg, Rem, Shr, SubAssign};
 use std::marker::PhantomData;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNewtypeStruct};
 use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
@@ -306,9 +306,14 @@ impl<T: PrimitiveInt> HashableElRing for StaticRingBase<T> {
 /// 
 /// For the difference to [`StaticRing`], see the documentation of [`crate::ring::RingStore`].
 /// 
-#[derive(Debug)]
 pub struct StaticRingBase<T> {
     element: PhantomData<T>
+}
+
+impl<T> Debug for StaticRingBase<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Z")
+    }
 }
 
 impl<T> PartialEq for StaticRingBase<T> {

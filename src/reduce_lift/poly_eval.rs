@@ -1,4 +1,6 @@
 
+use std::fmt::Debug;
+
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::resultant::ComputeResultantRing;
 use crate::divisibility::{DivisibilityRing, Domain};
@@ -26,7 +28,7 @@ pub trait InterpolationBaseRing: DivisibilityRing {
     /// For the reason why there are so many quite specific trait bounds here:
     /// See the doc of [`EvalPolyLocallyRing::LocalRingBase`].
     /// 
-    type ExtendedRingBase<'a>: ?Sized + PrincipalIdealRing + Domain + LinSolveRing + ComputeResultantRing
+    type ExtendedRingBase<'a>: ?Sized + PrincipalIdealRing + Domain + LinSolveRing + ComputeResultantRing + Debug
         where Self: 'a;
 
     type ExtendedRing<'a>: RingStore<Type = Self::ExtendedRingBase<'a>> + Clone
@@ -355,7 +357,7 @@ pub trait EvalPolyLocallyRing: RingBase + FiniteRingSpecializable {
     /// required by some algorithms. This clearly makes it a lot less generic than it should be,
     /// but so far it worked out without too much trouble.
     /// 
-    type LocalRingBase<'ring>: ?Sized + PrincipalIdealRing + Domain + LinSolveRing + ComputeResultantRing
+    type LocalRingBase<'ring>: ?Sized + PrincipalIdealRing + Domain + LinSolveRing + ComputeResultantRing + Debug
         where Self: 'ring;
 
     type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
@@ -375,6 +377,7 @@ pub trait EvalPolyLocallyRing: RingBase + FiniteRingSpecializable {
     ///  - symmetric, i.e. `|-x| = |x|`,
     ///  - sub-additive, i.e. `|x + y| <= |x| + |y|`
     ///  - sub-multiplicative, i.e. `|xy| <= |x| |y|`
+    /// 
     /// and this function should give `ln|x|`
     /// 
     fn ln_pseudo_norm(&self, el: &Self::Element) -> f64;
@@ -417,7 +420,7 @@ pub trait EvalPolyLocallyRing: RingBase + FiniteRingSpecializable {
 }
 
 impl<R> EvalPolyLocallyRing for R
-    where R: ?Sized + FiniteRing + Field
+    where R: ?Sized + FiniteRing + Field + Debug
 {
     type LocalComputationData<'ring> = RingRef<'ring, Self>
         where Self: 'ring;

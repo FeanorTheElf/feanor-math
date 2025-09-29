@@ -214,6 +214,8 @@ pub enum EnvBindingStrength {
 /// ));
 /// ```
 /// 
+/// TODO: on next breaking release restrict with `: Debug`
+/// 
 #[allow(missing_docs)]
 pub trait RingBase: PartialEq {
 

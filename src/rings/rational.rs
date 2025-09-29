@@ -65,7 +65,6 @@ use std::marker::PhantomData;
 /// assert_el_eq!(ZZ, ZZ.int_hom().map(2), QQ.den(&one_half));
 /// ```
 /// 
-#[derive(Debug)]
 pub struct RationalFieldBase<I: RingStore>
     where I::Type: IntegerRing
 {
@@ -89,6 +88,14 @@ impl<I> Copy for RationalFieldBase<I>
         El<I>: Copy
 {}
 
+impl<I> Debug for RationalFieldBase<I>
+    where I: RingStore,
+        I::Type: IntegerRing
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Q")
+    }
+}
 ///
 /// [`RingStore`] corresponding to [`RationalFieldBase`]
 /// 
