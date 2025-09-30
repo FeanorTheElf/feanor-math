@@ -112,16 +112,14 @@ pub enum InterpolationError {
 /// # #![feature(allocator_api)]
 /// # use std::alloc::Global;
 /// # use feanor_math::ring::*;
+/// # use feanor_math::primitive_int::StaticRing;
 /// # use feanor_math::homomorphism::Homomorphism;
 /// # use feanor_math::seq::*;
 /// # use feanor_math::algorithms::interpolate::*;
 /// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
-/// let ZnX = DensePolyRing::new(Zn::new(25), "X");
-/// let ZZ_to_Zn = ZnX.base_ring().int_hom();
-/// // since `1 = 6 mod 5`, the values of any polynomial at 1 resp. 6 must be the same modulo 5
-/// let actual = interpolate(&ZnX, [ZZ_to_Zn.map(1), ZZ_to_Zn.map(6)].copy_els(), [ZZ_to_Zn.map(1), ZZ_to_Zn.map(2)].copy_els(), Global);
+/// let ZnX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let actual = interpolate(&ZnX, [-2, 0, 2].copy_els(), [1, 0, 1].copy_els(), Global);
 /// assert!(actual.is_err());
 /// ```
 /// 

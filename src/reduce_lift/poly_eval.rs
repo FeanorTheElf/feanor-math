@@ -516,20 +516,21 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for EvaluatePolyL
 /// 
 /// # Example
 /// ```rust
+/// # use std::fmt::Debug;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::reduce_lift::poly_eval::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::algorithms::resultant::*;
 /// # use feanor_math::divisibility::*;
-/// # use crate::feanor_math::homomorphism::Homomorphism;
+/// # use feanor_math::homomorphism::Homomorphism;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::rings::poly::dense_poly::DensePolyRing;
 /// # use feanor_math::pid::*;
 /// # use feanor_math::impl_interpolation_base_ring_char_zero;
 /// // we wrap a `RingBase` here for simplicity, but in practice a wrapper should
 /// // always store a `RingStore` instead
-/// #[derive(PartialEq)]
+/// #[derive(PartialEq, Debug)]
 /// struct MyRingWrapper<R: RingBase>(R);
 /// impl<R: RingBase> DelegateRing for MyRingWrapper<R> {
 ///     type Element = R::Element;
@@ -543,7 +544,7 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for EvaluatePolyL
 /// impl<R: RingBase> DelegateRingImplEuclideanRing for MyRingWrapper<R> {}
 /// impl<R: RingBase> DelegateRingImplFiniteRing for MyRingWrapper<R> {}
 /// impl<R: Domain> Domain for MyRingWrapper<R> {}
-/// impl_interpolation_base_ring_char_zero!{ <{ R }> InterpolationBaseRing for MyRingWrapper<R> where R: PrincipalIdealRing + Domain + ComputeResultantRing }
+/// impl_interpolation_base_ring_char_zero!{ <{ R }> InterpolationBaseRing for MyRingWrapper<R> where R: PrincipalIdealRing + Domain + ComputeResultantRing + Debug }
 /// 
 /// // now we can use `InterpolationBaseRing`-functionality
 /// let ring = MyRingWrapper(StaticRing::<i64>::RING.into());
