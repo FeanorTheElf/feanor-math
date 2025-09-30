@@ -1,6 +1,7 @@
 use libc;
 
 use std::marker::PhantomData;
+use std::fmt::Debug;
 
 use serde::de::DeserializeSeed;
 use serde::ser::SerializeTuple;
@@ -85,7 +86,7 @@ impl std::fmt::Debug for MPZEl {
 /// 
 /// TODO: Remove `Copy` at next breaking release.
 /// 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct MPZBase;
 
 ///
