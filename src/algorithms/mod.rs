@@ -139,3 +139,4 @@ pub mod newton;
 /// Contains an implementation of the Fincke-Pohst lattice point enumeration algorithm.
 /// 
 pub mod fincke_pohst;
+pub mod qr;
