@@ -463,7 +463,6 @@ use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 /// 
 /// For a variant of this function that allows for more configuration, see [`buchberger()`].
 /// 
-#[stability::unstable(feature = "enable")]
 pub fn buchberger_simple<P, O>(ring: P, input_basis: Vec<El<P>>, order: O) -> Vec<El<P>>
     where P: RingStore + Copy + Send + Sync,
         El<P>: Send + Sync,
