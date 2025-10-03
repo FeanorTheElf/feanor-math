@@ -341,7 +341,7 @@ impl<A: Allocator + Clone> OrderedRing for RustBigintRingBase<A> {
     }
 
     fn abs_cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> Ordering {
-        bigint_cmp(&rhs.1, &lhs.1)
+        bigint_cmp(&lhs.1, &rhs.1)
     }
 }
 
@@ -726,6 +726,13 @@ fn test_cmp() {
     assert_eq!(false, ZZ.is_lt(&ZZ.int_hom().map(2), &ZZ.int_hom().map(2)));
     assert_eq!(false, ZZ.is_lt(&ZZ.int_hom().map(3), &ZZ.int_hom().map(2)));
     assert_eq!(true, ZZ.is_gt(&ZZ.int_hom().map(-1), &ZZ.int_hom().map(-2)));
+
+    assert_eq!(Ordering::Less, ZZ.abs_cmp(&ZZ.int_hom().map(-1), &ZZ.int_hom().map(2)));
+    assert_eq!(Ordering::Less, ZZ.abs_cmp(&ZZ.int_hom().map(1), &ZZ.int_hom().map(2)));
+    assert_eq!(Ordering::Equal, ZZ.abs_cmp(&ZZ.int_hom().map(2), &ZZ.int_hom().map(2)));
+    assert_eq!(Ordering::Greater, ZZ.abs_cmp(&ZZ.int_hom().map(-3), &ZZ.int_hom().map(2)));
+    assert_eq!(Ordering::Greater, ZZ.abs_cmp(&ZZ.int_hom().map(3), &ZZ.int_hom().map(2)));
+    assert_eq!(Ordering::Less, ZZ.abs_cmp(&ZZ.int_hom().map(-1), &ZZ.int_hom().map(-2)));
 }
 
 #[test]
