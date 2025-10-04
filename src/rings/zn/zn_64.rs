@@ -95,27 +95,27 @@ pub struct ZnBase {
     inv_modulus: u128
 }
 
-const ZZ: StaticRing<i64> = StaticRing::<i64>::RING;
-#[allow(non_upper_case_globals)]
-const ZZbig: BigIntRing = BigIntRing::RING;
+const fn two_pow_128_div(x: u64) -> u128 {
+    let q_high = (1u128 << 64) / (x as u128);
+    let r_high = (1u128 << 64) % (x as u128);
+    let q_low = (r_high << 64) / (x as u128);
+    let result = (q_high << 64) | q_low;
+    debug_assert!(result.wrapping_mul(x as u128) == 0 || result.wrapping_mul(x as u128) >= 0u128.wrapping_sub(x as u128));
+    return result;
+}
 
 impl ZnBase {
 
-    pub fn new(modulus: u64) -> Self {
+    pub const fn new(modulus: u64) -> Self {
         assert!(modulus > 1);
         // this should imply the statement we need later
         assert!(modulus <= ((1 << 62) / 9));
         // we want representatives to grow up to 6 * modulus
         assert!(modulus as u128 * 6 <= u64::MAX as u128);
-        let modulus_i64: i64 = modulus.try_into().unwrap();
-        let inv_modulus = ZZbig.euclidean_div(ZZbig.power_of_two(128), &ZZbig.coerce(&ZZ, modulus_i64));
+        let modulus_i64: i64 = modulus as i64;
+        let inv_modulus = two_pow_128_div(modulus);
         // we need the product `inv_modulus * (6 * modulus)^2` to fit into 192 bit, should be implied by `modulus < ((1 << 62) / 9)`
-        debug_assert!(ZZbig.is_lt(&ZZbig.mul_ref_fst(&inv_modulus, ZZbig.pow(ZZbig.int_hom().mul_map(ZZbig.coerce(&ZZ, modulus_i64), 6), 2)), &ZZbig.power_of_two(192)));
-        let inv_modulus = if ZZbig.eq_el(&inv_modulus, &ZZbig.power_of_two(127)) {
-            1u128 << 127
-        } else {
-            int_cast(inv_modulus, &StaticRing::<i128>::RING, &ZZbig) as u128
-        };
+        // debug_assert!(ZZbig.is_lt(&ZZbig.mul_ref_fst(&int_cast(inv_modulus as i128, ZZbig, StaticRing::<i128>::RING), ZZbig.pow(ZZbig.int_hom().mul_map(ZZbig.coerce(&ZZ, modulus_i64), 6), 2)), &ZZbig.power_of_two(192)));
         Self {
             modulus: modulus_i64,
             inv_modulus: inv_modulus,
@@ -240,7 +240,7 @@ pub type Zn = RingValue<ZnBase>;
 
 impl Zn {
 
-    pub fn new(modulus: u64) -> Self {
+    pub const fn new(modulus: u64) -> Self {
         RingValue::from(ZnBase::new(modulus))
     }
 }
@@ -1206,7 +1206,7 @@ use test::Bencher;
 
 #[cfg(test)]
 fn elements<'a>(ring: &'a Zn) -> impl 'a + Iterator<Item = El<Zn>> {
-    (0..63).map(|i| ring.coerce(&ZZ, 1 << i))
+    (0..63).map(|i| ring.coerce(&StaticRing::<i64>::RING, 1 << i))
 }
 
 #[cfg(test)]

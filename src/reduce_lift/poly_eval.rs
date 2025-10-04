@@ -420,7 +420,7 @@ pub trait EvalPolyLocallyRing: RingBase + FiniteRingSpecializable {
 }
 
 impl<R> EvalPolyLocallyRing for R
-    where R: ?Sized + FiniteRing + Field + Debug
+    where R: ?Sized + FiniteRing + Field + Debug + SelfIso
 {
     type LocalComputationData<'ring> = RingRef<'ring, Self>
         where Self: 'ring;
@@ -639,17 +639,21 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
             fn local_computation<'ring>(&'ring self, ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
                 let mut primes = Vec::new();
                 let mut ln_current = 0.;
-                let mut current_value = (1 << 62) / 9;
-                while ln_current < ln_pseudo_norm_bound + 1. {
-                    current_value = $crate::algorithms::miller_rabin::prev_prime(StaticRing::<i64>::RING, current_value).unwrap();
-                    if current_value < (1 << 32) {
+                let mut prime_it = //$crate::reduce_lift::primelist::LARGE_PRIMES.iter().copied().chain
+                ((0..).scan((1 << 62) / 9, |current, _| {
+                    *current = $crate::algorithms::miller_rabin::prev_prime(StaticRing::<i64>::RING, *current).unwrap();
+                    if *current < (1 << 32) {
                         panic!("not enough primes");
                     }
-                    primes.push(current_value);
-                    ln_current += (current_value as f64).ln();
+                    return Some($crate::rings::zn::zn_64::Zn::new(*current as u64));
+                }));
+                while ln_current < ln_pseudo_norm_bound + 1. {
+                    let Fp = prime_it.next().unwrap();
+                    ln_current += (*$crate::rings::zn::ZnRingStore::modulus(&Fp) as f64).ln();
+                    primes.push(Fp);
                 }
                 return $crate::rings::zn::zn_rns::Zn::new(
-                    primes.into_iter().map(|p| $crate::rings::field::AsField::from($crate::rings::field::AsFieldBase::promise_is_perfect_field($crate::rings::zn::zn_64::Zn::new(p as u64)))).collect(),
+                    primes.into_iter().map(|Fp| $crate::rings::field::AsField::from($crate::rings::field::AsFieldBase::promise_is_perfect_field(Fp))).collect(),
                     RingRef::new(self)
                 );
             }

@@ -1,11 +1,16 @@
 
+use std::mem::swap;
+
+use crate::delegate::{UnwrapHom, WrapHom};
 use crate::reduce_lift::poly_eval::{EvalPolyLocallyRing, EvaluatePolyLocallyReductionMap};
 use crate::divisibility::{DivisibilityRingStore, Domain};
-use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
+use crate::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::algorithms::eea::signed_lcm;
+use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::fraction::FractionFieldStore;
 use crate::rings::poly::*;
 use crate::rings::finite::*;
+use crate::pid::EuclideanRingStore;
 use crate::specialization::FiniteRingOperation;
 use crate::algorithms;
 use crate::integer::*;
@@ -16,9 +21,10 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 
 ///
 /// Computes the resultant of `f` and `g` over the base ring, using
-/// a direct variant of Eulid's algorithm. Users should instead use
-/// [`ComputeResultantRing::resultant()`], which can be much faster
-/// depending on the ring.
+/// a direct variant of Eulid's algorithm. 
+/// 
+/// This function is deprecated, you should instead use
+/// [`ComputeResultantRing::resultant()`] or [`resultant_finite_field()`].
 /// 
 /// The resultant is the determinant of the linear map
 /// ```text
@@ -44,6 +50,7 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 /// assert_eq!(0, discriminant);
 /// ```
 /// 
+#[deprecated]
 pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
     where P: RingStore + Copy,
         P::Type: PolyRing,
@@ -57,7 +64,7 @@ pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type a
     let mut scale_num = base_ring.one();
 
     if ring.degree(&g).unwrap() < ring.degree(&f).unwrap() {
-        if (ring.degree(&g).unwrap() + ring.degree(&f).unwrap()) % 2 != 0 {
+        if ring.degree(&g).unwrap() % 2 != 0 && ring.degree(&f).unwrap() % 2 != 0 {
             base_ring.negate_inplace(&mut scale_num);
         }
         std::mem::swap(&mut f, &mut g);
@@ -84,6 +91,10 @@ pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type a
 
         g = f;
         f = r;
+
+        if ring.degree(&g).unwrap() % 2 != 0 && ring.degree(&f).unwrap_or(0) % 2 != 0 {
+            base_ring.negate_inplace(&mut scale_num);
+        }
     }
 
     if ring.is_zero(&f) {
@@ -96,6 +107,57 @@ pub fn resultant_global<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type a
     }
 }
 
+///
+/// Computes the resultant of two polynomials `f` and `g` over a finite field.
+/// 
+/// Usually you should use [`ComputeResultantRing::resultant()`], unless you
+/// are implementing said method for a custom ring.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn resultant_finite_field<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
+    where P: RingStore + Copy,
+        P::Type: PolyRing + EuclideanRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Domain + FiniteRing
+{
+    let base_ring = ring.base_ring();
+    if ring.is_zero(&g) || ring.is_zero(&f) {
+        return base_ring.zero();
+    }
+    let mut scale = base_ring.one();
+    if ring.degree(&g).unwrap() < ring.degree(&f).unwrap() {
+        if ring.degree(&g).unwrap() % 2 != 0 && ring.degree(&f).unwrap() % 2 != 0 {
+            base_ring.negate_inplace(&mut scale);
+        }
+        swap(&mut f, &mut g);
+    }
+
+    while ring.degree(&f).unwrap_or(0) >= 1 {
+        assert!(ring.degree(&g).unwrap() >= ring.degree(&f).unwrap());
+        let deg_g = ring.degree(&g).unwrap();
+        let r = ring.euclidean_rem(g, &f);
+        g = r;
+        base_ring.mul_assign(&mut scale, base_ring.pow(base_ring.clone_el(ring.lc(&f).unwrap()), deg_g - ring.degree(&g).unwrap_or(0)));
+
+        swap(&mut f, &mut g);
+        if ring.degree(&g).unwrap() % 2 != 0 && ring.degree(&f).unwrap_or(0) % 2 != 0 {
+            base_ring.negate_inplace(&mut scale);
+        }
+    }
+
+    if ring.is_zero(&f) {
+        return base_ring.zero();
+    } else {
+        let mut result = base_ring.clone_el(&ring.coefficient_at(&f, 0));
+        result = base_ring.pow(result, ring.degree(&g).unwrap());
+        base_ring.mul_assign(&mut result, scale);
+        return result;
+    }
+}
+
+///
+/// Trait for rings that support computing resultants of polynomials
+/// over the ring.
+/// 
 #[stability::unstable(feature = "enable")]
 pub trait ComputeResultantRing: RingBase {
 
@@ -132,7 +194,7 @@ pub trait ComputeResultantRing: RingBase {
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
 }
 
-impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain> ComputeResultantRing for R {
+impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain + SelfIso> ComputeResultantRing for R {
 
     default fn resultant<P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
         where P: RingStore + Copy,
@@ -142,7 +204,7 @@ impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain> ComputeResul
         struct ComputeResultant<P>
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: EvalPolyLocallyRing + PrincipalIdealRing + Domain
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: EvalPolyLocallyRing + PrincipalIdealRing + Domain + SelfIso
         {
             ring: P,
             f: El<P>,
@@ -151,14 +213,17 @@ impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain> ComputeResul
         impl<P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for ComputeResultant<P>
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: EvalPolyLocallyRing + PrincipalIdealRing + Domain
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: EvalPolyLocallyRing + PrincipalIdealRing + Domain + SelfIso
         {
             type Output = El<<P::Type as RingExtension>::BaseRing>;
 
             fn execute(self) -> Self::Output
                 where <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing
             {
-                resultant_global(self.ring, self.f, self.g)
+                let new_poly_ring = DensePolyRing::new(AsField::from(AsFieldBase::promise_is_perfect_field(self.ring.base_ring())), "X");
+                let hom = new_poly_ring.lifted_hom(&self.ring, WrapHom::new(new_poly_ring.base_ring().get_ring()));
+                let result = resultant_finite_field(&new_poly_ring, hom.map(self.f), hom.map(self.g));
+                return UnwrapHom::new(new_poly_ring.base_ring().get_ring()).map(result);
             }
 
             fn fallback(self) -> Self::Output {
@@ -171,7 +236,7 @@ impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain> ComputeResul
                 }
                 let n = ring.degree(&f).unwrap() + ring.degree(&g).unwrap();
                 let coeff_bound_ln = ring.terms(&f).chain(ring.terms(&g)).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap();
-                let ln_max_norm = (coeff_bound_ln + base_ring.get_ring().ln_pseudo_norm(&base_ring.int_hom().map(n as i32))) * n as f64;
+                let ln_max_norm = coeff_bound_ln * n as f64 + base_ring.get_ring().ln_pseudo_norm(&base_ring.int_hom().map(n as i32)) * n as f64 / 2.;
 
                 let work_locally = base_ring.get_ring().local_computation(ln_max_norm);
                 let mut resultants = Vec::new();
@@ -235,6 +300,7 @@ use crate::rings::zn::ZnRingStore;
 use crate::rings::zn::zn_64::Zn;
 
 #[test]
+#[allow(deprecated)]
 fn test_resultant_global() {
     let ZZ = StaticRing::<i64>::RING;
     let ZZX = DensePolyRing::new(ZZ, "X");
@@ -243,7 +309,7 @@ fn test_resultant_global() {
     let f = ZZX.from_terms([(3, 0), (-5, 1), (1, 2)].into_iter());
     let g = ZZX.from_terms([(-5, 0), (2, 1)].into_iter());
 
-    assert_el_eq!(ZZ, 13, resultant_global(&ZZX, ZZX.clone_el(&f), ZZX.clone_el(&g)));
+    assert_el_eq!(ZZ, -13, resultant_global(&ZZX, ZZX.clone_el(&f), ZZX.clone_el(&g)));
     assert_el_eq!(ZZ, -13, resultant_global(&ZZX, g, f));
 
     // if f and g have common factors, this should be zero
@@ -264,6 +330,26 @@ fn test_resultant_global() {
 }
 
 #[test]
+#[allow(deprecated)]
+fn test_resultant_finite_field() {
+    let Fp = Zn::new(17).as_field().ok().unwrap();
+    let FpX = DensePolyRing::new(Fp, "X");
+
+    let [f, g] = FpX.with_wrapped_indeterminate(|X| [X.pow_ref(5) + 13 * X.pow_ref(4) + 4 * X.pow_ref(3) + X.pow_ref(2) + 14 * X + 7, X.pow_ref(3) + 1]);
+    assert_el_eq!(Fp, Fp.int_hom().map(8), resultant_finite_field(&FpX, FpX.clone_el(&f), FpX.clone_el(&g)));
+    assert_el_eq!(Fp, Fp.int_hom().map(9), resultant_finite_field(&FpX, FpX.clone_el(&g), FpX.clone_el(&f)));
+    assert_el_eq!(Fp, Fp.int_hom().map(8), resultant_global(&FpX, FpX.clone_el(&f), FpX.clone_el(&g)));
+    assert_el_eq!(Fp, Fp.int_hom().map(9), resultant_global(&FpX, FpX.clone_el(&g), FpX.clone_el(&f)));
+
+    let [f, g] = FpX.with_wrapped_indeterminate(|X| [X.pow_ref(4) + 4 * X.pow_ref(3) + X.pow_ref(2) + 14 * X + 7, X.pow_ref(3) + 1]);
+    assert_el_eq!(Fp, Fp.int_hom().map(5), resultant_finite_field(&FpX, FpX.clone_el(&f), FpX.clone_el(&g)));
+    assert_el_eq!(Fp, Fp.int_hom().map(5), resultant_finite_field(&FpX, FpX.clone_el(&g), FpX.clone_el(&f)));
+    assert_el_eq!(Fp, Fp.int_hom().map(5), resultant_global(&FpX, FpX.clone_el(&f), FpX.clone_el(&g)));
+    assert_el_eq!(Fp, Fp.int_hom().map(5), resultant_global(&FpX, FpX.clone_el(&g), FpX.clone_el(&f)));
+}
+
+#[test]
+#[allow(deprecated)]
 fn test_resultant_local_polynomial() {
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
@@ -325,4 +411,17 @@ fn test_resultant_local_integer() {
         X.pow_ref(512) + 1
     ]);
     assert_el_eq!(ZZ, ZZ.pow(ZZ.parse("381380816531458621441", 10).unwrap(), 8), <_ as ComputeResultantRing>::resultant(&ZZX, f, g));
+}
+
+#[test]
+#[ignore]
+fn test_resultant_large() {
+    let ZZ = BigIntRing::RING;
+    let ZZX = DensePolyRing::new(ZZ, "X");
+
+    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2 * X + 2]);
+    let g = ZZX.from_terms([(ZZ.one(), 1 << 14), (ZZ.one(), 0)]);
+    println!("start");
+    let result = BigIntRingBase::resultant(&ZZX, f, g);
+    println!("{}", ZZ.format(&result))
 }

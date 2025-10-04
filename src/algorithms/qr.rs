@@ -1,11 +1,7 @@
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::field::{Field, FieldStore};
-use crate::homomorphism::Homomorphism;
-use crate::assert_matrix_eq;
-use crate::rings::fraction::FractionFieldStore;
 use crate::integer::*;
 use crate::matrix::*;
-use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::approx_real::{ApproxRealField, SqrtRing};
 use crate::rings::rational::*;
@@ -263,6 +259,14 @@ use crate::algorithms::matmul::MatmulAlgorithm;
 use crate::matrix::format_matrix;
 #[cfg(test)]
 use crate::rings::approx_real::float::Real64;
+#[cfg(test)]
+use crate::homomorphism::Homomorphism;
+#[cfg(test)]
+use crate::assert_matrix_eq;
+#[cfg(test)]
+use crate::rings::fraction::FractionFieldStore;
+#[cfg(test)]
+use crate::primitive_int::StaticRing;
 
 #[cfg(test)]
 fn assert_is_correct_qr<V1, V2, V3>(original: Submatrix<V1, f64>, q: Submatrix<V2, f64>, r: Submatrix<V3, f64>)
