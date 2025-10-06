@@ -1,5 +1,6 @@
 use std::alloc::{Allocator, Global};
 use std::marker::PhantomData;
+use std::fmt::{Debug, Formatter};
 
 use extension_impl::FreeAlgebraImplBase;
 use sparse::SparseMapVector;
@@ -261,7 +262,6 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
 /// anymore if a nonstandard `Impl` is chosen - which I believe will be very rarely the case in practice.
 /// 
 #[repr(transparent)]
-#[derive(Debug)]
 pub struct GaloisFieldBase<Impl>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra + FiniteRing,
@@ -329,7 +329,7 @@ impl<R, A, C> GaloisFieldOver<R, A, C>
     where R: RingStore + Clone,
         R::Type: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
         C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone
+        A: Allocator + Clone + Send + Sync
 {
     ///
     /// Creates a new instance of a finite/galois field, as given-degree extension of the
@@ -404,7 +404,7 @@ impl<R, A, C> GaloisFieldOver<R, A, C>
 }
 
 impl<A> GaloisFieldBase<AsField<FreeAlgebraImpl<AsField<Zn>, SparseMapVector<AsField<Zn>>, A, KaratsubaAlgorithm>>>
-    where A: Allocator + Clone
+    where A: Allocator + Clone + Send + Sync
 {
     ///
     /// Creates the galois ring `GR(p, e, degree)`, mirroring the structure of this galois field.
@@ -444,7 +444,7 @@ impl<Impl> GaloisFieldBase<Impl>
         where S: RingStore + Clone,
             S::Type: ZnRing + CanHomFrom<<<<Impl::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::IntegerRingBase>,
             C2: ConvolutionAlgorithm<S::Type>,
-            A2: Allocator + Clone
+            A2: Allocator + Clone + Send + Sync
     {
         let (p, e) = is_prime_power(&BigIntRing::RING, &new_base_ring.size(&BigIntRing::RING).unwrap()).unwrap();
         assert!(BigIntRing::RING.eq_el(&p, &self.base_ring().size(&BigIntRing::RING).unwrap()));
@@ -522,6 +522,16 @@ impl<Impl> PartialEq for GaloisFieldBase<Impl>
 {
     fn eq(&self, other: &Self) -> bool {
         self.base.get_ring() == other.base.get_ring()
+    }
+}
+
+impl<Impl> Debug for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GF({:?})", self.base.get_ring())
     }
 }
 
@@ -724,9 +734,9 @@ impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>> for FreeAlgebraImplBase
         Impl::Type: Field + FreeAlgebra + FiniteRing,
         <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
         R: RingStore,
-        V: VectorView<El<R>>,
+        V: VectorView<El<R>> + Send + Sync,
         C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone,
+        A: Allocator + Clone + Send + Sync,
         FreeAlgebraImplBase<R, V, A, C>: CanHomFrom<Impl::Type>
 {
     type Homomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanHomFrom<Impl::Type>>::Homomorphism;
@@ -749,9 +759,9 @@ impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>> for AsFieldBase<FreeAlg
         <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
         R: RingStore,
         R::Type: LinSolveRing,
-        V: VectorView<El<R>>,
+        V: VectorView<El<R>> + Send + Sync,
         C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone,
+        A: Allocator + Clone + Send + Sync,
         FreeAlgebraImplBase<R, V, A, C>: CanHomFrom<Impl::Type>
 {
     type Homomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanHomFrom<Impl::Type>>::Homomorphism;
@@ -793,9 +803,9 @@ impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for FreeAlgebraImplBa
         Impl::Type: Field + FreeAlgebra + FiniteRing,
         <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
         R: RingStore,
-        V: VectorView<El<R>>,
+        V: VectorView<El<R>> + Send + Sync,
         C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone,
+        A: Allocator + Clone + Send + Sync,
         FreeAlgebraImplBase<R, V, A, C>: CanIsoFromTo<Impl::Type>
 {
     type Isomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanIsoFromTo<Impl::Type>>::Isomorphism;
@@ -818,9 +828,9 @@ impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for AsFieldBase<FreeA
         <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
         R: RingStore,
         R::Type: LinSolveRing,
-        V: VectorView<El<R>>,
+        V: VectorView<El<R>> + Send + Sync,
         C: ConvolutionAlgorithm<R::Type>,
-        A: Allocator + Clone,
+        A: Allocator + Clone + Send + Sync,
         FreeAlgebraImplBase<R, V, A, C>: CanIsoFromTo<Impl::Type>
 {
     type Isomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanIsoFromTo<Impl::Type>>::Isomorphism;
@@ -850,8 +860,8 @@ fn test_can_hom_from() {
     fn FreeAlgebraImpl_wrap_unwrap_homs<R, V, A, C>()
         where R: RingStore,
             R::Type: SelfIso + LinSolveRing,
-            V: VectorView<El<R>>,
-            A: Allocator + Clone,
+            V: VectorView<El<R>> + Send + Sync,
+            A: Allocator + Clone + Send + Sync,
             C: ConvolutionAlgorithm<R::Type>
     {
         assert_impl_CanHomFrom::<FreeAlgebraImplBase<R, V, A, C>, AsFieldBase<FreeAlgebraImpl<R, V, A, C>>>();
@@ -861,8 +871,8 @@ fn test_can_hom_from() {
     fn FreeAlgebraImpl_from_GaloisField<R, V, A, C>()
         where R: RingStore,
             R::Type: SelfIso + LinSolveRing + FiniteRing + Field + ZnRing,
-            V: VectorView<El<R>>,
-            A: Allocator + Clone,
+            V: VectorView<El<R>> + Send + Sync,
+            A: Allocator + Clone + Send + Sync,
             C: ConvolutionAlgorithm<R::Type>
     {
         assert_impl_CanHomFrom::<GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, A, C>>>, AsFieldBase<FreeAlgebraImpl<R, V, A, C>>>();
@@ -872,8 +882,8 @@ fn test_can_hom_from() {
     fn GaloisField_from_GaloisField<R, V, A, C>()
         where R: RingStore,
             R::Type: SelfIso + LinSolveRing + FiniteRing + Field + ZnRing,
-            V: VectorView<El<R>>,
-            A: Allocator + Clone,
+            V: VectorView<El<R>> + Send + Sync,
+            A: Allocator + Clone + Send + Sync,
             C: ConvolutionAlgorithm<R::Type>
     {
         assert_impl_CanHomFrom::<GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, A, C>>>, GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, A, C>>>>();

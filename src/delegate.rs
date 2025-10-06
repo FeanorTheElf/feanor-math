@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::fmt::Debug;
 
 use crate::pid::EuclideanRing;
 use crate::pid::PrincipalIdealRing;
@@ -247,7 +248,7 @@ use crate::specialization::*;
 /// }
 /// ```
 /// 
-pub trait DelegateRing: PartialEq {
+pub trait DelegateRing: PartialEq + Debug + Send + Sync {
 
     ///
     /// Type of the delegated-to ring.
@@ -258,7 +259,7 @@ pub trait DelegateRing: PartialEq {
     /// Type of elements of this ring. These should always wrap elements from the delegated-to ring,
     /// but may store additional data.
     /// 
-    type Element;
+    type Element: Send + Sync;
 
     ///
     /// Returns a reference to the delegated-to ring, which is used by all other default

@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::ops::Deref;
 
 use crate::homomorphism::*;
@@ -214,15 +215,13 @@ pub enum EnvBindingStrength {
 /// ));
 /// ```
 /// 
-/// TODO: on next breaking release restrict with `: Debug`
-/// 
 #[allow(missing_docs)]
-pub trait RingBase: PartialEq {
+pub trait RingBase: PartialEq + Debug + Send + Sync {
 
     ///
     /// Type of elements of the ring
     /// 
-    type Element: Sized;
+    type Element: Sized + Send + Sync;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element;
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.add_assign(lhs, self.clone_el(rhs)) }
@@ -626,7 +625,7 @@ macro_rules! assert_el_eq {
 /// just provide an implementation of `get_ring()` and put ring functionality in
 /// a custom implementation of [`RingBase`].
 /// 
-pub trait RingStore: Sized {
+pub trait RingStore: Sized + Send + Sync {
     
     ///
     /// The type of the stored ring.
@@ -1240,7 +1239,7 @@ impl<'a, R: RingBase + ?Sized> RingStore for RingRef<'a, R> {
     }
 }
 
-impl<'a, S: Deref> RingStore for S
+impl<'a, S: Deref + Send + Sync> RingStore for S
     where S::Target: RingStore
 {    
     type Type = <<S as Deref>::Target as RingStore>::Type;
@@ -1270,11 +1269,11 @@ fn test_ring_rc_lifetimes() {
 #[test]
 fn test_internal_wrappings_dont_matter() {
     
-    #[derive(Clone, PartialEq)]
+    #[derive(Clone, PartialEq, Debug)]
     pub struct ABase;
 
     #[allow(unused)]
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     pub struct BBase<R: RingStore> {
         base: R
     }
@@ -1335,7 +1334,7 @@ fn test_internal_wrappings_dont_matter() {
 
     impl_eq_based_self_iso!{ ABase }
 
-    impl<R: RingStore> RingBase for BBase<R> {
+    impl<R: RingStore + Debug> RingBase for BBase<R> {
         type Element = i32;
 
         fn clone_el(&self, val: &Self::Element) -> Self::Element {
@@ -1382,7 +1381,7 @@ fn test_internal_wrappings_dont_matter() {
         fn is_approximate(&self) -> bool { false }
     }
 
-    impl<R: RingStore> CanHomFrom<ABase> for BBase<R> {
+    impl<R: RingStore + Debug> CanHomFrom<ABase> for BBase<R> {
 
         type Homomorphism = ();
 
@@ -1395,7 +1394,7 @@ fn test_internal_wrappings_dont_matter() {
         }
     }
 
-    impl<R: RingStore, S: RingStore> CanHomFrom<BBase<S>> for BBase<R> 
+    impl<R: RingStore + Debug, S: RingStore + Debug> CanHomFrom<BBase<S>> for BBase<R> 
         where R::Type: CanHomFrom<S::Type>
     {
         type Homomorphism = ();
@@ -1409,7 +1408,7 @@ fn test_internal_wrappings_dont_matter() {
         }
     }
 
-    impl<R: RingStore> CanIsoFromTo<BBase<R>> for BBase<R> 
+    impl<R: RingStore + Debug> CanIsoFromTo<BBase<R>> for BBase<R> 
         where R::Type: CanHomFrom<R::Type>
     {
         type Isomorphism = ();

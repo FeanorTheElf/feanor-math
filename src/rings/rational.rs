@@ -514,6 +514,10 @@ impl<I> DivisibilityRing for RationalFieldBase<I>
             |x, y| (signed_gcd(x.0, self.base_ring().clone_el(self.num(y)), self.base_ring()), signed_lcm(x.1, self.base_ring().clone_el(self.den(y)), self.base_ring())));
         return Some(RationalFieldEl(num, den));
     }
+
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {
+        ()
+    }
 }
 
 impl_interpolation_base_ring_char_zero!{ <{I}> InterpolationBaseRing for RationalFieldBase<I> where I: RingStore, I::Type: IntegerRing + ComputeResultantRing }

@@ -48,7 +48,7 @@ pub mod complex_fft;
 /// (and thus `fft`, `inv_fft`, ...) on same inputs (w.r.t. equality given by the
 /// base rings, which are equal).
 /// 
-pub trait FFTAlgorithm<R: ?Sized + RingBase> {
+pub trait FFTAlgorithm<R: ?Sized + RingBase>: Send + Sync {
 
     ///
     /// This FFTTable can compute the FFT of arrays of this length.
@@ -193,7 +193,7 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase> {
 
 impl<T, R> FFTAlgorithm<R> for T
     where R: ?Sized + RingBase,
-        T: Deref, 
+        T: Deref + Sync + Send, 
         T::Target: FFTAlgorithm<R>
 {
     fn len(&self) -> usize {

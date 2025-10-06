@@ -98,6 +98,15 @@ impl<R> PartialEq for FractionFieldImplBase<R>
     }
 }
 
+impl<R> Debug for FractionFieldImplBase<R>
+    where R: RingStore,
+        R::Type: Domain
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Frac({:?})", self.base_ring.get_ring())
+    }
+}
+
 impl<R> Clone for FractionFieldImplBase<R>
     where R: RingStore + Clone,
         R::Type: Domain
@@ -315,6 +324,10 @@ impl<R> DivisibilityRing for FractionFieldImplBase<R>
                 den: denominator_lcm
             });
         }
+    }
+
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {
+        ()
     }
 }
 

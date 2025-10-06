@@ -132,8 +132,6 @@ pub trait DivisibilityRing: RingBase {
     /// panic at runtime when calling [`DivisibilityRing::prepare_divisor()`] (unfortunately). However,
     /// it seems like the most usable solution, and does not require unsafe code.
     /// 
-    /// TODO: at the next breaking release, remove default implementation of `prepare_divisor()`.
-    /// 
     /// # Example
     /// 
     /// Assume we want to go through all positive integers `<= 1000` that are divisible by `257`. The naive 
@@ -165,22 +163,7 @@ pub trait DivisibilityRing: RingBase {
     /// }
     /// ```
     /// 
-    #[stability::unstable(feature = "enable")]
-    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {
-        struct ProduceUnitType;
-        trait ProduceValue<T> {
-            fn produce() -> T;
-        }
-        impl<T> ProduceValue<T> for ProduceUnitType {
-            default fn produce() -> T {
-                panic!("if you specialize DivisibilityRing::PreparedDivisorData, you must also specialize DivisibilityRing::prepare_divisor()")
-            }
-        }
-        impl ProduceValue<()> for ProduceUnitType {
-            fn produce() -> () {}
-        }
-        <ProduceUnitType as ProduceValue<Self::PreparedDivisorData>>::produce()
-    }
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData;
 
     ///
     /// Same as [`DivisibilityRing::checked_left_div()`] but for a prepared divisor.

@@ -20,7 +20,7 @@ pub struct CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A = Global>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>,
-        A: Allocator
+        A: Allocator + Sync + Send
 {
     log3_n: usize,
     hom: H,
@@ -133,13 +133,13 @@ impl<R_main, R_twiddle, H, A> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>,
-        A: Allocator
+        A: Allocator + Sync + Send
 {
     ///
     /// Most general way to create a [`CooleyTukeyRadix3FFT`].
     /// 
     /// The given closure should, on input `i`, return `z^i` for a primitive
-    /// `3^log3_n`-th root of unity. The given allocator is used to copy the input
+    /// `3^log3_n`-th root of unity. The given Allocator + Sync + Send is used to copy the input
     /// data in cases where the input data layout is not optimal for the algorithm
     /// 
     #[stability::unstable(feature = "enable")]
@@ -219,7 +219,7 @@ impl<R_main, R_twiddle, H, A> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>
     /// Replaces the allocator used for temporary allocations by this FFT.
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn with_allocator<A_new: Allocator>(self, allocator: A_new) -> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A_new> {
+    pub fn with_allocator<A_new: Allocator + Sync + Send>(self, allocator: A_new) -> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A_new> {
         CooleyTukeyRadix3FFT {
             twiddles: self.twiddles,
             inv_twiddles: self.inv_twiddles,
@@ -316,7 +316,7 @@ impl<R_main, R_twiddle, H, A> Clone for CooleyTukeyRadix3FFT<R_main, R_twiddle, 
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main> + Clone,
-        A: Allocator + Clone
+        A: Allocator + Sync + Send + Clone
 {
     fn clone(&self) -> Self {
         Self {
@@ -335,7 +335,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for CooleyTukeyRadix3FFT<R_ma
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>,
-        A: Allocator
+        A: Allocator + Sync + Send
 {
     fn len(&self) -> usize {
         if self.log3_n == 0 {
@@ -521,7 +521,7 @@ impl<R: ?Sized + RingBase, S: ?Sized + RingBase> CooleyTukeyRadix3Butterfly<S> f
 
 impl<H, A> FFTErrorEstimate for CooleyTukeyRadix3FFT<Complex64Base, Complex64Base, H, A> 
     where H: Homomorphism<Complex64Base, Complex64Base>,
-        A: Allocator
+        A: Allocator + Sync + Send
 {
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
         // the butterfly performs two multiplications with roots of unity, and then two additions

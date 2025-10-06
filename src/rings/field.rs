@@ -103,12 +103,10 @@ impl<R> Copy for AsFieldBase<R>
 
 impl<R> Debug for AsFieldBase<R>
     where R: RingStore,
-        R::Type: DivisibilityRing + Debug
+        R::Type: DivisibilityRing
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("AsField")
-            .field(&self.base.get_ring())
-            .finish()
+        write!(f, "AsField({:?})", self.get_delegate())
     }
 }
 

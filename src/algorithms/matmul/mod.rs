@@ -18,7 +18,6 @@ pub mod strassen;
 /// Trait to allow rings to provide specialized implementations for inner products, i.e.
 /// the sums `sum_i a[i] * b[i]`.
 /// 
-#[stability::unstable(feature = "enable")]
 pub trait ComputeInnerProduct: RingBase {
 
     ///
@@ -75,7 +74,6 @@ impl<R: ?Sized + RingBase> ComputeInnerProduct for R {
 ///
 /// Trait for objects that can compute a matrix multiplications over some ring.
 /// 
-#[stability::unstable(feature = "enable")]
 pub trait MatmulAlgorithm<R: ?Sized + RingBase> {
 
     ///
@@ -141,7 +139,6 @@ impl<R, T> MatmulAlgorithm<R> for T
 /// Trait to allow rings to customize the parameters with which [`StrassenAlgorithm`] will
 /// compute matrix multiplications.
 /// 
-#[stability::unstable(feature = "enable")]
 pub trait StrassenHint: RingBase {
 
     ///
@@ -164,10 +161,8 @@ impl<R: RingBase + ?Sized> StrassenHint for R {
     }
 }
 
-#[stability::unstable(feature = "enable")]
 pub const STANDARD_MATMUL: StrassenAlgorithm = StrassenAlgorithm::new(Global);
 
-#[stability::unstable(feature = "enable")]
 #[derive(Clone, Copy)]
 pub struct StrassenAlgorithm<A: Allocator = Global> {
     allocator: A
@@ -175,7 +170,6 @@ pub struct StrassenAlgorithm<A: Allocator = Global> {
 
 impl<A: Allocator> StrassenAlgorithm<A> {
 
-    #[stability::unstable(feature = "enable")]
     pub const fn new(allocator: A) -> Self {
         Self { allocator }
     }

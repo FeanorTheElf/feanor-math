@@ -2,8 +2,6 @@ use std::alloc::{Allocator, Global};
 use std::ops::Deref;
 
 use crate::ring::*;
-use crate::seq::subvector::SubvectorView;
-use crate::seq::*;
 
 use karatsuba::*;
 
@@ -31,6 +29,9 @@ pub mod rns;
 
 ///
 /// Trait for objects that can compute a convolution over some ring.
+/// 
+/// The functions all take the ring by reference to [`RingBase`], since
+/// that makes [`ConvolutionAlgorithm`] dyn-compatible.
 /// 
 /// # Example
 /// ```rust
@@ -62,7 +63,7 @@ pub mod rns;
 /// assert_eq!(expected, actual);
 /// ```
 /// 
-pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
+pub trait ConvolutionAlgorithm<R: ?Sized + RingBase>: Send + Sync {
 
     ///
     /// Additional data associated to a list of ring elements, which can be used to
@@ -72,34 +73,7 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// Note that a `PreparedConvolutionOperand` can only be used for convolutions
     /// with the same list of values it was created for.
     /// 
-    #[stability::unstable(feature = "enable")]
     type PreparedConvolutionOperand = ();
-
-    ///
-    /// Elementwise adds the convolution of `lhs` and `rhs` to `dst`.
-    /// 
-    /// In other words, computes `dst[i] += sum_j lhs[j] * rhs[i - j]` for all `i`, where
-    /// `j` runs through all positive integers for which `lhs[j]` and `rhs[i - j]` are defined,
-    /// i.e. not out-of-bounds.
-    /// 
-    /// In particular, it is necessary that `dst.len() >= lhs.len() + rhs.len() - 1`. However,
-    /// to allow for more efficient implementations, it is instead required that 
-    /// `dst.len() >= lhs.len() + rhs.len()`.
-    /// 
-    /// # Panic
-    /// 
-    /// Panics if `dst` is shorter than `lhs.len() + rhs.len() - 1`. May panic if `dst` is shorter
-    /// than `lhs.len() + rhs.len()`.
-    /// 
-    /// TODO: On next breaking release, just take slice instead of [`VectorView`]s.
-    /// This might require the user to copy the data once, but so far most algorithms copy
-    /// it anyway, because this will make subsequent memory accesses more predictable and
-    /// better optimized.
-    /// 
-    /// Maybe also consider taking the ring by `&RingBase`, since this would then allow
-    /// for dynamic dispatch.
-    /// 
-    fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S);
 
     ///
     /// Returns whether this convolution algorithm supports computations of 
@@ -109,7 +83,7 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// e.g. for finite fields, required data might only be precomputed for some moduli,
     /// and thus only these will be supported.
     /// 
-    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, ring: S) -> bool;
+    fn supports_ring(&self, ring: &R) -> bool;
 
     ///
     /// Takes an input list of values and computes an opaque [`ConvolutionAlgorithm::PreparedConvolutionOperand`],
@@ -131,14 +105,7 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// are encouraged to not compute any data during [`ConvolutionAlgorithm::prepare_convolution_operand()`],
     /// but initialize an object with interior mutability, and use it to cache data computed during
     /// [`ConvolutionAlgorithm::compute_convolution_prepared()`].
-    /// 
-    /// TODO: At next breaking release, remove the default implementation
-    /// 
-    /// TODO: On next breaking release, just take slice instead of [`VectorView`]s.
-    /// This might require the user to copy the data once, but so far most algorithms copy
-    /// it anyway, because this will make subsequent memory accesses more predictable and
-    /// better optimized.
-    /// 
+    ///  
     /// # Example
     /// 
     /// ```rust
@@ -166,116 +133,52 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     /// assert!(expected.iter().zip(actual.iter()).all(|(l, r)| ring.eq_el(l, r)));
     /// ```
     /// 
-    /// TODO: On next breaking release, just take slice instead of [`VectorView`]s.
-    /// This might require the user to copy the data once, but so far most algorithms copy
-    /// it anyway, because this will make subsequent memory accesses more predictable and
-    /// better optimized.
-    /// 
     /// Maybe also consider taking the ring by `&RingBase`, since this would then allow
     /// for dynamic dispatch.
     /// 
-    #[stability::unstable(feature = "enable")]
-    fn prepare_convolution_operand<S, V>(&self, _val: V, _length_hint: Option<usize>, _ring: S) -> Self::PreparedConvolutionOperand
-        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
-    {
-        struct ProduceUnitType;
-        trait ProduceValue<T> {
-            fn produce() -> T;
-        }
-        impl<T> ProduceValue<T> for ProduceUnitType {
-            default fn produce() -> T {
-                panic!("if you specialize ConvolutionAlgorithm::PreparedConvolutionOperand, you must also specialize ConvolutionAlgorithm::prepare_convolution_operand()")
-            }
-        }
-        impl ProduceValue<()> for ProduceUnitType {
-            fn produce() -> () {}
-        }
-        return <ProduceUnitType as ProduceValue<Self::PreparedConvolutionOperand>>::produce();
-    }
+    fn prepare_convolution_operand(&self, val: &[R::Element], length_hint: Option<usize>, ring: &R) -> Self::PreparedConvolutionOperand;
     
     ///
     /// Elementwise adds the convolution of `lhs` and `rhs` to `dst`. If provided, the given
     /// prepared convolution operands are used for a faster computation.
     /// 
-    /// When called with `None` as both the prepared convolution operands, this is exactly
-    /// equivalent to [`ConvolutionAlgorithm::compute_convolution()`].
+    /// This will produce nonsensical results, if the prepared convolution operands don't
+    /// match the passed data, i.e. if `lhs_prep` has not been created by calling
+    /// [`ConvolutionAlgorithm::prepare_convolution_operand()`] on `lhs`, and similarly
+    /// for `rhs`.
     /// 
-    /// TODO: On next breaking release, just take slice instead of [`VectorView`]s.
-    /// This might require the user to copy the data once, but so far most algorithms copy
-    /// it anyway, because this will make subsequent memory accesses more predictable and
-    /// better optimized.
+    /// # Panic
     /// 
-    #[stability::unstable(feature = "enable")]
-    fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, _lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, _rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: S)
-        where S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>
-    {
-        self.compute_convolution(lhs, rhs, dst, ring)
-    }
+    /// Panics if `dst` is shorter than `lhs.len() + rhs.len() - 1`. May panic if `dst` is shorter
+    /// than `lhs.len() + rhs.len()`.
+    /// 
+    fn compute_convolution(&self, lhs: &[R::Element], lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: &[R::Element], rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: &R);
 
     ///
-    /// Computes a convolution for each tuple in the given sequence, and sums the result of each convolution
-    /// to `dst`.
+    /// Computes a convolution for each tuple in the given sequence, and sums the result of
+    /// each convolution to `dst`.
     /// 
     /// In other words, this computes `dst[k] += sum_l sum_(i + j = k) values[l][i] * values[l][k]`.
-    /// It can be faster than calling [`ConvolutionAlgorithm::prepare_convolution_operand()`].
+    /// It can be faster than calling [`ConvolutionAlgorithm::compute_convolution()`] multiple times.
     /// 
-    /// TODO: On next breaking release, just take slice instead of [`VectorView`]s.
-    /// This might require the user to copy the data once, but so far most algorithms copy
-    /// it anyway, because this will make subsequent memory accesses more predictable and
-    /// better optimized.
-    /// 
-    #[stability::unstable(feature = "enable")]
-    fn compute_convolution_sum<'a, S, I, V1, V2>(&self, values: I, dst: &mut [R::Element], ring: S) 
-        where S: RingStore<Type = R> + Copy, 
-            I: ExactSizeIterator<Item = (V1, Option<&'a Self::PreparedConvolutionOperand>, V2, Option<&'a Self::PreparedConvolutionOperand>)>,
-            V1: VectorView<R::Element>,
-            V2: VectorView<R::Element>,
-            Self: 'a,
-            R: 'a
-    {
+    fn compute_convolution_sum(&self, values: &[(&[R::Element], Option<&Self::PreparedConvolutionOperand>, &[R::Element], Option<&Self::PreparedConvolutionOperand>)], dst: &mut [R::Element], ring: &R) {
         for (lhs, lhs_prep, rhs, rhs_prep) in values {
-            self.compute_convolution_prepared(lhs, lhs_prep, rhs, rhs_prep, dst, ring)
+            self.compute_convolution(lhs, *lhs_prep, rhs, *rhs_prep, dst, ring)
         }
     }
 }
 
-impl<'a, R, C> ConvolutionAlgorithm<R> for C
+impl<R, C> ConvolutionAlgorithm<R> for C
     where R: ?Sized + RingBase,
-        C: Deref,
+        C: Deref + Send + Sync,
         C::Target: ConvolutionAlgorithm<R>
 {
     type PreparedConvolutionOperand = <C::Target as ConvolutionAlgorithm<R>>::PreparedConvolutionOperand;
 
-    fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S) {
-        (**self).compute_convolution(lhs, rhs, dst, ring)
-    }
-
-    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, ring: S) -> bool {
-        (**self).supports_ring(ring)
-    }
-
-    fn prepare_convolution_operand<S, V>(&self, val: V, len_hint: Option<usize>, ring: S) -> Self::PreparedConvolutionOperand
-        where S: RingStore<Type = R> + Copy, V: VectorView<R::Element>
-    {
-        (**self).prepare_convolution_operand(val, len_hint, ring)
-    }
-
-    fn compute_convolution_prepared<S, V1, V2>(&self, lhs: V1, lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: V2, rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: S)
-        where S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>
-    {
-        (**self).compute_convolution_prepared(lhs, lhs_prep, rhs, rhs_prep, dst, ring);
-    }
-
-    fn compute_convolution_sum<'b, S, I, V1, V2>(&self, values: I, dst: &mut [R::Element], ring: S) 
-        where S: RingStore<Type = R> + Copy, 
-            I: ExactSizeIterator<Item = (V1, Option<&'b Self::PreparedConvolutionOperand>, V2, Option<&'b Self::PreparedConvolutionOperand>)>,
-            V1: VectorView<R::Element>,
-            V2: VectorView<R::Element>,
-            Self: 'b,
-            R: 'b
-    {
-        (**self).compute_convolution_sum(values, dst, ring);
-    }
+    fn supports_ring(&self, ring: &R) -> bool { (**self).supports_ring(ring) }
+    fn prepare_convolution_operand(&self, val: &[R::Element], length_hint: Option<usize>, ring: &R) -> Self::PreparedConvolutionOperand { (**self).prepare_convolution_operand(val, length_hint, ring) }
+    fn compute_convolution(&self, lhs: &[R::Element], lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: &[R::Element], rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: &R) { (**self).compute_convolution(lhs, lhs_prep, rhs, rhs_prep, dst, ring); }
+    fn compute_convolution_sum(&self, values: &[(&[R::Element], Option<&Self::PreparedConvolutionOperand>, &[R::Element], Option<&Self::PreparedConvolutionOperand>)], dst: &mut [R::Element], ring: &R) { (**self).compute_convolution_sum(values, dst, ring); }
 }
 
 ///
@@ -283,7 +186,7 @@ impl<'a, R, C> ConvolutionAlgorithm<R> for C
 /// with a threshold defined by [`KaratsubaHint`].
 /// 
 #[derive(Clone, Copy, Debug)]
-pub struct KaratsubaAlgorithm<A: Allocator = Global> {
+pub struct KaratsubaAlgorithm<A: Allocator + Send + Sync = Global> {
     allocator: A
 }
 
@@ -293,7 +196,7 @@ pub struct KaratsubaAlgorithm<A: Allocator = Global> {
 /// 
 pub const STANDARD_CONVOLUTION: KaratsubaAlgorithm = KaratsubaAlgorithm::new(Global);
 
-impl<A: Allocator> KaratsubaAlgorithm<A> {
+impl<A: Allocator + Send + Sync> KaratsubaAlgorithm<A> {
     
     #[stability::unstable(feature = "enable")]
     pub const fn new(allocator: A) -> Self {
@@ -301,13 +204,17 @@ impl<A: Allocator> KaratsubaAlgorithm<A> {
     }
 }
 
-impl<R: ?Sized + RingBase, A: Allocator> ConvolutionAlgorithm<R> for KaratsubaAlgorithm<A> {
-
-    fn compute_convolution<S: RingStore<Type = R>, V1: VectorView<<R as RingBase>::Element>, V2: VectorView<<R as RingBase>::Element>>(&self, lhs: V1, rhs: V2, dst: &mut[<R as RingBase>::Element], ring: S) {
-        karatsuba(ring.get_ring().karatsuba_threshold(), dst, SubvectorView::new(&lhs), SubvectorView::new(&rhs), &ring, &self.allocator)
+impl<R: ?Sized + RingBase, A: Allocator + Send + Sync> ConvolutionAlgorithm<R> for KaratsubaAlgorithm<A> {
+    
+    fn compute_convolution(&self, lhs: &[R::Element], _lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: &[R::Element], _rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: &R) {
+        karatsuba(<R as KaratsubaHint>::karatsuba_threshold(ring), dst, lhs, rhs, RingRef::new(ring), &self.allocator);
+    }
+    
+    fn prepare_convolution_operand(&self, _val: &[<R as RingBase>::Element], _length_hint: Option<usize>, _ring: &R) -> Self::PreparedConvolutionOperand {
+        ()
     }
 
-    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool {
+    fn supports_ring(&self, _ring: &R) -> bool {
         true
     }
 }
@@ -396,7 +303,7 @@ pub mod generic_tests {
     
                 let mut actual = Vec::new();
                 actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
-                convolution.compute_convolution(&lhs, &rhs, &mut actual, &ring);
+                convolution.compute_convolution(&lhs, None, &rhs, None, &mut actual, ring.get_ring());
                 for i in 0..(lhs_len + rhs_len) {
                     assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
                 }
@@ -411,7 +318,7 @@ pub mod generic_tests {
     
                 let mut actual = Vec::new();
                 actual.extend((0..(lhs_len + rhs_len)).map(|i| ring.mul(ring.int_hom().map(i * i), ring.pow(ring.clone_el(&scale), 2))));
-                convolution.compute_convolution(&lhs, &rhs, &mut actual, &ring);
+                convolution.compute_convolution(&lhs, None, &rhs, None, &mut actual, ring.get_ring());
                 for i in 0..(lhs_len + rhs_len) {
                     assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
                 }
@@ -437,13 +344,13 @@ pub mod generic_tests {
     
                 let mut actual = Vec::new();
                 actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
-                convolution.compute_convolution_prepared(
+                convolution.compute_convolution(
                     &lhs,
-                    Some(&convolution.prepare_convolution_operand(&lhs, None, &ring)),
+                    Some(&convolution.prepare_convolution_operand(&lhs, None, ring.get_ring())),
                     &rhs,
-                    Some(&convolution.prepare_convolution_operand(&rhs, None, &ring)),
+                    Some(&convolution.prepare_convolution_operand(&rhs, None, ring.get_ring())),
                     &mut actual, 
-                    &ring
+                    ring.get_ring()
                 );
                 for i in 0..(lhs_len + rhs_len) {
                     assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
@@ -451,13 +358,13 @@ pub mod generic_tests {
 
                 let mut actual = Vec::new();
                 actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
-                convolution.compute_convolution_prepared(
+                convolution.compute_convolution(
                     &lhs,
-                    Some(&convolution.prepare_convolution_operand(&lhs, None, &ring)),
+                    Some(&convolution.prepare_convolution_operand(&lhs, None, ring.get_ring())),
                     &rhs,
                     None,
                     &mut actual, 
-                    &ring
+                    ring.get_ring()
                 );
                 for i in 0..(lhs_len + rhs_len) {
                     assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
@@ -465,13 +372,13 @@ pub mod generic_tests {
                 
                 let mut actual = Vec::new();
                 actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
-                convolution.compute_convolution_prepared(
+                convolution.compute_convolution(
                     &lhs,
                     None,
                     &rhs,
-                    Some(&convolution.prepare_convolution_operand(&rhs, None, &ring)),
+                    Some(&convolution.prepare_convolution_operand(&rhs, None, ring.get_ring())),
                     &mut actual, 
-                    &ring
+                    ring.get_ring()
                 );
                 for i in 0..(lhs_len + rhs_len) {
                     assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
@@ -480,13 +387,13 @@ pub mod generic_tests {
                 let mut actual = Vec::new();
                 actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
                 let data = [
-                    (&lhs[..], Some(convolution.prepare_convolution_operand(&lhs, None, &ring)), &rhs[..], Some(convolution.prepare_convolution_operand(&rhs, None, &ring))),
+                    (&lhs[..], Some(convolution.prepare_convolution_operand(&lhs, None, ring.get_ring())), &rhs[..], Some(convolution.prepare_convolution_operand(&rhs, None, ring.get_ring()))),
                     (&rhs[..], None, &lhs[..], None)
                 ];
                 convolution.compute_convolution_sum(
-                    data.as_fn().map_fn(|(l, l_prep, r, r_prep): &(_, _, _, _)| (l, l_prep.as_ref(), r, r_prep.as_ref())).iter(),
+                    &data.iter().map(|(l, l_prep, r, r_prep): &(_, _, _, _)| (&l[..], l_prep.as_ref(), &r[..], r_prep.as_ref())).collect::<Vec<_>>(),
                     &mut actual, 
-                    &ring
+                    ring.get_ring()
                 );
                 for i in 0..(lhs_len + rhs_len) {
                     assert_el_eq!(&ring, &ring.add_ref(&expected[i as usize], &expected[i as usize]), &actual[i as usize]);
@@ -495,13 +402,13 @@ pub mod generic_tests {
                 let mut actual = Vec::new();
                 actual.resize_with((lhs_len + rhs_len) as usize, || ring.zero());
                 let data = [
-                    (&lhs[..], Some(convolution.prepare_convolution_operand(&lhs, None, &ring)), &rhs[..], None),
-                    (&rhs[..], None, &lhs[..], Some(convolution.prepare_convolution_operand(&lhs, None, &ring)))
+                    (&lhs[..], Some(convolution.prepare_convolution_operand(&lhs, None, ring.get_ring())), &rhs[..], None),
+                    (&rhs[..], None, &lhs[..], Some(convolution.prepare_convolution_operand(&lhs, None, ring.get_ring())))
                 ];
                 convolution.compute_convolution_sum(
-                    data.as_fn().map_fn(|(l, l_prep, r, r_prep)| (l, l_prep.as_ref(), r, r_prep.as_ref())).iter(),
+                    &data.iter().map(|(l, l_prep, r, r_prep)| (&l[..], l_prep.as_ref(), &r[..], r_prep.as_ref())).collect::<Vec<_>>(),
                     &mut actual, 
-                    &ring
+                    ring.get_ring()
                 );
                 for i in 0..(lhs_len + rhs_len) {
                     assert_el_eq!(&ring, &ring.add_ref(&expected[i as usize], &expected[i as usize]), &actual[i as usize]);

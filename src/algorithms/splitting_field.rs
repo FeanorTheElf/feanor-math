@@ -273,7 +273,7 @@ pub fn extend_number_field_promise_is_irreducible<K, Controller>(poly_ring: Dens
 
                     let result = FreeAlgebraHom::promise_is_well_defined(poly_ring.into().into_base_ring(), result, K_generator);
 
-                    log_progress!(controller, "success");
+                    log_progress!(controller, "(success)");
                     return (result, L_generator);
                 } else {
                     unreachable!()

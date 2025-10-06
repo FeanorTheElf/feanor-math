@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::*;
@@ -25,6 +27,15 @@ pub struct AsLocalPIRBase<R: DivisibilityRingStore>
     base: R,
     max_ideal_gen: LocalPIREl<R>,
     nilpotent_power: Option<usize>
+}
+
+impl<R> Debug for AsLocalPIRBase<R>
+    where R: RingStore,
+        R::Type: DivisibilityRing
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "AsLocalPIR({:?})", self.get_delegate())
+    }
 }
 
 impl<R> Clone for AsLocalPIRBase<R>

@@ -67,7 +67,6 @@ pub mod unstable_sealed {
     pub trait UnstableSealed {}
 }
 
-mod unsafe_any;
 mod lazy;
 mod cow;
 

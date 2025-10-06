@@ -70,12 +70,13 @@ pub fn poly_squarefree_part_finite_field<P, Controller>(poly_ring: P, poly: &El<
     if poly_ring.is_zero(&derivate) {
         let q = poly_ring.base_ring().size(&BigIntRing::RING).unwrap();
         let (p, e) = is_prime_power(BigIntRing::RING, &q).unwrap();
-        let p = int_cast(p, StaticRing::<i64>::RING, BigIntRing::RING) as usize;
-        assert!(p > 0);
-        let undo_frobenius = Frobenius::new(poly_ring.base_ring(), e - 1);
+        let p_usize = int_cast(BigIntRing::RING.clone_el(&p), StaticRing::<i64>::RING, BigIntRing::RING) as usize;
+        assert!(p_usize > 0);
+        let power = BigIntRing::RING.pow(p, e - 1);
+        let undo_frobenius = |x| poly_ring.base_ring().pow_gen(poly_ring.base_ring().clone_el(x), &power, BigIntRing::RING);
         let base_poly = poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| {
-            debug_assert!(i % p == 0);
-            (undo_frobenius.map_ref(c), i / p)
+            debug_assert!(i % p_usize == 0);
+            (undo_frobenius(c), i / p_usize)
         }));
         return poly_squarefree_part_finite_field(poly_ring, &base_poly, controller);
     } else {

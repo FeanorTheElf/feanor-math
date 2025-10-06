@@ -154,7 +154,7 @@ impl<R, A> Debug for MultivariatePolyRingEl<R, A>
 /// 
 pub struct MultivariatePolyRingImplBase<R, A = Global>
     where R: RingStore,
-        A: Clone + Allocator + Send
+        A: Allocator + Send + Sync + Clone
 {
     base_ring: R,
     variable_count: usize,
@@ -190,7 +190,7 @@ impl<R> MultivariatePolyRingImpl<R>
 
 impl<R, A> MultivariatePolyRingImpl<R, A>
     where R: RingStore,
-        A: Clone + Allocator + Send
+        A: Allocator + Send + Sync + Clone
 {
     ///
     /// Creates a new instance of the ring `base_ring[X0, ..., Xn]` where `n = variable_count - 1`.
@@ -239,7 +239,7 @@ impl<R, A> MultivariatePolyRingImpl<R, A>
 
 impl<R, A> MultivariatePolyRingImplBase<R, A>
     where R: RingStore,
-        A: Clone + Allocator + Send
+        A: Allocator + Send + Sync + Clone
 {
     #[stability::unstable(feature = "enable")]
     pub fn allocator(&self) -> &A {
@@ -398,7 +398,7 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
 impl<R, A> Debug for MultivariatePolyRingImplBase<R, A>
     where R: RingStore,
         R::Type: Debug,
-        A: Clone + Allocator + Send
+        A: Allocator + Send + Sync + Clone
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MultivariatePolyRingImplBase")
@@ -411,7 +411,7 @@ impl<R, A> Debug for MultivariatePolyRingImplBase<R, A>
 
 impl<R, A> PartialEq for MultivariatePolyRingImplBase<R, A>
     where R: RingStore,
-        A: Clone + Allocator + Send
+        A: Allocator + Send + Sync + Clone
 {
     fn eq(&self, other: &Self) -> bool {
         self.base_ring.get_ring() == other.base_ring.get_ring() && self.variable_count == other.variable_count && self.max_supported_deg == other.max_supported_deg
@@ -420,7 +420,7 @@ impl<R, A> PartialEq for MultivariatePolyRingImplBase<R, A>
 
 impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
     where R: RingStore,
-        A: Clone + Allocator + Send
+        A: Allocator + Send + Sync + Clone
 {
     type Element = MultivariatePolyRingEl<R, A>;
 
@@ -573,7 +573,7 @@ impl<'a, R> Iterator for TermIterImpl<'a, R>
 
 impl<R, A> RingExtension for MultivariatePolyRingImplBase<R, A>
     where R: RingStore,
-        A: Clone + Allocator + Send
+        A: Allocator + Send + Sync + Clone
 {
     type BaseRing = R;
 
@@ -601,7 +601,7 @@ impl<R, A> RingExtension for MultivariatePolyRingImplBase<R, A>
 
 impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
     where R: RingStore,
-        A: Clone + Allocator + Send
+        A: Allocator + Send + Sync + Clone
 {
     type Monomial = MonomialIdentifier;
     type TermIter<'a> = TermIterImpl<'a, R>
@@ -838,7 +838,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
 
 impl<P, R, A> CanHomFrom<P> for MultivariatePolyRingImplBase<R, A> 
     where R: RingStore,
-        A: Clone + Allocator + Send,
+        A: Allocator + Send + Sync + Clone,
         P: MultivariatePolyRing,
         R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>
 {
@@ -866,7 +866,7 @@ impl<P, R, A> CanHomFrom<P> for MultivariatePolyRingImplBase<R, A>
 
 impl<P, R, A> CanIsoFromTo<P> for MultivariatePolyRingImplBase<R, A> 
     where R: RingStore,
-        A: Clone + Allocator + Send,
+        A: Allocator + Send + Sync + Clone,
         P: MultivariatePolyRing,
         R::Type: CanIsoFromTo<<P::BaseRing as RingStore>::Type>
 {

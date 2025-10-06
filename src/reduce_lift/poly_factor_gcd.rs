@@ -112,7 +112,7 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
     /// An ideal of the ring for which we know a decomposition into maximal ideals, and
     /// can use Hensel lifting to lift values to higher powers of this ideal.
     /// 
-    type SuitableIdeal<'ring>
+    type SuitableIdeal<'ring>: Send + Sync
         where Self: 'ring;
 
     ///

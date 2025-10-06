@@ -375,6 +375,10 @@ impl<I: RingStore> DivisibilityRing for ZnBase<I>
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs)
     }
+
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {
+        ()
+    }
 }
 
 impl<I: RingStore, J: RingStore> CanHomFrom<ZnBase<J>> for ZnBase<I> 

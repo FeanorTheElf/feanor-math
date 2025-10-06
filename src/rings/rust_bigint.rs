@@ -53,7 +53,7 @@ pub struct RustBigint<A: Allocator = Global>(bool, Vec<u64, A>);
 /// (requires an installation of mpir and activating the feature "mpir").
 /// 
 #[derive(Copy, Clone)]
-pub struct RustBigintRingBase<A: Allocator + Clone = Global> {
+pub struct RustBigintRingBase<A: Allocator + Send + Sync + Clone = Global> {
     allocator: A
 }
 
@@ -62,7 +62,7 @@ pub struct RustBigintRingBase<A: Allocator + Clone = Global> {
 /// 
 pub type RustBigintRing<A = Global> = RingValue<RustBigintRingBase<A>>;
 
-impl<A: Allocator + Clone> RustBigintRing<A> {
+impl<A: Allocator + Send + Sync + Clone> RustBigintRing<A> {
     
     #[stability::unstable(feature = "enable")]
     pub fn new_with_alloc(allocator: A) -> RustBigintRing<A> {
@@ -78,14 +78,14 @@ impl RustBigintRing {
     pub const RING: RustBigintRing = RingValue::from(RustBigintRingBase { allocator: Global });
 }
 
-impl<A: Allocator + Clone + Default> Default for RustBigintRingBase<A> {
+impl<A: Allocator + Send + Sync + Clone + Default> Default for RustBigintRingBase<A> {
 
     fn default() -> Self {
         RustBigintRingBase { allocator: A::default() }
     }
 }
 
-impl<A: Allocator + Clone> RustBigintRingBase<A> {
+impl<A: Allocator + Send + Sync + Clone> RustBigintRingBase<A> {
 
     ///
     /// If the given big integer fits into a `i128`, this will be
@@ -128,13 +128,13 @@ impl<A: Allocator + Clone> RustBigintRingBase<A> {
     }
 }
 
-impl<A: Allocator + Clone> Debug for RustBigintRingBase<A> {
+impl<A: Allocator + Send + Sync + Clone> Debug for RustBigintRingBase<A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Z")
     }
 }
 
-impl<A: Allocator + Clone> PartialEq for RustBigintRingBase<A> {
+impl<A: Allocator + Send + Sync + Clone> PartialEq for RustBigintRingBase<A> {
 
     fn eq(&self, _other: &Self) -> bool {
         // it is perfectly valid to swap elements between two different `RustBigintRing`s,
@@ -144,7 +144,7 @@ impl<A: Allocator + Clone> PartialEq for RustBigintRingBase<A> {
     }
 }
 
-impl<A: Allocator + Clone> RingBase for RustBigintRingBase<A> {
+impl<A: Allocator + Send + Sync + Clone> RingBase for RustBigintRingBase<A> {
     
     type Element = RustBigint<A>;
 
@@ -290,7 +290,7 @@ impl<A: Allocator + Clone> RingBase for RustBigintRingBase<A> {
     fn is_approximate(&self) -> bool { false }
 }
 
-impl<A1: Allocator + Clone, A2: Allocator + Clone> IntCast<RustBigintRingBase<A2>> for RustBigintRingBase<A1> {
+impl<A1: Allocator + Send + Sync + Clone, A2: Allocator + Send + Sync + Clone> IntCast<RustBigintRingBase<A2>> for RustBigintRingBase<A1> {
     
     fn cast(&self, _: &RustBigintRingBase<A2>, value: RustBigint<A2>) -> Self::Element {
         // allocate it with our allocator
@@ -303,7 +303,7 @@ impl<A1: Allocator + Clone, A2: Allocator + Clone> IntCast<RustBigintRingBase<A2
 macro_rules! specialize_int_cast {
     ($($from:ty),*) => {
         $(
-            impl<A: Allocator + Clone> IntCast<StaticRingBase<$from>> for RustBigintRingBase<A> {
+            impl<A: Allocator + Send + Sync + Clone> IntCast<StaticRingBase<$from>> for RustBigintRingBase<A> {
 
                 fn cast(&self, _: &StaticRingBase<$from>, value: $from) -> RustBigint<A> {
                     let negative = value < 0;
@@ -314,7 +314,7 @@ macro_rules! specialize_int_cast {
                 }
             }
 
-            impl<A: Allocator + Clone> IntCast<RustBigintRingBase<A>> for StaticRingBase<$from> {
+            impl<A: Allocator + Send + Sync + Clone> IntCast<RustBigintRingBase<A>> for StaticRingBase<$from> {
 
                 fn cast(&self, from: &RustBigintRingBase<A>, value: RustBigint<A>) -> $from {
                     <$from>::try_from(from.map_i128(&value).expect(concat!("integer does not fit into a ", stringify!($from)))).ok().expect(concat!("integer does not fit into a ", stringify!($from)))
@@ -326,9 +326,9 @@ macro_rules! specialize_int_cast {
 
 specialize_int_cast!{ i8, i16, i32, i64, i128 }
 
-impl<A: Allocator + Clone> Domain for RustBigintRingBase<A> {}
+impl<A: Allocator + Send + Sync + Clone> Domain for RustBigintRingBase<A> {}
 
-impl<A: Allocator + Clone> OrderedRing for RustBigintRingBase<A> {
+impl<A: Allocator + Send + Sync + Clone> OrderedRing for RustBigintRingBase<A> {
 
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> Ordering {
         match (lhs.0, rhs.0) {
@@ -345,7 +345,7 @@ impl<A: Allocator + Clone> OrderedRing for RustBigintRingBase<A> {
     }
 }
 
-impl<A: Allocator + Clone> DivisibilityRing for RustBigintRingBase<A> {
+impl<A: Allocator + Send + Sync + Clone> DivisibilityRing for RustBigintRingBase<A> {
     
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(rhs) && self.is_zero(lhs) {
@@ -367,9 +367,13 @@ impl<A: Allocator + Clone> DivisibilityRing for RustBigintRingBase<A> {
     {
         Some(elements.fold(self.zero(), |a, b| self.ideal_gen(&a, b)))
     }
+
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {
+        ()
+    }
 }
 
-impl<A: Allocator + Clone> PrincipalIdealRing for RustBigintRingBase<A> {
+impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBase<A> {
 
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(lhs) && self.is_zero(rhs) {
@@ -383,7 +387,7 @@ impl<A: Allocator + Clone> PrincipalIdealRing for RustBigintRingBase<A> {
     }
 }
 
-impl<A: Allocator + Clone> EuclideanRing for RustBigintRingBase<A> {
+impl<A: Allocator + Send + Sync + Clone> EuclideanRing for RustBigintRingBase<A> {
 
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
@@ -399,7 +403,7 @@ impl<A: Allocator + Clone> EuclideanRing for RustBigintRingBase<A> {
     }
 }
 
-impl<A: Allocator + Clone> HashableElRing for RustBigintRingBase<A> {
+impl<A: Allocator + Send + Sync + Clone> HashableElRing for RustBigintRingBase<A> {
 
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
         let block = highest_set_block(&el.1);
@@ -429,7 +433,7 @@ impl<'de> Deserialize<'de> for RustBigintRingBase<Global> {
     }
 }
 
-impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
+impl<A: Allocator + Send + Sync + Clone> SerializableElementRing for RustBigintRingBase<A> {
 
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
         where D: Deserializer<'de>
@@ -472,21 +476,21 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
     }
 }
 
-impl_interpolation_base_ring_char_zero!{ <{A}> InterpolationBaseRing for RustBigintRingBase<A> where A: Allocator + Clone }
+impl_interpolation_base_ring_char_zero!{ <{A}> InterpolationBaseRing for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
 
-impl_poly_gcd_locally_for_ZZ!{ <{A}> IntegerPolyGCDRing for RustBigintRingBase<A> where A: Allocator + Clone }
+impl_poly_gcd_locally_for_ZZ!{ <{A}> IntegerPolyGCDRing for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
 
-impl_eval_poly_locally_for_ZZ!{ <{A}> EvalPolyLocallyRing for RustBigintRingBase<A> where A: Allocator + Clone }
+impl_eval_poly_locally_for_ZZ!{ <{A}> EvalPolyLocallyRing for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
 
 impl<A> FiniteRingSpecializable for RustBigintRingBase<A>
-    where A: Allocator + Clone
+    where A: Allocator + Send + Sync + Clone
 {
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
         op.fallback()
     }
 }
 
-impl<A: Allocator + Clone> IntegerRing for RustBigintRingBase<A> {
+impl<A: Allocator + Send + Sync + Clone> IntegerRing for RustBigintRingBase<A> {
 
     fn to_float_approx(&self, value: &Self::Element) -> f64 {
         let sign = if value.0 { -1. } else { 1. };

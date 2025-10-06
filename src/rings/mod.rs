@@ -85,8 +85,8 @@ pub mod local;
 /// 
 pub mod fraction;
 
-///
-/// Contains [`direct_power::DirectPowerRing`], which models the direct product ring of many
-/// copies of a single base ring.
-/// 
-pub mod direct_power;
+// ///
+// /// Contains [`direct_power::DirectPowerRing`], which models the direct product ring of many
+// /// copies of a single base ring.
+// /// 
+// pub mod direct_power;

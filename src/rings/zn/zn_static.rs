@@ -1,4 +1,5 @@
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt::Debug;
 
 use crate::algorithms::eea::*;
 use crate::reduce_lift::poly_eval::InterpolationBaseRing;
@@ -21,7 +22,7 @@ use crate::specialization::*;
 /// at compile time.
 /// 
 #[stability::unstable(feature = "enable")]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ZnBase<const N: u64, const IS_FIELD: bool>;
 
 #[stability::unstable(feature = "enable")]
@@ -43,6 +44,17 @@ impl<const N: u64, const IS_FIELD: bool> ZnBase<N, IS_FIELD> {
     pub const fn new() -> Self {
         assert!(!IS_FIELD || is_prime(N));
         ZnBase
+    }
+}
+
+impl<const N: u64, const IS_FIELD: bool> Debug for ZnBase<N, IS_FIELD> {
+    
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if IS_FIELD {
+            write!(f, "Z/{}Z", N)
+        } else {
+            write!(f, "F{}", N)
+        }
     }
 }
 
@@ -135,6 +147,10 @@ impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnBase<N, IS_FIELD
         } else {
             None
         }
+    }
+
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {
+        ()
     }
 }
 

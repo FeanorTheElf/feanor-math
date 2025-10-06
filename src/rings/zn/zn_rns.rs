@@ -72,7 +72,7 @@ use crate::primitive_int::*;
 /// assert!(R.eq_el(&R.int_hom().map(120493), &R.coerce(&S, S.int_hom().map(120493))));
 /// ```
 /// 
-pub struct ZnBase<C: RingStore, J: RingStore, A: Allocator + Clone = Global> 
+pub struct ZnBase<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone = Global> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -114,7 +114,7 @@ impl<J: RingStore> Zn<zn_64::Zn, J, Global>
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> Zn<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> Zn<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -155,7 +155,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> Zn<C, J, A>
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> Zn<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> Zn<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -179,7 +179,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> Zn<C, J, A>
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -206,7 +206,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> ZnBase<C, J, A>
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> Debug for ZnBase<C, J, A>
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> Debug for ZnBase<C, J, A>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -216,7 +216,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> Debug for ZnBase<C, J, A>
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> VectorView<C> for Zn<C, J, A>
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> VectorView<C> for Zn<C, J, A>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -230,7 +230,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> VectorView<C> for Zn<C, J
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> VectorView<C> for ZnBase<C, J, A>
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> VectorView<C> for ZnBase<C, J, A>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -244,7 +244,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> VectorView<C> for ZnBase<
     }
 }
 
-pub struct ZnEl<C: RingStore, A: Allocator + Clone>
+pub struct ZnEl<C: RingStore, A: Allocator + Send + Sync + Clone>
     where C::Type: ZnRing
 {
     data: Vec<El<C>, A>
@@ -253,7 +253,7 @@ pub struct ZnEl<C: RingStore, A: Allocator + Clone>
 impl<C, A> Debug for ZnEl<C, A> 
     where C: RingStore,
         C::Type: ZnRing,
-        A: Allocator + Clone,
+        A: Allocator + Send + Sync + Clone,
         El<C>: Debug
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -263,7 +263,7 @@ impl<C, A> Debug for ZnEl<C, A>
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> RingBase for ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> RingBase for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -355,7 +355,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> RingBase for ZnBase<C, J,
     fn is_approximate(&self) -> bool { false }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> Clone for ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> Clone for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>,
@@ -372,7 +372,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> Clone for ZnBase<C, J, A>
     }
 }
 
-impl<C1: RingStore, J1: RingStore, C2: RingStore, J2: RingStore, A1: Allocator + Clone, A2: Allocator + Clone> CanHomFrom<ZnBase<C2, J2, A2>> for ZnBase<C1, J1, A1> 
+impl<C1: RingStore, J1: RingStore, C2: RingStore, J2: RingStore, A1: Allocator + Send + Sync + Clone, A2: Allocator + Send + Sync + Clone> CanHomFrom<ZnBase<C2, J2, A2>> for ZnBase<C1, J1, A1> 
     where C1::Type: ZnRing + CanHomFrom<C2::Type> + CanHomFrom<J1::Type>,
         <C1::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J1::Type>,
         C2::Type: ZnRing + CanHomFrom<J2::Type>,
@@ -406,7 +406,7 @@ impl<C1: RingStore, J1: RingStore, C2: RingStore, J2: RingStore, A1: Allocator +
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> PartialEq for ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> PartialEq for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>,
         J::Type: IntegerRing
@@ -416,7 +416,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> PartialEq for ZnBase<C, J
     }
 }
 
-impl<C1: RingStore, J1: RingStore, C2: RingStore, J2: RingStore, A1: Allocator + Clone, A2: Allocator + Clone> CanIsoFromTo<ZnBase<C2, J2, A2>> for ZnBase<C1, J1, A1> 
+impl<C1: RingStore, J1: RingStore, C2: RingStore, J2: RingStore, A1: Allocator + Send + Sync + Clone, A2: Allocator + Send + Sync + Clone> CanIsoFromTo<ZnBase<C2, J2, A2>> for ZnBase<C1, J1, A1> 
     where C1::Type: ZnRing + CanIsoFromTo<C2::Type> + CanHomFrom<J1::Type>,
         <C1::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J1::Type>,
         C2::Type: ZnRing + CanHomFrom<J2::Type>,
@@ -446,7 +446,7 @@ impl<C1: RingStore, J1: RingStore, C2: RingStore, J2: RingStore, A1: Allocator +
     }
 }
 
-impl<C: RingStore, J: RingStore, K: RingStore, A: Allocator + Clone> CanHomFrom<zn_big::ZnBase<K>> for ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, K: RingStore, A: Allocator + Send + Sync + Clone> CanHomFrom<zn_big::ZnBase<K>> for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing + CanIsoFromTo<K::Type>,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>,
@@ -483,7 +483,7 @@ impl<C: RingStore, J: RingStore, K: RingStore, A: Allocator + Clone> CanHomFrom<
     }
 }
 
-impl<C: RingStore, J: RingStore, K: RingStore, A: Allocator + Clone> CanIsoFromTo<zn_big::ZnBase<K>> for ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, K: RingStore, A: Allocator + Send + Sync + Clone> CanIsoFromTo<zn_big::ZnBase<K>> for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing + CanIsoFromTo<K::Type>,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>,
@@ -527,7 +527,7 @@ impl<C: RingStore, J: RingStore, K: RingStore, A: Allocator + Clone> CanIsoFromT
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> CanHomFrom<zn_64::ZnBase> for ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> CanHomFrom<zn_64::ZnBase> for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing + CanIsoFromTo<StaticRingBase<i64>>,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -543,7 +543,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> CanHomFrom<zn_64::ZnBase>
     }
 }
 
-impl<C: RingStore, J: RingStore, K: IntegerRing, A: Allocator + Clone> CanHomFrom<K> for ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, K: IntegerRing, A: Allocator + Send + Sync + Clone> CanHomFrom<K> for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type> + CanHomFrom<K>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>,
@@ -566,7 +566,7 @@ impl<C: RingStore, J: RingStore, K: IntegerRing, A: Allocator + Clone> CanHomFro
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> DivisibilityRing for ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> DivisibilityRing for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -578,9 +578,13 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> DivisibilityRing for ZnBa
         }
         return Some(ZnEl { data });
     }
+
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {
+        ()
+    }
 }
 
-pub struct FromCongruenceElementCreator<'a, C: RingStore, J: RingStore, A: Allocator + Clone>
+pub struct FromCongruenceElementCreator<'a, C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -588,7 +592,7 @@ pub struct FromCongruenceElementCreator<'a, C: RingStore, J: RingStore, A: Alloc
     ring: &'a ZnBase<C, J, A>
 }
 
-impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> Clone for FromCongruenceElementCreator<'a, C, J, A>
+impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> Clone for FromCongruenceElementCreator<'a, C, J, A>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -598,13 +602,13 @@ impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> Clone for FromCon
     }
 }
 
-impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> Copy for FromCongruenceElementCreator<'a, C, J, A>
+impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> Copy for FromCongruenceElementCreator<'a, C, J, A>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {}
 
-impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> FnOnce<(&'b [El<C>],)> for FromCongruenceElementCreator<'a, C, J, A>
+impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> FnOnce<(&'b [El<C>],)> for FromCongruenceElementCreator<'a, C, J, A>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -616,7 +620,7 @@ impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> FnOnce<(&'b [El<C
     }
 }
 
-impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> FnMut<(&'b [El<C>],)> for FromCongruenceElementCreator<'a, C, J, A>
+impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> FnMut<(&'b [El<C>],)> for FromCongruenceElementCreator<'a, C, J, A>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -626,7 +630,7 @@ impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> FnMut<(&'b [El<C>
     }
 }
 
-pub struct CloneComponentElement<'a, C: RingStore, J: RingStore, A: Allocator + Clone>
+pub struct CloneComponentElement<'a, C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -634,7 +638,7 @@ pub struct CloneComponentElement<'a, C: RingStore, J: RingStore, A: Allocator + 
     ring: &'a ZnBase<C, J, A>
 }
 
-impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> Clone for CloneComponentElement<'a, C, J, A>
+impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> Clone for CloneComponentElement<'a, C, J, A>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -644,13 +648,13 @@ impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> Clone for CloneCo
     }
 }
 
-impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> Copy for CloneComponentElement<'a, C, J, A>
+impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> Copy for CloneComponentElement<'a, C, J, A>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {}
 
-impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> FnOnce<(usize, &'b El<C>)> for CloneComponentElement<'a, C, J, A>
+impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> FnOnce<(usize, &'b El<C>)> for CloneComponentElement<'a, C, J, A>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -662,7 +666,7 @@ impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> FnOnce<(usize, &'
     }
 }
 
-impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> FnMut<(usize, &'b El<C>)> for CloneComponentElement<'a, C, J, A>
+impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> FnMut<(usize, &'b El<C>)> for CloneComponentElement<'a, C, J, A>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -672,7 +676,7 @@ impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> FnMut<(usize, &'b
     }
 }
 
-impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> Fn<(usize, &'b El<C>)> for CloneComponentElement<'a, C, J, A>
+impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> Fn<(usize, &'b El<C>)> for CloneComponentElement<'a, C, J, A>
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -682,7 +686,7 @@ impl<'a, 'b, C: RingStore, J: RingStore, A: Allocator + Clone> Fn<(usize, &'b El
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> HashableElRing for ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> HashableElRing for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type> + HashableElRing,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -694,7 +698,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> HashableElRing for ZnBase
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> FiniteRingSpecializable for ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> FiniteRingSpecializable for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -704,7 +708,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> FiniteRingSpecializable f
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> FiniteRing for ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> FiniteRing for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -731,7 +735,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> FiniteRing for ZnBase<C, 
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> PrincipalIdealRing for ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> PrincipalIdealRing for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -753,7 +757,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> PrincipalIdealRing for Zn
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> ZnRing for ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> ZnRing for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
@@ -802,7 +806,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Clone> ZnRing for ZnBase<C, J, A
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Clone> SerializableElementRing for ZnBase<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> SerializableElementRing for ZnBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type> + SerializableElementRing,
         J::Type: IntegerRing + SerializableElementRing,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>

@@ -76,7 +76,7 @@ pub struct CooleyTuckeyFFT<R_main, R_twiddle, H, A = Global>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase,
         H: Homomorphism<R_twiddle, R_main>,
-        A: Allocator
+        A: Allocator + Sync + Send
 {
     hom: H,
     root_of_unity: R_main::Element,
@@ -287,7 +287,7 @@ impl<R_main, R_twiddle, H, A> PartialEq for CooleyTuckeyFFT<R_main, R_twiddle, H
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>,
-        A: Allocator
+        A: Allocator + Sync + Send
 {
     fn eq(&self, other: &Self) -> bool {
         self.ring().get_ring() == other.ring().get_ring() &&
@@ -297,10 +297,10 @@ impl<R_main, R_twiddle, H, A> PartialEq for CooleyTuckeyFFT<R_main, R_twiddle, H
 }
 
 impl<R_main, R_twiddle, H, A> Debug for CooleyTuckeyFFT<R_main, R_twiddle, H, A> 
-    where R_main: ?Sized + RingBase + Debug,
+    where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>,
-        A: Allocator
+        A: Allocator + Sync + Send
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CooleyTuckeyFFT")
@@ -315,7 +315,7 @@ impl<R_main, R_twiddle, H, A> Clone for CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main> + Clone,
-        A: Allocator + Clone
+        A: Allocator + Sync + Send + Clone
 {
     fn clone(&self) -> Self {
         Self {
@@ -454,13 +454,13 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>,
-        A: Allocator
+        A: Allocator + Sync + Send
 {
     ///
     /// Most general way to create a [`CooleyTuckeyFFT`].
     /// 
     /// This is currently the same as [`CooleyTuckeyFFT::new_with_pows_with_hom()`], except
-    /// that it additionally accepts an allocator, which is used to copy the input data in
+    /// that it additionally accepts an Allocator + Sync + Send, which is used to copy the input data in
     /// cases where the input data layout is not optimal for the algorithm.
     /// 
     #[stability::unstable(feature = "enable")]
@@ -644,7 +644,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     /// Replaces the allocator used for temporary allocations by this FFT.
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn with_allocator<A_new: Allocator>(self, allocator: A_new) -> CooleyTuckeyFFT<R_main, R_twiddle, H, A_new> {
+    pub fn with_allocator<A_new: Allocator + Sync + Send>(self, allocator: A_new) -> CooleyTuckeyFFT<R_main, R_twiddle, H, A_new> {
         CooleyTuckeyFFT {
             root_of_unity_list: self.root_of_unity_list,
             inv_root_of_unity_list: self.inv_root_of_unity_list,
@@ -774,7 +774,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for CooleyTuckeyFFT<R_main, R
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>,
-        A: Allocator
+        A: Allocator + Sync + Send
 {
     fn len(&self) -> usize {
         1 << self.log2_n
@@ -822,7 +822,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for CooleyTuckeyFFT<R_main, R
         if let Some(data) = values.as_slice_mut() {
             self.unordered_truncated_fft(data, 1 << self.log2_n);
         } else {
-            let mut data = Vec::with_capacity_in(1 << self.log2_n, &self.allocator);
+            let mut data = Vec::with_capacity_in(1 << self.log2_n, self.allocator());
             data.extend(values.clone_ring_els(ring).iter());
             self.unordered_truncated_fft(&mut data, 1 << self.log2_n);
             for (i, x) in data.into_iter().enumerate() {
@@ -840,7 +840,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for CooleyTuckeyFFT<R_main, R
         if let Some(data) = values.as_slice_mut() {
             self.unordered_truncated_fft_inv(data, 1 << self.log2_n);
         } else {
-            let mut data = Vec::with_capacity_in(1 << self.log2_n, &self.allocator);
+            let mut data = Vec::with_capacity_in(1 << self.log2_n, self.allocator());
             data.extend(values.clone_ring_els(ring).iter());
             self.unordered_truncated_fft_inv(&mut data, 1 << self.log2_n);
             for (i, x) in data.into_iter().enumerate() {
@@ -852,7 +852,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for CooleyTuckeyFFT<R_main, R
 
 impl<H, A> FFTErrorEstimate for CooleyTuckeyFFT<Complex64Base, Complex64Base, H, A> 
     where H: Homomorphism<Complex64Base, Complex64Base>,
-        A: Allocator
+        A: Allocator + Sync + Send
 {
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
         // the butterfly performs a multiplication with a root of unity, and an addition

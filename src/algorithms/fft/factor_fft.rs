@@ -74,8 +74,8 @@ impl<R_main, R_twiddle, H, A1, A2> GeneralCooleyTukeyFFT<R_main, R_twiddle, H, C
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main>,
-        A1: Allocator + Clone,
-        A2: Allocator + Clone
+        A1: Allocator + Sync + Send,
+        A2: Allocator + Sync + Send
 {
     ///
     /// Replaces the ring that this object can compute FFTs over, assuming that the current

@@ -35,7 +35,7 @@ pub struct BluesteinFFT<R_main, R_twiddle, H, A = Global>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main> + Clone, 
-        A: Allocator + Clone
+        A: Allocator + Sync + Send
 {
     m_fft_table: BaseFFT<R_main, R_twiddle, H, A>,
     b_unordered_fft: Vec<R_twiddle::Element>,
@@ -46,7 +46,7 @@ pub struct BluesteinFFT<R_main, R_twiddle, H, A = Global>
 
 impl<H, A> BluesteinFFT<Complex64Base, Complex64Base, H, A>
     where H: Homomorphism<Complex64Base, Complex64Base> + Clone, 
-        A: Allocator + Clone
+        A: Allocator + Sync + Send
 {
     ///
     /// Creates an [`BluesteinFFT`] for the complex field, using the given homomorphism
@@ -67,7 +67,7 @@ impl<H, A> BluesteinFFT<Complex64Base, Complex64Base, H, A>
 
 impl<R, A> BluesteinFFT<Complex64Base, Complex64Base, Identity<R>, A>
     where R: RingStore<Type = Complex64Base> + Clone, 
-        A: Allocator + Clone
+        A: Allocator + Sync + Send
 {
     ///
     /// Creates an [`BluesteinFFT`] for the complex field.
@@ -80,7 +80,7 @@ impl<R, A> BluesteinFFT<Complex64Base, Complex64Base, Identity<R>, A>
 impl<R, A> BluesteinFFT<R::Type, R::Type, Identity<R>, A>
     where R: RingStore + Clone,
         R::Type: DivisibilityRing,
-        A: Allocator + Clone
+        A: Allocator + Sync + Send
 {
     ///
     /// Creates an [`BluesteinFFT`] for the given ring, using the given roots of unity.
@@ -128,7 +128,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main> + Clone, 
-        A: Allocator + Clone
+        A: Allocator + Sync + Send
 {
     ///
     /// Creates an [`BluesteinFFT`] for the given ring, using the given roots of unity.
@@ -251,29 +251,6 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         };
     }
 
-    ///
-    /// Computes the FFT of the given values using Bluestein's algorithm, using only the passed
-    /// buffer as temporary storage.
-    /// 
-    /// This will not allocate additional memory, as opposed to [`BluesteinFFT::fft()`] etc.
-    /// 
-    /// Basically, the idea is to write an FFT of any length (e.g. prime length) as a convolution,
-    /// and compute the convolution efficiently using a power-of-two FFT (e.g. with the Cooley-Tukey 
-    /// algorithm).
-    /// 
-    /// TODO: At next breaking release, make this private
-    /// 
-    pub fn fft_base<V, W, const INV: bool>(&self, values: V, _buffer: W)
-        where V: SwappableVectorViewMut<R_main::Element>, 
-            W: SwappableVectorViewMut<R_main::Element>
-    {
-        if INV {
-            self.unordered_inv_fft(values, self.ring());
-        } else {
-            self.unordered_fft(values, self.ring());
-        }
-    }
-
     fn fft_base_impl<V, A2, const INV: bool>(&self, mut values: V, mut buffer: Vec<R_main::Element, A2>)
         where V: SwappableVectorViewMut<R_main::Element>,
             A2: Allocator
@@ -352,7 +329,7 @@ impl<R_main, R_twiddle, H, A> PartialEq for BluesteinFFT<R_main, R_twiddle, H, A
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main> + Clone, 
-        A: Allocator + Clone
+        A: Allocator + Sync + Send
 {
     fn eq(&self, other: &Self) -> bool {
         self.ring().get_ring() == other.ring().get_ring() &&
@@ -362,10 +339,10 @@ impl<R_main, R_twiddle, H, A> PartialEq for BluesteinFFT<R_main, R_twiddle, H, A
 }
 
 impl<R_main, R_twiddle, H, A> Debug for BluesteinFFT<R_main, R_twiddle, H, A>
-    where R_main: ?Sized + RingBase + Debug,
+    where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main> + Clone, 
-        A: Allocator + Clone
+        A: Allocator + Sync + Send
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BluesteinFFT")
@@ -380,7 +357,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for BluesteinFFT<R_main, R_tw
     where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + RingBase + DivisibilityRing,
         H: Homomorphism<R_twiddle, R_main> + Clone, 
-        A: Allocator + Clone
+        A: Allocator + Sync + Send
 {
     fn len(&self) -> usize {
         self.n
@@ -404,7 +381,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for BluesteinFFT<R_main, R_tw
             S: RingStore<Type = R_main> + Copy 
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
-        let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.allocator().clone());
+        let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.allocator());
         buffer.extend((0..self.m_fft_table.len()).map(|_| self.ring().zero()));
         self.fft_base_impl::<_, _, false>(values, buffer);
     }
@@ -414,7 +391,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for BluesteinFFT<R_main, R_tw
             S: RingStore<Type = R_main> + Copy 
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
-        let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.allocator().clone());
+        let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.allocator());
         buffer.extend((0..self.m_fft_table.len()).map(|_| self.ring().zero()));
         self.fft_base_impl::<_, _, true>(values, buffer);
     }
@@ -436,7 +413,7 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for BluesteinFFT<R_main, R_tw
 
 impl<H, A> FFTErrorEstimate for BluesteinFFT<Complex64Base, Complex64Base, H, A>
     where H: Homomorphism<Complex64Base, Complex64Base> + Clone, 
-        A: Allocator + Clone
+        A: Allocator + Sync + Send
 {
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
         let error_after_twiddling = input_error + input_bound * (root_of_unity_error() + f64::EPSILON);
@@ -461,8 +438,7 @@ fn test_fft_base() {
     // a 5-th root of unity is 91 
     let fft = BluesteinFFT::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4, Global);
     let mut values = [1, 3, 2, 0, 7];
-    let mut buffer = [0; 16];
-    fft.fft_base::<_, _, false>(&mut values, &mut buffer);
+    fft.fft(&mut values, ring);
     let expected = [13, 137, 202, 206, 170];
     assert_eq!(expected, values);
 }
@@ -487,9 +463,8 @@ fn test_inv_fft_base() {
     let fft = BluesteinFFT::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4, Global);
     let values = [1, 3, 2, 0, 7];
     let mut work = values;
-    let mut buffer = [0; 16];
-    fft.fft_base::<_, _, false>(&mut work, &mut buffer);
-    fft.fft_base::<_, _, true>(&mut work, &mut buffer);
+    fft.fft(&mut work, ring);
+    fft.inv_fft(&mut work, ring);
     assert_eq!(values, work);
 }
 

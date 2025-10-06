@@ -448,7 +448,7 @@ impl<Impl, I> DelegateRingImplEuclideanRing for NumberFieldBase<Impl, I>
 
 impl<Impl, I> Debug for NumberFieldBase<Impl, I>
     where Impl: RingStore,
-        Impl::Type: Field + FreeAlgebra + Debug,
+        Impl::Type: Field + FreeAlgebra,
         <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
@@ -739,6 +739,18 @@ impl<'a, Impl, I> PartialEq for NumberFieldByOrder<'a, Impl, I>
     }
 }
 
+impl<'a, Impl, I> Debug for NumberFieldByOrder<'a, Impl, I>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra,
+        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Type: IntegerRing
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NumberFieldByOrder({:?})", self.base.get_ring())
+    }
+}
+
 impl<'a, Impl, I> FiniteRingSpecializable for NumberFieldByOrder<'a, Impl, I>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
@@ -808,6 +820,15 @@ impl<'ring, I> PartialEq for NumberFieldOrderQuotient<'ring, I>
 {
     fn eq(&self, other: &Self) -> bool {
         self.implementation.get_ring() == other.implementation.get_ring()
+    }
+}
+
+impl<'ring, I> Debug for NumberFieldOrderQuotient<'ring, I>
+    where I: 'ring + RingStore,
+        I::Type: IntegerRing
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NumberFieldOrderQuotient({:?})", self.implementation.get_ring())
     }
 }
 

@@ -27,7 +27,7 @@ use crate::primitive_int::{StaticRingBase, StaticRing};
 ///    This requires the underlying [`RingBase`]s to implement [`CanHomFrom`],
 ///    and the functions of that trait define the homomorphism.
 ///  
-pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized> 
+pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>: Send + Sync 
     where Domain: RingBase, Codomain: RingBase
 {
     ///
@@ -398,7 +398,7 @@ pub trait CanHomFrom<S>: RingBase
     ///
     /// Data required to compute the action of the canonical homomorphism on ring elements.
     /// 
-    type Homomorphism;
+    type Homomorphism: Send + Sync;
 
     ///
     /// If there is a canonical homomorphism `from -> self`, returns `Some(data)`, where 
@@ -485,7 +485,7 @@ pub trait CanIsoFromTo<S>: CanHomFrom<S>
     ///
     /// Data required to compute a preimage under the canonical homomorphism.
     /// 
-    type Isomorphism;
+    type Isomorphism: Send + Sync;
 
     ///
     /// If there is a canonical homomorphism `from -> self`, and this homomorphism
@@ -541,10 +541,10 @@ pub struct CanHom<R, S>
 }
 
 impl<R, S> Debug for CanHom<R, S>
-    where R: RingStore + Debug, S: RingStore + Debug, S::Type: CanHomFrom<R::Type>
+    where R: RingStore, S: RingStore, S::Type: CanHomFrom<R::Type>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CanHom").field("from", &self.from).field("to", &self.to).finish()
+        write!(f, "CanHom({:?} -> {:?})", self.from.get_ring(), self.to.get_ring())
     }
 }
 
@@ -743,10 +743,10 @@ pub struct CanIso<R, S>
 }
 
 impl<R, S> Debug for CanIso<R, S>
-    where R: RingStore + Debug, S: RingStore + Debug, S::Type: CanIsoFromTo<R::Type>
+    where R: RingStore, S: RingStore, S::Type: CanIsoFromTo<R::Type>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CanIso").field("from", &self.from).field("to", &self.to).finish()
+        write!(f, "CanIso({:?} <- {:?})", self.from.get_ring(), self.to.get_ring())
     }
 }
 
@@ -1087,7 +1087,7 @@ impl<'a, S, R, H> Homomorphism<S, R> for &'a H
 /// 
 #[derive(Clone)]
 pub struct LambdaHom<R: RingStore, S: RingStore, F>
-    where F: Fn(&R, &S, &El<R>) -> El<S>
+    where F: Send + Sync + Fn(&R, &S, &El<R>) -> El<S>
 {
     from: R,
     to: S,
@@ -1095,13 +1095,13 @@ pub struct LambdaHom<R: RingStore, S: RingStore, F>
 }
 
 impl<R: RingStore, S: RingStore, F> Copy for LambdaHom<R, S, F>
-    where F: Copy + Fn(&R, &S, &El<R>) -> El<S>,
+    where F: Send + Sync + Copy + Fn(&R, &S, &El<R>) -> El<S>,
         R: Copy, El<R>: Copy,
         S: Copy, El<S>: Copy
 {}
 
 impl<R: RingStore, S: RingStore, F> LambdaHom<R, S, F>
-    where F: Fn(&R, &S, &El<R>) -> El<S>
+    where F: Send + Sync + Fn(&R, &S, &El<R>) -> El<S>
 {
     ///
     /// Creates a new [`LambdaHom`] from `from` to `to`, mapping elements as
@@ -1132,7 +1132,7 @@ impl<R: RingStore, S: RingStore, F> LambdaHom<R, S, F>
 }
 
 impl<R: RingStore, S: RingStore, F> Homomorphism<R::Type, S::Type> for LambdaHom<R, S, F>
-    where F: Fn(&R, &S, &El<R>) -> El<S>
+    where F: Send + Sync + Fn(&R, &S, &El<R>) -> El<S>
 {
     type CodomainStore = S;
     type DomainStore = R;

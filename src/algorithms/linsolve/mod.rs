@@ -140,8 +140,8 @@ impl<R: ?Sized + PrincipalIdealRing> LinSolveRing for R {
 impl<R, V, A_ring, C_ring> LinSolveRing for FreeAlgebraImplBase<R, V, A_ring, C_ring>
     where R: RingStore,
         R::Type: LinSolveRing,
-        V: VectorView<El<R>>,
-        A_ring: Allocator + Clone, 
+        V: VectorView<El<R>> + Send + Sync,
+        A_ring: Allocator + Clone + Send + Sync, 
         C_ring: ConvolutionAlgorithm<R::Type>
 {
     fn solve_right<V1, V2, V3, A>(&self, lhs: SubmatrixMut<V1, Self::Element>, rhs: SubmatrixMut<V2, Self::Element>, out: SubmatrixMut<V3, Self::Element>, allocator: A) -> SolveResult

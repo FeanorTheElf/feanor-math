@@ -1,6 +1,3 @@
-
-use std::fmt::Debug;
-
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::resultant::ComputeResultantRing;
 use crate::divisibility::{DivisibilityRing, Domain};
@@ -28,7 +25,7 @@ pub trait InterpolationBaseRing: DivisibilityRing {
     /// For the reason why there are so many quite specific trait bounds here:
     /// See the doc of [`EvalPolyLocallyRing::LocalRingBase`].
     /// 
-    type ExtendedRingBase<'a>: ?Sized + PrincipalIdealRing + Domain + LinSolveRing + ComputeResultantRing + Debug
+    type ExtendedRingBase<'a>: ?Sized + PrincipalIdealRing + Domain + LinSolveRing + ComputeResultantRing
         where Self: 'a;
 
     type ExtendedRing<'a>: RingStore<Type = Self::ExtendedRingBase<'a>> + Clone
@@ -357,7 +354,7 @@ pub trait EvalPolyLocallyRing: RingBase + FiniteRingSpecializable {
     /// required by some algorithms. This clearly makes it a lot less generic than it should be,
     /// but so far it worked out without too much trouble.
     /// 
-    type LocalRingBase<'ring>: ?Sized + PrincipalIdealRing + Domain + LinSolveRing + ComputeResultantRing + Debug
+    type LocalRingBase<'ring>: ?Sized + PrincipalIdealRing + Domain + LinSolveRing + ComputeResultantRing
         where Self: 'ring;
 
     type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
@@ -367,7 +364,7 @@ pub trait EvalPolyLocallyRing: RingBase + FiniteRingSpecializable {
     /// A collection of prime ideals of the ring, and additionally any data required to reconstruct
     /// a small ring element from its projections onto each prime ideal.
     /// 
-    type LocalComputationData<'ring>
+    type LocalComputationData<'ring>: Send + Sync
         where Self: 'ring;
 
     ///
@@ -420,7 +417,7 @@ pub trait EvalPolyLocallyRing: RingBase + FiniteRingSpecializable {
 }
 
 impl<R> EvalPolyLocallyRing for R
-    where R: ?Sized + FiniteRing + Field + Debug + SelfIso
+    where R: ?Sized + FiniteRing + Field + SelfIso
 {
     type LocalComputationData<'ring> = RingRef<'ring, Self>
         where Self: 'ring;
@@ -544,7 +541,7 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for EvaluatePolyL
 /// impl<R: RingBase> DelegateRingImplEuclideanRing for MyRingWrapper<R> {}
 /// impl<R: RingBase> DelegateRingImplFiniteRing for MyRingWrapper<R> {}
 /// impl<R: Domain> Domain for MyRingWrapper<R> {}
-/// impl_interpolation_base_ring_char_zero!{ <{ R }> InterpolationBaseRing for MyRingWrapper<R> where R: PrincipalIdealRing + Domain + ComputeResultantRing + Debug }
+/// impl_interpolation_base_ring_char_zero!{ <{ R }> InterpolationBaseRing for MyRingWrapper<R> where R: PrincipalIdealRing + Domain + ComputeResultantRing }
 /// 
 /// // now we can use `InterpolationBaseRing`-functionality
 /// let ring = MyRingWrapper(StaticRing::<i64>::RING.into());

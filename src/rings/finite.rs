@@ -1,12 +1,6 @@
-use std::marker::PhantomData;
-
-use crate::algorithms::int_factor::is_prime_power;
-use crate::field::*;
-use crate::homomorphism::Homomorphism;
 use crate::ring::*;
-use crate::integer::{BigIntRing, IntegerRing, IntegerRingStore};
+use crate::integer::*;
 use crate::specialization::FiniteRingSpecializable;
-use crate::unsafe_any::UnsafeAny;
 
 ///
 /// Trait for rings that are finite.
@@ -77,109 +71,6 @@ pub trait FiniteRingStore: RingStore
 impl<R: RingStore> FiniteRingStore for R
     where R::Type: FiniteRing
 {}
-
-#[stability::unstable(feature = "enable")]
-pub struct UnsafeAnyFrobeniusDataGuarded<GuardType: ?Sized> {
-    content: UnsafeAny,
-    guard: PhantomData<GuardType>
-}
-
-impl<GuardType: ?Sized> UnsafeAnyFrobeniusDataGuarded<GuardType> {
-    
-    #[stability::unstable(feature = "enable")]
-    pub fn uninit() -> UnsafeAnyFrobeniusDataGuarded<GuardType> {
-        Self {
-            content: UnsafeAny::uninit(),
-            guard: PhantomData
-        }
-    }
-    
-    #[stability::unstable(feature = "enable")]
-    pub unsafe fn from<T>(value: T) -> UnsafeAnyFrobeniusDataGuarded<GuardType> {
-        Self {
-            content: unsafe { UnsafeAny::from(value) },
-            guard: PhantomData
-        }
-    }
-    
-    #[stability::unstable(feature = "enable")]
-    pub unsafe fn get<'a, T>(&'a self) -> &'a T {
-        unsafe { self.content.get() }
-    }
-}
-
-#[stability::unstable(feature = "enable")]
-pub trait ComputeFrobeniusRing: Field + FiniteRing {
-    
-    type FrobeniusData;
-
-    fn create_frobenius(&self, exponent_of_p: usize) -> (Self::FrobeniusData, usize);
-
-    fn apply_frobenius(&self, _frobenius_data: &Self::FrobeniusData, exponent_of_p: usize, x: Self::Element) -> Self::Element;
-}
-
-impl<R> ComputeFrobeniusRing for R
-    where R: ?Sized + Field + FiniteRing
-{
-    type FrobeniusData = UnsafeAnyFrobeniusDataGuarded<R>;
-
-    default fn create_frobenius(&self, exponent_of_p: usize) -> (Self::FrobeniusData, usize) {
-        (UnsafeAnyFrobeniusDataGuarded::uninit(), exponent_of_p)
-    }
-
-    default fn apply_frobenius(&self, _frobenius_data: &Self::FrobeniusData, exponent_of_p: usize, x: Self::Element) -> Self::Element {
-        if exponent_of_p == 0 {
-            return x
-        } else {
-            let (p, e) = is_prime_power(BigIntRing::RING, &self.size(&BigIntRing::RING).unwrap()).unwrap();
-            return RingRef::new(self).pow_gen(x, &BigIntRing::RING.pow(p, exponent_of_p % e), BigIntRing::RING);
-        }
-    }
-}
-
-#[stability::unstable(feature = "enable")]
-pub struct Frobenius<R>
-    where R: RingStore,
-        R::Type: FiniteRing + Field
-{
-    field: R,
-    data: <R::Type as ComputeFrobeniusRing>::FrobeniusData,
-    exponent_of_p: usize
-}
-
-impl<R> Frobenius<R>
-    where R: RingStore,
-        R::Type: FiniteRing + Field
-{
-    #[stability::unstable(feature = "enable")]
-    pub fn new(field: R, exponent_of_p: usize) -> Self {
-        let (_p, field_dimension) = is_prime_power(BigIntRing::RING, &field.size(BigIntRing::RING).unwrap()).unwrap();
-        let exponent_of_p = exponent_of_p % field_dimension;
-        let (data, exponent_of_p2) = field.get_ring().create_frobenius(exponent_of_p);
-        assert_eq!(exponent_of_p, exponent_of_p2);
-        return Self { field: field, data: data, exponent_of_p: exponent_of_p };
-    }
-}
-
-impl<R> Homomorphism<R::Type, R::Type> for Frobenius<R>
-    where R: RingStore,
-        R::Type: FiniteRing + Field
-{
-    type CodomainStore = R;
-    type DomainStore = R;
-
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
-        &self.field
-    }
-
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
-        &self.field
-    }
-
-    fn map(&self, x: <R::Type as RingBase>::Element) -> <R::Type as RingBase>::Element {
-        self.field.get_ring().apply_frobenius(&self.data, self.exponent_of_p, x)
-    }
-}
 
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {

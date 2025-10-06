@@ -170,7 +170,7 @@ pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_po
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain,
         V1: VectorFn<V2>,
         V2: VectorFn<El<<P::Type as RingExtension>::BaseRing>>,
-        A: Allocator,
+        A: Allocator + Send + Sync,
         A2: Allocator
 {
     let dim_prod = |range: Range<usize>| <_ as RingStore>::prod(&StaticRing::<i64>::RING, range.map(|i| interpolation_points.at(i).len().try_into().unwrap())) as usize;

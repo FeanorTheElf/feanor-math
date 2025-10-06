@@ -77,9 +77,7 @@ impl<R: RingStore> Debug for SparsePolyRingBase<R>
     where R::Type: Debug
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        f.debug_struct("SparsePolyRingBase")
-            .field("base_ring", &self.base_ring.get_ring())
-            .finish()
+        write!(f, "{:?}[{}]", self.base_ring.get_ring(), self.unknown_name)
     }
 }
 
@@ -302,7 +300,7 @@ impl<R: RingStore> RingExtension for SparsePolyRingBase<R> {
 pub trait ImplGenericCanIsoFromToMarker: PolyRing {}
 
 impl<R, A, C> ImplGenericCanIsoFromToMarker for dense_poly::DensePolyRingBase<R, A, C> 
-    where R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>
+    where R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>
 {}
 
 impl<R, P> CanHomFrom<P> for SparsePolyRingBase<R> 
@@ -469,6 +467,10 @@ impl<R,> DivisibilityRing for SparsePolyRingBase<R>
         } else {
             None
         }
+    }
+
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {
+        ()
     }
 }
 

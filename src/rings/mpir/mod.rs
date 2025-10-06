@@ -84,9 +84,7 @@ impl std::fmt::Debug for MPZEl {
 /// Arbitrary-precision integer ring, implemented by binding to the well-known
 /// and heavily optimized library mpir (fork of gmp).
 /// 
-/// TODO: Remove `Copy` at next breaking release.
-/// 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct MPZBase;
 
 ///
