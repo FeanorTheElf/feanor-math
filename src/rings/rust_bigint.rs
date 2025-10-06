@@ -250,7 +250,7 @@ impl<A: Allocator + Send + Sync + Clone> RingBase for RustBigintRingBase<A> {
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
     
-    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
+    fn fmt_el_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
         ///
         /// 10 to this power fits still in a u64
         /// 
@@ -461,7 +461,7 @@ impl<A: Allocator + Send + Sync + Clone> SerializableElementRing for RustBigintR
         where S: Serializer
     {
         if serializer.is_human_readable() {
-            SerializableNewtypeStruct::new("BigInt", format!("{}", RingRef::new(self).format(el)).as_str()).serialize(serializer)
+            SerializableNewtypeStruct::new("BigInt", format!("{}", RingRef::new(self).formatted_el(el)).as_str()).serialize(serializer)
         } else {
             let len = highest_set_block(&el.1).map(|n| n + 1).unwrap_or(0);
             let mut data = Vec::with_capacity_in(len * size_of::<u64>(), &self.allocator);
@@ -577,7 +577,7 @@ const ZZ: RustBigintRing = RustBigintRing::RING;
 #[test]
 fn test_print_power_2() {
     let x = RustBigint(false, vec![0, 0, 1]);
-    assert_eq!("340282366920938463463374607431768211456", format!("{}", RustBigintRing::RING.format(&x)));
+    assert_eq!("340282366920938463463374607431768211456", format!("{}", RustBigintRing::RING.formatted_el(&x)));
 }
 
 #[test]

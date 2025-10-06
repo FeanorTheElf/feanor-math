@@ -71,7 +71,7 @@ impl<R: RingStore + Clone> Debug for SparseMapVector<R> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut output = f.debug_map();
         for (key, value) in self.nontrivial_entries() {
-            _ = output.entry(&key, &self.ring.format(value));
+            _ = output.entry(&key, &self.ring.formatted_el(value));
         }
         output.finish()
     }

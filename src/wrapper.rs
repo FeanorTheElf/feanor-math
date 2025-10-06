@@ -383,14 +383,14 @@ impl<R: RingStore> Hash for RingElementWrapper<R>
 impl<R: RingStore> Display for RingElementWrapper<R> {
 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.ring.get_ring().dbg(&self.element, f)
+        self.ring.get_ring().fmt_el(&self.element, f)
     }
 }
 
 impl<R: RingStore> Debug for RingElementWrapper<R> {
 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.ring.get_ring().dbg(&self.element, f)
+        self.ring.get_ring().fmt_el(&self.element, f)
     }
 }
 

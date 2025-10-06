@@ -106,7 +106,7 @@ impl RingBase for Real64Base {
 
     fn is_approximate(&self) -> bool { true }
 
-    fn dbg_within<'a>(&self, x: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
+    fn fmt_el_within<'a>(&self, x: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
         write!(out, "{}", x)
     }
     

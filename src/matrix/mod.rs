@@ -34,7 +34,7 @@ pub fn format_matrix<'a, M, R>(row_count: usize, col_count: usize, matrix: M, ri
 
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             let strings = (0..self.row_count).flat_map(|i| (0..self.col_count).map(move |j| (i, j)))
-                .map(|(i, j)| format!("{}", self.ring.format((self.matrix)(i, j))))
+                .map(|(i, j)| format!("{}", self.ring.formatted_el((self.matrix)(i, j))))
                 .collect::<Vec<_>>();
             let max_len = strings.iter().map(|s| s.chars().count()).chain([2].into_iter()).max().unwrap();
             let mut strings = strings.into_iter();

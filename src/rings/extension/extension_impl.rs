@@ -357,15 +357,15 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
         self.base_ring().get_ring().is_approximate()
     }
 
-    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+    fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         debug_assert_eq!(1 << self.log2_padded_len, value.values.len());
-        self.dbg_within(value, out, EnvBindingStrength::Weakest)
+        self.fmt_el_within(value, out, EnvBindingStrength::Weakest)
     }
 
-    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
+    fn fmt_el_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
         debug_assert_eq!(1 << self.log2_padded_len, value.values.len());
         let poly_ring = DensePolyRing::new(self.base_ring(), self.gen_name);
-        poly_ring.get_ring().dbg_within(&RingRef::new(self).poly_repr(&poly_ring, value, &self.base_ring().identity()), out, env)
+        poly_ring.get_ring().fmt_el_within(&RingRef::new(self).poly_repr(&poly_ring, value, &self.base_ring().identity()), out, env)
     }
 
     fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
@@ -499,7 +499,7 @@ impl<R, V, A, C> Debug for FreeAlgebraImplBase<R, V, A, C>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let poly_ring = DensePolyRing::new(self.base_ring(), self.gen_name);
-        write!(f, "{:?}[{}]/({})", self.base_ring.get_ring(), self.gen_name, poly_ring.format(&RingRef::new(self).generating_poly(&poly_ring, self.base_ring.identity())))
+        write!(f, "{:?}[{}]/({})", self.base_ring.get_ring(), self.gen_name, poly_ring.formatted_el(&RingRef::new(self).generating_poly(&poly_ring, self.base_ring.identity())))
     }
 }
 

@@ -289,7 +289,7 @@ use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 #[cfg(test)]
 use crate::rings::multivariate::*;
 #[cfg(test)]
-use crate::algorithms::buchberger::buchberger_simple;
+use crate::algorithms::buchberger::buchberger;
 #[cfg(test)]
 use crate::integer::BigIntRing;
 #[cfg(test)]
@@ -381,7 +381,7 @@ fn test_resultant_local_polynomial() {
     // reverse the order of indeterminates, so that we indeed eliminate `Y`
     let [f, g] = QQYX.with_wrapped_indeterminates(|[Y, X]| [ 1 + X.pow_ref(2) + 2 * Y + (1 + X) * Y.pow_ref(2), 3 + X + (2 + X) * Y + (1 + X + X.pow_ref(2)) * Y.pow_ref(2) ]);
 
-    let gb = buchberger_simple::<_, _>(&QQYX, vec![f, g], Lex);
+    let gb = buchberger::<_, _>(&QQYX, vec![f, g], Lex);
     let expected = gb.into_iter().filter(|poly| QQYX.appearing_indeterminates(&poly).len() == 1).collect::<Vec<_>>();
     assert!(expected.len() == 1);
     let expected = QQX.normalize(QQX.from_terms(QQYX.terms(&expected[0]).map(|(c, m)| (QQ.clone_el(c), QQYX.exponent_at(m, 1)))));
@@ -423,5 +423,5 @@ fn test_resultant_large() {
     let g = ZZX.from_terms([(ZZ.one(), 1 << 14), (ZZ.one(), 0)]);
     println!("start");
     let result = BigIntRingBase::resultant(&ZZX, f, g);
-    println!("{}", ZZ.format(&result))
+    println!("{}", ZZ.formatted_el(&result))
 }

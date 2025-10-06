@@ -1162,7 +1162,7 @@ impl<'a, R> PolyGCDLocallyDomain for IntegersWithLocalZnQuotient<'a, R>
     fn dbg_ideal<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
         where Self: 'ring
     {
-        self.dbg(ideal, out)
+        self.fmt_el(ideal, out)
     }
 }
 

@@ -348,7 +348,7 @@ impl<R_main, R_twiddle, H, A> Debug for BluesteinFFT<R_main, R_twiddle, H, A>
         f.debug_struct("BluesteinFFT")
             .field("ring", &self.ring().get_ring())
             .field("n", &self.n)
-            .field("root_of_unity_n", &self.ring().format(&self.root_of_unity(self.ring())))
+            .field("root_of_unity_n", &self.ring().formatted_el(&self.root_of_unity(self.ring())))
             .finish()
     }
 }

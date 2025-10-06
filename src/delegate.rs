@@ -420,12 +420,12 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
         self.get_delegate().is_noetherian()
     }
 
-    default fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        self.get_delegate().dbg(self.delegate_ref(value), out)
+    default fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        self.get_delegate().fmt_el(self.delegate_ref(value), out)
     }
 
-    default fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
-        self.get_delegate().dbg_within(self.delegate_ref(value), out, env)
+    default fn fmt_el_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
+        self.get_delegate().fmt_el_within(self.delegate_ref(value), out, env)
     }
 
     default fn negate(&self, value: Self::Element) -> Self::Element {

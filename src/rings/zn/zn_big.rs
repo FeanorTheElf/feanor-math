@@ -143,7 +143,7 @@ impl<I> Debug for ZnBase<I>
         I::Type: IntegerRing
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Z/{}Z", self.integer_ring().format(self.modulus()))
+        write!(f, "Z/{}Z", self.integer_ring().formatted_el(self.modulus()))
     }
 }
 
@@ -274,16 +274,16 @@ impl<I: RingStore> RingBase for ZnBase<I>
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
 
-    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
+    fn fmt_el_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
         if self.integer_ring.is_geq(&value.0, &self.modulus) {
             let reduced_value = self.integer_ring.sub_ref(&value.0, &self.modulus);
             if self.integer_ring.eq_el(&reduced_value, &self.modulus) {
-                self.integer_ring.get_ring().dbg(&self.integer_ring.zero(), out)
+                self.integer_ring.get_ring().fmt_el(&self.integer_ring.zero(), out)
             } else {
-                self.integer_ring.get_ring().dbg(&reduced_value, out)
+                self.integer_ring.get_ring().fmt_el(&reduced_value, out)
             }
         } else {
-            self.integer_ring.get_ring().dbg(&value.0, out)
+            self.integer_ring.get_ring().fmt_el(&value.0, out)
         }
     }
     
@@ -779,7 +779,7 @@ fn test_unreduced() {
     assert!(ring.is_one(&x));
     assert!(ring.is_one(&ring.mul_ref(&x, &x)));
     assert!(ring.eq_el(&x, &ring.mul_ref(&x, &x)));
-    assert_eq!("1", format!("{}", ring.format(&x)));
+    assert_eq!("1", format!("{}", ring.formatted_el(&x)));
 }
 
 #[test]

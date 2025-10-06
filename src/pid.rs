@@ -255,13 +255,13 @@ pub mod generic_tests {
         let elements = edge_case_elements.collect::<Vec<_>>();
 
         let expected_unit = ring.checked_div_min(&ring.zero(), &ring.zero()).unwrap();
-        assert!(ring.is_unit(&expected_unit), "checked_div_min() returned a non-minimal quotient {} * {} = {}", ring.format(&expected_unit), ring.format(&ring.zero()), ring.format(&ring.zero()));
+        assert!(ring.is_unit(&expected_unit), "checked_div_min() returned a non-minimal quotient {} * {} = {}", ring.formatted_el(&expected_unit), ring.formatted_el(&ring.zero()), ring.formatted_el(&ring.zero()));
         let expected_zero = ring.checked_div_min(&ring.zero(), &ring.one()).unwrap();
-        assert!(ring.is_zero(&expected_zero), "checked_div_min() returned a wrong quotient {} * {} = {}", ring.format(&expected_zero), ring.format(&ring.one()), ring.format(&ring.zero()));
+        assert!(ring.is_zero(&expected_zero), "checked_div_min() returned a wrong quotient {} * {} = {}", ring.formatted_el(&expected_zero), ring.formatted_el(&ring.one()), ring.formatted_el(&ring.zero()));
 
         for a in &elements {
             let expected_unit = ring.checked_div_min(a, a).unwrap();
-            assert!(ring.is_unit(&expected_unit), "checked_div_min() returned a non-minimal quotient {} * {} = {}", ring.format(&expected_unit), ring.format(a), ring.format(a));
+            assert!(ring.is_unit(&expected_unit), "checked_div_min() returned a non-minimal quotient {} * {} = {}", ring.formatted_el(&expected_unit), ring.formatted_el(a), ring.formatted_el(a));
         }
 
         for a in &elements {
@@ -270,7 +270,7 @@ pub mod generic_tests {
                     let g1 = ring.mul_ref(a, b);
                     let g2 = ring.mul_ref(a, c);
                     let (s, t, g) = ring.extended_ideal_gen(&g1, &g2);
-                    assert!(ring.checked_div(&g, a).is_some(), "Wrong ideal generator: ({}) contains the ideal I = ({}, {}), but extended_ideal_gen() found a generator I = ({}) that does not satisfy {} | {}", ring.format(a), ring.format(&g1), ring.format(&g2), ring.format(&g), ring.format(a), ring.format(&g));
+                    assert!(ring.checked_div(&g, a).is_some(), "Wrong ideal generator: ({}) contains the ideal I = ({}, {}), but extended_ideal_gen() found a generator I = ({}) that does not satisfy {} | {}", ring.formatted_el(a), ring.formatted_el(&g1), ring.formatted_el(&g2), ring.formatted_el(&g), ring.formatted_el(a), ring.formatted_el(&g));
                     assert_el_eq!(ring, g, ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2)));
                 }
             }
@@ -280,7 +280,7 @@ pub mod generic_tests {
                 let g1 = ring.mul_ref(a, b);
                 let g2 = ring.mul_ref_fst(a, ring.add_ref_fst(b, ring.one()));
                 let (s, t, g) = ring.extended_ideal_gen(&g1, &g2);
-                assert!(ring.checked_div(&g, a).is_some() && ring.checked_div(a, &g).is_some(), "Expected ideals ({}) and I = ({}, {}) to be equal, but extended_ideal_gen() returned generator {} of I", ring.format(a), ring.format(&g1), ring.format(&g2), ring.format(&g));
+                assert!(ring.checked_div(&g, a).is_some() && ring.checked_div(a, &g).is_some(), "Expected ideals ({}) and I = ({}, {}) to be equal, but extended_ideal_gen() returned generator {} of I", ring.formatted_el(a), ring.formatted_el(&g1), ring.formatted_el(&g2), ring.formatted_el(&g));
                 assert_el_eq!(ring, g, ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2)));
             }
         }

@@ -16,8 +16,6 @@ use rational::*;
 ///
 /// Contains algorithms for computing the factorization of polynomials.
 /// 
-/// TODO: move to [`crate::algorithms::poly_factor`].
-/// 
 pub mod factor_locally;
 ///
 /// Contains an implementation of the Cantor-Zassenhaus algorithm for

@@ -480,7 +480,7 @@ pub mod generic_impls {
         let mut terms = ring.terms(el).fuse();
         let first_term = terms.next();
         if first_term.is_none() {
-            return ring.base_ring().get_ring().dbg_within(&ring.base_ring().zero(), out, env);
+            return ring.base_ring().get_ring().fmt_el_within(&ring.base_ring().zero(), out, env);
         }
         let second_term = terms.next();
         let use_parenthesis = (env > EnvBindingStrength::Sum && second_term.is_some()) || 
@@ -502,7 +502,7 @@ pub mod generic_impls {
         };
         if let Some((c, i)) = terms.next() {
             if ring.base_ring().get_ring().is_approximate() || !ring.base_ring().is_one(c) || i == 0 {
-                ring.base_ring().get_ring().dbg_within(c, out, if i == 0 { EnvBindingStrength::Sum } else { EnvBindingStrength:: Product })?;
+                ring.base_ring().get_ring().fmt_el_within(c, out, if i == 0 { EnvBindingStrength::Sum } else { EnvBindingStrength:: Product })?;
             }
             print_unknown(i, out)?;
         } else {
@@ -511,7 +511,7 @@ pub mod generic_impls {
         while let Some((c, i)) = terms.next() {
             write!(out, " + ")?;
             if ring.base_ring().get_ring().is_approximate() || !ring.base_ring().is_one(c) || i == 0 {
-                ring.base_ring().get_ring().dbg_within(c, out, if i == 0 { EnvBindingStrength::Sum } else { EnvBindingStrength:: Product })?;
+                ring.base_ring().get_ring().fmt_el_within(c, out, if i == 0 { EnvBindingStrength::Sum } else { EnvBindingStrength:: Product })?;
             }
             print_unknown(i, out)?;
         }

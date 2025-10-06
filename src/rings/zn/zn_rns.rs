@@ -212,7 +212,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> Debug for Z
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Z/{}Z", self.integer_ring().format(self.modulus()))
+        write!(f, "Z/{}Z", self.integer_ring().formatted_el(self.modulus()))
     }
 }
 
@@ -342,8 +342,8 @@ impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> RingBase fo
     fn is_commutative(&self) -> bool { true }
     fn is_noetherian(&self) -> bool { true }
 
-    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
-        self.total_ring.get_ring().dbg(&RingRef::new(self).can_iso(&self.total_ring).unwrap().map_ref(value), out)
+    fn fmt_el_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
+        self.total_ring.get_ring().fmt_el(&RingRef::new(self).can_iso(&self.total_ring).unwrap().map_ref(value), out)
     }
     
     fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
@@ -961,5 +961,5 @@ fn test_not_coprime() {
 #[test]
 fn test_format() {
     let ring = Zn::new([72057594035352641, 72057594035418113, 72057594036334721, 72057594036945793, ].iter().map(|p| zn_64::Zn::new(*p)).collect(), BigIntRing::RING);
-    assert_eq!("1", format!("{}", ring.format(&ring.int_hom().map(1))));
+    assert_eq!("1", format!("{}", ring.formatted_el(&ring.int_hom().map(1))));
 }

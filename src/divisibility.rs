@@ -317,22 +317,22 @@ pub mod generic_tests {
             for b in &elements {
                 let ab = ring.mul(ring.clone_el(a), ring.clone_el(b));
                 let c = ring.checked_left_div(&ab, &a);
-                assert!(c.is_some(), "Divisibility existence failed: there should exist b = {} such that {} = b * {}, but none was found", ring.format(b), ring.format(&ab), ring.format(&a));
-                assert!(ring.eq_el(&ab, &ring.mul_ref_snd(ring.clone_el(a), c.as_ref().unwrap())), "Division failed: {} * {} != {} but {} = checked_div({}, {})", ring.format(a), ring.format(c.as_ref().unwrap()), ring.format(&ab), ring.format(c.as_ref().unwrap()), ring.format(&ab), ring.format(&a));
+                assert!(c.is_some(), "Divisibility existence failed: there should exist b = {} such that {} = b * {}, but none was found", ring.formatted_el(b), ring.formatted_el(&ab), ring.formatted_el(&a));
+                assert!(ring.eq_el(&ab, &ring.mul_ref_snd(ring.clone_el(a), c.as_ref().unwrap())), "Division failed: {} * {} != {} but {} = checked_div({}, {})", ring.formatted_el(a), ring.formatted_el(c.as_ref().unwrap()), ring.formatted_el(&ab), ring.formatted_el(c.as_ref().unwrap()), ring.formatted_el(&ab), ring.formatted_el(&a));
 
                 if !ring.is_unit(a) {
                     let ab_plus_one = ring.add(ring.clone_el(&ab), ring.one());
                     let c = ring.checked_left_div(&ab_plus_one, &a);
-                    assert!(c.is_none(), "Unit check failed: is_unit({}) is false but checked_div({}, {}) = {}", ring.format(a), ring.format(&ab_plus_one), ring.format(a), ring.format(c.as_ref().unwrap()));
+                    assert!(c.is_none(), "Unit check failed: is_unit({}) is false but checked_div({}, {}) = {}", ring.formatted_el(a), ring.formatted_el(&ab_plus_one), ring.formatted_el(a), ring.formatted_el(c.as_ref().unwrap()));
 
                     let ab_minus_one = ring.sub(ring.clone_el(&ab), ring.one());
                     let c = ring.checked_left_div(&ab_minus_one, &a);
-                    assert!(c.is_none(), "Unit check failed: is_unit({}) is false but checked_div({}, {}) = {}", ring.format(a), ring.format(&ab_minus_one), ring.format(a), ring.format(c.as_ref().unwrap()));
+                    assert!(c.is_none(), "Unit check failed: is_unit({}) is false but checked_div({}, {}) = {}", ring.formatted_el(a), ring.formatted_el(&ab_minus_one), ring.formatted_el(a), ring.formatted_el(c.as_ref().unwrap()));
                 } else {
                     let inv = ring.checked_left_div(&ring.one(), a);
-                    assert!(inv.is_some(), "Unit check failed: is_unit({}) is true but checked_div({}, {}) is None", ring.format(a), ring.format(&ring.one()), ring.format(&a));
+                    assert!(inv.is_some(), "Unit check failed: is_unit({}) is true but checked_div({}, {}) is None", ring.formatted_el(a), ring.formatted_el(&ring.one()), ring.formatted_el(&a));
                     let prod = ring.mul_ref(a, inv.as_ref().unwrap());
-                    assert!(ring.eq_el(&ring.one(), &prod), "Division failed: {} != {} * {} but checked_div({}, {}) = {}", ring.format(&ring.one()), ring.format(a), ring.format(inv.as_ref().unwrap()), ring.format(&ring.one()), ring.format(a), ring.format(c.as_ref().unwrap()));
+                    assert!(ring.eq_el(&ring.one(), &prod), "Division failed: {} != {} * {} but checked_div({}, {}) = {}", ring.formatted_el(&ring.one()), ring.formatted_el(a), ring.formatted_el(inv.as_ref().unwrap()), ring.formatted_el(&ring.one()), ring.formatted_el(a), ring.formatted_el(c.as_ref().unwrap()));
                 }
             }
         }
@@ -342,22 +342,22 @@ pub mod generic_tests {
             for b in &elements {
                 let ab = ring.mul(ring.clone_el(a), ring.clone_el(b));
                 let c = a_prepared_divisor.checked_left_div_by(&ab, ring.get_ring());
-                assert!(c.is_some(), "Divisibility existence failed for prepared divisor: there should exist b = {} such that {} = b * {}, but none was found", ring.format(b), ring.format(&ab), ring.format(&a));
-                assert!(ring.eq_el(&ab, &ring.mul_ref_snd(ring.clone_el(a), c.as_ref().unwrap())), "Division failed: {} * {} != {} but {} = checked_div({}, {})", ring.format(a), ring.format(c.as_ref().unwrap()), ring.format(&ab), ring.format(c.as_ref().unwrap()), ring.format(&ab), ring.format(&a));
+                assert!(c.is_some(), "Divisibility existence failed for prepared divisor: there should exist b = {} such that {} = b * {}, but none was found", ring.formatted_el(b), ring.formatted_el(&ab), ring.formatted_el(&a));
+                assert!(ring.eq_el(&ab, &ring.mul_ref_snd(ring.clone_el(a), c.as_ref().unwrap())), "Division failed: {} * {} != {} but {} = checked_div({}, {})", ring.formatted_el(a), ring.formatted_el(c.as_ref().unwrap()), ring.formatted_el(&ab), ring.formatted_el(c.as_ref().unwrap()), ring.formatted_el(&ab), ring.formatted_el(&a));
 
                 if !ring.get_ring().is_unit_prepared(&a_prepared_divisor) {
                     let ab_plus_one = ring.add(ring.clone_el(&ab), ring.one());
                     let c = a_prepared_divisor.checked_left_div_by(&ab_plus_one, ring.get_ring());
-                    assert!(c.is_none(), "Unit check failed for prepared divisor: is_unit({}) is false but checked_div({}, {}) = {}", ring.format(a), ring.format(&ab_plus_one), ring.format(a), ring.format(c.as_ref().unwrap()));
+                    assert!(c.is_none(), "Unit check failed for prepared divisor: is_unit({}) is false but checked_div({}, {}) = {}", ring.formatted_el(a), ring.formatted_el(&ab_plus_one), ring.formatted_el(a), ring.formatted_el(c.as_ref().unwrap()));
 
                     let ab_minus_one = ring.sub(ring.clone_el(&ab), ring.one());
                     let c = a_prepared_divisor.checked_left_div_by(&ab_minus_one, ring.get_ring());
-                    assert!(c.is_none(), "Unit check failed for prepared divisor: is_unit({}) is false but checked_div({}, {}) = {}", ring.format(a), ring.format(&ab_minus_one), ring.format(a), ring.format(c.as_ref().unwrap()));
+                    assert!(c.is_none(), "Unit check failed for prepared divisor: is_unit({}) is false but checked_div({}, {}) = {}", ring.formatted_el(a), ring.formatted_el(&ab_minus_one), ring.formatted_el(a), ring.formatted_el(c.as_ref().unwrap()));
                 } else {
                     let inv = a_prepared_divisor.checked_left_div_by(&ring.one(), ring.get_ring());
-                    assert!(inv.is_some(), "Unit check failed for prepared divisor: is_unit({}) is true but checked_div({}, {}) is None", ring.format(a), ring.format(&ring.one()), ring.format(&a));
+                    assert!(inv.is_some(), "Unit check failed for prepared divisor: is_unit({}) is true but checked_div({}, {}) is None", ring.formatted_el(a), ring.formatted_el(&ring.one()), ring.formatted_el(&a));
                     let prod = ring.mul_ref(a, inv.as_ref().unwrap());
-                    assert!(ring.eq_el(&ring.one(), &prod), "Division failed for prepared divisor: {} != {} * {} but checked_div({}, {}) = {}", ring.format(&ring.one()), ring.format(a), ring.format(inv.as_ref().unwrap()), ring.format(&ring.one()), ring.format(a), ring.format(c.as_ref().unwrap()));
+                    assert!(ring.eq_el(&ring.one(), &prod), "Division failed for prepared divisor: {} != {} * {} but checked_div({}, {}) = {}", ring.formatted_el(&ring.one()), ring.formatted_el(a), ring.formatted_el(inv.as_ref().unwrap()), ring.formatted_el(&ring.one()), ring.formatted_el(a), ring.formatted_el(c.as_ref().unwrap()));
                 }
             }
         }

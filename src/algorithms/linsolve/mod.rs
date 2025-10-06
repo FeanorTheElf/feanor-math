@@ -113,7 +113,7 @@ pub trait LinSolveRingStore: RingStore
     /// For details, see [`LinSolveRing::solve_right()`].
     /// 
     #[stability::unstable(feature = "enable")]
-    fn solve_right_with<V1, V2, V3, A>(&self, lhs: SubmatrixMut<V1, El<Self>>, rhs: SubmatrixMut<V2, El<Self>>, out: SubmatrixMut<V3, El<Self>>, allocator: A) -> SolveResult
+    fn solve_right_with_allocator<V1, V2, V3, A>(&self, lhs: SubmatrixMut<V1, El<Self>>, rhs: SubmatrixMut<V2, El<Self>>, out: SubmatrixMut<V3, El<Self>>, allocator: A) -> SolveResult
         where V1: AsPointerToSlice<El<Self>>,
             V2: AsPointerToSlice<El<Self>>,
             V3: AsPointerToSlice<El<Self>>,

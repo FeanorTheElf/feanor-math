@@ -137,6 +137,7 @@ pub fn signed_eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
 /// In general, the gcd is only unique up to multiplication by units. For integers, the function
 /// [`signed_gcd()`] gives more guarantees.
 /// 
+#[stability::unstable(feature = "enable")]
 pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
     where R: RingStore,
         R::Type: EuclideanRing
@@ -203,6 +204,7 @@ pub fn signed_lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
 /// In general, the lcm is only unique up to multiplication by units. For integers, the function
 /// [`signed_lcm()`] gives more guarantees.
 /// 
+#[stability::unstable(feature = "enable")]
 pub fn lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
     where R: RingStore,
         R::Type: EuclideanRing

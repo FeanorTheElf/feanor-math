@@ -226,7 +226,7 @@ fn test_factor_int_poly() {
     assert_eq!(2, actual.len());
     for (factor, e) in &actual {
         assert_eq!(1, *e);
-        assert!(ZZX.eq_el(&f, factor) || ZZX.eq_el(&g, factor), "Got unexpected factor {}", ZZX.format(&factor));
+        assert!(ZZX.eq_el(&f, factor) || ZZX.eq_el(&g, factor), "Got unexpected factor {}", ZZX.formatted_el(&factor));
     }
 
     let [f, g] = ZZX.with_wrapped_indeterminate(|X| [5 * X.pow_ref(2) + 1, 3 * X.pow_ref(2) + 2]);
@@ -235,7 +235,7 @@ fn test_factor_int_poly() {
     assert_eq!(2, actual.len());
     for (factor, e) in &actual {
         assert_eq!(1, *e);
-        assert!(ZZX.eq_el(&f, factor) || ZZX.eq_el(&g, factor), "Got unexpected factor {}", ZZX.format(&factor));
+        assert!(ZZX.eq_el(&f, factor) || ZZX.eq_el(&g, factor), "Got unexpected factor {}", ZZX.formatted_el(&factor));
     }
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [5 * X.pow_ref(2) + 1]);

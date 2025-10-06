@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 
 use crate::algorithms::eea::{inv_crt, signed_gcd};
 use crate::algorithms::int_bisect::root_floor;
@@ -567,6 +568,18 @@ impl<G: AbelianGroupStore> PartialEq for SubgroupBase<G> {
     }
 }
 
+impl<G: AbelianGroupStore> Debug for SubgroupBase<G> {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<")?;
+        for g in self.generators() {
+            write!(f, "{}, ", self.parent().formatted_el(g))?;
+        }
+        write!(f, ">")?;
+        return Ok(());
+    }
+}
+
 impl<G: AbelianGroupStore> AbelianGroupBase for SubgroupBase<G> {
 
     type Element = GroupEl<G>;
@@ -609,6 +622,10 @@ impl<G: AbelianGroupStore> AbelianGroupBase for SubgroupBase<G> {
 
     fn op_ref_snd(&self, lhs:Self::Element, rhs: &Self::Element) -> Self::Element {
         self.parent().op_ref_snd(lhs, rhs)
+    }
+
+    fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        self.parent().get_group().fmt_el(value, out)
     }
 }
 
@@ -905,8 +922,17 @@ struct ProdGroupBase<G: AbelianGroupStore, const N: usize>(G);
 
 #[cfg(test)]
 impl<G: AbelianGroupStore, const N: usize> PartialEq for ProdGroupBase<G, N> {
+    
     fn eq(&self, other: &Self) -> bool {
         self.0.get_group() == other.0.get_group()
+    }
+}
+
+#[cfg(test)]
+impl<G: AbelianGroupStore, const N: usize> Debug for ProdGroupBase<G, N> {
+    
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({:?})^{}", self.0.get_group(), N)
     }
 }
 
@@ -938,6 +964,14 @@ impl<G: AbelianGroupStore, const N: usize> AbelianGroupBase for ProdGroupBase<G,
 
     fn identity(&self) -> Self::Element {
         from_fn(|_| self.0.identity())
+    }
+
+    fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        let mut seq = out.debug_list();
+        for x in value {
+            _ = seq.entry(&self.0.formatted_el(x));
+        }
+        return seq.finish();
     }
 }
 

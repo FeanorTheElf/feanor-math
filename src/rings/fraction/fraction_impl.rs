@@ -223,16 +223,16 @@ impl<R> RingBase for FractionFieldImplBase<R>
         self.from(self.base_ring.int_hom().map(value))
     }
 
-    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
+    fn fmt_el_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
         if let Some(quo) = self.base_ring.checked_div(&value.num, &value.den) {
-            self.base_ring.get_ring().dbg_within(&quo, out, env)
+            self.base_ring.get_ring().fmt_el_within(&quo, out, env)
         } else {
             if env >= EnvBindingStrength::Product {
                 write!(out, "(")?;
             }
-            self.base_ring.get_ring().dbg_within(&value.num, out, EnvBindingStrength::Product)?;
+            self.base_ring.get_ring().fmt_el_within(&value.num, out, EnvBindingStrength::Product)?;
             write!(out, "/")?;
-            self.base_ring.get_ring().dbg_within(&value.den, out, EnvBindingStrength::Product)?;
+            self.base_ring.get_ring().fmt_el_within(&value.den, out, EnvBindingStrength::Product)?;
             if env >= EnvBindingStrength::Product {
                 write!(out, ")")?;
             }

@@ -533,11 +533,11 @@ impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
     fn is_commutative(&self) -> bool { self.base_ring().is_commutative() }
     fn is_noetherian(&self) -> bool { self.base_ring().is_noetherian() }
 
-    fn dbg(&self, value: &Self::Element, out: &mut std::fmt::Formatter) -> std::fmt::Result {
-        self.dbg_within(value, out, EnvBindingStrength::Weakest)
+    fn fmt_el(&self, value: &Self::Element, out: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.fmt_el_within(value, out, EnvBindingStrength::Weakest)
     }
 
-    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
+    fn fmt_el_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
         super::generic_impls::print(RingRef::new(self), value, out, env)
     }
 

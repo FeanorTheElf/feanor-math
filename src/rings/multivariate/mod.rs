@@ -685,7 +685,7 @@ pub mod generic_impls {
             P::Type: MultivariatePolyRing
     {
         if ring.is_zero(poly) {
-            ring.base_ring().get_ring().dbg_within(&ring.base_ring().zero(), out, env)?;
+            ring.base_ring().get_ring().fmt_el_within(&ring.base_ring().zero(), out, env)?;
         } else {
             if env >= EnvBindingStrength::Product {
                 write!(out, "(")?;
@@ -697,7 +697,7 @@ pub mod generic_impls {
                 }
                 let is_constant_term = ring.monomial_deg(m) == 0;
                 if !ring.base_ring().is_one(c) || is_constant_term {
-                    ring.base_ring().get_ring().dbg_within(c, out, if is_constant_term { EnvBindingStrength::Sum } else { EnvBindingStrength::Product })?;
+                    ring.base_ring().get_ring().fmt_el_within(c, out, if is_constant_term { EnvBindingStrength::Sum } else { EnvBindingStrength::Product })?;
                     if !is_constant_term {
                         write!(out, " * ")?;
                     }

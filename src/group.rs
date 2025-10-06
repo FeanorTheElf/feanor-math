@@ -26,12 +26,12 @@ use crate::serialization::{DeserializeWithRing, SerializableElementRing, Seriali
 /// 
 /// 
 #[stability::unstable(feature = "enable")]
-pub trait AbelianGroupBase: PartialEq {
+pub trait AbelianGroupBase: PartialEq + Debug + Send + Sync {
 
     ///
     /// Type used to represent elements of this group.
     /// 
-    type Element;
+    type Element: Sized + Send + Sync;
 
     ///
     /// Clones an element of the group.
@@ -110,6 +110,8 @@ pub trait AbelianGroupBase: PartialEq {
     fn is_identity(&self, x: &Self::Element) -> bool {
         self.eq_el(x, &self.identity())
     }
+    
+    fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
 }
 
 ///
@@ -145,7 +147,7 @@ macro_rules! delegate_group {
 /// the design of [`RingBase`] and [`RingStore`]. See there for details.
 /// 
 #[stability::unstable(feature = "enable")]
-pub trait AbelianGroupStore {
+pub trait AbelianGroupStore: Send + Sync {
     type Type: AbelianGroupBase;
 
     fn get_group(&self) -> &Self::Type;
@@ -163,10 +165,14 @@ pub trait AbelianGroupStore {
     fn hash<H: Hasher>(&self, x: &GroupEl<Self>, hasher: &mut H) {
         self.get_group().hash(x, hasher)
     }
+
+    fn formatted_el<'a>(&'a self, x: &'a GroupEl<Self>) -> GroupElementDisplayWrapper<'a, Self::Type> {
+        GroupElementDisplayWrapper { group: self.get_group(), element: x }
+    }
 }
 
 impl<G> AbelianGroupStore for G
-    where G: Deref,
+    where G: Deref + Send + Sync,
         G::Target: AbelianGroupStore
 {
     type Type = <G::Target as AbelianGroupStore>::Type;
@@ -272,6 +278,14 @@ impl<R: RingStore> PartialEq for AddGroupBase<R>
     }
 }
 
+impl<R: RingStore> Debug for AddGroupBase<R>
+    where R::Type: HashableElRing
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0.get_ring())
+    }
+}
+
 impl<R: RingStore> AbelianGroupBase for AddGroupBase<R>
     where R::Type: HashableElRing
 {
@@ -283,6 +297,7 @@ impl<R: RingStore> AbelianGroupBase for AddGroupBase<R>
     fn inv(&self, x: &Self::Element) -> Self::Element { self.0.negate(self.0.clone_el(x)) }
     fn identity(&self) -> Self::Element { self.0.zero() }
     fn hash<H: Hasher>(&self, x: &Self::Element, hasher: &mut H) { self.0.hash(x, hasher) }
+    fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result { self.0.get_ring().fmt_el(value, out) }
 }
 
 impl<R: RingStore> AddGroup<R>
@@ -310,6 +325,14 @@ impl<R: RingStore> PartialEq for MultGroupBase<R>
     }
 }
 
+impl<R: RingStore> Debug for MultGroupBase<R> 
+    where R::Type: HashableElRing + DivisibilityRing
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({:?})*", self.0.get_ring())
+    }
+}
+
 impl<R: RingStore> AbelianGroupBase for MultGroupBase<R> 
     where R::Type: HashableElRing + DivisibilityRing
 {
@@ -321,6 +344,7 @@ impl<R: RingStore> AbelianGroupBase for MultGroupBase<R>
     fn identity(&self) -> Self::Element { MultGroupEl(self.0.one()) }
     fn hash<H: Hasher>(&self, x: &Self::Element, hasher: &mut H) { self.0.hash(&x.0, hasher) }
     fn op(&self, lhs: Self::Element, rhs: Self::Element) -> Self::Element { MultGroupEl(self.0.mul(lhs.0, rhs.0)) }
+    fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result { self.0.get_ring().fmt_el(&value.0, out) }
 }
 
 impl<R: RingStore> SerializableElementGroup for MultGroupBase<R> 
@@ -350,14 +374,6 @@ impl<R: RingStore> Clone for MultGroupBase<R>
 impl<R: RingStore> Copy for MultGroupBase<R> 
     where R: Copy, R::Type: HashableElRing + DivisibilityRing
 {}
-
-impl<R: RingStore> Debug for MultGroupBase<R> 
-    where R::Type: Debug + HashableElRing + DivisibilityRing
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({:?})*", self.0.get_ring())
-    }
-}
 
 impl<R: RingStore> Clone for MultGroupEl<R> 
     where R::Type: HashableElRing + DivisibilityRing,
@@ -589,5 +605,25 @@ impl<G: AbelianGroupStore> Serialize for SerializeOwnedWithGroup<G>
         where S: Serializer
     {
         self.group.get_group().serialize(&self.el, serializer)
+    }
+}
+
+#[stability::unstable(feature = "enable")]
+pub struct GroupElementDisplayWrapper<'a, G: AbelianGroupBase + ?Sized> {
+    group: &'a G,
+    element: &'a G::Element
+}
+
+impl<'a, G: AbelianGroupBase + ?Sized> std::fmt::Display for GroupElementDisplayWrapper<'a, G> {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.group.fmt_el(self.element, f)
+    }
+}
+
+impl<'a, G: AbelianGroupBase + ?Sized> std::fmt::Debug for GroupElementDisplayWrapper<'a, G> {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.group.fmt_el(self.element, f)
     }
 }

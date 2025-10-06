@@ -226,12 +226,12 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
         self.base_ring.is_noetherian()
     }
 
-    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
+    fn fmt_el_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
         super::generic_impls::dbg_poly(self, value, out, self.unknown_name, env)
     }
 
-    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        self.dbg_within(value, out, EnvBindingStrength::Weakest)
+    fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+        self.fmt_el_within(value, out, EnvBindingStrength::Weakest)
     }
 
     fn square(&self, value: &mut Self::Element) {
@@ -873,13 +873,13 @@ fn test_print() {
         (base_poly_ring.from_terms([(1, 0), (2, 2)].into_iter()), 0),
         (base_poly_ring.from_terms([(3, 0), (4, 2)].into_iter()), 2)
     ].into_iter());
-    assert_eq!("(4X^2 + 3)Y^2 + 2X^2 + 1", format!("{}", poly_ring.format(&poly)));
+    assert_eq!("(4X^2 + 3)Y^2 + 2X^2 + 1", format!("{}", poly_ring.formatted_el(&poly)));
 
     let poly = poly_ring.from_terms([
         (base_poly_ring.zero(), 0),
         (base_poly_ring.from_terms([(4, 2)].into_iter()), 2)
     ].into_iter());
-    assert_eq!("4X^2Y^2", format!("{}", poly_ring.format(&poly)));
+    assert_eq!("4X^2Y^2", format!("{}", poly_ring.formatted_el(&poly)));
 }
 
 #[test]

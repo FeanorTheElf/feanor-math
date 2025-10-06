@@ -1423,21 +1423,21 @@ pub mod generic_tests {
                     let map_b = hom.map_ref(b);
                     let map_sum = to.add_ref(&map_a, &map_b);
                     let sum_map = hom.map(from.add_ref(a, b));
-                    assert!(to.eq_el(&map_sum, &sum_map), "Additive homomorphic property failed: hom({} + {}) = {} != {} = {} + {}", from.format(a), from.format(b), to.format(&sum_map), to.format(&map_sum), to.format(&map_a), to.format(&map_b));
+                    assert!(to.eq_el(&map_sum, &sum_map), "Additive homomorphic property failed: hom({} + {}) = {} != {} = {} + {}", from.formatted_el(a), from.formatted_el(b), to.formatted_el(&sum_map), to.formatted_el(&map_sum), to.formatted_el(&map_a), to.formatted_el(&map_b));
                 }
                 {
                     let map_a = hom.map_ref(a);
                     let map_b = hom.map_ref(b);
                     let map_prod = to.mul_ref(&map_a, &map_b);
                     let prod_map = hom.map(from.mul_ref(a, b));
-                    assert!(to.eq_el(&map_prod, &prod_map), "Multiplicative homomorphic property failed: hom({} * {}) = {} != {} = {} * {}", from.format(a), from.format(b), to.format(&prod_map), to.format(&map_prod), to.format(&map_a), to.format(&map_b));
+                    assert!(to.eq_el(&map_prod, &prod_map), "Multiplicative homomorphic property failed: hom({} * {}) = {} != {} = {} * {}", from.formatted_el(a), from.formatted_el(b), to.formatted_el(&prod_map), to.formatted_el(&map_prod), to.formatted_el(&map_a), to.formatted_el(&map_b));
                 }
                 {
                     let map_a = hom.map_ref(a);
                     let prod_map = hom.map(from.mul_ref(a, b));
                     let mut mul_assign = to.clone_el(&map_a);
                     hom.mul_assign_ref_map( &mut mul_assign, b);
-                    assert!(to.eq_el(&mul_assign, &prod_map), "mul_assign_ref_map() failed: hom({} * {}) = {} != {} = mul_map_in(hom({}), {})", from.format(a), from.format(b), to.format(&prod_map), to.format(&mul_assign), to.format(&map_a), from.format(b));
+                    assert!(to.eq_el(&mul_assign, &prod_map), "mul_assign_ref_map() failed: hom({} * {}) = {} != {} = mul_map_in(hom({}), {})", from.formatted_el(a), from.formatted_el(b), to.formatted_el(&prod_map), to.formatted_el(&mul_assign), to.formatted_el(&map_a), from.formatted_el(b));
                 }
             }
         }

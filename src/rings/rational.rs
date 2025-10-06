@@ -318,14 +318,14 @@ impl<I> RingBase for RationalFieldBase<I>
         Some(ZZ.zero())
     }
 
-    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
+    fn fmt_el_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
         if self.base_ring().is_one(&value.1) {
-            write!(out, "{}", self.integers.format(&value.0))
+            write!(out, "{}", self.integers.formatted_el(&value.0))
         } else {
             if env > EnvBindingStrength::Product {
-                write!(out, "({}/{})", self.integers.format(&value.0), self.integers.format(&value.1))
+                write!(out, "({}/{})", self.integers.formatted_el(&value.0), self.integers.formatted_el(&value.1))
             } else {
-                write!(out, "{}/{}", self.integers.format(&value.0), self.integers.format(&value.1))
+                write!(out, "{}/{}", self.integers.formatted_el(&value.0), self.integers.formatted_el(&value.1))
             }
         }
     }
