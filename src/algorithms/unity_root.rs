@@ -72,7 +72,11 @@ pub fn get_prim_root_of_unity_gen<R, I>(ring: R, n: &El<I>, ZZ: I) -> Option<El<
     return Some(current);
 }
 
-#[stability::unstable(feature = "enable")]
+///
+/// Returns a primitive `n`-th root of unity in the given finite field,
+/// or `None`, if the order of the multiplicative group of the field is
+/// not divisible by `n`.
+/// 
 pub fn get_prim_root_of_unity<R>(ring: R, n: usize) -> Option<El<R>>
     where R: RingStore, 
         R::Type: FiniteRing + Field
@@ -80,7 +84,11 @@ pub fn get_prim_root_of_unity<R>(ring: R, n: usize) -> Option<El<R>>
     get_prim_root_of_unity_gen(ring, &int_cast(n.try_into().unwrap(), BigIntRing::RING, StaticRing::<i64>::RING), BigIntRing::RING)
 }
 
-#[stability::unstable(feature = "enable")]
+///
+/// Returns a primitive `2^log2_n`-th root of unity in the given finite field,
+/// or `None`, if the order of the multiplicative group of the field is
+/// not divisible by `2^log2_n`.
+/// 
 pub fn get_prim_root_of_unity_pow2<R>(ring: R, log2_n: usize) -> Option<El<R>>
     where R: RingStore, 
         R::Type: FiniteRing + Field
