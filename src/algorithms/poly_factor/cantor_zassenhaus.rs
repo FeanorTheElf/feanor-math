@@ -22,6 +22,57 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use oorandom;
 
 ///
+/// Let `a` be the given ring element and `q` the size of the finite base field. 
+/// Then this function computes
+/// ```text
+///   a^(1 + q + q^2 + ... + q^e)
+/// ```
+/// 
+/// This can be done by the following fact: Since `q` is the size of the finite
+/// base field, we know that for any polynomial `f`, we have `f(X^q) = f^q(X)`.
+/// Thus, if `f(X)` is congruent to `a^(1 + ... + p^i)` modulo the modulus of
+/// `ring`, we find that `f(X^q)` is congruent to `a^(p + p^2 + ... + p^(i + 1))`.
+/// Multiplication by `X` then gives `a^(1 + ... + p^(i + 1))`.
+/// 
+fn pow_geometric_series_characteristic<R>(ring: R, a: El<R>, e: usize) -> El<R>
+    where R: RingStore,
+        R::Type: FreeAlgebra,
+        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing
+{
+    let q = ring.base_ring().size(BigIntRing::RING).unwrap();
+    let log2_q = BigIntRing::RING.abs_log2_ceil(&q).unwrap();
+    let d = ring.rank();
+
+    if d == 1 {
+        return a;
+    } else if log2_q * 2 < d {
+        // the standard square-and-multiply approach requires roughly `log2(q^e)` multiplications in `ring`
+        let ZZbig = BigIntRing::RING;
+        let exp = ZZbig.checked_div(&ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&q), e + 1), ZZbig.one()), &ZZbig.sub_ref_fst(&q, ZZbig.one())).unwrap();
+        return ring.pow_gen(a, &exp, BigIntRing::RING);
+    } else {
+        // the self-composition approach requires `e` compositions of a polynomial with `X^q`
+        let mut powers_of_gen_pow_q = Vec::new();
+        powers_of_gen_pow_q.push(ring.one());
+        powers_of_gen_pow_q.push(ring.pow_gen(ring.canonical_gen(), &q, BigIntRing::RING));
+        for i in 2..ring.rank() {
+            powers_of_gen_pow_q.push(ring.mul_ref(&powers_of_gen_pow_q[1], &powers_of_gen_pow_q[i - 1]));
+        }
+        let mut current = ring.clone_el(&a);
+        for _ in 0..e {
+            let current_wrt_basis = ring.wrt_canonical_basis(&current);
+            let mut new = ring.zero();
+            for i in 0..ring.rank() {
+                new = ring.inclusion().fma_map(&powers_of_gen_pow_q[i], &current_wrt_basis.at(i), new);
+            }
+            drop(current_wrt_basis);
+            current = ring.mul_ref_snd(new, &a);
+        }
+        return current;
+    }
+}
+
+///
 /// Takes a squarefree polynomial `f` in the form of the ring `R[X]/(f)` and
 /// returns whether `f` is irreducible over the base ring `R`.
 /// 
@@ -85,15 +136,31 @@ pub fn distinct_degree_factorization_base<P, R, Controller>(poly_ring: P, mod_f_
         let mut result = Vec::new();
         let mut current_deg = 0;
         result.push(poly_ring.one());
-        let mut x_power_Q_mod_f = mod_f_ring.canonical_gen();
+
+        let mut x_power_q_powers = Vec::new();
+        x_power_q_powers.push(mod_f_ring.one());
+        x_power_q_powers.push(mod_f_ring.pow_gen(mod_f_ring.canonical_gen(), &q, ZZ));
+        for i in 2..mod_f_ring.rank() {
+            x_power_q_powers.push(mod_f_ring.mul_ref(&x_power_q_powers[1], &x_power_q_powers[i - 1]));
+        }
+        let mut current = mod_f_ring.clone_el(&x_power_q_powers[1]);
         while 2 * current_deg <= poly_ring.degree(&f).unwrap() {
             current_deg += 1;
-            x_power_Q_mod_f = mod_f_ring.pow_gen(x_power_Q_mod_f, &q, ZZ);
-            let fq_defining_poly_mod_f = poly_ring.sub(mod_f_ring.poly_repr(&poly_ring, &x_power_Q_mod_f, &poly_ring.base_ring().identity()), poly_ring.indeterminate());
+            let fq_defining_poly_mod_f = poly_ring.sub(mod_f_ring.poly_repr(&poly_ring, &current, &poly_ring.base_ring().identity()), poly_ring.indeterminate());
             let deg_i_factor = poly_ring.normalize(poly_ring.get_ring().ideal_gen_with_controller(&f, &fq_defining_poly_mod_f, controller.clone()));
             f = poly_ring.checked_div(&f, &deg_i_factor).unwrap();
             result.push(deg_i_factor);
             log_progress!(controller, ".");
+
+            // we can compute `current^q` as `current(X^q)` since over a finite field
+            // of size `q`, we have `f^q(X) = f(X^q)`
+            let current_wrt_basis = mod_f_ring.wrt_canonical_basis(&current);
+            let mut new = mod_f_ring.zero();
+            for i in 0..mod_f_ring.rank() {
+                new = mod_f_ring.inclusion().fma_map(&x_power_q_powers[i], &current_wrt_basis.at(i), new);
+            }
+            drop(current_wrt_basis);
+            current = new;
         }
         if poly_ring.degree(&f).unwrap() >= result.len() {
             result.resize_with(poly_ring.degree(&f).unwrap(), || poly_ring.one());
@@ -186,18 +253,23 @@ pub fn cantor_zassenhaus_base<P, R, Controller>(poly_ring: P, mod_f_ring: R, d: 
     assert!(mod_f_ring.rank() % d == 0);
     assert!(mod_f_ring.rank() > d);
 
-    controller.run_computation(format_args!("cantor_zassenhaus(deg={}, fdeg={})", mod_f_ring.rank(), d), |_| {
+    controller.run_computation(format_args!("cantor_zassenhaus(deg={}, fdeg={})", mod_f_ring.rank(), d), |controller| {
         let mut rng = oorandom::Rand64::new(ZZ.default_hash(&q) as u128);
-        let exp = ZZ.half_exact(ZZ.sub(ZZ.pow(q, d), ZZ.one()));
+        // we raise `T` to the power `(q^d - 1)/2 = (q - 1)/2 * (1 + q + ... + q^(d - 1))`
+        let exp = ZZ.half_exact(ZZ.sub(ZZ.clone_el(&q), ZZ.one()));
         let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
 
         for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
             let T = mod_f_ring.from_canonical_basis((0..mod_f_ring.rank()).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())));
-            let G = mod_f_ring.sub(mod_f_ring.pow_gen(T, &exp, ZZ), mod_f_ring.one());
+            let T_pow = mod_f_ring.pow_gen(pow_geometric_series_characteristic(&mod_f_ring, mod_f_ring.clone_el(&T), d - 1), &exp, ZZ);
+            // debug_assert!(mod_f_ring.eq_el(&mod_f_ring.pow_gen(mod_f_ring.clone_el(&T), &ZZ.sum((0..d).map(|i| ZZ.pow(ZZ.clone_el(&q), i))), ZZ), &pow_geometric_series_characteristic(&mod_f_ring, mod_f_ring.clone_el(&T), d - 1)));
+            // debug_assert!(mod_f_ring.eq_el(&mod_f_ring.pow_gen(T, &ZZ.half_exact(ZZ.sub(ZZ.pow(ZZ.clone_el(&q), d), ZZ.one())), ZZ), &T_pow));
+            let G = mod_f_ring.sub(T_pow, mod_f_ring.one());
             let g = poly_ring.get_ring().ideal_gen(&f, &mod_f_ring.poly_repr(&poly_ring, &G, &poly_ring.base_ring().identity()));
             if !poly_ring.is_unit(&g) && poly_ring.checked_div(&g, &f).is_none() {
                 return g;
             }
+            log_progress!(controller, ".");
         }
         unreachable!()
     })
@@ -491,4 +563,33 @@ fn test_cantor_zassenhaus_even_extension_field() {
     let h = ring.mul_ref(&f, &g);
     let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 4, DontObserve));
     assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
+}
+
+#[test]
+fn test_pow_geometric_series_characteristic() {
+    let base_ring = Fp::<65537>::RING;
+    let ring = FreeAlgebraImpl::new(base_ring, 3, [1]);
+    assert_el_eq!(&ring, ring.pow(ring.canonical_gen(), 1), pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 0));
+    assert_el_eq!(&ring, ring.pow(ring.canonical_gen(), 1 + 65537), pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 1));
+    assert_el_eq!(&ring, ring.pow(ring.canonical_gen(), 1 + 65537 + 65537 * 65537), pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 2));
+    assert_el_eq!(&ring, ring.pow(ring.canonical_gen(), 1 + 65537 + 65537 * 65537 + 65537 * 65537 * 65537), pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 3));
+    
+    let ring = FreeAlgebraImpl::new(base_ring, 3, [4, 3]);
+    assert_el_eq!(&ring, ring.pow(ring.canonical_gen(), 1), pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 0));
+    assert_el_eq!(&ring, ring.pow(ring.canonical_gen(), 1 + 65537), pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 1));
+    assert_el_eq!(&ring, ring.pow(ring.canonical_gen(), 1 + 65537 + 65537 * 65537), pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 2));
+    assert_el_eq!(&ring, ring.pow(ring.canonical_gen(), 1 + 65537 + 65537 * 65537 + 65537 * 65537 * 65537), pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 3));
+
+    let a = ring.from_canonical_basis([1, 2, 3]);
+    assert_el_eq!(&ring, ring.pow(ring.clone_el(&a), 1), pow_geometric_series_characteristic(&ring, ring.clone_el(&a), 0));
+    assert_el_eq!(&ring, ring.pow(ring.clone_el(&a), 1 + 65537), pow_geometric_series_characteristic(&ring, ring.clone_el(&a), 1));
+    assert_el_eq!(&ring, ring.pow(ring.clone_el(&a), 1 + 65537 + 65537 * 65537), pow_geometric_series_characteristic(&ring, ring.clone_el(&a), 2));
+    assert_el_eq!(&ring, ring.pow(ring.clone_el(&a), 1 + 65537 + 65537 * 65537 + 65537 * 65537 * 65537), pow_geometric_series_characteristic(&ring, ring.clone_el(&a), 3));
+
+    let base_ring = Fp::<100003>::RING;
+    let ring = FreeAlgebraImpl::new(base_ring, 3, [1, 1]);
+    assert_el_eq!(&ring, ring.pow(ring.canonical_gen(), 1), pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 0));
+    assert_el_eq!(&ring, ring.pow(ring.canonical_gen(), 1 + 100003), pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 1));
+    assert_el_eq!(&ring, ring.pow(ring.canonical_gen(), 1 + 100003 + 100003 * 100003), pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 2));
+    assert_el_eq!(&ring, ring.pow(ring.canonical_gen(), 1 + 100003 + 100003 * 100003 + 100003 * 100003 * 100003), pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 3));
 }
