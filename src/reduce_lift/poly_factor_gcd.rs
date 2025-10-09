@@ -128,9 +128,14 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
             Self: 'ring;
 
     ///
-    /// Returns an ideal sampled at random from the interval of all supported ideals.
+    /// Returns an ideal sampled from the set of all supported ideals.
     /// 
-    fn random_suitable_ideal<'ring, F>(&'ring self, rng: F) -> Self::SuitableIdeal<'ring>
+    /// The parameter `attempt` is the number of previously sampled ideals for which the
+    /// computation failed. Implementations are encouraged to sample ideals that allow a very
+    /// fast computation for small values of `attempt`, and sample ideals (close to) uniformly
+    /// random from all supported ideals for larger values of `attempt`. 
+    /// 
+    fn random_suitable_ideal<'ring, F>(&'ring self, rng: F, attempt: usize) -> Self::SuitableIdeal<'ring>
         where F: FnMut() -> u64;
 
     ///
@@ -690,10 +695,10 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 $crate::rings::zn::zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.pow(int_cast(*p, BigIntRing::RING, StaticRing::<i64>::RING), e))
             }
         
-            fn random_suitable_ideal<'ring, F>(&'ring self, rng: F) -> Self::SuitableIdeal<'ring>
+            fn random_suitable_ideal<'ring, F>(&'ring self, rng: F, attempt: usize) -> Self::SuitableIdeal<'ring>
                 where F: FnMut() -> u64
             {
-                let lower_bound = StaticRing::<i64>::RING.get_ring().get_uniformly_random_bits(24, rng);
+                let lower_bound = StaticRing::<i64>::RING.get_ring().get_uniformly_random_bits(std::cmp::min(57, 6 + attempt), rng);
                 return $crate::algorithms::miller_rabin::next_prime(StaticRing::<i64>::RING, lower_bound);
             }
         
@@ -824,7 +829,7 @@ impl<R> PolyGCDLocallyDomain for R
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
     }
 
-    fn random_suitable_ideal<'ring, RandomNumberFunction>(&'ring self, rng: RandomNumberFunction) -> Self::SuitableIdeal<'ring>
+    fn random_suitable_ideal<'ring, RandomNumberFunction>(&'ring self, rng: RandomNumberFunction, attempt: usize) -> Self::SuitableIdeal<'ring>
         where RandomNumberFunction: FnMut() -> u64
     {
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
@@ -1071,7 +1076,7 @@ impl<'a, R> PolyGCDLocallyDomain for IntegersWithLocalZnQuotient<'a, R>
         return ((log2_max_coeff as f64 + poly_deg as f64) / self.integers.abs_log2_floor(ideal).unwrap_or(1) as f64 * crate::reduce_lift::poly_factor_gcd::INTRING_HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR).ceil() as usize + 1;
     }
 
-    fn random_suitable_ideal<'ring, F>(&'ring self, _rng: F) -> Self::SuitableIdeal<'ring>
+    fn random_suitable_ideal<'ring, F>(&'ring self, _rng: F, _attempt: usize) -> Self::SuitableIdeal<'ring>
         where F: FnMut() -> u64
     {
         self.integers.clone_el(&self.prime)

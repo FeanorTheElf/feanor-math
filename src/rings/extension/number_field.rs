@@ -506,13 +506,22 @@ impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
             P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
+        Self::gcd_with_controller(poly_ring, lhs, rhs, DontObserve)
+    }
+
+    fn gcd_with_controller<P, Controller>(poly_ring: P, lhs: &El<P>, rhs: &El<P>, controller: Controller) -> El<P>
+        where P: RingStore + Copy,
+            P::Type: PolyRing + DivisibilityRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
+            Controller: ComputationController
+    {
         let self_ = NumberFieldByOrder { base: RingRef::new(poly_ring.base_ring().get_ring()) };
 
         let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
         let lhs_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, lhs);
         let rhs_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, rhs);
 
-        let result = poly_gcd_local(&order_poly_ring, order_poly_ring.clone_el(&lhs_order), order_poly_ring.clone_el(&rhs_order), DontObserve);
+        let result = poly_gcd_local(&order_poly_ring, order_poly_ring.clone_el(&lhs_order), order_poly_ring.clone_el(&rhs_order), controller);
 
         return self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &result);
     }
@@ -569,10 +578,10 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I, Controller>(poly_ring
         let self_ = poly_ring.base_ring();
 
         // first, we try to find an inert prime `p` and lift a factorization modulo `p` to the ring
-        'try_factor_directly: for _ in 0..TRY_FACTOR_DIRECTLY_ATTEMPTS {
+        'try_factor_directly: for attempt in 0..TRY_FACTOR_DIRECTLY_ATTEMPTS {
             let mut inert_prime = None;
             for _ in 0..(TRY_FIND_INERT_PRIME_ATTEMPTS * self_.rank()) {
-                let p = self_.get_ring().random_suitable_ideal(|| rng.rand_u64());
+                let p = self_.get_ring().random_suitable_ideal(|| rng.rand_u64(), attempt);
                 if p.minpoly_factors_mod_p.len() == 1 {
                     inert_prime = Some(p);
                     break;
@@ -1010,7 +1019,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
         return ((log2_max_coeff as f64 + poly_deg as f64 + (self.rank() as f64).log2()) / log2_p * HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR).ceil() as usize + 1;
     }
 
-    fn random_suitable_ideal<'ring, F>(&'ring self, mut rng: F) -> Self::SuitableIdeal<'ring>
+    fn random_suitable_ideal<'ring, F>(&'ring self, mut rng: F, attempt: usize) -> Self::SuitableIdeal<'ring>
         where F: FnMut() -> u64
     {
         let QQ = self.base.base_ring();
@@ -1023,7 +1032,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
 
         // search for a prime `p` such that the minimal polynomial is unramified modulo `p`
         for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
-            let p = ZZ.get_ring().random_suitable_ideal(&mut rng);
+            let p = ZZ.get_ring().random_suitable_ideal(&mut rng, attempt);
             assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&p));
 
             let Fp_as_ring = ZZ.get_ring().local_ring_at(&p, 1, 0);
@@ -1035,7 +1044,6 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
             let gen_poly_mod_p = FpX.from_terms(ZZX.terms(&gen_poly).map(|(c, i)| (ZZ_to_Fp.map_ref(c), i)));
             let (factorization, _) = <_ as FactorPolyField>::factor_poly(&FpX, &gen_poly_mod_p);
             if factorization.iter().all(|(_, e)| *e == 1) {
-
                 return NumberRingIdeal {
                     minpoly_factors_mod_p: factorization.into_iter().map(|(f, _)| f).collect(),
                     number_field_poly: gen_poly,

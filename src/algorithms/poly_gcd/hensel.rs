@@ -404,7 +404,9 @@ fn hensel_lift_factorization_internal<'ring, 'data, 'local, R, P1, P2, V, Contro
 }
 
 ///
-/// Like [`hensel_lift()`] but for an arbitrary number of factors.
+/// Given the factorization of `f` into pairwise coprime factors modulo a maximal
+/// ideal `m` of the ring `R` (given by `reduction_map`), lifts each factor to `R/m^e`
+/// (with `e` given implicitly by `reduction_map`) so that their product is `f`.
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V, Controller>(

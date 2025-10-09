@@ -262,10 +262,8 @@ pub fn cantor_zassenhaus_base<P, R, Controller>(poly_ring: P, mod_f_ring: R, d: 
         for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
             let T = mod_f_ring.from_canonical_basis((0..mod_f_ring.rank()).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())));
             let T_pow = mod_f_ring.pow_gen(pow_geometric_series_characteristic(&mod_f_ring, mod_f_ring.clone_el(&T), d - 1), &exp, ZZ);
-            // debug_assert!(mod_f_ring.eq_el(&mod_f_ring.pow_gen(mod_f_ring.clone_el(&T), &ZZ.sum((0..d).map(|i| ZZ.pow(ZZ.clone_el(&q), i))), ZZ), &pow_geometric_series_characteristic(&mod_f_ring, mod_f_ring.clone_el(&T), d - 1)));
-            // debug_assert!(mod_f_ring.eq_el(&mod_f_ring.pow_gen(T, &ZZ.half_exact(ZZ.sub(ZZ.pow(ZZ.clone_el(&q), d), ZZ.one())), ZZ), &T_pow));
             let G = mod_f_ring.sub(T_pow, mod_f_ring.one());
-            let g = poly_ring.get_ring().ideal_gen(&f, &mod_f_ring.poly_repr(&poly_ring, &G, &poly_ring.base_ring().identity()));
+            let g = poly_ring.get_ring().ideal_gen_with_controller(&f, &mod_f_ring.poly_repr(&poly_ring, &G, &poly_ring.base_ring().identity()), controller.clone());
             if !poly_ring.is_unit(&g) && poly_ring.checked_div(&g, &f).is_none() {
                 return g;
             }

@@ -8,7 +8,7 @@ use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::*;
 use crate::homomorphism::*;
-use crate::computation::DontObserve;
+use crate::computation::{ComputationController, DontObserve};
 use crate::algorithms::resultant::ComputeResultantRing;
 use crate::integer::*;
 use crate::ordered::{OrderedRing, OrderedRingStore};
@@ -624,11 +624,20 @@ impl<I> PolyTFracGCDRing for RationalFieldBase<I>
     
         return power_decomp.into_iter().map(|(f, k)| (QQX.normalize(ZZX_to_QQX.map(f)), k)).collect();
     }
-    
+
     fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
         where P: RingStore + Copy,
-            P::Type: PolyRing,
+            P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    {
+        Self::gcd_with_controller(poly_ring, lhs, rhs, DontObserve)
+    }
+
+    fn gcd_with_controller<P, Controller>(poly_ring: P, lhs: &El<P>, rhs: &El<P>, controller: Controller) -> El<P>
+        where P: RingStore + Copy,
+            P::Type: PolyRing + DivisibilityRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
+            Controller: ComputationController
     {
         if poly_ring.is_zero(lhs) {
             return poly_ring.clone_el(rhs);
@@ -645,7 +654,7 @@ impl<I> PolyTFracGCDRing for RationalFieldBase<I>
         let ZZX = DensePolyRing::new(ZZ, "X");
         let lhs = ZZX.from_terms(QQX.terms(lhs).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm_lhs, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
         let rhs = ZZX.from_terms(QQX.terms(rhs).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm_rhs, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
-        let result = poly_gcd_local(&ZZX, lhs, rhs, DontObserve);
+        let result = poly_gcd_local(&ZZX, lhs, rhs, controller);
         let ZZX_to_QQX = QQX.lifted_hom(&ZZX, QQ.inclusion());
     
         return QQX.normalize(ZZX_to_QQX.map(result));

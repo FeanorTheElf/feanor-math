@@ -437,10 +437,6 @@ pub fn lll_quadratic_form<I, R, H, V1, T>(
         }
     }
 
-    // check if it is indeed `(delta, eta)`-LLL-reduced, considering errors;
-    // we only have to check for the Lovasz condition, since size-reduce already
-    // ensures that it is `eta`-size reduced
-
     return Ok(());
 }
 

@@ -149,9 +149,9 @@ fn factor_squarefree_monic_integer_poly_local<'a, P, Controller>(ZZX: P, f: &El<
     let mut rng = oorandom::Rand64::new(1);
     let bound = ln_factor_max_coeff(ZZX, f);
 
-    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+    for attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
 
-        let prime = ZZ.get_ring().random_suitable_ideal(|| rng.rand_u64());
+        let prime = ZZ.get_ring().random_suitable_ideal(|| rng.rand_u64(), attempt);
         assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&prime));
         let prime_f64 = BigIntRing::RING.to_float_approx(&ZZ.get_ring().principal_ideal_generator(&prime));
         let e = (bound / prime_f64.ln()).ceil() as usize + 1;

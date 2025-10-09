@@ -45,7 +45,7 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
 
     let ring = poly_ring.base_ring().get_ring();
 
-    let ideal = ring.random_suitable_ideal(rng);
+    let ideal = ring.random_suitable_ideal(rng, current_attempt);
     let heuristic_e = ring.heuristic_exponent(&ideal, poly_ring.degree(f).unwrap(), poly_ring.terms(f).map(|(c, _)| c));
     assert!(heuristic_e >= 1);
     let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt.try_into().unwrap())).floor() as usize;
