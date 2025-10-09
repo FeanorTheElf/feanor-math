@@ -89,7 +89,7 @@ fn search_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>, delta: i64) -> Option<
     where I::Type: IntegerRing,
         zn_64::ZnBase: CanHomFrom<I::Type>
 {
-    assert!(ZZ.is_pos(&n));
+    assert!(!ZZ.is_neg(&n));
 
     let m = SMALL_IS_COPRIME_TABLE.len();
     let Zm = zn_64::Zn::new(m as u64);
@@ -153,8 +153,8 @@ pub fn prev_prime<I: IntegerRingStore>(ZZ: I, n: El<I>) -> Option<El<I>>
     where I::Type: IntegerRing,
         zn_64::ZnBase: CanHomFrom<I::Type>
 {
-    assert!(ZZ.is_pos(&n));
-    if ZZ.is_one(&n) {
+    assert!(!ZZ.is_neg(&n));
+    if ZZ.is_zero(&n) || ZZ.is_one(&n) {
         return None;
     }
     let n_minus_one = ZZ.sub(n, ZZ.one());
@@ -169,7 +169,7 @@ pub fn next_prime<I: IntegerRingStore>(ZZ: I, n: El<I>) -> El<I>
     where I::Type: IntegerRing,
         zn_64::ZnBase: CanHomFrom<I::Type>
 {
-    assert!(ZZ.is_pos(&n));
+    assert!(!ZZ.is_neg(&n));
     let n_plus_one = ZZ.add(n, ZZ.one());
     search_prime(ZZ, n_plus_one, 1).unwrap()
 }
@@ -267,6 +267,7 @@ fn test_prev_prime() {
     assert_eq!(Some(2), prev_prime(StaticRing::<i64>::RING, 3));
     assert_eq!(None, prev_prime(StaticRing::<i64>::RING, 2));
     assert_eq!(None, prev_prime(StaticRing::<i64>::RING, 1));
+    assert_eq!(None, prev_prime(StaticRing::<i64>::RING, 0));
 
     let mut last_prime = 11;
     for i in 12..1000 {
@@ -287,6 +288,7 @@ fn test_next_prime() {
         }
     }
     assert_eq!(2, next_prime(StaticRing::<i64>::RING, 1));
+    assert_eq!(2, next_prime(StaticRing::<i64>::RING, 0));
 }
 
 #[test]
