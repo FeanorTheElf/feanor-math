@@ -591,12 +591,7 @@ fn test_generic_computation() {
         ring.sub_ref_snd(ring.int_hom().map(1), poly_ring.coefficient_at(&X2, 2)),
     ];
 
-    let start = std::time::Instant::now();
     let gb1 = buchberger_with_strategy(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_LOG_PROGRESS).unwrap_or_else(no_error);
-    let end = std::time::Instant::now();
-
-    println!("Computed GB in {} ms", (end - start).as_millis());
-
     assert_eq!(11, gb1.len());
 }
 
@@ -660,16 +655,11 @@ fn test_expensive_gb_1() {
         8 * Y2 * Y6 + 8 * Y1 * Y7.clone()
     ]);
 
-    let start = std::time::Instant::now();
     let gb = buchberger_with_strategy(&ring, system.iter().map(|f| ring.clone_el(f)).collect(), DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_COMPUTATION_CONTROLLER).unwrap_or_else(no_error);
-    let end = std::time::Instant::now();
-
-    println!("Computed GB in {} ms", (end - start).as_millis());
 
     for f in &part_of_result {
         assert!(ring.is_zero(&multivariate_division(&ring, ring.clone_el(f), gb.iter(), DegRevLex)));
     }
-
     assert_eq!(108, gb.len());
 }
 
@@ -689,12 +679,7 @@ fn test_expensive_gb_2() {
         2 * X0 * X6.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(4)
     ]);
 
-    let start = std::time::Instant::now();
     let gb = buchberger_with_strategy(&ring, basis, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_COMPUTATION_CONTROLLER).unwrap_or_else(no_error);
-    let end = std::time::Instant::now();
-
-    println!("Computed GB in {} ms", (end - start).as_millis());
-
     assert_eq!(130, gb.len());
 }
 
@@ -708,13 +693,8 @@ fn test_groebner_cyclic6() {
         [x + y + z + t + u + v, x*y + y*z + z*t + t*u + x*v + u*v, x*y*z + y*z*t + z*t*u + x*y*v + x*u*v + t*u*v, x*y*z*t + y*z*t*u + x*y*z*v + x*y*u*v + x*t*u*v + z*t*u*v, x*y*z*t*u + x*y*z*t*v + x*y*z*u*v + x*y*t*u*v + x*z*t*u*v + y*z*t*u*v, x*y*z*t*u*v - 1]
     });
 
-    let start = std::time::Instant::now();
     let gb = buchberger_with_strategy(&ring, cyclic6, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_COMPUTATION_CONTROLLER).unwrap_or_else(no_error);
-    let end = std::time::Instant::now();
-
-    println!("Computed GB in {} ms", (end - start).as_millis());
     assert_eq!(45, gb.len());
-
 }
 
 #[test]
@@ -728,11 +708,7 @@ fn test_groebner_cyclic7() {
         x*y*z*t*u + y*z*t*u*v + x*y*z*t*w + x*y*z*v*w + x*y*u*v*w + x*t*u*v*w + z*t*u*v*w, x*y*z*t*u*v + x*y*z*t*u*w + x*y*z*t*v*w + x*y*z*u*v*w + x*y*t*u*v*w + x*z*t*u*v*w + y*z*t*u*v*w, x*y*z*t*u*v*w - 1
     ]);
 
-    let start = std::time::Instant::now();
     let gb = buchberger_with_strategy(&ring, cyclic7, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_COMPUTATION_CONTROLLER).unwrap_or_else(no_error);
-    let end = std::time::Instant::now();
-
-    println!("Computed GB in {} ms", (end - start).as_millis());
     assert_eq!(209, gb.len());
 }
 
@@ -748,10 +724,6 @@ fn test_groebner_cyclic8() {
         x*y*z*s*t*u*v + x*y*z*s*t*u*w + x*y*z*s*t*v*w + x*y*z*s*u*v*w + x*y*z*t*u*v*w + x*y*s*t*u*v*w + x*z*s*t*u*v*w + y*z*s*t*u*v*w, x*y*z*s*t*u*v*w - 1
     ]);
 
-    let start = std::time::Instant::now();
     let gb = buchberger_with_strategy(&ring, cyclic7, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_COMPUTATION_CONTROLLER).unwrap_or_else(no_error);
-    let end = std::time::Instant::now();
-
-    println!("Computed GB in {} ms", (end - start).as_millis());
     assert_eq!(372, gb.len());
 }

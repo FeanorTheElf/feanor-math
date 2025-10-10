@@ -1,4 +1,4 @@
-use std::{fmt::Arguments, io::Write, sync::atomic::{AtomicBool, Ordering}};
+use std::{fmt::Arguments, io::Write, sync::atomic::{AtomicBool, Ordering}, time::Instant};
 
 use atomicbox::AtomicOptionBox;
 
@@ -105,7 +105,6 @@ pub trait ComputationController: Clone + UnstableSealed {
     /// Inspired by Rayon, and behaves the same as `join()` there.
     /// Concretely, this function runs both closures, possibly in parallel, and
     /// returns their results.
-    /// 
     /// 
     #[stability::unstable(feature = "enable")]
     fn join<A, B, RA, RB>(self, oper_a: A, oper_b: B) -> (RA, RB)
@@ -359,11 +358,13 @@ impl ComputationController for LogProgress {
         where F: FnOnce(Self) -> T
     {
         self.log(description);
+        let start = Instant::now();
         let result = computation(Self { inner_comp: true });
+        let end = Instant::now();
         if self.inner_comp {
-            self.log(format_args!("done."));
+            self.log(format_args!("done({} ms).", (end - start).as_millis()));
         } else {
-            self.log(format_args!("done.\n"));
+            self.log(format_args!("done({} ms).\n", (end - start).as_millis()));
         }
         return result;
     }

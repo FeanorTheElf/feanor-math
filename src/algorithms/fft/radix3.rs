@@ -279,14 +279,11 @@ impl<R_main, R_twiddle, H, A> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>
             &self.twiddles[step]
         };
         let third_root_of_unity = &self.third_root_of_unity;
-        // let start = std::time::Instant::now();
         butterfly_loop(self.log3_n, data, step, twiddles, |x, y, z, twiddle1, twiddle2| if INV {
             <R_main as CooleyTukeyRadix3Butterfly<R_twiddle>>::inv_butterfly(&self.hom, x, y, z, &third_root_of_unity, twiddle1, twiddle2)
         } else {
             <R_main as CooleyTukeyRadix3Butterfly<R_twiddle>>::butterfly(&self.hom, x, y, z, &third_root_of_unity, twiddle1, twiddle2)
         });
-        // let end = std::time::Instant::now();
-        // BUTTERFLY_RADIX3_TIMES[step].fetch_add((end - start).as_micros() as usize, std::sync::atomic::Ordering::Relaxed);
     }
 
     fn fft_impl(&self, data: &mut [R_main::Element]) {

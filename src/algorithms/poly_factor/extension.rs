@@ -55,7 +55,7 @@ pub fn poly_factor_squarefree_extension<P, Controller>(LX: P, f: &El<P>, attempt
             );
             let gen_poly = L.generating_poly(&KXY, KX.inclusion());
         
-            return <_ as ComputeResultantRing>::resultant(&KXY, f_over_KY, gen_poly);
+            return <_ as ComputeResultantRing>::resultant_with_controller(&KXY, f_over_KY, gen_poly, controller.clone());
         };
 
         // we want to find `k` such that `N(f(X + k theta))` remains square-free, where `theta` generates `L`;
@@ -88,7 +88,6 @@ pub fn poly_factor_squarefree_extension<P, Controller>(LX: P, f: &El<P>, attempt
             let f_transformed = LX.evaluate(f, &lin_transform, &LX.inclusion());
 
             let norm_f_transformed = Norm(LX.clone_el(&f_transformed));
-            log_progress!(controller, "(norm)");
             let degree = KX.degree(&norm_f_transformed).unwrap();
             let squarefree_part = <_ as PolyTFracGCDRing>::squarefree_part(&KX, &norm_f_transformed);
             log_progress!(controller, "(squarefree)");

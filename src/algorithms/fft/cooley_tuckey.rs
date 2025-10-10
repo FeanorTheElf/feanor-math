@@ -565,7 +565,6 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         } else {
             &self.root_of_unity_list[log2_step]
         };
-        // let start = std::time::Instant::now();
         let butterfly = |a: &mut _, b: &mut _, twiddle: &_| {
             if INV {
                 if !IS_PREPARED {
@@ -582,8 +581,6 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
             }
         };
         butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, twiddles, butterfly);
-        // let end = std::time::Instant::now();
-        // BUTTERFLY_TIMES[log2_step].fetch_add((end - start).as_micros() as usize, std::sync::atomic::Ordering::Relaxed);
     }
     
     ///

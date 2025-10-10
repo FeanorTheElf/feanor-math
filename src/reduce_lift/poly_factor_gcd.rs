@@ -698,7 +698,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
             fn random_suitable_ideal<'ring, F>(&'ring self, rng: F, attempt: usize) -> Self::SuitableIdeal<'ring>
                 where F: FnMut() -> u64
             {
-                let lower_bound = StaticRing::<i64>::RING.get_ring().get_uniformly_random_bits(std::cmp::min(57, 6 + attempt), rng);
+                let lower_bound = StaticRing::<i64>::RING.get_ring().get_uniformly_random_bits(std::cmp::min(57, 8 + 8 * attempt), rng);
                 return $crate::algorithms::miller_rabin::next_prime(StaticRing::<i64>::RING, lower_bound);
             }
         

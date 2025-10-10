@@ -322,8 +322,6 @@ pub fn lenstra_ec_factor<R, Controller>(Zn: R, controller: Controller) -> Result
 #[cfg(test)]
 use crate::rings::zn::zn_64::Zn;
 #[cfg(test)]
-use std::time::Instant;
-#[cfg(test)]
 use test::Bencher;
 #[cfg(test)]
 use crate::rings::rust_bigint::*;
@@ -359,18 +357,12 @@ fn test_ec_factor_large() {
 
     let n: i128 = 1073741827 * 71316922984999;
 
-    let begin = Instant::now();
     let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::Zn::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n)), controller.clone()).unwrap_or_else(no_error));
-    let end = Instant::now();
-    println!("Done in {} ms", (end - begin).as_millis());
     assert!(p == 1073741827 || p == 71316922984999);
 
     let n: i128 = 1152921504606847009 * 2305843009213693967;
 
-    let begin = Instant::now();
     let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::Zn::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n)), controller).unwrap_or_else(no_error));
-    let end = Instant::now();
-    println!("Done in {} ms", (end - begin).as_millis());
     assert!(p == 1152921504606847009 || p == 2305843009213693967);
 }
 
@@ -385,10 +377,7 @@ fn test_compute_partial_factorization() {
     );
 
     let Zn = zn_big::Zn::new(ZZbig, ZZbig.clone_el(&n));
-    let begin = Instant::now();
     let factor = lenstra_ec_factor_small(&Zn, 50, 1, TEST_LOG_PROGRESS).unwrap_or_else(no_error).unwrap();
-    let end = Instant::now();
-    println!("Done in {} ms", (end - begin).as_millis());
     ZZbig.println(&factor);
     assert!(!ZZbig.is_one(&factor));
     assert!(!ZZbig.eq_el(&factor, &n));

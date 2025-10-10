@@ -155,12 +155,16 @@ pub fn interpolate<P, V1, V2, A: Allocator>(poly_ring: P, x: V1, y: V2, allocato
         R.mul_assign(&mut factors[i], y.at(i));
     }
 
-    if let Some(inv) = R.invert(&denominator) {
-        Ok(poly_ring.inclusion().mul_map(<_ as RingStore>::sum(&poly_ring, nums.into_iter().zip(factors.into_iter()).map(|(num, c)| poly_ring.inclusion().mul_map(num, c))), inv))
-    } else {
-        let scaled_result = <_ as RingStore>::sum(&poly_ring, nums.into_iter().zip(factors.into_iter()).map(|(num, c)| poly_ring.inclusion().mul_map(num, c)));
-        poly_ring.try_from_terms(poly_ring.terms(&scaled_result).map(|(c, i)| R.checked_div(&c, &denominator).map(|c| (c, i)).ok_or(InterpolationError::NotInvertible)))
+    let mut scaled_result = poly_ring.zero();
+    for (num, c) in nums.into_iter().zip(factors.into_iter()) {
+        scaled_result = poly_ring.inclusion().fma_map(&num, &c, scaled_result);
     }
+    let result = if let Some(inv) = R.invert(&denominator) {
+        Ok(poly_ring.inclusion().mul_map(scaled_result, inv))
+    } else {
+        poly_ring.try_from_terms(poly_ring.terms(&scaled_result).map(|(c, i)| R.checked_div(&c, &denominator).map(|c| (c, i)).ok_or(InterpolationError::NotInvertible)))
+    };
+    return result;
 }
 
 #[stability::unstable(feature = "enable")]

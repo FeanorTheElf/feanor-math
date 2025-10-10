@@ -5,7 +5,7 @@ use feanor_serde::seq::*;
 
 use crate::algorithms::convolution::*;
 use crate::algorithms::interpolate::interpolate;
-use crate::algorithms::poly_div::fast_poly_div_rem;
+use crate::algorithms::poly_div::{fast_poly_div_rem, poly_div_rem, poly_rem, FAST_POLY_DIV_THRESHOLD};
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::computation::{no_error, ComputationController, DontObserve};
 use crate::reduce_lift::poly_eval::{EvalPolyLocallyRing, InterpolationBaseRing, ToExtRingMap};
@@ -730,9 +730,23 @@ impl<R, A, C> EuclideanRing for DensePolyRingBase<R, A, C>
     where A: Allocator + Clone + Send + Sync, R: RingStore, R::Type: Field + PolyTFracGCDRing, C: ConvolutionAlgorithm<R::Type>
 {
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+        assert!(!self.is_zero(&rhs));
         let lc_inv = self.base_ring.invert(&rhs.data[self.degree(rhs).unwrap()]).unwrap();
-        let (quo, rem) = fast_poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().mul_ref(&x, &lc_inv)), DontObserve).unwrap_or_else(no_error);
-        return (quo, rem);
+        if self.degree(&lhs).unwrap_or(0).saturating_sub(self.degree(rhs).unwrap()) < FAST_POLY_DIV_THRESHOLD {
+            return poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().mul_ref(&x, &lc_inv))).unwrap_or_else(no_error);
+        } else {
+            return fast_poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().mul_ref(&x, &lc_inv)), DontObserve).unwrap_or_else(no_error);
+        }
+    }
+
+    fn euclidean_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
+        assert!(!self.is_zero(&rhs));
+        let lc_inv = self.base_ring.invert(&rhs.data[self.degree(rhs).unwrap()]).unwrap();
+        if self.degree(&lhs).unwrap_or(0).saturating_sub(self.degree(rhs).unwrap()) < FAST_POLY_DIV_THRESHOLD {
+            return poly_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().mul_ref(&x, &lc_inv))).unwrap_or_else(no_error);
+        } else {
+            return fast_poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().mul_ref(&x, &lc_inv)), DontObserve).unwrap_or_else(no_error).1;
+        }
     }
 
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
