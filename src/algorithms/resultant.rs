@@ -267,7 +267,7 @@ fn test_resultant_local_polynomial() {
 
     let actual = <_ as ComputeResultantRing>::resultant(&QQXY, QQXY.clone_el(&f), QQXY.clone_el(&g));
     let [expected] = QQX.with_wrapped_indeterminate(|X| [X.pow_ref(8) + 2 * X.pow_ref(7) + 3 * X.pow_ref(6) - 5 * X.pow_ref(5) - 10 * X.pow_ref(4) - 7 * X.pow_ref(3) + 8 * X.pow_ref(2) + 8 * X + 4]);
-    assert_el_eq!(&QQX, &actual, &actual);
+    assert_el_eq!(&QQX, &expected, &actual);
 
     let QQYX = MultivariatePolyRingImpl::new(&QQ, 2);
     // reverse the order of indeterminates, so that we indeed eliminate `Y`
