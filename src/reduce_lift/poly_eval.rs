@@ -629,11 +629,11 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
             type LocalRingBase<'ring> = $crate::rings::field::AsFieldBase<$crate::rings::zn::zn_64::Zn>
                 where Self: 'ring;
 
-            fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
+            fn ln_valuation(&self, el: &Self::Element) -> f64 {
                 RingRef::new(self).abs_log2_ceil(el).unwrap_or(0) as f64 * 2f64.ln()
             }
 
-            fn local_computation<'ring>(&'ring self, ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
+            fn local_computation<'ring>(&'ring self, ln_valuation_bound: f64) -> Self::LocalComputationData<'ring> {
                 let mut primes = Vec::new();
                 let mut ln_current = 0.;
                 let mut prime_it = //$crate::reduce_lift::primelist::LARGE_PRIMES.iter().copied().chain
@@ -644,7 +644,7 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
                     }
                     return Some($crate::rings::zn::zn_64::Zn::new(*current as u64));
                 }));
-                while ln_current < ln_pseudo_norm_bound + 1. {
+                while ln_current < ln_valuation_bound + 1. {
                     let Fp = prime_it.next().unwrap();
                     ln_current += (*$crate::rings::zn::ZnRingStore::modulus(&Fp) as f64).ln();
                     primes.push(Fp);
