@@ -364,6 +364,10 @@ impl<'a, V, T> VectorView<T> for Column<'a, V, T>
             self.raw_data.entry_at(i, 0).as_ref()
         }
     }
+    
+    fn specialize_sparse<Op: crate::seq::SparseVectorViewOperation<T, Self>>(op: Op) -> Op::Output {
+        op.fallback()
+    }
 }
 
 ///
@@ -464,6 +468,10 @@ impl<'a, V, T> VectorView<T> for ColumnMut<'a, V, T>
         unsafe {
             self.raw_data.entry_at(i, 0).as_ref()
         }
+    }
+    
+    fn specialize_sparse<Op: crate::seq::SparseVectorViewOperation<T, Self>>(op: Op) -> Op::Output {
+        op.fallback()
     }
 }
 

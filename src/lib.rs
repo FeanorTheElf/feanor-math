@@ -70,6 +70,8 @@ pub mod unstable_sealed {
 mod lazy;
 mod cow;
 
+
+pub mod function;
 ///
 /// Contains [`computation::ComputationController`] to observe long-running computations.
 /// 

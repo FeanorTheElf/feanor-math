@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use crate::{function::{IdentityFunction, TensorProductFunction}, impl_specialize_sparse_wrapped_vector, seq::VectorViewSparse};
+
 use super::{SwappableVectorViewMut, VectorFn, VectorView, VectorViewMut};
 
 pub struct VectorViewMap<V: VectorView<T>, T: ?Sized, U: ?Sized, F: for<'a> Fn(&'a T) -> &'a U> {
@@ -41,6 +43,28 @@ impl<V: VectorView<T>, T: ?Sized, U: ?Sized, F: for<'a> Fn(&'a T) -> &'a U> Vect
     fn len(&self) -> usize {
         self.base.len()
     }
+
+    fn specialize_sparse<Op: super::SparseVectorViewOperation<U, Self>>(op: Op) -> Op::Output {
+        impl_specialize_sparse_wrapped_vector!{ 
+            op; <{ T, V, Op, U, F }> specialize_sparse 
+                where V: VectorView<T>, 
+                    Op: SparseVectorViewOperation<U, VectorViewMap<V, T, U, F>>, 
+                    T: ?Sized, 
+                    U: ?Sized, 
+                    F: for<'a> Fn(&'a T) -> &'a U
+        }
+    }
+}
+
+impl<V: VectorViewSparse<T>, T: ?Sized, U: ?Sized, F: for<'a> Fn(&'a T) -> &'a U> VectorViewSparse<U> for VectorViewMap<V, T, U, F> {
+
+    type Iter<'a> = std::iter::Map<V::Iter<'a>, TensorProductFunction<IdentityFunction, &'a F>>
+        where Self: 'a, 
+            U: 'a;
+
+    fn nontrivial_entries<'a>(&'a self) -> Self::Iter<'a> {
+        self.base.nontrivial_entries().map(TensorProductFunction(IdentityFunction, &self.mapping_fn))
+    }
 }
 
 pub struct VectorViewMapMut<V: VectorViewMut<T>, T: ?Sized, U: ?Sized, F_const: for<'a> Fn(&'a T) -> &'a U, F_mut: for<'a> FnMut(&'a mut T) -> &'a mut U> {
@@ -69,6 +93,18 @@ impl<V: VectorViewMut<T>, T: ?Sized, U: ?Sized, F_const: for<'a> Fn(&'a T) -> &'
     fn len(&self) -> usize {
         self.base.len()
     }
+    
+    fn specialize_sparse<Op: super::SparseVectorViewOperation<U, Self>>(op: Op) -> Op::Output {
+        impl_specialize_sparse_wrapped_vector!{ 
+            op; <{ T, V, Op, U, F_const, F_mut }> specialize_sparse 
+                where V: VectorView<T>, 
+                    Op: SparseVectorViewOperation<U, VectorViewMapMut<V, T, U, F_const, F_mut>>, 
+                    T: ?Sized, 
+                    V: VectorViewMut<T>,
+                    U: ?Sized, 
+                    F_const: for<'a> Fn(&'a T) -> &'a U, F_mut: for<'a> FnMut(&'a mut T) -> &'a mut U
+        }
+    }
 }
 
 impl<V: VectorViewMut<T>, T: ?Sized, U: ?Sized, F_const: for<'a> Fn(&'a T) -> &'a U, F_mut: for<'a> FnMut(&'a mut T) -> &'a mut U> VectorViewMut<U> for VectorViewMapMut<V, T, U, F_const, F_mut> {
@@ -82,6 +118,17 @@ impl<V: SwappableVectorViewMut<T>, T: ?Sized, U: ?Sized, F_const: for<'a> Fn(&'a
 
     fn swap(&mut self, i: usize, j: usize) {
         self.base.swap(i, j)
+    }
+}
+
+impl<V: VectorViewSparse<T> + VectorViewMut<T>, T: ?Sized, U: ?Sized, F_const: for<'a> Fn(&'a T) -> &'a U, F_mut: for<'a> FnMut(&'a mut T) -> &'a mut U> VectorViewSparse<U> for VectorViewMapMut<V, T, U, F_const, F_mut> {
+
+    type Iter<'a> = std::iter::Map<V::Iter<'a>, TensorProductFunction<IdentityFunction, &'a F_const>>
+        where Self: 'a, 
+            U: 'a;
+
+    fn nontrivial_entries<'a>(&'a self) -> Self::Iter<'a> {
+        self.base.nontrivial_entries().map(TensorProductFunction(IdentityFunction, &self.mapping_fns.0))
     }
 }
 

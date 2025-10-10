@@ -47,28 +47,30 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for SubvectorView<V, T> {
         self.end - self.begin
     }
 
-    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
+    fn specialize_sparse<Op: SparseVectorViewOperation<T, Self>>(op: Op) -> Op::Output {
 
-        struct WrapSubvector<T: ?Sized, Op: SparseVectorViewOperation<T>> {
+        struct WrapSubvector<T: ?Sized, V: VectorView<T>, Op: SparseVectorViewOperation<T, SubvectorView<V, T>>> {
             op: Op,
             element: PhantomData<T>,
-            begin: usize,
-            end: usize
+            vector: PhantomData<V>
         }
 
-        impl<T: ?Sized, Op: SparseVectorViewOperation<T>> SparseVectorViewOperation<T> for WrapSubvector<T, Op> {
+        impl<T: ?Sized, V: VectorView<T>, Op: SparseVectorViewOperation<T, SubvectorView<V, T>>> SparseVectorViewOperation<T, V> for WrapSubvector<T, V, Op> {
 
-            type Output<'a> = Op::Output<'a>
-                where Self: 'a;
+            type Output = Op::Output;
 
-            fn execute<'a, V: 'a + VectorViewSparse<T> + Clone>(self, vector: V) -> Self::Output<'a>
-                where Self: 'a
+            fn execute(self) -> Self::Output
+                where V: VectorViewSparse<T>
             {
-                self.op.execute(SubvectorView::new(vector).restrict_full(self.begin..self.end))
+                self.op.execute()
+            }
+
+            fn fallback(self) -> Self::Output {
+                self.op.fallback()
             }
         }
 
-        self.base.specialize_sparse(WrapSubvector { op: op, element: PhantomData, begin: self.begin, end: self.end })
+        V::specialize_sparse(WrapSubvector { op: op, element: PhantomData, vector: PhantomData })
     }
 
     fn as_slice<'a>(&'a self) -> Option<&'a [T]>
@@ -284,19 +286,25 @@ fn test_subvector_sparse() {
 
     let subvector = SubvectorView::new(sparse_vector).restrict(20..=256);
 
-    struct Verify;
+    struct Verify(SubvectorView<SparseMapVector<StaticRing<i64>>, i64>);
 
-    impl SparseVectorViewOperation<i64> for Verify {
+    impl SparseVectorViewOperation<i64, SubvectorView<SparseMapVector<StaticRing<i64>>, i64>> for Verify {
 
-        type Output<'a> = ();
+        type Output = ();
 
-        fn execute<'a, V: 'a + VectorViewSparse<i64>>(self, vector: V) -> Self::Output<'a> {
+        fn execute(self) -> Self::Output
+            where SubvectorView<SparseMapVector<StaticRing<i64>>, i64>: VectorViewSparse<i64>
+        {
             assert!(
-                vec![(20, &20), (256, &256)] == vector.nontrivial_entries().collect::<Vec<_>>() ||
-                vec![(256, &256), (20, &20)] == vector.nontrivial_entries().collect::<Vec<_>>()
+                vec![(20, &20), (256, &256)] == self.0.nontrivial_entries().collect::<Vec<_>>() ||
+                vec![(256, &256), (20, &20)] == self.0.nontrivial_entries().collect::<Vec<_>>()
             );
+        }
+
+        fn fallback(self) -> Self::Output {
+            unreachable!()
         }
     }
 
-    subvector.specialize_sparse(Verify).unwrap();
+    VectorView::specialize_sparse(Verify(subvector));
 }

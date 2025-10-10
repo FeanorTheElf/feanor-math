@@ -141,12 +141,7 @@ impl<R, V, A, C> FreeAlgebraImpl<R, V, A, C>
 {
     #[stability::unstable(feature = "enable")]
     pub fn new_with_convolution(base_ring: R, rank: usize, x_pow_rank: V, gen_name: &'static str, element_allocator: A, convolution: C) -> Self {
-        assert!(rank >= 1);
-        assert!(x_pow_rank.len() <= rank);
-        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
-        RingValue::from(FreeAlgebraImplBase {
-            base_ring, gen_name, x_pow_rank, element_allocator, rank, log2_padded_len, convolution
-        })
+        RingValue::from(FreeAlgebraImplBase::create(base_ring, rank, x_pow_rank, gen_name, element_allocator, convolution))
     }
 }
 
@@ -170,6 +165,16 @@ impl<R, V, A, C> FreeAlgebraImplBase<R, V, A, C>
     }
 
     #[stability::unstable(feature = "enable")]
+    pub fn create(base_ring: R, rank: usize, x_pow_rank: V, gen_name: &'static str, element_allocator: A, convolution: C) -> Self {
+        assert!(rank >= 1);
+        assert!(x_pow_rank.len() <= rank);
+        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
+        FreeAlgebraImplBase {
+            base_ring, gen_name, x_pow_rank, element_allocator, rank, log2_padded_len, convolution
+        }
+    }
+
+    #[stability::unstable(feature = "enable")]
     pub fn allocator(&self) -> &A {
         &self.element_allocator
     }
@@ -190,43 +195,44 @@ impl<R, V, A, C> FreeAlgebraImplBase<R, V, A, C>
     }
 
     fn reduce_mod_poly(&self, data: &mut [El<R>]) {
-        struct ReduceModulo<'a, R>
-            where R: RingStore
+        struct ReduceModulo<'a, R, V>
+            where R: RingStore,
+                V: VectorView<El<R>>
         {
             rank: usize,
             base_ring: &'a R,
+            x_pow_rank: &'a V,
             data: &'a mut [El<R>]
         }
 
-        impl<'a, R> SparseVectorViewOperation<El<R>> for ReduceModulo<'a, R>
-            where R: RingStore
+        impl<'a, R, V> SparseVectorViewOperation<El<R>, V> for ReduceModulo<'a, R, V>
+            where R: RingStore,
+                V: VectorView<El<R>>
         {
-            type Output<'b> = ()
-                where Self: 'b;
+            type Output = ();
         
-            fn execute<'b, V: 'b + VectorViewSparse<El<R>>>(self, vector: V) -> () {
+            fn execute(self) -> () 
+                where V: VectorViewSparse<El<R>>
+            {
                 for i in (self.rank..(2 * self.rank)).rev() {
-                    for (j, c) in vector.nontrivial_entries() {
+                    for (j, c) in self.x_pow_rank.nontrivial_entries() {
                         let add = self.base_ring.mul_ref(c, &mut self.data[i]);
+                        self.base_ring.add_assign(&mut self.data[i - self.rank + j], add);
+                    }
+                }
+            }
+
+            fn fallback(self) -> Self::Output {
+                for i in (self.rank..(2 * self.rank)).rev() {
+                    for j in 0..self.x_pow_rank.len() {
+                        let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &self.data[i]);
                         self.base_ring.add_assign(&mut self.data[i - self.rank + j], add);
                     }
                 }
             }
         }
 
-        let was_sparse = self.x_pow_rank.specialize_sparse(ReduceModulo {
-            rank: self.rank,
-            base_ring: self.base_ring(),
-            data: data
-        });
-        if was_sparse.is_err() {
-            for i in (self.rank()..(2 * self.rank())).rev() {
-                for j in 0..self.x_pow_rank.len() {
-                    let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &data[i]);
-                    self.base_ring.add_assign(&mut data[i - self.rank() + j], add);
-                }
-            }
-        }
+        V::specialize_sparse(ReduceModulo { base_ring: self.base_ring(), rank: self.rank, x_pow_rank: &self.x_pow_rank, data })
     }
 }
 

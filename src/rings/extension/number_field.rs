@@ -804,7 +804,7 @@ type LocalRing<'ring, I> = <<I as RingStore>::Type as PolyGCDLocallyDomain>::Loc
 
 type ImplementationRing<'ring, I> = AsFieldBase<FreeAlgebraImpl<
     AsField<<<I as RingStore>::Type as IntegerPolyGCDRing>::LocalRingAsZn<'ring>>, 
-    SparseMapVector<AsField<<<I as RingStore>::Type as IntegerPolyGCDRing>::LocalRingAsZn<'ring>>>>
+    Vec<El<AsField<<<I as RingStore>::Type as IntegerPolyGCDRing>::LocalRingAsZn<'ring>>>>>
 >;
 
 struct NumberFieldOrderQuotient<'ring, I>
@@ -819,7 +819,14 @@ impl<'ring, I> Clone for NumberFieldOrderQuotient<'ring, I>
         I::Type: IntegerRing
 {
     fn clone(&self) -> Self {
-        Self { implementation: self.implementation.clone() }
+        Self { implementation: RingValue::from(AsFieldBase::promise_is_field(RingValue::from(FreeAlgebraImplBase::create(
+            self.implementation.base_ring().clone(),
+            self.implementation.rank(),
+            self.implementation.get_ring().get_delegate().x_pow_rank().iter().map(|x| self.implementation.base_ring().clone_el(x)).collect(),
+            self.implementation.get_ring().get_delegate().gen_name(),
+            self.implementation.get_ring().get_delegate().allocator().clone(),
+            self.implementation.get_ring().get_delegate().convolution().clone()
+        ))).unwrap()) }
     }
 }
 
@@ -1071,13 +1078,14 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
             .compose(PolyGCDLocallyBaseRingToFieldIso::new(ZZ.get_ring(), &ideal.prime, ideal.Fp_as_ring.get_ring(), FpX.base_ring().get_ring(), 0).inv());
 
         let irred_poly = &ideal.minpoly_factors_mod_p[idx];
-        let mut x_pow_rank = SparseMapVector::new(FpX.degree(irred_poly).unwrap(), ideal.Fp_as_zn.clone());
+        let mut x_pow_rank = (0..FpX.degree(irred_poly).unwrap()).map(|_| Fp_to_Fp.codomain().zero()).collect::<Vec<_>>();
         for (c, i) in FpX.terms(irred_poly) {
             if i < x_pow_rank.len() {
                 *x_pow_rank.at_mut(i) = Fp_to_Fp.codomain().negate(Fp_to_Fp.map_ref(c));
             }
         }
-        _ = x_pow_rank.at_mut(0);
+        let trailing_zeros = x_pow_rank.iter().rev().take_while(|x| Fp_to_Fp.codomain().is_zero(x)).count();
+        x_pow_rank.truncate(x_pow_rank.len() - trailing_zeros);
         return RingValue::from(NumberFieldOrderQuotient {
             implementation: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new(ideal.Fp_as_zn.clone(), FpX.degree(irred_poly).unwrap(), x_pow_rank))),
         });

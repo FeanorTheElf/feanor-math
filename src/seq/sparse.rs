@@ -107,8 +107,8 @@ impl<R: RingStore> VectorView<El<R>> for SparseMapVector<R> {
         self.len
     }
 
-    fn specialize_sparse<'a, Op: SparseVectorViewOperation<El<R>>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
-        Ok(op.execute(self))
+    fn specialize_sparse<Op: SparseVectorViewOperation<El<R>, Self>>(op: Op) -> Op::Output {
+        op.execute()
     }
 }
 

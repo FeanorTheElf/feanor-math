@@ -1,6 +1,7 @@
 
 use std::alloc::Allocator;
 use std::fmt::{Debug, Formatter};
+use std::marker::PhantomData;
 use std::ops::{Bound, Range, RangeBounds};
 
 pub use conversion::{CloneElFn, VectorViewFn, VectorFnIter};
@@ -96,9 +97,7 @@ pub trait VectorView<T: ?Sized> {
     /// `V: VectorViewSparse`, even though specialization currently does not support
     /// this.
     /// 
-    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, _op: Op) -> Result<Op::Output<'a>, ()> {
-        Err(())
-    }
+    fn specialize_sparse<Op: SparseVectorViewOperation<T, Self>>(_op: Op) -> Op::Output;
 
     ///
     /// Returns an iterator over all elements in this vector.
@@ -277,16 +276,80 @@ pub trait VectorViewSparse<T: ?Sized>: VectorView<T> {
 /// 
 /// Used as a workaround for specialization, together with [`VectorView::specialize_sparse()`].
 /// 
-/// TODO: on next breaking update (unfortunate that I missed 3.0.0), replace this by
-/// the more powerful workaround technique as used for finite rings in [`crate::specialization`].
-/// 
-pub trait SparseVectorViewOperation<T: ?Sized> {
+pub trait SparseVectorViewOperation<T: ?Sized, V: ?Sized> {
 
-    type Output<'a>
-        where Self: 'a;
+    type Output;
 
-    fn execute<'a, V: 'a + VectorViewSparse<T> + Clone>(self, vector: V) -> Self::Output<'a>
-        where Self: 'a;
+    fn execute(self) -> Self::Output
+        where V: VectorViewSparse<T>;
+
+    fn fallback(self) -> Self::Output;
+}
+
+#[macro_export]
+macro_rules! impl_specialize_sparse_wrapped_vector {
+    (# lt_args_to_phantom_data; $($lt_args:lifetime),*) => {
+        PhantomData<($(&$lt_args ()),*,)>
+    };
+    (# gen_args_to_phantom_data; ) => {
+        PhantomData<()>
+    };
+    (# gen_args_to_phantom_data; $($gen_args:ident),+) => {
+        PhantomData<($(Box<$gen_args>),*,)>
+    };
+    ($op:expr; <{ T, V, Op, $($gen_args:ident),* }> specialize_sparse where V: VectorView<T>, Op: SparseVectorViewOperation<$el_ty:ty, $self_ty:ty>, $($constraints:tt)*)=> {
+        struct DelegateSparseVectorViewOperation<T, V, Op, $($gen_args),*>
+            where V: $crate::seq::VectorView<T>, Op: $crate::seq::SparseVectorViewOperation<$el_ty, $self_ty>, $($constraints)*
+        {
+            op: Op,
+            vector: std::marker::PhantomData<V>,
+            element: std::marker::PhantomData<T>,
+            gen_args: $crate::impl_specialize_sparse_wrapped_vector!(# gen_args_to_phantom_data; $($gen_args),*)
+        }
+        impl<T, V, Op, $($gen_args),*> $crate::seq::SparseVectorViewOperation<T, V> for DelegateSparseVectorViewOperation<T, V, Op, $($gen_args),*>
+            where V: $crate::seq::VectorView<T>, Op: $crate::seq::SparseVectorViewOperation<$el_ty, $self_ty>, $($constraints)*
+        {
+            type Output = Op::Output;
+
+            fn execute(self) -> Self::Output
+                where V: $crate::seq::VectorViewSparse<T>
+            {
+                self.op.execute()
+            }
+
+            fn fallback(self) -> Self::Output {
+                self.op.fallback()
+            }
+        }
+        <V as $crate::seq::VectorView<_>>::specialize_sparse(DelegateSparseVectorViewOperation { op: $op, vector: std::marker::PhantomData, element: std::marker::PhantomData, gen_args: std::marker::PhantomData })
+    };
+    ($op:expr; <{ $($lt_args:lifetime),+; T, V, Op, $($gen_args:ident),* }> specialize_sparse where V: VectorView<T>, Op: SparseVectorViewOperation<$el_ty:ty, $self_ty:ty>, $($constraints:tt)*)=> {
+        struct DelegateSparseVectorViewOperation<$($lt_args),*, T, V, Op, $($gen_args),*>
+            where V: $crate::seq::VectorView<T>, Op: $crate::seq::SparseVectorViewOperation<$el_ty, $self_ty>, $($constraints)*
+        {
+            op: Op,
+            vector: std::marker::PhantomData<V>,
+            element: std::marker::PhantomData<T>,
+            lifetimes: $crate::impl_specialize_sparse_wrapped_vector!(# lt_args_to_phantom_data; $($lt_args),*),
+            gen_args: $crate::impl_specialize_sparse_wrapped_vector!(# gen_args_to_phantom_data; $($gen_args),*)
+        }
+        impl<$($lt_args),*, T, V, Op, $($gen_args)*> $crate::seq::SparseVectorViewOperation<T, V> for DelegateSparseVectorViewOperation<$($lt_args),*, T, V, Op, $($gen_args),*>
+            where V: $crate::seq::VectorView<T>, Op: $crate::seq::SparseVectorViewOperation<$el_ty, $self_ty>, $($constraints)*
+        {
+            type Output = Op::Output;
+
+            fn execute(self) -> Self::Output
+                where V: $crate::seq::VectorViewSparse<T>
+            {
+                self.op.execute()
+            }
+
+            fn fallback(self) -> Self::Output {
+                self.op.fallback()
+            }
+        }
+        <V as $crate::seq::VectorView<_>>::specialize_sparse(DelegateSparseVectorViewOperation { op: $op, vector: std::marker::PhantomData, element: std::marker::PhantomData, lifetimes: std::marker::PhantomData, gen_args: std::marker::PhantomData })
+    };
 }
 
 fn range_within<R: RangeBounds<usize>>(len: usize, range: R) -> Range<usize> {
@@ -379,8 +442,8 @@ impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for Box<V> {
         unsafe { (**self).at_unchecked(i) }
     }
 
-    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
-        (**self).specialize_sparse(op)
+    fn specialize_sparse<Op: SparseVectorViewOperation<T, Self>>(op: Op) -> Op::Output {
+        impl_specialize_sparse_wrapped_vector!{ op; <{ T, V, Op, }> specialize_sparse where V: VectorView<T>, Op: SparseVectorViewOperation<T, Box<V>>, T: ?Sized, V: ?Sized }
     }
 
     fn as_slice<'a>(&'a self) -> Option<&'a [T]>
@@ -431,8 +494,8 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a V {
         unsafe { (**self).at_unchecked(i) }
     }
 
-    fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Result<Op::Output<'b>, ()> {
-        (**self).specialize_sparse(op)
+    fn specialize_sparse<Op: SparseVectorViewOperation<T, Self>>(op: Op) -> Op::Output {
+        impl_specialize_sparse_wrapped_vector!{ op; <{ 'a; T, V, Op, }> specialize_sparse where V: VectorView<T>, Op: SparseVectorViewOperation<T, &'a V>, T: ?Sized, V: 'a + ?Sized }
     }
     
     fn as_slice<'b>(&'b self) -> Option<&'b [T]>
@@ -465,10 +528,10 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a mut V {
         unsafe { (**self).at_unchecked(i) }
     }
 
-    fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Result<Op::Output<'b>, ()> {
-        (**self).specialize_sparse(op)
+    fn specialize_sparse<Op: SparseVectorViewOperation<T, Self>>(op: Op) -> Op::Output {
+        impl_specialize_sparse_wrapped_vector!{ op; <{ 'a; T, V, Op, }> specialize_sparse where V: VectorView<T>, Op: SparseVectorViewOperation<T, &'a mut V>, T: ?Sized, V: 'a + ?Sized }
     }
-    
+
     fn as_slice<'b>(&'b self) -> Option<&'b [T]>
         where T: Sized
     {
@@ -740,6 +803,10 @@ impl<T> VectorView<T> for [T] {
     {
         Some(self)
     }
+
+    fn specialize_sparse<Op: SparseVectorViewOperation<T, Self>>(op: Op) -> Op::Output {
+        op.fallback()
+    }
 }
 
 impl<'a, T> SelfSubvectorView<T> for &'a [T] {
@@ -799,6 +866,10 @@ impl<T, A: Allocator> VectorView<T> for Vec<T, A> {
     {
         Some(&*self)
     }
+
+    fn specialize_sparse<Op: SparseVectorViewOperation<T, Self>>(op: Op) -> Op::Output {
+        op.fallback()
+    }
 }
 
 impl<T, A: Allocator> VectorViewMut<T> for Vec<T, A> {
@@ -843,6 +914,10 @@ impl<T, const N: usize> VectorView<T> for [T; N] {
         where T: Sized
     {
         Some(&self[..])
+    }
+
+    fn specialize_sparse<Op: SparseVectorViewOperation<T, Self>>(op: Op) -> Op::Output {
+        op.fallback()
     }
 }
 

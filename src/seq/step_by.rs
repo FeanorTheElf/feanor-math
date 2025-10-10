@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use crate::impl_specialize_sparse_wrapped_vector;
+
 use super::*;
 
 #[derive(Debug)]
@@ -47,6 +49,10 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for StepBy<V, T> {
     fn at(&self, i: usize) -> &T {
         self.base.at(i * self.step_by)
     }
+
+    fn specialize_sparse<Op: SparseVectorViewOperation<T, Self>>(op: Op) -> Op::Output {
+        impl_specialize_sparse_wrapped_vector!{ op; <{ T, V, Op, }> specialize_sparse where V: VectorView<T>, Op: SparseVectorViewOperation<T, StepBy<V, T>>, T: ?Sized }
+    }
 }
 
 impl<V: VectorViewMut<T>, T: ?Sized> VectorViewMut<T> for StepBy<V, T> {
@@ -60,6 +66,40 @@ impl<V: SwappableVectorViewMut<T>, T: ?Sized> SwappableVectorViewMut<T> for Step
 
     fn swap(&mut self, i: usize, j: usize) {
         self.base.swap(i * self.step_by, j * self.step_by)
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct FilterDivisibleBy(usize);
+
+impl<'a, T> FnOnce<(&'a (usize, T), )> for FilterDivisibleBy {
+    type Output = bool;
+
+    extern "rust-call" fn call_once(self, args: (&'a (usize, T), )) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, T> FnMut<(&'a (usize, T), )> for FilterDivisibleBy {
+    extern "rust-call" fn call_mut(&mut self, args: (&'a (usize, T), )) -> Self::Output {
+        self.call(args)
+    }
+}
+
+impl<'a, T> Fn<(&'a (usize, T), )> for FilterDivisibleBy {
+    extern "rust-call" fn call(&self, args: (&'a (usize, T), )) -> Self::Output {
+        args.0.0 % self.0 == 0
+    }
+}
+
+impl<V: VectorViewSparse<T>, T: ?Sized> VectorViewSparse<T> for StepBy<V, T> {
+
+    type Iter<'a> = std::iter::Filter<V::Iter<'a>, FilterDivisibleBy>
+        where Self: 'a, 
+            T: 'a;
+
+    fn nontrivial_entries<'a>(&'a self) -> Self::Iter<'a> {
+        self.base.nontrivial_entries().filter(FilterDivisibleBy(self.step_by))
     }
 }
 

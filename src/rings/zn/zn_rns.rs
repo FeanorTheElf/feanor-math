@@ -228,6 +228,10 @@ impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> VectorView<
     fn at(&self, index: usize) -> &C {
         &self.get_ring().at(index)
     }
+    
+    fn specialize_sparse<Op: crate::seq::SparseVectorViewOperation<C, Self>>(op: Op) -> Op::Output {
+        op.fallback()
+    }
 }
 
 impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> VectorView<C> for ZnBase<C, J, A>
@@ -241,6 +245,10 @@ impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> VectorView<
 
     fn at(&self, index: usize) -> &C {
         &self.components[index]
+    }
+
+    fn specialize_sparse<Op: crate::seq::SparseVectorViewOperation<C, Self>>(op: Op) -> Op::Output {
+        op.fallback()
     }
 }
 

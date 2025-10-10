@@ -229,6 +229,7 @@ fn test_factor_int_poly() {
         assert!(ZZX.eq_el(&f, factor) || ZZX.eq_el(&g, factor), "Got unexpected factor {}", ZZX.formatted_el(&factor));
     }
 
+    let ZZX = DensePolyRing::new(StaticRing::<i128>::RING, "X");
     let [f, g] = ZZX.with_wrapped_indeterminate(|X| [5 * X.pow_ref(2) + 1, 3 * X.pow_ref(2) + 2]);
     let input = ZZX.mul_ref(&f, &g);
     let actual = poly_factor_integer(&ZZX, input, TEST_LOG_PROGRESS);
