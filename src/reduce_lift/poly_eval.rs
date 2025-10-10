@@ -111,11 +111,11 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
 /// that work modulo prime ideals (or their powers), which is different from the mathematical concept
 /// of localization.
 /// 
-/// More concretely, a ring `R` implementing this trait should be endowed with a "pseudo norm"
+/// More concretely, a ring `R` implementing this trait should be endowed with a valuation
 /// ```text
-///   |.|: R  ->  [0, ∞)
+///   |.|: R  ->  [0, ∞) u { -∞ }
 /// ```
-/// i.e. a symmetric, sub-additive, sub-multiplicative map.
+/// i.e. a sub-additive and multiplicative map with `|x| = -∞` iff `x = 0`.
 /// Furthermore, for any bound `b`, the ring should be able to provide prime ideals
 /// `p1, ..., pk` together with the rings `Ri = R / pi`, such that the restricted
 /// reduction map
@@ -368,16 +368,16 @@ pub trait EvalPolyLocallyRing: RingBase + FiniteRingSpecializable {
         where Self: 'ring;
 
     ///
-    /// Computes (an upper bound of) the natural logarithm of the pseudo norm of a ring element.
+    /// Computes an upper bound of the natural logarithm of the valuation of a ring element.
     /// 
-    /// The pseudo norm should be
-    ///  - symmetric, i.e. `|-x| = |x|`,
+    /// The valuation should be
+    ///  - `-∞` if and only if `x = 0`,
     ///  - sub-additive, i.e. `|x + y| <= |x| + |y|`
-    ///  - sub-multiplicative, i.e. `|xy| <= |x| |y|`
+    ///  - multiplicative, i.e. `|xy| = |x| + |y|`
     /// 
-    /// and this function should give `ln|x|`
+    /// and this function should give `ln|x|` (or `-∞` if `x = 0`).
     /// 
-    fn ln_pseudo_norm(&self, el: &Self::Element) -> f64;
+    fn ln_valuation(&self, el: &Self::Element) -> f64;
 
     ///
     /// Sets up the context for a new polynomial evaluation, whose output
@@ -428,7 +428,7 @@ impl<R> EvalPolyLocallyRing for R
     type LocalRingBase<'ring> = Self
         where Self: 'ring;
 
-    fn ln_pseudo_norm(&self, _el: &Self::Element) -> f64 {
+    fn ln_valuation(&self, _el: &Self::Element) -> f64 {
         0.
     }
 

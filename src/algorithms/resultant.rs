@@ -171,8 +171,11 @@ impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain + SelfIso> Co
                 }
                 self.controller.run_computation(format_args!("resultant_local(ldeg={}, rdeg={})", ring_ref.degree(f_ref).unwrap(), ring_ref.degree(g_ref).unwrap()), |controller| {
                     let n = ring_ref.degree(f_ref).unwrap() + ring_ref.degree(g_ref).unwrap();
-                    let coeff_bound_ln = ring_ref.terms(f_ref).chain(ring_ref.terms(g_ref)).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap();
-                    let ln_max_norm = coeff_bound_ln * n as f64 + base_ring.get_ring().ln_pseudo_norm(&base_ring.int_hom().map(n as i32)) * n as f64 / 2.;
+                    let coeff_bound_f_ln = ring_ref.terms(f_ref).map(|(c, _)| base_ring.get_ring().ln_valuation(c)).max_by(f64::total_cmp).unwrap();
+                    let coeff_bound_g_ln = ring_ref.terms(g_ref).map(|(c, _)| base_ring.get_ring().ln_valuation(c)).max_by(f64::total_cmp).unwrap();
+                    let ln_max_norm = coeff_bound_f_ln * ring_ref.degree(g_ref).unwrap() as f64 + 
+                        coeff_bound_g_ln * ring_ref.degree(f_ref).unwrap() as f64 + 
+                        base_ring.get_ring().ln_valuation(&base_ring.int_hom().map(n as i32)) * n as f64;
 
                     let work_locally = base_ring.get_ring().local_computation(ln_max_norm);
                     let work_locally_ref = &work_locally;
