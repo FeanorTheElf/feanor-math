@@ -170,12 +170,14 @@ impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain + SelfIso> Co
                     return base_ring.zero();
                 }
                 self.controller.run_computation(format_args!("resultant_local(ldeg={}, rdeg={})", ring_ref.degree(f_ref).unwrap(), ring_ref.degree(g_ref).unwrap()), |controller| {
-                    let n = ring_ref.degree(f_ref).unwrap() + ring_ref.degree(g_ref).unwrap();
                     let coeff_bound_f_ln = ring_ref.terms(f_ref).map(|(c, _)| base_ring.get_ring().ln_valuation(c)).max_by(f64::total_cmp).unwrap();
                     let coeff_bound_g_ln = ring_ref.terms(g_ref).map(|(c, _)| base_ring.get_ring().ln_valuation(c)).max_by(f64::total_cmp).unwrap();
                     let ln_max_norm = coeff_bound_f_ln * ring_ref.degree(g_ref).unwrap() as f64 + 
                         coeff_bound_g_ln * ring_ref.degree(f_ref).unwrap() as f64 + 
-                        base_ring.get_ring().ln_valuation(&base_ring.int_hom().map(n as i32)) * n as f64;
+                        // this is just an estimate on the number of terms we sum up: for each column belonging to `f`, there are `deg(f)` nonzero entries, and
+                        // we have `deg(g)` such columns, thus the number of terms is bounded by `deg(f)^deg(g)`; similarly for `g` 
+                        base_ring.get_ring().ln_valuation(&base_ring.int_hom().map(ring_ref.degree(f_ref).unwrap() as i32)) * ring_ref.degree(g_ref).unwrap() as f64 +
+                        base_ring.get_ring().ln_valuation(&base_ring.int_hom().map(ring_ref.degree(g_ref).unwrap() as i32)) * ring_ref.degree(f_ref).unwrap() as f64;
 
                     let work_locally = base_ring.get_ring().local_computation(ln_max_norm);
                     let work_locally_ref = &work_locally;
