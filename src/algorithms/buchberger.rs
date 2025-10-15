@@ -474,7 +474,7 @@ pub fn buchberger_simple<P, O>(ring: P, input_basis: Vec<El<P>>, order: O) -> Ve
 {
     let as_local_pir = AsLocalPIR::from_field(ring.base_ring());
     let new_poly_ring = MultivariatePolyRingImpl::new(&as_local_pir, ring.indeterminate_count());
-    let from_ring = new_poly_ring.lifted_hom(ring, WrapHom::new(as_local_pir.get_ring()));
+    let from_ring = new_poly_ring.lifted_hom(ring, WrapHom::to_delegate_ring(as_local_pir.get_ring()));
     let result = buchberger::<_, _, _, _, _>(
         &new_poly_ring, 
         input_basis.into_iter().map(|f| from_ring.map(f)).collect(), 
@@ -483,7 +483,7 @@ pub fn buchberger_simple<P, O>(ring: P, input_basis: Vec<El<P>>, order: O) -> Ve
         |_| false, 
         DontObserve
     ).unwrap_or_else(no_error);
-    let to_ring = ring.lifted_hom(&new_poly_ring, UnwrapHom::new(as_local_pir.get_ring()));
+    let to_ring = ring.lifted_hom(&new_poly_ring, UnwrapHom::from_delegate_ring(as_local_pir.get_ring()));
     return result.into_iter().map(|f| to_ring.map(f)).collect();
 }
 

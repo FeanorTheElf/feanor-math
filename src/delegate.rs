@@ -779,31 +779,54 @@ impl<R> FreeAlgebra for R
     }
 }
 
-#[stability::unstable(feature = "enable")]
-pub struct WrapHom<'a, R>
-    where R: DelegateRing
+///
+/// Homomorphism from a ring to a [`DelegateRing`] with the former ring
+/// as delegate target. An element is mapped by using [`DelegateRing::rev_delegate()`].
+/// 
+pub struct WrapHom<R, S>
+    where R: RingStore,
+        S::Type: DelegateRing<Base = R::Type>,
+        S: RingStore
 {
-    to: RingRef<'a, R>,
-    from: RingRef<'a, R::Base>
+    from: R,
+    to: S
 }
 
-impl<'a, R> WrapHom<'a, R>
-    where R: DelegateRing
+impl<R, S> WrapHom<R, S>
+    where R: RingStore,
+        S::Type: DelegateRing<Base = R::Type>,
+        S: RingStore
 {
-    #[stability::unstable(feature = "enable")]
-    pub fn new(ring: &'a R) -> Self {
-        Self {
-            to: RingRef::new(ring),
-            from: RingRef::new(ring.get_delegate())
-        }
+    ///
+    /// Creates a new [`WrapHom`] between the given rings.
+    /// 
+    pub fn new(from: R, to: S) -> Self {
+        Self { from, to }
     }
 }
 
-impl<'a, R> Homomorphism<<R as DelegateRing>::Base, R> for WrapHom<'a, R>
-    where R: DelegateRing
+impl<'a, R> WrapHom<RingRef<'a, R::Base>, RingRef<'a, R>>
+    where R: ?Sized + DelegateRing
 {
-    type DomainStore = RingRef<'a, <R as DelegateRing>::Base>;
-    type CodomainStore = RingRef<'a, R>;
+    ///
+    /// Creates a new [`WrapHom`] from the given ring's delegate target
+    /// to the given ring.
+    /// 
+    /// This function must take `to` by reference, since it must be able to
+    /// obtain a reference to its delegate target that lives long enough.
+    /// 
+    pub fn to_delegate_ring(to: &'a R) -> Self {
+        Self::new(RingRef::new(to.get_delegate()), RingRef::new(to))
+    }
+}
+
+impl<R, S> Homomorphism<R::Type, S::Type> for WrapHom<R, S>
+    where R: RingStore,
+        S::Type: DelegateRing<Base = R::Type>,
+        S: RingStore
+{
+    type DomainStore = R;
+    type CodomainStore = S;
 
     fn domain<'b>(&'b self) -> &'b Self::DomainStore {
         &self.from
@@ -813,36 +836,58 @@ impl<'a, R> Homomorphism<<R as DelegateRing>::Base, R> for WrapHom<'a, R>
         &self.to
     }
 
-    fn map(&self, x: <<R as DelegateRing>::Base as RingBase>::Element) -> <R as RingBase>::Element {
+    fn map(&self, x: El<R>) -> El<S> {
         self.to.get_ring().element_cast(self.to.get_ring().rev_delegate(x))
     }
 }
 
-#[stability::unstable(feature = "enable")]
-pub struct UnwrapHom<'a, R>
-    where R: DelegateRing
+///
+/// Homomorphism from a [`DelegateRing`] to its delegate target. An element
+/// is mapped by using [`DelegateRing::delegate()`].
+/// 
+pub struct UnwrapHom<R, S>
+    where R: RingStore,
+        R::Type: DelegateRing<Base = S::Type>,
+        S: RingStore
 {
-    from: RingRef<'a, R>,
-    to: RingRef<'a, R::Base>
+    from: R,
+    to: S
 }
 
-impl<'a, R> UnwrapHom<'a, R>
-    where R: DelegateRing
+impl<R, S> UnwrapHom<R, S>
+    where R: RingStore,
+        R::Type: DelegateRing<Base = S::Type>,
+        S: RingStore
 {
-    #[stability::unstable(feature = "enable")]
-    pub fn new(ring: &'a R) -> Self {
-        Self {
-            from: RingRef::new(ring),
-            to: RingRef::new(ring.get_delegate())
-        }
+    ///
+    /// Creates a new [`UnwrapHom`] between the given rings.
+    /// 
+    pub fn new(from: R, to: S) -> Self {
+        Self { from, to }
     }
 }
 
-impl<'a, R> Homomorphism<R, <R as DelegateRing>::Base> for UnwrapHom<'a, R>
-    where R: DelegateRing
+impl<'a, R> UnwrapHom<RingRef<'a, R>, RingRef<'a, R::Base>>
+    where R: ?Sized + DelegateRing
 {
-    type DomainStore = RingRef<'a, R>;
-    type CodomainStore = RingRef<'a, <R as DelegateRing>::Base>;
+    ///
+    /// Creates a new [`UnwrapHom`] from the given ring to its delegate target.
+    /// 
+    /// This function must take `from` by reference, since it must be able to
+    /// obtain a reference to its delegate target that lives long enough.
+    /// 
+    pub fn from_delegate_ring(from: &'a R) -> Self {
+        Self::new(RingRef::new(from), RingRef::new(from.get_delegate()))
+    }
+}
+
+impl<R, S> Homomorphism<R::Type, S::Type> for UnwrapHom<R, S>
+    where R: RingStore,
+        R::Type: DelegateRing<Base = S::Type>,
+        S: RingStore
+{
+    type DomainStore = R;
+    type CodomainStore = S;
 
     fn domain<'b>(&'b self) -> &'b Self::DomainStore {
         &self.from
@@ -852,7 +897,7 @@ impl<'a, R> Homomorphism<R, <R as DelegateRing>::Base> for UnwrapHom<'a, R>
         &self.to
     }
 
-    fn map(&self, x: <R as RingBase>::Element) -> <<R as DelegateRing>::Base as RingBase>::Element {
+    fn map(&self, x: El<R>) -> El<S> {
         self.from.get_ring().delegate(self.from.get_ring().rev_element_cast(x))
     }
 }

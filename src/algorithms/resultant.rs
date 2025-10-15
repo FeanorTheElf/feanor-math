@@ -221,9 +221,9 @@ impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain + SelfIso> Co
                 where <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing
             {
                 let new_poly_ring = DensePolyRing::new(AsField::from(AsFieldBase::promise_is_perfect_field(self.ring.base_ring())), "X");
-                let hom = new_poly_ring.lifted_hom(&self.ring, WrapHom::new(new_poly_ring.base_ring().get_ring()));
+                let hom = new_poly_ring.lifted_hom(&self.ring, WrapHom::to_delegate_ring(new_poly_ring.base_ring().get_ring()));
                 let result = resultant_finite_field(&new_poly_ring, hom.map(self.f), hom.map(self.g));
-                return UnwrapHom::new(new_poly_ring.base_ring().get_ring()).map(result);
+                return UnwrapHom::from_delegate_ring(new_poly_ring.base_ring().get_ring()).map(result);
             }
 
             fn fallback(self) -> Self::Output {

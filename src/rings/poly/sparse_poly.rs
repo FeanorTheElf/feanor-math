@@ -23,7 +23,7 @@ use std::sync::Arc;
 /// coefficients, thus giving improved performance in the case that most coefficients are
 /// zero.
 /// 
-/// Unless polynomials are very sparse, [`DensePolyRing`] will provide better performance.
+/// Unless polynomials are very sparse, [`crate::rings::poly::dense_poly::DensePolyRing`] will provide better performance.
 /// 
 /// # Example
 /// ```rust

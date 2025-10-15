@@ -1037,7 +1037,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
         let ZZ = QQ.base_ring();
         assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&ideal.prime));
         let FpX = &ideal.FpX;
-        let Fp_to_Fp = WrapHom::new(ideal.Fp_as_zn.get_ring())
+        let Fp_to_Fp = WrapHom::to_delegate_ring(ideal.Fp_as_zn.get_ring())
             .compose(RingRef::new(ideal.Fp_as_zn.get_ring().get_delegate()).into_can_hom(&ideal.Fp_as_ring).ok().unwrap())
             .compose(PolyGCDLocallyBaseRingToFieldIso::new(ZZ.get_ring(), &ideal.prime, ideal.Fp_as_ring.get_ring(), FpX.base_ring().get_ring(), 0).inv());
 
@@ -1100,7 +1100,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
         where Self: 'ring
     {
         assert!(idx < self.maximal_ideal_factor_count(ideal));
-        let hom = WrapHom::new(to.base_ring().get_ring()).compose(RingRef::new(to.base_ring().get_ring().get_delegate()).into_can_hom(from.base_ring()).ok().unwrap());
+        let hom = WrapHom::to_delegate_ring(to.base_ring().get_ring()).compose(RingRef::new(to.base_ring().get_ring().get_delegate()).into_can_hom(from.base_ring()).ok().unwrap());
         to.from_canonical_basis(from.wrt_canonical_basis(&x).iter().map(|c| hom.map(c)))
     }
 
@@ -1109,7 +1109,7 @@ impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
     {
         assert!(idx < self.maximal_ideal_factor_count(ideal));
         assert!(idx < self.maximal_ideal_factor_count(ideal));
-        let hom = RingRef::new(from.base_ring().get_ring().get_delegate()).into_can_iso(to.base_ring()).ok().unwrap().compose(UnwrapHom::new(from.base_ring().get_ring()));
+        let hom = RingRef::new(from.base_ring().get_ring().get_delegate()).into_can_iso(to.base_ring()).ok().unwrap().compose(UnwrapHom::from_delegate_ring(from.base_ring().get_ring()));
         to.from_canonical_basis(from.wrt_canonical_basis(&x).iter().map(|c| hom.map(c)))
     }
 

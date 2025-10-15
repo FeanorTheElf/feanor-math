@@ -538,8 +538,6 @@ use std::array::from_fn;
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
 #[cfg(test)]
-use crate::assert_el_eq;
-#[cfg(test)]
 use crate::rings::zn::zn_64::*;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
