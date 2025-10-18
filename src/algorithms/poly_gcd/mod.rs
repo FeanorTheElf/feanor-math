@@ -416,7 +416,7 @@ fn test_poly_gcd_galois_field() {
 
 #[test]
 fn test_poly_gcd_prime_field() {
-    let field = zn_64::Zn::new(5).as_field().ok().unwrap();
+    let field = zn_64::Zn64B::new(5).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(&field, "X");
     let [f, g, f_g_gcd] = poly_ring.with_wrapped_indeterminate(|X| [(X.pow_ref(2) + 2) * (X.pow_ref(5) + 1), (X.pow_ref(2) + 2) * (X + 1) * (X + 2), (X.pow_ref(2) + 2) * (X + 1)]);
     assert_el_eq!(&poly_ring, &f_g_gcd, <_ as PolyTFracGCDRing>::gcd(&poly_ring, &f, &g));

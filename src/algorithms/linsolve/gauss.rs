@@ -145,7 +145,7 @@ pub fn largest_nonzero_minor<R, V>(A: SubmatrixMut<V, El<R>>, ring: R) -> (Vec<u
 #[cfg(test)]
 use crate::rings::local::AsLocalPIR;
 #[cfg(test)]
-use crate::rings::zn::zn_64::Zn;
+use crate::rings::zn::zn_64::Zn64B;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
 #[cfg(test)]
@@ -184,7 +184,7 @@ fn test_largest_nonzero_minor_field() {
 
 #[test]
 fn test_largest_nonzero_minor_localpir() {
-    let ring = AsLocalPIR::from_zn(Zn::new(8)).unwrap();
+    let ring = AsLocalPIR::from_zn(Zn64B::new(8)).unwrap();
     let i = |x: i32| ring.int_hom().map(x);
 
     let mut matrix = [vec![i(0), i(0)], vec![i(0), i(1)]];

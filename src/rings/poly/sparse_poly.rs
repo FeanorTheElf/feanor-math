@@ -560,16 +560,16 @@ fn test_poly_ring_axioms() {
 
 #[test]
 fn test_canonical_iso_axioms_different_base_ring() {
-    let poly_ring1 = SparsePolyRing::new(zn_big::Zn::new(StaticRing::<i128>::RING, 7), "X");
-    let poly_ring2 = SparsePolyRing::new(zn_64::Zn::new(7), "X");
+    let poly_ring1 = SparsePolyRing::new(zn_big::ZnGB::new(StaticRing::<i128>::RING, 7), "X");
+    let poly_ring2 = SparsePolyRing::new(zn_64::Zn64B::new(7), "X");
     crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
     crate::ring::generic_tests::test_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
 }
 
 #[test]
 fn test_canonical_iso_dense_poly_ring() {
-    let poly_ring1 = SparsePolyRing::new(zn_64::Zn::new(7), "X");
-    let poly_ring2 = DensePolyRing::new(zn_64::Zn::new(7), "X");
+    let poly_ring1 = SparsePolyRing::new(zn_64::Zn64B::new(7), "X");
+    let poly_ring2 = DensePolyRing::new(zn_64::Zn64B::new(7), "X");
     crate::ring::generic_tests::test_hom_axioms(&poly_ring2, &poly_ring1, edge_case_elements(&poly_ring2));
     crate::ring::generic_tests::test_iso_axioms(&poly_ring2, &poly_ring1, edge_case_elements(&poly_ring2));
 }

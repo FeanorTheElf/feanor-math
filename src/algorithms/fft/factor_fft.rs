@@ -493,7 +493,7 @@ const BENCH_N2: usize = 601;
 
 #[bench]
 fn bench_factor_fft(bencher: &mut test::Bencher) {
-    let ring = zn_64::Zn::new(1602564097);
+    let ring = zn_64::Zn64B::new(1602564097);
     let fastmul_ring = zn_64::ZnFastmul::new(ring).unwrap();
     let embedding = ring.can_hom(&fastmul_ring).unwrap();
     let ring_as_field = ring.as_field().ok().unwrap();

@@ -883,7 +883,7 @@ impl<R1, V1, A1, C1, R2, V2, A2, C2> CanIsoFromTo<FreeAlgebraImplBase<R1, V1, A1
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_64::{Zn, ZnEl};
+use crate::rings::zn::zn_64::{Zn64B, Zn64BEl};
 #[cfg(test)]
 use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
@@ -892,8 +892,8 @@ use crate::rings::zn::zn_static;
 use crate::algorithms::convolution::fft::FFTConvolution;
 
 #[cfg(test)]
-fn test_ring0_and_elements() -> (FreeAlgebraImpl<Zn, Vec<ZnEl>>, Vec<FreeAlgebraImplEl<Zn>>) {
-    let R = FreeAlgebraImpl::new(Zn::new(7), 1, vec![Zn::new(7).neg_one()]);
+fn test_ring0_and_elements() -> (FreeAlgebraImpl<Zn64B, Vec<Zn64BEl>>, Vec<FreeAlgebraImplEl<Zn64B>>) {
+    let R = FreeAlgebraImpl::new(Zn64B::new(7), 1, vec![Zn64B::new(7).neg_one()]);
     let elements = R.elements().collect();
     return (R, elements);
 }
@@ -992,7 +992,7 @@ fn test_ring_axioms() {
 
 #[test]
 fn test_rank_1_ring() {
-    let base_ring = Zn::new(5).as_field().ok().unwrap();
+    let base_ring = Zn64B::new(5).as_field().ok().unwrap();
     let ring = FreeAlgebraImpl::new(base_ring, 1, [base_ring.int_hom().map(1)]).as_field().ok().unwrap();
     crate::field::generic_tests::test_field_axioms(&ring, ring.elements());
 
@@ -1015,7 +1015,7 @@ fn test_free_algebra_axioms() {
 
 #[test]
 fn test_division() {
-    let base_ring = Zn::new(4);
+    let base_ring = Zn64B::new(4);
     let i = base_ring.int_hom();
     let ring = FreeAlgebraImpl::new(base_ring, 2, [i.map(-1), i.map(-1)]);
 
@@ -1072,11 +1072,11 @@ fn test_cubic_mul() {
 
 #[test]
 fn test_as_field() {
-    let base_ring = Zn::new(5).as_field().ok().unwrap();
+    let base_ring = Zn64B::new(5).as_field().ok().unwrap();
     let ring = FreeAlgebraImpl::new(base_ring, 1, [base_ring.int_hom().map(1)]).as_field().ok().unwrap();
     crate::field::generic_tests::test_field_axioms(&ring, ring.elements());
 
-    let base_ring = Zn::new(3).as_field().ok().unwrap();
+    let base_ring = Zn64B::new(3).as_field().ok().unwrap();
     let ring = FreeAlgebraImpl::new(base_ring, 2, [base_ring.int_hom().map(2)]).as_field().ok().unwrap();
     crate::field::generic_tests::test_field_axioms(&ring, ring.elements());
 

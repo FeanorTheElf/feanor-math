@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter};
 
 use extension_impl::FreeAlgebraImplBase;
 use sparse::SparseMapVector;
-use zn_64::Zn;
+use zn_64::Zn64B;
 
 use crate::algorithms::convolution::*;
 use crate::algorithms::eea::signed_gcd;
@@ -274,7 +274,7 @@ pub struct GaloisFieldBase<Impl>
 /// The default implementation of a finite field extension of a prime field, 
 /// based on [`Zn`].
 /// 
-pub type DefaultGaloisFieldImpl = AsField<FreeAlgebraImpl<AsField<Zn>, SparseMapVector<AsField<Zn>>, Global, KaratsubaAlgorithm>>;
+pub type DefaultGaloisFieldImpl = AsField<FreeAlgebraImpl<AsField<Zn64B>, SparseMapVector<AsField<Zn64B>>, Global, KaratsubaAlgorithm>>;
 
 ///
 /// Implementation of finite/galois fields.
@@ -321,7 +321,7 @@ impl GaloisField {
     /// ```
     /// 
     pub fn new(p: i64, degree: usize) -> Self {
-        Self::new_with_convolution(Zn::new(p as u64).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION)
+        Self::new_with_convolution(Zn64B::new(p as u64).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION)
     }
 }
 
@@ -403,7 +403,7 @@ impl<R, A, C> GaloisFieldOver<R, A, C>
     }
 }
 
-impl<A> GaloisFieldBase<AsField<FreeAlgebraImpl<AsField<Zn>, SparseMapVector<AsField<Zn>>, A, KaratsubaAlgorithm>>>
+impl<A> GaloisFieldBase<AsField<FreeAlgebraImpl<AsField<Zn64B>, SparseMapVector<AsField<Zn64B>>, A, KaratsubaAlgorithm>>>
     where A: Allocator + Clone + Send + Sync
 {
     ///
@@ -418,8 +418,8 @@ impl<A> GaloisFieldBase<AsField<FreeAlgebraImpl<AsField<Zn>, SparseMapVector<AsF
     /// For more configuration options, use [`GaloisFieldBase::galois_ring_with()`].
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn galois_ring(&self, e: usize) -> AsLocalPIR<FreeAlgebraImpl<Zn, SparseMapVector<Zn>, A, KaratsubaAlgorithm>> {
-        self.galois_ring_with(Zn::new(StaticRing::<i64>::RING.pow(*self.base_ring().modulus(), e) as u64), self.base.get_ring().get_delegate().allocator().clone(), STANDARD_CONVOLUTION)
+    pub fn galois_ring(&self, e: usize) -> AsLocalPIR<FreeAlgebraImpl<Zn64B, SparseMapVector<Zn64B>, A, KaratsubaAlgorithm>> {
+        self.galois_ring_with(Zn64B::new(StaticRing::<i64>::RING.pow(*self.base_ring().modulus(), e) as u64), self.base.get_ring().get_delegate().allocator().clone(), STANDARD_CONVOLUTION)
     }
 }
 
@@ -915,7 +915,7 @@ fn test_principal_ideal_ring_axioms() {
 #[test]
 fn test_galois_field_even() {
     for degree in 1..=9 {
-        let field = GaloisField::new_with_convolution(Zn::new(2).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
+        let field = GaloisField::new_with_convolution(Zn64B::new(2).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
         assert_eq!(degree, field.rank());
         assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
     }
@@ -924,13 +924,13 @@ fn test_galois_field_even() {
 #[test]
 fn test_galois_field_odd() {
     for degree in 1..=9 {
-        let field = GaloisField::new_with_convolution(Zn::new(3).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
+        let field = GaloisField::new_with_convolution(Zn64B::new(3).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
         assert_eq!(degree, field.rank());
         assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
     }
 
     for degree in 1..=9 {
-        let field = GaloisField::new_with_convolution(Zn::new(5).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
+        let field = GaloisField::new_with_convolution(Zn64B::new(5).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
         assert_eq!(degree, field.rank());
         assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
     }
@@ -938,19 +938,19 @@ fn test_galois_field_odd() {
 
 #[test]
 fn test_galois_field_no_trinomial() {
-    let field = GaloisField::new_with_convolution(Zn::new(2).as_field().ok().unwrap(), 24, Global, STANDARD_CONVOLUTION);
+    let field = GaloisField::new_with_convolution(Zn64B::new(2).as_field().ok().unwrap(), 24, Global, STANDARD_CONVOLUTION);
     assert_eq!(24, field.rank());
     let poly_ring = DensePolyRing::new(field.base_ring(), "X");
     poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
     assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
 
-    let field = GaloisField::new_with_convolution(Zn::new(3).as_field().ok().unwrap(), 30, Global, STANDARD_CONVOLUTION);
+    let field = GaloisField::new_with_convolution(Zn64B::new(3).as_field().ok().unwrap(), 30, Global, STANDARD_CONVOLUTION);
     assert_eq!(30, field.rank());
     let poly_ring = DensePolyRing::new(field.base_ring(), "X");
     poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
     assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
 
-    let field = GaloisField::new_with_convolution(Zn::new(17).as_field().ok().unwrap(), 32, Global, STANDARD_CONVOLUTION);
+    let field = GaloisField::new_with_convolution(Zn64B::new(17).as_field().ok().unwrap(), 32, Global, STANDARD_CONVOLUTION);
     assert_eq!(32, field.rank());
     let poly_ring = DensePolyRing::new(field.base_ring(), "X");
     poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));

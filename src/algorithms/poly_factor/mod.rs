@@ -156,7 +156,7 @@ impl<R: ?Sized> FactorPolyField for R
 impl<I> FactorPolyField for RationalFieldBase<I>
     where I: RingStore,
         I::Type: IntegerRing,
-        ZnBase: CanHomFrom<I::Type>
+        Zn64BBase: CanHomFrom<I::Type>
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: RingStore + Copy,

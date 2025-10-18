@@ -87,12 +87,12 @@ const SMALL_IS_COPRIME_TABLE: [bool; 30] = [
 
 fn search_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>, delta: i64) -> Option<El<I>>
     where I::Type: IntegerRing,
-        zn_64::ZnBase: CanHomFrom<I::Type>
+        zn_64::Zn64BBase: CanHomFrom<I::Type>
 {
     assert!(!ZZ.is_neg(&n));
 
     let m = SMALL_IS_COPRIME_TABLE.len();
-    let Zm = zn_64::Zn::new(m as u64);
+    let Zm = zn_64::Zn64B::new(m as u64);
     let mut n_mod_m = Zm.coerce(&ZZ, ZZ.clone_el(&n));
     let mut diff_to_n = 0;
     let Zi64_to_Zm = Zm.can_hom::<StaticRing<i64>>(&StaticRing::<i64>::RING).unwrap();
@@ -151,7 +151,7 @@ fn search_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>, delta: i64) -> Option<
 #[stability::unstable(feature = "enable")]
 pub fn prev_prime<I: IntegerRingStore>(ZZ: I, n: El<I>) -> Option<El<I>>
     where I::Type: IntegerRing,
-        zn_64::ZnBase: CanHomFrom<I::Type>
+        zn_64::Zn64BBase: CanHomFrom<I::Type>
 {
     assert!(!ZZ.is_neg(&n));
     if ZZ.is_zero(&n) || ZZ.is_one(&n) {
@@ -167,7 +167,7 @@ pub fn prev_prime<I: IntegerRingStore>(ZZ: I, n: El<I>) -> Option<El<I>>
 #[stability::unstable(feature = "enable")]
 pub fn next_prime<I: IntegerRingStore>(ZZ: I, n: El<I>) -> El<I>
     where I::Type: IntegerRing,
-        zn_64::ZnBase: CanHomFrom<I::Type>
+        zn_64::Zn64BBase: CanHomFrom<I::Type>
 {
     assert!(!ZZ.is_neg(&n));
     let n_plus_one = ZZ.add(n, ZZ.one());

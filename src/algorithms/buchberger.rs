@@ -253,13 +253,10 @@ fn augment_lm<P, O>(ring: P, f: El<P>, order: O) -> (El<P>, ExpandedMonomial)
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn buchberger_with_strategy<P, O, Controller, SortFn, AbortFn>(ring: P, input_basis: Vec<El<P>>, order: O, mut sort_spolys: SortFn, mut abort_early_if: AbortFn, controller: Controller) -> Result<Vec<El<P>>, Controller::Abort>
-    where P: RingStore + Copy + Send + Sync,
-        El<P>: Send + Sync,
+    where P: RingStore + Copy,
         P::Type: MultivariatePolyRing,
-        <P::Type as RingExtension>::BaseRing: Sync,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalLocalRing,
         O: MonomialOrder + Copy + Send + Sync,
-        PolyCoeff<P>: Send + Sync,
         Controller: ComputationController,
         SortFn: FnMut(&mut [SPoly], &[El<P>]),
         AbortFn: FnMut(&[(El<P>, ExpandedMonomial)]) -> bool
@@ -463,13 +460,11 @@ fn inter_reduce<P, O>(ring: P, mut polys: Vec<(El<P>, ExpandedMonomial)>, order:
 /// For a variant of this function that allows for more configuration, see [`buchberger_with_strategy()`].
 /// 
 pub fn buchberger<P, O>(ring: P, input_basis: Vec<El<P>>, order: O) -> Vec<El<P>>
-    where P: RingStore + Copy + Send + Sync,
-        El<P>: Send + Sync,
+    where P: RingStore + Copy,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: Sync,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
-        O: MonomialOrder + Copy + Send + Sync,
-        PolyCoeff<P>: Send + Sync
+        O: MonomialOrder + Copy + Send + Sync
 {
     let as_local_pir = AsLocalPIR::from_field(ring.base_ring());
     let new_poly_ring = MultivariatePolyRingImpl::new(&as_local_pir, ring.indeterminate_count());

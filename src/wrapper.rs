@@ -409,7 +409,7 @@ use crate::rings::zn::zn_64;
 
 #[test]
 fn test_arithmetic_expression() {
-    let ring = zn_64::Zn::new(17);
+    let ring = zn_64::Zn64B::new(17);
 
     for x in ring.elements() {
         for y in ring.elements() {
@@ -426,7 +426,7 @@ fn test_arithmetic_expression() {
 
 #[test]
 fn test_arithmetic_expression_int() {
-    let ring = zn_64::Zn::new(17);
+    let ring = zn_64::Zn64B::new(17);
 
     for x in ring.elements() {
         for y in ring.elements() {
@@ -443,7 +443,7 @@ fn test_arithmetic_expression_int() {
 
 #[test]
 fn test_arithmetic_expression_ref() {
-    let ring = zn_64::Zn::new(17);
+    let ring = zn_64::Zn64B::new(17);
 
     for x in ring.elements() {
         for y in ring.elements() {
@@ -460,7 +460,7 @@ fn test_arithmetic_expression_ref() {
 
 #[test]
 fn test_arithmetic_expression_int_ref() {
-    let ring = zn_64::Zn::new(17);
+    let ring = zn_64::Zn64B::new(17);
 
     for x in ring.elements() {
         for y in ring.elements() {

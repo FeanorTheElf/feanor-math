@@ -275,18 +275,18 @@ use test::Bencher;
 #[cfg(test)]
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 #[cfg(test)]
-use crate::rings::zn::zn_64::{Zn, ZnBase, ZnEl};
+use crate::rings::zn::zn_64::{Zn64B, Zn64BBase, Zn64BEl};
 
 #[test]
 fn test_convolution() {
-    let ring = zn_64::Zn::new(65537);
+    let ring = zn_64::Zn64B::new(65537);
     let convolution = NTTConvolution::new(ring);
     super::generic_tests::test_convolution(&convolution, &ring, ring.one());
 }
 
 #[cfg(test)]
-fn run_benchmark<F>(ring: Zn, bencher: &mut Bencher, mut f: F)
-    where F: FnMut(&[(&[ZnEl], Option<&PreparedConvolutionOperand<ZnBase>>, &[ZnEl], Option<&PreparedConvolutionOperand<ZnBase>>)], &mut [ZnEl], Zn)
+fn run_benchmark<F>(ring: Zn64B, bencher: &mut Bencher, mut f: F)
+    where F: FnMut(&[(&[Zn64BEl], Option<&PreparedConvolutionOperand<Zn64BBase>>, &[Zn64BEl], Option<&PreparedConvolutionOperand<Zn64BBase>>)], &mut [Zn64BEl], Zn64B)
 {
     let mut expected = (0..512).map(|_| ring.zero()).collect::<Vec<_>>();
     let value = (0..256).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
@@ -326,7 +326,7 @@ fn run_benchmark<F>(ring: Zn, bencher: &mut Bencher, mut f: F)
 
 #[bench]
 fn bench_convolution_sum(bencher: &mut Bencher) {
-    let ring = zn_64::Zn::new(65537);
+    let ring = zn_64::Zn64B::new(65537);
     let convolution = NTTConvolution::new(ring);
 
     run_benchmark(ring, bencher, |values, dst, _| convolution.compute_convolution_sum_impl(values, dst));
@@ -334,7 +334,7 @@ fn bench_convolution_sum(bencher: &mut Bencher) {
 
 #[bench]
 fn bench_convolution_sum_default(bencher: &mut Bencher) {
-    let ring = zn_64::Zn::new(65537);
+    let ring = zn_64::Zn64B::new(65537);
     let convolution = NTTConvolution::new(ring);
 
     run_benchmark(ring, bencher, |values, dst, ring| {

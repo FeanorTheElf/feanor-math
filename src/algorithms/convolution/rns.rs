@@ -8,7 +8,7 @@ use crate::integer::*;
 use crate::lazy::LazyVec;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
-use crate::rings::zn::zn_64::{Zn, ZnBase, ZnFastmul, ZnFastmulBase};
+use crate::rings::zn::zn_64::{Zn64B, Zn64BBase, ZnFastmul, ZnFastmulBase};
 use crate::rings::zn::*;
 use crate::divisibility::*;
 use crate::seq::*;
@@ -26,15 +26,15 @@ use super::ConvolutionAlgorithm;
 /// [`RNSConvolutionZn`].
 /// 
 #[stability::unstable(feature = "enable")]
-pub struct RNSConvolution<I = BigIntRing, C = NTTConvolution<ZnBase, ZnFastmulBase, CanHom<ZnFastmul, Zn>>, A = Global, CreateC = CreateNTTConvolution>
+pub struct RNSConvolution<I = BigIntRing, C = NTTConvolution<Zn64BBase, ZnFastmulBase, CanHom<ZnFastmul, Zn64B>>, A = Global, CreateC = CreateNTTConvolution>
     where I: RingStore + Clone,
         I::Type: IntegerRing,
-        C: ConvolutionAlgorithm<ZnBase>,
+        C: ConvolutionAlgorithm<Zn64BBase>,
         A: Send + Sync + Allocator + Clone,
-        CreateC: Send + Sync + Fn(Zn) -> C
+        CreateC: Send + Sync + Fn(Zn64B) -> C
 {
     integer_ring: I,
-    rns_rings: LazyVec<zn_rns::Zn<Zn, I, A>>,
+    rns_rings: LazyVec<zn_rns::ZnRNS<Zn64B, I, A>>,
     convolutions: LazyVec<C>,
     create_convolution: CreateC,
     required_root_of_unity_log2: usize,
@@ -46,12 +46,12 @@ pub struct RNSConvolution<I = BigIntRing, C = NTTConvolution<ZnBase, ZnFastmulBa
 /// 
 #[stability::unstable(feature = "enable")]
 #[repr(transparent)]
-pub struct RNSConvolutionZn<I = BigIntRing, C = NTTConvolution<ZnBase, ZnFastmulBase, CanHom<ZnFastmul, Zn>>, A = Global, CreateC = CreateNTTConvolution>
+pub struct RNSConvolutionZn<I = BigIntRing, C = NTTConvolution<Zn64BBase, ZnFastmulBase, CanHom<ZnFastmul, Zn64B>>, A = Global, CreateC = CreateNTTConvolution>
     where I: RingStore + Clone,
         I::Type: IntegerRing,
-        C: ConvolutionAlgorithm<ZnBase>,
+        C: ConvolutionAlgorithm<Zn64BBase>,
         A: Send + Sync + Allocator + Clone,
-        CreateC: Send + Sync + Fn(Zn) -> C
+        CreateC: Send + Sync + Fn(Zn64B) -> C
 {
     base: RNSConvolution<I, C, A, CreateC>
 }
@@ -60,9 +60,9 @@ pub struct RNSConvolutionZn<I = BigIntRing, C = NTTConvolution<ZnBase, ZnFastmul
 /// A prepared convolution operand for a [`RNSConvolution`].
 /// 
 #[stability::unstable(feature = "enable")]
-pub struct PreparedConvolutionOperand<R, C = NTTConvolution<ZnBase, ZnFastmulBase, CanHom<ZnFastmul, Zn>>>
+pub struct PreparedConvolutionOperand<R, C = NTTConvolution<Zn64BBase, ZnFastmulBase, CanHom<ZnFastmul, Zn64B>>>
     where R: ?Sized + RingBase,
-        C: ConvolutionAlgorithm<ZnBase>
+        C: ConvolutionAlgorithm<Zn64BBase>
 {
     prepared: LazyVec<C::PreparedConvolutionOperand>,
     log2_data_size: usize,
@@ -83,9 +83,9 @@ pub struct CreateNTTConvolution<A = Global>
 impl<I, C, A, CreateC> From<RNSConvolutionZn<I, C, A, CreateC>> for RNSConvolution<I, C, A, CreateC>
     where I: RingStore + Clone,
         I::Type: IntegerRing,
-        C: ConvolutionAlgorithm<ZnBase>,
+        C: ConvolutionAlgorithm<Zn64BBase>,
         A: Send + Sync + Allocator + Clone,
-        CreateC: Send + Sync + Fn(Zn) -> C
+        CreateC: Send + Sync + Fn(Zn64B) -> C
 {
     fn from(value: RNSConvolutionZn<I, C, A, CreateC>) -> Self {
         value.base
@@ -95,9 +95,9 @@ impl<I, C, A, CreateC> From<RNSConvolutionZn<I, C, A, CreateC>> for RNSConvoluti
 impl<'a, I, C, A, CreateC> From<&'a RNSConvolutionZn<I, C, A, CreateC>> for &'a RNSConvolution<I, C, A, CreateC>
     where I: RingStore + Clone,
         I::Type: IntegerRing,
-        C: ConvolutionAlgorithm<ZnBase>,
+        C: ConvolutionAlgorithm<Zn64BBase>,
         A: Send + Sync + Allocator + Clone,
-        CreateC: Send + Sync + Fn(Zn) -> C
+        CreateC: Send + Sync + Fn(Zn64B) -> C
 {
     fn from(value: &'a RNSConvolutionZn<I, C, A, CreateC>) -> Self {
         &value.base
@@ -107,9 +107,9 @@ impl<'a, I, C, A, CreateC> From<&'a RNSConvolutionZn<I, C, A, CreateC>> for &'a 
 impl<I, C, A, CreateC> From<RNSConvolution<I, C, A, CreateC>> for RNSConvolutionZn<I, C, A, CreateC>
     where I: RingStore + Clone,
         I::Type: IntegerRing,
-        C: ConvolutionAlgorithm<ZnBase>,
+        C: ConvolutionAlgorithm<Zn64BBase>,
         A: Send + Sync + Allocator + Clone,
-        CreateC: Send + Sync + Fn(Zn) -> C
+        CreateC: Send + Sync + Fn(Zn64B) -> C
 {
     fn from(value: RNSConvolution<I, C, A, CreateC>) -> Self {
         RNSConvolutionZn { base: value }
@@ -119,9 +119,9 @@ impl<I, C, A, CreateC> From<RNSConvolution<I, C, A, CreateC>> for RNSConvolution
 impl<'a, I, C, A, CreateC> From<&'a RNSConvolution<I, C, A, CreateC>> for &'a RNSConvolutionZn<I, C, A, CreateC>
     where I: RingStore + Clone,
         I::Type: IntegerRing,
-        C: ConvolutionAlgorithm<ZnBase>,
+        C: ConvolutionAlgorithm<Zn64BBase>,
         A: Send + Sync + Allocator + Clone,
-        CreateC: Send + Sync + Fn(Zn) -> C
+        CreateC: Send + Sync + Fn(Zn64B) -> C
 {
     fn from(value: &'a RNSConvolution<I, C, A, CreateC>) -> Self {
         unsafe { std::mem::transmute(value) }
@@ -139,28 +139,28 @@ impl CreateNTTConvolution<Global> {
     }
 }
 
-impl<A> FnOnce<(Zn,)> for CreateNTTConvolution<A>
+impl<A> FnOnce<(Zn64B,)> for CreateNTTConvolution<A>
     where A: Send + Sync + Allocator + Clone
 {
-    type Output = NTTConvolution<ZnBase, ZnFastmulBase, CanHom<ZnFastmul, Zn>, A>;
+    type Output = NTTConvolution<Zn64BBase, ZnFastmulBase, CanHom<ZnFastmul, Zn64B>, A>;
 
-    extern "rust-call" fn call_once(self, args: (Zn,)) -> Self::Output {
+    extern "rust-call" fn call_once(self, args: (Zn64B,)) -> Self::Output {
         self.call(args)
     }
 }
 
-impl<A> FnMut<(Zn,)> for CreateNTTConvolution<A>
+impl<A> FnMut<(Zn64B,)> for CreateNTTConvolution<A>
     where A: Send + Sync + Allocator + Clone
 {
-    extern "rust-call" fn call_mut(&mut self, args: (Zn,)) -> Self::Output {
+    extern "rust-call" fn call_mut(&mut self, args: (Zn64B,)) -> Self::Output {
         self.call(args)
     }
 }
 
-impl<A> Fn<(Zn,)> for CreateNTTConvolution<A>
+impl<A> Fn<(Zn64B,)> for CreateNTTConvolution<A>
     where A: Send + Sync + Allocator + Clone
 {
-    extern "rust-call" fn call(&self, args: (Zn,)) -> Self::Output {
+    extern "rust-call" fn call(&self, args: (Zn64B,)) -> Self::Output {
         let ring = args.0;
         let ring_fastmul = ZnFastmul::new(ring).unwrap();
         let hom = ring.into_can_hom(ring_fastmul).ok().unwrap();
@@ -183,9 +183,9 @@ impl RNSConvolution {
 impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
     where I: RingStore + Clone,
         I::Type: IntegerRing,
-        C: ConvolutionAlgorithm<ZnBase>,
+        C: ConvolutionAlgorithm<Zn64BBase>,
         A: Send + Sync + Allocator + Clone,
-        CreateC: Send + Sync + Fn(Zn) -> C
+        CreateC: Send + Sync + Fn(Zn64B) -> C
 {
     ///
     /// Creates a new [`RNSConvolution`] with all the given configuration parameters.
@@ -212,8 +212,8 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
             required_root_of_unity_log2: required_root_of_unity_log2,
             allocator: allocator
         };
-        let initial_ring = zn_rns::Zn::new_with_alloc(
-            vec![Zn::new(Self::sample_next_prime(required_root_of_unity_log2, (1 << max_prime_size_log2) + 1).unwrap() as u64)],
+        let initial_ring = zn_rns::ZnRNS::new_with_alloc(
+            vec![Zn64B::new(Self::sample_next_prime(required_root_of_unity_log2, (1 << max_prime_size_log2) + 1).unwrap() as u64)],
             result.integer_ring.clone(), 
             result.allocator.clone()
         );
@@ -233,15 +233,15 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
         return None;
     }
 
-    fn get_rns_ring(&self, moduli_count: usize) -> &zn_rns::Zn<Zn, I, A> {
-        self.rns_rings.get_or_init_incremental(moduli_count - 1, |_, prev| zn_rns::Zn::new_with_alloc(
-            prev.as_iter().cloned().chain([Zn::new(Self::sample_next_prime(self.required_root_of_unity_log2, *prev.at(prev.len() - 1).modulus()).unwrap() as u64)]).collect(),
+    fn get_rns_ring(&self, moduli_count: usize) -> &zn_rns::ZnRNS<Zn64B, I, A> {
+        self.rns_rings.get_or_init_incremental(moduli_count - 1, |_, prev| zn_rns::ZnRNS::new_with_alloc(
+            prev.as_iter().cloned().chain([Zn64B::new(Self::sample_next_prime(self.required_root_of_unity_log2, *prev.at(prev.len() - 1).modulus()).unwrap() as u64)]).collect(),
             self.integer_ring.clone(),
             self.allocator.clone()
         ))
     }
 
-    fn get_rns_factor(&self, i: usize) -> &Zn {
+    fn get_rns_factor(&self, i: usize) -> &Zn64B {
         let rns_ring = self.get_rns_ring(i + 1);
         return rns_ring.at(rns_ring.len() - 1);
     }
@@ -302,7 +302,7 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
     
     fn get_prepared_operand<'a, R>(
         &self,
-        data: &[El<Zn>],
+        data: &[El<Zn64B>],
         data_prep: &'a PreparedConvolutionOperand<R, C>,
         rns_index: usize
     ) -> &'a C::PreparedConvolutionOperand
@@ -396,8 +396,8 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
 
         let mut merge_current = |
             current_width: usize, 
-            lhs_tmp: &mut Vec<(Vec<El<Zn>, _>, Option<&PreparedConvolutionOperand<R, C>>), _>, 
-            rhs_tmp: &mut Vec<(Vec<El<Zn>, _>, Option<&PreparedConvolutionOperand<R, C>>), _>
+            lhs_tmp: &mut Vec<(Vec<El<Zn64B>, _>, Option<&PreparedConvolutionOperand<R, C>>), _>, 
+            rhs_tmp: &mut Vec<(Vec<El<Zn64B>, _>, Option<&PreparedConvolutionOperand<R, C>>), _>
         | {
             if current_width == 0 {
                 lhs_tmp.clear();
@@ -488,9 +488,9 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
 impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolution<I, C, A, CreateC>
     where I: RingStore + Clone,
         I::Type: IntegerRing,
-        C: ConvolutionAlgorithm<ZnBase>,
+        C: ConvolutionAlgorithm<Zn64BBase>,
         A: Send + Sync + Allocator + Clone,
-        CreateC: Send + Sync + Fn(Zn) -> C,
+        CreateC: Send + Sync + Fn(Zn64B) -> C,
         R: ?Sized + IntegerRing
 {
     type PreparedConvolutionOperand = PreparedConvolutionOperand<R, C>;
@@ -538,9 +538,9 @@ impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolution<I, C, A, Cr
 impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolutionZn<I, C, A, CreateC>
     where I: RingStore + Clone,
         I::Type: IntegerRing,
-        C: ConvolutionAlgorithm<ZnBase>,
+        C: ConvolutionAlgorithm<Zn64BBase>,
         A: Send + Sync + Allocator + Clone,
-        CreateC: Send + Sync + Fn(Zn) -> C,
+        CreateC: Send + Sync + Fn(Zn64B) -> C,
         R: ?Sized + ZnRing + CanHomFrom<I::Type>
 {
     type PreparedConvolutionOperand = PreparedConvolutionOperand<R, C>;
@@ -600,7 +600,7 @@ fn test_convolution_integer() {
 
 #[test]
 fn test_convolution_zn() {
-    let ring = Zn::new((1 << 57) + 1);
+    let ring = Zn64B::new((1 << 57) + 1);
     let convolution = RNSConvolutionZn::from(RNSConvolution::new_with_convolution(7, usize::MAX, BigIntRing::RING, Global, NTTConvolution::new));
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));

@@ -27,10 +27,13 @@ use crate::rings::zn::*;
 use crate::serialization::*;
 
 ///
-/// Ring representing `Z/nZ`, computing the modular reductions
-/// via a Barett-reduction algorithm. This is a general-purpose
-/// method, but note that it is required that `n^3` fits into the
-/// supplied integer type.]
+/// Represents the ring `Z/nZ` for general integers `n`.
+/// 
+/// The `GB` in the name stands for "general Barett", which is the kind
+/// of reduction internally used.
+/// 
+/// This is a general-purpose method, but note that it is required 
+/// that `n^3` fits into the supplied integer type.
 /// 
 /// # Performance
 /// 
@@ -73,7 +76,7 @@ use crate::serialization::*;
 /// assert!(R.eq_el(&R.int_hom().map(120493), &R.coerce(&S, S.int_hom().map(120493))));
 /// ```
 ///
-pub struct ZnBase<I: RingStore> 
+pub struct ZnGBBase<I: RingStore> 
     where I::Type: IntegerRing
 {
     integer_ring: I,
@@ -87,17 +90,17 @@ pub struct ZnBase<I: RingStore>
 /// Ring representing `Z/nZ`, computing the modular reductions
 /// via a Barett-reduction algorithm. For details, see [`ZnBase`].
 /// 
-pub type Zn<I> = RingValue<ZnBase<I>>;
+pub type ZnGB<I> = RingValue<ZnGBBase<I>>;
 
-impl<I: RingStore> Zn<I>
+impl<I: RingStore> ZnGB<I>
     where I::Type: IntegerRing
 {
     pub fn new(integer_ring: I, modulus: El<I>) -> Self {
-        RingValue::from(ZnBase::new(integer_ring, modulus))
+        RingValue::from(ZnGBBase::new(integer_ring, modulus))
     }
 }
 
-impl<I: RingStore> ZnBase<I> 
+impl<I: RingStore> ZnGBBase<I> 
     where I::Type: IntegerRing
 {
     pub fn new(integer_ring: I, modulus: El<I>) -> Self {
@@ -113,7 +116,7 @@ impl<I: RingStore> ZnBase<I>
         // check that this expression does not overflow
         _ = integer_ring.mul_ref_snd(integer_ring.pow(integer_ring.clone_el(&modulus), 2), &inverse_modulus);
 
-        return ZnBase {
+        return ZnGBBase {
             twice_modulus: integer_ring.add_ref(&modulus, &modulus),
             integer_ring: integer_ring,
             modulus: modulus,
@@ -135,10 +138,10 @@ impl<I: RingStore> ZnBase<I>
     }
 }
 
-pub struct ZnEl<I: RingStore>(/* allow it to grow up to 2 * modulus(), inclusively */ El<I>)
+pub struct ZnGBEl<I: RingStore>(/* allow it to grow up to 2 * modulus(), inclusively */ El<I>)
     where I::Type: IntegerRing;
 
-impl<I> Debug for ZnBase<I> 
+impl<I> Debug for ZnGBBase<I> 
     where I: RingStore,
         I::Type: IntegerRing
 {
@@ -147,7 +150,7 @@ impl<I> Debug for ZnBase<I>
     }
 }
 
-impl<I: RingStore> Debug for ZnEl<I> 
+impl<I: RingStore> Debug for ZnGBEl<I> 
     where El<I>: Clone + Debug,
         I::Type: IntegerRing
 {
@@ -158,27 +161,27 @@ impl<I: RingStore> Debug for ZnEl<I>
     }
 }
 
-impl<I: RingStore> Clone for ZnEl<I> 
+impl<I: RingStore> Clone for ZnGBEl<I> 
     where El<I>: Clone,
         I::Type: IntegerRing
 {
     fn clone(&self) -> Self {
-        ZnEl(self.0.clone())
+        ZnGBEl(self.0.clone())
     }
 }
 
-impl<I: RingStore> Copy for ZnEl<I>
+impl<I: RingStore> Copy for ZnGBEl<I>
     where El<I>: Copy,
         I::Type: IntegerRing
 {}
 
-impl<I: RingStore> RingBase for ZnBase<I> 
+impl<I: RingStore> RingBase for ZnGBBase<I> 
     where I::Type: IntegerRing
 {
-    type Element = ZnEl<I>;
+    type Element = ZnGBEl<I>;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        ZnEl(self.integer_ring().clone_el(&val.0))
+        ZnGBEl(self.integer_ring().clone_el(&val.0))
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -296,12 +299,12 @@ impl<I: RingStore> RingBase for ZnBase<I>
     fn is_approximate(&self) -> bool { false }
 }
 
-impl<I: RingStore> Clone for ZnBase<I> 
+impl<I: RingStore> Clone for ZnGBBase<I> 
     where I: Clone,
         I::Type: IntegerRing
 {
     fn clone(&self) -> Self {
-        ZnBase {
+        ZnGBBase {
             integer_ring: self.integer_ring.clone(),
             modulus: self.integer_ring.clone_el(&self.modulus),
             inverse_modulus: self.integer_ring.clone_el(&self.inverse_modulus),
@@ -311,7 +314,7 @@ impl<I: RingStore> Clone for ZnBase<I>
     }
 }
 
-impl<I: RingStore> InterpolationBaseRing for AsFieldBase<Zn<I>>
+impl<I: RingStore> InterpolationBaseRing for AsFieldBase<ZnGB<I>>
     where I::Type: IntegerRing
 {
     type ExtendedRingBase<'a> = GaloisFieldBaseOver<RingRef<'a, Self>>
@@ -343,13 +346,13 @@ impl<I: RingStore> InterpolationBaseRing for AsFieldBase<Zn<I>>
         return (ring, points);
     }
 }
-impl<I: RingStore> Copy for ZnBase<I> 
+impl<I: RingStore> Copy for ZnGBBase<I> 
     where I: Copy,
         El<I>: Copy,
         I::Type: IntegerRing
 {}
 
-impl<I: RingStore> HashableElRing for ZnBase<I>
+impl<I: RingStore> HashableElRing for ZnGBBase<I>
     where I::Type: IntegerRing
 {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
@@ -357,7 +360,7 @@ impl<I: RingStore> HashableElRing for ZnBase<I>
     }
 }
 
-impl<I: RingStore + Default> FromModulusCreateableZnRing for ZnBase<I>
+impl<I: RingStore + Default> FromModulusCreateableZnRing for ZnGBBase<I>
     where I::Type: IntegerRing
 {
     fn from_modulus<F, E>(create_modulus: F) -> Result<Self, E>
@@ -369,7 +372,7 @@ impl<I: RingStore + Default> FromModulusCreateableZnRing for ZnBase<I>
     }
 }
 
-impl<I: RingStore> DivisibilityRing for ZnBase<I> 
+impl<I: RingStore> DivisibilityRing for ZnGBBase<I> 
     where I::Type: IntegerRing
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
@@ -381,13 +384,13 @@ impl<I: RingStore> DivisibilityRing for ZnBase<I>
     }
 }
 
-impl<I: RingStore, J: RingStore> CanHomFrom<ZnBase<J>> for ZnBase<I> 
+impl<I: RingStore, J: RingStore> CanHomFrom<ZnGBBase<J>> for ZnGBBase<I> 
     where I::Type: IntegerRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing
 {
     type Homomorphism =  <I::Type as CanHomFrom<J::Type>>::Homomorphism;
 
-    fn has_canonical_hom(&self, from: &ZnBase<J>) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &ZnGBBase<J>) -> Option<Self::Homomorphism> {
         let base_hom = <I::Type as CanHomFrom<J::Type>>::has_canonical_hom(self.integer_ring.get_ring(), from.integer_ring.get_ring())?;
         if self.integer_ring.eq_el(
             &self.modulus,
@@ -399,40 +402,40 @@ impl<I: RingStore, J: RingStore> CanHomFrom<ZnBase<J>> for ZnBase<I>
         }
     }
 
-    fn map_in(&self, from: &ZnBase<J>, el: <ZnBase<J> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        ZnEl(<I::Type as CanHomFrom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), el.0, hom))
+    fn map_in(&self, from: &ZnGBBase<J>, el: <ZnGBBase<J> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        ZnGBEl(<I::Type as CanHomFrom<J::Type>>::map_in(self.integer_ring.get_ring(), from.integer_ring.get_ring(), el.0, hom))
     }
 }
 
-impl<I: RingStore> CanHomFrom<zn_64::ZnBase> for ZnBase<I>
+impl<I: RingStore> CanHomFrom<zn_64::Zn64BBase> for ZnGBBase<I>
     where I::Type: IntegerRing
 {
-    type Homomorphism = <zn_64::ZnBase as CanIsoFromTo<ZnBase<I>>>::Isomorphism;
+    type Homomorphism = <zn_64::Zn64BBase as CanIsoFromTo<ZnGBBase<I>>>::Isomorphism;
 
-    fn has_canonical_hom(&self, from: &zn_64::ZnBase) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &zn_64::Zn64BBase) -> Option<Self::Homomorphism> {
         from.has_canonical_iso(self)
     }
 
-    fn map_in(&self, from: &zn_64::ZnBase, el: <zn_64::ZnBase as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &zn_64::Zn64BBase, el: <zn_64::Zn64BBase as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         from.map_out(self, el, hom)
     }
 }
 
-impl<I: RingStore> CanIsoFromTo<zn_64::ZnBase> for ZnBase<I>
+impl<I: RingStore> CanIsoFromTo<zn_64::Zn64BBase> for ZnGBBase<I>
     where I::Type: IntegerRing
 {
-    type Isomorphism = <zn_64::ZnBase as CanHomFrom<ZnBase<I>>>::Homomorphism;
+    type Isomorphism = <zn_64::Zn64BBase as CanHomFrom<ZnGBBase<I>>>::Homomorphism;
 
-    fn has_canonical_iso(&self, from: &zn_64::ZnBase) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, from: &zn_64::Zn64BBase) -> Option<Self::Isomorphism> {
         from.has_canonical_hom(self)
     }
 
-    fn map_out(&self, from: &zn_64::ZnBase, el: Self::Element, iso: &Self::Isomorphism) -> <zn_64::ZnBase as RingBase>::Element {
+    fn map_out(&self, from: &zn_64::Zn64BBase, el: Self::Element, iso: &Self::Isomorphism) -> <zn_64::Zn64BBase as RingBase>::Element {
         from.map_in(self, el, iso)
     }
 }
 
-impl<I: RingStore> PartialEq for ZnBase<I>
+impl<I: RingStore> PartialEq for ZnGBBase<I>
     where I::Type: IntegerRing
 {
     fn eq(&self, other: &Self) -> bool {
@@ -440,13 +443,13 @@ impl<I: RingStore> PartialEq for ZnBase<I>
     }
 }
 
-impl<I: RingStore, J: RingStore> CanIsoFromTo<ZnBase<J>> for ZnBase<I>
+impl<I: RingStore, J: RingStore> CanIsoFromTo<ZnGBBase<J>> for ZnGBBase<I>
     where I::Type: IntegerRing + CanIsoFromTo<J::Type>,
         J::Type: IntegerRing
 {
     type Isomorphism = <I::Type as CanIsoFromTo<J::Type>>::Isomorphism;
 
-    fn has_canonical_iso(&self, from: &ZnBase<J>) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, from: &ZnGBBase<J>) -> Option<Self::Isomorphism> {
         let base_iso = <I::Type as CanIsoFromTo<J::Type>>::has_canonical_iso(self.integer_ring.get_ring(), from.integer_ring.get_ring())?;
         if from.integer_ring().eq_el(
             from.modulus(),
@@ -458,16 +461,16 @@ impl<I: RingStore, J: RingStore> CanIsoFromTo<ZnBase<J>> for ZnBase<I>
         }
     }
 
-    fn map_out(&self, from: &ZnBase<J>, el: Self::Element, iso: &Self::Isomorphism) -> <ZnBase<J> as RingBase>::Element {
-        ZnEl(<I::Type as CanIsoFromTo<J::Type>>::map_out(self.integer_ring.get_ring(), from.integer_ring.get_ring(), el.0, iso))
+    fn map_out(&self, from: &ZnGBBase<J>, el: Self::Element, iso: &Self::Isomorphism) -> <ZnGBBase<J> as RingBase>::Element {
+        ZnGBEl(<I::Type as CanIsoFromTo<J::Type>>::map_out(self.integer_ring.get_ring(), from.integer_ring.get_ring(), el.0, iso))
     }
 }
 
-impl<I: RingStore, J: IntegerRing + ?Sized> CanHomFrom<J> for ZnBase<I>
+impl<I: RingStore, J: IntegerRing + ?Sized> CanHomFrom<J> for ZnGBBase<I>
     where I::Type: IntegerRing, 
         J: CanIsoFromTo<I::Type>
 {
-    type Homomorphism = super::generic_impls::BigIntToZnHom<J, I::Type, ZnBase<I>>;
+    type Homomorphism = super::generic_impls::BigIntToZnHom<J, I::Type, ZnGBBase<I>>;
 
     fn has_canonical_hom(&self, from: &J) -> Option<Self::Homomorphism> {
         super::generic_impls::has_canonical_hom_from_bigint(from, self, self.integer_ring.get_ring(), Some(&self.integer_ring.mul_ref(&self.twice_modulus, &self.twice_modulus)))
@@ -476,11 +479,11 @@ impl<I: RingStore, J: IntegerRing + ?Sized> CanHomFrom<J> for ZnBase<I>
     fn map_in(&self, from: &J, el: J::Element, hom: &Self::Homomorphism) -> Self::Element {
         super::generic_impls::map_in_from_bigint(from, self, self.integer_ring.get_ring(), el, hom, |n| {
             debug_assert!(self.integer_ring.is_lt(&n, &self.modulus));
-            ZnEl(n)
+            ZnGBEl(n)
         }, |mut n| {
             debug_assert!(self.integer_ring.is_lt(&n, &self.integer_ring.mul_ref(&self.twice_modulus, &self.twice_modulus)));
             self.bounded_reduce(&mut n);
-            ZnEl(n)
+            ZnGBEl(n)
         })
     }
 }
@@ -489,7 +492,7 @@ pub struct ZnBaseElementsIter<'a, I>
     where I: RingStore,
         I::Type: IntegerRing
 {
-    ring: &'a ZnBase<I>,
+    ring: &'a ZnGBBase<I>,
     current: El<I>
 }
 
@@ -506,20 +509,20 @@ impl<'a, I> Iterator for ZnBaseElementsIter<'a, I>
     where I: RingStore,
         I::Type: IntegerRing
 {
-    type Item = ZnEl<I>;
+    type Item = ZnGBEl<I>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.ring.integer_ring().is_lt(&self.current, self.ring.modulus()) {
             let result = self.ring.integer_ring().clone_el(&self.current);
             self.ring.integer_ring().add_assign(&mut self.current, self.ring.integer_ring().one());
-            return Some(ZnEl(result));
+            return Some(ZnGBEl(result));
         } else {
             return None;
         }
     }
 }
 
-impl<I> Serialize for ZnBase<I>
+impl<I> Serialize for ZnGBBase<I>
     where I: RingStore + Serialize,
         I::Type: IntegerRing + SerializableElementRing
 {
@@ -530,7 +533,7 @@ impl<I> Serialize for ZnBase<I>
     }
 }
 
-impl<'de, I> Deserialize<'de> for ZnBase<I>
+impl<'de, I> Deserialize<'de> for ZnGBBase<I>
     where I: RingStore + Deserialize<'de>,
         I::Type: IntegerRing + SerializableElementRing
 {
@@ -543,11 +546,11 @@ impl<'de, I> Deserialize<'de> for ZnBase<I>
             DeserializeWithRing::new(ring_cell.get().unwrap())
         })), deserializer)?;
         let ring = ring_cell.into_inner().unwrap();
-        return Ok(Zn::new(ring, modulus).into());
+        return Ok(ZnGB::new(ring, modulus).into());
     }
 }
 
-impl<I: RingStore> SerializableElementRing for ZnBase<I>
+impl<I: RingStore> SerializableElementRing for ZnGBBase<I>
     where I::Type: IntegerRing + SerializableElementRing
 {
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
@@ -565,7 +568,7 @@ impl<I: RingStore> SerializableElementRing for ZnBase<I>
     }
 }
 
-impl<I: RingStore> FiniteRing for ZnBase<I>
+impl<I: RingStore> FiniteRing for ZnGBBase<I>
     where I::Type: IntegerRing
 {
     type ElementsIter<'a> = ZnBaseElementsIter<'a, I>
@@ -593,7 +596,7 @@ impl<I: RingStore> FiniteRing for ZnBase<I>
     }
 }
 
-impl<I: RingStore> PrincipalIdealRing for ZnBase<I>
+impl<I: RingStore> PrincipalIdealRing for ZnGBBase<I>
     where I::Type: IntegerRing
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
@@ -607,7 +610,7 @@ impl<I: RingStore> PrincipalIdealRing for ZnBase<I>
     }
 }
 
-impl<I> FiniteRingSpecializable for ZnBase<I>
+impl<I> FiniteRingSpecializable for ZnGBBase<I>
     where I: RingStore,
         I::Type: IntegerRing
 {
@@ -616,7 +619,7 @@ impl<I> FiniteRingSpecializable for ZnBase<I>
     }
 }
 
-impl<I: RingStore> ZnRing for ZnBase<I>
+impl<I: RingStore> ZnRing for ZnGBBase<I>
     where I::Type: IntegerRing
 {
     type IntegerRingBase = I::Type;
@@ -644,14 +647,14 @@ impl<I: RingStore> ZnRing for ZnBase<I>
     fn from_int_promise_reduced(&self, x: El<Self::IntegerRing>) -> Self::Element {
         debug_assert!(!self.integer_ring().is_neg(&x));
         debug_assert!(self.integer_ring().is_lt(&x, self.modulus()));
-        ZnEl(x)
+        ZnGBEl(x)
     }
 }
 
-impl_field_wrap_unwrap_homs!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
-impl_field_wrap_unwrap_isos!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
-impl_localpir_wrap_unwrap_homs!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
-impl_localpir_wrap_unwrap_isos!{ <{I, J}> ZnBase<I>, ZnBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
+impl_field_wrap_unwrap_homs!{ <{I, J}> ZnGBBase<I>, ZnGBBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
+impl_field_wrap_unwrap_isos!{ <{I, J}> ZnGBBase<I>, ZnGBBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
+impl_localpir_wrap_unwrap_homs!{ <{I, J}> ZnGBBase<I>, ZnGBBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
+impl_localpir_wrap_unwrap_isos!{ <{I, J}> ZnGBBase<I>, ZnGBBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
 
 #[cfg(test)]
 use crate::integer::BigIntRing;
@@ -661,7 +664,7 @@ use crate::rings::rust_bigint::*;
 #[test]
 fn test_mul() {
     const ZZ: BigIntRing = BigIntRing::RING;
-    let Z257 = Zn::new(ZZ, ZZ.int_hom().map(257));
+    let Z257 = ZnGB::new(ZZ, ZZ.int_hom().map(257));
     let x = Z257.coerce(&ZZ, ZZ.int_hom().map(256));
     assert_el_eq!(Z257, Z257.one(), Z257.mul_ref(&x, &x));
 }
@@ -669,7 +672,7 @@ fn test_mul() {
 #[test]
 fn test_project() {
     const ZZ: StaticRing<i64> = StaticRing::RING;
-    let Z17 = Zn::new(ZZ, 17);
+    let Z17 = ZnGB::new(ZZ, 17);
     for k in 0..289 {
         assert_el_eq!(Z17, Z17.int_hom().map((289 - k) % 17), Z17.coerce(&ZZ, -k as i64));
     }
@@ -677,66 +680,66 @@ fn test_project() {
 
 #[test]
 fn test_ring_axioms_znbase() {
-    let ring = Zn::new(StaticRing::<i64>::RING, 63);
+    let ring = ZnGB::new(StaticRing::<i64>::RING, 63);
     crate::ring::generic_tests::test_ring_axioms(&ring, ring.elements())
 }
 
 #[test]
 fn test_hash_axioms() {
-    let ring = Zn::new(StaticRing::<i64>::RING, 63);
+    let ring = ZnGB::new(StaticRing::<i64>::RING, 63);
     crate::ring::generic_tests::test_hash_axioms(&ring, ring.elements())
 }
 
 #[test]
 fn test_canonical_iso_axioms_zn_big() {
-    let from = Zn::new(StaticRing::<i128>::RING, 7 * 11);
-    let to = Zn::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(7 * 11));
+    let from = ZnGB::new(StaticRing::<i128>::RING, 7 * 11);
+    let to = ZnGB::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(7 * 11));
     crate::ring::generic_tests::test_hom_axioms(&from, &to, from.elements());
     crate::ring::generic_tests::test_iso_axioms(&from, &to, from.elements());
-    assert!(from.can_hom(&Zn::new(StaticRing::<i64>::RING, 19)).is_none());
+    assert!(from.can_hom(&ZnGB::new(StaticRing::<i64>::RING, 19)).is_none());
 }
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {
     let from = StaticRing::<i32>::RING;
-    let to = Zn::new(StaticRing::<i128>::RING, 7 * 11);
+    let to = ZnGB::new(StaticRing::<i128>::RING, 7 * 11);
     crate::ring::generic_tests::test_hom_axioms(&from, to, 0..=(2 * 7 * 11));
 }
 
 #[test]
 fn test_zn_ring_axioms_znbase() {
-    super::generic_tests::test_zn_axioms(Zn::new(StaticRing::<i64>::RING, 17));
-    super::generic_tests::test_zn_axioms(Zn::new(StaticRing::<i64>::RING, 63));
+    super::generic_tests::test_zn_axioms(ZnGB::new(StaticRing::<i64>::RING, 17));
+    super::generic_tests::test_zn_axioms(ZnGB::new(StaticRing::<i64>::RING, 63));
 }
 
 #[test]
 fn test_zn_map_in_large_int_znbase() {
-    super::generic_tests::test_map_in_large_int(Zn::new(StaticRing::<i64>::RING, 63));
+    super::generic_tests::test_map_in_large_int(ZnGB::new(StaticRing::<i64>::RING, 63));
 }
 
 #[test]
 fn test_zn_map_in_small_int() {
-    let ring = Zn::new(StaticRing::<i64>::RING, 257);
+    let ring = ZnGB::new(StaticRing::<i64>::RING, 257);
     assert_el_eq!(ring, ring.one(), ring.coerce(&StaticRing::<i8>::RING, 1));
 }
 
 #[test]
 fn test_divisibility_axioms() {
-    let R = Zn::new(StaticRing::<i64>::RING, 17);
+    let R = ZnGB::new(StaticRing::<i64>::RING, 17);
     crate::divisibility::generic_tests::test_divisibility_axioms(&R, R.elements());
 }
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
-    let R = Zn::new(StaticRing::<i64>::RING, 17);
+    let R = ZnGB::new(StaticRing::<i64>::RING, 17);
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
-    let R = Zn::new(StaticRing::<i64>::RING, 63);
+    let R = ZnGB::new(StaticRing::<i64>::RING, 63);
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
 }
 
 #[test]
 fn test_canonical_iso_axioms_as_field() {
-    let R = Zn::new(StaticRing::<i128>::RING, 17);
+    let R = ZnGB::new(StaticRing::<i128>::RING, 17);
     let R2 = R.clone().as_field().ok().unwrap();
     crate::ring::generic_tests::test_hom_axioms(&R, &R2, R.elements());
     crate::ring::generic_tests::test_iso_axioms(&R, &R2, R.elements());
@@ -746,8 +749,8 @@ fn test_canonical_iso_axioms_as_field() {
 
 #[test]
 fn test_canonical_iso_axioms_zn_64() {
-    let R = Zn::new(StaticRing::<i128>::RING, 17);
-    let R2 = zn_64::Zn::new(17);
+    let R = ZnGB::new(StaticRing::<i128>::RING, 17);
+    let R2 = zn_64::Zn64B::new(17);
     crate::ring::generic_tests::test_hom_axioms(&R, &R2, R.elements());
     crate::ring::generic_tests::test_iso_axioms(&R, &R2, R.elements());
     crate::ring::generic_tests::test_hom_axioms(&R2, &R, R2.elements());
@@ -756,23 +759,23 @@ fn test_canonical_iso_axioms_zn_64() {
 
 #[test]
 fn test_finite_field_axioms() {
-    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(&StaticRing::<i64>::RING, 128));
-    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(&StaticRing::<i64>::RING, 15));
-    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(&StaticRing::<i128>::RING, 1 << 32));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&StaticRing::<i64>::RING, 128));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&StaticRing::<i64>::RING, 15));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&StaticRing::<i128>::RING, 1 << 32));
 }
 
 #[test]
 fn test_serialize() {
-    let ring = Zn::new(&StaticRing::<i64>::RING, 128);
+    let ring = ZnGB::new(&StaticRing::<i64>::RING, 128);
     crate::serialization::generic_tests::test_serialization(ring, ring.elements())
 }
 #[test]
 fn test_unreduced() {
     let ZZbig = RustBigintRing::RING;
-    let ring = Zn::new(ZZbig, ZZbig.prod([72057594035352641, 72057594035418113, 72057594036334721, 72057594036945793, ].iter().map(|p| int_cast(*p, ZZbig, StaticRing::<i64>::RING))));
+    let ring = ZnGB::new(ZZbig, ZZbig.prod([72057594035352641, 72057594035418113, 72057594036334721, 72057594036945793, ].iter().map(|p| int_cast(*p, ZZbig, StaticRing::<i64>::RING))));
     let value = ZZbig.get_ring().parse("26959946664284515451292772736873168147996033528710027874998326058050", 10).unwrap();
 
-    let x: ZnEl<RustBigintRing> = ZnEl(value);
+    let x: ZnGBEl<RustBigintRing> = ZnGBEl(value);
     // this means this is a valid representative, although it is > ring.modulus()
     assert!(ZZbig.is_lt(&x.0, &ring.get_ring().twice_modulus));
 
@@ -784,7 +787,7 @@ fn test_unreduced() {
 
 #[test]
 fn test_serialize_deserialize() {
-    crate::serialization::generic_tests::test_serialize_deserialize(Zn::new(StaticRing::<i64>::RING, 128).into());
-    crate::serialization::generic_tests::test_serialize_deserialize(Zn::new(StaticRing::<i64>::RING, 129).into());
-    crate::serialization::generic_tests::test_serialize_deserialize(Zn::new(BigIntRing::RING, BigIntRing::RING.power_of_two(10)).into());
+    crate::serialization::generic_tests::test_serialize_deserialize(ZnGB::new(StaticRing::<i64>::RING, 128).into());
+    crate::serialization::generic_tests::test_serialize_deserialize(ZnGB::new(StaticRing::<i64>::RING, 129).into());
+    crate::serialization::generic_tests::test_serialize_deserialize(ZnGB::new(BigIntRing::RING, BigIntRing::RING.power_of_two(10)).into());
 }

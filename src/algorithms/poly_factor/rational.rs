@@ -20,7 +20,7 @@ pub fn poly_factor_rational<'a, P, I, Controller>(poly_ring: P, poly: &El<P>, co
         <P::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing,
-        ZnBase: CanHomFrom<I::Type>,
+        Zn64BBase: CanHomFrom<I::Type>,
         Controller: ComputationController
 {
     assert!(!poly_ring.is_zero(poly));

@@ -169,7 +169,7 @@ use crate::rings::extension::galois_field::GaloisField;
 #[cfg(test)]
 use crate::rings::extension::FreeAlgebraStore;
 #[cfg(test)]
-use crate::rings::zn::zn_64::Zn;
+use crate::rings::zn::zn_64::Zn64B;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
 #[cfg(test)]
@@ -347,7 +347,7 @@ fn test_determinant() {
     struct TestRing;
     use crate::delegate::DelegateRing;
     impl DelegateRing for TestRing {
-        type Base = zn_static::ZnBase<45, false>;
+        type Base = zn_static::ZnSBase<45, false>;
         type Element = u64;
 
         fn get_delegate(&self) -> &Self::Base { zn_static::Zn::RING.get_ring() }
@@ -388,7 +388,7 @@ fn test_determinant() {
 #[ignore]
 fn time_solve_right_using_pre_smith_galois_field() {
     let n = 100;
-    let base_field = Zn::new(257).as_field().ok().unwrap();
+    let base_field = Zn64B::new(257).as_field().ok().unwrap();
     let allocator = feanor_mempool::AllocArc(Arc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>())));
     let field = GaloisField::new_with_convolution(base_field, 21, allocator, STANDARD_CONVOLUTION);
     let matrix = OwnedMatrix::from_fn(n, n, |i, j| field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j));
@@ -407,7 +407,7 @@ fn time_solve_right_using_pre_smith_galois_field() {
 #[ignore]
 fn time_solve_right_using_extension() {
     let n = 126;
-    let base_field = Zn::new(257).as_field().ok().unwrap();
+    let base_field = Zn64B::new(257).as_field().ok().unwrap();
     let allocator = feanor_mempool::AllocArc(Arc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>())));
     let field = GaloisField::new_with_convolution(base_field, 21, allocator, STANDARD_CONVOLUTION);
     let matrix = OwnedMatrix::from_fn(n, n, |i, j| field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j));
@@ -424,7 +424,7 @@ fn time_solve_right_using_extension() {
 
 #[bench]
 fn bench_solve_right_using_pre_smith_galois_field(bencher: &mut Bencher) {
-    let base_field = Zn::new(257).as_field().ok().unwrap();
+    let base_field = Zn64B::new(257).as_field().ok().unwrap();
     let allocator = feanor_mempool::AllocArc(Arc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>())));
     let field = GaloisField::create(FreeAlgebraImpl::new_with_convolution(base_field, 5, [base_field.int_hom().map(3), base_field.int_hom().map(-4)], "x", allocator, STANDARD_CONVOLUTION).as_field().ok().unwrap());
     let matrix = OwnedMatrix::from_fn(10, 10, |i, j| field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j));

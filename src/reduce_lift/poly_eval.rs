@@ -620,13 +620,13 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
         impl<$($gen_args)*> $crate::reduce_lift::poly_eval::EvalPolyLocallyRing for $int_ring_type
             where $($constraints)*
         {
-            type LocalComputationData<'ring> = $crate::rings::zn::zn_rns::Zn<$crate::rings::field::AsField<$crate::rings::zn::zn_64::Zn>, RingRef<'ring, Self>>
+            type LocalComputationData<'ring> = $crate::rings::zn::zn_rns::ZnRNS<$crate::rings::field::AsField<$crate::rings::zn::zn_64::Zn64B>, RingRef<'ring, Self>>
                 where Self: 'ring;
 
-            type LocalRing<'ring> = $crate::rings::field::AsField<$crate::rings::zn::zn_64::Zn>
+            type LocalRing<'ring> = $crate::rings::field::AsField<$crate::rings::zn::zn_64::Zn64B>
                 where Self: 'ring;
 
-            type LocalRingBase<'ring> = $crate::rings::field::AsFieldBase<$crate::rings::zn::zn_64::Zn>
+            type LocalRingBase<'ring> = $crate::rings::field::AsFieldBase<$crate::rings::zn::zn_64::Zn64B>
                 where Self: 'ring;
 
             fn ln_valuation(&self, el: &Self::Element) -> f64 {
@@ -642,14 +642,14 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
                     if *current < (1 << 32) {
                         panic!("not enough primes");
                     }
-                    return Some($crate::rings::zn::zn_64::Zn::new(*current as u64));
+                    return Some($crate::rings::zn::zn_64::Zn64B::new(*current as u64));
                 }));
                 while ln_current < ln_valuation_bound + 1. {
                     let Fp = prime_it.next().unwrap();
                     ln_current += (*$crate::rings::zn::ZnRingStore::modulus(&Fp) as f64).ln();
                     primes.push(Fp);
                 }
-                return $crate::rings::zn::zn_rns::Zn::new(
+                return $crate::rings::zn::zn_rns::ZnRNS::new(
                     primes.into_iter().map(|Fp| $crate::rings::field::AsField::from($crate::rings::field::AsFieldBase::promise_is_perfect_field(Fp))).collect(),
                     RingRef::new(self)
                 );

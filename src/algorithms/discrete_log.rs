@@ -191,7 +191,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
         for i in 0..self.order_factorization.len() {
             let (p, e) = self.order_factorization[i];
             let relation_lattice = self.scaled_relation_lattices[i][e].data();
-            let Zpne = zn_big::Zn::new(ZZbig, ZZbig.pow(int_cast(p, ZZbig, StaticRing::<i64>::RING), e * n));
+            let Zpne = zn_big::ZnGB::new(ZZbig, ZZbig.pow(int_cast(p, ZZbig, StaticRing::<i64>::RING), e * n));
             let mod_pne = Zpne.can_hom(&StaticRing::<i64>::RING).unwrap();
             let relation_lattice_det = determinant_using_pre_smith(
                 &Zpne, 
@@ -442,7 +442,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
             return Vec::new();
         }
 
-        let Zpne = zn_big::Zn::new(ZZbig, ZZbig.pow(int_cast(p, ZZbig, StaticRing::<i64>::RING), e * n));
+        let Zpne = zn_big::ZnGB::new(ZZbig, ZZbig.pow(int_cast(p, ZZbig, StaticRing::<i64>::RING), e * n));
         let mod_pne = Zpne.can_hom(&StaticRing::<i64>::RING).unwrap();
         let relation_lattice = self.scaled_relation_lattices[p_idx][e].data();
         let mut relation_lattice_mod_pne = OwnedMatrix::from_fn(relation_lattice.row_count(), relation_lattice.col_count(), |k, l| mod_pne.map(*relation_lattice.at(k, l)));
@@ -452,8 +452,8 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
             group: &'a G,
             generators: &'a mut [GroupEl<G>]
         }
-        impl<'a, G: AbelianGroupStore> TransformTarget<zn_big::ZnBase<BigIntRing>> for TransformGenerators<'a, G> {
-         fn transform<S: Copy + RingStore<Type = zn_big::ZnBase<BigIntRing>>>(&mut self, ring: S, i: usize, j: usize, transform: &[El<zn_big::Zn<BigIntRing>>; 4]) {
+        impl<'a, G: AbelianGroupStore> TransformTarget<zn_big::ZnGBBase<BigIntRing>> for TransformGenerators<'a, G> {
+         fn transform<S: Copy + RingStore<Type = zn_big::ZnGBBase<BigIntRing>>>(&mut self, ring: S, i: usize, j: usize, transform: &[El<zn_big::ZnGB<BigIntRing>>; 4]) {
                 let transform_inv_det = ring.invert(&ring.sub(
                     ring.mul_ref(&transform[0], &transform[3]),
                     ring.mul_ref(&transform[1], &transform[2])

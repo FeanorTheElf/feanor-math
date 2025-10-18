@@ -45,7 +45,7 @@ fn point_eq<R>(Zn: &R, P: &Point<R>, Q: &Point<R>) -> bool
     };
     if !Zn.is_unit(&factor_quo.1) {
         let factor_of_n = signed_gcd(Zn.integer_ring().clone_el(Zn.modulus()), Zn.smallest_positive_lift(Zn.clone_el(&factor_quo.1)), Zn.integer_ring());
-        let Zn_new = zn_big::Zn::new(BigIntRing::RING, int_cast(Zn.integer_ring().checked_div(Zn.modulus(), &factor_of_n).unwrap(), BigIntRing::RING, Zn.integer_ring()));
+        let Zn_new = zn_big::ZnGB::new(BigIntRing::RING, int_cast(Zn.integer_ring().checked_div(Zn.modulus(), &factor_of_n).unwrap(), BigIntRing::RING, Zn.integer_ring()));
         let red_map = ZnReductionMap::new(Zn, &Zn_new).unwrap();
         if (Zn_new.is_zero(&red_map.map_ref(&Q.0)) && Zn_new.is_zero(&red_map.map_ref(&Q.1)) && Zn_new.is_zero(&red_map.map_ref(&Q.2))) || (Zn_new.is_zero(&red_map.map_ref(&P.0)) && Zn_new.is_zero(&red_map.map_ref(&P.1)) && Zn_new.is_zero(&red_map.map_ref(&P.2))) {
             if (Zn_new.is_zero(&red_map.map_ref(&P.0)) && Zn_new.is_zero(&red_map.map_ref(&P.1)) && Zn_new.is_zero(&red_map.map_ref(&P.2))) != (Zn_new.is_zero(&red_map.map_ref(&Q.0)) && Zn_new.is_zero(&red_map.map_ref(&Q.1)) && Zn_new.is_zero(&red_map.map_ref(&Q.2))) {
@@ -55,7 +55,7 @@ fn point_eq<R>(Zn: &R, P: &Point<R>, Q: &Point<R>) -> bool
             return false;
         }
 
-        let Zn_new = zn_big::Zn::new(BigIntRing::RING, int_cast(factor_of_n, BigIntRing::RING, Zn.integer_ring()));
+        let Zn_new = zn_big::ZnGB::new(BigIntRing::RING, int_cast(factor_of_n, BigIntRing::RING, Zn.integer_ring()));
         let red_map = ZnReductionMap::new(Zn, &Zn_new).unwrap();
         if (Zn_new.is_zero(&red_map.map_ref(&Q.0)) && Zn_new.is_zero(&red_map.map_ref(&Q.1)) && Zn_new.is_zero(&red_map.map_ref(&Q.2))) || (Zn_new.is_zero(&red_map.map_ref(&P.0)) && Zn_new.is_zero(&red_map.map_ref(&P.1)) && Zn_new.is_zero(&red_map.map_ref(&P.2))) {
             if (Zn_new.is_zero(&red_map.map_ref(&P.0)) && Zn_new.is_zero(&red_map.map_ref(&P.1)) && Zn_new.is_zero(&red_map.map_ref(&P.2))) != (Zn_new.is_zero(&red_map.map_ref(&Q.0)) && Zn_new.is_zero(&red_map.map_ref(&Q.1)) && Zn_new.is_zero(&red_map.map_ref(&Q.2))) {
@@ -193,8 +193,7 @@ fn optimize_parameters(ln_p: f64, ln_n: f64) -> (f64, f64) {
 /// Optimizes the parameters to find a factor of size roughly `p`; `p` should be at most sqrt(n)
 /// 
 fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, mut rng: F, controller: Controller) -> Result<Option<El<<R::Type as ZnRing>::IntegerRing>>, Controller::Abort>
-    where R: RingStore + Copy + Send + Sync,
-        El<R>: Send,
+    where R: RingStore + Copy,
         R::Type: ZnRing + DivisibilityRing,
         F: FnMut() -> u64 + Send,
         Controller: ComputationController
@@ -269,8 +268,7 @@ fn lenstra_ec_factor_base<R, F, Controller>(Zn: R, log2_p: usize, mut rng: F, co
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn lenstra_ec_factor_small<R, Controller>(Zn: R, min_factor_bound_log2: usize, repetitions: usize, controller: Controller) -> Result<Option<El<<R::Type as ZnRing>::IntegerRing>>, Controller::Abort>
-    where R: ZnRingStore + DivisibilityRingStore + Copy + Send + Sync,
-        El<R>: Send,
+    where R: ZnRingStore + DivisibilityRingStore + Copy,
         R::Type: ZnRing + DivisibilityRing,
         Controller: ComputationController
 {
@@ -293,8 +291,7 @@ pub fn lenstra_ec_factor_small<R, Controller>(Zn: R, min_factor_bound_log2: usiz
 
 #[stability::unstable(feature = "enable")]
 pub fn lenstra_ec_factor<R, Controller>(Zn: R, controller: Controller) -> Result<El<<R::Type as ZnRing>::IntegerRing>, Controller::Abort>
-    where R: ZnRingStore + DivisibilityRingStore + Copy + Send + Sync,
-        El<R>: Send,
+    where R: ZnRingStore + DivisibilityRingStore + Copy,
         R::Type: ZnRing + DivisibilityRing,
         Controller: ComputationController
 {
@@ -320,7 +317,7 @@ pub fn lenstra_ec_factor<R, Controller>(Zn: R, controller: Controller) -> Result
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_64::Zn;
+use crate::rings::zn::zn_64::Zn64B;
 #[cfg(test)]
 use test::Bencher;
 #[cfg(test)]
@@ -329,7 +326,7 @@ use crate::rings::rust_bigint::*;
 #[test]
 fn test_ec_factor() {
     let n = 65537 * 65539;
-    let actual = lenstra_ec_factor(&Zn::new(n as u64), TEST_LOG_PROGRESS).unwrap_or_else(no_error);
+    let actual = lenstra_ec_factor(&Zn64B::new(n as u64), TEST_LOG_PROGRESS).unwrap_or_else(no_error);
     assert!(actual != 1 && actual != n && n % actual == 0);
 }
 
@@ -337,7 +334,7 @@ fn test_ec_factor() {
 fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
     let bits = 58;
     let n = ((1i64 << bits) + 1) / 5;
-    let ring = Zn::new(n as u64);
+    let ring = Zn64B::new(n as u64);
 
     bencher.iter(|| {
         let p = lenstra_ec_factor(&ring, TEST_LOG_PROGRESS).unwrap_or_else(no_error);
@@ -357,12 +354,13 @@ fn test_ec_factor_large() {
 
     let n: i128 = 1073741827 * 71316922984999;
 
-    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::Zn::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n)), controller.clone()).unwrap_or_else(no_error));
+
+    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::ZnGB::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n)), controller.clone()).unwrap_or_else(no_error));
     assert!(p == 1073741827 || p == 71316922984999);
 
     let n: i128 = 1152921504606847009 * 2305843009213693967;
 
-    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::Zn::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n)), controller).unwrap_or_else(no_error));
+    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::ZnGB::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n)), controller).unwrap_or_else(no_error));
     assert!(p == 1152921504606847009 || p == 2305843009213693967);
 }
 
@@ -376,7 +374,7 @@ fn test_compute_partial_factorization() {
         RustBigintRing::RING
     );
 
-    let Zn = zn_big::Zn::new(ZZbig, ZZbig.clone_el(&n));
+    let Zn = zn_big::ZnGB::new(ZZbig, ZZbig.clone_el(&n));
     let factor = lenstra_ec_factor_small(&Zn, 50, 1, TEST_LOG_PROGRESS).unwrap_or_else(no_error).unwrap();
     ZZbig.println(&factor);
     assert!(!ZZbig.is_one(&factor));

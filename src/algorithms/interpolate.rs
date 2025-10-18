@@ -207,7 +207,7 @@ pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_po
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_64::Zn;
+use crate::rings::zn::zn_64::Zn64B;
 #[cfg(test)]
 use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
@@ -272,7 +272,7 @@ fn test_interpolate() {
     let actual = interpolate(&poly_ring, x.clone(), x.map_fn(|x| poly_ring.evaluate(&poly, &x, &ring.identity())), Global).unwrap();
     assert_el_eq!(&poly_ring, &poly, &actual);
 
-    let ring = Zn::new(29).as_field().ok().unwrap();
+    let ring = Zn64B::new(29).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(ring, "X");
     let x = (0..5).map_fn(|x| ring.int_hom().map(x as i32));
     let y = (0..5).map_fn(|x| if x == 3 { ring.int_hom().map(6) } else { ring.zero() });
@@ -284,7 +284,7 @@ fn test_interpolate() {
 
 #[test]
 fn test_interpolate_multivariate() {
-    let ring = Zn::new(29).as_field().ok().unwrap();
+    let ring = Zn64B::new(29).as_field().ok().unwrap();
     let poly_ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(ring, 2);
 
     let interpolation_points = (0..2).map_fn(|_| (0..5).map_fn(|x| ring.int_hom().map(x as i32)));
@@ -317,7 +317,7 @@ fn test_interpolate_multivariate() {
 #[test]
 #[ignore]
 fn large_polynomial_interpolation() {
-    let field = Zn::new(65537).as_field().ok().unwrap();
+    let field = Zn64B::new(65537).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");
     let hom = poly_ring.base_ring().can_hom(&StaticRing::<i64>::RING).unwrap();
     let actual = interpolate(&poly_ring, (0..65536).map_fn(|x| hom.map(x as i64)), (0..65536).map_fn(|x| hom.map(x as i64)), Global).unwrap();

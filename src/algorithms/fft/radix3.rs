@@ -542,7 +542,7 @@ use crate::rings::zn::zn_static::Fp;
 #[test]
 fn test_radix3_butterflies() {
     let log3_n = 3;
-    let ring = Zn::new(109);
+    let ring = Zn64B::new(109);
     let ring_fastmul = ZnFastmul::new(ring).unwrap();
     let int_hom = ring.int_hom();
     let i = |x| int_hom.map(x);
@@ -571,7 +571,7 @@ fn test_radix3_butterflies() {
     let mut actual = data;
     for i in 0..log3_n {
         fft.butterfly_step_main::<false>(&mut actual, i);
-        let expected: [ZnEl; LEN] = expected_threeadic_reverse(i + 1);
+        let expected: [Zn64BEl; LEN] = expected_threeadic_reverse(i + 1);
         for (a, e) in actual.iter().zip(expected.iter()) {
             assert_el_eq!(ring, a, e);
         }
@@ -581,7 +581,7 @@ fn test_radix3_butterflies() {
 #[test]
 fn test_radix3_inv_fft() {
     let log3_n = 3;
-    let ring = Zn::new(109);
+    let ring = Zn64B::new(109);
     let ring_fastmul = ZnFastmul::new(ring).unwrap();
     let zeta = ring.int_hom().map(97);
     let fft = CooleyTukeyRadix3FFT::new_with_hom(ring.into_can_hom(ring_fastmul).ok().unwrap(), ring_fastmul.coerce(&ring, zeta), log3_n);

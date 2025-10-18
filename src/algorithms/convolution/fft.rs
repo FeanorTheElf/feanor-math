@@ -434,12 +434,12 @@ impl<I, A> ConvolutionAlgorithm<I> for FFTConvolution<A>
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
 #[cfg(test)]
-use crate::rings::zn::zn_64::Zn;
+use crate::rings::zn::zn_64::Zn64B;
 
 #[test]
 fn test_convolution_zn() {
     let convolution: FFTConvolutionZn = FFTConvolution::new().into();
-    let ring = Zn::new(17 * 257);
+    let ring = Zn64B::new(17 * 257);
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.one());
 }
@@ -457,7 +457,7 @@ fn test_convolution_int() {
 fn test_fft_convolution_not_enough_precision() {
     let convolution_algorithm: FFTConvolutionZn = FFTConvolution::new().into();
 
-    let ring = Zn::new(1099511627791);
+    let ring = Zn64B::new(1099511627791);
     let lhs = ring.elements().take(1024).collect::<Vec<_>>();
     let rhs = ring.elements().take(1024).collect::<Vec<_>>();
     let mut actual = (0..(lhs.len() + rhs.len())).map(|_| ring.zero()).collect::<Vec<_>>();

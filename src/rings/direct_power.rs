@@ -465,25 +465,25 @@ use crate::primitive_int::StaticRing;
 
 #[test]
 fn test_ring_axioms() {
-    let ring: DirectPowerRing<_, 3> = DirectPowerRing::new(Zn::new(3));
+    let ring: DirectPowerRing<_, 3> = DirectPowerRing::new(Zn64B::new(3));
     crate::ring::generic_tests::test_ring_axioms(&ring, ring.elements());
 }
 
 #[test]
 fn test_can_hom_axioms() {
     let from: DirectPowerRing<_, 3> = DirectPowerRing::new(StaticRing::<i64>::RING);
-    let ring: DirectPowerRing<_, 3> = DirectPowerRing::new(Zn::new(3));
+    let ring: DirectPowerRing<_, 3> = DirectPowerRing::new(Zn64B::new(3));
     crate::ring::generic_tests::test_hom_axioms(&from, &ring, multi_cartesian_product((0..3).map(|_| -4..5), clone_array::<_, 3>, |_, x| *x));
 }
 
 #[test]
 fn test_hash_axioms() {
-    let ring: DirectPowerRing<_, 3> = DirectPowerRing::new(Zn::new(3));
+    let ring: DirectPowerRing<_, 3> = DirectPowerRing::new(Zn64B::new(3));
     crate::ring::generic_tests::test_hash_axioms(&ring, ring.elements());
 }
 
 #[test]
 fn test_serialization() {
-    let ring: DirectPowerRing<_, 3> = DirectPowerRing::new(Zn::new(3));
+    let ring: DirectPowerRing<_, 3> = DirectPowerRing::new(Zn64B::new(3));
     crate::serialization::generic_tests::test_serialization(&ring, ring.elements());
 }

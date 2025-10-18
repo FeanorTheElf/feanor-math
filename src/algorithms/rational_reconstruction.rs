@@ -115,7 +115,7 @@ use crate::primitive_int::StaticRing;
 #[test]
 fn test_rational_reconstruction() {
     let n = 2021027;
-    let Zn = zn_64::Zn::new(n as u64);
+    let Zn = zn_64::Zn64B::new(n as u64);
     let ab_bound = (n as f64 / 2.).sqrt().floor() as i32;
     for a in -ab_bound..ab_bound {
         for b in 1..ab_bound {
@@ -127,7 +127,7 @@ fn test_rational_reconstruction() {
     }
 
     // this example leads to `a, b` that are divisible by `17`.
-    let ring = zn_64::Zn::new(17 * 17 * 17);
+    let ring = zn_64::Zn64B::new(17 * 17 * 17);
     let hom = ring.can_hom(ring.integer_ring()).unwrap();
     let (a, b) = balanced_rational_reconstruction(&ring, hom.map(4048));
     assert_el_eq!(&ring, &hom.map(a), ring.mul(hom.map(b), hom.map(4048)));

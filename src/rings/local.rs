@@ -518,7 +518,7 @@ macro_rules! impl_localpir_wrap_unwrap_isos {
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_big::Zn;
+use crate::rings::zn::zn_big::ZnGB;
 #[cfg(test)]
 use crate::primitive_int::*;
 #[cfg(test)]
@@ -538,36 +538,36 @@ use super::extension::galois_field::GaloisField;
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {
-    let R = AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING, 8)).unwrap();
+    let R = AsLocalPIR::from_zn(ZnGB::new(StaticRing::<i64>::RING, 8)).unwrap();
     crate::ring::generic_tests::test_hom_axioms(StaticRing::<i64>::RING, &R, 0..8);
 }
 
 #[test]
 fn test_divisibility_axioms() {
-    let R = AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING, 8)).unwrap();
+    let R = AsLocalPIR::from_zn(ZnGB::new(StaticRing::<i64>::RING, 8)).unwrap();
     crate::divisibility::generic_tests::test_divisibility_axioms(&R, R.elements());
 }
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
-    let R = AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING, 8)).unwrap();
+    let R = AsLocalPIR::from_zn(ZnGB::new(StaticRing::<i64>::RING, 8)).unwrap();
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
-    let R = AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING, 9)).unwrap();
+    let R = AsLocalPIR::from_zn(ZnGB::new(StaticRing::<i64>::RING, 9)).unwrap();
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
-    let R = AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING, 17)).unwrap();
+    let R = AsLocalPIR::from_zn(ZnGB::new(StaticRing::<i64>::RING, 17)).unwrap();
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
 }
 
 #[test]
 fn test_canonical_hom_axioms_wrap_unwrap() {
-    let R = AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING, 8)).unwrap();
+    let R = AsLocalPIR::from_zn(ZnGB::new(StaticRing::<i64>::RING, 8)).unwrap();
     crate::ring::generic_tests::test_hom_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());
     crate::ring::generic_tests::test_iso_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());
 }
 
 #[test]
 fn test_checked_div_min() {
-    let ring = AsLocalPIR::from_zn(Zn::new(StaticRing::<i64>::RING, 27)).unwrap();
+    let ring = AsLocalPIR::from_zn(ZnGB::new(StaticRing::<i64>::RING, 27)).unwrap();
     assert_el_eq!(&ring, ring.zero(), ring.checked_div_min(&ring.zero(), &ring.one()).unwrap());
     assert_el_eq!(&ring, ring.int_hom().map(9), ring.checked_div_min(&ring.zero(), &ring.int_hom().map(3)).unwrap());
     assert_el_eq!(&ring, ring.int_hom().map(3), ring.checked_div_min(&ring.zero(), &ring.int_hom().map(9)).unwrap());

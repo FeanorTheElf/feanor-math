@@ -637,13 +637,13 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
         impl<$($gen_args)*> $crate::reduce_lift::poly_factor_gcd::PolyGCDLocallyDomain for $int_ring_type
             where $($constraints)*
         {
-            type LocalRing<'ring> = $crate::rings::zn::zn_big::Zn<BigIntRing>
+            type LocalRing<'ring> = $crate::rings::zn::zn_big::ZnGB<BigIntRing>
                 where Self: 'ring;
-            type LocalRingBase<'ring> = $crate::rings::zn::zn_big::ZnBase<BigIntRing>
+            type LocalRingBase<'ring> = $crate::rings::zn::zn_big::ZnGBBase<BigIntRing>
                 where Self: 'ring;
-            type LocalFieldBase<'ring> = $crate::rings::field::AsFieldBase<$crate::rings::zn::zn_64::Zn>
+            type LocalFieldBase<'ring> = $crate::rings::field::AsFieldBase<$crate::rings::zn::zn_64::Zn64B>
                 where Self: 'ring;
-            type LocalField<'ring> = $crate::rings::field::AsField<$crate::rings::zn::zn_64::Zn>
+            type LocalField<'ring> = $crate::rings::field::AsField<$crate::rings::zn::zn_64::Zn64B>
                 where Self: 'ring;
             type SuitableIdeal<'ring> = i64
                 where Self: 'ring;
@@ -685,14 +685,14 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 use $crate::rings::zn::*;
 
                 assert_eq!(0, max_ideal_idx);
-                $crate::rings::zn::zn_64::Zn::new(*p as u64).as_field().ok().unwrap()
+                $crate::rings::zn::zn_64::Zn64B::new(*p as u64).as_field().ok().unwrap()
             }
         
             fn local_ring_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>
                 where Self: 'ring
             {
                 assert_eq!(0, max_ideal_idx);
-                $crate::rings::zn::zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.pow(int_cast(*p, BigIntRing::RING, StaticRing::<i64>::RING), e))
+                $crate::rings::zn::zn_big::ZnGB::new(BigIntRing::RING, BigIntRing::RING.pow(int_cast(*p, BigIntRing::RING, StaticRing::<i64>::RING), e))
             }
         
             fn random_suitable_ideal<'ring, F>(&'ring self, rng: F, attempt: usize) -> Self::SuitableIdeal<'ring>

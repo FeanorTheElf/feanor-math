@@ -248,7 +248,7 @@ use crate::rings::zn::*;
 
 #[test]
 fn test_partial_eea() {
-    let field = zn_64::Zn::new(65537).as_field().ok().unwrap();
+    let field = zn_64::Zn64B::new(65537).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");
     let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [
         X.pow_ref(9) - X.pow_ref(7) + 3 * X.pow_ref(2) - 1,
@@ -270,7 +270,7 @@ fn test_partial_eea() {
 
 #[test]
 fn test_fast_poly_eea() {
-    let field = zn_64::Zn::new(65537).as_field().ok().unwrap();
+    let field = zn_64::Zn64B::new(65537).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");
     let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [
         X.pow_ref(90) - X.pow_ref(70) + 3 * X.pow_ref(20) - 1,
