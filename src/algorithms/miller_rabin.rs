@@ -200,6 +200,9 @@ pub fn is_prime_base<R>(Zn: R, k: usize) -> bool
     let ZZ = Zn.integer_ring();
     let n = Zn.modulus();
     assert!(ZZ.is_pos(n));
+    if ZZ.is_one(n) {
+        return false;
+    }
 
     let mut rng = oorandom::Rand64::new(ZZ.default_hash(n) as u128);
     let mut n_minus_one = ZZ.sub_ref_fst(n, ZZ.one());

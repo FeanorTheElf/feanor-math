@@ -448,10 +448,12 @@ macro_rules! impl_localpir_wrap_unwrap_homs {
             type Homomorphism = <$self_type_to as CanHomFrom<$self_type_from>>::Homomorphism;
 
             fn has_canonical_hom(&self, from: &$self_type_from) -> Option<Self::Homomorphism> {
+                use $crate::delegate::*;
                 self.get_delegate().has_canonical_hom(from)
             }
 
             fn map_in(&self, from: &$self_type_from, el: <$self_type_from as $crate::ring::RingBase>::Element, hom: &Self::Homomorphism) -> <Self as $crate::ring::RingBase>::Element {
+                use $crate::delegate::*;
                 self.rev_delegate(self.get_delegate().map_in(from, el, hom))
             }
         }
@@ -462,10 +464,12 @@ macro_rules! impl_localpir_wrap_unwrap_homs {
             type Homomorphism = <$self_type_to as CanHomFrom<$self_type_from>>::Homomorphism;
 
             fn has_canonical_hom(&self, from: &$crate::rings::local::AsLocalPIRBase<AsLocalPIRStore>) -> Option<Self::Homomorphism> {
+                use $crate::delegate::*;
                 self.has_canonical_hom(from.get_delegate())
             }
 
             fn map_in(&self, from: &$crate::rings::local::AsLocalPIRBase<AsLocalPIRStore>, el: $crate::rings::local::LocalPIREl<AsLocalPIRStore>, hom: &Self::Homomorphism) -> <Self as $crate::ring::RingBase>::Element {
+                use $crate::delegate::*;
                 self.map_in(from.get_delegate(), from.delegate(el), hom)
             }
         }
@@ -490,10 +494,12 @@ macro_rules! impl_localpir_wrap_unwrap_isos {
             type Isomorphism = <$self_type_to as CanIsoFromTo<$self_type_from>>::Isomorphism;
 
             fn has_canonical_iso(&self, from: &$self_type_from) -> Option<Self::Isomorphism> {
+                use $crate::delegate::*;
                 self.get_delegate().has_canonical_iso(from)
             }
 
             fn map_out(&self, from: &$self_type_from, el: <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <$self_type_from as RingBase>::Element {
+                use $crate::delegate::*;
                 self.get_delegate().map_out(from, self.delegate(el), iso)
             }
         }
@@ -504,10 +510,12 @@ macro_rules! impl_localpir_wrap_unwrap_isos {
             type Isomorphism = <$self_type_to as CanIsoFromTo<$self_type_from>>::Isomorphism;
 
             fn has_canonical_iso(&self, from: &$crate::rings::local::AsLocalPIRBase<AsLocalPIRStore>) -> Option<Self::Isomorphism> {
+                use $crate::delegate::*;
                 self.has_canonical_iso(from.get_delegate())
             }
 
             fn map_out(&self, from: &$crate::rings::local::AsLocalPIRBase<AsLocalPIRStore>, el: <Self as RingBase>::Element, hom: &Self::Isomorphism) -> $crate::rings::local::LocalPIREl<AsLocalPIRStore> {
+                use $crate::delegate::*;
                 from.rev_delegate(self.map_out(from.get_delegate(), el, hom))
             }
         }

@@ -45,6 +45,26 @@ pub fn eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
     return (sa, ta, a);
 }
 
+#[stability::unstable(feature = "enable")]
+pub const fn const_eea(a: i128, b: i128) -> (i128, i128, i128) {
+    let (mut a, mut b) = (a, b);
+
+    let (mut sa, mut ta) = (1, 0);
+    let (mut sb, mut tb) = (0, 1);
+
+    while b != 0 {
+        let (quo, rem) = (a / b, a % b);
+        ta -= quo * tb;
+        sa -= quo * sb;
+        a = rem;
+
+        swap(&mut a, &mut b);
+        swap(&mut sa, &mut sb);
+        swap(&mut ta, &mut tb);
+    }
+    return (sa, ta, a);
+}
+
 ///
 /// Computes the gcd `d` of `a` and `b`, together with "half a Bezout identity", i.e.
 /// some `s` such that `s * a = d mod b`.

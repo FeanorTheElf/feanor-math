@@ -517,6 +517,34 @@ impl<I: RingStore> CanIsoFromTo<zn_big::ZnGBBase<I>> for Zn64BBase
     }
 }
 
+impl CanHomFrom<zn_64m::Zn64MBase> for Zn64BBase {
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, from: &zn_64m::Zn64MBase) -> Option<Self::Homomorphism> {
+        if self.modulus() == from.modulus() {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn map_in(&self, from: &zn_64m::Zn64MBase, el: <zn_64m::Zn64MBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
+        self.from_int_promise_reduced(from.smallest_positive_lift(el))
+    }
+}
+
+impl CanIsoFromTo<zn_64m::Zn64MBase> for Zn64BBase {
+    type Isomorphism = <zn_64m::Zn64MBase as CanHomFrom<Self>>::Homomorphism;
+
+    fn has_canonical_iso(&self, from: &zn_64m::Zn64MBase) -> Option<Self::Isomorphism> {
+        from.has_canonical_hom(self)
+    }
+
+    fn map_out(&self, from: &zn_64m::Zn64MBase, el: <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <zn_64m::Zn64MBase as RingBase>::Element {
+        from.map_in(self, el, iso)
+    }
+}
+
 ///
 /// Data associated to an element of [`ZnBase`] that allows for faster division. 
 /// For details, see [`DivisibilityRing::prepare_divisor()`].

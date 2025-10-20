@@ -21,7 +21,6 @@ use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::seq::*;
-use crate::delegate::DelegateRing;
 use crate::rings::extension::galois_field::*;
 use crate::rings::zn::*;
 use crate::serialization::*;

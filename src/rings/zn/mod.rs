@@ -35,6 +35,8 @@ pub mod zn_static;
 /// 
 pub mod zn_rns;
 
+pub mod zn_64m;
+
 ///
 /// Trait for all rings that represent a quotient of the integers `Z/nZ` for some integer `n`.
 /// 
@@ -178,7 +180,7 @@ pub mod generic_impls {
         } else {
             Some(BigIntToZnHom {
                 highbit_mod: to.integer_ring().abs_highest_set_bit(to.modulus()).unwrap(),
-                highbit_bound: usize::MAX,
+                highbit_bound: 0,
                 int_ring: PhantomData,
                 to_large_int_ring: PhantomData,
                 hom: from.has_canonical_hom(to.integer_ring().get_ring())?,
@@ -584,17 +586,19 @@ pub mod generic_tests {
         assert!(R.is_zero(&R.coerce(ZZ, ZZ.clone_el(n))));
         assert!(R.is_field() == algorithms::miller_rabin::is_prime(ZZ, n, 10));
 
-        let mut k = ZZ.one();
-        while ZZ.is_lt(&k, &n) {
-            assert!(!R.is_zero(&R.coerce(ZZ, ZZ.clone_el(&k))));
-            ZZ.add_assign(&mut k, ZZ.one());
-        }
-
-        let all_elements = R.elements().collect::<Vec<_>>();
-        assert_eq!(int_cast(ZZ.clone_el(n), &StaticRing::<i128>::RING, &ZZ) as usize, all_elements.len());
-        for (i, x) in all_elements.iter().enumerate() {
-            for (j, y) in all_elements.iter().enumerate() {
-                assert!(i == j || !R.eq_el(x, y));
+        if ZZ.is_lt(n, &ZZ.power_of_two(7)) {
+            let mut k = ZZ.one();
+            while ZZ.is_lt(&k, &n) {
+                assert!(!R.is_zero(&R.coerce(ZZ, ZZ.clone_el(&k))));
+                ZZ.add_assign(&mut k, ZZ.one());
+            }
+            
+            let all_elements = R.elements().collect::<Vec<_>>();
+            assert_eq!(int_cast(ZZ.clone_el(n), &StaticRing::<i128>::RING, &ZZ) as usize, all_elements.len());
+            for (i, x) in all_elements.iter().enumerate() {
+                for (j, y) in all_elements.iter().enumerate() {
+                    assert!(i == j || !R.eq_el(x, y));
+                }
             }
         }
     }

@@ -27,7 +27,6 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::seq::*;
 use crate::ring::*;
 use crate::integer::IntegerRingStore;
-use crate::delegate::DelegateRing;
 use crate::homomorphism::*;
 use crate::serialization::*;
 use crate::seq::sparse::SparseMapVector;

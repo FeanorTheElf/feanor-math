@@ -287,7 +287,7 @@ pub mod generic_tests {
 
         let ZZbig = BigIntRing::RING;
         let char = ring.characteristic(ZZbig).unwrap();
-        if !ZZbig.is_zero(&char) && ZZbig.is_leq(&char, &ZZbig.power_of_two(30)) {
+        if !ZZbig.is_zero(&char) && !ZZbig.is_one(&char) && ZZbig.is_leq(&char, &ZZbig.power_of_two(30)) {
             let p = factor(ZZbig, ZZbig.clone_el(&char)).into_iter().next().unwrap().0;
             let expected = ring.int_hom().map(int_cast(ZZbig.checked_div(&char, &p).unwrap(), StaticRing::<i32>::RING, ZZbig));
             let ann_p = ring.annihilator(&ring.int_hom().map(int_cast(p, StaticRing::<i32>::RING, ZZbig)));
