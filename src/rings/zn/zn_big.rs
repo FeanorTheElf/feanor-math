@@ -7,7 +7,7 @@ use feanor_serde::newtype_struct::*;
 use serde::de::{Error, DeserializeSeed};
 use serde::{Deserializer, Serializer, Serialize, Deserialize}; 
 
-use crate::reduce_lift::poly_eval::InterpolationBaseRing;
+use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::divisibility::DivisibilityRing;
 use crate::impl_localpir_wrap_unwrap_homs;
 use crate::impl_localpir_wrap_unwrap_isos;

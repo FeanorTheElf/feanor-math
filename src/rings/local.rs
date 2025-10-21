@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::*;
-use crate::reduce_lift::poly_eval::InterpolationBaseRing;
+use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::delegate::*;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::Field;

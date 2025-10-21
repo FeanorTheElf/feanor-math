@@ -9,7 +9,7 @@ use crate::algorithms::poly_factor::factor_locally::{factor_and_lift_mod_pe, Fac
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::poly_gcd::gcd::poly_gcd_local;
 use crate::algorithms::resultant::ComputeResultantRing;
-use crate::reduce_lift::poly_factor_gcd::*;
+use crate::reduce_lift::lift_poly_factors::*;
 use crate::rings::extension::number_field::newton::find_approximate_complex_root;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
 use crate::computation::*;
@@ -42,7 +42,7 @@ use super::Field;
 use super::FreeAlgebra;
 
 const TRY_FIND_INERT_PRIME_ATTEMPTS: usize = 10;
-const TRY_FACTOR_DIRECTLY_ATTEMPTS: usize = 5;
+const TRY_FACTOR_DIRECTLY_ATTEMPTS: usize = 0;
 
 ///
 /// An algebraic number field, i.e. a finite rank field extension of the rationals.
@@ -670,9 +670,9 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
 }
 
 ///
-/// Implements [`PolyGCDLocallyDomain`] for [`NumberField`].
+/// Implements [`PolyLiftFactorsDomain`] for [`NumberField`].
 /// 
-/// We don't want to expose the interface of [`PolyGCDLocallyDomain`] for number
+/// We don't want to expose the interface of [`PolyLiftFactorsDomain`] for number
 /// fields generally, thus use a private newtype.
 /// 
 /// Note that this does not actually represent the order, since during
@@ -800,7 +800,7 @@ impl<'a, Impl, I> Domain for NumberFieldByOrder<'a, Impl, I>
         I::Type: IntegerRing
 {}
 
-type LocalRing<'ring, I> = <<I as RingStore>::Type as PolyGCDLocallyDomain>::LocalRing<'ring>;
+type LocalRing<'ring, I> = <<I as RingStore>::Type as PolyLiftFactorsDomain>::LocalRing<'ring>;
 
 type ImplementationRing<'ring, I> = AsFieldBase<FreeAlgebraImpl<
     AsField<<<I as RingStore>::Type as IntegerPolyGCDRing>::LocalRingAsZn<'ring>>, 
@@ -930,13 +930,13 @@ pub struct NumberRingIdeal<'ring, I>
         I::Type: IntegerRing,
         I: 'ring
 {
-    prime: <I::Type as PolyGCDLocallyDomain>::SuitableIdeal<'ring>,
+    prime: <I::Type as PolyLiftFactorsDomain>::SuitableIdeal<'ring>,
     ZZX: DensePolyRing<&'ring I>,
     number_field_poly: El<DensePolyRing<&'ring I>>,
-    FpX: DensePolyRing<<I::Type as PolyGCDLocallyDomain>::LocalField<'ring>>,
-    Fp_as_ring: <I::Type as PolyGCDLocallyDomain>::LocalRing<'ring>,
+    FpX: DensePolyRing<<I::Type as PolyLiftFactorsDomain>::LocalField<'ring>>,
+    Fp_as_ring: <I::Type as PolyLiftFactorsDomain>::LocalRing<'ring>,
     Fp_as_zn: AsField<<I::Type as IntegerPolyGCDRing>::LocalRingAsZn<'ring>>,
-    minpoly_factors_mod_p: Vec<El<DensePolyRing<<I::Type as PolyGCDLocallyDomain>::LocalField<'ring>>>>
+    minpoly_factors_mod_p: Vec<El<DensePolyRing<<I::Type as PolyLiftFactorsDomain>::LocalField<'ring>>>>
 }
 
 impl<'ring, I> NumberRingIdeal<'ring, I>
@@ -944,7 +944,7 @@ impl<'ring, I> NumberRingIdeal<'ring, I>
         I::Type: IntegerRing,
         I: 'ring
 {
-    fn lifted_factorization<'a>(&'a self, e: usize) -> (DensePolyRing<<I::Type as PolyGCDLocallyDomain>::LocalRing<'ring>>, Vec<El<DensePolyRing<<I::Type as PolyGCDLocallyDomain>::LocalRing<'ring>>>>) {
+    fn lifted_factorization<'a>(&'a self, e: usize) -> (DensePolyRing<<I::Type as PolyLiftFactorsDomain>::LocalRing<'ring>>, Vec<El<DensePolyRing<<I::Type as PolyLiftFactorsDomain>::LocalRing<'ring>>>>) {
         let ZZX = &self.ZZX;
         let ZZ = ZZX.base_ring();
         let ZpeX = DensePolyRing::new(ZZ.get_ring().local_ring_at(&self.prime, e, 0), "X");
@@ -970,7 +970,7 @@ impl<'ring, I> Debug for NumberRingIdeal<'ring, I>
     where I: RingStore,
         I::Type: IntegerRing,
         I: 'ring,
-        <I::Type as PolyGCDLocallyDomain>::SuitableIdeal<'ring>: Debug
+        <I::Type as PolyLiftFactorsDomain>::SuitableIdeal<'ring>: Debug
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NumberRingIdeal")
@@ -979,7 +979,7 @@ impl<'ring, I> Debug for NumberRingIdeal<'ring, I>
     }
 }
 
-impl<'a, Impl, I> PolyGCDLocallyDomain for NumberFieldByOrder<'a, Impl, I>
+impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
         <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,

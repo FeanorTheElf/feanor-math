@@ -650,7 +650,7 @@ impl_interpolation_base_ring_char_zero!{ InterpolationBaseRing for MPZBase }
 
 impl_poly_gcd_locally_for_ZZ!{ IntegerPolyGCDRing for MPZBase }
 
-impl_eval_poly_locally_for_ZZ!{ EvalPolyLocallyRing for MPZBase }
+impl_eval_poly_locally_for_ZZ!{ LiftPolyEvalRing for MPZBase }
 
 impl FiniteRingSpecializable for MPZBase {
     

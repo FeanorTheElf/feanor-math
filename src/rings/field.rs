@@ -1,6 +1,6 @@
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
-use crate::reduce_lift::poly_eval::{InterpolationBaseRing, InterpolationBaseRingStore};
+use crate::reduce_lift::lift_poly_eval::{InterpolationBaseRing, InterpolationBaseRingStore};
 use crate::delegate::*;
 use crate::divisibility::*;
 use crate::local::PrincipalLocalRing;

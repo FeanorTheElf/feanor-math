@@ -1,9 +1,6 @@
 use crate::algorithms::eea::const_eea;
-use crate::impl_field_wrap_unwrap_homs;
-use crate::impl_field_wrap_unwrap_isos;
-use crate::impl_localpir_wrap_unwrap_homs;
-use crate::impl_localpir_wrap_unwrap_isos;
-use crate::reduce_lift::poly_eval::InterpolationBaseRing;
+use crate::{impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos, impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos};
+use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::divisibility::*;
 use crate::impl_eq_based_self_iso;
 use crate::ordered::OrderedRingStore;

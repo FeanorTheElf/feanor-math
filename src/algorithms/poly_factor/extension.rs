@@ -1,7 +1,7 @@
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::computation::*;
-use crate::reduce_lift::poly_eval::InterpolationBaseRing;
+use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::field::*;
 use crate::homomorphism::*;
 use crate::algorithms::resultant::ComputeResultantRing;

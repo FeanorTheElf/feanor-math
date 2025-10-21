@@ -36,7 +36,7 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P
     SXs: &[DensePolyRing<&'local R::LocalRing<'ring>>], 
     local_power_decompositions: &[Vec<El<DensePolyRing<&'local R::LocalRing<'ring>>>>]
 ) -> Option<Vec<(El<P>, usize)>>
-    where R: ?Sized + PolyGCDLocallyDomain,
+    where R: ?Sized + PolyLiftFactorsDomain,
         P: RingStore + Copy,
         P::Type: PolyRing,
         <P::Type as RingExtension>::BaseRing: RingStore<Type = R>
@@ -84,7 +84,7 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2, Controller
     SX: P2,
     controller: Controller
 ) -> Option<(Vec<Signature>, Vec<El<P2>>)>
-    where R: ?Sized + PolyGCDLocallyDomain,
+    where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore + Copy,
         P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R>,
@@ -144,7 +144,7 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2, Controller
 pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> Vec<(El<P>, usize)>
     where P: RingStore + Copy,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain,
         Controller: ComputationController
 {
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(poly).unwrap()));
@@ -208,7 +208,7 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &
 pub fn poly_power_decomposition_local<P, Controller>(poly_ring: P, mut f: El<P>, controller: Controller) -> Vec<(El<P>, usize)>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain + DivisibilityRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing,
         Controller: ComputationController
 {
     assert!(!poly_ring.is_zero(&f));
@@ -239,7 +239,7 @@ pub fn poly_power_decomposition_local<P, Controller>(poly_ring: P, mut f: El<P>,
 pub fn poly_squarefree_part_local<P, Controller>(poly_ring: P, f: El<P>, controller: Controller) -> El<P>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain + DivisibilityRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing,
         Controller: ComputationController
 {
     assert!(!poly_ring.is_zero(&f));

@@ -10,7 +10,7 @@ use crate::homomorphism::*;
 use crate::rings::zn::FromModulusCreateableZnRing;
 use crate::rings::zn::*;
 use crate::seq::*;
-use crate::reduce_lift::poly_factor_gcd::*;
+use crate::reduce_lift::lift_poly_factors::*;
 
 use crate::computation::DontObserve;
 use super::DensePolyRing;
@@ -33,7 +33,7 @@ fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2, Controller>(
     factors: (&El<P2>, &El<P2>),
     controller: Controller
 ) -> (El<P1>, El<P1>)
-    where R: ?Sized + PolyGCDLocallyDomain,
+    where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore, P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
         P2: RingStore, P2::Type: PolyRing + PrincipalIdealRing,
@@ -155,7 +155,7 @@ fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
     factors: (&El<P2>, &El<P2>),
     controller: Controller
 ) -> (El<P1>, El<P1>)
-    where R: ?Sized + PolyGCDLocallyDomain,
+    where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore, P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
         P2: RingStore, P2::Type: PolyRing + PrincipalIdealRing,
@@ -248,7 +248,7 @@ fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Contro
     (s, t): (&El<P2>, &El<P2>),
     controller: Controller
 ) -> (El<P1>, El<P1>)
-    where R: ?Sized + PolyGCDLocallyDomain,
+    where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore, P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
         P2: RingStore, P2::Type: PolyRing + PrincipalIdealRing,
@@ -385,7 +385,7 @@ fn hensel_lift_factorization_internal<'ring, 'data, 'local, R, P1, P2, V, Contro
     factors: V,
     controller: Controller
 ) -> Vec<El<P1>>
-    where R: ?Sized + PolyGCDLocallyDomain,
+    where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore + Copy, P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
         P2: RingStore + Copy, P2::Type: PolyRing + PrincipalIdealRing,
@@ -417,7 +417,7 @@ pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V, Controller>
     factors: V,
     controller: Controller
 ) -> Vec<El<P1>>
-    where R: ?Sized + PolyGCDLocallyDomain,
+    where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore + Copy, P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
         P2: RingStore + Copy, P2::Type: PolyRing + PrincipalIdealRing,

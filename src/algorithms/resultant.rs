@@ -6,7 +6,7 @@ use atomicbox::AtomicOptionBox;
 
 use crate::computation::{ComputationController, DontObserve, ShortCircuitingComputation, ShortCircuitingComputationHandle};
 use crate::delegate::{UnwrapHom, WrapHom};
-use crate::reduce_lift::poly_eval::{EvalPolyLocallyRing, EvaluatePolyLocallyReductionMap};
+use crate::reduce_lift::lift_poly_eval::{LiftPolyEvalRing, EvaluatePolyLocallyReductionMap};
 use crate::divisibility::{DivisibilityRingStore, Domain};
 use crate::pid::*;
 use crate::algorithms::eea::signed_lcm;
@@ -125,7 +125,7 @@ pub trait ComputeResultantRing: RingBase {
     }
 }
 
-impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain + SelfIso> ComputeResultantRing for R {
+impl<R: ?Sized + LiftPolyEvalRing + Domain + SelfIso> ComputeResultantRing for R {
 
     default fn resultant_with_controller<P, Controller>(ring: P, f: El<P>, g: El<P>, controller: Controller) -> El<<P::Type as RingExtension>::BaseRing>
         where P: RingStore + Copy,
@@ -136,7 +136,7 @@ impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain + SelfIso> Co
         struct ComputeResultant<P, Controller>
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: EvalPolyLocallyRing + PrincipalIdealRing + Domain + SelfIso,
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LiftPolyEvalRing + Domain + SelfIso,
                 Controller: ComputationController
         {
             ring: P,
@@ -147,7 +147,7 @@ impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain + SelfIso> Co
         impl<P, Controller> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for ComputeResultant<P, Controller>
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: EvalPolyLocallyRing + PrincipalIdealRing + Domain + SelfIso,
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LiftPolyEvalRing + Domain + SelfIso,
                 Controller: ComputationController
         {
             type Output = El<<P::Type as RingExtension>::BaseRing>;

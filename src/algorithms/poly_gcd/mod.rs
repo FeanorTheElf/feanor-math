@@ -4,7 +4,7 @@ use squarefree_part::poly_power_decomposition_local;
 
 use crate::computation::*;
 use crate::divisibility::*;
-use crate::reduce_lift::poly_factor_gcd::*;
+use crate::reduce_lift::lift_poly_factors::*;
 use crate::homomorphism::*;
 use crate::pid::*;
 use crate::rings::field::*;
@@ -65,11 +65,11 @@ const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
 /// euclidean algorithm is only efficient over finite fields, where no coefficient explosion happens.
 /// The general idea for other rings/fields is to reduce it to the finite case, by considering the
 /// situation modulo a finite-index ideal. The requirements for this approach are defined by the
-/// trait [`PolyGCDLocallyDomain`], and there is a blanket impl `R: PolyTFracGCDRing where R: PolyGCDLocallyDomain`.
+/// trait [`PolyLiftFactorsDomain`], and there is a blanket impl `R: PolyTFracGCDRing where R: PolyLiftFactorsDomain`.
 /// 
 /// Note that this blanket impl used [`crate::specialization::FiniteRingSpecializable`] to use the standard 
 /// algorithm whenever the corresponding ring is actually finite. In other words, despite the fact that the blanket 
-/// implementation for `PolyGCDLocallyDomain`s also applies to finite fields, the local implementation is not 
+/// implementation for `PolyLiftFactorsDomain`s also applies to finite fields, the local implementation is not 
 /// actually used in these cases.
 /// 
 pub trait PolyTFracGCDRing {
@@ -281,7 +281,7 @@ pub fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
 
 
 impl<R> PolyTFracGCDRing for R
-    where R: ?Sized + PolyGCDLocallyDomain + SelfIso
+    where R: ?Sized + PolyLiftFactorsDomain + SelfIso
 {
     default fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
         where P: RingStore + Copy,
@@ -306,7 +306,7 @@ impl<R> PolyTFracGCDRing for R
         impl<'a, P, Controller> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PowerDecompositionOperation<'a, P, Controller>
             where P: RingStore + Copy,
                 P::Type: PolyRing + DivisibilityRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain + DivisibilityRing + SelfIso,
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing + SelfIso,
                 Controller: ComputationController
         {
             type Output = Vec<(El<P>, usize)>;
@@ -355,7 +355,7 @@ impl<R> PolyTFracGCDRing for R
         impl<'a, P, Controller> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PolyGCDOperation<'a, P, Controller>
             where P: RingStore + Copy,
                 P::Type: PolyRing + DivisibilityRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain + DivisibilityRing + SelfIso,
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing + SelfIso,
                 Controller: ComputationController
         {
             type Output = El<P>;

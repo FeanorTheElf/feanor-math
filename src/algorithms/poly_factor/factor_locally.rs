@@ -5,7 +5,7 @@ use crate::algorithms::poly_gcd::hensel::*;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::computation::ComputationController;
-use crate::reduce_lift::poly_factor_gcd::*;
+use crate::reduce_lift::lift_poly_factors::*;
 use crate::ring::*;
 use crate::rings::poly::*;
 use crate::homomorphism::*;
@@ -18,7 +18,7 @@ use crate::seq::VectorView;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 
 fn combine_local_factors_local<'ring, 'data, 'local, R, P1, P2>(reduction: &'local ReductionContext<'ring, 'data, R>, poly_ring: P1, poly: &El<P1>, local_poly_ring: P2, local_e: usize, local_factors: Vec<El<P2>>) -> Vec<El<P1>>
-    where R: ?Sized + PolyGCDLocallyDomain,
+    where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore + Copy,
         P1::Type: PolyRing + DivisibilityRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R>,
@@ -83,7 +83,7 @@ pub enum FactorAndLiftModpeResult<P>
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::SuitableIdeal<'ring>, e: usize, poly: &El<P>, controller: Controller) -> FactorAndLiftModpeResult<P>
-    where R: ?Sized + PolyGCDLocallyDomain,
+    where R: ?Sized + PolyLiftFactorsDomain,
         P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <P::Type as RingExtension>::BaseRing: RingStore<Type = R>,

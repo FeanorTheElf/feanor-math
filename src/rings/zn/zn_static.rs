@@ -2,7 +2,7 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::Debug;
 
 use crate::algorithms::eea::*;
-use crate::reduce_lift::poly_eval::InterpolationBaseRing;
+use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::local::PrincipalLocalRing;
 use crate::field::*;
 use crate::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};

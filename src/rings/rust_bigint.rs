@@ -480,7 +480,7 @@ impl_interpolation_base_ring_char_zero!{ <{A}> InterpolationBaseRing for RustBig
 
 impl_poly_gcd_locally_for_ZZ!{ <{A}> IntegerPolyGCDRing for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
 
-impl_eval_poly_locally_for_ZZ!{ <{A}> EvalPolyLocallyRing for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
+impl_eval_poly_locally_for_ZZ!{ <{A}> LiftPolyEvalRing for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
 
 impl<A> FiniteRingSpecializable for RustBigintRingBase<A>
     where A: Allocator + Send + Sync + Clone

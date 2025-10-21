@@ -1,6 +1,6 @@
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
 use crate::algorithms::fft::radix3::CooleyTukeyRadix3Butterfly;
-use crate::reduce_lift::poly_eval::InterpolationBaseRing;
+use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::delegate::DelegateRing;
 use crate::delegate::DelegateRingImplFiniteRing;
 use crate::divisibility::*;

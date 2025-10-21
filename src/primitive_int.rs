@@ -228,7 +228,7 @@ impl_interpolation_base_ring_char_zero!{ <{T}> InterpolationBaseRing for StaticR
 
 impl_poly_gcd_locally_for_ZZ!{ <{T}> IntegerPolyGCDRing for StaticRingBase<T> where T: PrimitiveInt }
 
-impl_eval_poly_locally_for_ZZ!{ <{T}> EvalPolyLocallyRing for StaticRingBase<T> where T: PrimitiveInt }
+impl_eval_poly_locally_for_ZZ!{ <{T}> LiftPolyEvalRing for StaticRingBase<T> where T: PrimitiveInt }
 
 impl<T> FiniteRingSpecializable for StaticRingBase<T>
     where T: PrimitiveInt

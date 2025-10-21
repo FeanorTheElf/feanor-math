@@ -36,7 +36,7 @@ struct Signature {
 fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F, current_attempt: usize, controller: Controller) -> Option<El<P>>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain,
         F: FnMut() -> u64,
         Controller: ComputationController
 {
@@ -127,7 +127,7 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
 fn poly_gcd_coprime_local<P, F, Controller>(poly_ring: P, mut f: El<P>, mut g: El<P>, rng: F, attempt: usize, controller: Controller) -> Option<El<P>>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain,
         F: FnMut() -> u64,
         Controller: ComputationController
 {
@@ -166,7 +166,7 @@ fn poly_gcd_coprime_local<P, F, Controller>(poly_ring: P, mut f: El<P>, mut g: E
 pub fn poly_gcd_monic_local<'a, P, Controller>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El<P>, controller: Controller) -> El<P>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain,
         Controller: ComputationController
 {
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
@@ -219,7 +219,7 @@ pub fn poly_gcd_monic_local<'a, P, Controller>(poly_ring: P, mut f: &'a El<P>, m
 pub fn poly_gcd_local<P, Controller>(poly_ring: P, mut f: El<P>, mut g: El<P>, controller: Controller) -> El<P>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyGCDLocallyDomain,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain,
         Controller: ComputationController
 {
     if poly_ring.is_zero(&f) {
