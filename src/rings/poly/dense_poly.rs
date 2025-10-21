@@ -594,21 +594,21 @@ impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> Li
         }
     }
 
-    fn local_computation<'ring>(&'ring self, ln_pseudo_norm: f64) -> Self::LocalComputationData<'ring> {
+    fn init_reduce_lift<'ring>(&'ring self, ln_pseudo_norm: f64) -> Self::LocalComputationData<'ring> {
         let required_points = ln_pseudo_norm.ceil() as usize + 1;
         ToExtRingMap::for_interpolation(self.base_ring().get_ring(), required_points)
     }
 
-    fn local_ring_count<'ring>(&self, data: &Self::LocalComputationData<'ring>) -> usize 
+    fn prime_ideal_count<'ring>(&self, data: &Self::LocalComputationData<'ring>) -> usize 
         where Self: 'ring
     {
         data.1.len()
     }
 
-    fn local_ring_at<'ring>(&self, data: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
+    fn quotient_ring_at<'ring>(&self, data: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
         where Self: 'ring
     {
-        assert!(i < self.local_ring_count(data));
+        assert!(i < self.prime_ideal_count(data));
         data.0.codomain().clone()
     }
         

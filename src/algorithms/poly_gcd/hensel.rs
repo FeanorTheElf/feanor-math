@@ -26,7 +26,7 @@ use super::DensePolyRing;
 /// 
 #[cfg(test)]
 fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2, Controller>(
-    reduction_map: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
+    reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
@@ -47,7 +47,7 @@ fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2, Controller>(
 
     let prime_field = base_poly_ring.base_ring();
     let prime_ring = reduction_map.codomain();
-    let prime_ring_iso = PolyGCDLocallyBaseRingToFieldIso::new(reduction_map.parent_ring().into(), reduction_map.ideal(), prime_ring.get_ring(), prime_field.get_ring(), reduction_map.max_ideal_idx());
+    let prime_ring_iso = PolyLiftFactorsDomainBaseRingToFieldIso::new(reduction_map.parent_ring().into(), reduction_map.ideal(), prime_ring.get_ring(), prime_field.get_ring(), reduction_map.max_ideal_idx());
 
     let (g, h) = factors;
     let (mut s, mut t, d) = base_poly_ring.extended_ideal_gen(g, h);
@@ -148,7 +148,7 @@ impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
 /// if `r >> e`.
 ///
 fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
-    reduction_map: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
+    reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
@@ -169,7 +169,7 @@ fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
 
     let prime_field = base_poly_ring.base_ring();
     let prime_ring = reduction_map.codomain();
-    let prime_ring_iso = PolyGCDLocallyBaseRingToFieldIso::new(reduction_map.parent_ring().into(), reduction_map.ideal(), prime_ring.get_ring(), prime_field.get_ring(), reduction_map.max_ideal_idx());
+    let prime_ring_iso = PolyLiftFactorsDomainBaseRingToFieldIso::new(reduction_map.parent_ring().into(), reduction_map.ideal(), prime_ring.get_ring(), prime_field.get_ring(), reduction_map.max_ideal_idx());
     assert_el_eq!(base_poly_ring, base_poly_ring.lifted_hom(&target_poly_ring, (&prime_ring_iso).compose(&reduction_map)).map_ref(f), base_poly_ring.mul_ref(factors.0, factors.1));
     
     let (g, h) = factors;
@@ -240,7 +240,7 @@ fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
 /// `p^r` that reduce to `s, t` modulo `p^e`.
 /// 
 fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
-    reduction_map: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
+    reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>,
@@ -261,7 +261,7 @@ fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Contro
 
     let prime_field = base_poly_ring.base_ring();
     let prime_ring = reduction_map.codomain();
-    let prime_ring_iso = PolyGCDLocallyBaseRingToFieldIso::new(reduction_map.parent_ring().into(), reduction_map.ideal(), prime_ring.get_ring(), prime_field.get_ring(), reduction_map.max_ideal_idx());
+    let prime_ring_iso = PolyLiftFactorsDomainBaseRingToFieldIso::new(reduction_map.parent_ring().into(), reduction_map.ideal(), prime_ring.get_ring(), prime_field.get_ring(), reduction_map.max_ideal_idx());
     let poly_hom = base_poly_ring.lifted_hom(&target_poly_ring, (&prime_ring_iso).compose(&reduction_map));
     assert_el_eq!(base_poly_ring, base_poly_ring.one(), base_poly_ring.add(poly_hom.mul_ref_map(s, f), poly_hom.mul_ref_map(t, g)));
 
@@ -351,11 +351,11 @@ pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> O
     let Zpe = poly_ring.base_ring();
     let ZZ = Zpe.integer_ring();
     let (p, e) = is_prime_power(ZZ, Zpe.modulus()).unwrap();
-    let wrapped_ring: IntegersWithLocalZnQuotient<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> = IntegersWithLocalZnQuotient::new(ZZ, p);
+    let wrapped_ring: IntegersWithZnQuotient<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> = IntegersWithZnQuotient::new(ZZ, p);
     let reduction_context = wrapped_ring.reduction_context(e);
 
     let Zpe_to_Zp = reduction_context.intermediate_ring_to_field_reduction(0);
-    let Fp = wrapped_ring.local_field_at(Zpe_to_Zp.ideal(), 0);
+    let Fp = wrapped_ring.quotient_field_at(Zpe_to_Zp.ideal(), 0);
     let FpX = DensePolyRing::new(&Fp, "X");
     let Zpe_to_Fp = reduction_context.base_ring_to_field_iso(0).compose(&Zpe_to_Zp);
     let ZpeX_to_FpX = FpX.lifted_hom(&poly_ring, &Zpe_to_Fp);
@@ -378,7 +378,7 @@ pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> O
 /// product is `f mod p^r`.
 /// 
 fn hensel_lift_factorization_internal<'ring, 'data, 'local, R, P1, P2, V, Controller>(
-    reduction_map: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
+    reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
@@ -410,7 +410,7 @@ fn hensel_lift_factorization_internal<'ring, 'data, 'local, R, P1, P2, V, Contro
 /// 
 #[stability::unstable(feature = "enable")]
 pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V, Controller>(
-    reduction_map: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
+    reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
@@ -440,10 +440,10 @@ use crate::integer::*;
 fn test_hensel_lift() {
     let ZZ = BigIntRing::RING;
     let prime = 5;
-    let Zp = ZZ.get_ring().local_ring_at(&prime, 1, 0);
-    let Fp = ZZ.get_ring().local_field_at(&prime, 0);
-    let Zpe = ZZ.get_ring().local_ring_at(&prime, 6, 0);
-    let Zpe_to_Zp = PolyGCDLocallyIntermediateReductionMap::new(ZZ.get_ring(), &prime, &Zpe, 6, &Zp, 1, 0);
+    let Zp = ZZ.get_ring().quotient_ring_at(&prime, 1, 0);
+    let Fp = ZZ.get_ring().quotient_field_at(&prime, 0);
+    let Zpe = ZZ.get_ring().quotient_ring_at(&prime, 6, 0);
+    let Zpe_to_Zp = PolyLiftFactorsDomainIntermediateReductionMap::new(ZZ.get_ring(), &prime, &Zpe, 6, &Zp, 1, 0);
     let ZpeX = DensePolyRing::new(&Zpe, "X");
     let FpX = DensePolyRing::new(&Fp, "X");
     let ZpeX_to_ZpX = FpX.lifted_hom(&ZpeX, Fp.can_hom(&Zp).unwrap().compose(&Zpe_to_Zp));
@@ -471,10 +471,10 @@ fn test_hensel_lift() {
 fn test_hensel_lift_bezout_identity() {
     let ZZ = BigIntRing::RING;
     let prime = 5;
-    let Zp = ZZ.get_ring().local_ring_at(&prime, 1, 0);
-    let Fp = ZZ.get_ring().local_field_at(&prime, 0);
-    let Zpe = ZZ.get_ring().local_ring_at(&prime, 6, 0);
-    let Zpe_to_Zp = PolyGCDLocallyIntermediateReductionMap::new(ZZ.get_ring(), &prime, &Zpe, 6, &Zp, 1, 0);
+    let Zp = ZZ.get_ring().quotient_ring_at(&prime, 1, 0);
+    let Fp = ZZ.get_ring().quotient_field_at(&prime, 0);
+    let Zpe = ZZ.get_ring().quotient_ring_at(&prime, 6, 0);
+    let Zpe_to_Zp = PolyLiftFactorsDomainIntermediateReductionMap::new(ZZ.get_ring(), &prime, &Zpe, 6, &Zp, 1, 0);
     let ZpeX = DensePolyRing::new(&Zpe, "X");
     let FpX = DensePolyRing::new(&Fp, "X");
 

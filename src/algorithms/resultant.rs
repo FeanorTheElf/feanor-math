@@ -6,7 +6,7 @@ use atomicbox::AtomicOptionBox;
 
 use crate::computation::{ComputationController, DontObserve, ShortCircuitingComputation, ShortCircuitingComputationHandle};
 use crate::delegate::{UnwrapHom, WrapHom};
-use crate::reduce_lift::lift_poly_eval::{LiftPolyEvalRing, EvaluatePolyLocallyReductionMap};
+use crate::reduce_lift::lift_poly_eval::{LiftPolyEvalRing, LiftPolyEvalRingReductionMap};
 use crate::divisibility::{DivisibilityRingStore, Domain};
 use crate::pid::*;
 use crate::algorithms::eea::signed_lcm;
@@ -179,15 +179,15 @@ impl<R: ?Sized + LiftPolyEvalRing + Domain + SelfIso> ComputeResultantRing for R
                         base_ring.get_ring().ln_valuation(&base_ring.int_hom().map(ring_ref.degree(f_ref).unwrap() as i32)) * ring_ref.degree(g_ref).unwrap() as f64 +
                         base_ring.get_ring().ln_valuation(&base_ring.int_hom().map(ring_ref.degree(g_ref).unwrap() as i32)) * ring_ref.degree(f_ref).unwrap() as f64;
 
-                    let work_locally = base_ring.get_ring().local_computation(ln_max_norm);
+                    let work_locally = base_ring.get_ring().init_reduce_lift(ln_max_norm);
                     let work_locally_ref = &work_locally;
-                    let count = base_ring.get_ring().local_ring_count(&work_locally);
+                    let count = base_ring.get_ring().prime_ideal_count(&work_locally);
                     log_progress!(controller, "({})", count);
                     let resultants = (0..count).map(|_| AtomicOptionBox::none()).collect::<Vec<_>>();
                     let resultants_ref = &resultants;
 
                     ShortCircuitingComputation::<(), _>::new().handle(controller).join_many((0..count).map_fn(|i| move |handle: ShortCircuitingComputationHandle<_, _>| {
-                        let embedding = EvaluatePolyLocallyReductionMap::new(base_ring.get_ring(), work_locally_ref, i);
+                        let embedding = LiftPolyEvalRingReductionMap::new(base_ring.get_ring(), work_locally_ref, i);
                         let new_poly_ring = DensePolyRing::new(embedding.codomain(), "X");
                         let poly_ring_embedding = new_poly_ring.lifted_hom(ring_ref, &embedding);
                         let local_f = poly_ring_embedding.map_ref(f_ref);

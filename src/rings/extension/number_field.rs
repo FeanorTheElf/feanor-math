@@ -803,8 +803,8 @@ impl<'a, Impl, I> Domain for NumberFieldByOrder<'a, Impl, I>
 type LocalRing<'ring, I> = <<I as RingStore>::Type as PolyLiftFactorsDomain>::LocalRing<'ring>;
 
 type ImplementationRing<'ring, I> = AsFieldBase<FreeAlgebraImpl<
-    AsField<<<I as RingStore>::Type as IntegerPolyGCDRing>::LocalRingAsZn<'ring>>, 
-    Vec<El<AsField<<<I as RingStore>::Type as IntegerPolyGCDRing>::LocalRingAsZn<'ring>>>>>
+    AsField<<<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalRingAsZn<'ring>>, 
+    Vec<El<AsField<<<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalRingAsZn<'ring>>>>>
 >;
 
 struct NumberFieldOrderQuotient<'ring, I>
@@ -935,7 +935,7 @@ pub struct NumberRingIdeal<'ring, I>
     number_field_poly: El<DensePolyRing<&'ring I>>,
     FpX: DensePolyRing<<I::Type as PolyLiftFactorsDomain>::LocalField<'ring>>,
     Fp_as_ring: <I::Type as PolyLiftFactorsDomain>::LocalRing<'ring>,
-    Fp_as_zn: AsField<<I::Type as IntegerPolyGCDRing>::LocalRingAsZn<'ring>>,
+    Fp_as_zn: AsField<<I::Type as IntegerPolyLiftFactorsDomain>::LocalRingAsZn<'ring>>,
     minpoly_factors_mod_p: Vec<El<DensePolyRing<<I::Type as PolyLiftFactorsDomain>::LocalField<'ring>>>>
 }
 
@@ -947,11 +947,11 @@ impl<'ring, I> NumberRingIdeal<'ring, I>
     fn lifted_factorization<'a>(&'a self, e: usize) -> (DensePolyRing<<I::Type as PolyLiftFactorsDomain>::LocalRing<'ring>>, Vec<El<DensePolyRing<<I::Type as PolyLiftFactorsDomain>::LocalRing<'ring>>>>) {
         let ZZX = &self.ZZX;
         let ZZ = ZZX.base_ring();
-        let ZpeX = DensePolyRing::new(ZZ.get_ring().local_ring_at(&self.prime, e, 0), "X");
+        let ZpeX = DensePolyRing::new(ZZ.get_ring().quotient_ring_at(&self.prime, e, 0), "X");
         let Zpe = ZpeX.base_ring();
         let FpX = &self.FpX;
-        let Zpe_to_Fp = PolyGCDLocallyIntermediateReductionMap::new(ZZ.get_ring(), &self.prime, Zpe, e, &self.Fp_as_ring, 1, 0);
-        let ZZ_to_Zpe = PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &self.prime, &Zpe, e, 0);
+        let Zpe_to_Fp = PolyLiftFactorsDomainIntermediateReductionMap::new(ZZ.get_ring(), &self.prime, Zpe, e, &self.Fp_as_ring, 1, 0);
+        let ZZ_to_Zpe = PolyLiftFactorsDomainReductionMap::new(ZZ.get_ring(), &self.prime, &Zpe, e, 0);
 
         let factors = hensel::hensel_lift_factorization(
             &Zpe_to_Fp,
@@ -1042,8 +1042,8 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
             let p = ZZ.get_ring().random_suitable_ideal(&mut rng, attempt);
             assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&p));
 
-            let Fp_as_ring = ZZ.get_ring().local_ring_at(&p, 1, 0);
-            let FpX = DensePolyRing::new(ZZ.get_ring().local_field_at(&p, 0), "X");
+            let Fp_as_ring = ZZ.get_ring().quotient_ring_at(&p, 1, 0);
+            let FpX = DensePolyRing::new(ZZ.get_ring().quotient_field_at(&p, 0), "X");
             let Fp = FpX.base_ring();
             let ZZ_to_Fp = LambdaHom::new(ZZ, Fp, |ZZ, Fp, x| ZZ.get_ring().base_ring_to_field(&p, Fp_as_ring.get_ring(), Fp.get_ring(), 0, 
                 ZZ.get_ring().reduce_ring_el(&p, (Fp_as_ring.get_ring(), 1), 0, ZZ.clone_el(x))));
@@ -1065,7 +1065,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         unreachable!()
     }
 
-    fn local_field_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, idx: usize) -> Self::LocalField<'ring>
+    fn quotient_field_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, idx: usize) -> Self::LocalField<'ring>
         where Self: 'ring
     {
         assert!(idx < self.maximal_ideal_factor_count(ideal));
@@ -1075,7 +1075,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         let FpX = &ideal.FpX;
         let Fp_to_Fp = WrapHom::new(ideal.Fp_as_zn.get_ring())
             .compose(RingRef::new(ideal.Fp_as_zn.get_ring().get_delegate()).into_can_hom(&ideal.Fp_as_ring).ok().unwrap())
-            .compose(PolyGCDLocallyBaseRingToFieldIso::new(ZZ.get_ring(), &ideal.prime, ideal.Fp_as_ring.get_ring(), FpX.base_ring().get_ring(), 0).inv());
+            .compose(PolyLiftFactorsDomainBaseRingToFieldIso::new(ZZ.get_ring(), &ideal.prime, ideal.Fp_as_ring.get_ring(), FpX.base_ring().get_ring(), 0).inv());
 
         let irred_poly = &ideal.minpoly_factors_mod_p[idx];
         let mut x_pow_rank = (0..FpX.degree(irred_poly).unwrap()).map(|_| Fp_to_Fp.codomain().zero()).collect::<Vec<_>>();
@@ -1091,14 +1091,14 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         });
     }
 
-    fn local_ring_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, e: usize, idx: usize) -> Self::LocalRing<'ring>
+    fn quotient_ring_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, e: usize, idx: usize) -> Self::LocalRing<'ring>
         where Self: 'ring
     {
         assert!(idx < self.maximal_ideal_factor_count(ideal));
         let QQ = self.base.base_ring();
         let ZZ = QQ.base_ring();
         let (ZpeX, factors) = ideal.lifted_factorization(e);
-        let Zpe = ZZ.get_ring().local_ring_at(&ideal.prime, e, 0);
+        let Zpe = ZZ.get_ring().quotient_ring_at(&ideal.prime, e, 0);
         assert!(Zpe.get_ring() == ZpeX.base_ring().get_ring());
 
         let irred_poly = &factors[idx];
@@ -1124,7 +1124,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
             assert!(ZZ.is_one(QQ.get_ring().den(&x)));
             ZZ.clone_el(QQ.get_ring().num(&x))
         });
-        let ZZ_to_Zpe = PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &ideal.prime, to.0.base_ring(), to.1, 0);
+        let ZZ_to_Zpe = PolyLiftFactorsDomainReductionMap::new(ZZ.get_ring(), &ideal.prime, to.0.base_ring(), to.1, 0);
 
         ZZX.evaluate(
             &self.base.poly_repr(ZZX, &x, partial_QQ_to_ZZ), 
@@ -1183,7 +1183,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         let Zpe = from.at(0).base_ring();
         assert!(from.iter().all(|ring| ring.base_ring().get_ring() == Zpe.get_ring()));
         let ZpeX = DensePolyRing::new(Zpe, "X");
-        let ZZ_to_Zpe = PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &ideal.prime, Zpe, e, 0);
+        let ZZ_to_Zpe = PolyLiftFactorsDomainReductionMap::new(ZZ.get_ring(), &ideal.prime, Zpe, e, 0);
 
         // compute data necessary for inverse CRT
         let mut unit_vectors = (0..self.maximal_ideal_factor_count(ideal)).map(|_| ZpeX.zero()).collect::<Vec<_>>();

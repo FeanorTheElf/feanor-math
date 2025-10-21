@@ -17,7 +17,7 @@ use crate::iters::powerset;
 use crate::seq::VectorView;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 
-fn combine_local_factors_local<'ring, 'data, 'local, R, P1, P2>(reduction: &'local ReductionContext<'ring, 'data, R>, poly_ring: P1, poly: &El<P1>, local_poly_ring: P2, local_e: usize, local_factors: Vec<El<P2>>) -> Vec<El<P1>>
+fn combine_local_factors_local<'ring, 'data, 'local, R, P1, P2>(reduction: &'local PolyLiftFactorsDomainReductionContext<'ring, 'data, R>, poly_ring: P1, poly: &El<P1>, local_poly_ring: P2, local_e: usize, local_factors: Vec<El<P2>>) -> Vec<El<P1>>
     where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore + Copy,
         P1::Type: PolyRing + DivisibilityRing,
@@ -92,7 +92,7 @@ pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::
     let ring = poly_ring.base_ring().get_ring();
     assert_eq!(1, ring.maximal_ideal_factor_count(&prime), "currently only maximal ideals are supported, got {}", IdealDisplayWrapper::new(ring, prime));
 
-    let reduction = ReductionContext::new(ring, prime, e);
+    let reduction = PolyLiftFactorsDomainReductionContext::new(ring, prime, e);
     let red_map = reduction.intermediate_ring_to_field_reduction(0);
 
     let iso = reduction.base_ring_to_field_iso(0);

@@ -24,11 +24,7 @@ use crate::rings::finite::FiniteRing;
 /// to the ring. For infinite fields, this is the most important approach to computing gcd's,
 /// and also factorizations (with some caveats...).
 /// 
-/// Note that here (and in `feanor-math` generally), the term "local" is used to refer to algorithms
-/// that work modulo prime ideals (or their powers), which is different from the mathematical concept
-/// of localization.
-/// 
-/// The general philosophy is similar to [`crate::reduce_lift::poly_eval::LiftPolyEvalRing`].
+/// The general philosophy is similar to [`crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing`].
 /// However, when working with factorizations, it is usually better to compute modulo the factorization
 /// modulo an ideal `I`, and use Hensel lifting to derive the factorization modulo `I^e`.
 /// `LiftPolyEvalRing` on the other hand is designed to allow computations modulo multiple different 
@@ -42,8 +38,10 @@ use crate::rings::finite::FiniteRing;
 /// over `R` from the factorization over `R / I^e`. Note that we don't assume that this `e` can be
 /// computed, except possibly in special cases (like the integers). Also, we cannot always assume
 /// that `I` is a maximal ideal (unfortunately - it was a nasty surprise when I realized this after
-/// running my first implementation), however I believe we can choose it such that we know its decomposition
-/// into maximal ideals `a = m1 ∩ ... ∩ mr`.
+/// running my first implementation), however I believe we can choose it such that we know its
+/// decomposition into maximal ideals `a = m1 ∩ ... ∩ mr`. Of course, this makes the standard approach
+/// much more complicated (and when computing factorizations, we often restrict to the case that `I`
+/// itself is indeed maximal).
 /// 
 /// Note also that I want this to work even when going to algebraic extensions or even the algebraic
 /// closure. This however seems to follow naturally in most cases.
@@ -82,9 +80,8 @@ use crate::rings::finite::FiniteRing;
 /// 
 /// # Type-level recursion
 /// 
-/// This trait and related functionality use type-level recursion, as explained in [`crate::reduce_lift::poly_eval::LiftPolyEvalRing`].
+/// This trait and related functionality use type-level recursion, as explained in [`crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing`].
 /// 
-#[stability::unstable(feature = "enable")]
 pub trait PolyLiftFactorsDomain: Domain + DivisibilityRing + FiniteRingSpecializable {
 
     ///
@@ -93,6 +90,11 @@ pub trait PolyLiftFactorsDomain: Domain + DivisibilityRing + FiniteRingSpecializ
     type LocalRingBase<'ring>: ?Sized + LinSolveRing
         where Self: 'ring;
 
+    ///
+    /// The [`RingStore`] corresponding to the local ring.
+    /// 
+    /// This may reference data stored by [`PolyLiftFactorsDomain::SuitableIdeal`].
+    /// 
     type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>> + Clone
         where Self: 'ring;
     
@@ -100,11 +102,16 @@ pub trait PolyLiftFactorsDomain: Domain + DivisibilityRing + FiniteRingSpecializ
     /// The type of the field we get by quotienting out a power of a prime ideal.
     /// 
     /// For the reason why there are so many quite specific trait bounds here:
-    /// See the doc of [`crate::reduce_lift::poly_eval::LiftPolyEvalRing::LocalRingBase`].
+    /// See the doc of [`crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing::LocalRingBase`].
     /// 
     type LocalFieldBase<'ring>: ?Sized + PolyTFracGCDRing + FactorPolyField + Field + SelfIso + FiniteRingSpecializable
         where Self: 'ring;
 
+    ///
+    /// The [`RingStore`] corresponding to the local field.
+    /// 
+    /// This may reference data stored by [`PolyLiftFactorsDomain::SuitableIdeal`].
+    /// f
     type LocalField<'ring>: RingStore<Type = Self::LocalFieldBase<'ring>> + Clone
         where Self: 'ring;
 
@@ -118,9 +125,11 @@ pub trait PolyLiftFactorsDomain: Domain + DivisibilityRing + FiniteRingSpecializ
     ///
     /// Returns an exponent `e` such that we hope that the factors of a polynomial of given degree, 
     /// involving the given coefficient can already be read of (via [`PolyLiftFactorsDomain::reconstruct_ring_el()`]) 
-    /// their reductions modulo `I^e`. Note that this is just a heuristic, and if it does not work,
-    /// the implementation will gradually try larger `e`. Thus, even if this function returns constant
-    /// 1, correctness will not be affected, but giving a good guess can improve performance
+    /// their reductions modulo `I^e`. 
+    /// 
+    /// Note that this is just a heuristic, and if it does not work, most implementations will gradually try
+    /// larger `e`. Thus, even if this function returns constant 1, correctness will not be affected, but giving
+    /// a good guess can improve performance.
     /// 
     fn heuristic_exponent<'ring, 'a, I>(&self, _ideal: &Self::SuitableIdeal<'ring>, _poly_deg: usize, _coefficients: I) -> usize
         where I: Iterator<Item = &'a Self::Element>,
@@ -149,13 +158,13 @@ pub trait PolyLiftFactorsDomain: Domain + DivisibilityRing + FiniteRingSpecializ
     /// 
     /// This will always be a field, since `mi` is a maximal ideal.
     /// 
-    fn local_field_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
+    fn quotient_field_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
         where Self: 'ring;
     
     ///
     /// Returns `R / mi^e`, where `mi` is the `i`-th maximal ideal over `I`.
     /// 
-    fn local_ring_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>
+    fn quotient_ring_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>
         where Self: 'ring;
 
     ///
@@ -220,8 +229,7 @@ pub trait PolyLiftFactorsDomain: Domain + DivisibilityRing + FiniteRingSpecializ
 /// Subtrait of [`PolyLiftFactorsDomain`] that restricts the local rings to be [`ZnRing`],
 /// which is necessary when implementing some base cases.
 /// 
-#[stability::unstable(feature = "enable")]
-pub trait IntegerPolyGCDRing: PolyLiftFactorsDomain {
+pub trait IntegerPolyLiftFactorsDomain: PolyLiftFactorsDomain {
 
     ///
     /// It would be much preferrable if we could restrict associated types from supertraits,
@@ -241,7 +249,7 @@ pub trait IntegerPolyGCDRing: PolyLiftFactorsDomain {
         where Self: 'ring
     {
         assert_eq!(1, self.maximal_ideal_factor_count(p));
-        let Fp = self.local_ring_at(p, 1, 0);
+        let Fp = self.quotient_ring_at(p, 1, 0);
         let Fp = self.local_ring_as_zn(&Fp);
         return int_cast(Fp.integer_ring().clone_el(Fp.modulus()), BigIntRing::RING, Fp.integer_ring());
     }
@@ -276,7 +284,7 @@ impl<'a, 'ring, R: 'ring + ?Sized + PolyLiftFactorsDomain> Display for IdealDisp
 /// as specified by [`PolyLiftFactorsDomain`].
 /// 
 #[stability::unstable(feature = "enable")]
-pub struct PolyGCDLocallyReductionMap<'ring, 'data, 'local, R>
+pub struct PolyLiftFactorsDomainReductionMap<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyLiftFactorsDomain, 'ring: 'data
 {
     ring: RingRef<'data, R>,
@@ -285,12 +293,12 @@ pub struct PolyGCDLocallyReductionMap<'ring, 'data, 'local, R>
     max_ideal_idx: usize
 }
 
-impl<'ring, 'data, 'local, R> PolyGCDLocallyReductionMap<'ring, 'data, 'local, R>
+impl<'ring, 'data, 'local, R> PolyLiftFactorsDomainReductionMap<'ring, 'data, 'local, R>
     where R: 'ring +?Sized + PolyLiftFactorsDomain, 'ring: 'data
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: &'data R, ideal: &'data R::SuitableIdeal<'ring>, to: &'local R::LocalRing<'ring>, to_e: usize, max_ideal_idx: usize) -> Self {
-        assert!(to.get_ring() == ring.local_ring_at(ideal, to_e, max_ideal_idx).get_ring());
+        assert!(to.get_ring() == ring.quotient_ring_at(ideal, to_e, max_ideal_idx).get_ring());
         Self {
             ring: RingRef::new(ring),
             ideal: ideal,
@@ -300,7 +308,7 @@ impl<'ring, 'data, 'local, R> PolyGCDLocallyReductionMap<'ring, 'data, 'local, R
     }
 }
 
-impl<'ring, 'data, 'local, R> Homomorphism<R, R::LocalRingBase<'ring>> for PolyGCDLocallyReductionMap<'ring, 'data, 'local, R>
+impl<'ring, 'data, 'local, R> Homomorphism<R, R::LocalRingBase<'ring>> for PolyLiftFactorsDomainReductionMap<'ring, 'data, 'local, R>
     where R: 'ring +?Sized + PolyLiftFactorsDomain, 'ring: 'data
 {
     type CodomainStore = &'local R::LocalRing<'ring>;
@@ -324,7 +332,7 @@ impl<'ring, 'data, 'local, R> Homomorphism<R, R::LocalRingBase<'ring>> for PolyG
 /// ideal `I`, as specified by [`PolyLiftFactorsDomain`].
 /// 
 #[stability::unstable(feature = "enable")]
-pub struct PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>
+pub struct PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyLiftFactorsDomain, 'ring: 'data
 {
     ring: RingRef<'data, R>,
@@ -334,13 +342,13 @@ pub struct PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>
     max_ideal_idx: usize
 }
 
-impl<'ring, 'data, 'local, R> PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>
+impl<'ring, 'data, 'local, R> PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyLiftFactorsDomain, 'ring: 'data
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: &'data R, ideal: &'data R::SuitableIdeal<'ring>, from: &'local R::LocalRing<'ring>, from_e: usize, to: &'local R::LocalRing<'ring>, to_e: usize, max_ideal_idx: usize) -> Self {
-        assert!(ring.local_ring_at(ideal, from_e, max_ideal_idx).get_ring() == from.get_ring());
-        assert!(ring.local_ring_at(ideal, to_e, max_ideal_idx).get_ring() == to.get_ring());
+        assert!(ring.quotient_ring_at(ideal, from_e, max_ideal_idx).get_ring() == from.get_ring());
+        assert!(ring.quotient_ring_at(ideal, to_e, max_ideal_idx).get_ring() == to.get_ring());
         Self {
             ring: RingRef::new(ring),
             ideal: ideal,
@@ -376,7 +384,7 @@ impl<'ring, 'data, 'local, R> PolyGCDLocallyIntermediateReductionMap<'ring, 'dat
     }
 }
 
-impl<'ring, 'data, 'local, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalRingBase<'ring>> for PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>
+impl<'ring, 'data, 'local, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalRingBase<'ring>> for PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyLiftFactorsDomain, 'ring: 'data
 {
     type CodomainStore = &'local R::LocalRing<'ring>;
@@ -401,7 +409,7 @@ impl<'ring, 'data, 'local, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalRing
 /// `R` with maximal ideal `mi`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub struct PolyGCDLocallyBaseRingToFieldIso<'ring, 'data, 'local, R>
+pub struct PolyLiftFactorsDomainBaseRingToFieldIso<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyLiftFactorsDomain, 'ring: 'data
 {
     ring: RingRef<'data, R>,
@@ -411,13 +419,13 @@ pub struct PolyGCDLocallyBaseRingToFieldIso<'ring, 'data, 'local, R>
     max_ideal_idx: usize
 }
 
-impl<'ring, 'data, 'local, R> PolyGCDLocallyBaseRingToFieldIso<'ring, 'data, 'local, R>
+impl<'ring, 'data, 'local, R> PolyLiftFactorsDomainBaseRingToFieldIso<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyLiftFactorsDomain, 'ring: 'data
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: &'data R, ideal: &'data R::SuitableIdeal<'ring>, from: &'local R::LocalRingBase<'ring>, to: &'local R::LocalFieldBase<'ring>, max_ideal_idx: usize) -> Self {
-        assert!(ring.local_ring_at(ideal, 1, max_ideal_idx).get_ring() == from);
-        assert!(ring.local_field_at(ideal, max_ideal_idx).get_ring() == to);
+        assert!(ring.quotient_ring_at(ideal, 1, max_ideal_idx).get_ring() == from);
+        assert!(ring.quotient_field_at(ideal, max_ideal_idx).get_ring() == to);
         Self {
             ring: RingRef::new(ring),
             ideal: ideal,
@@ -439,7 +447,7 @@ impl<'ring, 'data, 'local, R> PolyGCDLocallyBaseRingToFieldIso<'ring, 'data, 'lo
     }
 }
 
-impl<'ring, 'data, 'local, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalFieldBase<'ring>> for PolyGCDLocallyBaseRingToFieldIso<'ring, 'data, 'local, R>
+impl<'ring, 'data, 'local, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalFieldBase<'ring>> for PolyLiftFactorsDomainBaseRingToFieldIso<'ring, 'data, 'local, R>
     where R: 'ring + ?Sized + PolyLiftFactorsDomain, 'ring: 'data
 {
     type DomainStore = RingRef<'local, R::LocalRingBase<'ring>>;
@@ -478,8 +486,8 @@ impl<'ring, 'data, 'local, R> PolyGCDLocallyFieldToBaseRingIso<'ring, 'data, 'lo
     where R: 'ring + ?Sized + PolyLiftFactorsDomain, 'ring: 'data
 {
     #[stability::unstable(feature = "enable")]
-    pub fn inv(&self) -> PolyGCDLocallyBaseRingToFieldIso<'ring, 'data, 'local, R> {
-        PolyGCDLocallyBaseRingToFieldIso {
+    pub fn inv(&self) -> PolyLiftFactorsDomainBaseRingToFieldIso<'ring, 'data, 'local, R> {
+        PolyLiftFactorsDomainBaseRingToFieldIso {
             ring: self.ring,
             ideal: self.ideal,
             from: self.to,
@@ -517,7 +525,7 @@ impl<'ring, 'data, 'local, R> Homomorphism<R::LocalFieldBase<'ring>, R::LocalRin
 /// for [`ReductionContext`].
 ///
 #[stability::unstable(feature = "enable")]
-pub struct ReductionContext<'ring, 'data, R>
+pub struct PolyLiftFactorsDomainReductionContext<'ring, 'data, R>
     where R: 'ring + ?Sized + PolyLiftFactorsDomain, 'ring: 'data
 {
     ring: RingRef<'data, R>,
@@ -528,7 +536,7 @@ pub struct ReductionContext<'ring, 'data, R>
     to_fields: Vec<R::LocalField<'ring>>
 }
 
-impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
+impl<'ring, 'data, R> PolyLiftFactorsDomainReductionContext<'ring, 'data, R>
     where R: 'ring + ?Sized + PolyLiftFactorsDomain, 'ring: 'data
 {
     #[stability::unstable(feature = "enable")]
@@ -539,9 +547,9 @@ impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
             ring: RingRef::new(ring), 
             ideal: ideal, 
             from_e: e,
-            from: (0..maximal_ideal_factor_count).map(|idx| ring.local_ring_at(ideal, e, idx)).collect::<Vec<_>>(), 
-            to: (0..maximal_ideal_factor_count).map(|idx| ring.local_ring_at(ideal, 1, idx)).collect::<Vec<_>>(),
-            to_fields: (0..maximal_ideal_factor_count).map(|idx| ring.local_field_at(ideal, idx)).collect::<Vec<_>>(),
+            from: (0..maximal_ideal_factor_count).map(|idx| ring.quotient_ring_at(ideal, e, idx)).collect::<Vec<_>>(), 
+            to: (0..maximal_ideal_factor_count).map(|idx| ring.quotient_ring_at(ideal, 1, idx)).collect::<Vec<_>>(),
+            to_fields: (0..maximal_ideal_factor_count).map(|idx| ring.quotient_field_at(ideal, idx)).collect::<Vec<_>>(),
         }
     }
     
@@ -551,8 +559,8 @@ impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn main_ring_to_field_reduction<'local>(&'local self, max_ideal_idx: usize) -> PolyGCDLocallyReductionMap<'ring, 'data, 'local, R> {
-        PolyGCDLocallyReductionMap {
+    pub fn main_ring_to_field_reduction<'local>(&'local self, max_ideal_idx: usize) -> PolyLiftFactorsDomainReductionMap<'ring, 'data, 'local, R> {
+        PolyLiftFactorsDomainReductionMap {
             ideal: self.ideal,
             ring: self.ring,
             to: (self.to.at(max_ideal_idx), 1),
@@ -561,8 +569,8 @@ impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn main_ring_to_intermediate_ring_reduction<'local>(&'local self, max_ideal_idx: usize) -> PolyGCDLocallyReductionMap<'ring, 'data, 'local, R> {
-        PolyGCDLocallyReductionMap {
+    pub fn main_ring_to_intermediate_ring_reduction<'local>(&'local self, max_ideal_idx: usize) -> PolyLiftFactorsDomainReductionMap<'ring, 'data, 'local, R> {
+        PolyLiftFactorsDomainReductionMap {
             ideal: self.ideal,
             ring: self.ring,
             to: (self.from.at(max_ideal_idx), self.from_e),
@@ -571,8 +579,8 @@ impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn intermediate_ring_to_field_reduction<'local>(&'local self, max_ideal_idx: usize) -> PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R> {
-        PolyGCDLocallyIntermediateReductionMap {
+    pub fn intermediate_ring_to_field_reduction<'local>(&'local self, max_ideal_idx: usize) -> PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R> {
+        PolyLiftFactorsDomainIntermediateReductionMap {
             from: (&self.from[max_ideal_idx], self.from_e),
             to: (&self.to[max_ideal_idx], 1),
             max_ideal_idx: max_ideal_idx,
@@ -582,8 +590,8 @@ impl<'ring, 'data, R> ReductionContext<'ring, 'data, R>
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn base_ring_to_field_iso<'local>(&'local self, max_ideal_idx: usize) -> PolyGCDLocallyBaseRingToFieldIso<'ring, 'data, 'local, R> {
-        PolyGCDLocallyBaseRingToFieldIso {
+    pub fn base_ring_to_field_iso<'local>(&'local self, max_ideal_idx: usize) -> PolyLiftFactorsDomainBaseRingToFieldIso<'ring, 'data, 'local, R> {
+        PolyLiftFactorsDomainBaseRingToFieldIso {
             ring: self.ring,
             ideal: self.ideal,
             from: RingRef::new(self.to[max_ideal_idx].get_ring()),
@@ -679,7 +687,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 return hom.map(from.0.any_lift(x));
             }
         
-            fn local_field_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
+            fn quotient_field_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
                 where Self: 'ring
             {
                 use $crate::rings::zn::*;
@@ -688,7 +696,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 $crate::rings::zn::zn_64::Zn64B::new(*p as u64).as_field().ok().unwrap()
             }
         
-            fn local_ring_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>
+            fn quotient_ring_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>
                 where Self: 'ring
             {
                 assert_eq!(0, max_ideal_idx);
@@ -767,7 +775,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
             }
         }
 
-        impl<$($gen_args)*> $crate::reduce_lift::lift_poly_factors::IntegerPolyGCDRing for $int_ring_type
+        impl<$($gen_args)*> $crate::reduce_lift::lift_poly_factors::IntegerPolyLiftFactorsDomain for $int_ring_type
             where $($constraints)*
         {
             type LocalRingAsZnBase<'ring> = Self::LocalRingBase<'ring>
@@ -835,13 +843,13 @@ impl<R> PolyLiftFactorsDomain for R
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
     }
 
-    fn local_field_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
+    fn quotient_field_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
         where Self: 'ring
     {
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
     }
                 
-    fn local_ring_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>
+    fn quotient_ring_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>
         where Self: 'ring
     {
         unreachable!("this should never be called for finite fields, since specialized functions are available in this case")
@@ -895,15 +903,19 @@ impl<R> PolyLiftFactorsDomain for R
     }
 }
 
+///
+/// Wrapper around an integer ring which overrides the implementation of the 
+/// quotient ring used for [`PolyLiftFactorsDomain`].
+/// 
 #[stability::unstable(feature = "enable")]
-pub struct IntegersWithLocalZnQuotient<'a, R>
+pub struct IntegersWithZnQuotient<'a, R>
     where R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + LinSolveRing + Clone
 {
     integers: &'a R::IntegerRing,
     prime: El<R::IntegerRing>
 }
 
-impl<'a, R> IntegersWithLocalZnQuotient<'a, R>
+impl<'a, R> IntegersWithZnQuotient<'a, R>
     where R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + LinSolveRing + Clone
 {
     #[stability::unstable(feature = "enable")]
@@ -913,19 +925,19 @@ impl<'a, R> IntegersWithLocalZnQuotient<'a, R>
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn reduction_context<'b>(&'b self, from_e: usize) -> ReductionContext<'b, 'b, Self> {
-        ReductionContext {
+    pub fn reduction_context<'b>(&'b self, from_e: usize) -> PolyLiftFactorsDomainReductionContext<'b, 'b, Self> {
+        PolyLiftFactorsDomainReductionContext {
             ring: RingRef::new(self),
             ideal: &self.prime,
             from_e: from_e,
-            from: vec![self.local_ring_at(&self.prime, from_e, 0)], 
-            to: vec![self.local_ring_at(&self.prime, 1, 0)], 
-            to_fields: vec![self.local_field_at(&self.prime, 0)], 
+            from: vec![self.quotient_ring_at(&self.prime, from_e, 0)], 
+            to: vec![self.quotient_ring_at(&self.prime, 1, 0)], 
+            to_fields: vec![self.quotient_field_at(&self.prime, 0)], 
         }
     }
 }
 
-impl<'a, R> Debug for IntegersWithLocalZnQuotient<'a, R>
+impl<'a, R> Debug for IntegersWithZnQuotient<'a, R>
     where R: ?Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + LinSolveRing + Clone,
         R::IntegerRingBase: Debug
 {
@@ -936,7 +948,7 @@ impl<'a, R> Debug for IntegersWithLocalZnQuotient<'a, R>
     }
 }
 
-impl<'a, R> PartialEq for IntegersWithLocalZnQuotient<'a, R>
+impl<'a, R> PartialEq for IntegersWithZnQuotient<'a, R>
     where R: ?Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + LinSolveRing + Clone
 {
     fn eq(&self, other: &Self) -> bool {
@@ -944,7 +956,7 @@ impl<'a, R> PartialEq for IntegersWithLocalZnQuotient<'a, R>
     }
 }
 
-impl<'a, R> DelegateRing for IntegersWithLocalZnQuotient<'a, R>
+impl<'a, R> DelegateRing for IntegersWithZnQuotient<'a, R>
     where R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + LinSolveRing + Clone
 {
     type Base = <R as ZnRing>::IntegerRingBase;
@@ -960,26 +972,26 @@ impl<'a, R> DelegateRing for IntegersWithLocalZnQuotient<'a, R>
     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
 }
 
-impl<'a, R> OrderedRing for IntegersWithLocalZnQuotient<'a, R>
+impl<'a, R> OrderedRing for IntegersWithZnQuotient<'a, R>
     where R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + Clone
 {
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering { self.get_delegate().cmp(self.delegate_ref(lhs), self.delegate_ref(rhs)) }
     fn abs_cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering { self.get_delegate().abs_cmp(self.delegate_ref(lhs), self.delegate_ref(rhs)) }
 }
 
-impl<'a, R> Domain for IntegersWithLocalZnQuotient<'a, R>
+impl<'a, R> Domain for IntegersWithZnQuotient<'a, R>
     where R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + Clone
 {}
 
-impl<'a, R> DelegateRingImplFiniteRing for IntegersWithLocalZnQuotient<'a, R>
+impl<'a, R> DelegateRingImplFiniteRing for IntegersWithZnQuotient<'a, R>
     where R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + Clone
 {}
 
-impl<'a, R> DelegateRingImplEuclideanRing for IntegersWithLocalZnQuotient<'a, R>
+impl<'a, R> DelegateRingImplEuclideanRing for IntegersWithZnQuotient<'a, R>
     where R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + Clone
 {}
 
-impl<'a, R> crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing for IntegersWithLocalZnQuotient<'a, R>
+impl<'a, R> crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing for IntegersWithZnQuotient<'a, R>
     where R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + Clone
 {
     type LocalRingBase<'ring> = <<Self as DelegateRing>::Base as crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing>::LocalRingBase<'ring>
@@ -999,20 +1011,20 @@ impl<'a, R> crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing for IntegersWit
         self.get_delegate().reduce(computation, self.delegate_ref(el))
     }
 
-    fn local_ring_count<'ring>(&self, computation: &Self::LocalComputationData<'ring>) -> usize
+    fn prime_ideal_count<'ring>(&self, computation: &Self::LocalComputationData<'ring>) -> usize
         where Self: 'ring
     {
-        self.get_delegate().local_ring_count(computation)
+        self.get_delegate().prime_ideal_count(computation)
     }
 
-    fn local_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
+    fn quotient_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
         where Self: 'ring
     {
-        crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing::local_ring_at(self.get_delegate(), computation, i)
+        crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing::quotient_ring_at(self.get_delegate(), computation, i)
     }
 
-    fn local_computation<'ring>(&'ring self, ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
-        self.get_delegate().local_computation(ln_pseudo_norm_bound)
+    fn init_reduce_lift<'ring>(&'ring self, ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
+        self.get_delegate().init_reduce_lift(ln_pseudo_norm_bound)
     }
 
     fn lift_combine<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
@@ -1022,7 +1034,7 @@ impl<'a, R> crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing for IntegersWit
     }
 }
 
-impl<'a, R> IntegerRing for IntegersWithLocalZnQuotient<'a, R>
+impl<'a, R> IntegerRing for IntegersWithZnQuotient<'a, R>
     where R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + Clone
 {
     fn to_float_approx(&self, value: &Self::Element) -> f64 { self.get_delegate().to_float_approx(self.delegate_ref(self.rev_element_cast_ref(value))) }
@@ -1049,7 +1061,7 @@ impl<'a, R> IntegerRing for IntegersWithLocalZnQuotient<'a, R>
     }
 }
 
-impl<'a, R> PolyLiftFactorsDomain for IntegersWithLocalZnQuotient<'a, R>
+impl<'a, R> PolyLiftFactorsDomain for IntegersWithZnQuotient<'a, R>
     where R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + LinSolveRing + Clone
 {
     type LocalRingBase<'ring> = R
@@ -1089,14 +1101,14 @@ impl<'a, R> PolyLiftFactorsDomain for IntegersWithLocalZnQuotient<'a, R>
         1
     }
 
-    fn local_field_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
+    fn quotient_field_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
         where Self: 'ring
     {
         assert_eq!(0, max_ideal_idx);
-        self.local_ring_at(ideal, 1, 0).as_field().ok().unwrap()
+        self.quotient_ring_at(ideal, 1, 0).as_field().ok().unwrap()
     }
     
-    fn local_ring_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>
+    fn quotient_ring_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>
         where Self: 'ring
     {
         assert_eq!(0, max_ideal_idx);
@@ -1171,7 +1183,7 @@ impl<'a, R> PolyLiftFactorsDomain for IntegersWithLocalZnQuotient<'a, R>
     }
 }
 
-impl<'a, R> IntegerPolyGCDRing for IntegersWithLocalZnQuotient<'a, R>
+impl<'a, R> IntegerPolyLiftFactorsDomain for IntegersWithZnQuotient<'a, R>
     where R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + LinSolveRing + Clone
 {
     type LocalRingAsZn<'ring> = Self::LocalRing<'ring>

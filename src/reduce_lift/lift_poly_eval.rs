@@ -104,11 +104,8 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
 }
 
 ///
-/// Trait for rings that support performing computations locally. 
-/// 
-/// Note that here (and in `feanor-math` generally), the term "local" is used to refer to algorithms
-/// that work modulo prime ideals (or their powers), which is different from the mathematical concept
-/// of localization.
+/// Trait for rings that support lifting evaluations of a polynomial modulo a product
+/// of prime ideals to the original ring. 
 /// 
 /// More concretely, a ring `R` implementing this trait should be endowed with a valuation
 /// ```text
@@ -382,19 +379,19 @@ pub trait LiftPolyEvalRing: RingBase + FiniteRingSpecializable {
     /// Sets up the context for a new polynomial evaluation, whose output
     /// should have pseudo norm less than the given bound.
     /// 
-    fn local_computation<'ring>(&'ring self, ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring>;
+    fn init_reduce_lift<'ring>(&'ring self, ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring>;
 
     ///
-    /// Returns the number `k` of local rings that are required
+    /// Returns the number `k` of quotient rings that are required
     /// to get the correct result of the given computation.
     /// 
-    fn local_ring_count<'ring>(&self, computation: &Self::LocalComputationData<'ring>) -> usize
+    fn prime_ideal_count<'ring>(&self, computation: &Self::LocalComputationData<'ring>) -> usize
         where Self: 'ring;
 
     ///
     /// Returns the `i`-th local ring belonging to the given computation.
     /// 
-    fn local_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
+    fn quotient_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
         where Self: 'ring;
 
     ///
@@ -431,17 +428,17 @@ impl<R> LiftPolyEvalRing for R
         0.
     }
 
-    fn local_computation<'ring>(&'ring self, _ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
+    fn init_reduce_lift<'ring>(&'ring self, _ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
         RingRef::new(self)
     }
 
-    fn local_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, _i: usize) -> Self::LocalRing<'ring>
+    fn quotient_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, _i: usize) -> Self::LocalRing<'ring>
         where Self: 'ring
     {
         *computation
     }
 
-    fn local_ring_count<'ring>(&self, _computation: &Self::LocalComputationData<'ring>) -> usize
+    fn prime_ideal_count<'ring>(&self, _computation: &Self::LocalComputationData<'ring>) -> usize
         where Self: 'ring
     {
         1
@@ -466,7 +463,7 @@ impl<R> LiftPolyEvalRing for R
 /// given by [`LiftPolyEvalRing`].
 /// 
 #[stability::unstable(feature = "enable")]
-pub struct EvaluatePolyLocallyReductionMap<'ring, 'data, R>
+pub struct LiftPolyEvalRingReductionMap<'ring, 'data, R>
     where R: 'ring + ?Sized + LiftPolyEvalRing, 'ring: 'data
 {
     ring: RingRef<'data, R>,
@@ -475,16 +472,16 @@ pub struct EvaluatePolyLocallyReductionMap<'ring, 'data, R>
     index: usize
 }
 
-impl<'ring, 'data, R> EvaluatePolyLocallyReductionMap<'ring, 'data, R>
+impl<'ring, 'data, R> LiftPolyEvalRingReductionMap<'ring, 'data, R>
     where R: 'ring +?Sized + LiftPolyEvalRing, 'ring: 'data
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: &'data R, data: &'data R::LocalComputationData<'ring>, index: usize) -> Self {
-        Self { ring: RingRef::new(ring), data: data, local_ring: ring.local_ring_at(data, index), index: index }
+        Self { ring: RingRef::new(ring), data: data, local_ring: ring.quotient_ring_at(data, index), index: index }
     }
 }
 
-impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for EvaluatePolyLocallyReductionMap<'ring, 'data, R>
+impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for LiftPolyEvalRingReductionMap<'ring, 'data, R>
     where R: 'ring +?Sized + LiftPolyEvalRing, 'ring: 'data
 {
     type CodomainStore = R::LocalRing<'ring>;
@@ -632,7 +629,7 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
                 RingRef::new(self).abs_log2_ceil(el).unwrap_or(0) as f64 * 2f64.ln()
             }
 
-            fn local_computation<'ring>(&'ring self, ln_valuation_bound: f64) -> Self::LocalComputationData<'ring> {
+            fn init_reduce_lift<'ring>(&'ring self, ln_valuation_bound: f64) -> Self::LocalComputationData<'ring> {
                 let mut primes = Vec::new();
                 let mut ln_current = 0.;
                 let mut prime_it = //$crate::reduce_lift::primelist::LARGE_PRIMES.iter().copied().chain
@@ -654,13 +651,13 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
                 );
             }
 
-            fn local_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
+            fn quotient_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
                 where Self: 'ring
             {
                 <_ as $crate::seq::VectorView<_>>::at(computation, i).clone()
             }
 
-            fn local_ring_count<'ring>(&self, computation: &Self::LocalComputationData<'ring>) -> usize
+            fn prime_ideal_count<'ring>(&self, computation: &Self::LocalComputationData<'ring>) -> usize
                 where Self: 'ring
             {
                 <_ as $crate::seq::VectorView<_>>::len(computation)

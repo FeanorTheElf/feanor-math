@@ -29,7 +29,7 @@ struct Signature {
 ///  - `S` is `R/m^e`
 /// 
 fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P>(
-    reduction: &'local ReductionContext<'ring, 'data, R>, 
+    reduction: &'local PolyLiftFactorsDomainReductionContext<'ring, 'data, R>, 
     RX: P, 
     poly: &El<P>, 
     signature: &[Signature], 
@@ -80,7 +80,7 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P
 fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2, Controller>(
     RX: P1, 
     f: &El<P1>, 
-    S_to_F: &PolyGCDLocallyIntermediateReductionMap<'ring, 'data, 'local, R>, 
+    S_to_F: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     SX: P2,
     controller: Controller
 ) -> Option<(Vec<Signature>, Vec<El<P2>>)>
@@ -95,9 +95,9 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2, Controller
 {
     assert!(SX.base_ring().get_ring() == S_to_F.domain().get_ring());
     let R = RX.base_ring().get_ring();
-    let F = R.local_field_at(S_to_F.ideal(), S_to_F.max_ideal_idx());
+    let F = R.quotient_field_at(S_to_F.ideal(), S_to_F.max_ideal_idx());
     let FX = DensePolyRing::new(&F, "X");
-    let iso = PolyGCDLocallyBaseRingToFieldIso::new(R, S_to_F.ideal(), S_to_F.codomain().get_ring(), F.get_ring(), S_to_F.max_ideal_idx());
+    let iso = PolyLiftFactorsDomainBaseRingToFieldIso::new(R, S_to_F.ideal(), S_to_F.codomain().get_ring(), F.get_ring(), S_to_F.max_ideal_idx());
 
     let f_mod_m = FX.from_terms(RX.terms(f).map(|(c, i)| (
         iso.map(R.reduce_ring_el(S_to_F.ideal(), (S_to_F.codomain().get_ring(), 1), S_to_F.max_ideal_idx(), R.clone_el(c))),
@@ -160,7 +160,7 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &
             let heuristic_e = ring.heuristic_exponent(&ideal, poly_ring.degree(poly).unwrap(), poly_ring.terms(poly).map(|(c, _)| c));
             assert!(heuristic_e >= 1);
             let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt.try_into().unwrap())).floor() as usize;
-            let reduction = ReductionContext::new(ring, &ideal, e);
+            let reduction = PolyLiftFactorsDomainReductionContext::new(ring, &ideal, e);
 
             log_progress!(controller, "(mod={}^{})(parts={})", IdealDisplayWrapper::new(ring, &ideal), e, reduction.len());
 

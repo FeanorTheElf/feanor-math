@@ -7,7 +7,6 @@ use crate::rings::finite::*;
 /// 
 /// Used through the trait [`FiniteRingSpecializable`].
 /// 
-#[stability::unstable(feature = "enable")]
 pub trait FiniteRingOperation<R>
     where R: ?Sized
 {    
@@ -31,7 +30,6 @@ pub trait FiniteRingOperation<R>
 /// 
 /// This serves as a workaround while specialization is not properly supported. 
 /// 
-#[stability::unstable(feature = "enable")]
 pub trait FiniteRingSpecializable: RingBase {
 
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output;
