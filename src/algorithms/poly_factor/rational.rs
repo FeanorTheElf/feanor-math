@@ -1,6 +1,7 @@
 
 use crate::algorithms::poly_factor::factor_locally::poly_factor_integer;
 use crate::computation::*;
+use crate::pid::PrincipalIdealRingStore;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::ring::*;
 use crate::rings::poly::*;
@@ -8,7 +9,6 @@ use crate::homomorphism::*;
 use crate::divisibility::*;
 use crate::rings::rational::RationalFieldBase;
 use crate::rings::zn::zn_64::*;
-use crate::algorithms::eea::signed_lcm;
 use crate::pid::EuclideanRing;
 
 use super::IntegerRing;
@@ -28,7 +28,7 @@ pub fn poly_factor_rational<'a, P, I, Controller>(poly_ring: P, poly: &El<P>, co
     let QQ = QQX.base_ring();
     let ZZ = QQ.base_ring();
 
-    let den_lcm = QQX.terms(poly).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+    let den_lcm = QQX.terms(poly).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| ZZ.ideal_intersect(&a, b));
     
     let ZZX = DensePolyRing::new(ZZ, "X");
     let f = ZZX.from_terms(QQX.terms(poly).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));

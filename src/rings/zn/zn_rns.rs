@@ -37,7 +37,7 @@ use crate::primitive_int::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::seq::*;
 /// 
-/// let R = Zn::create_from_primes(vec![17, 19], StaticRing::<i64>::RING);
+/// let R = ZnRNS::create_from_primes(vec![17, 19], StaticRing::<i64>::RING);
 /// let x = R.get_ring().from_congruence([R.get_ring().at(0).int_hom().map(1), R.get_ring().at(1).int_hom().map(16)].into_iter());
 /// assert_eq!(35, R.smallest_lift(R.clone_el(&x)));
 /// let y = R.mul_ref(&x, &x);
@@ -54,8 +54,8 @@ use crate::primitive_int::*;
 /// # use feanor_math::rings::zn::zn_rns::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::primitive_int::*;
-/// let R = Zn::create_from_primes(vec![17, 19], BigIntRing::RING);
-/// let S = zn_big::Zn::new(StaticRing::<i64>::RING, 17 * 19);
+/// let R = ZnRNS::create_from_primes(vec![17, 19], BigIntRing::RING);
+/// let S = zn_big::ZnGB::new(StaticRing::<i64>::RING, 17 * 19);
 /// assert!(R.eq_el(&R.int_hom().map(12), &R.coerce(&S, S.int_hom().map(12))));
 /// assert!(S.eq_el(&S.int_hom().map(12), &R.can_iso(&S).unwrap().map(R.int_hom().map(12))));
 /// ```
@@ -67,7 +67,7 @@ use crate::primitive_int::*;
 /// # use feanor_math::rings::zn::zn_rns::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::primitive_int::*;
-/// let R = Zn::create_from_primes(vec![3, 5, 7], BigIntRing::RING);
+/// let R = ZnRNS::create_from_primes(vec![3, 5, 7], BigIntRing::RING);
 /// let S = BigIntRing::RING;
 /// assert!(R.eq_el(&R.int_hom().map(120493), &R.coerce(&S, S.int_hom().map(120493))));
 /// ```
@@ -135,7 +135,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> ZnRNS<C, J,
         for R in &summands {
             let R_modulus = R.integer_ring().can_iso(ZZ).unwrap().map_ref(R.modulus());
             assert!(
-                ZZ.is_one(&algorithms::eea::signed_gcd(ZZ.checked_div(total_ring.modulus(), &R_modulus).unwrap(), R_modulus, ZZ)),
+                ZZ.is_unit(&ZZ.ideal_gen(&ZZ.checked_div(total_ring.modulus(), &R_modulus).unwrap(), &R_modulus)),
                 "all moduli must be coprime"
             );
             // makes things much easier, e.g. during CanIsoFromTo implementation

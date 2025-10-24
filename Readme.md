@@ -107,7 +107,7 @@ F25.solve_right(lhs.data_mut(), rhs.data_mut(), result.data_mut()).assert_solved
 // since addition resp. multiplication are always relative to a ring, and a ring element does
 // not generally know which ring it belongs to (if you want to store ring elements together with
 // a reference to the ring, see `RingElementWrapper`)
-println!("Solution is [{}, {}]", F25.format(result.at(0, 0)), F25.format(result.at(1, 0)));
+println!("Solution is [{}, {}]", F25.formatted_el(result.at(0, 0)), F25.formatted_el(result.at(1, 0)));
 assert_el_eq!(&F25, F25.zero(), F25.add_ref(result.at(0, 0), result.at(1, 0)));
 ```
 
@@ -135,7 +135,7 @@ use feanor_math::rings::poly::*;
 
 // first, we create multiple rings: the prime field F7, the bivariate polynomial ring F7[X, Y] and the univariate 
 //                                  polynomial ring F7[T]
-let F7 = Zn::new(7).as_field().ok().unwrap();
+let F7 = Zn64B::new(7).as_field().ok().unwrap();
 let F7XY = MultivariatePolyRingImpl::new(&F7, 2);
 let F7T = DensePolyRing::new(&F7, "T");
 
@@ -144,12 +144,12 @@ let F7T = DensePolyRing::new(&F7, "T");
 let [f1, f2] = F7XY.with_wrapped_indeterminates(|[X, Y]| [X * X * Y - 1, X * Y - 2]);
 
 // now compute a groebner basis
-let groebner_basis_degrevlex = buchberger_simple(&F7XY, vec![F7XY.clone_el(&f1), F7XY.clone_el(&f2)], DegRevLex);
+let groebner_basis_degrevlex = buchberger(&F7XY, vec![F7XY.clone_el(&f1), F7XY.clone_el(&f2)], DegRevLex);
 // if the groebner basis contains a unit, the system is unsolvable
 assert!(groebner_basis_degrevlex.iter().all(|f| F7XY.appearing_indeterminates(f).len() > 0), "system has no solution");
 // now compute a lex-groebner basis; note that it still makes sense to do this on top of the degrevlex groebner
 // basis, as it will drastically speed up the computation
-let mut groebner_basis_lex = buchberger_simple(&F7XY, groebner_basis_degrevlex, Lex);
+let mut groebner_basis_lex = buchberger(&F7XY, groebner_basis_degrevlex, Lex);
 
 // sort descending by leading terms, which means the system will have the shape [f1(X, Y), ..., fr(X, Y), g(Y)]
 groebner_basis_lex.sort_unstable_by(|f, g| Lex.compare(&F7XY, F7XY.LT(f, Lex).unwrap().1, F7XY.LT(g, Lex).unwrap().1).reverse());
@@ -194,7 +194,7 @@ fn fermat_is_prime(n: i64) -> bool {
     // be used in practice. This is just a proof of concept.
 
     let ZZ = StaticRing::<i64>::RING;
-    let Zn = Zn::new(ZZ, n); // the ring Z/nZ
+    let Zn = ZnGB::new(ZZ, n); // the ring Z/nZ
 
     // check for 6 random a whether a^n == a mod n
     let mut rng = oorandom::Rand64::new(1);
@@ -235,7 +235,7 @@ fn fermat_is_prime<R>(ZZ: R, n: El<R>) -> bool
     // be used in practice. This is just a proof of concept.
 
     // ZZ is not guaranteed to be Copy anymore, so use reference instead
-    let Zn = Zn::new(&ZZ, ZZ.clone_el(&n)); // the ring Z/nZ
+    let Zn = ZnGB::new(&ZZ, ZZ.clone_el(&n)); // the ring Z/nZ
 
     // check for 6 random a whether a^n == a mod n
     let mut rng = oorandom::Rand64::new(1);
@@ -268,7 +268,7 @@ use feanor_math::integer::*;
 use feanor_math::assert_el_eq;
 use feanor_math::ring::*;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 struct F2Base;
 
 // this is a minimal implementation of `RingBase`. Note that `RingBase` contains many more
@@ -313,7 +313,7 @@ impl RingBase for F2Base {
     fn is_noetherian(&self) -> bool { true }
     fn is_approximate(&self) -> bool { false }
 
-    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
+    fn fmt_el_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
         write!(out, "{}", *value)
     }
 }
@@ -337,11 +337,12 @@ For example, a simple polynomial ring implementation could look like this.
 ```rust
 use feanor_math::assert_el_eq;
 use feanor_math::ring::*;
-use feanor_math::rings::zn::zn_64::Zn;
+use feanor_math::rings::zn::zn_64::*;
 use feanor_math::integer::*;
 use feanor_math::homomorphism::*;
 use feanor_math::rings::zn::*;
 use std::cmp::{min, max};
+use std::fmt::Debug;
 
 pub struct MyPolyRingBase<R: RingStore> {
     base_ring: R
@@ -357,6 +358,13 @@ impl<R: RingStore> PartialEq for MyPolyRingBase<R> {
 
     fn eq(&self, other: &Self) -> bool {
         self.base_ring.get_ring() == other.base_ring.get_ring()
+    }
+}
+
+impl<R: RingStore> Debug for MyPolyRingBase<R> {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}[X]", self.base_ring.get_ring())
     }
 }
 
@@ -429,13 +437,13 @@ impl<R: RingStore> RingBase for MyPolyRingBase<R> {
         self.base_ring.get_ring().is_approximate()
     }
 
-    fn dbg_within(&self, val: &Self::Element, f: &mut std::fmt::Formatter, env: EnvBindingStrength) -> Result<(), std::fmt::Error> {
+    fn fmt_el_within(&self, val: &Self::Element, f: &mut std::fmt::Formatter, env: EnvBindingStrength) -> Result<(), std::fmt::Error> {
         // this is just for demonstration purposes - note that this prints zero coefficients, and
         // does not print parenthesis even when `env > EnvBindingStrength::Sum`
         for i in 0..(val.len() - 1) {
-            write!(f, "{} * X^{} + ", self.base_ring.format(&val[i]), i)?;
+            write!(f, "{} * X^{} + ", self.base_ring.formatted_el(&val[i]), i)?;
         }
-        write!(f, "{} * X^{}", self.base_ring.format(val.last().unwrap()), val.len() - 1)
+        write!(f, "{} * X^{}", self.base_ring.formatted_el(val.last().unwrap()), val.len() - 1)
     }
 
     fn characteristic<I>(&self, ZZ: I) -> Option<El<I>>
@@ -448,7 +456,7 @@ impl<R: RingStore> RingBase for MyPolyRingBase<R> {
 // in a real implementation, we definitely should implement also `feanor_math::rings::poly::PolyRing`, and
 // possibly other traits (`CanHomFrom<other polynomial rings>`, `RingExtension`, `DivisibilityRing`, `EuclideanRing`)
 
-let base = Zn::new(17);
+let base = Zn64B::new(17);
 // we do not use the `RingBase`-implementor directly, but wrap it in a `RingStore`;
 // while it is possible to use "raw" `RingBase`s, it is usually recommended to use them
 // through `RingStore`s instead, since `RingStore` provides a slightly higher-level interface

@@ -40,7 +40,7 @@ pub trait PrincipalIdealRing: DivisibilityRing {
     /// # use feanor_math::pid::*;
     /// # use feanor_math::homomorphism::*;
     /// # use feanor_math::rings::zn::zn_64::*;
-    /// let Z6 = Zn::new(6);
+    /// let Z6 = Zn64B::new(6);
     /// assert_el_eq!(Z6, Z6.int_hom().map(3), Z6.annihilator(&Z6.int_hom().map(2)));
     /// ```
     /// 
@@ -88,13 +88,23 @@ pub trait PrincipalIdealRing: DivisibilityRing {
 
     ///
     /// Computes a generator `g` of the ideal `(lhs, rhs) = (g)`, also known as greatest
-    /// common divisor.
+    /// common divisor of `lhs` and `rhs`.
     /// 
     /// If you require also a Bezout identiy, i.e. `g = s * lhs + t * rhs`, consider
     /// using [`PrincipalIdealRing::extended_ideal_gen()`].
     /// 
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         self.extended_ideal_gen(lhs, rhs).2
+    }
+
+    ///
+    /// Returns a generator `g` of the ideal `(lhs) n (rhs) = (g)`, also known as least
+    /// common multiple of `lhs` and `rhs`.
+    /// 
+    fn ideal_intersect(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element
+        where Self: Domain
+    {
+        self.checked_div(&self.mul_ref(lhs, rhs), &self.ideal_gen(lhs, rhs)).unwrap()
     }
 
     ///
@@ -109,15 +119,22 @@ pub trait PrincipalIdealRing: DivisibilityRing {
     }
 
     ///
-    /// Computes a generator of the ideal `(lhs) ∩ (rhs)`, also known as least common
-    /// multiple.
+    /// Returns the ring element `x` that is `= a mod p` and `= b mod q`, assuming
+    /// that `p` and `q` are coprime.
     /// 
-    /// In other words, computes a ring element `g` such that `lhs, rhs | g` and for every
-    /// `g'` with this property, have `g | g'`. Note that such an `g` is only unique up to
-    /// multiplication by units.
+    /// Panics if `p, q` are not coprime.
     /// 
-    fn lcm(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        self.checked_left_div(&self.mul_ref(lhs, rhs), &self.ideal_gen(lhs, rhs)).unwrap()
+    fn inv_crt(&self, [a, b]: [&Self::Element; 2], [p, q]: [&Self::Element; 2]) -> Self::Element {
+        let (s, t, d) = self.extended_ideal_gen(p, q);
+        assert!(self.is_unit(&d));
+        self.checked_div(
+            &self.fma(
+                b, 
+                &self.mul_ref_fst(p, s),
+                self.mul_ref_fst(a, self.mul_ref_fst(q, t))
+            ),
+            &d
+        ).unwrap()
     }
 }
 
@@ -131,14 +148,32 @@ pub trait PrincipalIdealRingStore: RingStore
     delegate!{ PrincipalIdealRing, fn checked_div_min(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> }
     delegate!{ PrincipalIdealRing, fn extended_ideal_gen(&self, lhs: &El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>, El<Self>) }
     delegate!{ PrincipalIdealRing, fn ideal_gen(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
+    delegate!{ PrincipalIdealRing, fn inv_crt(&self, congruence: [&El<Self>; 2], modulus: [&El<Self>; 2]) -> El<Self> }
     delegate!{ PrincipalIdealRing, fn annihilator(&self, val: &El<Self>) -> El<Self> }
-    delegate!{ PrincipalIdealRing, fn lcm(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
+
+    ///
+    /// See [`PrincipalIdealRing::ideal_intersect()`].
+    /// 
+    fn ideal_intersect(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self>
+        where Self::Type: Domain
+    {
+        self.get_ring().ideal_intersect(lhs, rhs)
+    }
 
     ///
     /// Alias for [`PrincipalIdealRingStore::ideal_gen()`].
     /// 
     fn gcd(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> {
         self.ideal_gen(lhs, rhs)
+    }
+
+    ///
+    /// Alias for [`PrincipalIdealRingStore::ideal_intersect()`].
+    /// 
+    fn lcm(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self>
+        where Self::Type: Domain
+    {
+        self.ideal_intersect(lhs, rhs)
     }
 }
 
@@ -295,4 +330,18 @@ pub mod generic_tests {
             assert!(ring.checked_div(&expected, &ann_p).is_some());
         }
     }
+}
+
+#[cfg(test)]
+use crate::primitive_int::StaticRing;
+
+#[test]
+fn test_inv_crt() {
+    let ring = StaticRing::<i64>::RING;
+    assert_eq!(4, (ring.inv_crt([&4, &3], [&7, &9]) % 7 + 7) % 7);
+    assert_eq!(3, (ring.inv_crt([&4, &3], [&7, &9]) % 9 + 9) % 9);
+    assert_eq!(2, (ring.inv_crt([&-2, &3], [&4, &5]) % 4 + 4) % 4);
+    assert_eq!(3, (ring.inv_crt([&-2, &3], [&4, &5]) % 5 + 5) % 5);
+    assert_eq!(1, (ring.inv_crt([&-3, &10], [&4, &25]) % 4 + 4) % 4);
+    assert_eq!(10, (ring.inv_crt([&-3, &10], [&4, &25]) % 25 + 25) % 25);
 }

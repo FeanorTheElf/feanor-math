@@ -60,7 +60,7 @@ pub trait MultivariatePolyRing: RingExtension {
     /// let poly_ring = MultivariatePolyRingImpl::new(StaticRing::<i64>::RING, 3);
     /// let x_as_monomial = poly_ring.create_monomial([1, 0, 0]);
     /// let x_as_poly = poly_ring.create_term(1, x_as_monomial);
-    /// assert_eq!("X0", format!("{}", poly_ring.format(&x_as_poly)));
+    /// assert_eq!("X0", format!("{}", poly_ring.formatted_el(&x_as_poly)));
     /// ```
     /// 
     fn create_monomial<I>(&self, exponents: I) -> Self::Monomial
@@ -431,7 +431,7 @@ pub trait MultivariatePolyRingStore: RingStore
     /// use feanor_math::rings::multivariate::*;
     /// use feanor_math::rings::zn::zn_64::*;
     /// use feanor_math::rings::multivariate::multivariate_impl::*;
-    /// let base_ring = Zn::new(7);
+    /// let base_ring = Zn64B::new(7);
     /// let poly_ring = MultivariatePolyRingImpl::new(base_ring, 3);
     /// let f_version1 = poly_ring.from_terms([(base_ring.int_hom().map(3), poly_ring.create_monomial([0, 0, 0])), (base_ring.int_hom().map(2), poly_ring.create_monomial([0, 1, 1])), (base_ring.one(), poly_ring.create_monomial([2, 0, 0]))].into_iter());
     /// let f_version2 = poly_ring.with_wrapped_indeterminates_dyn(|[x, y, z]| [3 + 2 * y * z + x.pow_ref(2)]).into_iter().next().unwrap();
@@ -461,7 +461,7 @@ pub trait MultivariatePolyRingStore: RingStore
     /// use feanor_math::rings::multivariate::*;
     /// use feanor_math::rings::zn::zn_64::*;
     /// use feanor_math::rings::multivariate::multivariate_impl::*;
-    /// let base_ring = Zn::new(7);
+    /// let base_ring = Zn64B::new(7);
     /// let poly_ring = MultivariatePolyRingImpl::new(base_ring, 3);
     /// let f_version1 = poly_ring.from_terms([(base_ring.int_hom().map(3), poly_ring.create_monomial([0, 0, 0])), (base_ring.int_hom().map(2), poly_ring.create_monomial([0, 1, 1])), (base_ring.one(), poly_ring.create_monomial([2, 0, 0]))].into_iter());
     /// let f_version2 = poly_ring.with_wrapped_indeterminates_dyn(|[x, y, z]| [3 + 2 * y * z + x.pow_ref(2)]).into_iter().next().unwrap();

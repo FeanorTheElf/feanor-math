@@ -47,7 +47,7 @@ use crate::serialization::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_big::*;
 /// # use feanor_math::primitive_int::*;
-/// let R = Zn::new(StaticRing::<i64>::RING, 257);
+/// let R = ZnGB::new(StaticRing::<i64>::RING, 257);
 /// let a = R.int_hom().map(16);
 /// assert!(R.eq_el(&R.int_hom().map(-1), &R.mul_ref(&a, &a)));
 /// assert!(R.is_one(&R.pow(a, 4)));
@@ -58,7 +58,7 @@ use crate::serialization::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_big::*;
 /// # use feanor_math::primitive_int::*;
-/// let R = Zn::new(StaticRing::<i32>::RING, 2053);
+/// let R = ZnGB::new(StaticRing::<i32>::RING, 2053);
 /// ```
 ///
 /// # Canonical mappings
@@ -70,7 +70,7 @@ use crate::serialization::*;
 /// # use feanor_math::rings::zn::zn_big::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::primitive_int::*;
-/// let R = Zn::new(StaticRing::<i16>::RING, 7);
+/// let R = ZnGB::new(StaticRing::<i16>::RING, 7);
 /// let S = BigIntRing::RING;
 /// assert!(R.eq_el(&R.int_hom().map(120493), &R.coerce(&S, S.int_hom().map(120493))));
 /// ```

@@ -48,7 +48,7 @@ pub fn no_error<T>(error: !) -> T {
 /// # use feanor_math::algorithms::ec_factor::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::computation::*;
-/// let ring = zn_64::Zn::new(8591966237);
+/// let ring = zn_64::Zn64B::new(8591966237);
 /// // factors 8591966237 while printing progress
 /// let factor = lenstra_ec_factor(ring, LOG_PROGRESS).unwrap_or_else(no_error);
 /// assert!(8591966237 % factor == 0);
@@ -62,7 +62,7 @@ pub fn no_error<T>(error: !) -> T {
 /// # use feanor_math::algorithms::ec_factor::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::computation::*;
-/// # let ring = zn_64::Zn::new(8591966237);
+/// # let ring = zn_64::Zn64B::new(8591966237);
 /// // factors 8591966237 using multiple threads
 /// let factor = lenstra_ec_factor(ring, RunMultithreadedLogProgress).unwrap_or_else(no_error);
 /// assert!(8591966237 % factor == 0);

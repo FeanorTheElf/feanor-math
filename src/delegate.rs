@@ -42,7 +42,7 @@ use crate::specialization::*;
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
 /// 
-/// #[derive(PartialEq, Clone)]
+/// #[derive(PartialEq, Clone, Debug)]
 /// struct MyI32Ring;
 /// struct MyI32RingEl(i32);
 /// 
@@ -87,6 +87,7 @@ use crate::specialization::*;
 /// An example when special ring traits are automatically implemented is 
 /// given by the following.
 /// ```rust
+/// # use std::fmt::Debug;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::delegate::*;
@@ -99,6 +100,14 @@ use crate::specialization::*;
 /// {
 ///     fn eq(&self, other: &Self) -> bool {
 ///         self.0.get_ring() == other.0.get_ring()
+///     }
+/// }
+/// 
+/// impl<R> Debug for BoringRingWrapper<R>
+///     where R: RingStore
+/// {
+///     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+///         write!(f, "BoringRingWrapper({:?})", self.get_delegate())
 ///     }
 /// }
 /// 
@@ -120,6 +129,7 @@ use crate::specialization::*;
 /// ```
 /// [`DivisibilityRing`] is automatically implemented (but can be specialized):
 /// ```rust
+/// # use std::fmt::Debug;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::divisibility::*;
@@ -133,6 +143,14 @@ use crate::specialization::*;
 /// # {
 /// #     fn eq(&self, other: &Self) -> bool {
 /// #         self.0.get_ring() == other.0.get_ring()
+/// #     }
+/// # }
+/// # 
+/// # impl<R> Debug for BoringRingWrapper<R>
+/// #     where R: RingStore
+/// # {
+/// #     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+/// #         write!(f, "BoringRingWrapper({:?})", self.get_delegate())
 /// #     }
 /// # }
 /// # 
@@ -161,6 +179,7 @@ use crate::specialization::*;
 /// ```
 /// [`FiniteRing`] for example is not automatically implemented:
 /// ```rust,compile_fail
+/// # use std::fmt::Debug;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::finite::*;
@@ -173,6 +192,14 @@ use crate::specialization::*;
 /// # {
 /// #     fn eq(&self, other: &Self) -> bool {
 /// #         self.0.get_ring() == other.0.get_ring()
+/// #     }
+/// # }
+/// #
+/// # impl<R> Debug for BoringRingWrapper<R>
+/// #     where R: RingStore
+/// # {
+/// #     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+/// #         write!(f, "BoringRingWrapper({:?})", self.get_delegate())
 /// #     }
 /// # }
 /// #
@@ -203,6 +230,7 @@ use crate::specialization::*;
 /// ```
 /// But we can add a delegate-implementation of [`FiniteRing`] by adding the marker trait [`DelegateRingImplFiniteRing`]:
 /// ```rust
+/// # use std::fmt::Debug;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::finite::*;
@@ -215,6 +243,14 @@ use crate::specialization::*;
 /// # {
 /// #     fn eq(&self, other: &Self) -> bool {
 /// #         self.0.get_ring() == other.0.get_ring()
+/// #     }
+/// # }
+/// # 
+/// # impl<R> Debug for BoringRingWrapper<R>
+/// #     where R: RingStore
+/// # {
+/// #     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+/// #         write!(f, "BoringRingWrapper({:?})", self.get_delegate())
 /// #     }
 /// # }
 /// # 

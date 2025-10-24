@@ -1,5 +1,4 @@
 use crate::algorithms::convolution::KaratsubaHint;
-use crate::algorithms::eea::{signed_gcd, signed_lcm};
 use crate::serialization::*;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
@@ -171,7 +170,7 @@ impl<I> RationalFieldBase<I>
     /// ```
     /// 
     pub fn num<'a>(&'a self, el: &'a <Self as RingBase>::Element) -> &'a El<I> {
-        debug_assert!(self.base_ring().is_one(&signed_gcd(self.base_ring().clone_el(&el.1), self.base_ring().clone_el(&el.0), self.base_ring())));
+        debug_assert!(self.base_ring().is_unit(&self.base_ring().ideal_gen(&el.0, &el.1)));
         &el.0
     }
 
@@ -192,7 +191,7 @@ impl<I> RationalFieldBase<I>
     /// ```
     /// 
     pub fn den<'a>(&'a self, el: &'a <Self as RingBase>::Element) -> &'a El<I> {
-        debug_assert!(self.base_ring().is_one(&signed_gcd(self.base_ring().clone_el(&el.1), self.base_ring().clone_el(&el.0), self.base_ring())));
+        debug_assert!(self.base_ring().is_unit(&self.base_ring().ideal_gen(&el.0, &el.1)));
         &el.1
     }
 
@@ -259,8 +258,10 @@ impl<I> RationalFieldBase<I>
         I::Type: IntegerRing
 {
     fn reduce(&self, value: (&mut El<I>, &mut El<I>)) {
-        // take the denominator first, as in this case gcd will have the same sign, and the final denominator will be positive
-        let gcd = signed_gcd(self.integers.clone_el(&*value.1), self.integers.clone_el(&*value.0), &self.integers);
+        let mut gcd = self.integers.ideal_gen(&*value.0, &*value.1);
+        if self.integers.is_neg(&gcd) != self.integers.is_neg(&*value.1) {
+            self.integers.negate_inplace(&mut gcd);
+        }
         *value.0 = self.integers.checked_div(&*value.0, &gcd).unwrap();
         *value.1 = self.integers.checked_div(&*value.1, &gcd).unwrap();
     }
@@ -381,9 +382,10 @@ impl<I: RingStore> HashableElRing for RationalFieldBase<I>
     where I::Type: IntegerRing + HashableElRing
 {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
-        let gcd = signed_gcd(self.integers.clone_el(&el.1), self.integers.clone_el(&el.0), &self.integers);
-        self.integers.get_ring().hash(&self.integers.checked_div(&el.0, &gcd).unwrap(), h);
-        self.integers.get_ring().hash(&self.integers.checked_div(&el.1, &gcd).unwrap(), h);
+        debug_assert!(self.base_ring().is_unit(&self.base_ring().ideal_gen(&el.0, &el.1)));
+        debug_assert!(!self.base_ring().is_neg(&el.1));
+        self.integers.get_ring().hash(&el.0, h);
+        self.integers.get_ring().hash(&el.1, h);
     }
 }
 
@@ -553,7 +555,11 @@ impl<I> DivisibilityRing for RationalFieldBase<I>
     {
         let (num, den) = elements.fold(
             (self.integers.zero(), self.integers.one()), 
-            |x, y| (signed_gcd(x.0, self.base_ring().clone_el(self.num(y)), self.base_ring()), signed_lcm(x.1, self.base_ring().clone_el(self.den(y)), self.base_ring())));
+            |x, y| {
+                let num_gcd = self.base_ring().ideal_gen(&x.0, self.num(y));
+                let den_lcm = self.base_ring().checked_div(&self.base_ring().mul_ref(&x.1, self.den(y)), &self.base_ring().ideal_gen(&x.1, self.den(y))).unwrap();
+                (num_gcd, den_lcm)
+            });
         return Some(RationalFieldEl(num, den));
     }
 
@@ -690,7 +696,7 @@ impl<I> PolyTFracGCDRing for RationalFieldBase<I>
         let QQ = QQX.base_ring();
         let ZZ = QQ.base_ring();
     
-        let den_lcm = QQX.terms(poly).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+        let den_lcm = QQX.terms(poly).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| ZZ.checked_div(&ZZ.mul_ref(&a, b), &ZZ.ideal_gen(&a, b)).unwrap());
         
         let ZZX = DensePolyRing::new(ZZ, "X");
         let f = ZZX.from_terms(QQX.terms(poly).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
@@ -723,8 +729,8 @@ impl<I> PolyTFracGCDRing for RationalFieldBase<I>
         let QQ = QQX.base_ring();
         let ZZ = QQ.base_ring();
     
-        let den_lcm_lhs = QQX.terms(lhs).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
-        let den_lcm_rhs = QQX.terms(rhs).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+        let den_lcm_lhs = QQX.terms(lhs).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| ZZ.checked_div(&ZZ.mul_ref(&a, b), &ZZ.ideal_gen(&a, b)).unwrap());
+        let den_lcm_rhs = QQX.terms(rhs).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| ZZ.checked_div(&ZZ.mul_ref(&a, b), &ZZ.ideal_gen(&a, b)).unwrap());
         
         let ZZX = DensePolyRing::new(ZZ, "X");
         let lhs = ZZX.from_terms(QQX.terms(lhs).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm_lhs, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));

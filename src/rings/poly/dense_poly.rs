@@ -573,6 +573,10 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
     }
 }
 
+pub struct DensePolyRingBaseLocalComputationData<'ring, R>(ToExtRingMap<'ring, R::Type>, Vec<El<<R::Type as InterpolationBaseRing>::ExtendedRing<'ring>>>)
+    where R: RingStore,
+        R::Type: InterpolationBaseRing;
+
 impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> LiftPolyEvalRing for DensePolyRingBase<R, A, C> 
     where R: RingStore,
         R::Type: InterpolationBaseRing
@@ -583,7 +587,7 @@ impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> Li
     type LocalRingBase<'ring> = <R::Type as InterpolationBaseRing>::ExtendedRingBase<'ring>
         where Self: 'ring;
 
-    type LocalComputationData<'ring> = (ToExtRingMap<'ring, R::Type>, Vec<El<<R::Type as InterpolationBaseRing>::ExtendedRing<'ring>>>)
+    type LocalComputationData<'ring> = DensePolyRingBaseLocalComputationData<'ring, R>
         where Self: 'ring;
 
     fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
@@ -596,7 +600,8 @@ impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> Li
 
     fn init_reduce_lift<'ring>(&'ring self, ln_pseudo_norm: f64) -> Self::LocalComputationData<'ring> {
         let required_points = ln_pseudo_norm.ceil() as usize + 1;
-        ToExtRingMap::for_interpolation(self.base_ring().get_ring(), required_points)
+        let (map, points) = ToExtRingMap::for_interpolation(self.base_ring().get_ring(), required_points);
+        DensePolyRingBaseLocalComputationData(map, points)
     }
 
     fn prime_ideal_count<'ring>(&self, data: &Self::LocalComputationData<'ring>) -> usize 

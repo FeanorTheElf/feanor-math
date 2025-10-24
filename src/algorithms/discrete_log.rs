@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 
-use crate::algorithms::eea::{inv_crt, signed_gcd};
 use crate::algorithms::int_bisect::root_floor;
 use crate::algorithms::int_factor::factor;
 use crate::algorithms::linsolve::smith::{determinant_using_pre_smith, pre_smith};
@@ -198,7 +197,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
                 OwnedMatrix::from_fn(relation_lattice.row_count(), relation_lattice.col_count(), |k, l| mod_pne.map(*relation_lattice.at(k, l))).data_mut(), 
                 Global
             );
-            ZZbig.mul_assign(&mut result, signed_gcd(ZZbig.clone_el(Zpne.modulus()), Zpne.smallest_positive_lift(relation_lattice_det), ZZbig));
+            ZZbig.mul_assign(&mut result, ZZbig.ideal_gen(Zpne.modulus(), &Zpne.smallest_positive_lift(relation_lattice_det)));
         }
         return result;
     }
@@ -417,8 +416,11 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
             ).unwrap();
             let padic_dlog = self.padic_dlog(p_idx, e, &group.pow(target, &power))?;
             for j in 0..n {
-                current_dlog[j] = inv_crt(current_dlog[j], padic_dlog[j], &current_order[j], &ZZ.pow(p, e), ZZ);
+                current_dlog[j] = ZZ.inv_crt([&current_dlog[j], &padic_dlog[j]], [&current_order[j], &ZZ.pow(p, e)]);
                 current_order[j] *= ZZ.pow(p, e);
+                if ZZ.is_neg(&current_dlog[j]) {
+                    ZZ.add_assign_ref(&mut current_dlog[j], &current_order[j]);
+                }
             }
         }
         debug_assert!(group.eq_el(
@@ -788,7 +790,7 @@ impl<R> Subgroup<MultGroup<R>>
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::wrapper::*;
 /// # use feanor_math::algorithms::discrete_log::*;
-/// let ring = Zn::new(17);
+/// let ring = Zn64B::new(17);
 /// let group = MultGroup::new(ring);
 /// let x = group.from_ring_el(ring.int_hom().map(9)).unwrap();
 /// assert_eq!(Some(vec![3]), baby_giant_step(&group, group.pow(&x, &int_cast(3, BigIntRing::RING, StaticRing::<i64>::RING)), &[x], &[BigIntRing::RING.power_of_two(4)]));

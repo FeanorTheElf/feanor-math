@@ -311,7 +311,7 @@ pub trait PolyRingStore: RingStore
     /// use feanor_math::homomorphism::*;
     /// use feanor_math::rings::zn::zn_64::*;
     /// use feanor_math::rings::poly::dense_poly::*;
-    /// let base_ring = Zn::new(7);
+    /// let base_ring = Zn64B::new(7);
     /// let poly_ring = DensePolyRing::new(base_ring, "X");
     /// let f_version1 = poly_ring.from_terms([(base_ring.int_hom().map(3), 0), (base_ring.int_hom().map(2), 1), (base_ring.one(), 3)].into_iter());
     /// let f_version2 = poly_ring.with_wrapped_indeterminate_dyn(|x| [3 + 2 * x + x.pow_ref(3)]).into_iter().next().unwrap();
@@ -344,7 +344,7 @@ pub trait PolyRingStore: RingStore
     /// use feanor_math::homomorphism::*;
     /// use feanor_math::rings::zn::zn_64::*;
     /// use feanor_math::rings::poly::dense_poly::*;
-    /// let base_ring = Zn::new(7);
+    /// let base_ring = Zn64B::new(7);
     /// let poly_ring = DensePolyRing::new(base_ring, "X");
     /// let f_version1 = poly_ring.from_terms([(base_ring.int_hom().map(3), 0), (base_ring.int_hom().map(2), 1), (base_ring.one(), 3)].into_iter());
     /// let [f_version2] = poly_ring.with_wrapped_indeterminate(|x| [3 + 2 * x + x.pow_ref(3)]);

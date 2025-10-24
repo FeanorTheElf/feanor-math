@@ -501,8 +501,8 @@ impl<R, S> ZnReductionMap<R, S>
     /// # use feanor_math::homomorphism::*;
     /// # use feanor_math::rings::zn::*;
     /// # use feanor_math::rings::zn::zn_64::*;
-    /// let Z5 = Zn::new(5);
-    /// let Z25 = Zn::new(25);
+    /// let Z5 = Zn64B::new(5);
+    /// let Z25 = Zn64B::new(25);
     /// let f = ZnReductionMap::new(&Z25, &Z5).unwrap();
     /// assert_el_eq!(Z25, Z25.int_hom().map(15), f.mul_quotient_fraction(Z5.int_hom().map(3)));
     /// ```
@@ -522,8 +522,8 @@ impl<R, S> ZnReductionMap<R, S>
     /// # use feanor_math::homomorphism::*;
     /// # use feanor_math::rings::zn::*;
     /// # use feanor_math::rings::zn::zn_64::*;
-    /// let Z5 = Zn::new(5);
-    /// let Z25 = Zn::new(25);
+    /// let Z5 = Zn64B::new(5);
+    /// let Z25 = Zn64B::new(25);
     /// let f = ZnReductionMap::new(&Z25, &Z5).unwrap();
     /// assert_el_eq!(Z25, Z25.int_hom().map(-2), f.smallest_lift(Z5.int_hom().map(3)));
     /// ```

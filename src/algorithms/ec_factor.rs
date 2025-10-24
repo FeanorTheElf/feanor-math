@@ -11,7 +11,6 @@ use crate::rings::finite::*;
 use crate::integer::*;
 use crate::rings::zn::*;
 use crate::pid::PrincipalIdealRingStore;
-use crate::algorithms::eea::signed_gcd;
 use crate::algorithms::sqr_mul;
 use crate::seq::VectorFn;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
@@ -44,7 +43,7 @@ fn point_eq<R>(Zn: &R, P: &Point<R>, Q: &Point<R>) -> bool
         (&P.2, &Q.2)
     };
     if !Zn.is_unit(&factor_quo.1) {
-        let factor_of_n = signed_gcd(Zn.integer_ring().clone_el(Zn.modulus()), Zn.smallest_positive_lift(Zn.clone_el(&factor_quo.1)), Zn.integer_ring());
+        let factor_of_n = Zn.integer_ring().ideal_gen(Zn.modulus(), &Zn.smallest_positive_lift(Zn.clone_el(&factor_quo.1)));
         let Zn_new = zn_big::ZnGB::new(BigIntRing::RING, int_cast(Zn.integer_ring().checked_div(Zn.modulus(), &factor_of_n).unwrap(), BigIntRing::RING, Zn.integer_ring()));
         let red_map = ZnReductionMap::new(Zn, &Zn_new).unwrap();
         if (Zn_new.is_zero(&red_map.map_ref(&Q.0)) && Zn_new.is_zero(&red_map.map_ref(&Q.1)) && Zn_new.is_zero(&red_map.map_ref(&Q.2))) || (Zn_new.is_zero(&red_map.map_ref(&P.0)) && Zn_new.is_zero(&red_map.map_ref(&P.1)) && Zn_new.is_zero(&red_map.map_ref(&P.2))) {

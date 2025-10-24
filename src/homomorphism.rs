@@ -308,10 +308,10 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>: Send + Sync
 /// let ZZ = StaticRing::<i128>::RING;
 /// let ZZ_big = BigIntRing::RING;
 /// 
-/// let zn_big_i128 = zn_big::Zn::new(ZZ, 17 * 257);
-/// let zn_big_big = zn_big::Zn::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
-/// let Zn_std = zn_64::Zn::new(17 * 257);
-/// let Zn_rns = zn_rns::Zn::create_from_primes(vec![17, 257], ZZ_big);
+/// let zn_big_i128 = zn_big::ZnGB::new(ZZ, 17 * 257);
+/// let zn_big_big = zn_big::ZnGB::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
+/// let Zn_std = zn_64::Zn64B::new(17 * 257);
+/// let Zn_rns = zn_rns::ZnRNS::create_from_primes(vec![17, 257], ZZ_big);
 /// 
 /// assert!(zn_big_i128.can_iso(&zn_big_i128).is_some());
 /// assert!(zn_big_i128.can_iso(&zn_big_big).is_some());
@@ -335,8 +335,8 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>: Send + Sync
 /// # use feanor_math::integer::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::assert_el_eq;
-/// let Z9 = zn_64::Zn::new(9);
-/// let Z3 = zn_64::Zn::new(3);
+/// let Z9 = zn_64::Zn64B::new(9);
+/// let Z3 = zn_64::Zn64B::new(3);
 /// assert!(Z3.can_hom(&Z9).is_none());
 /// let mod_3 = ZnReductionMap::new(&Z9, &Z3).unwrap();
 /// assert_el_eq!(Z3, Z3.one(), mod_3.map(Z9.int_hom().map(4)));
@@ -353,10 +353,10 @@ pub trait Homomorphism<Domain: ?Sized, Codomain: ?Sized>: Send + Sync
 /// let ZZ = StaticRing::<i128>::RING;
 /// let ZZ_big = BigIntRing::RING;
 /// 
-/// let zn_big_i128 = zn_big::Zn::new(ZZ, 17 * 257);
-/// let zn_big_big = zn_big::Zn::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
-/// let Zn_std = zn_64::Zn::new(17 * 257);
-/// let Zn_rns = zn_rns::Zn::create_from_primes(vec![17, 257], ZZ_big);
+/// let zn_big_i128 = zn_big::ZnGB::new(ZZ, 17 * 257);
+/// let zn_big_big = zn_big::ZnGB::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
+/// let Zn_std = zn_64::Zn64B::new(17 * 257);
+/// let Zn_rns = zn_rns::ZnRNS::create_from_primes(vec![17, 257], ZZ_big);
 /// 
 /// assert!(zn_big_i128.can_hom(&ZZ).is_some());
 /// assert!(zn_big_i128.can_hom(&ZZ_big).is_some());
@@ -1272,6 +1272,7 @@ impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
 /// Note that this does not support generic types, as for those, it is
 /// usually better to implement
 /// ```rust
+/// # use std::fmt::Debug;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::delegate::*;
@@ -1289,6 +1290,11 @@ impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
 /// # impl<R: RingStore> PartialEq for RingConstructor<R> {
 /// #     fn eq(&self, other: &Self) -> bool {
 /// #         self.0.get_ring() == other.0.get_ring()
+/// #     }
+/// # }
+/// # impl<R: RingStore> Debug for RingConstructor<R> {
+/// #     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+/// #         write!(f, "RingConstructor({:?})", self.get_delegate())
 /// #     }
 /// # }
 /// impl<R, S> CanHomFrom<RingConstructor<S>> for RingConstructor<R>
@@ -1319,7 +1325,7 @@ impl<R, S, T, F, G> Homomorphism<R, T> for ComposedHom<R, S, T, F, G>
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
 /// 
-/// #[derive(PartialEq, Clone)]
+/// #[derive(PartialEq, Clone, Debug)]
 /// struct MyI32Ring;
 /// 
 /// impl DelegateRing for MyI32Ring {

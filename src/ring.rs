@@ -19,19 +19,13 @@ use serde::{Serialize, Deserialize};
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
-/// struct CustomDisplay<'a>(&'a DensePolyRing<StaticRing<i64>>, &'a El<DensePolyRing<StaticRing<i64>>>, EnvBindingStrength);
-/// impl<'a> std::fmt::Display for CustomDisplay<'a> {
-///     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-///         self.0.get_ring().dbg_within(self.1, formatter, self.2)
-///     }
-/// }
 /// let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
 /// let f = poly_ring.add(poly_ring.one(), poly_ring.indeterminate());
-/// assert_eq!("X + 1", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Weakest)));
-/// assert_eq!("X + 1", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Sum)));
-/// assert_eq!("(X + 1)", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Product)));
-/// assert_eq!("(X + 1)", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Power)));
-/// assert_eq!("(X + 1)", format!("{}", CustomDisplay(&poly_ring, &f, EnvBindingStrength::Strongest)));
+/// assert_eq!("X + 1", format!("{}", poly_ring.formatted_el_within(&f, EnvBindingStrength::Weakest)));
+/// assert_eq!("X + 1", format!("{}", poly_ring.formatted_el_within(&f, EnvBindingStrength::Sum)));
+/// assert_eq!("(X + 1)", format!("{}", poly_ring.formatted_el_within(&f, EnvBindingStrength::Product)));
+/// assert_eq!("(X + 1)", format!("{}", poly_ring.formatted_el_within(&f, EnvBindingStrength::Power)));
+/// assert_eq!("(X + 1)", format!("{}", poly_ring.formatted_el_within(&f, EnvBindingStrength::Strongest)));
 /// ```
 /// 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, PartialOrd, Ord)]
@@ -112,8 +106,8 @@ pub enum EnvBindingStrength {
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::zn::*;
-/// let Z7 = zn_big::Zn::new(StaticRing::<i64>::RING, 7);
-/// let Z11 = zn_big::Zn::new(StaticRing::<i64>::RING, 11);
+/// let Z7 = zn_big::ZnGB::new(StaticRing::<i64>::RING, 7);
+/// let Z11 = zn_big::ZnGB::new(StaticRing::<i64>::RING, 11);
 /// assert!(Z11.get_ring() != Z7.get_ring());
 /// let neg_one = Z7.int_hom().map(-1);
 /// assert!(!Z11.is_neg_one(&neg_one));
@@ -129,7 +123,7 @@ pub enum EnvBindingStrength {
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::zn::*;
-/// let Z11_fst = zn_big::Zn::new(StaticRing::<i64>::RING, 7);
+/// let Z11_fst = zn_big::ZnGB::new(StaticRing::<i64>::RING, 7);
 /// let Z11_snd = Z11_fst.clone();
 /// assert!(Z11_fst.get_ring() == Z11_snd.get_ring());
 /// let neg_one = Z11_fst.int_hom().map(-1);
@@ -145,7 +139,7 @@ pub enum EnvBindingStrength {
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::integer::*;
 /// 
-/// #[derive(PartialEq)]
+/// #[derive(PartialEq, Debug)]
 /// struct MyRingBase;
 /// 
 /// impl RingBase for MyRingBase {
@@ -168,7 +162,7 @@ pub enum EnvBindingStrength {
 ///     fn is_noetherian(&self) -> bool { true }
 ///     fn is_approximate(&self) -> bool { false }
 /// 
-///     fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
+///     fn fmt_el_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
 ///         write!(out, "{}", **value)
 ///     }
 /// 
@@ -485,10 +479,11 @@ pub trait RingBase: PartialEq + Debug + Send + Sync {
     /// # use feanor_math::ring::*;
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::rings::zn::*;
+    /// # use feanor_math::rings::zn::zn_64::*;
     /// let ZZ = StaticRing::<i16>::RING;
     /// assert_eq!(Some(0), StaticRing::<i64>::RING.characteristic(&ZZ));
-    /// assert_eq!(None, zn_64::Zn::new(i16::MAX as u64 + 1).characteristic(&ZZ));
-    /// assert_eq!(Some(i16::MAX), zn_64::Zn::new(i16::MAX as u64).characteristic(&ZZ));
+    /// assert_eq!(None, Zn64B::new(i16::MAX as u64 + 1).characteristic(&ZZ));
+    /// assert_eq!(Some(i16::MAX), Zn64B::new(i16::MAX as u64).characteristic(&ZZ));
     /// ```
     /// 
     fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
@@ -594,7 +589,7 @@ macro_rules! assert_el_eq {
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
-/// # use std::rc::Rc;
+/// # use std::sync::Arc;
 /// fn add_in_ring<R: RingStore>(ring: R, a: El<R>, b: El<R>) -> El<R> {
 ///     ring.add(a, b)
 /// }
@@ -602,7 +597,7 @@ macro_rules! assert_el_eq {
 /// let ring: RingValue<StaticRingBase<i64>> = StaticRing::<i64>::RING;
 /// assert_el_eq!(ring, 7, add_in_ring(ring, 3, 4));
 /// assert_el_eq!(ring, 7, add_in_ring(&ring, 3, 4));
-/// assert_el_eq!(ring, 7, add_in_ring(Rc::new(ring), 3, 4));
+/// assert_el_eq!(ring, 7, add_in_ring(Arc::new(ring), 3, 4));
 /// ```
 /// 
 /// # What does this do?
@@ -863,7 +858,7 @@ pub trait RingStore: Sized + Send + Sync {
     /// # use feanor_math::integer::*;
     /// let ring = BigIntRing::RING;
     /// let element = ring.int_hom().map(3);
-    /// assert_eq!("3", format!("{}", ring.format(&element)));
+    /// assert_eq!("3", format!("{}", ring.formatted_el(&element)));
     /// ```
     /// 
     fn formatted_el<'a>(&'a self, value: &'a El<Self>) -> RingElementDisplayWrapper<'a, Self::Type> {
@@ -887,10 +882,10 @@ pub trait RingStore: Sized + Send + Sync {
     /// # use feanor_math::rings::poly::*;
     /// let ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
     /// let [f, g] = ring.with_wrapped_indeterminate(|X| [X.clone(), X + 1]);
-    /// assert_eq!("X", format!("{}", ring.format_within(&f, EnvBindingStrength::Sum)));
-    /// assert_eq!("X", format!("{}", ring.format_within(&f, EnvBindingStrength::Product)));
-    /// assert_eq!("X + 1", format!("{}", ring.format_within(&g, EnvBindingStrength::Sum)));
-    /// assert_eq!("(X + 1)", format!("{}", ring.format_within(&g, EnvBindingStrength::Product)));
+    /// assert_eq!("X", format!("{}", ring.formatted_el_within(&f, EnvBindingStrength::Sum)));
+    /// assert_eq!("X", format!("{}", ring.formatted_el_within(&f, EnvBindingStrength::Product)));
+    /// assert_eq!("X + 1", format!("{}", ring.formatted_el_within(&g, EnvBindingStrength::Sum)));
+    /// assert_eq!("(X + 1)", format!("{}", ring.formatted_el_within(&g, EnvBindingStrength::Product)));
     /// ```
     /// 
     fn formatted_el_within<'a>(&'a self, value: &'a El<Self>, within: EnvBindingStrength) -> RingElementDisplayWrapper<'a, Self::Type> {

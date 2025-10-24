@@ -9,7 +9,6 @@ use crate::delegate::{UnwrapHom, WrapHom};
 use crate::reduce_lift::lift_poly_eval::{LiftPolyEvalRing, LiftPolyEvalRingReductionMap};
 use crate::divisibility::{DivisibilityRingStore, Domain};
 use crate::pid::*;
-use crate::algorithms::eea::signed_lcm;
 use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::fraction::FractionFieldStore;
 use crate::rings::poly::*;
@@ -74,7 +73,6 @@ pub fn resultant_finite_field<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::
 /// Trait for rings that support computing resultants of polynomials
 /// over the ring.
 /// 
-#[stability::unstable(feature = "enable")]
 pub trait ComputeResultantRing: RingBase {
 
     ///
@@ -221,11 +219,11 @@ impl<I> ComputeResultantRing for RationalFieldBase<I>
             return ring.base_ring().zero();
         }
         let QQ = ring.base_ring();
-        let ZZ = QQ.base_ring();
+        let ZZ: &I = QQ.base_ring();
         let f_deg = ring.degree(&f).unwrap();
         let g_deg = ring.degree(&g).unwrap();
-        let f_den_lcm = ring.terms(&f).map(|(c, _)| ZZ.clone_el(QQ.get_ring().den(c))).fold(ZZ.one(), |a, b| signed_lcm(a, b, ZZ));
-        let g_den_lcm = ring.terms(&g).map(|(c, _)| ZZ.clone_el(QQ.get_ring().den(c))).fold(ZZ.one(), |a, b| signed_lcm(a, b, ZZ));
+        let f_den_lcm = ring.terms(&f).map(|(c, _)| ZZ.clone_el(QQ.get_ring().den(c))).fold(ZZ.one(), |a, b| ZZ.ideal_intersect(&a, &b));
+        let g_den_lcm = ring.terms(&g).map(|(c, _)| ZZ.clone_el(QQ.get_ring().den(c))).fold(ZZ.one(), |a, b| ZZ.ideal_intersect(&a, &b));
         let ZZX = DensePolyRing::new(ZZ, "X");
         let f_int = ZZX.from_terms(ring.terms(&f).map(|(c, i)| { let (a, b) = (QQ.get_ring().num(c), QQ.get_ring().den(c)); (ZZ.checked_div(&ZZ.mul_ref(&f_den_lcm, a), b).unwrap(), i) }));
         let g_int = ZZX.from_terms(ring.terms(&g).map(|(c, i)| { let (a, b) = (QQ.get_ring().num(c), QQ.get_ring().den(c)); (ZZ.checked_div(&ZZ.mul_ref(&f_den_lcm, a), b).unwrap(), i) }));

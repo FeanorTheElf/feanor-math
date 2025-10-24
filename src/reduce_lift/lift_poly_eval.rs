@@ -15,7 +15,6 @@ use crate::specialization::FiniteRingSpecializable;
 /// these already have infinitely many points whose pairwise differences are non-zero-divisors. 
 /// Such an implementation can be added to new types using the macro [`impl_interpolation_base_ring_char_zero!`].
 /// 
-#[stability::unstable(feature = "enable")]
 pub trait InterpolationBaseRing: DivisibilityRing {
 
     ///
@@ -329,9 +328,6 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
 /// run_type_recursion(&RecursiveCase(BaseCase));
 /// ```
 /// 
-/// Another advantage is that every function 
-/// 
-#[stability::unstable(feature = "enable")]
 pub trait LiftPolyEvalRing: RingBase + FiniteRingSpecializable {
     
     ///
@@ -519,11 +515,12 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for LiftPolyEvalR
 /// # use std::fmt::Debug;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::delegate::*;
-/// # use feanor_math::reduce_lift::poly_eval::*;
+/// # use feanor_math::reduce_lift::lift_poly_eval::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::algorithms::resultant::*;
 /// # use feanor_math::divisibility::*;
-/// # use feanor_math::homomorphism::Homomorphism;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::computation::ComputationController;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::rings::poly::dense_poly::DensePolyRing;
 /// # use feanor_math::pid::*;
@@ -544,22 +541,34 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for LiftPolyEvalR
 /// impl<R: RingBase> DelegateRingImplEuclideanRing for MyRingWrapper<R> {}
 /// impl<R: RingBase> DelegateRingImplFiniteRing for MyRingWrapper<R> {}
 /// impl<R: Domain> Domain for MyRingWrapper<R> {}
+/// impl<R: RingBase> CanHomFrom<MyRingWrapper<R>> for MyRingWrapper<R> {
+///     type Homomorphism = ();
+///     fn has_canonical_hom(&self, from: &Self) -> Option<()> { if self == from { Some(()) } else { None } }
+///     fn map_in(&self, _from: &Self, x: <Self as RingBase>::Element, (): &()) -> <Self as RingBase>::Element { x }
+/// }
+/// impl<R: RingBase> CanIsoFromTo<MyRingWrapper<R>> for MyRingWrapper<R> {
+///     type Isomorphism = ();
+///     fn has_canonical_iso(&self, from: &Self) -> Option<()> { if self == from { Some(()) } else { None } }
+///     fn map_out(&self, _from: &Self, x: <Self as RingBase>::Element, (): &()) -> <Self as RingBase>::Element { x }
+/// }
+/// 
 /// impl_interpolation_base_ring_char_zero!{ <{ R }> InterpolationBaseRing for MyRingWrapper<R> where R: PrincipalIdealRing + Domain + ComputeResultantRing }
 /// 
 /// // now we can use `InterpolationBaseRing`-functionality
 /// let ring = MyRingWrapper(StaticRing::<i64>::RING.into());
 /// let (embedding, points) = ToExtRingMap::for_interpolation(&ring, 3);
 /// assert_eq!(0, points[0]);
-/// assert_eq!(1, points[1]);
-/// assert_eq!(2, points[2]);
+/// assert_eq!(-1, points[1]);
+/// assert_eq!(1, points[2]);
 /// 
 /// // There is a problem here, described in LiftPolyEvalRing::LocalRingBase.
 /// // Short version: we need to manually impl ComputeResultantRing
 /// impl<R: ComputeResultantRing> ComputeResultantRing for MyRingWrapper<R> {
-///     fn resultant<P>(poly_ring: P, f: El<P>, g: El<P>) -> Self::Element
+///     fn resultant_with_controller<P, Controller>(poly_ring: P, f: El<P>, g: El<P>, _: Controller) -> Self::Element
 ///         where P: RingStore + Copy,
 ///             P::Type: PolyRing,
-///             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+///             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
+///             Controller: ComputationController
 ///     {
 ///         let new_poly_ring = DensePolyRing::new(RingRef::new(poly_ring.base_ring().get_ring().get_delegate()), "X");
 ///         let hom = new_poly_ring.lifted_hom(&poly_ring, UnwrapHom::new(poly_ring.base_ring().get_ring()));

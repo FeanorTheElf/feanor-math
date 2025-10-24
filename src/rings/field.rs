@@ -40,9 +40,9 @@ use serde::de::DeserializeSeed;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_64::*;
 /// // 7 is a prime, so this is a field - but must be checked at runtime
-/// let Fp_as_ring = Zn::new(7);
+/// let Fp_as_ring = Zn64B::new(7);
 /// // we use `ZnRing::as_field()` to make this a field
-/// let Fp_as_field: AsField<Zn> = Fp_as_ring.as_field().ok().unwrap();
+/// let Fp_as_field = Fp_as_ring.as_field().ok().unwrap();
 /// // in many cases (like here) we can use canonical isomorphisms to map elements
 /// let iso = Fp_as_field.can_iso(&Fp_as_ring).unwrap();
 /// assert_el_eq!(&Fp_as_ring, Fp_as_ring.one(), iso.map(Fp_as_field.one()));
@@ -523,9 +523,9 @@ impl<'de, R> Deserialize<'de> for AsFieldBase<R>
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::{impl_eq_based_self_iso, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 /// // A no-op wrapper around Zn
-/// #[derive(Copy, Clone)]
+/// #[derive(Copy, Clone, Debug)]
 /// struct MyPossibleField {
-///     base_zn: Zn
+///     base_zn: Zn64B
 /// }
 /// 
 /// impl PartialEq for MyPossibleField {
@@ -540,8 +540,8 @@ impl<'de, R> Deserialize<'de> for AsFieldBase<R>
 /// 
 /// impl DelegateRing for MyPossibleField {
 ///     
-///     type Base = ZnBase;
-///     type Element = ZnEl;
+///     type Base = Zn64BBase;
+///     type Element = El<Zn64B>;
 ///
 ///     fn get_delegate(&self) -> &Self::Base { self.base_zn.get_ring() }
 ///     fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
@@ -555,7 +555,7 @@ impl<'de, R> Deserialize<'de> for AsFieldBase<R>
 /// // there is also a generic verision, which looks like
 /// impl_field_wrap_unwrap_isos!{ <{ /* type params here */ }> MyPossibleField, MyPossibleField where /* constraints here */ }
 /// 
-/// let R = RingValue::from(MyPossibleField { base_zn: Zn::new(5) });
+/// let R = RingValue::from(MyPossibleField { base_zn: Zn64B::new(5) });
 /// let R_field = RingValue::from(AsFieldBase::promise_is_perfect_field(R));
 /// let _ = R.can_hom(&R_field).unwrap();
 /// let _ = R_field.can_hom(&R).unwrap();

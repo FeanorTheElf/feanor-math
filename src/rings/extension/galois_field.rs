@@ -7,12 +7,11 @@ use sparse::SparseMapVector;
 use zn_64::Zn64B;
 
 use crate::algorithms::convolution::*;
-use crate::algorithms::eea::signed_gcd;
 use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
-use crate::algorithms::int_factor::factor;
-use crate::algorithms::int_factor::is_prime_power;
+use crate::algorithms::int_factor::*;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
+use crate::pid::PrincipalIdealRingStore;
 use crate::algorithms::unity_root::*;
 use crate::computation::DontObserve;
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
@@ -104,7 +103,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
         let p = Fp.size(&ZZbig).unwrap();
         let mut small_d = 1;
         let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
-        let mut large_d = int_cast(signed_gcd(Fq_star_order, int_cast(TryInto::<i64>::try_into(degree).unwrap() / small_d, ZZbig, StaticRing::<i64>::RING), ZZbig), ZZ, ZZbig);
+        let mut large_d = int_cast(ZZbig.ideal_gen(&Fq_star_order, &int_cast(TryInto::<i64>::try_into(degree).unwrap() / small_d, ZZbig, StaticRing::<i64>::RING)), ZZ, ZZbig);
         let mut increased_small_d = true;
         while increased_small_d {
             increased_small_d = false;
@@ -112,7 +111,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
             for (k, _) in factor(&ZZ, TryInto::<i64>::try_into(degree).unwrap() / small_d) {
                 let new_small_d = small_d * k;
                 let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), new_small_d as usize), ZZbig.one());
-                let new_large_d = int_cast(signed_gcd(Fq_star_order, int_cast(TryInto::<i64>::try_into(degree).unwrap() / new_small_d, ZZbig, StaticRing::<i64>::RING), ZZbig), ZZ, ZZbig);
+                let new_large_d = int_cast(ZZbig.ideal_gen(&Fq_star_order, &int_cast(TryInto::<i64>::try_into(degree).unwrap() / new_small_d, ZZbig, StaticRing::<i64>::RING)), ZZ, ZZbig);
                 if new_large_d > large_d {
                     small_d = new_small_d;
                     large_d = new_large_d;
@@ -235,7 +234,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::extension::galois_field::*;
-/// let base_ring = Zn::new(5).as_field().ok().unwrap();
+/// let base_ring = Zn64B::new(5).as_field().ok().unwrap();
 /// let raw_F25: FreeAlgebraImpl<_, _> = FreeAlgebraImpl::new(base_ring, 2, [base_ring.int_hom().map(2)]);
 /// let asfield_F25 = raw_F25.clone().as_field().ok().unwrap();
 /// // alternatively, you can ensure yourself that the ring is a field and use `promise_is_field` to avoid the check at runtime; be careful when doing this!
@@ -352,7 +351,7 @@ impl<R, A, C> GaloisFieldOver<R, A, C>
     /// # use feanor_math::rings::zn::*;
     /// # use feanor_math::algorithms::convolution::*;
     /// # use feanor_math::rings::extension::galois_field::*;
-    /// let F25 = GaloisField::new_with_convolution(Zn::new(5).as_field().ok().unwrap(), 2, Global, STANDARD_CONVOLUTION);
+    /// let F25 = GaloisField::new_with_convolution(Zn64B::new(5).as_field().ok().unwrap(), 2, Global, STANDARD_CONVOLUTION);
     /// let generator = F25.canonical_gen();
     /// let norm = F25.mul_ref_fst(&generator, F25.pow(F25.clone_el(&generator), 5));
     /// let inclusion = F25.inclusion();

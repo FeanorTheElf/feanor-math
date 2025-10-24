@@ -322,7 +322,7 @@ fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Contro
 /// # use feanor_math::rings::poly::dense_poly::*;
 /// # use feanor_math::algorithms::poly_gcd::hensel::*;
 /// # use feanor_math::assert_el_eq;
-/// let ring = AsLocalPIR::from_zn(Zn::new(81)).unwrap();
+/// let ring = AsLocalPIR::from_zn(Zn64B::new(81)).unwrap();
 /// let poly_ring = DensePolyRing::new(&ring, "X");
 /// let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 1, X.pow_ref(2) + X + 2]);
 /// let (s, t) = local_zn_ring_bezout_identity(&poly_ring, &f, &g).unwrap();

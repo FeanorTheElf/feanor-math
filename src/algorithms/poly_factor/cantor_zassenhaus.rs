@@ -196,7 +196,7 @@ pub fn distinct_degree_factorization_base<P, R, Controller>(poly_ring: P, mod_f_
 /// # use feanor_math::computation::*;
 /// # use crate::feanor_math::homomorphism::Homomorphism;
 /// # use feanor_math::algorithms::poly_factor::cantor_zassenhaus::*;
-/// let Fp = Zn::new(3).as_field().ok().unwrap();
+/// let Fp = Zn64B::new(3).as_field().ok().unwrap();
 /// let FpX = DensePolyRing::new(Fp, "X");
 /// // f = (X^3 + 2 X^2 + 1) (X^3 + 2 X + 1) (X^2 + 1)
 /// let f = FpX.prod([

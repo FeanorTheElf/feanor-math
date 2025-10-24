@@ -22,7 +22,7 @@ use crate::field::*;
 /// println!("The result is: {}", x.clone() + x.clone() * x);
 /// // instead of
 /// let x = ring.indeterminate();
-/// println!("The result is: {}", ring.format(&ring.add(ring.mul(ring.clone_el(&x), ring.clone_el(&x)), ring.clone_el(&x))));
+/// println!("The result is: {}", ring.formatted_el(&ring.add(ring.mul(ring.clone_el(&x), ring.clone_el(&x)), ring.clone_el(&x))));
 /// ```
 /// You can also retrieve the wrapped element
 /// ```rust

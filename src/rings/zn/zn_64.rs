@@ -75,7 +75,7 @@ fn reduce_to_half(x: u64, bound: u64) -> u64 {
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_64::*;
-/// let zn = Zn::new(7);
+/// let zn = Zn64B::new(7);
 /// assert_el_eq!(zn, zn.one(), zn.mul(zn.int_hom().map(3), zn.int_hom().map(5)));
 /// ```
 /// Too large moduli will give an error.
@@ -84,7 +84,7 @@ fn reduce_to_half(x: u64, bound: u64) -> u64 {
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::rings::zn::zn_64::*;
-/// Zn::new((1 << 62) / 9 + 1);
+/// Zn64B::new((1 << 62) / 9 + 1);
 /// ```
 /// 
 #[derive(Clone, Copy)]
@@ -565,7 +565,7 @@ impl DivisibilityRing for Zn64BBase {
     }
 
     fn prepare_divisor(&self, x: &Self::Element) -> Self::PreparedDivisorData {
-        let (s, _t, d) = algorithms::eea::signed_eea(self.smallest_positive_lift(*x), *self.modulus(), self.integer_ring());
+        let (s, _t, d) = self.integer_ring().extended_ideal_gen(&self.smallest_positive_lift(*x), self.modulus());
         debug_assert!(d > 0);
         debug_assert!(d <= *self.modulus());
         return ZnPreparedDivisorData {
@@ -770,7 +770,7 @@ impl ZnRing for Zn64BBase {
     /// # use feanor_math::assert_el_eq;
     /// # use feanor_math::ring::*;
     /// # use feanor_math::rings::zn::zn_64::*;
-    /// let ring = Zn::new(7);
+    /// let ring = Zn64B::new(7);
     /// assert_el_eq!(ring, ring.zero(), ring.get_ring().from_int_promise_reduced(42));
     /// ```
     /// Larger values lead to a panic in debug mode, and to a logic error in release mode.
@@ -779,7 +779,7 @@ impl ZnRing for Zn64BBase {
     /// # use feanor_math::assert_el_eq;
     /// # use feanor_math::ring::*;
     /// # use feanor_math::rings::zn::zn_64::*;
-    /// let ring = Zn::new(7);
+    /// let ring = Zn64B::new(7);
     /// ring.get_ring().from_int_promise_reduced(43);
     /// ```
     /// 
@@ -816,7 +816,7 @@ impl HashableElRing for Zn64BBase {
 /// # use feanor_math::rings::zn::zn_64::*;
 /// # use feanor_math::algorithms::fft::*;
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
-/// let ring = Zn::new(1073872897);
+/// let ring = Zn64B::new(1073872897);
 /// let fastmul_ring = ZnFastmul::new(ring).unwrap();
 /// // The values stored by the FFT table are elements of `ZnFastmulBase`
 /// let fft = CooleyTuckeyFFT::for_zn_with_hom(ring.can_hom(&fastmul_ring).unwrap(), 15).unwrap();

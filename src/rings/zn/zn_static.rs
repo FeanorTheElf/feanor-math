@@ -1,7 +1,6 @@
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::Debug;
 
-use crate::algorithms::eea::*;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::local::PrincipalLocalRing;
 use crate::field::*;
@@ -137,7 +136,7 @@ impl<const N: u64, const IS_FIELD: bool> CanIsoFromTo<ZnSBase<N, IS_FIELD>> for 
 impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnSBase<N, IS_FIELD> {
 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        let (s, _, d) = signed_eea((*rhs).try_into().unwrap(), N as i64, StaticRing::<i64>::RING);
+        let (s, _, d) = StaticRing::<i64>::RING.extended_ideal_gen(&((*rhs).try_into().unwrap()), &(N as i64));
         let mut rhs_inv = ((s % (N as i64)) + (N as i64)) as u64;
         if rhs_inv >= N {
             rhs_inv -= N;

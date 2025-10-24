@@ -1,12 +1,12 @@
 use std::fmt::Debug;
 use std::fmt::Formatter;
 
-use crate::algorithms::eea::signed_gcd;
 use crate::algorithms::matmul::StrassenHint;
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::homomorphism::*;
 use crate::divisibility::*;
 use crate::field::Field;
+use crate::pid::PrincipalIdealRingStore;
 use crate::homomorphism::Homomorphism;
 use crate::rings::rational::RationalFieldBase;
 use crate::integer::IntegerRing;
@@ -395,7 +395,7 @@ impl<R> HashableElRing for FractionFieldImplBase<R>
         R::Type: Domain + IntegerRing + HashableElRing
 {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
-        let gcd = signed_gcd(self.base_ring.clone_el(&el.den), self.base_ring.clone_el(&el.num), &self.base_ring);
+        let gcd = self.base_ring().ideal_gen(&el.den, &el.num);
         self.base_ring.get_ring().hash(&self.base_ring.checked_div(&el.num, &gcd).unwrap(), h);
         self.base_ring.get_ring().hash(&self.base_ring.checked_div(&el.den, &gcd).unwrap(), h);
     }

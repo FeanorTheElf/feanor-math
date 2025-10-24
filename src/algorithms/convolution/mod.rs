@@ -43,23 +43,25 @@ pub mod rns;
 /// struct NaiveConvolution;
 /// // we support all rings!
 /// impl<R: ?Sized + RingBase> ConvolutionAlgorithm<R> for NaiveConvolution {
-///     fn compute_convolution<S: RingStore<Type = R>, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(&self, lhs: V1, rhs: V2, dst: &mut [R::Element], ring: S) {
+/// 
+///     fn prepare_convolution_operand(&self, val: &[R::Element], length_hint: Option<usize>, ring: &R) -> () { () }
+/// 
+///     fn compute_convolution(&self, lhs: &[R::Element], _: Option<&()>, rhs: &[R::Element], _: Option<&()>, dst: &mut [R::Element], ring: &R) {
 ///         for i in 0..(lhs.len() + rhs.len() - 1) {
 ///             for j in max(0, i as isize - rhs.len() as isize + 1)..min(lhs.len() as isize, i as isize + 1) {
 ///                 ring.add_assign(&mut dst[i], ring.mul_ref(lhs.at(j as usize), rhs.at(i - j as usize)));
 ///             }
 ///         }
 ///     }
-///     fn supports_ring<S: RingStore<Type = R>>(&self, _: S) -> bool
-///         where S: Copy
-///     { true }
+/// 
+///     fn supports_ring(&self, ring: &R) -> bool { true }
 /// }
 /// let lhs = [1, 2, 3, 4, 5];
 /// let rhs = [2, 3, 4, 5, 6];
 /// let mut expected = [0; 10];
 /// let mut actual = [0; 10];
-/// STANDARD_CONVOLUTION.compute_convolution(lhs, rhs, &mut expected, StaticRing::<i64>::RING);
-/// NaiveConvolution.compute_convolution(lhs, rhs, &mut actual, StaticRing::<i64>::RING);
+/// STANDARD_CONVOLUTION.compute_convolution(&lhs[..], None, &rhs[..], None, &mut expected, StaticRing::<i64>::RING.get_ring());
+/// NaiveConvolution.compute_convolution(&lhs[..], None, &rhs[..], None, &mut actual, StaticRing::<i64>::RING.get_ring());
 /// assert_eq!(expected, actual);
 /// ```
 /// 
@@ -104,7 +106,7 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase>: Send + Sync {
     /// to the length of the output of any future convolution that uses the given operand. Alternatively, implementations
     /// are encouraged to not compute any data during [`ConvolutionAlgorithm::prepare_convolution_operand()`],
     /// but initialize an object with interior mutability, and use it to cache data computed during
-    /// [`ConvolutionAlgorithm::compute_convolution_prepared()`].
+    /// [`ConvolutionAlgorithm::compute_convolution()`].
     ///  
     /// # Example
     /// 
@@ -115,21 +117,21 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase>: Send + Sync {
     /// # use feanor_math::rings::zn::*;
     /// # use feanor_math::rings::zn::zn_64::*;
     /// # use feanor_math::rings::finite::*;
-    /// let ring = Zn::new(65537);
+    /// let ring = Zn64B::new(65537);
     /// let convolution = NTTConvolution::new(ring);
     /// let lhs = ring.elements().take(10).collect::<Vec<_>>();
     /// let rhs = ring.elements().take(10).collect::<Vec<_>>();
     /// // "standard" use
     /// let mut expected = (0..19).map(|_| ring.zero()).collect::<Vec<_>>();
-    /// convolution.compute_convolution(&lhs, &rhs, &mut expected, ring);
+    /// convolution.compute_convolution(&lhs, None, &rhs, None, &mut expected, ring.get_ring());
     /// 
     /// // "prepared" variant
-    /// let lhs_prep = convolution.prepare_convolution_operand(&lhs, None, ring);
-    /// let rhs_prep = convolution.prepare_convolution_operand(&rhs, None, ring);
+    /// let lhs_prep = convolution.prepare_convolution_operand(&lhs, None, ring.get_ring());
+    /// let rhs_prep = convolution.prepare_convolution_operand(&rhs, None, ring.get_ring());
     /// let mut actual = (0..19).map(|_| ring.zero()).collect::<Vec<_>>();
     /// // this will now be faster than `convolution.compute_convolution()`
-    /// convolution.compute_convolution_prepared(&lhs, Some(&lhs_prep), &rhs, Some(&rhs_prep), &mut actual, ring);
-    /// println!("{:?}, {:?}", actual.iter().map(|x| ring.format(x)).collect::<Vec<_>>(), expected.iter().map(|x| ring.format(x)).collect::<Vec<_>>());
+    /// convolution.compute_convolution(&lhs, Some(&lhs_prep), &rhs, Some(&rhs_prep), &mut actual, ring.get_ring());
+    /// println!("{:?}, {:?}", actual.iter().map(|x| ring.formatted_el(x)).collect::<Vec<_>>(), expected.iter().map(|x| ring.formatted_el(x)).collect::<Vec<_>>());
     /// assert!(expected.iter().zip(actual.iter()).all(|(l, r)| ring.eq_el(l, r)));
     /// ```
     /// 

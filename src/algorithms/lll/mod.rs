@@ -74,15 +74,15 @@ fn assert_rational_lattice_isomorphic<R, S, I, V1, V2>(small_ring: R, large_ring
 {
     use std::alloc::Global;
 
-    use crate::algorithms::eea::signed_lcm;
     use crate::divisibility::DivisibilityRingStore;
     use crate::algorithms::linsolve::smith::solve_right_using_pre_smith;
+    use crate::pid::PrincipalIdealRingStore;
 
     let n = lhs.row_count();
     assert_eq!(n, rhs.row_count());
     let hom = large_ring.can_hom(&small_ring).unwrap();
     let den_lcm = lhs.row_iter().chain(rhs.row_iter()).flat_map(|r| r.iter()).fold(large_ring.base_ring().one(), |a, b| 
-        signed_lcm(a, large_ring.base_ring().clone_el(large_ring.get_ring().den(&hom.map_ref(b))), large_ring.base_ring())
+        large_ring.base_ring().ideal_intersect(&a, &large_ring.get_ring().den(&hom.map_ref(b)))
     );
     let mut A: OwnedMatrix<_> = OwnedMatrix::zero(n, lhs.col_count(), large_ring.base_ring());
     let mut B: OwnedMatrix<_> = OwnedMatrix::zero(n, rhs.col_count(), large_ring.base_ring());

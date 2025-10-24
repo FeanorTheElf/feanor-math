@@ -211,9 +211,9 @@ use crate::algorithms::cyclotomic::cyclotomic_polynomial;
 #[cfg(test)]
 use std::f64::consts::PI;
 #[cfg(test)]
-use crate::algorithms::eea::signed_gcd;
-#[cfg(test)]
 use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use crate::pid::PrincipalIdealRingStore;
 
 #[test]
 fn test_find_approximate_complex_root() {
@@ -241,7 +241,7 @@ fn test_find_approximate_complex_root() {
     let (root, radius) = find_approximate_complex_root(&ZZX, &f).unwrap();
     assert!(radius <= 0.000000001);
     let root_of_unity = |k, n| CC.exp(CC.mul(CC.from_f64(2.0 * PI * k as f64 / n as f64), Complex64::I));
-    assert!((0..105).filter(|k| signed_gcd(*k, 105, StaticRing::<i64>::RING) == 1).any(|k| CC.abs(CC.sub(root_of_unity(k, 105), root)) <= radius));
+    assert!((0..105).filter(|k| StaticRing::<i64>::RING.ideal_gen(k, &105) == 1).any(|k| CC.abs(CC.sub(root_of_unity(k, 105), root)) <= radius));
     
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 6 * X.pow_ref(2) - 11]);
     let (root, radius) = find_approximate_complex_root(&ZZX, &f).unwrap();
@@ -281,7 +281,7 @@ fn test_find_all_approximate_complex_roots() {
     
     let root_of_unity = |k, n| CC.exp(CC.mul(CC.from_f64(2.0 * PI * k as f64 / n as f64), Complex64::I));
     let f = cyclotomic_polynomial(&ZZX, 105);
-    let expected = (1..=52).rev().filter(|i| signed_gcd(*i, 105, StaticRing::<i64>::RING) == 1).flat_map(|i| [root_of_unity(105 - i, 105), root_of_unity(i, 105)]).chain([CC.one()]);
+    let expected = (1..=52).rev().filter(|i| StaticRing::<i64>::RING.ideal_gen(i, &105) == 1).flat_map(|i| [root_of_unity(105 - i, 105), root_of_unity(i, 105)]).chain([CC.one()]);
     let actual = find_all_approximate_complex_roots(&ZZX, &f).unwrap();
     assert_eq!(48, actual.len());
     for (expected, (actual, dist)) in expected.zip(actual.iter().copied()) {

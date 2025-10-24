@@ -35,7 +35,7 @@ use std::marker::PhantomData;
 /// # use feanor_math::rings::rust_bigint::*;
 /// const ZZ: RustBigintRing = RustBigintRing::RING;
 /// let a: RustBigint = ZZ.add(ZZ.power_of_two(50), ZZ.power_of_two(100));
-/// assert_eq!("1267650600228230527396610048000", format!("{}", ZZ.format(&a)));
+/// assert_eq!("1267650600228230527396610048000", format!("{}", ZZ.formatted_el(&a)));
 /// ```
 /// and not
 /// ```compile_fail

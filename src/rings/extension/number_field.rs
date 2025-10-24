@@ -16,7 +16,6 @@ use crate::computation::*;
 use crate::delegate::*;
 use crate::specialization::*;
 use crate::algorithms::convolution::*;
-use crate::algorithms::eea::signed_lcm;
 use crate::algorithms::poly_gcd::*;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::integer::*;
@@ -293,7 +292,7 @@ impl NumberField {
         let ZZ = QQ.base_ring();
         let denominator = poly_ring.terms(generating_poly).map(|(c, _)| QQ.get_ring().den(c)).fold(
             ZZ.one(), 
-            |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ)
+            |a, b| ZZ.ideal_intersect(&a, b)
         );
         let rank = poly_ring.degree(generating_poly).unwrap();
         let scaled_lc = ZZ.checked_div(&ZZ.mul_ref(&denominator, QQ.get_ring().num(poly_ring.lc(generating_poly).unwrap())), QQ.get_ring().den(poly_ring.lc(generating_poly).unwrap())).unwrap();
@@ -714,8 +713,8 @@ impl<'a, Impl, I> NumberFieldByOrder<'a, Impl, I>
         let QQ = self.base.base_ring();
         let ZZ = QQ.base_ring();
         let denominator = QQ.inclusion().map(from.terms(poly).map(|(c, _)| 
-            self.base.wrt_canonical_basis(c).iter().map(|c| ZZ.clone_el(QQ.get_ring().den(&c))).fold(ZZ.one(), |a, b| signed_lcm(a, b, ZZ))
-        ).fold(ZZ.one(), |a, b| signed_lcm(a, b, ZZ)));
+            self.base.wrt_canonical_basis(c).iter().map(|c| ZZ.clone_el(QQ.get_ring().den(&c))).fold(ZZ.one(), |a, b| ZZ.ideal_intersect(&a, &b))
+        ).fold(ZZ.one(), |a, b| ZZ.ideal_intersect(&a, &b)));
         debug_assert!(!QQ.is_zero(&denominator));
         return to.from_terms(from.terms(poly).map(|(c, i)| (self.base.inclusion().mul_ref_map(c, &denominator), i)));
     }
@@ -1346,12 +1345,12 @@ fn random_test_poly_gcd_number_field() {
         let f = KY.from_terms((0..=5).map(|i| (random_element_K(), i)));
         let g = KY.from_terms((0..=5).map(|i| (random_element_K(), i)));
         let h = KY.from_terms((0..=4).map(|i| (random_element_K(), i)));
-        // println!("Testing gcd on ({}) * ({}) and ({}) * ({})", poly_ring.format(&f), poly_ring.format(&h), poly_ring.format(&g), poly_ring.format(&h));
+        // println!("Testing gcd on ({}) * ({}) and ({}) * ({})", poly_ring.formatted_el(&f), poly_ring.formatted_el(&h), poly_ring.formatted_el(&g), poly_ring.formatted_el(&h));
         let lhs = KY.mul_ref(&f, &h);
         let rhs = KY.mul_ref(&g, &h);
 
         let gcd = <_ as PolyTFracGCDRing>::gcd(&KY, &lhs, &rhs);
-        // println!("Result {}", poly_ring.format(&gcd));
+        // println!("Result {}", poly_ring.formatted_el(&gcd));
 
         assert!(KY.divides(&lhs, &gcd));
         assert!(KY.divides(&rhs, &gcd));

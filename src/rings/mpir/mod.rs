@@ -429,7 +429,7 @@ impl SerializableElementRing for MPZBase {
         where S: Serializer
     {
         if serializer.is_human_readable() {
-            SerializableNewtypeStruct::new("BigInt", format!("{}", RingRef::new(self).format(el)).as_str()).serialize(serializer)
+            SerializableNewtypeStruct::new("BigInt", format!("{}", RingRef::new(self).formatted_el(el)).as_str()).serialize(serializer)
         } else {
             let len = self.to_le_bytes_len(el);
             let mut data = Vec::with_capacity(len);

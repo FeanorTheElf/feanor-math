@@ -1,11 +1,10 @@
-use crate::algorithms::eea::signed_gcd;
 use crate::ordered::OrderedRingStore;
 use crate::ring::*;
 use crate::homomorphism::*;
 use crate::integer::*;
-use crate::rings::zn::zn_64;
-use crate::rings::zn::ZnOperation;
-use crate::rings::zn::ZnRing;
+use crate::rings::zn::*;
+use crate::pid::PrincipalIdealRingStore;
+use crate::divisibility::*;
 use crate::primitive_int::*;
 use crate::rings::zn::ZnRingStore;
 use crate::rings::zn::choose_zn_impl;
@@ -97,7 +96,7 @@ fn search_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>, delta: i64) -> Option<
     let mut diff_to_n = 0;
     let Zi64_to_Zm = Zm.can_hom::<StaticRing<i64>>(&StaticRing::<i64>::RING).unwrap();
     let Zi64_to_ZZ = ZZ.can_hom(&StaticRing::<i64>::RING).unwrap();
-    debug_assert!(ZZ.is_one(&signed_gcd(ZZ.clone_el(&n), Zi64_to_ZZ.map(delta), &ZZ)));
+    debug_assert!(ZZ.is_unit(&ZZ.ideal_gen(&n, &Zi64_to_ZZ.map(delta))));
     let Zm_delta = Zi64_to_Zm.map(delta);
     let ZZ_m = Zi64_to_ZZ.map(m.try_into().unwrap());
 
