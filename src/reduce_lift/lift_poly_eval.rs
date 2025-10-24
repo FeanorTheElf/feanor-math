@@ -592,10 +592,11 @@ macro_rules! impl_interpolation_base_ring_char_zero {
             }
 
             fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
-                let ZZbig = $crate::integer::BigIntRing::RING;
-                assert!(ZZbig.is_zero(&self.characteristic(&ZZbig).unwrap()));
+                assert_eq!(0, self.characteristic($crate::primitive_int::StaticRing::<i64>::RING).unwrap());
                 let ring = $crate::ring::RingRef::new(self);
-                (ring, (0..count).map(|n| <_ as $crate::homomorphism::Homomorphism<_, _>>::map(&ring.int_hom(), n.try_into().unwrap())).collect())
+                // yield both positive and negative integers, since that keeps the absolute value of the points as small as possible
+                // (this will improve performance in some cases that are sensitive to the size of coefficients)
+                (ring, (0..count).map(|n| if n % 2 == 1 { -(((n + 1) / 2) as i32) } else { (n / 2) as i32 }).map(|n| <_ as $crate::homomorphism::Homomorphism<_, _>>::map(&ring.int_hom(), n)).collect())
             }
         }
     };

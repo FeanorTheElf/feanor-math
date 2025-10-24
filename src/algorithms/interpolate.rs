@@ -1,3 +1,5 @@
+use crate::algorithms::matmul::ComputeInnerProduct;
+use crate::computation::LOG_PROGRESS;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::integer::IntegerRingStore;
 use crate::iters::multi_cartesian_product;
@@ -22,6 +24,8 @@ use std::ops::Range;
 /// of multiplication is constant, this becomes `O(n log n T)`. In the other common case, where
 /// the input elements are degree-1 polynomials, this becomes `O(n sum_(0 <= i <= log n) 2^(i c)) = O(n^(c + 1))`
 /// where `c` is the multiplication exponent, e.g. `c = 1.58...` for Karatsuba multiplication.
+/// Unfortunately, this means that a single complete multiplication together with `n` polynomial
+/// divisions by the monic linear factors is faster.
 /// 
 /// # Example
 /// ```rust
@@ -131,40 +135,49 @@ pub fn interpolate<P, V1, V2, A: Allocator>(poly_ring: P, x: V1, y: V2, allocato
         V1: VectorFn<El<<P::Type as RingExtension>::BaseRing>>,
         V2: VectorFn<El<<P::Type as RingExtension>::BaseRing>>
 {
-    assert_eq!(x.len(), y.len());
-    let R = poly_ring.base_ring();
-    let null_poly = poly_ring.prod(x.iter().map(|x| poly_ring.from_terms([(R.one(), 1), (R.negate(x), 0)])));
-    let mut nums = Vec::with_capacity_in(x.len(), &allocator);
-    let div_linear = |poly: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>| if let Some(d) = poly_ring.degree(poly) {
-        poly_ring.from_terms((0..d).rev().scan(R.zero(), |current, i| {
-            R.add_assign_ref(current, poly_ring.coefficient_at(poly, i + 1));
-            let result = R.clone_el(current);
-            R.mul_assign_ref(current, a);
-            return Some((result, i));
-        }))
-    } else { poly_ring.zero() };
-    nums.extend(x.iter().map(|x| div_linear(&null_poly, &x)));
+    use crate::computation::ComputationController;
+    LOG_PROGRESS.run_computation(format_args!("interpolate(num={})", x.len()), |_| {
+        assert_eq!(x.len(), y.len());
+        let base_ring = poly_ring.base_ring();
+        let null_poly = poly_ring.prod(x.iter().map(|x| poly_ring.from_terms([(base_ring.one(), 1), (base_ring.negate(x), 0)])));
+        let mut nums = Vec::with_capacity_in(x.len(), &allocator);
+        let div_linear = |poly: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>| if let Some(d) = poly_ring.degree(poly) {
+            poly_ring.from_terms((0..d).rev().scan(base_ring.zero(), |current, i| {
+                base_ring.add_assign_ref(current, poly_ring.coefficient_at(poly, i + 1));
+                let result = base_ring.clone_el(current);
+                base_ring.mul_assign_ref(current, a);
+                return Some((result, i));
+            }))
+        } else { poly_ring.zero() };
+        nums.extend(x.iter().map(|x| div_linear(&null_poly, &x)));
+        let nums = nums;
 
-    let mut denoms = Vec::with_capacity_in(x.len(), &allocator);
-    denoms.extend((0..x.len()).map(|i| poly_ring.evaluate(&nums[i], &x.at(i), &R.identity())));
-    let mut factors = Vec::with_capacity_in(x.len(), &allocator);
-    factors.resize_with(x.len(), || R.zero());
-    product_except_one(R, (&denoms[..]).into_clone_ring_els(R), &mut factors);
-    let denominator = R.mul_ref(&factors[0], &denoms[0]);
-    for i in 0..x.len() {
-        R.mul_assign(&mut factors[i], y.at(i));
-    }
+        let mut denoms = Vec::with_capacity_in(x.len(), &allocator);
+        denoms.extend((0..x.len()).map(|i| poly_ring.evaluate(&nums[i], &x.at(i), &base_ring.identity())));
+        let denoms = denoms;
 
-    let mut scaled_result = poly_ring.zero();
-    for (num, c) in nums.into_iter().zip(factors.into_iter()) {
-        scaled_result = poly_ring.inclusion().fma_map(&num, &c, scaled_result);
-    }
-    let result = if let Some(inv) = R.invert(&denominator) {
-        Ok(poly_ring.inclusion().mul_map(scaled_result, inv))
-    } else {
-        poly_ring.try_from_terms(poly_ring.terms(&scaled_result).map(|(c, i)| R.checked_div(&c, &denominator).map(|c| (c, i)).ok_or(InterpolationError::NotInvertible)))
-    };
-    return result;
+        let denoms_inv = denoms.iter().map(|den| base_ring.invert(den).ok_or(())).collect::<Result<Vec<_>, _>>();
+        if let Ok(denoms_inv) = denoms_inv {
+            return Ok(poly_ring.from_terms((0..x.len()).map(|i| (
+                <_ as ComputeInnerProduct>::inner_product_ref_fst(base_ring.get_ring(), (0..x.len()).map(|j| (poly_ring.coefficient_at(&nums[j], i), base_ring.mul_ref_snd(y.at(j), &denoms_inv[j])))),
+                i
+            ))));
+        } else {
+            let mut factors = Vec::with_capacity_in(x.len(), &allocator);
+            factors.resize_with(x.len(), || base_ring.zero());
+            product_except_one(base_ring, (&denoms[..]).into_clone_ring_els(base_ring), &mut factors);
+            let denominator = base_ring.mul_ref(&factors[0], &denoms[0]);
+            for (factor, y) in factors.iter_mut().zip(y.iter()) {
+                base_ring.mul_assign(factor, y);
+            }
+
+            let mut scaled_result = poly_ring.zero();
+            for (num, c) in nums.into_iter().zip(factors.into_iter()) {
+                scaled_result = poly_ring.inclusion().fma_map(&num, &c, scaled_result);
+            }
+            return poly_ring.try_from_terms(poly_ring.terms(&scaled_result).map(|(c, i)| base_ring.checked_div(&c, &denominator).map(|c| (c, i)).ok_or(InterpolationError::NotInvertible)));
+        }
+    })
 }
 
 #[stability::unstable(feature = "enable")]
@@ -214,6 +227,10 @@ use crate::rings::zn::ZnRingStore;
 use std::alloc::Global;
 #[cfg(test)]
 use multivariate_impl::MultivariatePolyRingImpl;
+#[cfg(test)]
+use crate::rings::fraction::FractionFieldStore;
+#[cfg(test)]
+use crate::rings::rational::RationalField;
 
 use super::convolution::STANDARD_CONVOLUTION;
 
@@ -268,14 +285,23 @@ fn test_interpolate() {
     let ring = StaticRing::<i64>::RING;
     let poly_ring = DensePolyRing::new(ring, "X");
     let poly = poly_ring.from_terms([(3, 0), (1, 1), (-1, 3), (2, 4), (1, 5)].into_iter());
-    let x = (0..6).map_fn(|x| x.try_into().unwrap());
+    let x = (0..6).map_fn(|i| i.try_into().unwrap());
     let actual = interpolate(&poly_ring, x.clone(), x.map_fn(|x| poly_ring.evaluate(&poly, &x, &ring.identity())), Global).unwrap();
     assert_el_eq!(&poly_ring, &poly, &actual);
 
+    let ring = RationalField::new(StaticRing::<i64>::RING);
+    let poly_ring = DensePolyRing::new(ring, "X");
+    let x = (0..4).map_fn(|i| ring.from_fraction(i.try_into().unwrap(), 1));
+    let y = (0..4).map_fn(|_| ring.zero());
+    let actual = interpolate(&poly_ring, x.clone(), y, Global).unwrap();
+    for i in 0..4 {
+        assert_el_eq!(ring, ring.zero(), poly_ring.evaluate(&actual, &ring.from_fraction(i, 1), ring.identity()));
+    }
+
     let ring = Zn64B::new(29).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(ring, "X");
-    let x = (0..5).map_fn(|x| ring.int_hom().map(x as i32));
-    let y = (0..5).map_fn(|x| if x == 3 { ring.int_hom().map(6) } else { ring.zero() });
+    let x = (0..5).map_fn(|i| ring.int_hom().map(i as i32));
+    let y = (0..5).map_fn(|i| if i == 3 { ring.int_hom().map(6) } else { ring.zero() });
     let poly = interpolate(&poly_ring, x.clone(), y.clone(), Global).unwrap();
     for i in 0..5 {
         assert_el_eq!(ring, y.at(i), poly_ring.evaluate(&poly, &x.at(i), &ring.identity()));

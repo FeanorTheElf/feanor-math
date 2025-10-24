@@ -156,11 +156,10 @@ pub fn fast_poly_eea<P, Controller>(poly_ring: P, lhs: El<P>, rhs: El<P>, contro
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
         Controller: ComputationController
 {
-    fn fast_poly_eea_impl<P, Controller>(poly_ring: P, lhs: El<P>, rhs: El<P>, target_deg: usize, controller: Controller, memory: &mut [El<P>]) -> ([El<P>; 4], [El<P>; 2])
+    fn fast_poly_eea_impl<P>(poly_ring: P, lhs: El<P>, rhs: El<P>, target_deg: usize, memory: &mut [El<P>]) -> ([El<P>; 4], [El<P>; 2])
         where P: RingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
-            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
-            Controller: ComputationController
+            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field
     {
         if poly_ring.is_zero(&lhs) || poly_ring.is_zero(&rhs) {
             return ([poly_ring.one(), poly_ring.zero(), poly_ring.zero(), poly_ring.one()], [lhs, rhs]);
@@ -168,18 +167,17 @@ pub fn fast_poly_eea<P, Controller>(poly_ring: P, lhs: El<P>, rhs: El<P>, contro
         let ldeg = poly_ring.degree(&lhs).unwrap();
         let rdeg = poly_ring.degree(&rhs).unwrap();
         if ldeg < target_deg + FAST_POLY_EEA_THRESHOLD || rdeg < target_deg + FAST_POLY_EEA_THRESHOLD {
-            log_progress!(controller, ".");
             return partial_eea(poly_ring, lhs, rhs, target_deg);
         } else if ldeg >= 2 * rdeg {
             let (mut q, r) = poly_ring.euclidean_div_rem(lhs, &rhs);
             poly_ring.negate_inplace(&mut q);
-            let (transform, rest) = fast_poly_eea_impl(poly_ring, r, rhs, target_deg, controller, memory);
+            let (transform, rest) = fast_poly_eea_impl(poly_ring, r, rhs, target_deg, memory);
             let mut transform: (_, _, _, _) = transform.into();
             transform.1 = poly_ring.fma(&q, &transform.0, transform.1);
             transform.3 = poly_ring.fma(&q, &transform.2, transform.3);
             return (transform.into(), rest);
         } else if rdeg >= 2 * ldeg {
-            let (transform, rest) = fast_poly_eea_impl(poly_ring, rhs, lhs, target_deg, controller, memory);
+            let (transform, rest) = fast_poly_eea_impl(poly_ring, rhs, lhs, target_deg, memory);
             let transform: (_, _, _, _) = transform.into();
             return ([transform.1, transform.0, transform.3, transform.2], rest);
         }
@@ -194,8 +192,7 @@ pub fn fast_poly_eea<P, Controller>(poly_ring: P, lhs: El<P>, rhs: El<P>, contro
         let mut rhs_lower = rhs;
         poly_ring.truncate_monomials(&mut rhs_lower, split_deg);
 
-        log_progress!(controller, "({},{})", max(poly_ring.degree(&lhs_upper).unwrap(), poly_ring.degree(&rhs_upper).unwrap()), part_target_deg);
-        let (fst_transform, [mut lhs_rest, mut rhs_rest]) = fast_poly_eea_impl(poly_ring, lhs_upper, rhs_upper, part_target_deg, controller.clone(), memory);
+        let (fst_transform, [mut lhs_rest, mut rhs_rest]) = fast_poly_eea_impl(poly_ring, lhs_upper, rhs_upper, part_target_deg, memory);
         poly_ring.mul_assign_monomial(&mut lhs_rest, split_deg);
         poly_ring.mul_assign_monomial(&mut rhs_rest, split_deg);
 
@@ -204,8 +201,7 @@ pub fn fast_poly_eea<P, Controller>(poly_ring: P, lhs: El<P>, rhs: El<P>, contro
         rhs_rest = poly_ring.fma(&fst_transform[2], &lhs_lower, rhs_rest);
         rhs_rest = poly_ring.fma(&fst_transform[3], &rhs_lower, rhs_rest);
 
-        log_progress!(controller, "({},{})", max(poly_ring.degree(&lhs_rest).unwrap_or(0), poly_ring.degree(&rhs_rest).unwrap_or(0)), target_deg);
-        let (snd_transform, rest) = fast_poly_eea_impl(poly_ring, lhs_rest, rhs_rest, target_deg, controller, memory);
+        let (snd_transform, rest) = fast_poly_eea_impl(poly_ring, lhs_rest, rhs_rest, target_deg, memory);
 
         // multiply snd_transform * fst_transform
         let mut result = [poly_ring.zero(), poly_ring.zero(), poly_ring.zero(), poly_ring.zero()];
@@ -228,8 +224,8 @@ pub fn fast_poly_eea<P, Controller>(poly_ring: P, lhs: El<P>, rhs: El<P>, contro
         return (poly_ring.one(), poly_ring.zero(), lhs);
     }
 
-    controller.run_computation(format_args!("fast_poly_eea(ldeg={}, rdeg={})", poly_ring.degree(&lhs).unwrap(), poly_ring.degree(&rhs).unwrap()), |controller| {
-        let ([s1, t1, s2, t2], [a1, a2]) = fast_poly_eea_impl(poly_ring, lhs, rhs, 0, controller,  &mut (0..strassen_mem_size(false, 2, 0)).map(|_| poly_ring.zero()).collect::<Vec<_>>());
+    controller.run_computation(format_args!("fast_poly_eea(ldeg={}, rdeg={})", poly_ring.degree(&lhs).unwrap(), poly_ring.degree(&rhs).unwrap()), |_| {
+        let ([s1, t1, s2, t2], [a1, a2]) = fast_poly_eea_impl(poly_ring, lhs, rhs, 0, &mut (0..strassen_mem_size(false, 2, 0)).map(|_| poly_ring.zero()).collect::<Vec<_>>());
         if poly_ring.is_zero(&a1) {
             return (s2, t2, a2);
         } else {

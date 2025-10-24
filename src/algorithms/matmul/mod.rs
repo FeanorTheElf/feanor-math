@@ -23,26 +23,26 @@ pub trait ComputeInnerProduct: RingBase {
     ///
     /// Computes the inner product `sum_i lhs[i] * rhs[i]`.
     /// 
-    fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
+    fn inner_product_ref<'a, I: IntoIterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
         where Self::Element: 'a,
             Self: 'a;
 
     ///
     /// Computes the inner product `sum_i lhs[i] * rhs[i]`.
     /// 
-    fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
+    fn inner_product_ref_fst<'a, I: IntoIterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
         where Self::Element: 'a,
             Self: 'a;
 
     ///
     /// Computes the inner product `sum_i lhs[i] * rhs[i]`.
     /// 
-    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element;
+    fn inner_product<I: IntoIterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element;
 }
 
 impl<R: ?Sized + RingBase> ComputeInnerProduct for R {
 
-    default fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
+    default fn inner_product_ref_fst<'a, I: IntoIterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
         where Self::Element: 'a
     {
         let mut result = self.zero();
@@ -52,7 +52,7 @@ impl<R: ?Sized + RingBase> ComputeInnerProduct for R {
         return result;
     }
 
-    default fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
+    default fn inner_product_ref<'a, I: IntoIterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
         where Self::Element: 'a
     {
         let mut result = self.zero();
@@ -62,7 +62,7 @@ impl<R: ?Sized + RingBase> ComputeInnerProduct for R {
         return result;
     }
 
-    default fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
+    default fn inner_product<I: IntoIterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
         let mut result = self.zero();
         for (l, r) in els {
             result = self.fma(&l, &r, result);

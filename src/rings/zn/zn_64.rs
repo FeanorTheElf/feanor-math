@@ -433,11 +433,11 @@ impl InterpolationBaseRing for AsFieldBase<Zn64B> {
 
 impl ComputeInnerProduct for Zn64BBase {
 
-    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
+    fn inner_product<I: IntoIterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
 
         debug_assert!(u128::MAX / (self.repr_bound() as u128 * self.repr_bound() as u128) >= 36);
         const REDUCE_AFTER_STEPS: usize = 32;
-        let mut array_chunks = els.array_chunks::<REDUCE_AFTER_STEPS>();
+        let mut array_chunks = els.into_iter().array_chunks::<REDUCE_AFTER_STEPS>();
         let mut result = self.zero();
         while let Some(chunk) = array_chunks.next() {
             let mut sum: u128 = 0;
@@ -458,16 +458,16 @@ impl ComputeInnerProduct for Zn64BBase {
         return result;
     }
 
-    fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
+    fn inner_product_ref_fst<'a, I: IntoIterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
         where Self::Element: 'a
     {
-        self.inner_product(els.map(|(l, r)| (self.clone_el(l), r)))
+        self.inner_product(els.into_iter().map(|(l, r)| (self.clone_el(l), r)))
     }
 
-    fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
+    fn inner_product_ref<'a, I: IntoIterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
         where Self::Element: 'a
     {
-        self.inner_product_ref_fst(els.map(|(l, r)| (l, self.clone_el(r))))
+        self.inner_product_ref_fst(els.into_iter().map(|(l, r)| (l, self.clone_el(r))))
     }
 }
 

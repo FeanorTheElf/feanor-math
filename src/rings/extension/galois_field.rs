@@ -677,22 +677,22 @@ impl<Impl> ComputeInnerProduct for GaloisFieldBase<Impl>
         Impl::Type: Field + FreeAlgebra + FiniteRing,
         <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
 {
-    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
-        self.rev_delegate(self.get_delegate().inner_product(els.map(|(a, b)| (self.delegate(a), self.delegate(b)))))
+    fn inner_product<I: IntoIterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
+        self.rev_delegate(self.get_delegate().inner_product(els.into_iter().map(|(a, b)| (self.delegate(a), self.delegate(b)))))
     }
 
-    fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
+    fn inner_product_ref<'a, I: IntoIterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
         where Self::Element: 'a,
             Self: 'a
     {
-        self.rev_delegate(self.get_delegate().inner_product_ref(els.map(|(a, b)| (self.delegate_ref(a), self.delegate_ref(b)))))
+        self.rev_delegate(self.get_delegate().inner_product_ref(els.into_iter().map(|(a, b)| (self.delegate_ref(a), self.delegate_ref(b)))))
     }
 
-    fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
+    fn inner_product_ref_fst<'a, I: IntoIterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
         where Self::Element: 'a,
             Self: 'a
     {
-        self.rev_delegate(self.get_delegate().inner_product_ref_fst(els.map(|(a, b)| (self.delegate_ref(a), self.delegate(b)))))
+        self.rev_delegate(self.get_delegate().inner_product_ref_fst(els.into_iter().map(|(a, b)| (self.delegate_ref(a), self.delegate(b)))))
     }
 }
 

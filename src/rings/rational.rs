@@ -1,7 +1,7 @@
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::eea::{signed_gcd, signed_lcm};
 use crate::serialization::*;
-use crate::algorithms::matmul::StrassenHint;
+use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::poly_gcd::gcd::poly_gcd_local;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
@@ -15,7 +15,9 @@ use crate::ordered::{OrderedRing, OrderedRingStore};
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::*;
 use crate::impl_interpolation_base_ring_char_zero;
-use crate::pid::{EuclideanRing, PrincipalIdealRing};
+use crate::rings::fraction::*;
+use crate::rings::poly::PolyRing;
+use crate::pid::{EuclideanRing, EuclideanRingStore, PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::specialization::*;
 use crate::ring::*;
 
@@ -26,6 +28,8 @@ use serde::de::DeserializeSeed;
 
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::mem::replace;
+use std::ops::Deref;
 
 ///
 /// An implementation of the rational number `Q`, based on representing them
@@ -191,6 +195,37 @@ impl<I> RationalFieldBase<I>
         debug_assert!(self.base_ring().is_one(&signed_gcd(self.base_ring().clone_el(&el.1), self.base_ring().clone_el(&el.0), self.base_ring())));
         &el.1
     }
+
+    fn inner_product_impl<J, T1, T2>(&self, els: J) -> RationalFieldEl<I>
+        where J: Iterator<Item = (T1, T2)>,
+            T1: Deref<Target = RationalFieldEl<I>>,
+            T2: Deref<Target = RationalFieldEl<I>>
+    {
+        let mut current_den = self.integers.one();
+        // rationale: If we take an inner product, there is a significant chance that all summands
+        // have a denominator that divides an unknown "maximal denominator"; It seems likely that
+        // after we have processed some elements, the lcm of all denominators is this maximal denominator,
+        // and thus it makes sense to optimize for the case that the next denominator divides the
+        // maximal denominator
+        let mut current_num = self.integers.zero();
+        for (lhs, rhs) in els {
+            let new_den = self.integers.mul_ref(&lhs.1, &rhs.1);
+            let (quo, rem) = self.integers.euclidean_div_rem(self.integers.clone_el(&current_den), &new_den);
+            if self.integers.is_zero(&rem) {
+                current_num = self.integers.fma(&lhs.0, &self.integers.mul_ref_fst(&rhs.0, quo), current_num);
+            } else {
+                // we already did the first euclidean division for finding the gcd, so use rem here
+                let gcd = self.integers.ideal_gen(&rem, &new_den);
+                let scale_by = self.integers.checked_div(&new_den, &gcd).unwrap();
+                let quo = self.integers.checked_div(&current_den, &gcd).unwrap();
+                self.integers.mul_assign_ref(&mut current_num, &scale_by);
+                self.integers.mul_assign_ref(&mut current_den, &scale_by);
+                current_num = self.integers.fma(&lhs.0, &self.integers.mul_ref_fst(&rhs.0, quo), current_num);
+            }
+        }
+        self.reduce((&mut current_num, &mut current_den));
+        return RationalFieldEl(current_num, current_den);
+    }
 }
 
 impl<I> RationalField<I>
@@ -243,14 +278,17 @@ impl<I> RingBase for RationalFieldBase<I>
 {
     type Element = RationalFieldEl<I>;
 
-    fn add_assign(&self, lhs: &mut Self::Element, mut rhs: Self::Element) {
-        if self.integers.is_one(&lhs.1) && self.integers.is_one(&rhs.1) {
+    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
+        if self.integers.is_zero(&rhs.0) {
+            // do nothing
+        } else if self.integers.is_zero(&lhs.0) {
+            *lhs = rhs;
+        } else if self.integers.is_one(&lhs.1) && self.integers.is_one(&rhs.1) {
             self.integers.add_assign(&mut lhs.0, rhs.0);
         } else {
             self.integers.mul_assign_ref(&mut lhs.0, &rhs.1);
-            self.integers.mul_assign_ref(&mut rhs.0, &lhs.1);
+            lhs.0 = self.integers.fma(&rhs.0, &lhs.1, replace(&mut lhs.0, self.integers.zero()));
             self.integers.mul_assign(&mut lhs.1, rhs.1);
-            self.integers.add_assign(&mut lhs.0, rhs.0);
             self.reduce((&mut lhs.0, &mut lhs.1));
         }
     }
@@ -260,11 +298,15 @@ impl<I> RingBase for RationalFieldBase<I>
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        if self.integers.is_one(&lhs.1) && self.integers.is_one(&rhs.1) {
+        if self.integers.is_zero(&rhs.0) {
+            // do nothing
+        } else if self.integers.is_zero(&lhs.0) {
+            *lhs = self.clone_el(rhs);
+        } else if self.integers.is_one(&lhs.1) && self.integers.is_one(&rhs.1) {
             self.integers.add_assign_ref(&mut lhs.0, &rhs.0);
         } else {
             self.integers.mul_assign_ref(&mut lhs.0, &rhs.1);
-            self.integers.add_assign(&mut lhs.0, self.integers.mul_ref(&lhs.1, &rhs.0));
+            lhs.0 = self.integers.fma(&rhs.0, &lhs.1, replace(&mut lhs.0, self.integers.zero()));
             self.integers.mul_assign_ref(&mut lhs.1, &rhs.1);
             self.reduce((&mut lhs.0, &mut lhs.1));
         }
@@ -601,6 +643,39 @@ impl<I> OrderedRing for RationalFieldBase<I>
     }
 }
 
+struct DerefT<T>(T);
+
+impl<T> Deref for DerefT<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<I> ComputeInnerProduct for RationalFieldBase<I>
+    where I: RingStore,
+        I::Type: IntegerRing
+{
+    fn inner_product_ref<'a, J: IntoIterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: J) -> Self::Element
+        where Self::Element: 'a,
+            Self: 'a
+    {
+        self.inner_product_impl(els.into_iter())
+    }
+
+    fn inner_product_ref_fst<'a, J: IntoIterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: J) -> Self::Element
+        where Self::Element: 'a,
+            Self: 'a
+    {
+        self.inner_product_impl(els.into_iter().map(|(lhs, rhs)| (lhs, DerefT(rhs))))
+    }
+
+    fn inner_product<J: IntoIterator<Item = (Self::Element, Self::Element)>>(&self, els: J) -> Self::Element {
+        self.inner_product_impl(els.into_iter().map(|(lhs, rhs)| (DerefT(lhs), DerefT(rhs))))
+    }
+}
+
 impl<I> PolyTFracGCDRing for RationalFieldBase<I>
     where I: RingStore,
         I::Type: IntegerRing
@@ -666,9 +741,6 @@ use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
 
-use super::fraction::FractionField;
-use super::poly::PolyRing;
-
 #[cfg(test)]
 fn edge_case_elements() -> impl Iterator<Item = El<RationalField<StaticRing<i64>>>> {
     let ring = RationalField::new(StaticRing::<i64>::RING);
@@ -685,6 +757,23 @@ fn test_ring_axioms() {
     assert!(!ring.is_zero(&half));
     assert_el_eq!(ring, ring.one(), ring.add_ref(&half, &half));
     crate::ring::generic_tests::test_ring_axioms(ring, edge_case_elements());
+}
+
+#[test]
+fn test_inner_product() {
+    let ring = RationalField::new(StaticRing::<i64>::RING);
+
+    assert_el_eq!(ring, ring.from_fraction(5, 3), <_ as ComputeInnerProduct>::inner_product(ring.get_ring(), [
+        (ring.from_fraction(1, 1), ring.from_fraction(1, 1)),
+        (ring.from_fraction(2, 1), ring.from_fraction(1, 3))
+    ]));
+
+    assert_el_eq!(ring, ring.from_fraction(11, 6), <_ as ComputeInnerProduct>::inner_product(ring.get_ring(), [
+        (ring.from_fraction(1, 3), ring.from_fraction(2, 1)),
+        (ring.from_fraction(2, 3), ring.from_fraction(1, 1)),
+        (ring.from_fraction(2, 3), ring.from_fraction(1, 2)),
+        (ring.from_fraction(1, 3), ring.from_fraction(1, 2))
+    ]));
 }
 
 #[test]
