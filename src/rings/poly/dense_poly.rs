@@ -586,7 +586,7 @@ impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> Li
     type LocalComputationData<'ring> = (ToExtRingMap<'ring, R::Type>, Vec<El<<R::Type as InterpolationBaseRing>::ExtendedRing<'ring>>>)
         where Self: 'ring;
 
-    fn ln_valuation(&self, el: &Self::Element) -> f64 {
+    fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
         if let Some(d) = self.degree(el) {
             return d as f64;
         } else {

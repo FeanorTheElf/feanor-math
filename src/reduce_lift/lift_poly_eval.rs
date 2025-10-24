@@ -107,11 +107,12 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
 /// Trait for rings that support lifting evaluations of a polynomial modulo a product
 /// of prime ideals to the original ring. 
 /// 
-/// More concretely, a ring `R` implementing this trait should be endowed with a valuation
+/// More concretely, a ring `R` implementing this trait should be endowed with a norm-like map
 /// ```text
 ///   |.|: R  ->  [0, ∞) u { -∞ }
 /// ```
-/// i.e. a sub-additive and multiplicative map with `|x| = -∞` iff `x = 0`.
+/// For the exact properties expected of this map, see [`LiftPolyEvalRing::ln_pseudo_norm()`].
+/// 
 /// Furthermore, for any bound `b`, the ring should be able to provide prime ideals
 /// `p1, ..., pk` together with the rings `Ri = R / pi`, such that the restricted
 /// reduction map
@@ -364,16 +365,22 @@ pub trait LiftPolyEvalRing: RingBase + FiniteRingSpecializable {
         where Self: 'ring;
 
     ///
-    /// Computes an upper bound of the natural logarithm of the valuation of a ring element.
+    /// Computes an upper bound of the natural logarithm of the pseudo-norm of a ring element.
     /// 
     /// The valuation should be
-    ///  - `-∞` if and only if `x = 0`,
     ///  - sub-additive, i.e. `|x + y| <= |x| + |y|`
-    ///  - multiplicative, i.e. `|xy| = |x| + |y|`
+    ///  - sub-multiplicative, i.e. `|xy| <= |x| |y|`
+    ///  - "semi-non-archimedean" (this is not a standard property), which we define as
+    ///    `|x1 + ... + xn| <= |n| max_i |xi|`
     /// 
-    /// and this function should give `ln|x|` (or `-∞` if `x = 0`).
+    /// Note that together with the last property, we can bound the evaluation of a
+    /// multivariate polynomial `f(X1, ..., Xn) = sum_I a_I X^I` at `x1, ..., xn` by
+    /// ```text
+    ///   |#{ I | a_I != 0}| max_I |a_I| |x1|^deg_X1(f) ... |xn|^deg_Xn(f)
+    /// ```
+    /// where `deg_Xi(f)` is the degree of `f` as a polynomial in `Xi`.
     /// 
-    fn ln_valuation(&self, el: &Self::Element) -> f64;
+    fn ln_pseudo_norm(&self, el: &Self::Element) -> f64;
 
     ///
     /// Sets up the context for a new polynomial evaluation, whose output
@@ -424,7 +431,7 @@ impl<R> LiftPolyEvalRing for R
     type LocalRingBase<'ring> = Self
         where Self: 'ring;
 
-    fn ln_valuation(&self, _el: &Self::Element) -> f64 {
+    fn ln_pseudo_norm(&self, _el: &Self::Element) -> f64 {
         0.
     }
 
@@ -625,7 +632,7 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
             type LocalRingBase<'ring> = $crate::rings::field::AsFieldBase<$crate::rings::zn::zn_64::Zn64B>
                 where Self: 'ring;
 
-            fn ln_valuation(&self, el: &Self::Element) -> f64 {
+            fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
                 RingRef::new(self).abs_log2_ceil(el).unwrap_or(0) as f64 * 2f64.ln()
             }
 

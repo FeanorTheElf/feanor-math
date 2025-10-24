@@ -1001,8 +1001,8 @@ impl<'a, R> crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing for IntegersWit
     type LocalComputationData<'ring> = <<Self as DelegateRing>::Base as crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing>::LocalComputationData<'ring>
         where Self:'ring;
     
-    fn ln_valuation(&self, el: &Self::Element) -> f64 {
-        self.get_delegate().ln_valuation(self.delegate_ref(el))
+    fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
+        self.get_delegate().ln_pseudo_norm(self.delegate_ref(el))
     }
     
     fn reduce<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &Self::Element) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
