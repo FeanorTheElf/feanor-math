@@ -3,9 +3,9 @@ use std::fmt::Display;
 
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::miller_rabin::is_prime;
-use crate::computation::no_error;
 use crate::delegate::*;
 use crate::divisibility::*;
+use crate::function::no_error;
 use crate::homomorphism::*;
 use crate::integer::*;
 use crate::ordered::OrderedRing;

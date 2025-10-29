@@ -1,5 +1,4 @@
 use crate::algorithms::matmul::ComputeInnerProduct;
-use crate::computation::LOG_PROGRESS;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::integer::IntegerRingStore;
 use crate::iters::multi_cartesian_product;
@@ -135,8 +134,7 @@ pub fn interpolate<P, V1, V2, A: Allocator>(poly_ring: P, x: V1, y: V2, allocato
         V1: VectorFn<El<<P::Type as RingExtension>::BaseRing>>,
         V2: VectorFn<El<<P::Type as RingExtension>::BaseRing>>
 {
-    use crate::computation::ComputationController;
-    LOG_PROGRESS.run_computation(format_args!("interpolate(num={})", x.len()), |_| {
+    span!(Level::INFO, "interpolate", num_points = x.len()).in_scope(|| {
         assert_eq!(x.len(), y.len());
         let base_ring = poly_ring.base_ring();
         let null_poly = poly_ring.prod(x.iter().map(|x| poly_ring.from_terms([(base_ring.one(), 1), (base_ring.negate(x), 0)])));
@@ -227,6 +225,7 @@ use crate::rings::zn::ZnRingStore;
 use std::alloc::Global;
 #[cfg(test)]
 use multivariate_impl::MultivariatePolyRingImpl;
+use tracing::{Level, span};
 #[cfg(test)]
 use crate::rings::fraction::FractionFieldStore;
 #[cfg(test)]

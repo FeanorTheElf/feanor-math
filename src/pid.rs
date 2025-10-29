@@ -1,4 +1,3 @@
-use crate::computation::ComputationController;
 use crate::ring::*;
 use crate::divisibility::*;
 
@@ -105,17 +104,6 @@ pub trait PrincipalIdealRing: DivisibilityRing {
         where Self: Domain
     {
         self.checked_div(&self.mul_ref(lhs, rhs), &self.ideal_gen(lhs, rhs)).unwrap()
-    }
-
-    ///
-    /// As [`PrincipalIdealRing::ideal_gen()`], this computes a generator of the ideal `(lhs, rhs)`.
-    /// However, it additionally accepts a [`ComputationController`] to customize the performed
-    /// computation.
-    /// 
-    fn ideal_gen_with_controller<Controller>(&self, lhs: &Self::Element, rhs: &Self::Element, _: Controller) -> Self::Element
-        where Controller: ComputationController
-    {
-        self.ideal_gen(lhs, rhs)
     }
 
     ///

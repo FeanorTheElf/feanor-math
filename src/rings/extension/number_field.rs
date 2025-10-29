@@ -12,7 +12,6 @@ use crate::algorithms::resultant::ComputeResultantRing;
 use crate::reduce_lift::lift_poly_factors::*;
 use crate::rings::extension::number_field::newton::find_approximate_complex_root;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
-use crate::computation::*;
 use crate::delegate::*;
 use crate::specialization::*;
 use crate::algorithms::convolution::*;
@@ -35,6 +34,7 @@ use crate::rings::extension::sparse::SparseMapVector;
 use feanor_serde::newtype_struct::*;
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use serde::de::DeserializeSeed;
+use tracing::{Level, event, span};
 
 use super::extension_impl::FreeAlgebraImpl;
 use super::Field;
@@ -505,22 +505,13 @@ impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
             P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        Self::gcd_with_controller(poly_ring, lhs, rhs, DontObserve)
-    }
-
-    fn gcd_with_controller<P, Controller>(poly_ring: P, lhs: &El<P>, rhs: &El<P>, controller: Controller) -> El<P>
-        where P: RingStore + Copy,
-            P::Type: PolyRing + DivisibilityRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
-            Controller: ComputationController
-    {
         let self_ = NumberFieldByOrder { base: RingRef::new(poly_ring.base_ring().get_ring()) };
 
         let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
         let lhs_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, lhs);
         let rhs_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, rhs);
 
-        let result = poly_gcd_local(&order_poly_ring, order_poly_ring.clone_el(&lhs_order), order_poly_ring.clone_el(&rhs_order), controller);
+        let result = poly_gcd_local(&order_poly_ring, order_poly_ring.clone_el(&lhs_order), order_poly_ring.clone_el(&rhs_order));
 
         return self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &result);
     }
@@ -534,7 +525,7 @@ impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
         let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
         let poly_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, poly);
 
-        let result = poly_power_decomposition_local(&order_poly_ring, poly_order, DontObserve);
+        let result = poly_power_decomposition_local(&order_poly_ring, poly_order);
 
         return result.into_iter().map(|(f, k)| (self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), k)).collect();
     }
@@ -561,7 +552,7 @@ enum HeuristicFactorPolyInOrderResult<P>
 /// E.g. `X^4 - 10 X^2 + 1` is reducible modulo every prime. In fact, it is a theorem that
 /// there exists inert primes if and only if the Galois group of the extension is cyclic.
 /// 
-fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> HeuristicFactorPolyInOrderResult<P>
+fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I>(poly_ring: P, poly: &El<P>) -> HeuristicFactorPolyInOrderResult<P>
     where Impl: 'a + RingStore,
         Impl::Type: Field + FreeAlgebra,
         <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
@@ -569,10 +560,9 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I, Controller>(poly_ring
         I::Type: IntegerRing,
         P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <P::Type as RingExtension>::BaseRing: RingStore<Type = NumberFieldByOrder<'a, Impl, I>>,
-        Controller: ComputationController
+        <P::Type as RingExtension>::BaseRing: RingStore<Type = NumberFieldByOrder<'a, Impl, I>>
 {
-    controller.run_computation(format_args!("factor_direct(deg={}, extdeg={})", poly_ring.degree(poly).unwrap(), poly_ring.base_ring().rank()), |controller| {
+    span!(Level::INFO, "factor_poly_direct_numberfield", poly_deg = poly_ring.degree(poly).unwrap_or(0), numberfield_deg = poly_ring.base_ring().rank()).in_scope(|| {
         let mut rng = oorandom::Rand64::new(1);
         let self_ = poly_ring.base_ring();
 
@@ -587,13 +577,13 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I, Controller>(poly_ring
                 }
             }
             if let Some(p) = inert_prime {
-                log_progress!(controller, "(inert_prime={})", IdealDisplayWrapper::new(self_.base_ring().base_ring().get_ring(), &p.prime));
+                event!(Level::INFO, prime = %IdealDisplayWrapper::new(self_.base_ring().base_ring().get_ring(), &p.prime), "found_inert_prime");
                 let lc_poly = self_.clone_el(poly_ring.lc(poly).unwrap());
                 let monic_poly = evaluate_aX(poly_ring, poly, &lc_poly);
                 let e = 2 * self_.get_ring().heuristic_exponent(&p, poly_ring.degree(&monic_poly).unwrap(), poly_ring.terms(&monic_poly).map(|(c, _)| c));
-                match factor_and_lift_mod_pe(poly_ring, &p, e, &monic_poly, controller.clone()) {
+                match factor_and_lift_mod_pe(poly_ring, &p, e, &monic_poly) {
                     FactorAndLiftModpeResult::PartialFactorization(factorization) => {
-                        log_progress!(controller, "(partial_success)");
+                        event!(Level::INFO, "nontrivial_factorization");
                         debug_assert!(poly_ring.eq_el(&monic_poly, &poly_ring.normalize(poly_ring.prod(factorization.iter().map(|f| poly_ring.clone_el(f))))));
                         let result: Vec<_> = factorization.into_iter().map(|f| (unevaluate_aX(poly_ring, &f, &lc_poly), 1)).collect();
                         debug_assert!(poly_ring.eq_el(&poly_ring.normalize(poly_ring.clone_el(poly)), &poly_ring.normalize(poly_ring.prod(result.iter().map(|(f, e)| poly_ring.pow(poly_ring.clone_el(f), *e))))));
@@ -604,9 +594,9 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I, Controller>(poly_ring
                     },
                     FactorAndLiftModpeResult::NotSquarefreeModpe => {
                         // probably not square-free
-                        let power_decomposition = poly_power_decomposition_local(poly_ring, poly_ring.clone_el(poly), controller.clone());
+                        let power_decomposition = poly_power_decomposition_local(poly_ring, poly_ring.clone_el(poly));
                         if power_decomposition.len() > 1 {
-                            log_progress!(controller, "(partial_success)");
+                        event!(Level::INFO, "nontrivial_factorization");
                             return HeuristicFactorPolyInOrderResult::PartialFactorization(power_decomposition);
                         }
                     },
@@ -616,7 +606,7 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I, Controller>(poly_ring
                 break 'try_factor_directly;
             }
         }
-        log_progress!(controller, "(fail)");
+        event!(Level::INFO, "failed");
         return HeuristicFactorPolyInOrderResult::Unknown;
     })
 }
@@ -633,15 +623,6 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        Self::factor_poly_with_controller(poly_ring, poly, DontObserve)
-    }
-
-    fn factor_poly_with_controller<P, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: RingStore + Copy,
-            P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
-            Controller: ComputationController
-    {
         let self_ = NumberFieldByOrder { base: RingRef::new(poly_ring.base_ring().get_ring()) };
         let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
 
@@ -653,13 +634,13 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
             } else {
                 let poly_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, &current);
                 // try the direct factorization
-                match heuristic_factor_poly_directly_in_order(&order_poly_ring, &poly_order, controller.clone()) {
+                match heuristic_factor_poly_directly_in_order(&order_poly_ring, &poly_order) {
                     HeuristicFactorPolyInOrderResult::PartialFactorization(partial_factorization) => to_factor.extend(
                         partial_factorization.into_iter().map(|(f, e)| (self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), e * e_base))
                     ),
                     HeuristicFactorPolyInOrderResult::Irreducible => result.push((current, e_base)),
                     HeuristicFactorPolyInOrderResult::Unknown => result.extend(
-                        poly_factor_extension(&poly_ring, &current, controller.clone()).0.into_iter().map(|(f, e)| (f, e * e_base))
+                        poly_factor_extension(&poly_ring, &current).0.into_iter().map(|(f, e)| (f, e * e_base))
                     )
                 }
             }
@@ -957,8 +938,7 @@ impl<'ring, I> NumberRingIdeal<'ring, I>
             &ZpeX,
             FpX,
             &ZpeX.lifted_hom(ZZX, ZZ_to_Zpe).map_ref(&self.number_field_poly),
-            &self.minpoly_factors_mod_p[..],
-            DontObserve
+            &self.minpoly_factors_mod_p[..]
         );
         
         return (ZpeX, factors);

@@ -1,10 +1,9 @@
 
 use std::mem::swap;
-use std::sync::atomic::Ordering;
 
-use atomicbox::AtomicOptionBox;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use tracing::{Level, Span, event, span};
 
-use crate::computation::{ComputationController, DontObserve, ShortCircuitingComputation, ShortCircuitingComputationHandle};
 use crate::delegate::{UnwrapHom, WrapHom};
 use crate::reduce_lift::lift_poly_eval::{LiftPolyEvalRing, LiftPolyEvalRingReductionMap};
 use crate::divisibility::{DivisibilityRingStore, Domain};
@@ -14,7 +13,6 @@ use crate::rings::fraction::FractionFieldStore;
 use crate::rings::poly::*;
 use crate::rings::finite::*;
 use crate::pid::EuclideanRingStore;
-use crate::seq::VectorFn;
 use crate::specialization::FiniteRingOperation;
 use crate::integer::*;
 use crate::rings::rational::*;
@@ -74,18 +72,6 @@ pub fn resultant_finite_field<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::
 /// over the ring.
 /// 
 pub trait ComputeResultantRing: RingBase {
-
-    ///
-    /// Computes the resultant of `f` and `g` over the base ring, taking
-    /// a controller to control the performed computation.
-    /// 
-    /// See also [`ComputeResultantRing::resultant()`].
-    /// 
-    fn resultant_with_controller<P, Controller>(poly_ring: P, f: El<P>, g: El<P>, controller: Controller) -> Self::Element
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
-            Controller: ComputationController;
     
     ///
     /// Computes the resultant of `f` and `g` over the base ring.
@@ -117,36 +103,29 @@ pub trait ComputeResultantRing: RingBase {
     fn resultant<P>(poly_ring: P, f: El<P>, g: El<P>) -> Self::Element
         where P: RingStore + Copy,
             P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
-    {
-        Self::resultant_with_controller(poly_ring, f, g, DontObserve)
-    }
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
 }
 
 impl<R: ?Sized + LiftPolyEvalRing + Domain + SelfIso> ComputeResultantRing for R {
 
-    default fn resultant_with_controller<P, Controller>(ring: P, f: El<P>, g: El<P>, controller: Controller) -> El<<P::Type as RingExtension>::BaseRing>
+    default fn resultant<P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
         where P: RingStore + Copy,
             P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = R>,
-            Controller: ComputationController
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = R>
     {
-        struct ComputeResultant<P, Controller>
+        struct ComputeResultant<P>
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LiftPolyEvalRing + Domain + SelfIso,
-                Controller: ComputationController
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LiftPolyEvalRing + Domain + SelfIso
         {
             ring: P,
             f: El<P>,
-            g: El<P>,
-            controller: Controller
+            g: El<P>
         }
-        impl<P, Controller> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for ComputeResultant<P, Controller>
+        impl<P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for ComputeResultant<P>
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LiftPolyEvalRing + Domain + SelfIso,
-                Controller: ComputationController
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LiftPolyEvalRing + Domain + SelfIso
         {
             type Output = El<<P::Type as RingExtension>::BaseRing>;
 
@@ -167,7 +146,7 @@ impl<R: ?Sized + LiftPolyEvalRing + Domain + SelfIso> ComputeResultantRing for R
                 if ring_ref.is_zero(f_ref) || ring_ref.is_zero(g_ref) {
                     return base_ring.zero();
                 }
-                self.controller.run_computation(format_args!("resultant_local(ldeg={}, rdeg={})", ring_ref.degree(f_ref).unwrap(), ring_ref.degree(g_ref).unwrap()), |controller| {
+                span!(Level::INFO, "resultant", lhs_deg = ring_ref.degree(f_ref).unwrap(), rhs_deg = ring_ref.degree(g_ref).unwrap()).in_scope(|| {
                     let coeff_bound_f_ln = ring_ref.terms(f_ref).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap();
                     let coeff_bound_g_ln = ring_ref.terms(g_ref).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap();
                     let ln_max_norm = coeff_bound_f_ln * ring_ref.degree(g_ref).unwrap() as f64 + 
@@ -180,28 +159,24 @@ impl<R: ?Sized + LiftPolyEvalRing + Domain + SelfIso> ComputeResultantRing for R
                     let work_locally = base_ring.get_ring().init_reduce_lift(ln_max_norm);
                     let work_locally_ref = &work_locally;
                     let count = base_ring.get_ring().prime_ideal_count(&work_locally);
-                    log_progress!(controller, "({})", count);
-                    let resultants = (0..count).map(|_| AtomicOptionBox::none()).collect::<Vec<_>>();
-                    let resultants_ref = &resultants;
+                    event!(Level::INFO, prime_ideal_count = count, "compute_local");
 
-                    ShortCircuitingComputation::<(), _>::new().handle(controller).join_many((0..count).map_fn(|i| move |handle: ShortCircuitingComputationHandle<_, _>| {
+                    let current_span = Span::current();
+                    let resultants = (0..count).into_par_iter().map(|i| current_span.in_scope(|| {
                         let embedding = LiftPolyEvalRingReductionMap::new(base_ring.get_ring(), work_locally_ref, i);
                         let new_poly_ring = DensePolyRing::new(embedding.codomain(), "X");
                         let poly_ring_embedding = new_poly_ring.lifted_hom(ring_ref, &embedding);
                         let local_f = poly_ring_embedding.map_ref(f_ref);
                         let local_g = poly_ring_embedding.map_ref(g_ref);
                         let local_resultant = <_ as ComputeResultantRing>::resultant(&new_poly_ring, local_f, local_g);
-                        _ = resultants_ref[i].swap(Some(Box::new(local_resultant)), Ordering::SeqCst);
-                        log_progress!(handle, ".");
-                        return Ok(None);
-                    }));
+                        return local_resultant;
+                    })).collect::<Vec<_>>();
 
-                    let resultants = resultants.into_iter().map(|r| *r.swap(None, Ordering::SeqCst).unwrap()).collect::<Vec<_>>();
                     return base_ring.get_ring().lift_combine(&work_locally, &resultants);
                 })
             }
         }
-        R::specialize(ComputeResultant { ring, f, g, controller })
+        R::specialize(ComputeResultant { ring, f, g })
     }
 }
 
@@ -209,11 +184,10 @@ impl<I> ComputeResultantRing for RationalFieldBase<I>
     where I: RingStore,
         I::Type: IntegerRing 
 {
-    fn resultant_with_controller<P, Controller>(ring: P, f: El<P>, g: El<P>, controller: Controller) -> El<<P::Type as RingExtension>::BaseRing>
+    fn resultant<P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
         where P: RingStore + Copy,
             P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
-            Controller: ComputationController
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
         if ring.is_zero(&g) || ring.is_zero(&f) {
             return ring.base_ring().zero();
@@ -227,7 +201,7 @@ impl<I> ComputeResultantRing for RationalFieldBase<I>
         let ZZX = DensePolyRing::new(ZZ, "X");
         let f_int = ZZX.from_terms(ring.terms(&f).map(|(c, i)| { let (a, b) = (QQ.get_ring().num(c), QQ.get_ring().den(c)); (ZZ.checked_div(&ZZ.mul_ref(&f_den_lcm, a), b).unwrap(), i) }));
         let g_int = ZZX.from_terms(ring.terms(&g).map(|(c, i)| { let (a, b) = (QQ.get_ring().num(c), QQ.get_ring().den(c)); (ZZ.checked_div(&ZZ.mul_ref(&f_den_lcm, a), b).unwrap(), i) }));
-        let result_unscaled = <_ as ComputeResultantRing>::resultant_with_controller(&ZZX, f_int, g_int, controller);
+        let result_unscaled = <_ as ComputeResultantRing>::resultant(&ZZX, f_int, g_int);
         return QQ.from_fraction(result_unscaled, ZZ.mul(ZZ.pow(f_den_lcm, g_deg), ZZ.pow(g_den_lcm, f_deg)));
     }
 }

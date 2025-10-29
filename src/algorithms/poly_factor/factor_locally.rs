@@ -1,10 +1,13 @@
 use std::convert::identity;
 
+use tracing::Level;
+use tracing::event;
+use tracing::span;
+
 use crate::algorithms::poly_gcd::*;
 use crate::algorithms::poly_gcd::hensel::*;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::poly_factor::FactorPolyField;
-use crate::computation::ComputationController;
 use crate::reduce_lift::lift_poly_factors::*;
 use crate::ring::*;
 use crate::rings::poly::*;
@@ -82,12 +85,11 @@ pub enum FactorAndLiftModpeResult<P>
 /// return non-irreducible factors of `f`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::SuitableIdeal<'ring>, e: usize, poly: &El<P>, controller: Controller) -> FactorAndLiftModpeResult<P>
+pub fn factor_and_lift_mod_pe<'ring, R, P>(poly_ring: P, prime: &R::SuitableIdeal<'ring>, e: usize, poly: &El<P>) -> FactorAndLiftModpeResult<P>
     where R: ?Sized + PolyLiftFactorsDomain,
         P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <P::Type as RingExtension>::BaseRing: RingStore<Type = R>,
-        Controller: ComputationController
+        <P::Type as RingExtension>::BaseRing: RingStore<Type = R>
 {
     let ring = poly_ring.base_ring().get_ring();
     assert_eq!(1, ring.maximal_ideal_factor_count(&prime), "currently only maximal ideals are supported, got {}", IdealDisplayWrapper::new(ring, prime));
@@ -102,7 +104,7 @@ pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::
 
     let poly_mod_m = FX.lifted_hom(poly_ring, R_to_F).map_ref(poly);
     let mut factors = Vec::new();
-    for (f, k) in <_ as FactorPolyField>::factor_poly_with_controller(&FX, &poly_mod_m, controller.clone()).0 {
+    for (f, k) in <_ as FactorPolyField>::factor_poly(&FX, &poly_mod_m).0 {
         if k > 1 {
             return FactorAndLiftModpeResult::NotSquarefreeModpe;
         }
@@ -114,7 +116,7 @@ pub fn factor_and_lift_mod_pe<'ring, R, P, Controller>(poly_ring: P, prime: &R::
 
     let SX = DensePolyRing::new(*red_map.domain(), "X");
     let poly_mod_me = SX.lifted_hom(poly_ring, reduction.main_ring_to_intermediate_ring_reduction(0)).map_ref(poly);
-    let factorization_mod_me = hensel_lift_factorization(&red_map, &SX, &FX, &poly_mod_me, &factors[..], controller);
+    let factorization_mod_me = hensel_lift_factorization(&red_map, &SX, &FX, &poly_mod_me, &factors[..]);
     let combined_factorization = combine_local_factors_local(&reduction, poly_ring, poly, &SX, e, factorization_mod_me);
     if combined_factorization.len() == 1 {
         return FactorAndLiftModpeResult::Unknown;
@@ -138,11 +140,10 @@ fn ln_factor_max_coeff<P>(ZZX: P, f: &El<P>) -> f64
     return (log2_poly_norm + d as f64) * 2f64.ln();
 }
 
-fn factor_squarefree_monic_integer_poly_local<'a, P, Controller>(ZZX: P, f: &El<P>, controller: Controller) -> Vec<El<P>>
+fn factor_squarefree_monic_integer_poly_local<'a, P>(ZZX: P, f: &El<P>) -> Vec<El<P>>
     where P: 'a + RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
-        Controller: ComputationController
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
 {
     let ZZ = ZZX.base_ring();
     assert!(ZZ.is_one(ZZX.lc(f).unwrap()));
@@ -155,8 +156,8 @@ fn factor_squarefree_monic_integer_poly_local<'a, P, Controller>(ZZX: P, f: &El<
         assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&prime));
         let prime_f64 = BigIntRing::RING.to_float_approx(&ZZ.get_ring().principal_ideal_generator(&prime));
         let e = (bound / prime_f64.ln()).ceil() as usize + 1;
-        log_progress!(controller, "(mod={}^{})", IdealDisplayWrapper::new(ZZ.get_ring(), &prime), e);
-        match factor_and_lift_mod_pe(ZZX, &prime, e, f, controller.clone()) {
+        event!(Level::INFO, prime_ideal = %IdealDisplayWrapper::new(ZZ.get_ring(), &prime), exponent = e, "factor_modulo");
+        match factor_and_lift_mod_pe(ZZX, &prime, e, f) {
             FactorAndLiftModpeResult::Irreducible => return vec![ZZX.clone_el(f)],
             FactorAndLiftModpeResult::PartialFactorization(result) => return result,
             // unknown means irreducible, since we chose `e` large enough
@@ -174,24 +175,24 @@ fn factor_squarefree_monic_integer_poly_local<'a, P, Controller>(ZZX: P, f: &El<
 /// product is `f` only up to multiplication by a nonzero integer. 
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn poly_factor_integer<P, Controller>(ZZX: P, f: El<P>, controller: Controller) -> Vec<(El<P>, usize)>
+pub fn poly_factor_integer<P>(ZZX: P, f: El<P>) -> Vec<(El<P>, usize)>
     where P: PolyRingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing,
-        Controller: ComputationController
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
 {
     assert!(!ZZX.is_zero(&f));
-    let power_decomposition = poly_power_decomposition_local(ZZX, ZZX.clone_el(&f), controller.clone());
 
-    controller.run_computation(format_args!("factor_int_poly(deg={})", ZZX.degree(&f).unwrap()), |controller| {
+    span!(Level::INFO, "factor_poly_integer", poly_deg = ZZX.degree(&f).unwrap()).in_scope(|| {
+
+        let power_decomposition = poly_power_decomposition_local(ZZX, ZZX.clone_el(&f));
 
         let mut result = Vec::new();
         let mut current = ZZX.clone_el(&f);
         for (factor, _k) in power_decomposition {
-            log_progress!(controller, "(deg={})", ZZX.degree(&factor).unwrap());
+            event!(Level::INFO, factor_deg = ZZX.degree(&factor).unwrap_or(0), "found_factor");
             let lc_factor = ZZX.lc(&factor).unwrap();
             let factor_monic = evaluate_aX(ZZX, &factor, lc_factor);
-            let factorization = factor_squarefree_monic_integer_poly_local(&ZZX, &factor_monic, controller.clone());
+            let factorization = factor_squarefree_monic_integer_poly_local(&ZZX, &factor_monic);
             for irred_factor in factorization.into_iter().map(|fi| unevaluate_aX(ZZX, &fi, &lc_factor)) {
                 let irred_factor_lc = ZZX.lc(&irred_factor).unwrap();
                 let mut power = 0;
@@ -214,15 +215,13 @@ pub fn poly_factor_integer<P, Controller>(ZZX: P, f: El<P>, controller: Controll
 use crate::primitive_int::*;
 #[cfg(test)]
 use crate::algorithms::poly_gcd::make_primitive;
-#[cfg(test)]
-use crate::computation::TEST_LOG_PROGRESS;
 
 #[test]
 fn test_factor_int_poly() {
     let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
     let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1, X + 1]);
     let input = ZZX.mul_ref(&f, &g);
-    let actual = poly_factor_integer(&ZZX, input, TEST_LOG_PROGRESS);
+    let actual = poly_factor_integer(&ZZX, input);
     assert_eq!(2, actual.len());
     for (factor, e) in &actual {
         assert_eq!(1, *e);
@@ -232,7 +231,7 @@ fn test_factor_int_poly() {
     let ZZX = DensePolyRing::new(StaticRing::<i128>::RING, "X");
     let [f, g] = ZZX.with_wrapped_indeterminate(|X| [5 * X.pow_ref(2) + 1, 3 * X.pow_ref(2) + 2]);
     let input = ZZX.mul_ref(&f, &g);
-    let actual = poly_factor_integer(&ZZX, input, TEST_LOG_PROGRESS);
+    let actual = poly_factor_integer(&ZZX, input);
     assert_eq!(2, actual.len());
     for (factor, e) in &actual {
         assert_eq!(1, *e);
@@ -241,7 +240,7 @@ fn test_factor_int_poly() {
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [5 * X.pow_ref(2) + 1]);
     let input = ZZX.mul_ref(&f, &f);
-    let actual = poly_factor_integer(&ZZX, input, TEST_LOG_PROGRESS);
+    let actual = poly_factor_integer(&ZZX, input);
     assert_eq!(1, actual.len());
     assert_eq!(2, actual[0].1);
     assert_el_eq!(&ZZX, &f, &actual[0].0);

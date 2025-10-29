@@ -3,7 +3,6 @@ use std::cmp::Ordering;
 use oorandom::Rand64;
 
 use crate::algorithms::poly_gcd::squarefree_part::poly_squarefree_part_local;
-use crate::computation::DontObserve;
 use crate::rings::poly::dense_poly::*;
 use crate::homomorphism::*;
 use crate::field::FieldStore;
@@ -152,7 +151,7 @@ pub fn find_approximate_complex_root<P>(ZZX: P, f: &El<P>) -> Result<(El<Complex
 {
     assert!(ZZX.degree(f).unwrap_or(0) > 0);
     let CC = Complex64::RING;
-    assert!(ZZX.checked_div(&poly_squarefree_part_local(&ZZX, ZZX.clone_el(f), DontObserve), f).is_some(), "polynomial must be square-free");
+    assert!(ZZX.checked_div(&poly_squarefree_part_local(&ZZX, ZZX.clone_el(f)), f).is_some(), "polynomial must be square-free");
     let CCX = DensePolyRing::new(CC, "X");
     return find_approximate_complex_root_squarefree(&CCX, &CCX.lifted_hom(&ZZX, CC.can_hom(ZZX.base_ring()).unwrap()).map_ref(f), ZZX.degree(f).unwrap());
 }
@@ -178,7 +177,7 @@ pub fn find_all_approximate_complex_roots<P>(ZZX: P, poly: &El<P>) -> Result<Vec
     assert!(ZZX.degree(poly).unwrap_or(0) > 0);
     let CC = Complex64::RING;
     let ZZ_to_CC = CC.can_hom(ZZX.base_ring()).unwrap();
-    assert!(ZZX.checked_div(&poly_squarefree_part_local(&ZZX, ZZX.clone_el(poly), DontObserve), poly).is_some(), "polynomial must be square-free");
+    assert!(ZZX.checked_div(&poly_squarefree_part_local(&ZZX, ZZX.clone_el(poly)), poly).is_some(), "polynomial must be square-free");
     let CCX = DensePolyRing::new(CC, "X");
     let ZZX_to_CCX = CCX.lifted_hom(&ZZX, ZZ_to_CC);
 

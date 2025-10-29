@@ -1,5 +1,8 @@
 use dense_poly::DensePolyRing;
 use squarefree_part::poly_power_decomposition_monic_local;
+use tracing::Level;
+use tracing::event;
+use tracing::span;
 
 use crate::algorithms::poly_gcd::*;
 use crate::algorithms::poly_gcd::hensel::*;
@@ -33,12 +36,11 @@ struct Signature {
 /// More precisely, computes some `d in R[X]` of maximal degree with the property that there exists 
 /// `a in R \ {0}` such that `d | af, ag`.
 ///
-fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F, current_attempt: usize, controller: Controller) -> Option<El<P>>
+fn poly_gcd_monic_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F, current_attempt: usize) -> Option<El<P>>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain,
-        F: FnMut() -> u64,
-        Controller: ComputationController
+        F: FnMut() -> u64
 {
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(g).unwrap()));
@@ -51,7 +53,7 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
     let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt.try_into().unwrap())).floor() as usize;
     let reduction = PolyLiftFactorsDomainReductionContext::new(ring, &ideal, e);
 
-    log_progress!(controller, "(mod={}^{})(parts={})", IdealDisplayWrapper::new(ring, &ideal), e, reduction.len());
+    event!(Level::INFO, ideal = %IdealDisplayWrapper::new(ring, &ideal), exponent = e, maximal_ideal_count = reduction.len(), "modulo_ideal");
 
     let mut signature: Option<Signature> = None;
     let mut poly_rings_mod_me = Vec::new();
@@ -66,9 +68,7 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
         let FX = DensePolyRing::new(&F, "X");
         let RX_to_FX = FX.lifted_hom(poly_ring, &R_to_F);
 
-        let d = controller.clone().run_computation(format_args!("local_gcd."), |_| 
-            FX.normalize(FX.ideal_gen(&RX_to_FX.map_ref(f), &RX_to_FX.map_ref(g)))
-        );
+        let d = FX.normalize(FX.ideal_gen(&RX_to_FX.map_ref(f), &RX_to_FX.map_ref(g)));
 
         let f_over_d = FX.checked_div(&RX_to_FX.map_ref(f), &d).unwrap();
         let g_over_d = FX.checked_div(&RX_to_FX.map_ref(g), &d).unwrap();
@@ -78,11 +78,11 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
         } else if FX.is_unit(&FX.ideal_gen(&d, &g_over_d)) {
             (g, d, g_over_d, Signature { gcd_deg: deg_d, coprime_to_f_over_d: false })
         } else {
-            log_progress!(controller, "(not_coprime)");
+            event!(Level::INFO, "not_coprime");
             return None;
         };
         if signature.is_some() && signature.as_ref().unwrap() != &new_signature {
-            log_progress!(controller, "(signature_mismatch)");
+            event!(Level::INFO, "signature_mismatch");
             return None;
         }
         signature = Some(new_signature);
@@ -90,25 +90,21 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
         let RX_to_SX = SX.lifted_hom(poly_ring, reduction.main_ring_to_intermediate_ring_reduction(idx));
 
         let factors = [factor1, factor2];
-        let [d, _] = hensel_lift_factorization(&S_to_F, &SX, &FX, &RX_to_SX.map_ref(poly), &factors[..], controller.clone()).try_into().ok().unwrap();
+        let [d, _] = hensel_lift_factorization(&S_to_F, &SX, &FX, &RX_to_SX.map_ref(poly), &factors[..]).try_into().ok().unwrap();
 
         poly_rings_mod_me.push(SX);
         gcds_mod_me.push(d);
     }
 
     let signature = signature.unwrap();
-    let mut result = controller.clone().run_computation(format_args!("reconstruct."), |_|
-        poly_ring.from_terms((0..=signature.gcd_deg).map(|i| (
-            reduction.reconstruct_ring_el((0..reduction.len()).map_fn(|j| poly_rings_mod_me[j].coefficient_at(&gcds_mod_me[j], i))),
-            i
-        )))
-    );
+    let mut result = poly_ring.from_terms((0..=signature.gcd_deg).map(|i| (
+        reduction.reconstruct_ring_el((0..reduction.len()).map_fn(|j| poly_rings_mod_me[j].coefficient_at(&gcds_mod_me[j], i))),
+        i
+    )));
 
-    let divides_f_and_g = controller.clone().run_computation(format_args!("check_division."), |_|
-        poly_ring.divides(&f, &result) && poly_ring.divides(&g, &result)
-    );
+    let divides_f_and_g = poly_ring.divides(&f, &result) && poly_ring.divides(&g, &result);
     if !divides_f_and_g {
-        log_progress!(controller, "(no_divisor)");
+        event!(Level::INFO, "failed");
         return None;
     } else {
         _ = poly_ring.balance_poly(&mut result);
@@ -124,12 +120,11 @@ fn poly_gcd_monic_coprime_local<P, F, Controller>(poly_ring: P, f: &El<P>, g: &E
 /// More precisely, computes some `d in R[X]` of maximal degree with the property that there exists 
 /// `a in R \ {0}` such that `d | af, ag`.
 ///
-fn poly_gcd_coprime_local<P, F, Controller>(poly_ring: P, mut f: El<P>, mut g: El<P>, rng: F, attempt: usize, controller: Controller) -> Option<El<P>>
+fn poly_gcd_coprime_local<P, F>(poly_ring: P, mut f: El<P>, mut g: El<P>, rng: F, attempt: usize) -> Option<El<P>>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain,
-        F: FnMut() -> u64,
-        Controller: ComputationController
+        F: FnMut() -> u64
 {
     if poly_ring.is_zero(&f) {
         return Some(poly_ring.clone_el(&g));
@@ -145,7 +140,7 @@ fn poly_gcd_coprime_local<P, F, Controller>(poly_ring: P, mut f: El<P>, mut g: E
     let f_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_map(f, lcg), &a);
     let g_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_map(g, lcf), &a);
 
-    let d_monic = poly_gcd_monic_coprime_local(poly_ring, &f_monic, &g_monic, rng, attempt, controller)?;
+    let d_monic = poly_gcd_monic_coprime_local(poly_ring, &f_monic, &g_monic, rng, attempt)?;
 
     let mut result = unevaluate_aX(poly_ring, &d_monic, &a);
     _ = poly_ring.balance_poly(&mut result);
@@ -163,27 +158,26 @@ fn poly_gcd_coprime_local<P, F, Controller>(poly_ring: P, mut f: El<P>, mut g: E
 /// of the underlying ring.
 ///
 #[stability::unstable(feature = "enable")]
-pub fn poly_gcd_monic_local<'a, P, Controller>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El<P>, controller: Controller) -> El<P>
+pub fn poly_gcd_monic_local<'a, P>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El<P>) -> El<P>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain,
-        Controller: ComputationController
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain
 {
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(g).unwrap()));
 
-    controller.run_computation(format_args!("gcd_local(deg_l={}, deg_r={})", poly_ring.degree(f).unwrap(), poly_ring.degree(g).unwrap()), |controller| {
+    span!(Level::INFO, "poly_gcd_local", lhs_deg = poly_ring.degree(f).unwrap(), rhs_deg = poly_ring.degree(g).unwrap()).in_scope(|| {
 
         let mut rng = oorandom::Rand64::new(1);
         for attempt in 0..HOPE_FOR_SQUAREFREE_TRIES {
-            if let Some(result) = poly_gcd_monic_coprime_local(poly_ring, f, g, || rng.rand_u64(), attempt, controller.clone()) {
+            if let Some(result) = poly_gcd_monic_coprime_local(poly_ring, f, g, || rng.rand_u64(), attempt) {
                 return result;
             }
         }
         if poly_ring.degree(g).unwrap_or(0) <= poly_ring.degree(f).unwrap_or(0) {
             std::mem::swap(&mut f, &mut g);
         }
-        let f_power_decomposition = poly_power_decomposition_monic_local(poly_ring, f, controller.clone());
+        let f_power_decomposition = poly_power_decomposition_monic_local(poly_ring, f);
         let mut g = poly_ring.clone_el(g);
         let mut d = poly_ring.one();
 
@@ -193,7 +187,7 @@ pub fn poly_gcd_monic_local<'a, P, Controller>(poly_ring: P, mut f: &'a El<P>, m
                 return d;
             }
             for attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
-                if let Some(di) = poly_gcd_coprime_local(poly_ring, poly_ring.clone_el(&squarefree_part_i), poly_ring.clone_el(&g), || rng.rand_u64(), attempt, controller.clone()) {
+                if let Some(di) = poly_gcd_coprime_local(poly_ring, poly_ring.clone_el(&squarefree_part_i), poly_ring.clone_el(&g), || rng.rand_u64(), attempt) {
                     g = poly_ring.checked_div(&g, &di).unwrap();
                     poly_ring.mul_assign(&mut d, di);
                     continue 'extract_part_i;
@@ -216,11 +210,10 @@ pub fn poly_gcd_monic_local<'a, P, Controller>(poly_ring: P, mut f: &'a El<P>, m
 /// of the underlying ring.
 ///
 #[stability::unstable(feature = "enable")]
-pub fn poly_gcd_local<P, Controller>(poly_ring: P, mut f: El<P>, mut g: El<P>, controller: Controller) -> El<P>
+pub fn poly_gcd_local<P>(poly_ring: P, mut f: El<P>, mut g: El<P>) -> El<P>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain,
-        Controller: ComputationController
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain
 {
     if poly_ring.is_zero(&f) {
         return poly_ring.clone_el(&g);
@@ -236,7 +229,7 @@ pub fn poly_gcd_local<P, Controller>(poly_ring: P, mut f: El<P>, mut g: El<P>, c
     let f_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_map(f, lcg), &a);
     let g_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_map(g, lcf), &a);
 
-    let d_monic = poly_gcd_monic_local(poly_ring, &f_monic, &g_monic, controller);
+    let d_monic = poly_gcd_monic_local(poly_ring, &f_monic, &g_monic);
 
     let mut result = unevaluate_aX(poly_ring, &d_monic, &a);
     _ = poly_ring.balance_poly(&mut result);
@@ -269,25 +262,25 @@ fn test_poly_gcd_local() {
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 0, 0, 0], 1),
-        poly_gcd_local(&poly_ring, poly([1, 0, 1, 0, 0], 1), poly([1, 0, 0, 1, 0], 2), TEST_LOG_PROGRESS)
+        poly_gcd_local(&poly_ring, poly([1, 0, 1, 0, 0], 1), poly([1, 0, 0, 1, 0], 2))
     );
     
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 1, 0, 1], 1),
-        poly_gcd_local(&poly_ring, poly([1, 1, 1, 0, 1], 20), poly([1, 0, 1, 1, 1], 12), TEST_LOG_PROGRESS)
+        poly_gcd_local(&poly_ring, poly([1, 1, 1, 0, 1], 20), poly([1, 0, 1, 1, 1], 12))
     );
 
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 2, 0, 1], 1),
-        poly_gcd_local(&poly_ring, poly([1, 1, 3, 0, 1], 20), poly([3, 0, 2, 0, 3], 12), TEST_LOG_PROGRESS)
+        poly_gcd_local(&poly_ring, poly([1, 1, 3, 0, 1], 20), poly([3, 0, 2, 0, 3], 12))
     );
 
     assert_el_eq!(
         &poly_ring,
         poly([1, 0, 0, 5, 0], 1),
-        poly_gcd_local(&poly_ring, poly([2, 1, 3, 5, 1], 20), poly([1, 0, 0, 7, 0], 12), TEST_LOG_PROGRESS)
+        poly_gcd_local(&poly_ring, poly([2, 1, 3, 5, 1], 20), poly([1, 0, 0, 7, 0], 12))
     );
 }
 
@@ -304,7 +297,7 @@ fn random_test_poly_gcd_local() {
         // println!("Testing gcd on ({}) * ({}) and ({}) * ({})", poly_ring.formatted_el(&f), poly_ring.formatted_el(&h), poly_ring.formatted_el(&g), poly_ring.formatted_el(&h));
         let lhs = poly_ring.mul_ref(&f, &h);
         let rhs = poly_ring.mul_ref(&g, &h);
-        let gcd = make_primitive(&poly_ring, &poly_gcd_local(&poly_ring, poly_ring.clone_el(&lhs), poly_ring.clone_el(&rhs), TEST_LOG_PROGRESS)).0;
+        let gcd = make_primitive(&poly_ring, &poly_gcd_local(&poly_ring, poly_ring.clone_el(&lhs), poly_ring.clone_el(&rhs))).0;
         // println!("Result {}", poly_ring.formatted_el(&gcd));
 
         assert!(poly_ring.divides(&lhs, &gcd));

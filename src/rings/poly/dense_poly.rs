@@ -7,7 +7,7 @@ use crate::algorithms::convolution::*;
 use crate::algorithms::interpolate::interpolate;
 use crate::algorithms::poly_div::{fast_poly_div_rem, poly_div_rem, poly_rem, FAST_POLY_DIV_THRESHOLD};
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
-use crate::computation::{no_error, ComputationController, DontObserve};
+use crate::function::no_error;
 use crate::reduce_lift::lift_poly_eval::{LiftPolyEvalRing, InterpolationBaseRing, ToExtRingMap};
 use crate::divisibility::*;
 use crate::integer::*;
@@ -549,7 +549,7 @@ impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> Po
 
     fn div_rem_monic(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(self.base_ring().is_one(self.coefficient_at(rhs, self.degree(rhs).unwrap())));
-        let (quo, rem) = fast_poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().clone_el(x)), DontObserve).unwrap_or_else(no_error);
+        let (quo, rem) = fast_poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().clone_el(x))).unwrap_or_else(no_error);
         return (quo, rem);
     }
 
@@ -649,7 +649,7 @@ impl<R, A: Allocator + Clone + Send + Sync, C> DivisibilityRing for DensePolyRin
                 return RingRef::new(self).try_from_terms(self.terms(lhs).map(|(c, i)| self.base_ring().checked_left_div(c, rhs).map(|c| (c, i)).ok_or(()))).ok();
             } else {
                 let lc = &rhs.data[d];
-                let (quo, rem) = fast_poly_div_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| self.base_ring().checked_left_div(&x, lc).ok_or(()), DontObserve).ok()?;
+                let (quo, rem) = fast_poly_div_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| self.base_ring().checked_left_div(&x, lc).ok_or(())).ok()?;
                 if self.is_zero(&rem) {
                     Some(quo)
                 } else {
@@ -669,7 +669,7 @@ impl<R, A: Allocator + Clone + Send + Sync, C> DivisibilityRing for DensePolyRin
                 true
             } else {
                 let lc = &rhs.data[d];
-                if let Ok((_, rem)) = fast_poly_div_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| self.base_ring().checked_left_div(&x, lc).ok_or(()), DontObserve) {
+                if let Ok((_, rem)) = fast_poly_div_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| self.base_ring().checked_left_div(&x, lc).ok_or(())) {
                     if self.is_zero(&rem) {
                         true
                     } else {
@@ -723,12 +723,6 @@ impl<R, A, C> PrincipalIdealRing for DensePolyRingBase<R, A, C>
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         <_ as PolyTFracGCDRing>::gcd(RingRef::new(self), lhs, rhs)
     }
-
-    fn ideal_gen_with_controller<Controller>(&self, lhs: &Self::Element, rhs: &Self::Element, controller: Controller) -> Self::Element
-        where Controller: ComputationController
-    {
-        <_ as PolyTFracGCDRing>::gcd_with_controller(RingRef::new(self), lhs, rhs, controller)
-    }
 }
 
 impl<R, A, C> EuclideanRing for DensePolyRingBase<R, A, C> 
@@ -740,7 +734,7 @@ impl<R, A, C> EuclideanRing for DensePolyRingBase<R, A, C>
         if self.degree(&lhs).unwrap_or(0).saturating_sub(self.degree(rhs).unwrap()) < FAST_POLY_DIV_THRESHOLD {
             return poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().mul_ref(&x, &lc_inv))).unwrap_or_else(no_error);
         } else {
-            return fast_poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().mul_ref(&x, &lc_inv)), DontObserve).unwrap_or_else(no_error);
+            return fast_poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().mul_ref(&x, &lc_inv))).unwrap_or_else(no_error);
         }
     }
 
@@ -750,7 +744,7 @@ impl<R, A, C> EuclideanRing for DensePolyRingBase<R, A, C>
         if self.degree(&lhs).unwrap_or(0).saturating_sub(self.degree(rhs).unwrap()) < FAST_POLY_DIV_THRESHOLD {
             return poly_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().mul_ref(&x, &lc_inv))).unwrap_or_else(no_error);
         } else {
-            return fast_poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().mul_ref(&x, &lc_inv)), DontObserve).unwrap_or_else(no_error).1;
+            return fast_poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().mul_ref(&x, &lc_inv))).unwrap_or_else(no_error).1;
         }
     }
 

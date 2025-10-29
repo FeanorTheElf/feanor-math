@@ -1,7 +1,7 @@
-use crate::computation::*;
 use crate::ring::*;
 use crate::rings::poly::*;
 
+use tracing::{Level, span};
 use std::cmp::max;
 
 ///
@@ -113,17 +113,15 @@ pub const FAST_POLY_DIV_THRESHOLD: usize = 32;
 /// which is faster for large inputs.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn fast_poly_div_rem<P, F, E, Controller>(poly_ring: P, f: El<P>, g: &El<P>, mut left_div_lc: F, controller: Controller)-> Result<(El<P>, El<P>), E>
+pub fn fast_poly_div_rem<P, F, E>(poly_ring: P, f: El<P>, g: &El<P>, mut left_div_lc: F)-> Result<(El<P>, El<P>), E>
     where P: RingStore + Copy,
         P::Type: PolyRing,
-        F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>,
-        Controller: ComputationController
+        F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>
 {
-    fn fast_poly_div_impl<P, F, E, Controller>(poly_ring: P, f: El<P>, g: &El<P>, left_div_lc: &mut F, controller: Controller)-> Result<(El<P>, El<P>), E>
+    fn fast_poly_div_impl<P, F, E>(poly_ring: P, f: El<P>, g: &El<P>, left_div_lc: &mut F)-> Result<(El<P>, El<P>), E>
         where P: RingStore + Copy,
             P::Type: PolyRing,
-            F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>,
-            Controller: ComputationController
+            F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>
     {
         let deg_g = poly_ring.degree(g).unwrap();
         if poly_ring.degree(&f).is_none() || poly_ring.degree(&f).unwrap() < deg_g {
@@ -152,7 +150,7 @@ pub fn fast_poly_div_rem<P, F, E, Controller>(poly_ring: P, f: El<P>, g: &El<P>,
         let mut g_lower = poly_ring.clone_el(g);
         poly_ring.truncate_monomials(&mut g_lower, split_degree_g);
 
-        let (q_upper, r) = fast_poly_div_impl(poly_ring, poly_ring.clone_el(&f_upper), &g_upper, &mut *left_div_lc, controller.clone())?;
+        let (q_upper, r) = fast_poly_div_impl(poly_ring, poly_ring.clone_el(&f_upper), &g_upper, &mut *left_div_lc)?;
         debug_assert!(poly_ring.degree(&q_upper).is_none() || poly_ring.degree(&q_upper).unwrap() <= deg_f + split_degree_g - split_degree_f - deg_g);
         debug_assert!(poly_ring.degree(&r).is_none() || poly_ring.degree(&r).unwrap() <= deg_g - split_degree_g - 1);
 
@@ -162,7 +160,7 @@ pub fn fast_poly_div_rem<P, F, E, Controller>(poly_ring: P, f: El<P>, g: &El<P>,
         poly_ring.get_ring().add_assign_from_terms(&mut f_lower, poly_ring.terms(&g_lower).map(|(c, i)| (poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(c)), i + split_degree_f - split_degree_g)));
         debug_assert!(poly_ring.degree(&f_lower).is_none() || poly_ring.degree(&f_lower).unwrap() <= max(deg_f + split_degree_g - deg_g, deg_g + split_degree_f - split_degree_g));
 
-        let (mut q_lower, r) = fast_poly_div_impl(poly_ring, poly_ring.clone_el(&f_lower), g, &mut *left_div_lc, controller)?;
+        let (mut q_lower, r) = fast_poly_div_impl(poly_ring, poly_ring.clone_el(&f_lower), g, &mut *left_div_lc)?;
 
         poly_ring.get_ring().add_assign_from_terms(&mut q_lower, poly_ring.terms(&q_upper).map(|(c, i)| (poly_ring.base_ring().clone_el(c), i + split_degree_f - split_degree_g)));
         return Ok((q_lower, r));
@@ -172,20 +170,22 @@ pub fn fast_poly_div_rem<P, F, E, Controller>(poly_ring: P, f: El<P>, g: &El<P>,
     if poly_ring.is_zero(&f) {
         return Ok((poly_ring.zero(), f));
     }
-    controller.run_computation(format_args!("fast_poly_div(ldeg={}, rdeg={})", poly_ring.degree(&f).unwrap(), poly_ring.degree(g).unwrap()), |controller| 
-        fast_poly_div_impl(poly_ring, f, g, &mut left_div_lc, controller)
-    )
+    span!(Level::INFO, "fast_poly_div", lhs_deg = poly_ring.degree(&f).unwrap_or(0), rhs_deg = poly_ring.degree(g).unwrap_or(0)).in_scope(|| { 
+        fast_poly_div_impl(poly_ring, f, g, &mut left_div_lc)
+    })
 }
 
 #[cfg(test)]
 use crate::integer::*;
 #[cfg(test)]
 use dense_poly::DensePolyRing;
+#[cfg(test)]
+use crate::function::no_error;
 
 #[test]
 fn test_fast_poly_div() {
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(ZZ, "X");
     let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(80) - 1, X.pow_ref(40) - 2 * X.pow_ref(33) + X.pow_ref(21) - X + 10]);
-    assert_el_eq!(&ZZX, ZZX.div_rem_monic(ZZX.clone_el(&f), &g).0, fast_poly_div_rem(&ZZX, ZZX.clone_el(&f), &g, |c| Ok(ZZ.clone_el(c)), LOG_PROGRESS).unwrap_or_else(no_error).0);
+    assert_el_eq!(&ZZX, ZZX.div_rem_monic(ZZX.clone_el(&f), &g).0, fast_poly_div_rem(&ZZX, ZZX.clone_el(&f), &g, |c| Ok(ZZ.clone_el(c))).unwrap_or_else(no_error).0);
 }

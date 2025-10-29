@@ -2,7 +2,6 @@ use gcd::poly_gcd_local;
 use finite::{poly_power_decomposition_finite_field, fast_poly_eea};
 use squarefree_part::poly_power_decomposition_local;
 
-use crate::computation::*;
 use crate::divisibility::*;
 use crate::reduce_lift::lift_poly_factors::*;
 use crate::homomorphism::*;
@@ -114,20 +113,6 @@ pub trait PolyTFracGCDRing {
         where P: RingStore + Copy,
             P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
-
-    ///
-    /// As [`PolyTFracGCDRing::power_decomposition()`], this writes a polynomial as a product
-    /// of powers of square-free polynomials. However, it additionally accepts a [`ComputationController`]
-    /// to customize the performed computation.
-    /// 
-    fn power_decomposition_with_controller<P, Controller>(poly_ring: P, poly: &El<P>, _: Controller) -> Vec<(El<P>, usize)>
-        where P: RingStore + Copy,
-            P::Type: PolyRing + DivisibilityRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
-            Controller: ComputationController
-    {
-        Self::power_decomposition(poly_ring, poly)
-    }
     
     ///
     /// Computes the greatest common divisor of two polynomials `f, g` over the fraction field,
@@ -159,20 +144,6 @@ pub trait PolyTFracGCDRing {
         where P: RingStore + Copy,
             P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
-
-    ///
-    /// As [`PolyTFracGCDRing::gcd()`], this computes the gcd of two polynomials.
-    /// However, it additionally accepts a [`ComputationController`] to customize
-    /// the performed computation.
-    /// 
-    fn gcd_with_controller<P, Controller>(poly_ring: P, lhs: &El<P>, rhs: &El<P>, _: Controller) -> El<P>
-        where P: RingStore + Copy,
-            P::Type: PolyRing + DivisibilityRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
-            Controller: ComputationController
-    {
-        Self::gcd(poly_ring, lhs, rhs)
-    }
 }
 
 ///
@@ -288,26 +259,15 @@ impl<R> PolyTFracGCDRing for R
             P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        Self::power_decomposition_with_controller(poly_ring, poly, DontObserve)
-    }
-
-    default fn power_decomposition_with_controller<P, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> Vec<(El<P>, usize)>
-        where P: RingStore + Copy,
-            P::Type: PolyRing + DivisibilityRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
-            Controller: ComputationController
-    {
-        struct PowerDecompositionOperation<'a, P, Controller>(P, &'a El<P>, Controller)
+        struct PowerDecompositionOperation<'a, P>(P, &'a El<P>)
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso,
-                Controller: ComputationController;
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso,;
 
-        impl<'a, P, Controller> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PowerDecompositionOperation<'a, P, Controller>
+        impl<'a, P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PowerDecompositionOperation<'a, P>
             where P: RingStore + Copy,
                 P::Type: PolyRing + DivisibilityRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing + SelfIso,
-                Controller: ComputationController
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing + SelfIso
         {
             type Output = Vec<(El<P>, usize)>;
 
@@ -318,18 +278,18 @@ impl<R> PolyTFracGCDRing for R
 
                 let new_poly_ring = DensePolyRing::new(AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())), "X");
                 let new_poly = new_poly_ring.from_terms(self.0.terms(&self.1).map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(self.0.base_ring().clone_el(c)), i)));
-                poly_power_decomposition_finite_field(&new_poly_ring, &new_poly, self.2).into_iter().map(|(f, k)| 
+                poly_power_decomposition_finite_field(&new_poly_ring, &new_poly).into_iter().map(|(f, k)| 
                     (self.0.from_terms(new_poly_ring.terms(&f).map(|(c, i)| (new_poly_ring.base_ring().get_ring().unwrap_element(new_poly_ring.base_ring().clone_el(c)), i))), k)
                 ).collect()
             }
 
             fn fallback(self) -> Self::Output {
                 let poly_ring = self.0;
-                poly_power_decomposition_local(poly_ring, poly_ring.clone_el(self.1), self.2)
+                poly_power_decomposition_local(poly_ring, poly_ring.clone_el(self.1))
             }
         }
 
-        R::specialize(PowerDecompositionOperation(poly_ring, poly, controller))
+        R::specialize(PowerDecompositionOperation(poly_ring, poly))
     }
     
     default fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
@@ -337,26 +297,15 @@ impl<R> PolyTFracGCDRing for R
             P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        Self::gcd_with_controller(poly_ring, lhs, rhs, DontObserve)
-    }
-
-    fn gcd_with_controller<P, Controller>(poly_ring: P, lhs: &El<P>, rhs: &El<P>, controller: Controller) -> El<P>
-        where P: RingStore + Copy,
-            P::Type: PolyRing + DivisibilityRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
-            Controller: ComputationController
-    {
-        struct PolyGCDOperation<'a, P, Controller>(P, &'a El<P>, &'a El<P>, Controller)
+        struct PolyGCDOperation<'a, P>(P, &'a El<P>, &'a El<P>)
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso,
-                Controller: ComputationController;
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso;
 
-        impl<'a, P, Controller> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PolyGCDOperation<'a, P, Controller>
+        impl<'a, P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for PolyGCDOperation<'a, P>
             where P: RingStore + Copy,
                 P::Type: PolyRing + DivisibilityRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing + SelfIso,
-                Controller: ComputationController
+                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing + SelfIso
         {
             type Output = El<P>;
 
@@ -368,17 +317,17 @@ impl<R> PolyTFracGCDRing for R
                 let new_poly_ring = DensePolyRing::new(AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())), "X");
                 let new_lhs = new_poly_ring.from_terms(self.0.terms(&self.1).map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(self.0.base_ring().clone_el(c)), i)));
                 let new_rhs = new_poly_ring.from_terms(self.0.terms(&self.2).map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(self.0.base_ring().clone_el(c)), i)));
-                let result = new_poly_ring.normalize(fast_poly_eea(&new_poly_ring, new_lhs, new_rhs, self.3).2);
+                let result = new_poly_ring.normalize(fast_poly_eea(&new_poly_ring, new_lhs, new_rhs).2);
                 return self.0.from_terms(new_poly_ring.terms(&result).map(|(c, i)| (new_poly_ring.base_ring().get_ring().unwrap_element(new_poly_ring.base_ring().clone_el(c)), i)));
             }
 
             fn fallback(self) -> Self::Output {
                 let poly_ring = self.0;
-                poly_gcd_local(poly_ring, poly_ring.clone_el(self.1), poly_ring.clone_el(self.2), self.3)
+                poly_gcd_local(poly_ring, poly_ring.clone_el(self.1), poly_ring.clone_el(self.2))
             }
         }
 
-        R::specialize(PolyGCDOperation(poly_ring, lhs, rhs, controller))
+        R::specialize(PolyGCDOperation(poly_ring, lhs, rhs))
     }
 }
 

@@ -1,4 +1,3 @@
-use crate::computation::*;
 use super::poly_gcd::PolyTFracGCDRing;
 use crate::field::*;
 use crate::homomorphism::*;
@@ -103,20 +102,6 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
 
     ///
-    /// As [`FactorPolyField::factor_poly()`], this computes the factorization of
-    /// a polynomial. However, it additionally accepts a [`ComputationController`]
-    /// to customize the performed computation.
-    /// 
-    fn factor_poly_with_controller<P, Controller>(poly_ring: P, poly: &El<P>, _: Controller) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: RingStore + Copy,
-            P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
-            Controller: ComputationController
-    {
-        Self::factor_poly(poly_ring, poly)
-    }
-
-    ///
     /// Returns whether the given polynomial is irreducible over the base field.
     /// 
     /// This is functionally equivalent to checking whether the output of [`FactorPolyField::factor_poly()`]
@@ -140,16 +125,7 @@ impl<R: ?Sized> FactorPolyField for R
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        Self::factor_poly_with_controller(poly_ring, poly, DontObserve)
-    }
-
-    fn factor_poly_with_controller<P, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: RingStore,
-            P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
-            Controller: ComputationController
-    {
-        poly_factor_finite_field(poly_ring, poly, controller)
+        poly_factor_finite_field(poly_ring, poly)
     }
 }
 
@@ -163,16 +139,7 @@ impl<I> FactorPolyField for RationalFieldBase<I>
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        Self::factor_poly_with_controller(poly_ring, poly, DontObserve)
-    }
-
-    fn factor_poly_with_controller<P, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> (Vec<(El<P>, usize)>, Self::Element)
-        where P: RingStore + Copy,
-            P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
-            Controller: ComputationController
-    {
-        poly_factor_rational(poly_ring, poly, controller)
+        poly_factor_rational(poly_ring, poly)
     }
 }
 

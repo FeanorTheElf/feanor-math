@@ -73,11 +73,6 @@ mod cow;
 
 pub mod function;
 ///
-/// Contains [`computation::ComputationController`] to observe long-running computations.
-/// 
-#[macro_use]
-pub mod computation;
-///
 /// Contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`].
 /// 
 #[macro_use]

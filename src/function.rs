@@ -1,4 +1,11 @@
 
+pub fn no_error<T>(res: Result<T, !>) -> T {
+    match res {
+        Ok(res) => res,
+        Err(res) => res
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct TensorProductFunction<F, G>(pub F, pub G);
 

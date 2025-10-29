@@ -1,7 +1,10 @@
 use std::marker::PhantomData;
 
+use tracing::Level;
+use tracing::event;
+use tracing::span;
+
 use crate::algorithms::int_factor::is_prime_power;
-use crate::computation::ComputationController;
 use crate::pid::*;
 use crate::ring::*;
 use crate::divisibility::*;
@@ -11,9 +14,7 @@ use crate::rings::zn::FromModulusCreateableZnRing;
 use crate::rings::zn::*;
 use crate::seq::*;
 use crate::reduce_lift::lift_poly_factors::*;
-
-use crate::computation::DontObserve;
-use super::DensePolyRing;
+use crate::rings::poly::dense_poly::*;
 
 ///
 /// Given a monic polynomial `f` modulo `p^r` and a factorization `f = gh mod p^e`
@@ -25,20 +26,18 @@ use super::DensePolyRing;
 /// if `r >> e`.
 /// 
 #[cfg(test)]
-fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2, Controller>(
+fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2>(
     reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
-    factors: (&El<P2>, &El<P2>),
-    controller: Controller
+    factors: (&El<P2>, &El<P2>)
 ) -> (El<P1>, El<P1>)
     where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore, P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
         P2: RingStore, P2::Type: PolyRing + PrincipalIdealRing,
-        <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>,
-        Controller: ComputationController
+        <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>
 {
     assert!(target_poly_ring.base_ring().is_one(target_poly_ring.lc(f).unwrap()));
     assert!(base_poly_ring.base_ring().is_one(base_poly_ring.lc(factors.0).unwrap()));
@@ -72,8 +71,8 @@ fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2, Controller>(
     let mut current_h = lift_to_target_poly_ring(h);
 
     let P = target_poly_ring;
-    for _ in reduction_map.to_e()..reduction_map.from_e() {
-        log_progress!(controller, ".");
+    for current_e in reduction_map.to_e()..reduction_map.from_e() {
+        event!(Level::INFO, current_e = current_e);
         let delta = P.sub_ref_fst(f, P.mul_ref(&current_g, &current_h));
         let mut delta_g = P.mul_ref(&lifted_t, &delta);
         let mut delta_h = P.mul_ref(&lifted_s, &delta);
@@ -147,20 +146,18 @@ impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
 /// This uses quadratic Hensel lifting, thus will be faster than [`hensel_lift_linear()`]
 /// if `r >> e`.
 ///
-fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
+fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2>(
     reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
-    factors: (&El<P2>, &El<P2>),
-    controller: Controller
+    factors: (&El<P2>, &El<P2>)
 ) -> (El<P1>, El<P1>)
     where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore, P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
         P2: RingStore, P2::Type: PolyRing + PrincipalIdealRing,
-        <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>,
-        Controller: ComputationController
+        <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>
 {
     assert!(target_poly_ring.base_ring().is_one(target_poly_ring.lc(f).unwrap()));
     assert!(base_poly_ring.base_ring().is_one(base_poly_ring.lc(factors.0).unwrap()));
@@ -194,7 +191,7 @@ fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
     let degree_delta_bound = base_poly_ring.degree(g).unwrap() + base_poly_ring.degree(h).unwrap();
     let mut current_g = HenselLiftableBarrettReducer::new(&target_poly_ring, lift_to_target_poly_ring(g), degree_delta_bound, 1);
     let mut current_h = HenselLiftableBarrettReducer::new(&target_poly_ring, lift_to_target_poly_ring(h), degree_delta_bound, 1);
-    log_progress!(controller, "(setup)");
+    event!(Level::INFO, "setup_done");
 
     // we have to lift the Bezout identity starting from `e = 1`, so for simplicity,
     // start lifting everything from `e = 1` on
@@ -228,7 +225,7 @@ fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
         debug_assert!(P.degree(&current_t).is_none() || P.degree(&current_t).unwrap() < base_poly_ring.degree(&g).unwrap());
 
         current_e = 2 * current_e;
-        log_progress!(controller, ".");
+        event!(Level::INFO, current_exp = current_e);
     }
     debug_assert!(P.eq_el(f, &P.mul_ref(&current_g.poly, &current_h.poly)));
     return (current_g.poly, current_h.poly);
@@ -239,21 +236,19 @@ fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
 /// for `e < r`, this computes a Bezout identity `s' f + t' g = 1` with `s', t'` polynomials modulo 
 /// `p^r` that reduce to `s, t` modulo `p^e`.
 /// 
-fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Controller>(
+fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2>(
     reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>,
     g: &El<P1>, 
-    (s, t): (&El<P2>, &El<P2>),
-    controller: Controller
+    (s, t): (&El<P2>, &El<P2>)
 ) -> (El<P1>, El<P1>)
     where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore, P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
         P2: RingStore, P2::Type: PolyRing + PrincipalIdealRing,
-        <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>,
-        Controller: ComputationController
+        <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>
 {
     assert!(target_poly_ring.base_ring().is_one(target_poly_ring.lc(f).unwrap()));
     assert!(target_poly_ring.base_ring().is_one(target_poly_ring.lc(g).unwrap()));
@@ -285,7 +280,7 @@ fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2, Contro
 
     let P = target_poly_ring;
     while current_e < reduction_map.from_e() {
-        log_progress!(controller, ".");
+        event!(Level::INFO, current_exp = current_e);
 
         // lift the bezout identity
         // the formula is `s' = s(2 - (sg + th))`, `t' = t(2 - (sg + th))`
@@ -367,7 +362,7 @@ pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> O
     let scale = Fp.invert(FpX.coefficient_at(&d_base, 0)).unwrap();
     FpX.inclusion().mul_assign_ref_map(&mut s_base, &scale);
     FpX.inclusion().mul_assign_ref_map(&mut t_base, &scale);
-    let (s, t) = hensel_lift_bezout_identity_quadratic(&Zpe_to_Zp, &poly_ring, &FpX, f, g, (&s_base, &t_base), DontObserve);
+    let (s, t) = hensel_lift_bezout_identity_quadratic(&Zpe_to_Zp, &poly_ring, &FpX, f, g, (&s_base, &t_base));
 
     return Some((s, t));
 }
@@ -377,28 +372,26 @@ pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> O
 /// pairwise coprime factors (with `e < r`), computes a monic lift of each factor, such that their
 /// product is `f mod p^r`.
 /// 
-fn hensel_lift_factorization_internal<'ring, 'data, 'local, R, P1, P2, V, Controller>(
+fn hensel_lift_factorization_internal<'ring, 'data, 'local, R, P1, P2, V>(
     reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
-    factors: V,
-    controller: Controller
+    factors: V
 ) -> Vec<El<P1>>
     where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore + Copy, P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
         P2: RingStore + Copy, P2::Type: PolyRing + PrincipalIdealRing,
         <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>,
-        V: SelfSubvectorView<El<P2>>,
-        Controller: ComputationController
+        V: SelfSubvectorView<El<P2>>
 {
     if factors.len() == 1 {
         return vec![target_poly_ring.clone_el(f)];
     }
     let (g, h) = (factors.at(0), base_poly_ring.prod(factors.as_iter().skip(1).map(|h| base_poly_ring.clone_el(h))));
-    let (g_lifted, h_lifted) = hensel_lift_quadratic(reduction_map, target_poly_ring, base_poly_ring, &f, (g, &h), controller.clone());
-    let mut result = hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, &h_lifted, factors.restrict(1..), controller);
+    let (g_lifted, h_lifted) = hensel_lift_quadratic(reduction_map, target_poly_ring, base_poly_ring, &f, (g, &h));
+    let mut result = hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, &h_lifted, factors.restrict(1..));
     result.insert(0, g_lifted);
     return result;
 }
@@ -409,27 +402,27 @@ fn hensel_lift_factorization_internal<'ring, 'data, 'local, R, P1, P2, V, Contro
 /// (with `e` given implicitly by `reduction_map`) so that their product is `f`.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V, Controller>(
+pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V>(
     reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
-    factors: V,
-    controller: Controller
+    factors: V
 ) -> Vec<El<P1>>
     where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore + Copy, P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
         P2: RingStore + Copy, P2::Type: PolyRing + PrincipalIdealRing,
         <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>,
-        V: SelfSubvectorView<El<P2>>,
-        Controller: ComputationController
+        V: SelfSubvectorView<El<P2>>
 {
     assert!(target_poly_ring.base_ring().is_one(target_poly_ring.lc(f).unwrap()));
     assert!(factors.as_iter().all(|f| base_poly_ring.base_ring().is_one(base_poly_ring.lc(f).unwrap())));
     assert!(target_poly_ring.base_ring().get_ring() == reduction_map.domain().get_ring());
 
-    let result = controller.run_computation(format_args!("hensel_lift(deg={}, to={})", target_poly_ring.degree(f).unwrap(), reduction_map.from_e()), |controller| hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, f, factors, controller));
+    let result = span!(Level::INFO, "hensel_lift", poly_deg = target_poly_ring.degree(f).unwrap(), target_exponent = reduction_map.from_e()).in_scope(|| 
+        hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, f, factors)
+    );
     return result;
 }
 
@@ -450,19 +443,19 @@ fn test_hensel_lift() {
 
     let [f, g] = ZpeX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 3, X + 1]);
     let h = ZpeX.mul_ref(&f, &g);
-    let (actual_f, actual_g) = hensel_lift_linear(&Zpe_to_Zp, &ZpeX, &FpX, &h, (&ZpeX_to_ZpX.map_ref(&f), &ZpeX_to_ZpX.map_ref(&g)), DontObserve);
+    let (actual_f, actual_g) = hensel_lift_linear(&Zpe_to_Zp, &ZpeX, &FpX, &h, (&ZpeX_to_ZpX.map_ref(&f), &ZpeX_to_ZpX.map_ref(&g)));
     assert_el_eq!(&ZpeX, &f, &actual_f);
     assert_el_eq!(&ZpeX, &g, &actual_g);
-    let (actual_f, actual_g) = hensel_lift_quadratic(&Zpe_to_Zp, &ZpeX, &FpX, &h, (&ZpeX_to_ZpX.map_ref(&f), &ZpeX_to_ZpX.map_ref(&g)), DontObserve);
+    let (actual_f, actual_g) = hensel_lift_quadratic(&Zpe_to_Zp, &ZpeX, &FpX, &h, (&ZpeX_to_ZpX.map_ref(&f), &ZpeX_to_ZpX.map_ref(&g)));
     assert_el_eq!(&ZpeX, &f, &actual_f);
     assert_el_eq!(&ZpeX, &g, &actual_g);
 
     let [f, g] = ZpeX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 25 * X + 3 + 625, X + 1 + 125]);
     let h = ZpeX.mul_ref(&f, &g);
-    let (actual_f, actual_g) = hensel_lift_linear(&Zpe_to_Zp, &ZpeX, &FpX, &h, (&ZpeX_to_ZpX.map_ref(&f), &ZpeX_to_ZpX.map_ref(&g)), DontObserve);
+    let (actual_f, actual_g) = hensel_lift_linear(&Zpe_to_Zp, &ZpeX, &FpX, &h, (&ZpeX_to_ZpX.map_ref(&f), &ZpeX_to_ZpX.map_ref(&g)));
     assert_el_eq!(&ZpeX, &f, &actual_f);
     assert_el_eq!(&ZpeX, &g, &actual_g);
-    let (actual_f, actual_g) = hensel_lift_quadratic(&Zpe_to_Zp, &ZpeX, &FpX, &h, (&ZpeX_to_ZpX.map_ref(&f), &ZpeX_to_ZpX.map_ref(&g)), DontObserve);
+    let (actual_f, actual_g) = hensel_lift_quadratic(&Zpe_to_Zp, &ZpeX, &FpX, &h, (&ZpeX_to_ZpX.map_ref(&f), &ZpeX_to_ZpX.map_ref(&g)));
     assert_el_eq!(&ZpeX, &f, &actual_f);
     assert_el_eq!(&ZpeX, &g, &actual_g);
 }
@@ -480,7 +473,7 @@ fn test_hensel_lift_bezout_identity() {
 
     let [f, g] = ZpeX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 6 * X + 2, X.pow_ref(2) + 11]);
     let [s_base, t_base] = FpX.with_wrapped_indeterminate(|X| [3 * X + 3, 2 * X]);
-    let (s, t) = hensel_lift_bezout_identity_quadratic(&Zpe_to_Zp, &ZpeX, &FpX, &f, &g, (&s_base, &t_base), DontObserve);
+    let (s, t) = hensel_lift_bezout_identity_quadratic(&Zpe_to_Zp, &ZpeX, &FpX, &f, &g, (&s_base, &t_base));
     assert_eq!(1, ZpeX.degree(&s).unwrap());
     assert_eq!(1, ZpeX.degree(&t).unwrap());
     assert_el_eq!(&ZpeX, ZpeX.one(), ZpeX.add(ZpeX.mul_ref(&f, &s), ZpeX.mul_ref(&g, &t)));

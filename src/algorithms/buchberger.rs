@@ -1,6 +1,7 @@
 use append_only_vec::AppendOnlyVec;
+use tracing::{Level, Span, event, span};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-use crate::computation::*;
 use crate::delegate::{UnwrapHom, WrapHom};
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::field::Field;
@@ -252,16 +253,15 @@ fn augment_lm<P, O>(ring: P, f: El<P>, order: O) -> (El<P>, ExpandedMonomial)
 ///  - `!` means that the algorithm decided to discard all current S-polynomial, and restart the computation with the current basis
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn buchberger_with_strategy<P, O, Controller, SortFn, AbortFn>(ring: P, input_basis: Vec<El<P>>, order: O, mut sort_spolys: SortFn, mut abort_early_if: AbortFn, controller: Controller) -> Result<Vec<El<P>>, Controller::Abort>
+pub fn buchberger_with_strategy<P, O, SortFn, AbortFn>(ring: P, input_basis: Vec<El<P>>, order: O, mut sort_spolys: SortFn, mut abort_early_if: AbortFn) -> Vec<El<P>>
     where P: RingStore + Copy,
         P::Type: MultivariatePolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalLocalRing,
         O: MonomialOrder + Copy + Send + Sync,
-        Controller: ComputationController,
         SortFn: FnMut(&mut [SPoly], &[El<P>]),
         AbortFn: FnMut(&[(El<P>, ExpandedMonomial)]) -> bool
 {
-    controller.run_computation(format_args!("buchberger(len={}, vars={})", input_basis.len(), ring.indeterminate_count()), |controller| {
+    span!(Level::INFO, "buchberger", poly_count = input_basis.len(), var_count =  ring.indeterminate_count()).in_scope(|| {
 
         // this are the basis polynomials we generated; we only append to this, such that the S-polys remain valid
         let input_basis = inter_reduce(&ring, input_basis.into_iter().map(|f| augment_lm(ring, f, order)).collect(), order).into_iter().map(|(f, _)| f).collect::<Vec<_>>();
@@ -294,66 +294,59 @@ pub fn buchberger_with_strategy<P, O, Controller, SortFn, AbortFn>(ring: P, inpu
             let spolys_to_reduce_index = open.iter().enumerate().rev().filter(|(_, spoly)| ring.monomial_deg(&spoly.lcm_term(ring, &basis, order).1) > current_deg).next().map(|(i, _)| i + 1).unwrap_or(0);
             let spolys_to_reduce = &open[spolys_to_reduce_index..];
 
-            let computation = ShortCircuitingComputation::new();
             let new_polys = AppendOnlyVec::new();
-            let new_polys_ref = &new_polys;
-            let basis_ref = &basis;
-            let reducers_ref = &reducers;
+            let current_span = Span::current();
 
-            computation.handle(controller.clone()).join_many(spolys_to_reduce.as_fn().map_fn(move |spoly| move |handle: ShortCircuitingComputationHandle<(), _>| {
-                let mut f = spoly.poly(ring, basis_ref, order);
+            spolys_to_reduce.into_par_iter().for_each(|spoly| current_span.in_scope(|| {
+                let mut f = spoly.poly(ring, &basis, order);
                 
-                reduce_poly(ring, &mut f, || reducers_ref.iter().chain(new_polys_ref.iter()).map(|(f, lmf)| (f, lmf)), order);
+                reduce_poly(ring, &mut f, || reducers.iter().chain(new_polys.iter()).map(|(f, lmf)| (f, lmf)), order);
 
                 if !ring.is_zero(&f) {
-                    log_progress!(handle, "s");
-                    _ = new_polys_ref.push(augment_lm(ring, f, order));
+                    event!(Level::INFO, "found_basis_poly");
+                    _ = new_polys.push(augment_lm(ring, f, order));
                 } else {
-                    log_progress!(handle, "-");
+                    event!(Level::INFO, "reduced_to_zero");
                 }
-
-                checkpoint!(handle);
-                return Ok(None);
             }));
 
             drop(open.drain(spolys_to_reduce_index..));
             let new_polys = new_polys.into_vec();
-            _ = computation.finish()?;
 
             // process the generated new polynomials
             if new_polys.len() == 0 && open.len() == 0 {
                 if changed {
-                    log_progress!(controller, "!");
+                    event!(Level::INFO, "restart");
                     // this seems necessary, as the invariants for `reducers` don't imply that it already is a GB;
                     // more concretely, reducers contains polys of basis that are reduced with eath other, but the
                     // S-polys between two of them might not have been considered
-                    return buchberger_with_strategy::<P, O, _, _, _>(ring, reducers.into_iter().map(|(f, _)| f).collect(), order, sort_spolys, abort_early_if, controller);
+                    return buchberger_with_strategy::<P, O, _, _>(ring, reducers.into_iter().map(|(f, _)| f).collect(), order, sort_spolys, abort_early_if);
                 } else {
-                    return Ok(reducers.into_iter().map(|(f, _)| f).collect());
+                    return reducers.into_iter().map(|(f, _)| f).collect();
                 }
             } else if new_polys.len() == 0 {
                 current_deg = ring.monomial_deg(&open.last().unwrap().lcm_term(ring, &basis, order).1);
-                log_progress!(controller, "{{{}}}", current_deg);
+                event!(Level::INFO, new_deg = current_deg, "increase_deg");
             } else {
                 changed = true;
                 current_deg = 0;
                 update_basis(ring, new_polys.iter().map(|(f, _)| ring.clone_el(f)), &mut basis, &mut open, order, nilpotent_power, &mut filtered_spolys, &mut sort_spolys);
-                log_progress!(controller, "(b={})(S={})(f={})", basis.len(), open.len(), filtered_spolys);
+                event!(Level::INFO, basis_poly_count = basis.len(), spolys_count = open.len(), filtered_count = filtered_spolys, "update_basis");
 
                 reducers.extend(new_polys.into_iter());
                 reducers = inter_reduce(ring, reducers, order);
                 sort_reducers(&mut reducers);
-                log_progress!(controller, "(r={})", reducers.len());
+                event!(Level::INFO, reducers_count = reducers.len(), "update_reducers");
                 if abort_early_if(&reducers) {
-                    log_progress!(controller, "(early_abort)");
-                    return Ok(reducers.into_iter().map(|(f, _)| f).collect());
+                    event!(Level::INFO, "early_abort");
+                    return reducers.into_iter().map(|(f, _)| f).collect();
                 }
             }
 
             // less S-polys if we restart from scratch with reducers
             if open.len() + filtered_spolys > reducers.len() * reducers.len() / 2 + reducers.len() * nilpotent_power.unwrap_or(0) + 1 {
-                log_progress!(controller, "!");
-                return buchberger_with_strategy::<P, O, _, _, _>(ring, reducers.into_iter().map(|(f, _)| f).collect(), order, sort_spolys, abort_early_if, controller);
+                event!(Level::INFO, "restart");
+                return buchberger_with_strategy::<P, O, _, _>(ring, reducers.into_iter().map(|(f, _)| f).collect(), order, sort_spolys, abort_early_if);
             }
         }
     })
@@ -469,14 +462,13 @@ pub fn buchberger<P, O>(ring: P, input_basis: Vec<El<P>>, order: O) -> Vec<El<P>
     let as_local_pir = AsLocalPIR::from_field(ring.base_ring());
     let new_poly_ring = MultivariatePolyRingImpl::new(&as_local_pir, ring.indeterminate_count());
     let from_ring = new_poly_ring.lifted_hom(ring, WrapHom::new(as_local_pir.get_ring()));
-    let result = buchberger_with_strategy::<_, _, _, _, _>(
+    let result = buchberger_with_strategy::<_, _, _, _>(
         &new_poly_ring, 
         input_basis.into_iter().map(|f| from_ring.map(f)).collect(), 
         order, 
         default_sort_fn(&new_poly_ring, order), 
-        |_| false, 
-        DontObserve
-    ).unwrap_or_else(no_error);
+        |_| false
+    );
     let to_ring = ring.lifted_hom(&new_poly_ring, UnwrapHom::new(as_local_pir.get_ring()));
     return result.into_iter().map(|f| to_ring.map(f)).collect();
 }
@@ -505,7 +497,7 @@ fn test_buchberger_small() {
         (15, ring.create_monomial([0, 0]))
     ].into_iter());
 
-    let actual = buchberger_with_strategy(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_LOG_PROGRESS).unwrap_or_else(no_error);
+    let actual = buchberger_with_strategy(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2)], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
 
     let expected = ring.from_terms([
         (16, ring.create_monomial([0, 3])),
@@ -543,7 +535,7 @@ fn test_buchberger_larger() {
         (7, ring.create_monomial([0, 0, 0]))
     ].into_iter());
 
-    let actual = buchberger_with_strategy(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_LOG_PROGRESS).unwrap_or_else(no_error);
+    let actual = buchberger_with_strategy(&ring, vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
 
     let g1 = ring.from_terms([
         (1, ring.create_monomial([0, 4, 0])),
@@ -586,7 +578,7 @@ fn test_generic_computation() {
         ring.sub_ref_snd(ring.int_hom().map(1), poly_ring.coefficient_at(&X2, 2)),
     ];
 
-    let gb1 = buchberger_with_strategy(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_LOG_PROGRESS).unwrap_or_else(no_error);
+    let gb1 = buchberger_with_strategy(&ring, basis.iter().map(|f| ring.clone_el(f)).collect(), DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
     assert_eq!(11, gb1.len());
 }
 
@@ -596,7 +588,7 @@ fn test_gb_local_ring() {
     let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 1);
     
     let f = ring.from_terms([(base.int_hom().map(4), ring.create_monomial([1])), (base.one(), ring.create_monomial([0]))].into_iter());
-    let gb = buchberger_with_strategy(&ring, vec![f], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_LOG_PROGRESS).unwrap_or_else(no_error);
+    let gb = buchberger_with_strategy(&ring, vec![f], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
 
     assert_eq!(1, gb.len());
     assert_el_eq!(ring, ring.one(), gb[0]);
@@ -626,13 +618,6 @@ fn test_gb_lex() {
     }
 }
 
-#[cfg(test)]
-#[cfg(feature = "parallel")]
-static TEST_COMPUTATION_CONTROLLER: ExecuteMultithreaded<LogProgress> = RunMultithreadedLogProgress;
-#[cfg(test)]
-#[cfg(not(feature = "parallel"))]
-static TEST_COMPUTATION_CONTROLLER: LogProgress = TEST_LOG_PROGRESS;
-
 #[ignore]
 #[test]
 fn test_expensive_gb_1() {
@@ -650,7 +635,7 @@ fn test_expensive_gb_1() {
         8 * Y2 * Y6 + 8 * Y1 * Y7.clone()
     ]);
 
-    let gb = buchberger_with_strategy(&ring, system.iter().map(|f| ring.clone_el(f)).collect(), DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_COMPUTATION_CONTROLLER).unwrap_or_else(no_error);
+    let gb = buchberger_with_strategy(&ring, system.iter().map(|f| ring.clone_el(f)).collect(), DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
 
     for f in &part_of_result {
         assert!(ring.is_zero(&multivariate_division(&ring, ring.clone_el(f), gb.iter(), DegRevLex)));
@@ -674,7 +659,7 @@ fn test_expensive_gb_2() {
         2 * X0 * X6.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(4)
     ]);
 
-    let gb = buchberger_with_strategy(&ring, basis, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_COMPUTATION_CONTROLLER).unwrap_or_else(no_error);
+    let gb = buchberger_with_strategy(&ring, basis, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
     assert_eq!(130, gb.len());
 }
 
@@ -688,7 +673,7 @@ fn test_groebner_cyclic6() {
         [x + y + z + t + u + v, x*y + y*z + z*t + t*u + x*v + u*v, x*y*z + y*z*t + z*t*u + x*y*v + x*u*v + t*u*v, x*y*z*t + y*z*t*u + x*y*z*v + x*y*u*v + x*t*u*v + z*t*u*v, x*y*z*t*u + x*y*z*t*v + x*y*z*u*v + x*y*t*u*v + x*z*t*u*v + y*z*t*u*v, x*y*z*t*u*v - 1]
     });
 
-    let gb = buchberger_with_strategy(&ring, cyclic6, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_COMPUTATION_CONTROLLER).unwrap_or_else(no_error);
+    let gb = buchberger_with_strategy(&ring, cyclic6, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
     assert_eq!(45, gb.len());
 }
 
@@ -703,7 +688,7 @@ fn test_groebner_cyclic7() {
         x*y*z*t*u + y*z*t*u*v + x*y*z*t*w + x*y*z*v*w + x*y*u*v*w + x*t*u*v*w + z*t*u*v*w, x*y*z*t*u*v + x*y*z*t*u*w + x*y*z*t*v*w + x*y*z*u*v*w + x*y*t*u*v*w + x*z*t*u*v*w + y*z*t*u*v*w, x*y*z*t*u*v*w - 1
     ]);
 
-    let gb = buchberger_with_strategy(&ring, cyclic7, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_COMPUTATION_CONTROLLER).unwrap_or_else(no_error);
+    let gb = buchberger_with_strategy(&ring, cyclic7, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
     assert_eq!(209, gb.len());
 }
 
@@ -719,6 +704,6 @@ fn test_groebner_cyclic8() {
         x*y*z*s*t*u*v + x*y*z*s*t*u*w + x*y*z*s*t*v*w + x*y*z*s*u*v*w + x*y*z*t*u*v*w + x*y*s*t*u*v*w + x*z*s*t*u*v*w + y*z*s*t*u*v*w, x*y*z*s*t*u*v*w - 1
     ]);
 
-    let gb = buchberger_with_strategy(&ring, cyclic7, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false, TEST_COMPUTATION_CONTROLLER).unwrap_or_else(no_error);
+    let gb = buchberger_with_strategy(&ring, cyclic7, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
     assert_eq!(372, gb.len());
 }

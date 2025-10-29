@@ -1,6 +1,4 @@
 use crate::algorithms::ec_factor::lenstra_ec_factor;
-use crate::computation::no_error;
-use crate::computation::DontObserve;
 use crate::divisibility::DivisibilityRingStore;
 use crate::ordered::OrderedRing;
 use crate::ordered::OrderedRingStore;
@@ -35,7 +33,7 @@ impl<I> ZnOperation for ECFactorInt<I>
             R: 'a + RingStore, 
             R::Type: ZnRing
     {
-        int_cast(lenstra_ec_factor(&ring, DontObserve).unwrap_or_else(no_error), self.result_ring, ring.integer_ring())
+        int_cast(lenstra_ec_factor(&ring), self.result_ring, ring.integer_ring())
     }
 }
 

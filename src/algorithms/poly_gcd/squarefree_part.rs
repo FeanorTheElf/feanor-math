@@ -1,5 +1,9 @@
 use std::fmt::Debug;
 
+use tracing::Level;
+use tracing::event;
+use tracing::span;
+
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::algorithms::poly_gcd::*;
 use crate::algorithms::poly_gcd::hensel::*;
@@ -77,12 +81,11 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P
 ///  - `F` is `R/m` where `m` is a maximal ideal containing the currently considered ideal `I`
 ///  - `S` is `R/m^e`
 /// 
-fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2, Controller>(
+fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2>(
     RX: P1, 
     f: &El<P1>, 
     S_to_F: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
-    SX: P2,
-    controller: Controller
+    SX: P2
 ) -> Option<(Vec<Signature>, Vec<El<P2>>)>
     where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore + Copy,
@@ -90,8 +93,7 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2, Controller
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R>,
         P2: RingStore + Copy,
         P2::Type: PolyRing<BaseRing = &'local R::LocalRing<'ring>>,
-        R::LocalRing<'ring>: 'local,
-        Controller: ComputationController
+        R::LocalRing<'ring>: 'local
 {
     assert!(SX.base_ring().get_ring() == S_to_F.domain().get_ring());
     let R = RX.base_ring().get_ring();
@@ -123,8 +125,7 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2, Controller
         SX,
         &FX,
         &f_mod_me,
-        &power_decomposition_mod_m[..],
-        controller
+        &power_decomposition_mod_m[..]
     );
 
     return Some((
@@ -141,15 +142,14 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2, Controller
 /// of the underlying ring.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> Vec<(El<P>, usize)>
+pub fn poly_power_decomposition_monic_local<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
     where P: RingStore + Copy,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain,
-        Controller: ComputationController
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain
 {
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(poly).unwrap()));
 
-    controller.run_computation(format_args!("power_decomp_local(deg={})", poly_ring.degree(poly).unwrap()), |controller| {
+    span!(Level::INFO, "poly_power_decomposition", poly_deg = poly_ring.degree(poly).unwrap()).in_scope(|| {
 
         let ring = poly_ring.base_ring().get_ring();
         let mut rng = oorandom::Rand64::new(1);
@@ -162,7 +162,7 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &
             let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt.try_into().unwrap())).floor() as usize;
             let reduction = PolyLiftFactorsDomainReductionContext::new(ring, &ideal, e);
 
-            log_progress!(controller, "(mod={}^{})(parts={})", IdealDisplayWrapper::new(ring, &ideal), e, reduction.len());
+            event!(Level::INFO, ideal = %IdealDisplayWrapper::new(ring, &ideal), exponent = e, maximal_ideal_count = reduction.len(), "modulo_ideal");
 
             let mut signature: Option<Vec<_>> = None;
             let mut poly_rings_mod_me = Vec::new();
@@ -170,14 +170,14 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &
 
             for idx in 0..reduction.len() {
                 let SX = DensePolyRing::new(*reduction.intermediate_ring_to_field_reduction(idx).domain(), "X");
-                match compute_local_power_decomposition(poly_ring, poly, &reduction.intermediate_ring_to_field_reduction(idx), &SX, controller.clone()) {
+                match compute_local_power_decomposition(poly_ring, poly, &reduction.intermediate_ring_to_field_reduction(idx), &SX) {
                     None => {
                         unreachable!("`compute_local_power_decomposition()` currently cannot fail");
                     },
                     Some((new_signature, local_power_decomposition)) => if new_signature == &[Signature { degree: poly_ring.degree(poly).unwrap(), perfect_power: 1 }] {
                         return vec![(poly_ring.clone_el(poly), 1)];
                     } else if signature.is_some() && &signature.as_ref().unwrap()[..] != &new_signature[..] {
-                        log_progress!(controller, "(signature_mismatch)");
+                        event!(Level::INFO, "signature_mismatch");
                         continue 'try_random_ideal;
                     } else {
                         signature = Some(new_signature);
@@ -190,7 +190,7 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &
             if let Some(result) = power_decomposition_from_local_power_decomposition(&reduction, poly_ring, poly, &signature.as_ref().unwrap()[..], &poly_rings_mod_me[..], &power_decompositions_mod_me[..]) {
                 return result;
             } else {
-                log_progress!(controller, "(invalid_lift)");
+                event!(Level::INFO, "invalid_lift");
             }
         }
         unreachable!()
@@ -205,17 +205,16 @@ pub fn poly_power_decomposition_monic_local<P, Controller>(poly_ring: P, poly: &
 /// of the underlying ring.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn poly_power_decomposition_local<P, Controller>(poly_ring: P, mut f: El<P>, controller: Controller) -> Vec<(El<P>, usize)>
+pub fn poly_power_decomposition_local<P>(poly_ring: P, mut f: El<P>) -> Vec<(El<P>, usize)>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing,
-        Controller: ComputationController
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing
 {
     assert!(!poly_ring.is_zero(&f));
     _ = poly_ring.balance_poly(&mut f);
     let lcf = poly_ring.lc(&f).unwrap();
     let f_monic = evaluate_aX(poly_ring, &f, lcf);
-    let power_decomposition = poly_power_decomposition_monic_local(poly_ring, &f_monic, controller);
+    let power_decomposition = poly_power_decomposition_monic_local(poly_ring, &f_monic);
     let result = power_decomposition.into_iter().map(|(fi, i)| {
         let mut result = unevaluate_aX(poly_ring, &fi, &lcf);
         _ = poly_ring.balance_poly(&mut result);
@@ -236,14 +235,13 @@ pub fn poly_power_decomposition_local<P, Controller>(poly_ring: P, mut f: El<P>,
 /// of the underlying ring.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn poly_squarefree_part_local<P, Controller>(poly_ring: P, f: El<P>, controller: Controller) -> El<P>
+pub fn poly_squarefree_part_local<P>(poly_ring: P, f: El<P>) -> El<P>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing,
-        Controller: ComputationController
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing
 {
     assert!(!poly_ring.is_zero(&f));
-    let mut result = poly_ring.prod(poly_power_decomposition_local(poly_ring, f, controller).into_iter().map(|(fi, _i)| fi));
+    let mut result = poly_ring.prod(poly_power_decomposition_local(poly_ring, f).into_iter().map(|(fi, _i)| fi));
     _ = poly_ring.balance_poly(&mut result);
     return result;
 }
@@ -275,23 +273,23 @@ fn test_squarefree_part_local() {
     };
 
     let expected = [(poly_ring.clone_el(&f1), 1)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected));
     assert_eq(&expected, &actual);
 
     let expected = [(poly_ring.mul_ref(&f3, &f4), 3)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected));
     assert_eq(&expected, &actual);
 
     let expected = [(poly_ring.clone_el(&f2), 2), (poly_ring.mul_ref(&f3, &f4), 3)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected));
     assert_eq(&expected, &actual);
     
     let expected = [(poly_ring.mul_ref(&f1, &f2), 1), (poly_ring.clone_el(&f4), 2), (poly_ring.clone_el(&f3), 3)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected));
     assert_eq(&expected, &actual);
     
     let expected = [(poly_ring.mul_ref(&f1, &f2), 2), (poly_ring.clone_el(&f4), 4), (poly_ring.clone_el(&f3), 6)];
-    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected), TEST_LOG_PROGRESS);
+    let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected));
     assert_eq(&expected, &actual);
 }
 
@@ -308,7 +306,7 @@ fn random_test_poly_power_decomposition_local() {
         let h = poly_ring.from_terms((0..=2).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
         let poly = make_primitive(&poly_ring, &poly_ring.prod([&f, &g, &g, &h, &h, &h, &h, &h].into_iter().map(|poly| poly_ring.clone_el(poly)))).0;
         
-        let mut power_decomp = poly_power_decomposition_local(&poly_ring, poly_ring.clone_el(&poly), TEST_LOG_PROGRESS);
+        let mut power_decomp = poly_power_decomposition_local(&poly_ring, poly_ring.clone_el(&poly));
         for (f, _k) in &mut power_decomp {
             *f = make_primitive(&poly_ring, &f).0;
         }
