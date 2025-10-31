@@ -20,6 +20,7 @@ use crate::integer::*;
 use crate::specialization::*;
 use crate::rings::rust_bigint::*;
 use crate::algorithms::bigint_ops::deserialize_bigint_from_bytes;
+use crate::serialization::{DeserializeWithRing, SerializableElementRing};
 
 mod mpir_bindings;
 
@@ -787,8 +788,8 @@ specialize_int_cast!{ i8, i16, i32 }
 
 #[cfg(test)]
 use crate::pid::EuclideanRingStore;
-use crate::serialization::DeserializeWithRing;
-use crate::serialization::SerializableElementRing;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 fn edge_case_elements_bigint() -> impl Iterator<Item = RustBigint> {
@@ -958,6 +959,7 @@ fn from_to_float_approx() {
 
 #[bench]
 fn bench_mul_300_bits(bencher: &mut test::Bencher) {
+    LogAlgorithmSubscriber::init_test();
     let x = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap());
     let y = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap());
     let z = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());
@@ -969,6 +971,7 @@ fn bench_mul_300_bits(bencher: &mut test::Bencher) {
 
 #[bench]
 fn bench_div_300_bits(bencher: &mut test::Bencher) {
+    LogAlgorithmSubscriber::init_test();
     let x = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap());
     let y = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap());
     let z = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());

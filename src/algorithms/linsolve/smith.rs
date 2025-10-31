@@ -396,6 +396,7 @@ fn test_determinant() {
 #[test]
 #[ignore]
 fn time_solve_right_using_pre_smith_galois_field() {
+    LogAlgorithmSubscriber::init_test();
     let n = 100;
     let base_field = Zn64B::new(257).as_field().ok().unwrap();
     let allocator = feanor_mempool::AllocArc(Arc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>())));
@@ -415,6 +416,7 @@ fn time_solve_right_using_pre_smith_galois_field() {
 #[test]
 #[ignore]
 fn time_solve_right_using_extension() {
+    LogAlgorithmSubscriber::init_test();
     let n = 126;
     let base_field = Zn64B::new(257).as_field().ok().unwrap();
     let allocator = feanor_mempool::AllocArc(Arc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>())));
@@ -433,6 +435,7 @@ fn time_solve_right_using_extension() {
 
 #[bench]
 fn bench_solve_right_using_pre_smith_galois_field(bencher: &mut Bencher) {
+    LogAlgorithmSubscriber::init_test();
     let base_field = Zn64B::new(257).as_field().ok().unwrap();
     let allocator = feanor_mempool::AllocArc(Arc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>())));
     let field = GaloisField::create(FreeAlgebraImpl::new_with_convolution(base_field, 5, [base_field.int_hom().map(3), base_field.int_hom().map(-4)], "x", allocator, STANDARD_CONVOLUTION).as_field().ok().unwrap());

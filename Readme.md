@@ -507,6 +507,12 @@ As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` ca
    On the other hand, a ring-dependent object only stores ring elements - and will take the ring as parameter to all functions that require it.
    If your object is generic, it should be generic in `R: RingStore` in the self-contained object case, and generic in the ring element type `T` in the ring-dependent object case.
    Since there is no common supertrait for ring elements, this means that a ring-dependent object will be generic in some unconstraint type `T`, and each function will take some parameter of generic type `R: RingStore, R::Type: RingBase<Element = T>`.
+ - The tracing level `INFO` is used for general status reports by a possibly-long running algorithm.
+   Events for level `TRACE` are used for profiling purposes, and thus emitted by almost every function in the crate.
+ - When implementing logging for some algorithm, all the relevant `span!()` and `event!()` statements should be where the algorithm is implemented.
+   In particular, many algorithms are implemented as global functions, but then called through a trait.
+   Thus, the implementation of the trait contains only delegation calls, and should not be annotated with explicit tracing statements.
+   Note that when using tracing for profiling purposes (on level `TRACE`), all functions on the path should be annotated with `#[instrument(skip_all, level = "trace")]`.
 
 # Performance
 

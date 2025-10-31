@@ -347,6 +347,7 @@ fn test_interpolate_multivariate() {
 #[test]
 #[ignore]
 fn large_polynomial_interpolation() {
+    LogAlgorithmSubscriber::init_test();
     let field = Zn64B::new(65537).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");
     let hom = poly_ring.base_ring().can_hom(&StaticRing::<i64>::RING).unwrap();

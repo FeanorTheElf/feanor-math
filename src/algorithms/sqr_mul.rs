@@ -274,6 +274,7 @@ fn test_shortest_addition_chain_table() {
 
 #[bench]
 fn bench_standard_square_and_multiply(bencher: &mut Bencher) {
+    LogAlgorithmSubscriber::init_test();
     let ring = zn_64::Zn64B::new(536903681);
     let x = ring.int_hom().map(2);
     bencher.iter(|| {
@@ -293,6 +294,7 @@ fn bench_standard_square_and_multiply(bencher: &mut Bencher) {
 
 #[bench]
 fn bench_addchain_square_and_multiply(bencher: &mut Bencher) {
+    LogAlgorithmSubscriber::init_test();
     let ring = zn_64::Zn64B::new(536903681);
     let x = ring.int_hom().map(2);
     bencher.iter(|| {

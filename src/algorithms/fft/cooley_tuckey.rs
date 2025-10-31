@@ -986,6 +986,7 @@ const BENCH_SIZE_LOG2: usize = 13;
 
 #[bench]
 fn bench_fft_zn_big(bencher: &mut test::Bencher) {
+    LogAlgorithmSubscriber::init_test();
     let ring = zn_big::ZnGB::new(StaticRing::<i128>::RING, 1073872897);
     let fft = CooleyTuckeyFFT::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
     let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
@@ -997,6 +998,7 @@ fn bench_fft_zn_big(bencher: &mut test::Bencher) {
 
 #[bench]
 fn bench_fft_zn_64(bencher: &mut test::Bencher) {
+    LogAlgorithmSubscriber::init_test();
     let ring = zn_64::Zn64B::new(1073872897);
     let fft = CooleyTuckeyFFT::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
     let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
@@ -1008,6 +1010,7 @@ fn bench_fft_zn_64(bencher: &mut test::Bencher) {
 
 #[bench]
 fn bench_fft_zn_64_fastmul(bencher: &mut test::Bencher) {
+    LogAlgorithmSubscriber::init_test();
     let ring = zn_64::Zn64B::new(1073872897);
     let fastmul_ring = zn_64::ZnFastmul::new(ring).unwrap();
     let fft = CooleyTuckeyFFT::for_zn_with_hom(ring.into_can_hom(fastmul_ring).ok().unwrap(), BENCH_SIZE_LOG2).unwrap();

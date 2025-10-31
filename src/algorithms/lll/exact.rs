@@ -540,6 +540,7 @@ fn test_lll_generating_set() {
 
 #[bench]
 fn bench_lll_10d(bencher: &mut Bencher) {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
 

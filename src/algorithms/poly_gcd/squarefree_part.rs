@@ -299,6 +299,7 @@ fn test_squarefree_part_local() {
 #[test]
 #[ignore]
 fn random_test_poly_power_decomposition_local() {
+    LogAlgorithmSubscriber::init_test();
     let ring = BigIntRing::RING;
     let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
     let mut rng = oorandom::Rand64::new(1);

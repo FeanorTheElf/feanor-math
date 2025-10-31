@@ -1,3 +1,5 @@
+use tracing::{Level, span};
+
 use crate::algorithms::matmul::{STANDARD_MATMUL, MatmulAlgorithm};
 use crate::field::*;
 use crate::homomorphism::*;
@@ -392,52 +394,54 @@ pub fn lll_quadratic_form<I, R, H, V1, T>(
         V1: AsPointerToSlice<I::Element>,
         T: TransformTarget<I>
 {
-    assert!(!h.domain().get_ring().is_approximate());
-    let RR = h.codomain();
     assert_eq!(quadratic_form.row_count(), quadratic_form.col_count());
+    span!(Level::INFO, "lll_float", n = quadratic_form.row_count(), delta = ?h.codomain().formatted_el(delta), eta = ?h.codomain().formatted_el(eta)).in_scope(|| {
+        assert!(!h.domain().get_ring().is_approximate());
+        let RR = h.codomain();
 
-    let half = RR.div(&RR.one(), &RR.int_hom().map(2));
-    assert!(RR.is_gt(eta, &half));
-    assert!(RR.is_lt(delta, &RR.one()));
-    assert!(RR.is_gt(delta, &RR.mul_ref(eta, eta)));
-    let strict_delta = RR.mul_ref_snd(RR.add_ref_fst(delta, RR.one()), &half);
+        let half = RR.div(&RR.one(), &RR.int_hom().map(2));
+        assert!(RR.is_gt(eta, &half));
+        assert!(RR.is_lt(delta, &RR.one()));
+        assert!(RR.is_gt(delta, &RR.mul_ref(eta, eta)));
+        let strict_delta = RR.mul_ref_snd(RR.add_ref_fst(delta, RR.one()), &half);
 
-    let mut C = OwnedMatrix::zero(quadratic_form.row_count(), quadratic_form.row_count(), RR);
-    let mut E = OwnedMatrix::zero(quadratic_form.row_count(), quadratic_form.row_count(), RR);
-    let mut gso = GSOMatrix {
-        cholesky: C.data_mut(),
-        error_bound: E.data_mut(),
-        quadratic_form: quadratic_form
-    };
+        let mut C = OwnedMatrix::zero(quadratic_form.row_count(), quadratic_form.row_count(), RR);
+        let mut E = OwnedMatrix::zero(quadratic_form.row_count(), quadratic_form.row_count(), RR);
+        let mut gso = GSOMatrix {
+            cholesky: C.data_mut(),
+            error_bound: E.data_mut(),
+            quadratic_form: quadratic_form
+        };
 
-    let mut i = 1;
-    let mut zero_vector_count = 0;
-    let mut remaining_swaps = gso.quadratic_form.row_count() * gso.quadratic_form.row_count() * 1000;
-    gso = remove_zero_vectors(gso, &h, &mut zero_vector_count);
-    while i < gso.quadratic_form.row_count() {
-        assert!(i > 0);
-        size_reduce(&mut gso, i, &h, eta, OffsetTransformIndex::new(&mut transform, zero_vector_count))?;
-        match check_lovasz_condition(&mut gso, i, &h, &strict_delta) {
-            LovaszCondition::Swap if remaining_swaps == 0 => {
-                return Err(NotEnoughPrecision);
-            }
-            LovaszCondition::Swap => {
-                remaining_swaps -= 1;
-                gso.swap(h.domain(), i - 1, i);
-                OffsetTransformIndex::new(&mut transform, zero_vector_count).swap(h.domain(), i - 1, i);
-                i -= 1;
-                if i == 0 {
-                    gso = remove_zero_vectors(gso, &h, &mut zero_vector_count);
-                    i = 1;
+        let mut i = 1;
+        let mut zero_vector_count = 0;
+        let mut remaining_swaps = gso.quadratic_form.row_count() * gso.quadratic_form.row_count() * 1000;
+        gso = remove_zero_vectors(gso, &h, &mut zero_vector_count);
+        while i < gso.quadratic_form.row_count() {
+            assert!(i > 0);
+            size_reduce(&mut gso, i, &h, eta, OffsetTransformIndex::new(&mut transform, zero_vector_count))?;
+            match check_lovasz_condition(&mut gso, i, &h, &strict_delta) {
+                LovaszCondition::Swap if remaining_swaps == 0 => {
+                    return Err(NotEnoughPrecision);
                 }
-            },
-            LovaszCondition::Satisfied => {
-                i += 1;
+                LovaszCondition::Swap => {
+                    remaining_swaps -= 1;
+                    gso.swap(h.domain(), i - 1, i);
+                    OffsetTransformIndex::new(&mut transform, zero_vector_count).swap(h.domain(), i - 1, i);
+                    i -= 1;
+                    if i == 0 {
+                        gso = remove_zero_vectors(gso, &h, &mut zero_vector_count);
+                        i = 1;
+                    }
+                },
+                LovaszCondition::Satisfied => {
+                    i += 1;
+                }
             }
         }
-    }
 
-    return Ok(());
+        return Ok(());
+    })
 }
 
 ///

@@ -1440,6 +1440,7 @@ fn test_bounded_reduce() {
 
 #[bench]
 fn bench_hom_from_i64_large_modulus(bencher: &mut Bencher) {
+    LogAlgorithmSubscriber::init_test();
     // the case that the modulus is large
     let Zn = Zn64B::new(36028797018963971 /* = 2^55 + 3 */);
     bencher.iter(|| {
@@ -1450,6 +1451,7 @@ fn bench_hom_from_i64_large_modulus(bencher: &mut Bencher) {
 
 #[bench]
 fn bench_hom_from_i64_small_modulus(bencher: &mut Bencher) {
+    LogAlgorithmSubscriber::init_test();
     // the case that the modulus is large
     let Zn = Zn64B::new(17);
     bencher.iter(|| {
@@ -1460,6 +1462,7 @@ fn bench_hom_from_i64_small_modulus(bencher: &mut Bencher) {
 
 #[bench]
 fn bench_reduction_map_use_case(bencher: &mut Bencher) {
+    LogAlgorithmSubscriber::init_test();
     // this benchmark is inspired by the use in https://eprint.iacr.org/2023/1510.pdf
     let p = 17;
     let Zp2 = Zn64B::new(p * p);
@@ -1487,6 +1490,7 @@ fn bench_reduction_map_use_case(bencher: &mut Bencher) {
 
 #[bench]
 fn bench_inner_product(bencher: &mut Bencher) {
+    LogAlgorithmSubscriber::init_test();
     let Fp = Zn64B::new(65537);
     let len = 1 << 12;
     let lhs = (0..len).map(|i| Fp.int_hom().map(i)).collect::<Vec<_>>();

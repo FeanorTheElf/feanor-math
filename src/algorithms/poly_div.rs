@@ -169,13 +169,17 @@ pub fn fast_poly_div_rem<P, F, E>(poly_ring: P, f: El<P>, g: &El<P>, mut left_di
     if poly_ring.is_zero(&f) {
         return Ok((poly_ring.zero(), f));
     }
-    fast_poly_div_impl(poly_ring, f, g, &mut left_div_lc)
+    
+    span!(Level::INFO, "fast_poly_div", lhs_deg = poly_ring.degree(&f).unwrap(), rhs_deg = poly_ring.degree(&g).unwrap()).in_scope(|| {
+        fast_poly_div_impl(poly_ring, f, g, &mut left_div_lc)
+    })
 }
 
 #[cfg(test)]
 use crate::integer::*;
 #[cfg(test)]
 use dense_poly::DensePolyRing;
+use tracing::{Level, span};
 #[cfg(test)]
 use crate::function::no_error;
 #[cfg(test)]

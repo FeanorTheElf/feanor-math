@@ -1313,6 +1313,7 @@ fn test_poly_gcd_number_field() {
 #[test]
 #[ignore]
 fn random_test_poly_gcd_number_field() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
     let ZZX = DensePolyRing::new(ZZ, "X");

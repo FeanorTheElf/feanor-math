@@ -240,7 +240,7 @@ fn lenstra_ec_factor_base<R, F>(Zn: R, log2_p: usize, mut rng: F) -> Option<El<<
             }
             
             return None;
-        })).find_any(|res| res.is_some()).unwrap();
+        })).find_any(|res| res.is_some())?;
 
         if let Some(result) = result {
             return Some(Zn.integer_ring().ideal_gen(&Zn.smallest_positive_lift(result), Zn.modulus()));
@@ -333,6 +333,7 @@ fn test_ec_factor() {
 
 #[bench]
 fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
+    LogAlgorithmSubscriber::init_test();
     let bits = 58;
     let n = ((1i64 << bits) + 1) / 5;
     let ring = Zn64B::new(n as u64);
@@ -347,6 +348,7 @@ fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
 #[test]
 #[ignore]
 fn test_ec_factor_large() {
+    LogAlgorithmSubscriber::init_test();
     let ZZbig = BigIntRing::RING;
 
     let n: i128 = 1073741827 * 71316922984999;
@@ -363,6 +365,7 @@ fn test_ec_factor_large() {
 #[test]
 #[ignore]
 fn test_compute_partial_factorization() {
+    LogAlgorithmSubscriber::init_test();
     let ZZbig = BigIntRing::RING;
     let n = int_cast(
         RustBigintRing::RING.get_ring().parse("5164499756173817179311838344006023748659411585658447025661318713081295244033682389259290706560275662871806343945494986751", 10).unwrap(),

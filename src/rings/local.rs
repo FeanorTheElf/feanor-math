@@ -592,6 +592,7 @@ fn test_checked_div_min() {
 #[test]
 #[ignore]
 fn test_solve_large_galois_ring() {
+    LogAlgorithmSubscriber::init_test();
     let ring: AsLocalPIR<_> = GaloisField::new(17, 2048).get_ring().galois_ring(5);
     let mut matrix: OwnedMatrix<_> = OwnedMatrix::zero(2, 2, &ring);
     let mut rng = oorandom::Rand64::new(1);

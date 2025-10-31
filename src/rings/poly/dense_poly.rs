@@ -911,6 +911,7 @@ fn test_print() {
 #[test]
 #[ignore]
 fn test_expensive_prod() {
+    LogAlgorithmSubscriber::init_test();
     let ring = GaloisField::new(17, 2048);
     let poly_ring = DensePolyRing::new(&ring, "X");
     let mut rng = oorandom::Rand64::new(1);
@@ -951,6 +952,7 @@ fn test_evaluate_approximate_ring() {
 
 #[bench]
 fn bench_div_rem_monic(bencher: &mut Bencher) {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let ring = DensePolyRing::new(ZZ, "X");
     let phi_n = 30 * 40;

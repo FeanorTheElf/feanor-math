@@ -687,6 +687,7 @@ fn test_smallest_positive_lift() {
 
 #[bench]
 fn bench_hom_from_i64_large_modulus(bencher: &mut Bencher) {
+    LogAlgorithmSubscriber::init_test();
     // the case that the modulus is large
     let Zn = Zn64M::new(36028797018963971 /* = 2^55 + 3 */);
     bencher.iter(|| {
@@ -697,6 +698,7 @@ fn bench_hom_from_i64_large_modulus(bencher: &mut Bencher) {
 
 #[bench]
 fn bench_hom_from_i64_small_modulus(bencher: &mut Bencher) {
+    LogAlgorithmSubscriber::init_test();
     // the case that the modulus is large
     let Zn = Zn64M::new(17);
     bencher.iter(|| {

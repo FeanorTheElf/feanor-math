@@ -288,6 +288,7 @@ fn test_resultant_local_integer() {
 #[test]
 #[ignore]
 fn test_resultant_large() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(ZZ, "X");
 

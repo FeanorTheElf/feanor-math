@@ -2,6 +2,8 @@ use std::cmp::max;
 use std::alloc::{Allocator, Global};
 use std::marker::PhantomData;
 
+use tracing::{Level, event, span};
+
 use crate::cow::*;
 use crate::algorithms::fft::complex_fft::FFTErrorEstimate;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
@@ -84,6 +86,7 @@ impl<A> FFTConvolution<A>
         assert!(self.has_sufficient_precision(log2_len, log2_data_size));
 
         let mut compute_result = || {
+            event!(Level::INFO, "compute_fft");
             let mut result = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
             result.extend(data.as_iter().map(|x| Complex64::RING.from_f64(to_int(x) as f64)));
             result.resize(1 << log2_len, Complex64::RING.zero());
@@ -120,24 +123,26 @@ impl<A> FFTConvolution<A>
         where R: ?Sized + RingBase,
             ToInt: FnMut(&R::Element) -> i64
     {
-        let log2_data_size = if let Some(log2_data_size) = ring_log2_el_size {
-            log2_data_size 
-        } else {
-            data.as_iter().map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap()
-        };
-        let result = PreparedConvolutionOperand {
-            fft_data: LazyVec::new(),
-            ring: PhantomData,
-            log2_data_size: log2_data_size
-        };
-        // if a length-hint is given, initialize the corresponding length entry;
-        // this might avoid confusing performance characteristics when the user does
-        // not expect lazy behavior
-        if let Some(len) = length_hint {
-            let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
-            _ = self.get_fft_data(data, Some(&result), ring, log2_len, to_int, ring_log2_el_size);
-        }
-        return result;
+        span!(Level::INFO, "prepare_convolution_float_fft", len_hint = length_hint).in_scope(|| {
+            let log2_data_size = if let Some(log2_data_size) = ring_log2_el_size {
+                log2_data_size 
+            } else {
+                data.as_iter().map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap()
+            };
+            let result = PreparedConvolutionOperand {
+                fft_data: LazyVec::new(),
+                ring: PhantomData,
+                log2_data_size: log2_data_size
+            };
+            // if a length-hint is given, initialize the corresponding length entry;
+            // this might avoid confusing performance characteristics when the user does
+            // not expect lazy behavior
+            if let Some(len) = length_hint {
+                let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
+                _ = self.get_fft_data(data, Some(&result), ring, log2_len, to_int, ring_log2_el_size);
+            }
+            return result;
+        })
     }
 
     fn compute_convolution_impl<R, ToInt, FromInt>(
@@ -160,27 +165,31 @@ impl<A> FFTConvolution<A>
             return;
         }
         let len = lhs.len() + rhs.len() - 1;
-        assert!(dst.len() >= len);
-        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
-        let mut lhs_fft = self.get_fft_data(lhs, lhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
-        let mut rhs_fft = self.get_fft_data(rhs, rhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
-        if rhs_fft.is_owned() {
-            std::mem::swap(&mut lhs_fft, &mut rhs_fft);
-        }
-        let lhs_fft: &mut Vec<El<Complex64>, A> = lhs_fft.to_mut();
+        span!(Level::INFO, "convolution_float_fft", len = len).in_scope(|| {
 
-        for i in 0..(1 << log2_len) {
-            CC.mul_assign(&mut lhs_fft[i], rhs_fft[i]);
-        }
+            assert!(dst.len() >= len);
+            let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
-        self.get_fft_table(log2_len).unordered_inv_fft(&mut *lhs_fft, CC);
+            let mut lhs_fft = self.get_fft_data(lhs, lhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
+            let mut rhs_fft = self.get_fft_data(rhs, rhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
+            if rhs_fft.is_owned() {
+                std::mem::swap(&mut lhs_fft, &mut rhs_fft);
+            }
+            let lhs_fft: &mut Vec<El<Complex64>, A> = lhs_fft.to_mut();
 
-        for i in 0..len {
-            let result = CC.closest_gaussian_int(lhs_fft[i]);
-            debug_assert_eq!(0, result.1);
-            ring.add_assign(&mut dst[i], from_int(result.0));
-        }
+            for i in 0..(1 << log2_len) {
+                CC.mul_assign(&mut lhs_fft[i], rhs_fft[i]);
+            }
+
+            self.get_fft_table(log2_len).unordered_inv_fft(&mut *lhs_fft, CC);
+
+            for i in 0..len {
+                let result = CC.closest_gaussian_int(lhs_fft[i]);
+                debug_assert_eq!(0, result.1);
+                ring.add_assign(&mut dst[i], from_int(result.0));
+            }
+        })
     }
 
     fn compute_convolution_sum_impl<R, ToInt, FromInt>(
@@ -197,63 +206,66 @@ impl<A> FFTConvolution<A>
             FromInt: FnMut(i64) -> R::Element
     {
         let len = dst.len();
-        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
-        let mut buffer = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
-        buffer.resize(1 << log2_len, CC.zero());
+        span!(Level::INFO, "convolution_sum_float_fft", len = len).in_scope(|| {
 
-        let mut count_since_last_reduction = 0;
-        let mut current_max_sum_len = usize::MAX;
-        let mut current_log2_data_size = if let Some(log2_data_size) = ring_log2_el_size {
-            log2_data_size
-        } else {
-            0
-        };
-        for (lhs, lhs_prep, rhs, rhs_prep) in data {
-            if lhs.len() == 0 || rhs.len() == 0 {
-                continue;
-            }
-            assert!(lhs.len() + rhs.len() - 1 <= dst.len());
+            let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
+            let mut buffer = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
+            buffer.resize(1 << log2_len, CC.zero());
 
-            if ring_log2_el_size.is_none() {
-                current_log2_data_size = max(
-                    current_log2_data_size,
-                    lhs.as_iter().chain(rhs.as_iter()).map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap()
-                );
-                current_max_sum_len = self.max_sum_len(log2_len, current_log2_data_size);
-            }
-            assert!(current_max_sum_len > 0);
-            
-            if count_since_last_reduction > current_max_sum_len {
-                count_since_last_reduction = 0;
-                self.get_fft_table(log2_len).unordered_inv_fft(&mut *buffer, CC);
-                for i in 0..len {
-                    let result = CC.closest_gaussian_int(buffer[i]);
-                    debug_assert_eq!(0, result.1);
-                    ring.add_assign(&mut dst[i], from_int(result.0));
+            let mut count_since_last_reduction = 0;
+            let mut current_max_sum_len = usize::MAX;
+            let mut current_log2_data_size = if let Some(log2_data_size) = ring_log2_el_size {
+                log2_data_size
+            } else {
+                0
+            };
+            for (lhs, lhs_prep, rhs, rhs_prep) in data {
+                if lhs.len() == 0 || rhs.len() == 0 {
+                    continue;
                 }
+                assert!(lhs.len() + rhs.len() - 1 <= dst.len());
+
+                if ring_log2_el_size.is_none() {
+                    current_log2_data_size = max(
+                        current_log2_data_size,
+                        lhs.as_iter().chain(rhs.as_iter()).map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap()
+                    );
+                    current_max_sum_len = self.max_sum_len(log2_len, current_log2_data_size);
+                }
+                assert!(current_max_sum_len > 0);
+                
+                if count_since_last_reduction > current_max_sum_len {
+                    count_since_last_reduction = 0;
+                    self.get_fft_table(log2_len).unordered_inv_fft(&mut *buffer, CC);
+                    for i in 0..len {
+                        let result = CC.closest_gaussian_int(buffer[i]);
+                        debug_assert_eq!(0, result.1);
+                        ring.add_assign(&mut dst[i], from_int(result.0));
+                    }
+                    for i in 0..(1 << log2_len) {
+                        buffer[i] = CC.zero();
+                    }
+                }
+                
+                let mut lhs_fft = self.get_fft_data(lhs, *lhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
+                let mut rhs_fft = self.get_fft_data(rhs, *rhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
+                if rhs_fft.is_owned() {
+                    std::mem::swap(&mut lhs_fft, &mut rhs_fft);
+                }
+                let lhs_fft: &mut Vec<El<Complex64>, A> = lhs_fft.to_mut();
                 for i in 0..(1 << log2_len) {
-                    buffer[i] = CC.zero();
+                    CC.mul_assign(&mut lhs_fft[i], rhs_fft[i]);
+                    CC.add_assign(&mut buffer[i], lhs_fft[i]);
                 }
+                count_since_last_reduction += 1;
             }
-            
-            let mut lhs_fft = self.get_fft_data(lhs, *lhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
-            let mut rhs_fft = self.get_fft_data(rhs, *rhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
-            if rhs_fft.is_owned() {
-                std::mem::swap(&mut lhs_fft, &mut rhs_fft);
+            self.get_fft_table(log2_len).unordered_inv_fft(&mut *buffer, CC);
+            for i in 0..len {
+                let result = CC.closest_gaussian_int(buffer[i]);
+                debug_assert_eq!(0, result.1);
+                ring.add_assign(&mut dst[i], from_int(result.0));
             }
-            let lhs_fft: &mut Vec<El<Complex64>, A> = lhs_fft.to_mut();
-            for i in 0..(1 << log2_len) {
-                CC.mul_assign(&mut lhs_fft[i], rhs_fft[i]);
-                CC.add_assign(&mut buffer[i], lhs_fft[i]);
-            }
-            count_since_last_reduction += 1;
-        }
-        self.get_fft_table(log2_len).unordered_inv_fft(&mut *buffer, CC);
-        for i in 0..len {
-            let result = CC.closest_gaussian_int(buffer[i]);
-            debug_assert_eq!(0, result.1);
-            ring.add_assign(&mut dst[i], from_int(result.0));
-        }
+        })
     }
 }
 

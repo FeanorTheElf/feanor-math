@@ -294,6 +294,7 @@ pub fn buchberger_with_strategy<P, O, SortFn, AbortFn>(ring: P, input_basis: Vec
             // the matrix reduction step during F4
             let spolys_to_reduce_index = open.iter().enumerate().rev().filter(|(_, spoly)| ring.monomial_deg(&spoly.lcm_term(ring, &basis, order).1) > current_deg).next().map(|(i, _)| i + 1).unwrap_or(0);
             let spolys_to_reduce = &open[spolys_to_reduce_index..];
+            let considered_spolys = spolys_to_reduce.len();
 
             let new_polys = AppendOnlyVec::new();
             let current_span = Span::current();
@@ -311,7 +312,7 @@ pub fn buchberger_with_strategy<P, O, SortFn, AbortFn>(ring: P, input_basis: Vec
                 }
             }));
 
-            event!(Level::INFO, reduced_to_zero = reduced_to_zero.load(Ordering::Relaxed));
+            event!(Level::INFO, reduced_to_zero = reduced_to_zero.load(Ordering::Relaxed), new_basis_polys = considered_spolys - reduced_to_zero.load(Ordering::Relaxed));
 
             drop(open.drain(spolys_to_reduce_index..));
             let new_polys = new_polys.into_vec();
@@ -334,12 +335,11 @@ pub fn buchberger_with_strategy<P, O, SortFn, AbortFn>(ring: P, input_basis: Vec
                 changed = true;
                 current_deg = 0;
                 update_basis(ring, new_polys.iter().map(|(f, _)| ring.clone_el(f)), &mut basis, &mut open, order, nilpotent_power, &mut filtered_spolys, &mut sort_spolys);
-                event!(Level::INFO, basis_poly_count = basis.len(), spoly_count = open.len(), filtered_count = filtered_spolys);
 
                 reducers.extend(new_polys.into_iter());
                 reducers = inter_reduce(ring, reducers, order);
                 sort_reducers(&mut reducers);
-                event!(Level::INFO, reducers_count = reducers.len());
+                event!(Level::INFO, basis_poly_count = basis.len(), reducers_count = reducers.len(), spoly_count = open.len(), filtered_count = filtered_spolys);
                 if abort_early_if(&reducers) {
                     event!(Level::INFO, "early_abort");
                     return reducers.into_iter().map(|(f, _)| f).collect();
@@ -658,6 +658,7 @@ fn test_expensive_gb_1() {
 #[test]
 #[ignore]
 fn test_expensive_gb_2() {
+    LogAlgorithmSubscriber::init_test();
     let base = zn_static::Fp::<7>::RING;
     let ring = MultivariatePolyRingImpl::new(base, 7);
 
@@ -678,6 +679,7 @@ fn test_expensive_gb_2() {
 #[test]
 #[ignore]
 fn test_groebner_cyclic6() {
+    LogAlgorithmSubscriber::init_test();
     let base = zn_static::Fp::<65537>::RING;
     let ring = MultivariatePolyRingImpl::new(base, 6);
 
@@ -692,6 +694,7 @@ fn test_groebner_cyclic6() {
 #[test]
 #[ignore]
 fn test_groebner_cyclic7() {
+    LogAlgorithmSubscriber::init_test();
     let base = zn_static::Fp::<65537>::RING;
     let ring = MultivariatePolyRingImpl::new(base, 7);
 
@@ -707,6 +710,7 @@ fn test_groebner_cyclic7() {
 #[test]
 #[ignore]
 fn test_groebner_cyclic8() {
+    LogAlgorithmSubscriber::init_test();
     let base = zn_static::Fp::<65537>::RING;
     let ring = MultivariatePolyRingImpl::new(base, 8);
 

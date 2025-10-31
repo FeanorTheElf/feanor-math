@@ -246,6 +246,8 @@ pub fn naive_matmul<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const
 use test;
 #[cfg(test)]
 use crate::primitive_int::*;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 const BENCH_SIZE: usize = 128;
@@ -254,6 +256,7 @@ type BenchInt = i64;
 
 #[bench]
 fn bench_naive_matmul(bencher: &mut test::Bencher) {
+    LogAlgorithmSubscriber::init_test();
     let lhs = OwnedMatrix::from_fn_in(BENCH_SIZE, BENCH_SIZE, |i, j| std::hint::black_box(i as BenchInt + j as BenchInt), Global);
     let rhs = OwnedMatrix::from_fn_in(BENCH_SIZE, BENCH_SIZE, |i, j| std::hint::black_box(i as BenchInt + j as BenchInt), Global);
     let mut result: OwnedMatrix<BenchInt> = OwnedMatrix::zero(BENCH_SIZE, BENCH_SIZE, StaticRing::<BenchInt>::RING);
@@ -273,6 +276,7 @@ fn bench_naive_matmul(bencher: &mut test::Bencher) {
 
 #[bench]
 fn bench_strassen_matmul(bencher: &mut test::Bencher) {
+    LogAlgorithmSubscriber::init_test();
     let threshold_log_2 = 4;
     let lhs = OwnedMatrix::from_fn_in(BENCH_SIZE, BENCH_SIZE, |i, j| std::hint::black_box(i as BenchInt + j as BenchInt), Global);
     let rhs = OwnedMatrix::from_fn_in(BENCH_SIZE, BENCH_SIZE, |i, j| std::hint::black_box(i as BenchInt + j as BenchInt), Global);

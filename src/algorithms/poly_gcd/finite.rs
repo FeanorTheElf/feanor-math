@@ -223,14 +223,15 @@ pub fn fast_poly_eea<P>(poly_ring: P, lhs: El<P>, rhs: El<P>) -> (El<P>, El<P>, 
     } else if poly_ring.is_zero(&rhs) {
         return (poly_ring.one(), poly_ring.zero(), lhs);
     }
-
-    let ([s1, t1, s2, t2], [a1, a2]) = fast_poly_eea_impl(poly_ring, lhs, rhs, 0, &mut (0..strassen_mem_size(false, 2, 0)).map(|_| poly_ring.zero()).collect::<Vec<_>>());
-    if poly_ring.is_zero(&a1) {
-        return (s2, t2, a2);
-    } else {
-        assert!(poly_ring.is_zero(&a2));
-        return (s1, t1, a1);
-    }
+    span!(Level::INFO, "fast_poly_eea", lhs_deg = poly_ring.degree(&lhs).unwrap(), rhs_deg = poly_ring.degree(&rhs).unwrap()).in_scope(|| {
+        let ([s1, t1, s2, t2], [a1, a2]) = fast_poly_eea_impl(poly_ring, lhs, rhs, 0, &mut (0..strassen_mem_size(false, 2, 0)).map(|_| poly_ring.zero()).collect::<Vec<_>>());
+        if poly_ring.is_zero(&a1) {
+            return (s2, t2, a2);
+        } else {
+            assert!(poly_ring.is_zero(&a2));
+            return (s1, t1, a1);
+        }
+    })
 }
 
 #[cfg(test)]
