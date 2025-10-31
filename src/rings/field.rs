@@ -655,21 +655,26 @@ macro_rules! impl_field_wrap_unwrap_isos {
 use crate::rings::zn::zn_big::ZnGB;
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {
+    LogAlgorithmSubscriber::init_test();
     let R = ZnGB::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
     crate::ring::generic_tests::test_hom_axioms(StaticRing::<i64>::RING, &R, 0..17);
 }
 
 #[test]
 fn test_divisibility_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let R = ZnGB::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
     crate::divisibility::generic_tests::test_divisibility_axioms(&R, R.elements());
 }
 
 #[test]
 fn test_canonical_hom_axioms_wrap_unwrap() {
+    LogAlgorithmSubscriber::init_test();
     let R = ZnGB::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
     crate::ring::generic_tests::test_hom_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());
     crate::ring::generic_tests::test_iso_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());
@@ -677,6 +682,7 @@ fn test_canonical_hom_axioms_wrap_unwrap() {
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let R = ZnGB::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
     crate::pid::generic_tests::test_euclidean_ring_axioms(&R, R.elements());
@@ -684,6 +690,7 @@ fn test_principal_ideal_ring_axioms() {
 
 #[test]
 fn test_field_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let R = ZnGB::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
     crate::field::generic_tests::test_field_axioms(&R, R.elements());
 }

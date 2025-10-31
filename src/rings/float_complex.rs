@@ -291,8 +291,12 @@ impl<I> CanHomFrom<RationalFieldBase<I>> for Complex64Base
     }
 }
 
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
+
 #[test]
 fn test_pow() {
+    LogAlgorithmSubscriber::init_test();
     let CC = Complex64::RING;
     let i = Complex64::I;
     assert!(CC.is_approx_eq(CC.negate(i), CC.pow(i, 3), 1));
@@ -306,6 +310,7 @@ fn test_pow() {
 
 #[test]
 fn test_mul() {
+    LogAlgorithmSubscriber::init_test();
     let CC = Complex64::RING;
     let i = Complex64::I;
     assert!(CC.is_approx_eq(CC.mul(i, i), CC.from_f64(-1.), 1));

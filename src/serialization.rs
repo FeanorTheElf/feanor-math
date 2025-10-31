@@ -170,9 +170,12 @@ pub mod generic_tests {
 
 #[cfg(test)]
 use crate::integer::{BigIntRing, IntegerRingStore};
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_serialize() {
+    LogAlgorithmSubscriber::init_test();
     let value = BigIntRing::RING.add(BigIntRing::RING.power_of_two(128), BigIntRing::RING.one());
     let json = serde_json::to_string(&SerializeWithRing::new(&value, BigIntRing::RING)).unwrap();
     assert_eq!("\"340282366920938463463374607431768211457\"", json);

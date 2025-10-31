@@ -659,9 +659,12 @@ impl_localpir_wrap_unwrap_isos!{ <{I, J}> ZnGBBase<I>, ZnGBBase<J> where I: Ring
 use crate::integer::BigIntRing;
 #[cfg(test)]
 use crate::rings::rust_bigint::*;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_mul() {
+    LogAlgorithmSubscriber::init_test();
     const ZZ: BigIntRing = BigIntRing::RING;
     let Z257 = ZnGB::new(ZZ, ZZ.int_hom().map(257));
     let x = Z257.coerce(&ZZ, ZZ.int_hom().map(256));
@@ -670,6 +673,7 @@ fn test_mul() {
 
 #[test]
 fn test_project() {
+    LogAlgorithmSubscriber::init_test();
     const ZZ: StaticRing<i64> = StaticRing::RING;
     let Z17 = ZnGB::new(ZZ, 17);
     for k in 0..289 {
@@ -679,18 +683,21 @@ fn test_project() {
 
 #[test]
 fn test_ring_axioms_znbase() {
+    LogAlgorithmSubscriber::init_test();
     let ring = ZnGB::new(StaticRing::<i64>::RING, 63);
     crate::ring::generic_tests::test_ring_axioms(&ring, ring.elements())
 }
 
 #[test]
 fn test_hash_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let ring = ZnGB::new(StaticRing::<i64>::RING, 63);
     crate::ring::generic_tests::test_hash_axioms(&ring, ring.elements())
 }
 
 #[test]
 fn test_canonical_iso_axioms_zn_big() {
+    LogAlgorithmSubscriber::init_test();
     let from = ZnGB::new(StaticRing::<i128>::RING, 7 * 11);
     let to = ZnGB::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(7 * 11));
     crate::ring::generic_tests::test_hom_axioms(&from, &to, from.elements());
@@ -700,6 +707,7 @@ fn test_canonical_iso_axioms_zn_big() {
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {
+    LogAlgorithmSubscriber::init_test();
     let from = StaticRing::<i32>::RING;
     let to = ZnGB::new(StaticRing::<i128>::RING, 7 * 11);
     crate::ring::generic_tests::test_hom_axioms(&from, to, 0..=(2 * 7 * 11));
@@ -707,29 +715,34 @@ fn test_canonical_hom_axioms_static_int() {
 
 #[test]
 fn test_zn_ring_axioms_znbase() {
+    LogAlgorithmSubscriber::init_test();
     super::generic_tests::test_zn_axioms(ZnGB::new(StaticRing::<i64>::RING, 17));
     super::generic_tests::test_zn_axioms(ZnGB::new(StaticRing::<i64>::RING, 63));
 }
 
 #[test]
 fn test_zn_map_in_large_int_znbase() {
+    LogAlgorithmSubscriber::init_test();
     super::generic_tests::test_map_in_large_int(ZnGB::new(StaticRing::<i64>::RING, 63));
 }
 
 #[test]
 fn test_zn_map_in_small_int() {
+    LogAlgorithmSubscriber::init_test();
     let ring = ZnGB::new(StaticRing::<i64>::RING, 257);
     assert_el_eq!(ring, ring.one(), ring.coerce(&StaticRing::<i8>::RING, 1));
 }
 
 #[test]
 fn test_divisibility_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let R = ZnGB::new(StaticRing::<i64>::RING, 17);
     crate::divisibility::generic_tests::test_divisibility_axioms(&R, R.elements());
 }
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let R = ZnGB::new(StaticRing::<i64>::RING, 17);
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
     let R = ZnGB::new(StaticRing::<i64>::RING, 63);
@@ -738,6 +751,7 @@ fn test_principal_ideal_ring_axioms() {
 
 #[test]
 fn test_canonical_iso_axioms_as_field() {
+    LogAlgorithmSubscriber::init_test();
     let R = ZnGB::new(StaticRing::<i128>::RING, 17);
     let R2 = R.clone().as_field().ok().unwrap();
     crate::ring::generic_tests::test_hom_axioms(&R, &R2, R.elements());
@@ -748,6 +762,7 @@ fn test_canonical_iso_axioms_as_field() {
 
 #[test]
 fn test_canonical_iso_axioms_zn_64() {
+    LogAlgorithmSubscriber::init_test();
     let R = ZnGB::new(StaticRing::<i128>::RING, 17);
     let R2 = zn_64::Zn64B::new(17);
     crate::ring::generic_tests::test_hom_axioms(&R, &R2, R.elements());
@@ -758,6 +773,7 @@ fn test_canonical_iso_axioms_zn_64() {
 
 #[test]
 fn test_finite_field_axioms() {
+    LogAlgorithmSubscriber::init_test();
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&StaticRing::<i64>::RING, 128));
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&StaticRing::<i64>::RING, 15));
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&StaticRing::<i128>::RING, 1 << 32));
@@ -765,11 +781,13 @@ fn test_finite_field_axioms() {
 
 #[test]
 fn test_serialize() {
+    LogAlgorithmSubscriber::init_test();
     let ring = ZnGB::new(&StaticRing::<i64>::RING, 128);
     crate::serialization::generic_tests::test_serialization(ring, ring.elements())
 }
 #[test]
 fn test_unreduced() {
+    LogAlgorithmSubscriber::init_test();
     let ZZbig = RustBigintRing::RING;
     let ring = ZnGB::new(ZZbig, ZZbig.prod([72057594035352641, 72057594035418113, 72057594036334721, 72057594036945793, ].iter().map(|p| int_cast(*p, ZZbig, StaticRing::<i64>::RING))));
     let value = ZZbig.get_ring().parse("26959946664284515451292772736873168147996033528710027874998326058050", 10).unwrap();
@@ -786,6 +804,7 @@ fn test_unreduced() {
 
 #[test]
 fn test_serialize_deserialize() {
+    LogAlgorithmSubscriber::init_test();
     crate::serialization::generic_tests::test_serialize_deserialize(ZnGB::new(StaticRing::<i64>::RING, 128).into());
     crate::serialization::generic_tests::test_serialize_deserialize(ZnGB::new(StaticRing::<i64>::RING, 129).into());
     crate::serialization::generic_tests::test_serialize_deserialize(ZnGB::new(BigIntRing::RING, BigIntRing::RING.power_of_two(10)).into());

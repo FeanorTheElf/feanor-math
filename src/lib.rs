@@ -31,6 +31,8 @@
 #![feature(int_roundings)]
 #![feature(array_try_from_fn)]
 #![feature(hasher_prefixfree_extras)]
+#![feature(current_thread_id)]
+#![feature(thread_id_value)]
 
 #![doc = include_str!("../Readme.md")]
 
@@ -70,7 +72,7 @@ pub mod unstable_sealed {
 mod lazy;
 mod cow;
 
-
+pub mod tracing;
 pub mod function;
 ///
 /// Contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`].

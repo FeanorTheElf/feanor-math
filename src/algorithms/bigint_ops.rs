@@ -538,6 +538,8 @@ pub fn deserialize_bigint_from_bytes<'de, D, F, T>(deserializer: D, from_bytes: 
 
 #[cfg(test)]
 use std::alloc::Global;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 fn parse(s: &str, base: u32) -> Vec<BlockInt> {
@@ -550,6 +552,7 @@ fn parse(s: &str, base: u32) -> Vec<BlockInt> {
 
 #[test]
 fn test_sub() {
+    LogAlgorithmSubscriber::init_test();
     let mut x = parse("923645871236598172365987287530543", 10);
     let y = parse("58430657823473456743684735863478", 10);
     let z = parse("865215213413124715622302551667065", 10);
@@ -565,6 +568,7 @@ fn test_sub() {
 
 #[test]
 fn test_sub_with_carry() {
+    LogAlgorithmSubscriber::init_test();
     let mut x = parse("1000000000000000000", 16);
     let y = parse("FFFFFFFFFFFFFFFF00", 16);
     bigint_sub(&mut x, &y, 0);
@@ -573,6 +577,7 @@ fn test_sub_with_carry() {
 
 #[test]
 fn test_add() {
+    LogAlgorithmSubscriber::init_test();
     let mut x = parse("923645871236598172365987287530543", 10);
     let y = parse("58430657823473456743684735863478", 10);
     let z = parse("982076529060071629109672023394021", 10);
@@ -582,6 +587,7 @@ fn test_add() {
 
 #[test]
 fn test_add_with_carry() {
+    LogAlgorithmSubscriber::init_test();
     let mut x = parse("1BC00000000000000BC", 16);
     let y =  parse("FFFFFFFFFFFFFFFF0000000000000000BC", 16);
     let z = parse("10000000000000000BC0000000000000178", 16);
@@ -591,6 +597,7 @@ fn test_add_with_carry() {
 
 #[test]
 fn test_mul() {
+    LogAlgorithmSubscriber::init_test();
     let x = parse("57873674586797895671345345", 10);
     let y = parse("21308561789045691782534873921650342768903561413264128756389247568729346542359871235465", 10);
     let z = parse("1233204770891906354921751949503652431220138020953161094405729272872607166072371117664593787957056214903826660425", 10);
@@ -599,6 +606,7 @@ fn test_mul() {
 
 #[test]
 fn test_fma() {
+    LogAlgorithmSubscriber::init_test();
     let x = parse("543929578293075482904560982347609823468792", 10);
     let y = parse("598147578092315980234089723484389243859743", 10);
     let a = parse("98734435342", 10);
@@ -608,6 +616,7 @@ fn test_fma() {
 
 #[test]
 fn test_div_no_remainder() {
+    LogAlgorithmSubscriber::init_test();
     let mut x = parse("578435387FF0582367863200000000000000000000", 16);
     let y = parse("200000000000000000000", 16);
     let z = parse("2BC21A9C3FF82C11B3C319", 16);
@@ -618,6 +627,7 @@ fn test_div_no_remainder() {
 
 #[test]
 fn test_div_with_remainder() {
+    LogAlgorithmSubscriber::init_test();
     let mut x = parse("578435387FF0582367863200000000007651437856", 16);
     let y = parse("200000000000000000000", 16);
     let z = parse("2BC21A9C3FF82C11B3C319", 16);
@@ -629,6 +639,7 @@ fn test_div_with_remainder() {
 
 #[test]
 fn test_div_big() {
+    LogAlgorithmSubscriber::init_test();
     let mut x = parse("581239456149785691238569872349872348569871269871234657986123987237865847935698734296434575367565723846982523852347", 10);
     let y = parse("903852718907268716125180964783634518356783568793426834569872365791233387356325", 10);
     let q = parse("643068769934649368349591185247155725", 10);
@@ -648,6 +659,7 @@ fn test_div_big() {
 
 #[test]
 fn test_div_last_block_overflow() {
+    LogAlgorithmSubscriber::init_test();
     let mut x = parse("3227812347608635737069898965003764842912132241036529391038324195675809527521051493287056691600172289294878964965934366720", 10);
     let y = parse("302231454903657293676544", 10);
     let q = parse("10679935179604550411975108530847760573013522611783263849735208039111098628903202750114810434682880", 10);
@@ -658,6 +670,7 @@ fn test_div_last_block_overflow() {
 
 #[test]
 fn test_div_small() {
+    LogAlgorithmSubscriber::init_test();
     let mut x = parse("891023591340178345678931246518793456983745682137459364598623489512389745698237456890239238476873429872346579", 10);
     let q = parse("255380794307875708133829534685810678413226048190730686328066348384175908769916152734376393945793473738133", 10);
     _ = bigint_div_small(&mut x, 3489);
@@ -666,6 +679,7 @@ fn test_div_small() {
 
 #[test]
 fn test_bigint_rshift() {
+    LogAlgorithmSubscriber::init_test();
     let mut x = parse("9843a756781b34567f81394", 16);
     let z = parse("9843a756781b34567", 16);
 	bigint_rshift(&mut x, 24);
@@ -678,6 +692,7 @@ fn test_bigint_rshift() {
 
 #[test]
 fn test_bigint_lshift() {
+    LogAlgorithmSubscriber::init_test();
     let mut x = parse("2", 10);
 	bigint_lshift(&mut x, 0);
     assert_eq!(parse("2", 10), truncate_zeros(x));

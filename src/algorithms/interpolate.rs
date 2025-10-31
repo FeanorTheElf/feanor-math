@@ -9,6 +9,9 @@ use crate::rings::poly::*;
 use crate::seq::*;
 use crate::homomorphism::Homomorphism;
 use crate::rings::poly::dense_poly::DensePolyRing;
+use crate::algorithms::convolution::STANDARD_CONVOLUTION;
+
+use tracing::{Level, span};
 
 use std::alloc::Allocator;
 use std::cmp::min;
@@ -225,16 +228,16 @@ use crate::rings::zn::ZnRingStore;
 use std::alloc::Global;
 #[cfg(test)]
 use multivariate_impl::MultivariatePolyRingImpl;
-use tracing::{Level, span};
 #[cfg(test)]
 use crate::rings::fraction::FractionFieldStore;
 #[cfg(test)]
 use crate::rings::rational::RationalField;
-
-use super::convolution::STANDARD_CONVOLUTION;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_product_except_one() {
+    LogAlgorithmSubscriber::init_test();
     let ring = StaticRing::<i64>::RING;
     let data = [2, 3, 5, 7, 11, 13, 17, 19];
     let mut actual = [0; 8];
@@ -281,6 +284,7 @@ fn test_product_except_one() {
 
 #[test]
 fn test_interpolate() {
+    LogAlgorithmSubscriber::init_test();
     let ring = StaticRing::<i64>::RING;
     let poly_ring = DensePolyRing::new(ring, "X");
     let poly = poly_ring.from_terms([(3, 0), (1, 1), (-1, 3), (2, 4), (1, 5)].into_iter());
@@ -309,6 +313,7 @@ fn test_interpolate() {
 
 #[test]
 fn test_interpolate_multivariate() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Zn64B::new(29).as_field().ok().unwrap();
     let poly_ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(ring, 2);
 

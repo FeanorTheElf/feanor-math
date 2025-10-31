@@ -896,6 +896,8 @@ use crate::rings::zn::zn_static::F17;
 use crate::rings::zn::*;
 #[cfg(test)]
 use crate::rings::approx_real::float::Real64;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 fn ring_and_elements() -> (MultivariatePolyRingImpl<zn_static::Fp<17>>, Vec<MultivariatePolyRingEl<zn_static::Fp<17>>>) {
@@ -915,18 +917,21 @@ fn ring_and_elements() -> (MultivariatePolyRingImpl<zn_static::Fp<17>>, Vec<Mult
 
 #[test]
 fn test_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let (ring, els) = ring_and_elements();
     crate::ring::generic_tests::test_ring_axioms(&ring, els.into_iter());
 }
 
 #[test]
 fn test_multivariate_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let (ring, _els) = ring_and_elements();
     crate::rings::multivariate::generic_tests::test_poly_ring_axioms(&ring, [F17.one(), F17.zero(), F17.int_hom().map(2), F17.neg_one()].into_iter());
 }
 
 #[test]
 fn test_enumeration_index_degrevlex() {
+    LogAlgorithmSubscriber::init_test();
 
     let cum_binomial_lookup_table = (0..4).map(|n| (0..7).map(|k| compute_cum_binomial(n, k)).collect::<Vec<_>>()).collect::<Vec<_>>();
 
@@ -977,6 +982,7 @@ fn test_enumeration_index_degrevlex() {
 
 #[test]
 fn test_create_multiplication_table() {
+    LogAlgorithmSubscriber::init_test();
     let cum_binomial_lookup_table = (0..3).map(|n| (0..7).map(|k| compute_cum_binomial(n, k)).collect::<Vec<_>>()).collect::<Vec<_>>();
     let mul_table = MultivariatePolyRingImplBase::<StaticRing<i64>>::create_multiplication_table(3, 3, 4, &cum_binomial_lookup_table);
 
@@ -999,11 +1005,13 @@ fn test_create_multiplication_table() {
 
 #[test]
 fn test_monomial_small() {
+    LogAlgorithmSubscriber::init_test();
     assert_eq!(16, size_of::<MonomialIdentifier>());
 }
 
 #[test]
 fn test_new_many_variables() {
+    LogAlgorithmSubscriber::init_test();
     for m in 1..32 {
         let ring = MultivariatePolyRingImpl::new_with_mult_table(StaticRing::<i64>::RING, m, 32, (2, 3), Global);
         assert_eq!(m, ring.indeterminate_count());
@@ -1012,6 +1020,7 @@ fn test_new_many_variables() {
 
 #[test]
 fn test_evaluate_approximate_ring() {
+    LogAlgorithmSubscriber::init_test();
     let ring = MultivariatePolyRingImpl::new(Real64::RING, 2);
     let [f] = ring.with_wrapped_indeterminates(|[X, Y]| [X * X * Y - Y * Y]);
     let x = 0.47312;
@@ -1021,6 +1030,7 @@ fn test_evaluate_approximate_ring() {
 
 #[test]
 fn test_evaluate_many_variables() {
+    LogAlgorithmSubscriber::init_test();
     let ring = MultivariatePolyRingImpl::new_with_mult_table(StaticRing::<i64>::RING, 20, 16, (4, 6), Global);
     let [f] = ring.with_wrapped_indeterminates(|X: [_; 20]| [X[0] + X[5] + X[19]]);
     assert_eq!(1 + 6 + 20, ring.evaluate(&f, (1..21).map_fn(|x| x as i64), StaticRing::<i64>::RING.identity()));
@@ -1028,6 +1038,7 @@ fn test_evaluate_many_variables() {
 
 #[test]
 fn test_appearing_indeterminates() {
+    LogAlgorithmSubscriber::init_test();
     let F7 = zn_64::Zn64B::new(7).as_field().ok().unwrap();
     let F7XY = MultivariatePolyRingImpl::new(&F7, 2);
     let [f, g] = F7XY.with_wrapped_indeterminates(|[X, Y]| [5 + 4 * X, 6 + 2 * Y]);

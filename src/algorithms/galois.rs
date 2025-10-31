@@ -298,9 +298,12 @@ pub fn find_complex_conjugation<'a, K1, K2, K3>(
 
 #[cfg(test)]
 use crate::algorithms::poly_factor::FactorPolyField;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_compute_galois_closure() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(&ZZ, "X");
 
@@ -333,12 +336,8 @@ fn test_compute_galois_closure() {
 
 #[test]
 fn test_compute_galois_group() {
-    tracing_subscriber::fmt()
-        .compact()
-        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::ENTER | tracing_subscriber::fmt::format::FmtSpan::EXIT)
-        .with_timer(tracing_subscriber::fmt::time())
-        .with_file(false)
-        .init();
+    LogAlgorithmSubscriber::init_test();
+    LogAlgorithmSubscriber::init_test();
 
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(&ZZ, "X");
@@ -388,6 +387,7 @@ fn test_compute_galois_group() {
 
 #[test]
 fn test_complex_conjugation() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(&ZZ, "X");
     

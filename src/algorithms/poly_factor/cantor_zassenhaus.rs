@@ -449,9 +449,12 @@ pub fn cantor_zassenhaus_even<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
 
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_distinct_degree_factorization() {
+    LogAlgorithmSubscriber::init_test();
     let field = Fp::<2>::RING;
     let ring = DensePolyRing::new(field, "X");
 
@@ -484,6 +487,7 @@ fn test_distinct_degree_factorization() {
 
 #[test]
 fn test_is_irreducible() {
+    LogAlgorithmSubscriber::init_test();
     let field = Fp::<3>::RING;
     let ring = DensePolyRing::new(field, "X");
 
@@ -497,6 +501,7 @@ fn test_is_irreducible() {
 
 #[test]
 fn test_cantor_zassenhaus() {
+    LogAlgorithmSubscriber::init_test();
     let ring = DensePolyRing::new(Fp::<7>::RING, "X");
     let f = ring.from_terms([(1, 0), (1, 2)].into_iter());
     let g = ring.from_terms([(3, 0), (1, 1), (1, 2)].into_iter());
@@ -507,6 +512,7 @@ fn test_cantor_zassenhaus() {
 
 #[test]
 fn test_cantor_zassenhaus_even() {
+    LogAlgorithmSubscriber::init_test();
     let ring = DensePolyRing::new(Fp::<2>::RING, "X");
     // (X^3 + X + 1) (X^3 + X^2 + 1)
     let f = ring.from_terms([(1, 0), (1, 1), (1, 3)].into_iter());
@@ -525,6 +531,7 @@ fn test_cantor_zassenhaus_even() {
 
 #[test]
 fn test_cantor_zassenhaus_even_extension_field() {
+    LogAlgorithmSubscriber::init_test();
 
     let Fq = FreeAlgebraImpl::new(Fp::<2>::RING, 4, [1, 1, 0, 0]).as_field().ok().unwrap();
     let ring = DensePolyRing::new(&Fq, "X");
@@ -558,6 +565,7 @@ fn test_cantor_zassenhaus_even_extension_field() {
 
 #[test]
 fn test_pow_geometric_series_characteristic() {
+    LogAlgorithmSubscriber::init_test();
     let base_ring = Fp::<65537>::RING;
     let ring = FreeAlgebraImpl::new(base_ring, 3, [1]);
     assert_el_eq!(&ring, ring.pow(ring.canonical_gen(), 1), pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 0));

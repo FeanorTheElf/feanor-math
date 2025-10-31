@@ -577,7 +577,7 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I>(poly_ring: P, poly: &
                 }
             }
             if let Some(p) = inert_prime {
-                event!(Level::INFO, prime = %IdealDisplayWrapper::new(self_.base_ring().base_ring().get_ring(), &p.prime), "found_inert_prime");
+                event!(Level::INFO, prime = %IdealDisplayWrapper::new(self_.base_ring().base_ring().get_ring(), &p.prime));
                 let lc_poly = self_.clone_el(poly_ring.lc(poly).unwrap());
                 let monic_poly = evaluate_aX(poly_ring, poly, &lc_poly);
                 let e = 2 * self_.get_ring().heuristic_exponent(&p, poly_ring.degree(&monic_poly).unwrap(), poly_ring.terms(&monic_poly).map(|(c, _)| c));
@@ -1244,9 +1244,12 @@ impl<'de, Impl, I> Deserialize<'de> for NumberFieldBase<Impl, I>
 use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[cfg(test)]
 use crate::iters::multi_cartesian_product;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(ZZ, "X");
 
@@ -1260,6 +1263,7 @@ fn test_principal_ideal_ring_axioms() {
 
 #[test]
 fn test_adjoin_root() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
     let QQX = DensePolyRing::new(QQ, "X");
@@ -1270,6 +1274,7 @@ fn test_adjoin_root() {
 
 #[test]
 fn test_poly_gcd_number_field() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(ZZ, "X");
 

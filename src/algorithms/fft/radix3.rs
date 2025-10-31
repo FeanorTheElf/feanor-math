@@ -538,9 +538,12 @@ use crate::rings::finite::FiniteRingStore;
 use crate::rings::zn::zn_64::*;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_radix3_butterflies() {
+    LogAlgorithmSubscriber::init_test();
     let log3_n = 3;
     let ring = Zn64B::new(109);
     let ring_fastmul = ZnFastmul::new(ring).unwrap();
@@ -580,6 +583,7 @@ fn test_radix3_butterflies() {
 
 #[test]
 fn test_radix3_inv_fft() {
+    LogAlgorithmSubscriber::init_test();
     let log3_n = 3;
     let ring = Zn64B::new(109);
     let ring_fastmul = ZnFastmul::new(ring).unwrap();
@@ -598,6 +602,7 @@ fn test_radix3_inv_fft() {
 
 #[test]
 fn test_size_1_fft() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Fp::<17>::RING;
     let fft = CooleyTukeyRadix3FFT::for_zn(&ring, 0).unwrap().change_ring(ring.identity()).0;
     let values: [u64; 1] = [3];
@@ -670,6 +675,7 @@ pub mod generic_tests {
 
 #[test]
 fn test_butterfly() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Fp::<109>::RING;
     generic_tests::test_cooley_tuckey_radix3_butterfly(
         ring,

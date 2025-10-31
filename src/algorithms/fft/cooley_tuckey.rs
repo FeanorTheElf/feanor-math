@@ -874,9 +874,12 @@ use crate::rings::zn::zn_static;
 use crate::field::*;
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_bitreverse_fft_inplace_basic() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Fp::<5>::RING;
     let z = ring.int_hom().map(2);
     let fft = CooleyTuckeyFFT::new(ring, ring.div(&1, &z), 2);
@@ -893,6 +896,7 @@ fn test_bitreverse_fft_inplace_basic() {
 
 #[test]
 fn test_bitreverse_fft_inplace_advanced() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Fp::<17>::RING;
     let z = ring.int_hom().map(3);
     let fft = CooleyTuckeyFFT::new(ring, z, 4);
@@ -909,6 +913,7 @@ fn test_bitreverse_fft_inplace_advanced() {
 
 #[test]
 fn test_unordered_fft_permutation() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Fp::<17>::RING;
     let fft = CooleyTuckeyFFT::for_zn(&ring, 4).unwrap();
     let mut values = [0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -923,6 +928,7 @@ fn test_unordered_fft_permutation() {
 
 #[test]
 fn test_bitreverse_inv_fft_inplace() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Fp::<17>::RING;
     let fft = CooleyTuckeyFFT::for_zn(&ring, 4).unwrap();
     let values: [u64; 16] = [1, 2, 3, 2, 1, 0, 17 - 1, 17 - 2, 17 - 1, 0, 1, 2, 3, 4, 5, 6];
@@ -934,6 +940,7 @@ fn test_bitreverse_inv_fft_inplace() {
 
 #[test]
 fn test_truncated_fft() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Fp::<17>::RING;
     let fft = CooleyTuckeyFFT::new(ring, 2, 3);
 
@@ -953,6 +960,7 @@ fn test_truncated_fft() {
 
 #[test]
 fn test_for_zn() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Fp::<17>::RING;
     let fft = CooleyTuckeyFFT::for_zn(ring, 4).unwrap();
     assert!(ring.is_neg_one(&ring.pow(fft.root_of_unity, 8)));
@@ -1012,6 +1020,7 @@ fn bench_fft_zn_64_fastmul(bencher: &mut test::Bencher) {
 
 #[test]
 fn test_approximate_fft() {
+    LogAlgorithmSubscriber::init_test();
     let CC = Complex64::RING;
     for log2_n in [4, 7, 11, 15] {
         let fft = CooleyTuckeyFFT::new_with_pows(CC, |x| CC.root_of_unity(x, 1 << log2_n), log2_n);
@@ -1028,6 +1037,7 @@ fn test_approximate_fft() {
 
 #[test]
 fn test_size_1_fft() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Fp::<17>::RING;
     let fft = CooleyTuckeyFFT::for_zn(&ring, 0).unwrap().change_ring(ring.identity()).0;
     let values: [u64; 1] = [3];
@@ -1075,5 +1085,6 @@ pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Itera
 
 #[test]
 fn test_butterfly() {
+    LogAlgorithmSubscriber::init_test();
     generic_test_cooley_tuckey_butterfly(zn_static::F17, zn_static::F17, zn_static::F17.elements(), &get_prim_root_of_unity_pow2(zn_static::F17, 4).unwrap());
 }

@@ -492,9 +492,12 @@ use crate::assert_matrix_eq;
 use crate::algorithms::lll::{assert_lattice_isomorphic, norm_squared};
 #[cfg(test)]
 use crate::rings::approx_real::float::*;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_compute_cholesky_column_without_pivot() {
+    LogAlgorithmSubscriber::init_test();
     let RR = Real64::RING;
     let mut quadratic_form = [
         DerefArray::from([4., 5.]),
@@ -548,6 +551,7 @@ fn test_compute_cholesky_column_without_pivot() {
 
 #[test]
 fn test_lll_float_2d() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = StaticRing::<i64>::RING;
     let RR = Real64::RING;
     let original = [
@@ -596,6 +600,7 @@ fn test_lll_float_2d() {
 
 #[test]
 fn test_lll_float_3d() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = StaticRing::<i64>::RING;
     let RR = Real64::RING;
     // in this case, the shortest vector is shorter than half the second successive minimum,
@@ -621,6 +626,7 @@ fn test_lll_float_3d() {
 
 #[test]
 fn test_lll_precision() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = StaticRing::<i128>::RING;
     let RR = Real64::RING;
     let original = [
@@ -695,6 +701,7 @@ fn test_lll_precision() {
 
 #[test]
 fn test_lll_generating_set() {
+    LogAlgorithmSubscriber::init_test();
     let RR = Real64::RING;
     let ZZ = StaticRing::<i128>::RING;
     let original = [

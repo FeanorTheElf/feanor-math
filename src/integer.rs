@@ -635,6 +635,8 @@ pub mod generic_impls {
 use crate::primitive_int::*;
 #[cfg(test)]
 use generic_impls::map_from_integer_ring;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[allow(missing_docs)]
 #[cfg(any(test, feature = "generic_tests"))]
@@ -723,6 +725,7 @@ pub mod generic_tests {
 
 #[test]
 fn test_int_div_assumption() {
+    LogAlgorithmSubscriber::init_test();
     assert_eq!(-1, -10 / 8);
     assert_eq!(-1, 10 / -8);
     assert_eq!(1, 10 / 8);
@@ -731,6 +734,7 @@ fn test_int_div_assumption() {
 
 #[test]
 fn test_rounded_div() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = StaticRing::<i32>::RING;
     assert_el_eq!(ZZ, 3, ZZ.rounded_div(20, &7));
     assert_el_eq!(ZZ, -3, ZZ.rounded_div(-20, &7));
@@ -744,6 +748,7 @@ fn test_rounded_div() {
 
 #[test]
 fn test_binomial() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = StaticRing::<i32>::RING;
     assert_eq!(0, binomial(-4, &-1, ZZ));
     assert_eq!(1, binomial(-4, &0, ZZ));
@@ -773,6 +778,7 @@ fn test_binomial() {
 
 #[test]
 fn test_factorial() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = StaticRing::<i32>::RING;
     assert_eq!(1, factorial(&0, ZZ));
     assert_eq!(1, factorial(&1, ZZ));
@@ -783,6 +789,7 @@ fn test_factorial() {
 
 #[test]
 fn test_ceil_floor_div() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = StaticRing::<i32>::RING;
     for rhs in [-10, -3, -2, -1, 1, 2, 3, 10] {
         for lhs in [-10, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 10] {
@@ -799,6 +806,7 @@ fn test_ceil_floor_div() {
 
 #[test]
 fn test_parse() {
+    LogAlgorithmSubscriber::init_test();
     let ZZbig = BigIntRing::RING;
     assert_el_eq!(&ZZbig, &ZZbig.int_hom().map(3), ZZbig.parse("3", 10).unwrap());
     assert_el_eq!(&ZZbig, &ZZbig.power_of_two(100), ZZbig.parse("1267650600228229401496703205376", 10).unwrap());
@@ -810,6 +818,7 @@ fn test_parse() {
 
 #[test]
 fn test_map_from_integer() {
+    LogAlgorithmSubscriber::init_test();
     let ZZbig = BigIntRing::RING;
     assert_el_eq!(&ZZbig, ZZbig.parse("0", 10).unwrap(), map_from_integer_ring(ZZbig, ZZbig, ZZbig.parse("0", 10).unwrap()));
     assert_el_eq!(&ZZbig, ZZbig.parse("-1", 10).unwrap(), map_from_integer_ring(ZZbig, ZZbig, ZZbig.parse("-1", 10).unwrap()));

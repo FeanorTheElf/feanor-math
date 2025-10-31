@@ -1060,6 +1060,9 @@ impl<'a, V: AsPointerToSlice<T> + Deref<Target = [T]>, T> Submatrix<'a, V, T> {
 }
 
 #[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
+
+#[cfg(test)]
 fn assert_submatrix_eq<V: AsPointerToSlice<T>, T: PartialEq + Debug, const N: usize, const M: usize>(expected: [[T; M]; N], actual: &mut SubmatrixMut<V, T>) {
     assert_eq!(N, actual.row_count());
     assert_eq!(M, actual.col_count());
@@ -1152,6 +1155,7 @@ fn test_submatrix<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i64>) {
 
 #[test]
 fn test_submatrix_wrapper() {
+    LogAlgorithmSubscriber::init_test();
     with_testmatrix_vec(test_submatrix);
     with_testmatrix_array(test_submatrix);
     with_testmatrix_linmem(test_submatrix);
@@ -1187,6 +1191,7 @@ fn test_submatrix_mutate<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i
 
 #[test]
 fn test_submatrix_mutate_wrapper() {
+    LogAlgorithmSubscriber::init_test();
     with_testmatrix_vec(test_submatrix_mutate);
     with_testmatrix_array(test_submatrix_mutate);
     with_testmatrix_linmem(test_submatrix_mutate);
@@ -1254,6 +1259,7 @@ fn test_submatrix_col_iter<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V,
 
 #[test]
 fn test_submatrix_col_iter_wrapper() {
+    LogAlgorithmSubscriber::init_test();
     with_testmatrix_vec(test_submatrix_col_iter);
     with_testmatrix_array(test_submatrix_col_iter);
     with_testmatrix_linmem(test_submatrix_col_iter);
@@ -1316,6 +1322,7 @@ fn test_submatrix_row_iter<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V,
 
 #[test]
 fn test_submatrix_row_iter_wrapper() {
+    LogAlgorithmSubscriber::init_test();
     with_testmatrix_vec(test_submatrix_row_iter);
     with_testmatrix_array(test_submatrix_row_iter);
     with_testmatrix_linmem(test_submatrix_row_iter);
@@ -1354,6 +1361,7 @@ fn test_submatrix_col_at<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i
 
 #[test]
 fn test_submatrix_col_at_wrapper() {
+    LogAlgorithmSubscriber::init_test();
     with_testmatrix_vec(test_submatrix_col_at);
     with_testmatrix_array(test_submatrix_col_at);
     with_testmatrix_linmem(test_submatrix_col_at);
@@ -1392,6 +1400,7 @@ fn test_submatrix_row_at<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i
 
 #[test]
 fn test_submatrix_row_at_wrapper() {
+    LogAlgorithmSubscriber::init_test();
     with_testmatrix_vec(test_submatrix_row_at);
     with_testmatrix_array(test_submatrix_row_at);
     with_testmatrix_linmem(test_submatrix_row_at);

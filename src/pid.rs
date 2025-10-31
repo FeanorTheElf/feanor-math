@@ -322,9 +322,12 @@ pub mod generic_tests {
 
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_inv_crt() {
+    LogAlgorithmSubscriber::init_test();
     let ring = StaticRing::<i64>::RING;
     assert_eq!(4, (ring.inv_crt([&4, &3], [&7, &9]) % 7 + 7) % 7);
     assert_eq!(3, (ring.inv_crt([&4, &3], [&7, &9]) % 9 + 9) % 9);

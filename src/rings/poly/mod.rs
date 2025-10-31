@@ -668,9 +668,12 @@ use std::fmt::{Display, Formatter};
 use dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_dbg_poly() {
+    LogAlgorithmSubscriber::init_test();
     let ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
     let [f1, f2, f3, f4] = ring.with_wrapped_indeterminate(|X| [X.clone(), X + 1, 2 * X + 1, 2 * X]);
 

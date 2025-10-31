@@ -221,8 +221,12 @@ fn multiply<'a, R: RingStore, V: AsPointerToSlice<El<R>>, I: IntoIterator<Item =
     return result;
 }
 
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
+
 #[test]
 fn test_smith_integers() {
+    LogAlgorithmSubscriber::init_test();
     let ring = StaticRing::<i64>::RING;
     let mut A = OwnedMatrix::new(
         vec![ 1, 2, 3, 4, 
@@ -245,6 +249,7 @@ fn test_smith_integers() {
 
 #[test]
 fn test_smith_zn() {
+    LogAlgorithmSubscriber::init_test();
     let ring = zn_static::Zn::<45>::RING;
     let mut A = OwnedMatrix::new(
         vec![ 8, 3, 5, 8,
@@ -271,6 +276,7 @@ fn test_smith_zn() {
 
 #[test]
 fn test_solve_zn() {
+    LogAlgorithmSubscriber::init_test();
     let ring = zn_static::Zn::<45>::RING;
     let A = OwnedMatrix::new(
         vec![ 8, 3, 5, 8,
@@ -296,6 +302,7 @@ fn test_solve_zn() {
 
 #[test]
 fn test_solve_int() {
+    LogAlgorithmSubscriber::init_test();
     let ring = StaticRing::<i64>::RING;
     let A = OwnedMatrix::new(
         vec![3, 6, 2, 0, 4, 7,
@@ -311,6 +318,7 @@ fn test_solve_int() {
 
 #[test]
 fn test_large() {
+    LogAlgorithmSubscriber::init_test();
     let ring = zn_static::Zn::<16>::RING;
     let data_A = [
         [0, 0, 0, 0, 0, 0, 0, 0,11, 0, 0],
@@ -332,6 +340,7 @@ fn test_large() {
 
 #[test]
 fn test_determinant() {
+    LogAlgorithmSubscriber::init_test();
     let ring = StaticRing::<i64>::RING;
     let A = OwnedMatrix::new(
         vec![1, 0, 3, 

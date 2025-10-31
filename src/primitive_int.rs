@@ -482,8 +482,12 @@ impl<T: PrimitiveInt> Default for StaticRingBase<T> {
     }
 }
 
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
+
 #[test]
 fn test_ixx_bit_op() {
+    LogAlgorithmSubscriber::init_test();
     let ring_i16 = StaticRing::<i16>::RING;
     let ring_i128 = StaticRing::<i128>::RING;
     assert_eq!(Some(2), ring_i16.abs_highest_set_bit(&0x5));
@@ -502,6 +506,7 @@ fn test_ixx_bit_op() {
 
 #[test]
 fn test_get_uniformly_random() {
+    LogAlgorithmSubscriber::init_test();
     crate::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i8>::RING);
     crate::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i16>::RING);
     crate::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i32>::RING);
@@ -511,6 +516,7 @@ fn test_get_uniformly_random() {
 
 #[test]
 fn test_integer_axioms() {
+    LogAlgorithmSubscriber::init_test();
     crate::integer::generic_tests::test_integer_axioms(StaticRing::<i8>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
     crate::integer::generic_tests::test_integer_axioms(StaticRing::<i16>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
     crate::integer::generic_tests::test_integer_axioms(StaticRing::<i32>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
@@ -520,6 +526,7 @@ fn test_integer_axioms() {
 
 #[test]
 fn test_euclidean_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     crate::pid::generic_tests::test_euclidean_ring_axioms(StaticRing::<i8>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
     crate::pid::generic_tests::test_euclidean_ring_axioms(StaticRing::<i16>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
     crate::pid::generic_tests::test_euclidean_ring_axioms(StaticRing::<i32>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
@@ -529,6 +536,7 @@ fn test_euclidean_ring_axioms() {
 
 #[test]
 fn test_principal_ideal_ring_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(StaticRing::<i8>::RING, [-2, -1, 0, 1, 2].into_iter());
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(StaticRing::<i16>::RING, [-2, -1, 0, 1, 2, 3, 4].into_iter());
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(StaticRing::<i32>::RING, [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter());
@@ -539,6 +547,7 @@ fn test_principal_ideal_ring_ring_axioms() {
 
 #[test]
 fn test_lowest_set_bit() {
+    LogAlgorithmSubscriber::init_test();
     assert_eq!(None, StaticRing::<i32>::RING.abs_lowest_set_bit(&0));
     assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&3));
     assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&-3));
@@ -549,6 +558,7 @@ fn test_lowest_set_bit() {
 
 #[test]
 fn test_prepared_div() {
+    LogAlgorithmSubscriber::init_test();
     type PrimInt = i8;
     for x in PrimInt::MIN..PrimInt::MAX {
         let div_x = PreparedDivisor::new(StaticRing::<PrimInt>::RING.get_ring(), x);
@@ -572,6 +582,7 @@ fn test_prepared_div() {
 
 #[test]
 fn test_serialization() {
+    LogAlgorithmSubscriber::init_test();
     crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i8>::RING.into());
     crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i16>::RING.into());
     crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i32>::RING.into());

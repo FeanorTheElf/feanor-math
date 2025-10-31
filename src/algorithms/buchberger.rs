@@ -16,6 +16,7 @@ use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 
 use std::cmp::min;
 use std::fmt::Debug;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[stability::unstable(feature = "enable")]
 #[derive(PartialEq, Clone, Eq, Hash)]
@@ -296,19 +297,21 @@ pub fn buchberger_with_strategy<P, O, SortFn, AbortFn>(ring: P, input_basis: Vec
 
             let new_polys = AppendOnlyVec::new();
             let current_span = Span::current();
+            let reduced_to_zero = AtomicUsize::new(0);
 
-            spolys_to_reduce.into_par_iter().for_each(|spoly| current_span.in_scope(|| {
+            spolys_to_reduce.into_par_iter().for_each(|spoly| span!(parent: current_span.clone(), Level::INFO, "reduce_spoly").in_scope(|| {
                 let mut f = spoly.poly(ring, &basis, order);
                 
                 reduce_poly(ring, &mut f, || reducers.iter().chain(new_polys.iter()).map(|(f, lmf)| (f, lmf)), order);
 
                 if !ring.is_zero(&f) {
-                    event!(Level::INFO, "found_basis_poly");
                     _ = new_polys.push(augment_lm(ring, f, order));
                 } else {
-                    event!(Level::INFO, "reduced_to_zero");
+                    _ = reduced_to_zero.fetch_add(1, Ordering::Relaxed);
                 }
             }));
+
+            event!(Level::INFO, reduced_to_zero = reduced_to_zero.load(Ordering::Relaxed));
 
             drop(open.drain(spolys_to_reduce_index..));
             let new_polys = new_polys.into_vec();
@@ -326,17 +329,17 @@ pub fn buchberger_with_strategy<P, O, SortFn, AbortFn>(ring: P, input_basis: Vec
                 }
             } else if new_polys.len() == 0 {
                 current_deg = ring.monomial_deg(&open.last().unwrap().lcm_term(ring, &basis, order).1);
-                event!(Level::INFO, new_deg = current_deg, "increase_deg");
+                event!(Level::INFO, consider_deg = current_deg);
             } else {
                 changed = true;
                 current_deg = 0;
                 update_basis(ring, new_polys.iter().map(|(f, _)| ring.clone_el(f)), &mut basis, &mut open, order, nilpotent_power, &mut filtered_spolys, &mut sort_spolys);
-                event!(Level::INFO, basis_poly_count = basis.len(), spolys_count = open.len(), filtered_count = filtered_spolys, "update_basis");
+                event!(Level::INFO, basis_poly_count = basis.len(), spoly_count = open.len(), filtered_count = filtered_spolys);
 
                 reducers.extend(new_polys.into_iter());
                 reducers = inter_reduce(ring, reducers, order);
                 sort_reducers(&mut reducers);
-                event!(Level::INFO, reducers_count = reducers.len(), "update_reducers");
+                event!(Level::INFO, reducers_count = reducers.len());
                 if abort_early_if(&reducers) {
                     event!(Level::INFO, "early_abort");
                     return reducers.into_iter().map(|(f, _)| f).collect();
@@ -481,9 +484,12 @@ use crate::rings::zn::zn_static;
 use crate::integer::BigIntRing;
 #[cfg(test)]
 use crate::rings::rational::RationalField;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_buchberger_small() {
+    LogAlgorithmSubscriber::init_test();
     let base = zn_static::F17;
     let ring = MultivariatePolyRingImpl::new(base, 2);
 
@@ -513,6 +519,8 @@ fn test_buchberger_small() {
 
 #[test]
 fn test_buchberger_larger() {
+    LogAlgorithmSubscriber::init_test();
+    LogAlgorithmSubscriber::init_test();
     let base = zn_static::F17;
     let ring = MultivariatePolyRingImpl::new(base, 3);
 
@@ -559,6 +567,7 @@ fn test_buchberger_larger() {
 
 #[test]
 fn test_generic_computation() {
+    LogAlgorithmSubscriber::init_test();
     let base = zn_static::F17;
     let ring = MultivariatePolyRingImpl::new(base, 6);
     let poly_ring = dense_poly::DensePolyRing::new(&ring, "X");
@@ -584,6 +593,7 @@ fn test_generic_computation() {
 
 #[test]
 fn test_gb_local_ring() {
+    LogAlgorithmSubscriber::init_test();
     let base = AsLocalPIR::from_zn(zn_static::Zn::<16>::RING).unwrap();
     let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 1);
     
@@ -596,6 +606,7 @@ fn test_gb_local_ring() {
 
 #[test]
 fn test_gb_lex() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let QQ = AsLocalPIR::from_field(RationalField::new(ZZ));
     let QQYX = MultivariatePolyRingImpl::new(&QQ, 2);
@@ -621,6 +632,7 @@ fn test_gb_lex() {
 #[ignore]
 #[test]
 fn test_expensive_gb_1() {
+    LogAlgorithmSubscriber::init_test();
     let base = AsLocalPIR::from_zn(zn_static::Zn::<16>::RING).unwrap();
     let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 12);
 

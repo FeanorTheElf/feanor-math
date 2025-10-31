@@ -505,8 +505,12 @@ pub fn condense<I, F, T>(iter: I, f: F) -> CondenseIter<I, F, T>
     CondenseIter { base_iter: iter, f: f }
 }
 
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
+
 #[test]
 fn test_converted_combinations() {
+    LogAlgorithmSubscriber::init_test();
     let a = [2, 3, 5, 7];
     assert_eq!(1, combinations(a.iter(), 0, |_| 0).count());
     assert_eq!(4, combinations(a.iter(), 1, |_| 0).count());
@@ -517,6 +521,7 @@ fn test_converted_combinations() {
 
 #[test]
 fn test_powerset() {
+    LogAlgorithmSubscriber::init_test();
     let a = [1, 2, 3, 4];
     assert_eq!(16, basic_powerset(a.iter()).count());
 
@@ -544,6 +549,7 @@ fn test_powerset() {
 #[allow(deprecated)]
 #[test]
 fn test_multi_cartesian_product() {
+    LogAlgorithmSubscriber::init_test();
     let a = [0, 1];
     let b = [0, 1];
     let c = [-1, 1];
@@ -569,6 +575,7 @@ fn test_multi_cartesian_product() {
 #[allow(trivial_casts)]
 #[test]
 fn test_multiset_combinations() {
+    LogAlgorithmSubscriber::init_test();
     let a = [1, 2, 3, 1];
     let mut iter = multiset_combinations(&a, 3, clone_slice);
     assert_eq!(&[1, 2, 0, 0][..], &*iter.next().unwrap());
@@ -622,6 +629,7 @@ fn test_multiset_combinations() {
 
 #[test]
 fn test_multiset_combinations_k_unlimited() {
+    LogAlgorithmSubscriber::init_test();
     fn fac(n: usize) -> usize {
         if n == 0 { 1 } else { n * fac(n - 1) }
     }

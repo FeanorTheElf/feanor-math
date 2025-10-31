@@ -435,9 +435,12 @@ impl<I, A> ConvolutionAlgorithm<I> for FFTConvolution<A>
 use crate::rings::finite::FiniteRingStore;
 #[cfg(test)]
 use crate::rings::zn::zn_64::Zn64B;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_convolution_zn() {
+    LogAlgorithmSubscriber::init_test();
     let convolution: FFTConvolutionZn = FFTConvolution::new().into();
     let ring = Zn64B::new(17 * 257);
 
@@ -446,6 +449,7 @@ fn test_convolution_zn() {
 
 #[test]
 fn test_convolution_int() {
+    LogAlgorithmSubscriber::init_test();
     let convolution: FFTConvolution = FFTConvolution::new();
     let ring = StaticRing::<i64>::RING;
 

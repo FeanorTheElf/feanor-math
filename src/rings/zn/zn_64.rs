@@ -1232,6 +1232,8 @@ impl<I> CanIsoFromTo<zn_big::ZnGBBase<I>> for AsFieldBase<Zn64B>
 
 #[cfg(test)]
 use test::Bencher;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 fn elements<'a>(ring: &'a Zn64B) -> impl 'a + Iterator<Item = El<Zn64B>> {
@@ -1243,12 +1245,14 @@ const LARGE_MODULI: [u64; 6] = [(1 << 41) - 1, (1 << 42) - 1, (1 << 58) - 1, (1 
 
 #[test]
 fn test_complete_reduce() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Zn64B::new(32);
     assert_eq!(31, ring.get_ring().complete_reduce(4 * 32 - 1));
 }
 
 #[test]
 fn test_sum() {
+    LogAlgorithmSubscriber::init_test();
     for n in LARGE_MODULI {
         let Zn = Zn64B::new(n);
         assert_el_eq!(Zn, Zn.int_hom().map(10001 * 5000), Zn.sum((0..=10000).map(|x| Zn.int_hom().map(x))));
@@ -1257,6 +1261,7 @@ fn test_sum() {
 
 #[test]
 fn test_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     for n in 2..=17 {
         let ring = Zn64B::new(n);
         crate::ring::generic_tests::test_ring_axioms(&ring, (0..=ring.get_ring().repr_bound()).map(|n| Zn64BEl(n)));
@@ -1269,6 +1274,7 @@ fn test_ring_axioms() {
 
 #[test]
 fn test_hash_axioms() {
+    LogAlgorithmSubscriber::init_test();
     for n in 2..=17 {
         let ring = Zn64B::new(n);
         crate::ring::generic_tests::test_hash_axioms(&ring, (0..=ring.get_ring().repr_bound()).map(|n| Zn64BEl(n)));
@@ -1281,6 +1287,7 @@ fn test_hash_axioms() {
 
 #[test]
 fn test_divisibility_axioms() {
+    LogAlgorithmSubscriber::init_test();
     for n in 2..=17 {
         let Zn = Zn64B::new(n);
         crate::divisibility::generic_tests::test_divisibility_axioms(&Zn, Zn.elements());
@@ -1293,6 +1300,7 @@ fn test_divisibility_axioms() {
 
 #[test]
 fn test_zn_axioms() {
+    LogAlgorithmSubscriber::init_test();
     for n in 2..=17 {
         let Zn = Zn64B::new(n);
         super::generic_tests::test_zn_axioms(&Zn);
@@ -1301,6 +1309,7 @@ fn test_zn_axioms() {
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     for n in 2..=17 {
         let R = Zn64B::new(n);
         crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
@@ -1311,6 +1320,7 @@ fn test_principal_ideal_ring_axioms() {
 
 #[test]
 fn test_hom_from_fastmul() {
+    LogAlgorithmSubscriber::init_test();
     for n in 2..=17 {
         let Zn = Zn64B::new(n);
         let Zn_fastmul = ZnFastmul::new(Zn).unwrap();
@@ -1325,6 +1335,7 @@ fn test_hom_from_fastmul() {
 
 #[test]
 fn test_finite_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     for n in 2..=17 {
         crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn64B::new(n));
     }
@@ -1334,6 +1345,7 @@ fn test_finite_ring_axioms() {
 
 #[test]
 fn test_from_int_hom() {
+    LogAlgorithmSubscriber::init_test();
     for n in 2..=17 {
         let Zn = Zn64B::new(n);
         crate::ring::generic_tests::test_hom_axioms(StaticRing::<i8>::RING, Zn, -8..8);
@@ -1348,6 +1360,7 @@ fn test_from_int_hom() {
 
 #[test]
 fn test_bounded_reduce_large() {
+    LogAlgorithmSubscriber::init_test();
     const FACTOR: usize = 32;
     let n_max = (1 << 62) / 9;
     for n in (n_max - 10)..=n_max {
@@ -1361,6 +1374,7 @@ fn test_bounded_reduce_large() {
 
 #[test]
 fn test_smallest_lift() {
+    LogAlgorithmSubscriber::init_test();
     for n in 2..=17 {
         let ring = Zn64B::new(n);
         for k in 0..=ring.get_ring().repr_bound() {
@@ -1376,6 +1390,7 @@ fn test_smallest_lift() {
 
 #[test]
 fn test_smallest_positive_lift() {
+    LogAlgorithmSubscriber::init_test();
     for n in 2..=17 {
         let ring = Zn64B::new(n);
         for k in 0..=ring.get_ring().repr_bound() {
@@ -1387,6 +1402,7 @@ fn test_smallest_positive_lift() {
 
 #[test]
 fn test_bounded_reduce_small() {
+    LogAlgorithmSubscriber::init_test();
     for n in 2..=17 {
         let Zn = Zn64B::new(n);
         let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128;
@@ -1398,6 +1414,7 @@ fn test_bounded_reduce_small() {
 
 #[test]
 fn test_bounded_reduce_large_small() {
+    LogAlgorithmSubscriber::init_test();
     const FACTOR: usize = 32;
     for n in 2..=17 {
         let Zn = Zn64B::new(n);
@@ -1410,6 +1427,7 @@ fn test_bounded_reduce_large_small() {
 
 #[test]
 fn test_bounded_reduce() {
+    LogAlgorithmSubscriber::init_test();
     let n_max = (1 << 62) / 9;
     for n in (n_max - 10)..=n_max {
         let Zn = Zn64B::new(n);
@@ -1483,6 +1501,7 @@ fn bench_inner_product(bencher: &mut Bencher) {
 
 #[test]
 fn test_serialize() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Zn64B::new(128);
     crate::serialization::generic_tests::test_serialization(ring, ring.elements())
 }

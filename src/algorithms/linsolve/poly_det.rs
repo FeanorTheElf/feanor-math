@@ -147,6 +147,7 @@ use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 
 #[test]
 fn test_determinant_poly_matrix() {
+    LogAlgorithmSubscriber::init_test();
     let poly_ring: MultivariatePolyRingImpl<_, _> = MultivariatePolyRingImpl::new(StaticRing::<i128>::RING, 3);
 
     let det2 = |A: Submatrix<_, _>| poly_ring.sub(poly_ring.mul_ref(A.at(0, 0), A.at(1, 1)), poly_ring.mul_ref(A.at(0, 1), A.at(1, 0)));

@@ -408,8 +408,12 @@ pub fn choose_zn_impl<'a, I, F>(ZZ: I, n: El<I>, f: F) -> F::Output<'a>
     }
 }
 
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
+
 #[test]
 fn test_choose_zn_impl() {
+    LogAlgorithmSubscriber::init_test();
     let int_value = 4;
     // work in Z/17Z without explicitly choosing an implementation
     struct DoStuff { int_value: i64 }
@@ -615,6 +619,7 @@ pub mod generic_tests {
 
 #[test]
 fn test_reduction_map_large_value() {
+    LogAlgorithmSubscriber::init_test();
     let ring1 = zn_64::Zn64B::new(1 << 42);
     let ring2 = zn_big::ZnGB::new(BigIntRing::RING, BigIntRing::RING.power_of_two(666));
     let reduce = ZnReductionMap::new(&ring2, ring1).unwrap();
@@ -623,6 +628,7 @@ fn test_reduction_map_large_value() {
 
 #[test]
 fn test_reduction_map() {
+    LogAlgorithmSubscriber::init_test();
     let ring1 = zn_64::Zn64B::new(257);
     let ring2 = zn_big::ZnGB::new(StaticRing::<i128>::RING, 257 * 7);
 
@@ -636,6 +642,7 @@ fn test_reduction_map() {
 
 #[test]
 fn test_generic_impl_checked_div_min() {
+    LogAlgorithmSubscriber::init_test();
     let ring = zn_64::Zn64B::new(5 * 7 * 11 * 13);
     let actual = ring.annihilator(&ring.int_hom().map(1001));
     let expected = ring.int_hom().map(5);

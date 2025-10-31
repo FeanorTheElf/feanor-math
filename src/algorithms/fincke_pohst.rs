@@ -5,6 +5,7 @@ use crate::field::*;
 use crate::matrix::*;
 use crate::ordered::OrderedRingStore;
 use crate::algorithms::matmul::ComputeInnerProduct;
+use crate::rings::approx_real::ApproxRealField;
 
 ///
 /// Uses the Fincke-Pohst algorithm to find integer points close to `target`, where
@@ -118,14 +119,16 @@ pub fn fincke_pohst<I, R, H, V, F>(h: H, quadratic_form: Submatrix<V, R::Element
     }
 }
 
-use crate::rings::approx_real::ApproxRealField;
 #[cfg(test)]
 use crate::rings::approx_real::float::*;
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_fincke_pohst_2d() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = StaticRing::<i64>::RING;
     let RR = Real64::RING;
 
@@ -157,6 +160,7 @@ fn test_fincke_pohst_2d() {
 
 #[test]
 fn test_fincke_pohst_3d() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = StaticRing::<i64>::RING;
     let RR = Real64::RING;
 

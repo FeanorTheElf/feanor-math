@@ -232,9 +232,12 @@ pub fn is_prime_base<R>(Zn: R, k: usize) -> bool
 
 #[cfg(test)]
 use crate::rings::rust_bigint::RustBigintRing;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_is_prime() {
+    LogAlgorithmSubscriber::init_test();
     assert!(is_prime(StaticRing::<i128>::RING, &2, 5));
     assert!(is_prime(StaticRing::<i128>::RING, &3, 5));
     assert!(is_prime(StaticRing::<i128>::RING, &5, 5));
@@ -258,6 +261,7 @@ fn test_is_prime() {
 
 #[test]
 fn test_prev_prime() {
+    LogAlgorithmSubscriber::init_test();
     assert_eq!(Some(7), prev_prime(StaticRing::<i64>::RING, 11));
     assert_eq!(Some(7), prev_prime(StaticRing::<i64>::RING, 10));
     assert_eq!(Some(7), prev_prime(StaticRing::<i64>::RING, 9));
@@ -282,6 +286,7 @@ fn test_prev_prime() {
 
 #[test]
 fn test_next_prime() {
+    LogAlgorithmSubscriber::init_test();
     let mut last_prime = 1009;
     for i in (2..1000).rev() {
         assert_eq!(last_prime, next_prime(StaticRing::<i64>::RING, i));
@@ -295,6 +300,7 @@ fn test_next_prime() {
 
 #[test]
 fn test_search_prime() {
+    LogAlgorithmSubscriber::init_test();
     assert_eq!(None, search_prime(StaticRing::<i64>::RING, 1, -2));
     for (p, n) in [(3, 3), (5, 5), (7, 7), (7, 9), (11, 11)] {
         assert_eq!(Some(p), search_prime(StaticRing::<i64>::RING, n, -2));

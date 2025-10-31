@@ -276,9 +276,12 @@ use test::Bencher;
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 #[cfg(test)]
 use crate::rings::zn::zn_64::{Zn64B, Zn64BBase, Zn64BEl};
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_convolution() {
+    LogAlgorithmSubscriber::init_test();
     let ring = zn_64::Zn64B::new(65537);
     let convolution = NTTConvolution::new(ring);
     super::generic_tests::test_convolution(&convolution, &ring, ring.one());

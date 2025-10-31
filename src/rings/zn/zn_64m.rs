@@ -560,6 +560,8 @@ impl HashableElRing for Zn64MBase {
 
 #[cfg(test)]
 use test::Bencher;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 fn elements<'a>(ring: &'a Zn64M) -> impl 'a + Iterator<Item = El<Zn64M>> {
@@ -571,6 +573,7 @@ const TEST_MODULI: [u64; 12] = [1, 3, 5, 7, 9, 11, 13, 15, 17, (1 << 60) - 3, (1
 
 #[test]
 fn test_montgomery_reduce() {
+    LogAlgorithmSubscriber::init_test();
     let Zn = Zn64M::new(19);
     assert_eq!(9, Zn.get_ring().montgomery_reduce(1));
     assert_eq!(18, Zn.get_ring().montgomery_reduce(2));
@@ -581,12 +584,14 @@ fn test_montgomery_reduce() {
 
 #[test]
 fn test_from_int_promise_reduced() {
+    LogAlgorithmSubscriber::init_test();
     let Zn = Zn64M::new(19);
     assert_eq!(17, Zn.get_ring().from_int_promise_reduced(1).0);
 }
 
 #[test]
 fn test_sum() {
+    LogAlgorithmSubscriber::init_test();
     for n in TEST_MODULI {
         let Zn = Zn64M::new(n);
         assert_el_eq!(Zn, Zn.int_hom().map(10001 * 5000), Zn.sum((0..=10000).map(|x| Zn.int_hom().map(x))));
@@ -595,6 +600,7 @@ fn test_sum() {
 
 #[test]
 fn test_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     for n in TEST_MODULI {
         let ring = Zn64M::new(n);
         crate::ring::generic_tests::test_ring_axioms(&ring, elements(&ring));
@@ -603,6 +609,7 @@ fn test_ring_axioms() {
 
 #[test]
 fn test_hash_axioms() {
+    LogAlgorithmSubscriber::init_test();
     for n in TEST_MODULI {
         if n != 1 {
             let ring = Zn64M::new(n);
@@ -613,6 +620,7 @@ fn test_hash_axioms() {
 
 #[test]
 fn test_divisibility_axioms() {
+    LogAlgorithmSubscriber::init_test();
     for n in TEST_MODULI {
         let Zn = Zn64M::new(n);
         crate::divisibility::generic_tests::test_divisibility_axioms(&Zn, elements(&Zn));
@@ -621,6 +629,7 @@ fn test_divisibility_axioms() {
 
 #[test]
 fn test_zn_axioms() {
+    LogAlgorithmSubscriber::init_test();
     for n in TEST_MODULI {
         let Zn = Zn64M::new(n);
         super::generic_tests::test_zn_axioms(&Zn);
@@ -629,6 +638,7 @@ fn test_zn_axioms() {
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     for n in TEST_MODULI {
         if n < 100 {
             let R = Zn64M::new(n);
@@ -639,6 +649,7 @@ fn test_principal_ideal_ring_axioms() {
 
 #[test]
 fn test_finite_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     for n in TEST_MODULI {
         if n < 100 {
             crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn64M::new(n));
@@ -648,6 +659,7 @@ fn test_finite_ring_axioms() {
 
 #[test]
 fn test_from_int_hom() {
+    LogAlgorithmSubscriber::init_test();
     for n in TEST_MODULI {
         let Zn = Zn64M::new(n);
         crate::ring::generic_tests::test_hom_axioms(StaticRing::<i8>::RING, Zn, -8..8);
@@ -662,6 +674,7 @@ fn test_from_int_hom() {
 
 #[test]
 fn test_smallest_positive_lift() {
+    LogAlgorithmSubscriber::init_test();
     for n in TEST_MODULI {
         if n < 100 {
             let ring = Zn64M::new(n);
@@ -694,6 +707,7 @@ fn bench_hom_from_i64_small_modulus(bencher: &mut Bencher) {
 
 #[test]
 fn test_serialize() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Zn64M::new(129);
     crate::serialization::generic_tests::test_serialization(ring, ring.elements())
 }

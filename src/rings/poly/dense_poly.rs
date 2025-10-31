@@ -777,6 +777,8 @@ use crate::ordered::OrderedRingStore;
 use test::Bencher;
 #[cfg(test)]
 use crate::algorithms::cyclotomic::cyclotomic_polynomial;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El<P>>
@@ -797,6 +799,7 @@ fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El
 
 #[test]
 fn test_prod() {
+    LogAlgorithmSubscriber::init_test();
     let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
     assert_el_eq!(&poly_ring, poly_ring.one(), poly_ring.prod([].into_iter()));
 
@@ -812,6 +815,7 @@ fn test_prod() {
 
 #[test]
 fn test_fma_base() {
+    LogAlgorithmSubscriber::init_test();
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
     let [f, g, h] = poly_ring.with_wrapped_indeterminate(|X| [X + 3, X.pow_ref(2) - 1, X.pow_ref(2) + 2 * X + 5]);
     assert_el_eq!(&poly_ring, h, poly_ring.get_ring().fma_base(&f, &2, g));
@@ -827,42 +831,49 @@ fn test_fma_base() {
 
 #[test]
 fn test_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
     crate::ring::generic_tests::test_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_hash_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
     crate::ring::generic_tests::test_hash_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_poly_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
     super::generic_tests::test_poly_ring_axioms(poly_ring, Zn::<7>::RING.elements());
 }
 
 #[test]
 fn test_divisibility_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
     crate::divisibility::generic_tests::test_divisibility_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_euclidean_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
     crate::pid::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_canonical_iso_axioms_different_base_ring() {
+    LogAlgorithmSubscriber::init_test();
     let poly_ring1 = DensePolyRing::new(zn_big::ZnGB::new(StaticRing::<i128>::RING, 7), "X");
     let poly_ring2 = DensePolyRing::new(zn_64::Zn64B::new(7), "X");
     crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
@@ -871,6 +882,7 @@ fn test_canonical_iso_axioms_different_base_ring() {
 
 #[test]
 fn test_canonical_iso_sparse_poly_ring() {
+    LogAlgorithmSubscriber::init_test();
     let poly_ring1 = SparsePolyRing::new(zn_64::Zn64B::new(7), "X");
     let poly_ring2 = DensePolyRing::new(zn_64::Zn64B::new(7), "X");
     crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
@@ -879,6 +891,7 @@ fn test_canonical_iso_sparse_poly_ring() {
 
 #[test]
 fn test_print() {
+    LogAlgorithmSubscriber::init_test();
     let base_poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
     let poly_ring = DensePolyRing::new(&base_poly_ring, "Y");
 
@@ -922,12 +935,14 @@ fn test_expensive_prod() {
 
 #[test]
 fn test_serialize() {
+    LogAlgorithmSubscriber::init_test();
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
     crate::serialization::generic_tests::test_serialization(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_evaluate_approximate_ring() {
+    LogAlgorithmSubscriber::init_test();
     let ring = DensePolyRing::new(Real64::RING, "X");
     let [f] = ring.with_wrapped_indeterminate(|X| [X * X * X - X + 1]);
     let x = 0.47312;

@@ -492,9 +492,12 @@ impl<R: RingStore, I: RingStore> CanIsoFromTo<RationalFieldBase<I>> for Fraction
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::iters::multi_cartesian_product;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_balance_factor() {
+    LogAlgorithmSubscriber::init_test();
     let ring = FractionFieldImpl::new(StaticRing::<i64>::RING);
     let elements = [
         ring.from_fraction(2 * 11, 3),
@@ -513,6 +516,7 @@ fn test_balance_factor() {
 
 #[test]
 fn test_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let ring = FractionFieldImpl::new(StaticRing::<i64>::RING);
     let edge_case_elements = multi_cartesian_product([&[-3, -2, -1, 0, 1, 2, 3][..], &[1, 2, 3][..]].into_iter().map(|list| list.iter().copied()), |data| ring.from_fraction(data[0], data[1]), |_, x| *x);
     crate::ring::generic_tests::test_ring_axioms(&ring, edge_case_elements);

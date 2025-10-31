@@ -58,9 +58,12 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::sparse_poly::SparsePolyRing;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_cyclotomic_polynomial() {
+    LogAlgorithmSubscriber::init_test();
     let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
     assert!(poly_ring.eq_el(
         &poly_ring.from_terms([(1, 1), (1, 0)].into_iter()),

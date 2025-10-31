@@ -70,8 +70,12 @@ pub fn permute_inv_using_allocator<V, T, F, A: Allocator>(mut values: V, perm: F
     }
 }
 
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
+
 #[test]
 fn test_permute() {
+    LogAlgorithmSubscriber::init_test();
     let mut values = [0, 1, 2, 3, 4, 5, 6, 7];
     let permutation = [2, 1, 7, 5, 6, 3, 4, 0];
     permute(&mut values, |i| permutation[i]);
@@ -80,6 +84,7 @@ fn test_permute() {
 
 #[test]
 fn test_permute_inv() {
+    LogAlgorithmSubscriber::init_test();
     let mut values = [2, 1, 7, 5, 6, 3, 4, 0];
     let permutation = [2, 1, 7, 5, 6, 3, 4, 0];
     permute_inv(&mut values, |i| permutation[i]);

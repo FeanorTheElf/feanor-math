@@ -267,6 +267,8 @@ use crate::assert_matrix_eq;
 use crate::rings::fraction::FractionFieldStore;
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 fn assert_is_correct_qr<V1, V2, V3>(original: Submatrix<V1, f64>, q: Submatrix<V2, f64>, r: Submatrix<V3, f64>)
@@ -366,6 +368,7 @@ fn assert_is_correct_ldl<V1, V2>(original: Submatrix<V1, f64>, l: Submatrix<V2, 
 
 #[test]
 fn test_float_qr() {
+    LogAlgorithmSubscriber::init_test();
     let RR = Real64::RING;
     let a = OwnedMatrix::new_with_shape(vec![0., 1., 1., 0.], 2, 2);
     let mut r = a.clone_matrix(RR);
@@ -400,6 +403,7 @@ fn test_float_qr() {
 
 #[test]
 fn test_float_qdr() {
+    LogAlgorithmSubscriber::init_test();
     let RR = Real64::RING;
     let a = OwnedMatrix::new_with_shape((1..10).map(|c| c as f64).collect(), 3, 3);
     let mut r = a.clone_matrix(RR);
@@ -419,6 +423,7 @@ fn test_float_qdr() {
 
 #[test]
 fn test_float_ldl() {
+    LogAlgorithmSubscriber::init_test();
     let RR = Real64::RING;
     let a = OwnedMatrix::new_with_shape(vec![5., 1., 1., 5.], 2, 2);
     let mut l = a.clone_matrix(RR);
@@ -450,6 +455,7 @@ fn test_float_ldl() {
 
 #[test]
 fn test_rational_qdr() {
+    LogAlgorithmSubscriber::init_test();
     let QQ = RationalField::new(StaticRing::<i64>::RING);
     let mut actual_r = OwnedMatrix::new_with_shape((1..10).map(|x| QQ.pow(QQ.int_hom().map(x), 2)).collect(), 3, 3);
     let mut actual_q = OwnedMatrix::zero(3, 3, &QQ);

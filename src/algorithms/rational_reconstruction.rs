@@ -109,9 +109,12 @@ use crate::homomorphism::Homomorphism;
 use crate::divisibility::DivisibilityRingStore;
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_rational_reconstruction() {
+    LogAlgorithmSubscriber::init_test();
     let n = 2021027;
     let Zn = zn_64::Zn64B::new(n as u64);
     let ab_bound = (n as f64 / 2.).sqrt().floor() as i32;

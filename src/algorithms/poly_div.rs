@@ -1,7 +1,6 @@
 use crate::ring::*;
 use crate::rings::poly::*;
 
-use tracing::{Level, span};
 use std::cmp::max;
 
 ///
@@ -170,9 +169,7 @@ pub fn fast_poly_div_rem<P, F, E>(poly_ring: P, f: El<P>, g: &El<P>, mut left_di
     if poly_ring.is_zero(&f) {
         return Ok((poly_ring.zero(), f));
     }
-    span!(Level::INFO, "fast_poly_div", lhs_deg = poly_ring.degree(&f).unwrap_or(0), rhs_deg = poly_ring.degree(g).unwrap_or(0)).in_scope(|| { 
-        fast_poly_div_impl(poly_ring, f, g, &mut left_div_lc)
-    })
+    fast_poly_div_impl(poly_ring, f, g, &mut left_div_lc)
 }
 
 #[cfg(test)]
@@ -181,9 +178,12 @@ use crate::integer::*;
 use dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::function::no_error;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_fast_poly_div() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(ZZ, "X");
     let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(80) - 1, X.pow_ref(40) - 2 * X.pow_ref(33) + X.pow_ref(21) - X + 10]);

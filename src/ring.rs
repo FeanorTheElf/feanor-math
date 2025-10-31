@@ -1248,9 +1248,12 @@ impl<'a, S: Deref + Send + Sync> RingStore for S
 use std::rc::Rc;
 #[cfg(test)]
 use crate::impl_eq_based_self_iso;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_ring_rc_lifetimes() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Rc::new(StaticRing::<i32>::RING);
     let mut ring_ref = None;
     assert!(ring_ref.is_none());
@@ -1263,6 +1266,7 @@ fn test_ring_rc_lifetimes() {
 
 #[test]
 fn test_internal_wrappings_dont_matter() {
+    LogAlgorithmSubscriber::init_test();
     
     #[derive(Clone, PartialEq, Debug)]
     pub struct ABase;
@@ -1641,6 +1645,7 @@ pub mod generic_tests {
 
 #[test]
 fn test_environment_binding() {
+    LogAlgorithmSubscriber::init_test();
     assert!(EnvBindingStrength::Strongest > EnvBindingStrength::Power);
     assert!(EnvBindingStrength::Power > EnvBindingStrength::Product);
     assert!(EnvBindingStrength::Product > EnvBindingStrength::Sum);

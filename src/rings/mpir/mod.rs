@@ -819,6 +819,7 @@ fn edge_case_elements() -> impl Iterator<Item = MPZEl> {
 
 #[test]
 fn test_negate_inplace() {
+    LogAlgorithmSubscriber::init_test();
     let mut a = MPZ::RING.power_of_two(64);
     MPZ::RING.negate_inplace(&mut a);
     assert!(MPZ::RING.is_neg(&a));
@@ -832,37 +833,44 @@ fn test_negate_inplace() {
 
 #[test]
 fn test_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     crate::ring::generic_tests::test_ring_axioms(MPZ::RING, edge_case_elements())
 }
 
 #[test]
 fn test_hash_axioms() {
+    LogAlgorithmSubscriber::init_test();
     crate::ring::generic_tests::test_hash_axioms(MPZ::RING, edge_case_elements());
 }
 
 #[test]
 fn test_divisibility_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     crate::divisibility::generic_tests::test_divisibility_axioms(MPZ::RING, edge_case_elements())
 }
 
 #[test]
 fn test_euclidean_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     crate::pid::generic_tests::test_euclidean_ring_axioms(MPZ::RING, edge_case_elements())
 }
 
 #[test]
 fn test_integer_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     crate::integer::generic_tests::test_integer_axioms(MPZ::RING, edge_case_elements())
 }
 
 #[test]
 fn test_canonical_iso_axioms_i32() {
+    LogAlgorithmSubscriber::init_test();
     crate::ring::generic_tests::test_hom_axioms(StaticRing::<i32>::RING, MPZ::RING, [0, -1, 1, i16::MAX as i32, i16::MIN as i32].into_iter());
     crate::ring::generic_tests::test_iso_axioms(StaticRing::<i32>::RING, MPZ::RING, [0, -1, 1, i16::MIN as i32, i16::MAX as i32].into_iter());
 }
 
 #[test]
 fn test_canonical_iso_axioms_i64() {
+    LogAlgorithmSubscriber::init_test();
     crate::ring::generic_tests::test_hom_axioms(StaticRing::<i64>::RING, MPZ::RING, [0, -1, 1, i32::MAX as i64, i32::MIN as i64].into_iter());
     crate::ring::generic_tests::test_iso_axioms(StaticRing::<i64>::RING, MPZ::RING, [0, -1, 1, i32::MIN as i64, i32::MAX as i64].into_iter());
 
@@ -874,6 +882,7 @@ fn test_canonical_iso_axioms_i64() {
 
 #[test]
 fn test_canonical_iso_axioms_i128() {
+    LogAlgorithmSubscriber::init_test();
     crate::ring::generic_tests::test_hom_axioms(StaticRing::<i128>::RING, MPZ::RING, [0, -1, 1, i64::MAX as i128, i64::MIN as i128].into_iter());
     crate::ring::generic_tests::test_iso_axioms(StaticRing::<i128>::RING, MPZ::RING, [0, -1, 1, i64::MIN as i128, i64::MAX as i128].into_iter());
 
@@ -885,12 +894,14 @@ fn test_canonical_iso_axioms_i128() {
 
 #[test]
 fn test_canonical_iso_axioms_bigint() {
+    LogAlgorithmSubscriber::init_test();
     crate::ring::generic_tests::test_hom_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
     crate::ring::generic_tests::test_iso_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
 }
 
 #[test]
 fn test_abs_is_bit_set() {
+    LogAlgorithmSubscriber::init_test();
     let a = MPZ::RING.int_hom().map(1 << 15);
     assert_eq!(true, MPZ::RING.abs_is_bit_set(&a, 15));
     assert_eq!(false, MPZ::RING.abs_is_bit_set(&a, 16));
@@ -910,6 +921,7 @@ fn test_abs_is_bit_set() {
 
 #[test]
 fn test_highest_set_bit() {
+    LogAlgorithmSubscriber::init_test();
     assert_eq!(None, MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(0)));
     assert_eq!(Some(0), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(1)));
     assert_eq!(Some(0), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(-1)));
@@ -923,6 +935,7 @@ fn test_highest_set_bit() {
 
 #[test]
 fn test_lowest_set_bit() {
+    LogAlgorithmSubscriber::init_test();
     assert_eq!(None, MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(0)));
     assert_eq!(Some(0), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(1)));
     assert_eq!(Some(0), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(-1)));
@@ -936,6 +949,7 @@ fn test_lowest_set_bit() {
 
 #[test]
 fn from_to_float_approx() {
+    LogAlgorithmSubscriber::init_test();
     let x: f64 = 83465209236517892563478156042389675783219532497861237985328563.;
     let y = MPZ::RING.to_float_approx(&MPZ::RING.from_float_approx(x).unwrap());
     assert!(x * 0.99 < y);
@@ -966,5 +980,6 @@ fn bench_div_300_bits(bencher: &mut test::Bencher) {
 
 #[test]
 fn test_serialization() {
+    LogAlgorithmSubscriber::init_test();
     crate::serialization::generic_tests::test_serialization(MPZ::RING, edge_case_elements());
 }

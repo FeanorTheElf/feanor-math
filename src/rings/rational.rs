@@ -736,6 +736,8 @@ impl<I> PolyTFracGCDRing for RationalFieldBase<I>
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 fn edge_case_elements() -> impl Iterator<Item = El<RationalField<StaticRing<i64>>>> {
@@ -746,6 +748,7 @@ fn edge_case_elements() -> impl Iterator<Item = El<RationalField<StaticRing<i64>
 
 #[test]
 fn test_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let ring = RationalField::new(StaticRing::<i64>::RING);
 
     let half = ring.checked_div(&ring.int_hom().map(1), &ring.int_hom().map(2)).unwrap();
@@ -757,6 +760,7 @@ fn test_ring_axioms() {
 
 #[test]
 fn test_inner_product() {
+    LogAlgorithmSubscriber::init_test();
     let ring = RationalField::new(StaticRing::<i64>::RING);
 
     assert_el_eq!(ring, ring.from_fraction(5, 3), <_ as ComputeInnerProduct>::inner_product(ring.get_ring(), [
@@ -774,12 +778,14 @@ fn test_inner_product() {
 
 #[test]
 fn test_divisibility_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let ring = RationalField::new(StaticRing::<i64>::RING);
     crate::divisibility::generic_tests::test_divisibility_axioms(ring, edge_case_elements());
 }
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let ring = RationalField::new(StaticRing::<i64>::RING);
     crate::pid::generic_tests::test_euclidean_ring_axioms(ring, edge_case_elements());
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(ring, edge_case_elements());
@@ -787,24 +793,28 @@ fn test_principal_ideal_ring_axioms() {
 
 #[test]
 fn test_int_hom_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let ring = RationalField::new(StaticRing::<i64>::RING);
     crate::ring::generic_tests::test_hom_axioms(&StaticRing::<i64>::RING, ring, -16..15);
 }
 
 #[test]
 fn test_serialization() {
+    LogAlgorithmSubscriber::init_test();
     let ring = RationalField::new(StaticRing::<i64>::RING);
     crate::serialization::generic_tests::test_serialization(ring, edge_case_elements());
 }
 
 #[test]
 fn test_serialize_deserialize() {
+    LogAlgorithmSubscriber::init_test();
     crate::serialization::generic_tests::test_serialize_deserialize(RationalField::new(StaticRing::<i64>::RING).into());
     crate::serialization::generic_tests::test_serialize_deserialize(RationalField::new(BigIntRing::RING).into());
 }
 
 #[test]
 fn test_serialize_postcard() {
+    LogAlgorithmSubscriber::init_test();
     let ring: RingValue<RationalFieldBase<RingValue<crate::primitive_int::StaticRingBase<i64>>>> = RationalField::new(StaticRing::<i64>::RING);
     let serialized = postcard::to_allocvec(&SerializeWithRing::new(&ring.int_hom().map(42), &ring)).unwrap();
     let result = DeserializeWithRing::new(&ring).deserialize(

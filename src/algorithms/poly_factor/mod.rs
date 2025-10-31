@@ -147,9 +147,12 @@ impl<I> FactorPolyField for RationalFieldBase<I>
 use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::rings::zn::*;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_factor_rational_poly() {
+    LogAlgorithmSubscriber::init_test();
     let QQ = RationalField::new(BigIntRing::RING);
     let incl = QQ.int_hom();
     let poly_ring = DensePolyRing::new(&QQ, "X");
@@ -180,6 +183,7 @@ fn test_factor_rational_poly() {
 
 #[test]
 fn test_factor_nonmonic_poly() {
+    LogAlgorithmSubscriber::init_test();
     let QQ = RationalField::new(BigIntRing::RING);
     let incl = QQ.int_hom();
     let poly_ring = DensePolyRing::new(&QQ, "X");
@@ -197,6 +201,7 @@ fn test_factor_nonmonic_poly() {
 
 #[test]
 fn test_factor_fp() {
+    LogAlgorithmSubscriber::init_test();
     let Fp = zn_static::Fp::<5>::RING;
     let poly_ring = DensePolyRing::new(Fp, "X");
     let f = poly_ring.from_terms([(1, 0), (2, 1), (1, 3)].into_iter());

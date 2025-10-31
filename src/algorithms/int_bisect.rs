@@ -128,9 +128,12 @@ pub fn root_floor<R>(ZZ: R, n: El<R>, root: usize) -> El<R>
 
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_bisect_floor() {
+    LogAlgorithmSubscriber::init_test();
     assert_eq!(0, bisect_floor(&StaticRing::<i64>::RING, 0, 10, |x| if *x == 0 { 0 } else { 1 }));
     assert_eq!(9, bisect_floor(&StaticRing::<i64>::RING, 0, 10, |x| if *x == 10 { 1 } else { 0 }));
     assert_eq!(-15, bisect_floor(&StaticRing::<i64>::RING, -20, -10, |x| *x + 15));
@@ -138,6 +141,7 @@ fn test_bisect_floor() {
 
 #[test]
 fn test_root_floor() {
+    LogAlgorithmSubscriber::init_test();
     assert_eq!(4, root_floor(&StaticRing::<i64>::RING, 16, 2));
     assert_eq!(3, root_floor(&StaticRing::<i64>::RING, 27, 3));
     assert_eq!(4, root_floor(&StaticRing::<i64>::RING, 17, 2));

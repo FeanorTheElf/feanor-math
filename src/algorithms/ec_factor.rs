@@ -1,5 +1,12 @@
 use std::sync::atomic::AtomicU64;
 
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
+use tracing::Level;
+use tracing::Span;
+use tracing::event;
+use tracing::span;
+
 use crate::algorithms;
 use crate::divisibility::*;
 use crate::homomorphism::Homomorphism;
@@ -219,7 +226,7 @@ fn lenstra_ec_factor_base<R, F>(Zn: R, log2_p: usize, mut rng: F) -> Option<El<<
         let rng_seed = AtomicU64::new(1);
         let current_span = Span::current();
 
-        let result = (0..attempts).into_par_iter().map(|_| current_span.in_scope(|| {
+        let result = (0..attempts).into_par_iter().map(|_| span!(parent: current_span.clone(), Level::INFO, "test_curve").in_scope(|| {
             let mut rng = oorandom::Rand64::new(((rng_seed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u128) << 64) | base_rng_value as u128);
             let (x, y) = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()));
             let (x_sqr, y_sqr) = (square(&Zn, &x), square(&Zn, &y));
@@ -309,19 +316,16 @@ pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::IntegerRing>
 
 #[cfg(test)]
 use crate::rings::zn::zn_64::Zn64B;
-use rayon::iter::IntoParallelIterator;
-use rayon::iter::ParallelIterator;
 #[cfg(test)]
 use test::Bencher;
-use tracing::Level;
-use tracing::Span;
-use tracing::event;
-use tracing::span;
 #[cfg(test)]
 use crate::rings::rust_bigint::*;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_ec_factor() {
+    LogAlgorithmSubscriber::init_test();
     let n = 65537 * 65539;
     let actual = lenstra_ec_factor(&Zn64B::new(n as u64));
     assert!(actual != 1 && actual != n && n % actual == 0);

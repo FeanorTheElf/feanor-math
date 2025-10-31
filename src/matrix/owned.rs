@@ -220,9 +220,12 @@ impl<T: Debug, A: Allocator> Debug for OwnedMatrix<T, A> {
 
 #[cfg(test)]
 use crate::primitive_int::*;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_zero_col_matrix() {
+    LogAlgorithmSubscriber::init_test();
     let A: OwnedMatrix<i64> = OwnedMatrix::new_with_shape(Vec::new(), 10, 0);
     assert_eq!(0, A.col_count());
     assert_eq!(10, A.row_count());

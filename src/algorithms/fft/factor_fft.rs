@@ -352,9 +352,12 @@ use crate::rings::zn::ZnRingStore;
 use std::alloc::Global;
 #[cfg(test)]
 use crate::algorithms::fft::bluestein::BluesteinFFT;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_fft_basic() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Zn::<97>::RING;
     let z = ring.int_hom().map(39);
     let fft = GeneralCooleyTukeyFFT::new(ring, ring.pow(z, 16), 
@@ -374,6 +377,7 @@ fn test_fft_basic() {
 
 #[test]
 fn test_fft_long() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Fp::<97>::RING;
     let z = ring.int_hom().map(39);
     let fft = GeneralCooleyTukeyFFT::new(ring, ring.pow(z, 4), 
@@ -393,6 +397,7 @@ fn test_fft_long() {
 
 #[test]
 fn test_fft_unordered() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Fp::<1409>::RING;
     let z = get_prim_root_of_unity(ring, 64 * 11).unwrap();
     let fft = GeneralCooleyTukeyFFT::new(
@@ -425,6 +430,7 @@ fn test_fft_unordered() {
 
 #[test]
 fn test_unordered_fft_permutation_inv() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Fp::<1409>::RING;
     let z = get_prim_root_of_unity(ring, 64 * 11).unwrap();
     let fft = GeneralCooleyTukeyFFT::new(
@@ -452,6 +458,7 @@ fn test_unordered_fft_permutation_inv() {
 
 #[test]
 fn test_inv_fft() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Fp::<97>::RING;
     let z = ring.int_hom().map(39);
     let fft = GeneralCooleyTukeyFFT::new(ring, ring.pow(z, 16), 
@@ -467,6 +474,7 @@ fn test_inv_fft() {
 
 #[test]
 fn test_approximate_fft() {
+    LogAlgorithmSubscriber::init_test();
     let CC = Complex64::RING;
     for (p, log2_n) in [(5, 3), (53, 5), (101, 8), (503, 10)] {
         let fft = GeneralCooleyTukeyFFT::new_with_pows(

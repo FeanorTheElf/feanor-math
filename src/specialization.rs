@@ -62,9 +62,12 @@ use crate::integer::*;
 use crate::rings::extension::extension_impl::*;
 #[cfg(test)]
 use crate::rings::extension::*;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_specialize_finite_field() {
+    LogAlgorithmSubscriber::init_test();
 
     struct Verify<'a, R>(&'a R, i32)
         where R: ?Sized + RingBase;

@@ -846,9 +846,12 @@ impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for AsFieldBase<FreeA
 use test::Bencher;
 #[cfg(test)]
 use std::time::Instant;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_can_hom_from() {
+    LogAlgorithmSubscriber::init_test();
     #[allow(unused)]
     fn assert_impl_CanHomFrom<From, To>()
         where To: ?Sized + CanHomFrom<From>, From: ?Sized + RingBase 
@@ -890,6 +893,7 @@ fn test_can_hom_from() {
 
 #[test]
 fn test_galois_field() {
+    LogAlgorithmSubscriber::init_test();
     let field = GaloisField::new(3, 1);
     assert_eq!(3, field.elements().count());
     crate::ring::generic_tests::test_ring_axioms(&field, field.elements());
@@ -905,6 +909,7 @@ fn test_galois_field() {
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
+    LogAlgorithmSubscriber::init_test();
     let field = GaloisField::new(3, 2);
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(&field, field.elements());
     crate::pid::generic_tests::test_euclidean_ring_axioms(&field, field.elements());
@@ -912,6 +917,7 @@ fn test_principal_ideal_ring_axioms() {
 
 #[test]
 fn test_galois_field_even() {
+    LogAlgorithmSubscriber::init_test();
     for degree in 1..=9 {
         let field = GaloisField::new_with_convolution(Zn64B::new(2).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
         assert_eq!(degree, field.rank());
@@ -921,6 +927,7 @@ fn test_galois_field_even() {
 
 #[test]
 fn test_galois_field_odd() {
+    LogAlgorithmSubscriber::init_test();
     for degree in 1..=9 {
         let field = GaloisField::new_with_convolution(Zn64B::new(3).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
         assert_eq!(degree, field.rank());
@@ -936,6 +943,7 @@ fn test_galois_field_odd() {
 
 #[test]
 fn test_galois_field_no_trinomial() {
+    LogAlgorithmSubscriber::init_test();
     let field = GaloisField::new_with_convolution(Zn64B::new(2).as_field().ok().unwrap(), 24, Global, STANDARD_CONVOLUTION);
     assert_eq!(24, field.rank());
     let poly_ring = DensePolyRing::new(field.base_ring(), "X");

@@ -75,9 +75,12 @@ use crate::rings::extension::extension_impl::FreeAlgebraImpl;
 use crate::rings::zn::zn_static;
 #[cfg(test)]
 use crate::assert_matrix_eq;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_solve() {
+    LogAlgorithmSubscriber::init_test();
     let base_ring = zn_static::Zn::<15>::RING;
     // Z_15[X]/(X^3 + X^2 + 1);  X^3 + X^2 + 1 = (X + 2)(X + 2X + 2) mod 3, but it is irreducible mod 5
     let ring = FreeAlgebraImpl::new(base_ring, 3, [14, 0, 14]);
@@ -119,6 +122,7 @@ fn test_solve() {
 
 #[test]
 fn test_invert() {
+    LogAlgorithmSubscriber::init_test();
     let base_ring = zn_static::Zn::<15>::RING;
     // Z_15[X]/(X^3 + X^2 + 1);  X^3 + X^2 + 1 = (X + 2)(X + 2X + 2) mod 3, but it is irreducible mod 5
     let ring = FreeAlgebraImpl::new(base_ring, 3, [14, 0, 14]);

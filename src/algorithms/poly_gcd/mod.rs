@@ -339,9 +339,12 @@ use crate::rings::zn::zn_64;
 use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
 use crate::integer::*;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_poly_root() {
+    LogAlgorithmSubscriber::init_test();
     let ring = BigIntRing::RING;
     let poly_ring = DensePolyRing::new(ring, "X");
     let [f] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(7) + X.pow_ref(6) + X.pow_ref(5) + X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1]);
@@ -357,6 +360,7 @@ fn test_poly_root() {
 
 #[test]
 fn test_poly_gcd_galois_field() {
+    LogAlgorithmSubscriber::init_test();
     let field = GaloisField::new(5, 3);
     let poly_ring = DensePolyRing::new(&field, "X");
     let [f, g, f_g_gcd] = poly_ring.with_wrapped_indeterminate(|X| [(X.pow_ref(2) + 2) * (X.pow_ref(5) + 1), (X.pow_ref(2) + 2) * (X + 1) * (X + 2), (X.pow_ref(2) + 2) * (X + 1)]);
@@ -365,6 +369,7 @@ fn test_poly_gcd_galois_field() {
 
 #[test]
 fn test_poly_gcd_prime_field() {
+    LogAlgorithmSubscriber::init_test();
     let field = zn_64::Zn64B::new(5).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(&field, "X");
     let [f, g, f_g_gcd] = poly_ring.with_wrapped_indeterminate(|X| [(X.pow_ref(2) + 2) * (X.pow_ref(5) + 1), (X.pow_ref(2) + 2) * (X + 1) * (X + 2), (X.pow_ref(2) + 2) * (X + 1)]);

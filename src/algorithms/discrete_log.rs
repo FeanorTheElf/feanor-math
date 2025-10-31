@@ -991,9 +991,12 @@ use crate::assert_matrix_eq;
 use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[cfg(test)]
 use std::array::from_fn;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_baby_giant_step() {
+    LogAlgorithmSubscriber::init_test();
     for base_bound in [21, 26, 31, 37] {
         let dlog_bound = [int_cast(base_bound, ZZbig, ZZ)];
         let G = AddGroup::new(ZZ);
@@ -1043,6 +1046,7 @@ fn test_baby_giant_step() {
 
 #[test]
 fn test_padic_relation_lattice() {
+    LogAlgorithmSubscriber::init_test();
     let G = AddGroup::new(Zn::<81>::RING);
 
     let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZ), vec![1]);
@@ -1098,6 +1102,7 @@ fn test_padic_relation_lattice() {
 
 #[test]
 fn random_test_dlog() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Zn::<1400>::RING;
     let i = ring.can_hom(&ZZ).unwrap();
     let mut rng = Rand64::new(0);
@@ -1151,6 +1156,7 @@ fn random_test_dlog() {
 
 #[test]
 fn test_zn_dlog() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Zn::<51>::RING;
     let g1 = ring.int_hom().map(37);
     let g2 = ring.int_hom().map(35);
@@ -1174,6 +1180,7 @@ fn test_zn_dlog() {
 
 #[test]
 fn test_zn_subgroup_size() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Zn::<153>::RING;
     let group = MultGroup::new(ring);
     let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
@@ -1201,6 +1208,7 @@ fn test_zn_subgroup_size() {
 
 #[test]
 fn test_enumerate_elements() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Zn::<45>::RING;
     let group = AddGroup::new(ring);
 

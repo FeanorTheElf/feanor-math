@@ -112,9 +112,12 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::PolyRingStore;
 #[cfg(test)]
 use crate::rings::extension::galois_field::GaloisField;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_is_prim_root_of_unity() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Zn::<17>::RING;
     assert!(is_prim_root_of_unity_pow2(ring, &ring.int_hom().map(2), 3));
     assert!(!is_prim_root_of_unity_pow2(ring, &ring.int_hom().map(2), 4));
@@ -143,6 +146,7 @@ fn test_is_prim_root_of_unity() {
 
 #[test]
 fn test_get_prim_root_of_unity() {
+    LogAlgorithmSubscriber::init_test();
     let ring = Fp::<17>::RING;
     assert!(is_prim_root_of_unity_pow2(&ring, &get_prim_root_of_unity_pow2(&ring, 4).unwrap(), 4));
     assert!(get_prim_root_of_unity_pow2(&ring, 5).is_none());

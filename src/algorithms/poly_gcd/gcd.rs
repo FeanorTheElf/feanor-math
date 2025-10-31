@@ -53,7 +53,7 @@ fn poly_gcd_monic_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F
     let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt.try_into().unwrap())).floor() as usize;
     let reduction = PolyLiftFactorsDomainReductionContext::new(ring, &ideal, e);
 
-    event!(Level::INFO, ideal = %IdealDisplayWrapper::new(ring, &ideal), exponent = e, maximal_ideal_count = reduction.len(), "modulo_ideal");
+    event!(Level::INFO, ideal = %IdealDisplayWrapper::new(ring, &ideal), exponent = e, maximal_ideal_count = reduction.len());
 
     let mut signature: Option<Signature> = None;
     let mut poly_rings_mod_me = Vec::new();
@@ -245,9 +245,12 @@ use crate::RANDOM_TEST_INSTANCE_COUNT;
 use crate::algorithms::poly_gcd::make_primitive;
 #[cfg(test)]
 use crate::integer::*;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_poly_gcd_local() {
+    LogAlgorithmSubscriber::init_test();
     let ring = BigIntRing::RING;
     let poly_ring = DensePolyRing::new(ring, "X");
     let irred_polys = poly_ring.with_wrapped_indeterminate(|X| [
@@ -286,6 +289,7 @@ fn test_poly_gcd_local() {
 
 #[test]
 fn random_test_poly_gcd_local() {
+    LogAlgorithmSubscriber::init_test();
     let ring = BigIntRing::RING;
     let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
     let mut rng = oorandom::Rand64::new(1);

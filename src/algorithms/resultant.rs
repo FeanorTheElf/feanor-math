@@ -159,10 +159,10 @@ impl<R: ?Sized + LiftPolyEvalRing + Domain + SelfIso> ComputeResultantRing for R
                     let work_locally = base_ring.get_ring().init_reduce_lift(ln_max_norm);
                     let work_locally_ref = &work_locally;
                     let count = base_ring.get_ring().prime_ideal_count(&work_locally);
-                    event!(Level::INFO, prime_ideal_count = count, "compute_local");
+                    event!(Level::INFO, prime_ideal_count = count);
 
                     let current_span = Span::current();
-                    let resultants = (0..count).into_par_iter().map(|i| current_span.in_scope(|| {
+                    let resultants = (0..count).into_par_iter().map(|i| span!(parent: current_span.clone(), Level::INFO, "resultant_mod_ideal").in_scope(|| {
                         let embedding = LiftPolyEvalRingReductionMap::new(base_ring.get_ring(), work_locally_ref, i);
                         let new_poly_ring = DensePolyRing::new(embedding.codomain(), "X");
                         let poly_ring_embedding = new_poly_ring.lifted_hom(ring_ref, &embedding);
@@ -216,6 +216,8 @@ use crate::algorithms::buchberger::buchberger;
 use crate::integer::BigIntRing;
 #[cfg(test)]
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 #[allow(deprecated)]
@@ -260,6 +262,7 @@ fn test_resultant_local_polynomial() {
 
 #[test]
 fn test_resultant_local_integer() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(ZZ, "X");
 

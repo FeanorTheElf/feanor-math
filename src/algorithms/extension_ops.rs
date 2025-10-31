@@ -151,9 +151,12 @@ use crate::rings::extension::extension_impl::FreeAlgebraImpl;
 use crate::rings::rational::RationalField;
 #[cfg(test)]
 use crate::rings::poly::dense_poly::DensePolyRing;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_charpoly() {
+    LogAlgorithmSubscriber::init_test();
     let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2]);
     let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
 
@@ -178,6 +181,7 @@ fn test_charpoly() {
 
 #[test]
 fn test_minpoly() {
+    LogAlgorithmSubscriber::init_test();
     let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 6, [2]);
     let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
 
@@ -193,6 +197,7 @@ fn test_minpoly() {
 
 #[test]
 fn test_trace() {
+    LogAlgorithmSubscriber::init_test();
     let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2, 0, 0]);
 
     assert_eq!(3, ring.trace(ring.from_canonical_basis([1, 0, 0])));
@@ -205,6 +210,7 @@ fn test_trace() {
 
 #[test]
 fn test_discriminant() {
+    LogAlgorithmSubscriber::init_test();
     let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2, 0, 0]);
     assert_eq!(-108, discriminant(ring.get_ring()));
 
@@ -223,6 +229,7 @@ fn test_discriminant() {
 
 #[test]
 fn test_from_canonical_basis_extended() {
+    LogAlgorithmSubscriber::init_test();
     let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2]);
     let actual = from_canonical_basis_extended(ring.get_ring(), [1, 2, 3, 4, 5, 6, 7]);
     let expected = ring.from_canonical_basis([37, 12, 15]);

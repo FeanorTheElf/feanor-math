@@ -213,9 +213,12 @@ use std::f64::consts::PI;
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::pid::PrincipalIdealRingStore;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_find_approximate_complex_root() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(&ZZ, "X");
     let CC = Complex64::RING;
@@ -256,6 +259,7 @@ fn test_find_approximate_complex_root() {
 
 #[test]
 fn test_find_all_approximate_complex_roots() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(&ZZ, "X");
     let CC = Complex64::RING;

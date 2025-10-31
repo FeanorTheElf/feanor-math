@@ -156,7 +156,7 @@ fn factor_squarefree_monic_integer_poly_local<'a, P>(ZZX: P, f: &El<P>) -> Vec<E
         assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&prime));
         let prime_f64 = BigIntRing::RING.to_float_approx(&ZZ.get_ring().principal_ideal_generator(&prime));
         let e = (bound / prime_f64.ln()).ceil() as usize + 1;
-        event!(Level::INFO, prime_ideal = %IdealDisplayWrapper::new(ZZ.get_ring(), &prime), exponent = e, "factor_modulo");
+        event!(Level::INFO, prime_ideal = %IdealDisplayWrapper::new(ZZ.get_ring(), &prime), exponent = e);
         match factor_and_lift_mod_pe(ZZX, &prime, e, f) {
             FactorAndLiftModpeResult::Irreducible => return vec![ZZX.clone_el(f)],
             FactorAndLiftModpeResult::PartialFactorization(result) => return result,
@@ -189,7 +189,7 @@ pub fn poly_factor_integer<P>(ZZX: P, f: El<P>) -> Vec<(El<P>, usize)>
         let mut result = Vec::new();
         let mut current = ZZX.clone_el(&f);
         for (factor, _k) in power_decomposition {
-            event!(Level::INFO, factor_deg = ZZX.degree(&factor).unwrap_or(0), "found_factor");
+            event!(Level::INFO, factor_deg = ZZX.degree(&factor).unwrap_or(0));
             let lc_factor = ZZX.lc(&factor).unwrap();
             let factor_monic = evaluate_aX(ZZX, &factor, lc_factor);
             let factorization = factor_squarefree_monic_integer_poly_local(&ZZX, &factor_monic);
@@ -215,9 +215,12 @@ pub fn poly_factor_integer<P>(ZZX: P, f: El<P>) -> Vec<(El<P>, usize)>
 use crate::primitive_int::*;
 #[cfg(test)]
 use crate::algorithms::poly_gcd::make_primitive;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_factor_int_poly() {
+    LogAlgorithmSubscriber::init_test();
     let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
     let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1, X + 1]);
     let input = ZZX.mul_ref(&f, &g);

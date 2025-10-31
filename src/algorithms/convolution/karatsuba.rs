@@ -239,9 +239,12 @@ fn karatsuba_mem_size(block_size_log2: usize, threshold_size_log2: usize) -> usi
 
 #[cfg(test)]
 use std::alloc::Global;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_karatsuba_impl() {
+    LogAlgorithmSubscriber::init_test();
     let a = [1, 2, 3, 0];
     let b = [3, 4, 5, 0];
     let mut c = [0; 8];
@@ -252,6 +255,7 @@ fn test_karatsuba_impl() {
 
 #[test]
 fn test_karatsuba_mul() {
+    LogAlgorithmSubscriber::init_test();
     let mut c = vec![0, 0, 0, 0];
     karatsuba(0, &mut c[..], &[-1, 0][..], &[1, 0][..], StaticRing::<i64>::RING, &Global);
     assert_eq!(vec![-1, 0, 0, 0], c);

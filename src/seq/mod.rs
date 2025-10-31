@@ -1052,8 +1052,12 @@ impl<'a, T: Clone> Fn<(&'a T,)> for CloneValue {
     }
 }
 
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
+
 #[test]
 fn test_vector_fn_iter() {
+    LogAlgorithmSubscriber::init_test();
     let vec = vec![1, 2, 4, 8, 16];
     assert_eq!(vec, vec.as_fn().into_iter().copied().collect::<Vec<_>>());
 }

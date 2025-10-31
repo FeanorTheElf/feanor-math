@@ -162,7 +162,7 @@ pub fn poly_power_decomposition_monic_local<P>(poly_ring: P, poly: &El<P>) -> Ve
             let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt.try_into().unwrap())).floor() as usize;
             let reduction = PolyLiftFactorsDomainReductionContext::new(ring, &ideal, e);
 
-            event!(Level::INFO, ideal = %IdealDisplayWrapper::new(ring, &ideal), exponent = e, maximal_ideal_count = reduction.len(), "modulo_ideal");
+            event!(Level::INFO, ideal = %IdealDisplayWrapper::new(ring, &ideal), exponent = e, maximal_ideal_count = reduction.len());
 
             let mut signature: Option<Vec<_>> = None;
             let mut poly_rings_mod_me = Vec::new();
@@ -250,9 +250,12 @@ pub fn poly_squarefree_part_local<P>(poly_ring: P, f: El<P>) -> El<P>
 use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[cfg(test)]
 use super::make_primitive;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_squarefree_part_local() {
+    LogAlgorithmSubscriber::init_test();
     let ring = BigIntRing::RING;
     let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
     let [f1, f2, f3, f4] = poly_ring.with_wrapped_indeterminate(|X| [

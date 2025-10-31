@@ -152,6 +152,7 @@ impl<V: VectorFn<T>, T> VectorFn<T> for StepByFn<V, T> {
 
 #[test]
 fn test_step_by() {
+    LogAlgorithmSubscriber::init_test();
     let vec = [0, 1, 2, 3, 4, 5, 6, 7];
     let zero: [i32; 0] = [];
     assert_eq!(0, zero.step_by_view(1).len());
@@ -164,6 +165,7 @@ fn test_step_by() {
 
 #[test]
 fn test_step_by_fn() {
+    LogAlgorithmSubscriber::init_test();
     let vec = [0, 1, 2, 3, 4, 5, 6, 7].into_copy_els();
     let zero: CloneElFn<[i32; 0], _, _> = [].into_copy_els();
     assert_eq!(0, zero.step_by_fn(1).len());

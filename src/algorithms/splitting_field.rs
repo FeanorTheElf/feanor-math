@@ -338,7 +338,7 @@ pub fn splitting_field<K, F>(
             }
 
             if let Some((extend_with_poly, e)) = extend_with_poly {
-                event!(Level::INFO, deg = poly_ring.degree(&extend_with_poly).unwrap(), "found_irred_poly");
+                event!(Level::INFO, deg = poly_ring.degree(&extend_with_poly).unwrap());
                 let ref_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
                 let ref_extend_with_poly = ref_poly_ring.lifted_hom(&poly_ring, poly_ring.base_ring().identity()).map_ref(&extend_with_poly);
                 let (into_new_field, root) = create_field(ref_poly_ring, ref_extend_with_poly);
@@ -480,9 +480,12 @@ use crate::wrapper::RingElementWrapper;
 use crate::rings::rational::RationalField;
 #[cfg(test)]
 use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
+#[cfg(test)]
+use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_extend_field() {
+    LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
     let ZZX = DensePolyRing::new(&ZZ, "X");
