@@ -1,3 +1,5 @@
+use tracing::instrument;
+
 use crate::algorithms::matmul::naive_matmul;
 use crate::matrix::*;
 use crate::ring::*;
@@ -512,6 +514,7 @@ pub fn dispatch_strassen_impl<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: b
 /// Uses the given allocator to allocate temporary memory.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn strassen<R, V1, V2, V3, A, const T1: bool, const T2: bool, const T3: bool>(
     add_assign: bool,
     threshold_log2: usize,

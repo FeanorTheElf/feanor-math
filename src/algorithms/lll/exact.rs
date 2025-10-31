@@ -19,6 +19,7 @@ use std::alloc::Allocator;
 /// Size-reduces `target` w.r.t. the GSO matrix, and also sends the performed
 /// operations to `col_ops`.
 /// 
+#[instrument(skip_all, level = "trace")]
 fn size_reduce<R, I, V, T>(
     ring: R,
     mut target: SubmatrixMut<V, El<R>>, 
@@ -63,6 +64,7 @@ fn size_reduce<R, I, V, T>(
 ///   mu' = gamma^2 mu
 /// ```
 /// 
+#[instrument(skip_all, level = "trace")]
 fn swap_gso_cols<R, V>(ring: R, mut gso: SubmatrixMut<V, El<R>>, i: usize, j: usize)
     where R: RingStore,
         R::Type: OrderedRing + Field,
@@ -142,6 +144,7 @@ fn swap_gso_cols<R, V>(ring: R, mut gso: SubmatrixMut<V, El<R>>, i: usize, j: us
 /// `D` is returned on the diagonal of the matrix, and `L^T` is returned in
 /// the upper triangle of the matrix.
 /// 
+#[instrument(skip_all, level = "trace")]
 fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>) -> Result<(), usize>
     where R: RingStore,
         R::Type: Field, 
@@ -190,6 +193,7 @@ fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>) -> Result<(), usize>
 /// less rational arithmetic, which can be very slow.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn lll<R, I, V1, V2, A>(
     ring: R, 
     quadratic_form: Submatrix<V1, El<R>>, 
@@ -303,6 +307,7 @@ pub fn lll<R, I, V1, V2, A>(
 
 #[cfg(test)]
 use test::Bencher;
+use tracing::instrument;
 #[cfg(test)]
 use std::alloc::Global;
 #[cfg(test)]

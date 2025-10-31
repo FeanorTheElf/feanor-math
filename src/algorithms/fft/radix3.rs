@@ -1,5 +1,7 @@
 use std::alloc::{Allocator, Global};
 
+use tracing::instrument;
+
 use crate::algorithms::fft::FFTAlgorithm;
 use crate::rings::float_complex::Complex64Base;
 use crate::algorithms::fft::complex_fft::*;
@@ -109,6 +111,7 @@ impl<R_main, R_twiddle, H> CooleyTukeyRadix3FFT<R_main, R_twiddle, H>
     /// will incur avoidable precision loss.
     /// 
     #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
     pub fn new_with_hom(hom: H, zeta: R_twiddle::Element, log3_n: usize) -> Self {
         let ring = hom.domain();
         let pow_zeta = |i: i64| if i < 0 {
@@ -143,6 +146,7 @@ impl<R_main, R_twiddle, H, A> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>
     /// data in cases where the input data layout is not optimal for the algorithm
     /// 
     #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
     pub fn create<F>(hom: H, mut root_of_unity_pow: F, log3_n: usize, allocator: A) -> Self 
         where F: FnMut(i64) -> R_twiddle::Element
     {
@@ -169,6 +173,7 @@ impl<R_main, R_twiddle, H, A> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>
     /// cheap. 
     /// 
     #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
     pub fn change_ring<R_new: ?Sized + RingBase, H_new: Homomorphism<R_twiddle, R_new>>(self, new_hom: H_new) -> (CooleyTukeyRadix3FFT<R_new, R_twiddle, H_new, A>, H) {
         let ring = new_hom.codomain();
         let root_of_unity = if self.log3_n == 0 {
@@ -286,6 +291,7 @@ impl<R_main, R_twiddle, H, A> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>
         });
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn fft_impl(&self, data: &mut [R_main::Element]) {
         for i in 0..data.len() {
             <R_main as CooleyTukeyRadix3Butterfly<R_twiddle>>::prepare_for_fft(self.hom.codomain().get_ring(), &mut data[i]);
@@ -295,6 +301,7 @@ impl<R_main, R_twiddle, H, A> CooleyTukeyRadix3FFT<R_main, R_twiddle, H, A>
         }
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn inv_fft_impl(&self, data: &mut [R_main::Element]) {
         for i in 0..data.len() {
             <R_main as CooleyTukeyRadix3Butterfly<R_twiddle>>::prepare_for_inv_fft(self.hom.codomain().get_ring(), &mut data[i]);

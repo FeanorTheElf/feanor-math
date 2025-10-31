@@ -5,6 +5,7 @@ use serde::Serialize;
 use serde::de::DeserializeSeed;
 use feanor_serde::newtype_struct::*;
 use feanor_serde::seq::*;
+use tracing::instrument;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::iters::multi_cartesian_product;
@@ -125,6 +126,7 @@ impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> ZnRNS<C, J,
     /// provided, which has to be able to store values of size at least `n^3`.
     /// 
     #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
     pub fn new_with_alloc(summands: Vec<C>, large_integers: J, element_allocator: A) -> Self {
         assert!(summands.len() > 0);
         let total_modulus = large_integers.prod(
@@ -512,6 +514,7 @@ impl<C: RingStore, J: RingStore, K: RingStore, A: Allocator + Send + Sync + Clon
         ))
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn map_out(&self, from: &zn_big::ZnGBBase<K>, el: Self::Element, (final_iso, red): &Self::Isomorphism) -> zn_big::ZnGBEl<K> {
         assert_eq!(self.len(), el.data.len());
         let small_integer_ring = self.at(0).integer_ring();

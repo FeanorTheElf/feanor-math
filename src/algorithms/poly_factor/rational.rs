@@ -1,4 +1,6 @@
 
+use tracing::instrument;
+
 use crate::algorithms::poly_factor::factor_locally::poly_factor_integer;
 use crate::pid::PrincipalIdealRingStore;
 use crate::rings::poly::dense_poly::DensePolyRing;
@@ -13,6 +15,7 @@ use crate::pid::EuclideanRing;
 use super::IntegerRing;
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn poly_factor_rational<'a, P, I>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,

@@ -1,3 +1,5 @@
+use tracing::instrument;
+
 use crate::algorithms::ec_factor::lenstra_ec_factor;
 use crate::divisibility::DivisibilityRingStore;
 use crate::ordered::OrderedRing;
@@ -40,6 +42,7 @@ impl<I> ZnOperation for ECFactorInt<I>
 ///
 /// If the given integer is a power of a prime `p`, returns `Some((p, ln(n)/ln(p)))`.
 /// 
+#[instrument(skip_all, level = "trace")]
 pub fn is_prime_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
     where I: RingStore + Copy,
         I::Type: IntegerRing
@@ -74,6 +77,7 @@ fn is_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
 /// 
 /// Returns a list of all factors with their multipliplicities.
 /// 
+#[instrument(skip_all, level = "trace")]
 pub fn factor<I>(ZZ: I, mut n: El<I>) -> Vec<(El<I>, usize)> 
     where I: RingStore + Copy, 
         I::Type: IntegerRing + OrderedRing + CanIsoFromTo<BigIntRingBase> + CanIsoFromTo<StaticRingBase<i128>>

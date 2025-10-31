@@ -1,5 +1,6 @@
 
 use strassen::*;
+use tracing::instrument;
 
 use crate::matrix::*;
 use crate::ring::*;
@@ -216,6 +217,7 @@ impl<R: ?Sized + RingBase, A: Allocator> MatmulAlgorithm<R> for StrassenAlgorith
 /// for more sophisticated implementations. 
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn naive_matmul<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
     lhs: TransposableSubmatrix<V1, El<R>, T1>, 
     rhs: TransposableSubmatrix<V2, El<R>, T2>, 

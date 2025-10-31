@@ -1,3 +1,5 @@
+use tracing::instrument;
+
 use crate::ring::*;
 use crate::integer::*;
 use crate::ordered::*;
@@ -9,6 +11,7 @@ use crate::ordered::*;
 /// If we consider a continuous extension of `f` to the real numbers, this means that
 /// the function finds `floor(x)` for some root `x` of `f` between `left` and `right`.
 /// 
+#[instrument(skip_all, level = "trace")]
 pub fn bisect_floor<R, F>(ZZ: R, left: El<R>, right: El<R>, mut func: F) -> El<R>
     where R: RingStore, R::Type: IntegerRing, F: FnMut(&El<R>) -> El<R>
 {
@@ -41,6 +44,7 @@ pub fn bisect_floor<R, F>(ZZ: R, left: El<R>, right: El<R>, mut func: F) -> El<R
 /// If we consider a continuous extension of `f` to the real numbers, this means that
 /// the function finds `floor(x)` for some root `x` of `f`.
 /// 
+#[instrument(skip_all, level = "trace")]
 pub fn find_root_floor<R, F>(ZZ: R, approx: El<R>, mut func: F) -> El<R>
     where R: RingStore, R::Type: IntegerRing, F: FnMut(&El<R>) -> El<R>
 {
@@ -89,6 +93,7 @@ pub fn find_root_floor<R, F>(ZZ: R, approx: El<R>, mut func: F) -> El<R>
 /// assert_eq!(26, root_floor(&ZZ, ZZ.pow(5, 26), 26));
 /// ```
 /// 
+#[instrument(skip_all, level = "trace")]
 pub fn root_floor<R>(ZZ: R, n: El<R>, root: usize) -> El<R>
     where R: RingStore, R::Type: IntegerRing
 {

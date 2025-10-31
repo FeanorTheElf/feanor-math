@@ -19,7 +19,7 @@ use crate::seq::VectorFn;
 use crate::rings::poly::dense_poly::DensePolyRing;
 
 use oorandom;
-use tracing::{Level, event, span};
+use tracing::instrument;
 
 ///
 /// Let `a` be the given ring element and `q` the size of the finite base field. 
@@ -34,6 +34,7 @@ use tracing::{Level, event, span};
 /// `ring`, we find that `f(X^q)` is congruent to `a^(p + p^2 + ... + p^(i + 1))`.
 /// Multiplication by `X` then gives `a^(1 + ... + p^(i + 1))`.
 /// 
+#[instrument(skip_all, level = "trace")]
 fn pow_geometric_series_characteristic<R>(ring: R, a: El<R>, e: usize) -> El<R>
     where R: RingStore,
         R::Type: FreeAlgebra,
@@ -77,6 +78,7 @@ fn pow_geometric_series_characteristic<R>(ring: R, a: El<R>, e: usize) -> El<R>
 /// returns whether `f` is irreducible over the base ring `R`.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn squarefree_is_irreducible_base<P, R>(poly_ring: P, mod_f_ring: R) -> bool
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
@@ -113,6 +115,7 @@ pub fn squarefree_is_irreducible_base<P, R>(poly_ring: P, mod_f_ring: R) -> bool
 /// which is the internal representation that is used to actually compute the factorization.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn distinct_degree_factorization_base<P, R>(poly_ring: P, mod_f_ring: R) -> Vec<El<P>>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
@@ -126,47 +129,44 @@ pub fn distinct_degree_factorization_base<P, R>(poly_ring: P, mod_f_ring: R) -> 
     let q = poly_ring.base_ring().size(&ZZ).unwrap();
     debug_assert!(ZZ.eq_el(&is_prime_power(&ZZ, &q).unwrap().0, &poly_ring.base_ring().characteristic(&ZZ).unwrap()));
 
-    span!(Level::INFO, "distinct_degree_factor", poly_deg = mod_f_ring.rank()).in_scope(|| {
-        let mut f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
-        if mod_f_ring.rank() == 1 {
-            return vec![poly_ring.one(), f];
-        }
+    let mut f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
+    if mod_f_ring.rank() == 1 {
+        return vec![poly_ring.one(), f];
+    }
 
-        let mut result = Vec::new();
-        let mut current_deg = 0;
-        result.push(poly_ring.one());
+    let mut result = Vec::new();
+    let mut current_deg = 0;
+    result.push(poly_ring.one());
 
-        let mut x_power_q_powers = Vec::new();
-        x_power_q_powers.push(mod_f_ring.one());
-        x_power_q_powers.push(mod_f_ring.pow_gen(mod_f_ring.canonical_gen(), &q, ZZ));
-        for i in 2..mod_f_ring.rank() {
-            x_power_q_powers.push(mod_f_ring.mul_ref(&x_power_q_powers[1], &x_power_q_powers[i - 1]));
-        }
-        let mut current = mod_f_ring.clone_el(&x_power_q_powers[1]);
-        while 2 * current_deg <= poly_ring.degree(&f).unwrap() {
-            current_deg += 1;
-            let fq_defining_poly_mod_f = poly_ring.sub(mod_f_ring.poly_repr(&poly_ring, &current, &poly_ring.base_ring().identity()), poly_ring.indeterminate());
-            let deg_i_factor = poly_ring.normalize(poly_ring.get_ring().ideal_gen(&f, &fq_defining_poly_mod_f));
-            f = poly_ring.checked_div(&f, &deg_i_factor).unwrap();
-            result.push(deg_i_factor);
-            event!(Level::INFO, current_deg = current_deg);
+    let mut x_power_q_powers = Vec::new();
+    x_power_q_powers.push(mod_f_ring.one());
+    x_power_q_powers.push(mod_f_ring.pow_gen(mod_f_ring.canonical_gen(), &q, ZZ));
+    for i in 2..mod_f_ring.rank() {
+        x_power_q_powers.push(mod_f_ring.mul_ref(&x_power_q_powers[1], &x_power_q_powers[i - 1]));
+    }
+    let mut current = mod_f_ring.clone_el(&x_power_q_powers[1]);
+    while 2 * current_deg <= poly_ring.degree(&f).unwrap() {
+        current_deg += 1;
+        let fq_defining_poly_mod_f = poly_ring.sub(mod_f_ring.poly_repr(&poly_ring, &current, &poly_ring.base_ring().identity()), poly_ring.indeterminate());
+        let deg_i_factor = poly_ring.normalize(poly_ring.get_ring().ideal_gen(&f, &fq_defining_poly_mod_f));
+        f = poly_ring.checked_div(&f, &deg_i_factor).unwrap();
+        result.push(deg_i_factor);
 
-            // we can compute `current^q` as `current(X^q)` since over a finite field
-            // of size `q`, we have `f^q(X) = f(X^q)`
-            let current_wrt_basis = mod_f_ring.wrt_canonical_basis(&current);
-            let mut new = mod_f_ring.zero();
-            for i in 0..mod_f_ring.rank() {
-                new = mod_f_ring.inclusion().fma_map(&x_power_q_powers[i], &current_wrt_basis.at(i), new);
-            }
-            drop(current_wrt_basis);
-            current = new;
+        // we can compute `current^q` as `current(X^q)` since over a finite field
+        // of size `q`, we have `f^q(X) = f(X^q)`
+        let current_wrt_basis = mod_f_ring.wrt_canonical_basis(&current);
+        let mut new = mod_f_ring.zero();
+        for i in 0..mod_f_ring.rank() {
+            new = mod_f_ring.inclusion().fma_map(&x_power_q_powers[i], &current_wrt_basis.at(i), new);
         }
-        if poly_ring.degree(&f).unwrap() >= result.len() {
-            result.resize_with(poly_ring.degree(&f).unwrap(), || poly_ring.one());
-            result.push(f);
-        }
-        return result;
-    })
+        drop(current_wrt_basis);
+        current = new;
+    }
+    if poly_ring.degree(&f).unwrap() >= result.len() {
+        result.resize_with(poly_ring.degree(&f).unwrap(), || poly_ring.one());
+        result.push(f);
+    }
+    return result;
 }
 
 ///
@@ -234,6 +234,7 @@ pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>
 /// representation that is used to actually compute the factorization.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn cantor_zassenhaus_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) -> El<P>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
@@ -250,24 +251,21 @@ pub fn cantor_zassenhaus_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) -> El
     assert!(mod_f_ring.rank() % d == 0);
     assert!(mod_f_ring.rank() > d);
 
-    span!(Level::INFO, "cantor_zassenhaus", poly_deg = mod_f_ring.rank(), extension_deg = d).in_scope(|| {
-        let mut rng = oorandom::Rand64::new(ZZ.default_hash(&q) as u128);
-        // we raise `T` to the power `(q^d - 1)/2 = (q - 1)/2 * (1 + q + ... + q^(d - 1))`
-        let exp = ZZ.half_exact(ZZ.sub(ZZ.clone_el(&q), ZZ.one()));
-        let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
+    let mut rng = oorandom::Rand64::new(ZZ.default_hash(&q) as u128);
+    // we raise `T` to the power `(q^d - 1)/2 = (q - 1)/2 * (1 + q + ... + q^(d - 1))`
+    let exp = ZZ.half_exact(ZZ.sub(ZZ.clone_el(&q), ZZ.one()));
+    let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
 
-        for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
-            let T = mod_f_ring.from_canonical_basis((0..mod_f_ring.rank()).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())));
-            let T_pow = mod_f_ring.pow_gen(pow_geometric_series_characteristic(&mod_f_ring, mod_f_ring.clone_el(&T), d - 1), &exp, ZZ);
-            let G = mod_f_ring.sub(T_pow, mod_f_ring.one());
-            let g = poly_ring.get_ring().ideal_gen(&f, &mod_f_ring.poly_repr(&poly_ring, &G, &poly_ring.base_ring().identity()));
-            if !poly_ring.is_unit(&g) && poly_ring.checked_div(&g, &f).is_none() {
-                return g;
-            }
-            event!(Level::INFO, "failed_attempt");
+    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+        let T = mod_f_ring.from_canonical_basis((0..mod_f_ring.rank()).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())));
+        let T_pow = mod_f_ring.pow_gen(pow_geometric_series_characteristic(&mod_f_ring, mod_f_ring.clone_el(&T), d - 1), &exp, ZZ);
+        let G = mod_f_ring.sub(T_pow, mod_f_ring.one());
+        let g = poly_ring.get_ring().ideal_gen(&f, &mod_f_ring.poly_repr(&poly_ring, &G, &poly_ring.base_ring().identity()));
+        if !poly_ring.is_unit(&g) && poly_ring.checked_div(&g, &f).is_none() {
+            return g;
         }
-        unreachable!()
-    })
+    }
+    unreachable!()
 }
 
 ///
@@ -318,6 +316,7 @@ pub fn cantor_zassenhaus<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
 /// function don't work. In this case, we repeat, but clearly the randomness must be new. Thus, we allow passing
 /// a seed.
 /// 
+#[instrument(skip_all, level = "trace")]
 fn cantor_zassenhaus_even_base_with_root_of_unity<P, R>(poly_ring: P, mod_f_ring: R, d: usize, seed: u64) -> El<P>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
@@ -366,6 +365,7 @@ fn cantor_zassenhaus_even_base_with_root_of_unity<P, R>(poly_ring: P, mod_f_ring
 /// assuming all its irreducible factors have degree `d`.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn cantor_zassenhaus_even_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) -> El<P>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
@@ -378,55 +378,53 @@ pub fn cantor_zassenhaus_even_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) 
     assert!(mod_f_ring.rank() % d == 0);
     assert!(mod_f_ring.rank() > d);
     
-    span!(Level::INFO, "cantor_zassenhaus", poly_deg = mod_f_ring.rank(), extension_deg = d).in_scope(|| {
-        let ZZ = BigIntRing::RING;
-        let Fq = poly_ring.base_ring();
-        let q = Fq.size(&ZZ).unwrap();
-        let e = ZZ.abs_log2_ceil(&q).unwrap();
-        assert_el_eq!(ZZ, ZZ.power_of_two(e), q);
-        let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
+    let ZZ = BigIntRing::RING;
+    let Fq = poly_ring.base_ring();
+    let q = Fq.size(&ZZ).unwrap();
+    let e = ZZ.abs_log2_ceil(&q).unwrap();
+    assert_el_eq!(ZZ, ZZ.power_of_two(e), q);
+    let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
 
-        if e % 2 != 0 {
-            // adjoin a third root of unity, this will enable use to use the main idea
-            // use `promise_as_field()`, since `as_field().unwrap()` can cause infinite generic expansion (always adding a `&`)
-            let new_base_ring = AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with_convolution(Fq, 2, [Fq.neg_one(), Fq.neg_one()], "𝝵", Global, STANDARD_CONVOLUTION)));
-            let new_x_pow_rank = mod_f_ring.wrt_canonical_basis(&mod_f_ring.pow(mod_f_ring.canonical_gen(), mod_f_ring.rank())).into_iter().map(|x| new_base_ring.inclusion().map(x)).collect::<Vec<_>>();
-            // once we have any kind of tensoring operation, maybe we can find a way to do this that preserves e.g. sparse implementations?
-            let new_mod_f_ring = FreeAlgebraImpl::new_with_convolution(&new_base_ring, new_x_pow_rank.len(), &new_x_pow_rank, "x", Global, STANDARD_CONVOLUTION);
-            let new_poly_ring = DensePolyRing::new(&new_base_ring, "X");
+    if e % 2 != 0 {
+        // adjoin a third root of unity, this will enable use to use the main idea
+        // use `promise_as_field()`, since `as_field().unwrap()` can cause infinite generic expansion (always adding a `&`)
+        let new_base_ring = AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with_convolution(Fq, 2, [Fq.neg_one(), Fq.neg_one()], "𝝵", Global, STANDARD_CONVOLUTION)));
+        let new_x_pow_rank = mod_f_ring.wrt_canonical_basis(&mod_f_ring.pow(mod_f_ring.canonical_gen(), mod_f_ring.rank())).into_iter().map(|x| new_base_ring.inclusion().map(x)).collect::<Vec<_>>();
+        // once we have any kind of tensoring operation, maybe we can find a way to do this that preserves e.g. sparse implementations?
+        let new_mod_f_ring = FreeAlgebraImpl::new_with_convolution(&new_base_ring, new_x_pow_rank.len(), &new_x_pow_rank, "x", Global, STANDARD_CONVOLUTION);
+        let new_poly_ring = DensePolyRing::new(&new_base_ring, "X");
 
-            // it might happen that cantor_zassenhaus gives a nontrivial factor over the extension, but that factor only
-            // induces a trivial factor over the base ring; in this case repeat
-            for seed in 0..u64::MAX {
-                let factor = new_poly_ring.normalize(cantor_zassenhaus_even_base_with_root_of_unity(&new_poly_ring, &new_mod_f_ring, d, seed));
+        // it might happen that cantor_zassenhaus gives a nontrivial factor over the extension, but that factor only
+        // induces a trivial factor over the base ring; in this case repeat
+        for seed in 0..u64::MAX {
+            let factor = new_poly_ring.normalize(cantor_zassenhaus_even_base_with_root_of_unity(&new_poly_ring, &new_mod_f_ring, d, seed));
 
-                if new_poly_ring.terms(&factor).all(|(c, _)| Fq.is_zero(&new_base_ring.wrt_canonical_basis(c).at(1))) {
-                    // factor already lives in Fq
-                    return poly_ring.from_terms(new_poly_ring.terms(&factor).map(|(c, i)| (new_base_ring.wrt_canonical_basis(c).at(0), i)));
-                } else {
-                    assert!(d % 2 == 0);
-                    // if d is even, the factor might only live in `new_base_ring`, but we can just use its norm;
-                    // the automorphism is X -> X^2
-                    let factor_conjugate = new_poly_ring.from_terms(new_poly_ring.terms(&factor).map(|(c, i)| {
-                        let c_vec = new_base_ring.wrt_canonical_basis(c);
-                        let new_c = new_base_ring.from_canonical_basis([Fq.sub(c_vec.at(0), c_vec.at(1)), Fq.negate(c_vec.at(1))].into_iter());
-                        (new_c, i)
-                    }));
-                    let factor_norm = new_poly_ring.mul(factor, factor_conjugate);
-                    let factor_norm_Fq = poly_ring.from_terms(new_poly_ring.terms(&factor_norm).map(|(c, i)| (new_base_ring.wrt_canonical_basis(c).at(0), i)));
-                    let potential_result = poly_ring.ideal_gen(&f, &factor_norm_Fq);
-                    if poly_ring.degree(&potential_result).unwrap() < mod_f_ring.rank() {
-                        return potential_result;
-                    }
-                    // we are unlucky, and got `factor` that contains exactly one factor over the extension ring of each irreducible factor of `f`;
-                    // in this case, `factor` is a nontrivial factor of `f`, but `N(factor)` is `f` up to units
+            if new_poly_ring.terms(&factor).all(|(c, _)| Fq.is_zero(&new_base_ring.wrt_canonical_basis(c).at(1))) {
+                // factor already lives in Fq
+                return poly_ring.from_terms(new_poly_ring.terms(&factor).map(|(c, i)| (new_base_ring.wrt_canonical_basis(c).at(0), i)));
+            } else {
+                assert!(d % 2 == 0);
+                // if d is even, the factor might only live in `new_base_ring`, but we can just use its norm;
+                // the automorphism is X -> X^2
+                let factor_conjugate = new_poly_ring.from_terms(new_poly_ring.terms(&factor).map(|(c, i)| {
+                    let c_vec = new_base_ring.wrt_canonical_basis(c);
+                    let new_c = new_base_ring.from_canonical_basis([Fq.sub(c_vec.at(0), c_vec.at(1)), Fq.negate(c_vec.at(1))].into_iter());
+                    (new_c, i)
+                }));
+                let factor_norm = new_poly_ring.mul(factor, factor_conjugate);
+                let factor_norm_Fq = poly_ring.from_terms(new_poly_ring.terms(&factor_norm).map(|(c, i)| (new_base_ring.wrt_canonical_basis(c).at(0), i)));
+                let potential_result = poly_ring.ideal_gen(&f, &factor_norm_Fq);
+                if poly_ring.degree(&potential_result).unwrap() < mod_f_ring.rank() {
+                    return potential_result;
                 }
+                // we are unlucky, and got `factor` that contains exactly one factor over the extension ring of each irreducible factor of `f`;
+                // in this case, `factor` is a nontrivial factor of `f`, but `N(factor)` is `f` up to units
             }
-            unreachable!()
-        } else {
-            return cantor_zassenhaus_even_base_with_root_of_unity(poly_ring, mod_f_ring, d, 0);
         }
-    })
+        unreachable!()
+    } else {
+        return cantor_zassenhaus_even_base_with_root_of_unity(poly_ring, mod_f_ring, d, 0);
+    }
 }
 
 ///

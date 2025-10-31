@@ -2,6 +2,8 @@ use std::alloc::Allocator;
 use std::alloc::Global;
 use std::fmt::Debug;
 
+use tracing::instrument;
+
 use crate::algorithms::fft::FFTAlgorithm;
 use crate::algorithms::unity_root::*;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
@@ -219,6 +221,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     /// This function takes a length-`m` base FFT, where `m >= 2m`, and a function `root_of_unity_pows`,
     /// on input `i`, should return `z^i` for an `n`-th primitive root of unity `z`.
     /// 
+    #[instrument(skip_all, level = "trace")]
     #[stability::unstable(feature = "enable")]
     pub fn create<F>(m_fft_table: BaseFFT<R_main, R_twiddle, H, A>, mut root_of_unity_n_pows: F, n: usize) -> Self
         where F: FnMut(i64) -> R_twiddle::Element
@@ -251,6 +254,7 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
         };
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn fft_base_impl<V, A2, const INV: bool>(&self, mut values: V, mut buffer: Vec<R_main::Element, A2>)
         where V: SwappableVectorViewMut<R_main::Element>,
             A2: Allocator

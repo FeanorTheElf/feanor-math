@@ -1,3 +1,5 @@
+use tracing::instrument;
+
 use crate::ring::*;
 use crate::homomorphism::Homomorphism;
 use crate::integer::*;
@@ -27,6 +29,7 @@ use crate::rings::approx_real::ApproxRealField;
 /// not be selected accurately.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn fincke_pohst<I, R, H, V, F>(h: H, quadratic_form: Submatrix<V, R::Element>, target: &[R::Element], radius_sqr: R::Element, mut for_point: F)
     where I: ?Sized + IntegerRing,
         R: ?Sized + ApproxRealField,

@@ -8,6 +8,7 @@ use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
 use crate::ring::*;
 use crate::pid::PrincipalIdealRing;
 
+use tracing::instrument;
 use transform::TransformList;
 
 ///
@@ -34,6 +35,7 @@ use transform::TransformList;
 /// in feanor_math).
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: SubmatrixMut<V, El<R>>)
     where R: RingStore + Copy,
         R::Type: PrincipalIdealRing,
@@ -84,6 +86,7 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
 }
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(ring: R, mut lhs: SubmatrixMut<V1, El<R>>, mut rhs: SubmatrixMut<V2, El<R>>, mut out: SubmatrixMut<V3, El<R>>, _allocator: A) -> SolveResult
     where R: RingStore + Copy,
         R::Type: PrincipalIdealRing,

@@ -1,5 +1,7 @@
 use std::alloc::Allocator;
 
+use tracing::instrument;
+
 use crate::matrix::*;
 use crate::rings::extension::{FreeAlgebra, FreeAlgebraStore};
 use crate::ring::*;
@@ -8,6 +10,7 @@ use crate::seq::*;
 use super::{LinSolveRing, SolveResult};
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn solve_right_over_extension<R, V1, V2, V3, A>(ring: R, lhs: SubmatrixMut<V1, El<R>>, rhs: SubmatrixMut<V2, El<R>>, mut out: SubmatrixMut<V3, El<R>>, allocator: A) -> SolveResult
     where R: RingStore,
         R::Type: FreeAlgebra,

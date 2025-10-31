@@ -1,5 +1,8 @@
+use tracing::instrument;
+
 use crate::algorithms;
 use crate::algorithms::convolution::ConvolutionAlgorithm;
+use crate::algorithms::eea::eea;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::divisibility::*;
 use crate::integer::IntegerRing;
@@ -155,6 +158,7 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         }
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         lhs.data.set_len(max(lhs.data.len(), rhs.data.len()));
         for (i, c) in rhs.data.nontrivial_entries() {
@@ -167,6 +171,7 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         self.add_assign_ref(lhs, &rhs);
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         lhs.data.set_len(max(lhs.data.len(), rhs.data.len()));
         for (i, c) in rhs.data.nontrivial_entries() {
@@ -235,6 +240,7 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         *value = self.mul_ref(&value, &value);
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         if lhs.data.len() == 0 || rhs.data.len() == 0 {
             return self.zero();
@@ -414,6 +420,7 @@ impl<R> PolyRing for SparsePolyRingBase<R>
         }
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
         where I: IntoIterator<Item = (El<Self::BaseRing>, usize)>
     {
@@ -493,7 +500,7 @@ impl<R> PrincipalIdealRing for SparsePolyRingBase<R>
     }
 
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), RingRef::new(self))
+        eea(self.clone_el(lhs), self.clone_el(rhs), RingRef::new(self))
     }
     
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {

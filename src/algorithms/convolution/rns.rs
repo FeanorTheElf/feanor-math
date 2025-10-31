@@ -2,6 +2,8 @@ use std::alloc::{Allocator, Global};
 use std::cmp::{min, max};
 use std::marker::PhantomData;
 
+use tracing::instrument;
+
 use crate::algorithms::miller_rabin::is_prime;
 use crate::homomorphism::*;
 use crate::integer::*;
@@ -311,6 +313,7 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
         data_prep.prepared.get_or_init(rns_index, || self.get_convolution(rns_index).prepare_convolution_operand(data, data_prep.len_hint, self.get_rns_factor(rns_index).get_ring()))
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn compute_convolution_impl<R, V1, V2, ToInt, FromInt>(
         &self,
         lhs: V1,
@@ -364,6 +367,7 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
         }
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn compute_convolution_sum_impl<R, ToInt, FromInt>(
         &self, 
         values: &[(&[R::Element], Option<&PreparedConvolutionOperand<R, C>>, &[R::Element], Option<&PreparedConvolutionOperand<R, C>>)], 
@@ -459,6 +463,7 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
         merge_current(current_width, &mut lhs_tmp, &mut rhs_tmp);
     }
     
+    #[instrument(skip_all, level = "trace")]
     fn prepare_convolution_impl<R, V, ToInt>(
         &self,
         data: V,

@@ -2,10 +2,7 @@ use std::sync::atomic::AtomicU64;
 
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
-use tracing::Level;
-use tracing::Span;
-use tracing::event;
-use tracing::span;
+use tracing::{Level, event, instrument, span};
 
 use crate::algorithms;
 use crate::divisibility::*;
@@ -78,6 +75,7 @@ fn point_eq<R>(Zn: &R, P: &Point<R>, Q: &Point<R>) -> bool
 }
 
 #[inline(never)]
+#[instrument(skip_all, level = "trace")]
 fn edcurve_add<R>(Zn: &R, d: &El<R>, P: Point<R>, Q: &Point<R>) -> Point<R> 
     where R: RingStore,
         R::Type: ZnRing
@@ -105,6 +103,7 @@ fn edcurve_add<R>(Zn: &R, d: &El<R>, P: Point<R>, Q: &Point<R>) -> Point<R>
 }
 
 #[inline(never)]
+#[instrument(skip_all, level = "trace")]
 fn edcurve_double<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> Point<R> 
     where R: RingStore,
         R::Type: ZnRing
@@ -130,6 +129,7 @@ fn edcurve_double<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> Point<R>
     return result;
 }
 
+#[instrument(skip_all, level = "trace")]
 fn ec_pow<R>(base: &Point<R>, d: &El<R>, power: &El<BigIntRing>, Zn: &R) -> Point<R>
     where R: RingStore,
         R::Type: ZnRing
@@ -148,6 +148,7 @@ fn ec_pow<R>(base: &Point<R>, d: &El<R>, power: &El<BigIntRing>, Zn: &R) -> Poin
     ).unwrap_or_else(|x| x)
 }
 
+#[instrument(skip_all, level = "trace")]
 fn is_on_curve<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> bool
     where R: RingStore,
         R::Type: ZnRing
@@ -170,6 +171,7 @@ const POW_COST_CONSTANT: f64 = 0.1;
 ///
 /// returns `(ln_B, ln_attempts)`
 /// 
+#[instrument(skip_all, level = "trace")]
 fn optimize_parameters(ln_p: f64, ln_n: f64) -> (f64, f64) {
     let pow_cost_constant = POW_COST_CONSTANT;
     let ln_cost_per_attempt = |ln_B: f64| ln_B + ln_B.ln() + pow_cost_constant * ln_n.ln();
@@ -196,6 +198,7 @@ fn optimize_parameters(ln_p: f64, ln_n: f64) -> (f64, f64) {
 ///
 /// Optimizes the parameters to find a factor of size roughly `p`; `p` should be at most sqrt(n)
 /// 
+#[instrument(skip_all, level = "trace")]
 fn lenstra_ec_factor_base<R, F>(Zn: R, log2_p: usize, mut rng: F) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
     where R: RingStore + Copy,
         R::Type: ZnRing + DivisibilityRing,
@@ -210,7 +213,7 @@ fn lenstra_ec_factor_base<R, F>(Zn: R, log2_p: usize, mut rng: F) -> Option<El<<
         let (ln_B, ln_attempts) = optimize_parameters(ln_p, log2_n as f64 * 2f64.ln());
         // after this many random curves, we expect to have found a factor with high probability, unless there is no factor of size about `log2_size`
         let attempts = ln_attempts.exp() as usize;
-        event!(Level::INFO, attempts = attempts);
+        event!(Level::INFO, check_curves = attempts);
 
         let log2_B = ln_B / 2f64.ln();
         assert!(log2_B <= i128::MAX as f64);
@@ -224,9 +227,8 @@ fn lenstra_ec_factor_base<R, F>(Zn: R, log2_p: usize, mut rng: F) -> Option<El<<
 
         let base_rng_value = rng();
         let rng_seed = AtomicU64::new(1);
-        let current_span = Span::current();
 
-        let result = (0..attempts).into_par_iter().map(|_| span!(parent: current_span.clone(), Level::INFO, "test_curve").in_scope(|| {
+        let result = (0..attempts).into_par_iter().map(|_| {
             let mut rng = oorandom::Rand64::new(((rng_seed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u128) << 64) | base_rng_value as u128);
             let (x, y) = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()));
             let (x_sqr, y_sqr) = (square(&Zn, &x), square(&Zn, &y));
@@ -240,7 +242,7 @@ fn lenstra_ec_factor_base<R, F>(Zn: R, log2_p: usize, mut rng: F) -> Option<El<<
             }
             
             return None;
-        })).find_any(|res| res.is_some())?;
+        }).find_any(|res| res.is_some())?;
 
         if let Some(result) = result {
             return Some(Zn.integer_ring().ideal_gen(&Zn.smallest_positive_lift(result), Zn.modulus()));
@@ -267,6 +269,7 @@ fn lenstra_ec_factor_base<R, F>(Zn: R, log2_p: usize, mut rng: F) -> Option<El<<
 ///  - `.` means an elliptic curve was tried and did not yield a factor of `n`
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn lenstra_ec_factor_small<R>(Zn: R, min_factor_bound_log2: usize, repetitions: usize) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
     where R: ZnRingStore + DivisibilityRingStore + Copy,
         R::Type: ZnRing + DivisibilityRing
@@ -289,6 +292,7 @@ pub fn lenstra_ec_factor_small<R>(Zn: R, min_factor_bound_log2: usize, repetitio
 }
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::IntegerRing>
     where R: ZnRingStore + DivisibilityRingStore + Copy,
         R::Type: ZnRing + DivisibilityRing

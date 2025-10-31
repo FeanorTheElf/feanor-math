@@ -2,6 +2,7 @@ use std::convert::identity;
 
 use tracing::Level;
 use tracing::event;
+use tracing::instrument;
 use tracing::span;
 
 use crate::algorithms::poly_gcd::*;
@@ -20,6 +21,7 @@ use crate::iters::powerset;
 use crate::seq::VectorView;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 
+#[instrument(skip_all, level = "trace")]
 fn combine_local_factors_local<'ring, 'data, 'local, R, P1, P2>(reduction: &'local PolyLiftFactorsDomainReductionContext<'ring, 'data, R>, poly_ring: P1, poly: &El<P1>, local_poly_ring: P2, local_e: usize, local_factors: Vec<El<P2>>) -> Vec<El<P1>>
     where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore + Copy,
@@ -85,44 +87,53 @@ pub enum FactorAndLiftModpeResult<P>
 /// return non-irreducible factors of `f`.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn factor_and_lift_mod_pe<'ring, R, P>(poly_ring: P, prime: &R::SuitableIdeal<'ring>, e: usize, poly: &El<P>) -> FactorAndLiftModpeResult<P>
     where R: ?Sized + PolyLiftFactorsDomain,
         P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
         <P::Type as RingExtension>::BaseRing: RingStore<Type = R>
 {
-    let ring = poly_ring.base_ring().get_ring();
-    assert_eq!(1, ring.maximal_ideal_factor_count(&prime), "currently only maximal ideals are supported, got {}", IdealDisplayWrapper::new(ring, prime));
+    span!(Level::INFO, "factor_poly_locally", poly_deg = poly_ring.degree(poly).unwrap()).in_scope(|| {
+        let ring = poly_ring.base_ring().get_ring();
+        assert_eq!(1, ring.maximal_ideal_factor_count(&prime), "currently only maximal ideals are supported, got {}", IdealDisplayWrapper::new(ring, prime));
 
-    let reduction = PolyLiftFactorsDomainReductionContext::new(ring, prime, e);
-    let red_map = reduction.intermediate_ring_to_field_reduction(0);
+        event!(Level::INFO, prime_ideal = %IdealDisplayWrapper::new(ring, &prime), exponent = e);
 
-    let iso = reduction.base_ring_to_field_iso(0);
-    let F = iso.codomain();
-    let FX = DensePolyRing::new(&F, "X");
-    let R_to_F = (&iso).compose(reduction.main_ring_to_field_reduction(0));
+        let reduction = PolyLiftFactorsDomainReductionContext::new(ring, prime, e);
+        let red_map = reduction.intermediate_ring_to_field_reduction(0);
 
-    let poly_mod_m = FX.lifted_hom(poly_ring, R_to_F).map_ref(poly);
-    let mut factors = Vec::new();
-    for (f, k) in <_ as FactorPolyField>::factor_poly(&FX, &poly_mod_m).0 {
-        if k > 1 {
-            return FactorAndLiftModpeResult::NotSquarefreeModpe;
+        let iso = reduction.base_ring_to_field_iso(0);
+        let F = iso.codomain();
+        let FX = DensePolyRing::new(&F, "X");
+        let R_to_F = (&iso).compose(reduction.main_ring_to_field_reduction(0));
+
+        let poly_mod_m = FX.lifted_hom(poly_ring, R_to_F).map_ref(poly);
+        let mut factors = Vec::new();
+        for (f, k) in <_ as FactorPolyField>::factor_poly(&FX, &poly_mod_m).0 {
+            if k > 1 {
+                event!(Level::INFO, "not_squarefree");
+                return FactorAndLiftModpeResult::NotSquarefreeModpe;
+            }
+            factors.push(f);
         }
-        factors.push(f);
-    }
-    if factors.len() == 1 {
-        return FactorAndLiftModpeResult::Irreducible;
-    }
+        if factors.len() == 1 {
+            event!(Level::INFO, "irreducible");
+            return FactorAndLiftModpeResult::Irreducible;
+        }
 
-    let SX = DensePolyRing::new(*red_map.domain(), "X");
-    let poly_mod_me = SX.lifted_hom(poly_ring, reduction.main_ring_to_intermediate_ring_reduction(0)).map_ref(poly);
-    let factorization_mod_me = hensel_lift_factorization(&red_map, &SX, &FX, &poly_mod_me, &factors[..]);
-    let combined_factorization = combine_local_factors_local(&reduction, poly_ring, poly, &SX, e, factorization_mod_me);
-    if combined_factorization.len() == 1 {
-        return FactorAndLiftModpeResult::Unknown;
-    } else {
-        return FactorAndLiftModpeResult::PartialFactorization(combined_factorization);
-    }
+        let SX = DensePolyRing::new(*red_map.domain(), "X");
+        let poly_mod_me = SX.lifted_hom(poly_ring, reduction.main_ring_to_intermediate_ring_reduction(0)).map_ref(poly);
+        let factorization_mod_me = hensel_lift_factorization(&red_map, &SX, &FX, &poly_mod_me, &factors[..]);
+        let combined_factorization = combine_local_factors_local(&reduction, poly_ring, poly, &SX, e, factorization_mod_me);
+        if combined_factorization.len() == 1 {
+            event!(Level::INFO, "single_factor_lift");
+            return FactorAndLiftModpeResult::Unknown;
+        } else {
+            event!(Level::INFO, "partial_factorization");
+            return FactorAndLiftModpeResult::PartialFactorization(combined_factorization);
+        }
+    })
 }
 
 fn ln_factor_max_coeff<P>(ZZX: P, f: &El<P>) -> f64
@@ -156,7 +167,6 @@ fn factor_squarefree_monic_integer_poly_local<'a, P>(ZZX: P, f: &El<P>) -> Vec<E
         assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&prime));
         let prime_f64 = BigIntRing::RING.to_float_approx(&ZZ.get_ring().principal_ideal_generator(&prime));
         let e = (bound / prime_f64.ln()).ceil() as usize + 1;
-        event!(Level::INFO, prime_ideal = %IdealDisplayWrapper::new(ZZ.get_ring(), &prime), exponent = e);
         match factor_and_lift_mod_pe(ZZX, &prime, e, f) {
             FactorAndLiftModpeResult::Irreducible => return vec![ZZX.clone_el(f)],
             FactorAndLiftModpeResult::PartialFactorization(result) => return result,
@@ -175,6 +185,7 @@ fn factor_squarefree_monic_integer_poly_local<'a, P>(ZZX: P, f: &El<P>) -> Vec<E
 /// product is `f` only up to multiplication by a nonzero integer. 
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn poly_factor_integer<P>(ZZX: P, f: El<P>) -> Vec<(El<P>, usize)>
     where P: PolyRingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
@@ -182,33 +193,29 @@ pub fn poly_factor_integer<P>(ZZX: P, f: El<P>) -> Vec<(El<P>, usize)>
 {
     assert!(!ZZX.is_zero(&f));
 
-    span!(Level::INFO, "factor_poly_integer", poly_deg = ZZX.degree(&f).unwrap()).in_scope(|| {
+    let power_decomposition = poly_power_decomposition_local(ZZX, ZZX.clone_el(&f));
 
-        let power_decomposition = poly_power_decomposition_local(ZZX, ZZX.clone_el(&f));
-
-        let mut result = Vec::new();
-        let mut current = ZZX.clone_el(&f);
-        for (factor, _k) in power_decomposition {
-            event!(Level::INFO, factor_deg = ZZX.degree(&factor).unwrap_or(0));
-            let lc_factor = ZZX.lc(&factor).unwrap();
-            let factor_monic = evaluate_aX(ZZX, &factor, lc_factor);
-            let factorization = factor_squarefree_monic_integer_poly_local(&ZZX, &factor_monic);
-            for irred_factor in factorization.into_iter().map(|fi| unevaluate_aX(ZZX, &fi, &lc_factor)) {
-                let irred_factor_lc = ZZX.lc(&irred_factor).unwrap();
-                let mut power = 0;
-                let irred_factor = make_primitive(ZZX, &irred_factor).0;
-                while let Some(quo) = ZZX.checked_div(&ZZX.inclusion().mul_ref_map(&current, &ZZX.base_ring().pow(ZZX.base_ring().clone_el(&irred_factor_lc), ZZX.degree(&f).unwrap())), &irred_factor) {
-                    current = quo;
-                    _ = ZZX.balance_poly(&mut current);
-                    power += 1;
-                }
-                assert!(power >= 1);
-                result.push((irred_factor, power));
+    let mut result = Vec::new();
+    let mut current = ZZX.clone_el(&f);
+    for (factor, _k) in power_decomposition {
+        let lc_factor = ZZX.lc(&factor).unwrap();
+        let factor_monic = evaluate_aX(ZZX, &factor, lc_factor);
+        let factorization = factor_squarefree_monic_integer_poly_local(&ZZX, &factor_monic);
+        for irred_factor in factorization.into_iter().map(|fi| unevaluate_aX(ZZX, &fi, &lc_factor)) {
+            let irred_factor_lc = ZZX.lc(&irred_factor).unwrap();
+            let mut power = 0;
+            let irred_factor = make_primitive(ZZX, &irred_factor).0;
+            while let Some(quo) = ZZX.checked_div(&ZZX.inclusion().mul_ref_map(&current, &ZZX.base_ring().pow(ZZX.base_ring().clone_el(&irred_factor_lc), ZZX.degree(&f).unwrap())), &irred_factor) {
+                current = quo;
+                _ = ZZX.balance_poly(&mut current);
+                power += 1;
             }
+            assert!(power >= 1);
+            result.push((irred_factor, power));
         }
-        debug_assert_eq!(ZZX.degree(&f).unwrap(), result.iter().map(|(fi, i)| *i * ZZX.degree(fi).unwrap()).sum::<usize>());
-        return result;
-    })
+    }
+    debug_assert_eq!(ZZX.degree(&f).unwrap(), result.iter().map(|(fi, i)| *i * ZZX.degree(fi).unwrap()).sum::<usize>());
+    return result;
 }
 
 #[cfg(test)]

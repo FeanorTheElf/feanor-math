@@ -2,6 +2,8 @@ use std::alloc::Allocator;
 use std::alloc::Global;
 use std::cmp::min;
 
+use tracing::instrument;
+
 use crate::algorithms::int_bisect::bisect_floor;
 use crate::algorithms::linsolve::smith::determinant_using_pre_smith;
 use crate::algorithms::linsolve::*;
@@ -21,6 +23,7 @@ use crate::rings::poly::PolyRing;
 /// Default impl for [`FreeAlgebra::from_canonical_basis_extended()`]
 ///  
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn from_canonical_basis_extended<R, V>(ring: &R, vec: V) -> R::Element
     where R: ?Sized + FreeAlgebra,
         V: IntoIterator<Item = El<<R as RingExtension>::BaseRing>>
@@ -45,6 +48,7 @@ pub fn from_canonical_basis_extended<R, V>(ring: &R, vec: V) -> R::Element
 }
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn charpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<P>
     where R: ?Sized + FreeAlgebra,
         P: RingStore,
@@ -58,6 +62,7 @@ pub fn charpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<
 }
  
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn minpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<P>
     where R: ?Sized + FreeAlgebra,
         P: RingStore,
@@ -110,6 +115,7 @@ pub fn minpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<P
 /// Default impl for [`FreeAlgebra::discriminant()`]
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn discriminant<R>(ring: &R) -> El<R::BaseRing>
     where R: ?Sized + FreeAlgebra,
         <R::BaseRing as RingStore>::Type: PrincipalIdealRing
@@ -127,6 +133,7 @@ pub fn discriminant<R>(ring: &R) -> El<R::BaseRing>
 }
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn create_multiplication_matrix<R: RingStore, A: Allocator>(ring: R, el: &El<R>, allocator: A) -> OwnedMatrix<El<<R::Type as RingExtension>::BaseRing>, A>
     where R::Type: FreeAlgebra
 {

@@ -1,6 +1,8 @@
 use crate::ring::*;
 use crate::rings::poly::*;
 
+use tracing::instrument;
+
 use std::cmp::max;
 
 ///
@@ -19,6 +21,7 @@ use std::cmp::max;
 /// implicitly performs the polynomial division over the field of fractions.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn poly_div_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left_div_lc: F) -> Result<(El<P>, El<P>), E>
     where P: RingStore,
         P::Type: PolyRing,
@@ -71,6 +74,7 @@ pub fn poly_div_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left
 /// implicitly performs the polynomial division over the field of fractions.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn poly_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left_div_lc: F) -> Result<El<P>, E>
     where P: RingStore,
         P::Type: PolyRing,
@@ -112,6 +116,7 @@ pub const FAST_POLY_DIV_THRESHOLD: usize = 32;
 /// which is faster for large inputs.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn fast_poly_div_rem<P, F, E>(poly_ring: P, f: El<P>, g: &El<P>, mut left_div_lc: F)-> Result<(El<P>, El<P>), E>
     where P: RingStore + Copy,
         P::Type: PolyRing,
@@ -169,17 +174,13 @@ pub fn fast_poly_div_rem<P, F, E>(poly_ring: P, f: El<P>, g: &El<P>, mut left_di
     if poly_ring.is_zero(&f) {
         return Ok((poly_ring.zero(), f));
     }
-    
-    span!(Level::INFO, "fast_poly_div", lhs_deg = poly_ring.degree(&f).unwrap(), rhs_deg = poly_ring.degree(&g).unwrap()).in_scope(|| {
-        fast_poly_div_impl(poly_ring, f, g, &mut left_div_lc)
-    })
+    return fast_poly_div_impl(poly_ring, f, g, &mut left_div_lc);
 }
 
 #[cfg(test)]
 use crate::integer::*;
 #[cfg(test)]
 use dense_poly::DensePolyRing;
-use tracing::{Level, span};
 #[cfg(test)]
 use crate::function::no_error;
 #[cfg(test)]

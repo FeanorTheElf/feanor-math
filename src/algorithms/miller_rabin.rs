@@ -11,6 +11,7 @@ use crate::rings::zn::choose_zn_impl;
 use crate::DEFAULT_PROBABILISTIC_REPETITIONS;
 
 use oorandom;
+use tracing::instrument;
 
 struct CheckIsFieldMillerRabin {
     probability_param: usize
@@ -84,6 +85,7 @@ const SMALL_IS_COPRIME_TABLE: [bool; 30] = [
     true
 ];
 
+#[instrument(skip_all, level = "trace")]
 fn search_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>, delta: i64) -> Option<El<I>>
     where I::Type: IntegerRing,
         zn_64::Zn64BBase: CanHomFrom<I::Type>
@@ -192,6 +194,7 @@ pub fn next_prime<I: IntegerRingStore>(ZZ: I, n: El<I>) -> El<I>
 /// PRNG would be random, then the probability of a wrong output is at 
 /// most 4^(-k).
 /// 
+#[instrument(skip_all, level = "trace")]
 pub fn is_prime_base<R>(Zn: R, k: usize) -> bool 
     where R: ZnRingStore,
         R::Type: ZnRing

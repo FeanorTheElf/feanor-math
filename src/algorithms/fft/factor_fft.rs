@@ -1,6 +1,8 @@
 
 use std::alloc::Allocator;
 
+use tracing::instrument;
+
 use crate::seq::subvector::SubvectorView;
 use crate::ring::*;
 use crate::homomorphism::*;
@@ -275,6 +277,7 @@ impl<R_main, R_twiddle, H, T1, T2> FFTAlgorithm<R_main> for GeneralCooleyTukeyFF
         &self.root_of_unity
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn unordered_fft<V, S>(&self, mut values: V, ring: S)
         where V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
             S: RingStore<Type = R_main> + Copy 
@@ -295,6 +298,7 @@ impl<R_main, R_twiddle, H, T1, T2> FFTAlgorithm<R_main> for GeneralCooleyTukeyFF
         }
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn unordered_inv_fft<V, S>(&self, mut values: V, ring: S)
         where V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
             S: RingStore<Type = R_main> + Copy 

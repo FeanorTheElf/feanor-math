@@ -1,5 +1,4 @@
 use std::alloc::{Allocator, Global};
-use tracing::{Level, event, span};
 
 use crate::cow::*;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
@@ -97,6 +96,7 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
         self.fft_algos.get_or_init(log2_n, || CooleyTuckeyFFT::for_zn_with_hom(self.hom.clone(), log2_n).expect("NTTConvolution was instantiated with parameters that don't support this length"))
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn get_ntt_data<'a, V>(
         &self,
         data: V,
@@ -109,7 +109,6 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
         let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&significant_entries.try_into().unwrap()).unwrap();
 
         let compute_result = || {
-            event!(Level::INFO, "compute_ntt");
             let mut result = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
             result.extend(data.as_iter().map(|x| self.ring().clone_el(x)));
             result.resize_with(1 << log2_len, || self.ring().zero());
@@ -125,6 +124,7 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
         }
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn compute_convolution_ntt<'a, V1, V2>(&self,
         lhs: V1,
         mut lhs_prep: Option<&'a PreparedConvolutionOperand<R_main, A>>,
@@ -164,6 +164,7 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
         return lhs_ntt;
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn prepare_convolution_impl<V>(
         &self,
         data: V,
@@ -177,21 +178,20 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
         } else {
             2 * data.len()
         };
-        span!(Level::INFO, "prepare_convolution_ntt", len = significant_entries).in_scope(|| {
-            let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&significant_entries.try_into().unwrap()).unwrap();
+        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&significant_entries.try_into().unwrap()).unwrap();
 
-            let mut result = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
-            result.extend(data.as_iter().map(|x| self.ring().clone_el(x)));
-            result.resize_with(1 << log2_len, || self.ring().zero());
-            self.get_ntt_table(log2_len).unordered_truncated_fft(&mut result, significant_entries);
+        let mut result = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
+        result.extend(data.as_iter().map(|x| self.ring().clone_el(x)));
+        result.resize_with(1 << log2_len, || self.ring().zero());
+        self.get_ntt_table(log2_len).unordered_truncated_fft(&mut result, significant_entries);
 
-            return PreparedConvolutionOperand {
-                ntt_data: result,
-                significant_entries: significant_entries
-            };
-        })
+        return PreparedConvolutionOperand {
+            ntt_data: result,
+            significant_entries: significant_entries
+        };
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn compute_convolution_impl(
         &self,
         lhs: &[R_main::Element],
@@ -202,39 +202,36 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
     ) {
         assert!(lhs.len() + rhs.len() - 1 <= dst.len());
         let len = lhs.len() + rhs.len() - 1;
-        span!(Level::INFO, "convolution_ntt", len = len).in_scope(|| {
-            let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
+        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
-            let mut lhs_ntt = self.compute_convolution_ntt(lhs, lhs_prep, rhs, rhs_prep, len);
-            let lhs_ntt = lhs_ntt.to_mut_with(|_| unreachable!());
-            self.get_ntt_table(log2_len).unordered_truncated_fft_inv(&mut lhs_ntt[..], len);
-            for (i, x) in lhs_ntt.drain(..).enumerate().take(len) {
-                self.ring().add_assign(&mut dst[i], x);
-            }
-        })
+        let mut lhs_ntt = self.compute_convolution_ntt(lhs, lhs_prep, rhs, rhs_prep, len);
+        let lhs_ntt = lhs_ntt.to_mut_with(|_| unreachable!());
+        self.get_ntt_table(log2_len).unordered_truncated_fft_inv(&mut lhs_ntt[..], len);
+        for (i, x) in lhs_ntt.drain(..).enumerate().take(len) {
+            self.ring().add_assign(&mut dst[i], x);
+        }
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn compute_convolution_sum_impl(&self, values: &[(&[R_main::Element], Option<&PreparedConvolutionOperand<R_main, A>>, &[R_main::Element], Option<&PreparedConvolutionOperand<R_main, A>>)], dst: &mut [R_main::Element]) {
         let len = dst.len();
-        span!(Level::INFO, "convolution_sum_ntt", len = len).in_scope(|| {
-            let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
+        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
-            let mut buffer = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
-            buffer.resize_with(1 << log2_len, || self.ring().zero());
+        let mut buffer = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
+        buffer.resize_with(1 << log2_len, || self.ring().zero());
 
-            for (lhs, lhs_prep, rhs, rhs_prep) in values {
-                assert!(lhs.len() + rhs.len() - 1 <= len);
+        for (lhs, lhs_prep, rhs, rhs_prep) in values {
+            assert!(lhs.len() + rhs.len() - 1 <= len);
 
-                let res_ntt = self.compute_convolution_ntt(lhs, *lhs_prep, rhs, *rhs_prep, len);
-                for i in 0..len {
-                    self.ring().add_assign_ref(&mut buffer[i], &res_ntt[i]);
-                }
+            let res_ntt = self.compute_convolution_ntt(lhs, *lhs_prep, rhs, *rhs_prep, len);
+            for i in 0..len {
+                self.ring().add_assign_ref(&mut buffer[i], &res_ntt[i]);
             }
-            self.get_ntt_table(log2_len).unordered_truncated_fft_inv(&mut buffer, len);
-            for (i, x) in buffer.drain(..).enumerate().take(len) {
-                self.ring().add_assign(&mut dst[i], x);
-            }
-        })
+        }
+        self.get_ntt_table(log2_len).unordered_truncated_fft_inv(&mut buffer, len);
+        for (i, x) in buffer.drain(..).enumerate().take(len) {
+            self.ring().add_assign(&mut dst[i], x);
+        }
     }
 }
 
@@ -280,6 +277,7 @@ impl<R_main, R_twiddle, H, A> ConvolutionAlgorithm<R_main> for NTTConvolution<R_
 
 #[cfg(test)]
 use test::Bencher;
+use tracing::instrument;
 #[cfg(test)]
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 #[cfg(test)]

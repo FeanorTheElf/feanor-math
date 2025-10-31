@@ -2,6 +2,8 @@ use std::alloc::{Allocator, Global};
 use std::ops::Range;
 use std::fmt::Debug;
 
+use tracing::instrument;
+
 use crate::algorithms::unity_root::*;
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::rings::zn::*;
@@ -226,6 +228,7 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H, Global>
     /// Do not use this for approximate rings, as computing the powers of `root_of_unity`
     /// will incur avoidable precision loss.
     /// 
+    #[instrument(skip_all, level = "trace")]
     pub fn new_with_hom(hom: H, root_of_unity: R_twiddle::Element, log2_n: usize) -> Self {
         let ring = hom.domain();
         let root_of_unity_pow = |i: i64| if i >= 0 {
@@ -465,6 +468,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     /// cases where the input data layout is not optimal for the algorithm.
     /// 
     #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
     pub fn create<F>(hom: H, mut root_of_unity_pow: F, log2_n: usize, allocator: A) -> Self 
         where F: FnMut(i64) -> R_twiddle::Element
     {
@@ -499,6 +503,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     /// cheap. 
     /// 
     #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
     pub fn change_ring<R_new: ?Sized + RingBase, H_new: Homomorphism<R_twiddle, R_new>>(self, new_hom: H_new) -> (CooleyTuckeyFFT<R_new, R_twiddle, H_new, A>, H) {
         let ring = new_hom.codomain();
         let root_of_unity = if self.log2_n == 0 {
@@ -560,6 +565,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     /// No idea why...
     /// 
     #[inline(never)]
+    #[instrument(skip_all, level = "trace")]
     fn butterfly_step_main<const INV: bool, const IS_PREPARED: bool>(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize) {
         let twiddles = if INV {
             &self.inv_root_of_unity_list[log2_step]
@@ -592,6 +598,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     /// ```
     /// 
     #[inline(never)]
+    #[instrument(skip_all, level = "trace")]
     fn butterfly_ub_from_ab(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize) {
         butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, &self.root_of_unity_list[log2_step], |a, b, twiddle| {
             *a = self.hom.mul_ref_snd_map(
@@ -609,6 +616,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     /// ```
     /// 
     #[inline(never)]
+    #[instrument(skip_all, level = "trace")]
     fn butterfly_uv_from_ub(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize) {
         butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, &self.root_of_unity_list[log2_step], |a, b, twiddle| {
             *b = self.ring().sub_ref_fst(a, self.hom.mul_ref_map(b, twiddle));
@@ -623,6 +631,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     /// ```
     /// 
     #[inline(never)]
+    #[instrument(skip_all, level = "trace")]
     fn butterfly_ab_from_ub(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize) {
         butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, &self.root_of_unity_list[log2_step], |a, b, twiddle| {
             *a = self.ring().add_ref(a, a);
@@ -681,6 +690,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     /// It can be inverted using [`CooleyTuckey::unordered_truncated_fft_inv()`].
     /// 
     #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
     pub fn unordered_truncated_fft(&self, data: &mut [R_main::Element], nonzero_entries: usize) {
         assert_eq!(self.len(), data.len());
         assert!(nonzero_entries > self.len() / 2);
@@ -709,6 +719,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     /// many elements.
     /// 
     #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
     pub fn unordered_truncated_fft_inv(&self, data: &mut [R_main::Element], nonzero_entries: usize) {   
         assert_eq!(self.len(), data.len());
         assert!(nonzero_entries > self.len() / 2);
@@ -756,6 +767,7 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     /// Permutes the given list of length `n` according to `values[bitreverse(i, log2(n))] = values[i]`.
     /// This is exactly the permutation that is implicitly applied by [`CooleyTuckeyFFT::unordered_fft()`].
     /// 
+    #[instrument(skip_all, level = "trace")]
     pub fn bitreverse_permute_inplace<V, T>(&self, mut values: V) 
         where V: SwappableVectorViewMut<T>
     {

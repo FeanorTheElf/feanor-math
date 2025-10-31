@@ -1,8 +1,6 @@
 use std::marker::PhantomData;
 
-use tracing::Level;
-use tracing::event;
-use tracing::span;
+use tracing::instrument;
 
 use crate::algorithms::int_factor::is_prime_power;
 use crate::pid::*;
@@ -26,6 +24,7 @@ use crate::rings::poly::dense_poly::*;
 /// if `r >> e`.
 /// 
 #[cfg(test)]
+#[instrument(skip_all, level = "trace")]
 fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2>(
     reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
@@ -71,8 +70,7 @@ fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2>(
     let mut current_h = lift_to_target_poly_ring(h);
 
     let P = target_poly_ring;
-    for current_e in reduction_map.to_e()..reduction_map.from_e() {
-        event!(Level::INFO, current_e = current_e);
+    for _ in reduction_map.to_e()..reduction_map.from_e() {
         let delta = P.sub_ref_fst(f, P.mul_ref(&current_g, &current_h));
         let mut delta_g = P.mul_ref(&lifted_t, &delta);
         let mut delta_h = P.mul_ref(&lifted_s, &delta);
@@ -98,6 +96,7 @@ struct HenselLiftableBarrettReducer<P: ?Sized + PolyRing> {
 
 impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
 
+    #[instrument(skip_all, level = "trace")]
     fn div_rem_poly<S>(&self, poly_ring: S, poly: El<S>) -> (El<S>, El<S>)
         where S: RingStore<Type = P>
     {
@@ -109,6 +108,7 @@ impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
         return (poly_ring.negate(quotient), truncated_remainder);
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn new<S>(poly_ring: S, poly: El<S>, other_d: usize, start_e: usize) -> Self
         where S: RingStore<Type = P> + Copy
     {
@@ -126,6 +126,7 @@ impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
         };
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn lift<S>(&mut self, poly_ring: S, delta_poly: El<S>, new_e: usize)
         where S: RingStore<Type = P> + Copy
     {
@@ -146,6 +147,7 @@ impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
 /// This uses quadratic Hensel lifting, thus will be faster than [`hensel_lift_linear()`]
 /// if `r >> e`.
 ///
+#[instrument(skip_all, level = "trace")]
 fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2>(
     reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
@@ -191,7 +193,6 @@ fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2>(
     let degree_delta_bound = base_poly_ring.degree(g).unwrap() + base_poly_ring.degree(h).unwrap();
     let mut current_g = HenselLiftableBarrettReducer::new(&target_poly_ring, lift_to_target_poly_ring(g), degree_delta_bound, 1);
     let mut current_h = HenselLiftableBarrettReducer::new(&target_poly_ring, lift_to_target_poly_ring(h), degree_delta_bound, 1);
-    event!(Level::INFO, "setup_done");
 
     // we have to lift the Bezout identity starting from `e = 1`, so for simplicity,
     // start lifting everything from `e = 1` on
@@ -225,7 +226,6 @@ fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2>(
         debug_assert!(P.degree(&current_t).is_none() || P.degree(&current_t).unwrap() < base_poly_ring.degree(&g).unwrap());
 
         current_e = 2 * current_e;
-        event!(Level::INFO, current_exp = current_e);
     }
     debug_assert!(P.eq_el(f, &P.mul_ref(&current_g.poly, &current_h.poly)));
     return (current_g.poly, current_h.poly);
@@ -236,6 +236,7 @@ fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2>(
 /// for `e < r`, this computes a Bezout identity `s' f + t' g = 1` with `s', t'` polynomials modulo 
 /// `p^r` that reduce to `s, t` modulo `p^e`.
 /// 
+#[instrument(skip_all, level = "trace")]
 fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2>(
     reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
@@ -280,7 +281,6 @@ fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2>(
 
     let P = target_poly_ring;
     while current_e < reduction_map.from_e() {
-        event!(Level::INFO, current_exp = current_e);
 
         // lift the bezout identity
         // the formula is `s' = s(2 - (sg + th))`, `t' = t(2 - (sg + th))`
@@ -325,6 +325,7 @@ fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2>(
 /// ```
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> Option<(El<P>, El<P>)>
     where P: RingStore,
         P::Type: PolyRing,
@@ -372,6 +373,7 @@ pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> O
 /// pairwise coprime factors (with `e < r`), computes a monic lift of each factor, such that their
 /// product is `f mod p^r`.
 /// 
+#[instrument(skip_all, level = "trace")]
 fn hensel_lift_factorization_internal<'ring, 'data, 'local, R, P1, P2, V>(
     reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
@@ -402,6 +404,7 @@ fn hensel_lift_factorization_internal<'ring, 'data, 'local, R, P1, P2, V>(
 /// (with `e` given implicitly by `reduction_map`) so that their product is `f`.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V>(
     reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
@@ -419,11 +422,8 @@ pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V>(
     assert!(target_poly_ring.base_ring().is_one(target_poly_ring.lc(f).unwrap()));
     assert!(factors.as_iter().all(|f| base_poly_ring.base_ring().is_one(base_poly_ring.lc(f).unwrap())));
     assert!(target_poly_ring.base_ring().get_ring() == reduction_map.domain().get_ring());
-
-    let result = span!(Level::INFO, "hensel_lift", poly_deg = target_poly_ring.degree(f).unwrap(), target_exponent = reduction_map.from_e()).in_scope(|| 
-        hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, f, factors)
-    );
-    return result;
+    
+    return hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, f, factors);
 }
 
 #[cfg(test)]

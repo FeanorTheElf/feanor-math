@@ -1,3 +1,5 @@
+use tracing::instrument;
+
 use crate::homomorphism::*;
 use crate::rings::extension::*;
 use crate::ring::*;
@@ -19,6 +21,7 @@ use crate::algorithms::poly_gcd::hensel::local_zn_ring_bezout_identity;
 /// of using matrix inversion to compute `a^-1`).
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn invert_over_local_zn<S>(ring: S, el: &El<S>) -> Option<El<S>>
     where S: RingStore,
         S::Type: FreeAlgebra,

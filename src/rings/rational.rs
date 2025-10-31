@@ -2,7 +2,7 @@ use crate::algorithms::convolution::KaratsubaHint;
 use crate::serialization::*;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
-use crate::algorithms::poly_gcd::gcd::poly_gcd_local;
+use crate::algorithms::poly_gcd::gcd_locally::poly_gcd_local;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::*;

@@ -1,3 +1,5 @@
+use tracing::instrument;
+
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::local::{PrincipalLocalRing, PrincipalLocalRingStore};
 use crate::matrix::{AsPointerToSlice, SubmatrixMut, TransposableSubmatrixMut};
@@ -39,6 +41,7 @@ use crate::ring::*;
 /// assert_eq!(vec![1], col_idxs);
 /// ```
 /// 
+#[instrument(skip_all, level = "trace")]
 #[stability::unstable(feature = "enable")]
 pub fn largest_nonzero_minor<R, V>(A: SubmatrixMut<V, El<R>>, ring: R) -> (Vec<usize>, Vec<usize>)
     where R: RingStore + Copy,

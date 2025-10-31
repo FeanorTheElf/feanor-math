@@ -1,3 +1,5 @@
+use tracing::instrument;
+
 use crate::field::Field;
 use crate::integer::int_cast;
 use crate::integer::BigIntRing;
@@ -11,7 +13,7 @@ use crate::ordered::OrderedRingStore;
 
 use super::int_factor::factor;
 
-#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usize) -> bool {
     if log2_n == 0 {
         return ring.is_one(el);
@@ -32,7 +34,7 @@ pub fn is_root_of_unity_gen<R: RingStore, I: RingStore>(ring: R, el: &El<R>, n: 
     ring.is_one(&ring.pow_gen(ring.clone_el(&el), n, ZZ))
 }
 
-#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn is_prim_root_of_unity<R: RingStore>(ring: R, el: &El<R>, n: usize) -> bool {
     is_prim_root_of_unity_gen(ring, el, &n.try_into().unwrap(), StaticRing::<i64>::RING)
 }
@@ -72,7 +74,7 @@ pub fn get_prim_root_of_unity_gen<R, I>(ring: R, n: &El<I>, ZZ: I) -> Option<El<
     return Some(current);
 }
 
-#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn get_prim_root_of_unity<R>(ring: R, n: usize) -> Option<El<R>>
     where R: RingStore, 
         R::Type: FiniteRing + Field
@@ -80,7 +82,7 @@ pub fn get_prim_root_of_unity<R>(ring: R, n: usize) -> Option<El<R>>
     get_prim_root_of_unity_gen(ring, &int_cast(n.try_into().unwrap(), BigIntRing::RING, StaticRing::<i64>::RING), BigIntRing::RING)
 }
 
-#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn get_prim_root_of_unity_pow2<R>(ring: R, log2_n: usize) -> Option<El<R>>
     where R: RingStore, 
         R::Type: FiniteRing + Field

@@ -7,7 +7,7 @@ use crate::algorithms::newton::{self, absolute_error_of_poly_eval};
 use crate::algorithms::poly_factor::extension::poly_factor_extension;
 use crate::algorithms::poly_factor::factor_locally::{factor_and_lift_mod_pe, FactorAndLiftModpeResult};
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
-use crate::algorithms::poly_gcd::gcd::poly_gcd_local;
+use crate::algorithms::poly_gcd::gcd_locally::poly_gcd_local;
 use crate::algorithms::resultant::ComputeResultantRing;
 use crate::reduce_lift::lift_poly_factors::*;
 use crate::rings::extension::number_field::newton::find_approximate_complex_root;
@@ -34,7 +34,7 @@ use crate::rings::extension::sparse::SparseMapVector;
 use feanor_serde::newtype_struct::*;
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use serde::de::DeserializeSeed;
-use tracing::{Level, event, span};
+use tracing::{Level, event, instrument, span};
 
 use super::extension_impl::FreeAlgebraImpl;
 use super::Field;
@@ -552,6 +552,7 @@ enum HeuristicFactorPolyInOrderResult<P>
 /// E.g. `X^4 - 10 X^2 + 1` is reducible modulo every prime. In fact, it is a theorem that
 /// there exists inert primes if and only if the Galois group of the extension is cyclic.
 /// 
+#[instrument(skip_all, level = "trace")]
 fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I>(poly_ring: P, poly: &El<P>) -> HeuristicFactorPolyInOrderResult<P>
     where Impl: 'a + RingStore,
         Impl::Type: Field + FreeAlgebra,
@@ -562,7 +563,7 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I>(poly_ring: P, poly: &
         P::Type: PolyRing + DivisibilityRing,
         <P::Type as RingExtension>::BaseRing: RingStore<Type = NumberFieldByOrder<'a, Impl, I>>
 {
-    span!(Level::INFO, "factor_poly_direct_numberfield", poly_deg = poly_ring.degree(poly).unwrap_or(0), numberfield_deg = poly_ring.base_ring().rank()).in_scope(|| {
+    span!(Level::INFO, "factor_poly_numberfield", poly_deg = poly_ring.degree(poly).unwrap_or(0), numberfield_deg = poly_ring.base_ring().rank()).in_scope(|| {
         let mut rng = oorandom::Rand64::new(1);
         let self_ = poly_ring.base_ring();
 
@@ -583,20 +584,20 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I>(poly_ring: P, poly: &
                 let e = 2 * self_.get_ring().heuristic_exponent(&p, poly_ring.degree(&monic_poly).unwrap(), poly_ring.terms(&monic_poly).map(|(c, _)| c));
                 match factor_and_lift_mod_pe(poly_ring, &p, e, &monic_poly) {
                     FactorAndLiftModpeResult::PartialFactorization(factorization) => {
-                        event!(Level::INFO, "nontrivial_factorization");
                         debug_assert!(poly_ring.eq_el(&monic_poly, &poly_ring.normalize(poly_ring.prod(factorization.iter().map(|f| poly_ring.clone_el(f))))));
                         let result: Vec<_> = factorization.into_iter().map(|f| (unevaluate_aX(poly_ring, &f, &lc_poly), 1)).collect();
                         debug_assert!(poly_ring.eq_el(&poly_ring.normalize(poly_ring.clone_el(poly)), &poly_ring.normalize(poly_ring.prod(result.iter().map(|(f, e)| poly_ring.pow(poly_ring.clone_el(f), *e))))));
                         return HeuristicFactorPolyInOrderResult::PartialFactorization(result);
                     },
                     FactorAndLiftModpeResult::Irreducible => {
+                        event!(Level::INFO, "irreducible");
                         return HeuristicFactorPolyInOrderResult::Irreducible;
                     },
                     FactorAndLiftModpeResult::NotSquarefreeModpe => {
                         // probably not square-free
                         let power_decomposition = poly_power_decomposition_local(poly_ring, poly_ring.clone_el(poly));
                         if power_decomposition.len() > 1 {
-                        event!(Level::INFO, "nontrivial_factorization");
+                            event!(Level::INFO, "nontrivial_factorization");
                             return HeuristicFactorPolyInOrderResult::PartialFactorization(power_decomposition);
                         }
                     },
@@ -606,7 +607,7 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I>(poly_ring: P, poly: &
                 break 'try_factor_directly;
             }
         }
-        event!(Level::INFO, "failed");
+        event!(Level::INFO, "no_inert_prime");
         return HeuristicFactorPolyInOrderResult::Unknown;
     })
 }
@@ -618,6 +619,7 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
         I: RingStore,
         I::Type: IntegerRing + ComputeResultantRing
 {
+    #[instrument(skip_all, level = "trace")]
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: RingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
@@ -680,6 +682,7 @@ impl<'a, Impl, I> NumberFieldByOrder<'a, Impl, I>
     /// Multiplies the given polynomial with the lcm of the denominators of all coefficients,
     /// and returns the polynomial as element of the current order.
     /// 
+    #[instrument(skip_all, level = "trace")]
     fn scale_poly_to_order<'ring, P1, P2>(&self, from: P1, to: P2, poly: &El<P1>) -> El<P2>
         where P1: RingStore,
             P1::Type: PolyRing,
@@ -700,6 +703,7 @@ impl<'a, Impl, I> NumberFieldByOrder<'a, Impl, I>
         return to.from_terms(from.terms(poly).map(|(c, i)| (self.base.inclusion().mul_ref_map(c, &denominator), i)));
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn normalize_map_back_from_order<'ring, P1, P2>(&self, from: P1, to: P2, poly: &El<P1>) -> El<P2>
         where P1: RingStore,
             P1::Type: PolyRing,
@@ -1005,6 +1009,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         return ((log2_max_coeff as f64 + poly_deg as f64 + (self.rank() as f64).log2()) / log2_p * HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR).ceil() as usize + 1;
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn random_suitable_ideal<'ring, F>(&'ring self, mut rng: F, attempt: usize) -> Self::SuitableIdeal<'ring>
         where F: FnMut() -> u64
     {
@@ -1044,6 +1049,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         unreachable!()
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn quotient_field_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, idx: usize) -> Self::LocalField<'ring>
         where Self: 'ring
     {
@@ -1070,6 +1076,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         });
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn quotient_ring_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, e: usize, idx: usize) -> Self::LocalRing<'ring>
         where Self: 'ring
     {
@@ -1092,6 +1099,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         return FreeAlgebraImpl::new(Zpe, degree, x_pow_rank);
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn reduce_ring_el<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, to: (&Self::LocalRingBase<'ring>, usize), idx: usize, x: Self::Element) -> El<Self::LocalRing<'ring>>
         where Self: 'ring
     {
@@ -1147,6 +1155,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         to.0.from_canonical_basis(from.0.wrt_canonical_basis(&x).iter().map(|c| ZZ.get_ring().lift_partial(&ideal.prime, (from.0.base_ring().get_ring(), from.1), (to.0.base_ring().get_ring(), to.1), 0, c)))
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn reconstruct_ring_el<'local, 'element, 'ring, V1, V2>(&self, ideal: &Self::SuitableIdeal<'ring>, from: V1, e: usize, x: V2) -> Self::Element
         where Self: 'ring,
             V1: VectorFn<&'local Self::LocalRing<'ring>>,

@@ -11,7 +11,7 @@ use crate::homomorphism::Homomorphism;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 
-use tracing::{Level, span};
+use tracing::instrument;
 
 use std::alloc::Allocator;
 use std::cmp::min;
@@ -45,6 +45,7 @@ use std::ops::Range;
 /// ```
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn product_except_one<V, R>(ring: R, values: V, out: &mut [El<R>])
     where R: RingStore,
         V: VectorFn<El<R>>
@@ -130,6 +131,7 @@ pub enum InterpolationError {
 /// ```
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn interpolate<P, V1, V2, A: Allocator>(poly_ring: P, x: V1, y: V2, allocator: A) -> Result<El<P>, InterpolationError>
     where P: RingStore,
         P::Type: PolyRing,
@@ -137,48 +139,46 @@ pub fn interpolate<P, V1, V2, A: Allocator>(poly_ring: P, x: V1, y: V2, allocato
         V1: VectorFn<El<<P::Type as RingExtension>::BaseRing>>,
         V2: VectorFn<El<<P::Type as RingExtension>::BaseRing>>
 {
-    span!(Level::INFO, "interpolate", num_points = x.len()).in_scope(|| {
-        assert_eq!(x.len(), y.len());
-        let base_ring = poly_ring.base_ring();
-        let null_poly = poly_ring.prod(x.iter().map(|x| poly_ring.from_terms([(base_ring.one(), 1), (base_ring.negate(x), 0)])));
-        let mut nums = Vec::with_capacity_in(x.len(), &allocator);
-        let div_linear = |poly: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>| if let Some(d) = poly_ring.degree(poly) {
-            poly_ring.from_terms((0..d).rev().scan(base_ring.zero(), |current, i| {
-                base_ring.add_assign_ref(current, poly_ring.coefficient_at(poly, i + 1));
-                let result = base_ring.clone_el(current);
-                base_ring.mul_assign_ref(current, a);
-                return Some((result, i));
-            }))
-        } else { poly_ring.zero() };
-        nums.extend(x.iter().map(|x| div_linear(&null_poly, &x)));
-        let nums = nums;
+    assert_eq!(x.len(), y.len());
+    let base_ring = poly_ring.base_ring();
+    let null_poly = poly_ring.prod(x.iter().map(|x| poly_ring.from_terms([(base_ring.one(), 1), (base_ring.negate(x), 0)])));
+    let mut nums = Vec::with_capacity_in(x.len(), &allocator);
+    let div_linear = |poly: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>| if let Some(d) = poly_ring.degree(poly) {
+        poly_ring.from_terms((0..d).rev().scan(base_ring.zero(), |current, i| {
+            base_ring.add_assign_ref(current, poly_ring.coefficient_at(poly, i + 1));
+            let result = base_ring.clone_el(current);
+            base_ring.mul_assign_ref(current, a);
+            return Some((result, i));
+        }))
+    } else { poly_ring.zero() };
+    nums.extend(x.iter().map(|x| div_linear(&null_poly, &x)));
+    let nums = nums;
 
-        let mut denoms = Vec::with_capacity_in(x.len(), &allocator);
-        denoms.extend((0..x.len()).map(|i| poly_ring.evaluate(&nums[i], &x.at(i), &base_ring.identity())));
-        let denoms = denoms;
+    let mut denoms = Vec::with_capacity_in(x.len(), &allocator);
+    denoms.extend((0..x.len()).map(|i| poly_ring.evaluate(&nums[i], &x.at(i), &base_ring.identity())));
+    let denoms = denoms;
 
-        let denoms_inv = denoms.iter().map(|den| base_ring.invert(den).ok_or(())).collect::<Result<Vec<_>, _>>();
-        if let Ok(denoms_inv) = denoms_inv {
-            return Ok(poly_ring.from_terms((0..x.len()).map(|i| (
-                <_ as ComputeInnerProduct>::inner_product_ref_fst(base_ring.get_ring(), (0..x.len()).map(|j| (poly_ring.coefficient_at(&nums[j], i), base_ring.mul_ref_snd(y.at(j), &denoms_inv[j])))),
-                i
-            ))));
-        } else {
-            let mut factors = Vec::with_capacity_in(x.len(), &allocator);
-            factors.resize_with(x.len(), || base_ring.zero());
-            product_except_one(base_ring, (&denoms[..]).into_clone_ring_els(base_ring), &mut factors);
-            let denominator = base_ring.mul_ref(&factors[0], &denoms[0]);
-            for (factor, y) in factors.iter_mut().zip(y.iter()) {
-                base_ring.mul_assign(factor, y);
-            }
-
-            let mut scaled_result = poly_ring.zero();
-            for (num, c) in nums.into_iter().zip(factors.into_iter()) {
-                scaled_result = poly_ring.inclusion().fma_map(&num, &c, scaled_result);
-            }
-            return poly_ring.try_from_terms(poly_ring.terms(&scaled_result).map(|(c, i)| base_ring.checked_div(&c, &denominator).map(|c| (c, i)).ok_or(InterpolationError::NotInvertible)));
+    let denoms_inv = denoms.iter().map(|den| base_ring.invert(den).ok_or(())).collect::<Result<Vec<_>, _>>();
+    if let Ok(denoms_inv) = denoms_inv {
+        return Ok(poly_ring.from_terms((0..x.len()).map(|i| (
+            <_ as ComputeInnerProduct>::inner_product_ref_fst(base_ring.get_ring(), (0..x.len()).map(|j| (poly_ring.coefficient_at(&nums[j], i), base_ring.mul_ref_snd(y.at(j), &denoms_inv[j])))),
+            i
+        ))));
+    } else {
+        let mut factors = Vec::with_capacity_in(x.len(), &allocator);
+        factors.resize_with(x.len(), || base_ring.zero());
+        product_except_one(base_ring, (&denoms[..]).into_clone_ring_els(base_ring), &mut factors);
+        let denominator = base_ring.mul_ref(&factors[0], &denoms[0]);
+        for (factor, y) in factors.iter_mut().zip(y.iter()) {
+            base_ring.mul_assign(factor, y);
         }
-    })
+
+        let mut scaled_result = poly_ring.zero();
+        for (num, c) in nums.into_iter().zip(factors.into_iter()) {
+            scaled_result = poly_ring.inclusion().fma_map(&num, &c, scaled_result);
+        }
+        return poly_ring.try_from_terms(poly_ring.terms(&scaled_result).map(|(c, i)| base_ring.checked_div(&c, &denominator).map(|c| (c, i)).ok_or(InterpolationError::NotInvertible)));
+    }
 }
 
 #[stability::unstable(feature = "enable")]

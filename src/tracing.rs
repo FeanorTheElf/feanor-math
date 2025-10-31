@@ -102,8 +102,8 @@ impl LogAlgorithmSubscriber {
             span_map: RwLock::new(HashMap::new()), 
             current_span: ThreadLocal::new(),
             default_instant: Instant::now(),
-            interested_level: Level::INFO..=Level::INFO,
-            max_depth: 3
+            interested_level: Level::INFO..=Level::TRACE,
+            max_depth: 4
         })
     }
 

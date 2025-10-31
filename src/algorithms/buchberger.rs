@@ -1,5 +1,5 @@
 use append_only_vec::AppendOnlyVec;
-use tracing::{Level, Span, event, span};
+use tracing::{Level, event, instrument, span};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::delegate::{UnwrapHom, WrapHom};
@@ -83,6 +83,7 @@ impl SPoly {
 
     
     #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
     pub fn poly<P, O>(&self, ring: P, basis: &[El<P>], order: O) -> El<P>
         where P: RingStore + Copy,
             P::Type: MultivariatePolyRing,
@@ -110,6 +111,7 @@ impl SPoly {
 }
 
 #[inline(never)]
+#[instrument(skip_all, level = "trace")]
 fn find_reducer<'a, 'b, P, O, I>(ring: P, f: &El<P>, reducers: I, order: O) -> Option<(usize, &'a El<P>, PolyCoeff<P>, PolyMonomial<P>)>
     where P: RingStore + Copy,
         P::Type: MultivariatePolyRing,
@@ -254,6 +256,7 @@ fn augment_lm<P, O>(ring: P, f: El<P>, order: O) -> (El<P>, ExpandedMonomial)
 ///  - `!` means that the algorithm decided to discard all current S-polynomial, and restart the computation with the current basis
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn buchberger_with_strategy<P, O, SortFn, AbortFn>(ring: P, input_basis: Vec<El<P>>, order: O, mut sort_spolys: SortFn, mut abort_early_if: AbortFn) -> Vec<El<P>>
     where P: RingStore + Copy,
         P::Type: MultivariatePolyRing,
@@ -297,10 +300,9 @@ pub fn buchberger_with_strategy<P, O, SortFn, AbortFn>(ring: P, input_basis: Vec
             let considered_spolys = spolys_to_reduce.len();
 
             let new_polys = AppendOnlyVec::new();
-            let current_span = Span::current();
             let reduced_to_zero = AtomicUsize::new(0);
 
-            spolys_to_reduce.into_par_iter().for_each(|spoly| span!(parent: current_span.clone(), Level::INFO, "reduce_spoly").in_scope(|| {
+            spolys_to_reduce.into_par_iter().for_each(|spoly| {
                 let mut f = spoly.poly(ring, &basis, order);
                 
                 reduce_poly(ring, &mut f, || reducers.iter().chain(new_polys.iter()).map(|(f, lmf)| (f, lmf)), order);
@@ -310,7 +312,7 @@ pub fn buchberger_with_strategy<P, O, SortFn, AbortFn>(ring: P, input_basis: Vec
                 } else {
                     _ = reduced_to_zero.fetch_add(1, Ordering::Relaxed);
                 }
-            }));
+            });
 
             event!(Level::INFO, reduced_to_zero = reduced_to_zero.load(Ordering::Relaxed), new_basis_polys = considered_spolys - reduced_to_zero.load(Ordering::Relaxed));
 
@@ -355,6 +357,7 @@ pub fn buchberger_with_strategy<P, O, SortFn, AbortFn>(ring: P, input_basis: Vec
     })
 }
 
+#[instrument(skip_all, level = "trace")]
 fn update_basis<I, P, O, SortFn>(ring: P, new_polys: I, basis: &mut Vec<El<P>>, open: &mut Vec<SPoly>, order: O, nilpotent_power: Option<usize>, filtered_spolys: &mut usize, sort_spolys: &mut SortFn)
     where P: RingStore + Copy,
         P::Type: MultivariatePolyRing,
@@ -387,6 +390,7 @@ fn update_basis<I, P, O, SortFn>(ring: P, new_polys: I, basis: &mut Vec<El<P>>, 
     sort_spolys(&mut *open, &*basis);
 }
 
+#[instrument(skip_all, level = "trace")]
 fn reduce_poly<'a, 'b, F, I, P, O>(ring: P, to_reduce: &mut El<P>, mut reducers: F, order: O)
     where P: 'a + RingStore + Copy,
         P::Type: MultivariatePolyRing,
@@ -407,6 +411,7 @@ fn reduce_poly<'a, 'b, F, I, P, O>(ring: P, to_reduce: &mut El<P>, mut reducers:
 }
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn multivariate_division<'a, P, O, I>(ring: P, mut f: El<P>, reducers: I, order: O) -> El<P>
     where P: 'a + RingStore + Copy,
         P::Type: MultivariatePolyRing,
@@ -419,6 +424,7 @@ pub fn multivariate_division<'a, P, O, I>(ring: P, mut f: El<P>, reducers: I, or
     return f;
 }
 
+#[instrument(skip_all, level = "trace")]
 fn inter_reduce<P, O>(ring: P, mut polys: Vec<(El<P>, ExpandedMonomial)>, order: O) -> Vec<(El<P>, ExpandedMonomial)>
     where P: RingStore + Copy,
         P::Type: MultivariatePolyRing,

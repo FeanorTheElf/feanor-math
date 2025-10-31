@@ -4,6 +4,7 @@ use std::fmt::Debug;
 
 use atomicbox::AtomicOptionBox;
 use thread_local::ThreadLocal;
+use tracing::instrument;
 
 use crate::algorithms::int_bisect;
 use crate::iters::multiset_combinations;
@@ -204,6 +205,7 @@ impl<R, A> MultivariatePolyRingImpl<R, A>
     /// required.
     /// 
     #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
     pub fn new_with_mult_table(base_ring: R, variable_count: usize, max_supported_deg: Exponent, max_multiplication_table: (Exponent, Exponent), allocator: A) -> Self {
         assert!(variable_count >= 1);
         assert!(max_multiplication_table.0 <= max_multiplication_table.1);
@@ -295,6 +297,7 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
         }
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn create_multiplication_table(variable_count: usize, lhs_deg: Exponent, rhs_deg: Exponent, cum_binomial_lookup_table: &[Vec<u64>]) -> Vec<Vec<u64>> {
         debug_assert!(lhs_deg <= rhs_deg);
         let lhs_max_deg = (0..variable_count).map(|_| lhs_deg as usize).collect::<Vec<_>>();
@@ -355,6 +358,7 @@ impl<R, A> MultivariatePolyRingImplBase<R, A>
     ///
     /// Computes the sum of two elements; rhs may contain zero elements, but must be sorted and not contain equal monomials
     ///
+    #[instrument(skip_all, level = "trace")]
     fn add_terms<I>(&self, lhs: &<Self as RingBase>::Element, rhs_sorted: I, out: Vec<(El<R>, MonomialIdentifier), A>) -> <Self as RingBase>::Element
         where I: Iterator<Item = (El<R>, MonomialIdentifier)>
     {
@@ -466,6 +470,7 @@ impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
         *lhs = self.mul_ref(lhs, rhs);
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         let mut tmp = Vec::new_in(self.allocator.clone());
         if lhs.data.len() > rhs.data.len() {
@@ -637,6 +642,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
         mon.data.clone().wrap()
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, terms: I)
         where I: IntoIterator<Item = (El<Self::BaseRing>, Self::Monomial)>
     {
@@ -657,6 +663,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
         _ = self.tmp_poly.swap(Some(Box::new(rhs)), std::sync::atomic::Ordering::AcqRel);
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn mul_assign_monomial(&self, f: &mut Self::Element, rhs: Self::Monomial) {
         let rhs_deg = rhs.data.deg;
         let (mut lhs_mon, mut rhs_mon) = self.tmp_monomials();
@@ -804,6 +811,7 @@ impl<R, A> MultivariatePolyRing for MultivariatePolyRingImplBase<R, A>
         }
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn evaluate<S, V, H>(&self, f: &Self::Element, values: V, hom: H) -> S::Element
         where S: ?Sized + RingBase,
             H: Homomorphism<<Self::BaseRing as RingStore>::Type, S>,

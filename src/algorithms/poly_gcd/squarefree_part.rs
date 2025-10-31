@@ -1,8 +1,6 @@
 use std::fmt::Debug;
 
-use tracing::Level;
-use tracing::event;
-use tracing::span;
+use tracing::{Level, event, span};
 
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::algorithms::poly_gcd::*;
@@ -32,6 +30,7 @@ struct Signature {
 ///  - `F` is `R/m` where `m` is a maximal ideal containing the currently considered ideal `I`
 ///  - `S` is `R/m^e`
 /// 
+#[instrument(skip_all, level = "trace")]
 fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P>(
     reduction: &'local PolyLiftFactorsDomainReductionContext<'ring, 'data, R>, 
     RX: P, 
@@ -81,6 +80,7 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P
 ///  - `F` is `R/m` where `m` is a maximal ideal containing the currently considered ideal `I`
 ///  - `S` is `R/m^e`
 /// 
+#[instrument(skip_all, level = "trace")]
 fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2>(
     RX: P1, 
     f: &El<P1>, 
@@ -142,6 +142,7 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2>(
 /// of the underlying ring.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn poly_power_decomposition_monic_local<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
     where P: RingStore + Copy,
         P::Type: PolyRing,
@@ -205,6 +206,7 @@ pub fn poly_power_decomposition_monic_local<P>(poly_ring: P, poly: &El<P>) -> Ve
 /// of the underlying ring.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn poly_power_decomposition_local<P>(poly_ring: P, mut f: El<P>) -> Vec<(El<P>, usize)>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,

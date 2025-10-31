@@ -1,5 +1,6 @@
 use serde::de::{self, DeserializeSeed, Visitor};
 use serde::Deserializer;
+use tracing::instrument;
 
 use crate::seq::*;
 
@@ -23,12 +24,14 @@ fn truncate_zeros(mut x: Vec<BlockInt>) -> Vec<BlockInt> {
 	return x;
 }
 
+#[instrument(skip_all, level = "trace")]
 fn assign<A: Allocator>(x: &mut Vec<BlockInt, A>, rhs: &[BlockInt]) {
     x.clear();
     x.extend((0..rhs.len()).map(|i| rhs[i]))
 }
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn bigint_add<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], block_offset: usize) {
 	let prev_len = lhs.len();
 	let mut buffer: bool = false;
@@ -55,6 +58,7 @@ pub fn bigint_add<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], bl
 }
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn highest_set_block(x: &[BlockInt]) -> Option<usize> {
 	for i in (0..x.len()).rev() {
 		if x[i] != 0 {
@@ -65,6 +69,7 @@ pub fn highest_set_block(x: &[BlockInt]) -> Option<usize> {
 }
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn bigint_cmp(lhs: &[BlockInt], rhs: &[BlockInt]) -> Ordering {
 	match (highest_set_block(lhs.as_ref()), highest_set_block(rhs.as_ref())) {
 		(None, None) => return Ordering::Equal,
@@ -88,6 +93,7 @@ pub fn bigint_cmp(lhs: &[BlockInt], rhs: &[BlockInt]) -> Ordering {
 }
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn bigint_cmp_small(lhs: &[BlockInt], rhs: DoubleBlockInt) -> Ordering {
 	match highest_set_block(lhs.as_ref()) {
 	   None => 0.cmp(&rhs),
@@ -103,6 +109,7 @@ pub fn bigint_cmp_small(lhs: &[BlockInt], rhs: DoubleBlockInt) -> Ordering {
 /// This will panic if the subtraction would result in a negative number
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn bigint_sub(lhs: &mut [BlockInt], rhs: &[BlockInt], block_offset: usize) {
 	assert!(bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Less);
 
@@ -133,6 +140,7 @@ pub fn bigint_sub(lhs: &mut [BlockInt], rhs: &[BlockInt], block_offset: usize) {
 /// This will panic or give a wrong result if the subtraction would result in a negative number
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn bigint_sub_self<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt]) {
 	debug_assert!(bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Greater);
 
@@ -156,6 +164,7 @@ pub fn bigint_sub_self<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt
 }
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn bigint_lshift<A: Allocator>(lhs: &mut Vec<BlockInt, A>, power: usize) {
 	if let Some(high) = highest_set_block(&lhs) {
 		let mut buffer: BlockInt = 0;
@@ -177,6 +186,7 @@ pub fn bigint_lshift<A: Allocator>(lhs: &mut Vec<BlockInt, A>, power: usize) {
 }
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn bigint_rshift(lhs: &mut [BlockInt], power: usize) {
 	if let Some(high) = highest_set_block(lhs) {
 		let mut buffer: BlockInt = 0;
@@ -204,6 +214,7 @@ pub fn bigint_rshift(lhs: &mut [BlockInt], power: usize) {
 }
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn bigint_fma<A: Allocator, A2: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt], mut out: Vec<BlockInt, A>, scratch_alloc: A2) -> Vec<BlockInt, A> {
 	let prev_len = highest_set_block(&out).map(|x| x + 1).unwrap_or(0);
 	let new_len = max(prev_len + 1, highest_set_block(lhs.as_ref()).and_then(|lb| highest_set_block(rhs.as_ref()).map(|rb| lb + rb + 2)).unwrap_or(0));
@@ -224,6 +235,7 @@ pub fn bigint_fma<A: Allocator, A2: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt
 /// Complexity O(log(n))
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn bigint_mul_small<A: Allocator>(lhs: &mut Vec<BlockInt, A>, factor: BlockInt) {
 	if let Some(d) = highest_set_block(lhs.as_ref()) {
 		let mut buffer: u64 = 0;
@@ -238,6 +250,7 @@ pub fn bigint_mul_small<A: Allocator>(lhs: &mut Vec<BlockInt, A>, factor: BlockI
 }
 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn bigint_add_small<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: BlockInt) {
 	if lhs.len() > 0 {
 		let (sum, mut buffer) = lhs[0].overflowing_add(rhs);
@@ -259,6 +272,7 @@ pub fn bigint_add_small<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: BlockInt)
 ///
 /// Same as division_step, but for self_high == rhs_high == d
 /// 
+#[instrument(skip_all, level = "trace")]
 fn division_step_last<A: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], d: usize, tmp: &mut Vec<BlockInt, A>) -> u64 {
 	assert!(lhs[d] != 0);
 	assert!(rhs[d] != 0);
@@ -301,6 +315,7 @@ fn division_step_last<A: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], d: u
 /// 
 /// Complexity O(log(n))
 /// 
+#[instrument(skip_all, level = "trace")]
 fn division_step<A: Allocator>(
 	lhs: &mut [BlockInt], 
 	rhs: &[BlockInt], 
@@ -382,6 +397,7 @@ fn division_step<A: Allocator>(
 /// Complexity O(log(n)^2)
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn bigint_div<A: Allocator, A2: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], mut out: Vec<BlockInt, A>, scratch_alloc: A2) -> Vec<BlockInt, A> {
 	assert!(highest_set_block(rhs.as_ref()).is_some());
 	
@@ -426,6 +442,7 @@ pub fn bigint_div<A: Allocator, A2: Allocator>(lhs: &mut [BlockInt], rhs: &[Bloc
 /// Calculates self /= divisor and returns the remainder of the division.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn bigint_div_small(lhs: &mut [BlockInt], rhs: BlockInt) -> BlockInt {
 	assert!(rhs != 0);
 	let highest_block_opt = highest_set_block(lhs.as_ref());
@@ -460,6 +477,7 @@ pub fn bigint_div_small(lhs: &mut [BlockInt], rhs: BlockInt) -> BlockInt {
 /// is that this function can accept a byte array with a shorter lifetime.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn deserialize_bigint_from_bytes<'de, D, F, T>(deserializer: D, from_bytes: F) -> Result<(bool, T), D::Error>
 	where D: Deserializer<'de>,
 		F: FnOnce(&[u8]) -> T

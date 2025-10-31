@@ -47,6 +47,7 @@ pub fn generic_abs_square_and_multiply<T, U, F, H, I>(base: U, power: &El<I>, in
 /// This function aborts as soon as any operation returns `Err(_)`.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn try_generic_abs_square_and_multiply<T, U, F, H, I, E>(base: U, power: &El<I>, int_ring: I, mut square: F, mut multiply_base: H, identity: T) -> Result<T, E>
     where I: RingStore,
         I::Type: IntegerRing,
@@ -80,6 +81,7 @@ pub fn try_generic_abs_square_and_multiply<T, U, F, H, I, E>(base: U, power: &El
 /// [`generic_abs_square_and_multiply()`].
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn generic_pow_shortest_chain_table<T, F, G, H, I, E>(base: T, power: &El<I>, int_ring: I, mut double: G, mut mul: F, mut clone: H, identity: T) -> Result<T, E>
     where I: RingStore,
         I::Type: IntegerRing,
@@ -241,6 +243,7 @@ const SHORTEST_ADDITION_CHAINS: [(usize, usize); 65] = [
 
 #[cfg(test)]
 use test::Bencher;
+use tracing::instrument;
 #[cfg(test)]
 use crate::rings::zn::zn_64;
 #[cfg(test)]

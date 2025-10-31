@@ -1,5 +1,8 @@
+use tracing::instrument;
+
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::field::{Field, FieldStore};
+use crate::ordered::OrderedRingStore;
 use crate::integer::*;
 use crate::matrix::*;
 use crate::ring::*;
@@ -83,51 +86,125 @@ pub trait QRDecompositionField: Field {
     }
 }
 
+#[instrument(skip_all, level = "trace")]
+fn gram_schmidt<R, V1, V2>(ring: R, mut matrix: SubmatrixMut<V1, El<R>>, mut q: SubmatrixMut<V2, El<R>>) -> Vec<El<R>>
+    where R: RingStore,
+        R::Type: Field,
+        V1: AsPointerToSlice<El<R>>,
+        V2: AsPointerToSlice<El<R>>
+{
+    assert!(!ring.get_ring().is_approximate());
+        
+    // since there is no issue with numerical stability, we can do Gram-Schmidt
+    let m = matrix.row_count();
+    let n = matrix.col_count();
+    assert_eq!(m, q.row_count());
+    assert_eq!(m, q.col_count());
+
+    let mut result = Vec::with_capacity(n);
+    let mut mus = Vec::with_capacity(n);
+    for i in 0..n {
+        mus.clear();
+        for j in 0..i {
+            mus.push(ring.div(
+                &<_ as ComputeInnerProduct>::inner_product_ref(ring.get_ring(), (0..m).map(|k| (matrix.at(k, i), q.at(k, j)))),
+                &result[j]
+            ));
+        }
+        let (mut target, orthogonalized) = q.reborrow().split_cols(i..(i + 1), 0..i);
+        for k in 0..m {
+            *target.at_mut(k, 0) = ring.sub_ref_fst(
+                matrix.at(k, i),
+                <_ as ComputeInnerProduct>::inner_product_ref(ring.get_ring(), (0..i).map(|j| (&mus[j], orthogonalized.at(k, j))))
+            );
+        }
+        result.push(<_ as RingStore>::sum(&ring, (0..m).map(|k| ring.pow(ring.clone_el(target.at(k, 0)), 2))));
+        for (k, c) in mus.drain(..).enumerate() {
+            *matrix.at_mut(k, i) = c;
+        }
+        *matrix.at_mut(i, i) = ring.one();
+        for k in (i + 1)..m {
+            *matrix.at_mut(k, i) = ring.zero();
+        }
+    }
+
+    return result;
+}
+
+#[instrument(skip_all, level = "trace")]
+fn householder_qr<R, V1, V2>(ring: R, mut matrix: SubmatrixMut<V1, El<R>>, mut q: SubmatrixMut<V2, El<R>>)
+    where R: RingStore,
+        R::Type: ApproxRealField + SqrtRing,
+        V1: AsPointerToSlice<El<R>>,
+        V2: AsPointerToSlice<El<R>>
+{
+    let m = matrix.row_count();
+    let n = matrix.col_count();
+    assert_eq!(m, q.row_count());
+    assert_eq!(m, q.col_count());
+    for i in 0..m {
+        for j in 0..m {
+            *q.at_mut(i, j) = if i == j { ring.one() } else { ring.zero() };
+        }
+    }
+
+    let mut householder_vector = Vec::with_capacity(m);
+    for i in 0..min(n, m) {
+        let norm_sqr = <_ as RingStore>::sum(&ring, (i..m).map(|k| ring.pow(ring.clone_el(matrix.at(k, i)), 2)));
+        let norm = ring.get_ring().sqrt(ring.clone_el(&norm_sqr));
+        let alpha = if ring.is_neg(matrix.at(i, i)) {
+            ring.clone_el(&norm)
+        } else {
+            ring.negate(ring.clone_el(&norm))
+        };
+        // | x - alpha * e1 | / sqrt(2)
+        let scale = ring.get_ring().sqrt(ring.sub(norm_sqr, ring.mul_ref(&alpha, matrix.at(i, i))));
+        householder_vector.clear();
+        householder_vector.extend((i..m).map(|k| ring.clone_el(matrix.at(k, i))));
+        ring.sub_assign_ref(&mut householder_vector[0], &alpha);
+        for x in &mut householder_vector {
+            *x = ring.div(x, &scale);
+        }
+
+        // update matrix
+        let mut rest = matrix.reborrow().submatrix(i..m, (i + 1)..n);
+        for j in 0..(n - i - 1) {
+            let inner_product = <_ as ComputeInnerProduct>::inner_product_ref(ring.get_ring(), (0..(m - i)).map(|k| (&householder_vector[k], rest.at(k, j))));
+            for k in 0..(m - i) {
+                ring.sub_assign(rest.at_mut(k, j), ring.mul_ref(&inner_product, &householder_vector[k]));
+            }
+        }
+
+        // update q
+        let mut rest = q.reborrow().restrict_cols(i..m);
+        for j in 0..m {
+            let inner_product = <_ as ComputeInnerProduct>::inner_product_ref(ring.get_ring(), (0..(m - i)).map(|k| (&householder_vector[k], rest.at(j, k))));
+            for k in 0..(m - i) {
+                ring.sub_assign(rest.at_mut(j, k), ring.mul_ref(&inner_product, &householder_vector[k]));
+            }
+        }
+
+        // update pivot
+        let mut pivot_col = matrix.reborrow().submatrix(i..m, i..(i + 1));
+        for k in 1..(m - i) {
+            *pivot_col.at_mut(k, 0) = ring.zero();
+        }
+        *pivot_col.at_mut(0, 0) = alpha;
+    }
+}
+
 impl<I> QRDecompositionField for RationalFieldBase<I>
     where I: RingStore,
         I::Type: IntegerRing
 {
-    fn scaled_qr_decomposition<V1, V2>(&self, mut matrix: SubmatrixMut<V1, Self::Element>, mut q: SubmatrixMut<V2, Self::Element>) -> Vec<Self::Element>
+    fn scaled_qr_decomposition<V1, V2>(&self, matrix: SubmatrixMut<V1, Self::Element>, q: SubmatrixMut<V2, Self::Element>) -> Vec<Self::Element>
         where V1: AsPointerToSlice<Self::Element>, V2: AsPointerToSlice<Self::Element>
     {
-        // since there is no issue with numerical stability, we can do Gram-Schmidt
-        let ring = RingValue::from_ref(self);
-        let m = matrix.row_count();
-        let n = matrix.col_count();
-        assert_eq!(m, q.row_count());
-        assert_eq!(m, q.col_count());
-
-        let mut result = Vec::with_capacity(n);
-        let mut mus = Vec::with_capacity(n);
-        for i in 0..n {
-            mus.clear();
-            for j in 0..i {
-                mus.push(self.div(
-                    &<_ as ComputeInnerProduct>::inner_product_ref(self, (0..m).map(|k| (matrix.at(k, i), q.at(k, j)))),
-                    &result[j]
-                ));
-            }
-            let (mut target, orthogonalized) = q.reborrow().split_cols(i..(i + 1), 0..i);
-            for k in 0..m {
-                *target.at_mut(k, 0) = self.sub_ref_fst(
-                    matrix.at(k, i),
-                    <_ as ComputeInnerProduct>::inner_product_ref(self, (0..i).map(|j| (&mus[j], orthogonalized.at(k, j))))
-                );
-            }
-            result.push(<_ as RingStore>::sum(ring, (0..m).map(|k| ring.pow(ring.clone_el(target.at(k, 0)), 2))));
-            for (k, c) in mus.drain(..).enumerate() {
-                *matrix.at_mut(k, i) = c;
-            }
-            *matrix.at_mut(i, i) = self.one();
-            for k in (i + 1)..m {
-                *matrix.at_mut(k, i) = self.zero();
-            }
-        }
-
-        return result;
+        gram_schmidt(RingValue::from_ref(self), matrix, q)
     }
 }
 
+#[instrument(skip_all, level = "trace")]
 fn ldl_decomposition_impl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>) -> Vec<El<R>>
     where R: RingStore, 
         R::Type: Field,
@@ -189,63 +266,10 @@ impl<R: ApproxRealField + SqrtRing> QRDecompositionField for R {
         ldl_decomposition_impl(RingRef::new(self), matrix)
     }
 
-    default fn qr_decomposition<V1, V2>(&self, mut matrix: SubmatrixMut<V1, Self::Element>, mut q: SubmatrixMut<V2, Self::Element>)
+    default fn qr_decomposition<V1, V2>(&self, matrix: SubmatrixMut<V1, Self::Element>, q: SubmatrixMut<V2, Self::Element>)
         where V1: AsPointerToSlice<Self::Element>, V2: AsPointerToSlice<Self::Element>
     {
-        let ring = RingRef::new(self);
-        let m = matrix.row_count();
-        let n = matrix.col_count();
-        assert_eq!(m, q.row_count());
-        assert_eq!(m, q.col_count());
-        for i in 0..m {
-            for j in 0..m {
-                *q.at_mut(i, j) = if i == j { self.one() } else { self.zero() };
-            }
-        }
-
-        let mut householder_vector = Vec::with_capacity(m);
-        for i in 0..min(n, m) {
-            let norm_sqr = <_ as RingStore>::sum(&ring, (i..m).map(|k| ring.pow(ring.clone_el(matrix.at(k, i)), 2)));
-            let norm = self.sqrt(self.clone_el(&norm_sqr));
-            let alpha = if self.is_neg(matrix.at(i, i)) {
-                self.clone_el(&norm)
-            } else {
-                self.negate(self.clone_el(&norm))
-            };
-            // | x - alpha * e1 | / sqrt(2)
-            let scale = self.sqrt(self.sub(norm_sqr, self.mul_ref(&alpha, matrix.at(i, i))));
-            householder_vector.clear();
-            householder_vector.extend((i..m).map(|k| ring.clone_el(matrix.at(k, i))));
-            ring.sub_assign_ref(&mut householder_vector[0], &alpha);
-            for x in &mut householder_vector {
-                *x = self.div(x, &scale);
-            }
-
-            // update matrix
-            let mut rest = matrix.reborrow().submatrix(i..m, (i + 1)..n);
-            for j in 0..(n - i - 1) {
-                let inner_product = <_ as ComputeInnerProduct>::inner_product_ref(self, (0..(m - i)).map(|k| (&householder_vector[k], rest.at(k, j))));
-                for k in 0..(m - i) {
-                    ring.sub_assign(rest.at_mut(k, j), ring.mul_ref(&inner_product, &householder_vector[k]));
-                }
-            }
-
-            // update q
-            let mut rest = q.reborrow().restrict_cols(i..m);
-            for j in 0..m {
-                let inner_product = <_ as ComputeInnerProduct>::inner_product_ref(self, (0..(m - i)).map(|k| (&householder_vector[k], rest.at(j, k))));
-                for k in 0..(m - i) {
-                    ring.sub_assign(rest.at_mut(j, k), ring.mul_ref(&inner_product, &householder_vector[k]));
-                }
-            }
-
-            // update pivot
-            let mut pivot_col = matrix.reborrow().submatrix(i..m, i..(i + 1));
-            for k in 1..(m - i) {
-                *pivot_col.at_mut(k, 0) = self.zero();
-            }
-            *pivot_col.at_mut(0, 0) = alpha;
-        }
+        householder_qr(RingRef::new(self), matrix, q);
     }
 }
 

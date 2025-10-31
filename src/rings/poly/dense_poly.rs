@@ -2,6 +2,7 @@ use feanor_serde::newtype_struct::*;
 use serde::de::DeserializeSeed;
 use serde::{Deserializer, Serialize, Serializer};
 use feanor_serde::seq::*;
+use tracing::instrument;
 
 use crate::algorithms::convolution::*;
 use crate::algorithms::interpolate::interpolate;
@@ -154,6 +155,7 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
         DensePolyRingEl { data }
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         for i in 0..min(lhs.data.len(), rhs.data.len()) {
             self.base_ring.add_assign_ref(&mut lhs.data[i], &rhs.data[i]);
@@ -167,6 +169,7 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
         self.add_assign_ref(lhs, &rhs);
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         for i in 0..min(lhs.data.len(), rhs.data.len()) {
             self.base_ring.sub_assign_ref(&mut lhs.data[i], &rhs.data[i]);
@@ -238,6 +241,7 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
         *value = self.mul_ref(&value, &value);
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         let lhs_len = if self.base_ring().get_ring().is_approximate() { lhs.data.len() } else { self.degree(lhs).map(|i| i + 1).unwrap_or(0) };
         let rhs_len = if self.base_ring().get_ring().is_approximate() { rhs.data.len() } else { self.degree(rhs).map(|i| i + 1).unwrap_or(0) };
@@ -268,6 +272,7 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
         self.base_ring().characteristic(ZZ)
     }
     
+    #[instrument(skip_all, level = "trace")]
     fn prod<I>(&self, els: I) -> Self::Element 
         where I: IntoIterator<Item = Self::Element>
     {
@@ -471,6 +476,7 @@ impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> Se
     where R: RingStore,
         R::Type: SerializableElementRing
 {
+    #[instrument(skip_all, level = "trace")]
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
         where D: Deserializer<'de>
     {
@@ -481,6 +487,7 @@ impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> Se
         )).deserialize(deserializer).map(|data| DensePolyRingEl { data })
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
@@ -511,6 +518,7 @@ impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> Po
         }
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
         where I: IntoIterator<Item = (El<Self::BaseRing>, usize)>
     {
@@ -534,6 +542,7 @@ impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> Po
         }
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn mul_assign_monomial(&self, lhs: &mut Self::Element, rhs_power: usize) {
         _ = lhs.data.splice(0..0, (0..rhs_power).map(|_| self.base_ring().zero()));
     }
@@ -553,6 +562,7 @@ impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> Po
         return (quo, rem);
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn evaluate<S, H>(&self, f: &Self::Element, value: &S::Element, hom: H) -> S::Element
         where S: ?Sized + RingBase,
             H: Homomorphism<R::Type, S>

@@ -2,7 +2,7 @@
 use std::mem::swap;
 
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use tracing::{Level, Span, event, span};
+use tracing::instrument;
 
 use crate::delegate::{UnwrapHom, WrapHom};
 use crate::reduce_lift::lift_poly_eval::{LiftPolyEvalRing, LiftPolyEvalRingReductionMap};
@@ -27,6 +27,7 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 /// are implementing said method for a custom ring.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn resultant_finite_field<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
     where P: RingStore + Copy,
         P::Type: PolyRing + EuclideanRing,
@@ -66,6 +67,45 @@ pub fn resultant_finite_field<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::
         return result;
     }
 }
+
+#[instrument(skip_all, level = "trace")]
+fn  resultant_locally<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> El<<P::Type as RingExtension>::BaseRing>
+    where P: RingStore + Copy,
+        P::Type: PolyRing,
+        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LiftPolyEvalRing + Domain + SelfIso
+{
+    let base_ring = poly_ring.base_ring();
+    if poly_ring.is_zero(f) || poly_ring.is_zero(g) {
+        return base_ring.zero();
+    }
+    let coeff_bound_f_ln = poly_ring.terms(f).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap();
+    let coeff_bound_g_ln = poly_ring.terms(g).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap();
+    let ln_max_norm = coeff_bound_f_ln * poly_ring.degree(g).unwrap() as f64 + 
+        coeff_bound_g_ln * poly_ring.degree(f).unwrap() as f64 + 
+        // this is just an estimate on the number of terms we sum up: for each column belonging to `f`, there are `deg(f)` nonzero entries, and
+        // we have `deg(g)` such columns, thus the number of terms is bounded by `deg(f)^deg(g)`; similarly for `g` 
+        base_ring.get_ring().ln_pseudo_norm(&base_ring.int_hom().map(poly_ring.degree(f).unwrap() as i32)) * poly_ring.degree(g).unwrap() as f64 +
+        base_ring.get_ring().ln_pseudo_norm(&base_ring.int_hom().map(poly_ring.degree(g).unwrap() as i32)) * poly_ring.degree(f).unwrap() as f64;
+
+    let work_locally = base_ring.get_ring().init_reduce_lift(ln_max_norm);
+    let work_locally_ref = &work_locally;
+    let count = base_ring.get_ring().prime_ideal_count(&work_locally);
+    event!(Level::INFO, prime_ideal_count = count);
+
+    let current_span = Span::current();
+    let resultants = (0..count).into_par_iter().map(|i| span!(parent: current_span.clone(), Level::INFO, "resultant_mod_ideal").in_scope(|| {
+        let embedding = LiftPolyEvalRingReductionMap::new(base_ring.get_ring(), work_locally_ref, i);
+        let new_poly_ring = DensePolyRing::new(embedding.codomain(), "X");
+        let poly_ring_embedding = new_poly_ring.lifted_hom(poly_ring, &embedding);
+        let local_f = poly_ring_embedding.map_ref(f);
+        let local_g = poly_ring_embedding.map_ref(g);
+        let local_resultant = <_ as ComputeResultantRing>::resultant(&new_poly_ring, local_f, local_g);
+        return local_resultant;
+    })).collect::<Vec<_>>();
+
+    return base_ring.get_ring().lift_combine(&work_locally, &resultants);
+}
+
 
 ///
 /// Trait for rings that support computing resultants of polynomials
@@ -139,41 +179,7 @@ impl<R: ?Sized + LiftPolyEvalRing + Domain + SelfIso> ComputeResultantRing for R
             }
 
             fn fallback(self) -> Self::Output {
-                let ring_ref = &self.ring;
-                let f_ref = &self.f;
-                let g_ref = &self.g;
-                let base_ring = ring_ref.base_ring();
-                if ring_ref.is_zero(f_ref) || ring_ref.is_zero(g_ref) {
-                    return base_ring.zero();
-                }
-                span!(Level::INFO, "resultant", lhs_deg = ring_ref.degree(f_ref).unwrap(), rhs_deg = ring_ref.degree(g_ref).unwrap()).in_scope(|| {
-                    let coeff_bound_f_ln = ring_ref.terms(f_ref).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap();
-                    let coeff_bound_g_ln = ring_ref.terms(g_ref).map(|(c, _)| base_ring.get_ring().ln_pseudo_norm(c)).max_by(f64::total_cmp).unwrap();
-                    let ln_max_norm = coeff_bound_f_ln * ring_ref.degree(g_ref).unwrap() as f64 + 
-                        coeff_bound_g_ln * ring_ref.degree(f_ref).unwrap() as f64 + 
-                        // this is just an estimate on the number of terms we sum up: for each column belonging to `f`, there are `deg(f)` nonzero entries, and
-                        // we have `deg(g)` such columns, thus the number of terms is bounded by `deg(f)^deg(g)`; similarly for `g` 
-                        base_ring.get_ring().ln_pseudo_norm(&base_ring.int_hom().map(ring_ref.degree(f_ref).unwrap() as i32)) * ring_ref.degree(g_ref).unwrap() as f64 +
-                        base_ring.get_ring().ln_pseudo_norm(&base_ring.int_hom().map(ring_ref.degree(g_ref).unwrap() as i32)) * ring_ref.degree(f_ref).unwrap() as f64;
-
-                    let work_locally = base_ring.get_ring().init_reduce_lift(ln_max_norm);
-                    let work_locally_ref = &work_locally;
-                    let count = base_ring.get_ring().prime_ideal_count(&work_locally);
-                    event!(Level::INFO, prime_ideal_count = count);
-
-                    let current_span = Span::current();
-                    let resultants = (0..count).into_par_iter().map(|i| span!(parent: current_span.clone(), Level::INFO, "resultant_mod_ideal").in_scope(|| {
-                        let embedding = LiftPolyEvalRingReductionMap::new(base_ring.get_ring(), work_locally_ref, i);
-                        let new_poly_ring = DensePolyRing::new(embedding.codomain(), "X");
-                        let poly_ring_embedding = new_poly_ring.lifted_hom(ring_ref, &embedding);
-                        let local_f = poly_ring_embedding.map_ref(f_ref);
-                        let local_g = poly_ring_embedding.map_ref(g_ref);
-                        let local_resultant = <_ as ComputeResultantRing>::resultant(&new_poly_ring, local_f, local_g);
-                        return local_resultant;
-                    })).collect::<Vec<_>>();
-
-                    return base_ring.get_ring().lift_combine(&work_locally, &resultants);
-                })
+                resultant_locally(self.ring, &self.f, &self.g)
             }
         }
         R::specialize(ComputeResultant { ring, f, g })

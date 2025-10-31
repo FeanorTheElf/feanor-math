@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
 use std::mem::swap;
 
+use tracing::instrument;
+
 use crate::ring::*;
 use crate::rings::zn::*;
 use crate::integer::*;
@@ -18,6 +20,7 @@ use crate::ordered::OrderedRingStore;
 /// dependent with `u`.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn reduce_2d_modular_relation_basis<R>(Zn: R, x: El<R>) -> (
     [El<<R::Type as ZnRing>::IntegerRing>; 2], 
     [El<<R::Type as ZnRing>::IntegerRing>; 2]
@@ -91,6 +94,7 @@ pub fn reduce_2d_modular_relation_basis<R>(Zn: R, x: El<R>) -> (
 /// the determinant of the basis is `< sqrt(n) * sqrt(n) = n = det(L)`, a contradiction.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn balanced_rational_reconstruction<R>(Zn: R, x: El<R>) -> (El<<R::Type as ZnRing>::IntegerRing>, El<<R::Type as ZnRing>::IntegerRing>)
     where R: RingStore,
         R::Type: ZnRing

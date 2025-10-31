@@ -1,6 +1,7 @@
-use gcd::poly_gcd_local;
+use gcd_locally::poly_gcd_local;
 use finite::{poly_power_decomposition_finite_field, fast_poly_eea};
 use squarefree_part::poly_power_decomposition_local;
+use tracing::instrument;
 
 use crate::divisibility::*;
 use crate::reduce_lift::lift_poly_factors::*;
@@ -31,7 +32,7 @@ pub mod squarefree_part;
 ///
 /// Contains algorithms for computing the gcd of polynomials.
 /// 
-pub mod gcd;
+pub mod gcd_locally;
 
 const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
 
@@ -154,6 +155,7 @@ pub trait PolyTFracGCDRing {
 /// that can be used to make polynomials over a domain monic (when setting `a = lc(f)`).
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn evaluate_aX<P>(poly_ring: P, f: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>) -> El<P>
     where P: RingStore,
         P::Type: PolyRing,
@@ -172,6 +174,7 @@ pub fn evaluate_aX<P>(poly_ring: P, f: &El<P>, a: &El<<P::Type as RingExtension>
 /// Computes the inverse to [`evaluate_aX()`].
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn unevaluate_aX<P>(poly_ring: P, g: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>) -> El<P>
     where P: RingStore,
         P::Type: PolyRing,
@@ -191,6 +194,7 @@ pub fn unevaluate_aX<P>(poly_ring: P, g: &El<P>, a: &El<<P::Type as RingExtensio
 /// is the content of `f`, i.e. the gcd of all coefficients of `f`.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn make_primitive<P>(poly_ring: P, f: &El<P>) -> (El<P>, El<<P::Type as RingExtension>::BaseRing>)
     where P: RingStore,
         P::Type: PolyRing,
@@ -223,6 +227,7 @@ pub fn make_primitive<P>(poly_ring: P, f: &El<P>) -> (El<P>, El<<P::Type as Ring
 /// ```
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
     where P: RingStore,
         P::Type: PolyRing,

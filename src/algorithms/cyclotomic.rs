@@ -1,3 +1,5 @@
+use tracing::instrument;
+
 use crate::divisibility::*;
 use crate::primitive_int::StaticRing;
 use crate::rings::poly::*;
@@ -35,6 +37,7 @@ use crate::algorithms;
 /// assert_el_eq!(poly_ring, poly_ring.from_terms([(1, 0), (1, 1), (1, 2)].into_iter()), &cyclo_poly);
 /// ```
 /// 
+#[instrument(skip_all, level = "trace")]
 pub fn cyclotomic_polynomial<P>(P: P, n: usize) -> El<P>
     where P: RingStore, 
         P::Type: PolyRing + DivisibilityRing

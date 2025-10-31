@@ -1,6 +1,4 @@
-use tracing::Level;
-use tracing::event;
-use tracing::span;
+use tracing::instrument;
 
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
@@ -31,83 +29,80 @@ pub struct ProbablyNotSquarefree;
 /// `2^-attempts`. If it is not square-free, this will always fail (i.e. return `Err`). 
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn poly_factor_squarefree_extension<P>(LX: P, f: &El<P>, attempts: usize) -> Result<Vec<El<P>>, ProbablyNotSquarefree>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra + PolyTFracGCDRing,
         <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + SelfIso
 {
-    span!(Level::INFO, "factor_poly_extension", poly_deg = LX.degree(f).unwrap(), extension_deg = LX.base_ring().rank()).in_scope(|| {
-        let L = LX.base_ring();
-        let K = L.base_ring();
+    let L = LX.base_ring();
+    let K = L.base_ring();
 
-        assert!(LX.base_ring().is_one(LX.lc(f).unwrap()));
+    assert!(LX.base_ring().is_one(LX.lc(f).unwrap()));
 
-        let KX = DensePolyRing::new(K, "X");
-        // Y will take the role of the ring generator `theta`, and `X` remains the indeterminate
-        let KXY = DensePolyRing::new(KX.clone(), "Y");
+    let KX = DensePolyRing::new(K, "X");
+    // Y will take the role of the ring generator `theta`, and `X` remains the indeterminate
+    let KXY = DensePolyRing::new(KX.clone(), "Y");
 
-        let Norm = |f: El<P>| {
-            let f_over_KY = <_ as RingStore>::sum(&KXY,
-                LX.terms(&f).map(|(c, i)| {
-                    let mut result = L.poly_repr(&KXY, c, KX.inclusion());
-                    KXY.inclusion().mul_assign_map(&mut result, KX.pow(KX.indeterminate(), i));
-                    result
-                })
-            );
-            let gen_poly = L.generating_poly(&KXY, KX.inclusion());
-        
-            return <_ as ComputeResultantRing>::resultant(&KXY, f_over_KY, gen_poly);
-        };
+    let Norm = |f: El<P>| {
+        let f_over_KY = <_ as RingStore>::sum(&KXY,
+            LX.terms(&f).map(|(c, i)| {
+                let mut result = L.poly_repr(&KXY, c, KX.inclusion());
+                KXY.inclusion().mul_assign_map(&mut result, KX.pow(KX.indeterminate(), i));
+                result
+            })
+        );
+        let gen_poly = L.generating_poly(&KXY, KX.inclusion());
+    
+        return <_ as ComputeResultantRing>::resultant(&KXY, f_over_KY, gen_poly);
+    };
 
-        // we want to find `k` such that `N(f(X + k theta))` remains square-free, where `theta` generates `L`;
-        // there are only finitely many `k` that don't work, by the following idea:
-        // Write `f = f1 ... fr` for the factorization of `f`, where `r <= d`. Then `N(f(X + k theta))` is not
-        // square-free, iff there exist `i != j` and `sigma` such that `fi(X + k theta) = sigma(fj(X + k theta)) = sigma(fj)(X + k sigma(theta))`.
-        // Now note that for given `i, j, sigma`, `fi(X + k theta) = sigma(fj)(X + k sigma(theta))` for at most one `k`, as otherwise
-        // `fi(a (k1 - k2) theta) sigma(theta)) = sigma(fj)(a (k1 - k2) sigma(theta))` for all `a in Z` (evaluation is ring hom).
-        //
-        // Now note that `fi(X) - sigma(fj(X))` is a linear combination of `X^m` and `sigma(X^m)`, i.e. of `deg(fi) + deg(fj) <= d`
-        // basic functions. The vectors `(a1 theta)^m, ..., (al theta)^m` for `m <= deg(fi)` and `sigma(a1 theta)^m, ..., sigma(al theta)^m`
-        // for `m <= deg(fj)` are all linearly independent (assuming `a1, ..., al` distinct and `l >= deg(fi) + deg(fj) + 2`), 
-        // thus `char(K) >= d + 2` (or `char(K) = 0`) implies that `fi = fj = 0`, a contradiction.
-        //
-        // Thus we find that there are at most `d(d + 1)/2 * [L : K]` many `k` such that `N(f(X + k theta))` is not squarefree.
-        // This would even work if `k` is not an integer, but any element of `K`. Note that we still require `char(K) >= d + 2` for
-        // the previous paragraph to work.
+    // we want to find `k` such that `N(f(X + k theta))` remains square-free, where `theta` generates `L`;
+    // there are only finitely many `k` that don't work, by the following idea:
+    // Write `f = f1 ... fr` for the factorization of `f`, where `r <= d`. Then `N(f(X + k theta))` is not
+    // square-free, iff there exist `i != j` and `sigma` such that `fi(X + k theta) = sigma(fj(X + k theta)) = sigma(fj)(X + k sigma(theta))`.
+    // Now note that for given `i, j, sigma`, `fi(X + k theta) = sigma(fj)(X + k sigma(theta))` for at most one `k`, as otherwise
+    // `fi(a (k1 - k2) theta) sigma(theta)) = sigma(fj)(a (k1 - k2) sigma(theta))` for all `a in Z` (evaluation is ring hom).
+    //
+    // Now note that `fi(X) - sigma(fj(X))` is a linear combination of `X^m` and `sigma(X^m)`, i.e. of `deg(fi) + deg(fj) <= d`
+    // basic functions. The vectors `(a1 theta)^m, ..., (al theta)^m` for `m <= deg(fi)` and `sigma(a1 theta)^m, ..., sigma(al theta)^m`
+    // for `m <= deg(fj)` are all linearly independent (assuming `a1, ..., al` distinct and `l >= deg(fi) + deg(fj) + 2`), 
+    // thus `char(K) >= d + 2` (or `char(K) = 0`) implies that `fi = fj = 0`, a contradiction.
+    //
+    // Thus we find that there are at most `d(d + 1)/2 * [L : K]` many `k` such that `N(f(X + k theta))` is not squarefree.
+    // This would even work if `k` is not an integer, but any element of `K`. Note that we still require `char(K) >= d + 2` for
+    // the previous paragraph to work.
 
-        let ZZbig = BigIntRing::RING;
-        let characteristic = K.characteristic(&ZZbig).unwrap();
-        // choose bound about twice as large as necessary, so the probability of succeeding is almost 1/2
-        let bound = LX.degree(f).unwrap() * LX.degree(f).unwrap() * L.rank();
-        assert!(ZZbig.is_zero(&characteristic) || ZZbig.is_geq(&characteristic, &int_cast(bound.try_into().unwrap(), ZZbig, StaticRing::<i64>::RING)));
+    let ZZbig = BigIntRing::RING;
+    let characteristic = K.characteristic(&ZZbig).unwrap();
+    // choose bound about twice as large as necessary, so the probability of succeeding is almost 1/2
+    let bound = LX.degree(f).unwrap() * LX.degree(f).unwrap() * L.rank();
+    assert!(ZZbig.is_zero(&characteristic) || ZZbig.is_geq(&characteristic, &int_cast(bound.try_into().unwrap(), ZZbig, StaticRing::<i64>::RING)));
 
-        let mut rng = oorandom::Rand64::new(1);
+    let mut rng = oorandom::Rand64::new(1);
 
-        for _ in 0..attempts {
-            let k = StaticRing::<i32>::RING.get_uniformly_random(&bound.try_into().unwrap(), || rng.rand_u64());
-            let lin_transform = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(k)), 0), (L.one(), 1)].into_iter());
-            let f_transformed = LX.evaluate(f, &lin_transform, &LX.inclusion());
+    for _ in 0..attempts {
+        let k = StaticRing::<i32>::RING.get_uniformly_random(&bound.try_into().unwrap(), || rng.rand_u64());
+        let lin_transform = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(k)), 0), (L.one(), 1)].into_iter());
+        let f_transformed = LX.evaluate(f, &lin_transform, &LX.inclusion());
 
-            let norm_f_transformed = Norm(LX.clone_el(&f_transformed));
-            let degree = KX.degree(&norm_f_transformed).unwrap();
-            let squarefree_part = <_ as PolyTFracGCDRing>::squarefree_part(&KX, &norm_f_transformed);
-            event!(Level::INFO, "norm_squarefree");
+        let norm_f_transformed = Norm(LX.clone_el(&f_transformed));
+        let degree = KX.degree(&norm_f_transformed).unwrap();
+        let squarefree_part = <_ as PolyTFracGCDRing>::squarefree_part(&KX, &norm_f_transformed);
 
-            if KX.degree(&squarefree_part).unwrap() == degree {
-                let lin_transform_rev = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0), (L.one(), 1)].into_iter());
-                let (factorization, _unit) = <_ as FactorPolyField>::factor_poly(&KX, &squarefree_part);
-                event!(Level::INFO, "norm_factored");
-                
-                return Ok(factorization.into_iter().map(|(factor, e)| {
-                    assert!(e == 1);
-                    let f_factor = LX.normalize(<_ as PolyTFracGCDRing>::gcd(&LX, &f_transformed, &LX.lifted_hom(&KX, L.inclusion()).map(factor)));
-                    return LX.evaluate(&f_factor, &lin_transform_rev, &LX.inclusion());
-                }).collect());
-            }
+        if KX.degree(&squarefree_part).unwrap() == degree {
+            let lin_transform_rev = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0), (L.one(), 1)].into_iter());
+            let (factorization, _unit) = <_ as FactorPolyField>::factor_poly(&KX, &squarefree_part);
+            
+            return Ok(factorization.into_iter().map(|(factor, e)| {
+                assert!(e == 1);
+                let f_factor = LX.normalize(<_ as PolyTFracGCDRing>::gcd(&LX, &f_transformed, &LX.lifted_hom(&KX, L.inclusion()).map(factor)));
+                return LX.evaluate(&f_factor, &lin_transform_rev, &LX.inclusion());
+            }).collect());
         }
-        return Err(ProbablyNotSquarefree);
-    })
+    }
+    return Err(ProbablyNotSquarefree);
 }
 
 ///
@@ -115,6 +110,7 @@ pub fn poly_factor_squarefree_extension<P>(LX: P, f: &El<P>, attempts: usize) ->
 /// field extension of a base field that supports polynomial factorization. 
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn poly_factor_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,

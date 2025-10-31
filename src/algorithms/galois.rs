@@ -2,6 +2,8 @@
 use std::fmt::Debug;
 use std::hash::Hash;
 
+use tracing::instrument;
+
 use crate::function::no_error;
 use crate::homomorphism::*;
 use crate::field::*;
@@ -26,6 +28,7 @@ use super::sqr_mul::generic_pow_shortest_chain_table;
 /// generator are returned via [`Result::Err`] instead.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn compute_galois_closure(field: NumberField) -> Result<
         FreeAlgebraHom<NumberField, NumberField>,
         (NumberField, Vec<El<NumberField>>)
@@ -83,6 +86,7 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
     /// of field to the given element.
     /// 
     #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
     pub fn new(field: K, image_of_canonical_gen: El<K>) -> Self {
         let poly_ring = DensePolyRing::new(field.base_ring(), "X");
         assert!(field.is_zero(&poly_ring.evaluate(&field.generating_poly(&poly_ring, field.base_ring().identity()), &image_of_canonical_gen, field.inclusion())));
@@ -96,6 +100,7 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
     /// Returns the galois automorphism `x -> self(first(x))`
     /// 
     #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
     pub fn compose_gal(self, first: &Self) -> Self {
         assert!(self.field.get_ring() == first.field.get_ring());
         let new_image = self.map_ref(&first.image_of_canonical_gen_powers[1]);
@@ -107,6 +112,7 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
     /// `self` is applied `k` times.
     /// 
     #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
     pub fn pow(self, k: usize) -> Self {
         let field = self.field;
         let poly_ring = DensePolyRing::new(field.base_ring(), "X");
@@ -134,6 +140,7 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
     /// Returns the inverse of this automorphism
     /// 
     #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
     pub fn invert(self) -> Self {
         let k = self.field.rank() - 1;
         self.pow(k)
@@ -159,6 +166,7 @@ impl<K, Impl, I> Homomorphism<NumberFieldBase<Impl, I>, NumberFieldBase<Impl, I>
         &self.field
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn map_ref(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> <NumberFieldBase<Impl, I> as RingBase>::Element {
         let coeffs_wrt_basis = self.field.wrt_canonical_basis(x);
         let hom = self.field.inclusion();
@@ -241,6 +249,7 @@ impl<K, Impl, I> Hash for GaloisAutomorphism<K, Impl, I>
 /// Otherwise, returns its embedding into its Galois closure as [`Result::Err`].
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn compute_galois_group<K>(field: K) -> Result<
         Vec<GaloisAutomorphism<K, DefaultNumberFieldImpl, BigIntRing>>, 
         FreeAlgebraHom<K, NumberField>
@@ -266,6 +275,7 @@ pub fn compute_galois_group<K>(field: K) -> Result<
 /// the given embedding `K -> C`.
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn find_complex_conjugation<'a, K1, K2, K3>(
     field: K1, 
     complex_embedding: &ComplexEmbedding<K2, DefaultNumberFieldImpl, BigIntRing>, 
@@ -336,8 +346,11 @@ fn test_compute_galois_closure() {
 
 #[test]
 fn test_compute_galois_group() {
-    LogAlgorithmSubscriber::init_test();
-    LogAlgorithmSubscriber::init_test();
+    // LogAlgorithmSubscriber::init_test();
+    use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
+    tracing_subscriber::registry().with(chrome_layer).init();
 
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(&ZZ, "X");

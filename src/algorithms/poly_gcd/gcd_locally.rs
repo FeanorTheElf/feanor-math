@@ -1,8 +1,7 @@
 use dense_poly::DensePolyRing;
 use squarefree_part::poly_power_decomposition_monic_local;
-use tracing::Level;
-use tracing::event;
-use tracing::span;
+use tracing::instrument;
+use tracing::{Level, event, span};
 
 use crate::algorithms::poly_gcd::*;
 use crate::algorithms::poly_gcd::hensel::*;
@@ -36,6 +35,7 @@ struct Signature {
 /// More precisely, computes some `d in R[X]` of maximal degree with the property that there exists 
 /// `a in R \ {0}` such that `d | af, ag`.
 ///
+#[instrument(skip_all, level = "trace")]
 fn poly_gcd_monic_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F, current_attempt: usize) -> Option<El<P>>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
@@ -104,7 +104,7 @@ fn poly_gcd_monic_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F
 
     let divides_f_and_g = poly_ring.divides(&f, &result) && poly_ring.divides(&g, &result);
     if !divides_f_and_g {
-        event!(Level::INFO, "failed");
+        event!(Level::INFO, "invalid_lift");
         return None;
     } else {
         _ = poly_ring.balance_poly(&mut result);
@@ -120,6 +120,7 @@ fn poly_gcd_monic_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F
 /// More precisely, computes some `d in R[X]` of maximal degree with the property that there exists 
 /// `a in R \ {0}` such that `d | af, ag`.
 ///
+#[instrument(skip_all, level = "trace")]
 fn poly_gcd_coprime_local<P, F>(poly_ring: P, mut f: El<P>, mut g: El<P>, rng: F, attempt: usize) -> Option<El<P>>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
@@ -158,6 +159,7 @@ fn poly_gcd_coprime_local<P, F>(poly_ring: P, mut f: El<P>, mut g: El<P>, rng: F
 /// of the underlying ring.
 ///
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn poly_gcd_monic_local<'a, P>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El<P>) -> El<P>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
@@ -166,7 +168,7 @@ pub fn poly_gcd_monic_local<'a, P>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(g).unwrap()));
 
-    span!(Level::INFO, "poly_gcd_local", lhs_deg = poly_ring.degree(f).unwrap(), rhs_deg = poly_ring.degree(g).unwrap()).in_scope(|| {
+    span!(Level::INFO, "poly_gcd", lhs_deg = poly_ring.degree(f).unwrap(), rhs_deg = poly_ring.degree(g).unwrap()).in_scope(|| {
 
         let mut rng = oorandom::Rand64::new(1);
         for attempt in 0..HOPE_FOR_SQUAREFREE_TRIES {
@@ -210,6 +212,7 @@ pub fn poly_gcd_monic_local<'a, P>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El
 /// of the underlying ring.
 ///
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn poly_gcd_local<P>(poly_ring: P, mut f: El<P>, mut g: El<P>) -> El<P>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,

@@ -1,3 +1,5 @@
+use tracing::instrument;
+
 use crate::pid::*;
 use crate::ring::*;
 
@@ -18,6 +20,7 @@ use std::mem::swap;
 /// which uses a ring-specific algorithm to compute the Bezout identity (which will of
 /// course be [`eea()`] in some cases).
 /// 
+#[instrument(skip_all, level = "trace")]
 pub fn eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>, El<R>) 
     where R: RingStore,
         R::Type: EuclideanRing
@@ -76,6 +79,7 @@ pub const fn const_eea(a: i128, b: i128) -> (i128, i128, i128) {
 /// For details, see [`eea()`].
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn half_eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>) 
     where R: RingStore,
         R::Type: EuclideanRing
@@ -108,6 +112,7 @@ pub fn half_eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>)
 /// a ring-specific algorithm to compute the gcd (which will of course be [`gcd()`] in some cases).
 /// 
 #[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
 pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
     where R: RingStore,
         R::Type: EuclideanRing
