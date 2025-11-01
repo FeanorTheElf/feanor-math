@@ -102,7 +102,7 @@ impl LogAlgorithmSubscriber {
             span_map: RwLock::new(HashMap::new()), 
             current_span: ThreadLocal::new(),
             default_instant: Instant::now(),
-            interested_level: Level::INFO..=Level::TRACE,
+            interested_level: Level::INFO..=Level::INFO,
             max_depth: 4
         })
     }
@@ -184,7 +184,7 @@ impl Subscriber for LogAlgorithmSubscriber {
             let current_span = self.current_span().id().map(|id| span_map.get(id).unwrap());
             if current_span.is_none() || (current_span.unwrap().logging_permission.has_permission() && current_span.unwrap().level < self.max_depth) {
                 
-                print!("{}event [", &SPACES[..current_span.map(|s| s.level * 2 + 2).unwrap_or(0)]);
+                print!("{}[", &SPACES[..current_span.map(|s| s.level * 2 + 2).unwrap_or(0)]);
                 struct V;
                 impl Visit for V {
                     fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
@@ -212,7 +212,7 @@ impl Subscriber for LogAlgorithmSubscriber {
         };
         if permission.is_some() {
             if entered_span.level <= self.max_depth {
-                println!("{}start {}#{} [{}]", &SPACES[..(entered_span.level * 2)], entered_span.name, span.into_u64(), entered_span.description);
+                println!("{}{} [{}]", &SPACES[..(entered_span.level * 2)], entered_span.name, entered_span.description);
             }
             if entered_span.level == self.max_depth {
                 println!("{}...", &SPACES[..(entered_span.level * 2 + 2)]);
@@ -232,7 +232,7 @@ impl Subscriber for LogAlgorithmSubscriber {
         let logging_permission = exited_span.logging_permission.take();
         if let Some(permission) = logging_permission {
             if exited_span.level <= self.max_depth {
-                println!("{}done ({} us) {}#{}", &SPACES[..(exited_span.level * 2)], time, exited_span.name, span.into_u64());
+                println!("{}done ({} us)", &SPACES[..(exited_span.level * 2)], time);
             }
             if let Some(parent) = &exited_span.parent {
                 span_map.get(&parent).unwrap().logging_permission.give(permission);

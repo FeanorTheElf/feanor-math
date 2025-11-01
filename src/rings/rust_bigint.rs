@@ -4,6 +4,7 @@ use serde::ser::SerializeTuple;
 use serde::{Deserializer, Serialize, Deserialize, Serializer}; 
 
 use crate::algorithms::bigint_ops::*;
+use crate::algorithms::eea::{eea, gcd};
 use crate::divisibility::{DivisibilityRing, Domain};
 use crate::pid::*;
 use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ, impl_eval_poly_locally_for_ZZ};
@@ -11,7 +12,6 @@ use crate::integer::*;
 use crate::ordered::*;
 use crate::primitive_int::*;
 use crate::ring::*;
-use crate::algorithms;
 use crate::serialization::*;
 use crate::specialization::*;
 
@@ -383,7 +383,11 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
     }
     
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), RingRef::new(self))
+        eea(self.clone_el(lhs), self.clone_el(rhs), RingRef::new(self))
+    }
+
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+        gcd(self.clone_el(lhs), self.clone_el(rhs), RingRef::new(self))
     }
 }
 

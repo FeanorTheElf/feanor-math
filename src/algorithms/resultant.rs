@@ -90,10 +90,8 @@ fn  resultant_locally<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> El<<P::Type as R
     let work_locally = base_ring.get_ring().init_reduce_lift(ln_max_norm);
     let work_locally_ref = &work_locally;
     let count = base_ring.get_ring().prime_ideal_count(&work_locally);
-    event!(Level::INFO, prime_ideal_count = count);
 
-    let current_span = Span::current();
-    let resultants = (0..count).into_par_iter().map(|i| span!(parent: current_span.clone(), Level::INFO, "resultant_mod_ideal").in_scope(|| {
+    let resultants = (0..count).into_par_iter().map(|i| {
         let embedding = LiftPolyEvalRingReductionMap::new(base_ring.get_ring(), work_locally_ref, i);
         let new_poly_ring = DensePolyRing::new(embedding.codomain(), "X");
         let poly_ring_embedding = new_poly_ring.lifted_hom(poly_ring, &embedding);
@@ -101,7 +99,7 @@ fn  resultant_locally<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> El<<P::Type as R
         let local_g = poly_ring_embedding.map_ref(g);
         let local_resultant = <_ as ComputeResultantRing>::resultant(&new_poly_ring, local_f, local_g);
         return local_resultant;
-    })).collect::<Vec<_>>();
+    }).collect::<Vec<_>>();
 
     return base_ring.get_ring().lift_combine(&work_locally, &resultants);
 }

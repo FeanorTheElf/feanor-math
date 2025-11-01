@@ -347,10 +347,12 @@ fn test_compute_galois_closure() {
 #[test]
 fn test_compute_galois_group() {
     // LogAlgorithmSubscriber::init_test();
+    use tracing_subscriber::Layer;
     use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
     let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
-    tracing_subscriber::registry().with(chrome_layer).init();
+    let filtered_chrome_layer = chrome_layer.with_filter(tracing_subscriber::filter::filter_fn(|metadata| metadata.target() != "feanor_math::algorithms::bigint_ops"));
+    tracing_subscriber::registry().with(filtered_chrome_layer).init();
 
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(&ZZ, "X");
