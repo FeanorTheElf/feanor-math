@@ -4,7 +4,6 @@ use serde::ser::SerializeTuple;
 use serde::{Deserializer, Serialize, Deserialize, Serializer}; 
 
 use crate::algorithms::bigint_ops::*;
-use crate::algorithms::eea::{eea, gcd};
 use crate::divisibility::{DivisibilityRing, Domain};
 use crate::pid::*;
 use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ, impl_eval_poly_locally_for_ZZ};
@@ -383,11 +382,19 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
     }
     
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        eea(self.clone_el(lhs), self.clone_el(rhs), RingRef::new(self))
-    }
+        let mut current_transform = [self.one(), self.zero(), self.zero(), self.one()];
+        let [mut a, mut b] = [self.clone_el(lhs), self.clone_el(rhs)];
 
-    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        gcd(self.clone_el(lhs), self.clone_el(rhs), RingRef::new(self))
+        while !self.is_zero(&a) && !self.is_zero(&b) {
+
+        }
+
+        let [sa, ta, sb, tb] = current_transform;
+        if self.is_zero(&a) {
+            return (sb, tb, b);
+        } else {
+            return (sa, ta, a);
+        }
     }
 }
 

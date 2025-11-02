@@ -231,9 +231,6 @@ pub fn bigint_fma<A: Allocator, A2: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt
 	return out;
 }
 
-///
-/// Complexity O(log(n))
-/// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn bigint_mul_small<A: Allocator>(lhs: &mut Vec<BlockInt, A>, factor: BlockInt) {

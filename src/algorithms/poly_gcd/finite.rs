@@ -1,8 +1,8 @@
-use std::mem::swap;
 use std::cmp::max;
 
 use tracing::instrument;
 
+use crate::algorithms::eea::partial_eea_poly;
 use crate::algorithms::matmul::strassen::{dispatch_strassen_impl, strassen_mem_size};
 use crate::algorithms::int_factor::is_prime_power;
 use crate::matrix::*;
@@ -88,58 +88,6 @@ pub fn poly_squarefree_part_finite_field<P>(poly_ring: P, poly: &El<P>) -> El<P>
 const FAST_POLY_EEA_THRESHOLD: usize = 32;
 
 ///
-/// Computes linearly independent vectors `(s, t)` and `(s', t')` and `a, a'` 
-/// such that `a = s * lhs + t * rhs` and `a' = s' * lhs + t' * rhs` are both of
-/// degree at most `target_deg`, or alternatively one of them is zero (in which
-/// case the degree cannot be reduced further).
-/// 
-/// The degrees of `s, t, s', t'` are bounded as
-/// ```text
-///   deg(s) < deg(rhs) - deg(a)
-///   deg(t) < deg(lhs) - deg(a)
-///   deg(s') < deg(rhs) - deg(a')
-///   deg(t') < deg(lhs) - deg(a')
-/// ```
-///
-#[instrument(skip_all, level = "trace")]
-fn partial_eea<P>(ring: P, lhs: El<P>, rhs: El<P>, target_deg: usize) -> ([El<P>; 4], [El<P>; 2])
-    where P: RingStore + Copy,
-        P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field
-{
-    if ring.is_zero(&lhs) || ring.is_zero(&rhs) {
-        return ([ring.one(), ring.zero(), ring.zero(), ring.one()], [lhs, rhs]);
-    }
-    let (mut a, mut b) = (ring.clone_el(&lhs), ring.clone_el(&rhs));
-    let (mut sa, mut ta) = (ring.one(), ring.zero());
-    let (mut sb, mut tb) = (ring.zero(), ring.one());
-    
-    if ring.degree(&a).unwrap() < ring.degree(&b).unwrap() {
-        swap(&mut a, &mut b);
-        swap(&mut sa, &mut sb);
-        swap(&mut ta, &mut tb);
-    }
-
-    while ring.degree(&a).unwrap() > target_deg && !ring.is_zero(&b) {
-        debug_assert!(ring.eq_el(&a, &ring.add(ring.mul_ref(&sa, &lhs), ring.mul_ref(&ta, &rhs))));
-        debug_assert!(ring.eq_el(&b, &ring.add(ring.mul_ref(&sb, &lhs), ring.mul_ref(&tb, &rhs))));
-
-        let (quo, rem) = ring.euclidean_div_rem(a, &b);
-        ta = ring.sub(ta, ring.mul_ref(&quo, &tb));
-        sa = ring.sub(sa, ring.mul_ref_snd(quo, &sb));
-        a = rem;
-
-        swap(&mut a, &mut b);
-        swap(&mut sa, &mut sb);
-        swap(&mut ta, &mut tb);
-        
-        debug_assert_eq!(ring.degree(&sb).unwrap(), ring.degree(&rhs).unwrap() - ring.degree(&a).unwrap());
-        debug_assert_eq!(ring.degree(&tb).unwrap(), ring.degree(&lhs).unwrap() - ring.degree(&a).unwrap());
-    }
-    return ([sa, ta, sb, tb], [a, b]);
-}
-
-///
 /// Computes a Bezout identity for polynomials, using a fast divide-and-conquer
 /// polynomial gcd algorithm. Unless you are implementing [`crate::pid::PrincipalIdealRing`]
 /// for a custom type, you should use [`crate::pid::PrincipalIdealRing::extended_ideal_gen()`]
@@ -169,7 +117,7 @@ pub fn fast_poly_eea<P>(poly_ring: P, lhs: El<P>, rhs: El<P>) -> (El<P>, El<P>, 
         let ldeg = poly_ring.degree(&lhs).unwrap();
         let rdeg = poly_ring.degree(&rhs).unwrap();
         if ldeg < target_deg + FAST_POLY_EEA_THRESHOLD || rdeg < target_deg + FAST_POLY_EEA_THRESHOLD {
-            return partial_eea(poly_ring, lhs, rhs, target_deg);
+            return partial_eea_poly(poly_ring, lhs, rhs, target_deg);
         } else if ldeg >= 2 * rdeg {
             let (mut q, r) = poly_ring.euclidean_div_rem(lhs, &rhs);
             poly_ring.negate_inplace(&mut q);
@@ -242,29 +190,6 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::zn::*;
 #[cfg(test)]
 use crate::tracing::LogAlgorithmSubscriber;
-
-#[test]
-fn test_partial_eea() {
-    LogAlgorithmSubscriber::init_test();
-    let field = zn_64::Zn64B::new(65537).as_field().ok().unwrap();
-    let poly_ring = DensePolyRing::new(field, "X");
-    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [
-        X.pow_ref(9) - X.pow_ref(7) + 3 * X.pow_ref(2) - 1,
-        X.pow_ref(10) + X.pow_ref(6) + 1,
-    ]);
-
-    for k in (1..10).rev() {
-        let ([s1, t1, s2, t2], [a, b]) = partial_eea(&poly_ring, poly_ring.clone_el(&f), poly_ring.clone_el(&g), k);
-        assert_el_eq!(&poly_ring, poly_ring.add(poly_ring.mul_ref(&s1, &f), poly_ring.mul_ref(&t1, &g)), &a);
-        assert_el_eq!(&poly_ring, poly_ring.add(poly_ring.mul_ref(&s2, &f), poly_ring.mul_ref(&t2, &g)), &b);
-        assert_eq!(k, poly_ring.degree(&a).unwrap());
-        assert_eq!(k - 1, poly_ring.degree(&b).unwrap());
-        assert!(poly_ring.degree(&s1).is_none() || poly_ring.degree(&s1).unwrap() < 10 - poly_ring.degree(&a).unwrap());
-        assert!(poly_ring.degree(&t1).is_none() || poly_ring.degree(&t1).unwrap() < 9 - poly_ring.degree(&a).unwrap());
-        assert!(poly_ring.degree(&s2).is_none() || poly_ring.degree(&s2).unwrap() < 10 - poly_ring.degree(&b).unwrap());
-        assert!(poly_ring.degree(&t2).is_none() || poly_ring.degree(&t2).unwrap() < 9 - poly_ring.degree(&b).unwrap());
-    }
-}
 
 #[test]
 fn test_fast_poly_eea() {
