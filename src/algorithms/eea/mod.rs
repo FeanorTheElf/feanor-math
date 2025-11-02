@@ -142,13 +142,17 @@ pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
 /// In particular, we have `deg(x) > target_deg` and `deg(x') <= target_deg`, except if `a, b`
 /// already both have degree `<= target_deg`.
 /// 
-/// The degrees of `s, t, s', t'` are given as
+/// The degrees of `s, t, s', t'` are bounded as
 /// ```text
-///   deg(s) <= deg(a) - deg(x)
-///   deg(t) <= deg(b) - deg(x)
+///   deg(s) <= deg(b) - deg(x)
+///   deg(t) <= deg(a) - deg(x)
 ///   deg(s') <= deg(b) - deg(x')
 ///   deg(t') <= deg(a) - deg(x')
 /// ```
+/// except if either `a` or `b` already have degree `<= target_deg` (i.e. no steps in
+/// the Euclidean algorithm are performed), in which case only the two bounds involving
+/// the larger one of `deg(a)` resp. `deg(b)` hold.
+/// 
 /// The proof of this is similar to the one outlined in [`partial_eea_int()`], but simpler, because
 /// the degree-valuation is non-Archimedean.
 /// 
@@ -204,26 +208,26 @@ pub fn partial_eea_poly<P>(ring: P, lhs: El<P>, rhs: El<P>, target_deg: usize) -
 /// 
 /// The size of `s, t, s', t'` are bounded as
 /// ```text
-///   |s| <= min(|a|, |b|) / |x|
-///   |t| <= max(|a|, |b|) / |x|
-///   |s'| <= min(|a|, |b|) / |x'|
-///   |t'| <= max(|a|, |b|) / |x'|
+///   |s| <= |b| / |x|
+///   |t| <= |a| / |x|
+///   |s'| <= |b| / |x'|
+///   |t'| <= |a| / |x'|
 /// ```
 /// except if `min(|a|, |b|) <= target_size`, i.e. no step is performed during the
-/// Euclidean algorithm. In such cases, the bounds on `|t|` still hold, but the bounds
-/// on `|s|` don't (as `s = 1` but `min(|a|, |b|) < |x|`).
+/// Euclidean algorithm. In such cases, the bounds involving the larger one of `|a|`
+/// resp. `|b|` still hold, but the other two don't.
 /// 
 /// # Proof
 /// 
 /// As in the euclidean algorithm, define `s_0 = 1, t_0 = 0, s_1 = 0, t_1 = 1` and
-/// `a_0 = absmax(a, b), a_1 = absmin(a, b)`. Then define recursively
+/// `a_0 = a, a_1 = b`. Then define recursively
 /// ```text
 ///   q_i = floor(a_(i - 1) / a_i),
 ///   a_(i + 1) = a_(i - 1) - q_i a_i,
 ///   s_(i + 1) = s_(i - 1) - q_i s_i,
 ///   t_(i + 1) = t_(i - 1) - q_i t_i
 /// ```
-/// We assume for the proof that `a, b` are positive.
+/// We assume for the proof that `a > b > 0`.
 /// Now observe that 
 ///  - the `a_i` are decreasing
 ///  - the signs of `s_i` and `t_i` are alternating for `i >= 2`
@@ -285,8 +289,6 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::zn::zn_64::*;
 #[cfg(test)]
 use crate::rings::zn::*;
-#[cfg(test)]
-use std::cmp::{max, min};
 
 #[test]
 fn test_gcd() {
@@ -326,15 +328,20 @@ fn test_partial_eea_poly() {
         } else if a_deg <= deg || b_deg <= deg {
             assert!(poly_ring.degree(&x).unwrap_or(0) > deg);
             assert!(poly_ring.degree(&x_).unwrap_or(0) <= deg);
-            assert!(poly_ring.degree(&t).unwrap_or(0) <= max(a_deg, b_deg) - poly_ring.degree(&x).unwrap_or(0));
-            assert!(poly_ring.degree(&t_).unwrap_or(0) <= max(a_deg, b_deg) - poly_ring.degree(&x_).unwrap_or(0));
+            if a_deg >= b_deg {
+                assert!(poly_ring.degree(&t).unwrap_or(0) <= a_deg - poly_ring.degree(&x).unwrap_or(0));
+                assert!(poly_ring.degree(&t_).unwrap_or(0) <= a_deg - poly_ring.degree(&x_).unwrap_or(0));
+            } else {
+                assert!(poly_ring.degree(&s).unwrap_or(0) <= b_deg - poly_ring.degree(&x).unwrap_or(0));
+                assert!(poly_ring.degree(&s_).unwrap_or(0) <= b_deg - poly_ring.degree(&x_).unwrap_or(0));
+            }
         } else {
             assert!(poly_ring.degree(&x).unwrap_or(0) > deg);
             assert!(poly_ring.degree(&x_).unwrap_or(0) <= deg);
-            assert!(poly_ring.degree(&s).unwrap_or(0) <= min(a_deg, b_deg) - poly_ring.degree(&x).unwrap_or(0));
-            assert!(poly_ring.degree(&s_).unwrap_or(0) <= min(a_deg, b_deg) - poly_ring.degree(&x_).unwrap_or(0));
-            assert!(poly_ring.degree(&t).unwrap_or(0) <= max(a_deg, b_deg) - poly_ring.degree(&x).unwrap_or(0));
-            assert!(poly_ring.degree(&t_).unwrap_or(0) <= max(a_deg, b_deg) - poly_ring.degree(&x_).unwrap_or(0));
+            assert!(poly_ring.degree(&t).unwrap_or(0) <= a_deg - poly_ring.degree(&x).unwrap_or(0));
+            assert!(poly_ring.degree(&t_).unwrap_or(0) <= a_deg - poly_ring.degree(&x_).unwrap_or(0));
+            assert!(poly_ring.degree(&s).unwrap_or(0) <= b_deg - poly_ring.degree(&x).unwrap_or(0));
+            assert!(poly_ring.degree(&s_).unwrap_or(0) <= b_deg - poly_ring.degree(&x_).unwrap_or(0));
         }
     };
 
@@ -372,15 +379,20 @@ fn test_partial_int() {
         } else if a.abs() <= size || b.abs() <= size {
             assert!(x.abs() > size);
             assert!(x_.abs() <= size);
-            assert!(t.abs() * x.abs() <= max(a.abs(), b.abs()));
-            assert!(t_.abs() * x_.abs() <= max(a.abs(), b.abs()));
+            if a.abs() >= b.abs() {
+                assert!(t.abs() * x.abs() <= a.abs());
+                assert!(t_.abs() * x_.abs() <= a.abs());
+            } else {
+                assert!(s.abs() * x.abs() <= b.abs());
+                assert!(s_.abs() * x_.abs() <= b.abs());
+            }
         } else {
             assert!(x.abs() > size);
             assert!(x_.abs() <= size);
-            assert!(s.abs() * x.abs() <= min(a.abs(), b.abs()));
-            assert!(t.abs() * x.abs() <= max(a.abs(), b.abs()));
-            assert!(s_.abs() * x_.abs() <= min(a.abs(), b.abs()));
-            assert!(t_.abs() * x_.abs() <= max(a.abs(), b.abs()));
+            assert!(t.abs() * x.abs() <= a.abs());
+            assert!(t_.abs() * x_.abs() <= a.abs());
+            assert!(s.abs() * x.abs() <= b.abs());
+            assert!(s_.abs() * x_.abs() <= b.abs());
         }
     };
     for i in 0..9 {
@@ -388,5 +400,7 @@ fn test_partial_int() {
         test_on_input(9, 6, i);
         test_on_input(7, 9, i);
         test_on_input(9, 7, i);
+        test_on_input(7, 1, i);
+        test_on_input(1, 7, i);
     }
 }

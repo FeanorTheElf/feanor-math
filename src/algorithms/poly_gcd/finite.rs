@@ -176,9 +176,11 @@ pub fn fast_poly_eea<P>(poly_ring: P, lhs: El<P>, rhs: El<P>) -> (El<P>, El<P>, 
     let ([s1, t1, s2, t2], [a1, a2]) = fast_poly_eea_impl(poly_ring, lhs, rhs, 0, &mut (0..strassen_mem_size(false, 2, 0)).map(|_| poly_ring.zero()).collect::<Vec<_>>());
     if poly_ring.is_zero(&a1) {
         return (s2, t2, a2);
-    } else {
-        assert!(poly_ring.is_zero(&a2));
+    } else if poly_ring.is_zero(&a2) || poly_ring.degree(&a1).unwrap() == 0 {
         return (s1, t1, a1);
+    } else {
+        assert!(poly_ring.degree(&a2).unwrap() == 0);
+        return (s2, t2, a2);
     }
 }
 
