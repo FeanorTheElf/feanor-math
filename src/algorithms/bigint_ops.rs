@@ -5,7 +5,7 @@ use tracing::instrument;
 use crate::seq::*;
 
 use core::fmt;
-use std::cmp::{Ordering, min, max};
+use std::cmp::{Ordering, max};
 use std::alloc::Allocator;
 
 type BlockInt = u64;
@@ -25,238 +25,55 @@ fn truncate_zeros(mut x: Vec<BlockInt>) -> Vec<BlockInt> {
 }
 
 #[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn bigint_add<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], block_offset: usize) {
-	let prev_len = lhs.len();
-	let mut buffer: bool = false;
-	let mut i = 0;
-	if let Some(rhs_d) = highest_set_block(rhs) {
-		while i <= rhs_d || buffer {
-			let rhs_val = *rhs.get(i).unwrap_or(&0);
-			let j = i + block_offset;
-			expand(lhs, j + 1);
-			let (sum, overflow) = lhs[j].overflowing_add(rhs_val);
-			if buffer {
-				let (carry_sum, carry_overflow) = sum.overflowing_add(1);
-				*lhs.at_mut(j) = carry_sum;
-				buffer = overflow || carry_overflow;
-			} else {
-				*lhs.at_mut(j) = sum;
-				buffer = overflow;
-			}
-			i += 1;
-		}
-	}
-	let new_highest_set_block = highest_set_block(&lhs);
-	debug_assert!(new_highest_set_block.is_none() || max(prev_len, new_highest_set_block.unwrap() + 1) == lhs.len());
-}
-
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn highest_set_block(x: &[BlockInt]) -> Option<usize> {
+#[inline(always)]
+pub fn effective_length(x: &[BlockInt]) -> usize {
 	for i in (0..x.len()).rev() {
 		if x[i] != 0 {
-			return Some(i);
+			return i + 1;
 		}
 	}
-	return None;
+	return 0;
 }
 
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn bigint_cmp(lhs: &[BlockInt], rhs: &[BlockInt]) -> Ordering {
-	match (highest_set_block(lhs.as_ref()), highest_set_block(rhs.as_ref())) {
-		(None, None) => return Ordering::Equal,
-		(Some(_), None) => return Ordering::Greater,
-		(None, Some(_)) => return Ordering::Less,
-		(Some(x), Some(y)) => match x.cmp(&y) {
-			Ordering::Less => return Ordering::Less,
-			Ordering::Greater => return Ordering::Greater,
-			Ordering::Equal => {
-				for i in (0..=x).rev() {
-					match lhs[i].cmp(&rhs[i]) {
-						Ordering::Less => return Ordering::Less,
-						Ordering::Greater => return Ordering::Greater,
-						_ => {}
-					}
-				}
-				return Ordering::Equal;
-			}
+#[inline(always)]
+fn core_fma_small_ref_fst<A: Allocator>(lhs: &[BlockInt], factor: BlockInt, summand: &mut Vec<u64, A>, shift: u32) {
+	let block_offset = (shift / BLOCK_BITS) as usize;
+	let remaining_shift = shift % BLOCK_BITS;
+
+	let mut implementation = || {
+		// a little trick: using `wrapping_sub` will result in an out-of-bounds index if
+		// signed arithmetic would result in a negative index
+		assert!(lhs.len() as u128 + block_offset as u128 + 1 < usize::MAX as u128);
+		let lhs_shifted_block = |i: usize| (*lhs.get(i.wrapping_sub(block_offset)).unwrap_or(&0) >> remaining_shift) | lhs.get((i + 1).wrapping_sub(block_offset)).unwrap_or(&0).checked_shl(BLOCK_BITS - remaining_shift).unwrap_or(0);
+
+		let up_to = max(effective_length(lhs.as_ref()) + block_offset + 1, effective_length(summand));
+		summand.truncate(up_to + 1);
+		expand(summand, up_to + 1);
+		let mut buffer: u64 = 0;
+		for i in block_offset..up_to {
+			let prod = lhs_shifted_block(i) as u128 * factor as u128 + buffer as u128 + summand[i] as u128;
+			summand[i] = (prod & ((1u128 << BLOCK_BITS) - 1)) as u64;
+			buffer = (prod >> BLOCK_BITS) as u64;
 		}
-	};
-}
-
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn bigint_cmp_small(lhs: &[BlockInt], rhs: DoubleBlockInt) -> Ordering {
-	match highest_set_block(lhs.as_ref()) {
-	   None => 0.cmp(&rhs),
-	   Some(0) => (lhs[0] as DoubleBlockInt).cmp(&rhs),
-	   Some(1) => (((lhs[1] as DoubleBlockInt) << BLOCK_BITS) | (lhs[0] as DoubleBlockInt)).cmp(&rhs),
-	   Some(_) => Ordering::Greater,
-	}
-}
-
-///
-/// Calculate lhs -= rhs * (1 << BLOCK_BITS)^block_offset
-/// 
-/// This will panic if the subtraction would result in a negative number
-/// 
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn bigint_sub(lhs: &mut [BlockInt], rhs: &[BlockInt], block_offset: usize) {
-	assert!(bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Less);
-
-	if let Some(rhs_high) = highest_set_block(rhs.as_ref()) {
-		let mut buffer: bool = false;
-		let mut i = 0;
-		while i <= rhs_high || buffer {
-			let rhs_val = *rhs.get(i).unwrap_or(&0);
-			let j = i + block_offset;
-			debug_assert!(j < lhs.len());
-			let (difference, overflow) = lhs[j].overflowing_sub(rhs_val);
-			if buffer {
-				let (carry_difference, carry_overflow) = difference.overflowing_sub(1);
-				lhs[j] = carry_difference;
-				buffer = overflow || carry_overflow;
-			} else {
-				lhs[j] = difference;
-				buffer = overflow;
-			}
-			i += 1;
-		}
-	}
-}
-
-///
-/// Calculate lhs = rhs - lhs
-/// 
-/// This will panic or give a wrong result if the subtraction would result in a negative number
-/// 
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn bigint_sub_self<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt]) {
-	debug_assert!(bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Greater);
-
-	let rhs_high = highest_set_block(rhs.as_ref()).expect("rhs must be larger than lhs");
-	expand(lhs, rhs_high + 1);
-	let mut buffer: bool = false;
-	let mut i = 0;
-	while i <= rhs_high {
-		let (difference, overflow) = rhs[i].overflowing_sub(lhs[i]);
-		if buffer {
-			let (carry_difference, carry_overflow) = difference.overflowing_sub(1);
-			lhs[i] = carry_difference;
-			buffer = overflow || carry_overflow;
-		} else {
-			lhs[i] = difference;
-			buffer = overflow;
-		}
-		i += 1;
-	}
-	assert!(!buffer);
-}
-
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn bigint_lshift<A: Allocator>(lhs: &mut Vec<BlockInt, A>, power: usize) {
-	if let Some(high) = highest_set_block(&lhs) {
-		let mut buffer: BlockInt = 0;
-		let mut i = 0;
-		let in_block = (power % BlockInt::BITS as usize) as u32;
-		if in_block != 0 {
-			while i <= high || buffer != 0 {
-				expand(lhs, i + 1);
-				let tmp = lhs[i].overflowing_shr(BlockInt::BITS - in_block).0;
-				lhs[i] = (lhs[i] << in_block) | buffer;
-				buffer = tmp;
-				i += 1;
-			}
-		}
-		lhs.reverse();
-		lhs.extend((0..(power / BlockInt::BITS as usize)).map(|_| 0));
-		lhs.reverse();
-	}
-}
-
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn bigint_rshift(lhs: &mut [BlockInt], power: usize) {
-	if let Some(high) = highest_set_block(lhs) {
-		let mut buffer: BlockInt = 0;
-		let in_block = (power % BlockInt::BITS as usize) as u32;
-		let mut i = high as isize;
-		if in_block != 0 {
-			while i >= 0 {
-				let tmp = lhs[i as usize].overflowing_shl(BlockInt::BITS - in_block).0;
-				lhs[i as usize] = (lhs[i as usize] >> in_block) | buffer;
-				buffer = tmp;
-				i -= 1;
-			}
-		}
-		let blocks = power / BlockInt::BITS as usize;
-		if blocks != 0 {
-			for i in 0..min(blocks, lhs.len()) {
-				lhs[i] = 0;
-			}
-			for i in blocks..=high {
-				lhs[i - blocks] = lhs[i];
-				lhs[i] = 0;
-			}
-		}
-	}
-}
-
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn bigint_fma<A: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt], mut out: Vec<BlockInt, A>) -> Vec<BlockInt, A> {
-	let prev_len = highest_set_block(&out).map(|x| x + 1).unwrap_or(0);
-	let new_len = max(prev_len + 1, highest_set_block(lhs.as_ref()).and_then(|lb| highest_set_block(rhs.as_ref()).map(|rb| lb + rb + 2)).unwrap_or(0));
-	out.resize(new_len, 0);
-	if let Some(d) = highest_set_block(rhs.as_ref()) {
-		for i in 0..=d {
-			bigint_fma_small_ref_fst(lhs, rhs[i], &mut out, i);
-		}
-	}
-	debug_assert!(highest_set_block(&out).is_none() || highest_set_block(&out).unwrap() as isize >= out.len() as isize - 2);
-	return out;
-}
-
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn bigint_fma_small_ref_fst<A: Allocator>(lhs: &[BlockInt], factor: BlockInt, summand: &mut Vec<u64, A>, block_offset: usize) {
-	let up_to = max(highest_set_block(lhs.as_ref()).map(|d| d + block_offset + 1).unwrap_or(0), highest_set_block(summand).map(|d| d + 1).unwrap_or(0));
-	expand(summand, up_to + 1);
-	let mut buffer: u64 = 0;
-	for i in block_offset..up_to {
-		let prod = *lhs.get(i - block_offset).unwrap_or(&0) as u128 * factor as u128 + buffer as u128 + summand[i] as u128;
-		summand[i] = (prod & ((1u128 << BLOCK_BITS) - 1)) as u64;
-		buffer = (prod >> BLOCK_BITS) as u64;
-	}
-	if buffer == 0 {
-		summand.truncate(up_to);
-	} else {
 		summand[up_to] = buffer;
+		let result_len = effective_length(&summand);
+		debug_assert!(summand.len() <= result_len + 2);
+		summand.truncate(result_len);
+	};
+
+	// allow the compiler to produce specialized code for the case remaining_shift == 0
+	if factor == 0 {
+		// do nothing
+	} else if remaining_shift == 0 {
+		implementation();
+	} else {
+		implementation();
 	}
 }
 
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn bigint_fma_small_ref_snd<A: Allocator>(lhs: &mut Vec<u64, A>, factor: BlockInt, summand: &[u64], block_offset: usize) {
-	let up_to = max(highest_set_block(lhs.as_ref()).map(|d| d + block_offset + 1).unwrap_or(0), highest_set_block(summand).map(|d| d + 1).unwrap_or(0));
-	let mut buffer: u64 = 0;
-	_ = lhs.splice(0..0, summand[0..block_offset].iter().copied());
-	expand(lhs, up_to + 1);
-	for i in block_offset..up_to {
-		let prod = lhs[i] as u128 * factor as u128 + buffer as u128 + *summand.get(i).unwrap_or(&0) as u128;
-		lhs[i] = (prod & ((1u128 << BLOCK_BITS) - 1)) as u64;
-		buffer = (prod >> BLOCK_BITS) as u64;
-	}
-	if buffer == 0 {
-		lhs.truncate(up_to);
-	} else {
-		lhs[up_to] = buffer;
-	}
+#[inline(always)]
+pub fn core_fma_small_ref_snd<A: Allocator>(lhs: &mut Vec<u64, A>, factor: BlockInt, summand: &[u64], shift: usize) {
+	unimplemented!()
 }
 
 #[stability::unstable(feature = "enable")]
@@ -278,6 +95,108 @@ pub fn bigint_add_small<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: BlockInt)
 		*lhs.at_mut(0) = rhs;
 	}
 }
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn bigint_cmp(lhs: &[BlockInt], rhs: &[BlockInt]) -> Ordering {
+	let llen = effective_length(lhs);
+	let rlen = effective_length(rhs);
+	match llen.cmp(&rlen) {
+		Ordering::Less => Ordering::Less,
+		Ordering::Greater => Ordering::Greater,
+		Ordering::Equal => {
+			for i in (0..llen).rev() {
+				match lhs[i].cmp(&rhs[i]) {
+					Ordering::Less => return Ordering::Less,
+					Ordering::Greater => return Ordering::Greater,
+					_ => {}
+				}
+			}
+			return Ordering::Equal;
+		}
+	}
+}
+
+#[stability::unstable(feature = "enable")]
+pub fn bigint_cmp_small(lhs: &[BlockInt], rhs: DoubleBlockInt) -> Ordering {
+	bigint_cmp(lhs, &[(rhs & ((1 << BLOCK_BITS) - 1)) as BlockInt, (rhs >> BLOCK_BITS) as BlockInt])
+}
+
+
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn bigint_add<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], shift: u32) {
+	core_fma_small_ref_fst(rhs, 1, lhs, shift);
+}
+
+///
+/// Calculate lhs -= rhs * 2**shift
+/// 
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn bigint_sub(lhs: &mut [BlockInt], rhs: &[BlockInt], shift: u32) -> Result<(), ()> {
+	unimplemented!()
+}
+
+///
+/// Calculate lhs = rhs - lhs
+/// 
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn bigint_sub_self<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt]) -> Result<(), ()> {
+	unimplemented!()
+}
+
+///
+/// Computes `summand := lhs * factor * 2**shift + summand`
+/// 
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn bigint_fma_small_ref_fst<A: Allocator>(lhs: &[BlockInt], factor: BlockInt, summand: &mut Vec<u64, A>, shift: u32) {
+	core_fma_small_ref_fst(lhs, factor, summand, shift);
+}
+
+///
+/// Computes `lhs := lhs * factor * 2**shift + summand`
+/// 
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn bigint_fma_small_ref_snd<A: Allocator>(lhs: &mut Vec<u64, A>, factor: BlockInt, summand: &[u64], shift: usize) {
+	core_fma_small_ref_snd(lhs, factor, summand, shift);
+}
+
+///
+/// Computes `lhs := lhs << power`
+/// 
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn bigint_lshift<A: Allocator>(lhs: &mut Vec<BlockInt, A>, power: usize) {
+	core_fma_small_ref_snd(lhs, 1, &[], power);
+}
+
+///
+/// Computes `lhs := lhs >> power`
+/// 
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn bigint_rshift(lhs: &mut [BlockInt], power: usize) {
+	unimplemented!()
+}
+
+///
+/// Computes `summand + lhs * rhs`
+/// 
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn bigint_fma<A: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt], mut summand: Vec<BlockInt, A>) -> Vec<BlockInt, A> {
+	summand.resize(max(effective_length(lhs) + effective_length(rhs), effective_length(summand.as_ref())), 0);
+	for i in 0..effective_length(rhs) {
+		core_fma_small_ref_fst(lhs, rhs[i], &mut summand, BLOCK_BITS * i as u32);
+	}
+	let result_len = effective_length(&summand);
+	debug_assert!(summand.len() <= result_len + 2);
+	summand.truncate(result_len);
+	return summand;
+}
 
 ///
 /// Same as division_step, but for self_high == rhs_high == d
@@ -292,7 +211,8 @@ fn division_step_last<A: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], d: u
 
 	if rhs_high_blocks == u128::MAX {
 		if bigint_cmp(lhs, rhs) != Ordering::Less {
-			bigint_sub(lhs, rhs, 0);
+			let sub_result = bigint_sub(lhs, rhs, 0);
+			debug_assert!(sub_result.is_ok());
 			return 1;
 		} else {
 			return 0;
@@ -300,15 +220,18 @@ fn division_step_last<A: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], d: u
 	} else {
 		let mut quotient = (self_high_blocks / (rhs_high_blocks + 1)) as u64;
 		tmp.clear();
-		bigint_fma_small_ref_fst(rhs, quotient, tmp, 0);
-		bigint_sub(lhs, tmp.as_ref(), 0);
+		core_fma_small_ref_fst(rhs, quotient, tmp, 0);
+		let sub_result = bigint_sub(lhs, tmp.as_ref(), 0);
+		debug_assert!(sub_result.is_ok());
 
 		if bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Less {
-			bigint_sub(lhs, rhs.as_ref(), 0);
+			let sub_result = bigint_sub(lhs, rhs.as_ref(), 0);
+			debug_assert!(sub_result.is_ok());
 			quotient += 1;
 		}
 		if bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Less {
-			bigint_sub(lhs, rhs.as_ref(), 0);
+			let sub_result = bigint_sub(lhs, rhs.as_ref(), 0);
+			debug_assert!(sub_result.is_ok());
 			quotient += 1;
 		}
 		
@@ -359,13 +282,15 @@ fn division_step<A: Allocator>(
 			let mut quotient = (lhs_high_blocks / (rhs_high_blocks + 1)) as u64;
 			debug_assert!(quotient != 0);
 			tmp.clear();
-			bigint_fma_small_ref_fst(rhs.as_ref(), quotient, tmp, 0);
-			bigint_sub(lhs, tmp.as_ref(), lhs_high - rhs_high);
+			core_fma_small_ref_fst(rhs.as_ref(), quotient, tmp, 0);
+			let sub_result = bigint_sub(lhs, tmp.as_ref(), (lhs_high - rhs_high).try_into().unwrap());
+			debug_assert!(sub_result.is_ok());
 
 			let lhs_high_blocks = ((lhs[lhs_high] as DoubleBlockInt) << BLOCK_BITS) | (lhs[lhs_high - 1] as DoubleBlockInt);
 
 			if lhs_high_blocks > rhs_high_blocks {
-				bigint_sub(lhs, rhs.as_ref(), lhs_high - rhs_high);
+				let sub_result = bigint_sub(lhs, rhs.as_ref(), (lhs_high - rhs_high).try_into().unwrap());
+				debug_assert!(sub_result.is_ok());
 				quotient += 1;
 			}
 			result_upper = quotient;
@@ -384,11 +309,13 @@ fn division_step<A: Allocator>(
 		if lhs[lhs_high] != 0 {
 			let mut quotient = (lhs_high_blocks / (rhs_high_block + 1)) as BlockInt;
 			tmp.clear();
-			bigint_fma_small_ref_fst(rhs.as_ref(), quotient, tmp, 0);
-			bigint_sub(lhs, tmp.as_ref(), lhs_high - rhs_high - 1);
+			core_fma_small_ref_fst(rhs.as_ref(), quotient, tmp, 0);
+			let sub_result = bigint_sub(lhs, tmp.as_ref(), (lhs_high - rhs_high - 1).try_into().unwrap());
+			debug_assert!(sub_result.is_ok());
 
 			if lhs[lhs_high] != 0 {
-				bigint_sub(lhs, rhs.as_ref(), lhs_high - rhs_high - 1);
+				let sub_result = bigint_sub(lhs, rhs.as_ref(), (lhs_high - rhs_high - 1).try_into().unwrap());
+				debug_assert!(sub_result.is_ok());
 				quotient += 1;
 			}
 			result_lower = quotient;
@@ -407,43 +334,44 @@ fn division_step<A: Allocator>(
 /// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn bigint_div<A: Allocator, A2: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], mut out: Vec<BlockInt, A>, scratch_alloc: A2) -> Vec<BlockInt, A> {
-	assert!(highest_set_block(rhs.as_ref()).is_some());
-	
+pub fn bigint_div<A: Allocator, A2: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], mut out: Vec<BlockInt, A>, scratch_alloc: A2) -> Vec<BlockInt, A> {
+	assert!(effective_length(rhs) > 0);
+
 	out.clear();
-	match (highest_set_block(lhs), highest_set_block(rhs)) {
-		(_, None) => panic!("division by zero"),
-		(None, Some(_)) => return out,
-		(Some(d), Some(k)) if d < k => return out,
-		(Some(d), Some(k)) if k == 0 => {
-			let rem = bigint_div_small(lhs, rhs[0]);
-			for i in 0..=d {
-				out.push(lhs[i]);
-				lhs[i] = 0;
-			}
-			lhs[0] = rem;
-			return out;
-		},
-		(Some(mut d), Some(k)) => {
-			let mut tmp = Vec::new_in(scratch_alloc);
-			expand(&mut out, d - k + 1);
-			while d > k {
-				if lhs[d] != 0 {
-					let (quo_upper, quo_lower, quo_power) = division_step(lhs, rhs.as_ref(), d, k, &mut tmp);
-					*out.at_mut(quo_power) = quo_lower;
-					bigint_add(&mut out, &[quo_upper][..], quo_power + 1);
-					debug_assert!(lhs[d] == 0);
-				}
-				d -= 1;
-			}
-			let quo = if lhs[d] != 0 {
-				division_step_last(lhs, rhs, d, &mut tmp)
-			} else {
-				0
-			};
-			bigint_add(&mut out, &[quo], 0);
-			return out;
+	if effective_length(rhs) == 1 {
+		let rem = bigint_div_small(lhs, rhs[0]);
+		let lhs_len = effective_length(lhs);
+		for i in 0..lhs_len {
+			out.push(lhs[i]);
+			lhs[i] = 0;
 		}
+		expand(lhs, 1);
+		lhs[0] = rem;
+		lhs.truncate(effective_length(lhs));
+		return out;
+	} else {
+		let mut lhs_len = effective_length(lhs);
+		let rhs_len = effective_length(rhs);
+		let mut tmp = Vec::new_in(scratch_alloc);
+		expand(&mut out, (lhs_len + 1).saturating_sub(rhs_len));
+		while lhs_len > 0 && lhs_len > rhs_len {
+			if lhs[lhs_len - 1] != 0 {
+				let (quo_upper, quo_lower, quo_power) = division_step(lhs, rhs.as_ref(), lhs_len - 1, rhs_len - 1, &mut tmp);
+				out[quo_power] = quo_lower;
+				bigint_add(&mut out, &[quo_upper][..], BLOCK_BITS * (quo_power as u32 + 1));
+				debug_assert!(lhs[lhs_len - 1] == 0);
+			}
+			lhs_len -= 1;
+		}
+		debug_assert_eq!(lhs_len, rhs_len);
+		let quo = if lhs[lhs_len - 1] != 0 {
+			division_step_last(lhs, rhs, lhs_len - 1, &mut tmp)
+		} else {
+			0
+		};
+		bigint_add(&mut out, &[quo], 0);
+		lhs.truncate(effective_length(lhs));
+		return out;
 	}
 }
 
@@ -454,25 +382,21 @@ pub fn bigint_div<A: Allocator, A2: Allocator>(lhs: &mut [BlockInt], rhs: &[Bloc
 #[instrument(skip_all, level = "trace")]
 pub fn bigint_div_small(lhs: &mut [BlockInt], rhs: BlockInt) -> BlockInt {
 	assert!(rhs != 0);
-	let highest_block_opt = highest_set_block(lhs.as_ref());
-	if highest_block_opt == Some(0) {
-		let (quo, rem) = (lhs[0] / rhs, lhs[0] % rhs);
-		*lhs.at_mut(0) = quo;
-		return rem;
-	} else if let Some(highest_block) = highest_block_opt {
-		let (quo, rem) = (lhs[highest_block] / rhs, lhs[highest_block] % rhs);
+	let lhs_len = effective_length(lhs);
+	if lhs_len == 0 {
+		return 0;
+	} else {
+		let (quo, rem) = (lhs[lhs_len - 1] / rhs, lhs[lhs_len - 1] % rhs);
 		let mut buffer = rem as DoubleBlockInt;
-		*lhs.at_mut(highest_block) = quo;
-		for i in (0..highest_block).rev() {
+		lhs[lhs_len - 1] = quo;
+		for i in (0..(lhs_len - 1)).rev() {
 			buffer = (buffer << BLOCK_BITS) | (lhs[i] as DoubleBlockInt);
 			let (quo, rem) = (buffer / rhs as DoubleBlockInt, buffer % rhs as DoubleBlockInt);
 			debug_assert!(quo <= BlockInt::MAX as DoubleBlockInt);
-			*lhs.at_mut(i) = quo as BlockInt;
+			lhs[i] = quo as BlockInt;
 			buffer = rem;
 		}
 		return buffer as BlockInt;
-	} else {
-		return 0;
 	}
 }
 
@@ -583,13 +507,13 @@ fn test_sub() {
     let mut x = parse("923645871236598172365987287530543", 10);
     let y = parse("58430657823473456743684735863478", 10);
     let z = parse("865215213413124715622302551667065", 10);
-    bigint_sub(&mut x, &y, 0);
+    bigint_sub(&mut x, &y, 0).unwrap();
     assert_eq!(truncate_zeros(z), truncate_zeros(x));
 
     let x = parse("4294836225", 10);
     let mut y = parse("4294967297", 10);
     let z = parse("131072", 10);
-    bigint_sub(&mut y, &x, 0);
+    bigint_sub(&mut y, &x, 0).unwrap();
     assert_eq!(truncate_zeros(y), truncate_zeros(z));
 }
 
@@ -598,7 +522,7 @@ fn test_sub_with_carry() {
     LogAlgorithmSubscriber::init_test();
     let mut x = parse("1000000000000000000", 16);
     let y = parse("FFFFFFFFFFFFFFFF00", 16);
-    bigint_sub(&mut x, &y, 0);
+    bigint_sub(&mut x, &y, 0).unwrap();
     assert_eq!(vec![256], truncate_zeros(x));
 }
 
@@ -734,15 +658,35 @@ fn test_bigint_lshift() {
 }
 
 #[test]
-fn test_bigint_fma_small() {
+fn test_core_fma_small() {
     LogAlgorithmSubscriber::init_test();
 	let x = parse("10000000000000000000000000000000", 10);
 	let mut z = parse("100000000000000000000000000000000", 10);
-	bigint_fma_small_ref_fst(&x, 42, &mut z, 0);
+	core_fma_small_ref_fst(&x, 42, &mut z, 0);
 	assert_eq!(parse("520000000000000000000000000000000", 10), truncate_zeros(z));
 
 	let mut x = parse("10000000000000000000000000000000", 10);
 	let z = parse("100000000000000000000000000000000", 10);
-	bigint_fma_small_ref_snd(&mut x, 42, &z, 0);
+	core_fma_small_ref_snd(&mut x, 42, &z, 0);
 	assert_eq!(parse("520000000000000000000000000000000", 10), truncate_zeros(x));
+
+	let x = parse("10000000000000000000000000000000", 10);
+	let mut z = parse("100000000000000000000000000000000", 10);
+	core_fma_small_ref_fst(&x, 42, &mut z, 1);
+	assert_eq!(parse("940000000000000000000000000000000", 10), truncate_zeros(z));
+
+	let mut x = parse("10000000000000000000000000000000", 10);
+	let z = parse("100000000000000000000000000000000", 10);
+	core_fma_small_ref_snd(&mut x, 42, &z, 1);
+	assert_eq!(parse("940000000000000000000000000000000", 10), truncate_zeros(x));
+	
+	let x = parse("10000000000000000000000000000000", 10);
+	let mut z = parse("100000000000000000000000000000000", 10);
+	core_fma_small_ref_fst(&x, 42, &mut z, 63);
+	assert_eq!(parse("92233720368547758180000000000000000000000000000000", 10), truncate_zeros(z));
+
+	let mut x = parse("10000000000000000000000000000000", 10);
+	let z = parse("100000000000000000000000000000000", 10);
+	core_fma_small_ref_snd(&mut x, 42, &z, 63);
+	assert_eq!(parse("92233720368547758180000000000000000000000000000000", 10), truncate_zeros(x));
 }

@@ -93,11 +93,11 @@ impl<A: Allocator + Send + Sync + Clone> RustBigintRingBase<A> {
     /// returned. Otherwise, `None` is returned.
     /// 
     pub fn map_i128(&self, val: &RustBigint<A>) -> Option<i128> {
-        match highest_set_block(&val.1) {
-            None => Some(0),
-            Some(0) if val.0 => Some(-(val.1[0] as i128)),
-            Some(0) if !val.0 => Some(val.1[0] as i128),
-            Some(1) if val.0 => {
+        match effective_length(&val.1) {
+            0 => Some(0),
+            1 if val.0 => Some(-(val.1[0] as i128)),
+            1 if !val.0 => Some(val.1[0] as i128),
+            2 if val.0 => {
                 let value = val.1[0] as u128 + ((val.1[1] as u128) << u64::BITS);
                 if value == 1 << (u128::BITS - 1) {
                     Some(i128::MIN)
@@ -105,8 +105,8 @@ impl<A: Allocator + Send + Sync + Clone> RustBigintRingBase<A> {
                     i128::try_from(value).ok().map(|x| -x)
                 }
             },
-            Some(1) if !val.0 => i128::try_from(val.1[0] as u128 + ((val.1[1] as u128) << u64::BITS)).ok(),
-            Some(_) => None
+            2 if !val.0 => i128::try_from(val.1[0] as u128 + ((val.1[1] as u128) << u64::BITS)).ok(),
+            _ => None
         }
     }
 
@@ -165,14 +165,16 @@ impl<A: Allocator + Send + Sync + Clone> RingBase for RustBigintRingBase<A> {
             (RustBigint(lhs_sgn, lhs_val), RustBigint(_, rhs_val)) => {
                 match bigint_cmp(lhs_val, rhs_val) {
                     Ordering::Less => {
-                        bigint_sub_self(lhs_val, rhs_val);
+                        let sub_result = bigint_sub_self(lhs_val, rhs_val);
+			            debug_assert!(sub_result.is_ok());
                         *lhs_sgn = !*lhs_sgn;
                     },
                     Ordering::Equal => {
                         lhs_val.clear();
                     },
                     Ordering::Greater => {
-                        bigint_sub(lhs_val, rhs_val, 0);
+                        let sub_result = bigint_sub(lhs_val, rhs_val, 0);
+			            debug_assert!(sub_result.is_ok());
                     }
                 }
             }
@@ -213,7 +215,7 @@ impl<A: Allocator + Send + Sync + Clone> RingBase for RustBigintRingBase<A> {
 
     fn mul_int(&self, mut lhs: Self::Element, rhs: i32) -> Self::Element {
         lhs.0 ^= rhs < 0;
-        bigint_fma_small_ref_snd(&mut lhs.1, rhs.unsigned_abs().into(), &[], 0);
+        core_fma_small_ref_snd(&mut lhs.1, rhs.unsigned_abs().into(), &[], 0);
         return lhs;
     }
 
@@ -236,15 +238,15 @@ impl<A: Allocator + Send + Sync + Clone> RingBase for RustBigintRingBase<A> {
     }
 
     fn is_zero(&self, value: &Self::Element) -> bool {
-        highest_set_block(&value.1).is_none()
+        effective_length(&value.1) == 0
     }
 
     fn is_one(&self, value: &Self::Element) -> bool {
-        value.0 == false && highest_set_block(&value.1) == Some(0) && value.1[0] == 1
+        value.0 == false && effective_length(&value.1) == 1 && value.1[0] == 1
     }
 
     fn is_neg_one(&self, value: &Self::Element) -> bool {
-        value.0 == true && highest_set_block(&value.1) == Some(0) && value.1[0] == 1
+        value.0 == true && effective_length(&value.1) == 1 && value.1[0] == 1
     }
 
     fn is_commutative(&self) -> bool { true }
@@ -262,7 +264,7 @@ impl<A: Allocator + Send + Sync + Clone> RingBase for RustBigintRingBase<A> {
         }
         let mut copy = value.clone();
         let mut remainders: Vec<u64> = Vec::with_capacity(
-            (highest_set_block(&value.1).unwrap_or(0) + 1) * u64::BITS as usize / 3
+            effective_length(&value.1) * u64::BITS as usize / 3
         );
         while !self.is_zero(&copy) {
             let rem = bigint_div_small(&mut copy.1, BIG_POWER_TEN);
@@ -520,11 +522,8 @@ impl<A: Allocator + Send + Sync + Clone> EuclideanRing for RustBigintRingBase<A>
 impl<A: Allocator + Send + Sync + Clone> HashableElRing for RustBigintRingBase<A> {
 
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
-        let block = highest_set_block(&el.1);
-        if let Some(b) = block {
-            for i in 0..=b {
-                h.write_u64(el.1[i])
-            }
+        for i in 0..effective_length(&el.1) {
+            h.write_u64(el.1[i])
         }
     }
 }
@@ -577,7 +576,7 @@ impl<A: Allocator + Send + Sync + Clone> SerializableElementRing for RustBigintR
         if serializer.is_human_readable() {
             SerializableNewtypeStruct::new("BigInt", format!("{}", RingRef::new(self).formatted_el(el)).as_str()).serialize(serializer)
         } else {
-            let len = highest_set_block(&el.1).map(|n| n + 1).unwrap_or(0);
+            let len = effective_length(&el.1);
             let mut data = Vec::with_capacity_in(len * size_of::<u64>(), &self.allocator);
             for digit in &el.1 {
                 data.extend(digit.to_le_bytes().into_iter());
@@ -626,7 +625,7 @@ impl<A: Allocator + Send + Sync + Clone> CanHomFrom<StaticRingBase<i64>> for Rus
     }
 
     fn mul_assign_map_in_ref(&self, _: &StaticRingBase<i64>, lhs: &mut RustBigint<A>, rhs: &<StaticRingBase<i64> as RingBase>::Element, (): &()) {
-        bigint_fma_small_ref_snd(&mut lhs.1, rhs.unsigned_abs() as u64, &[], 0);
+        core_fma_small_ref_snd(&mut lhs.1, rhs.unsigned_abs() as u64, &[], 0);
         lhs.0 ^= *rhs < 0;
     }
 }
@@ -635,10 +634,10 @@ impl<A: Allocator + Send + Sync + Clone> IntegerRing for RustBigintRingBase<A> {
 
     fn to_float_approx(&self, value: &Self::Element) -> f64 {
         let sign = if value.0 { -1. } else { 1. };
-        match highest_set_block(&value.1) {
-            None => 0.,
-            Some(0) => value.1[0] as f64 * sign,
-            Some(d) => (value.1[d] as f64 * 2f64.powi((d * u64::BITS as usize).try_into().unwrap()) + value.1[d - 1] as f64 * 2f64.powi(((d - 1) * u64::BITS as usize).try_into().unwrap())) * sign
+        match effective_length(&value.1) {
+            0 => 0.,
+            1 => value.1[0] as f64 * sign,
+            l => (value.1[l - 1] as f64 * 2f64.powi(((l - 1) * u64::BITS as usize).try_into().unwrap()) + value.1[l - 2] as f64 * 2f64.powi(((l - 2) * u64::BITS as usize).try_into().unwrap())) * sign
         }
     }
 
@@ -679,7 +678,7 @@ impl<A: Allocator + Send + Sync + Clone> IntegerRing for RustBigintRingBase<A> {
     }
 
     fn abs_highest_set_bit(&self, value: &Self::Element) -> Option<usize> {
-        let block = highest_set_block(&value.1)?;
+        let block = effective_length(&value.1).checked_sub(1)?;
         Some(block * u64::BITS as usize + u64::BITS as usize - value.1[block].leading_zeros() as usize - 1)
     }
 
