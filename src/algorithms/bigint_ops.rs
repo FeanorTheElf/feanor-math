@@ -24,12 +24,6 @@ fn truncate_zeros(mut x: Vec<BlockInt>) -> Vec<BlockInt> {
 	return x;
 }
 
-#[instrument(skip_all, level = "trace")]
-fn assign<A: Allocator>(x: &mut Vec<BlockInt, A>, rhs: &[BlockInt]) {
-    x.clear();
-    x.extend((0..rhs.len()).map(|i| rhs[i]))
-}
-
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn bigint_add<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], block_offset: usize) {
@@ -215,16 +209,13 @@ pub fn bigint_rshift(lhs: &mut [BlockInt], power: usize) {
 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn bigint_fma<A: Allocator, A2: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt], mut out: Vec<BlockInt, A>, scratch_alloc: A2) -> Vec<BlockInt, A> {
+pub fn bigint_fma<A: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt], mut out: Vec<BlockInt, A>) -> Vec<BlockInt, A> {
 	let prev_len = highest_set_block(&out).map(|x| x + 1).unwrap_or(0);
 	let new_len = max(prev_len + 1, highest_set_block(lhs.as_ref()).and_then(|lb| highest_set_block(rhs.as_ref()).map(|rb| lb + rb + 2)).unwrap_or(0));
 	out.resize(new_len, 0);
 	if let Some(d) = highest_set_block(rhs.as_ref()) {
-		let mut val = Vec::new_in(scratch_alloc);
 		for i in 0..=d {
-			assign(&mut val, lhs.as_ref());
-			bigint_mul_small(&mut val, rhs[i]);
-			bigint_add(&mut out, val.as_ref(), i);
+			bigint_fma_small_ref_fst(lhs, rhs[i], &mut out, i);
 		}
 	}
 	debug_assert!(highest_set_block(&out).is_none() || highest_set_block(&out).unwrap() as isize >= out.len() as isize - 2);
@@ -233,16 +224,38 @@ pub fn bigint_fma<A: Allocator, A2: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt
 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn bigint_mul_small<A: Allocator>(lhs: &mut Vec<BlockInt, A>, factor: BlockInt) {
-	if let Some(d) = highest_set_block(lhs.as_ref()) {
-		let mut buffer: u64 = 0;
-		for i in 0..=d {
-			let prod = lhs[i] as u128 * factor as u128 + buffer as u128;
-			*lhs.at_mut(i) = (prod & ((1u128 << BLOCK_BITS) - 1)) as u64;
-			buffer = (prod >> BLOCK_BITS) as u64;
-		}
-		expand(lhs, d + 2);
-		*lhs.at_mut(d + 1) = buffer;
+pub fn bigint_fma_small_ref_fst<A: Allocator>(lhs: &[BlockInt], factor: BlockInt, summand: &mut Vec<u64, A>, block_offset: usize) {
+	let up_to = max(highest_set_block(lhs.as_ref()).map(|d| d + block_offset + 1).unwrap_or(0), highest_set_block(summand).map(|d| d + 1).unwrap_or(0));
+	expand(summand, up_to + 1);
+	let mut buffer: u64 = 0;
+	for i in block_offset..up_to {
+		let prod = *lhs.get(i - block_offset).unwrap_or(&0) as u128 * factor as u128 + buffer as u128 + summand[i] as u128;
+		summand[i] = (prod & ((1u128 << BLOCK_BITS) - 1)) as u64;
+		buffer = (prod >> BLOCK_BITS) as u64;
+	}
+	if buffer == 0 {
+		summand.truncate(up_to);
+	} else {
+		summand[up_to] = buffer;
+	}
+}
+
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn bigint_fma_small_ref_snd<A: Allocator>(lhs: &mut Vec<u64, A>, factor: BlockInt, summand: &[u64], block_offset: usize) {
+	let up_to = max(highest_set_block(lhs.as_ref()).map(|d| d + block_offset + 1).unwrap_or(0), highest_set_block(summand).map(|d| d + 1).unwrap_or(0));
+	let mut buffer: u64 = 0;
+	_ = lhs.splice(0..0, summand[0..block_offset].iter().copied());
+	expand(lhs, up_to + 1);
+	for i in block_offset..up_to {
+		let prod = lhs[i] as u128 * factor as u128 + buffer as u128 + *summand.get(i).unwrap_or(&0) as u128;
+		lhs[i] = (prod & ((1u128 << BLOCK_BITS) - 1)) as u64;
+		buffer = (prod >> BLOCK_BITS) as u64;
+	}
+	if buffer == 0 {
+		lhs.truncate(up_to);
+	} else {
+		lhs[up_to] = buffer;
 	}
 }
 
@@ -286,8 +299,8 @@ fn division_step_last<A: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], d: u
 		}
 	} else {
 		let mut quotient = (self_high_blocks / (rhs_high_blocks + 1)) as u64;
-		assign(tmp, rhs.as_ref());
-		bigint_mul_small(tmp, quotient);
+		tmp.clear();
+		bigint_fma_small_ref_fst(rhs, quotient, tmp, 0);
 		bigint_sub(lhs, tmp.as_ref(), 0);
 
 		if bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Less {
@@ -307,7 +320,7 @@ fn division_step_last<A: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], d: u
 ///
 /// Finds some integer d such that subtracting d * rhs from self clears the top
 /// block of self. self will be assigned the value after the subtraction and d
-/// will be returned as d = (u * 2 ^ block_bits + l) * 2 ^ (k * block_bits) 
+/// will be returned as d = (u * 2**block_bits + l) * 2**(k * block_bits) 
 /// where the return value is (u, l, k)
 /// 
 /// Complexity O(log(n))
@@ -330,8 +343,8 @@ fn division_step<A: Allocator>(
 	//  - by choosing a and b as the top two blocks of lhs resp. lhs, achieve that a - a//(b+1) * b <= b + 2^k
 	//    (where k = BLOCK_BITS); hence, lhs - a//(b+1) * rhs <= rhs + 2^k, and so possibly subtracting rhs
 	//    achieves new_lhs <= rhs
-	//  - by choosing a as the top two blocks and b as only the top block of lhs resp. lhs (now b < 2^k), achieve that
-	//    lhs - a//(b+1) * rhs < 2^k + 2^k = 2 * 2^k, and so after possibly subtracting rhs we find
+	//  - by choosing a as the top two blocks and b as only the top block of lhs resp. lhs (now b < 2^k), achieve
+	//    that lhs - a//(b+1) * rhs < 2^k + 2^k = 2 * 2^k, and so after possibly subtracting rhs we find
 	//    that the top block of lhs is cleared
 
 	let mut result_upper = 0;
@@ -345,8 +358,8 @@ fn division_step<A: Allocator>(
 		if rhs_high_blocks != DoubleBlockInt::MAX && lhs_high_blocks >= (rhs_high_blocks + 1) {
 			let mut quotient = (lhs_high_blocks / (rhs_high_blocks + 1)) as u64;
 			debug_assert!(quotient != 0);
-			assign(tmp, rhs.as_ref());
-			bigint_mul_small(tmp, quotient);
+			tmp.clear();
+			bigint_fma_small_ref_fst(rhs.as_ref(), quotient, tmp, 0);
 			bigint_sub(lhs, tmp.as_ref(), lhs_high - rhs_high);
 
 			let lhs_high_blocks = ((lhs[lhs_high] as DoubleBlockInt) << BLOCK_BITS) | (lhs[lhs_high - 1] as DoubleBlockInt);
@@ -370,8 +383,8 @@ fn division_step<A: Allocator>(
 
 		if lhs[lhs_high] != 0 {
 			let mut quotient = (lhs_high_blocks / (rhs_high_block + 1)) as BlockInt;
-			assign(tmp, rhs.as_ref());
-			bigint_mul_small(tmp, quotient);
+			tmp.clear();
+			bigint_fma_small_ref_fst(rhs.as_ref(), quotient, tmp, 0);
 			bigint_sub(lhs, tmp.as_ref(), lhs_high - rhs_high - 1);
 
 			if lhs[lhs_high] != 0 {
@@ -388,8 +401,7 @@ fn division_step<A: Allocator>(
 
 ///
 /// Calculates abs(self) = abs(self) % abs(rhs) and returns the quotient
-/// of the division abs(self) / abs(rhs). The sign bit of self is ignored
-/// and left unchanged.
+/// of the division abs(self) / abs(rhs).
 /// 
 /// Complexity O(log(n)^2)
 /// 
@@ -616,7 +628,7 @@ fn test_mul() {
     let x = parse("57873674586797895671345345", 10);
     let y = parse("21308561789045691782534873921650342768903561413264128756389247568729346542359871235465", 10);
     let z = parse("1233204770891906354921751949503652431220138020953161094405729272872607166072371117664593787957056214903826660425", 10);
-    assert_eq!(truncate_zeros(z), truncate_zeros(bigint_fma(&x, &y, Vec::new(), Global)));
+    assert_eq!(truncate_zeros(z), truncate_zeros(bigint_fma(&x, &y, Vec::new())));
 }
 
 #[test]
@@ -626,7 +638,7 @@ fn test_fma() {
     let y = parse("598147578092315980234089723484389243859743", 10);
     let a = parse("98734435342", 10);
     let z = parse("325350159908777866468983871740437853305599423427707736569559476320508903561720075798", 10);
-    assert_eq!(truncate_zeros(z), truncate_zeros(bigint_fma(&x, &y, a, Global)));
+    assert_eq!(truncate_zeros(z), truncate_zeros(bigint_fma(&x, &y, a)));
 }
 
 #[test]
@@ -719,4 +731,18 @@ fn test_bigint_lshift() {
     let mut x = parse("4829192", 10);
 	bigint_lshift(&mut x, 64);
     assert_eq!(parse("89082868906805576987574272", 10), truncate_zeros(x));
+}
+
+#[test]
+fn test_bigint_fma_small() {
+    LogAlgorithmSubscriber::init_test();
+	let x = parse("10000000000000000000000000000000", 10);
+	let mut z = parse("100000000000000000000000000000000", 10);
+	bigint_fma_small_ref_fst(&x, 42, &mut z, 0);
+	assert_eq!(parse("520000000000000000000000000000000", 10), truncate_zeros(z));
+
+	let mut x = parse("10000000000000000000000000000000", 10);
+	let z = parse("100000000000000000000000000000000", 10);
+	bigint_fma_small_ref_snd(&mut x, 42, &z, 0);
+	assert_eq!(parse("520000000000000000000000000000000", 10), truncate_zeros(x));
 }

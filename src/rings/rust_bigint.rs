@@ -1,9 +1,11 @@
 use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNewtypeStruct};
 use serde::de::{self, DeserializeSeed};
 use serde::ser::SerializeTuple;
-use serde::{Deserializer, Serialize, Deserialize, Serializer}; 
+use serde::{Deserializer, Serialize, Deserialize, Serializer};
+use tracing::instrument; 
 
 use crate::algorithms::bigint_ops::*;
+use crate::algorithms::eea::{eea, partial_eea_int};
 use crate::divisibility::{DivisibilityRing, Domain};
 use crate::pid::*;
 use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ, impl_eval_poly_locally_for_ZZ};
@@ -16,10 +18,10 @@ use crate::specialization::*;
 
 use std::alloc::Allocator;
 use std::alloc::Global;
-use std::cmp::Ordering::*;
-use std::cmp::Ordering;
+use std::cmp::{Ordering, max, min};
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::mem::{replace, swap};
 
 ///
 /// An element of the integer ring implementation [`RustBigintRing`].
@@ -162,14 +164,14 @@ impl<A: Allocator + Send + Sync + Clone> RingBase for RustBigintRingBase<A> {
             },
             (RustBigint(lhs_sgn, lhs_val), RustBigint(_, rhs_val)) => {
                 match bigint_cmp(lhs_val, rhs_val) {
-                    Less => {
+                    Ordering::Less => {
                         bigint_sub_self(lhs_val, rhs_val);
                         *lhs_sgn = !*lhs_sgn;
                     },
-                    Equal => {
+                    Ordering::Equal => {
                         lhs_val.clear();
                     },
-                    Greater => {
+                    Ordering::Greater => {
                         bigint_sub(lhs_val, rhs_val, 0);
                     }
                 }
@@ -196,13 +198,13 @@ impl<A: Allocator + Send + Sync + Clone> RingBase for RustBigintRingBase<A> {
     }
 
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        let result = bigint_fma(&lhs.1, &rhs.1, Vec::new_in(self.allocator.clone()), &self.allocator);
+        let result = bigint_fma(&lhs.1, &rhs.1, Vec::new_in(self.allocator.clone()));
         *lhs = RustBigint(lhs.0 ^ rhs.0, result);
     }
 
     fn fma(&self, lhs: &Self::Element, rhs: &Self::Element, summand: Self::Element) -> Self::Element {
         if lhs.0 ^ rhs.0 == summand.0 {
-            let result = bigint_fma(&lhs.1, &rhs.1, summand.1, &self.allocator);
+            let result = bigint_fma(&lhs.1, &rhs.1, summand.1);
             RustBigint(summand.0, result)
         } else {
             self.add(summand, self.mul_ref(lhs, rhs))
@@ -211,8 +213,7 @@ impl<A: Allocator + Send + Sync + Clone> RingBase for RustBigintRingBase<A> {
 
     fn mul_int(&self, mut lhs: Self::Element, rhs: i32) -> Self::Element {
         lhs.0 ^= rhs < 0;
-        let rhs = rhs.unsigned_abs();
-        bigint_mul_small(&mut lhs.1, rhs.into());
+        bigint_fma_small_ref_snd(&mut lhs.1, rhs.unsigned_abs().into(), &[], 0);
         return lhs;
     }
 
@@ -228,7 +229,7 @@ impl<A: Allocator + Send + Sync + Clone> RingBase for RustBigintRingBase<A> {
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         if lhs.0 == rhs.0 {
-            bigint_cmp(&lhs.1, &rhs.1) == Equal
+            bigint_cmp(&lhs.1, &rhs.1) == Ordering::Equal
         } else {
             self.is_zero(lhs) && self.is_zero(rhs)
         }
@@ -333,9 +334,9 @@ impl<A: Allocator + Send + Sync + Clone> OrderedRing for RustBigintRingBase<A> {
         match (lhs.0, rhs.0) {
             (true, true) => bigint_cmp(&rhs.1, &lhs.1),
             (false, false) => bigint_cmp(&lhs.1, &rhs.1),
-            (_, _) if self.is_zero(lhs) && self.is_zero(rhs) => Equal,
-            (true, false) => Less,
-            (false, true) => Greater
+            (_, _) if self.is_zero(lhs) && self.is_zero(rhs) => Ordering::Equal,
+            (true, false) => Ordering::Less,
+            (false, true) => Ordering::Greater
         }
     }
 
@@ -381,20 +382,122 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
         self.checked_left_div(lhs, rhs)
     }
     
+    #[instrument(skip_all, level = "trace")]
     fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        let mut current_transform = [self.one(), self.zero(), self.zero(), self.one()];
+
+        let from_i64 = RingValue::from_ref(self).can_hom(&StaticRing::<i64>::RING).unwrap();
+
+        let get_abs_head_bits = |x: &RustBigint<A>, shift: usize| {
+            let block_idx = shift / 64;
+            let remaining_shift = shift % 64;
+            let result = if x.1.len() <= block_idx {
+                0
+            } else if x.1.len() == block_idx + 1 || remaining_shift == 0 {
+                x.1[block_idx] >> remaining_shift
+            } else {
+                (x.1[block_idx] >> remaining_shift) | (x.1[block_idx + 1] << (64 - remaining_shift))
+            };
+            debug_assert!(result < (1 << 63));
+            return result as i64;
+        };
+
         let [mut a, mut b] = [self.clone_el(lhs), self.clone_el(rhs)];
+        let [mut sa, mut ta, mut sb, mut tb] = [self.one(), self.zero(), self.zero(), self.one()];
 
-        while !self.is_zero(&a) && !self.is_zero(&b) {
+        while let Some(mut i_a) = self.abs_highest_set_bit(&a) && let Some(mut i_b) = self.abs_highest_set_bit(&b) && i_a >= 63 && i_b >= 63 {
+            if self.is_neg(&a) {
+                self.negate_inplace(&mut a);
+                self.negate_inplace(&mut sa);
+                self.negate_inplace(&mut ta);
+            }
+            if self.is_neg(&b) {
+                self.negate_inplace(&mut b);
+                self.negate_inplace(&mut sb);
+                self.negate_inplace(&mut tb);
+            }
+            if i_a < i_b {
+                swap(&mut a, &mut b);
+                swap(&mut i_a, &mut i_b);
+                swap(&mut sa, &mut sb);
+                swap(&mut ta, &mut tb);
+            }
+            if i_a - i_b >= 16 {
+                let a_shift = i_a - 62;
+                let b_shift = min(i_b - 31, a_shift);
+                let quo = get_abs_head_bits(&a, a_shift) / (get_abs_head_bits(&b, b_shift) + 1);
 
+                let mut b_shifted = self.clone_el(&b);
+                bigint_lshift(&mut b_shifted.1, a_shift - b_shift);
+                a = from_i64.fma_map(&b_shifted, &-quo, a);
+                let mut sb_shifted = self.clone_el(&sb);
+                bigint_lshift(&mut sb_shifted.1, a_shift - b_shift);
+                sa = from_i64.fma_map(&sb_shifted, &-quo, sa);
+                let mut tb_shifted = self.clone_el(&tb);
+                bigint_lshift(&mut tb_shifted.1, a_shift - b_shift);
+                ta = from_i64.fma_map(&tb_shifted, &-quo, ta);
+            } else {
+                let shift = max(i_a, i_b) - 62;
+                let a_head = get_abs_head_bits(&a, shift);
+                debug_assert!(a_head.abs() >= (1 << 47));
+                let b_head = get_abs_head_bits(&b, shift);
+                debug_assert!(b_head.abs() >= (1 << 47));
+                
+                // by the bound given by `partial_eea_int()`, we find that `b_new < 2**32`
+                // and also `|transform[2]|, |transform[3]| <= a / (a_new - b_new) < 2**64 / 2**31 = 2**33`;
+                // thus we decreased the size of at least one new value from >= 2**47 to at most 3 * 2**33
+                let (transform, _) = partial_eea_int(StaticRing::<i64>::RING, a_head, b_head, &(1 << 32));
+
+                let apply_transform = |[a, b]: [&mut RustBigint<A>; 2]| {
+                    let new_b = from_i64.fma_map(&b, &transform[3], from_i64.mul_ref_map(&a, &transform[2]));
+                    *a = from_i64.fma_map(&b, &transform[1], from_i64.mul_map(replace(a, self.zero()), transform[0]));
+                    *b = new_b;
+                };
+                apply_transform([&mut a, &mut b]);
+                apply_transform([&mut sa, &mut sb]);
+                apply_transform([&mut ta, &mut tb]);
+            }
+            debug_assert!(self.eq_el(&a, &self.add(self.mul_ref(&sa, lhs), self.mul_ref(&ta, rhs))));
+            debug_assert!(self.eq_el(&b, &self.add(self.mul_ref(&sb, lhs), self.mul_ref(&tb, rhs))));
         }
-
-        let [sa, ta, sb, tb] = current_transform;
         if self.is_zero(&a) {
             return (sb, tb, b);
-        } else {
-            return (sa, ta, a);
+        } else if self.is_neg(&a) {
+            self.negate_inplace(&mut a);
+            self.negate_inplace(&mut sa);
+            self.negate_inplace(&mut ta);
         }
+        if self.is_zero(&b) {
+            return (sa, ta, a);
+        } else if self.is_neg(&b) {
+            self.negate_inplace(&mut b);
+            self.negate_inplace(&mut sb);
+            self.negate_inplace(&mut tb);
+        }
+
+        let mut i_a = self.abs_highest_set_bit(&a).unwrap();
+        let mut i_b = self.abs_highest_set_bit(&b).unwrap();
+        if i_a < i_b {
+            swap(&mut a, &mut b);
+            swap(&mut i_a, &mut i_b);
+            swap(&mut sa, &mut sb);
+            swap(&mut ta, &mut tb);
+        }
+        debug_assert!(i_b < 63);
+        let b = b.1[0];
+        let mut quo = a;
+        let a = bigint_div_small(&mut quo.1, b);
+        debug_assert!(a <= i64::MAX as u64);
+        
+        self.negate_inplace(&mut quo);
+        sa = self.fma(&quo, &sb, sa);
+        ta = self.fma(&quo, &tb, ta);
+
+        let (s_final, t_final, d) = eea(a as i64, b as i64, StaticRing::<i64>::RING);
+        return (
+            from_i64.fma_map(&sb, &t_final, from_i64.mul_map(sa, s_final)),
+            from_i64.fma_map(&tb, &t_final, from_i64.mul_map(ta, s_final)),
+            from_i64.map(d)
+        );
     }
 }
 
@@ -456,7 +559,7 @@ impl<A: Allocator + Send + Sync + Clone> SerializableElementRing for RustBigintR
             return self.parse(string.as_str(), 10).map_err(|()| de::Error::custom(format!("cannot parse \"{}\" as number", string)));
         } else {
             let (negative, data) = deserialize_bigint_from_bytes(deserializer, |data| {
-                let mut result_data = Vec::with_capacity_in((data.len() - 1) / size_of::<u64>() + 1, self.allocator.clone());
+                let mut result_data = Vec::with_capacity_in(data.len().div_ceil(size_of::<u64>()), self.allocator.clone());
                 let (chunks, last) = data.as_chunks();
                 for digit in chunks {
                     result_data.push(u64::from_le_bytes(*digit));
@@ -498,6 +601,33 @@ impl<A> FiniteRingSpecializable for RustBigintRingBase<A>
 {
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
         op.fallback()
+    }
+}
+
+impl<A: Allocator + Send + Sync + Clone> CanHomFrom<StaticRingBase<i64>> for RustBigintRingBase<A> {
+
+    fn fma_map_in(&self, from: &StaticRingBase<i64>, lhs: &RustBigint<A>, rhs: &<StaticRingBase<i64> as RingBase>::Element, mut summand: RustBigint<A>, (): &()) -> RustBigint<A> {
+        if self.is_zero(&summand) {
+            let mut result = self.clone_el(lhs);
+            self.mul_assign_map_in(from, &mut result, *rhs, &());
+            return result;
+        } else if (*rhs < 0) ^ self.is_neg(lhs) == self.is_neg(&summand) {
+            bigint_fma_small_ref_fst(&lhs.1, (*rhs).unsigned_abs(), &mut summand.1, 0);
+            return summand;
+        } else {
+            let mut tmp = self.clone_el(lhs);
+            self.mul_assign_map_in(from, &mut tmp, *rhs, &());
+            return self.add(tmp, summand);
+        }
+    }
+
+    fn mul_assign_map_in(&self, from: &StaticRingBase<i64>, lhs: &mut RustBigint<A>, rhs: <StaticRingBase<i64> as RingBase>::Element, (): &()) {
+        self.mul_assign_map_in_ref(from, lhs, &rhs, &());
+    }
+
+    fn mul_assign_map_in_ref(&self, _: &StaticRingBase<i64>, lhs: &mut RustBigint<A>, rhs: &<StaticRingBase<i64> as RingBase>::Element, (): &()) {
+        bigint_fma_small_ref_snd(&mut lhs.1, rhs.unsigned_abs() as u64, &[], 0);
+        lhs.0 ^= *rhs < 0;
     }
 }
 
@@ -789,6 +919,21 @@ fn test_canonical_iso_static_int() {
     // for the hom test, we have to be able to multiply elements in `StaticRing::<i128>::RING`, so we cannot test `i128::MAX` or `i128::MIN`
     crate::ring::generic_tests::test_hom_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128].iter().copied());
     crate::ring::generic_tests::test_iso_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128, i128::MAX, i128::MIN].iter().copied());
+}
+
+#[test]
+fn test_fma_map_in() {
+    LogAlgorithmSubscriber::init_test();
+    let from_i64 = ZZ.can_hom(&StaticRing::<i64>::RING).unwrap();
+    assert_el_eq!(ZZ, ZZ.get_ring().parse("10000000000000000000000", 10).unwrap(), from_i64.fma_map(&ZZ.get_ring().parse("100000000000000000000", 10).unwrap(), &100, ZZ.zero()));
+    assert_el_eq!(ZZ, ZZ.get_ring().parse("-10000000000000000000000", 10).unwrap(), from_i64.fma_map(&ZZ.get_ring().parse("100000000000000000000", 10).unwrap(), &-100, ZZ.zero()));
+    assert_el_eq!(ZZ, ZZ.get_ring().parse("10000000000000000000000", 10).unwrap(), from_i64.fma_map(&ZZ.get_ring().parse("100000000000000000000", 10).unwrap(), &100, ZZ.negate(ZZ.zero())));
+    assert_el_eq!(ZZ, ZZ.get_ring().parse("-10000000000000000000000", 10).unwrap(), from_i64.fma_map(&ZZ.get_ring().parse("100000000000000000000", 10).unwrap(), &-100, ZZ.negate(ZZ.zero())));
+
+    assert_el_eq!(ZZ, ZZ.get_ring().parse("10100000000000000000000", 10).unwrap(), from_i64.fma_map(&ZZ.get_ring().parse("100000000000000000000", 10).unwrap(), &100, ZZ.get_ring().parse("100000000000000000000", 10).unwrap()));
+    assert_el_eq!(ZZ, ZZ.get_ring().parse("-9900000000000000000000", 10).unwrap(), from_i64.fma_map(&ZZ.get_ring().parse("100000000000000000000", 10).unwrap(), &-100, ZZ.get_ring().parse("100000000000000000000", 10).unwrap()));
+    assert_el_eq!(ZZ, ZZ.get_ring().parse("9900000000000000000000", 10).unwrap(), from_i64.fma_map(&ZZ.get_ring().parse("100000000000000000000", 10).unwrap(), &100, ZZ.get_ring().parse("-100000000000000000000", 10).unwrap()));
+    assert_el_eq!(ZZ, ZZ.get_ring().parse("-10100000000000000000000", 10).unwrap(), from_i64.fma_map(&ZZ.get_ring().parse("100000000000000000000", 10).unwrap(), &-100, ZZ.get_ring().parse("-100000000000000000000", 10).unwrap()));
 }
 
 #[test]

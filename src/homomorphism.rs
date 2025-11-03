@@ -1443,7 +1443,13 @@ pub mod generic_tests {
                     let prod_map = hom.map(from.mul_ref(a, b));
                     let mut mul_assign = to.clone_el(&map_a);
                     hom.mul_assign_ref_map( &mut mul_assign, b);
-                    assert!(to.eq_el(&mul_assign, &prod_map), "mul_assign_ref_map() failed: hom({} * {}) = {} != {} = mul_map_in(hom({}), {})", from.formatted_el(a), from.formatted_el(b), to.formatted_el(&prod_map), to.formatted_el(&mul_assign), to.formatted_el(&map_a), from.formatted_el(b));
+                    assert!(to.eq_el(&mul_assign, &prod_map), "mul_assign_ref_map() failed: hom({} * {}) = {} != {} = mul_map(hom({}), {})", from.formatted_el(a), from.formatted_el(b), to.formatted_el(&prod_map), to.formatted_el(&mul_assign), from.formatted_el(a), from.formatted_el(b));
+                }
+                {
+                    let c = from.add_ref(a, b);
+                    let expected = hom.map(from.add_ref_snd(from.mul_ref(a, b), &c));
+                    let actual = hom.fma_map(&hom.map_ref(a), b, hom.map_ref(&c));
+                    assert!(to.eq_el(&actual, &expected), "mul_assign_ref_map() failed: hom({} * {} + {}) = {} != {} = fma_map(hom({}), {}, hom({}))", from.formatted_el(a), from.formatted_el(b), from.formatted_el(&c), to.formatted_el(&expected), to.formatted_el(&actual), from.formatted_el(a), from.formatted_el(b), from.formatted_el(&c));
                 }
             }
         }

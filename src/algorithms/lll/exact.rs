@@ -485,7 +485,7 @@ fn test_lll_generating_set() {
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
     let original = matrix!(
-        QQ.inclusion().compose(ZZ.can_hom(&StaticRing::<i128>::RING).unwrap()),
+        QQ.inclusion().compose(ZZ.can_hom::<StaticRing<i128>>(&StaticRing::<i128>::RING).unwrap()),
         DerefArray::from([-4,   8, -54,  -1,   42,   15,   -23,   -259]),
         DerefArray::from([-3,  10, -36,  18,  -48, -473, -1200,  -6493]),
         DerefArray::from([ 5, -13,  62, -15,   17,  398,  1043,   5721]),
@@ -514,7 +514,7 @@ fn test_lll_generating_set() {
     assert_el_eq!(QQ, QQ.int_hom().map(40), norm_squared(&QQ, &reduced_matrix.as_const().col_at(7)));
 
     let original = matrix!(
-        QQ.inclusion().compose(ZZ.can_hom(&StaticRing::<i128>::RING).unwrap()),
+        QQ.inclusion().compose(ZZ.can_hom::<StaticRing<i128>>(&StaticRing::<i128>::RING).unwrap()),
         DerefArray::from([  -60725263117,   -448122081513,  -218368759847,   2100701846793,   216156377534,   -3137996709827,   14835704835919,    67504381450573]),
         DerefArray::from([-1310716961940,  -9682451257943, -4729935920987,  45413204073392,  4667627712725,  -67791459966817,  320528485599331,  1458334256347773]),
         DerefArray::from([ 1159398893231,   8564380015666,  4183444050825, -40168532351902, -4128711773154,   59963582382418, -283516375460965, -1289940218804617]),
@@ -551,7 +551,7 @@ fn bench_lll_10d(bencher: &mut Bencher) {
 
     bencher.iter(|| {
         let original = matrix!(
-            QQ.inclusion().compose(ZZ.can_hom(&StaticRing::<i128>::RING).unwrap()),
+            QQ.inclusion().compose(ZZ.can_hom::<StaticRing<i128>>(&StaticRing::<i128>::RING).unwrap()),
             DerefArray::from([       1,        0,        0,        0,        0,        0,        0,        0,        0,        0]),
             DerefArray::from([       0,        1,        0,        0,        0,        0,        0,        0,        0,        0]),
             DerefArray::from([       0,        0,        1,        0,        0,        0,        0,        0,        0,        0]),

@@ -316,6 +316,18 @@ impl<I, J> CanHomFrom<I> for J
     default fn map_in_ref(&self, from: &I, el: &<I as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         <J as CanHomFrom<I>>::map_in(self, from, from.clone_el(el), hom)
     }
+
+    default fn fma_map_in(&self, from: &I, lhs: &Self::Element, rhs: &<I as RingBase>::Element, summand: Self::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.fma(lhs, &self.map_in_ref(from, rhs, hom), summand)
+    }
+
+    default fn mul_assign_map_in(&self, from: &I, lhs: &mut Self::Element, rhs: <I as RingBase>::Element, hom: &Self::Homomorphism) {
+        self.mul_assign(lhs, self.map_in(from, rhs, hom));
+    }
+
+    default fn mul_assign_map_in_ref(&self, from: &I, lhs: &mut Self::Element, rhs: &<I as RingBase>::Element, hom: &Self::Homomorphism) {
+        self.mul_assign(lhs, self.map_in_ref(from, rhs, hom));
+    }
 }
 
 impl<I, J> CanIsoFromTo<I> for J

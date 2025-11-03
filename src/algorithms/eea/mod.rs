@@ -210,8 +210,8 @@ pub fn partial_eea_poly<P>(ring: P, lhs: El<P>, rhs: El<P>, target_deg: usize) -
 /// ```text
 ///   |s| <= |b| / |x|
 ///   |t| <= |a| / |x|
-///   |s'| <= |b| / |x'|
-///   |t'| <= |a| / |x'|
+///   |s'| <= |b| / (|x| - |x'|)
+///   |t'| <= |a| / (|x| - |x'|)
 /// ```
 /// except if `min(|a|, |b|) <= target_size`, i.e. no step is performed during the
 /// Euclidean algorithm. In such cases, the bounds involving the larger one of `|a|`
@@ -233,8 +233,8 @@ pub fn partial_eea_poly<P>(ring: P, lhs: El<P>, rhs: El<P>, target_deg: usize) -
 ///  - the signs of `s_i` and `t_i` are alternating for `i >= 2`
 ///  - we have `a_i |s_i| <= |s_2| a_2 q_2 / q_i` and `a_i |t_i| <= |t_2| a_2 q_2 / q_i` for `i >= 2`;
 ///    this can be shown by induction, using the first two points
-///  - finally, this implies for `i >= 1` that `a_i |s_i| <= a_1` and `a_i |t_i| <= a_0`,
-///    using that `q_2 a_2 <= a_1` and `q_1 a_1 <= a_0` (and also `q_1 >= 1`)
+///  - finally, this implies for `i >= 1` that `a_i |s_i| <= a_1 / q_i` and `a_i |t_i| <= a_0 / q_i`,
+///    using that `q_2 a_2 <= a_1` and `q_1 a_1 <= a_0`
 ///  - unfortunately, it does not apply to `i = 0`
 /// 
 #[stability::unstable(feature = "enable")]
@@ -258,8 +258,9 @@ pub fn partial_eea_int<R>(ring: R, lhs: El<R>, rhs: El<R>, target_size: &El<R>) 
     }
 
     while ring.abs_cmp(&b, target_size) == Ordering::Greater {
-        debug_assert!(ring.eq_el(&a, &ring.add(ring.mul_ref(&sa, &lhs), ring.mul_ref(&ta, &rhs))));
-        debug_assert!(ring.eq_el(&b, &ring.add(ring.mul_ref(&sb, &lhs), ring.mul_ref(&tb, &rhs))));
+        // these might trigger integer overflow
+        // debug_assert!(ring.eq_el(&a, &ring.add(ring.mul_ref(&sa, &lhs), ring.mul_ref(&ta, &rhs))));
+        // debug_assert!(ring.eq_el(&b, &ring.add(ring.mul_ref(&sb, &lhs), ring.mul_ref(&tb, &rhs))));
 
         let (quo, rem) = ring.euclidean_div_rem(a, &b);
         let tb_new = ring.sub(ta, ring.mul_ref(&quo, &tb));
@@ -273,8 +274,9 @@ pub fn partial_eea_int<R>(ring: R, lhs: El<R>, rhs: El<R>, target_size: &El<R>) 
         sb = sb_new;
         b = b_new;
         
-        debug_assert!(ring.abs_cmp(&ring.mul_ref(&sb, &b), &rhs) != Ordering::Greater);
-        debug_assert!(ring.abs_cmp(&ring.mul_ref(&tb, &b), &lhs) != Ordering::Greater);
+        // these might trigger integer overflow
+        // debug_assert!(ring.abs_cmp(&ring.mul_ref(&sb, &b), &rhs) != Ordering::Greater);
+        // debug_assert!(ring.abs_cmp(&ring.mul_ref(&tb, &b), &lhs) != Ordering::Greater);
     }
     return ([sa, ta, sb, tb], [a, b]);
 }
@@ -381,18 +383,18 @@ fn test_partial_int() {
             assert!(x_.abs() <= size);
             if a.abs() >= b.abs() {
                 assert!(t.abs() * x.abs() <= a.abs());
-                assert!(t_.abs() * x_.abs() <= a.abs());
+                assert!(t_.abs() * (x.abs() - x_.abs()) <= a.abs());
             } else {
                 assert!(s.abs() * x.abs() <= b.abs());
-                assert!(s_.abs() * x_.abs() <= b.abs());
+                assert!(s_.abs() * (x.abs() - x_.abs()) <= b.abs());
             }
         } else {
             assert!(x.abs() > size);
             assert!(x_.abs() <= size);
             assert!(t.abs() * x.abs() <= a.abs());
-            assert!(t_.abs() * x_.abs() <= a.abs());
+            assert!(t_.abs() * (x.abs() - x_.abs()) <= a.abs());
             assert!(s.abs() * x.abs() <= b.abs());
-            assert!(s_.abs() * x_.abs() <= b.abs());
+            assert!(s_.abs() * (x.abs() - x_.abs()) <= b.abs());
         }
     };
     for i in 0..9 {

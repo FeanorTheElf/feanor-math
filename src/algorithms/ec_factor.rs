@@ -222,7 +222,7 @@ fn lenstra_ec_factor_base<R, F>(Zn: R, log2_p: usize, mut rng: F) -> Option<El<<
         let power_factorization = primes.iter()
             .map(|p| (*p, log2_B.ceil() as usize / StaticRing::<i128>::RING.abs_log2_ceil(&p).unwrap()))
             .collect::<Vec<_>>();
-        let power = ZZ.prod(power_factorization.iter().map(|(p, e)| ZZ.pow(ZZ.coerce(&StaticRing::<i128>::RING, *p), *e)));
+        let power = ZZ.prod(power_factorization.iter().map(|(p, e)| ZZ.pow(ZZ.coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, *p), *e)));
         let power_ref = &power;
 
         let base_rng_value = rng();
@@ -357,12 +357,12 @@ fn test_ec_factor_large() {
 
     let n: i128 = 1073741827 * 71316922984999;
 
-    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::ZnGB::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n))));
+    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::ZnGB::new(&ZZbig, ZZbig.coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, n))));
     assert!(p == 1073741827 || p == 71316922984999);
 
     let n: i128 = 1152921504606847009 * 2305843009213693967;
 
-    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::ZnGB::new(&ZZbig, ZZbig.coerce(&StaticRing::<i128>::RING, n))));
+    let p = StaticRing::<i128>::RING.coerce(&ZZbig, lenstra_ec_factor(&zn_big::ZnGB::new(&ZZbig, ZZbig.coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, n))));
     assert!(p == 1152921504606847009 || p == 2305843009213693967);
 }
 
