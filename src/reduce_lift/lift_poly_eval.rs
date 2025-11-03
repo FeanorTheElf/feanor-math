@@ -649,14 +649,7 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
             fn init_reduce_lift<'ring>(&'ring self, ln_valuation_bound: f64) -> Self::LocalComputationData<'ring> {
                 let mut primes = Vec::new();
                 let mut ln_current = 0.;
-                let mut prime_it = //$crate::reduce_lift::primelist::LARGE_PRIMES.iter().copied().chain
-                ((0..).scan((1 << 62) / 9, |current, _| {
-                    *current = $crate::algorithms::miller_rabin::prev_prime(StaticRing::<i64>::RING, *current).unwrap();
-                    if *current < (1 << 32) {
-                        panic!("not enough primes");
-                    }
-                    return Some($crate::rings::zn::zn_64::Zn64B::new(*current as u64));
-                }));
+                let mut prime_it = $crate::reduce_lift::primelist::LARGE_PRIMES.iter().copied().map(|p| $crate::rings::zn::zn_64::Zn64B::new(p as u64));
                 while ln_current < ln_valuation_bound + 1. {
                     let Fp = prime_it.next().unwrap();
                     ln_current += (*$crate::rings::zn::ZnRingStore::modulus(&Fp) as f64).ln();

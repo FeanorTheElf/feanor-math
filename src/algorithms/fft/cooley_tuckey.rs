@@ -960,7 +960,6 @@ fn test_truncated_fft() {
     let mut complete_fft = data;
     fft.unordered_fft(&mut complete_fft, ring);
     for k in 5..=8 {
-        println!("{}", k);
         let mut truncated_fft = data;
         fft.unordered_truncated_fft(&mut truncated_fft, k);
         assert_eq!(&complete_fft[..k], &truncated_fft[..k]);

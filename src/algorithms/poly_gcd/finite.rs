@@ -118,19 +118,21 @@ pub fn fast_poly_eea<P>(poly_ring: P, lhs: El<P>, rhs: El<P>) -> (El<P>, El<P>, 
         let rdeg = poly_ring.degree(&rhs).unwrap();
         if ldeg < target_deg + FAST_POLY_EEA_THRESHOLD || rdeg < target_deg + FAST_POLY_EEA_THRESHOLD {
             return partial_eea_poly(poly_ring, lhs, rhs, target_deg);
-        } else if ldeg >= 2 * rdeg {
+        } else if 2 * ldeg >= 3 * rdeg {
             let (mut q, r) = poly_ring.euclidean_div_rem(lhs, &rhs);
             poly_ring.negate_inplace(&mut q);
+            assert!(poly_ring.degree(&r).unwrap_or(0) <= rdeg);
             let (transform, rest) = fast_poly_eea_impl(poly_ring, r, rhs, target_deg, memory);
             let mut transform: (_, _, _, _) = transform.into();
             transform.1 = poly_ring.fma(&q, &transform.0, transform.1);
             transform.3 = poly_ring.fma(&q, &transform.2, transform.3);
             return (transform.into(), rest);
-        } else if rdeg >= 2 * ldeg {
+        } else if 2 * rdeg >= 3 * ldeg {
             let (transform, rest) = fast_poly_eea_impl(poly_ring, rhs, lhs, target_deg, memory);
             let transform: (_, _, _, _) = transform.into();
             return ([transform.1, transform.0, transform.3, transform.2], rest);
         }
+
         let split_deg = max(ldeg, rdeg) / 3;
         assert!(2 * split_deg + 1 < max(ldeg, rdeg));
         let part_target_deg = max(split_deg, target_deg.saturating_sub(split_deg));
@@ -142,7 +144,9 @@ pub fn fast_poly_eea<P>(poly_ring: P, lhs: El<P>, rhs: El<P>) -> (El<P>, El<P>, 
         let mut rhs_lower = rhs;
         poly_ring.truncate_monomials(&mut rhs_lower, split_deg);
 
+        assert!(poly_ring.degree(&lhs_upper).unwrap_or(0) + poly_ring.degree(&rhs_upper).unwrap_or(0) <= ldeg + rdeg - split_deg);
         let (fst_transform, [mut lhs_rest, mut rhs_rest]) = fast_poly_eea_impl(poly_ring, lhs_upper, rhs_upper, part_target_deg, memory);
+
         poly_ring.mul_assign_monomial(&mut lhs_rest, split_deg);
         poly_ring.mul_assign_monomial(&mut rhs_rest, split_deg);
 
@@ -151,6 +155,7 @@ pub fn fast_poly_eea<P>(poly_ring: P, lhs: El<P>, rhs: El<P>) -> (El<P>, El<P>, 
         rhs_rest = poly_ring.fma(&fst_transform[2], &lhs_lower, rhs_rest);
         rhs_rest = poly_ring.fma(&fst_transform[3], &rhs_lower, rhs_rest);
 
+        assert!(poly_ring.degree(&lhs_rest).unwrap_or(0) + poly_ring.degree(&rhs_rest).unwrap_or(0) <= ldeg + rdeg - split_deg);
         let (snd_transform, rest) = fast_poly_eea_impl(poly_ring, lhs_rest, rhs_rest, target_deg, memory);
 
         // multiply snd_transform * fst_transform
@@ -196,13 +201,25 @@ use crate::tracing::LogAlgorithmSubscriber;
 #[test]
 fn test_fast_poly_eea() {
     LogAlgorithmSubscriber::init_test();
+
+    let field = zn_64::Zn64B::new(2).as_field().ok().unwrap();
+    let poly_ring = DensePolyRing::new(field, "X");
+
+    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [
+        X.pow_ref(96) + X.pow_ref(55),
+        X.pow_ref(54),
+    ]);
+    let (s, t, d) = fast_poly_eea(&poly_ring, poly_ring.clone_el(&f), poly_ring.clone_el(&g));
+    assert_el_eq!(&poly_ring, &d, poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g)));
+    assert_el_eq!(&poly_ring, poly_ring.pow(poly_ring.indeterminate(), 54), poly_ring.normalize(d));
+
     let field = zn_64::Zn64B::new(65537).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");
+
     let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [
         X.pow_ref(90) - X.pow_ref(70) + 3 * X.pow_ref(20) - 1,
         X.pow_ref(100) + X.pow_ref(60) + 1,
     ]);
-
     let (s, t, d) = fast_poly_eea(&poly_ring, poly_ring.clone_el(&f), poly_ring.clone_el(&g));
     assert!(poly_ring.is_unit(&d));
     assert_el_eq!(&poly_ring, &d, poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g)));
@@ -211,7 +228,6 @@ fn test_fast_poly_eea() {
         X.pow_ref(9) - X.pow_ref(7) + 3 * X.pow_ref(2) - 1,
         X.pow_ref(100) + X.pow_ref(60) + 1,
     ]);
-
     let (s, t, d) = fast_poly_eea(&poly_ring, poly_ring.clone_el(&f), poly_ring.clone_el(&g));
     assert!(poly_ring.is_unit(&d));
     assert_el_eq!(&poly_ring, &d, poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g)));

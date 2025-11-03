@@ -1,4 +1,5 @@
 
+pub mod primelist;
 ///
 /// Contains the trait [`poly_eval::LiftPolyEvalRing`] that formalizes the assumptions
 /// required when we want to perform some algebraic computation (i.e. given by a polynomial)

@@ -6,6 +6,7 @@ use crate::seq::*;
 
 use core::fmt;
 use std::cmp::{Ordering, max};
+use std::iter::repeat;
 use std::alloc::Allocator;
 
 type BlockInt = u64;
@@ -35,6 +36,15 @@ pub fn effective_length(x: &[BlockInt]) -> usize {
 	return 0;
 }
 
+///
+/// Computes `summand = lhs * factor * 2**shift + summand`.
+/// 
+/// This should be inlined, as it is often used with some parameters
+/// set to fixed values, and the compiler can do significant optimizations
+/// in these cases.
+/// 
+/// This function does not truncate the resulting vector.
+/// 
 #[inline(always)]
 fn core_fma_small_ref_fst<A: Allocator>(lhs: &[BlockInt], factor: BlockInt, summand: &mut Vec<u64, A>, shift: u32) {
 	let block_offset = (shift / BLOCK_BITS) as usize;
@@ -44,36 +54,133 @@ fn core_fma_small_ref_fst<A: Allocator>(lhs: &[BlockInt], factor: BlockInt, summ
 		// a little trick: using `wrapping_sub` will result in an out-of-bounds index if
 		// signed arithmetic would result in a negative index
 		assert!(lhs.len() as u128 + block_offset as u128 + 1 < usize::MAX as u128);
-		let lhs_shifted_block = |i: usize| (*lhs.get(i.wrapping_sub(block_offset)).unwrap_or(&0) >> remaining_shift) | lhs.get((i + 1).wrapping_sub(block_offset)).unwrap_or(&0).checked_shl(BLOCK_BITS - remaining_shift).unwrap_or(0);
+		let lhs_shifted_block = |i: usize| (*lhs.get(i.wrapping_sub(block_offset)).unwrap_or(&0) << remaining_shift) | 
+			lhs.get(i.wrapping_sub(block_offset + 1)).unwrap_or(&0).checked_shr(BLOCK_BITS - remaining_shift).unwrap_or(0);
 
-		let up_to = max(effective_length(lhs.as_ref()) + block_offset + 1, effective_length(summand));
+		let lhs_len = effective_length(lhs.as_ref());
+		if factor == 0 || lhs_len == 0 {
+			return;
+		}
+		let up_to = max(lhs_len + block_offset + 1, effective_length(summand));
 		summand.truncate(up_to + 1);
 		expand(summand, up_to + 1);
 		let mut buffer: u64 = 0;
-		for i in block_offset..up_to {
+		for i in block_offset..(up_to + 1) {
 			let prod = lhs_shifted_block(i) as u128 * factor as u128 + buffer as u128 + summand[i] as u128;
 			summand[i] = (prod & ((1u128 << BLOCK_BITS) - 1)) as u64;
 			buffer = (prod >> BLOCK_BITS) as u64;
 		}
-		summand[up_to] = buffer;
-		let result_len = effective_length(&summand);
-		debug_assert!(summand.len() <= result_len + 2);
-		summand.truncate(result_len);
+		debug_assert!(summand.len() <= effective_length(&summand) + 2);
+		debug_assert_eq!(0, buffer);
 	};
 
 	// allow the compiler to produce specialized code for the case remaining_shift == 0
-	if factor == 0 {
-		// do nothing
-	} else if remaining_shift == 0 {
+	if remaining_shift == 0 {
 		implementation();
 	} else {
 		implementation();
 	}
 }
 
+///
+/// Computes `lhs = lhs * factor * 2**shift + summand`
+/// 
+/// This should be inlined, as it is often used with some parameters
+/// set to fixed values, and the compiler can do significant optimizations
+/// in these cases.
+/// 
+/// This function does not truncate the resulting vector.
+/// 
 #[inline(always)]
-pub fn core_fma_small_ref_snd<A: Allocator>(lhs: &mut Vec<u64, A>, factor: BlockInt, summand: &[u64], shift: usize) {
-	unimplemented!()
+pub fn core_fma_small_ref_snd<A: Allocator>(lhs: &mut Vec<u64, A>, factor: BlockInt, summand: &[u64], shift: u32) {
+	let block_offset = (shift / BLOCK_BITS) as usize;
+	let remaining_shift = shift % BLOCK_BITS;
+
+	let mut implementation = || {
+		// a little trick: using `wrapping_sub` will result in an out-of-bounds index if
+		// signed arithmetic would result in a negative index
+		assert!(lhs.len() as u128 + block_offset as u128 + 1 < usize::MAX as u128);
+
+		let lhs_len = effective_length(lhs.as_ref());
+		if factor == 0 || lhs_len == 0 {
+			lhs.clear();
+			lhs.extend(summand.iter().copied());
+			return;
+		}
+		let up_to = max(lhs_len + block_offset + 1, effective_length(summand));
+		_ = lhs.splice(0..0, summand.iter().copied().chain(repeat(0)).take(block_offset));
+		expand(lhs, up_to + 1);
+		let mut buffer: u64 = 0;
+		let mut shift_buffer: u64 = 0;
+		for i in block_offset..(up_to + 1) {
+			let prod = (((lhs[i] as u64) << remaining_shift) + shift_buffer) as u128 * factor as u128 + buffer as u128 + *summand.get(i).unwrap_or(&0) as u128;
+			shift_buffer = lhs[i].checked_shr(BLOCK_BITS - remaining_shift).unwrap_or(0);
+			lhs[i] = (prod & ((1u128 << BLOCK_BITS) - 1)) as u64;
+			buffer = (prod >> BLOCK_BITS) as u64;
+		}
+		debug_assert!(lhs.len() <= effective_length(&lhs) + 2);
+		debug_assert_eq!(0, buffer);
+	};
+
+	// allow the compiler to produce specialized code for the case remaining_shift == 0
+	if remaining_shift == 0 {
+		implementation()
+	} else {
+		implementation()
+	}
+}
+
+///
+/// Computes `summand = summand - rhs * factor * 2**shift`.
+/// 
+/// If `rhs * factor * 2**shift > summand`, the function returns `Err(())`
+/// and sets `summand` to be `rhs * factor * 2**shift - summand`.
+/// 
+/// This should be inlined, as it is often used with some parameters
+/// set to fixed values, and the compiler can do significant optimizations
+/// in these cases.
+/// 
+/// This function does not truncate the resulting vector.
+/// 
+#[inline(always)]
+fn core_fms_small_ref_fst<A: Allocator>(rhs: &[BlockInt], factor: BlockInt, summand: &mut Vec<u64, A>, shift: u32) -> Result<(), ()> {
+	let block_offset = (shift / BLOCK_BITS) as usize;
+	let remaining_shift = shift % BLOCK_BITS;
+
+	let mut implementation = || {
+		// a little trick: using `wrapping_sub` will result in an out-of-bounds index if
+		// signed arithmetic would result in a negative index
+		assert!(rhs.len() as u128 + block_offset as u128 + 1 < usize::MAX as u128);
+		let rhs_shifted_block = |i: usize| (*rhs.get(i.wrapping_sub(block_offset)).unwrap_or(&0) << remaining_shift) | 
+			rhs.get(i.wrapping_sub(block_offset + 1)).unwrap_or(&0).checked_shr(BLOCK_BITS - remaining_shift).unwrap_or(0);
+
+		let up_to = max(effective_length(rhs.as_ref()) + block_offset + 1, effective_length(summand));
+		summand.truncate(up_to + 1);
+		expand(summand, up_to + 1);
+		let mut buffer: u64 = 0;
+		for i in block_offset..(up_to + 1) {
+			let value = (summand[i] as u128).wrapping_sub(buffer as u128 + rhs_shifted_block(i) as u128 * factor as u128);
+			summand[i] = (value & ((1u128 << BLOCK_BITS) - 1)) as u64;
+			buffer = -((value >> BLOCK_BITS) as u64 as i64) as u64;
+		}
+		if buffer == 0 {
+			return Ok(());
+		} else {
+			debug_assert!(buffer == 1);
+			summand.iter_mut().for_each(|x| *x = !*x );
+			bigint_add_small(summand, 1);
+			return Err(());
+		}
+	};
+
+	// allow the compiler to produce specialized code for the case remaining_shift == 0
+	if factor == 0 {
+		Ok(())
+	} else if remaining_shift == 0 {
+		implementation()
+	} else {
+		implementation()
+	}
 }
 
 #[stability::unstable(feature = "enable")]
@@ -126,42 +233,60 @@ pub fn bigint_cmp_small(lhs: &[BlockInt], rhs: DoubleBlockInt) -> Ordering {
 #[instrument(skip_all, level = "trace")]
 pub fn bigint_add<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], shift: u32) {
 	core_fma_small_ref_fst(rhs, 1, lhs, shift);
+	let new_len = effective_length(&lhs);
+	lhs.truncate(new_len);
 }
 
 ///
 /// Calculate lhs -= rhs * 2**shift
 /// 
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn bigint_sub(lhs: &mut [BlockInt], rhs: &[BlockInt], shift: u32) -> Result<(), ()> {
-	unimplemented!()
-}
-
-///
-/// Calculate lhs = rhs - lhs
+/// If `rhs * 2**shift > lhs`, the function returns `Err(())`
+/// and sets `summand` to `rhs * 2**shift - lhs`.
 /// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn bigint_sub_self<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt]) -> Result<(), ()> {
-	unimplemented!()
+pub fn bigint_sub<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], shift: u32) -> Result<(), ()> {
+	let result = core_fms_small_ref_fst(rhs, 1, lhs, shift);
+	let new_len = effective_length(&lhs);
+	lhs.truncate(new_len);
+	return result;
 }
 
 ///
-/// Computes `summand := lhs * factor * 2**shift + summand`
+/// Computes `summand = lhs * factor * 2**shift + summand`
 /// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn bigint_fma_small_ref_fst<A: Allocator>(lhs: &[BlockInt], factor: BlockInt, summand: &mut Vec<u64, A>, shift: u32) {
 	core_fma_small_ref_fst(lhs, factor, summand, shift);
+	let new_len = effective_length(&summand);
+	summand.truncate(new_len);
 }
 
 ///
-/// Computes `lhs := lhs * factor * 2**shift + summand`
+/// Computes `lhs = lhs * factor * 2**shift + summand`
 /// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn bigint_fma_small_ref_snd<A: Allocator>(lhs: &mut Vec<u64, A>, factor: BlockInt, summand: &[u64], shift: usize) {
+pub fn bigint_fma_small_ref_snd<A: Allocator>(lhs: &mut Vec<u64, A>, factor: BlockInt, summand: &[u64], shift: u32) {
 	core_fma_small_ref_snd(lhs, factor, summand, shift);
+	let new_len = effective_length(&lhs);
+	lhs.truncate(new_len);
+}
+
+///
+/// Computes `summand = summand - rhs * factor * 2**shift`
+/// 
+/// If `rhs * factor * 2**shift > summand`, the function returns `Err(())`
+/// and sets `summand` to be `rhs * factor * 2**shift - summand`.
+/// 
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn bigint_fms_small_ref_fst<A: Allocator>(rhs: &[BlockInt], factor: BlockInt, summand: &mut Vec<u64, A>, shift: u32) -> Result<(), ()> {
+	let result = core_fms_small_ref_fst(rhs, factor, summand, shift);
+	let new_len = effective_length(&summand);
+	summand.truncate(new_len);
+	return result;
 }
 
 ///
@@ -169,7 +294,7 @@ pub fn bigint_fma_small_ref_snd<A: Allocator>(lhs: &mut Vec<u64, A>, factor: Blo
 /// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn bigint_lshift<A: Allocator>(lhs: &mut Vec<BlockInt, A>, power: usize) {
+pub fn bigint_lshift<A: Allocator>(lhs: &mut Vec<BlockInt, A>, power: u32) {
 	core_fma_small_ref_snd(lhs, 1, &[], power);
 }
 
@@ -178,8 +303,20 @@ pub fn bigint_lshift<A: Allocator>(lhs: &mut Vec<BlockInt, A>, power: usize) {
 /// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn bigint_rshift(lhs: &mut [BlockInt], power: usize) {
-	unimplemented!()
+pub fn bigint_rshift<A: Allocator>(lhs: &mut Vec<BlockInt, A>, power: usize) {
+	let shift: u32 = power.try_into().unwrap();
+	let block_offset = (shift / BLOCK_BITS) as usize;
+	let remaining_shift = shift % BLOCK_BITS;
+	let lhs_len = effective_length(lhs);
+	if lhs_len <= block_offset {
+		lhs.clear();
+		return;
+	}
+
+	for i in 0..(lhs_len - block_offset) {
+		lhs[i] = (lhs[i + block_offset] >> remaining_shift) | lhs.get(i + block_offset + 1).unwrap_or(&0).checked_shl(BLOCK_BITS - remaining_shift).unwrap_or(0)
+	}
+	lhs.truncate(lhs_len - block_offset);
 }
 
 ///
@@ -192,9 +329,7 @@ pub fn bigint_fma<A: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt], mut summand:
 	for i in 0..effective_length(rhs) {
 		core_fma_small_ref_fst(lhs, rhs[i], &mut summand, BLOCK_BITS * i as u32);
 	}
-	let result_len = effective_length(&summand);
-	debug_assert!(summand.len() <= result_len + 2);
-	summand.truncate(result_len);
+	summand.truncate(effective_length(&summand));
 	return summand;
 }
 
@@ -202,7 +337,7 @@ pub fn bigint_fma<A: Allocator>(lhs: &[BlockInt], rhs: &[BlockInt], mut summand:
 /// Same as division_step, but for self_high == rhs_high == d
 /// 
 #[instrument(skip_all, level = "trace")]
-fn division_step_last<A: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], d: usize, tmp: &mut Vec<BlockInt, A>) -> u64 {
+fn division_step_last<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], d: usize) -> u64 {
 	assert!(lhs[d] != 0);
 	assert!(rhs[d] != 0);
 
@@ -219,18 +354,16 @@ fn division_step_last<A: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], d: u
 		}
 	} else {
 		let mut quotient = (self_high_blocks / (rhs_high_blocks + 1)) as u64;
-		tmp.clear();
-		core_fma_small_ref_fst(rhs, quotient, tmp, 0);
-		let sub_result = bigint_sub(lhs, tmp.as_ref(), 0);
+		let sub_result = core_fms_small_ref_fst(rhs, quotient, lhs, 0);
 		debug_assert!(sub_result.is_ok());
 
 		if bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Less {
-			let sub_result = bigint_sub(lhs, rhs.as_ref(), 0);
+		let sub_result = core_fms_small_ref_fst(rhs, 1, lhs, 0);
 			debug_assert!(sub_result.is_ok());
 			quotient += 1;
 		}
 		if bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Less {
-			let sub_result = bigint_sub(lhs, rhs.as_ref(), 0);
+		let sub_result = core_fms_small_ref_fst(rhs, 1, lhs, 0);
 			debug_assert!(sub_result.is_ok());
 			quotient += 1;
 		}
@@ -249,13 +382,7 @@ fn division_step_last<A: Allocator>(lhs: &mut [BlockInt], rhs: &[BlockInt], d: u
 /// Complexity O(log(n))
 /// 
 #[instrument(skip_all, level = "trace")]
-fn division_step<A: Allocator>(
-	lhs: &mut [BlockInt], 
-	rhs: &[BlockInt], 
-	lhs_high: usize, 
-	rhs_high: usize, 
-	tmp: &mut Vec<BlockInt, A>
-) -> (u64, u64, usize) {
+fn division_step<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], lhs_high: usize, rhs_high: usize) -> (u64, u64, usize) {
 	assert!(lhs_high > rhs_high);
 	assert!(lhs[lhs_high] != 0);
 	assert!(rhs[rhs_high] != 0);
@@ -281,15 +408,13 @@ fn division_step<A: Allocator>(
 		if rhs_high_blocks != DoubleBlockInt::MAX && lhs_high_blocks >= (rhs_high_blocks + 1) {
 			let mut quotient = (lhs_high_blocks / (rhs_high_blocks + 1)) as u64;
 			debug_assert!(quotient != 0);
-			tmp.clear();
-			core_fma_small_ref_fst(rhs.as_ref(), quotient, tmp, 0);
-			let sub_result = bigint_sub(lhs, tmp.as_ref(), (lhs_high - rhs_high).try_into().unwrap());
+			let sub_result = core_fms_small_ref_fst(rhs, quotient, lhs, BLOCK_BITS * (lhs_high - rhs_high) as u32);
 			debug_assert!(sub_result.is_ok());
 
 			let lhs_high_blocks = ((lhs[lhs_high] as DoubleBlockInt) << BLOCK_BITS) | (lhs[lhs_high - 1] as DoubleBlockInt);
 
 			if lhs_high_blocks > rhs_high_blocks {
-				let sub_result = bigint_sub(lhs, rhs.as_ref(), (lhs_high - rhs_high).try_into().unwrap());
+				let sub_result = core_fms_small_ref_fst(rhs, 1, lhs, BLOCK_BITS * (lhs_high - rhs_high) as u32);
 				debug_assert!(sub_result.is_ok());
 				quotient += 1;
 			}
@@ -308,13 +433,11 @@ fn division_step<A: Allocator>(
 
 		if lhs[lhs_high] != 0 {
 			let mut quotient = (lhs_high_blocks / (rhs_high_block + 1)) as BlockInt;
-			tmp.clear();
-			core_fma_small_ref_fst(rhs.as_ref(), quotient, tmp, 0);
-			let sub_result = bigint_sub(lhs, tmp.as_ref(), (lhs_high - rhs_high - 1).try_into().unwrap());
+			let sub_result = core_fms_small_ref_fst(rhs, quotient, lhs, BLOCK_BITS * (lhs_high - rhs_high - 1) as u32);
 			debug_assert!(sub_result.is_ok());
 
 			if lhs[lhs_high] != 0 {
-				let sub_result = bigint_sub(lhs, rhs.as_ref(), (lhs_high - rhs_high - 1).try_into().unwrap());
+			let sub_result = core_fms_small_ref_fst(rhs, 1, lhs, BLOCK_BITS * (lhs_high - rhs_high - 1) as u32);
 				debug_assert!(sub_result.is_ok());
 				quotient += 1;
 			}
@@ -334,11 +457,12 @@ fn division_step<A: Allocator>(
 /// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn bigint_div<A: Allocator, A2: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], mut out: Vec<BlockInt, A>, scratch_alloc: A2) -> Vec<BlockInt, A> {
+pub fn bigint_div<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], mut out: Vec<BlockInt, A>) -> Vec<BlockInt, A> {
 	assert!(effective_length(rhs) > 0);
 
 	out.clear();
-	if effective_length(rhs) == 1 {
+	let rhs_len = effective_length(rhs);
+	if rhs_len == 1 {
 		let rem = bigint_div_small(lhs, rhs[0]);
 		let lhs_len = effective_length(lhs);
 		for i in 0..lhs_len {
@@ -351,21 +475,22 @@ pub fn bigint_div<A: Allocator, A2: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: 
 		return out;
 	} else {
 		let mut lhs_len = effective_length(lhs);
-		let rhs_len = effective_length(rhs);
-		let mut tmp = Vec::new_in(scratch_alloc);
+		if lhs_len < rhs_len {
+			return out;
+		}
 		expand(&mut out, (lhs_len + 1).saturating_sub(rhs_len));
-		while lhs_len > 0 && lhs_len > rhs_len {
+		while lhs_len > rhs_len {
 			if lhs[lhs_len - 1] != 0 {
-				let (quo_upper, quo_lower, quo_power) = division_step(lhs, rhs.as_ref(), lhs_len - 1, rhs_len - 1, &mut tmp);
+				let (quo_upper, quo_lower, quo_power) = division_step(lhs, rhs.as_ref(), lhs_len - 1, rhs_len - 1);
 				out[quo_power] = quo_lower;
 				bigint_add(&mut out, &[quo_upper][..], BLOCK_BITS * (quo_power as u32 + 1));
 				debug_assert!(lhs[lhs_len - 1] == 0);
 			}
 			lhs_len -= 1;
 		}
-		debug_assert_eq!(lhs_len, rhs_len);
+		debug_assert!(lhs_len == rhs_len);
 		let quo = if lhs[lhs_len - 1] != 0 {
-			division_step_last(lhs, rhs, lhs_len - 1, &mut tmp)
+			division_step_last(lhs, rhs, lhs_len - 1)
 		} else {
 			0
 		};
@@ -488,8 +613,6 @@ pub fn deserialize_bigint_from_bytes<'de, D, F, T>(deserializer: D, from_bytes: 
 }
 
 #[cfg(test)]
-use std::alloc::Global;
-#[cfg(test)]
 use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
@@ -571,7 +694,7 @@ fn test_div_no_remainder() {
     let mut x = parse("578435387FF0582367863200000000000000000000", 16);
     let y = parse("200000000000000000000", 16);
     let z = parse("2BC21A9C3FF82C11B3C319", 16);
-    let quotient = bigint_div(&mut x, &y, Vec::new(), Global);
+    let quotient = bigint_div(&mut x, &y, Vec::new());
     assert_eq!(Vec::<BlockInt>::new(), truncate_zeros(x));
     assert_eq!(truncate_zeros(z), truncate_zeros(quotient));
 }
@@ -583,7 +706,7 @@ fn test_div_with_remainder() {
     let y = parse("200000000000000000000", 16);
     let z = parse("2BC21A9C3FF82C11B3C319", 16);
     let r = parse("7651437856", 16);
-    let quotient = bigint_div(&mut x, &y, Vec::new(), Global);
+    let quotient = bigint_div(&mut x, &y, Vec::new());
     assert_eq!(truncate_zeros(r), truncate_zeros(x));
     assert_eq!(truncate_zeros(z), truncate_zeros(quotient));
 }
@@ -595,7 +718,7 @@ fn test_div_big() {
     let y = parse("903852718907268716125180964783634518356783568793426834569872365791233387356325", 10);
     let q = parse("643068769934649368349591185247155725", 10);
     let r = parse("265234469040774335115597728873888165088018116561138613092906563355599185141722", 10);
-    let actual = bigint_div(&mut x, &y, Vec::new(), Global);
+    let actual = bigint_div(&mut x, &y, Vec::new());
     assert_eq!(truncate_zeros(r), truncate_zeros(x));
     assert_eq!(truncate_zeros(q), truncate_zeros(actual));
 
@@ -603,7 +726,7 @@ fn test_div_big() {
 	let y = parse("170141183460469231731687303715884105727", 10);
 	let q = parse("680564733841876926926749214863536422916", 10);
 	let r = vec![4];
-	let actual = bigint_div(&mut x, &y, Vec::new(), Global);
+	let actual = bigint_div(&mut x, &y, Vec::new());
 	assert_eq!(truncate_zeros(r), truncate_zeros(x));
     assert_eq!(truncate_zeros(q), truncate_zeros(actual));
 }
@@ -614,7 +737,7 @@ fn test_div_last_block_overflow() {
     let mut x = parse("3227812347608635737069898965003764842912132241036529391038324195675809527521051493287056691600172289294878964965934366720", 10);
     let y = parse("302231454903657293676544", 10);
     let q = parse("10679935179604550411975108530847760573013522611783263849735208039111098628903202750114810434682880", 10);
-    let quotient = bigint_div(&mut x, &y, Vec::new(), Global);
+    let quotient = bigint_div(&mut x, &y, Vec::new());
     assert_eq!(truncate_zeros(q), truncate_zeros(quotient));
     assert_eq!(Vec::<BlockInt>::new(), truncate_zeros(x));
 }
@@ -662,31 +785,60 @@ fn test_core_fma_small() {
     LogAlgorithmSubscriber::init_test();
 	let x = parse("10000000000000000000000000000000", 10);
 	let mut z = parse("100000000000000000000000000000000", 10);
-	core_fma_small_ref_fst(&x, 42, &mut z, 0);
+	bigint_fma_small_ref_fst(&x, 42, &mut z, 0);
 	assert_eq!(parse("520000000000000000000000000000000", 10), truncate_zeros(z));
 
 	let mut x = parse("10000000000000000000000000000000", 10);
 	let z = parse("100000000000000000000000000000000", 10);
-	core_fma_small_ref_snd(&mut x, 42, &z, 0);
+	bigint_fma_small_ref_snd(&mut x, 42, &z, 0);
 	assert_eq!(parse("520000000000000000000000000000000", 10), truncate_zeros(x));
 
 	let x = parse("10000000000000000000000000000000", 10);
 	let mut z = parse("100000000000000000000000000000000", 10);
-	core_fma_small_ref_fst(&x, 42, &mut z, 1);
+	bigint_fma_small_ref_fst(&x, 42, &mut z, 1);
 	assert_eq!(parse("940000000000000000000000000000000", 10), truncate_zeros(z));
 
 	let mut x = parse("10000000000000000000000000000000", 10);
 	let z = parse("100000000000000000000000000000000", 10);
-	core_fma_small_ref_snd(&mut x, 42, &z, 1);
+	bigint_fma_small_ref_snd(&mut x, 42, &z, 1);
 	assert_eq!(parse("940000000000000000000000000000000", 10), truncate_zeros(x));
 	
 	let x = parse("10000000000000000000000000000000", 10);
 	let mut z = parse("100000000000000000000000000000000", 10);
-	core_fma_small_ref_fst(&x, 42, &mut z, 63);
-	assert_eq!(parse("92233720368547758180000000000000000000000000000000", 10), truncate_zeros(z));
+	bigint_fma_small_ref_fst(&x, 42, &mut z, 63);
+	assert_eq!(parse("3873816255479005839460000000000000000000000000000000", 10), truncate_zeros(z));
 
 	let mut x = parse("10000000000000000000000000000000", 10);
 	let z = parse("100000000000000000000000000000000", 10);
-	core_fma_small_ref_snd(&mut x, 42, &z, 63);
-	assert_eq!(parse("92233720368547758180000000000000000000000000000000", 10), truncate_zeros(x));
+	bigint_fma_small_ref_snd(&mut x, 42, &z, 63);
+	assert_eq!(parse("3873816255479005839460000000000000000000000000000000", 10), truncate_zeros(x));
+}
+
+#[test]
+fn test_bigint_fms_small() {
+    LogAlgorithmSubscriber::init_test();
+	let x = parse("10000000000000000000000000000000", 10);
+	let mut z = parse("1000000000000000000000000000000000", 10);
+	bigint_fms_small_ref_fst(&x, 42, &mut z, 0).unwrap();
+	assert_eq!(parse("580000000000000000000000000000000", 10), truncate_zeros(z));
+
+	let x = parse("10000000000000000000000000000001", 10);
+	let mut z = parse("1000000000000000000000000000000000", 10);
+	bigint_fms_small_ref_fst(&x, 42, &mut z, 0).unwrap();
+	assert_eq!(parse("579999999999999999999999999999958", 10), truncate_zeros(z));
+
+	let x = parse("10000000000000000000010000000000", 10);
+	let mut z = parse("1000000000000000000000000000000000", 10);
+	bigint_fms_small_ref_fst(&x, 42, &mut z, 0).unwrap();
+	assert_eq!(parse("579999999999999999999580000000000", 10), truncate_zeros(z));
+
+	let x = parse("10000000000000000000010000000000", 10);
+	let mut z = parse("1000000000000000000000000000000000", 10);
+	bigint_fms_small_ref_fst(&x, 42, &mut z, 1).unwrap();
+	assert_eq!(parse("159999999999999999999160000000000", 10), truncate_zeros(z));
+	
+	let x = parse("10000000000000000000010000000000", 10);
+	let mut z = parse("1000000000000000000000000000000000", 10);
+	assert!(bigint_fms_small_ref_fst(&x, 42, &mut z, 2).is_err());
+	assert_eq!(parse("680000000000000000001680000000000", 10), truncate_zeros(z));
 }

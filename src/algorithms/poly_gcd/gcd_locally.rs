@@ -301,11 +301,9 @@ fn random_test_poly_gcd_local() {
         let f = poly_ring.from_terms((0..=20).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
         let g = poly_ring.from_terms((0..=20).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
         let h = poly_ring.from_terms((0..=10).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-        // println!("Testing gcd on ({}) * ({}) and ({}) * ({})", poly_ring.formatted_el(&f), poly_ring.formatted_el(&h), poly_ring.formatted_el(&g), poly_ring.formatted_el(&h));
         let lhs = poly_ring.mul_ref(&f, &h);
         let rhs = poly_ring.mul_ref(&g, &h);
         let gcd = make_primitive(&poly_ring, &poly_gcd_local(&poly_ring, poly_ring.clone_el(&lhs), poly_ring.clone_el(&rhs))).0;
-        // println!("Result {}", poly_ring.formatted_el(&gcd));
 
         assert!(poly_ring.divides(&lhs, &gcd));
         assert!(poly_ring.divides(&rhs, &gcd));

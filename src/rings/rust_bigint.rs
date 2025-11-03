@@ -15,6 +15,7 @@ use crate::primitive_int::*;
 use crate::ring::*;
 use crate::serialization::*;
 use crate::specialization::*;
+use crate::homomorphism::*;
 
 use std::alloc::Allocator;
 use std::alloc::Global;
@@ -163,20 +164,8 @@ impl<A: Allocator + Send + Sync + Clone> RingBase for RustBigintRingBase<A> {
                 bigint_add(lhs_val, rhs_val, 0);
             },
             (RustBigint(lhs_sgn, lhs_val), RustBigint(_, rhs_val)) => {
-                match bigint_cmp(lhs_val, rhs_val) {
-                    Ordering::Less => {
-                        let sub_result = bigint_sub_self(lhs_val, rhs_val);
-			            debug_assert!(sub_result.is_ok());
-                        *lhs_sgn = !*lhs_sgn;
-                    },
-                    Ordering::Equal => {
-                        lhs_val.clear();
-                    },
-                    Ordering::Greater => {
-                        let sub_result = bigint_sub(lhs_val, rhs_val, 0);
-			            debug_assert!(sub_result.is_ok());
-                    }
-                }
+                let negated = bigint_sub(lhs_val, &rhs_val, 0).is_err();
+                *lhs_sgn ^= negated;
             }
         }
     }
@@ -403,6 +392,15 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
             return result as i64;
         };
 
+        let fma_with_shift = |lhs: &RustBigint<A>, factor: i64, summand: &mut RustBigint<A>, shift: u32| {
+            if (factor < 0) ^ lhs.0 == summand.0 {
+                bigint_fma_small_ref_fst(&lhs.1, factor.unsigned_abs(), &mut summand.1, shift);
+            } else {
+                let negated = bigint_fms_small_ref_fst(&lhs.1, factor.unsigned_abs(), &mut summand.1, shift).is_err();
+                summand.0 ^= negated;
+            }
+        };
+
         let [mut a, mut b] = [self.clone_el(lhs), self.clone_el(rhs)];
         let [mut sa, mut ta, mut sb, mut tb] = [self.one(), self.zero(), self.zero(), self.one()];
 
@@ -428,15 +426,12 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
                 let b_shift = min(i_b - 31, a_shift);
                 let quo = get_abs_head_bits(&a, a_shift) / (get_abs_head_bits(&b, b_shift) + 1);
 
-                let mut b_shifted = self.clone_el(&b);
-                bigint_lshift(&mut b_shifted.1, a_shift - b_shift);
-                a = from_i64.fma_map(&b_shifted, &-quo, a);
-                let mut sb_shifted = self.clone_el(&sb);
-                bigint_lshift(&mut sb_shifted.1, a_shift - b_shift);
-                sa = from_i64.fma_map(&sb_shifted, &-quo, sa);
-                let mut tb_shifted = self.clone_el(&tb);
-                bigint_lshift(&mut tb_shifted.1, a_shift - b_shift);
-                ta = from_i64.fma_map(&tb_shifted, &-quo, ta);
+                fma_with_shift(&b, -quo, &mut a, (a_shift - b_shift).try_into().unwrap());
+                fma_with_shift(&sb, -quo, &mut sa, (a_shift - b_shift).try_into().unwrap());
+                fma_with_shift(&tb, -quo, &mut ta, (a_shift - b_shift).try_into().unwrap());
+
+                debug_assert!(self.eq_el(&a, &self.add(self.mul_ref(&sa, lhs), self.mul_ref(&ta, rhs))));
+                debug_assert!(self.eq_el(&b, &self.add(self.mul_ref(&sb, lhs), self.mul_ref(&tb, rhs))));
             } else {
                 let shift = max(i_a, i_b) - 62;
                 let a_head = get_abs_head_bits(&a, shift);
@@ -457,9 +452,10 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
                 apply_transform([&mut a, &mut b]);
                 apply_transform([&mut sa, &mut sb]);
                 apply_transform([&mut ta, &mut tb]);
+
+                debug_assert!(self.eq_el(&a, &self.add(self.mul_ref(&sa, lhs), self.mul_ref(&ta, rhs))));
+                debug_assert!(self.eq_el(&b, &self.add(self.mul_ref(&sb, lhs), self.mul_ref(&tb, rhs))));
             }
-            debug_assert!(self.eq_el(&a, &self.add(self.mul_ref(&sa, lhs), self.mul_ref(&ta, rhs))));
-            debug_assert!(self.eq_el(&b, &self.add(self.mul_ref(&sb, lhs), self.mul_ref(&tb, rhs))));
         }
         if self.is_zero(&a) {
             return (sb, tb, b);
@@ -507,8 +503,9 @@ impl<A: Allocator + Send + Sync + Clone> EuclideanRing for RustBigintRingBase<A>
 
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
-        let mut quo = RustBigint(false, bigint_div(&mut lhs.1, &rhs.1, self.zero().1, &self.allocator));
-        if rhs.0 ^ lhs.0 {// if result of division is zero, `.is_neg(&lhs)` does not work as expected
+        let mut quo = RustBigint(false, bigint_div(&mut lhs.1, &rhs.1, self.zero().1));
+        // if result of division is zero, `.is_neg(&lhs)` does not work as expected
+        if rhs.0 ^ lhs.0 {
             self.negate_inplace(&mut quo);
         }
         return (quo, lhs);
@@ -605,19 +602,14 @@ impl<A> FiniteRingSpecializable for RustBigintRingBase<A>
 
 impl<A: Allocator + Send + Sync + Clone> CanHomFrom<StaticRingBase<i64>> for RustBigintRingBase<A> {
 
-    fn fma_map_in(&self, from: &StaticRingBase<i64>, lhs: &RustBigint<A>, rhs: &<StaticRingBase<i64> as RingBase>::Element, mut summand: RustBigint<A>, (): &()) -> RustBigint<A> {
-        if self.is_zero(&summand) {
-            let mut result = self.clone_el(lhs);
-            self.mul_assign_map_in(from, &mut result, *rhs, &());
-            return result;
-        } else if (*rhs < 0) ^ self.is_neg(lhs) == self.is_neg(&summand) {
-            bigint_fma_small_ref_fst(&lhs.1, (*rhs).unsigned_abs(), &mut summand.1, 0);
-            return summand;
+    fn fma_map_in(&self, _: &StaticRingBase<i64>, lhs: &RustBigint<A>, rhs: &<StaticRingBase<i64> as RingBase>::Element, mut summand: RustBigint<A>, (): &()) -> RustBigint<A> {
+        if (*rhs < 0) ^ lhs.0 == summand.0 {
+            bigint_fma_small_ref_fst(&lhs.1, rhs.unsigned_abs(), &mut summand.1, 0);
         } else {
-            let mut tmp = self.clone_el(lhs);
-            self.mul_assign_map_in(from, &mut tmp, *rhs, &());
-            return self.add(tmp, summand);
+            let negated = bigint_fms_small_ref_fst(&lhs.1, rhs.unsigned_abs(), &mut summand.1, 0).is_err();
+            summand.0 ^= negated;
         }
+        return summand;
     }
 
     fn mul_assign_map_in(&self, from: &StaticRingBase<i64>, lhs: &mut RustBigint<A>, rhs: <StaticRingBase<i64> as RingBase>::Element, (): &()) {
@@ -687,7 +679,7 @@ impl<A: Allocator + Send + Sync + Clone> IntegerRing for RustBigintRingBase<A> {
     }
 
     fn mul_pow_2(&self, value: &mut Self::Element, power: usize) {
-        bigint_lshift(&mut value.1, power)
+        bigint_lshift(&mut value.1, power.try_into().unwrap())
     }
 
     fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, mut rng: G) -> Self::Element {
@@ -708,8 +700,6 @@ impl<A: Allocator + Send + Sync + Clone> IntegerRing for RustBigintRingBase<A> {
     }
 }
 
-#[cfg(test)]
-use crate::homomorphism::*;
 #[cfg(test)]
 use crate::tracing::LogAlgorithmSubscriber;
 

@@ -659,7 +659,11 @@ impl<R, A: Allocator + Clone + Send + Sync, C> DivisibilityRing for DensePolyRin
                 return RingRef::new(self).try_from_terms(self.terms(lhs).map(|(c, i)| self.base_ring().checked_left_div(c, rhs).map(|c| (c, i)).ok_or(()))).ok();
             } else {
                 let lc = &rhs.data[d];
-                let (quo, rem) = fast_poly_div_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| self.base_ring().checked_left_div(&x, lc).ok_or(())).ok()?;
+                let (quo, rem) = if let Some(lc_inv) = self.base_ring().invert(&lc) {
+                    fast_poly_div_rem::<_, _, !>(RingRef::new(self), self.clone_el(lhs), rhs, |x| Ok(self.base_ring().mul_ref(x, &lc_inv))).ok()?
+                } else {
+                    fast_poly_div_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| self.base_ring().checked_left_div(x, lc).ok_or(())).ok()?
+                };
                 if self.is_zero(&rem) {
                     Some(quo)
                 } else {

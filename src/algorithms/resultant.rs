@@ -298,7 +298,6 @@ fn test_resultant_large() {
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2 * X + 2]);
     let g = ZZX.from_terms([(ZZ.one(), 1 << 14), (ZZ.one(), 0)]);
-    println!("start");
     let result = BigIntRingBase::resultant(&ZZX, f, g);
     println!("{}", ZZ.formatted_el(&result))
 }

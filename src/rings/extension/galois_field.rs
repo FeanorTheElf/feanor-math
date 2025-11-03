@@ -966,6 +966,7 @@ fn test_galois_field_no_trinomial() {
 #[bench]
 fn bench_create_galois_ring_2_14_96(bencher: &mut Bencher) {
     LogAlgorithmSubscriber::init_test();
+
     bencher.iter(|| {
         let field = GaloisField::new(2, 96);
         let ring = field.get_ring().galois_ring(14);

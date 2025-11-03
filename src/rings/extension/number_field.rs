@@ -1320,9 +1320,18 @@ fn test_poly_gcd_number_field() {
 }
 
 #[test]
-#[ignore]
 fn random_test_poly_gcd_number_field() {
-    LogAlgorithmSubscriber::init_test();
+    // LogAlgorithmSubscriber::init_test();
+    
+    use tracing_subscriber::Layer;
+    use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
+    let filtered_chrome_layer = chrome_layer.with_filter(tracing_subscriber::filter::filter_fn(|metadata| 
+        !["feanor_math::algorithms::bigint_ops", "feanor_math::algorithms::convolution::karatsuba", "feanor_math::algorithms::eea", "feanor_math::algorithms::sqr_mul"].contains(&metadata.target())
+    ));
+    tracing_subscriber::registry().with(filtered_chrome_layer).init();
+
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
     let ZZX = DensePolyRing::new(ZZ, "X");
@@ -1336,16 +1345,14 @@ fn random_test_poly_gcd_number_field() {
         let K = NumberField::new(&ZZX, &genpoly);
         let KY = DensePolyRing::new(&K, "Y");
 
-        let mut random_element_K = || K.from_canonical_basis((0..6).map(|_| QQ.inclusion().map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64()))));
+        let mut random_element_K = || K.from_canonical_basis((0..K.rank()).map(|_| QQ.inclusion().map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64()))));
         let f = KY.from_terms((0..=5).map(|i| (random_element_K(), i)));
         let g = KY.from_terms((0..=5).map(|i| (random_element_K(), i)));
         let h = KY.from_terms((0..=4).map(|i| (random_element_K(), i)));
-        // println!("Testing gcd on ({}) * ({}) and ({}) * ({})", poly_ring.formatted_el(&f), poly_ring.formatted_el(&h), poly_ring.formatted_el(&g), poly_ring.formatted_el(&h));
         let lhs = KY.mul_ref(&f, &h);
         let rhs = KY.mul_ref(&g, &h);
 
         let gcd = <_ as PolyTFracGCDRing>::gcd(&KY, &lhs, &rhs);
-        // println!("Result {}", poly_ring.formatted_el(&gcd));
 
         assert!(KY.divides(&lhs, &gcd));
         assert!(KY.divides(&rhs, &gcd));

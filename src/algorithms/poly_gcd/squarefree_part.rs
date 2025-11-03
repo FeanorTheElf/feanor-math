@@ -299,7 +299,6 @@ fn test_squarefree_part_local() {
 }
 
 #[test]
-#[ignore]
 fn random_test_poly_power_decomposition_local() {
     LogAlgorithmSubscriber::init_test();
     let ring = BigIntRing::RING;
