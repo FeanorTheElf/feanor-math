@@ -11,7 +11,8 @@ use crate::MAX_PROBABILISTIC_REPETITIONS;
 use super::evaluate_aX;
 use super::unevaluate_aX;
 
-const HOPE_FOR_SQUAREFREE_TRIES: usize = 3;
+const HOPE_FOR_SQUAREFREE_TRIES: usize = 0;
+const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
 
 ///
 /// Describes the relationship of `f, g, gcd(f, g)` modulo a single maximal ideal

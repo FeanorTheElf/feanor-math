@@ -34,8 +34,6 @@ pub mod squarefree_part;
 /// 
 pub mod gcd_locally;
 
-const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
-
 ///
 /// Trait for domain `R` for which there is an efficient way of computing the gcd
 /// of univariate polynomials over `TFrac(R)`, where `TFrac(R)` is the total ring

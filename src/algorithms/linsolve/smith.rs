@@ -31,8 +31,7 @@ use transform::TransformList;
 /// is returned - and in fact, this algorithm can sometimes choose
 /// one that has exponential size in the input. Hence, in these
 /// cases it is recommended to use another algorithm, e.g. based on
-/// LLL to perform intermediate lattice reductions (not yet implemented
-/// in feanor_math).
+/// LLL to perform intermediate lattice reductions.
 /// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]

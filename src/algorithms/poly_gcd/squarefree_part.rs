@@ -10,7 +10,8 @@ use crate::MAX_PROBABILISTIC_REPETITIONS;
 
 use super::evaluate_aX;
 use super::unevaluate_aX;
-use super::INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT;
+
+const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
 
 ///
 /// For the power-decomposition `f = f1^e1 ... fr^er`, stores a tuple (ei, deg(fi))

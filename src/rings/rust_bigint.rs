@@ -5,7 +5,7 @@ use serde::{Deserializer, Serialize, Deserialize, Serializer};
 use tracing::instrument; 
 
 use crate::algorithms::bigint_ops::*;
-use crate::algorithms::eea::{eea, partial_eea_int};
+use crate::algorithms::eea::{eea, gcd, partial_eea_int};
 use crate::divisibility::{DivisibilityRing, Domain};
 use crate::pid::*;
 use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ, impl_eval_poly_locally_for_ZZ};
@@ -123,10 +123,26 @@ impl<A: Allocator + Send + Sync + Clone> RustBigintRingBase<A> {
     /// Interprets the elements of the iterator as digits in a `2^64`-adic
     /// digit representation, and returns the big integer represented by it.
     /// 
-    pub fn from_base_u64_repr<I>(&self, data: I) -> RustBigint
+    pub fn from_base_u64_repr<I>(&self, data: I) -> RustBigint<A>
         where I: Iterator<Item = u64>
     {
-        RustBigint(false, data.collect())
+        let mut result = Vec::with_capacity_in(data.size_hint().0, self.allocator.clone());
+        result.extend(data);
+        RustBigint(false, result)
+    }
+
+    ///
+    /// Computes `lhs * rhs * 2**shift + summand`.
+    /// 
+    #[stability::unstable(feature = "enable")]
+    pub fn fma_i64_with_shift(&self, lhs: &RustBigint<A>, rhs: i64, mut summand: RustBigint<A>, shift: u32) -> RustBigint<A> {
+        if (rhs < 0) ^ lhs.0 == summand.0 {
+            bigint_fma_small_ref_fst(&lhs.1, rhs.unsigned_abs(), &mut summand.1, shift);
+        } else {
+            let negated = bigint_fms_small_ref_fst(&lhs.1, rhs.unsigned_abs(), &mut summand.1, shift).is_err();
+            summand.0 ^= negated;
+        }
+        return summand;
     }
 }
 
@@ -392,15 +408,6 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
             return result as i64;
         };
 
-        let fma_with_shift = |lhs: &RustBigint<A>, factor: i64, summand: &mut RustBigint<A>, shift: u32| {
-            if (factor < 0) ^ lhs.0 == summand.0 {
-                bigint_fma_small_ref_fst(&lhs.1, factor.unsigned_abs(), &mut summand.1, shift);
-            } else {
-                let negated = bigint_fms_small_ref_fst(&lhs.1, factor.unsigned_abs(), &mut summand.1, shift).is_err();
-                summand.0 ^= negated;
-            }
-        };
-
         let [mut a, mut b] = [self.clone_el(lhs), self.clone_el(rhs)];
         let [mut sa, mut ta, mut sb, mut tb] = [self.one(), self.zero(), self.zero(), self.one()];
 
@@ -426,9 +433,9 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
                 let b_shift = min(i_b - 31, a_shift);
                 let quo = get_abs_head_bits(&a, a_shift) / (get_abs_head_bits(&b, b_shift) + 1);
 
-                fma_with_shift(&b, -quo, &mut a, (a_shift - b_shift).try_into().unwrap());
-                fma_with_shift(&sb, -quo, &mut sa, (a_shift - b_shift).try_into().unwrap());
-                fma_with_shift(&tb, -quo, &mut ta, (a_shift - b_shift).try_into().unwrap());
+                a = self.fma_i64_with_shift(&b, -quo, a, (a_shift - b_shift).try_into().unwrap());
+                sa = self.fma_i64_with_shift(&sb, -quo, sa, (a_shift - b_shift).try_into().unwrap());
+                ta = self.fma_i64_with_shift(&tb, -quo, ta, (a_shift - b_shift).try_into().unwrap());
 
                 debug_assert!(self.eq_el(&a, &self.add(self.mul_ref(&sa, lhs), self.mul_ref(&ta, rhs))));
                 debug_assert!(self.eq_el(&b, &self.add(self.mul_ref(&sb, lhs), self.mul_ref(&tb, rhs))));
@@ -496,6 +503,85 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
             from_i64.fma_map(&tb, &t_final, from_i64.mul_map(ta, s_final)),
             from_i64.map(d)
         );
+    }
+
+    #[instrument(skip_all, level = "trace")]
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+
+        let from_i64 = RingValue::from_ref(self).can_hom(&StaticRing::<i64>::RING).unwrap();
+
+        let get_abs_head_bits = |x: &RustBigint<A>, shift: usize| {
+            let block_idx = shift / 64;
+            let remaining_shift = shift % 64;
+            let result = if x.1.len() <= block_idx {
+                0
+            } else if x.1.len() == block_idx + 1 || remaining_shift == 0 {
+                x.1[block_idx] >> remaining_shift
+            } else {
+                (x.1[block_idx] >> remaining_shift) | (x.1[block_idx + 1] << (64 - remaining_shift))
+            };
+            debug_assert!(result < (1 << 63));
+            return result as i64;
+        };
+
+        let [mut a, mut b] = [self.clone_el(lhs), self.clone_el(rhs)];
+
+        while let Some(mut i_a) = self.abs_highest_set_bit(&a) && let Some(mut i_b) = self.abs_highest_set_bit(&b) && i_a >= 63 && i_b >= 63 {
+            if self.is_neg(&a) {
+                self.negate_inplace(&mut a);
+            }
+            if self.is_neg(&b) {
+                self.negate_inplace(&mut b);
+            }
+            if i_a < i_b {
+                swap(&mut a, &mut b);
+                swap(&mut i_a, &mut i_b);
+            }
+            if i_a - i_b >= 16 {
+                let a_shift = i_a - 62;
+                let b_shift = min(i_b - 31, a_shift);
+                let quo = get_abs_head_bits(&a, a_shift) / (get_abs_head_bits(&b, b_shift) + 1);
+                a = self.fma_i64_with_shift(&b, -quo, a, (a_shift - b_shift).try_into().unwrap());
+            } else {
+                let shift = max(i_a, i_b) - 62;
+                let a_head = get_abs_head_bits(&a, shift);
+                debug_assert!(a_head.abs() >= (1 << 47));
+                let b_head = get_abs_head_bits(&b, shift);
+                debug_assert!(b_head.abs() >= (1 << 47));
+                
+                let (transform, _) = partial_eea_int(StaticRing::<i64>::RING, a_head, b_head, &(1 << 32));
+
+                let new_b = from_i64.fma_map(&b, &transform[3], from_i64.mul_ref_map(&a, &transform[2]));
+                a = from_i64.fma_map(&b, &transform[1], from_i64.mul_map(a, transform[0]));
+                b = new_b;
+            }
+        }
+        if self.is_zero(&a) {
+            return b;
+        } else if self.is_neg(&a) {
+            self.negate_inplace(&mut a);
+        }
+        if self.is_zero(&b) {
+            return a;
+        } else if self.is_neg(&b) {
+            self.negate_inplace(&mut b);
+        }
+
+        let mut i_a = self.abs_highest_set_bit(&a).unwrap();
+        let mut i_b = self.abs_highest_set_bit(&b).unwrap();
+        if i_a < i_b {
+            swap(&mut a, &mut b);
+            swap(&mut i_a, &mut i_b);
+        }
+        debug_assert!(i_b < 63);
+        let b = b.1[0];
+        let mut quo = a;
+        let a = bigint_div_small(&mut quo.1, b);
+        debug_assert!(a <= i64::MAX as u64);
+        
+        self.negate_inplace(&mut quo);
+        let d = gcd(a as i64, b as i64, StaticRing::<i64>::RING);
+        return from_i64.map(d);
     }
 }
 
@@ -602,14 +688,8 @@ impl<A> FiniteRingSpecializable for RustBigintRingBase<A>
 
 impl<A: Allocator + Send + Sync + Clone> CanHomFrom<StaticRingBase<i64>> for RustBigintRingBase<A> {
 
-    fn fma_map_in(&self, _: &StaticRingBase<i64>, lhs: &RustBigint<A>, rhs: &<StaticRingBase<i64> as RingBase>::Element, mut summand: RustBigint<A>, (): &()) -> RustBigint<A> {
-        if (*rhs < 0) ^ lhs.0 == summand.0 {
-            bigint_fma_small_ref_fst(&lhs.1, rhs.unsigned_abs(), &mut summand.1, 0);
-        } else {
-            let negated = bigint_fms_small_ref_fst(&lhs.1, rhs.unsigned_abs(), &mut summand.1, 0).is_err();
-            summand.0 ^= negated;
-        }
-        return summand;
+    fn fma_map_in(&self, _: &StaticRingBase<i64>, lhs: &RustBigint<A>, rhs: &<StaticRingBase<i64> as RingBase>::Element, summand: RustBigint<A>, (): &()) -> RustBigint<A> {
+        self.fma_i64_with_shift(lhs, *rhs, summand, 0)
     }
 
     fn mul_assign_map_in(&self, from: &StaticRingBase<i64>, lhs: &mut RustBigint<A>, rhs: <StaticRingBase<i64> as RingBase>::Element, (): &()) {
