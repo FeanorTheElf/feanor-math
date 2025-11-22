@@ -6,7 +6,7 @@ use crate::divisibility::*;
 use crate::matrix::*;
 use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
 use crate::ring::*;
-use crate::pid::PrincipalIdealRing;
+use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 
 use transform::TransformList;
 
@@ -107,10 +107,13 @@ pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(ring: R, mut lhs: Submatrix
     // the value of out[lhs.row_count().., ..] is irrelevant, since lhs
     // is zero in these places anyway. Thus we just leave it unchanged
 
+    let mut solution_unique = true;
+
     for i in 0..min(lhs.row_count(), lhs.col_count()) {
         let pivot = lhs.at(i, i);
         for j in 0..rhs.col_count() {
             if let Some(quo) = ring.checked_left_div(rhs.at(i, j), pivot) {
+                solution_unique &= ring.is_zero(&ring.annihilator(&pivot));
                 *out.at_mut(i, j) = quo;
             } else {
                 return SolveResult::NoSolution;
@@ -119,7 +122,11 @@ pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(ring: R, mut lhs: Submatrix
     }
 
     R.replay_transposed(ring, TransformRows(out, ring.get_ring()));
-    return SolveResult::FoundSomeSolution;
+    return if solution_unique {
+        SolveResult::FoundUniqueSolution
+    } else {
+        SolveResult::FoundSomeSolution
+    };
 }
 
 #[stability::unstable(feature = "enable")]
@@ -291,6 +298,46 @@ fn test_solve_zn() {
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 4, ring);
     ring.get_ring().solve_right(A.clone_matrix(ring).data_mut(), B.clone_matrix(ring).data_mut(), solution.data_mut(), Global).assert_solved();
 
+    assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
+}
+
+#[test]
+fn test_unique_solution_correct() {
+    let ring = zn_static::Zn::<45>::RING;
+    let A = OwnedMatrix::new(
+        vec![ 1, 0, 0, 0,
+                    0, 1, 0, 0,
+                    0, 0, 1, 0,
+                    0, 0, 0, 1 ],
+        4
+    );
+    let B = OwnedMatrix::new(vec![ 1, 1, 0, 0 ], 1);
+    let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 1, ring);
+    assert_eq!(SolveResult::FoundUniqueSolution, ring.get_ring().solve_right(A.clone_matrix(ring).data_mut(), B.clone_matrix(ring).data_mut(), solution.data_mut(), Global));
+    assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
+    
+    let A = OwnedMatrix::new(
+        vec![ 1, 0, 0, 0,
+                    0, 1, 0, 0,
+                    0, 0, 1, 0,
+                    0, 0, 0, 0 ],
+        4
+    );
+    let B = OwnedMatrix::new(vec![ 1, 1, 0, 0 ], 1);
+    let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 1, ring);
+    assert_eq!(SolveResult::FoundSomeSolution, ring.get_ring().solve_right(A.clone_matrix(ring).data_mut(), B.clone_matrix(ring).data_mut(), solution.data_mut(), Global));
+    assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
+    
+    let A = OwnedMatrix::new(
+        vec![ 1, 0, 0, 0,
+                    0, 1, 0, 0,
+                    0, 0, 1, 0,
+                    0, 0, 0, 3 ],
+        4
+    );
+    let B = OwnedMatrix::new(vec![ 1, 1, 0, 0 ], 1);
+    let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 1, ring);
+    assert_eq!(SolveResult::FoundSomeSolution, ring.get_ring().solve_right(A.clone_matrix(ring).data_mut(), B.clone_matrix(ring).data_mut(), solution.data_mut(), Global));
     assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
 }
 
