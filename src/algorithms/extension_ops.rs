@@ -92,11 +92,7 @@ pub fn minpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<P
             SolveResult::NoSolution => {
                 -1
             },
-            SolveResult::FoundUniqueSolution => {
-                result = Some(sol_poly(&sol));
-                0
-            },
-            SolveResult::FoundSomeSolution => {
+            SolveResult::FoundUniqueSolution | SolveResult::FoundSomeSolution => {
                 result = Some(sol_poly(&sol));
                 1
             }
