@@ -106,12 +106,12 @@ impl<C: RingStore, J: RingStore> ZnRNS<C, J, Global>
     }
 }
 
-impl<J: RingStore> ZnRNS<zn_64::Zn64B, J, Global> 
-    where zn_64::Zn64BBase: CanHomFrom<J::Type>,
+impl<J: RingStore> ZnRNS<zn_64b::Zn64B, J, Global> 
+    where zn_64b::Zn64BBase: CanHomFrom<J::Type>,
         J::Type: IntegerRing
 {
     pub fn create_from_primes(primes: Vec<i64>, large_integers: J) -> Self {
-        Self::new_with_alloc(primes.into_iter().map(|p| zn_64::Zn64B::new(p as u64)).collect(), large_integers, Global)
+        Self::new_with_alloc(primes.into_iter().map(|p| zn_64b::Zn64B::new(p as u64)).collect(), large_integers, Global)
     }
 }
 
@@ -538,18 +538,18 @@ impl<C: RingStore, J: RingStore, K: RingStore, A: Allocator + Send + Sync + Clon
     }
 }
 
-impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> CanHomFrom<zn_64::Zn64BBase> for ZnRNSBase<C, J, A> 
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> CanHomFrom<zn_64b::Zn64BBase> for ZnRNSBase<C, J, A> 
     where C::Type: ZnRing + CanHomFrom<J::Type>,
         J::Type: IntegerRing + CanIsoFromTo<StaticRingBase<i64>>,
         <C::Type as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Type>
 {
-    type Homomorphism = (<Self as CanHomFrom<zn_big::ZnGBBase<J>>>::Homomorphism, <zn_big::ZnGBBase<J> as CanHomFrom<zn_64::Zn64BBase>>::Homomorphism);
+    type Homomorphism = (<Self as CanHomFrom<zn_big::ZnGBBase<J>>>::Homomorphism, <zn_big::ZnGBBase<J> as CanHomFrom<zn_64b::Zn64BBase>>::Homomorphism);
 
-    fn has_canonical_hom(&self, from: &zn_64::Zn64BBase) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &zn_64b::Zn64BBase) -> Option<Self::Homomorphism> {
         Some((self.has_canonical_hom(self.total_ring.get_ring())?, self.total_ring.get_ring().has_canonical_hom(from)?))
     }
     
-    fn map_in(&self, from: &zn_64::Zn64BBase, el: zn_64::Zn64BEl, hom: &Self::Homomorphism) -> ZnRNSEl<C, A> {
+    fn map_in(&self, from: &zn_64b::Zn64BBase, el: zn_64b::Zn64BEl, hom: &Self::Homomorphism) -> ZnRNSEl<C, A> {
         self.map_in(self.total_ring.get_ring(), self.total_ring.get_ring().map_in(from, el, &hom.1), &hom.0)
     }
 }
@@ -960,7 +960,7 @@ fn test_finite_ring_axioms() {
 #[test]
 fn test_not_prime() {
     LogAlgorithmSubscriber::init_test();
-    let ring = ZnRNS::new(vec![zn_64::Zn64B::new(15), zn_64::Zn64B::new(7)], StaticRing::<i64>::RING);
+    let ring = ZnRNS::new(vec![zn_64b::Zn64B::new(15), zn_64b::Zn64B::new(7)], StaticRing::<i64>::RING);
     let equivalent_ring = zn_big::ZnGB::new(StaticRing::<i64>::RING, 15 * 7);
     crate::ring::generic_tests::test_ring_axioms(&ring, ring.elements());
     crate::divisibility::generic_tests::test_divisibility_axioms(&ring, ring.elements());
@@ -978,12 +978,12 @@ fn test_serialization() {
 #[test]
 #[should_panic]
 fn test_not_coprime() {
-    _ = ZnRNS::new(vec![zn_64::Zn64B::new(15), zn_64::Zn64B::new(35)], StaticRing::<i64>::RING);
+    _ = ZnRNS::new(vec![zn_64b::Zn64B::new(15), zn_64b::Zn64B::new(35)], StaticRing::<i64>::RING);
 }
 
 #[test]
 fn test_format() {
     LogAlgorithmSubscriber::init_test();
-    let ring = ZnRNS::new([72057594035352641, 72057594035418113, 72057594036334721, 72057594036945793, ].iter().map(|p| zn_64::Zn64B::new(*p)).collect(), BigIntRing::RING);
+    let ring = ZnRNS::new([72057594035352641, 72057594035418113, 72057594036334721, 72057594036945793, ].iter().map(|p| zn_64b::Zn64B::new(*p)).collect(), BigIntRing::RING);
     assert_eq!("1", format!("{}", ring.formatted_el(&ring.int_hom().map(1))));
 }

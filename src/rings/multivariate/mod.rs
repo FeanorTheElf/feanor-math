@@ -429,7 +429,7 @@ pub trait MultivariatePolyRingStore: RingStore
     /// use feanor_math::homomorphism::*;
     /// use feanor_math::ring::*;
     /// use feanor_math::rings::multivariate::*;
-    /// use feanor_math::rings::zn::zn_64::*;
+    /// use feanor_math::rings::zn::zn_64b::*;
     /// use feanor_math::rings::multivariate::multivariate_impl::*;
     /// let base_ring = Zn64B::new(7);
     /// let poly_ring = MultivariatePolyRingImpl::new(base_ring, 3);
@@ -459,7 +459,7 @@ pub trait MultivariatePolyRingStore: RingStore
     /// use feanor_math::homomorphism::*;
     /// use feanor_math::ring::*;
     /// use feanor_math::rings::multivariate::*;
-    /// use feanor_math::rings::zn::zn_64::*;
+    /// use feanor_math::rings::zn::zn_64b::*;
     /// use feanor_math::rings::multivariate::multivariate_impl::*;
     /// let base_ring = Zn64B::new(7);
     /// let poly_ring = MultivariatePolyRingImpl::new(base_ring, 3);

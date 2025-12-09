@@ -349,7 +349,7 @@ use crate::rings::zn::zn_static::{Zn, Fp};
 #[cfg(test)]
 use crate::algorithms::unity_root::*;
 #[cfg(test)]
-use crate::rings::zn::zn_64;
+use crate::rings::zn::zn_64b;
 #[cfg(test)]
 use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
@@ -506,8 +506,8 @@ const BENCH_N2: usize = 601;
 #[bench]
 fn bench_factor_fft(bencher: &mut test::Bencher) {
     LogAlgorithmSubscriber::init_test();
-    let ring = zn_64::Zn64B::new(1602564097);
-    let fastmul_ring = zn_64::ZnFastmul::new(ring).unwrap();
+    let ring = zn_64b::Zn64B::new(1602564097);
+    let fastmul_ring = zn_64b::ZnFastmul::new(ring).unwrap();
     let embedding = ring.can_hom(&fastmul_ring).unwrap();
     let ring_as_field = ring.as_field().ok().unwrap();
     let root_of_unity = fastmul_ring.coerce(&ring, ring_as_field.get_ring().unwrap_element(get_prim_root_of_unity(&ring_as_field, 2 * 31 * 601).unwrap()));

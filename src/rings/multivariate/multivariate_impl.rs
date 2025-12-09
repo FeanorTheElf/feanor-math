@@ -1047,7 +1047,7 @@ fn test_evaluate_many_variables() {
 #[test]
 fn test_appearing_indeterminates() {
     LogAlgorithmSubscriber::init_test();
-    let F7 = zn_64::Zn64B::new(7).as_field().ok().unwrap();
+    let F7 = zn_64b::Zn64B::new(7).as_field().ok().unwrap();
     let F7XY = MultivariatePolyRingImpl::new(&F7, 2);
     let [f, g] = F7XY.with_wrapped_indeterminates(|[X, Y]| [5 + 4 * X, 6 + 2 * Y]);
     assert_eq!(vec![(0, 1)], F7XY.appearing_indeterminates(&f));

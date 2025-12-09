@@ -38,7 +38,7 @@ use crate::serialization::*;
 /// 
 /// This implementation is optimized for use with large integer
 /// rings. If the moduli are small, consider using specialized implementations 
-/// (like [`crate::rings::zn::zn_64::Zn`]), which will be much faster.
+/// (like [`crate::rings::zn::zn_64b::Zn`]), which will be much faster.
 ///
 /// # Example
 /// ```rust
@@ -406,30 +406,30 @@ impl<I: RingStore, J: RingStore> CanHomFrom<ZnGBBase<J>> for ZnGBBase<I>
     }
 }
 
-impl<I: RingStore> CanHomFrom<zn_64::Zn64BBase> for ZnGBBase<I>
+impl<I: RingStore> CanHomFrom<zn_64b::Zn64BBase> for ZnGBBase<I>
     where I::Type: IntegerRing
 {
-    type Homomorphism = <zn_64::Zn64BBase as CanIsoFromTo<ZnGBBase<I>>>::Isomorphism;
+    type Homomorphism = <zn_64b::Zn64BBase as CanIsoFromTo<ZnGBBase<I>>>::Isomorphism;
 
-    fn has_canonical_hom(&self, from: &zn_64::Zn64BBase) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &zn_64b::Zn64BBase) -> Option<Self::Homomorphism> {
         from.has_canonical_iso(self)
     }
 
-    fn map_in(&self, from: &zn_64::Zn64BBase, el: <zn_64::Zn64BBase as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &zn_64b::Zn64BBase, el: <zn_64b::Zn64BBase as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         from.map_out(self, el, hom)
     }
 }
 
-impl<I: RingStore> CanIsoFromTo<zn_64::Zn64BBase> for ZnGBBase<I>
+impl<I: RingStore> CanIsoFromTo<zn_64b::Zn64BBase> for ZnGBBase<I>
     where I::Type: IntegerRing
 {
-    type Isomorphism = <zn_64::Zn64BBase as CanHomFrom<ZnGBBase<I>>>::Homomorphism;
+    type Isomorphism = <zn_64b::Zn64BBase as CanHomFrom<ZnGBBase<I>>>::Homomorphism;
 
-    fn has_canonical_iso(&self, from: &zn_64::Zn64BBase) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, from: &zn_64b::Zn64BBase) -> Option<Self::Isomorphism> {
         from.has_canonical_hom(self)
     }
 
-    fn map_out(&self, from: &zn_64::Zn64BBase, el: Self::Element, iso: &Self::Isomorphism) -> <zn_64::Zn64BBase as RingBase>::Element {
+    fn map_out(&self, from: &zn_64b::Zn64BBase, el: Self::Element, iso: &Self::Isomorphism) -> <zn_64b::Zn64BBase as RingBase>::Element {
         from.map_in(self, el, iso)
     }
 }
@@ -764,7 +764,7 @@ fn test_canonical_iso_axioms_as_field() {
 fn test_canonical_iso_axioms_zn_64() {
     LogAlgorithmSubscriber::init_test();
     let R = ZnGB::new(StaticRing::<i128>::RING, 17);
-    let R2 = zn_64::Zn64B::new(17);
+    let R2 = zn_64b::Zn64B::new(17);
     crate::ring::generic_tests::test_hom_axioms(&R, &R2, R.elements());
     crate::ring::generic_tests::test_iso_axioms(&R, &R2, R.elements());
     crate::ring::generic_tests::test_hom_axioms(&R2, &R, R2.elements());

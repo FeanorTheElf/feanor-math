@@ -25,7 +25,7 @@ use super::complex_fft::*;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::algorithms::fft::*;
 /// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::zn::zn_64b::*;
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
 /// // this ring has a 256-th primitive root of unity
 /// let ring = Zn64B::new(257);
@@ -1010,7 +1010,7 @@ fn bench_fft_zn_big(bencher: &mut test::Bencher) {
 #[bench]
 fn bench_fft_zn_64(bencher: &mut test::Bencher) {
     LogAlgorithmSubscriber::init_test();
-    let ring = zn_64::Zn64B::new(1073872897);
+    let ring = zn_64b::Zn64B::new(1073872897);
     let fft = CooleyTuckeyFFT::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
     let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
@@ -1022,8 +1022,8 @@ fn bench_fft_zn_64(bencher: &mut test::Bencher) {
 #[bench]
 fn bench_fft_zn_64_fastmul(bencher: &mut test::Bencher) {
     LogAlgorithmSubscriber::init_test();
-    let ring = zn_64::Zn64B::new(1073872897);
-    let fastmul_ring = zn_64::ZnFastmul::new(ring).unwrap();
+    let ring = zn_64b::Zn64B::new(1073872897);
+    let fastmul_ring = zn_64b::ZnFastmul::new(ring).unwrap();
     let fft = CooleyTuckeyFFT::for_zn_with_hom(ring.into_can_hom(fastmul_ring).ok().unwrap(), BENCH_SIZE_LOG2).unwrap();
     let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);

@@ -797,7 +797,7 @@ impl<R> Subgroup<MultGroup<R>>
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::integer::*;
 /// # use feanor_math::primitive_int::StaticRing;
-/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::zn::zn_64b::*;
 /// # use feanor_math::wrapper::*;
 /// # use feanor_math::algorithms::discrete_log::*;
 /// let ring = Zn64B::new(17);

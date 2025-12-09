@@ -38,7 +38,7 @@ use serde::de::DeserializeSeed;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::field::*;
 /// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::zn::zn_64b::*;
 /// // 7 is a prime, so this is a field - but must be checked at runtime
 /// let Fp_as_ring = Zn64B::new(7);
 /// // we use `ZnRing::as_field()` to make this a field
@@ -57,7 +57,7 @@ use serde::de::DeserializeSeed;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::field::*;
 /// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::zn::zn_64b::*;
 /// fn work_in_Fp<R>(ring: R)
 ///     where R: RingStore,
 ///         R::Type: ZnRing
@@ -509,7 +509,7 @@ impl<'de, R> Deserialize<'de> for AsFieldBase<R>
 /// `AsFieldBase<RingStore<Type = S>>: CanHomFrom<R>`.
 /// 
 /// This has to be a macro, as a blanket implementation would unfortunately cause conflicting impls.
-/// Usually, whenever a ring naturally might be a ring (e.g. like [`crate::rings::zn::zn_64::Zn`] or
+/// Usually, whenever a ring naturally might be a ring (e.g. like [`crate::rings::zn::zn_64b::Zn`] or
 /// [`crate::rings::extension::extension_impl::FreeAlgebraImpl`], which even provide a function like 
 /// [`crate::rings::zn::ZnRingStore::as_field()`]), you might use this macro to implement [`CanHomFrom`]
 /// that simplify conversion from and to the field wrapper.
@@ -517,7 +517,7 @@ impl<'de, R> Deserialize<'de> for AsFieldBase<R>
 /// # Example
 /// ```rust
 /// # use feanor_math::ring::*;
-/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::zn::zn_64b::*;
 /// # use feanor_math::rings::field::*;
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::homomorphism::*;

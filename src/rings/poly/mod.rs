@@ -309,7 +309,7 @@ pub trait PolyRingStore: RingStore
     /// use feanor_math::ring::*;
     /// use feanor_math::rings::poly::*;
     /// use feanor_math::homomorphism::*;
-    /// use feanor_math::rings::zn::zn_64::*;
+    /// use feanor_math::rings::zn::zn_64b::*;
     /// use feanor_math::rings::poly::dense_poly::*;
     /// let base_ring = Zn64B::new(7);
     /// let poly_ring = DensePolyRing::new(base_ring, "X");
@@ -342,7 +342,7 @@ pub trait PolyRingStore: RingStore
     /// use feanor_math::ring::*;
     /// use feanor_math::rings::poly::*;
     /// use feanor_math::homomorphism::*;
-    /// use feanor_math::rings::zn::zn_64::*;
+    /// use feanor_math::rings::zn::zn_64b::*;
     /// use feanor_math::rings::poly::dense_poly::*;
     /// let base_ring = Zn64B::new(7);
     /// let poly_ring = DensePolyRing::new(base_ring, "X");

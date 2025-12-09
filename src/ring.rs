@@ -479,7 +479,7 @@ pub trait RingBase: PartialEq + Debug + Send + Sync {
     /// # use feanor_math::ring::*;
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::rings::zn::*;
-    /// # use feanor_math::rings::zn::zn_64::*;
+    /// # use feanor_math::rings::zn::zn_64b::*;
     /// let ZZ = StaticRing::<i16>::RING;
     /// assert_eq!(Some(0), StaticRing::<i64>::RING.characteristic(&ZZ));
     /// assert_eq!(None, Zn64B::new(i16::MAX as u64 + 1).characteristic(&ZZ));

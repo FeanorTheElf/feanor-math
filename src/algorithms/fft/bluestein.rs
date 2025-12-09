@@ -453,8 +453,8 @@ fn test_fft_base() {
 #[test]
 fn test_fft_fastmul() {
     LogAlgorithmSubscriber::init_test();
-    let ring = zn_64::Zn64B::new(241);
-    let fastmul_ring = zn_64::ZnFastmul::new(ring).unwrap();
+    let ring = zn_64b::Zn64B::new(241);
+    let fastmul_ring = zn_64b::ZnFastmul::new(ring).unwrap();
     let fft = BluesteinFFT::new_with_hom(ring.can_hom(&fastmul_ring).unwrap(), fastmul_ring.int_hom().map(36), fastmul_ring.int_hom().map(111), 5, 4, Global);
     let mut values: [_; 5] = std::array::from_fn(|i| ring.int_hom().map([1, 3, 2, 0, 7][i]));
     fft.fft(&mut values, ring);
@@ -500,8 +500,8 @@ const BENCH_SIZE: usize = 1009;
 #[bench]
 fn bench_bluestein(bencher: &mut test::Bencher) {
     LogAlgorithmSubscriber::init_test();
-    let ring = zn_64::Zn64B::new(18597889);
-    let fastmul_ring = zn_64::ZnFastmul::new(ring).unwrap();
+    let ring = zn_64b::Zn64B::new(18597889);
+    let fastmul_ring = zn_64b::ZnFastmul::new(ring).unwrap();
     let embedding = ring.can_hom(&fastmul_ring).unwrap();
     let ring_as_field = ring.as_field().ok().unwrap();
     let root_of_unity = fastmul_ring.coerce(&ring, ring_as_field.get_ring().unwrap_element(get_prim_root_of_unity(&ring_as_field, 2 * BENCH_SIZE).unwrap()));

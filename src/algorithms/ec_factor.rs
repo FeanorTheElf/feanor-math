@@ -319,7 +319,7 @@ pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::IntegerRing>
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_64::Zn64B;
+use crate::rings::zn::zn_64b::Zn64B;
 #[cfg(test)]
 use test::Bencher;
 #[cfg(test)]

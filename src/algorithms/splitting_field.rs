@@ -515,9 +515,8 @@ fn test_extend_field() {
 }
 
 #[test]
-#[allow(unused)]
+#[ignore]
 fn test_variety_from_lex_gb() {
-    unimplemented!("Currently super slow");
     let ZZX = DensePolyRing::new(BigIntRing::RING, "X");
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X - 1]);
     let QQ = NumberField::new(ZZX, &f);

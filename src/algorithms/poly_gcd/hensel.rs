@@ -313,7 +313,7 @@ fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2>(
 /// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::zn::zn_64b::*;
 /// # use feanor_math::rings::local::*;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::rings::poly::dense_poly::*;

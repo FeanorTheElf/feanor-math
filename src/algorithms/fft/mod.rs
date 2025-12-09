@@ -82,7 +82,7 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase>: Send + Sync {
     /// ```text
     /// # use feanor_math::ring::*;
     /// # use feanor_math::rings::zn::*;
-    /// # use feanor_math::rings::zn::zn_64::*;
+    /// # use feanor_math::rings::zn::zn_64b::*;
     /// # use feanor_math::algorithms::*;
     /// # use feanor_math::field::*;
     /// # use feanor_math::algorithms::fft::*;

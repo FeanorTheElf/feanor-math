@@ -9,7 +9,7 @@ use crate::rings::poly::*;
 use crate::homomorphism::*;
 use crate::divisibility::*;
 use crate::rings::rational::RationalFieldBase;
-use crate::rings::zn::zn_64::*;
+use crate::rings::zn::zn_64b::*;
 use crate::pid::EuclideanRing;
 
 use super::IntegerRing;

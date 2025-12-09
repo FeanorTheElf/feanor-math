@@ -46,7 +46,7 @@ use crate::tracing::LogAlgorithmSubscriber;
 #[test]
 fn test_invert_over_local_zn() {
     LogAlgorithmSubscriber::init_test();
-    let base_ring = AsLocalPIR::from_zn(zn_64::Zn64B::new(27)).unwrap();
+    let base_ring = AsLocalPIR::from_zn(zn_64b::Zn64B::new(27)).unwrap();
     let array = |data: [i32; 4]| std::array::from_fn::<_, 4, _>(|i| base_ring.int_hom().map(data[i]));
     let ring = FreeAlgebraImpl::new(base_ring, 4, array([1, 0, 0, 1]));
 
@@ -74,7 +74,7 @@ fn test_invert_over_local_zn() {
     let a = ring.from_canonical_basis(array([0, 3, 9, 9]));
     assert!(invert_over_local_zn(RingRef::new(ring.get_ring()), &a).is_none());
 
-    let base_ring = zn_64::Zn64B::new(257).as_field().ok().unwrap();
+    let base_ring = zn_64b::Zn64B::new(257).as_field().ok().unwrap();
     let array = |data: [i32; 2]| std::array::from_fn::<_, 2, _>(|i| base_ring.int_hom().map(data[i]));
     let ring = FreeAlgebraImpl::new(base_ring, 2, array([1, 0]));
 

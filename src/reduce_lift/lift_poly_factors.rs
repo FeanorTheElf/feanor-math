@@ -649,9 +649,9 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 where Self: 'ring;
             type LocalRingBase<'ring> = $crate::rings::zn::zn_big::ZnGBBase<BigIntRing>
                 where Self: 'ring;
-            type LocalFieldBase<'ring> = $crate::rings::field::AsFieldBase<$crate::rings::zn::zn_64::Zn64B>
+            type LocalFieldBase<'ring> = $crate::rings::field::AsFieldBase<$crate::rings::zn::zn_64b::Zn64B>
                 where Self: 'ring;
-            type LocalField<'ring> = $crate::rings::field::AsField<$crate::rings::zn::zn_64::Zn64B>
+            type LocalField<'ring> = $crate::rings::field::AsField<$crate::rings::zn::zn_64b::Zn64B>
                 where Self: 'ring;
             type SuitableIdeal<'ring> = i64
                 where Self: 'ring;
@@ -693,7 +693,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 use $crate::rings::zn::*;
 
                 assert_eq!(0, max_ideal_idx);
-                $crate::rings::zn::zn_64::Zn64B::new(*p as u64).as_field().ok().unwrap()
+                $crate::rings::zn::zn_64b::Zn64B::new(*p as u64).as_field().ok().unwrap()
             }
         
             fn quotient_ring_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>

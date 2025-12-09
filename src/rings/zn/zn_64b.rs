@@ -74,7 +74,7 @@ fn reduce_to_half(x: u64, bound: u64) -> u64 {
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::zn::zn_64b::*;
 /// let zn = Zn64B::new(7);
 /// assert_el_eq!(zn, zn.one(), zn.mul(zn.int_hom().map(3), zn.int_hom().map(5)));
 /// ```
@@ -83,7 +83,7 @@ fn reduce_to_half(x: u64, bound: u64) -> u64 {
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::zn::zn_64b::*;
 /// Zn64B::new((1 << 62) / 9 + 1);
 /// ```
 /// 
@@ -769,7 +769,7 @@ impl ZnRing for Zn64BBase {
     /// # use feanor_math::rings::zn::*;
     /// # use feanor_math::assert_el_eq;
     /// # use feanor_math::ring::*;
-    /// # use feanor_math::rings::zn::zn_64::*;
+    /// # use feanor_math::rings::zn::zn_64b::*;
     /// let ring = Zn64B::new(7);
     /// assert_el_eq!(ring, ring.zero(), ring.get_ring().from_int_promise_reduced(42));
     /// ```
@@ -778,7 +778,7 @@ impl ZnRing for Zn64BBase {
     /// # use feanor_math::rings::zn::*;
     /// # use feanor_math::assert_el_eq;
     /// # use feanor_math::ring::*;
-    /// # use feanor_math::rings::zn::zn_64::*;
+    /// # use feanor_math::rings::zn::zn_64b::*;
     /// let ring = Zn64B::new(7);
     /// ring.get_ring().from_int_promise_reduced(43);
     /// ```
@@ -813,7 +813,7 @@ impl HashableElRing for Zn64BBase {
 /// # #![feature(const_type_name)]
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::ring::*;
-/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::zn::zn_64b::*;
 /// # use feanor_math::algorithms::fft::*;
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
 /// let ring = Zn64B::new(1073872897);

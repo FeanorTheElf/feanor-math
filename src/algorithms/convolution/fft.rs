@@ -441,7 +441,7 @@ impl<I, A> ConvolutionAlgorithm<I> for FFTConvolution<A>
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
 #[cfg(test)]
-use crate::rings::zn::zn_64::Zn64B;
+use crate::rings::zn::zn_64b::Zn64B;
 #[cfg(test)]
 use crate::tracing::LogAlgorithmSubscriber;
 

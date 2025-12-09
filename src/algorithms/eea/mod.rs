@@ -288,7 +288,7 @@ use crate::tracing::LogAlgorithmSubscriber;
 #[cfg(test)]
 use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
-use crate::rings::zn::zn_64::*;
+use crate::rings::zn::zn_64b::*;
 #[cfg(test)]
 use crate::rings::zn::*;
 

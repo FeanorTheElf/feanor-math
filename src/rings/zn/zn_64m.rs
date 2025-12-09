@@ -331,10 +331,10 @@ impl<I: RingStore> CanIsoFromTo<zn_big::ZnGBBase<I>> for Zn64MBase
     }
 }
 
-impl CanHomFrom<zn_64::Zn64BBase> for Zn64MBase {
+impl CanHomFrom<zn_64b::Zn64BBase> for Zn64MBase {
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, from: &zn_64::Zn64BBase) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &zn_64b::Zn64BBase) -> Option<Self::Homomorphism> {
         if self.modulus() == from.modulus() {
             Some(())
         } else {
@@ -342,19 +342,19 @@ impl CanHomFrom<zn_64::Zn64BBase> for Zn64MBase {
         }
     }
 
-    fn map_in(&self, from: &zn_64::Zn64BBase, el: <zn_64::Zn64BBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &zn_64b::Zn64BBase, el: <zn_64b::Zn64BBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
         self.from_int_promise_reduced(from.smallest_positive_lift(el))
     }
 }
 
-impl CanIsoFromTo<zn_64::Zn64BBase> for Zn64MBase {
-    type Isomorphism = <zn_64::Zn64BBase as CanHomFrom<Self>>::Homomorphism;
+impl CanIsoFromTo<zn_64b::Zn64BBase> for Zn64MBase {
+    type Isomorphism = <zn_64b::Zn64BBase as CanHomFrom<Self>>::Homomorphism;
 
-    fn has_canonical_iso(&self, from: &zn_64::Zn64BBase) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, from: &zn_64b::Zn64BBase) -> Option<Self::Isomorphism> {
         from.has_canonical_hom(self)
     }
 
-    fn map_out(&self, from: &zn_64::Zn64BBase, el: <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <zn_64::Zn64BBase as RingBase>::Element {
+    fn map_out(&self, from: &zn_64b::Zn64BBase, el: <Self as RingBase>::Element, iso: &Self::Isomorphism) -> <zn_64b::Zn64BBase as RingBase>::Element {
         from.map_in(self, el, iso)
     }
 }

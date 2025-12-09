@@ -47,16 +47,16 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
     // otherwise we might not terminate...
     assert!(ring.is_noetherian());
     assert!(ring.is_commutative());
+    let (row_count, col_count) = (A.row_count(), A.col_count());
 
-    span!(Level::INFO, "pre_smith", n = A.row_count(), m = A.col_count()).in_scope(|| {
-
-        for k in 0..min(A.row_count(), A.col_count()) {
+    span!(Level::INFO, "pre_smith", n = row_count, m = col_count, is_small = row_count < 32 || col_count < 32).in_scope(|| {
+        for k in 0..min(row_count, col_count) {
             let mut changed_row = true;
             while changed_row {
                 changed_row = false;
                 
                 // eliminate the column
-                for i in (k + 1)..A.row_count() {
+                for i in (k + 1)..row_count {
                     if ring.is_zero(A.at(i, k)) {
                         continue;
                     } else if let Some(quo) = ring.checked_div(A.at(i, k), A.at(k, k)) {
@@ -70,7 +70,7 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
                 }
                 
                 // now eliminate the row
-                for j in (k + 1)..A.col_count() {
+                for j in (k + 1)..col_count {
                     if ring.is_zero(A.at(k, j)) {
                         continue;
                     } else if let Some(quo) = ring.checked_div(A.at(k, j), A.at(k, k)) {
@@ -86,7 +86,7 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
                 }
             }
         }
-    })
+    });
 }
 
 #[stability::unstable(feature = "enable")]
@@ -176,7 +176,7 @@ use crate::rings::extension::galois_field::GaloisField;
 #[cfg(test)]
 use crate::rings::extension::FreeAlgebraStore;
 #[cfg(test)]
-use crate::rings::zn::zn_64::Zn64B;
+use crate::rings::zn::zn_64b::Zn64B;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
 #[cfg(test)]

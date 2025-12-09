@@ -38,7 +38,7 @@ pub trait PrincipalIdealRing: DivisibilityRing {
     /// # use feanor_math::ring::*;
     /// # use feanor_math::pid::*;
     /// # use feanor_math::homomorphism::*;
-    /// # use feanor_math::rings::zn::zn_64::*;
+    /// # use feanor_math::rings::zn::zn_64b::*;
     /// let Z6 = Zn64B::new(6);
     /// assert_el_eq!(Z6, Z6.int_hom().map(3), Z6.annihilator(&Z6.int_hom().map(2)));
     /// ```

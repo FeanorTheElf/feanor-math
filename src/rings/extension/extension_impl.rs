@@ -882,7 +882,7 @@ impl<R1, V1, A1, C1, R2, V2, A2, C2> CanIsoFromTo<FreeAlgebraImplBase<R1, V1, A1
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_64::{Zn64B, Zn64BEl};
+use crate::rings::zn::zn_64b::{Zn64B, Zn64BEl};
 #[cfg(test)]
 use crate::rings::zn::ZnRingStore;
 #[cfg(test)]

@@ -221,7 +221,7 @@ pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_po
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_64::Zn64B;
+use crate::rings::zn::zn_64b::Zn64B;
 #[cfg(test)]
 use crate::rings::zn::ZnRingStore;
 #[cfg(test)]

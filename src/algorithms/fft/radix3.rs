@@ -542,7 +542,7 @@ use std::array::from_fn;
 #[cfg(test)]
 use crate::rings::finite::FiniteRingStore;
 #[cfg(test)]
-use crate::rings::zn::zn_64::*;
+use crate::rings::zn::zn_64b::*;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
 #[cfg(test)]

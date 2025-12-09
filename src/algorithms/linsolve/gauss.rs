@@ -148,7 +148,7 @@ pub fn largest_nonzero_minor<R, V>(A: SubmatrixMut<V, El<R>>, ring: R) -> (Vec<u
 #[cfg(test)]
 use crate::rings::local::AsLocalPIR;
 #[cfg(test)]
-use crate::rings::zn::zn_64::Zn64B;
+use crate::rings::zn::zn_64b::Zn64B;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
 #[cfg(test)]

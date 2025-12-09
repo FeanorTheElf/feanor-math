@@ -7,7 +7,7 @@ use crate::ring::*;
 use crate::rings::finite::FiniteRing;
 use crate::rings::poly::*;
 use crate::rings::rational::*;
-use crate::rings::zn::zn_64::*;
+use crate::rings::zn::zn_64b::*;
 
 use finite::*;
 use rational::*;

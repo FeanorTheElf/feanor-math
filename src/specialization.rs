@@ -89,8 +89,8 @@ fn test_specialize_finite_field() {
         }
     }
 
-    let ring = zn_64::Zn64B::new(7).as_field().ok().unwrap();
-    assert!(<AsFieldBase<zn_64::Zn64B>>::specialize(Verify(ring.get_ring(), 7)));
+    let ring = zn_64b::Zn64B::new(7).as_field().ok().unwrap();
+    assert!(<AsFieldBase<zn_64b::Zn64B>>::specialize(Verify(ring.get_ring(), 7)));
     
     let ring = GaloisField::new(3, 2);
     assert!(GaloisFieldBase::specialize(Verify(ring.get_ring(), 9)));

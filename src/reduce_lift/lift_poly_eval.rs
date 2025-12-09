@@ -618,7 +618,7 @@ macro_rules! impl_interpolation_base_ring_char_zero {
 /// Implements [`LiftPolyEvalRing`] for an integer ring.
 /// 
 /// This uses a default implementation, where the prime ideals are given by the largest prime numbers
-/// such that the corresponding residue field can be implemented using [`crate::rings::zn::zn_64::Zn`]. 
+/// such that the corresponding residue field can be implemented using [`crate::rings::zn::zn_64b::Zn`]. 
 /// This should be suitable in almost all scenarios.
 /// 
 /// The syntax is the same as for other impl-macros, see e.g. [`crate::impl_interpolation_base_ring_char_zero!`].
@@ -633,13 +633,13 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
         impl<$($gen_args)*> $crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing for $int_ring_type
             where $($constraints)*
         {
-            type LocalComputationData<'ring> = $crate::rings::zn::zn_rns::ZnRNS<$crate::rings::field::AsField<$crate::rings::zn::zn_64::Zn64B>, RingRef<'ring, Self>>
+            type LocalComputationData<'ring> = $crate::rings::zn::zn_rns::ZnRNS<$crate::rings::field::AsField<$crate::rings::zn::zn_64b::Zn64B>, RingRef<'ring, Self>>
                 where Self: 'ring;
 
-            type LocalRing<'ring> = $crate::rings::field::AsField<$crate::rings::zn::zn_64::Zn64B>
+            type LocalRing<'ring> = $crate::rings::field::AsField<$crate::rings::zn::zn_64b::Zn64B>
                 where Self: 'ring;
 
-            type LocalRingBase<'ring> = $crate::rings::field::AsFieldBase<$crate::rings::zn::zn_64::Zn64B>
+            type LocalRingBase<'ring> = $crate::rings::field::AsFieldBase<$crate::rings::zn::zn_64b::Zn64B>
                 where Self: 'ring;
 
             fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
@@ -649,7 +649,7 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
             fn init_reduce_lift<'ring>(&'ring self, ln_valuation_bound: f64) -> Self::LocalComputationData<'ring> {
                 let mut primes = Vec::new();
                 let mut ln_current = 0.;
-                let mut prime_it = $crate::reduce_lift::primelist::LARGE_PRIMES.iter().copied().map(|p| $crate::rings::zn::zn_64::Zn64B::new(p as u64));
+                let mut prime_it = $crate::reduce_lift::primelist::LARGE_PRIMES.iter().copied().map(|p| $crate::rings::zn::zn_64b::Zn64B::new(p as u64));
                 while ln_current < ln_valuation_bound + 1. {
                     let Fp = prime_it.next().unwrap();
                     ln_current += (*$crate::rings::zn::ZnRingStore::modulus(&Fp) as f64).ln();

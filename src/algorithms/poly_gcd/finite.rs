@@ -190,7 +190,7 @@ pub fn fast_poly_eea<P>(poly_ring: P, lhs: El<P>, rhs: El<P>) -> (El<P>, El<P>, 
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_64;
+use crate::rings::zn::zn_64b;
 #[cfg(test)]
 use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
@@ -202,7 +202,7 @@ use crate::tracing::LogAlgorithmSubscriber;
 fn test_fast_poly_eea() {
     LogAlgorithmSubscriber::init_test();
 
-    let field = zn_64::Zn64B::new(2).as_field().ok().unwrap();
+    let field = zn_64b::Zn64B::new(2).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");
 
     let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [
@@ -213,7 +213,7 @@ fn test_fast_poly_eea() {
     assert_el_eq!(&poly_ring, &d, poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g)));
     assert_el_eq!(&poly_ring, poly_ring.pow(poly_ring.indeterminate(), 54), poly_ring.normalize(d));
 
-    let field = zn_64::Zn64B::new(65537).as_field().ok().unwrap();
+    let field = zn_64b::Zn64B::new(65537).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");
 
     let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [

@@ -10,7 +10,7 @@ use crate::integer::*;
 use crate::lazy::LazyVec;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
-use crate::rings::zn::zn_64::{Zn64B, Zn64BBase, ZnFastmul, ZnFastmulBase};
+use crate::rings::zn::zn_64b::{Zn64B, Zn64BBase, ZnFastmul, ZnFastmulBase};
 use crate::rings::zn::*;
 use crate::divisibility::*;
 use crate::seq::*;

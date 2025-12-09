@@ -9,7 +9,7 @@ use crate::integer::{IntegerRing, IntegerRingStore};
 use crate::rings::finite::{FiniteRing, FiniteRingStore};
 use crate::ring::*;
 use crate::iters::*;
-use crate::rings::zn::zn_64::*;
+use crate::rings::zn::zn_64b::*;
 use crate::homomorphism::*;
 use crate::seq::CloneRingEl;
 

@@ -245,7 +245,7 @@ const SHORTEST_ADDITION_CHAINS: [(usize, usize); 65] = [
 use test::Bencher;
 use tracing::instrument;
 #[cfg(test)]
-use crate::rings::zn::zn_64;
+use crate::rings::zn::zn_64b;
 #[cfg(test)]
 use crate::homomorphism::*;
 #[cfg(test)]
@@ -278,7 +278,7 @@ fn test_shortest_addition_chain_table() {
 #[bench]
 fn bench_standard_square_and_multiply(bencher: &mut Bencher) {
     LogAlgorithmSubscriber::init_test();
-    let ring = zn_64::Zn64B::new(536903681);
+    let ring = zn_64b::Zn64B::new(536903681);
     let x = ring.int_hom().map(2);
     bencher.iter(|| {
         assert_el_eq!(&ring, &ring.one(), try_generic_abs_square_and_multiply::<_, _, _, _, _, !>(
@@ -298,7 +298,7 @@ fn bench_standard_square_and_multiply(bencher: &mut Bencher) {
 #[bench]
 fn bench_addchain_square_and_multiply(bencher: &mut Bencher) {
     LogAlgorithmSubscriber::init_test();
-    let ring = zn_64::Zn64B::new(536903681);
+    let ring = zn_64b::Zn64B::new(536903681);
     let x = ring.int_hom().map(2);
     bencher.iter(|| {
         assert_el_eq!(&ring, &ring.one(), generic_pow_shortest_chain_table::<_, _, _, _, _, !>(

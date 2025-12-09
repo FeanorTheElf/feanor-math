@@ -1321,7 +1321,17 @@ fn test_poly_gcd_number_field() {
 
 #[test]
 fn random_test_poly_gcd_number_field() {
-    LogAlgorithmSubscriber::init_test();
+    // LogAlgorithmSubscriber::init_test();
+    
+    use tracing_subscriber::Layer;
+    use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
+    let filtered_chrome_layer = chrome_layer.with_filter(tracing_subscriber::filter::filter_fn(|metadata| 
+        !["feanor_math::algorithms::bigint_ops", "feanor_math::algorithms::convolution::karatsuba", "feanor_math::algorithms::eea", "feanor_math::algorithms::sqr_mul"].contains(&metadata.target())
+    ));
+    tracing_subscriber::registry().with(filtered_chrome_layer).init();
+
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
     let ZZX = DensePolyRing::new(ZZ, "X");

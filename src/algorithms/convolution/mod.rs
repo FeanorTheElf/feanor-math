@@ -115,7 +115,7 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase>: Send + Sync {
     /// # use feanor_math::algorithms::convolution::*;
     /// # use feanor_math::algorithms::convolution::ntt::*;
     /// # use feanor_math::rings::zn::*;
-    /// # use feanor_math::rings::zn::zn_64::*;
+    /// # use feanor_math::rings::zn::zn_64b::*;
     /// # use feanor_math::rings::finite::*;
     /// let ring = Zn64B::new(65537);
     /// let convolution = NTTConvolution::new(ring);

@@ -79,7 +79,7 @@ pub fn reduce_2d_modular_relation_basis<R>(Zn: R, x: El<R>) -> (
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::divisibility::*;
 /// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::zn::zn_64b::*;
 /// # use feanor_math::algorithms::rational_reconstruction::*;
 /// let ring = Zn64B::new(100000000);
 /// assert_eq!((3, 7), balanced_rational_reconstruction(&ring, ring.checked_div(&ring.int_hom().map(3), &ring.int_hom().map(7)).unwrap()));
@@ -120,7 +120,7 @@ use crate::tracing::LogAlgorithmSubscriber;
 fn test_rational_reconstruction() {
     LogAlgorithmSubscriber::init_test();
     let n = 2021027;
-    let Zn = zn_64::Zn64B::new(n as u64);
+    let Zn = zn_64b::Zn64B::new(n as u64);
     let ab_bound = (n as f64 / 2.).sqrt().floor() as i32;
     for a in -ab_bound..ab_bound {
         for b in 1..ab_bound {
@@ -132,7 +132,7 @@ fn test_rational_reconstruction() {
     }
 
     // this example leads to `a, b` that are divisible by `17`.
-    let ring = zn_64::Zn64B::new(17 * 17 * 17);
+    let ring = zn_64b::Zn64B::new(17 * 17 * 17);
     let hom = ring.can_hom(ring.integer_ring()).unwrap();
     let (a, b) = balanced_rational_reconstruction(&ring, hom.map(4048));
     assert_el_eq!(&ring, &hom.map(a), ring.mul(hom.map(b), hom.map(4048)));

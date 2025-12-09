@@ -29,12 +29,12 @@ In the end, though not perfect, this turns out to work quite well.
 ## Features
 
 The following rings are provided
- - The integer ring `Z`, as a trait [`crate::integer::IntegerRing`] with implementations for all primitive ints (`i8` to `i128`) given by [`crate::primitive_int::StaticRing`], an arbitrary-precision implementation [`crate::rings::rust_bigint::RustBigintRing`], and an optional implementation using bindings to the heavily optimized library [mpir](https://github.com/wbhart/mpir) (enable with `features=mpir`) given by [`crate::rings::mpir::MPZ`].
- - The quotient ring `Z/nZ`, as a trait [`crate::rings::zn::ZnRing`] with four implementations. One where the modulus is small and known at compile-time [`crate::rings::zn::zn_static::Zn`], an optimized implementation of Barett-reductions for moduli somewhat smaller than 64 bits [`crate::rings::zn::zn_64::Zn`], a generic implementation of Barett-reductions for any modulus and any integer ring (optimized for arbitrary-precision ones) [`crate::rings::zn::zn_big::Zn`] and a residue-number-system implementation for highly composite moduli [`crate::rings::zn::zn_rns::Zn`].
- - The polynomial ring `R[X]` over any base ring, as a trait [`crate::rings::poly::PolyRing`] with two implementations, one for densely filled polynomials [`crate::rings::poly::dense_poly::DensePolyRing`] and one for sparsely filled polynomials [`crate::rings::poly::sparse_poly::SparsePolyRing`].
- - Finite-rank simple and free ring extensions, as a trait [`crate::rings::extension::FreeAlgebra`], with an implementation based on polynomial division [`crate::rings::extension::extension_impl::FreeAlgebraImpl`]. In particular, this includes finite/galois fields and number fields.
- - Multivariate polynomial rings `R[X1, ..., XN]` over any base ring, as the trait [`crate::rings::multivariate::MultivariatePolyRing`] and one implementation [`crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl`] based on a sparse representation using ordered vectors.
- - Combining the above, you can get Galois fields (easily available using [`crate::rings::extension::galois_field::GaloisField`]) or arbitrary number fields (they also have the wrapper type [`crate::rings::extension::number_field::NumberField`] for a more convenient interface).
+ - The integer ring `Z`, as a trait [`IntegerRing`] with implementations for all primitive ints (`i8` to `i128`) given by [`StaticRing`], an arbitrary-precision implementation [`RustBigintRing`], and an optional implementation using bindings to the heavily optimized library [mpir](https://github.com/wbhart/mpir) (enable with `features=mpir`) given by [`MPZ`].
+ - The quotient ring `Z/nZ`, as a trait [`ZnRing`] with four implementations. One where the modulus is small and known at compile-time [`Zn`], an optimized implementation of Barett-reductions for moduli somewhat smaller than 64 bits [`Zn64B`], an optimized implementation of Montgomery-reductions for moduli somewhat smaller than 64 bits [`Zn64M`], a generic implementation of Barett-reductions for any modulus and any integer ring (optimized for arbitrary-precision ones) [`ZnGBBase`] and a residue-number-system implementation for highly composite moduli [`ZnRNS`].
+ - The polynomial ring `R[X]` over any base ring, as a trait [`PolyRing`] with two implementations, one for densely filled polynomials [`DensePolyRing`] and one for sparsely filled polynomials [`SparsePolyRing`].
+ - Finite-rank simple and free ring extensions, as a trait [`FreeAlgebra`], with an implementation based on polynomial division [`FreeAlgebraImpl`]. In particular, this includes finite/galois fields and number fields.
+ - Multivariate polynomial rings `R[X1, ..., XN]` over any base ring, as the trait [`MultivariatePolyRing`] and one implementation [`MultivariatePolyRingImpl`] based on a sparse representation using ordered vectors.
+ - Combining the above, you can get Galois fields (easily available using [`GaloisField`]) or arbitrary number fields (they also have the wrapper type [`NumberField`] for a more convenient interface).
 
 The following algorithms are implemented
  - Fast Fourier transforms, including an optimized implementation of the Cooley-Tukey algorithm for the power-of-two and power-of-three cases, an implementation of the Bluestein algorithm for arbitrary lengths, and a factor FFT implementation (also based on the Cooley-Tukey algorithm). The Fourier transforms work on all rings that have suitable roots of unity, in particular the complex numbers `C` and suitable finite rings `Fq`.
@@ -118,7 +118,7 @@ Note that this code currently requires unstable features, i.e. activating the fe
 ```rust
 use feanor_math::homomorphism::*;
 use feanor_math::rings::zn::*;
-use feanor_math::rings::zn::zn_64::*;
+use feanor_math::rings::zn::zn_64b::*;
 use feanor_math::assert_el_eq;
 use feanor_math::ring::*;
 use feanor_math::field::*;
@@ -337,7 +337,7 @@ For example, a simple polynomial ring implementation could look like this.
 ```rust
 use feanor_math::assert_el_eq;
 use feanor_math::ring::*;
-use feanor_math::rings::zn::zn_64::*;
+use feanor_math::rings::zn::zn_64b::*;
 use feanor_math::integer::*;
 use feanor_math::homomorphism::*;
 use feanor_math::rings::zn::*;
@@ -493,12 +493,12 @@ As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` ca
  - Rings that wrap a base ring (like `MyRing<BaseRing: RingStore>`) should not implement `Copy`, unless both `BaseRing: Copy` and `El<BaseRing>: Copy`.
    There are some cases where I had previously added `#[derive(Copy)]`, which then made adding struct members of base ring elements to the ring a breaking change.
  - Equality (via `PartialEq`) of rings implies that they are "the same" and their elements can be used interchangeably without conversion.
-   Being (canonically) isomorphic (via [`crate::homomorphism::CanIsoFromTo`]) implies that two rings are "the same", but their elements might use different internal
-   format. Using the functions [`crate::homomorphism::CanIsoFromTo`], they can be converted between both rings. For more info, see also [`crate::ring::RingBase`].
+   Being (canonically) isomorphic (via [`CanIsoFromTo`]) implies that two rings are "the same", but their elements might use different internal
+   format. Using the functions [`CanIsoFromTo`], they can be converted between both rings. For more info, see also [`crate::ring::RingBase`].
  - Algorithms are exposed in one of three ways: As global function, as subtrait of [`crate::ring::RingBase`] or as their own trait, generic in some ring type `R: RingBase`.
-   The first should be seen as the default, while the second way can be used if the implementation of the algorithm depends heavily on the ring in question (e.g. factoring polynomials, see [`crate::algorithms::poly_factor::FactorPolyField`]).
+   The first should be seen as the default, while the second way can be used if the implementation of the algorithm depends heavily on the ring in question (e.g. factoring polynomials, see [`FactorPolyField`]).
    Furthermore, in some situations, one might want algorithms to store data between multiple executions, and/or make higher-level algorithms (or rings) configurable with a concrete implementation of a used sub-algorithm (strategy pattern).
-   In these cases, it makes sense to define a new trait for objects representing an implementation of the algorithm (e.g. computing convolutions, see [`crate::algorithms::convolution::ConvolutionAlgorithm`]).
+   In these cases, it makes sense to define a new trait for objects representing an implementation of the algorithm (e.g. computing convolutions, see [`ConvolutionAlgorithm`]).
  - More complicated objects often have multiple functions to construct them: 
    A function `new()`, which makes default choices for all but the core parameters, multiple functions `new_with_xyz()` that allow to additionally configure `xyz`, and a function `create()`. 
    The latter usually allows complete customization, and usually is `#[stability::unstable]`, since it will change whenever the object's implementation changes to allow for more (or less) configuration.
@@ -523,8 +523,32 @@ However, I did not have the time so far to thoroughly optimize many of the algor
 
 ## Tipps for achieving optimal performance
 
- - Use `lto = "fat"` in the `Cargo.toml` of your project. This is absolutely vital to enable inlining across crate boundaries, and can have a huge impact if you extensively use rings that have "simple" basic arithmetic - like [`crate::rings::zn::zn_64::Zn`] or [`crate::primitive_int::StaticRing`].
+ - Use `lto = "fat"` in the `Cargo.toml` of your project. This is absolutely vital to enable inlining across crate boundaries, and can have a huge impact if you extensively use rings that have "simple" basic arithmetic - like [`Zn64B`] or [`StaticRing`].
  - Different parts of this library are at different stages of optimization. While I have spent some time on finite fields and the FFT algorithms, for example working over rationals is currently somewhat slow.
  - If you extensively use rings whose elements require dynamic memory allocation, be careful to use a custom allocator, e.g. one from [`feanor-mempool`](https://github.com/FeanorTheElf/feanor-mempool).
  - The default arbitrary-precision integer arithmetic is somewhat slow. Use the feature "mpir" together with an installation of the [mpir](https://github.com/wbhart/mpir) library if you heavily use arbitrary-precision integers. 
- - Write your code so that it is easy to replace ring types and other generic parameters! `feanor-math` often provides different implementations of the same thing, but with different performance characteristics (e.g. [`crate::rings::poly::sparse_poly::SparsePolyRing`] vs [`crate::rings::poly::dense_poly::DensePolyRing`], [`crate::algorithms::convolution::KaratsubaAlgorithm`] vs [`crate::algorithms::convolution::ntt::NTTConvolution`] and so on). If your code makes it easy to replace one with the other, you can just experiment which version gives the best performance. `feanor-math` supports that by exposing basically all interfaces through traits.
+ - Write your code so that it is easy to replace ring types and other generic parameters! `feanor-math` often provides different implementations of the same thing, but with different performance characteristics (e.g. [`SparsePolyRing`] vs [`DensePolyRing`], [`KaratsubaAlgorithm`] vs [`NTTConvolution`] and so on). If your code makes it easy to replace one with the other, you can just experiment which version gives the best performance. `feanor-math` supports that by exposing basically all interfaces through traits.
+
+[`IntegerRing`]: crate::integer::IntegerRing
+[`StaticRing`]: crate::primitive_int::StaticRing
+[`RustBigintRing`]: crate::rings::rust_bigint::RustBigintRing
+[`MPZ`]: crate::rings::mpir::MPZ
+[`ZnRing`]: crate::rings::zn::ZnRing
+[`Zn`]: crate::rings::zn::zn_static::Zn
+[`ZnGBBase`]: crate::rings::zn::zn_big::ZnGBBase
+[`Zn64B`]: crate::rings::zn::zn_64b::Zn64B
+[`ZnRNS`]: crate::rings::zn::zn_rns::ZnRNS
+[`PolyRing`]: crate::rings::poly::PolyRing
+[`DensePolyRing`]: crate::rings::poly::dense_poly::DensePolyRing
+[`SparsePolyRing`]: crate::rings::poly::sparse_poly::SparsePolyRing
+[`FreeAlgebra`]: crate::rings::extension::FreeAlgebra
+[`FreeAlgebraImpl`]: crate::rings::extension::extension_impl::FreeAlgebraImpl
+[`MultivariatePolyRing`]: crate::rings::multivariate::MultivariatePolyRing
+[`MultivariatePolyRingImpl`]: crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl
+[`GaloisField`]: crate::rings::extension::galois_field::GaloisField
+[`NumberField`]: crate::rings::extension::number_field::NumberField
+[`CanIsoFromTo`]: crate::homomorphism::CanIsoFromTo
+[`ConvolutionAlgorithm`]: crate::algorithms::convolution::ConvolutionAlgorithm
+[`FactorPolyField`]: crate::algorithms::poly_factor::FactorPolyField
+[`KaratsubaAlgorithm`]: crate::algorithms::convolution::KaratsubaAlgorithm
+[`NTTConvolution`]: crate::algorithms::convolution::ntt::NTTConvolution

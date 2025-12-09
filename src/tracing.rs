@@ -68,7 +68,9 @@ struct SpanState {
     /// to ensure that a span is not entered by multiple threads at the same time
     entered_timestamp: AtomicU64,
     /// on which level of the span tree this span is
-    level: usize
+    level: usize,
+    /// whether the operation performed by the span is to be considered "small" or "cheap"
+    is_small: bool
 }
 
 pub struct LogAlgorithmSubscriber {
@@ -115,13 +117,14 @@ impl LogAlgorithmSubscriber {
 
 struct FieldRecorder {
     message: Option<String>,
-    fields: Option<String>
+    fields: Option<String>,
+    is_small: bool
 }
 
 impl FieldRecorder {
 
     fn new() -> Self {
-        Self { message: None, fields: None }
+        Self { message: None, fields: None, is_small: false }
     }
 
     fn to_string(self) -> String {
@@ -169,6 +172,14 @@ impl Visit for FieldRecorder {
             }
         }
     }
+
+    fn record_bool(&mut self, field: &Field, value: bool) {
+        if field.name() == "is_small" {
+            self.is_small = value;
+        } else {
+            self.record_debug(field, &value);
+        }
+    }
 }
 
 impl Subscriber for LogAlgorithmSubscriber {
@@ -199,16 +210,17 @@ impl Subscriber for LogAlgorithmSubscriber {
         let parent = span.parent().cloned().or_else(|| self.current_span.get_or(|| Cell::new(None)).get().map(Id::from_non_zero_u64));
         let level = parent.as_ref().map(|id| spans.get(id).unwrap().level + 1).unwrap_or(0);
 
-        let mut description = FieldRecorder::new();
-        span.record(&mut description);
-        description.message = Some(span.metadata().name().to_owned());
+        let mut fields = FieldRecorder::new();
+        span.record(&mut fields);
+        fields.message = Some(span.metadata().name().to_owned());
 
         assert!(spans.insert(Id::from_non_zero_u64(id), SpanState {
             parent: parent,
             level: level,
             metadata: span.metadata(),
             reference_counter: AtomicUsize::new(1),
-            description: description.to_string(),
+            is_small: fields.is_small,
+            description: fields.to_string(),
             logging_permission: LoggingPermissionHolder::new(),
             entered_timestamp: AtomicU64::new(0)
         }).is_none());
@@ -224,14 +236,16 @@ impl Subscriber for LogAlgorithmSubscriber {
     }
 
     fn event(&self, event: &Event<'_>) {
-        if *event.metadata().level() == Level::INFO {
+        if self.interested_level.contains(event.metadata().level()) {
             let span_map = self.span_map();
             let current_span = self.current_span().id().map(|id| span_map.get(id).unwrap());
             if current_span.is_none() || (current_span.unwrap().logging_permission.has_permission() && current_span.unwrap().level < self.max_depth) {
-                let mut description = FieldRecorder::new();
-                event.record(&mut description);
-                print!("{}", description.to_string());
-                std::io::Write::flush(&mut stdout()).unwrap();
+                let mut fields = FieldRecorder::new();
+                event.record(&mut fields);
+                if !fields.is_small {
+                    print!("{}", fields.to_string());
+                    std::io::Write::flush(&mut stdout()).unwrap();
+                }
             }
         }
     }
@@ -245,7 +259,7 @@ impl Subscriber for LogAlgorithmSubscriber {
         } else {
             Some(LoggingPermission::create_new_permission())
         };
-        if permission.is_some() {
+        if permission.is_some() && !entered_span.is_small {
             if entered_span.level < self.max_depth {
                 print!("{}", entered_span.description);
                 std::io::Write::flush(&mut stdout()).unwrap();
@@ -268,7 +282,7 @@ impl Subscriber for LogAlgorithmSubscriber {
         let time = Instant::now().duration_since(self.default_instant).as_micros() as u64 - entered_timestamp;
         let logging_permission = exited_span.logging_permission.take();
         if let Some(permission) = logging_permission {
-            if exited_span.level <= self.max_depth {
+            if exited_span.level <= self.max_depth && !exited_span.is_small {
                 print!("done({}us)", time);
                 if exited_span.level == 0 {
                     println!();

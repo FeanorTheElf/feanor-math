@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter};
 
 use extension_impl::FreeAlgebraImplBase;
 use sparse::SparseMapVector;
-use zn_64::Zn64B;
+use zn_64b::Zn64B;
 
 use crate::algorithms::convolution::*;
 use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
@@ -229,7 +229,7 @@ fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorando
 /// # use feanor_math::rings::field::*;
 /// # use feanor_math::rings::finite::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::zn::zn_64::*;
+/// # use feanor_math::rings::zn::zn_64b::*;
 /// # use feanor_math::rings::zn::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::extension::galois_field::*;
@@ -346,7 +346,7 @@ impl<R, A, C> GaloisFieldOver<R, A, C>
     /// # use feanor_math::rings::extension::*;
     /// # use feanor_math::rings::finite::*;
     /// # use feanor_math::homomorphism::*;
-    /// # use feanor_math::rings::zn::zn_64::*;
+    /// # use feanor_math::rings::zn::zn_64b::*;
     /// # use feanor_math::rings::zn::*;
     /// # use feanor_math::algorithms::convolution::*;
     /// # use feanor_math::rings::extension::galois_field::*;

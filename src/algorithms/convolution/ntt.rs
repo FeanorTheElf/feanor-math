@@ -281,14 +281,14 @@ use tracing::instrument;
 #[cfg(test)]
 use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 #[cfg(test)]
-use crate::rings::zn::zn_64::{Zn64B, Zn64BBase, Zn64BEl};
+use crate::rings::zn::zn_64b::{Zn64B, Zn64BBase, Zn64BEl};
 #[cfg(test)]
 use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_convolution() {
     LogAlgorithmSubscriber::init_test();
-    let ring = zn_64::Zn64B::new(65537);
+    let ring = zn_64b::Zn64B::new(65537);
     let convolution = NTTConvolution::new(ring);
     super::generic_tests::test_convolution(&convolution, &ring, ring.one());
 }
@@ -336,7 +336,7 @@ fn run_benchmark<F>(ring: Zn64B, bencher: &mut Bencher, mut f: F)
 #[bench]
 fn bench_convolution_sum(bencher: &mut Bencher) {
     LogAlgorithmSubscriber::init_test();
-    let ring = zn_64::Zn64B::new(65537);
+    let ring = zn_64b::Zn64B::new(65537);
     let convolution = NTTConvolution::new(ring);
 
     run_benchmark(ring, bencher, |values, dst, _| convolution.compute_convolution_sum_impl(values, dst));
@@ -345,7 +345,7 @@ fn bench_convolution_sum(bencher: &mut Bencher) {
 #[bench]
 fn bench_convolution_sum_default(bencher: &mut Bencher) {
     LogAlgorithmSubscriber::init_test();
-    let ring = zn_64::Zn64B::new(65537);
+    let ring = zn_64b::Zn64B::new(65537);
     let convolution = NTTConvolution::new(ring);
 
     run_benchmark(ring, bencher, |values, dst, ring| {
