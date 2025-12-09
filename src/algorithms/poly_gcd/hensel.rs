@@ -1,6 +1,8 @@
 use std::marker::PhantomData;
 
+use tracing::Level;
 use tracing::instrument;
+use tracing::span;
 
 use crate::algorithms::int_factor::is_prime_power;
 use crate::pid::*;
@@ -374,26 +376,25 @@ pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> O
 /// product is `f mod p^r`.
 /// 
 #[instrument(skip_all, level = "trace")]
-fn hensel_lift_factorization_internal<'ring, 'data, 'local, R, P1, P2, V>(
+fn hensel_lift_factorization_internal<'ring, 'data, 'local, R, P1, P2>(
     reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
-    factors: V
+    factors: &[El<P2>]
 ) -> Vec<El<P1>>
     where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore + Copy, P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
         P2: RingStore + Copy, P2::Type: PolyRing + PrincipalIdealRing,
-        <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>,
-        V: SelfSubvectorView<El<P2>>
+        <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>
 {
     if factors.len() == 1 {
         return vec![target_poly_ring.clone_el(f)];
     }
     let (g, h) = (factors.at(0), base_poly_ring.prod(factors.as_iter().skip(1).map(|h| base_poly_ring.clone_el(h))));
     let (g_lifted, h_lifted) = hensel_lift_quadratic(reduction_map, target_poly_ring, base_poly_ring, &f, (g, &h));
-    let mut result = hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, &h_lifted, factors.restrict(1..));
+    let mut result = hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, &h_lifted, &factors[1..]);
     result.insert(0, g_lifted);
     return result;
 }
@@ -405,25 +406,26 @@ fn hensel_lift_factorization_internal<'ring, 'data, 'local, R, P1, P2, V>(
 /// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2, V>(
+pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2>(
     reduction_map: &PolyLiftFactorsDomainIntermediateReductionMap<'ring, 'data, 'local, R>, 
     target_poly_ring: P1, 
     base_poly_ring: P2, 
     f: &El<P1>, 
-    factors: V
+    factors: &[El<P2>]
 ) -> Vec<El<P1>>
     where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore + Copy, P1::Type: PolyRing,
         <P1::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>,
         P2: RingStore + Copy, P2::Type: PolyRing + PrincipalIdealRing,
-        <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>,
-        V: SelfSubvectorView<El<P2>>
+        <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalFieldBase<'ring>>
 {
     assert!(target_poly_ring.base_ring().is_one(target_poly_ring.lc(f).unwrap()));
     assert!(factors.as_iter().all(|f| base_poly_ring.base_ring().is_one(base_poly_ring.lc(f).unwrap())));
     assert!(target_poly_ring.base_ring().get_ring() == reduction_map.domain().get_ring());
     
-    return hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, f, factors);
+    span!(Level::INFO, "hensel_lift_factorization", num_factors = factors.len()).in_scope(|| {
+        hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, f, factors)
+    })
 }
 
 #[cfg(test)]

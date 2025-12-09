@@ -1,6 +1,7 @@
 use std::cell::Cell;
 use std::collections::HashMap;
-use std::fmt::Write;
+use std::fmt::{Display, Write};
+use std::io::stdout;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::ops::RangeInclusive;
@@ -14,8 +15,6 @@ use tracing::field::{Field, Visit};
 use tracing::{Event, Level, Metadata, Subscriber, span};
 use tracing::span::Id;
 use tracing_core::Interest;
-
-const SPACES: &'static str = "                                                                                                                                                                                                                                                                                                                                                      ";
 
 struct LoggingPermission {
     data: PhantomData<()>
@@ -57,8 +56,6 @@ impl LoggingPermissionHolder {
 
 struct SpanState {
     parent: Option<Id>,
-    /// name of the span
-    name: &'static str,
     /// how many handles to the span currently exist; used for reference counting,
     /// to remove the span from map of spans when it is no longer used
     reference_counter: AtomicUsize,
@@ -103,7 +100,7 @@ impl LogAlgorithmSubscriber {
             current_span: ThreadLocal::new(),
             default_instant: Instant::now(),
             interested_level: Level::INFO..=Level::INFO,
-            max_depth: 4
+            max_depth: 2
         })
     }
 
@@ -113,6 +110,64 @@ impl LogAlgorithmSubscriber {
     
     fn span_map_mut<'a>(&'a self) -> RwLockWriteGuard<'a, HashMap<Id, SpanState>> {
         self.span_map.write().unwrap()
+    }
+}
+
+struct FieldRecorder {
+    message: Option<String>,
+    fields: Option<String>
+}
+
+impl FieldRecorder {
+
+    fn new() -> Self {
+        Self { message: None, fields: None }
+    }
+
+    fn to_string(self) -> String {
+        match (self.message, self.fields) {
+            (Some(mut message), Some(fields)) => {
+                write!(&mut message, "({})", fields).unwrap();
+                message
+            },
+            (Some(mut message), None) => {
+                write!(&mut message, ".").unwrap();
+                message
+            },
+            (None, Some(fields)) => {
+                format!("({})", fields)
+            },
+            (None, None) => ".".to_owned()
+        }
+    }
+}
+
+impl Display for FieldRecorder {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(message) = &self.message {
+            write!(f, "{}", message)?;
+        }
+        if let Some(fields) = &self.fields {
+            write!(f, "({})", fields)
+        } else {
+            write!(f, ".")
+        }
+    }
+}
+
+impl Visit for FieldRecorder {
+
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        if field.name() == "message" {
+            self.message = Some(format!("{:?}", value));
+        } else {
+            if let Some(fields) = &mut self.fields {
+                write!(fields, ", {}={:?}", field.name(), value).unwrap();
+            } else {
+                self.fields = Some(format!("{}={:?}", field.name(), value));
+            }
+        }
     }
 }
 
@@ -144,26 +199,16 @@ impl Subscriber for LogAlgorithmSubscriber {
         let parent = span.parent().cloned().or_else(|| self.current_span.get_or(|| Cell::new(None)).get().map(Id::from_non_zero_u64));
         let level = parent.as_ref().map(|id| spans.get(id).unwrap().level + 1).unwrap_or(0);
 
-        struct V(String);
-        let mut description = V("".to_owned());
-        impl Visit for V {
-            fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
-                if field.name() == "message" {
-                    write!(self.0, "{:?}, ", value).unwrap();
-                } else {
-                    write!(self.0, "{}: {:?}, ", field.name(), value).unwrap();
-                }
-            }
-        }
+        let mut description = FieldRecorder::new();
         span.record(&mut description);
+        description.message = Some(span.metadata().name().to_owned());
 
         assert!(spans.insert(Id::from_non_zero_u64(id), SpanState {
             parent: parent,
             level: level,
-            name: span.metadata().name(),
             metadata: span.metadata(),
             reference_counter: AtomicUsize::new(1),
-            description: description.0,
+            description: description.to_string(),
             logging_permission: LoggingPermissionHolder::new(),
             entered_timestamp: AtomicU64::new(0)
         }).is_none());
@@ -183,20 +228,10 @@ impl Subscriber for LogAlgorithmSubscriber {
             let span_map = self.span_map();
             let current_span = self.current_span().id().map(|id| span_map.get(id).unwrap());
             if current_span.is_none() || (current_span.unwrap().logging_permission.has_permission() && current_span.unwrap().level < self.max_depth) {
-                
-                print!("{}[", &SPACES[..current_span.map(|s| s.level * 2 + 2).unwrap_or(0)]);
-                struct V;
-                impl Visit for V {
-                    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
-                        if field.name() == "message" {
-                            print!("{:?}, ", value);
-                        } else {
-                            print!("{}: {:?}, ", field.name(), value);
-                        }
-                    }
-                }
-                event.record(&mut V);
-                println!("]");
+                let mut description = FieldRecorder::new();
+                event.record(&mut description);
+                print!("{}", description.to_string());
+                std::io::Write::flush(&mut stdout()).unwrap();
             }
         }
     }
@@ -211,11 +246,13 @@ impl Subscriber for LogAlgorithmSubscriber {
             Some(LoggingPermission::create_new_permission())
         };
         if permission.is_some() {
-            if entered_span.level <= self.max_depth {
-                println!("{}{} [{}]", &SPACES[..(entered_span.level * 2)], entered_span.name, entered_span.description);
+            if entered_span.level < self.max_depth {
+                print!("{}", entered_span.description);
+                std::io::Write::flush(&mut stdout()).unwrap();
             }
             if entered_span.level == self.max_depth {
-                println!("{}...", &SPACES[..(entered_span.level * 2 + 2)]);
+                print!("{}...", entered_span.description);
+                std::io::Write::flush(&mut stdout()).unwrap();
             }
         }
         assert!(entered_span.entered_timestamp.compare_exchange(0, Instant::now().duration_since(self.default_instant).as_micros() as u64, Ordering::SeqCst, Ordering::SeqCst).is_ok(), "entered an already running span");
@@ -232,7 +269,11 @@ impl Subscriber for LogAlgorithmSubscriber {
         let logging_permission = exited_span.logging_permission.take();
         if let Some(permission) = logging_permission {
             if exited_span.level <= self.max_depth {
-                println!("{}done ({} us)", &SPACES[..(exited_span.level * 2)], time);
+                print!("done({}us)", time);
+                if exited_span.level == 0 {
+                    println!();
+                }
+                std::io::Write::flush(&mut stdout()).unwrap();
             }
             if let Some(parent) = &exited_span.parent {
                 span_map.get(&parent).unwrap().logging_permission.give(permission);

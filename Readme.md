@@ -512,7 +512,7 @@ As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` ca
    Most algorithms behave very predictably, and these won't emit any `TRACE`-level events at all.
    Much more events are emitted on level `TRACE`, which are intended to be used for profiling.
    Any function that performs a significant amount of computation should emit such events, usually by annotating it with `#[instrument(skip_all, level = "trace")]`.
- - When implementing logging for some algorithm, the `#[instrument]` annotations and the `span!()` and `event!()` statements should be at the function that actually performs the algorithm
+ - When implementing logging for algorithm, the `span!()` and `event!()` statements should be at the function that actually performs the algorithm, since they are supposed to give information about the execution and progress of the concrete algorithm.
    In particular, many algorithms are implemented as global functions, but then called through a trait.
    Thus, the implementation of the trait contains only delegation calls, and should not be annotated with explicit tracing statements.
 

@@ -8,7 +8,9 @@ use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
 use crate::ring::*;
 use crate::pid::PrincipalIdealRing;
 
+use tracing::Level;
 use tracing::instrument;
+use tracing::span;
 use transform::TransformList;
 
 ///
@@ -46,42 +48,45 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
     assert!(ring.is_noetherian());
     assert!(ring.is_commutative());
 
-    for k in 0..min(A.row_count(), A.col_count()) {
-        let mut changed_row = true;
-        while changed_row {
-            changed_row = false;
-            
-            // eliminate the column
-            for i in (k + 1)..A.row_count() {
-                if ring.is_zero(A.at(i, k)) {
-                    continue;
-                } else if let Some(quo) = ring.checked_div(A.at(i, k), A.at(k, k)) {
-                    TransformRows(A.reborrow(), ring.get_ring()).subtract(ring, k, i, &quo);
-                    L.subtract(ring, k, i, &quo);
-                } else {
-                    let (transform, _) = ring.get_ring().create_elimination_matrix(A.at(k, k), A.at(i, k));
-                    TransformRows(A.reborrow(), ring.get_ring()).transform(ring, k, i, &transform);
-                    L.transform(ring, k, i, &transform);
+    span!(Level::INFO, "pre_smith", n = A.row_count(), m = A.col_count()).in_scope(|| {
+
+        for k in 0..min(A.row_count(), A.col_count()) {
+            let mut changed_row = true;
+            while changed_row {
+                changed_row = false;
+                
+                // eliminate the column
+                for i in (k + 1)..A.row_count() {
+                    if ring.is_zero(A.at(i, k)) {
+                        continue;
+                    } else if let Some(quo) = ring.checked_div(A.at(i, k), A.at(k, k)) {
+                        TransformRows(A.reborrow(), ring.get_ring()).subtract(ring, k, i, &quo);
+                        L.subtract(ring, k, i, &quo);
+                    } else {
+                        let (transform, _) = ring.get_ring().create_elimination_matrix(A.at(k, k), A.at(i, k));
+                        TransformRows(A.reborrow(), ring.get_ring()).transform(ring, k, i, &transform);
+                        L.transform(ring, k, i, &transform);
+                    }
                 }
-            }
-            
-            // now eliminate the row
-            for j in (k + 1)..A.col_count() {
-                if ring.is_zero(A.at(k, j)) {
-                    continue;
-                } else if let Some(quo) = ring.checked_div(A.at(k, j), A.at(k, k)) {
-                    changed_row = true;
-                    TransformCols(A.reborrow(), ring.get_ring()).subtract(ring, k, j, &quo);
-                    R.subtract(ring, k, j, &quo);
-                } else {
-                    changed_row = true;
-                    let (transform, _) = ring.get_ring().create_elimination_matrix(A.at(k, k), A.at(k, j));
-                    TransformCols(A.reborrow(), ring.get_ring()).transform(ring, k, j, &transform);
-                    R.transform(ring, k, j, &transform);
+                
+                // now eliminate the row
+                for j in (k + 1)..A.col_count() {
+                    if ring.is_zero(A.at(k, j)) {
+                        continue;
+                    } else if let Some(quo) = ring.checked_div(A.at(k, j), A.at(k, k)) {
+                        changed_row = true;
+                        TransformCols(A.reborrow(), ring.get_ring()).subtract(ring, k, j, &quo);
+                        R.subtract(ring, k, j, &quo);
+                    } else {
+                        changed_row = true;
+                        let (transform, _) = ring.get_ring().create_elimination_matrix(A.at(k, k), A.at(k, j));
+                        TransformCols(A.reborrow(), ring.get_ring()).transform(ring, k, j, &transform);
+                        R.transform(ring, k, j, &transform);
+                    }
                 }
             }
         }
-    }
+    })
 }
 
 #[stability::unstable(feature = "enable")]

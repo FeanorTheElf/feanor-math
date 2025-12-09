@@ -1,4 +1,4 @@
-use tracing::instrument;
+use tracing::{Level, event, instrument, span};
 
 use crate::algorithms::matmul::{STANDARD_MATMUL, MatmulAlgorithm};
 use crate::field::*;
@@ -222,6 +222,7 @@ fn size_reduce<I, R, H, V1, V2, V3, T>(
         if RR.is_leq(&new_largest_max_mu, &eta) {
             return Ok(());
         } else if RR.is_geq(&new_largest_max_mu, &largest_max_mu) {
+            event!(Level::INFO, "size_reduction_not_converging");
             return Err(NotEnoughPrecision);
         } else {
             largest_max_mu = new_largest_max_mu;
@@ -245,7 +246,13 @@ fn size_reduce<I, R, H, V1, V2, V3, T>(
             };
             let min_mu = RR.div(&min_entry, gso.cholesky.at(k, k));
 
-            let factor = RR.get_ring().round_to_integer(BigIntRing::RING, min_mu).ok_or(NotEnoughPrecision)?;
+            let factor = match RR.get_ring().round_to_integer(BigIntRing::RING, min_mu) {
+                Some(factor) => factor,
+                None => {
+                    event!(Level::INFO, value = %RR.formatted_el(&RR.div(&min_entry, gso.cholesky.at(k, k))), "invalid_float");
+                    return Err(NotEnoughPrecision);
+                }
+            };
             if !BigIntRing::RING.is_zero(&factor) {
                 let (mut target, rest) = gso.cholesky.reborrow().split_cols(i..(i + 1), 0..i);
                 let factor = map_from_integer_ring(&BigIntRing::RING, h.domain(), factor);
@@ -410,42 +417,46 @@ pub fn lll_quadratic_form<I, R, H, V1, T>(
     assert!(RR.is_gt(delta, &RR.mul_ref(eta, eta)));
     let strict_delta = RR.mul_ref_snd(RR.add_ref_fst(delta, RR.one()), &half);
 
-    let mut C = OwnedMatrix::zero(quadratic_form.row_count(), quadratic_form.row_count(), RR);
-    let mut E = OwnedMatrix::zero(quadratic_form.row_count(), quadratic_form.row_count(), RR);
-    let mut gso = GSOMatrix {
-        cholesky: C.data_mut(),
-        error_bound: E.data_mut(),
-        quadratic_form: quadratic_form
-    };
+    span!(Level::INFO, "lll_float", n = quadratic_form.row_count(), delta = %RR.formatted_el(delta), eta = %RR.formatted_el(eta)).in_scope(|| {
 
-    let mut i = 1;
-    let mut zero_vector_count = 0;
-    let mut remaining_swaps = gso.quadratic_form.row_count() * gso.quadratic_form.row_count() * 1000;
-    gso = remove_zero_vectors(gso, &h, &mut zero_vector_count);
-    while i < gso.quadratic_form.row_count() {
-        assert!(i > 0);
-        size_reduce(&mut gso, i, &h, eta, OffsetTransformIndex::new(&mut transform, zero_vector_count))?;
-        match check_lovasz_condition(&mut gso, i, &h, &strict_delta) {
-            LovaszCondition::Swap if remaining_swaps == 0 => {
-                return Err(NotEnoughPrecision);
-            }
-            LovaszCondition::Swap => {
-                remaining_swaps -= 1;
-                gso.swap(h.domain(), i - 1, i);
-                OffsetTransformIndex::new(&mut transform, zero_vector_count).swap(h.domain(), i - 1, i);
-                i -= 1;
-                if i == 0 {
-                    gso = remove_zero_vectors(gso, &h, &mut zero_vector_count);
-                    i = 1;
+        let mut C = OwnedMatrix::zero(quadratic_form.row_count(), quadratic_form.row_count(), RR);
+        let mut E = OwnedMatrix::zero(quadratic_form.row_count(), quadratic_form.row_count(), RR);
+        let mut gso = GSOMatrix {
+            cholesky: C.data_mut(),
+            error_bound: E.data_mut(),
+            quadratic_form: quadratic_form
+        };
+
+        let mut i = 1;
+        let mut zero_vector_count = 0;
+        let mut remaining_swaps = gso.quadratic_form.row_count() * gso.quadratic_form.row_count() * 1000;
+        gso = remove_zero_vectors(gso, &h, &mut zero_vector_count);
+        while i < gso.quadratic_form.row_count() {
+            assert!(i > 0);
+            size_reduce(&mut gso, i, &h, eta, OffsetTransformIndex::new(&mut transform, zero_vector_count))?;
+            match check_lovasz_condition(&mut gso, i, &h, &strict_delta) {
+                LovaszCondition::Swap if remaining_swaps == 0 => {
+                    event!(Level::INFO, "swap_count_exceeded");
+                    return Err(NotEnoughPrecision);
                 }
-            },
-            LovaszCondition::Satisfied => {
-                i += 1;
+                LovaszCondition::Swap => {
+                    remaining_swaps -= 1;
+                    gso.swap(h.domain(), i - 1, i);
+                    OffsetTransformIndex::new(&mut transform, zero_vector_count).swap(h.domain(), i - 1, i);
+                    i -= 1;
+                    if i == 0 {
+                        gso = remove_zero_vectors(gso, &h, &mut zero_vector_count);
+                        i = 1;
+                    }
+                },
+                LovaszCondition::Satisfied => {
+                    i += 1;
+                }
             }
         }
-    }
 
-    return Ok(());
+        return Ok(());
+    })
 }
 
 ///
