@@ -226,7 +226,7 @@ impl<T: PrimitiveInt> OrderedRing for StaticRingBase<T> {
 
 impl_interpolation_base_ring_char_zero!{ <{T}> InterpolationBaseRing for StaticRingBase<T> where T: PrimitiveInt }
 
-impl_poly_gcd_locally_for_ZZ!{ <{T}> IntegerPolyGCDRing for StaticRingBase<T> where T: PrimitiveInt }
+impl_poly_gcd_locally_for_ZZ!{ <{T}> IntegerPolyLiftFactorsDomain for StaticRingBase<T> where T: PrimitiveInt }
 
 impl_eval_poly_locally_for_ZZ!{ <{T}> LiftPolyEvalRing for StaticRingBase<T> where T: PrimitiveInt }
 

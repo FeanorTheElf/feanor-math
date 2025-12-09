@@ -787,8 +787,8 @@ impl<'a, Impl, I> Domain for NumberFieldByOrder<'a, Impl, I>
 type LocalRing<'ring, I> = <<I as RingStore>::Type as PolyLiftFactorsDomain>::LocalRing<'ring>;
 
 type ImplementationRing<'ring, I> = AsFieldBase<FreeAlgebraImpl<
-    AsField<<<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalRingAsZn<'ring>>, 
-    Vec<El<AsField<<<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalRingAsZn<'ring>>>>>
+    <<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring>, 
+    Vec<El<<<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring>>>>
 >;
 
 struct NumberFieldOrderQuotient<'ring, I>
@@ -919,7 +919,7 @@ pub struct NumberRingIdeal<'ring, I>
     number_field_poly: El<DensePolyRing<&'ring I>>,
     FpX: DensePolyRing<<I::Type as PolyLiftFactorsDomain>::LocalField<'ring>>,
     Fp_as_ring: <I::Type as PolyLiftFactorsDomain>::LocalRing<'ring>,
-    Fp_as_zn: AsField<<I::Type as IntegerPolyLiftFactorsDomain>::LocalRingAsZn<'ring>>,
+    Fp_as_zn: <I::Type as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring>,
     minpoly_factors_mod_p: Vec<El<DensePolyRing<<I::Type as PolyLiftFactorsDomain>::LocalField<'ring>>>>
 }
 
@@ -1038,9 +1038,9 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
                 return NumberRingIdeal {
                     minpoly_factors_mod_p: factorization.into_iter().map(|(f, _)| f).collect(),
                     number_field_poly: gen_poly,
+                    Fp_as_zn: ZZ.get_ring().local_field_into_zn(Fp.clone()),
                     FpX: FpX,
                     ZZX: ZZX,
-                    Fp_as_zn: ZZ.get_ring().local_ring_into_zn(Fp_as_ring.clone()).as_field().ok().unwrap(),
                     Fp_as_ring: Fp_as_ring,
                     prime: p
                 };
@@ -1058,18 +1058,16 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         let ZZ = QQ.base_ring();
         assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&ideal.prime));
         let FpX = &ideal.FpX;
-        let Fp_to_Fp = WrapHom::new(ideal.Fp_as_zn.get_ring())
-            .compose(RingRef::new(ideal.Fp_as_zn.get_ring().get_delegate()).into_can_hom(&ideal.Fp_as_ring).ok().unwrap())
-            .compose(PolyLiftFactorsDomainBaseRingToFieldIso::new(ZZ.get_ring(), &ideal.prime, ideal.Fp_as_ring.get_ring(), FpX.base_ring().get_ring(), 0).inv());
+        let Fp_to_Fp_zn = ideal.Fp_as_zn.can_hom(ideal.FpX.base_ring()).unwrap();
 
         let irred_poly = &ideal.minpoly_factors_mod_p[idx];
-        let mut x_pow_rank = (0..FpX.degree(irred_poly).unwrap()).map(|_| Fp_to_Fp.codomain().zero()).collect::<Vec<_>>();
+        let mut x_pow_rank = (0..FpX.degree(irred_poly).unwrap()).map(|_| Fp_to_Fp_zn.codomain().zero()).collect::<Vec<_>>();
         for (c, i) in FpX.terms(irred_poly) {
             if i < x_pow_rank.len() {
-                *x_pow_rank.at_mut(i) = Fp_to_Fp.codomain().negate(Fp_to_Fp.map_ref(c));
+                *x_pow_rank.at_mut(i) = Fp_to_Fp_zn.codomain().negate(Fp_to_Fp_zn.map_ref(c));
             }
         }
-        let trailing_zeros = x_pow_rank.iter().rev().take_while(|x| Fp_to_Fp.codomain().is_zero(x)).count();
+        let trailing_zeros = x_pow_rank.iter().rev().take_while(|x| Fp_to_Fp_zn.codomain().is_zero(x)).count();
         x_pow_rank.truncate(x_pow_rank.len() - trailing_zeros);
         return RingValue::from(NumberFieldOrderQuotient {
             implementation: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new(ideal.Fp_as_zn.clone(), FpX.degree(irred_poly).unwrap(), x_pow_rank))),
@@ -1124,7 +1122,9 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         where Self: 'ring
     {
         assert!(idx < self.maximal_ideal_factor_count(ideal));
-        let hom = WrapHom::new(to.base_ring().get_ring()).compose(RingRef::new(to.base_ring().get_ring().get_delegate()).into_can_hom(from.base_ring()).ok().unwrap());
+        let ZZ = self.base.base_ring().base_ring();
+        let hom = to.base_ring().can_hom(ideal.FpX.base_ring()).unwrap()
+            .compose(PolyLiftFactorsDomainBaseRingToFieldIso::new(ZZ.get_ring(), &ideal.prime, from.base_ring().get_ring(), ideal.FpX.base_ring().get_ring(), 0));
         to.from_canonical_basis(from.wrt_canonical_basis(&x).iter().map(|c| hom.map(c)))
     }
 
@@ -1133,7 +1133,9 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
     {
         assert!(idx < self.maximal_ideal_factor_count(ideal));
         assert!(idx < self.maximal_ideal_factor_count(ideal));
-        let hom = RingRef::new(from.base_ring().get_ring().get_delegate()).into_can_iso(to.base_ring()).ok().unwrap().compose(UnwrapHom::new(from.base_ring().get_ring()));
+        let ZZ = self.base.base_ring().base_ring();
+        let hom = PolyLiftFactorsDomainBaseRingToFieldIso::new(ZZ.get_ring(), &ideal.prime, to.base_ring().get_ring(), ideal.FpX.base_ring().get_ring(), 0).inv()
+            .compose(from.base_ring().can_iso(ideal.FpX.base_ring()).unwrap());
         to.from_canonical_basis(from.wrt_canonical_basis(&x).iter().map(|c| hom.map(c)))
     }
 
@@ -1328,7 +1330,7 @@ fn random_test_poly_gcd_number_field() {
     use tracing_subscriber::util::SubscriberInitExt;
     let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
     let filtered_chrome_layer = chrome_layer.with_filter(tracing_subscriber::filter::filter_fn(|metadata| 
-        !["feanor_math::algorithms::bigint_ops", "feanor_math::algorithms::convolution::karatsuba", "feanor_math::algorithms::eea", "feanor_math::algorithms::sqr_mul"].contains(&metadata.target())
+        !["feanor_math::algorithms::bigint_ops", "feanor_math::algorithms::eea", "feanor_math::algorithms::sqr_mul"].contains(&metadata.target())
     ));
     tracing_subscriber::registry().with(filtered_chrome_layer).init();
 

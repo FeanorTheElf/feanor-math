@@ -241,9 +241,19 @@ pub trait IntegerPolyLiftFactorsDomain: PolyLiftFactorsDomain {
     type LocalRingAsZn<'ring>: RingStore<Type = Self::LocalRingAsZnBase<'ring>> + Clone
         where Self: 'ring;
 
+    type LocalFieldAsZnBase<'ring>: ?Sized + CanIsoFromTo<Self::LocalFieldBase<'ring>> + PolyTFracGCDRing + FactorPolyField + Field + SelfIso + ZnRing
+        where Self: 'ring;
+
+    type LocalFieldAsZn<'ring>: RingStore<Type = Self::LocalFieldAsZnBase<'ring>> + Clone
+        where Self: 'ring;
+
     fn local_ring_as_zn<'a, 'ring>(&self, local_field: &'a Self::LocalRing<'ring>) -> &'a Self::LocalRingAsZn<'ring>;
 
     fn local_ring_into_zn<'ring>(&self, local_field: Self::LocalRing<'ring>) -> Self::LocalRingAsZn<'ring>;
+
+    fn local_field_as_zn<'a, 'ring>(&self, local_field: &'a Self::LocalField<'ring>) -> &'a Self::LocalFieldAsZn<'ring>;
+
+    fn local_field_into_zn<'ring>(&self, local_field: Self::LocalField<'ring>) -> Self::LocalFieldAsZn<'ring>;
 
     fn principal_ideal_generator<'ring>(&self, p: &Self::SuitableIdeal<'ring>) -> El<BigIntRing>
         where Self: 'ring
@@ -626,6 +636,55 @@ impl<'ring, 'data, R> PolyLiftFactorsDomainReductionContext<'ring, 'data, R>
 #[stability::unstable(feature = "enable")]
 pub const INTRING_HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR: f64 = 0.25;
 
+#[macro_export]
+macro_rules! impl_integer_poly_gcd_locally_for_ZZ {
+    (IntegerPolyLiftFactorsDomain for $int_ring_type:ty) => {
+        $crate::impl_integer_poly_gcd_locally_for_ZZ!{ <{}> IntegerPolyLiftFactorsDomain for $int_ring_type where }
+    };
+    (<{$($gen_args:tt)*}> IntegerPolyLiftFactorsDomain for $int_ring_type:ty where $($constraints:tt)*) => {
+
+        impl<$($gen_args)*> $crate::reduce_lift::lift_poly_factors::IntegerPolyLiftFactorsDomain for $int_ring_type
+            where $($constraints)*
+        {
+            type LocalRingAsZnBase<'ring> = Self::LocalRingBase<'ring>
+                where Self: 'ring;
+
+            type LocalRingAsZn<'ring> = Self::LocalRing<'ring>
+                where Self: 'ring;
+
+            type LocalFieldAsZnBase<'ring> = Self::LocalFieldBase<'ring>
+                where Self: 'ring;
+
+            type LocalFieldAsZn<'ring> = Self::LocalField<'ring>
+                where Self: 'ring;
+
+            fn local_ring_as_zn<'ref_lifetime, 'ring>(&self, local_field: &'ref_lifetime Self::LocalRing<'ring>) -> &'ref_lifetime Self::LocalRingAsZn<'ring>
+                where Self: 'ring
+            {
+                local_field
+            }
+            
+            fn local_ring_into_zn<'ring>(&self, local_field: Self::LocalRing<'ring>) -> Self::LocalRingAsZn<'ring>
+                where Self: 'ring
+            {
+                local_field
+            }
+
+            fn local_field_as_zn<'ref_lifetime, 'ring>(&self, local_field: &'ref_lifetime Self::LocalField<'ring>) -> &'ref_lifetime Self::LocalFieldAsZn<'ring>
+                where Self: 'ring
+            {
+                local_field
+            }
+            
+            fn local_field_into_zn<'ring>(&self, local_field: Self::LocalField<'ring>) -> Self::LocalFieldAsZn<'ring>
+                where Self: 'ring
+            {
+                local_field
+            }
+        }
+    };
+}
+
 ///
 /// Implements [`PolyLiftFactorsDomain`] and [`IntegerPolyGCDRing`] for an integer ring.
 /// 
@@ -637,10 +696,10 @@ pub const INTRING_HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR: f64 = 0.25;
 /// 
 #[macro_export]
 macro_rules! impl_poly_gcd_locally_for_ZZ {
-    (IntegerPolyGCDRing for $int_ring_type:ty) => {
-        impl_poly_gcd_locally_for_ZZ!{ <{}> IntegerPolyGCDRing for $int_ring_type where }
+    (IntegerPolyLiftFactorsDomain for $int_ring_type:ty) => {
+        $crate::impl_poly_gcd_locally_for_ZZ!{ <{}> IntegerPolyLiftFactorsDomain for $int_ring_type where }
     };
-    (<{$($gen_args:tt)*}> IntegerPolyGCDRing for $int_ring_type:ty where $($constraints:tt)*) => {
+    (<{$($gen_args:tt)*}> IntegerPolyLiftFactorsDomain for $int_ring_type:ty where $($constraints:tt)*) => {
 
         impl<$($gen_args)*> $crate::reduce_lift::lift_poly_factors::PolyLiftFactorsDomain for $int_ring_type
             where $($constraints)*
@@ -775,27 +834,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
             }
         }
 
-        impl<$($gen_args)*> $crate::reduce_lift::lift_poly_factors::IntegerPolyLiftFactorsDomain for $int_ring_type
-            where $($constraints)*
-        {
-            type LocalRingAsZnBase<'ring> = Self::LocalRingBase<'ring>
-                where Self: 'ring;
-
-            type LocalRingAsZn<'ring> = Self::LocalRing<'ring>
-                where Self: 'ring;
-
-            fn local_ring_as_zn<'a, 'ring>(&self, local_field: &'a Self::LocalRing<'ring>) -> &'a Self::LocalRingAsZn<'ring>
-                where Self: 'ring
-            {
-                local_field
-            }
-            
-            fn local_ring_into_zn<'ring>(&self, local_field: Self::LocalRing<'ring>) -> Self::LocalRingAsZn<'ring>
-                where Self: 'ring
-            {
-                local_field
-            }
-        }
+        $crate::impl_integer_poly_gcd_locally_for_ZZ!{ <{$($gen_args)*}> IntegerPolyLiftFactorsDomain for $int_ring_type where $($constraints)* }
     };
 }
 
@@ -1183,23 +1222,4 @@ impl<'a, R> PolyLiftFactorsDomain for IntegersWithZnQuotient<'a, R>
     }
 }
 
-impl<'a, R> IntegerPolyLiftFactorsDomain for IntegersWithZnQuotient<'a, R>
-    where R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + LinSolveRing + Clone
-{
-    type LocalRingAsZn<'ring> = Self::LocalRing<'ring>
-        where Self:'ring;
-    type LocalRingAsZnBase<'ring> = Self::LocalRingBase<'ring>
-        where Self:'ring;
-
-    fn local_ring_as_zn<'b, 'ring>(&self, local_field: &'b Self::LocalRing<'ring>) -> &'b Self::LocalRingAsZn<'ring>
-        where Self: 'ring
-    {
-        local_field
-    }
-
-    fn local_ring_into_zn<'ring>(&self, local_field: Self::LocalRing<'ring>) -> Self::LocalRingAsZn<'ring>
-        where Self: 'ring
-    {
-        local_field
-    }
-}
+impl_integer_poly_gcd_locally_for_ZZ!{ <{'a, R}> IntegerPolyLiftFactorsDomain for IntegersWithZnQuotient<'a, R> where R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + LinSolveRing + Clone }

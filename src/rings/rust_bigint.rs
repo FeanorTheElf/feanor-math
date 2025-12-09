@@ -674,7 +674,7 @@ impl<A: Allocator + Send + Sync + Clone> SerializableElementRing for RustBigintR
 
 impl_interpolation_base_ring_char_zero!{ <{A}> InterpolationBaseRing for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
 
-impl_poly_gcd_locally_for_ZZ!{ <{A}> IntegerPolyGCDRing for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
+impl_poly_gcd_locally_for_ZZ!{ <{A}> IntegerPolyLiftFactorsDomain for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
 
 impl_eval_poly_locally_for_ZZ!{ <{A}> LiftPolyEvalRing for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
 
