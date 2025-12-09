@@ -536,7 +536,8 @@ pub fn strassen<R, V1, V2, V3, A, const T1: bool, const T2: bool, const T3: bool
     assert_eq!(rhs.col_count(), dst.col_count());
     assert_eq!(lhs.col_count(), rhs.row_count());
 
-    if lhs.row_count() <= (1 << threshold_log2) || lhs.col_count() <= (1 << threshold_log2) || rhs.col_count() <= (1 << threshold_log2) {
+    let threshold = 1usize.checked_shl(threshold_log2 as u32).unwrap_or(usize::MAX);
+    if lhs.row_count() <= threshold || lhs.col_count() <= threshold || rhs.col_count() <= threshold {
         if add_assign {
             naive_matmul::<_, _, _, _, true, T1, T2, T3>(lhs, rhs, dst, ring);
         } else {
