@@ -32,18 +32,21 @@ struct Signature {
 ///  - `S` is `R/m^e`
 /// 
 #[instrument(skip_all, level = "trace")]
-fn power_decomposition_from_local_power_decomposition<'ring, 'data, 'local, R, P>(
-    reduction: &'local PolyLiftFactorsDomainReductionContext<'ring, 'data, R>, 
-    RX: P, 
-    poly: &El<P>, 
+fn power_decomposition_from_local_power_decomposition<'ring, 'data, R, P1, P2>(
+    reduction: &PolyLiftFactorsDomainReductionContext<'ring, 'data, R>, 
+    RX: P1, 
+    poly: &El<P1>, 
     signature: &[Signature], 
-    SXs: &[DensePolyRing<&'local R::LocalRing<'ring>>], 
-    local_power_decompositions: &[Vec<El<DensePolyRing<&'local R::LocalRing<'ring>>>>]
-) -> Option<Vec<(El<P>, usize)>>
+    SXs: &[P2], 
+    local_power_decompositions: &[Vec<El<P2>>]
+) -> Option<Vec<(El<P1>, usize)>>
     where R: ?Sized + PolyLiftFactorsDomain,
-        P: RingStore + Copy,
-        P::Type: PolyRing,
-        <P::Type as RingExtension>::BaseRing: RingStore<Type = R>
+        P1: RingStore + Copy,
+        P1::Type: PolyRing,
+        <P1::Type as RingExtension>::BaseRing: RingStore<Type = R>,
+        P2: RingStore,
+        P2::Type: PolyRing,
+        <P2::Type as RingExtension>::BaseRing: RingStore<Type = R::LocalRingBase<'ring>>
 {
     assert_eq!(reduction.len(), local_power_decompositions.len());
     assert_eq!(reduction.len(), SXs.len());

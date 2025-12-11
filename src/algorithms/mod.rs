@@ -119,7 +119,7 @@ pub mod poly_gcd;
 /// Contains implementations to extend [`crate::rings::extension::number_field::NumberField`]s by adjoining
 /// additional roots of polynomials.
 /// 
-pub mod splitting_field;
+// pub mod splitting_field;
 ///
 /// Contains algorithms for computing divisions in ring extensions for which standard methods
 /// are not sufficient.
@@ -129,7 +129,7 @@ pub mod zpe_extension;
 /// Contains algorithms for computing the Galois group and Galois closure of a
 /// [`crate::rings::extension::number_field::NumberField`].
 /// 
-pub mod galois;
+// pub mod galois;
 ///
 /// Contains an implementation of the Newton-Raphson method for approximating roots of
 /// polynomials (and more generally, "well-behaved" functions).

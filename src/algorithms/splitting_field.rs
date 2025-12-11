@@ -1,9 +1,8 @@
-use std::alloc::*;
 use std::borrow::Borrow;
 
 use tracing::instrument;
 
-use crate::algorithms::convolution::STANDARD_CONVOLUTION;
+use crate::algorithms::convolution::DynConvolution;
 use crate::homomorphism::*;
 use crate::matrix::OwnedMatrix;
 use crate::rings::extension::galois_field::*;
@@ -155,13 +154,10 @@ pub fn extend_galois_field<K>(poly_ring: DensePolyRing<K>, irred_poly: &El<Dense
     
     let L = AsField::from(
         AsFieldBase::promise_is_perfect_field(
-            FreeAlgebraImpl::new_with_convolution(
+            FreeAlgebraImpl::new(
                 K, 
                 poly_ring.degree(&irred_poly).unwrap(), 
-                (0..poly_ring.degree(&irred_poly).unwrap()).map(|i| K.negate(K.clone_el(poly_ring.coefficient_at(&irred_poly, i)))).collect::<Vec<_>>(),
-                "X",
-                Global,
-                STANDARD_CONVOLUTION
+                (0..poly_ring.degree(&irred_poly).unwrap()).map(|i| K.negate(K.clone_el(poly_ring.coefficient_at(&irred_poly, i)))).collect::<Vec<_>>()
             )
         )
     );
@@ -230,13 +226,10 @@ pub fn extend_number_field_promise_is_irreducible<K>(poly_ring: DensePolyRing<K>
 
     let L = AsField::from(
         AsFieldBase::promise_is_perfect_field(
-            FreeAlgebraImpl::new_with_convolution(
+            FreeAlgebraImpl::new(
                 K, 
                 poly_ring.degree(&irred_poly).unwrap(), 
-                (0..poly_ring.degree(&irred_poly).unwrap()).map(|i| K.negate(K.clone_el(poly_ring.coefficient_at(&irred_poly, i)))).collect::<Vec<_>>(),
-                "X",
-                Global,
-                STANDARD_CONVOLUTION
+                (0..poly_ring.degree(&irred_poly).unwrap()).map(|i| K.negate(K.clone_el(poly_ring.coefficient_at(&irred_poly, i)))).collect::<Vec<_>>()
             )
         )
     );
@@ -306,7 +299,7 @@ pub fn splitting_field<K, F>(
 )
     where K: RingStore + Clone,
         K::Type: FactorPolyField + FreeAlgebra,
-        F: for<'a> FnMut(DensePolyRing<&'a K>, El<DensePolyRing<&'a K>>) -> (FreeAlgebraHom<&'a K, K>, El<K>)
+        F: for<'a, 'b> FnMut(DensePolyRing<&'a K, DynConvolution<'b, K::Type>>, El<DensePolyRing<&'a K, DynConvolution<'b, K::Type>>>) -> (FreeAlgebraHom<&'a K, K>, El<K>)
 {
     assert!(!poly_ring.is_zero(&f));
     let mut to_split = vec![(f, 1)];
@@ -384,7 +377,7 @@ pub fn variety_from_lex_gb<K, P, F>(
         K::Type: FactorPolyField + FreeAlgebra,
         P::Type: MultivariatePolyRing,
         <P::Type as RingExtension>::BaseRing: Borrow<K> + RingStore<Type = K::Type>,
-        F: for<'a> FnMut(DensePolyRing<&'a K>, El<DensePolyRing<&'a K>>) -> (FreeAlgebraHom<&'a K, K>, El<K>)
+        F: for<'a, 'b> FnMut(DensePolyRing<&'a K, DynConvolution<'b, K::Type>>, El<DensePolyRing<&'a K, DynConvolution<'b, K::Type>>>) -> (FreeAlgebraHom<&'a K, K>, El<K>)
 {
     let n = poly_ring.indeterminate_count();
     let constant_monomial = poly_ring.create_monomial((0..n).map(|_| 0));

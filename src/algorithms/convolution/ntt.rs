@@ -1,5 +1,7 @@
 use std::alloc::{Allocator, Global};
 
+use tracing::instrument;
+
 use crate::cow::*;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::lazy::LazyVec;
@@ -277,13 +279,12 @@ impl<R_main, R_twiddle, H, A> ConvolutionAlgorithm<R_main> for NTTConvolution<R_
 
 #[cfg(test)]
 use test::Bencher;
-use tracing::instrument;
-#[cfg(test)]
-use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 #[cfg(test)]
 use crate::rings::zn::zn_64b::{Zn64B, Zn64BBase, Zn64BEl};
 #[cfg(test)]
 use crate::tracing::LogAlgorithmSubscriber;
+#[cfg(test)]
+use crate::algorithms::convolution::KaratsubaAlgorithm;
 
 #[test]
 fn test_convolution() {
@@ -298,8 +299,8 @@ fn run_benchmark<F>(ring: Zn64B, bencher: &mut Bencher, mut f: F)
     where F: FnMut(&[(&[Zn64BEl], Option<&PreparedConvolutionOperand<Zn64BBase>>, &[Zn64BEl], Option<&PreparedConvolutionOperand<Zn64BBase>>)], &mut [Zn64BEl], Zn64B)
 {
     let mut expected = (0..512).map(|_| ring.zero()).collect::<Vec<_>>();
-    let value = (0..256).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
-    STANDARD_CONVOLUTION.compute_convolution(
+    let value: Vec<Zn64BEl> = (0..256).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
+    KaratsubaAlgorithm::new(4, Global).compute_convolution(
         &value,
         None,
         &value,

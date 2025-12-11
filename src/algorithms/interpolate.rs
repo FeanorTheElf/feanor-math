@@ -9,7 +9,6 @@ use crate::rings::poly::*;
 use crate::seq::*;
 use crate::homomorphism::Homomorphism;
 use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 
 use tracing::instrument;
 
@@ -196,7 +195,7 @@ pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_po
     let n = poly_ring.indeterminate_count();
     assert_eq!(values.len(), dim_prod(0..n));
 
-    let uni_poly_ring = DensePolyRing::new_with_convolution(poly_ring.base_ring(), "X", &allocator, STANDARD_CONVOLUTION);
+    let uni_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
 
     for i in (0..n).rev() {
         let leading_dim = dim_prod((i + 1)..n);

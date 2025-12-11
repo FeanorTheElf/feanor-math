@@ -10,16 +10,14 @@ use crate::algorithms::convolution::*;
 use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
 use crate::algorithms::int_factor::*;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
-use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::pid::PrincipalIdealRingStore;
 use crate::algorithms::unity_root::*;
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
 use crate::divisibility::{DivisibilityRingStore, Domain};
-use crate::field::*;
+use crate::{MAX_PROBABILISTIC_REPETITIONS, field::*};
 use crate::pid::PrincipalIdealRing;
 use crate::rings::extension::extension_impl::FreeAlgebraImpl;
 use crate::rings::finite::*;
-use crate::algorithms::convolution::fft::*;
 use crate::algorithms::poly_factor::cantor_zassenhaus;
 use crate::pid::EuclideanRing;
 use crate::primitive_int::{StaticRing, StaticRingBase};
@@ -27,6 +25,7 @@ use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::local::{AsLocalPIR, AsLocalPIRBase};
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::PolyRing;
+use crate::rings::zn::zn_64b::Zn64BBase;
 use crate::rings::zn::*;
 use crate::ring::*;
 use crate::rings::extension::*;
@@ -63,12 +62,12 @@ fn filter_irreducible<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Optio
 /// Both will lead to more efficient arithmetic in the ring `k[X]/(f)`. However, in general
 /// finding a very small `f` is hard, thus we use heuristics.
 /// 
-fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convolution: C, rng: &mut oorandom::Rand64) -> El<P>
+fn find_small_irreducible_poly<P, C>(poly_ring: P, degree: usize, convolution: C, rng: &mut oorandom::Rand64) -> El<P>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <P::Type as RingExtension>::BaseRing: Copy,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
-        C: ConvolutionAlgorithm<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+        C: Copy + ConvolutionAlgorithm<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
     let Fp = *poly_ring.base_ring();
     let create_mod_f_ring = |f: &El<P>| {
@@ -78,7 +77,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
                 *f_body.at_mut(i) = poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(c));
             }
         }
-        return FreeAlgebraImpl::new_with_convolution(Fp, degree, f_body, "θ", Global, &convolution);
+        return FreeAlgebraImpl::new_with_convolution(Fp, degree, f_body, "θ", Global, convolution);
     };
 
     if degree > 3 {
@@ -123,7 +122,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
         if large_d != 1 {
             let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
             // careful here to not get an infinite generic argument recursion
-            let Fq = GaloisField::new_internal(Fp, small_d as usize, Global, &convolution);
+            let Fq = GaloisField::new_internal(Fp, small_d as usize, Global, convolution);
             // the primitive element of `Fq` clearly has no `k`-th root, for every `k | large_d` since `large_d | #Fq*`;
             // hence we can use `MinPoly(primitive_element)(X^large_d)`
             let primitive_element = if is_prim_root_of_unity_gen(&Fq, &Fq.canonical_gen(), &Fq_star_order, ZZbig) {
@@ -146,39 +145,13 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
     }
 
     // fallback, just generate a random irreducible polynomial
-    loop {
+    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
         let f = poly_ring.from_terms((0..degree).map(|i| (Fp.random_element(|| rng.rand_u64()), i)).chain([(Fp.one(), degree)].into_iter()));
         if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
             return result;
         }
     }
-}
-
-fn find_small_irreducible_poly<P>(poly_ring: P, degree: usize, rng: &mut oorandom::Rand64) -> El<P>
-    where P: RingStore,
-        P::Type: PolyRing + EuclideanRing,
-        <P::Type as RingExtension>::BaseRing: Copy,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>
-{
-    static_assert_impls!(<<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyTFracGCDRing);
-    
-    let log2_modulus = poly_ring.base_ring().integer_ring().abs_log2_ceil(poly_ring.base_ring().modulus()).unwrap();
-    let fft_convolution = FFTConvolution::new_with_alloc(Global);
-    if fft_convolution.has_sufficient_precision(StaticRing::<i64>::RING.abs_log2_ceil(&degree.try_into().unwrap()).unwrap() + 1, log2_modulus) {
-        find_small_irreducible_poly_base(
-            &poly_ring,
-            degree,
-            <FFTConvolutionZn as From<_>>::from(fft_convolution),
-            rng
-        )
-    } else {
-        find_small_irreducible_poly_base(
-            &poly_ring,
-            degree,
-            STANDARD_CONVOLUTION,
-            rng
-        )
-    }
+    unreachable!()
 }
 
 ///
@@ -272,7 +245,7 @@ pub struct GaloisFieldBase<Impl>
 /// The default implementation of a finite field extension of a prime field, 
 /// based on [`Zn`].
 /// 
-pub type DefaultGaloisFieldImpl = AsField<FreeAlgebraImpl<AsField<Zn64B>, SparseMapVector<AsField<Zn64B>>, Global, KaratsubaAlgorithm>>;
+pub type DefaultGaloisFieldImpl = AsField<FreeAlgebraImpl<AsField<Zn64B>, SparseMapVector<AsField<Zn64B>>, DynConvolution<'static, <AsField<Zn64B> as RingStore>::Type>, Global>>;
 
 ///
 /// Implementation of finite/galois fields.
@@ -285,21 +258,21 @@ pub type GaloisField<Impl = DefaultGaloisFieldImpl> = RingValue<GaloisFieldBase<
 /// Type alias for the most common instantiation of [`GaloisField`], which
 /// uses [`FreeAlgebraImpl`] to compute ring arithmetic.
 /// 
-pub type GaloisFieldOver<R, A = Global, C = KaratsubaAlgorithm> = RingValue<GaloisFieldBaseOver<R, A, C>>;
+pub type GaloisFieldOver<R, C = DynConvolution<'static, <R as RingStore>::Type>, A = Global> = RingValue<GaloisFieldBaseOver<R, C, A>>;
 
 ///
 /// Type alias for the most common instantiation of [`GaloisFieldBase`], which
 /// uses [`FreeAlgebraImpl`] to compute ring arithmetic.
 /// 
-pub type GaloisFieldBaseOver<R, A = Global, C = KaratsubaAlgorithm> = GaloisFieldBase<AsField<FreeAlgebraImpl<R, SparseMapVector<R>, A, C>>>;
+pub type GaloisFieldBaseOver<R, C = DynConvolution<'static, <R as RingStore>::Type>, A = Global> = GaloisFieldBase<AsField<FreeAlgebraImpl<R, SparseMapVector<R>, C, A>>>;
 
 impl GaloisField {
 
     ///
     /// Creates a new instance of the finite/galois field `GF(p^degree)`.
     /// 
-    /// If you need more options for configuration, consider using [`GaloisField::new_with_convolution()`] or
-    /// the most general [`GaloisField::create()`].
+    /// If you need more options for configuration, consider using [`GaloisField::new_with_base_field()`],
+    /// [`GaloisField::new_with_convolution()`] or the most general [`GaloisField::create()`].
     /// 
     /// # Example
     /// ```rust
@@ -319,11 +292,49 @@ impl GaloisField {
     /// ```
     /// 
     pub fn new(p: i64, degree: usize) -> Self {
-        Self::new_with_convolution(Zn64B::new(p as u64).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION)
+        let base_field = Zn64B::new(p as u64).as_field().ok().unwrap();
+        Self::new_with_base_field(base_field, degree)
     }
 }
 
-impl<R, A, C> GaloisFieldOver<R, A, C>
+impl<'conv, R> GaloisFieldOver<R, DynConvolution<'conv, R::Type>, Global>
+    where R: RingStore + Clone,
+        R::Type: 'conv + ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
+{
+    ///
+    /// Creates a new instance of the finite/galois field that is the unique
+    /// field extension of the given base field and the given degree.
+    /// 
+    /// If you need to specify more options, consider using [`GaloisField::new_with_convolution()`]
+    /// or the most general [`GaloisField::create()`].
+    /// 
+    /// # Example
+    /// ```rust
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::rings::extension::*;
+    /// # use feanor_math::rings::zn::zn_64b::*;
+    /// # use feanor_math::rings::finite::*;
+    /// # use feanor_math::homomorphism::*;
+    /// # use feanor_math::rings::extension::galois_field::*;
+    /// let F5 = Zn64B::new(5).as_field().ok().unwrap();
+    /// let F25 = GaloisField::new_with_base_field(F5, 2);
+    /// let generator = F25.canonical_gen();
+    /// let norm = F25.mul_ref_fst(&generator, F25.pow(F25.clone_el(&generator), 5));
+    /// let inclusion = F25.inclusion();
+    /// // the norm must be an element of the prime field
+    /// assert!(F25.base_ring().elements().any(|x| {
+    ///     F25.eq_el(&norm, &inclusion.map(x))
+    /// }));
+    /// ```
+    /// 
+    pub fn new_with_base_field(base_field: R, degree: usize) -> Self {
+        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&degree.try_into().unwrap()).unwrap();
+        let convolution = base_field.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        Self::new_with_convolution(base_field, degree, Global, convolution)
+    }
+}
+
+impl<R, A, C> GaloisFieldOver<R, C, A>
     where R: RingStore + Clone,
         R::Type: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
         C: ConvolutionAlgorithm<R::Type>,
@@ -363,15 +374,17 @@ impl<R, A, C> GaloisFieldOver<R, A, C>
     #[stability::unstable(feature = "enable")]
     pub fn new_with_convolution(base_field: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self {
         assert!(degree >= 1);
-        let poly_ring = DensePolyRing::new(&base_field, "X");
+        let poly_ring = DensePolyRing::new_with_convolution(&base_field, "X", &allocator, &convolution_algorithm);
         let mut rng = oorandom::Rand64::new(poly_ring.base_ring().integer_ring().default_hash(poly_ring.base_ring().modulus()) as u128);
-        let modulus = find_small_irreducible_poly(&poly_ring, degree, &mut rng);
+        let modulus = find_small_irreducible_poly(&poly_ring, degree, &convolution_algorithm, &mut rng);
         let mut modulus_vec = SparseMapVector::new(degree, base_field.clone());
         for (c, i) in poly_ring.terms(&modulus) {
             if i != degree {
                 *modulus_vec.at_mut(i) = base_field.negate(base_field.clone_el(c));
             }
         }
+        drop(poly_ring);
+        drop(modulus);
         return RingValue::from(GaloisFieldBase { 
             base: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with_convolution(base_field, degree, modulus_vec, "θ", allocator, convolution_algorithm)))
         });
@@ -379,30 +392,34 @@ impl<R, A, C> GaloisFieldOver<R, A, C>
 
     ///
     /// Instantiates the galois field by calling `find_small_irreducible_poly()` with a poly ring whose base ring
-    /// is exactly `R`; this prevents infinite generic argument recursion, which might otherwise happen if each
-    /// recursive call adds a reference `&` to `R`.
+    /// is exactly `R` and a convolution that is exactly `C`; this prevents infinite generic argument recursion,
+    ///  which might otherwise happen if each recursive call adds a reference `&` to `R` resp. `C`.
     /// 
     fn new_internal(base_ring: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self
-        where R: Copy
+        where R: Copy,
+            C: Copy
     {
         assert!(degree >= 1);
-        let poly_ring = DensePolyRing::new(base_ring.clone(), "X");
+        let poly_ring = DensePolyRing::new_with_convolution(base_ring, "X", &allocator, convolution_algorithm);
         let mut rng = oorandom::Rand64::new(poly_ring.base_ring().integer_ring().default_hash(poly_ring.base_ring().modulus()) as u128);
-        let modulus = find_small_irreducible_poly(&poly_ring, degree, &mut rng);
+        let modulus = find_small_irreducible_poly(&poly_ring, degree, convolution_algorithm, &mut rng);
         let mut modulus_vec = SparseMapVector::new(degree, base_ring.clone());
         for (c, i) in poly_ring.terms(&modulus) {
             if i != degree {
                 *modulus_vec.at_mut(i) = base_ring.negate(base_ring.clone_el(c));
             }
         }
+        drop(poly_ring);
+        drop(modulus);
         return RingValue::from(GaloisFieldBase { 
             base: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new_with_convolution(base_ring, degree, modulus_vec, "θ", allocator, convolution_algorithm)))
         });
     }
 }
 
-impl<A> GaloisFieldBase<AsField<FreeAlgebraImpl<AsField<Zn64B>, SparseMapVector<AsField<Zn64B>>, A, KaratsubaAlgorithm>>>
-    where A: Allocator + Clone + Send + Sync
+impl<A, C> GaloisFieldBase<AsField<FreeAlgebraImpl<AsField<Zn64B>, SparseMapVector<AsField<Zn64B>>, C, A>>>
+    where A: Allocator + Clone + Send + Sync,
+        C: ConvolutionAlgorithm<AsFieldBase<Zn64B>>
 {
     ///
     /// Creates the galois ring `GR(p, e, degree)`, mirroring the structure of this galois field.
@@ -416,8 +433,11 @@ impl<A> GaloisFieldBase<AsField<FreeAlgebraImpl<AsField<Zn64B>, SparseMapVector<
     /// For more configuration options, use [`GaloisFieldBase::galois_ring_with()`].
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn galois_ring(&self, e: usize) -> AsLocalPIR<FreeAlgebraImpl<Zn64B, SparseMapVector<Zn64B>, A, KaratsubaAlgorithm>> {
-        self.galois_ring_with(Zn64B::new(StaticRing::<i64>::RING.pow(*self.base_ring().modulus(), e) as u64), self.base.get_ring().get_delegate().allocator().clone(), STANDARD_CONVOLUTION)
+    pub fn galois_ring(&self, e: usize) -> AsLocalPIR<FreeAlgebraImpl<Zn64B, SparseMapVector<Zn64B>, DynConvolution<'static, Zn64BBase>, A>> {
+        let base_ring = Zn64B::new(StaticRing::<i64>::RING.pow(*self.base_ring().modulus(), e) as u64);
+        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&self.rank().try_into().unwrap()).unwrap();
+        let convolution = base_ring.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        self.galois_ring_with(base_ring, self.base.get_ring().get_delegate().allocator().clone(), convolution)
     }
 }
 
@@ -438,7 +458,7 @@ impl<Impl> GaloisFieldBase<Impl>
     /// See also [`GaloisFieldBase::galois_ring()`] for a simpler version of this function.
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn galois_ring_with<S, A2, C2>(&self, new_base_ring: S, allocator: A2, convolution_algorithm: C2) -> AsLocalPIR<FreeAlgebraImpl<S, SparseMapVector<S>, A2, C2>>
+    pub fn galois_ring_with<S, A2, C2>(&self, new_base_ring: S, allocator: A2, convolution_algorithm: C2) -> AsLocalPIR<FreeAlgebraImpl<S, SparseMapVector<S>, C2, A2>>
         where S: RingStore + Clone,
             S::Type: ZnRing + CanHomFrom<<<<Impl::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::IntegerRingBase>,
             C2: ConvolutionAlgorithm<S::Type>,
@@ -727,7 +747,7 @@ impl<Impl, S> CanHomFrom<S> for GaloisFieldBase<Impl>
 ///
 /// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
 /// 
-impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>> for FreeAlgebraImplBase<R, V, A, C>
+impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>> for FreeAlgebraImplBase<R, V, C, A>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra + FiniteRing,
         <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
@@ -735,9 +755,9 @@ impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>> for FreeAlgebraImplBase
         V: VectorView<El<R>> + Send + Sync,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone + Send + Sync,
-        FreeAlgebraImplBase<R, V, A, C>: CanHomFrom<Impl::Type>
+        FreeAlgebraImplBase<R, V, C, A>: CanHomFrom<Impl::Type>
 {
-    type Homomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanHomFrom<Impl::Type>>::Homomorphism;
+    type Homomorphism = <FreeAlgebraImplBase<R, V, C, A> as CanHomFrom<Impl::Type>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &GaloisFieldBase<Impl>) -> Option<Self::Homomorphism> {
         self.has_canonical_hom(from.base.get_ring())
@@ -751,7 +771,7 @@ impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>> for FreeAlgebraImplBase
 ///
 /// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
 /// 
-impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>> for AsFieldBase<FreeAlgebraImpl<R, V, A, C>>
+impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>> for AsFieldBase<FreeAlgebraImpl<R, V, C, A>>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra + FiniteRing,
         <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
@@ -760,9 +780,9 @@ impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>> for AsFieldBase<FreeAlg
         V: VectorView<El<R>> + Send + Sync,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone + Send + Sync,
-        FreeAlgebraImplBase<R, V, A, C>: CanHomFrom<Impl::Type>
+        FreeAlgebraImplBase<R, V, C, A>: CanHomFrom<Impl::Type>
 {
-    type Homomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanHomFrom<Impl::Type>>::Homomorphism;
+    type Homomorphism = <FreeAlgebraImplBase<R, V, C, A> as CanHomFrom<Impl::Type>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &GaloisFieldBase<Impl>) -> Option<Self::Homomorphism> {
         self.get_delegate().has_canonical_hom(from.base.get_ring())
@@ -796,7 +816,7 @@ impl<Impl, S> CanIsoFromTo<S> for GaloisFieldBase<Impl>
 ///
 /// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
 /// 
-impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for FreeAlgebraImplBase<R, V, A, C>
+impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for FreeAlgebraImplBase<R, V, C, A>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra + FiniteRing,
         <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
@@ -804,9 +824,9 @@ impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for FreeAlgebraImplBa
         V: VectorView<El<R>> + Send + Sync,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone + Send + Sync,
-        FreeAlgebraImplBase<R, V, A, C>: CanIsoFromTo<Impl::Type>
+        FreeAlgebraImplBase<R, V, C, A>: CanIsoFromTo<Impl::Type>
 {
-    type Isomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanIsoFromTo<Impl::Type>>::Isomorphism;
+    type Isomorphism = <FreeAlgebraImplBase<R, V, C, A> as CanIsoFromTo<Impl::Type>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &GaloisFieldBase<Impl>) -> Option<Self::Isomorphism> {
         self.has_canonical_iso(from.base.get_ring())
@@ -820,7 +840,7 @@ impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for FreeAlgebraImplBa
 ///
 /// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
 /// 
-impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for AsFieldBase<FreeAlgebraImpl<R, V, A, C>>
+impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for AsFieldBase<FreeAlgebraImpl<R, V, C, A>>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra + FiniteRing,
         <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
@@ -829,9 +849,9 @@ impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for AsFieldBase<FreeA
         V: VectorView<El<R>> + Send + Sync,
         C: ConvolutionAlgorithm<R::Type>,
         A: Allocator + Clone + Send + Sync,
-        FreeAlgebraImplBase<R, V, A, C>: CanIsoFromTo<Impl::Type>
+        FreeAlgebraImplBase<R, V, C, A>: CanIsoFromTo<Impl::Type>
 {
-    type Isomorphism = <FreeAlgebraImplBase<R, V, A, C> as CanIsoFromTo<Impl::Type>>::Isomorphism;
+    type Isomorphism = <FreeAlgebraImplBase<R, V, C, A> as CanIsoFromTo<Impl::Type>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &GaloisFieldBase<Impl>) -> Option<Self::Isomorphism> {
         self.get_delegate().has_canonical_iso(from.base.get_ring())
@@ -865,7 +885,7 @@ fn test_can_hom_from() {
             A: Allocator + Clone + Send + Sync,
             C: ConvolutionAlgorithm<R::Type>
     {
-        assert_impl_CanHomFrom::<FreeAlgebraImplBase<R, V, A, C>, AsFieldBase<FreeAlgebraImpl<R, V, A, C>>>();
+        assert_impl_CanHomFrom::<FreeAlgebraImplBase<R, V, C, A>, AsFieldBase<FreeAlgebraImpl<R, V, C, A>>>();
     }
 
     #[allow(unused)]
@@ -876,7 +896,7 @@ fn test_can_hom_from() {
             A: Allocator + Clone + Send + Sync,
             C: ConvolutionAlgorithm<R::Type>
     {
-        assert_impl_CanHomFrom::<GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, A, C>>>, AsFieldBase<FreeAlgebraImpl<R, V, A, C>>>();
+        assert_impl_CanHomFrom::<GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, C, A>>>, AsFieldBase<FreeAlgebraImpl<R, V, C, A>>>();
     }
 
     #[allow(unused)]
@@ -887,7 +907,7 @@ fn test_can_hom_from() {
             A: Allocator + Clone + Send + Sync,
             C: ConvolutionAlgorithm<R::Type>
     {
-        assert_impl_CanHomFrom::<GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, A, C>>>, GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, A, C>>>>();
+        assert_impl_CanHomFrom::<GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, C, A>>>, GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, C, A>>>>();
     }
 }
 
@@ -919,7 +939,7 @@ fn test_principal_ideal_ring_axioms() {
 fn test_galois_field_even() {
     LogAlgorithmSubscriber::init_test();
     for degree in 1..=9 {
-        let field = GaloisField::new_with_convolution(Zn64B::new(2).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
+        let field = GaloisField::new(2, degree);
         assert_eq!(degree, field.rank());
         assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
     }
@@ -929,13 +949,13 @@ fn test_galois_field_even() {
 fn test_galois_field_odd() {
     LogAlgorithmSubscriber::init_test();
     for degree in 1..=9 {
-        let field = GaloisField::new_with_convolution(Zn64B::new(3).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
+        let field = GaloisField::new(3, degree);
         assert_eq!(degree, field.rank());
         assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
     }
 
     for degree in 1..=9 {
-        let field = GaloisField::new_with_convolution(Zn64B::new(5).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION);
+        let field = GaloisField::new(5, degree);
         assert_eq!(degree, field.rank());
         assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
     }
@@ -944,19 +964,19 @@ fn test_galois_field_odd() {
 #[test]
 fn test_galois_field_no_trinomial() {
     LogAlgorithmSubscriber::init_test();
-    let field = GaloisField::new_with_convolution(Zn64B::new(2).as_field().ok().unwrap(), 24, Global, STANDARD_CONVOLUTION);
+    let field = GaloisField::new(2, 24);
     assert_eq!(24, field.rank());
     let poly_ring = DensePolyRing::new(field.base_ring(), "X");
     poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
     assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
 
-    let field = GaloisField::new_with_convolution(Zn64B::new(3).as_field().ok().unwrap(), 30, Global, STANDARD_CONVOLUTION);
+    let field = GaloisField::new(3, 30);
     assert_eq!(30, field.rank());
     let poly_ring = DensePolyRing::new(field.base_ring(), "X");
     poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
     assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
 
-    let field = GaloisField::new_with_convolution(Zn64B::new(17).as_field().ok().unwrap(), 32, Global, STANDARD_CONVOLUTION);
+    let field = GaloisField::new(17, 32);
     assert_eq!(32, field.rank());
     let poly_ring = DensePolyRing::new(field.base_ring(), "X");
     poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));

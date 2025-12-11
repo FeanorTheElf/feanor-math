@@ -305,7 +305,7 @@ impl<R: RingStore> RingExtension for SparsePolyRingBase<R> {
 
 pub trait ImplGenericCanIsoFromToMarker: PolyRing {}
 
-impl<R, A, C> ImplGenericCanIsoFromToMarker for dense_poly::DensePolyRingBase<R, A, C> 
+impl<R, A, C> ImplGenericCanIsoFromToMarker for dense_poly::DensePolyRingBase<R, C, A> 
     where R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>
 {}
 

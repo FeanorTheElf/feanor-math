@@ -1,3 +1,4 @@
+use std::alloc::Global;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::cell::OnceCell;
@@ -7,6 +8,7 @@ use feanor_serde::newtype_struct::*;
 use serde::de::{Error, DeserializeSeed};
 use serde::{Deserializer, Serializer, Serialize, Deserialize}; 
 
+use crate::algorithms::convolution::DynConvolution;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::divisibility::DivisibilityRing;
 use crate::impl_localpir_wrap_unwrap_homs;
@@ -316,10 +318,10 @@ impl<I: RingStore> Clone for ZnGBBase<I>
 impl<I: RingStore> InterpolationBaseRing for AsFieldBase<ZnGB<I>>
     where I::Type: IntegerRing
 {
-    type ExtendedRingBase<'a> = GaloisFieldBaseOver<RingRef<'a, Self>>
+    type ExtendedRingBase<'a> = GaloisFieldBaseOver<RingRef<'a, Self>, DynConvolution<'a, Self>, Global>
         where Self: 'a;
 
-    type ExtendedRing<'a> = GaloisFieldOver<RingRef<'a, Self>>
+    type ExtendedRing<'a> = GaloisFieldOver<RingRef<'a, Self>, DynConvolution<'a, Self>, Global>
         where Self: 'a;
 
     fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>

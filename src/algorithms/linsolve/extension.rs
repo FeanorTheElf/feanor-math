@@ -108,7 +108,7 @@ fn test_solve() {
     let A = OwnedMatrix::from_fn_in(3, 2, |i, j| ring.clone_el(&data_A[i][j]), Global);
     let B = OwnedMatrix::from_fn_in(3, 1, |i, j| ring.clone_el(&data_B[i][j]), Global);
     let mut prod: OwnedMatrix<_> = OwnedMatrix::zero(3, 1, &ring);
-    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(A.data()), TransposableSubmatrix::from(sol.data()), TransposableSubmatrixMut::from(prod.data_mut()), ring);
+    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(A.data()), TransposableSubmatrix::from(sol.data()), TransposableSubmatrixMut::from(prod.data_mut()), &ring);
 
     assert_matrix_eq!(&ring, &B, &prod);
 

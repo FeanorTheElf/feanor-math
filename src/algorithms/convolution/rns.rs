@@ -593,9 +593,9 @@ impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolutionZn<I, C, A, 
 }
 
 #[cfg(test)]
-use super::STANDARD_CONVOLUTION;
-#[cfg(test)]
 use crate::tracing::LogAlgorithmSubscriber;
+#[cfg(test)]
+use crate::algorithms::convolution::KaratsubaAlgorithm;
 
 #[test]
 fn test_convolution_integer() {
@@ -626,7 +626,7 @@ fn test_convolution_sum() {
         (0..(13 - i % 7)).map(|x| (1 << i) * (x as i128 + 1)).collect::<Vec<_>>(),
     )).collect::<Vec<_>>();
     let mut expected = (0..22).map(|_| 0).collect::<Vec<_>>();
-    STANDARD_CONVOLUTION.compute_convolution_sum(&data.iter().map(|(l, r)| (&l[..], None, &r[..], None)).collect::<Vec<_>>(), &mut expected, ring.get_ring());
+    KaratsubaAlgorithm::new(4, Global).compute_convolution_sum(&data.iter().map(|(l, r)| (&l[..], None, &r[..], None)).collect::<Vec<_>>(), &mut expected, ring.get_ring());
 
     let mut actual = (0..21).map(|_| 0).collect::<Vec<_>>();
     convolution.compute_convolution_sum(&data.iter().map(|(l, r)| (&l[..], None, &r[..], None)).collect::<Vec<_>>(), &mut actual, ring.get_ring());

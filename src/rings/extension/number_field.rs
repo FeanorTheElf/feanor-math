@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Formatter};
 use std::alloc::Global;
 use std::marker::PhantomData;
+use std::mem::transmute;
 
 use crate::algorithms::interpolate::product_except_one;
 use crate::algorithms::newton::{self, absolute_error_of_poly_eval};
@@ -9,6 +10,7 @@ use crate::algorithms::poly_factor::factor_locally::{factor_and_lift_mod_pe, Fac
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::poly_gcd::gcd_locally::poly_gcd_local;
 use crate::algorithms::resultant::ComputeResultantRing;
+use crate::primitive_int::StaticRing;
 use crate::reduce_lift::lift_poly_factors::*;
 use crate::rings::extension::number_field::newton::find_approximate_complex_root;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
@@ -232,7 +234,8 @@ impl<K, Impl, I> Homomorphism<NumberFieldBase<Impl, I>, Complex64Base> for Compl
 }
 
 #[stability::unstable(feature = "enable")]
-pub type DefaultNumberFieldImpl = AsField<FreeAlgebraImpl<RationalField<BigIntRing>, Vec<El<RationalField<BigIntRing>>>, Global, KaratsubaAlgorithm>>;
+pub type DefaultNumberFieldImpl = AsField<FreeAlgebraImpl<RationalField<BigIntRing>, Vec<El<RationalField<BigIntRing>>>, DynConvolution<'static, RationalFieldBase<BigIntRing>>, Global>>;
+
 #[stability::unstable(feature = "enable")]
 pub type NumberField<Impl = DefaultNumberFieldImpl, I = BigIntRing> = RingValue<NumberFieldBase<Impl, I>>;
 
@@ -256,7 +259,9 @@ impl NumberField {
         let QQ = RationalField::new(BigIntRing::RING);
         let rank = poly_ring.degree(generating_poly).unwrap();
         let modulus = (0..rank).map(|i| QQ.negate(QQ.inclusion().map_ref(poly_ring.coefficient_at(generating_poly, i)))).collect::<Vec<_>>();
-        return FreeAlgebraImpl::new_with_convolution(QQ, rank, modulus, "θ", Global, STANDARD_CONVOLUTION).as_field().ok().map(Self::create);
+        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
+        let convolution = QQ.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        return FreeAlgebraImpl::new_with_convolution(QQ, rank, modulus, "θ", Global, convolution).as_field().ok().map(Self::create);
     }
     
     ///
@@ -374,10 +379,19 @@ impl<Impl, I> NumberFieldBase<Impl, I>
         I: RingStore,
         I::Type: IntegerRing
 {
-    fn generating_poly_as_int<'a>(&self, ZZX: &DensePolyRing<&'a I>) -> El<DensePolyRing<&'a I>> {
-        let ZZ = *ZZX.base_ring();
+    fn generating_poly_as_int<P>(&self, ZZX: P) -> El<P>
+        where P: RingStore,
+            P::Type: PolyRing,
+            <P::Type as RingExtension>::BaseRing: RingStore<Type = I::Type>
+    {
+        let ZZ = ZZX.base_ring();
+        assert!(ZZ.get_ring() == self.base_ring().base_ring().get_ring());
         let assume_in_ZZ = LambdaHom::new(self.base_ring(), ZZ, |from, to, x| to.checked_div(from.get_ring().num(x), from.get_ring().den(x)).unwrap());
-        return self.base.generating_poly(ZZX, &assume_in_ZZ);
+        return self.base.generating_poly(&ZZX, &assume_in_ZZ);
+    }
+
+    fn by_order(&self) -> &RingValue<NumberFieldByOrder<Impl, I>> {
+        unsafe { transmute::<&NumberFieldBase<_, _>, &RingValue<NumberFieldByOrder<_, _>>>(self) }
     }
 }
 
@@ -505,15 +519,14 @@ impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
             P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        let self_ = NumberFieldByOrder { base: RingRef::new(poly_ring.base_ring().get_ring()) };
-
-        let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
-        let lhs_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, lhs);
-        let rhs_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, rhs);
+        let self_ = poly_ring.base_ring().get_ring().by_order();
+        let order_poly_ring = DensePolyRing::new(self_, "X");
+        let lhs_order = self_.get_ring().scale_poly_to_order(poly_ring, &order_poly_ring, lhs);
+        let rhs_order = self_.get_ring().scale_poly_to_order(poly_ring, &order_poly_ring, rhs);
 
         let result = poly_gcd_local(&order_poly_ring, order_poly_ring.clone_el(&lhs_order), order_poly_ring.clone_el(&rhs_order));
 
-        return self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &result);
+        return self_.get_ring().normalize_map_back_from_order(&order_poly_ring, poly_ring, &result);
     }
 
     fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
@@ -521,13 +534,13 @@ impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
             P::Type: PolyRing + DivisibilityRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self> 
     {
-        let self_ = NumberFieldByOrder { base: RingRef::new(poly_ring.base_ring().get_ring()) };
-        let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
-        let poly_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, poly);
+        let self_ = poly_ring.base_ring().get_ring().by_order();
+        let order_poly_ring = DensePolyRing::new(self_, "X");
+        let poly_order = self_.get_ring().scale_poly_to_order(poly_ring, &order_poly_ring, poly);
 
         let result = poly_power_decomposition_local(&order_poly_ring, poly_order);
 
-        return result.into_iter().map(|(f, k)| (self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), k)).collect();
+        return result.into_iter().map(|(f, k)| (self_.get_ring().normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), k)).collect();
     }
 }
 
@@ -561,7 +574,7 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I>(poly_ring: P, poly: &
         I::Type: IntegerRing,
         P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <P::Type as RingExtension>::BaseRing: RingStore<Type = NumberFieldByOrder<'a, Impl, I>>
+        <P::Type as RingExtension>::BaseRing: RingStore<Type = NumberFieldByOrder<Impl, I>>
 {
     span!(Level::INFO, "factor_poly_numberfield", poly_deg = poly_ring.degree(poly).unwrap_or(0), numberfield_deg = poly_ring.base_ring().rank()).in_scope(|| {
         let mut rng = oorandom::Rand64::new(1);
@@ -625,8 +638,8 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
             P::Type: PolyRing + EuclideanRing,
             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
     {
-        let self_ = NumberFieldByOrder { base: RingRef::new(poly_ring.base_ring().get_ring()) };
-        let order_poly_ring = DensePolyRing::new(RingRef::new(&self_), "X");
+        let self_ = poly_ring.base_ring().get_ring().by_order();
+        let order_poly_ring = DensePolyRing::new(self_, "X");
 
         let mut to_factor = vec![(poly_ring.clone_el(poly), 1)];
         let mut result = Vec::new();
@@ -634,11 +647,11 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
             if poly_ring.degree(&current).unwrap() == 1 {
                 result.push((poly_ring.normalize(current), 1));
             } else {
-                let poly_order = self_.scale_poly_to_order(poly_ring, &order_poly_ring, &current);
+                let poly_order = self_.get_ring().scale_poly_to_order(poly_ring, &order_poly_ring, &current);
                 // try the direct factorization
                 match heuristic_factor_poly_directly_in_order(&order_poly_ring, &poly_order) {
                     HeuristicFactorPolyInOrderResult::PartialFactorization(partial_factorization) => to_factor.extend(
-                        partial_factorization.into_iter().map(|(f, e)| (self_.normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), e * e_base))
+                        partial_factorization.into_iter().map(|(f, e)| (self_.get_ring().normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), e * e_base))
                     ),
                     HeuristicFactorPolyInOrderResult::Irreducible => result.push((current, e_base)),
                     HeuristicFactorPolyInOrderResult::Unknown => result.extend(
@@ -661,17 +674,18 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
 /// `reconstruct_ring_el()` we might reconstruct an element outside of the
 /// order. Hence, it should remain private.
 /// 
-struct NumberFieldByOrder<'a, Impl, I>
+#[repr(transparent)]
+struct NumberFieldByOrder<Impl, I>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
         <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
 {
-    base: RingRef<'a, NumberFieldBase<Impl, I>>
+    base: NumberFieldBase<Impl, I>
 }
 
-impl<'a, Impl, I> NumberFieldByOrder<'a, Impl, I>
+impl<Impl, I> NumberFieldByOrder<Impl, I>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
         <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
@@ -692,15 +706,15 @@ impl<'a, Impl, I> NumberFieldByOrder<'a, Impl, I>
             <P2::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
             Self: 'ring
     {
-        debug_assert!(self.base.get_ring() == from.base_ring().get_ring());
-        debug_assert!(self.base.get_ring() == to.base_ring().get_ring().base.get_ring());
+        debug_assert!(self.get_delegate() == from.base_ring().get_ring());
+        debug_assert!(self.get_delegate() == to.base_ring().get_ring().get_delegate());
         let QQ = self.base.base_ring();
         let ZZ = QQ.base_ring();
         let denominator = QQ.inclusion().map(from.terms(poly).map(|(c, _)| 
             self.base.wrt_canonical_basis(c).iter().map(|c| ZZ.clone_el(QQ.get_ring().den(&c))).fold(ZZ.one(), |a, b| ZZ.ideal_intersect(&a, &b))
         ).fold(ZZ.one(), |a, b| ZZ.ideal_intersect(&a, &b)));
         debug_assert!(!QQ.is_zero(&denominator));
-        return to.from_terms(from.terms(poly).map(|(c, i)| (self.base.inclusion().mul_ref_map(c, &denominator), i)));
+        return to.from_terms(from.terms(poly).map(|(c, i)| (RingValue::from_ref(&self.base).into_inclusion().mul_ref_map(c, &denominator), i)));
     }
 
     #[instrument(skip_all, level = "trace")]
@@ -713,14 +727,14 @@ impl<'a, Impl, I> NumberFieldByOrder<'a, Impl, I>
             <P2::Type as RingExtension>::BaseRing: RingStore<Type = NumberFieldBase<Impl, I>>,
             Self: 'ring
     {
-        debug_assert!(self.base.get_ring() == to.base_ring().get_ring());
-        debug_assert!(self.base.get_ring() == from.base_ring().get_ring().base.get_ring());
+        debug_assert!(self.get_delegate() == to.base_ring().get_ring());
+        debug_assert!(self.get_delegate() == from.base_ring().get_ring().get_delegate());
         let result = to.from_terms(from.terms(poly).map(|(c, i)| (self.clone_el(c), i)));
         return to.normalize(result);
     }
 }
 
-impl<'a, Impl, I> PartialEq for NumberFieldByOrder<'a, Impl, I>
+impl<Impl, I> PartialEq for NumberFieldByOrder<Impl, I>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
         <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
@@ -728,11 +742,11 @@ impl<'a, Impl, I> PartialEq for NumberFieldByOrder<'a, Impl, I>
         I::Type: IntegerRing
 {
     fn eq(&self, other: &Self) -> bool {
-        self.base.get_ring() == other.base.get_ring()
+        self.base == other.base
     }
 }
 
-impl<'a, Impl, I> Debug for NumberFieldByOrder<'a, Impl, I>
+impl<Impl, I> Debug for NumberFieldByOrder<Impl, I>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
         <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
@@ -740,11 +754,11 @@ impl<'a, Impl, I> Debug for NumberFieldByOrder<'a, Impl, I>
         I::Type: IntegerRing
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "NumberFieldByOrder({:?})", self.base.get_ring())
+        write!(f, "NumberFieldByOrder({:?})", &self.base)
     }
 }
 
-impl<'a, Impl, I> FiniteRingSpecializable for NumberFieldByOrder<'a, Impl, I>
+impl<Impl, I> FiniteRingSpecializable for NumberFieldByOrder<Impl, I>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
         <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
@@ -756,18 +770,18 @@ impl<'a, Impl, I> FiniteRingSpecializable for NumberFieldByOrder<'a, Impl, I>
     }
 }
 
-impl<'a, Impl, I> DelegateRing for NumberFieldByOrder<'a, Impl, I>
+impl<Impl, I> DelegateRing for NumberFieldByOrder<Impl, I>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
         <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
 {
-    type Base = Impl::Type;
-    type Element = El<Impl>;
+    type Base = NumberFieldBase<Impl, I>;
+    type Element = El<NumberField<Impl, I>>;
 
     fn get_delegate(&self) -> &Self::Base {
-        self.base.get_ring().base.get_ring()
+        &self.base
     }
 
     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
@@ -776,7 +790,7 @@ impl<'a, Impl, I> DelegateRing for NumberFieldByOrder<'a, Impl, I>
     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
 }
 
-impl<'a, Impl, I> Domain for NumberFieldByOrder<'a, Impl, I>
+impl<Impl, I> Domain for NumberFieldByOrder<Impl, I>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
         <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
@@ -786,122 +800,23 @@ impl<'a, Impl, I> Domain for NumberFieldByOrder<'a, Impl, I>
 
 type LocalRing<'ring, I> = <<I as RingStore>::Type as PolyLiftFactorsDomain>::LocalRing<'ring>;
 
-type ImplementationRing<'ring, I> = AsFieldBase<FreeAlgebraImpl<
+type LocalRingPolyRing<'ring, I> = DensePolyRing<LocalRing<'ring, I>, DynConvolution<'ring, <LocalRing<'ring, I> as RingStore>::Type>>;
+
+type LocalField<'ring, I> = <<I as RingStore>::Type as PolyLiftFactorsDomain>::LocalField<'ring>;
+
+type LocalFieldPolyRing<'ring, I> = DensePolyRing<LocalField<'ring, I>, DynConvolution<'ring, <LocalField<'ring, I> as RingStore>::Type>>;
+
+type NumberFieldQuotientField<'ring, I> = AsFieldBase<FreeAlgebraImpl<
     <<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring>, 
-    Vec<El<<<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring>>>>
+    Vec<El<<<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring>>>,
+    DynConvolution<'ring, <<<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring> as RingStore>::Type>
+>>;
+
+type NumberFieldQuotientRing<'ring, I> = FreeAlgebraImplBase<
+    LocalRing<'ring, I>, 
+    SparseMapVector<LocalRing<'ring, I>>,
+    DynConvolution<'ring, <LocalRing<'ring, I> as RingStore>::Type>
 >;
-
-struct NumberFieldOrderQuotient<'ring, I>
-    where I: 'ring + RingStore,
-        I::Type: IntegerRing
-{
-    implementation: RingValue<ImplementationRing<'ring, I>>
-}
-
-impl<'ring, I> Clone for NumberFieldOrderQuotient<'ring, I>
-    where I: 'ring + RingStore,
-        I::Type: IntegerRing
-{
-    fn clone(&self) -> Self {
-        Self { implementation: RingValue::from(AsFieldBase::promise_is_field(RingValue::from(FreeAlgebraImplBase::create(
-            self.implementation.base_ring().clone(),
-            self.implementation.rank(),
-            self.implementation.get_ring().get_delegate().x_pow_rank().iter().map(|x| self.implementation.base_ring().clone_el(x)).collect(),
-            self.implementation.get_ring().get_delegate().gen_name(),
-            self.implementation.get_ring().get_delegate().allocator().clone(),
-            self.implementation.get_ring().get_delegate().convolution().clone()
-        ))).unwrap()) }
-    }
-}
-
-impl<'ring, I> PartialEq for NumberFieldOrderQuotient<'ring, I>
-    where I: 'ring + RingStore,
-        I::Type: IntegerRing
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.implementation.get_ring() == other.implementation.get_ring()
-    }
-}
-
-impl<'ring, I> Debug for NumberFieldOrderQuotient<'ring, I>
-    where I: 'ring + RingStore,
-        I::Type: IntegerRing
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "NumberFieldOrderQuotient({:?})", self.implementation.get_ring())
-    }
-}
-
-impl<'ring, I> DelegateRing for NumberFieldOrderQuotient<'ring, I>
-    where I: 'ring + RingStore,
-        I::Type: IntegerRing
-{
-    type Base = ImplementationRing<'ring, I>;
-    type Element = <ImplementationRing<'ring, I> as RingBase>::Element;
-
-    fn get_delegate(&self) -> &Self::Base {
-        self.implementation.get_ring()
-    }
-
-    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
-    fn delegate_mut<'b>(&self, el: &'b mut Self::Element) -> &'b mut <Self::Base as RingBase>::Element { el }
-    fn delegate_ref<'b>(&self, el: &'b Self::Element) -> &'b <Self::Base as RingBase>::Element { el }
-    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
-}
-
-impl<'ring, I> Domain for NumberFieldOrderQuotient<'ring, I>
-    where I: 'ring + RingStore,
-        I::Type: IntegerRing
-{}
-
-impl<'ring, I> DelegateRingImplEuclideanRing for NumberFieldOrderQuotient<'ring, I>
-    where I: 'ring + RingStore,
-        I::Type: IntegerRing
-{}
-
-impl<'ring, I> Field for NumberFieldOrderQuotient<'ring, I>
-    where I: 'ring + RingStore,
-        I::Type: IntegerRing
-{}
-
-impl<'ring, I> DelegateRingImplFiniteRing for NumberFieldOrderQuotient<'ring, I>
-    where I: 'ring + RingStore,
-        I::Type: IntegerRing
-{}
-
-impl<'ring, I> CanHomFrom<Self> for NumberFieldOrderQuotient<'ring, I>
-    where I: 'ring + RingStore,
-        I::Type: IntegerRing
-{
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, from: &Self) -> Option<Self::Homomorphism> {
-        if self == from {
-            Some(())
-        } else {
-            None
-        }
-    }
-
-    fn map_in(&self, _from: &Self, el: <Self as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
-        el
-    }
-}
-
-impl<'ring, I> CanIsoFromTo<Self> for NumberFieldOrderQuotient<'ring, I>
-    where I: 'ring + RingStore,
-        I::Type: IntegerRing
-{
-    type Isomorphism = <Self as CanHomFrom<Self>>::Homomorphism;
-
-    fn has_canonical_iso(&self, from: &Self) -> Option<Self::Isomorphism> {
-        from.has_canonical_hom(self)
-    }
-
-    fn map_out(&self, from: &Self, el: Self::Element, iso: &Self::Isomorphism) -> <Self as RingBase>::Element {
-        from.map_in(self, el, iso)
-    }
-}
 
 ///
 /// A prime ideal of a [`NumberField`].
@@ -915,12 +830,12 @@ pub struct NumberRingIdeal<'ring, I>
         I: 'ring
 {
     prime: <I::Type as PolyLiftFactorsDomain>::SuitableIdeal<'ring>,
-    ZZX: DensePolyRing<&'ring I>,
-    number_field_poly: El<DensePolyRing<&'ring I>>,
-    FpX: DensePolyRing<<I::Type as PolyLiftFactorsDomain>::LocalField<'ring>>,
+    ZZX: DensePolyRing<&'ring I, DynConvolution<'ring, I::Type>>,
+    number_field_poly: El<DensePolyRing<&'ring I, DynConvolution<'ring, I::Type>>>,
+    FpX: LocalFieldPolyRing<'ring, I>,
     Fp_as_ring: <I::Type as PolyLiftFactorsDomain>::LocalRing<'ring>,
     Fp_as_zn: <I::Type as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring>,
-    minpoly_factors_mod_p: Vec<El<DensePolyRing<<I::Type as PolyLiftFactorsDomain>::LocalField<'ring>>>>
+    minpoly_factors_mod_p: Vec<El<LocalFieldPolyRing<'ring, I>>>
 }
 
 impl<'ring, I> NumberRingIdeal<'ring, I>
@@ -928,7 +843,7 @@ impl<'ring, I> NumberRingIdeal<'ring, I>
         I::Type: IntegerRing,
         I: 'ring
 {
-    fn lifted_factorization<'a>(&'a self, e: usize) -> (DensePolyRing<<I::Type as PolyLiftFactorsDomain>::LocalRing<'ring>>, Vec<El<DensePolyRing<<I::Type as PolyLiftFactorsDomain>::LocalRing<'ring>>>>) {
+    fn lifted_factorization<'a>(&'a self, e: usize) -> (LocalRingPolyRing<'ring, I>, Vec<El<LocalRingPolyRing<'ring, I>>>) {
         let ZZX = &self.ZZX;
         let ZZ = ZZX.base_ring();
         let ZpeX = DensePolyRing::new(ZZ.get_ring().quotient_ring_at(&self.prime, e, 0), "X");
@@ -962,23 +877,20 @@ impl<'ring, I> Debug for NumberRingIdeal<'ring, I>
     }
 }
 
-impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
+impl<Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<Impl, I>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
         <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
 {
-    type LocalRingBase<'ring> = FreeAlgebraImplBase<
-        LocalRing<'ring, I>, 
-        SparseMapVector<LocalRing<'ring, I>>
-    >
+    type LocalRingBase<'ring> = NumberFieldQuotientRing<'ring, I>
         where Self: 'ring;
 
     type LocalRing<'ring> = RingValue<Self::LocalRingBase<'ring>>
         where Self: 'ring;
 
-    type LocalFieldBase<'ring> = NumberFieldOrderQuotient<'ring, I>
+    type LocalFieldBase<'ring> = NumberFieldQuotientField<'ring, I>
         where Self: 'ring;
 
     type LocalField<'ring> = RingValue<Self::LocalFieldBase<'ring>>
@@ -1016,7 +928,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         let QQ = self.base.base_ring();
         let ZZ = QQ.base_ring();
         let ZZX = DensePolyRing::new(ZZ, "X");
-        let gen_poly = self.base.generating_poly(&ZZX, LambdaHom::new(QQ, ZZ, |QQ, ZZ, x| {
+        let gen_poly = RingValue::from_ref(&self.base).generating_poly(&ZZX, LambdaHom::new(QQ, ZZ, |QQ, ZZ, x| {
             assert!(ZZ.is_one(QQ.get_ring().den(&x)));
             ZZ.clone_el(QQ.get_ring().num(&x))
         }));
@@ -1038,7 +950,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
                 return NumberRingIdeal {
                     minpoly_factors_mod_p: factorization.into_iter().map(|(f, _)| f).collect(),
                     number_field_poly: gen_poly,
-                    Fp_as_zn: ZZ.get_ring().local_field_into_zn(Fp.clone()),
+                    Fp_as_zn: ZZ.get_ring().local_field_into_zn(ZZ.get_ring().quotient_field_at(&p, 0)),
                     FpX: FpX,
                     ZZX: ZZX,
                     Fp_as_ring: Fp_as_ring,
@@ -1050,7 +962,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
     }
 
     #[instrument(skip_all, level = "trace")]
-    fn quotient_field_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, idx: usize) -> Self::LocalField<'ring>
+    fn quotient_field_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, idx: usize) -> RingValue<NumberFieldQuotientField<'ring, I>>
         where Self: 'ring
     {
         assert!(idx < self.maximal_ideal_factor_count(ideal));
@@ -1069,13 +981,12 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         }
         let trailing_zeros = x_pow_rank.iter().rev().take_while(|x| Fp_to_Fp_zn.codomain().is_zero(x)).count();
         x_pow_rank.truncate(x_pow_rank.len() - trailing_zeros);
-        return RingValue::from(NumberFieldOrderQuotient {
-            implementation: AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new(ideal.Fp_as_zn.clone(), FpX.degree(irred_poly).unwrap(), x_pow_rank))),
-        });
+        let Fp: <<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring> = ideal.Fp_as_zn.clone();
+        return AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new(Fp, FpX.degree(irred_poly).unwrap(), x_pow_rank)));
     }
 
     #[instrument(skip_all, level = "trace")]
-    fn quotient_ring_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, e: usize, idx: usize) -> Self::LocalRing<'ring>
+    fn quotient_ring_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, e: usize, idx: usize) -> RingValue<NumberFieldQuotientRing<'ring, I>>
         where Self: 'ring
     {
         assert!(idx < self.maximal_ideal_factor_count(ideal));
@@ -1087,7 +998,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
 
         let irred_poly = &factors[idx];
         let degree = ZpeX.degree(irred_poly).unwrap();
-        let mut x_pow_rank = SparseMapVector::new(degree, Zpe.clone());
+        let mut x_pow_rank = SparseMapVector::new(degree, ZZ.get_ring().quotient_ring_at(&ideal.prime, e, 0));
         for (c, i) in ZpeX.terms(irred_poly) {
             if i < x_pow_rank.len() {
                 *x_pow_rank.at_mut(i) = Zpe.negate(Zpe.clone_el(c));
@@ -1112,7 +1023,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         let ZZ_to_Zpe = PolyLiftFactorsDomainReductionMap::new(ZZ.get_ring(), &ideal.prime, to.0.base_ring(), to.1, 0);
 
         ZZX.evaluate(
-            &self.base.poly_repr(ZZX, &x, partial_QQ_to_ZZ), 
+            &RingValue::from_ref(&self.base).poly_repr(ZZX, &x, partial_QQ_to_ZZ), 
             &to.0.canonical_gen(), 
             RingRef::new(to.0).into_inclusion().compose(ZZ_to_Zpe)
         )
@@ -1179,7 +1090,7 @@ impl<'a, Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<'a, Impl, I>
         let mut unit_vectors = (0..self.maximal_ideal_factor_count(ideal)).map(|_| ZpeX.zero()).collect::<Vec<_>>();
         product_except_one(&ZpeX, (&from).map_fn(|galois_ring| galois_ring.generating_poly(&ZpeX, Zpe.identity())), &mut unit_vectors);
         let complete_product = ZpeX.mul_ref_fst(&unit_vectors[0], from.at(0).generating_poly(&ZpeX, Zpe.identity()));
-        assert_el_eq!(&ZpeX, &complete_product, &self.base.generating_poly(&ZpeX, ZZ_to_Zpe.compose(LambdaHom::new(QQ, ZZ, |QQ, ZZ, x| {
+        assert_el_eq!(&ZpeX, &complete_product, &RingValue::from_ref(&self.base).generating_poly(&ZpeX, ZZ_to_Zpe.compose(LambdaHom::new(QQ, ZZ, |QQ, ZZ, x| {
             assert!(ZZ.is_one(QQ.get_ring().den(&x)));
             ZZ.clone_el(QQ.get_ring().num(&x))
         }))));

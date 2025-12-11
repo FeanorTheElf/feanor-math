@@ -52,7 +52,7 @@ use super::FreeAlgebraStore;
 /// assert_el_eq!(ring, ring.one(), ring.pow(root_of_unity, 6));
 /// ```
 /// 
-pub struct FreeAlgebraImplBase<R, V, A = Global, C = KaratsubaAlgorithm>
+pub struct FreeAlgebraImplBase<R, V, C = DynConvolution<'static, <R as RingStore>::Type>, A = Global>
     where R: RingStore, 
         V: VectorView<El<R>> + Send + Sync, 
         A: Allocator + Clone + Send + Sync,
@@ -72,10 +72,12 @@ pub struct FreeAlgebraImplBase<R, V, A = Global, C = KaratsubaAlgorithm>
 /// equivalently a quotient of a univariate polynomial ring `R[X]/(f(X))`. For details, see
 /// [`FreeAlgebraImplBase`].
 /// 
-pub type FreeAlgebraImpl<R, V, A = Global, C = KaratsubaAlgorithm> = RingValue<FreeAlgebraImplBase<R, V, A, C>>;
+pub type FreeAlgebraImpl<R, V, C = DynConvolution<'static, <R as RingStore>::Type>, A = Global> = RingValue<FreeAlgebraImplBase<R, V, C, A>>;
 
-impl<R, V> FreeAlgebraImpl<R, V>
-    where R: RingStore, V: VectorView<El<R>> + Send + Sync
+impl<'conv, R, V> FreeAlgebraImpl<R, V, DynConvolution<'conv, R::Type>, Global>
+    where R: RingStore, 
+        R::Type: 'conv,
+        V: VectorView<El<R>> + Send + Sync
 {
     ///
     /// Creates a new [`FreeAlgebraImpl`] ring as extension of the given base ring.
@@ -83,11 +85,13 @@ impl<R, V> FreeAlgebraImpl<R, V>
     /// The created ring is `R[X]/(X^rank - sum_i x_pow_rank[i] X^i)`.
     /// 
     pub fn new(base_ring: R, rank: usize, x_pow_rank: V) -> Self {
-        Self::new_with_convolution(base_ring, rank, x_pow_rank, "θ", Global, STANDARD_CONVOLUTION)
+        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
+        let convolution = base_ring.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        Self::new_with_convolution(base_ring, rank, x_pow_rank, "θ", Global, convolution)
     }
 }
 
-impl<R, V, A, C> Clone for FreeAlgebraImplBase<R, V, A, C>
+impl<R, V, C, A> Clone for FreeAlgebraImplBase<R, V, C, A>
     where R: RingStore + Clone, 
         V: VectorView<El<R>> + Send + Sync + Clone,
         A: Allocator + Clone + Send + Sync,
@@ -106,7 +110,7 @@ impl<R, V, A, C> Clone for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> Copy for FreeAlgebraImplBase<R, V, A, C>
+impl<R, V, C, A> Copy for FreeAlgebraImplBase<R, V, C, A>
     where R: RingStore + Copy, 
         V: VectorView<El<R>> + Send + Sync + Copy,
         A: Allocator + Send + Sync + Copy,
@@ -132,7 +136,7 @@ impl<R, A> Debug for FreeAlgebraImplEl<R, A>
     }
 }
 
-impl<R, V, A, C> FreeAlgebraImpl<R, V, A, C>
+impl<R, V, C, A> FreeAlgebraImpl<R, V, C, A>
     where R: RingStore, 
         V: VectorView<El<R>> + Send + Sync,
         A: Allocator + Clone + Send + Sync,
@@ -144,14 +148,14 @@ impl<R, V, A, C> FreeAlgebraImpl<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> FreeAlgebraImplBase<R, V, A, C>
+impl<R, V, C, A> FreeAlgebraImplBase<R, V, C, A>
     where R: RingStore, 
         V: VectorView<El<R>> + Send + Sync,
         A: Allocator + Clone + Send + Sync,
         C: ConvolutionAlgorithm<R::Type>
 {
     #[stability::unstable(feature = "enable")]
-    pub fn set_convolution<C_new: ConvolutionAlgorithm<R::Type>>(self, new_convolution: C_new) -> FreeAlgebraImpl<R, V, A, C_new> {
+    pub fn with_convolution<C_new: ConvolutionAlgorithm<R::Type>>(self, new_convolution: C_new) -> FreeAlgebraImpl<R, V, C_new, A> {
         RingValue::from(FreeAlgebraImplBase {
             base_ring: self.base_ring,
             x_pow_rank: self.x_pow_rank,
@@ -159,6 +163,19 @@ impl<R, V, A, C> FreeAlgebraImplBase<R, V, A, C>
             log2_padded_len: self.log2_padded_len,
             rank: self.rank,
             convolution: new_convolution,
+            gen_name: self.gen_name
+        })
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn with_allocator<A_new: Allocator + Clone + Send + Sync>(self, new_allocator: A_new) -> FreeAlgebraImpl<R, V, C, A_new> {
+        RingValue::from(FreeAlgebraImplBase {
+            base_ring: self.base_ring,
+            x_pow_rank: self.x_pow_rank,
+            element_allocator: new_allocator,
+            log2_padded_len: self.log2_padded_len,
+            rank: self.rank,
+            convolution: self.convolution,
             gen_name: self.gen_name
         })
     }
@@ -235,7 +252,7 @@ impl<R, V, A, C> FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> PartialEq for FreeAlgebraImplBase<R, V, A, C>
+impl<R, V, C, A> PartialEq for FreeAlgebraImplBase<R, V, C, A>
     where R: RingStore, 
         V: VectorView<El<R>> + Send + Sync,
         A: Allocator + Clone + Send + Sync,
@@ -250,7 +267,7 @@ impl<R, V, A, C> PartialEq for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
+impl<R, V, C, A> RingBase for FreeAlgebraImplBase<R, V, C, A>
     where R: RingStore, 
         V: VectorView<El<R>> + Send + Sync,
         A: Allocator + Clone + Send + Sync,
@@ -408,7 +425,7 @@ impl<R, V, A, C> RingBase for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> RingExtension for FreeAlgebraImplBase<R, V, A, C>
+impl<R, V, C, A> RingExtension for FreeAlgebraImplBase<R, V, C, A>
     where R: RingStore, 
         V: VectorView<El<R>> + Send + Sync,
         A: Allocator + Clone + Send + Sync,
@@ -457,7 +474,7 @@ impl<R, V, A, C> RingExtension for FreeAlgebraImplBase<R, V, A, C>
 /// 
 /// TODO: Decide and implement on the next breaking release
 /// 
-impl<R, V, A, C> DivisibilityRing for FreeAlgebraImplBase<R, V, A, C>
+impl<R, V, C, A> DivisibilityRing for FreeAlgebraImplBase<R, V, C, A>
     where R: RingStore, 
         R::Type: LinSolveRing,
         V: VectorView<El<R>> + Send + Sync,
@@ -496,7 +513,7 @@ impl<R, V, A, C> DivisibilityRing for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> Debug for FreeAlgebraImplBase<R, V, A, C>
+impl<R, V, C, A> Debug for FreeAlgebraImplBase<R, V, C, A>
     where R: RingStore, 
         V: VectorView<El<R>> + Send + Sync, 
         A: Allocator + Clone + Send + Sync,
@@ -508,7 +525,7 @@ impl<R, V, A, C> Debug for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
-impl<R, V> Serialize for FreeAlgebraImplBase<R, V, Global, KaratsubaAlgorithm>
+impl<'a, R, V> Serialize for FreeAlgebraImplBase<R, V, DynConvolution<'a, R::Type>, Global>
     where R: RingStore + Serialize, 
         R::Type: SerializableElementRing,
         V: VectorView<El<R>> + Send + Sync,
@@ -521,9 +538,9 @@ impl<R, V> Serialize for FreeAlgebraImplBase<R, V, Global, KaratsubaAlgorithm>
     }
 }
 
-impl<'de, R> Deserialize<'de> for FreeAlgebraImplBase<R, SparseMapVector<R>, Global, KaratsubaAlgorithm>
+impl<'de, 'conv, R> Deserialize<'de> for FreeAlgebraImplBase<R, SparseMapVector<R>, DynConvolution<'conv, R::Type>, Global>
     where R: RingStore + Deserialize<'de> + Clone, 
-        R::Type: SerializableElementRing,
+        R::Type: 'conv + SerializableElementRing,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer<'de>
@@ -542,13 +559,16 @@ impl<'de, R> Deserialize<'de> for FreeAlgebraImplBase<R, SparseMapVector<R>, Glo
             *x_pow_rank.at_mut(i) = poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(c));
         }
         _ = x_pow_rank.at_mut(0);
-        return Ok(FreeAlgebraImpl::new_with_convolution(poly_ring.into().into_base_ring(), rank, x_pow_rank, "θ", Global, STANDARD_CONVOLUTION).into());
+        let base_ring = poly_ring.into().into_base_ring();
+        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
+        let convolution = base_ring.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        return Ok(FreeAlgebraImpl::new_with_convolution(base_ring, rank, x_pow_rank, "θ", Global, convolution).into());
     }
 }
 
-impl<'de, R> Deserialize<'de> for FreeAlgebraImplBase<R, Vec<El<R>>, Global, KaratsubaAlgorithm>
+impl<'de, 'conv, R> Deserialize<'de> for FreeAlgebraImplBase<R, Vec<El<R>>, DynConvolution<'conv, R::Type>, Global>
     where R: RingStore + Deserialize<'de>, 
-        R::Type: SerializableElementRing
+        R::Type: 'conv + SerializableElementRing
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer<'de>
@@ -563,11 +583,14 @@ impl<'de, R> Deserialize<'de> for FreeAlgebraImplBase<R, Vec<El<R>>, Global, Kar
         assert!(poly_ring.base_ring().is_one(poly_ring.lc(&poly).unwrap()));
         let rank = poly_ring.degree(&poly).unwrap();
         let x_pow_rank = (0..rank).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&poly, i)))).collect::<Vec<_>>();
-        return Ok(FreeAlgebraImpl::new_with_convolution(poly_ring.into().into_base_ring(), rank, x_pow_rank, "θ", Global, STANDARD_CONVOLUTION).into());
+        let base_ring = poly_ring.into().into_base_ring();
+        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
+        let convolution = base_ring.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        return Ok(FreeAlgebraImpl::new_with_convolution(base_ring, rank, x_pow_rank, "θ", Global, convolution).into());
     }
 }
 
-impl<R, V, A, C> SerializableElementRing for FreeAlgebraImplBase<R, V, A, C>
+impl<R, V, C, A> SerializableElementRing for FreeAlgebraImplBase<R, V, C, A>
     where R: RingStore, 
         V: VectorView<El<R>> + Send + Sync,
         A: Allocator + Clone + Send + Sync,
@@ -598,7 +621,7 @@ impl<R, V, A, C> SerializableElementRing for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> FreeAlgebra for FreeAlgebraImplBase<R, V, A, C>
+impl<R, V, C, A> FreeAlgebra for FreeAlgebraImplBase<R, V, C, A>
     where R: RingStore, 
         V: VectorView<El<R>> + Send + Sync,
         A: Allocator + Clone + Send + Sync,
@@ -643,7 +666,7 @@ impl<R, V, A, C> FreeAlgebra for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> HashableElRing for FreeAlgebraImplBase<R, V, A, C>
+impl<R, V, C, A> HashableElRing for FreeAlgebraImplBase<R, V, C, A>
     where R: RingStore, 
         R::Type: HashableElRing,
         V: VectorView<El<R>> + Send + Sync,
@@ -670,17 +693,17 @@ impl<R, V, A, C> HashableElRing for FreeAlgebraImplBase<R, V, A, C>
 /// 
 /// Used by the implementation of [`FiniteRing::elements()`] for [`FreeAlgebraImplBase`].
 /// 
-pub struct WRTCanonicalBasisElementCreator<'a, R, V, A, C>
+pub struct WRTCanonicalBasisElementCreator<'a, R, V, C, A>
     where R: RingStore, 
         R::Type: FiniteRing, 
         V: VectorView<El<R>> + Send + Sync,
         A: Allocator + Clone + Send + Sync,
         C: ConvolutionAlgorithm<R::Type>
 {
-    base_ring: &'a FreeAlgebraImplBase<R, V, A, C>
+    base_ring: &'a FreeAlgebraImplBase<R, V, C, A>
 }
 
-impl<'a, R, V, A, C> Clone for WRTCanonicalBasisElementCreator<'a, R, V, A, C>
+impl<'a, R, V, C, A> Clone for WRTCanonicalBasisElementCreator<'a, R, V, C, A>
     where R: RingStore, 
         R::Type: FiniteRing, 
         V: VectorView<El<R>> + Send + Sync,
@@ -690,21 +713,21 @@ impl<'a, R, V, A, C> Clone for WRTCanonicalBasisElementCreator<'a, R, V, A, C>
     fn clone(&self) -> Self { *self }
 }
 
-impl<'a, 'b, R, V, A, C> FnOnce<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator<'a, R, V, A, C>
+impl<'a, 'b, R, V, C, A> FnOnce<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator<'a, R, V, C, A>
     where R: RingStore, 
         R::Type: FiniteRing, 
         V: VectorView<El<R>> + Send + Sync,
         A: Allocator + Clone + Send + Sync,
         C: ConvolutionAlgorithm<R::Type>
 {
-    type Output = El<FreeAlgebraImpl<R, V, A, C>>;
+    type Output = El<FreeAlgebraImpl<R, V, C, A>>;
 
     extern "rust-call" fn call_once(mut self, args: (&'b [El<R>], )) -> Self::Output {
         self.call_mut(args)
     }
 }
 
-impl<'a, 'b, R, V, A, C> FnMut<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator<'a, R, V, A, C>
+impl<'a, 'b, R, V, C, A> FnMut<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator<'a, R, V, C, A>
     where R: RingStore, 
         R::Type: FiniteRing, 
         V: VectorView<El<R>> + Send + Sync,
@@ -716,7 +739,7 @@ impl<'a, 'b, R, V, A, C> FnMut<(&'b [El<R>], )> for WRTCanonicalBasisElementCrea
     }
 }
 
-impl<'a, R, V, A, C> Copy for WRTCanonicalBasisElementCreator<'a, R, V, A, C>
+impl<'a, R, V, C, A> Copy for WRTCanonicalBasisElementCreator<'a, R, V, C, A>
     where R: RingStore, 
         R::Type: FiniteRing, 
         V: VectorView<El<R>> + Send + Sync,
@@ -724,7 +747,7 @@ impl<'a, R, V, A, C> Copy for WRTCanonicalBasisElementCreator<'a, R, V, A, C>
         C: ConvolutionAlgorithm<R::Type>
 {}
 
-impl<R, V, A, C> FiniteRingSpecializable for FreeAlgebraImplBase<R, V, A, C>
+impl<R, V, C, A> FiniteRingSpecializable for FreeAlgebraImplBase<R, V, C, A>
     where R: RingStore,
         R::Type: FiniteRingSpecializable, 
         V: VectorView<El<R>> + Send + Sync,
@@ -732,25 +755,25 @@ impl<R, V, A, C> FiniteRingSpecializable for FreeAlgebraImplBase<R, V, A, C>
         C: ConvolutionAlgorithm<R::Type>
 {
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
-        struct OpWrapper<R, V, A, C, O>
+        struct OpWrapper<R, V, C, A, O>
             where R: RingStore,
                 R::Type: FiniteRingSpecializable, 
                 V: VectorView<El<R>> + Send + Sync,
                 A: Allocator + Clone + Send + Sync,
                 C: ConvolutionAlgorithm<R::Type>,
-                O: FiniteRingOperation<FreeAlgebraImplBase<R, V, A, C>>
+                O: FiniteRingOperation<FreeAlgebraImplBase<R, V, C, A>>
         {
             operation: O,
-            ring: PhantomData<FreeAlgebraImpl<R, V, A, C>>
+            ring: PhantomData<FreeAlgebraImpl<R, V, C, A>>
         }
 
-        impl<R, V, A, C, O> FiniteRingOperation<R::Type> for OpWrapper<R, V, A, C, O>
+        impl<R, V, C, A, O> FiniteRingOperation<R::Type> for OpWrapper<R, V, C, A, O>
             where R: RingStore,
                 R::Type: FiniteRingSpecializable, 
                 V: VectorView<El<R>> + Send + Sync,
                 A: Allocator + Clone + Send + Sync,
                 C: ConvolutionAlgorithm<R::Type>,
-                O: FiniteRingOperation<FreeAlgebraImplBase<R, V, A, C>>
+                O: FiniteRingOperation<FreeAlgebraImplBase<R, V, C, A>>
         {
             type Output = O::Output;
             fn execute(self) -> Self::Output where R::Type:FiniteRing {
@@ -765,14 +788,14 @@ impl<R, V, A, C> FiniteRingSpecializable for FreeAlgebraImplBase<R, V, A, C>
     }
 }
 
-impl<R, V, A, C> FiniteRing for FreeAlgebraImplBase<R, V, A, C>
+impl<R, V, C, A> FiniteRing for FreeAlgebraImplBase<R, V, C, A>
     where R: RingStore, 
         R::Type: FiniteRing, 
         V: VectorView<El<R>> + Send + Sync,
         A: Allocator + Clone + Send + Sync,
         C: ConvolutionAlgorithm<R::Type>
 {
-    type ElementsIter<'a> = MultiProduct<<R::Type as FiniteRing>::ElementsIter<'a>, WRTCanonicalBasisElementCreator<'a, R, V, A, C>, CloneRingEl<&'a R>, Self::Element>
+    type ElementsIter<'a> = MultiProduct<<R::Type as FiniteRing>::ElementsIter<'a>, WRTCanonicalBasisElementCreator<'a, R, V, C, A>, CloneRingEl<&'a R>, Self::Element>
         where Self: 'a;
 
     fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
@@ -796,41 +819,41 @@ impl<R, V, A, C> FiniteRing for FreeAlgebraImplBase<R, V, A, C>
 }
 
 impl_field_wrap_unwrap_homs!{
-    <{R1, V1, A1, C1, R2, V2, A2, C2}> FreeAlgebraImplBase<R1, V1, A1, C1>, FreeAlgebraImplBase<R2, V2, A2, C2>
+    <{R1, V1, C1, A1, R2, V2, C2, A2}> FreeAlgebraImplBase<R1, V1, C1, A1>, FreeAlgebraImplBase<R2, V2, C2, A2>
         where R1: RingStore, R1::Type: LinSolveRing, V1: VectorView<El<R1>> + Send + Sync, A1: Allocator + Clone + Send + Sync, C1: ConvolutionAlgorithm<R1::Type>,
             R2: RingStore, R2::Type: LinSolveRing, V2: VectorView<El<R2>> + Send + Sync, A2: Allocator + Clone + Send + Sync, C2: ConvolutionAlgorithm<R2::Type>,
             R2::Type: CanHomFrom<R1::Type>
 }
 
 impl_field_wrap_unwrap_isos!{
-    <{R1, V1, A1, C1, R2, V2, A2, C2}> FreeAlgebraImplBase<R1, V1, A1, C1>, FreeAlgebraImplBase<R2, V2, A2, C2>
+    <{R1, V1, C1, A1, R2, V2, C2, A2}> FreeAlgebraImplBase<R1, V1, C1, A1>, FreeAlgebraImplBase<R2, V2, C2, A2>
         where R1: RingStore, R1::Type: LinSolveRing, V1: VectorView<El<R1>> + Send + Sync, A1: Allocator + Clone + Send + Sync, C1: ConvolutionAlgorithm<R1::Type>,
             R2: RingStore, R2::Type: LinSolveRing, V2: VectorView<El<R2>> + Send + Sync, A2: Allocator + Clone + Send + Sync, C2: ConvolutionAlgorithm<R2::Type>,
             R2::Type: CanIsoFromTo<R1::Type>
 }
 
 impl_localpir_wrap_unwrap_homs!{
-    <{R1, V1, A1, C1, R2, V2, A2, C2}> FreeAlgebraImplBase<R1, V1, A1, C1>, FreeAlgebraImplBase<R2, V2, A2, C2>
+    <{R1, V1, C1, A1, R2, V2, C2, A2}> FreeAlgebraImplBase<R1, V1, C1, A1>, FreeAlgebraImplBase<R2, V2, C2, A2>
         where R1: RingStore, R1::Type: LinSolveRing, V1: VectorView<El<R1>> + Send + Sync, A1: Allocator + Clone + Send + Sync, C1: ConvolutionAlgorithm<R1::Type>,
             R2: RingStore, R2::Type: LinSolveRing, V2: VectorView<El<R2>> + Send + Sync, A2: Allocator + Clone + Send + Sync, C2: ConvolutionAlgorithm<R2::Type>,
             R2::Type: CanHomFrom<R1::Type>
 }
 
 impl_localpir_wrap_unwrap_isos!{
-    <{R1, V1, A1, C1, R2, V2, A2, C2}> FreeAlgebraImplBase<R1, V1, A1, C1>, FreeAlgebraImplBase<R2, V2, A2, C2>
+    <{R1, V1, C1, A1, R2, V2, C2, A2}> FreeAlgebraImplBase<R1, V1, C1, A1>, FreeAlgebraImplBase<R2, V2, C2, A2>
         where R1: RingStore, R1::Type: LinSolveRing, V1: VectorView<El<R1>> + Send + Sync, A1: Allocator + Clone + Send + Sync, C1: ConvolutionAlgorithm<R1::Type>,
             R2: RingStore, R2::Type: LinSolveRing, V2: VectorView<El<R2>> + Send + Sync, A2: Allocator + Clone + Send + Sync, C2: ConvolutionAlgorithm<R2::Type>,
             R2::Type: CanIsoFromTo<R1::Type>
 }
 
-impl<R1, V1, A1, C1, R2, V2, A2, C2> CanHomFrom<FreeAlgebraImplBase<R1, V1, A1, C1>> for FreeAlgebraImplBase<R2, V2, A2, C2>
+impl<R1, V1, C1, A1, R2, V2, C2, A2> CanHomFrom<FreeAlgebraImplBase<R1, V1, C1, A1>> for FreeAlgebraImplBase<R2, V2, C2, A2>
     where R1: RingStore, V1: VectorView<El<R1>> + Send + Sync, A1: Allocator + Clone + Send + Sync, C1: ConvolutionAlgorithm<R1::Type>,
         R2: RingStore, V2: VectorView<El<R2>> + Send + Sync, A2: Allocator + Clone + Send + Sync, C2: ConvolutionAlgorithm<R2::Type>,
         R2::Type: CanHomFrom<R1::Type>
 {
     type Homomorphism = <R2::Type as CanHomFrom<R1::Type>>::Homomorphism;
 
-    fn has_canonical_hom(&self, from: &FreeAlgebraImplBase<R1, V1, A1, C1>) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &FreeAlgebraImplBase<R1, V1, C1, A1>) -> Option<Self::Homomorphism> {
         if self.rank() == from.rank() {
             let hom = self.base_ring.get_ring().has_canonical_hom(from.base_ring.get_ring())?;
             if (0..self.rank()).all(|i| (i >= self.x_pow_rank.len() && i >= from.x_pow_rank.len()) ||
@@ -847,19 +870,19 @@ impl<R1, V1, A1, C1, R2, V2, A2, C2> CanHomFrom<FreeAlgebraImplBase<R1, V1, A1, 
         }
     }
 
-    fn map_in(&self, from: &FreeAlgebraImplBase<R1, V1, A1, C1>, el: <FreeAlgebraImplBase<R1, V1, A1> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+    fn map_in(&self, from: &FreeAlgebraImplBase<R1, V1, C1, A1>, el: <FreeAlgebraImplBase<R1, V1, C1, A1> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         self.from_canonical_basis((0..self.rank()).map(|i| self.base_ring.get_ring().map_in_ref(from.base_ring.get_ring(), &el.values[i], hom)))
     }
 }
 
-impl<R1, V1, A1, C1, R2, V2, A2, C2> CanIsoFromTo<FreeAlgebraImplBase<R1, V1, A1, C1>> for FreeAlgebraImplBase<R2, V2, A2, C2>
+impl<R1, V1, C1, A1, R2, V2, C2, A2> CanIsoFromTo<FreeAlgebraImplBase<R1, V1, C1, A1>> for FreeAlgebraImplBase<R2, V2, C2, A2>
     where R1: RingStore, V1: VectorView<El<R1>> + Send + Sync, A1: Allocator + Clone + Send + Sync, C1: ConvolutionAlgorithm<R1::Type>,
         R2: RingStore, V2: VectorView<El<R2>> + Send + Sync, A2: Allocator + Clone + Send + Sync, C2: ConvolutionAlgorithm<R2::Type>,
         R2::Type: CanIsoFromTo<R1::Type>
 {
     type Isomorphism = <R2::Type as CanIsoFromTo<R1::Type>>::Isomorphism;
 
-    fn has_canonical_iso(&self, from: &FreeAlgebraImplBase<R1, V1, A1, C1>) -> Option<Self::Isomorphism> {
+    fn has_canonical_iso(&self, from: &FreeAlgebraImplBase<R1, V1, C1, A1>) -> Option<Self::Isomorphism> {
         if self.rank() == from.rank() {
             let iso = self.base_ring.get_ring().has_canonical_iso(from.base_ring.get_ring())?;
             if (0..self.rank()).all(|i|(i >= self.x_pow_rank.len() && i >= from.x_pow_rank.len()) ||
@@ -876,7 +899,7 @@ impl<R1, V1, A1, C1, R2, V2, A2, C2> CanIsoFromTo<FreeAlgebraImplBase<R1, V1, A1
         }
     }
 
-    fn map_out(&self, from: &FreeAlgebraImplBase<R1, V1, A1, C1>, el: <FreeAlgebraImplBase<R2, V2, A2> as RingBase>::Element, iso: &Self::Isomorphism) -> <FreeAlgebraImplBase<R1, V1, A1, C1> as RingBase>::Element {
+    fn map_out(&self, from: &FreeAlgebraImplBase<R1, V1, C1, A1>, el: <FreeAlgebraImplBase<R2, V2, C2, A2> as RingBase>::Element, iso: &Self::Isomorphism) -> <FreeAlgebraImplBase<R1, V1, C1, A1> as RingBase>::Element {
         from.from_canonical_basis((0..self.rank()).map(|i| self.base_ring.get_ring().map_out(from.base_ring.get_ring(), self.base_ring.clone_el(&el.values[i]), iso)))
     }
 }
@@ -982,7 +1005,7 @@ fn test_ring_axioms() {
     crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
     
     let (ring, els) = test_ring2_and_elements();
-    let ring = ring.into().set_convolution(FFTConvolution::new_with_alloc(Global));
+    let ring = ring.into().with_convolution(FFTConvolution::new_with_alloc(Global));
     crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
 
     let base_ring = zn_static::Fp::<257>::RING;

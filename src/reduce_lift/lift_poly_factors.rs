@@ -95,7 +95,7 @@ pub trait PolyLiftFactorsDomain: Domain + DivisibilityRing + FiniteRingSpecializ
     /// 
     /// This may reference data stored by [`PolyLiftFactorsDomain::SuitableIdeal`].
     /// 
-    type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>> + Clone
+    type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
         where Self: 'ring;
     
     ///
@@ -112,7 +112,7 @@ pub trait PolyLiftFactorsDomain: Domain + DivisibilityRing + FiniteRingSpecializ
     /// 
     /// This may reference data stored by [`PolyLiftFactorsDomain::SuitableIdeal`].
     /// f
-    type LocalField<'ring>: RingStore<Type = Self::LocalFieldBase<'ring>> + Clone
+    type LocalField<'ring>: RingStore<Type = Self::LocalFieldBase<'ring>>
         where Self: 'ring;
 
     ///

@@ -128,10 +128,9 @@ pub trait FromModulusCreateableZnRing: Sized + ZnRing {
 }
 
 pub mod generic_impls {
-    use std::alloc::Global;
     use std::marker::PhantomData;
-
-    use crate::algorithms::convolution::STANDARD_CONVOLUTION;
+    
+    use crate::algorithms::convolution::DynConvolution;
     use crate::algorithms::int_bisect;
     use crate::ordered::*;
     use crate::primitive_int::{StaticRing, StaticRingBase};
@@ -297,9 +296,9 @@ pub mod generic_impls {
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn interpolation_ring<R: ZnRingStore>(ring: R, count: usize) -> GaloisFieldOver<R>
+    pub fn interpolation_ring<'conv, R: ZnRingStore>(ring: R, count: usize) -> GaloisFieldOver<R, DynConvolution<'conv, R::Type>>
         where R: Clone,
-            R::Type: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>
+            R::Type: 'conv + ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>
     {
         let ZZbig = BigIntRing::RING;
         let modulus = int_cast(ring.integer_ring().clone_el(ring.modulus()), ZZbig, ring.integer_ring());
@@ -310,7 +309,7 @@ pub mod generic_impls {
             -1
         }) + 1;
         assert!(degree >= 1);
-        return GaloisField::new_with_convolution(ring, degree as usize, Global, STANDARD_CONVOLUTION);
+        return GaloisField::new_with_base_field(ring, degree as usize);
     }
 }
 

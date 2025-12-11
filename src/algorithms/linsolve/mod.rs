@@ -137,7 +137,7 @@ impl<R: ?Sized + PrincipalIdealRing> LinSolveRing for R {
     }
 }
 
-impl<R, V, A_ring, C_ring> LinSolveRing for FreeAlgebraImplBase<R, V, A_ring, C_ring>
+impl<R, V, A_ring, C_ring> LinSolveRing for FreeAlgebraImplBase<R, V, C_ring, A_ring>
     where R: RingStore,
         R::Type: LinSolveRing,
         V: VectorView<El<R>> + Send + Sync,

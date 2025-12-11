@@ -1,5 +1,8 @@
 use std::alloc::{Allocator, Global};
+use std::any::Any;
+use std::marker::PhantomData;
 use std::ops::Deref;
+use std::sync::Arc;
 
 use crate::ring::*;
 
@@ -189,27 +192,22 @@ impl<R, C> ConvolutionAlgorithm<R> for C
 /// 
 #[derive(Clone, Copy, Debug)]
 pub struct KaratsubaAlgorithm<A: Allocator + Send + Sync = Global> {
-    allocator: A
+    allocator: A,
+    threshold_log2: usize
 }
-
-///
-/// Good default algorithm for computing convolutions, using Karatsuba's algorithm
-/// with a threshold defined by [`KaratsubaHint`].
-/// 
-pub const STANDARD_CONVOLUTION: KaratsubaAlgorithm = KaratsubaAlgorithm::new(Global);
 
 impl<A: Allocator + Send + Sync> KaratsubaAlgorithm<A> {
     
     #[stability::unstable(feature = "enable")]
-    pub const fn new(allocator: A) -> Self {
-        Self { allocator }
+    pub const fn new(threshold_log2: usize, allocator: A) -> Self {
+        Self { threshold_log2, allocator }
     }
 }
 
 impl<R: ?Sized + RingBase, A: Allocator + Send + Sync> ConvolutionAlgorithm<R> for KaratsubaAlgorithm<A> {
     
     fn compute_convolution(&self, lhs: &[R::Element], _lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: &[R::Element], _rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: &R) {
-        karatsuba(<R as KaratsubaHint>::karatsuba_threshold(ring), dst, lhs, rhs, RingRef::new(ring), &self.allocator);
+        karatsuba(self.threshold_log2, dst, lhs, rhs, RingRef::new(ring), &self.allocator);
     }
     
     fn prepare_convolution_operand(&self, _val: &[<R as RingBase>::Element], _length_hint: Option<usize>, _ring: &R) -> Self::PreparedConvolutionOperand {
@@ -243,6 +241,62 @@ impl<R: RingBase + ?Sized> KaratsubaHint for R {
 
     default fn karatsuba_threshold(&self) -> usize {
         0
+    }
+}
+
+pub type DynConvolution<'a, R> = Arc<dyn 'a + ConvolutionAlgorithm<R, PreparedConvolutionOperand = Box<dyn Any>>>;
+
+pub struct TypeErasableConvolution<R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>>
+    where C::PreparedConvolutionOperand: 'static
+{
+    ring: PhantomData<R>,
+    convolution: C
+}
+
+impl<R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> TypeErasableConvolution<R, C>
+    where C::PreparedConvolutionOperand: 'static
+{
+    pub fn new(convolution: C) -> Self {
+        Self { ring: PhantomData, convolution: convolution }
+    }
+}
+
+impl<R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> ConvolutionAlgorithm<R> for TypeErasableConvolution<R, C>
+    where C::PreparedConvolutionOperand: 'static
+{
+    type PreparedConvolutionOperand = Box<dyn Any>;
+
+    fn compute_convolution(&self, lhs: &[<R as RingBase>::Element], lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: &[<R as RingBase>::Element], rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [<R as RingBase>::Element], ring: &R) {
+        self.convolution.compute_convolution(lhs, lhs_prep.map(|op| op.downcast_ref().unwrap()), rhs, rhs_prep.map(|op| op.downcast_ref().unwrap()), dst, ring);
+    }
+
+    fn compute_convolution_sum(&self, values: &[(&[<R as RingBase>::Element], Option<&Self::PreparedConvolutionOperand>, &[<R as RingBase>::Element], Option<&Self::PreparedConvolutionOperand>)], dst: &mut [<R as RingBase>::Element], ring: &R) {
+        self.convolution.compute_convolution_sum(&values.iter().map(|(l, l_prep, r, r_prep)| 
+            (*l, l_prep.map(|op| op.downcast_ref().unwrap()), *r, r_prep.map(|op| op.downcast_ref().unwrap()))
+        ).collect::<Vec<_>>(), dst, ring);
+    }
+
+    fn prepare_convolution_operand(&self, val: &[<R as RingBase>::Element], length_hint: Option<usize>, ring: &R) -> Self::PreparedConvolutionOperand {
+        Box::new(self.convolution.prepare_convolution_operand(val, length_hint, ring))
+    }
+
+    fn supports_ring(&self, ring: &R) -> bool {
+        self.convolution.supports_ring(ring)
+    }
+}
+
+pub trait DefaultConvolutionRing: RingBase {
+
+    fn create_default_convolution<'conv>(&self, max_len: Option<usize>) -> DynConvolution<'conv, Self>
+        where Self: 'conv;
+}
+
+impl<R: ?Sized + RingBase> DefaultConvolutionRing for R {
+
+    default fn create_default_convolution<'conv>(&self, _max_len_hint: Option<usize>) -> DynConvolution<'conv, Self>
+        where Self: 'conv
+    {
+        Arc::new(TypeErasableConvolution::new(KaratsubaAlgorithm::new(0, Global)))
     }
 }
 

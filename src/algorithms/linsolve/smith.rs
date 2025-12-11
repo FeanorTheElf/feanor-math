@@ -196,13 +196,7 @@ use crate::homomorphism::Homomorphism;
 #[cfg(test)]
 use crate::algorithms::linsolve::LinSolveRing;
 #[cfg(test)]
-use std::ptr::Alignment;
-#[cfg(test)]
-use std::sync::Arc;
-#[cfg(test)]
 use std::time::Instant;
-#[cfg(test)]
-use crate::algorithms::convolution::STANDARD_CONVOLUTION;
 #[cfg(test)]
 use crate::algorithms::linsolve::extension::solve_right_over_extension;
 #[cfg(test)]
@@ -392,11 +386,7 @@ fn test_determinant() {
     }
 
     let ring = RingValue::from(TestRing);
-    let A = OwnedMatrix::new(
-        vec![ 9, 0, 
-                   15, 3],
-        2
-    );
+    let A = OwnedMatrix::new(vec![ 9, 0, 15, 3], 2);
     assert_el_eq!(ring, 27, determinant_using_pre_smith(ring, A.clone_matrix(&ring).data_mut(), Global));
 }
 
@@ -405,9 +395,7 @@ fn test_determinant() {
 fn time_solve_right_using_pre_smith_galois_field() {
     LogAlgorithmSubscriber::init_test();
     let n = 100;
-    let base_field = Zn64B::new(257).as_field().ok().unwrap();
-    let allocator = feanor_mempool::AllocArc(Arc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>())));
-    let field = GaloisField::new_with_convolution(base_field, 21, allocator, STANDARD_CONVOLUTION);
+    let field = GaloisField::new(257, 21);
     let matrix = OwnedMatrix::from_fn(n, n, |i, j| field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j));
     
     let mut inv = OwnedMatrix::zero(n, n, &field);
@@ -425,9 +413,7 @@ fn time_solve_right_using_pre_smith_galois_field() {
 fn time_solve_right_using_extension() {
     LogAlgorithmSubscriber::init_test();
     let n = 126;
-    let base_field = Zn64B::new(257).as_field().ok().unwrap();
-    let allocator = feanor_mempool::AllocArc(Arc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>())));
-    let field = GaloisField::new_with_convolution(base_field, 21, allocator, STANDARD_CONVOLUTION);
+    let field = GaloisField::new(257, 21);
     let matrix = OwnedMatrix::from_fn(n, n, |i, j| field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j));
     
     let mut inv = OwnedMatrix::zero(n, n, &field);
@@ -444,8 +430,7 @@ fn time_solve_right_using_extension() {
 fn bench_solve_right_using_pre_smith_galois_field(bencher: &mut Bencher) {
     LogAlgorithmSubscriber::init_test();
     let base_field = Zn64B::new(257).as_field().ok().unwrap();
-    let allocator = feanor_mempool::AllocArc(Arc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>())));
-    let field = GaloisField::create(FreeAlgebraImpl::new_with_convolution(base_field, 5, [base_field.int_hom().map(3), base_field.int_hom().map(-4)], "x", allocator, STANDARD_CONVOLUTION).as_field().ok().unwrap());
+    let field = GaloisField::create(FreeAlgebraImpl::new(base_field, 5, [base_field.int_hom().map(3), base_field.int_hom().map(-4)]).as_field().ok().unwrap());
     let matrix = OwnedMatrix::from_fn(10, 10, |i, j| field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j));
     bencher.iter(|| {
         let mut inv = OwnedMatrix::zero(10, 10, &field);
