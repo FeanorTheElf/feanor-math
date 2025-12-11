@@ -65,7 +65,7 @@ pub struct GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>>,
         Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
-        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        BaseRing<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
 {
@@ -77,7 +77,7 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>>,
         Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
-        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        BaseRing<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
 {
@@ -151,7 +151,7 @@ impl<K, Impl, I> Homomorphism<NumberFieldBase<Impl, I>, NumberFieldBase<Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>>,
         Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
-        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        BaseRing<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
 {
@@ -182,7 +182,7 @@ impl<K, Impl, I> Debug for GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>>,
         Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
-        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        BaseRing<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
 {
@@ -195,7 +195,7 @@ impl<K, Impl, I> Clone for GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>> + Clone,
         Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
-        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        BaseRing<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
 {
@@ -211,7 +211,7 @@ impl<K, Impl, I> PartialEq for GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>>,
         Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
-        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        BaseRing<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
 {
@@ -225,7 +225,7 @@ impl<K, Impl, I> Eq for GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>>,
         Impl: RingStore,
         Impl::Type: Field + FreeAlgebra,
-        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        BaseRing<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
 {}
@@ -234,7 +234,7 @@ impl<K, Impl, I> Hash for GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>>,
         Impl: RingStore,
         Impl::Type: Field + FreeAlgebra + HashableElRing,
-        <Impl::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        BaseRing<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
 {

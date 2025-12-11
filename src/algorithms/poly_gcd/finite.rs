@@ -24,7 +24,7 @@ use crate::rings::finite::*;
 pub fn poly_power_decomposition_finite_field<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
     where P: RingStore + Copy,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
+        <BaseRing<P> as RingStore>::Type: FiniteRing + Field
 {
     assert!(!poly_ring.is_zero(&poly));
     let squarefree_part = poly_squarefree_part_finite_field(poly_ring, poly);
@@ -59,7 +59,7 @@ pub fn poly_power_decomposition_finite_field<P>(poly_ring: P, poly: &El<P>) -> V
 pub fn poly_squarefree_part_finite_field<P>(poly_ring: P, poly: &El<P>) -> El<P>
     where P: RingStore,
         P::Type: PolyRing + PrincipalIdealRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
+        <BaseRing<P> as RingStore>::Type: FiniteRing + Field
 {
     assert!(!poly_ring.is_zero(&poly));
     if poly_ring.degree(poly).unwrap() == 0 {
@@ -104,12 +104,12 @@ const FAST_POLY_EEA_THRESHOLD: usize = 32;
 pub fn fast_poly_eea<P>(poly_ring: P, lhs: El<P>, rhs: El<P>) -> (El<P>, El<P>, El<P>)
     where P: RingStore + Copy,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field
+        <BaseRing<P> as RingStore>::Type: Field
 {
     fn fast_poly_eea_impl<P>(poly_ring: P, lhs: El<P>, rhs: El<P>, target_deg: usize, memory: &mut [El<P>]) -> ([El<P>; 4], [El<P>; 2])
         where P: RingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
-            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field
+            <BaseRing<P> as RingStore>::Type: Field
     {
         if poly_ring.is_zero(&lhs) || poly_ring.is_zero(&rhs) {
             return ([poly_ring.one(), poly_ring.zero(), poly_ring.zero(), poly_ring.one()], [lhs, rhs]);

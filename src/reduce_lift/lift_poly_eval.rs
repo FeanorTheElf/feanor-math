@@ -567,7 +567,7 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for LiftPolyEvalR
 ///     fn resultant_with_controller<P, Controller>(poly_ring: P, f: El<P>, g: El<P>, _: Controller) -> Self::Element
 ///         where P: RingStore + Copy,
 ///             P::Type: PolyRing,
-///             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
+///             BaseRing<P>: RingStore<Type = Self>,
 ///             Controller: ComputationController
 ///     {
 ///         let new_poly_ring = DensePolyRing::new(RingRef::new(poly_ring.base_ring().get_ring().get_delegate()), "X");

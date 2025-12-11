@@ -16,10 +16,10 @@ use super::IntegerRing;
 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn poly_factor_rational<'a, P, I>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
+pub fn poly_factor_rational<'a, P, I>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, El<BaseRing<P>>)
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
-        <P::Type as RingExtension>::BaseRing: RingStore<Type = RationalFieldBase<I>>,
+        BaseRing<P>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing,
         Zn64BBase: CanHomFrom<I::Type>

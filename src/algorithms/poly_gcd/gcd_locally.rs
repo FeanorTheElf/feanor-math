@@ -40,7 +40,7 @@ struct Signature {
 fn poly_gcd_monic_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F, current_attempt: usize) -> Option<El<P>>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain,
+        <BaseRing<P> as RingStore>::Type: PolyLiftFactorsDomain,
         F: FnMut() -> u64
 {
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
@@ -125,7 +125,7 @@ fn poly_gcd_monic_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F
 fn poly_gcd_coprime_local<P, F>(poly_ring: P, mut f: El<P>, mut g: El<P>, rng: F, attempt: usize) -> Option<El<P>>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain,
+        <BaseRing<P> as RingStore>::Type: PolyLiftFactorsDomain,
         F: FnMut() -> u64
 {
     if poly_ring.is_zero(&f) {
@@ -164,7 +164,7 @@ fn poly_gcd_coprime_local<P, F>(poly_ring: P, mut f: El<P>, mut g: El<P>, rng: F
 pub fn poly_gcd_monic_local<'a, P>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El<P>) -> El<P>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain
+        <BaseRing<P> as RingStore>::Type: PolyLiftFactorsDomain
 {
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(g).unwrap()));
@@ -217,7 +217,7 @@ pub fn poly_gcd_monic_local<'a, P>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El
 pub fn poly_gcd_local<P>(poly_ring: P, mut f: El<P>, mut g: El<P>) -> El<P>
     where P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PolyLiftFactorsDomain
+        <BaseRing<P> as RingStore>::Type: PolyLiftFactorsDomain
 {
     if poly_ring.is_zero(&f) {
         return poly_ring.clone_el(&g);

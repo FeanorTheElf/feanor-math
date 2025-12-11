@@ -380,7 +380,7 @@ pub trait MultivariatePolyRingStore: RingStore
     /// 
     fn evaluate<R, V, H>(&self, f: &El<Self>, value: V, hom: H) -> R::Element
         where R: ?Sized + RingBase,
-            H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, R>,
+            H: Homomorphism<<BaseRing<Self> as RingStore>::Type, R>,
             V: VectorFn<R::Element>
     {
         self.get_ring().evaluate(f, value, hom)
@@ -393,7 +393,7 @@ pub trait MultivariatePolyRingStore: RingStore
     fn into_lifted_hom<P, H>(self, from: P, hom: H) -> CoefficientHom<P, Self, H>
         where P: RingStore,
             P::Type: MultivariatePolyRing,
-            H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
+            H: Homomorphism<<BaseRing<P> as RingStore>::Type, <BaseRing<Self> as RingStore>::Type>
     {
         CoefficientHom {
             from: from,
@@ -412,7 +412,7 @@ pub trait MultivariatePolyRingStore: RingStore
     fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
         where P: RingStore,
             P::Type: MultivariatePolyRing,
-            H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
+            H: Homomorphism<<BaseRing<P> as RingStore>::Type, <BaseRing<Self> as RingStore>::Type>
     {
         self.into_lifted_hom(from, hom)
     }

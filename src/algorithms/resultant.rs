@@ -28,10 +28,10 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 /// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn resultant_finite_field<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
+pub fn resultant_finite_field<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<BaseRing<P>>
     where P: RingStore + Copy,
         P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Domain + FiniteRing
+        <BaseRing<P> as RingStore>::Type: Domain + FiniteRing
 {
     let base_ring = ring.base_ring();
     if ring.is_zero(&g) || ring.is_zero(&f) {
@@ -69,10 +69,10 @@ pub fn resultant_finite_field<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<<P::
 }
 
 #[instrument(skip_all, level = "trace")]
-fn  resultant_locally<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> El<<P::Type as RingExtension>::BaseRing>
+fn  resultant_locally<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> El<BaseRing<P>>
     where P: RingStore + Copy,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LiftPolyEvalRing + Domain + SelfIso
+        <BaseRing<P> as RingStore>::Type: LiftPolyEvalRing + Domain + SelfIso
 {
     let base_ring = poly_ring.base_ring();
     if poly_ring.is_zero(f) || poly_ring.is_zero(g) {
@@ -141,34 +141,34 @@ pub trait ComputeResultantRing: RingBase {
     fn resultant<P>(poly_ring: P, f: El<P>, g: El<P>) -> Self::Element
         where P: RingStore + Copy,
             P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
+            BaseRing<P>: RingStore<Type = Self>;
 }
 
 impl<R: ?Sized + LiftPolyEvalRing + Domain + SelfIso> ComputeResultantRing for R {
 
-    default fn resultant<P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
+    default fn resultant<P>(ring: P, f: El<P>, g: El<P>) -> El<BaseRing<P>>
         where P: RingStore + Copy,
             P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = R>
+            BaseRing<P>: RingStore<Type = R>
     {
         struct ComputeResultant<P>
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LiftPolyEvalRing + Domain + SelfIso
+                <BaseRing<P> as RingStore>::Type: LiftPolyEvalRing + Domain + SelfIso
         {
             ring: P,
             f: El<P>,
             g: El<P>
         }
-        impl<P> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type> for ComputeResultant<P>
+        impl<P> FiniteRingOperation<<BaseRing<P> as RingStore>::Type> for ComputeResultant<P>
             where P: RingStore + Copy,
                 P::Type: PolyRing,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LiftPolyEvalRing + Domain + SelfIso
+                <BaseRing<P> as RingStore>::Type: LiftPolyEvalRing + Domain + SelfIso
         {
-            type Output = El<<P::Type as RingExtension>::BaseRing>;
+            type Output = El<BaseRing<P>>;
 
             fn execute(self) -> Self::Output
-                where <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing
+                where <BaseRing<P> as RingStore>::Type: FiniteRing
             {
                 let new_poly_ring = DensePolyRing::new(AsField::from(AsFieldBase::promise_is_perfect_field(self.ring.base_ring())), "X");
                 let hom = new_poly_ring.lifted_hom(&self.ring, WrapHom::new(new_poly_ring.base_ring().get_ring()));
@@ -188,10 +188,10 @@ impl<I> ComputeResultantRing for RationalFieldBase<I>
     where I: RingStore,
         I::Type: IntegerRing 
 {
-    fn resultant<P>(ring: P, f: El<P>, g: El<P>) -> El<<P::Type as RingExtension>::BaseRing>
+    fn resultant<P>(ring: P, f: El<P>, g: El<P>) -> El<BaseRing<P>>
         where P: RingStore + Copy,
             P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+            BaseRing<P>: RingStore<Type = Self>
     {
         if ring.is_zero(&g) || ring.is_zero(&f) {
             return ring.base_ring().zero();

@@ -915,7 +915,7 @@ pub trait RingStore: Sized + Send + Sync {
 pub trait RingExtensionStore: RingStore
     where Self::Type: RingExtension
 {
-    delegate!{ RingExtension, fn base_ring(&self) -> &<Self::Type as RingExtension>::BaseRing }
+    delegate!{ RingExtension, fn base_ring(&self) -> &BaseRing<Self> }
 
     ///
     /// Returns the inclusion map of the base ring `R -> self`.
@@ -960,6 +960,21 @@ impl<'a, R: RingBase + ?Sized> std::fmt::Debug for RingElementDisplayWrapper<'a,
         self.ring.fmt_el_within(self.element, f, self.within)
     }
 }
+
+///
+/// Type alias for the base ring [`RingStore`] of a [`RingExtensionStore`].
+/// 
+/// # Example
+/// 
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::galois_field::*;
+/// let ring = GaloisField::new(3, 1);
+/// fn foo(base_ring: &BaseRing<GaloisField>) {}
+/// foo(ring.base_ring());
+/// ```
+/// 
+pub type BaseRing<R> = <<R as RingStore>::Type as RingExtension>::BaseRing;
 
 ///
 /// Trait for rings that are an extension ring of a base ring.

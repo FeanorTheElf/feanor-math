@@ -35,10 +35,10 @@ pub trait FractionField: Field + RingExtension {
     /// # use feanor_math::rings::fraction::*;
     /// # use feanor_math::rings::rational::*;
     /// # use feanor_math::primitive_int::*;
-    /// fn to_base_ring<R>(ring: R, el: El<R>) -> Option<El<<R::Type as RingExtension>::BaseRing>>
+    /// fn to_base_ring<R>(ring: R, el: El<R>) -> Option<El<BaseRing<R>>>
     ///     where R: RingStore,
     ///         R::Type: FractionField,
-    ///         <<R::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing
+    ///         <BaseRing<R> as RingStore>::Type: DivisibilityRing
     /// {
     ///     let (a, b) = ring.as_fraction(el);
     ///     ring.base_ring().checked_div(&a, &b)
@@ -67,8 +67,8 @@ pub trait FractionField: Field + RingExtension {
 pub trait FractionFieldStore: RingStore
     where Self::Type: FractionField
 {
-    delegate!{ FractionField, fn as_fraction(&self, el: El<Self>) -> (El<<Self::Type as RingExtension>::BaseRing>, El<<Self::Type as RingExtension>::BaseRing>) }
-    delegate!{ FractionField, fn from_fraction(&self, num: El<<Self::Type as RingExtension>::BaseRing>, den: El<<Self::Type as RingExtension>::BaseRing>) -> El<Self> }
+    delegate!{ FractionField, fn as_fraction(&self, el: El<Self>) -> (El<BaseRing<Self>>, El<BaseRing<Self>>) }
+    delegate!{ FractionField, fn from_fraction(&self, num: El<BaseRing<Self>>, den: El<BaseRing<Self>>) -> El<Self> }
 }
 
 impl<R: RingStore> FractionFieldStore for R

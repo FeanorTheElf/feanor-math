@@ -25,7 +25,7 @@ use std::cmp::max;
 pub fn poly_div_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left_div_lc: F) -> Result<(El<P>, El<P>), E>
     where P: RingStore,
         P::Type: PolyRing,
-        F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>
+        F: FnMut(&El<BaseRing<P>>) -> Result<El<BaseRing<P>>, E>
 {
     assert!(poly_ring.degree(rhs).is_some());
 
@@ -78,7 +78,7 @@ pub fn poly_div_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left
 pub fn poly_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left_div_lc: F) -> Result<El<P>, E>
     where P: RingStore,
         P::Type: PolyRing,
-        F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>
+        F: FnMut(&El<BaseRing<P>>) -> Result<El<BaseRing<P>>, E>
 {
     assert!(poly_ring.degree(rhs).is_some());
 
@@ -120,12 +120,12 @@ pub const FAST_POLY_DIV_THRESHOLD: usize = 32;
 pub fn fast_poly_div_rem<P, F, E>(poly_ring: P, f: El<P>, g: &El<P>, mut left_div_lc: F)-> Result<(El<P>, El<P>), E>
     where P: RingStore + Copy,
         P::Type: PolyRing,
-        F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>
+        F: FnMut(&El<BaseRing<P>>) -> Result<El<BaseRing<P>>, E>
 {
     fn fast_poly_div_impl<P, F, E>(poly_ring: P, f: El<P>, g: &El<P>, left_div_lc: &mut F)-> Result<(El<P>, El<P>), E>
         where P: RingStore + Copy,
             P::Type: PolyRing,
-            F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>
+            F: FnMut(&El<BaseRing<P>>) -> Result<El<BaseRing<P>>, E>
     {
         let deg_g = poly_ring.degree(g).unwrap();
         if poly_ring.degree(&f).is_none() || poly_ring.degree(&f).unwrap() < deg_g {

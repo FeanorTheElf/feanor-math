@@ -159,8 +159,8 @@ pub trait FreeAlgebra: RingExtension {
     fn charpoly<P, H>(&self, el: &Self::Element, poly_ring: P, hom: H) -> El<P>
         where P: RingStore,
             P::Type: PolyRing,
-            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
-            H: Homomorphism<<Self::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+            <BaseRing<P> as RingStore>::Type: LinSolveRing,
+            H: Homomorphism<<Self::BaseRing as RingStore>::Type, <BaseRing<P> as RingStore>::Type>
     {
         extension_ops::charpoly(self, el, poly_ring, hom)
     }
@@ -182,8 +182,8 @@ pub trait FreeAlgebra: RingExtension {
     fn minpoly<P, H>(&self, el: &Self::Element, poly_ring: P, hom: H) -> El<P>
         where P: RingStore,
             P::Type: PolyRing,
-            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
-            H: Homomorphism<<Self::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+            <BaseRing<P> as RingStore>::Type: LinSolveRing,
+            H: Homomorphism<<Self::BaseRing as RingStore>::Type, <BaseRing<P> as RingStore>::Type>
     {
         extension_ops::minpoly(self, el, poly_ring, hom)
     }
@@ -234,7 +234,7 @@ pub trait FreeAlgebraStore: RingStore
 {
     delegate!{ FreeAlgebra, fn canonical_gen(&self) -> El<Self> }
     delegate!{ FreeAlgebra, fn rank(&self) -> usize }
-    delegate!{ FreeAlgebra, fn trace(&self, el: El<Self>) -> El<<Self::Type as RingExtension>::BaseRing> }
+    delegate!{ FreeAlgebra, fn trace(&self, el: El<Self>) -> El<BaseRing<Self>> }
 
     ///
     /// See [`FreeAlgebra::wrt_canonical_basis()`].
@@ -247,7 +247,7 @@ pub trait FreeAlgebraStore: RingStore
     /// See [`FreeAlgebra::from_canonical_basis()`].
     ///
     fn from_canonical_basis<V>(&self, vec: V) -> El<Self>
-        where V: IntoIterator<Item = El<<Self::Type as RingExtension>::BaseRing>>,
+        where V: IntoIterator<Item = El<BaseRing<Self>>>,
             V::IntoIter: DoubleEndedIterator
     {
         self.get_ring().from_canonical_basis(vec)
@@ -257,7 +257,7 @@ pub trait FreeAlgebraStore: RingStore
     /// See [`FreeAlgebra::from_canonical_basis_extended()`].
     ///
     fn from_canonical_basis_extended<V>(&self, vec: V) -> El<Self>
-        where V: IntoIterator<Item = El<<Self::Type as RingExtension>::BaseRing>>
+        where V: IntoIterator<Item = El<BaseRing<Self>>>
     {
         self.get_ring().from_canonical_basis_extended(vec)
     }
@@ -269,7 +269,7 @@ pub trait FreeAlgebraStore: RingStore
     fn generating_poly<P, H>(&self, poly_ring: P, hom: H) -> El<P>
         where P: PolyRingStore,
             P::Type: PolyRing,
-            H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+            H: Homomorphism<<BaseRing<Self> as RingStore>::Type, <BaseRing<P> as RingStore>::Type>
     {
         assert!(hom.domain().get_ring() == self.base_ring().get_ring());
         poly_ring.sub(
@@ -285,7 +285,7 @@ pub trait FreeAlgebraStore: RingStore
     ///
     fn as_field(self) -> Result<AsField<Self>, Self>
         where Self::Type: DivisibilityRing,
-            <<Self::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FactorPolyField
+            <BaseRing<Self> as RingStore>::Type: Field + FactorPolyField
     {
         let poly_ring = DensePolyRing::new(self.base_ring(), "X");
         if <_ as FactorPolyField>::factor_poly(&poly_ring, &self.generating_poly(&poly_ring, self.base_ring().identity())).0.len() > 1 {
@@ -303,7 +303,7 @@ pub trait FreeAlgebraStore: RingStore
     fn poly_repr<P, H>(&self, to: P, el: &El<Self>, hom: H) -> El<P>
         where P: PolyRingStore,
             P::Type: PolyRing,
-            H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+            H: Homomorphism<<BaseRing<Self> as RingStore>::Type, <BaseRing<P> as RingStore>::Type>
     {
         let coeff_vec = self.wrt_canonical_basis(el);
         to.from_terms(
@@ -320,8 +320,8 @@ pub trait FreeAlgebraStore: RingStore
     /// 
     /// See also [`FreeAlgebra::discriminant()`].
     /// 
-    fn discriminant(&self) -> El<<Self::Type as RingExtension>::BaseRing>
-        where <<Self::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing
+    fn discriminant(&self) -> El<BaseRing<Self>>
+        where <BaseRing<Self> as RingStore>::Type: PrincipalIdealRing
     {
         self.get_ring().discriminant()
     }
@@ -332,8 +332,8 @@ pub trait FreeAlgebraStore: RingStore
     fn charpoly<P, H>(&self, el: &El<Self>, poly_ring: P, hom: H) -> El<P>
         where P: RingStore,
             P::Type: PolyRing,
-            <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
-            H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+            <BaseRing<P> as RingStore>::Type: LinSolveRing,
+            H: Homomorphism<<BaseRing<Self> as RingStore>::Type, <BaseRing<P> as RingStore>::Type>
     {
         self.get_ring().charpoly(el, poly_ring, hom)
     }
@@ -362,7 +362,7 @@ pub struct FreeAlgebraHom<R, S>
         R::Type: FreeAlgebra,
         S: RingStore,
         S::Type: FreeAlgebra,
-        <S::Type as RingExtension>::BaseRing: RingStore<Type = <<R::Type as RingExtension>::BaseRing as RingStore>::Type>
+        <S::Type as RingExtension>::BaseRing: RingStore<Type = <BaseRing<R> as RingStore>::Type>
 {
     from: R,
     to: S,
@@ -388,7 +388,7 @@ impl<R, S> FreeAlgebraHom<R, S>
         R::Type: FreeAlgebra,
         S: RingStore,
         S::Type: FreeAlgebra,
-        <S::Type as RingExtension>::BaseRing: RingStore<Type = <<R::Type as RingExtension>::BaseRing as RingStore>::Type>
+        <S::Type as RingExtension>::BaseRing: RingStore<Type = <BaseRing<R> as RingStore>::Type>
 {
     ///
     /// Creates a new [`FreeAlgebraHom`] from `R` to `S`, mapping the canonical
@@ -442,7 +442,7 @@ impl<R, S> Homomorphism<R::Type, S::Type> for FreeAlgebraHom<R, S>
         R::Type: FreeAlgebra,
         S: RingStore,
         S::Type: FreeAlgebra,
-        <S::Type as RingExtension>::BaseRing: RingStore<Type = <<R::Type as RingExtension>::BaseRing as RingStore>::Type>
+        <S::Type as RingExtension>::BaseRing: RingStore<Type = <BaseRing<R> as RingStore>::Type>
 {
     type DomainStore = R;
     type CodomainStore = S;

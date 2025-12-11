@@ -99,7 +99,7 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: RingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>;
+            BaseRing<P>: RingStore<Type = Self>;
 
     ///
     /// Returns whether the given polynomial is irreducible over the base field.
@@ -110,7 +110,7 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
     fn is_irred<P>(poly_ring: P, poly: &El<P>) -> bool
         where P: RingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+            BaseRing<P>: RingStore<Type = Self>
     {
         let factorization = Self::factor_poly(poly_ring, poly).0;
         return factorization.len() == 1 && factorization[0].1 == 1;
@@ -123,7 +123,7 @@ impl<R: ?Sized> FactorPolyField for R
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: RingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+            BaseRing<P>: RingStore<Type = Self>
     {
         poly_factor_finite_field(poly_ring, poly)
     }
@@ -137,7 +137,7 @@ impl<I> FactorPolyField for RationalFieldBase<I>
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
         where P: RingStore + Copy,
             P::Type: PolyRing + EuclideanRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+            BaseRing<P>: RingStore<Type = Self>
     {
         poly_factor_rational(poly_ring, poly)
     }

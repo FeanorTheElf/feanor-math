@@ -134,15 +134,15 @@ pub enum InterpolationError {
 pub fn interpolate<P, V1, V2, A: Allocator>(poly_ring: P, x: V1, y: V2, allocator: A) -> Result<El<P>, InterpolationError>
     where P: RingStore,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain,
-        V1: VectorFn<El<<P::Type as RingExtension>::BaseRing>>,
-        V2: VectorFn<El<<P::Type as RingExtension>::BaseRing>>
+        <BaseRing<P> as RingStore>::Type: DivisibilityRing + Domain,
+        V1: VectorFn<El<BaseRing<P>>>,
+        V2: VectorFn<El<BaseRing<P>>>
 {
     assert_eq!(x.len(), y.len());
     let base_ring = poly_ring.base_ring();
     let null_poly = poly_ring.prod(x.iter().map(|x| poly_ring.from_terms([(base_ring.one(), 1), (base_ring.negate(x), 0)])));
     let mut nums = Vec::with_capacity_in(x.len(), &allocator);
-    let div_linear = |poly: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>| if let Some(d) = poly_ring.degree(poly) {
+    let div_linear = |poly: &El<P>, a: &El<BaseRing<P>>| if let Some(d) = poly_ring.degree(poly) {
         poly_ring.from_terms((0..d).rev().scan(base_ring.zero(), |current, i| {
             base_ring.add_assign_ref(current, poly_ring.coefficient_at(poly, i + 1));
             let result = base_ring.clone_el(current);
@@ -181,12 +181,12 @@ pub fn interpolate<P, V1, V2, A: Allocator>(poly_ring: P, x: V1, y: V2, allocato
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_points: V1, mut values: Vec<El<<P::Type as RingExtension>::BaseRing>, A2>, allocator: A) -> Result<El<P>, InterpolationError>
+pub fn interpolate_multivariate<P, V1, V2, A, A2>(poly_ring: P, interpolation_points: V1, mut values: Vec<El<BaseRing<P>>, A2>, allocator: A) -> Result<El<P>, InterpolationError>
     where P: RingStore,
         P::Type: MultivariatePolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain,
+        <BaseRing<P> as RingStore>::Type: DivisibilityRing + Domain,
         V1: VectorFn<V2>,
-        V2: VectorFn<El<<P::Type as RingExtension>::BaseRing>>,
+        V2: VectorFn<El<BaseRing<P>>>,
         A: Allocator + Send + Sync,
         A2: Allocator
 {

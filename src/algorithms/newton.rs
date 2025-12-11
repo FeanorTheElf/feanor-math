@@ -27,7 +27,7 @@ pub struct PrecisionError;
 pub fn absolute_error_of_poly_eval<P>(poly_ring: P, f: &El<P>, poly_deg: usize, point: Complex64El, relative_error_point: f64) -> f64
     where P: RingStore,
         P::Type: PolyRing + DivisibilityRing,
-        <P::Type as RingExtension>::BaseRing: RingStore<Type = Complex64Base>
+        BaseRing<P>: RingStore<Type = Complex64Base>
 {
     let CC = Complex64::RING;
     let mut current = point;
@@ -46,7 +46,7 @@ pub fn absolute_error_of_poly_eval<P>(poly_ring: P, f: &El<P>, poly_deg: usize, 
 fn bound_distance_to_root<P>(approx_root: Complex64El, CCX: P, poly: &El<P>, poly_deg: usize) -> Result<f64, PrecisionError>
     where P: RingStore,
         P::Type: PolyRing + DivisibilityRing,
-        <P::Type as RingExtension>::BaseRing: RingStore<Type = Complex64Base>
+        BaseRing<P>: RingStore<Type = Complex64Base>
 {
     let CC = Complex64::RING;
     let f = poly;
@@ -86,7 +86,7 @@ fn bound_distance_to_root<P>(approx_root: Complex64El, CCX: P, poly: &El<P>, pol
 fn newton_with_initial<P>(poly_ring: P, f: &El<P>, poly_deg: usize, initial: El<Complex64>) -> Result<(El<Complex64>, f64), PrecisionError>
     where P: RingStore,
         P::Type: PolyRing + DivisibilityRing,
-        <P::Type as RingExtension>::BaseRing: RingStore<Type = Complex64Base>
+        BaseRing<P>: RingStore<Type = Complex64Base>
 {
     let CC = Complex64::RING;
     let f_prime = derive_poly(&poly_ring, f);
@@ -101,7 +101,7 @@ fn newton_with_initial<P>(poly_ring: P, f: &El<P>, poly_deg: usize, initial: El<
 fn find_approximate_complex_root_squarefree<P>(poly_ring: P, f: &El<P>, poly_deg: usize) -> Result<(El<Complex64>, f64), PrecisionError>
     where P: RingStore,
         P::Type: PolyRing + DivisibilityRing,
-        <P::Type as RingExtension>::BaseRing: RingStore<Type = Complex64Base>
+        BaseRing<P>: RingStore<Type = Complex64Base>
 {
     let mut rng = Rand64::new(1);
     let CC = Complex64::RING;
@@ -153,7 +153,7 @@ fn find_approximate_complex_root_squarefree<P>(poly_ring: P, f: &El<P>, poly_deg
 pub fn find_approximate_complex_root<P>(ZZX: P, f: &El<P>) -> Result<(El<Complex64>, f64), PrecisionError>
     where P: RingStore,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
+        <BaseRing<P> as RingStore>::Type: IntegerRing
 {
     assert!(ZZX.degree(f).unwrap_or(0) > 0);
     let CC = Complex64::RING;
@@ -179,7 +179,7 @@ pub fn find_approximate_complex_root<P>(ZZX: P, f: &El<P>) -> Result<(El<Complex
 pub fn find_all_approximate_complex_roots<P>(ZZX: P, poly: &El<P>) -> Result<Vec<(El<Complex64>, f64)>, PrecisionError>
     where P: RingStore,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
+        <BaseRing<P> as RingStore>::Type: IntegerRing
 {
     assert!(ZZX.degree(poly).unwrap_or(0) > 0);
     let CC = Complex64::RING;

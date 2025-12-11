@@ -868,11 +868,11 @@ impl<R> Inclusion<R>
     }
 }
     
-impl<R> Homomorphism<<<R::Type as RingExtension>::BaseRing as RingStore>::Type, R::Type> for Inclusion<R>
+impl<R> Homomorphism<<BaseRing<R> as RingStore>::Type, R::Type> for Inclusion<R>
     where R: RingStore, R::Type: RingExtension
 {
     type CodomainStore = R;
-    type DomainStore = <R::Type as RingExtension>::BaseRing;
+    type DomainStore = BaseRing<R>;
 
     fn domain<'a>(&'a self) -> &'a Self::DomainStore {
         self.ring.base_ring()
@@ -882,31 +882,31 @@ impl<R> Homomorphism<<<R::Type as RingExtension>::BaseRing as RingStore>::Type, 
         &self.ring
     }
 
-    fn map(&self, x: El<<R::Type as RingExtension>::BaseRing>) -> El<R> {
+    fn map(&self, x: El<BaseRing<R>>) -> El<R> {
         self.ring.get_ring().from(x)
     }
 
-    fn map_ref(&self, x: &El<<R::Type as RingExtension>::BaseRing>) -> El<R> {
+    fn map_ref(&self, x: &El<BaseRing<R>>) -> El<R> {
         self.ring.get_ring().from_ref(x)
     }
 
-    fn mul_assign_ref_map(&self, lhs: &mut El<R>, rhs: &El<<R::Type as RingExtension>::BaseRing>) {
+    fn mul_assign_ref_map(&self, lhs: &mut El<R>, rhs: &El<BaseRing<R>>) {
         self.ring.get_ring().mul_assign_base(lhs, rhs)
     }
 
-    fn mul_assign_map(&self, lhs: &mut El<R>, rhs: El<<R::Type as RingExtension>::BaseRing>) {
+    fn mul_assign_map(&self, lhs: &mut El<R>, rhs: El<BaseRing<R>>) {
         self.mul_assign_ref_map(lhs, &rhs)
     }
 
-    fn mul_assign_map_through_hom<First: ?Sized + RingBase, H: Homomorphism<First, <<R::Type as RingExtension>::BaseRing as RingStore>::Type>>(&self, lhs: &mut El<R>, rhs: First::Element, hom: H) {
+    fn mul_assign_map_through_hom<First: ?Sized + RingBase, H: Homomorphism<First, <BaseRing<R> as RingStore>::Type>>(&self, lhs: &mut El<R>, rhs: First::Element, hom: H) {
         self.ring.get_ring().mul_assign_base_through_hom(lhs, &rhs, hom)
     }
 
-    fn mul_assign_ref_map_through_hom<First: ?Sized + RingBase, H: Homomorphism<First, <<R::Type as RingExtension>::BaseRing as RingStore>::Type>>(&self, lhs: &mut El<R>, rhs: &First::Element, hom: H) {
+    fn mul_assign_ref_map_through_hom<First: ?Sized + RingBase, H: Homomorphism<First, <BaseRing<R> as RingStore>::Type>>(&self, lhs: &mut El<R>, rhs: &First::Element, hom: H) {
         self.ring.get_ring().mul_assign_base_through_hom(lhs, rhs, hom)
     }
 
-    fn fma_map(&self, lhs: &El<R>, rhs: &El<<R::Type as RingExtension>::BaseRing>, summand: El<R>) -> El<R> {
+    fn fma_map(&self, lhs: &El<R>, rhs: &El<BaseRing<R>>, summand: El<R>) -> El<R> {
         self.ring.get_ring().fma_base(lhs, rhs, summand)
     }
 }

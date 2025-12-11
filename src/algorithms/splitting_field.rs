@@ -62,16 +62,16 @@ pub fn extend_number_field<K>(poly_ring: DensePolyRing<K>, irred_poly: &El<Dense
 /// 
 #[instrument(skip_all, level = "trace")]
 fn test_primitive_element<R>(L: R, potential_primitive_element: El<R>) -> Option<(
-    DensePolyRing<<<<R::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing>, 
-    El<DensePolyRing<<<<R::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing>>,
-    El<DensePolyRing<<<<R::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing>>,
-    El<DensePolyRing<<<<R::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing>>
+    DensePolyRing<<<BaseRing<R> as RingStore>::Type as RingExtension>::BaseRing>, 
+    El<DensePolyRing<<<BaseRing<R> as RingStore>::Type as RingExtension>::BaseRing>>,
+    El<DensePolyRing<<<BaseRing<R> as RingStore>::Type as RingExtension>::BaseRing>>,
+    El<DensePolyRing<<<BaseRing<R> as RingStore>::Type as RingExtension>::BaseRing>>
 )>
     where R: RingStore,
         R::Type: FreeAlgebra,
-        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra,
-        <<<R::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing: Clone,
-        <<<<R::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing
+        <BaseRing<R> as RingStore>::Type: FreeAlgebra,
+        <<BaseRing<R> as RingStore>::Type as RingExtension>::BaseRing: Clone,
+        <<<BaseRing<R> as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing
 {
     let K = L.base_ring();
     let k = K.base_ring();
@@ -376,7 +376,7 @@ pub fn variety_from_lex_gb<K, P, F>(
         K: RingStore + Clone,
         K::Type: FactorPolyField + FreeAlgebra,
         P::Type: MultivariatePolyRing,
-        <P::Type as RingExtension>::BaseRing: Borrow<K> + RingStore<Type = K::Type>,
+        BaseRing<P>: Borrow<K> + RingStore<Type = K::Type>,
         F: for<'a, 'b> FnMut(DensePolyRing<&'a K, DynConvolution<'b, K::Type>>, El<DensePolyRing<&'a K, DynConvolution<'b, K::Type>>>) -> (FreeAlgebraHom<&'a K, K>, El<K>)
 {
     let n = poly_ring.indeterminate_count();

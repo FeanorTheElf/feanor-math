@@ -26,10 +26,10 @@ use crate::algorithms::int_factor::factor;
 fn determinant_poly_matrix_base<P, V, A, I>(A: Submatrix<V, El<P>>, poly_ring: P, allocator: A, total_max_degrees: BTreeMap<usize, usize>, interpolation_points: I) -> El<P>
     where P: RingStore,
         P::Type: MultivariatePolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
+        <BaseRing<P> as RingStore>::Type: PrincipalIdealRing,
         V: AsPointerToSlice<El<P>>,
         A: Allocator,
-        I: VectorFn<El<<P::Type as RingExtension>::BaseRing>>,
+        I: VectorFn<El<BaseRing<P>>>,
 {
     assert_eq!(A.row_count(), A.col_count());
     let n = A.row_count();
@@ -37,7 +37,7 @@ fn determinant_poly_matrix_base<P, V, A, I>(A: Submatrix<V, El<P>>, poly_ring: P
 
     let interpolation_grid_dims = total_max_degrees.iter().map(|(_var, exp)| *exp as i64 + 1).collect::<Vec<_>>();
     let interpolation_grid_size = StaticRing::<i64>::RING.prod(interpolation_grid_dims.iter().copied());
-    let mut determinants: Vec<El<<P::Type as RingExtension>::BaseRing>, &A> = Vec::with_capacity_in(interpolation_grid_size as usize, &allocator);
+    let mut determinants: Vec<El<BaseRing<P>>, &A> = Vec::with_capacity_in(interpolation_grid_size as usize, &allocator);
     let mut evaluated_matrix = OwnedMatrix::zero_in(n, n, R, &allocator);
 
     for _ in multi_cartesian_product((0..total_max_degrees.len()).map(|i| interpolation_points.iter().take(interpolation_grid_dims[i] as usize)), |assignment| {
@@ -103,7 +103,7 @@ pub fn naive_det<R, V, A>(A: Submatrix<V, El<R>>, ring: R, allocator: A) -> El<R
 pub fn determinant_poly_matrix<P, V, A>(A: Submatrix<V, El<P>>, poly_ring: P, allocator: A) -> El<P>
     where P: RingStore,
         P::Type: MultivariatePolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: PrincipalIdealRing,
+        <BaseRing<P> as RingStore>::Type: PrincipalIdealRing,
         V: AsPointerToSlice<El<P>>,
         A: Allocator
 {

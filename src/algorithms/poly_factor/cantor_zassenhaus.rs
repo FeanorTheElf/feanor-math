@@ -35,7 +35,7 @@ use tracing::instrument;
 fn pow_geometric_series_characteristic<R>(ring: R, a: El<R>, e: usize) -> El<R>
     where R: RingStore,
         R::Type: FreeAlgebra,
-        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing
+        <BaseRing<R> as RingStore>::Type: FiniteRing
 {
     let q = ring.base_ring().size(BigIntRing::RING).unwrap();
     let log2_q = BigIntRing::RING.abs_log2_ceil(&q).unwrap();
@@ -81,8 +81,8 @@ pub fn squarefree_is_irreducible_base<P, R>(poly_ring: P, mod_f_ring: R) -> bool
         P::Type: PolyRing + EuclideanRing,
         R: RingStore,
         R::Type: FreeAlgebra,
-        <<R as RingStore>::Type as RingExtension>::BaseRing: RingStore<Type = <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type>,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
+        BaseRing<R>: RingStore<Type = <BaseRing<P> as RingStore>::Type>,
+        <BaseRing<P> as RingStore>::Type: FiniteRing + Field
 {
     if mod_f_ring.rank() == 1 {
         return true;
@@ -118,8 +118,8 @@ pub fn distinct_degree_factorization_base<P, R>(poly_ring: P, mod_f_ring: R) -> 
         P::Type: PolyRing + EuclideanRing,
         R: RingStore,
         R::Type: FreeAlgebra,
-        <<R as RingStore>::Type as RingExtension>::BaseRing: RingStore<Type = <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type>,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
+        BaseRing<R>: RingStore<Type = <BaseRing<P> as RingStore>::Type>,
+        <BaseRing<P> as RingStore>::Type: FiniteRing + Field
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     let ZZ = BigIntRing::RING;
@@ -212,8 +212,8 @@ pub fn distinct_degree_factorization_base<P, R>(poly_ring: P, mod_f_ring: R) -> 
 pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P as RingStore>::Type as RingExtension>::BaseRing: FieldStore + RingStore,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
+        BaseRing<P>: FieldStore + RingStore,
+        <BaseRing<P> as RingStore>::Type: FiniteRing + Field
 {
     let lc = poly_ring.base_ring().clone_el(poly_ring.lc(&f).unwrap());
     f = poly_ring.normalize(f);
@@ -237,8 +237,8 @@ pub fn cantor_zassenhaus_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) -> El
         P::Type: PolyRing + EuclideanRing,
         R: RingStore,
         R::Type: FreeAlgebra,
-        <<R as RingStore>::Type as RingExtension>::BaseRing: RingStore<Type = <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type>,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
+        BaseRing<R>: RingStore<Type = <BaseRing<P> as RingStore>::Type>,
+        <BaseRing<P> as RingStore>::Type: FiniteRing + Field
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     let ZZ = BigIntRing::RING;
@@ -296,8 +296,8 @@ pub fn cantor_zassenhaus_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) -> El
 pub fn cantor_zassenhaus<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P as RingStore>::Type as RingExtension>::BaseRing: RingStore + FieldStore,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
+        BaseRing<P>: RingStore + FieldStore,
+        <BaseRing<P> as RingStore>::Type: FiniteRing + Field
 {
     f = poly_ring.normalize(f);
     let f_coeffs = (0..poly_ring.degree(&f).unwrap()).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))).collect::<Vec<_>>();
@@ -319,8 +319,8 @@ fn cantor_zassenhaus_even_base_with_root_of_unity<P, R>(poly_ring: P, mod_f_ring
         P::Type: PolyRing + EuclideanRing,
         R: RingStore,
         R::Type: FreeAlgebra,
-        <<R as RingStore>::Type as RingExtension>::BaseRing: RingStore<Type = <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type>,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field
+        BaseRing<R>: RingStore<Type = <BaseRing<P> as RingStore>::Type>,
+        <BaseRing<P> as RingStore>::Type: FiniteRing + Field
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     let ZZ = BigIntRing::RING;
@@ -368,8 +368,8 @@ pub fn cantor_zassenhaus_even_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) 
         P::Type: PolyRing + EuclideanRing,
         R: RingStore,
         R::Type: FreeAlgebra,
-        <<R as RingStore>::Type as RingExtension>::BaseRing: RingStore<Type = <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type>,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso
+        BaseRing<R>: RingStore<Type = <BaseRing<P> as RingStore>::Type>,
+        <BaseRing<P> as RingStore>::Type: FiniteRing + Field + SelfIso
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     assert!(mod_f_ring.rank() % d == 0);
@@ -432,8 +432,8 @@ pub fn cantor_zassenhaus_even_base<P, R>(poly_ring: P, mod_f_ring: R, d: usize) 
 pub fn cantor_zassenhaus_even<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
-        <<P as RingStore>::Type as RingExtension>::BaseRing: RingStore + FieldStore,
-        <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso
+        BaseRing<P>: RingStore + FieldStore,
+        <BaseRing<P> as RingStore>::Type: FiniteRing + Field + SelfIso
 {
     f = poly_ring.normalize(f);
     let f_coeffs = (0..poly_ring.degree(&f).unwrap()).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))).collect::<Vec<_>>();

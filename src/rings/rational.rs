@@ -691,7 +691,7 @@ impl<I> PolyTFracGCDRing for RationalFieldBase<I>
     fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
         where P: RingStore + Copy,
             P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+            BaseRing<P>: RingStore<Type = Self>
     {
         assert!(!poly_ring.is_zero(poly));
         let QQX = &poly_ring;
@@ -711,7 +711,7 @@ impl<I> PolyTFracGCDRing for RationalFieldBase<I>
     fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
         where P: RingStore + Copy,
             P::Type: PolyRing + DivisibilityRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+            BaseRing<P>: RingStore<Type = Self>
     {
         if poly_ring.is_zero(lhs) {
             return poly_ring.clone_el(rhs);

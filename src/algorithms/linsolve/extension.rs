@@ -14,7 +14,7 @@ use super::{LinSolveRing, SolveResult};
 pub fn solve_right_over_extension<R, V1, V2, V3, A>(ring: R, lhs: SubmatrixMut<V1, El<R>>, rhs: SubmatrixMut<V2, El<R>>, mut out: SubmatrixMut<V3, El<R>>, allocator: A) -> SolveResult
     where R: RingStore,
         R::Type: FreeAlgebra,
-        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
+        <BaseRing<R> as RingStore>::Type: LinSolveRing,
         V1: AsPointerToSlice<El<R>>,
         V2: AsPointerToSlice<El<R>>,
         V3: AsPointerToSlice<El<R>>,

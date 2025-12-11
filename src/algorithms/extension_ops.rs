@@ -53,8 +53,8 @@ pub fn charpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<
     where R: ?Sized + FreeAlgebra,
         P: RingStore,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
-        H: Homomorphism<<R::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+        <BaseRing<P> as RingStore>::Type: LinSolveRing,
+        H: Homomorphism<<R::BaseRing as RingStore>::Type, <BaseRing<P> as RingStore>::Type>
 {
     let minpoly = minpoly(ring, el, &poly_ring, hom);
     let power = StaticRing::<i64>::RING.checked_div(&(ring.rank() as i64), &(poly_ring.degree(&minpoly).unwrap() as i64)).unwrap() as usize;
@@ -67,8 +67,8 @@ pub fn minpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<P
     where R: ?Sized + FreeAlgebra,
         P: RingStore,
         P::Type: PolyRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
-        H: Homomorphism<<R::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+        <BaseRing<P> as RingStore>::Type: LinSolveRing,
+        H: Homomorphism<<R::BaseRing as RingStore>::Type, <BaseRing<P> as RingStore>::Type>
 {
     assert!(!ring.is_zero(el));
     let base_ring = hom.codomain();
@@ -92,7 +92,7 @@ pub fn minpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<P
             *rhs.at_mut(i, 0) = base_ring.negate(hom.map(wrt_basis.at(i)));
         }
         let mut sol = OwnedMatrix::zero(d, 1, &base_ring);
-        let sol_poly = |sol: &OwnedMatrix<El<<P::Type as RingExtension>::BaseRing>>| poly_ring.from_terms((0..d).map(|i| (base_ring.clone_el(sol.at(i, 0)), i)).chain([(base_ring.one(), d)].into_iter()));
+        let sol_poly = |sol: &OwnedMatrix<El<BaseRing<P>>>| poly_ring.from_terms((0..d).map(|i| (base_ring.clone_el(sol.at(i, 0)), i)).chain([(base_ring.one(), d)].into_iter()));
         match <_ as LinSolveRingStore>::solve_right(base_ring, lhs.data_mut(), rhs.data_mut(), sol.data_mut()) {
             SolveResult::NoSolution => {
                 -1
@@ -134,7 +134,7 @@ pub fn discriminant<R>(ring: &R) -> El<R::BaseRing>
 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn create_multiplication_matrix<R: RingStore, A: Allocator>(ring: R, el: &El<R>, allocator: A) -> OwnedMatrix<El<<R::Type as RingExtension>::BaseRing>, A>
+pub fn create_multiplication_matrix<R: RingStore, A: Allocator>(ring: R, el: &El<R>, allocator: A) -> OwnedMatrix<El<BaseRing<R>>, A>
     where R::Type: FreeAlgebra
 {
     let mut result = OwnedMatrix::zero_in(ring.rank(), ring.rank(), ring.base_ring(), allocator);

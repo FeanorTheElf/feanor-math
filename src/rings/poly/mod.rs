@@ -167,7 +167,7 @@ pub trait PolyRingStore: RingStore
     ///
     /// See [`PolyRing::coefficient_at()`].
     /// 
-    fn coefficient_at<'a>(&'a self, f: &'a El<Self>, i: usize) -> &'a El<<Self::Type as RingExtension>::BaseRing> {
+    fn coefficient_at<'a>(&'a self, f: &'a El<Self>, i: usize) -> &'a El<BaseRing<Self>> {
         self.get_ring().coefficient_at(f, i)
     }
 
@@ -185,7 +185,7 @@ pub trait PolyRingStore: RingStore
     /// the corresponding coefficients will be summed up.
     /// 
     fn from_terms<I>(&self, iter: I) -> El<Self>
-        where I: IntoIterator<Item = (El<<Self::Type as RingExtension>::BaseRing>, usize)>,
+        where I: IntoIterator<Item = (El<BaseRing<Self>>, usize)>,
     {
         let mut result = self.zero();
         self.get_ring().add_assign_from_terms(&mut result, iter);
@@ -199,7 +199,7 @@ pub trait PolyRingStore: RingStore
     /// in which case the computation is aborted and the first error is returned.
     /// 
     fn try_from_terms<E, I>(&self, iter: I) -> Result<El<Self>, E>
-        where I: IntoIterator<Item = Result<(El<<Self::Type as RingExtension>::BaseRing>, usize), E>>,
+        where I: IntoIterator<Item = Result<(El<BaseRing<Self>>, usize), E>>,
     {
         let mut result = self.zero();
         let mut error = None;
@@ -218,7 +218,7 @@ pub trait PolyRingStore: RingStore
     /// Returns a reference to the leading coefficient of the given polynomial, or `None` if the
     /// polynomial is zero.
     /// 
-    fn lc<'a>(&'a self, f: &'a El<Self>) -> Option<&'a El<<Self::Type as RingExtension>::BaseRing>> {
+    fn lc<'a>(&'a self, f: &'a El<Self>) -> Option<&'a El<BaseRing<Self>>> {
         Some(self.coefficient_at(f, self.degree(f)?))
     }
     
@@ -240,7 +240,7 @@ pub trait PolyRingStore: RingStore
     /// ```
     /// 
     fn normalize(&self, mut f: El<Self>) -> El<Self>
-        where <<Self::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain
+        where <BaseRing<Self> as RingStore>::Type: DivisibilityRing + Domain
     {
         if self.is_zero(&f) {
             return f;
@@ -258,7 +258,7 @@ pub trait PolyRingStore: RingStore
     /// 
     fn evaluate<R, H>(&self, f: &El<Self>, value: &R::Element, hom: H) -> R::Element
         where R: ?Sized + RingBase,
-            H: Homomorphism<<<Self::Type as RingExtension>::BaseRing as RingStore>::Type, R>
+            H: Homomorphism<<BaseRing<Self> as RingStore>::Type, R>
     {
         self.get_ring().evaluate(f, value, hom)
     }
@@ -273,7 +273,7 @@ pub trait PolyRingStore: RingStore
     fn into_lifted_hom<P, H>(self, from: P, hom: H) -> CoefficientHom<P, Self, H>
         where P: RingStore,
             P::Type: PolyRing,
-            H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
+            H: Homomorphism<<BaseRing<P> as RingStore>::Type, <BaseRing<Self> as RingStore>::Type>
     {
         CoefficientHom {
             from: from,
@@ -289,7 +289,7 @@ pub trait PolyRingStore: RingStore
     fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
         where P: RingStore,
             P::Type: PolyRing,
-            H: Homomorphism<<<P::Type as RingExtension>::BaseRing as RingStore>::Type, <<Self::Type as RingExtension>::BaseRing as RingStore>::Type>
+            H: Homomorphism<<BaseRing<P> as RingStore>::Type, <BaseRing<Self> as RingStore>::Type>
     {
         self.into_lifted_hom(from, hom)
     }
@@ -363,8 +363,8 @@ pub trait PolyRingStore: RingStore
     /// See [`PolyRing::balance_poly()`].
     /// 
     #[stability::unstable(feature = "enable")]
-    fn balance_poly(&self, f: &mut El<Self>) -> Option<El<<Self::Type as RingExtension>::BaseRing>>
-        where <<Self::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing
+    fn balance_poly(&self, f: &mut El<Self>) -> Option<El<BaseRing<Self>>>
+        where <BaseRing<Self> as RingStore>::Type: DivisibilityRing
     {
         self.get_ring().balance_poly(f)
     }
@@ -531,10 +531,10 @@ pub mod generic_impls {
 pub fn transpose_indeterminates<P1, P2, H>(from: P1, to: P2, base_hom: H) -> impl Homomorphism<P1::Type, P2::Type>
     where P1: RingStore, P1::Type: PolyRing,
         P2: RingStore, P2::Type: PolyRing,
-        <<P1::Type as RingExtension>::BaseRing as RingStore>::Type: PolyRing,
-        <<P2::Type as RingExtension>::BaseRing as RingStore>::Type: PolyRing,
-        H: Homomorphism<<<<<P1::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type,
-            <<<<P2::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type>
+        <BaseRing<P1> as RingStore>::Type: PolyRing,
+        <BaseRing<P2> as RingStore>::Type: PolyRing,
+        H: Homomorphism<<<<BaseRing<P1> as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type,
+            <<<BaseRing<P2> as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type>
 {
     LambdaHom::new(from, to, move |from, to, x| {
         let mut result_terms: HashMap<usize, Vec<(_, usize)>> = HashMap::new();
@@ -554,7 +554,7 @@ pub fn transpose_indeterminates<P1, P2, H>(from: P1, to: P2, base_hom: H) -> imp
 pub mod generic_tests {
     use super::*;
 
-    pub fn test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R::Type as RingExtension>::BaseRing>>>(ring: R, interesting_base_ring_elements: I)
+    pub fn test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<BaseRing<R>>>>(ring: R, interesting_base_ring_elements: I)
         where R::Type: PolyRing
     {    
         let x = ring.indeterminate();

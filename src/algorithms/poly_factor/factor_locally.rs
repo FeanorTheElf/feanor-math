@@ -26,7 +26,7 @@ fn combine_local_factors_local<'ring, 'data, 'local, R, P1, P2>(reduction: &'loc
     where R: ?Sized + PolyLiftFactorsDomain,
         P1: RingStore + Copy,
         P1::Type: PolyRing + DivisibilityRing,
-        <P1::Type as RingExtension>::BaseRing: RingStore<Type = R>,
+        BaseRing<P1>: RingStore<Type = R>,
         P2: RingStore + Copy,
         P2::Type: PolyRing<BaseRing = &'local R::LocalRing<'ring>>,
         R::LocalRing<'ring>: 'local
@@ -92,7 +92,7 @@ pub fn factor_and_lift_mod_pe<'ring, R, P>(poly_ring: P, prime: &R::SuitableIdea
     where R: ?Sized + PolyLiftFactorsDomain,
         P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <P::Type as RingExtension>::BaseRing: RingStore<Type = R>
+        BaseRing<P>: RingStore<Type = R>
 {
     span!(Level::INFO, "factor_poly_locally", poly_deg = poly_ring.degree(poly).unwrap()).in_scope(|| {
         let ring = poly_ring.base_ring().get_ring();
@@ -139,7 +139,7 @@ pub fn factor_and_lift_mod_pe<'ring, R, P>(poly_ring: P, prime: &R::SuitableIdea
 fn ln_factor_max_coeff<P>(ZZX: P, f: &El<P>) -> f64
     where P: RingStore,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
+        <BaseRing<P> as RingStore>::Type: IntegerRing
 {
     assert!(!ZZX.is_zero(f));
     let ZZ = ZZX.base_ring();
@@ -154,7 +154,7 @@ fn ln_factor_max_coeff<P>(ZZX: P, f: &El<P>) -> f64
 fn factor_squarefree_monic_integer_poly_local<'a, P>(ZZX: P, f: &El<P>) -> Vec<El<P>>
     where P: 'a + RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
+        <BaseRing<P> as RingStore>::Type: IntegerRing
 {
     let ZZ = ZZX.base_ring();
     assert!(ZZ.is_one(ZZX.lc(f).unwrap()));
@@ -189,7 +189,7 @@ fn factor_squarefree_monic_integer_poly_local<'a, P>(ZZX: P, f: &El<P>) -> Vec<E
 pub fn poly_factor_integer<P>(ZZX: P, f: El<P>) -> Vec<(El<P>, usize)>
     where P: PolyRingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: IntegerRing
+        <BaseRing<P> as RingStore>::Type: IntegerRing
 {
     assert!(!ZZX.is_zero(&f));
 
