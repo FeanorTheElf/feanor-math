@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 
-use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::*;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
@@ -284,14 +283,6 @@ impl<R: DivisibilityRingStore> PrincipalIdealRing for AsLocalPIRBase<R>
                 self.clone_el(b)
             )
         }
-    }
-}
-
-impl<R: DivisibilityRingStore> KaratsubaHint for AsLocalPIRBase<R>
-    where R::Type: DivisibilityRing
-{
-    fn karatsuba_threshold(&self) -> usize {
-        self.get_delegate().karatsuba_threshold()
     }
 }
 

@@ -1,4 +1,3 @@
-use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::reduce_lift::lift_poly_eval::{InterpolationBaseRing, InterpolationBaseRingStore};
 use crate::delegate::*;
@@ -431,14 +430,6 @@ impl<R: RingStore> Field for AsFieldBase<R>
 {
     fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         FieldEl(self.get_delegate().checked_left_div(&lhs.0, &rhs.0).unwrap())
-    }
-}
-
-impl<R: RingStore> KaratsubaHint for AsFieldBase<R>
-    where R::Type: DivisibilityRing
-{
-    fn karatsuba_threshold(&self) -> usize {
-        self.get_delegate().karatsuba_threshold()
     }
 }
 

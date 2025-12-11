@@ -680,16 +680,6 @@ impl<'de, Impl> Deserialize<'de> for GaloisFieldBase<Impl>
     }
 }
 
-impl<Impl> KaratsubaHint for GaloisFieldBase<Impl>
-    where Impl: RingStore,
-        Impl::Type: Field + FreeAlgebra + FiniteRing,
-        <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field
-{
-    fn karatsuba_threshold(&self) -> usize {
-        self.get_delegate().karatsuba_threshold()
-    }
-}
-
 impl<Impl> ComputeInnerProduct for GaloisFieldBase<Impl>
     where Impl: RingStore,
         Impl::Type: Field + FreeAlgebra + FiniteRing,

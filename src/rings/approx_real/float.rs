@@ -1,7 +1,8 @@
 use core::f64;
 use std::f64::EPSILON;
+use std::sync::Arc;
 
-use crate::algorithms::convolution::KaratsubaHint;
+use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, NaiveConvolution, TypeErasableConvolution};
 use crate::algorithms::matmul::StrassenHint;
 use crate::ordered::OrderedRing;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
@@ -162,10 +163,13 @@ impl StrassenHint for Real64Base {
     }
 }
 
-impl KaratsubaHint for Real64Base {
-    fn karatsuba_threshold(&self) -> usize {
+impl DefaultConvolutionRing for Real64Base {
+
+    fn create_default_convolution<'conv>(&self, _max_len_hint: Option<usize>) -> DynConvolution<'conv, Self>
+        where Self: 'conv
+    {
         // disable Karatsuba's algorithm, as it is very numerically unstable
-        usize::MAX
+        Arc::new(TypeErasableConvolution::new(NaiveConvolution))
     }
 }
 

@@ -1,8 +1,12 @@
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::sync::Arc;
 
+use crate::algorithms::convolution::DefaultConvolutionRing;
+use crate::algorithms::convolution::DynConvolution;
+use crate::algorithms::convolution::NaiveConvolution;
+use crate::algorithms::convolution::TypeErasableConvolution;
 use crate::algorithms::matmul::StrassenHint;
-use crate::algorithms::convolution::KaratsubaHint;
 use crate::homomorphism::*;
 use crate::divisibility::*;
 use crate::field::Field;
@@ -410,12 +414,14 @@ impl<R: RingStore> StrassenHint for FractionFieldImplBase<R>
     }
 }
 
-impl<R: RingStore> KaratsubaHint for FractionFieldImplBase<R>
+impl<R: RingStore> DefaultConvolutionRing for FractionFieldImplBase<R>
     where R: RingStore,
         R::Type: Domain
 {
-    default fn karatsuba_threshold(&self) -> usize {
-        usize::MAX
+    fn create_default_convolution<'conv>(&self, _max_len_hint: Option<usize>) -> DynConvolution<'conv, Self>
+        where Self: 'conv
+    {
+        Arc::new(TypeErasableConvolution::new(NaiveConvolution))
     }
 }
 

@@ -77,7 +77,7 @@ pub enum EnvBindingStrength {
 /// the storage - everything that allows access to a ring then is a 
 /// [`RingStore`], as for example, references or shared pointers
 /// to rings. If you want to use rings directly by value, some technical
-/// details make it necessary to use the no-op container [`RingStore`].
+/// details make it necessary to use the no-op container [`RingValue`].
 /// For more detail, see the documentation of [`RingStore`].
 /// 
 /// # A note on equality
@@ -127,7 +127,7 @@ pub enum EnvBindingStrength {
 /// let Z11_snd = Z11_fst.clone();
 /// assert!(Z11_fst.get_ring() == Z11_snd.get_ring());
 /// let neg_one = Z11_fst.int_hom().map(-1);
-/// assert!(Z11_fst.is_neg_one(&neg_one));
+/// assert!(Z11_snd.is_neg_one(&neg_one));
 /// ```
 /// 
 /// # Example

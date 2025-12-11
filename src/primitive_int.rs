@@ -7,6 +7,7 @@ use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNew
 use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
 use serde::de::{DeserializeOwned, DeserializeSeed};
 
+use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm};
 use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ, impl_eval_poly_locally_for_ZZ};
 use crate::ring::*;
 use crate::algorithms;
@@ -15,7 +16,6 @@ use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::divisibility::*;
 use crate::ordered::*;
 use crate::integer::*;
-use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::StrassenHint;
 use crate::specialization::*;
 use crate::serialization::SerializableElementRing;
@@ -398,25 +398,22 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     fn is_approximate(&self) -> bool { false }
 }
 
-impl KaratsubaHint for StaticRingBase<i8> {
-    fn karatsuba_threshold(&self) -> usize { 4 }
+macro_rules! impl_default_convolution_ring {
+    ($($prim_type:ty: $threshold_log2:literal),*) => {
+        $(
+            impl DefaultConvolutionRing for StaticRingBase<$prim_type> {
+
+                fn create_default_convolution<'conv>(&self, _max_len_hint: Option<usize>) -> DynConvolution<'conv, Self>
+                    where Self: 'conv
+                {
+                    std::sync::Arc::new($crate::algorithms::convolution::TypeErasableConvolution::new(KaratsubaAlgorithm::new($threshold_log2, std::alloc::Global)))
+                }
+            }
+        )*
+    };
 }
 
-impl KaratsubaHint for StaticRingBase<i16> {
-    fn karatsuba_threshold(&self) -> usize { 4 }
-}
-
-impl KaratsubaHint for StaticRingBase<i32> {
-    fn karatsuba_threshold(&self) -> usize { 4 }
-}
-
-impl KaratsubaHint for StaticRingBase<i64> {
-    fn karatsuba_threshold(&self) -> usize { 4 }
-}
-
-impl KaratsubaHint for StaticRingBase<i128> {
-    fn karatsuba_threshold(&self) -> usize { 3 }
-}
+impl_default_convolution_ring!{ i8: 4, i16: 4, i32: 4, i64: 4, i128: 3 }
 
 impl StrassenHint for StaticRingBase<i8> {
     fn strassen_threshold(&self) -> usize { 6 }

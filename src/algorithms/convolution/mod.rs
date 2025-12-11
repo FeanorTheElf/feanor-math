@@ -219,28 +219,23 @@ impl<R: ?Sized + RingBase, A: Allocator + Send + Sync> ConvolutionAlgorithm<R> f
     }
 }
 
-///
-/// Trait to allow rings to customize the parameters with which [`KaratsubaAlgorithm`] will
-/// compute convolutions over the ring.
-/// 
-#[stability::unstable(feature = "enable")]
-pub trait KaratsubaHint: RingBase {
+#[derive(Clone, Copy, Debug)]
+pub struct NaiveConvolution;
 
-    ///
-    /// Define a threshold from which on [`KaratsubaAlgorithm`] will use the Karatsuba algorithm.
-    /// 
-    /// Concretely, when this returns `k`, [`KaratsubaAlgorithm`] will reduce the 
-    /// convolution down to ones on slices of size `2^k`, and compute their convolution naively. The default
-    /// value is `0`, but if the considered rings have fast multiplication (compared to addition), then setting
-    /// it higher may result in a performance gain.
-    /// 
-    fn karatsuba_threshold(&self) -> usize;
-}
+impl<R: ?Sized + RingBase> ConvolutionAlgorithm<R> for NaiveConvolution {
 
-impl<R: RingBase + ?Sized> KaratsubaHint for R {
+    type PreparedConvolutionOperand = ();
 
-    default fn karatsuba_threshold(&self) -> usize {
-        0
+    fn compute_convolution(&self, lhs: &[R::Element], _: Option<&()>, rhs: &[R::Element], _: Option<&()>, dst: &mut [R::Element], ring: &R) {
+        naive_assign_mul::<_, _, _, _, true>(dst, lhs, rhs, RingRef::new(ring));
+    }
+
+    fn prepare_convolution_operand(&self, _: &[R::Element], _: Option<usize>, _: &R) -> Self::PreparedConvolutionOperand {
+        ()
+    }
+
+    fn supports_ring(&self, _: &R) -> bool {
+        true
     }
 }
 
