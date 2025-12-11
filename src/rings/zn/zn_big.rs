@@ -1,4 +1,5 @@
 use std::alloc::Global;
+use std::cmp::min;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::cell::OnceCell;
@@ -9,6 +10,7 @@ use serde::de::{Error, DeserializeSeed};
 use serde::{Deserializer, Serializer, Serialize, Deserialize}; 
 
 use crate::algorithms::convolution::DynConvolution;
+use crate::iters::multi_cartesian_product;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::divisibility::DivisibilityRing;
 use crate::impl_localpir_wrap_unwrap_homs;
@@ -343,7 +345,17 @@ impl<I: RingStore> InterpolationBaseRing for AsFieldBase<ZnGB<I>>
 
     fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
         let ring = super::generic_impls::interpolation_ring(RingRef::new(self), count);
-        let points = ring.elements().take(count).collect();
+        let ZZ = self.integer_ring();
+        let modulus = if ZZ.abs_log2_ceil(self.modulus()).unwrap_or(0) <= 63 {
+            int_cast(ZZ.clone_el(self.modulus()), StaticRing::<i64>::RING, ZZ)
+        } else {
+            i64::MAX
+        };
+        let points = multi_cartesian_product(
+            (0..ring.rank()).map(|_| 0..(min(count.try_into().unwrap(), modulus))), 
+            |values| ring.from_canonical_basis(values.iter().map(|x| self.from_int_promise_reduced(int_cast(*x, ZZ, StaticRing::<i64>::RING)))),
+            |_, x| *x
+        ).take(count).collect();
         return (ring, points);
     }
 }

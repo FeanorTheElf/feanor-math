@@ -566,8 +566,9 @@ fn test_principal_ideal_ring_axioms() {
 fn test_canonical_hom_axioms_wrap_unwrap() {
     LogAlgorithmSubscriber::init_test();
     let R = AsLocalPIR::from_zn(ZnGB::new(StaticRing::<i64>::RING, 8)).unwrap();
-    crate::ring::generic_tests::test_hom_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());
-    crate::ring::generic_tests::test_iso_axioms(RingRef::new(R.get_ring().get_delegate()), &R, RingRef::new(R.get_ring().get_delegate()).elements());
+    let int_hom = RingRef::new(R.get_ring().get_delegate()).into_int_hom();
+    crate::ring::generic_tests::test_hom_axioms(int_hom.codomain(), &R, (0..8).map(|x| int_hom.map(x)));
+    crate::ring::generic_tests::test_iso_axioms(int_hom.codomain(), &R, (0..8).map(|x| int_hom.map(x)));
 }
 
 #[test]

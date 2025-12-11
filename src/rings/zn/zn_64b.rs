@@ -4,6 +4,7 @@ use crate::algorithms::convolution::KaratsubaAlgorithm;
 use crate::algorithms::convolution::TypeErasableConvolution;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
 use crate::algorithms::fft::radix3::CooleyTukeyRadix3Butterfly;
+use crate::iters::multi_cartesian_product;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::delegate::DelegateRing;
 use crate::delegate::DelegateRingImplFiniteRing;
@@ -431,7 +432,11 @@ impl InterpolationBaseRing for AsFieldBase<Zn64B> {
 
     fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
         let ring = super::generic_impls::interpolation_ring(RingRef::new(self), count);
-        let points = ring.elements().take(count).collect();
+        let points = multi_cartesian_product(
+            (0..ring.rank()).map(|_| (0..*self.modulus()).map(|x| self.from_int_promise_reduced(x))), 
+            |values| ring.from_canonical_basis(values.iter().copied()),
+            |_, x| *x
+        ).take(count).collect();
         return (ring, points);
     }
 }
