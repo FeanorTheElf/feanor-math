@@ -885,8 +885,6 @@ use crate::rings::zn::zn_static;
 #[cfg(test)]
 use crate::field::*;
 #[cfg(test)]
-use crate::rings::finite::FiniteRingStore;
-#[cfg(test)]
 use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
@@ -1100,5 +1098,5 @@ pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Itera
 #[test]
 fn test_butterfly() {
     LogAlgorithmSubscriber::init_test();
-    generic_test_cooley_tuckey_butterfly(zn_static::F17, zn_static::F17, zn_static::F17.elements(), &get_prim_root_of_unity_pow2(zn_static::F17, 4).unwrap());
+    generic_test_cooley_tuckey_butterfly(zn_static::F17, zn_static::F17, 0..17, &get_prim_root_of_unity_pow2(zn_static::F17, 4).unwrap());
 }

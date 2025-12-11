@@ -596,7 +596,7 @@ pub mod generic_tests {
                 ZZ.add_assign(&mut k, ZZ.one());
             }
             
-            let all_elements = R.elements().collect::<Vec<_>>();
+            let all_elements = (0..int_cast(R.integer_ring().clone_el(n), StaticRing::<i32>::RING, R.integer_ring())).map(|x| R.int_hom().map(x)).collect::<Vec<_>>();
             assert_eq!(int_cast(ZZ.clone_el(n), &StaticRing::<i128>::RING, &ZZ) as usize, all_elements.len());
             for (i, x) in all_elements.iter().enumerate() {
                 for (j, y) in all_elements.iter().enumerate() {
@@ -631,12 +631,12 @@ fn test_reduction_map() {
     let ring1 = zn_64b::Zn64B::new(257);
     let ring2 = zn_big::ZnGB::new(StaticRing::<i128>::RING, 257 * 7);
 
-    crate::homomorphism::generic_tests::test_homomorphism_axioms(ZnReductionMap::new(&ring2, &ring1).unwrap(), ring2.elements().step_by(8));
+    crate::homomorphism::generic_tests::test_homomorphism_axioms(ZnReductionMap::new(&ring2, &ring1).unwrap(), (0..(257 * 7)).step_by(8).map(|x| ring2.int_hom().map(x)));
 
     let ring1 = zn_big::ZnGB::new(StaticRing::<i16>::RING, 3);
     let ring2 = zn_big::ZnGB::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(65537 * 3));
 
-    crate::homomorphism::generic_tests::test_homomorphism_axioms(ZnReductionMap::new(&ring2, &ring1).unwrap(), ring2.elements().step_by(1024));
+    crate::homomorphism::generic_tests::test_homomorphism_axioms(ZnReductionMap::new(&ring2, &ring1).unwrap(), (0..(65537 * 3)).step_by(1024).map(|x| ring2.int_hom().map(x)));
 }
 
 #[test]

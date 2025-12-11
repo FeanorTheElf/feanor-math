@@ -16,8 +16,6 @@ use crate::algorithms::linsolve::LinSolveRing;
 use crate::divisibility::*;
 use crate::{impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 use crate::integer::*;
-use crate::iters::multi_cartesian_product;
-use crate::iters::MultiProduct;
 use crate::rings::poly::PolyRingStore;
 use crate::matrix::OwnedMatrix;
 use crate::primitive_int::StaticRing;
@@ -687,66 +685,6 @@ impl<R, V, C, A> HashableElRing for FreeAlgebraImplBase<R, V, C, A>
     }
 }
 
-///
-/// Function that creates a [`FreeAlgebraImplEl`] from its canonical basis
-/// representation.
-/// 
-/// Used by the implementation of [`FiniteRing::elements()`] for [`FreeAlgebraImplBase`].
-/// 
-pub struct WRTCanonicalBasisElementCreator<'a, R, V, C, A>
-    where R: RingStore, 
-        R::Type: FiniteRing, 
-        V: VectorView<El<R>> + Send + Sync,
-        A: Allocator + Clone + Send + Sync,
-        C: ConvolutionAlgorithm<R::Type>
-{
-    base_ring: &'a FreeAlgebraImplBase<R, V, C, A>
-}
-
-impl<'a, R, V, C, A> Clone for WRTCanonicalBasisElementCreator<'a, R, V, C, A>
-    where R: RingStore, 
-        R::Type: FiniteRing, 
-        V: VectorView<El<R>> + Send + Sync,
-        A: Allocator + Clone + Send + Sync,
-        C: ConvolutionAlgorithm<R::Type>
-{
-    fn clone(&self) -> Self { *self }
-}
-
-impl<'a, 'b, R, V, C, A> FnOnce<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator<'a, R, V, C, A>
-    where R: RingStore, 
-        R::Type: FiniteRing, 
-        V: VectorView<El<R>> + Send + Sync,
-        A: Allocator + Clone + Send + Sync,
-        C: ConvolutionAlgorithm<R::Type>
-{
-    type Output = El<FreeAlgebraImpl<R, V, C, A>>;
-
-    extern "rust-call" fn call_once(mut self, args: (&'b [El<R>], )) -> Self::Output {
-        self.call_mut(args)
-    }
-}
-
-impl<'a, 'b, R, V, C, A> FnMut<(&'b [El<R>], )> for WRTCanonicalBasisElementCreator<'a, R, V, C, A>
-    where R: RingStore, 
-        R::Type: FiniteRing, 
-        V: VectorView<El<R>> + Send + Sync,
-        A: Allocator + Clone + Send + Sync,
-        C: ConvolutionAlgorithm<R::Type>
-{
-    extern "rust-call" fn call_mut(&mut self, args: (&'b [El<R>], )) -> Self::Output {
-        self.base_ring.from_canonical_basis(args.0.iter().map(|x| self.base_ring.base_ring().clone_el(x)))
-    }
-}
-
-impl<'a, R, V, C, A> Copy for WRTCanonicalBasisElementCreator<'a, R, V, C, A>
-    where R: RingStore, 
-        R::Type: FiniteRing, 
-        V: VectorView<El<R>> + Send + Sync,
-        A: Allocator + Clone + Send + Sync,
-        C: ConvolutionAlgorithm<R::Type>
-{}
-
 impl<R, V, C, A> FiniteRingSpecializable for FreeAlgebraImplBase<R, V, C, A>
     where R: RingStore,
         R::Type: FiniteRingSpecializable, 
@@ -795,13 +733,6 @@ impl<R, V, C, A> FiniteRing for FreeAlgebraImplBase<R, V, C, A>
         A: Allocator + Clone + Send + Sync,
         C: ConvolutionAlgorithm<R::Type>
 {
-    type ElementsIter<'a> = MultiProduct<<R::Type as FiniteRing>::ElementsIter<'a>, WRTCanonicalBasisElementCreator<'a, R, V, C, A>, CloneRingEl<&'a R>, Self::Element>
-        where Self: 'a;
-
-    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
-        multi_cartesian_product((0..self.rank()).map(|_| self.base_ring().elements()), WRTCanonicalBasisElementCreator { base_ring: self }, CloneRingEl(self.base_ring()))
-    }
-
     fn size<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
         where I::Type: IntegerRing
     {
@@ -918,7 +849,7 @@ use crate::tracing::LogAlgorithmSubscriber;
 #[cfg(test)]
 fn test_ring0_and_elements() -> (FreeAlgebraImpl<Zn64B, Vec<Zn64BEl>>, Vec<FreeAlgebraImplEl<Zn64B>>) {
     let R = FreeAlgebraImpl::new(Zn64B::new(7), 1, vec![Zn64B::new(7).neg_one()]);
-    let elements = R.elements().collect();
+    let elements = (0..7).map(|x| R.int_hom().map(x)).collect();
     return (R, elements);
 }
 
@@ -1021,7 +952,7 @@ fn test_rank_1_ring() {
     LogAlgorithmSubscriber::init_test();
     let base_ring = Zn64B::new(5).as_field().ok().unwrap();
     let ring = FreeAlgebraImpl::new(base_ring, 1, [base_ring.int_hom().map(1)]).as_field().ok().unwrap();
-    crate::field::generic_tests::test_field_axioms(&ring, ring.elements());
+    crate::field::generic_tests::test_field_axioms(&ring, (0..5).map(|x| ring.int_hom().map(x)));
 
     assert_el_eq!(ring, ring.one(), ring.canonical_gen());
 }
@@ -1107,11 +1038,12 @@ fn test_as_field() {
     LogAlgorithmSubscriber::init_test();
     let base_ring = Zn64B::new(5).as_field().ok().unwrap();
     let ring = FreeAlgebraImpl::new(base_ring, 1, [base_ring.int_hom().map(1)]).as_field().ok().unwrap();
-    crate::field::generic_tests::test_field_axioms(&ring, ring.elements());
+    crate::field::generic_tests::test_field_axioms(&ring, (0..5).map(|x| ring.int_hom().map(x)));
 
     let base_ring = Zn64B::new(3).as_field().ok().unwrap();
     let ring = FreeAlgebraImpl::new(base_ring, 2, [base_ring.int_hom().map(2)]).as_field().ok().unwrap();
-    crate::field::generic_tests::test_field_axioms(&ring, ring.elements());
+    let ring_ref = &ring;
+    crate::field::generic_tests::test_field_axioms(&ring, (0..3).flat_map(|x| (0..3).map(move |y| ring_ref.from_canonical_basis([base_ring.int_hom().map(x), base_ring.int_hom().map(y)]))));
 
     assert!(FreeAlgebraImpl::new(base_ring, 2, [base_ring.int_hom().map(1)]).as_field().is_err());
 }

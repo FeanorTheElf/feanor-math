@@ -425,28 +425,6 @@ impl_field_wrap_unwrap_isos!{ Zn64MBase, Zn64MBase }
 impl_localpir_wrap_unwrap_homs!{ Zn64MBase, Zn64MBase }
 impl_localpir_wrap_unwrap_isos!{ Zn64MBase, Zn64MBase }
 
-#[derive(Clone, Copy)]
-#[stability::unstable(feature = "enable")]
-pub struct ZnBaseElementsIter<'a> {
-    ring: &'a Zn64MBase,
-    current: i64
-}
-
-impl<'a> Iterator for ZnBaseElementsIter<'a> {
-
-    type Item = Zn64MEl;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.current < self.ring.modulus {
-            let result = self.current;
-            self.current += 1;
-            return Some(self.ring.from_int_promise_reduced(result));
-        } else {
-            return None;
-        }
-    }
-}
-
 impl FiniteRingSpecializable for Zn64MBase {
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
         op.execute()
@@ -454,15 +432,6 @@ impl FiniteRingSpecializable for Zn64MBase {
 }
 
 impl FiniteRing for Zn64MBase {
-
-    type ElementsIter<'a> = ZnBaseElementsIter<'a>;
-
-    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
-        ZnBaseElementsIter {
-            ring: self,
-            current: 0
-        }
-    }
 
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element {
         super::generic_impls::random_element(self, rng)
@@ -646,8 +615,8 @@ fn test_principal_ideal_ring_axioms() {
     LogAlgorithmSubscriber::init_test();
     for n in TEST_MODULI {
         if n < 100 {
-            let R = Zn64M::new(n);
-            crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
+            let R = Zn64M::new(n as u64);
+            crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, elements(&R));
         }
     }
 }
@@ -716,5 +685,5 @@ fn bench_hom_from_i64_small_modulus(bencher: &mut Bencher) {
 fn test_serialize() {
     LogAlgorithmSubscriber::init_test();
     let ring = Zn64M::new(129);
-    crate::serialization::generic_tests::test_serialization(ring, ring.elements())
+    crate::serialization::generic_tests::test_serialization(ring, (0..129).map(|x| ring.int_hom().map(x)))
 }

@@ -403,8 +403,6 @@ impl<R: RingStore> Deref for RingElementWrapper<R> {
 }
 
 #[cfg(test)]
-use crate::rings::finite::FiniteRingStore;
-#[cfg(test)]
 use crate::rings::zn::zn_64b;
 #[cfg(test)]
 use crate::tracing::LogAlgorithmSubscriber;
@@ -414,9 +412,9 @@ fn test_arithmetic_expression() {
     LogAlgorithmSubscriber::init_test();
     let ring = zn_64b::Zn64B::new(17);
 
-    for x in ring.elements() {
-        for y in ring.elements() {
-            for z in ring.elements() {
+    for x in (0..17).map(|x| ring.int_hom().map(x)) {
+        for y in (0..17).map(|x| ring.int_hom().map(x)) {
+            for z in (0..17).map(|x| ring.int_hom().map(x)) {
                 let expected = ring.add(ring.mul(x, y), ring.mul(ring.add(x, z), ring.sub(y, z)));
                 let x = RingElementWrapper::new(&ring, x);
                 let y = RingElementWrapper::new(&ring, y);
@@ -432,9 +430,9 @@ fn test_arithmetic_expression_int() {
     LogAlgorithmSubscriber::init_test();
     let ring = zn_64b::Zn64B::new(17);
 
-    for x in ring.elements() {
-        for y in ring.elements() {
-            for z in ring.elements() {
+    for x in (0..17).map(|x| ring.int_hom().map(x)) {
+        for y in (0..17).map(|x| ring.int_hom().map(x)) {
+            for z in (0..17).map(|x| ring.int_hom().map(x)) {
                 let expected = ring.add(ring.add(ring.int_hom().mul_map(ring.mul(x, y), 8), ring.mul(ring.add(ring.add(ring.one(), x), ring.int_hom().mul_map(z, 2)), ring.sub(y, ring.int_hom().mul_map(z, 2)))), ring.int_hom().map(5));
                 let x = RingElementWrapper::new(&ring, x);
                 let y = RingElementWrapper::new(&ring, y);
@@ -450,9 +448,9 @@ fn test_arithmetic_expression_ref() {
     LogAlgorithmSubscriber::init_test();
     let ring = zn_64b::Zn64B::new(17);
 
-    for x in ring.elements() {
-        for y in ring.elements() {
-            for z in ring.elements() {
+    for x in (0..17).map(|x| ring.int_hom().map(x)) {
+        for y in (0..17).map(|x| ring.int_hom().map(x)) {
+            for z in (0..17).map(|x| ring.int_hom().map(x)) {
                 let expected = ring.add(ring.mul(x, y), ring.mul(ring.add(x, z), ring.sub(y, z)));
                 let x = RingElementWrapper::new(&ring, x);
                 let y = RingElementWrapper::new(&ring, y);
@@ -468,9 +466,9 @@ fn test_arithmetic_expression_int_ref() {
     LogAlgorithmSubscriber::init_test();
     let ring = zn_64b::Zn64B::new(17);
 
-    for x in ring.elements() {
-        for y in ring.elements() {
-            for z in ring.elements() {
+    for x in (0..17).map(|x| ring.int_hom().map(x)) {
+        for y in (0..17).map(|x| ring.int_hom().map(x)) {
+            for z in (0..17).map(|x| ring.int_hom().map(x)) {
                 let expected = ring.add(ring.add(ring.int_hom().mul_map(ring.mul(x, y), 8), ring.mul(ring.add(ring.add(ring.one(), x), ring.int_hom().mul_map(z, 2)), ring.sub(y, ring.int_hom().mul_map(z, 2)))), ring.int_hom().map(5));
                 let x = RingElementWrapper::new(&ring, x);
                 let y = RingElementWrapper::new(&ring, y);

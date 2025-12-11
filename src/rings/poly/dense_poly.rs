@@ -863,7 +863,7 @@ fn test_hash_axioms() {
 fn test_poly_ring_axioms() {
     LogAlgorithmSubscriber::init_test();
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
-    super::generic_tests::test_poly_ring_axioms(poly_ring, Zn::<7>::RING.elements());
+    super::generic_tests::test_poly_ring_axioms(poly_ring, 0..7);
 }
 
 #[test]

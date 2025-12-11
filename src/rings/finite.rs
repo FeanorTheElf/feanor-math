@@ -12,19 +12,6 @@ use crate::specialization::FiniteRingSpecializable;
 pub trait FiniteRing: RingBase + FiniteRingSpecializable {
 
     ///
-    /// Type of the iterator returned by [`FiniteRing::elements()`], which should
-    /// iterate over all elements of the ring.
-    /// 
-    type ElementsIter<'a>: Sized + Clone + Iterator<Item = <Self as RingBase>::Element>
-        where Self: 'a;
-
-    ///
-    /// Returns an iterator over all elements of this ring.
-    /// The order is not specified.
-    /// 
-    fn elements<'a>(&'a self) -> Self::ElementsIter<'a>;
-
-    ///
     /// Returns a uniformly random element from this ring, using the randomness
     /// provided by `rng`.
     /// 
@@ -44,13 +31,6 @@ pub trait FiniteRing: RingBase + FiniteRingSpecializable {
 pub trait FiniteRingStore: RingStore
     where Self::Type: FiniteRing
 {
-    ///
-    /// See [`FiniteRing::elements()`].
-    /// 
-    fn elements<'a>(&'a self) -> <Self::Type as FiniteRing>::ElementsIter<'a> {
-        self.get_ring().elements()
-    }
-
     ///
     /// See [`FiniteRing::random_element()`].
     /// 
@@ -76,7 +56,7 @@ impl<R: RingStore> FiniteRingStore for R
 pub mod generic_tests {
 
     use crate::divisibility::DivisibilityRingStore;
-    use crate::integer::{int_cast, BigIntRing, IntegerRingStore};
+    use crate::integer::{BigIntRing, IntegerRingStore};
     use crate::ordered::OrderedRingStore;
     use crate::primitive_int::StaticRing;
 
@@ -93,10 +73,6 @@ pub mod generic_tests {
 
         if ZZ.is_geq(&size, &ZZ.power_of_two(7)) {
             assert_eq!(None, ring.size(&StaticRing::<i8>::RING));
-        }
-
-        if ZZ.is_leq(&size, &ZZ.power_of_two(30)) {
-            assert_eq!(int_cast(size, &StaticRing::<i64>::RING, &ZZ) as usize, ring.elements().count());
         }
     }
 }

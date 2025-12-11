@@ -489,40 +489,6 @@ impl<I: RingStore, J: IntegerRing + ?Sized> CanHomFrom<J> for ZnGBBase<I>
     }
 }
 
-pub struct ZnBaseElementsIter<'a, I>
-    where I: RingStore,
-        I::Type: IntegerRing
-{
-    ring: &'a ZnGBBase<I>,
-    current: El<I>
-}
-
-impl<'a, I> Clone for ZnBaseElementsIter<'a, I>
-    where I: RingStore,
-        I::Type: IntegerRing
-{
-    fn clone(&self) -> Self {
-        Self { ring: self.ring, current: self.ring.integer_ring().clone_el(&self.current) }
-    }
-}
-
-impl<'a, I> Iterator for ZnBaseElementsIter<'a, I>
-    where I: RingStore,
-        I::Type: IntegerRing
-{
-    type Item = ZnGBEl<I>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.ring.integer_ring().is_lt(&self.current, self.ring.modulus()) {
-            let result = self.ring.integer_ring().clone_el(&self.current);
-            self.ring.integer_ring().add_assign(&mut self.current, self.ring.integer_ring().one());
-            return Some(ZnGBEl(result));
-        } else {
-            return None;
-        }
-    }
-}
-
 impl<I> Serialize for ZnGBBase<I>
     where I: RingStore + Serialize,
         I::Type: IntegerRing + SerializableElementRing
@@ -572,16 +538,6 @@ impl<I: RingStore> SerializableElementRing for ZnGBBase<I>
 impl<I: RingStore> FiniteRing for ZnGBBase<I>
     where I::Type: IntegerRing
 {
-    type ElementsIter<'a> = ZnBaseElementsIter<'a, I>
-        where Self: 'a;
-
-    fn elements<'a>(&'a self) -> ZnBaseElementsIter<'a, I> {
-        ZnBaseElementsIter {
-            ring: self,
-            current: self.integer_ring().zero()
-        }
-    }
-
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element {
         super::generic_impls::random_element(self, rng)
     }
@@ -687,14 +643,14 @@ fn test_project() {
 fn test_ring_axioms_znbase() {
     LogAlgorithmSubscriber::init_test();
     let ring = ZnGB::new(StaticRing::<i64>::RING, 63);
-    crate::ring::generic_tests::test_ring_axioms(&ring, ring.elements())
+    crate::ring::generic_tests::test_ring_axioms(&ring, (0..63).map(|x| ring.int_hom().map(x)))
 }
 
 #[test]
 fn test_hash_axioms() {
     LogAlgorithmSubscriber::init_test();
     let ring = ZnGB::new(StaticRing::<i64>::RING, 63);
-    crate::ring::generic_tests::test_hash_axioms(&ring, ring.elements())
+    crate::ring::generic_tests::test_hash_axioms(&ring, (0..63).map(|x| ring.int_hom().map(x)))
 }
 
 #[test]
@@ -702,8 +658,8 @@ fn test_canonical_iso_axioms_zn_big() {
     LogAlgorithmSubscriber::init_test();
     let from = ZnGB::new(StaticRing::<i128>::RING, 7 * 11);
     let to = ZnGB::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(7 * 11));
-    crate::ring::generic_tests::test_hom_axioms(&from, &to, from.elements());
-    crate::ring::generic_tests::test_iso_axioms(&from, &to, from.elements());
+    crate::ring::generic_tests::test_hom_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x)));
+    crate::ring::generic_tests::test_iso_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x)));
     assert!(from.can_hom(&ZnGB::new(StaticRing::<i64>::RING, 19)).is_none());
 }
 
@@ -739,16 +695,16 @@ fn test_zn_map_in_small_int() {
 fn test_divisibility_axioms() {
     LogAlgorithmSubscriber::init_test();
     let R = ZnGB::new(StaticRing::<i64>::RING, 17);
-    crate::divisibility::generic_tests::test_divisibility_axioms(&R, R.elements());
+    crate::divisibility::generic_tests::test_divisibility_axioms(&R, (0..17).map(|x| R.int_hom().map(x)));
 }
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
     LogAlgorithmSubscriber::init_test();
     let R = ZnGB::new(StaticRing::<i64>::RING, 17);
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..17).map(|x| R.int_hom().map(x)));
     let R = ZnGB::new(StaticRing::<i64>::RING, 63);
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..63).map(|x| R.int_hom().map(x)));
 }
 
 #[test]
@@ -756,10 +712,10 @@ fn test_canonical_iso_axioms_as_field() {
     LogAlgorithmSubscriber::init_test();
     let R = ZnGB::new(StaticRing::<i128>::RING, 17);
     let R2 = R.clone().as_field().ok().unwrap();
-    crate::ring::generic_tests::test_hom_axioms(&R, &R2, R.elements());
-    crate::ring::generic_tests::test_iso_axioms(&R, &R2, R.elements());
-    crate::ring::generic_tests::test_hom_axioms(&R2, &R, R2.elements());
-    crate::ring::generic_tests::test_iso_axioms(&R2, &R, R2.elements());
+    crate::ring::generic_tests::test_hom_axioms(&R, &R2, (0..17).map(|x| R.int_hom().map(x)));
+    crate::ring::generic_tests::test_iso_axioms(&R, &R2, (0..17).map(|x| R.int_hom().map(x)));
+    crate::ring::generic_tests::test_hom_axioms(&R2, &R, (0..17).map(|x| R2.int_hom().map(x)));
+    crate::ring::generic_tests::test_iso_axioms(&R2, &R, (0..17).map(|x| R2.int_hom().map(x)));
 }
 
 #[test]
@@ -767,10 +723,10 @@ fn test_canonical_iso_axioms_zn_64() {
     LogAlgorithmSubscriber::init_test();
     let R = ZnGB::new(StaticRing::<i128>::RING, 17);
     let R2 = zn_64b::Zn64B::new(17);
-    crate::ring::generic_tests::test_hom_axioms(&R, &R2, R.elements());
-    crate::ring::generic_tests::test_iso_axioms(&R, &R2, R.elements());
-    crate::ring::generic_tests::test_hom_axioms(&R2, &R, R2.elements());
-    crate::ring::generic_tests::test_iso_axioms(&R2, &R, R2.elements());
+    crate::ring::generic_tests::test_hom_axioms(&R, &R2, (0..17).map(|x| R.int_hom().map(x)));
+    crate::ring::generic_tests::test_iso_axioms(&R, &R2, (0..17).map(|x| R.int_hom().map(x)));
+    crate::ring::generic_tests::test_hom_axioms(&R2, &R, (0..17).map(|x| R2.int_hom().map(x)));
+    crate::ring::generic_tests::test_iso_axioms(&R2, &R, (0..17).map(|x| R2.int_hom().map(x)));
 }
 
 #[test]
@@ -785,7 +741,7 @@ fn test_finite_field_axioms() {
 fn test_serialize() {
     LogAlgorithmSubscriber::init_test();
     let ring = ZnGB::new(&StaticRing::<i64>::RING, 128);
-    crate::serialization::generic_tests::test_serialization(ring, ring.elements())
+    crate::serialization::generic_tests::test_serialization(ring, (0..128).map(|x| ring.int_hom().map(x)))
 }
 #[test]
 fn test_unreduced() {

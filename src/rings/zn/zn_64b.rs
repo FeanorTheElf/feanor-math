@@ -639,27 +639,6 @@ macro_rules! impl_static_int_to_zn {
 
 impl_static_int_to_zn!{ i8, i16, i32, i64, i128 }
 
-#[derive(Clone, Copy)]
-pub struct ZnBaseElementsIter<'a> {
-    ring: &'a Zn64BBase,
-    current: u64
-}
-
-impl<'a> Iterator for ZnBaseElementsIter<'a> {
-
-    type Item = Zn64BEl;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.current < self.ring.modulus_u64() {
-            let result = self.current;
-            self.current += 1;
-            return Some(self.ring.from_u64_promise_reduced(result));
-        } else {
-            return None;
-        }
-    }
-}
-
 impl FiniteRingSpecializable for Zn64BBase {
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
         op.execute()
@@ -667,15 +646,6 @@ impl FiniteRingSpecializable for Zn64BBase {
 }
 
 impl FiniteRing for Zn64BBase {
-
-    type ElementsIter<'a> = ZnBaseElementsIter<'a>;
-
-    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
-        ZnBaseElementsIter {
-            ring: self,
-            current: 0
-        }
-    }
 
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element {
         super::generic_impls::random_element(self, rng)
@@ -1297,8 +1267,8 @@ fn test_hash_axioms() {
 fn test_divisibility_axioms() {
     LogAlgorithmSubscriber::init_test();
     for n in 2..=17 {
-        let Zn = Zn64B::new(n);
-        crate::divisibility::generic_tests::test_divisibility_axioms(&Zn, Zn.elements());
+        let Zn = Zn64B::new(n as u64);
+        crate::divisibility::generic_tests::test_divisibility_axioms(&Zn, (0..n).map(|x| Zn.int_hom().map(x)));
     }
     for n in LARGE_MODULI {
         let Zn = Zn64B::new(n);
@@ -1319,20 +1289,20 @@ fn test_zn_axioms() {
 fn test_principal_ideal_ring_axioms() {
     LogAlgorithmSubscriber::init_test();
     for n in 2..=17 {
-        let R = Zn64B::new(n);
-        crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
+        let R = Zn64B::new(n as u64);
+        crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, (0..n).map(|x| R.int_hom().map(x)));
     }
     let R = Zn64B::new(63);
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, (0..63).map(|x| R.int_hom().map(x)));
 }
 
 #[test]
 fn test_hom_from_fastmul() {
     LogAlgorithmSubscriber::init_test();
     for n in 2..=17 {
-        let Zn = Zn64B::new(n);
+        let Zn = Zn64B::new(n as u64);
         let Zn_fastmul = ZnFastmul::new(Zn).unwrap();
-        crate::ring::generic_tests::test_hom_axioms(Zn_fastmul, Zn, Zn.elements().map(|x| Zn_fastmul.coerce(&Zn, x)));
+        crate::ring::generic_tests::test_hom_axioms(Zn_fastmul, Zn, (0..n).map(|x| Zn_fastmul.int_hom().map(x)));
     }
     for n in [(1 << 41) - 1, (1 << 42) - 1, (1 << 58) - 1, (1 << 58) + 1, (3 << 57) - 1, (3 << 57) + 1] {
         let Zn = Zn64B::new(n);
@@ -1473,10 +1443,10 @@ fn bench_reduction_map_use_case(bencher: &mut Bencher) {
     LogAlgorithmSubscriber::init_test();
     // this benchmark is inspired by the use in https://eprint.iacr.org/2023/1510.pdf
     let p = 17;
-    let Zp2 = Zn64B::new(p * p);
-    let Zp = Zn64B::new(p);
+    let Zp2 = Zn64B::new((p * p) as u64);
+    let Zp = Zn64B::new(p as u64);
     let Zp2_mod_p = ZnReductionMap::new(&Zp2, &Zp).unwrap();
-    let Zp2_p = PreparedDivisor::new(Zp2.get_ring(), Zp2.int_hom().map(p as i32));
+    let Zp2_p = PreparedDivisor::new(Zp2.get_ring(), Zp2.int_hom().map(p));
 
     let split_quo_rem = |x: El<Zn64B>| {
         let rem = Zp2_mod_p.map_ref(&x);
@@ -1486,8 +1456,8 @@ fn bench_reduction_map_use_case(bencher: &mut Bencher) {
     };
 
     bencher.iter(|| {
-        for x in Zp2.elements() {
-            for y in Zp2.elements() {
+        for x in (0..(p * p)).map(|x| Zp2.int_hom().map(x)) {
+            for y in (0..(p * p)).map(|x| Zp2.int_hom().map(x)) {
                 let (x_low, x_high) = split_quo_rem(x);
                 let (y_low, y_high) = split_quo_rem(y);
                 assert_el_eq!(Zp2, Zp2.mul(x, y), &Zp2.add(Zp2.mul(Zp2_mod_p.smallest_lift(x_low), Zp2_mod_p.smallest_lift(y_low)), Zp2_mod_p.mul_quotient_fraction(Zp.add(Zp.mul(x_low, y_high), Zp.mul(x_high, y_low)))));
@@ -1515,5 +1485,5 @@ fn bench_inner_product(bencher: &mut Bencher) {
 fn test_serialize() {
     LogAlgorithmSubscriber::init_test();
     let ring = Zn64B::new(128);
-    crate::serialization::generic_tests::test_serialization(ring, ring.elements())
+    crate::serialization::generic_tests::test_serialization(ring, (0..128).map(|x| ring.int_hom().map(x)))
 }

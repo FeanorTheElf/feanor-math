@@ -548,18 +548,18 @@ fn test_canonical_hom_axioms_static_int() {
 fn test_divisibility_axioms() {
     LogAlgorithmSubscriber::init_test();
     let R = AsLocalPIR::from_zn(ZnGB::new(StaticRing::<i64>::RING, 8)).unwrap();
-    crate::divisibility::generic_tests::test_divisibility_axioms(&R, R.elements());
+    crate::divisibility::generic_tests::test_divisibility_axioms(&R, (0..8).map(|x| R.int_hom().map(x)));
 }
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
     LogAlgorithmSubscriber::init_test();
     let R = AsLocalPIR::from_zn(ZnGB::new(StaticRing::<i64>::RING, 8)).unwrap();
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..8).map(|x| R.int_hom().map(x)));
     let R = AsLocalPIR::from_zn(ZnGB::new(StaticRing::<i64>::RING, 9)).unwrap();
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..9).map(|x| R.int_hom().map(x)));
     let R = AsLocalPIR::from_zn(ZnGB::new(StaticRing::<i64>::RING, 17)).unwrap();
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..17).map(|x| R.int_hom().map(x)));
 }
 
 #[test]

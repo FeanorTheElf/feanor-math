@@ -905,24 +905,27 @@ fn test_can_hom_from() {
 fn test_galois_field() {
     LogAlgorithmSubscriber::init_test();
     let field = GaloisField::new(3, 1);
-    assert_eq!(3, field.elements().count());
-    crate::ring::generic_tests::test_ring_axioms(&field, field.elements());
-    crate::ring::generic_tests::test_self_iso(&field, field.elements());
-    crate::field::generic_tests::test_field_axioms(&field, field.elements());
+    let elements = (0..3).map(|x| field.int_hom().map(x));
+    crate::ring::generic_tests::test_ring_axioms(&field, elements.clone());
+    crate::ring::generic_tests::test_self_iso(&field, elements.clone());
+    crate::field::generic_tests::test_field_axioms(&field, elements.clone());
 
     let field = GaloisField::new(3, 2);
-    assert_eq!(9, field.elements().count());
-    crate::ring::generic_tests::test_ring_axioms(&field, field.elements());
-    crate::ring::generic_tests::test_self_iso(&field, field.elements());
-    crate::field::generic_tests::test_field_axioms(&field, field.elements());
+    let field_ref = &field;
+    let elements = (0..3).flat_map(|x| (0..3).map(move |y| field_ref.from_canonical_basis([field_ref.base_ring().int_hom().map(x), field_ref.base_ring().int_hom().map(y)])));
+    crate::ring::generic_tests::test_ring_axioms(&field, elements.clone());
+    crate::ring::generic_tests::test_self_iso(&field, elements.clone());
+    crate::field::generic_tests::test_field_axioms(&field, elements.clone());
 }
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
     LogAlgorithmSubscriber::init_test();
     let field = GaloisField::new(3, 2);
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&field, field.elements());
-    crate::pid::generic_tests::test_euclidean_ring_axioms(&field, field.elements());
+    let field_ref = &field;
+    let elements = (0..3).flat_map(|x| (0..3).map(move |y| field_ref.from_canonical_basis([field_ref.base_ring().int_hom().map(x), field_ref.base_ring().int_hom().map(y)])));
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&field, elements.clone());
+    crate::pid::generic_tests::test_euclidean_ring_axioms(&field, elements.clone());
 }
 
 #[test]

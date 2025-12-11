@@ -597,34 +597,6 @@ impl<R: DelegateRing + ?Sized> SerializableElementRing for R
 }
 
 ///
-/// Iterator over all elements of a finite [`DelegateRing`].
-/// 
-pub struct DelegateFiniteRingElementsIter<'a, R: ?Sized>
-    where R: DelegateRing, R::Base: FiniteRing
-{
-    ring: &'a R,
-    base: <R::Base as FiniteRing>::ElementsIter<'a>
-}
-
-impl<'a, R: ?Sized> Clone for DelegateFiniteRingElementsIter<'a, R>
-    where R: DelegateRing, R::Base: FiniteRing
-{
-    fn clone(&self) -> Self {
-        Self { ring: self.ring, base: self.base.clone() }
-    }
-}
-
-impl<'a, R: ?Sized> Iterator for DelegateFiniteRingElementsIter<'a, R>
-    where R: DelegateRing, R::Base: FiniteRing
-{
-    type Item = <R as RingBase>::Element;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base.next().map(|x| self.ring.rev_delegate(x))
-    }
-}
-
-///
 /// Marks a [`DelegateRing`] `R` to be considered in the blanket implementation
 /// `R: FiniteRing where R::Base: FiniteRing`.
 /// 
@@ -635,17 +607,7 @@ pub trait DelegateRingImplFiniteRing: DelegateRing {}
 
 impl<R: DelegateRingImplFiniteRing + ?Sized> FiniteRing for R
     where R::Base: FiniteRing
-{
-    type ElementsIter<'a> = DelegateFiniteRingElementsIter<'a, R>
-        where R: 'a;
-
-    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
-        DelegateFiniteRingElementsIter {
-            ring: self,
-            base: self.get_delegate().elements()
-        }
-    }
-    
+{    
     default fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <R as RingBase>::Element {
         self.element_cast(self.rev_delegate(self.get_delegate().random_element(rng)))
     }

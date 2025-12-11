@@ -540,8 +540,6 @@ impl<H, A> FFTErrorEstimate for CooleyTukeyRadix3FFT<Complex64Base, Complex64Bas
 #[cfg(test)]
 use std::array::from_fn;
 #[cfg(test)]
-use crate::rings::finite::FiniteRingStore;
-#[cfg(test)]
 use crate::rings::zn::zn_64b::*;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
@@ -687,7 +685,7 @@ fn test_butterfly() {
     generic_tests::test_cooley_tuckey_radix3_butterfly(
         ring,
         ring,
-        ring.elements().step_by(10),
+        (0..109).step_by(10).map(|x| ring.int_hom().map(x)),
         &63,
         &97,
     );

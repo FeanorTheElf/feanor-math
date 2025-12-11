@@ -182,26 +182,6 @@ impl<const N: u64> EuclideanRing for ZnSBase<N, true> {
     }
 }
 
-#[stability::unstable(feature = "enable")]
-#[derive(Clone, Copy)]
-pub struct ZnBaseElementsIter<const N: u64> {
-    current: u64
-}
-
-impl<const N: u64> Iterator for ZnBaseElementsIter<N> {
-
-    type Item = u64;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.current < N {
-            self.current += 1;
-            return Some(self.current - 1);
-        } else {
-            return None;
-        }
-    }
-}
-
 impl<const N: u64, const IS_FIELD: bool> HashableElRing for ZnSBase<N, IS_FIELD> {
     
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
@@ -227,11 +207,6 @@ impl<const N: u64, const IS_FIELD: bool> SerializableElementRing for ZnSBase<N, 
 }
 
 impl<const N: u64, const IS_FIELD: bool> FiniteRing for ZnSBase<N, IS_FIELD> {
-    type ElementsIter<'a> = ZnBaseElementsIter<N>;
-
-    fn elements<'a>(&'a self) -> ZnBaseElementsIter<N> {
-        ZnBaseElementsIter { current: 0 }
-    }
 
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element {
         generic_impls::random_element(self, rng)
@@ -423,16 +398,16 @@ fn test_zn_ring_axioms_znbase() {
 #[test]
 fn test_divisibility_axioms() {
     LogAlgorithmSubscriber::init_test();
-    crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<17>::RING, Zn::<17>::RING.elements());
-    crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<9>::RING, Zn::<9>::RING.elements());
-    crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<12>::RING, Zn::<12>::RING.elements());
+    crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<17>::RING, 0..17);
+    crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<9>::RING, 0..8);
+    crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<12>::RING, 0..12);
 }
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
     LogAlgorithmSubscriber::init_test();
     let R = Zn::<17>::RING;
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, 0..17);
     let R = Zn::<63>::RING;
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, R.elements());
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, 0..63);
 }

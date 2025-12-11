@@ -527,8 +527,6 @@ use crate::rings::zn::*;
 #[cfg(test)]
 use crate::rings::zn::zn_static::{Zn, Fp};
 #[cfg(test)]
-use crate::rings::finite::FiniteRingStore;
-#[cfg(test)]
 use super::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
@@ -566,7 +564,7 @@ fn test_ring_axioms() {
 fn test_poly_ring_axioms() {
     LogAlgorithmSubscriber::init_test();
     let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
-    super::generic_tests::test_poly_ring_axioms(poly_ring, Zn::<7>::RING.elements());
+    super::generic_tests::test_poly_ring_axioms(poly_ring, 0..7);
 }
 
 #[test]
