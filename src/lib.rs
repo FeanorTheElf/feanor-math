@@ -16,7 +16,6 @@
 #![feature(btree_cursors)]
 #![feature(test)]
 #![feature(min_specialization)]
-#![feature(maybe_uninit_slice)]
 #![feature(iter_array_chunks)]
 #![feature(allocator_api)]
 #![feature(cow_is_borrowed)]
