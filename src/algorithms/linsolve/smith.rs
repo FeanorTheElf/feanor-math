@@ -83,6 +83,12 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
     }
 }
 
+///
+/// Computes a matrix `X` such that `lhs * X = rhs`, if it exists.
+/// 
+/// This function will change the value of `A`, more concretely overwrite it
+/// with its "pre-smith" form as specified by [`pre_smith()`].
+/// 
 #[stability::unstable(feature = "enable")]
 pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(ring: R, mut lhs: SubmatrixMut<V1, El<R>>, mut rhs: SubmatrixMut<V2, El<R>>, mut out: SubmatrixMut<V3, El<R>>, _allocator: A) -> SolveResult
     where R: RingStore + Copy,
@@ -127,6 +133,41 @@ pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(ring: R, mut lhs: Submatrix
     } else {
         SolveResult::FoundSomeSolution
     };
+}
+
+///
+/// Computes a basis of the right-kernel of the matrix `A`, i.e. a full-rank
+/// matrix `B` such that `AB = 0` and every `x` with `Ax = 0` is of the form
+/// `x = By` for some `y`.
+/// 
+/// This function will change the value of `A`, more concretely overwrite it
+/// with its "pre-smith" form as specified by [`pre_smith()`].
+/// 
+/// **Note on rings with zero-divisors** If the given ring has zero-divisors,
+/// the notion of being "full-rank" is not well-defined. Instead, `B` will have
+/// the property that every minor is nonzero. Note that it is not required that
+/// every minor is invertible - this is usually not possible. For example, in
+/// `Z/6Z`, the right-kernel of `A = (2)` is `{0, 3}`, and thus the only generating
+/// set is `B = (3)`, which doesn't have a unit minor.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn kernel_basis_using_pre_smith<R, V, A>(ring: R, mut A: SubmatrixMut<V, El<R>>, allocator: A) -> OwnedMatrix<El<R>, A>
+    where R: RingStore + Copy,
+        R::Type: PrincipalIdealRing,
+        V: AsPointerToSlice<El<R>>,
+        A: Allocator
+{
+    let mut R = TransformList::new(A.col_count());
+    pre_smith(ring, &mut (), &mut R, A.reborrow());
+    
+    let annihilators = (0..A.col_count()).map(|i| if i < A.row_count() { ring.annihilator(A.at(i, i)) } else { ring.one() }).collect::<Vec<_>>();
+    let annihilators = annihilators.iter().enumerate().filter(|(_, a)| !ring.is_zero(a)).enumerate();
+    let mut B = OwnedMatrix::zero_in(A.col_count(), annihilators.clone().count(), ring, allocator);
+    for (i, (j, a)) in annihilators {
+        *B.at_mut(i, j) = ring.clone_el(a);
+    }
+    R.replay_transposed(ring, &mut TransformRows(B.data_mut(), ring.get_ring()));
+    return B;
 }
 
 #[stability::unstable(feature = "enable")]
@@ -423,12 +464,40 @@ fn test_determinant() {
     }
 
     let ring = RingValue::from(TestRing);
-    let A = OwnedMatrix::new(
-        vec![ 9, 0, 
-                   15, 3],
-        2
-    );
+    let A = OwnedMatrix::new(vec![9, 0, 15, 3], 2);
     assert_el_eq!(ring, 27, determinant_using_pre_smith(ring, A.clone_matrix(&ring).data_mut(), Global));
+}
+
+#[test]
+fn test_kernel_basis() {
+    let ring = StaticRing::<i64>::RING;
+    let mut A = OwnedMatrix::identity(2, 2, ring);
+    assert_matrix_eq!(ring, [[], []], kernel_basis_using_pre_smith(ring, A.data_mut(), Global));
+
+    let mut A = OwnedMatrix::zero(2, 2, ring);
+    assert_matrix_eq!(ring, [[1, 0], [0, 1]], kernel_basis_using_pre_smith(ring, A.data_mut(), Global));
+
+    let A = OwnedMatrix::new(vec![1, 1, 2, 3, 2, 1], 3);
+    let B = kernel_basis_using_pre_smith(ring, A.clone_matrix(ring).data_mut(), Global);
+    assert_eq!(1, B.col_count());
+    assert!(!ring.is_zero(B.at(0, 0)));
+    let mut product = OwnedMatrix::zero(2, 1, ring);
+    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(A.data()), TransposableSubmatrix::from(B.data()), TransposableSubmatrixMut::from(product.data_mut()), ring);
+    assert_matrix_eq!(ring, [[0], [0]], product);
+
+    let A = OwnedMatrix::new(vec![1, 1, 1, 1, 1, 1], 2);
+    let B = kernel_basis_using_pre_smith(ring, A.clone_matrix(ring).data_mut(), Global);
+    assert_eq!(1, B.col_count());
+    assert!(!ring.is_zero(B.at(0, 0)));
+    let mut product = OwnedMatrix::zero(3, 1, ring);
+    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(A.data()), TransposableSubmatrix::from(B.data()), TransposableSubmatrixMut::from(product.data_mut()), ring);
+    assert_matrix_eq!(ring, [[0], [0], [0]], product);
+
+    let ring = Zn::new(6);
+    let A = OwnedMatrix::new(vec![ring.int_hom().map(2)], 1);
+    let B = kernel_basis_using_pre_smith(ring, A.clone_matrix(ring).data_mut(), Global);
+    assert_eq!(1, B.col_count());
+    assert_matrix_eq!(ring, [[ring.int_hom().map(3)]], B);
 }
 
 #[test]
