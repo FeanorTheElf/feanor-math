@@ -2,7 +2,7 @@ use std::sync::atomic::AtomicU64;
 
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
-use tracing::{Level, event, instrument};
+use tracing::{Span, span, Level, event, instrument};
 
 use crate::algorithms;
 use crate::divisibility::*;
@@ -228,7 +228,8 @@ fn lenstra_ec_factor_base<R, F>(Zn: R, log2_p: usize, mut rng: F) -> Option<El<<
     let base_rng_value = rng();
     let rng_seed = AtomicU64::new(1);
 
-    let result = (0..attempts).into_par_iter().map(|_| {
+    let outer_span = Span::current();
+    let result = (0..attempts).into_par_iter().map(|_| span!(parent: &outer_span, Level::TRACE, "try_curve").in_scope(|| {
         let mut rng = oorandom::Rand64::new(((rng_seed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u128) << 64) | base_rng_value as u128);
         let (x, y) = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()));
         let (x_sqr, y_sqr) = (square(&Zn, &x), square(&Zn, &y));
@@ -242,7 +243,7 @@ fn lenstra_ec_factor_base<R, F>(Zn: R, log2_p: usize, mut rng: F) -> Option<El<<
         }
         
         return None;
-    }).find_any(|res| res.is_some())?;
+    })).find_any(|res| res.is_some())?;
 
     if let Some(result) = result {
         return Some(Zn.integer_ring().ideal_gen(&Zn.smallest_positive_lift(result), Zn.modulus()));
