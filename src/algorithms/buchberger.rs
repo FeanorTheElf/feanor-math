@@ -1,5 +1,5 @@
 use append_only_vec::AppendOnlyVec;
-use tracing::{Level, event, instrument};
+use tracing::{Level, Span, event, instrument, span};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::delegate::{UnwrapHom, WrapHom};
@@ -87,7 +87,7 @@ impl<C, M> SPoly<C, M> {
     {
         match self {
             SPoly::Standard { i, j } => term_lcm(&ring, ring.LT(&basis[*i], order).unwrap(), ring.LT(&basis[*j], order).unwrap()),
-            SPoly::LTAnnihilated { i: _, annihilator, annihilate_including } => (ring.base_ring().annihilator(annihilator), ring.clone_monomial(annihilate_including))
+            SPoly::LTAnnihilated { i, annihilator: _, annihilate_including } => (ring.base_ring().clone_el(ring.coefficient_at(&basis[*i], annihilate_including)), ring.clone_monomial(annihilate_including))
         }
     }
 
@@ -260,8 +260,8 @@ fn update_basis<I, P, O, SortFn>(ring: P, new_polys: I, basis: &mut Vec<El<P>>, 
         }
         if !ring.base_ring().is_unit(&ring.LT(new_poly, order).unwrap().0) {
             let mut terms = ring.terms(&new_poly).collect::<Vec<_>>();
-            terms.sort_unstable_by(|(_, l), (_, m)| order.compare(ring, *l, *m));
-            let mut current_annihilator = ring.base_ring().annihilator(&ring.LT(new_poly, order).unwrap().0);
+            terms.sort_unstable_by(|(_, l), (_, m)| order.compare(ring, *l, *m).reverse());
+            let mut current_annihilator = ring.base_ring().annihilator(&terms[0].0);
             for j in 1..terms.len() {
                 if !ring.base_ring().is_zero(&ring.base_ring().mul_ref(terms[j].0, &current_annihilator)) {
                     let new_annihilator = ring.base_ring().ideal_intersect(&current_annihilator, &ring.base_ring().annihilator(terms[j].0));
@@ -413,7 +413,8 @@ pub fn buchberger_with_strategy<P, O, SortFn, AbortFn>(ring: P, input_basis: Vec
         let new_polys = AppendOnlyVec::new();
         let reduced_to_zero = AtomicUsize::new(0);
 
-        spolys_to_reduce.into_par_iter().for_each(|spoly: &SPoly<_, _>| {
+        let outer_span = Span::current();
+        spolys_to_reduce.into_par_iter().for_each(|spoly: &SPoly<_, _>| span!(parent: &outer_span, Level::TRACE, "reduce_spoly").in_scope(|| {
             let mut f = spoly.poly(ring, &basis, order);
             
             reduce_poly(ring, &mut f, || reducers.iter().chain(new_polys.iter()).map(|(f, lmf)| (f, lmf)), order);
@@ -423,7 +424,7 @@ pub fn buchberger_with_strategy<P, O, SortFn, AbortFn>(ring: P, input_basis: Vec
             } else {
                 _ = reduced_to_zero.fetch_add(1, Ordering::Relaxed);
             }
-        });
+        }));
 
         event!(Level::TRACE, reduced_to_zero = reduced_to_zero.load(Ordering::Relaxed), new_basis_polys = considered_spolys - reduced_to_zero.load(Ordering::Relaxed));
 
