@@ -155,7 +155,7 @@ fn find_reducer<'a, 'b, P, O, I>(ring: P, f: &El<P>, reducers: I, order: O) -> O
 /// `new_spoly = S(i, k)` is filtered due to the S-polys `S(i, j)` and `S(j, k)`.
 /// For other criteria, `j = usize::MAX`.
 /// 
-#[inline(never)]
+#[instrument(skip_all, level = "trace")]
 fn filter_spoly<P, O>(ring: P, new_spoly: &SPoly<PolyCoeff<P>, PolyMonomial<P>>, basis: &[El<P>], order: O) -> Option<usize>
     where P: RingStore + Copy,
         P::Type: MultivariatePolyRing,
