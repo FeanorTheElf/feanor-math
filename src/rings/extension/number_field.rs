@@ -5,7 +5,7 @@ use std::mem::transmute;
 
 use crate::algorithms::interpolate::product_except_one;
 use crate::algorithms::newton::{self, absolute_error_of_poly_eval};
-use crate::algorithms::poly_factor::extension::poly_factor_extension;
+use crate::algorithms::poly_factor::extension::poly_factor_extfield;
 use crate::algorithms::poly_factor::factor_locally::{factor_and_lift_mod_pe, FactorAndLiftModpeResult};
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::poly_gcd::gcd_locally::poly_gcd_local;
@@ -36,7 +36,7 @@ use crate::rings::extension::sparse::SparseMapVector;
 use feanor_serde::newtype_struct::*;
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use serde::de::DeserializeSeed;
-use tracing::{Level, event, instrument, span};
+use tracing::{Level, instrument, event};
 
 use super::extension_impl::FreeAlgebraImpl;
 use super::Field;
@@ -566,7 +566,7 @@ enum HeuristicFactorPolyInOrderResult<P>
 /// there exists inert primes if and only if the Galois group of the extension is cyclic.
 /// 
 #[instrument(skip_all, level = "trace")]
-fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I>(poly_ring: P, poly: &El<P>) -> HeuristicFactorPolyInOrderResult<P>
+fn poly_factor_numberfield_heuristic<'a, P, Impl, I>(poly_ring: P, poly: &El<P>) -> HeuristicFactorPolyInOrderResult<P>
     where Impl: 'a + RingStore,
         Impl::Type: Field + FreeAlgebra,
         BaseRing<Impl>: RingStore<Type = RationalFieldBase<I>>,
@@ -576,53 +576,52 @@ fn heuristic_factor_poly_directly_in_order<'a, P, Impl, I>(poly_ring: P, poly: &
         P::Type: PolyRing + DivisibilityRing,
         BaseRing<P>: RingStore<Type = NumberFieldByOrder<Impl, I>>
 {
-    span!(Level::INFO, "factor_poly_numberfield", poly_deg = poly_ring.degree(poly).unwrap_or(0), numberfield_deg = poly_ring.base_ring().rank()).in_scope(|| {
-        let mut rng = oorandom::Rand64::new(1);
-        let self_ = poly_ring.base_ring();
+    event!(Level::TRACE, poly_deg = poly_ring.degree(poly).unwrap_or(0), numberfield_deg = poly_ring.base_ring().rank());
+    let mut rng = oorandom::Rand64::new(1);
+    let self_ = poly_ring.base_ring();
 
-        // first, we try to find an inert prime `p` and lift a factorization modulo `p` to the ring
-        'try_factor_directly: for attempt in 0..TRY_FACTOR_DIRECTLY_ATTEMPTS {
-            let mut inert_prime = None;
-            for _ in 0..(TRY_FIND_INERT_PRIME_ATTEMPTS * self_.rank()) {
-                let p = self_.get_ring().random_suitable_ideal(|| rng.rand_u64(), attempt);
-                if p.minpoly_factors_mod_p.len() == 1 {
-                    inert_prime = Some(p);
-                    break;
-                }
-            }
-            if let Some(p) = inert_prime {
-                event!(Level::INFO, prime = %IdealDisplayWrapper::new(self_.base_ring().base_ring().get_ring(), &p.prime));
-                let lc_poly = self_.clone_el(poly_ring.lc(poly).unwrap());
-                let monic_poly = evaluate_aX(poly_ring, poly, &lc_poly);
-                let e = 2 * self_.get_ring().heuristic_exponent(&p, poly_ring.degree(&monic_poly).unwrap(), poly_ring.terms(&monic_poly).map(|(c, _)| c));
-                match factor_and_lift_mod_pe(poly_ring, &p, e, &monic_poly) {
-                    FactorAndLiftModpeResult::PartialFactorization(factorization) => {
-                        debug_assert!(poly_ring.eq_el(&monic_poly, &poly_ring.normalize(poly_ring.prod(factorization.iter().map(|f| poly_ring.clone_el(f))))));
-                        let result: Vec<_> = factorization.into_iter().map(|f| (unevaluate_aX(poly_ring, &f, &lc_poly), 1)).collect();
-                        debug_assert!(poly_ring.eq_el(&poly_ring.normalize(poly_ring.clone_el(poly)), &poly_ring.normalize(poly_ring.prod(result.iter().map(|(f, e)| poly_ring.pow(poly_ring.clone_el(f), *e))))));
-                        return HeuristicFactorPolyInOrderResult::PartialFactorization(result);
-                    },
-                    FactorAndLiftModpeResult::Irreducible => {
-                        event!(Level::INFO, "irreducible");
-                        return HeuristicFactorPolyInOrderResult::Irreducible;
-                    },
-                    FactorAndLiftModpeResult::NotSquarefreeModpe => {
-                        // probably not square-free
-                        let power_decomposition = poly_power_decomposition_local(poly_ring, poly_ring.clone_el(poly));
-                        if power_decomposition.len() > 1 {
-                            event!(Level::INFO, "nontrivial_factorization");
-                            return HeuristicFactorPolyInOrderResult::PartialFactorization(power_decomposition);
-                        }
-                    },
-                    FactorAndLiftModpeResult::Unknown => {}
-                }
-            } else {
-                break 'try_factor_directly;
+    // first, we try to find an inert prime `p` and lift a factorization modulo `p` to the ring
+    'try_factor_directly: for attempt in 0..TRY_FACTOR_DIRECTLY_ATTEMPTS {
+        let mut inert_prime = None;
+        for _ in 0..(TRY_FIND_INERT_PRIME_ATTEMPTS * self_.rank()) {
+            let p = self_.get_ring().random_suitable_ideal(|| rng.rand_u64(), attempt);
+            if p.minpoly_factors_mod_p.len() == 1 {
+                inert_prime = Some(p);
+                break;
             }
         }
-        event!(Level::INFO, "no_inert_prime");
-        return HeuristicFactorPolyInOrderResult::Unknown;
-    })
+        if let Some(p) = inert_prime {
+            event!(Level::TRACE, prime = %IdealDisplayWrapper::new(self_.base_ring().base_ring().get_ring(), &p.prime));
+            let lc_poly = self_.clone_el(poly_ring.lc(poly).unwrap());
+            let monic_poly = evaluate_aX(poly_ring, poly, &lc_poly);
+            let e = 2 * self_.get_ring().heuristic_exponent(&p, poly_ring.degree(&monic_poly).unwrap(), poly_ring.terms(&monic_poly).map(|(c, _)| c));
+            match factor_and_lift_mod_pe(poly_ring, &p, e, &monic_poly) {
+                FactorAndLiftModpeResult::PartialFactorization(factorization) => {
+                    debug_assert!(poly_ring.eq_el(&monic_poly, &poly_ring.normalize(poly_ring.prod(factorization.iter().map(|f| poly_ring.clone_el(f))))));
+                    let result: Vec<_> = factorization.into_iter().map(|f| (unevaluate_aX(poly_ring, &f, &lc_poly), 1)).collect();
+                    debug_assert!(poly_ring.eq_el(&poly_ring.normalize(poly_ring.clone_el(poly)), &poly_ring.normalize(poly_ring.prod(result.iter().map(|(f, e)| poly_ring.pow(poly_ring.clone_el(f), *e))))));
+                    return HeuristicFactorPolyInOrderResult::PartialFactorization(result);
+                },
+                FactorAndLiftModpeResult::Irreducible => {
+                    event!(Level::TRACE, "irreducible");
+                    return HeuristicFactorPolyInOrderResult::Irreducible;
+                },
+                FactorAndLiftModpeResult::NotSquarefreeModpe => {
+                    // probably not square-free
+                    let power_decomposition = poly_power_decomposition_local(poly_ring, poly_ring.clone_el(poly));
+                    if power_decomposition.len() > 1 {
+                        event!(Level::TRACE, "nontrivial_factorization");
+                        return HeuristicFactorPolyInOrderResult::PartialFactorization(power_decomposition);
+                    }
+                },
+                FactorAndLiftModpeResult::Unknown => {}
+            }
+        } else {
+            break 'try_factor_directly;
+        }
+    }
+    event!(Level::TRACE, "no_inert_prime");
+    return HeuristicFactorPolyInOrderResult::Unknown;
 }
 
 impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
@@ -649,13 +648,13 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
             } else {
                 let poly_order = self_.get_ring().scale_poly_to_order(poly_ring, &order_poly_ring, &current);
                 // try the direct factorization
-                match heuristic_factor_poly_directly_in_order(&order_poly_ring, &poly_order) {
+                match poly_factor_numberfield_heuristic(&order_poly_ring, &poly_order) {
                     HeuristicFactorPolyInOrderResult::PartialFactorization(partial_factorization) => to_factor.extend(
                         partial_factorization.into_iter().map(|(f, e)| (self_.get_ring().normalize_map_back_from_order(&order_poly_ring, poly_ring, &f), e * e_base))
                     ),
                     HeuristicFactorPolyInOrderResult::Irreducible => result.push((current, e_base)),
                     HeuristicFactorPolyInOrderResult::Unknown => result.extend(
-                        poly_factor_extension(&poly_ring, &current).0.into_iter().map(|(f, e)| (f, e * e_base))
+                        poly_factor_extfield(&poly_ring, &current).0.into_iter().map(|(f, e)| (f, e * e_base))
                     )
                 }
             }
@@ -1234,16 +1233,16 @@ fn test_poly_gcd_number_field() {
 
 #[test]
 fn random_test_poly_gcd_number_field() {
-    // LogAlgorithmSubscriber::init_test();
+    LogAlgorithmSubscriber::init_test();
     
-    use tracing_subscriber::Layer;
-    use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
-    use tracing_subscriber::util::SubscriberInitExt;
-    let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
-    let filtered_chrome_layer = chrome_layer.with_filter(tracing_subscriber::filter::filter_fn(|metadata| 
-        !["feanor_math::algorithms::bigint_ops", "feanor_math::algorithms::eea", "feanor_math::algorithms::sqr_mul"].contains(&metadata.target())
-    ));
-    tracing_subscriber::registry().with(filtered_chrome_layer).init();
+    // use tracing_subscriber::Layer;
+    // use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+    // use tracing_subscriber::util::SubscriberInitExt;
+    // let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
+    // let filtered_chrome_layer = chrome_layer.with_filter(tracing_subscriber::filter::filter_fn(|metadata| 
+    //     !["feanor_math::algorithms::bigint_ops", "feanor_math::algorithms::eea", "feanor_math::algorithms::sqr_mul"].contains(&metadata.target())
+    // ));
+    // tracing_subscriber::registry().with(filtered_chrome_layer).init();
 
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);

@@ -1,8 +1,6 @@
 use std::marker::PhantomData;
 
-use tracing::Level;
 use tracing::instrument;
-use tracing::span;
 
 use crate::algorithms::int_factor::is_prime_power;
 use crate::pid::*;
@@ -423,9 +421,7 @@ pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2>(
     assert!(factors.as_iter().all(|f| base_poly_ring.base_ring().is_one(base_poly_ring.lc(f).unwrap())));
     assert!(target_poly_ring.base_ring().get_ring() == reduction_map.domain().get_ring());
     
-    span!(Level::INFO, "hensel_lift_factorization", num_factors = factors.len()).in_scope(|| {
-        hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, f, factors)
-    })
+    hensel_lift_factorization_internal(reduction_map, target_poly_ring, base_poly_ring, f, factors)
 }
 
 #[cfg(test)]

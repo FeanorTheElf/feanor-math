@@ -27,7 +27,7 @@ pub type PolyMonomial<P> = <<P as RingStore>::Type as MultivariatePolyRing>::Mon
 /// 
 pub trait MultivariatePolyRing: RingExtension {
 
-    type Monomial;
+    type Monomial: Send + Sync;
     type TermIter<'a>: Iterator<Item = (&'a El<Self::BaseRing>, &'a Self::Monomial)>
         where Self: 'a;
 

@@ -2,7 +2,7 @@ use std::sync::atomic::AtomicU64;
 
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
-use tracing::{Level, event, instrument, span};
+use tracing::{Level, event, instrument};
 
 use crate::algorithms;
 use crate::divisibility::*;
@@ -204,53 +204,52 @@ fn lenstra_ec_factor_base<R, F>(Zn: R, log2_p: usize, mut rng: F) -> Option<El<<
         R::Type: ZnRing + DivisibilityRing,
         F: FnMut() -> u64 + Send
 {
-    span!(Level::INFO, "ec_factor", log2_n = Zn.integer_ring().abs_log2_ceil(Zn.modulus()).unwrap(), log2_p = log2_p).in_scope(|| {
+    event!(Level::TRACE, log2_n = Zn.integer_ring().abs_log2_ceil(Zn.modulus()).unwrap(), log2_p = log2_p);
 
-        let ZZ = BigIntRing::RING;
-        assert!(ZZ.is_leq(&ZZ.power_of_two(log2_p * 2), &Zn.size(&ZZ).unwrap()));
-        let log2_n = ZZ.abs_log2_ceil(&Zn.size(&ZZ).unwrap()).unwrap();
-        let ln_p = log2_p as f64 * 2f64.ln();
-        let (ln_B, ln_attempts) = optimize_parameters(ln_p, log2_n as f64 * 2f64.ln());
-        // after this many random curves, we expect to have found a factor with high probability, unless there is no factor of size about `log2_size`
-        let attempts = ln_attempts.exp() as usize;
-        event!(Level::INFO, check_curves = attempts);
+    let ZZ = BigIntRing::RING;
+    assert!(ZZ.is_leq(&ZZ.power_of_two(log2_p * 2), &Zn.size(&ZZ).unwrap()));
+    let log2_n = ZZ.abs_log2_ceil(&Zn.size(&ZZ).unwrap()).unwrap();
+    let ln_p = log2_p as f64 * 2f64.ln();
+    let (ln_B, ln_attempts) = optimize_parameters(ln_p, log2_n as f64 * 2f64.ln());
+    // after this many random curves, we expect to have found a factor with high probability, unless there is no factor of size about `log2_size`
+    let attempts = ln_attempts.exp() as usize;
+    event!(Level::TRACE, check_curves = attempts);
 
-        let log2_B = ln_B / 2f64.ln();
-        assert!(log2_B <= i128::MAX as f64);
+    let log2_B = ln_B / 2f64.ln();
+    assert!(log2_B <= i128::MAX as f64);
 
-        let primes = algorithms::erathostenes::enumerate_primes(&StaticRing::<i128>::RING, &(1i128 << (log2_B as u64)));
-        let power_factorization = primes.iter()
-            .map(|p| (*p, log2_B.ceil() as usize / StaticRing::<i128>::RING.abs_log2_ceil(&p).unwrap()))
-            .collect::<Vec<_>>();
-        let power = ZZ.prod(power_factorization.iter().map(|(p, e)| ZZ.pow(ZZ.coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, *p), *e)));
-        let power_ref = &power;
+    let primes = algorithms::erathostenes::enumerate_primes(&StaticRing::<i128>::RING, &(1i128 << (log2_B as u64)));
+    let power_factorization = primes.iter()
+        .map(|p| (*p, log2_B.ceil() as usize / StaticRing::<i128>::RING.abs_log2_ceil(&p).unwrap()))
+        .collect::<Vec<_>>();
+    let power = ZZ.prod(power_factorization.iter().map(|(p, e)| ZZ.pow(ZZ.coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, *p), *e)));
+    let power_ref = &power;
 
-        let base_rng_value = rng();
-        let rng_seed = AtomicU64::new(1);
+    let base_rng_value = rng();
+    let rng_seed = AtomicU64::new(1);
 
-        let result = (0..attempts).into_par_iter().map(|_| {
-            let mut rng = oorandom::Rand64::new(((rng_seed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u128) << 64) | base_rng_value as u128);
-            let (x, y) = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()));
-            let (x_sqr, y_sqr) = (square(&Zn, &x), square(&Zn, &y));
-            if let Some(d) = Zn.checked_div(&Zn.sub(Zn.add_ref(&x_sqr, &y_sqr), Zn.one()), &Zn.mul(x_sqr, y_sqr)) {
-                let P = (x, y, Zn.one());
-                debug_assert!(is_on_curve(&Zn, &d, &P));
-                let result = ec_pow(&P, &d, power_ref, &Zn).0;
-                if !Zn.is_unit(&result) && !Zn.is_zero(&result) {
-                    return Some(result);
-                }
+    let result = (0..attempts).into_par_iter().map(|_| {
+        let mut rng = oorandom::Rand64::new(((rng_seed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u128) << 64) | base_rng_value as u128);
+        let (x, y) = (Zn.random_element(|| rng.rand_u64()), Zn.random_element(|| rng.rand_u64()));
+        let (x_sqr, y_sqr) = (square(&Zn, &x), square(&Zn, &y));
+        if let Some(d) = Zn.checked_div(&Zn.sub(Zn.add_ref(&x_sqr, &y_sqr), Zn.one()), &Zn.mul(x_sqr, y_sqr)) {
+            let P = (x, y, Zn.one());
+            debug_assert!(is_on_curve(&Zn, &d, &P));
+            let result = ec_pow(&P, &d, power_ref, &Zn).0;
+            if !Zn.is_unit(&result) && !Zn.is_zero(&result) {
+                return Some(result);
             }
-            
-            return None;
-        }).find_any(|res| res.is_some())?;
-
-        if let Some(result) = result {
-            return Some(Zn.integer_ring().ideal_gen(&Zn.smallest_positive_lift(result), Zn.modulus()));
-        } else {
-            event!(Level::INFO, "failed");
-            return None;
         }
-    })
+        
+        return None;
+    }).find_any(|res| res.is_some())?;
+
+    if let Some(result) = result {
+        return Some(Zn.integer_ring().ideal_gen(&Zn.smallest_positive_lift(result), Zn.modulus()));
+    } else {
+        event!(Level::TRACE, "failed");
+        return None;
+    }
 }
 
 ///

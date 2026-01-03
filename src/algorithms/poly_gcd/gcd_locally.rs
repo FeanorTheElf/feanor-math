@@ -1,7 +1,6 @@
 use dense_poly::DensePolyRing;
 use squarefree_part::poly_power_decomposition_monic_local;
-use tracing::instrument;
-use tracing::{Level, event, span};
+use tracing::{Level, instrument, event};
 
 use crate::algorithms::poly_gcd::*;
 use crate::algorithms::poly_gcd::hensel::*;
@@ -54,7 +53,7 @@ fn poly_gcd_monic_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F
     let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt.try_into().unwrap())).floor() as usize;
     let reduction = PolyLiftFactorsDomainReductionContext::new(ring, &ideal, e);
 
-    event!(Level::INFO, ideal = %IdealDisplayWrapper::new(ring, &ideal), exponent = e, maximal_ideal_count = reduction.len());
+    event!(Level::TRACE, ideal = %IdealDisplayWrapper::new(ring, &ideal), exponent = e, maximal_ideal_count = reduction.len());
 
     let mut signature: Option<Signature> = None;
     let mut poly_rings_mod_me = Vec::new();
@@ -79,11 +78,11 @@ fn poly_gcd_monic_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F
         } else if FX.is_unit(&FX.ideal_gen(&d, &g_over_d)) {
             (g, d, g_over_d, Signature { gcd_deg: deg_d, coprime_to_f_over_d: false })
         } else {
-            event!(Level::INFO, "not_coprime");
+            event!(Level::TRACE, "not_coprime");
             return None;
         };
         if signature.is_some() && signature.as_ref().unwrap() != &new_signature {
-            event!(Level::INFO, "signature_mismatch");
+            event!(Level::TRACE, "signature_mismatch");
             return None;
         }
         signature = Some(new_signature);
@@ -105,7 +104,7 @@ fn poly_gcd_monic_coprime_local<P, F>(poly_ring: P, f: &El<P>, g: &El<P>, rng: F
 
     let divides_f_and_g = poly_ring.divides(&f, &result) && poly_ring.divides(&g, &result);
     if !divides_f_and_g {
-        event!(Level::INFO, "invalid_lift");
+        event!(Level::TRACE, "invalid_lift");
         return None;
     } else {
         _ = poly_ring.balance_poly(&mut result);
@@ -169,37 +168,36 @@ pub fn poly_gcd_monic_local<'a, P>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(g).unwrap()));
 
-    span!(Level::INFO, "poly_gcd", lhs_deg = poly_ring.degree(f).unwrap(), rhs_deg = poly_ring.degree(g).unwrap()).in_scope(|| {
+    event!(Level::TRACE, lhs_deg = poly_ring.degree(f).unwrap(), rhs_deg = poly_ring.degree(g).unwrap());
 
-        let mut rng = oorandom::Rand64::new(1);
-        for attempt in 0..HOPE_FOR_SQUAREFREE_TRIES {
-            if let Some(result) = poly_gcd_monic_coprime_local(poly_ring, f, g, || rng.rand_u64(), attempt) {
-                return result;
-            }
+    let mut rng = oorandom::Rand64::new(1);
+    for attempt in 0..HOPE_FOR_SQUAREFREE_TRIES {
+        if let Some(result) = poly_gcd_monic_coprime_local(poly_ring, f, g, || rng.rand_u64(), attempt) {
+            return result;
         }
-        if poly_ring.degree(g).unwrap_or(0) <= poly_ring.degree(f).unwrap_or(0) {
-            std::mem::swap(&mut f, &mut g);
-        }
-        let f_power_decomposition = poly_power_decomposition_monic_local(poly_ring, f);
-        let mut g = poly_ring.clone_el(g);
-        let mut d = poly_ring.one();
+    }
+    if poly_ring.degree(g).unwrap_or(0) <= poly_ring.degree(f).unwrap_or(0) {
+        std::mem::swap(&mut f, &mut g);
+    }
+    let f_power_decomposition = poly_power_decomposition_monic_local(poly_ring, f);
+    let mut g = poly_ring.clone_el(g);
+    let mut d = poly_ring.one();
 
-        'extract_part_i: for i in 1.. {
-            let squarefree_part_i = poly_ring.prod(f_power_decomposition.iter().filter(|(_, j)| *j >= i).map(|(fj, _)| poly_ring.clone_el(fj)));
-            if poly_ring.is_one(&squarefree_part_i) {
-                return d;
+    'extract_part_i: for i in 1.. {
+        let squarefree_part_i = poly_ring.prod(f_power_decomposition.iter().filter(|(_, j)| *j >= i).map(|(fj, _)| poly_ring.clone_el(fj)));
+        if poly_ring.is_one(&squarefree_part_i) {
+            return d;
+        }
+        for attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
+            if let Some(di) = poly_gcd_coprime_local(poly_ring, poly_ring.clone_el(&squarefree_part_i), poly_ring.clone_el(&g), || rng.rand_u64(), attempt) {
+                g = poly_ring.checked_div(&g, &di).unwrap();
+                poly_ring.mul_assign(&mut d, di);
+                continue 'extract_part_i;
             }
-            for attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
-                if let Some(di) = poly_gcd_coprime_local(poly_ring, poly_ring.clone_el(&squarefree_part_i), poly_ring.clone_el(&g), || rng.rand_u64(), attempt) {
-                    g = poly_ring.checked_div(&g, &di).unwrap();
-                    poly_ring.mul_assign(&mut d, di);
-                    continue 'extract_part_i;
-                }
-            }
-            unreachable!()
         }
         unreachable!()
-    })
+    }
+    unreachable!()
 }
 
 ///

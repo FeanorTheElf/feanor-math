@@ -30,7 +30,7 @@ pub struct ProbablyNotSquarefree;
 /// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn poly_factor_squarefree_extension<P>(LX: P, f: &El<P>, attempts: usize) -> Result<Vec<El<P>>, ProbablyNotSquarefree>
+pub fn poly_factor_extfield_squarefree<P>(LX: P, f: &El<P>, attempts: usize) -> Result<Vec<El<P>>, ProbablyNotSquarefree>
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <BaseRing<P> as RingStore>::Type: Field + FreeAlgebra + PolyTFracGCDRing,
@@ -111,7 +111,7 @@ pub fn poly_factor_squarefree_extension<P>(LX: P, f: &El<P>, attempts: usize) ->
 /// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn poly_factor_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<BaseRing<P>>)
+pub fn poly_factor_extfield<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<BaseRing<P>>)
     where P: RingStore,
         P::Type: PolyRing + EuclideanRing,
         <BaseRing<P> as RingStore>::Type: FreeAlgebra + PerfectField + FiniteRingSpecializable + PolyTFracGCDRing,
@@ -133,7 +133,7 @@ pub fn poly_factor_extension<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>
     assert!(!KX.is_zero(f));
     let mut result: Vec<(El<P>, usize)> = Vec::new();
     for (non_irred_factor, k) in <_ as PolyTFracGCDRing>::power_decomposition(KX, f) {
-        for factor in poly_factor_squarefree_extension(KX, &non_irred_factor, MAX_PROBABILISTIC_REPETITIONS).ok().unwrap() {
+        for factor in poly_factor_extfield_squarefree(KX, &non_irred_factor, MAX_PROBABILISTIC_REPETITIONS).ok().unwrap() {
             if let Some((i, _)) = result.iter().enumerate().filter(|(_, f)| KX.eq_el(&f.0, &factor)).next() {
                 result[i].1 += k;
             } else {

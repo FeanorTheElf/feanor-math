@@ -1,6 +1,4 @@
-use tracing::Level;
-use tracing::instrument;
-use tracing::span;
+use tracing::{Level, instrument, event};
 
 use crate::algorithms::matmul::naive_matmul;
 use crate::matrix::*;
@@ -546,116 +544,115 @@ pub fn strassen<R, V1, V2, V3, A, const T1: bool, const T2: bool, const T3: bool
         return;
     }
 
-    span!(Level::INFO, "strassen_matmul", n = lhs.row_count(), k = lhs.col_count(), m = rhs.col_count()).in_scope(|| {
+    event!(Level::TRACE, n = lhs.row_count(), k = lhs.col_count(), m = rhs.col_count());
 
-        const ZZ: StaticRing<i64> = StaticRing::<i64>::RING;
+    const ZZ: StaticRing<i64> = StaticRing::<i64>::RING;
 
-        let max_block_size_log2 = [
-            ZZ.abs_log2_floor(&lhs.row_count().try_into().unwrap()),
-            ZZ.abs_log2_floor(&lhs.col_count().try_into().unwrap()),
-            ZZ.abs_log2_floor(&rhs.col_count().try_into().unwrap())
-        ].into_iter().min().unwrap().unwrap();
+    let max_block_size_log2 = [
+        ZZ.abs_log2_floor(&lhs.row_count().try_into().unwrap()),
+        ZZ.abs_log2_floor(&lhs.col_count().try_into().unwrap()),
+        ZZ.abs_log2_floor(&rhs.col_count().try_into().unwrap())
+    ].into_iter().min().unwrap().unwrap();
         
-        let memory_size = strassen_mem_size(add_assign || (lhs.col_count() >= (2 << max_block_size_log2)), max_block_size_log2, threshold_log2);
-        let mut memory = Vec::with_capacity_in(memory_size, allocator);
-        memory.resize_with(memory_size, || ring.zero());
+    let memory_size = strassen_mem_size(add_assign || (lhs.col_count() >= (2 << max_block_size_log2)), max_block_size_log2, threshold_log2);
+    let mut memory = Vec::with_capacity_in(memory_size, allocator);
+    memory.resize_with(memory_size, || ring.zero());
 
-        let mut matmul_part = |block_size_log2: usize, lhs_rows: Range<usize>, ks: Range<usize>, rhs_cols: Range<usize>, add_assign: bool| {
-            let block_size = 1 << block_size_log2;
-            debug_assert_eq!(lhs_rows.len() % block_size, 0);
-            debug_assert_eq!(ks.len() % block_size, 0);
-            debug_assert_eq!(rhs_cols.len() % block_size, 0);
-            if lhs_rows.len() == 0 || ks.len() == 0 || rhs_cols.len() == 0 {
-                return;
-            }
-            for lhs_row in lhs_rows.step_by(block_size) {
-                for rhs_col in rhs_cols.clone().step_by(block_size) {
-                    for k in ks.clone().step_by(block_size) {
-                        if add_assign || k > 0 {
-                            dispatch_strassen_impl::<_, _, _, _, true, T1, T2, T3>(
-                                block_size_log2, 
-                                threshold_log2, 
-                                lhs.submatrix(lhs_row..(lhs_row + block_size), k..(k + block_size)), 
-                                rhs.submatrix(k..(k + block_size), rhs_col..(rhs_col + block_size)), 
-                                dst.reborrow().submatrix(lhs_row..(lhs_row + block_size), rhs_col..(rhs_col + block_size)), 
-                                ring, 
-                                &mut memory
-                            );
-                        } else {
-                            dispatch_strassen_impl::<_, _, _, _, false, T1, T2, T3>(
-                                block_size_log2, 
-                                threshold_log2, 
-                                lhs.submatrix(lhs_row..(lhs_row + block_size), k..(k + block_size)), 
-                                rhs.submatrix(k..(k + block_size), rhs_col..(rhs_col + block_size)), 
-                                dst.reborrow().submatrix(lhs_row..(lhs_row + block_size), rhs_col..(rhs_col + block_size)), 
-                                ring, 
-                                &mut memory
-                            );
-                        }
+    let mut matmul_part = |block_size_log2: usize, lhs_rows: Range<usize>, ks: Range<usize>, rhs_cols: Range<usize>, add_assign: bool| {
+        let block_size = 1 << block_size_log2;
+        debug_assert_eq!(lhs_rows.len() % block_size, 0);
+        debug_assert_eq!(ks.len() % block_size, 0);
+        debug_assert_eq!(rhs_cols.len() % block_size, 0);
+        if lhs_rows.len() == 0 || ks.len() == 0 || rhs_cols.len() == 0 {
+            return;
+        }
+        for lhs_row in lhs_rows.step_by(block_size) {
+            for rhs_col in rhs_cols.clone().step_by(block_size) {
+                for k in ks.clone().step_by(block_size) {
+                    if add_assign || k > 0 {
+                        dispatch_strassen_impl::<_, _, _, _, true, T1, T2, T3>(
+                            block_size_log2, 
+                            threshold_log2, 
+                            lhs.submatrix(lhs_row..(lhs_row + block_size), k..(k + block_size)), 
+                            rhs.submatrix(k..(k + block_size), rhs_col..(rhs_col + block_size)), 
+                            dst.reborrow().submatrix(lhs_row..(lhs_row + block_size), rhs_col..(rhs_col + block_size)), 
+                            ring, 
+                            &mut memory
+                        );
+                    } else {
+                        dispatch_strassen_impl::<_, _, _, _, false, T1, T2, T3>(
+                            block_size_log2, 
+                            threshold_log2, 
+                            lhs.submatrix(lhs_row..(lhs_row + block_size), k..(k + block_size)), 
+                            rhs.submatrix(k..(k + block_size), rhs_col..(rhs_col + block_size)), 
+                            dst.reborrow().submatrix(lhs_row..(lhs_row + block_size), rhs_col..(rhs_col + block_size)), 
+                            ring, 
+                            &mut memory
+                        );
                     }
                 }
             }
-        };
+        }
+    };
 
-        let mut lhs_included_rows = 0;
-        let mut included_k = 0;
-        let mut rhs_included_cols = 0;
-        let mut current_block_size_log2 = max_block_size_log2;
-        loop {
-            // complete using naive algorithm, this is significantly faster than going down all the block sizes
-            if current_block_size_log2 <= threshold_log2 {
-                if add_assign {
-                    naive_matmul::<_, _, _, _, true, T1, T2, T3>(
-                        lhs.submatrix(lhs_included_rows..lhs.row_count(), 0..included_k), 
-                        rhs.submatrix(0..included_k, 0..rhs_included_cols), 
-                        dst.reborrow().submatrix(lhs_included_rows..lhs.row_count(), 0..rhs_included_cols), 
-                        ring
-                    );
-                    naive_matmul::<_, _, _, _, true, T1, T2, T3>(
-                        lhs.submatrix(0..lhs.row_count(), 0..included_k), 
-                        rhs.submatrix(0..included_k, rhs_included_cols..rhs.col_count()), 
-                        dst.reborrow().submatrix(0..lhs.row_count(), rhs_included_cols..rhs.col_count()), 
-                        ring
-                    );
-                } else {
-                    naive_matmul::<_, _, _, _, false, T1, T2, T3>(
-                        lhs.submatrix(lhs_included_rows..lhs.row_count(), 0..included_k), 
-                        rhs.submatrix(0..included_k, 0..rhs_included_cols), 
-                        dst.reborrow().submatrix(lhs_included_rows..lhs.row_count(), 0..rhs_included_cols), 
-                        ring
-                    );
-                    naive_matmul::<_, _, _, _, false, T1, T2, T3>(
-                        lhs.submatrix(0..lhs.row_count(), 0..included_k), 
-                        rhs.submatrix(0..included_k, rhs_included_cols..rhs.col_count()), 
-                        dst.reborrow().submatrix(0..lhs.row_count(), rhs_included_cols..rhs.col_count()), 
-                        ring
-                    );
-                }
+    let mut lhs_included_rows = 0;
+    let mut included_k = 0;
+    let mut rhs_included_cols = 0;
+    let mut current_block_size_log2 = max_block_size_log2;
+    loop {
+        // complete using naive algorithm, this is significantly faster than going down all the block sizes
+        if current_block_size_log2 <= threshold_log2 {
+            if add_assign {
                 naive_matmul::<_, _, _, _, true, T1, T2, T3>(
-                    lhs.submatrix(0..lhs.row_count(), included_k..lhs.col_count()), 
-                    rhs.submatrix(included_k..rhs.row_count(), 0..rhs.col_count()), 
-                    dst.submatrix(0..lhs.row_count(), 0..rhs.col_count()), 
+                    lhs.submatrix(lhs_included_rows..lhs.row_count(), 0..included_k), 
+                    rhs.submatrix(0..included_k, 0..rhs_included_cols), 
+                    dst.reborrow().submatrix(lhs_included_rows..lhs.row_count(), 0..rhs_included_cols), 
                     ring
                 );
-                return;
-            }
-            let block_size = 1 << current_block_size_log2;
-            if included_k + block_size <= lhs.col_count() {
-                matmul_part(current_block_size_log2, 0..lhs_included_rows, included_k..(included_k + block_size), 0..rhs_included_cols, true);
-                included_k += block_size;
-            } else if rhs_included_cols + block_size <= rhs.col_count() {
-                matmul_part(current_block_size_log2, 0..lhs_included_rows, 0..included_k, rhs_included_cols..(rhs_included_cols + block_size), add_assign);
-                rhs_included_cols += block_size;
-            } else if lhs_included_rows + block_size <= lhs.row_count() {
-                matmul_part(current_block_size_log2, lhs_included_rows..(lhs_included_rows + block_size), 0..included_k, 0..rhs_included_cols, add_assign);
-                lhs_included_rows += block_size;
-            } else if current_block_size_log2 == 0 {
-                return;
+                naive_matmul::<_, _, _, _, true, T1, T2, T3>(
+                    lhs.submatrix(0..lhs.row_count(), 0..included_k), 
+                    rhs.submatrix(0..included_k, rhs_included_cols..rhs.col_count()), 
+                    dst.reborrow().submatrix(0..lhs.row_count(), rhs_included_cols..rhs.col_count()), 
+                    ring
+                );
             } else {
-                current_block_size_log2 -= 1;
+                naive_matmul::<_, _, _, _, false, T1, T2, T3>(
+                    lhs.submatrix(lhs_included_rows..lhs.row_count(), 0..included_k), 
+                    rhs.submatrix(0..included_k, 0..rhs_included_cols), 
+                    dst.reborrow().submatrix(lhs_included_rows..lhs.row_count(), 0..rhs_included_cols), 
+                    ring
+                );
+                naive_matmul::<_, _, _, _, false, T1, T2, T3>(
+                    lhs.submatrix(0..lhs.row_count(), 0..included_k), 
+                    rhs.submatrix(0..included_k, rhs_included_cols..rhs.col_count()), 
+                    dst.reborrow().submatrix(0..lhs.row_count(), rhs_included_cols..rhs.col_count()), 
+                    ring
+                );
             }
+            naive_matmul::<_, _, _, _, true, T1, T2, T3>(
+                lhs.submatrix(0..lhs.row_count(), included_k..lhs.col_count()), 
+                rhs.submatrix(included_k..rhs.row_count(), 0..rhs.col_count()), 
+                dst.submatrix(0..lhs.row_count(), 0..rhs.col_count()), 
+                ring
+            );
+            return;
         }
-    })
+        let block_size = 1 << current_block_size_log2;
+        if included_k + block_size <= lhs.col_count() {
+            matmul_part(current_block_size_log2, 0..lhs_included_rows, included_k..(included_k + block_size), 0..rhs_included_cols, true);
+            included_k += block_size;
+        } else if rhs_included_cols + block_size <= rhs.col_count() {
+            matmul_part(current_block_size_log2, 0..lhs_included_rows, 0..included_k, rhs_included_cols..(rhs_included_cols + block_size), add_assign);
+            rhs_included_cols += block_size;
+        } else if lhs_included_rows + block_size <= lhs.row_count() {
+            matmul_part(current_block_size_log2, lhs_included_rows..(lhs_included_rows + block_size), 0..included_k, 0..rhs_included_cols, add_assign);
+            lhs_included_rows += block_size;
+        } else if current_block_size_log2 == 0 {
+            return;
+        } else {
+            current_block_size_log2 -= 1;
+        }
+    }
 }
 
 #[cfg(test)]

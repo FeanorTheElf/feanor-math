@@ -5,7 +5,7 @@ use std::io::stdout;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::ops::RangeInclusive;
-use std::sync::RwLock;
+use std::sync::{Mutex, RwLock};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 use std::time::Instant;
@@ -63,14 +63,21 @@ struct SpanState {
     description: String,
     /// span metadata
     metadata: &'static Metadata<'static>,
-    /// whether the span is currently allowed to produce logs
+    /// whether the span is currently allowed to produce logs; A permission is created for
+    /// every root span, and moved (not copied) to the first entered child span. Once a span
+    /// is exited, the permission is given back to the parent span.
     logging_permission: LoggingPermissionHolder,
-    /// to ensure that a span is not entered by multiple threads at the same time
+    /// Messages that would be printed during the first `span_min_duration` microseconds of the
+    /// span are instead queued here, and printed with the first print that happens after
+    /// `span_min_duration` are passed
+    queued_messages: Mutex<Vec<String>>,
+    /// whether the queued messages have been printed
+    printed_queued_messages: AtomicBool,
+    /// dual purpose: track time, and ensure that a span is not entered by multiple threads
+    /// at the same time; a span that is not entered has the value `0` here
     entered_timestamp: AtomicU64,
     /// on which level of the span tree this span is
     level: usize,
-    /// whether the operation performed by the span is to be considered "small" or "cheap"
-    is_small: bool
 }
 
 pub struct LogAlgorithmSubscriber {
@@ -79,19 +86,28 @@ pub struct LogAlgorithmSubscriber {
     current_span: ThreadLocal<Cell<Option<NonZeroU64>>>,
     default_instant: Instant,
     interested_level: RangeInclusive<Level>,
-    max_depth: usize
+    max_depth: usize,
+    span_min_duration: u64
 }
 
 impl LogAlgorithmSubscriber {
 
-    pub fn init(levels: RangeInclusive<Level>, max_depth: usize) {
+    ///
+    /// Initializes a [`LogAlgorithmsSubscriber`], which will print to stdout all
+    /// tracing `span!`s and `events!` that match the following:
+    ///  - the tracing level is within `levels`
+    ///  - the spans are nested at most `max_depth` deep
+    ///  - the current span is running for at least `span_min_duration_in_micros` microseconds
+    /// 
+    pub fn init(levels: RangeInclusive<Level>, max_depth: usize, span_min_duration_in_micros: u64) {
         tracing::subscriber::set_global_default(Self { 
             span_ids: AtomicU64::new(1), 
             span_map: RwLock::new(HashMap::new()), 
             current_span: ThreadLocal::new(),
             default_instant: Instant::now(),
             max_depth: max_depth,
-            interested_level: levels
+            interested_level: levels,
+            span_min_duration: span_min_duration_in_micros
         }).unwrap()
     }
 
@@ -101,8 +117,9 @@ impl LogAlgorithmSubscriber {
             span_map: RwLock::new(HashMap::new()), 
             current_span: ThreadLocal::new(),
             default_instant: Instant::now(),
-            interested_level: Level::INFO..=Level::INFO,
-            max_depth: 2
+            interested_level: Level::ERROR..=Level::TRACE,
+            max_depth: 4,
+            span_min_duration: 100000
         })
     }
 
@@ -113,18 +130,86 @@ impl LogAlgorithmSubscriber {
     fn span_map_mut<'a>(&'a self) -> RwLockWriteGuard<'a, HashMap<Id, SpanState>> {
         self.span_map.write().unwrap()
     }
+
+    fn take_permission_for_span(&self, span_map: &RwLockReadGuard<HashMap<Id, SpanState>>, span: &SpanState) {
+        if span.logging_permission.has_permission() {
+            if let Ok(_) = span.printed_queued_messages.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst) {
+                for message in span.queued_messages.lock().unwrap().drain(..) {
+                    print!("{}", message);
+                }
+                std::io::Write::flush(&mut stdout()).unwrap();
+            }
+            return;
+        }
+        if let Some(parent) = &span.parent {
+            let parent = span_map.get(parent).unwrap();
+            self.take_permission_for_span(span_map, parent);
+            if let Some(permission) = parent.logging_permission.take() {
+                // println!("taking permission from parent {} to {}", parent.description, span.description);
+                if let Ok(_) = span.printed_queued_messages.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst) {
+                    for message in span.queued_messages.lock().unwrap().drain(..) {
+                        print!("{}", message);
+                    }
+                    std::io::Write::flush(&mut stdout()).unwrap();
+                }
+                span.logging_permission.give(permission);
+            }
+        }
+    }
+
+    ///
+    /// If the current span has been running for at least `span_min_duration` microseconds,
+    /// this function will try to obtain the logging permission, and if granted, log the given
+    /// message. Otherwise, they will be queued and printed together with the first message
+    /// at which the span has been running for at least that long, assuming there is any.
+    /// 
+    /// Note that in cases that the time given by `Instant::now()` is non-monotonous, rare
+    /// cases of wrong (dropped or misordered) logging may occur.
+    /// 
+    fn delayed_print_messages<'a, I: IntoIterator<Item = String>>(&self, current_span: Option<&SpanState>, span_map: &RwLockReadGuard<HashMap<Id, SpanState>>, messages: I) {
+        if let Some(current_span) = current_span {
+            if current_span.printed_queued_messages.load(Ordering::SeqCst) {
+                // println!("directly printing");
+                if current_span.logging_permission.has_permission() {
+                    for message in messages {
+                        print!("{}", message);
+                    }
+                    std::io::Write::flush(&mut stdout()).unwrap();
+                }
+                return;
+            }
+            let runtime = self.default_instant.elapsed().as_micros() as u64 - current_span.entered_timestamp.load(Ordering::SeqCst);
+            if runtime > self.span_min_duration {
+                self.take_permission_for_span(span_map, current_span);
+                if current_span.logging_permission.has_permission() {
+                    for message in messages {
+                        print!("{}", message);
+                    }
+                    std::io::Write::flush(&mut stdout()).unwrap();
+                }
+            } else {
+                let messages = messages.into_iter().collect::<Vec<_>>();
+                // println!("queueing {} -> {}", &messages[0], current_span.description);
+                current_span.queued_messages.lock().unwrap().extend(messages);
+            }
+        } else {
+            for message in messages {
+                print!("{}", message);
+            }
+            std::io::Write::flush(&mut stdout()).unwrap();
+        }
+    }
 }
 
 struct FieldRecorder {
     message: Option<String>,
-    fields: Option<String>,
-    is_small: bool
+    fields: Option<String>
 }
 
 impl FieldRecorder {
 
     fn new() -> Self {
-        Self { message: None, fields: None, is_small: false }
+        Self { message: None, fields: None }
     }
 
     fn to_string(self) -> String {
@@ -172,14 +257,6 @@ impl Visit for FieldRecorder {
             }
         }
     }
-
-    fn record_bool(&mut self, field: &Field, value: bool) {
-        if field.name() == "is_small" {
-            self.is_small = value;
-        } else {
-            self.record_debug(field, &value);
-        }
-    }
 }
 
 impl Subscriber for LogAlgorithmSubscriber {
@@ -214,15 +291,21 @@ impl Subscriber for LogAlgorithmSubscriber {
         span.record(&mut fields);
         fields.message = Some(span.metadata().name().to_owned());
 
+        let logging_permission = LoggingPermissionHolder::new();
+        if parent.is_none() {
+            logging_permission.give(LoggingPermission::create_new_permission());
+        }
+
         assert!(spans.insert(Id::from_non_zero_u64(id), SpanState {
             parent: parent,
             level: level,
             metadata: span.metadata(),
             reference_counter: AtomicUsize::new(1),
-            is_small: fields.is_small,
             description: fields.to_string(),
-            logging_permission: LoggingPermissionHolder::new(),
-            entered_timestamp: AtomicU64::new(0)
+            logging_permission: logging_permission,
+            entered_timestamp: AtomicU64::new(0),
+            printed_queued_messages: AtomicBool::new(false),
+            queued_messages: Mutex::new(Vec::new())
         }).is_none());
         return Id::from_non_zero_u64(id);
     }
@@ -242,10 +325,7 @@ impl Subscriber for LogAlgorithmSubscriber {
             if current_span.is_none() || (current_span.unwrap().logging_permission.has_permission() && current_span.unwrap().level < self.max_depth) {
                 let mut fields = FieldRecorder::new();
                 event.record(&mut fields);
-                if !fields.is_small {
-                    print!("{}", fields.to_string());
-                    std::io::Write::flush(&mut stdout()).unwrap();
-                }
+                self.delayed_print_messages(current_span, &span_map, [fields.to_string()]);
             }
         }
     }
@@ -254,46 +334,32 @@ impl Subscriber for LogAlgorithmSubscriber {
         self.current_span.get_or(|| Cell::new(None)).set(Some(span.into_non_zero_u64()));
         let span_map = self.span_map();
         let entered_span = span_map.get(span).unwrap();
-        let permission = if let Some(parent) = &entered_span.parent {
-            span_map.get(&parent).unwrap().logging_permission.take()
-        } else {
-            Some(LoggingPermission::create_new_permission())
-        };
-        if permission.is_some() && !entered_span.is_small {
-            if entered_span.level < self.max_depth {
-                print!("{}", entered_span.description);
-                std::io::Write::flush(&mut stdout()).unwrap();
-            }
-            if entered_span.level == self.max_depth {
-                print!("{}...", entered_span.description);
-                std::io::Write::flush(&mut stdout()).unwrap();
-            }
-        }
         assert!(entered_span.entered_timestamp.compare_exchange(0, Instant::now().duration_since(self.default_instant).as_micros() as u64, Ordering::SeqCst, Ordering::SeqCst).is_ok(), "entered an already running span");
-        if let Some(permission) = permission {
-            entered_span.logging_permission.give(permission);
+        if entered_span.level < self.max_depth {
+            self.delayed_print_messages(Some(entered_span), &span_map, [entered_span.description.clone()]);
+        } else if entered_span.level == self.max_depth {
+            self.delayed_print_messages(Some(entered_span), &span_map, [format!("{}...", entered_span.description)]);
         }
     }
 
     fn exit(&self, span: &Id) {
         let span_map = self.span_map();
         let exited_span = span_map.get(span).unwrap();
-        let entered_timestamp = exited_span.entered_timestamp.swap(0, Ordering::SeqCst);
-        let time = Instant::now().duration_since(self.default_instant).as_micros() as u64 - entered_timestamp;
-        let logging_permission = exited_span.logging_permission.take();
-        if let Some(permission) = logging_permission {
-            if exited_span.level <= self.max_depth && !exited_span.is_small {
-                print!("done({}us)", time);
-                if exited_span.level == 0 {
-                    println!();
-                }
-                std::io::Write::flush(&mut stdout()).unwrap();
+        let time = Instant::now().duration_since(self.default_instant).as_micros() as u64 - exited_span.entered_timestamp.load(Ordering::SeqCst);
+        if exited_span.level <= self.max_depth {
+            if exited_span.level == 0 {
+                self.delayed_print_messages(Some(exited_span), &span_map, [format!("done({}us)\n", time)]);
+            } else { 
+                self.delayed_print_messages(Some(exited_span), &span_map, [format!("done({}us)", time)]);
             }
+        }
+        if let Some(logging_permission) = exited_span.logging_permission.take() {
             if let Some(parent) = &exited_span.parent {
-                span_map.get(&parent).unwrap().logging_permission.give(permission);
+                span_map.get(&parent).unwrap().logging_permission.give(logging_permission);
             }
         }
         self.current_span.get_or(|| Cell::new(None)).set(exited_span.parent.as_ref().map(|id| id.into_non_zero_u64()));
+        exited_span.entered_timestamp.store(0, Ordering::SeqCst);
     }
 
     fn clone_span(&self, id: &Id) -> Id {

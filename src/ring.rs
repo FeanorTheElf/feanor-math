@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::ops::Deref;
 
 use crate::homomorphism::*;
@@ -1256,6 +1257,17 @@ impl<'a, S: Deref + Send + Sync> RingStore for S
     
     fn get_ring<'b>(&'b self) -> &'b Self::Type {
         (**self).get_ring()
+    }
+}
+
+#[stability::unstable(feature = "enable")]
+pub struct NeverRing<R: ?Sized + RingBase>(!, PhantomData<R>);
+
+impl<R: ?Sized + RingBase> RingStore for NeverRing<R> {
+    type Type = R;
+
+    fn get_ring<'a>(&'a self) -> &'a Self::Type {
+        self.0
     }
 }
 

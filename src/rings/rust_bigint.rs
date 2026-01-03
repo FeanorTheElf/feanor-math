@@ -2,7 +2,7 @@ use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNew
 use serde::de::{self, DeserializeSeed};
 use serde::ser::SerializeTuple;
 use serde::{Deserializer, Serialize, Deserialize, Serializer};
-use tracing::instrument; 
+use tracing::instrument;
 
 use crate::algorithms::bigint_ops::*;
 use crate::algorithms::eea::{eea, gcd, partial_eea_int};
