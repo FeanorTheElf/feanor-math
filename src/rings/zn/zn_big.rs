@@ -13,10 +13,7 @@ use crate::algorithms::convolution::DynConvolution;
 use crate::iters::multi_cartesian_product;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::divisibility::DivisibilityRing;
-use crate::impl_localpir_wrap_unwrap_homs;
-use crate::impl_localpir_wrap_unwrap_isos;
-use crate::impl_field_wrap_unwrap_homs;
-use crate::impl_field_wrap_unwrap_isos;
+use crate::{impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 use crate::rings::extension::FreeAlgebraStore;
 use crate::pid::*;
 use crate::specialization::*;
@@ -622,8 +619,6 @@ impl<I: RingStore> ZnRing for ZnGBBase<I>
 
 impl_field_wrap_unwrap_homs!{ <{I, J}> ZnGBBase<I>, ZnGBBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
 impl_field_wrap_unwrap_isos!{ <{I, J}> ZnGBBase<I>, ZnGBBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
-impl_localpir_wrap_unwrap_homs!{ <{I, J}> ZnGBBase<I>, ZnGBBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
-impl_localpir_wrap_unwrap_isos!{ <{I, J}> ZnGBBase<I>, ZnGBBase<J> where I: RingStore, I::Type: IntegerRing, J: RingStore, J::Type: IntegerRing }
 
 #[cfg(test)]
 use crate::integer::BigIntRing;

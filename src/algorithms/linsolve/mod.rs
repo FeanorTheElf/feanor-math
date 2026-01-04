@@ -18,11 +18,6 @@ pub mod smith;
 /// Contains the algorithm for solving linear systems over free ring extensions.
 /// 
 pub mod extension;
-///
-/// Contains algorithms related to Gaussian elimination. Note that standard functionality
-/// relating to solving linear systems is provided by [`LinSolveRing`] instead.
-/// 
-pub mod gauss;
 
 ///
 /// Result of trying to solve a linear system.

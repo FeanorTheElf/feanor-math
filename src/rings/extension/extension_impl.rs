@@ -14,7 +14,7 @@ use crate::algorithms::convolution::*;
 use crate::algorithms::extension_ops::create_multiplication_matrix;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::divisibility::*;
-use crate::{impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
+use crate::{impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 use crate::integer::*;
 use crate::rings::poly::PolyRingStore;
 use crate::matrix::OwnedMatrix;
@@ -757,20 +757,6 @@ impl_field_wrap_unwrap_homs!{
 }
 
 impl_field_wrap_unwrap_isos!{
-    <{R1, V1, C1, A1, R2, V2, C2, A2}> FreeAlgebraImplBase<R1, V1, C1, A1>, FreeAlgebraImplBase<R2, V2, C2, A2>
-        where R1: RingStore, R1::Type: LinSolveRing, V1: VectorView<El<R1>> + Send + Sync, A1: Allocator + Clone + Send + Sync, C1: ConvolutionAlgorithm<R1::Type>,
-            R2: RingStore, R2::Type: LinSolveRing, V2: VectorView<El<R2>> + Send + Sync, A2: Allocator + Clone + Send + Sync, C2: ConvolutionAlgorithm<R2::Type>,
-            R2::Type: CanIsoFromTo<R1::Type>
-}
-
-impl_localpir_wrap_unwrap_homs!{
-    <{R1, V1, C1, A1, R2, V2, C2, A2}> FreeAlgebraImplBase<R1, V1, C1, A1>, FreeAlgebraImplBase<R2, V2, C2, A2>
-        where R1: RingStore, R1::Type: LinSolveRing, V1: VectorView<El<R1>> + Send + Sync, A1: Allocator + Clone + Send + Sync, C1: ConvolutionAlgorithm<R1::Type>,
-            R2: RingStore, R2::Type: LinSolveRing, V2: VectorView<El<R2>> + Send + Sync, A2: Allocator + Clone + Send + Sync, C2: ConvolutionAlgorithm<R2::Type>,
-            R2::Type: CanHomFrom<R1::Type>
-}
-
-impl_localpir_wrap_unwrap_isos!{
     <{R1, V1, C1, A1, R2, V2, C2, A2}> FreeAlgebraImplBase<R1, V1, C1, A1>, FreeAlgebraImplBase<R2, V2, C2, A2>
         where R1: RingStore, R1::Type: LinSolveRing, V1: VectorView<El<R1>> + Send + Sync, A1: Allocator + Clone + Send + Sync, C1: ConvolutionAlgorithm<R1::Type>,
             R2: RingStore, R2::Type: LinSolveRing, V2: VectorView<El<R2>> + Send + Sync, A2: Allocator + Clone + Send + Sync, C2: ConvolutionAlgorithm<R2::Type>,

@@ -39,14 +39,12 @@ pub fn invert_over_local_zn<S>(ring: S, el: &El<S>) -> Option<El<S>>
 #[cfg(test)]
 use crate::rings::extension::extension_impl::FreeAlgebraImpl;
 #[cfg(test)]
-use crate::rings::local::AsLocalPIR;
-#[cfg(test)]
 use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_invert_over_local_zn() {
     LogAlgorithmSubscriber::init_test();
-    let base_ring = AsLocalPIR::from_zn(zn_64b::Zn64B::new(27)).unwrap();
+    let base_ring = zn_64b::Zn64B::new(27);
     let array = |data: [i32; 4]| std::array::from_fn::<_, 4, _>(|i| base_ring.int_hom().map(data[i]));
     let ring = FreeAlgebraImpl::new(base_ring, 4, array([1, 0, 0, 1]));
 

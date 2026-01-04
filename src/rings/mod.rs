@@ -74,19 +74,7 @@ pub mod rational;
 pub mod mpir;
 
 ///
-/// This module contains the wrapper [`local::AsLocalPIR`] that wraps a ring to signal that it is a
-/// local principal ideal ring [`crate::local::PrincipalLocalRing`]. 
-/// 
-pub mod local;
-
-///
 /// This module contains the trait [`fraction::FractionField`] for rings that are the field of fractions
 /// of an underlying domain.
 /// 
 pub mod fraction;
-
-// ///
-// /// Contains [`direct_power::DirectPowerRing`], which models the direct product ring of many
-// /// copies of a single base ring.
-// /// 
-// pub mod direct_power;

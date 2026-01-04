@@ -1,10 +1,9 @@
 use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm, TypeErasableConvolution};
 use crate::algorithms::eea::const_eea;
 use crate::iters::multi_cartesian_product;
-use crate::{impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos, impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos};
+use crate::{impl_eq_based_self_iso, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::divisibility::*;
-use crate::impl_eq_based_self_iso;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::*;
 use crate::integer::*;
@@ -427,8 +426,6 @@ impl_static_int_to_zn!{ i8, i16, i32, i64, i128 }
 
 impl_field_wrap_unwrap_homs!{ Zn64MBase, Zn64MBase }
 impl_field_wrap_unwrap_isos!{ Zn64MBase, Zn64MBase }
-impl_localpir_wrap_unwrap_homs!{ Zn64MBase, Zn64MBase }
-impl_localpir_wrap_unwrap_isos!{ Zn64MBase, Zn64MBase }
 
 impl FiniteRingSpecializable for Zn64MBase {
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {

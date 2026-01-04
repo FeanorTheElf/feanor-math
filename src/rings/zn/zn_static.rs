@@ -3,7 +3,6 @@ use std::fmt::Debug;
 
 use crate::iters::multi_cartesian_product;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
-use crate::local::PrincipalLocalRing;
 use crate::field::*;
 use crate::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::divisibility::*;
@@ -299,17 +298,6 @@ impl<const N: u64> Domain for ZnSBase<N, true> {}
 impl<const N: u64> PerfectField for ZnSBase<N, true> {}
 
 impl<const N: u64> Field for ZnSBase<N, true> {}
-
-impl<const N: u64> PrincipalLocalRing for ZnSBase<N, true> {
-    
-    fn max_ideal_gen(&self) ->  &Self::Element {
-        &0
-    }
-
-    fn nilpotent_power(&self) -> Option<usize> {
-        Some(1)
-    }
-}
 
 impl<const N: u64, const IS_FIELD: bool> RingValue<ZnSBase<N, IS_FIELD>> {
 

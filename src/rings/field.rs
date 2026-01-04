@@ -2,7 +2,6 @@ use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::reduce_lift::lift_poly_eval::{InterpolationBaseRing, InterpolationBaseRingStore};
 use crate::delegate::*;
 use crate::divisibility::*;
-use crate::local::PrincipalLocalRing;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::field::*;
 use crate::integer::IntegerRing;
@@ -11,7 +10,6 @@ use crate::homomorphism::*;
 use crate::rings::zn::FromModulusCreateableZnRing;
 use crate::rings::zn::*;
 use crate::specialization::FiniteRingSpecializable;
-use super::local::AsLocalPIRBase;
 use crate::primitive_int::*;
 
 use std::marker::PhantomData;
@@ -76,8 +74,7 @@ use serde::de::DeserializeSeed;
 pub struct AsFieldBase<R: RingStore> 
     where R::Type: DivisibilityRing
 {
-    base: R,
-    zero: FieldEl<R>
+    base: R
 }
 
 impl<R> PerfectField for AsFieldBase<R>
@@ -90,7 +87,7 @@ impl<R> Clone for AsFieldBase<R>
         R::Type: DivisibilityRing
 {
     fn clone(&self) -> Self {
-        Self { zero: FieldEl(self.base.zero()), base: self.base.clone() }
+        Self { base: self.base.clone() }
     }
 }
 
@@ -166,7 +163,7 @@ impl<R: RingStore> AsFieldBase<R>
     /// be checked by the caller.
     /// 
     pub fn promise_is_perfect_field(base: R) -> Self {
-        Self { zero: FieldEl(base.zero()), base }
+        Self { base }
     }
 
     ///
@@ -298,40 +295,6 @@ impl<R: RingStore, S: IntegerRing + ?Sized> CanHomFrom<S> for AsFieldBase<R>
     }
 }
 
-impl<R1, R2> CanHomFrom<AsLocalPIRBase<R1>> for AsFieldBase<R2>
-    where R1: RingStore, R2: RingStore,
-        R2::Type: CanHomFrom<R1::Type>,
-        R1::Type: DivisibilityRing,
-        R2::Type: DivisibilityRing
-{
-    type Homomorphism = <R2::Type as CanHomFrom<R1::Type>>::Homomorphism;
-
-    fn has_canonical_hom(&self, from: &AsLocalPIRBase<R1>) -> Option<Self::Homomorphism> {
-        self.get_delegate().has_canonical_hom(from.get_delegate())
-    }
-
-    fn map_in(&self, from: &AsLocalPIRBase<R1>, el: <AsLocalPIRBase<R1> as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        self.rev_delegate(self.get_delegate().map_in(from.get_delegate(), from.delegate(el), hom))
-    }
-}
-
-impl<R1, R2> CanIsoFromTo<AsLocalPIRBase<R1>> for AsFieldBase<R2>
-    where R1: RingStore, R2: RingStore,
-        R2::Type: CanIsoFromTo<R1::Type>,
-        R1::Type: DivisibilityRing,
-        R2::Type: DivisibilityRing
-{
-    type Isomorphism = <R2::Type as CanIsoFromTo<R1::Type>>::Isomorphism;
-
-    fn has_canonical_iso(&self, from: &AsLocalPIRBase<R1>) -> Option<Self::Isomorphism> {
-        self.get_delegate().has_canonical_iso(from.get_delegate())
-    }
-
-    fn map_out(&self, from: &AsLocalPIRBase<R1>, el: Self::Element, iso: &Self::Isomorphism) -> <AsLocalPIRBase<R1> as RingBase>::Element {
-        from.rev_delegate(self.get_delegate().map_out(from.get_delegate(), self.delegate(el), iso))
-    }
-}
-
 impl<R: RingStore> PrincipalIdealRing for AsFieldBase<R> 
     where R::Type: DivisibilityRing
 {
@@ -348,26 +311,6 @@ impl<R: RingStore> PrincipalIdealRing for AsFieldBase<R>
             (self.zero(), self.one(), self.clone_el(rhs))
         } else {
             (self.one(), self.zero(), self.clone_el(lhs))
-        }
-    }
-}
-
-impl<R: RingStore> PrincipalLocalRing for AsFieldBase<R> 
-    where R::Type: DivisibilityRing
-{
-    fn max_ideal_gen(&self) ->  &Self::Element {
-        &self.zero
-    }
-
-    fn nilpotent_power(&self) -> Option<usize> {
-        Some(1)
-    }
-
-    fn valuation(&self, x: &Self::Element) -> Option<usize> {
-        if self.is_zero(x) {
-            return None;
-        } else {
-            return Some(0);
         }
     }
 }
@@ -491,7 +434,7 @@ impl<'de, R> Deserialize<'de> for AsFieldBase<R>
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer<'de>
     {
-        DeserializeSeedNewtypeStruct::new("AsField", PhantomData::<R>).deserialize(deserializer).map(|base_ring| AsFieldBase { zero: FieldEl(base_ring.zero()), base: base_ring })
+        DeserializeSeedNewtypeStruct::new("AsField", PhantomData::<R>).deserialize(deserializer).map(|base_ring| AsFieldBase { base: base_ring })
     }
 }
 

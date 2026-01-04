@@ -2,7 +2,6 @@ use append_only_vec::AppendOnlyVec;
 use tracing::{Level, Span, event, instrument, span};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-use crate::delegate::{UnwrapHom, WrapHom};
 use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
 use crate::field::Field;
 use crate::homomorphism::Homomorphism;
@@ -10,8 +9,6 @@ use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::ring::*;
 use crate::seq::*;
 use crate::rings::multivariate::*;
-use crate::rings::local::AsLocalPIR;
-use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -480,18 +477,13 @@ pub fn buchberger<P, O>(ring: P, input_basis: Vec<El<P>>, order: O) -> Vec<El<P>
         <BaseRing<P> as RingStore>::Type: Field,
         O: MonomialOrder + Copy + Send + Sync
 {
-    let as_local_pir = AsLocalPIR::from_field(ring.base_ring());
-    let new_poly_ring = MultivariatePolyRingImpl::new(&as_local_pir, ring.indeterminate_count());
-    let from_ring = new_poly_ring.lifted_hom(ring, WrapHom::new(as_local_pir.get_ring()));
-    let result = buchberger_with_strategy::<_, _, _, _>(
-        &new_poly_ring, 
-        input_basis.into_iter().map(|f| from_ring.map(f)).collect(), 
+    buchberger_with_strategy::<_, _, _, _>(
+        ring, 
+        input_basis, 
         order, 
-        default_sort_fn(&new_poly_ring, order), 
+        default_sort_fn(ring, order), 
         |_| false
-    );
-    let to_ring = ring.lifted_hom(&new_poly_ring, UnwrapHom::new(as_local_pir.get_ring()));
-    return result.into_iter().map(|f| to_ring.map(f)).collect();
+    )
 }
 
 #[cfg(test)]
@@ -504,6 +496,8 @@ use crate::integer::BigIntRing;
 use crate::rings::rational::RationalField;
 #[cfg(test)]
 use crate::tracing::LogAlgorithmSubscriber;
+#[cfg(test)]
+use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 
 #[test]
 fn test_buchberger_small() {
@@ -612,7 +606,7 @@ fn test_generic_computation() {
 #[test]
 fn test_gb_local_ring() {
     LogAlgorithmSubscriber::init_test();
-    let base = AsLocalPIR::from_zn(zn_static::Zn::<16>::RING).unwrap();
+    let base = zn_static::Zn::<16>::RING;
     let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 1);
     
     let f = ring.from_terms([(base.int_hom().map(4), ring.create_monomial([1])), (base.one(), ring.create_monomial([0]))].into_iter());
@@ -626,7 +620,7 @@ fn test_gb_local_ring() {
 fn test_gb_lex() {
     LogAlgorithmSubscriber::init_test();
     let ZZ = BigIntRing::RING;
-    let QQ = AsLocalPIR::from_field(RationalField::new(ZZ));
+    let QQ = RationalField::new(ZZ);
     let QQYX = MultivariatePolyRingImpl::new(&QQ, 2);
     let [f, g] = QQYX.with_wrapped_indeterminates(|[Y, X]| [ 1 + X.pow_ref(2) + 2 * Y + (1 + X) * Y.pow_ref(2), 3 + X + (2 + X) * Y + (1 + X + X.pow_ref(2)) * Y.pow_ref(2) ]);
     let expected = QQYX.with_wrapped_indeterminates(|[Y, X]| [ 
@@ -651,7 +645,7 @@ fn test_gb_lex() {
 #[test]
 fn test_expensive_gb_1() {
     LogAlgorithmSubscriber::init_test();
-    let base = AsLocalPIR::from_zn(zn_static::Zn::<16>::RING).unwrap();
+    let base = zn_static::Zn::<16>::RING;
     let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 12);
 
     let system = ring.with_wrapped_indeterminates(|[Y0, Y1, Y2, Y3, Y4, Y5, Y6, Y7, Y8, Y9, Y10, Y11]| [

@@ -9,7 +9,7 @@ use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::delegate::DelegateRing;
 use crate::delegate::DelegateRingImplFiniteRing;
 use crate::divisibility::*;
-use crate::{impl_eq_based_self_iso, impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
+use crate::{impl_eq_based_self_iso, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::*;
 use crate::integer::*;
@@ -1180,8 +1180,6 @@ impl<I: ?Sized + IntegerRing> CanHomFrom<I> for ZnFastmulBase
 
 impl_field_wrap_unwrap_homs!{ Zn64BBase, Zn64BBase }
 impl_field_wrap_unwrap_isos!{ Zn64BBase, Zn64BBase }
-impl_localpir_wrap_unwrap_homs!{ Zn64BBase, Zn64BBase }
-impl_localpir_wrap_unwrap_isos!{ Zn64BBase, Zn64BBase }
 
 impl<I> CanHomFrom<zn_big::ZnGBBase<I>> for AsFieldBase<Zn64B>
     where I: RingStore,

@@ -22,7 +22,6 @@ use crate::algorithms::poly_factor::cantor_zassenhaus;
 use crate::pid::EuclideanRing;
 use crate::primitive_int::{StaticRing, StaticRingBase};
 use crate::rings::field::{AsField, AsFieldBase};
-use crate::rings::local::{AsLocalPIR, AsLocalPIRBase};
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::PolyRing;
 use crate::rings::zn::zn_64b::Zn64BBase;
@@ -433,11 +432,11 @@ impl<A, C> GaloisFieldBase<AsField<FreeAlgebraImpl<AsField<Zn64B>, SparseMapVect
     /// For more configuration options, use [`GaloisFieldBase::galois_ring_with()`].
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn galois_ring(&self, e: usize) -> AsLocalPIR<FreeAlgebraImpl<Zn64B, SparseMapVector<Zn64B>, DynConvolution<'static, Zn64BBase>, A>> {
+    pub fn galois_ring(&self, e: usize) -> FreeAlgebraImpl<Zn64B, SparseMapVector<Zn64B>, DynConvolution<'static, Zn64BBase>, A> {
         let base_ring = Zn64B::new(StaticRing::<i64>::RING.pow(*self.base_ring().modulus(), e) as u64);
         let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&self.rank().try_into().unwrap()).unwrap();
         let convolution = base_ring.get_ring().create_default_convolution(Some(2 << log2_padded_len));
-        self.galois_ring_with(base_ring, self.base.get_ring().get_delegate().allocator().clone(), convolution)
+        self.galois_ring_with_convolution(base_ring, self.base.get_ring().get_delegate().allocator().clone(), convolution)
     }
 }
 
@@ -458,13 +457,13 @@ impl<Impl> GaloisFieldBase<Impl>
     /// See also [`GaloisFieldBase::galois_ring()`] for a simpler version of this function.
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn galois_ring_with<S, A2, C2>(&self, new_base_ring: S, allocator: A2, convolution_algorithm: C2) -> AsLocalPIR<FreeAlgebraImpl<S, SparseMapVector<S>, C2, A2>>
+    pub fn galois_ring_with_convolution<S, A2, C2>(&self, new_base_ring: S, allocator: A2, convolution_algorithm: C2) -> FreeAlgebraImpl<S, SparseMapVector<S>, C2, A2>
         where S: RingStore + Clone,
             S::Type: ZnRing + CanHomFrom<<<BaseRing<Impl> as RingStore>::Type as ZnRing>::IntegerRingBase>,
             C2: ConvolutionAlgorithm<S::Type>,
             A2: Allocator + Clone + Send + Sync
     {
-        let (p, e) = is_prime_power(&BigIntRing::RING, &new_base_ring.size(&BigIntRing::RING).unwrap()).unwrap();
+        let (p, _e) = is_prime_power(&BigIntRing::RING, &new_base_ring.size(&BigIntRing::RING).unwrap()).unwrap();
         assert!(BigIntRing::RING.eq_el(&p, &self.base_ring().size(&BigIntRing::RING).unwrap()));
         let mut modulus_vec = SparseMapVector::new(self.rank(), new_base_ring.clone());
         let x_pow_deg = RingRef::new(self).pow(self.canonical_gen(), self.rank());
@@ -483,9 +482,7 @@ impl<Impl> GaloisFieldBase<Impl>
             allocator,
             convolution_algorithm
         );
-        let hom = result.base_ring().can_hom(self.base_ring().integer_ring()).unwrap();
-        let max_ideal_gen = result.inclusion().map(hom.map_ref(self.base_ring().modulus()));
-        return AsLocalPIR::from(AsLocalPIRBase::promise_is_local_pir(result, max_ideal_gen, Some(e)));
+        return result;
     }
 
     #[stability::unstable(feature = "enable")]
