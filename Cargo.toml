@@ -1,0 +1,73 @@
+[package]
+name = "feanor-math"
+version = "3.5.13"
+edition = "2024"
+authors = ["Simon Pohmann <simon@pohmann.de>"]
+
+repository = "https://github.com/FeanorTheElf/feanor-math"
+homepage = "https://github.com/FeanorTheElf/feanor-math"
+keywords = ["math", "mathematics", "primes", "number-theory", "algebra"]
+readme = "Readme.md"
+description = "A library for number theory, providing implementations for arithmetic in various rings and algorithms working on them."
+license = "MIT"
+
+[badges]
+maintenance = { status = "actively-developed" }
+
+[lib]
+crate-type = ["rlib"]
+bench = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+oorandom = "11.1.3"
+libc = "0.2"
+stability = "0.2.0"
+append-only-vec = "0.1.5"
+thread_local = "1.1.8"
+atomicbox = "0.4.0"
+serde = { version = "1.0.207", features = ["derive"] }
+serde_bytes = "0.11.15"
+bytemuck = { version = "1.16.3" }
+serde_assert = { version = "0.8.0", optional = true }
+rayon = { version = "1.8.0", optional = true }
+ndarray = { version = "0.15.6", optional = true }
+feanor-serde = "0.1.5"
+
+[dev-dependencies]
+debugit = "0.2.0"
+feanor-mempool = "2.1.0"
+serde_assert = "0.8.0"
+serde_json = "1.0.125"
+postcard = { version = "1.1.3", features = ["use-std"] }
+
+[features]
+default = []
+
+# Enables the export of "generic tests", functions that test the set of axioms associated with a trait.
+generic_tests = ["dep:serde_assert"]
+
+# Makes all unstable items visible to outside crates
+unstable-enable = []
+
+# Try to link to the mpir library for arbitrary-precision integers, and make `BigIntRing` refer to it.
+mpir = []
+
+# Enables parallel computation in some underlying algorithms. Currently this applies only to F4 and ECM.
+parallel = ["dep:rayon"]
+
+# Includes the matrix and tensor library ndarray, together with a (currently minimalistic) interface to matrices in this crate.
+ndarray = ["dep:ndarray"]
+
+# Use many kernels optimized for various settings during matrix multiplication. Somewhat improves performance at
+# the cost of code generation time.
+optimized_matmul = []
+
+[profile.profiling]
+inherits = "bench"
+debug = true
+panic = "abort"
+
+[package.metadata.docs.rs]
+all-features = true
