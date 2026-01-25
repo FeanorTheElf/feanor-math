@@ -139,6 +139,14 @@ pub trait FreeAlgebra: RingExtension {
     }
 
     ///
+    /// Multiplies the given element by the `power`-th power of the canonical generator
+    /// of this ring, as given by [`FreeAlgebra::canonical_gen()`].
+    /// 
+    fn mul_assign_gen_power(&self, el: &mut Self::Element, power: usize) {
+        self.mul_assign(el, RingRef::new(self).pow(self.canonical_gen(), power));
+    }
+
+    ///
     /// Like [`FreeAlgebra::from_canonical_basis()`], this computes the sum `sum_i vec[i] * x^i` where `x` is the
     /// canonical generator given by [`FreeAlgebra::canonical_gen()`]. Unlike [`FreeAlgebra::from_canonical_basis()`],
     /// `vec` can return any number elements.
@@ -235,6 +243,7 @@ pub trait FreeAlgebraStore: RingStore
     delegate!{ FreeAlgebra, fn canonical_gen(&self) -> El<Self> }
     delegate!{ FreeAlgebra, fn rank(&self) -> usize }
     delegate!{ FreeAlgebra, fn trace(&self, el: El<Self>) -> El<<Self::Type as RingExtension>::BaseRing> }
+    delegate!{ FreeAlgebra, fn mul_assign_gen_power(&self, el: &mut El<Self>, power: usize) -> () }
 
     ///
     /// See [`FreeAlgebra::wrt_canonical_basis()`].
@@ -495,9 +504,9 @@ pub mod generic_tests {
             assert_el_eq!(ring.base_ring(), x_n_1_vec_expected.at(i), x_n_1_vec_actual.at(i));
         }
 
-        // test basis wrt_root_of_unity_basis linearity and compatibility from_root_of_unity_basis/wrt_root_of_unity_basis
-        for i in (0..ring.rank()).step_by(5) {
-            for j in (1..ring.rank()).step_by(7) {
+        // test basis wrt_canonical_basis linearity and compatibility from_canonical_basis/wrt_canonical_basis
+        for i in (0..ring.rank()).step_by(3) {
+            for j in (1..ring.rank()).step_by(5) {
                 if i == j {
                     continue;
                 }
@@ -514,6 +523,19 @@ pub mod generic_tests {
                         assert_el_eq!(ring.base_ring(), ring.base_ring().zero(), element_vec.at(k));
                     }
                 }
+            }
+        }
+        
+        // test basis mul_assign_gen_power
+        for i in (0..ring.rank()).step_by(3) {
+            for j in (0..ring.rank()).step_by(5) {
+                let element = ring.add(ring.pow(ring.canonical_gen(), i), ring.one());
+                let mut actual = ring.clone_el(&element);
+                ring.mul_assign_gen_power(&mut actual, j);
+                assert_el_eq!(ring,
+                    ring.mul(element, ring.pow(ring.canonical_gen(), j)),
+                    actual
+                );
             }
         }
     }

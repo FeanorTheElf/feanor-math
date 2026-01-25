@@ -26,10 +26,8 @@ pub fn from_canonical_basis_extended<R, V>(ring: &R, vec: V) -> R::Element
         V: IntoIterator<Item = El<<R as RingExtension>::BaseRing>>
 {
     let mut data = vec.into_iter().collect::<Vec<_>>();
-    let power_of_canonical_gen = ring.mul(
-        ring.from_canonical_basis((1..ring.rank()).map(|_| ring.base_ring().zero()).chain([ring.base_ring().one()].into_iter())),
-        ring.canonical_gen()
-    );
+    let mut power_of_canonical_gen = ring.one();
+    ring.mul_assign_gen_power(&mut power_of_canonical_gen, ring.rank());
     let mut current_power = ring.one();
     return <_ as ComputeInnerProduct>::inner_product(ring, (0..).map_while(|_| {
         if data.len() == 0 {
@@ -92,11 +90,10 @@ pub fn minpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<P
             SolveResult::NoSolution => {
                 -1
             },
-            SolveResult::FoundUniqueSolution => {
-                result = Some(sol_poly(&sol));
-                0
-            },
-            SolveResult::FoundSomeSolution => {
+            // I once thought that `FoundUniqueSolution` means we are immediately done;
+            // however, that's wrong - it may be that the matrix has a nontrivial kernel,
+            // but there still is only one solution to the given system 
+            SolveResult::FoundUniqueSolution | SolveResult::FoundSomeSolution => {
                 result = Some(sol_poly(&sol));
                 1
             }

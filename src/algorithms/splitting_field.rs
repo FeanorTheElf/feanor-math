@@ -521,6 +521,7 @@ fn test_extend_field() {
 }
 
 #[test]
+#[ignore]
 fn test_variety_from_lex_gb() {
     unimplemented!("Currently super slow");
     let ZZX = DensePolyRing::new(BigIntRing::RING, "X");

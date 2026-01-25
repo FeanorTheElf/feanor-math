@@ -448,7 +448,7 @@ impl ComputeInnerProduct for ZnBase {
             self.add_assign(&mut result, ZnEl(self.bounded_reduce_larger::<REDUCE_AFTER_STEPS>(sum)));
         }
         let mut sum: u128 = 0;
-        for (l, r) in array_chunks.into_remainder().unwrap() {
+        for (l, r) in array_chunks.into_remainder() {
             debug_assert!(l.0 <= self.repr_bound());
             debug_assert!(r.0 <= self.repr_bound());
             sum += l.0 as u128 * r.0 as u128;

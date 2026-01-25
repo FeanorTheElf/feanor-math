@@ -777,6 +777,11 @@ impl<R> FreeAlgebra for R
     default fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a> {
         self.get_delegate().wrt_canonical_basis(self.delegate_ref(el))
     }
+
+    default fn mul_assign_gen_power(&self, el: &mut Self::Element, power: usize) {
+        self.get_delegate().mul_assign_gen_power(self.delegate_mut(el), power);
+        self.postprocess_delegate_mut(el);
+    }
 }
 
 ///

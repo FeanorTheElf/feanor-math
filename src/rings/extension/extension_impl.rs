@@ -2,6 +2,7 @@ use std::alloc::{Allocator, Global};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::cell::OnceCell;
+use std::mem::replace;
 
 use feanor_serde::dependent_tuple::DeserializeSeedDependentTuple;
 use feanor_serde::newtype_struct::DeserializeSeedNewtypeStruct;
@@ -634,6 +635,29 @@ impl<R, V, A, C> FreeAlgebra for FreeAlgebraImplBase<R, V, A, C>
 
     fn rank(&self) -> usize {
         self.rank
+    }
+
+    fn mul_assign_gen_power(&self, el: &mut Self::Element, power: usize) {
+        let mut gen_pow_d = Vec::new_in(self.allocator().clone());
+        gen_pow_d.extend(self.x_pow_rank.as_iter().map(|c| self.base_ring.clone_el(c)));
+        gen_pow_d.resize_with(1 << self.log2_padded_len, || self.base_ring.zero());
+
+        if power % self.rank() != 0 {
+            let mut gen_pow_rem = Vec::new_in(self.allocator().clone());
+            gen_pow_rem.extend((0..((power % self.rank()) - 1)).map(|_| self.base_ring.zero()));
+            gen_pow_rem.push(self.base_ring.one());
+            gen_pow_rem.resize_with(1 << self.log2_padded_len, || self.base_ring.zero());
+            *el = self.prod([
+                FreeAlgebraImplEl { values: replace(&mut el.values, Box::new_in([], self.allocator().clone())) },
+                RingValue::from_ref(self).pow(FreeAlgebraImplEl { values: gen_pow_d.into_boxed_slice() }, power / self.rank),
+                FreeAlgebraImplEl { values: gen_pow_rem.into_boxed_slice() },
+            ]);
+        } else {
+            self.mul_assign(
+                el,
+                RingValue::from_ref(self).pow(FreeAlgebraImplEl { values: gen_pow_d.into_boxed_slice() }, power / self.rank),
+            );
+        }
     }
 }
 
