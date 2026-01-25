@@ -10,7 +10,7 @@
 *.run.xml
 *.synctex.gz
 *.toc
-
+trace-*
 bibliography.bib
 notes.tex
 notes.pdf
