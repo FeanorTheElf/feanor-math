@@ -320,8 +320,17 @@ impl GaloisField {
     /// }));
     /// ```
     /// 
+    /// # Panics
+    /// 
+    /// Panics if `Z/pZ` is not a field, namely if `p` is not prime.
+    /// 
     pub fn new(p: i64, degree: usize) -> Self {
-        Self::new_with_convolution(Zn::new(p as u64).as_field().ok().unwrap(), degree, Global, STANDARD_CONVOLUTION)
+        let field = match Zn::new(p as u64).as_field() {
+            Ok(field) => field,
+            Err(_) => panic!("characteristic {p} is not a prime"),
+        };
+
+        Self::new_with_convolution(field, degree, Global, STANDARD_CONVOLUTION)
     }
 }
 
