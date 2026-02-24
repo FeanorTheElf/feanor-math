@@ -1,5 +1,7 @@
+use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::field::Field;
 use crate::integer::int_cast;
+use crate::homomorphism::Homomorphism;
 use crate::integer::BigIntRing;
 use crate::integer::IntegerRing;
 use crate::ring::*;
@@ -8,6 +10,7 @@ use crate::rings::finite::*;
 use crate::divisibility::DivisibilityRingStore;
 use crate::integer::IntegerRingStore;
 use crate::ordered::OrderedRingStore;
+use crate::rings::zn::ZnRing;
 
 use super::int_factor::factor;
 
@@ -54,22 +57,23 @@ pub fn is_prim_root_of_unity_gen<R: RingStore, I>(ring: R, el: &El<R>, n: &El<I>
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn get_prim_root_of_unity_gen<R, I>(ring: R, n: &El<I>, ZZ: I) -> Option<El<R>>
+pub fn get_prim_root_of_unity_gen<R, I>(ring: R, n: &El<I>, ZZ: I, order: &El<I>) -> Option<El<R>>
     where R: RingStore, 
-        R::Type: FiniteRing + Field,
+        R::Type: FiniteRing,
         I: RingStore + Copy,
         I::Type: IntegerRing
 {
-    let order = ZZ.sub(ring.size(&ZZ).unwrap(), ZZ.one());
-    let power = ZZ.checked_div(&order, n)?;
+    let power = ZZ.checked_div(order, n)?;
     
     let mut rng = oorandom::Rand64::new(ZZ.default_hash(&ring.size(&ZZ).unwrap()) as u128);
     let mut current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZ);
-    while !is_prim_root_of_unity_gen(&ring, &current, n, ZZ) {
+    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+        if is_prim_root_of_unity_gen(&ring, &current, n, ZZ) {
+            return Some(current);
+        }
         current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZ);
     }
-    debug_assert!(is_prim_root_of_unity_gen(&ring, &current, n, ZZ));
-    return Some(current);
+    unreachable!()
 }
 
 ///
@@ -81,7 +85,44 @@ pub fn get_prim_root_of_unity<R>(ring: R, n: usize) -> Option<El<R>>
     where R: RingStore, 
         R::Type: FiniteRing + Field
 {
-    get_prim_root_of_unity_gen(ring, &int_cast(n.try_into().unwrap(), BigIntRing::RING, StaticRing::<i64>::RING), BigIntRing::RING)
+    let order = BigIntRing::RING.sub(ring.size(&BigIntRing::RING).unwrap(), BigIntRing::RING.one());
+    get_prim_root_of_unity_gen(ring, &int_cast(n.try_into().unwrap(), BigIntRing::RING, StaticRing::<i64>::RING), BigIntRing::RING, &order)
+}
+
+#[stability::unstable(feature = "enable")]
+pub fn get_prim_root_of_unity_zn_gen<R, I>(ring: R, ZZ: &I, n: &El<I>) -> Option<El<R>>
+    where R: RingStore, 
+        R::Type: ZnRing,
+        I: RingStore,
+        I::Type: IntegerRing
+{
+    let order = factor(ZZ, ring.characteristic(ZZ).unwrap()).into_iter().map(|(p, e)| if ZZ.eq_el(&p, &ZZ.int_hom().map(2)) {
+        match e {
+            1 => ZZ.one(),
+            2 => p,
+            e => ZZ.pow(p, e - 2)
+        }
+    } else {
+        ZZ.mul(ZZ.sub_ref_fst(&p, ZZ.one()), ZZ.pow(p, e - 1))
+    }).fold(ZZ.one(), |current, next| if ZZ.is_lt(&current, &next) { next } else { current });
+    get_prim_root_of_unity_gen(ring, n, ZZ, &order)
+}
+
+///
+/// Returns a primitive `n`-th root of unity in the given ring `Z/kZ`,
+/// or `None`, if the order of the multiplicative group of the field is
+/// not divisible by `n`.
+/// 
+/// Note that if `Z/kZ` is not a prime, it may have more than `phi(k)`
+/// primitive roots of unity, in particular there may be `a, b` with
+/// `<a>, <b> <= (Z/kZ)*` both of order `n`, but `<a> n <b> = { 1 }`.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn get_prim_root_of_unity_zn<R>(ring: R, n: usize) -> Option<El<R>>
+    where R: RingStore, 
+        R::Type: ZnRing
+{
+    get_prim_root_of_unity_zn_gen(ring, &BigIntRing::RING, &int_cast(n as i64, BigIntRing::RING, StaticRing::<i64>::RING))
 }
 
 ///
@@ -93,25 +134,31 @@ pub fn get_prim_root_of_unity_pow2<R>(ring: R, log2_n: usize) -> Option<El<R>>
     where R: RingStore, 
         R::Type: FiniteRing + Field
 {
-    const ZZ: BigIntRing = BigIntRing::RING;
-    let order = ZZ.sub(ring.size(&ZZ).unwrap(), ZZ.one());
-    let power = ZZ.checked_div(&order, &ZZ.power_of_two(log2_n))?;
-    
-    let mut rng = oorandom::Rand64::new(ZZ.default_hash(&ring.size(&ZZ).unwrap()) as u128);
-    let mut current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZ);
-    while !is_prim_root_of_unity_pow2(&ring, &current, log2_n) {
-        current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZ);
-    }
-    assert!(is_prim_root_of_unity_pow2(&ring, &current, log2_n));
-    return Some(current);
+    let order = BigIntRing::RING.sub(ring.size(&BigIntRing::RING).unwrap(), BigIntRing::RING.one());
+    get_prim_root_of_unity_gen(ring, &BigIntRing::RING.power_of_two(log2_n), BigIntRing::RING, &order)
+}
+
+///
+/// Returns a primitive `n`-th root of unity in the given ring `Z/kZ`,
+/// or `None`, if the order of the multiplicative group of the field is
+/// not divisible by `n`.
+/// 
+/// Note that if `Z/kZ` is not a prime, it may have more than `phi(k)`
+/// primitive roots of unity, in particular there may be `a, b` with
+/// `<a>, <b> <= (Z/kZ)*` both of order `n`, but `<a> n <b> = { 1 }`.
+/// 
+#[stability::unstable(feature = "enable")]
+pub fn get_prim_root_of_unity_pow2_zn<R, I>(ring: R, log2_n: usize) -> Option<El<R>>
+    where R: RingStore, 
+        R::Type: ZnRing
+{
+    get_prim_root_of_unity_zn_gen(ring, &BigIntRing::RING, &BigIntRing::RING.power_of_two(log2_n))
 }
 
 #[cfg(test)]
 use crate::rings::zn::zn_static::{Zn, Fp};
 #[cfg(test)]
 use crate::algorithms::poly_factor::FactorPolyField;
-#[cfg(test)]
-use crate::homomorphism::*;
 #[cfg(test)]
 use crate::algorithms::cyclotomic::cyclotomic_polynomial;
 #[cfg(test)]
@@ -168,4 +215,35 @@ fn test_get_prim_root_of_unity() {
 
     let ring = GaloisField::new(17, 16);
     assert!(is_prim_root_of_unity_pow2(&ring, &get_prim_root_of_unity_pow2(&ring, 4).unwrap(), 4));
+}
+
+#[test]
+fn test_get_prim_root_of_unity_zn() {
+    let ring = Zn::<1>::RING;
+    assert!(get_prim_root_of_unity_zn(&ring, 2).is_none());
+
+    let ring = Fp::<2>::RING;
+    assert!(get_prim_root_of_unity_zn(&ring, 2).is_none());
+
+    let ring = Zn::<4>::RING;
+    assert!(is_prim_root_of_unity(&ring, &get_prim_root_of_unity_zn(&ring, 2).unwrap(), 2));
+    assert!(get_prim_root_of_unity_zn(&ring, 4).is_none());
+
+    let ring = Zn::<8>::RING;
+    assert!(is_prim_root_of_unity(&ring, &get_prim_root_of_unity_zn(&ring, 2).unwrap(), 2));
+    assert!(get_prim_root_of_unity_zn(&ring, 4).is_none());
+
+    let ring = Zn::<16>::RING;
+    assert!(is_prim_root_of_unity(&ring, &get_prim_root_of_unity_zn(&ring, 4).unwrap(), 4));
+    assert!(get_prim_root_of_unity_zn(&ring, 5).is_none());
+
+    let ring = Zn::<15>::RING;
+    assert!(is_prim_root_of_unity(&ring, &get_prim_root_of_unity_zn(&ring, 4).unwrap(), 4));
+    assert!(get_prim_root_of_unity_zn(&ring, 5).is_none());
+
+    let ring = Zn::<75>::RING;
+    assert!(is_prim_root_of_unity(&ring, &get_prim_root_of_unity_zn(&ring, 5).unwrap(), 5));
+    assert!(is_prim_root_of_unity(&ring, &get_prim_root_of_unity_zn(&ring, 4).unwrap(), 4));
+    assert!(get_prim_root_of_unity_zn(&ring, 3).is_none());
+    assert!(get_prim_root_of_unity_zn(&ring, 8).is_none());
 }

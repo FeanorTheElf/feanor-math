@@ -130,7 +130,7 @@ fn find_small_irreducible_poly_base<P, C>(poly_ring: P, degree: usize, convoluti
             let primitive_element = if is_prim_root_of_unity_gen(&Fq, &Fq.canonical_gen(), &Fq_star_order, ZZbig) {
                 Fq.canonical_gen()
             } else {
-                get_prim_root_of_unity_gen(&Fq, &Fq_star_order, ZZbig).unwrap()
+                get_prim_root_of_unity_gen(&Fq, &Fq_star_order, ZZbig, &Fq_star_order).unwrap()
             };
             // I thought for a while that it would be enough to have a primitive `lcm(Fq_star_order, large_d^inf)`-th root of unity,
             // however it is not guaranteed that this would indeed generate the field
