@@ -276,7 +276,7 @@ impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H, Global>
     pub fn for_zn_with_hom(hom: H, log2_n: usize) -> Option<Self>
         where R_twiddle: ZnRing
     {
-        let root_of_unity = get_prim_root_of_unity_zn(hom.domain(), log2_n)?;
+        let root_of_unity = get_prim_root_of_unity_zn(hom.domain(), 1 << log2_n)?;
         Some(Self::new_with_hom(hom, root_of_unity, log2_n))
     }
 }
