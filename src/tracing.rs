@@ -5,15 +5,16 @@ use std::io::stdout;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::ops::RangeInclusive;
-use std::sync::{Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{RwLockReadGuard, RwLockWriteGuard};
-use std::time::Instant;
+use std::thread::{current_id, sleep, spawn};
+use std::time::{Duration, Instant};
 
 use thread_local::ThreadLocal;
 use tracing::field::{Field, Visit};
 use tracing::{Event, Level, Metadata, Subscriber, span};
-use tracing::span::Id;
+use tracing::span::{Attributes, Id};
 use tracing_core::Interest;
 
 struct LoggingPermission {
@@ -93,14 +94,14 @@ pub struct LogAlgorithmSubscriber {
 impl LogAlgorithmSubscriber {
 
     ///
-    /// Initializes a [`LogAlgorithmsSubscriber`], which will print to stdout all
+    /// Creates a [`LogAlgorithmsSubscriber`], which will print to stdout all
     /// tracing `span!`s and `events!` that match the following:
     ///  - the tracing level is within `levels`
     ///  - the spans are nested at most `max_depth` deep
     ///  - the current span is running for at least `span_min_duration_in_micros` microseconds
     /// 
-    pub fn init(levels: RangeInclusive<Level>, max_depth: usize, span_min_duration_in_micros: u64) {
-        tracing::subscriber::set_global_default(Self { 
+    pub fn new(levels: RangeInclusive<Level>, max_depth: usize, span_min_duration_in_micros: u64) -> Self {
+        Self { 
             span_ids: AtomicU64::new(1), 
             span_map: RwLock::new(HashMap::new()), 
             current_span: ThreadLocal::new(),
@@ -108,7 +109,19 @@ impl LogAlgorithmSubscriber {
             max_depth: max_depth,
             interested_level: levels,
             span_min_duration: span_min_duration_in_micros
-        }).unwrap()
+        }
+    }
+
+    ///
+    /// Initializes a [`LogAlgorithmsSubscriber`] and sets it as the global default.
+    /// 
+    /// The subscriber will print to stdout all tracing `span!`s and `events!` that match the following:
+    ///  - the tracing level is within `levels`
+    ///  - the spans are nested at most `max_depth` deep
+    ///  - the current span is running for at least `span_min_duration_in_micros` microseconds
+    /// 
+    pub fn init(levels: RangeInclusive<Level>, max_depth: usize, span_min_duration_in_micros: u64) {
+        tracing::subscriber::set_global_default(Self::new(levels, max_depth, span_min_duration_in_micros)).unwrap()
     }
 
     pub fn init_test() {
@@ -124,20 +137,29 @@ impl LogAlgorithmSubscriber {
     }
 
     fn span_map<'a>(&'a self) -> RwLockReadGuard<'a, HashMap<Id, SpanState>> {
-        self.span_map.read().unwrap()
+        println!("lock2 {:?}", current_id());
+        let result = self.span_map.read().unwrap();
+        println!("locked2 {:?}", current_id());
+        result
     }
     
     fn span_map_mut<'a>(&'a self) -> RwLockWriteGuard<'a, HashMap<Id, SpanState>> {
-        self.span_map.write().unwrap()
+        println!("lock3 {:?}", current_id());
+        let result = self.span_map.write().unwrap();
+        println!("locked3 {:?}", current_id());
+        result
     }
 
     fn take_permission_for_span(&self, span_map: &RwLockReadGuard<HashMap<Id, SpanState>>, span: &SpanState) {
         if span.logging_permission.has_permission() {
             if let Ok(_) = span.printed_queued_messages.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst) {
+                println!("lock4 {:?}", current_id());
                 for message in span.queued_messages.lock().unwrap().drain(..) {
                     print!("{}", message);
                 }
+                println!("locked4 {:?}", current_id());
                 std::io::Write::flush(&mut stdout()).unwrap();
+                println!("unlock4 {:?}", current_id());
             }
             return;
         }
@@ -147,10 +169,13 @@ impl LogAlgorithmSubscriber {
             if let Some(permission) = parent.logging_permission.take() {
                 // println!("taking permission from parent {} to {}", parent.description, span.description);
                 if let Ok(_) = span.printed_queued_messages.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst) {
+                    println!("lock5 {:?}", current_id());
                     for message in span.queued_messages.lock().unwrap().drain(..) {
                         print!("{}", message);
                     }
+                    println!("locked5 {:?}", current_id());
                     std::io::Write::flush(&mut stdout()).unwrap();
+                    println!("unlock5 {:?}", current_id());
                 }
                 span.logging_permission.give(permission);
             }
@@ -169,7 +194,6 @@ impl LogAlgorithmSubscriber {
     fn delayed_print_messages<'a, I: IntoIterator<Item = String>>(&self, current_span: Option<&SpanState>, span_map: &RwLockReadGuard<HashMap<Id, SpanState>>, messages: I) {
         if let Some(current_span) = current_span {
             if current_span.printed_queued_messages.load(Ordering::SeqCst) {
-                // println!("directly printing");
                 if current_span.logging_permission.has_permission() {
                     for message in messages {
                         print!("{}", message);
@@ -190,7 +214,10 @@ impl LogAlgorithmSubscriber {
             } else {
                 let messages = messages.into_iter().collect::<Vec<_>>();
                 // println!("queueing {} -> {}", &messages[0], current_span.description);
+                println!("lock1 {:?}", current_id());
                 current_span.queued_messages.lock().unwrap().extend(messages);
+                println!("locked1 {:?}", current_id());
+                println!("unlock1 {:?}", current_id());
             }
         } else {
             for message in messages {
@@ -307,6 +334,7 @@ impl Subscriber for LogAlgorithmSubscriber {
             printed_queued_messages: AtomicBool::new(false),
             queued_messages: Mutex::new(Vec::new())
         }).is_none());
+            println!("unlock3 {:?}", current_id());
         return Id::from_non_zero_u64(id);
     }
 
@@ -327,6 +355,7 @@ impl Subscriber for LogAlgorithmSubscriber {
                 event.record(&mut fields);
                 self.delayed_print_messages(current_span, &span_map, [fields.to_string()]);
             }
+            println!("unlock2 {:?}", current_id());
         }
     }
 
@@ -340,6 +369,7 @@ impl Subscriber for LogAlgorithmSubscriber {
         } else if entered_span.level == self.max_depth {
             self.delayed_print_messages(Some(entered_span), &span_map, [format!("{}...", entered_span.description)]);
         }
+            println!("unlock2 {:?}", current_id());
     }
 
     fn exit(&self, span: &Id) {
@@ -360,15 +390,18 @@ impl Subscriber for LogAlgorithmSubscriber {
         }
         self.current_span.get_or(|| Cell::new(None)).set(exited_span.parent.as_ref().map(|id| id.into_non_zero_u64()));
         exited_span.entered_timestamp.store(0, Ordering::SeqCst);
+            println!("unlock2 {:?}", current_id());
     }
 
     fn clone_span(&self, id: &Id) -> Id {
         _ = self.span_map().get(id).unwrap().reference_counter.fetch_add(1, Ordering::Relaxed);
+            println!("unlock2 {:?}", current_id());
         return id.clone();
     }
 
     fn try_close(&self, id: Id) -> bool {
         let remaining_handles = self.span_map().get(&id).unwrap().reference_counter.fetch_sub(1, Ordering::Relaxed) - 1;
+            println!("unlock2 {:?}", current_id());
         if remaining_handles == 0 {
             _ = self.span_map_mut().remove(&id).unwrap();
             true

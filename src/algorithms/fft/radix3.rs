@@ -5,7 +5,7 @@ use tracing::instrument;
 use crate::algorithms::fft::FFTAlgorithm;
 use crate::rings::float_complex::Complex64Base;
 use crate::algorithms::fft::complex_fft::*;
-use crate::algorithms::unity_root::{get_prim_root_of_unity, is_prim_root_of_unity};
+use crate::algorithms::unity_root::{get_prim_root_of_unity_zn, is_prim_root_of_unity};
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::homomorphism::*;
 use crate::primitive_int::StaticRing;
@@ -88,8 +88,7 @@ impl<R> CooleyTukeyRadix3FFT<R::Type, R::Type, Identity<R>>
         where R::Type: ZnRing
     {
         let n = ZZ.pow(3, log3_n);
-        let as_field = (&ring).as_field().ok().unwrap();
-        let root_of_unity = as_field.get_ring().unwrap_element(get_prim_root_of_unity(&as_field, n as usize)?);
+        let root_of_unity = get_prim_root_of_unity_zn(&ring, n as usize)?;
         return Some(Self::new_with_hom(ring.into_identity(), root_of_unity, log3_n));
     }
 }

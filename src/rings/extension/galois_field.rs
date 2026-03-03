@@ -127,7 +127,7 @@ fn find_small_irreducible_poly<P, C>(poly_ring: P, degree: usize, convolution: C
             let primitive_element = if is_prim_root_of_unity_gen(&Fq, &Fq.canonical_gen(), &Fq_star_order, ZZbig) {
                 Fq.canonical_gen()
             } else {
-                get_prim_root_of_unity_gen(&Fq, &Fq_star_order, ZZbig).unwrap()
+                get_prim_root_of_unity_gen(&Fq, &Fq_star_order, ZZbig, &Fq_star_order).unwrap()
             };
             // I thought for a while that it would be enough to have a primitive `lcm(Fq_star_order, large_d^inf)`-th root of unity,
             // however it is not guaranteed that this would indeed generate the field
@@ -290,9 +290,17 @@ impl GaloisField {
     /// }));
     /// ```
     /// 
+    /// # Panics
+    /// 
+    /// Panics if `Z/pZ` is not a field, namely if `p` is not prime.
+    /// 
     pub fn new(p: i64, degree: usize) -> Self {
-        let base_field = Zn64B::new(p as u64).as_field().ok().unwrap();
-        Self::new_with_base_field(base_field, degree)
+        let field = match Zn64B::new(p as u64).as_field() {
+            Ok(field) => field,
+            Err(_) => panic!("characteristic {p} is not a prime"),
+        };
+
+        Self::new_with_base_field(field, degree)
     }
 }
 

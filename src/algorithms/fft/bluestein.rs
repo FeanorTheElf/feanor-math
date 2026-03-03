@@ -208,10 +208,9 @@ impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
     pub fn for_zn_with_hom(hom: H, n: usize, tmp_mem_allocator: A) -> Option<Self>
         where R_twiddle: ZnRing
     {
-        let ring_as_field = hom.domain().as_field().ok().unwrap();
-        let root_of_unity_2n = ring_as_field.get_ring().unwrap_element(get_prim_root_of_unity(&ring_as_field, 2 * n)?);
+        let root_of_unity_2n = get_prim_root_of_unity_zn(hom.domain(), 2 * n)?;
         let log2_m = StaticRing::<i64>::RING.abs_log2_ceil(&(n * 2).try_into().unwrap()).unwrap();
-        let root_of_unity_m = ring_as_field.get_ring().unwrap_element(get_prim_root_of_unity_pow2(&ring_as_field, log2_m)?);
+        let root_of_unity_m = get_prim_root_of_unity_zn(hom.domain(), 1 << log2_m)?;
         return Some(Self::new_with_hom(hom, root_of_unity_2n, root_of_unity_m, n, log2_m, tmp_mem_allocator));
     }
     
@@ -503,13 +502,11 @@ fn bench_bluestein(bencher: &mut test::Bencher) {
     let ring = zn_64b::Zn64B::new(18597889);
     let fastmul_ring = zn_64b::ZnFastmul::new(ring).unwrap();
     let embedding = ring.can_hom(&fastmul_ring).unwrap();
-    let ring_as_field = ring.as_field().ok().unwrap();
-    let root_of_unity = fastmul_ring.coerce(&ring, ring_as_field.get_ring().unwrap_element(get_prim_root_of_unity(&ring_as_field, 2 * BENCH_SIZE).unwrap()));
-    let fastmul_ring_as_field = fastmul_ring.as_field().ok().unwrap();
+    let root_of_unity = fastmul_ring.coerce(&ring, get_prim_root_of_unity_zn(&ring, 2 * BENCH_SIZE).unwrap());
     let fft = BluesteinFFT::new_with_hom(
         embedding.clone(), 
         root_of_unity, 
-        fastmul_ring_as_field.get_ring().unwrap_element(get_prim_root_of_unity_pow2(&fastmul_ring_as_field, 11).unwrap()), 
+        get_prim_root_of_unity_zn(&fastmul_ring, 1 << 11).unwrap(), 
         BENCH_SIZE, 
         11, 
         Global

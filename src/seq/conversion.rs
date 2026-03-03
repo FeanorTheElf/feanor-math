@@ -63,6 +63,10 @@ impl<V: VectorFn<T>, T> Iterator for VectorFnIter<V, T> {
             return Err(NonZero::new(lacking_elements).unwrap())
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len(), Some(self.len()))
+    }
 }
 
 impl<V: VectorFn<T>, T> DoubleEndedIterator for VectorFnIter<V, T> {

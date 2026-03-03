@@ -351,8 +351,6 @@ use crate::algorithms::unity_root::*;
 #[cfg(test)]
 use crate::rings::zn::zn_64b;
 #[cfg(test)]
-use crate::rings::zn::ZnRingStore;
-#[cfg(test)]
 use std::alloc::Global;
 #[cfg(test)]
 use crate::algorithms::fft::bluestein::BluesteinFFT;
@@ -509,14 +507,12 @@ fn bench_factor_fft(bencher: &mut test::Bencher) {
     let ring = zn_64b::Zn64B::new(1602564097);
     let fastmul_ring = zn_64b::ZnFastmul::new(ring).unwrap();
     let embedding = ring.can_hom(&fastmul_ring).unwrap();
-    let ring_as_field = ring.as_field().ok().unwrap();
-    let root_of_unity = fastmul_ring.coerce(&ring, ring_as_field.get_ring().unwrap_element(get_prim_root_of_unity(&ring_as_field, 2 * 31 * 601).unwrap()));
-    let fastmul_ring_as_field = fastmul_ring.as_field().ok().unwrap();
+    let root_of_unity = fastmul_ring.coerce(&ring, get_prim_root_of_unity_zn(&ring, 2 * 31 * 601).unwrap());
     let fft = GeneralCooleyTukeyFFT::new_with_hom(
         embedding.clone(), 
         fastmul_ring.pow(root_of_unity, 2),
-        BluesteinFFT::new_with_hom(embedding.clone(), fastmul_ring.pow(root_of_unity, BENCH_N1), fastmul_ring_as_field.get_ring().unwrap_element(get_prim_root_of_unity_pow2(&fastmul_ring_as_field, 11).unwrap()), BENCH_N2, 11, Global),
-        BluesteinFFT::new_with_hom(embedding, fastmul_ring.pow(root_of_unity, BENCH_N2), fastmul_ring_as_field.get_ring().unwrap_element(get_prim_root_of_unity_pow2(&fastmul_ring_as_field, 6).unwrap()), BENCH_N1, 6, Global),
+        BluesteinFFT::new_with_hom(embedding.clone(), fastmul_ring.pow(root_of_unity, BENCH_N1), get_prim_root_of_unity_zn(&fastmul_ring, 1 << 11).unwrap(), BENCH_N2, 11, Global),
+        BluesteinFFT::new_with_hom(embedding, fastmul_ring.pow(root_of_unity, BENCH_N2), get_prim_root_of_unity_zn(&fastmul_ring, 1 << 6).unwrap(), BENCH_N1, 6, Global),
     );
     let data = (0..(BENCH_N1 * BENCH_N2)).map(|i| ring.int_hom().map(i as i32)).collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(BENCH_N1 * BENCH_N2);

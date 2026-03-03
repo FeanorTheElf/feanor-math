@@ -558,7 +558,7 @@ impl<R, A> RingBase for MultivariatePolyRingImplBase<R, A>
 }
 
 /// 
-/// Iterator over the terms of a [`MultivariatePolyImplEl`].
+/// Iterator over the terms of a [`MultivariatePolyRingEl`].
 /// 
 pub struct TermIterImpl<'a, R>
     where R: RingStore
