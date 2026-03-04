@@ -404,12 +404,10 @@ impl<R: RingStore> Deref for RingElementWrapper<R> {
 
 #[cfg(test)]
 use crate::rings::zn::zn_64b;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_arithmetic_expression() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = zn_64b::Zn64B::new(17);
 
     for x in (0..17).map(|x| ring.int_hom().map(x)) {
@@ -427,7 +425,7 @@ fn test_arithmetic_expression() {
 
 #[test]
 fn test_arithmetic_expression_int() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = zn_64b::Zn64B::new(17);
 
     for x in (0..17).map(|x| ring.int_hom().map(x)) {
@@ -445,7 +443,7 @@ fn test_arithmetic_expression_int() {
 
 #[test]
 fn test_arithmetic_expression_ref() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = zn_64b::Zn64B::new(17);
 
     for x in (0..17).map(|x| ring.int_hom().map(x)) {
@@ -463,7 +461,7 @@ fn test_arithmetic_expression_ref() {
 
 #[test]
 fn test_arithmetic_expression_int_ref() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = zn_64b::Zn64B::new(17);
 
     for x in (0..17).map(|x| ring.int_hom().map(x)) {

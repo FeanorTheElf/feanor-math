@@ -347,12 +347,10 @@ macro_rules! matrix {
     };
 }
 
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_ldl() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = StaticRing::<i64>::RING;
     let QQ = RationalField::new(ZZ);
     let mut data = matrix!(
@@ -380,7 +378,7 @@ fn test_ldl() {
 
 #[test]
 fn test_swap_gso_cols() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = StaticRing::<i64>::RING;
     let QQ = RationalField::new(ZZ);
     let mut matrix = matrix!(
@@ -404,7 +402,7 @@ fn test_swap_gso_cols() {
 
 #[test]
 fn test_lll_2d() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = StaticRing::<i64>::RING;
     let QQ = RationalField::new(ZZ);
     let original = matrix!(
@@ -436,7 +434,7 @@ fn test_lll_2d() {
 
 #[test]
 fn test_lll_3d() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = StaticRing::<i128>::RING;
     let QQ = RationalField::new(ZZ);
     // in this case, the shortest vector is shorter than half the second successive minimum,
@@ -460,7 +458,7 @@ fn test_lll_3d() {
 
 #[test]
 fn test_lll_generating_set() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = StaticRing::<i64>::RING;
     let QQ = RationalField::new(ZZ);
 
@@ -545,7 +543,7 @@ fn test_lll_generating_set() {
 
 #[bench]
 fn bench_lll_10d(bencher: &mut Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
 

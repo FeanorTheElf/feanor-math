@@ -861,12 +861,10 @@ impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for AsFieldBase<FreeA
 use test::Bencher;
 #[cfg(test)]
 use std::time::Instant;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_can_hom_from() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     #[allow(unused)]
     fn assert_impl_CanHomFrom<From, To>()
         where To: ?Sized + CanHomFrom<From>, From: ?Sized + RingBase 
@@ -908,7 +906,7 @@ fn test_can_hom_from() {
 
 #[test]
 fn test_galois_field() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let field = GaloisField::new(3, 1);
     let elements = (0..3).map(|x| field.int_hom().map(x));
     crate::ring::generic_tests::test_ring_axioms(&field, elements.clone());
@@ -925,7 +923,7 @@ fn test_galois_field() {
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let field = GaloisField::new(3, 2);
     let field_ref = &field;
     let elements = (0..3).flat_map(|x| (0..3).map(move |y| field_ref.from_canonical_basis([field_ref.base_ring().int_hom().map(x), field_ref.base_ring().int_hom().map(y)])));
@@ -935,7 +933,7 @@ fn test_principal_ideal_ring_axioms() {
 
 #[test]
 fn test_galois_field_even() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for degree in 1..=9 {
         let field = GaloisField::new(2, degree);
         assert_eq!(degree, field.rank());
@@ -945,7 +943,7 @@ fn test_galois_field_even() {
 
 #[test]
 fn test_galois_field_odd() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for degree in 1..=9 {
         let field = GaloisField::new(3, degree);
         assert_eq!(degree, field.rank());
@@ -961,7 +959,7 @@ fn test_galois_field_odd() {
 
 #[test]
 fn test_galois_field_no_trinomial() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let field = GaloisField::new(2, 24);
     assert_eq!(24, field.rank());
     let poly_ring = DensePolyRing::new(field.base_ring(), "X");
@@ -983,7 +981,7 @@ fn test_galois_field_no_trinomial() {
 
 #[bench]
 fn bench_create_galois_ring_2_14_96(bencher: &mut Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
 
     bencher.iter(|| {
         let field = GaloisField::new(2, 96);
@@ -995,7 +993,7 @@ fn bench_create_galois_ring_2_14_96(bencher: &mut Bencher) {
 #[test]
 #[ignore]
 fn test_galois_field_huge() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let start = Instant::now();
     let field = GaloisField::new(17, 2048);
     _ = std::hint::black_box(field);

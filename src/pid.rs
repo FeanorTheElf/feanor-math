@@ -323,12 +323,10 @@ pub mod generic_tests {
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Zn;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_inv_crt() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i64>::RING;
     assert_eq!(4, (ring.inv_crt([&4, &3], [&7, &9]) % 7 + 7) % 7);
     assert_eq!(3, (ring.inv_crt([&4, &3], [&7, &9]) % 9 + 9) % 9);
@@ -340,7 +338,7 @@ fn test_inv_crt() {
 
 #[test]
 fn test_ideal_intersect() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = Zn::<6>::RING;
     assert!(ring.ideal_intersect(&2, &4) == 2 || ring.ideal_intersect(&2, &4) == 4);
     assert_eq!(0, ring.ideal_intersect(&2, &3));

@@ -324,12 +324,10 @@ use crate::rings::zn::zn_64b::Zn64B;
 use test::Bencher;
 #[cfg(test)]
 use crate::rings::rust_bigint::*;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_ec_factor() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let n = 65537 * 65539;
     let actual = lenstra_ec_factor(&Zn64B::new(n as u64));
     assert!(actual != 1 && actual != n && n % actual == 0);
@@ -337,7 +335,7 @@ fn test_ec_factor() {
 
 #[bench]
 fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let bits = 58;
     let n = ((1i64 << bits) + 1) / 5;
     let ring = Zn64B::new(n as u64);
@@ -352,7 +350,7 @@ fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
 #[test]
 #[ignore]
 fn test_ec_factor_large() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZbig = BigIntRing::RING;
 
     let n: i128 = 1073741827 * 71316922984999;
@@ -369,7 +367,7 @@ fn test_ec_factor_large() {
 #[test]
 #[ignore]
 fn test_compute_partial_factorization() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZbig = BigIntRing::RING;
     let n = int_cast(
         RustBigintRing::RING.get_ring().parse("5164499756173817179311838344006023748659411585658447025661318713081295244033682389259290706560275662871806343945494986751", 10).unwrap(),

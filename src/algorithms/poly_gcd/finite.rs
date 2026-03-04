@@ -195,12 +195,10 @@ use crate::rings::zn::zn_64b;
 use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::rings::zn::*;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_fast_poly_eea() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
 
     let field = zn_64b::Zn64B::new(2).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");

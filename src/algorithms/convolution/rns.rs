@@ -593,13 +593,11 @@ impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolutionZn<I, C, A, 
 }
 
 #[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
-#[cfg(test)]
 use crate::algorithms::convolution::KaratsubaAlgorithm;
 
 #[test]
 fn test_convolution_integer() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i128>::RING;
     let convolution = RNSConvolution::new_with_convolution(7, usize::MAX, BigIntRing::RING, Global, NTTConvolution::new);
 
@@ -608,7 +606,7 @@ fn test_convolution_integer() {
 
 #[test]
 fn test_convolution_zn() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = Zn64B::new((1 << 57) + 1);
     let convolution = RNSConvolutionZn::from(RNSConvolution::new_with_convolution(7, usize::MAX, BigIntRing::RING, Global, NTTConvolution::new));
 
@@ -617,7 +615,7 @@ fn test_convolution_zn() {
 
 #[test]
 fn test_convolution_sum() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i128>::RING;
     let convolution = RNSConvolution::new_with_convolution(7, 20, BigIntRing::RING, Global, NTTConvolution::new);
     

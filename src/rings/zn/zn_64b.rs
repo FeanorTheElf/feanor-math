@@ -1213,8 +1213,6 @@ impl<I> CanIsoFromTo<zn_big::ZnGBBase<I>> for AsFieldBase<Zn64B>
 
 #[cfg(test)]
 use test::Bencher;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 fn elements<'a>(ring: &'a Zn64B) -> impl 'a + Iterator<Item = El<Zn64B>> {
@@ -1226,14 +1224,14 @@ const LARGE_MODULI: [u64; 6] = [(1 << 41) - 1, (1 << 42) - 1, (1 << 58) - 1, (1 
 
 #[test]
 fn test_complete_reduce() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = Zn64B::new(32);
     assert_eq!(31, ring.get_ring().complete_reduce(4 * 32 - 1));
 }
 
 #[test]
 fn test_sum() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for n in LARGE_MODULI {
         let Zn = Zn64B::new(n);
         assert_el_eq!(Zn, Zn.int_hom().map(10001 * 5000), Zn.sum((0..=10000).map(|x| Zn.int_hom().map(x))));
@@ -1242,7 +1240,7 @@ fn test_sum() {
 
 #[test]
 fn test_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for n in 2..=17 {
         let ring = Zn64B::new(n);
         crate::ring::generic_tests::test_ring_axioms(&ring, (0..=ring.get_ring().repr_bound()).map(|n| Zn64BEl(n)));
@@ -1255,7 +1253,7 @@ fn test_ring_axioms() {
 
 #[test]
 fn test_hash_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for n in 2..=17 {
         let ring = Zn64B::new(n);
         crate::ring::generic_tests::test_hash_axioms(&ring, (0..=ring.get_ring().repr_bound()).map(|n| Zn64BEl(n)));
@@ -1268,7 +1266,7 @@ fn test_hash_axioms() {
 
 #[test]
 fn test_divisibility_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for n in 2..=17 {
         let Zn = Zn64B::new(n as u64);
         crate::divisibility::generic_tests::test_divisibility_axioms(&Zn, (0..n).map(|x| Zn.int_hom().map(x)));
@@ -1281,7 +1279,7 @@ fn test_divisibility_axioms() {
 
 #[test]
 fn test_zn_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for n in 2..=17 {
         let Zn = Zn64B::new(n);
         super::generic_tests::test_zn_axioms(&Zn);
@@ -1290,7 +1288,7 @@ fn test_zn_axioms() {
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for n in 2..=17 {
         let R = Zn64B::new(n as u64);
         crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, (0..n).map(|x| R.int_hom().map(x)));
@@ -1301,7 +1299,7 @@ fn test_principal_ideal_ring_axioms() {
 
 #[test]
 fn test_hom_from_fastmul() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for n in 2..=17 {
         let Zn = Zn64B::new(n as u64);
         let Zn_fastmul = ZnFastmul::new(Zn).unwrap();
@@ -1316,7 +1314,7 @@ fn test_hom_from_fastmul() {
 
 #[test]
 fn test_finite_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for n in 2..=17 {
         crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn64B::new(n));
     }
@@ -1326,7 +1324,7 @@ fn test_finite_ring_axioms() {
 
 #[test]
 fn test_from_int_hom() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for n in 2..=17 {
         let Zn = Zn64B::new(n);
         crate::ring::generic_tests::test_hom_axioms(StaticRing::<i8>::RING, Zn, -8..8);
@@ -1341,7 +1339,7 @@ fn test_from_int_hom() {
 
 #[test]
 fn test_bounded_reduce_large() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     const FACTOR: usize = 32;
     let n_max = (1 << 62) / 9;
     for n in (n_max - 10)..=n_max {
@@ -1355,7 +1353,7 @@ fn test_bounded_reduce_large() {
 
 #[test]
 fn test_smallest_lift() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for n in 2..=17 {
         let ring = Zn64B::new(n);
         for k in 0..=ring.get_ring().repr_bound() {
@@ -1371,7 +1369,7 @@ fn test_smallest_lift() {
 
 #[test]
 fn test_smallest_positive_lift() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for n in 2..=17 {
         let ring = Zn64B::new(n);
         for k in 0..=ring.get_ring().repr_bound() {
@@ -1383,7 +1381,7 @@ fn test_smallest_positive_lift() {
 
 #[test]
 fn test_bounded_reduce_small() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for n in 2..=17 {
         let Zn = Zn64B::new(n);
         let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128;
@@ -1395,7 +1393,7 @@ fn test_bounded_reduce_small() {
 
 #[test]
 fn test_bounded_reduce_large_small() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     const FACTOR: usize = 32;
     for n in 2..=17 {
         let Zn = Zn64B::new(n);
@@ -1408,7 +1406,7 @@ fn test_bounded_reduce_large_small() {
 
 #[test]
 fn test_bounded_reduce() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let n_max = (1 << 62) / 9;
     for n in (n_max - 10)..=n_max {
         let Zn = Zn64B::new(n);
@@ -1421,7 +1419,7 @@ fn test_bounded_reduce() {
 
 #[bench]
 fn bench_hom_from_i64_large_modulus(bencher: &mut Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     // the case that the modulus is large
     let Zn = Zn64B::new(36028797018963971 /* = 2^55 + 3 */);
     bencher.iter(|| {
@@ -1432,7 +1430,7 @@ fn bench_hom_from_i64_large_modulus(bencher: &mut Bencher) {
 
 #[bench]
 fn bench_hom_from_i64_small_modulus(bencher: &mut Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     // the case that the modulus is large
     let Zn = Zn64B::new(17);
     bencher.iter(|| {
@@ -1443,7 +1441,7 @@ fn bench_hom_from_i64_small_modulus(bencher: &mut Bencher) {
 
 #[bench]
 fn bench_reduction_map_use_case(bencher: &mut Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     // this benchmark is inspired by the use in https://eprint.iacr.org/2023/1510.pdf
     let p = 17;
     let Zp2 = Zn64B::new((p * p) as u64);
@@ -1471,7 +1469,7 @@ fn bench_reduction_map_use_case(bencher: &mut Bencher) {
 
 #[bench]
 fn bench_inner_product(bencher: &mut Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let Fp = Zn64B::new(65537);
     let len = 1 << 12;
     let lhs = (0..len).map(|i| Fp.int_hom().map(i)).collect::<Vec<_>>();
@@ -1486,7 +1484,7 @@ fn bench_inner_product(bencher: &mut Bencher) {
 
 #[test]
 fn test_serialize() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = Zn64B::new(128);
     crate::serialization::generic_tests::test_serialization(ring, (0..128).map(|x| ring.int_hom().map(x)))
 }

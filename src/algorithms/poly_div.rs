@@ -183,12 +183,10 @@ use crate::integer::*;
 use dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::function::no_error;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_fast_poly_div() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(ZZ, "X");
     let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(80) - 1, X.pow_ref(40) - 2 * X.pow_ref(33) + X.pow_ref(21) - X + 10]);

@@ -299,12 +299,10 @@ impl<R: ?Sized + RingBase> DefaultConvolutionRing for R {
 use test;
 #[cfg(test)]
 use crate::primitive_int::*;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[bench]
 fn bench_naive_mul(bencher: &mut test::Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let a: Vec<i32> = (0..32).collect();
     let b: Vec<i32> = (0..32).collect();
     let mut c: Vec<i32> = (0..64).collect();
@@ -319,7 +317,7 @@ fn bench_naive_mul(bencher: &mut test::Bencher) {
 
 #[bench]
 fn bench_karatsuba_mul(bencher: &mut test::Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let a: Vec<i32> = (0..32).collect();
     let b: Vec<i32> = (0..32).collect();
     let mut c: Vec<i32> = (0..64).collect();

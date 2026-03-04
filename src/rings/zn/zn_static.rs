@@ -319,12 +319,10 @@ pub type Zn<const N: u64> = RingValue<ZnSBase<N, false>>;
 #[stability::unstable(feature = "enable")]
 pub type Fp<const P: u64> = RingValue<ZnSBase<P, true>>;
 
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_is_prime() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     assert_eq!(true, is_prime(17));
     assert_eq!(false, is_prime(49));
 }
@@ -334,7 +332,7 @@ pub const F17: Fp<17> = Fp::<17>::RING;
 
 #[test]
 fn test_finite_field_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&F17);
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::<128>::RING);
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&Fp::<257>::RING);
@@ -343,7 +341,7 @@ fn test_finite_field_axioms() {
 
 #[test]
 fn test_zn_el_add() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let a = F17.int_hom().map(6);
     let b = F17.int_hom().map(12);
     assert_eq!(F17.int_hom().map(1), F17.add(a, b));
@@ -351,7 +349,7 @@ fn test_zn_el_add() {
 
 #[test]
 fn test_zn_el_sub() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let a = F17.int_hom().map(6);
     let b = F17.int_hom().map(12);
     assert_eq!(F17.int_hom().map(11), F17.sub(a, b));
@@ -359,7 +357,7 @@ fn test_zn_el_sub() {
 
 #[test]
 fn test_zn_el_mul() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let a = F17.int_hom().map(6);
     let b = F17.int_hom().map(12);
     assert_eq!(F17.int_hom().map(4), F17.mul(a, b));
@@ -367,7 +365,7 @@ fn test_zn_el_mul() {
 
 #[test]
 fn test_zn_el_div() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let a = F17.int_hom().map(6);
     let b = F17.int_hom().map(12);
     assert_eq!(F17.int_hom().map(9), F17.checked_div(&a, &b).unwrap());
@@ -375,7 +373,7 @@ fn test_zn_el_div() {
 
 #[test]
 fn fn_test_div_impossible() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let _a = Zn::<22>::RING.int_hom().map(4);
     // the following line should give a compiler error
     // Zn::<22>::RING.div(_a, _a);
@@ -383,14 +381,14 @@ fn fn_test_div_impossible() {
 
 #[test]
 fn test_zn_ring_axioms_znbase() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     super::generic_tests::test_zn_axioms(Zn::<17>::RING);
     super::generic_tests::test_zn_axioms(Zn::<63>::RING);
 }
 
 #[test]
 fn test_divisibility_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<17>::RING, 0..17);
     crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<9>::RING, 0..8);
     crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<12>::RING, 0..12);
@@ -398,7 +396,7 @@ fn test_divisibility_axioms() {
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let R = Zn::<17>::RING;
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(R, 0..17);
     let R = Zn::<63>::RING;

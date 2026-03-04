@@ -284,8 +284,6 @@ pub fn partial_eea_int<R>(ring: R, lhs: El<R>, rhs: El<R>, target_size: &El<R>) 
 #[cfg(test)]
 use crate::primitive_int::*;
 #[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
-#[cfg(test)]
 use crate::rings::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::rings::zn::zn_64b::*;
@@ -294,7 +292,7 @@ use crate::rings::zn::*;
 
 #[test]
 fn test_gcd() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     assert_eq!(3, gcd(15, 6, &StaticRing::<i64>::RING).abs());
     assert_eq!(3, gcd(6, 15, &StaticRing::<i64>::RING).abs());
 
@@ -315,7 +313,7 @@ fn test_gcd() {
 
 #[test]
 fn test_partial_eea_poly() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let field = Zn64B::new(65537).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");
     let test_on_input = |a, b, deg| {
@@ -368,7 +366,7 @@ fn test_partial_eea_poly() {
 
 #[test]
 fn test_partial_int() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let test_on_input = |a: i64, b: i64, size: i64| {
         assert!(a != 0);
         assert!(b != 0);

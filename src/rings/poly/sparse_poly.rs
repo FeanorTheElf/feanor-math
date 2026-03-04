@@ -530,8 +530,6 @@ use crate::rings::zn::zn_static::{Zn, Fp};
 use super::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El<P>>
@@ -555,21 +553,21 @@ fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El
 
 #[test]
 fn test_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
     crate::ring::generic_tests::test_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_poly_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
     super::generic_tests::test_poly_ring_axioms(poly_ring, 0..7);
 }
 
 #[test]
 fn test_canonical_iso_axioms_different_base_ring() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let poly_ring1 = SparsePolyRing::new(zn_big::ZnGB::new(StaticRing::<i128>::RING, 7), "X");
     let poly_ring2 = SparsePolyRing::new(zn_64b::Zn64B::new(7), "X");
     crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
@@ -578,7 +576,7 @@ fn test_canonical_iso_axioms_different_base_ring() {
 
 #[test]
 fn test_canonical_iso_dense_poly_ring() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let poly_ring1 = SparsePolyRing::new(zn_64b::Zn64B::new(7), "X");
     let poly_ring2 = DensePolyRing::new(zn_64b::Zn64B::new(7), "X");
     crate::ring::generic_tests::test_hom_axioms(&poly_ring2, &poly_ring1, edge_case_elements(&poly_ring2));
@@ -587,21 +585,21 @@ fn test_canonical_iso_dense_poly_ring() {
 
 #[test]
 fn test_divisibility_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
     crate::divisibility::generic_tests::test_divisibility_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_euclidean_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
     crate::pid::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }

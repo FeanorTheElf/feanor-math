@@ -467,12 +467,10 @@ use crate::wrapper::RingElementWrapper;
 use crate::rings::rational::RationalField;
 #[cfg(test)]
 use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_extend_field() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
     let ZZX = DensePolyRing::new(&ZZ, "X");

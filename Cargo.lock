@@ -114,6 +114,7 @@ dependencies = [
  "bytemuck",
  "feanor-mempool",
  "feanor-serde",
+ "feanor-tracing",
  "libc",
  "ndarray",
  "oorandom",
@@ -147,6 +148,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71fa2c7f5c1d04782a554cc8c74e5936d8316463c9c32c9f6e622b354a845ca3"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "feanor-tracing"
+version = "1.0.0"
+dependencies = [
+ "thread_local",
+ "tracing",
+ "tracing-core",
 ]
 
 [[package]]

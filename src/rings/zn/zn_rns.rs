@@ -746,29 +746,27 @@ impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> Serializabl
 
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 const EDGE_CASE_ELEMENTS: [i32; 9] = [0, 1, 7, 9, 62, 8, 10, 11, 12];
 
 #[test]
 fn test_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = ZnRNS::create_from_primes(vec![7, 11], StaticRing::<i64>::RING);
     crate::ring::generic_tests::test_ring_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.int_hom().map(x)))
 }
 
 #[test]
 fn test_hash_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = ZnRNS::create_from_primes(vec![7, 11], StaticRing::<i64>::RING);
     crate::ring::generic_tests::test_hash_axioms(&ring, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.int_hom().map(x)))
 }
 
 #[test]
 fn test_map_in_map_out() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring1 = ZnRNS::create_from_primes(vec![7, 11, 17], StaticRing::<i64>::RING);
     let ring2 = zn_big::ZnGB::new(StaticRing::<i64>::RING, 7 * 11 * 17);
     for x in [0, 1, 7, 8, 9, 10, 11, 17, 7 * 17, 11 * 8, 11 * 17, 7 * 11 * 17 - 1] {
@@ -779,7 +777,7 @@ fn test_map_in_map_out() {
 
 #[test]
 fn test_canonical_iso_axioms_zn_big() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let from = zn_big::ZnGB::new(StaticRing::<i128>::RING, 7 * 11);
     let to = ZnRNS::create_from_primes(vec![7, 11], StaticRing::<i64>::RING);
     crate::ring::generic_tests::test_hom_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x)));
@@ -793,7 +791,7 @@ fn test_canonical_iso_axioms_zn_big() {
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let from = StaticRing::<i32>::RING;
     let to = ZnRNS::create_from_primes(vec![7, 11], StaticRing::<i64>::RING);
     crate::ring::generic_tests::test_hom_axioms(&from, to, EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.int_hom().map(x)));
@@ -801,14 +799,14 @@ fn test_canonical_hom_axioms_static_int() {
 
 #[test]
 fn test_zn_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = ZnRNS::create_from_primes(vec![7, 11], StaticRing::<i64>::RING);
     super::generic_tests::test_zn_axioms(ring);
 }
 
 #[test]
 fn test_zn_map_in_large_int() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = ZnRNS::create_from_primes(vec![7, 11], BigIntRing::RING);
     super::generic_tests::test_map_in_large_int(ring);
 
@@ -819,7 +817,7 @@ fn test_zn_map_in_large_int() {
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let R = ZnRNS::create_from_primes(vec![5], BigIntRing::RING);
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..5).map(|x| R.int_hom().map(x)));
     
@@ -839,7 +837,7 @@ fn test_principal_ideal_ring_axioms() {
 
 #[test]
 fn test_finite_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(vec![3, 5, 7, 11], StaticRing::<i64>::RING));
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(vec![3, 5], StaticRing::<i64>::RING));
     crate::rings::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(vec![3], StaticRing::<i64>::RING));
@@ -848,7 +846,7 @@ fn test_finite_ring_axioms() {
 
 #[test]
 fn test_not_prime() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = ZnRNS::new(vec![zn_64b::Zn64B::new(15), zn_64b::Zn64B::new(7)], StaticRing::<i64>::RING);
     let equivalent_ring = zn_big::ZnGB::new(StaticRing::<i64>::RING, 15 * 7);
     crate::ring::generic_tests::test_ring_axioms(&ring, (0..105).map(|x| ring.int_hom().map(x)));
@@ -859,7 +857,7 @@ fn test_not_prime() {
 
 #[test]
 fn test_serialization() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = ZnRNS::create_from_primes(vec![3, 5, 7], StaticRing::<i64>::RING);
     crate::serialization::generic_tests::test_serialization(&ring, (0..105).map(|x| ring.int_hom().map(x)));
 }
@@ -872,7 +870,7 @@ fn test_not_coprime() {
 
 #[test]
 fn test_format() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = ZnRNS::new([72057594035352641, 72057594035418113, 72057594036334721, 72057594036945793, ].iter().map(|p| zn_64b::Zn64B::new(*p)).collect(), BigIntRing::RING);
     assert_eq!("1", format!("{}", ring.formatted_el(&ring.int_hom().map(1))));
 }

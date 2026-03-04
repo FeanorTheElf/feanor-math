@@ -105,14 +105,11 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2>(
     let FX = DensePolyRing::new(&F, "X");
     let iso = PolyLiftFactorsDomainBaseRingToFieldIso::new(R, S_to_F.ideal(), S_to_F.codomain().get_ring(), F.get_ring(), S_to_F.max_ideal_idx());
 
-    let f_mod_m = FX.from_terms(RX.terms(f).map(|(c, i)| (
-        iso.map(R.reduce_ring_el(S_to_F.ideal(), (S_to_F.codomain().get_ring(), 1), S_to_F.max_ideal_idx(), R.clone_el(c))),
-        i
-    )));
     let f_mod_me = SX.from_terms(RX.terms(f).map(|(c, i)| (
         R.reduce_ring_el(S_to_F.ideal(), (S_to_F.domain().get_ring(), S_to_F.from_e()), S_to_F.max_ideal_idx(), R.clone_el(c)),
         i
     )));
+    let f_mod_m = FX.from_terms(SX.terms(&f_mod_me).map(|(c, i)| (iso.map(S_to_F.map_ref(c)), i)));
 
     let mut power_decomposition_mod_m = Vec::new();
     let mut signature = Vec::new();
@@ -255,12 +252,10 @@ pub fn poly_squarefree_part_local<P>(poly_ring: P, f: El<P>) -> El<P>
 use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[cfg(test)]
 use super::make_primitive;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_squarefree_part_local() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = BigIntRing::RING;
     let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
     let [f1, f2, f3, f4] = poly_ring.with_wrapped_indeterminate(|X| [
@@ -303,7 +298,7 @@ fn test_squarefree_part_local() {
 
 #[test]
 fn random_test_poly_power_decomposition_local() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = BigIntRing::RING;
     let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
     let mut rng = oorandom::Rand64::new(1);

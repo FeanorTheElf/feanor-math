@@ -177,12 +177,10 @@ pub fn factor<I>(ZZ: I, mut n: El<I>) -> Vec<(El<I>, usize)>
     }
 }
 
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_factor() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZbig = BigIntRing::RING;
     assert_eq!(vec![(3, 2), (5, 1), (29, 1)], factor(&StaticRing::<i64>::RING, 3 * 3 * 5 * 29));
     assert_eq!(vec![(2, 8)], factor(&StaticRing::<i64>::RING, 256));
@@ -211,12 +209,12 @@ fn test_factor() {
 
 #[test]
 fn test_is_prime_power() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     assert_eq!(Some((2, 6)), is_prime_power(&StaticRing::<i64>::RING, &64));
 }
 
 #[test]
 fn test_is_prime_power_large_n() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     assert_eq!(Some((5, 25)), is_prime_power(&StaticRing::<i64>::RING, &StaticRing::<i64>::RING.pow(5, 25)));
 }

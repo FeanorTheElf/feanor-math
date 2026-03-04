@@ -151,12 +151,10 @@ use crate::rings::zn::zn_64b::Zn64B;
 use crate::rings::zn::zn_static::Fp;
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_largest_nonzero_minor_field() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let field = Fp::<17>::RING;
 
     let mut matrix = [vec![1, 0], vec![1, 0]];
@@ -188,7 +186,7 @@ fn test_largest_nonzero_minor_field() {
 
 #[test]
 fn test_largest_nonzero_minor_localpir() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = Zn64B::new(8);
     let i = |x: i32| ring.int_hom().map(x);
 

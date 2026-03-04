@@ -36,12 +36,10 @@ pub fn enumerate_primes<I>(ZZ: I, B: &El<I>) -> Vec<El<I>>
 use crate::algorithms;
 #[cfg(test)]
 use crate::DEFAULT_PROBABILISTIC_REPETITIONS;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_enumerate_primes() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     assert_eq!(vec![2], erathostenes(3));
     assert_eq!(vec![2, 3], erathostenes(4));
     assert_eq!(vec![2, 3, 5, 7, 11, 13, 17, 19], erathostenes(20));
@@ -50,7 +48,7 @@ fn test_enumerate_primes() {
 
 #[test]
 fn test_enumerate_primes_large() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for p in enumerate_primes(&StaticRing::<i64>::RING, &100000) {
         assert!(algorithms::miller_rabin::is_prime(&StaticRing::<i64>::RING, &p, DEFAULT_PROBABILISTIC_REPETITIONS));
     }

@@ -659,12 +659,10 @@ pub fn strassen<R, V1, V2, V3, A, const T1: bool, const T2: bool, const T3: bool
 use std::alloc::Global;
 #[cfg(test)]
 use crate::assert_matrix_eq;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_dispatch_strassen_one_level() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     {
         let a = [DerefArray::from([ 1, 2 ]), DerefArray::from([ 3, 4 ])];
         let b = [DerefArray::from([ 2, 1 ]), DerefArray::from([ -1, -2 ])];
@@ -710,7 +708,7 @@ fn test_dispatch_strassen_one_level() {
 
 #[test]
 fn test_dispatch_strassen_add_assign_one_level() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     {
         let a = [DerefArray::from([ 1, 2 ]), DerefArray::from([ 3, 4 ])];
         let b = [DerefArray::from([ 2, 1 ]), DerefArray::from([ -1, -2 ])];
@@ -756,7 +754,7 @@ fn test_dispatch_strassen_add_assign_one_level() {
 
 #[test]
 fn test_dispatch_strassen_more_levels() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let a = OwnedMatrix::from_fn_in(16, 16, |i, j| (i * j) as i64, Global);
     let b = OwnedMatrix::from_fn_in(16, 16, |i, j| i as i64 - (j as i64) * (j as i64), Global);
     let mut result: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(16, 16, |_, _| i64::MIN, Global);
@@ -786,7 +784,7 @@ fn test_dispatch_strassen_more_levels() {
 
 #[test]
 fn test_dispatch_strassen_add_assign_more_levels() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let a = OwnedMatrix::from_fn_in(16, 16, |i, j| (i * j) as i64, Global);
     let b = OwnedMatrix::from_fn_in(16, 16, |i, j| i as i64 - (j as i64) * (j as i64), Global);
     let mut result: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(16, 16, |i, j| (i as i64) * (i as i64) + j as i64, Global);
@@ -816,7 +814,7 @@ fn test_dispatch_strassen_add_assign_more_levels() {
 
 #[test]
 fn test_strassen_non_power_of_two() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let a = OwnedMatrix::from_fn_in(15, 60, |i, j| (i * j) as i64, Global);
     let b = OwnedMatrix::from_fn_in(60, 17, |i, j| i as i64 - (j as i64) * (j as i64), Global);
     let mut result: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(15, 17, |_, _| i64::MIN, Global);
@@ -844,7 +842,7 @@ fn test_strassen_non_power_of_two() {
 
 #[test]
 fn test_strassen_non_power_of_two_add_assign() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let a = OwnedMatrix::from_fn_in(15, 60, |i, j| (i * j) as i64, Global);
     let b = OwnedMatrix::from_fn_in(60, 17, |i, j| i as i64 - (j as i64) * (j as i64), Global);
     let mut result: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(15, 17, |i, j| (i as i64) * (i as i64) + j as i64, Global);

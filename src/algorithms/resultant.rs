@@ -221,8 +221,6 @@ use crate::algorithms::buchberger::buchberger;
 use crate::integer::BigIntRing;
 #[cfg(test)]
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 #[allow(deprecated)]
@@ -267,7 +265,7 @@ fn test_resultant_local_polynomial() {
 
 #[test]
 fn test_resultant_local_integer() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(ZZ, "X");
 
@@ -293,7 +291,7 @@ fn test_resultant_local_integer() {
 #[test]
 #[ignore]
 fn test_resultant_large() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(ZZ, "X");
 

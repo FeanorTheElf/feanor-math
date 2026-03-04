@@ -231,12 +231,10 @@ use multivariate_impl::MultivariatePolyRingImpl;
 use crate::rings::fraction::FractionFieldStore;
 #[cfg(test)]
 use crate::rings::rational::RationalField;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_product_except_one() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i64>::RING;
     let data = [2, 3, 5, 7, 11, 13, 17, 19];
     let mut actual = [0; 8];
@@ -283,7 +281,7 @@ fn test_product_except_one() {
 
 #[test]
 fn test_interpolate() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i64>::RING;
     let poly_ring = DensePolyRing::new(ring, "X");
     let poly = poly_ring.from_terms([(3, 0), (1, 1), (-1, 3), (2, 4), (1, 5)].into_iter());
@@ -312,7 +310,7 @@ fn test_interpolate() {
 
 #[test]
 fn test_interpolate_multivariate() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = Zn64B::new(29).as_field().ok().unwrap();
     let poly_ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(ring, 2);
 
@@ -346,7 +344,7 @@ fn test_interpolate_multivariate() {
 #[test]
 #[ignore]
 fn large_polynomial_interpolation() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let field = Zn64B::new(65537).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");
     let hom = poly_ring.base_ring().can_hom(&StaticRing::<i64>::RING).unwrap();

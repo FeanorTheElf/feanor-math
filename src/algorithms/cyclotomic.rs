@@ -61,12 +61,10 @@ use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::sparse_poly::SparsePolyRing;
 #[cfg(test)]
 use crate::rings::zn::zn_static::Fp;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_cyclotomic_polynomial() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
     assert!(poly_ring.eq_el(
         &poly_ring.from_terms([(1, 1), (1, 0)].into_iter()),
@@ -103,7 +101,7 @@ fn test_cyclotomic_polynomial() {
 
 #[bench]
 fn bench_cyclotomic_polynomial_3965585_dense(bencher: &mut test::Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
     bencher.iter(|| {
         _ = std::hint::black_box(cyclotomic_polynomial(&poly_ring, std::hint::black_box(257 * 257 * 65)));
@@ -112,7 +110,7 @@ fn bench_cyclotomic_polynomial_3965585_dense(bencher: &mut test::Bencher) {
 
 #[bench]
 fn bench_cyclotomic_polynomial_3965585_sparse(bencher: &mut test::Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
     bencher.iter(|| {
         _ = std::hint::black_box(cyclotomic_polynomial(&poly_ring, std::hint::black_box(257 * 257 * 65)));

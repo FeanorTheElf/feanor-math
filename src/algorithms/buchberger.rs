@@ -495,13 +495,11 @@ use crate::integer::BigIntRing;
 #[cfg(test)]
 use crate::rings::rational::RationalField;
 #[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
-#[cfg(test)]
 use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 
 #[test]
 fn test_buchberger_small() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base = zn_static::F17;
     let ring = MultivariatePolyRingImpl::new(base, 2);
 
@@ -531,8 +529,8 @@ fn test_buchberger_small() {
 
 #[test]
 fn test_buchberger_larger() {
-    LogAlgorithmSubscriber::init_test();
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base = zn_static::F17;
     let ring = MultivariatePolyRingImpl::new(base, 3);
 
@@ -579,7 +577,7 @@ fn test_buchberger_larger() {
 
 #[test]
 fn test_generic_computation() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base = zn_static::F17;
     let ring = MultivariatePolyRingImpl::new(base, 6);
     let poly_ring = dense_poly::DensePolyRing::new(&ring, "X");
@@ -605,7 +603,7 @@ fn test_generic_computation() {
 
 #[test]
 fn test_gb_local_ring() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base = zn_static::Zn::<16>::RING;
     let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 1);
     
@@ -618,7 +616,7 @@ fn test_gb_local_ring() {
 
 #[test]
 fn test_gb_lex() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
     let QQYX = MultivariatePolyRingImpl::new(&QQ, 2);
@@ -644,7 +642,7 @@ fn test_gb_lex() {
 #[ignore]
 #[test]
 fn test_expensive_gb_1() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base = zn_static::Zn::<16>::RING;
     let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 12);
 
@@ -670,7 +668,7 @@ fn test_expensive_gb_1() {
 #[test]
 #[ignore]
 fn test_expensive_gb_2() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base = zn_static::Fp::<7>::RING;
     let ring = MultivariatePolyRingImpl::new(base, 7);
 
@@ -691,7 +689,7 @@ fn test_expensive_gb_2() {
 #[test]
 #[ignore]
 fn test_groebner_cyclic6() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base = zn_static::Fp::<65537>::RING;
     let ring = MultivariatePolyRingImpl::new(base, 6);
 
@@ -706,7 +704,7 @@ fn test_groebner_cyclic6() {
 #[test]
 #[ignore]
 fn test_groebner_cyclic7() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base = zn_static::Fp::<65537>::RING;
     let ring = MultivariatePolyRingImpl::new(base, 7);
 
@@ -722,7 +720,7 @@ fn test_groebner_cyclic7() {
 #[test]
 #[ignore]
 fn test_groebner_cyclic8() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base = zn_static::Fp::<65537>::RING;
     let ring = MultivariatePolyRingImpl::new(base, 8);
 

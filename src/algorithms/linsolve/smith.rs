@@ -267,12 +267,10 @@ fn multiply<'a, R: RingStore, V: AsPointerToSlice<El<R>>, I: IntoIterator<Item =
     return result;
 }
 
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_smith_integers() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i64>::RING;
     let mut A = OwnedMatrix::new(
         vec![ 1, 2, 3, 4, 
@@ -295,7 +293,7 @@ fn test_smith_integers() {
 
 #[test]
 fn test_smith_zn() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = zn_static::Zn::<45>::RING;
     let mut A = OwnedMatrix::new(
         vec![ 8, 3, 5, 8,
@@ -322,7 +320,7 @@ fn test_smith_zn() {
 
 #[test]
 fn test_solve_zn() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = zn_static::Zn::<45>::RING;
     let A = OwnedMatrix::new(
         vec![ 8, 3, 5, 8,
@@ -388,7 +386,7 @@ fn test_unique_solution_correct() {
 
 #[test]
 fn test_solve_int() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i64>::RING;
     let A = OwnedMatrix::new(
         vec![3, 6, 2, 0, 4, 7,
@@ -404,7 +402,7 @@ fn test_solve_int() {
 
 #[test]
 fn test_large() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = zn_static::Zn::<16>::RING;
     let data_A = [
         [0, 0, 0, 0, 0, 0, 0, 0,11, 0, 0],
@@ -426,7 +424,7 @@ fn test_large() {
 
 #[test]
 fn test_determinant() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i64>::RING;
     let A = OwnedMatrix::new(
         vec![1, 0, 3, 
@@ -510,7 +508,7 @@ fn test_kernel_basis() {
 #[test]
 #[ignore]
 fn time_solve_right_using_pre_smith_galois_field() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let n = 100;
     let field = GaloisField::new(257, 21);
     let matrix = OwnedMatrix::from_fn(n, n, |i, j| field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j));
@@ -528,7 +526,7 @@ fn time_solve_right_using_pre_smith_galois_field() {
 #[test]
 #[ignore]
 fn time_solve_right_using_extension() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let n = 126;
     let field = GaloisField::new(257, 21);
     let matrix = OwnedMatrix::from_fn(n, n, |i, j| field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j));
@@ -545,7 +543,7 @@ fn time_solve_right_using_extension() {
 
 #[bench]
 fn bench_solve_right_using_pre_smith_galois_field(bencher: &mut Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base_field = Zn64B::new(257).as_field().ok().unwrap();
     let field = GaloisField::create(FreeAlgebraImpl::new(base_field, 5, [base_field.int_hom().map(3), base_field.int_hom().map(-4)]).as_field().ok().unwrap());
     let matrix = OwnedMatrix::from_fn(10, 10, |i, j| field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j));

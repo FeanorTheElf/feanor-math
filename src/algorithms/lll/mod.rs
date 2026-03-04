@@ -25,8 +25,6 @@ use crate::homomorphism::*;
 use crate::rings::rational::RationalFieldBase;
 #[cfg(test)]
 use crate::seq::*;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 fn norm_squared<I, V>(ring: I, col: &Column<V, El<I>>) -> El<I>
@@ -106,7 +104,7 @@ fn assert_rational_lattice_isomorphic<R, S, I, V1, V2>(small_ring: R, large_ring
 
 #[test]
 fn test_assert_lattice_isomorphic() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = StaticRing::<i64>::RING;
 
     let lhs = [

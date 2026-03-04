@@ -426,12 +426,10 @@ pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2>(
 
 #[cfg(test)]
 use crate::integer::*;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_hensel_lift() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = BigIntRing::RING;
     let prime = 5;
     let Zp = ZZ.get_ring().quotient_ring_at(&prime, 1, 0);
@@ -463,7 +461,7 @@ fn test_hensel_lift() {
 
 #[test]
 fn test_hensel_lift_bezout_identity() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = BigIntRing::RING;
     let prime = 5;
     let Zp = ZZ.get_ring().quotient_ring_at(&prime, 1, 0);

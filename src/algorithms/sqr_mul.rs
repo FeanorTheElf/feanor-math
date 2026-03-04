@@ -248,12 +248,10 @@ use tracing::instrument;
 use crate::rings::zn::zn_64b;
 #[cfg(test)]
 use crate::homomorphism::*;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_generic_abs_square_and_multiply() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for i in 0..(1 << 16) {
         assert_eq!(Ok(i), try_generic_abs_square_and_multiply::<_, _, _, _, _, !>(1, &i, StaticRing::<i32>::RING, |a| Ok(a * 2), |a, b| Ok(a + b), 0));
     }
@@ -261,7 +259,7 @@ fn test_generic_abs_square_and_multiply() {
 
 #[test]
 fn test_generic_pow_shortest_chain_table() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for i in 0..(1 << 16) {
         assert_eq!(Ok(i), generic_pow_shortest_chain_table::<_, _, _, _, _, !>(1, &i, StaticRing::<i32>::RING, |a| Ok(a * 2), |a, b| Ok(a + b), |a| *a, 0));
     }
@@ -269,7 +267,7 @@ fn test_generic_pow_shortest_chain_table() {
 
 #[test]
 fn test_shortest_addition_chain_table() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     for i in 0..SHORTEST_ADDITION_CHAINS.len() {
         assert_eq!(i, SHORTEST_ADDITION_CHAINS[i].0 + SHORTEST_ADDITION_CHAINS[i].1);
     }
@@ -277,7 +275,7 @@ fn test_shortest_addition_chain_table() {
 
 #[bench]
 fn bench_standard_square_and_multiply(bencher: &mut Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = zn_64b::Zn64B::new(536903681);
     let x = ring.int_hom().map(2);
     bencher.iter(|| {
@@ -297,7 +295,7 @@ fn bench_standard_square_and_multiply(bencher: &mut Bencher) {
 
 #[bench]
 fn bench_addchain_square_and_multiply(bencher: &mut Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = zn_64b::Zn64B::new(536903681);
     let x = ring.int_hom().map(2);
     bencher.iter(|| {

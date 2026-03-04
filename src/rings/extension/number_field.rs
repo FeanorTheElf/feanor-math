@@ -1165,12 +1165,10 @@ impl<'de, Impl, I> Deserialize<'de> for NumberFieldBase<Impl, I>
 use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[cfg(test)]
 use crate::iters::multi_cartesian_product;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(ZZ, "X");
 
@@ -1184,7 +1182,7 @@ fn test_principal_ideal_ring_axioms() {
 
 #[test]
 fn test_adjoin_root() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
     let QQX = DensePolyRing::new(QQ, "X");
@@ -1195,7 +1193,7 @@ fn test_adjoin_root() {
 
 #[test]
 fn test_poly_gcd_number_field() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(ZZ, "X");
 
@@ -1233,7 +1231,7 @@ fn test_poly_gcd_number_field() {
 
 #[test]
 fn random_test_poly_gcd_number_field() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     
     // use tracing_subscriber::Layer;
     // use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;

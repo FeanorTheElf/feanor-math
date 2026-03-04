@@ -70,9 +70,8 @@ pub mod unstable_sealed {
 
 mod lazy;
 mod cow;
-
-pub mod tracing;
 pub mod function;
+
 ///
 /// Contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`].
 /// 

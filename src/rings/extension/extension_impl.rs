@@ -853,8 +853,6 @@ use crate::rings::zn::ZnRingStore;
 use crate::rings::zn::zn_static;
 #[cfg(test)]
 use crate::algorithms::convolution::fft::FFTConvolution;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 fn test_ring0_and_elements() -> (FreeAlgebraImpl<Zn64B, Vec<Zn64BEl>>, Vec<FreeAlgebraImplEl<Zn64B>>) {
@@ -926,14 +924,14 @@ fn test_ring4_and_elements() -> (FreeAlgebraImpl<StaticRing::<i64>, SparseMapVec
 
 #[test]
 fn test_sparse() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let (ring, _) = test_ring4_and_elements();
     assert_el_eq!(ring, ring.canonical_gen(), ring.pow(ring.canonical_gen(), 3));
 }
 
 #[test]
 fn test_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     // let (ring, els) = test_ring0_and_elements();
     // crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
     // let (ring, els) = test_ring1_and_elements();
@@ -959,7 +957,7 @@ fn test_ring_axioms() {
 
 #[test]
 fn test_rank_1_ring() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base_ring = Zn64B::new(5).as_field().ok().unwrap();
     let ring = FreeAlgebraImpl::new(base_ring, 1, [base_ring.int_hom().map(1)]).as_field().ok().unwrap();
     crate::field::generic_tests::test_field_axioms(&ring, (0..5).map(|x| ring.int_hom().map(x)));
@@ -969,7 +967,7 @@ fn test_rank_1_ring() {
 
 #[test]
 fn test_free_algebra_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let (ring, _) = test_ring0_and_elements();
     super::generic_tests::test_free_algebra_axioms(ring);
     let (ring, _) = test_ring1_and_elements();
@@ -984,7 +982,7 @@ fn test_free_algebra_axioms() {
 
 #[test]
 fn test_division() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base_ring = Zn64B::new(4);
     let i = base_ring.int_hom();
     let ring = FreeAlgebraImpl::new(base_ring, 2, [i.map(-1), i.map(-1)]);
@@ -1003,7 +1001,7 @@ fn test_division() {
 
 #[test]
 fn test_division_ring_of_integers() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base_ring = StaticRing::<i64>::RING;
     let ring = FreeAlgebraImpl::new(base_ring, 2, [11, 0]);
 
@@ -1019,7 +1017,7 @@ fn test_division_ring_of_integers() {
 
 #[test]
 fn test_divisibility_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let (ring, els) = test_ring0_and_elements();
     crate::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
     let (ring, els) = test_ring1_and_elements();
@@ -1034,7 +1032,7 @@ fn test_divisibility_axioms() {
 
 #[test]
 fn test_cubic_mul() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base_ring = zn_static::Zn::<256>::RING;
     let modulo = base_ring.int_hom();
     let ring = FreeAlgebraImpl::new(base_ring, 3, [modulo.map(-1), modulo.map(-1), modulo.map(-1)]);
@@ -1045,7 +1043,7 @@ fn test_cubic_mul() {
 
 #[test]
 fn test_as_field() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let base_ring = Zn64B::new(5).as_field().ok().unwrap();
     let ring = FreeAlgebraImpl::new(base_ring, 1, [base_ring.int_hom().map(1)]).as_field().ok().unwrap();
     crate::field::generic_tests::test_field_axioms(&ring, (0..5).map(|x| ring.int_hom().map(x)));
@@ -1060,7 +1058,7 @@ fn test_as_field() {
 
 #[test]
 fn test_serialization() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let (ring, els) = test_ring0_and_elements();
     crate::serialization::generic_tests::test_serialization(ring, els.into_iter());
     let (ring, els) = test_ring1_and_elements();
@@ -1082,7 +1080,7 @@ fn test_from_canonical_basis_enforce_len() {
 
 #[test]
 fn test_serialize_deserialize() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     crate::serialization::generic_tests::test_serialize_deserialize(test_ring0_and_elements().0.into());
     crate::serialization::generic_tests::test_serialize_deserialize(test_ring2_and_elements().0.into());
     crate::serialization::generic_tests::test_serialize_deserialize(test_ring3_and_elements().0.into());

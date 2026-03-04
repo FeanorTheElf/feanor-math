@@ -218,12 +218,10 @@ pub fn poly_factor_integer<P>(ZZX: P, f: El<P>) -> Vec<(El<P>, usize)>
 use crate::primitive_int::*;
 #[cfg(test)]
 use crate::algorithms::poly_gcd::make_primitive;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_factor_int_poly() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
     let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1, X + 1]);
     let input = ZZX.mul_ref(&f, &g);

@@ -780,22 +780,20 @@ impl<A: Allocator + Send + Sync + Clone> IntegerRing for RustBigintRingBase<A> {
     }
 }
 
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[cfg(test)]
 const ZZ: RustBigintRing = RustBigintRing::RING;
 
 #[test]
 fn test_print_power_2() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let x = RustBigint(false, vec![0, 0, 1]);
     assert_eq!("340282366920938463463374607431768211456", format!("{}", RustBigintRing::RING.formatted_el(&x)));
 }
 
 #[test]
 fn test_from() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     assert!(ZZ.eq_el(&RustBigint(false, vec![]), &ZZ.int_hom().map(0)));
     assert!(ZZ.eq_el(&RustBigint(false, vec![2138479]), &ZZ.int_hom().map(2138479)));
     assert!(ZZ.eq_el(&RustBigint(true, vec![2138479]), &ZZ.int_hom().map(-2138479)));
@@ -804,7 +802,7 @@ fn test_from() {
 
 #[test]
 fn test_to_i128() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let iso = ZZ.can_iso(&StaticRing::<i128>::RING).unwrap();
     assert_eq!(0, iso.map(RustBigint(false, vec![])));
     assert_eq!(2138479, iso.map(RustBigint(false, vec![2138479])));
@@ -818,7 +816,7 @@ fn test_to_i128() {
 
 #[test]
 fn test_sub_assign() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let mut x = RustBigintRing::RING.get_ring().parse("4294836225", 10).unwrap();
     let y = RustBigintRing::RING.get_ring().parse("4294967297", 10).unwrap();
     let z = RustBigintRing::RING.get_ring().parse("-131072", 10).unwrap();
@@ -828,7 +826,7 @@ fn test_sub_assign() {
 
 #[test]
 fn test_assumptions_integer_division() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     assert_eq!(-1, -3 / 2);
     assert_eq!(-1, 3 / -2);
     assert_eq!(1, -3 / -2);
@@ -861,43 +859,43 @@ fn edge_case_elements() -> impl Iterator<Item = RustBigint> {
 
 #[test]
 fn test_bigint_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     crate::ring::generic_tests::test_ring_axioms(ZZ, edge_case_elements())
 }
 
 #[test]
 fn test_hash_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     crate::ring::generic_tests::test_hash_axioms(ZZ, edge_case_elements());
 }
 
 #[test]
 fn test_bigint_divisibility_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     crate::divisibility::generic_tests::test_divisibility_axioms(ZZ, edge_case_elements())
 }
 
 #[test]
 fn test_bigint_euclidean_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     crate::pid::generic_tests::test_euclidean_ring_axioms(ZZ, edge_case_elements());
 }
 
 #[test]
 fn test_bigint_principal_ideal_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(ZZ, edge_case_elements());
 }
 
 #[test]
 fn test_bigint_integer_ring_axioms() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     crate::integer::generic_tests::test_integer_axioms(ZZ, edge_case_elements())
 }
 
 #[test]
 fn from_to_float_approx() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let x: f64 = 83465209236517892563478156042389675783219532497861237985328563.;
     let y = ZZ.to_float_approx(&ZZ.from_float_approx(x).unwrap());
     assert!(x * 0.99999 < y);
@@ -916,7 +914,7 @@ fn from_to_float_approx() {
 
 #[bench]
 fn bench_div_300_bits(bencher: &mut test::Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let x = RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
     let y = RustBigintRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
     let z = RustBigintRing::RING.get_ring().parse("48682207850683149082203680872586784064678018", 10).unwrap();
@@ -928,7 +926,7 @@ fn bench_div_300_bits(bencher: &mut test::Bencher) {
 
 #[bench]
 fn bench_mul_300_bits(bencher: &mut test::Bencher) {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let x = RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap();
     let y = RustBigintRing::RING.get_ring().parse("48937502893645789234569182735646324895723409587234", 10).unwrap();
     let z = RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap();
@@ -940,7 +938,7 @@ fn bench_mul_300_bits(bencher: &mut test::Bencher) {
 
 #[test]
 fn test_is_zero() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let zero = ZZ.zero();
     let mut nonzero = ZZ.one();
     ZZ.mul_pow_2(&mut nonzero, 83124);
@@ -952,7 +950,7 @@ fn test_is_zero() {
 
 #[test]
 fn test_cmp() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     assert_eq!(true, ZZ.is_lt(&ZZ.int_hom().map(-1), &ZZ.int_hom().map(2)));
     assert_eq!(true, ZZ.is_lt(&ZZ.int_hom().map(1), &ZZ.int_hom().map(2)));
     assert_eq!(false, ZZ.is_lt(&ZZ.int_hom().map(2), &ZZ.int_hom().map(2)));
@@ -969,7 +967,7 @@ fn test_cmp() {
 
 #[test]
 fn test_get_uniformly_random() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     crate::integer::generic_tests::test_integer_get_uniformly_random(ZZ);
 
     let ring = ZZ;
@@ -984,7 +982,7 @@ fn test_get_uniformly_random() {
 
 #[test]
 fn test_canonical_iso_static_int() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     // for the hom test, we have to be able to multiply elements in `StaticRing::<i128>::RING`, so we cannot test `i128::MAX` or `i128::MIN`
     crate::ring::generic_tests::test_hom_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128].iter().copied());
     crate::ring::generic_tests::test_iso_axioms(StaticRing::<i128>::RING, ZZ, [0, 1, -1, -100, 100, i64::MAX as i128, i64::MIN as i128, i128::MAX, i128::MIN].iter().copied());
@@ -992,7 +990,7 @@ fn test_canonical_iso_static_int() {
 
 #[test]
 fn test_fma_map_in() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let from_i64 = ZZ.can_hom(&StaticRing::<i64>::RING).unwrap();
     assert_el_eq!(ZZ, ZZ.get_ring().parse("10000000000000000000000", 10).unwrap(), from_i64.fma_map(&ZZ.get_ring().parse("100000000000000000000", 10).unwrap(), &100, ZZ.zero()));
     assert_el_eq!(ZZ, ZZ.get_ring().parse("-10000000000000000000000", 10).unwrap(), from_i64.fma_map(&ZZ.get_ring().parse("100000000000000000000", 10).unwrap(), &-100, ZZ.zero()));
@@ -1007,13 +1005,13 @@ fn test_fma_map_in() {
 
 #[test]
 fn test_serialize() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     crate::serialization::generic_tests::test_serialization(ZZ, edge_case_elements())
 }
 
 #[test]
 fn test_serialize_postcard() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let serialized = postcard::to_allocvec(&SerializeWithRing::new(&ZZ.power_of_two(10000), ZZ)).unwrap();
     let result = DeserializeWithRing::new(ZZ).deserialize(
         &mut postcard::Deserializer::from_flavor(postcard::de_flavors::Slice::new(&serialized))

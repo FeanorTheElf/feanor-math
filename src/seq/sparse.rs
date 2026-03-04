@@ -182,7 +182,7 @@ fn assert_vector_eq<const N: usize>(vec: &SparseMapVector<StaticRing<i64>>, valu
 
 #[test]
 fn test_at_mut() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i64>::RING;
     let mut vector = SparseMapVector::new(5, ring);
 
@@ -215,7 +215,7 @@ fn test_at_mut() {
 
 #[test]
 fn test_nontrivial_entries() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i64>::RING;
     let mut vector = SparseMapVector::new(5, ring);
     assert_eq!(vector.nontrivial_entries().collect::<HashMap<_, _>>(), [].into_iter().collect());
@@ -244,7 +244,7 @@ fn test_nontrivial_entries() {
 
 #[test]
 fn test_scan() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i64>::RING;
     let mut vector = SparseMapVector::new(5, ring);
     *vector.at_mut(1) = 2;

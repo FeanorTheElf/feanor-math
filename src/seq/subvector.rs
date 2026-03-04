@@ -219,12 +219,10 @@ impl<V: VectorFn<T>, T> SelfSubvectorFn<T> for SubvectorFn<V, T> {
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
 use super::sparse::SparseMapVector;
-#[cfg(test)]
-use crate::tracing::LogAlgorithmSubscriber;
 
 #[test]
 fn test_subvector_ranges() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let a = SubvectorView::new([0, 1, 2, 3, 4]);
     assert_eq!(3, a.restrict(0..3).len());
     assert_eq!(3, a.restrict(0..=2).len());
@@ -235,7 +233,7 @@ fn test_subvector_ranges() {
 
 #[test]
 fn test_subvector_subvector() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let a = SubvectorView::new([0, 1, 2, 3, 4]);
     let b = a.restrict(1..4);
     assert_eq!(3, b.len());
@@ -254,7 +252,7 @@ fn test_subvector_subvector_oob() {
 
 #[test]
 fn test_subvector_fn_ranges() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let a = SubvectorFn::new([0, 1, 2, 3, 4].clone_els_by(|x| *x));
     assert_eq!(3, a.restrict(0..3).len());
     assert_eq!(3, a.restrict(0..=2).len());
@@ -265,7 +263,7 @@ fn test_subvector_fn_ranges() {
 
 #[test]
 fn test_subvector_fn_subvector() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let a = SubvectorFn::new([0, 1, 2, 3, 4].clone_els_by(|x| *x));
     let b = a.restrict(1..4);
     assert_eq!(3, b.len());
@@ -284,7 +282,7 @@ fn test_subvector_fn_subvector_oob() {
 
 #[test]
 fn test_subvector_sparse() {
-    LogAlgorithmSubscriber::init_test();
+    feanor_tracing::DelayedLogger::init_test();
     let mut sparse_vector = SparseMapVector::new(1000, StaticRing::<i64>::RING);
     *sparse_vector.at_mut(6) = 6;
     *sparse_vector.at_mut(20) = 20;
