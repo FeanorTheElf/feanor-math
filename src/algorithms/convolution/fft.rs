@@ -126,7 +126,7 @@ impl<A> FFTConvolution<A>
         let log2_data_size = if let Some(log2_data_size) = ring_log2_el_size {
             log2_data_size 
         } else {
-            data.as_iter().map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap()
+            data.as_iter().map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap_or(0)
         };
         let result = PreparedConvolutionOperand {
             fft_data: LazyVec::new(),
@@ -137,8 +137,10 @@ impl<A> FFTConvolution<A>
         // this might avoid confusing performance characteristics when the user does
         // not expect lazy behavior
         if let Some(len) = length_hint {
-            let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
-            _ = self.get_fft_data(data, Some(&result), ring, log2_len, to_int, ring_log2_el_size);
+            if len > 0 {
+                let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
+                _ = self.get_fft_data(data, Some(&result), ring, log2_len, to_int, ring_log2_el_size);
+            }
         }
         return result;
     }
@@ -191,7 +193,7 @@ impl<A> FFTConvolution<A>
     #[instrument(skip_all, level = "trace")]
     fn compute_convolution_sum_impl<R, ToInt, FromInt>(
         &self,
-        data: &[(&[R::Element], Option<&PreparedConvolutionOperand<R, A>>, &[R::Element], Option<&PreparedConvolutionOperand<R, A>>)],
+        values: &[(&[R::Element], Option<&PreparedConvolutionOperand<R, A>>, &[R::Element], Option<&PreparedConvolutionOperand<R, A>>)],
         dst: &mut [R::Element],
         ring: &R,
         mut to_int: ToInt,
@@ -202,9 +204,16 @@ impl<A> FFTConvolution<A>
             ToInt: FnMut(&R::Element) -> i64,
             FromInt: FnMut(i64) -> R::Element
     {
-        let len = dst.len();
-
+        if values.len() == 0 {
+            return;
+        }
+        let len = values.iter().map(|(l, _, r, _)| if l.len() == 0 || r.len() == 0 { 0 } else { l.len() + r.len() - 1}).max().unwrap();
+        if len == 0 {
+            return;
+        }
+        assert!(len <= dst.len() + 1);
         let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
+
         let mut buffer = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
         buffer.resize(1 << log2_len, CC.zero());
 
@@ -215,7 +224,7 @@ impl<A> FFTConvolution<A>
         } else {
             0
         };
-        for (lhs, lhs_prep, rhs, rhs_prep) in data {
+        for (lhs, lhs_prep, rhs, rhs_prep) in values {
             if lhs.len() == 0 || rhs.len() == 0 {
                 continue;
             }

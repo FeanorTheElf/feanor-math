@@ -479,7 +479,7 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
         let input_size_log2 = if let Some(log2_data_size) = ring_log2_el_size {
             log2_data_size
         } else { 
-            data.as_iter().map(|x| self.integer_ring.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap()
+            data.as_iter().map(|x| self.integer_ring.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap_or(0)
         };
         return PreparedConvolutionOperand {
             ring: PhantomData,

@@ -374,8 +374,8 @@ pub mod generic_tests {
         where C: ConvolutionAlgorithm<R::Type>,
             R: RingStore
     {
-        for lhs_len in [2, 3, 4, 15] {
-            for rhs_len in [2, 3, 4, 15, 31, 32, 33] {
+        for lhs_len in [0, 1, 2, 3, 4, 15] {
+            for rhs_len in [0, 1, 2, 3, 4, 15, 31, 32, 33] {
                 let lhs = (0..lhs_len).map(|i| ring.mul_ref_snd(ring.int_hom().map(i), &scale)).collect::<Vec<_>>();
                 let rhs = (0..rhs_len).map(|i| ring.mul_ref_snd(ring.int_hom().map(i), &scale)).collect::<Vec<_>>();
                 let expected = (0..(lhs_len + rhs_len)).map(|i| if i < lhs_len + rhs_len {
@@ -415,8 +415,8 @@ pub mod generic_tests {
         where C: ConvolutionAlgorithm<R::Type>,
             R: RingStore
     {
-        for lhs_len in [2, 3, 4, 14, 15] {
-            for rhs_len in [2, 3, 4, 15, 31, 32, 33] {
+        for lhs_len in [0, 1, 2, 3, 4, 14, 15] {
+            for rhs_len in [0, 1, 2, 3, 4, 15, 31, 32, 33] {
                 let lhs = (0..lhs_len).map(|i| ring.mul_ref_snd(ring.int_hom().map(i), &scale)).collect::<Vec<_>>();
                 let rhs = (0..rhs_len).map(|i| ring.mul_ref_snd(ring.int_hom().map(i), &scale)).collect::<Vec<_>>();
                 let expected = (0..(lhs_len + rhs_len)).map(|i| if i < lhs_len + rhs_len {

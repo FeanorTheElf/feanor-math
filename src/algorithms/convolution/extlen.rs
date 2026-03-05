@@ -91,26 +91,33 @@ impl<R, C> ConvolutionAlgorithm<R> for LengthExtendedConvolution<C>
     }
 
     fn compute_convolution_sum(&self, values: &[(&[R::Element], Option<&Self::PreparedConvolutionOperand>, &[R::Element], Option<&Self::PreparedConvolutionOperand>)], dst: &mut [R::Element], ring: &R) {
-        let len = dst.len();
-        for (lhs, _, rhs, _) in values {
-            assert!(lhs.len() + rhs.len() <= len + 1);
+        if values.len() == 0 {
+            return;
         }
-        let lhs_prep_owned = values.iter().map(|(lhs, lhs_prep, rhs, _)| if lhs_prep.is_none() {
-            Some(self.prepare_convolution_operand(lhs, Some(lhs.len() + rhs.len()), ring))
+        let len = values.iter().map(|(l, _, r, _)| if l.len() == 0 || r.len() == 0 { 0 } else { l.len() + r.len() - 1}).max().unwrap();
+        if len == 0 {
+            return;
+        }
+        assert!(len <= dst.len() + 1);
+
+        let lhs_prep_owned = values.iter().map(|(lhs, lhs_prep, _, _)| if lhs_prep.is_none() {
+            Some(self.prepare_convolution_operand(lhs, Some(len), ring))
         } else {
             None
         }).collect::<Vec<_>>();
         let lhs_prep = values.iter().zip(lhs_prep_owned.iter()).map(|((_, lhs_prep, _, _), lhs_owned)| lhs_prep.or(lhs_owned.as_ref()).unwrap());
         
-        let rhs_prep_owned = values.iter().map(|(lhs, _, rhs, rhs_prep)| if rhs_prep.is_none() {
-            Some(self.prepare_convolution_operand(rhs, Some(lhs.len() + rhs.len()), ring))
+        let rhs_prep_owned = values.iter().map(|(_, _, rhs, rhs_prep)| if rhs_prep.is_none() {
+            Some(self.prepare_convolution_operand(rhs, Some(len), ring))
         } else {
             None
         }).collect::<Vec<_>>();
         let rhs_prep = values.iter().zip(rhs_prep_owned.iter()).map(|((_, _, _, rhs_prep), rhs_owned)| rhs_prep.or(rhs_owned.as_ref()).unwrap());
 
         for k in 0..=((len - 1) / self.chunk_len()) {
-            let values = values.iter().map(|(lhs, _, rhs, _)| (lhs, rhs)).zip(lhs_prep.clone().zip(rhs_prep.clone())).flat_map(|((lhs, rhs), (lhs_prep, rhs_prep))| 
+            let values = values.iter().map(|(lhs, _, rhs, _)| (lhs, rhs)).zip(lhs_prep.clone().zip(rhs_prep.clone()))
+            .filter(|((lhs, rhs), _)| lhs.len() != 0 && rhs.len() != 0)
+            .flat_map(|((lhs, rhs), (lhs_prep, rhs_prep))| 
                 (k.saturating_sub(rhs_prep.prepared_parts.len() - 1)..min(k + 1, lhs_prep.prepared_parts.len())).map(move |i| (
                     &lhs[(i * self.chunk_len())..min((i + 1) * self.chunk_len(), lhs.len())],
                     Some(&lhs_prep.prepared_parts[i]),

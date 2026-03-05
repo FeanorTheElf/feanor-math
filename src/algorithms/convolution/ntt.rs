@@ -137,9 +137,6 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
         where V1: VectorView<R_main::Element>,
             V2: VectorView<R_main::Element>
     {
-        if lhs.len() == 0 || rhs.len() == 0 {
-            return MyCow::Owned(Vec::new_in(self.allocator.clone()));
-        }
         let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
         if lhs_prep.is_some() && (lhs_prep.unwrap().significant_entries < len || lhs_prep.unwrap().ntt_data.len() != 1 << log2_len) {
@@ -175,11 +172,17 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
         where V: VectorView<R_main::Element>
     {
         let significant_entries = if let Some(out_len) = len_hint {
-            assert!(data.len() <= out_len);
+            assert!(data.len() <= out_len, "length_hint cannot be smaller than the length of a single convolution operand");
             out_len
         } else {
             2 * data.len()
         };
+        if significant_entries == 0 {
+            return PreparedConvolutionOperand {
+                ntt_data: Vec::new_in(self.allocator.clone()),
+                significant_entries: significant_entries
+            };
+        }
         let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&significant_entries.try_into().unwrap()).unwrap();
 
         let mut result = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
@@ -202,8 +205,12 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
         rhs_prep: Option<&PreparedConvolutionOperand<R_main, A>>,
         dst: &mut [R_main::Element]
     ) {
-        assert!(lhs.len() + rhs.len() - 1 <= dst.len());
+        if lhs.len() == 0 || rhs.len() == 0 {
+            return;
+        }
         let len = lhs.len() + rhs.len() - 1;
+        assert!(len <= dst.len() + 1);
+        
         let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
         let mut lhs_ntt = self.compute_convolution_ntt(lhs, lhs_prep, rhs, rhs_prep, len);
@@ -216,13 +223,23 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
 
     #[instrument(skip_all, level = "trace")]
     fn compute_convolution_sum_impl(&self, values: &[(&[R_main::Element], Option<&PreparedConvolutionOperand<R_main, A>>, &[R_main::Element], Option<&PreparedConvolutionOperand<R_main, A>>)], dst: &mut [R_main::Element]) {
-        let len = dst.len();
+        if values.len() == 0 {
+            return;
+        }
+        let len = values.iter().map(|(l, _, r, _)| if l.len() == 0 || r.len() == 0 { 0 } else { l.len() + r.len() - 1}).max().unwrap();
+        if len == 0 {
+            return;
+        }
+        assert!(len <= dst.len() + 1);
         let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
         let mut buffer = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
         buffer.resize_with(1 << log2_len, || self.ring().zero());
 
         for (lhs, lhs_prep, rhs, rhs_prep) in values {
+            if lhs.len() == 0 || rhs.len() == 0 {
+                continue;
+            }
             assert!(lhs.len() + rhs.len() <= len + 1);
 
             let res_ntt = self.compute_convolution_ntt(lhs, *lhs_prep, rhs, *rhs_prep, len);
