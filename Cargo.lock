@@ -153,6 +153,8 @@ dependencies = [
 [[package]]
 name = "feanor-tracing"
 version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ce01413bb459f3291c7d296e769200993f677774fe0b4f1951ea21adcb9c9a4"
 dependencies = [
  "thread_local",
  "tracing",

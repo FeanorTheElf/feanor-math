@@ -21,7 +21,7 @@ use super::ConvolutionAlgorithm;
 /// 
 #[stability::unstable(feature = "enable")]
 pub struct NTTConvolution<R_main, R_twiddle, H, A = Global>
-    where R_main: ?Sized + ZnRing,
+    where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + ZnRing,
         H: Homomorphism<R_twiddle, R_main> + Clone,
         A: Allocator + Clone + Send + Sync
@@ -36,7 +36,7 @@ pub struct NTTConvolution<R_main, R_twiddle, H, A = Global>
 /// 
 #[stability::unstable(feature = "enable")]
 pub struct PreparedConvolutionOperand<R, A = Global>
-    where R: ?Sized + ZnRing,
+    where R: ?Sized + RingBase,
         A: Allocator + Clone + Send + Sync
 {
     significant_entries: usize,
@@ -61,7 +61,7 @@ impl<R> NTTConvolution<R::Type, R::Type, Identity<R>>
 }
 
 impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
-    where R_main: ?Sized + ZnRing,
+    where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + ZnRing,
         H: Homomorphism<R_twiddle, R_main> + Clone,
         A: Allocator + Clone + Send + Sync
@@ -223,7 +223,7 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
         buffer.resize_with(1 << log2_len, || self.ring().zero());
 
         for (lhs, lhs_prep, rhs, rhs_prep) in values {
-            assert!(lhs.len() + rhs.len() - 1 <= len);
+            assert!(lhs.len() + rhs.len() <= len + 1);
 
             let res_ntt = self.compute_convolution_ntt(lhs, *lhs_prep, rhs, *rhs_prep, len);
             for i in 0..len {
@@ -238,7 +238,7 @@ impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
 }
 
 impl<R_main, R_twiddle, H, A> ConvolutionAlgorithm<R_main> for NTTConvolution<R_main, R_twiddle, H, A>
-    where R_main: ?Sized + ZnRing,
+    where R_main: ?Sized + RingBase,
         R_twiddle: ?Sized + ZnRing,
         H: Homomorphism<R_twiddle, R_main> + Clone,
         A: Allocator + Clone + Send + Sync

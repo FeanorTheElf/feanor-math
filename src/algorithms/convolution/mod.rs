@@ -30,6 +30,8 @@ pub mod ntt;
 /// 
 pub mod rns;
 
+pub mod extlen;
+
 ///
 /// Trait for objects that can compute a convolution over some ring.
 /// 
@@ -184,6 +186,35 @@ impl<R, C> ConvolutionAlgorithm<R> for C
     fn prepare_convolution_operand(&self, val: &[R::Element], length_hint: Option<usize>, ring: &R) -> Self::PreparedConvolutionOperand { (**self).prepare_convolution_operand(val, length_hint, ring) }
     fn compute_convolution(&self, lhs: &[R::Element], lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: &[R::Element], rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: &R) { (**self).compute_convolution(lhs, lhs_prep, rhs, rhs_prep, dst, ring); }
     fn compute_convolution_sum(&self, values: &[(&[R::Element], Option<&Self::PreparedConvolutionOperand>, &[R::Element], Option<&Self::PreparedConvolutionOperand>)], dst: &mut [R::Element], ring: &R) { (**self).compute_convolution_sum(values, dst, ring); }
+}
+
+pub struct UnimplementedConvolution {
+    _restrict_visibility: PhantomData<()>
+}
+
+impl UnimplementedConvolution {
+
+    #[stability::unstable(feature = "enable")]
+    pub fn new() -> Self {
+        Self {
+            _restrict_visibility: PhantomData
+        }
+    }
+}
+
+impl<R: ?Sized + RingBase> ConvolutionAlgorithm<R> for UnimplementedConvolution {
+    
+    fn supports_ring(&self, _: &R) -> bool {
+        true
+    }
+
+    fn prepare_convolution_operand(&self, _: &[R::Element], _: Option<usize>, _: &R) -> Self::PreparedConvolutionOperand {
+        panic!("UnimplementedConvolution is unimplemented by design")
+    }
+    
+    fn compute_convolution(&self, _: &[R::Element], _: Option<&Self::PreparedConvolutionOperand>, _: &[R::Element], _: Option<&Self::PreparedConvolutionOperand>, _: &mut [R::Element], _: &R) {
+        panic!("UnimplementedConvolution is unimplemented by design")
+    }
 }
 
 ///
