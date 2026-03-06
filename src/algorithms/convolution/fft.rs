@@ -1,4 +1,3 @@
-use std::cmp::max;
 use std::alloc::{Allocator, Global};
 use std::marker::PhantomData;
 
@@ -103,14 +102,15 @@ impl<A> FFTConvolution<A>
 
     #[stability::unstable(feature = "enable")]
     pub fn has_sufficient_precision(&self, log2_len: usize, log2_input_size: usize) -> bool {
-        self.max_sum_len(log2_len, log2_input_size) > 0
+        self.convolution_result_error(log2_len, log2_input_size) < 0.5
     }
-    
-    fn max_sum_len(&self, log2_len: usize, log2_input_size: usize) -> usize {
+
+    fn convolution_result_error(&self, log2_len: usize, log2_input_size: usize) -> f64 {
         let fft_table = self.get_fft_table(log2_len);
         let input_size = 2f64.powi(log2_input_size.try_into().unwrap());
-        (0.5 / fft_table.expected_absolute_error(input_size * input_size, input_size * input_size * f64::EPSILON + fft_table.expected_absolute_error(input_size, 0.))).floor() as usize
+        fft_table.expected_absolute_error(input_size * input_size, input_size * input_size * f64::EPSILON + fft_table.expected_absolute_error(input_size, 0.))
     }
+
 
     fn prepare_convolution_impl<R, ToInt>(
         &self,
@@ -217,30 +217,21 @@ impl<A> FFTConvolution<A>
         let mut buffer = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
         buffer.resize(1 << log2_len, CC.zero());
 
-        let mut count_since_last_reduction = 0;
-        let mut current_max_sum_len = usize::MAX;
-        let mut current_log2_data_size = if let Some(log2_data_size) = ring_log2_el_size {
-            log2_data_size
-        } else {
-            0
-        };
+        let mut current_error = 0.;
         for (lhs, lhs_prep, rhs, rhs_prep) in values {
             if lhs.len() == 0 || rhs.len() == 0 {
                 continue;
             }
             assert!(lhs.len() + rhs.len() - 1 <= dst.len());
 
-            if ring_log2_el_size.is_none() {
-                current_log2_data_size = max(
-                    current_log2_data_size,
-                    lhs.as_iter().chain(rhs.as_iter()).map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap()
-                );
-                current_max_sum_len = self.max_sum_len(log2_len, current_log2_data_size);
-            }
-            assert!(current_max_sum_len > 0);
+            let lhs_rhs_log2_size = if let Some(ring_log2_el_size) = ring_log2_el_size {
+                ring_log2_el_size
+            } else {
+                lhs.as_iter().chain(rhs.as_iter()).map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap()
+            };
             
-            if count_since_last_reduction > current_max_sum_len {
-                count_since_last_reduction = 0;
+            if current_error + self.convolution_result_error(log2_len, lhs_rhs_log2_size) >= 0.5 {
+                current_error = 0.;
                 self.get_fft_table(log2_len).unordered_inv_fft(&mut *buffer, CC);
                 for i in 0..len {
                     let result = CC.closest_gaussian_int(buffer[i]);
@@ -262,7 +253,8 @@ impl<A> FFTConvolution<A>
                 CC.mul_assign(&mut lhs_fft[i], rhs_fft[i]);
                 CC.add_assign(&mut buffer[i], lhs_fft[i]);
             }
-            count_since_last_reduction += 1;
+            current_error += self.convolution_result_error(log2_len, lhs_rhs_log2_size);
+            assert!(current_error < 0.5, "not enough precision for a single multiplication");
         }
         self.get_fft_table(log2_len).unordered_inv_fft(&mut *buffer, CC);
         for i in 0..len {

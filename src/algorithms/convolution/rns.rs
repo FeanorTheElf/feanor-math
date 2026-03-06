@@ -255,9 +255,9 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
     ///
     /// "width" refers to the number of RNS factors we need
     /// 
-    fn compute_required_width(&self, input_size_log2: usize, lhs_len: usize, rhs_len: usize, inner_prod_len: usize) -> usize {
+    fn compute_required_width(&self, input_size_log2: usize, lhs_rhs_min_len: usize, inner_prod_len: usize) -> usize {
         let log2_output_size = input_size_log2 * 2 + 
-            StaticRing::<i64>::RING.abs_log2_ceil(&min(lhs_len, rhs_len).try_into().unwrap()).unwrap_or(0) +
+            StaticRing::<i64>::RING.abs_log2_ceil(&lhs_rhs_min_len.try_into().unwrap()).unwrap_or(0) +
             StaticRing::<i64>::RING.abs_log2_ceil(&inner_prod_len.try_into().unwrap()).unwrap_or(0) +
             1;
         let mut width = log2_output_size.div_ceil(57);
@@ -337,7 +337,7 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
         }
 
         let input_size_log2 = self.get_log2_input_size(&lhs, lhs_prep, &rhs, rhs_prep, ring, &mut to_int, ring_log2_el_size);
-        let width = self.compute_required_width(input_size_log2, lhs.len(), rhs.len(), 1);
+        let width = self.compute_required_width(input_size_log2, min(lhs.len(), rhs.len()), 1);
         let len = lhs.len() + rhs.len() - 1;
 
         let mut res_data = Vec::with_capacity_in(len * width, self.allocator.clone());
@@ -381,86 +381,52 @@ impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
             ToInt: FnMut(&R::Element) -> El<I>,
             FromInt: FnMut(El<I>) -> R::Element
     {
-        let out_len = dst.len();
-        let inner_product_length = dst.len();
-
-        let mut current_width = 0;
-        let mut current_input_size_log2 = 0;
-        let mut lhs_max_len = 0;
-        let mut rhs_max_len = 0;
-        let mut res_data = Vec::new_in(self.allocator.clone());
-        let mut lhs_tmp = Vec::new_in(self.allocator.clone());
-        let mut rhs_tmp = Vec::new_in(self.allocator.clone());
-        
-        // the algorithm is as follows:
-        //  - we keep track of the current "width" (i.e. number of RNS factors) to represent the result
-        //  - we collect iterator elements, until the current width is not sufficient anymore
-        //  - then we do `merge_current()`: forward all collected samples to the child convolutions,
-        //    add the result to `dst`, and clear the buffers; continue with updated width
-
-        let mut merge_current = |
-            current_width: usize, 
-            lhs_tmp: &mut Vec<(Vec<El<Zn64B>, _>, Option<&PreparedConvolutionOperand<R, C>>), _>, 
-            rhs_tmp: &mut Vec<(Vec<El<Zn64B>, _>, Option<&PreparedConvolutionOperand<R, C>>), _>
-        | {
-            if current_width == 0 {
-                lhs_tmp.clear();
-                rhs_tmp.clear();
-                return;
-            }
-            res_data.clear();
-            for i in 0..current_width {
-                res_data.extend((0..out_len).map(|_| self.get_rns_factor(i).zero()));
-                self.get_convolution(i).compute_convolution_sum(
-                    &lhs_tmp.iter().zip(rhs_tmp.iter()).map(|((lhs, lhs_prep), (rhs, rhs_prep))| {
-                        let lhs_data = &lhs[(i * lhs.len() / current_width)..((i + 1) * lhs.len() / current_width)];
-                        let rhs_data = &rhs[(i * rhs.len() / current_width)..((i + 1) * rhs.len() / current_width)];
-                        (
-                            lhs_data,
-                            lhs_prep.map(|lhs_prep| self.get_prepared_operand(lhs_data, lhs_prep, i)),
-                            rhs_data,
-                            rhs_prep.map(|rhs_prep| self.get_prepared_operand(rhs_data, rhs_prep, i)),
-                        )
-                    }).collect::<Vec<_>>(),
-                    &mut res_data[(i * out_len)..((i + 1) * out_len)],
-                    self.get_rns_factor(i).get_ring()
-                );
-            }
-            lhs_tmp.clear();
-            rhs_tmp.clear();
-            for j in 0..out_len {
-                let add = self.get_rns_ring(current_width).smallest_lift(self.get_rns_ring(current_width).from_congruence((0..current_width).map(|i| res_data[i * out_len + j])));
-                ring.add_assign(&mut dst[j], from_int(add));
-            }
-        };
-
-        for (lhs, lhs_prep, rhs, rhs_prep) in values {
-            if lhs.len() == 0 || rhs.len() == 0 {
-                continue;
-            }
-            assert!(out_len >= lhs.len() + rhs.len() - 1);
-            current_input_size_log2 = max(
-                current_input_size_log2,
-                self.get_log2_input_size(lhs, *lhs_prep, rhs, *rhs_prep, ring, &mut to_int, ring_log2_el_size)
-            );
-            lhs_max_len = max(lhs_max_len, lhs.len());
-            rhs_max_len = max(rhs_max_len, rhs.len());
-            let required_width = self.compute_required_width(current_input_size_log2, lhs_max_len, rhs_max_len, inner_product_length);
-
-            if required_width > current_width {
-                merge_current(current_width, &mut lhs_tmp, &mut rhs_tmp);
-                current_width = required_width;
-            }
-
-            lhs_tmp.push((Vec::with_capacity_in(lhs.len() * current_width, self.allocator.clone()), *lhs_prep));
-            rhs_tmp.push((Vec::with_capacity_in(rhs.len() * current_width, self.allocator.clone()), *rhs_prep));
-            for i in 0..current_width {
-                let hom = self.get_rns_factor(i).into_can_hom(&self.integer_ring).ok().unwrap();
-                lhs_tmp.last_mut().unwrap().0.extend(lhs.as_iter().map(|x| hom.map(to_int(x))));
-                rhs_tmp.last_mut().unwrap().0.extend(rhs.as_iter().map(|x| hom.map(to_int(x))));
-            }
+        if values.len() == 0 {
+            return;
         }
-        merge_current(current_width, &mut lhs_tmp, &mut rhs_tmp);
+        let len = values.iter().map(|(l, _, r, _)| if l.len() == 0 || r.len() == 0 { 0 } else { l.len() + r.len() - 1}).max().unwrap();
+        let min_len = values.iter().map(|(l, _, r, _)| min(l.len(), r.len())).max().unwrap();
+        if len == 0 {
+            return;
+        }
+        assert!(len <= dst.len() + 1);
+
+        let log2_el_size = if let Some(ring_log2_el_size) = ring_log2_el_size {
+            ring_log2_el_size
+        } else {
+            values.iter().map(|(lhs, _, rhs, _)| lhs.iter().chain(rhs.iter()).map(|x| self.integer_ring.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap_or(0)).max().unwrap_or(0)
+        };
+        let width = self.compute_required_width(log2_el_size, min_len, values.len());
+
+        let mut res_data = Vec::with_capacity_in(len * width, self.allocator.clone());
+        for i in 0..width {
+            res_data.extend((0..len).map(|_| self.get_rns_factor(i).zero()));
+        }
+        let mut lhs_tmp = values.iter().map(|(lhs, _, _, _)| Vec::with_capacity_in(lhs.len(), self.allocator.clone())).collect::<Vec<_>>();
+        let mut rhs_tmp = values.iter().map(|(_, _, rhs, _)| Vec::with_capacity_in(rhs.len(), self.allocator.clone())).collect::<Vec<_>>();
+        for i in 0..width {
+            let hom = self.get_rns_factor(i).into_can_hom(&self.integer_ring).ok().unwrap();
+            for (j, (lhs, _, rhs, _)) in values.iter().enumerate() {
+                lhs_tmp[j].clear();
+                lhs_tmp[j].extend(lhs.as_iter().map(|x| hom.map(to_int(x))));
+                rhs_tmp[j].clear();
+                rhs_tmp[j].extend(rhs.as_iter().map(|x| hom.map(to_int(x))));
+            }
+            self.get_convolution(i).compute_convolution_sum(
+                &lhs_tmp.iter().zip(rhs_tmp.iter()).zip(values.iter()).map(|((lhs, rhs), (_, lhs_prep, _, rhs_prep))| (
+                    &lhs[..], 
+                    lhs_prep.map(|lhs_prep| self.get_prepared_operand(&lhs, lhs_prep, i)),
+                    &rhs[..], 
+                    rhs_prep.map(|rhs_prep| self.get_prepared_operand(&rhs, rhs_prep, i))
+                )).collect::<Vec<_>>(),
+                &mut res_data[(i * len)..((i + 1) * len)], 
+                self.get_rns_factor(i).get_ring()
+            );
+        }
+        for j in 0..len {
+            let add = self.get_rns_ring(width).smallest_lift(self.get_rns_ring(width).from_congruence((0..width).map(|i| res_data[i * len + j])));
+            ring.add_assign(&mut dst[j], from_int(add));
+        }
     }
     
     #[instrument(skip_all, level = "trace")]
