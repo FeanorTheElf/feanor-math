@@ -7,7 +7,7 @@ use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNew
 use serde::{Deserialize, Deserializer, Serialize, Serializer}; 
 use serde::de::{DeserializeOwned, DeserializeSeed};
 
-use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm};
+use crate::algorithms::convolution::*;
 use crate::{impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ, impl_eval_poly_locally_for_ZZ};
 use crate::ring::*;
 use crate::algorithms;
@@ -402,11 +402,8 @@ macro_rules! impl_default_convolution_ring {
     ($($prim_type:ty: $threshold_log2:literal),*) => {
         $(
             impl DefaultConvolutionRing for StaticRingBase<$prim_type> {
-
-                fn create_default_convolution<'conv>(&self, _max_len_hint: Option<usize>) -> DynConvolution<'conv, Self>
-                    where Self: 'conv
-                {
-                    std::sync::Arc::new($crate::algorithms::convolution::TypeErasableConvolution::new(KaratsubaAlgorithm::new($threshold_log2, std::alloc::Global)))
+                fn karatsuba_threshold_log2(&self) -> usize {
+                    $threshold_log2
                 }
             }
         )*

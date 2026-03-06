@@ -22,7 +22,7 @@ impl ZnOperation for CheckIsFieldMillerRabin {
     type Output<'a> = bool
         where Self: 'a;
 
-    fn call<'a, R>(self, ring: R) -> bool
+    fn execute<'a, R>(self, ring: R) -> bool
         where R: 'a + ZnRingStore, R::Type: ZnRing
     {
         is_prime_base(ring, self.probability_param)

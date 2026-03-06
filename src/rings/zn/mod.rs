@@ -130,7 +130,6 @@ pub trait FromModulusCreateableZnRing: Sized + ZnRing {
 pub mod generic_impls {
     use std::marker::PhantomData;
     
-    use crate::algorithms::convolution::DynConvolution;
     use crate::algorithms::int_bisect;
     use crate::ordered::*;
     use crate::primitive_int::{StaticRing, StaticRingBase};
@@ -144,8 +143,7 @@ pub mod generic_impls {
     /// A generic `ZZ -> Z/nZ` homomorphism. Optimized for the case that values of `ZZ` can be very
     /// large, but allow for efficient estimation of their approximate size.
     /// 
-    
-        pub struct BigIntToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
+    pub struct BigIntToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
         where I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>
     {
         highbit_mod: usize,
@@ -296,7 +294,7 @@ pub mod generic_impls {
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn interpolation_ring<'conv, R: ZnRingStore>(ring: R, count: usize) -> GaloisFieldOver<R, DynConvolution<'conv, R::Type>>
+    pub fn interpolation_ring<'conv, R: ZnRingStore>(ring: R, count: usize) -> GaloisFieldOver<R>
         where R: Clone,
             R::Type: 'conv + ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>
     {
@@ -352,7 +350,7 @@ pub trait ZnOperation {
     type Output<'a>
         where Self: 'a;
 
-    fn call<'a, R>(self, ring: R) -> Self::Output<'a>
+    fn execute<'a, R>(self, ring: R) -> Self::Output<'a>
         where Self: 'a, 
             R: 'a + RingStore, 
             R::Type: ZnRing, 
@@ -383,7 +381,7 @@ pub trait ZnOperation {
 ///     type Output<'a> = ()
 ///         where Self: 'a;
 /// 
-///     fn call<'a, R>(self, Zn: R) -> ()
+///     fn execute<'a, R>(self, Zn: R) -> ()
 ///         where Self: 'a,
 ///             R: 'a + RingStore,
 ///             R::Type: ZnRing
@@ -401,9 +399,9 @@ pub fn choose_zn_impl<'a, I, F>(ZZ: I, n: El<I>, f: F) -> F::Output<'a>
         F: ZnOperation
 {
     if ZZ.abs_highest_set_bit(&n).unwrap_or(0) < 57 {
-        f.call(zn_64b::Zn64B::new(StaticRing::<i64>::RING.coerce(&ZZ, n) as u64))
+        f.execute(zn_64b::Zn64B::new(StaticRing::<i64>::RING.coerce(&ZZ, n) as u64))
     } else {
-        f.call(zn_big::ZnGB::new(BigIntRing::RING, int_cast(n, &BigIntRing::RING, &ZZ)))
+        f.execute(zn_big::ZnGB::new(BigIntRing::RING, int_cast(n, &BigIntRing::RING, &ZZ)))
     }
 }
 
@@ -419,7 +417,7 @@ fn test_choose_zn_impl() {
         type Output<'a> = ()
             where Self: 'a;
 
-        fn call<'a, R>(self, Zn: R)
+        fn execute<'a, R>(self, Zn: R)
             where R: 'a + RingStore, R::Type: ZnRing
         {
             let value = Zn.coerce(Zn.integer_ring(), int_cast(self.int_value, Zn.integer_ring(), &StaticRing::<i64>::RING));

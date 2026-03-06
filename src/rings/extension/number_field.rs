@@ -10,7 +10,6 @@ use crate::algorithms::poly_factor::factor_locally::{factor_and_lift_mod_pe, Fac
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::poly_gcd::gcd_locally::poly_gcd_local;
 use crate::algorithms::resultant::ComputeResultantRing;
-use crate::primitive_int::StaticRing;
 use crate::reduce_lift::lift_poly_factors::*;
 use crate::rings::extension::number_field::newton::find_approximate_complex_root;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
@@ -234,7 +233,7 @@ impl<K, Impl, I> Homomorphism<NumberFieldBase<Impl, I>, Complex64Base> for Compl
 }
 
 #[stability::unstable(feature = "enable")]
-pub type DefaultNumberFieldImpl = AsField<FreeAlgebraImpl<RationalField<BigIntRing>, Vec<El<RationalField<BigIntRing>>>, DynConvolution<'static, RationalFieldBase<BigIntRing>>, Global>>;
+pub type DefaultNumberFieldImpl = AsField<FreeAlgebraImpl<RationalField<BigIntRing>, Vec<El<RationalField<BigIntRing>>>, NaiveConvolution>>;
 
 #[stability::unstable(feature = "enable")]
 pub type NumberField<Impl = DefaultNumberFieldImpl, I = BigIntRing> = RingValue<NumberFieldBase<Impl, I>>;
@@ -259,9 +258,7 @@ impl NumberField {
         let QQ = RationalField::new(BigIntRing::RING);
         let rank = poly_ring.degree(generating_poly).unwrap();
         let modulus = (0..rank).map(|i| QQ.negate(QQ.inclusion().map_ref(poly_ring.coefficient_at(generating_poly, i)))).collect::<Vec<_>>();
-        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
-        let convolution = QQ.get_ring().create_default_convolution(Some(2 << log2_padded_len));
-        return FreeAlgebraImpl::new_with_convolution(QQ, rank, modulus, "θ", Global, convolution).as_field().ok().map(Self::create);
+        return FreeAlgebraImpl::new_with_convolution(QQ, rank, modulus, "θ", Global, NaiveConvolution).as_field().ok().map(Self::create);
     }
     
     ///
@@ -799,22 +796,20 @@ impl<Impl, I> Domain for NumberFieldByOrder<Impl, I>
 
 type LocalRing<'ring, I> = <<I as RingStore>::Type as PolyLiftFactorsDomain>::LocalRing<'ring>;
 
-type LocalRingPolyRing<'ring, I> = DensePolyRing<LocalRing<'ring, I>, DynConvolution<'ring, <LocalRing<'ring, I> as RingStore>::Type>>;
+type LocalRingPolyRing<'ring, I> = DensePolyRing<LocalRing<'ring, I>>;
 
 type LocalField<'ring, I> = <<I as RingStore>::Type as PolyLiftFactorsDomain>::LocalField<'ring>;
 
-type LocalFieldPolyRing<'ring, I> = DensePolyRing<LocalField<'ring, I>, DynConvolution<'ring, <LocalField<'ring, I> as RingStore>::Type>>;
+type LocalFieldPolyRing<'ring, I> = DensePolyRing<LocalField<'ring, I>>;
 
 type NumberFieldQuotientField<'ring, I> = AsFieldBase<FreeAlgebraImpl<
     <<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring>, 
-    Vec<El<<<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring>>>,
-    DynConvolution<'ring, <<<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring> as RingStore>::Type>
+    Vec<El<<<I as RingStore>::Type as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring>>>
 >>;
 
 type NumberFieldQuotientRing<'ring, I> = FreeAlgebraImplBase<
     LocalRing<'ring, I>, 
-    SparseMapVector<LocalRing<'ring, I>>,
-    DynConvolution<'ring, <LocalRing<'ring, I> as RingStore>::Type>
+    SparseMapVector<LocalRing<'ring, I>>
 >;
 
 ///
@@ -829,8 +824,8 @@ pub struct NumberRingIdeal<'ring, I>
         I: 'ring
 {
     prime: <I::Type as PolyLiftFactorsDomain>::SuitableIdeal<'ring>,
-    ZZX: DensePolyRing<&'ring I, DynConvolution<'ring, I::Type>>,
-    number_field_poly: El<DensePolyRing<&'ring I, DynConvolution<'ring, I::Type>>>,
+    ZZX: DensePolyRing<&'ring I>,
+    number_field_poly: El<DensePolyRing<&'ring I>>,
     FpX: LocalFieldPolyRing<'ring, I>,
     Fp_as_ring: <I::Type as PolyLiftFactorsDomain>::LocalRing<'ring>,
     Fp_as_zn: <I::Type as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring>,

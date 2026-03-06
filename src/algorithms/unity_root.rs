@@ -12,7 +12,7 @@ use crate::rings::finite::*;
 use crate::divisibility::DivisibilityRingStore;
 use crate::integer::IntegerRingStore;
 use crate::ordered::OrderedRingStore;
-use crate::rings::zn::ZnRing;
+use crate::rings::zn::*;
 
 use super::int_factor::factor;
 
@@ -100,16 +100,18 @@ pub fn get_prim_root_of_unity_zn_gen<R, I>(ring: R, ZZ: &I, n: &El<I>) -> Option
         I: RingStore,
         I::Type: IntegerRing
 {
-    let order = factor(ZZ, ring.characteristic(ZZ).unwrap()).into_iter().map(|(p, e)| if ZZ.eq_el(&p, &ZZ.int_hom().map(2)) {
+    let ZZbig = BigIntRing::RING;
+    let modulus = int_cast(ring.integer_ring().clone_el(ring.modulus()), ZZbig, ring.integer_ring());
+    let order = factor(ZZbig, modulus).into_iter().map(|(p, e)| if ZZbig.eq_el(&p, &ZZbig.int_hom().map(2)) {
         match e {
-            1 => ZZ.one(),
+            1 => ZZbig.one(),
             2 => p,
-            e => ZZ.pow(p, e - 2)
+            e => ZZbig.pow(p, e - 2)
         }
     } else {
-        ZZ.mul(ZZ.sub_ref_fst(&p, ZZ.one()), ZZ.pow(p, e - 1))
-    }).fold(ZZ.one(), |current, next| if ZZ.is_lt(&current, &next) { next } else { current });
-    get_prim_root_of_unity_gen(ring, n, ZZ, &order)
+        ZZbig.mul(ZZbig.sub_ref_fst(&p, ZZbig.one()), ZZbig.pow(p, e - 1))
+    }).fold(ZZbig.one(), |current, next| if ZZbig.is_lt(&current, &next) { next } else { current });
+    get_prim_root_of_unity_gen(ring, &int_cast(ZZ.clone_el(n), ZZbig, ZZ), ZZbig, &order)
 }
 
 ///

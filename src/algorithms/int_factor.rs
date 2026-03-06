@@ -30,7 +30,7 @@ impl<I> ZnOperation for ECFactorInt<I>
     type Output<'a> = El<I>
         where Self: 'a;
 
-    fn call<'a, R>(self, ring: R) -> El<I>
+    fn execute<'a, R>(self, ring: R) -> El<I>
         where Self: 'a, 
             R: 'a + RingStore, 
             R::Type: ZnRing

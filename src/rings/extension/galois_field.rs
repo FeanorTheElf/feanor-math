@@ -6,6 +6,7 @@ use extension_impl::FreeAlgebraImplBase;
 use sparse::SparseMapVector;
 use zn_64b::Zn64B;
 
+use crate::rings::extension::galois_field::extlen::LengthExtendedConvolution;
 use crate::algorithms::convolution::*;
 use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
 use crate::algorithms::int_factor::*;
@@ -24,7 +25,6 @@ use crate::primitive_int::{StaticRing, StaticRingBase};
 use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::PolyRing;
-use crate::rings::zn::zn_64b::Zn64BBase;
 use crate::rings::zn::*;
 use crate::ring::*;
 use crate::rings::extension::*;
@@ -244,7 +244,7 @@ pub struct GaloisFieldBase<Impl>
 /// The default implementation of a finite field extension of a prime field, 
 /// based on [`Zn`].
 /// 
-pub type DefaultGaloisFieldImpl = AsField<FreeAlgebraImpl<AsField<Zn64B>, SparseMapVector<AsField<Zn64B>>, DynConvolution<'static, <AsField<Zn64B> as RingStore>::Type>, Global>>;
+pub type DefaultGaloisFieldImpl = AsField<FreeAlgebraImpl<AsField<Zn64B>, SparseMapVector<AsField<Zn64B>>, KaratsubaAlgorithm, Global>>;
 
 ///
 /// Implementation of finite/galois fields.
@@ -257,13 +257,13 @@ pub type GaloisField<Impl = DefaultGaloisFieldImpl> = RingValue<GaloisFieldBase<
 /// Type alias for the most common instantiation of [`GaloisField`], which
 /// uses [`FreeAlgebraImpl`] to compute ring arithmetic.
 /// 
-pub type GaloisFieldOver<R, C = DynConvolution<'static, <R as RingStore>::Type>, A = Global> = RingValue<GaloisFieldBaseOver<R, C, A>>;
+pub type GaloisFieldOver<R, C = KaratsubaAlgorithm, A = Global> = RingValue<GaloisFieldBaseOver<R, C, A>>;
 
 ///
 /// Type alias for the most common instantiation of [`GaloisFieldBase`], which
 /// uses [`FreeAlgebraImpl`] to compute ring arithmetic.
 /// 
-pub type GaloisFieldBaseOver<R, C = DynConvolution<'static, <R as RingStore>::Type>, A = Global> = GaloisFieldBase<AsField<FreeAlgebraImpl<R, SparseMapVector<R>, C, A>>>;
+pub type GaloisFieldBaseOver<R, C = KaratsubaAlgorithm, A = Global> = GaloisFieldBase<AsField<FreeAlgebraImpl<R, SparseMapVector<R>, C, A>>>;
 
 impl GaloisField {
 
@@ -304,7 +304,7 @@ impl GaloisField {
     }
 }
 
-impl<'conv, R> GaloisFieldOver<R, DynConvolution<'conv, R::Type>, Global>
+impl<'conv, R> GaloisFieldOver<R, KaratsubaAlgorithm, Global>
     where R: RingStore + Clone,
         R::Type: 'conv + ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
 {
@@ -335,8 +335,7 @@ impl<'conv, R> GaloisFieldOver<R, DynConvolution<'conv, R::Type>, Global>
     /// ```
     /// 
     pub fn new_with_base_field(base_field: R, degree: usize) -> Self {
-        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&degree.try_into().unwrap()).unwrap();
-        let convolution = base_field.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        let convolution = KaratsubaAlgorithm::new(base_field.get_ring().karatsuba_threshold_log2(), Global);
         Self::new_with_convolution(base_field, degree, Global, convolution)
     }
 }
@@ -440,10 +439,9 @@ impl<A, C> GaloisFieldBase<AsField<FreeAlgebraImpl<AsField<Zn64B>, SparseMapVect
     /// For more configuration options, use [`GaloisFieldBase::galois_ring_with()`].
     /// 
     #[stability::unstable(feature = "enable")]
-    pub fn galois_ring(&self, e: usize) -> FreeAlgebraImpl<Zn64B, SparseMapVector<Zn64B>, DynConvolution<'static, Zn64BBase>, A> {
+    pub fn galois_ring(&self, e: usize) -> FreeAlgebraImpl<Zn64B, SparseMapVector<Zn64B>, KaratsubaAlgorithm, A> {
         let base_ring = Zn64B::new(StaticRing::<i64>::RING.pow(*self.base_ring().modulus(), e) as u64);
-        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&self.rank().try_into().unwrap()).unwrap();
-        let convolution = base_ring.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        let convolution = KaratsubaAlgorithm::new(base_ring.get_ring().karatsuba_threshold_log2(), Global);
         self.galois_ring_with_convolution(base_ring, self.base.get_ring().get_delegate().allocator().clone(), convolution)
     }
 }
@@ -599,6 +597,16 @@ impl<Impl> PerfectField for GaloisFieldBase<Impl>
         Impl::Type: Field + FreeAlgebra + FiniteRing,
         <BaseRing<Impl> as RingStore>::Type: ZnRing + Field
 {}
+
+impl<Impl> DefaultConvolutionRing for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <BaseRing<Impl> as RingStore>::Type: ZnRing + Field
+{
+    fn with_default_convolution<F: WithConvolutionOperation<Self>>(&self, f: F) -> F::Output {
+        f.execute(LengthExtendedConvolution::for_zn_extension(RingRef::new(self), 64).unwrap())
+    }
+}
 
 // impl<Impl> LinSolveRing for GaloisFieldBase<Impl>
 //     where Impl: RingStore,

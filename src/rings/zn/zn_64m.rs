@@ -1,4 +1,4 @@
-use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm, TypeErasableConvolution};
+use crate::algorithms::convolution::*;
 use crate::algorithms::eea::const_eea;
 use crate::iters::multi_cartesian_product;
 use crate::{impl_eq_based_self_iso, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
@@ -17,10 +17,8 @@ use crate::algorithms::matmul::StrassenHint;
 use crate::specialization::*;
 use crate::homomorphism::*;
 
-use std::alloc::Global;
 use std::marker::PhantomData;
 use std::fmt::Debug;
-use std::sync::Arc;
 
 use feanor_serde::newtype_struct::*;
 use serde::de::{DeserializeSeed, Error};
@@ -472,11 +470,7 @@ impl StrassenHint for Zn64MBase {
 
 impl DefaultConvolutionRing for Zn64MBase {
     
-    fn create_default_convolution<'conv>(&self, _max_len_hint: Option<usize>) -> DynConvolution<'conv, Self>
-        where Self: 'conv
-    {
-        Arc::new(TypeErasableConvolution::new(KaratsubaAlgorithm::new(6, Global)))
-    }
+    fn karatsuba_threshold_log2(&self) -> usize { 6 }
 }
 
 impl ZnRing for Zn64MBase {

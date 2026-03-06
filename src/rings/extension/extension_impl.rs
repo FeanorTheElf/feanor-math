@@ -51,7 +51,7 @@ use super::FreeAlgebraStore;
 /// assert_el_eq!(ring, ring.one(), ring.pow(root_of_unity, 6));
 /// ```
 /// 
-pub struct FreeAlgebraImplBase<R, V, C = DynConvolution<'static, <R as RingStore>::Type>, A = Global>
+pub struct FreeAlgebraImplBase<R, V, C = KaratsubaAlgorithm, A = Global>
     where R: RingStore, 
         V: VectorView<El<R>> + Send + Sync, 
         A: Allocator + Clone + Send + Sync,
@@ -71,9 +71,9 @@ pub struct FreeAlgebraImplBase<R, V, C = DynConvolution<'static, <R as RingStore
 /// equivalently a quotient of a univariate polynomial ring `R[X]/(f(X))`. For details, see
 /// [`FreeAlgebraImplBase`].
 /// 
-pub type FreeAlgebraImpl<R, V, C = DynConvolution<'static, <R as RingStore>::Type>, A = Global> = RingValue<FreeAlgebraImplBase<R, V, C, A>>;
+pub type FreeAlgebraImpl<R, V, C = KaratsubaAlgorithm, A = Global> = RingValue<FreeAlgebraImplBase<R, V, C, A>>;
 
-impl<'conv, R, V> FreeAlgebraImpl<R, V, DynConvolution<'conv, R::Type>, Global>
+impl<'conv, R, V> FreeAlgebraImpl<R, V, KaratsubaAlgorithm, Global>
     where R: RingStore, 
         R::Type: 'conv,
         V: VectorView<El<R>> + Send + Sync
@@ -84,8 +84,7 @@ impl<'conv, R, V> FreeAlgebraImpl<R, V, DynConvolution<'conv, R::Type>, Global>
     /// The created ring is `R[X]/(X^rank - sum_i x_pow_rank[i] X^i)`.
     /// 
     pub fn new(base_ring: R, rank: usize, x_pow_rank: V) -> Self {
-        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
-        let convolution = base_ring.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        let convolution = KaratsubaAlgorithm::new(base_ring.get_ring().karatsuba_threshold_log2(), Global);
         Self::new_with_convolution(base_ring, rank, x_pow_rank, "θ", Global, convolution)
     }
 }
@@ -524,7 +523,7 @@ impl<R, V, C, A> Debug for FreeAlgebraImplBase<R, V, C, A>
     }
 }
 
-impl<'a, R, V> Serialize for FreeAlgebraImplBase<R, V, DynConvolution<'a, R::Type>, Global>
+impl<'a, R, V> Serialize for FreeAlgebraImplBase<R, V, KaratsubaAlgorithm, Global>
     where R: RingStore + Serialize, 
         R::Type: SerializableElementRing,
         V: VectorView<El<R>> + Send + Sync,
@@ -537,7 +536,7 @@ impl<'a, R, V> Serialize for FreeAlgebraImplBase<R, V, DynConvolution<'a, R::Typ
     }
 }
 
-impl<'de, 'conv, R> Deserialize<'de> for FreeAlgebraImplBase<R, SparseMapVector<R>, DynConvolution<'conv, R::Type>, Global>
+impl<'de, 'conv, R> Deserialize<'de> for FreeAlgebraImplBase<R, SparseMapVector<R>, KaratsubaAlgorithm, Global>
     where R: RingStore + Deserialize<'de> + Clone, 
         R::Type: 'conv + SerializableElementRing,
 {
@@ -559,13 +558,12 @@ impl<'de, 'conv, R> Deserialize<'de> for FreeAlgebraImplBase<R, SparseMapVector<
         }
         _ = x_pow_rank.at_mut(0);
         let base_ring = poly_ring.into().into_base_ring();
-        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
-        let convolution = base_ring.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        let convolution = KaratsubaAlgorithm::new(base_ring.get_ring().karatsuba_threshold_log2(), Global);
         return Ok(FreeAlgebraImpl::new_with_convolution(base_ring, rank, x_pow_rank, "θ", Global, convolution).into());
     }
 }
 
-impl<'de, 'conv, R> Deserialize<'de> for FreeAlgebraImplBase<R, Vec<El<R>>, DynConvolution<'conv, R::Type>, Global>
+impl<'de, 'conv, R> Deserialize<'de> for FreeAlgebraImplBase<R, Vec<El<R>>, KaratsubaAlgorithm, Global>
     where R: RingStore + Deserialize<'de>, 
         R::Type: 'conv + SerializableElementRing
 {
@@ -583,8 +581,7 @@ impl<'de, 'conv, R> Deserialize<'de> for FreeAlgebraImplBase<R, Vec<El<R>>, DynC
         let rank = poly_ring.degree(&poly).unwrap();
         let x_pow_rank = (0..rank).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&poly, i)))).collect::<Vec<_>>();
         let base_ring = poly_ring.into().into_base_ring();
-        let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
-        let convolution = base_ring.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        let convolution = KaratsubaAlgorithm::new(base_ring.get_ring().karatsuba_threshold_log2(), Global);
         return Ok(FreeAlgebraImpl::new_with_convolution(base_ring, rank, x_pow_rank, "θ", Global, convolution).into());
     }
 }

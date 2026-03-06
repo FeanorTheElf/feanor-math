@@ -1,4 +1,4 @@
-use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, NaiveConvolution, TypeErasableConvolution};
+use crate::algorithms::convolution::*;
 use crate::serialization::*;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
@@ -28,7 +28,6 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::mem::replace;
 use std::ops::Deref;
-use std::sync::Arc;
 
 ///
 /// An implementation of the rational number `Q`, based on representing them
@@ -400,10 +399,11 @@ impl<I: RingStore> StrassenHint for RationalFieldBase<I>
 impl<I: RingStore> DefaultConvolutionRing for RationalFieldBase<I>
     where I::Type: IntegerRing
 {
-    fn create_default_convolution<'conv>(&self, _max_len_hint: Option<usize>) -> DynConvolution<'conv, Self>
-        where Self: 'conv
-    {
-        Arc::new(TypeErasableConvolution::new(NaiveConvolution))
+    fn karatsuba_threshold_log2(&self) -> usize { usize::MAX }
+
+    fn with_default_convolution<F: WithConvolutionOperation<Self>>(&self, f: F) -> F::Output {
+        // disable Karatsuba's algorithm, as it is very numerically unstable
+        f.execute(NaiveConvolution)
     }
 }
 

@@ -62,7 +62,7 @@ use std::cmp::{min, max};
 /// assert_el_eq!(P2, P2.pow(P2.indeterminate(), 10), &P.can_iso(&P2).unwrap().map(high_power_of_x));
 /// ```
 /// 
-pub struct DensePolyRingBase<R: RingStore, C: ConvolutionAlgorithm<R::Type> = DynConvolution<'static, <R as RingStore>::Type>, A: Allocator + Clone + Send + Sync = Global> {
+pub struct DensePolyRingBase<R: RingStore, C: ConvolutionAlgorithm<R::Type> = KaratsubaAlgorithm, A: Allocator + Clone + Send + Sync = Global> {
     base_ring: R,
     unknown_name: &'static str,
     zero: El<R>,
@@ -95,13 +95,13 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
 /// The univariate polynomial ring `R[X]`, with polynomials being stored as dense vectors of coefficients.
 /// For details, see [`DensePolyRingBase`].
 /// 
-pub type DensePolyRing<R, C = DynConvolution<'static, <R as RingStore>::Type>, A = Global> = RingValue<DensePolyRingBase<R, C, A>>;
+pub type DensePolyRing<R, C = KaratsubaAlgorithm, A = Global> = RingValue<DensePolyRingBase<R, C, A>>;
 
-impl<'conv, R: RingStore> DensePolyRing<R, DynConvolution<'conv, R::Type>, Global>
+impl<'conv, R: RingStore> DensePolyRing<R>
     where R::Type: 'conv
 {
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        let convolution = base_ring.get_ring().create_default_convolution(None);
+        let convolution = KaratsubaAlgorithm::new(base_ring.get_ring().karatsuba_threshold_log2(), Global);
         Self::new_with_convolution(base_ring, unknown_name, Global, convolution)
     }
 }

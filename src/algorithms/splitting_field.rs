@@ -2,7 +2,6 @@ use std::borrow::Borrow;
 
 use tracing::instrument;
 
-use crate::algorithms::convolution::DynConvolution;
 use crate::homomorphism::*;
 use crate::matrix::OwnedMatrix;
 use crate::rings::extension::galois_field::*;

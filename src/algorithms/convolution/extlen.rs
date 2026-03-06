@@ -1,5 +1,12 @@
 use crate::ring::*;
 use crate::algorithms::convolution::*;
+use crate::rings::zn::*;
+use crate::algorithms::int_factor::factor;
+use crate::integer::*;
+use crate::homomorphism::Homomorphism;
+use crate::ordered::OrderedRingStore;
+use crate::homomorphism::Inclusion;
+use crate::algorithms::convolution::ntt::NTTConvolution;
 
 use std::marker::PhantomData;
 use std::cmp::min;
@@ -16,6 +23,33 @@ pub struct PreparedConvolutionOperand<R, C>
     prepared_parts: Vec<C::PreparedConvolutionOperand>,
     convolution: PhantomData<C>,
     ring: PhantomData<R>
+}
+
+impl<R> LengthExtendedConvolution<NTTConvolution<R::Type, <<R::Type as RingExtension>::BaseRing as RingStore>::Type, Inclusion<R>>>
+    where R: RingStore + Clone,
+        R::Type: RingExtension,
+        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing
+{
+    pub fn for_zn_extension(ring: R, abort_if_ntt_len_le: usize) -> Result<Self, usize> {
+        let ZZbig = BigIntRing::RING;
+        let modulus = int_cast(ring.base_ring().integer_ring().clone_el(ring.base_ring().modulus()), ZZbig, ring.base_ring().integer_ring());
+        let order = factor(ZZbig, modulus).into_iter().map(|(p, e)| if ZZbig.eq_el(&p, &ZZbig.int_hom().map(2)) {
+            match e {
+                1 => ZZbig.one(),
+                2 => p,
+                e => ZZbig.pow(p, e - 2)
+            }
+        } else {
+            ZZbig.mul(ZZbig.sub_ref_fst(&p, ZZbig.one()), ZZbig.pow(p, e - 1))
+        }).fold(ZZbig.one(), |current, next| if ZZbig.is_lt(&current, &next) { next } else { current });
+        let dividing_power_of_two = ZZbig.abs_lowest_set_bit(&order).unwrap();
+        let base_max_len = if dividing_power_of_two < usize::BITS as usize { 1 << dividing_power_of_two } else { usize::MAX };
+        if base_max_len < abort_if_ntt_len_le {
+            return Err(dividing_power_of_two);
+        }
+        let base_convolution = NTTConvolution::new_with_hom(ring.into_inclusion(), Global);
+        return Ok(Self::new(base_convolution, dividing_power_of_two));
+    }
 }
 
 impl<C> LengthExtendedConvolution<C> {
@@ -45,7 +79,7 @@ impl<R, C> ConvolutionAlgorithm<R> for LengthExtendedConvolution<C>
             None => None,
             Some(len) if len < val.len() => panic!("length_hint cannot be smaller than the length of a single convolution operand"),
             Some(len) if len < self.base_max_len => Some(len),
-            Some(len) => Some(len)
+            Some(_) => Some(self.base_max_len)
         };
         PreparedConvolutionOperand {
             prepared_parts: val.chunks(self.chunk_len()).map(|chunk| 
@@ -131,9 +165,7 @@ impl<R, C> ConvolutionAlgorithm<R> for LengthExtendedConvolution<C>
 }
 
 #[cfg(test)]
-use crate::algorithms::convolution::ntt::*;
-#[cfg(test)]
-use crate::rings::zn::*;
+use crate::rings::extension::galois_field::GaloisField;
 
 #[test]
 fn test_convolution() {
@@ -143,4 +175,18 @@ fn test_convolution() {
     for l in [2, 3, 4, 8] {
         super::generic_tests::test_convolution(LengthExtendedConvolution::new(&base_convolution, l), &ring, ring.one());
     }
+
+    let ring = zn_64b::Zn64B::new(5);
+    let base_convolution = NTTConvolution::new(ring);
+    for l in [2, 3, 4] {
+        super::generic_tests::test_convolution(LengthExtendedConvolution::new(&base_convolution, l), &ring, ring.one());
+    }
+}
+
+#[test]
+fn test_for_zn_extension() {
+    let field = GaloisField::new(5, 4);
+    let convolution = LengthExtendedConvolution::for_zn_extension(&field, 4).unwrap();
+    super::generic_tests::test_convolution(&convolution, &field, field.one());
+    assert!(LengthExtendedConvolution::for_zn_extension(&field, 5).is_err());
 }
