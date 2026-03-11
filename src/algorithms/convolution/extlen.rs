@@ -1,5 +1,11 @@
 use crate::ring::*;
 use crate::algorithms::convolution::*;
+use crate::algorithms::convolution::ntt::NTTConvolution;
+use crate::algorithms::int_factor::factor;
+use crate::integer::*;
+use crate::rings::zn::*;
+use crate::homomorphism::*;
+use crate::ordered::OrderedRingStore;
 
 use std::marker::PhantomData;
 use std::cmp::min;
@@ -27,6 +33,33 @@ impl<C> LengthExtendedConvolution<C> {
 
     fn chunk_len(&self) -> usize {
         self.base_max_len / 2
+    }
+}
+
+impl<R> LengthExtendedConvolution<NTTConvolution<R::Type, <<R::Type as RingExtension>::BaseRing as RingStore>::Type, Inclusion<R>>>
+    where R: RingStore + Clone,
+        R::Type: RingExtension,
+        <<R::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing
+{
+    pub fn for_zn_extension(ring: R, abort_if_ntt_len_le: usize) -> Result<Self, usize> {
+        let ZZbig = BigIntRing::RING;
+        let modulus = int_cast(ring.base_ring().integer_ring().clone_el(ring.base_ring().modulus()), ZZbig, ring.base_ring().integer_ring());
+        let order = factor(ZZbig, modulus).into_iter().map(|(p, e)| if ZZbig.eq_el(&p, &ZZbig.int_hom().map(2)) {
+            match e {
+                1 => ZZbig.one(),
+                2 => p,
+                e => ZZbig.pow(p, e - 2)
+            }
+        } else {
+            ZZbig.mul(ZZbig.sub_ref_fst(&p, ZZbig.one()), ZZbig.pow(p, e - 1))
+        }).fold(ZZbig.one(), |current, next| if ZZbig.is_lt(&current, &next) { next } else { current });
+        let dividing_power_of_two = ZZbig.abs_lowest_set_bit(&order).unwrap();
+        let base_max_len = if dividing_power_of_two < usize::BITS as usize { 1 << dividing_power_of_two } else { usize::MAX };
+        if base_max_len < abort_if_ntt_len_le {
+            return Err(dividing_power_of_two);
+        }
+        let base_convolution = NTTConvolution::new_with_hom(ring.into_inclusion(), Global);
+        return Ok(Self::new(base_convolution, dividing_power_of_two));
     }
 }
 

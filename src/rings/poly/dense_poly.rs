@@ -101,7 +101,7 @@ impl<'conv, R: RingStore> DensePolyRing<R, DynConvolution<'conv, R::Type>, Globa
     where R::Type: 'conv
 {
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        let convolution = base_ring.get_ring().create_default_convolution(None);
+        let convolution = <R::Type>::create_default_convolution(base_ring.clone(), None);
         Self::new_with_convolution(base_ring, unknown_name, Global, convolution)
     }
 }

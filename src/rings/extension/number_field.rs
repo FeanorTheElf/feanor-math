@@ -260,7 +260,7 @@ impl NumberField {
         let rank = poly_ring.degree(generating_poly).unwrap();
         let modulus = (0..rank).map(|i| QQ.negate(QQ.inclusion().map_ref(poly_ring.coefficient_at(generating_poly, i)))).collect::<Vec<_>>();
         let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
-        let convolution = QQ.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        let convolution = RationalFieldBase::create_default_convolution(QQ.clone(), Some(2 << log2_padded_len));
         return FreeAlgebraImpl::new_with_convolution(QQ, rank, modulus, "θ", Global, convolution).as_field().ok().map(Self::create);
     }
     

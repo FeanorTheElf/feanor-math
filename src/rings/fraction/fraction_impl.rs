@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use crate::algorithms::convolution::DefaultConvolutionRing;
 use crate::algorithms::convolution::DynConvolution;
-use crate::algorithms::convolution::NaiveConvolution;
-use crate::algorithms::convolution::TypeErasableConvolution;
+use crate::algorithms::convolution::SchoolbookConvolution;
+use crate::algorithms::convolution::TypeErasedConvolution;
 use crate::algorithms::matmul::StrassenHint;
 use crate::homomorphism::*;
 use crate::divisibility::*;
@@ -418,10 +418,11 @@ impl<R: RingStore> DefaultConvolutionRing for FractionFieldImplBase<R>
     where R: RingStore,
         R::Type: Domain
 {
-    fn create_default_convolution<'conv>(&self, _max_len_hint: Option<usize>) -> DynConvolution<'conv, Self>
-        where Self: 'conv
+    fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
+        where S: RingStore<Type = Self> + 'conv,
+            Self: 'conv
     {
-        Arc::new(TypeErasableConvolution::new(NaiveConvolution))
+        Arc::new(TypeErasedConvolution::new(SchoolbookConvolution))
     }
 }
 

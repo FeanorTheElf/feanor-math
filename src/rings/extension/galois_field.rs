@@ -1,11 +1,13 @@
 use std::alloc::{Allocator, Global};
 use std::marker::PhantomData;
 use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
 
 use extension_impl::FreeAlgebraImplBase;
 use sparse::SparseMapVector;
 use zn_64b::Zn64B;
 
+use crate::rings::extension::galois_field::extlen::LengthExtendedConvolution;
 use crate::algorithms::convolution::*;
 use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
 use crate::algorithms::int_factor::*;
@@ -305,7 +307,7 @@ impl GaloisField {
 }
 
 impl<'conv, R> GaloisFieldOver<R, DynConvolution<'conv, R::Type>, Global>
-    where R: RingStore + Clone,
+    where R: RingStore + Clone + 'conv,
         R::Type: 'conv + ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
 {
     ///
@@ -336,7 +338,7 @@ impl<'conv, R> GaloisFieldOver<R, DynConvolution<'conv, R::Type>, Global>
     /// 
     pub fn new_with_base_field(base_field: R, degree: usize) -> Self {
         let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&degree.try_into().unwrap()).unwrap();
-        let convolution = base_field.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        let convolution = <R::Type>::create_default_convolution(base_field.clone(), Some(2 << log2_padded_len));
         Self::new_with_convolution(base_field, degree, Global, convolution)
     }
 }
@@ -443,7 +445,7 @@ impl<A, C> GaloisFieldBase<AsField<FreeAlgebraImpl<AsField<Zn64B>, SparseMapVect
     pub fn galois_ring(&self, e: usize) -> FreeAlgebraImpl<Zn64B, SparseMapVector<Zn64B>, DynConvolution<'static, Zn64BBase>, A> {
         let base_ring = Zn64B::new(StaticRing::<i64>::RING.pow(*self.base_ring().modulus(), e) as u64);
         let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&self.rank().try_into().unwrap()).unwrap();
-        let convolution = base_ring.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        let convolution = Zn64B::create_default_convolution(base_ring.clone(), Some(2 << log2_padded_len));
         self.galois_ring_with_convolution(base_ring, self.base.get_ring().get_delegate().allocator().clone(), convolution)
     }
 }
@@ -545,6 +547,18 @@ impl<Impl> PartialEq for GaloisFieldBase<Impl>
 {
     fn eq(&self, other: &Self) -> bool {
         self.base.get_ring() == other.base.get_ring()
+    }
+}
+
+impl<Impl> DefaultConvolutionRing for GaloisFieldBase<Impl>
+    where Impl: RingStore,
+        Impl::Type: Field + FreeAlgebra + FiniteRing,
+        <BaseRing<Impl> as RingStore>::Type: ZnRing + Field
+{   
+    default fn create_default_convolution<'conv, S>(self_: S, max_len: Option<usize>) -> DynConvolution<'conv, Self>
+        where S: RingStore<Type = Self> + 'conv
+    {
+        Arc::new(TypeErasedConvolution::new(LengthExtendedConvolution::for_zn_extension(self_, 64).unwrap()))
     }
 }
 

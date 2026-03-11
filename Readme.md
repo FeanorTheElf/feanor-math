@@ -489,16 +489,16 @@ As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` ca
  - Functions that take a ring as parameter should usually be generic and take `R` where `R: RingStore`.
    In cases where we would usually take the ring by reference, prefer instead to take `R` by value with `R: RingStore + Copy`.
    Since for `R: RingStore` also `&R: RingStore`, this just makes the interface more general.
-   The main exception for this rule is if you want to use dynamic dispatch (or for some other reason avoid generic parameters), in which case you should take `&R` where `R` is some fixed type with `R: RingBase`.
+   The main exception for this rule is if you want to use dynamic dispatch (or for some other reason avoid generic parameters), in which case you should take `&dyn RingTrait<Element = _>`.
  - Rings that wrap a base ring (like `MyRing<BaseRing: RingStore>`) should not implement `Copy`, unless both `BaseRing: Copy` and `El<BaseRing>: Copy`.
    There are some cases where I had previously added `#[derive(Copy)]`, which then made adding struct members of base ring elements to the ring a breaking change.
  - Equality (via `PartialEq`) of rings implies that they are "the same" and their elements can be used interchangeably without conversion.
    Being (canonically) isomorphic (via [`CanIsoFromTo`]) implies that two rings are "the same", but their elements might use different internal
    format. Using the functions [`CanIsoFromTo`], they can be converted between both rings. For more info, see also [`crate::ring::RingBase`].
- - Algorithms are exposed in one of three ways: As global function, as subtrait of [`crate::ring::RingBase`] or as their own trait, generic in some ring type `R: RingBase`.
+ <!-- - Algorithms are exposed in one of three ways: As global function, as subtrait of [`crate::ring::RingBase`] or as their own trait, generic in some ring type `R: RingBase`.
    The first should be seen as the default, while the second way can be used if the implementation of the algorithm depends heavily on the ring in question (e.g. factoring polynomials, see [`FactorPolyField`]).
    Furthermore, in some situations, one might want algorithms to store data between multiple executions, and/or make higher-level algorithms (or rings) configurable with a concrete implementation of a used sub-algorithm (strategy pattern).
-   In these cases, it makes sense to define a new trait for objects representing an implementation of the algorithm (e.g. computing convolutions, see [`ConvolutionAlgorithm`]).
+   In these cases, it makes sense to define a new trait for objects representing an implementation of the algorithm (e.g. computing convolutions, see [`ConvolutionAlgorithm`]). -->
  - More complicated objects often have multiple functions to construct them: 
    A function `new()`, which makes default choices for all but the core parameters, multiple functions `new_with_xyz()` that allow to additionally configure `xyz`, and a function `create()`. 
    The latter usually allows complete customization, and usually is `#[stability::unstable]`, since it will change whenever the object's implementation changes to allow for more (or less) configuration.
@@ -507,11 +507,8 @@ As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` ca
    On the other hand, a ring-dependent object only stores ring elements - and will take the ring as parameter to all functions that require it.
    If your object is generic, it should be generic in `R: RingStore` in the self-contained object case, and generic in the ring element type `T` in the ring-dependent object case.
    Since there is no common supertrait for ring elements, this means that a ring-dependent object will be generic in some unconstraint type `T`, and each function will take some parameter of generic type `R: RingStore, R::Type: RingBase<Element = T>`.
- - The tracing level `INFO` is used for general status reports by a possibly-long running algorithm.
-   In particular, this is used to display additional information about how the algorithm is progressing, which is not strictly performance-related.
-   Most algorithms behave very predictably, and these won't emit any `TRACE`-level events at all.
-   Much more events are emitted on level `TRACE`, which are intended to be used for profiling.
-   Any function that performs a significant amount of computation should emit such events, usually by annotating it with `#[instrument(skip_all, level = "trace")]`.
+ - In many cases, I'm still unsure which of those two to opt for. Currently, I'm more in favour of making most higher-level objects to store the rings, in particular, since I already made the decision to do this for homomorphisms.
+ - Tracing events will usually be emitted at level `TRACE`; I found that more fine-grained levels are less usable than they sound, because of the deep call stacks and different user environments often consider very different things important. Furthermore, it avoids the mental load of thinking about the concrete level at every place.
  - When implementing logging for algorithm, the `span!()` and `event!()` statements should be at the function that actually performs the algorithm, since they are supposed to give information about the execution and progress of the concrete algorithm.
    In particular, many algorithms are implemented as global functions, but then called through a trait.
    Thus, the implementation of the trait contains only delegation calls, and should not be annotated with explicit tracing statements.

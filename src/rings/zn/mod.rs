@@ -297,7 +297,7 @@ pub mod generic_impls {
 
     #[stability::unstable(feature = "enable")]
     pub fn interpolation_ring<'conv, R: ZnRingStore>(ring: R, count: usize) -> GaloisFieldOver<R, DynConvolution<'conv, R::Type>>
-        where R: Clone,
+        where R: 'conv + Clone,
             R::Type: 'conv + ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>
     {
         let ZZbig = BigIntRing::RING;

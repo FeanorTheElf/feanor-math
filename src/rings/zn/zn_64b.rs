@@ -1,7 +1,4 @@
-use crate::algorithms::convolution::DefaultConvolutionRing;
-use crate::algorithms::convolution::DynConvolution;
-use crate::algorithms::convolution::KaratsubaAlgorithm;
-use crate::algorithms::convolution::TypeErasableConvolution;
+use crate::algorithms::convolution::*;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
 use crate::algorithms::fft::radix3::CooleyTukeyRadix3Butterfly;
 use crate::iters::multi_cartesian_product;
@@ -407,10 +404,10 @@ impl FromModulusCreateableZnRing for Zn64BBase {
 
 impl InterpolationBaseRing for AsFieldBase<Zn64B> {
 
-    type ExtendedRingBase<'a> = GaloisFieldBaseOver<RingRef<'a, Self>>
+    type ExtendedRingBase<'a> = GaloisFieldBaseOver<RingRef<'a, Self>, DynConvolution<'a, Self>>
         where Self: 'a;
 
-    type ExtendedRing<'a> = GaloisFieldOver<RingRef<'a, Self>>
+    type ExtendedRing<'a> = GaloisFieldOver<RingRef<'a, Self>, DynConvolution<'a, Self>>
         where Self: 'a;
 
     fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
@@ -688,10 +685,10 @@ impl StrassenHint for Zn64BBase {
 
 impl DefaultConvolutionRing for Zn64BBase {
     
-    fn create_default_convolution<'conv>(&self, _max_len_hint: Option<usize>) -> DynConvolution<'conv, Self>
-        where Self: 'conv
+    default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
+        where S: RingStore<Type = Self> + 'conv
     {
-        Arc::new(TypeErasableConvolution::new(KaratsubaAlgorithm::new(6, Global)))
+        Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(6, Global)))
     }
 }
 

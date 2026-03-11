@@ -1,5 +1,4 @@
 use std::alloc::{Allocator, Global};
-use std::any::Any;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -45,9 +44,9 @@ pub mod extlen;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::seq::*;
 /// # use feanor_math::algorithms::convolution::*;
-/// struct NaiveConvolution;
+/// struct SchoolbookConvolution;
 /// // we support all rings!
-/// impl<R: ?Sized + RingBase> ConvolutionAlgorithm<R> for NaiveConvolution {
+/// impl<R: ?Sized + RingBase> ConvolutionAlgorithm<R> for SchoolbookConvolution {
 /// 
 ///     fn prepare_convolution_operand(&self, val: &[R::Element], length_hint: Option<usize>, ring: &R) -> () { () }
 /// 
@@ -66,7 +65,7 @@ pub mod extlen;
 /// let mut expected = [0; 10];
 /// let mut actual = [0; 10];
 /// STANDARD_CONVOLUTION.compute_convolution(&lhs[..], None, &rhs[..], None, &mut expected, StaticRing::<i64>::RING.get_ring());
-/// NaiveConvolution.compute_convolution(&lhs[..], None, &rhs[..], None, &mut actual, StaticRing::<i64>::RING.get_ring());
+/// SchoolbookConvolution.compute_convolution(&lhs[..], None, &rhs[..], None, &mut actual, StaticRing::<i64>::RING.get_ring());
 /// assert_eq!(expected, actual);
 /// ```
 /// 
@@ -251,14 +250,14 @@ impl<R: ?Sized + RingBase, A: Allocator + Send + Sync> ConvolutionAlgorithm<R> f
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct NaiveConvolution;
+pub struct SchoolbookConvolution;
 
-impl<R: ?Sized + RingBase> ConvolutionAlgorithm<R> for NaiveConvolution {
+impl<R: ?Sized + RingBase> ConvolutionAlgorithm<R> for SchoolbookConvolution {
 
     type PreparedConvolutionOperand = ();
 
     fn compute_convolution(&self, lhs: &[R::Element], _: Option<&()>, rhs: &[R::Element], _: Option<&()>, dst: &mut [R::Element], ring: &R) {
-        naive_assign_mul::<_, _, _, _, true>(dst, lhs, rhs, RingRef::new(ring));
+        schoolbook_assign_mul::<_, _, _, _, true>(dst, lhs, rhs, RingRef::new(ring));
     }
 
     fn prepare_convolution_operand(&self, _: &[R::Element], _: Option<usize>, _: &R) -> Self::PreparedConvolutionOperand {
@@ -270,41 +269,33 @@ impl<R: ?Sized + RingBase> ConvolutionAlgorithm<R> for NaiveConvolution {
     }
 }
 
-pub type DynConvolution<'a, R> = Arc<dyn 'a + ConvolutionAlgorithm<R, PreparedConvolutionOperand = Box<dyn Any>>>;
+pub type DynConvolution<'a, R> = Arc<dyn 'a + ConvolutionAlgorithm<R, PreparedConvolutionOperand = ()>>;
 
-pub struct TypeErasableConvolution<R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>>
-    where C::PreparedConvolutionOperand: 'static
-{
+pub struct TypeErasedConvolution<R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> {
     ring: PhantomData<R>,
     convolution: C
 }
 
-impl<R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> TypeErasableConvolution<R, C>
-    where C::PreparedConvolutionOperand: 'static
-{
+impl<R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> TypeErasedConvolution<R, C> {
     pub fn new(convolution: C) -> Self {
         Self { ring: PhantomData, convolution: convolution }
     }
 }
 
-impl<R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> ConvolutionAlgorithm<R> for TypeErasableConvolution<R, C>
-    where C::PreparedConvolutionOperand: 'static
-{
-    type PreparedConvolutionOperand = Box<dyn Any>;
+impl<R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> ConvolutionAlgorithm<R> for TypeErasedConvolution<R, C> {
+    type PreparedConvolutionOperand = ();
 
-    fn compute_convolution(&self, lhs: &[<R as RingBase>::Element], lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: &[<R as RingBase>::Element], rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [<R as RingBase>::Element], ring: &R) {
-        self.convolution.compute_convolution(lhs, lhs_prep.map(|op| op.downcast_ref().unwrap()), rhs, rhs_prep.map(|op| op.downcast_ref().unwrap()), dst, ring);
+    fn compute_convolution(&self, lhs: &[<R as RingBase>::Element], _: Option<&Self::PreparedConvolutionOperand>, rhs: &[<R as RingBase>::Element], _: Option<&Self::PreparedConvolutionOperand>, dst: &mut [<R as RingBase>::Element], ring: &R) {
+        self.convolution.compute_convolution(lhs, None, rhs, None, dst, ring);
     }
 
     fn compute_convolution_sum(&self, values: &[(&[<R as RingBase>::Element], Option<&Self::PreparedConvolutionOperand>, &[<R as RingBase>::Element], Option<&Self::PreparedConvolutionOperand>)], dst: &mut [<R as RingBase>::Element], ring: &R) {
-        self.convolution.compute_convolution_sum(&values.iter().map(|(l, l_prep, r, r_prep)| 
-            (*l, l_prep.map(|op| op.downcast_ref().unwrap()), *r, r_prep.map(|op| op.downcast_ref().unwrap()))
+        self.convolution.compute_convolution_sum(&values.iter().map(|(l, _, r, _)| 
+            (*l, None, *r, None)
         ).collect::<Vec<_>>(), dst, ring);
     }
 
-    fn prepare_convolution_operand(&self, val: &[<R as RingBase>::Element], length_hint: Option<usize>, ring: &R) -> Self::PreparedConvolutionOperand {
-        Box::new(self.convolution.prepare_convolution_operand(val, length_hint, ring))
-    }
+    fn prepare_convolution_operand(&self, _val: &[<R as RingBase>::Element], _length_hint: Option<usize>, _ring: &R) -> Self::PreparedConvolutionOperand {}
 
     fn supports_ring(&self, ring: &R) -> bool {
         self.convolution.supports_ring(ring)
@@ -313,16 +304,19 @@ impl<R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> ConvolutionAlgorithm<R> f
 
 pub trait DefaultConvolutionRing: RingBase {
 
-    fn create_default_convolution<'conv>(&self, max_len: Option<usize>) -> DynConvolution<'conv, Self>
-        where Self: 'conv;
+    fn create_default_convolution<'conv, S>(self_: S, max_len: Option<usize>) -> DynConvolution<'conv, Self>
+        where S: RingStore<Type = Self> + 'conv,
+            // I would have thought this was implied by the above, but apparently it isn't
+            Self: 'conv;
 }
 
 impl<R: ?Sized + RingBase> DefaultConvolutionRing for R {
 
-    default fn create_default_convolution<'conv>(&self, _max_len_hint: Option<usize>) -> DynConvolution<'conv, Self>
-        where Self: 'conv
+    default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
+        where S: RingStore<Type = Self> + 'conv,
+            Self: 'conv
     {
-        Arc::new(TypeErasableConvolution::new(KaratsubaAlgorithm::new(0, Global)))
+        Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(0, Global)))
     }
 }
 
@@ -332,7 +326,7 @@ use test;
 use crate::primitive_int::*;
 
 #[bench]
-fn bench_naive_mul(bencher: &mut test::Bencher) {
+fn bench_schoolbook_convolution(bencher: &mut test::Bencher) {
     feanor_tracing::DelayedLogger::init_test();
     let a: Vec<i32> = (0..32).collect();
     let b: Vec<i32> = (0..32).collect();
@@ -347,7 +341,7 @@ fn bench_naive_mul(bencher: &mut test::Bencher) {
 }
 
 #[bench]
-fn bench_karatsuba_mul(bencher: &mut test::Bencher) {
+fn bench_karatsuba_convolution(bencher: &mut test::Bencher) {
     feanor_tracing::DelayedLogger::init_test();
     let a: Vec<i32> = (0..32).collect();
     let b: Vec<i32> = (0..32).collect();

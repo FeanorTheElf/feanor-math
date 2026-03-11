@@ -1,6 +1,6 @@
 use tracing::{Level, instrument, event};
 
-use crate::algorithms::matmul::naive_matmul;
+use crate::algorithms::matmul::schoolbook_matmul;
 use crate::matrix::*;
 use crate::ring::*;
 use crate::integer::*;
@@ -224,7 +224,7 @@ macro_rules! strassen_base_algorithm {
             debug_assert_eq!(dst.col_count(), 1 << block_size_log2);
 
             if steps_left == 0 {
-                naive_matmul::<_, _, _, _, $ADD_ASSIGN, $T1, $T2, $T3>(lhs, rhs, dst, ring);
+                schoolbook_matmul::<_, _, _, _, $ADD_ASSIGN, $T1, $T2, $T3>(lhs, rhs, dst, ring);
             } else {
                 // we have something similar to the "Winograd form"
                 // [ a  b ] [ a' b' ]   [ t + x,      w + v + y ]
@@ -415,7 +415,7 @@ macro_rules! unrolled_strassen_impl {
                 }
             )*
             if block_size_log2 <= threshold_size_log2 {
-                naive_matmul::<_, _, _, _, ADD_ASSIGN, T1, T2, T3>(lhs, rhs, dst, ring);
+                schoolbook_matmul::<_, _, _, _, ADD_ASSIGN, T1, T2, T3>(lhs, rhs, dst, ring);
             } else {
                 match block_size_log2 - threshold_size_log2 {
                     $(
@@ -499,7 +499,7 @@ pub fn dispatch_strassen_impl<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: b
     }
 
     if block_size_log2 <= threshold_size_log2 {
-        naive_matmul::<_, _, _, _, ADD_ASSIGN, T1, T2, T3>(lhs, rhs, dst, ring);
+        schoolbook_matmul::<_, _, _, _, ADD_ASSIGN, T1, T2, T3>(lhs, rhs, dst, ring);
     } else {
         let steps_left = block_size_log2 - threshold_size_log2;
         strassen_impl::<_, _, _, _, ADD_ASSIGN, T1, T2, T3>(block_size_log2, lhs, rhs, dst, ring, memory, steps_left)
@@ -537,9 +537,9 @@ pub fn strassen<R, V1, V2, V3, A, const T1: bool, const T2: bool, const T3: bool
     let threshold = 1usize.checked_shl(threshold_log2 as u32).unwrap_or(usize::MAX);
     if lhs.row_count() <= threshold || lhs.col_count() <= threshold || rhs.col_count() <= threshold {
         if add_assign {
-            naive_matmul::<_, _, _, _, true, T1, T2, T3>(lhs, rhs, dst, ring);
+            schoolbook_matmul::<_, _, _, _, true, T1, T2, T3>(lhs, rhs, dst, ring);
         } else {
-            naive_matmul::<_, _, _, _, false, T1, T2, T3>(lhs, rhs, dst, ring);
+            schoolbook_matmul::<_, _, _, _, false, T1, T2, T3>(lhs, rhs, dst, ring);
         }
         return;
     }
@@ -600,36 +600,36 @@ pub fn strassen<R, V1, V2, V3, A, const T1: bool, const T2: bool, const T3: bool
     let mut rhs_included_cols = 0;
     let mut current_block_size_log2 = max_block_size_log2;
     loop {
-        // complete using naive algorithm, this is significantly faster than going down all the block sizes
+        // complete using schoolbook algorithm, this is significantly faster than going down all the block sizes
         if current_block_size_log2 <= threshold_log2 {
             if add_assign {
-                naive_matmul::<_, _, _, _, true, T1, T2, T3>(
+                schoolbook_matmul::<_, _, _, _, true, T1, T2, T3>(
                     lhs.submatrix(lhs_included_rows..lhs.row_count(), 0..included_k), 
                     rhs.submatrix(0..included_k, 0..rhs_included_cols), 
                     dst.reborrow().submatrix(lhs_included_rows..lhs.row_count(), 0..rhs_included_cols), 
                     ring
                 );
-                naive_matmul::<_, _, _, _, true, T1, T2, T3>(
+                schoolbook_matmul::<_, _, _, _, true, T1, T2, T3>(
                     lhs.submatrix(0..lhs.row_count(), 0..included_k), 
                     rhs.submatrix(0..included_k, rhs_included_cols..rhs.col_count()), 
                     dst.reborrow().submatrix(0..lhs.row_count(), rhs_included_cols..rhs.col_count()), 
                     ring
                 );
             } else {
-                naive_matmul::<_, _, _, _, false, T1, T2, T3>(
+                schoolbook_matmul::<_, _, _, _, false, T1, T2, T3>(
                     lhs.submatrix(lhs_included_rows..lhs.row_count(), 0..included_k), 
                     rhs.submatrix(0..included_k, 0..rhs_included_cols), 
                     dst.reborrow().submatrix(lhs_included_rows..lhs.row_count(), 0..rhs_included_cols), 
                     ring
                 );
-                naive_matmul::<_, _, _, _, false, T1, T2, T3>(
+                schoolbook_matmul::<_, _, _, _, false, T1, T2, T3>(
                     lhs.submatrix(0..lhs.row_count(), 0..included_k), 
                     rhs.submatrix(0..included_k, rhs_included_cols..rhs.col_count()), 
                     dst.reborrow().submatrix(0..lhs.row_count(), rhs_included_cols..rhs.col_count()), 
                     ring
                 );
             }
-            naive_matmul::<_, _, _, _, true, T1, T2, T3>(
+            schoolbook_matmul::<_, _, _, _, true, T1, T2, T3>(
                 lhs.submatrix(0..lhs.row_count(), included_k..lhs.col_count()), 
                 rhs.submatrix(included_k..rhs.row_count(), 0..rhs.col_count()), 
                 dst.submatrix(0..lhs.row_count(), 0..rhs.col_count()), 
@@ -771,7 +771,7 @@ fn test_dispatch_strassen_more_levels() {
     );
 
     let mut expected: OwnedMatrix<i64> = OwnedMatrix::zero(16, 16, StaticRing::<i64>::RING);
-    naive_matmul::<_, _, _, _, false, false, false, false>(
+    schoolbook_matmul::<_, _, _, _, false, false, false, false>(
         TransposableSubmatrix::from(a.data()), 
         TransposableSubmatrix::from(b.data()), 
         TransposableSubmatrixMut::from(expected.data_mut()), 
@@ -801,7 +801,7 @@ fn test_dispatch_strassen_add_assign_more_levels() {
     );
 
     let mut expected: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(16, 16, |i, j| (i as i64) * (i as i64) + j as i64, Global);
-    naive_matmul::<_, _, _, _, true, false, false, false>(
+    schoolbook_matmul::<_, _, _, _, true, false, false, false>(
         TransposableSubmatrix::from(a.data()), 
         TransposableSubmatrix::from(b.data()), 
         TransposableSubmatrixMut::from(expected.data_mut()), 
@@ -830,7 +830,7 @@ fn test_strassen_non_power_of_two() {
     );
 
     let mut expected: OwnedMatrix<i64> = OwnedMatrix::zero(15, 17, StaticRing::<i64>::RING);
-    naive_matmul::<_, _, _, _, false, false, false, false>(
+    schoolbook_matmul::<_, _, _, _, false, false, false, false>(
         TransposableSubmatrix::from(a.data()), 
         TransposableSubmatrix::from(b.data()), 
         TransposableSubmatrixMut::from(expected.data_mut()), 
@@ -858,7 +858,7 @@ fn test_strassen_non_power_of_two_add_assign() {
     );
 
     let mut expected: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(15, 17, |i, j| (i as i64) * (i as i64) + j as i64, Global);
-    naive_matmul::<_, _, _, _, true, false, false, false>(
+    schoolbook_matmul::<_, _, _, _, true, false, false, false>(
         TransposableSubmatrix::from(a.data()), 
         TransposableSubmatrix::from(b.data()), 
         TransposableSubmatrixMut::from(expected.data_mut()), 

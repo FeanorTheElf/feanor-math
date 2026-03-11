@@ -403,10 +403,10 @@ macro_rules! impl_default_convolution_ring {
         $(
             impl DefaultConvolutionRing for StaticRingBase<$prim_type> {
 
-                fn create_default_convolution<'conv>(&self, _max_len_hint: Option<usize>) -> DynConvolution<'conv, Self>
-                    where Self: 'conv
+                default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
+                    where S: RingStore<Type = Self> + 'conv
                 {
-                    std::sync::Arc::new($crate::algorithms::convolution::TypeErasableConvolution::new(KaratsubaAlgorithm::new($threshold_log2, std::alloc::Global)))
+                    std::sync::Arc::new($crate::algorithms::convolution::TypeErasedConvolution::new(KaratsubaAlgorithm::new($threshold_log2, std::alloc::Global)))
                 }
             }
         )*

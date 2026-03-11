@@ -85,7 +85,7 @@ impl<'conv, R, V> FreeAlgebraImpl<R, V, DynConvolution<'conv, R::Type>, Global>
     /// 
     pub fn new(base_ring: R, rank: usize, x_pow_rank: V) -> Self {
         let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
-        let convolution = base_ring.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        let convolution = <R::Type>::create_default_convolution(base_ring.clone(), Some(2 << log2_padded_len));
         Self::new_with_convolution(base_ring, rank, x_pow_rank, "θ", Global, convolution)
     }
 }
@@ -538,7 +538,7 @@ impl<'a, R, V> Serialize for FreeAlgebraImplBase<R, V, DynConvolution<'a, R::Typ
 }
 
 impl<'de, 'conv, R> Deserialize<'de> for FreeAlgebraImplBase<R, SparseMapVector<R>, DynConvolution<'conv, R::Type>, Global>
-    where R: RingStore + Deserialize<'de> + Clone, 
+    where R: 'conv + RingStore + Deserialize<'de> + Clone, 
         R::Type: 'conv + SerializableElementRing,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -560,7 +560,7 @@ impl<'de, 'conv, R> Deserialize<'de> for FreeAlgebraImplBase<R, SparseMapVector<
         _ = x_pow_rank.at_mut(0);
         let base_ring = poly_ring.into().into_base_ring();
         let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
-        let convolution = base_ring.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        let convolution = <R::Type>::create_default_convolution(base_ring.clone(), Some(2 << log2_padded_len));
         return Ok(FreeAlgebraImpl::new_with_convolution(base_ring, rank, x_pow_rank, "θ", Global, convolution).into());
     }
 }
@@ -584,7 +584,7 @@ impl<'de, 'conv, R> Deserialize<'de> for FreeAlgebraImplBase<R, Vec<El<R>>, DynC
         let x_pow_rank = (0..rank).map(|i| poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&poly, i)))).collect::<Vec<_>>();
         let base_ring = poly_ring.into().into_base_ring();
         let log2_padded_len = StaticRing::<i64>::RING.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
-        let convolution = base_ring.get_ring().create_default_convolution(Some(2 << log2_padded_len));
+        let convolution = <R::Type>::create_default_convolution(base_ring.clone(), Some(2 << log2_padded_len));
         return Ok(FreeAlgebraImpl::new_with_convolution(base_ring, rank, x_pow_rank, "θ", Global, convolution).into());
     }
 }

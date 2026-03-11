@@ -2,6 +2,7 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::Debug;
 
 use crate::iters::multi_cartesian_product;
+use crate::algorithms::convolution::DynConvolution;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::field::*;
 use crate::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
@@ -225,10 +226,10 @@ impl<const N: u64, const IS_FIELD: bool> FiniteRing for ZnSBase<N, IS_FIELD> {
 
 impl<const N: u64> InterpolationBaseRing for ZnSBase<N, true> {
 
-    type ExtendedRingBase<'a> = GaloisFieldBaseOver<RingRef<'a, Self>>
+    type ExtendedRingBase<'a> = GaloisFieldBaseOver<RingRef<'a, Self>, DynConvolution<'a, Self>>
         where Self: 'a;
 
-    type ExtendedRing<'a> = GaloisFieldOver<RingRef<'a, Self>>
+    type ExtendedRing<'a> = GaloisFieldOver<RingRef<'a, Self>, DynConvolution<'a, Self>>
         where Self: 'a;
 
     fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>

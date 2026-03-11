@@ -1,4 +1,4 @@
-use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm, TypeErasableConvolution};
+use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm, TypeErasedConvolution};
 use crate::algorithms::eea::const_eea;
 use crate::iters::multi_cartesian_product;
 use crate::{impl_eq_based_self_iso, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
@@ -257,10 +257,10 @@ impl FromModulusCreateableZnRing for Zn64MBase {
 
 impl InterpolationBaseRing for AsFieldBase<Zn64M> {
 
-    type ExtendedRingBase<'a> = GaloisFieldBaseOver<RingRef<'a, Self>>
+    type ExtendedRingBase<'a> = GaloisFieldBaseOver<RingRef<'a, Self>, DynConvolution<'a, Self>>
         where Self: 'a;
 
-    type ExtendedRing<'a> = GaloisFieldOver<RingRef<'a, Self>>
+    type ExtendedRing<'a> = GaloisFieldOver<RingRef<'a, Self>, DynConvolution<'a, Self>>
         where Self: 'a;
 
     fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
@@ -472,10 +472,10 @@ impl StrassenHint for Zn64MBase {
 
 impl DefaultConvolutionRing for Zn64MBase {
     
-    fn create_default_convolution<'conv>(&self, _max_len_hint: Option<usize>) -> DynConvolution<'conv, Self>
-        where Self: 'conv
+    default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
+        where S: RingStore<Type = Self> + 'conv
     {
-        Arc::new(TypeErasableConvolution::new(KaratsubaAlgorithm::new(6, Global)))
+        Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(6, Global)))
     }
 }
 

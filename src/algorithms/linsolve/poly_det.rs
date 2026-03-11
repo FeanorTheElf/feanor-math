@@ -60,10 +60,10 @@ fn determinant_poly_matrix_base<P, V, A, I>(A: Submatrix<V, El<P>>, poly_ring: P
 }
 
 ///
-/// Computes the determinant in exponential time using the naive Laplace formula.
+/// Computes the determinant in exponential time using the Laplace formula.
 /// 
 #[stability::unstable(feature = "enable")]
-pub fn naive_det<R, V, A>(A: Submatrix<V, El<R>>, ring: R, allocator: A) -> El<R>
+pub fn laplace_det<R, V, A>(A: Submatrix<V, El<R>>, ring: R, allocator: A) -> El<R>
     where R: RingStore + Copy,
         V: AsPointerToSlice<El<R>>,
         A: Allocator + Copy
@@ -90,7 +90,7 @@ pub fn naive_det<R, V, A>(A: Submatrix<V, El<R>>, ring: R, allocator: A) -> El<R
                 }
             }
         }
-        let result = ring.mul_ref_fst(A.at(i, 0), naive_det(tmp_matrix.data(), ring, allocator));
+        let result = ring.mul_ref_fst(A.at(i, 0), laplace_det(tmp_matrix.data(), ring, allocator));
         if i % 2 == 0 {
             return result;
         } else {
@@ -169,7 +169,7 @@ fn test_determinant_poly_matrix() {
     ];
     let matrix = Submatrix::<Vec<_>, _>::from_2d(&matrix[..]);
     let expected = poly_ring.with_wrapped_indeterminates(|[x0, x1, x2]| [x0 * x0 - x1 * x2]).into_iter().next().unwrap();
-    assert_el_eq!(&poly_ring, &expected, naive_det(matrix, &poly_ring, Global));
+    assert_el_eq!(&poly_ring, &expected, laplace_det(matrix, &poly_ring, Global));
     assert_el_eq!(&poly_ring, &expected, determinant_poly_matrix(matrix, &poly_ring, Global));
 
     let matrix = [
@@ -179,7 +179,7 @@ fn test_determinant_poly_matrix() {
     ];
     let matrix = Submatrix::<Vec<_>, _>::from_2d(&matrix[..]);
     assert_el_eq!(&poly_ring, det3(matrix), determinant_poly_matrix(matrix, &poly_ring, Global));
-    assert_el_eq!(&poly_ring, det3(matrix), naive_det(matrix, &poly_ring, Global));
+    assert_el_eq!(&poly_ring, det3(matrix), laplace_det(matrix, &poly_ring, Global));
 
     let matrix = [
         poly_ring.with_wrapped_indeterminates_dyn(|[x0, x1, x2]| [x0.clone(), x1.clone(), x2.clone()]),
@@ -188,7 +188,7 @@ fn test_determinant_poly_matrix() {
     ];
     let matrix = Submatrix::<Vec<_>, _>::from_2d(&matrix[..]);
     assert_el_eq!(&poly_ring, &poly_ring.zero(), determinant_poly_matrix(matrix, &poly_ring, Global));
-    assert_el_eq!(&poly_ring, &poly_ring.zero(), naive_det(matrix, &poly_ring, Global));
+    assert_el_eq!(&poly_ring, &poly_ring.zero(), laplace_det(matrix, &poly_ring, Global));
 
     let matrix = [
         poly_ring.with_wrapped_indeterminates_dyn(|[x0, x1, x2]| [x0.clone(),             x0 + x1,                x0 + x1 + x2,           x0.clone().pow(2)]),
@@ -198,5 +198,5 @@ fn test_determinant_poly_matrix() {
     ];
     let matrix = Submatrix::<Vec<_>, _>::from_2d(&matrix[..]);
     assert_el_eq!(&poly_ring, det4(matrix), determinant_poly_matrix(matrix, &poly_ring, Global));
-    assert_el_eq!(&poly_ring, det4(matrix), naive_det(matrix, &poly_ring, Global));
+    assert_el_eq!(&poly_ring, det4(matrix), laplace_det(matrix, &poly_ring, Global));
 }

@@ -1,4 +1,4 @@
-use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, NaiveConvolution, TypeErasableConvolution};
+use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, SchoolbookConvolution, TypeErasedConvolution};
 use crate::serialization::*;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
@@ -400,10 +400,11 @@ impl<I: RingStore> StrassenHint for RationalFieldBase<I>
 impl<I: RingStore> DefaultConvolutionRing for RationalFieldBase<I>
     where I::Type: IntegerRing
 {
-    fn create_default_convolution<'conv>(&self, _max_len_hint: Option<usize>) -> DynConvolution<'conv, Self>
-        where Self: 'conv
+    default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
+        where S: RingStore<Type = Self> + 'conv,
+            Self: 'conv
     {
-        Arc::new(TypeErasableConvolution::new(NaiveConvolution))
+        Arc::new(TypeErasedConvolution::new(SchoolbookConvolution))
     }
 }
 

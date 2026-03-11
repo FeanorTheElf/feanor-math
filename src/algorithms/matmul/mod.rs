@@ -147,7 +147,7 @@ pub trait StrassenHint: RingBase {
     /// 
     /// Concretely, when this returns `k`, [`StrassenAlgorithm`] will reduce the 
     /// matrix multipliction down to `2^k x 2^k` matrices using Strassen's algorithm,
-    /// and then use naive matmul for the rest.
+    /// and then use schoolbook matmul for the rest.
     /// 
     /// The value is `0`, but if the considered rings have fast multiplication (compared to addition), 
     /// then setting this higher may result in a performance gain.
@@ -218,7 +218,7 @@ impl<R: ?Sized + RingBase, A: Allocator> MatmulAlgorithm<R> for StrassenAlgorith
 /// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn naive_matmul<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
+pub fn schoolbook_matmul<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
     lhs: TransposableSubmatrix<V1, El<R>, T1>, 
     rhs: TransposableSubmatrix<V2, El<R>, T2>, 
     mut dst: TransposableSubmatrixMut<V3, El<R>, T3>, 
@@ -255,7 +255,7 @@ const BENCH_SIZE: usize = 128;
 type BenchInt = i64;
 
 #[bench]
-fn bench_naive_matmul(bencher: &mut test::Bencher) {
+fn bench_schoolbook_matmul(bencher: &mut test::Bencher) {
     feanor_tracing::DelayedLogger::init_test();
     let lhs = OwnedMatrix::from_fn_in(BENCH_SIZE, BENCH_SIZE, |i, j| std::hint::black_box(i as BenchInt + j as BenchInt), Global);
     let rhs = OwnedMatrix::from_fn_in(BENCH_SIZE, BENCH_SIZE, |i, j| std::hint::black_box(i as BenchInt + j as BenchInt), Global);
